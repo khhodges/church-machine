@@ -3,30 +3,31 @@
 
 ROOT CAUSE
 ----------
-EFX_MAP silently ignores `initial begin` blocks that initialise a 32-bit-wide
-inferred array (`reg [31:0] dmem [...]`).  The CM BRAM comes out all-zeros
-after synthesis, NIA stays stuck at 0x00000000, and the Sapphire firmware fires
-the NULL_CAP fault watchdog on every boot.
+EFX_MAP silently ignores ALL forms of `initial begin` on inferred arrays —
+whether 32-bit wide or byte-lane 8-bit wide.  Both approaches produce an
+all-zero BRAM after synthesis.
+
+The ONLY confirmed working pattern for non-zero BRAM initialisation in this
+Efinity project is the one used by the Sapphire SoC ROM:
+
+    reg [7:0] rom_lane [0:N];
+    initial $readmemb("lane.bin", rom_lane);
+
+where the .bin file (ASCII 0/1 text, one 8-bit value per line) is present in
+the `work_syn/` directory before efx_map runs.
 
 FIX
 ---
-EFX_MAP *does* correctly initialise BRAM inferred from **byte-wide** arrays
-(`reg [7:0] lane [...]`) — exactly what Amaranth/SpinalHDL generates for the
-Sapphire SoC firmware RAM.  This script rewrites the relevant section of
-church_ti60_f225.v so that the single 32-bit-wide `dmem` array becomes four
-byte-wide lane arrays (`dmem_b0`–`dmem_b3`), with matching updates to the
-write and read `always` blocks.
-
-The four-lane structure is:
-  dmem_b0  → bits  7:0   (LSB)
-  dmem_b1  → bits 15:8
-  dmem_b2  → bits 23:16
-  dmem_b3  → bits 31:24  (MSB)
+This script:
+  1. Rewrites church_ti60_f225.v: converts the single `reg [31:0] dmem [N:0]`
+     to four `reg [7:0] dmem_b0..b3 [0:N]`, each using `$readmemb`.
+  2. Writes four binary data files (cm_dmem_b0.bin … cm_dmem_b3.bin) into
+     `<project_dir>/work_syn/` so they are present when efx_map runs.
 
 Usage:
     python3 patch_cm_bram.py [PROJECT_DIR]
 
-  PROJECT_DIR — directory that contains church_ti60_f225.v.
+  PROJECT_DIR — directory that contains church_ti60_f225.v and work_syn/.
                 Defaults to the directory containing this script.
 
 Run BEFORE efx_map (Efinity synthesis).  Re-run whenever church_ti60_f225.v
@@ -37,16 +38,17 @@ import os
 import re
 
 
+ALREADY_PATCHED_SENTINEL = 'readmemb'
+
+
 # ── Patterns to locate the four regions we need to replace ──────────────────
 
-# 1. Declaration: optional (* src ... *) attribute line + reg declaration
 DECL_PAT = re.compile(
-    r'(?:\(\* src[^*]*\*\)\n)?'       # optional Yosys src attribute
-    r'  reg \[31:0\] dmem \[(\d+):0\];\n',  # captures depth-1
+    r'(?:\(\* src[^*]*\*\)\n)?'
+    r'  reg \[31:0\] dmem \[(\d+):0\];\n',
     re.MULTILINE,
 )
 
-# 2. Initial begin block (sparse — only assigned entries are listed)
 INIT_PAT = re.compile(
     r'  initial begin\n'
     r'((?:    dmem\[\d+\] = 32\'d\d+;\n)*)'
@@ -54,7 +56,6 @@ INIT_PAT = re.compile(
     re.MULTILINE,
 )
 
-# 3. Write always block
 WRITE_PAT = re.compile(
     r'  always @\(posedge clk\) begin\n'
     r'    if \(dmem_wr__en\)\n'
@@ -63,7 +64,6 @@ WRITE_PAT = re.compile(
     re.MULTILINE,
 )
 
-# 4. Read always block (includes the _0_ register declaration)
 READ_PAT = re.compile(
     r'  reg \[31:0\] _0_;\n'
     r'  always @\(posedge clk\) begin\n'
@@ -73,7 +73,29 @@ READ_PAT = re.compile(
     re.MULTILINE,
 )
 
-ALREADY_PATCHED_SENTINEL = 'dmem_b0'
+
+def write_bin_files(vals: dict, depth: int, work_syn_dir: str) -> None:
+    """Write four byte-lane .bin files in $readmemb text format.
+
+    Each file has `depth` lines (one per address, 0 to depth-1).
+    Each line is 8 ASCII characters '0' or '1', MSB first.
+    Files go into work_syn_dir so efx_map finds them by bare filename.
+    """
+    os.makedirs(work_syn_dir, exist_ok=True)
+    lanes = [bytearray(depth) for _ in range(4)]
+    for idx, w in vals.items():
+        if 0 <= idx < depth:
+            lanes[0][idx] = w & 0xFF
+            lanes[1][idx] = (w >> 8) & 0xFF
+            lanes[2][idx] = (w >> 16) & 0xFF
+            lanes[3][idx] = (w >> 24) & 0xFF
+
+    for n, lane in enumerate(lanes):
+        fpath = os.path.join(work_syn_dir, f'cm_dmem_b{n}.bin')
+        with open(fpath, 'w') as f:
+            for byte_val in lane:
+                f.write(f'{byte_val:08b}\n')
+        print(f'  Wrote {fpath}  ({depth} lines)')
 
 
 def main():
@@ -88,15 +110,31 @@ def main():
         print('       Pass the directory that contains church_ti60_f225.v.')
         sys.exit(1)
 
+    work_syn_dir = os.path.join(project_dir, 'work_syn')
+
     print(f'Reading {vpath} ...')
     src = open(vpath).read()
 
     if ALREADY_PATCHED_SENTINEL in src:
-        print('church_ti60_f225.v already patched (dmem_b0 present) — nothing to do.')
+        print('church_ti60_f225.v already has $readmemb — re-writing bin files only.')
+        # Still write/refresh the bin files in case work_syn was cleaned
+        dm = re.search(r'reg \[7:0\] dmem_b0 \[0:(\d+)\]', src)
+        if not dm:
+            print('ERROR: $readmemb sentinel present but cannot parse depth.')
+            sys.exit(1)
+        depth = int(dm.group(1)) + 1
+        # Parse values from the existing bin files or re-extract from history
+        # For safety, re-run the full flow: ask user to cp original first.
+        print('       To apply a fresh patch, restore from build/church_ti60_f225.v first:')
+        print()
+        print('  cd ~/church_project/SoC/church-machine && git pull')
+        print('  cp build/church_ti60_f225.v ~/church_project/SoC/church_ti60_f225.v')
+        print(f'  python3 hardware/soc_combined/patch_cm_bram.py {project_dir}')
+        print()
+        print('Re-writing bin files from existing patched Verilog is not supported.')
+        print('Please restore the original Verilog and re-run.')
         sys.exit(0)
 
-    # Detect the OLD $readmemh patch (prev version of this script) — cannot
-    # apply the byte-lane rewrite on top of it; need the original source.
     if '$readmemh' in src and 'church_dmem.mem' in src:
         print('ERROR: church_ti60_f225.v has the OLD $readmemh patch applied.')
         print('       Re-copy the original file from the repo, then re-run:')
@@ -106,13 +144,13 @@ def main():
         print(f'  python3 hardware/soc_combined/patch_cm_bram.py {project_dir}')
         sys.exit(1)
 
-    # ── Step 1: find declaration, extract depth ──────────────────────────────
+    # ── Step 1: find declaration ─────────────────────────────────────────────
     dm = DECL_PAT.search(src)
     if not dm:
         print('ERROR: could not find  reg [31:0] dmem [N:0]  declaration.')
         sys.exit(1)
-    depth = int(dm.group(1)) + 1          # e.g. 16383 → depth=16384
-    depth_idx = depth - 1                 # Verilog [N:0] upper bound
+    depth = int(dm.group(1)) + 1
+    depth_idx = depth - 1
     print(f'  dmem depth: {depth} words ({depth * 4 // 1024} KB)')
 
     # ── Step 2: find initial begin, parse values ─────────────────────────────
@@ -129,37 +167,24 @@ def main():
     nonzero = sum(1 for v in vals.values() if v)
     print(f'  Initial block: {len(vals)} entries, {nonzero} non-zero')
 
+    # ── Step 3: write .bin files to work_syn/ ───────────────────────────────
+    print(f'  Writing bin files to {work_syn_dir}/ ...')
+    write_bin_files(vals, depth, work_syn_dir)
+
     # ── Build replacement strings ─────────────────────────────────────────────
 
-    # New lane declarations (depth index is [0:N-1] for Verilog byte arrays)
     new_decls = (
         f'  reg [7:0] dmem_b0 [0:{depth_idx}];\n'
         f'  reg [7:0] dmem_b1 [0:{depth_idx}];\n'
         f'  reg [7:0] dmem_b2 [0:{depth_idx}];\n'
         f'  reg [7:0] dmem_b3 [0:{depth_idx}];\n'
+        f'  initial $readmemb("cm_dmem_b0.bin", dmem_b0);\n'
+        f'  initial $readmemb("cm_dmem_b1.bin", dmem_b1);\n'
+        f'  initial $readmemb("cm_dmem_b2.bin", dmem_b2);\n'
+        f'  initial $readmemb("cm_dmem_b3.bin", dmem_b3);\n'
     )
 
-    # New initial begin — one line per non-zero byte (skip zero bytes; BRAM
-    # INIT params default to 0 so unspecified entries are correctly zero).
-    init_lines = ['  initial begin']
-    for idx in sorted(vals.keys()):
-        w = vals[idx]
-        if w == 0:
-            continue
-        b0 =  w        & 0xFF
-        b1 = (w >>  8) & 0xFF
-        b2 = (w >> 16) & 0xFF
-        b3 = (w >> 24) & 0xFF
-        if b0:
-            init_lines.append(f"    dmem_b0[{idx}] = 8'h{b0:02x};")
-        if b1:
-            init_lines.append(f"    dmem_b1[{idx}] = 8'h{b1:02x};")
-        if b2:
-            init_lines.append(f"    dmem_b2[{idx}] = 8'h{b2:02x};")
-        if b3:
-            init_lines.append(f"    dmem_b3[{idx}] = 8'h{b3:02x};")
-    init_lines.append('  end')
-    new_init = '\n'.join(init_lines) + '\n'
+    new_init = ''
 
     new_write = (
         '  always @(posedge clk) begin\n'
@@ -184,25 +209,21 @@ def main():
     # ── Apply substitutions ───────────────────────────────────────────────────
     out = src
 
-    # 1. Declaration → lane declarations
     out, n1 = DECL_PAT.subn(new_decls, out, count=1)
     if n1 != 1:
         print('ERROR: declaration substitution failed.')
         sys.exit(1)
 
-    # 2. Initial begin → byte-lane initial begin
     out, n2 = INIT_PAT.subn(new_init, out, count=1)
     if n2 != 1:
         print('ERROR: initial begin substitution failed.')
         sys.exit(1)
 
-    # 3. Write always block
     out, n3 = WRITE_PAT.subn(new_write, out, count=1)
     if n3 != 1:
         print('ERROR: write always block substitution failed.')
         sys.exit(1)
 
-    # 4. Read always block
     out, n4 = READ_PAT.subn(new_read, out, count=1)
     if n4 != 1:
         print('ERROR: read always block substitution failed.')
@@ -215,14 +236,14 @@ def main():
     with open(vpath, 'w') as f:
         f.write(out)
 
-    init_byte_count = len(init_lines) - 2  # subtract 'initial begin' and 'end'
-    print(f'  Patched: {vpath}')
-    print(f'  Declaration:  reg [31:0] dmem [{depth_idx}:0]  →  4 × reg [7:0] dmem_b0..3 [0:{depth_idx}]')
-    print(f'  Initial begin: {init_byte_count} non-zero byte assignments')
-    print(f'  Write block:  dmem[addr] <= data  →  4-lane byte writes')
-    print(f'  Read block:   _0_ <= dmem[addr]   →  concat of 4 lane reads')
     print()
-    print('Done. Now run synthesis:')
+    print(f'  Patched: {vpath}')
+    print(f'  reg [31:0] dmem [{depth_idx}:0] → 4 × reg [7:0] dmem_b0..3 [0:{depth_idx}]')
+    print(f'  Initialisation: initial begin → $readmemb from work_syn/cm_dmem_b*.bin')
+    print(f'  Write block: single 32-bit → 4-lane byte writes')
+    print(f'  Read block:  _0_ <= dmem[addr] → concat of 4 lane reads')
+    print()
+    print('Done. Now run synthesis (bin files are already in work_syn/):')
     print('  bash work_syn/run_efx_map.sh')
     print('  bash work_pnr/run_efx_pnr.sh')
     print('  bash ~/church_project/SoC/church-machine/hardware/soc_combined/run_efx_pgm.sh \\')
