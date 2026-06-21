@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<efx:project name="church_soc_cm" description="Church Machine Sapphire SoC plus Church Machine combined bitstream for Ti60F225" last_change="0" sw_version="2025.2" last_run_state="" last_run_flow="" config_result_in_sync="false" xmlns:efx="http://www.efinixinc.com/enf_proj" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.efinixinc.com/enf_proj enf_proj.xsd">
+<efx:project name="church_soc_cm" description="Church Machine Sapphire SoC plus Church Machine combined bitstream for Ti60F225" last_change="0" sw_version="2026.1" last_run_state="" last_run_flow="" config_result_in_sync="false" xmlns:efx="http://www.efinixinc.com/enf_proj" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.efinixinc.com/enf_proj enf_proj.xsd">
 
     <efx:device_info>
         <efx:family name="Titanium"/>

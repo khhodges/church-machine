@@ -10,8 +10,7 @@
 #   bash scripts/build_ti60_bitstream.sh --flash          # also flash + smoke-test
 #
 # Prerequisites:
-#   Efinity 2025.2 (synthesis)   — $EFINITY_MAP_HOME  or ~/efinity/2025.2
-#   Efinity 2026.1 (P&R + pgm)  — $EFINITY_HOME      or ~/efinity/2026.1
+#   Efinity 2026.1 (synthesis + P&R + pgm) — $EFINITY_MAP_HOME / $EFINITY_HOME  or ~/efinity/2026.1
 #   Efinity RISC-V IDE 2025.2   — toolchain at ~/efinity/efinity-riscv-ide-2025.2/toolchain/bin
 #   openFPGALoader               — /usr/bin/openFPGALoader  (apt)  OR  ~/oss-cad-suite/bin/openFPGALoader
 #   pyserial                     — pip install pyserial (for smoke-test when --flash is used)
@@ -28,7 +27,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SOC_DIR="${SOC_PROJECT_DIR:-$HOME/church_project/SoC}"
-EFINITY_MAP="${EFINITY_MAP_HOME:-$HOME/efinity/2025.2}"
+EFINITY_MAP="${EFINITY_MAP_HOME:-$HOME/efinity/2026.1}"
 EFINITY="${EFINITY_HOME:-$HOME/efinity/2026.1}"
 BITSTREAMS="$REPO_ROOT/bitstreams"
 HW="$REPO_ROOT/hardware/soc_combined"
@@ -59,8 +58,8 @@ echo ""
 _info "Step 0/8: Pre-flight checks"
 
 if [ ! -x "$EFINITY_MAP/bin/efx_map" ]; then
-    _fail "Efinity 2025.2 (efx_map) not found at $EFINITY_MAP/bin/efx_map
-       Install Efinity 2025.2 or set EFINITY_MAP_HOME to override."
+    _fail "Efinity 2026.1 (efx_map) not found at $EFINITY_MAP/bin/efx_map
+       Install Efinity 2026.1 or set EFINITY_MAP_HOME to override."
 fi
 
 if [ ! -x "$EFINITY/bin/efx_pnr" ]; then
@@ -143,8 +142,8 @@ else
 fi
 echo ""
 
-# ── Step 3: Synthesis (EFX_MAP, Efinity 2025.2) ─────────────────────────────
-_info "Step 3/8: Synthesis (efx_map — Efinity 2025.2, ~4 min)"
+# ── Step 3: Synthesis (EFX_MAP, Efinity 2026.1) ─────────────────────────────
+_info "Step 3/8: Synthesis (efx_map — Efinity 2026.1, ~4 min)"
 
 # Efinity GUI re-injects infer_set_reset / infer_clk_enable into the local
 # project XML whenever the project is opened.  These params crash efx_map
