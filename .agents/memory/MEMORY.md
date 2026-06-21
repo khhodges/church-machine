@@ -18,3 +18,4 @@
 - [Verilog/RTLIL regeneration procedure](verilog-regen-procedure.md) — 9 gen commands for all actively-synthesised targets; legacy-frozen files; builder tab visibility trap
 - [ChurchAssembler Node global shim](church-assembler-node-shim.md) — compileAssembly() checks typeof global; set global.ChurchAssembler before requiring CLOOMCCompiler in Node subprocesses
 - [app.py raw SQL pattern](app-py-raw-sql.md) — server/app.py has no sqlite3 import; all DB access must use db.session.execute(_sa_text(...)); never _sqlite3.connect()
+- [church_ti60f225 module name](church-module-name.md) — Amaranth/Yosys generates module church_ti60f225 (no underscore); top.v must instantiate without underscore or efx_map hard-crashes with bare STACK TRACE
