@@ -113,12 +113,16 @@ cp "$SAPPHIRE_V" "$SOC_DIR/sapphire.v"
 _ok "sapphire.v deployed to $SOC_DIR/sapphire.v"
 echo ""
 
-# ── Step 2.5: Copy CM Verilog (stripped of zero-init noise) ─────────────────
+# ── Step 2.5: Copy CM Verilog and peri.xml to SoC project ───────────────────
 # build/church_ti60_f225.v has 16K dmem[] entries but ~99% are zero.
 # Zero assignments are stripped at commit time → only ~93 non-zero lines remain.
 # This makes EFX_MAP synthesis 20–50× faster and prevents OOM hangs on
 # resource-limited machines.  The stripped copy is kept in build/ (canonical);
 # here we deploy it into the Efinity project directory before synthesis runs.
+#
+# church_soc_cm.peri.xml MUST also be deployed: top.v top-level ports (e.g.
+# cm_uart_rx) must have matching GPIO entries in peri.xml or efx_map crashes
+# with a bare STACK TRACE before printing any synthesis output.
 _info "Step 2.5/8: Deploy CM Verilog to SoC project"
 CM_V_SRC="$REPO_ROOT/build/church_ti60_f225.v"
 CM_V_DST="$SOC_DIR/church_ti60_f225.v"
@@ -128,6 +132,15 @@ fi
 cp "$CM_V_SRC" "$CM_V_DST"
 NON_ZERO=$(grep -c "dmem\[" "$CM_V_DST" || true)
 _ok "church_ti60_f225.v deployed ($NON_ZERO non-zero dmem[] lines)"
+
+PERI_SRC="$HW/church_soc_cm.peri.xml"
+PERI_DST="$SOC_DIR/church_soc_cm.peri.xml"
+if [ -f "$PERI_SRC" ]; then
+    cp "$PERI_SRC" "$PERI_DST"
+    _ok "church_soc_cm.peri.xml deployed (IO pin definitions)"
+else
+    _warn "church_soc_cm.peri.xml not found at $PERI_SRC — skipping (existing SoC copy will be used)"
+fi
 echo ""
 
 # ── Step 3: Synthesis (EFX_MAP, Efinity 2025.2) ─────────────────────────────
