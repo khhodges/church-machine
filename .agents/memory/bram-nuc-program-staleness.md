@@ -36,10 +36,34 @@ cp build/church_ti60_f225.v hardware/soc_combined/
 
 *Always follow with — on the Chromebook before Efinity synthesis:*
 ```bash
-python3 hardware/soc_combined/patch_cm_bram.py hardware/soc_combined
+cd ~/church_project/SoC/church-machine && git pull
+cp build/church_ti60_f225.v ~/church_project/SoC/church_ti60_f225.v
+python3 hardware/soc_combined/patch_cm_bram.py ~/church_project/SoC/
 ```
-`patch_cm_bram.py` converts the `initial begin` block to `$readmemh`
-(EFX_MAP ignores `initial begin` but correctly processes `$readmemh`).
+
+`patch_cm_bram.py` converts the 32-bit wide `dmem` array to 4 × 8-bit
+byte-lane arrays (`dmem_b0..dmem_b3`) — see "EFX_MAP BRAM width trap" below.
+
+## EFX_MAP BRAM width trap — CONFIRMED ROOT CAUSE (2026-06-21)
+
+**EFX_MAP silently ignores `initial begin` on 32-bit-wide inferred arrays.**
+Neither `initial begin` NOR `initial $readmemh(...)` initialises the BRAM
+when the source is `reg [31:0] dmem [N:0]`.  The synthesised BRAM comes out
+all-zeros → NIA stuck at 0x000 → NULL_CAP fault on every boot.
+
+**What DOES work:** byte-wide arrays (`reg [7:0] lane [0:N]`) with
+`initial begin lane[i] = 8'hXX; end`.  This is exactly what Amaranth/SpinalHDL
+generates for the Sapphire SoC firmware RAM — and why Sapphire initialises
+correctly while the CM BRAM does not.
+
+**The fix (implemented in `patch_cm_bram.py`):**
+1. Replaces `reg [31:0] dmem [N:0]` with four `reg [7:0] dmem_b0..b3 [0:N]`
+2. Replaces the single `initial begin` with byte-lane assignments (hex, sparse)
+3. Replaces the write `always` block with 4-lane byte writes
+4. Replaces the read `always` block with `{dmem_b3, dmem_b2, dmem_b1, dmem_b0}`
+
+**Key diagnostic:** If `church_ti60_f225.v` still has `reg [31:0] dmem`,
+patch_cm_bram.py has not been run (or the wrong version ran).
 
 ## NIA offset vs LUMP layout — CRITICAL
 
@@ -74,7 +98,7 @@ Verified by reading `dmem[255] = 0xF8004400` = NUC_LUMP_HEADER with cw=17
 actually synthesised.  Mismatch → HUNG fires during the delay loop → LED
 blinks once then stops.
 
-**Current correct values (firmware v2.2, new layout):**
+**Current correct values (firmware v2.3, new layout):**
 ```c
 #define NUC_CODE_START   0x00000000u   /* floor: code starts at NIA=0x004 */
 #define NUC_CODE_END     0x00000044u   /* ceiling: last instr at NIA=0x044 */
@@ -95,3 +119,10 @@ If BRAM is stale or the NUC_CODE range is wrong, the firmware CALLHOME shows:
 - NIA stuck at one value for 3 consecutive 1-s samples (HUNG fires)
 - If NIA=0x030: new-layout BRAM, fix is NUC_CODE_START=0x000/END=0x044 ✓
 - If NIA=0x194: old-layout BRAM, fix is NUC_CODE_START=0x160/END=0x1B0
+
+## Build script (scripts/build_ti60_bitstream.sh) fixes — 2026-06-21
+
+- Step 1: now does `make -C firmware clean` before `make` — prevents stale
+  .elf reuse across git pull cycles (was silently keeping old FW version)
+- Step 2.5: now calls `patch_cm_bram.py` after deploying church_ti60_f225.v
+  and BEFORE running synthesis — eliminates the 32-bit BRAM init failure
