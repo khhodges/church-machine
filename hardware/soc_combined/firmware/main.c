@@ -4,7 +4,7 @@
  * Bare-metal RISC-V firmware for the combined Sapphire SoC + Church Machine
  * bitstream on the Ti60F225 devkit.
  *
- * FIRMWARE v2.2 — fix HUNG false-positive (NUC_CODE range 0x000..0x044, new BRAM layout)
+ * FIRMWARE v2.3 — LUMP relay: APB3 UART-TX relay delivers LUMPs via ttyUSB2 only
  * =====================================================
  * Every CALLHOME now reports real NIA, real fault state, and real UID from
  * the APB3 bridge registers (no hardcoded zeros).  New record types:
@@ -14,6 +14,8 @@
  *   HUNG:{...}             — hung-program watchdog (NIA unchanged 3 s, no fault)
  *   TRACE:[0x..,0x..,...]  — 10-entry NIA circular buffer, emitted every ~1 s
  *   PONG\r\n               — response to RESET/PING/STATUS? commands over UART
+ *   LUMP_PUSH_START:{...}  — emitted when LUMP_START relay begins (len field)
+ *   LUMP_DONE:{...}        — emitted after CM restarts; ok=1 success, ok=0 fail
  *
  * CALLHOME protocol (ASCII, parsed by hardware/soc_combined/callhome_bridge.py):
  *   CALLHOME:{"board":"Ti60F225","uid":"<16 hex>","nia":"0x<8 hex>",
@@ -36,9 +38,12 @@
  *       --port=/dev/ttyUSB2 --baud=57600 --ide=http://localhost:5000
  *
  * UART commands accepted over ttyUSB2 (non-blocking receive):
- *   RESET\r\n   — pulse CTRL=0 for 1 s, reboots CM core
- *   PING\r\n    — respond with PONG\r\n
- *   STATUS?\r\n — emit one CALLHOME immediately
+ *   RESET\r\n           — pulse CTRL=0 for 1 s, reboots CM core
+ *   PING\r\n            — respond with PONG\r\n
+ *   STATUS?\r\n         — emit one CALLHOME immediately
+ *   LUMP_START:<n>\r\n  — relay n raw bytes (immediately following) into CM
+ *                          uart_rx via APB3 relay; wait for CM reboot;
+ *                          respond with LUMP_DONE:{"ok":1|0}\r\n
  *
  * HOW THE CHURCH MACHINE STARTS (from CM Verilog, church_ti60_f225.v)
  * ====================================================================
@@ -255,6 +260,14 @@ static int uart_getc_nonblocking(void)
     return -1;
 }
 
+/* Blocks until a byte is available; returns received byte (0–255). */
+static int uart_getc_blocking(void)
+{
+    uint32_t v;
+    do { v = UART_DATA; } while (!(v & UART_RX_VALID));
+    return (int)(v & 0xFFu);
+}
+
 /* Emit 32-bit value as 8 lowercase hex digits (no prefix). */
 static void uart_puthex32_lower(uint32_t v)
 {
@@ -403,9 +416,54 @@ static void uart_emit_trace(uint32_t *buf, uint32_t count)
 }
 
 /* ------------------------------------------------------------------ */
+/* LUMP relay: stream n bytes from UART0 → APB3 relay → CM uart_rx  */
+/* ------------------------------------------------------------------ */
+/*
+ * Protocol (called from uart_poll_command on LUMP_START:<n>\r\n):
+ *   1. Read n bytes from UART0 (blocking), relay each byte to CM.
+ *   2. Wait 2 s for CM PATCH_LUMP FSM to process and ACK internally.
+ *   3. Restart CM: hold push_button 1.2 s (free-run restart).
+ *   4. Wait 3 s for CM reboot; sample boot_complete.
+ *   5. Emit LUMP_DONE:{"ok":1}\r\n or LUMP_DONE:{"ok":0}\r\n.
+ */
+static void lump_push(uint32_t n)
+{
+    uint32_t i;
+
+    uart_puts("LUMP_PUSH_START:{\"len\":");
+    uart_putdec(n);
+    uart_puts("}\r\n");
+
+    /* Relay every byte: block on UART0 RX, spin on relay ready, write */
+    for (i = 0u; i < n; i++) {
+        int b = uart_getc_blocking();
+        while (!(CM_RELAY_READY & 1u)) { /* spin */ }
+        CM_RELAY_DATA = (uint32_t)(unsigned char)b;
+    }
+
+    /* Wait 2 s for CM to finish processing the PATCH_LUMP frame */
+    delay_loops(2u * LOOPS_PER_SECOND);
+
+    /* Restart CM: hold push_button ~1.2 s (30 M cycles @ 25 MHz) */
+    CM_CTRL = CM_CTRL_PRESSED;
+    delay_loops(12u * (LOOPS_PER_SECOND / 10u));
+    CM_CTRL = CM_CTRL_RELEASED;
+
+    /* Wait 3 s for CM to complete boot sequence */
+    delay_loops(3u * LOOPS_PER_SECOND);
+
+    /* boot_complete is the reliable reboot indicator */
+    uint32_t ok = (CM_STATUS & CM_STATUS_BOOT_COMPLETE) ? 1u : 0u;
+
+    uart_puts("LUMP_DONE:{\"ok\":");
+    uart_putc(ok ? '1' : '0');
+    uart_puts("}\r\n");
+}
+
+/* ------------------------------------------------------------------ */
 /* UART command receiver — non-blocking line accumulator              */
 /* ------------------------------------------------------------------ */
-#define RX_BUF_SIZE 16u
+#define RX_BUF_SIZE 32u   /* 32 > "LUMP_START:65535" (15 chars) */
 static char     _rx_buf[RX_BUF_SIZE];
 static uint32_t _rx_len = 0u;
 
@@ -443,6 +501,20 @@ static int uart_poll_command(uint32_t *force_callhome_out)
                    _rx_buf[6]=='?') {
             if (force_callhome_out)
                 *force_callhome_out = 1u;
+        } else if (_rx_len >= 12u &&
+                   _rx_buf[0]=='L' && _rx_buf[1]=='U' && _rx_buf[2]=='M' &&
+                   _rx_buf[3]=='P' && _rx_buf[4]=='_' && _rx_buf[5]=='S' &&
+                   _rx_buf[6]=='T' && _rx_buf[7]=='A' && _rx_buf[8]=='R' &&
+                   _rx_buf[9]=='T' && _rx_buf[10]==':') {
+            /* Parse decimal byte count after "LUMP_START:" */
+            uint32_t n = 0u;
+            uint32_t k;
+            for (k = 11u; k < _rx_len; k++) {
+                if (_rx_buf[k] >= '0' && _rx_buf[k] <= '9')
+                    n = n * 10u + (uint32_t)(_rx_buf[k] - '0');
+            }
+            if (n > 0u)
+                lump_push(n);
         }
 
         _rx_len = 0u;
