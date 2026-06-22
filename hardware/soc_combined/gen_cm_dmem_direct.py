@@ -80,16 +80,19 @@ READ_PAT = re.compile(
     re.MULTILINE,
 )
 
-# $readmemb form: declarations (separate from write/read blocks below)
+# $readmemb form: declarations (separate from write/read blocks below).
+# Use [ ]+ (flexible indentation) and an optional (* src ... *) attribute
+# line — the Chromebook-generated Verilog can have 2- or 4-space indent.
 DECL_BRAM_PAT = re.compile(
-    r'  reg \[7:0\] dmem_b0 \[0:\d+\];\n'
-    r'  reg \[7:0\] dmem_b1 \[0:\d+\];\n'
-    r'  reg \[7:0\] dmem_b2 \[0:\d+\];\n'
-    r'  reg \[7:0\] dmem_b3 \[0:\d+\];\n'
-    r'  initial \$readmemb\("[^"]*", dmem_b0\);\n'
-    r'  initial \$readmemb\("[^"]*", dmem_b1\);\n'
-    r'  initial \$readmemb\("[^"]*", dmem_b2\);\n'
-    r'  initial \$readmemb\("[^"]*", dmem_b3\);\n',
+    r'(?:[ ]+\(\*[^*]*\*\)\n)?'           # optional (* src ... *) attribute
+    r'[ ]+reg \[7:0\] dmem_b0 \[0:\d+\];\n'
+    r'[ ]+reg \[7:0\] dmem_b1 \[0:\d+\];\n'
+    r'[ ]+reg \[7:0\] dmem_b2 \[0:\d+\];\n'
+    r'[ ]+reg \[7:0\] dmem_b3 \[0:\d+\];\n'
+    r'[ ]+initial \$readmemb\("[^"]*", dmem_b0\);\n'
+    r'[ ]+initial \$readmemb\("[^"]*", dmem_b1\);\n'
+    r'[ ]+initial \$readmemb\("[^"]*", dmem_b2\);\n'
+    r'[ ]+initial \$readmemb\("[^"]*", dmem_b3\);\n',
     re.MULTILINE,
 )
 
