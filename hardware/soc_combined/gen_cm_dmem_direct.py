@@ -480,7 +480,7 @@ def main():
             # Try to add cm_dmem_bram.v after the first .v file entry
             xml2 = re.sub(
                 r'(<File Path="church_ti60_f225\.v"[^/]*/>\s*\n)',
-                r'\1    <File Path="cm_dmem_bram.v" Type="VERILOG" Version="VERILOG_2K" '/r'>\n'
+                r'\1    <File Path="cm_dmem_bram.v" Type="VERILOG" Version="VERILOG_2K" />\n'
                 r'      <Options/>\n'
                 r'    </File>\n',
                 xml,
