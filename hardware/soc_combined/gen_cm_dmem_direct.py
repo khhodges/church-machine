@@ -376,9 +376,14 @@ def main():
     # ── Check for existing cm_dmem_bram patch ────────────────────────────────
     if 'cm_dmem_bram' in src:
         print('church_ti60_f225.v already uses cm_dmem_bram.')
-        print('Re-generating cm_dmem_bram.v only (no patch to .v needed).')
+        bak_path = vpath + '.pre_direct'
+        if os.path.isfile(bak_path):
+            print(f'  Reading original data from backup: {bak_path}')
+            src = open(bak_path).read()
+        else:
+            print('Re-generating cm_dmem_bram.v only (no patch to .v needed).')
         # Try to extract depth from the module
-        dm = re.search(r'reg \[31:0\] upper_mem \[2048:(\d+)\]', src)
+        dm = re.search(r'reg \[31:0\] upper_mem \[2048:(\d+)\]', open(vpath).read())
         if dm:
             depth = int(dm.group(1)) + 1
         else:
