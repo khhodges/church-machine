@@ -232,6 +232,30 @@ class WukongUdpListener:
         if self._thread:
             self._thread.join(timeout=3.0)
 
+    def restart_after_fork(self):
+        """Restart the listener thread after a process fork (e.g. gunicorn post_fork).
+
+        OS threads do not survive fork().  The socket file descriptor IS inherited
+        by the child process, so we reuse it rather than re-binding the port.
+        This avoids both 'address already in use' errors and port-ownership races
+        with the parent process.
+
+        If the socket was not inherited (self._sock is None), falls back to a
+        full stop+start cycle.
+        """
+        if self._sock is None:
+            # No inherited socket — full restart
+            self.start()
+            return
+        # Socket inherited; only the thread needs to be recreated.
+        self._stop_event.clear()
+        self._thread = threading.Thread(
+            target=self._run, daemon=True, name='wukong-udp-listener')
+        self._thread.start()
+        logging.info(
+            "WukongUdpListener: thread restarted after fork on UDP port %d",
+            self.port)
+
     def _run(self):
         while not self._stop_event.is_set():
             try:

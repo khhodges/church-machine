@@ -63,3 +63,20 @@ def post_fork(server, worker):
         logging.getLogger("gunicorn.error").warning(
             "post_fork: APScheduler restart failed: %s", _e
         )
+
+    # 3 — restart Wukong UDP listener
+    # The listener's background thread does not survive fork().  The socket FD
+    # was inherited, so restart_after_fork() reuses it and only recreates the
+    # thread — no port-rebind required and no 'address already in use' risk.
+    # This ensures callhome events received in the worker process update the
+    # same _callhome_log / _latest_callhome_data that Flask handlers see.
+    try:
+        import server.app as _sapp2
+        _wl = getattr(_sapp2, '_wukong_listener', None)
+        if _wl is not None:
+            _wl.restart_after_fork()
+    except Exception as _e:
+        import logging
+        logging.getLogger("gunicorn.error").warning(
+            "post_fork: Wukong UDP listener restart failed: %s", _e
+        )
