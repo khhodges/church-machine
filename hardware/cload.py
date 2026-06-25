@@ -122,8 +122,8 @@ class ChurchCLoad(Elaboratable):
             cr14_view.word1_location.eq(raw_base + 4),
             cr14_w2_view.limit_offset.eq(cw_reg - 1),    # cw-1 (inclusive last valid PC; cw from lump header, not allocation size)
             cr14_w2_view.gt_seq.eq(e_gt_view.gt_seq),
-            cr14_w2_view.spare.eq(0),
             cr14_w2_view.g_bit.eq(0),
+            cr14_w2_view.f_flag.eq(0),
         ]
 
         # ── CR6 build (original E-GT in W0, reduced c-list view in W1–W3) ──────
@@ -137,8 +137,8 @@ class ChurchCLoad(Elaboratable):
             ),
             cr6_w2_view.limit_offset.eq(cc_reg - 1),
             cr6_w2_view.gt_seq.eq(e_gt_view.gt_seq),
-            cr6_w2_view.spare.eq(0),
             cr6_w2_view.g_bit.eq(0),
+            cr6_w2_view.f_flag.eq(0),
         ]
 
         local_cr_wr_addr = Signal(4)

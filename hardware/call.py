@@ -316,8 +316,8 @@ class ChurchCall(Elaboratable):
             cr14_wl_view.word1_location.eq(cr14_wm_view.word1_location),  # NS_base+4
             cr14_wl_w2.limit_offset.eq(cw_reg - 1),                       # cw-1 (inclusive last valid PC; matches NS format convention)
             cr14_wl_w2.gt_seq.eq(cr14_lat_w2.gt_seq),
-            cr14_wl_w2.spare.eq(0),
             cr14_wl_w2.g_bit.eq(0),
+            cr14_wl_w2.f_flag.eq(0),
         ]
 
         # CR6 read latch — filled by SET_CR6_BASE
@@ -350,8 +350,8 @@ class ChurchCall(Elaboratable):
             ),
             cr6_adj_w2.limit_offset.eq(cc_reg - 1),       # cc − 1 (inclusive count)
             cr6_adj_w2.gt_seq.eq(cr6_lat_w2.gt_seq),
-            cr6_adj_w2.spare.eq(0),
             cr6_adj_w2.g_bit.eq(0),
+            cr6_adj_w2.f_flag.eq(0),
         ]
 
 

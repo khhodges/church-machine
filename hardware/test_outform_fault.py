@@ -33,19 +33,17 @@ def _pack32_le(v):
 # ---------------------------------------------------------------------------
 # GT / CAP_REG helper constants
 # (derived from layouts.py GT_LAYOUT / CAP_REG_LAYOUT / hw_types.py)
-# GT_LAYOUT (word0, 32 bits) — new encoding:
+# GT_LAYOUT (word0, 32 bits) — v2.0 encoding:
 #   [15:0]  slot_id   (16 bits)
-#   [22:16] gt_seq    ( 7 bits)
-#   [24:23] gt_type   ( 2 bits)  GT_TYPE_INFORM=1, GT_TYPE_OUTFORM=2
-#   [25]    f_flag    ( 1 bit )  Far indicator
-#   [26]    spare     ( 1 bit )  reserved/zero
+#   [24:16] gt_seq    ( 9 bits)  ★v2.0 was 7b at [22:16]
+#   [26:25] gt_type   ( 2 bits)  GT_TYPE_INFORM=1, GT_TYPE_OUTFORM=2  ★v2.0 was [24:23]
 #   [27]    dom       ( 1 bit )  0=Turing {X,W,R}, 1=Church {E,S,L}
 #   [30:28] perm      ( 3 bits)  dom=0→{X,W,R}; dom=1→{E,S,L}; L=perm[0]
 #   [31]    b_flag    ( 1 bit )
 # CAP_REG_LAYOUT (96 bits):
 #   [31:0]  word0_gt
 #   [63:32] word1_location
-#   [95:64] word2_w2   (WORD2_LAYOUT: limit_offset[20:0] | gt_seq[6:0] | g_bit[28] | spare[2:0])
+#   [95:64] word2_w2   (WORD2_LAYOUT: limit_offset[20:0] | gt_seq[9b][29:21] | g_bit[30] | f_flag[31]) ★v2.0
 # ---------------------------------------------------------------------------
 
 _GT_TYPE_INFORM  = 0b01
@@ -55,13 +53,12 @@ _PERM_L_PERM = 1   # L-perm: perm[0]=L=1 → perm=0b001=1
 
 
 def _word0_gt(gt_type, slot_id=1, dom=0, perm=0):
-    """Pack a 32-bit GT word using new GT_LAYOUT encoding.
-    New layout: slot_id[15:0] | gt_seq[22:16]=0 | gt_type[24:23]
-                | f_flag[25]=0 | spare[26]=0 | dom[27] | perm[30:28] | b_flag[31]=0
+    """Pack a 32-bit GT word using v2.0 GT_LAYOUT encoding.
+    Layout: slot_id[15:0] | gt_seq[24:16]=0 | gt_type[26:25] | dom[27] | perm[30:28] | b_flag[31]=0 ★v2.0
     """
     return (
         (slot_id & 0xFFFF)
-        | ((gt_type & 0x3) << 23)
+        | ((gt_type & 0x3) << 25)
         | ((dom     & 0x1) << 27)
         | ((perm    & 0x7) << 28)
     )
@@ -225,8 +222,6 @@ def test_mload_wait_outform_fault_type():
             "slot_id": 1,
             "gt_seq":  0,
             "gt_type": _GT_TYPE_INFORM,
-            "f_flag":  0,
-            "spare":   0,
             "dom":     _PERM_L_DOM,   # 1 = Church domain
             "perm":    _PERM_L_PERM,  # 0b001 = L-perm
             "b_flag":  0,
@@ -236,7 +231,7 @@ def test_mload_wait_outform_fault_type():
     }
 
     # Build the outform GT word (plain integer; mem_rd_data is Signal(32)).
-    # gt_type bits [24:23] = GT_TYPE_OUTFORM = 0b10 → bit 24 = 1, bit 23 = 0
+    # gt_type bits [26:25] = GT_TYPE_OUTFORM = 0b10 → bit 26 = 1, bit 25 = 0 ★v2.0
     _outform_gt_word = _word0_gt(gt_type=_GT_TYPE_OUTFORM, slot_id=2)
 
     async def testbench(ctx):
@@ -245,7 +240,7 @@ def test_mload_wait_outform_fault_type():
         ctx.set(dut.mem_rd_data,        _outform_gt_word)  # memory returns outform GT
         ctx.set(dut.mem_rd_valid,       1)               # memory always ready
         ctx.set(dut.cr15_namespace,     {
-            "word0_gt": {"slot_id": 0, "gt_seq": 0, "gt_type": 0, "f_flag": 0, "spare": 0, "dom": 0, "perm": 0, "b_flag": 0},
+            "word0_gt": {"slot_id": 0, "gt_seq": 0, "gt_type": 0, "dom": 0, "perm": 0, "b_flag": 0},
             "word1_location": 0, "word2_w2": 0,
         })                                               # namespace cap (unused here)
         ctx.set(dut.sub_m_elevated,     0)

@@ -6,11 +6,13 @@ integrity32_amaranth(m, w0, w1, result) — Amaranth combinatorial helper (used 
 Design
 ──────
 The check covers NS Entry W0 (location) and NS Entry W1 (authority) to produce
-NS Entry W2 (integrity32).  g_bit at W1[28] is masked out before computing so
-the GC unit can set/clear it without invalidating the stored W2 value.
+NS Entry W2 (integrity32).  Both g_bit at W1[30] and f_flag at W1[31] are masked
+out before computing so the GC unit and IDE can mutate them without invalidating
+the stored W2 value. ★v2.0: g_bit moved from [28] to [30]; f_flag moved from
+GT[25] to W1[31].
 
 Formula (purely linear — collapses to a single LUT layer in FPGA synthesis):
-    w1_masked = w1 & ~(1 << 28)          # mask g_bit
+    w1_masked = w1 & ~(1 << 30) & ~(1 << 31)   # mask g_bit and f_flag
     result = ROL(w0, 7) ^ ROL(w1_masked, 13) ^ 0xDEADBEEF
 
 Strength: 32-bit → forgery probability 1 in 2^32 ≈ 1 in 4.3 billion.
@@ -18,7 +20,7 @@ Strength: 32-bit → forgery probability 1 in 2^32 ≈ 1 in 4.3 billion.
 
 from amaranth import *
 
-G_BIT_MASK_32 = 0xFFFFFFFF ^ (1 << 28)
+G_BIT_MASK_32 = 0x3FFFFFFF   # zeroes bit[30] (g_bit) and bit[31] (f_flag) ★v2.0
 INTEGRITY32_CONST = 0xDEADBEEF
 
 

@@ -21,18 +21,18 @@ def encode_turing(opcode, cond=CondCode.AL, dr_dst=0, dr_src=0, imm=0):
            ((dr_dst & 0xF) << 19) | ((dr_src & 0xF) << 15) | (imm & 0x7FFF)
 
 
-def make_gt(gt_type=GT_TYPE_NULL, perms=0, slot_id=0, gt_seq=0, b_flag=0, f_flag=0):
-    """Encode a 32-bit Golden Token word using the new dom+perm[2:0] format.
+def make_gt(gt_type=GT_TYPE_NULL, perms=0, slot_id=0, gt_seq=0, b_flag=0):
+    """Encode a 32-bit Golden Token word using the v2.0 dom+perm[2:0] format.
 
-    GT Word 0 field layout:
+    GT Word 0 field layout (v2.0 ★):
       [15:0]  slot_id   — 16-bit namespace slot index
-      [22:16] gt_seq    — 7-bit revocation counter (must match NS entry word2[31:25])
-      [24:23] gt_type   — 00=NULL  01=Inform (GT_TYPE_INFORM)  10=Outform  11=Abstract
-      [25]    f_flag    — Far indicator (per-token; new — freed from old perms[5] spare)
-      [26]    spare     — reserved, zero
+      [24:16] gt_seq    — 9-bit revocation counter (★v2.0 was 7b at [22:16])
+      [26:25] gt_type   — 00=NULL  01=Inform  10=Outform  11=Abstract (★v2.0 was [24:23])
       [27]    dom       — 0=Turing {X,W,R}, 1=Church {E,S,L}
       [30:28] perm      — 3-bit payload (dom=0: X/W/R; dom=1: E/S/L)
       [31]    b_flag    — bindable override (IO devices; excluded from CRC seal input)
+
+    Note: f_flag has moved from GT[25] to NS SLOT W1[31] (WORD2_LAYOUT) in v2.0.
 
     perms: 6-bit logical mask using PERM_MASK_* constants (caller-facing, unchanged API).
     The encoding converts automatically via gt_encode_perm().
@@ -44,8 +44,8 @@ def make_gt(gt_type=GT_TYPE_NULL, perms=0, slot_id=0, gt_seq=0, b_flag=0, f_flag
     CLOOMC listing cross-ref: simulator/secure_boot_tutorial.js §"Secure Boot — Overview"
     """
     dom, perm3 = gt_encode_perm(perms)
-    return (b_flag << 31) | (perm3 << 28) | (dom << 27) | (f_flag << 25) | \
-           (gt_type << 23) | (gt_seq << 16) | slot_id
+    return (b_flag << 31) | (perm3 << 28) | (dom << 27) | \
+           (gt_type << 25) | (gt_seq << 16) | slot_id
 
 
 # ---------------------------------------------------------------------------
@@ -318,7 +318,7 @@ def _abstract_gt_word(perms):
     """Encode a permission mask as an Abstract GT word using the v1.1 dom+perm encoding.
 
     Abstract GTs are advisory annotations stored in NS entry word3.  They encode
-    only the permission intent for the slot; slot_id, gt_seq, gt_type, f_flag, and
+    only the permission intent for the slot; slot_id, gt_seq, gt_type, and
     b_flag are all zero.  Hardware never checks this field; ChurchMLoad gates its
     output on M-bit so user-mode LOAD cannot observe it.
 
@@ -334,10 +334,10 @@ def _make_ns_entry(gt_type, perms, slot_id, gt_seq, location, alloc_size, cw=0, 
 
     Layout:
       word0_location    (+0):  lump base byte address (location)
-      word1_authority   (+4):  limit_offset[20:0] | gt_seq[6:0] | g_bit[28]=0 | spare[3:0]
+      word1_authority   (+4):  WORD2_LAYOUT — limit_offset[20:0] | gt_seq[29:21] (9b) | g_bit[30] | f_flag[31] ★v2.0
                                limit_offset = alloc_size - 1  (last valid word index)
                                Identical bit layout to CR W2 (WORD2_LAYOUT).
-      word2_integrity   (+8):  integrity32(W0, W1 with g_bit masked)
+      word2_integrity   (+8):  integrity32(W0, W1 with g_bit[30] and f_flag[31] masked) ★v2.0
                                Parallel 32-bit check; g_bit excluded so GC can set it freely.
       word3_abstract_gt (+12): Abstract GT annotation — permission-profile word for the NS
                                abstraction (M-bit gated; invisible to user-mode LOAD).
@@ -347,10 +347,10 @@ def _make_ns_entry(gt_type, perms, slot_id, gt_seq, location, alloc_size, cw=0, 
     not cached in the NS table entry.
 
     CLOOMC listing cross-ref: simulator/secure_boot_tutorial.js §"Boot ROM Cross-Reference"
-    GT Word 0 fields: slot_id[15:0], gt_seq[22:16], gt_type[24:23], perms[30:25]
+    GT Word 0 fields: slot_id[15:0], gt_seq[24:16] (9b), gt_type[26:25], dom[27], perm[30:28] ★v2.0
     """
     limit_offset = max(0, alloc_size - 1) & 0x1FFFFF
-    word1_authority = ((gt_seq & 0x7F) << 21) | limit_offset
+    word1_authority = ((gt_seq & 0x1FF) << 21) | limit_offset  # gt_seq 9b at [29:21] ★v2.0
 
     word2_integrity = integrity32(location, word1_authority)
 

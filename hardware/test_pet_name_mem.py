@@ -43,11 +43,10 @@ from .boot_rom import DEMO_CLIST_NAMED_SLOTS
 # Helpers — cap-register dict constructors
 # ---------------------------------------------------------------------------
 
-def _gt_dict(gt_type=0, dom=0, perm=0, slot_id=0, gt_seq=0,
-             f_flag=0, spare=0, b_flag=0):
+def _gt_dict(gt_type=0, dom=0, perm=0, slot_id=0, gt_seq=0, b_flag=0):
     return {
         "slot_id": slot_id, "gt_seq": gt_seq, "gt_type": gt_type,
-        "f_flag": f_flag, "spare": spare, "dom": dom, "perm": perm, "b_flag": b_flag,
+        "dom": dom, "perm": perm, "b_flag": b_flag,
     }
 
 

@@ -42,7 +42,7 @@ SRC_CR_ADDR       = 3
 
 _NULL_GT_DICT     = {
     "slot_id": 0, "gt_seq": 0, "gt_type": 0,
-    "f_flag": 0, "spare": 0, "dom": 0, "perm": 0, "b_flag": 0,
+    "dom": 0, "perm": 0, "b_flag": 0,
 }
 _NULL_CAP_DICT    = {
     "word0_gt": _NULL_GT_DICT,
@@ -53,8 +53,6 @@ _OUTFORM_GT_DICT  = {
     "slot_id": OUTFORM_SLOT_ID,
     "gt_seq":  OUTFORM_GT_SEQ,
     "gt_type": GT_TYPE_OUTFORM,
-    "f_flag":  0,
-    "spare":   0,
     "dom":     1,              # Church domain (E-perm)
     "perm":    OUTFORM_PERMS,  # perm[2]=E=1 → 0b100=4
     "b_flag":  OUTFORM_B_FLAG,
@@ -67,14 +65,13 @@ _OUTFORM_CAP_DICT = {
 
 
 def _pack_word0_gt(gt_type, slot_id, gt_seq=0, dom=0, perm=0, b_flag=0):
-    """Pack a 32-bit GT word using new GT_LAYOUT bit positions.
-    New layout: slot_id[15:0] | gt_seq[22:16] | gt_type[24:23] | f_flag[25]=0
-                | spare[26]=0 | dom[27] | perm[30:28] | b_flag[31]
+    """Pack a 32-bit GT word using v2.0 GT_LAYOUT bit positions.
+    Layout: slot_id[15:0] | gt_seq[24:16] (9b) | gt_type[26:25] | dom[27] | perm[30:28] | b_flag[31] ★v2.0
     """
     return (
           (slot_id  & 0xFFFF)
-        | ((gt_seq  & 0x7F)  << 16)
-        | ((gt_type & 0x3)   << 23)
+        | ((gt_seq  & 0x1FF) << 16)
+        | ((gt_type & 0x3)   << 25)
         | ((dom     & 0x1)   << 27)
         | ((perm    & 0x7)   << 28)
         | ((b_flag  & 0x1)   << 31)
@@ -208,10 +205,10 @@ def test_mode2_success():
     # Verify promoted GT fields inside cr_wr_data
     cr_wr_val = results["cr_wr_data_raw"]
     prom_word0    = cr_wr_val & 0xFFFFFFFF
-    prom_gt_type  = (prom_word0 >> 23) & 0x3
+    prom_gt_type  = (prom_word0 >> 25) & 0x3   # gt_type at [26:25] ★v2.0
     prom_slot_id  = prom_word0 & 0xFFFF
-    prom_gt_seq   = (prom_word0 >> 16) & 0x7F
-    # New GT layout: f_flag[25], spare[26], dom[27], perm[30:28]
+    prom_gt_seq   = (prom_word0 >> 16) & 0x1FF  # gt_seq 9b at [24:16] ★v2.0
+    # v2.0 GT layout: gt_seq[24:16], gt_type[26:25], dom[27], perm[30:28]
     prom_dom      = (prom_word0 >> 27) & 0x1
     prom_perm     = (prom_word0 >> 28) & 0x7
     prom_b_flag   = (prom_word0 >> 31) & 0x1
@@ -430,7 +427,7 @@ def test_mode2_core_integration():
     _NULL_CR = {"word0_gt": _NULL_GT_DICT, "word1_location": 0, "word2_w2": 0}
     _OUTFORM_CR = {
         "word0_gt":       {"slot_id": SLOT_ID, "gt_seq": 0, "gt_type": GT_TYPE_OUTFORM,
-                           "f_flag": 0, "spare": 0, "dom": 1, "perm": PERMS, "b_flag": 0},
+                           "dom": 1, "perm": PERMS, "b_flag": 0},
         "word1_location": 0xDEAD_0000,
         "word2_w2":       0,
     }

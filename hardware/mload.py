@@ -202,14 +202,14 @@ class ChurchMLoad(Elaboratable):
                 ]
                 with m.If(self.mem_rd_valid):
                     m.d.sync += result_view.word0_gt.eq(self.mem_rd_data)
-                    with m.If(self.mem_rd_data[23:25] == GT_TYPE_ABSTRACT):
+                    with m.If(self.mem_rd_data[25:27] == GT_TYPE_ABSTRACT):
                         # Stub: Abstract GT in a c-list slot has no NS entry or lump.
                         # INVALID_OP prevents ab_data[15:0] from being misinterpreted
                         # as a slot_id in the NS table.  Replace with Abstract Manager
                         # dispatch when the hardware path is implemented (Task #432).
                         m.d.sync += fault_type_reg.eq(FaultType.INVALID_OP)
                         m.next = "FAULT"
-                    with m.Elif(self.mem_rd_data[23:25] == GT_TYPE_OUTFORM):
+                    with m.Elif(self.mem_rd_data[25:27] == GT_TYPE_OUTFORM):
                         m.d.sync += [
                             outform_clist_addr_reg.eq(clist_gt_addr),
                             outform_gt_raw_reg.eq(self.mem_rd_data),
@@ -251,7 +251,7 @@ class ChurchMLoad(Elaboratable):
             if self.enable_seal_check:
                 with m.State("RESET_GBIT"):
                     gbit_cleared_w1 = Signal(32)
-                    m.d.comb += gbit_cleared_w1.eq(ns_w1_saved & ~(1 << 28))
+                    m.d.comb += gbit_cleared_w1.eq(ns_w1_saved & ~(1 << 30))
                     m.d.comb += [
                         local_mem_addr.eq(u_ns_gate.ns_entry_addr_out + 4),
                         local_mem_wr_en.eq(1),

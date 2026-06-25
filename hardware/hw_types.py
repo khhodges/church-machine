@@ -33,14 +33,13 @@ CR_INTERRUPT    = 13
 CR_CLOOMC       = 14   # CR14: code register / CLOOMC (canonical name)
 CR_NAMESPACE    = 15
 
-GT_SEQ_BITS     = 7
+GT_SEQ_BITS     = 9
 GT_SLOT_ID_BITS = 16
 GT_PERM_BITS    = 4    # dom(1) + perm[2:0](3) — was 6; compressed via Turing/Church mutual exclusion
 GT_TYPE_BITS    = 2
 GT_WIDTH        = 32
 
-GT_FFLAG_BIT    = 25   # bit position of f_flag in GT word
-GT_SPARE_BIT    = 26   # bit position of spare in GT word
+GT_TYPE_SHIFT   = 25   # bit position of gt_type[26:25] in GT word
 GT_DOM_BIT      = 27   # bit position of dom   in GT word
 
 

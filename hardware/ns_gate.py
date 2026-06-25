@@ -16,8 +16,8 @@ class ChurchNSGate(Elaboratable):
     NS entry layout (16-byte stride, slot_id << 4):
         W0 (+0)  location      — lump base byte address
         W1 (+4)  authority     — identical layout to CR W2 (WORD2_LAYOUT)
-                                 g_bit at [28]; masked out before integrity check
-        W2 (+8)  integrity     — integrity32(W0, W1 with g_bit cleared)
+                                 g_bit at [30], f_flag at [31]; both masked before integrity check ★v2.0
+        W2 (+8)  integrity     — integrity32(W0, W1 with g_bit[30] and f_flag[31] cleared)
         W3 (+12) abstract_gt   — advisory permission-profile annotation; fetched
                                  and latched into raw_w3 (ChurchMLoad gates on M-bit)
 

@@ -45,7 +45,7 @@ def _integrity32(w0, w1):
     def rol32(x, n):
         x = x & 0xFFFFFFFF
         return ((x << n) | (x >> (32 - n))) & 0xFFFFFFFF
-    w1m = w1 & 0xEFFFFFFF
+    w1m = w1 & 0x3FFFFFFF   # mask g_bit[30] and f_flag[31] ★v2.0
     return (rol32(w0, 7) ^ rol32(w1m, 13) ^ 0xDEADBEEF) & 0xFFFFFFFF
 
 
@@ -57,7 +57,7 @@ class MWinFSMUnit(Elaboratable):
     """Single-state check that mirrors the hardware WRITEBACK condition.
 
     Inputs (set before trigger):
-        dr11 — GT word (bits[24:23] must be non-NULL to allow writeback)
+        dr11 — GT word (bits[26:25] must be non-NULL to allow writeback) ★v2.0
         dr12 — NS location word
         dr13 — NS authority word
         dr14 — expected integrity32(dr12, dr13)
@@ -96,9 +96,9 @@ class MWinFSMUnit(Elaboratable):
         integrity_ok = Signal()
         m.d.comb += integrity_ok.eq(integrity_computed == dr14_lat)
 
-        # gt_seq check: DR11[22:16] must equal DR13[27:21]
-        dr11_gt_seq = Signal(7)
-        dr13_gt_seq = Signal(7)
+        # gt_seq check: DR11[24:16] must equal DR13[29:21] ★v2.0
+        dr11_gt_seq = Signal(9)
+        dr13_gt_seq = Signal(9)
         gtseq_ok    = Signal()
         m.d.comb += [
             dr11_gt_seq.eq(View(GT_LAYOUT, dr11_lat).gt_seq),
@@ -118,9 +118,9 @@ class MWinFSMUnit(Elaboratable):
             seal_ok.eq(seal_masked == View(SEALS_LAYOUT, dr15_lat).seal),
         ]
 
-        # DR11 validity: bits[24:23] != 0b00 (not NULL)
+        # DR11 validity: bits[26:25] != 0b00 (not NULL) ★v2.0 gt_type at [26:25]
         dr11_valid = Signal()
-        m.d.comb += dr11_valid.eq(dr11_lat[23:25] != 0)
+        m.d.comb += dr11_valid.eq(dr11_lat[25:27] != 0)
 
         with m.FSM(name="mwin_unit"):
             with m.State("IDLE"):
@@ -133,7 +133,7 @@ class MWinFSMUnit(Elaboratable):
                         dr14_lat.eq(self.dr14),
                         dr15_lat.eq(self.dr15),
                     ]
-                    with m.If(self.dr11[23:25] != 0):
+                    with m.If(self.dr11[25:27] != 0):
                         m.next = "WRITEBACK"
                     with m.Else():
                         m.next = "FAULT"
@@ -190,9 +190,9 @@ def test_mwin_valid_seal():
     dut = MWinFSMUnit()
     results = {}
 
-    # w13 must have DR13[27:21]=0 to match DR11.gt_seq=0 (gtseq_ok=True).
-    # bits[27:21] of the test w13 values are zeroed by ANDing out those bits.
-    _GTSEQ_MASK = ~(0x7F << 21) & 0xFFFFFFFF   # zero out bits[27:21]
+    # w13 must have DR13[29:21]=0 to match DR11.gt_seq=0 (gtseq_ok=True) ★v2.0.
+    # bits[29:21] of the test w13 values are zeroed by ANDing out those bits.
+    _GTSEQ_MASK = ~(0x1FF << 21) & 0xFFFFFFFF   # zero out bits[29:21] ★v2.0
     VECTORS = [
         (0x00001000, 0x00000010 & _GTSEQ_MASK),   # typical NS entry
         (0xABCDEF01, 0x12345678 & _GTSEQ_MASK),   # arbitrary (gtseq bits zeroed)
@@ -202,9 +202,9 @@ def test_mwin_valid_seal():
     async def testbench(ctx):
         all_ok = True
         for (w12, w13) in VECTORS:
-            # GT word: Inform type (bits[24:23]=0b01), gt_seq in bits[22:16]=0
-            # DR13[27:21]=0 must match DR11[22:16]=0 (gtseq_ok=True)
-            gt_word  = (0b01 << 23)    # gt_type=INFORM, gt_seq=0, slot=0
+            # GT word: Inform type (bits[26:25]=0b01), gt_seq in bits[24:16]=0
+            # DR13[29:21]=0 must match DR11[24:16]=0 (gtseq_ok=True) ★v2.0
+            gt_word  = (0b01 << 25)    # gt_type=INFORM, gt_seq=0, slot=0
             integ    = _integrity32(w12, w13)
             seal_val = _seal(w12, w13)
             # Pack seal into DR15[24:0], version=0 in bits[31:25]
@@ -250,7 +250,7 @@ def test_mwin_invalid_seal():
     dut = MWinFSMUnit()
     results = {}
 
-    _GTSEQ_MASK = ~(0x7F << 21) & 0xFFFFFFFF   # zero out bits[27:21]
+    _GTSEQ_MASK = ~(0x1FF << 21) & 0xFFFFFFFF   # zero out bits[29:21] ★v2.0
     VECTORS = [
         (0x00001000, 0x00000010 & _GTSEQ_MASK),
         (0xABCDEF01, 0x12345678 & _GTSEQ_MASK),
@@ -260,7 +260,7 @@ def test_mwin_invalid_seal():
     async def testbench(ctx):
         all_ok = True
         for (w12, w13) in VECTORS:
-            gt_word   = (0b01 << 23)   # INFORM type, gt_seq=0, DR13[27:21]=0
+            gt_word   = (0b01 << 25)   # INFORM type, gt_seq=0, DR13[29:21]=0 ★v2.0
             integ     = _integrity32(w12, w13)
             good_seal = _seal(w12, w13)
             bad_seal  = (good_seal ^ 0x1) & 0x1FFFFFF   # flip LSB

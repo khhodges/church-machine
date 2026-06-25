@@ -38,12 +38,12 @@ class ChurchGCUnit(Elaboratable):
 
         # NS_ENTRY_LAYOUT (4 words at stride slot_id << 4, i.e. 16 bytes per entry):
         #   word_select(0, 32) = word0_location  (+0)  — lump base byte address
-        #   word_select(1, 32) = word1_authority (+4)  — WORD2_LAYOUT: limit_offset | gt_seq | g_bit[28] | spare
-        #   word_select(2, 32) = word2_integrity (+8)  — integrity32(W0, W1 with g_bit masked)
+        #   word_select(1, 32) = word1_authority (+4)  — WORD2_LAYOUT: limit_offset[20:0] | gt_seq[29:21] | g_bit[30] | f_flag[31] ★v2.0
+        #   word_select(2, 32) = word2_integrity (+8)  — integrity32(W0, W1 with g_bit[30]+f_flag[31] masked)
         # The GC bus carries 3 × 32 bits (W0, W1, W2). W3 (pad) is not fetched.
-        # g_bit is at W1[28].  GC reads/writes W1; integrity stays valid (g_bit masked in check).
+        # g_bit is at W1[30] ★v2.0.  GC reads/writes W1; integrity stays valid (g_bit masked in check).
         latched_entry = Signal(32 * 3)
-        latched_w1 = latched_entry.word_select(1, 32)   # word1_authority (+4): g_bit at [28]
+        latched_w1 = latched_entry.word_select(1, 32)   # word1_authority (+4): g_bit at [30] ★v2.0
 
         w1_view = View(WORD2_LAYOUT, latched_w1)   # g_bit and gt_seq live here
 

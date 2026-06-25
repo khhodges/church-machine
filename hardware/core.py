@@ -842,13 +842,13 @@ class ChurchCore(Elaboratable):
                 # CR15 (namespace cap): full 96-bit write to include word1_location=0
                 # (NS at dmem byte 0) and word2_w2=18 (limit: slots 0..18 accessible).
                 # ns_gt: slot_id=0, gt_seq=0, GT_TYPE_INFORM, perms=0
-                # word0_gt = (GT_TYPE_INFORM<<23) | 0 = 0x00800000
+                # word0_gt = (GT_TYPE_INFORM<<25) | 0 = 0x02000000 ★v2.0
                 # Slots 16=SlideRule, 17=(empty), 18=Constants
                 m.d.comb += [
                     boot_cap_wr_en.eq(1),
                     boot_cap_wr_addr.eq(15),
                     boot_cap_wr_data.eq(Cat(
-                        C(0x00800000, 32),  # word0_gt: GT_TYPE_INFORM, slot_id=0
+                        C(0x02000000, 32),  # word0_gt: GT_TYPE_INFORM, slot_id=0 ★v2.0
                         C(0,          32),  # word1_location = 0 (NS at dmem start)
                         C(18,         32),  # word2_w2: limit_offset=18 (slots 0-18)
                     )),
@@ -869,13 +869,13 @@ class ChurchCore(Elaboratable):
                 # (DEMO_CLIST at dmem byte 0x400 = word 256) and word2_w2=63
                 # (limit: indices 0..63 accessible).
                 # cr6_gt: slot_id=2, GT_TYPE_INFORM, E-perm (Church dom=1, perm=0b100), gt_seq=0
-                # New GT word layout: b_flag[31] | perm[30:28] | dom[27] | f_flag[25] | gt_type[24:23] | gt_seq[22:16] | slot[15:0]
-                # word0_gt = (0b100<<28)|(1<<27)|(GT_TYPE_INFORM<<23)|2 = 0x48800002
+                # v2.0 GT word layout: b_flag[31] | perm[30:28] | dom[27] | gt_type[26:25] | gt_seq[24:16] | slot[15:0]
+                # word0_gt = (0b100<<28)|(1<<27)|(GT_TYPE_INFORM<<25)|2 = 0x4A000002 ★v2.0
                 m.d.comb += [
                     boot_cap_wr_en.eq(1),
                     boot_cap_wr_addr.eq(6),
                     boot_cap_wr_data.eq(Cat(
-                        C(0x48800002, 32),  # word0_gt: Church E-perm (dom=1,perm=0b100), GT_TYPE_INFORM, slot=2
+                        C(0x4A000002, 32),  # word0_gt: Church E-perm (dom=1,perm=0b100), GT_TYPE_INFORM, slot=2 ★v2.0
                         C(0x400,      32),  # word1_location = 0x400 (DEMO_CLIST base)
                         C(63,         32),  # word2_w2: limit_offset=63 (64 entries)
                     )),
@@ -1606,12 +1606,12 @@ class ChurchCore(Elaboratable):
             m.d.comb += mint_slot_id_p3.eq(mint_slot_id_reg + 3)
             m.d.comb += mint_clist_slot_base.eq(Cat(Const(0, 8), mint_slot_id_p3))
 
-            # E-GT:  b=0 | perm[2:0]=0b100(bit30) | dom=1(bit27) | typ=Inform(01<<23) | gt_seq=1(<<16) | slot_id
-            # New GT layout: dom=1 (Church), perm[2]=E → 0x48000000 | (GT_TYPE_INFORM<<23) | (1<<16) | slot
+            # E-GT:  b=0 | perm[2:0]=0b100(bit30) | dom=1(bit27) | typ=Inform(01<<25) | gt_seq=1(<<16) | slot_id ★v2.0
+            # v2.0 GT layout: dom=1 (Church), perm[2]=E → 0x4A000000 | (GT_TYPE_INFORM<<25) | (1<<16) | slot
             m.d.comb += mint_e_gt_d.eq(
-                (1 << 30) | (1 << GT_DOM_BIT) | (GT_TYPE_INFORM << 23) | (1 << 16) | mint_slot_id_reg
+                (1 << 30) | (1 << GT_DOM_BIT) | (GT_TYPE_INFORM << 25) | (1 << 16) | mint_slot_id_reg
             )
-            # W2: spare=0 | gt_seq=1(<<21) | limit_offset = lump_size-1
+            # W2: f_flag=0 | g_bit=0 | gt_seq=1(<<21) | limit_offset = lump_size-1 ★v2.0
             mint_w2 = Signal(32)
             m.d.comb += mint_w2.eq((1 << 21) | (mint_lump_size_reg - 1)[:21])
 
@@ -1843,7 +1843,7 @@ class ChurchCore(Elaboratable):
             m.d.comb += mint_clist_slot_base_ni.eq(Cat(Const(0, 8), mint_slot_id_p3_ni))
 
             m.d.comb += mint_e_gt_d.eq(
-                (1 << 30) | (GT_TYPE_INFORM << 23) | (1 << 16) | mint_slot_id_reg
+                (1 << 30) | (GT_TYPE_INFORM << 25) | (1 << 16) | mint_slot_id_reg  # ★v2.0
             )
             mint_w2_ni = Signal(32, name="mint_w2_ni")
             m.d.comb += mint_w2_ni.eq((1 << 21) | (mint_lump_size_reg - 1)[:21])
@@ -2008,7 +2008,7 @@ class ChurchCore(Elaboratable):
         # AND cr15_m_flag == 1  (never fires when M is not active).
         # cr15_m_set (test/microcode injection): single-cycle M-set, no FSM state change.
         #
-        # IDLE  → latch DR11-DR13, validate DR11 gt_type bits[24:23]:
+        # IDLE  → latch DR11-DR13, validate DR11 gt_type bits[26:25] ★v2.0:
         #           gt_type != NULL (0b00) → WRITEBACK
         #           gt_type == NULL        → FAULT
         # WRITEBACK (1 cycle): pack latched DR11-DR13 → CR15 + clear M → IDLE
@@ -2033,10 +2033,10 @@ class ChurchCore(Elaboratable):
         mwin_dr14_lat = Signal(32)
         mwin_dr15_lat = Signal(32)
 
-        # Combinatorial: decode DR11 gt_type (bits[24:23]) for NULL check.
-        # In hardware, GT_TYPE_NULL = 0b00 at bits[24:23].
+        # Combinatorial: decode DR11 gt_type (bits[26:25]) for NULL check ★v2.0.
+        # In hardware, GT_TYPE_NULL = 0b00 at bits[26:25].
         mwin_dr11_valid = Signal()
-        m.d.comb += mwin_dr11_valid.eq(u_regs.m_dr11[23:25] != GT_TYPE_NULL)
+        m.d.comb += mwin_dr11_valid.eq(u_regs.m_dr11[25:27] != GT_TYPE_NULL)
 
         # Integrity check on the latched shadow — must match integrity32(DR12, DR13).
         mwin_integrity_computed = Signal(32)
@@ -2044,10 +2044,10 @@ class ChurchCore(Elaboratable):
         mwin_integrity_ok = Signal()
         m.d.comb += mwin_integrity_ok.eq(mwin_integrity_computed == mwin_dr14_lat)
 
-        # gt_seq revocation check — GT.gt_seq (DR11[22:16]) must match NS_auth.gt_seq (DR13[27:21]).
+        # gt_seq revocation check — GT.gt_seq (DR11[24:16]) must match NS_auth.gt_seq (DR13[29:21]) ★v2.0.
         # Detects stale GTs revoked by GC since the M-window was set.
-        mwin_dr11_gt_seq = Signal(7)
-        mwin_dr13_gt_seq = Signal(7)
+        mwin_dr11_gt_seq = Signal(9)
+        mwin_dr13_gt_seq = Signal(9)
         mwin_gtseq_ok    = Signal()
         m.d.comb += [
             mwin_dr11_gt_seq.eq(View(GT_LAYOUT, mwin_dr11_lat).gt_seq),
