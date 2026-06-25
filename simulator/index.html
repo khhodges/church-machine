@@ -165,7 +165,8 @@
                             <!-- Learn -->
                             <div class="ham-subhead">Learn</div>
                             <div class="ham-group">
-                                <button class="ham-item" id="hamItem-tutorial" onclick="switchView('tutorial');closeHamburger()">Tutorial</button>
+                                <button class="ham-item" id="hamItem-start" onclick="switchView('start');closeHamburger()">&#x1F680; Get Started</button>
+                                <button class="ham-item" id="hamItem-tutorial" onclick="switchView('tutorial');closeHamburger()">Tutorials</button>
                                 <button class="ham-item" id="hamItem-docs" onclick="openDocAnchor('quick-start.md');closeHamburger()">Docs<kbd class="ham-kbd">C+Y</kbd></button>
                                 <button class="ham-item" id="hamItem-reference" onclick="switchView('reference');closeHamburger()">Reference<kbd class="ham-kbd">C+F</kbd></button>
                                 <button class="ham-item" id="hamItem-hello-mum" onclick="switchView('hello-mum');closeHamburger()">Hello Mum</button>
@@ -832,6 +833,10 @@
     </div>
 
     <div id="tutorial" class="view">
+        <div id="tutorialView"></div>
+    </div>
+
+    <div id="start" class="view">
         <div class="r1-tutorial-wrap">
             <div class="r1-tutorial-heading">Get Started with the Church Machine</div>
             <div class="r1-tutorial-sub">Three steps to run your first capability-secured program on real hardware.</div>
@@ -875,8 +880,6 @@
                 </div>
             </div>
         </div>
-        <!-- legacy tutorial engine hidden — accessible via ?debug=1 -->
-        <div id="tutorialView" style="display:none;"></div>
     </div>
 
     <div id="builder" class="view">
@@ -1391,7 +1394,7 @@ EFXPT_HOME=$HOME/efinity/2025.2/pt \
                             <div class="sw-what-next-title">🚀 What would you like to do next?</div>
                             <ul>
                                 <li><strong>Write your first program</strong> — open the <a href="#" onclick="switchView('editor');return false;">Code view</a> and try one of the built-in example programs.</li>
-                                <li><strong>Learn step by step</strong> — open the <a href="#" onclick="switchView('tutorial');return false;">Tutorial tab</a> for guided lessons starting from the basics.</li>
+                                <li><strong>Learn step by step</strong> — open the <a href="#" onclick="switchView('tutorial');return false;">Tutorials</a> for guided lessons starting from the basics.</li>
                                 <li><strong>Explore example programs</strong> — use the <em>Examples</em> drop-down in the Code view to load ready-made programs and run them on your board.</li>
                                 <li><strong>Read the reference guide</strong> — open the <a href="#" onclick="switchView('reference');return false;">Reference view</a> to browse the full instruction set and capability model.</li>
                             </ul>

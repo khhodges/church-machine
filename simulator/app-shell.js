@@ -723,7 +723,7 @@ function init() {
         }
     }).catch(function() { window._hasOpenAIKey = false; });
     checkBootId();
-    const views = ['repl','editor','tutorial','dashboard','namespace','hello-mum','abstractions','lumps','pipeline','trace','reference','docs','builder','sitemap','gc','devices','github','memory','gt-view'];
+    const views = ['repl','editor','start','tutorial','dashboard','namespace','hello-mum','abstractions','lumps','pipeline','trace','reference','docs','builder','sitemap','gc','devices','github','memory','gt-view'];
     const rawHash = window.location.hash.replace('#', '');
     const [hashView, hashQuery] = rawHash.split('?');
     const hashParams = {};
@@ -1203,7 +1203,7 @@ function switchView(viewId) {
     }
     if (viewId === 'gt-view') renderGTView();
     if (viewId === 'pipeline' && pipelineViz) pipelineViz.render();
-    if (viewId === 'tutorial') {
+    if (viewId === 'start') {
         if (typeof window._r1CheckSteps === 'function') window._r1CheckSteps();
     }
     if (viewId === 'builder' && typeof initBuilder === 'function') initBuilder();
@@ -1301,7 +1301,7 @@ let _pendingGCPhases = null;   // phases[] from the current in-progress GC run
 
 // ── Default-view lightning bolt drag-and-drop ──────────────────────────────
 function _initDefaultViewBolt() {
-    const views = ['repl','editor','tutorial','dashboard','namespace','hello-mum','abstractions','lumps','pipeline','trace','reference','docs','builder','sitemap','gc','devices','github','memory','gt-view'];
+    const views = ['repl','editor','start','tutorial','dashboard','namespace','hello-mum','abstractions','lumps','pipeline','trace','reference','docs','builder','sitemap','gc','devices','github','memory','gt-view'];
     const bolt = document.getElementById('hamDefaultBolt');
     const clearBtn = document.getElementById('hamDefaultClear');
     if (!bolt) return;
