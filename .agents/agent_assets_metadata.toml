@@ -228,3 +228,9 @@ id = "LV5-7eokTftIsW9fpKKm9"
 uri = "file://docs/dist/cm-msg-protocol-v1.pdf"
 type = "pdf"
 title = "CM_MSG Protocol — V1 for Distribution and Review"
+
+[[outputs]]
+id = "7E_aBXG6JKaDiP77dlb45"
+uri = "file://docs/GoldenDetails.pdf"
+type = "pdf"
+title = "GoldenDetails v2.0 — Church Machine Hardware Format Reference"
