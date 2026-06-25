@@ -45,10 +45,10 @@ class CLOOMCCompiler {
             LOAD: 0, SAVE: 1, CALL: 2, RETURN: 3,
             CHANGE: 4, SWITCH: 5, TPERM: 6, LAMBDA: 7,
             ELOADCALL: 8, XLOADLAMBDA: 9,
-            DREAD: 10, DWRITE: 11,
-            BFEXT: 12, BFINS: 13,
-            MCMP: 14, IADD: 15, ISUB: 16,
-            BRANCH: 17, SHL: 18, SHR: 19,
+            DREAD: 16, DWRITE: 17,              // ★ v2.0: Turing opcodes start at 16
+            BFEXT: 18, BFINS: 19,
+            MCMP: 20, IADD: 21, ISUB: 22,
+            BRANCH: 23, SHL: 24, SHR: 25,
         };
         this.conditions = {
             EQ: 0, NE: 1, CS: 2, CC: 3,

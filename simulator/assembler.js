@@ -13,8 +13,8 @@
 //
 // INSTRUCTION ENCODING  (32-bit word, big-endian field layout)
 //
-//   Standard instruction header (opcodes 0–19):
-//     bits[31:27]  opcode   (5 bits, 0–19 for instructions; 0x1E=WORD; 0x1F=lump header)
+//   Standard instruction header (v2.0: Church opcodes 0–9, Turing opcodes 16–25, gaps 10–15 and 26–29 FAULT):
+//     bits[31:27]  opcode   (5 bits; 0–9 Church; 16–25 Turing; 0x1E=WORD; 0x1F=lump header)
 //     bits[26:23]  condition code (ARM-style: EQ/NE/CS/CC/MI/PL/VS/VC/
 //                                              HI/LS/GE/LT/GT/LE/AL/NV)
 //     bits[22:0]   operand fields  (vary by opcode — see cases in assemble())
@@ -34,17 +34,18 @@
 //   7  LAMBDA     create closure        Mint a new capability from template
 //   8  ELOADCALL  c-list[n] → CALL      Load from c-list and call in one op
 //   9  XLOADLAMBDA                      Extended load-lambda
-//  10  DREAD      read device register  MMIO read from I/O segment
-//  11  DWRITE     write device register MMIO write to I/O segment
-//  12  BFEXT      bit-field extract     Extract bits[hi:lo] from DR
-//  13  BFINS      bit-field insert      Insert bits into DR at [hi:lo]
-//  14  MCMP       memory compare        Compare two memory regions
-//  15  IADD       integer add           DR ← DR + DR  (or DR + imm)
-//  16  ISUB       integer subtract      DR ← DR − DR  (or DR − imm)
-//  17  BRANCH     conditional branch    PC-relative jump
-//  18  SHL        shift left            DR ← DR << n
-//  19  SHR        shift right           DR ← DR >> n  (logical)
-//  --  (20–29 reserved for future instructions, e.g. floating-point)
+//  (10–15 unassigned — FAULT if executed)
+//  16  DREAD      read device register  MMIO read from I/O segment
+//  17  DWRITE     write device register MMIO write to I/O segment
+//  18  BFEXT      bit-field extract     Extract bits[hi:lo] from DR
+//  19  BFINS      bit-field insert      Insert bits into DR at [hi:lo]
+//  20  MCMP       memory compare        Compare two memory regions
+//  21  IADD       integer add           DR ← DR + DR  (or DR + imm)
+//  22  ISUB       integer subtract      DR ← DR − DR  (or DR − imm)
+//  23  BRANCH     conditional branch    PC-relative jump
+//  24  SHL        shift left            DR ← DR << n
+//  25  SHR        shift right           DR ← DR >> n  (logical)
+//  (26–29 unassigned — FAULT if executed)
 // 0x1E WORD       inline data constant  bits[26:0] = 27-bit payload
 // 0x1F             lump header magic    (not an instruction)
 //
@@ -214,10 +215,10 @@ class ChurchAssembler {
             'LOAD': 0, 'SAVE': 1, 'CALL': 2, 'RETURN': 3,
             'CHANGE': 4, 'SWITCH': 5, 'TPERM': 6, 'LAMBDA': 7,
             'ELOADCALL': 8, 'XLOADLAMBDA': 9,
-            'DREAD': 10, 'DWRITE': 11,
-            'BFEXT': 12, 'BFINS': 13,
-            'MCMP': 14, 'IADD': 15, 'ISUB': 16,
-            'BRANCH': 17, 'SHL': 18, 'SHR': 19,
+            'DREAD': 16, 'DWRITE': 17,            // ★ v2.0: Turing opcodes start at 16
+            'BFEXT': 18, 'BFINS': 19,
+            'MCMP': 20, 'IADD': 21, 'ISUB': 22,
+            'BRANCH': 23, 'SHL': 24, 'SHR': 25,
             'WORD': 0x1E,
         };
         this.conditions = {
@@ -1035,7 +1036,7 @@ class ChurchAssembler {
         const _condNames = ['EQ','NE','CS','CC','MI','PL','VS','VC','HI','LS','GE','LT','GT','LE','','NV'];
         for (let i = 0; i < words.length; i++) {
             const w = words[i] >>> 0;
-            if (((w >>> 27) & 0x1F) !== 17) continue;   // not a BRANCH instruction
+            if (((w >>> 27) & 0x1F) !== 23) continue;   // not a BRANCH instruction (v2.0: opcode 23)
             const rawImm = w & 0x7FFF;
             const signedOffset = (rawImm & 0x4000) ? (rawImm | 0xFFFF8000) : rawImm;
             const target = i + signedOffset;
@@ -1476,7 +1477,7 @@ class ChurchAssembler {
                 }
                 break;
             }
-            case 10: {
+            case 16: {
                 crDst = this._parseDR(parts[1], lineNum);
                 crSrc = this._parseCR(parts[2], lineNum);
                 // CR14 (Current-Lump) is RX — user code may DREAD it to read
@@ -1506,7 +1507,7 @@ class ChurchAssembler {
                 }
                 break;
             }
-            case 11: {
+            case 17: {
                 crDst = this._parseDR(parts[1], lineNum);
                 crSrc = this._parseCR(parts[2], lineNum);
                 this._checkPrivCR(crSrc, 'DWRITE', lineNum);
@@ -1533,7 +1534,7 @@ class ChurchAssembler {
                 }
                 break;
             }
-            case 12: {
+            case 18: {
                 crDst = this._parseDR(parts[1], lineNum);
                 crSrc = this._parseDR(parts[2], lineNum);
                 const rawWid12 = this._parseImm(parts[4], lineNum);
@@ -1549,7 +1550,7 @@ class ChurchAssembler {
                 imm = (pos12 << 5) | wid12;
                 break;
             }
-            case 13: {
+            case 19: {
                 crDst = this._parseDR(parts[1], lineNum);
                 crSrc = this._parseDR(parts[2], lineNum);
                 const rawWid13 = this._parseImm(parts[4], lineNum);
@@ -1565,7 +1566,7 @@ class ChurchAssembler {
                 imm = (pos13 << 5) | wid13;
                 break;
             }
-            case 14: {
+            case 20: {
                 const _drDst14 = this._parseDR(parts[1], lineNum);
                 const _p2_14 = (parts[2] || '').replace(/,/g, '').trim();
                 const _p2isImm14 = parts[3] === undefined && _p2_14 !== '' && (
@@ -1575,7 +1576,7 @@ class ChurchAssembler {
                     /^0[bB][01]+$/.test(_p2_14)
                 );
                 if (_p2isImm14) {
-                    opcode = 16;
+                    opcode = 22; // MCMP immediate → encoded as ISUB (v2.0: opcode 22)
                     crDst = 15;
                     crSrc = _drDst14;
                     const _immStr14 = _p2_14.startsWith('#') ? _p2_14.substring(1) : _p2_14;
@@ -1590,7 +1591,7 @@ class ChurchAssembler {
                 }
                 break;
             }
-            case 15: {
+            case 21: {
                 crDst = this._parseDR(parts[1], lineNum);
                 {
                     const _p2 = (parts[2] || '').replace(/,/g, '').trim();
@@ -1621,7 +1622,7 @@ class ChurchAssembler {
                 }
                 break;
             }
-            case 16: {
+            case 22: {
                 crDst = this._parseDR(parts[1], lineNum);
                 {
                     const _p2 = (parts[2] || '').replace(/,/g, '').trim();
@@ -1652,7 +1653,7 @@ class ChurchAssembler {
                 }
                 break;
             }
-            case 17: {
+            case 23: {
                 // BRANCH supports three operand forms:
                 //   BRANCH label        — unconditional jump to label
                 //   BRANCH offset       — unconditional jump by signed integer offset
@@ -1680,13 +1681,13 @@ class ChurchAssembler {
                 }
                 break;
             }
-            case 18: {
+            case 24: {
                 crDst = this._parseDR(parts[1], lineNum);
                 crSrc = this._parseDR(parts[2], lineNum);
                 imm = this._parseImm(parts[3], lineNum) & 0x1F;
                 break;
             }
-            case 19: {
+            case 25: {
                 crDst = this._parseDR(parts[1], lineNum);
                 crSrc = this._parseDR(parts[2], lineNum);
                 let shamt = this._parseImm(parts[3], lineNum) & 0x1F;
@@ -2013,7 +2014,7 @@ class ChurchAssembler {
             if (labelMap.has(i)) {
                 lines.push(labelMap.get(i) + ':');
             }
-            if (((word >>> 27) & 0x1F) === 17) {
+            if (((word >>> 27) & 0x1F) === 23) {  // BRANCH = opcode 23 in v2.0
                 const rawImm = word & 0x7FFF;
                 const soff = (rawImm & 0x4000) ? (rawImm | 0xFFFF8000) : rawImm;
                 const target = i + soff;
@@ -2047,7 +2048,13 @@ class ChurchAssembler {
         const crSrc  = (word >>> 15) & 0xF;
         const imm    = word & 0x7FFF;
 
-        const opNames   = ['LOAD','SAVE','CALL','RETURN','CHANGE','SWITCH','TPERM','LAMBDA','ELOADCALL','XLOADLAMBDA','DREAD','DWRITE','BFEXT','BFINS','MCMP','IADD','ISUB','BRANCH','SHL','SHR'];
+        // v2.0: Church 0–9, unassigned 10–15, Turing 16–25 (sparse — use an object not an array)
+        const opNames   = {
+            0:'LOAD', 1:'SAVE', 2:'CALL', 3:'RETURN', 4:'CHANGE', 5:'SWITCH',
+            6:'TPERM', 7:'LAMBDA', 8:'ELOADCALL', 9:'XLOADLAMBDA',
+            16:'DREAD', 17:'DWRITE', 18:'BFEXT', 19:'BFINS', 20:'MCMP',
+            21:'IADD', 22:'ISUB', 23:'BRANCH', 24:'SHL', 25:'SHR',
+        };
         const condNames = ['EQ','NE','CS','CC','MI','PL','VS','VC','HI','LS','GE','LT','GT','LE','','NV'];
 
         // WORD inline data constant — 27-bit payload in bits[26:0]
@@ -2068,7 +2075,8 @@ class ChurchAssembler {
             return `.header ${typNames[typ]||'?'} n-6=${n_minus_6}\u2192${lumpSize}w cw=${cw} cc=${cc}`;
         }
 
-        if (opcode > 19) return `??? 0x${word.toString(16).padStart(8, '0')}`;
+        // v2.0: opcodes 10–15 and 26–29 are unassigned; anything else not in opNames is unknown
+        if (!opNames[opcode]) return `??? 0x${word.toString(16).padStart(8, '0')}`;
 
         const op       = opNames[opcode];
         const condStr  = cond === 14 ? '' : condNames[cond];
@@ -2158,40 +2166,40 @@ class ChurchAssembler {
                 return `${mnemonic}  CR${crDst}, CR${crSrc}[${hexOff(imm)}]`;
             }
             // DREAD DRd, CRs, #offset  (bit14=1, immediate) or DRd, CRs, #base, DRx (bit14=0, indexed)
-            case 10:
+            case 16:
                 if (imm & 0x4000) return `${mnemonic}  DR${crDst}, CR${crSrc}, #${imm & 0x3FFF}`;
                 return `${mnemonic}  DR${crDst}, CR${crSrc}, #${(imm >> 4) & 0x3FF}, DR${imm & 0xF}`;
             // DWRITE DRd, CRs, #offset  (bit14=1, immediate) or DRd, CRs, #base, DRx (bit14=0, indexed)
-            case 11:
+            case 17:
                 if (imm & 0x4000) return `${mnemonic}  DR${crDst}, CR${crSrc}, #${imm & 0x3FFF}`;
                 return `${mnemonic}  DR${crDst}, CR${crSrc}, #${(imm >> 4) & 0x3FF}, DR${imm & 0xF}`;
             // BFEXT DRd, DRs, pos, w  — bit-field extract
-            case 12: {
+            case 18: {
                 const pos   = (imm >>> 5) & 0x1F;
                 const width = imm & 0x1F;
                 return `${mnemonic}  DR${crDst}, DR${crSrc}, pos=${pos}, w=${width}`;
             }
             // BFINS DRd, DRs, pos, w  — bit-field insert
-            case 13: {
+            case 19: {
                 const pos   = (imm >>> 5) & 0x1F;
                 const width = imm & 0x1F;
                 return `${mnemonic}  DR${crDst}, DR${crSrc}, pos=${pos}, w=${width}`;
             }
             // MCMP DRd, DRs  — compare, update condition flags
-            case 14: return `${mnemonic}  DR${crDst}, DR${crSrc}`;
+            case 20: return `${mnemonic}  DR${crDst}, DR${crSrc}`;
             // IADD DRd, DRs, DRm | #imm
-            case 15: return (imm & 0x4000) ? `${mnemonic}  DR${crDst}, DR${crSrc}, #${imm & 0x3FFF}` : `${mnemonic}  DR${crDst}, DR${crSrc}, DR${imm & 0xF}`;
+            case 21: return (imm & 0x4000) ? `${mnemonic}  DR${crDst}, DR${crSrc}, #${imm & 0x3FFF}` : `${mnemonic}  DR${crDst}, DR${crSrc}, DR${imm & 0xF}`;
             // ISUB DRd, DRs, DRm | #imm
-            case 16: return (imm & 0x4000) ? `${mnemonic}  DR${crDst}, DR${crSrc}, #${imm & 0x3FFF}` : `${mnemonic}  DR${crDst}, DR${crSrc}, DR${imm & 0xF}`;
+            case 22: return (imm & 0x4000) ? `${mnemonic}  DR${crDst}, DR${crSrc}, #${imm & 0x3FFF}` : `${mnemonic}  DR${crDst}, DR${crSrc}, DR${imm & 0xF}`;
             // BRANCH soff  — PC-relative conditional jump
-            case 17: {
+            case 23: {
                 const soff = (imm & 0x4000) ? (imm | 0xFFFF8000) : imm;
                 return `${mnemonic}  ${soff >= 0 ? '+' : ''}${soff}`;
             }
             // SHL DRd, DRs, shamt
-            case 18: return `${mnemonic}  DR${crDst}, DR${crSrc}, ${imm & 0x1F}`;
+            case 24: return `${mnemonic}  DR${crDst}, DR${crSrc}, ${imm & 0x1F}`;
             // SHR DRd, DRs, shamt [ASR]
-            case 19: {
+            case 25: {
                 const arith = (imm >>> 5) & 1;
                 const shamt = imm & 0x1F;
                 return `${mnemonic}  DR${crDst}, DR${crSrc}, ${shamt}${arith ? ' ASR' : ''}`;

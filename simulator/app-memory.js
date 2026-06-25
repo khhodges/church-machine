@@ -3345,7 +3345,7 @@ window.__crdToggleFaultDetail = function(detailRowId, summaryRow) {
 //   9 = XLOADLAMBDA                          (crSrc is the c-list base; not written)
 // Only LOAD (opcode 0) modifies crDst as a register; the others only dereference crSrc.
 function _computeReferencedCListSlots(codeBase, codeCount) {
-    const BRANCH_OPCODE = 17;
+    const BRANCH_OPCODE = 23; // v2.0 ISA: BRANCH is opcode 23
 
     // ── Phase 1: Collect basic-block entry points ─────────────────────────────
     // Word 0 always starts a block.  Every branch target and every fall-through

@@ -1008,11 +1008,11 @@ function _tryAutoAssembleLump(absIdx) {
     for (let i = 0; i < N; i++) {
         const md = userMethodData[`${absIdx}:${methods[i]}`] || {};
         const code = (md.compiled && md.compiled.length > 0) ? md.compiled : [0];
-        // Emit a BRANCH instruction (opcode 17) as the method-table entry.
+        // Emit a BRANCH instruction (opcode 23 in v2.0) as the method-table entry.
         // Mirrors _assembleLumpFromCatalog: branchOffset = bodyOffset - i.
         // CALL dispatcher resolves: pc = (methodIndex-1) + offset = i + (bodyOffset-i) = bodyOffset.
         const branchOffset = bodyOffset - i;
-        methodTable.push(((17 << 27) | (branchOffset & 0x7FFF)) >>> 0);
+        methodTable.push(((23 << 27) | (branchOffset & 0x7FFF)) >>> 0);
         bodies.push(code);
         bodyOffset += code.length;
     }
@@ -1062,13 +1062,13 @@ function _assembleLumpFromCatalog(absIdx) {
     for (let i = 0; i < N; i++) {
         const md = userMethodData[`${absIdx}:${methods[i]}`] || {};
         const code = (md.compiled && md.compiled.length > 0) ? md.compiled : [0]; // zero-pad placeholder
-        // Emit a BRANCH instruction (opcode 17) as the method-table entry.
+        // Emit a BRANCH instruction (opcode 23 in v2.0) as the method-table entry.
         // The table entry for method (i+1) sits at lump word (i+1), lump-relative PC = i.
         // Branch offset = bodyOffset - i so the CALL dispatcher resolves:
         //   new pc = (methodIndex - 1) + offset = i + (bodyOffset - i) = bodyOffset.
         // Fetch: physAddr = lump_base + 1 + bodyOffset → first instruction of the body.
         const branchOffset = bodyOffset - i;
-        methodTable.push(((17 << 27) | (branchOffset & 0x7FFF)) >>> 0);
+        methodTable.push(((23 << 27) | (branchOffset & 0x7FFF)) >>> 0);
         bodies.push(code);
         bodyOffset += code.length;
     }

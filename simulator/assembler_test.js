@@ -876,7 +876,7 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
     const w = r.words[0];
     const opcode6 = (w >>> 27) & 0x1F;
     const imm6    = w & 0x7FFF;
-    assert('DL6 indexed DREAD: opcode=10', opcode6 === 10, `opcode=${opcode6}`);
+    assert('DL6 indexed DREAD: opcode=16', opcode6 === 16, `opcode=${opcode6}`);
     assert('DL6 indexed DREAD: bit14=0 (indexed mode)', (imm6 & 0x4000) === 0, `imm=0x${imm6.toString(16)}`);
     assert('DL6 indexed DREAD: base=10 in bits[13:4]', ((imm6 >> 4) & 0x3FF) === 10,
         `base=${(imm6>>4)&0x3FF}`);
@@ -892,7 +892,7 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
     const w = r.words[0];
     const opcode7 = (w >>> 27) & 0x1F;
     const imm7    = w & 0x7FFF;
-    assert('DL7 indexed DWRITE: opcode=11', opcode7 === 11, `opcode=${opcode7}`);
+    assert('DL7 indexed DWRITE: opcode=17', opcode7 === 17, `opcode=${opcode7}`);
     assert('DL7 indexed DWRITE: bit14=0 (indexed mode)', (imm7 & 0x4000) === 0, `imm=0x${imm7.toString(16)}`);
     assert('DL7 indexed DWRITE: base=5 in bits[13:4]', ((imm7 >> 4) & 0x3FF) === 5,
         `base=${(imm7>>4)&0x3FF}`);
@@ -1259,7 +1259,7 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
     const imm   = word & 0x7FFF;
     const shamt = imm & 0x1F;
     const arith = (imm >>> 5) & 1;
-    assert('SA1 opcode=19 (SHR)', opcode === 19, 'got ' + opcode);
+    assert('SA1 opcode=25 (SHR)', opcode === 25, 'got ' + opcode);
     assert('SA1 shamt=4', shamt === 4, 'got ' + shamt);
     assert('SA1 arith=0 (LSR)', arith === 0, 'got ' + arith);
 }
@@ -1275,7 +1275,7 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
     const imm   = word & 0x7FFF;
     const shamt = imm & 0x1F;
     const arith = (imm >>> 5) & 1;
-    assert('SA2 opcode=19 (SHR)', opcode === 19, 'got ' + opcode);
+    assert('SA2 opcode=25 (SHR)', opcode === 25, 'got ' + opcode);
     assert('SA2 shamt=4', shamt === 4, 'got ' + shamt);
     assert('SA2 arith=1 (ASR)', arith === 1, 'got ' + arith);
 }
@@ -1347,7 +1347,7 @@ const CLOOMCCompiler = require('./cloomc_compiler.js');
 // Returns { word, shamt, arith } or null.
 function findSHR(words) {
     for (const w of words) {
-        if (((w >>> 27) & 0x1F) === 19) {
+        if (((w >>> 27) & 0x1F) === 25) {  // SHR = opcode 25 in v2.0
             const imm = w & 0x7FFF;
             return { word: w, shamt: imm & 0x1F, arith: (imm >>> 5) & 1 };
         }
@@ -2813,11 +2813,11 @@ validateGTConstant('SM_GT_RWX_IDX1', SM_GT_RWX_IDX1);
 // SWITCH opcode = 5 → bits[31:27] = 0b00101 → 0xA0000000 base
 // crSrc=1 → bit 15 → 0x00008000;  crSrc=2 → 0x00010000
 // SWITCH_TGT_CR13 = 5, SWITCH_TGT_CR15 = 7
-// Abstract GT type=3 → bits[24:23] of word0 → (3<<23) = 0x01800000
+// Abstract GT type=3 → bits[26:25] of word0 → (3<<25) = 0x06000000  (v2.0 layout)
 // PassKey sentinels: CR13=0xFFFFFFFE, CR15=0xFFFFFFFF
 
-const SW_ABSTRACT_GT = 0x01800000;          // Minimal Abstract GT (type=3, no permissions, index=0)
-const SW_INFORM_GT   = 0x00800000;          // Inform GT (type=1) — must fault
+const SW_ABSTRACT_GT = 0x06000000;          // Minimal Abstract GT (type=3, v2.0: gt_type at [26:25]=(3<<25))
+const SW_INFORM_GT   = 0x02000000;          // Inform GT (type=1, v2.0: gt_type at [26:25]=(1<<25))
 // Instruction words use AL (always) condition = 0xE in bits[26:23] — same pattern as TP_INSTR_*.
 // The >>> 0 converts signed-negative JavaScript bit-op results to unsigned 32-bit.
 const SW_CR1_TGT5 = ((5 << 27) | (0xE << 23) | (1 << 15) | 5) >>> 0;  // SWITCH AL CR1, 5 (→CR13)
@@ -5473,11 +5473,11 @@ HALT
     // EX8: .org 100 + 6 .word entries → at least 106 words (code may fill beyond 100)
     assert('EX8 ada_note_g total word count covers .org data region',
         result.words.length >= 106, `got ${result.words.length}`);
-    // EX9: first instruction is DREAD (opcode=10=0xA)
+    // EX9: first instruction is DREAD (opcode=16=0x10 in v2.0)
     {
         const w = result.words[0] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
-        assert('EX9 ada_note_g word[0] is DREAD (opcode=10)', opcode === 10, `got ${opcode}`);
+        assert('EX9 ada_note_g word[0] is DREAD (opcode=16)', opcode === 16, `got ${opcode}`);
     }
     // EX10: data values 1,2,4,1,1,1 appear in the final six words (the .word section)
     {
@@ -5934,14 +5934,14 @@ HALT
     const pnLoad = pnResult.words[0];
     assert('EX-PN word 0 is LOAD opcode (bits[31:27] = 0)',
         (pnLoad >>> 27) === 0, `got opcode ${pnLoad >>> 27}`);
-    // Verify word 1 is IADD (opcode 15 = 0b01111)
+    // Verify word 1 is IADD (opcode 21 = 0b10101 in v2.0)
     const pnIadd = pnResult.words[1];
-    assert('EX-PN word 1 is IADD opcode (bits[31:27] = 15)',
-        (pnIadd >>> 27) === 15, `got opcode ${pnIadd >>> 27}`);
-    // Verify word 2 is DWRITE (opcode 11 = 0b01011)
+    assert('EX-PN word 1 is IADD opcode (bits[31:27] = 21)',
+        (pnIadd >>> 27) === 21, `got opcode ${pnIadd >>> 27}`);
+    // Verify word 2 is DWRITE (opcode 17 = 0b10001 in v2.0)
     const pnDwrite = pnResult.words[2];
-    assert('EX-PN word 2 is DWRITE opcode (bits[31:27] = 11)',
-        (pnDwrite >>> 27) === 11, `got opcode ${pnDwrite >>> 27}`);
+    assert('EX-PN word 2 is DWRITE opcode (bits[31:27] = 17)',
+        (pnDwrite >>> 27) === 17, `got opcode ${pnDwrite >>> 27}`);
 
     // PETNAME (no-dot form) must produce identical words
     const aNoDot = new ChurchAssembler();
@@ -6021,35 +6021,35 @@ HALT
     assert('EX-PH private_helpers.cloomc produces 6 words (IADD+BRANCH+ISUB+BRANCH+SHL+HALT)',
         phResult.words.length === 6, `got ${phResult.words.length}`);
 
-    // Word 0: IADD (opcode 15 = 0b01111) — add_and_double body
-    assert('EX-PH word[0] is IADD (opcode 15)',
-        ((phResult.words[0] >>> 27) & 0x1F) === 15,
+    // Word 0: IADD (opcode 21 = 0b10101 in v2.0) — add_and_double body
+    assert('EX-PH word[0] is IADD (opcode 21)',
+        ((phResult.words[0] >>> 27) & 0x1F) === 21,
         `got opcode ${(phResult.words[0] >>> 27) & 0x1F}`);
 
-    // Word 1: BRANCH (opcode 17 = 0b10001) — forward to _double_result
-    assert('EX-PH word[1] is BRANCH (opcode 17)',
-        ((phResult.words[1] >>> 27) & 0x1F) === 17,
+    // Word 1: BRANCH (opcode 23 = 0b10111 in v2.0) — forward to _double_result
+    assert('EX-PH word[1] is BRANCH (opcode 23)',
+        ((phResult.words[1] >>> 27) & 0x1F) === 23,
         `got opcode ${(phResult.words[1] >>> 27) & 0x1F}`);
 
-    // Word 2: ISUB (opcode 16 = 0b10000) — sub_and_double body
-    assert('EX-PH word[2] is ISUB (opcode 16)',
-        ((phResult.words[2] >>> 27) & 0x1F) === 16,
+    // Word 2: ISUB (opcode 22 = 0b10110 in v2.0) — sub_and_double body
+    assert('EX-PH word[2] is ISUB (opcode 22)',
+        ((phResult.words[2] >>> 27) & 0x1F) === 22,
         `got opcode ${(phResult.words[2] >>> 27) & 0x1F}`);
 
-    // Word 3: BRANCH (opcode 17) — from Method 2 to _double_result
-    assert('EX-PH word[3] is BRANCH (opcode 17)',
-        ((phResult.words[3] >>> 27) & 0x1F) === 17,
+    // Word 3: BRANCH (opcode 23 in v2.0) — from Method 2 to _double_result
+    assert('EX-PH word[3] is BRANCH (opcode 23)',
+        ((phResult.words[3] >>> 27) & 0x1F) === 23,
         `got opcode ${(phResult.words[3] >>> 27) & 0x1F}`);
 
-    // Word 4: SHL (opcode 18 = 0b10010) — private helper body
-    assert('EX-PH word[4] is SHL (opcode 18)',
-        ((phResult.words[4] >>> 27) & 0x1F) === 18,
+    // Word 4: SHL (opcode 24 = 0b11000 in v2.0) — private helper body
+    assert('EX-PH word[4] is SHL (opcode 24)',
+        ((phResult.words[4] >>> 27) & 0x1F) === 24,
         `got opcode ${(phResult.words[4] >>> 27) & 0x1F}`);
 
     // Word 5: HALT — the assembler encodes HALT with opcode 0 (LOAD form)
-    // We verify the last word is not a BRANCH (opcode 17) so the program halts.
+    // We verify the last word is not a BRANCH (opcode 23 in v2.0) so the program halts.
     assert('EX-PH word[5] is not BRANCH (program terminates after _double_result)',
-        ((phResult.words[5] >>> 27) & 0x1F) !== 17,
+        ((phResult.words[5] >>> 27) & 0x1F) !== 23,
         `word[5] unexpectedly encoded as BRANCH`);
 
     // Both BRANCHes use relative offsets and therefore have different imm values,
@@ -6583,17 +6583,17 @@ abstraction VlcTest {
         assert('EX-PFS: post_flash_selftest contains at least 4 TPERM EXACT words',
             exactWords.length >= 4,
             `found ${exactWords.length}`);
-        // Must contain SHR ASR words (opcode=19, ASR flag encoded in bit 5 of imm field)
-        const SHR_OP = 19;
+        // Must contain SHR ASR words (opcode=25 in v2.0, ASR flag encoded in bit 5 of imm field)
+        const SHR_OP = 25;
         const asrWords = words.filter(w =>
             ((w >>> 27) & 0x1F) === SHR_OP && (w >>> 5) & 1
         );
         assert('EX-PFS: post_flash_selftest contains at least 3 SHR ASR words',
             asrWords.length >= 3,
             `found ${asrWords.length}`);
-        // Must contain BFEXT (opcode=12) and BFINS (opcode=13)
-        const bfextCount = words.filter(w => ((w >>> 27) & 0x1F) === 12).length;
-        const bfinsCount = words.filter(w => ((w >>> 27) & 0x1F) === 13).length;
+        // Must contain BFEXT (opcode=18 in v2.0) and BFINS (opcode=19 in v2.0)
+        const bfextCount = words.filter(w => ((w >>> 27) & 0x1F) === 18).length;
+        const bfinsCount = words.filter(w => ((w >>> 27) & 0x1F) === 19).length;
         assert('EX-PFS: post_flash_selftest contains at least 3 BFEXT words',
             bfextCount >= 3, `found ${bfextCount}`);
         assert('EX-PFS: post_flash_selftest contains at least 2 BFINS words',
@@ -7028,7 +7028,7 @@ abstraction VlcTest {
             // Mini-simulator: executes IADD/ISUB/SHL, ignores everything else.
             // Returns a Uint32Array of DR0-DR15 after running all words.
             function runMiniSim(words) {
-                const IADD_OP = 15, ISUB_OP = 16, SHL_OP = 18;
+                const IADD_OP = 21, ISUB_OP = 22, SHL_OP = 24;  // v2.0 opcodes
                 const regs = new Uint32Array(16); // DR0 stays 0
                 for (const w of words) {
                     const op   = (w >>> 27) & 0x1F;
@@ -7104,7 +7104,7 @@ abstraction VlcTest {
         // the register ends up holding the expected unsigned/positive value.
         {
             function runMiniSimPos(words) {
-                const IADD_OP = 15, ISUB_OP = 16, SHL_OP = 18;
+                const IADD_OP = 21, ISUB_OP = 22, SHL_OP = 24;  // v2.0 opcodes
                 const regs = new Uint32Array(16);
                 for (const w of words) {
                     const op   = (w >>> 27) & 0x1F;
@@ -9069,13 +9069,13 @@ Add a method called Run
         a.errors.map(e => e.message).join('; '));
     assert('SYN5-a MCMP DR0, #5: exactly 1 word emitted', r.words.length === 1,
         'got ' + r.words.length);
-    // Synthesized as ISUB DR15, DR0, #5 — opcode=15, crDst=15, crSrc=0, imm=0x4005
+    // Synthesized as ISUB DR15, DR0, #5 — opcode=22 (v2.0), crDst=15, crSrc=0, imm=0x4005
     const w = r.words[0];
     const opcode = (w >>> 27) & 0x1F;
     const crDst  = (w >>> 19) & 0xF;
     const crSrc  = (w >>> 15) & 0xF;
     const imm    = w & 0x7FFF;
-    assert('SYN5-a opcode = 16 (ISUB)', opcode === 16, 'got opcode ' + opcode);
+    assert('SYN5-a opcode = 22 (ISUB)', opcode === 22, 'got opcode ' + opcode);
     assert('SYN5-a crDst = 15 (scratch DR15)', crDst === 15, 'got crDst ' + crDst);
     assert('SYN5-a crSrc = 0 (DR0)', crSrc === 0, 'got crSrc ' + crSrc);
     assert('SYN5-a imm = 0x4005 (immediate flag + 5)', imm === 0x4005,
@@ -9129,7 +9129,7 @@ Add a method called Run
     const opcode = (w >>> 27) & 0x1F;
     const crDst  = (w >>> 19) & 0xF;
     const crSrc  = (w >>> 15) & 0xF;
-    assert('SYN5-e register form opcode = 14 (MCMP)', opcode === 14, 'got opcode ' + opcode);
+    assert('SYN5-e register form opcode = 20 (MCMP)', opcode === 20, 'got opcode ' + opcode);
     assert('SYN5-e register form crDst = 0 (DR0)', crDst === 0, 'got crDst ' + crDst);
     assert('SYN5-e register form crSrc = 1 (DR1)', crSrc === 1, 'got crSrc ' + crSrc);
 }

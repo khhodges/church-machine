@@ -9,7 +9,7 @@
 // inline copy — but any change to the BRANCH-encoding formula or header
 // packing must be applied here and reflected there in the same commit.
 
-const BRANCH_OPCODE = 17;
+const BRANCH_OPCODE = 23; // ★ v2.0 ISA: BRANCH is opcode 23 (was 17)
 
 // Assemble a LUMP binary with a BRANCH-encoded method table.
 //

@@ -762,7 +762,11 @@ class ChurchSimulator {
     packNSWord1(limit17, bFlag, gBit, gtType, clistCount) {
         return (
             ((bFlag & 1) << 31) |
-            // bit[30] reserved — f_flag moved to GT word bit[25] (per-token, not per-NS-entry)
+            // bit[30]: f_flag (far-lump) — REMOVED in v2.0 ISA; always 0 in packNSWord1.
+            //          In v1.x, f_flag lived in the GT word at bit[25]. In v2.0, it was
+            //          retired entirely: far-lumps are no longer a gate in the mLoad/mSave path.
+            //          parseNSWord1() returns f:0 for forward compatibility with any code that
+            //          still reads the field; callers should treat f===1 as unreachable in v2.0.
             ((gBit & 1) << 29) |        // G-bit at bit[29] — matches server/boot_image.py pack_ns_word1 g→29.
             // bit[28] reserved — NOT used for chainable; chainable lives in this.nsChainable[] side-table.
             ((gtType & 3) << 26) |
@@ -774,7 +778,10 @@ class ChurchSimulator {
     parseNSWord1(word1) {
         return {
             b: (word1 >>> 31) & 1,
-            // bit[30] reserved — f_flag moved to GT word bit[25] (per-token, not per-NS-entry)
+            // f: far-lump flag — REMOVED in v2.0; bit[30] is always 0 in the simulator's
+            //    NS Word1 layout.  Exposed here so callers (mSave, boot, CALL) that check
+            //    .f === 1 always see false and skip the far-lump restriction path.
+            f: (word1 >>> 30) & 1,      // ★ v2.0: always 0; retained for API compatibility
             g: (word1 >>> 29) & 1,      // G-bit at bit[29] — matches packNSWord1 and boot_image.py.
             // bit[28] reserved — chainable is NOT in Word 1; see this.nsChainable[] side-table.
             gtType: (word1 >>> 26) & 3,
@@ -1158,7 +1165,7 @@ class ChurchSimulator {
                         : (DEVICE_REG_LIMITS[i] !== undefined ? DEVICE_REG_LIMITS[i]
                         : (mySize - 1));
             const nsTableCount = (i === 0) ? abstractions.length : 0;
-            // New GT layout: [31]=b_flag [30:28]=perm[2:0] [27]=dom [26]=spare [25]=f_flag ...
+            // v2.0 GT layout: [31]=b_flag [30:28]=perm[2:0] [27]=dom ★[26:25]=gt_type ★[24:16]=gt_seq ...
             const _ap   = a.perms || {};
             const _dom  = (_ap.L || _ap.S || _ap.E) ? 1 : 0;
             const _p3   = _dom === 0
@@ -1918,15 +1925,15 @@ class ChurchSimulator {
     }
 
     parseGT(gt32) {
-        // New GT layout: [31]=b_flag [30:28]=perm[2:0] [27]=dom [26]=spare [25]=f_flag
-        //               [24:23]=gt_type [22:16]=gt_seq [15:0]=slot_id
+        // v2.0 GT layout: [31]=b_flag [30:28]=perm[2:0] [27]=dom
+        //               ★[26:25]=gt_type  ★[24:16]=gt_seq(9b)  [15:0]=slot_id
+        // f_flag is now in the NS SLOT authority word (Word 1 bit[31]), not the GT word.
         gt32 = gt32 >>> 0;
         const b_flag = (gt32 >>> 31) & 1;
         const perm3  = (gt32 >>> 28) & 0x7;
         const dom    = (gt32 >>> 27) & 0x1;
-        const f_flag = (gt32 >>> 25) & 0x1;
-        const type   = (gt32 >>> 23) & 0x3;
-        const gt_seq = (gt32 >>> 16) & 0x7F;
+        const type   = (gt32 >>> 25) & 0x3;   // ★ was [24:23]
+        const gt_seq = (gt32 >>> 16) & 0x1FF; // ★ 9 bits, was 7 bits at [22:16]
         const index  =  gt32         & 0xFFFF;
         // Decode permissions from dom+perm3 (mutual exclusion enforced by dom bit).
         const permissions = dom === 0
@@ -1948,7 +1955,6 @@ class ChurchSimulator {
         return {
             gt_seq, index,
             permissions,
-            f_flag,
             type,
             typeName: ['NULL','Inform','Outform','Abstract'][type & 3],
             malformed,
@@ -1990,8 +1996,9 @@ class ChurchSimulator {
         if (!single.ok) {
             throw new Error(`createGT: single-Church-perm violation (${single.bits}) — slot ${slotId} must carry exactly one Church permission`);
         }
-        // New GT layout: [31]=b_flag [30:28]=perm[2:0] [27]=dom [26]=spare=0 [25]=f_flag=0
-        //               [24:23]=gt_type [22:16]=gt_seq [15:0]=slot_id
+        // v2.0 GT layout: [31]=b_flag [30:28]=perm[2:0] [27]=dom
+        //               ★[26:25]=gt_type  ★[24:16]=gt_seq(9b)  [15:0]=slot_id
+        // f_flag is in NS SLOT Word 1 bit[31], not in the GT word.
         const hasChurch = perms.L || perms.S || perms.E;
         const dom   = hasChurch ? 1 : 0;
         const perm3 = dom === 0
@@ -1999,14 +2006,14 @@ class ChurchSimulator {
             : (((perms.E ? 1 : 0) << 2) | ((perms.S ? 1 : 0) << 1) | (perms.L ? 1 : 0));
         const b = (perms.B ? 1 : 0);
         const p = ((b << 31) | (perm3 << 28) | (dom << 27)) >>> 0;
-        const t = ((type   & 0x3)  << 23) >>> 0;
-        const s = ((gt_seq & 0x7F) << 16) >>> 0;
+        const t = ((type   & 0x3)  << 25) >>> 0; // ★ was << 23
+        const s = ((gt_seq & 0x1FF) << 16) >>> 0; // ★ 9 bits, was 0x7F << 16
         const i = (slotId  & 0xFFFF)      >>> 0;
         return (p | t | s | i) >>> 0;
     }
 
     // Abstract GT helpers (Task #406) ─────────────────────────────────────────
-    // Layout: [31:27]=ab_type  [26:25]=R/W  [24:23]=0b11(type)  [22:16]=gt_seq  [15:0]=ab_data
+    // v2.0 layout: [31:27]=ab_type  ★[26:25]=gt_type=0b11  [24]=R  [23]=W  [22:16]=gt_seq  [15:0]=ab_data
     // ab_data for ab_type=0x00 I/O: [15:8]=device_class  [7:0]=device_data
     static AB_TYPE_IO          = 0x00;   // I/O device (LED, UART, Button, Timer, Display)
     static AB_TYPE_M_ELEVATION = 0x01;   // M Abstraction — sets CRn(M=1)
@@ -2032,9 +2039,9 @@ class ChurchSimulator {
         const wBit = perms.W ? 1 : 0;
         return (
             ((ab_type & 0x1F) << 27) |
-            (rBit             << 26) |   // R at bit[26]
-            (wBit             << 25) |   // W at bit[25]
-            (0b11             << 23) |   // type = Abstract
+            (0b11             << 25) |   // ★ gt_type=Abstract at [26:25], was [24:23]
+            (rBit             << 24) |   // ★ R at bit[24], was [26]
+            (wBit             << 23) |   // ★ W at bit[23], was [25]
             ((gt_seq & 0x7F)  << 16) |
             (ab_data & 0xFFFF)
         ) >>> 0;
@@ -2043,9 +2050,9 @@ class ChurchSimulator {
     parseAbstractGT(gt32) {
         gt32 = gt32 >>> 0;
         const ab_type      = (gt32 >>> 27) & 0x1F;
-        const R            = (gt32 >>> 26) & 1;
-        const W            = (gt32 >>> 25) & 1;
-        const type         = (gt32 >>> 23) & 0x3;   // always 0b11 for Abstract
+        const type         = (gt32 >>> 25) & 0x3;   // ★ always 0b11 for Abstract; was [24:23]
+        const R            = (gt32 >>> 24) & 1;      // ★ was [26]
+        const W            = (gt32 >>> 23) & 1;      // ★ was [25]
         const gt_seq       = (gt32 >>> 16) & 0x7F;
         const ab_data      = gt32 & 0xFFFF;
         const device_class = (ab_data >>> 8) & 0xFF;
@@ -2664,13 +2671,13 @@ class ChurchSimulator {
         const dr12 = this.dr[12] >>> 0;
         const dr13 = this.dr[13] >>> 0;
         const dr14 = this.dr[14] >>> 0;
-        // Gate 1: DR11 must be non-NULL (bits[24:23] != 0b00).
-        const dr11Type = (dr11 >>> 23) & 0x3;
+        // Gate 1: DR11 must be non-NULL (v2.0: gt_type at bits[26:25] != 0b00).
+        const dr11Type = (dr11 >>> 25) & 0x3;   // ★ v2.0: gt_type moved from [24:23] to [26:25]
         // Gate 2: integrity32(DR12, DR13) must equal DR14.
         const computed = this._integrity32(dr12, dr13);
-        // Gate 3: gt_seq from DR11[22:16] must match DR13[27:21].
-        const seqDR11 = (dr11 >>> 16) & 0x7F;
-        const seqDR13 = (dr13 >>> 21) & 0x7F;
+        // Gate 3: gt_seq from DR11[24:16] (v2.0: 9-bit) must match DR13[27:21] (NS seal format).
+        const seqDR11 = (dr11 >>> 16) & 0x1FF;  // ★ v2.0: 9 bits, was 7 bits at [22:16]
+        const seqDR13 = (dr13 >>> 21) & 0x7F;   // NS seal word: stays as simulator abstraction
         const pass = (dr11Type !== 0) && (computed === dr14) && (seqDR11 === seqDR13);
         this.cr[15].m = 0;
         if (pass) {
@@ -2681,7 +2688,7 @@ class ChurchSimulator {
         }
         const why = dr11Type === 0 ? 'NULL DR11' :
                     computed !== dr14 ? `integrity mismatch (got 0x${computed.toString(16).toUpperCase()} expected 0x${dr14.toString(16).toUpperCase()})` :
-                    `gt_seq mismatch (DR11[22:16]=${seqDR11} != DR13[27:21]=${seqDR13})`;
+                    `gt_seq mismatch (DR11[24:16]=${seqDR11} != DR13[27:21]=${seqDR13})`;
         this.fault('INVALID_OP', `M-window writeback failed: ${why}`);
         return false;
     }
@@ -2724,7 +2731,13 @@ class ChurchSimulator {
     }
 
     opName(code) {
-        const names = ['LOAD','SAVE','CALL','RETURN','CHANGE','SWITCH','TPERM','LAMBDA','ELOADCALL','XLOADLAMBDA','DREAD','DWRITE','BFEXT','BFINS','MCMP','IADD','ISUB','BRANCH','SHL','SHR'];
+        // v2.0 ISA: Church opcodes 0–9; Turing opcodes 16–25; 10–15 and 26–29 unassigned.
+        const names = {
+            0:'LOAD', 1:'SAVE', 2:'CALL', 3:'RETURN', 4:'CHANGE', 5:'SWITCH',
+            6:'TPERM', 7:'LAMBDA', 8:'ELOADCALL', 9:'XLOADLAMBDA',
+            16:'DREAD', 17:'DWRITE', 18:'BFEXT', 19:'BFINS', 20:'MCMP',
+            21:'IADD', 22:'ISUB', 23:'BRANCH', 24:'SHL', 25:'SHR',
+        };
         return names[code] || '???';
     }
 
@@ -3165,17 +3178,13 @@ class ChurchSimulator {
             return null;
         }
         const instrWord = fetch.word;
-        if (instrWord === 0) {
-            if (!this.bootComplete) {
-                this.output += `[PP250] Zero instruction at PC=${this.pc} (addr=0x${fetch.addr.toString(16)}) — pre-boot zero, returning to boot sequence\n`;
-                this._returnToBoot();
-                return { pc: this.pc, physicalPC: this.physicalPC, instr: null, desc: 'PP250: zero instruction -> reboot' };
-            }
-            this.output += `[PP250] HALT at PC=${this.pc} (addr=0x${fetch.addr.toString(16)}) — machine stopped.\n`;
-            this.halted = true;
-            this.running = false;
-            this.emit('stateChange', this.getState());
-            return { pc: this.pc, physicalPC: this.physicalPC, instr: null, desc: 'HALT: machine stopped' };
+        // v2.0: HALT (instrWord===0) does not exist. A zero word decodes to
+        // LOAD EQ, CR0, CR0[0] — a conditional NOP that executes only when Z=1.
+        // Pre-boot zero-word handling is retained via the boot PC sentinel path.
+        if (instrWord === 0 && !this.bootComplete) {
+            this.output += `[PP250] Zero instruction at PC=${this.pc} (addr=0x${fetch.addr.toString(16)}) — pre-boot zero, returning to boot sequence\n`;
+            this._returnToBoot();
+            return { pc: this.pc, physicalPC: this.physicalPC, instr: null, desc: 'PP250: zero instruction -> reboot' };
         }
 
         const d = this.decodeInstruction(instrWord);
@@ -3215,12 +3224,12 @@ class ChurchSimulator {
         //     inside _execChange (must be 12–15). crSrc is also unrestricted: the boot
         //     sequence uses `CHANGE CR12, CR12, 1` where crSrc==12 (the only instruction
         //     that may reach into the privileged bank as a source is CHANGE itself).
-        //   DREAD (opcode 10) / DWRITE (opcode 11): may use CR14 as the source
+        //   DREAD (opcode 16) / DWRITE (opcode 17): may use CR14 as the source
         //     capability field to access read-only data packed after HALT in the
         //     code lump (`DREAD DR, CR14, offset` pattern).
         if (d.opcode !== 4) {
             // crDst encodes a CR index only for Church opcodes (0–9).
-            // Turing opcodes (10–19) put a DR index in the same bit field — do not fence them.
+            // Turing opcodes (16–25) put a DR index in the same bit field — do not fence them.
             const isChurchOp = (d.opcode <= 9);
             if (isChurchOp && d.crDst >= 12) {
                 this.fault('PRIV_REG', `${this.opName(d.opcode)}: CR${d.crDst} is privileged — only CHANGE may write CR12–CR15`);
@@ -3233,11 +3242,11 @@ class ChurchSimulator {
             //   5 (SWITCH)                    — crSrc is the register to swap ✓
             //   6 (TPERM), 7 (LAMBDA)         — crSrc unused (stays 0, no false fault) ✓
             //   8 (ELOADCALL), 9 (XLOADLAMBDA)— crSrc is the c-list CR ✓
-            //   10 (DREAD), 11 (DWRITE)       — crSrc is a CR (with CR14 exception)
-            //   12–19 (other Turing)          — crSrc is a DR index, not a CR ✗
-            const isDreadDwrite = (d.opcode === 10 || d.opcode === 11);
+            //   16 (DREAD), 17 (DWRITE)       — crSrc is a CR (with CR14 exception)
+            //   18–25 (other Turing)          — crSrc is a DR index, not a CR ✗
+            const isDreadDwrite = (d.opcode === 16 || d.opcode === 17);
             // Opcodes where crSrc genuinely carries a CR index (privilege fence applies):
-            const crSrcIsCapReg = [0, 1, 5, 8, 9, 10, 11].includes(d.opcode);
+            const crSrcIsCapReg = [0, 1, 5, 8, 9, 16, 17].includes(d.opcode);
             if (crSrcIsCapReg && d.crSrc >= 12 && !(isDreadDwrite && d.crSrc === 14)) {
                 this.fault('PRIV_REG', `${this.opName(d.opcode)}: CR${d.crSrc} is privileged — DREAD/DWRITE may use CR14 as source; all other instructions must use CR0–CR11`);
                 return null;
@@ -3269,16 +3278,25 @@ class ChurchSimulator {
             case 7: result = this._execLambda(d); break;
             case 8: result = this._execEloadcall(d); break;
             case 9: result = this._execXloadlambda(d); break;
-            case 10: result = this._execDread(d); break;
-            case 11: result = this._execDwrite(d); break;
-            case 12: result = this._execBfext(d); break;
-            case 13: result = this._execBfins(d); break;
-            case 14: result = this._execMcmp(d); break;
-            case 15: result = this._execIadd(d); break;
-            case 16: result = this._execIsub(d); break;
-            case 17: result = this._execBranch(d); break;
-            case 18: result = this._execShl(d); break;
-            case 19: result = this._execShr(d); break;
+            // opcodes 10–15: unassigned in v2.0 ISA → FAULT
+            case 10: case 11: case 12: case 13: case 14: case 15:
+                this.fault('INVALID_OP', `Opcode ${d.opcode} is unassigned (reserved gap 10–15) in v2.0 ISA`);
+                return null;
+            // opcodes 16–25: Turing data-register instructions
+            case 16: result = this._execDread(d); break;
+            case 17: result = this._execDwrite(d); break;
+            case 18: result = this._execBfext(d); break;
+            case 19: result = this._execBfins(d); break;
+            case 20: result = this._execMcmp(d); break;
+            case 21: result = this._execIadd(d); break;
+            case 22: result = this._execIsub(d); break;
+            case 23: result = this._execBranch(d); break;
+            case 24: result = this._execShl(d); break;
+            case 25: result = this._execShr(d); break;
+            // opcodes 26–29: unassigned in v2.0 ISA → FAULT
+            case 26: case 27: case 28: case 29:
+                this.fault('INVALID_OP', `Opcode ${d.opcode} is unassigned (reserved gap 26–29) in v2.0 ISA`);
+                return null;
             case 0x1E:
                 this.fault('INVALID_OP', `WORD (opcode 0x1E) is an inline data constant and cannot be executed — check your RETURN placement`);
                 return null;
@@ -3922,12 +3940,12 @@ class ChurchSimulator {
         //   index=0 → NIA = lump_base + 1 (word 1, single-entry-point shortcut).
         //   index>0 → read memory[lump_base + index]; 0 = private → FAULT.
         //
-        // Method-table entries are BRANCH instructions (opcode 17, 15-bit signed
+        // Method-table entries are BRANCH instructions (opcode 23 in v2.0 ISA, 15-bit signed
         // offset in bits [14:0]).  The entry at lump word `methodIndex` sits at
         // lump-relative PC = methodIndex - 1 (fetch formula: physAddr = base+1+pc).
         // New PC = (methodIndex - 1) + branchOffset = bodyOffset.
         //
-        // Backward compat: if the opcode field is not 17, the entry is treated as
+        // Backward compat: if the opcode field is not 23, the entry is treated as
         // a direct lump-relative PC (legacy bare-address format from pre-task-1134
         // LUMPs stored on disk).
         const methodIndex = (d.imm !== undefined) ? (d.imm & 0x7FFF) : 0;
@@ -3942,7 +3960,7 @@ class ChurchSimulator {
                 return null;
             }
             const entryOpcode = (tableEntry >>> 27) & 0x1F;
-            if (entryOpcode === 17) {  // BRANCH-encoded method-table entry (Task #1134)
+            if (entryOpcode === 23) {  // BRANCH-encoded method-table entry (v2.0: opcode 23)
                 // Decode 15-bit signed offset; table entry at lump PC (methodIndex - 1).
                 const soff = (tableEntry & 0x4000)
                     ? ((tableEntry & 0x7FFF) | 0xFFFF8000)
@@ -5520,8 +5538,8 @@ class ChurchSimulator {
             return null;
         }
         // Abstract GT intercept (type=0b11): bypass mLoad, route to Abstract Manager.
-        // Pass crIdx so the M-window helper can read the 5 CR words directly.
-        if (((dataGT >>> 23) & 0x3) === 3) {
+        // v2.0: gt_type is at bits[26:25] (was [24:23]).
+        if (((dataGT >>> 25) & 0x3) === 3) {  // ★ v2.0: gt_type moved to [26:25]
             return this._dispatchAbstractDread(d.crSrc, drIdx, d.imm);
         }
         const srcCR = this.cr[d.crSrc];
@@ -5581,8 +5599,8 @@ class ChurchSimulator {
             return null;
         }
         // Abstract GT intercept (type=0b11): bypass mLoad, route to Abstract Manager.
-        // Pass crIdx so the M-window helper can read the 5 CR words directly.
-        if (((dataGT >>> 23) & 0x3) === 3) {
+        // v2.0: gt_type is at bits[26:25] (was [24:23]).
+        if (((dataGT >>> 25) & 0x3) === 3) {  // ★ v2.0: gt_type moved to [26:25]
             return this._dispatchAbstractDwrite(d.crSrc, drIdx, d.imm);
         }
         const srcCR = this.cr[d.crSrc];
