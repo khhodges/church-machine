@@ -496,6 +496,26 @@ class RgmiiMac(Elaboratable):
             o_Q1=rxctl_d1, o_Q2=rxctl_d2,
         )
 
+        # ── 2-FF synchronizers: rxc_buf → sync (eth after DomainRenamer) ────────
+        # IDDR outputs (rxctl_d1, rxd_d1) are registered by rxc_buf — the PHY's
+        # recovered 25 MHz clock.  The RX FSM runs in 'sync' (MMCM-derived
+        # 25 MHz), which is asynchronous to rxc_buf.  A 2-stage register chain
+        # resolves metastability before the FSM sees either signal.
+        # At 100BASE-T the preamble is 8 bytes (16 nibble clocks = 640 ns), so
+        # the 2-cycle / 80 ns synchronizer latency is absorbed by the preamble
+        # stripper with ample margin.
+        rxctl_sync1 = Signal()
+        rxctl_sync2 = Signal()   # RXDV, metastability-resolved — safe for FSM
+        rxd_sync1   = Signal(4)
+        rxd_sync2   = Signal(4)  # RXD nibble, resolved — safe for FSM
+
+        m.d.sync += [
+            rxctl_sync1.eq(rxctl_d1),     # first stage: sample across boundary
+            rxctl_sync2.eq(rxctl_sync1),  # second stage: resolved
+            rxd_sync1.eq(rxd_d1),
+            rxd_sync2.eq(rxd_sync1),
+        ]
+
         # ── RX byte assembler (streaming — no internal buffer) ────────────────
         # At 100BASE-T: one nibble (4 bits) per 25 MHz clock cycle.
         # Two nibbles (lo first per MII convention) assemble one byte.
@@ -513,40 +533,41 @@ class RgmiiMac(Elaboratable):
         ]
 
         # ── RX FSM ─────────────────────────────────────────────────────────────
+        # Uses rxctl_sync2 / rxd_sync2 (2-FF synchronized from rxc_buf domain).
         with m.FSM(name="rgmii_rx"):
 
             with m.State("RX_IDLE"):
                 m.d.sync += [rx_len_ctr.eq(0), rx_nib_phase.eq(0)]
-                with m.If(rxctl_d1):
+                with m.If(rxctl_sync2):
                     m.next = "RX_PREAMBLE"
 
             with m.State("RX_PREAMBLE"):
                 # Strip 8-byte preamble + SFD (0x55…55_D5).
                 # SFD = 0xD5: lo nibble = 0x5, hi nibble = 0xD.
                 # Transition to RX_DATA on the hi nibble of the SFD byte.
-                with m.If(~rxctl_d1):
+                with m.If(~rxctl_sync2):
                     m.next = "RX_IDLE"
                 with m.Elif(rx_nib_phase == 0):
-                    m.d.sync += [rx_lo_nib.eq(rxd_d1), rx_nib_phase.eq(1)]
+                    m.d.sync += [rx_lo_nib.eq(rxd_sync2), rx_nib_phase.eq(1)]
                 with m.Else():
                     m.d.sync += rx_nib_phase.eq(0)
-                    with m.If((rx_lo_nib == 0x5) & (rxd_d1 == 0xD)):
+                    with m.If((rx_lo_nib == 0x5) & (rxd_sync2 == 0xD)):
                         m.d.sync += rx_len_ctr.eq(0)
                         m.next = "RX_DATA"
 
             with m.State("RX_DATA"):
-                with m.If(~rxctl_d1):
+                with m.If(~rxctl_sync2):
                     # RXDV de-asserted: frame is complete.
                     m.d.comb += self.rx_done.eq(1)
                     m.d.sync += self.rx_len.eq(rx_len_ctr)
                     m.next = "RX_IDLE"
                 with m.Elif(rx_nib_phase == 0):
-                    m.d.sync += [rx_lo_nib.eq(rxd_d1), rx_nib_phase.eq(1)]
+                    m.d.sync += [rx_lo_nib.eq(rxd_sync2), rx_nib_phase.eq(1)]
                 with m.Else():
                     # Hi nibble: combinatorially drive rx_data and rx_valid.
                     # MII convention: lo nibble transmitted first.
                     m.d.comb += [
-                        self.rx_data.eq(Cat(rx_lo_nib, rxd_d1)),
+                        self.rx_data.eq(Cat(rx_lo_nib, rxd_sync2)),
                         self.rx_valid.eq(1),
                     ]
                     m.d.sync += [

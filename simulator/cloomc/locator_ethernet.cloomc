@@ -80,8 +80,8 @@ abstraction Locator {
     //   LITERAL   DR2, #0
     //   BRANCH.EQ DR1, DR2, recv_loop  ; no frame yet
     //
-    //   ; DR1 = RX byte count — read ETH_RX_LEN to get word count
-    //   DREAD  DR4, CR7, #3            ; ETH_RX_LEN (words in pending frame)
+    //   ; DR1 = RX byte count from Receive(); confirm with ETH_RX_LEN (also bytes)
+    //   DREAD  DR4, CR7, #3            ; ETH_RX_LEN (byte count; ÷4 = word count)
     //
     //   ; Drain ETH_RX_DATA words into DMEM scratch area (base = DR5)
     //   LITERAL DR5, #SCRATCH_BASE     ; DMEM scratch base address
@@ -144,7 +144,9 @@ abstraction Locator {
             }
 
             // Drain the received frame from ETH_RX_DATA into DMEM scratch
-            n_words = dread(eth, 3)    // ETH_RX_LEN: word count of pending frame
+            // ETH_RX_LEN (offset 3) returns byte count (per API contract)
+            n_bytes = dread(eth, 3)    // ETH_RX_LEN: byte count of pending frame
+            n_words = n_bytes / 4      // 4 bytes per 32-bit word
             scratch = dmem_alloc(n_words)
             i = 0
             while i < n_words {

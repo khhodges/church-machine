@@ -322,8 +322,9 @@ class WukongXC7A100T(Elaboratable):
         tx_wptr          = Signal(7)    # TX word FIFO write pointer
         tx_use_buf_reg   = Signal()     # registered tx_use_buf flag
         tx_buf_nibs_reg  = Signal(12)   # registered nibble count
-        tx_req_sync      = Signal()     # TX trigger pulse
+        tx_toggle        = Signal()     # flips each time CM writes ETH_TX_LEN
         tx_trigger       = Signal()
+        tx_use_clr_ctr   = Signal(4)    # countdown to clear tx_use_buf after toggle
 
         # Connect registered TX-buffer ports to mac (combinational pass-through)
         m.d.comb += [
@@ -331,9 +332,16 @@ class WukongXC7A100T(Elaboratable):
             mac.tx_buf_nibs.eq(tx_buf_nibs_reg),
         ]
 
-        # TX request: FFSynchronizer converts single-cycle sync pulse to eth trigger
-        m.submodules.sync_tx_req = FFSynchronizer(
-            tx_req_sync, mac.send, o_domain="eth")
+        # TX CDC: toggle synchronizer — the toggle level is stable for many cycles
+        # so FFSynchronizer resolves it reliably.  Edge detection in the 'eth'
+        # domain generates a one-cycle mac.send pulse.  Single-cycle pulses through
+        # FFSynchronizer are unreliable (can be missed); the toggle pattern is not.
+        tx_toggle_eth      = Signal()
+        tx_toggle_eth_prev = Signal()
+        m.submodules.sync_tx_toggle = FFSynchronizer(
+            tx_toggle, tx_toggle_eth, o_domain="eth")
+        m.d.eth += tx_toggle_eth_prev.eq(tx_toggle_eth)
+        m.d.comb += mac.send.eq(tx_toggle_eth ^ tx_toggle_eth_prev)
 
         # Default: mac.tx_buf_we is 0 unless overridden in MMIO write handler
         m.d.comb += [
@@ -369,15 +377,20 @@ class WukongXC7A100T(Elaboratable):
                     ]
                     m.d.sync += tx_wptr.eq(tx_wptr + 1)
 
-        # One-cycle TX request pulse when ETH_TX_LEN is written
+        # Flip toggle on TX request; start countdown to clear tx_use_buf_reg.
+        # tx_use_buf_reg must remain high long enough for the toggle edge to
+        # propagate through 2 FFSynchronizer FFs (≥ 2 eth cycles ≈ 80 ns).
+        # A 15-cycle countdown at 25 MHz = 600 ns provides ample margin.
         with m.If(tx_trigger):
-            m.d.sync += [tx_req_sync.eq(1), tx_trigger.eq(0)]
-        with m.Else():
-            m.d.sync += tx_req_sync.eq(0)
-
-        # Clear tx_use_buf once tx_req pulse has fired (one cycle after tx_trigger)
-        with m.If(tx_req_sync):
-            m.d.sync += tx_use_buf_reg.eq(0)
+            m.d.sync += [
+                tx_toggle.eq(~tx_toggle),
+                tx_trigger.eq(0),
+                tx_use_clr_ctr.eq(15),
+            ]
+        with m.Elif(tx_use_clr_ctr > 0):
+            m.d.sync += tx_use_clr_ctr.eq(tx_use_clr_ctr - 1)
+            with m.If(tx_use_clr_ctr == 1):
+                m.d.sync += tx_use_buf_reg.eq(0)
 
         # MMIO read (combinational)
         with m.Switch(self.mmio_addr):
@@ -387,9 +400,12 @@ class WukongXC7A100T(Elaboratable):
                 m.d.comb += self.mmio_rdata.eq(Mux(link_up_sync, 1, 0))
             with m.Case(2):
                 m.d.comb += self.mmio_rdata.eq(eth_tx_len_reg)
-            with m.Case(3):   # ETH_RX_LEN: words remaining in current RX frame
+            with m.Case(3):   # ETH_RX_LEN: byte count of pending frame (per API spec)
+                # rx_words_remaining × 4 converts word count to byte count.
+                # This matches the Ethernet abstraction API contract: Receive()
+                # returns byte count, and ETH_RX_LEN gives the same measure.
                 m.d.comb += self.mmio_rdata.eq(
-                    Mux(rx_frame_rdy_sync, rx_words_remaining, 0))
+                    Mux(rx_frame_rdy_sync, rx_words_remaining << 2, 0))
             with m.Case(4):
                 m.d.comb += self.mmio_rdata.eq(eth_ip_reg)
             with m.Case(5):
