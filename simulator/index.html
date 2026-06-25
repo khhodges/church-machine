@@ -101,6 +101,10 @@
         .ham-debug-section { display:none; flex-direction:column; }
         html.r1-debug-mode .ham-debug-section { display:flex; }
         .ham-subhead { font-size:0.6rem; font-weight:700; letter-spacing:0.09em; color:#44446a; text-transform:uppercase; padding:0.5rem 0.75rem 0.05rem; }
+        /* tutorial selector bar */
+        .btn-tut-select { transition:background 0.15s,border-color 0.15s; }
+        .btn-tut-select:hover { background:rgba(218,165,32,0.22) !important; border-color:rgba(218,165,32,0.7) !important; }
+        .btn-tut-select.active { background:rgba(218,165,32,0.32) !important; border-color:#daa520 !important; font-weight:600; }
         /* tutorial cards */
         .r1-tutorial-wrap { padding:1.5rem; max-width:720px; margin:0 auto; }
         .r1-tutorial-heading { font-family:Georgia,serif; font-size:1.4rem; color:#daa520; margin-bottom:0.4rem; }
@@ -833,6 +837,18 @@
     </div>
 
     <div id="tutorial" class="view">
+        <div class="tutorial-selector" style="display:flex;flex-wrap:wrap;gap:0.4rem;padding:0.75rem 1rem 0;border-bottom:1px solid rgba(218,165,32,0.18);background:rgba(0,0,0,0.18);">
+            <button id="tutSelect-sliderule"     class="btn-tut-select active" onclick="selectTutorial('sliderule')"     style="padding:0.3rem 0.75rem;border:1px solid rgba(218,165,32,0.4);background:rgba(218,165,32,0.12);color:#daa520;border-radius:4px;cursor:pointer;font-size:0.82rem;">📐 Slide Rule</button>
+            <button id="tutSelect-cloomc"        class="btn-tut-select"        onclick="selectTutorial('cloomc')"        style="padding:0.3rem 0.75rem;border:1px solid rgba(218,165,32,0.4);background:rgba(218,165,32,0.12);color:#daa520;border-radius:4px;cursor:pointer;font-size:0.82rem;">📘 CLOOMC Language</button>
+            <button id="tutSelect-security"      class="btn-tut-select"        onclick="selectTutorial('security')"      style="padding:0.3rem 0.75rem;border:1px solid rgba(218,165,32,0.4);background:rgba(218,165,32,0.12);color:#daa520;border-radius:4px;cursor:pointer;font-size:0.82rem;">🔒 Security</button>
+            <button id="tutSelect-thread"        class="btn-tut-select"        onclick="selectTutorial('thread')"        style="padding:0.3rem 0.75rem;border:1px solid rgba(218,165,32,0.4);background:rgba(218,165,32,0.12);color:#daa520;border-radius:4px;cursor:pointer;font-size:0.82rem;">🧵 Threads</button>
+            <button id="tutSelect-abstraction"   class="btn-tut-select"        onclick="selectTutorial('abstraction')"   style="padding:0.3rem 0.75rem;border:1px solid rgba(218,165,32,0.4);background:rgba(218,165,32,0.12);color:#daa520;border-radius:4px;cursor:pointer;font-size:0.82rem;">🧩 Abstractions</button>
+            <button id="tutSelect-namespace"     class="btn-tut-select"        onclick="selectTutorial('namespace')"     style="padding:0.3rem 0.75rem;border:1px solid rgba(218,165,32,0.4);background:rgba(218,165,32,0.12);color:#daa520;border-radius:4px;cursor:pointer;font-size:0.82rem;">🗂 Namespace</button>
+            <button id="tutSelect-secureboot"    class="btn-tut-select"        onclick="selectTutorial('secureboot')"    style="padding:0.3rem 0.75rem;border:1px solid rgba(218,165,32,0.4);background:rgba(218,165,32,0.12);color:#daa520;border-radius:4px;cursor:pointer;font-size:0.82rem;">🥾 Secure Boot</button>
+            <button id="tutSelect-englishloops"  class="btn-tut-select"        onclick="selectTutorial('englishloops')"  style="padding:0.3rem 0.75rem;border:1px solid rgba(218,165,32,0.4);background:rgba(218,165,32,0.12);color:#daa520;border-radius:4px;cursor:pointer;font-size:0.82rem;">🔁 Loops</button>
+            <button id="tutSelect-englishstring" class="btn-tut-select"        onclick="selectTutorial('englishstring')" style="padding:0.3rem 0.75rem;border:1px solid rgba(218,165,32,0.4);background:rgba(218,165,32,0.12);color:#daa520;border-radius:4px;cursor:pointer;font-size:0.82rem;">📝 Strings</button>
+            <button id="tutSelect-englishcontact" class="btn-tut-select"       onclick="selectTutorial('englishcontact')" style="padding:0.3rem 0.75rem;border:1px solid rgba(218,165,32,0.4);background:rgba(218,165,32,0.12);color:#daa520;border-radius:4px;cursor:pointer;font-size:0.82rem;">📇 Contacts</button>
+        </div>
         <div id="tutorialView"></div>
     </div>
 
