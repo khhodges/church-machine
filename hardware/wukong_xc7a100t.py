@@ -46,6 +46,7 @@ RGMII pin map (QMTECH Wukong v1.1 schematic)
 
 from amaranth import *
 from amaranth.lib.cdc import FFSynchronizer
+import amaranth.lib.memory as _lib_mem
 from .rgmii_mac import RgmiiMac
 
 # Board MAC address (locally administered, CE:11 prefix)
@@ -226,20 +227,27 @@ class WukongXC7A100T(Elaboratable):
             mac.busy, busy_sync, o_domain="sync")
         m.d.comb += self.eth_busy.eq(busy_sync)
 
-        # ── RX FIFO: eth-domain byte assembler + word FIFO ────────────────────
+        # ── RX Memory: dual-clock BRAM (eth write, sync read) ─────────────────
         # mac.rx_valid/rx_data fire in the 'eth' clock domain.
-        # We assemble 4-byte groups into 32-bit big-endian words and store them
-        # in a 64-word FIFO (eth-domain write pointer, sync-domain read pointer).
-        # A frame-ready flag is synchronized to 'sync' so the CM can poll ETH_RX_LEN.
-        RX_FIFO_WORDS = 64
-        rx_fifo = Array(Signal(32, name=f"rxf{i}") for i in range(RX_FIFO_WORDS))
+        # Bytes are assembled into 32-bit big-endian words and stored via the eth
+        # write port of an Amaranth lib.memory.Memory (maps to Xilinx SDP BRAM with
+        # independent clocks on synthesis — CDC-correct at the hardware level).
+        # Only the single-bit frame-ready flag crosses the domain boundary via
+        # FFSynchronizer; the multi-bit data bus never crosses directly.
+        rx_mem = _lib_mem.Memory(shape=32, depth=64, init=[])
+        m.submodules.rx_mem = rx_mem
+        rx_wp = rx_mem.write_port(domain="eth")
+        rx_rp = rx_mem.read_port(domain="sync", transparent_for=[])
 
         # eth domain: byte phase + word accumulator + write pointer
-        rx_byte_phase = Signal(2)    # 0-3: byte position within current word
-        rx_word_acc   = Signal(32)   # partial word accumulator
-        rx_wptr       = Signal(6)    # FIFO write pointer (counts words written)
-        rx_len_words  = Signal(7)    # words in most-recently completed frame
-        rx_frame_rdy_eth = Signal()  # set on rx_done, cleared on drain-ack
+        rx_byte_phase    = Signal(2)    # 0-3: byte position within current word
+        rx_word_acc      = Signal(32)   # partial word accumulator
+        rx_wptr          = Signal(6)    # memory write pointer (counts words written)
+        rx_len_words     = Signal(7)    # words in most-recently completed frame
+        rx_frame_rdy_eth = Signal()     # set on rx_done, cleared on drain-ack
+
+        # Write port defaults: disabled
+        m.d.comb += [rx_wp.addr.eq(rx_wptr), rx_wp.data.eq(0), rx_wp.en.eq(0)]
 
         # Byte → word assembly in eth domain
         with m.If(mac.rx_valid):
@@ -252,20 +260,20 @@ class WukongXC7A100T(Elaboratable):
                 with m.Case(2):
                     m.d.eth += rx_word_acc[8:16].eq(mac.rx_data)
                 with m.Case(3):
-                    # Write completed word (byte 3 = mac.rx_data; bytes 0-2 in rx_word_acc)
-                    m.d.eth += [
-                        rx_fifo[rx_wptr].eq(
-                            Cat(mac.rx_data,
-                                rx_word_acc[8:16],
-                                rx_word_acc[16:24],
-                                rx_word_acc[24:32])),
-                        rx_wptr.eq(rx_wptr + 1),
+                    # Combinatorially assert write enable; Memory clocks the write
+                    # on the eth rising edge — no cross-domain path for the data.
+                    m.d.comb += [
+                        rx_wp.en.eq(1),
+                        rx_wp.data.eq(Cat(mac.rx_data,
+                                          rx_word_acc[8:16],
+                                          rx_word_acc[16:24],
+                                          rx_word_acc[24:32])),
                     ]
+                    m.d.eth += rx_wptr.eq(rx_wptr + 1)
 
         # Frame done: latch word count and set ready flag
         with m.If(mac.rx_done):
             m.d.eth += [
-                # If the last partial word has any bytes accumulated, flush it
                 rx_len_words.eq(
                     Mux(rx_byte_phase != 0,
                         rx_wptr + 1,     # partial word pending
@@ -274,21 +282,26 @@ class WukongXC7A100T(Elaboratable):
                 rx_byte_phase.eq(0),
                 rx_wptr.eq(0),
             ]
-            # Flush any partial word (less than 4 bytes) as a zero-padded word
+            # Flush any partial word (less than 4 bytes) as a zero-padded word.
+            # rx_valid and rx_done are mutually exclusive so rx_wp.en has no conflict.
             with m.If(rx_byte_phase != 0):
-                m.d.eth += rx_fifo[rx_wptr].eq(
-                    Cat(Const(0, 8),
-                        rx_word_acc[8:16],
-                        rx_word_acc[16:24],
-                        rx_word_acc[24:32]))
+                m.d.comb += [
+                    rx_wp.en.eq(1),
+                    rx_wp.data.eq(Cat(Const(0, 8),
+                                      rx_word_acc[8:16],
+                                      rx_word_acc[16:24],
+                                      rx_word_acc[24:32])),
+                ]
 
-        # sync domain: FFSynchronizer for frame-ready flag
+        # sync domain: FFSynchronizer for frame-ready flag (1 bit — safe CDC)
         rx_frame_rdy_sync = Signal()
         m.submodules.sync_rx_frame_rdy = FFSynchronizer(
             rx_frame_rdy_eth, rx_frame_rdy_sync, o_domain="sync")
 
-        # sync domain: latch word count when frame_rdy arrives (safe: rx_len_words
-        # is stable ≥3 'eth' cycles before rx_frame_rdy_sync rises in 'sync')
+        # sync domain: latch word count when frame_rdy arrives.
+        # rx_len_words is written in 'eth' atomically with rx_frame_rdy_eth, so it
+        # is stable for ≥2 eth cycles (≥8 sync cycles at 100/25 MHz) before
+        # rx_frame_rdy_sync rises — metastability risk is negligible.
         rx_len_words_sync  = Signal(7)
         rx_rptr            = Signal(6)    # read pointer (CM drains via ETH_RX_DATA)
         rx_words_remaining = Signal(7)    # = rx_len_words_sync - rx_rptr
@@ -305,12 +318,17 @@ class WukongXC7A100T(Elaboratable):
         rx_drain_done = Signal()
         m.d.comb += rx_drain_done.eq(
             rx_frame_rdy_sync & (rx_rptr >= rx_len_words_sync))
-        # Propagate drain-done from sync → eth domain so rx_frame_rdy_eth is cleared
         rx_drain_done_eth = Signal()
         m.submodules.sync_drain_done = FFSynchronizer(
             rx_drain_done, rx_drain_done_eth, o_domain="eth")
         with m.If(rx_drain_done_eth):
             m.d.eth += rx_frame_rdy_eth.eq(0)
+
+        # RX read port address is driven from rx_rptr (1-cycle latency):
+        # rx_rp.data at sync cycle N = memory[rx_rptr at sync cycle N-1].
+        # The CLOOMC drain loop (dread + increment = ≥2 sync cycles per word)
+        # satisfies the latency: rptr is stable for ≥1 cycle before next read.
+        m.d.comb += rx_rp.addr.eq(rx_rptr)
 
         # ── MMIO register block (EthernetDevice capability, CM 'sync' domain) ─
         # The CM core accesses these registers via DREAD/DWRITE to the
@@ -319,18 +337,8 @@ class WukongXC7A100T(Elaboratable):
         eth_ip_reg       = Signal(32)   # ETH_IP_ADDR
         eth_port_reg     = Signal(16)   # ETH_PORT
         eth_tx_len_reg   = Signal(11)   # ETH_TX_LEN (byte count, triggers TX)
-        tx_wptr          = Signal(7)    # TX word FIFO write pointer
-        tx_use_buf_reg   = Signal()     # registered tx_use_buf flag
-        tx_buf_nibs_reg  = Signal(12)   # registered nibble count
         tx_toggle        = Signal()     # flips each time CM writes ETH_TX_LEN
         tx_trigger       = Signal()
-        tx_use_clr_ctr   = Signal(4)    # countdown to clear tx_use_buf after toggle
-
-        # Connect registered TX-buffer ports to mac (combinational pass-through)
-        m.d.comb += [
-            mac.tx_use_buf.eq(tx_use_buf_reg),
-            mac.tx_buf_nibs.eq(tx_buf_nibs_reg),
-        ]
 
         # TX CDC: toggle synchronizer — the toggle level is stable for many cycles
         # so FFSynchronizer resolves it reliably.  Edge detection in the 'eth'
@@ -343,56 +351,33 @@ class WukongXC7A100T(Elaboratable):
         m.d.eth += tx_toggle_eth_prev.eq(tx_toggle_eth)
         m.d.comb += mac.send.eq(tx_toggle_eth ^ tx_toggle_eth_prev)
 
-        # Default: mac.tx_buf_we is 0 unless overridden in MMIO write handler
-        m.d.comb += [
-            mac.tx_buf_we.eq(0),
-            mac.tx_buf_waddr.eq(0),
-            mac.tx_buf_wdata.eq(0),
-        ]
-
         # MMIO write
         with m.If(self.mmio_we):
             with m.Switch(self.mmio_addr):
                 with m.Case(0):   # ETH_CTRL
                     m.d.sync += eth_ctrl_reg.eq(self.mmio_wdata)
-                with m.Case(2):   # ETH_TX_LEN — byte count; triggers TX
+                with m.Case(2):   # ETH_TX_LEN — byte count; triggers TX via toggle
                     m.d.sync += [
                         eth_tx_len_reg.eq(self.mmio_wdata[:11]),
                         tx_trigger.eq(1),
-                        tx_wptr.eq(0),            # reset write pointer for next frame
-                        tx_use_buf_reg.eq(1),
-                        # nibs = byte_count << 1 (2 nibbles per byte)
-                        tx_buf_nibs_reg.eq(self.mmio_wdata[:11] << 1),
                     ]
                 with m.Case(4):   # ETH_IP_ADDR
                     m.d.sync += eth_ip_reg.eq(self.mmio_wdata)
                 with m.Case(5):   # ETH_PORT
                     m.d.sync += eth_port_reg.eq(self.mmio_wdata[:16])
-                with m.Case(6):   # ETH_TX_DATA — write word to TX buffer, advance ptr
-                    # Write this word to the MAC's runtime TX word buffer
-                    m.d.comb += [
-                        mac.tx_buf_we.eq(1),
-                        mac.tx_buf_waddr.eq(tx_wptr),
-                        mac.tx_buf_wdata.eq(self.mmio_wdata),
-                    ]
-                    m.d.sync += tx_wptr.eq(tx_wptr + 1)
 
-        # Flip toggle on TX request; start countdown to clear tx_use_buf_reg.
-        # tx_use_buf_reg must remain high long enough for the toggle edge to
-        # propagate through 2 FFSynchronizer FFs (≥ 2 eth cycles ≈ 80 ns).
-        # A 15-cycle countdown at 25 MHz = 600 ns provides ample margin.
+        # Flip toggle on TX request (one sync cycle after mmio_we)
         with m.If(tx_trigger):
             m.d.sync += [
                 tx_toggle.eq(~tx_toggle),
                 tx_trigger.eq(0),
-                tx_use_clr_ctr.eq(15),
             ]
-        with m.Elif(tx_use_clr_ctr > 0):
-            m.d.sync += tx_use_clr_ctr.eq(tx_use_clr_ctr - 1)
-            with m.If(tx_use_clr_ctr == 1):
-                m.d.sync += tx_use_buf_reg.eq(0)
 
         # MMIO read (combinational)
+        # ETH_RX_DATA (reg 7) uses the dual-clock Memory read port (rx_rp) with
+        # 1-cycle latency: rx_rp.data reflects memory[rx_rptr from the previous
+        # sync cycle].  The CLOOMC drain loop (dread + increment = ≥2 sync cycles
+        # per word) ensures at least 1 idle cycle between consecutive reads.
         with m.Switch(self.mmio_addr):
             with m.Case(0):
                 m.d.comb += self.mmio_rdata.eq(eth_ctrl_reg)
@@ -410,10 +395,11 @@ class WukongXC7A100T(Elaboratable):
                 m.d.comb += self.mmio_rdata.eq(eth_ip_reg)
             with m.Case(5):
                 m.d.comb += self.mmio_rdata.eq(eth_port_reg)
-            with m.Case(7):   # ETH_RX_DATA: drain one word from RX FIFO per read
+            with m.Case(7):   # ETH_RX_DATA: drain one word from RX Memory per read.
+                # rx_rp.data = memory[rx_rptr_{prev}] — see latency note above.
                 m.d.comb += self.mmio_rdata.eq(
                     Mux(rx_frame_rdy_sync & (rx_rptr < rx_len_words_sync),
-                        rx_fifo[rx_rptr],
+                        rx_rp.data,
                         0))
                 # Advance read pointer when CM reads this register
                 with m.If(self.mmio_re & rx_frame_rdy_sync &

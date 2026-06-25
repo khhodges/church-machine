@@ -174,16 +174,6 @@ class RgmiiMac(Elaboratable):
         self.rgmii_txd   = Signal(4)
         self.rgmii_txctl = Signal()
 
-        # ── Runtime TX buffer interface (word-oriented MMIO writes) ──────────
-        # Top-level writes 32-bit words here before asserting send.
-        # When tx_use_buf=1, the TX FSM reads nibbles from this buffer instead
-        # of the elaboration-time FRAME_ROM.  Word order is big-endian.
-        self.tx_buf_we    = Signal()           # write enable (one cycle)
-        self.tx_buf_waddr = Signal(7)          # word address [0..127]
-        self.tx_buf_wdata = Signal(32)         # 32-bit word data
-        self.tx_use_buf   = Signal()           # 1 = TX from buf; 0 = FRAME_ROM
-        self.tx_buf_nibs  = Signal(12)         # nibble count when tx_use_buf=1
-
         # ── RGMII RX ports ──────────────────────────────────────────────────
         # RXC is the 25 MHz clock received from the PHY (independent input clock).
         # RXDV is encoded on RXCTL rising edge; RXDV^RXER on falling edge.
@@ -296,39 +286,13 @@ class RgmiiMac(Elaboratable):
         # MDIO output defaults (overridden inside FSM states)
         m.d.comb += [self.mdio_o.eq(1), self.mdio_oe.eq(1)]
 
-        # ── Runtime TX word buffer (Array of 128 × 32-bit words) ─────────────
-        # Top-level fills this via tx_buf_we/waddr/wdata before triggering TX.
-        # Nibble extraction: word_idx = nib_idx >> 3; nib_in_word = nib_idx[2:0].
-        # Each 32-bit word carries 8 nibbles, MSN of byte 0 at nib_in_word=1.
-        TX_BUF_WORDS = 128
-        tx_buf_arr = Array(Signal(32, name=f"txb{i}") for i in range(TX_BUF_WORDS))
-        with m.If(self.tx_buf_we):
-            m.d.sync += tx_buf_arr[self.tx_buf_waddr].eq(self.tx_buf_wdata)
-
         # ── TX state ──────────────────────────────────────────────────────────
-        # nib_idx is 12 bits to span both FRAME_ROM (fixed) and tx_buf (up to 1024 nibs).
-        nib_idx  = Signal(12)
+        nib_idx  = Signal(range(N_NIBS + 1))
         tx_run   = Signal()
         ifg_ctr  = Signal(5)
 
-        # Nibble selection from TX buffer: re-declare properly with nib_idx available
-        tx_word_sel  = nib_idx[3:]          # bits [11:3] → word index
-        tx_nib_sel   = nib_idx[:3]          # bits [2:0]  → nibble within word
-        tx_cur_word  = tx_buf_arr[tx_word_sel]
-        tx_buf_nib2  = Signal(4)
-        with m.Switch(tx_nib_sel):
-            for ni in range(8):
-                with m.Case(ni):
-                    m.d.comb += tx_buf_nib2.eq(tx_cur_word[ni * 4:(ni + 1) * 4])
-
-        # Total nibble count: elaboration-time (FRAME_ROM) or runtime (tx_buf)
-        tx_n_nibs = Signal(12)
-        m.d.comb += tx_n_nibs.eq(Mux(self.tx_use_buf, self.tx_buf_nibs, N_NIBS))
-
         m.d.comb += [
-            tx_nibble.eq(Mux(tx_run,
-                             Mux(self.tx_use_buf, tx_buf_nib2, FRAME_ROM[nib_idx]),
-                             0)),
+            tx_nibble.eq(Mux(tx_run, FRAME_ROM[nib_idx], 0)),
             txen.eq(tx_run),
             self.busy.eq(~rst_done | mdio_busy | tx_run),
         ]
@@ -437,13 +401,11 @@ class RgmiiMac(Elaboratable):
                 with m.Else():
                     m.d.sync += poll_ctr.eq(poll_ctr + 1)
 
-            # Transmit nibbles from pre-built frame ROM or runtime TX buffer ───
+            # Transmit nibbles from pre-built frame ROM ───────────────────────
             # At 25 MHz, one nibble per clock = 100 Mbps.
             # TXEN (rgmii_txctl) is high for the entire frame including preamble.
-            # When tx_use_buf=1, tx_n_nibs (derived from tx_buf_nibs) determines
-            # the frame length; otherwise the fixed N_NIBS from elaboration is used.
             with m.State("TX"):
-                with m.If(nib_idx < tx_n_nibs - 1):
+                with m.If(nib_idx < N_NIBS - 1):
                     m.d.sync += nib_idx.eq(nib_idx + 1)
                 with m.Else():
                     m.d.sync += [tx_run.eq(0), ifg_ctr.eq(0)]
