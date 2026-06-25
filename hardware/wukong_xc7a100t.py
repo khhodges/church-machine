@@ -57,12 +57,13 @@ _ETH_TOKEN = 0x00003300
 
 # Callhome UDP payload (minimal, N=0 requests; Locator fills in real requests at run time)
 _CALLHOME_PAYLOAD = (
-    _ETH_TOKEN .to_bytes(4, 'big') +  # sender token
-    b'\x00\x00\x00\x00' +             # CM version (filled by firmware at runtime)
-    _BOARD_MAC +                       # MAC
-    b'\x00\x00' +                      # pad
-    b'\x00\x00\x00\x00' +             # uptime
-    b'\x00\x00'                        # N=0 requests
+    (0xCE110001).to_bytes(4, 'big') +  # CALLHOME_MAGIC (server parser requires this)
+    _ETH_TOKEN .to_bytes(4, 'big') +   # sender token (ETHERNET_TOKEN 0x00003300)
+    b'\x00\x00\x00\x00' +              # CM version (filled by firmware at runtime)
+    _BOARD_MAC +                        # MAC
+    b'\x00\x00' +                       # pad
+    b'\x00\x00\x00\x00' +              # uptime
+    b'\x00\x00'                         # N=0 requests
 )
 
 
@@ -336,42 +337,129 @@ class WukongXC7A100T(Elaboratable):
         eth_ctrl_reg     = Signal(32)   # ETH_CTRL
         eth_ip_reg       = Signal(32)   # ETH_IP_ADDR
         eth_port_reg     = Signal(16)   # ETH_PORT
-        eth_tx_len_reg   = Signal(11)   # ETH_TX_LEN (byte count, triggers TX)
+        eth_tx_len_reg   = Signal(11)   # ETH_TX_LEN byte count (informational)
+        tx_wptr          = Signal(7)    # write pointer into tx_sync_buf
+        tx_len_bytes_reg = Signal(11)   # byte count of current TX frame
         tx_toggle        = Signal()     # flips each time CM writes ETH_TX_LEN
         tx_trigger       = Signal()
 
-        # TX CDC: toggle synchronizer — the toggle level is stable for many cycles
-        # so FFSynchronizer resolves it reliably.  Edge detection in the 'eth'
-        # domain generates a one-cycle mac.send pulse.  Single-cycle pulses through
-        # FFSynchronizer are unreliable (can be missed); the toggle pattern is not.
-        tx_toggle_eth      = Signal()
-        tx_toggle_eth_prev = Signal()
-        m.submodules.sync_tx_toggle = FFSynchronizer(
-            tx_toggle, tx_toggle_eth, o_domain="eth")
-        m.d.eth += tx_toggle_eth_prev.eq(tx_toggle_eth)
-        m.d.comb += mac.send.eq(tx_toggle_eth ^ tx_toggle_eth_prev)
+        # ── Sync-domain TX word buffer ──────────────────────────────────────
+        # The CM fills this buffer word-by-word via ETH_TX_DATA (reg 6) writes,
+        # then writes ETH_TX_LEN (reg 2) to trigger TX.
+        # All MMIO writes are in the 'sync' domain.  The buffer is NEVER read
+        # directly by the eth domain; instead the copy FSM below registers each
+        # word into an eth-domain Array (tx_eth_buf) before TX starts.
+        TX_BUF_WORDS = 128
+        tx_sync_buf = Array(Signal(32, name=f"tsb{i}") for i in range(TX_BUF_WORDS))
 
         # MMIO write
         with m.If(self.mmio_we):
             with m.Switch(self.mmio_addr):
                 with m.Case(0):   # ETH_CTRL
                     m.d.sync += eth_ctrl_reg.eq(self.mmio_wdata)
-                with m.Case(2):   # ETH_TX_LEN — byte count; triggers TX via toggle
+                with m.Case(2):   # ETH_TX_LEN — byte count; triggers copy + TX
                     m.d.sync += [
                         eth_tx_len_reg.eq(self.mmio_wdata[:11]),
+                        tx_len_bytes_reg.eq(self.mmio_wdata[:11]),
                         tx_trigger.eq(1),
+                        tx_wptr.eq(0),      # reset write pointer for next frame
                     ]
                 with m.Case(4):   # ETH_IP_ADDR
                     m.d.sync += eth_ip_reg.eq(self.mmio_wdata)
                 with m.Case(5):   # ETH_PORT
                     m.d.sync += eth_port_reg.eq(self.mmio_wdata[:16])
+                with m.Case(6):   # ETH_TX_DATA — write one 32-bit word, advance pointer
+                    # Write the word and advance the pointer in the same cycle.
+                    # All writes are fully in the sync domain — no CDC here.
+                    m.d.sync += [
+                        tx_sync_buf[tx_wptr].eq(self.mmio_wdata),
+                        tx_wptr.eq(tx_wptr + 1),
+                    ]
 
-        # Flip toggle on TX request (one sync cycle after mmio_we)
+        # Flip toggle one cycle after ETH_TX_LEN write (tx_trigger pulse)
         with m.If(tx_trigger):
             m.d.sync += [
                 tx_toggle.eq(~tx_toggle),
                 tx_trigger.eq(0),
             ]
+
+        # ── TX CDC: toggle synchronizer + copy FSM ──────────────────────────
+        #
+        # When the CM writes ETH_TX_LEN, tx_toggle flips (sync domain).
+        # The toggle propagates to the 'eth' domain through an FFSynchronizer
+        # (adds ~3 eth cycles ≈ 120 ns of latency).  Because the CM writes ALL
+        # ETH_TX_DATA words BEFORE writing ETH_TX_LEN, tx_sync_buf is fully
+        # stable for ≥3 eth cycles by the time the copy FSM starts.
+        #
+        # The copy FSM (eth domain) then:
+        #   1. Registers each tx_sync_buf word into the eth-domain tx_eth_buf,
+        #      one word per eth cycle.  (Stable data window → safe multi-bit capture.)
+        #   2. After the last word is copied, pulses mac.send for one eth cycle.
+        #
+        # mac.tx_ext_word is driven combinatorially from tx_eth_buf[mac.tx_word_addr].
+        # The MAC's TX FSM reads one nibble per eth cycle from the word, so the entire
+        # TX data path is in the eth domain after the copy — no further CDC.
+
+        tx_toggle_eth      = Signal()
+        tx_toggle_eth_prev = Signal()
+        m.submodules.sync_tx_toggle = FFSynchronizer(
+            tx_toggle, tx_toggle_eth, o_domain="eth")
+        m.d.eth += tx_toggle_eth_prev.eq(tx_toggle_eth)
+        tx_copy_trigger = Signal()   # one-cycle pulse in eth domain
+        m.d.comb += tx_copy_trigger.eq(tx_toggle_eth ^ tx_toggle_eth_prev)
+
+        # Eth-domain copy buffer (purely in eth domain; read by MAC TX FSM)
+        tx_eth_buf  = Array(Signal(32, name=f"teb{i}") for i in range(TX_BUF_WORDS))
+        tx_copy_idx = Signal(7)      # copy loop counter (eth domain)
+        tx_len_words_eth = Signal(7) # words to copy (eth domain, latched at copy start)
+        tx_n_nibs_eth    = Signal(12)# nibble count (eth domain, latched at copy start)
+
+        # Compute sync-domain values; sampled by eth domain at copy trigger.
+        # Both are stable for ≥3 eth cycles before tx_copy_trigger rises.
+        tx_len_words_comb = Signal(7)
+        tx_n_nibs_comb    = Signal(12)
+        m.d.comb += [
+            tx_len_words_comb.eq((tx_len_bytes_reg + 3) >> 2),  # ceil(len/4)
+            tx_n_nibs_comb.eq(tx_len_bytes_reg << 1),           # bytes × 2
+        ]
+
+        # mac.send default (driven HIGH only in TRIGGER state below)
+        m.d.comb += mac.send.eq(0)
+
+        with m.FSM(domain="eth", name="tx_copy_fsm"):
+            with m.State("IDLE"):
+                # On toggle edge: latch frame dimensions and start copy
+                with m.If(tx_copy_trigger):
+                    m.d.eth += [
+                        tx_copy_idx.eq(0),
+                        tx_len_words_eth.eq(tx_len_words_comb),
+                        tx_n_nibs_eth.eq(tx_n_nibs_comb),
+                    ]
+                    m.next = "COPY"
+
+            with m.State("COPY"):
+                # Register one sync-domain word into the eth-domain buffer.
+                # tx_sync_buf data is stable (written before ETH_TX_LEN toggle),
+                # so this single-cycle register capture is CDC-safe.
+                m.d.eth += [
+                    tx_eth_buf[tx_copy_idx].eq(tx_sync_buf[tx_copy_idx]),
+                    tx_copy_idx.eq(tx_copy_idx + 1),
+                ]
+                with m.If(tx_copy_idx == tx_len_words_eth - 1):
+                    m.next = "TRIGGER"
+
+            with m.State("TRIGGER"):
+                # All words are in the eth buffer.  Pulse mac.send for one eth cycle.
+                m.d.comb += mac.send.eq(1)
+                m.next = "IDLE"
+
+        # Drive MAC ext-TX ports (combinatorial from eth-domain tx_eth_buf)
+        # tx_eth_buf[mac.tx_word_addr] is a same-domain Array read — no CDC.
+        m.d.comb += [
+            mac.tx_ext_word.eq(tx_eth_buf[mac.tx_word_addr]),
+            mac.tx_use_ext.eq(1),           # always use eth buffer (boot ROM pre-fills it)
+            mac.tx_n_nibs_ext.eq(tx_n_nibs_eth),
+        ]
 
         # MMIO read (combinational)
         # ETH_RX_DATA (reg 7) uses the dual-clock Memory read port (rx_rp) with
@@ -381,8 +469,11 @@ class WukongXC7A100T(Elaboratable):
         with m.Switch(self.mmio_addr):
             with m.Case(0):
                 m.d.comb += self.mmio_rdata.eq(eth_ctrl_reg)
-            with m.Case(1):   # ETH_STATUS: 0=down, 1=up
-                m.d.comb += self.mmio_rdata.eq(Mux(link_up_sync, 1, 0))
+            with m.Case(1):
+                # ETH_STATUS: 0=down, 1=up, 2=negotiating/busy
+                # Matches Ethernet.Status() → 0|1|2 contract in locator_ethernet.cloomc
+                m.d.comb += self.mmio_rdata.eq(
+                    Mux(link_up_sync, 1, Mux(busy_sync, 2, 0)))
             with m.Case(2):
                 m.d.comb += self.mmio_rdata.eq(eth_tx_len_reg)
             with m.Case(3):   # ETH_RX_LEN: byte count of pending frame (per API spec)

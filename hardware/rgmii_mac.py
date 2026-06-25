@@ -174,6 +174,16 @@ class RgmiiMac(Elaboratable):
         self.rgmii_txd   = Signal(4)
         self.rgmii_txctl = Signal()
 
+        # ── Runtime TX extension interface ──────────────────────────────────
+        # Top-level fills an eth-domain copy buffer and supplies nibble data.
+        # tx_word_addr outputs the current word index (nib_idx >> 3) so the
+        # top-level can drive tx_ext_word combinatorially from its eth buffer.
+        # When tx_use_ext=0 the MAC falls back to the elaboration-time FRAME_ROM.
+        self.tx_ext_word   = Signal(32)  # current TX word from eth-domain buffer
+        self.tx_word_addr  = Signal(7)   # output: nib_idx[11:3] (word address)
+        self.tx_use_ext    = Signal()    # 1 = use tx_ext_word; 0 = FRAME_ROM
+        self.tx_n_nibs_ext = Signal(12)  # total nibble count when tx_use_ext=1
+
         # ── RGMII RX ports ──────────────────────────────────────────────────
         # RXC is the 25 MHz clock received from the PHY (independent input clock).
         # RXDV is encoded on RXCTL rising edge; RXDV^RXER on falling edge.
@@ -287,12 +297,29 @@ class RgmiiMac(Elaboratable):
         m.d.comb += [self.mdio_o.eq(1), self.mdio_oe.eq(1)]
 
         # ── TX state ──────────────────────────────────────────────────────────
-        nib_idx  = Signal(range(N_NIBS + 1))
+        # nib_idx is 12 bits to span both FRAME_ROM (fixed) and runtime ext frames
+        # (up to 2 KB = 4096 nibbles).
+        nib_idx  = Signal(12)
         tx_run   = Signal()
         ifg_ctr  = Signal(5)
 
+        # Runtime nibble count: elaboration-time (FRAME_ROM) or ext buffer
+        tx_n_nibs = Signal(12)
+        m.d.comb += tx_n_nibs.eq(Mux(self.tx_use_ext, self.tx_n_nibs_ext, N_NIBS))
+
+        # Nibble selection from the ext word: nib_idx[2:0] selects one of 8 nibbles
+        tx_ext_nib = Signal(4)
+        with m.Switch(nib_idx[:3]):
+            for ni in range(8):
+                with m.Case(ni):
+                    m.d.comb += tx_ext_nib.eq(
+                        self.tx_ext_word[ni * 4:(ni + 1) * 4])
+
         m.d.comb += [
-            tx_nibble.eq(Mux(tx_run, FRAME_ROM[nib_idx], 0)),
+            self.tx_word_addr.eq(nib_idx[3:]),
+            tx_nibble.eq(Mux(tx_run,
+                             Mux(self.tx_use_ext, tx_ext_nib, FRAME_ROM[nib_idx]),
+                             0)),
             txen.eq(tx_run),
             self.busy.eq(~rst_done | mdio_busy | tx_run),
         ]
@@ -405,7 +432,7 @@ class RgmiiMac(Elaboratable):
             # At 25 MHz, one nibble per clock = 100 Mbps.
             # TXEN (rgmii_txctl) is high for the entire frame including preamble.
             with m.State("TX"):
-                with m.If(nib_idx < N_NIBS - 1):
+                with m.If(nib_idx < tx_n_nibs - 1):
                     m.d.sync += nib_idx.eq(nib_idx + 1)
                 with m.Else():
                     m.d.sync += [tx_run.eq(0), ifg_ctr.eq(0)]
