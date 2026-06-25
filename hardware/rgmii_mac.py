@@ -174,6 +174,19 @@ class RgmiiMac(Elaboratable):
         self.rgmii_txd   = Signal(4)
         self.rgmii_txctl = Signal()
 
+        # ── RGMII RX ports ──────────────────────────────────────────────────
+        # RXC is the 25 MHz clock received from the PHY (independent input clock).
+        # RXDV is encoded on RXCTL rising edge; RXDV^RXER on falling edge.
+        self.rgmii_rxc   = Signal()         # RX clock input (from PHY, 25 MHz)
+        self.rgmii_rxd   = Signal(4)        # RX nibble input
+        self.rgmii_rxctl = Signal()         # RXDV (rising) / RXDV^RXER (falling)
+
+        # Streaming RX output (consumer assembles into a frame buffer externally)
+        self.rx_valid    = Signal()         # high for one 'sync' cycle per valid byte
+        self.rx_data     = Signal(8)        # RX byte (combinational, valid with rx_valid)
+        self.rx_done     = Signal()         # high one cycle when frame ends (RXDV falls)
+        self.rx_len      = Signal(11)       # byte count of the just-completed frame
+
     def elaborate(self, platform):
         m = Module()
 
@@ -406,5 +419,101 @@ class RgmiiMac(Elaboratable):
                 with m.Else():
                     m.d.sync += poll_ctr.eq(0)
                     m.next = "IDLE"
+
+        # ── RGMII RX IDDR instances ───────────────────────────────────────────
+        # SAME_EDGE_PIPELINED: D1 (rising) and D2 (falling) both registered on
+        # the rising edge of C with one-cycle pipeline delay.
+        # RXC is an independent input clock from the PHY.  In a full design it
+        # drives a separate ClockDomain("rxc"); here the BUFG output is wired
+        # directly to each IDDR C pin so the synthesiser infers the correct clock
+        # topology.  At 100BASE-T D1 == D2 — only D1 (rxd_d1) is used.
+        rxc_buf  = Signal()
+        rxd_d1   = Signal(4)
+        rxd_d2   = Signal(4)    # reserved for 1 Gbps upgrade path
+        rxctl_d1 = Signal()     # RXDV (rising edge of RXCTL)
+        rxctl_d2 = Signal()     # RXDV ^ RXER (falling edge of RXCTL)
+
+        m.submodules.bufg_rxc = Instance(
+            "BUFG",
+            i_I=self.rgmii_rxc,
+            o_O=rxc_buf,
+        )
+        for i in range(4):
+            m.submodules[f"iddr_rxd{i}"] = Instance(
+                "IDDR",
+                p_DDR_CLK_EDGE="SAME_EDGE_PIPELINED",
+                p_INIT_Q1=0, p_INIT_Q2=0, p_SRTYPE="SYNC",
+                i_C=rxc_buf, i_CE=Const(1, 1),
+                i_D=self.rgmii_rxd[i],
+                i_R=Const(0, 1), i_S=Const(0, 1),
+                o_Q1=rxd_d1[i], o_Q2=rxd_d2[i],
+            )
+        m.submodules.iddr_rxctl = Instance(
+            "IDDR",
+            p_DDR_CLK_EDGE="SAME_EDGE_PIPELINED",
+            p_INIT_Q1=0, p_INIT_Q2=0, p_SRTYPE="SYNC",
+            i_C=rxc_buf, i_CE=Const(1, 1),
+            i_D=self.rgmii_rxctl,
+            i_R=Const(0, 1), i_S=Const(0, 1),
+            o_Q1=rxctl_d1, o_Q2=rxctl_d2,
+        )
+
+        # ── RX byte assembler (streaming — no internal buffer) ────────────────
+        # At 100BASE-T: one nibble (4 bits) per 25 MHz clock cycle.
+        # Two nibbles (lo first per MII convention) assemble one byte.
+        # rx_valid pulses high for one cycle when rx_data holds a valid byte.
+        # rx_done  pulses high for one cycle when RXDV de-asserts (frame end).
+        rx_lo_nib    = Signal(4)
+        rx_nib_phase = Signal()   # 0 = awaiting lo nibble, 1 = awaiting hi nibble
+        rx_len_ctr   = Signal(11) # byte counter for current frame
+
+        # Combinational defaults (overridden inside FSM states via Amaranth priority)
+        m.d.comb += [
+            self.rx_valid.eq(0),
+            self.rx_done.eq(0),
+            self.rx_data.eq(0),
+        ]
+
+        # ── RX FSM ─────────────────────────────────────────────────────────────
+        with m.FSM(name="rgmii_rx"):
+
+            with m.State("RX_IDLE"):
+                m.d.sync += [rx_len_ctr.eq(0), rx_nib_phase.eq(0)]
+                with m.If(rxctl_d1):
+                    m.next = "RX_PREAMBLE"
+
+            with m.State("RX_PREAMBLE"):
+                # Strip 8-byte preamble + SFD (0x55…55_D5).
+                # SFD = 0xD5: lo nibble = 0x5, hi nibble = 0xD.
+                # Transition to RX_DATA on the hi nibble of the SFD byte.
+                with m.If(~rxctl_d1):
+                    m.next = "RX_IDLE"
+                with m.Elif(rx_nib_phase == 0):
+                    m.d.sync += [rx_lo_nib.eq(rxd_d1), rx_nib_phase.eq(1)]
+                with m.Else():
+                    m.d.sync += rx_nib_phase.eq(0)
+                    with m.If((rx_lo_nib == 0x5) & (rxd_d1 == 0xD)):
+                        m.d.sync += rx_len_ctr.eq(0)
+                        m.next = "RX_DATA"
+
+            with m.State("RX_DATA"):
+                with m.If(~rxctl_d1):
+                    # RXDV de-asserted: frame is complete.
+                    m.d.comb += self.rx_done.eq(1)
+                    m.d.sync += self.rx_len.eq(rx_len_ctr)
+                    m.next = "RX_IDLE"
+                with m.Elif(rx_nib_phase == 0):
+                    m.d.sync += [rx_lo_nib.eq(rxd_d1), rx_nib_phase.eq(1)]
+                with m.Else():
+                    # Hi nibble: combinatorially drive rx_data and rx_valid.
+                    # MII convention: lo nibble transmitted first.
+                    m.d.comb += [
+                        self.rx_data.eq(Cat(rx_lo_nib, rxd_d1)),
+                        self.rx_valid.eq(1),
+                    ]
+                    m.d.sync += [
+                        rx_nib_phase.eq(0),
+                        rx_len_ctr.eq(rx_len_ctr + 1),
+                    ]
 
         return m

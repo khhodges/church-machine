@@ -52,6 +52,10 @@ try:
     from boot_constants import NUC_CODE_WORDS, DEMO_CLIST_SIZE, BOOT_ABSTR_DEFAULT_SIZE
 except ImportError:
     from server.boot_constants import NUC_CODE_WORDS, DEMO_CLIST_SIZE, BOOT_ABSTR_DEFAULT_SIZE
+try:
+    import wukong_udp as _wukong_udp
+except ImportError:
+    _wukong_udp = None
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -8487,6 +8491,44 @@ with app.app_context():
         )
     except Exception as _sched_exc:
         logging.warning("APScheduler could not start: %s", _sched_exc)
+
+    # ── Wukong Ethernet UDP listener ─────────────────────────────────────────
+    # Listens on UDP port 5900 for Wukong XC7A100T callhome frames.
+    # Parses frames by token (0x00003300 = Ethernet abstraction Pet-Name GT),
+    # logs them to _callhome_log, and replies with lump-serve responses.
+    _wukong_listener = None
+    if _wukong_udp is not None:
+        def _on_wukong_callhome(entry):
+            """Handle a Wukong callhome event on the UDP listener thread."""
+            log_entry = {
+                "ts":         entry.get("ts", 0.0),
+                "uid":        entry.get("mac", b'').hex(":"),
+                "board":      "Wukong XC7A100T",
+                "nia":        "0x00000000",
+                "boot_ok":    1,
+                "fault":      0,
+                "fault_code": 0,
+                "fw_major":   (entry.get("cm_version", 0) >> 16) & 0xFFFF,
+                "fw_minor":    entry.get("cm_version", 0) & 0xFFFF,
+                "boot_count": 1,
+                "type":       "wukong_callhome",
+                "src_addr":   str(entry.get("src_addr", "")),
+                "uptime":     entry.get("uptime", 0),
+            }
+            _append_callhome_log(log_entry)
+            logging.info(
+                "Wukong callhome: MAC=%s uptime=%ds requests=%s from %s",
+                log_entry["uid"], log_entry["uptime"],
+                [hex(t) for t in entry.get("requests", [])],
+                entry.get("src_addr"),
+            )
+
+        try:
+            _wukong_listener = _wukong_udp.WukongUdpListener(
+                on_callhome=_on_wukong_callhome)
+            _wukong_listener.start()
+        except Exception as _wudp_exc:
+            logging.warning("Wukong UDP listener could not start: %s", _wudp_exc)
 
 def _free_port(port):
     """Kill any process holding the given port using /proc/net/tcp."""

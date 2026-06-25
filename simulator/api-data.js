@@ -322,9 +322,9 @@ const API_DATA = [
         ]
     },
     {
-        slot: 51, name: 'Ethernet', layer: 2,
+        slot: null, token: '00003300', name: 'Ethernet', layer: 2,
         perms: 'E',
-        description: 'Raw Ethernet frame transport — XC7A100T lazy-load channel. Locator fetches all other abstractions through it.',
+        description: 'Raw Ethernet frame transport — XC7A100T lazy-load channel. Locator fetches all other abstractions through it. Identity: token 00003300 (slot is assigned at load time and is not a stable identifier).',
         implemented: true, profile: 'XC7A100T',
         methods: [
             { name: 'Send',    signature: 'Send(dataGT, byteLen) → ok',     perms: 'E', description: 'Transmit a raw Ethernet frame.', implemented: true },

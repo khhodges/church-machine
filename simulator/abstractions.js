@@ -519,7 +519,9 @@ class AbstractionRegistry {
             'Hardware interrupt entry point — wakes sleeping threads on ALARM fire and handles Tier 2 fault recovery (Task #1077)',
             { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 0 } });
 
-        // NS slot 51 — Ethernet (XC7A100T-only)
+        // Ethernet — token 00003300 (XC7A100T-only)
+        // Identity: token 00003300.  The NS slot below (51) is the loader's initial
+        // assignment and is NOT a stable identity — callers must hold a GT, not a slot index.
         // Application LUMP in the minimal three-LUMP ROM image for the QMTECH Wukong board.
         // Provides raw Ethernet frame send/receive (no TCP/IP); the Locator uses it to
         // fetch all remaining abstractions from the IDE/Mum Tunnel on demand over Ethernet,

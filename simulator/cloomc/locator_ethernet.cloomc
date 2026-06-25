@@ -1,0 +1,123 @@
+// Locator abstraction — token 00007700
+// Runs on the QMTECH Wukong XC7A100T at power-on.
+//
+// Identity: token 00007700.  NS slot assignment is determined at load time
+// by the boot ROM and is not a stable identity.  The boot thread's CR0 holds
+// the Locator's E-GT — that is the only boot-entry contract.
+//
+// The Locator is the Application LUMP in the minimal three-LUMP boot ROM:
+//   Namespace LUMP  — NS table, GT minting authority
+//   Thread LUMP     — boot thread (calls Locator.Boot on first CALL)
+//   Locator LUMP    — this file (fetches every other abstraction over Ethernet)
+//
+// Once Boot() returns, the Namespace table is fully populated with every
+// lazy-load abstraction the CM needs.  The thread then branches to the first
+// user abstraction fetched from the IDE.
+//
+// Wire protocol: docs/HARDWARE.md § Wukong Ethernet Protocol
+//
+// C-list:
+//   CR6[0] (slot 0) = Ethernet GT  (token 00003300) — RGMII transport layer
+//   CR6[1] (slot 1) = Mint GT      — installs fetched LUMPs into the Namespace
+//   CR6[2] (slot 2) = NSWrite GT   — promotes Outform NS entries to Live
+//
+// Permissions granted to callers: E (enter/call only).
+
+abstraction Locator {
+    capabilities {
+        Ethernet,
+        Mint,
+        NSWrite
+    }
+
+    // Boot() — entry point called by the startup thread (CR0 = Locator E-GT).
+    //
+    // Steps:
+    //   1. Load Ethernet GT from CR6 slot 0 (token 00003300).
+    //   2. Poll Ethernet.Status() until link is up (returns 1).
+    //   3. Send callhome broadcast frame (magic=0xCE110001, token=0x00003300)
+    //      via Ethernet.Send().
+    //   4. Enter receive loop via Ethernet.Receive().
+    //   5. On a valid lump-serve response (magic=0xCE110002):
+    //        a. Read lump words from ETH_RX_DATA into DMEM scratch area.
+    //        b. Call Mint.Install(lumpBase, wordCount) to register the LUMP.
+    //        c. Call NSWrite.Promote(nsSlot) to make the NS entry Live.
+    //   6. Return when the boot catalogue is complete.
+    //
+    // Compiled instructions (pseudo-assembly; actual encoding by CLOOMC++ compiler):
+    //
+    //   ; --- Step 1: load Ethernet GT ---
+    //   LOAD   CR7, CR6, #0         ; Ethernet GT → CR7  (token 00003300)
+    //
+    //   ; --- Step 2: poll for link-up ---
+    //   link_poll:
+    //   ELOADCALL CR7, #1           ; call Ethernet.Status() → DR1
+    //   LITERAL DR2, #1
+    //   BRANCH.NE DR1, DR2, link_poll
+    //
+    //   ; --- Step 3: send callhome broadcast ---
+    //   ; (caller pre-builds the callhome frame in ETH_TX_DATA via DWRITE)
+    //   LITERAL DR2, #26            ; frame length (minimum callhome, N=0)
+    //   ELOADCALL CR7, #0           ; call Ethernet.Send(dataGT=0, byteLen=26)
+    //
+    //   ; --- Step 4-5: receive loop ---
+    //   recv_loop:
+    //   ELOADCALL CR7, #1           ; call Ethernet.Receive() → DR1 (byte count, 0=empty)
+    //   LITERAL DR2, #0
+    //   BRANCH.EQ DR1, DR2, recv_loop
+    //   ; DR1 = byte count of pending frame; drain it and dispatch
+    //   ELOADCALL CR7, #3           ; Ethernet.Status() sanity check (optional)
+    //   ; ... install lump words, call Mint and NSWrite ...
+    //   BRANCH recv_loop
+    //
+    //   RETURN
+    //
+    // Inputs:  (none)
+    // Outputs: (none) — side effect is a fully populated Namespace table
+    method Boot() {
+        eth    = load(CR6, 0)
+        mint   = load(CR6, 1)
+        nsw    = load(CR6, 2)
+
+        // Step 2: wait for link
+        status = call(eth, 1)     // Ethernet.Status()
+        while status != 1 {
+            status = call(eth, 1)
+        }
+
+        // Step 3: send callhome broadcast (frame pre-built in ETH_TX_DATA)
+        call(eth, 0, 0, 26)       // Ethernet.Send(dataGT=0, byteLen=26)
+
+        // Step 4-5: receive and install lump-serve responses
+        loop {
+            bytecount = call(eth, 1)  // Ethernet.Receive()
+            if bytecount > 0 {
+                // Drain frame words from ETH_RX_DATA, install via Mint, promote via NSWrite
+                // (implementation expanded by CLOOMC++ compiler from DMEM scratch pattern)
+                words = drain(eth, bytecount)
+                install(mint, words)
+                promote(nsw)
+            }
+        }
+
+        return(0)
+    }
+
+    // Status() — query Locator state.
+    //
+    // Returns the current Ethernet link status by delegating to Ethernet.Status().
+    // Callers can poll this to confirm the Locator has an active IDE connection.
+    //
+    // Compiled instructions (3 words):
+    //   LOAD   CR7, CR6, #0      ; Ethernet GT → CR7
+    //   ELOADCALL CR7, #1        ; Ethernet.Status() → DR1
+    //   RETURN
+    //
+    // Inputs:  (none)
+    // Outputs: DR1 = 0 (link down) | 1 (link up) | 2 (negotiating)
+    method Status() {
+        eth = load(CR6, 0)
+        s   = call(eth, 1)    // Ethernet.Status()
+        return(s)
+    }
+}

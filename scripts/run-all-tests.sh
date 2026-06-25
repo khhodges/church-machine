@@ -217,6 +217,9 @@ register_suite "ti60-uart-dry-run" \
 register_suite "pet-name-memory-tests" \
     'node simulator/test_pet_name_memory.js'
 
+register_suite "wukong-protocol-tests" \
+    'python -m pytest scripts/test_wukong_protocol.py -v'
+
 # ---------------------------------------------------------------------------
 # Group registry — map a short group name to a list of suite names
 # ---------------------------------------------------------------------------

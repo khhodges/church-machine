@@ -199,6 +199,17 @@ Device drivers accessed via Abstract GTs. L = read device, S = write device, E =
 > **Note:** UART, Button, Timer, Display are **planned** — Abstract GT hardware validation not yet implemented.
 > **LED** is **partially** implemented in the simulator.
 
+### Ethernet — NS[null] `E` *(XC7A100T only)*
+
+Raw Ethernet frame transport — XC7A100T lazy-load channel. Locator fetches all other abstractions through it. Identity: token 00003300 (slot is assigned at load time and is not a stable identifier).
+
+| Method | Signature | Perms | Description |
+|--------|-----------|-------|-------------|
+| Send | `Send(dataGT, byteLen) → ok` | E | Transmit a raw Ethernet frame. |
+| Receive | `Receive() → (dataGT, byteLen)` | E | Receive the next available Ethernet frame. |
+| Connect | `Connect(ipv4, port) → ok` | E | Configure remote endpoint for the lazy-load channel. |
+| Status | `Status() → 0|1|2` | E | Query link state: 0=down, 1=up, 2=busy. |
+
 ### LED — NS[12] `S E` *(partial)*
 
 6 onboard LEDs (active-low). LED identity is the capability offset (0–5) in the C-list. DR1 return: ≥0 success, <0 failure.
@@ -209,17 +220,6 @@ Device drivers accessed via Abstract GTs. L = read device, S = write device, E =
 | Clear | `Clear(ledGT) → DR1` | S | ✅ | Turn the LED off. |
 | Toggle | `Toggle(ledGT) → DR1` | S | ✅ | Toggle the LED state. |
 | State | `State(ledGT) → DR1` | L | ✅ | Read current LED state (1=on, 0=off). |
-
-### Ethernet — NS[51] `E` *(XC7A100T only)*
-
-Raw Ethernet frame transport — XC7A100T lazy-load channel. Locator fetches all other abstractions through it.
-
-| Method | Signature | Perms | Description |
-|--------|-----------|-------|-------------|
-| Send | `Send(dataGT, byteLen) → ok` | E | Transmit a raw Ethernet frame. |
-| Receive | `Receive() → (dataGT, byteLen)` | E | Receive the next available Ethernet frame. |
-| Connect | `Connect(ipv4, port) → ok` | E | Configure remote endpoint for the lazy-load channel. |
-| Status | `Status() → 0|1|2` | E | Query link state: 0=down, 1=up, 2=busy. |
 
 ### Planned (not yet implemented)
 
@@ -391,7 +391,7 @@ PP250 deterministic garbage collection with bidirectional G-bit. Atomic Turing i
 |-------|-------|-------|--------|
 | 0–3 | Boot | 4 | ✅ Complete |
 | 4–10, 19, 31–32, 45, 47–49 | System Services | 14 | 🟡 Partial |
-| 11–15, 51 | Hardware Attachments | 6 | 🟡 Partial |
+| null, 11–15 | Hardware Attachments | 6 | 🟡 Partial |
 | 16–18, 46 | Mathematics | 4 | 🟡 Partial |
 | 20–27, 43 | Lambda Calculus | 9 | ✅ Complete |
 | 28–30 | Social Abstractions | 3 | 🔴 Planned |

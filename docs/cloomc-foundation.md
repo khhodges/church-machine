@@ -444,10 +444,12 @@ thread calls the Locator, which opens the Ethernet link to the IDE. Everything
 else (Memory Manager, Mint, Navana, the full catalogue) arrives via lazy load
 over that Ethernet connection.
 
-The Ethernet abstraction (NS slot 51) is the transport layer the Locator
-uses — a separate, lower-level CLOOMC abstraction that wraps the RMII PHY
+The Ethernet abstraction (token 00003300) is the transport layer the Locator
+uses — a separate, lower-level CLOOMC abstraction that wraps the RGMII PHY
 hardware on the QMTECH Wukong board. The Locator calls Ethernet.Send /
-Ethernet.Receive; the Ethernet abstraction talks to the silicon.
+Ethernet.Receive; the Ethernet abstraction talks to the silicon. Its NS slot
+is assigned at load time and is not a stable identity; callers identify it
+by token 00003300.
 
 On the **Tang Nano 20K** the transport is UART, and the Application LUMP
 is the UART Locator abstraction — structurally identical to the XC7A100T

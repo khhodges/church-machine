@@ -12,6 +12,7 @@
     "sha32-vectors",
     "check-sha32-collisions",
     "compile-api-tests",
-    "lump-builder-dispatch-tests"
+    "lump-builder-dispatch-tests",
+    "wukong-protocol-tests"
   ]
 }

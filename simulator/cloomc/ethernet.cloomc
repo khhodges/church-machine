@@ -1,11 +1,15 @@
-// Ethernet abstraction — NS slot 51, token 00003300
+// Ethernet abstraction — token 00003300
 // Provides raw Ethernet frame send/receive for the QMTECH Wukong XC7A100T.
+//
+// Identity: token 00003300.  NS slot assignment is determined at load time by
+// the Locator/loader and is not a stable identity.  Callers identify this
+// abstraction by its token, never by slot number.
 //
 // This abstraction is the Application LUMP in the minimal three-LUMP ROM image
 // (Namespace + Thread + Ethernet) for the XC7A100T board.  Once running, the
 // startup thread calls Status/Connect to bring up the link, then the Locator
-// (Task #1163) can fetch all remaining abstractions from the IDE/Mum Tunnel
-// on demand over Ethernet, replacing UART as the lazy-load transport.
+// can fetch all remaining abstractions from the IDE/Mum Tunnel on demand over
+// Ethernet, replacing UART as the lazy-load transport.
 //
 // MMIO model — caller responsibility:
 //   TX path: write frame bytes sequentially to ETH_TX_DATA (offset 6), then
@@ -15,7 +19,7 @@
 //            DR1 = N (byte count) if a frame is ready.  Drain the frame with
 //            N sequential DREAD CR7,#7 reads from ETH_RX_DATA.
 //
-// Hardware: RMII PHY interface (LAN8720A or equivalent) on QMTECH Wukong.
+// Hardware: RGMII PHY interface (RTL8211E) on QMTECH Wukong XC7A100T.
 //   MMIO base 0x40001000 (EthernetDevice GT, device_class=ETH):
 //     offset 0  ETH_CTRL    — bit[0]=reset, bit[1]=enable
 //     offset 1  ETH_STATUS  — 0=link down, 1=link up, 2=negotiating
@@ -27,7 +31,7 @@
 //     offset 7  ETH_RX_DATA — RX FIFO (drain bytes here after Receive returns N)
 //
 // C-list:
-//   CR6[0] (slot 0, target NS 51-hw) = EthernetDevice capability (hardware MMIO GT)
+//   CR6[0] (slot 0, target token 00003300) = EthernetDevice capability (hardware MMIO GT)
 //
 // Permissions granted to callers: E (enter/call only).
 

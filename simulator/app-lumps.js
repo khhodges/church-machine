@@ -4441,8 +4441,9 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot) {
         // Guard: when nsSlot is null/undefined we force the lump into
         // BOOT_ABSTR_NS_SLOT (slot 3 — Boot.Abstr, the only slot CR14
         // references after boot).  But sim.bootEntrySlot may still hold a
-        // previously-selected slot (e.g. 51 for Ethernet) from a boot-entry
-        // badge click.  instantBoot() runs NUC_CLIST which does an mLoad on
+        // previously-selected slot (e.g. the Ethernet abstraction, identified
+        // by token 00003300, whose slot is assigned at load time) from a
+        // boot-entry badge click.  instantBoot() runs NUC_CLIST which does an mLoad on
         // sim.bootEntrySlot; if that slot has no installed lump the mLoad
         // faults with LUMP_MAGIC before we ever write our binary.
         // Fix: temporarily force both sim.bootEntrySlot and the module-level
