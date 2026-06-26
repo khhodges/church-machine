@@ -223,6 +223,9 @@ register_suite "wukong-protocol-tests" \
 register_suite "build-guard-tests" \
     'bash scripts/test_build_guard.sh'
 
+register_suite "update-lump-tests" \
+    'node scripts/test_update_lump.js'
+
 # ---------------------------------------------------------------------------
 # Group registry — map a short group name to a list of suite names
 # ---------------------------------------------------------------------------
@@ -232,7 +235,7 @@ declare -A ALL_GROUPS
 
 ALL_GROUPS["boot"]="boot-image-matches-sim boot-image-loads-and-boots boot-image-upload-endpoint boot-image-serve-endpoints boot-layout-regression"
 
-ALL_GROUPS["lump"]="lump-consistency lump-binary-tests lump-roundtrip"
+ALL_GROUPS["lump"]="lump-consistency lump-binary-tests lump-roundtrip update-lump-tests"
 
 ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests pet-name-mem-tests warning-panel-tests disasm-panel-tests boot-entry-sync-tests selftest-lump-runs pet-name-memory-tests lump-builder-dispatch-tests"
 
