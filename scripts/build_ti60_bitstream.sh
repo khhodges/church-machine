@@ -140,6 +140,9 @@ if [ ! -f "$CM_V_SRC" ]; then
     _fail "church_ti60_f225.v not found at $CM_V_SRC — regenerate with hardware/gen_verilog.py"
 fi
 cp "$CM_V_SRC" "$CM_V_DST"
+# Yosys flattens the Amaranth design into 'module top'; top.v instantiates
+# 'church_ti60f225' (no underscore).  Rename so there is no duplicate 'top'.
+sed -i 's/^module top(/module church_ti60f225(/' "$CM_V_DST"
 NON_ZERO=$(grep -c "dmem\[" "$CM_V_DST" || true)
 _ok "church_ti60_f225.v deployed ($NON_ZERO non-zero dmem[] lines)"
 
