@@ -143,21 +143,37 @@ cp "$CM_V_SRC" "$CM_V_DST"
 NON_ZERO=$(grep -c "dmem\[" "$CM_V_DST" || true)
 _ok "church_ti60_f225.v deployed ($NON_ZERO non-zero dmem[] lines)"
 
-# ── patch_cm_bram: convert initial begin → $readmemh ────────────────────────
-# EFX_MAP ignores Verilog `initial begin` blocks when inferring BRAM content.
-# Without this patch the CM BRAM is all-zeros after synthesis → NIA stays
-# stuck at 0x00000000 → NULL_CAP fault on every boot.
-# patch_cm_bram.py writes work_syn/church_dmem.mem and replaces the initial
-# begin block with a $readmemh line that EFX_MAP correctly processes.
-PATCH_CM_BRAM="$HW/patch_cm_bram.py"
-if [ ! -f "$PATCH_CM_BRAM" ]; then
-    _fail "patch_cm_bram.py not found at $PATCH_CM_BRAM"
+# ── gen_cm_dmem_direct: replace inferred dmem with explicit EFX_RAM10 ────────
+# EFX_MAP 2026.1 silently drops ALL forms of BRAM init for inferred arrays:
+#   • initial begin        → BRAM all-zero after synthesis
+#   • $readmemb/$readmemh  → INIT stored in defparam only; efx_pnr reads
+#                            verific comments (no INIT_N there) → still zero
+# The ONLY working path: explicit EFX_RAM10 instantiation with inline INIT params.
+# gen_cm_dmem_direct.py:
+#   1. Reads boot ROM words from church_ti60_f225.v's initial begin block
+#   2. Writes cm_dmem_bram.v — 64 explicit EFX_RAM10 instances with INIT values
+#   3. Patches church_ti60_f225.v to instantiate cm_dmem_bram instead of dmem[]
+# cm_dmem_bram.v is listed in church_soc_cm.xml (deployed immediately below).
+GEN_CM_DMEM="$HW/gen_cm_dmem_direct.py"
+if [ ! -f "$GEN_CM_DMEM" ]; then
+    _fail "gen_cm_dmem_direct.py not found at $GEN_CM_DMEM"
 fi
-python3 "$PATCH_CM_BRAM" "$SOC_DIR" 2>&1 | grep -E "Written|Patched|already|ERROR"
-if grep -q 'readmemh' "$CM_V_DST" 2>/dev/null; then
-    _ok "church_ti60_f225.v CM BRAM patched (initial begin → \$readmemh)"
+python3 "$GEN_CM_DMEM" "$SOC_DIR" 2>&1 | grep -E "Written|Replaced|Patched|already|ERROR|cm_dmem|non-zero"
+if grep -q 'cm_dmem_bram' "$CM_V_DST" 2>/dev/null; then
+    _ok "church_ti60_f225.v CM BRAM → explicit EFX_RAM10 (cm_dmem_bram)"
 else
-    _warn "patch_cm_bram.py did not produce \$readmemh — check output above"
+    _warn "gen_cm_dmem_direct.py did not patch church_ti60_f225.v — check output above"
+fi
+
+# Deploy church_soc_cm.xml from repo (ensures cm_dmem_bram.v is listed as a source).
+# The sed at Step 3 strips any banned params from the freshly-deployed copy.
+XML_SRC="$HW/church_soc_cm.xml"
+XML_DST="$SOC_DIR/church_soc_cm.xml"
+if [ -f "$XML_SRC" ]; then
+    cp "$XML_SRC" "$XML_DST"
+    _ok "church_soc_cm.xml deployed (source list includes cm_dmem_bram.v)"
+else
+    _warn "church_soc_cm.xml not found at $XML_SRC — using existing SoC copy"
 fi
 
 PERI_SRC="$HW/church_soc_cm.peri.xml"
