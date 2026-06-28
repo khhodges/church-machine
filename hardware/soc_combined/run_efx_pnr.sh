@@ -14,6 +14,10 @@
 #     them from the project XML.  Omitting them causes an immediate SIGSEGV crash.
 #   - Do NOT pass --use_vdb_file unless a VDB already exists from a prior run.
 #   - --operating_conditions must match the XML timing_model ("C3" for Ti60F225).
+#   - VDB is written by efx_map as <SOC_DIR>/top.vdb (named after the Verilog
+#     top module "top"), NOT outflow/<circuit>.vdb. efx_run.py --flow map would
+#     write outflow/<circuit>.vdb but efx_run.py requires PyQt6 (unavailable on
+#     headless servers). We pass top.vdb directly to efx_pnr.
 
 set -euo pipefail
 
@@ -79,7 +83,7 @@ echo ""
     --device         "$DEVICE" \
     --operating_conditions "$OPCOND" \
     --pack --place --route \
-    --vdb_file       "outflow/${CIRCUIT}.vdb" \
+    --vdb_file       "top.vdb" \
     --sync_file      "outflow/${CIRCUIT}.interface.csv" \
     --work_dir       "work_pnr" \
     --output_dir     "outflow" \
