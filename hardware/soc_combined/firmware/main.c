@@ -283,17 +283,21 @@ static void uart_puthex32_lower(uint32_t v)
         uart_putc(hex[(v >> i) & 0xFu]);
 }
 
-/* Emit a decimal number (0..999999). */
+/* Emit a decimal number (0..999999).
+ * NO local array — char buf[] requires byte-stores (sb) to stack which
+ * hang on this SoC (dBus byte-enable writes to BRAM not supported).
+ * Instead we walk powers of 10 from high to low using only scalar
+ * uint32_t variables that -O2 keeps in CPU registers. */
 static void uart_putdec(uint32_t v)
 {
-    char buf[7];
-    int  n = 0;
+    uint32_t tmp;
     if (v == 0u) { uart_putc('0'); return; }
-    while (v > 0u && n < 7) {
-        buf[n++] = (char)('0' + v % 10u);
-        v /= 10u;
-    }
-    while (--n >= 0) uart_putc(buf[n]);
+    if (v >= 100000u) { tmp = v / 100000u; uart_putc((char)('0' + tmp % 10u)); }
+    if (v >= 10000u)  { tmp = v / 10000u;  uart_putc((char)('0' + tmp % 10u)); }
+    if (v >= 1000u)   { tmp = v / 1000u;   uart_putc((char)('0' + tmp % 10u)); }
+    if (v >= 100u)    { tmp = v / 100u;    uart_putc((char)('0' + tmp % 10u)); }
+    if (v >= 10u)     { tmp = v / 10u;     uart_putc((char)('0' + tmp % 10u)); }
+    uart_putc((char)('0' + v % 10u));
 }
 
 static void delay_loops(uint32_t loops)
