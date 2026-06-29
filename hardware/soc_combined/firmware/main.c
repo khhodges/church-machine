@@ -242,8 +242,14 @@ static cm_key_entry_t cm_key_table[9];  /* zero-initialised at reset */
 static void uart_putc(char c)
 {
     UART_DATA = (1u << 8) | (uint32_t)(unsigned char)c;
-    for (volatile uint32_t i = 0; i < 3000u; i++)
-        __asm__("nop");
+    /* Register-only delay — loop counter stays in a CPU register.
+     * DO NOT use "volatile uint32_t i" here: volatile forces the counter
+     * to the stack (data bus).  On this SoC the data bus to ROM-space
+     * (0xF9007xxx stack region) may not be ready at boot, causing a hang
+     * after the very first UART write.  The asm "+r" constraint keeps the
+     * counter in a GPR and avoids any memory access. */
+    uint32_t _d = 3000u;
+    __asm__ volatile("1: addi %0,%0,-1\n bne %0,zero,1b\n" : "+r"(_d));
 }
 
 static void uart_puts(const char *s)
