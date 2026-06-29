@@ -22,3 +22,5 @@
 - [church_ti60f225 module name](church-module-name.md) — Amaranth/Yosys generates module church_ti60f225 (no underscore); top.v must instantiate without underscore or efx_map hard-crashes with bare STACK TRACE
 - [v2.0 hardware format audit](v2-format-audit.md) — cond codes ARM order (CS=2 not LT=2); Turing opcodes at 16-25 not 10-19; integrity32=ROL-XOR not CRC; g_bit is toggle not set/clear; simulator NS format incompatible with hardware WORD2_LAYOUT
 - [Efinity headless PnR flow](efinity-headless-pnr.md) — efx_run.py needs PyQt6 (unavailable headless); VDB=top.vdb, sync=top.res.csv; set EFINITY_USER_DIR_INI+EFXPT_HOME; always use tmux
+- [Sapphire BRAM symbol file generation](sapphire-bram-symbol-gen.md) — ELF has 4096-byte page-align prefix before ROM; must use hardcoded ROM_BASE=0xF9000000 not min(paddr); files go in soc_combined/ not firmware/
+- [Sapphire firmware uart_putdec hang](sapphire-uart-putdec-hang.md) — uart_putdec using divu/remu hangs at runtime even with always_inline uart_putc; replaced with uart_puthex32_lower+uart_putc in callhome path
