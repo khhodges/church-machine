@@ -298,8 +298,9 @@ static void uart_putdec(uint32_t v)
 
 static void delay_loops(uint32_t loops)
 {
-    volatile uint32_t i;
-    for (i = 0; i < loops; i++) __asm__ volatile("nop");
+    /* Register-only countdown — same reasoning as uart_putc.
+     * volatile uint32_t i would force a stack write and hang. */
+    __asm__ volatile("1: addi %0,%0,-1\n bne %0,zero,1b\n" : "+r"(loops));
 }
 
 /* ------------------------------------------------------------------ */
