@@ -339,14 +339,14 @@ static void uart_emit_callhome(uint32_t boot_reason)
     uart_puts(",\"fault\":");
     uart_putc(fault_latched ? '1' : '0');
     uart_puts(",\"fault_code\":");
-    uart_putdec(fault_code);
+    uart_puthex32_lower(fault_code);   /* hex avoids divu/remu — known-working path */
     uart_puts(",\"fault_name\":\"");
     uart_puts(fault_code_name(fault_code));
     uart_puts("\"");
     uart_puts(",\"fw_major\":");
-    uart_putdec(FW_MAJOR);
+    uart_putc((char)('0' + (FW_MAJOR % 10u))); /* single-char, no division needed */
     uart_puts(",\"fw_minor\":");
-    uart_putdec(FW_MINOR);
+    uart_putc((char)('0' + (FW_MINOR % 10u)));
 
     /* ns_manifest: list of 9 Core OGTs with runtime-computed token_32 */
     uart_puts(",\"ns_manifest\":[");
