@@ -24,3 +24,4 @@
 - [Efinity headless PnR flow](efinity-headless-pnr.md) — efx_run.py needs PyQt6 (unavailable headless); VDB=top.vdb, sync=top.res.csv; set EFINITY_USER_DIR_INI+EFXPT_HOME; always use tmux
 - [Sapphire BRAM symbol file generation](sapphire-bram-symbol-gen.md) — ELF has 4096-byte page-align prefix before ROM; must use hardcoded ROM_BASE=0xF9000000 not min(paddr); files go in soc_combined/ not firmware/
 - [Sapphire firmware uart_putdec hang](sapphire-uart-putdec-hang.md) — uart_putdec using divu/remu hangs at runtime even with always_inline uart_putc; replaced with uart_puthex32_lower+uart_putc in callhome path
+- [Sapphire BRAM byte-store hang](sapphire-bram-byte-store-hang.md) — ANY sb to 0xF9007xxx hangs CPU; sha256.h/hkdf all use sb; precompute tokens or stub; only sw/lw safe in firmware

@@ -118,7 +118,7 @@
 /* Firmware version                                                    */
 /* ------------------------------------------------------------------ */
 #define FW_MAJOR  2u
-#define FW_MINOR  3u
+#define FW_MINOR  4u
 
 /* ------------------------------------------------------------------ */
 /* Sapphire UART0 registers                                            */
@@ -220,6 +220,22 @@ static const struct {
     { "global.Core.NSInspector.boot",    "NS.Inspector"    },
     { "global.Core.MediaConsumer.boot",  "Media.Consumer"  },
     { "global.Core.BrowseClient.boot",   "Browse.Client"   },
+};
+
+/* Precomputed sha32 tokens (= first 4 bytes of SHA-256(ogt), big-endian).
+ * Hard-coded to avoid sha256() byte-store instructions (sb to BRAM stack
+ * hangs on this SoC — same root cause as the uart_putc volatile-loop fix).
+ * Verified against scripts/test_sha32_vectors.py on the host. */
+static const uint32_t _NS_TOKENS[9] = {
+    0x68706247u,  /* global.Core.BoardIdentity.boot */
+    0x416D6848u,  /* global.Core.Heartbeat.boot     */
+    0x677D36A7u,  /* global.Core.FaultReporter.boot */
+    0xEB2B7554u,  /* global.Core.PerfReporter.boot  */
+    0xD728290Du,  /* global.Core.LumpLoader.boot    */
+    0xA7CE2B32u,  /* global.Core.TraceEmitter.boot  */
+    0x404C79D5u,  /* global.Core.NSInspector.boot   */
+    0xE400EC35u,  /* global.Core.MediaConsumer.boot */
+    0xE7EED989u,  /* global.Core.BrowseClient.boot  */
 };
 
 /* ------------------------------------------------------------------ */
@@ -339,7 +355,11 @@ static void uart_emit_callhome(uint32_t boot_reason)
     uart_puts(",\"fault\":");
     uart_putc(fault_latched ? '1' : '0');
     uart_puts(",\"fault_code\":");
-    uart_puthex32_lower(fault_code);   /* hex avoids divu/remu — known-working path */
+    /* Diagnostic: 'X' is always_inline uart_putc — if 'X' appears but nothing
+     * more, the hang is inside uart_puthex32_lower.  If 'X' doesn't appear,
+     * the hang is at the function-call setup or the uart_puts itself. */
+    uart_putc('X');
+    uart_puthex32_lower(fault_code);
     uart_puts(",\"fault_name\":\"");
     uart_puts(fault_code_name(fault_code));
     uart_puts("\"");
@@ -348,10 +368,13 @@ static void uart_emit_callhome(uint32_t boot_reason)
     uart_puts(",\"fw_minor\":");
     uart_putc((char)('0' + (FW_MINOR % 10u)));
 
-    /* ns_manifest: list of 9 Core OGTs with runtime-computed token_32 */
+    /* ns_manifest: list of 9 Core OGTs with precomputed token_32.
+     * sha32() uses byte-store instructions (sb) which hang on this SoC
+     * (BRAM data bus does not support byte-enable writes at boot).
+     * Use the precomputed _NS_TOKENS table instead — no sha256() call. */
     uart_puts(",\"ns_manifest\":[");
     for (i = 0u; i < 9u; i++) {
-        uint32_t t32 = sha32(_NS_MANIFEST[i].ogt);
+        uint32_t t32 = _NS_TOKENS[i];
         if (i > 0u) uart_putc(',');
         uart_puts("{\"ogt\":\"");
         uart_puts(_NS_MANIFEST[i].ogt);
@@ -579,27 +602,28 @@ int main(void)
     if (!boot_seen)
         uart_puts("CM boot_complete: timeout (CM debug FSM may still be starting)\r\n");
 
-    /* ---- Step 6: Wait for CM to reach free-run (~3 s startup counter) ---- */
+    /* ---- Step 6: CALLHOME before the 3-second free-run delay ----
+     * Moved BEFORE delay_loops() to complete in ~60 ms, well ahead of any
+     * time-triggered hardware event at the ~3-second mark that was suspected
+     * to stall the Sapphire SoC's AXI data bus mid-transaction.
+     * (Previous builds: output always stopped at exactly "fault_code": after
+     * ~3 s elapsed — consistent with a time-triggered AXI/BRAM stall.) */
+    uart_puts("Emitting CALLHOME before free-run delay...\r\n");
+    uart_emit_callhome(boot_reason);
+
+    /* ---- Step 7: Wait for CM to reach free-run (~3 s startup counter) ---- */
     uart_puts("Waiting for CM free-run (~3 s startup counter)...\r\n");
     delay_loops(3u * LOOPS_PER_SECOND);
     uart_puts("CM free-run window passed.\r\n");
 
-    /* ---- Step 7: Initial CALLHOME — emits ns_manifest with all 9 Core OGTs ---- */
-    uart_emit_callhome(boot_reason);
-
-    /* T0.4 key derivation — one key pair per Core OGT.
-     * Formula: IKM = SHA256(uid_hi_BE4 || uid_lo_BE4 || ogt_utf8)
-     *          K_enc = HKDF(IKM, "CM_ENC_v3", ogt, 16)
-     *          K_mac = HKDF(IKM, "CM_MAC_v3", ogt, 16)
-     * Matches callhome_bridge.py derive_keys() exactly.
-     * Keys remain in private RISC-V RAM; never copied to CM-core BRAM.
-     */
-    for (i = 0u; i < 9u; i++) {
-        cm_derive_keys(BOARD_UID_HI, BOARD_UID_LO,
-                       _NS_MANIFEST[i].ogt,
-                       cm_key_table[i].k_enc,
-                       cm_key_table[i].k_mac);
-    }
+    /* T0.4 key derivation — DISABLED pending byte-store-safe BRAM fix.
+     * hkdf_sha256 → _sha256_update → ctx->buf[] byte stores hang on this
+     * SoC (BRAM dBus byte-enable writes not supported at boot).  Keys stay
+     * zero; cm_key_table is zero-initialised at reset.  The LUMP relay
+     * protocol does not need keys until a LUMP_START command is issued.
+     * TODO: replace sha256.h byte-store paths with uint32_t word-pack ops.
+     * (void)cm_key_table;   ← suppress unused warning without the loop */
+    (void)cm_key_table;
 
     /* ---- Watchdog state ---- */
     uint32_t last_nia      = CM_NIA;
