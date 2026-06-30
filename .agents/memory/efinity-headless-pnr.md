@@ -16,21 +16,22 @@ Never use `efx_run.py` on a headless server — it requires PyQt6 and fails with
    - Writes VDB to `<SOC_DIR>/top.vdb` (named after Verilog `module top`, NOT `outflow/<circuit>.vdb`)
    - Also writes `top.res.csv` — **this is a resource utilization report, NOT an IO sync file**
 
-2. **Interface Designer / sync file** — BROKEN headlessly
-   - `efx_run.py` interface step does not generate any file on headless (PyQt6 missing)
-   - `top.res.csv` produced by efx_map is a resource report; passing it as `--sync_file` crashes efx_pnr with "unknown escape sequence" on the `sep=\t` header
-   - **Workaround**: omit `--sync_file` entirely. efx_pnr reads peri.xml from the project XML (`<efx:inter_file>`). IO cell names in peri.xml must exactly match top-level Verilog port names. If they match, placement works; if not, IO cells are randomly placed (logic still routed correctly — just wrong physical pins).
+2. **Interface Designer / sync file** — runs headlessly via `efx_run --flow interface`
+   - With `EFINITY_USER_DIR_INI` set, `efx_run` (not efx_run.py) runs Interface Designer even without a GUI
+   - It exits non-zero but still writes `outflow/<circuit>.interface.csv` — swallow the exit code
+   - `top.res.csv` (in project root, produced by efx_map) is a resource report; DO NOT pass as `--sync_file` — crashes efx_pnr with "unknown escape sequence" on `sep=\t`
+   - Correct sync file: `outflow/<circuit>.interface.csv` (named after circuit, not Verilog top module)
 
-3. **Place & Route** — omit `--sync_file`:
+3. **Place & Route** — use `--sync_file outflow/<circuit>.interface.csv`:
    ```
    efx_pnr --prj <proj>.xml --circuit <circuit> \
      --family Titanium --device Ti60F225 --operating_conditions C3 \
      --pack --place --route \
      --vdb_file top.vdb \
-     --work_dir work_pnr --output_dir outflow --max_threads 4
+     --sync_file outflow/<circuit>.interface.csv \
+     --work_dir work_pnr --output_dir outflow
    ```
    - `--vdb_file top.vdb` (project root, not outflow/)
-   - Do NOT pass `--sync_file` — the resource CSV will crash it
    - EFINITY_HOME must be exported before calling efx_pnr
 
 ## Required env vars (set before any step)

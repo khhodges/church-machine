@@ -25,4 +25,4 @@
 - [Sapphire BRAM symbol file generation](sapphire-bram-symbol-gen.md) — ELF has 4096-byte page-align prefix before ROM; must use hardcoded ROM_BASE=0xF9000000 not min(paddr); files go in soc_combined/ not firmware/
 - [Sapphire firmware uart_putdec hang](sapphire-uart-putdec-hang.md) — uart_putdec using divu/remu hangs at runtime even with always_inline uart_putc; replaced with uart_puthex32_lower+uart_putc in callhome path
 - [Sapphire BRAM byte-store hang](sapphire-bram-byte-store-hang.md) — ANY sb to 0xF9007xxx hangs CPU; sha256.h/hkdf all use sb; precompute tokens or stub; only sw/lw safe in firmware
-- [top.res.csv backslash crash](top-res-csv-backslash.md) — efx_pnr CSV parser treats \ as C escape prefix → "unknown escape sequence" crash; run_efx_pnr.sh now strips backslashes after Interface Designer
+- [top.res.csv wrong sync file](top-res-csv-backslash.md) — Interface Designer writes outflow/<circuit>.interface.csv NOT top.res.csv; top.res.csv is MAP resource report; passing it to efx_pnr crashes "unknown escape sequence" on \t
