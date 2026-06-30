@@ -84,7 +84,7 @@ sudo "$LOADER" -b titanium_ti60_f225_jtag --external-flash -f "$HEX_FILE"
 echo ""
 
 # ── Done — auto-open IDE on the Devices / callhome console page ───────────
-CONSOLE_URL="${IDE_URL}/simulator/?view=devices"
+CONSOLE_URL="${IDE_URL}/simulator/#devices"
 
 echo "╔══════════════════════════════════════════╗"
 echo "║   FLASH COMPLETE                         ║"

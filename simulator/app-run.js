@@ -13207,24 +13207,32 @@ function showApiAbstractionDetail(slot) {
     window._asmExampleSources = seed;
 })();
 
-// ── URL param routing (?view=devices, ?view=builder&tab=ti60-connect, etc.) ──
-// Allows external scripts (flash_and_monitor.sh) to deep-link directly to a
-// specific view on page load without requiring a user click.
+// ── URL search-param routing (?view=devices, ?view=builder&tab=ti60-connect) ──
+// Wraps window.init (defined in app-shell.js) so the ?view= param is applied
+// *after* init() has finished setting the default view — avoiding the race
+// where the DOMContentLoaded fetch completes after the load event and resets
+// whatever a load-handler wrote.  Hash routing (#devices) is handled natively
+// by init() itself and needs no wrapper.
 (function _applyUrlViewParam() {
-    window.addEventListener('load', function() {
-        try {
-            const p = new URLSearchParams(window.location.search);
-            const view = p.get('view');
-            if (view && typeof switchView === 'function') {
-                switchView(view);
-                const tab = p.get('tab');
-                if (tab && typeof switchBuilderViewTab === 'function' && view === 'builder') {
-                    switchBuilderViewTab(tab);
+    try {
+        const p = new URLSearchParams(window.location.search);
+        const view = p.get('view');
+        if (!view) return;
+        const _origInit = window.init;
+        window.init = function() {
+            _origInit.apply(this, arguments);
+            try {
+                if (typeof switchView === 'function') {
+                    switchView(view);
+                    const tab = p.get('tab');
+                    if (tab && view === 'builder' && typeof switchBuilderViewTab === 'function') {
+                        switchBuilderViewTab(tab);
+                    }
+                    if (tab && view === 'devices' && typeof switchDevicesTab === 'function') {
+                        switchDevicesTab(tab);
+                    }
                 }
-                if (tab && typeof switchDevicesTab === 'function' && view === 'devices') {
-                    switchDevicesTab(tab);
-                }
-            }
-        } catch(e) {}
-    });
+            } catch(e) {}
+        };
+    } catch(e) {}
 })();
