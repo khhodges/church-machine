@@ -309,13 +309,8 @@ class ChurchSimulator {
         // the namespace view can show stale or blank labels after a second
         // reset-then-reload cycle (nsLabels from the first _initNamespaceTable()
         // call is the only prior source of truth).
-        // Hardware authority port slots (NS[19-22]: CR12_PORT/CR13_PORT/
-        // CR12_MBIT/CR13_MBIT as used by SCHEDULER_IRQ_CLIST) are seeded under
-        // their catalog names ("Loader", "SUCC", "PRED", "ADD") — these ARE the
-        // authoritative software-visible abstraction names.  The c-list constant
-        // names (CR12_PORT etc.) describe the c-list *capability position*, not
-        // the NS slot label.  User pet names are restored afterwards by the
-        // loadNamespaceState() call in app-shell.js so overwriting here is safe.
+        // A second override pass (below) then applies the hardware-boot-specific
+        // labels for slots whose correct names differ from the simulator catalog.
         const _bootCatalog = this._getAbstractionCatalog();
         for (let _bi = 0; _bi < count; _bi++) {
             const _bBase = this.NS_TABLE_BASE + _bi * this.NS_ENTRY_WORDS;
@@ -323,23 +318,59 @@ class ChurchSimulator {
             if (!_hasEntry) {
                 // Slot is zeroed in the binary (free/reserved) — mark as free
                 // so the namespace view shows '(free)' rather than a stale name.
-                if (!this.nsLabels[_bi]) this.nsLabels[_bi] = '(free)';
+                this.nsLabels[_bi] = '(free)';
                 continue;
             }
             if (_bootCatalog[_bi]) {
-                // Always use the catalog label for populated catalog slots —
-                // this is the authoritative name for the slot.
                 this.nsLabels[_bi] = _bootCatalog[_bi].label;
             } else if (!this.nsLabels[_bi]) {
-                // Populated slot beyond catalog range with no existing label.
                 this.nsLabels[_bi] = `slot_${_bi}`;
             }
         }
 
+        // Hardware-boot label override — applied AFTER catalog re-seeding.
+        // The simulator's abstraction catalog diverges from the hardware boot
+        // namespace (boot_rom.py DEMO_NAMESPACE) in two places:
+        //
+        //   Slots 11-14: the server-generated boot binary has live MMIO device
+        //     entries (UART_DEV, LED_DEV, BTN_DEV, TIMER_DEV) at these indices.
+        //     The simulator catalog marks them null/freed (Tasks #406/#431) so
+        //     the catalog pass above labels them "(free)" even though word0/word1
+        //     are non-zero in the binary.
+        //
+        //   Slots 19-22: the hardware boot namespace places S-perm hardware port
+        //     authority objects here (CR12_PORT_CAP at 0xFFFFFF0C, etc.) so that
+        //     Scheduler.IRQ can invoke CHANGE CR12/CR13 and M-bit-set.  The
+        //     simulator catalog labels those same indices as math abstractions
+        //     (Loader, SUCC, PRED, ADD) — incorrect for the hardware binary.
+        //
+        // These overrides ensure the namespace view names match the loaded binary
+        // exactly, matching boot_rom.py §"MMIO device GT slot assignments" and
+        // §"Church Hardware Address Range capability slots (slots 19-22)".
+        const _HW_BOOT_LABELS = {
+            11: 'UART_DEV',    // MMIO 0x40000014 — UART TX/STATUS/RX
+            12: 'LED_DEV',     // MMIO 0x40000000 — 5 RGB LED words
+            13: 'BTN_DEV',     // MMIO 0x40000028 — button R-perm
+            14: 'TIMER_DEV',   // MMIO 0x4000002C — timer/alarm RW
+            19: 'CR12 Port',   // S-perm authority: CHANGE CR12 (0xFFFFFF0C)
+            20: 'CR13 Port',   // S-perm authority: CHANGE CR13 (0xFFFFFF0D)
+            21: 'CR12 M-bit',  // S-perm authority: SET M-BIT CR12 (0xFFFFFF1C)
+            22: 'CR13 M-bit',  // S-perm authority: SET M-BIT CR13 (0xFFFFFF1D)
+        };
+        for (const [_hwSlotStr, _hwLabel] of Object.entries(_HW_BOOT_LABELS)) {
+            const _hwSlot = +_hwSlotStr;
+            if (_hwSlot >= count) continue;
+            const _hwBase = this.NS_TABLE_BASE + _hwSlot * this.NS_ENTRY_WORDS;
+            if (this.memory[_hwBase] !== 0 || this.memory[_hwBase + 1] !== 0) {
+                this.nsLabels[_hwSlot] = _hwLabel;
+            }
+        }
+
         // Integrity check: the minimum complete boot namespace has 23 slots
-        // (indices 0-22 covering Boot.NS, Boot.Thread, Boot.Abstr, Salvation,
-        // Navana, Mint, Memory, Scheduler, Stack, DijkstraFlag, freed 11-14,
-        // Display, SlideRule, Abacus, Constants, Loader, SUCC, PRED, ADD).
+        // (indices 0-22: Boot.NS, Boot.Thread, freed-2, freed-3, Salvation,
+        // Navana, Mint, Memory, Scheduler, Stack, DijkstraFlag, UART_DEV,
+        // LED_DEV, BTN_DEV, TIMER_DEV, Display, SlideRule, empty-17, Constants,
+        // CR12 Port, CR13 Port, CR12 M-bit, CR13 M-bit).
         // Warn loudly in the console log when the binary is smaller than this.
         const _BOOT_SLOT_MIN = 23;
         if (count < _BOOT_SLOT_MIN) {
