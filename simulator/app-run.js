@@ -11198,7 +11198,7 @@ function toggleHWNamespace() {
     }
     _hwNSVisible = true;
     if (btn) btn.style.background = 'rgba(234,179,8,0.35)';
-    if (_hwNSLoaded) { panel.style.display = ''; return; }
+    if (_hwNSLoaded) { panel.style.display = ''; panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
     panel.style.display = '';
     panel.innerHTML = '<div style="color:#9ca3af;font-size:0.8rem;padding:8px;">Loading…</div>';
     fetch('/api/hardware-namespace')
@@ -11207,9 +11207,11 @@ function toggleHWNamespace() {
             if (!data.ok) throw new Error(data.error || 'Failed');
             _hwNSLoaded = true;
             panel.innerHTML = _renderHWNS(data);
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
         })
         .catch(err => {
             panel.innerHTML = '<div style="color:#f87171;font-size:0.8rem;padding:8px;">Error: ' + err.message + '</div>';
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
 }
 
