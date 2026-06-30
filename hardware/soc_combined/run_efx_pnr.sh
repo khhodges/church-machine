@@ -55,6 +55,43 @@ mkdir -p "$EFINITY_USER_DIR_INI"
 cd "$SOC_DIR"
 
 # ----------------------------------------------------------------
+# Step 0a: Generate Sapphire symbol bins from firmware.bin
+# These byte-lane files are consumed by patch_mapv_init.py (Step 0b).
+# firmware.bin must exist — run `make -C firmware` first.
+# ----------------------------------------------------------------
+FIRMWARE_BIN="$SOC_DIR/firmware/firmware.bin"
+if [ ! -f "$FIRMWARE_BIN" ]; then
+    echo "ERROR: $FIRMWARE_BIN not found — run: make -C $SOC_DIR/firmware"
+    exit 1
+fi
+echo "==> Step 0a: Generating Sapphire symbol bins from firmware ..."
+python3 "$SCRIPT_DIR/../../scripts/gen_sapphire_symbol_bins.py" \
+    "$FIRMWARE_BIN" --out-dir "$SOC_DIR"
+echo "    Done."
+echo ""
+
+# ----------------------------------------------------------------
+# Step 0b: Patch Sapphire firmware into MAP output (map.v)
+# EFX_MAP ignores Verilog $readmemb for Sapphire BRAM; patch_mapv_init.py
+# writes the firmware bytes directly into INIT_ defparam lines in map.v.
+# MUST run before efx_pnr — PnR embeds the INIT_ values in the bitstream.
+# ----------------------------------------------------------------
+MAPV="$SOC_DIR/outflow/${CIRCUIT}.map.v"
+if [ ! -f "$MAPV" ]; then
+    echo "ERROR: $MAPV not found — run run_efx_map.sh first."
+    exit 1
+fi
+echo "==> Step 0b: Patching Sapphire firmware into map.v (patch_mapv_init.py) ..."
+python3 "$SCRIPT_DIR/../../scripts/patch_mapv_init.py" \
+    "$MAPV" \
+    "$SOC_DIR/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin" \
+    "$SOC_DIR/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin" \
+    "$SOC_DIR/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin" \
+    "$SOC_DIR/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin"
+echo "    Done."
+echo ""
+
+# ----------------------------------------------------------------
 # Step 0: Interface Designer
 # Reads peri.xml → writes IO placement into the project database.
 # On headless servers efx_run raises 'EFINITY_USER_DIR_INI' KeyError
