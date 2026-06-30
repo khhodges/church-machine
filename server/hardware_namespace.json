@@ -1,0 +1,214 @@
+{
+  "source": "hardware/boot_rom.py DEMO_NAMESPACE",
+  "description": "Ti60 F225 FPGA boot image namespace — baked into BRAM at synthesis time",
+  "slot_count": 23,
+  "slots": [
+    {
+      "slot": 0,
+      "name": "Boot.NS",
+      "gt_type": "Inform",
+      "perms": "RW",
+      "location": "top of DMEM",
+      "size_words": 64,
+      "description": "NS root — covers full physical address space"
+    },
+    {
+      "slot": 1,
+      "name": "Boot.Thread",
+      "gt_type": "Inform",
+      "perms": "RW",
+      "location": "0x0100",
+      "size_words": 64,
+      "description": "Thread Abstraction lump"
+    },
+    {
+      "slot": 2,
+      "name": "(empty)",
+      "gt_type": "NULL",
+      "perms": "",
+      "location": "",
+      "size_words": 0,
+      "description": "Freed — Startup.Config removed"
+    },
+    {
+      "slot": 3,
+      "name": "(empty)",
+      "gt_type": "NULL",
+      "perms": "",
+      "location": "",
+      "size_words": 0,
+      "description": "Placeholder slot"
+    },
+    {
+      "slot": 4,
+      "name": "Salvation",
+      "gt_type": "Inform",
+      "perms": "E",
+      "location": "0x03FC",
+      "size_words": 64,
+      "description": "First user abstraction — NUC_PROGRAM on hardware"
+    },
+    {
+      "slot": 5,
+      "name": "Navana",
+      "gt_type": "Inform",
+      "perms": "E",
+      "location": "0x0500",
+      "size_words": 64,
+      "description": "Namespace controller"
+    },
+    {
+      "slot": 6,
+      "name": "Mint",
+      "gt_type": "Inform",
+      "perms": "E",
+      "location": "0x0600",
+      "size_words": 64,
+      "description": "Capability minting"
+    },
+    {
+      "slot": 7,
+      "name": "Memory",
+      "gt_type": "Inform",
+      "perms": "E",
+      "location": "0x0700",
+      "size_words": 64,
+      "description": "Memory management"
+    },
+    {
+      "slot": 8,
+      "name": "Scheduler",
+      "gt_type": "Inform",
+      "perms": "E",
+      "location": "0x0800",
+      "size_words": 64,
+      "description": "Thread scheduling"
+    },
+    {
+      "slot": 9,
+      "name": "Stack",
+      "gt_type": "Inform",
+      "perms": "E",
+      "location": "0x0900",
+      "size_words": 64,
+      "description": "LIFO stack abstraction"
+    },
+    {
+      "slot": 10,
+      "name": "DijkstraFlag",
+      "gt_type": "Inform",
+      "perms": "E",
+      "location": "0x0A00",
+      "size_words": 64,
+      "description": "Synchronisation primitive"
+    },
+    {
+      "slot": 11,
+      "name": "UART_DEV",
+      "gt_type": "Inform",
+      "perms": "RW",
+      "location": "0x40000014",
+      "size_words": 3,
+      "description": "UART MMIO device"
+    },
+    {
+      "slot": 12,
+      "name": "LED_DEV",
+      "gt_type": "Inform",
+      "perms": "RW",
+      "location": "0x40000000",
+      "size_words": 5,
+      "description": "LED MMIO device"
+    },
+    {
+      "slot": 13,
+      "name": "BTN_DEV",
+      "gt_type": "Inform",
+      "perms": "R",
+      "location": "0x40000028",
+      "size_words": 1,
+      "description": "Button MMIO device"
+    },
+    {
+      "slot": 14,
+      "name": "TIMER_DEV",
+      "gt_type": "Inform",
+      "perms": "RW",
+      "location": "0x4000002C",
+      "size_words": 5,
+      "description": "Timer MMIO device"
+    },
+    {
+      "slot": 15,
+      "name": "Display",
+      "gt_type": "Inform",
+      "perms": "E",
+      "location": "0x0F00",
+      "size_words": 64,
+      "description": "Reserved for future display device"
+    },
+    {
+      "slot": 16,
+      "name": "SlideRule",
+      "gt_type": "Inform",
+      "perms": "E",
+      "location": "0x07FC",
+      "size_words": 256,
+      "description": "Layer 3 Mathematics — 8 methods"
+    },
+    {
+      "slot": 17,
+      "name": "(empty)",
+      "gt_type": "Inform",
+      "perms": "RW",
+      "location": "0x1100",
+      "size_words": 64,
+      "description": "Reserved"
+    },
+    {
+      "slot": 18,
+      "name": "Constants",
+      "gt_type": "Inform",
+      "perms": "R",
+      "location": "0x1200",
+      "size_words": 64,
+      "description": "Layer 3 read-only constants"
+    },
+    {
+      "slot": 19,
+      "name": "CR12.Port",
+      "gt_type": "Inform",
+      "perms": "S",
+      "location": "0xFFFFFF0C",
+      "size_words": 1,
+      "description": "Authority to change CR12 (hardware port)"
+    },
+    {
+      "slot": 20,
+      "name": "CR13.Port",
+      "gt_type": "Inform",
+      "perms": "S",
+      "location": "0xFFFFFF0D",
+      "size_words": 1,
+      "description": "Authority to change CR13 (hardware port)"
+    },
+    {
+      "slot": 21,
+      "name": "CR12.Mbit",
+      "gt_type": "Inform",
+      "perms": "S",
+      "location": "0xFFFFFF1C",
+      "size_words": 1,
+      "description": "Authority for CR12 M-bit"
+    },
+    {
+      "slot": 22,
+      "name": "CR13.Mbit",
+      "gt_type": "Inform",
+      "perms": "S",
+      "location": "0xFFFFFF1D",
+      "size_words": 1,
+      "description": "Authority for CR13 M-bit"
+    }
+  ]
+}

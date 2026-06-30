@@ -11183,6 +11183,75 @@ function importNamespaceFile() {
     document.getElementById('nsImportFile').click();
 }
 
+let _hwNSLoaded = false;
+let _hwNSVisible = false;
+
+function toggleHWNamespace() {
+    const panel = document.getElementById('hwNSPanel');
+    const btn   = document.getElementById('hwNSToggleBtn');
+    if (!panel) return;
+    if (_hwNSVisible) {
+        panel.style.display = 'none';
+        _hwNSVisible = false;
+        if (btn) btn.style.background = 'rgba(234,179,8,0.15)';
+        return;
+    }
+    _hwNSVisible = true;
+    if (btn) btn.style.background = 'rgba(234,179,8,0.35)';
+    if (_hwNSLoaded) { panel.style.display = ''; return; }
+    panel.style.display = '';
+    panel.innerHTML = '<div style="color:#9ca3af;font-size:0.8rem;padding:8px;">Loading…</div>';
+    fetch('/api/hardware-namespace')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) throw new Error(data.error || 'Failed');
+            _hwNSLoaded = true;
+            panel.innerHTML = _renderHWNS(data);
+        })
+        .catch(err => {
+            panel.innerHTML = '<div style="color:#f87171;font-size:0.8rem;padding:8px;">Error: ' + err.message + '</div>';
+        });
+}
+
+function _renderHWNS(data) {
+    const permColour = { E:'#86efac', R:'#93c5fd', W:'#fde68a', S:'#f9a8d4', RW:'#c4b5fd', '':'#4b5563' };
+    const typeColour = { Inform:'#60a5fa', NULL:'#6b7280' };
+    let rows = '';
+    for (const s of data.slots) {
+        const pc = permColour[s.perms] || '#9ca3af';
+        const tc = typeColour[s.gt_type] || '#9ca3af';
+        const empty = !s.name || s.name.startsWith('(');
+        rows += `<tr style="opacity:${empty ? 0.45 : 1}">` +
+            `<td style="color:#fde68a;text-align:right;padding:3px 8px;font-variant-numeric:tabular-nums">${s.slot}</td>` +
+            `<td style="padding:3px 10px;font-weight:${empty?'normal':'600'}">${s.name}</td>` +
+            `<td style="padding:3px 8px;color:${tc};font-size:0.75rem">${s.gt_type}</td>` +
+            `<td style="padding:3px 8px;color:${pc};font-weight:700;font-size:0.8rem;letter-spacing:0.04em">${s.perms || '—'}</td>` +
+            `<td style="padding:3px 8px;font-family:monospace;font-size:0.75rem;color:#a3e6b8">${s.location || '—'}</td>` +
+            `<td style="padding:3px 8px;text-align:right;color:#9ca3af;font-size:0.75rem">${s.size_words || '—'}</td>` +
+            `<td style="padding:3px 8px;color:#9ca3af;font-size:0.72rem">${s.description}</td>` +
+            '</tr>';
+    }
+    return `<div style="border:1px solid rgba(234,179,8,0.25);border-radius:6px;overflow:hidden">
+        <div style="background:rgba(234,179,8,0.1);padding:8px 14px;font-size:0.78rem;color:#fde68a;font-weight:600;letter-spacing:0.03em">
+            ⚙ Hardware Boot Namespace — Ti60 F225 FPGA BRAM
+            <span style="font-weight:normal;color:#9ca3af;margin-left:10px;font-size:0.72rem">${data.description}</span>
+        </div>
+        <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:0.8rem;color:#e5e7eb">
+            <thead><tr style="background:rgba(0,0,0,0.3);font-size:0.72rem;color:#6b7280;text-transform:uppercase;letter-spacing:0.06em">
+                <th style="padding:4px 8px;text-align:right">Slot</th>
+                <th style="padding:4px 10px;text-align:left">Name</th>
+                <th style="padding:4px 8px;text-align:left">GT Type</th>
+                <th style="padding:4px 8px;text-align:left">Perms</th>
+                <th style="padding:4px 8px;text-align:left">Location</th>
+                <th style="padding:4px 8px;text-align:right">Words</th>
+                <th style="padding:4px 8px;text-align:left">Description</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
+        </div></div>`;
+}
+
 function parseCodeWords(codeArr) {
     if (!Array.isArray(codeArr)) return [];
     return codeArr.map(w => {

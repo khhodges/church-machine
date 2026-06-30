@@ -566,8 +566,12 @@
                 <button class="btn btn-primary btn-sm" onclick="importNamespaceFile()" data-tooltip="Import — Load namespace entries from a JSON or binary file">Import</button>
                 <button class="btn btn-primary btn-sm" onclick="downloadNamespaceLump()" data-tooltip="Download Namespace JSON — Export a self-describing manifest of every namespace slot">Download Namespace JSON</button>
                 <input type="file" id="nsImportFile" style="display:none;" accept=".json,.bin" onchange="handleNSImport(event)">
+                <button class="btn btn-sm" id="hwNSToggleBtn" onclick="toggleHWNamespace()"
+                    style="background:rgba(234,179,8,0.15);border:1px solid rgba(234,179,8,0.4);color:#fde68a;"
+                    data-tooltip="HW Boot NS — Show the namespace baked into the Ti60 FPGA BRAM at boot">⚙ HW Boot NS</button>
             </div>
             <div id="namespaceTable"></div>
+            <div id="hwNSPanel" style="display:none;margin-top:18px;"></div>
         </div>
     </div>
 
@@ -2475,7 +2479,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
          via window._cloomcLangExampleGroups); both must precede app-source-library. -->
     <script src="app-compile.js?v=20260625a"></script>
     <script src="app-lump-editor.js?v=20260516e"></script>
-    <script src="app-run.js?v=20260630b"></script>
+    <script src="app-run.js?v=20260630c"></script>
     <script src="app-source-library.js?v=20260509d"></script>
     <script src="app-invoke.js?v=20260521a"></script>
     <script src="app-misc.js?v=20260623a"></script>
