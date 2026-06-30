@@ -13,6 +13,20 @@
 
 set -euo pipefail
 
+# ── Auto-tmux — run inside a persistent session so the terminal never locks ──
+# Detach any time with Ctrl+B, D.  Reattach with:  tmux attach -t church-build
+# Skip if already inside tmux, or if NO_TMUX=1 is set.
+if [ -z "${TMUX:-}" ] && [ "${NO_TMUX:-0}" = "0" ] && command -v tmux &>/dev/null; then
+    SESSION="church-build"
+    if tmux has-session -t "$SESSION" 2>/dev/null; then
+        echo "==> Attaching to existing tmux session '$SESSION' ..."
+        exec tmux attach -t "$SESSION"
+    fi
+    echo "==> Launching inside tmux session '$SESSION' (detach: Ctrl+B, D) ..."
+    exec tmux new-session -s "$SESSION" \
+        "export _CHURCH_BOOTSTRAPPED=${_CHURCH_BOOTSTRAPPED:-0}; export NO_TMUX=1; bash '${BASH_SOURCE[0]}' $*; echo ''; echo 'Build finished — press Enter to close.'; read"
+fi
+
 # ── Self-bootstrap ────────────────────────────────────────────────────────────
 # If this script is stale, pull latest from GitHub and re-exec the new version
 # before touching Efinity.  The guard variable prevents an infinite re-exec loop.
