@@ -587,6 +587,10 @@ function init() {
         // boot-image catalog entries take precedence; only truly empty slots
         // (like user-defined slot 50+) are restored from localStorage.
         loadNamespaceState();
+        // Refresh the namespace table immediately after the boot image loads so
+        // the live unified view populates even if the user navigated there before
+        // the async fetch resolved, or before auto-boot fired.
+        if (currentView === 'namespace' && typeof updateNamespace === 'function') updateNamespace();
         // ALL auto-boot fires HERE (inside the .then) so that:
         //   1. window.bootImage is already set → sim.reset() → _maybeApplyBootImage()
         //      loads the correct binary immediately.
