@@ -2585,6 +2585,7 @@ function updateNamespace() {
             html += `<div class="ns-detail-panel">`;
             html += `<div class="ns-detail-title">Memory at 0x${e.word0_location.toString(16).toUpperCase().padStart(4, '0')} \u2014 ${e.label || 'Slot '+i} (${lim.limit + 1} words)</div>`;
             html += renderMemoryDump(e.word0_location, lim.limit + 1, i);
+            html += _renderNSInlineCode(i, e.word0_location, lim);
             if (lim.clistCount > 0) {
                 const _nsClistBase = (e.word0_location >>> 0) + lim.limit + 1 - lim.clistCount;
                 const _hlSlot = window._pendingHighlightCListSlot;
@@ -2669,6 +2670,51 @@ function updateNamespace() {
 
     html += '</tbody></table>';
     container.innerHTML = html;
+}
+
+// ── Inline code listing for NS expanded rows ──────────────────────────────────
+// Renders a compact disassembler listing for the code region of a namespace
+// lump when that lump has a valid header and at least one code word.
+// Returns an HTML string (empty string when the slot carries no code).
+function _renderNSInlineCode(slotIdx, loc, lim) {
+    if (!sim || !sim.memory || !loc || loc === 0 || loc >= sim.memory.length) return '';
+    if (!sim.parseLumpHeader) return '';
+    const lumpWord0 = sim.memory[loc >>> 0] >>> 0;
+    const lumpHdr   = sim.parseLumpHeader(lumpWord0);
+    if (!lumpHdr || !lumpHdr.valid || lumpHdr.cw === 0) return '';
+
+    const asm       = (typeof ChurchAssembler !== 'undefined') ? new ChurchAssembler() : null;
+    if (!asm) return '';
+
+    const codeStart = (loc >>> 0) + 1;
+    const codeCount = lumpHdr.cw;
+
+    let out = '<div class="ns-clist-section">';
+    out += `<div class="ns-clist-title">Code \u2014 ${codeCount} instruction${codeCount !== 1 ? 's' : ''}</div>`;
+    out += '<table class="cr-table ns-clist-inline-table"><thead><tr>';
+    out += '<th>Addr</th><th>Hex</th><th>Instruction</th></tr></thead><tbody>';
+
+    for (let w = 0; w < codeCount; w++) {
+        const addr = codeStart + w;
+        if (addr >= sim.memory.length) break;
+        const word = sim.memory[addr] >>> 0;
+        let decoded;
+        if (word === 0) {
+            decoded = '<span style="color:#6b7280">NOP / HALT</span>';
+        } else {
+            const raw = asm.disassemble(word);
+            decoded = (typeof _highlightCLOOMCSource === 'function')
+                ? _highlightCLOOMCSource(raw, 'assembly')
+                : raw;
+        }
+        out += `<tr>`;
+        out += `<td class="cr-idx">0x${addr.toString(16).toUpperCase().padStart(4, '0')}</td>`;
+        out += `<td class="abs-clist-gt">0x${word.toString(16).toUpperCase().padStart(8, '0')}</td>`;
+        out += `<td class="code-disasm">${decoded}</td>`;
+        out += `</tr>`;
+    }
+    out += '</tbody></table></div>';
+    return out;
 }
 
 // ── Memory dump view ──────────────────────────────────────────────────────────

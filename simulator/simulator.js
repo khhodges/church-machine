@@ -302,6 +302,60 @@ class ChurchSimulator {
         const reserved = Math.min(maxEntries, baseNamed + empty);
         if (reserved > count) count = reserved;
         this.nsCount = count;
+
+        // Reseed nsLabels from the canonical abstraction catalog for every
+        // populated NS slot.  loadBootImage() copies raw binary words into
+        // memory but the binary carries no label strings — without this step
+        // the namespace view can show stale or blank labels after a second
+        // reset-then-reload cycle (nsLabels from the first _initNamespaceTable()
+        // call is the only prior source of truth).
+        // Hardware authority port slots (NS[19-22]: CR12_PORT/CR13_PORT/
+        // CR12_MBIT/CR13_MBIT as used by SCHEDULER_IRQ_CLIST) are seeded under
+        // their catalog names ("Loader", "SUCC", "PRED", "ADD") — these ARE the
+        // authoritative software-visible abstraction names.  The c-list constant
+        // names (CR12_PORT etc.) describe the c-list *capability position*, not
+        // the NS slot label.  User pet names are restored afterwards by the
+        // loadNamespaceState() call in app-shell.js so overwriting here is safe.
+        const _bootCatalog = this._getAbstractionCatalog();
+        for (let _bi = 0; _bi < count; _bi++) {
+            const _bBase = this.NS_TABLE_BASE + _bi * this.NS_ENTRY_WORDS;
+            const _hasEntry = (this.memory[_bBase] !== 0 || this.memory[_bBase + 1] !== 0);
+            if (!_hasEntry) {
+                // Slot is zeroed in the binary (free/reserved) — mark as free
+                // so the namespace view shows '(free)' rather than a stale name.
+                if (!this.nsLabels[_bi]) this.nsLabels[_bi] = '(free)';
+                continue;
+            }
+            if (_bootCatalog[_bi]) {
+                // Always use the catalog label for populated catalog slots —
+                // this is the authoritative name for the slot.
+                this.nsLabels[_bi] = _bootCatalog[_bi].label;
+            } else if (!this.nsLabels[_bi]) {
+                // Populated slot beyond catalog range with no existing label.
+                this.nsLabels[_bi] = `slot_${_bi}`;
+            }
+        }
+
+        // Integrity check: the minimum complete boot namespace has 23 slots
+        // (indices 0-22 covering Boot.NS, Boot.Thread, Boot.Abstr, Salvation,
+        // Navana, Mint, Memory, Scheduler, Stack, DijkstraFlag, freed 11-14,
+        // Display, SlideRule, Abacus, Constants, Loader, SUCC, PRED, ADD).
+        // Warn loudly in the console log when the binary is smaller than this.
+        const _BOOT_SLOT_MIN = 23;
+        if (count < _BOOT_SLOT_MIN) {
+            this.output += `[BOOTIMG] WARNING: only ${count} NS slots active (< ${_BOOT_SLOT_MIN} expected). Boot namespace may be incomplete.\n`;
+        } else {
+            // Verify that every slot in the core 23 has a meaningful label.
+            const _unlabelled = [];
+            for (let _ci = 0; _ci < _BOOT_SLOT_MIN; _ci++) {
+                const _lbl = this.nsLabels[_ci];
+                if (!_lbl || _lbl === `slot_${_ci}`) _unlabelled.push(_ci);
+            }
+            if (_unlabelled.length > 0) {
+                this.output += `[BOOTIMG] WARNING: ${_unlabelled.length} core boot slot(s) have no catalog label: [${_unlabelled.join(', ')}] — check the abstraction catalog.\n`;
+            }
+        }
+
         this.output += `[BOOTIMG] Loaded ${n}-word boot image; ${count} NS entries active.\n`;
         this.emit('stateChange', this.getState());
         return true;

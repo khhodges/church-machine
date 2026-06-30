@@ -387,16 +387,6 @@ def api_bitstream_status():
         "size_bytes": meta.get("size_bytes"),
     })
 
-@app.route("/api/hardware-namespace")
-def api_hardware_namespace():
-    """Return the Ti60 F225 FPGA boot image namespace table (static, from boot_rom.py)."""
-    ns_path = os.path.join(os.path.dirname(__file__), "hardware_namespace.json")
-    try:
-        with open(ns_path) as _f:
-            data = json.load(_f)
-        return jsonify({"ok": True, **data})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/dl/build-soc-cm-md")
 def download_build_soc_cm_md():
