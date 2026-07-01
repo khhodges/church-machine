@@ -1301,6 +1301,26 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
         encodedRow === 31, 'got ' + encodedRow);
 }
 
+// EL20: CALL method-name form with NS slot = 32 → out-of-range error.
+//       SlideRule is mapped to slot 32 via nsSymbols (not nsLoaded), so the
+//       CALL handler converts it to ELOADCALL internally using the dot-notation
+//       branch at ~line 1227 of assembler.js.  That branch previously masked
+//       the slot with & 0xFF instead of & 0x1F, silently encoding the wrong
+//       c-list row.  The fix adds a > 31 guard and must fire here.
+{
+    const a = new ChurchAssembler(CONVENTIONS);
+    a.setNamespace({ 'SlideRule': 32 }); // slot 32 exceeds the 5-bit row field
+    a.assemble('CALL SlideRule, Multiply');
+    assert('EL20 CALL method-name NS slot=32: produces an error',
+        a.errors.length > 0, 'expected at least one error');
+    assert('EL20 error says "out of range" and shows 32',
+        a.errors.some(e => e.message.includes('out of range') && e.message.includes('32')),
+        a.errors.map(e => e.message).join('; '));
+    assert('EL20 error mentions 5-bit field',
+        a.errors.some(e => e.message.includes('5-bit')),
+        a.errors.map(e => e.message).join('; '));
+}
+
 // ── SHR / ASR encoding and disassembly ───────────────────────────────────────
 
 // SA1: Plain SHR (LSR) — imm[5] must be 0.

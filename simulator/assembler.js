@@ -1223,8 +1223,10 @@ class ChurchAssembler {
                             const _methIdx = typeof _methEntry === 'object' ? _methEntry.index : _methEntry;
                             if (_methIdx < 0 || _methIdx > 126) {
                                 this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, _methName), message: `Method "${_methName}" of ${rawDotTok} has index ${_methIdx} which is out of range (0–126 allowed for ELOADCALL).` });
+                            } else if (_nsSlot > 31) {
+                                this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, rawDotTok), message: `ELOADCALL c-list row ${_nsSlot} is out of range (0–31 allowed; ELOADCALL uses a 5-bit row field).` });
                             } else {
-                                imm = ((_methIdx + 1) << 8) | (_nsSlot & 0xFF);
+                                imm = ((_methIdx + 1) << 8) | (_nsSlot & 0x1F);
                             }
                         } else {
                             const _known = Object.keys(this.methodConventions[rawDotTok]).join(', ');
