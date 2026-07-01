@@ -10,8 +10,8 @@ Suite 1 — Python catalog (server/boot_image.py DEFAULT_ABSTRACTION_CATALOG):
   P2  Every non-null entry carries at most one Church permission bit.
 
 Suite 2 — Simulator catalog cross-check (simulator/simulator.js
-          _getAbstractionCatalog() via Node):
-  S1  The simulator catalog has exactly 50 entries (same length as Python).
+          _getHardwareBootCatalog() via Node):
+  S1  The simulator catalog has exactly 8 entries (same length as Python).
   S2  Every non-null simulator entry is domain-pure.
   S3  Every non-null simulator entry has at most one Church permission bit.
   S4  Every non-null entry in both catalogs agrees on label and perms

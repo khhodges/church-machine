@@ -902,7 +902,7 @@ MAX_NS_ENTRIES = 1024
 # device + Step 2 catalog slots — the simulator writes the whole default
 # abstraction catalog regardless of what's in Step 2. Keep in sync with
 # simulator.js _getAbstractionCatalog() default list length.
-BASE_NAMED_NS_COUNT = 47
+BASE_NAMED_NS_COUNT = 8
 
 # Slots reserved for foundational lumps (Step 1) and device MMIO regions —
 # the programmer cannot place an additional resident lump body here. Slots

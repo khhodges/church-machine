@@ -191,44 +191,8 @@ DEFAULT_ABSTRACTION_CATALOG = [
     ("TIMER_DEV",    {"R":1,"W":1,"X":0,"L":0,"S":0,"E":0}, False),  # 5  MMIO 0x4000002C
     ("SelfTest",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 6  boot entry point
     None,                                                               # 7  [programmable]
-    ("SlideRule",    {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, True),   # 8
-    ("Constants",    {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 9
-    ("Loader",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 10
-    ("SUCC",         {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),  # 11
-    ("PRED",         {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),  # 12
-    ("ADD",          {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),  # 13
-    ("SUB",          {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),  # 14
-    ("MUL",          {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),  # 15
-    ("ISZERO",       {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),  # 16
-    ("TRUE",         {"R":0,"W":0,"X":0,"L":1,"S":0,"E":0}, False),  # 17
-    ("FALSE",        {"R":0,"W":0,"X":0,"L":1,"S":0,"E":0}, False),  # 18
-    None,                                                               # 19 freed
-    None,                                                               # 20 freed
-    None,                                                               # 21 freed
-    ("Tunnel",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 22
-    ("Keystone",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 23
-    None,                                                               # 24 freed
-    None,                                                               # 25 freed
-    None,                                                               # 26 freed
-    None,                                                               # 27 freed
-    None,                                                               # 28 freed
-    None,                                                               # 29 freed
-    None,                                                               # 30 freed
-    None,                                                               # 31 freed
-    None,                                                               # 32 freed
-    None,                                                               # 33 freed
-    ("PAIR",         {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),  # 34
-    ("GC",           {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 35
-    ("Thread",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 36
-    None,                                                               # 37 freed
-    ("Billing",      {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 38
-    ("TuringMemory", {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 39
-    ("ChurchMemory", {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 40
-    ("Scheduler.IRQ.Thread", {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False),  # 41
-    ("Ethernet",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 42
-    ("EventRouter",  {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 43
 ]
-assert len(DEFAULT_ABSTRACTION_CATALOG) == 44, "catalog drift vs simulator.js"
+assert len(DEFAULT_ABSTRACTION_CATALOG) == 8, "catalog drift vs simulator.js"
 
 # MMIO NS slot specs: (mmio_byte_addr, lim17).
 # Slots 2-5 use physical MMIO addresses — no RAM body is allocated;
@@ -677,6 +641,35 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         clist_gts.append(create_gt(0, i, perms, 1))
 
     ns_count = len(catalog)
+
+    # ----- Step 2 augmentation: NS entries for extended slots (≥8) ------
+    # The 8-slot hardware catalog loop above only creates NS entries for
+    # slots 0–7.  Resident Step-2 lumps targeting slots ≥ 8 need explicit
+    # NS entries written here.  Lazy (resident=False) slots are left as
+    # all-zeros — the runtime lazy loader writes their NS entry on first use.
+    for _e2 in step2_lumps:
+        if not isinstance(_e2, dict):
+            continue
+        _e2_slot = _e2.get("nsSlot")
+        if not isinstance(_e2_slot, int) or _e2_slot < len(catalog):
+            continue   # foundational / in-catalog slots already handled
+        if _e2_slot in _RESERVED_SLOTS:
+            continue
+        if not (bool(_e2.get("resident"))
+                and isinstance(_e2.get("physAddr"), int)
+                and _e2["physAddr"] > 0):
+            continue   # lazy-load: no NS entry in boot image
+        _e2_phys  = int(_e2["physAddr"])
+        _e2_size  = int(_e2.get("lumpSize") or SLOT_SIZE)
+        _e2_lim17 = (_e2_size - 1) & 0x1FFFF
+        _e2_perms = {"E": 1}   # callable abstraction
+        _e2_base  = ns_table_base + _e2_slot * NS_ENTRY_WORDS
+        mem[_e2_base + 0] = _e2_phys & 0xFFFFFFFF
+        mem[_e2_base + 1] = pack_ns_word1(_e2_lim17, 0, 0, 0, 1, 0)
+        mem[_e2_base + 2] = make_version_seals(0, _e2_phys, _e2_lim17)
+        mem[_e2_base + 3] = _abstract_gt_word(_e2_perms)
+        locations[_e2_slot] = _e2_phys
+        ns_count = max(ns_count, _e2_slot + 1)
 
     # ----- Step 3: empty NS slots ---------------------------------------
     empty_count = 0

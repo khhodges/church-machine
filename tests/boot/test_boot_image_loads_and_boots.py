@@ -103,18 +103,17 @@ def _cfg_no_window():
 
 # (config, skip_window, expected_ns_count)
 # expected_ns_count is the exact nsCount loadBootImage() should report:
-#   * The default abstraction catalog defines 44 named slots (slots 0..43),
-#     so any default+catalog image yields 44.
-#     (Task #1918 Minimal Boot Namespace: 8 boot slots 0-7, extended 8-43)
-#   * Step-3 emptySlotCount adds reserved-but-empty entries on top of the
-#     catalog count; its baseNamedNsCount=51 is explicitly set in the config
-#     (not derived from catalog size), so step3_reservation total remains 51+8=59.
+#   * Task #1930 — hardware cold-boot catalog is exactly 8 slots (0–7).
+#     Slots 0–6 produce NS entries; slot 7 is null (programmable) → nsCount=7.
+#   * Step-2 resident lumps for slots ≥8 push nsCount up: nsSlot=18 → nsCount=19.
+#   * Step-3 emptySlotCount adds reserved-but-empty entries; baseNamedNsCount=51
+#     sets the starting index explicitly → total = 51 + 8 = 59.
 CONFIGS = [
-    pytest.param(_cfg_default(),           False, 44, id="default"),
-    pytest.param(_cfg_custom_step1(),      False, 44, id="custom_step1"),
-    pytest.param(_cfg_step2_resident(),    False, 44, id="step2_resident"),
+    pytest.param(_cfg_default(),           False,  7, id="default"),
+    pytest.param(_cfg_custom_step1(),      False,  7, id="custom_step1"),
+    pytest.param(_cfg_step2_resident(),    False, 19, id="step2_resident"),
     pytest.param(_cfg_step3_reservation(), False, 59, id="step3_reservation"),
-    pytest.param(_cfg_no_window(),         True,  44, id="no_window_bootconfig"),
+    pytest.param(_cfg_no_window(),         True,   7, id="no_window_bootconfig"),
 ]
 
 

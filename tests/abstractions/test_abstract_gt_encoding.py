@@ -4,7 +4,8 @@ Covers:
   - create_abstract_gt() bit layout
   - Device-class constants
   - BOOT_IMAGE_FORMAT_TAG bump
-  - LED c-list slots 8-13 in the generated boot image
+  - 8-slot cold-boot NS table (slots 0-7 only by default)
+  - Step-2 resident LUMPs for slots ≥8 get NS entries in boot image
   - DREAD/DWRITE routing via Node simulator (headless)
 """
 import atexit
@@ -142,132 +143,6 @@ def test_boot_image_contains_correct_format_tag():
     assert words[tag_idx] == BOOT_IMAGE_FORMAT_TAG
 
 
-# ── LED c-list slots in generated boot image ─────────────────────────────────
-
-def _get_clist_words(img_bytes, cfg):
-    """Return the c-list GT words from the NS lump c-list tail in the generated image.
-
-    Since Task #694 the DEMO_CLIST lives at the end of the NS lump body
-    (mem[ns_size-47 .. ns_size-1]), not in Boot.Abstr's free region.
-    Boot.Abstr has cc=0 since Task #651, so its tail is zeroed.
-    """
-    step1 = cfg["step1"]
-    total   = int(step1["totalNamespaceWords"])
-    ns_size = int(step1["namespaceLumpWords"])
-    NS_CATALOG_COUNT = len(DEFAULT_ABSTRACTION_CATALOG)
-    DEMO_CLIST_SIZE  = 18
-
-    words = list(struct.unpack(f"<{total}I", img_bytes))
-    # The NS lump c-list tail starts at ns_size - NS_CATALOG_COUNT (word index into mem[]).
-    clist_start = ns_size - NS_CATALOG_COUNT
-    clist = [words[clist_start + i] for i in range(DEMO_CLIST_SIZE)]
-    return clist
-
-
-def test_led_clist_slots_are_abstract_gts():
-    """C-list slots 8-13 must be Abstract GTs (type=0b11)."""
-    cfg = {"step1": {
-        "totalNamespaceWords": 16384,
-        "namespaceLumpWords": 64,
-        "threadLumpWords": 256,
-    }}
-    img = generate_boot_image(cfg, _EMPTY_LUMPS_DIR)
-    clist = _get_clist_words(img, cfg)
-    for slot_offset in range(6):
-        slot_idx = 8 + slot_offset
-        gt = clist[slot_idx]
-        gt_type = (gt >> 23) & 0x3
-        assert gt_type == 3, f"c-list[{slot_idx}] type={gt_type}, expected 3 (Abstract)"
-
-
-def test_led_clist_slots_correct_device_class():
-    """C-list slots 8-13 encode device_class=LED (0x01)."""
-    cfg = {"step1": {
-        "totalNamespaceWords": 16384,
-        "namespaceLumpWords": 64,
-        "threadLumpWords": 256,
-    }}
-    img = generate_boot_image(cfg, _EMPTY_LUMPS_DIR)
-    clist = _get_clist_words(img, cfg)
-    for led_idx in range(6):
-        gt = clist[8 + led_idx]
-        device_class = (gt >> 8) & 0xFF
-        assert device_class == DEVICE_CLASS_LED, (
-            f"c-list[{8+led_idx}] device_class=0x{device_class:02X}, expected 0x01"
-        )
-
-
-def test_led_clist_slots_correct_device_data():
-    """C-list slot 8+N encodes device_data=N (pin index)."""
-    cfg = {"step1": {
-        "totalNamespaceWords": 16384,
-        "namespaceLumpWords": 64,
-        "threadLumpWords": 256,
-    }}
-    img = generate_boot_image(cfg, _EMPTY_LUMPS_DIR)
-    clist = _get_clist_words(img, cfg)
-    for led_idx in range(6):
-        gt = clist[8 + led_idx]
-        device_data = gt & 0xFF
-        assert device_data == led_idx, (
-            f"c-list[{8+led_idx}] device_data={device_data}, expected {led_idx}"
-        )
-
-
-def test_led_clist_slots_rw_permissions():
-    """LED Abstract GTs have R and W bits set; no other perm bits."""
-    cfg = {"step1": {
-        "totalNamespaceWords": 16384,
-        "namespaceLumpWords": 64,
-        "threadLumpWords": 256,
-    }}
-    img = generate_boot_image(cfg, _EMPTY_LUMPS_DIR)
-    clist = _get_clist_words(img, cfg)
-    for led_idx in range(6):
-        gt = clist[8 + led_idx]
-        R = (gt >> 26) & 1
-        W = (gt >> 25) & 1
-        assert R == 1, f"c-list[{8+led_idx}] missing R bit"
-        assert W == 1, f"c-list[{8+led_idx}] missing W bit"
-
-
-def test_uart_btn_timer_clist_slots_are_abstract_gts():
-    """UART (c-list 14), BTN (15), TIMER (17) are Abstract GTs (type=0b11).
-    TIMER moved from slot 16→17 to free slot 16 for SlideRule (Inform GT)."""
-    cfg = {"step1": {
-        "totalNamespaceWords": 16384,
-        "namespaceLumpWords": 64,
-        "threadLumpWords": 256,
-    }}
-    img = generate_boot_image(cfg, _EMPTY_LUMPS_DIR)
-    clist = _get_clist_words(img, cfg)
-    expected = [
-        (14, DEVICE_CLASS_UART,   0),   # UART   reg0=TX
-        (15, DEVICE_CLASS_BUTTON, 0),   # Button reg0=state
-        (17, DEVICE_CLASS_TIMER,  0),   # Timer  reg0=TICKS_LO  (moved from 16)
-    ]
-    for slot_idx, expected_class, expected_data in expected:
-        gt = clist[slot_idx]
-        gt_type      = (gt >> 23) & 0x3
-        device_class = (gt >>  8) & 0xFF
-        device_data  = gt & 0xFF
-        assert gt_type == 3, (
-            f"c-list[{slot_idx}] type={gt_type}, expected 3 (Abstract)"
-        )
-        assert device_class == expected_class, (
-            f"c-list[{slot_idx}] device_class=0x{device_class:02X}, expected 0x{expected_class:02X}"
-        )
-        assert device_data == expected_data, (
-            f"c-list[{slot_idx}] device_data={device_data}, expected {expected_data}"
-        )
-    # Slot 16 must now be an Inform GT (type=0b01) pointing to SlideRule (NS idx 16)
-    sliderule_gt = clist[16]
-    gt_type = (sliderule_gt >> 23) & 0x3
-    ns_idx  = sliderule_gt & 0xFFFF
-    assert gt_type == 1, f"c-list[16] type={gt_type}, expected 1 (Inform, SlideRule)"
-    assert ns_idx  == 16, f"c-list[16] NS idx={ns_idx}, expected 16 (SlideRule)"
-
-
 # ── perm validation (Task #406 requirement) ──────────────────────────────────
 
 @pytest.mark.parametrize("bad_perm", ["X", "L", "S", "E", "B"])
@@ -311,14 +186,6 @@ def test_led_ns_slot_12_is_freed():
     )
 
 
-def test_led_catalog_slot_12_is_none():
-    """DEFAULT_ABSTRACTION_CATALOG[12] must be None (LED NS slot freed)."""
-    from server.boot_image import DEFAULT_ABSTRACTION_CATALOG
-    assert DEFAULT_ABSTRACTION_CATALOG[12] is None, (
-        "Slot 12 should be None (freed), got: " + repr(DEFAULT_ABSTRACTION_CATALOG[12])
-    )
-
-
 # ── UART/Button/Timer NS slots 11/13/14 freed (Task #431 requirement) ─────────
 
 def test_uart_btn_timer_ns_slots_are_freed():
@@ -341,39 +208,74 @@ def test_uart_btn_timer_ns_slots_are_freed():
         )
 
 
-def test_uart_btn_timer_catalog_slots_are_none():
-    """DEFAULT_ABSTRACTION_CATALOG[11], [13], [14] must be None (NS slots freed)."""
-    from server.boot_image import DEFAULT_ABSTRACTION_CATALOG
-    for slot_idx in (11, 13, 14):
-        assert DEFAULT_ABSTRACTION_CATALOG[slot_idx] is None, (
-            f"Slot {slot_idx} should be None (freed), got: "
-            + repr(DEFAULT_ABSTRACTION_CATALOG[slot_idx])
-        )
+# ── 8-slot cold-boot baseline (Task #1930) ────────────────────────────────────
 
-
-def test_uart_btn_perms_in_abstract_gts():
-    """UART c-list[14] has R|W; Button c-list[15] has R only; Timer c-list[17] has R|W.
-    c-list[16] is now SlideRule Inform GT with E perm only."""
+def test_cold_boot_slot_8_is_empty():
+    """NS slot 8 must be all-zero at cold boot (no Step 2 config)."""
     cfg = {"step1": {
         "totalNamespaceWords": 16384,
         "namespaceLumpWords": 64,
         "threadLumpWords": 256,
     }}
     img = generate_boot_image(cfg, _EMPTY_LUMPS_DIR)
-    clist = _get_clist_words(img, cfg)
-    uart_gt      = clist[14]
-    btn_gt       = clist[15]
-    sliderule_gt = clist[16]
-    timer_gt     = clist[17]
-    assert (uart_gt      >> 26) & 1 == 1, "UART GT missing R"
-    assert (uart_gt      >> 25) & 1 == 1, "UART GT missing W"
-    assert (btn_gt       >> 26) & 1 == 1, "Button GT missing R"
-    assert (btn_gt       >> 25) & 1 == 0, "Button GT should not have W"
-    assert (timer_gt     >> 26) & 1 == 1, "Timer GT missing R"
-    assert (timer_gt     >> 25) & 1 == 1, "Timer GT missing W"
-    # SlideRule Inform GT: E perm (bit 5 of 7-bit perm field = bit 30 of GT word)
-    assert (sliderule_gt >> 30) & 1 == 1, "SlideRule GT missing E perm"
-    assert (sliderule_gt >> 26) & 1 == 0, "SlideRule GT should not have R"
-    assert (sliderule_gt >> 25) & 1 == 0, "SlideRule GT should not have W"
+    words = struct.unpack(f"<{len(img) // 4}I", img)
+    total = len(words)
+    ns_table_base = total - NS_TABLE_RESERVE
+    base = ns_table_base + 8 * NS_ENTRY_WORDS
+    entry_words = [words[base + i] for i in range(NS_ENTRY_WORDS)]
+    assert all(w == 0 for w in entry_words), (
+        f"NS slot 8 should be all zeros at cold boot, got {[hex(w) for w in entry_words]}"
+    )
 
 
+def test_step2_resident_slot_8_gets_ns_entry():
+    """A Step-2 resident LUMP at slot 8 must produce a non-zero NS entry."""
+    SLOT8_PHYS = 0x0800
+    SLOT8_SIZE = 64
+    cfg = {
+        "step1": {
+            "totalNamespaceWords": 16384,
+            "namespaceLumpWords": 64,
+            "threadLumpWords": 256,
+        },
+        "step2": {
+            "lumps": [{"nsSlot": 8, "resident": True, "physAddr": SLOT8_PHYS, "lumpSize": SLOT8_SIZE}]
+        },
+    }
+    img = generate_boot_image(cfg, _EMPTY_LUMPS_DIR)
+    words = struct.unpack(f"<{len(img) // 4}I", img)
+    total = len(words)
+    ns_table_base = total - NS_TABLE_RESERVE
+    base = ns_table_base + 8 * NS_ENTRY_WORDS
+    loc_word = words[base + 0]
+    assert loc_word == SLOT8_PHYS, (
+        f"NS slot 8 location word should be 0x{SLOT8_PHYS:04X}, got 0x{loc_word:08X}"
+    )
+    word1 = words[base + 1]
+    lim17 = word1 & 0x1FFFF
+    assert lim17 == SLOT8_SIZE - 1, (
+        f"NS slot 8 lim17 should be {SLOT8_SIZE - 1}, got {lim17}"
+    )
+
+
+def test_step2_lazy_slot_8_stays_empty():
+    """A Step-2 lazy (resident=False) LUMP at slot 8 must leave its NS entry all-zero."""
+    cfg = {
+        "step1": {
+            "totalNamespaceWords": 16384,
+            "namespaceLumpWords": 64,
+            "threadLumpWords": 256,
+        },
+        "step2": {
+            "lumps": [{"nsSlot": 8, "resident": False}]
+        },
+    }
+    img = generate_boot_image(cfg, _EMPTY_LUMPS_DIR)
+    words = struct.unpack(f"<{len(img) // 4}I", img)
+    total = len(words)
+    ns_table_base = total - NS_TABLE_RESERVE
+    base = ns_table_base + 8 * NS_ENTRY_WORDS
+    entry_words = [words[base + i] for i in range(NS_ENTRY_WORDS)]
+    assert all(w == 0 for w in entry_words), (
+        f"NS slot 8 (lazy) should be all zeros; got {[hex(w) for w in entry_words]}"
+    )

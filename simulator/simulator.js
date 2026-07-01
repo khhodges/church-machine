@@ -113,7 +113,7 @@ const M_BIT_PORT_CR15         = 0xFFFFFF1F; // M-bit authority port for CR15
 const IO_PORT_PET_NAME_WR     = 0xFFFFFF38; // DWRITE to this addr marks c-list slot (value & 0x3F) as named
 // Boot-default named slots — matches hardware/boot_rom.py DEMO_CLIST_NAMED_SLOTS.
 // Live slots: 0-6 (excl. 7), 8-10, 22 (Tunnel), 23 (Keystone), 42 (Ethernet), 43 (EventRouter).
-const BOOT_NAMED_SLOTS = Object.freeze([0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 22, 23, 42, 43]);
+const BOOT_NAMED_SLOTS = Object.freeze([0, 1, 2, 3, 4, 5, 6]);
 
 // Simulator-internal constant for the IRQ thread NS slot.
 // Slot 41 is the fixed boot-image IRQ thread position used by _fireSchedulerIRQ
@@ -305,18 +305,7 @@ class ChurchSimulator {
         // the namespace view can show stale or blank labels after a second
         // reset-then-reload cycle (nsLabels from the first _initNamespaceTable()
         // call is the only prior source of truth).
-        //
-        // HARDWARE_LABELS takes priority over the abstractionRegistry-based
-        // catalog for the 14 canonical boot slots.  This prevents stale or
-        // mismatched registry entries (e.g. church-numeral ADD at slot 22)
-        // from shadowing the live boot-image labels (Tunnel, Keystone, …).
-        const _HW_LABELS = {
-            0: 'Boot.NS',    1: 'Boot.Thread', 2: 'UART_DEV',  3: 'LED_DEV',
-            4: 'BTN_DEV',    5: 'TIMER_DEV',   6: 'SelfTest',  8: 'SlideRule',
-            9: 'Constants', 10: 'Loader',      22: 'Tunnel',  23: 'Keystone',
-           42: 'Ethernet',  43: 'EventRouter',
-        };
-        const _bootCatalog = this._getAbstractionCatalog();
+        const _bootCatalog = this._getHardwareBootCatalog();
         for (let _bi = 0; _bi < count; _bi++) {
             const _bBase = this.NS_TABLE_BASE + _bi * this.NS_ENTRY_WORDS;
             const _hasEntry = (this.memory[_bBase] !== 0 || this.memory[_bBase + 1] !== 0);
@@ -326,9 +315,7 @@ class ChurchSimulator {
                 this.nsLabels[_bi] = '(free)';
                 continue;
             }
-            if (_HW_LABELS[_bi]) {
-                this.nsLabels[_bi] = _HW_LABELS[_bi];
-            } else if (_bootCatalog[_bi]) {
+            if (_bootCatalog[_bi]) {
                 this.nsLabels[_bi] = _bootCatalog[_bi].label;
             } else if (!this.nsLabels[_bi] || this.nsLabels[_bi] === '(free)') {
                 this.nsLabels[_bi] = `slot_${_bi}`;
@@ -1068,32 +1055,11 @@ class ChurchSimulator {
         return entries;
     }
 
-    _getAbstractionCatalog() {
-        if (this.abstractionRegistry) {
-            // Use slot-indexed sparse access so that freed NS slots (freedNSSlot:true)
-            // appear as null at their correct index position rather than being silently
-            // shifted — which would assign the wrong NS slot to every subsequent entry.
-            const dict = this.abstractionRegistry.abstractions;
-            const maxIdx = Object.keys(dict).reduce((m, k) => Math.max(m, +k), -1);
-            const result = [];
-            for (let i = 0; i <= maxIdx; i++) {
-                const a = dict[i];
-                if (!a || a.freedNSSlot) {
-                    result.push(null);
-                } else {
-                    result.push({
-                        label: a.name,
-                        perms: a.perms,
-                        chainable: a.chainable || false,
-                        handler: a.handler || null,
-                    });
-                }
-            }
-            return result;
-        }
-        // Minimal 8-slot boot namespace, then lazy-load extended abstractions.
-        // Church HW Range authority slots 19-22 removed; CHANGE CR12/CR13 authority
-        // is now an Abstract S-perm GT (0x2E000000) in SCHEDULER_IRQ_CLIST.
+    _getHardwareBootCatalog() {
+        // Hardware cold-boot namespace: exactly 8 slots (0–7).
+        // Slots 8+ appear only after explicit LUMP deployment via the Builder.
+        // This catalog NEVER derives from abstractionRegistry — the registry is
+        // the application-level abstraction library, not the hardware boot image.
         return [
             { label: 'Boot.NS',      perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false },  // 0
             { label: 'Boot.Thread',  perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false },  // 1
@@ -1103,42 +1069,6 @@ class ChurchSimulator {
             { label: 'TIMER_DEV',    perms: {R:1,W:1,X:0,L:0,S:0,E:0}, chainable: false },  // 5  MMIO 0x4000002C
             { label: 'SelfTest',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 6  boot entry point
             null,                                                                               // 7  [programmable]
-            { label: 'SlideRule',    perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: true  },  // 8
-            { label: 'Constants',    perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 9
-            { label: 'Loader',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 10
-            null,                                                                               // 11 freed (was SUCC)
-            null,                                                                               // 12 freed (was PRED)
-            null,                                                                               // 13 freed (was ADD)
-            null,                                                                               // 14 freed (was SUB)
-            null,                                                                               // 15 freed (was MUL)
-            null,                                                                               // 16 freed (was ISZERO)
-            null,                                                                               // 17 freed (was TRUE)
-            null,                                                                               // 18 freed (was FALSE)
-            null,                                                                               // 19 freed
-            null,                                                                               // 20 freed
-            null,                                                                               // 21 freed
-            { label: 'Tunnel',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 22
-            { label: 'Keystone',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 23
-            null,                                                                               // 24 freed
-            null,                                                                               // 25 freed
-            null,                                                                               // 26 freed
-            null,                                                                               // 27 freed
-            null,                                                                               // 28 freed
-            null,                                                                               // 29 freed
-            null,                                                                               // 30 freed
-            null,                                                                               // 31 freed
-            null,                                                                               // 32 freed
-            null,                                                                               // 33 freed
-            null,                                                                               // 34 freed (was PAIR)
-            null,                                                                               // 35 freed (was GC)
-            null,                                                                               // 36 freed (was Thread)
-            null,                                                                               // 37 freed
-            null,                                                                               // 38 freed (was Billing)
-            null,                                                                               // 39 freed (was TuringMemory)
-            null,                                                                               // 40 freed (was ChurchMemory)
-            null,                                                                               // 41 freed (was Scheduler.IRQ.Thread — see SCHEDULER_IRQ_THREAD_SLOT)
-            { label: 'Ethernet',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 42
-            { label: 'EventRouter',  perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 43
         ];
     }
 
@@ -1150,7 +1080,7 @@ class ChurchSimulator {
         this.nsLabels = {};
         this.nsChainable = {};
         this.nsCount = 0;
-        const abstractions = this._getAbstractionCatalog();
+        const abstractions = this._getHardwareBootCatalog();
         const clistChildren = [];
         const clistGTs = [];
 
@@ -1244,6 +1174,26 @@ class ChurchSimulator {
             clistChildren.push(i);
             const gtWord = this.createGT(0, i, a.perms, 1);
             clistGTs.push(gtWord);
+        }
+
+        // ── Step 2 augmentation: NS entries for extended slots (≥8) ──────────
+        // The 8-slot hardware catalog loop above only creates NS entries for
+        // slots 0–7. Resident Step-2 lumps targeting slots ≥ 8 need explicit
+        // NS entries. Lazy (resident=False) slots are left as all-zeros —
+        // the runtime lazy loader writes their NS entry on first use.
+        for (const _e2 of _bcStep2Lumps) {
+            if (!_e2 || typeof _e2.nsSlot !== 'number') continue;
+            const _e2Slot = _e2.nsSlot | 0;
+            if (_e2Slot < abstractions.length) continue;   // in-catalog, handled above
+            if (!_e2.resident || !Number.isFinite(_e2.physAddr) || _e2.physAddr <= 0) continue;
+            const _e2Phys  = _e2.physAddr | 0;
+            const _e2Size  = (_e2.lumpSize || this.SLOT_SIZE) | 0;
+            const _e2Lim17 = (_e2Size - 1) & 0x1FFFF;
+            // Callable abstraction: Church domain (dom=1), E-perm (p3=4=0b100)
+            const _e2AbsGt = ((4 << 28) | (1 << 27)) >>> 0;
+            this.writeNSEntry(_e2Slot, _e2Phys, _e2Lim17, 0, 0, 1, 0, 0, _e2AbsGt);
+            this.nsLabels[_e2Slot]    = `slot${_e2Slot}`;
+            this.nsChainable[_e2Slot] = false;
         }
 
         // Step 3 (Task #216): reserve N blank NS entries at the end of the

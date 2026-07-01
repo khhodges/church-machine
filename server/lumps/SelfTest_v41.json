@@ -1,0 +1,41 @@
+{
+  "token": "00000600",
+  "abstraction": "SelfTest",
+  "filename": "SelfTest_v41.lump",
+  "sidecar_file": "SelfTest_v41.json",
+  "ns_slot": 6,
+  "lump_size": 64,
+  "typ": 0,
+  "content_type": "code",
+  "cw": 17,
+  "cc": 8,
+  "profile": "IoT",
+  "language": "unknown",
+  "author": "",
+  "version": "",
+  "release_notes": "",
+  "methods": [],
+  "capabilities": [],
+  "pet_names": {
+    "DR": {},
+    "CR": {}
+  },
+  "mtbf": {
+    "consecutive_clean": 0,
+    "total_runs": 0,
+    "status": "unknown",
+    "source_hash": ""
+  },
+  "deployment": {
+    "target_board": "ti60-f225",
+    "profile": "IoT",
+    "built_at": "2026-07-01T12:08:38.883153Z",
+    "builder": "CLOOMC++ IDE v1.0"
+  },
+  "grants": [
+    "E"
+  ],
+  "source": "",
+  "lump_version": 41,
+  "compiled_at": 1782907718.8831663
+}

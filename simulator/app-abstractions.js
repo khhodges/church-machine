@@ -311,6 +311,14 @@ function _initLazyLoadManifest() {
     const residentSlots = [];
     if (typeof BOOT_UPLOADS !== 'undefined') {
         for (const upload of BOOT_UPLOADS) {
+            // Only include slots that are explicitly declared in Step-2 config.
+            // Slots ≥ 8 must not appear in the namespace until the user deploys
+            // them via the Builder — BOOT_UPLOADS is the library of available
+            // lumps, not an automatic list of what is installed at boot.
+            if (upload.methods && upload.methods.length > 0 && upload.index >= 8
+                    && !Object.prototype.hasOwnProperty.call(residentMap, upload.index)) {
+                continue;   // not in Step-2 config → skip, deploy via Builder only
+            }
             if (upload.methods && upload.methods.length > 0 && upload.index >= 16) {
                 const cfg = residentMap[upload.index];
                 const isResident = !!(cfg && cfg.resident);
