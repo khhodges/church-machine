@@ -305,8 +305,17 @@ class ChurchSimulator {
         // the namespace view can show stale or blank labels after a second
         // reset-then-reload cycle (nsLabels from the first _initNamespaceTable()
         // call is the only prior source of truth).
-        // A second override pass (below) then applies the hardware-boot-specific
-        // labels for slots whose correct names differ from the simulator catalog.
+        //
+        // HARDWARE_LABELS takes priority over the abstractionRegistry-based
+        // catalog for the 14 canonical boot slots.  This prevents stale or
+        // mismatched registry entries (e.g. church-numeral ADD at slot 22)
+        // from shadowing the live boot-image labels (Tunnel, Keystone, …).
+        const _HW_LABELS = {
+            0: 'Boot.NS',    1: 'Boot.Thread', 2: 'UART_DEV',  3: 'LED_DEV',
+            4: 'BTN_DEV',    5: 'TIMER_DEV',   6: 'SelfTest',  8: 'SlideRule',
+            9: 'Constants', 10: 'Loader',      22: 'Tunnel',  23: 'Keystone',
+           42: 'Ethernet',  43: 'EventRouter',
+        };
         const _bootCatalog = this._getAbstractionCatalog();
         for (let _bi = 0; _bi < count; _bi++) {
             const _bBase = this.NS_TABLE_BASE + _bi * this.NS_ENTRY_WORDS;
@@ -317,9 +326,11 @@ class ChurchSimulator {
                 this.nsLabels[_bi] = '(free)';
                 continue;
             }
-            if (_bootCatalog[_bi]) {
+            if (_HW_LABELS[_bi]) {
+                this.nsLabels[_bi] = _HW_LABELS[_bi];
+            } else if (_bootCatalog[_bi]) {
                 this.nsLabels[_bi] = _bootCatalog[_bi].label;
-            } else if (!this.nsLabels[_bi]) {
+            } else if (!this.nsLabels[_bi] || this.nsLabels[_bi] === '(free)') {
                 this.nsLabels[_bi] = `slot_${_bi}`;
             }
         }

@@ -386,6 +386,13 @@ class AbstractionRegistry {
             [27, 'FALSE', 'Boolean false'],
         ];
 
+        // Slots 22 and 23 are occupied by Tunnel and Keystone in the boot
+        // namespace (see simulator.js _getAbstractionCatalog fallback).
+        // The church-numeral entries for ADD and SUB exist here for UI/doc
+        // purposes only; they must not create physical NS entries that would
+        // shadow the live boot slots.
+        const _churchNumeralBootReserved = new Set([22, 23]);
+
         for (const [idx, name, desc] of churchNumerals) {
             const isBool = (name === 'TRUE' || name === 'FALSE');
             const methods = isBool ? [] : ['Apply'];
@@ -395,9 +402,10 @@ class AbstractionRegistry {
             const perms = isBool
                 ? { R: 0, W: 0, X: 0, L: 1, S: 0, E: 0 }
                 : { R: 0, W: 0, X: 1, L: 0, S: 0, E: 0 };
+            const freedNSSlot = _churchNumeralBootReserved.has(idx);
             this.createAbstraction(idx, name, 4, methods,
                 `Church numeral: ${desc}`,
-                { author: 'SIPantic', version: '1.0.0', perms });
+                { author: 'SIPantic', version: '1.0.0', perms, freedNSSlot });
         }
 
         this.createAbstraction(28, 'Family', 5,
@@ -475,10 +483,12 @@ class AbstractionRegistry {
             'Email — child LOADs contact GTs',
             { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
+        // Slot 43 is occupied by EventRouter in the boot namespace.
+        // PAIR exists here for UI/doc purposes only (freedNSSlot: true).
         this.createAbstraction(43, 'PAIR', 4,
             ['Apply'],
             'Church pair constructor',
-            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 1, L: 0, S: 0, E: 0 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 1, L: 0, S: 0, E: 0 }, freedNSSlot: true });
 
         this.createAbstraction(44, 'GC', 8,
             ['Scan', 'Identify', 'Clear', 'Flip'],
