@@ -1788,6 +1788,82 @@ ${capLines}
     assert('CC14B oversized c-list via compileJS — error mentions 32 or 5-bit limit',
         compResult.errors.some(e => /32|5.bit/i.test(e.message)),
         'errors: ' + compResult.errors.map(e => e.message).join('; '));
+
+    // ── Part C: compiler (compileLambda) path ─────────────────────────────────
+    const lambdaSrc =
+`abstraction Oversized {
+  capabilities {
+${capLines}
+  }
+  method run() = 0
+}`;
+    const ccLambda = new CLOOMCCompiler();
+    const lambdaResult = ccLambda.compileLambda(lambdaSrc);
+    assert('CC14C oversized c-list via compileLambda — emits ≥1 error',
+        lambdaResult.errors.length > 0,
+        'expected ≥1 error for 33-capability c-list via compileLambda, got 0');
+    assert('CC14C oversized c-list via compileLambda — error mentions 32 or 5-bit limit',
+        lambdaResult.errors.some(e => /32|5.bit/i.test(e.message)),
+        'errors: ' + lambdaResult.errors.map(e => e.message).join('; '));
+
+    // ── Part D: compiler (compileHaskell) path ────────────────────────────────
+    const haskellSrc =
+`abstraction Oversized {
+  capabilities {
+${capLines}
+  }
+  method run() = 0
+}`;
+    const ccHaskell = new CLOOMCCompiler();
+    const haskellResult = ccHaskell.compileHaskell(haskellSrc);
+    assert('CC14D oversized c-list via compileHaskell — emits ≥1 error',
+        haskellResult.errors.length > 0,
+        'expected ≥1 error for 33-capability c-list via compileHaskell, got 0');
+    assert('CC14D oversized c-list via compileHaskell — error mentions 32 or 5-bit limit',
+        haskellResult.errors.some(e => /32|5.bit/i.test(e.message)),
+        'errors: ' + haskellResult.errors.map(e => e.message).join('; '));
+
+    // ── Part E: compiler (compileSymbolic) path ───────────────────────────────
+    // Symbolic multiline capabilities split by whitespace, so "Cap0 E" → two
+    // tokens each; 33 lines yields 66 items (still > 32, error fires).
+    const symbolicSrc =
+`abstraction Oversized {
+  capabilities {
+${capLines}
+  }
+  method run() {
+    let k = 0
+  }
+}`;
+    const ccSymbolic = new CLOOMCCompiler();
+    const symbolicResult = ccSymbolic.compileSymbolic(symbolicSrc);
+    assert('CC14E oversized c-list via compileSymbolic — emits ≥1 error',
+        symbolicResult.errors.length > 0,
+        'expected ≥1 error for 33-capability c-list via compileSymbolic, got 0');
+    assert('CC14E oversized c-list via compileSymbolic — error mentions 32 or 5-bit limit',
+        symbolicResult.errors.some(e => /32|5.bit/i.test(e.message)),
+        'errors: ' + symbolicResult.errors.map(e => e.message).join('; '));
+
+    // ── Part F: compiler (compileEnglish) path ────────────────────────────────
+    // English block form; capabilities are whitespace-split per line so single-word
+    // names (no rights suffix) keep the count at exactly 33.
+    const englishCapLines = Array.from({ length: 33 }, (_, i) => `    Cap${i}`).join('\n');
+    const englishSrc =
+`abstraction Oversized {
+  capabilities {
+${englishCapLines}
+  }
+  run():
+    return 0
+}`;
+    const ccEnglish = new CLOOMCCompiler();
+    const englishResult = ccEnglish.compileEnglish(englishSrc);
+    assert('CC14F oversized c-list via compileEnglish — emits ≥1 error',
+        englishResult.errors.length > 0,
+        'expected ≥1 error for 33-capability c-list via compileEnglish, got 0');
+    assert('CC14F oversized c-list via compileEnglish — error mentions 32 or 5-bit limit',
+        englishResult.errors.some(e => /32|5.bit/i.test(e.message)),
+        'errors: ' + englishResult.errors.map(e => e.message).join('; '));
 }
 
 // ── SE: Simulator-level SHR / ASR execution tests ────────────────────────────
