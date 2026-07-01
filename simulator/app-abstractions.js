@@ -500,7 +500,6 @@ function setBootEntrySlot(idx) {
     }
     renderAbstractions();
     if (currentView === 'namespace') updateNamespace();
-    _refreshBootNSDetailIfOpen();
     if (typeof window.lumpEditorRenderResidentPanel === 'function') window.lumpEditorRenderResidentPanel();
 }
 
@@ -512,16 +511,7 @@ function _syncBootEntryFromSim() {
         localStorage.setItem('bootEntrySlot', String(fromSim));
         renderAbstractions();
         if (currentView === 'namespace') updateNamespace();
-        _refreshBootNSDetailIfOpen();
         if (typeof window.lumpEditorRenderResidentPanel === 'function') window.lumpEditorRenderResidentPanel();
-    }
-}
-
-function _refreshBootNSDetailIfOpen() {
-    if (typeof selectedAbsIndex === 'number' && selectedAbsIndex === 0 &&
-            typeof _renderBootNSDecoder === 'function' && abstractionRegistry) {
-        const contentEl = document.getElementById('absDetailContent');
-        if (contentEl) _renderBootNSDecoder(contentEl, abstractionRegistry.getAbstraction(0));
     }
 }
 
@@ -1044,7 +1034,7 @@ function _buildNsDepGraph(nsMeta, lump, showNull) {
         }
         _nsdgTooltipData[slotTipKey] = { html: slotTipHtml };
 
-        svg += `<g onmouseenter="showNsdgTooltip(event,'${slotTipKey}')" onmouseleave="hideNsdgTooltip()">`;
+        svg += `<g>`;
         svg += `<rect x="${slotX}" y="${rowCY - SLOT_H / 2}" width="${SLOT_W}" height="${SLOT_H}" rx="4" fill="${slotBodyCol}" stroke="${stateCol}" stroke-width="${isNullSlot ? '0.6' : '1.2'}" stroke-dasharray="${isNullSlot ? '3 2' : 'none'}"/>`;
         svg += `<text x="${slotX + 6}" y="${rowCY - 5}" font-size="7" font-weight="bold" fill="${slotTextCol}" font-family="monospace" opacity="${isNullSlot ? '0.5' : '1'}">[${parseInt(ent.slot)}] ${e((ent.state || 'null').toUpperCase())}</text>`;
         svg += `<text x="${slotX + 6}" y="${rowCY + 8}" font-size="9" fill="${isNullSlot ? '#3a3a5a' : '#dde8f0'}" font-family="monospace" opacity="${isNullSlot ? '0.5' : '1'}">${e(slotLabel)}</text>`;
@@ -1100,9 +1090,7 @@ function _buildNsDepGraph(nsMeta, lump, showNull) {
             const clickable = !!tgtLump;
             const clickAttr = clickable ? ` style="cursor:pointer" onclick="showLumpDetail('${tgtTok}')"` : '';
             const titleEl = clickable ? `<title>Navigate to ${e(tgtLump.abstraction || tgtTok)}</title>` : '';
-            const tipAttrs = ` onmouseenter="showNsdgTooltip(event,'${tgtTipKey}')" onmouseleave="hideNsdgTooltip()"`;
-
-            svg += `<g${clickAttr}${tipAttrs}>${titleEl}`;
+            svg += `<g${clickAttr}>${titleEl}`;
             svg += `<rect x="${tgtX}" y="${rowCY - TGT_H / 2}" width="${TGT_W}" height="${TGT_H}" rx="4" fill="#080810" stroke="${tgtStroke}" stroke-width="${clickable ? '1.8' : '1'}"/>`;
             if (clickable) svg += `<rect x="${tgtX}" y="${rowCY - TGT_H / 2}" width="${TGT_W}" height="${TGT_H}" rx="4" fill="${tgtCol}" fill-opacity="0.04"/>`;
             svg += `<text x="${tgtX + 7}" y="${rowCY - 5}" font-size="9" font-weight="${clickable ? 'bold' : 'normal'}" fill="${tgtCol}" font-family="monospace">${e(tgtLine1)}</text>`;
@@ -1311,34 +1299,6 @@ function _nsdgToggleNull(tk) {
     btn.textContent = showing
         ? `Show ${nc} null slot${nc !== 1 ? 's' : ''}`
         : `Hide null slots`;
-}
-
-function showNsdgTooltip(evt, key) {
-    const data = _nsdgTooltipData[key];
-    if (!data) return;
-    let tip = document.getElementById('nsdg-tooltip');
-    if (!tip) {
-        tip = document.createElement('div');
-        tip.id = 'nsdg-tooltip';
-        tip.className = 'nsdg-tooltip';
-        document.body.appendChild(tip);
-    }
-    tip.innerHTML = data.html;
-    tip.style.display = 'block';
-    const vw = window.innerWidth || 800;
-    let tx = evt.clientX + 16;
-    let ty = evt.clientY + 12;
-    tip.style.left = tx + 'px';
-    tip.style.top = ty + 'px';
-    requestAnimationFrame(() => {
-        const tw = tip.offsetWidth;
-        if (tx + tw > vw - 8) tip.style.left = Math.max(8, evt.clientX - tw - 8) + 'px';
-    });
-}
-
-function hideNsdgTooltip() {
-    const tip = document.getElementById('nsdg-tooltip');
-    if (tip) tip.style.display = 'none';
 }
 
 function _buildDnaGraph(lump, allLumps) {

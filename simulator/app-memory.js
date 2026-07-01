@@ -1700,13 +1700,6 @@ function pipelineGateClick(nsIdx) {
     }
 }
 
-let nsExpandedSlot = -1;
-
-function toggleNSDetail(idx) {
-    nsExpandedSlot = (nsExpandedSlot === idx) ? -1 : idx;
-    updateNamespace();
-}
-
 function _gtPetName(gtWord) {
     gtWord = gtWord >>> 0;
     if (!gtWord) return '';
@@ -2092,10 +2085,7 @@ function _installBootEntryGTIntoCR0() {
     if (bSlot === null || bSlot === undefined) return false;
     const gtWord = sim.createGT(0, bSlot, {E:1}, 1);
     // Write to the primary thread (NS slot 1 — the boot thread).
-    // If the user is currently viewing a different thread slot in the namespace
-    // panel, also write there, so the visible Zone ① table immediately updates.
     const targets = new Set([1]);
-    if (nsExpandedSlot >= 0 && THREAD_NS_SLOTS.has(nsExpandedSlot)) targets.add(nsExpandedSlot);
     let wrote = false;
     for (const nsIdx of targets) {
         const entry = sim.readNSEntry(nsIdx);
@@ -2531,11 +2521,10 @@ function updateNamespace() {
         const lim = sim.parseNSWord1(e.word1_limit);
         const ver = (e.word2_seals >>> 25) & 0x7F;
         const seal = e.word2_seals & 0xFFFF;
-        const isExpanded = (nsExpandedSlot === i);
         const isBootNS = (i === bootEntrySlot);
         const warmStyle = codeNotResident ? 'color:#f0a040;font-style:italic;' : '';
         const rowOpacity = codeNotResident ? 'opacity:0.8;' : '';
-        html += `<tr id="ns-row-${i}" class="ns-row${isExpanded ? ' ns-row-active' : ''}" onclick="toggleNSDetail(${i})" style="cursor:pointer;${rowOpacity}">`;
+        html += `<tr id="ns-row-${i}" class="ns-row" style="${rowOpacity}">`;
         html += `<td class="ns-idx-cell"><span class="ns-boot-btn${isBootNS ? ' boot-entry-active' : ''}" onclick="event.stopPropagation();setBootEntrySlot(${i})" title="${isBootNS ? 'Current boot entry' : 'Set as boot entry'}">${isBootNS ? '\u26a1' : i}</span></td>`;
         let nsLabelInner = e.label || '-';
         {
@@ -2554,7 +2543,7 @@ function updateNamespace() {
                 }
             }
         }
-        html += `<td class="ns-label" style="${warmStyle}" onmouseenter="showNSEntryTooltip(event,${i})" onmouseleave="hideNSEntryTooltip()">${nsLabelInner}</td>`;
+        html += `<td class="ns-label" style="${warmStyle}">${nsLabelInner}</td>`;
         html += `<td style="${warmStyle}cursor:pointer;text-decoration:underline dotted;color:#4ec9b0;" title="Open memory view at this address" onclick="event.stopPropagation();jumpToMemory(${e.word0_location})">0x${e.word0_location.toString(16).toUpperCase().padStart(8, '0')}</td>`;
         if (codeNotResident) {
             const priorityTag = manifest.priority === 'hot' ? 'Hot' : (manifest.priority === 'cold' ? 'Cold' : 'Warm');
@@ -2580,51 +2569,6 @@ function updateNamespace() {
             }
         }
         html += '</tr>';
-        if (isExpanded) {
-            html += `<tr class="ns-detail-row"><td colspan="10">`;
-            html += `<div class="ns-detail-panel">`;
-            html += `<div class="ns-detail-title">Memory at 0x${e.word0_location.toString(16).toUpperCase().padStart(4, '0')} \u2014 ${e.label || 'Slot '+i} (${lim.limit + 1} words)</div>`;
-            html += renderMemoryDump(e.word0_location, lim.limit + 1, i);
-            html += _renderNSInlineCode(i, e.word0_location, lim);
-            if (lim.clistCount > 0) {
-                const _nsClistBase = (e.word0_location >>> 0) + lim.limit + 1 - lim.clistCount;
-                const _hlSlot = window._pendingHighlightCListSlot;
-                html += `<div class="ns-clist-section">`;
-                html += `<div class="ns-clist-title">C-List &mdash; ${lim.clistCount} slot${lim.clistCount !== 1 ? 's' : ''} &mdash; base 0x${_nsClistBase.toString(16).toUpperCase().padStart(4,'0')}</div>`;
-                html += `<table class="cr-table ns-clist-inline-table"><thead><tr>`;
-                html += `<th>Slot</th><th>GT Word</th><th>NS Idx</th><th>Type</th><th>Pet Name</th></tr></thead><tbody>`;
-                for (let _ci = 0; _ci < lim.clistCount; _ci++) {
-                    const _cAddr = _nsClistBase + _ci;
-                    const _cGT = (sim.memory && _cAddr < sim.memory.length) ? (sim.memory[_cAddr] >>> 0) : 0;
-                    const _isHL = (_hlSlot === _ci);
-                    const _isPend = (typeof ChurchSimulator !== 'undefined' && ChurchSimulator.isPendingGT) ? ChurchSimulator.isPendingGT(_cGT) : false;
-                    const _hlCls = _isHL ? ' clist-pending-highlight' : '';
-                    const _hlId  = _isHL ? ` id="ns-clist-pending-slot-${_ci}"` : '';
-                    if (_isPend) {
-                        const _pName = (typeof ChurchSimulator !== 'undefined' && ChurchSimulator.pendingGTName) ? ChurchSimulator.pendingGTName(_cGT) : `slot${_ci}`;
-                        html += `<tr class="clist-pending-row${_hlCls}"${_hlId}>`;
-                        html += `<td class="cr-idx">${_ci}</td>`;
-                        html += `<td class="abs-clist-gt" style="color:#f59e0b;">0x${_cGT.toString(16).toUpperCase().padStart(8,'0')}</td>`;
-                        html += `<td>\u2014</td>`;
-                        html += `<td><span class="clist-pending-type-badge">Pending</span></td>`;
-                        html += `<td class="abs-clist-name" style="color:#f59e0b;">\u201C${_pName}\u201D <span class="clist-pending-badge-inline">\u26A1\u202FUnresolved</span></td>`;
-                        html += `</tr>`;
-                    } else {
-                        const _cParsed = sim.parseGT(_cGT);
-                        const _cLabel = (_cGT !== 0) ? ((sim.nsLabels && sim.nsLabels[_cParsed.index]) ? `NS[${_cParsed.index}] \u2014 ${sim.nsLabels[_cParsed.index]}` : `NS[${_cParsed.index}]`) : '\u2014';
-                        html += `<tr class="${_isHL ? 'clist-pending-highlight' : ''}${_cGT !== 0 ? ' cr-active' : ''}"${_hlId}>`;
-                        html += `<td class="cr-idx">${_ci}</td>`;
-                        html += `<td class="abs-clist-gt">0x${_cGT.toString(16).toUpperCase().padStart(8,'0')}</td>`;
-                        html += `<td>${_cGT !== 0 ? _cParsed.index : '\u2014'}</td>`;
-                        html += `<td>${_cGT !== 0 ? _cParsed.typeName : '\u2014'}</td>`;
-                        html += `<td class="abs-clist-name">${_cLabel}</td>`;
-                        html += `</tr>`;
-                    }
-                }
-                html += `</tbody></table></div>`;
-            }
-            html += `</div></td></tr>`;
-        }
     }
 
     // Append virtual rows for board-specific abstraction slots not yet in the loaded namespace
@@ -2670,51 +2614,6 @@ function updateNamespace() {
 
     html += '</tbody></table>';
     container.innerHTML = html;
-}
-
-// ── Inline code listing for NS expanded rows ──────────────────────────────────
-// Renders a compact disassembler listing for the code region of a namespace
-// lump when that lump has a valid header and at least one code word.
-// Returns an HTML string (empty string when the slot carries no code).
-function _renderNSInlineCode(slotIdx, loc, lim) {
-    if (!sim || !sim.memory || !loc || loc === 0 || loc >= sim.memory.length) return '';
-    if (!sim.parseLumpHeader) return '';
-    const lumpWord0 = sim.memory[loc >>> 0] >>> 0;
-    const lumpHdr   = sim.parseLumpHeader(lumpWord0);
-    if (!lumpHdr || !lumpHdr.valid || lumpHdr.cw === 0) return '';
-
-    const asm       = (typeof ChurchAssembler !== 'undefined') ? new ChurchAssembler() : null;
-    if (!asm) return '';
-
-    const codeStart = (loc >>> 0) + 1;
-    const codeCount = lumpHdr.cw;
-
-    let out = '<div class="ns-clist-section">';
-    out += `<div class="ns-clist-title">Code \u2014 ${codeCount} instruction${codeCount !== 1 ? 's' : ''}</div>`;
-    out += '<table class="cr-table ns-clist-inline-table"><thead><tr>';
-    out += '<th>Addr</th><th>Hex</th><th>Instruction</th></tr></thead><tbody>';
-
-    for (let w = 0; w < codeCount; w++) {
-        const addr = codeStart + w;
-        if (addr >= sim.memory.length) break;
-        const word = sim.memory[addr] >>> 0;
-        let decoded;
-        if (word === 0) {
-            decoded = '<span style="color:#6b7280">NOP / HALT</span>';
-        } else {
-            const raw = asm.disassemble(word);
-            decoded = (typeof _highlightCLOOMCSource === 'function')
-                ? _highlightCLOOMCSource(raw, 'assembly')
-                : raw;
-        }
-        out += `<tr>`;
-        out += `<td class="cr-idx">0x${addr.toString(16).toUpperCase().padStart(4, '0')}</td>`;
-        out += `<td class="abs-clist-gt">0x${word.toString(16).toUpperCase().padStart(8, '0')}</td>`;
-        out += `<td class="code-disasm">${decoded}</td>`;
-        out += `</tr>`;
-    }
-    out += '</tbody></table></div>';
-    return out;
 }
 
 // ── Memory dump view ──────────────────────────────────────────────────────────
@@ -2797,11 +2696,6 @@ function _openPendingCListInNS(slotIdx) {
     if (typeof switchView === 'function') switchView('namespace');
 
     if (targetNSIdx >= 0) {
-        if (typeof nsExpandedSlot !== 'undefined') {
-            nsExpandedSlot = targetNSIdx;
-        } else {
-            window.nsExpandedSlot = targetNSIdx;
-        }
         if (typeof updateNamespace === 'function') updateNamespace();
         // Scroll the NS row into view and then scroll to the highlighted c-list slot
         setTimeout(() => {
@@ -2868,128 +2762,6 @@ function renderMemoryView() {
     container.innerHTML = html;
 }
 
-function _getNSEntryTooltipEl() {
-    let el = document.getElementById('nsEntryTooltip');
-    if (!el) {
-        el = document.createElement('div');
-        el.id = 'nsEntryTooltip';
-        el.className = 'ns-entry-tooltip';
-        document.body.appendChild(el);
-    }
-    return el;
-}
-
-function showNSEntryTooltip(evt, idx) {
-    const tt = _getNSEntryTooltipEl();
-    const e = sim.readNSEntry(idx);
-    if (!e) { tt.classList.remove('visible'); return; }
-
-    const manifest = sim.lazyManifest ? sim.lazyManifest[idx] : null;
-    let codeNotResident = false;
-    if (manifest && e.word0_location > 0) {
-        const lumpHdr = sim.memory ? sim.parseLumpHeader(sim.memory[e.word0_location]) : null;
-        if (lumpHdr && !lumpHdr.valid) codeNotResident = true;
-    }
-
-    const lim = sim.parseNSWord1(e.word1_limit);
-    const typeNames = ['NULL','Inform','Outform','Abstract'];
-    const badgeClass = ['ns-tt-badge-null','ns-tt-badge-inform','ns-tt-badge-outform','ns-tt-badge-abstract'];
-    const typeName = typeNames[lim.gtType] || '?';
-    const ver = (e.word2_seals >>> 25) & 0x7F;
-    const seal = e.word2_seals & 0xFFFF;
-    const sizeWords = lim.limit + 1;
-    const sizeBytes = sizeWords * 4;
-
-    let absMatch = null;
-    if (abstractionRegistry && typeof abstractionRegistry.getAbstraction === 'function') {
-        absMatch = abstractionRegistry.getAbstraction(idx);
-    }
-
-    let html = `<div class="ns-tt-header">Slot ${idx}<span class="ns-tt-badge ${badgeClass[lim.gtType]}">${typeName}</span></div>`;
-    if (e.label) html += `<div class="ns-tt-label">"${e.label}"</div>`;
-    if (codeNotResident) {
-        const priorityTag = manifest.priority === 'hot' ? 'Hot' : (manifest.priority === 'cold' ? 'Cold' : 'Warm');
-        html += `<div style="color:#f0a040;font-size:0.75rem;margin-top:0.25rem;margin-bottom:0.25rem;"><b>${priorityTag}</b> — code not resident, will lazy-load on first CALL</div>`;
-    }
-    if (absMatch) {
-        const absName = absMatch.name || '';
-        const absLayer = absMatch.layer != null ? ` · Layer ${absMatch.layer}` : '';
-        const absMethods = Array.isArray(absMatch.methods) ? absMatch.methods : [];
-        const ttProfile = _getAbstractionProfile(absMatch);
-        const ttProfileClass = ttProfile === 'Full' ? 'profile-badge-full' : ttProfile === 'XC7A100T' ? 'profile-badge-xc7a100t' : 'profile-badge-iot';
-        html += `<div class="ns-tt-abs-name">${absName}<span class="abs-profile-badge ${ttProfileClass}" style="margin-left:6px;vertical-align:middle;">${ttProfile}</span><span style="color:#9ca3af;font-weight:400;font-size:0.7rem;">${absLayer}</span></div>`;
-        if (absMatch.description) {
-            const d = absMatch.description;
-            html += `<div style="color:#9ca3af;font-size:0.72rem;margin-bottom:0.25rem;">${d.slice(0,100)}${d.length > 100 ? '…' : ''}</div>`;
-        }
-        if (absMethods.length) {
-            html += `<div style="color:#6b7280;font-size:0.7rem;margin-bottom:0.2rem;">${absMethods.length} method${absMethods.length !== 1 ? 's' : ''}: <span style="color:#c084fc;">${absMethods.slice(0,5).join(', ')}${absMethods.length > 5 ? ', …' : ''}</span></div>`;
-        }
-        const catalogEntry = Array.isArray(_lumpCatalog) ? _lumpCatalog.find(c => c.nsSlot === idx) : null;
-        const mediaTags = catalogEntry && catalogEntry.mediaTags;
-        if (mediaTags && typeof mediaTags === 'object') {
-            const tagEntries = Object.entries(mediaTags);
-            if (tagEntries.length) {
-                html += `<div style="color:#6b7280;font-size:0.7rem;margin-top:0.3rem;margin-bottom:0.15rem;font-weight:600;letter-spacing:0.02em;">Media Types</div>`;
-                html += `<table style="font-size:0.69rem;border-collapse:collapse;width:100%;margin-bottom:0.1rem;">`;
-                for (const [tag, val] of tagEntries) {
-                    const hexStr = (val && val.hex) ? val.hex : (typeof val === 'string' ? val : '');
-                    const desc   = (val && val.description) ? val.description : '';
-                    html += `<tr><td style="color:#c084fc;font-family:monospace;padding:1px 6px 1px 0;white-space:nowrap;">${tag}</td><td style="color:#9ca3af;padding:1px 6px 1px 0;white-space:nowrap;font-family:monospace;">${hexStr}</td><td style="color:#d1d5db;padding:1px 0;">${desc}</td></tr>`;
-                }
-                html += `</table>`;
-            }
-        }
-        html += '<hr class="ns-tt-divider">';
-    }
-    html += `<div class="ns-tt-row"><b>Address</b> 0x${e.word0_location.toString(16).toUpperCase().padStart(8,'0')}</div>`;
-    html += `<div class="ns-tt-row"><b>Size</b> ${sizeWords} word${sizeWords !== 1 ? 's' : ''} &nbsp;(${sizeBytes} bytes)</div>`;
-    html += `<div class="ns-tt-row"><b>Version</b> ${ver} &nbsp;&nbsp;<b style="margin-left:0.6rem">CRC</b> 0x${seal.toString(16).toUpperCase().padStart(4,'0')}</div>`;
-    if (e.clistCount) html += `<div class="ns-tt-row"><b>C-list</b> ${e.clistCount} entr${e.clistCount !== 1 ? 'ies' : 'y'}</div>`;
-    const flags = [];
-    if (lim.f) flags.push('<span class="ns-tt-flag">F Far/Tunnel</span>');
-    if (lim.b) flags.push('<span class="ns-tt-flag">B</span>');
-    if (e.gBit) flags.push('<span class="ns-tt-flag">G GC-live</span>');
-    if (e.chainable) flags.push('<span class="ns-tt-flag">Chainable</span>');
-    if (flags.length) html += `<div class="ns-tt-row" style="flex-wrap:wrap;gap:4px;"><b>Flags</b> ${flags.join(' ')}</div>`;
-
-    const _ttSrcLump = _findSrcLump(idx, e.label);
-    const _ttSrcToken = _ttSrcLump ? _ttSrcLump.token : null;
-    if (_ttSrcToken && !codeNotResident) {
-        html += `<div style="margin-top:0.5rem;text-align:right;"><a href="#" style="color:#4ec9b0;font-size:0.72rem;text-decoration:none;" onclick="event.preventDefault();hideNSEntryTooltip();_openLumpSource('${_ttSrcToken}')">View Source \u2192</a></div>`;
-    }
-
-    tt.innerHTML = html;
-    tt.classList.add('visible');
-    // Anchor to the left edge of the 3rd column (W0: Location) of the hovered row
-    const row = evt.target.closest('tr');
-    const col3 = row ? row.querySelectorAll('td')[2] : null;
-    _positionNSTooltip(tt, evt, col3);
-}
-
-function _positionNSTooltip(tt, evt, anchorEl) {
-    const margin = 8;
-    tt.style.left = '0px'; tt.style.top = '0px';
-    const tw = tt.offsetWidth || 260;
-    const th = tt.offsetHeight || 140;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    // Anchor to the left edge of the Location column — popup opens over Location, never hides Label
-    const anchorX = anchorEl ? anchorEl.getBoundingClientRect().left : evt.clientX;
-    let x = anchorX;
-    let y = evt.clientY - th / 2;
-    if (x + tw > vw - 8) x = vw - tw - 8;
-    if (x < 8) x = 8;
-    if (y < 8) y = 8;
-    if (y + th > vh - 8) y = vh - th - 8;
-    tt.style.left = x + 'px';
-    tt.style.top  = y + 'px';
-}
-
-function hideNSEntryTooltip() {
-    const tt = document.getElementById('nsEntryTooltip');
-    if (tt) tt.classList.remove('visible');
-}
 
 function toggleCRDetailMenu(evt) {
     const dd = document.getElementById('crdMenuDropdown');

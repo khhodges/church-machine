@@ -267,83 +267,6 @@ a.next-step-link:hover {
     box-shadow: 0 0 6px rgba(251,191,36,0.4);
 }
 
-.ns-entry-tooltip {
-    display: none;
-    position: fixed;
-    z-index: 9000;
-    background: var(--bg-dark, #0d1b2a);
-    border: 1px solid var(--church-gold, #f4b942);
-    border-radius: 7px;
-    padding: 0.6rem 0.85rem 0.7rem;
-    box-shadow: 0 6px 24px rgba(0,0,0,0.65);
-    pointer-events: none;
-    min-width: 220px;
-    max-width: 340px;
-    font-size: 0.78rem;
-    line-height: 1.5;
-}
-.ns-entry-tooltip.visible { display: block; }
-.ns-tt-header {
-    font-size: 0.92rem;
-    font-weight: 700;
-    color: var(--church-gold, #f4b942);
-    margin-bottom: 0.35rem;
-    letter-spacing: 0.01em;
-}
-.ns-tt-label {
-    color: #e0e0e0;
-    font-style: italic;
-    margin-bottom: 0.3rem;
-    font-size: 0.83rem;
-}
-.ns-tt-row {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 0.1rem;
-    color: var(--text-secondary, #8a9bb0);
-}
-.ns-tt-row b {
-    color: var(--text-primary, #e0e0e0);
-    font-weight: 600;
-    min-width: 80px;
-    flex-shrink: 0;
-}
-.ns-tt-badge {
-    display: inline-block;
-    font-size: 0.68rem;
-    font-weight: 700;
-    border-radius: 3px;
-    padding: 0 5px;
-    margin-left: 0.25rem;
-    vertical-align: middle;
-}
-.ns-tt-badge-inform  { background: #1e40af; color: #93c5fd; }
-.ns-tt-badge-abstract{ background: #5b21b6; color: #c4b5fd; }
-.ns-tt-badge-outform { background: #065f46; color: #6ee7b7; }
-.ns-tt-badge-null    { background: #374151; color: #9ca3af; }
-.ns-tt-flag {
-    display: inline-block;
-    font-size: 0.66rem;
-    font-weight: 700;
-    padding: 1px 5px;
-    border-radius: 3px;
-    margin-left: 3px;
-    background: rgba(244,185,66,0.15);
-    color: var(--church-gold, #f4b942);
-    border: 1px solid rgba(244,185,66,0.35);
-}
-.ns-tt-divider {
-    border: none;
-    border-top: 1px solid rgba(255,255,255,0.08);
-    margin: 0.4rem 0;
-}
-.ns-tt-abs-name {
-    color: #c084fc;
-    font-weight: 600;
-    font-size: 0.81rem;
-    margin-bottom: 0.1rem;
-}
-
 .boot-image-view {
     padding: 0.4rem 0.6rem 0.8rem;
     font-size: 0.78rem;
@@ -2887,32 +2810,6 @@ a.next-step-link:hover {
 
 .ns-row:hover {
     background: rgba(78, 201, 176, 0.08);
-}
-
-.ns-row-active {
-    background: rgba(78, 201, 176, 0.08) !important;
-    border-left: 3px solid rgba(200, 155, 60, 0.4);
-}
-
-.ns-detail-row td {
-    padding: 0 !important;
-    border-bottom: 1px solid rgba(200, 155, 60, 0.25) !important;
-}
-
-.ns-detail-panel {
-    background: rgba(0, 0, 0, 0.2);
-    padding: 0.5rem 0.75rem;
-    margin: 0;
-}
-
-.ns-detail-title {
-    font-size: 0.75rem;
-    color: rgba(200, 155, 60, 0.7);
-    font-weight: 600;
-    padding-bottom: 0.4rem;
-    border-bottom: 1px solid rgba(212, 168, 67, 0.15);
-    margin-bottom: 0.4rem;
-    font-family: 'Courier New', monospace;
 }
 
 .ns-mem-table {
@@ -6185,26 +6082,6 @@ mark.abs-search-highlight {
     font-size: 0.7rem;
     font-weight: 600;
     margin-left: 4px;
-}
-
-/* Inline c-list table shown in NS expanded detail when pending highlight is active */
-.ns-clist-section {
-    margin-top: 12px;
-    border-top: 1px solid rgba(245, 158, 11, 0.25);
-    padding-top: 8px;
-}
-
-.ns-clist-title {
-    font-size: 0.78rem;
-    color: #f59e0b;
-    font-weight: 600;
-    margin-bottom: 6px;
-    letter-spacing: 0.04em;
-}
-
-.ns-clist-inline-table {
-    width: 100%;
-    font-size: 0.76rem;
 }
 
 /* ── Method selector numbers & main badge ─────────────────────────────── */

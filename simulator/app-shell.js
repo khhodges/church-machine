@@ -768,7 +768,6 @@ function init() {
         const nsSlot = parseInt(hashParams.ns, 10);
         if (!isNaN(nsSlot)) {
             setTimeout(function() {
-                if (typeof toggleNSDetail === 'function') toggleNSDetail(nsSlot);
                 const row = document.getElementById('ns-row-' + nsSlot);
                 if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }, 120);

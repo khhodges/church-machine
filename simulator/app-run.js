@@ -2876,14 +2876,10 @@ function faultModalOpenBinaryLump(nsIdx) {
     }
     // Fallback: open namespace view scrolled to the relevant slot.
     switchView('namespace');
-    if (typeof nsExpandedSlot !== 'undefined' && typeof updateNamespace === 'function') {
-        nsExpandedSlot = nsIdx;
-        updateNamespace();
-        setTimeout(function() {
-            var row = document.getElementById('ns-row-' + nsIdx);
-            if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 80);
-    }
+    setTimeout(function() {
+        var row = document.getElementById('ns-row-' + nsIdx);
+        if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 80);
 }
 
 function faultModalEditCode(crIdx) {

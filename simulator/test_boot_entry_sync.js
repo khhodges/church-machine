@@ -140,7 +140,6 @@ function makeSandbox(sim, initialBootEntrySlot) {
         // ── Stub functions (no-ops; do not affect the sync invariant) ──────
         renderAbstractions:          () => {},
         updateNamespace:             () => {},
-        _refreshBootNSDetailIfOpen:  () => {},
         _reapplyStickyPatches:       () => {},
         _injectClistNow:             () => {},
         _applyBootLumpPetNames:      () => {},
