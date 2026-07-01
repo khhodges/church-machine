@@ -1162,7 +1162,7 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
 }
 
 // EL11: c-list row = 256 is out of range → error (simple Name form).
-//       SlideRule256 is mapped to slot 256 in a local namespace.
+//       SlideRule is mapped to slot 256 in a local namespace (well above the 0–31 limit).
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace({ 'SlideRule': 256 });
@@ -1246,6 +1246,7 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
         a.errors.map(e => e.message).join('; '));
 }
 
+// EX-ELOADCALL-BOUNDS: Row field is 5-bit (0–31); row=32 must be rejected, row=31 accepted.
 // EL17: c-list row = 32 is out of range → error (Name shorthand form).
 //       Row 32 exceeds the 5-bit rs2 field (valid range 0–31) and must be caught
 //       at assembly time to prevent a silent wrong-capability access at runtime.
@@ -1263,31 +1264,40 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
         a.errors.map(e => e.message).join('; '));
 }
 
-// EL18: c-list row = 32 is out of range → error (explicit CRsrc form).
+// EL18: row=31 via Name form → accepted (max valid 5-bit row value).
+{
+    const a = new ChurchAssembler(CONVENTIONS);
+    a.setNamespace({ 'SlideRule': 31 });
+    a.assemble('ELOADCALL CR0, SlideRule');
+    assert('EL18 ELOADCALL row=31 (Name form): no errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+}
+
+// EL19: c-list row = 32 is out of range → error (explicit CRsrc form).
 //       ELOADCALL CR0, CR11, #32 — the 5-bit rs2 field cannot encode row 32.
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.assemble('ELOADCALL CR0, CR11, #32');
-    assert('EL18 ELOADCALL explicit row=32 (no method): produces an error',
+    assert('EL19 ELOADCALL explicit row=32 (no method): produces an error',
         a.errors.length > 0, 'expected at least one error');
-    assert('EL18 error says "out of range" and shows 32',
+    assert('EL19 error says "out of range" and shows 32',
         a.errors.some(e => e.message.includes('out of range') && e.message.includes('32')),
         a.errors.map(e => e.message).join('; '));
-    assert('EL18 error mentions 5-bit field',
+    assert('EL19 error mentions 5-bit field',
         a.errors.some(e => e.message.includes('5-bit')),
         a.errors.map(e => e.message).join('; '));
 }
 
-// EL19: c-list row = 31 is the maximum valid row → no error.
+// EL20: c-list row = 31 is the maximum valid row → no error.
 //       Verifies the boundary: row 31 must assemble cleanly (fits in 5 bits).
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.assemble('ELOADCALL CR0, CR11, #31');
-    assert('EL19 ELOADCALL explicit row=31 (boundary): no errors',
+    assert('EL20 ELOADCALL explicit row=31 (boundary): no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     const word = a.assemble('ELOADCALL CR0, CR11, #31').words[0];
     const encodedRow = word & 0x1F;
-    assert('EL19 encoded row field is 31',
+    assert('EL20 encoded row field is 31',
         encodedRow === 31, 'got ' + encodedRow);
 }
 
