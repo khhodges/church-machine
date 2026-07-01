@@ -62,9 +62,23 @@ if [ ! -x "$LOADER" ]; then
     exit 1
 fi
 
-# ── Download hex ──────────────────────────────────────────────────────────
-echo "==> [1/3] Downloading hex from droplet ..."
-curl --fail -# -o "$HEX_FILE" "$HEX_URL"
+# ── Download hex (IDE first, droplet fallback) ────────────────────────────
+IDE_HEX_URL="$IDE_URL/dl/ti60-hex"
+echo "==> [1/3] Downloading hex ..."
+if curl --fail --silent --max-time 10 -o "$HEX_FILE" "$IDE_HEX_URL" 2>/dev/null; then
+    echo "    Source: IDE ($IDE_HEX_URL)"
+elif curl --fail -# --max-time 30 -o "$HEX_FILE" "$HEX_URL" 2>/dev/null; then
+    echo "    Source: droplet ($HEX_URL)"
+else
+    echo ""
+    echo "ERROR: Could not download hex from either source."
+    echo "  IDE:     $IDE_HEX_URL"
+    echo "  Droplet: $HEX_URL"
+    echo ""
+    echo "  To start the droplet server:"
+    echo "    ssh root@$DROPLET 'bash ~/church-machine/hardware/soc_combined/serve_bitstream.sh'"
+    exit 1
+fi
 ls -lh "$HEX_FILE"
 echo ""
 
