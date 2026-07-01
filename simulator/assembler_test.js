@@ -1235,7 +1235,7 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
 }
 
 // EL16: Explicit CRsrc form with row=256 and a method index → out-of-range error.
-//       ELOADCALL CR0, CR11, #256, 0 — slot must be 0–255 even when method index is present.
+//       ELOADCALL CR0, CR11, #256, 0 — slot must be 0–31 even when method index is present.
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.assemble('ELOADCALL CR0, CR11, #256, 0');
@@ -1244,6 +1244,51 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
     assert('EL16 error says "out of range" and shows 256',
         a.errors.some(e => e.message.includes('out of range') && e.message.includes('256')),
         a.errors.map(e => e.message).join('; '));
+}
+
+// EL17: c-list row = 32 is out of range → error (Name shorthand form).
+//       Row 32 exceeds the 5-bit rs2 field (valid range 0–31) and must be caught
+//       at assembly time to prevent a silent wrong-capability access at runtime.
+{
+    const a = new ChurchAssembler(CONVENTIONS);
+    a.setNamespace({ 'SlideRule': 32 });
+    a.assemble('ELOADCALL CR0, SlideRule');
+    assert('EL17 ELOADCALL row=32 (Name form): produces an error',
+        a.errors.length > 0, 'expected at least one error');
+    assert('EL17 error says "out of range" and shows 32',
+        a.errors.some(e => e.message.includes('out of range') && e.message.includes('32')),
+        a.errors.map(e => e.message).join('; '));
+    assert('EL17 error mentions 5-bit field',
+        a.errors.some(e => e.message.includes('5-bit')),
+        a.errors.map(e => e.message).join('; '));
+}
+
+// EL18: c-list row = 32 is out of range → error (explicit CRsrc form).
+//       ELOADCALL CR0, CR11, #32 — the 5-bit rs2 field cannot encode row 32.
+{
+    const a = new ChurchAssembler(CONVENTIONS);
+    a.assemble('ELOADCALL CR0, CR11, #32');
+    assert('EL18 ELOADCALL explicit row=32 (no method): produces an error',
+        a.errors.length > 0, 'expected at least one error');
+    assert('EL18 error says "out of range" and shows 32',
+        a.errors.some(e => e.message.includes('out of range') && e.message.includes('32')),
+        a.errors.map(e => e.message).join('; '));
+    assert('EL18 error mentions 5-bit field',
+        a.errors.some(e => e.message.includes('5-bit')),
+        a.errors.map(e => e.message).join('; '));
+}
+
+// EL19: c-list row = 31 is the maximum valid row → no error.
+//       Verifies the boundary: row 31 must assemble cleanly (fits in 5 bits).
+{
+    const a = new ChurchAssembler(CONVENTIONS);
+    a.assemble('ELOADCALL CR0, CR11, #31');
+    assert('EL19 ELOADCALL explicit row=31 (boundary): no errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    const word = a.assemble('ELOADCALL CR0, CR11, #31').words[0];
+    const encodedRow = word & 0x1F;
+    assert('EL19 encoded row field is 31',
+        encodedRow === 31, 'got ' + encodedRow);
 }
 
 // ── SHR / ASR encoding and disassembly ───────────────────────────────────────

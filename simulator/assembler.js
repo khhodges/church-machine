@@ -147,7 +147,7 @@
 //     ELOADCALL CR0, SlideRule, Divide   → imm = 0x0201  (row=1, method=2)
 //     ELOADCALL CR0, CR6, #1, 0         → imm = 0x0101  (row=1, method=1 for 0-based idx 0)
 //   Without a method operand the fast-path (method=0, NIA = lump word 1) is used.
-//   Supported c-list row range: 0–255; method index range: 0–126 (0-based).
+//   Supported c-list row range: 0–31 (5-bit rs2 field); method index range: 0–126 (0-based).
 //
 // POST-ASSEMBLY BRANCH BOUNDS CHECK
 //   After encoding all words, the assembler verifies that every BRANCH
@@ -1378,20 +1378,20 @@ class ChurchAssembler {
                     // imm15[7:0] = c-list row; imm15[14:8] = 0 (fast-path, NIA = lump word 1)
                     this._checkCapDeclared(res8.key, lineNum);
                     crSrc = 6;
-                    if (res8.slot < 0 || res8.slot > 255) {
-                        this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, res8.key), message: `ELOADCALL c-list row ${res8.slot} is out of range (0–255 allowed).` });
+                    if (res8.slot < 0 || res8.slot > 31) {
+                        this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, res8.key), message: `ELOADCALL c-list row ${res8.slot} is out of range (0–31 allowed; ELOADCALL uses a 5-bit row field).` });
                     }
-                    imm   = res8.slot & 0xFF;
+                    imm   = res8.slot & 0x1F;
                 } else if (res8 !== null && parts[3] && !res8.consumed) {
                     // Method index in ELOADCALL: ELOADCALL CRdst, Name, MethodName  or  ELOADCALL CRdst, Name, 0
                     // imm15[14:8] = method index (1-based, 1–127); imm15[7:0] = c-list row
                     this._checkCapDeclared(res8.key, lineNum);
                     crSrc = 6;
                     const rawSlot8v = res8.slot;
-                    if (rawSlot8v < 0 || rawSlot8v > 255) {
-                        this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, res8.key), message: `ELOADCALL c-list row ${rawSlot8v} is out of range (0–255 allowed).` });
+                    if (rawSlot8v < 0 || rawSlot8v > 31) {
+                        this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, res8.key), message: `ELOADCALL c-list row ${rawSlot8v} is out of range (0–31 allowed; ELOADCALL uses a 5-bit row field).` });
                     }
-                    const clistRow8 = rawSlot8v & 0xFF;
+                    const clistRow8 = rawSlot8v & 0x1F;
                     const rawMeth8  = (parts[3] || '').replace(/,/g, '').trim();
                     let methodIdx8  = 0;
                     // Resolve conventions key: try exact case first (e.g. 'SlideRule'),
@@ -1428,11 +1428,11 @@ class ChurchAssembler {
                     crSrc = this._parseCR(parts[2], lineNum);
                     this._checkPrivCR(crSrc, 'ELOADCALL', lineNum);
                     const rawSlot8v  = this._parseImm(parts[3], lineNum);
-                    if (rawSlot8v < 0 || rawSlot8v > 255) {
+                    if (rawSlot8v < 0 || rawSlot8v > 31) {
                         const _slotTok = (parts[3] || '').replace(/,/g, '').trim();
-                        this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, _slotTok), message: `ELOADCALL c-list row ${rawSlot8v} is out of range (0–255 allowed).` });
+                        this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, _slotTok), message: `ELOADCALL c-list row ${rawSlot8v} is out of range (0–31 allowed; ELOADCALL uses a 5-bit row field).` });
                     }
-                    const rawSlot8   = rawSlot8v & 0xFF;
+                    const rawSlot8   = rawSlot8v & 0x1F;
                     let methodIdx8e  = 0;
                     if (parts[4]) {
                         const rawMeth8e = (parts[4] || '').replace(/,/g, '').trim();
