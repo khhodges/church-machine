@@ -1,7 +1,7 @@
 from amaranth import *
 from amaranth.lib.data import View
 
-from .hw_types import SCHEDULER_IRQ_NS_SLOT
+from .hw_types import SCHEDULER_IRQ_NS_SLOT, FaultType
 from .layouts import CAP_REG_LAYOUT
 
 # Method-table slot for the 'IRQ' entry inside the Scheduler abstraction.
@@ -52,6 +52,12 @@ class ChurchIRQDispatch(Elaboratable):
         self.nia_set   = Signal()
         self.nia_value = Signal(32)
 
+        # Fault output: asserted for one cycle when ns_base == 0 after FETCH_NS.
+        # NIA is never updated when this fires — the caller must treat it as a
+        # hard fault (FaultType.IRQ_NULL_BASE = 0x14).
+        self.null_base_fault      = Signal()
+        self.null_base_fault_type = Signal(5, init=int(FaultType.IRQ_NULL_BASE))
+
     def elaborate(self, platform):
         m = Module()
 
@@ -93,7 +99,17 @@ class ChurchIRQDispatch(Elaboratable):
                 ]
                 with m.If(self.mem_rd_valid):
                     m.d.sync += ns_base.eq(self.mem_rd_data)
-                    m.next = "FETCH_METHOD"
+                    with m.If(self.mem_rd_data == 0):
+                        # NS slot 8 has not been populated — lump base is null.
+                        # Abort: raise null_base_fault without touching NIA.
+                        m.next = "NULL_BASE_FAULT"
+                    with m.Else():
+                        m.next = "FETCH_METHOD"
+
+            with m.State("NULL_BASE_FAULT"):
+                # One-cycle fault pulse.  NIA is never written.
+                # core.py maps null_base_fault → FaultType.IRQ_NULL_BASE.
+                m.next = "IDLE"
 
             with m.State("FETCH_METHOD"):
                 # Read method-table entry: mem[ns_base + SCHEDULER_IRQ_METHOD_IDX * 4]
@@ -123,6 +139,7 @@ class ChurchIRQDispatch(Elaboratable):
             self.busy.eq(~fsm.ongoing("IDLE")),
             self.complete.eq(fsm.ongoing("COMPLETE")),
             self.nia_set.eq(fsm.ongoing("COMPLETE")),
+            self.null_base_fault.eq(fsm.ongoing("NULL_BASE_FAULT")),
         ]
 
         return m

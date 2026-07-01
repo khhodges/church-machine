@@ -332,6 +332,7 @@ class FaultType(IntEnum):
     ABSENT_OUTFORM  = 0x11   # mLoad: outform absent — SW trap downloads code, reissues CALL
     STACK_CORRUPT   = 0x12   # CALL stack pointer above sp_max (STO corrupted or header wrong)
     STACK_UNDERFLOW = 0x13   # RETURN with no caller frame — popped past sentinel (NIA=0x7FFF)
+    IRQ_NULL_BASE   = 0x14   # IRQ dispatch: NS slot 8 lump base is 0 (Scheduler.IRQ not booted)
     OUTFORM_CRC     = 0x15   # Outform download: CRC-32 mismatch in received lump
     OUTFORM_ALLOC   = 0x16   # Outform download: memory allocator rejected the lump size
     OUTFORM_MINT    = 0x17   # Outform download: Mint capability-minting step failed

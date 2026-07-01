@@ -22,7 +22,7 @@ from amaranth.sim import Simulator
 from .irq_dispatch import ChurchIRQDispatch, SCHEDULER_IRQ_METHOD_IDX
 from .hw_types import (
     IRQ_REASON_TIMER, IRQ_REASON_LAZY_LOAD, IRQ_REASON_LAZY_RESOLVE,
-    SCHEDULER_IRQ_NS_SLOT,
+    SCHEDULER_IRQ_NS_SLOT, FaultType,
 )
 from .layouts import CAP_REG_LAYOUT
 
@@ -434,14 +434,80 @@ def test_irq_dispatch_simultaneous_fetch_method():
 
 
 # ---------------------------------------------------------------------------
+# Sub-test 6: null ns_base guard — ns_base=0 must not corrupt NIA
+# ---------------------------------------------------------------------------
+
+def test_irq_dispatch_null_base():
+    """NS slot 8 lump base == 0 → null_base_fault asserted, nia_set never fires."""
+    dut = ChurchIRQDispatch()
+
+    async def testbench(ctx):
+        ctx.set(dut.mem_rd_valid, 0)
+        ctx.set(dut.mem_rd_data, 0)
+        ctx.set(dut.cr15_namespace["word1_location"], NS_TABLE_BASE)
+
+        ctx.set(dut.irq_reason, IRQ_REASON_TIMER)
+        ctx.set(dut.irq_slot, 0)
+        ctx.set(dut.start, 1)
+        await ctx.tick()
+        ctx.set(dut.start, 0)
+
+        assert ctx.get(dut.busy) == 1, "busy should be 1 after start"
+
+        # --- FETCH_NS: unit drives mem_rd_addr; respond with 0 (unbooted slot) ---
+        assert ctx.get(dut.mem_rd_en) == 1, "FETCH_NS: mem_rd_en not asserted"
+        addr_ns = ctx.get(dut.mem_rd_addr)
+        assert addr_ns == IRQ_NS_ADDR, (
+            f"FETCH_NS: expected mem_rd_addr={IRQ_NS_ADDR:#x}, got {addr_ns:#x}"
+        )
+        ctx.set(dut.mem_rd_data, 0)   # lump base is zero — Scheduler.IRQ not booted
+        ctx.set(dut.mem_rd_valid, 1)
+        await ctx.tick()
+        ctx.set(dut.mem_rd_valid, 0)
+
+        # --- NULL_BASE_FAULT state: fault fires, nia_set must NOT fire ---
+        null_fault = ctx.get(dut.null_base_fault)
+        nia_set    = ctx.get(dut.nia_set)
+        nia_val    = ctx.get(dut.nia_value)
+        fault_type = ctx.get(dut.null_base_fault_type)
+
+        assert null_fault == 1, (
+            f"NULL_BASE: null_base_fault not asserted (got {null_fault})"
+        )
+        assert nia_set == 0, (
+            f"NULL_BASE: nia_set fired when ns_base=0 — NIA corruption! "
+            f"nia_value={nia_val:#x}"
+        )
+        assert fault_type == int(FaultType.IRQ_NULL_BASE), (
+            f"NULL_BASE: fault_type mismatch — expected "
+            f"{int(FaultType.IRQ_NULL_BASE):#x}, got {fault_type:#x}"
+        )
+        await ctx.tick()
+
+        # Back to IDLE — busy must be clear, fault must be deasserted
+        assert ctx.get(dut.busy) == 0, "busy should clear after NULL_BASE_FAULT→IDLE"
+        assert ctx.get(dut.null_base_fault) == 0, (
+            "null_base_fault should be 0 one cycle after NULL_BASE_FAULT state"
+        )
+        print(f"  PASS: null_base_fault asserted, nia_set={nia_set} (no NIA write), "
+              f"fault_type={fault_type:#x} (IRQ_NULL_BASE)")
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(testbench)
+    with sim.write_vcd("/dev/null"):
+        sim.run()
+    print("PASS: test_irq_dispatch_null_base")
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
 def main():
     print("=" * 60)
     print("ChurchIRQDispatch Cross-Check Tests")
-    print("Three trigger conditions + simultaneous-trigger stall tests")
-    print("→ ELOADCALL to Scheduler.IRQ (NS slot 8)")
+    print("Three trigger conditions + simultaneous-trigger stall + null-base guard")
     print("=" * 60)
 
     tests = [
@@ -450,6 +516,7 @@ def main():
         test_irq_dispatch_lazy_resolve,
         test_irq_dispatch_simultaneous_fetch_ns,
         test_irq_dispatch_simultaneous_fetch_method,
+        test_irq_dispatch_null_base,
     ]
     passed = 0
     failed = 0

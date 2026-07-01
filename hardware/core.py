@@ -2188,6 +2188,9 @@ class ChurchCore(Elaboratable):
             m.d.comb += [self.fault.eq(u_outform.outform_fault_type), self.fault_valid.eq(1)]
         with m.Elif(u_outform_fsm.fault):
             m.d.comb += [self.fault.eq(u_outform_fsm.fault_type), self.fault_valid.eq(1)]
+        if not self.iot_profile:
+            with m.Elif(u_irq_dispatch.null_base_fault):
+                m.d.comb += [self.fault.eq(FaultType.IRQ_NULL_BASE), self.fault_valid.eq(1)]
         with m.Elif(mwin_fault_valid):
             m.d.comb += [self.fault.eq(FaultType.INVALID_OP), self.fault_valid.eq(1)]
         with m.Else():
