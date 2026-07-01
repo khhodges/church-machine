@@ -1709,6 +1709,7 @@ def test_core_eloadcall_xloadlambda_irq():
 
         ctx.set(dut.imem_data,  eloadcall_instr)
         ctx.set(dut.imem_valid, 1)
+        nia_before_eloadcall = ctx.get(dut.nia)
         await ctx.tick()
 
         irq_v  = ctx.get(dut.irq_valid)
@@ -1716,6 +1717,7 @@ def test_core_eloadcall_xloadlambda_irq():
         irq_ns = ctx.get(dut.irq_ns_slot)
         irq_d1 = ctx.get(dut.irq_dr1)
         irq_mi = ctx.get(dut.irq_method_index)
+        nia_after_eloadcall = ctx.get(dut.nia)
 
         ctx.set(dut.imem_valid, 0)
         await ctx.tick()
@@ -1732,8 +1734,13 @@ def test_core_eloadcall_xloadlambda_irq():
             f"ELOADCALL: irq_dr1={irq_d1:#04x}, expected EL_ROW={EL_ROW:#04x}")
         assert irq_mi == EL_METHOD_INDEX, (
             f"ELOADCALL: irq_method_index={irq_mi:#03x}, expected {EL_METHOD_INDEX:#03x}")
+        assert nia_after_eloadcall == nia_before_eloadcall, (
+            f"ELOADCALL: NIA must not advance when lazy-resolve IRQ fires; "
+            f"before={nia_before_eloadcall:#010x}, after={nia_after_eloadcall:#010x} "
+            f"(expected hold, got +{nia_after_eloadcall - nia_before_eloadcall})")
         print(f"  PASS ELOADCALL: irq_valid=1, reason=LAZY_RESOLVE({irq_r}), "
               f"ns_slot={irq_ns}, dr1={irq_d1:#04x}, method_idx={irq_mi:#03x}")
+        print(f"  PASS ELOADCALL: NIA held at {nia_after_eloadcall:#010x} (no advance on IRQ)")
 
         irq_v_idle = ctx.get(dut.irq_valid)
         assert irq_v_idle == 0, (
@@ -1742,10 +1749,12 @@ def test_core_eloadcall_xloadlambda_irq():
 
         ctx.set(dut.imem_data,  xloadlambda_instr)
         ctx.set(dut.imem_valid, 1)
+        nia_before_xloadlambda = ctx.get(dut.nia)
         await ctx.tick()
 
         xl_v   = ctx.get(dut.xloadlambda_valid)
         xl_idx = ctx.get(dut.xloadlambda_index)
+        nia_after_xloadlambda = ctx.get(dut.nia)
 
         ctx.set(dut.imem_valid, 0)
         await ctx.tick()
@@ -1755,7 +1764,12 @@ def test_core_eloadcall_xloadlambda_irq():
             f"got {xl_v}")
         assert xl_idx == XL_IMM12, (
             f"XLOADLAMBDA: xloadlambda_index={xl_idx:#05x}, expected {XL_IMM12:#05x}")
+        assert nia_after_xloadlambda == nia_before_xloadlambda, (
+            f"XLOADLAMBDA: NIA must not advance when lambda-loader IRQ fires; "
+            f"before={nia_before_xloadlambda:#010x}, after={nia_after_xloadlambda:#010x} "
+            f"(expected hold, got +{nia_after_xloadlambda - nia_before_xloadlambda})")
         print(f"  PASS XLOADLAMBDA: xloadlambda_valid=1, xloadlambda_index={xl_idx:#05x}")
+        print(f"  PASS XLOADLAMBDA: NIA held at {nia_after_xloadlambda:#010x} (no advance on IRQ)")
 
         xl_v_idle = ctx.get(dut.xloadlambda_valid)
         assert xl_v_idle == 0, (

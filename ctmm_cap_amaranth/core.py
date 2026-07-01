@@ -242,6 +242,16 @@ class CMCapCore(Elaboratable):
 
         all_checks_pass = u_perm.all_checks_pass
 
+        # Forward-declare IRQ fire signals here so the NIA stall path (below) can reference them.
+        eloadcall_fire = Signal()
+        m.d.comb += eloadcall_fire.eq(
+            exec_enable & is_church_op & (church_op == ChurchOpcode.ELOADCALL) & all_checks_pass
+        )
+        xloadlambda_fire = Signal()
+        m.d.comb += xloadlambda_fire.eq(
+            exec_enable & is_church_op & (church_op == ChurchOpcode.XLOADLAMBDA) & all_checks_pass
+        )
+
         m.d.comb += [
             u_gc.gc_start.eq(self.gc_start),
             u_gc.gc_mark_en.eq(1),
@@ -545,7 +555,7 @@ class CMCapCore(Elaboratable):
             m.d.sync += nia_reg.eq(jump_target)
         with m.Elif(branch_taken):
             m.d.sync += nia_reg.eq(branch_target)
-        with m.Elif(exec_enable):
+        with m.Elif(exec_enable & ~eloadcall_fire & ~xloadlambda_fire):
             m.d.sync += nia_reg.eq(nia_reg + 4)
 
         m.d.comb += [
@@ -705,12 +715,8 @@ class CMCapCore(Elaboratable):
         # ELOADCALL dispatch — lazy-resolve IRQ to Scheduler (NS slot SCHEDULER_IRQ_NS_SLOT).
         # Fires for one cycle whenever ELOADCALL passes the E-perm check on CR_CLIST.
         # DR0 = IRQ_REASON_LAZY_RESOLVE; DR1 = c-list row; method_index is advisory.
+        # (eloadcall_fire Signal and m.d.comb assignment are forward-declared above the NIA block.)
         # -----------------------------------------------------------------------
-        eloadcall_fire = Signal()
-        m.d.comb += eloadcall_fire.eq(
-            exec_enable & is_church_op & (church_op == ChurchOpcode.ELOADCALL) & all_checks_pass
-        )
-
         m.d.comb += [
             self.irq_valid.eq(eloadcall_fire),
             self.irq_reason.eq(IRQ_REASON_LAZY_RESOLVE),
@@ -723,11 +729,8 @@ class CMCapCore(Elaboratable):
         # XLOADLAMBDA dispatch — lambda body loader.
         # Fires for one cycle whenever XLOADLAMBDA passes the X-perm check on CR_CLOOMC.
         # xloadlambda_index carries the lambda body offset from the instruction cap_index field.
+        # (xloadlambda_fire Signal and m.d.comb assignment are forward-declared above the NIA block.)
         # -----------------------------------------------------------------------
-        m.d.comb += xloadlambda_fire.eq(
-            exec_enable & is_church_op & (church_op == ChurchOpcode.XLOADLAMBDA) & all_checks_pass
-        )
-
         m.d.comb += [
             self.xloadlambda_valid.eq(xloadlambda_fire),
             self.xloadlambda_index.eq(u_decoder.cap_index),
