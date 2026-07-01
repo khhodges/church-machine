@@ -1321,6 +1321,28 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
         a.errors.map(e => e.message).join('; '));
 }
 
+// EL21: dot-notation CALL with NS slot = 31 → boundary pass (no error).
+//       SlideRule is mapped to slot 31 via nsSymbols (not nsLoaded), so the
+//       CALL handler converts it to ELOADCALL via the dot-notation branch at
+//       ~line 1226 of assembler.js.  Slot 31 is the maximum valid 5-bit value
+//       and must assemble cleanly with the correct row and method fields encoded.
+//       Complements EL20 (slot=32 error case): a future change that lowers the
+//       threshold to 30 would break this test, catching the regression.
+{
+    const a = new ChurchAssembler(CONVENTIONS);
+    a.setNamespace({ 'SlideRule': 31 }); // slot 31 = maximum valid 5-bit row
+    const result = a.assemble('CALL SlideRule, Multiply');
+    assert('EL21 CALL dot-notation NS slot=31 (boundary): no errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    const word = result.words[0];
+    const encodedRow    = word & 0x1F;
+    const encodedMethod = (word >>> 8) & 0x7F;
+    assert('EL21 encoded row field is 31',
+        encodedRow === 31, 'got ' + encodedRow);
+    assert('EL21 encoded method field is 1 (Multiply index 0 → 1-based)',
+        encodedMethod === 1, 'got ' + encodedMethod);
+}
+
 // ── SHR / ASR encoding and disassembly ───────────────────────────────────────
 
 // SA1: Plain SHR (LSR) — imm[5] must be 0.
