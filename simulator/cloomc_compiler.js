@@ -1683,11 +1683,11 @@ class CLOOMCCompiler {
                 errors.push({ line: stmt.lineNum, message: `Method index ${methodSelector} for '${callDotMatch[1]}.${methodName}' is out of range (0–126).` });
                 return;
             }
-            if (clistOffset < 0 || clistOffset > 255) {
-                errors.push({ line: stmt.lineNum, message: `C-list row ${clistOffset} for '${callDotMatch[1]}' is out of range (0–255).` });
+            if (clistOffset < 0 || clistOffset > 31) {
+                errors.push({ line: stmt.lineNum, message: `C-list row ${clistOffset} for '${callDotMatch[1]}' is out of range (0–31).` });
                 return;
             }
-            const eloadcallImm = (eloadcallMethodIdx << 8) | clistOffset;
+            const eloadcallImm = (eloadcallMethodIdx << 5) | clistOffset;
             manifest.push({ src: stmt.lineNum, addr: code.length, desc: `ELOADCALL CR0, CR6[${clistOffset}], method=${eloadcallMethodIdx} -> ${callDotMatch[1]}.${methodName}` });
             code.push(this.encode(this.opcodes.ELOADCALL, 14, 0, 6, eloadcallImm));
             return;
@@ -1735,11 +1735,11 @@ class CLOOMCCompiler {
                 errors.push({ line: stmt.lineNum, message: `Method index ${methodSelector} for '${bareDotMatch[1]}.${methodName}' is out of range (0–126).` });
                 return;
             }
-            if (clistOffset < 0 || clistOffset > 255) {
-                errors.push({ line: stmt.lineNum, message: `C-list row ${clistOffset} for '${bareDotMatch[1]}' is out of range (0–255).` });
+            if (clistOffset < 0 || clistOffset > 31) {
+                errors.push({ line: stmt.lineNum, message: `C-list row ${clistOffset} for '${bareDotMatch[1]}' is out of range (0–31).` });
                 return;
             }
-            const eloadcallImm = (eloadcallMethodIdx << 8) | clistOffset;
+            const eloadcallImm = (eloadcallMethodIdx << 5) | clistOffset;
             manifest.push({ src: stmt.lineNum, addr: code.length, desc: `ELOADCALL CR0, CR6[${clistOffset}], method=${eloadcallMethodIdx} -> ${bareDotMatch[1]}.${methodName} (implied call)` });
             code.push(this.encode(this.opcodes.ELOADCALL, 14, 0, 6, eloadcallImm));
             return;
@@ -1850,11 +1850,11 @@ class CLOOMCCompiler {
                 errors.push({ line: stmt.lineNum, message: `Method index ${methodSelector} for '${callMatch[2]}.${methodName}' is out of range (0–126 allowed for ELOADCALL).` });
                 return;
             }
-            if (clistOffset < 0 || clistOffset > 255) {
-                errors.push({ line: stmt.lineNum, message: `C-list row ${clistOffset} for '${callMatch[2]}' is out of range (0–255 allowed for ELOADCALL).` });
+            if (clistOffset < 0 || clistOffset > 31) {
+                errors.push({ line: stmt.lineNum, message: `C-list row ${clistOffset} for '${callMatch[2]}' is out of range (0–31 allowed for ELOADCALL).` });
                 return;
             }
-            const eloadcallImm = (eloadcallMethodIdx << 8) | clistOffset;
+            const eloadcallImm = (eloadcallMethodIdx << 5) | clistOffset;
             manifest.push({ src: stmt.lineNum, addr: code.length, desc: `ELOADCALL CR0, CR6[${clistOffset}], method=${eloadcallMethodIdx} -> ${callMatch[2]}.${methodName}` });
             code.push(this.encode(this.opcodes.ELOADCALL, 14, 0, 6, eloadcallImm));
 
@@ -3432,7 +3432,7 @@ class CLOOMCCompiler {
                         emitExpr(arg, targetDR, lineNum);
                     }
                 }
-                const eloadImm = ((methodIdx + 1) << 8) | (clistSlot & 0xFF);
+                const eloadImm = ((methodIdx + 1) << 5) | (clistSlot & 0x1F);
                 code.push(this.encode(this.opcodes.ELOADCALL, 14, 0, 6, eloadImm));
                 manifest.push({ line: lineNum, instr: `ELOADCALL CR0, CR6[${clistSlot}], method=${methodIdx + 1}`, comment: `${absName}.${mName}(${argsStr}) → DR1` });
                 const resultDR = this.DR_ARGS_START;

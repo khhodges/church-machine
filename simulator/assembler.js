@@ -139,13 +139,14 @@
 //   If the method name is not found a clear error lists the known methods.
 //
 //   Method index in ELOADCALL:
-//   ELOADCALL imm15 is a two-part field: bits[14:8] = method index (1-based,
-//   0 = fast-path), bits[7:0] = c-list row.  An optional method name or
-//   0-based integer may follow the abstraction name / slot operand:
-//     ELOADCALL CR0, SlideRule           → imm = 0x0001  (row=1, method=0)
-//     ELOADCALL CR0, SlideRule, Multiply → imm = 0x0101  (row=1, method=1)
-//     ELOADCALL CR0, SlideRule, Divide   → imm = 0x0201  (row=1, method=2)
-//     ELOADCALL CR0, CR6, #1, 0         → imm = 0x0101  (row=1, method=1 for 0-based idx 0)
+//   ELOADCALL imm15 uses R-type field widths: bits[11:5] = method index (1-based,
+//   0 = fast-path, 7 bits matching hardware funct7), bits[4:0] = c-list row (5 bits
+//   matching hardware rs2, range 0–31).  An optional method name or 0-based integer
+//   may follow the abstraction name / slot operand:
+//     ELOADCALL CR0, SlideRule           → imm = 0x0003  (row=3, method=0)
+//     ELOADCALL CR0, SlideRule, Multiply → imm = 0x0023  (row=3, method=1)
+//     ELOADCALL CR0, SlideRule, Divide   → imm = 0x0043  (row=3, method=2)
+//     ELOADCALL CR0, CR6, #1, 0         → imm = 0x0021  (row=1, method=1 for 0-based idx 0)
 //   Without a method operand the fast-path (method=0, NIA = lump word 1) is used.
 //   Supported c-list row range: 0–31 (5-bit rs2 field); method index range: 0–126 (0-based).
 //
@@ -1243,7 +1244,7 @@ class ChurchAssembler {
                             } else if (_nsSlot > 31) {
                                 this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, rawDotTok), message: `ELOADCALL c-list row ${_nsSlot} is out of range (0–31 allowed; ELOADCALL uses a 5-bit row field).` });
                             } else {
-                                imm = ((_methIdx + 1) << 8) | (_nsSlot & 0x1F);
+                                imm = ((_methIdx + 1) << 5) | (_nsSlot & 0x1F);
                             }
                         } else {
                             const _known = Object.keys(this.methodConventions[rawDotTok]).join(', ');
@@ -1394,7 +1395,7 @@ class ChurchAssembler {
                 const res8 = this._resolveNSNameBracket(parts[2], parts[3]);
                 if (res8 !== null && (!parts[3] || res8.consumed)) {
                     // Two-operand shorthand: ELOADCALL CRdst, Name  (or ELOADCALL CRdst, LED[N])
-                    // imm15[7:0] = c-list row; imm15[14:8] = 0 (fast-path, NIA = lump word 1)
+                    // imm15[4:0] = c-list row (5-bit, matches hardware rs2); imm15[11:5] = 0 (fast-path)
                     this._checkCapDeclared(res8.key, lineNum);
                     crSrc = 6;
                     if (res8.slot < 0 || res8.slot > 31) {
@@ -1403,7 +1404,7 @@ class ChurchAssembler {
                     imm   = res8.slot & 0x1F;
                 } else if (res8 !== null && parts[3] && !res8.consumed) {
                     // Method index in ELOADCALL: ELOADCALL CRdst, Name, MethodName  or  ELOADCALL CRdst, Name, 0
-                    // imm15[14:8] = method index (1-based, 1–127); imm15[7:0] = c-list row
+                    // imm15[11:5] = method index (1-based, 7 bits, matches hardware funct7); imm15[4:0] = c-list row (5 bits, matches hardware rs2)
                     this._checkCapDeclared(res8.key, lineNum);
                     crSrc = 6;
                     const rawSlot8v = res8.slot;
@@ -1440,10 +1441,10 @@ class ChurchAssembler {
                     } else {
                         this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, rawMeth8), message: `No method conventions for "${res8.key}"; cannot resolve method "${rawMeth8}". Use a numeric 0-based index instead.` });
                     }
-                    imm = (methodIdx8 << 8) | clistRow8;
+                    imm = (methodIdx8 << 5) | clistRow8;
                 } else {
                     // Explicit form: ELOADCALL CRdst, CRsrc, #slot [, methodIdx]
-                    // imm15[7:0] = c-list row; imm15[14:8] = method index (1-based, 0 = fast-path)
+                    // imm15[4:0] = c-list row (5 bits, matches hardware rs2); imm15[11:5] = method index (7 bits, matches hardware funct7)
                     crSrc = this._parseCR(parts[2], lineNum);
                     this._checkPrivCR(crSrc, 'ELOADCALL', lineNum);
                     const rawSlot8v  = this._parseImm(parts[3], lineNum);
@@ -1466,7 +1467,7 @@ class ChurchAssembler {
                             this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, rawMeth8e), message: `ELOADCALL: expected a 0-based numeric method index as 4th operand, got "${rawMeth8e}".` });
                         }
                     }
-                    imm = (methodIdx8e << 8) | rawSlot8;
+                    imm = (methodIdx8e << 5) | rawSlot8;
                 }
                 break;
             }
@@ -2158,11 +2159,12 @@ class ChurchAssembler {
             // LAMBDA CRd  — create closure from template
             case 7: return `${mnemonic}  CR${crDst}`;
             // ELOADCALL CRd, CR6[row], method  — fused load + method-table call (always numeric)
-            // imm15[7:0] = c-list row; imm15[14:8] = method index (1-based, 0=fast-path)
+            // R-type field widths: imm15[4:0] = c-list row (5-bit, matches hardware rs2);
+            //                      imm15[11:5] = method index (7-bit 1-based, 0=fast-path, matches hardware funct7)
             // Disassembler prints method as 0-based so output is directly re-assemblable.
             case 8: {
-                const ec8Row    = imm & 0xFF;
-                const ec8Method = (imm >>> 8) & 0x7F;
+                const ec8Row    = imm & 0x1F;
+                const ec8Method = (imm >>> 5) & 0x7F;
                 const ec8Src    = crSrc === 6 ? cdOff(ec8Row) : `CR${crSrc}[${hexOff(ec8Row)}]`;
                 if (ec8Method > 0) return `${mnemonic}  CR${crDst}, ${ec8Src}, ${ec8Method - 1}`;
                 return `${mnemonic}  CR${crDst}, ${ec8Src}`;

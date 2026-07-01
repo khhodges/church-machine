@@ -4894,9 +4894,10 @@ class ChurchSimulator {
             srcLoc = (hdr.valid && hdr.cc > 0) ? (lumpBase + hdr.lumpSize - hdr.cc) >>> 0 : lumpBase;
             ecClistSize = (hdr.valid && hdr.cc > 0) ? hdr.cc : 1;
         }
-        // imm15[14:8] = method index (0–127); imm15[7:0] = c-list row (0–255).
-        const ecRow = d.imm & 0xFF;
-        const ecMethodIdx = (d.imm >>> 8) & 0x7F;
+        // R-type field widths: imm15[4:0] = c-list row (5-bit, 0–31, matches hardware rs2);
+        //                      imm15[11:5] = method index (7-bit 1-based, 0=fast-path, matches hardware funct7).
+        const ecRow = d.imm & 0x1F;
+        const ecMethodIdx = (d.imm >>> 5) & 0x7F;
         const ecAbsAddr = (srcLoc + ecRow) >>> 0;
         const ecClistRange = { base: srcLoc, upperBound: (srcLoc + ecClistSize - 1) >>> 0 };
         const loadCheck = this.mLoad(clistGT, d.crSrc === 6 ? null : 'L', d.crSrc, ecAbsAddr, ecClistRange);

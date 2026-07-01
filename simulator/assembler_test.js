@@ -1031,8 +1031,8 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
     assert('EL1 imm = 0x0003 (row=3, method=0)', imm === 0x0003, 'got 0x' + imm.toString(16));
 }
 
-// EL2: Method-named form — Multiply (index 0) → 1-based bits[14:8] = 1.
-//      ELOADCALL CR0, SlideRule, Multiply  →  imm = (1<<8)|3 = 0x0103
+// EL2: Method-named form — Multiply (index 0) → 1-based stored as 1.
+//      R-type split: imm = (1<<5)|3 = 0x0023  (method=1 in bits[11:5], row=3 in bits[4:0])
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace(NS_SYMBOLS);
@@ -1041,12 +1041,12 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
     const imm  = word & 0x7FFF;
     assert('EL2 ELOADCALL CR0, SlideRule, Multiply: no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
-    assert('EL2 imm = 0x0103 (method Multiply=0→1-based 1, row=3)',
-        imm === 0x0103, 'got 0x' + imm.toString(16));
+    assert('EL2 imm = 0x0023 (method Multiply=0→1-based 1 in bits[11:5], row=3 in bits[4:0])',
+        imm === 0x0023, 'got 0x' + imm.toString(16));
 }
 
-// EL3: Method-named form — Divide (index 1) → 1-based bits[14:8] = 2.
-//      ELOADCALL CR0, SlideRule, Divide  →  imm = (2<<8)|3 = 0x0203
+// EL3: Method-named form — Divide (index 1) → 1-based stored as 2.
+//      R-type split: imm = (2<<5)|3 = 0x0043  (method=2 in bits[11:5], row=3 in bits[4:0])
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace(NS_SYMBOLS);
@@ -1055,12 +1055,12 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
     const imm  = word & 0x7FFF;
     assert('EL3 ELOADCALL CR0, SlideRule, Divide: no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
-    assert('EL3 imm = 0x0203 (method Divide=1→1-based 2, row=3)',
-        imm === 0x0203, 'got 0x' + imm.toString(16));
+    assert('EL3 imm = 0x0043 (method Divide=1→1-based 2 in bits[11:5], row=3 in bits[4:0])',
+        imm === 0x0043, 'got 0x' + imm.toString(16));
 }
 
-// EL4: Numeric 0-based index form — index 0 → 1-based bits[14:8] = 1.
-//      ELOADCALL CR0, SlideRule, 0  →  imm = (1<<8)|3 = 0x0103
+// EL4: Numeric 0-based index form — index 0 → 1-based stored as 1.
+//      R-type split: imm = (1<<5)|3 = 0x0023  (method=1 in bits[11:5], row=3 in bits[4:0])
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace(NS_SYMBOLS);
@@ -1069,8 +1069,8 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
     const imm  = word & 0x7FFF;
     assert('EL4 ELOADCALL CR0, SlideRule, 0 (numeric): no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
-    assert('EL4 imm = 0x0103 (numeric 0-based 0 → 1-based 1, row=3)',
-        imm === 0x0103, 'got 0x' + imm.toString(16));
+    assert('EL4 imm = 0x0023 (numeric 0-based 0 → 1-based 1 in bits[11:5], row=3 in bits[4:0])',
+        imm === 0x0023, 'got 0x' + imm.toString(16));
 }
 
 // EL5: Explicit CRsrc form without method — ELOADCALL CR0, CR11, #5
@@ -1091,7 +1091,7 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
 
 // EL6: Explicit CRsrc form with numeric method index.
 //      ELOADCALL CR0, CR11, #5, 2  →  method 0-based 2 → 1-based 3
-//      crDst=0, crSrc=11, imm = (3<<8)|5 = 0x0305
+//      R-type split: imm = (3<<5)|5 = 0x0065  (method=3 in bits[11:5], row=5 in bits[4:0])
 {
     const a = new ChurchAssembler(CONVENTIONS);
     const r = a.assemble('ELOADCALL CR0, CR11, #5, 2');
@@ -1101,8 +1101,8 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
     assert('EL6 ELOADCALL CR0, CR11, #5, 2 (explicit with method): no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('EL6 crSrc = 11', crSrc === 11, 'got ' + crSrc);
-    assert('EL6 imm = 0x0305 (method 2→1-based 3 in bits[14:8], row=5)',
-        imm === 0x0305, 'got 0x' + imm.toString(16));
+    assert('EL6 imm = 0x0065 (method 2→1-based 3 in bits[11:5], row=5 in bits[4:0])',
+        imm === 0x0065, 'got 0x' + imm.toString(16));
 }
 
 // EL7: Unknown method name produces a targeted error listing known methods.
@@ -1147,9 +1147,10 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
         !/, \d+$/.test(dis.trim()), 'got: ' + dis);
 }
 
-// EL10: Disassembler output — with method index → appends 0-based index.
-//       Assemble ELOADCALL CR0, SlideRule, Multiply (imm=0x0103) then disassemble.
-//       Expected suffix: ", 0"  (Multiply is index 0, 1-based stored as 1 → display as 0)
+// EL10: Round-trip test — assemble ELOADCALL with non-zero method, verify encoded fields,
+//       then disassemble and confirm the method index survives intact.
+//       ELOADCALL CR0, SlideRule, Multiply: R-type imm = (1<<5)|3 = 0x0023.
+//       Decoded: row = 0x0023 & 0x1F = 3, method_1based = (0x0023>>>5)&0x7F = 1 → display as 0.
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace(NS_SYMBOLS);
@@ -1301,33 +1302,28 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
         encodedRow === 31, 'got ' + encodedRow);
 }
 
-// EL20: CALL method-name form with NS slot = 32 → out-of-range error.
+// EL20b: CALL method-name form with NS slot = 32 → out-of-range error.
 //       SlideRule is mapped to slot 32 via nsSymbols (not nsLoaded), so the
 //       CALL handler converts it to ELOADCALL internally using the dot-notation
-//       branch at ~line 1227 of assembler.js.  That branch previously masked
-//       the slot with & 0xFF instead of & 0x1F, silently encoding the wrong
-//       c-list row.  The fix adds a > 31 guard and must fire here.
+//       branch.  That branch adds a > 31 guard and must fire here.
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace({ 'SlideRule': 32 }); // slot 32 exceeds the 5-bit row field
     a.assemble('CALL SlideRule, Multiply');
-    assert('EL20 CALL method-name NS slot=32: produces an error',
+    assert('EL20b CALL method-name NS slot=32: produces an error',
         a.errors.length > 0, 'expected at least one error');
-    assert('EL20 error says "out of range" and shows 32',
+    assert('EL20b error says "out of range" and shows 32',
         a.errors.some(e => e.message.includes('out of range') && e.message.includes('32')),
         a.errors.map(e => e.message).join('; '));
-    assert('EL20 error mentions 5-bit field',
+    assert('EL20b error mentions 5-bit field',
         a.errors.some(e => e.message.includes('5-bit')),
         a.errors.map(e => e.message).join('; '));
 }
 
 // EL21: dot-notation CALL with NS slot = 31 → boundary pass (no error).
 //       SlideRule is mapped to slot 31 via nsSymbols (not nsLoaded), so the
-//       CALL handler converts it to ELOADCALL via the dot-notation branch at
-//       ~line 1226 of assembler.js.  Slot 31 is the maximum valid 5-bit value
-//       and must assemble cleanly with the correct row and method fields encoded.
-//       Complements EL20 (slot=32 error case): a future change that lowers the
-//       threshold to 30 would break this test, catching the regression.
+//       CALL handler converts it to ELOADCALL via the dot-notation branch.
+//       Slot 31 is the maximum valid 5-bit value and must assemble cleanly.
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace({ 'SlideRule': 31 }); // slot 31 = maximum valid 5-bit row
@@ -1336,11 +1332,79 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     const word = result.words[0];
     const encodedRow    = word & 0x1F;
-    const encodedMethod = (word >>> 8) & 0x7F;
+    const encodedMethod = (word >>> 5) & 0x7F;
     assert('EL21 encoded row field is 31',
         encodedRow === 31, 'got ' + encodedRow);
     assert('EL21 encoded method field is 1 (Multiply index 0 → 1-based)',
         encodedMethod === 1, 'got ' + encodedMethod);
+}
+
+// EL-RT: ELOADCALL R-type round-trip — assemble → simulator decode → extract fields.
+//   Confirms that the R-type imm split (bits[4:0]=row 5-bit, bits[11:5]=method 7-bit)
+//   survives the full encode→decode cycle using ChurchSimulator.decodeInstruction().
+//   Encoding: imm = (method_1based << 5) | row
+//   Decoding: row = imm & 0x1F; method_1based = (imm >>> 5) & 0x7F
+{
+    const ChurchSimulator = require('./simulator.js');
+    const sim = new ChurchSimulator();
+
+    // Variant A: ELOADCALL CR0, SlideRule — no method → method=0, row=3
+    {
+        const a = new ChurchAssembler(CONVENTIONS);
+        a.setNamespace(NS_SYMBOLS);
+        const r = a.assemble('ELOADCALL CR0, SlideRule');
+        assert('EL-RT-A assemble OK', a.errors.length === 0, a.errors.map(e=>e.message).join('; '));
+        const d = sim.decodeInstruction(r.words[0]);
+        assert('EL-RT-A opcode=8 (ELOADCALL)', d.opcode === 8, `got ${d.opcode}`);
+        const rtRow    = d.imm & 0x1F;
+        const rtMethod = (d.imm >>> 5) & 0x7F;
+        assert('EL-RT-A row=3 (SlideRule NS slot)', rtRow === 3, `got row=${rtRow}`);
+        assert('EL-RT-A method=0 (no method operand)', rtMethod === 0, `got method=${rtMethod}`);
+    }
+
+    // Variant B: ELOADCALL CR0, SlideRule, Divide — Divide index 1 → method_1based=2, row=3
+    {
+        const a = new ChurchAssembler(CONVENTIONS);
+        a.setNamespace(NS_SYMBOLS);
+        const r = a.assemble('ELOADCALL CR0, SlideRule, Divide');
+        assert('EL-RT-B assemble OK', a.errors.length === 0, a.errors.map(e=>e.message).join('; '));
+        const d = sim.decodeInstruction(r.words[0]);
+        const rtRow    = d.imm & 0x1F;
+        const rtMethod = (d.imm >>> 5) & 0x7F;
+        assert('EL-RT-B row=3 (SlideRule NS slot)', rtRow === 3, `got row=${rtRow}`);
+        assert('EL-RT-B method=2 (Divide index 1, 1-based)', rtMethod === 2, `got method=${rtMethod}`);
+        // Confirm full imm value matches R-type formula: (2<<5)|3 = 0x0043
+        assert('EL-RT-B imm=(2<<5)|3=0x0043', d.imm === 0x0043, `got imm=0x${d.imm.toString(16)}`);
+    }
+
+    // Variant C: ELOADCALL CR0, SlideRule, Sqrt — Sqrt index 2 → method_1based=3, row=3
+    {
+        const a = new ChurchAssembler(CONVENTIONS);
+        a.setNamespace(NS_SYMBOLS);
+        const r = a.assemble('ELOADCALL CR0, SlideRule, Sqrt');
+        assert('EL-RT-C assemble OK', a.errors.length === 0, a.errors.map(e=>e.message).join('; '));
+        const d = sim.decodeInstruction(r.words[0]);
+        const rtRow    = d.imm & 0x1F;
+        const rtMethod = (d.imm >>> 5) & 0x7F;
+        assert('EL-RT-C row=3 (SlideRule NS slot)', rtRow === 3, `got row=${rtRow}`);
+        assert('EL-RT-C method=3 (Sqrt index 2, 1-based)', rtMethod === 3, `got method=${rtMethod}`);
+        // Confirm full imm value: (3<<5)|3 = 0x0063
+        assert('EL-RT-C imm=(3<<5)|3=0x0063', d.imm === 0x0063, `got imm=0x${d.imm.toString(16)}`);
+    }
+
+    // Variant D: high method index — explicit form ELOADCALL CR0, CR11, #7, 15 → method_1based=16, row=7
+    {
+        const a = new ChurchAssembler(CONVENTIONS);
+        const r = a.assemble('ELOADCALL CR0, CR11, #7, 15');
+        assert('EL-RT-D assemble OK', a.errors.length === 0, a.errors.map(e=>e.message).join('; '));
+        const d = sim.decodeInstruction(r.words[0]);
+        const rtRow    = d.imm & 0x1F;
+        const rtMethod = (d.imm >>> 5) & 0x7F;
+        assert('EL-RT-D row=7', rtRow === 7, `got row=${rtRow}`);
+        assert('EL-RT-D method=16 (0-based 15, 1-based)', rtMethod === 16, `got method=${rtMethod}`);
+        // Confirm full imm value: (16<<5)|7 = 0x0207
+        assert('EL-RT-D imm=(16<<5)|7=0x0207', d.imm === 0x0207, `got imm=0x${d.imm.toString(16)}`);
+    }
 }
 
 // ── SHR / ASR encoding and disassembly ───────────────────────────────────────
@@ -1660,7 +1724,7 @@ function findSHR(words) {
 
 // CC11: CALL Abstraction.Method(args) — uppercase keyword form compiles to ELOADCALL.
 //   Scheduler.pause(10): Scheduler is at c-list offset 0; pause is index 4 → selector 5.
-//   Expected ELOADCALL imm = (5 << 8) | 0 = 0x0500.
+//   R-type split: ELOADCALL imm = (5 << 5) | 0 = 0x00A0.
 {
     const cc = new CLOOMCCompiler();
     cc.methodConventions['SCHEDULER'] = {
@@ -1684,8 +1748,8 @@ function findSHR(words) {
         eloadWord !== undefined, 'no ELOADCALL found in ' + JSON.stringify(words));
     if (eloadWord !== undefined) {
         const imm = eloadWord & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('CC11 CALL Scheduler.pause(10) — row=0 (Scheduler at cap offset 0)',
             row === 0, `got row=${row}`);
         assert('CC11 CALL Scheduler.pause(10) — method=5 (pause index 4, 1-based)',
@@ -1714,6 +1778,7 @@ function findSHR(words) {
 
 // CC13: Abstraction.Method(args) — bare dot-notation (implied CALL) compiles to ELOADCALL.
 //   Scheduler.pause(10): Scheduler is at c-list offset 0; pause is index 4 → selector 5.
+//   R-type split: imm = (5<<5)|0 = 0x00A0.
 {
     const cc = new CLOOMCCompiler();
     cc.methodConventions['SCHEDULER'] = {
@@ -1738,9 +1803,9 @@ function findSHR(words) {
     if (eloadWord !== undefined) {
         const imm = eloadWord & 0x7FFF;
         assert('CC13 bare dot-notation — row=0 (Scheduler at cap offset 0)',
-            (imm & 0xFF) === 0, `got row=${imm & 0xFF}`);
+            (imm & 0x1F) === 0, `got row=${imm & 0x1F}`);
         assert('CC13 bare dot-notation — method=5 (pause index 4, 1-based)',
-            ((imm >>> 8) & 0x7F) === 5, `got method=${(imm >>> 8) & 0x7F}`);
+            ((imm >>> 5) & 0x7F) === 5, `got method=${(imm >>> 5) & 0x7F}`);
     }
 }
 
@@ -3237,17 +3302,16 @@ HALT`;
     // CD6–CD10: word[10] = ELOADCALL CR8, Constants, Pi  (Style B)
     // At this point nsLoaded['Constants']=11 from the earlier LOAD, so
     // _resolveNSName('Constants') returns 11 (CR number) — not the NS slot 18.
-    // imm[7:0]  = 11  (c-list row = nsLoaded value for Constants)
-    // imm[14:8] =  1  (Pi index 0, stored 1-based)
-    // full imm  = (1<<8)|11 = 0x010B = 267
+    // R-type split: imm[4:0] = 11 (c-list row); imm[11:5] = 1 (Pi index 0, stored 1-based)
+    // full imm  = (1<<5)|11 = 0x002B = 43
     {
         const w      = result.words[10] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const crDst  = (w >>> 19) & 0xF;
         const crSrc  = (w >>> 15) & 0xF;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('CD6 ELOADCALL CR8, Constants, Pi — opcode=8 (ELOADCALL)',
             opcode === 8, `got opcode=${opcode}`);
         assert('CD7 ELOADCALL CR8, Constants, Pi — crDst=8',
@@ -3317,14 +3381,14 @@ HALT`;
     }
 
     // CD23–CD25: word[11] = ELOADCALL CR8, Constants, E  (index 1, stored 1-based → method=2)
-    // imm[7:0]=11 (nsLoaded[Constants]), imm[14:8]=2  →  full imm=(2<<8)|11=0x020B=523
+    // R-type split: imm[4:0]=11 (nsLoaded[Constants]), imm[11:5]=2  →  full imm=(2<<5)|11=0x004B=75
     {
         const w      = result.words[11] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const crDst  = (w >>> 19) & 0xF;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('CD23 ELOADCALL CR8, Constants, E — opcode=8 (ELOADCALL)',
             opcode === 8, `got opcode=${opcode}`);
         assert('CD24 ELOADCALL CR8, Constants, E — c-list row=11 (nsLoaded[Constants]=11)',
@@ -3334,14 +3398,14 @@ HALT`;
     }
 
     // CD26–CD28: word[14] = ELOADCALL CR8, Constants, One  (index 4, stored 1-based → method=5)
-    // imm[7:0]=11 (nsLoaded[Constants]), imm[14:8]=5  →  full imm=(5<<8)|11=0x050B=1291
+    // R-type split: imm[4:0]=11 (nsLoaded[Constants]), imm[11:5]=5  →  full imm=(5<<5)|11=0x00AB=171
     {
         const w      = result.words[14] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const crDst  = (w >>> 19) & 0xF;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('CD26 ELOADCALL CR8, Constants, One — opcode=8 (ELOADCALL)',
             opcode === 8, `got opcode=${opcode}`);
         assert('CD27 ELOADCALL CR8, Constants, One — c-list row=11 (nsLoaded[Constants]=11)',
@@ -3351,14 +3415,14 @@ HALT`;
     }
 
     // CD29–CD31: word[12] = ELOADCALL CR8, Constants, Phi  (index 2, stored 1-based → method=3)
-    // imm[7:0]=11 (nsLoaded[Constants]), imm[14:8]=3  →  full imm=(3<<8)|11=0x030B=779
+    // R-type split: imm[4:0]=11 (nsLoaded[Constants]), imm[11:5]=3  →  full imm=(3<<5)|11=0x006B=107
     {
         const w      = result.words[12] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const crDst  = (w >>> 19) & 0xF;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('CD29 ELOADCALL CR8, Constants, Phi — opcode=8 (ELOADCALL)',
             opcode === 8, `got opcode=${opcode}`);
         assert('CD30 ELOADCALL CR8, Constants, Phi — c-list row=11 (nsLoaded[Constants]=11)',
@@ -3368,14 +3432,14 @@ HALT`;
     }
 
     // CD32–CD34: word[13] = ELOADCALL CR8, Constants, Zero  (index 3, stored 1-based → method=4)
-    // imm[7:0]=11 (nsLoaded[Constants]), imm[14:8]=4  →  full imm=(4<<8)|11=0x040B=1035
+    // R-type split: imm[4:0]=11 (nsLoaded[Constants]), imm[11:5]=4  →  full imm=(4<<5)|11=0x008B=139
     {
         const w      = result.words[13] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const crDst  = (w >>> 19) & 0xF;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('CD32 ELOADCALL CR8, Constants, Zero — opcode=8 (ELOADCALL)',
             opcode === 8, `got opcode=${opcode}`);
         assert('CD33 ELOADCALL CR8, Constants, Zero — c-list row=11 (nsLoaded[Constants]=11)',
@@ -3494,8 +3558,8 @@ HALT`;
 //   LOAD CR2, Mum      — opcode=0, cond=14, crDst=2, crSrc=6, imm=5
 //     word = (0<<27)|(14<<23)|(2<<19)|(6<<15)|5 = 0x07130005
 //   ELOADCALL CR0, Tunnel, Connect — Connect index=5 stored 1-based=6; Tunnel slot=3
-//     imm = (6<<8)|3 = 0x0603;  opcode=8, cond=14, crDst=0, crSrc=6
-//     word = (8<<27)|(14<<23)|(0<<19)|(6<<15)|0x0603 = 0x47030603
+//     R-type split: imm = (6<<5)|3 = 0x00C3=195;  opcode=8, cond=14, crDst=0, crSrc=6
+//     word = (8<<27)|(14<<23)|(0<<19)|(6<<15)|0x00C3 = 0x470300C3
 
 const TUNNEL_CONVENTIONS_BC = {
     'Tunnel': {
@@ -3540,8 +3604,8 @@ const TUNNEL_NS_BC = { 'Tunnel': 3, 'Mum': 5 };
         const crDst  = (w >>> 19) & 0xF;
         const crSrc  = (w >>> 15) & 0xF;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC7 Tunnel.Connect(Mum) word[1] ELOADCALL — opcode=8',
             opcode === 8, `got opcode=${opcode}`);
         assert('BC8 Tunnel.Connect(Mum) word[1] ELOADCALL — crDst=0 (scratch CR0)',
@@ -3608,7 +3672,7 @@ const TUNNEL_NS_BC = { 'Tunnel': 3, 'Mum': 5 };
 // NS slots match hw_binary.js / repl.js boot table:
 //   Scheduler=8, DijkstraFlag=10, Button=13, Timer=14, flag_GT=10 (alias for DijkstraFlag)
 //
-// ELOADCALL imm encoding: imm = ((index+1) << 8) | ns_slot   (index is 0-based)
+// ELOADCALL imm encoding: imm = ((index+1) << 5) | ns_slot   (R-type split: row 5-bit, method 7-bit)
 
 const SCHED_CONVENTIONS_BC = {
     'Scheduler': {
@@ -3647,8 +3711,8 @@ const SCHED_NS_BC = {
     // Encoding:
     //   LOAD CR2, flag_GT  — opcode=0, cond=14, crDst=2, crSrc=6, imm=10 (flag_GT slot)
     //     word = (0<<27)|(14<<23)|(2<<19)|(6<<15)|10 = 0x0713000A
-    //   ELOADCALL — Wait index=2 → 1-based=3; Scheduler slot=8; imm=(3<<8)|8=0x0308
-    //     word = (8<<27)|(14<<23)|(0<<19)|(6<<15)|0x0308 = 0x47030308
+    //   ELOADCALL — Wait index=2 → 1-based=3; Scheduler slot=8; R-type: imm=(3<<5)|8=0x0068=104
+    //     word = (8<<27)|(14<<23)|(0<<19)|(6<<15)|0x0068 = 0x47030068
     const a = new ChurchAssembler(SCHED_CONVENTIONS_BC);
     a.setNamespace(SCHED_NS_BC);
     const result = a.assemble('Scheduler.Wait(flag_GT)\nHALT');
@@ -3672,8 +3736,8 @@ const SCHED_NS_BC = {
         const w      = result.words[1] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC23 Scheduler.Wait(flag_GT) word[1] ELOADCALL — opcode=8',
             opcode === 8, `got opcode=${opcode}`);
         assert('BC24 Scheduler.Wait(flag_GT) word[1] ELOADCALL — row=8 (Scheduler NS slot)',
@@ -3686,7 +3750,7 @@ const SCHED_NS_BC = {
 {
     // BC26–BC29: Scheduler.Yield() — no args → ELOADCALL only (no LOAD)
     //
-    //   ELOADCALL — Yield index=0 → 1-based=1; Scheduler slot=8; imm=(1<<8)|8=0x0108
+    //   ELOADCALL — Yield index=0 → 1-based=1; Scheduler slot=8; R-type: imm=(1<<5)|8=0x0028=40
     const a = new ChurchAssembler(SCHED_CONVENTIONS_BC);
     a.setNamespace(SCHED_NS_BC);
     const result = a.assemble('Scheduler.Yield()\nHALT');
@@ -3700,8 +3764,8 @@ const SCHED_NS_BC = {
         const w      = result.words[0] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC28 Scheduler.Yield() word[0] ELOADCALL — opcode=8',
             opcode === 8, `got opcode=${opcode}`);
         assert('BC29 Scheduler.Yield() word[0] ELOADCALL — method=1 (Yield index 0, 1-based)',
@@ -3712,7 +3776,7 @@ const SCHED_NS_BC = {
 {
     // BC30–BC34: DijkstraFlag.Signal() — no args → ELOADCALL only
     //
-    //   ELOADCALL — Signal index=1 → 1-based=2; DijkstraFlag slot=10; imm=(2<<8)|10=0x020A
+    //   ELOADCALL — Signal index=1 → 1-based=2; DijkstraFlag slot=10; R-type: imm=(2<<5)|10=0x004A=74
     const a = new ChurchAssembler(SCHED_CONVENTIONS_BC);
     a.setNamespace(SCHED_NS_BC);
     const result = a.assemble('DijkstraFlag.Signal()\nHALT');
@@ -3726,8 +3790,8 @@ const SCHED_NS_BC = {
         const w      = result.words[0] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC32 DijkstraFlag.Signal() word[0] ELOADCALL — opcode=8',
             opcode === 8, `got opcode=${opcode}`);
         assert('BC33 DijkstraFlag.Signal() word[0] ELOADCALL — row=10 (DijkstraFlag NS slot)',
@@ -3740,7 +3804,7 @@ const SCHED_NS_BC = {
 {
     // BC35–BC39: Button.Read() — no args → ELOADCALL only
     //
-    //   ELOADCALL — Read index=0 → 1-based=1; Button slot=13; imm=(1<<8)|13=0x010D
+    //   ELOADCALL — Read index=0 → 1-based=1; Button slot=13; R-type: imm=(1<<5)|13=0x002D=45
     const a = new ChurchAssembler(SCHED_CONVENTIONS_BC);
     a.setNamespace(SCHED_NS_BC);
     const result = a.assemble('Button.Read()\nHALT');
@@ -3754,8 +3818,8 @@ const SCHED_NS_BC = {
         const w      = result.words[0] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC37 Button.Read() word[0] ELOADCALL — opcode=8',
             opcode === 8, `got opcode=${opcode}`);
         assert('BC38 Button.Read() word[0] ELOADCALL — row=13 (Button NS slot)',
@@ -3836,8 +3900,8 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
         const w = r.words[0] >>> 0;
         assert('BC43 Stack.Push() word[0] opcode=8 (ELOADCALL)',
             ((w >>> 27) & 0x1F) === 8, `got opcode=${(w >>> 27) & 0x1F}`);
-        const row    = w & 0xFF;
-        const method = (w >>> 8) & 0x7F;
+        const row    = w & 0x1F;
+        const method = (w >>> 5) & 0x7F;
         assert('BC43 Stack.Push() ELOADCALL row=9 (Stack NS slot)',
             row === 9, `got row=${row}`);
         assert('BC43 Stack.Push() ELOADCALL method=1 (Push index 0, 1-based)',
@@ -3855,7 +3919,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
         r.words.length === 2, `got ${r.words.length}`);
     {
         const w = r.words[0] >>> 0;
-        const method = (w >>> 8) & 0x7F;
+        const method = (w >>> 5) & 0x7F;
         assert('BC44 Stack.Pop() ELOADCALL method=2 (Pop index 1, 1-based)',
             method === 2, `got method=${method}`);
     }
@@ -3881,7 +3945,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
         r.words.length === 2, `got ${r.words.length}`);
     {
         const w = r.words[0] >>> 0;
-        const method = (w >>> 8) & 0x7F;
+        const method = (w >>> 5) & 0x7F;
         assert('BC46 Stack.Depth() ELOADCALL method=4 (Depth index 3, 1-based)',
             method === 4, `got method=${method}`);
     }
@@ -3898,8 +3962,8 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
         r.words.length === 2, `got ${r.words.length}`);
     {
         const w = r.words[0] >>> 0;
-        const row    = w & 0xFF;
-        const method = (w >>> 8) & 0x7F;
+        const row    = w & 0x1F;
+        const method = (w >>> 5) & 0x7F;
         assert('BC47 UART.Send() ELOADCALL row=11 (UART NS slot)',
             row === 11, `got row=${row}`);
         assert('BC47 UART.Send() ELOADCALL method=1 (Send index 0, 1-based)',
@@ -3927,7 +3991,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
         r.words.length === 2, `got ${r.words.length}`);
     {
         const w = r.words[0] >>> 0;
-        const method = (w >>> 8) & 0x7F;
+        const method = (w >>> 5) & 0x7F;
         assert('BC49 UART.SetBaud() ELOADCALL method=3 (SetBaud index 2, 1-based)',
             method === 3, `got method=${method}`);
     }
@@ -3944,8 +4008,8 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
         r.words.length === 2, `got ${r.words.length}`);
     {
         const w = r.words[0] >>> 0;
-        const row    = w & 0xFF;
-        const method = (w >>> 8) & 0x7F;
+        const row    = w & 0x1F;
+        const method = (w >>> 5) & 0x7F;
         assert('BC50 LED.Set() ELOADCALL row=12 (LED NS slot)',
             row === 12, `got row=${row}`);
         assert('BC50 LED.Set() ELOADCALL method=1 (Set index 0, 1-based)',
@@ -3983,7 +4047,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
         r.words.length === 2, `got ${r.words.length}`);
     {
         const w = r.words[0] >>> 0;
-        const method = (w >>> 8) & 0x7F;
+        const method = (w >>> 5) & 0x7F;
         assert('BC53 LED.State() ELOADCALL method=4 (State index 3, 1-based)',
             method === 4, `got method=${method}`);
     }
@@ -4000,8 +4064,8 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
         r.words.length === 2, `got ${r.words.length}`);
     {
         const w = r.words[0] >>> 0;
-        const row    = w & 0xFF;
-        const method = (w >>> 8) & 0x7F;
+        const row    = w & 0x1F;
+        const method = (w >>> 5) & 0x7F;
         assert('BC54 Display.Write() ELOADCALL row=15 (Display NS slot)',
             row === 15, `got row=${row}`);
         assert('BC54 Display.Write() ELOADCALL method=1 (Write index 0, 1-based)',
@@ -4019,7 +4083,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
         r.words.length === 2, `got ${r.words.length}`);
     {
         const w = r.words[0] >>> 0;
-        const method = (w >>> 8) & 0x7F;
+        const method = (w >>> 5) & 0x7F;
         assert('BC55 Display.Clear() ELOADCALL method=2 (Clear index 1, 1-based)',
             method === 2, `got method=${method}`);
     }
@@ -4035,7 +4099,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
         r.words.length === 2, `got ${r.words.length}`);
     {
         const w = r.words[0] >>> 0;
-        const method = (w >>> 8) & 0x7F;
+        const method = (w >>> 5) & 0x7F;
         assert('BC56 Display.Scroll() ELOADCALL method=3 (Scroll index 2, 1-based)',
             method === 3, `got method=${method}`);
     }
@@ -4090,8 +4154,8 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
         const w1 = r.words[1] >>> 0;
         assert('BC59 Display.Write(char) word[1] is ELOADCALL (opcode=8)',
             ((w1 >>> 27) & 0x1F) === 8, `got opcode=${(w1 >>> 27) & 0x1F}`);
-        const row    = w1 & 0xFF;
-        const method = (w1 >>> 8) & 0x7F;
+        const row    = w1 & 0x1F;
+        const method = (w1 >>> 5) & 0x7F;
         assert('BC59 Display.Write(char) ELOADCALL row=15 (Display NS slot)',
             row === 15, `got row=${row}`);
         assert('BC59 Display.Write(char) ELOADCALL method=1 (Write index 0, 1-based)',
@@ -4111,7 +4175,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
         r.words.length === 3, `got ${r.words.length}`);
     {
         const w1 = r.words[1] >>> 0;
-        const method = (w1 >>> 8) & 0x7F;
+        const method = (w1 >>> 5) & 0x7F;
         assert('BC60 UART.SetBaud(rate) ELOADCALL method=3 (SetBaud index 2, 1-based)',
             method === 3, `got method=${method}`);
     }
@@ -4122,7 +4186,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
 // Conventions mirror _ABSTRACTION_CONVENTIONS entries added for Memory and Mint
 // in app-absdetail.js.  NS slots match repl.js boot table: Mint=6, Memory=7.
 //
-// ELOADCALL imm encoding: imm = ((index+1) << 8) | ns_slot   (index is 0-based)
+// ELOADCALL imm encoding: imm = ((index+1) << 5) | ns_slot   (R-type split: row 5-bit, method 7-bit)
 
 const SMM_CONVENTIONS_BC = {
     'Memory': {
@@ -4171,8 +4235,8 @@ const SMM_NS_BC = {
         const w      = result.words[1] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC66 Memory.Allocate(pool_GT) word[1] ELOADCALL — opcode=8',
             opcode === 8, `got opcode=${opcode}`);
         assert('BC67 Memory.Allocate(pool_GT) word[1] ELOADCALL — row=7 (Memory NS slot)',
@@ -4211,8 +4275,8 @@ const SMM_NS_BC = {
         const w      = result.words[1] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC74 Mint.Encode(mem_GT) word[1] ELOADCALL — opcode=8',
             opcode === 8, `got opcode=${opcode}`);
         assert('BC75 Mint.Encode(mem_GT) word[1] ELOADCALL — row=6 (Mint NS slot)',
@@ -4256,8 +4320,8 @@ const TUNNEL_FULL_NS_BC = { 'Tunnel': 31, 'Mem': 7 };
         const w      = result.words[1] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC63 Tunnel.Connect(Mem) word[1] ELOADCALL — opcode=8',
             opcode === 8, `got opcode=${opcode}`);
         assert('BC63 Tunnel.Connect(Mem) word[1] ELOADCALL — row=31 (Tunnel NS slot)',
@@ -4281,8 +4345,8 @@ const TUNNEL_FULL_NS_BC = { 'Tunnel': 31, 'Mem': 7 };
     {
         const w      = result.words[0] >>> 0;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC65 Tunnel.Send() ELOADCALL — row=31 (Tunnel NS slot)',
             row === 31, `got row=${row}`);
         assert('BC65 Tunnel.Send() ELOADCALL — method=2 (Send index 1, 1-based)',
@@ -4304,8 +4368,8 @@ const TUNNEL_FULL_NS_BC = { 'Tunnel': 31, 'Mem': 7 };
     {
         const w      = result.words[0] >>> 0;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC67 Tunnel.Receive() ELOADCALL — row=31 (Tunnel NS slot)',
             row === 31, `got row=${row}`);
         assert('BC67 Tunnel.Receive() ELOADCALL — method=3 (Receive index 2, 1-based)',
@@ -4327,8 +4391,8 @@ const TUNNEL_FULL_NS_BC = { 'Tunnel': 31, 'Mem': 7 };
     {
         const w      = result.words[0] >>> 0;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC68 Tunnel.Register() ELOADCALL — row=31 (Tunnel NS slot)',
             row === 31, `got row=${row}`);
         assert('BC68 Tunnel.Register() ELOADCALL — method=1 (Register index 0, 1-based)',
@@ -4350,8 +4414,8 @@ const TUNNEL_FULL_NS_BC = { 'Tunnel': 31, 'Mem': 7 };
     {
         const w      = result.words[0] >>> 0;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC69 Tunnel.Fault() ELOADCALL — row=31 (Tunnel NS slot)',
             row === 31, `got row=${row}`);
         assert('BC69 Tunnel.Fault() ELOADCALL — method=4 (Fault index 3, 1-based)',
@@ -4363,7 +4427,7 @@ const TUNNEL_FULL_NS_BC = { 'Tunnel': 31, 'Mem': 7 };
     // BC70–BC72: Tunnel.Fetch() — no args (pre-load DR1/DR2 before call) → ELOADCALL only
     //   Fetch has input 'DR1=slot token, DR2=expected words, CR2=write-GT'; DR args are
     //   pre-loaded by the caller; CR2 is set separately.  Empty bare-call emits ELOADCALL.
-    //   ELOADCALL — Fetch index=4 → 1-based=5; Tunnel slot=31; imm=(5<<8)|31=0x051F
+    //   ELOADCALL — Fetch index=4 → 1-based=5; Tunnel slot=31; R-type: imm=(5<<5)|31=0x00BF=191
     const a = new ChurchAssembler(TUNNEL_FULL_CONVENTIONS_BC);
     a.setNamespace(TUNNEL_FULL_NS_BC);
     const result = a.assemble('Tunnel.Fetch()\nHALT');
@@ -4376,8 +4440,8 @@ const TUNNEL_FULL_NS_BC = { 'Tunnel': 31, 'Mem': 7 };
         const w      = result.words[0] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC72 Tunnel.Fetch() ELOADCALL — opcode=8',
             opcode === 8, `got opcode=${opcode}`);
         assert('BC72 Tunnel.Fetch() ELOADCALL — row=31 (Tunnel NS slot)',
@@ -4691,8 +4755,8 @@ function symCompile(body, caps) {
         const w      = result.words[0] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC77 UART.Send() ELOADCALL — opcode=8',
             opcode === 8, `got opcode=${opcode}`);
         assert('BC77 UART.Send() ELOADCALL — row=11 (UART NS slot)',
@@ -4714,8 +4778,8 @@ function symCompile(body, caps) {
     {
         const w      = result.words[0] >>> 0;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC78 UART.Receive() ELOADCALL — row=11 (UART NS slot)',
             row === 11, `got row=${row}`);
         assert('BC78 UART.Receive() ELOADCALL — method=2 (Receive index 1, 1-based)',
@@ -4736,8 +4800,8 @@ function symCompile(body, caps) {
         const w      = result.words[1] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC79 UART.Send(byte) word[1] ELOADCALL — opcode=8',
             opcode === 8, `got opcode=${opcode}`);
         assert('BC79 UART.Send(byte) word[1] ELOADCALL — row=11 (UART NS slot)',
@@ -4760,8 +4824,8 @@ function symCompile(body, caps) {
         const w      = result.words[0] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC80 LED.Set() ELOADCALL — opcode=8',
             opcode === 8, `got opcode=${opcode}`);
         assert('BC80 LED.Set() ELOADCALL — row=12 (LED NS slot)',
@@ -4783,8 +4847,8 @@ function symCompile(body, caps) {
     {
         const w      = result.words[0] >>> 0;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC81 LED.Toggle() ELOADCALL — row=12 (LED NS slot)',
             row === 12, `got row=${row}`);
         assert('BC81 LED.Toggle() ELOADCALL — method=3 (Toggle index 2, 1-based)',
@@ -4805,8 +4869,8 @@ function symCompile(body, caps) {
         const w      = result.words[0] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC82 Display.Write() ELOADCALL — opcode=8',
             opcode === 8, `got opcode=${opcode}`);
         assert('BC82 Display.Write() ELOADCALL — row=15 (Display NS slot)',
@@ -4828,8 +4892,8 @@ function symCompile(body, caps) {
     {
         const w      = result.words[0] >>> 0;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC83 Display.Clear() ELOADCALL — row=15 (Display NS slot)',
             row === 15, `got row=${row}`);
         assert('BC83 Display.Clear() ELOADCALL — method=2 (Clear index 1, 1-based)',
@@ -4842,8 +4906,8 @@ function symCompile(body, caps) {
 // Scheduler.pause() — no inline args (caller pre-loads DR1=ticks) → ELOADCALL only.
 //
 // Encoding:
-//   ELOADCALL — pause index=4 → 1-based=5; Scheduler slot=8; imm=(5<<8)|8=0x0508
-//     word = (8<<27)|(14<<23)|(0<<19)|(6<<15)|0x0508 = 0x47030508
+//   ELOADCALL — pause index=4 → 1-based=5; Scheduler slot=8; R-type: imm=(5<<5)|8=0x00A8=168
+//     word = (8<<27)|(14<<23)|(0<<19)|(6<<15)|0x00A8 = 0x470300A8
 
 {
     // BC84–BC88: Scheduler.pause() bare-call
@@ -4860,8 +4924,8 @@ function symCompile(body, caps) {
         const w      = result.words[0] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC86 Scheduler.pause() word[0] ELOADCALL — opcode=8',
             opcode === 8, `got opcode=${opcode}`);
         assert('BC87 Scheduler.pause() word[0] ELOADCALL — row=8 (Scheduler NS slot)',
@@ -4888,8 +4952,8 @@ function symCompile(body, caps) {
 {
     // BC90–BC94: CALL Scheduler, pause — namespace-slot bare-call path → ELOADCALL
     //
-    // Encoding: pause index=4 → 1-based=5; Scheduler slot=8; imm=(5<<8)|8=0x0508
-    //   word = (8<<27)|(14<<23)|(0<<19)|(6<<15)|0x0508
+    // Encoding: pause index=4 → 1-based=5; Scheduler slot=8; R-type: imm=(5<<5)|8=0x00A8=168
+    //   word = (8<<27)|(14<<23)|(0<<19)|(6<<15)|0x00A8
     const a = new ChurchAssembler(SCHED_CONVENTIONS_BC);
     a.setNamespace(SCHED_NS_BC);
     const result = a.assemble('CALL Scheduler, pause\nHALT');
@@ -4903,8 +4967,8 @@ function symCompile(body, caps) {
         const w      = result.words[0] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
         const imm    = w & 0x7FFF;
-        const row    = imm & 0xFF;
-        const method = (imm >>> 8) & 0x7F;
+        const row    = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
         assert('BC92 CALL Scheduler, pause word[0] — opcode=8 (ELOADCALL, not CALL)',
             opcode === 8, `got opcode=${opcode}`);
         assert('BC93 CALL Scheduler, pause word[0] — row=8 (Scheduler NS slot)',
@@ -5076,8 +5140,8 @@ const SALVATION_NS_BC = { 'Salvation': 4 };
     {
         const w      = r.words[0] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
-        const row    = w & 0xFF;
-        const method = (w >>> 8) & 0x7F;
+        const row    = w & 0x1F;
+        const method = (w >>> 5) & 0x7F;
         assert('BC102 ELOADCALL CR0, Salvation, main — opcode=8 (ELOADCALL)',
             opcode === 8, `got opcode=${opcode}`);
         assert('BC102 ELOADCALL CR0, Salvation, main — row=4 (Salvation NS slot)',
@@ -5139,8 +5203,8 @@ const NAVANA_NS_BC = { 'Navana': 5 };
     {
         const w      = r.words[0] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
-        const row    = w & 0xFF;
-        const method = (w >>> 8) & 0x7F;
+        const row    = w & 0x1F;
+        const method = (w >>> 5) & 0x7F;
         assert('BC104 ELOADCALL CR0, Navana, main — opcode=8 (ELOADCALL)',
             opcode === 8, `got opcode=${opcode}`);
         assert('BC104 ELOADCALL CR0, Navana, main — row=5 (Navana NS slot)',
@@ -5193,8 +5257,8 @@ const MINT_NS_BC = { 'Mint': 6 };
     {
         const w      = r.words[0] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
-        const row    = w & 0xFF;
-        const method = (w >>> 8) & 0x7F;
+        const row    = w & 0x1F;
+        const method = (w >>> 5) & 0x7F;
         assert('BC106 ELOADCALL CR0, Mint, main — opcode=8 (ELOADCALL)',
             opcode === 8, `got opcode=${opcode}`);
         assert('BC106 ELOADCALL CR0, Mint, main — row=6 (Mint NS slot)',
@@ -5248,8 +5312,8 @@ const MEMORY_NS_BC = { 'Memory': 7 };
     {
         const w      = r.words[0] >>> 0;
         const opcode = (w >>> 27) & 0x1F;
-        const row    = w & 0xFF;
-        const method = (w >>> 8) & 0x7F;
+        const row    = w & 0x1F;
+        const method = (w >>> 5) & 0x7F;
         assert('BC108 ELOADCALL CR0, Memory, main — opcode=8 (ELOADCALL)',
             opcode === 8, `got opcode=${opcode}`);
         assert('BC108 ELOADCALL CR0, Memory, main — row=7 (Memory NS slot)',
@@ -6567,10 +6631,10 @@ HALT
         `got ${eloadWords.length} ELOADCALL word(s)`);
 
     // Verify each ELOADCALL targets C-list row 0 (DijkstraFlag is the sole capability, 0-based)
-    const allRow0 = eloadWords.every(w => (w & 0xFF) === 0);
+    const allRow0 = eloadWords.every(w => (w & 0x1F) === 0);
     assert('EX-JDF-RUN-C5: all 6 ELOADCALL words target C-list row 0 (DijkstraFlag)',
         allRow0,
-        `rows: ${eloadWords.map(w => w & 0xFF).join(', ')}`);
+        `rows: ${eloadWords.map(w => w & 0x1F).join(', ')}`);
 
     // ── Phase B: DijkstraFlag binding trace ──────────────────────────────────
     // Create a minimal sim wired to SystemAbstractions (DijkstraFlag at slot 10).
@@ -6696,7 +6760,7 @@ abstraction VlcTest {
             `got ${eloadWords.length} ELOADCALL word(s)`);
 
         if (eloadWords.length === 1) {
-            const methodIdx = (eloadWords[0] >>> 8) & 0x7F;
+            const methodIdx = (eloadWords[0] >>> 5) & 0x7F;
             assert(`EX-VLC-${kw}: ELOADCALL targets Test (method index 4, 1-based)`,
                 methodIdx === 4,
                 `got methodIdx=${methodIdx}`);
