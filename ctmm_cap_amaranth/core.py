@@ -4,6 +4,7 @@ from amaranth.lib.data import View
 from .types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT, SEALS_LAYOUT
 from hardware.integrity32 import integrity32_amaranth, integrity32
+from hardware.hw_types import IRQ_REASON_LAZY_RESOLVE, SCHEDULER_IRQ_NS_SLOT
 from .registers import CMCapRegisters
 from .decoder import CMCapDecoder
 from .perm_check import CMCapPermCheck
@@ -75,6 +76,22 @@ class CMCapCore(Elaboratable):
 
         self.nia = Signal(32)
         self.flags = Signal(COND_FLAGS_LAYOUT)
+
+        # ELOADCALL lazy-resolve IRQ dispatch outputs.
+        # irq_valid is asserted for one cycle when an ELOADCALL fires after perm check passes.
+        # irq_reason = IRQ_REASON_LAZY_RESOLVE; irq_ns_slot = SCHEDULER_IRQ_NS_SLOT (8).
+        # irq_dr1 = c-list row (5 bits, rs2 field); irq_method_index = funct7 field (7 bits).
+        self.irq_valid        = Signal()
+        self.irq_reason       = Signal(4)
+        self.irq_ns_slot      = Signal(8)
+        self.irq_dr1          = Signal(5)
+        self.irq_method_index = Signal(7)
+
+        # XLOADLAMBDA lambda-body-loader dispatch outputs.
+        # xloadlambda_valid is asserted for one cycle when XLOADLAMBDA fires after perm check.
+        # xloadlambda_index = cap_index (lambda body offset) from the instruction.
+        self.xloadlambda_valid = Signal()
+        self.xloadlambda_index = Signal(12)
 
     def elaborate(self, platform):
         m = Module()
@@ -148,17 +165,32 @@ class CMCapCore(Elaboratable):
             exec_enable & is_church_op & (church_op == ChurchOpcode.LAMBDA)
         )
 
+        # ELOADCALL: E-perm check on CR_CLIST (CR6); fires lazy-resolve IRQ to Scheduler.
+        # XLOADLAMBDA: X-perm check on CR_CLOOMC (CR14); fires lambda-body-loader dispatch.
+        eloadcall_start_sig   = Signal()
+        xloadlambda_start_sig = Signal()
+        m.d.comb += eloadcall_start_sig.eq(
+            exec_enable & is_church_op & (church_op == ChurchOpcode.ELOADCALL)
+        )
+        m.d.comb += xloadlambda_start_sig.eq(
+            exec_enable & is_church_op & (church_op == ChurchOpcode.XLOADLAMBDA)
+        )
+
         tperm_start_sig = Signal()
         call_start_sig = Signal()
         ret_start_sig = Signal()
 
+        # cr_rd_addr mux: ELOADCALL always checks CR_CLIST; XLOADLAMBDA always checks
+        # CR_CLOOMC, regardless of what cr_src the instruction encodes.
         m.d.comb += u_regs.cr_rd_addr.eq(
             Mux(lambda_start_sig | u_lambda.lambda_busy, u_lambda.cr_rd_addr,
                 Mux(u_tperm.tperm_busy, u_tperm.cr_rd_addr,
                     Mux(u_call.call_busy, u_call.cr_rd_addr,
                         Mux(u_return.busy, u_return.cr_rd_addr,
                             Mux(u_save.save_busy, u_save.cr_rd_addr,
-                                cr_src)))))
+                                Mux(eloadcall_start_sig, CR_CLIST,
+                                    Mux(xloadlambda_start_sig, CR_CLOOMC,
+                                        cr_src)))))))
         )
 
         perm_gt_sig = Signal(GT_LAYOUT)
@@ -182,6 +214,14 @@ class CMCapCore(Elaboratable):
             with m.Case(ChurchOpcode.CHANGE):
                 m.d.comb += required_perms.eq(PERM_MASK_L)
             with m.Case(ChurchOpcode.LAMBDA):
+                m.d.comb += required_perms.eq(PERM_MASK_X)
+            with m.Case(ChurchOpcode.ELOADCALL):
+                # E-perm on CR_CLIST (CR6): authority to execute an entry in the c-list.
+                # cr_rd_addr mux routes to CR_CLIST for this opcode.
+                m.d.comb += required_perms.eq(PERM_MASK_E)
+            with m.Case(ChurchOpcode.XLOADLAMBDA):
+                # X-perm on CR_CLOOMC (CR14): authority to load and jump to a lambda body.
+                # cr_rd_addr mux routes to CR_CLOOMC for this opcode.
                 m.d.comb += required_perms.eq(PERM_MASK_X)
             with m.Default():
                 m.d.comb += required_perms.eq(0)
@@ -652,6 +692,39 @@ class CMCapCore(Elaboratable):
             u_save.cr_rd_data.eq(u_regs.cr_rd_data),
             u_save.cr15_namespace.eq(u_regs.cr15_namespace),
             u_save.mem_wr_done.eq(1),
+        ]
+
+        # -----------------------------------------------------------------------
+        # ELOADCALL dispatch — lazy-resolve IRQ to Scheduler (NS slot SCHEDULER_IRQ_NS_SLOT).
+        # Fires for one cycle whenever ELOADCALL passes the E-perm check on CR_CLIST.
+        # DR0 = IRQ_REASON_LAZY_RESOLVE; DR1 = c-list row; method_index is advisory.
+        # -----------------------------------------------------------------------
+        eloadcall_fire = Signal()
+        m.d.comb += eloadcall_fire.eq(
+            exec_enable & is_church_op & (church_op == ChurchOpcode.ELOADCALL) & all_checks_pass
+        )
+
+        m.d.comb += [
+            self.irq_valid.eq(eloadcall_fire),
+            self.irq_reason.eq(IRQ_REASON_LAZY_RESOLVE),
+            self.irq_ns_slot.eq(SCHEDULER_IRQ_NS_SLOT),
+            self.irq_dr1.eq(u_decoder.eloadcall_row),
+            self.irq_method_index.eq(u_decoder.eloadcall_method_index),
+        ]
+
+        # -----------------------------------------------------------------------
+        # XLOADLAMBDA dispatch — lambda body loader.
+        # Fires for one cycle whenever XLOADLAMBDA passes the X-perm check on CR_CLOOMC.
+        # xloadlambda_index carries the lambda body offset from the instruction cap_index field.
+        # -----------------------------------------------------------------------
+        xloadlambda_fire = Signal()
+        m.d.comb += xloadlambda_fire.eq(
+            exec_enable & is_church_op & (church_op == ChurchOpcode.XLOADLAMBDA) & all_checks_pass
+        )
+
+        m.d.comb += [
+            self.xloadlambda_valid.eq(xloadlambda_fire),
+            self.xloadlambda_index.eq(u_decoder.cap_index),
         ]
 
         # -----------------------------------------------------------------------

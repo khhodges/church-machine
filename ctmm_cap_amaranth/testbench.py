@@ -1634,9 +1634,147 @@ def test_decoder_eloadcall_xloadlambda():
     print("PASS: test_decoder_eloadcall_xloadlambda")
 
 
+def test_core_eloadcall_xloadlambda_irq():
+    """End-to-end test: ELOADCALL fires lazy-resolve IRQ; XLOADLAMBDA fires lambda loader.
+
+    Uses a full CMCapCore with async testbench (not just the decoder in isolation).
+
+    ELOADCALL
+    ---------
+    After boot the LOAD_NUC boot state writes CR6 (c-list) with E-perm (dom=1, perm=0b100).
+    An ELOADCALL instruction with row=EL_ROW and method_index=EL_METHOD_INDEX passes the
+    E-perm check on CR_CLIST and fires for one cycle:
+      irq_valid=1, irq_reason=IRQ_REASON_LAZY_RESOLVE,
+      irq_ns_slot=SCHEDULER_IRQ_NS_SLOT, irq_dr1=EL_ROW, irq_method_index=EL_METHOD_INDEX.
+    When imem_valid is deasserted the IRQ outputs de-assert immediately (combinatorial).
+
+    XLOADLAMBDA
+    -----------
+    CR14 (CR_CLOOMC, code register) is pre-loaded with X-perm (dom=0, perm=0b100) via the
+    debug write port.  A XLOADLAMBDA instruction with cap_index=XL_IMM12 passes the X-perm
+    check on CR_CLOOMC and fires for one cycle:
+      xloadlambda_valid=1, xloadlambda_index=XL_IMM12.
+    """
+    from hardware.hw_types import IRQ_REASON_LAZY_RESOLVE, SCHEDULER_IRQ_NS_SLOT
+
+    dut = CMCapCore()
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+
+    EL_ROW          = 0x07   # 5-bit c-list row  → rs2   field instr[24:20]
+    EL_METHOD_INDEX = 0x3    # 7-bit method index → funct7 field instr[31:25]
+    # ELOADCALL is R-type: funct7[6:0] | rs2[4:0] | rs1 | funct3 | rd | opcode
+    # encode_church places `index & 0xFFF` at bits[31:20]:
+    #   index[4:0]  → instr[24:20] = row          (5 bits, rs2)
+    #   index[11:5] → instr[31:25] = method_index (7 bits, funct7)
+    EL_IMM12        = (EL_METHOD_INDEX << 5) | EL_ROW   # 0x067
+    eloadcall_instr = encode_church(
+        int(ChurchOpcode.ELOADCALL), cr_dst=0, cr_src=CR_CLIST, index=EL_IMM12
+    )
+
+    XL_IMM12         = 0x1A2
+    xloadlambda_instr = encode_church(
+        int(ChurchOpcode.XLOADLAMBDA), cr_dst=0, cr_src=0, index=XL_IMM12
+    )
+
+    async def testbench(ctx):
+        print("\n=== CMCapCore: ELOADCALL + XLOADLAMBDA IRQ Dispatch (end-to-end) ===")
+
+        ctx.set(dut.boot_start, 1)
+        ctx.set(dut.imem_valid, 0)
+        await ctx.tick()
+        ctx.set(dut.boot_start, 0)
+
+        for _ in range(10):
+            await ctx.tick()
+            if ctx.get(dut.boot_complete):
+                break
+        assert ctx.get(dut.boot_complete) == 1, "Boot did not complete before ELOADCALL test"
+        print("  Boot complete")
+
+        ctx.set(dut.dbg_cap_wr_en,   1)
+        ctx.set(dut.dbg_cap_wr_addr, CR_CLOOMC)
+        ctx.set(dut.dbg_cap_wr_data, {
+            "word0_gt": {
+                "gt_type": GT_TYPE_INFORM, "f_flag": 0, "spare": 0,
+                "dom": 0, "perm": 0b100, "index": 1, "version": 0,
+            },
+            "word1_location": 0x100,
+            "word2_limit":    64,
+            "word3_seals":    0,
+        })
+        await ctx.tick()
+        ctx.set(dut.dbg_cap_wr_en, 0)
+        await ctx.tick()
+
+        ctx.set(dut.imem_data,  eloadcall_instr)
+        ctx.set(dut.imem_valid, 1)
+        await ctx.tick()
+
+        irq_v  = ctx.get(dut.irq_valid)
+        irq_r  = ctx.get(dut.irq_reason)
+        irq_ns = ctx.get(dut.irq_ns_slot)
+        irq_d1 = ctx.get(dut.irq_dr1)
+        irq_mi = ctx.get(dut.irq_method_index)
+
+        ctx.set(dut.imem_valid, 0)
+        await ctx.tick()
+
+        assert irq_v == 1, (
+            f"ELOADCALL: irq_valid should be 1 (E-perm check on CR6 must pass), got {irq_v}")
+        assert irq_r == IRQ_REASON_LAZY_RESOLVE, (
+            f"ELOADCALL: irq_reason={irq_r}, expected IRQ_REASON_LAZY_RESOLVE="
+            f"{IRQ_REASON_LAZY_RESOLVE}")
+        assert irq_ns == SCHEDULER_IRQ_NS_SLOT, (
+            f"ELOADCALL: irq_ns_slot={irq_ns}, expected SCHEDULER_IRQ_NS_SLOT="
+            f"{SCHEDULER_IRQ_NS_SLOT}")
+        assert irq_d1 == EL_ROW, (
+            f"ELOADCALL: irq_dr1={irq_d1:#04x}, expected EL_ROW={EL_ROW:#04x}")
+        assert irq_mi == EL_METHOD_INDEX, (
+            f"ELOADCALL: irq_method_index={irq_mi:#03x}, expected {EL_METHOD_INDEX:#03x}")
+        print(f"  PASS ELOADCALL: irq_valid=1, reason=LAZY_RESOLVE({irq_r}), "
+              f"ns_slot={irq_ns}, dr1={irq_d1:#04x}, method_idx={irq_mi:#03x}")
+
+        irq_v_idle = ctx.get(dut.irq_valid)
+        assert irq_v_idle == 0, (
+            f"ELOADCALL: irq_valid should deassert when imem_valid=0, got {irq_v_idle}")
+        print("  PASS ELOADCALL: irq_valid=0 when not executing")
+
+        ctx.set(dut.imem_data,  xloadlambda_instr)
+        ctx.set(dut.imem_valid, 1)
+        await ctx.tick()
+
+        xl_v   = ctx.get(dut.xloadlambda_valid)
+        xl_idx = ctx.get(dut.xloadlambda_index)
+
+        ctx.set(dut.imem_valid, 0)
+        await ctx.tick()
+
+        assert xl_v == 1, (
+            f"XLOADLAMBDA: xloadlambda_valid should be 1 (X-perm check on CR14 must pass), "
+            f"got {xl_v}")
+        assert xl_idx == XL_IMM12, (
+            f"XLOADLAMBDA: xloadlambda_index={xl_idx:#05x}, expected {XL_IMM12:#05x}")
+        print(f"  PASS XLOADLAMBDA: xloadlambda_valid=1, xloadlambda_index={xl_idx:#05x}")
+
+        xl_v_idle = ctx.get(dut.xloadlambda_valid)
+        assert xl_v_idle == 0, (
+            f"XLOADLAMBDA: xloadlambda_valid should deassert when imem_valid=0, "
+            f"got {xl_v_idle}")
+        print("  PASS XLOADLAMBDA: xloadlambda_valid=0 when not executing")
+
+        print("=== CMCapCore ELOADCALL + XLOADLAMBDA IRQ Tests PASSED ===")
+
+    sim.add_testbench(testbench)
+    with sim.write_vcd("/tmp/core_eloadcall_xloadlambda.vcd"):
+        sim.run()
+    print("PASS: test_core_eloadcall_xloadlambda_irq")
+
+
 if __name__ == "__main__":
     test_msave_happy_path()
     test_mload_direct_mode()
     test_mload_msave_round_trip()
     test_tperm_frame_exact()
     test_decoder_eloadcall_xloadlambda()
+    test_core_eloadcall_xloadlambda_irq()
