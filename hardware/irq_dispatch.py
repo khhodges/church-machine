@@ -21,6 +21,18 @@ class ChurchIRQDispatch(Elaboratable):
       IRQ_REASON_LAZY_LOAD    — CALL pipeline detected cw=0 (CODE_NOT_RESIDENT)
       IRQ_REASON_LAZY_RESOLVE — NULL GT read from c-list slot
 
+    Null-base guard:
+      If FETCH_NS returns ns_base == 0 (Scheduler.IRQ not booted), the unit
+      asserts null_base_fault for one cycle and returns to IDLE without touching
+      NIA.  core.py maps this to FaultType.IRQ_NULL_BASE.
+
+    One-deep pending register:
+      If start arrives while the FSM is busy (not IDLE), the trigger is captured
+      in pend_reason/pend_slot/pend_valid.  When the in-flight dispatch finishes
+      and the FSM returns to IDLE, it immediately begins the pending dispatch
+      without requiring an external re-pulse.  If a third trigger arrives before
+      the pending one is consumed it overwrites the pending entry (last-wins).
+
     The unit contributes to any_unit_busy while active, preventing nested
     injection.  No stack frame is pushed; Scheduler.IRQ manages thread context
     via CHANGE (see Task #1077 transparent-suspension design).
@@ -66,6 +78,11 @@ class ChurchIRQDispatch(Elaboratable):
         ns_base      = Signal(32)
         method_entry = Signal(32)
 
+        # One-deep pending-trigger register.
+        pend_valid  = Signal()
+        pend_reason = Signal(2)
+        pend_slot   = Signal(16)
+
         cr15_view = View(CAP_REG_LAYOUT, self.cr15_namespace)
 
         # Byte address of NS[SCHEDULER_IRQ_NS_SLOT].word0_location.
@@ -84,7 +101,24 @@ class ChurchIRQDispatch(Elaboratable):
 
         with m.FSM(name="irq_dispatch") as fsm:
             with m.State("IDLE"):
-                with m.If(self.start):
+                with m.If(pend_valid):
+                    # Replay the captured pending trigger immediately.
+                    m.d.sync += [
+                        reason_lat.eq(pend_reason),
+                        slot_lat.eq(pend_slot),
+                        pend_valid.eq(0),
+                    ]
+                    with m.If(self.start):
+                        # A new trigger arrived in the same cycle — capture it as
+                        # the replacement pending entry (overrides the .eq(0) above
+                        # because later assignments win in Amaranth sync domain).
+                        m.d.sync += [
+                            pend_reason.eq(self.irq_reason),
+                            pend_slot.eq(self.irq_slot),
+                            pend_valid.eq(1),
+                        ]
+                    m.next = "FETCH_NS"
+                with m.Elif(self.start):
                     m.d.sync += [
                         reason_lat.eq(self.irq_reason),
                         slot_lat.eq(self.irq_slot),
@@ -134,6 +168,17 @@ class ChurchIRQDispatch(Elaboratable):
 
             with m.State("COMPLETE"):
                 m.next = "IDLE"
+
+        # Capture a trigger that arrives while the FSM is busy (non-IDLE).
+        # Later m.d.sync assignments take priority over earlier ones in Amaranth,
+        # so this overrides any same-cycle write from inside the FSM.
+        # When multiple triggers arrive back-to-back, the last one wins (one-deep).
+        with m.If(self.start & ~fsm.ongoing("IDLE")):
+            m.d.sync += [
+                pend_reason.eq(self.irq_reason),
+                pend_slot.eq(self.irq_slot),
+                pend_valid.eq(1),
+            ]
 
         m.d.comb += [
             self.busy.eq(~fsm.ongoing("IDLE")),
