@@ -3,9 +3,19 @@ set -e
 
 echo "Post-merge setup complete (no dependencies to install)"
 
-# Push to GitHub so the mirror never goes stale.
-# Requires GITHUB_PAT secret — see scripts/sync-to-github.sh for details.
-bash scripts/sync-to-github.sh || true
+# Use a file lock so concurrent post-merge runs (rapid back-to-back task
+# merges) queue rather than racing on .git/config.lock — which caused the
+# 90 s timeout when two merges landed simultaneously.
+LOCK_FILE="/tmp/church-post-merge.lock"
+
+(
+    flock -w 80 9 || { echo "post-merge: lock wait timed out — skipping GitHub sync"; exit 0; }
+
+    # Push to GitHub so the mirror never goes stale.
+    # Requires GITHUB_PAT secret — see scripts/sync-to-github.sh for details.
+    bash scripts/sync-to-github.sh || true
+
+) 9>"$LOCK_FILE"
 
 # Record task completion in the cost-tracking table and update task status.
 # TASK_ID and TASK_TITLE are passed safely via environment — no shell injection.
