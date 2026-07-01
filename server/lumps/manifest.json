@@ -1168,7 +1168,7 @@
     {
         "token": "00001f00",
         "abstraction": "Tunnel",
-        "ns_slot": 31,
+        "ns_slot": 22,
         "lump_size": 64,
         "cw": 37,
         "dw": 0,
@@ -1413,7 +1413,7 @@
     {
         "token": "00002000",
         "abstraction": "Keystone",
-        "ns_slot": 32,
+        "ns_slot": 23,
         "lump_size": 64,
         "lump_type": "application_namespace",
         "cw": 22,
@@ -1425,7 +1425,7 @@
         "capabilities": [
             {
                 "slot": 0,
-                "target_ns": 31,
+                "target_ns": 22,
                 "target_token": "00001F00",
                 "name": "Tunnel",
                 "grants": [

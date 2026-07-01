@@ -1,17 +1,16 @@
-"""Round-trip test: NS lump header and c-list encoding (Task #695).
+"""Round-trip test: NS lump header and c-list encoding (Task #695, updated #1918).
 
 Verifies that generate_boot_image() writes:
 
   * A valid lump header at memory[0] for the NS lump (Boot.NS, slot 0):
-      magic=0x1F, n_minus_6=0, cw=0, cc=47, typ=0
+      magic=0x1F, n_minus_6=0, cw=0, cc=44, typ=0
 
-  * The full c-list tail at words ns_size-47 .. ns_size-1  (= words 17..63
+  * The full c-list tail at words ns_size-44 .. ns_size-1  (= words 20..63
     for the default 64-word NS lump), with each slot containing the correct
     Golden Token for that catalog entry.
 
-This is distinct from test_boot_image_matches_simulator.py which only confirms
-Python and simulator agree byte-for-byte but does not name or assert
-individual field values.  A failure here points directly at the broken field.
+Task #1918 reduced the catalog from 53 to 44 entries (8-slot minimal boot
+namespace: slots 0-7 for boot, 8-43 for extended abstractions).
 """
 import os
 import struct
@@ -26,14 +25,8 @@ from server.boot_image import (  # noqa: E402
     generate_boot_image,
     pack_lump_header,
     create_gt,
-    create_abstract_gt,
     _ns_n_minus_6,
     DEFAULT_ABSTRACTION_CATALOG,
-    AB_TYPE_IO,
-    DEVICE_CLASS_LED,
-    DEVICE_CLASS_UART,
-    DEVICE_CLASS_BUTTON,
-    DEVICE_CLASS_TIMER,
 )
 
 # ---------------------------------------------------------------------------
@@ -41,8 +34,8 @@ from server.boot_image import (  # noqa: E402
 # ---------------------------------------------------------------------------
 
 NS_LUMP_SIZE    = 64    # step1.namespaceLumpWords
-CATALOG_COUNT   = len(DEFAULT_ABSTRACTION_CATALOG)   # 47
-CLIST_BASE      = NS_LUMP_SIZE - CATALOG_COUNT        # 64 - 47 = 17
+CATALOG_COUNT   = len(DEFAULT_ABSTRACTION_CATALOG)   # 44
+CLIST_BASE      = NS_LUMP_SIZE - CATALOG_COUNT        # 64 - 44 = 20
 
 
 def _default_cfg():
@@ -125,8 +118,8 @@ def test_ns_lump_header_full_word(boot_words):
 def test_clist_base_offset():
     """C-list starts at word NS_LUMP_SIZE - CATALOG_COUNT for the default NS lump.
 
-    With 50 catalog entries and a 64-word NS lump the c-list base is
-    64 - 50 = 14.  (Task #760 Stage 1 grew the catalog from 47 to 50.)
+    With 44 catalog entries and a 64-word NS lump the c-list base is
+    64 - 44 = 20.  (Task #1918 reduced the catalog from 53 to 44 entries.)
     """
     expected = NS_LUMP_SIZE - CATALOG_COUNT
     assert CLIST_BASE == expected, (
@@ -136,11 +129,11 @@ def test_clist_base_offset():
 
 
 # ---------------------------------------------------------------------------
-# 3.  First few c-list entries (named GT words at words 17–20)
+# 3.  First few c-list entries (minimal boot slots 0-7)
 # ---------------------------------------------------------------------------
 
 def test_mem_mgr_gt_at_clist_0(boot_words):
-    """memory[17] clist[0] == R|W Inform GT for NS slot 0 (memory manager)."""
+    """clist[0] == R|W Inform GT for NS slot 0 (Boot.NS memory manager)."""
     expected = create_gt(0, 0, {"R": 1, "W": 1}, 1)
     actual = boot_words[CLIST_BASE + 0]
     assert actual == expected, (
@@ -149,7 +142,7 @@ def test_mem_mgr_gt_at_clist_0(boot_words):
 
 
 def test_boot_thread_gt_at_clist_1(boot_words):
-    """memory[18] clist[1] == null-perm Inform GT for NS slot 1 (Boot.Thread)."""
+    """clist[1] == null-perm Inform GT for NS slot 1 (Boot.Thread)."""
     expected = create_gt(0, 1, {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, 1)
     actual = boot_words[CLIST_BASE + 1]
     assert actual == expected, (
@@ -157,92 +150,96 @@ def test_boot_thread_gt_at_clist_1(boot_words):
     )
 
 
-def test_slot2_gt_at_clist_2_is_null(boot_words):
-    """clist[2] == null GT (slot 2 freed — Startup.Config removed, Task #989)."""
+def test_uart_dev_gt_at_clist_2(boot_words):
+    """clist[2] == R|W Inform GT for NS slot 2 (UART_DEV MMIO)."""
+    expected = create_gt(0, 2, {"R": 1, "W": 1}, 1)
     actual = boot_words[CLIST_BASE + 2]
-    assert actual == 0, (
-        f"clist[2] (freed slot 2) should be null (0x00000000), got 0x{actual:08X}"
+    assert actual == expected, (
+        f"clist[2] (UART_DEV) 0x{actual:08X} != expected 0x{expected:08X}"
     )
 
 
-def test_boot_abstr_gt_at_clist_3(boot_words):
-    """memory[20] clist[3] == E-perm Inform GT for NS slot 3 (Boot.Abstr / LED flash)."""
-    expected = create_gt(0, 3, {"E": 1}, 1)
+def test_led_dev_gt_at_clist_3(boot_words):
+    """clist[3] == R|W Inform GT for NS slot 3 (LED_DEV MMIO)."""
+    expected = create_gt(0, 3, {"R": 1, "W": 1}, 1)
     actual = boot_words[CLIST_BASE + 3]
     assert actual == expected, (
-        f"clist[3] (Boot.Abstr GT) 0x{actual:08X} != expected 0x{expected:08X}"
+        f"clist[3] (LED_DEV) 0x{actual:08X} != expected 0x{expected:08X}"
+    )
+
+
+def test_btn_dev_gt_at_clist_4(boot_words):
+    """clist[4] == R-perm Inform GT for NS slot 4 (BTN_DEV MMIO)."""
+    expected = create_gt(0, 4, {"R": 1}, 1)
+    actual = boot_words[CLIST_BASE + 4]
+    assert actual == expected, (
+        f"clist[4] (BTN_DEV) 0x{actual:08X} != expected 0x{expected:08X}"
+    )
+
+
+def test_timer_dev_gt_at_clist_5(boot_words):
+    """clist[5] == R|W Inform GT for NS slot 5 (TIMER_DEV MMIO)."""
+    expected = create_gt(0, 5, {"R": 1, "W": 1}, 1)
+    actual = boot_words[CLIST_BASE + 5]
+    assert actual == expected, (
+        f"clist[5] (TIMER_DEV) 0x{actual:08X} != expected 0x{expected:08X}"
+    )
+
+
+def test_selftest_gt_at_clist_6(boot_words):
+    """clist[6] == E-perm Inform GT for NS slot 6 (SelfTest / Boot.Abstr)."""
+    expected = create_gt(0, 6, {"E": 1}, 1)
+    actual = boot_words[CLIST_BASE + 6]
+    assert actual == expected, (
+        f"clist[6] (SelfTest) 0x{actual:08X} != expected 0x{expected:08X}"
+    )
+
+
+def test_slot7_gt_at_clist_7_is_null(boot_words):
+    """clist[7] == null GT (slot 7 = programmable/free)."""
+    actual = boot_words[CLIST_BASE + 7]
+    assert actual == 0, (
+        f"clist[7] (programmable slot 7) should be null (0x00000000), got 0x{actual:08X}"
     )
 
 
 # ---------------------------------------------------------------------------
-# 4.  Hardware device Abstract GTs (clist slots 8–17)
+# 4.  Extended abstraction slots (8+)
 # ---------------------------------------------------------------------------
 
-def test_led_abstract_gts_at_clist_8_13(boot_words):
-    """clist[8..13] == 6 Abstract LED GTs (R|W, device class LED, index 0..5)."""
-    rw = {"R": 1, "W": 1}
-    for led_idx in range(6):
-        ab_data = ((DEVICE_CLASS_LED & 0xFF) << 8) | led_idx
-        expected = create_abstract_gt(AB_TYPE_IO, rw, 0, ab_data)
-        actual = boot_words[CLIST_BASE + 8 + led_idx]
-        assert actual == expected, (
-            f"clist[{8 + led_idx}] (LED[{led_idx}]) "
-            f"0x{actual:08X} != expected 0x{expected:08X}"
-        )
-
-
-def test_uart_gt_at_clist_14(boot_words):
-    """clist[14] == Abstract UART GT (R|W, reg0=TX)."""
-    expected = create_abstract_gt(
-        AB_TYPE_IO, {"R": 1, "W": 1}, 0, (DEVICE_CLASS_UART << 8) | 0
-    )
-    actual = boot_words[CLIST_BASE + 14]
+def test_slide_rule_gt_at_clist_8(boot_words):
+    """clist[8] == E-perm Inform GT for NS slot 8 (SlideRule)."""
+    expected = create_gt(0, 8, {"E": 1}, 1)
+    actual = boot_words[CLIST_BASE + 8]
     assert actual == expected, (
-        f"clist[14] (UART) 0x{actual:08X} != expected 0x{expected:08X}"
+        f"clist[8] (SlideRule) 0x{actual:08X} != expected 0x{expected:08X}"
     )
 
 
-def test_button_gt_at_clist_15(boot_words):
-    """clist[15] == Abstract Button GT (R-only, reg0=state)."""
-    expected = create_abstract_gt(
-        AB_TYPE_IO, {"R": 1}, 0, (DEVICE_CLASS_BUTTON << 8) | 0
-    )
-    actual = boot_words[CLIST_BASE + 15]
+def test_tunnel_gt_at_clist_22(boot_words):
+    """clist[22] == E-perm Inform GT for NS slot 22 (Tunnel)."""
+    expected = create_gt(0, 22, {"E": 1}, 1)
+    actual = boot_words[CLIST_BASE + 22]
     assert actual == expected, (
-        f"clist[15] (Button) 0x{actual:08X} != expected 0x{expected:08X}"
+        f"clist[22] (Tunnel) 0x{actual:08X} != expected 0x{expected:08X}"
     )
 
 
-def test_slide_rule_gt_at_clist_16(boot_words):
-    """clist[16] == E-perm Inform GT for NS slot 16 (SlideRule)."""
-    expected = create_gt(0, 16, {"E": 1}, 1)
-    actual = boot_words[CLIST_BASE + 16]
+def test_keystone_gt_at_clist_23(boot_words):
+    """clist[23] == E-perm Inform GT for NS slot 23 (Keystone)."""
+    expected = create_gt(0, 23, {"E": 1}, 1)
+    actual = boot_words[CLIST_BASE + 23]
     assert actual == expected, (
-        f"clist[16] (SlideRule) 0x{actual:08X} != expected 0x{expected:08X}"
+        f"clist[23] (Keystone) 0x{actual:08X} != expected 0x{expected:08X}"
     )
 
-
-def test_timer_gt_at_clist_17(boot_words):
-    """clist[17] == Abstract Timer GT (R|W, reg0=TICKS_LO)."""
-    expected = create_abstract_gt(
-        AB_TYPE_IO, {"R": 1, "W": 1}, 0, (DEVICE_CLASS_TIMER << 8) | 0
-    )
-    actual = boot_words[CLIST_BASE + 17]
-    assert actual == expected, (
-        f"clist[17] (Timer) 0x{actual:08X} != expected 0x{expected:08X}"
-    )
-
-
-# ---------------------------------------------------------------------------
-# 5.  Last few c-list entries (catalog slots 44–45) and freed slot 46
-# ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("slot,name,perms", [
-    (44, "GC",     {"E": 1}),
-    (45, "Thread", {"E": 1}),
+    (35, "GC",     {"E": 1}),
+    (36, "Thread", {"E": 1}),
 ])
-def test_last_clist_entries(boot_words, slot, name, perms):
-    """clist[44..45] == E-perm Inform GTs for GC and Thread."""
+def test_gc_thread_clist_entries(boot_words, slot, name, perms):
+    """clist[35] and clist[36] == E-perm Inform GTs for GC and Thread."""
     expected = create_gt(0, slot, perms, 1)
     actual = boot_words[CLIST_BASE + slot]
     assert actual == expected, (
@@ -250,20 +247,12 @@ def test_last_clist_entries(boot_words, slot, name, perms):
     )
 
 
-def test_clist_slot46_freed(boot_words):
-    """clist[46] == 0 — slot 46 (Circle) was freed in Task #970."""
-    actual = boot_words[CLIST_BASE + 46]
-    assert actual == 0, (
-        f"clist[46] (freed Circle slot) 0x{actual:08X} != expected 0x00000000"
-    )
-
-
 # ---------------------------------------------------------------------------
-# 7.  Full c-list span — every word in words 17..63 is accounted for
+# 5.  Full c-list span — every word in words 20..63 is accounted for
 # ---------------------------------------------------------------------------
 
 def test_clist_span_length(boot_words):
-    """The c-list tail occupies exactly CATALOG_COUNT words (17..63 inclusive)."""
+    """The c-list tail occupies exactly CATALOG_COUNT words (20..63 inclusive)."""
     clist = boot_words[CLIST_BASE: CLIST_BASE + CATALOG_COUNT]
     assert len(clist) == CATALOG_COUNT, (
         f"c-list slice length {len(clist)} != {CATALOG_COUNT}"

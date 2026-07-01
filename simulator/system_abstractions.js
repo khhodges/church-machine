@@ -434,10 +434,10 @@ class SystemAbstractions {
                 sim.nsClistMap[1].push({ gt: ledPK.gt, device: 'LED', passKeyId: ledPK.id });
             }
 
-            // Wire Tunnel E-GT (NS[31]) into Keystone (NS[32]) c-list slot 0 at boot.
+            // Wire Tunnel E-GT (NS[22]) into Keystone (NS[23]) c-list slot 0 at boot.
             let keystoneWired = false;
             if (sim.abstractionRegistry) {
-                const ksInit = sim.abstractionRegistry.dispatchMethod(32, 'Init', sim, {});
+                const ksInit = sim.abstractionRegistry.dispatchMethod(23, 'Init', sim, {});
                 keystoneWired = !!(ksInit && ksInit.ok && ksInit.result);
             }
 
@@ -2735,7 +2735,7 @@ class SystemAbstractions {
     }
 
     _bindTunnel() {
-        const TUNNEL_NS = 31;
+        const TUNNEL_NS = 22;
 
         this.registry.bindMethod(TUNNEL_NS, 'Call', function(sim, args) {
             const cr2 = (args && args.cr2 !== undefined) ? (args.cr2 >>> 0) : 0;
@@ -2763,13 +2763,13 @@ class SystemAbstractions {
         const FAULT_NO_CONTACT = 0xDEAD0001;
         const TUNNEL_OFFLINE   = 0xDEAD0002;  // Tunnel bridge not live (Stage 4+)
         const GREET_RESPONSE   = 0x48454C4C;
-        const KEYSTONE_NS      = 32;
-        const TUNNEL_NS        = 31;
+        const KEYSTONE_NS      = 23;
+        const TUNNEL_NS        = 22;
 
         this.registry.bindMethod(KEYSTONE_NS, 'Init', function(sim, args) {
-            // Wire the Tunnel E-GT (NS[31]) into Keystone c-list slot 0 at boot.
+            // Wire the Tunnel E-GT (NS[22]) into Keystone c-list slot 0 at boot.
             // This satisfies the boot-wiring contract declared in manifest.json:
-            //   capabilities[0] = { slot:0, target_ns:31, wired_at_boot:true }
+            //   capabilities[0] = { slot:0, target_ns:22, wired_at_boot:true }
             const tunnelGT = sim.createGT(0, TUNNEL_NS, { E: 1 }, 1);
             const entry = sim.readNSEntry(KEYSTONE_NS);
             if (entry) {

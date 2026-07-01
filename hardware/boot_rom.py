@@ -424,50 +424,32 @@ def _make_ns_entry(gt_type, perms, slot_id, gt_seq, location, alloc_size, cw=0, 
 # ---------------------------------------------------------------------------
 # SCHEDULER_IRQ_CLIST — capability list for the Scheduler.IRQ lump (NS slot 8)
 #
-# Scheduler.IRQ is the sole hardware IRQ dispatcher (Task #1523 / #1525).
-# Its c-list grants E-perm access to the four S-perm authority objects at
-# NS slots 19–22 so that the IRQ handler can perform:
-#   CHANGE CR12  — install a new thread-stack capability
-#   CHANGE CR13  — install a new IRQ-handler capability
-#   SET M-BIT    — mark a GT as M-elevated before installing into CR12/CR13
+# Scheduler.IRQ is the sole hardware IRQ dispatcher.
+# Its c-list carries a single Abstract S-perm GT that encodes CHANGE CR12/CR13
+# authority directly in the token — no NS entries required.
 #
-# The GT words use E-perm (dom=Church, perm3=0b100) because Scheduler.IRQ
-# holds a restricted delegate copy of the authority; the NS entries
-# themselves carry S-perm (the full authority over CHANGE operations).
+# Abstract S-perm GT: type=0b11 (Abstract), dom=1 (Church), perm3=0b010 (S)
+# Word value: (0b010<<28)|(1<<27)|(0b11<<25) = 0x2E000000
 #
-# Layout (cc = 4; lump tail words [lump_size-4 .. lump_size-1]):
-#   idx 0: E-perm GT → NS slot 19  CR12_PORT_CAP  (authority to CHANGE CR12)
-#   idx 1: E-perm GT → NS slot 20  CR13_PORT_CAP  (authority to CHANGE CR13)
-#   idx 2: E-perm GT → NS slot 21  CR12_MBIT_CAP  (authority for CR12 M-bit)
-#   idx 3: E-perm GT → NS slot 22  CR13_MBIT_CAP  (authority for CR13 M-bit)
+# Layout (cc = 1; lump tail word [lump_size-1]):
+#   idx 0: Abstract S-perm GT — authority to CHANGE CR12/CR13
 # ---------------------------------------------------------------------------
 SCHEDULER_IRQ_CLIST = [
-    make_gt(GT_TYPE_INFORM, PERM_MASK_E, CHURCH_HW_CR12_PORT_SLOT, 0),  # idx 0: CR12_PORT E-GT → NS[19]
-    make_gt(GT_TYPE_INFORM, PERM_MASK_E, CHURCH_HW_CR13_PORT_SLOT, 0),  # idx 1: CR13_PORT E-GT → NS[20]
-    make_gt(GT_TYPE_INFORM, PERM_MASK_E, CHURCH_HW_CR12_MBIT_SLOT, 0),  # idx 2: CR12_MBIT E-GT → NS[21]
-    make_gt(GT_TYPE_INFORM, PERM_MASK_E, CHURCH_HW_CR13_MBIT_SLOT, 0),  # idx 3: CR13_MBIT E-GT → NS[22]
+    make_gt(GT_TYPE_ABSTRACT, PERM_MASK_S, 0, 0),  # idx 0: Abstract S-perm GT (0x2E000000)
 ]
 
 # ---------------------------------------------------------------------------
-# THREAD_MANAGER_CLIST — capability list entries for Thread Manager (NS slot 45)
+# THREAD_MANAGER_CLIST — capability list entries for Thread Manager (NS slot 36)
 #
 # Thread Manager needs cooperative-scheduling authority over CR12 (thread
-# stacks) but NOT CR13 (interrupt-handler register — IRQ-manager territory).
-# It therefore receives E-perm GTs for the two CR12 authority objects only:
+# stacks).  A single Abstract S-perm GT encodes this authority without
+# requiring any NS entry.
 #
-#   CHANGE CR12   — install a new thread-stack capability into CR12
-#   SET CR12 M-BIT — mark a thread-stack GT as M-elevated before install
-#
-# CR13 caps (slots 20, 22) remain exclusive to Scheduler.IRQ.
-#
-# Layout (cc = 2; appended after the existing Scheduler-E and Memory-E GTs
-# at c-list indices 2 and 3 of the Thread Manager lump tail):
-#   idx 0 (clist idx 2): E-perm GT → NS slot 19  CR12_PORT_CAP  (CHANGE CR12)
-#   idx 1 (clist idx 3): E-perm GT → NS slot 21  CR12_MBIT_CAP  (CR12 M-bit)
+# Layout (cc = 1; lump tail word [lump_size-1]):
+#   idx 0: Abstract S-perm GT — authority to CHANGE CR12
 # ---------------------------------------------------------------------------
 THREAD_MANAGER_CLIST = [
-    make_gt(GT_TYPE_INFORM, PERM_MASK_E, CHURCH_HW_CR12_PORT_SLOT, 0),  # idx 0: CR12_PORT E-GT → NS[19]
-    make_gt(GT_TYPE_INFORM, PERM_MASK_E, CHURCH_HW_CR12_MBIT_SLOT, 0),  # idx 1: CR12_MBIT E-GT → NS[21]
+    make_gt(GT_TYPE_ABSTRACT, PERM_MASK_S, 0, 0),  # idx 0: Abstract S-perm GT (0x2E000000)
 ]
 
 MMIO_LED_ADDR   = 0x40000000   # offsets 0–4: LED0–LED4, bits[2:0]={B,G,R}
@@ -506,60 +488,46 @@ _MMIO_ENTRIES = {
 #   Slot 17: (empty)       — reserved
 #   Slot 18: Constants     — Layer 3 read-only constants (R-perm)
 # ---------------------------------------------------------------------------
+# Minimal 8-slot boot namespace.
+# Church HW Range authority slots 19-22 removed — authority is now a
+# pre-baked Abstract S-perm GT (0x2E000000) in SCHEDULER_IRQ_CLIST.
 _SYSTEM_ABSTRACTION_SLOTS = {
-    5:  ('Navana',       PERM_MASK_E),
-    6:  ('Mint',         PERM_MASK_E),
-    7:  ('Memory',       PERM_MASK_E),
-    8:  ('Scheduler',    PERM_MASK_E),
-    9:  ('Stack',        PERM_MASK_E),
-    10: ('DijkstraFlag', PERM_MASK_E),
-    15: ('Display',      PERM_MASK_E),
+    SELFTEST_NS_SLOT: ('SelfTest', PERM_MASK_E),  # boot entry point (slot 6)
 }
 
-NS_SLOT_COUNT = 23   # expanded to include Church HW Range port authority caps (slots 19-22)
+NS_SLOT_COUNT = 8   # minimal boot namespace: slots 0-7
 
-# Church HW Range NS entry metadata: (location, size_in_words, gt_type, perms)
-_CHURCH_HW_ENTRIES = {
-    CHURCH_HW_CR12_PORT_SLOT: (CR_PORT_CR12, 1, GT_TYPE_INFORM, PERM_MASK_S),
-    CHURCH_HW_CR13_PORT_SLOT: (CR_PORT_CR13, 1, GT_TYPE_INFORM, PERM_MASK_S),
-    CHURCH_HW_CR12_MBIT_SLOT: (M_BIT_PORT_CR12, 1, GT_TYPE_INFORM, PERM_MASK_S),
-    CHURCH_HW_CR13_MBIT_SLOT: (M_BIT_PORT_CR13, 1, GT_TYPE_INFORM, PERM_MASK_S),
-}
-
+# ---------------------------------------------------------------------------
+# DEMO_NAMESPACE — minimal 8-slot NS table for hardware boot
+#
+#   Slot 0: Boot.NS      — NS root (location=NS_TABLE_BASE, limit=64)
+#   Slot 1: Boot.Thread  — Thread lump (base=0x0100, limit=63)
+#   Slot 2: UART_DEV     — MMIO 0x40000014, RW, limit=2 (3 words: TX/STATUS/RX)
+#   Slot 3: LED_DEV      — MMIO 0x40000000, RW, limit=4 (5 words)
+#   Slot 4: BTN_DEV      — MMIO 0x40000028, R,  limit=0 (1 word)
+#   Slot 5: TIMER_DEV    — MMIO 0x4000002C, RW, limit=4 (5 words)
+#   Slot 6: SelfTest     — lazy lump (base=0x0600, limit=63), E-perm
+#   Slot 7: [programmable] — null NS entry
+# ---------------------------------------------------------------------------
 DEMO_NAMESPACE = []
 for _i in range(NS_SLOT_COUNT):
-    if _i in _MMIO_ENTRIES:
-        _loc, _sz, _gtype, _perms = _MMIO_ENTRIES[_i]
-        _entry = _make_ns_entry(_gtype, _perms, _i, 0, _loc, _sz,
-                                abstract_gt=_abstract_gt_word(_perms))
-    elif _i in _CHURCH_HW_ENTRIES:
-        _loc, _sz, _gtype, _perms = _CHURCH_HW_ENTRIES[_i]
-        _entry = _make_ns_entry(_gtype, _perms, _i, 0, _loc, _sz,
-                                abstract_gt=_abstract_gt_word(_perms))
-    elif _i == 0:
+    if _i == 0:
         _entry = _make_ns_entry(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, _i, 0,
                                 NS_TABLE_BASE, 64,
                                 abstract_gt=_abstract_gt_word(PERM_MASK_R | PERM_MASK_W))
-    elif _i == 4:
-        _entry = _make_ns_entry(GT_TYPE_INFORM, PERM_MASK_E, _i, 0,
-                                NUC_LUMP_BASE, 64,
-                                abstract_gt=_abstract_gt_word(PERM_MASK_E))
-    elif _i == SLIDERULE_SLOT:
-        _entry = _make_ns_entry(GT_TYPE_INFORM, PERM_MASK_E, _i, 0,
-                                SLIDERULE_LUMP_BASE, 256,
-                                abstract_gt=_abstract_gt_word(PERM_MASK_E))
-    elif _i == CONSTANTS_SLOT:
-        _entry = _make_ns_entry(GT_TYPE_INFORM, PERM_MASK_R, _i, 0,
-                                CONSTANTS_SLOT * 0x100, 64,
-                                abstract_gt=_abstract_gt_word(PERM_MASK_R))
+    elif _i in _MMIO_ENTRIES:
+        _loc, _sz, _gtype, _perms = _MMIO_ENTRIES[_i]
+        _entry = _make_ns_entry(_gtype, _perms, _i, 0, _loc, _sz,
+                                abstract_gt=_abstract_gt_word(_perms))
     elif _i in _SYSTEM_ABSTRACTION_SLOTS:
         _name, _perms = _SYSTEM_ABSTRACTION_SLOTS[_i]
         _entry = _make_ns_entry(GT_TYPE_INFORM, _perms, _i, 0,
                                 _i * 0x100, 64,
                                 abstract_gt=_abstract_gt_word(_perms))
-    elif _i == 2 or _i == 3:
-        _entry = _make_ns_entry(GT_TYPE_NULL, 0, _i, 0, 0, 0)  # freed/empty slot
+    elif _i == 7:
+        _entry = _make_ns_entry(GT_TYPE_NULL, 0, _i, 0, 0, 0)  # [programmable]
     else:
+        # Slot 1: Boot.Thread (default: location=0x100, alloc=64 words, RW)
         _entry = _make_ns_entry(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, _i, 0,
                                 _i * 0x100, 64,
                                 abstract_gt=_abstract_gt_word(PERM_MASK_R | PERM_MASK_W))
@@ -567,47 +535,40 @@ for _i in range(NS_SLOT_COUNT):
 
 
 # ---------------------------------------------------------------------------
-# DEMO_CLIST — initial C-List for the boot abstraction (Boot.Abstr, Slot 3)
+# DEMO_CLIST — initial C-List for the boot abstraction (SelfTest, Slot 6)
 #
 # Aligned with simulator boot c-list (simulator.js _initBootState).
+# Minimal 11-entry layout matching the 8-slot namespace.
 #
-#   idx  0: make_gt(Inform, R|X, slot_id=3, gt_seq=0)          — boot-internal: code/constants R|X GT
-#   idx  1: make_gt(Inform, X,   slot_id=4, gt_seq=0)          — boot-internal: boot code exec-only GT
-#   idx  2: make_gt(NULL,   0,   0,         0)                  — boot-internal: filled by SAVE epilogue (Thread GT)
-#   idx  3: make_gt(Inform, E,   slot_id=2, gt_seq=0)          — boot-internal: Boot.Abstr E-GT (return channel)
-#   idx  4: make_gt(NULL,   0,   0,         0)                  — freed (was Startup.Config E-GT, Task #989)
-#   idx  5: make_gt(Inform, E,   slot_id=5, gt_seq=0)          — Navana E-GT
-#   idx  6: make_gt(Inform, E,   slot_id=6, gt_seq=0)          — Mint E-GT
-#   idx  7: make_gt(Inform, E,   slot_id=7, gt_seq=0)          — Memory E-GT
-#   idx  8: make_gt(Inform, R|W, slot_id=12, b_flag=1)         — LED_DEV  (MMIO, bindable)
-#   idx  9: make_gt(Inform, R|W, slot_id=11, b_flag=1)         — UART_DEV (MMIO, bindable)
-#   idx 10: make_gt(Inform, R,   slot_id=13, b_flag=1)         — BTN_DEV  (MMIO, bindable)
-#   idx 11: make_gt(Inform, R|W, slot_id=14, b_flag=1)         — TIMER_DEV(MMIO, bindable)
-#   idx 12: make_gt(Inform, E,   slot_id=16, gt_seq=0)         — SlideRule E-GT (Layer 3)
-#   idx 13: make_gt(Inform, R,   slot_id=18, gt_seq=0)         — Constants R-GT (Layer 3)
+#   idx  0: make_gt(Inform, R|X, slot_id=6, gt_seq=0)         — boot-internal: SelfTest code/constants R|X
+#   idx  1: make_gt(NULL,   0,   0,         0)                 — freed (Salvation/NUC_PROGRAM removed)
+#   idx  2: make_gt(NULL,   0,   0,         0)                 — boot-internal: filled by SAVE epilogue (Thread GT)
+#   idx  3: make_gt(Inform, E,   slot_id=6, gt_seq=0)         — boot-internal: SelfTest E-GT (return channel)
+#   idx  4: make_gt(NULL,   0,   0,         0)                 — freed
+#   idx  5: make_gt(Inform, R|W, slot_id=3, b_flag=1)         — LED_DEV  (MMIO NS slot 3, bindable)
+#   idx  6: make_gt(Inform, R|W, slot_id=2, b_flag=1)         — UART_DEV (MMIO NS slot 2, bindable)
+#   idx  7: make_gt(Inform, R,   slot_id=4, b_flag=1)         — BTN_DEV  (MMIO NS slot 4, bindable)
+#   idx  8: make_gt(Inform, R|W, slot_id=5, b_flag=1)         — TIMER_DEV(MMIO NS slot 5, bindable)
+#   idx  9: make_gt(Inform, E,   slot_id=8, gt_seq=0)         — SlideRule E-GT (NS slot 8)
+#   idx 10: make_gt(Inform, R,   slot_id=9, gt_seq=0)         — Constants R-GT (NS slot 9)
 #
 # Indices 0–3 are boot-internal (used by BOOT_PROGRAM firmware only).
-# Indices 4–13 are the user-visible c-list, matching simulator layout exactly.
+# Indices 5–10 are the user-visible c-list (idx 4 freed).
 #
-# b_flag=1 marks each IO device GT as IDE-bound to a physical peripheral.  The flag is
-# excluded from the CRC seal input so the runtime can clear it on un-bind without
-# recomputing the NS entry.
+# b_flag=1 marks each IO device GT as IDE-bound to a physical peripheral.
 # ---------------------------------------------------------------------------
 DEMO_CLIST = [
-    make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_X, 3, 0),        # idx 0: boot-internal code/constants R|X
-    make_gt(GT_TYPE_INFORM, PERM_MASK_X, 4, 0),                       # idx 1: boot-internal boot code X-only
-    make_gt(GT_TYPE_NULL, 0, 0, 0),                                    # idx 2: boot-internal → Thread GT after SAVE
-    make_gt(GT_TYPE_INFORM, PERM_MASK_E, 2, 0),                       # idx 3: boot-internal Boot.Abstr E-GT
-    make_gt(GT_TYPE_NULL, 0, 0, 0),                                    # idx 4: freed — Slot 2 no longer Startup.Config (Task #989)
-    make_gt(GT_TYPE_INFORM, PERM_MASK_E, 5, 0),                       # idx 5: Navana E-GT, Slot 5
-    make_gt(GT_TYPE_INFORM, PERM_MASK_E, 6, 0),                       # idx 6: Mint E-GT, Slot 6
-    make_gt(GT_TYPE_INFORM, PERM_MASK_E, 7, 0),                       # idx 7: Memory E-GT, Slot 7
-    make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, MMIO_LED_SLOT,   0, b_flag=1),  # idx 8:  LED_DEV  → NS 12
-    make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, MMIO_UART_SLOT,  0, b_flag=1),  # idx 9:  UART_DEV → NS 11
-    make_gt(GT_TYPE_INFORM, PERM_MASK_R,                MMIO_BTN_SLOT,   0, b_flag=1),  # idx 10: BTN_DEV  → NS 13
-    make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, MMIO_TIMER_SLOT, 0, b_flag=1),  # idx 11: TIMER_DEV→ NS 14
-    make_gt(GT_TYPE_INFORM, PERM_MASK_E, SLIDERULE_SLOT, 0),            # idx 12: SlideRule E-GT, Slot 16
-    make_gt(GT_TYPE_INFORM, PERM_MASK_R, CONSTANTS_SLOT, 0),            # idx 13: Constants R-GT, Slot 18
+    make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_X, SELFTEST_NS_SLOT, 0),   # idx 0: SelfTest R|X
+    make_gt(GT_TYPE_NULL, 0, 0, 0),                                              # idx 1: freed (Salvation removed)
+    make_gt(GT_TYPE_NULL, 0, 0, 0),                                              # idx 2: Thread GT (SAVE epilogue)
+    make_gt(GT_TYPE_INFORM, PERM_MASK_E, SELFTEST_NS_SLOT, 0),                  # idx 3: SelfTest E-GT return channel
+    make_gt(GT_TYPE_NULL, 0, 0, 0),                                              # idx 4: freed
+    make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, MMIO_LED_SLOT,   0, b_flag=1),  # idx 5:  LED_DEV  → NS 3
+    make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, MMIO_UART_SLOT,  0, b_flag=1),  # idx 6:  UART_DEV → NS 2
+    make_gt(GT_TYPE_INFORM, PERM_MASK_R,                MMIO_BTN_SLOT,   0, b_flag=1),  # idx 7:  BTN_DEV  → NS 4
+    make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, MMIO_TIMER_SLOT, 0, b_flag=1),  # idx 8:  TIMER_DEV→ NS 5
+    make_gt(GT_TYPE_INFORM, PERM_MASK_E, SLIDERULE_SLOT, 0),                    # idx 9:  SlideRule E-GT → NS 8
+    make_gt(GT_TYPE_INFORM, PERM_MASK_R, CONSTANTS_SLOT, 0),                    # idx 10: Constants R-GT → NS 9
 ]
 
 while len(DEMO_CLIST) < 64:
@@ -625,9 +586,10 @@ while len(DEMO_CLIST) < 64:
 # instead of triggering LAZY_RESOLVE.
 #
 # Excluded from DEMO_CLIST_NAMED_SLOTS:
-#   idx 4 — freed (was Startup.Config E-GT, Task #989; now permanently empty)
+#   idx 1 — freed (Salvation/NUC_PROGRAM removed)
+#   idx 4 — freed
 # ---------------------------------------------------------------------------
-DEMO_CLIST_NAMED_SLOTS = frozenset({0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13})
+DEMO_CLIST_NAMED_SLOTS = frozenset({0, 1, 2, 3, 5, 6, 7, 8, 9, 10})
 
 
 class BootRom(Elaboratable):

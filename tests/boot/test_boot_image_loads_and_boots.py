@@ -21,7 +21,7 @@ and asserts:
   * Capability registers landed on the expected NS slots:
       - CR15 -> NS Slot 0 (Boot.NS, the namespace root)
       - CR12 -> NS Slot 1 (Boot.Thread, the thread identity)
-      - CR14 -> NS Slot 3 (Boot.Abstr, code; R+X)  [direct — no director hop since Task #247]
+      - CR14 -> NS Slot 6 (Boot.Abstr/SelfTest, code; R+X)  [direct — no director hop since Task #247]
       - CR6  -> NULL (cc=0 CLOOMC design: no c-list at HALT; Task #651)
   * A sentinel CALL frame was pushed (so a stray RETURN reboots cleanly).
   * PC=0 and M-elevation has been dropped after boot completes.
@@ -103,21 +103,18 @@ def _cfg_no_window():
 
 # (config, skip_window, expected_ns_count)
 # expected_ns_count is the exact nsCount loadBootImage() should report:
-#   * The default abstraction catalog defines 53 named slots (slots 0..52),
-#     so any default+catalog image yields 53.
-#     (Task #760 Stage 1 added Billing/TuringMemory/ChurchMemory at NS[47..49];
-#      Task #1077 added Scheduler.IRQ.Thread at NS[50];
-#      Ethernet MMIO abstraction added at NS[51];
-#      EventRouter wired as resident LUMP at NS[52])
+#   * The default abstraction catalog defines 44 named slots (slots 0..43),
+#     so any default+catalog image yields 44.
+#     (Task #1918 Minimal Boot Namespace: 8 boot slots 0-7, extended 8-43)
 #   * Step-3 emptySlotCount adds reserved-but-empty entries on top of the
 #     catalog count; its baseNamedNsCount=51 is explicitly set in the config
 #     (not derived from catalog size), so step3_reservation total remains 51+8=59.
 CONFIGS = [
-    pytest.param(_cfg_default(),           False, 53, id="default"),
-    pytest.param(_cfg_custom_step1(),      False, 53, id="custom_step1"),
-    pytest.param(_cfg_step2_resident(),    False, 53, id="step2_resident"),
+    pytest.param(_cfg_default(),           False, 44, id="default"),
+    pytest.param(_cfg_custom_step1(),      False, 44, id="custom_step1"),
+    pytest.param(_cfg_step2_resident(),    False, 44, id="step2_resident"),
     pytest.param(_cfg_step3_reservation(), False, 59, id="step3_reservation"),
-    pytest.param(_cfg_no_window(),         True,  53, id="no_window_bootconfig"),
+    pytest.param(_cfg_no_window(),         True,  44, id="no_window_bootconfig"),
 ]
 
 
@@ -213,19 +210,19 @@ def test_boot_image_loads_and_boots(cfg, skip_window, expected_ns_count):
         f"CR12 should hold a GT for NS Slot 1 (Boot.Thread); got "
         f"index={_gt_index(status['cr12']['word0'])}"
     )
-    assert _gt_index(status["cr14"]["word0"]) == 3, (
-        f"CR14 should hold a GT for NS Slot 3 (Boot.Abstr code); got "
+    assert _gt_index(status["cr14"]["word0"]) == 6, (
+        f"CR14 should hold a GT for NS Slot 6 (Boot.Abstr/SelfTest code); got "
         f"index={_gt_index(status['cr14']['word0'])}"
     )
     # CR6 at HALT depends on the embedded Boot.Abstr lump's cc field:
     #   cc=0 (default / pre-LAZY placeholder): B:06 NUC_CLIST leaves CR6 NULL.
     #   cc>0 (POLA-finalized lump): B:06 NUC_CLIST installs the compacted c-list;
-    #         CR6 holds a valid E-GT for NS Slot 3 (Boot.Abstr).
+    #         CR6 holds a valid E-GT for NS Slot 6 (Boot.Abstr/SelfTest).
     # Both are correct — the distinction is whether POLA compression has been
-    # applied and saved to 00000300.lump (Task #651 applies to the cc=0 path).
+    # applied and saved to 00000600.lump (Task #651 applies to the cc=0 path).
     cr6_idx = _gt_index(status["cr6"]["word0"])
-    assert cr6_idx == 0 or cr6_idx == 3, (
-        f"CR6 at HALT must be NULL (cc=0, index=0) or Boot.Abstr GT (cc>0, index=3); "
+    assert cr6_idx == 0 or cr6_idx == 6, (
+        f"CR6 at HALT must be NULL (cc=0, index=0) or Boot.Abstr GT (cc>0, index=6); "
         f"got index={cr6_idx}"
     )
 

@@ -996,10 +996,10 @@ def _validate_step2(step2, step1, target_board):
     _ns_slots_max_v2 = int(step1.get("nsSlotsMax") or MAX_NS_ENTRIES)
     NS_TABLE_RESERVE = _boot_image_gen.ns_table_reserve_words(_ns_slots_max_v2)
     total = step1["totalNamespaceWords"]
-    # Determine actual Boot.Abstr size from saved 00000300.lump (Task #568).
+    # Determine actual Boot.Abstr size from saved 00000600.lump (Task #568, updated #1918).
     # A resident step-2 lump must not overlap whichever Boot.Abstr will actually be placed.
     _abstr_size_for_validation = BOOT_ABSTR_DEFAULT_SIZE
-    _saved_abstr_path = os.path.join(LUMPS_DIR, '00000300.lump')
+    _saved_abstr_path = os.path.join(LUMPS_DIR, '00000600.lump')
     if os.path.isfile(_saved_abstr_path):
         try:
             import struct as _vstruct
@@ -3988,7 +3988,7 @@ _BOOT_ABSTR_META = {}   # populated by _load_boot_abstr_lump(); empty means not 
 _BOOT_NS_META    = {}   # populated by _load_boot_ns_lump();    empty means not found
 
 def _load_boot_abstr_lump():
-    """Parse boot-image.bin, extract Boot.Abstr (NS slot 3) and cache in LAZY_LUMPS.
+    """Parse boot-image.bin, extract Boot.Abstr (NS slot 6) and cache in LAZY_LUMPS.
 
     boot-image.bin is stored little-endian (matching validate_boot_image / simulator.js).
     The extracted word array is re-packed big-endian for LAZY_LUMPS, matching the
@@ -4005,10 +4005,15 @@ def _load_boot_abstr_lump():
             return
         # boot-image.bin is little-endian — mirrors validate_boot_image() and simulator.js
         mem = list(_struct.unpack(f'<{n_words}I', raw[:n_words * 4]))
-        # NS table lives at the last 1024 words of the image.
-        ns_table_base = n_words - 1024   # NS_TABLE_RESERVE = 1024
+        # NS table lives at the last NS_TABLE_RESERVE words of the image.
+        # Read the boot config to get the correct nsSlotsMax — same pattern as _load_boot_ns_lump().
+        _cfg_ab, _err_ab = _read_saved_boot_config()
+        _step1_ab = (_cfg_ab or {}).get("step1", {})
+        _ns_slots_max_ab = int(_step1_ab.get("nsSlotsMax") or _boot_image_gen.MAX_NS_ENTRIES)
+        _ns_table_reserve_ab = _boot_image_gen.ns_table_reserve_words(_ns_slots_max_ab)
+        ns_table_base = n_words - _ns_table_reserve_ab
         NS_ENTRY_WORDS = 4
-        BOOT_ABSTR_NS_SLOT = 3
+        BOOT_ABSTR_NS_SLOT = 6  # Task #1918: Boot.Abstr/SelfTest at slot 6 (was slot 3)
         boot_ns_base = ns_table_base + BOOT_ABSTR_NS_SLOT * NS_ENTRY_WORDS
         word0_location = mem[boot_ns_base]   # NS entry word0 = physical word address of lump
         if word0_location == 0 or word0_location + 1 >= n_words:
@@ -4023,9 +4028,9 @@ def _load_boot_abstr_lump():
             return
         lump_words = mem[word0_location:word0_location + lump_size]
         # Store as big-endian bytes — matches *.lump file convention and get_lump_words
-        LAZY_LUMPS['00000003'] = _struct.pack(f'>{lump_size}I', *lump_words)
+        LAZY_LUMPS['00000600'] = _struct.pack(f'>{lump_size}I', *lump_words)
         _BOOT_ABSTR_META.update({
-            "token":       "00000003",
+            "token":       "00000600",
             "abstraction": "LED flash",
             "ns_slot":     BOOT_ABSTR_NS_SLOT,
             "lump_size":   lump_size,
@@ -4056,7 +4061,7 @@ def _load_boot_abstr_lump():
             ]
         print(f'[boot] Boot.Abstr extracted: {lump_size}w at mem[{word0_location}], '
               f'cw={cw}, cc={cc}', flush=True)
-        # SINGLE SOURCE OF TRUTH: LAZY_LUMPS['00000003'] always holds the binary
+        # SINGLE SOURCE OF TRUTH: LAZY_LUMPS['00000600'] always holds the binary
         # extracted from boot-image.bin above.  We deliberately do NOT override it
         # with any saved programmer lump (00000300.lump) because that would create
         # two different binaries under the same token — one shown by the Code View
@@ -4067,31 +4072,29 @@ def _load_boot_abstr_lump():
         #
         # Sidecar annotations (author, version, pet_names, capabilities) are
         # programmer-supplied metadata and are safe to merge — they do not affect the
-        # binary.  Prefer 00000300.json (written by /api/lumps/save for ns_slot=3);
+        # binary.  Prefer 00000600.json (written by /api/lumps/save for ns_slot=6);
         # fall back to 00000003.json for backward-compat.
-        _saved300_path = os.path.join(os.path.dirname(__file__), 'lumps', '00000300.lump')
-        if os.path.isfile(_saved300_path):
+        _saved600_path = os.path.join(os.path.dirname(__file__), 'lumps', '00000600.lump')
+        if os.path.isfile(_saved600_path):
             try:
-                with open(_saved300_path, 'rb') as _s300f:
-                    _s300raw = _s300f.read()
-                _s300n = len(_s300raw) // 4
-                if _s300n >= 1:
-                    _s300words = list(_struct.unpack(f'>{_s300n}I', _s300raw[:_s300n * 4]))
-                    _s300hdr  = _s300words[0]
-                    _boot_raw = LAZY_LUMPS.get('00000003', b'')
-                    if _s300raw[:len(_boot_raw)] != _boot_raw:
-                        print('[boot] WARNING: 00000300.lump differs from boot-image.bin binary '
+                with open(_saved600_path, 'rb') as _s600f:
+                    _s600raw = _s600f.read()
+                _s600n = len(_s600raw) // 4
+                if _s600n >= 1:
+                    _boot_raw = LAZY_LUMPS.get('00000600', b'')
+                    if _s600raw[:len(_boot_raw)] != _boot_raw:
+                        print('[boot] WARNING: 00000600.lump differs from boot-image.bin binary '
                               '— ignoring saved binary to keep Code View and LUMP panel in sync.',
                               flush=True)
                     else:
-                        print('[boot] 00000300.lump matches boot-image.bin binary — consistent.',
+                        print('[boot] 00000600.lump matches boot-image.bin binary — consistent.',
                               flush=True)
-            except Exception as _e300:
-                print(f'[boot] 00000300.lump consistency check failed: {_e300}', flush=True)
+            except Exception as _e600:
+                print(f'[boot] 00000600.lump consistency check failed: {_e600}', flush=True)
         _lumps_dir_sc = os.path.dirname(__file__)
-        _sidecar_300 = os.path.join(_lumps_dir_sc, 'lumps', '00000300.json')
+        _sidecar_600 = os.path.join(_lumps_dir_sc, 'lumps', '00000600.json')
         _sidecar_003 = os.path.join(_lumps_dir_sc, 'lumps', '00000003.json')
-        _sidecar_path = _sidecar_300 if os.path.isfile(_sidecar_300) else (
+        _sidecar_path = _sidecar_600 if os.path.isfile(_sidecar_600) else (
             _sidecar_003 if os.path.isfile(_sidecar_003) else None)
         if _sidecar_path:
             try:
@@ -4583,6 +4586,17 @@ def save_lump():
     LAZY_LUMPS[token8] = lump_bytes
     LAZY_LUMPS[token8.lstrip('0') or '0'] = lump_bytes
 
+    # For the boot-abstr slot (token 00000600), also keep the canonical
+    # token-named file that generate_boot_image() reads directly from disk.
+    # The versioned filename (e.g. SelfTest_v17.lump) is kept for the archive,
+    # but boot-image regeneration needs the predictable 00000600.lump path.
+    _bi_boot_token = f"{_boot_image_gen.BOOT_ABSTR_NS_SLOT << 8:08x}"
+    if token8 == _bi_boot_token:
+        _canonical_lump = os.path.join(lumps_dir, f'{_bi_boot_token}.lump')
+        if os.path.abspath(lump_path) != os.path.abspath(_canonical_lump):
+            with open(_canonical_lump, 'wb') as _clfh:
+                _clfh.write(lump_bytes)
+
     # ── Phase 6: Build and write sidecar JSON ─────────────────────────────────
     sidecar = {
         "token":         token8,
@@ -4681,7 +4695,7 @@ def save_lump():
                     _bif.write(blob_bi)
                 boot_refreshed = True
                 print(f'[lumps] boot-image.bin regenerated ({len(blob_bi)} bytes)', flush=True)
-                _load_boot_abstr_lump()   # refresh _BOOT_ABSTR_META / LAZY_LUMPS['00000003']
+                _load_boot_abstr_lump()   # refresh _BOOT_ABSTR_META / LAZY_LUMPS['00000600']
                 _load_boot_ns_lump()      # refresh _BOOT_NS_META from updated boot-image.bin
             else:
                 boot_refresh_note = f'boot config unavailable: {err_bi}'
@@ -4996,10 +5010,10 @@ def list_lumps():
         result.append(entry)
 
     # Prepend system LUMPs extracted live from boot-image.bin.
-    # Boot.NS (slot 0, typ=1) comes first so it heads the list; Boot.Abstr (slot 3)
+    # Boot.NS (slot 0, typ=1) comes first so it heads the list; Boot.Abstr (slot 6)
     # follows immediately after.  Filter any stale manifest duplicates first.
     if _BOOT_ABSTR_META:
-        result = [e for e in result if e.get('token') not in ('00000300', '00000003')]
+        result = [e for e in result if e.get('token') not in ('00000600', '00000300', '00000003')]
         result = [dict(_BOOT_ABSTR_META)] + result
     if _BOOT_NS_META:
         result = [e for e in result if e.get('token') != '00000000']
@@ -5010,7 +5024,7 @@ def list_lumps():
     # valid — they are live in-memory copies from boot-image.bin.
     for _e in result:
         _tk = _e.get('token', '')
-        if _tk in ('00000003', '00000000'):
+        if _tk in ('00000600', '00000000'):
             _e['binary_valid'] = True
         elif _tk:
             _lp = os.path.join(lumps_dir, f'{_tk}.lump')
@@ -5029,11 +5043,11 @@ def list_lumps():
 
     # Inject clist_entries for every LUMP with cc > 0 and a readable binary.
     # Boot.NS (00000000): C-List is already in namespace_meta — skip.
-    # Boot.Abstr (00000003): clist_entries already set inside _BOOT_ABSTR_META — skip.
+    # Boot.Abstr (00000600): clist_entries already set inside _BOOT_ABSTR_META — skip.
     # All other LUMPs: read from the .lump file.
     for _e in result:
         _tk = _e.get('token', '')
-        if _tk in ('00000000', '00000003') or 'clist_entries' in _e:
+        if _tk in ('00000000', '00000600') or 'clist_entries' in _e:
             continue
         _cc = int(_e.get('cc', 0) or 0)
         if _cc == 0:
@@ -5508,12 +5522,12 @@ def patch_lump_meta(token):
 
     # When no sidecar exists yet, bootstrap one so the PATCH can proceed and
     # subsequent reads return persisted metadata.  Priority:
-    #   1. Boot.Abstr (token "00000003") — seed from in-memory _BOOT_ABSTR_META.
+    #   1. Boot.Abstr (token "00000600") — seed from in-memory _BOOT_ABSTR_META.
     #   2. Any other lump — seed from the matching manifest.json entry, or a
     #      minimal stub if it is in LAZY_LUMPS but not in the manifest.
     if not os.path.isfile(sidecar_path):
         seed = None
-        if key8 == '00000003' and _BOOT_ABSTR_META:
+        if key8 == '00000600' and _BOOT_ABSTR_META:
             seed = dict(_BOOT_ABSTR_META)
         else:
             # Try the manifest first
@@ -5577,7 +5591,7 @@ def patch_lump_meta(token):
         return jsonify({"error": f"Could not write sidecar: {exc}"}), 500
 
     # Keep _BOOT_ABSTR_META in sync so /api/lumps/list returns the new values immediately.
-    if key8 == '00000003':
+    if key8 == '00000600':
         for field in ("author", "version"):
             if field in payload:
                 _BOOT_ABSTR_META[field] = sidecar[field]
@@ -5752,8 +5766,8 @@ def resize_lump(token_hex):
     * Standalone .lump files — read from the file, repack, write back, update
       the sidecar JSON and manifest.
 
-    * Boot lump (token 00000003) embedded in boot-image.bin — repack the lump
-      in-place inside the binary memory image, update NS slot 3 words 1 and 2
+    * Boot lump (token 00000600) embedded in boot-image.bin — repack the lump
+      in-place inside the binary memory image, update NS slot 6 words 1 and 2
       (cr_limit and CRC-16/XMODEM seal), write boot-image.bin back, then
       refresh LAZY_LUMPS and _BOOT_ABSTR_META via _load_boot_abstr_lump().
 
@@ -5766,10 +5780,10 @@ def resize_lump(token_hex):
     lump_path    = os.path.join(lumps_dir, f'{key8}.lump')
     sidecar_path = os.path.join(lumps_dir, f'{key8}.json')
 
-    # Special branch: boot lump embedded in boot-image.bin (token 00000003).
+    # Special branch: boot lump embedded in boot-image.bin (token 00000600).
     # There is no standalone .lump file for this token; resize it in-place inside
-    # the binary, update NS slot 3, then write the file back.
-    if not os.path.isfile(lump_path) and key8 == '00000003' and _BOOT_ABSTR_META:
+    # the binary, update NS slot 6, then write the file back.
+    if not os.path.isfile(lump_path) and key8 == '00000600' and _BOOT_ABSTR_META:
         boot_path = os.path.join(os.path.dirname(__file__), 'lumps', 'boot-image.bin')
         if not os.path.isfile(boot_path):
             return jsonify({"error": "boot-image.bin not found"}), 400
@@ -5852,7 +5866,7 @@ def resize_lump(token_hex):
             return jsonify({"error": f"Post-resize validation failed: {ve}"}), 500
 
         saved = old_size - new_size
-        print(f'[lump/resize] boot-image 00000003: {old_size}w → {new_size}w '
+        print(f'[lump/resize] boot-image 00000600: {old_size}w → {new_size}w '
               f'(cw={cw}, cc={cc}, cr_limit={new_cr_limit}, saved {saved}w)', flush=True)
         return jsonify({"ok": True, "already_minimal": False,
                         "old_size": old_size, "lump_size": new_size,

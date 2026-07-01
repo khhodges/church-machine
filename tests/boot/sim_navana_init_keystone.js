@@ -24,8 +24,8 @@
 
 'use strict';
 
-const KEYSTONE_NS = 32;
-const TUNNEL_NS   = 31;
+const KEYSTONE_NS = 23;
+const TUNNEL_NS   = 22;
 
 let raw = '';
 process.stdin.setEncoding('utf8');

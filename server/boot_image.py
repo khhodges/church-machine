@@ -72,11 +72,11 @@ DEVICE_REG_LIMITS = {}  # slots 11 (UART), 12 (LED), 13 (Button), 14 (Timer) fre
 try:
     from hardware.hw_types import BOOT_ABSTR_NS_SLOT
 except ImportError:
-    BOOT_ABSTR_NS_SLOT = 3   # fallback: hardware.hw_types not on path (standalone runner)
+    BOOT_ABSTR_NS_SLOT = 6   # fallback: hardware.hw_types not on path (standalone runner)
 
 # Mandatory NS slots — every valid boot image must have a non-zero entry here.
-# Slot 2 freed (Startup.Config removed); foundational trio is slots 0, 1, 3.
-_MANDATORY_NS_SLOTS = (0, 1, BOOT_ABSTR_NS_SLOT)  # slots 0, 1, 3
+# Minimal boot trio: NS root (0), Thread (1), SelfTest/boot-entry (6).
+_MANDATORY_NS_SLOTS = (0, 1, BOOT_ABSTR_NS_SLOT)  # slots 0, 1, 6
 
 # Format-version tag written to mem[NS_TABLE_BASE - 1] so loadBootImage()
 # can reject stale binaries.
@@ -132,6 +132,19 @@ AB_TYPE_IO          = 0x00
 AB_TYPE_M_ELEVATION = 0x01
 
 
+def create_abstract_sperm_gt():
+    """Abstract S-perm GT — encodes CHANGE CR12/CR13 authority without an NS entry.
+
+    type=0b11 (Abstract), dom=1 (Church), perm3=0b010 (S), slot_id=0, gt_seq=0.
+    Word value: (0b010<<28)|(1<<27)|(0b11<<25) = 0x2E000000
+
+    Replaces the old Inform GTs pointing at Church HW Range NS entries (slots 19-22).
+    Used in SERVICE_CLIST_DEFS via descriptor type "abstract_sperm".
+    """
+    dom, perm3 = _encode_perm({"S": 1})
+    return _u32((perm3 << 28) | (dom << 27) | (0b11 << 25))
+
+
 def create_abstract_gt(ab_type, rw_perms, gt_seq, ab_data):
     """Encode a self-describing Abstract GT word (type=0b11).
 
@@ -165,103 +178,80 @@ def create_abstract_gt(ab_type, rw_perms, gt_seq, ab_data):
 # fallback list (used when no abstractionRegistry is wired in). The boot
 # image is produced from this canonical list so server and simulator
 # agree on what the default boot ROM contains.
+#
+# Minimal 8-slot boot namespace (slots 0-7), followed by lazy-load abstractions.
+# Church HW Range authority slots 19-22 removed — CHANGE CR12/CR13 authority
+# is now a pre-baked Abstract S-perm GT (0x2E000000) in SERVICE_CLIST_DEFS.
 DEFAULT_ABSTRACTION_CATALOG = [
-    ("Boot.NS",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False),
-    ("Boot.Thread",   {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False),
-    None,             # slot 2 freed — Startup.Config removed; hardware ISA owns M-state per CR register
-    ("LED flash",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
-    ("Salvation",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
-    ("Navana",        {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
-    ("Mint",          {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
-    ("Memory",        {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
-    ("Scheduler",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
-    ("Stack",         {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, True),
-    ("DijkstraFlag",  {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
-    None,             # slot 11 freed — UART NS slot eliminated (Task #431); Abstract UART GTs need no NS entry
-    None,             # slot 12 freed — LED NS slot eliminated (Task #406); Abstract LED GTs need no NS entry
-    None,             # slot 13 freed — Button NS slot eliminated (Task #431); Abstract Button GTs need no NS entry
-    None,             # slot 14 freed — Timer NS slot eliminated (Task #431); Abstract Timer GTs need no NS entry
-    ("Display",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
-    ("SlideRule",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, True),
-    ("Abacus",        {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, True),
-    ("Constants",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
-    ("Loader",        {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
-    ("SUCC",          {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),
-    ("PRED",          {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),
-    ("ADD",           {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),
-    ("SUB",           {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),
-    ("MUL",           {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),
-    ("ISZERO",        {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),
-    ("TRUE",          {"R":0,"W":0,"X":0,"L":1,"S":0,"E":0}, False),
-    ("FALSE",         {"R":0,"W":0,"X":0,"L":1,"S":0,"E":0}, False),
-    None,             # slot 28 freed — Family (future idea, see docs/future-abstractions.md)
-    None,             # slot 29 freed — Schoolroom (future idea, see docs/future-abstractions.md)
-    None,             # slot 30 freed — Friends (future idea, see docs/future-abstractions.md)
-    ("Tunnel",        {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
-    ("Keystone",      {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
-    None,             # slot 33 freed — Editor (future idea, see docs/future-abstractions.md)
-    None,             # slot 34 freed — Assembler (future idea, see docs/future-abstractions.md)
-    None,             # slot 35 freed — Debugger (future idea, see docs/future-abstractions.md)
-    None,             # slot 36 freed — Deployer (future idea, see docs/future-abstractions.md)
-    None,             # slot 37 freed — Browser (future idea, see docs/future-abstractions.md)
-    None,             # slot 38 freed — Messenger (future idea, see docs/future-abstractions.md)
-    None,             # slot 39 freed — Photos (future idea, see docs/future-abstractions.md)
-    None,             # slot 40 freed — Social (future idea, see docs/future-abstractions.md)
-    None,             # slot 41 freed — Video (future idea, see docs/future-abstractions.md)
-    None,             # slot 42 freed — Email (future idea, see docs/future-abstractions.md)
-    ("PAIR",          {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),
-    ("GC",            {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
-    ("Thread",        {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
-    None,             # slot 46 freed — Circle (future idea, see docs/future-abstractions.md)
-    ("Billing",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),   # NS[47] — P-GT quota enforcer (Task #760 Stage 1)
-    ("TuringMemory",  {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),   # NS[48] — domain-separated code allocator (Task #760 Stage 1)
-    ("ChurchMemory",  {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),   # NS[49] — abstract handle allocator (Task #760 Stage 1)
-    ("Scheduler.IRQ.Thread", {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False), # NS[50] — fixed boot-image IRQ thread; zero perms, authority via M-register on CHANGE (Task #1077)
-    ("Ethernet",             {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False), # NS[51] — Ethernet MMIO abstraction (token 00003300, v1.1.0)
-    ("EventRouter",          {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False), # NS[52] — event-to-handler routing table (token b3076308, v1.0.0)
+    ("Boot.NS",      {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False),  # 0
+    ("Boot.Thread",  {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False),  # 1
+    ("UART_DEV",     {"R":1,"W":1,"X":0,"L":0,"S":0,"E":0}, False),  # 2  MMIO 0x40000014
+    ("LED_DEV",      {"R":1,"W":1,"X":0,"L":0,"S":0,"E":0}, False),  # 3  MMIO 0x40000000
+    ("BTN_DEV",      {"R":1,"W":0,"X":0,"L":0,"S":0,"E":0}, False),  # 4  MMIO 0x40000028
+    ("TIMER_DEV",    {"R":1,"W":1,"X":0,"L":0,"S":0,"E":0}, False),  # 5  MMIO 0x4000002C
+    ("SelfTest",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 6  boot entry point
+    None,                                                               # 7  [programmable]
+    ("SlideRule",    {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, True),   # 8
+    ("Constants",    {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 9
+    ("Loader",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 10
+    ("SUCC",         {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),  # 11
+    ("PRED",         {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),  # 12
+    ("ADD",          {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),  # 13
+    ("SUB",          {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),  # 14
+    ("MUL",          {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),  # 15
+    ("ISZERO",       {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),  # 16
+    ("TRUE",         {"R":0,"W":0,"X":0,"L":1,"S":0,"E":0}, False),  # 17
+    ("FALSE",        {"R":0,"W":0,"X":0,"L":1,"S":0,"E":0}, False),  # 18
+    None,                                                               # 19 freed
+    None,                                                               # 20 freed
+    None,                                                               # 21 freed
+    ("Tunnel",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 22
+    ("Keystone",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 23
+    None,                                                               # 24 freed
+    None,                                                               # 25 freed
+    None,                                                               # 26 freed
+    None,                                                               # 27 freed
+    None,                                                               # 28 freed
+    None,                                                               # 29 freed
+    None,                                                               # 30 freed
+    None,                                                               # 31 freed
+    None,                                                               # 32 freed
+    None,                                                               # 33 freed
+    ("PAIR",         {"R":0,"W":0,"X":1,"L":0,"S":0,"E":0}, False),  # 34
+    ("GC",           {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 35
+    ("Thread",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 36
+    None,                                                               # 37 freed
+    ("Billing",      {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 38
+    ("TuringMemory", {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 39
+    ("ChurchMemory", {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 40
+    ("Scheduler.IRQ.Thread", {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False),  # 41
+    ("Ethernet",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 42
+    ("EventRouter",  {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 43
 ]
-assert len(DEFAULT_ABSTRACTION_CATALOG) == 53, "catalog drift vs simulator.js"
+assert len(DEFAULT_ABSTRACTION_CATALOG) == 44, "catalog drift vs simulator.js"
 
-# Service abstraction c-list capability table (Task #971).
-# Single-authority model:
-#   Navana  (slot 5)  — sole NS table writer; holds R|W token to namespace lump
-#   Memory  (slot 7)  — sole physical allocator; calls GC under pressure
-#   Mint    (slot 6)  — sole GT lifecycle manager; delegates NS writes to Navana
+# MMIO NS slot specs: (mmio_byte_addr, lim17).
+# Slots 2-5 use physical MMIO addresses — no RAM body is allocated;
+# running_offset is not advanced for these slots.
+_MMIO_SLOT_SPECS = {
+    2: (0x40000014, 2),   # UART_DEV: TX/STATUS/RX (3 words, lim17=2)
+    3: (0x40000000, 4),   # LED_DEV:  LED0-LED4    (5 words, lim17=4)
+    4: (0x40000028, 0),   # BTN_DEV:  state        (1 word,  lim17=0)
+    5: (0x4000002C, 4),   # TIMER_DEV: 5 registers (5 words, lim17=4)
+}
+
+# Service abstraction c-list capability table.
 # Each entry: ns_slot -> [ GT descriptor, ... ]
-#   GT descriptor is a tuple:
-#     ("inform",   ns_slot_ref, perms_dict)          -> create_gt(0, ns_slot_ref, perms_dict, 1)
-#     ("abstract", ab_type, rw_perms_dict, ab_data)  -> create_abstract_gt(ab_type, rw_perms_dict, 0, ab_data)
+#   GT descriptor tuple types:
+#     ("inform",        ns_slot_ref, perms_dict) -> create_gt(0, ns_slot_ref, perms_dict, 1)
+#     ("abstract",      ab_type, rw_perms_dict, ab_data) -> create_abstract_gt(...)
+#     ("abstract_sperm",)                        -> create_abstract_sperm_gt() = 0x2E000000
+# Minimal: only Thread (36), TuringMemory (39), ChurchMemory (40) need c-lists.
+# Pure Church-calculus slots (SUCC/PRED/ADD/SUB/MUL/ISZERO/TRUE/FALSE/PAIR) keep cc=0.
 SERVICE_CLIST_DEFS = {
-    4:  [("inform", 5,  {"E":1})],                                     # Salvation:    Navana E
-    5:  [("inform", 0,  {"R":1,"W":1}),                                # Navana:       namespace lump R|W (scoped to NS physical block)
-         ("inform", 6,  {"E":1}),                                      #               Mint E
-         ("inform", 7,  {"E":1})],                                     #               Memory E
-    6:  [("inform", 5,  {"E":1})],                                     # Mint:         Navana E
-    7:  [("inform", 44, {"E":1})],                                     # Memory:       GC E
-    8:  [("inform", 45, {"E":1}),                                      # Scheduler:    Thread E
-         ("inform", 7,  {"E":1}),                                      #               Memory E
-         ("inform", 19, {"E":1}),                                      #               CR12_PORT_CAP E-GT (CHANGE CR12 authority; NS slot 19)
-         ("inform", 20, {"E":1}),                                      #               CR13_PORT_CAP E-GT (CHANGE CR13 authority; NS slot 20)
-         ("inform", 21, {"E":1}),                                      #               CR12_MBIT_CAP E-GT (CR12 M-bit authority; NS slot 21)
-         ("inform", 22, {"E":1})],                                     #               CR13_MBIT_CAP E-GT (CR13 M-bit authority; NS slot 22)
-    9:  [("inform", 7,  {"E":1})],                                     # Stack:        Memory E
-    10: [("inform", 8,  {"E":1})],                                     # DijkstraFlag: Scheduler E
-    15: [("abstract", AB_TYPE_IO, {"R":1,"W":1},                       # Display:      Abstract I/O GT (device_class=DISPLAY)
-         (DEVICE_CLASS_DISPLAY << 8) | 0)],
-    17: [("inform", 18, {"E":1}),                                      # Abacus:       Constants E
-         ("inform", 15, {"E":1})],                                     #               Display E
-    44: [("inform", 5,  {"E":1}),                                      # GC:           Navana E
-         ("inform", 7,  {"E":1})],                                     #               Memory E
-    45: [("inform", 8,  {"E":1}),                                      # Thread:       Scheduler E
-         ("inform", 7,  {"E":1}),                                      #               Memory E
-         ("inform", 19, {"E":1}),                                      #               CR12_PORT_CAP E-GT (CHANGE CR12 authority; NS slot 19)
-         ("inform", 21, {"E":1})],                                     #               CR12_MBIT_CAP E-GT (CR12 M-bit authority; NS slot 21)
-    47: [("inform", 7,  {"E":1}),                                      # Billing:      Memory E
-         ("inform", 5,  {"E":1})],                                     #               Navana E
-    48: [("inform", 7,  {"E":1}),                                      # TuringMemory: Memory E
-         ("inform", 47, {"E":1})],                                     #               Billing E
-    49: [("inform", 7,  {"E":1}),                                      # ChurchMemory: Memory E
-         ("inform", 47, {"E":1})],                                     #               Billing E
+    36: [("abstract_sperm",)],                                         # Thread:       Abstract S-perm GT (CHANGE CR12 authority)
+    39: [("inform", 38, {"E":1})],                                     # TuringMemory: Billing E
+    40: [("inform", 38, {"E":1})],                                     # ChurchMemory: Billing E
 }
 
 
@@ -519,10 +509,10 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
 
     if "abstractionLumpWords" in step1:
         print("WARNING: abstractionLumpWords is deprecated and ignored; "
-              "Boot.Abstr size is determined by the saved lump (00000300.lump) "
+              "Boot.Abstr size is determined by the saved lump (00000600.lump) "
               "or defaults to 64 words.")
 
-    # ── Load saved Boot.Abstr lump (00000300.lump) if present and valid ──────
+    # ── Load saved Boot.Abstr lump (00000600.lump) if present and valid ──────
     # The saved lump is written big-endian by /api/lumps/save.  If it passes
     # all validation checks its declared size becomes the actual Boot.Abstr
     # allocation; otherwise the hardcoded default (64 words) is used.
@@ -604,13 +594,10 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     step2_lumps = []
     if isinstance(cfg.get("step2"), dict):
         step2_lumps = cfg["step2"].get("lumps") or []
-    # Foundational slots (NS slot 0, Thread slot 1, Boot.Abstr slot 3) and
-    # MMIO device-register windows must not be overridden by caller-supplied
-    # physAddr values, even when generate_boot_image() is called directly
-    # (bypassing the app-layer _validate_step2 guard).
-    # Slot 2 is intentionally excluded — it is available for catalog use.
-    _FOUNDATIONAL_SLOTS = {0, 1, BOOT_ABSTR_NS_SLOT}  # slots 0, 1, 3 — slot 2 is free for catalog use
-    _DEVICE_REG_SLOTS   = set(range(11, 16))                      # slots 11..15
+    # Foundational slots (0=NS, 1=Thread, 6=SelfTest) and MMIO device-register
+    # windows (2-5) must not be overridden by caller-supplied physAddr values.
+    _FOUNDATIONAL_SLOTS = {0, 1, BOOT_ABSTR_NS_SLOT}  # slots 0, 1, 6 — minimal boot trio
+    _DEVICE_REG_SLOTS   = set(_MMIO_SLOT_SPECS.keys())            # slots 2..5 (MMIO)
     _RESERVED_SLOTS     = _FOUNDATIONAL_SLOTS | _DEVICE_REG_SLOTS
 
     phys_override = {}
@@ -631,8 +618,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     slot_sizes = {
         0: ns_size,
         1: thread_size,
-        # Slot 2 freed — no override needed.
-        BOOT_ABSTR_NS_SLOT: actual_abstr_size,  # Boot.Abstr: from saved lump or 64w default
+        # Slots 2-5: MMIO — no RAM body, handled by _MMIO_SLOT_SPECS.
+        BOOT_ABSTR_NS_SLOT: actual_abstr_size,  # SelfTest: from saved lump or 64w default
     }
 
     # ----- NS entries ----------------------------------------------------
@@ -658,6 +645,10 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         if i == 0:
             loc = 0
             running_offset = ns_size
+        elif i in _MMIO_SLOT_SPECS:
+            # MMIO NS slot: physical MMIO byte address, no RAM body allocated.
+            loc = _MMIO_SLOT_SPECS[i][0]
+            # Don't advance running_offset (no RAM reservation for MMIO).
         else:
             if override is not None:
                 loc = override
@@ -666,14 +657,13 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
                 running_offset += my_size
         locations[i] = loc
 
-        # Slot 0: limit covers the entire programmer-budgeted namespace
-        # (totalNamespaceWords - 1), not a hardcoded memory.length-1 — the
-        # NS root must accurately describe the namespace it anchors.
+        # Slot 0: limit covers the entire programmer-budgeted namespace.
+        # MMIO slots: lim17 from _MMIO_SLOT_SPECS (device register count - 1).
         if i == 0:
             lim17 = (total - 1) & 0x1FFFF
             clist_count = len(catalog)
-        elif i in DEVICE_REG_LIMITS:
-            lim17 = DEVICE_REG_LIMITS[i]
+        elif i in _MMIO_SLOT_SPECS:
+            lim17 = _MMIO_SLOT_SPECS[i][1]
             clist_count = 0
         else:
             lim17 = (my_size - 1) & 0x1FFFF
@@ -722,32 +712,6 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     mem[thread_loc] = pack_lump_header(_ns_n_minus_6(thread_size), 32, 12, 2)
     mem[thread_loc + 244] = create_gt(0, boot_entry_slot, {"E": 1}, 1)
 
-    # Hardware device GTs (clist slots 8..18) — match simulator.js HW_DEVICE_SLOTS.
-    # Slots 8–13: Abstract LED GTs (Task #406) — type=0b11, no NS slot, no lump.
-    rw_perms = {"R":1,"W":1}
-    while len(clist_gts) < 19:
-        clist_gts.append(0)
-    for led_idx in range(6):
-        ab_data = ((DEVICE_CLASS_LED & 0xFF) << 8) | (led_idx & 0xFF)
-        clist_gts[8 + led_idx] = create_abstract_gt(AB_TYPE_IO, rw_perms, 0, ab_data)
-    # Slots 14–15: Abstract I/O GTs — Task #431 (no NS slot, no lump; fully self-describing)
-    clist_gts[14] = create_abstract_gt(AB_TYPE_IO, rw_perms,  0,
-                        (DEVICE_CLASS_UART   << 8) | 0)   # UART_DEV  R|W  reg0=TX
-    clist_gts[15] = create_abstract_gt(AB_TYPE_IO, {"R":1},  0,
-                        (DEVICE_CLASS_BUTTON << 8) | 0)   # BTN_DEV   R    reg0=state
-    # Slot 16: SlideRule Inform GT (NS slot 16, E-perm, gt_seq=0).
-    # TIMER_DEV was erroneously here (Task #431); c-list slot 16 must carry SlideRule
-    # because compiled code uses "CALL CRn, CR6, 16" to invoke SlideRule methods.
-    clist_gts[16] = create_gt(0, 16, {"E":1}, 1)          # SlideRule  E   -> NS idx 16
-    # Slot 17: TIMER_DEV moved from slot 16 (simulator-only; not in boot ROM image).
-    clist_gts[17] = create_abstract_gt(AB_TYPE_IO, rw_perms,  0,
-                        (DEVICE_CLASS_TIMER  << 8) | 0)   # TIMER_DEV R|W  reg0=TICKS_LO
-    # Slot 18: ChurchHW — hardware-control Abstract GT (W-only, Task #1542).
-    # Used by the .petname assembler pseudo-instruction to register c-list slots
-    # with PetNameMemory via IO_PORT_PET_NAME_WR (0xFFFFFF38).
-    clist_gts[18] = create_abstract_gt(AB_TYPE_IO, {"W":1},  0,
-                        (DEVICE_CLASS_CHURCHHW << 8) | 0) # ChurchHW  W   PET_NAME_WR
-
     # Memory-manager GT at c-list[0]: R|W capability over NS slot 0 (full namespace).
     mem_mgr_gt = create_gt(0, 0, {"R":1, "W":1}, 1)
     clist_gts[0] = mem_mgr_gt
@@ -764,21 +728,16 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     for ci in range(ns_catalog_count):
         mem[ns_size - ns_catalog_count + ci] = clist_gts[ci] if ci < len(clist_gts) else 0
 
-    # Truncate to DEMO_CLIST_SIZE.
-    # Slot 16 = SlideRule Inform GT; slot 17 = TIMER_DEV Abstract GT (moved from 16, Task #461).
-    # Slot 18 = ChurchHW Abstract GT (W-only, Task #1542).
+    # Truncate to DEMO_CLIST_SIZE (11 entries for minimal 8-slot namespace).
     clist_gts = clist_gts[:DEMO_CLIST_SIZE]
 
-    # ----- Boot.Abstr lump (NS slot 3) ------------------------------------
-    # The Boot Abstraction: directly loaded by B:03 (INIT_ABSTR), no director hop.
+    # ----- Boot.Abstr lump (NS slot 6 = SelfTest) -------------------------
+    # The Boot Abstraction: directly loaded by B:06 (INIT_ABSTR), no director hop.
     #
-    # When 00000300.lump is present (normal case):
-    #   The saved LED-flash lump is loaded.  It has cc=1, cw=17 (64-word allocation).
-    #   C-List slot 0: Abstract LED GT (R+W), POLA-compacted from boot-C-List slot 8.
-    #   capabilities { LED0 }  — LED0 declared in 00000300.json sidecar.
-    #   Code: LOAD CR3, CR6[0x0000]  →  LED GT → CR3; then toggle loop forever.
+    # When 00000600.lump is present (normal case):
+    #   The saved SelfTest lump is loaded.  It has cc=1, cw=17 (64-word allocation).
     #
-    # Fallback (00000300.lump absent): cc=0, cw=NUC_CODE_WORDS=3.
+    # Fallback (00000600.lump absent): cc=0, cw=NUC_CODE_WORDS=3.
     #   Word  0:      Lump header (n_minus_6, cw=3, cc=0)
     #   Words 1–3:    Code region: LOAD→CHANGE→CALL (3 instructions)
     #   Words 4..end: Freespace (no c-list)
@@ -811,18 +770,12 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         mem[entry_ns_base + 1] = pack_ns_word1(entry_cr_limit, 0, 0, 0, 1, 0)
         mem[entry_ns_base + 2] = make_version_seals(0, boot_entry_loc, entry_cr_limit)
 
-    # Slot 2 freed — Startup.Config removed. The hardware ISA owns M-state per CR register;
-    # CALL through a non-M E-GT (BOOT_ROM_WORDS[2]) drops M automatically.
     # Thread.CR[0] entry E-GT is pre-set to boot_entry_slot above; IDE overwrites on connect.
 
-
-    # ----- Service abstraction c-lists (Task #971) --------------------------------
-    # Populate c-lists for the 14 service abstractions that have declared capability
-    # requirements. All are handler-based (cw=0 — no CLOOMC code), so only the
-    # lump header and c-list GT tail are written. The NS entry word1/word2 are
-    # updated to reflect the new lim17 (= lump_size − cc − 1) and cc.
-    # Pure Church-calculus slots (SUCC/PRED/ADD/SUB/MUL/ISZERO/TRUE/FALSE/PAIR)
-    # intentionally keep cc=0 and are absent from SERVICE_CLIST_DEFS.
+    # ----- Service abstraction c-lists ------------------------------------
+    # Populate c-lists for service abstractions that have declared capability
+    # requirements. All are handler-based (cw=0 — no CLOOMC code).
+    # Pure Church-calculus slots keep cc=0 and are absent from SERVICE_CLIST_DEFS.
     for _cslot, _entries in SERVICE_CLIST_DEFS.items():
         _cc = len(_entries)
         _loc = locations.get(_cslot)
@@ -834,7 +787,9 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         mem[_loc] = pack_lump_header(_ns_n_minus_6(_sz), 0, _cc, 0)
         # c-list GT words at lump tail
         for _ci, _entry in enumerate(_entries):
-            if _entry[0] == "abstract":
+            if _entry[0] == "abstract_sperm":
+                _gt = create_abstract_sperm_gt()
+            elif _entry[0] == "abstract":
                 _, _ab_type, _rw_perms, _ab_data = _entry
                 _gt = create_abstract_gt(_ab_type, _rw_perms, 0, _ab_data)
             else:  # "inform"
@@ -842,7 +797,6 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
                 _gt = create_gt(0, _ref_slot, _perms, 1)
             mem[_loc + _sz - _cc + _ci] = _gt & 0xFFFFFFFF
         # Update NS entry: word1 (lim17 + cc) and word2 (seal)
-        _cat = DEFAULT_ABSTRACTION_CATALOG[_cslot]
         _ns_base = ns_table_base + _cslot * NS_ENTRY_WORDS
         mem[_ns_base + 1] = pack_ns_word1(_lim17, 0, 0, 0, 1, _cc)
         mem[_ns_base + 2] = make_version_seals(0, _loc, _lim17)

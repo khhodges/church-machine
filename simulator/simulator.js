@@ -112,26 +112,17 @@ const M_BIT_PORT_CR14         = 0xFFFFFF1E; // M-bit authority port for CR14
 const M_BIT_PORT_CR15         = 0xFFFFFF1F; // M-bit authority port for CR15
 const IO_PORT_PET_NAME_WR     = 0xFFFFFF38; // DWRITE to this addr marks c-list slot (value & 0x3F) as named
 // Boot-default named slots — matches hardware/boot_rom.py DEMO_CLIST_NAMED_SLOTS.
-// Used to reset petNameMemory to a clean baseline between program loads so that
-// stale named-slot entries from a previous program cannot suppress NULL_CAP faults
-// in a subsequent program that never declared those slots.
-const BOOT_NAMED_SLOTS = Object.freeze([0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+// Updated for minimal 8-slot namespace (indices 1 and 4 freed).
+const BOOT_NAMED_SLOTS = Object.freeze([0, 1, 2, 3, 5, 6, 7, 8, 9, 10]);
 
 
-// SCHEDULER_IRQ_CLIST — simulated c-list for the Scheduler abstraction (NS slot 8).
-// Mirrors hardware/boot_rom.py SCHEDULER_IRQ_CLIST (Task #1530).
-// Four E-perm GTs grant the IRQ handler authority to perform CHANGE CR12/CR13.
-// Layout (cc=4):
-//   idx 0: E-perm GT → NS[19]  CR12_PORT_CAP  (authority to CHANGE CR12)
-//   idx 1: E-perm GT → NS[20]  CR13_PORT_CAP  (authority to CHANGE CR13)
-//   idx 2: E-perm GT → NS[21]  CR12_MBIT_CAP  (authority for CR12 M-bit)
-//   idx 3: E-perm GT → NS[22]  CR13_MBIT_CAP  (authority for CR13 M-bit)
-// Cross-reference: simulator/system_abstractions.js SCHEDULER_IRQ_CLIST_SPEC (Task #1530).
+// SCHEDULER_IRQ_CLIST — simulated c-list for the Scheduler.IRQ abstraction (NS slot 8).
+// Mirrors hardware/boot_rom.py SCHEDULER_IRQ_CLIST.
+// Single Abstract S-perm GT (0x2E000000) encodes CHANGE CR12/CR13 authority without NS entries.
+// Layout (cc=1):
+//   idx 0: Abstract S-perm GT — authority to CHANGE CR12/CR13
 const SCHEDULER_IRQ_CLIST = [
-    { name: 'CR12_PORT', target: 19, grants: { E: 1 } },
-    { name: 'CR13_PORT', target: 20, grants: { E: 1 } },
-    { name: 'CR12_MBIT', target: 21, grants: { E: 1 } },
-    { name: 'CR13_MBIT', target: 22, grants: { E: 1 } },
+    { name: 'SPERM', abstractSperm: true },
 ];
 
 // Pre-computed 32-bit instruction words from hardware/boot_rom.py BOOT_PROGRAM.
@@ -176,10 +167,10 @@ class ChurchSimulator {
         this.abstractGTManager = new AbstractGTManager();
 
         // Which NS slot the boot sequence jumps to at B:05/B:06.
-        // Defaults to 3 (Boot.Abstr / LED flash); overridden by app.js
+        // Defaults to 6 (SelfTest); overridden by app.js
         // when the user selects a different boot-entry abstraction.
         // Intentionally NOT reset by reset() — persists across soft resets.
-        this.bootEntrySlot = 3;
+        this.bootEntrySlot = 6;
 
         // Immutable architectural identity: the canonical Boot.Abstr slot.
         // Captured once at construction from bootEntrySlot and NEVER mutated
@@ -328,51 +319,11 @@ class ChurchSimulator {
             }
         }
 
-        // Hardware-boot label override — applied AFTER catalog re-seeding.
-        // The simulator's abstraction catalog diverges from the hardware boot
-        // namespace (boot_rom.py DEMO_NAMESPACE) in two places:
-        //
-        //   Slots 11-14: the server-generated boot binary has live MMIO device
-        //     entries (UART_DEV, LED_DEV, BTN_DEV, TIMER_DEV) at these indices.
-        //     The simulator catalog marks them null/freed (Tasks #406/#431) so
-        //     the catalog pass above labels them "(free)" even though word0/word1
-        //     are non-zero in the binary.
-        //
-        //   Slots 19-22: the hardware boot namespace places S-perm hardware port
-        //     authority objects here (CR12_PORT_CAP at 0xFFFFFF0C, etc.) so that
-        //     Scheduler.IRQ can invoke CHANGE CR12/CR13 and M-bit-set.  The
-        //     simulator catalog labels those same indices as math abstractions
-        //     (Loader, SUCC, PRED, ADD) — incorrect for the hardware binary.
-        //
-        // These overrides ensure the namespace view names match the loaded binary
-        // exactly, matching boot_rom.py §"MMIO device GT slot assignments" and
-        // §"Church Hardware Address Range capability slots (slots 19-22)".
-        const _HW_BOOT_LABELS = {
-            11: 'UART_DEV',    // MMIO 0x40000014 — UART TX/STATUS/RX
-            12: 'LED_DEV',     // MMIO 0x40000000 — 5 RGB LED words
-            13: 'BTN_DEV',     // MMIO 0x40000028 — button R-perm
-            14: 'TIMER_DEV',   // MMIO 0x4000002C — timer/alarm RW
-            19: 'CR12 Port',   // S-perm authority: CHANGE CR12 (0xFFFFFF0C)
-            20: 'CR13 Port',   // S-perm authority: CHANGE CR13 (0xFFFFFF0D)
-            21: 'CR12 M-bit',  // S-perm authority: SET M-BIT CR12 (0xFFFFFF1C)
-            22: 'CR13 M-bit',  // S-perm authority: SET M-BIT CR13 (0xFFFFFF1D)
-        };
-        for (const [_hwSlotStr, _hwLabel] of Object.entries(_HW_BOOT_LABELS)) {
-            const _hwSlot = +_hwSlotStr;
-            if (_hwSlot >= count) continue;
-            const _hwBase = this.NS_TABLE_BASE + _hwSlot * this.NS_ENTRY_WORDS;
-            if (this.memory[_hwBase] !== 0 || this.memory[_hwBase + 1] !== 0) {
-                this.nsLabels[_hwSlot] = _hwLabel;
-            }
-        }
-
-        // Integrity check: the minimum complete boot namespace has 23 slots
-        // (indices 0-22: Boot.NS, Boot.Thread, freed-2, freed-3, Salvation,
-        // Navana, Mint, Memory, Scheduler, Stack, DijkstraFlag, UART_DEV,
-        // LED_DEV, BTN_DEV, TIMER_DEV, Display, SlideRule, empty-17, Constants,
-        // CR12 Port, CR13 Port, CR12 M-bit, CR13 M-bit).
+        // Integrity check: the minimum complete boot namespace has 8 slots
+        // (indices 0-7: Boot.NS, Boot.Thread, UART_DEV, LED_DEV,
+        // BTN_DEV, TIMER_DEV, SelfTest, [programmable]).
         // Warn loudly in the console log when the binary is smaller than this.
-        const _BOOT_SLOT_MIN = 23;
+        const _BOOT_SLOT_MIN = 8;
         if (count < _BOOT_SLOT_MIN) {
             this.output += `[BOOTIMG] WARNING: only ${count} NS slots active (< ${_BOOT_SLOT_MIN} expected). Boot namespace may be incomplete.\n`;
         } else {
@@ -767,7 +718,7 @@ class ChurchSimulator {
 
         this.lazyManifest = {};
         this._lastLoadTargetSlot = null;
-        this._loaderSlot = 19;
+        this._loaderSlot = 10;
 
         this._initNamespaceTable();
         this.output += '--- HARD RESET: all registers zeroed ---\n';
@@ -1124,60 +1075,54 @@ class ChurchSimulator {
             }
             return result;
         }
+        // Minimal 8-slot boot namespace, then lazy-load extended abstractions.
+        // Church HW Range authority slots 19-22 removed; CHANGE CR12/CR13 authority
+        // is now an Abstract S-perm GT (0x2E000000) in SCHEDULER_IRQ_CLIST.
         return [
-            { label: 'Boot.NS',      perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false },
-            { label: 'Boot.Thread',   perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false },
-            null,              // slot 2 freed — Startup.Config removed; hardware ISA owns M-state per CR register
-            { label: 'LED flash',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
-            { label: 'Salvation',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
-            { label: 'Navana',        perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
-            { label: 'Mint',          perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
-            { label: 'Memory',        perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
-            { label: 'Scheduler',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
-            { label: 'Stack',         perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: true },
-            { label: 'DijkstraFlag',  perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
-            null,              // slot 11 freed — UART NS slot eliminated (Task #431); Abstract UART GTs need no NS entry
-            null,              // slot 12 freed — LED NS slot eliminated (Task #406); Abstract LED GTs need no NS entry
-            null,              // slot 13 freed — Button NS slot eliminated (Task #431); Abstract Button GTs need no NS entry
-            null,              // slot 14 freed — Timer NS slot eliminated (Task #431); Abstract Timer GTs need no NS entry
-            { label: 'Display',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
-            { label: 'SlideRule',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: true },
-            { label: 'Abacus',        perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: true },
-            { label: 'Constants',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
-            { label: 'Loader',        perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
-            { label: 'SUCC',          perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },
-            { label: 'PRED',          perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },
-            { label: 'ADD',           perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },
-            { label: 'SUB',           perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },
-            { label: 'MUL',           perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },
-            { label: 'ISZERO',        perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },
-            { label: 'TRUE',          perms: {R:0,W:0,X:0,L:1,S:0,E:0}, chainable: false },
-            { label: 'FALSE',         perms: {R:0,W:0,X:0,L:1,S:0,E:0}, chainable: false },
-            null,              // slot 28 freed — Family (future idea, see docs/future-abstractions.md)
-            null,              // slot 29 freed — Schoolroom (future idea, see docs/future-abstractions.md)
-            null,              // slot 30 freed — Friends (future idea, see docs/future-abstractions.md)
-            { label: 'Tunnel',        perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
-            { label: 'Keystone',      perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
-            null,              // slot 33 freed — Editor (future idea, see docs/future-abstractions.md)
-            null,              // slot 34 freed — Assembler (future idea, see docs/future-abstractions.md)
-            null,              // slot 35 freed — Debugger (future idea, see docs/future-abstractions.md)
-            null,              // slot 36 freed — Deployer (future idea, see docs/future-abstractions.md)
-            null,              // slot 37 freed — Browser (future idea, see docs/future-abstractions.md)
-            null,              // slot 38 freed — Messenger (future idea, see docs/future-abstractions.md)
-            null,              // slot 39 freed — Photos (future idea, see docs/future-abstractions.md)
-            null,              // slot 40 freed — Social (future idea, see docs/future-abstractions.md)
-            null,              // slot 41 freed — Video (future idea, see docs/future-abstractions.md)
-            null,              // slot 42 freed — Email (future idea, see docs/future-abstractions.md)
-            { label: 'PAIR',          perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },
-            { label: 'GC',            perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false, handler: 'gc' },
-            { label: 'Thread',        perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
-            null,              // slot 46 freed — Circle (future idea, see docs/future-abstractions.md)
-            { label: 'Billing',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },   // NS[47] — P-GT quota enforcer (Task #760 Stage 1)
-            { label: 'TuringMemory',  perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },   // NS[48] — domain-separated code allocator (Task #760 Stage 1)
-            { label: 'ChurchMemory',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },   // NS[49] — abstract handle allocator (Task #760 Stage 1)
-            { label: 'Scheduler.IRQ.Thread', perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false }, // NS[50] — fixed boot-image IRQ thread; zero perms, authority via M-register on CHANGE (Task #1077)
-            { label: 'Ethernet',             perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false }, // NS[51] — Ethernet MMIO abstraction (token 00003300, v1.1.0)
-            { label: 'EventRouter',          perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false }, // NS[52] — event-to-handler routing table (token b3076308, v1.0.0)
+            { label: 'Boot.NS',      perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false },  // 0
+            { label: 'Boot.Thread',  perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false },  // 1
+            { label: 'UART_DEV',     perms: {R:1,W:1,X:0,L:0,S:0,E:0}, chainable: false },  // 2  MMIO 0x40000014
+            { label: 'LED_DEV',      perms: {R:1,W:1,X:0,L:0,S:0,E:0}, chainable: false },  // 3  MMIO 0x40000000
+            { label: 'BTN_DEV',      perms: {R:1,W:0,X:0,L:0,S:0,E:0}, chainable: false },  // 4  MMIO 0x40000028
+            { label: 'TIMER_DEV',    perms: {R:1,W:1,X:0,L:0,S:0,E:0}, chainable: false },  // 5  MMIO 0x4000002C
+            { label: 'SelfTest',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 6  boot entry point
+            null,                                                                               // 7  [programmable]
+            { label: 'SlideRule',    perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: true  },  // 8
+            { label: 'Constants',    perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 9
+            { label: 'Loader',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 10
+            { label: 'SUCC',         perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },  // 11
+            { label: 'PRED',         perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },  // 12
+            { label: 'ADD',          perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },  // 13
+            { label: 'SUB',          perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },  // 14
+            { label: 'MUL',          perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },  // 15
+            { label: 'ISZERO',       perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },  // 16
+            { label: 'TRUE',         perms: {R:0,W:0,X:0,L:1,S:0,E:0}, chainable: false },  // 17
+            { label: 'FALSE',        perms: {R:0,W:0,X:0,L:1,S:0,E:0}, chainable: false },  // 18
+            null,                                                                               // 19 freed
+            null,                                                                               // 20 freed
+            null,                                                                               // 21 freed
+            { label: 'Tunnel',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 22
+            { label: 'Keystone',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 23
+            null,                                                                               // 24 freed
+            null,                                                                               // 25 freed
+            null,                                                                               // 26 freed
+            null,                                                                               // 27 freed
+            null,                                                                               // 28 freed
+            null,                                                                               // 29 freed
+            null,                                                                               // 30 freed
+            null,                                                                               // 31 freed
+            null,                                                                               // 32 freed
+            null,                                                                               // 33 freed
+            { label: 'PAIR',         perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },  // 34
+            { label: 'GC',           perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false, handler: 'gc' }, // 35
+            { label: 'Thread',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 36
+            null,                                                                               // 37 freed
+            { label: 'Billing',      perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 38
+            { label: 'TuringMemory', perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 39
+            { label: 'ChurchMemory', perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 40
+            { label: 'Scheduler.IRQ.Thread', perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false }, // 41
+            { label: 'Ethernet',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 42
+            { label: 'EventRouter',  perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 43
         ];
     }
 
@@ -1193,13 +1138,14 @@ class ChurchSimulator {
         const clistChildren = [];
         const clistGTs = [];
 
-        // Device register NS limits — all I/O devices migrated to Abstract GTs; no Inform NS entries remain.
-        // LED:    freed Task #406 (slot 12); Abstract GTs in c-list[8]–[13].
-        // UART:   freed Task #431 (slot 11); Abstract GT  in c-list[14].
-        // Button: freed Task #431 (slot 13); Abstract GT  in c-list[15].
-        // Timer:  freed Task #431 (slot 14); Abstract GT  in c-list[17] (moved from 16, Task #461).
-        // Display (slot 15) is next in the migration roadmap.
-        const DEVICE_REG_LIMITS = {};  // no device register Inform NS entries remain
+        // MMIO device-register NS limits: slots 2-5 use physical MMIO addresses.
+        // lim17 = (register_count - 1) for each device.
+        const DEVICE_REG_LIMITS = {
+            2: 2,   // UART_DEV:  3 words (TX/STATUS/RX), lim17=2
+            3: 4,   // LED_DEV:   5 words (LED0-LED4),   lim17=4
+            4: 0,   // BTN_DEV:   1 word  (state),        lim17=0
+            5: 4,   // TIMER_DEV: 5 words (5 regs),       lim17=4
+        };
 
         // Boot Image Designer Step 1 (Task #214): if a project boot config has
         // been saved by the IDE, use the programmer-chosen lump sizes. Otherwise
@@ -1214,11 +1160,11 @@ class ChurchSimulator {
         // keeps this path consistent with server/boot_image.py BOOT_ABSTR_DEFAULT_SIZE.
         const BOOT_ABSTR_LUMP_SIZE = 64;
         const NS_LUMP_SIZE         = (_bcStep1 && _bcStep1.namespaceLumpWords) || this.SLOT_SIZE;
-        // Boot.Abstr at bootEntrySlot (default 3); slot 2 is freed (Startup.Config removed).
+        // Boot.Abstr at bootEntrySlot (default 6 = SelfTest).
+        // Slots 2-5 are MMIO — no RAM body, no slotSizes entry needed.
         const slotSizes = {};
         slotSizes[0] = NS_LUMP_SIZE;
         slotSizes[1] = THREAD_LUMP_SIZE;
-        // Slot 2 freed — no override needed.
         slotSizes[this.bootEntrySlot] = BOOT_ABSTR_LUMP_SIZE;  // Boot.Abstr: 64w default
 
         // Boot Image Designer Step 2 (Task #215): per-slot physAddr overrides
@@ -1252,19 +1198,16 @@ class ChurchSimulator {
                 continue;
             }
 
-            // Step 2 physAddr override (if any) replaces the runningOffset
-            // location for this slot, but does not advance runningOffset —
-            // resident lumps are placed in the usable region (after the
-            // foundational layout) which is disjoint from the runningOffset
-            // path, so subsequent foundational slots are unaffected.
+            // MMIO slots 2-5: use physical MMIO byte address; don't advance runningOffset.
+            // Step 2 physAddr override replaces runningOffset for resident lump slots.
+            const MMIO_ADDRS = { 2: 0x40000014, 3: 0x40000000, 4: 0x40000028, 5: 0x4000002C };
             const overrideLoc = physAddrOverride[i];
             const loc = (i === 0) ? 0
-                      : (overrideLoc !== undefined ? overrideLoc : runningOffset);
-            // Slot 0 is the namespace physical-memory descriptor; the
-            // namespace lump it anchors reserves NS_LUMP_SIZE words so
-            // subsequent slots start after it (Task #214 Step 1).
-            if (i > 0 && overrideLoc === undefined) runningOffset += mySize;
-            else if (i === 0) runningOffset = NS_LUMP_SIZE;
+                      : (MMIO_ADDRS[i] !== undefined ? MMIO_ADDRS[i]
+                      : (overrideLoc !== undefined ? overrideLoc : runningOffset));
+            // Only advance runningOffset for RAM-backed slots (not slot 0, not MMIO, not overrides).
+            if (i === 0) runningOffset = NS_LUMP_SIZE;
+            else if (MMIO_ADDRS[i] === undefined && overrideLoc === undefined) runningOffset += mySize;
             const lim17 = (i === 0) ? (this.memory.length - 1)
                         : (DEVICE_REG_LIMITS[i] !== undefined ? DEVICE_REG_LIMITS[i]
                         : (mySize - 1));
@@ -1334,7 +1277,7 @@ class ChurchSimulator {
         this.memory[threadLoc] = this.packLumpHeader(THREAD_N_MINUS_6, THREAD_SW, THREAD_CC, 2);
 
         // Thread caps zone — CR0 home slot at word offset +244 is pre-set to an E-GT
-        // for bootEntrySlot (default: slot 3, LED flash) so the board boots standalone
+        // for bootEntrySlot (default: slot 6, SelfTest) so the board boots standalone
         // without needing setBootEntrySlot() from the IDE.  Mirrors server/boot_image.py
         // which writes create_gt(0, boot_entry_slot, {"E":1}, 1) at thread_loc+244.
         // The IDE overwrites this when the user picks a different entry.  The "if empty"
@@ -1342,42 +1285,10 @@ class ChurchSimulator {
         this.memory[threadLoc + THREAD_CAPS_OFFSET] =
             this.createGT(0, this.bootEntrySlot, {E: 1}, 1);
 
-        // DEMO_CLIST hardware alignment: slots 8–16 hold device GTs so
-        // hardware code "LOAD CR3, CR6, 8" picks up the LED device, exactly as on Ti60 F225.
-        //   [8]–[13] LED[0]–LED[5] Abstract GTs (type=0b11, ab_type=I/O, device_class=LED, device_data=0-5)
-        //            No NS slot, no lump — capability entirely encoded in the 32-bit GT word (Task #406).
-        //   [14] UART_DEV  R|W → Abstract GT (device_class=UART,  device_data=0=TX)    — Task #431
-        //   [15] BTN_DEV   R   → Abstract GT (device_class=BUTTON, device_data=0=state) — Task #431
-        //   [16] TIMER_DEV R|W → Abstract GT (device_class=TIMER,  device_data=0=TICKS_LO) — Task #431
-        for (let ledIdx = 0; ledIdx < 6; ledIdx++) {
-            const ab_data = ((ChurchSimulator.DEVICE_CLASS_LED & 0xFF) << 8) | (ledIdx & 0xFF);
-            clistGTs[8 + ledIdx] = this.createAbstractGT(
-                ChurchSimulator.AB_TYPE_IO, {R:1, W:1}, 0, ab_data);
-        }
-        // Slots 14–16: Abstract I/O GTs (Task #431) — no NS slot, no lump
-        clistGTs[14] = this.createAbstractGT(ChurchSimulator.AB_TYPE_IO, {R:1,W:1}, 0,
-            ((ChurchSimulator.DEVICE_CLASS_UART   & 0xFF) << 8) | 0);  // UART_DEV  R|W  reg0=TX
-        clistGTs[15] = this.createAbstractGT(ChurchSimulator.AB_TYPE_IO, {R:1},     0,
-            ((ChurchSimulator.DEVICE_CLASS_BUTTON & 0xFF) << 8) | 0);  // BTN_DEV   R    reg0=state
-        // Slot 16: SlideRule Inform GT (NS slot 16, E-perm, gt_seq=0)
-        // TIMER_DEV was erroneously placed here (Task #431); it conflicted with SlideRule at
-        // NS slot 16. CALL instructions that reference SlideRule use "CALL CRn, CR6, 16"
-        // (see app-absdetail.js) — so c-list slot 16 must carry the SlideRule GT, not TIMER_DEV.
-        clistGTs[16] = this.createGT(0, 16, {E:1}, 1);  // SlideRule  E   -> NS idx 16
-        // Slot 17: TIMER_DEV moved from slot 16 to avoid NS-slot conflict
-        clistGTs[17] = this.createAbstractGT(ChurchSimulator.AB_TYPE_IO, {R:1,W:1}, 0,
-            ((ChurchSimulator.DEVICE_CLASS_TIMER  & 0xFF) << 8) | 0);  // TIMER_DEV R|W  reg0=TICKS_LO
-        // Slot 18: ChurchHW — hardware-control Abstract GT (W-only).
-        // DWRITE through this GT marks a c-list slot (DR value & 0x3F) as named in PetNameMemory.
-        // Used by the .petname <n> assembler pseudo-instruction (Task #1542).
-        clistGTs[18] = this.createAbstractGT(ChurchSimulator.AB_TYPE_IO, {W:1}, 0,
-            ((ChurchSimulator.DEVICE_CLASS_CHURCHHW & 0xFF) << 8) | 0);  // ChurchHW  W   PET_NAME_WR
         // Memory-manager GT at c-list[0]: R|W Inform capability over NS slot 0 (full namespace).
-        // Mirrors boot_image.py "Memory-manager GT at c-list[0]" so the NS lump c-list matches
-        // the Python-generated boot image exactly (Task #694).
         clistGTs[0] = this.createGT(0, 0, {R:1, W:1}, 1);
         const NUC_CODE_WORDS    = 3;
-        const DEMO_CLIST_SIZE   = 19;   // slots 0–18; slot 18 = ChurchHW (Task #1542)
+        const DEMO_CLIST_SIZE   = 11;   // slots 0–10 (minimal 8-slot namespace)
 
         // ── NS lump header and c-list (Task #694) ────────────────────────────────────
         // Write a valid lump header at memory[0] for the NS lump (Slot 0):
@@ -1401,7 +1312,7 @@ class ChurchSimulator {
         // loaded at Run time (the "LAZY LOAD does work on First CALL" fix).
         this.demoClistGTs       = clistGTs.slice();
 
-        // ── Boot.Abstr lump (NS Slot 3) ────────────────────────────────────────────
+        // ── Boot.Abstr lump (NS Slot 6 = SelfTest) ────────────────────────────────
         // Redesigned (Task #651): cc=0, cw=3. No c-list. Three instructions:
         //   CHANGE AL, CR12, CR12, #1  — switch to Boot.Thread (slot 1);
         //                                RESTORE_CALL loads CR0–CR11 from thread caps zone
@@ -1449,37 +1360,14 @@ class ChurchSimulator {
         // Entry format: [ns_slot, [ descriptor, ... ]]
         //   Inform descriptor:   { type: 'inform',   ref: N,       perms: {E:1} }
         //   Abstract descriptor: { type: 'abstract', abType: T, rwPerms: {...}, abData: D }
+        // Minimal SERVICE_CLIST_DEFS: Thread (36) needs Abstract S-perm GT;
+        // TuringMemory (39) and ChurchMemory (40) each get Billing E-GT.
+        // Pure Church-calculus slots keep cc=0 and are absent here.
+        const ABSTRACT_SPERM_GT = (0b010 << 28) | (1 << 27) | (0b11 << 25); // 0x2E000000
         const SERVICE_CLIST_DEFS = [
-            [ 4, [{ type:'inform', ref:5,  perms:{E:1} }]],                                                    // Salvation:    Navana E
-            [ 5, [{ type:'inform', ref:0,  perms:{R:1,W:1} },                                                  // Navana:       namespace lump R|W
-                  { type:'inform', ref:6,  perms:{E:1} },                                                      //               Mint E
-                  { type:'inform', ref:7,  perms:{E:1} }]],                                                    //               Memory E
-            [ 6, [{ type:'inform', ref:5,  perms:{E:1} }]],                                                    // Mint:         Navana E
-            [ 7, [{ type:'inform', ref:44, perms:{E:1} }]],                                                    // Memory:       GC E
-            [ 8, [{ type:'inform', ref:45, perms:{E:1} },                                                      // Scheduler:    Thread E
-                  { type:'inform', ref:7,  perms:{E:1} },                                                      //               Memory E
-                  { type:'inform', ref:19, perms:{E:1} },                                                      //               CR12_PORT_CAP E-GT (CHANGE CR12 authority; hw NS slot 19)
-                  { type:'inform', ref:20, perms:{E:1} },                                                      //               CR13_PORT_CAP E-GT (CHANGE CR13 authority; hw NS slot 20)
-                  { type:'inform', ref:21, perms:{E:1} },                                                      //               CR12_MBIT_CAP E-GT (CR12 M-bit authority; hw NS slot 21)
-                  { type:'inform', ref:22, perms:{E:1} }]],                                                    //               CR13_MBIT_CAP E-GT (CR13 M-bit authority; hw NS slot 22)
-            [ 9, [{ type:'inform', ref:7,  perms:{E:1} }]],                                                    // Stack:        Memory E
-            [10, [{ type:'inform', ref:8,  perms:{E:1} }]],                                                    // DijkstraFlag: Scheduler E
-            [15, [{ type:'abstract', abType:ChurchSimulator.AB_TYPE_IO, rwPerms:{R:1,W:1},                     // Display:      Abstract I/O GT
-                   abData: (ChurchSimulator.DEVICE_CLASS_DISPLAY << 8) | 0 }]],
-            [17, [{ type:'inform', ref:18, perms:{E:1} },                                                      // Abacus:       Constants E
-                  { type:'inform', ref:15, perms:{E:1} }]],                                                    //               Display E
-            [44, [{ type:'inform', ref:5,  perms:{E:1} },                                                      // GC:           Navana E
-                  { type:'inform', ref:7,  perms:{E:1} }]],                                                    //               Memory E
-            [45, [{ type:'inform', ref:8,  perms:{E:1} },                                                      // Thread:       Scheduler E
-                  { type:'inform', ref:7,  perms:{E:1} },                                                      //               Memory E
-                  { type:'inform', ref:19, perms:{E:1} },                                                      //               CR12_PORT_CAP E-GT (CHANGE CR12 authority; hw NS slot 19)
-                  { type:'inform', ref:21, perms:{E:1} }]],                                                    //               CR12_MBIT_CAP E-GT (CR12 M-bit authority; hw NS slot 21)
-            [47, [{ type:'inform', ref:7,  perms:{E:1} },                                                      // Billing:      Memory E
-                  { type:'inform', ref:5,  perms:{E:1} }]],                                                    //               Navana E
-            [48, [{ type:'inform', ref:7,  perms:{E:1} },                                                      // TuringMemory: Memory E
-                  { type:'inform', ref:47, perms:{E:1} }]],                                                    //               Billing E
-            [49, [{ type:'inform', ref:7,  perms:{E:1} },                                                      // ChurchMemory: Memory E
-                  { type:'inform', ref:47, perms:{E:1} }]],                                                    //               Billing E
+            [36, [{ type:'abstractSperm' }]],                                                          // Thread:       Abstract S-perm GT (CHANGE CR12 authority)
+            [39, [{ type:'inform', ref:38, perms:{E:1} }]],                                            // TuringMemory: Billing E
+            [40, [{ type:'inform', ref:38, perms:{E:1} }]],                                            // ChurchMemory: Billing E
         ];
         for (const [cslot, entries] of SERVICE_CLIST_DEFS) {
             const cc  = entries.length;
@@ -1494,7 +1382,9 @@ class ChurchSimulator {
             for (let ci = 0; ci < entries.length; ci++) {
                 const e = entries[ci];
                 let gt;
-                if (e.type === 'abstract') {
+                if (e.type === 'abstractSperm') {
+                    gt = ABSTRACT_SPERM_GT >>> 0;
+                } else if (e.type === 'abstract') {
                     gt = this.createAbstractGT(e.abType, e.rwPerms, 0, e.abData);
                 } else {
                     gt = this.createGT(0, e.ref, e.perms, 1);
@@ -1502,7 +1392,6 @@ class ChurchSimulator {
                 this.memory[loc + sz - cc + ci] = gt >>> 0;
             }
             // Update NS entry word1 (lim17 + cc) and word2 (seal)
-            const catEntry  = abstractions[cslot];
             const nsBase    = this.NS_TABLE_BASE + cslot * this.NS_ENTRY_WORDS;
             this.memory[nsBase + 1] = this.packNSWord1(lim17, 0, 0, 1, cc) >>> 0;
             this.memory[nsBase + 2] = this.makeVersionSeals(0, loc, lim17) >>> 0;
@@ -1720,7 +1609,7 @@ class ChurchSimulator {
 
                 if (this.abstractionRegistry) {
                     const _chResult = this.abstractionRegistry.dispatchMethod(
-                        this._slotByPetName('Tunnel', 31), 'Register', this,
+                        this._slotByPetName('Tunnel', 22), 'Register', this,
                         { dr1: _bootReason, dr2: _lastFault, dr3: _faultNIA }
                     );
                     if (_chResult && _chResult.ok !== false) {
@@ -3119,7 +3008,7 @@ class ChurchSimulator {
 
         // Resolve pet names to slot indices at call time (nsLabels is live here).
         const _schedulerSlot   = this._slotByPetName('Scheduler', 8);
-        const _irqThreadSlot   = this._slotByPetName('Scheduler.IRQ.Thread', 50);
+        const _irqThreadSlot   = this._slotByPetName('Scheduler.IRQ.Thread', 41);
 
         // Clear the alarm flag immediately on TIMER fire so timerArmed is false
         // whether this is called from step() (which pre-clears it) or directly.
@@ -3127,29 +3016,20 @@ class ChurchSimulator {
             this.irqState.timerArmed = false;
         }
 
-        // ── Authority check (Task #1530) ──────────────────────────────────────
-        // Before performing the simulated CHANGE CR12/CR13 thread-stack swap,
-        // verify that the Scheduler abstraction holds E-perm GTs
-        // for CR12_PORT (→ NS[19]) and CR13_PORT (→ NS[20]) in its c-list.
-        // Mirrors the hardware mLoad pipeline's capability validation for CHANGE.
-        // Cross-reference: hardware/boot_rom.py SCHEDULER_IRQ_CLIST (Task #1530).
+        // ── Authority check ───────────────────────────────────────────────────
+        // Verify that the Scheduler abstraction holds the Abstract S-perm GT
+        // (0x2E000000) in its c-list[0] — this encodes CHANGE CR12/CR13 authority.
+        // Mirrors hardware/boot_rom.py SCHEDULER_IRQ_CLIST (Abstract S-perm GT).
         const _schedulerAbs = this.abstractionRegistry.getAbstraction(_schedulerSlot);
         const _clist = _schedulerAbs ? (_schedulerAbs.capabilities || []) : [];
         if (_clist.length > 0) {
-            const _cr12Auth = _clist[0];
-            const _cr13Auth = _clist[1];
-            const _hasCR12 = _cr12Auth && _cr12Auth.target === 19 &&
-                             _cr12Auth.grants && _cr12Auth.grants.E;
-            const _hasCR13 = _cr13Auth && _cr13Auth.target === 20 &&
-                             _cr13Auth.grants && _cr13Auth.grants.E;
-            if (!_hasCR12 || !_hasCR13) {
-                const _missing = [];
-                if (!_hasCR12) _missing.push('CR12_PORT\u2192NS[19]');
-                if (!_hasCR13) _missing.push('CR13_PORT\u2192NS[20]');
-                this.output += `  [IRQ] CHANGE authority check FAILED \u2014 missing E-perm GTs: ${_missing.join(', ')}\n`;
+            const _spermAuth = _clist[0];
+            const _hasSperm = _spermAuth && _spermAuth.abstractSperm;
+            if (!_hasSperm) {
+                this.output += `  [IRQ] CHANGE authority check FAILED \u2014 missing Abstract S-perm GT at c-list[0]\n`;
                 return false;
             }
-            this.output += `  [IRQ] CHANGE authority check OK \u2014 CR12_PORT(NS[19]) + CR13_PORT(NS[20]) verified\n`;
+            this.output += `  [IRQ] CHANGE authority check OK \u2014 Abstract S-perm GT (0x2E000000) verified\n`;
         }
         // ─────────────────────────────────────────────────────────────────────
 
@@ -3163,7 +3043,7 @@ class ChurchSimulator {
         };
         this.irqState.suspendedStep = this.stepCount;
 
-        // Simulate CHANGE to the predefined IRQ thread (NS slot 50, Task #1077 §3).
+        // Simulate CHANGE to the predefined IRQ thread (NS slot 41).
         // In hardware, Scheduler.IRQ performs CHANGE to the fixed boot-image IRQ thread;
         // we track this here for auditability.
         this.irqState.irqThreadSlot = _irqThreadSlot;

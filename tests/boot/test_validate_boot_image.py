@@ -71,7 +71,7 @@ def test_validate_boot_image_rejects_zeroed_slot3():
     image = generate_boot_image(cfg, LUMPS_DIR)
     null_image = _zero_ns_slot(image, cfg, BOOT_ABSTR_NS_SLOT)
     total = int(cfg["step1"]["totalNamespaceWords"])
-    with pytest.raises(ValueError, match=r"mandatory NS slot 3"):
+    with pytest.raises(ValueError, match=r"mandatory NS slot 6"):
         validate_boot_image(null_image, total)
 
 

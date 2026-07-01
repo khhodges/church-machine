@@ -2,25 +2,25 @@
 
 Task #737: Confirm that the Binary tab shows updated cw/cc values immediately
 after /api/lumps/save (no page reload) and that those values survive a server
-restart (because _load_boot_abstr_lump() reads 00000300.lump on startup).
+restart (because _load_boot_abstr_lump() reads 00000600.lump on startup).
 
 Three scenarios:
 
-  1. POST /api/lumps/save for ns_slot=3 with a lump containing cw=17, cc=18
+  1. POST /api/lumps/save for ns_slot=6 with a lump containing cw=17, cc=18
      → GET /api/lumps/list immediately after save (no manual reload, no page
      refresh) must return cw=17 / cc=18 as the first (Boot.Abstr) entry.
      The save endpoint calls _load_boot_abstr_lump() internally when boot-
      image.bin and boot-config.json are present on disk, so the in-memory
      _BOOT_ABSTR_META is refreshed without any extra step.
 
-  2. With 00000300.lump already on disk, calling _load_boot_abstr_lump()
+  2. With 00000600.lump already on disk, calling _load_boot_abstr_lump()
      (simulating a server restart) must still return cw=17 / cc=18.  The
      function is called twice to confirm idempotency across multiple boots.
 
-  3. No 00000300.lump / sidecar on disk → _load_boot_abstr_lump() falls back
+  3. No 00000600.lump / sidecar on disk → _load_boot_abstr_lump() falls back
      to the on-disk boot-image.bin which carries the canonical NUC_CODE_WORDS=3,
-     cc=0 Boot.Abstr; GET /api/lumps/list must report cw=3 / cc=0 (no
-     regression in the no-saved-lump code path).
+     cc=0 Boot.Abstr (SelfTest at NS slot 6); GET /api/lumps/list must report
+     cw=3 / cc=0 (no regression in the no-saved-lump code path).
 """
 import os
 import struct
@@ -31,14 +31,17 @@ import pytest
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)
 
-from server.boot_constants import NUC_CODE_WORDS  # noqa: E402
+from server.boot_constants import NUC_CODE_WORDS, DEMO_CLIST_SIZE  # noqa: E402
 
 LUMPS_DIR      = os.path.join(ROOT, "server", "lumps")
+LUMP_600_PATH  = os.path.join(LUMPS_DIR, "00000600.lump")
+JSON_600_PATH  = os.path.join(LUMPS_DIR, "00000600.json")
+# 00000003.json is the legacy sidecar name; _load_boot_abstr_lump() falls
+# back to it when 00000600.json is absent, so the fixture must manage it too.
+JSON_003_PATH  = os.path.join(LUMPS_DIR, "00000003.json")
+# Keep old 300 names for backward-compat reference in clean_600 fixture.
 LUMP_300_PATH  = os.path.join(LUMPS_DIR, "00000300.lump")
 JSON_300_PATH  = os.path.join(LUMPS_DIR, "00000300.json")
-# 00000003.json is the legacy sidecar name; _load_boot_abstr_lump() falls
-# back to it when 00000300.json is absent, so the fixture must manage it too.
-JSON_003_PATH  = os.path.join(LUMPS_DIR, "00000003.json")
 # manifest.json is updated by /api/lumps/save; back it up to prevent churn.
 MANIFEST_PATH  = os.path.join(LUMPS_DIR, "manifest.json")
 
@@ -47,7 +50,7 @@ MANIFEST_PATH  = os.path.join(LUMPS_DIR, "manifest.json")
 # n_minus_6=0  →  lump_size = 1 << (0+6) = 64 words
 
 SAVED_CW        = 17
-SAVED_CC        = 18
+SAVED_CC        = 8   # must be ≤ DEMO_CLIST_SIZE (currently 11)
 LUMP_N_MINUS_6  = 0           # 64-word lump
 LUMP_SIZE_WORDS = 1 << (LUMP_N_MINUS_6 + 6)  # 64
 
@@ -79,9 +82,11 @@ def clean_300():
     """Snapshot and restore the lumps directory state around each test.
 
     Files removed before the test (and restored/removed after):
-    - 00000300.lump  (written by /api/lumps/save for ns_slot=3)
-    - 00000300.json  (sidecar written by same endpoint)
+    - 00000600.lump  (written by /api/lumps/save for ns_slot=6; Task #1918)
+    - 00000600.json  (sidecar written by same endpoint)
     - 00000003.json  (legacy sidecar read as fallback by _load_boot_abstr_lump)
+    - 00000300.lump  (old Boot.Abstr lump, kept for backward-compat)
+    - 00000300.json  (old sidecar)
 
     Files backed up but kept in place (only restored after the test):
     - manifest.json  (updated by /api/lumps/save; must remain intact so the
@@ -91,7 +96,7 @@ def clean_300():
     All existing files are restored unconditionally in teardown, so the real
     lumps directory is left exactly as it was found regardless of test outcome.
     """
-    _to_remove    = (LUMP_300_PATH, JSON_300_PATH, JSON_003_PATH)
+    _to_remove    = (LUMP_600_PATH, JSON_600_PATH, JSON_003_PATH, LUMP_300_PATH, JSON_300_PATH)
     _keep_in_place = (MANIFEST_PATH,)
     _backed: dict[str, bytes] = {}
 
@@ -130,9 +135,9 @@ def reset_boot_abstr_meta():
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _write_lump_300(cw=SAVED_CW, cc=SAVED_CC):
-    """Write a minimal valid 00000300.lump (big-endian, as /api/lumps/save does)."""
+    """Write a minimal valid 00000600.lump (big-endian, as /api/lumps/save does)."""
     words = _make_lump_words(cw, cc)
-    with open(LUMP_300_PATH, "wb") as fh:
+    with open(LUMP_600_PATH, "wb") as fh:
         fh.write(struct.pack(f">{LUMP_SIZE_WORDS}I", *words))
 
 
@@ -160,7 +165,7 @@ def _simulate_server_restart():
 
 
 def _get_boot_abstr_from_list(client):
-    """Return the first (Boot.Abstr) entry from GET /api/lumps/list."""
+    """Return the Boot.Abstr (NS slot 6, token 00000600) entry from GET /api/lumps/list."""
     resp = client.get("/api/lumps/list")
     assert resp.status_code == 200, (
         f"GET /api/lumps/list returned {resp.status_code}; "
@@ -170,7 +175,14 @@ def _get_boot_abstr_from_list(client):
     assert isinstance(entries, list) and len(entries) > 0, (
         "Expected a non-empty JSON array from /api/lumps/list"
     )
-    return entries[0]
+    for e in entries:
+        if e.get("token") in ("00000600",) or e.get("ns_slot") == 6:
+            return e
+    tokens = [e.get("token") for e in entries]
+    pytest.fail(
+        f"Boot.Abstr (token='00000600', ns_slot=6) not found in /api/lumps/list. "
+        f"Tokens present: {tokens}"
+    )
 
 
 # ── Test 1: save cw=17/cc=18 → list reflects new values without page reload ──
@@ -185,20 +197,20 @@ BOOT_CONFIG_ON_DISK = os.path.join(ROOT, "server", "boot-config.json")
            "auto-refresh _BOOT_ABSTR_META",
 )
 def test_save_ns_slot3_updates_list_immediately(client, clean_300, reset_boot_abstr_meta):
-    """POST /api/lumps/save (ns_slot=3, cw=17, cc=18) must cause GET /api/lumps/list
+    """POST /api/lumps/save (ns_slot=6, cw=17, cc=18) must cause GET /api/lumps/list
     to return the new cw/cc immediately — no page reload or server restart needed.
 
     When both boot-image.bin and boot-config.json are present, save_lump()
     regenerates boot-image.bin and then calls _load_boot_abstr_lump(), which
-    reads 00000300.lump (and 00000300.json) to update _BOOT_ABSTR_META in-process.
+    reads 00000600.lump (and 00000600.json) to update _BOOT_ABSTR_META in-process.
     The next GET /api/lumps/list therefore reflects the saved values without any
     additional reload step.
     """
     payload = {
         "binary": _make_lump_words(SAVED_CW, SAVED_CC),
         "metadata": {
-            "abstraction": "LED flash",
-            "ns_slot": 3,
+            "abstraction": "SelfTest",
+            "ns_slot": 6,
             "cw": SAVED_CW,
             "cc": SAVED_CC,
         },
@@ -210,10 +222,10 @@ def test_save_ns_slot3_updates_list_immediately(client, clean_300, reset_boot_ab
     )
     data = resp.get_json()
     assert data.get("ok") is True, f"Expected ok=true, got: {data}"
-    assert data.get("token") == "00000300", (
-        f"Expected token='00000300' for ns_slot=3, got: {data.get('token')!r}"
+    assert data.get("token") == "00000600", (
+        f"Expected token='00000600' for ns_slot=6, got: {data.get('token')!r}"
     )
-    assert os.path.isfile(LUMP_300_PATH), "00000300.lump was not written to disk"
+    assert os.path.isfile(LUMP_600_PATH), "00000600.lump was not written to disk"
     assert data.get("boot_image_refreshed") is True, (
         "Expected save_lump() to regenerate boot-image.bin and refresh "
         "_BOOT_ABSTR_META in-process (boot_image_refreshed must be True); "
@@ -233,7 +245,7 @@ def test_save_ns_slot3_updates_list_immediately(client, clean_300, reset_boot_ab
 # ── Test 2: values survive a simulated server restart ─────────────────────────
 
 def test_saved_cw_cc_survive_server_restart(client, clean_300, reset_boot_abstr_meta):
-    """With 00000300.lump on disk, _load_boot_abstr_lump() called twice
+    """With 00000600.lump on disk, _load_boot_abstr_lump() called twice
     (simulating two sequential boots) must return cw=17 / cc=18 each time."""
     _write_lump_300(SAVED_CW, SAVED_CC)
 
@@ -257,15 +269,15 @@ def test_saved_cw_cc_survive_server_restart(client, clean_300, reset_boot_abstr_
     reason="boot-image.bin not present on disk; cannot verify fallback defaults",
 )
 def test_no_saved_lump_returns_boot_image_defaults(client, clean_300, reset_boot_abstr_meta):
-    """When 00000300.lump and all sidecar JSONs are absent, _load_boot_abstr_lump()
-    reads the NS slot 3 lump directly from boot-image.bin.
+    """When 00000600.lump and all sidecar JSONs are absent, _load_boot_abstr_lump()
+    reads the NS slot 6 (SelfTest/Boot.Abstr) lump directly from boot-image.bin.
 
     The canonical Boot.Abstr embedded in boot-image.bin has cw=NUC_CODE_WORDS=3
     and cc=0.  GET /api/lumps/list must reflect these defaults, confirming no
     regression in the no-saved-lump code path.
     """
-    assert not os.path.isfile(LUMP_300_PATH), "Precondition: 00000300.lump must not exist"
-    assert not os.path.isfile(JSON_300_PATH), "Precondition: 00000300.json must not exist"
+    assert not os.path.isfile(LUMP_600_PATH), "Precondition: 00000600.lump must not exist"
+    assert not os.path.isfile(JSON_600_PATH), "Precondition: 00000600.json must not exist"
     assert not os.path.isfile(JSON_003_PATH), "Precondition: 00000003.json must not exist"
 
     _simulate_server_restart()

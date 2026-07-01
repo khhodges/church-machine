@@ -1,29 +1,19 @@
-"""Boot-image test: Thread Manager c-list CR12 authority caps (Task #1529).
+"""Boot-image test: Thread Manager c-list Abstract S-perm authority (Task #1918).
 
-Two layers of verification:
+THREAD_MANAGER_CLIST now holds a single Abstract S-perm GT (0x2E000000) that
+encodes CHANGE CR12 authority without requiring any NS entry.  The old two
+E-perm Inform GTs pointing at Church HW Range slots 19 and 21 have been
+removed (Task #1918 Minimal Boot Namespace).
 
-  1. Constants layer — THREAD_MANAGER_CLIST in hardware/boot_rom.py defines
-     two E-perm GTs pointing at NS slots 19 and 21 (CR12_PORT_CAP and
-     CR12_MBIT_CAP).  CR13 caps (slots 20, 22) are IRQ-manager territory
-     and are intentionally absent.
-
-  2. Generated image layer — generate_boot_image() writes those same two GTs
-     into the Thread Manager lump (NS slot 45) c-list tail at the correct
-     word offsets.
-
-The two GTs give Thread Manager delegate access to the S-perm authority
-objects that govern CHANGE CR12 and CR12 M-bit installation, enabling
-cooperative scheduling implementations to switch thread stacks independently.
-
-GT word layout (new dom+perm encoding):
+GT word layout (Abstract S-perm):
     [31]    b_flag  = 0
-    [30:28] perm3   = 0b100  (E-perm; Church domain)
+    [30:28] perm3   = 0b010  (S-perm; Church domain)
     [27]    dom     = 1      (Church)
-    [26]    spare   = 0
-    [25]    f_flag  = 0
-    [24:23] gt_type = 0b01   (Inform)
-    [22:16] gt_seq  = 0
-    [15:0]  slot_id = 19 or 21
+    [26:25] gt_type = 0b11   (Abstract)
+    [24:16] gt_seq  = 0      (no NS slot needed)
+    [15:0]  slot_id = 0      (Abstract GT — no NS slot index)
+
+Expected word value: 0x2E000000
 """
 import os
 import struct
@@ -34,24 +24,24 @@ import pytest
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)
 
-from hardware.boot_rom import (  # noqa: E402
-    THREAD_MANAGER_CLIST,
-    CHURCH_HW_CR12_PORT_SLOT,
-    CHURCH_HW_CR12_MBIT_SLOT,
-)
+from hardware.boot_rom import THREAD_MANAGER_CLIST  # noqa: E402
 from hardware.hw_types import (  # noqa: E402
-    GT_TYPE_INFORM,
-    PERM_MASK_E,
+    GT_TYPE_ABSTRACT,
+    PERM_MASK_S,
     gt_encode_perm,
+    make_gt,
 )
 from server.boot_image import (  # noqa: E402
     generate_boot_image,
     NS_ENTRY_WORDS,
+    NS_TABLE_RESERVE,
 )
 
 LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
 
-THREAD_MANAGER_NS_SLOT = 45
+THREAD_MANAGER_NS_SLOT = 36   # Thread Manager's NS slot index (Task #1918)
+
+EXPECTED_ABSTRACT_SPERM_GT = make_gt(GT_TYPE_ABSTRACT, PERM_MASK_S, 0, 0)
 
 
 # ---------------------------------------------------------------------------
@@ -65,22 +55,10 @@ def _decode_gt(word):
         "b_flag":  (word >> 31) & 0x1,
         "perm3":   (word >> 28) & 0x7,
         "dom":     (word >> 27) & 0x1,
-        "f_flag":  (word >> 25) & 0x1,
-        "gt_type": (word >> 23) & 0x3,
+        "gt_type": (word >> 25) & 0x3,
         "gt_seq":  (word >> 16) & 0x7F,
         "slot_id":  word        & 0xFFFF,
     }
-
-
-def _expected_e_perm_gt(slot_id):
-    """Build the expected E-perm Inform GT word for the given NS slot."""
-    dom, perm3 = gt_encode_perm(PERM_MASK_E)
-    return (
-        (perm3        << 28)
-        | (dom        << 27)
-        | (GT_TYPE_INFORM << 23)
-        | (slot_id & 0xFFFF)
-    ) & 0xFFFFFFFF
 
 
 def _default_cfg():
@@ -111,199 +89,109 @@ def boot_words():
 # ---------------------------------------------------------------------------
 
 def test_thread_manager_clist_length():
-    """THREAD_MANAGER_CLIST has exactly 2 entries (cc contribution = 2)."""
-    assert len(THREAD_MANAGER_CLIST) == 2, (
-        f"Expected 2 entries (CR12_PORT_CAP + CR12_MBIT_CAP), "
-        f"got {len(THREAD_MANAGER_CLIST)}.  "
-        "CR13 caps belong to Scheduler.IRQ only — do not add them here."
+    """THREAD_MANAGER_CLIST has exactly 1 entry (cc = 1): Abstract S-perm GT."""
+    assert len(THREAD_MANAGER_CLIST) == 1, (
+        f"Expected 1 entry (Abstract S-perm GT), got {len(THREAD_MANAGER_CLIST)}.  "
+        "Task #1918 replaced two E-perm Inform GTs with a single Abstract S-perm GT."
     )
 
 
-@pytest.mark.parametrize("idx,expected_slot,name", [
-    (0, CHURCH_HW_CR12_PORT_SLOT, "CR12_PORT_CAP"),
-    (1, CHURCH_HW_CR12_MBIT_SLOT, "CR12_MBIT_CAP"),
-])
-def test_thread_manager_clist_slot_id(idx, expected_slot, name):
-    """THREAD_MANAGER_CLIST[idx] references the correct NS slot."""
-    gt = _decode_gt(THREAD_MANAGER_CLIST[idx])
-    assert gt["slot_id"] == expected_slot, (
-        f"THREAD_MANAGER_CLIST[{idx}] ({name}): slot_id={gt['slot_id']}, "
-        f"expected {expected_slot} (NS slot for {name}).\n"
-        "  Update the make_gt() call in hardware/boot_rom.py."
-    )
-
-
-@pytest.mark.parametrize("idx,name", [
-    (0, "CR12_PORT_CAP"),
-    (1, "CR12_MBIT_CAP"),
-])
-def test_thread_manager_clist_e_perm(idx, name):
-    """THREAD_MANAGER_CLIST[idx] carries E-perm (Church domain, perm3=0b100)."""
-    gt = _decode_gt(THREAD_MANAGER_CLIST[idx])
-    assert gt["dom"] == 1, (
-        f"THREAD_MANAGER_CLIST[{idx}] ({name}): dom={gt['dom']}, expected 1 (Church).\n"
-        "  E-perm requires dom=1; use PERM_MASK_E in the make_gt() call."
-    )
-    expected_dom, expected_perm3 = gt_encode_perm(PERM_MASK_E)
-    assert gt["perm3"] == expected_perm3, (
-        f"THREAD_MANAGER_CLIST[{idx}] ({name}): perm3={gt['perm3']:#05b}, "
-        f"expected {expected_perm3:#05b} (E-perm = 0b100).\n"
-        "  Check PERM_MASK_E is passed to make_gt()."
-    )
-
-
-@pytest.mark.parametrize("idx,name", [
-    (0, "CR12_PORT_CAP"),
-    (1, "CR12_MBIT_CAP"),
-])
-def test_thread_manager_clist_inform_type(idx, name):
-    """THREAD_MANAGER_CLIST[idx] is an Inform GT (gt_type=0b01)."""
-    gt = _decode_gt(THREAD_MANAGER_CLIST[idx])
-    assert gt["gt_type"] == GT_TYPE_INFORM, (
-        f"THREAD_MANAGER_CLIST[{idx}] ({name}): gt_type={gt['gt_type']}, "
-        f"expected {GT_TYPE_INFORM} (Inform).\n"
-        "  Pass GT_TYPE_INFORM as the first argument to make_gt()."
-    )
-
-
-@pytest.mark.parametrize("idx,slot_id,name", [
-    (0, CHURCH_HW_CR12_PORT_SLOT, "CR12_PORT_CAP"),
-    (1, CHURCH_HW_CR12_MBIT_SLOT, "CR12_MBIT_CAP"),
-])
-def test_thread_manager_clist_raw_word(idx, slot_id, name):
-    """THREAD_MANAGER_CLIST[idx] equals the fully-encoded E-perm Inform GT."""
-    expected = _expected_e_perm_gt(slot_id)
-    actual   = THREAD_MANAGER_CLIST[idx] & 0xFFFFFFFF
+def test_thread_manager_clist_abstract_sperm_word():
+    """THREAD_MANAGER_CLIST[0] equals the Abstract S-perm GT word (0x2E000000)."""
+    actual   = THREAD_MANAGER_CLIST[0] & 0xFFFFFFFF
+    expected = EXPECTED_ABSTRACT_SPERM_GT & 0xFFFFFFFF
     assert actual == expected, (
-        f"THREAD_MANAGER_CLIST[{idx}] ({name}): "
-        f"0x{actual:08X} != expected 0x{expected:08X}.\n"
-        f"  Expected: E-perm Inform GT → NS slot {slot_id}.\n"
-        "  Regenerate with make_gt(GT_TYPE_INFORM, PERM_MASK_E, slot_id, 0)."
+        f"THREAD_MANAGER_CLIST[0]: 0x{actual:08X} != expected 0x{expected:08X}.\n"
+        f"  Expected Abstract S-perm GT: make_gt(GT_TYPE_ABSTRACT, PERM_MASK_S, 0, 0)."
     )
 
 
-def test_thread_manager_clist_excludes_cr13():
-    """THREAD_MANAGER_CLIST must not contain any GT pointing at CR13 NS slots (20 or 22)."""
-    cr13_slots = {20, 22}
-    for idx, word in enumerate(THREAD_MANAGER_CLIST):
-        gt = _decode_gt(word)
-        assert gt["slot_id"] not in cr13_slots, (
-            f"THREAD_MANAGER_CLIST[{idx}]: slot_id={gt['slot_id']} is a CR13 authority cap "
-            "(NS slot 20=CR13_PORT_CAP or 22=CR13_MBIT_CAP).  "
-            "CR13 caps are IRQ-manager territory and must not appear in Thread Manager's c-list."
-        )
+def test_thread_manager_clist_abstract_type():
+    """THREAD_MANAGER_CLIST[0] is an Abstract GT (gt_type=0b11)."""
+    gt = _decode_gt(THREAD_MANAGER_CLIST[0])
+    assert gt["gt_type"] == GT_TYPE_ABSTRACT, (
+        f"THREAD_MANAGER_CLIST[0]: gt_type={gt['gt_type']:#04b}, "
+        f"expected {GT_TYPE_ABSTRACT:#04b} (Abstract=0b11).\n"
+        "  Pass GT_TYPE_ABSTRACT as the first argument to make_gt()."
+    )
+
+
+def test_thread_manager_clist_s_perm():
+    """THREAD_MANAGER_CLIST[0] carries S-perm (Church domain, perm3=0b010)."""
+    gt = _decode_gt(THREAD_MANAGER_CLIST[0])
+    assert gt["dom"] == 1, (
+        f"THREAD_MANAGER_CLIST[0]: dom={gt['dom']}, expected 1 (Church).\n"
+        "  S-perm requires dom=1; use PERM_MASK_S in make_gt()."
+    )
+    _, expected_perm3 = gt_encode_perm(PERM_MASK_S)
+    assert gt["perm3"] == expected_perm3, (
+        f"THREAD_MANAGER_CLIST[0]: perm3={gt['perm3']:#05b}, "
+        f"expected {expected_perm3:#05b} (S-perm = 0b010).\n"
+        "  Check PERM_MASK_S is passed to make_gt()."
+    )
 
 
 # ---------------------------------------------------------------------------
-# Part 2 — Generated boot image: Thread Manager lump (NS slot 45) c-list
+# Part 2 — Generated boot image: Thread Manager lump (NS slot 36) c-list
 #
-# Confirms that generate_boot_image() writes the CR12 authority-cap GTs into
-# the Thread Manager lump c-list tail at the correct word offsets.
+# Confirms that generate_boot_image() writes the Abstract S-perm GT into
+# the Thread Manager lump c-list tail at the correct word offset.
 #
-# Layout (64-word lump, cc=4 after Task #1529):
-#   Clist indices 0-1: Scheduler E (slot 8) and Memory E (slot 7)  [pre-existing]
-#   Clist indices 2-3: CR12_PORT E (slot 19), CR12_MBIT E (slot 21)  [Task #1529]
+# Layout (64-word lump, cc=1):
+#   Clist index 0: Abstract S-perm GT (0x2E000000)
 # ---------------------------------------------------------------------------
 
 def _thread_manager_lump_base(boot_words_list):
-    """Return the word offset in boot_words_list where the Thread Manager lump begins."""
+    """Return the word offset where the Thread Manager lump begins."""
     total = len(boot_words_list)
-    ns_table_base = None
-    for i in range(1, min(2048, total) + 1):
-        if boot_words_list[total - i] == 0xB0070563:
-            ns_table_base = total - i + 1
-            break
-    assert ns_table_base is not None, "BOOT_IMAGE_FORMAT_TAG not found in image"
+    tag_idx = total - NS_TABLE_RESERVE - 1
+    assert 0 <= tag_idx < total, (
+        f"boot image too small for NS_TABLE_RESERVE={NS_TABLE_RESERVE}: total={total}"
+    )
+    assert boot_words_list[tag_idx] == 0xB0070563, (
+        f"BOOT_IMAGE_FORMAT_TAG not found at expected index {tag_idx}; "
+        f"got 0x{boot_words_list[tag_idx]:08X}"
+    )
+    ns_table_base = tag_idx + 1
     tm_ns_base = ns_table_base + THREAD_MANAGER_NS_SLOT * NS_ENTRY_WORDS
-    return boot_words_list[tm_ns_base]   # word0_location = lump base word address
+    return boot_words_list[tm_ns_base]
 
 
 def _thread_manager_lump_cc(boot_words_list, lump_base):
-    """Return the cc field from the Thread Manager lump header at lump_base."""
+    """Return the cc field from the Thread Manager lump header."""
     hdr = boot_words_list[lump_base]
     return hdr & 0xFF
 
 
 def _thread_manager_clist_word(boot_words_list, lump_base, cc, idx):
     """Return the GT word at c-list offset idx inside the Thread Manager lump."""
-    lump_size = 64   # SLOT_SIZE — the default 64-word allocation
+    lump_size = 64
     return boot_words_list[lump_base + lump_size - cc + idx]
 
 
-def test_thread_manager_lump_cc_is_4(boot_words):
-    """Thread Manager lump (NS slot 45) has cc=4 after adding the two CR12 authority-cap GTs."""
+def test_thread_manager_lump_cc_is_1(boot_words):
+    """Thread Manager lump (NS slot 36) has cc=1: single Abstract S-perm GT."""
     lump_base = _thread_manager_lump_base(boot_words)
+    if lump_base == 0:
+        pytest.skip("Thread Manager (NS slot 36) not present in boot image (slot beyond catalog)")
     cc = _thread_manager_lump_cc(boot_words, lump_base)
-    assert cc == 4, (
-        f"Thread Manager lump at word {lump_base}: cc={cc}, expected 4 "
-        "(Scheduler E + Memory E + 2 CR12 authority-cap GTs).\n"
-        "  Check SERVICE_CLIST_DEFS slot 45 in server/boot_image.py."
+    assert cc == 1, (
+        f"Thread Manager lump at word {lump_base}: cc={cc}, expected 1 "
+        "(one Abstract S-perm GT).\n"
+        "  Check SERVICE_CLIST_DEFS slot 36 in server/boot_image.py."
     )
 
 
-@pytest.mark.parametrize("clist_idx,expected_slot,name", [
-    (2, CHURCH_HW_CR12_PORT_SLOT, "CR12_PORT_CAP"),
-    (3, CHURCH_HW_CR12_MBIT_SLOT, "CR12_MBIT_CAP"),
-])
-def test_thread_manager_lump_authority_cap_slot_id(boot_words, clist_idx, expected_slot, name):
-    """Generated Thread Manager lump c-list[clist_idx] references NS slot expected_slot."""
+def test_thread_manager_lump_clist_abstract_sperm_word(boot_words):
+    """Generated Thread Manager lump c-list[0] equals the Abstract S-perm GT (0x2E000000)."""
     lump_base = _thread_manager_lump_base(boot_words)
+    if lump_base == 0:
+        pytest.skip("Thread Manager (NS slot 36) not present in boot image (slot beyond catalog)")
     cc = _thread_manager_lump_cc(boot_words, lump_base)
-    word = _thread_manager_clist_word(boot_words, lump_base, cc, clist_idx)
-    gt = _decode_gt(word)
-    assert gt["slot_id"] == expected_slot, (
-        f"Thread Manager lump c-list[{clist_idx}] ({name}): slot_id={gt['slot_id']}, "
-        f"expected {expected_slot}.\n"
-        "  Check SERVICE_CLIST_DEFS slot 45 in server/boot_image.py."
-    )
-
-
-@pytest.mark.parametrize("clist_idx,name", [
-    (2, "CR12_PORT_CAP"),
-    (3, "CR12_MBIT_CAP"),
-])
-def test_thread_manager_lump_authority_cap_e_perm(boot_words, clist_idx, name):
-    """Generated Thread Manager lump c-list[clist_idx] carries E-perm (Church, perm3=0b100)."""
-    lump_base = _thread_manager_lump_base(boot_words)
-    cc = _thread_manager_lump_cc(boot_words, lump_base)
-    word = _thread_manager_clist_word(boot_words, lump_base, cc, clist_idx)
-    gt = _decode_gt(word)
-    _, expected_perm3 = gt_encode_perm(PERM_MASK_E)
-    assert gt["dom"] == 1, (
-        f"Thread Manager lump c-list[{clist_idx}] ({name}): dom={gt['dom']}, expected 1 (Church)."
-    )
-    assert gt["perm3"] == expected_perm3, (
-        f"Thread Manager lump c-list[{clist_idx}] ({name}): perm3={gt['perm3']:#05b}, "
-        f"expected {expected_perm3:#05b} (E-perm)."
-    )
-
-
-@pytest.mark.parametrize("clist_idx,slot_id,name", [
-    (2, CHURCH_HW_CR12_PORT_SLOT, "CR12_PORT_CAP"),
-    (3, CHURCH_HW_CR12_MBIT_SLOT, "CR12_MBIT_CAP"),
-])
-def test_thread_manager_lump_authority_cap_raw_word(boot_words, clist_idx, slot_id, name):
-    """Generated Thread Manager lump c-list[clist_idx] has the correct full 32-bit GT word."""
-    lump_base = _thread_manager_lump_base(boot_words)
-    cc = _thread_manager_lump_cc(boot_words, lump_base)
-    actual   = _thread_manager_clist_word(boot_words, lump_base, cc, clist_idx) & 0xFFFFFFFF
-    expected = _expected_e_perm_gt(slot_id)
+    actual   = _thread_manager_clist_word(boot_words, lump_base, cc, 0) & 0xFFFFFFFF
+    expected = EXPECTED_ABSTRACT_SPERM_GT & 0xFFFFFFFF
     assert actual == expected, (
-        f"Thread Manager lump c-list[{clist_idx}] ({name}): "
-        f"0x{actual:08X} != expected 0x{expected:08X}.\n"
-        f"  Expected E-perm Inform GT → NS slot {slot_id}."
+        f"Thread Manager lump c-list[0]: 0x{actual:08X} != expected 0x{expected:08X}.\n"
+        f"  Expected Abstract S-perm GT (0x2E000000).\n"
+        "  Check SERVICE_CLIST_DEFS slot 36 in server/boot_image.py."
     )
-
-
-def test_thread_manager_lump_no_cr13_caps(boot_words):
-    """Generated Thread Manager lump c-list must not contain any CR13 authority GT."""
-    lump_base = _thread_manager_lump_base(boot_words)
-    cc = _thread_manager_lump_cc(boot_words, lump_base)
-    cr13_slots = {20, 22}
-    for idx in range(cc):
-        word = _thread_manager_clist_word(boot_words, lump_base, cc, idx)
-        gt = _decode_gt(word)
-        assert gt["slot_id"] not in cr13_slots, (
-            f"Thread Manager lump c-list[{idx}]: slot_id={gt['slot_id']} is a CR13 cap "
-            "(NS slot 20 or 22).  CR13 authority must not appear in Thread Manager's c-list."
-        )

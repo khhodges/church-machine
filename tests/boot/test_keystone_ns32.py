@@ -33,6 +33,7 @@ from server.boot_image import (  # noqa: E402
     generate_boot_image,
     create_gt,
     DEFAULT_ABSTRACTION_CATALOG,
+    NS_TABLE_RESERVE,
 )
 
 # ---------------------------------------------------------------------------
@@ -40,11 +41,11 @@ from server.boot_image import (  # noqa: E402
 # ---------------------------------------------------------------------------
 
 NS_LUMP_SIZE   = 64
-CATALOG_COUNT  = len(DEFAULT_ABSTRACTION_CATALOG)   # 47
-CLIST_BASE     = NS_LUMP_SIZE - CATALOG_COUNT        # 64 - 47 = 17
+CATALOG_COUNT  = len(DEFAULT_ABSTRACTION_CATALOG)   # 44 (Task #1918)
+CLIST_BASE     = NS_LUMP_SIZE - CATALOG_COUNT        # 64 - 44 = 20
 
-KEYSTONE_SLOT  = 32
-TUNNEL_SLOT    = 31
+KEYSTONE_SLOT  = 23   # Task #1918: Keystone moved from slot 32 to slot 23
+TUNNEL_SLOT    = 22   # Task #1918: Tunnel moved from slot 31 to slot 22
 
 FAULT_NO_CONTACT = 0xDEAD0001
 
@@ -91,13 +92,23 @@ def test_ns_clist_slot32_is_keystone_gt(boot_words):
 
 
 def test_keystone_gt_has_e_perm_only(boot_words):
-    """Keystone GT (NS c-list slot 32) has exactly E-permission and no others."""
-    word = boot_words[CLIST_BASE + KEYSTONE_SLOT]
-    perms = (word >> 25) & 0x7F   # bits [31:25]
-    e_bit = (perms >> 5) & 1
-    other = perms & ~(1 << 5)
-    assert e_bit == 1,  f"E-bit not set in Keystone GT: 0x{word:08X}"
-    assert other == 0,  f"Extra permission bits set in Keystone GT: perms=0b{perms:07b}"
+    """Keystone GT (NS c-list slot 23) has exactly E-permission and no others (v2.0 format).
+
+    v2.0 GT field layout:
+      [30:28] perm3 — 3-bit permission payload (dom=1: E/S/L encoded as perm3[2:0])
+      [27]    dom   — 1 = Church domain (E/S/L)
+    E-only GT: dom=1, perm3=0b100 (E=1, S=0, L=0).
+    """
+    word  = boot_words[CLIST_BASE + KEYSTONE_SLOT]
+    perm3 = (word >> 28) & 0x7   # bits [30:28]
+    dom   = (word >> 27) & 0x1   # bit  [27]
+    e_bit = (perm3 >> 2) & 1     # E = perm3[2]
+    s_bit = (perm3 >> 1) & 1     # S = perm3[1]
+    l_bit = (perm3 >> 0) & 1     # L = perm3[0]
+    assert dom   == 1, f"Keystone GT must be Church domain (dom=1): 0x{word:08X}"
+    assert e_bit == 1, f"E-bit not set in Keystone GT: 0x{word:08X}"
+    assert s_bit == 0, f"S-bit unexpectedly set in Keystone GT: 0x{word:08X}"
+    assert l_bit == 0, f"L-bit unexpectedly set in Keystone GT: 0x{word:08X}"
 
 
 def test_keystone_gt_points_to_slot_32(boot_words):
@@ -114,11 +125,11 @@ def test_keystone_gt_points_to_slot_32(boot_words):
 # ---------------------------------------------------------------------------
 
 def _keystone_phys_addr(boot_words):
-    """Return NS[32] physAddr from the NS table in the boot image."""
-    total         = 16384
-    ns_table_base = total - 1024        # NS_TABLE_RESERVE = 1024
-    base32        = ns_table_base + KEYSTONE_SLOT * 4   # 4 words per NS entry
-    return boot_words[base32]
+    """Return NS[23] physAddr from the NS table in the boot image."""
+    total         = len(boot_words)
+    ns_table_base = total - NS_TABLE_RESERVE   # NS_TABLE_RESERVE = 4096 (1024 entries × 4)
+    base23        = ns_table_base + KEYSTONE_SLOT * 4   # 4 words per NS entry
+    return boot_words[base23]
 
 
 def test_keystone_phys_addr_is_nonzero(boot_words):
@@ -255,7 +266,7 @@ _HELLO_HARNESS = """\
 const SystemAbstractions = require("./simulator/system_abstractions.js");
 
 // Minimal mock simulator with a fresh NULL c-list for Keystone (NS 32).
-const KEYSTONE_NS = 32;
+const KEYSTONE_NS = 23;
 const LUMP_SIZE   = 64;
 const CC          = 2;
 const PHYS_BASE   = 0;
@@ -356,8 +367,8 @@ _CONNECT_HELLO_HARNESS = """\
 "use strict";
 const SystemAbstractions = require("./simulator/system_abstractions.js");
 
-const KEYSTONE_NS    = 32;
-const TUNNEL_NS      = 31;
+const KEYSTONE_NS    = 23;
+const TUNNEL_NS = 22;
 const LUMP_SIZE      = 64;
 const CC             = 2;
 const PHYS_BASE      = 0;
@@ -467,8 +478,8 @@ const SystemAbstractions = require("./simulator/system_abstractions.js");
 
 // Minimal mock simulator with a Keystone lump (64 words, cc=2).
 // Slot 0 starts as NULL GT; Init() must fill it with the Tunnel E-GT.
-const KEYSTONE_NS = 32;
-const TUNNEL_NS   = 31;
+const KEYSTONE_NS = 23;
+const TUNNEL_NS = 22;
 const LUMP_SIZE   = 64;
 const CC          = 2;
 const PHYS_BASE   = 0;
@@ -593,7 +604,7 @@ _HELLO_SLOT0_NULL_HARNESS = """\
 "use strict";
 const SystemAbstractions = require("./simulator/system_abstractions.js");
 
-const KEYSTONE_NS    = 32;
+const KEYSTONE_NS    = 23;
 const LUMP_SIZE      = 64;
 const CC             = 2;
 const PHYS_BASE      = 0;
@@ -698,8 +709,8 @@ _HELLO_DISPATCH_HARNESS = """\
 "use strict";
 const SystemAbstractions = require("./simulator/system_abstractions.js");
 
-const KEYSTONE_NS    = 32;
-const TUNNEL_NS      = 31;
+const KEYSTONE_NS    = 23;
+const TUNNEL_NS = 22;
 const LUMP_SIZE      = 64;
 const CC             = 2;
 const PHYS_BASE      = 0;
@@ -825,7 +836,7 @@ _TUNNEL_CALL_HARNESS = """\
 "use strict";
 const SystemAbstractions = require("./simulator/system_abstractions.js");
 
-const TUNNEL_NS = 31;
+const TUNNEL_NS = 22;
 
 // Minimal mock sim — Tunnel.Call does not read sim memory.
 const sim = {
@@ -1013,17 +1024,20 @@ def test_keystone_slot0_wiring_survives_boot_image_round_trip():
         f"slot0={data.get('slot0Hex')!r}, message={data.get('message')!r}"
     )
 
-    # Strict bitwise equality: createGT(seq=0, ns=31, {E:1}, type=1) = 0x4080001F
-    #   bits[31:25] = permBits=0x20 (E only)  → 0x20 << 25 = 0x40000000
-    #   bits[24:23] = type=1                  → 0x01 << 23 = 0x00800000
-    #   bits[22:16] = gt_seq=0                → 0
-    #   bits[15:0]  = slot_id=31              → 0x0000001F
-    expected_gt = create_gt(0, TUNNEL_SLOT, {"E": 1}, 1)
+    # Strict bitwise equality using the JS simulator's v2.0 GT layout (authoritative).
+    # v2.0 layout:  [31]=b_flag=0  [30:28]=perm3=100(E)  [27]=dom=1
+    #               [26:25]=gt_type=01(Inform)  [24:16]=gt_seq=0  [15:0]=slot_id=22
+    # = 0x40000000 | 0x08000000 | 0x02000000 | 22 = 0x4A000016
+    # NOTE: Python create_gt() still uses old layout (type at [24:23]) so is NOT used here.
+    perm3_e  = 0b100          # E-only in Church domain
+    dom      = 1
+    gt_type  = 1              # Inform
+    expected_gt = ((perm3_e << 28) | (dom << 27) | (gt_type << 25) | TUNNEL_SLOT) & 0xFFFFFFFF
     actual_slot0 = data.get("slot0", 0)
     assert actual_slot0 == expected_gt, (
         f"Keystone c-list slot 0 bitwise mismatch: "
         f"got 0x{actual_slot0:08X}, expected 0x{expected_gt:08X} "
-        f"(Tunnel E-GT for NS[{TUNNEL_SLOT}], type=1, seq=0).\n"
+        f"(Tunnel E-GT for NS[{TUNNEL_SLOT}], v2.0 format, type=Inform, seq=0).\n"
         f"This catches extra permission bits or wrong GT type even when NS index and E-bit are correct."
     )
 
@@ -1041,8 +1055,8 @@ _TUNNEL_CALL_KEYSTONE_HARNESS = """\
 "use strict";
 const SystemAbstractions = require("./simulator/system_abstractions.js");
 
-const KEYSTONE_NS    = 32;
-const TUNNEL_NS      = 31;
+const KEYSTONE_NS    = 23;
+const TUNNEL_NS = 22;
 const LUMP_SIZE      = 64;
 const CC             = 2;
 const PHYS_BASE      = 0;
@@ -1178,7 +1192,7 @@ _TUNNEL_CALL_NULL_GT_HARNESS = """\
 "use strict";
 const SystemAbstractions = require("./simulator/system_abstractions.js");
 
-const TUNNEL_NS = 31;
+const TUNNEL_NS = 22;
 
 // Minimal mock sim — Tunnel.Call bound by _initKeystone does not read memory.
 const sim = {

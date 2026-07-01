@@ -75,6 +75,25 @@ def gt_decode_perm(dom: int, perm3: int) -> int:
         X = (perm3 >> 2) & 1
         return (R << PERM_R) | (W << PERM_W) | (X << PERM_X)
 
+
+def make_gt(gt_type=GT_TYPE_NULL, perms=0, slot_id=0, gt_seq=0, b_flag=0):
+    """Encode a 32-bit Golden Token word using the v2.0 dom+perm[2:0] format.
+
+    GT Word 0 field layout (v2.0):
+      [15:0]  slot_id   — 16-bit namespace slot index
+      [24:16] gt_seq    — 9-bit revocation counter
+      [26:25] gt_type   — 00=NULL  01=Inform  10=Outform  11=Abstract
+      [27]    dom       — 0=Turing {X,W,R}, 1=Church {E,S,L}
+      [30:28] perm      — 3-bit payload (dom=0: X/W/R; dom=1: E/S/L)
+      [31]    b_flag    — bindable override (IO devices)
+
+    perms: 6-bit logical mask using PERM_MASK_* constants.
+    """
+    dom, perm3 = gt_encode_perm(perms)
+    return (b_flag << 31) | (perm3 << 28) | (dom << 27) | \
+           (gt_type << 25) | (gt_seq << 16) | slot_id
+
+
 CR_WIDTH        = 96
 WORD_WIDTH      = 32
 
@@ -180,20 +199,20 @@ IRQ_REASON_LAZY_RESOLVE = 2   # NULL GT in c-list slot (ELOADCALL / XLOADLAMBDA)
 # runtime JS or general server code.  JS resolves slot names at runtime via
 # sim._slotByPetName() / sim.nsLabels.
 # ---------------------------------------------------------------------------
-BOOT_ABSTR_NS_SLOT           = 3    # Boot.Abstr (first application entry point)
-TUNNEL_NS_SLOT               = 31   # Tunnel (call-home I/O channel)
-SLIDERULE_SLOT               = 16   # SlideRule (Layer 3 Mathematics abstraction)
-CONSTANTS_SLOT               = 18   # Constants (Layer 3 read-only)
-MMIO_UART_SLOT               = 11   # UART device
-MMIO_LED_SLOT                = 12   # LED device
-MMIO_BTN_SLOT                = 13   # Button device
-MMIO_TIMER_SLOT              = 14   # Timer device
-CHURCH_HW_CR12_PORT_SLOT     = 19   # authority to CHANGE CR12 (0xFFFFFF0C, S-perm)
-CHURCH_HW_CR13_PORT_SLOT     = 20   # authority to CHANGE CR13 (0xFFFFFF0D, S-perm)
-CHURCH_HW_CR12_MBIT_SLOT     = 21   # authority for CR12 M-bit (0xFFFFFF1C, S-perm)
-CHURCH_HW_CR13_MBIT_SLOT     = 22   # authority for CR13 M-bit (0xFFFFFF1D, S-perm)
-SCHEDULER_NS_SLOT            = SCHEDULER_IRQ_NS_SLOT   # alias: Scheduler at NS slot 8
-SCHEDULER_IRQ_THREAD_NS_SLOT = 50   # Scheduler.IRQ.Thread (fixed boot-image IRQ thread)
+SELFTEST_NS_SLOT             = 6    # SelfTest (boot entry point; minimal boot namespace)
+BOOT_ABSTR_NS_SLOT           = SELFTEST_NS_SLOT   # alias: canonical boot-entry slot
+TUNNEL_NS_SLOT               = 22   # Tunnel (call-home I/O channel)
+SLIDERULE_SLOT               = 8    # SlideRule (Layer 3 Mathematics abstraction)
+CONSTANTS_SLOT               = 9    # Constants (Layer 3 read-only)
+MMIO_UART_SLOT               = 2    # UART device (MMIO 0x40000014)
+MMIO_LED_SLOT                = 3    # LED device  (MMIO 0x40000000)
+MMIO_BTN_SLOT                = 4    # Button device (MMIO 0x40000028)
+MMIO_TIMER_SLOT              = 5    # Timer device  (MMIO 0x4000002C)
+# Church HW Range NS slots 19-22 removed — authority now encoded as a
+# pre-baked Abstract S-perm GT (type=0b11, dom=1, perm3=0b010 → 0x2E000000).
+# No NS entries are needed; the token carries the authority directly.
+SCHEDULER_NS_SLOT            = SCHEDULER_IRQ_NS_SLOT   # hardware-hardwired to slot 8 (ChurchIRQDispatch); NS table no longer has Scheduler there
+SCHEDULER_IRQ_THREAD_NS_SLOT = 41   # Scheduler.IRQ.Thread (fixed boot-image IRQ thread)
 
 
 class ChurchOpcode(IntEnum):
