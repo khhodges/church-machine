@@ -100,32 +100,57 @@ fi
 echo "==> [1/5] Repo synced — ${_GIT_SHA}: ${_GIT_MSG}"
 echo ""
 
-# ── Step 2: Firmware (always clean rebuild — avoids git-pull timestamp trap) ──
-echo "==> [2/5] Firmware — clean rebuild ..."
+# ── Step 2: Firmware ──────────────────────────────────────────────────────────
+echo "==> [2/5] Firmware — compiling RISC-V firmware (~2 min)"
+echo "    Builds the Sapphire SoC firmware: call-home, fault telemetry, NIA polling."
+echo "    Always a clean rebuild to avoid git-pull timestamp traps."
+echo "    Output: firmware.elf → 4 × byte-lane .bin symbol files for the BRAM."
+echo ""
 make -C "$SOC_DIR/firmware" clean all
 echo "    Done."
 echo ""
 
-# ── Step 3: MAP — synthesis (~45 min) ────────────────────────────────────────
-# run_efx_map.sh bakes in:
-#   • patch_cm_bram.py  (CM DMEM via $readmemb — EFX_MAP ignores initial begin)
-#   • strips banned XML params (infer_clk_enable etc.)
-echo "==> [3/5] MAP — synthesis (~45 min) ..."
+# ── Step 3: MAP — synthesis ───────────────────────────────────────────────────
+echo "==> [3/5] MAP — Efinity synthesis (~45 min)"
+echo "    Translates all Verilog (Church Machine core + Sapphire SoC + glue) into"
+echo "    FPGA primitives (LUTs, FFs, BRAM, DSP) and places them on the Ti60 fabric."
+echo "    Sub-steps that run automatically inside this phase:"
+echo "      • patch_cm_bram.py   — rewrites CM DMEM to \$readmemb (EFX_MAP ignores"
+echo "                              initial begin blocks, so raw BRAM would be zeroed)"
+echo "      • XML param strip    — removes banned attrs (infer_clk_enable etc.) that"
+echo "                              cause EFX-0002 errors; Efinity re-injects them so"
+echo "                              we must strip before every compile"
+echo "    Output: work_syn/  (netlist, timing reports)"
+echo "    --- silence starts here (~45 min) ---"
+echo ""
 bash "$SOC_DIR/run_efx_map.sh"
 echo ""
 
-# ── Step 4: PNR — place & route (~30 min) ────────────────────────────────────
-# run_efx_pnr.sh bakes in:
-#   • gen_sapphire_symbol_bins.py  (firmware ELF → byte-lane .bin files)
-#   • patch_mapv_init.py           (Sapphire BRAM INIT_ injection into map.v)
-#   • Interface Designer           (IO placement from peri.xml)
-#   • efx_pnr
-echo "==> [4/5] PNR — place & route (~30 min) ..."
+# ── Step 4: PNR — place & route ───────────────────────────────────────────────
+echo "==> [4/5] PNR — place & route (~30 min)"
+echo "    Assigns synthesised cells to exact FPGA sites, routes all signal wires,"
+echo "    and writes the bitstream image."
+echo "    Sub-steps that run automatically inside this phase:"
+echo "      • gen_sapphire_symbol_bins.py — firmware ELF → byte-lane .bin files"
+echo "                                       so the Sapphire BRAM is initialised"
+echo "                                       with the correct call-home firmware"
+echo "      • patch_mapv_init.py          — injects BRAM INIT_ constants into the"
+echo "                                       post-MAP netlist (Efinity 2026.1 emits"
+echo "                                       a stub initial begin with 4 zeros)"
+echo "      • Interface Designer           — applies IO pin placement from peri.xml"
+echo "      • efx_pnr                      — the actual place-and-route engine"
+echo "    Output: outflow/church_soc_cm.bit"
+echo "    --- silence starts here (~30 min) ---"
+echo ""
 bash "$SOC_DIR/run_efx_pnr.sh"
 echo ""
 
-# ── Step 5: PGM — bitstream hex ──────────────────────────────────────────────
-echo "==> [5/5] PGM — generate hex ..."
+# ── Step 5: PGM — bitstream hex ───────────────────────────────────────────────
+echo "==> [5/5] PGM — generate .hex bitstream (<2 min)"
+echo "    Converts the .bit binary into the Intel HEX format that openFPGALoader"
+echo "    needs to flash the Ti60 F225 over USB-JTAG."
+echo "    Output: outflow/church_soc_cm.hex"
+echo ""
 bash "$SOC_DIR/run_efx_pgm.sh"
 echo ""
 
