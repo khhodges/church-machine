@@ -817,6 +817,13 @@ Encoding: op[4:0]=0x06 | cond[4] | CRd[4] | 0[4] | preset[5] | 0[10]
 
 B-modifier variants (bit 4 = 1): add 0x10 to any valid code (e.g. `EB = 0x18`). The B-modifier clears the Busy bit in CRd when the permission test passes.
 
+> **Silicon caveat (B-modifier):** The hardware decoder (`hardware/decoder.py`) currently
+> reads only the lower 4 bits of the preset field (`imm_field[:4]`). Bit 4 (the
+> B-modifier) is fully supported by the assembler and simulator but is **not wired in
+> current silicon** — on hardware, TPERM always behaves as if B = 0 regardless of whether
+> the B-modifier was encoded. The B-bit clear will take effect when the preset field is
+> widened to 5 bits in a future silicon revision.
+
 **Semantics** (in order):
 1. **NULL check**: if `CRd.word0 == 0` → Z=0, N=1, C=0, V=0, return immediately (no fault).
 2. **Reserved preset check**: if preset code (bits[3:0]) is `0x0B–0x0F` → `FAULT(TPERM_RSV)`. Both hardware and simulator fault here (D-3 closed — simulator aligned with hardware, Task #873).

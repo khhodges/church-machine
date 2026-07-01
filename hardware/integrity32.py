@@ -8,8 +8,7 @@ Design
 The check covers NS Entry W0 (location) and NS Entry W1 (authority) to produce
 NS Entry W2 (integrity32).  Both g_bit at W1[30] and f_flag at W1[31] are masked
 out before computing so the GC unit and IDE can mutate them without invalidating
-the stored W2 value. ★v2.0: g_bit moved from [28] to [30]; f_flag moved from
-GT[25] to W1[31].
+the stored W2 value.
 
 Formula (purely linear — collapses to a single LUT layer in FPGA synthesis):
     w1_masked = w1 & ~(1 << 30) & ~(1 << 31)   # mask g_bit and f_flag
