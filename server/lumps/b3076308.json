@@ -1,82 +1,82 @@
 {
-  "token": "b3076308",
-  "abstraction": "EventRouter",
-  "ns_slot": 52,
-  "ns_slot_policy": "static",
-  "boot_resident": true,
-  "lump_size": 64,
-  "cw": 19,
-  "cc": 0,
-  "methods": [
-    {
-      "name": "Add",
-      "visibility": "public",
-      "offset": 9,
-      "length": 2,
-      "description": "Register an event→handler mapping. DR0=eventGT, DR1=handlerGT. Returns 0=ok, 1=table_full."
-    },
-    {
-      "name": "Remove",
-      "visibility": "public",
-      "offset": 11,
-      "length": 2,
-      "description": "Unregister an event GT. DR0=eventGT. Returns 0=ok, 1=not_found."
-    },
-    {
-      "name": "Resolve",
-      "visibility": "public",
-      "offset": 11,
-      "length": 2,
-      "description": "Look up the handler GT for an event GT. DR0=eventGT. Returns handlerGT or 0 if not registered."
-    },
-    {
-      "name": "List",
-      "visibility": "public",
-      "offset": 11,
-      "length": 2,
-      "description": "Return the count of currently registered event→handler pairs."
-    },
-    {
-      "name": "Methods",
-      "visibility": "public",
-      "offset": 11,
-      "length": 4,
-      "description": "Return 5 — the count of public methods on this abstraction."
-    },
-    {
-      "name": "FindEvent",
-      "visibility": "private",
-      "offset": 15,
-      "length": 4,
-      "description": "(private) Linear scan for eventGT in the routing table. Returns slot index or -1."
-    },
-    {
-      "name": "BindEvent",
-      "visibility": "private",
-      "offset": 19,
-      "length": 4,
-      "description": "(private) Write an eventGT→handlerGT pair into a free slot. Returns 0."
-    },
-    {
-      "name": "UnbindEvent",
-      "visibility": "private",
-      "offset": 19,
-      "length": 4,
-      "description": "(private) Zero the routing-table entry for an event. Returns 0."
-    },
-    {
-      "name": "AllBoundEvents",
-      "visibility": "private",
-      "offset": 19,
-      "length": 4,
-      "description": "(private) Count non-zero routing table entries. Returns count."
-    }
-  ],
-  "grants": [
-    "E"
-  ],
-  "author": "SIPantic",
-  "version": "1.0.0",
-  "lump_version": 0,
-  "description": "Event-to-handler routing table. Maps event Golden Tokens to handler capabilities. Public: Add, Remove, Resolve, List, Methods. Private helpers enforce internal access control (dispatch entry=0)."
+    "token": "b3076308",
+    "abstraction": "EventRouter",
+    "ns_slot": 43,
+    "ns_slot_policy": "static",
+    "boot_resident": true,
+    "lump_size": 64,
+    "cw": 19,
+    "cc": 0,
+    "methods": [
+        {
+            "name": "Add",
+            "visibility": "public",
+            "offset": 9,
+            "length": 2,
+            "description": "Register an event\u2192handler mapping. DR0=eventGT, DR1=handlerGT. Returns 0=ok, 1=table_full."
+        },
+        {
+            "name": "Remove",
+            "visibility": "public",
+            "offset": 11,
+            "length": 2,
+            "description": "Unregister an event GT. DR0=eventGT. Returns 0=ok, 1=not_found."
+        },
+        {
+            "name": "Resolve",
+            "visibility": "public",
+            "offset": 11,
+            "length": 2,
+            "description": "Look up the handler GT for an event GT. DR0=eventGT. Returns handlerGT or 0 if not registered."
+        },
+        {
+            "name": "List",
+            "visibility": "public",
+            "offset": 11,
+            "length": 2,
+            "description": "Return the count of currently registered event\u2192handler pairs."
+        },
+        {
+            "name": "Methods",
+            "visibility": "public",
+            "offset": 11,
+            "length": 4,
+            "description": "Return 5 \u2014 the count of public methods on this abstraction."
+        },
+        {
+            "name": "FindEvent",
+            "visibility": "private",
+            "offset": 15,
+            "length": 4,
+            "description": "(private) Linear scan for eventGT in the routing table. Returns slot index or -1."
+        },
+        {
+            "name": "BindEvent",
+            "visibility": "private",
+            "offset": 19,
+            "length": 4,
+            "description": "(private) Write an eventGT\u2192handlerGT pair into a free slot. Returns 0."
+        },
+        {
+            "name": "UnbindEvent",
+            "visibility": "private",
+            "offset": 19,
+            "length": 4,
+            "description": "(private) Zero the routing-table entry for an event. Returns 0."
+        },
+        {
+            "name": "AllBoundEvents",
+            "visibility": "private",
+            "offset": 19,
+            "length": 4,
+            "description": "(private) Count non-zero routing table entries. Returns count."
+        }
+    ],
+    "grants": [
+        "E"
+    ],
+    "author": "SIPantic",
+    "version": "1.0.0",
+    "lump_version": 0,
+    "description": "Event-to-handler routing table. Maps event Golden Tokens to handler capabilities. Public: Add, Remove, Resolve, List, Methods. Private helpers enforce internal access control (dispatch entry=0)."
 }

@@ -1,39 +1,39 @@
 {
-  "token": "00002000",
-  "abstraction": "Keystone",
-  "ns_slot": 32,
-  "lump_size": 64,
-  "cw": 22,
-  "cc": 2,
-  "author": "SIPantic",
-  "version": "1.0",
-  "methods": [],
-  "grants": [
-    "E"
-  ],
-  "lump_version": 0,
-  "capabilities": [
-    {
-      "slot": 0,
-      "name": "Tunnel.Send",
-      "target_ns": 31,
-      "wired_at_boot": true,
-      "note": "Tunnel E-GT (NS[31]) — wired at boot; used by Hello to forward the GTKN packet to the far-end Mum",
-      "gt": "0x4880001f"
-    },
-    {
-      "slot": 1,
-      "name": "Tunnel.mymother",
-      "filled_by": "Connect",
-      "initial": "NULL_GT",
-      "note": "Mum Outform E-GT — NULL at boot; injected by Keystone.Connect when a valid Mum identity word is presented"
+    "token": "00002000",
+    "abstraction": "Keystone",
+    "ns_slot": 23,
+    "lump_size": 64,
+    "cw": 22,
+    "cc": 2,
+    "author": "SIPantic",
+    "version": "1.0",
+    "methods": [],
+    "grants": [
+        "E"
+    ],
+    "lump_version": 0,
+    "capabilities": [
+        {
+            "slot": 0,
+            "name": "Tunnel.Send",
+            "target_ns": 31,
+            "wired_at_boot": true,
+            "note": "Tunnel E-GT (NS[31]) \u2014 wired at boot; used by Hello to forward the GTKN packet to the far-end Mum",
+            "gt": "0x4880001f"
+        },
+        {
+            "slot": 1,
+            "name": "Tunnel.mymother",
+            "filled_by": "Connect",
+            "initial": "NULL_GT",
+            "note": "Mum Outform E-GT \u2014 NULL at boot; injected by Keystone.Connect when a valid Mum identity word is presented"
+        }
+    ],
+    "pet_names": {
+        "DR": {},
+        "CR": {
+            "0": "Tunnel.Send",
+            "1": "Tunnel.mymother"
+        }
     }
-  ],
-  "pet_names": {
-    "DR": {},
-    "CR": {
-      "0": "Tunnel.Send",
-      "1": "Tunnel.mymother"
-    }
-  }
 }

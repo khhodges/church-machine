@@ -112,8 +112,13 @@ const M_BIT_PORT_CR14         = 0xFFFFFF1E; // M-bit authority port for CR14
 const M_BIT_PORT_CR15         = 0xFFFFFF1F; // M-bit authority port for CR15
 const IO_PORT_PET_NAME_WR     = 0xFFFFFF38; // DWRITE to this addr marks c-list slot (value & 0x3F) as named
 // Boot-default named slots — matches hardware/boot_rom.py DEMO_CLIST_NAMED_SLOTS.
-// Updated for minimal 8-slot namespace (indices 1 and 4 freed).
-const BOOT_NAMED_SLOTS = Object.freeze([0, 1, 2, 3, 5, 6, 7, 8, 9, 10]);
+// Live slots: 0-6 (excl. 7), 8-10, 22 (Tunnel), 23 (Keystone), 42 (Ethernet), 43 (EventRouter).
+const BOOT_NAMED_SLOTS = Object.freeze([0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 22, 23, 42, 43]);
+
+// Simulator-internal constant for the IRQ thread NS slot.
+// Slot 41 is the fixed boot-image IRQ thread position used by _fireSchedulerIRQ
+// to record context switches; it does not have a live catalog entry.
+const SCHEDULER_IRQ_THREAD_SLOT = 41;
 
 
 // SCHEDULER_IRQ_CLIST — simulated c-list for the Scheduler.IRQ abstraction (NS slot 8).
@@ -706,7 +711,7 @@ class ChurchSimulator {
         // Mirrors hardware/pet_name_mem.py and hardware/boot_rom.py DEMO_CLIST_NAMED_SLOTS.
         // Initialised with the boot c-list named slots; updated by DWRITE to IO_PORT_PET_NAME_WR
         // (0xFFFFFF38) and by markNamedSlots() when a program with a capabilities block loads.
-        // Boot named slots: {0,1,2,3,5,6,7,8,9,10,11,12,13} — matches DEMO_CLIST_NAMED_SLOTS.
+        // Boot named slots: {0-6 (excl.7), 8-10, 22, 23, 42, 43} — matches DEMO_CLIST_NAMED_SLOTS.
         this.petNameMemory = new Set(BOOT_NAMED_SLOTS);
 
         // Lazy-Resolve: Transparent Thread Suspension (Task #1519)
@@ -1090,14 +1095,14 @@ class ChurchSimulator {
             { label: 'SlideRule',    perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: true  },  // 8
             { label: 'Constants',    perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 9
             { label: 'Loader',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 10
-            { label: 'SUCC',         perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },  // 11
-            { label: 'PRED',         perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },  // 12
-            { label: 'ADD',          perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },  // 13
-            { label: 'SUB',          perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },  // 14
-            { label: 'MUL',          perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },  // 15
-            { label: 'ISZERO',       perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },  // 16
-            { label: 'TRUE',         perms: {R:0,W:0,X:0,L:1,S:0,E:0}, chainable: false },  // 17
-            { label: 'FALSE',        perms: {R:0,W:0,X:0,L:1,S:0,E:0}, chainable: false },  // 18
+            null,                                                                               // 11 freed (was SUCC)
+            null,                                                                               // 12 freed (was PRED)
+            null,                                                                               // 13 freed (was ADD)
+            null,                                                                               // 14 freed (was SUB)
+            null,                                                                               // 15 freed (was MUL)
+            null,                                                                               // 16 freed (was ISZERO)
+            null,                                                                               // 17 freed (was TRUE)
+            null,                                                                               // 18 freed (was FALSE)
             null,                                                                               // 19 freed
             null,                                                                               // 20 freed
             null,                                                                               // 21 freed
@@ -1113,14 +1118,14 @@ class ChurchSimulator {
             null,                                                                               // 31 freed
             null,                                                                               // 32 freed
             null,                                                                               // 33 freed
-            { label: 'PAIR',         perms: {R:0,W:0,X:1,L:0,S:0,E:0}, chainable: false },  // 34
-            { label: 'GC',           perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false, handler: 'gc' }, // 35
-            { label: 'Thread',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 36
+            null,                                                                               // 34 freed (was PAIR)
+            null,                                                                               // 35 freed (was GC)
+            null,                                                                               // 36 freed (was Thread)
             null,                                                                               // 37 freed
-            { label: 'Billing',      perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 38
-            { label: 'TuringMemory', perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 39
-            { label: 'ChurchMemory', perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 40
-            { label: 'Scheduler.IRQ.Thread', perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false }, // 41
+            null,                                                                               // 38 freed (was Billing)
+            null,                                                                               // 39 freed (was TuringMemory)
+            null,                                                                               // 40 freed (was ChurchMemory)
+            null,                                                                               // 41 freed (was Scheduler.IRQ.Thread — see SCHEDULER_IRQ_THREAD_SLOT)
             { label: 'Ethernet',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 42
             { label: 'EventRouter',  perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 43
         ];
@@ -1360,15 +1365,11 @@ class ChurchSimulator {
         // Entry format: [ns_slot, [ descriptor, ... ]]
         //   Inform descriptor:   { type: 'inform',   ref: N,       perms: {E:1} }
         //   Abstract descriptor: { type: 'abstract', abType: T, rwPerms: {...}, abData: D }
-        // Minimal SERVICE_CLIST_DEFS: Thread (36) needs Abstract S-perm GT;
-        // TuringMemory (39) and ChurchMemory (40) each get Billing E-GT.
-        // Pure Church-calculus slots keep cc=0 and are absent here.
+        // SERVICE_CLIST_DEFS: c-list bootstrap for service abstractions.
+        // All placeholder slots (Thread/36, Billing/38, TuringMemory/39, ChurchMemory/40)
+        // were removed in the namespace prune — this table is now empty.
         const ABSTRACT_SPERM_GT = (0b010 << 28) | (1 << 27) | (0b11 << 25); // 0x2E000000
-        const SERVICE_CLIST_DEFS = [
-            [36, [{ type:'abstractSperm' }]],                                                          // Thread:       Abstract S-perm GT (CHANGE CR12 authority)
-            [39, [{ type:'inform', ref:38, perms:{E:1} }]],                                            // TuringMemory: Billing E
-            [40, [{ type:'inform', ref:38, perms:{E:1} }]],                                            // ChurchMemory: Billing E
-        ];
+        const SERVICE_CLIST_DEFS = [];
         for (const [cslot, entries] of SERVICE_CLIST_DEFS) {
             const cc  = entries.length;
             const loc = this.memory[this.NS_TABLE_BASE + cslot * this.NS_ENTRY_WORDS];
@@ -3008,7 +3009,7 @@ class ChurchSimulator {
 
         // Resolve pet names to slot indices at call time (nsLabels is live here).
         const _schedulerSlot   = this._slotByPetName('Scheduler', 8);
-        const _irqThreadSlot   = this._slotByPetName('Scheduler.IRQ.Thread', 41);
+        const _irqThreadSlot   = SCHEDULER_IRQ_THREAD_SLOT;
 
         // Clear the alarm flag immediately on TIMER fire so timerArmed is false
         // whether this is called from step() (which pre-clears it) or directly.

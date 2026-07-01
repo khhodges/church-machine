@@ -2,7 +2,7 @@
     {
         "token": "00001200",
         "abstraction": "Constants",
-        "ns_slot": 18,
+        "ns_slot": 9,
         "lump_size": 64,
         "cw": 18,
         "dw": 5,
@@ -15,15 +15,15 @@
                 "pet_names": {
                     "DR": {}
                 },
-                "description": "Return the IEEE-754 single-precision value of π (3.14159265…) in DR0.",
+                "description": "Return the IEEE-754 single-precision value of \u03c0 (3.14159265\u2026) in DR0.",
                 "inputs": [],
                 "outputs": [
-                    "DR0: π ≈ 3.14159265 (0x40490FDB)"
+                    "DR0: \u03c0 \u2248 3.14159265 (0x40490FDB)"
                 ],
                 "comments": [
-                    "load self-data-R cap (c-list[0]) into CR0 — grants read-only access to embedded data words",
-                    "read data word [0] (π = 3.14159265…) via CR0 into DR0",
-                    "return π in DR0 to caller"
+                    "load self-data-R cap (c-list[0]) into CR0 \u2014 grants read-only access to embedded data words",
+                    "read data word [0] (\u03c0 = 3.14159265\u2026) via CR0 into DR0",
+                    "return \u03c0 in DR0 to caller"
                 ]
             },
             {
@@ -33,14 +33,14 @@
                 "pet_names": {
                     "DR": {}
                 },
-                "description": "Return the IEEE-754 single-precision value of e (2.71828182…) in DR0.",
+                "description": "Return the IEEE-754 single-precision value of e (2.71828182\u2026) in DR0.",
                 "inputs": [],
                 "outputs": [
-                    "DR0: e ≈ 2.71828182 (0x402DF854)"
+                    "DR0: e \u2248 2.71828182 (0x402DF854)"
                 ],
                 "comments": [
-                    "load self-data-R cap (c-list[0]) into CR0 — grants read-only access to embedded data words",
-                    "read data word [1] (e = 2.71828182…) via CR0 into DR0",
+                    "load self-data-R cap (c-list[0]) into CR0 \u2014 grants read-only access to embedded data words",
+                    "read data word [1] (e = 2.71828182\u2026) via CR0 into DR0",
                     "return e in DR0 to caller"
                 ]
             },
@@ -51,15 +51,15 @@
                 "pet_names": {
                     "DR": {}
                 },
-                "description": "Return the IEEE-754 single-precision golden ratio φ (1.61803398…) in DR0.",
+                "description": "Return the IEEE-754 single-precision golden ratio \u03c6 (1.61803398\u2026) in DR0.",
                 "inputs": [],
                 "outputs": [
-                    "DR0: φ ≈ 1.61803398 (0x3FCF1BBD)"
+                    "DR0: \u03c6 \u2248 1.61803398 (0x3FCF1BBD)"
                 ],
                 "comments": [
-                    "load self-data-R cap (c-list[0]) into CR0 — grants read-only access to embedded data words",
-                    "read data word [2] (φ = 1.61803398…) via CR0 into DR0",
-                    "return φ in DR0 to caller"
+                    "load self-data-R cap (c-list[0]) into CR0 \u2014 grants read-only access to embedded data words",
+                    "read data word [2] (\u03c6 = 1.61803398\u2026) via CR0 into DR0",
+                    "return \u03c6 in DR0 to caller"
                 ]
             },
             {
@@ -75,7 +75,7 @@
                     "DR0: 0.0 (0x00000000)"
                 ],
                 "comments": [
-                    "load self-data-R cap (c-list[0]) into CR0 — grants read-only access to embedded data words",
+                    "load self-data-R cap (c-list[0]) into CR0 \u2014 grants read-only access to embedded data words",
                     "read data word [3] (0.0) via CR0 into DR0",
                     "return 0.0 in DR0 to caller"
                 ]
@@ -93,7 +93,7 @@
                     "DR0: 1.0 (0x3F800000)"
                 ],
                 "comments": [
-                    "load self-data-R cap (c-list[0]) into CR0 — grants read-only access to embedded data words",
+                    "load self-data-R cap (c-list[0]) into CR0 \u2014 grants read-only access to embedded data words",
                     "read data word [4] (1.0) via CR0 into DR0",
                     "return 1.0 in DR0 to caller"
                 ]
@@ -109,14 +109,14 @@
                 },
                 "description": "Store a user-supplied 32-bit value XYZ in the next free pool slot and return the slot index N in DR0. N is the retrieval key for Constants.Get(N). Returns FAULT if the pool (14 slots) is full.",
                 "inputs": [
-                    "DR0: XYZ — any IEEE-754 or raw 32-bit value to store"
+                    "DR0: XYZ \u2014 any IEEE-754 or raw 32-bit value to store"
                 ],
                 "outputs": [
-                    "DR0: N — pool slot index (0–13); FAULT if pool is full"
+                    "DR0: N \u2014 pool slot index (0\u201313); FAULT if pool is full"
                 ],
                 "comments": [
                     "bindMethod scans the bitmap, places XYZ in pool memory, marks slot as occupied",
-                    "returns slot index N in DR0 — no GT is created, no NS entry is written",
+                    "returns slot index N in DR0 \u2014 no GT is created, no NS entry is written",
                     "the pool is internal to the Constants abstraction boundary"
                 ]
             },
@@ -131,7 +131,7 @@
                 },
                 "description": "Read back the 32-bit value stored by Constants.Add() at slot index N. N comes from DR0. Returns FAULT if N is out of range or the slot is not allocated.",
                 "inputs": [
-                    "DR0: N — pool slot index returned by a prior Constants.Add()"
+                    "DR0: N \u2014 pool slot index returned by a prior Constants.Add()"
                 ],
                 "outputs": [
                     "DR0: stored 32-bit value; FAULT if N invalid or unallocated"
@@ -139,7 +139,7 @@
                 "comments": [
                     "bindMethod validates N against POOL_SIZE and the bitmap",
                     "reads pool memory at poolBase + N and returns the value in DR0",
-                    "no NS lookup — the pool is internal to the Constants abstraction"
+                    "no NS lookup \u2014 the pool is internal to the Constants abstraction"
                 ]
             }
         ],
@@ -160,87 +160,9 @@
         "lump_version": 0
     },
     {
-        "token": "00000c00",
-        "abstraction": "LED",
-        "ns_slot": 12,
-        "lump_size": 256,
-        "cw": 144,
-        "dw": 0,
-        "cc": 0,
-        "methods": [
-            {
-                "name": "Set",
-                "offset": 0,
-                "length": 33,
-                "description": "Turn on the LED identified by the calling capability’s C-list offset. The LED index (0–5) is encoded in the CALL instruction’s C-list slot field — no DR argument is required. DR0 returns ≥1 on success or <0 on fault.",
-                "inputs": [],
-                "outputs": [
-                    "DR0 = 1 (LED turned on successfully)",
-                    "DR0 = -1 (invalid capability offset / LED index out of range)"
-                ],
-                "comments": [
-                    "LED identity derived from C-list slot offset (CALL method, CR6, #(8+led))",
-                    "No DR register argument — capability IS the address of the LED",
-                    "Signed return: DR0 ≥0 success, DR0 <0 failure"
-                ]
-            },
-            {
-                "name": "Clear",
-                "offset": 33,
-                "length": 33,
-                "description": "Turn off the LED identified by the calling capability’s C-list offset. No DR argument required. DR0 returns ≥1 on success or <0 on fault.",
-                "inputs": [],
-                "outputs": [
-                    "DR0 = 1 (LED turned off successfully)",
-                    "DR0 = -1 (invalid capability offset / LED index out of range)"
-                ],
-                "comments": [
-                    "LED identity derived from C-list slot offset (CALL 1, CR6, #(8+led))",
-                    "Signed return convention: DR0 ≥0 success, DR0 <0 failure"
-                ]
-            },
-            {
-                "name": "Toggle",
-                "offset": 66,
-                "length": 57,
-                "description": "Flip the state of the LED identified by the calling capability’s C-list offset. No DR argument required. DR0 returns ≥1 on success or <0 on fault.",
-                "inputs": [],
-                "outputs": [
-                    "DR0 = 1 (LED state flipped successfully)",
-                    "DR0 = -1 (invalid capability offset / LED index out of range)"
-                ],
-                "comments": [
-                    "LED identity derived from C-list slot offset (CALL 2, CR6, #(8+led))",
-                    "Signed return convention: DR0 ≥0 success, DR0 <0 failure"
-                ]
-            },
-            {
-                "name": "State",
-                "offset": 123,
-                "length": 21,
-                "description": "Read the current on/off state of the LED identified by the calling capability’s C-list offset. No DR argument required. Returns DR0=1 (on), DR0=0 (off), or DR0<0 (fault).",
-                "inputs": [],
-                "outputs": [
-                    "DR0 = 1 (LED is currently on)",
-                    "DR0 = 0 (LED is currently off)",
-                    "DR0 = -1 (invalid capability offset / LED index out of range)"
-                ],
-                "comments": [
-                    "LED identity derived from C-list slot offset (CALL 3, CR6, #(8+led))",
-                    "Caller branches on DR0 sign: BGE DR0, #0, .got_state for success",
-                    "Signed return: ≥0 = on/off result, <0 = fault code"
-                ]
-            }
-        ],
-        "grants": [
-            "E"
-        ],
-        "lump_version": 0
-    },
-    {
         "token": "00001000",
         "abstraction": "SlideRule",
-        "ns_slot": 16,
+        "ns_slot": 8,
         "variant_group": "sliderule",
         "lump_size": 4096,
         "cw": 2602,
@@ -251,45 +173,45 @@
                 "name": "Multiply",
                 "offset": 0,
                 "length": 43,
-                "description": "Multiply two IEEE-754 floats (DR0 × DR1) and return the product in DR0.",
+                "description": "Multiply two IEEE-754 floats (DR0 \u00d7 DR1) and return the product in DR0.",
                 "inputs": [
                     "DR0: multiplicand",
                     "DR1: multiplier"
                 ],
                 "outputs": [
-                    "DR0: DR0 × DR1"
+                    "DR0: DR0 \u00d7 DR1"
                 ]
             },
             {
                 "name": "Divide",
                 "offset": 43,
                 "length": 41,
-                "description": "Divide DR0 by DR1 (DR0 ÷ DR1) and return the quotient in DR0. FAULT if DR1 is zero.",
+                "description": "Divide DR0 by DR1 (DR0 \u00f7 DR1) and return the quotient in DR0. FAULT if DR1 is zero.",
                 "inputs": [
                     "DR0: dividend",
                     "DR1: divisor (must be non-zero)"
                 ],
                 "outputs": [
-                    "DR0: DR0 ÷ DR1"
+                    "DR0: DR0 \u00f7 DR1"
                 ]
             },
             {
                 "name": "Sqrt",
                 "offset": 84,
                 "length": 40,
-                "description": "Return the square root of DR0 (√DR0). Input must be non-negative.",
+                "description": "Return the square root of DR0 (\u221aDR0). Input must be non-negative.",
                 "inputs": [
-                    "DR0: radicand (≥ 0)"
+                    "DR0: radicand (\u2265 0)"
                 ],
                 "outputs": [
-                    "DR0: √DR0"
+                    "DR0: \u221aDR0"
                 ]
             },
             {
                 "name": "Mod",
                 "offset": 124,
                 "length": 34,
-                "description": "Return the IEEE-754 remainder of DR0 ÷ DR1 (equivalent to fmod).",
+                "description": "Return the IEEE-754 remainder of DR0 \u00f7 DR1 (equivalent to fmod).",
                 "inputs": [
                     "DR0: dividend",
                     "DR1: divisor"
@@ -338,9 +260,9 @@
                 "name": "Asin",
                 "offset": 1068,
                 "length": 282,
-                "description": "Return the arcsine of DR0 in radians. Input must be in [−1, 1].",
+                "description": "Return the arcsine of DR0 in radians. Input must be in [\u22121, 1].",
                 "inputs": [
-                    "DR0: value in [−1, 1]"
+                    "DR0: value in [\u22121, 1]"
                 ],
                 "outputs": [
                     "DR0: arcsin(DR0) in radians"
@@ -350,9 +272,9 @@
                 "name": "Acos",
                 "offset": 1350,
                 "length": 290,
-                "description": "Return the arccosine of DR0 in radians. Input must be in [−1, 1].",
+                "description": "Return the arccosine of DR0 in radians. Input must be in [\u22121, 1].",
                 "inputs": [
-                    "DR0: value in [−1, 1]"
+                    "DR0: value in [\u22121, 1]"
                 ],
                 "outputs": [
                     "DR0: arccos(DR0) in radians"
@@ -374,7 +296,7 @@
                 "name": "ToDegrees",
                 "offset": 1920,
                 "length": 39,
-                "description": "Convert DR0 from radians to degrees (DR0 × 180/π).",
+                "description": "Convert DR0 from radians to degrees (DR0 \u00d7 180/\u03c0).",
                 "inputs": [
                     "DR0: angle in radians"
                 ],
@@ -386,7 +308,7 @@
                 "name": "ToRadians",
                 "offset": 1959,
                 "length": 37,
-                "description": "Convert DR0 from degrees to radians (DR0 × π/180).",
+                "description": "Convert DR0 from degrees to radians (DR0 \u00d7 \u03c0/180).",
                 "inputs": [
                     "DR0: angle in degrees"
                 ],
@@ -400,7 +322,7 @@
                 "length": 130,
                 "description": "Return the Bernoulli number B(n) for non-negative integer n in DR0.",
                 "inputs": [
-                    "DR0: integer n ≥ 0"
+                    "DR0: integer n \u2265 0"
                 ],
                 "outputs": [
                     "DR0: B(n)"
@@ -418,12 +340,12 @@
                     "DR0: |DR0|"
                 ],
                 "comments": [
-                    "IADD DR12, DR0, DR0: save 2×arg in DR12 (DR0 is zero-source here; DR12 = 2×call-arg)",
-                    "MCMP DR0, DR12: compare 0 vs 2×arg to detect sign (0 ≥ 2×arg means arg ≤ 0)",
-                    "BRANCHLT +4: if 0 < DR12 (arg > 0) skip negation — jump to positive-return path",
-                    "IADD DR12, DR0, DR0: reset DR12 = 0 (zero both sources) — prepare for ISUB negate",
-                    "ISUB DR12, DR12, DR0: DR12 = DR12 − 0 = 0 (acts as |arg| setup via sign-flip chain)",
-                    "IADD DR0, DR12, DR0: zero-source copy — DR0 ← DR12 (the negated or passthrough value)",
+                    "IADD DR12, DR0, DR0: save 2\u00d7arg in DR12 (DR0 is zero-source here; DR12 = 2\u00d7call-arg)",
+                    "MCMP DR0, DR12: compare 0 vs 2\u00d7arg to detect sign (0 \u2265 2\u00d7arg means arg \u2264 0)",
+                    "BRANCHLT +4: if 0 < DR12 (arg > 0) skip negation \u2014 jump to positive-return path",
+                    "IADD DR12, DR0, DR0: reset DR12 = 0 (zero both sources) \u2014 prepare for ISUB negate",
+                    "ISUB DR12, DR12, DR0: DR12 = DR12 \u2212 0 = 0 (acts as |arg| setup via sign-flip chain)",
+                    "IADD DR0, DR12, DR0: zero-source copy \u2014 DR0 \u2190 DR12 (the negated or passthrough value)",
                     "RETURN: DR0 = |arg|"
                 ]
             },
@@ -453,10 +375,10 @@
                     "DR0: min(DR0, DR1)"
                 ],
                 "comments": [
-                    "MCMP DR0, DR1: compare the two float inputs — sets flags for the GE/LT branch",
-                    "BRANCHGE +2: if DR0 ≥ DR1 then DR1 is smaller — jump to copy-DR1 path (instr 3)",
-                    "RETURN: DR0 < DR1, so DR0 is already the min — return it unchanged",
-                    "IADD DR0, DR1, #0: zero-source copy — DR0 ← DR1 (zero register makes this a move)",
+                    "MCMP DR0, DR1: compare the two float inputs \u2014 sets flags for the GE/LT branch",
+                    "BRANCHGE +2: if DR0 \u2265 DR1 then DR1 is smaller \u2014 jump to copy-DR1 path (instr 3)",
+                    "RETURN: DR0 < DR1, so DR0 is already the min \u2014 return it unchanged",
+                    "IADD DR0, DR1, #0: zero-source copy \u2014 DR0 \u2190 DR1 (zero register makes this a move)",
                     "RETURN: DR0 = min(DR0, DR1)"
                 ]
             },
@@ -473,10 +395,10 @@
                     "DR0: max(DR0, DR1)"
                 ],
                 "comments": [
-                    "MCMP DR0, DR1: compare the two float inputs — sets flags for the LE/GT branch",
-                    "BRANCHLE +2: if DR0 ≤ DR1 then DR1 is larger — jump to copy-DR1 path (instr 3)",
-                    "RETURN: DR0 > DR1, so DR0 is already the max — return it unchanged",
-                    "IADD DR0, DR1, #0: zero-source copy — DR0 ← DR1 (zero register makes this a move)",
+                    "MCMP DR0, DR1: compare the two float inputs \u2014 sets flags for the LE/GT branch",
+                    "BRANCHLE +2: if DR0 \u2264 DR1 then DR1 is larger \u2014 jump to copy-DR1 path (instr 3)",
+                    "RETURN: DR0 > DR1, so DR0 is already the max \u2014 return it unchanged",
+                    "IADD DR0, DR1, #0: zero-source copy \u2014 DR0 \u2190 DR1 (zero register makes this a move)",
                     "RETURN: DR0 = max(DR0, DR1)"
                 ]
             },
@@ -509,12 +431,12 @@
                 "name": "Log2",
                 "offset": 2273,
                 "length": 18,
-                "description": "Return the base-2 logarithm of DR0 (log₂ DR0). Input must be positive.",
+                "description": "Return the base-2 logarithm of DR0 (log\u2082 DR0). Input must be positive.",
                 "inputs": [
                     "DR0: positive float"
                 ],
                 "outputs": [
-                    "DR0: log₂(DR0)"
+                    "DR0: log\u2082(DR0)"
                 ]
             },
             {
@@ -534,27 +456,27 @@
                 "name": "Signum",
                 "offset": 2585,
                 "length": 17,
-                "description": "Return the sign of DR0: +1.0 if positive, −1.0 if negative, 0.0 if zero.",
+                "description": "Return the sign of DR0: +1.0 if positive, \u22121.0 if negative, 0.0 if zero.",
                 "inputs": [
                     "DR0: any float"
                 ],
                 "outputs": [
-                    "DR0: sign of DR0 (+1.0, 0.0, or −1.0)"
+                    "DR0: sign of DR0 (+1.0, 0.0, or \u22121.0)"
                 ],
                 "comments": [
-                    "MCMP DR0, DR1: compare arg vs 0 — detects positive case (BRANCHGT condition)",
+                    "MCMP DR0, DR1: compare arg vs 0 \u2014 detects positive case (BRANCHGT condition)",
                     "BRANCHGT +4: if arg > 0, jump to +1.0 return path (instr 4)",
-                    "MCMP DR0, DR1: re-compare arg vs 0 — detects negative case (BRANCHLT condition)",
-                    "BRANCHLT +6: if arg < 0, jump to −1.0 return path (instr 8)",
-                    "IADD DR0, DR0, #1: DR0 ← 0 + 1 = 1 (representing +1.0 integer; used as +1 signum)",
+                    "MCMP DR0, DR1: re-compare arg vs 0 \u2014 detects negative case (BRANCHLT condition)",
+                    "BRANCHLT +6: if arg < 0, jump to \u22121.0 return path (instr 8)",
+                    "IADD DR0, DR0, #1: DR0 \u2190 0 + 1 = 1 (representing +1.0 integer; used as +1 signum)",
                     "RETURN: DR0 = +1 (arg was positive)",
                     "MCMP DR0, DR1: compare arg vs 0 again for the zero case",
-                    "BRANCHNE +6: if arg ≠ 0 jump to −1.0 path (should not be reached — zero path falls through)",
-                    "ISUB DR12, DR12, #1: DR12 ← 0 − 1 = −1 (integer representation of −1.0 signum)",
-                    "IADD DR0, DR12, #0: zero-source copy — DR0 ← DR12 = −1",
-                    "RETURN: DR0 = −1 (arg was negative)",
-                    "IADD DR12, DR12, #0: clear scratch (DR12 ← 0, nop path for zero case)",
-                    "IADD DR0, DR12, #0: DR0 ← 0 (signum of 0 is 0)",
+                    "BRANCHNE +6: if arg \u2260 0 jump to \u22121.0 path (should not be reached \u2014 zero path falls through)",
+                    "ISUB DR12, DR12, #1: DR12 \u2190 0 \u2212 1 = \u22121 (integer representation of \u22121.0 signum)",
+                    "IADD DR0, DR12, #0: zero-source copy \u2014 DR0 \u2190 DR12 = \u22121",
+                    "RETURN: DR0 = \u22121 (arg was negative)",
+                    "IADD DR12, DR12, #0: clear scratch (DR12 \u2190 0, nop path for zero case)",
+                    "IADD DR0, DR12, #0: DR0 \u2190 0 (signum of 0 is 0)",
                     "RETURN: DR0 = 0 (arg was zero)"
                 ]
             }
@@ -591,26 +513,26 @@
                 "name": "Sub",
                 "offset": 4,
                 "length": 3,
-                "description": "Subtract DR1 from DR0 (DR0 − DR1) and return the result in DR0.",
+                "description": "Subtract DR1 from DR0 (DR0 \u2212 DR1) and return the result in DR0.",
                 "inputs": [
                     "DR0: minuend",
                     "DR1: subtrahend"
                 ],
                 "outputs": [
-                    "DR0: DR0 − DR1"
+                    "DR0: DR0 \u2212 DR1"
                 ]
             },
             {
                 "name": "Mul",
                 "offset": 7,
                 "length": 8,
-                "description": "Multiply two floats (DR0 × DR1) and return the product in DR0.",
+                "description": "Multiply two floats (DR0 \u00d7 DR1) and return the product in DR0.",
                 "inputs": [
                     "DR0: multiplicand",
                     "DR1: multiplier"
                 ],
                 "outputs": [
-                    "DR0: DR0 × DR1"
+                    "DR0: DR0 \u00d7 DR1"
                 ]
             },
             {
@@ -619,10 +541,10 @@
                 "length": 27,
                 "description": "Return the square root of DR0. Input must be non-negative.",
                 "inputs": [
-                    "DR0: radicand (≥ 0)"
+                    "DR0: radicand (\u2265 0)"
                 ],
                 "outputs": [
-                    "DR0: √DR0"
+                    "DR0: \u221aDR0"
                 ]
             },
             {
@@ -653,7 +575,7 @@
                 "name": "Signum",
                 "offset": 74,
                 "length": 25,
-                "description": "Return +1.0 if DR0 > 0, −1.0 if DR0 < 0, or 0.0 if DR0 = 0.",
+                "description": "Return +1.0 if DR0 > 0, \u22121.0 if DR0 < 0, or 0.0 if DR0 = 0.",
                 "inputs": [
                     "DR0: any float"
                 ],
@@ -813,7 +735,7 @@
                         "0": "c"
                     }
                 },
-                "description": "Return 1 if the character (code point DR0) is an ASCII uppercase letter (A–Z), else 0.",
+                "description": "Return 1 if the character (code point DR0) is an ASCII uppercase letter (A\u2013Z), else 0.",
                 "inputs": [
                     "DR0: Unicode code point"
                 ],
@@ -830,7 +752,7 @@
                         "0": "c"
                     }
                 },
-                "description": "Return 1 if the character (code point DR0) is an ASCII lowercase letter (a–z), else 0.",
+                "description": "Return 1 if the character (code point DR0) is an ASCII lowercase letter (a\u2013z), else 0.",
                 "inputs": [
                     "DR0: Unicode code point"
                 ],
@@ -857,7 +779,7 @@
                         "0": "c"
                     }
                 },
-                "description": "Return 1 if the code point DR0 is an ASCII decimal digit (0–9), else 0.",
+                "description": "Return 1 if the code point DR0 is an ASCII decimal digit (0\u20139), else 0.",
                 "inputs": [
                     "DR0: Unicode code point"
                 ],
@@ -870,7 +792,7 @@
                 "offset": 87,
                 "length": 3,
                 "aliasOf": "ReturnFalse",
-                "description": "Return 1 if the code point DR0 is an ASCII letter (A–Z or a–z), else 0.",
+                "description": "Return 1 if the code point DR0 is an ASCII letter (A\u2013Z or a\u2013z), else 0.",
                 "inputs": [
                     "DR0: Unicode code point"
                 ],
@@ -1028,12 +950,12 @@
                         "0": "c"
                     }
                 },
-                "description": "Return the decimal digit value (0–9) of the digit character DR0. Non-digits return −1.",
+                "description": "Return the decimal digit value (0\u20139) of the digit character DR0. Non-digits return \u22121.",
                 "inputs": [
                     "DR0: Unicode code point for a decimal digit"
                 ],
                 "outputs": [
-                    "DR0: integer value 0–9, or −1 if not a digit"
+                    "DR0: integer value 0\u20139, or \u22121 if not a digit"
                 ]
             },
             {
@@ -1041,7 +963,7 @@
                 "offset": 87,
                 "length": 3,
                 "aliasOf": "ReturnFalse",
-                "description": "Return 1 if the code point DR0 is a valid hexadecimal digit (0–9, A–F, a–f), else 0.",
+                "description": "Return 1 if the code point DR0 is a valid hexadecimal digit (0\u20139, A\u2013F, a\u2013f), else 0.",
                 "inputs": [
                     "DR0: Unicode code point"
                 ],
@@ -1097,7 +1019,7 @@
                         "0": "val"
                     }
                 },
-                "description": "Return DR0 if DR0 ≠ 0, else FAULT. Used to guard operations that require a non-zero value.",
+                "description": "Return DR0 if DR0 \u2260 0, else FAULT. Used to guard operations that require a non-zero value.",
                 "inputs": [
                     "DR0: value to check"
                 ],
@@ -1178,21 +1100,21 @@
                 "name": "Register",
                 "offset": 0,
                 "length": 6,
-                "description": "Send the call-home identification packet and await ACK from the IDE bridge. Replaces the hardwired B:02½ boot step. Writes 3 words to UART TX: [boot_reason · last_fault · fault_NIA], then blocks on RX for IDE ACK. Offline-safe: DR0 ≤ 0 if no ACK.",
+                "description": "Send the call-home identification packet and await ACK from the IDE bridge. Replaces the hardwired B:02\u00bd boot step. Writes 3 words to UART TX: [boot_reason \u00b7 last_fault \u00b7 fault_NIA], then blocks on RX for IDE ACK. Offline-safe: DR0 \u2264 0 if no ACK.",
                 "inputs": [
                     "DR1: boot_reason (0=cold, 1=warm, 2=fault-recovery)",
                     "DR2: last_fault code (0 if none)",
                     "DR3: fault_NIA address (0 if none)"
                 ],
                 "outputs": [
-                    "DR0: 1 = IDE connected and ACK received | ≤0 = offline"
+                    "DR0: 1 = IDE connected and ACK received | \u22640 = offline"
                 ],
                 "comments": [
-                    "LOAD  AL, CR7, CR6[0]   ; UART GT from c-list slot 0 → CR7",
+                    "LOAD  AL, CR7, CR6[0]   ; UART GT from c-list slot 0 \u2192 CR7",
                     "DWRITE DR1, CR7[0]       ; TX: boot_reason",
                     "DWRITE DR2, CR7[0]       ; TX: last_fault",
                     "DWRITE DR3, CR7[0]       ; TX: fault_NIA",
-                    "DREAD  DR0, CR7[1]       ; RX: IDE ACK (1=connected, ≤0=offline)",
+                    "DREAD  DR0, CR7[1]       ; RX: IDE ACK (1=connected, \u22640=offline)",
                     "RETURN AL, CR5"
                 ]
             },
@@ -1200,21 +1122,21 @@
                 "name": "Send",
                 "offset": 6,
                 "length": 6,
-                "description": "Transmit a self-identifying FourCC media packet to the IDE. Writes 3 words to UART TX: [tag · count · payload]. Tag is open registry—TEXT/VOIC/LUMP/GTKN/JPEG/PDF_/MP3_/… Fire-and-forget.",
+                "description": "Transmit a self-identifying FourCC media packet to the IDE. Writes 3 words to UART TX: [tag \u00b7 count \u00b7 payload]. Tag is open registry\u2014TEXT/VOIC/LUMP/GTKN/JPEG/PDF_/MP3_/\u2026 Fire-and-forget.",
                 "inputs": [
-                    "DR1: FourCC type tag (TEXT=0x54455854 · LUMP=0x4C554D50 · …)",
-                    "DR2: payload word count (1–13)",
+                    "DR1: FourCC type tag (TEXT=0x54455854 \u00b7 LUMP=0x4C554D50 \u00b7 \u2026)",
+                    "DR2: payload word count (1\u201313)",
                     "DR3: first payload word"
                 ],
                 "outputs": [
                     "DR0: 0 = queued | 1 = TX buffer overrun"
                 ],
                 "comments": [
-                    "LOAD  AL, CR7, CR6[0]   ; UART GT → CR7",
+                    "LOAD  AL, CR7, CR6[0]   ; UART GT \u2192 CR7",
                     "DWRITE DR1, CR7[0]       ; TX: FourCC tag word",
                     "DWRITE DR2, CR7[0]       ; TX: payload word count",
                     "DWRITE DR3, CR7[0]       ; TX: first payload word",
-                    "DREAD  DR0, CR7[0]       ; TX queue status → DR0 (0=OK, 1=overrun)",
+                    "DREAD  DR0, CR7[0]       ; TX queue status \u2192 DR0 (0=OK, 1=overrun)",
                     "RETURN AL, CR5"
                 ]
             },
@@ -1228,15 +1150,15 @@
                 ],
                 "outputs": [
                     "DR0: received word count (0 = timeout)",
-                    "DR1: FourCC type tag (TEXT · VOIC · LUMP · GTKN · …)",
+                    "DR1: FourCC type tag (TEXT \u00b7 VOIC \u00b7 LUMP \u00b7 GTKN \u00b7 \u2026)",
                     "DR2: first payload word"
                 ],
                 "comments": [
-                    "LOAD  AL, CR7, CR6[0]   ; UART GT → CR7",
+                    "LOAD  AL, CR7, CR6[0]   ; UART GT \u2192 CR7",
                     "DWRITE DR1, CR7[0]       ; TX: timeout hint",
-                    "DREAD  DR0, CR7[1]       ; RX word 0 → DR0 (word count; 0=timeout)",
-                    "DREAD  DR1, CR7[1]       ; RX word 1 → DR1 (FourCC tag)",
-                    "DREAD  DR2, CR7[1]       ; RX word 2 → DR2 (first payload word)",
+                    "DREAD  DR0, CR7[1]       ; RX word 0 \u2192 DR0 (word count; 0=timeout)",
+                    "DREAD  DR1, CR7[1]       ; RX word 1 \u2192 DR1 (FourCC tag)",
+                    "DREAD  DR2, CR7[1]       ; RX word 2 \u2192 DR2 (first payload word)",
                     "RETURN AL, CR5"
                 ]
             },
@@ -1244,27 +1166,27 @@
                 "name": "Fault",
                 "offset": 18,
                 "length": 9,
-                "description": "Report a hardware fault with full semantic location to the IDE. High-priority: bypasses the normal send queue. Writes 6 words to UART TX: [fault_code · ns_idx · thread_gt · abstr_idx · method_idx · instr_offset].",
+                "description": "Report a hardware fault with full semantic location to the IDE. High-priority: bypasses the normal send queue. Writes 6 words to UART TX: [fault_code \u00b7 ns_idx \u00b7 thread_gt \u00b7 abstr_idx \u00b7 method_idx \u00b7 instr_offset].",
                 "inputs": [
-                    "DR1: fault_code (0x10=PERM, 0x42=RANGE, 0x80=VERSION …)",
-                    "DR2: ns_idx — active namespace slot",
-                    "DR3: thread_gt — NS index of the faulting thread",
-                    "DR4: abstr_idx — NS slot of the executing abstraction",
-                    "DR5: method_idx — method index within the abstraction",
-                    "DR6: instr_offset — instruction offset within the method"
+                    "DR1: fault_code (0x10=PERM, 0x42=RANGE, 0x80=VERSION \u2026)",
+                    "DR2: ns_idx \u2014 active namespace slot",
+                    "DR3: thread_gt \u2014 NS index of the faulting thread",
+                    "DR4: abstr_idx \u2014 NS slot of the executing abstraction",
+                    "DR5: method_idx \u2014 method index within the abstraction",
+                    "DR6: instr_offset \u2014 instruction offset within the method"
                 ],
                 "outputs": [
                     "DR0: 0 = transmitted | non-zero = UART error"
                 ],
                 "comments": [
-                    "LOAD  AL, CR7, CR6[0]   ; UART GT → CR7",
+                    "LOAD  AL, CR7, CR6[0]   ; UART GT \u2192 CR7",
                     "DWRITE DR1, CR7[0]       ; TX: fault_code",
                     "DWRITE DR2, CR7[0]       ; TX: ns_idx",
                     "DWRITE DR3, CR7[0]       ; TX: thread_gt",
                     "DWRITE DR4, CR7[0]       ; TX: abstr_idx",
                     "DWRITE DR5, CR7[0]       ; TX: method_idx",
                     "DWRITE DR6, CR7[0]       ; TX: instr_offset",
-                    "DREAD  DR0, CR7[0]       ; TX queue status → DR0 (0=OK)",
+                    "DREAD  DR0, CR7[0]       ; TX queue status \u2192 DR0 (0=OK)",
                     "RETURN AL, CR5"
                 ]
             },
@@ -1272,9 +1194,9 @@
                 "name": "Fetch",
                 "offset": 27,
                 "length": 5,
-                "description": "Request and receive a lump binary from the IDE by NS slot token. Writes 2 words to UART TX: [token · expected_words]. IDE streams the lump back; hardware writes it via CR2. Called by Loader on NULL_CAP fault for a cold slot.",
+                "description": "Request and receive a lump binary from the IDE by NS slot token. Writes 2 words to UART TX: [token \u00b7 expected_words]. IDE streams the lump back; hardware writes it via CR2. Called by Loader on NULL_CAP fault for a cold slot.",
                 "inputs": [
-                    "CR2: Memory write-GT (write-perm buffer ≥ expected_words)",
+                    "CR2: Memory write-GT (write-perm buffer \u2265 expected_words)",
                     "DR1: NS slot token (identifies the requested abstraction)",
                     "DR2: expected lump size in words"
                 ],
@@ -1282,7 +1204,7 @@
                     "DR0: 0 = lump installed | non-zero = error (timeout/CRC/size)"
                 ],
                 "comments": [
-                    "LOAD  AL, CR7, CR6[0]   ; UART GT → CR7",
+                    "LOAD  AL, CR7, CR6[0]   ; UART GT \u2192 CR7",
                     "DWRITE DR1, CR7[0]       ; TX: slot token request",
                     "DWRITE DR2, CR7[0]       ; TX: expected word count",
                     "DREAD  DR0, CR7[1]       ; RX: 0=installed, non-zero=error",
@@ -1293,18 +1215,18 @@
                 "name": "Connect",
                 "offset": 32,
                 "length": 5,
-                "description": "Forward a CALL through the tunnel to a remote capability. The ‘Hello Mum’ primitive: CALL(CONNECT(me, mymother)). Restricts remote_gt to E-only, invokes via CALL, then reads the far-end return value from UART RX.",
+                "description": "Forward a CALL through the tunnel to a remote capability. The \u2018Hello Mum\u2019 primitive: CALL(CONNECT(me, mymother)). Restricts remote_gt to E-only, invokes via CALL, then reads the far-end return value from UART RX.",
                 "inputs": [
-                    "CR2: remote GT (Outform type, F-bit set — far-end abstraction)"
+                    "CR2: remote GT (Outform type, F-bit set \u2014 far-end abstraction)"
                 ],
                 "outputs": [
                     "DR0: far-end return value | non-zero = error / timeout"
                 ],
                 "comments": [
-                    "LOAD  AL, CR7, CR6[0]   ; UART GT → CR7",
+                    "LOAD  AL, CR7, CR6[0]   ; UART GT \u2192 CR7",
                     "TPERM AL, CR2, #E        ; restrict remote_gt to E-only before CALL",
                     "CALL  AL, CR2, CR2       ; invoke remote_gt via tunnel",
-                    "DREAD  DR0, CR7[1]       ; RX: far-end return value → DR0",
+                    "DREAD  DR0, CR7[1]       ; RX: far-end return value \u2192 DR0",
                     "RETURN AL, CR5"
                 ]
             }
@@ -1347,7 +1269,7 @@
     {
         "token": "00130000",
         "abstraction": "Loader",
-        "ns_slot": 19,
+        "ns_slot": 10,
         "lump_size": 64,
         "cw": 7,
         "dw": 0,
@@ -1367,16 +1289,16 @@
                     "DR0: 0 = lump installed | non-zero = error (timeout/CRC/size)"
                 ],
                 "comments": [
-                    "LOAD CR1, CR6[0]  — load Tunnel GT from c-list slot 0 into CR1",
-                    "CALL CR1, 4       — call Tunnel.Fetch (method 4); DR1=token, DR2=expected_words, CR2=write-GT",
-                    "RETURN            — DR0 = Tunnel.Fetch result (0=installed / non-zero=error)"
+                    "LOAD CR1, CR6[0]  \u2014 load Tunnel GT from c-list slot 0 into CR1",
+                    "CALL CR1, 4       \u2014 call Tunnel.Fetch (method 4); DR1=token, DR2=expected_words, CR2=write-GT",
+                    "RETURN            \u2014 DR0 = Tunnel.Fetch result (0=installed / non-zero=error)"
                 ]
             },
             {
                 "name": "Prefetch",
                 "offset": 3,
                 "length": 3,
-                "description": "Hint-driven load. Identical to Load — calls Tunnel.Fetch which is idempotent (already-resident lumps are a no-op at the IDE bridge). Returns 0 if installed or already resident.",
+                "description": "Hint-driven load. Identical to Load \u2014 calls Tunnel.Fetch which is idempotent (already-resident lumps are a no-op at the IDE bridge). Returns 0 if installed or already resident.",
                 "inputs": [
                     "CR2: Memory write-GT (write-perm buffer, set by caller)",
                     "DR1: NS slot token",
@@ -1386,24 +1308,24 @@
                     "DR0: 0 = installed or already resident | non-zero = error"
                 ],
                 "comments": [
-                    "LOAD CR1, CR6[0]  — load Tunnel GT from c-list slot 0 into CR1",
-                    "CALL CR1, 4       — call Tunnel.Fetch (method 4); idempotent — already-resident is fine",
-                    "RETURN            — DR0 = Tunnel.Fetch result"
+                    "LOAD CR1, CR6[0]  \u2014 load Tunnel GT from c-list slot 0 into CR1",
+                    "CALL CR1, 4       \u2014 call Tunnel.Fetch (method 4); idempotent \u2014 already-resident is fine",
+                    "RETURN            \u2014 DR0 = Tunnel.Fetch result"
                 ]
             },
             {
                 "name": "Evict",
                 "offset": 6,
                 "length": 1,
-                "description": "Unload a cold abstraction to reclaim memory. Stub — returns 0 immediately. Full implementation requires a Memory abstraction (not yet defined). GT and c-list are preserved; the next CALL on this slot triggers Load again.",
+                "description": "Unload a cold abstraction to reclaim memory. Stub \u2014 returns 0 immediately. Full implementation requires a Memory abstraction (not yet defined). GT and c-list are preserved; the next CALL on this slot triggers Load again.",
                 "inputs": [
                     "DR1: NS slot token (not used by stub)"
                 ],
                 "outputs": [
-                    "DR0: 0 (always — stub)"
+                    "DR0: 0 (always \u2014 stub)"
                 ],
                 "comments": [
-                    "RETURN  — stub: no Memory abstraction available yet; DR0 = 0 (no-op success)"
+                    "RETURN  \u2014 stub: no Memory abstraction available yet; DR0 = 0 (no-op success)"
                 ]
             }
         ],
@@ -1450,7 +1372,7 @@
                 "length": 17,
                 "description": "Verify Mum's 32-bit identity word. Zero or unknown protocol tag (bits[31:28] != 1) returns 0 (AM rejected). Valid identity returns 1; the simulator issues an Outform E-GT into c-list slot 1.",
                 "inputs": [
-                    "DR1: mum_identity_word — 32-bit encoded Mum public key reference (Ed25519 fingerprint; see Mum.cloomc)"
+                    "DR1: mum_identity_word \u2014 32-bit encoded Mum public key reference (Ed25519 fingerprint; see Mum.cloomc)"
                 ],
                 "outputs": [
                     "DR0: 1 (identity accepted; GT stored in c-list slot 1) | 0 (AM rejected)"
@@ -1469,16 +1391,16 @@
                 "description": "Load c-list slot 1 (Mum E-GT) and forward a CALL through the Tunnel to the far-end Mum.Greet() method. Returns FAULT_NO_CONTACT (0xDEAD0001) if Connect has not been called.",
                 "inputs": [],
                 "outputs": [
-                    "DR0: 0x48454C4C (far-end greeting word 'HELL' — Mum responded normally)",
-                    "DR0: 0xDEAD0001 (FAULT_NO_CONTACT — c-list slot 1 is NULL, Connect not yet called)",
+                    "DR0: 0x48454C4C (far-end greeting word 'HELL' \u2014 Mum responded normally)",
+                    "DR0: 0xDEAD0001 (FAULT_NO_CONTACT \u2014 c-list slot 1 is NULL, Connect not yet called)",
                     "DR0: non-zero Tunnel error on transmission failure"
                 ],
                 "comments": [
-                    "Load c-list slot 1 into CR7 — the Mum E-GT (NULL at boot)",
+                    "Load c-list slot 1 into CR7 \u2014 the Mum E-GT (NULL at boot)",
                     "Test CR7 for NULL GT (word == 0); if NULL branch to FAULT_NO_CONTACT return",
-                    "FAULT_NO_CONTACT = 0xDEAD0001 — clean fault, not a crash",
+                    "FAULT_NO_CONTACT = 0xDEAD0001 \u2014 clean fault, not a crash",
                     "Load Tunnel GT from c-list slot 0 into CR8",
-                    "Tunnel.Connect(mum_gt) — forward CALL via GTKN packet to far-end Mum.Greet()",
+                    "Tunnel.Connect(mum_gt) \u2014 forward CALL via GTKN packet to far-end Mum.Greet()",
                     "Receive far-end return value; return it as DR0"
                 ]
             }
@@ -1488,21 +1410,6 @@
         ],
         "domain": "Church",
         "domain_perms": "L+S+E",
-        "lump_version": 0
-    },
-    {
-        "token": "00000300",
-        "abstraction": "LED flash",
-        "ns_slot": 3,
-        "lump_size": 64,
-        "cw": 17,
-        "cc": 1,
-        "author": "",
-        "version": "",
-        "methods": [],
-        "grants": [
-            "E"
-        ],
         "lump_version": 0
     },
     {
@@ -1536,7 +1443,7 @@
     {
         "token": "00003300",
         "abstraction": "Ethernet",
-        "ns_slot": 51,
+        "ns_slot": 42,
         "ns_slot_policy": "static",
         "lump_size": 64,
         "cw": 13,
@@ -1550,8 +1457,8 @@
                 "length": 3,
                 "description": "Arm the transmitter after pre-loading frame bytes into ETH_TX_DATA (offset 6). DR1 = dataGT (reserved for future DMA path, ignored in MMIO model); DR2 = byte count. Returns DR1 = byteLen.",
                 "inputs": [
-                    "DR1: dataGT — reserved for future DMA path; ignored in MMIO model",
-                    "DR2: byteLen — byte count of frame pre-loaded in TX FIFO (1-1518)"
+                    "DR1: dataGT \u2014 reserved for future DMA path; ignored in MMIO model",
+                    "DR2: byteLen \u2014 byte count of frame pre-loaded in TX FIFO (1-1518)"
                 ],
                 "outputs": [
                     "DR1: byteLen (bytes committed to transmit)"
@@ -1693,7 +1600,7 @@
     },
     {
         "token": "6902f517",
-        "abstraction": "LED Blink — Ti60 F225 Hardware Nucleus Code",
+        "abstraction": "LED Blink \u2014 Ti60 F225 Hardware Nucleus Code",
         "ns_slot": null,
         "ns_slot_policy": "dynamic",
         "lump_size": 64,
@@ -2120,8 +2027,8 @@
     {
         "token": "d906a27f",
         "abstraction": "PostFlashSelftest",
-        "ns_slot": null,
-        "ns_slot_policy": "dynamic",
+        "ns_slot": 6,
+        "ns_slot_policy": "static",
         "variant_group": null,
         "lump_size": 1024,
         "cw": 515,
@@ -2135,7 +2042,7 @@
     {
         "token": "b3076308",
         "abstraction": "EventRouter",
-        "ns_slot": 52,
+        "ns_slot": 43,
         "ns_slot_policy": "static",
         "boot_resident": true,
         "lump_size": 64,
@@ -2153,7 +2060,7 @@
                 "visibility": "public",
                 "offset": 9,
                 "length": 2,
-                "description": "Register an event→handler mapping. DR0=eventGT, DR1=handlerGT. Returns 0=ok, 1=table_full."
+                "description": "Register an event\u2192handler mapping. DR0=eventGT, DR1=handlerGT. Returns 0=ok, 1=table_full."
             },
             {
                 "name": "Remove",
@@ -2174,14 +2081,14 @@
                 "visibility": "public",
                 "offset": 11,
                 "length": 2,
-                "description": "Return the count of currently registered event→handler pairs."
+                "description": "Return the count of currently registered event\u2192handler pairs."
             },
             {
                 "name": "Methods",
                 "visibility": "public",
                 "offset": 11,
                 "length": 4,
-                "description": "Return 5 — the count of public methods on this abstraction."
+                "description": "Return 5 \u2014 the count of public methods on this abstraction."
             },
             {
                 "name": "FindEvent",
@@ -2195,7 +2102,7 @@
                 "visibility": "private",
                 "offset": 19,
                 "length": 4,
-                "description": "(private) Write an eventGT→handlerGT pair into a free slot. Returns 0."
+                "description": "(private) Write an eventGT\u2192handlerGT pair into a free slot. Returns 0."
             },
             {
                 "name": "UnbindEvent",

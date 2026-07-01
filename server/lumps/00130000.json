@@ -1,29 +1,29 @@
 {
-  "token": "00130000",
-  "abstraction": "Loader",
-  "ns_slot": 19,
-  "lump_size": 64,
-  "cw": 7,
-  "dw": 0,
-  "cc": 1,
-  "author": "",
-  "version": "",
-  "methods": [],
-  "grants": [],
-  "lump_version": 0,
-  "capabilities": [
-    {
-      "slot": 0,
-      "name": "Tunnel.Fetch",
-      "target_ns": 31,
-      "note": "Tunnel E-GT — Loader delegates all lump downloads to Tunnel.Fetch (LOAD CR1, CR6[0]; CALL CR1, 4)",
-      "gt": "0x4880001f"
+    "token": "00130000",
+    "abstraction": "Loader",
+    "ns_slot": 10,
+    "lump_size": 64,
+    "cw": 7,
+    "dw": 0,
+    "cc": 1,
+    "author": "",
+    "version": "",
+    "methods": [],
+    "grants": [],
+    "lump_version": 0,
+    "capabilities": [
+        {
+            "slot": 0,
+            "name": "Tunnel.Fetch",
+            "target_ns": 31,
+            "note": "Tunnel E-GT \u2014 Loader delegates all lump downloads to Tunnel.Fetch (LOAD CR1, CR6[0]; CALL CR1, 4)",
+            "gt": "0x4880001f"
+        }
+    ],
+    "pet_names": {
+        "DR": {},
+        "CR": {
+            "0": "Tunnel.Fetch"
+        }
     }
-  ],
-  "pet_names": {
-    "DR": {},
-    "CR": {
-      "0": "Tunnel.Fetch"
-    }
-  }
 }

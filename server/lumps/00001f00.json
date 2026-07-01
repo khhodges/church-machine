@@ -1,31 +1,31 @@
 {
-  "token": "00001f00",
-  "abstraction": "Tunnel",
-  "ns_slot": 31,
-  "lump_size": 64,
-  "cw": 37,
-  "dw": 0,
-  "cc": 1,
-  "author": "",
-  "version": "",
-  "methods": [],
-  "grants": [
-    "E"
-  ],
-  "lump_version": 0,
-  "capabilities": [
-    {
-      "slot": 0,
-      "name": "Tunnel.UART",
-      "abstract_gt": "0x07800200",
-      "note": "Abstract UART RW GT — hardware serial port used for all Tunnel TX/RX operations (Register, Send, Receive, Fault, Fetch, Connect)",
-      "gt": "0x07800200"
+    "token": "00001f00",
+    "abstraction": "Tunnel",
+    "ns_slot": 22,
+    "lump_size": 64,
+    "cw": 37,
+    "dw": 0,
+    "cc": 1,
+    "author": "",
+    "version": "",
+    "methods": [],
+    "grants": [
+        "E"
+    ],
+    "lump_version": 0,
+    "capabilities": [
+        {
+            "slot": 0,
+            "name": "Tunnel.UART",
+            "abstract_gt": "0x07800200",
+            "note": "Abstract UART RW GT \u2014 hardware serial port used for all Tunnel TX/RX operations (Register, Send, Receive, Fault, Fetch, Connect)",
+            "gt": "0x07800200"
+        }
+    ],
+    "pet_names": {
+        "DR": {},
+        "CR": {
+            "0": "Tunnel.UART"
+        }
     }
-  ],
-  "pet_names": {
-    "DR": {},
-    "CR": {
-      "0": "Tunnel.UART"
-    }
-  }
 }

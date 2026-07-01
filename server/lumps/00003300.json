@@ -1,88 +1,88 @@
 {
-  "token": "00003300",
-  "abstraction": "Ethernet",
-  "ns_slot": 51,
-  "lump_size": 64,
-  "cw": 13,
-  "cc": 1,
-  "author": "SIPantic",
-  "version": "1.1.0",
-  "methods": [
-    {
-      "name": "Send",
-      "offset": 0,
-      "length": 3,
-      "description": "Arm the transmitter after pre-loading frame bytes into ETH_TX_DATA (offset 6). DR1 = dataGT (reserved for future DMA path, ignored in MMIO model); DR2 = byte count. Returns DR1 = byteLen.",
-      "inputs": [
-        "DR1: dataGT — reserved for future DMA path; ignored in MMIO model",
-        "DR2: byteLen — byte count of frame pre-loaded in TX FIFO (1–1518)"
-      ],
-      "outputs": [
-        "DR1: byteLen (bytes committed to transmit)"
-      ],
-      "comments": [
-        "LOAD CR7, CR6, #0   — EthernetDevice GT from c-list slot 0 → CR7",
-        "DWRITE DR2, CR7, #2 — byteLen → ETH_TX_LEN (commits queued bytes, starts TX)",
-        "RETURN"
-      ]
-    },
-    {
-      "name": "Receive",
-      "offset": 3,
-      "length": 3,
-      "description": "Poll for a pending frame (non-blocking). Returns DR1 = 0 if no frame is waiting, or DR1 = N (byte count) when a frame is ready. Drain the frame with N sequential DREAD CR7,#7 reads from ETH_RX_DATA before calling Receive() again.",
-      "inputs": [],
-      "outputs": [
-        "DR1: 0 = no frame waiting; N = byte count of pending frame (drain via ETH_RX_DATA reads)"
-      ],
-      "comments": [
-        "LOAD CR7, CR6, #0  — EthernetDevice GT from c-list slot 0 → CR7",
-        "DREAD DR1, CR7, #3 — ETH_RX_LEN → DR1 (0 = no frame, N = byte count)",
-        "RETURN"
-      ]
-    },
-    {
-      "name": "Connect",
-      "offset": 6,
-      "length": 4,
-      "description": "Register a UDP session endpoint. DR1 = packed IPv4 address (network byte order); DR2 = port number. Returns DR1 = 0 on success, -1 on fault.",
-      "inputs": [
-        "DR1: packed IPv4 address in network byte order (e.g. 0xC0A80001 = 192.168.0.1)",
-        "DR2: UDP port number (1–65535)"
-      ],
-      "outputs": [
-        "DR1: 0 on success, -1 on fault"
-      ],
-      "comments": [
-        "LOAD CR7, CR6, #0   — EthernetDevice GT from c-list slot 0 → CR7",
-        "DWRITE DR1, CR7, #4 — ipv4 → ETH_IP_ADDR",
-        "DWRITE DR2, CR7, #5 — port → ETH_PORT",
-        "RETURN"
-      ]
-    },
-    {
-      "name": "Status",
-      "offset": 10,
-      "length": 3,
-      "description": "Query hardware link state. Returns DR1 = 0 (link down), 1 (link up), or 2 (auto-negotiating).",
-      "inputs": [],
-      "outputs": [
-        "DR1: 0 = link down, 1 = link up, 2 = negotiating"
-      ],
-      "comments": [
-        "LOAD CR7, CR6, #0  — EthernetDevice GT from c-list slot 0 → CR7",
-        "DREAD DR1, CR7, #1 — ETH_STATUS direct 3-state value → DR1",
-        "RETURN"
-      ]
+    "token": "00003300",
+    "abstraction": "Ethernet",
+    "ns_slot": 42,
+    "lump_size": 64,
+    "cw": 13,
+    "cc": 1,
+    "author": "SIPantic",
+    "version": "1.1.0",
+    "methods": [
+        {
+            "name": "Send",
+            "offset": 0,
+            "length": 3,
+            "description": "Arm the transmitter after pre-loading frame bytes into ETH_TX_DATA (offset 6). DR1 = dataGT (reserved for future DMA path, ignored in MMIO model); DR2 = byte count. Returns DR1 = byteLen.",
+            "inputs": [
+                "DR1: dataGT \u2014 reserved for future DMA path; ignored in MMIO model",
+                "DR2: byteLen \u2014 byte count of frame pre-loaded in TX FIFO (1\u20131518)"
+            ],
+            "outputs": [
+                "DR1: byteLen (bytes committed to transmit)"
+            ],
+            "comments": [
+                "LOAD CR7, CR6, #0   \u2014 EthernetDevice GT from c-list slot 0 \u2192 CR7",
+                "DWRITE DR2, CR7, #2 \u2014 byteLen \u2192 ETH_TX_LEN (commits queued bytes, starts TX)",
+                "RETURN"
+            ]
+        },
+        {
+            "name": "Receive",
+            "offset": 3,
+            "length": 3,
+            "description": "Poll for a pending frame (non-blocking). Returns DR1 = 0 if no frame is waiting, or DR1 = N (byte count) when a frame is ready. Drain the frame with N sequential DREAD CR7,#7 reads from ETH_RX_DATA before calling Receive() again.",
+            "inputs": [],
+            "outputs": [
+                "DR1: 0 = no frame waiting; N = byte count of pending frame (drain via ETH_RX_DATA reads)"
+            ],
+            "comments": [
+                "LOAD CR7, CR6, #0  \u2014 EthernetDevice GT from c-list slot 0 \u2192 CR7",
+                "DREAD DR1, CR7, #3 \u2014 ETH_RX_LEN \u2192 DR1 (0 = no frame, N = byte count)",
+                "RETURN"
+            ]
+        },
+        {
+            "name": "Connect",
+            "offset": 6,
+            "length": 4,
+            "description": "Register a UDP session endpoint. DR1 = packed IPv4 address (network byte order); DR2 = port number. Returns DR1 = 0 on success, -1 on fault.",
+            "inputs": [
+                "DR1: packed IPv4 address in network byte order (e.g. 0xC0A80001 = 192.168.0.1)",
+                "DR2: UDP port number (1\u201365535)"
+            ],
+            "outputs": [
+                "DR1: 0 on success, -1 on fault"
+            ],
+            "comments": [
+                "LOAD CR7, CR6, #0   \u2014 EthernetDevice GT from c-list slot 0 \u2192 CR7",
+                "DWRITE DR1, CR7, #4 \u2014 ipv4 \u2192 ETH_IP_ADDR",
+                "DWRITE DR2, CR7, #5 \u2014 port \u2192 ETH_PORT",
+                "RETURN"
+            ]
+        },
+        {
+            "name": "Status",
+            "offset": 10,
+            "length": 3,
+            "description": "Query hardware link state. Returns DR1 = 0 (link down), 1 (link up), or 2 (auto-negotiating).",
+            "inputs": [],
+            "outputs": [
+                "DR1: 0 = link down, 1 = link up, 2 = negotiating"
+            ],
+            "comments": [
+                "LOAD CR7, CR6, #0  \u2014 EthernetDevice GT from c-list slot 0 \u2192 CR7",
+                "DREAD DR1, CR7, #1 \u2014 ETH_STATUS direct 3-state value \u2192 DR1",
+                "RETURN"
+            ]
+        }
+    ],
+    "grants": [
+        "E"
+    ],
+    "lump_version": 0,
+    "pet_names": {
+        "CR": {
+            "7": "EthernetDevice"
+        }
     }
-  ],
-  "grants": [
-    "E"
-  ],
-  "lump_version": 0,
-  "pet_names": {
-    "CR": {
-      "7": "EthernetDevice"
-    }
-  }
 }

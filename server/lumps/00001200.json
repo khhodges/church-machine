@@ -1,179 +1,179 @@
 {
-  "token": "00001200",
-  "abstraction": "Constants",
-  "ns_slot": 18,
-  "lump_size": 64,
-  "cw": 18,
-  "dw": 5,
-  "cc": 2,
-  "methods": [
-    {
-      "name": "Pi",
-      "offset": 0,
-      "length": 3,
-      "pet_names": {
-        "DR": {}
-      },
-      "description": "Return the IEEE-754 single-precision value of \u03c0 (3.14159265\u2026) in DR0.",
-      "inputs": [],
-      "outputs": [
-        "DR0: \u03c0 \u2248 3.14159265 (0x40490FDB)"
-      ],
-      "comments": [
-        "load self-data-R cap (c-list[0]) into CR0 \u2014 grants read-only access to embedded data words",
-        "read data word [0] (\u03c0 = 3.14159265\u2026) via CR0 into DR0",
-        "return \u03c0 in DR0 to caller"
-      ]
-    },
-    {
-      "name": "E",
-      "offset": 3,
-      "length": 3,
-      "pet_names": {
-        "DR": {}
-      },
-      "description": "Return the IEEE-754 single-precision value of e (2.71828182\u2026) in DR0.",
-      "inputs": [],
-      "outputs": [
-        "DR0: e \u2248 2.71828182 (0x402DF854)"
-      ],
-      "comments": [
-        "load self-data-R cap (c-list[0]) into CR0 \u2014 grants read-only access to embedded data words",
-        "read data word [1] (e = 2.71828182\u2026) via CR0 into DR0",
-        "return e in DR0 to caller"
-      ]
-    },
-    {
-      "name": "Phi",
-      "offset": 6,
-      "length": 3,
-      "pet_names": {
-        "DR": {}
-      },
-      "description": "Return the IEEE-754 single-precision golden ratio \u03c6 (1.61803398\u2026) in DR0.",
-      "inputs": [],
-      "outputs": [
-        "DR0: \u03c6 \u2248 1.61803398 (0x3FCF1BBD)"
-      ],
-      "comments": [
-        "load self-data-R cap (c-list[0]) into CR0 \u2014 grants read-only access to embedded data words",
-        "read data word [2] (\u03c6 = 1.61803398\u2026) via CR0 into DR0",
-        "return \u03c6 in DR0 to caller"
-      ]
-    },
-    {
-      "name": "Zero",
-      "offset": 9,
-      "length": 3,
-      "pet_names": {
-        "DR": {}
-      },
-      "description": "Return IEEE-754 positive zero (0.0) in DR0.",
-      "inputs": [],
-      "outputs": [
-        "DR0: 0.0 (0x00000000)"
-      ],
-      "comments": [
-        "load self-data-R cap (c-list[0]) into CR0 \u2014 grants read-only access to embedded data words",
-        "read data word [3] (0.0) via CR0 into DR0",
-        "return 0.0 in DR0 to caller"
-      ]
-    },
-    {
-      "name": "One",
-      "offset": 12,
-      "length": 3,
-      "pet_names": {
-        "DR": {}
-      },
-      "description": "Return IEEE-754 1.0 in DR0.",
-      "inputs": [],
-      "outputs": [
-        "DR0: 1.0 (0x3F800000)"
-      ],
-      "comments": [
-        "load self-data-R cap (c-list[0]) into CR0 \u2014 grants read-only access to embedded data words",
-        "read data word [4] (1.0) via CR0 into DR0",
-        "return 1.0 in DR0 to caller"
-      ]
-    },
-    {
-      "name": "Add",
-      "offset": 15,
-      "length": 3,
-      "pet_names": {
-        "DR": {
-          "0": "XYZ"
+    "token": "00001200",
+    "abstraction": "Constants",
+    "ns_slot": 9,
+    "lump_size": 64,
+    "cw": 18,
+    "dw": 5,
+    "cc": 2,
+    "methods": [
+        {
+            "name": "Pi",
+            "offset": 0,
+            "length": 3,
+            "pet_names": {
+                "DR": {}
+            },
+            "description": "Return the IEEE-754 single-precision value of \u03c0 (3.14159265\u2026) in DR0.",
+            "inputs": [],
+            "outputs": [
+                "DR0: \u03c0 \u2248 3.14159265 (0x40490FDB)"
+            ],
+            "comments": [
+                "load self-data-R cap (c-list[0]) into CR0 \u2014 grants read-only access to embedded data words",
+                "read data word [0] (\u03c0 = 3.14159265\u2026) via CR0 into DR0",
+                "return \u03c0 in DR0 to caller"
+            ]
+        },
+        {
+            "name": "E",
+            "offset": 3,
+            "length": 3,
+            "pet_names": {
+                "DR": {}
+            },
+            "description": "Return the IEEE-754 single-precision value of e (2.71828182\u2026) in DR0.",
+            "inputs": [],
+            "outputs": [
+                "DR0: e \u2248 2.71828182 (0x402DF854)"
+            ],
+            "comments": [
+                "load self-data-R cap (c-list[0]) into CR0 \u2014 grants read-only access to embedded data words",
+                "read data word [1] (e = 2.71828182\u2026) via CR0 into DR0",
+                "return e in DR0 to caller"
+            ]
+        },
+        {
+            "name": "Phi",
+            "offset": 6,
+            "length": 3,
+            "pet_names": {
+                "DR": {}
+            },
+            "description": "Return the IEEE-754 single-precision golden ratio \u03c6 (1.61803398\u2026) in DR0.",
+            "inputs": [],
+            "outputs": [
+                "DR0: \u03c6 \u2248 1.61803398 (0x3FCF1BBD)"
+            ],
+            "comments": [
+                "load self-data-R cap (c-list[0]) into CR0 \u2014 grants read-only access to embedded data words",
+                "read data word [2] (\u03c6 = 1.61803398\u2026) via CR0 into DR0",
+                "return \u03c6 in DR0 to caller"
+            ]
+        },
+        {
+            "name": "Zero",
+            "offset": 9,
+            "length": 3,
+            "pet_names": {
+                "DR": {}
+            },
+            "description": "Return IEEE-754 positive zero (0.0) in DR0.",
+            "inputs": [],
+            "outputs": [
+                "DR0: 0.0 (0x00000000)"
+            ],
+            "comments": [
+                "load self-data-R cap (c-list[0]) into CR0 \u2014 grants read-only access to embedded data words",
+                "read data word [3] (0.0) via CR0 into DR0",
+                "return 0.0 in DR0 to caller"
+            ]
+        },
+        {
+            "name": "One",
+            "offset": 12,
+            "length": 3,
+            "pet_names": {
+                "DR": {}
+            },
+            "description": "Return IEEE-754 1.0 in DR0.",
+            "inputs": [],
+            "outputs": [
+                "DR0: 1.0 (0x3F800000)"
+            ],
+            "comments": [
+                "load self-data-R cap (c-list[0]) into CR0 \u2014 grants read-only access to embedded data words",
+                "read data word [4] (1.0) via CR0 into DR0",
+                "return 1.0 in DR0 to caller"
+            ]
+        },
+        {
+            "name": "Add",
+            "offset": 15,
+            "length": 3,
+            "pet_names": {
+                "DR": {
+                    "0": "XYZ"
+                }
+            },
+            "description": "Store a user-supplied 32-bit value XYZ in the next free pool slot and return the slot index N in DR0. N is the retrieval key for Constants.Get(N). Returns FAULT if the pool (14 slots) is full.",
+            "inputs": [
+                "DR0: XYZ \u2014 any IEEE-754 or raw 32-bit value to store"
+            ],
+            "outputs": [
+                "DR0: N \u2014 pool slot index (0\u201313); FAULT if pool is full"
+            ],
+            "comments": [
+                "bindMethod scans the bitmap, places XYZ in pool memory, marks slot as occupied",
+                "returns slot index N in DR0 \u2014 no GT is created, no NS entry is written",
+                "the pool is internal to the Constants abstraction boundary"
+            ]
+        },
+        {
+            "name": "Get",
+            "offset": 18,
+            "length": 3,
+            "pet_names": {
+                "DR": {
+                    "0": "N"
+                }
+            },
+            "description": "Read back the 32-bit value stored by Constants.Add() at slot index N. N comes from DR0. Returns FAULT if N is out of range or the slot is not allocated.",
+            "inputs": [
+                "DR0: N \u2014 pool slot index returned by a prior Constants.Add()"
+            ],
+            "outputs": [
+                "DR0: stored 32-bit value; FAULT if N invalid or unallocated"
+            ],
+            "comments": [
+                "bindMethod validates N against POOL_SIZE and the bitmap",
+                "reads pool memory at poolBase + N and returns the value in DR0",
+                "no NS lookup \u2014 the pool is internal to the Constants abstraction"
+            ]
         }
-      },
-      "description": "Store a user-supplied 32-bit value XYZ in the next free pool slot and return the slot index N in DR0. N is the retrieval key for Constants.Get(N). Returns FAULT if the pool (14 slots) is full.",
-      "inputs": [
-        "DR0: XYZ \u2014 any IEEE-754 or raw 32-bit value to store"
-      ],
-      "outputs": [
-        "DR0: N \u2014 pool slot index (0\u201313); FAULT if pool is full"
-      ],
-      "comments": [
-        "bindMethod scans the bitmap, places XYZ in pool memory, marks slot as occupied",
-        "returns slot index N in DR0 \u2014 no GT is created, no NS entry is written",
-        "the pool is internal to the Constants abstraction boundary"
-      ]
-    },
-    {
-      "name": "Get",
-      "offset": 18,
-      "length": 3,
-      "pet_names": {
-        "DR": {
-          "0": "N"
+    ],
+    "grants": [
+        "E"
+    ],
+    "data_offset": 19,
+    "data_word_names": [
+        "Pi",
+        "E",
+        "Phi",
+        "Zero",
+        "One"
+    ],
+    "self_data_r": true,
+    "author": "Test",
+    "version": "1.0",
+    "lump_version": 0,
+    "capabilities": [
+        {
+            "slot": 0,
+            "name": "Constants.SelfDataR",
+            "note": "self-data read-only cap \u2014 grants read access to the embedded constant data words (Pi, E, Phi, Zero, One)"
+        },
+        {
+            "slot": 1,
+            "name": "Constants.PoolRW",
+            "note": "pool storage RW cap \u2014 grants read/write access to the mutable user-constant pool used by Add and Get methods"
         }
-      },
-      "description": "Read back the 32-bit value stored by Constants.Add() at slot index N. N comes from DR0. Returns FAULT if N is out of range or the slot is not allocated.",
-      "inputs": [
-        "DR0: N \u2014 pool slot index returned by a prior Constants.Add()"
-      ],
-      "outputs": [
-        "DR0: stored 32-bit value; FAULT if N invalid or unallocated"
-      ],
-      "comments": [
-        "bindMethod validates N against POOL_SIZE and the bitmap",
-        "reads pool memory at poolBase + N and returns the value in DR0",
-        "no NS lookup \u2014 the pool is internal to the Constants abstraction"
-      ]
+    ],
+    "pet_names": {
+        "DR": {},
+        "CR": {
+            "0": "Constants.SelfDataR",
+            "1": "Constants.PoolRW"
+        }
     }
-  ],
-  "grants": [
-    "E"
-  ],
-  "data_offset": 19,
-  "data_word_names": [
-    "Pi",
-    "E",
-    "Phi",
-    "Zero",
-    "One"
-  ],
-  "self_data_r": true,
-  "author": "Test",
-  "version": "1.0",
-  "lump_version": 0,
-  "capabilities": [
-    {
-      "slot": 0,
-      "name": "Constants.SelfDataR",
-      "note": "self-data read-only cap — grants read access to the embedded constant data words (Pi, E, Phi, Zero, One)"
-    },
-    {
-      "slot": 1,
-      "name": "Constants.PoolRW",
-      "note": "pool storage RW cap — grants read/write access to the mutable user-constant pool used by Add and Get methods"
-    }
-  ],
-  "pet_names": {
-    "DR": {},
-    "CR": {
-      "0": "Constants.SelfDataR",
-      "1": "Constants.PoolRW"
-    }
-  }
 }

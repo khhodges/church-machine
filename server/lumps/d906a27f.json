@@ -1,88 +1,88 @@
 {
-  "token": "d906a27f",
-  "abstraction": "PostFlashSelftest",
-  "ns_slot": null,
-  "ns_slot_policy": "dynamic",
-  "lump_size": 1024,
-  "typ": 0,
-  "content_type": "code",
-  "cw": 515,
-  "cc": 8,
-  "profile": "IoT",
-  "language": "assembly",
-  "description": "Post-Flash Exhaustive Self-Test — 81 hardware correctness tests (DR independence, ALU, shifts, branches, BFEXT/BFINS, TPERM, CHANGE, LOAD). DR0=0 on full pass, DR0=N on first failure.",
-  "capabilities": [
-    {
-      "name": "null",
-      "grants": [],
-      "gt": "0x00000000",
-      "note": "unused (slot 0 reserved)"
-    },
-    {
-      "name": "Boot.Thread",
-      "grants": [
+    "token": "d906a27f",
+    "abstraction": "PostFlashSelftest",
+    "ns_slot": 6,
+    "ns_slot_policy": "static",
+    "lump_size": 1024,
+    "typ": 0,
+    "content_type": "code",
+    "cw": 515,
+    "cc": 8,
+    "profile": "IoT",
+    "language": "assembly",
+    "description": "Post-Flash Exhaustive Self-Test \u2014 81 hardware correctness tests (DR independence, ALU, shifts, branches, BFEXT/BFINS, TPERM, CHANGE, LOAD). DR0=0 on full pass, DR0=N on first failure.",
+    "capabilities": [
+        {
+            "name": "null",
+            "grants": [],
+            "gt": "0x00000000",
+            "note": "unused (slot 0 reserved)"
+        },
+        {
+            "name": "Boot.Thread",
+            "grants": [
+                "E"
+            ],
+            "gt": "0x48800001",
+            "ns_slot": 1,
+            "note": "Boot.Thread E-GT \u2014 Church domain enter"
+        },
+        {
+            "name": "Mint",
+            "grants": [
+                "E"
+            ],
+            "gt": "0x48800006",
+            "ns_slot": 6,
+            "note": "Mint E-GT \u2014 Church domain enter; GT lifecycle manager (NS slot 2 freed, Mint fills this position)"
+        },
+        {
+            "name": "Boot.Abstr",
+            "grants": [
+                "E"
+            ],
+            "gt": "0x48800003",
+            "ns_slot": 3,
+            "note": "Boot.Abstr E-GT \u2014 Church domain enter; Section I/J/K/L TPERM E tests"
+        },
+        {
+            "name": "Salvation",
+            "grants": [
+                "E"
+            ],
+            "gt": "0x48800004",
+            "ns_slot": 4,
+            "note": "Salvation E-GT \u2014 Church domain enter"
+        },
+        {
+            "name": "Navana",
+            "grants": [
+                "E"
+            ],
+            "gt": "0x48800005",
+            "ns_slot": 5,
+            "note": "Navana E-GT \u2014 Church domain enter"
+        },
+        {
+            "name": "null",
+            "grants": [],
+            "gt": "0x00000000",
+            "note": "unused (slot 6 reserved)"
+        },
+        {
+            "name": "Boot.Nucs",
+            "grants": [
+                "X"
+            ],
+            "gt": "0x40800001",
+            "ns_slot": 1,
+            "note": "Boot.Nucs X-GT (nucleus execute) \u2014 Turing domain; Section I/J TPERM X tests"
+        }
+    ],
+    "grants": [
         "E"
-      ],
-      "gt": "0x48800001",
-      "ns_slot": 1,
-      "note": "Boot.Thread E-GT — Church domain enter"
-    },
-    {
-      "name": "Mint",
-      "grants": [
-        "E"
-      ],
-      "gt": "0x48800006",
-      "ns_slot": 6,
-      "note": "Mint E-GT — Church domain enter; GT lifecycle manager (NS slot 2 freed, Mint fills this position)"
-    },
-    {
-      "name": "Boot.Abstr",
-      "grants": [
-        "E"
-      ],
-      "gt": "0x48800003",
-      "ns_slot": 3,
-      "note": "Boot.Abstr E-GT — Church domain enter; Section I/J/K/L TPERM E tests"
-    },
-    {
-      "name": "Salvation",
-      "grants": [
-        "E"
-      ],
-      "gt": "0x48800004",
-      "ns_slot": 4,
-      "note": "Salvation E-GT — Church domain enter"
-    },
-    {
-      "name": "Navana",
-      "grants": [
-        "E"
-      ],
-      "gt": "0x48800005",
-      "ns_slot": 5,
-      "note": "Navana E-GT — Church domain enter"
-    },
-    {
-      "name": "null",
-      "grants": [],
-      "gt": "0x00000000",
-      "note": "unused (slot 6 reserved)"
-    },
-    {
-      "name": "Boot.Nucs",
-      "grants": [
-        "X"
-      ],
-      "gt": "0x40800001",
-      "ns_slot": 1,
-      "note": "Boot.Nucs X-GT (nucleus execute) — Turing domain; Section I/J TPERM X tests"
-    }
-  ],
-  "grants": [
-    "E"
-  ],
-  "author": "Church Machine",
-  "version": "1.1",
-  "lump_version": 0
+    ],
+    "author": "Church Machine",
+    "version": "1.1",
+    "lump_version": 0
 }
