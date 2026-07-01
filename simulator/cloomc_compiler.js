@@ -151,7 +151,7 @@ class CLOOMCCompiler {
             return { methods: [], errors, manifest: [], abstractionName: parsed.name || '', capabilities: parsed.capabilities || [], language: 'javascript' };
         }
 
-        const rom = this._buildROM(parsed.capabilities, capabilities || []);
+        const rom = this._buildROM(parsed.capabilities, capabilities || [], errors);
         const methods = [];
         const manifest = [];
 
@@ -222,7 +222,7 @@ class CLOOMCCompiler {
             return { methods: [], errors, manifest: [], abstractionName: parsed.name || '', capabilities: parsed.capabilities || [], language: 'lambda' };
         }
 
-        const rom = this._buildROM(parsed.capabilities, capabilities || []);
+        const rom = this._buildROM(parsed.capabilities, capabilities || [], errors);
         const methods = [];
         const manifest = [];
 
@@ -951,9 +951,16 @@ class CLOOMCCompiler {
         };
     }
 
-    _buildROM(declaredCaps, uploadCaps) {
+    _buildROM(declaredCaps, uploadCaps, outErrors) {
         const rom = {};
         const capNames = declaredCaps || [];
+        if (outErrors && capNames.length > 32) {
+            const excess = capNames.length - 32;
+            outErrors.push({
+                line: 1, col: 0, endCol: 0,
+                message: `capabilities block declares ${capNames.length} entries but the hardware c-list is limited to 32 (ELOADCALL uses a 5-bit row field, slots 0–31). Remove ${excess} entr${excess === 1 ? 'y' : 'ies'} or split the abstraction into smaller ones.`
+            });
+        }
         for (let i = 0; i < capNames.length; i++) {
             rom[(typeof capNames[i] === 'string' ? capNames[i] : capNames[i].name || '').toUpperCase()] = i;
         }
@@ -2053,7 +2060,7 @@ class CLOOMCCompiler {
             return { methods: [], errors, manifest: [], abstractionName: parsed.name || '', capabilities: parsed.capabilities || [], language: 'haskell' };
         }
 
-        const rom = this._buildROM(parsed.capabilities, capabilities || []);
+        const rom = this._buildROM(parsed.capabilities, capabilities || [], errors);
         const methods = [];
         const manifest = [];
 
@@ -3060,7 +3067,7 @@ class CLOOMCCompiler {
             }
         }
 
-        const rom = this._buildROM(parsed.capabilities, capabilities || []);
+        const rom = this._buildROM(parsed.capabilities, capabilities || [], errors);
         const methods = [];
         const manifest = [];
 
@@ -3752,7 +3759,7 @@ class CLOOMCCompiler {
             return { methods: [], errors, manifest: [], abstractionName: parsed.name || '', capabilities: parsed.capabilities || [], language: 'english' };
         }
 
-        const rom = this._buildROM(parsed.capabilities, capabilities || []);
+        const rom = this._buildROM(parsed.capabilities, capabilities || [], errors);
         const methods = [];
         const manifest = [];
 

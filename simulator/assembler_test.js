@@ -1722,6 +1722,52 @@ function findSHR(words) {
     }
 }
 
+// CC14: capabilities { } block with 33 entries → assembler error explaining the
+//   32-entry / 5-bit hardware limit.  The ELOADCALL row field is 5 bits wide (0–31);
+//   declaring 33 capabilities must be caught before instruction encoding so the
+//   programmer sees a clear count message rather than a cryptic "row out of range"
+//   on a later ELOADCALL.
+//
+//   Part A: raw assembler path (ChurchAssembler.assemble).
+//   Part B: compiler path (CLOOMCCompiler.compileJS → _buildROM).
+{
+    // Build source: 33 capabilities declared, one per line.
+    const capLines = Array.from({ length: 33 }, (_, i) => `  Cap${i} E`).join('\n');
+
+    // ── Part A: raw assembler ─────────────────────────────────────────────────
+    const asmSrc = `capabilities {\n${capLines}\n}\nHALT`;
+    const asm = new ChurchAssembler({});
+    const asmResult = asm.assemble(asmSrc);
+    assert('CC14A oversized c-list (33 caps) — assembler emits ≥1 error',
+        asmResult.errors.length > 0,
+        'expected ≥1 error for 33-capability c-list, got 0');
+    assert('CC14A oversized c-list — error mentions 32 or 5-bit limit',
+        asmResult.errors.some(e => /32|5.bit/i.test(e.message)),
+        'errors: ' + asmResult.errors.map(e => e.message).join('; '));
+    assert('CC14A oversized c-list — error mentions count of declared capabilities (33)',
+        asmResult.errors.some(e => /33/.test(e.message)),
+        'errors: ' + asmResult.errors.map(e => e.message).join('; '));
+
+    // ── Part B: compiler (compileJS) path ─────────────────────────────────────
+    const compilerSrc =
+`abstraction Oversized {
+  capabilities {
+${capLines}
+  }
+  method run() {
+    return 0
+  }
+}`;
+    const cc = new CLOOMCCompiler();
+    const compResult = cc.compileJS(compilerSrc);
+    assert('CC14B oversized c-list via compileJS — emits ≥1 error',
+        compResult.errors.length > 0,
+        'expected ≥1 error for 33-capability c-list via compiler, got 0');
+    assert('CC14B oversized c-list via compileJS — error mentions 32 or 5-bit limit',
+        compResult.errors.some(e => /32|5.bit/i.test(e.message)),
+        'errors: ' + compResult.errors.map(e => e.message).join('; '));
+}
+
 // ── SE: Simulator-level SHR / ASR execution tests ────────────────────────────
 // These tests instantiate ChurchSimulator directly and call _execShr so we can
 // confirm that the runtime actually sign-extends (ASR) or zero-extends (LSR)

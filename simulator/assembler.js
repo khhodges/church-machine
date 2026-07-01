@@ -690,6 +690,7 @@ class ChurchAssembler {
             // or multi-line        capabilities {\n  LED0\n  SlideRule\n}
             if (!_inCapBlock && !_inConstBlock && /^capabilities\s*\{/i.test(line)) {
                 this._hasCapBlock = true;
+                this._capBlockLine = lineNum + 1;
                 const inline = line.match(/^capabilities\s*\{\s*(.*?)\s*\}\s*$/i);
                 if (inline) {
                     for (const item of inline[1].split(',')) {
@@ -1001,6 +1002,22 @@ class ChurchAssembler {
             }
 
             instructions.push({ line, lineNum: lineNum + 1 });
+        }
+
+        // ── Post-parse: c-list size gate ──────────────────────────────────────────
+        // The ELOADCALL instruction encodes the c-list row in a 5-bit field (0–31),
+        // so a capabilities { } block may declare at most 32 entries.  Catching this
+        // here — before instruction encoding — lets the programmer read "you declared
+        // 33 capabilities" rather than a cryptic "row out of range" on a later
+        // ELOADCALL that happens to reference a slot beyond the hardware limit.
+        if (this._hasCapBlock && this.capabilities.length > 32) {
+            const excess = this.capabilities.length - 32;
+            this.errors.push({
+                line: this._capBlockLine || 1,
+                col: 0,
+                endCol: 0,
+                message: `capabilities block declares ${this.capabilities.length} entries but the hardware c-list is limited to 32 (ELOADCALL uses a 5-bit row field, slots 0–31). Remove ${excess} entr${excess === 1 ? 'y' : 'ies'} or split the abstraction into smaller ones.`
+            });
         }
 
         // ── Pass 2: encode instructions ───────────────────────────────────────────
