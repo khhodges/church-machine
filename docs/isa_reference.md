@@ -261,7 +261,7 @@ Flag-writing summary across all 20 instructions:
 
 ---
 
-### A.5 — CALL: 1-based method index; A.6 — ELOADCALL: split imm15
+### A.5 — CALL: 1-based method index; A.6 — ELOADCALL: R-type field layout
 
 > **A.5 — CALL imm15 is 1-based: user method index N encodes as imm15 = N + 1.**
 >
@@ -290,24 +290,28 @@ Flag-writing summary across all 20 instructions:
 > index 2, not 3. Always subtract 1 from the raw imm15 field to get the user-facing
 > method selector.
 
-> **A.6 — ELOADCALL imm15 is split into two fields.**
+> **A.6 — ELOADCALL uses R-type encoding (not a split imm15).**
 >
 > ```
-> imm15[14:8]  =  method index (7 bits, 0–127)    — same 1-based encoding as CALL
-> imm15[7:0]   =  c-list row   (8 bits, 0–255)    — word offset into CRsrc c-list
+> funct7[6:0]  =  instr[31:25]  =  method index (7 bits, 0–127)   — same 1-based encoding as CALL
+> rs2[4:0]     =  instr[24:20]  =  c-list row   (5 bits, 0–31)    — word offset into CRsrc c-list
 > ```
 >
 > ELOADCALL atomically loads the GT at `CRsrc[row]` into the destination CR and
 > calls it with the given method index. The method index is encoded identically
 > to CALL (0 = fast path, N+1 = user method N).
 >
-> **Backward compatibility:** old programs that encoded `ELOADCALL CRd, CRs, #N`
-> with a simple row number stored the row in bits[7:0] and left bits[14:8] = 0.
-> Method index 0 → fast path — behaviour is identical to the pre-split encoding.
+> This R-type layout replaced the former I-type split (`imm12[11:8]` = 4-bit
+> method index, `imm12[7:0]` = row) which silently truncated abstractions with
+> more than 16 method entries. The row field is now 5 bits (0–31) instead of
+> 8 bits; the method index field is now a full 7 bits (0–127).
+>
+> **Backward compatibility:** programs that encode method index 0 get the fast
+> path (NIA = lump_base + 4) — behaviour is identical to the pre-R-type encoding.
 >
 > Valid ranges (enforced by assembler and checked at assembly time):
-> - c-list row: 0–255 (8 bits; values 256+ are a hard assembler error)
-> - method index: 0–126 in user terms → 0–127 in imm15[14:8] (value 127 rejected)
+> - c-list row: 0–31 (5 bits; values 32+ are a hard assembler error)
+> - method index: 0–126 in user terms → 0–127 in funct7[6:0] (value 127 rejected)
 
 ---
 
@@ -902,33 +906,40 @@ LAMBDA AL, CR3           ; opcode=7, cond=14, fld_a=3, fld_b=0, imm=0
 ```
 Syntax:  ELOADCALL CRd, CRs, #row [, #method]
          ELOADCALL CRd, Name [, Method]    (two-operand shorthand — see A.6 and A.16)
-Encoding: op[4:0]=0x08 | cond[4] | CRd[4] | CRs[4] | method[7] | row[8]
+Encoding: R-type — instr[6:0]=0x0B (CHURCH_CUSTOM0) | instr[11]=1 | funct3=0b000
+                   funct7[6:0]=method_index | rs2[4:0]=row | instr[18:15]=CRs | instr[10:7]=CRd
 ```
 
-`imm15[14:8]` = method index (7 bits, 1-based; 0 = fast path).
-`imm15[7:0]` = c-list row (8 bits, 0–255).
+`funct7[6:0]` (instr[31:25]) = method index (7 bits, 1-based; 0 = fast path).
+`rs2[4:0]` (instr[24:20]) = c-list row (5 bits, 0–31).
+
+Church opcode 8 is carried via `instr[11]=1` (distinguishes opcodes 8–9 from 0–7) and `funct3=0b000`. The RISC-V base opcode field `instr[6:0]` is always `CHURCH_CUSTOM0 = 0x0B` for all Church instructions.
+
+This R-type layout replaced the former I-type split (`imm12[11:8]` = 4-bit method index, `imm12[7:0]` = row). The method index field is now a full 7 bits (0–127), eliminating silent truncation for abstractions with more than 16 method entries. The row field is 5 bits (0–31).
 
 **Semantics:** Atomic LOAD + CALL. No intermediate CR state is visible between the two phases.
 1. mLoad validates CRs's c-list for the row slot (L permission check as per LOAD semantics).
 2. GT at `CRs[row]` is loaded; Outform GTs are promoted Outform→Inform.
 3. mLoad validates E permission on the loaded GT.
 4. CRd ← loaded GT.
-5. Hardware CALL phase executes: push 2-word frame, set CR6/CR14, jump to callee entry. Method index is decoded from `imm15[14:8]` using the same 1-based encoding as CALL.
+5. Hardware CALL phase executes: push 2-word frame, set CR6/CR14, jump to callee entry. Method index is decoded from `funct7[6:0]` using the same 1-based encoding as CALL.
 
-Backward compatibility: programs that encode `imm15[14:8] = 0` get the fast-path (NIA = lump_base + 4) — identical to pre-split behaviour.
+Backward compatibility: programs that encode `funct7[6:0] = 0` get the fast-path (NIA = lump_base + 4) — identical to pre-R-type behaviour.
 
 **Flags:** N — Z — C — V (no flag writes)
 
 **Faults:** All faults from LOAD and CALL apply. Additionally:
 | Fault | Condition |
 |-------|-----------|
-| `BOUNDS` | `row` > 255 (assembler-enforced; hardware checks via c-list bounds) |
+| `BOUNDS` | `row` > 31 (assembler-enforced; hardware checks via c-list bounds) |
 
 **Example:** Load abstraction from c-list row 2 of CR6 into CR0, then call it via fast path.
 ```
 ELOADCALL AL, CR0, CR6, #2    ; row=2, method=0 (fast path)
-                                ; opcode=8, cond=14(AL), fld_a=0, fld_b=6, imm=2
-                                ; encoding: 0x47030002
+                                ; funct7=0x00 (method=0), rs2=0x02 (row=2),
+                                ; instr[18:15]=0x6 (CR6), instr[10:7]=0x0 (CR0),
+                                ; instr[11]=1, funct3=0b000, instr[6:0]=0x0B
+                                ; encoding: 0x0023080B
 ```
 
 ---
@@ -1406,7 +1417,7 @@ SHR AL, DR1, DR2, #3, ASR   ; ASR, mode=1; imm = (1 << 5) | 3 = 0x23
 | 5   | 0x05 | SWITCH      | Church  | 0      | CRn    | target[2:0] (5=CR13, 7=CR15)           | —             | INVALID_OP                      | D-11 closed |
 | 6   | 0x06 | TPERM       | Church  | CRd    | 0      | preset[4:0] (bit4=B-mod, [3:0]=code)   | N=!Z Z C=0 V=0 | TPERM_RSV            | D-3 (reserved presets) |
 | 7   | 0x07 | LAMBDA      | Church  | CRn    | 0      | 0 (unused)                             | —             | NULL, PERM, BOUNDS    | —           |
-| 8   | 0x08 | ELOADCALL   | Church  | CRd    | CRs    | method[14:8] \| row[7:0]              | —             | NULL, PERM, SEAL, BOUNDS | —        |
+| 8   | 0x08 | ELOADCALL   | Church  | CRd    | CRs    | funct7[6:0]=method_index \| rs2[4:0]=row | —          | NULL, PERM, SEAL, BOUNDS | —        |
 | 9   | 0x09 | XLOADLAMBDA | Church  | CRd    | CRs    | c-list row (0–32767)                   | —             | NULL, PERM, SEAL, BOUNDS | —        |
 | 10–15 | 0x0A–0x0F | *unassigned* | — | —  | —      | —                                      | —             | → **FAULT**           | —           |
 | 16  | 0x10 | DREAD       | Turing  | DRd    | CRs    | word offset (0–32767)                  | —             | NULL, PERM, BOUNDS    | —           |

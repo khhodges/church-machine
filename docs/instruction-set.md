@@ -298,9 +298,9 @@ ELOADCALL CRd, CRs, #row [, #method_index]
 
 Fused LOAD + CALL. Loads a GT from CRs's c-list at the given row (word offset), then immediately enters it. Atomic: no intermediate CR state is visible between the LOAD and the CALL.
 
-imm15 split: bits[7:0] = c-list row (word offset into the c-list of CRsrc, 0–255); bits[14:8] = method index passed to the hardware CALL phase (same semantics as CALL imm15, 0–127).
+R-type encoding: `funct7[6:0]` (instr[31:25]) = method index (7 bits, 0–127); `rs2[4:0]` (instr[24:20]) = c-list row (5 bits, 0–31). This replaced the former I-type split (imm12[11:8] = 4-bit method index, imm12[7:0] = row) which silently truncated abstractions with more than 16 method entries.
 
-Existing programs encode bits[14:8]=0 → method index 0 → NIA = lump_base + 4 (backward compatible).
+Existing programs that encode method index 0 get the fast path — NIA = lump_base + 4 (backward compatible).
 
 ### XLOADLAMBDA (opcode 9)
 
