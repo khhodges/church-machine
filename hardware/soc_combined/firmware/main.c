@@ -582,8 +582,17 @@ int main(void)
     /* ---- Step 3: Release push_button (keep CM running) ---- */
     CM_CTRL = CM_CTRL_RELEASED;
 
-    /* ---- Step 4: Boot banner ---- */
-    uart_puts("CHURCH Ti60 SoC+CM v2.4\r\n");
+    /* ---- Step 4: Boot banner ----
+     * Version digits are derived from FW_MAJOR/FW_MINOR (not hardcoded) so
+     * the banner can never drift out of sync with the #define bump — this
+     * is the root cause of the v2.3-vs-v2.4 stale-banner incident. Single
+     * uart_putc digit, no division, matches the fw_major/fw_minor emission
+     * used in the CALLHOME JSON above. */
+    uart_puts("CHURCH Ti60 SoC+CM v");
+    uart_putc((char)('0' + (FW_MAJOR % 10u)));
+    uart_putc('.');
+    uart_putc((char)('0' + (FW_MINOR % 10u)));
+    uart_puts("\r\n");
     uart_puts("UID=");
     emit_uid();
     uart_puts("\r\n");

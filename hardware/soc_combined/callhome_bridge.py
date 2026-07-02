@@ -1239,6 +1239,17 @@ def _reader_thread(port, baud):
                 except Exception:
                     pass
                 _ser = None
+            # Discard any partial line buffered before the drop. Without this,
+            # a truncated CALLHOME/TRACE/etc. line from before the disconnect
+            # gets silently concatenated (no separator) with whatever the
+            # reconnected port sends first (e.g. the next boot's greeting
+            # banner), producing a single corrupt line that fails JSON parsing
+            # and looks like a firmware bug when it is actually stale buffer
+            # state carried across the reconnect.
+            if buf:
+                print(f"  [bridge] Discarding {len(buf)} byte(s) of partial "
+                      f"buffer before reconnect: {buf!r}")
+                buf = b""
             if _AUTO_RECONNECT:
                 print(f"  [bridge] Reconnecting in 2 s…")
                 time.sleep(2)

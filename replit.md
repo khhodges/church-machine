@@ -93,6 +93,23 @@ The Sapphire SoC (RISC-V rv32im soft-core, 16 KB ROM / 16 KB RAM) runs alongside
 
 **ROM budget:** 16 KB. Current firmware uses ~1.6 KB. SHA32+HMAC+HKDF adds ~3 KB. 72% free. No FP coprocessor needed — SlideRule trig is a CLOOMC abstraction, not RISC-V firmware.
 
+## Ti60 One-Build-Bitstream-Script (OBBS) Consolidation
+
+Root-caused and fixed the v2.3-vs-v2.4 stale-firmware-banner incident plus a callhome bridge JSON-concat bug on serial reconnect. There is now exactly ONE canonical build pipeline and ONE firmware build location, with self-tests that catch stale data at each step instead of only surfacing as a wrong version string on a physical board.
+
+- **Root cause:** `run_efx_map.sh` used to rebuild firmware a second time from an untracked `$SOC_DIR/firmware` copy, silently overwriting the correctly-patched `sapphire.v` that `build_ti60_bitstream.sh` had just deployed — two firmware build locations, one of them stale.
+- **Fix — single build location:** `build_ti60_bitstream.sh` now rsyncs (`--delete`) the repo firmware sources into `$SOC_DIR/firmware` as an explicit step, verified byte-identical with `scripts/check_firmware_sha_sync.sh`. `run_efx_map.sh` no longer rebuilds or re-patches firmware — Step 0a is a read-only freshness self-test only, and hard-fails (`exit 1`) on direct invocation unless called via the OBBS (`_OBBS_RUN=1`/`ALLOW_DIRECT=1`).
+- **Fix — single pipeline:** `run_full_build.sh` is now a thin wrapper (tmux session, git pull, Efinity env, confirm prompt) that delegates the entire MAP/PNR/PGM sequence to `build_ti60_bitstream.sh`. Legacy hex filename `church_soc_cm.hex` is still written alongside `church_ti60_f225.hex` for backward compatibility with `flash_and_monitor.sh` and `server/app.py`.
+- **Fix — banner can no longer drift from source:** the boot banner in `hardware/soc_combined/firmware/main.c` used to be a hardcoded `"CHURCH Ti60 SoC+CM v2.4\r\n"` literal, independent of the `FW_MAJOR`/`FW_MINOR` `#define`s used everywhere else (including the CALLHOME JSON) — the exact root cause of the incident. It is now emitted digit-by-digit from `FW_MAJOR`/`FW_MINOR` at runtime, so the two can never disagree again.
+- **Fix — callhome bridge reconnect bug:** `callhome_bridge.py::_reader_thread()` now discards its partial read buffer on `SerialException` before reconnecting, so a truncated line from before a USB drop can no longer concatenate with post-reconnect data and fail JSON parsing.
+- **New self-tests (all runnable without real FPGA hardware — synthetic fixtures only):**
+  - `scripts/check_firmware_sha_sync.sh` — sha256-compares `$SOC_DIR/firmware` against the repo firmware dir; catches drift, missing files, and stray files.
+  - `scripts/check_fw_banner_matches_defines.sh` — fails if a hardcoded literal banner version ever disagrees with `FW_MAJOR`/`FW_MINOR` again.
+  - `scripts/check_sapphire_symbol_bins_fresh.sh` — sha256-compares the four Sapphire ROM `$readmemb` symbol bins in `$SOC_DIR/work_syn/` against the freshly-built repo copies. EFX_MAP resolves `$readmemb` bare filenames relative to `--work_dir` (`work_syn/`), not the project root — a stale/missing bin there is invisible to every other guard (sapphire.v itself still looks correctly patched). `build_ti60_bitstream.sh` deploys the bins into `work_syn/` right after patching sapphire.v and runs this guard immediately after; `run_efx_map.sh` Step 0a re-checks it read-only before MAP starts.
+  - `scripts/test_ti60_uart.py --expect-fw=MAJ.MIN` — physical-hardware smoke test now asserts the board's CALLHOME-reported firmware version against the version that was just built; `build_ti60_bitstream.sh`'s `--flash` step passes this automatically.
+  - `scripts/test_callhome_bridge_reconnect.py` — regression test for the reconnect JSON-concat bug.
+  - Fixtures for all three new guards live in `scripts/test_build_guard.sh` (Sections C, D, and E); all registered in `scripts/run-all-tests.sh` under the `checks` group.
+
 ## Gotchas / Known Traps
 
 ### Adding a new Assembly example tab (MUST DO BOTH steps)

@@ -229,6 +229,9 @@ register_suite "update-lump-tests" \
 register_suite "callhome-parser-tests" \
     'python -m pytest scripts/test_callhome_parser.py -v'
 
+register_suite "callhome-reconnect-tests" \
+    'python -m pytest scripts/test_callhome_bridge_reconnect.py -v'
+
 register_suite "check-slot-index-leak" \
     'node scripts/check-slot-index-leak.js'
 
@@ -245,7 +248,7 @@ ALL_GROUPS["lump"]="lump-consistency lump-binary-tests lump-roundtrip update-lum
 
 ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests pet-name-mem-tests warning-panel-tests disasm-panel-tests boot-entry-sync-tests selftest-lump-runs pet-name-memory-tests lump-builder-dispatch-tests"
 
-ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabilities-blocks check-api-reference-stale ti60-utilisation ti60-uart-dry-run callhome-parser-tests build-guard-tests check-slot-index-leak"
+ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabilities-blocks check-api-reference-stale ti60-utilisation ti60-uart-dry-run callhome-parser-tests callhome-reconnect-tests build-guard-tests check-slot-index-leak"
 
 ALL_GROUPS["hardware"]="hardware-sim"
 

@@ -15,10 +15,22 @@ Both the CM DMEM and the Sapphire SoC ROM use the SAME mechanism:
 
 **Sapphire SoC ROM** (ram_symbol0..3, 8192×8-bit per lane):
 - `scripts/patch_sapphire_init.py` patches sapphire.v with $readmemb calls
-- `scripts/gen_sapphire_symbol_bins.py firmware.bin --out-dir work_syn/`
-  writes the four lane .bin files to work_syn/
-- run_efx_map.sh does: `mkdir -p work_syn` → firmware make → gen_sapphire_symbol_bins →
-  patch_sapphire_init → efx_run
+  (patches the repo copy only — it does NOT copy any .bin files anywhere)
+- The firmware Makefile writes the four lane .bin files directly into
+  `hardware/soc_combined/` (repo) on every `make`
+- `scripts/build_ti60_bitstream.sh` is the ONLY place that copies those bins
+  into `$SOC_DIR/work_syn/` (right after patching sapphire.v), and
+  `scripts/check_sapphire_symbol_bins_fresh.sh` guards that the copy is
+  byte-identical before MAP runs. `run_efx_map.sh` re-checks this same guard
+  in its Step 0a (read-only) before invoking `efx_run.py`.
+- Gotcha (real regression caught by architect review, not hypothetical):
+  consolidating "single build location" work can easily delete the step that
+  populates `work_syn/` without anyone noticing, because sapphire.v itself
+  looks correctly patched and every other freshness guard (sha-sync on
+  firmware/, banner-vs-defines, sapphire.v mtime) inspects a *different*
+  artifact — none of them look inside `work_syn/`. Any future refactor of the
+  Ti60 build pipeline MUST keep (or re-add) an explicit bins-into-work_syn/
+  deploy step plus the check_sapphire_symbol_bins_fresh.sh guard.
 
 **CM DMEM** (dmem_b0..3, depth depends on NUC_PROGRAM):
 - `patch_cm_bram.py` converts the 32-bit dmem array to four byte-lane $readmemb

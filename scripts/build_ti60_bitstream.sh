@@ -133,6 +133,26 @@ print(m.group(1).strip() if m else 'unknown')
 _ok "Firmware built — banner: $FW_BANNER  symbol files in $HW/"
 echo ""
 
+# ── Step 1.5: Sync firmware source into the Efinity project directory ───────
+# $SOC_DIR (the Efinity synthesis project, e.g. ~/church_project/SoC) has
+# historically drifted from the repo's hardware/soc_combined/firmware/ — a
+# stale, untracked copy sitting there let run_efx_map.sh's old firmware
+# rebuild step silently bake old firmware bytes into the bitstream even
+# though this script had already built and patched the correct version.
+# That rebuild step no longer exists (see run_efx_map.sh), but we still
+# mirror the repo firmware into $SOC_DIR so there is only ever ONE firmware
+# source on disk during a build — eliminating the divergence by construction
+# rather than relying on every script remembering to read from the right
+# place.
+_info "Step 1.5/8: Sync firmware source into $SOC_DIR/firmware"
+mkdir -p "$SOC_DIR/firmware"
+rsync -a --delete "$HW/firmware/" "$SOC_DIR/firmware/"
+if ! bash "$SCRIPTS/check_firmware_sha_sync.sh" "$HW/firmware" "$SOC_DIR/firmware"; then
+    _fail "Firmware sync verification failed — $SOC_DIR/firmware still differs from $HW/firmware after rsync (see sha256 guard output above)"
+fi
+_ok "Firmware source synced and verified byte-identical: $SOC_DIR/firmware"
+echo ""
+
 # ── Step 2: Patch sapphire.v ────────────────────────────────────────────────
 # patch_sapphire_init.py writes firmware BRAM init-data into the repo copy
 # ($HW/sapphire.v).  After patching we MUST also copy it to $SOC_DIR because
@@ -151,6 +171,21 @@ _ok "sapphire.v patched (repo copy: $SAPPHIRE_V)"
 # Deploy patched sapphire.v to the Efinity project directory
 cp "$SAPPHIRE_V" "$SOC_DIR/sapphire.v"
 _ok "sapphire.v deployed to $SOC_DIR/sapphire.v"
+
+# sapphire.v only contains $readmemb("<bare filename>", ram_symbolN) calls —
+# the actual bin *contents* still have to be found on disk by EFX_MAP at
+# synthesis time. EFX_MAP resolves those bare filenames relative to
+# --work_dir (work_syn/), NOT hardware/soc_combined/ and NOT $SOC_DIR itself
+# (see .agents/memory/efx-map-readmemb.md — empirically confirmed). Deploying
+# sapphire.v without also deploying the bins into $SOC_DIR/work_syn/ leaves
+# whatever bins (possibly stale, possibly none) already happen to be sitting
+# there, which MAP will silently embed with no error.
+mkdir -p "$SOC_DIR/work_syn"
+cp "$HW"/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol*.bin "$SOC_DIR/work_syn/"
+if ! bash "$SCRIPTS/check_sapphire_symbol_bins_fresh.sh" "$HW" "$SOC_DIR/work_syn"; then
+    _fail "Sapphire symbol bins in $SOC_DIR/work_syn are stale after copy — see guard output above"
+fi
+_ok "Sapphire symbol bins deployed to $SOC_DIR/work_syn/ and verified fresh"
 echo ""
 
 # ── Step 2.5: Copy CM Verilog and peri.xml to SoC project ───────────────────
@@ -354,8 +389,13 @@ if [ "$DO_FLASH" -eq 1 ]; then
         echo ""
         _info "  Waiting 5 s for board to boot..."
         sleep 5
-        _info "  Running UART smoke-test..."
-        python3 "$SCRIPTS/test_ti60_uart.py" --port=auto --baud=57600 --timeout=30 --verbose
+        _info "  Running UART smoke-test (expecting fw=${FW_MAJOR}.${FW_MINOR})..."
+        # --expect-fw closes the loop on the stale-firmware bug: it fails
+        # loudly right here if the board reports a version other than the
+        # one that was just built and flashed, instead of that mismatch
+        # only surfacing later as a confusing banner string in the IDE.
+        python3 "$SCRIPTS/test_ti60_uart.py" --port=auto --baud=57600 --timeout=30 --verbose \
+            --expect-fw="${FW_MAJOR}.${FW_MINOR}"
     fi
 else
     _info "Step 7/8: Flash skipped (pass --flash to flash + smoke-test automatically)"

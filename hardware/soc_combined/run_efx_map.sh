@@ -20,26 +20,46 @@
 
 set -euo pipefail
 
-# ── Direct-invocation warning ────────────────────────────────────────────
-# scripts/build_ti60_bitstream.sh (the One Button Build Script) exports
-# _OBBS_RUN=1 immediately before calling this script, which guarantees that
-# `make clean`, patch_sapphire_init.py, and gen_cm_dmem_direct.py have all
-# already run in the correct order. Calling this script directly skips all
-# of that — the most common failure mode is stale/zeroed BRAM init because
-# firmware wasn't rebuilt or patched before synthesis. This is a warning
-# only; the script still runs so legitimate manual debugging is not blocked.
-if [ -z "${_OBBS_RUN:-}" ]; then
+# ── Direct-invocation guard ───────────────────────────────────────────────
+# scripts/build_ti60_bitstream.sh (the One Button Build Script — OBBS) is the
+# ONLY supported entry point for a synthesis run. It builds firmware from the
+# repo copy (hardware/soc_combined/firmware), patches sapphire.v, deploys both
+# into $SOC_PROJECT_DIR, and only then exports _OBBS_RUN=1 and calls this
+# script. This script itself no longer builds or patches firmware — it used
+# to (Step 0a used to run `make -C $SOC_DIR/firmware clean all` and re-patch
+# sapphire.v from THAT copy), which silently overwrote the correctly-patched
+# repo firmware with whatever stale/untracked sources happened to live in
+# $SOC_DIR/firmware. That was the root cause of a real incident where a
+# flashed board reported an old firmware banner despite the repo already
+# containing the fix. Calling this script directly (bypassing the OBBS) skips
+# the firmware build/patch/deploy steps entirely, so a hard fail here — not a
+# warning — is required to stop a synthesis run from silently baking in
+# whatever firmware happens to already be sitting in $SOC_DIR.
+#
+# Legitimate manual debugging (e.g. re-running MAP after tweaking Verilog
+# only, with firmware already deployed and known-fresh) can bypass the guard
+# with ALLOW_DIRECT=1.
+if [ -z "${_OBBS_RUN:-}" ] && [ -z "${ALLOW_DIRECT:-}" ]; then
     echo ""
     echo "=================================================================="
-    echo "[WARN] run_efx_map.sh invoked directly (not via build_ti60_bitstream.sh)"
-    echo "[WARN] This bypasses steps normally run first by the One Button Build"
-    echo "[WARN] Script. Before continuing, make sure you have already run:"
-    echo "[WARN]   1. make -C firmware clean all   (rebuild firmware fresh)"
-    echo "[WARN]   2. python3 scripts/patch_sapphire_init.py <sapphire.v>"
-    echo "[WARN]   3. python3 hardware/soc_combined/gen_cm_dmem_direct.py <soc_dir>"
-    echo "[WARN] Skipping these can silently bake stale/zeroed BRAM into the bitstream."
+    echo "[FAIL] run_efx_map.sh must be invoked via scripts/build_ti60_bitstream.sh"
+    echo "[FAIL] (the One Button Build Script), not directly."
+    echo "[FAIL]"
+    echo "[FAIL] Direct invocation skips the firmware build/patch/deploy steps"
+    echo "[FAIL] that build_ti60_bitstream.sh performs against the repo firmware"
+    echo "[FAIL] copy (hardware/soc_combined/firmware) — the only source of truth."
+    echo "[FAIL] Running MAP without them synthesises whatever firmware bytes"
+    echo "[FAIL] happen to already be in \$SOC_PROJECT_DIR, which can be stale."
+    echo "[FAIL]"
+    echo "[FAIL] Run instead:"
+    echo "[FAIL]   bash scripts/build_ti60_bitstream.sh"
+    echo "[FAIL]"
+    echo "[FAIL] If you are intentionally re-running MAP for hardware-only"
+    echo "[FAIL] debugging and firmware is already deployed + verified fresh,"
+    echo "[FAIL] set ALLOW_DIRECT=1 to bypass this guard."
     echo "=================================================================="
     echo ""
+    exit 1
 fi
 
 EFINITY="${EFINITY_HOME:-$HOME/efinity/2026.1}"
@@ -85,42 +105,75 @@ mkdir -p "$SOC_DIR/work_syn"
 cd "$SOC_DIR"
 
 # ----------------------------------------------------------------
-# Step 0a: Firmware — compile and patch into sapphire.v BEFORE synthesis
+# Step 0a: Firmware freshness self-test (NOT a rebuild)
 #
-# WHY HERE (not in run_efx_pnr.sh):
-#   efx_pnr uses --vdb_file top.vdb written by efx_map.  The VDB embeds
-#   BRAM INIT_ values at synthesis time; patching map.v afterward has no
-#   effect on the bitstream.  Firmware must be baked in before MAP.
+# Firmware is built, patched into sapphire.v, and deployed into $SOC_DIR
+# by scripts/build_ti60_bitstream.sh (Steps 1-2) BEFORE this script is ever
+# invoked — that is the only place firmware is compiled from. This script
+# used to ALSO rebuild firmware here, from $SOC_DIR/firmware (a separate,
+# never-synced copy on droplets), and re-ran patch_sapphire_init.py against
+# it — silently overwriting the correctly-patched sapphire.v that Step 2
+# had just deployed, with symbol bins baked from stale/untracked firmware
+# bytes. That produced a flashed board whose boot banner did not match the
+# repo's main.c, and cost real debugging time to trace. The fix is to never
+# rebuild firmware here — only verify what was already deployed is fresh.
 #
-# HOW: patch_sapphire_init.py inserts $readmemb bare-filename calls into
-#   sapphire.v.  gen_sapphire_symbol_bins.py writes the four lane .bin
-#   files into work_syn/ (EFX_MAP resolves $readmemb relative to its
-#   working directory, which is work_syn/ when --work_dir work_syn is
-#   used).  This mirrors exactly what patch_cm_bram.py does for the CM
-#   DMEM — bare $readmemb + files in work_syn/ is the only approach that
-#   survives into BRAM INITVAL_ parameters and the VDB.
+# WHY THE CHECK STILL RUNS HERE (not skipped entirely):
+#   efx_pnr uses --vdb_file top.vdb written by efx_map. The VDB embeds BRAM
+#   INIT_ values at synthesis time; patching map.v afterward has no effect
+#   on the bitstream. If sapphire.v is stale by the time MAP runs, the only
+#   recovery is re-running the whole OBBS — so we fail fast here, before
+#   spending ~45 minutes on synthesis, rather than discovering it only when
+#   the board boots the wrong firmware.
 # ----------------------------------------------------------------
-echo "==> Step 0a: Building Sapphire firmware (make -C firmware clean all) ..."
-make -C "$SOC_DIR/firmware" clean all
-echo "    ✓ Firmware compiled."
-echo ""
-
-FIRMWARE_BIN="$SOC_DIR/firmware/firmware.bin"
-echo "==> Step 0a: Generating Sapphire symbol bins → work_syn/ ..."
-# Files MUST go into work_syn/ — EFX_MAP resolves bare $readmemb filenames
-# relative to --work_dir (work_syn/), not relative to the project root.
-python3 "$SCRIPT_DIR/../../scripts/gen_sapphire_symbol_bins.py" \
-    "$FIRMWARE_BIN" --out-dir "$SOC_DIR/work_syn"
-echo "    ✓ Symbol bins written to work_syn/."
-echo ""
-
-echo "==> Step 0a: Patching sapphire.v with \$readmemb calls (patch_sapphire_init.py) ..."
-python3 "$SCRIPT_DIR/../../scripts/patch_sapphire_init.py" \
-    "$SOC_DIR/sapphire.v"
+echo "==> Step 0a: Verifying deployed sapphire.v is fresh (self-test, no rebuild) ..."
+if [ ! -f "$SOC_DIR/sapphire.v" ]; then
+    echo "[FAIL] $SOC_DIR/sapphire.v not found. It must be deployed by" >&2
+    echo "[FAIL] scripts/build_ti60_bitstream.sh before run_efx_map.sh runs." >&2
+    exit 1
+fi
+if [ -d "$SOC_DIR/firmware" ]; then
+    bash "$SCRIPT_DIR/../../scripts/check_sapphire_patch_fresh.sh" \
+        "$SOC_DIR/sapphire.v" "$SOC_DIR/firmware" || {
+        echo "[FAIL] sapphire.v in $SOC_DIR is stale relative to $SOC_DIR/firmware." >&2
+        echo "[FAIL] This should never happen when invoked via build_ti60_bitstream.sh —" >&2
+        echo "[FAIL] re-run it from the repo root rather than patching manually." >&2
+        exit 1
+    }
+else
+    echo "    (no $SOC_DIR/firmware directory to compare against — skipping mtime check)"
+fi
+if [ -f "$SOC_DIR/firmware/main.c" ]; then
+    bash "$SCRIPT_DIR/../../scripts/check_fw_banner_matches_defines.sh" \
+        "$SOC_DIR/firmware/main.c" || {
+        echo "[FAIL] Boot banner in $SOC_DIR/firmware/main.c disagrees with its own" >&2
+        echo "[FAIL] FW_MAJOR/FW_MINOR #defines — this is the stale-banner bug class." >&2
+        exit 1
+    }
+else
+    echo "    (no $SOC_DIR/firmware/main.c to check — skipping banner guard)"
+fi
+# sapphire.v itself only references the symbol bins by bare filename — the
+# actual bin CONTENTS must separately exist in work_syn/ (EFX_MAP's
+# --work_dir), which build_ti60_bitstream.sh deploys them into right after
+# patching sapphire.v. If a stale build's bins were left in work_syn/ from a
+# previous run, MAP would silently embed OLD firmware with every other guard
+# above still passing (they never look inside work_syn/).
+if [ -f "$SCRIPT_DIR/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin" ]; then
+    bash "$SCRIPT_DIR/../../scripts/check_sapphire_symbol_bins_fresh.sh" \
+        "$SCRIPT_DIR" "$SOC_DIR/work_syn" || {
+        echo "[FAIL] Sapphire symbol bins in $SOC_DIR/work_syn are stale or missing." >&2
+        echo "[FAIL] This should never happen when invoked via build_ti60_bitstream.sh —" >&2
+        echo "[FAIL] re-run it from the repo root rather than patching manually." >&2
+        exit 1
+    }
+else
+    echo "    (no symbol bins found in $SCRIPT_DIR — skipping bins freshness check)"
+fi
 echo "--- sapphire.v initial block (verification) ---"
 grep -A 6 'initial begin' "$SOC_DIR/sapphire.v" | grep -E 'readmemb|ram_symbol\[' | head -6
 echo "---"
-echo "    ✓ sapphire.v ready."
+echo "    ✓ sapphire.v verified fresh (built/patched/deployed by build_ti60_bitstream.sh)."
 echo ""
 
 # ----------------------------------------------------------------

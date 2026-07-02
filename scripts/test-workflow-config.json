@@ -16,6 +16,7 @@
     "wukong-protocol-tests",
     "build-guard-tests",
     "update-lump-tests",
-    "check-slot-index-leak"
+    "check-slot-index-leak",
+    "callhome-reconnect-tests"
   ]
 }

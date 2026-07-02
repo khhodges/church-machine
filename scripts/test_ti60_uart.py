@@ -17,6 +17,8 @@ Checks performed:
   8. FAULT_EVENT   — At least one valid FAULT_EVENT:{...} line seen (optional)
   9. HUNG          — At least one valid HUNG:{...} line seen (optional)
  10. ACK           — IDE call-home ACK received (optional, requires --ide=URL)
+ 11. FW_VERSION_MATCH — Reported fw_major.fw_minor equals --expect-fw (mandatory
+                        only if --expect-fw is passed; otherwise skipped)
 
 Exit codes:
   0 — all mandatory checks pass
@@ -25,6 +27,7 @@ Exit codes:
 Usage:
     python3 scripts/test_ti60_uart.py --dry-run
     python3 scripts/test_ti60_uart.py [--port=auto] [--baud=57600] [--timeout=10] [--ide=URL]
+    python3 scripts/test_ti60_uart.py --expect-fw=2.4   # fail if board reports any other version
 
 Flags:
     --dry-run              Run parser logic against canned transcript; no serial
@@ -36,6 +39,13 @@ Flags:
     --timeout=N            Seconds to wait for output in live mode (default: 10)
     --ide=URL              Check for a call-home ACK from the IDE server at URL
                            (optional; skipped if not provided)
+    --expect-fw=MAJ.MIN    Fail the run if the board's CALLHOME fw_major.fw_minor does
+                           not exactly match MAJ.MIN. Use this after a build/flash cycle
+                           to catch a stale-firmware board immediately instead of
+                           discovering the mismatch later from a banner in the IDE.
+                           Example: --expect-fw=2.4  (matches the value written to
+                           bitstreams/church_ti60_f225.json's "firmware_version" field,
+                           without the leading "v").
     --report-launch=TEST-NN  On completion, POST the overall PASS/FAIL result to
                            the IDE launch-test tracker at /api/launch-tests/TEST-NN.
                            Requires --ide=URL.  Recommended ID: TEST-09 (UART).
@@ -56,6 +66,7 @@ _TIMEOUT = 10.0
 _IDE_SERVER_URL = None
 _REPORT_LAUNCH_ID = None
 _VERBOSE = False
+_EXPECT_FW = None  # (major, minor) tuple, or None if not requested
 
 for _a in sys.argv[1:]:
     if _a == '--dry-run':
@@ -70,6 +81,13 @@ for _a in sys.argv[1:]:
         _IDE_SERVER_URL = _a[6:].rstrip('/')
     elif _a.startswith('--report-launch='):
         _REPORT_LAUNCH_ID = _a[len('--report-launch='):]
+    elif _a.startswith('--expect-fw='):
+        _raw = _a[len('--expect-fw='):].strip().lower().lstrip('v')
+        _parts = _raw.split('.')
+        if len(_parts) != 2 or not all(p.isdigit() for p in _parts):
+            print(f"ERROR: --expect-fw value must be MAJOR.MINOR (e.g. 2.4), got {_a[len('--expect-fw='):]!r}", file=sys.stderr)
+            sys.exit(2)
+        _EXPECT_FW = (int(_parts[0]), int(_parts[1]))
     elif _a == '--verbose':
         _VERBOSE = True
     elif _a in ('-h', '--help'):
@@ -235,8 +253,8 @@ class CheckResult:
         return f"  [{icon}]  {self.name}: {self.description}{detail}"
 
 
-def _make_checks():
-    return [
+def _make_checks(expect_fw=None):
+    checks = [
         CheckResult("GREETING",      "SoC boot greeting present"),
         CheckResult("BOOT_COMPLETE", "CM boot_complete line seen (or inferred)"),
         CheckResult("NIA_LINES",     "At least one NIA=0x... line seen"),
@@ -248,12 +266,24 @@ def _make_checks():
         CheckResult("HUNG",          "At least one valid HUNG line seen",         mandatory=False),
         CheckResult("ACK",           "IDE call-home ACK received",               mandatory=False),
     ]
+    # FW_VERSION_MATCH is only mandatory when the caller asked for a specific
+    # version via --expect-fw — this is the "stop wasting time on stale
+    # firmware" self-test: it fails loudly the moment a flashed board reports
+    # a version other than the one just built, instead of that mismatch only
+    # being noticed later from a banner string in the IDE.
+    checks.append(CheckResult(
+        "FW_VERSION_MATCH",
+        f"Reported firmware matches --expect-fw={expect_fw[0]}.{expect_fw[1]}" if expect_fw
+        else "Reported firmware matches --expect-fw (not requested)",
+        mandatory=expect_fw is not None,
+    ))
+    return checks
 
 # ---------------------------------------------------------------------------
 # Line processing
 # ---------------------------------------------------------------------------
 
-def process_lines(lines, checks, verbose=False):
+def process_lines(lines, checks, verbose=False, expect_fw=None):
     """
     Feed lines through the checks.  Modifies check objects in place.
     Returns True if all mandatory checks pass.
@@ -261,6 +291,8 @@ def process_lines(lines, checks, verbose=False):
     checks_by_name = {c.name: c for c in checks}
     callhome_seen = 0
     callhome_errors = []
+    fw_seen = None  # last (major, minor) seen across all CALLHOME packets
+    fw_mismatch_recorded = False  # sticky: first mismatch is never overwritten by a later match
 
     for line in lines:
         if verbose:
@@ -318,6 +350,26 @@ def process_lines(lines, checks, verbose=False):
                         checks_by_name["NS_MANIFEST"].mark_pass(
                             f"{len(manifest)} abstraction(s)"
                         )
+                    # FW_VERSION_MATCH: --expect-fw stale-firmware guard.
+                    # Checked against EVERY CALLHOME packet, not just the
+                    # first, so a board that boots on old firmware then
+                    # later reports the right version (e.g. after a
+                    # watchdog reset re-flash) does not mask the stale
+                    # reading — first mismatch wins and is not overwritten.
+                    if "fw_major" in pkt and "fw_minor" in pkt:
+                        fw_seen = (pkt["fw_major"], pkt["fw_minor"])
+                        if expect_fw is not None and not fw_mismatch_recorded:
+                            fw_check = checks_by_name["FW_VERSION_MATCH"]
+                            if fw_seen == expect_fw:
+                                fw_check.mark_pass(
+                                    f"board reports fw={fw_seen[0]}.{fw_seen[1]}, matches expected"
+                                )
+                            else:
+                                fw_mismatch_recorded = True
+                                fw_check.mark_fail(
+                                    f"board reports fw={fw_seen[0]}.{fw_seen[1]}, "
+                                    f"expected {expect_fw[0]}.{expect_fw[1]} — STALE FIRMWARE"
+                                )
 
         # TRACE:[...] — firmware v2.0 10-Hz NIA sampler
         if line.startswith("TRACE:"):
@@ -390,8 +442,8 @@ def run_dry_run():
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print()
 
-    checks = _make_checks()
-    ok = process_lines(DRY_RUN_TRANSCRIPT, checks, verbose=_VERBOSE)
+    checks = _make_checks(expect_fw=_EXPECT_FW)
+    ok = process_lines(DRY_RUN_TRANSCRIPT, checks, verbose=_VERBOSE, expect_fw=_EXPECT_FW)
 
     # ACK check — skip in dry-run (no IDE server)
     ack_check = next(c for c in checks if c.name == "ACK")
@@ -527,8 +579,8 @@ def run_live():
     print(f"  Received {len(lines_received)} line(s).")
     print()
 
-    checks = _make_checks()
-    ok = process_lines(lines_received, checks, verbose=False)
+    checks = _make_checks(expect_fw=_EXPECT_FW)
+    ok = process_lines(lines_received, checks, verbose=False, expect_fw=_EXPECT_FW)
 
     # ACK check
     ack_check = next(c for c in checks if c.name == "ACK")

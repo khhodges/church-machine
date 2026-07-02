@@ -192,6 +192,171 @@ else
 fi
 
 # ════════════════════════════════════════════════════════════════════════════
+# Section C: check_firmware_sha_sync.sh (sha256 sync guard)
+# ════════════════════════════════════════════════════════════════════════════
+echo ""
+echo "  Section C: check_firmware_sha_sync.sh (sha256 sync guard)"
+echo "  ─────────────────────────────────────────────────────"
+
+SHA_REPO="$TMPDIR_BASE/sha_repo_fw"
+SHA_SOC="$TMPDIR_BASE/sha_soc_fw"
+mkdir -p "$SHA_REPO" "$SHA_SOC"
+
+echo "int main() {}" > "$SHA_REPO/main.c"
+echo "#define X 1"   > "$SHA_REPO/main.h"
+
+# C1: identical copies → pass (exit 0)
+cp "$SHA_REPO/main.c" "$SHA_SOC/main.c"
+cp "$SHA_REPO/main.h" "$SHA_SOC/main.h"
+OUT=$(bash "$SCRIPTS/check_firmware_sha_sync.sh" "$SHA_REPO" "$SHA_SOC" 2>&1) && RC=$? || RC=$?
+assert_exit 0 "$RC" "C1: byte-identical dirs — exit 0"
+assert_output_contains "byte-identical" "$OUT" "C1: byte-identical — reports match"
+
+# C2: soc copy has stale content → fail (exit 1)
+echo "int main() { return 1; }" > "$SHA_SOC/main.c"
+OUT=$(bash "$SCRIPTS/check_firmware_sha_sync.sh" "$SHA_REPO" "$SHA_SOC" 2>&1) && RC=$? || RC=$?
+assert_exit 1 "$RC" "C2: stale content in SoC dir — exit 1"
+assert_output_contains "main.c" "$OUT" "C2: stale content — names offending file"
+assert_output_contains "GUARD FAIL" "$OUT" "C2: stale content — GUARD FAIL header"
+
+# C3: file missing from soc dir → fail (exit 1)
+cp "$SHA_REPO/main.c" "$SHA_SOC/main.c"
+rm "$SHA_SOC/main.h"
+OUT=$(bash "$SCRIPTS/check_firmware_sha_sync.sh" "$SHA_REPO" "$SHA_SOC" 2>&1) && RC=$? || RC=$?
+assert_exit 1 "$RC" "C3: missing file in SoC dir — exit 1"
+assert_output_contains "main.h" "$OUT" "C3: missing file — names it"
+
+# C4: stray extra file in soc dir → fail (exit 1)
+cp "$SHA_REPO/main.h" "$SHA_SOC/main.h"
+echo "stray" > "$SHA_SOC/leftover.c"
+OUT=$(bash "$SCRIPTS/check_firmware_sha_sync.sh" "$SHA_REPO" "$SHA_SOC" 2>&1) && RC=$? || RC=$?
+assert_exit 1 "$RC" "C4: stray extra file in SoC dir — exit 1"
+assert_output_contains "leftover.c" "$OUT" "C4: stray file — names it"
+rm -f "$SHA_SOC/leftover.c"
+
+# C5: missing repo dir → exit 2
+OUT=$(bash "$SCRIPTS/check_firmware_sha_sync.sh" "$TMPDIR_BASE/no_such_repo" "$SHA_SOC" 2>&1) && RC=$? || RC=$?
+assert_exit 2 "$RC" "C5: missing repo dir — exit 2"
+
+# C6: no arguments → exit 2
+OUT=$(bash "$SCRIPTS/check_firmware_sha_sync.sh" 2>&1) && RC=$? || RC=$?
+assert_exit 2 "$RC" "C6: no arguments — exit 2"
+
+# ════════════════════════════════════════════════════════════════════════════
+# Section D: check_fw_banner_matches_defines.sh (banner-vs-define guard)
+# ════════════════════════════════════════════════════════════════════════════
+echo ""
+echo "  Section D: check_fw_banner_matches_defines.sh (banner-vs-define guard)"
+echo "  ─────────────────────────────────────────────────────"
+
+BANNER_DIR="$TMPDIR_BASE/banner_fw"
+mkdir -p "$BANNER_DIR"
+
+make_main_c() {
+    # Arguments: <path> <fw_major> <fw_minor> <banner_line-or-empty>
+    local path="$1" maj="$2" min="$3" banner="$4"
+    {
+        echo "#define FW_MAJOR  ${maj}u"
+        echo "#define FW_MINOR  ${min}u"
+        if [ -n "$banner" ]; then
+            echo "    uart_puts(\"CHURCH Ti60 SoC+CM v${banner}\\r\\n\");"
+        else
+            echo "    uart_putc((char)('0' + (FW_MAJOR % 10u)));"
+            echo "    uart_putc((char)('0' + (FW_MINOR % 10u)));"
+        fi
+    } > "$path"
+}
+
+# D1: no literal banner (derived) → pass (exit 0)
+make_main_c "$BANNER_DIR/derived_main.c" 2 4 ""
+OUT=$(bash "$SCRIPTS/check_fw_banner_matches_defines.sh" "$BANNER_DIR/derived_main.c" 2>&1) && RC=$? || RC=$?
+assert_exit 0 "$RC" "D1: derived banner (no literal) — exit 0"
+assert_output_contains "cannot drift" "$OUT" "D1: derived banner — reports cannot-drift"
+
+# D2: literal banner matches defines → pass (exit 0)
+make_main_c "$BANNER_DIR/literal_match_main.c" 2 4 "2.4"
+OUT=$(bash "$SCRIPTS/check_fw_banner_matches_defines.sh" "$BANNER_DIR/literal_match_main.c" 2>&1) && RC=$? || RC=$?
+assert_exit 0 "$RC" "D2: literal banner matches defines — exit 0"
+
+# D3: literal banner is stale relative to defines → fail (exit 1) — the v2.3-vs-v2.4 bug
+make_main_c "$BANNER_DIR/literal_stale_main.c" 2 4 "2.3"
+OUT=$(bash "$SCRIPTS/check_fw_banner_matches_defines.sh" "$BANNER_DIR/literal_stale_main.c" 2>&1) && RC=$? || RC=$?
+assert_exit 1 "$RC" "D3: stale literal banner (v2.3 vs FW=2.4) — exit 1"
+assert_output_contains "GUARD FAIL" "$OUT" "D3: stale literal banner — GUARD FAIL header"
+assert_output_contains "v2.3" "$OUT" "D3: stale literal banner — shows literal version"
+assert_output_contains "v2.4" "$OUT" "D3: stale literal banner — shows expected version"
+
+# D4: missing file → exit 2
+OUT=$(bash "$SCRIPTS/check_fw_banner_matches_defines.sh" "$BANNER_DIR/no_such_main.c" 2>&1) && RC=$? || RC=$?
+assert_exit 2 "$RC" "D4: missing file — exit 2"
+
+# D5: no arguments → exit 2
+OUT=$(bash "$SCRIPTS/check_fw_banner_matches_defines.sh" 2>&1) && RC=$? || RC=$?
+assert_exit 2 "$RC" "D5: no arguments — exit 2"
+
+# D6: file with no parseable FW_MAJOR/FW_MINOR → exit 2
+echo "// no defines here" > "$BANNER_DIR/no_defines_main.c"
+OUT=$(bash "$SCRIPTS/check_fw_banner_matches_defines.sh" "$BANNER_DIR/no_defines_main.c" 2>&1) && RC=$? || RC=$?
+assert_exit 2 "$RC" "D6: no FW_MAJOR/FW_MINOR defines — exit 2"
+
+# ════════════════════════════════════════════════════════════════════════════
+# Section E: check_sapphire_symbol_bins_fresh.sh (work_syn/ bins guard)
+# ════════════════════════════════════════════════════════════════════════════
+echo ""
+echo "  Section E: check_sapphire_symbol_bins_fresh.sh (work_syn/ bins guard)"
+echo "  ─────────────────────────────────────────────────────"
+
+BINS_REPO="$TMPDIR_BASE/bins_repo_hw"
+BINS_WORK="$TMPDIR_BASE/bins_work_syn"
+mkdir -p "$BINS_REPO" "$BINS_WORK"
+
+SYM0="EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin"
+SYM1="EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin"
+SYM2="EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin"
+SYM3="EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin"
+
+echo "00000000" > "$BINS_REPO/$SYM0"
+echo "00000001" > "$BINS_REPO/$SYM1"
+echo "00000010" > "$BINS_REPO/$SYM2"
+echo "00000011" > "$BINS_REPO/$SYM3"
+
+# E1: bins missing entirely from work_syn/ → fail (exit 1)
+OUT=$(bash "$SCRIPTS/check_sapphire_symbol_bins_fresh.sh" "$BINS_REPO" "$BINS_WORK" 2>&1) && RC=$? || RC=$?
+assert_exit 1 "$RC" "E1: bins missing from work_syn/ — exit 1"
+assert_output_contains "Missing from" "$OUT" "E1: missing bins — lists them"
+assert_output_contains "GUARD FAIL" "$OUT" "E1: missing bins — GUARD FAIL header"
+
+# E2: bins copied fresh (identical) → pass (exit 0) — this is the OBBS deploy step
+cp "$BINS_REPO/$SYM0" "$BINS_REPO/$SYM1" "$BINS_REPO/$SYM2" "$BINS_REPO/$SYM3" "$BINS_WORK/"
+OUT=$(bash "$SCRIPTS/check_sapphire_symbol_bins_fresh.sh" "$BINS_REPO" "$BINS_WORK" 2>&1) && RC=$? || RC=$?
+assert_exit 0 "$RC" "E2: freshly-copied bins — exit 0"
+assert_output_contains "match" "$OUT" "E2: freshly-copied bins — reports match"
+
+# E3: work_syn/ bin is stale (content differs from a rebuilt repo bin) → fail (exit 1)
+# Simulates: firmware was rebuilt (repo bin changed) but work_syn/ still has the old copy.
+echo "11111111" > "$BINS_REPO/$SYM0"
+OUT=$(bash "$SCRIPTS/check_sapphire_symbol_bins_fresh.sh" "$BINS_REPO" "$BINS_WORK" 2>&1) && RC=$? || RC=$?
+assert_exit 1 "$RC" "E3: stale bin in work_syn/ (repo rebuilt) — exit 1"
+assert_output_contains "$SYM0" "$OUT" "E3: stale bin — names offending file"
+assert_output_contains "MAP will silently embed OLD" "$OUT" "E3: stale bin — explains the risk"
+echo "00000000" > "$BINS_REPO/$SYM0"   # restore for subsequent assertions
+cp "$BINS_REPO/$SYM0" "$BINS_WORK/$SYM0"
+
+# E4: repo hw dir missing a source bin (firmware never built) → exit 2 (usage error)
+rm "$BINS_REPO/$SYM3"
+OUT=$(bash "$SCRIPTS/check_sapphire_symbol_bins_fresh.sh" "$BINS_REPO" "$BINS_WORK" 2>&1) && RC=$? || RC=$?
+assert_exit 2 "$RC" "E4: repo hw dir missing source bin — exit 2"
+echo "00000011" > "$BINS_REPO/$SYM3"   # restore
+
+# E5: missing repo hw dir entirely → exit 2
+OUT=$(bash "$SCRIPTS/check_sapphire_symbol_bins_fresh.sh" "$TMPDIR_BASE/no_such_hw" "$BINS_WORK" 2>&1) && RC=$? || RC=$?
+assert_exit 2 "$RC" "E5: missing repo hw dir — exit 2"
+
+# E6: no arguments → exit 2
+OUT=$(bash "$SCRIPTS/check_sapphire_symbol_bins_fresh.sh" 2>&1) && RC=$? || RC=$?
+assert_exit 2 "$RC" "E6: no arguments — exit 2"
+
+# ════════════════════════════════════════════════════════════════════════════
 # Summary
 # ════════════════════════════════════════════════════════════════════════════
 echo ""

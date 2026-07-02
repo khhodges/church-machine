@@ -13,3 +13,5 @@ apscheduler>=3.11.0,<4
 cryptography>=48.0.0,<49
 qrcode[pil]>=8.2,<9
 Pillow>=12.2.0,<13
+fpdf
+pyserial

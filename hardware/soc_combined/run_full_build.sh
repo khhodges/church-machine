@@ -1,5 +1,5 @@
 #!/bin/bash
-# run_full_build.sh — ONE command: git pull → firmware → MAP → PNR → PGM → serve hex
+# run_full_build.sh — ONE command: git pull → build → serve hex
 #
 # Run from anywhere on the droplet:
 #   bash ~/church-machine/hardware/soc_combined/run_full_build.sh
@@ -10,6 +10,16 @@
 #
 # Takes ~75 min total (MAP 45 min + PNR 30 min + PGM <5 min).
 # When done, the .hex is served on port 8888 ready to download and flash.
+#
+# THIS SCRIPT IS A THIN WRAPPER around scripts/build_ti60_bitstream.sh — the
+# One Button Build Script (OBBS) and the ONLY place firmware is built,
+# patched, and version-gated. This file used to duplicate that pipeline by
+# calling run_efx_map.sh / run_efx_pnr.sh / run_efx_pgm.sh directly, which
+# meant two divergent build paths could produce two divergent bitstreams —
+# exactly what caused a flashed board to report a stale firmware banner
+# despite the repo already containing the fix. Everything droplet-specific
+# (tmux session management, git self-update, IDE upload, hex serving) stays
+# here; the actual synthesis pipeline lives in ONE script only.
 
 set -euo pipefail
 
@@ -49,7 +59,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SOC_DIR="$SCRIPT_DIR"
 
-# ── Efinity environment (all vars needed by MAP / PNR / PGM) ─────────────────
+# ── Efinity environment (needed by build_ti60_bitstream.sh + its sub-scripts) ─
 EFINITY="${EFINITY_HOME:-$HOME/efinity/2026.1}"
 export EFINITY_HOME="$EFINITY"
 export EFINITY_USER_DIR_INI="${EFINITY_USER_DIR_INI:-$HOME/.efinity}"
@@ -96,49 +106,15 @@ if [ "$_SKIP_CONFIRM" -eq 0 ]; then
     echo ""
 fi
 
-# ── Step 1: Confirm repo state (bootstrap already synced above) ───────────────
-echo "==> [1/4] Repo synced — ${_GIT_SHA}: ${_GIT_MSG}"
+# ── Delegate the entire build pipeline to the OBBS ────────────────────────────
+# scripts/build_ti60_bitstream.sh runs: firmware build → firmware sync →
+# sapphire.v patch/deploy → CM Verilog deploy → version gates → MAP → PNR →
+# PGM → copy to bitstreams/ + metadata sidecar. It is the single source of
+# truth for the pipeline; this wrapper does not duplicate any of those steps.
+echo "==> Delegating to scripts/build_ti60_bitstream.sh (repo root: $REPO_ROOT)"
+echo "    --- silence starts here for most of the ~75 min build ---"
 echo ""
-
-# ── Step 2: MAP — synthesis (includes firmware build + sapphire.v patch) ─────
-echo "==> [2/4] MAP — Efinity synthesis (~45 min)"
-echo "    Translates all Verilog (Church Machine core + Sapphire SoC + glue) into"
-echo "    FPGA primitives (LUTs, FFs, BRAM, DSP) and places them on the Ti60 fabric."
-echo "    Sub-steps that run automatically inside this phase:"
-echo "      • make -C firmware clean all  — always forces a fresh firmware compile"
-echo "      • gen_sapphire_symbol_bins.py — firmware ELF → 4 byte-lane .bin files"
-echo "      • patch_sapphire_init.py      — patches sapphire.v with firmware bytes"
-echo "                                       BEFORE synthesis so the VDB bakes them in"
-echo "                                       (patching map.v afterward is ignored by PNR)"
-echo "      • patch_cm_bram.py            — rewrites CM DMEM to \$readmemb"
-echo "      • XML param strip             — removes banned attrs (infer_clk_enable etc.)"
-echo "    Output: work_syn/  (netlist, timing reports, top.vdb)"
-echo "    --- silence starts here (~45 min) ---"
-echo ""
-bash "$SOC_DIR/run_efx_map.sh"
-echo ""
-
-# ── Step 3: PNR — place & route ───────────────────────────────────────────────
-echo "==> [3/4] PNR — place & route (~30 min)"
-echo "    Assigns synthesised cells to exact FPGA sites, routes all signal wires,"
-echo "    and writes the bitstream image."
-echo "    Sub-steps that run automatically inside this phase:"
-echo "      • Interface Designer — applies IO pin placement from peri.xml"
-echo "      • efx_pnr            — the actual place-and-route engine"
-echo "                             (reads firmware from top.vdb, already baked by MAP)"
-echo "    Output: outflow/church_soc_cm.bit"
-echo "    --- silence starts here (~30 min) ---"
-echo ""
-bash "$SOC_DIR/run_efx_pnr.sh"
-echo ""
-
-# ── Step 4: PGM — bitstream hex ───────────────────────────────────────────────
-echo "==> [4/4] PGM — generate .hex bitstream (<2 min)"
-echo "    Converts the .bit binary into the Intel HEX format that openFPGALoader"
-echo "    needs to flash the Ti60 F225 over USB-JTAG."
-echo "    Output: outflow/church_soc_cm.hex"
-echo ""
-bash "$SOC_DIR/run_efx_pgm.sh"
+bash "$REPO_ROOT/scripts/build_ti60_bitstream.sh"
 echo ""
 
 # ── Done ──────────────────────────────────────────────────────────────────────
@@ -148,13 +124,29 @@ echo "╔═══════════════════════�
 printf "║   BUILD COMPLETE in %dm %ds              ║\n" $(( ELAPSED/60 )) $(( ELAPSED%60 ))
 echo "╚══════════════════════════════════════════╝"
 echo ""
-HEX="$SOC_DIR/outflow/church_soc_cm.hex"
+
+BITSTREAMS="$REPO_ROOT/bitstreams"
+HEX="$BITSTREAMS/church_ti60_f225.hex"
+META="$BITSTREAMS/church_ti60_f225.json"
+if [ ! -f "$HEX" ]; then
+    echo "[FAIL] Expected build output not found: $HEX" >&2
+    echo "[FAIL] build_ti60_bitstream.sh should have created it — check its output above." >&2
+    exit 1
+fi
 ls -lh "$HEX"
 echo ""
 
+# Read the firmware version straight from the build's own metadata sidecar —
+# this is the version that was ACTUALLY embedded in this hex, not re-derived
+# from source (which could drift if this script's assumptions ever changed).
+_FW_VER="unknown"
+if [ -f "$META" ]; then
+    _FW_VER="$(python3 -c "import json; print(json.load(open('$META')).get('firmware_version', 'unknown'))" 2>/dev/null || echo "unknown")"
+fi
+echo "    Firmware version in this build: $_FW_VER"
+echo ""
+
 # ── Upload hex + metadata to IDE ─────────────────────────────────────────────
-_FW_MINOR=$(grep -oP 'FW_MINOR\s+\K[0-9]+' "$SOC_DIR/firmware/main.c" 2>/dev/null || echo "?")
-_FW_VER="2.${_FW_MINOR}"
 _IDE_URL="${CM_IDE_URL:-https://lab.cloomc.org}"
 echo "==> Uploading hex + metadata to IDE (${_IDE_URL}) ..."
 _UPLOAD_RESP=$(curl -s -o /tmp/ide_upload.json -w "%{http_code}" \
@@ -166,20 +158,27 @@ _UPLOAD_RESP=$(curl -s -o /tmp/ide_upload.json -w "%{http_code}" \
     -F "git_message=${_GIT_MSG}" \
     -F "firmware_version=${_FW_VER}" 2>/dev/null) || _UPLOAD_RESP="000"
 if [ "$_UPLOAD_RESP" = "200" ]; then
-    echo "    IDE Connect panel updated — commit ${_GIT_SHA}: ${_GIT_MSG}"
+    echo "    IDE Connect panel updated — commit ${_GIT_SHA}: ${_GIT_MSG} (fw ${_FW_VER})"
 else
     echo "    IDE upload skipped (HTTP ${_UPLOAD_RESP}) — hex still on port 8888."
 fi
 echo ""
 
-# ── Serve hex on port 8888 ────────────────────────────────────────────────────
-echo "==> Serving hex on port 8888 ..."
+# ── Serve bitstreams/ on port 8888 ────────────────────────────────────────────
+# flash_and_monitor.sh's droplet fallback still requests the legacy filename
+# church_soc_cm.hex — keep serving it under that name (as a copy of the
+# canonical bitstreams/church_ti60_f225.hex) so existing local flash scripts
+# keep working without also having to be updated in lockstep.
+cp "$HEX" "$BITSTREAMS/church_soc_cm.hex"
+echo "==> Serving $BITSTREAMS on port 8888 ..."
 pkill -f "http.server 8888" 2>/dev/null || true
-cd "$SOC_DIR/outflow"
+cd "$BITSTREAMS"
 python3 -m http.server 8888 &
 SERVER_PID=$!
 DROPLET_IP="$(hostname -I | awk '{print $1}')"
-echo "    Hex server PID $SERVER_PID — http://${DROPLET_IP}:8888/"
+echo "    Hex server PID $SERVER_PID"
+echo "    Canonical: http://${DROPLET_IP}:8888/church_ti60_f225.hex"
+echo "    Legacy:    http://${DROPLET_IP}:8888/church_soc_cm.hex  (used by flash_and_monitor.sh fallback)"
 echo ""
 echo "On your local machine — ONE command flashes and connects to the IDE:"
 echo ""

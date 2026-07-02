@@ -7,9 +7,16 @@ EFX_MAP can embed firmware bytes in the synthesised BRAM.
 
 EFX_MAP on Efinix Titanium IGNORES Verilog `initial begin` literal assignments
 on inferred arrays — they are treated as simulation-only and the BRAM init is
-left zeroed.  $readmemb with bare filenames (resolved relative to the project
-root, i.e. hardware/soc_combined/) IS propagated into BRAM INITVAL_ parameters
-during synthesis.  (The CM BRAM uses the same mechanism via patch_cm_bram.py.)
+left zeroed.  $readmemb with bare filenames IS propagated into BRAM INITVAL_
+parameters during synthesis — but only if the referenced files actually exist
+on disk at synthesis time, resolved relative to efx_run.py's --work_dir
+(work_syn/), NOT the project root and NOT hardware/soc_combined/ (empirically
+confirmed — see .agents/memory/efx-map-readmemb.md).  scripts/build_ti60_bitstream.sh
+deploys the four symbol bins into $SOC_DIR/work_syn/ after this script patches
+sapphire.v; scripts/check_sapphire_symbol_bins_fresh.sh guards that they are
+present and fresh there before MAP runs.  (The CM BRAM uses the same
+mechanism via patch_cm_bram.py, which already writes its .bin files directly
+into work_syn/.)
 
 The script replaces whatever is in the initial begin...end block that owns the
 four ram_symbol0..3 arrays with fresh $readmemb calls using the canonical
@@ -19,8 +26,11 @@ bare filenames.  It handles all three states the file can be in:
   2. Efinix 2026.1 stub  — initial begin with 4 zero assignments only
   3. Already-patched     — initial begin with 8192 inline assignments per lane
 
-After patching, gen_sapphire_symbol_bins.py must have been run first so the
-four .bin files exist in hardware/soc_combined/ alongside sapphire.v.
+After patching, the four .bin files must exist in hardware/soc_combined/
+alongside sapphire.v (the firmware Makefile writes them there automatically
+on every `make`; gen_sapphire_symbol_bins.py can regenerate them standalone
+from firmware.bin if needed) AND must be copied into $SOC_DIR/work_syn/
+before MAP runs — see check_sapphire_symbol_bins_fresh.sh.
 
 Usage (run from repo root):
     python3 scripts/patch_sapphire_init.py \\
@@ -28,9 +38,10 @@ Usage (run from repo root):
         [hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin ...]
 
 The .bin path arguments are accepted for backward compatibility but ignored —
-EFX_MAP resolves $readmemb bare filenames relative to soc_combined/ (CWD of
-run_efx_map.sh).  Just make sure gen_sapphire_symbol_bins.py has been run
-first so the files exist.
+this script only rewrites the $readmemb bare-filename block in sapphire.v.
+It does NOT copy the .bin files anywhere; deploying them into
+$SOC_DIR/work_syn/ (where EFX_MAP actually resolves bare filenames from) is
+done separately by scripts/build_ti60_bitstream.sh.
 """
 
 import re
@@ -130,9 +141,12 @@ def main():
     print(
         "Next steps:\n"
         "  1. Ensure symbol .bin files exist in hardware/soc_combined/ "
-        "(run gen_sapphire_symbol_bins.py if not)\n"
-        "  2. bash run_efx_map.sh   (re-synthesise — EFX_MAP will read the .bin files)\n"
-        "  3. bash run_efx_pnr.sh   (place & route)\n"
+        "(the firmware Makefile writes them on every `make`)\n"
+        "  2. Copy them into $SOC_DIR/work_syn/ — EFX_MAP reads $readmemb bare\n"
+        "     filenames relative to --work_dir, not hardware/soc_combined/.\n"
+        "     (scripts/build_ti60_bitstream.sh does steps 1-2 automatically.)\n"
+        "  3. bash run_efx_map.sh   (re-synthesise — EFX_MAP will read the .bin files)\n"
+        "  4. bash run_efx_pnr.sh   (place & route)\n"
     )
 
 
