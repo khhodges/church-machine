@@ -3,16 +3,20 @@ tests/test_dl_ti60_hex.py
 
 Unit tests for the /dl/ti60-hex download route in server/app.py.
 
-Three scenarios:
+Four scenarios:
   1. Local file present   → 200, Content-Disposition: attachment
   2. Local absent + GitHub mock returns bytes → 200, Content-Disposition: attachment
   3. Local absent + GitHub mock raises        → 404, plain-text error body
+  4. Integration: upstream server hangs → route terminates within read_timeout + margin
 """
 
 import os
 import sys
 import io
 import pathlib
+import socket
+import threading
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -214,3 +218,86 @@ class TestGitHubFallbackFailure:
              patch("requests.get", return_value=mock_resp):
             resp = client.get("/dl/ti60-hex")
         assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Test 4 — Integration: upstream server hangs, route must still terminate
+# ---------------------------------------------------------------------------
+
+class TestTimeoutEndsDownload:
+    """Prove the route does not hang the worker when the upstream never replies.
+
+    A real TCP server accepts the connection but never sends any bytes.
+    The real ``requests`` library is used (no mock) so the socket-level read
+    timeout is exercised end-to-end.  ``_DL_TIMEOUT`` is patched to (1, 2) so
+    the test completes in ~3 s rather than ~35 s.
+    """
+
+    PATCHED_READ_TIMEOUT = 2   # seconds — replaces the production 30 s read timeout
+    MARGIN = 3                 # extra seconds of headroom before the assertion fails
+
+    @staticmethod
+    def _start_hanging_server():
+        """Bind an OS-assigned port, accept one connection, never send a byte."""
+        srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        srv.bind(("127.0.0.1", 0))
+        srv.listen(1)
+        port = srv.getsockname()[1]
+
+        def _hold():
+            try:
+                conn, _ = srv.accept()
+                # Drain the incoming HTTP request so the client doesn't get a
+                # broken-pipe before the read timeout fires.
+                try:
+                    conn.recv(4096)
+                except OSError:
+                    pass
+                # Sit silently until the daemon thread is killed at process exit.
+                time.sleep(60)
+                conn.close()
+            except OSError:
+                pass
+            finally:
+                try:
+                    srv.close()
+                except OSError:
+                    pass
+
+        t = threading.Thread(target=_hold, daemon=True)
+        t.start()
+        return srv, port
+
+    def test_route_terminates_within_timeout(self, client):
+        import server.app as _app_mod
+
+        srv, port = self._start_hanging_server()
+        hanging_url = f"http://127.0.0.1:{port}/fake.hex"
+
+        original_url = _app_mod._GITHUB_RAW_HEX_URL
+        original_timeout = _app_mod._DL_TIMEOUT
+        _app_mod._GITHUB_RAW_HEX_URL = hanging_url
+        _app_mod._DL_TIMEOUT = (1, self.PATCHED_READ_TIMEOUT)
+
+        try:
+            with patch("os.path.isfile", return_value=False):
+                start = time.monotonic()
+                resp = client.get("/dl/ti60-hex")
+                elapsed = time.monotonic() - start
+        finally:
+            _app_mod._GITHUB_RAW_HEX_URL = original_url
+            _app_mod._DL_TIMEOUT = original_timeout
+            try:
+                srv.close()
+            except OSError:
+                pass
+
+        deadline = self.PATCHED_READ_TIMEOUT + self.MARGIN
+        assert elapsed < deadline, (
+            f"Route took {elapsed:.1f}s — hung past the read timeout "
+            f"({self.PATCHED_READ_TIMEOUT}s) + margin ({self.MARGIN}s)"
+        )
+        assert resp.status_code == 404, (
+            f"Expected 404 after timeout, got {resp.status_code}"
+        )

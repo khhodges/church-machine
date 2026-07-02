@@ -289,6 +289,7 @@ def download_soc_patch_script():
 _GITHUB_CM_REPO = "khhodges/church-machine"
 _GITHUB_HEX_PATH = "bitstreams/church_ti60_f225.hex"
 _GITHUB_RAW_HEX_URL = f"https://raw.githubusercontent.com/{_GITHUB_CM_REPO}/main/{_GITHUB_HEX_PATH}"
+_DL_TIMEOUT = (5, 30)  # (connect_seconds, read_seconds) for GitHub hex fetch
 
 @app.route("/dl/ti60-hex")
 def download_ti60_hex():
@@ -303,7 +304,7 @@ def download_ti60_hex():
         return _send_file(hex_path, as_attachment=True, download_name="church_soc_cm.hex",
                           mimetype="application/octet-stream")
     try:
-        gh = _requests.get(_GITHUB_RAW_HEX_URL, stream=True, timeout=(5, 30))
+        gh = _requests.get(_GITHUB_RAW_HEX_URL, stream=True, timeout=_DL_TIMEOUT)
         gh.raise_for_status()
         headers = {
             "Content-Type": "application/octet-stream",
