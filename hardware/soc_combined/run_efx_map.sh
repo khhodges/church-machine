@@ -80,7 +80,7 @@ cd "$SOC_DIR"
 # ----------------------------------------------------------------
 echo "==> Step 0a: Building Sapphire firmware (make -C firmware clean all) ..."
 make -C "$SOC_DIR/firmware" clean all
-echo "    Done."
+echo "    ✓ Firmware compiled."
 echo ""
 
 FIRMWARE_BIN="$SOC_DIR/firmware/firmware.bin"
@@ -89,7 +89,7 @@ echo "==> Step 0a: Generating Sapphire symbol bins → work_syn/ ..."
 # relative to --work_dir (work_syn/), not relative to the project root.
 python3 "$SCRIPT_DIR/../../scripts/gen_sapphire_symbol_bins.py" \
     "$FIRMWARE_BIN" --out-dir "$SOC_DIR/work_syn"
-echo "    Done."
+echo "    ✓ Symbol bins written to work_syn/."
 echo ""
 
 echo "==> Step 0a: Patching sapphire.v with \$readmemb calls (patch_sapphire_init.py) ..."
@@ -98,7 +98,7 @@ python3 "$SCRIPT_DIR/../../scripts/patch_sapphire_init.py" \
 echo "--- sapphire.v initial block (verification) ---"
 grep -A 6 'initial begin' "$SOC_DIR/sapphire.v" | grep -E 'readmemb|ram_symbol\[' | head -6
 echo "---"
-echo "    Done."
+echo "    ✓ sapphire.v ready."
 echo ""
 
 # ----------------------------------------------------------------
@@ -110,7 +110,11 @@ echo ""
 # ----------------------------------------------------------------
 echo "==> Step 0b: Patching CM DMEM BRAM init (patch_cm_bram.py) ..."
 python3 "$SCRIPT_DIR/patch_cm_bram.py" "$SOC_DIR"
-echo "    Done."
+echo "    ✓ CM DMEM BRAM patched."
+echo ""
+echo "==> All pre-synthesis patches complete. Starting MAP synthesis now (~45 min) ..."
+echo "    This step synthesises all Verilog into FPGA cells and bakes firmware into BRAM."
+echo "    The terminal will be quiet for most of this time — that is normal."
 echo ""
 
 # efx_run.py --flow map runs synthesis AND writes outflow/*.vdb (required by efx_pnr).

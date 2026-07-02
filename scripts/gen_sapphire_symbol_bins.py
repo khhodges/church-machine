@@ -69,17 +69,8 @@ def gen_symbol_bins(firmware_path, out_dir):
         )
 
     print(
-        f"\nDone.  Firmware: {len(data)} bytes ({fw_words} words), "
-        f"padded to {RAM_WORDS} words.\n"
-        "Next steps:\n"
-        "  1. python3 scripts/patch_sapphire_init.py sapphire.v \\\n"
-        "         EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin \\\n"
-        "         EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin \\\n"
-        "         EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin \\\n"
-        "         EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin\n"
-        "  2. Re-synthesise with 2025.2 efx_map\n"
-        "  3. Re-PnR with 2026.1 efx_pnr → pt_unified → efx_pgm\n"
-        "  4. Flash church_soc_cm.hex and test UART at 115200 8N1"
+        f"\nSymbol bins ready.  Firmware: {len(data)} bytes ({fw_words} words), "
+        f"padded to {RAM_WORDS} words."
     )
 
 
