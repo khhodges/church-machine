@@ -303,7 +303,7 @@ def download_ti60_hex():
         return _send_file(hex_path, as_attachment=True, download_name="church_soc_cm.hex",
                           mimetype="application/octet-stream")
     try:
-        gh = _requests.get(_GITHUB_RAW_HEX_URL, stream=True, timeout=15)
+        gh = _requests.get(_GITHUB_RAW_HEX_URL, stream=True, timeout=(5, 30))
         gh.raise_for_status()
         headers = {
             "Content-Type": "application/octet-stream",
