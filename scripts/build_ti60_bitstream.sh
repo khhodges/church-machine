@@ -47,11 +47,23 @@ _info() { printf '\033[0;36m[..]\033[0m  %s\n' "$*"; }
 _fail() { printf '\033[0;31m[FAIL]\033[0m %s\n' "$*" >&2; exit 1; }
 _warn() { printf '\033[0;33m[WARN]\033[0m %s\n' "$*"; }
 
+_SCRIPT_COMMIT="$(cd "$REPO_ROOT" && git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+_SCRIPT_DATE="$(cd "$REPO_ROOT" && git log -1 --format=%cd --date=short 2>/dev/null || echo unknown)"
+_SCRIPT_DIRTY=""
+if [ "$_SCRIPT_COMMIT" != "unknown" ] && ! (cd "$REPO_ROOT" && git diff --quiet -- scripts/build_ti60_bitstream.sh scripts/check_sapphire_patch_fresh.sh 2>/dev/null); then
+    _SCRIPT_DIRTY=" (LOCAL UNCOMMITTED CHANGES to build scripts!)"
+fi
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  Ti60 F225 Bitstream Build Pipeline"
 echo "  Repo:    $REPO_ROOT"
 echo "  SoC dir: $SOC_DIR"
+echo "  Commit:  ${_SCRIPT_COMMIT} (${_SCRIPT_DATE})${_SCRIPT_DIRTY}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "  If the Commit line above doesn't match what you expect, run 'git pull'"
+echo "  in $REPO_ROOT before filing a bug — every guard failure below is only"
+echo "  meaningful if this script itself is up to date."
 echo ""
 
 # ── Step 0: Pre-flight checks ──────────────────────────────────────────────

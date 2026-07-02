@@ -32,5 +32,6 @@
 - [Boot namespace architecture rules](boot-namespace-rules.md) — 2 hardwired slots only; namespace liveness rule; authority = Abstract GT not NS entry; 3-layer boot model; SelfTest loop/CALL pattern
 - [Boot.Abstr token and filename migration](boot-abstr-token-migration.md) — slot 3→6, token 00000003→00000600; NS_TABLE_RESERVE 1024→4096 fix; canonical 00000600.lump must be kept alive by save_lump(); Python create_gt vs JS createGT use different bit layouts
 - [Simulator E2E boot-state testing](sim-e2e-boot-testing.md) — instantBoot() fails at B:04 (async fetch); slowBoot() blocked by bootAnimating; force sim.bootComplete=true; suppress #whatsNewModal via addInitScript
+- [Self-diagnosing remote build guards](self-diagnosing-remote-guards.md) — version-stamp script output and dump actual-vs-expected state on failure when the script runs on a machine you can't directly access
 - [Boot catalog slot 4 no longer a gap](boot-catalog-slot4-no-longer-gap.md) — hardware boot catalog is 8 slots (0-6 named, gap moved to 7); never hardcode slot 3=Boot.Abstr, use sim.bootEntrySlot
 - [Freshness guards on idempotent patches must be content-based](freshness-guard-content-vs-mtime.md) — if a patch's output text never changes once applied, an mtime comparison against it will eventually false-positive forever

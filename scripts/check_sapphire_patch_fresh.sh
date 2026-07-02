@@ -72,6 +72,18 @@ if [ "${#MISSING_LANES[@]}" -gt 0 ]; then
     echo "  It is still in virgin, stub, or partially-patched form. EFX_MAP"
     echo "  will embed stale or zeroed firmware bytes and the board will not boot."
     echo ""
+    echo "  ── Diagnostic: actual ram_symbol lines currently in $SAPPHIRE_V ──"
+    if grep -n "ram_symbol[0-9]" "$SAPPHIRE_V" > /dev/null 2>&1; then
+        grep -n "ram_symbol[0-9]" "$SAPPHIRE_V" | head -10 | sed 's/^/    /'
+    else
+        echo "    (no 'ram_symbol' lines found at all — is this the right sapphire.v?)"
+    fi
+    echo ""
+    echo "  If the lines above already look like the expected form:"
+    echo "    \$readmemb(\"EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbolN.bin\", ram_symbolN);"
+    echo "  then this is not a stale-patch problem — paste this diagnostic block verbatim,"
+    echo "  it pinpoints the exact mismatch."
+    echo ""
     echo "  Run: python3 scripts/patch_sapphire_init.py"
     echo ""
     exit 1
