@@ -2,7 +2,7 @@
 # scripts/test_build_guard.sh
 #
 # Dry-run test for the bitstream build guards.
-# Tests check_sapphire_patch_fresh.sh (mtime guard) and
+# Tests check_sapphire_patch_fresh.sh (content guard) and
 # check_bram_init_zero.sh (INIT_0 guard) using synthetic fixtures.
 #
 # Runs entirely in a temp directory — no Efinity installation required.
@@ -61,62 +61,100 @@ echo "  Temp workspace: $TMPDIR_BASE"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # ════════════════════════════════════════════════════════════════════════════
-# Section A: check_sapphire_patch_fresh.sh (mtime guard)
+# Section A: check_sapphire_patch_fresh.sh (content guard)
 # ════════════════════════════════════════════════════════════════════════════
 echo ""
-echo "  Section A: check_sapphire_patch_fresh.sh (mtime guard)"
+echo "  Section A: check_sapphire_patch_fresh.sh (content guard)"
 echo "  ─────────────────────────────────────────────────────"
 
+SAPPHIRE_V="$TMPDIR_BASE/sapphire.v"
+
+readmemb_block() {
+    local lanes="$1"   # e.g. "0 1 2 3" or "0 1"
+    for lane in $lanes; do
+        echo "    \$readmemb(\"EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol${lane}.bin\", ram_symbol${lane});"
+    done
+}
+
+# A1: fully-patched (all 4 bare-filename $readmemb lanes present) → exit 0
+{
+    echo "module sapphire(...);"
+    echo "  initial begin"
+    readmemb_block "0 1 2 3"
+    echo "  end"
+    echo "endmodule"
+} > "$SAPPHIRE_V"
+OUT=$(bash "$SCRIPTS/check_sapphire_patch_fresh.sh" "$SAPPHIRE_V" 2>&1) && RC=$? || RC=$?
+assert_exit 0 "$RC" "A1: fully patched — exit 0"
+assert_output_contains "up-to-date" "$OUT" "A1: fully patched — reports up-to-date"
+
+# A2: virgin form (full-path $readmemb, not bare filename) → exit 1
+{
+    echo "module sapphire(...);"
+    echo "  initial begin"
+    echo "    \$readmemb(\"/some/full/path/symbol0.bin\", ram_symbol0);"
+    echo "    \$readmemb(\"/some/full/path/symbol1.bin\", ram_symbol1);"
+    echo "    \$readmemb(\"/some/full/path/symbol2.bin\", ram_symbol2);"
+    echo "    \$readmemb(\"/some/full/path/symbol3.bin\", ram_symbol3);"
+    echo "  end"
+    echo "endmodule"
+} > "$SAPPHIRE_V"
+OUT=$(bash "$SCRIPTS/check_sapphire_patch_fresh.sh" "$SAPPHIRE_V" 2>&1) && RC=$? || RC=$?
+assert_exit 1 "$RC" "A2: virgin form (full path) — exit 1"
+assert_output_contains "Run: python3 scripts/patch_sapphire_init.py" "$OUT" "A2: virgin form — remediation hint"
+assert_output_contains "GUARD FAIL" "$OUT" "A2: virgin form — GUARD FAIL header"
+
+# A3: stub form (Efinix 2026.1 IP zero-init stub, no $readmemb at all) → exit 1
+{
+    echo "module sapphire(...);"
+    echo "  initial begin"
+    echo "    ram_symbol0[0] = 8'h00;"
+    echo "    ram_symbol1[0] = 8'h00;"
+    echo "    ram_symbol2[0] = 8'h00;"
+    echo "    ram_symbol3[0] = 8'h00;"
+    echo "  end"
+    echo "endmodule"
+} > "$SAPPHIRE_V"
+OUT=$(bash "$SCRIPTS/check_sapphire_patch_fresh.sh" "$SAPPHIRE_V" 2>&1) && RC=$? || RC=$?
+assert_exit 1 "$RC" "A3: stub form (zero-init) — exit 1"
+assert_output_contains "ram_symbol0" "$OUT" "A3: stub form — lists missing lane"
+
+# A4: partially patched (only lanes 0-1 bare-filename, 2-3 still full-path) → exit 1
+{
+    echo "module sapphire(...);"
+    echo "  initial begin"
+    readmemb_block "0 1"
+    echo "    \$readmemb(\"/some/full/path/symbol2.bin\", ram_symbol2);"
+    echo "    \$readmemb(\"/some/full/path/symbol3.bin\", ram_symbol3);"
+    echo "  end"
+    echo "endmodule"
+} > "$SAPPHIRE_V"
+OUT=$(bash "$SCRIPTS/check_sapphire_patch_fresh.sh" "$SAPPHIRE_V" 2>&1) && RC=$? || RC=$?
+assert_exit 1 "$RC" "A4: partially patched (lanes 2-3 missing) — exit 1"
+assert_output_contains "ram_symbol2" "$OUT" "A4: partially patched — lists lane 2"
+assert_output_contains "ram_symbol3" "$OUT" "A4: partially patched — lists lane 3"
+
+# A5: fully patched, but firmware sources touched LATER (mtime newer than
+# sapphire.v) → must still exit 0. This is the regression case: an
+# mtime-based guard would have failed here even though the content is
+# correct — see check_sapphire_patch_fresh.sh header comment.
+{
+    echo "module sapphire(...);"
+    echo "  initial begin"
+    readmemb_block "0 1 2 3"
+    echo "  end"
+    echo "endmodule"
+} > "$SAPPHIRE_V"
 FW_DIR="$TMPDIR_BASE/firmware"
 mkdir -p "$FW_DIR"
-
-# Create synthetic firmware sources
-touch "$FW_DIR/main.c"
-touch "$FW_DIR/main.h"
-touch "$FW_DIR/link.ld"   # Not .c/.h — must be ignored
-
-SAPPHIRE_V="$TMPDIR_BASE/sapphire.v"
-touch "$SAPPHIRE_V"
-
-# A1: sapphire.v is newer than firmware sources → should pass (exit 0)
-sleep 0.05
-touch "$SAPPHIRE_V"
-OUT=$(bash "$SCRIPTS/check_sapphire_patch_fresh.sh" "$SAPPHIRE_V" "$FW_DIR" 2>&1) && RC=$? || RC=$?
-assert_exit 0 "$RC" "A1: fresh patch — exit 0"
-assert_output_contains "up-to-date" "$OUT" "A1: fresh patch — reports up-to-date"
-
-# A2: a .c source is newer than sapphire.v → should fail (exit 1)
 sleep 0.05
 touch "$FW_DIR/main.c"
-OUT=$(bash "$SCRIPTS/check_sapphire_patch_fresh.sh" "$SAPPHIRE_V" "$FW_DIR" 2>&1) && RC=$? || RC=$?
-assert_exit 1 "$RC" "A2: stale patch (main.c newer) — exit 1"
-assert_output_contains "Run: python3 scripts/patch_sapphire_init.py" "$OUT" "A2: stale patch — remediation hint"
-assert_output_contains "GUARD FAIL" "$OUT" "A2: stale patch — GUARD FAIL header"
+OUT=$(bash "$SCRIPTS/check_sapphire_patch_fresh.sh" "$SAPPHIRE_V" 2>&1) && RC=$? || RC=$?
+assert_exit 0 "$RC" "A5: patched content survives newer firmware mtime — exit 0"
 
-# A3: a .h source is newer than sapphire.v → should fail (exit 1)
-sleep 0.05
-touch "$SAPPHIRE_V"
-sleep 0.05
-touch "$FW_DIR/main.h"
-OUT=$(bash "$SCRIPTS/check_sapphire_patch_fresh.sh" "$SAPPHIRE_V" "$FW_DIR" 2>&1) && RC=$? || RC=$?
-assert_exit 1 "$RC" "A3: stale patch (main.h newer) — exit 1"
-assert_output_contains "main.h" "$OUT" "A3: stale patch — lists offending file"
-
-# A4: only link.ld is newer (not .c/.h) → should pass (exit 0)
-sleep 0.05
-touch "$SAPPHIRE_V"
-sleep 0.05
-touch "$FW_DIR/link.ld"
-OUT=$(bash "$SCRIPTS/check_sapphire_patch_fresh.sh" "$SAPPHIRE_V" "$FW_DIR" 2>&1) && RC=$? || RC=$?
-assert_exit 0 "$RC" "A4: only non-C/H file newer — exit 0 (link.ld ignored)"
-
-# A5: missing sapphire.v → should exit 2 (usage error)
-OUT=$(bash "$SCRIPTS/check_sapphire_patch_fresh.sh" "$TMPDIR_BASE/no_such_file.v" "$FW_DIR" 2>&1) && RC=$? || RC=$?
-assert_exit 2 "$RC" "A5: missing sapphire.v — exit 2"
-
-# A6: missing firmware dir → should exit 2 (usage error)
-OUT=$(bash "$SCRIPTS/check_sapphire_patch_fresh.sh" "$SAPPHIRE_V" "$TMPDIR_BASE/no_such_dir" 2>&1) && RC=$? || RC=$?
-assert_exit 2 "$RC" "A6: missing firmware dir — exit 2"
+# A6: missing sapphire.v → should exit 2 (usage error)
+OUT=$(bash "$SCRIPTS/check_sapphire_patch_fresh.sh" "$TMPDIR_BASE/no_such_file.v" 2>&1) && RC=$? || RC=$?
+assert_exit 2 "$RC" "A6: missing sapphire.v — exit 2"
 
 # A7: no arguments → should exit 2
 OUT=$(bash "$SCRIPTS/check_sapphire_patch_fresh.sh" 2>&1) && RC=$? || RC=$?

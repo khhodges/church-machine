@@ -254,16 +254,17 @@ else
 fi
 echo ""
 
-# ── Pre-synthesis mtime guard ───────────────────────────────────────────────
-# Verify that patch_sapphire_init.py was just run (or is still fresh) before
-# spending 4+ minutes on synthesis.  In normal operation Step 2 always patches,
-# so this guard catches only edge-cases such as:
-#   • manual efx_map invocation that bypasses the build script
-#   • git operations (stash/pull) that reset mtime on firmware sources
-# Guard exits non-zero with a remediation hint if any .c/.h is newer than
-# sapphire.v — which would mean synthesis will embed stale/zeroed firmware.
-_info "Pre-synthesis patch guard: verifying sapphire.v is up-to-date"
-bash "$SCRIPTS/check_sapphire_patch_fresh.sh" "$SAPPHIRE_V" "$HW/firmware" || {
+# ── Pre-synthesis patch guard ────────────────────────────────────────────────
+# Content-based sanity check that Step 2 actually left sapphire.v in patched
+# form (bare-filename $readmemb block present for all 4 ram_symbol lanes).
+# This is NOT an mtime comparison — sapphire.v's $readmemb block text is
+# identical across every firmware rebuild (it only references bare filenames,
+# never firmware bytes), so patch_sapphire_init.py correctly no-ops once
+# already patched and never touches sapphire.v's mtime again. An mtime-based
+# guard here would false-positive forever after the first successful patch.
+# See check_sapphire_patch_fresh.sh header comment for the full incident.
+_info "Pre-synthesis patch guard: verifying sapphire.v is patched"
+bash "$SCRIPTS/check_sapphire_patch_fresh.sh" "$SAPPHIRE_V" || {
     _fail "sapphire.v patch is stale — re-run 'python3 scripts/patch_sapphire_init.py' then retry."
 }
 echo ""

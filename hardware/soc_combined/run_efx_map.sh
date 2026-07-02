@@ -132,17 +132,13 @@ if [ ! -f "$SOC_DIR/sapphire.v" ]; then
     echo "[FAIL] scripts/build_ti60_bitstream.sh before run_efx_map.sh runs." >&2
     exit 1
 fi
-if [ -d "$SOC_DIR/firmware" ]; then
-    bash "$SCRIPT_DIR/../../scripts/check_sapphire_patch_fresh.sh" \
-        "$SOC_DIR/sapphire.v" "$SOC_DIR/firmware" || {
-        echo "[FAIL] sapphire.v in $SOC_DIR is stale relative to $SOC_DIR/firmware." >&2
-        echo "[FAIL] This should never happen when invoked via build_ti60_bitstream.sh —" >&2
-        echo "[FAIL] re-run it from the repo root rather than patching manually." >&2
-        exit 1
-    }
-else
-    echo "    (no $SOC_DIR/firmware directory to compare against — skipping mtime check)"
-fi
+bash "$SCRIPT_DIR/../../scripts/check_sapphire_patch_fresh.sh" \
+    "$SOC_DIR/sapphire.v" || {
+    echo "[FAIL] sapphire.v in $SOC_DIR is not patched (bare-filename \$readmemb block missing)." >&2
+    echo "[FAIL] This should never happen when invoked via build_ti60_bitstream.sh —" >&2
+    echo "[FAIL] re-run it from the repo root rather than patching manually." >&2
+    exit 1
+}
 if [ -f "$SOC_DIR/firmware/main.c" ]; then
     bash "$SCRIPT_DIR/../../scripts/check_fw_banner_matches_defines.sh" \
         "$SOC_DIR/firmware/main.c" || {
