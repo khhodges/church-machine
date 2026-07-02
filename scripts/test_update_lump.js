@@ -199,9 +199,9 @@ console.log('\n── Error cases ───────────────�
 
 // T3: Token found but no source available (binary-only lump)
 //     Pick a token with no source field and no .cloomc file on the search paths.
-//     00000300 (LED flash) has cc=1 but no source file.
+//     904adefe (LED flash) has cc=2 but no source file.
 {
-    const r = runUpdateLump(['--token', '00000300']);
+    const r = runUpdateLump(['--token', '904adefe']);
     check('T3: binary-only lump exits non-zero', r.status !== 0);
     check('T3: binary-only lump explains out-of-scope', r.stderr.includes('out of scope'));
 }

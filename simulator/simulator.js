@@ -122,12 +122,20 @@ const SCHEDULER_IRQ_THREAD_SLOT = 41;
 
 
 // SCHEDULER_IRQ_CLIST — simulated c-list for the Scheduler.IRQ abstraction (NS slot 8).
-// Mirrors hardware/boot_rom.py SCHEDULER_IRQ_CLIST.
-// Single Abstract S-perm GT (0x2E000000) encodes CHANGE CR12/CR13 authority without NS entries.
-// Layout (cc=1):
-//   idx 0: Abstract S-perm GT — authority to CHANGE CR12/CR13
+// Mirrors hardware/boot_rom.py SCHEDULER_IRQ_CLIST (Task #1530).
+// Four E-perm GTs grant the IRQ handler authority to perform CHANGE CR12/CR13.
+// Layout (cc=4):
+//   idx 0: E-perm GT → NS[19]  CR12_PORT  (authority to CHANGE CR12)
+//   idx 1: E-perm GT → NS[20]  CR13_PORT  (authority to CHANGE CR13)
+//   idx 2: E-perm GT → NS[21]  CR12_MBIT  (authority for CR12 M-bit)
+//   idx 3: E-perm GT → NS[22]  CR13_MBIT  (authority for CR13 M-bit)
+// Cross-reference: simulator/system_abstractions.js SCHEDULER_IRQ_CLIST_SPEC
+// (kept in sync manually — both must agree).
 const SCHEDULER_IRQ_CLIST = [
-    { name: 'SPERM', abstractSperm: true },
+    { name: 'CR12_PORT', target: 19, grants: { E: 1 } },
+    { name: 'CR13_PORT', target: 20, grants: { E: 1 } },
+    { name: 'CR12_MBIT', target: 21, grants: { E: 1 } },
+    { name: 'CR13_MBIT', target: 22, grants: { E: 1 } },
 ];
 
 // Pre-computed 32-bit instruction words from hardware/boot_rom.py BOOT_PROGRAM.
@@ -2979,19 +2987,28 @@ class ChurchSimulator {
         }
 
         // ── Authority check ───────────────────────────────────────────────────
-        // Verify that the Scheduler abstraction holds the Abstract S-perm GT
-        // (0x2E000000) in its c-list[0] — this encodes CHANGE CR12/CR13 authority.
-        // Mirrors hardware/boot_rom.py SCHEDULER_IRQ_CLIST (Abstract S-perm GT).
+        // Verify that the Scheduler abstraction holds valid CR12_PORT/CR13_PORT
+        // E-perm GTs (targeting NS[19]/NS[20]) at c-list[0]/[1] — this encodes
+        // CHANGE CR12/CR13 authority. Mirrors hardware/boot_rom.py
+        // SCHEDULER_IRQ_CLIST (Task #1530 four-entry named-capability format;
+        // see system_abstractions.js SCHEDULER_IRQ_CLIST_SPEC).
         const _schedulerAbs = this.abstractionRegistry.getAbstraction(_schedulerSlot);
         const _clist = _schedulerAbs ? (_schedulerAbs.capabilities || []) : [];
         if (_clist.length > 0) {
-            const _spermAuth = _clist[0];
-            const _hasSperm = _spermAuth && _spermAuth.abstractSperm;
-            if (!_hasSperm) {
-                this.output += `  [IRQ] CHANGE authority check FAILED \u2014 missing Abstract S-perm GT at c-list[0]\n`;
+            const _cr12Port = _clist[0];
+            const _cr13Port = _clist[1];
+            const _cr12PortOk = !!(_cr12Port && _cr12Port.name === 'CR12_PORT' &&
+                _cr12Port.target === 19 && _cr12Port.grants && _cr12Port.grants.E === 1);
+            const _cr13PortOk = !!(_cr13Port && _cr13Port.name === 'CR13_PORT' &&
+                _cr13Port.target === 20 && _cr13Port.grants && _cr13Port.grants.E === 1);
+            if (!_cr12PortOk || !_cr13PortOk) {
+                const _badName = !_cr12PortOk
+                    ? ((_cr12Port && _cr12Port.name) || 'CR12_PORT')
+                    : ((_cr13Port && _cr13Port.name) || 'CR13_PORT');
+                this.output += `  [IRQ] CHANGE authority check FAILED \u2014 invalid ${_badName} capability (expected E-perm GT with correct target)\n`;
                 return false;
             }
-            this.output += `  [IRQ] CHANGE authority check OK \u2014 Abstract S-perm GT (0x2E000000) verified\n`;
+            this.output += `  [IRQ] CHANGE authority check OK \u2014 CR12_PORT/CR13_PORT E-perm GTs verified\n`;
         }
         // ─────────────────────────────────────────────────────────────────────
 

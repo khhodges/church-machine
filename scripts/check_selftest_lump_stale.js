@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // scripts/check_selftest_lump_stale.js
 //
-// CI guard: fail if server/lumps/d906a27f.lump (or whichever token the current
+// CI guard: fail if server/lumps/2570eade.lump (or whichever token the current
 // source produces) is missing or does not match the assembled output of
 // simulator/examples/post_flash_selftest.cloomc.
 //

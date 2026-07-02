@@ -521,7 +521,7 @@ BOOT_ABSTR_E_GT = 0x48800003
 BOOT_NUCS_X_GT  = 0x40800001
 
 SELFTEST_LUMP_CASES = [
-    ("d906a27f", "PostFlashSelftest"),
+    ("2570eade", "PostFlashSelftest"),
     ("cb8739cf", "GT Encoding v1.1 Hardware Self-Test"),
 ]
 

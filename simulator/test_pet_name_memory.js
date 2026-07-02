@@ -18,7 +18,7 @@
 //   T013 — DWRITE to IO_PORT_PET_NAME_WR bypasses mLoad (no lump needed)
 //   T014 — DWRITE produces a trace line describing the operation
 //   T015 — Boot default petNameMemory contains the expected named slots
-//   T016 — Slot 4 is absent from boot defaults (gap in DEMO_CLIST_NAMED_SLOTS)
+//   T016 — Slot 7 is absent from boot defaults (gap in BOOT_NAMED_SLOTS)
 //   T017 — getState().petNameMemory returns an Array (not a Set)
 //   T018 — getState().petNameMemory reflects additions from markNamedSlots()
 //   T019 — getState().petNameMemory reflects additions from DWRITE intercept
@@ -40,9 +40,12 @@ function check(label, cond) {
     }
 }
 
-// Boot default named slots — mirrors hardware/boot_rom.py DEMO_CLIST_NAMED_SLOTS
-// and the initialiser in simulator.js constructor.
-const BOOT_NAMED_SLOTS = new Set([0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+// Boot default named slots — mirrors the BOOT_NAMED_SLOTS constant in
+// simulator.js (Object.freeze([0, 1, 2, 3, 4, 5, 6])), which in turn matches
+// the 8-slot hardware boot catalog (Boot.NS, Boot.Thread, UART_DEV, LED_DEV,
+// BTN_DEV, TIMER_DEV, SelfTest, [programmable]).  Slot 7 — the
+// "[programmable]" catalog entry — is the one genuine gap.
+const BOOT_NAMED_SLOTS = new Set([0, 1, 2, 3, 4, 5, 6]);
 const IO_PORT_PET_NAME_WR = 0xFFFFFF38;
 
 // Build a minimal simulator (no registry needed for these tests).
@@ -122,7 +125,7 @@ console.log('\n--- T005–T010: markNamedSlots / isNamedSlot ---');
     sim.markNamedSlots([25]);
     check('T006a: newly added slot 25 present',   sim.isNamedSlot(25));
     check('T006b: boot slot 0 still present',      sim.isNamedSlot(0));
-    check('T006c: boot slot 13 still present',     sim.isNamedSlot(13));
+    check('T006c: boot slot 6 still present',      sim.isNamedSlot(6));
 }
 {
     // T007 — markNamedSlots(null/undefined) must not throw or clear state
@@ -156,7 +159,7 @@ console.log('\n--- T005–T010: markNamedSlots / isNamedSlot ---');
     sim.markNamedSlots([35]);
     check('T010a: isNamedSlot(35) true after markNamedSlots', sim.isNamedSlot(35));
     check('T010b: isNamedSlot(36) false (never added)',       !sim.isNamedSlot(36));
-    check('T010c: isNamedSlot(4) false (boot gap)',           !sim.isNamedSlot(4));
+    check('T010c: isNamedSlot(7) false (boot gap)',           !sim.isNamedSlot(7));
 }
 
 // ── T011–T014: DWRITE to IO_PORT_PET_NAME_WR ──────────────────────────────────
@@ -232,11 +235,11 @@ console.log('\n--- T015–T019: getState().petNameMemory ---');
     check('T015b: all boot-default slots present in getState()', allPresent);
 }
 {
-    // T016 — slot 4 is absent from boot defaults (gap in DEMO_CLIST_NAMED_SLOTS)
+    // T016 — slot 7 is absent from boot defaults (gap in BOOT_NAMED_SLOTS)
     const sim = makeSim();
     const state = sim.getState();
-    check('T016: slot 4 absent from boot-default petNameMemory',
-        !state.petNameMemory.includes(4));
+    check('T016: slot 7 absent from boot-default petNameMemory',
+        !state.petNameMemory.includes(7));
 }
 {
     // T017 — getState() returns an Array, not a Set (JSON-serialisable)
@@ -315,8 +318,8 @@ console.log('\n--- T021–T025: resetNamedSlots() / cross-program reload isolati
     sim.resetNamedSlots();
     check('T022a: boot slot 0 present after reset',  sim.isNamedSlot(0));
     check('T022b: boot slot 1 present after reset',  sim.isNamedSlot(1));
-    check('T022c: boot slot 13 present after reset', sim.isNamedSlot(13));
-    check('T022d: boot slot 4 absent after reset (gap in DEMO_CLIST_NAMED_SLOTS)', !sim.isNamedSlot(4));
+    check('T022c: boot slot 6 present after reset',  sim.isNamedSlot(6));
+    check('T022d: boot slot 7 absent after reset (gap in BOOT_NAMED_SLOTS)', !sim.isNamedSlot(7));
     check('T022e: program-A slot 20 absent after reset', !sim.isNamedSlot(20));
     check('T022f: program-A slot 30 absent after reset', !sim.isNamedSlot(30));
 }
@@ -332,10 +335,10 @@ console.log('\n--- T021–T025: resetNamedSlots() / cross-program reload isolati
     check('T023c: boot slot 5 still present across reload', sim.isNamedSlot(5));
 }
 {
-    // T024 — Program A with 5 capabilities (slots 0–4) then program B with no
-    //         capabilities block.  Slot 4 is the first gap in BOOT_NAMED_SLOTS so
+    // T024 — Program A with 8 capabilities (slots 0–7) then program B with no
+    //         capabilities block.  Slot 7 is the first gap in BOOT_NAMED_SLOTS so
     //         it is ONLY named while program A is loaded; it must disappear after
-    //         reset + program B load.  Slots 0–3 survive because they are boot
+    //         reset + program B load.  Slots 0–6 survive because they are boot
     //         defaults, not because of stale program-A data.
     const resultA = assemble(`
 capabilities {
@@ -344,11 +347,14 @@ capabilities {
   LibC E
   LibD E
   LibE E
+  LibF E
+  LibG E
+  LibH E
 }
 HALT
 `);
     check('T024a: program A assembles without errors', resultA.errors.length === 0);
-    check('T024b: program A has 5 namedSlots', resultA.namedSlots.length === 5);
+    check('T024b: program A has 8 namedSlots', resultA.namedSlots.length === 8);
 
     const resultB = assemble(`
 HALT
@@ -357,14 +363,14 @@ HALT
     check('T024d: program B has no namedSlots', resultB.namedSlots.length === 0);
 
     const sim = makeSim();
-    // Load program A — slot 4 (boot-default gap) gets named
-    sim.markNamedSlots(resultA.namedSlots);   // slots [0, 1, 2, 3, 4]
-    check('T024e: slot 4 named after program A load (boot-default gap)', sim.isNamedSlot(4));
+    // Load program A — slot 7 (boot-default gap) gets named
+    sim.markNamedSlots(resultA.namedSlots);   // slots [0..7]
+    check('T024e: slot 7 named after program A load (boot-default gap)', sim.isNamedSlot(7));
 
     // Load program B (no capabilities block → reset only, no markNamedSlots call)
     sim.resetNamedSlots();
     // Program B does NOT call markNamedSlots (no capabilities block)
-    check('T024f: slot 4 absent after reload to program B (stale entry purged)', !sim.isNamedSlot(4));
+    check('T024f: slot 7 absent after reload to program B (stale entry purged)', !sim.isNamedSlot(7));
     // Slots 0–3 are boot defaults, so they survive via reset — NOT because of A's data
     check('T024g: slot 0 present after reload (boot default, not stale)', sim.isNamedSlot(0));
     check('T024h: slot 3 present after reload (boot default, not stale)', sim.isNamedSlot(3));
@@ -380,7 +386,7 @@ HALT
     }
     check('T025a: resetNamedSlots() does not throw', !threw);
     check('T025b: isNamedSlot() works normally after reset', sim.isNamedSlot(0));
-    check('T025c: isNamedSlot(4) false after reset (boot gap)', !sim.isNamedSlot(4));
+    check('T025c: isNamedSlot(7) false after reset (boot gap)', !sim.isNamedSlot(7));
 }
 
 // ── Final summary ──────────────────────────────────────────────────────────────

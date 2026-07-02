@@ -919,7 +919,10 @@ function _injectClistNow() {
         UART: 14, BTN: 15, SlideRule: 16, Timer: 17, Display: 14,
     };
 
-    const BOOT_ABSTR_SLOT = 3;
+    // Boot.Abstr's NS slot is dynamic (sim.bootEntrySlot, default 6 = SelfTest
+    // since the slot 3→6 migration) — do NOT hardcode 3 here, or CASE B reads
+    // garbage from an unrelated NS entry and every capability resolves wrong.
+    const BOOT_ABSTR_SLOT = sim.bootEntrySlot;
     const nsBase    = sim.NS_TABLE_BASE + BOOT_ABSTR_SLOT * sim.NS_ENTRY_WORDS;
     const w1f       = sim.parseNSWord1(sim.memory[nsBase + 1]);
     const lumpBase  = sim.memory[nsBase] >>> 0;
@@ -1030,11 +1033,11 @@ function _applyPendingSimLoad() {
     if (lastMethodTableSize > 0) sim.pc = lastMethodTableSize;
     if (pipelineViz) pipelineViz.setNIA(null);
     const abstrBase2 = sim.NS_TABLE_BASE + 2 * sim.NS_ENTRY_WORDS;
-    const abstrBase3 = sim.NS_TABLE_BASE + 3 * sim.NS_ENTRY_WORDS;
-    // When Boot.Abstr (slot 3) was relocated to the extended-code area for a
-    // large program (base >= 0x0400), use that base+1 as the code start so
-    // labels resolve correctly.  For ordinary small programs the existing
-    // slot-2 base is used unchanged.
+    const abstrBase3 = sim.NS_TABLE_BASE + sim.bootEntrySlot * sim.NS_ENTRY_WORDS;
+    // When Boot.Abstr (slot sim.bootEntrySlot, default 6 post slot 3→6 migration)
+    // was relocated to the extended-code area for a large program (base >= 0x0400),
+    // use that base+1 as the code start so labels resolve correctly.  For ordinary
+    // small programs the existing slot-2 base is used unchanged.
     const slot3Base  = sim.bootComplete ? (sim.memory[abstrBase3] >>> 0) : 0;
     const slot2Base  = sim.bootComplete ? (sim.memory[abstrBase2] || (2 * sim.SLOT_SIZE)) : 0;
     const progBase   = (slot3Base >= 0x0400) ? slot3Base + 1 : slot2Base;

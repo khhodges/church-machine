@@ -2,7 +2,7 @@
 //
 // Headless harness used by tests/simulator/test_selftest_lump_runs.py.
 //
-// Loads server/lumps/d906a27f.lump into a fresh boot image via
+// Loads server/lumps/2570eade.lump into a fresh boot image via
 // ChurchSimulator.loadLumpBinary(), runs the simulator to completion, and
 // verifies that DR0 === 0 (all 81 self-tests passed).
 //
@@ -81,8 +81,8 @@ if (!sim.bootComplete) {
     process.exit(1);
 }
 
-// ── Load d906a27f.lump binary ─────────────────────────────────────────────────
-const LUMP_PATH = path.join(ROOT, 'server', 'lumps', 'd906a27f.lump');
+// ── Load 2570eade.lump binary ─────────────────────────────────────────────────
+const LUMP_PATH = path.join(ROOT, 'server', 'lumps', '2570eade.lump');
 let lumpBytes;
 try {
     lumpBytes = fs.readFileSync(LUMP_PATH);
@@ -110,8 +110,14 @@ for (let i = 0; i < wordCount; i++) {
 }
 
 // loadLumpBinary places the lump at 0x0400 (extended-code area), updates
-// NS slot 3 (Boot.Abstr), CR14 (code register), and CR6 (c-list register).
-const loaded = sim.loadLumpBinary(lumpWords, 3);
+// the canonical Boot.Abstr NS slot (sim.bootEntrySlot, currently 6 — see
+// "Boot.Abstr token and filename migration" — slot 3 is stale), CR14 (code
+// register), and CR6 (c-list register). Targeting sim.bootEntrySlot (rather
+// than a hardcoded slot number) ensures loadLumpBinary's
+// `abstrSlot === this.bootEntrySlot` check rebuilds CR14 to point at the
+// newly-loaded code; a stale slot number leaves CR14 pointing at old memory
+// and the very first fetch reads garbage.
+const loaded = sim.loadLumpBinary(lumpWords, sim.bootEntrySlot);
 
 if (!loaded) {
     const out = {

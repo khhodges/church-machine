@@ -42,6 +42,12 @@ function makeTestSim() {
     const sysAbs = new SystemAbstractions(registry);
     sim.abstractionRegistry = registry;
     sim.bootComplete = true;
+    // Production boot() populates nsLabels from the abstraction catalog (simulator.js
+    // ~line 1170); this minimal harness skips boot() entirely, so seed the two labels
+    // fault-recovery tests rely on directly (NS slot 8 = Scheduler, 50 = its IRQ thread).
+    sim.nsLabels = sim.nsLabels || {};
+    sim.nsLabels[8] = 'Scheduler';
+    sim.nsLabels[50] = 'Scheduler.IRQ.Thread';
     return { sim, registry, sysAbs };
 }
 
@@ -298,14 +304,15 @@ console.log('\n--- T008: Scheduler.pause assembled ELOADCALL + runtime dispatch 
         asmResult.errors.length === 0,
         (asmResult.errors[0] || {}).message);
 
-    // Decode the ELOADCALL word — same bit-field extraction the simulator uses:
+    // Decode the ELOADCALL word — same bit-field extraction the simulator uses
+    // (see simulator.js _execEloadcall / assembler.js R-type field-width comment):
     //   imm = word & 0x7FFF
-    //   ecRow      = imm & 0xFF          → Scheduler NS slot (8)
-    //   ecMethodIdx = (imm >>> 8) & 0x7F → 1-based method index (5 for pause)
+    //   ecRow       = imm & 0x1F         → c-list row / Scheduler NS slot (8), 5-bit field
+    //   ecMethodIdx = (imm >>> 5) & 0x7F → 1-based method index (5 for pause), 7-bit field
     const eloadWord = (asmResult.words[0] || 0) >>> 0;
     const encodedImm     = eloadWord & 0x7FFF;
-    const encodedRow     = encodedImm & 0xFF;
-    const encodedMethod1 = (encodedImm >>> 8) & 0x7F;   // 1-based
+    const encodedRow     = encodedImm & 0x1F;
+    const encodedMethod1 = (encodedImm >>> 5) & 0x7F;   // 1-based
     const encodedMethod0 = encodedMethod1 - 1;           // 0-based index into methods[]
 
     check('T008d: assembled ELOADCALL encodes Scheduler NS slot (row=8)',
@@ -465,16 +472,18 @@ console.log('\n--- T009: loadProgram + step() pause + step() timer wake ---');
     check('T009-A1: assembler produces no errors for Scheduler.pause()',
         t9asmResult.errors.length === 0);
 
-    // Extract the 0-based method index from the ELOADCALL encoding:
-    //   imm15[7:0]  = c-list row = NS slot (8 for Scheduler)
-    //   imm15[14:8] = method index 1-based (5 for pause → 0-based = 4)
+    // Extract the 0-based method index from the ELOADCALL encoding (same
+    // bit-field widths as T008 — see simulator.js _execEloadcall /
+    // assembler.js R-type field-width comment):
+    //   imm15[4:0]  = c-list row = NS slot (8 for Scheduler), 5-bit field
+    //   imm15[11:5] = method index 1-based (5 for pause → 0-based = 4), 7-bit field
     const t9eloadWord = (t9asmResult.words[0] || 0) >>> 0;
     const t9Imm       = t9eloadWord & 0x7FFF;
-    const t9Method1   = (t9Imm >>> 8) & 0x7F;   // 1-based
+    const t9Method1   = (t9Imm >>> 5) & 0x7F;   // 1-based
     const t9Method0   = t9Method1 - 1;            // 0-based index into methods[]
 
-    check('T009-A2: ELOADCALL encodes Scheduler NS slot 8 in imm[7:0]',
-        (t9Imm & 0xFF) === 8);
+    check('T009-A2: ELOADCALL encodes Scheduler NS slot 8 in imm[4:0]',
+        (t9Imm & 0x1F) === 8);
     check('T009-A3: ELOADCALL encodes method index 5 (1-based) for pause',
         t9Method1 === 5 && t9Method0 === 4);
 

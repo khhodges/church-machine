@@ -287,9 +287,10 @@ console.log('\n--- T004: _injectClistNow CASE B — integration test ---');
         // Define and immediately call the function.
         vm.runInContext(fnSrc + '\n_injectClistNow();', ctx4);
 
-        // Boot.Abstr lump (NS slot 3): lumpBase=0x140=320, lumpSize=64.
+        // Boot.Abstr lump (NS slot sim2.bootEntrySlot, default 6 post slot 3→6
+        // migration): lumpBase=0x140=320, lumpSize=64.
         // CASE B clistBase = lumpBase + lumpSize − cc = 320 + 64 − 1 = 383.
-        const ns3Base  = sim2.NS_TABLE_BASE + 3 * sim2.NS_ENTRY_WORDS;
+        const ns3Base  = sim2.NS_TABLE_BASE + sim2.bootEntrySlot * sim2.NS_ENTRY_WORDS;
         const lumpBase = sim2.memory[ns3Base] >>> 0;
         const lumpHdr  = sim2.memory[lumpBase] >>> 0;
         const lumpSize = sim2.parseLumpHeader(lumpHdr).lumpSize;
@@ -511,15 +512,20 @@ console.log('\n--- T008: NULL GT no pet name → immediate NULL_CAP fault ---');
         console.log('SKIP T008: boot did not complete');
     } else {
         setupCR6(sim);
-        // Use slot 4 — the gap in BOOT_NAMED_SLOTS [0,1,2,3,5-13].
-        // Slot 4 is not pre-seeded as named, so a NULL GT there must hard-fault.
-        // Extend clistCount to 5 so the slot-4 access is in-bounds.
-        sim.cr[6].word2 = sim.packNSWord1(0, 0, 0, 0, 5);  // clistCount = 5
-        sim.memory[504] = 0;  // slot 4 → NULL GT (500 + 4)
-        // Leave programCapabilities empty → no pet name for slot 4.
+        // Use slot 7 — the one genuine gap in the 8-slot hardware boot catalog
+        // (slots 0-6 are Boot.NS/Boot.Thread/UART_DEV/LED_DEV/BTN_DEV/TIMER_DEV/
+        // SelfTest, all pre-seeded into petNameMemory at boot; slot 7 is the
+        // "[programmable]" catalog entry and is NOT in petNameMemory).
+        // Slot 4 (BTN_DEV) is pre-seeded as named post-migration, so it now
+        // takes the LAZY_RESOLVE branch instead of hard-faulting — only slot 7
+        // reliably reaches the NULL_CAP path this test exercises.
+        // Extend clistCount to 8 so the slot-7 access is in-bounds.
+        sim.cr[6].word2 = sim.packNSWord1(0, 0, 0, 0, 8);  // clistCount = 8
+        sim.memory[507] = 0;  // slot 7 → NULL GT (500 + 7)
+        // Leave programCapabilities empty → no pet name for slot 7.
         sim.programCapabilities = null;
 
-        const instr = sim.encodeInstruction(0, 0xE, 1, 6, 4);  // ecRow = 4
+        const instr = sim.encodeInstruction(0, 0xE, 1, 6, 7);  // ecRow = 7
         const cr14  = sim.cr[14];
         sim.memory[cr14.word1 + 1] = instr >>> 0;
         sim.pc     = 0;

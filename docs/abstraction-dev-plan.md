@@ -117,7 +117,7 @@
 | T7.4 | **Bernoulli numbers** | `simulator/cloomc/bernoulli_numbers.cloomc` | `◐` | Mathematical demonstration; catalog entry |
 | T7.5 | **Church Math / Pair / Case** | `simulator/cloomc/church_*.cloomc` | `◐` | Pure lambda-calculus arithmetic primitives |
 | T7.6 | **English frontend examples** | `simulator/cloomc/english_*.cloomc` | `◐` | Loops, integer ops, packed strings, Contact usage — English frontend showcases |
-| T7.7 | **PostFlashSelftest** | `server/lumps/d906a27f.lump` | `▣` | Already compiled; runs on boot to verify LUMP loading; needs OGT and boot-chain integration |
+| T7.7 | **PostFlashSelftest** | `server/lumps/2570eade.lump` | `▣` | Already compiled; runs on boot to verify LUMP loading; needs OGT and boot-chain integration |
 
 ---
 
