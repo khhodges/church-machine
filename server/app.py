@@ -292,11 +292,25 @@ _GITHUB_RAW_HEX_URL = f"https://raw.githubusercontent.com/{_GITHUB_CM_REPO}/main
 
 @app.route("/dl/ti60-hex")
 def download_ti60_hex():
-    """Redirect to the latest Ti60 hex on GitHub (raw.githubusercontent.com).
-    Falls back to the local bitstreams/ copy if GitHub is unreachable."""
-    from flask import redirect as _redirect
+    """Serve the Ti60 hex file as a download (Content-Disposition: attachment).
+    Serves the local bitstreams/ copy when present; otherwise fetches from GitHub
+    server-side and streams the bytes back so Chrome/Firefox/Safari always save
+    the file instead of rendering it in the browser tab."""
+    import requests as _requests
+    from flask import send_file as _send_file, stream_with_context as _swc, Response as _Response
     hex_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "bitstreams", "church_ti60_f225.hex"))
-    if not os.path.isfile(hex_path):
+    if os.path.isfile(hex_path):
+        return _send_file(hex_path, as_attachment=True, download_name="church_soc_cm.hex",
+                          mimetype="application/octet-stream")
+    try:
+        gh = _requests.get(_GITHUB_RAW_HEX_URL, stream=True, timeout=15)
+        gh.raise_for_status()
+        headers = {
+            "Content-Type": "application/octet-stream",
+            "Content-Disposition": 'attachment; filename="church_soc_cm.hex"',
+        }
+        return _Response(_swc(gh.iter_content(chunk_size=8192)), status=200, headers=headers)
+    except Exception:
         resp = make_response(
             "Pre-built bitstream not available yet.\n"
             "Run: make bitstream  (requires Efinity — see hardware/soc_combined/BUILD_SOC_CM.md)",
@@ -304,7 +318,6 @@ def download_ti60_hex():
         )
         resp.headers["Content-Type"] = "text/plain"
         return resp
-    return _redirect(_GITHUB_RAW_HEX_URL, code=302)
 
 def _push_bitstream_to_github(meta):
     """Background thread: git-commit the updated bitstreams/ files and push to GitHub."""
