@@ -44,6 +44,17 @@ export LD_LIBRARY_PATH=$EFINITY_HOME/lib:${LD_LIBRARY_PATH:-}
 mkdir -p $EFINITY_USER_DIR_INI
 ```
 
+**This export is per-script, not inherited.** `run_efx_map.sh` actually invokes
+`efx_run.py --flow map` (the project moved off bare `efx_map --project-xml`
+at some point), and that entry point hits the exact same
+`EFINITY_USER_DIR_INI` KeyError as Interface Designer/PnR does — but the
+export had only ever been added to `run_efx_pnr.sh`/`run_efx_pgm.sh`, not
+`run_efx_map.sh`, so MAP synthesis crashed instantly on a fresh droplet
+(`An exception occurred: 'EFINITY_USER_DIR_INI'`) while PnR worked fine.
+Whenever a new script invokes any `efx_*`/`efx_run(.py)` binary for the
+first time, grep sibling scripts for this export and copy it in — don't
+assume it's set globally by the caller.
+
 ## upper_mem / BRAM sizing trap
 The gen_cm_dmem_direct.py script previously declared `reg [31:0] upper_mem [2048:16383]` for
 addresses above the EFX_RAM10 range. Efinity synthesises this as 458K flip-flops (not BRAM),
