@@ -20,6 +20,28 @@
 
 set -euo pipefail
 
+# ── Direct-invocation warning ────────────────────────────────────────────
+# scripts/build_ti60_bitstream.sh (the One Button Build Script) exports
+# _OBBS_RUN=1 immediately before calling this script, which guarantees that
+# `make clean`, patch_sapphire_init.py, and gen_cm_dmem_direct.py have all
+# already run in the correct order. Calling this script directly skips all
+# of that — the most common failure mode is stale/zeroed BRAM init because
+# firmware wasn't rebuilt or patched before synthesis. This is a warning
+# only; the script still runs so legitimate manual debugging is not blocked.
+if [ -z "${_OBBS_RUN:-}" ]; then
+    echo ""
+    echo "=================================================================="
+    echo "[WARN] run_efx_map.sh invoked directly (not via build_ti60_bitstream.sh)"
+    echo "[WARN] This bypasses steps normally run first by the One Button Build"
+    echo "[WARN] Script. Before continuing, make sure you have already run:"
+    echo "[WARN]   1. make -C firmware clean all   (rebuild firmware fresh)"
+    echo "[WARN]   2. python3 scripts/patch_sapphire_init.py <sapphire.v>"
+    echo "[WARN]   3. python3 hardware/soc_combined/gen_cm_dmem_direct.py <soc_dir>"
+    echo "[WARN] Skipping these can silently bake stale/zeroed BRAM into the bitstream."
+    echo "=================================================================="
+    echo ""
+fi
+
 EFINITY="${EFINITY_HOME:-$HOME/efinity/2026.1}"
 EFX_RUN_PY="$EFINITY/scripts/efx_run.py"
 

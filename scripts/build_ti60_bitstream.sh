@@ -93,7 +93,37 @@ SYM0="$HW/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin"
 if [ ! -f "$SYM0" ]; then
     _fail "Firmware build failed: symbol0.bin not found. Check /tmp/build_fw.log"
 fi
-# Show the firmware version string that was compiled in
+
+# ── Post-compile version gate ────────────────────────────────────────────
+# Read the real version straight from the #define lines (never from comments
+# or the banner string, which can drift independently of the actual build).
+# Then verify the compiled artifact is actually newer than main.c — if make
+# silently no-op'd (e.g. clock skew, stale ccache) we would otherwise ship a
+# bitstream with old firmware bytes but a fresh-looking version string.
+FW_MAIN_C="$HW/firmware/main.c"
+FW_MAJOR="$(grep -oE '#define[[:space:]]+FW_MAJOR[[:space:]]+[0-9]+' "$FW_MAIN_C" | grep -oE '[0-9]+$' || echo "")"
+FW_MINOR="$(grep -oE '#define[[:space:]]+FW_MINOR[[:space:]]+[0-9]+' "$FW_MAIN_C" | grep -oE '[0-9]+$' || echo "")"
+if [ -z "$FW_MAJOR" ] || [ -z "$FW_MINOR" ]; then
+    _fail "Could not parse FW_MAJOR/FW_MINOR #define lines from $FW_MAIN_C"
+fi
+FW_VERSION="v${FW_MAJOR}.${FW_MINOR}"
+
+FW_ARTIFACT=""
+for _cand in "$HW/firmware/firmware.hex" "$HW/firmware/firmware.elf"; do
+    if [ -f "$_cand" ]; then
+        FW_ARTIFACT="$_cand"
+        break
+    fi
+done
+if [ -z "$FW_ARTIFACT" ]; then
+    _fail "Neither firmware.hex nor firmware.elf found after clean+build in $HW/firmware"
+fi
+if [ "$FW_MAIN_C" -nt "$FW_ARTIFACT" ]; then
+    _fail "firmware.hex is older than main.c after clean+build — aborting"
+fi
+_ok "Firmware ${FW_VERSION} compiled"
+
+# Show the firmware banner string that was compiled in (informational only)
 FW_BANNER=$(python3 -c "
 import re, pathlib
 mc = pathlib.Path('$HW/firmware/main.c').read_text()
@@ -214,6 +244,10 @@ sed -i \
     -e '/<efx:param name="infer_clk_enable"/d' \
     "$SOC_DIR/church_soc_cm.xml"
 
+# Sentinel so run_efx_map.sh knows it was invoked via the One Button Build
+# Script (and therefore make clean / patch_sapphire_init.py / gen_cm_dmem_direct.py
+# have already run) and can suppress its direct-invocation warning.
+export _OBBS_RUN=1
 EFINITY_HOME="$EFINITY_MAP" bash "$HW/run_efx_map.sh" "$SOC_DIR/church_soc_cm.xml" 2>&1 | tee /tmp/build_map.log | tail -8
 
 # Derive circuit name from the project XML filename — same convention used by
@@ -275,18 +309,16 @@ if [ -f "$SOC_DIR/outflow/${CIRCUIT}.bit" ]; then
     cp "$SOC_DIR/outflow/${CIRCUIT}.bit" "$BITSTREAMS/church_ti60_f225.bit"
 fi
 
-# Detect firmware version from firmware.hex word at offset 0 or banner string
+# Detect firmware version directly from the #define FW_MAJOR/FW_MINOR lines —
+# never from a comment or banner string, which can drift out of sync with the
+# actual compiled defines (see Step 1's post-compile gate for the same read).
 FW_VERSION="unknown"
-FW_HEX="$HW/firmware/firmware.hex"
-if [ -f "$FW_HEX" ]; then
-    FW_VERSION="$(head -1 "$FW_HEX" 2>/dev/null || echo unknown)"
-fi
-# Prefer banner string extraction
 FW_MAIN="$HW/firmware/main.c"
 if [ -f "$FW_MAIN" ]; then
-    FW_VER_STR="$(grep -o 'v[0-9]\+\.[0-9]\+' "$FW_MAIN" | head -1 || echo "")"
-    if [ -n "$FW_VER_STR" ]; then
-        FW_VERSION="$FW_VER_STR"
+    _META_FW_MAJOR="$(grep -oE '#define[[:space:]]+FW_MAJOR[[:space:]]+[0-9]+' "$FW_MAIN" | grep -oE '[0-9]+$' || echo "")"
+    _META_FW_MINOR="$(grep -oE '#define[[:space:]]+FW_MINOR[[:space:]]+[0-9]+' "$FW_MAIN" | grep -oE '[0-9]+$' || echo "")"
+    if [ -n "$_META_FW_MAJOR" ] && [ -n "$_META_FW_MINOR" ]; then
+        FW_VERSION="v${_META_FW_MAJOR}.${_META_FW_MINOR}"
     fi
 fi
 

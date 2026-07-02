@@ -4,7 +4,7 @@
  * Bare-metal RISC-V firmware for the combined Sapphire SoC + Church Machine
  * bitstream on the Ti60F225 devkit.
  *
- * FIRMWARE v2.3 — LUMP relay: APB3 UART-TX relay delivers LUMPs via ttyUSB2 only
+ * FIRMWARE v2.4 — LUMP relay: APB3 UART-TX relay delivers LUMPs via ttyUSB2 only
  * =====================================================
  * Every CALLHOME now reports real NIA, real fault state, and real UID from
  * the APB3 bridge registers (no hardcoded zeros).  New record types:
@@ -21,7 +21,7 @@
  *   CALLHOME:{"board":"Ti60F225","uid":"<16 hex>","nia":"0x<8 hex>",
  *             "boot_ok":<0|1>,"boot_reason":<0|2>,"fault":<0|1>,
  *             "fault_code":<0-31>,"fault_name":"<str>",
- *             "fw_major":2,"fw_minor":3,
+ *             "fw_major":2,"fw_minor":4,
  *             "ns_manifest":[...]}\r\n
  *
  *   FAULT_EVENT:{"uid":"<16hex>","nia":"0x<8hex>","fault_code":<N>,
