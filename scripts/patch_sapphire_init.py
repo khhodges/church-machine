@@ -14,9 +14,11 @@ on disk at synthesis time, resolved relative to efx_run.py's --work_dir
 confirmed — see .agents/memory/efx-map-readmemb.md).  scripts/build_ti60_bitstream.sh
 deploys the four symbol bins into $SOC_DIR/work_syn/ after this script patches
 sapphire.v; scripts/check_sapphire_symbol_bins_fresh.sh guards that they are
-present and fresh there before MAP runs.  (The CM BRAM uses the same
-mechanism via patch_cm_bram.py, which already writes its .bin files directly
-into work_syn/.)
+present and fresh there before MAP runs.  (The CM BRAM does NOT use this
+mechanism any more: it is patched via hardware/soc_combined/gen_cm_dmem_direct.py,
+which emits an explicit cm_dmem_bram EFX_RAM10 instantiation with no $readmemb
+and no work_syn/ bin files — the old patch_cm_bram.py $readmemb technique is
+obsolete/unused, see .agents/memory/obbs-single-patch-location.md.)
 
 The script replaces whatever is in the initial begin...end block that owns the
 four ram_symbol0..3 arrays with fresh $readmemb calls using the canonical

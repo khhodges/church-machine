@@ -15,7 +15,7 @@
 - [Sapphire SoC as Trusted Security Base](sapphire-soc-tsb.md) — RISC-V private RAM is the keystore; APB3 register map; 5 free capabilities; FAULT_RST gap; FP verdict; SHA32 commissioning impact
 - [Makefile tab rule](makefile-tab-rule.md) — edit tool converts tabs→spaces in recipe lines, breaking make; always use write tool for Makefile changes
 - [NS entry stride is 4 words](ns-entry-stride.md) — each NS slot is 4 words (16 bytes): [location, word1_authority, word2_integrity, abstract_gt]; slot N starts at byte N×16; never 3
-- [BRAM NUC_PROGRAM staleness trap](bram-nuc-program-staleness.md) — church_ti60_f225.v BRAM goes stale when boot_rom.py NUC_PROGRAM changes; patch_cm_bram.py alone cannot fix it
+- [BRAM NUC_PROGRAM staleness trap](bram-nuc-program-staleness.md) — church_ti60_f225.v BRAM goes stale when boot_rom.py NUC_PROGRAM changes; regen or patch via gen_cm_dmem_direct.py
 - [Verilog/RTLIL regeneration procedure](verilog-regen-procedure.md) — 9 gen commands for all actively-synthesised targets; legacy-frozen files; builder tab visibility trap
 - [ChurchAssembler Node global shim](church-assembler-node-shim.md) — compileAssembly() checks typeof global; set global.ChurchAssembler before requiring CLOOMCCompiler in Node subprocesses
 - [app.py raw SQL pattern](app-py-raw-sql.md) — server/app.py has no sqlite3 import; all DB access must use db.session.execute(_sa_text(...)); never _sqlite3.connect()
@@ -26,8 +26,9 @@
 - [Sapphire firmware uart_putdec hang](sapphire-uart-putdec-hang.md) — uart_putdec using divu/remu hangs at runtime even with always_inline uart_putc; replaced with uart_puthex32_lower+uart_putc in callhome path
 - [Sapphire BRAM byte-store hang](sapphire-bram-byte-store-hang.md) — ANY sb to 0xF9007xxx hangs CPU; sha256.h/hkdf all use sb; precompute tokens or stub; only sw/lw safe in firmware
 - [top.res.csv wrong sync file](top-res-csv-backslash.md) — Interface Designer writes outflow/<circuit>.interface.csv NOT top.res.csv; top.res.csv is MAP resource report; passing it to efx_pnr crashes "unknown escape sequence" on \t
-- [CM DMEM Thread.caps[0] boot fix](cm-dmem-thread-caps.md) — DMEM word 125 = Thread.caps[0]; must be 0x4A000004 (E-GT→Salvation/NUC_PROGRAM slot 4); run_efx_map.sh now auto-calls patch_cm_bram.py before MAP
-- [Ti60 one-button build](ti60-one-button-build.md) — firmware patch must happen in run_efx_map.sh BEFORE synthesis; patching map.v in PNR is ignored (PNR reads BRAM from top.vdb written by MAP)
+- [CM DMEM Thread.caps[0] boot fix](cm-dmem-thread-caps.md) — DMEM word 125 = Thread.caps[0]; must be 0x4A000004 (E-GT→Salvation/NUC_PROGRAM slot 4); CM DMEM patch is now gen_cm_dmem_direct.py, not patch_cm_bram.py
+- [OBBS single-patch-location bug class](obbs-single-patch-location.md) — a newer patch step + an un-removed older patch step for the same artifact eventually double-run; make the later step a read-only self-test, not a fallback patch
+- [Ti60 one-button build](ti60-one-button-build.md) — CM DMEM/firmware patches must happen BEFORE synthesis (build_ti60_bitstream.sh, not run_efx_map.sh); patching map.v in PNR is ignored (PNR reads BRAM from top.vdb written by MAP)
 - [Boot namespace architecture rules](boot-namespace-rules.md) — 2 hardwired slots only; namespace liveness rule; authority = Abstract GT not NS entry; 3-layer boot model; SelfTest loop/CALL pattern
 - [Boot.Abstr token and filename migration](boot-abstr-token-migration.md) — slot 3→6, token 00000003→00000600; NS_TABLE_RESERVE 1024→4096 fix; canonical 00000600.lump must be kept alive by save_lump(); Python create_gt vs JS createGT use different bit layouts
 - [Simulator E2E boot-state testing](sim-e2e-boot-testing.md) — instantBoot() fails at B:04 (async fetch); slowBoot() blocked by bootAnimating; force sim.bootComplete=true; suppress #whatsNewModal via addInitScript

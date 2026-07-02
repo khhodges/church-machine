@@ -177,15 +177,34 @@ echo "    ✓ sapphire.v verified fresh (built/patched/deployed by build_ti60_bi
 echo ""
 
 # ----------------------------------------------------------------
-# Step 0b: CM DMEM BRAM patch
-# EFX_MAP ignores Verilog 'initial begin' assignments on inferred arrays.
-# patch_cm_bram.py converts the dmem array to four byte-lane $readmemb
-# declarations and writes cm_dmem_b0..b3.bin into work_syn/ so MAP reads
-# the correct initial values.  Must run BEFORE efx_run.py.
+# Step 0b: CM DMEM BRAM freshness self-test (NOT a patch/rebuild)
+#
+# patch_cm_bram.py's $readmemb byte-lane technique is OBSOLETE: EFX_MAP
+# 2026.1 stores $readmemb INIT data only in a defparam that efx_pnr never
+# reads (see build_ti60_bitstream.sh Step 2.5 comments) — the BRAM still
+# synthesises all-zero. gen_cm_dmem_direct.py (explicit EFX_RAM10 instances
+# with inline INIT_N params) is the only confirmed-working technique, and
+# scripts/build_ti60_bitstream.sh's Step 2.5 already runs it and deploys
+# cm_dmem_bram.v + the patched church_ti60_f225.v into $SOC_DIR BEFORE this
+# script is ever invoked.
+#
+# Calling patch_cm_bram.py here unconditionally (as this step used to)
+# double-patches an already-cm_dmem_bram file: its "already patched" sentinel
+# is a bare `'readmemb' in src` substring check, which false-positives on the
+# comment gen_cm_dmem_direct.py leaves behind ("...bypasses $readmemb->VDB
+# bug..."), then fails with "cannot parse depth" because the old dmem_b0
+# declarations it looks for no longer exist. This is the same two-build-
+# locations bug class as the firmware banner incident — one canonical patch
+# path only. This step now just verifies Step 2.5 already deployed
+# cm_dmem_bram, mirroring Step 0a's self-test-not-rebuild philosophy.
 # ----------------------------------------------------------------
-echo "==> Step 0b: Patching CM DMEM BRAM init (patch_cm_bram.py) ..."
-python3 "$SCRIPT_DIR/patch_cm_bram.py" "$SOC_DIR"
-echo "    ✓ CM DMEM BRAM patched."
+echo "==> Step 0b: Verifying CM DMEM BRAM patch is fresh (self-test, no rebuild) ..."
+bash "$SCRIPT_DIR/../../scripts/check_cm_dmem_bram_fresh.sh" \
+    "$SOC_DIR/church_ti60_f225.v" "$SOC_DIR" || {
+    echo "[FAIL] CM DMEM BRAM guard failed — see output above." >&2
+    exit 1
+}
+echo "    ✓ CM DMEM BRAM already patched via cm_dmem_bram (gen_cm_dmem_direct.py)."
 echo ""
 echo "==> All pre-synthesis patches complete. Starting MAP synthesis now (~45 min) ..."
 echo "    This step synthesises all Verilog into FPGA cells and bakes firmware into BRAM."

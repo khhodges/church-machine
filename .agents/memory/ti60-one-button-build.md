@@ -17,7 +17,7 @@ Run this from the droplet (165.227.190.84). Takes ~75 min. Ends with the hex bei
 
 1. `git pull` — always start from latest code
 2. `make -C firmware clean all` — **clean, not just make** (git pull leaves equal timestamps; plain `make` skips rebuild and firmware stays at the old version)
-3. `run_efx_map.sh` — strips banned XML params, calls `patch_cm_bram.py` before synthesis (CM DMEM $readmemb fix)
+3. `run_efx_map.sh` — strips banned XML params; Step 0b self-tests the CM DMEM patch (see `obbs-single-patch-location.md` — the actual patch runs earlier, in `build_ti60_bitstream.sh` Step 2.5 via `gen_cm_dmem_direct.py`, not here)
 4. `run_efx_pnr.sh` — calls `gen_sapphire_symbol_bins.py` + `patch_mapv_init.py` before PNR (Sapphire BRAM firmware injection)
 5. `run_efx_pgm.sh` — all Efinity env vars pre-exported (EFINITY_USER_DIR_INI, EFXPT_HOME, EFXPGM_HOME)
 6. Kills any old http.server on 8888, starts fresh one serving outflow/

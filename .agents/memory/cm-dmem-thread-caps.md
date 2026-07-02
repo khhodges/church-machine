@@ -24,16 +24,21 @@ Then regenerate Verilog: `python3 -m hardware.gen_verilog --ti60` and copy to `h
 - `dmem_init` layout: `ns_init` (256 words) + `clist_init` (64 words) + zeros to 16384
 - DMEM word 511 = SlideRule lump header (already set)
 
-## patch_cm_bram.py — required before every MAP run
+## CM DMEM init — SUPERSEDED, now gen_cm_dmem_direct.py + cm_dmem_bram
 
-EFX_MAP silently ignores `initial begin` blocks on inferred arrays. The only way to get non-zero DMEM init into the bitstream is via `$readmemb` (ASCII 0/1 bit files in `work_syn/`).
+EFX_MAP silently ignores `initial begin` blocks on inferred arrays, so the DMEM
+init still has to be forced in some other way. The originally-documented fix
+(`patch_cm_bram.py`, four byte-lane `$readmemb` arrays) is now OBSOLETE and
+UNUSED — see `obbs-single-patch-location.md`. The current, confirmed-working
+technique is `hardware/soc_combined/gen_cm_dmem_direct.py`, which emits an
+explicit `cm_dmem_bram` module (EFX_RAM10 instantiation with inline `INIT_N`
+params, no `$readmemb`).
 
-`patch_cm_bram.py` (in `hardware/soc_combined/`):
-1. Reads the `initial begin … dmem[N] = 32'dX; … end` block from `church_ti60_f225.v`
-2. Rewrites the file to use four byte-lane `$readmemb` declarations
-3. Writes `cm_dmem_b0.bin` … `cm_dmem_b3.bin` into `work_syn/`
-
-**`run_efx_map.sh` now calls it automatically** (Step 0, before `efx_run.py`). Do not bypass this step.
+`scripts/build_ti60_bitstream.sh` Step 2.5 runs `gen_cm_dmem_direct.py` and
+deploys both the patched `church_ti60_f225.v` and `cm_dmem_bram.v` BEFORE
+`run_efx_map.sh` is invoked. `run_efx_map.sh` Step 0b only self-tests that
+this already happened (`scripts/check_cm_dmem_bram_fresh.sh`) — it does not
+patch anything itself.
 
 ## Verification after flash
 

@@ -357,6 +357,73 @@ OUT=$(bash "$SCRIPTS/check_sapphire_symbol_bins_fresh.sh" 2>&1) && RC=$? || RC=$
 assert_exit 2 "$RC" "E6: no arguments — exit 2"
 
 # ════════════════════════════════════════════════════════════════════════════
+# Section F: check_cm_dmem_bram_fresh.sh (cm_dmem_bram-vs-legacy-patch guard)
+# ════════════════════════════════════════════════════════════════════════════
+echo ""
+echo "  Section F: check_cm_dmem_bram_fresh.sh (cm_dmem_bram guard)"
+echo "  ─────────────────────────────────────────────────────"
+
+CMDMEM_DIR="$TMPDIR_BASE/cm_dmem_soc"
+mkdir -p "$CMDMEM_DIR"
+CMDMEM_V="$CMDMEM_DIR/church_ti60_f225.v"
+
+# F1: fresh, unpatched file (original 32-bit dmem[] form) — fail (exit 1)
+cat > "$CMDMEM_V" <<'EOF'
+module church_ti60f225(clk, mem_addr, mem_rd_data);
+  reg [31:0] dmem [16383:0];
+  initial begin
+    dmem[0] = 32'd1234;
+  end
+endmodule
+EOF
+OUT=$(bash "$SCRIPTS/check_cm_dmem_bram_fresh.sh" "$CMDMEM_V" "$CMDMEM_DIR" 2>&1) && RC=$? || RC=$?
+assert_exit 1 "$RC" "F1: unpatched dmem[] form — exit 1"
+assert_output_contains "does not use cm_dmem_bram" "$OUT" "F1: unpatched — explains what's missing"
+
+# F2: legacy $readmemb byte-lane patch applied (patch_cm_bram.py's old output) —
+# still fail (exit 1): this is exactly the state that used to crash with
+# "cannot parse depth" once gen_cm_dmem_direct.py's comment string tripped the
+# old bare 'readmemb' substring sentinel.
+cat > "$CMDMEM_V" <<'EOF'
+module church_ti60f225(clk, mem_addr, mem_rd_data);
+  reg [7:0] dmem_b0 [0:16383];
+  reg [7:0] dmem_b1 [0:16383];
+  reg [7:0] dmem_b2 [0:16383];
+  reg [7:0] dmem_b3 [0:16383];
+  initial $readmemb("cm_dmem_b0.bin", dmem_b0);
+endmodule
+EOF
+OUT=$(bash "$SCRIPTS/check_cm_dmem_bram_fresh.sh" "$CMDMEM_V" "$CMDMEM_DIR" 2>&1) && RC=$? || RC=$?
+assert_exit 1 "$RC" "F2: legacy \$readmemb byte-lane form — exit 1 (not cm_dmem_bram)"
+
+# F3: cm_dmem_bram patch applied but cm_dmem_bram.v not yet deployed — fail (exit 1)
+cat > "$CMDMEM_V" <<'EOF'
+module church_ti60f225(clk, mem_addr, mem_rd_data);
+  // cm_dmem_bram: direct EFX_RAM10 instantiation (bypasses $readmemb->VDB bug)
+  wire [31:0] _dmem_rd_data;
+  cm_dmem_bram u_dmem (.clk(clk));
+  assign mem_rd_data = _dmem_rd_data;
+endmodule
+EOF
+OUT=$(bash "$SCRIPTS/check_cm_dmem_bram_fresh.sh" "$CMDMEM_V" "$CMDMEM_DIR" 2>&1) && RC=$? || RC=$?
+assert_exit 1 "$RC" "F3: cm_dmem_bram used but cm_dmem_bram.v missing — exit 1"
+assert_output_contains "cm_dmem_bram.v missing" "$OUT" "F3: missing module — explains what's missing"
+
+# F4: cm_dmem_bram patch applied and cm_dmem_bram.v deployed — pass (exit 0)
+echo "// cm_dmem_bram.v stub" > "$CMDMEM_DIR/cm_dmem_bram.v"
+OUT=$(bash "$SCRIPTS/check_cm_dmem_bram_fresh.sh" "$CMDMEM_V" "$CMDMEM_DIR" 2>&1) && RC=$? || RC=$?
+assert_exit 0 "$RC" "F4: cm_dmem_bram used and deployed — exit 0"
+assert_output_contains "already uses cm_dmem_bram" "$OUT" "F4: pass — confirms cm_dmem_bram"
+
+# F5: missing input file — exit 2
+OUT=$(bash "$SCRIPTS/check_cm_dmem_bram_fresh.sh" "$CMDMEM_DIR/no_such.v" "$CMDMEM_DIR" 2>&1) && RC=$? || RC=$?
+assert_exit 2 "$RC" "F5: missing church_ti60_f225.v — exit 2"
+
+# F6: no arguments — exit 2
+OUT=$(bash "$SCRIPTS/check_cm_dmem_bram_fresh.sh" 2>&1) && RC=$? || RC=$?
+assert_exit 2 "$RC" "F6: no arguments — exit 2"
+
+# ════════════════════════════════════════════════════════════════════════════
 # Summary
 # ════════════════════════════════════════════════════════════════════════════
 echo ""

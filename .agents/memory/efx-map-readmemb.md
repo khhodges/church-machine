@@ -32,9 +32,13 @@ Both the CM DMEM and the Sapphire SoC ROM use the SAME mechanism:
   Ti60 build pipeline MUST keep (or re-add) an explicit bins-into-work_syn/
   deploy step plus the check_sapphire_symbol_bins_fresh.sh guard.
 
-**CM DMEM** (dmem_b0..3, depth depends on NUC_PROGRAM):
-- `patch_cm_bram.py` converts the 32-bit dmem array to four byte-lane $readmemb
-  declarations AND writes `cm_dmem_b0..3.bin` directly into work_syn/
+**CM DMEM** — SUPERSEDED: this file originally documented `patch_cm_bram.py`
+converting the 32-bit dmem array to four byte-lane $readmemb declarations.
+That technique is now confirmed obsolete/unused (see
+`obbs-single-patch-location.md`). CM DMEM init now uses
+`gen_cm_dmem_direct.py`'s explicit `cm_dmem_bram` EFX_RAM10 instantiation —
+no $readmemb, no work_syn/ bin files, run entirely as source-level Verilog
+patching before EFX_MAP ever starts.
 
 ## What does NOT work (all confirmed failing)
 

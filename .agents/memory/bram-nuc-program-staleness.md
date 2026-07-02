@@ -34,15 +34,19 @@ python hardware/gen_verilog.py --ti60
 cp build/church_ti60_f225.v hardware/soc_combined/
 ```
 
-*Always follow with — on the Chromebook before Efinity synthesis:*
+*Always follow with — on the build machine before Efinity synthesis:*
 ```bash
-cd ~/church_project/SoC/church-machine && git pull
-cp build/church_ti60_f225.v ~/church_project/SoC/church_ti60_f225.v
-python3 hardware/soc_combined/patch_cm_bram.py ~/church_project/SoC/
+cd ~/church-machine && git pull
+bash scripts/build_ti60_bitstream.sh --flash
 ```
+`build_ti60_bitstream.sh` Step 2.5 runs `hardware/soc_combined/gen_cm_dmem_direct.py`
+automatically — this is now the ONLY supported CM DMEM patch path. The older
+manual `patch_cm_bram.py` invocation shown in earlier revisions of this note
+is OBSOLETE and must not be run separately (see `obbs-single-patch-location.md`).
 
-`patch_cm_bram.py` converts the 32-bit wide `dmem` array to 4 × 8-bit
-byte-lane arrays (`dmem_b0..dmem_b3`) — see "EFX_MAP BRAM width trap" below.
+`gen_cm_dmem_direct.py` converts the DMEM init into an explicit `cm_dmem_bram`
+module (EFX_RAM10 instantiation) — see "EFX_MAP BRAM width trap" below for
+why byte/lane-style initialisation is required at all.
 
 ## EFX_MAP BRAM width trap — CONFIRMED ROOT CAUSE (2026-06-21)
 
@@ -124,5 +128,7 @@ If BRAM is stale or the NUC_CODE range is wrong, the firmware CALLHOME shows:
 
 - Step 1: now does `make -C firmware clean` before `make` — prevents stale
   .elf reuse across git pull cycles (was silently keeping old FW version)
-- Step 2.5: now calls `patch_cm_bram.py` after deploying church_ti60_f225.v
+- Step 2.5: now calls `gen_cm_dmem_direct.py` after deploying church_ti60_f225.v
   and BEFORE running synthesis — eliminates the 32-bit BRAM init failure
+  (superseded the earlier `patch_cm_bram.py` $readmemb approach — see
+  `obbs-single-patch-location.md`)
