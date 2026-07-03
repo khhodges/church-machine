@@ -2,6 +2,20 @@
 
 ---
 
+## Ti60 OBBS — Interface Designer silently fails headless (missing Efinity source patches)
+
+After the INIT_0 guard fix, MAP synthesis passed cleanly, but Place & Route's Step 0 (Interface Designer) then failed: `ERROR: Interface Designer did not produce .../church_soc_cm.interface.csv — cannot proceed.` — with no further detail, because `build_ti60_bitstream.sh` pipes `run_efx_pnr.sh`'s output through `tail -8`.
+
+- **Root cause:** PT Unified's `check_design()` validates HSIO GPIO clock rules that crash headless (PLL/OSC registries are never populated without a GUI session) before Interface Designer ever writes the `.interface.csv`. `hardware/soc_combined/BUILD_SOC_CM.md` already documented the 5 required Efinity-installation patches, but only as manual copy-paste Python snippets hardcoded to `/home/sipantichijk/efinity/2026.1/...` — a different machine/user than the current build host (`root@...`, `$HOME` = `/root`), so even a careful manual run would silently touch nothing.
+- **Fix — automated, idempotent patcher:** new `scripts/apply_efinity_headless_patches.py` resolves the Efinity install root the same way every other OBBS script does (`$EFINITY_HOME` else `~/efinity/2026.1`, or `--root` for tests), applies the 5 patches with sentinel-based idempotency (`church-headless-patch-v1`) and `py_compile` verification with automatic rollback on failure, and hard-fails naming the exact file if an anchor no longer matches (signals Efinity version drift instead of a silent no-op). Also includes best-effort optional P6 (`efx_run_pt_unified.py`'s post-design-check `return PTFlowRunnerStatusCode.ERROR`), applied only when unambiguous.
+- **Corrected a latent doc bug:** the doc's own Patch 4 used an `if True:` bypass that never actually calls `check_design()` at all, leaving IO config state unpopulated and producing a structurally incomplete LPF (see `.agents/memory/ti60-headless-lpf.md`, already disproven in an earlier incident). The new patcher implements the correct version: call `check_design()`, swallow the exception, then always proceed to `__gen_report`/`__gen_constraint`.
+- **Fix — wired into the pipeline, not just documented:** `run_efx_pnr.sh` now runs `apply_efinity_headless_patches.py --apply` as Step -1, before Interface Designer, on every invocation (self-healing, safe to re-run).
+- **Fix — diagnostics survive truncation:** `run_efx_pnr.sh`'s Interface Designer failure path now dumps a grep digest (`error|fail|exception|traceback`) of `outflow/interface.log` before exiting; `build_ti60_bitstream.sh`'s Step 4 tail was widened from `tail -8` to `tail -30` so that digest is no longer swallowed — closing the exact "please paste the log" round-trip described in the "Self-diagnosing build output" entry below.
+- **Tests:** `scripts/test_build_guard.sh` Section G (16 assertions: virgin apply, idempotent re-apply with checksum comparison, simulated version-drift anchor failure, `--check` mode both states, mixed pre-patched state) exercises the patcher against a synthetic fixture tree — no real Efinity installation required. 88/88 assertions passing.
+- **Doc cleanup:** `BUILD_SOC_CM.md`'s "5 one-time patches" section now points at the script instead of hardcoded manual snippets; all `/home/sipantichijk/...` paths in that section removed.
+
+---
+
 ## Ti60 OBBS — INIT_0 guard blind to Efinity 2026.1 netlist format
 
 `check_bram_init_zero.sh` (the post-MAP guard that aborts before Place & Route if the Sapphire firmware BRAM was synthesised with all-zero content) went blind the moment `run_efx_map.sh` was pointed at Efinity 2026.1 for synthesis: it reported `could not parse INIT_0 value` for all four lanes and failed the build even when `patch_sapphire_init.py` had run correctly and the firmware WAS embedded.

@@ -60,6 +60,23 @@ mkdir -p "$EFINITY_USER_DIR_INI"
 cd "$SOC_DIR"
 
 # ----------------------------------------------------------------
+# Step -1: Efinity headless patches (self-healing, one-time per install)
+# PT Unified's Interface Designer crashes deep inside check_design() on a
+# headless run (no PLL/OSC registries populated) unless the installed
+# Efinity Python sources are patched. Idempotent — safe to run every time.
+# ----------------------------------------------------------------
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+echo "==> Step -1: Applying Efinity headless patches (idempotent) ..."
+if ! python3 "$REPO_ROOT/scripts/apply_efinity_headless_patches.py" --apply --root "$EFINITY"; then
+    echo "ERROR: Efinity headless patches could not be applied — Interface Designer" >&2
+    echo "       will likely crash before producing the interface CSV. See messages" >&2
+    echo "       above; this usually means the installed Efinity version's source" >&2
+    echo "       has drifted from the anchors in apply_efinity_headless_patches.py." >&2
+    exit 1
+fi
+echo ""
+
+# ----------------------------------------------------------------
 # Step 0: Interface Designer
 # Reads peri.xml → writes IO placement into the project database.
 # On headless servers efx_run raises 'EFINITY_USER_DIR_INI' KeyError
@@ -79,7 +96,20 @@ echo "==> Step 0/2: Interface Designer (IO placement from peri.xml) ..."
 # with "unknown escape sequence" when passed as --sync_file.
 SYNC_FILE="$SOC_DIR/outflow/${CIRCUIT}.interface.csv"
 if [ ! -f "$SYNC_FILE" ]; then
-    echo "ERROR: Interface Designer did not produce $SYNC_FILE — cannot proceed."
+    echo "ERROR: Interface Designer did not produce $SYNC_FILE — cannot proceed." >&2
+    LOG_FILE="$SOC_DIR/outflow/interface.log"
+    if [ -f "$LOG_FILE" ]; then
+        DIGEST="$(grep -iE 'error|fail|exception|traceback' "$LOG_FILE" | tail -20 || true)"
+        echo "" >&2
+        if [ -n "$DIGEST" ]; then
+            echo "---- interface.log error digest (grep -iE 'error|fail|exception|traceback') ----" >&2
+            echo "$DIGEST" >&2
+        else
+            echo "---- interface.log tail (no error/fail/exception lines found) ----" >&2
+            tail -20 "$LOG_FILE" >&2
+        fi
+        echo "---- end digest (full log: $LOG_FILE) ----" >&2
+    fi
     exit 1
 fi
 echo "    Sync file: $SYNC_FILE"

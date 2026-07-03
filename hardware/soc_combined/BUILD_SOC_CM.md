@@ -401,80 +401,53 @@ Key changes in the corrected peri.xml (2026.1 vs old 2025.2 format):
 
 ---
 
-### Efinity 2026.1 headless: 5 one-time patches required
+### Efinity 2026.1 headless: 5 one-time patches required (now automated)
 
 The Interface Designer (PT Unified) refuses to generate the LPF on a headless
-Penguin because it validates HSIO GPIO clock rules that the Ti60F225 devkit
-clock pin (GPIOL_P_18 as `comp_gpio`) fails. Apply these 5 patches **once** per
-Efinity installation:
+build machine because it validates HSIO GPIO clock rules that the Ti60F225
+devkit clock pin (GPIOL_P_18 as `comp_gpio`) fails. `run_efx_pnr.sh` now
+applies these patches automatically, idempotently, at the start of every run
+(Step -1, before Interface Designer) by calling:
 
 ```bash
-# Patch 1: clkmux_rule_adv.py — pll_reg=None crash
-python3 - << 'EOF'
-import re
-path = '/home/sipantichijk/efinity/2026.1/pt/bin/tx60_device/clock_mux/clkmux_rule_adv.py'
-with open(path,'r') as f: c = f.read()
-old = 'for clkmux_inst in pll_reg.get_all_pll():'
-new = 'for clkmux_inst in (pll_reg.get_all_pll() if pll_reg is not None else []):'
-if old in c:
-    open(path,'w').write(c.replace(old,new,1)); print('P1 OK')
-else: print('P1 already applied or not found')
-EOF
-
-# Patch 2: clock_rule_adv.py — osc_reg=None crash
-python3 - << 'EOF'
-path = '/home/sipantichijk/efinity/2026.1/pt/bin/tx60_device/clock/clock_rule_adv.py'
-with open(path,'r') as f: c = f.read()
-old = 'for osc in checker.osc_reg.get_all_osc():'
-new = 'for osc in (checker.osc_reg.get_all_osc() if checker.osc_reg is not None else []):'
-if old in c:
-    open(path,'w').write(c.replace(old,new,1)); print('P2 OK')
-else: print('P2 already applied or not found')
-EOF
-
-# Patch 3: efx_run_pt_unified.py — wrap check_design() in try/except
-python3 - << 'EOF'
-path = '/home/sipantichijk/efinity/2026.1/scripts/efx_run_pt_unified.py'
-with open(path,'r') as f: c = f.read()
-old = '        is_design_pass = design_api.check_design()'
-new = ('        try:\n'
-       '            is_design_pass = design_api.check_design()\n'
-       '        except Exception as _chk_exc:\n'
-       '            print(f"WARNING: check_design() raised {_chk_exc!r} (headless patch)")\n'
-       '            is_design_pass = False')
-if old in c and 'try:\n            is_design_pass' not in c:
-    open(path,'w').write(c.replace(old,new,1)); print('P3 OK')
-else: print('P3 already applied or not found')
-EOF
-
-# Patch 4+5: design.py — skip check guard in generate() and wrap __gen_report
-python3 - << 'EOF'
-path = '/home/sipantichijk/efinity/2026.1/pt/bin/api_service/design.py'
-with open(path,'r') as f: c = f.read()
-# P4: generate() check guard
-c = c.replace(
-    'if self.check_design():\n            self.__gen_report(outdir)\n            self.__gen_constraint(enable_bitstream, outdir)',
-    'if True:  # patched: headless\n            try:\n                self.__gen_report(outdir)\n            except Exception:\n                print("WARNING: report generation skipped (headless patch)")\n            self.__gen_constraint(enable_bitstream, outdir)',
-    1)
-# Also patch the return-on-failure in efx_run_pt_unified.py context (handled above)
-open(path,'w').write(c)
-print('P4+5 applied')
-EOF
-
-# Verify all syntax OK
-for f in \
-  /home/sipantichijk/efinity/2026.1/pt/bin/tx60_device/clock_mux/clkmux_rule_adv.py \
-  /home/sipantichijk/efinity/2026.1/pt/bin/tx60_device/clock/clock_rule_adv.py \
-  /home/sipantichijk/efinity/2026.1/scripts/efx_run_pt_unified.py \
-  /home/sipantichijk/efinity/2026.1/pt/bin/api_service/design.py; do
-    python3 -m py_compile "$f" && echo "OK: $f"
-done
+python3 scripts/apply_efinity_headless_patches.py --apply
 ```
 
-The patches also require that `efx_run_pt_unified.py` continues past design check failures
-(remove the `return PTFlowRunnerStatusCode.ERROR` after the design-check table print).
-If you see `Fail to generate outputs` without the WARNING messages above, re-check that
-all 5 patches are applied.
+This resolves the Efinity install root the same way every other OBBS script
+does — `$EFINITY_HOME` if set, else `~/efinity/2026.1` — so it works
+regardless of which user/home-directory the build runs under (an earlier
+version of this doc hardcoded `/home/sipantichijk/...`, which silently did
+nothing on any other machine, including root-owned build hosts).
+
+To check patch status manually without applying anything:
+
+```bash
+python3 scripts/apply_efinity_headless_patches.py --check --root "$EFINITY_HOME"
+```
+
+The script patches 5 required call sites (P1–P5: `clkmux_rule_adv.py`
+pll_reg=None crash, `clock_rule_adv.py` osc_reg=None crash,
+`efx_run_pt_unified.py` check_design() try/except wrap, and `design.py`'s
+`generate()` — corrected to actually call `check_design()` and swallow its
+exception rather than the disproven `if True:` bypass, see
+`.agents/memory/ti60-headless-lpf.md`), plus a best-effort optional P6 that
+neutralizes `efx_run_pt_unified.py`'s `return PTFlowRunnerStatusCode.ERROR`
+after a design-check failure, applied only when there is exactly one
+unambiguous match.
+
+Each patch embeds a `church-headless-patch-v1` sentinel comment so re-running
+`--apply` is a true no-op once patched, and each is verified with
+`py_compile` (rolled back automatically if verification fails). If a patch's
+anchor text isn't found, the script fails loudly and names the file — that
+means the installed Efinity version has drifted and the anchor in
+`scripts/apply_efinity_headless_patches.py` needs updating, rather than the
+old silent "Fail to generate outputs" you'd get from the doc's manual
+snippets when they no-op on a path that doesn't exist.
+
+Regression coverage: `scripts/test_build_guard.sh` Section G exercises this
+patcher against a synthetic fixture tree (virgin apply, idempotent re-apply,
+simulated version drift, `--check` mode, mixed pre-patched state) — no real
+Efinity installation required.
 
 ---
 

@@ -331,7 +331,11 @@ echo ""
 
 # ── Step 4: Place & Route (EFX_PNR, Efinity 2026.1) ────────────────────────
 _info "Step 4/8: Place & Route (efx_pnr — Efinity 2026.1, ~5 min)"
-bash "$HW/run_efx_pnr.sh" "$SOC_DIR/church_soc_cm.xml" 2>&1 | tee /tmp/build_pnr.log | tail -8
+# tail -30 (not -8): run_efx_pnr.sh's Interface Designer failure path now
+# ends with a multi-line interface.log error digest that must survive this
+# truncation — an -8 tail previously hid the real crash reason, leaving only
+# the generic "did not produce ... .interface.csv" line visible.
+bash "$HW/run_efx_pnr.sh" "$SOC_DIR/church_soc_cm.xml" 2>&1 | tee /tmp/build_pnr.log | tail -30
 LBF="$SOC_DIR/work_pnr/${CIRCUIT}.lbf"
 if [ ! -f "$LBF" ]; then
     _fail "P&R output not found: $LBF — P&R may have failed. Check /tmp/build_pnr.log"

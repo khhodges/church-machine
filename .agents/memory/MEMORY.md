@@ -1,3 +1,4 @@
+- [Efinity headless Interface Designer patches](efinity-headless-interface-designer.md) — check_design() crashes headless without 5 installed-Efinity-source patches; use scripts/apply_efinity_headless_patches.py, not hardcoded doc snippets
 - [EFX_MAP $readmemb working directory](efx-map-readmemb.md) — symbol files must be in work_syn/ not project root or BRAM is silently zero-initialised
 - [Sapphire BRAM init — Variant B stub block](sapphire-bram-init-variant.md) — Efinity 2026.1 IP has stub initial begin (4 zeros) not $readmemb; depth=8192 words; patch_sapphire_init.py handles both variants
 - [Startup Wizard E2E setup](wizard-e2e-setup.md) — wizard is in #builder>#ti60ConnectPanel; needs switchView+switchBuilderViewTab; display:'' vs 'block' matters; use defer not async

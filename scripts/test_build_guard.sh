@@ -500,6 +500,132 @@ OUT=$(bash "$SCRIPTS/check_cm_dmem_bram_fresh.sh" 2>&1) && RC=$? || RC=$?
 assert_exit 2 "$RC" "F6: no arguments — exit 2"
 
 # ════════════════════════════════════════════════════════════════════════════
+# Section G: apply_efinity_headless_patches.py (Efinity headless patcher)
+# ════════════════════════════════════════════════════════════════════════════
+echo ""
+echo "  Section G: apply_efinity_headless_patches.py (Efinity headless patcher)"
+echo "  ─────────────────────────────────────────────────────"
+
+PATCHER="$SCRIPTS/apply_efinity_headless_patches.py"
+EFINITY_FIXTURE="$TMPDIR_BASE/efinity_fixture"
+
+make_virgin_efinity_fixture() {
+    local root="$1"
+    rm -rf "$root"
+    mkdir -p "$root/pt/bin/tx60_device/clock_mux"
+    mkdir -p "$root/pt/bin/tx60_device/clock"
+    mkdir -p "$root/pt/bin/api_service"
+    mkdir -p "$root/scripts"
+
+    cat > "$root/pt/bin/tx60_device/clock_mux/clkmux_rule_adv.py" <<'EOF'
+class ClkmuxRuleChecker:
+    def check(self, pll_reg):
+        for clkmux_inst in pll_reg.get_all_pll():
+            pass
+EOF
+
+    cat > "$root/pt/bin/tx60_device/clock/clock_rule_adv.py" <<'EOF'
+class ClockRuleChecker:
+    def check(self, checker):
+        for osc in checker.osc_reg.get_all_osc():
+            pass
+EOF
+
+    cat > "$root/scripts/efx_run_pt_unified.py" <<'EOF'
+class Runner:
+    def run(self, design_api):
+        is_design_pass = design_api.check_design()
+        if not is_design_pass:
+            print("design check failed")
+            return PTFlowRunnerStatusCode.ERROR
+        return PTFlowRunnerStatusCode.OK
+EOF
+
+    cat > "$root/pt/bin/api_service/design.py" <<'EOF'
+class DesignApi:
+    def generate(self, outdir, enable_bitstream):
+        if self.check_design():
+            self.__gen_report(outdir)
+            self.__gen_constraint(enable_bitstream, outdir)
+        return True
+EOF
+}
+
+# G1: virgin fixture tree — apply exits 0, sentinels present, files still compile
+make_virgin_efinity_fixture "$EFINITY_FIXTURE"
+OUT=$(python3 "$PATCHER" --apply --root "$EFINITY_FIXTURE" 2>&1) && RC=$? || RC=$?
+assert_exit 0 "$RC" "G1: virgin fixture — apply exits 0"
+assert_output_contains "P1-clkmux-pll-none" "$OUT" "G1: P1 reported"
+assert_output_contains "P4-5-design-generate-headless" "$OUT" "G1: P4-5 reported"
+if grep -q "church-headless-patch-v1" "$EFINITY_FIXTURE/pt/bin/api_service/design.py"; then
+    _ok "G1: design.py contains sentinel after apply"
+else
+    _fail "G1: design.py missing sentinel after apply"
+fi
+for f in \
+    "$EFINITY_FIXTURE/pt/bin/tx60_device/clock_mux/clkmux_rule_adv.py" \
+    "$EFINITY_FIXTURE/pt/bin/tx60_device/clock/clock_rule_adv.py" \
+    "$EFINITY_FIXTURE/scripts/efx_run_pt_unified.py" \
+    "$EFINITY_FIXTURE/pt/bin/api_service/design.py"; do
+    if python3 -m py_compile "$f" 2>/tmp/pyc_err.log; then
+        _ok "G1: $(basename "$f") compiles after patch"
+    else
+        _fail "G1: $(basename "$f") fails to compile after patch"
+        cat /tmp/pyc_err.log >&2
+    fi
+done
+
+# G2: re-apply on already-patched tree — exit 0, byte-identical (true idempotency)
+CHK_BEFORE=$(cd "$EFINITY_FIXTURE" && find . -type f -name '*.py' -exec sha256sum {} + | sort)
+OUT=$(python3 "$PATCHER" --apply --root "$EFINITY_FIXTURE" 2>&1) && RC=$? || RC=$?
+assert_exit 0 "$RC" "G2: re-apply on already-patched tree — exit 0"
+assert_output_contains "already applied" "$OUT" "G2: reports already applied"
+CHK_AFTER=$(cd "$EFINITY_FIXTURE" && find . -type f -name '*.py' -exec sha256sum {} + | sort)
+if [ "$CHK_BEFORE" = "$CHK_AFTER" ]; then
+    _ok "G2: re-apply is a true no-op (checksums unchanged)"
+else
+    _fail "G2: re-apply modified already-patched files"
+fi
+
+# G3: simulated Efinity version bump (anchor text no longer matches) — exit 1, names the file
+make_virgin_efinity_fixture "$EFINITY_FIXTURE"
+sed -i 's/for clkmux_inst in pll_reg.get_all_pll():/for clkmux_inst in pll_reg.iter_all_pll():/' \
+    "$EFINITY_FIXTURE/pt/bin/tx60_device/clock_mux/clkmux_rule_adv.py"
+OUT=$(python3 "$PATCHER" --apply --root "$EFINITY_FIXTURE" 2>&1) && RC=$? || RC=$?
+assert_exit 1 "$RC" "G3: anchor missing (simulated version drift) — exit 1"
+assert_output_contains "anchor text not found" "$OUT" "G3: explains anchor missing"
+assert_output_contains "clkmux_rule_adv.py" "$OUT" "G3: names the drifted file"
+
+# G4: --check on virgin tree — nonzero (not yet patched)
+make_virgin_efinity_fixture "$EFINITY_FIXTURE"
+OUT=$(python3 "$PATCHER" --check --root "$EFINITY_FIXTURE" 2>&1) && RC=$? || RC=$?
+assert_exit 1 "$RC" "G4: --check on virgin tree — exit 1"
+
+# G5: --check on fully-patched tree — exit 0
+python3 "$PATCHER" --apply --root "$EFINITY_FIXTURE" >/dev/null 2>&1
+OUT=$(python3 "$PATCHER" --check --root "$EFINITY_FIXTURE" 2>&1) && RC=$? || RC=$?
+assert_exit 0 "$RC" "G5: --check on fully-patched tree — exit 0"
+
+# G6: mixed state (P1 already patched by hand, rest virgin) — apply finishes the rest
+make_virgin_efinity_fixture "$EFINITY_FIXTURE"
+python3 - "$EFINITY_FIXTURE/pt/bin/tx60_device/clock_mux/clkmux_rule_adv.py" <<'PYEOF'
+import sys
+p = sys.argv[1]
+c = open(p).read()
+c = c.replace(
+    "for clkmux_inst in pll_reg.get_all_pll():",
+    "for clkmux_inst in (pll_reg.get_all_pll() if pll_reg is not None else []):  # church-headless-patch-v1",
+)
+open(p, "w").write(c)
+PYEOF
+OUT=$(python3 "$PATCHER" --apply --root "$EFINITY_FIXTURE" 2>&1) && RC=$? || RC=$?
+assert_exit 0 "$RC" "G6: mixed pre-patched state — apply exits 0"
+assert_output_contains "P1-clkmux-pll-none]: already applied" "$OUT" "G6: skips already-patched P1"
+assert_output_contains "P2-clock-osc-none]: patched and verified" "$OUT" "G6: applies remaining P2"
+
+rm -rf "$EFINITY_FIXTURE"
+
+# ════════════════════════════════════════════════════════════════════════════
 # Summary
 # ════════════════════════════════════════════════════════════════════════════
 echo ""
