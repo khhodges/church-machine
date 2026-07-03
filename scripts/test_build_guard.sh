@@ -229,6 +229,44 @@ else
     _ok "B7: non-zero lanes — remediation hint absent (correct)"
 fi
 
+# Helper: build a synthetic map.v matching Efinity 2026.1's verific netlist comment
+# format — INIT_0 as an unquoted sized Verilog literal (e.g. 256'h0000...) embedded
+# in a long /* verific EFX_ATTRIBUTE_CELL_NAME=EFX_RAM10, ... */ comment, instead of
+# the older quoted-string format. This is the exact shape that broke the guard on
+# real hardware builds once map moved to Efinity 2026.1.
+# Arguments: <path> <lane0_val> <lane1_val> <lane2_val> <lane3_val> (hex digits, no radix)
+make_map_v_verific_literal() {
+    local path="$1"
+    shift
+    local vals=("$@")
+    {
+        echo "// Synthetic Efinity 2026.1 verific-style map.v for testing"
+        for i in 0 1 2 3; do
+            echo "            .RDATA({\\u_sapphire/u_EfxSapphireSoc/system_ramA_logic_io_bus_rsp_payload_fragment_data [${i}]})) /* verific EFX_ATTRIBUTE_CELL_NAME=EFX_RAM10, READ_WIDTH=1, WRITE_WIDTH=1, WCLK_POLARITY=1'b1, WCLKE_POLARITY=1'b1, WE_POLARITY=2'b11, WADDREN_POLARITY=1'b1, RADDREN_POLARITY=1'b1, RST_POLARITY=1'b1, RCLK_POLARITY=1'b1, RE_POLARITY=1'b1, OUTPUT_REG=1'b0, WRITE_MODE=\"READ_FIRST\", RESET_RAM=\"ASYNC\", RESET_OUTREG=\"ASYNC\", INIT_0=256'h${vals[$i]} */ ram_symbol${i}__D\$g1_inst (.CLK());"
+        done
+    } > "$path"
+}
+
+ZEROHEX64="0000000000000000000000000000000000000000000000000000000000000000"
+NONZHEX64="1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b"
+
+# B8: Efinity 2026.1 verific literal format, all lanes non-zero → exit 0
+make_map_v_verific_literal "$MAP_DIR/verific_nonzero.map.v" "$NONZHEX64" "$NONZHEX64" "$NONZHEX64" "$NONZHEX64"
+OUT=$(bash "$SCRIPTS/check_bram_init_zero.sh" "$MAP_DIR/verific_nonzero.map.v" 2>&1) && RC=$? || RC=$?
+assert_exit 0 "$RC" "B8: verific literal format, all lanes non-zero — exit 0"
+assert_output_contains "non-zero" "$OUT" "B8: verific literal format — parsed as non-zero, not 'could not parse'"
+
+# B9: Efinity 2026.1 verific literal format, all lanes zero → exit 1
+make_map_v_verific_literal "$MAP_DIR/verific_zero.map.v" "$ZEROHEX64" "$ZEROHEX64" "$ZEROHEX64" "$ZEROHEX64"
+OUT=$(bash "$SCRIPTS/check_bram_init_zero.sh" "$MAP_DIR/verific_zero.map.v" 2>&1) && RC=$? || RC=$?
+assert_exit 1 "$RC" "B9: verific literal format, all lanes zero — exit 1"
+assert_output_contains "GUARD FAIL" "$OUT" "B9: verific literal format — correctly detected as zero, not 'could not parse'"
+if echo "$OUT" | grep -qF "could not parse INIT_0 value"; then
+    _fail "B9: verific literal format — should be parsed, not reported as unparseable"
+else
+    _ok "B9: verific literal format — parsed successfully (no 'could not parse' message)"
+fi
+
 # ════════════════════════════════════════════════════════════════════════════
 # Section C: check_firmware_sha_sync.sh (sha256 sync guard)
 # ════════════════════════════════════════════════════════════════════════════

@@ -52,16 +52,27 @@ for SYM in 0 1 2 3; do
         continue
     fi
 
-    HEX_VAL=$(echo "$INIT0" | grep -o '"[0-9a-fA-F]*"' | tr -d '"' | head -1 || true)
+    # Format A (older Efinity map.v / test fixtures): INIT_0("0000...") or INIT_0="0000..."
+    HEX_VAL=$(echo "$INIT0" | grep -oE '"[0-9a-fA-F]+"' | tr -d '"' | head -1 || true)
+
+    if [ -z "$HEX_VAL" ]; then
+        # Format B (Efinity 2026.1 verific netlist comment): INIT_0=256'h0000... (unquoted
+        # sized Verilog literal, e.g. 'h, 'b, 'o — radix letter immediately follows the tick).
+        LITERAL=$(echo "$INIT0" | grep -oE "INIT_0=[0-9]+'[a-zA-Z][0-9a-fA-FxXzZ_]+" | head -1 || true)
+        if [ -n "$LITERAL" ]; then
+            HEX_VAL=$(echo "$LITERAL" | sed -E "s/^INIT_0=[0-9]+'[a-zA-Z]//" | tr -d '_')
+        fi
+    fi
+
     if [ -z "$HEX_VAL" ]; then
         LANE_RESULTS+=("  symbol${SYM}: could not parse INIT_0 value from: $INIT0")
         continue
     fi
 
     if echo "$HEX_VAL" | grep -qE '^0+$'; then
-        LANE_RESULTS+=("  symbol${SYM}: INIT_0 = 0x${HEX_VAL:0:16}... (ALL ZERO)")
+        LANE_RESULTS+=("  symbol${SYM}: INIT_0 = ${HEX_VAL:0:16}... (ALL ZERO)")
     else
-        LANE_RESULTS+=("  symbol${SYM}: INIT_0 = 0x${HEX_VAL:0:16}... (non-zero ✓)")
+        LANE_RESULTS+=("  symbol${SYM}: INIT_0 = ${HEX_VAL:0:16}... (non-zero ✓)")
         ALL_ZERO=0
     fi
 done

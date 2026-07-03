@@ -2,6 +2,16 @@
 
 ---
 
+## Ti60 OBBS — INIT_0 guard blind to Efinity 2026.1 netlist format
+
+`check_bram_init_zero.sh` (the post-MAP guard that aborts before Place & Route if the Sapphire firmware BRAM was synthesised with all-zero content) went blind the moment `run_efx_map.sh` was pointed at Efinity 2026.1 for synthesis: it reported `could not parse INIT_0 value` for all four lanes and failed the build even when `patch_sapphire_init.py` had run correctly and the firmware WAS embedded.
+
+- **Root cause:** the guard's regex only understood one INIT_0 shape — a quoted hex string, e.g. `INIT_0("0000...")` — which is how older Efinity map.v output represented BRAM initial content. Efinity 2026.1's `efx_map` emits a `verific`-generated netlist where the same attribute appears unquoted, as a sized Verilog literal inside a long inline comment: `/* verific EFX_ATTRIBUTE_CELL_NAME=EFX_RAM10, ..., INIT_0=256'h0000... */`. The old regex found no quoted hex substring in that comment and reported every lane as unparseable, which the guard (correctly, given what it could see) treated as a failure.
+- **Fix:** `check_bram_init_zero.sh` now tries the legacy quoted-string format first, then falls back to parsing the unquoted `<width>'<radix><digits>` Verilog literal format (`'h`, `'b`, `'o`), stripping the radix prefix before checking for all-zero. Both formats are covered by synthetic fixtures in `scripts/test_build_guard.sh` Section B (69 assertions total across all guards).
+- **Lesson:** an Efinity toolchain version bump can silently change netlist *comment* syntax, not just command-line behavior — see `.agents/memory/efinity-version-split.md`. Any guard that greps synthesis output for attribute values should be format-tolerant or explicitly re-validated against a fresh sample after every Efinity version change, not just re-run.
+
+---
+
 ## Ti60 OBBS (One-Build-Bitstream-Script) Consolidation
 
 Root-caused and fixed the v2.3-vs-v2.4 stale-firmware-banner incident plus a callhome bridge JSON-concat bug on serial reconnect. There is now exactly ONE canonical build pipeline and ONE firmware build location, with self-tests that catch stale data at each step instead of only surfacing as a wrong version string on a physical board.
