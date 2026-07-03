@@ -214,16 +214,59 @@ echo "    This step synthesises all Verilog into FPGA cells and bakes firmware i
 echo "    The terminal will be quiet for most of this time — that is normal."
 echo ""
 
-# efx_run.py --flow map runs synthesis AND writes outflow/*.vdb (required by efx_pnr).
-# --work_dir sets the scratch directory; output lands in outflow/ as per the project XML.
+# efx_run.py --flow map runs synthesis AND writes outflow/<circuit>.vdb
+# (required by efx_pnr). --work_dir sets the scratch directory.
+#
+# KNOWN QUIRK (same class as the Interface Designer quirk already tolerated
+# in run_efx_pnr.sh): on this headless server efx_run.py can raise a Python
+# KeyError ("An exception occurred: 'EFINITY_USER_DIR_INI'") from some
+# internal cleanup/telemetry path AFTER synthesis has already completed
+# ("map : PASS" in the log) and the VDB has already been written to disk.
+# This is NOT the same failure as a genuinely-unset env var — both vars are
+# exported above. We do not trust efx_run.py's own exit code; we check
+# whether it actually produced a fresh outflow/<circuit>.vdb instead, the
+# same way run_efx_pnr.sh checks for outflow/<circuit>.interface.csv.
+VDB_FILE="$SOC_DIR/outflow/${CIRCUIT}.vdb"
+VDB_MARKER="$SOC_DIR/work_syn/.vdb_pre_synth_marker"
+mkdir -p "$SOC_DIR/outflow"
+rm -f "$VDB_MARKER"
+touch "$VDB_MARKER"
+
+set +e
 python3 "$EFX_RUN_PY" \
     --flow map \
     --work_dir work_syn \
     --prj "$PROJECT" \
     2>&1 | tee "$SOC_DIR/work_syn/synthesis.log"
+EFX_RUN_EXIT="${PIPESTATUS[0]}"
+set -e
+
+if [ "$EFX_RUN_EXIT" -ne 0 ]; then
+    if [ -f "$VDB_FILE" ] && [ "$VDB_FILE" -nt "$VDB_MARKER" ] \
+        && grep -q "EFINITY_USER_DIR_INI" "$SOC_DIR/work_syn/synthesis.log"; then
+        echo ""
+        echo "    NOTE: efx_run.py exited $EFX_RUN_EXIT with the known headless"
+        echo "    'EFINITY_USER_DIR_INI' KeyError quirk — but MAP synthesis"
+        echo "    already completed and wrote a fresh $VDB_FILE. Continuing."
+        echo ""
+    else
+        echo "" >&2
+        echo "[FAIL] efx_run.py --flow map exited $EFX_RUN_EXIT and no fresh VDB was produced." >&2
+        echo "[FAIL] Expected: $VDB_FILE (newer than $VDB_MARKER)." >&2
+        echo "[FAIL] Last 40 lines of $SOC_DIR/work_syn/synthesis.log:" >&2
+        tail -40 "$SOC_DIR/work_syn/synthesis.log" >&2 2>/dev/null || echo "[FAIL] (log not found)" >&2
+        rm -f "$VDB_MARKER"
+        exit 1
+    fi
+elif [ ! -f "$VDB_FILE" ]; then
+    echo "[FAIL] efx_run.py exited 0 but expected VDB not found: $VDB_FILE" >&2
+    rm -f "$VDB_MARKER"
+    exit 1
+fi
+rm -f "$VDB_MARKER"
 
 echo ""
-echo "==> Synthesis complete. VDB and netlist in $SOC_DIR/outflow/"
+echo "==> Synthesis complete. VDB: $VDB_FILE"
 echo "    Next: bash ~/church-machine/hardware/soc_combined/run_efx_pnr.sh $PROJECT"
 echo ""
 echo "    Verify BRAM init is non-zero:"

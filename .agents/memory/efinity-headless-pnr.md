@@ -1,59 +1,73 @@
 ---
 name: Efinity headless PnR flow (Ti60 on DigitalOcean droplet)
-description: Correct sequence and quirks for running efx_map + efx_pnr on a headless Linux server without PyQt6 or a GUI.
+description: Correct sequence and quirks for running efx_run.py/efx_pnr on a headless Linux server without PyQt6 or a GUI. Verified against real synthesis logs.
 ---
 
-## Rule
-Never use `efx_run.py` on a headless server — it requires PyQt6 and fails with `ModuleNotFoundError`. Use `efx_map --project-xml` for synthesis and `efx_pnr` directly for PnR.
+## Rule (UPDATED — the previous version of this note was wrong)
+`efx_run.py --flow map` **does** work headless on Efinity 2026.1, given the
+right env vars exported (see below) — it is not blocked by a missing PyQt6.
+It reliably completes real synthesis (`map : PASS` in the log) and writes
+`outflow/<circuit>.vdb`, not a project-root `top.vdb`.
 
-**Why:** `efx_run.py` is the Efinity GUI orchestrator; it imports PyQt6 at startup unconditionally. No GUI = no PyQt6 = crash before it does any work.
+**Do not trust `efx_run.py`'s own exit code.** On this droplet it can raise
+`An exception occurred: 'EFINITY_USER_DIR_INI'` from some internal
+cleanup/telemetry path *after* synthesis has already fully passed and the
+VDB is already written — the identical crash-after-success quirk already
+known for `efx_run --flow interface` (Interface Designer). Verify success by
+checking for a freshly-written output artifact (`outflow/<circuit>.vdb`,
+`outflow/<circuit>.interface.csv`), never by the tool's exit code alone.
 
-## Correct sequence (headless)
+**Why this matters beyond one script:** a hardcoded output path in one
+script (e.g. `--vdb_file top.vdb` in a PnR script) that doesn't match what
+the actual producing step currently writes will silently consume a stale
+leftover file from a much older run instead of failing loudly. Any time a
+multi-step pipeline passes a fixed filename between steps, verify it against
+what the producing step *actually just wrote*, not what an old comment or an
+earlier tool version once produced.
 
-1. **Synthesis** — `efx_map --project-xml <proj>.xml`
-   - Do NOT pass `--work_dir` or `--output_dir` — those flags use hyphens and the underscore form causes efx_map to print help and exit 0
-   - The XML already specifies `work_dir` and `write_efx_verilog`; pass `--project-xml` only
-   - Writes VDB to `<SOC_DIR>/top.vdb` (named after Verilog `module top`, NOT `outflow/<circuit>.vdb`)
-   - Also writes `top.res.csv` — **this is a resource utilization report, NOT an IO sync file**
+## Correct sequence (headless, verified)
+
+1. **Synthesis** — `efx_run.py --flow map --work_dir <dir> --prj <proj>.xml`
+   - Writes `outflow/<circuit>.vdb` and `outflow/<circuit>.map.v`
+   - May exit non-zero due to the `EFINITY_USER_DIR_INI` quirk above even on
+     full success — check for the VDB file (newer than a pre-run marker),
+     don't gate on exit code
+   - Requires `EFINITY_USER_DIR_INI`/`EFXPT_HOME` exported (see below) or it
+     fails immediately with the same KeyError, but with no VDB produced —
+     that's the real failure signal to hard-fail on
 
 2. **Interface Designer / sync file** — runs headlessly via `efx_run --flow interface`
    - With `EFINITY_USER_DIR_INI` set, `efx_run` (not efx_run.py) runs Interface Designer even without a GUI
    - It exits non-zero but still writes `outflow/<circuit>.interface.csv` — swallow the exit code
-   - `top.res.csv` (in project root, produced by efx_map) is a resource report; DO NOT pass as `--sync_file` — crashes efx_pnr with "unknown escape sequence" on `sep=\t`
    - Correct sync file: `outflow/<circuit>.interface.csv` (named after circuit, not Verilog top module)
 
-3. **Place & Route** — use `--sync_file outflow/<circuit>.interface.csv`:
+3. **Place & Route** — use `--vdb_file outflow/<circuit>.vdb` (the file MAP just wrote) and `--sync_file outflow/<circuit>.interface.csv`:
    ```
    efx_pnr --prj <proj>.xml --circuit <circuit> \
      --family Titanium --device Ti60F225 --operating_conditions C3 \
      --pack --place --route \
-     --vdb_file top.vdb \
+     --vdb_file outflow/<circuit>.vdb \
      --sync_file outflow/<circuit>.interface.csv \
      --work_dir work_pnr --output_dir outflow
    ```
-   - `--vdb_file top.vdb` (project root, not outflow/)
    - EFINITY_HOME must be exported before calling efx_pnr
 
 ## Required env vars (set before any step)
 ```bash
 export EFINITY_HOME=$HOME/efinity/2026.1
-export EFINITY_USER_DIR_INI=$HOME/.efinity   # prevents KeyError in efx_run
-export EFXPT_HOME=$EFINITY_HOME              # prevents KeyError in efx_run
+export EFINITY_USER_DIR_INI=$HOME/.efinity   # prevents KeyError in efx_run/efx_run.py
+export EFXPT_HOME=$EFINITY_HOME              # prevents KeyError in efx_run/efx_run.py
 export PATH=$EFINITY_HOME/bin:$PATH
 export LD_LIBRARY_PATH=$EFINITY_HOME/lib:${LD_LIBRARY_PATH:-}
 mkdir -p $EFINITY_USER_DIR_INI
 ```
 
-**This export is per-script, not inherited.** `run_efx_map.sh` actually invokes
-`efx_run.py --flow map` (the project moved off bare `efx_map --project-xml`
-at some point), and that entry point hits the exact same
-`EFINITY_USER_DIR_INI` KeyError as Interface Designer/PnR does — but the
-export had only ever been added to `run_efx_pnr.sh`/`run_efx_pgm.sh`, not
-`run_efx_map.sh`, so MAP synthesis crashed instantly on a fresh droplet
-(`An exception occurred: 'EFINITY_USER_DIR_INI'`) while PnR worked fine.
-Whenever a new script invokes any `efx_*`/`efx_run(.py)` binary for the
-first time, grep sibling scripts for this export and copy it in — don't
-assume it's set globally by the caller.
+**This export is per-script, not inherited.** Whenever a new script invokes
+any `efx_*`/`efx_run(.py)` binary for the first time, grep sibling scripts
+for this export and copy it in — don't assume it's set globally by the
+caller. (Exporting it alone does not guarantee a clean exit code, per the
+Rule above — it does guarantee the tool does real work instead of crashing
+immediately with no output at all.)
 
 ## upper_mem / BRAM sizing trap
 The gen_cm_dmem_direct.py script previously declared `reg [31:0] upper_mem [2048:16383]` for
@@ -62,7 +76,7 @@ causing 468K clock loads and making the design 16× too large for Ti60. The fix 
 `32'h0` for addresses ≥ 2048 rather than declaring a large reg array. Fixed in HEAD.
 
 ## Timing (4-vCPU / 8 GB DigitalOcean droplet, Ti60 SoC+CM design — 66K-line Verilog)
-- Synthesis (`efx_map`): ~45 min (10K clock loads after upper_mem fix)
+- Synthesis (`efx_run.py --flow map`): ~45 min (10K clock loads after upper_mem fix)
 - PnR (`efx_pnr`): expect 30–90 min with 4 threads
 - libstdc++ version warning (system v34 > bundled v32) is harmless
 
