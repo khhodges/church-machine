@@ -2,6 +2,53 @@
 
 ---
 
+## Ti60 OBBS (One-Build-Bitstream-Script) Consolidation
+
+Root-caused and fixed the v2.3-vs-v2.4 stale-firmware-banner incident plus a callhome bridge JSON-concat bug on serial reconnect. There is now exactly ONE canonical build pipeline and ONE firmware build location, with self-tests that catch stale data at each step instead of only surfacing as a wrong version string on a physical board.
+
+- **Root cause:** `run_efx_map.sh` used to rebuild firmware a second time from an untracked `$SOC_DIR/firmware` copy, silently overwriting the correctly-patched `sapphire.v` that `build_ti60_bitstream.sh` had just deployed — two firmware build locations, one of them stale.
+- **Fix — single build location:** `build_ti60_bitstream.sh` now rsyncs (`--delete`) the repo firmware sources into `$SOC_DIR/firmware` as an explicit step, verified byte-identical with `scripts/check_firmware_sha_sync.sh`. `run_efx_map.sh` no longer rebuilds or re-patches firmware — Step 0a is a read-only freshness self-test only, and hard-fails (`exit 1`) on direct invocation unless called via the OBBS (`_OBBS_RUN=1`/`ALLOW_DIRECT=1`).
+- **Fix — single pipeline:** `run_full_build.sh` is now a thin wrapper (tmux session, git pull, Efinity env, confirm prompt) that delegates the entire MAP/PNR/PGM sequence to `build_ti60_bitstream.sh`. Legacy hex filename `church_soc_cm.hex` is still written alongside `church_ti60_f225.hex` for backward compatibility with `flash_and_monitor.sh` and `server/app.py`.
+- **Fix — banner can no longer drift from source:** the boot banner in `hardware/soc_combined/firmware/main.c` used to be a hardcoded `"CHURCH Ti60 SoC+CM v2.4\r\n"` literal, independent of the `FW_MAJOR`/`FW_MINOR` `#define`s used everywhere else (including the CALLHOME JSON) — the exact root cause of the incident. It is now emitted digit-by-digit from `FW_MAJOR`/`FW_MINOR` at runtime, so the two can never disagree again.
+- **Fix — callhome bridge reconnect bug:** `callhome_bridge.py::_reader_thread()` now discards its partial read buffer on `SerialException` before reconnecting, so a truncated line from before a USB drop can no longer concatenate with post-reconnect data and fail JSON parsing.
+- **New self-tests (all runnable without real FPGA hardware — synthetic fixtures only):**
+  - `scripts/check_firmware_sha_sync.sh` — sha256-compares `$SOC_DIR/firmware` against the repo firmware dir; catches drift, missing files, and stray files.
+  - `scripts/check_fw_banner_matches_defines.sh` — fails if a hardcoded literal banner version ever disagrees with `FW_MAJOR`/`FW_MINOR` again.
+  - `scripts/check_sapphire_symbol_bins_fresh.sh` — sha256-compares the four Sapphire ROM `$readmemb` symbol bins in `$SOC_DIR/work_syn/` against the freshly-built repo copies. EFX_MAP resolves `$readmemb` bare filenames relative to `--work_dir` (`work_syn/`), not the project root — a stale/missing bin there is invisible to every other guard (sapphire.v itself still looks correctly patched). `build_ti60_bitstream.sh` deploys the bins into `work_syn/` right after patching sapphire.v and runs this guard immediately after; `run_efx_map.sh` Step 0a re-checks it read-only before MAP starts.
+  - `scripts/test_ti60_uart.py --expect-fw=MAJ.MIN` — physical-hardware smoke test now asserts the board's CALLHOME-reported firmware version against the version that was just built; `build_ti60_bitstream.sh`'s `--flash` step passes this automatically.
+  - `scripts/test_callhome_bridge_reconnect.py` — regression test for the reconnect JSON-concat bug.
+  - Fixtures for all three new guards live in `scripts/test_build_guard.sh` (Sections C, D, and E); all registered in `scripts/run-all-tests.sh` under the `checks` group.
+- **Follow-up fix — CM DMEM BRAM double-patch bug (same bug class):** `run_efx_map.sh` Step 0b unconditionally called the legacy `patch_cm_bram.py` ($readmemb byte-lane technique, confirmed broken on Efinity 2026.1) *after* `build_ti60_bitstream.sh` Step 2.5 had already patched the same file with the newer, correct `gen_cm_dmem_direct.py` (explicit `cm_dmem_bram` EFX_RAM10 instantiation). `patch_cm_bram.py`'s "already patched" sentinel is a bare `'readmemb' in src` substring check that false-positived on a comment `gen_cm_dmem_direct.py` leaves behind, then crashed (`cannot parse depth`) trying to find `dmem_b0` declarations that no longer existed. Fixed the same way as the banner incident: Step 0b is now a read-only self-test (`scripts/check_cm_dmem_bram_fresh.sh`), not a second patch call. New guard has 6 fixtures in `scripts/test_build_guard.sh` Section F. See `.agents/memory/obbs-single-patch-location.md` for the general bug-class writeup.
+- **Follow-up fix — sapphire.v patch guard false-positive (mtime-vs-content mismatch):** `check_sapphire_patch_fresh.sh` used to compare `mtime(sapphire.v)` against every firmware `.c`/`.h` file. But `patch_sapphire_init.py`'s `$readmemb` block only ever references *bare filenames* (never firmware bytes), so the block text is byte-identical across every rebuild — `patch_sapphire_init.py` correctly no-ops once already patched and never touches `sapphire.v`'s mtime again. Any later, unrelated mtime bump on a firmware source (git pull, touch, clock skew) then made the guard report `GUARD FAIL: sapphire.v patch is stale` forever, even though the content was 100% correct — blocking every build after the first. Fixed by making the guard content-based: it now checks that `sapphire.v` contains the canonical bare-filename `$readmemb` call for all 4 `ram_symbol0..3` lanes, instead of comparing timestamps. Call sites (`build_ti60_bitstream.sh`, `run_efx_map.sh` Step 0a) now pass only `<sapphire.v>` (firmware-dir argument dropped — no longer needed). `scripts/test_build_guard.sh` Section A rewritten with virgin/stub/partial/fully-patched fixtures (7 assertions), including a regression test proving a newer firmware mtime no longer breaks a correctly-patched file.
+- **Fix — MAP synthesis KeyError on fresh droplets:** `run_efx_map.sh` invokes `efx_run.py --flow map`, which raises `An exception occurred: 'EFINITY_USER_DIR_INI'` on headless servers unless that var (and `EFXPT_HOME`) is exported — `run_efx_pnr.sh`/`run_efx_pgm.sh` already exported it, `run_efx_map.sh` never did. Fixed by adding the same export there. See `.agents/memory/efinity-headless-pnr.md`.
+- **Follow-up fix — same KeyError still fires after export, PLUS a hidden stale-VDB bug (two bugs, one error message):** exporting the var did not stop the crash — synthesis logs proved `efx_run.py --flow map` raises the identical `EFINITY_USER_DIR_INI` KeyError from an internal cleanup path *after* `map : PASS` and after `outflow/<circuit>.vdb` is already written (same tolerated-crash class as the Interface Designer step in `run_efx_pnr.sh`). `run_efx_map.sh` now checks for a freshly-written VDB instead of trusting `efx_run.py`'s exit code, and only hard-fails (dumping the synthesis log tail) if no fresh VDB exists. Separately, `run_efx_pnr.sh` was passing `--vdb_file top.vdb` — a stale, unrelated file left over from a disproven older assumption that `efx_run.py` couldn't run headless at all — instead of the `outflow/<circuit>.vdb` that MAP actually produces; PnR would have silently packed an old netlist. Fixed by pointing `run_efx_pnr.sh` at `outflow/<circuit>.vdb` with an explicit existence check before Place & Route runs.
+- **Self-diagnosing build output (closing the remote-debug loop):** the recurring pain point across all these OBBS incidents was diagnosing failures on a remote build machine (`root@ubuntu-...`) with no direct access — every round of debugging cost a full back-and-forth of "please run this and paste the output." Two changes remove that cost going forward: (1) `build_ti60_bitstream.sh` now prints the exact commit hash/date (and flags local uncommitted changes to the build scripts) in its banner on every run, so "did you pull the fix?" is answered by the output itself, never a follow-up question; (2) `check_sapphire_patch_fresh.sh`'s failure output now dumps the actual `ram_symbol*` lines it found in `sapphire.v` (or notes if none exist at all) directly in the terminal, so a single pasted failure is self-diagnosing instead of requiring a second round-trip to inspect the file. General principle for future guards: a failing check should always print enough of the actual vs. expected state to diagnose from the failure message alone.
+
+---
+
+## Scheduler Interrupt & Three-Tier Fault Recovery (Task #1077)
+
+Simulation-only (no FPGA hardware). Implemented in JS simulator files only.
+
+- **Structured fault record:** `fault()` now populates `faultCode`, `faultingMnemonic`, `involvedGT`, `pipelineStage`, `faultingAbstractionSlot`, `faultingAbstractionLabel`, `tier`, `catchInvoked`, `irqInvoked`, `tier3Recovery` on every fault entry.
+- **Three-tier recovery:** `fault()` attempts Tier 1 (`.catch` method on faulting NS slot), Tier 2 (`Scheduler.IRQ` via `_fireSchedulerIRQ`), Tier 3 (double-fault `→ _returnToBoot`) before halting. Default behaviour (halt) preserved when no handlers are registered.
+- **Scheduler.pause:** New method (index 4) arms `irqState.timerArmed/timerDeadline`; suspends calling thread.
+- **Scheduler.IRQ:** New method (index 5, NS slot 8). Hidden ELOADCALL — wakes sleeping threads on TIMER fire or attempts fault recovery on FAULT escalation.
+- **Timer check in step():** Before each instruction fetch, if `bootComplete && timerArmed && !irqActive && stepCount >= timerDeadline`, a hidden Scheduler.IRQ is injected.
+- **NS slot 50:** `Scheduler.IRQ.Thread` — fixed boot-image slot for the IRQ thread.
+- **ChurchSimulator static constants:** `FAULT_CODES`, `SCHEDULER_NS_SLOT=8`, `SCHEDULER_IRQ_NS_SLOT=50`.
+- **Fault Popup:** Recovery section added — shows tier, .catch/IRQ invocation, HW code, mnemonic, pipeline stage, GT.
+- **Tests:** `simulator/test_fault_recovery.js` — 6 suites, 38 assertions covering all three tiers, pause, and flag-set wake.
+- **Docs:** `docs/instruction-set.md` Section "Three-Tier Fault Recovery"; `docs/isa_reference.md` Section 9.
+
+---
+
+## LUMP Spec — Builder ZIP Downloads (2026-05-15)
+
+Build log listings now match ZIP contents exactly for all 3 boards (Ti60, Wukong, Tang Nano): stale `.edif` removed from the Ti60 log; `local_bridge.py` added to Wukong and Tang Nano logs; `.v`/`.json` marked conditional for Tang Nano; file-icon map expanded; new zip-contents pytest suite (5 tests).
+
+---
+
 ## Release 1.3 — 2026-05-16
 
 ### GT format — dom+perm3 compression, f_flag per-token, TPERM EXACT
