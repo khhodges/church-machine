@@ -2,6 +2,17 @@
 
 ---
 
+## Ti60 OBBS — P1 headless patch made best-effort/optional (false hard-failure on a real build)
+
+A real build (2026-07) hard-failed at `apply_efinity_headless_patches.py`'s P1 step with `ANCHOR_MISSING`, blocking the whole PnR run even though P2, P3, and P4-5 all succeeded.
+
+- **Root cause:** P1's anchor (`for clkmux_inst in pll_reg.get_all_pll():`) assumed every Efinity 2026.1 sub-build has an unguarded PLL-registry loop in `clkmux_rule_adv.py`. Full-file evidence from the failing build showed this specific sub-build already null-checks `pll_reg`/`checker.design.pll_reg` on every PLL-related code path (`ClkMuxRulePLLMultConnection.check()`, `check_dyn_mux_input_pll_outclk()`, etc.) — the crash P1 exists to prevent cannot occur there, so there was nothing to patch, but the script still treated the missing anchor as a fatal error.
+- **Fix:** added a `required` flag to the `Patch` class (default `True`). P1 is now `required=False`, matching the existing best-effort P6: when its anchor is absent, `apply()` prints `SKIP` (not `FAIL`) and returns success, and `check()` treats `ANCHOR_MISSING` as OK. P2, P3, and P4-5 remain required — a missing anchor there still hard-fails and names the file, since those crash paths are still order-of-execution accurate on the machines seen so far.
+- **Tests:** `scripts/test_build_guard.sh` Section G — G3 now simulates version drift on a *required* patch (P2/`clock_rule_adv.py`) to prove hard-failure still works; new G3b simulates a missing anchor on optional P1 and asserts exit 0, a `SKIP` message, and that the other required patches still apply. 92/92 assertions passing.
+- **Docs:** `BUILD_SOC_CM.md`'s patch section updated to state P2/P3/P4-5 are required while P1/P6 are best-effort/optional.
+
+---
+
 ## Ti60 OBBS — Interface Designer silently fails headless (missing Efinity source patches)
 
 After the INIT_0 guard fix, MAP synthesis passed cleanly, but Place & Route's Step 0 (Interface Designer) then failed: `ERROR: Interface Designer did not produce .../church_soc_cm.interface.csv — cannot proceed.` — with no further detail, because `build_ti60_bitstream.sh` pipes `run_efx_pnr.sh`'s output through `tail -8`.

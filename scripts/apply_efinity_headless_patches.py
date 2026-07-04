@@ -15,10 +15,13 @@ Route then hard-fails with:
 with no further explanation, because the real crash happened inside a
 try-less call several frames up.
 
-This script applies 5 small, targeted patches directly to the installed
-Efinity Python sources (NOT to this repo's project files) so check_design()
-degrades gracefully instead of crashing, and design generation proceeds even
-when the design-check step reports a failure.
+This script applies up to 5 small, targeted patches directly to the
+installed Efinity Python sources (NOT to this repo's project files) so
+check_design() degrades gracefully instead of crashing, and design
+generation proceeds even when the design-check step reports a failure.
+P2, P3, and P4-5 are required. P1 and the optional P6 are best-effort: some
+Efinity 2026.1 sub-builds already null-guard that code natively, so a
+missing anchor there is not treated as a failure (see build_patches()).
 
 Usage:
     python3 scripts/apply_efinity_headless_patches.py --apply [--root PATH]
@@ -46,11 +49,16 @@ SENTINEL = "church-headless-patch-v1"
 
 
 class Patch:
-    def __init__(self, name, rel_path, anchor, replacement):
+    def __init__(self, name, rel_path, anchor, replacement, required=True):
         self.name = name
         self.rel_path = rel_path
         self.anchor = anchor
         self.replacement = replacement
+        # required=False: this patch's crash scenario is known to be absent
+        # in some Efinity 2026.1 sub-builds (the file already null-guards the
+        # code path natively). A missing anchor is then expected, not an
+        # error — see P1's history in CHANGELOG.md.
+        self.required = required
 
     def path(self, root):
         return os.path.join(root, self.rel_path)
@@ -72,7 +80,7 @@ class Patch:
 
     def check(self, root):
         state, _ = self.state(root)
-        ok = state == "ALREADY_APPLIED"
+        ok = state == "ALREADY_APPLIED" or (state == "ANCHOR_MISSING" and not self.required)
         print(f"{'OK  ' if ok else 'MISS'} [{self.name}]: {state} ({self.path(root)})")
         return ok
 
@@ -86,6 +94,13 @@ class Patch:
             print(f"OK   [{self.name}]: already applied (sentinel found)")
             return True
         if state == "ANCHOR_MISSING":
+            if not self.required:
+                print(
+                    f"SKIP [{self.name}]: anchor text not found in {p} — not "
+                    f"applicable to this Efinity build (optional patch; the "
+                    f"crash scenario it guards against isn't present here)."
+                )
+                return True
             print(
                 f"FAIL [{self.name}]: anchor text not found in {p} — "
                 f"Efinity version drift? This patch's anchor needs updating."
@@ -112,7 +127,15 @@ class Patch:
 def build_patches():
     patches = []
 
-    # Patch 1: clkmux_rule_adv.py — pll_reg=None crash
+    # Patch 1: clkmux_rule_adv.py — pll_reg=None crash.
+    #
+    # OPTIONAL (required=False): confirmed on a real Efinity 2026.1 install
+    # (2026-07) that this exact unguarded loop does not exist in every
+    # sub-build — that file's PLL-related code paths (e.g.
+    # ClkMuxRulePLLMultConnection.check(), check_dyn_mux_input_pll_outclk())
+    # already null-check pll_reg natively. Kept here best-effort in case an
+    # older/different sub-build still has the unguarded form; a missing
+    # anchor is not treated as a failure.
     patches.append(
         Patch(
             name="P1-clkmux-pll-none",
@@ -122,6 +145,7 @@ def build_patches():
                 f"for clkmux_inst in (pll_reg.get_all_pll() if pll_reg is not None else []):"
                 f"  # {SENTINEL}"
             ),
+            required=False,
         )
     )
 
@@ -274,12 +298,12 @@ def main():
 
     if not all_ok:
         print(
-            "\nOne or more required patches (P1-P5) could not be applied. "
+            "\nOne or more required patches could not be applied. "
             "Interface Designer will likely still fail headless. See messages above."
         )
         sys.exit(1)
 
-    print("\nAll required headless patches (P1-P5) applied/verified.")
+    print("\nAll required headless patches applied/verified (optional patches applied where applicable).")
     sys.exit(0)
 
 

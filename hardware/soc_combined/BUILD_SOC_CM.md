@@ -401,7 +401,7 @@ Key changes in the corrected peri.xml (2026.1 vs old 2025.2 format):
 
 ---
 
-### Efinity 2026.1 headless: 5 one-time patches required (now automated)
+### Efinity 2026.1 headless: up to 5 one-time patches (now automated)
 
 The Interface Designer (PT Unified) refuses to generate the LPF on a headless
 build machine because it validates HSIO GPIO clock rules that the Ti60F225
@@ -425,29 +425,37 @@ To check patch status manually without applying anything:
 python3 scripts/apply_efinity_headless_patches.py --check --root "$EFINITY_HOME"
 ```
 
-The script patches 5 required call sites (P1–P5: `clkmux_rule_adv.py`
-pll_reg=None crash, `clock_rule_adv.py` osc_reg=None crash,
-`efx_run_pt_unified.py` check_design() try/except wrap, and `design.py`'s
-`generate()` — corrected to actually call `check_design()` and swallow its
-exception rather than the disproven `if True:` bypass, see
-`.agents/memory/ti60-headless-lpf.md`), plus a best-effort optional P6 that
-neutralizes `efx_run_pt_unified.py`'s `return PTFlowRunnerStatusCode.ERROR`
-after a design-check failure, applied only when there is exactly one
-unambiguous match.
+The script patches call sites P1–P5: `clkmux_rule_adv.py` pll_reg=None
+crash, `clock_rule_adv.py` osc_reg=None crash, `efx_run_pt_unified.py`
+check_design() try/except wrap, and `design.py`'s `generate()` — corrected
+to actually call `check_design()` and swallow its exception rather than the
+disproven `if True:` bypass, see `.agents/memory/ti60-headless-lpf.md`.
+Plus a best-effort optional P6 that neutralizes `efx_run_pt_unified.py`'s
+`return PTFlowRunnerStatusCode.ERROR` after a design-check failure, applied
+only when there is exactly one unambiguous match.
+
+**P2, P3, and P4-5 are required.** P1 is best-effort/optional (like P6):
+confirmed on a real Efinity 2026.1 install (2026-07) that some sub-builds'
+`clkmux_rule_adv.py` already null-guard the PLL registry natively — no
+unguarded `pll_reg.get_all_pll()` loop exists there at all — so a missing
+anchor for P1 is reported as `SKIP`, not treated as a failure.
 
 Each patch embeds a `church-headless-patch-v1` sentinel comment so re-running
 `--apply` is a true no-op once patched, and each is verified with
-`py_compile` (rolled back automatically if verification fails). If a patch's
-anchor text isn't found, the script fails loudly and names the file — that
-means the installed Efinity version has drifted and the anchor in
-`scripts/apply_efinity_headless_patches.py` needs updating, rather than the
-old silent "Fail to generate outputs" you'd get from the doc's manual
-snippets when they no-op on a path that doesn't exist.
+`py_compile` (rolled back automatically if verification fails). If a
+*required* patch's anchor text isn't found, the script fails loudly and
+names the file — that means the installed Efinity version has drifted and
+the anchor in `scripts/apply_efinity_headless_patches.py` needs updating,
+rather than the old silent "Fail to generate outputs" you'd get from the
+doc's manual snippets when they no-op on a path that doesn't exist. For the
+optional P1/P6, a missing anchor is expected on some sub-builds and does not
+fail the run.
 
 Regression coverage: `scripts/test_build_guard.sh` Section G exercises this
 patcher against a synthetic fixture tree (virgin apply, idempotent re-apply,
-simulated version drift, `--check` mode, mixed pre-patched state) — no real
-Efinity installation required.
+simulated version drift on a required patch, simulated missing anchor on
+optional P1, `--check` mode, mixed pre-patched state) — no real Efinity
+installation required.
 
 ---
 

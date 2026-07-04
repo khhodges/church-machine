@@ -587,14 +587,29 @@ else
     _fail "G2: re-apply modified already-patched files"
 fi
 
-# G3: simulated Efinity version bump (anchor text no longer matches) — exit 1, names the file
+# G3: simulated Efinity version bump on a REQUIRED patch (anchor no longer
+# matches) — exit 1, names the file. Uses P2 (clock_rule_adv.py) since P1 is
+# optional/best-effort (see G3b) and would no longer trigger a hard failure.
+make_virgin_efinity_fixture "$EFINITY_FIXTURE"
+sed -i 's/for osc in checker.osc_reg.get_all_osc():/for osc in checker.osc_reg.iter_all_osc():/' \
+    "$EFINITY_FIXTURE/pt/bin/tx60_device/clock/clock_rule_adv.py"
+OUT=$(python3 "$PATCHER" --apply --root "$EFINITY_FIXTURE" 2>&1) && RC=$? || RC=$?
+assert_exit 1 "$RC" "G3: anchor missing on required patch (simulated version drift) — exit 1"
+assert_output_contains "anchor text not found" "$OUT" "G3: explains anchor missing"
+assert_output_contains "clock_rule_adv.py" "$OUT" "G3: names the drifted file"
+
+# G3b: P1 is optional/best-effort — a missing anchor there (e.g. because this
+# Efinity sub-build already null-guards the code natively, as confirmed on a
+# real install) must NOT fail the run; it should be reported as SKIP and the
+# other required patches still apply normally.
 make_virgin_efinity_fixture "$EFINITY_FIXTURE"
 sed -i 's/for clkmux_inst in pll_reg.get_all_pll():/for clkmux_inst in pll_reg.iter_all_pll():/' \
     "$EFINITY_FIXTURE/pt/bin/tx60_device/clock_mux/clkmux_rule_adv.py"
 OUT=$(python3 "$PATCHER" --apply --root "$EFINITY_FIXTURE" 2>&1) && RC=$? || RC=$?
-assert_exit 1 "$RC" "G3: anchor missing (simulated version drift) — exit 1"
-assert_output_contains "anchor text not found" "$OUT" "G3: explains anchor missing"
-assert_output_contains "clkmux_rule_adv.py" "$OUT" "G3: names the drifted file"
+assert_exit 0 "$RC" "G3b: anchor missing on optional P1 — exit 0 (not a failure)"
+assert_output_contains "SKIP [P1-clkmux-pll-none]: anchor text not found" "$OUT" "G3b: P1 reported as SKIP, not FAIL"
+assert_output_contains "not applicable to this Efinity build" "$OUT" "G3b: explains why P1 is optional"
+assert_output_contains "P2-clock-osc-none]: patched and verified" "$OUT" "G3b: other required patches still applied"
 
 # G4: --check on virgin tree — nonzero (not yet patched)
 make_virgin_efinity_fixture "$EFINITY_FIXTURE"

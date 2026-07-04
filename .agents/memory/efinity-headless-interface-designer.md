@@ -1,6 +1,6 @@
 ---
 name: Efinity headless Interface Designer patches
-description: Why PT Unified's Interface Designer needs 5 patches to the Efinity install itself to run headless, and why hardcoded doc snippets silently no-op on a new build machine
+description: Why PT Unified's Interface Designer needs patches to the Efinity install itself to run headless, why hardcoded doc snippets silently no-op on a new build machine, and why not all patches apply to every sub-build
 ---
 
 # Interface Designer needs the Efinity installation patched, not just the project
@@ -40,3 +40,15 @@ design-check failure table) is applied only best-effort when there is
 exactly one unambiguous match — the exact surrounding source was never
 captured verbatim from a real Efinity install, so don't assume it always
 fires; check the patcher's own output.
+
+**Not every Efinity 2026.1 sub-build has every crash path.** A real build
+(2026-07) proved P1's target file (`clkmux_rule_adv.py`) already null-guards
+`pll_reg` on every PLL-related code path in that particular sub-build — no
+unguarded `pll_reg.get_all_pll()` loop existed at all, so P1's anchor was
+never present. The `Patch` class now has a `required` flag; P1 (like P6) is
+`required=False` — a missing anchor there is reported as `SKIP` and does not
+fail the run, since the crash it exists to prevent simply may not apply.
+P2/P3/P4-5 remain `required=True`. Lesson: when a patch targets a crash
+scenario, verify with grep against the *actual failing install's* source
+before assuming a missing anchor means "the anchor needs updating" — it may
+instead mean the scenario doesn't exist in this sub-build.
