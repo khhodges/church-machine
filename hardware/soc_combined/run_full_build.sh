@@ -63,7 +63,9 @@ SOC_DIR="$SCRIPT_DIR"
 EFINITY="${EFINITY_HOME:-$HOME/efinity/2026.1}"
 export EFINITY_HOME="$EFINITY"
 export EFINITY_USER_DIR_INI="${EFINITY_USER_DIR_INI:-$HOME/.efinity}"
-export EFXPT_HOME="${EFXPT_HOME:-$EFINITY}"
+# EFXPT_HOME must be $EFINITY/pt, not the plain Efinity root — matches
+# Efinity's own bin/setup.sh. See run_efx_pnr.sh for the full explanation.
+export EFXPT_HOME="${EFXPT_HOME:-$EFINITY/pt}"
 export EFXPGM_HOME="${EFXPGM_HOME:-$EFINITY}"
 export PATH="$EFINITY/bin:${PATH:-}"
 if [ -d "$EFINITY/lib" ]; then

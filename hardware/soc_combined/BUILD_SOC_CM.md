@@ -499,6 +499,37 @@ appears before the Interface Designer invocation.
 
 ---
 
+### Interface Designer fails: `ERROR, unusupported device Ti60F225 in Interface Designer`
+
+(The misspelling is Efinity's own — not a typo in this repo.) This appears
+*after* Interface Designer starts running (i.e. after fixing the PYTHONPATH
+gap above), for a device name that is used consistently everywhere else in
+the project — the project XML, `peri.xml`'s `device_def="Ti60F225"`, and
+every other build script, including MAP synthesis, which succeeds with the
+same device string.
+
+**Root cause:** the device check calls
+`DeviceService.is_device_exists()` → `get_device_map_file()`, which reads
+`os.environ["EFXPT_HOME"]` and builds `"$EFXPT_HOME/db/devicemap.csv"`. The
+real file lives at `$EFINITY_HOME/pt/db/devicemap.csv` — note the `/pt`.
+Several OBBS scripts exported `EFXPT_HOME` as the *plain* Efinity root
+(`EFXPT_HOME="$EFINITY"`, no `/pt`), so the CSV path never resolves,
+`get_device_map_file()` silently returns `""`, and `is_device_exists()`
+always returns `False` — regardless of whether the device name is valid.
+Efinity's own `bin/setup.sh` defines `export EFXPT_HOME=$EFINITY_HOME/pt`;
+that is the value every OBBS script must use.
+
+**Fix:** every script that exports `EFXPT_HOME` (`run_efx_pnr.sh`,
+`run_efx_map.sh`, `run_full_build.sh`, `run_efx_pgm.sh`, `build_b4.sh`,
+`build_ti60.sh`, `build_and_flash.sh`) now sets it to `$EFINITY_HOME/pt`
+(or the script's equivalent Efinity-root variable + `/pt`). No Efinity
+source patching required.
+
+Regression coverage: `scripts/test_build_guard.sh` Section I statically
+asserts every OBBS script's `EFXPT_HOME` export ends in `/pt`.
+
+---
+
 ### `efx_pgm` fails with `ERROR: Unknown device family ""`
 
 **Efinity 2026.1 does not read family from the project XML or `--device` alone.**  

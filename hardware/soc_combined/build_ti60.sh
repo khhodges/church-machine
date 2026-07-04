@@ -53,7 +53,9 @@ done
 # ---------------------------------------------------------------------------
 export EFINITY_HOME="${EFINITY_HOME:-$HOME/efinity/2026.1}"
 export EFINITY_USER_DIR_INI="${EFINITY_USER_DIR_INI:-$HOME/.efinity}"
-export EFXPT_HOME="${EFXPT_HOME:-$EFINITY_HOME}"
+# EFXPT_HOME must be $EFINITY_HOME/pt, not the plain Efinity root — matches
+# Efinity's own bin/setup.sh. See run_efx_pnr.sh for the full explanation.
+export EFXPT_HOME="${EFXPT_HOME:-$EFINITY_HOME/pt}"
 export PATH="$EFINITY_HOME/bin:${PATH:-}"
 export LD_LIBRARY_PATH="$EFINITY_HOME/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 mkdir -p "$EFINITY_USER_DIR_INI"

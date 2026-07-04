@@ -679,6 +679,48 @@ else
     _fail "H3: PYTHONPATH export precedes Step 0 invocation — order regression (export_line=$PYTHONPATH_LINE, step0_line=$STEP0_LINE)"
 fi
 
+# ────────────────────────────────────────────────────────────────────────────
+# Section I: EFXPT_HOME must be $EFINITY_HOME/pt, not the plain Efinity root
+# ────────────────────────────────────────────────────────────────────────────
+echo ""
+echo "  Section I: EFXPT_HOME=\$EFINITY_HOME/pt regression guard"
+echo "  ───────────────────────────────────────────────────────"
+
+# I1-I6: Interface Designer's device/service.py builds
+# "$EFXPT_HOME/db/devicemap.csv" to validate a device name via
+# is_device_exists(). The real file lives at $EFINITY_HOME/pt/db/devicemap.csv
+# (confirmed on real hardware 2026-07). If any script exports EFXPT_HOME as
+# the plain Efinity root (missing the /pt suffix), get_device_map_file()
+# silently returns "" (file not found), is_device_exists() always returns
+# False, and efx_run_pt_unified.py prints a bogus
+# "ERROR, unusupported device Ti60F225 in Interface Designer" for a
+# perfectly valid device. Every script that exports EFXPT_HOME must end its
+# assignment in "/pt".
+EFXPT_HOME_SCRIPTS=(
+    "hardware/soc_combined/run_efx_pnr.sh"
+    "hardware/soc_combined/run_efx_map.sh"
+    "hardware/soc_combined/run_full_build.sh"
+    "hardware/soc_combined/run_efx_pgm.sh"
+    "hardware/soc_combined/build_b4.sh"
+    "hardware/soc_combined/build_ti60.sh"
+    "hardware/soc_combined/build_and_flash.sh"
+)
+I_IDX=1
+for rel in "${EFXPT_HOME_SCRIPTS[@]}"; do
+    script="$REPO_ROOT/$rel"
+    label="I${I_IDX}: $rel exports EFXPT_HOME ending in /pt"
+    if [ ! -f "$script" ]; then
+        _fail "$label — script not found"
+    elif grep -E '^\s*export EFXPT_HOME=' "$script" | grep -qv '/pt'; then
+        _fail "$label — found an EFXPT_HOME export WITHOUT /pt suffix"
+    elif grep -qE '^\s*export EFXPT_HOME=.*/pt("|})?' "$script"; then
+        _ok "$label"
+    else
+        _fail "$label — no EFXPT_HOME export ending in /pt found"
+    fi
+    I_IDX=$((I_IDX+1))
+done
+
 # ════════════════════════════════════════════════════════════════════════════
 # Summary
 # ════════════════════════════════════════════════════════════════════════════

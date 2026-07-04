@@ -2,6 +2,17 @@
 
 ---
 
+## Ti60 OBBS — Interface Designer reports `ERROR, unusupported device Ti60F225` (wrong `EFXPT_HOME`)
+
+After the PYTHONPATH fix below, Interface Designer actually ran instead of silently no-op'ing — but then failed immediately with `ERROR, unusupported device Ti60F225 in Interface Designer` (the misspelling is Efinity's own), for a device name used consistently everywhere else in the repo (project XML, `peri.xml`'s `device_def="Ti60F225"`, and every other build script — including MAP synthesis, which succeeded).
+
+- **Root cause:** `efx_run_pt_unified.py`'s device check calls `DeviceService.is_device_exists()`, which calls `get_device_map_file()`. That function reads `os.environ["EFXPT_HOME"]` and builds `"$EFXPT_HOME/db/devicemap.csv"`. The real file lives at `$EFINITY_HOME/pt/db/devicemap.csv` — confirmed present on the build host — but six of the seven OBBS scripts exported `EFXPT_HOME` as the *plain* Efinity root (e.g. `EFXPT_HOME="$EFINITY"`), missing the `/pt` suffix. With the wrong root, `os.path.exists(tmp_csv)` is `False`, `get_device_map_file()` silently returns `""`, and `is_device_exists()` always returns `False` regardless of whether the device is real — producing the bogus "unsupported device" error for a perfectly valid one. `hardware/soc_combined/build_and_flash.sh` already had the correct value (`EFXPT_HOME=$EFINITY_HOME/pt`), matching Efinity's own `bin/setup.sh` (`export EFXPT_HOME=$EFINITY_HOME/pt`) — confirming the fix and explaining why that one script never hit this bug.
+- **Fix:** Corrected the `EFXPT_HOME` export in all six affected scripts to end in `/pt`: `run_efx_pnr.sh`, `run_efx_map.sh`, `run_full_build.sh`, `run_efx_pgm.sh`, `build_b4.sh`, `build_ti60.sh`. No Efinity source patching required — this is a plain repo-side environment-variable bug.
+- **Tests:** `scripts/test_build_guard.sh` new Section I asserts every OBBS script that exports `EFXPT_HOME` ends the assignment in `/pt`. 102/102 assertions passing.
+- **Docs:** `BUILD_SOC_CM.md` new Troubleshooting subsection documents the symptom, root cause, and fix.
+
+---
+
 ## Ti60 OBBS — Interface Designer silently no-ops on missing `device` package (PYTHONPATH gap)
 
 A real build (2026-07) passed Step -1 (all headless patches SKIP/OK, per the P1-optional fix below) but then Step 0 (Interface Designer) produced an empty `interface.log`, exited 0, and never wrote `.interface.csv` — no crash, no traceback, nothing actionable in the logs.

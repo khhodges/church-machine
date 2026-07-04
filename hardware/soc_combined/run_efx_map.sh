@@ -75,9 +75,11 @@ fi
 # Headless servers throw `An exception occurred: 'EFINITY_USER_DIR_INI'`
 # (a Python KeyError from efx_run.py) if this is unset — same quirk
 # run_efx_pnr.sh and run_efx_pgm.sh already work around. EFXPT_HOME
-# (Efinity platform tools home) defaults to EFINITY_HOME.
+# (Efinity platform tools home) MUST be $EFINITY/pt, not the plain Efinity
+# root — matches Efinity's own bin/setup.sh. See run_efx_pnr.sh for the
+# full explanation (device-lookup CSV path depends on this being correct).
 export EFINITY_USER_DIR_INI="${EFINITY_USER_DIR_INI:-$HOME/.efinity}"
-export EFXPT_HOME="${EFXPT_HOME:-$EFINITY}"
+export EFXPT_HOME="${EFXPT_HOME:-$EFINITY/pt}"
 mkdir -p "$EFINITY_USER_DIR_INI"
 
 # Default project: church_soc_cm.xml in the same directory as this script

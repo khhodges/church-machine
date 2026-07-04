@@ -15,7 +15,9 @@ set -euo pipefail
 EFINITY="${EFINITY_HOME:-$HOME/efinity/2026.1}"
 export EFINITY_HOME="$EFINITY"
 export EFINITY_USER_DIR_INI="${EFINITY_USER_DIR_INI:-$HOME/.efinity}"
-export EFXPT_HOME="${EFXPT_HOME:-$HOME/efinity/2026.1}"
+# EFXPT_HOME must be $EFINITY/pt, not the plain Efinity root — matches
+# Efinity's own bin/setup.sh. See run_efx_pnr.sh for the full explanation.
+export EFXPT_HOME="${EFXPT_HOME:-$HOME/efinity/2026.1/pt}"
 export EFXPGM_HOME="${EFXPGM_HOME:-$HOME/efinity/2026.1}"
 
 if [ ! -x "$EFINITY/bin/efx_pgm" ]; then

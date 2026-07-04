@@ -53,9 +53,18 @@ OPCOND="C3"
 mkdir -p "$SOC_DIR/work_pnr" "$SOC_DIR/outflow"
 # Headless servers throw KeyError for these vars if unset.
 # EFINITY_USER_DIR_INI — user settings dir
-# EFXPT_HOME           — Efinity platform tools home (defaults to EFINITY_HOME)
+# EFXPT_HOME           — Efinity platform tools home. MUST be $EFINITY/pt,
+# NOT the plain Efinity root — matches Efinity's own bin/setup.sh
+# (`export EFXPT_HOME=$EFINITY_HOME/pt`). device/service.py's
+# get_device_map_file() builds "$EFXPT_HOME/db/devicemap.csv" to look up
+# whether a device name is valid; if EFXPT_HOME is missing the /pt suffix
+# that path doesn't exist, get_device_map_file() silently returns "", and
+# is_device_exists() always returns False — producing a bogus
+# "ERROR, unusupported device Ti60F225 in Interface Designer" for a
+# perfectly valid device. Confirmed on a real build (2026-07): the real
+# file lives at $EFINITY_HOME/pt/db/devicemap.csv.
 export EFINITY_USER_DIR_INI="${EFINITY_USER_DIR_INI:-$HOME/.efinity}"
-export EFXPT_HOME="${EFXPT_HOME:-$EFINITY}"
+export EFXPT_HOME="${EFXPT_HOME:-$EFINITY/pt}"
 # Interface Designer's `efx_run_pt_unified.py` does `from device.service
 # import DeviceService`, and that `device` package lives under
 # `$EFINITY_HOME/pt/bin` (not `scripts/`, where efx_run_pt_unified.py

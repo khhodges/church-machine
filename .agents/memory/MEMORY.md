@@ -38,3 +38,4 @@
 - [Boot catalog slot 4 no longer a gap](boot-catalog-slot4-no-longer-gap.md) — hardware boot catalog is 8 slots (0-6 named, gap moved to 7); never hardcode slot 3=Boot.Abstr, use sim.bootEntrySlot
 - [Freshness guards on idempotent patches must be content-based](freshness-guard-content-vs-mtime.md) — if a patch's output text never changes once applied, an mtime comparison against it will eventually false-positive forever
 - [Efinity PT Unified device package PYTHONPATH gap](efinity-pt-unified-pythonpath.md) — efx_run_pt_unified.py imports device.service from pt/bin; skipping setup.sh drops it from PYTHONPATH, causing a silent exit-0 no-op, not a crash
+- [EFXPT_HOME needs /pt suffix](efxpt-home-must-include-pt-suffix.md) — must equal $EFINITY_HOME/pt or Interface Designer's device-name check silently always fails ("unusupported device")
