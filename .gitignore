@@ -34,3 +34,12 @@ attached_assets/
 
 # FPGA build artifact — large generated ZIP; tracked by LFS but too big to push via Replit
 project.zip
+
+# Python bytecode cache (appears anywhere a Python script has been run, e.g. hardware/)
+__pycache__/
+*.pyc
+
+# Stray scratch files dropped at repo root by droplet build/patch scripts
+# (the hardware/soc_combined/ copies are handled by that directory's own .gitignore)
+/church_ti60_f225.v.pre_direct
+/cm_dmem_bram.v
