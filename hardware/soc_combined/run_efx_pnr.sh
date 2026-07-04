@@ -56,6 +56,21 @@ mkdir -p "$SOC_DIR/work_pnr" "$SOC_DIR/outflow"
 # EFXPT_HOME           — Efinity platform tools home (defaults to EFINITY_HOME)
 export EFINITY_USER_DIR_INI="${EFINITY_USER_DIR_INI:-$HOME/.efinity}"
 export EFXPT_HOME="${EFXPT_HOME:-$EFINITY}"
+# Interface Designer's `efx_run_pt_unified.py` does `from device.service
+# import DeviceService`, and that `device` package lives under
+# `$EFINITY_HOME/pt/bin` (not `scripts/`, where efx_run_pt_unified.py
+# itself lives). Efinity's own bin/setup.sh would normally put a Python
+# path like this on PYTHONPATH, but we deliberately don't source setup.sh
+# (it calls `exit` in non-interactive shells — see note above). Without
+# this, the import silently fails with ModuleNotFoundError, efx_run.py's
+# bare `except ImportError` swallows it into a one-line warning written
+# only to its own log file (not stdout/stderr), and the whole Interface
+# Designer step is skipped with exit code 0 — no crash, no CSV, no
+# indication anything went wrong except a downstream "did not produce
+# .interface.csv" error with a completely empty interface.log. Confirmed
+# on a real build (2026-07): `ModuleNotFoundError: No module named
+# 'device'` reproduced directly, fixed by adding pt/bin to PYTHONPATH.
+export PYTHONPATH="$EFINITY/pt/bin${PYTHONPATH:+:$PYTHONPATH}"
 mkdir -p "$EFINITY_USER_DIR_INI"
 cd "$SOC_DIR"
 

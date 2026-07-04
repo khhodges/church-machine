@@ -640,6 +640,45 @@ assert_output_contains "P2-clock-osc-none]: patched and verified" "$OUT" "G6: ap
 
 rm -rf "$EFINITY_FIXTURE"
 
+# ────────────────────────────────────────────────────────────────────────────
+# Section H: run_efx_pnr.sh — Interface Designer PYTHONPATH regression guard
+# ────────────────────────────────────────────────────────────────────────────
+echo ""
+echo "  Section H: run_efx_pnr.sh (Interface Designer PYTHONPATH guard)"
+echo "  ───────────────────────────────────────────────────────────────"
+
+PNR_SCRIPT="$REPO_ROOT/hardware/soc_combined/run_efx_pnr.sh"
+
+# H1: script exists
+if [ -f "$PNR_SCRIPT" ]; then
+    _ok "H1: run_efx_pnr.sh exists"
+else
+    _fail "H1: run_efx_pnr.sh exists — NOT FOUND at $PNR_SCRIPT"
+fi
+
+# H2: PYTHONPATH must include $EFINITY/pt/bin before efx_run is first invoked,
+# or efx_run_pt_unified.py's `from device.service import DeviceService` fails
+# with ModuleNotFoundError, which efx_run.py silently swallows into a
+# one-line log warning and skips Interface Designer with exit code 0 (no
+# .interface.csv, no visible error). Confirmed root cause on real hardware
+# 2026-07; see CHANGELOG.md and docs/HARDWARE.md.
+if grep -qE 'PYTHONPATH="\$EFINITY/pt/bin' "$PNR_SCRIPT" 2>/dev/null; then
+    _ok "H2: PYTHONPATH export includes \$EFINITY/pt/bin (device package path)"
+else
+    _fail "H2: PYTHONPATH export includes \$EFINITY/pt/bin — MISSING (Interface Designer will silently no-op)"
+fi
+
+# H3: the PYTHONPATH export must appear before Step 0 (Interface Designer
+# invocation), not after — order matters since it's an exported env var
+# read at process-invocation time.
+PYTHONPATH_LINE=$(grep -n 'PYTHONPATH="\$EFINITY/pt/bin' "$PNR_SCRIPT" 2>/dev/null | head -1 | cut -d: -f1)
+STEP0_LINE=$(grep -n 'Step 0/2: Interface Designer' "$PNR_SCRIPT" 2>/dev/null | head -1 | cut -d: -f1)
+if [ -n "$PYTHONPATH_LINE" ] && [ -n "$STEP0_LINE" ] && [ "$PYTHONPATH_LINE" -lt "$STEP0_LINE" ]; then
+    _ok "H3: PYTHONPATH export precedes Step 0 (Interface Designer) invocation"
+else
+    _fail "H3: PYTHONPATH export precedes Step 0 invocation — order regression (export_line=$PYTHONPATH_LINE, step0_line=$STEP0_LINE)"
+fi
+
 # ════════════════════════════════════════════════════════════════════════════
 # Summary
 # ════════════════════════════════════════════════════════════════════════════

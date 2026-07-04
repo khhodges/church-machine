@@ -459,6 +459,46 @@ installation required.
 
 ---
 
+### Interface Designer silently no-ops: empty `interface.log`, exit 0, no `.interface.csv`
+
+Distinct from the crash-based failures above (which raise a visible Python
+traceback). This one is quieter and more confusing: `efx_run --flow interface`
+exits **0**, produces an `interface.log` with **no content**, and never
+writes `<circuit>.interface.csv` — so `run_efx_pnr.sh`'s later step fails
+with a generic "did not produce .interface.csv" error that gives no hint
+why.
+
+**Root cause:** `efx_run_pt_unified.py` (in `$EFINITY_HOME/scripts/`) does
+`from device.service import DeviceService`, but the `device` package
+actually lives under `$EFINITY_HOME/pt/bin/device/`, not next to
+`efx_run_pt_unified.py` itself. Normally Efinity's own `bin/setup.sh` would
+put the right paths on `PYTHONPATH`, but this OBBS deliberately does not
+source `setup.sh` (it calls `exit` in non-interactive shells and would kill
+the build script — see the Step -1 comment in `run_efx_pnr.sh`). Without
+that, the import fails with `ModuleNotFoundError: No module named 'device'`
+— and `efx_run.py`'s own code catches this with a bare
+`except ImportError`, writes a one-line warning to its *log file only* (not
+stdout/stderr), and returns as if nothing happened. Confirmed by reproducing
+the import directly:
+
+```bash
+cd $EFINITY_HOME/scripts
+$EFINITY_HOME/bin/python3 -c "import efx_run_pt_unified"
+# Traceback ... ModuleNotFoundError: No module named 'device'
+```
+
+**Fix:** `run_efx_pnr.sh` now exports
+`PYTHONPATH="$EFINITY/pt/bin${PYTHONPATH:+:$PYTHONPATH}"` before Step 0
+(Interface Designer), alongside the other headless env vars
+(`EFINITY_USER_DIR_INI`, `EFXPT_HOME`). No Efinity source patching needed —
+this is a plain missing search path, not a broken/incomplete install.
+
+Regression coverage: `scripts/test_build_guard.sh` Section H statically
+asserts `run_efx_pnr.sh` exports this `PYTHONPATH` and that the export
+appears before the Interface Designer invocation.
+
+---
+
 ### `efx_pgm` fails with `ERROR: Unknown device family ""`
 
 **Efinity 2026.1 does not read family from the project XML or `--device` alone.**  

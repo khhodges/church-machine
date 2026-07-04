@@ -2,6 +2,17 @@
 
 ---
 
+## Ti60 OBBS — Interface Designer silently no-ops on missing `device` package (PYTHONPATH gap)
+
+A real build (2026-07) passed Step -1 (all headless patches SKIP/OK, per the P1-optional fix below) but then Step 0 (Interface Designer) produced an empty `interface.log`, exited 0, and never wrote `.interface.csv` — no crash, no traceback, nothing actionable in the logs.
+
+- **Root cause:** `efx_run_pt_unified.py` (in `$EFINITY_HOME/scripts/`) does `from device.service import DeviceService`, but the `device` package physically lives under `$EFINITY_HOME/pt/bin/device/`, not alongside `efx_run_pt_unified.py`. This OBBS deliberately never sources Efinity's own `bin/setup.sh` (it calls `exit` in non-interactive shells, which would kill the build script), so the `PYTHONPATH` entry `setup.sh` would normally provide is never set. The import then fails with `ModuleNotFoundError: No module named 'device'` — confirmed by reproducing it directly (`python3 -c "import efx_run_pt_unified"` from `$EFINITY_HOME/scripts/`). `efx_run.py`'s own code wraps that import in a bare `except ImportError`, logs a one-line warning to its log file only (not stdout/stderr), and returns as if the step succeeded — a genuinely new failure mode, distinct from the previously-documented "exits non-zero but still writes the CSV" pattern.
+- **Fix:** `run_efx_pnr.sh` now exports `PYTHONPATH="$EFINITY/pt/bin${PYTHONPATH:+:$PYTHONPATH}"` alongside its other headless env vars (`EFINITY_USER_DIR_INI`, `EFXPT_HOME`), before Step 0 runs. No Efinity source patching required — this is a plain missing search path in an otherwise-complete install, not a broken/incomplete one.
+- **Tests:** `scripts/test_build_guard.sh` new Section H statically asserts `run_efx_pnr.sh` exports this `PYTHONPATH` and that the export appears before the Interface Designer invocation. 95/95 assertions passing.
+- **Docs:** `BUILD_SOC_CM.md` new Troubleshooting subsection "Interface Designer silently no-ops" documents the symptom, root cause, and fix.
+
+---
+
 ## Ti60 OBBS — P1 headless patch made best-effort/optional (false hard-failure on a real build)
 
 A real build (2026-07) hard-failed at `apply_efinity_headless_patches.py`'s P1 step with `ANCHOR_MISSING`, blocking the whole PnR run even though P2, P3, and P4-5 all succeeded.
