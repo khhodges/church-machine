@@ -2,6 +2,75 @@
 
 ---
 
+## v2.0 ISA opcode-staleness sweep across `server/lumps/` (37 of 108 lumps carried pre-v2.0 opcodes 10–19)
+
+A reusable audit found that 37 of the 108 binaries in `server/lumps/` still encoded
+Turing-block opcodes in the old `10–19` range from before the v2.0 ISA renumbering
+to `16–25` (see `.agents/memory/v2-format-audit.md` and the PostFlashSelfTest
+incident above, which surfaced the first instance of this class of bug).
+
+- **Audit tool (new, reusable):** `scripts/audit_stale_isa_lumps.js` disassembles
+  every `.lump` in `server/lumps/`, flags any word whose top-5-bit opcode falls in
+  `[10,19]`, and classifies each stale lump as **live** (referenced by a boot slot,
+  manifest entry, or app code) or **orphaned** (no live reference — dead weight).
+  Run it any time a future ISA renumbering is suspected to have left stale binaries
+  behind.
+- **`00000600.lump` (active Boot.Abstr save-state) investigated first:** 15 of 17
+  words were stale. Rather than patch a save-state binary in place, it was deleted
+  outright — `server/boot_image.py`'s loader already falls back safely to a fresh,
+  correct trivial 3-word default when no saved Boot.Abstr lump is present, so
+  deletion is strictly safer than resurrecting a stale save.
+- **24 live-stale lumps fixed:**
+  - 2 recompiled from source via `scripts/update-lump.js`: `13ade9a4` (LedControl),
+    `4ea370af` (NoteGAssembly) — both had CLOOMC++ sources `update-lump.js` could
+    assemble directly.
+  - 22 fixed via a new mechanical remap tool, `scripts/remap_stale_isa_opcodes.js`,
+    which adds +6 to the top-5-bit opcode of every code word (`word[1..cw]`) whose
+    opcode falls in `[10,19]`, leaving c-list/header/all other bits untouched:
+    `SlideRule`, `SlideRuleHS`, `Tunnel` (×2), `Keystone` (×2), `Ethernet`,
+    `Salvation`, `GT-test`, `selftest-v1.1`, `LED` (×2), `Constants`,
+    `EventRouter`, `CapabilityTest`, `NoteGPublishedBug`, `NoteG_v6`,
+    `EnglishLoops`, `IntegerOps`, `BernoulliNumbers`, `WordString`, `StringOps`.
+    Validated safe via disassembly spot-checks (coherent instruction sequences
+    post-remap, including on lumps that were 90%+ stale, e.g. `SlideRule` at
+    2602/2652 words, `selftest-v1.1` at ~77%). `update-lump.js` could not recompile
+    these because it lacks multi-front-end language auto-detection and fails on
+    hand-authored English/Symbolic-Math keyword syntax (`ABSTRACTION`, `PUBLIC`,
+    `LET`, `CREATE`, `ADD`, `SET`) — a pre-existing gap in that tool, out of scope
+    here.
+- **13 orphaned-stale lumps deleted** (`.lump` + sidecar `.json` pairs), all
+  superseded-version artifacts with zero live references: `00000600` (counted
+  above), `0baf5e0e-v1`, `19d3e599-v1..v4`, `4ea370af-v1`, `5a93ce79-v1`,
+  `95a651e7-v1..v4`, `NoteG_v5`.
+- **Re-audit confirms 0 live-stale and 0 orphaned-stale lumps remain** (95 total
+  lumps on disk after cleanup).
+- **Verification:** `python -m pytest tests/lump/test_lump_consistency.py` — 316
+  passed. `scripts/run-all-tests.sh --group boot --group lump --group simulator
+  assembler-tests` — 19/22 suites passed. The 3 failing suites
+  (`lump-binary-tests`, `lump-roundtrip`, `boot-image-matches-sim`) were
+  investigated individually and confirmed **pre-existing and unrelated** to this
+  sweep:
+  - `boot-image-matches-sim`: GT-encoding format mismatches between Python
+    `create_gt()` (old bit layout) and JS `createGT()` (v2.0 layout) — an
+    explicitly out-of-scope, already-known issue (see
+    `.agents/memory/boot-abstr-token-migration.md` Rule 3) — plus several tests
+    that still hardcode the pre-migration fixture name `00000300.lump` instead of
+    the current canonical `00000600.lump` (Boot.Abstr moved from NS slot 3 to
+    slot 6 in an earlier task; those tests were never updated).
+  - `lump-binary-tests` (`LLB-02f/g`, `LLB-RBA-0`): `LLB-02` is a fully synthetic
+    zero-word HALT test with no lump-file dependency (pre-existing simulator
+    HALT-dispatch bug, untouched by this sweep); `LLB-RBA-0` fails on the same
+    stale `00000300.lump` fixture-naming issue described above.
+  - `lump-roundtrip`: fully synthetic (`assembleLump()`-generated fixtures, no
+    disk I/O) — a pre-existing CALL-dispatch bug in `simulator.js`, unrelated to
+    any lump binary touched by this sweep.
+- **No manifest/sidecar structural changes required** — the remap preserves word
+  count, so `cw`/`cc`/`lump_size` were already consistent; the consistency gate
+  (`tests/lump/test_lump_consistency.py`, rules R1–R11) passed without edits to
+  `manifest.json` beyond the entries removed for deleted orphans.
+
+---
+
 ## LUMP viewer shows `???` on every other line of PostFlashSelfTest's Run method (stale duplicate lump + dead hardcoded token)
 
 The Content tab of the PostFlashSelfTest LUMP viewer showed `???` on alternating

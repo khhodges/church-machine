@@ -51,3 +51,21 @@ Simulator `makeVersionSeals()` produces a "word2_seals" format: `gt_seq[31:25] |
 Hardware NS SLOT W1 (WORD2_LAYOUT): `f_flag[31] | g_bit[30] | gt_seq[29:21] | limit_offset[20:0]`.
 These are incompatible. The simulator and hardware cannot round-trip NS entries at binary level.
 This is a pre-existing divergence, not introduced by v2.0.
+
+## Stale-opcode `.lump` binaries are a recurring, sweepable bug class
+
+Any `.lump` compiled before the 10–19 → 16–25 Turing-opcode renumbering still has the
+old values baked into its code words (`???` disassembly or a wrong-but-plausible
+mnemonic, e.g. old `ISUB`=16 now collides with new `DREAD`=16 — silently mislabeled,
+not a crash). A full sweep found 37 of 108 lumps in `server/lumps/` affected.
+
+**Fix pattern:** `scripts/audit_stale_isa_lumps.js` (classify live vs orphaned) +
+`scripts/remap_stale_isa_opcodes.js` (mechanical +6 to any code-word opcode in
+`[10,19]`, word count/c-list/header untouched) is safe even at 90%+ stale-word
+ratios — verify via disassembly spot-check, not by trusting word count alone.
+Prefer recompiling from source (`update-lump.js`) when a `.cloomc` source exists;
+it can't yet auto-detect hand-authored English/Symbolic-Math keyword syntax
+(`ABSTRACTION`, `PUBLIC`, `LET`), so the binary remap is the fallback for those.
+
+**Why re-run this check:** any future ISA opcode renumbering will reintroduce this
+exact bug class against whatever lumps exist on disk at that time.
