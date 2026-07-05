@@ -69,3 +69,34 @@ it can't yet auto-detect hand-authored English/Symbolic-Math keyword syntax
 
 **Why re-run this check:** any future ISA opcode renumbering will reintroduce this
 exact bug class against whatever lumps exist on disk at that time.
+
+## The same staleness bug class also hits hardcoded JS decoder/annotation tables, not just `.lump` binaries
+
+Multiple **independent** hardcoded copies of the Turing-opcode table exist in `simulator/*.js`
+purely for UI decoding/annotation/reference, and none of them import from `assembler.js`'s
+opcode constants — so a renumbering only in the "real" ISA source (assembler.js/simulator.js)
+does not propagate to them:
+
+- `simulator/app-lumps.js` — `_autoComment()` switch, and a separate BRANCH-specific
+  `op === N` check for symbolic-label rendering.
+- `simulator/app-cr-detail.js` — `_decompileWord()` opcode checks, a separate
+  `_computeBranchArrows()` opcode check, and an internal LED/DWRITE-specific
+  `opcode === N` check nested inside the DREAD/DWRITE block.
+- `simulator/app-misc.js` — `_cmDecodeWord()` / `CM_MNEMONICS` table and its internal
+  operand-formatting switch.
+- `simulator/app-run.js` — the `INSTRUCTION_DATA` reference-panel array (actively used
+  for opcode lookup by `app-compile.js`, not just docs) has three places that must all
+  agree per instruction: the `opcode:` field, the `encoding:` bit-pattern string, and the
+  ASCII bit-diagram inside `details:`. Also has instruction-counting statistics
+  (`op === N`) buried in unrelated report-generation code.
+
+**Why:** produces both visible bugs ("unknown opcode" in the LUMP Content tab) and silent
+ones (wrong statistics/counts, wrong symbolic-branch-label resolution, wrong LED-transition
+annotation) that don't throw errors.
+
+**How to apply:** any future opcode/ISA numbering change must grep the whole `simulator/*.js`
+tree for `opcode === `, `op === `, and literal `case N:` numbers in the old range — not just
+the assembler/simulator core and not just `.lump` binaries — before considering the change
+complete. Test fixtures that construct raw `{opcode: N, ...}` objects don't need to be
+numerically correct if the tested function never reads `.opcode`, but leaving them stale is
+confusing.

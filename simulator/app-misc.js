@@ -2507,12 +2507,15 @@ function deployAll() {
 var _currentDevicesTab = 'devices';
 
 // ── Church Machine Instruction Decoder ────────────────────────────────────
-var CM_MNEMONICS = [
-    'LOAD', 'SAVE', 'CALL', 'RETURN', 'CHANGE',
-    'SWITCH', 'TPERM', 'LAMBDA', 'ELOADCALL', 'XLOADLAMBDA',
-    'DREAD', 'DWRITE', 'BFEXT', 'BFINS', 'MCMP',
-    'IADD', 'ISUB', 'BRANCH', 'SHL', 'SHR'
-];
+// ★ v2.0 ISA: opcodes 0-9 (Church-side), gap 10-15 (unassigned),
+// 16-25 (Turing data-register ops). Must stay in sync with the
+// canonical table in assembler.js (this.opcodes).
+var CM_MNEMONICS = {
+    0: 'LOAD', 1: 'SAVE', 2: 'CALL', 3: 'RETURN', 4: 'CHANGE',
+    5: 'SWITCH', 6: 'TPERM', 7: 'LAMBDA', 8: 'ELOADCALL', 9: 'XLOADLAMBDA',
+    16: 'DREAD', 17: 'DWRITE', 18: 'BFEXT', 19: 'BFINS', 20: 'MCMP',
+    21: 'IADD', 22: 'ISUB', 23: 'BRANCH', 24: 'SHL', 25: 'SHR'
+};
 
 var CM_CONDS = [
     'EQ', 'NE', 'CS', 'CC', 'MI', 'PL', 'VS', 'VC',
@@ -2530,7 +2533,7 @@ function _cmDecodeWord(word, wordAddr) {
     var src    = (word >>> 15) & 0x0F;
     var imm15  = word & 0x7FFF;
 
-    if (opcode > 19) {
+    if (CM_MNEMONICS[opcode] === undefined) {
         return { addr: wordAddr, hex: hexStr, mnemonic: '?', cond: 'AL', condSuffix: '', dst: null, src: null, imm: null, text: '? 0x' + hexStr };
     }
 
@@ -2550,12 +2553,12 @@ function _cmDecodeWord(word, wordAddr) {
         case 7:  operands = 'CR'+dst; break;
         case 8:  operands = 'CR'+dst+', CR'+src+', #'+imm15; break;
         case 9:  operands = 'CR'+dst+', CR'+src+', #'+imm15; break;
-        case 10: operands = 'DR'+dst+', CR'+src+', #'+imm15; break;
-        case 11: operands = 'CR'+dst+', #'+imm15+', DR'+src; break;
-        case 12: case 13: case 15: case 16: case 18: case 19:
+        case 16: operands = 'DR'+dst+', CR'+src+', #'+imm15; break;
+        case 17: operands = 'CR'+dst+', #'+imm15+', DR'+src; break;
+        case 18: case 19: case 21: case 22: case 24: case 25:
             operands = 'DR'+dst+', DR'+src+', #'+imm15; break;
-        case 14: operands = 'DR'+dst+', DR'+src; break;
-        case 17: {
+        case 20: operands = 'DR'+dst+', DR'+src; break;
+        case 23: {
             var signedOff = (imm15 & 0x4000) ? (imm15 - 0x8000) : imm15;
             var target    = (wordAddr + signedOff) >>> 0;
             operands = (signedOff >= 0 ? '+' : '') + signedOff + ' (→ 0x' + target.toString(16).toUpperCase() + ')';

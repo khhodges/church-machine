@@ -271,10 +271,10 @@ function assembleAndLoad() {
                 let branches = 0, calls = 0, lambdas = 0, mcmps = 0, total = codeArr.length;
                 for (const w of codeArr) {
                     const op = (w >>> 27) & 0x1F;
-                    if (op === 17) branches++;
+                    if (op === 23) branches++;
                     if (op === 2) calls++;
                     if (op === 7) lambdas++;
-                    if (op === 14) mcmps++;
+                    if (op === 20) mcmps++;
                 }
                 return { branches, calls, lambdas, mcmps, total };
             };
@@ -318,9 +318,9 @@ function assembleAndLoad() {
                 let branches = 0, calls = 0, mcmps = 0, total = codeArr.length;
                 for (const w of codeArr) {
                     const op = (w >>> 27) & 0x1F;
-                    if (op === 17) branches++;
+                    if (op === 23) branches++;
                     if (op === 2) calls++;
-                    if (op === 14) mcmps++;
+                    if (op === 20) mcmps++;
                 }
                 return { branches, calls, mcmps, total };
             };
@@ -12428,11 +12428,11 @@ const INSTRUCTION_DATA = [
         mState: { badge: null, note: 'M-neutral — fused LOAD+TPERM(X)+LAMBDA is in-scope. No capability domain boundary is crossed; no CR M-bit is modified.' },
     },
     {
-        opcode: 10, mnemonic: 'DREAD', domain: 'turing',
+        opcode: 16, mnemonic: 'DREAD', domain: 'turing',
         mState: 'pulse', mStateNote: 'Abstract GT dispatch path only: sets CRs.M=1 to open the M-inspection window (_setMWindow), dispatches to the Abstract Manager, then clears CRs.M=0 (_clearMWindow). Net effect on M is zero — transient only. Normal data GTs: no M interaction.',
         syntax: 'DREAD DRd, CRs, imm',
         brief: 'Read a data word from a GT-protected address into a data register',
-        encoding: 'opcode[5]=01010 | cond[4] | DRd[4] | CRs[4] | offset[15]',
+        encoding: 'opcode[5]=10000 | cond[4] | DRd[4] | CRs[4] | offset[15]',
         fields: [
             { name: 'DRd', desc: 'Destination data register (DR0-DR15)' },
             { name: 'CRs', desc: 'GT pointing to data object (R permission; or CR14 with X permission — code lump exception)' },
@@ -12443,7 +12443,7 @@ const INSTRUCTION_DATA = [
         details:
             '  31    27│26   23│22   19│18   15│14                0\n'
           + '  ┌──────┬──────┬──────┬──────┬───────────────────┐\n'
-          + '  │01010 │ cond │  DRd │  CRs │      offset       │\n'
+          + '  │10000 │ cond │  DRd │  CRs │      offset       │\n'
           + '  └──────┴──────┴──────┴──────┴───────────────────┘\n'
           + '   5-bit   4-bit   4-bit   4-bit       15-bit\n\n'
           + 'DRd    = destination data register for the 32-bit result.\n'
@@ -12460,11 +12460,11 @@ const INSTRUCTION_DATA = [
         mState: { badge: null, note: 'M-neutral — Turing-domain data read. No effect on any CR M-bit.' },
     },
     {
-        opcode: 11, mnemonic: 'DWRITE', domain: 'turing',
+        opcode: 17, mnemonic: 'DWRITE', domain: 'turing',
         mState: 'pulse', mStateNote: 'Abstract GT dispatch path only: sets CRs.M=1 to open the M-inspection window (_setMWindow), dispatches to the Abstract Manager, then clears CRs.M=0 (_clearMWindow). Net effect on M is zero — transient only. Normal data GTs: no M interaction.',
         syntax: 'DWRITE DRd, CRs, imm',
         brief: 'Write a data register value to a GT-protected address',
-        encoding: 'opcode[5]=01011 | cond[4] | DRd[4] | CRs[4] | offset[15]',
+        encoding: 'opcode[5]=10001 | cond[4] | DRd[4] | CRs[4] | offset[15]',
         fields: [
             { name: 'DRd', desc: 'Source data register (value to write)' },
             { name: 'CRs', desc: 'GT pointing to data object (W permission required; CR14 is not faulted at decode, but mLoad still enforces W at execution time)' },
@@ -12475,7 +12475,7 @@ const INSTRUCTION_DATA = [
         details:
             '  31    27│26   23│22   19│18   15│14                0\n'
           + '  ┌──────┬──────┬──────┬──────┬───────────────────┐\n'
-          + '  │01011 │ cond │  DRd │  CRs │      offset       │\n'
+          + '  │10001 │ cond │  DRd │  CRs │      offset       │\n'
           + '  └──────┴──────┴──────┴──────┴───────────────────┘\n'
           + '   5-bit   4-bit   4-bit   4-bit       15-bit\n\n'
           + 'DRd    = source data register (value to write).\n'
@@ -12491,11 +12491,11 @@ const INSTRUCTION_DATA = [
         mState: { badge: null, note: 'M-neutral — Turing-domain data write. No effect on any CR M-bit.' },
     },
     {
-        opcode: 12, mnemonic: 'BFEXT', domain: 'turing',
+        opcode: 18, mnemonic: 'BFEXT', domain: 'turing',
         mState: null, mStateNote: null,
         syntax: 'BFEXT DRd, DRs, pos, width',
         brief: 'Extract a bitfield from a data register',
-        encoding: 'opcode[5]=01100 | cond[4] | DRd[4] | DRs[4] | pos[5]<<5 | width[5]',
+        encoding: 'opcode[5]=10010 | cond[4] | DRd[4] | DRs[4] | pos[5]<<5 | width[5]',
         fields: [
             { name: 'DRd', desc: 'Destination data register (receives extracted bits, zero-extended)' },
             { name: 'DRs', desc: 'Source data register to extract from' },
@@ -12507,7 +12507,7 @@ const INSTRUCTION_DATA = [
         details:
             '  31    27│26   23│22   19│18   15│14  10│9    5│4    0\n'
           + '  ┌──────┬──────┬──────┬──────┬──────┬──────┬──────┐\n'
-          + '  │01100 │ cond │  DRd │  DRs │  ─   │ pos  │ wid  │\n'
+          + '  │10010 │ cond │  DRd │  DRs │  ─   │ pos  │ wid  │\n'
           + '  └──────┴──────┴──────┴──────┴──────┴──────┴──────┘\n'
           + '   5-bit   4-bit   4-bit   4-bit  5-bit  5-bit  5-bit\n\n'
           + 'DRd = destination (extracted bits, right-aligned, zero-extended).\n'
@@ -12524,11 +12524,11 @@ const INSTRUCTION_DATA = [
         mState: { badge: null, note: 'M-neutral — pure data-register operation. No capability or M-state involvement.' },
     },
     {
-        opcode: 13, mnemonic: 'BFINS', domain: 'turing',
+        opcode: 19, mnemonic: 'BFINS', domain: 'turing',
         mState: null, mStateNote: null,
         syntax: 'BFINS DRd, DRs, pos, width',
         brief: 'Insert a bitfield from one data register into another',
-        encoding: 'opcode[5]=01101 | cond[4] | DRd[4] | DRs[4] | pos[5]<<5 | width[5]',
+        encoding: 'opcode[5]=10011 | cond[4] | DRd[4] | DRs[4] | pos[5]<<5 | width[5]',
         fields: [
             { name: 'DRd', desc: 'Destination data register (read-modify-write: receives inserted bits)' },
             { name: 'DRs', desc: 'Source data register (low bits are inserted into DRd)' },
@@ -12540,7 +12540,7 @@ const INSTRUCTION_DATA = [
         details:
             '  31    27│26   23│22   19│18   15│14  10│9    5│4    0\n'
           + '  ┌──────┬──────┬──────┬──────┬──────┬──────┬──────┐\n'
-          + '  │01101 │ cond │  DRd │  DRs │  ─   │ pos  │ wid  │\n'
+          + '  │10011 │ cond │  DRd │  DRs │  ─   │ pos  │ wid  │\n'
           + '  └──────┴──────┴──────┴──────┴──────┴──────┴──────┘\n'
           + '   5-bit   4-bit   4-bit   4-bit  5-bit  5-bit  5-bit\n\n'
           + 'DRd = destination (read-modify-write: all bits outside [pos+width-1:pos] preserved).\n'
@@ -12557,11 +12557,11 @@ const INSTRUCTION_DATA = [
         mState: { badge: null, note: 'M-neutral — pure data-register operation. No capability or M-state involvement.' },
     },
     {
-        opcode: 14, mnemonic: 'MCMP', domain: 'turing',
+        opcode: 20, mnemonic: 'MCMP', domain: 'turing',
         mState: null, mStateNote: null,
         syntax: 'MCMP DRa, DRb',
         brief: 'Compare two data registers and set condition flags',
-        encoding: 'opcode[5]=01110 | cond[4] | DRa[4] | DRb[4] | 0[15]',
+        encoding: 'opcode[5]=10100 | cond[4] | DRa[4] | DRb[4] | 0[15]',
         fields: [
             { name: 'DRa', desc: 'First data register' },
             { name: 'DRb', desc: 'Second data register' },
@@ -12571,7 +12571,7 @@ const INSTRUCTION_DATA = [
         details:
             '  31    27│26   23│22   19│18   15│14                0\n'
           + '  ┌──────┬──────┬──────┬──────┬───────────────────┐\n'
-          + '  │01110 │ cond │  DRa │  DRb │        0          │\n'
+          + '  │10100 │ cond │  DRa │  DRb │        0          │\n'
           + '  └──────┴──────┴──────┴──────┴───────────────────┘\n'
           + '   5-bit   4-bit   4-bit   4-bit       zero\n\n'
           + 'DRa    = first operand (minuend, in dst field).\n'
@@ -12587,11 +12587,11 @@ const INSTRUCTION_DATA = [
         mState: { badge: null, note: 'M-neutral — pure data-register comparison. No capability or M-state involvement.' },
     },
     {
-        opcode: 15, mnemonic: 'IADD', domain: 'turing',
+        opcode: 21, mnemonic: 'IADD', domain: 'turing',
         mState: null, mStateNote: null,
         syntax: 'IADD DRd, DRa, DRb',
         brief: 'Integer addition with flag setting',
-        encoding: 'opcode[5]=01111 | cond[4] | DRd[4] | DRa[4] | DRb[4] in imm[3:0]',
+        encoding: 'opcode[5]=10101 | cond[4] | DRd[4] | DRa[4] | DRb[4] in imm[3:0]',
         fields: [
             { name: 'DRd', desc: 'Destination data register (result)' },
             { name: 'DRa', desc: 'First source register (in src field)' },
@@ -12602,7 +12602,7 @@ const INSTRUCTION_DATA = [
         details:
             '  31    27│26   23│22   19│18   15│14     4│3     0\n'
           + '  ┌──────┬──────┬──────┬──────┬───────────┬──────┐\n'
-          + '  │01111 │ cond │  DRd │  DRa │     0     │ DRb  │\n'
+          + '  │10101 │ cond │  DRd │  DRa │     0     │ DRb  │\n'
           + '  └──────┴──────┴──────┴──────┴───────────┴──────┘\n'
           + '   5-bit   4-bit   4-bit   4-bit   11-bit    4-bit\n\n'
           + 'DRd = destination (result).\n'
@@ -12619,11 +12619,11 @@ const INSTRUCTION_DATA = [
         mState: { badge: null, note: 'M-neutral — pure data-register arithmetic. No capability or M-state involvement.' },
     },
     {
-        opcode: 16, mnemonic: 'ISUB', domain: 'turing',
+        opcode: 22, mnemonic: 'ISUB', domain: 'turing',
         mState: null, mStateNote: null,
         syntax: 'ISUB DRd, DRa, DRb',
         brief: 'Integer subtraction with flag setting',
-        encoding: 'opcode[5]=10000 | cond[4] | DRd[4] | DRa[4] | DRb[4] in imm[3:0]',
+        encoding: 'opcode[5]=10110 | cond[4] | DRd[4] | DRa[4] | DRb[4] in imm[3:0]',
         fields: [
             { name: 'DRd', desc: 'Destination data register (result)' },
             { name: 'DRa', desc: 'First source register (minuend)' },
@@ -12634,7 +12634,7 @@ const INSTRUCTION_DATA = [
         details:
             '  31    27│26   23│22   19│18   15│14     4│3     0\n'
           + '  ┌──────┬──────┬──────┬──────┬───────────┬──────┐\n'
-          + '  │10000 │ cond │  DRd │  DRa │     0     │ DRb  │\n'
+          + '  │10110 │ cond │  DRd │  DRa │     0     │ DRb  │\n'
           + '  └──────┴──────┴──────┴──────┴───────────┴──────┘\n'
           + '   5-bit   4-bit   4-bit   4-bit   11-bit    4-bit\n\n'
           + 'DRd = destination (result).\n'
@@ -12651,11 +12651,11 @@ const INSTRUCTION_DATA = [
         mState: { badge: null, note: 'M-neutral — pure data-register arithmetic. No capability or M-state involvement.' },
     },
     {
-        opcode: 17, mnemonic: 'BRANCH', domain: 'turing',
+        opcode: 23, mnemonic: 'BRANCH', domain: 'turing',
         mState: null, mStateNote: null,
         syntax: 'BRANCH[cond] offset',
         brief: 'Conditional branch with signed PC-relative offset \u2014 use for error catch after a conditional instruction',
-        encoding: 'opcode[5]=10001 | cond[4] | 0[4] | 0[4] | signed_offset[15]',
+        encoding: 'opcode[5]=10111 | cond[4] | 0[4] | 0[4] | signed_offset[15]',
         fields: [
             { name: 'offset', desc: 'Signed 15-bit PC-relative offset (-16384 to +16383)' },
         ],
@@ -12664,7 +12664,7 @@ const INSTRUCTION_DATA = [
         details:
             '  31    27│26   23│22   19│18   15│14                0\n'
           + '  ┌──────┬──────┬──────┬──────┬───────────────────┐\n'
-          + '  │10001 │ cond │  ─   │  ─   │  signed offset    │\n'
+          + '  │10111 │ cond │  ─   │  ─   │  signed offset    │\n'
           + '  └──────┴──────┴──────┴──────┴───────────────────┘\n'
           + '   5-bit   4-bit  zero   zero        15-bit\n\n'
           + 'cond          = condition code (the branch condition)\n'
@@ -12679,11 +12679,11 @@ const INSTRUCTION_DATA = [
         mState: { badge: null, note: 'M-neutral — conditional branch reads flags only. No capability or M-state involvement.' },
     },
     {
-        opcode: 18, mnemonic: 'SHL', domain: 'turing',
+        opcode: 24, mnemonic: 'SHL', domain: 'turing',
         mState: null, mStateNote: null,
         syntax: 'SHL DRd, DRs, shamt',
         brief: 'Logical shift left with flag setting',
-        encoding: 'opcode[5]=10010 | cond[4] | DRd[4] | DRs[4] | shamt[5] in imm[4:0]',
+        encoding: 'opcode[5]=11000 | cond[4] | DRd[4] | DRs[4] | shamt[5] in imm[4:0]',
         fields: [
             { name: 'DRd', desc: 'Destination data register (result)' },
             { name: 'DRs', desc: 'Source data register (value to shift)' },
@@ -12694,7 +12694,7 @@ const INSTRUCTION_DATA = [
         details:
             '  31    27│26   23│22   19│18   15│14     5│4     0\n'
           + '  ┌──────┬──────┬──────┬──────┬───────────┬──────┐\n'
-          + '  │10010 │ cond │  DRd │  DRs │     0     │shamt │\n'
+          + '  │11000 │ cond │  DRd │  DRs │     0     │shamt │\n'
           + '  └──────┴──────┴──────┴──────┴───────────┴──────┘\n'
           + '   5-bit   4-bit   4-bit   4-bit   10-bit    5-bit\n\n'
           + 'DRd   = destination (shifted result).\n'
@@ -12711,11 +12711,11 @@ const INSTRUCTION_DATA = [
         mState: { badge: null, note: 'M-neutral — pure data-register shift. No capability or M-state involvement.' },
     },
     {
-        opcode: 19, mnemonic: 'SHR', domain: 'turing',
+        opcode: 25, mnemonic: 'SHR', domain: 'turing',
         mState: null, mStateNote: null,
         syntax: 'SHR DRd, DRs, shamt [, ASR]',
         brief: 'Logical or arithmetic shift right with flag setting',
-        encoding: 'opcode[5]=10011 | cond[4] | DRd[4] | DRs[4] | arith[1]<<5 | shamt[5]',
+        encoding: 'opcode[5]=11001 | cond[4] | DRd[4] | DRs[4] | arith[1]<<5 | shamt[5]',
         fields: [
             { name: 'DRd', desc: 'Destination data register (result)' },
             { name: 'DRs', desc: 'Source data register (value to shift)' },
@@ -12727,7 +12727,7 @@ const INSTRUCTION_DATA = [
         details:
             '  31    27│26   23│22   19│18   15│14   6│5│4     0\n'
           + '  ┌──────┬──────┬──────┬──────┬──────────┬─┬──────┐\n'
-          + '  │10011 │ cond │  DRd │  DRs │    0     │A│shamt │\n'
+          + '  │11001 │ cond │  DRd │  DRs │    0     │A│shamt │\n'
           + '  └──────┴──────┴──────┴──────┴──────────┴─┴──────┘\n'
           + '   5-bit   4-bit   4-bit   4-bit   9-bit  1   5-bit\n\n'
           + 'DRd   = destination (shifted result).\n'

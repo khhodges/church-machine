@@ -66,7 +66,7 @@ console.log('\n--- T_PNM1: DWRITE to 0xFFFFFF38 registers slot via _petNamedSlot
     // DR2 = 0x47 (71 decimal) → masked: 71 & 0x3F = 7
     sim.dr[2] = 0x47;
 
-    const d = { opcode: 11, crDst: 2, crSrc: 1, imm: 0, cond: 0 };
+    const d = { opcode: 17, crDst: 2, crSrc: 1, imm: 0, cond: 0 };
     const result = sim._execDwrite(d);
 
     check('T_PNM1a: _execDwrite returns non-null result', result !== null);

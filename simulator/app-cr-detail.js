@@ -1904,7 +1904,7 @@ function _computeBranchArrows(words) {
         const w = words[i] >>> 0;
         if (w === 0) continue;
         const opcode = (w >>> 27) & 0x1F;
-        if (opcode === 17) {
+        if (opcode === 23) {
             const imm = w & 0x7FFF;
             const soff = (imm & 0x4000) ? (imm | 0xFFFF8000) : imm;
             const tgtRow = i + soff;
@@ -2187,7 +2187,7 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets) {
                     const prevOp = (prevW >>> 27) & 0x1F;
                     const prevDst = (prevW >>> 19) & 0xF;
                     const prevImm = prevW & 0x7FFF;
-                    if (prevOp === 15 && prevDst === 3 && (prevImm & 0x4000)) {
+                    if (prevOp === 21 && prevDst === 3 && (prevImm & 0x4000)) {
                         dr3Val = prevImm & 0x3FFF;
                     }
                     if (dr3Val === null) {
@@ -2195,7 +2195,7 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets) {
                         const p2Op = (prev2W >>> 27) & 0x1F;
                         const p2Dst = (prev2W >>> 19) & 0xF;
                         const p2Imm = prev2W & 0x7FFF;
-                        if (p2Op === 15 && p2Dst === 3 && (p2Imm & 0x4000)) {
+                        if (p2Op === 21 && p2Dst === 3 && (p2Imm & 0x4000)) {
                             dr3Val = p2Imm & 0x3FFF;
                         }
                     }
@@ -2254,7 +2254,7 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets) {
                     let eDr3 = null;
                     if (sim && sim.memory && addr > 0) {
                         const ePrev = sim.memory[addr - 1] >>> 0;
-                        if (((ePrev >>> 27) & 0x1F) === 15 && ((ePrev >>> 19) & 0xF) === 3 && (ePrev & 0x4000)) {
+                        if (((ePrev >>> 27) & 0x1F) === 21 && ((ePrev >>> 19) & 0xF) === 3 && (ePrev & 0x4000)) {
                             eDr3 = ePrev & 0x3FFF;
                         }
                     }
@@ -2276,9 +2276,9 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets) {
         return { desc: _escDecomp(`xloadlambda${cc} ${dTag} \u2190 ${sTag}[${imm}]${ccDesc}`), compiler: false };
     }
 
-    if (opcode === 10 || opcode === 11) {
+    if (opcode === 16 || opcode === 17) {
         const sTag = _crTag(crSrc, crPets);
-        const verb = opcode === 10 ? 'read' : 'write';
+        const verb = opcode === 16 ? 'read' : 'write';
         const pet = crPets && crPets[crSrc];
         const rn = _regName(pet, imm);
         const offStr = rn ? `.${rn}` : `[${imm}]`;
@@ -2287,7 +2287,7 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets) {
         if (drV !== null) {
             const nsCheckIdx = sim.cr && sim.cr[crSrc] ? sim.parseGT(sim.cr[crSrc].word0).index : -1;
             if (nsCheckIdx === 12) {
-                const ledNow = (opcode === 11 && sim.ledBits !== undefined && sim.ledMode === 'program') ? (sim.ledBits >> imm) & 1 : null;
+                const ledNow = (opcode === 17 && sim.ledBits !== undefined && sim.ledMode === 'program') ? (sim.ledBits >> imm) & 1 : null;
                 if (ledNow !== null) {
                     const willBe = drV & 1 ? 'ON' : 'OFF';
                     const was = ledNow ? 'ON' : 'OFF';
@@ -2309,7 +2309,7 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets) {
         return { desc: _escDecomp(`${verb}${cc} ${_drTag(crDst)}, ${sTag}${offStr}${valStr}${ccDesc}`), compiler: false };
     }
 
-    if (opcode === 12) {
+    if (opcode === 18) {
         const pos = (imm >>> 5) & 0x1F;
         const width = imm & 0x1F;
         const srcV = sim && sim.dr ? (sim.dr[crSrc] >>> 0) : null;
@@ -2317,7 +2317,7 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets) {
         return { desc: _escDecomp(`bfext${cc} ${_drTag(crDst)} \u2190 ${_drTag(crSrc)}[${pos}:${pos+width-1}]${valStr}${ccDesc}`), compiler: false };
     }
 
-    if (opcode === 13) {
+    if (opcode === 19) {
         const pos = (imm >>> 5) & 0x1F;
         const width = imm & 0x1F;
         const srcV = sim && sim.dr ? (sim.dr[crSrc] >>> 0) : null;
@@ -2325,39 +2325,39 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets) {
         return { desc: _escDecomp(`bfins${cc} ${_drTag(crDst)}[${pos}:${pos+width-1}] \u2190 ${_drTag(crSrc)}${valStr}${ccDesc}`), compiler: false };
     }
 
-    if (opcode === 14) {
+    if (opcode === 20) {
         const dV = sim && sim.dr ? (sim.dr[crDst] >>> 0) : null;
         const sV = sim && sim.dr ? (sim.dr[crSrc] >>> 0) : null;
         const vals = (dV !== null && sV !== null) ? ` (${_fmtVal(dV)} vs ${_fmtVal(sV)})` : '';
         return { desc: _escDecomp(`mcmp${cc} ${_drTag(crDst)}, ${_drTag(crSrc)}${vals}${ccDesc}`), compiler: false };
     }
 
-    if (opcode === 15 || opcode === 16) {
-        const op = opcode === 15 ? '+' : '\u2212';
+    if (opcode === 21 || opcode === 22) {
+        const op = opcode === 21 ? '+' : '\u2212';
         const isImm = (imm & 0x4000) !== 0;
         const srcV = sim && sim.dr ? (sim.dr[crSrc] >>> 0) : null;
         if (isImm) {
             const immVal = imm & 0x3FFF;
-            const res = opcode === 15 ? ((srcV + immVal) >>> 0) : ((srcV - immVal) >>> 0);
+            const res = opcode === 21 ? ((srcV + immVal) >>> 0) : ((srcV - immVal) >>> 0);
             const valStr = srcV !== null ? ` (${_fmtVal(srcV)}${op}${immVal}=${_fmtVal(res)})` : '';
             return { desc: _escDecomp(`${_drTag(crDst)}= ${_drTag(crSrc)} ${op} #${immVal}${valStr}${ccDesc}`), compiler: false };
         } else {
             const drOp = imm & 0xF;
             const opV = sim && sim.dr ? (sim.dr[drOp] >>> 0) : null;
-            const res = opcode === 15 ? ((srcV + opV) >>> 0) : ((srcV - opV) >>> 0);
+            const res = opcode === 21 ? ((srcV + opV) >>> 0) : ((srcV - opV) >>> 0);
             const valStr = (srcV !== null && opV !== null) ? ` (${_fmtVal(srcV)}${op}${_fmtVal(opV)}=${_fmtVal(res)})` : '';
             return { desc: _escDecomp(`${_drTag(crDst)}= ${_drTag(crSrc)} ${op} ${_drTag(drOp)}${valStr}${ccDesc}`), compiler: false };
         }
     }
 
-    if (opcode === 17) {
+    if (opcode === 23) {
         const soff = (imm & 0x4000) ? (imm | 0xFFFF8000) : imm;
         const condLabel = cc || 'AL';
         const condExplain = cond === 14 ? ' [always]' : ` [${_condDescs[cond]}]`;
         return { desc: _escDecomp(`branch${cc} ${soff > 0 ? '+' : ''}${soff}${condExplain}`), compiler: false };
     }
 
-    if (opcode === 18) {
+    if (opcode === 24) {
         const shamt = imm & 0x1F;
         const srcV = sim && sim.dr ? (sim.dr[crSrc] >>> 0) : null;
         const res = (srcV << shamt) >>> 0;
@@ -2365,7 +2365,7 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets) {
         return { desc: _escDecomp(`${_drTag(crDst)}= ${_drTag(crSrc)} \u00AB ${shamt}${valStr}${ccDesc}`), compiler: false };
     }
 
-    if (opcode === 19) {
+    if (opcode === 25) {
         const arith = (imm >>> 5) & 1;
         const shamt = imm & 0x1F;
         const srcV = sim && sim.dr ? (sim.dr[crSrc] >>> 0) : null;

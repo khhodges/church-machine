@@ -2769,51 +2769,51 @@ function _renderLumpCodeContent(bodyEl, lump, words, token) {
                 }
                 return `${condStr}fused load + lambda ${crName(crSrc)}[${imm}] → CR${crDst}`;
             }
-            case 10: {  // DREAD DRd, CRs[imm]
+            case 16: {  // DREAD DRd, CRs[imm]
                 if (crAlias[crSrc] !== undefined) {
                     const nm = clistSlotName[crAlias[crSrc]];
                     if (nm) return `${condStr}DR${crDst} ← "${nm}"`;
                 }
                 return `${condStr}DR${crDst} ← data[${crName(crSrc)}+${imm}]`;
             }
-            case 11: {  // DWRITE DRd, CRs[imm]
+            case 17: {  // DWRITE DRd, CRs[imm]
                 if (crAlias[crSrc] !== undefined) {
                     const nm = clistSlotName[crAlias[crSrc]];
                     if (nm) return `${condStr}"${nm}" ← DR${crDst}`;
                 }
                 return `${condStr}data[${crName(crSrc)}+${imm}] ← DR${crDst}`;
             }
-            case 12: {  // BFEXT DRd, DRs, pos, w
+            case 18: {  // BFEXT DRd, DRs, pos, w
                 const pos   = (imm >>> 5) & 0x1F;
                 const width = imm & 0x1F;
                 return `${condStr}DR${crDst} = bits[${pos}:${pos+width-1}] of DR${crSrc}`;
             }
-            case 13: {  // BFINS DRd, DRs, pos, w
+            case 19: {  // BFINS DRd, DRs, pos, w
                 const pos   = (imm >>> 5) & 0x1F;
                 const width = imm & 0x1F;
                 return `${condStr}insert ${width}b from DR${crSrc} at pos ${pos} into DR${crDst}`;
             }
-            case 14: {  // MCMP DRd, DRs
+            case 20: {  // MCMP DRd, DRs
                 return `${condStr}compare DR${crDst} vs DR${crSrc} → flags`;
             }
-            case 15: {  // IADD DRd, DRs, DRm | #imm
+            case 21: {  // IADD DRd, DRs, DRm | #imm
                 const isImm = (imm & 0x4000) !== 0;
                 const rhs   = isImm ? `#${imm & 0x3FFF}` : `DR${imm & 0xF}`;
                 return `${condStr}DR${crDst} = DR${crSrc} + ${rhs}`;
             }
-            case 16: {  // ISUB DRd, DRs, DRm | #imm
+            case 22: {  // ISUB DRd, DRs, DRm | #imm
                 const isImm = (imm & 0x4000) !== 0;
                 const rhs   = isImm ? `#${imm & 0x3FFF}` : `DR${imm & 0xF}`;
                 return `${condStr}DR${crDst} = DR${crSrc} − ${rhs}`;
             }
-            case 17: {  // BRANCH soff
+            case 23: {  // BRANCH soff
                 const soff = (imm & 0x4000) ? (imm | 0xFFFF8000) : imm;
                 return `${condStr}branch → PC${soff >= 0 ? '+' : ''}${soff}`;
             }
-            case 18: {  // SHL DRd, DRs, shamt
+            case 24: {  // SHL DRd, DRs, shamt
                 return `${condStr}DR${crDst} = DR${crSrc} << ${imm & 0x1F}`;
             }
-            case 19: {  // SHR DRd, DRs, shamt [ASR]
+            case 25: {  // SHR DRd, DRs, shamt [ASR]
                 const arith = (imm >>> 5) & 1;
                 const shamt = imm & 0x1F;
                 return `${condStr}DR${crDst} = DR${crSrc} >> ${shamt} (${arith ? 'arithmetic' : 'logical'})`;
@@ -3021,7 +3021,7 @@ function _renderLumpCodeContent(bodyEl, lump, words, token) {
             let disHtml = null;
 
             // BRANCH: replace raw PC-offset text with symbolic label (L0, L1, …)
-            if (op === 17) {
+            if (op === 23) {
                 const _bsoff   = (imm & 0x4000) ? (imm | 0xFFFF8000) : imm;
                 const _btgt    = _lumpCi + _bsoff;
                 const _blabel  = _lumpBrLabelMap.get(_btgt);
