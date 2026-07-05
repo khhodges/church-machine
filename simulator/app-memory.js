@@ -1659,7 +1659,7 @@ function updateInfoDisplay() {
             <span class="info-label">Post-Flash Selftest</span>
             <span class="info-value">
                 <button id="dashSelftestBtn" class="btn btn-sm dash-selftest-btn" onclick="runSelftestLump()" title="Load PostFlashSelftest LUMP and run all 81 hardware correctness tests \u2014 DR0=0 on pass">Run Selftest</button>
-                <a href="#" onclick="event.preventDefault();switchView('lumps');setTimeout(()=>showLumpDetail('82f5ef56'),200);" style="color:#c89b3c;text-decoration:none;font-size:0.78rem;margin-left:0.5rem;">view LUMP</a>
+                <a href="#" onclick="event.preventDefault();switchView('lumps');setTimeout(()=>showLumpDetail('2570eade'),200);" style="color:#c89b3c;text-decoration:none;font-size:0.78rem;margin-left:0.5rem;">view LUMP</a>
             </span>
         </div>
         ${(typeof _lastSelftestResult !== 'undefined' && _lastSelftestResult !== null)

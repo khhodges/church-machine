@@ -1504,32 +1504,6 @@
         "lump_version": 0
     },
     {
-        "token": "5e1f0081",
-        "abstraction": "PostFlashSelfTest",
-        "ns_slot": null,
-        "ns_slot_policy": "dynamic",
-        "lump_size": 1024,
-        "cw": 512,
-        "dw": 0,
-        "cc": 8,
-        "methods": [
-            {
-                "name": "Run",
-                "offset": 0,
-                "length": 512,
-                "description": "Execute all 81 post-flash self-tests. Returns DR0=0 when all tests pass; DR0=N (1..81) identifies the first failing test.",
-                "inputs": [],
-                "outputs": [
-                    "DR0: 0 = all 81 tests passed; N = index of first failing test (1-81)"
-                ]
-            }
-        ],
-        "grants": [
-            "E"
-        ],
-        "lump_version": 0
-    },
-    {
         "token": "cb8739cf",
         "abstraction": "GT Encoding v1.1 Hardware Self-Test",
         "ns_slot": null,

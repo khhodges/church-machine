@@ -4529,7 +4529,7 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot) {
 }
 
 // ── Run Selftest shortcut ─────────────────────────────────────────────────────
-// Loads the PostFlashSelftest LUMP (token 82f5ef56) into the simulator, runs
+// Loads the PostFlashSelftest LUMP (token 2570eade) into the simulator, runs
 // it to completion, and reports DR0 (0 = all 81 tests passed).
 
 const _SELFTEST_SECTIONS = [
@@ -4688,7 +4688,7 @@ function _buildSelftestPanel(dr0, passed) {
 }
 
 async function runSelftestLump() {
-    const SELFTEST_TOKEN = '82f5ef56';
+    const SELFTEST_TOKEN = '2570eade';
     const SELFTEST_NAME  = 'PostFlashSelftest';
     const MAX_STEPS = 500000;
 

@@ -2,6 +2,46 @@
 
 ---
 
+## LUMP viewer shows `???` on every other line of PostFlashSelfTest's Run method (stale duplicate lump + dead hardcoded token)
+
+The Content tab of the PostFlashSelfTest LUMP viewer showed `???` on alternating
+lines of the `Run` method disassembly (e.g. `??? 0x7f08c00b  DR1 = DR1 + #11`),
+while the surrounding lines were labeled `DREAD` even though their side
+annotation read like a subtract (`DR0 = DR0 - DR0`).
+
+- **Root cause:** the user was viewing an **orphaned, stale lump** — token
+  `5e1f0081`, abstraction name `PostFlashSelfTest` (capital T) — assembled
+  before the v2.0 ISA renumbered the Turing block from opcodes 10–19 to
+  16–25 (see `.agents/memory/v2-format-audit.md`). Its raw bytecode still
+  carries the *old* opcode values: old `IADD`=15 now falls in the new
+  unassigned 10–15 gap → `???`; old `ISUB`=16 collides with the new
+  opcode-16 mnemonic `DREAD` → silently mislabeled (correct operand math,
+  wrong instruction name). `5e1f0081` was never touched by
+  `scripts/build_selftest_lump.js` / `scripts/check_selftest_lump_stale.js`
+  because those scripts match on the *current* abstraction name
+  `PostFlashSelftest` (lowercase t) — a one-character casing mismatch let
+  the old artifact sit undetected in `server/lumps/` and
+  `server/lumps/manifest.json` since the lump described earlier in this file
+  under "PostFlashSelfTest lump (token `5e1f0081`)".
+- **Second, more severe bug found during investigation:** the Dashboard's
+  "Run Selftest" button (`runSelftestLump()` in `simulator/app-lumps.js`)
+  and its "view LUMP" link (`simulator/app-memory.js`) were hardcoded to a
+  *third*, no-longer-existent token, `82f5ef56` — `server/lumps/82f5ef56.lump`
+  does not exist on disk at all, so the button 404'd. The canonical, current
+  lump (verified byte-for-byte up to date against
+  `simulator/examples/post_flash_selftest.cloomc` via
+  `node scripts/check_selftest_lump_stale.js`) is token `2570eade`.
+- **Fix:** deleted the orphaned `server/lumps/5e1f0081.lump` /
+  `5e1f0081.json` and its `manifest.json` entry; repointed the three
+  `82f5ef56` references (`app-lumps.js` ×2, `app-memory.js` ×1) to `2570eade`.
+- **Verification:** disassembled all 1024 words of `2570eade.lump` with the
+  current `simulator/assembler.js` — zero `???` results.
+  `tests/lump/test_lump_consistency.py` (322 incl. new checks),
+  `tests/simulator/test_selftest_lump_runs.py`, and
+  `node scripts/check_selftest_lump_stale.js` all pass.
+
+---
+
 ## Ti60 OBBS — Interface Designer reports `ERROR, unusupported device Ti60F225` (wrong `EFXPT_HOME`)
 
 After the PYTHONPATH fix below, Interface Designer actually ran instead of silently no-op'ing — but then failed immediately with `ERROR, unusupported device Ti60F225 in Interface Designer` (the misspelling is Efinity's own), for a device name used consistently everywhere else in the repo (project XML, `peri.xml`'s `device_def="Ti60F225"`, and every other build script — including MAP synthesis, which succeeded).
