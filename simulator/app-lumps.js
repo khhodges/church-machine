@@ -2947,7 +2947,7 @@ function _renderLumpCodeContent(bodyEl, lump, words, token) {
                 const _stubBadge = _inStubMethod
                     ? `<span class="lump-meth-stub-badge" title="Compiler error \u2014 method has no code body (bare RETURN stub)">&#x26A0; Empty stub</span>`
                     : '';
-                html += `<div class="lump-method-card${_inStubMethod ? ' lump-method-card-stub' : ''}" id="${cardId}">` +
+                html += `<div class="lump-method-card${_inStubMethod ? ' lump-method-card-stub' : ''}" id="${cardId}" data-method-name="${e(mb[i])}">` +
                         `<div class="lump-method-card-header">` +
                         `<span class="lump-method-card-name" onclick="(function(el){var card=el.closest('.lump-method-card');var c=card.getAttribute('data-collapsed')==='1';card.setAttribute('data-collapsed',c?'0':'1');})(this)">\u25c6 ${e(mb[i])}${auto}</span>` +
                         _stubBadge +
@@ -3947,10 +3947,10 @@ async function _absOpenInEditorByName(name, methodName) {
 
 async function _goToLumpByAbstractionName(name, methodName) {
     if (!name) return;
-    // Note: `methodName` is accepted for symmetry with the Abstraction/Editor
-    // jump links, but the LUMP Browser has no per-method drill-down view yet —
-    // it always lands on the LUMP as a whole, which is the graceful fallback
-    // for destinations without a specific-method context.
+    // `methodName`, when supplied, drills into that method's card in the
+    // Content tab (byte-range view) instead of landing on the LUMP as a
+    // whole — completing the three-way Editor \u2194 Abstraction \u2194 LUMP
+    // Browser method-level jump symmetry. See _scrollToLumpMethod().
     // Warm cache: check immediately without a network round-trip.
     if (_lumpsCache.length > 0) {
         const existing = _lumpsCache.find(l => l.abstraction === name);
@@ -3959,6 +3959,7 @@ async function _goToLumpByAbstractionName(name, methodName) {
             return;
         }
         _pendingLumpAbstractionName = name;
+        _pendingLumpMethodName = methodName || null;
         switchView('lumps');
         return;
     }
@@ -3975,10 +3976,43 @@ async function _goToLumpByAbstractionName(name, methodName) {
             return;
         }
         _pendingLumpAbstractionName = name;
+        _pendingLumpMethodName = methodName || null;
         switchView('lumps');
     } catch (e) {
         // Network error: do nothing rather than navigating blindly.
     }
+}
+
+// ── Method-level drill-down: LUMP Browser Content tab ──────────────────────
+// Finds the method's card (rendered by _renderLumpCodeContent with a
+// data-method-name attribute), expands it if collapsed, scrolls it into
+// view, and flashes a highlight. The Content tab loads its words via an
+// async fetch (_loadLumpContent), so the card may not exist yet on the first
+// call — poll briefly (up to ~4s) before giving up with a toast.
+function _scrollToLumpMethod(tk, methodName, _attempt) {
+    if (!tk || !methodName) return;
+    const attempt = _attempt || 0;
+    const panel = document.getElementById(`lumpTabContent_${tk}`);
+    const card = panel && typeof panel.querySelector === 'function' && typeof CSS !== 'undefined' && CSS.escape
+        ? panel.querySelector(`.lump-method-card[data-method-name="${CSS.escape(methodName)}"]`)
+        : (panel ? Array.prototype.find.call(panel.querySelectorAll('.lump-method-card'), c => c.getAttribute('data-method-name') === methodName) : null);
+    if (!card) {
+        if (attempt < 40) {
+            setTimeout(() => _scrollToLumpMethod(tk, methodName, attempt + 1), 100);
+        } else if (typeof _showFpgaToast === 'function') {
+            _showFpgaToast('Method not found', '\u201c' + methodName + '\u201d has no disassembled code in this LUMP.', 'warn', 2000);
+        }
+        return;
+    }
+    card.setAttribute('data-collapsed', '0');
+    if (typeof card.scrollIntoView === 'function') {
+        try { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+    }
+    card.classList.remove('lump-method-card-highlight');
+    // Force reflow so re-triggering the animation on repeat jumps works.
+    void card.offsetWidth;
+    card.classList.add('lump-method-card-highlight');
+    setTimeout(() => card.classList.remove('lump-method-card-highlight'), 2000);
 }
 
 // ── Open a saved lump in the Create (editor) page ──────────────────────────

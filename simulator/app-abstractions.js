@@ -525,6 +525,7 @@ function _applyBootEntryToSim() {
 let _lumpsCache = [];
 let _selectedLumpToken = null;
 let _pendingLumpAbstractionName = null;
+let _pendingLumpMethodName = null;
 let _nsdgTooltipData = {};
 let _lumpEditDirty = false;
 let _lumpSortOrder = localStorage.getItem('lumpSortOrder') || 'name';
@@ -568,6 +569,7 @@ async function renderLumps() {
                           || _allMatched[0];
             if (_matched) _selectedLumpToken = _matched.token;
             _pendingLumpAbstractionName = null;
+            if (_pendingLumpMethodName && _selectedLumpToken) window._pendingLumpTab = 'content';
         }
 
         // Auto-select the live lump (CR14 NS slot) every time the panel renders.
@@ -649,6 +651,14 @@ async function renderLumps() {
             const _ptk = (_selectedLumpToken || '').replace(/[^a-z0-9]/gi, '');
             if (typeof _switchLumpTab === 'function') _switchLumpTab(_ptk, window._pendingLumpTab);
             window._pendingLumpTab = null;
+        }
+        // Method-level drill-down: once the Content tab has been selected above,
+        // scroll to and highlight the specific method's card.
+        if (_pendingLumpMethodName) {
+            const _pendingMethod = _pendingLumpMethodName;
+            _pendingLumpMethodName = null;
+            const _mtk = (_selectedLumpToken || '').replace(/[^a-z0-9]/gi, '');
+            if (typeof _scrollToLumpMethod === 'function') _scrollToLumpMethod(_mtk, _pendingMethod);
         }
         updateLiveLumpBanner();
 

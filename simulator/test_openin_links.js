@@ -67,11 +67,12 @@ const TOAST_SRC        = extractFunctionByName('app-run.js', '_dismissFpgaToast'
                           extractFunctionByName('app-run.js', '_showFpgaToast');
 const ABS_TO_EDITOR_SRC = extractFunctionByName('app-lumps.js', '_absOpenInEditorByName');
 const ABS_TO_LUMP_SRC   = extractFunctionByName('app-lumps.js', '_goToLumpByAbstractionName');
+const SCROLL_METHOD_SRC = extractFunctionByName('app-lumps.js', '_scrollToLumpMethod');
 const REFRESH_LINKS_SRC = extractFunctionByName('app-shell.js', '_refreshEditorJumpLinks');
 const EDITOR_TO_LUMP_SRC = extractFunctionByName('app-shell.js', '_editorJumpToLump');
 const EDITOR_TO_ABS_SRC  = extractFunctionByName('app-shell.js', '_editorJumpToAbstraction');
 
-const ALL_SRC = [TOAST_SRC, ABS_TO_EDITOR_SRC, ABS_TO_LUMP_SRC,
+const ALL_SRC = [TOAST_SRC, ABS_TO_EDITOR_SRC, ABS_TO_LUMP_SRC, SCROLL_METHOD_SRC,
                  REFRESH_LINKS_SRC, EDITOR_TO_LUMP_SRC, EDITOR_TO_ABS_SRC].join('\n\n');
 
 // ── VM context factory ───────────────────────────────────────────────────────
@@ -111,6 +112,7 @@ function makeCtx({ lumpsCache = [], abstractions = [], fetchImpl = null } = {}) 
         window: { _pseudoEditContext: null, _editorLastSavedToken: null, _editorJumpTargets: null },
         _lumpsCache: lumpsCache,
         _pendingLumpAbstractionName: null,
+        _pendingLumpMethodName: null,
         abstractionRegistry: registry,
         switchView: (v) => calls.switchView.push(v),
         showLumpDetail: (t) => calls.showLumpDetail.push(t),
@@ -282,6 +284,48 @@ const SLIDE_RULE_ABS  = { index: 4, name: 'SlideRule' };
     } catch (e) { threw = true; }
     assert('T8 empty name: no exception thrown', !threw);
     assert('T8 empty name: no navigation triggered', calls.switchView.length === 0 && calls.openLumpInEditor.length === 0);
+})();
+
+// ── T9: Abstraction -> LUMP with a method name drills into the Content tab ──
+// _goToLumpByAbstractionName(name, methodName) should still navigate to the
+// LUMP Browser (same as T2) but must also stash the method name so the
+// caller (renderLumps in app-abstractions.js) can request the Content tab
+// and scroll to that method's card once it renders.
+(async function t9() {
+    const { ctx, calls } = makeCtx({ lumpsCache: [SLIDE_RULE_LUMP] });
+    await vm.runInContext('_goToLumpByAbstractionName("SlideRule", "Compute")', ctx);
+    assert('T9 Abstraction->LUMP (method): switchView("lumps") called',
+        calls.switchView[0] === 'lumps', calls.switchView);
+    assert('T9 Abstraction->LUMP (method): _pendingLumpMethodName set',
+        vm.runInContext('_pendingLumpMethodName', ctx) === 'Compute');
+})();
+
+// ── T10: _scrollToLumpMethod finds, expands, and highlights a method card ───
+(async function t10() {
+    const { ctx, document } = makeCtx({});
+    const panel = document.createElement('div');
+    panel.id = 'lumpTabContent_0700';
+    panel.innerHTML =
+        '<div class="lump-method-card" data-collapsed="1" data-method-name="Compute">card body</div>';
+    document.body.appendChild(panel);
+    vm.runInContext('_scrollToLumpMethod("0700", "Compute")', ctx);
+    const card = panel.querySelector('.lump-method-card');
+    assert('T10 method card expanded', card.getAttribute('data-collapsed') === '0');
+    assert('T10 method card highlighted', card.classList.contains('lump-method-card-highlight'));
+})();
+
+// ── T11 (DRIFT): _scrollToLumpMethod on a missing method name does not crash
+(async function t11() {
+    const { ctx, document } = makeCtx({});
+    const panel = document.createElement('div');
+    panel.id = 'lumpTabContent_0700';
+    panel.innerHTML = '<div class="lump-method-card" data-collapsed="1" data-method-name="Other">x</div>';
+    document.body.appendChild(panel);
+    let threw = false;
+    try {
+        vm.runInContext('_scrollToLumpMethod("0700", "Missing", 40)', ctx);
+    } catch (e) { threw = true; }
+    assert('T11 DRIFT: missing method name does not throw', !threw);
 })();
 
 // ── Summary ───────────────────────────────────────────────────────────────────
