@@ -1550,29 +1550,6 @@
     ]
   },
   {
-    "token": "8e37e416",
-    "abstraction": "Tunnel  (37 words, cc=1, 25 free)",
-    "ns_slot": null,
-    "ns_slot_policy": "dynamic",
-    "lump_size": 64,
-    "cw": 37,
-    "cc": 1,
-    "author": "",
-    "version": "2026.05.17",
-    "lump_version": 1,
-    "compiled_at": 1779027769.2562387,
-    "methods": [
-      {
-        "name": "run",
-        "offset": 0,
-        "length": 37
-      }
-    ],
-    "grants": [
-      "E"
-    ]
-  },
-  {
     "token": "6902f517",
     "abstraction": "LED Blink \u2014 Ti60 F225 Hardware Nucleus Code",
     "ns_slot": null,
@@ -2094,5 +2071,25 @@
       "E"
     ],
     "lump_version": 0
+  },
+  {
+    "token": "8e37e416",
+    "abstraction": "Tunnel(37words,cc=1,25free)",
+    "filename": "Tunnel_37words_cc_1_25free_v2.lump",
+    "sidecar_file": "Tunnel_37words_cc_1_25free_v2.json",
+    "ns_slot": null,
+    "lump_size": 64,
+    "cw": 1,
+    "cc": 1,
+    "lump_version": 2,
+    "compiled_at": 1783349151.044564,
+    "status": "wip",
+    "methods": [
+      {
+        "name": "run",
+        "offset": 0,
+        "length": 1
+      }
+    ]
   }
 ]
