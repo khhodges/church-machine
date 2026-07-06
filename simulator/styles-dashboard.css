@@ -3697,6 +3697,20 @@ a.next-step-link:hover {
 }
 .fpga-toast-fade { opacity: 0; visibility: hidden; }
 
+.fpga-toast-action {
+    display: block;
+    margin: 0 0.8rem 0.7rem;
+    padding: 0.3rem 0.6rem;
+    background: rgba(245,158,11,0.18);
+    border: 1px solid #f59e0b;
+    border-radius: 4px;
+    color: #ffd48a;
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.fpga-toast-action:hover { background: rgba(245,158,11,0.3); color: #fff; }
+
 .cr-inject-bar {
     display: flex;
     gap: 0.5rem;

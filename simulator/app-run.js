@@ -1699,7 +1699,7 @@ function _dismissFpgaToast() {
     var el = document.getElementById('fpgaToastEl');
     if (el) el.remove();
 }
-function _showFpgaToast(title, body, level, duration) {
+function _showFpgaToast(title, body, level, duration, action) {
     level = level || 'info';
     if (duration === undefined || duration === null) duration = 5000;
     _dismissFpgaToast();
@@ -1735,6 +1735,18 @@ function _showFpgaToast(title, body, level, duration) {
 
     el.appendChild(header);
     el.appendChild(bodyDiv);
+
+    if (action && action.label && typeof action.onClick === 'function') {
+        var actionBtn = document.createElement('button');
+        actionBtn.className = 'fpga-toast-action';
+        actionBtn.textContent = action.label;
+        actionBtn.addEventListener('click', function() {
+            _dismissFpgaToast();
+            action.onClick();
+        });
+        el.appendChild(actionBtn);
+    }
+
     document.body.appendChild(el);
 
     if (duration > 0) {

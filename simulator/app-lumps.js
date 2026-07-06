@@ -3989,6 +3989,27 @@ async function _goToLumpByAbstractionName(name, methodName) {
 // view, and flashes a highlight. The Content tab loads its words via an
 // async fetch (_loadLumpContent), so the card may not exist yet on the first
 // call — poll briefly (up to ~4s) before giving up with a toast.
+// Human-readable label for a lump record, used when telling the user which
+// version of an abstraction actually has the method they jumped to.
+function _lumpVersionLabel(lump) {
+    if (!lump) return 'this version';
+    if (lump.ns_slot !== null && lump.ns_slot !== undefined) return 'the boot-resident version';
+    if (lump.version) return `v${lump.version}`;
+    return 'this version';
+}
+
+// Re-selects a different saved LUMP (e.g. a sibling version of the same
+// abstraction) and resumes the Content-tab method drill-down there. Reuses
+// the existing "final priority" pending-token mechanism in renderLumps()
+// so the live-lump auto-select cannot clobber the explicit choice.
+function _switchToLumpVersionAndScroll(token, methodName) {
+    if (!token) return;
+    window._pendingLumpToken = token;
+    window._pendingLumpTab = 'content';
+    _pendingLumpMethodName = methodName || null;
+    if (typeof renderLumps === 'function') renderLumps();
+}
+
 function _scrollToLumpMethod(tk, methodName, _attempt) {
     if (!tk || !methodName) return;
     const attempt = _attempt || 0;
@@ -4000,7 +4021,33 @@ function _scrollToLumpMethod(tk, methodName, _attempt) {
         if (attempt < 40) {
             setTimeout(() => _scrollToLumpMethod(tk, methodName, attempt + 1), 100);
         } else if (typeof _showFpgaToast === 'function') {
-            _showFpgaToast('Method not found', '\u201c' + methodName + '\u201d has no disassembled code in this LUMP.', 'warn', 2000);
+            // Before giving up entirely, check whether a *different* saved
+            // version of this same abstraction actually has the method —
+            // that's the "wrong LUMP version" case, not a genuinely missing
+            // method. Name the right version and offer a one-click switch.
+            const curLump = (typeof _lumpsCache !== 'undefined')
+                ? _lumpsCache.find(l => (l.token || '').replace(/[^a-z0-9]/gi, '') === tk)
+                : null;
+            const altLump = (curLump && curLump.abstraction && typeof _lumpsCache !== 'undefined')
+                ? _lumpsCache.find(l => l.abstraction === curLump.abstraction
+                    && l.token !== curLump.token
+                    && Array.isArray(l.methods)
+                    && l.methods.some(m => m.name === methodName))
+                : null;
+            if (altLump) {
+                const curLabel = _lumpVersionLabel(curLump);
+                const altLabel = _lumpVersionLabel(altLump);
+                const altToken = altLump.token;
+                _showFpgaToast(
+                    'Wrong LUMP version',
+                    `\u201c${methodName}\u201d exists on ${altLabel}, not on ${curLabel} \u2014 switch versions to view it.`,
+                    'warn',
+                    6000,
+                    { label: `Switch to ${altLabel}`, onClick: function() { _switchToLumpVersionAndScroll(altToken, methodName); } }
+                );
+            } else {
+                _showFpgaToast('Method not found', '\u201c' + methodName + '\u201d has no disassembled code in this LUMP.', 'warn', 2000);
+            }
         }
         return;
     }

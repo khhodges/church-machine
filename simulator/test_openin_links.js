@@ -67,6 +67,11 @@ const TOAST_SRC        = extractFunctionByName('app-run.js', '_dismissFpgaToast'
                           extractFunctionByName('app-run.js', '_showFpgaToast');
 const ABS_TO_EDITOR_SRC = extractFunctionByName('app-lumps.js', '_absOpenInEditorByName');
 const ABS_TO_LUMP_SRC   = extractFunctionByName('app-lumps.js', '_goToLumpByAbstractionName');
+// Task #1998: wrong-LUMP-version toast helpers used by _scrollToLumpMethod's
+// exhausted-poll branch — must be extracted alongside it or the sandbox
+// throws a ReferenceError the moment the "not found" degrade path runs.
+const LUMP_VERSION_LABEL_SRC = extractFunctionByName('app-lumps.js', '_lumpVersionLabel');
+const SWITCH_LUMP_VERSION_SRC = extractFunctionByName('app-lumps.js', '_switchToLumpVersionAndScroll');
 const SCROLL_METHOD_SRC = extractFunctionByName('app-lumps.js', '_scrollToLumpMethod');
 const REFRESH_LINKS_SRC = extractFunctionByName('app-shell.js', '_refreshEditorJumpLinks');
 const EDITOR_TO_LUMP_SRC = extractFunctionByName('app-shell.js', '_editorJumpToLump');
@@ -76,7 +81,8 @@ const EDITOR_TO_ABS_SRC  = extractFunctionByName('app-shell.js', '_editorJumpToA
 // against when several lumps share one abstraction name (different versions).
 const RENDER_LUMPS_SRC   = extractFunctionByName('app-abstractions.js', 'renderLumps');
 
-const ALL_SRC = [TOAST_SRC, ABS_TO_EDITOR_SRC, ABS_TO_LUMP_SRC, SCROLL_METHOD_SRC,
+const ALL_SRC = [TOAST_SRC, ABS_TO_EDITOR_SRC, ABS_TO_LUMP_SRC,
+                 LUMP_VERSION_LABEL_SRC, SWITCH_LUMP_VERSION_SRC, SCROLL_METHOD_SRC,
                  REFRESH_LINKS_SRC, EDITOR_TO_LUMP_SRC, EDITOR_TO_ABS_SRC,
                  RENDER_LUMPS_SRC].join('\n\n');
 
@@ -533,6 +539,62 @@ trackAsync((async function t14() {
     assert('T14 the stale same-named card under the OLD token panel was never touched',
         staleCard.getAttribute('data-collapsed') === '1' && !staleCard.classList.contains('lump-method-card-highlight'),
         { collapsed: staleCard.getAttribute('data-collapsed'), highlighted: staleCard.classList.contains('lump-method-card-highlight') });
+})());
+
+// ── T15 (Task #1998): when the poll exhausts AND a sibling lump with the
+// same abstraction name actually has the requested method, the toast must
+// name that other version and offer a one-click switch — not the generic
+// "Method not found" message.
+//
+// WIDGETBOOT (boot-resident) has "MethodX" in its `.methods` sidecar record;
+// WIDGETV2FLOAT (versioned, resolved by renderLumps' preference rule) does
+// not have it rendered in its Content-tab panel. Since WIDGETBOOT.methods
+// really does list "MethodX", this is a genuine version mismatch, not a
+// missing method.
+trackAsync((async function t15() {
+    const WIDGET_BOOT = { abstraction: 'Widget', token: 'WIDGETBOOT', version: null, ns_slot: 5,
+        methods: [{ name: 'MethodX' }] };
+    const WIDGET_V2   = { abstraction: 'Widget', token: 'WIDGETV2FLOAT', version: 2, ns_slot: null,
+        methods: [{ name: 'MethodY' }] };
+    const lumps = [WIDGET_BOOT, WIDGET_V2];
+
+    const { ctx, document } = makeCtx({
+        lumpsCache: lumps,
+        fastTimers: true,
+        fetchImpl: async () => ({ ok: true, json: async () => lumps }),
+    });
+
+    await vm.runInContext('_goToLumpByAbstractionName("Widget", "MethodX")', ctx);
+    await vm.runInContext('renderLumps()', ctx);
+
+    // Only WIDGETV2FLOAT's panel exists in the DOM (the resolved token) and
+    // it never gets a "MethodX" card — matching its real method set.
+    const panel = document.createElement('div');
+    panel.id = 'lumpTabContent_WIDGETV2FLOAT';
+    panel.innerHTML = '<div class="lump-method-card" data-collapsed="1" data-method-name="MethodY">card body</div>';
+    document.body.appendChild(panel);
+
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const toastEl = document.getElementById('fpgaToastEl');
+    assert('T15 wrong-version toast shown', toastEl !== null);
+    const titleEl = toastEl && toastEl.querySelector('.fpga-toast-title');
+    assert('T15 toast title is "Wrong LUMP version"',
+        titleEl && titleEl.textContent === 'Wrong LUMP version', titleEl && titleEl.textContent);
+    const bodyEl = toastEl && toastEl.querySelector('.fpga-toast-body');
+    assert('T15 toast body names the boot-resident version',
+        bodyEl && bodyEl.textContent.includes('boot-resident'), bodyEl && bodyEl.textContent);
+    const actionBtn = toastEl && toastEl.querySelector('.fpga-toast-action');
+    assert('T15 toast offers a one-click switch action', actionBtn !== null);
+
+    // Clicking the action should re-target the OTHER token (WIDGETBOOT) and
+    // resume the drill-down there via the pending-token mechanism.
+    actionBtn.dispatchEvent(new (document.defaultView.Event)('click'));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    assert('T15 action switches window._pendingLumpToken to the sibling lump',
+        vm.runInContext('window._pendingLumpToken', ctx) === null && // consumed by renderLumps() re-run
+        vm.runInContext('_selectedLumpToken', ctx) === 'WIDGETBOOT',
+        { selected: vm.runInContext('_selectedLumpToken', ctx) });
 })());
 
 // ── Summary ───────────────────────────────────────────────────────────────────
