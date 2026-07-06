@@ -302,6 +302,14 @@ R-type encoding: `funct7[6:0]` (instr[31:25]) = method index (7 bits, 0–127); 
 
 Existing programs that encode method index 0 get the fast path — NIA = lump_base + 4 (backward compatible).
 
+**Design note — why the compiler doesn't auto-downgrade to LOAD+CALL:** When a `capabilities {}` block exceeds 32 entries, the CLOOMC++ compiler raises a hard error instead of silently emitting `LOAD` + `CALL` for the overflow entries. This is intentional, not an oversight:
+
+- **`ELOADCALL` and `LOAD`+`CALL` are not equally secure.** `ELOADCALL`'s atomicity guarantees no other instruction executes between the load and the call — including a timer-driven `Scheduler.IRQ` preemption. A plain `LOAD` followed by `CALL` leaves a real gap in which an interrupt can fire; the context switch that follows saves CR0–CR11 (including the freshly-loaded, not-yet-validated-by-CALL capability) into the thread's saved state, widening that capability's exposure window in ways the programmer never asked for.
+- **Silent substitution would violate the reliability model.** Per `docs/cloomc-foundation.md` §2, "the capability envelope IS the specification, and deviations from it are detectable faults, not silent corruptions." Auto-downgrading past the 32-row boundary would be exactly that kind of silent deviation.
+- **Hitting the cap is itself a useful signal.** An abstraction needing more than 32 declared capabilities is usually a sign it should be split into smaller abstractions, not a case that should be quietly patched around.
+
+A fallback is not impossible to add — an opt-in compiler flag could let a programmer explicitly accept the wider exposure window — but the default stays fail-loud so the tradeoff is always visible, never implicit.
+
 ### XLOADLAMBDA (opcode 9)
 
 ```

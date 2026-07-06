@@ -312,6 +312,20 @@ Flag-writing summary across all 20 instructions:
 > Valid ranges (enforced by assembler and checked at assembly time):
 > - c-list row: 0–31 (5 bits; values 32+ are a hard assembler error)
 > - method index: 0–126 in user terms → 0–127 in funct7[6:0] (value 127 rejected)
+>
+> **Design note — why row 32+ is a hard error, not a LOAD+CALL fallback.** The
+> CLOOMC++ compiler could theoretically emit a plain `LOAD`+`CALL` pair when a
+> `capabilities {}` block overflows 32 entries, but it deliberately does not.
+> `ELOADCALL`'s atomicity means no instruction — including a timer-driven
+> `Scheduler.IRQ` preemption — can execute between the load and the call. A
+> `LOAD` followed by `CALL` leaves a real gap: if an interrupt fires there, the
+> context switch saves CR0–CR11 (including the freshly-loaded, not-yet-called
+> capability) into the thread's saved state, widening its exposure window
+> silently. Per `docs/cloomc-foundation.md` §2, "the capability envelope IS the
+> specification, and deviations from it are detectable faults, not silent
+> corruptions" — so the compiler surfaces the boundary as a compile error
+> (usually itself a signal the abstraction should be split) rather than
+> quietly downgrading the instruction sequence's security shape.
 
 ---
 
