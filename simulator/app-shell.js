@@ -309,7 +309,11 @@ async function _refreshEditorJumpLinks() {
         if (derivedLump) token = derivedLump.token;
     }
 
-    window._editorJumpTargets = { token: token || null, absIdx: abs ? abs.index : null };
+    window._editorJumpTargets = {
+        token: token || null,
+        absIdx: abs ? abs.index : null,
+        methodName: (pec && pec.methodName) ? pec.methodName : null
+    };
 
     var lumpBtn = document.getElementById('editorJumpToLumpBtn');
     var absBtn  = document.getElementById('editorJumpToAbsBtn');
@@ -327,8 +331,9 @@ function _editorJumpToLump() {
 function _editorJumpToAbstraction() {
     var a = window._editorJumpTargets && window._editorJumpTargets.absIdx;
     if (a == null) return;
+    var m = window._editorJumpTargets && window._editorJumpTargets.methodName;
     if (typeof switchView === 'function') switchView('abstractions');
-    if (typeof showAbstractionDetail === 'function') showAbstractionDetail(a);
+    if (typeof showAbstractionDetail === 'function') showAbstractionDetail(a, m || null);
 }
 
 function savePseudoCode() {

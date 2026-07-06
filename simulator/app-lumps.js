@@ -1252,7 +1252,9 @@ function _lumpSrcEditMethod(absIdx, mName) {
     const outEl = document.getElementById('assemblyOutput');
     if (outEl) outEl.innerHTML = '';
     window._pseudoEditContext = { absIdx: absIdx, methodName: mName };
+    window._editorLastSavedToken = null;
     if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
+    if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
 }
 
 function _lumpSourceProxyEdit(fn) {
@@ -3897,12 +3899,12 @@ function _nsBuild() {
     });
 }
 
-function _goToAbstractionByName(name) {
+function _goToAbstractionByName(name, methodName) {
     if (!name || !abstractionRegistry) return;
     const abs = abstractionRegistry.getByName(name);
     if (!abs) return;
     switchView('abstractions');
-    showAbstractionDetail(abs.index);
+    showAbstractionDetail(abs.index, methodName || null);
 }
 
 // ── Symmetric Open-in link: Abstraction → Editor ───────────────────────────
@@ -3911,8 +3913,22 @@ function _goToAbstractionByName(name) {
 // openLumpInEditor() so drafts/banners/dirty-tracking behave identically no
 // matter which view the user jumped in from. Degrades gracefully (toast, no
 // navigation) when no compiled LUMP exists yet for this abstraction.
-async function _absOpenInEditorByName(name) {
+async function _absOpenInEditorByName(name, methodName) {
     if (!name) return;
+
+    // Method-level jump: if a specific method was active in the abstraction
+    // detail view, load that method's own catalog source directly (same
+    // helper the LUMP Source tab uses) instead of opening the whole LUMP.
+    if (methodName && typeof abstractionRegistry !== 'undefined' && abstractionRegistry) {
+        const abs = abstractionRegistry.getByName(name);
+        if (abs && abs.methods && abs.methods.indexOf(methodName) !== -1 && typeof _lumpSrcEditMethod === 'function') {
+            _lumpSrcEditMethod(abs.index, methodName);
+            if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
+            return;
+        }
+    }
+
+    // Fallback: no specific method context — open the whole saved LUMP, as before.
     if (_lumpsCache.length === 0) {
         try {
             const r = await fetch('/api/lumps/list');
@@ -3929,8 +3945,12 @@ async function _absOpenInEditorByName(name) {
     if (typeof openLumpInEditor === 'function') await openLumpInEditor(existing.token);
 }
 
-async function _goToLumpByAbstractionName(name) {
+async function _goToLumpByAbstractionName(name, methodName) {
     if (!name) return;
+    // Note: `methodName` is accepted for symmetry with the Abstraction/Editor
+    // jump links, but the LUMP Browser has no per-method drill-down view yet —
+    // it always lands on the LUMP as a whole, which is the graceful fallback
+    // for destinations without a specific-method context.
     // Warm cache: check immediately without a network round-trip.
     if (_lumpsCache.length > 0) {
         const existing = _lumpsCache.find(l => l.abstraction === name);

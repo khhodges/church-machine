@@ -315,7 +315,7 @@ function _renderBootNSDecoder(contentEl, abs) {
     contentEl.innerHTML = html;
 }
 
-function showAbstractionDetail(index) {
+function showAbstractionDetail(index, methodName) {
     selectedAbsIndex = index;
     renderAbstractions();
 
@@ -363,8 +363,8 @@ function showAbstractionDetail(index) {
     html += `<div class="abs-detail-badge layer-${abs.layer}">Layer ${abs.layer} \u2014 ${layerName}</div>`;
     html += ` <span class="abs-profile-badge ${detailProfileClass}" style="margin-left:4px;font-size:0.62rem;">${detailProfile}</span>`;
     html += `<div class="abs-detail-actions" style="margin:0.4rem 0;display:flex;gap:0.4rem;flex-wrap:wrap;">`;
-    html += `<button class="btn btn-sm abs-jump-btn" onclick="_absOpenInEditorByName(abstractionRegistry.getAbstraction(${abs.index}).name)" data-tooltip="Open in Editor \u2014 Load this abstraction's saved LUMP into the code editor">&#8594; Editor</button>`;
-    html += `<button class="btn btn-sm abs-jump-btn" onclick="_goToLumpByAbstractionName(abstractionRegistry.getAbstraction(${abs.index}).name)" data-tooltip="Open in LUMP Browser \u2014 Jump to this abstraction's compiled LUMP">&#8594; LUMP</button>`;
+    html += `<button class="btn btn-sm abs-jump-btn" onclick="_absOpenInEditorByName(abstractionRegistry.getAbstraction(${abs.index}).name,(window._absActiveMethod&&window._absActiveMethod[${abs.index}])||null)" data-tooltip="Open in Editor \u2014 Load this abstraction's saved LUMP (or the currently-active method) into the code editor">&#8594; Editor</button>`;
+    html += `<button class="btn btn-sm abs-jump-btn" onclick="_goToLumpByAbstractionName(abstractionRegistry.getAbstraction(${abs.index}).name,(window._absActiveMethod&&window._absActiveMethod[${abs.index}])||null)" data-tooltip="Open in LUMP Browser \u2014 Jump to this abstraction's compiled LUMP">&#8594; LUMP</button>`;
     html += `</div>`;
     html += `<div class="abs-detail-desc">${abs.description}</div>`;
     html += '</div>';
@@ -535,10 +535,15 @@ function showAbstractionDetail(index) {
                 return `${d.getDate()} ${_MONTHS_CS[d.getMonth()]} ${d.getFullYear()} ${hh}:${mm}`;
             };
 
+            let _jumpToMi = methodName ? methods.indexOf(methodName) : -1;
+            if (_jumpToMi < 0) _jumpToMi = 0;
+            window._absActiveMethod = window._absActiveMethod || {};
+            window._absActiveMethod[uid] = methods[_jumpToMi] || null;
+
             html += `<div class="abs-method-tabs" id="abs-tabs-${uid}">`;
             for (let mi = 0; mi < methods.length; mi++) {
                 const m = methods[mi];
-                const active = mi === 0 ? ' abs-method-tab-active' : '';
+                const active = mi === _jumpToMi ? ' abs-method-tab-active' : '';
                 const mStatus = _implStatusGet(`${uid}:${m}`);
                 const badgeLabel = IMPL_STATUS_SHORT[mStatus] || mStatus;
                 const mKey = `${uid}:${m}`;
@@ -594,7 +599,7 @@ function showAbstractionDetail(index) {
                 const m = methods[mi];
                 const purpose = methodPurposes[m] || 'Dispatched via CALL';
                 const example = methodExamples[m] || null;
-                const display = mi === 0 ? '' : ' style="display:none"';
+                const display = mi === _jumpToMi ? '' : ' style="display:none"';
                 const mKey2 = `${uid}:${m}`;
                 const md = userMethodData[mKey2] || {};
                 const isMainPanel = m.toLowerCase() === 'main';
@@ -860,6 +865,19 @@ function showAbstractionDetail(index) {
     }
 
     contentEl.innerHTML = html;
+
+    // Jump-to-method: if a specific method was requested, scroll its panel into
+    // view so the user lands on the method itself rather than the top of the
+    // abstraction detail (falls back to no-op when the abstraction has no
+    // methods, or the requested method wasn't found — the default first-method
+    // tab/panel is already shown in that case).
+    if (methodName && abs.methods && abs.methods.indexOf(methodName) !== -1) {
+        const _jumpMi = abs.methods.indexOf(methodName);
+        const _jumpPanel = document.getElementById(`abs-panel-${abs.index}-${_jumpMi}`);
+        if (_jumpPanel && typeof _jumpPanel.scrollIntoView === 'function') {
+            _jumpPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
 }
 
 function absSelectMethod(tabEl, panelId) {
@@ -876,6 +894,8 @@ function absSelectMethod(tabEl, panelId) {
 
 function absOpenMethodInEditor(absIdx, methodName, tabEl, panelId) {
     absSelectMethod(tabEl, panelId);
+    window._absActiveMethod = window._absActiveMethod || {};
+    window._absActiveMethod[absIdx] = methodName;
 
     // Method-tab clicks always load catalog source into the editor and set the
     // edit context. The backing LUMP (if any) is a reference file accessible from
@@ -980,6 +1000,8 @@ function absRestoreMethodVersion(absIdx, methodName, histIdx) {
 
     window._pseudoEditContext = { absIdx: absIdx, methodName: methodName };
     window._editorLastSavedToken = null;
+    window._absActiveMethod = window._absActiveMethod || {};
+    window._absActiveMethod[absIdx] = methodName;
     if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
     if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
 
