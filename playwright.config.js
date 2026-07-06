@@ -10,7 +10,12 @@ try {
     systemChromium = undefined;
 }
 
-const E2E_PORT = process.env.E2E_PORT || '5000';
+// Default to a dedicated port (never 5000) so the standalone e2e-tests
+// workflow can never contend for the same port as the main dev server
+// ("Church Machine IDE" workflow), even when invoked without an explicit
+// E2E_PORT override. server/app.py also has a bind-retry guard as a
+// second line of defense against stray processes holding the port.
+const E2E_PORT = process.env.E2E_PORT || '5050';
 
 module.exports = defineConfig({
     testDir: './tests/e2e',

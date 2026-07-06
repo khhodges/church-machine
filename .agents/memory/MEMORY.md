@@ -1,3 +1,4 @@
+- [Dev server port collision](dev-server-port-collision.md) — check-then-act "free port then bind" isn't race-proof between two independently-starting servers; give secondary servers their own default port + retry-with-backoff on bind
 - [Efinity headless Interface Designer patches](efinity-headless-interface-designer.md) — check_design() crashes headless without installed-Efinity-source patches; use scripts/apply_efinity_headless_patches.py; not every sub-build needs every patch (P1/P6 optional)
 - [EFX_MAP $readmemb working directory](efx-map-readmemb.md) — symbol files must be in work_syn/ not project root or BRAM is silently zero-initialised
 - [Sapphire BRAM init — Variant B stub block](sapphire-bram-init-variant.md) — Efinity 2026.1 IP has stub initial begin (4 zeros) not $readmemb; depth=8192 words; patch_sapphire_init.py handles both variants

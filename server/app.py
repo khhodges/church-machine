@@ -9236,8 +9236,34 @@ def api_compile():
     return jsonify(result), 200
 
 
+def _bind_with_retry(port, max_attempts=5, backoff_seconds=0.3):
+    """Bind app.run() on `port`, self-healing if another process wins a
+    startup race for the same port.
+
+    Two workflows can independently try to bind the same port at startup
+    (e.g. the main dev server and a test runner's own server instance).
+    _free_port() already kills whoever is squatting on the port *before*
+    we try to bind, but that is a single check-then-act step: another
+    process can grab the port in the gap between our kill and our bind.
+    Instead of crashing the whole workflow on that race, retry a few times
+    with a short backoff and re-run _free_port() each time.
+    """
+    import time as _time
+    for attempt in range(1, max_attempts + 1):
+        _free_port(port)
+        try:
+            app.run(host="0.0.0.0", port=port, debug=True, use_reloader=False, threaded=True)
+            return
+        except OSError as exc:
+            if "Address already in use" not in str(exc) or attempt == max_attempts:
+                raise
+            logging.warning(
+                "Port %d still in use after _free_port() (attempt %d/%d) — "
+                "retrying in %.1fs", port, attempt, max_attempts, backoff_seconds)
+            _time.sleep(backoff_seconds)
+
+
 if __name__ == "__main__":
     _port = int(os.environ.get("E2E_PORT", 5000))
-    _free_port(_port)
     logging.info("Starting Church Machine server on port %d", _port)
-    app.run(host="0.0.0.0", port=_port, debug=True, use_reloader=False, threaded=True)
+    _bind_with_retry(_port)
