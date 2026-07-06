@@ -16,6 +16,9 @@ R9   RETIRED — ns_slot=null is implicitly dynamic; ns_slot_policy is optional/
 R10  Every manifest entry with lump_size declared has a .lump file on disk.
 R11  Every manifest entry with lump_size declared has a sidecar .json on disk.
 R14  Every archive binary has a matching sidecar .json (both old <token>-vN and new <Name>_vN).
+R16  A statically-slotted, system-baseline lump's `abstraction` field must name a
+     currently-live entry in simulator/abstractions.js (catches abstraction-name
+     drift after a rename, at build/merge time instead of only as a runtime toast).
 
 Failure messages are written to be self-diagnosing: they state what was found,
 what was expected, and which file to correct.
@@ -36,6 +39,7 @@ import json
 import os
 import re as _re
 import struct
+import subprocess
 
 import pytest
 
@@ -605,6 +609,117 @@ class TestR13_SelftestClistGTs:
             f"{token} ({label}): c-list[7] = {word:#010x}: unexpected R or W permission "
             f"set alongside X (perm3={gt['perm3']:#05b}).\n"
             "  Boot.Nucs X-GT must carry exactly X permission."
+        )
+
+
+def _live_abstraction_names() -> set:
+    """Return the set of abstraction names currently registered in
+    simulator/abstractions.js by actually instantiating AbstractionRegistry
+    under Node — never a hand-maintained/regex copy that can itself drift.
+    """
+    abstractions_js = os.path.normpath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "simulator", "abstractions.js")
+    )
+    script = (
+        "const AbstractionRegistry = require(%r);"
+        "const reg = new AbstractionRegistry();"
+        "console.log(JSON.stringify(Object.values(reg.abstractions).map(a => a.name)));"
+    ) % abstractions_js
+    out = subprocess.run(
+        ["node", "-e", script], capture_output=True, text=True, check=True
+    ).stdout
+    return set(json.loads(out))
+
+
+LIVE_ABSTRACTION_NAMES = _live_abstraction_names()
+
+# Lumps whose `abstraction` field intentionally does not (and never has)
+# corresponded to a live simulator/abstractions.js registry entry, along
+# with the reason. Add an entry here ONLY when the mismatch is deliberate
+# (e.g. a variant lump that predates the registry, or a Haskell/alt-frontend
+# sibling that is browsed via the LUMP repository rather than the
+# Abstractions view). Anything else that fails R15 is real name drift —
+# fix the sidecar/manifest `abstraction` field or the registry name instead
+# of adding it here.
+KNOWN_NON_REGISTRY_ABSTRACTIONS = {
+    "SlideRuleHS": "Haskell-frontend SlideRule variant (variant_group=sliderule); "
+                   "browsable via the LUMP repository only, never wired into the "
+                   "Abstractions view/registry.",
+}
+
+
+def _abstraction_check_targets():
+    """Yield (source, token, abstraction_name) for every manifest/sidecar
+    entry that is expected to correspond to a live abstraction registry
+    entry: system-baseline (lump_version 0/absent) lumps with a real,
+    non-null NS slot. Dynamic/NULL lumps (ns_slot is None) and
+    user-compiled lumps (lump_version >= 1) are exempt — see replit.md
+    "LUMP Metadata Integrity" for the four NS-slot categories and the
+    lump_version convention.
+    """
+    targets = []
+    for e in MANIFEST:
+        abs_name = e.get("abstraction")
+        if not abs_name:
+            continue
+        lv = e.get("lump_version")
+        if lv is not None and lv >= 1:
+            continue
+        if e.get("ns_slot") is None:
+            continue
+        targets.append(("manifest", e.get("token", "?"), abs_name))
+
+    for token in JSON_TOKENS:
+        sc = _load_sidecar(token)
+        if not sc:
+            continue
+        abs_name = sc.get("abstraction")
+        if not abs_name:
+            continue
+        lv = sc.get("lump_version")
+        if lv is not None and lv >= 1:
+            continue
+        if sc.get("ns_slot") is None:
+            continue
+        targets.append((f"sidecar:{token}", token, abs_name))
+    return targets
+
+
+ABSTRACTION_CHECK_TARGETS = _abstraction_check_targets()
+
+
+class TestR16_AbstractionNameMatchesRegistry:
+    """R16: A system-baseline, statically-slotted lump's `abstraction` field
+    must name a currently-live entry in the simulator/abstractions.js
+    registry (or be an explicitly documented, deliberate exception).
+
+    This is the build/merge-time guard for abstraction-name drift: Task #1988
+    proved the four Open-in jump functions (Abstraction<->Editor,
+    LUMP<->Abstraction, Editor<->LUMP) degrade gracefully (toast, no crash)
+    when a lump's `abstraction` field no longer matches any live abstraction
+    name. This rule catches the drift itself — e.g. an abstraction rename in
+    abstractions.js that a lump's sidecar/manifest was never updated to
+    match — instead of only surfacing as a runtime toast the developer may
+    never see.
+    """
+
+    @pytest.mark.parametrize(
+        "source,token,abstraction_name", ABSTRACTION_CHECK_TARGETS,
+        ids=[f"{t[0]}-{t[1]}" for t in ABSTRACTION_CHECK_TARGETS],
+    )
+    def test_abstraction_name_is_live(self, source, token, abstraction_name):
+        if abstraction_name in KNOWN_NON_REGISTRY_ABSTRACTIONS:
+            return
+        assert abstraction_name in LIVE_ABSTRACTION_NAMES, (
+            f"{token} ({source}): abstraction = {abstraction_name!r} does not match "
+            "any live entry in simulator/abstractions.js.\n"
+            "  This usually means the abstraction was renamed and this lump's "
+            "manifest/sidecar `abstraction` field was not updated to match "
+            "(abstraction-name drift) — update the field to the new name.\n"
+            "  If this mismatch is deliberate (e.g. a pre-registry variant lump "
+            "browsable only via the LUMP repository), add it to "
+            "KNOWN_NON_REGISTRY_ABSTRACTIONS in tests/lump/test_lump_consistency.py "
+            "with a reason."
         )
 
 
