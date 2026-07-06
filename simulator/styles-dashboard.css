@@ -4586,7 +4586,8 @@ mark.abs-search-highlight {
 }
 
 .abs-method-tab {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
     background: rgba(30, 60, 120, 0.3);
     color: var(--text-secondary);
     font-family: 'JetBrains Mono', 'Courier New', monospace;
@@ -4598,6 +4599,15 @@ mark.abs-search-highlight {
     cursor: pointer;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
     user-select: none;
+    min-height: 1.6rem;
+}
+
+.abs-method-tab-name {
+    display: inline-block;
+    padding: 0.15rem 0.3rem;
+    margin: 0 0.2rem;
+    min-width: 1.5rem;
+    text-align: center;
 }
 
 .abs-method-tab:hover {
@@ -6094,6 +6104,7 @@ mark.abs-search-highlight {
     margin-right: 0.22rem;
     font-family: 'JetBrains Mono', 'Courier New', monospace;
     vertical-align: middle;
+    pointer-events: none;
 }
 
 .abs-method-tab-main {
@@ -6136,6 +6147,12 @@ mark.abs-search-highlight {
     font-family: 'JetBrains Mono', 'Courier New', monospace;
     margin-right: 0.3rem;
     vertical-align: middle;
+    pointer-events: none;
+}
+
+.abs-method-panel-name-text {
+    display: inline-block;
+    padding: 0.15rem 0.2rem;
 }
 
 .abs-method-copy-call-btn {
@@ -6143,7 +6160,7 @@ mark.abs-search-highlight {
     padding: 0.1rem 0.35rem !important;
     opacity: 0.45;
     transition: opacity 0.15s;
-    margin-left: 0.35rem;
+    margin-left: 0.75rem;
     vertical-align: middle;
     font-family: 'JetBrains Mono', 'Courier New', monospace;
 }

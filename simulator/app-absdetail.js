@@ -553,7 +553,7 @@ function showAbstractionDetail(index, methodName) {
                 const mainTabClass = isMain ? ' abs-method-tab-main' : '';
                 html += `<span class="abs-method-tab${active}${mainTabClass}" onclick="absOpenMethodInEditor(${uid},'${m}',this,'abs-panel-${uid}-${mi}')">`;
                 html += `<span class="abs-method-selector-num" title="Selector ${mi + 1}">#${mi + 1}</span>`;
-                html += `${m}`;
+                html += `<span class="abs-method-tab-name">${m}</span>`;
                 if (isMain) html += `<span class="abs-method-main-badge" title="Primary entry point \u2014 CALL enters here with no selector">entry</span>`;
                 html += `<span class="abs-compile-state-badge abs-compile-state-${compileState}" title="Compile state: ${csLabel}">${csLabel}</span>`;
                 html += `<span class="abs-method-status-badge abs-method-status-badge-${mStatus}" onclick="event.stopPropagation();absToggleStatusDropdown(${uid},${mi},event)" title="Status: ${IMPL_STATUS_LABELS[mStatus]} — click to change">`;
@@ -607,9 +607,9 @@ function showAbstractionDetail(index, methodName) {
                 html += `<div class="abs-method-panel-header">`;
                 html += `<div class="abs-method-panel-name">`;
                 html += `<span class="abs-method-panel-selector" title="Selector ${mi + 1}">#${mi + 1}</span>`;
-                html += `${abs.name}.${m}`;
+                html += `<span class="abs-method-panel-name-text">${abs.name}.${m}</span>`;
                 if (isMainPanel) html += ` <span class="abs-method-main-badge abs-method-main-badge-lg" title="Primary entry point \u2014 CALL without a selector goes here">primary entry point</span>`;
-                html += ` <button class="btn btn-xs abs-method-copy-call-btn" title="Copy: CALL ${abs.name}.${m}" onclick="event.stopPropagation();_absCopyCall('${abs.name.replace(/'/g,"\\'")}','${m.replace(/'/g,"\\'")}',this)">copy CALL</button>`;
+                html += `<button class="btn btn-xs abs-method-copy-call-btn" title="Copy: CALL ${abs.name}.${m}" onclick="event.stopPropagation();_absCopyCall('${abs.name.replace(/'/g,"\\'")}','${m.replace(/'/g,"\\'")}',this)">copy CALL</button>`;
                 html += `</div>`;
                 html += `<div class="abs-method-panel-actions">`;
                 // Generate button (hidden if no OPENAI_API_KEY)
