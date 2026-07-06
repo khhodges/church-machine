@@ -213,6 +213,8 @@ function selectUserTab(id) {
     _updateEditorCodeName(tab.name);
     // Leaving catalog edit context when user picks a personal tab
     window._pseudoEditContext = null;
+    window._editorLastSavedToken = null;
+    if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
     const editor = document.getElementById('asmEditor');
     if (editor) editor.value = tab.code;
     // Always show the personal group when a user tab is selected
@@ -269,7 +271,64 @@ function updateSavePseudoBtn() {
 
 function clearPseudoEditContext() {
     window._pseudoEditContext = null;
+    window._editorLastSavedToken = null;
     updateSavePseudoBtn();
+    if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
+}
+
+// ── Symmetric Open-in links: Editor \u2194 LUMP / Abstraction ─────────────────
+// Resolves the currently-open editor content (either a saved LUMP, opened via
+// openLumpInEditor(), or a catalog method, opened via absOpenMethodInEditor())
+// to its counterpart LUMP token / Abstraction index, cross-referencing via the
+// shared abstraction name when only one side of the context is known.  Hides
+// the corresponding toolbar button whenever no match can be resolved.
+async function _refreshEditorJumpLinks() {
+    var token  = window._editorLastSavedToken || null;
+    var pec    = window._pseudoEditContext;
+    var absIdx = (pec && pec.absIdx != null) ? pec.absIdx : null;
+
+    // Warm the lump cache lazily — only needed for cross-referencing.
+    if ((!token || absIdx == null) && (typeof _lumpsCache === 'undefined' || !_lumpsCache || _lumpsCache.length === 0)) {
+        try {
+            const r = await fetch('/api/lumps/list');
+            if (r.ok) _lumpsCache = await r.json();
+        } catch (e) {}
+    }
+
+    var lump = (token && typeof _lumpsCache !== 'undefined' && _lumpsCache)
+        ? _lumpsCache.find(function(l) { return l.token === token; }) : null;
+    if (absIdx == null && lump && lump.abstraction &&
+        typeof abstractionRegistry !== 'undefined' && abstractionRegistry) {
+        var derivedAbs = abstractionRegistry.getByName(lump.abstraction);
+        if (derivedAbs) absIdx = derivedAbs.index;
+    }
+    var abs = (absIdx != null && typeof abstractionRegistry !== 'undefined' && abstractionRegistry)
+        ? abstractionRegistry.getAbstraction(absIdx) : null;
+    if (!token && abs && typeof _lumpsCache !== 'undefined' && _lumpsCache) {
+        var derivedLump = _lumpsCache.find(function(l) { return l.abstraction === abs.name; });
+        if (derivedLump) token = derivedLump.token;
+    }
+
+    window._editorJumpTargets = { token: token || null, absIdx: abs ? abs.index : null };
+
+    var lumpBtn = document.getElementById('editorJumpToLumpBtn');
+    var absBtn  = document.getElementById('editorJumpToAbsBtn');
+    if (lumpBtn) lumpBtn.style.display = window._editorJumpTargets.token   ? '' : 'none';
+    if (absBtn)  absBtn.style.display  = window._editorJumpTargets.absIdx != null ? '' : 'none';
+}
+
+function _editorJumpToLump() {
+    var t = window._editorJumpTargets && window._editorJumpTargets.token;
+    if (!t) return;
+    if (typeof switchView === 'function') switchView('lumps');
+    if (typeof showLumpDetail === 'function') showLumpDetail(t);
+}
+
+function _editorJumpToAbstraction() {
+    var a = window._editorJumpTargets && window._editorJumpTargets.absIdx;
+    if (a == null) return;
+    if (typeof switchView === 'function') switchView('abstractions');
+    if (typeof showAbstractionDetail === 'function') showAbstractionDetail(a);
 }
 
 function savePseudoCode() {
@@ -1299,6 +1358,7 @@ function switchView(viewId) {
         if (typeof switchLumpWsTab === 'function' && !_selectedLumpToken) switchLumpWsTab('logic');
         renderLumps();
     }
+    if (viewId === 'editor' && typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
     if (viewId === 'gt-view') renderGTView();
     if (viewId === 'pipeline' && pipelineViz) pipelineViz.render();
     if (viewId === 'start') {

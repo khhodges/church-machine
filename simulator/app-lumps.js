@@ -23,6 +23,15 @@ function showLumpDetail(token) {
     titleEl.textContent = (lump.abstraction || 'Unknown Lump') +
         (isNamespace ? ' — Namespace LUMP' : ` — ${_lumpTitleLabel}`);
 
+    // ── Symmetric Open-in link: LUMP → Abstraction Catalog ──────────────────
+    // Only offered when a cataloged abstraction of the same name actually
+    // exists — degrades gracefully (button omitted) otherwise.
+    let _lumpAbsMatch = null;
+    if (lump.abstraction && typeof abstractionRegistry !== 'undefined' && abstractionRegistry &&
+        typeof abstractionRegistry.getByName === 'function') {
+        _lumpAbsMatch = abstractionRegistry.getByName(lump.abstraction);
+    }
+
     const _tk = token.replace(/[^a-z0-9]/gi, '');
     const _prevTab = _lumpActiveTab[_tk] || 'overview';
     delete _lumpContentLoaded[_tk];
@@ -75,6 +84,9 @@ function showLumpDetail(token) {
             `${_canShrink ? '' : 'disabled '}` +
             `title="${_canShrink ? `Remove unused freespace — shrink from ${_curSize}w to ${_minSize}w (save ${_saved}w)` : `Already at minimum size (${_curSize}w)`}">` +
             `Shrink to ${_minSize}w ▼</button>`;
+    }
+    if (_lumpAbsMatch) {
+        _headerStrip += `<button class="lump-hs-btn lump-view-abs-btn" onclick="_goToAbstractionByName('${_e(lump.abstraction)}')" title="View Abstraction \u2014 Jump to the Abstraction Catalog entry">&#8599; Abstraction</button>`;
     }
     _headerStrip += `<button class="btn lump-delete-btn lump-hs-delete-btn" data-delete-token="${_e(token)}" title="Delete this lump">&#128465;</button>`;
     _headerStrip += `</div>`;
@@ -3893,6 +3905,30 @@ function _goToAbstractionByName(name) {
     showAbstractionDetail(abs.index);
 }
 
+// ── Symmetric Open-in link: Abstraction → Editor ───────────────────────────
+// Reuses the same "find the saved LUMP for this abstraction" lookup as
+// _goToLumpByAbstractionName, then hands off to the existing, fully-featured
+// openLumpInEditor() so drafts/banners/dirty-tracking behave identically no
+// matter which view the user jumped in from. Degrades gracefully (toast, no
+// navigation) when no compiled LUMP exists yet for this abstraction.
+async function _absOpenInEditorByName(name) {
+    if (!name) return;
+    if (_lumpsCache.length === 0) {
+        try {
+            const r = await fetch('/api/lumps/list');
+            if (r.ok) _lumpsCache = await r.json();
+        } catch (e) {}
+    }
+    const existing = _lumpsCache.find(l => l.abstraction === name);
+    if (!existing) {
+        if (typeof _showFpgaToast === 'function') {
+            _showFpgaToast('No LUMP found', 'No compiled LUMP found for \u201c' + name + '\u201d \u2014 cannot open in editor', 'warn', 2000);
+        }
+        return;
+    }
+    if (typeof openLumpInEditor === 'function') await openLumpInEditor(existing.token);
+}
+
 async function _goToLumpByAbstractionName(name) {
     if (!name) return;
     // Warm cache: check immediately without a network round-trip.
@@ -4223,6 +4259,7 @@ async function openLumpInEditor(token) {
         var _db = document.getElementById('_lumpDraftBanner');
         if (_db) _db.remove();
         _discardBtn.remove();
+        if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
         if (typeof switchView === 'function') switchView('lumps');
     });
     // Insert the Discard button into the toolbar, after the inline Compile button
@@ -4236,6 +4273,12 @@ async function openLumpInEditor(token) {
     // clears this to null (app-compile.js line ~1158) so mid-edit state is
     // never stale.
     window._editorLastSavedToken = token;
+    // Opening a saved LUMP is a distinct context from a catalog-method edit —
+    // clear any stale abstraction/method context so the jump links reflect
+    // this LUMP, not a previously-edited method.
+    window._pseudoEditContext = null;
+    if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
+    if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
 }
 
 // ── GT Slot Picker ────────────────────────────────────────────────────────────

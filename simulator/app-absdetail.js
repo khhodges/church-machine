@@ -362,6 +362,10 @@ function showAbstractionDetail(index) {
     html += '<div class="abs-detail-section">';
     html += `<div class="abs-detail-badge layer-${abs.layer}">Layer ${abs.layer} \u2014 ${layerName}</div>`;
     html += ` <span class="abs-profile-badge ${detailProfileClass}" style="margin-left:4px;font-size:0.62rem;">${detailProfile}</span>`;
+    html += `<div class="abs-detail-actions" style="margin:0.4rem 0;display:flex;gap:0.4rem;flex-wrap:wrap;">`;
+    html += `<button class="btn btn-sm abs-jump-btn" onclick="_absOpenInEditorByName(abstractionRegistry.getAbstraction(${abs.index}).name)" data-tooltip="Open in Editor \u2014 Load this abstraction's saved LUMP into the code editor">&#8594; Editor</button>`;
+    html += `<button class="btn btn-sm abs-jump-btn" onclick="_goToLumpByAbstractionName(abstractionRegistry.getAbstraction(${abs.index}).name)" data-tooltip="Open in LUMP Browser \u2014 Jump to this abstraction's compiled LUMP">&#8594; LUMP</button>`;
+    html += `</div>`;
     html += `<div class="abs-detail-desc">${abs.description}</div>`;
     html += '</div>';
 
@@ -904,7 +908,9 @@ function absOpenMethodInEditor(absIdx, methodName, tabEl, panelId) {
 
     // Set catalog edit context so Save button shows "↑ Compile & Save"
     window._pseudoEditContext = { absIdx: absIdx, methodName: methodName };
+    window._editorLastSavedToken = null;
     if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
+    if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
 }
 
 function absShowAddForm(absIdx) {
@@ -973,7 +979,9 @@ function absRestoreMethodVersion(absIdx, methodName, histIdx) {
     if (outEl) outEl.innerHTML = '';
 
     window._pseudoEditContext = { absIdx: absIdx, methodName: methodName };
+    window._editorLastSavedToken = null;
     if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
+    if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
 
     const msg = document.createElement('div');
     msg.style.cssText = 'color:#ffb74d;font-style:italic;padding:2px 0;';
@@ -1394,7 +1402,9 @@ function absGenerateMethod(absIdx, methodName) {
                 if (typeof updateLineNumbers === 'function') updateLineNumbers();
             }
             window._pseudoEditContext = { absIdx: absIdx, methodName: methodName };
+            window._editorLastSavedToken = null;
             if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
+            if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
             const outEl = document.getElementById('assemblyOutput');
             if (outEl) {
                 const msg = document.createElement('div');
