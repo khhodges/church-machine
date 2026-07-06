@@ -71,20 +71,27 @@ const SCROLL_METHOD_SRC = extractFunctionByName('app-lumps.js', '_scrollToLumpMe
 const REFRESH_LINKS_SRC = extractFunctionByName('app-shell.js', '_refreshEditorJumpLinks');
 const EDITOR_TO_LUMP_SRC = extractFunctionByName('app-shell.js', '_editorJumpToLump');
 const EDITOR_TO_ABS_SRC  = extractFunctionByName('app-shell.js', '_editorJumpToAbstraction');
+// Task #1997: the real version-preference resolver (renderLumps) that decides
+// WHICH token _pendingLumpAbstractionName/_pendingLumpMethodName resolve
+// against when several lumps share one abstraction name (different versions).
+const RENDER_LUMPS_SRC   = extractFunctionByName('app-abstractions.js', 'renderLumps');
 
 const ALL_SRC = [TOAST_SRC, ABS_TO_EDITOR_SRC, ABS_TO_LUMP_SRC, SCROLL_METHOD_SRC,
-                 REFRESH_LINKS_SRC, EDITOR_TO_LUMP_SRC, EDITOR_TO_ABS_SRC].join('\n\n');
+                 REFRESH_LINKS_SRC, EDITOR_TO_LUMP_SRC, EDITOR_TO_ABS_SRC,
+                 RENDER_LUMPS_SRC].join('\n\n');
 
 // ── VM context factory ───────────────────────────────────────────────────────
 // Builds a jsdom document (with the two editor jump buttons present, matching
 // index.html) plus a real _lumpsCache / abstractionRegistry pair and spies for
 // every production entry point (switchView, showLumpDetail,
 // showAbstractionDetail, openLumpInEditor).
-function makeCtx({ lumpsCache = [], abstractions = [], fetchImpl = null } = {}) {
+function makeCtx({ lumpsCache = [], abstractions = [], fetchImpl = null,
+                    lumpsListHtmlId = 'lumpsListContent', fastTimers = false } = {}) {
     const dom = new JSDOM(
         '<!DOCTYPE html><body>' +
         '<button id="editorJumpToLumpBtn" style="display:none;"></button>' +
         '<button id="editorJumpToAbsBtn" style="display:none;"></button>' +
+        `<div id="${lumpsListHtmlId}"></div>` +
         '</body>'
     );
     const document = dom.window.document;
@@ -94,6 +101,7 @@ function makeCtx({ lumpsCache = [], abstractions = [], fetchImpl = null } = {}) 
         showLumpDetail: [],
         showAbstractionDetail: [],
         openLumpInEditor: [],
+        switchLumpTab: [],
     };
 
     const registry = {
@@ -105,20 +113,41 @@ function makeCtx({ lumpsCache = [], abstractions = [], fetchImpl = null } = {}) 
         },
     };
 
+    // fastTimers: used by tests that exercise _scrollToLumpMethod's retry
+    // poll (up to 40 * 100ms) via renderLumps rather than calling it
+    // directly with a pre-set _attempt — collapses only the poll's known
+    // 100ms retry interval to 0ms so a full "not found" degrade path runs
+    // in milliseconds. Other delays (e.g. the toast's own 2000ms/400ms
+    // auto-dismiss timers) are left untouched so the toast is still present
+    // when the test asserts on it shortly afterward.
+    const timeoutFn = fastTimers ? (fn, ms) => setTimeout(fn, ms === 100 ? 0 : ms) : setTimeout;
+
     const sandbox = {
         document,
-        setTimeout, clearTimeout,
+        setTimeout: timeoutFn, clearTimeout,
         Promise,
-        window: { _pseudoEditContext: null, _editorLastSavedToken: null, _editorJumpTargets: null },
+        window: { _pseudoEditContext: null, _editorLastSavedToken: null, _editorJumpTargets: null,
+                  _pendingLumpTab: null, _pendingLumpToken: null },
         _lumpsCache: lumpsCache,
         _pendingLumpAbstractionName: null,
         _pendingLumpMethodName: null,
+        _lumpSortOrder: 'name',
         abstractionRegistry: registry,
         switchView: (v) => calls.switchView.push(v),
         showLumpDetail: (t) => calls.showLumpDetail.push(t),
         showAbstractionDetail: (i) => calls.showAbstractionDetail.push(i),
         openLumpInEditor: async (t) => { calls.openLumpInEditor.push(t); },
         fetch: fetchImpl || (async () => { throw new Error('fetch not configured'); }),
+        // Minimal real behaviour (not spies) so renderLumps' own control flow
+        // (which relies on the sorted array + escaped html) does not throw
+        // before reaching the version-resolution / drill-down logic under test.
+        _lumpsSorted: (lumps) => lumps.slice(),
+        _escHtml: (s) => String(s == null ? '' : s),
+        _lumpDateStr: () => '',
+        _getLiveLumpState: () => null,
+        updateLiveLumpBanner: () => {},
+        _updateLumpRepoCount: () => {},
+        _switchLumpTab: (tk, tab) => calls.switchLumpTab.push([tk, tab]),
     };
 
     const ctx = vm.createContext(new Proxy(sandbox, {
@@ -422,6 +451,88 @@ trackAsync((async function t13() {
     assert('T13 poll finds the card once it appears', card.getAttribute('data-collapsed') === '0');
     assert('T13 poll highlights the newly-appeared card',
         card.classList.contains('lump-method-card-highlight'));
+})());
+
+// ── T14 (Task #1997): drill-down survives renderLumps() re-resolving
+// _selectedLumpToken to a DIFFERENT lump version than the one the user was
+// looking at when they double-clicked a method.
+//
+// Two lumps share the abstraction name "Widget" but are different
+// tokens/versions with disjoint method sets:
+//   - WIDGETBOOT — boot-resident (ns_slot set, no version), has "MethodX".
+//   - WIDGETV2FLOAT — a newer, versioned floating fork, has "MethodY" only.
+// renderLumps()'s "prefer user-saved (versioned, floating) over
+// boot-resident" rule (app-abstractions.js ~566-569) must pick
+// WIDGETV2FLOAT over WIDGETBOOT. The drill-down must then be attempted
+// against the RESOLVED token (WIDGETV2FLOAT), not whatever token was
+// selected before renderLumps ran — and since "MethodX" does not exist on
+// WIDGETV2FLOAT, it must degrade to the not-found toast rather than
+// silently matching same-named-but-wrong-version content.
+trackAsync((async function t14() {
+    const WIDGET_BOOT  = { abstraction: 'Widget', token: 'WIDGETBOOT',    version: null, ns_slot: 5 };
+    const WIDGET_V2     = { abstraction: 'Widget', token: 'WIDGETV2FLOAT', version: 2,    ns_slot: null };
+    const lumps = [WIDGET_BOOT, WIDGET_V2];
+
+    const { ctx, document, calls } = makeCtx({
+        lumpsCache: lumps,
+        fastTimers: true,
+        fetchImpl: async () => ({ ok: true, json: async () => lumps }),
+    });
+
+    // Simulate the user having been on the boot-resident version and
+    // double-clicking "MethodX" (only present there) to jump to the LUMP.
+    await vm.runInContext('_goToLumpByAbstractionName("Widget", "MethodX")', ctx);
+    assert('T14 setup: switchView("lumps") called', calls.switchView[0] === 'lumps', calls.switchView);
+    assert('T14 setup: _pendingLumpAbstractionName set to "Widget"',
+        vm.runInContext('_pendingLumpAbstractionName', ctx) === 'Widget');
+    assert('T14 setup: _pendingLumpMethodName set to "MethodX"',
+        vm.runInContext('_pendingLumpMethodName', ctx) === 'MethodX');
+
+    // The Content tab (for whichever token gets resolved) only has "MethodY"
+    // rendered — matching WIDGETV2FLOAT's real method set, not WIDGETBOOT's.
+    const panel = document.createElement('div');
+    panel.id = 'lumpTabContent_WIDGETV2FLOAT';
+    panel.innerHTML = '<div class="lump-method-card" data-collapsed="1" data-method-name="MethodY">card body</div>';
+    document.body.appendChild(panel);
+    // A same-named "MethodX" card also exists under the STALE boot token's
+    // panel, simulating the old version's content still being cached in the
+    // DOM from a prior view — it must never be the one that gets matched.
+    const stalePanel = document.createElement('div');
+    stalePanel.id = 'lumpTabContent_WIDGETBOOT';
+    stalePanel.innerHTML = '<div class="lump-method-card" data-collapsed="1" data-method-name="MethodX">stale card</div>';
+    document.body.appendChild(stalePanel);
+    const staleCard = stalePanel.querySelector('.lump-method-card');
+
+    // renderLumps() is what actually resolves _pendingLumpAbstractionName
+    // against the live lump list — this is the "pick a different LUMP
+    // version" step under test.
+    await vm.runInContext('renderLumps()', ctx);
+
+    assert('T14 renderLumps resolved _selectedLumpToken to the versioned floating fork (not boot-resident)',
+        vm.runInContext('_selectedLumpToken', ctx) === 'WIDGETV2FLOAT',
+        vm.runInContext('_selectedLumpToken', ctx));
+    assert('T14 renderLumps requested the Content tab for the RESOLVED token',
+        calls.switchLumpTab.length === 1 && calls.switchLumpTab[0][0] === 'WIDGETV2FLOAT' && calls.switchLumpTab[0][1] === 'content',
+        calls.switchLumpTab);
+    assert('T14 showLumpDetail called with the resolved token',
+        calls.showLumpDetail.includes('WIDGETV2FLOAT'), calls.showLumpDetail);
+
+    // Give the (fast-timer) retry poll a moment to exhaust its attempts —
+    // it must give up on the resolved token's panel (which only has
+    // MethodY) rather than silently finding/highlighting the stale
+    // same-named "MethodX" card that still lives under the OLD token's panel.
+    // 40 attempts * setTimeout(fn, 0) still costs Node's ~1ms floor per hop.
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const toastEl = document.getElementById('fpgaToastEl');
+    assert('T14 DRIFT: method-not-found toast shown for the resolved (v2) token, not a false match',
+        toastEl !== null);
+    const titleEl = toastEl && toastEl.querySelector('.fpga-toast-title');
+    assert('T14 toast title is "Method not found"',
+        titleEl && titleEl.textContent === 'Method not found', titleEl && titleEl.textContent);
+    assert('T14 the stale same-named card under the OLD token panel was never touched',
+        staleCard.getAttribute('data-collapsed') === '1' && !staleCard.classList.contains('lump-method-card-highlight'),
+        { collapsed: staleCard.getAttribute('data-collapsed'), highlighted: staleCard.classList.contains('lump-method-card-highlight') });
 })());
 
 // ── Summary ───────────────────────────────────────────────────────────────────
