@@ -722,6 +722,30 @@ class TestR16_AbstractionNameMatchesRegistry:
             "with a reason."
         )
 
+    @pytest.mark.parametrize(
+        "allowlisted_name", sorted(KNOWN_NON_REGISTRY_ABSTRACTIONS),
+    )
+    def test_allowlist_entry_is_not_stale(self, allowlisted_name):
+        """Companion guard for KNOWN_NON_REGISTRY_ABSTRACTIONS: every name in
+        the allowlist must still appear as an `abstraction` field on at least
+        one current manifest/sidecar entry (i.e. still be a real, checked
+        target). If a lump is renamed, deleted, or its `abstraction` field
+        changed, the allowlist entry stops matching anything and silently
+        rots — worse, it could later "cover for" an unrelated future name
+        collision that happens to reuse the same string. Remove stale
+        entries instead of leaving them in place.
+        """
+        current_abstraction_names = {t[2] for t in ABSTRACTION_CHECK_TARGETS}
+        assert allowlisted_name in current_abstraction_names, (
+            f"KNOWN_NON_REGISTRY_ABSTRACTIONS entry {allowlisted_name!r} no longer "
+            "matches any current manifest/sidecar `abstraction` field.\n"
+            "  The lump this entry was meant for was likely renamed, deleted, or "
+            "had its `abstraction` field changed. This allowlist entry is now dead "
+            "code and must be removed from KNOWN_NON_REGISTRY_ABSTRACTIONS in "
+            "tests/lump/test_lump_consistency.py — leaving it in place risks "
+            "silently masking an unrelated future name collision."
+        )
+
 
 class TestR14_ArchiveSidecarsExist:
     """R14: Every archive binary has a matching sidecar .json.
