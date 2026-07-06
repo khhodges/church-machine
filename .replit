@@ -155,6 +155,10 @@ args = "callhome-parser-tests"
 task = "workflow.run"
 args = "openin-links-tests"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "lump-warning-tests"
+
 [[workflows.workflow]]
 name = "Church Machine IDE"
 author = "agent"
@@ -548,6 +552,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node simulator/test_openin_links.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "lump-warning-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/lump_warning_test.js"
 
 [workflows.workflow.metadata]
 outputType = "console"
