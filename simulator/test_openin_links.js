@@ -142,9 +142,17 @@ function makeCtx({ lumpsCache = [], abstractions = [], fetchImpl = null } = {}) 
 // ── Test harness ─────────────────────────────────────────────────────────────
 let passed = 0;
 let failed = 0;
+let pendingAsync = 0;
 function assert(label, condition, detail) {
     if (condition) { console.log('PASS ' + label); passed++; }
     else { console.log('FAIL ' + label + (detail !== undefined ? ' \u2014 ' + detail : '')); failed++; }
+}
+// Long-running async tests (real setTimeout polling, e.g. T13) register
+// themselves here so the summary below waits for them instead of racing a
+// fixed delay against their completion.
+function trackAsync(promise) {
+    pendingAsync++;
+    return promise.finally(() => { pendingAsync--; });
 }
 
 // Known-good fixture: "SlideRule" abstraction with a matching compiled LUMP.
@@ -328,8 +336,99 @@ const SLIDE_RULE_ABS  = { index: 4, name: 'SlideRule' };
     assert('T11 DRIFT: missing method name does not throw', !threw);
 })();
 
+// ── T12: _scrollToLumpMethod after a mid-session Content-tab reload
+// (LUMP shrunk / re-forked) targets the freshly-rendered card, not a
+// detached reference from the render that existed before the reload ────────
+// Simulates: user drills into "Compute" while the OLD render is showing ->
+// LUMP gets Shrunk/re-forked -> caller does `delete _lumpContentLoaded[tk]`
+// and re-fetches -> _renderLumpCodeContent wipes bodyEl.innerHTML and
+// builds all-new `.lump-method-card` elements (new DOM node identities,
+// same data-method-name) -> a second drill-down into "Compute" must land
+// on the NEW card and must never mutate the OLD, now-detached one.
+(async function t12() {
+    const { ctx, document } = makeCtx({});
+    const panel = document.createElement('div');
+    panel.id = 'lumpTabContent_0700';
+    document.body.appendChild(panel);
+
+    const bodyEl = document.createElement('div');
+    bodyEl.id = 'lumpContentBody_0700';
+    panel.appendChild(bodyEl);
+
+    // Pre-resize render: stale card, already visited once (collapsed=0).
+    bodyEl.innerHTML = '<div class="lump-method-card" data-collapsed="0" ' +
+        'data-method-name="Compute" data-body="stale-13-words">card body OLD</div>';
+    const oldCard = bodyEl.querySelector('.lump-method-card');
+    oldCard.classList.add('lump-method-card-highlight');
+
+    // Drill-down #1 (pre-resize): resolves the OLD card, as expected.
+    vm.runInContext('_scrollToLumpMethod("0700", "Compute")', ctx);
+    assert('T12 pre-resize drill-down hits the pre-existing card',
+        bodyEl.querySelector('.lump-method-card') === oldCard);
+
+    // Simulate Shrink/re-fork: caller does `delete _lumpContentLoaded[tk]`
+    // and `_loadLumpContent` -> `_renderLumpCodeContent` re-fetches and
+    // wipes bodyEl.innerHTML, building a brand-new card for the same
+    // method name (auto-detected boundary this time, e.g. after Shrink
+    // collapsed the manifest methods array to zero entries).
+    oldCard.remove(); // now fully detached — must never be touched again
+    bodyEl.innerHTML = '<div class="lump-method-card" data-collapsed="1" ' +
+        'data-method-name="Compute" data-body="fresh-4-words">card body NEW</div>';
+    const newCard = bodyEl.querySelector('.lump-method-card');
+
+    // Drill-down #2 (post-resize): must resolve to the NEW card only.
+    vm.runInContext('_scrollToLumpMethod("0700", "Compute")', ctx);
+
+    assert('T12 post-resize drill-down expands the NEW card',
+        newCard.getAttribute('data-collapsed') === '0');
+    assert('T12 post-resize drill-down highlights the NEW card',
+        newCard.classList.contains('lump-method-card-highlight'));
+    assert('T12 post-resize drill-down never re-touches the detached OLD card',
+        oldCard.getAttribute('data-collapsed') === '0' && !oldCard.isConnected,
+        { collapsed: oldCard.getAttribute('data-collapsed'), connected: oldCard.isConnected });
+})();
+
+// ── T13: _scrollToLumpMethod polling picks up a card that only appears
+// AFTER the reload finishes (Content tab was mid-fetch when the jump was
+// requested — the realistic race after a Shrink/re-fork navigation) ───────
+trackAsync((async function t13() {
+    const { ctx, document } = makeCtx({});
+    const panel = document.createElement('div');
+    panel.id = 'lumpTabContent_0700';
+    document.body.appendChild(panel);
+
+    const bodyEl = document.createElement('div');
+    bodyEl.id = 'lumpContentBody_0700';
+    bodyEl.className = 'lump-hex-loading';
+    bodyEl.textContent = 'Loading\u2026';
+    panel.appendChild(bodyEl);
+
+    // Kick off the drill-down while the Content tab is still loading
+    // (attempt 0 finds nothing and schedules a retry ~100ms out).
+    vm.runInContext('_scrollToLumpMethod("0700", "Compute")', ctx);
+    assert('T13 no card yet: nothing to expand', bodyEl.querySelector('.lump-method-card') === null);
+
+    // Reload completes mid-poll: bodyEl is repopulated with the new card
+    // (auto-detected boundary, marked with the "[~]" UI badge elsewhere,
+    // but the data-method-name attribute itself stays the plain name).
+    await new Promise(resolve => setTimeout(resolve, 30));
+    bodyEl.className = '';
+    bodyEl.innerHTML = '<div class="lump-method-card" data-collapsed="1" ' +
+        'data-method-name="Compute">card body (auto-detected)</div>';
+    const card = bodyEl.querySelector('.lump-method-card');
+
+    // Wait past the 100ms retry interval for the poll to catch the new card.
+    await new Promise(resolve => setTimeout(resolve, 200));
+    assert('T13 poll finds the card once it appears', card.getAttribute('data-collapsed') === '0');
+    assert('T13 poll highlights the newly-appeared card',
+        card.classList.contains('lump-method-card-highlight'));
+})());
+
 // ── Summary ───────────────────────────────────────────────────────────────────
-setTimeout(function() {
-    console.log('\n' + passed + ' passed, ' + failed + ' failed');
-    if (failed > 0) process.exit(1);
-}, 50);
+(function waitAndSummarize() {
+    setTimeout(function() {
+        if (pendingAsync > 0) { waitAndSummarize(); return; }
+        console.log('\n' + passed + ' passed, ' + failed + ' failed');
+        if (failed > 0) process.exit(1);
+    }, 50);
+})();
