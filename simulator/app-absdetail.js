@@ -2443,7 +2443,7 @@ CALL   CR1              ; Display.Scroll via E perm:
         },
         'SlideRule': {
             'Multiply': `; SlideRule.Multiply — DR1 * DR2
-; Method index 0 — via NS LOAD + DR3 method select
+; Method index 0 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
 IADD   DR1, DR0, #2     ; Left operand
@@ -2451,7 +2451,7 @@ IADD   DR2, DR0, #3     ; Right operand
 IADD   DR3, DR0, #0     ; Method selector: Multiply (index 0)
 CALL   CR1              ; DR1 <- 6`,
             'Divide': `; SlideRule.Divide — DR1 / DR2
-; Method index 1 — via NS LOAD + DR3 method select
+; Method index 1 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
 IADD   DR1, DR0, #10    ; Dividend
@@ -2460,14 +2460,14 @@ IADD   DR3, DR0, #1     ; Method selector: Divide (index 1)
 CALL   CR1              ; DR1 <- 5
 ; Div by zero returns 0 with fault message`,
             'Sqrt': `; SlideRule.Sqrt — floor(sqrt(DR1))
-; Method index 2 — via NS LOAD + DR3 method select
+; Method index 2 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
 IADD   DR1, DR0, #9     ; Input
 IADD   DR3, DR0, #2     ; Method selector: Sqrt (index 2)
 CALL   CR1              ; DR1 <- 3`,
             'Mod': `; SlideRule.Mod — DR1 % DR2
-; Method index 3 — via NS LOAD + DR3 method select
+; Method index 3 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
 IADD   DR1, DR0, #10    ; Dividend
@@ -2475,7 +2475,7 @@ IADD   DR2, DR0, #3     ; Divisor
 IADD   DR3, DR0, #3     ; Method selector: Mod (index 3)
 CALL   CR1              ; DR1 <- 1`,
             'Sin': `; SlideRule.Sin — sine (radians)
-; Method index 4 — via NS LOAD + DR3 method select
+; Method index 4 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ; FPGA uses CORDIC; simulator uses IEEE 754
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
@@ -2483,14 +2483,14 @@ IADD   DR1, DR0, #0x3FC90FDB  ; pi/2 (1.5708 rad)
 IADD   DR3, DR0, #4     ; Method selector: Sin (index 4)
 CALL   CR1              ; DR1 <- 0x3F800000 (1.0)`,
             'Cos': `; SlideRule.Cos — cosine (radians)
-; Method index 5 — via NS LOAD + DR3 method select
+; Method index 5 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
 IADD   DR1, DR0, #0     ; 0.0 rad
 IADD   DR3, DR0, #5     ; Method selector: Cos (index 5)
 CALL   CR1              ; DR1 <- 0x3F800000 (1.0)`,
             'Tan': `; SlideRule.Tan — tangent (radians)
-; Method index 6 — via NS LOAD + DR3 method select
+; Method index 6 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
 IADD   DR1, DR0, #0x3F490FDB  ; pi/4 (0.7854 rad)
@@ -2498,7 +2498,7 @@ IADD   DR3, DR0, #6     ; Method selector: Tan (index 6)
 CALL   CR1              ; DR1 <- 0x3F800000 (1.0)
 ; Near pi/2: FAULT DOMAIN_ERROR (asymptote)`,
             'Asin': `; SlideRule.Asin — inverse sine -> radians
-; Method index 7 — via NS LOAD + DR3 method select
+; Method index 7 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
 IADD   DR1, DR0, #0x3F800000  ; 1.0
@@ -2506,21 +2506,21 @@ IADD   DR3, DR0, #7     ; Method selector: Asin (index 7)
 CALL   CR1              ; DR1 <- 0x3FC90FDB (pi/2)
 ; |input| > 1.0: FAULT DOMAIN_ERROR`,
             'Acos': `; SlideRule.Acos — inverse cosine -> radians
-; Method index 8 — via NS LOAD + DR3 method select
+; Method index 8 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
 IADD   DR1, DR0, #0x3F800000  ; 1.0
 IADD   DR3, DR0, #8     ; Method selector: Acos (index 8)
 CALL   CR1              ; DR1 <- 0x00000000 (0.0)`,
             'Atan': `; SlideRule.Atan — inverse tangent -> radians
-; Method index 9 — via NS LOAD + DR3 method select
+; Method index 9 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
 IADD   DR1, DR0, #0x3F800000  ; 1.0
 IADD   DR3, DR0, #9     ; Method selector: Atan (index 9)
 CALL   CR1              ; DR1 <- 0x3F490FDB (pi/4)`,
             'ToDegrees': `; SlideRule.ToDegrees — radians to degrees
-; Method index 10 — via NS LOAD + DR3 method select
+; Method index 10 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
 IADD   DR1, DR0, #0x40490FDB  ; pi (3.14159 rad)
@@ -2528,7 +2528,7 @@ IADD   DR3, DR0, #10    ; Method selector: ToDegrees (index 10)
 CALL   CR1              ; DR1 <- 0x43340000 (180.0 deg)
 ; Multiply by 180/pi internally`,
             'ToRadians': `; SlideRule.ToRadians — degrees to radians
-; Method index 11 — via NS LOAD + DR3 method select
+; Method index 11 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
 IADD   DR1, DR0, #0x43340000  ; 180.0 degrees
@@ -2536,7 +2536,7 @@ IADD   DR3, DR0, #11    ; Method selector: ToRadians (index 11)
 CALL   CR1              ; DR1 <- 0x40490FDB (pi rad)
 ; Multiply by pi/180 internally`,
             'Bernoulli': `; SlideRule.Bernoulli(n) — exact rational B(n)
-; Method index 12 — via NS LOAD + DR3 method select
+; Method index 12 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ; Returns: numerator in DR1, denominator in DR2
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
@@ -2546,7 +2546,7 @@ CALL   CR1              ; DR1 <- 1 (numerator)
                          ; DR2 <- 42 (denominator)
 ; Odd n>1 returns 0/1`,
             'Abs': `; SlideRule.Abs — |DR1|
-; Method index 13 — via NS LOAD + DR3 method select
+; Method index 13 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
 IADD   DR1, DR0, #42    ; Input
@@ -2554,7 +2554,7 @@ ISUB   DR1, DR0, DR1    ; Negate: DR1 = -42
 IADD   DR3, DR0, #13    ; Method selector: Abs (index 13)
 CALL   CR1              ; DR1 <- 42`,
             'Pow': `; SlideRule.Pow — base^exp (integer, exp >= 0)
-; Method index 14 — via NS LOAD + DR3 method select
+; Method index 14 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
 IADD   DR1, DR0, #2     ; Base
@@ -2563,7 +2563,7 @@ IADD   DR3, DR0, #14    ; Method selector: Pow (index 14)
 CALL   CR1              ; DR1 <- 1024
 ; Negative exponent returns 0`,
             'Min': `; SlideRule.Min — min(DR1, DR2)
-; Method index 15 — via NS LOAD + DR3 method select
+; Method index 15 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
 IADD   DR1, DR0, #7     ; First value
@@ -2571,7 +2571,7 @@ IADD   DR2, DR0, #3     ; Second value
 IADD   DR3, DR0, #15    ; Method selector: Min (index 15)
 CALL   CR1              ; DR1 <- 3`,
             'Max': `; SlideRule.Max — max(DR1, DR2)
-; Method index 16 — via NS LOAD + DR3 method select
+; Method index 16 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
 IADD   DR1, DR0, #7     ; First value
@@ -2579,7 +2579,7 @@ IADD   DR2, DR0, #3     ; Second value
 IADD   DR3, DR0, #16    ; Method selector: Max (index 16)
 CALL   CR1              ; DR1 <- 7`,
             'GCD': `; SlideRule.GCD — greatest common divisor
-; Method index 17 — via NS LOAD + DR3 method select
+; Method index 17 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
 IADD   DR1, DR0, #12    ; First value
@@ -2587,14 +2587,14 @@ IADD   DR2, DR0, #8     ; Second value
 IADD   DR3, DR0, #17    ; Method selector: GCD (index 17)
 CALL   CR1              ; DR1 <- 4`,
             'Factorial': `; SlideRule.Factorial — n!
-; Method index 18 — via NS LOAD + DR3 method select
+; Method index 18 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
 IADD   DR1, DR0, #10    ; n=10
 IADD   DR3, DR0, #18    ; Method selector: Factorial (index 18)
 CALL   CR1              ; DR1 <- 3628800`,
             'Log2': `; SlideRule.Log2 — floor(log2(n))
-; Method index 19 — via NS LOAD + DR3 method select
+; Method index 19 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
 IADD   DR1, DR0, #256   ; Input
@@ -2602,7 +2602,7 @@ IADD   DR3, DR0, #19    ; Method selector: Log2 (index 19)
 CALL   CR1              ; DR1 <- 8
 ; n<1 returns 0`,
             'Atan2': `; SlideRule.Atan2 — atan2(y, x)
-; Method index 20 — via NS LOAD + DR3 method select
+; Method index 20 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
 IADD   DR1, DR0, #0x3F800000  ; y = 1.0
@@ -2610,7 +2610,7 @@ IADD   DR2, DR0, #0x3F800000  ; x = 1.0
 IADD   DR3, DR0, #20    ; Method selector: Atan2 (index 20)
 CALL   CR1              ; DR1 <- 0x3F490FDB (pi/4)`,
             'Signum': `; SlideRule.Signum — sign of DR1: +1, 0, or -1
-; Method index 21 — via NS LOAD + DR3 method select
+; Method index 21 — LOAD CR1, SlideRule; set DR3=N, CALL CR1
 ;
 LOAD   CR1, SlideRule      ; Load SlideRule E-GT from NS
 IADD   DR1, DR0, #42    ; Positive input
