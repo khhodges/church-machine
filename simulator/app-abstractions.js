@@ -569,7 +569,10 @@ async function renderLumps() {
                           || _allMatched[0];
             if (_matched) _selectedLumpToken = _matched.token;
             _pendingLumpAbstractionName = null;
-            if (_pendingLumpMethodName && _selectedLumpToken) window._pendingLumpTab = 'content';
+            if (_pendingLumpMethodName && _selectedLumpToken) {
+                window._pendingLumpTab = (typeof _pendingLumpMethodTarget !== 'undefined' && _pendingLumpMethodTarget === 'hexdump')
+                    ? 'hexdump' : 'content';
+            }
         }
 
         // Auto-select the live lump (CR14 NS slot) every time the panel renders.
@@ -652,13 +655,20 @@ async function renderLumps() {
             if (typeof _switchLumpTab === 'function') _switchLumpTab(_ptk, window._pendingLumpTab);
             window._pendingLumpTab = null;
         }
-        // Method-level drill-down: once the Content tab has been selected above,
-        // scroll to and highlight the specific method's card.
+        // Method-level drill-down: once the Content (or Hex Dump) tab has been
+        // selected above, scroll to and highlight the specific method's
+        // card/byte-range. Target chosen by _goToLumpByAbstractionName's
+        // third argument, stashed in _pendingLumpMethodTarget.
         if (_pendingLumpMethodName) {
             const _pendingMethod = _pendingLumpMethodName;
+            const _target = (typeof _pendingLumpMethodTarget !== 'undefined') ? _pendingLumpMethodTarget : 'content';
             _pendingLumpMethodName = null;
             const _mtk = (_selectedLumpToken || '').replace(/[^a-z0-9]/gi, '');
-            if (typeof _scrollToLumpMethod === 'function') _scrollToLumpMethod(_mtk, _pendingMethod);
+            if (_target === 'hexdump' && typeof _scrollToLumpHexMethod === 'function') {
+                _scrollToLumpHexMethod(_mtk, _pendingMethod);
+            } else if (typeof _scrollToLumpMethod === 'function') {
+                _scrollToLumpMethod(_mtk, _pendingMethod);
+            }
         }
         updateLiveLumpBanner();
 

@@ -365,6 +365,9 @@ function showAbstractionDetail(index, methodName) {
     html += `<div class="abs-detail-actions" style="margin:0.4rem 0;display:flex;gap:0.4rem;flex-wrap:wrap;">`;
     html += `<button class="btn btn-sm abs-jump-btn" onclick="_absOpenInEditorByName(abstractionRegistry.getAbstraction(${abs.index}).name,(window._absActiveMethod&&window._absActiveMethod[${abs.index}])||null)" data-tooltip="Open in Editor \u2014 Load this abstraction's saved LUMP (or the currently-active method) into the code editor">&#8594; Editor</button>`;
     html += `<button class="btn btn-sm abs-jump-btn" onclick="_goToLumpByAbstractionName(abstractionRegistry.getAbstraction(${abs.index}).name,(window._absActiveMethod&&window._absActiveMethod[${abs.index}])||null)" data-tooltip="Open in LUMP Browser \u2014 Jump to this abstraction's compiled LUMP">&#8594; LUMP</button>`;
+    if (window._absActiveMethod && window._absActiveMethod[abs.index]) {
+        html += `<button class="btn btn-sm abs-jump-btn" onclick="_goToLumpByAbstractionName(abstractionRegistry.getAbstraction(${abs.index}).name,(window._absActiveMethod&&window._absActiveMethod[${abs.index}])||null,'hexdump')" data-tooltip="Open in LUMP Browser \u2014 Jump straight to this method's byte range in the Hex Dump tab">&#8594; Hex</button>`;
+    }
     html += `</div>`;
     html += `<div class="abs-detail-desc">${abs.description}</div>`;
     html += '</div>';

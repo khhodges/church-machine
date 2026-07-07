@@ -456,6 +456,68 @@ async function _patchCcFromBinary(token, lump, tk) {
     } catch (_e) { /* silent — best-effort patch */ }
 }
 
+// Computes { name, start, end } word-index ranges (end exclusive, indices
+// into the full `words` array including the header word at index 0) for
+// every method in a lump — the Hex Dump equivalent of the mb/mbObj maps
+// built inside _renderLumpCodeContent for the Content tab. Kept as a
+// separate, minimal pass (rather than sharing that function's internals)
+// so Content-tab rendering behaviour is untouched.
+function _computeLumpMethodWordRanges(lump, words) {
+    const methods = lump.methods || [];
+    const _binaryHdr = (words && words.length > 0 && typeof sim !== 'undefined' && sim && sim.parseLumpHeader)
+        ? sim.parseLumpHeader(words[0] >>> 0) : null;
+    const cw = (_binaryHdr && _binaryHdr.valid) ? _binaryHdr.cw : (parseInt(lump.cw) || 0);
+    const abstName = lump.abstraction || 'Lump';
+
+    const mb = {};  // wordIndex → method name
+    if (methods.length > 0) {
+        let _codeOnlyCursor = 0;
+        for (const m of methods) {
+            if (m.aliasOf) continue;
+            const hasOffset = typeof m.offset === 'number';
+            const codeArr   = Array.isArray(m.code) ? m.code : null;
+            const hasCode   = codeArr !== null || typeof m.code === 'string';
+            if (!hasOffset && !hasCode) continue;
+            let wi;
+            if (hasOffset) {
+                wi = 1 + m.offset;
+            } else {
+                wi = 1 + _codeOnlyCursor;
+                _codeOnlyCursor += codeArr ? codeArr.length : 1;
+            }
+            mb[wi] = m.name;
+        }
+    } else if (cw > 0) {
+        mb[1] = `${abstName}.Method_0`;
+        let mIdx = 0;
+        const scanEnd = Math.min(cw, words.length - 2);
+        for (let i = 1; i <= scanEnd; i++) {
+            const w = words[i] >>> 0;
+            const opcode = (w >>> 27) & 0x1F;
+            const isHalt   = w === 0;
+            const isReturn = opcode === 3;
+            if (isHalt || isReturn) {
+                let j = i + 1;
+                while (j <= cw && words[j] === 0) j++;
+                if (j <= cw && j < words.length) {
+                    mIdx++;
+                    mb[j] = `${abstName}.Method_${mIdx}`;
+                    i = j - 1;
+                }
+            }
+        }
+    }
+
+    const sortedKeys = Object.keys(mb).map(Number).sort((a, b) => a - b);
+    const codeEnd = Math.min(cw + 1, words.length);
+    const ranges = sortedKeys.map((wi, idx) => ({
+        name: mb[wi],
+        start: wi,
+        end: idx + 1 < sortedKeys.length ? sortedKeys[idx + 1] : codeEnd,
+    }));
+    return ranges;
+}
+
 async function _fetchAndShowLumpBinary(token, lump) {
     const tk = (token || '').replace(/[^a-z0-9]/gi, '');
     const bodyEl = document.getElementById(`lumpBinBody_${tk}`);
@@ -484,6 +546,15 @@ async function _fetchAndShowLumpBinary(token, lump) {
         const lumpSize = parseInt(lump.lump_size) || numWords;
         if (!numWords) throw new Error('Empty lump');
 
+        // Method boundaries (word index → method covering that word), used to
+        // annotate the code region and to let _scrollToLumpHexMethod() jump
+        // straight to a method's byte range from the Abstraction detail view.
+        const methodRanges = _computeLumpMethodWordRanges(lump, words);
+        const methodAtWord = idx => {
+            for (const r of methodRanges) if (idx >= r.start && idx < r.end) return r.name;
+            return null;
+        };
+
         const COLS = 8;
         const rowCount = Math.ceil(numWords / COLS);
 
@@ -492,6 +563,7 @@ async function _fetchAndShowLumpBinary(token, lump) {
         for (let c = 0; c < COLS; c++) t += `<th>+${c}</th>`;
         t += '<th>Pack4 ASCII</th></tr></thead><tbody>';
 
+        let _lastAnnotatedMethod = null;
         for (let row = 0; row < rowCount; row++) {
             const baseIdx  = row * COLS;
             const baseAddr = (baseIdx * 4).toString(16).toUpperCase().padStart(6, '0');
@@ -502,6 +574,17 @@ async function _fetchAndShowLumpBinary(token, lump) {
             else if (baseIdx >= lumpSize - cc && cc > 0) rowClass = 'lump-hex-clist-row';
             else if (baseIdx >= cw + 1)          rowClass = 'lump-hex-pad-row';
 
+            const rowMethod = methodAtWord(baseIdx);
+            if (rowMethod && rowMethod !== _lastAnnotatedMethod) {
+                _lastAnnotatedMethod = rowMethod;
+                const range = methodRanges.find(r => r.name === rowMethod);
+                const wordSpan = range ? ` (words ${range.start}\u2013${range.end - 1})` : '';
+                t += `<tr class="lump-hex-method-row"><td colspan="${COLS + 2}">`
+                   + `\u25b8 ${e(rowMethod)}${wordSpan}</td></tr>`;
+            } else if (!rowMethod) {
+                _lastAnnotatedMethod = null;
+            }
+
             for (let c = 0; c < COLS; c++) {
                 const i = baseIdx + c;
                 if (i < numWords) {
@@ -511,7 +594,8 @@ async function _fetchAndShowLumpBinary(token, lump) {
                     rowHex += '<td class="lump-hex-empty"></td>';
                 }
             }
-            t += `<tr class="${rowClass}"><td class="lump-hex-addr">0x${baseAddr}</td>${rowHex}`;
+            const methodAttr = rowMethod ? ` data-method-name="${e(rowMethod)}"` : '';
+            t += `<tr class="${rowClass}"${methodAttr}><td class="lump-hex-addr">0x${baseAddr}</td>${rowHex}`;
             t += `<td class="lump-hex-ascii">${e(rowAsc)}</td></tr>`;
         }
 
@@ -3945,12 +4029,22 @@ async function _absOpenInEditorByName(name, methodName) {
     if (typeof openLumpInEditor === 'function') await openLumpInEditor(existing.token);
 }
 
-async function _goToLumpByAbstractionName(name, methodName) {
+// Which panel a pending method-level jump should land on once the LUMP
+// Browser finishes rendering: 'content' (default, disassembly card — see
+// _scrollToLumpMethod) or 'hexdump' (raw byte range — see
+// _scrollToLumpHexMethod). Read once in renderLumps() then left as-is;
+// only _goToLumpByAbstractionName ever sets it.
+let _pendingLumpMethodTarget = 'content';
+
+async function _goToLumpByAbstractionName(name, methodName, targetTab) {
     if (!name) return;
     // `methodName`, when supplied, drills into that method's card in the
     // Content tab (byte-range view) instead of landing on the LUMP as a
     // whole — completing the three-way Editor \u2194 Abstraction \u2194 LUMP
     // Browser method-level jump symmetry. See _scrollToLumpMethod().
+    // `targetTab === 'hexdump'` instead lands on the Hex Dump tab's byte
+    // range for that method — see _scrollToLumpHexMethod().
+    _pendingLumpMethodTarget = (targetTab === 'hexdump') ? 'hexdump' : 'content';
     // Warm cache: check immediately without a network round-trip.
     if (_lumpsCache.length > 0) {
         const existing = _lumpsCache.find(l => l.abstraction === name);
@@ -3980,6 +4074,43 @@ async function _goToLumpByAbstractionName(name, methodName) {
         switchView('lumps');
     } catch (e) {
         // Network error: do nothing rather than navigating blindly.
+    }
+}
+
+// ── Method-level drill-down: LUMP Browser Hex Dump tab ─────────────────────
+// Symmetric counterpart to _scrollToLumpMethod() for the Hex Dump tab.
+// _fetchAndShowLumpBinary() (below) tags every <tr> that falls inside a
+// method's word range with data-method-name, so this just needs to switch
+// to the hexdump tab, wait for the (async) render, then scroll/highlight.
+function _scrollToLumpHexMethod(tk, methodName, _attempt) {
+    if (!tk || !methodName) return;
+    const attempt = _attempt || 0;
+    if (typeof _switchLumpTab === 'function') _switchLumpTab(tk, 'hexdump');
+    const panel = document.getElementById(`lumpTabHexdump_${tk}`);
+    const rows = panel ? panel.querySelectorAll(`tr[data-method-name]`) : null;
+    let firstRow = null;
+    if (rows) {
+        for (const row of rows) {
+            if (row.getAttribute('data-method-name') === methodName) { firstRow = row; break; }
+        }
+    }
+    if (!firstRow) {
+        if (attempt < 40) {
+            setTimeout(() => _scrollToLumpHexMethod(tk, methodName, attempt + 1), 100);
+        } else if (typeof _showFpgaToast === 'function') {
+            _showFpgaToast('Method not found', '\u201c' + methodName + '\u201d has no identifiable byte range in this LUMP\u2019s hex dump.', 'warn', 2000);
+        }
+        return;
+    }
+    if (typeof firstRow.scrollIntoView === 'function') {
+        try { firstRow.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+    }
+    const allForMethod = Array.prototype.filter.call(rows, r => r.getAttribute('data-method-name') === methodName);
+    for (const row of allForMethod) {
+        row.classList.remove('lump-hex-method-highlight');
+        void row.offsetWidth;
+        row.classList.add('lump-hex-method-highlight');
+        setTimeout(() => row.classList.remove('lump-hex-method-highlight'), 2000);
     }
 }
 
