@@ -1,0 +1,46 @@
+{
+  "token": "00000600",
+  "abstraction": "LEDflash",
+  "filename": "LEDflash_v1.lump",
+  "sidecar_file": "LEDflash_v1.json",
+  "ns_slot": null,
+  "lump_size": 64,
+  "typ": 0,
+  "content_type": "code",
+  "cw": 1,
+  "cc": 1,
+  "status": "wip",
+  "source": "; Boot Abstraction (Boot.Abstr) \u2014 the lump executed by the hardware ROM during boot phases B:01\u2013B:07.  Loads NS, Thread, and Boot.Abstr lumps, then CALL CR0 (Thread.CR[0]) enters the configured first abstraction directly.\n; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\nabstraction LEDflash {\n    capabilities {\n        ; (none \u2014 add capability grants here)\n    }\n\n    method Boot {\n        ; Hardware boot sequence entry point.\n        ; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n        ; TODO: write your code here\n\n        RETURN\n    }\n}",
+  "description": "Boot Abstraction (Boot.Abstr) \u2014 the lump executed by the hardware ROM during boot phases B:01\u2013B:07.  Loads NS, Thread, and Boot.Abstr lumps, then CALL CR0 (Thread.CR[0]) enters the configured first abstraction directly.",
+  "methods": [
+    {
+      "name": "Boot",
+      "offset": 0,
+      "length": 1,
+      "description": "Hardware boot sequence entry point."
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "self",
+      "rights": [
+        "E"
+      ],
+      "grants": [
+        "E"
+      ],
+      "nsIndex": -1
+    }
+  ],
+  "pet_names": {
+    "DR": {},
+    "CR": {}
+  },
+  "mtbf": {
+    "consecutive_clean": 0,
+    "total_runs": 0,
+    "status": "unknown"
+  },
+  "lump_version": 1,
+  "compiled_at": 1783359752.751318
+}

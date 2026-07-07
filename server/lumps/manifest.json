@@ -2091,5 +2091,26 @@
         "length": 1
       }
     ]
+  },
+  {
+    "token": "00000600",
+    "abstraction": "LEDflash",
+    "filename": "LEDflash_v1.lump",
+    "sidecar_file": "LEDflash_v1.json",
+    "ns_slot": null,
+    "lump_size": 64,
+    "cw": 1,
+    "cc": 1,
+    "lump_version": 1,
+    "compiled_at": 1783359752.751318,
+    "status": "wip",
+    "methods": [
+      {
+        "name": "Boot",
+        "offset": 0,
+        "length": 1,
+        "description": "Hardware boot sequence entry point."
+      }
+    ]
   }
 ]
