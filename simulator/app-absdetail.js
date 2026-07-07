@@ -856,7 +856,7 @@ function showAbstractionDetail(index, methodName) {
         html += '<div class="abs-detail-section abs-note-security">';
         html += '<div class="abs-detail-label">Namespace Extension Model</div>';
         html += '<div class="abs-note-text">SlideRule demonstrates the Church Machine\u2019s extensibility principle: ';
-        html += 'one CALL opcode, one namespace entry (NS[16]), and 22 methods accessed via two dispatch rules.<br><br>';
+        html += 'one CALL opcode, one namespace entry (SlideRule — NS[16]), and 22 methods accessed via two dispatch rules.<br><br>';
         html += '<b>Rule 1 \u2014 Direct (methods 0\u201314):</b> <code>CALL d, CRs, #imm</code> \u2014 the method index is the bare number <code>d</code> ';
         html += 'encoded directly in the instruction. Example: <code>CALL 0, CR6, 16</code> calls Multiply (index 0) from c-list offset 16.<br>';
         html += '<b>Rule 2 \u2014 DR3 Escape (methods 15+):</b> <code>CALL 15, CRs, #imm</code> \u2014 when <code>d=15</code>, the hardware reads DR3 ';
@@ -1787,14 +1787,14 @@ function getMethodExamples(abs) {
 ;   -> bounds check -> perm check -> F-bit -> deliver
 LOAD   CR1, Salvation       ; mLoad pipeline validates GT:
                          ;   1. Type != NULL (00=NULL, 01=Inform, 10=Outform, 11=Abstract)
-                         ;   2. GT.gt_seq == NS[4].word2[31:25]
+                         ;   2. GT.gt_seq == NS[4].word2[31:25]  ; NS[4] = Salvation
                          ;   3. CRC-16 seal(word0,word1) == word2[15:0]
                          ;   4. Index 4 within NS bounds
                          ;   5. L perm required for LOAD
                          ;   6. F-bit=0 (local, not tunneled)
                          ;   7. CR1 <- 128-bit capability register
 ; CR1.word0 = GT packed: Ver(7)|Idx(17)|Perms(6)|Type(2)
-; CR1.word1 = NS[4].word0 (location)
+; CR1.word1 = NS[4].word0 (location)     ; NS[4] = Salvation
 ; CR1.word2 = NS[4].word1 (B|F|G|...|limit[16:0])
 ; CR1.word3 = NS[4].word2 (version[31:25]|seal[24:0])`,
             'TPERM': `; Salvation.TPERM — prove GT health check
@@ -2005,7 +2005,7 @@ CALL   CR1              ; Mint.Encode internally:
 ;      skips reserved 0..44, finds e.g. slot 50
 ;      returns { nsIndex: 50, location: 0x3200 }
 ;   3. Version increment:
-;      read NS[50].word2, extract ver = (word2>>25)&0x7F
+;      read NS[50].word2, extract ver = (word2>>25)&0x7F  ; NS[50] = example dynamic slot
 ;      newVer = (ver + 1) & 0x7F  (never reset to 0)
 ;   4. Pack NS entry at NS_TABLE_BASE + 50*3:
 ;      word0 = location (0x3200)
@@ -2014,7 +2014,7 @@ CALL   CR1              ; Mint.Encode internally:
 ;   5. Pack GT:
 ;      GT = (seq<<16)|(50)|(0b000001<<25)|(0b01<<23)
 ;         = seq=1, idx=50, R+W, Inform
-; Result: CR1 <- ready-to-use GT for NS[50]
+; Result: CR1 <- ready-to-use GT for NS[50]  (dynamic slot chosen at runtime)
 
 ; ── EXAMPLE B: Inform + Turing R,W,X (full data+code) ────
 LOAD   CR1, Mint          ; Load Mint E-GT
@@ -2123,7 +2123,7 @@ CALL   CR1              ; Mint.Revoke:
 ;
 ; All GTs with old version are now dead:
 ;   any LOAD/CALL with stale GT hits mLoad step 2:
-;   GT.version(7 bits) != NS[50].word2.version(7 bits)
+;   GT.version(7 bits) != NS[50].word2.version(7 bits)  ; NS[50] = example dynamic slot
 ;   -> FAULT: VERSION_MISMATCH
 ; DR1 <- new version number`,
             'Transfer': `; Mint.Transfer — move GT between c-lists
@@ -2798,7 +2798,7 @@ LAMBDA CR1, DR1         ; Apply ISZERO:
                          ;     return TRUE (Church boolean)
                          ;   else:
                          ;     return FALSE
-; DR1 <- TRUE (NS[26] GT) because input was 0`,
+; DR1 <- TRUE (NS[26] = TRUE abstraction, GT) because input was 0`,
         },
         'PAIR': {
             'Apply': `; PAIR.Apply — Church pair constructor
@@ -3145,7 +3145,7 @@ LOAD   CR1, Editor       ; Load Editor E-GT
 DWRITE DR1, #80         ; NS slot containing source
 
 CALL   CR1              ; Editor.Load:
-;   1. LOAD GT for NS[80] (needs L perm in c-list)
+;   1. LOAD GT for NS[80] (caller-supplied slot via DR1; needs L perm in c-list)
 ;   2. mLoad validates: type, ver, seal, bounds
 ;   3. DREAD contents into editor buffer
 ;   4. Source is DATA domain — code is never Church domain`,
@@ -3248,7 +3248,7 @@ CALL   CR1              ; Debugger.Inspect:
             const bootLine = isTi60 ? `;   2. ${brdName} begins executing from boot vector` : `;   2. ${brdName} begins executing from boot vector`;
             return {
                 'Build': `; Deployer.Build — compile binary for ${brdName}\nLOAD   CR1, Deployer      ; Load Deployer E-GT\nLOAD   CR2, CR6, #0      ; Binary GT (DATA object)\n\nCALL   CR1              ; Deployer.Build:\n;   1. DREAD binary from CR2's location\n;   2. Add boot vector and NS table initialization\n;   3. Package for FPGA: ${chip} bitstream\n;   4. Memory.Allocate for deployment image\n;   5. Mint.Encode GT for image\n; CR2 <- deployment image GT`,
-                'Upload': `; Deployer.Upload — send to ${brdName} via UART\nLOAD   CR1, Deployer      ; Load Deployer E-GT\n\nCALL   CR1              ; Deployer.Upload:\n;   1. LOAD UART GT from c-list (NS[11])\n;   2. For each word in deployment image:\n;      SAVE word to UART (S perm on UART GT)\n${uartNote}\n;   4. Wait for ACK after each block`,
+                'Upload': `; Deployer.Upload — send to ${brdName} via UART\nLOAD   CR1, Deployer      ; Load Deployer E-GT\n\nCALL   CR1              ; Deployer.Upload:\n;   1. LOAD UART GT from c-list (NS[11] = UART)\n;   2. For each word in deployment image:\n;      SAVE word to UART (S perm on UART GT)\n${uartNote}\n;   4. Wait for ACK after each block`,
                 'Verify': `; Deployer.Verify — verify upload integrity\nLOAD   CR1, Deployer      ; Load Deployer E-GT\n\nCALL   CR1              ; Deployer.Verify:\n;   1. Request readback from ${brdName} via UART\n;   2. LOAD bytes from UART (L perm)\n;   3. Compare against original image\n;   4. Compute checksum match\n; DR1 <- 1 if verified, 0 if mismatch`,
                 'Boot': `; Deployer.Boot — boot the FPGA\nLOAD   CR1, Deployer      ; Load Deployer E-GT\n\nCALL   CR1              ; Deployer.Boot:\n;   1. Send boot command via UART\n${bootLine}\n;   3. FPGA initializes NS table (slots 0-45)\n;   4. Boot -> Salvation -> Navana (same as simulator)\n${clkNote}`,
             };
