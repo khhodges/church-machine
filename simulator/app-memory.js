@@ -2545,7 +2545,7 @@ function updateNamespace() {
                 }
             }
         }
-        html += `<td class="ns-label" style="${warmStyle}">${nsLabelInner}</td>`;
+        html += `<td class="ns-label ns-label-clickable" style="${warmStyle}cursor:pointer;" onclick="_openNSEntryDetail(${i})" title="Inspect capability object for NS[${i}]">${nsLabelInner} <span class="ns-inspect-arrow">&#9656;</span></td>`;
         html += `<td style="${warmStyle}cursor:pointer;text-decoration:underline dotted;color:#4ec9b0;" title="Open memory view at this address" onclick="event.stopPropagation();jumpToMemory(${e.word0_location})">0x${e.word0_location.toString(16).toUpperCase().padStart(8, '0')}</td>`;
         if (codeNotResident) {
             const priorityTag = manifest.priority === 'hot' ? 'Hot' : (manifest.priority === 'cold' ? 'Cold' : 'Warm');
