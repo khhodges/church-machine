@@ -84,7 +84,12 @@ function makeFixture(rowSpecs) {
     });
 
     // Attach the production click handler (requires disasmBody in scope).
-    const sandbox = { disasmBody: body, document: document };
+    // _disasmPinnedMap is declared at file-scope in app-misc.js (outside the
+    // extracted snippet).  Without it in the sandbox the Proxy fallback would
+    // return function(){}, making .set()/.delete() throw TypeError.  Supply the
+    // real Map here so the handler pins/unpins rows exactly as it does in the
+    // browser.
+    const sandbox = { disasmBody: body, document: document, _disasmPinnedMap: new Map() };
     const ctx = vm.createContext(new Proxy(sandbox, {
         get(target, prop, receiver) {
             if (prop in target) return Reflect.get(target, prop, receiver);
@@ -261,7 +266,7 @@ function assert(label, condition, detail) {
 //          the leading separator .nia-nodata-sep appears; null-word rows AFTER
 //          the NIA are rendered with .nia-no-data
 //   DB-3  Spotlight block (.chlog-modal-spotlight) is rendered when the current
-//          word decodes to a known mnemonic
+//          word has a mnemonic
 //   DB-4  Spotlight HTML is empty when the word at the NIA is null
 // ─────────────────────────────────────────────────────────────────────────────
 

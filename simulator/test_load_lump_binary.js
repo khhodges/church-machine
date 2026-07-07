@@ -227,10 +227,12 @@ console.log('\n--- LLB-01: NS slot 3 word0/word1 and CR14 wired correctly ---');
 }
 
 // ── LLB-02: step() fetches first code word at 0x0401 without fault ────────────
-// A zero code word (HALT instruction) produces a clean halt — no fault entry.
+// v2.0: word=0 decodes as LOADEQ (conditional NOP), not HALT.  HALT (instrWord===0)
+// was removed in v2.0 — a zero word now executes as LOAD EQ, CR0, CR0[0] which
+// skips silently when Z=0 (the default).  No fault is logged; sim.halted stays false.
 console.log('\n--- LLB-02: step() fetches first code word without fault ---');
 {
-    const SENTINEL = 0;   // word=0 → HALT (clean, no fault)
+    const SENTINEL = 0;   // word=0 → LOADEQ (conditional NOP in v2.0, no halt)
     const { sim, nsBase, GT_SEQ } = setupAndLoad({ cw: 4, cc: 1, codeWord: SENTINEL });
 
     // Rebuild CR14.word0 with the gt_seq that loadLumpBinary preserved in NS[3].word2
@@ -262,11 +264,12 @@ console.log('\n--- LLB-02: step() fetches first code word without fault ---');
     check('LLB-02e: faultLog is empty after step() — no fault occurred',
         sim.faultLog.length === 0,
         `faultLog has ${sim.faultLog.length} entry/entries`);
-    check('LLB-02f: sim.halted = true after HALT word',
-        sim.halted === true,
-        'sim.halted is false');
-    check('LLB-02g: step() result describes HALT (not a fault)',
-        result !== null && typeof result.desc === 'string' && result.desc.includes('HALT'),
+    check('LLB-02f: sim.halted remains false (word=0 is LOADEQ-skip in v2.0, not HALT)',
+        sim.halted === false,
+        'sim.halted is true unexpectedly');
+    check('LLB-02g: step() result desc reflects LOADEQ conditional execution (not HALT)',
+        result !== null && typeof result.desc === 'string' &&
+            (result.desc.toLowerCase().includes('loadeq') || result.desc.toLowerCase().includes('skipped') || result.desc.toLowerCase().includes('conditional')),
         `desc: "${result ? result.desc : ''}"` );
 }
 
@@ -368,19 +371,16 @@ console.log('\n--- LLB-08: NS[3].word2 seal consistent with EXTENDED_BASE and cw
         `stored=0x${storedWord2.toString(16)} expected=0x${expected.toString(16)}`);
 }
 
-// ── LLB-RBA: Real LED flash binary (00000300.lump, NS slot 3) ────────────────
-// Fixture: server/lumps/00000300.lump — canonical abstraction name "LED flash"
-// per sidecar JSON (server/lumps/00000300.json), loaded into NS slot 3
-// (sim.bootEntrySlot) at runtime.  cw=17, cc=1.
-// Note: the original task description referenced token "00000003"; the actual
-// fixture file on disk is "00000300" (confirmed by sidecar JSON "token" field).
+// ── LLB-RBA: Real LED Flash binary (LEDflash_v1.lump, token 00000600) ─────────
+// Fixture: server/lumps/LEDflash_v1.lump — canonical abstraction name "LED Flash"
+// per sidecar JSON (server/lumps/LEDflash_v1.json), token 00000600, cw=1, cc=1.
 // Reads the file as big-endian uint32 words — the same format served by the
-// Flask /api/lump/00000300/words endpoint.
-console.log('\n--- LLB-RBA: Real LED flash binary (00000300.lump, token 00000300, NS slot 3) ---');
+// Flask /api/lump/00000600/words endpoint.
+console.log('\n--- LLB-RBA: Real LED Flash binary (LEDflash_v1.lump, token 00000600) ---');
 {
-    const lumpPath = path.join(__dirname, '..', 'server', 'lumps', '00000300.lump');
+    const lumpPath = path.join(__dirname, '..', 'server', 'lumps', 'LEDflash_v1.lump');
     const lumpExists = fs.existsSync(lumpPath);
-    check('LLB-RBA-0: 00000300.lump fixture file exists on disk', lumpExists,
+    check('LLB-RBA-0: LEDflash_v1.lump fixture file exists on disk', lumpExists,
         lumpPath);
 
     if (lumpExists) {
@@ -391,16 +391,16 @@ console.log('\n--- LLB-RBA: Real LED flash binary (00000300.lump, token 00000300
             rawWords.length === 64,
             `got ${rawWords.length}`);
 
-        // Parse the header word from the fixture — must decode as cw=17, cc=1
+        // Parse the header word from the fixture — must decode as cw=1, cc=1
         const sim = new ChurchSimulator();
         const hdr0 = sim.parseLumpHeader(rawWords[0] >>> 0);
         check('LLB-RBA-2: fixture header magic = 0x1F (valid LUMP)',
             hdr0.valid,
             `magic=0x${hdr0.magic.toString(16)} word[0]=0x${(rawWords[0]>>>0).toString(16)}`);
-        check('LLB-RBA-3: fixture header cw = 17 (LED flash, NS slot 3)',
-            hdr0.cw === 17,
+        check('LLB-RBA-3: fixture header cw = 1 (LED Flash)',
+            hdr0.cw === 1,
             `got cw=${hdr0.cw}`);
-        check('LLB-RBA-4: fixture header cc = 1 (LED flash, NS slot 3)',
+        check('LLB-RBA-4: fixture header cc = 1 (LED Flash)',
             hdr0.cc === 1,
             `got cc=${hdr0.cc}`);
         check('LLB-RBA-5: fixture header lumpSize = 64',
@@ -417,8 +417,8 @@ console.log('\n--- LLB-RBA: Real LED flash binary (00000300.lump, token 00000300
             `got 0x${sim2.memory[nsBase+0].toString(16)}`);
 
         const p = sim2.parseNSWord1(sim2.memory[nsBase + 1]);
-        check('LLB-RBA-8: NS[3].word1 limit = 17 (cw from real fixture)',
-            p.limit === 17,
+        check('LLB-RBA-8: NS[3].word1 limit = 1 (cw from real fixture)',
+            p.limit === 1,
             `got limit=${p.limit}`);
         check('LLB-RBA-9: NS[3].word1 clistCount = 1 (cc from real fixture)',
             p.clistCount === 1,
@@ -428,15 +428,15 @@ console.log('\n--- LLB-RBA: Real LED flash binary (00000300.lump, token 00000300
             `got 0x${sim2.cr[14].word1.toString(16)}`);
 
         // LLB-RBA-11: Sidecar JSON metadata — prevents future token/name drift.
-        // The sidecar file must identify the abstraction as "LED flash" on NS slot 3.
-        const sidecarPath = path.join(__dirname, '..', 'server', 'lumps', '00000300.json');
+        // The sidecar file must identify the correct token and abstraction name.
+        const sidecarPath = path.join(__dirname, '..', 'server', 'lumps', 'LEDflash_v1.json');
         if (fs.existsSync(sidecarPath)) {
             const sidecar = JSON.parse(fs.readFileSync(sidecarPath, 'utf8'));
-            check('LLB-RBA-11: sidecar ns_slot = 3 (canonical NS slot for this lump)',
-                sidecar.ns_slot === 3,
-                `got ns_slot=${sidecar.ns_slot}`);
+            check('LLB-RBA-11: sidecar token = 00000600 (canonical token for LED Flash)',
+                sidecar.token === '00000600',
+                `got token=${sidecar.token}`);
         } else {
-            console.log('SKIP LLB-RBA-11 (sidecar 00000300.json not found)');
+            console.log('SKIP LLB-RBA-11 (sidecar LEDflash_v1.json not found)');
         }
     }
 }

@@ -38,7 +38,8 @@ const lumpAuditHasErrors = _auditMod.lumpAuditHasErrors;
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const CALL_OPCODE   = 2;
-const LUMP_SLOT     = 3;    // Boot.Abstr NS slot (same as simulator default)
+// NOTE: LUMP_SLOT is derived from sim.bootEntrySlot inside setupSim() — do NOT
+// hardcode 3 here; bootEntrySlot migrated from 3 → 6 with Boot.Abstr token migration.
 const LUMP_BASE     = 0x80; // arbitrary physical base for tests
 
 // ── Encode a CALL instruction targeting CR0 with a given method index ─────────
@@ -55,6 +56,7 @@ function callInstr(methodIndex) {
 function setupSim(extWords) {
     const sim = new ChurchSimulator();
     sim.bootComplete = true;
+    const LUMP_SLOT = sim.bootEntrySlot;  // derive from simulator (currently 6; was 3 pre-migration)
     sim.nsCount = Math.max(sim.nsCount, LUMP_SLOT + 1);
 
     // Seed NS slot 3 with a large enough lump so loadProgram takes the

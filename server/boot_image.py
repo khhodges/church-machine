@@ -263,14 +263,17 @@ def pack_lump_header(n_minus_6, cw, cc, typ=0):
 
 
 def create_gt(gt_seq, slot_id, perms, gt_type):
-    """Encode a 32-bit GT word using the new GT layout.
+    """Encode a 32-bit GT word using the v2.0 GT layout.
 
-    New layout: slot_id[15:0] | gt_seq[22:16] | gt_type[24:23]
-                | f_flag[25]=0 | spare[26]=0 | dom[27] | perm[30:28] | b_flag[31]=0
+    v2.0 layout (matches hardware/hw_types.py make_gt and simulator.js createGT):
+      slot_id[15:0] | gt_seq[24:16] (9-bit) | gt_type[26:25]
+      | dom[27] | perm[30:28] | b_flag[31]=0
+
+    Note: v1.x layout used gt_type[24:23] and gt_seq[22:16] (7-bit).
     """
     dom, perm3 = _encode_perm(perms)
-    t = ((gt_type & 0x3)  << 23) & 0xFFFFFFFF
-    s = ((gt_seq  & 0x7F) << 16) & 0xFFFFFFFF
+    t = ((gt_type & 0x3)  << 25) & 0xFFFFFFFF
+    s = ((gt_seq  & 0x1FF) << 16) & 0xFFFFFFFF
     d = ((dom     & 0x1)  << 27) & 0xFFFFFFFF
     p = ((perm3   & 0x7)  << 28) & 0xFFFFFFFF
     return _u32(d | p | t | s | (slot_id & 0xFFFF))
@@ -481,7 +484,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     # all validation checks its declared size becomes the actual Boot.Abstr
     # allocation; otherwise the hardcoded default (64 words) is used.
     _boot_saved_path = os.path.join(
-        lumps_dir, f"{BOOT_ABSTR_NS_SLOT << 8:08x}.lump")   # "00000300.lump"
+        lumps_dir, f"{BOOT_ABSTR_NS_SLOT << 8:08x}.lump")   # e.g. "00000600.lump" when slot=6
     actual_abstr_size = BOOT_ABSTR_DEFAULT_SIZE
     abstr_words = None
     if os.path.isfile(_boot_saved_path):

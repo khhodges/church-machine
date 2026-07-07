@@ -57,6 +57,11 @@ const DEFAULT_SCRIPT_ONLY_SUITES = [
     'check-sha32-collisions',
     'compile-api-tests',
     'lump-builder-dispatch-tests',
+    'wukong-protocol-tests',
+    'build-guard-tests',
+    'update-lump-tests',
+    'check-slot-index-leak',
+    'callhome-reconnect-tests',
 ];
 
 const configPath = path.join(__dirname, 'test-workflow-config.json');

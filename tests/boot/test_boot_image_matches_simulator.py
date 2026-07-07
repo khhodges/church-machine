@@ -242,7 +242,10 @@ def _make_boot_abstr_lump(lump_size, cc, nuc_code_words=3, demo_clist_size=18):
     (128, 0),   # 128w with cc=0 (larger lump, no c-list)
 ])
 def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
-    """generate_boot_image() places a valid 00000300.lump at Boot.Abstr's slot.
+    """generate_boot_image() places a valid saved Boot.Abstr lump at Boot.Abstr's slot.
+
+    The saved lump filename is derived from BOOT_ABSTR_NS_SLOT: f"{BOOT_ABSTR_NS_SLOT<<8:08x}.lump"
+    (e.g. "00000600.lump" when BOOT_ABSTR_NS_SLOT=6).
 
     Verifies:
       - Boot.Abstr NS table entry (word0) points to the correct physical address.
@@ -256,9 +259,11 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
         pack_ns_word1,
     )
 
-    # Write a synthetic saved lump into tmp_path.
+    # Write a synthetic saved lump into tmp_path using the filename that
+    # generate_boot_image() derives from BOOT_ABSTR_NS_SLOT.
     saved_bytes = _make_boot_abstr_lump(lump_size, cc)
-    saved_path = tmp_path / "00000300.lump"
+    saved_filename = f"{BOOT_ABSTR_NS_SLOT << 8:08x}.lump"
+    saved_path = tmp_path / saved_filename
     saved_path.write_bytes(saved_bytes)
 
     cfg = {

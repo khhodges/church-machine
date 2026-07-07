@@ -1933,20 +1933,6 @@
         "source": "simulator/cloomc/EventRouter.cloomc"
     },
     {
-        "token": "2570eade",
-        "abstraction": "Post-Flash Self-Test",
-        "ns_slot": null,
-        "ns_slot_policy": "dynamic",
-        "variant_group": null,
-        "lump_size": 1024,
-        "cw": 515,
-        "cc": 8,
-        "grants": [
-            "E"
-        ],
-        "lump_version": 0
-    },
-    {
         "token": "8e37e416",
         "abstraction": "Tunnel",
         "filename": "Tunnel_37words_cc_1_25free_v2.lump",
