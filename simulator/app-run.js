@@ -979,7 +979,7 @@ function _injectClistNow() {
 
         sim.memory[lumpBase] = ((lumpHdr & ~0xFF) | (cc & 0xFF)) >>> 0;
         const nsWord1B = sim.packNSWord1(
-            w1f.limit, w1f.b, w1f.g, w1f.chainable, w1f.gtType, cc
+            w1f.limit, w1f.b, w1f.g, w1f.gtType, cc
         );
         sim.memory[nsBase + 1] = nsWord1B;
         const cr6GTb = sim.createGT(0, BOOT_ABSTR_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
@@ -1009,7 +1009,7 @@ function _injectClistNow() {
         }
         sim.memory[lumpBase] = ((lumpHdr & ~0xFF) | (cc & 0xFF)) >>> 0;
         const nsWord1A = sim.packNSWord1(
-            w1f.limit, w1f.b, w1f.g, w1f.chainable, w1f.gtType, cc
+            w1f.limit, w1f.b, w1f.g, w1f.gtType, cc
         );
         sim.memory[nsBase + 1] = nsWord1A;
         const cr6GTa = sim.createGT(0, BOOT_ABSTR_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
