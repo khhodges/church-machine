@@ -1306,11 +1306,6 @@ function _autoLoadDefaultProgram() {
                 // Skip method table so PC lands on the first instruction (body at word N).
                 sim.pc = lastMethodTableSize;
             }
-            // Restore the namespace label for Boot.Abstr (sim.reset() clears
-            // nsLabels) so the CR detail heading shows the abstraction name
-            // rather than the boot-image default after reset.
-            const _bSlot = sim.bootEntrySlot;
-            if (sim.nsLabels && sim.programName) sim.nsLabels[_bSlot] = sim.programName;
             _injectClistNow();
         }
         // Only apply boot lump pet names when no source-compiled program is

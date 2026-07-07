@@ -1863,13 +1863,6 @@ function loadCLOOMCIntoSim() {
         con.textContent = `${_bootPrefix} \u2014 \u201c${result.abstractionName}\u201d loaded${_loadSrcHint} \u2014 ${words.length} words, ${methodTableSize} method${methodTableSize !== 1 ? 's' : ''} \u2014 click Step or Run`;
     }
 
-    // ── Update namespace label so the CR detail heading shows the abstraction name
-    // rather than the boot-image occupant of that slot ("LED flash", etc.).
-    const _bootSlot = sim.bootEntrySlot;
-    if (sim && sim.nsLabels) {
-        sim.nsLabels[_bootSlot] = result.abstractionName || sim.programName;
-    }
-
     // ── Populate a lump manifest from the CLOOMC methods so the API tab shows
     // call-site examples instead of "No method manifest available".
     if (typeof _lumpManifests !== 'undefined') {
