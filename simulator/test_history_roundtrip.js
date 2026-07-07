@@ -185,7 +185,7 @@ console.log('\n--- T1: Full roundtrip — all field types preserved ---');
     // Seed userMethodData with rich data for both methods
     userMethodData[`${absIdx}:init`] = {
         purpose:    'Initialises the subsystem',
-        example:    'LOAD DR0, #1\nCALL NS[7]\n',
+        example:    'LOAD DR0, #1\nCALL Memory\n',
         compiled:   [0x1000, 0x2000, 0xFFFF],
         compiledLang: 'assembly',
         compiledAt: '2026-05-14T10:00:00Z',
@@ -193,7 +193,7 @@ console.log('\n--- T1: Full roundtrip — all field types preserved ---');
     };
     userMethodData[`${absIdx}:run`] = {
         purpose: 'Runs the main loop',
-        example: 'CALL NS[7]\n',
+        example: 'CALL Memory\n',
         compiled: [0x3000],
         history:  []
     };
@@ -210,7 +210,7 @@ console.log('\n--- T1: Full roundtrip — all field types preserved ---');
     const run  = userMethodData[`${absIdx}:run`];
 
     check('T1a: init purpose restored', init.purpose === 'Initialises the subsystem');
-    check('T1b: init example restored', init.example === 'LOAD DR0, #1\nCALL NS[7]\n');
+    check('T1b: init example restored', init.example === 'LOAD DR0, #1\nCALL Memory\n');
     check('T1c: init compiled is array of 3', Array.isArray(init.compiled) && init.compiled.length === 3);
     check('T1d: init compiled[0] correct', init.compiled[0] === 0x1000);
     check('T1e: init history is array of 1', Array.isArray(init.history) && init.history.length === 1);
