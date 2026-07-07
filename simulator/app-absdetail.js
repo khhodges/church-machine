@@ -2653,27 +2653,25 @@ CALL   CR1              ; DR1 <- 42`,
         },
         'Constants': {
             'Pi': `; Constants.Pi — return π as IEEE 754
-; Step 1: bind Constants by name (Level-2 load)
-LOAD   CR11, Constants   ; CR11 = Constants E-GT (NS[18])
-; Step 2: call via dot-notation — assembler encodes CALL CR11, 1
-CALL   Constants.Pi      ; DR1 <- 0x40490FDB  (π ≈ 3.14159265)
-; Low-level equivalent:  LOAD CR11, NS[18]  then  CALL CR11, 1`,
+; LOAD CR11, Constants; CALL Constants.Pi
+LOAD   CR11, Constants   ; CR11 = Constants E-GT
+CALL   Constants.Pi      ; DR1 <- 0x40490FDB  (π ≈ 3.14159265)`,
             'E': `; Constants.E — return Euler's number as IEEE 754
-LOAD   CR11, Constants   ; CR11 = Constants E-GT (NS[18])
-CALL   Constants.E       ; DR1 <- 0x402DF854  (e ≈ 2.71828183)
-; Low-level equivalent:  CALL CR11, 2`,
+; LOAD CR11, Constants; CALL Constants.E
+LOAD   CR11, Constants   ; CR11 = Constants E-GT
+CALL   Constants.E       ; DR1 <- 0x402DF854  (e ≈ 2.71828183)`,
             'Phi': `; Constants.Phi — return golden ratio as IEEE 754
-LOAD   CR11, Constants   ; CR11 = Constants E-GT (NS[18])
-CALL   Constants.Phi     ; DR1 <- 0x3FCFBE77  (φ ≈ 1.61803399)
-; Low-level equivalent:  CALL CR11, 3`,
+; LOAD CR11, Constants; CALL Constants.Phi
+LOAD   CR11, Constants   ; CR11 = Constants E-GT
+CALL   Constants.Phi     ; DR1 <- 0x3FCFBE77  (φ ≈ 1.61803399)`,
             'Zero': `; Constants.Zero — return IEEE 754 +0.0
-LOAD   CR11, Constants   ; CR11 = Constants E-GT (NS[18])
-CALL   Constants.Zero    ; DR1 <- 0x00000000  (0.0 IEEE 754)
-; Low-level equivalent:  CALL CR11, 4`,
+; LOAD CR11, Constants; CALL Constants.Zero
+LOAD   CR11, Constants   ; CR11 = Constants E-GT
+CALL   Constants.Zero    ; DR1 <- 0x00000000  (0.0 IEEE 754)`,
             'One': `; Constants.One — return IEEE 754 1.0
-LOAD   CR11, Constants   ; CR11 = Constants E-GT (NS[18])
-CALL   Constants.One     ; DR1 <- 0x3F800000  (1.0 IEEE 754)
-; Low-level equivalent:  CALL CR11, 5`,
+; LOAD CR11, Constants; CALL Constants.One
+LOAD   CR11, Constants   ; CR11 = Constants E-GT
+CALL   Constants.One     ; DR1 <- 0x3F800000  (1.0 IEEE 754)`,
         },
         'Loader': {
             'Load': `; Loader.Load — fault-driven lazy load
@@ -2713,9 +2711,9 @@ LOAD   CR1, Circle       ; Load Circle E-GT
 DWRITE DR1, #0x40A00000 ; Radius: 5.0
 
 CALL   CR1              ; Circle.Area internally:
-;   1. LOAD CR2, NS[16] — get SlideRule GT
+;   1. LOAD CR2, SlideRule
 ;   2. CALL SlideRule.Multiply(r, r)  -> r^2 = 25.0
-;   3. LOAD CR3, NS[18] — get Constants GT
+;   3. LOAD CR3, Constants
 ;   4. CALL Constants.Pi             -> pi
 ;   5. CALL SlideRule.Multiply(pi, r^2) -> 78.5398
 ; DR1 <- 0x429CE5A0 (78.54)
