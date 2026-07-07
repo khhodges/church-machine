@@ -1842,9 +1842,9 @@ CALL   CR1              ; Enter Navana
                          ;   CR14 <- Navana CLOOMC (DATA-domain, privileged)
 ; Inside Navana.Init:
 ;   for each abstraction index 6..44:
-;     LOAD  CR3, NS[7]  ; Load Memory GT
+;     LOAD  CR3, Memory  ; Load Memory GT
 ;     CALL  CR3          ; Memory.Allocate -> backing storage
-;     LOAD  CR4, NS[6]  ; Load Mint GT
+;     LOAD  CR4, Mint    ; Load Mint GT
 ;     CALL  CR4          ; Mint.Encode -> NS entry + GT
 ;   Navana.Init never returns — enters event loop`,
             'Manage': `; Navana.Manage — abstraction lifecycle
