@@ -1792,8 +1792,8 @@ LOAD   CR1, Salvation       ; mLoad pipeline validates GT:
                          ;   7. CR1 <- 128-bit capability register
 ; CR1.word0 = GT packed: Ver(7)|Idx(17)|Perms(6)|Type(2)
 ; CR1.word1 = NS[4].word0 (location)     ; NS[4] = Salvation
-; CR1.word2 = NS[4].word1 (B|F|G|...|limit[16:0])
-; CR1.word3 = NS[4].word2 (version[31:25]|seal[24:0])`,
+; CR1.word2 = NS[4].word1 (B|F|G|...|limit[16:0])  ; NS[4] = Salvation
+; CR1.word3 = NS[4].word2 (version[31:25]|seal[24:0])  ; NS[4] = Salvation`,
             'TPERM': `; Salvation.TPERM — prove GT health check
 ; TPERM checks permissions + validity + bounds in one cycle
 ; Sets Z flag: Z=1 = all passed, Z=0 = something failed

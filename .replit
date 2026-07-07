@@ -159,6 +159,10 @@ args = "openin-links-tests"
 task = "workflow.run"
 args = "lump-warning-tests"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "check-ns-slot-annotations"
+
 [[workflows.workflow]]
 name = "Church Machine IDE"
 author = "agent"
@@ -566,6 +570,17 @@ args = "node simulator/lump_warning_test.js"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "check-ns-slot-annotations"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node scripts/check-ns-slot-annotations.js"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [[ports]]
 localPort = 5000
