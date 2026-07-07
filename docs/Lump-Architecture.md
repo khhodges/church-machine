@@ -302,7 +302,7 @@ on demand. NULL lumps never enter the Namespace table at all.
 If two manifest entries claim the same `ns_slot` they must share the same
 non-null `variant_group` string. The boot image installs exactly one at a time.
 
-Example: SlideRule (00001000) and SlideRuleHS (00001001) both have
+Example: SlideRule (00001000) and SlideRule (Haskell) (00001001) both have
 `ns_slot: 16` and `variant_group: "sliderule"`.
 
 | `ns_slot` | `ns_slot_policy` | Classification |

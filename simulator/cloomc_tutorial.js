@@ -134,7 +134,7 @@ class CLOOMCTutorial {
                 type: "code",
                 lang: "hs",
                 content: `<p>The Haskell front-end uses a functional style with expression-based methods. 9 methods:</p>
-<pre class="sr-code sr-code-hs">abstraction SlideRuleHS {
+<pre class="sr-code sr-code-hs">abstraction SlideRule (Haskell) {
     capabilities { Constants }
 
     method Add(a, b) = a + b

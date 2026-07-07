@@ -1,5 +1,5 @@
 -- ============================================================
--- Abstraction:  SlideRuleHS
+-- Abstraction:  SlideRule (Haskell)
 -- Description:  Haskell front-end for slide-rule integer math
 -- Author:       Church Machine Educational Platform
 -- Version:      1.0

@@ -73,7 +73,7 @@ Two manifest entries may declare the same `ns_slot` if and only if they both
 carry the same non-null `variant_group` string. This declares alternative
 implementations of the same abstraction; the boot image installs exactly one.
 
-Example: SlideRule (00001000) and SlideRuleHS (00001001) both declare
+Example: SlideRule (00001000) and SlideRule (Haskell) (00001001) both declare
 `"ns_slot": 16` and `"variant_group": "sliderule"`. Exactly one is active per
 boot image. This constraint is enforced by consistency gate rule R8.
 

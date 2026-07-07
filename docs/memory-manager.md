@@ -522,7 +522,7 @@ source):
 | 3 | LED flash | Hardware boot lump |
 | 12 | LED | Full LED abstraction (Set, Clear, Toggle, State) |
 | 16 | SlideRule | Complete IEEE-754 floating-point library (22 methods) |
-| 16 | SlideRuleHS | Hardware-safe floating-point variant (reduced method set) |
+| 16 | SlideRule (Haskell) | Hardware-safe floating-point variant (reduced method set) |
 | 18 | Constants | π, e, φ, 0, 1 — with user constant pool |
 | 19 | Loader | |
 | 31 | Tunnel | Remote namespace bridge (see §9.5) |

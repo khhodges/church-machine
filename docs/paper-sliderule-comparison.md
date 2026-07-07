@@ -317,7 +317,7 @@ The Haskell front-end uses a functional style with expression-based methods:
 -- Integer arithmetic on Church Machine hardware
 -- Proves both languages compile to the same 20-instruction target
 
-abstraction SlideRuleHS {
+abstraction SlideRule (Haskell) {
     capabilities { Constants }
 
     -- Basic arithmetic

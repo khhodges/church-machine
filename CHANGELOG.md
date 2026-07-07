@@ -27,7 +27,7 @@ incident above, which surfaced the first instance of this class of bug).
   - 22 fixed via a new mechanical remap tool, `scripts/remap_stale_isa_opcodes.js`,
     which adds +6 to the top-5-bit opcode of every code word (`word[1..cw]`) whose
     opcode falls in `[10,19]`, leaving c-list/header/all other bits untouched:
-    `SlideRule`, `SlideRuleHS`, `Tunnel` (×2), `Keystone` (×2), `Ethernet`,
+    `SlideRule`, `SlideRule (Haskell)`, `Tunnel` (×2), `Keystone` (×2), `Ethernet`,
     `Salvation`, `GT-test`, `selftest-v1.1`, `LED` (×2), `Constants`,
     `EventRouter`, `CapabilityTest`, `NoteGPublishedBug`, `NoteG_v6`,
     `EnglishLoops`, `IntegerOps`, `BernoulliNumbers`, `WordString`, `StringOps`.
@@ -447,14 +447,14 @@ and introduces formal change control (this document).
 #### New sidecar files created
 
 Six manifest entries had no per-lump `.json` sidecar. Sidecars created:
-`00000c00.json` (LED), `00001000.json` (SlideRule), `00001001.json` (SlideRuleHS),
+`00000c00.json` (LED), `00001000.json` (SlideRule), `00001001.json` (SlideRule (Haskell)),
 `00001f00.json` (Tunnel), `00130000.json` (Loader), `00002000.json` (Keystone).
 
 #### Schema additions (manifest.json)
 
 | Field | Applies to | Meaning |
 |---|---|---|
-| `variant_group` | SlideRule, SlideRuleHS | Both share `"variant_group": "sliderule"`. Two entries may claim the same `ns_slot` if and only if they share a non-null `variant_group`. The boot image installs exactly one at a time; the other is an alternative implementation. |
+| `variant_group` | SlideRule, SlideRule (Haskell) | Both share `"variant_group": "sliderule"`. Two entries may claim the same `ns_slot` if and only if they share a non-null `variant_group`. The boot image installs exactly one at a time; the other is an alternative implementation. |
 | `ns_slot_policy` | WordString | `"ns_slot_policy": "dynamic"` — formally declares the floating-lump pattern (see Architecture section below). |
 
 #### Architecture: floating lumps formalised
