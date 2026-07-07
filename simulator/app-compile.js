@@ -733,6 +733,10 @@ function smartCompile() {
             lang = 'javascript';
             if (sel) sel.value = 'javascript';
             onLangChange(true);
+        } else {
+            // Pure raw assembly — use the assembler path, not the CLOOMC++ compiler.
+            if (typeof assembleAndLoad === 'function') assembleAndLoad();
+            return;
         }
     }
 
