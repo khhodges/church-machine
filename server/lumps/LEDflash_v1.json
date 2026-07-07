@@ -3,7 +3,7 @@
   "abstraction": "SelfTest",
   "filename": "LEDflash_v1.lump",
   "sidecar_file": "LEDflash_v1.json",
-  "ns_slot": 6,
+  "ns_slot": null,
   "lump_size": 64,
   "typ": 0,
   "content_type": "code",
