@@ -838,7 +838,9 @@ function updateCRDetail() {
     // ── Ownership ─────────────────────────────────────────────────────────────
     {
         const _mfst = _lumpManifests[nsIdx];
-        const _owAbs = sim.abstractionRegistry && sim.abstractionRegistry.getAbstraction && sim.abstractionRegistry.getAbstraction(nsIdx);
+        const _owAbs = (sim.abstractionRegistry && _absName)
+            ? (sim.abstractionRegistry.getByName ? sim.abstractionRegistry.getByName(_absName) : null)
+            : null;
         const _owSidecar = _findSrcLump(nsIdx, _absName);
         html += '<div class="crd-lump-section">';
         html += '<div class="crd-lump-section-label">Ownership</div>';
