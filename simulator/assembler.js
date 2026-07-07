@@ -452,34 +452,33 @@ class ChurchAssembler {
         if (this._clistSlots && this._clistSlots[name] !== undefined)
             return this._clistSlots[name];
 
-        // 3. LED<N> Abstract GT shorthand — LED0–LED5 are boot-loaded AGTs at
-        //    c-list slots 8–13.  LOAD CR3, LED0  →  LOAD CR3, CR6, #8
+        // 3. LED<N> shorthand — all LED0–LED5 share the LED_DEV GT at boot
+        //    c-list slot 4 (clistGTs[4] = LED_DEV, MMIO 0x40000000, lim17=4).
+        //    LOAD CR3, LED0  →  LOAD CR3, CR6, #4  (same slot for all LEDs;
+        //    individual LEDs are selected by the DWRITE offset: 0=LED0…4=LED4).
         //    Legacy bracket form LED[N] is still accepted for back-compat.
         const ledMatch = name.match(/^LED(\d)$/i) || name.match(/^LED\[(\d)\]$/i);
         if (ledMatch) {
             const n = parseInt(ledMatch[1], 10);
-            if (n >= 0 && n <= 5) return 8 + n;
+            if (n >= 0 && n <= 5) return 4;   // all LEDs → LED_DEV GT at clistGTs[4]
         }
 
-        // 3.2. Hardware device shorthands — fixed boot c-list slots 14–17.
+        // 3.2. Hardware device shorthands — boot c-list positions in the current
+        //      11-slot DEMO_CLIST built by _getHardwareBootCatalog:
+        //        [3] UART_DEV  [4] LED_DEV  [5] BTN_DEV  [6] TIMER_DEV
         //      These are checked AFTER nsSymbols so that an explicit namespace table
         //      (set via setNamespace) takes priority when the abstraction is mounted
         //      in the Namespace Table for method dispatch (ELOADCALL).  When no
         //      namespace entry is present — e.g. in bare LOAD instructions without a
         //      capabilities block — the name falls through to here and resolves to the
         //      fixed boot c-list slot for that hardware device.
-        //
-        //      UART→14, BTN→15, SlideRule→16, Timer→17  (case-insensitive)
-        //
-        //      Note: if the shared namespace happens to carry a stale Timer or UART
-        //      entry from a different test context, callers (BC97–BC100) should clear
-        //      ChurchAssembler._sharedNsSymbols before assembling to avoid shadowing.
+        //      SlideRule is omitted — it is not a boot hardware device; if installed
+        //      it appears in the Namespace Table and resolves via nsSymbols above.
         {
             const nameUC = name.toUpperCase();
-            if (nameUC === 'UART')      return 14;
-            if (nameUC === 'BTN')       return 15;
-            if (nameUC === 'SLIDERULE') return 16;
-            if (nameUC === 'TIMER')     return 17;
+            if (nameUC === 'UART')  return 3;
+            if (nameUC === 'BTN')   return 5;
+            if (nameUC === 'TIMER') return 6;
         }
 
         // 3.5. Boot-image fixed capability names — always present in the boot c-list
@@ -1992,15 +1991,16 @@ class ChurchAssembler {
     }
 
     // Build a slot-number → capability-name map suitable for passing to disassemble().
-    // Always includes the hardware-fixed DEMO_CLIST positions (LED0–LED5 at 8–13,
-    // UART at 14, BTN at 15, SlideRule at 16, Timer at 17).
+    // Always includes the boot c-list positions from the current 11-slot DEMO_CLIST:
+    //   UART→3, LED_DEV→4, BTN→5, Timer→6
     // caps: array of {name} objects or strings from an assembled program's capability list.
     // nsLabels: sim.nsLabels — maps NS slot index → label string; used to resolve
     //   non-device abstractions (e.g. Tunnel at slot 31).
     static buildSlotNames(caps, nsLabels) {
+        // Boot c-list positions in the current 11-slot DEMO_CLIST:
+        //   [3] UART_DEV  [4] LED_DEV (LED0–LED4)  [5] BTN_DEV  [6] TIMER_DEV
         const slotNames = {
-            8: 'LED0', 9: 'LED1', 10: 'LED2', 11: 'LED3', 12: 'LED4', 13: 'LED5',
-            14: 'UART', 15: 'BTN', 16: 'SlideRule', 17: 'Timer',
+            3: 'UART', 4: 'LED_DEV', 5: 'BTN', 6: 'Timer',
         };
         if (caps && nsLabels) {
             for (const cap of caps) {

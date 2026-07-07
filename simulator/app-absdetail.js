@@ -1535,10 +1535,10 @@ function absDeleteMethod(absIdx) {
 
 const METHOD_REGISTER_CONVENTIONS = {
     'LED': {
-        'Set':    { index: 0, input: 'none (LED = capability offset 0\u20135 in C-list slot)', output: 'DR0 = 1 (success) or DR0 = -1 (invalid offset)',  dispatch: 'CALL 0, CR6, #(8+led)', note: 'C-list slot 8 = LED 0, 9 = LED 1, \u2026 13 = LED 5. No DR arg needed.' },
-        'Clear':  { index: 1, input: 'none (LED = capability offset 0\u20135 in C-list slot)', output: 'DR0 = 1 (success) or DR0 = -1 (invalid offset)',  dispatch: 'CALL 1, CR6, #(8+led)' },
-        'Toggle': { index: 2, input: 'none (LED = capability offset 0\u20135 in C-list slot)', output: 'DR0 = 1 (success) or DR0 = -1 (invalid offset)',  dispatch: 'CALL 2, CR6, #(8+led)' },
-        'State':  { index: 3, input: 'none (LED = capability offset 0\u20135 in C-list slot)', output: 'DR0 = 1 (on), DR0 = 0 (off), DR0 = -1 (fault)',   dispatch: 'CALL 3, CR6, #(8+led)', note: 'Signed return: \u22650 success, <0 fault. Caller checks BGE/BLT on DR0.' },
+        'Set':    { index: 0, input: 'none (LED = DWRITE offset 0\u20134 into LED_DEV GT)', output: 'DR0 = 1 (success) or DR0 = -1 (invalid offset)',  dispatch: 'LOAD CR3, LED0 / DWRITE DR1, CR3, #led', note: 'Boot C-list slot 4 = LED_DEV GT (MMIO 0x40000000, lim17=4). DWRITE offset 0=LED0 \u2026 4=LED4.' },
+        'Clear':  { index: 1, input: 'none (LED = DWRITE offset 0\u20134 into LED_DEV GT)', output: 'DR0 = 1 (success) or DR0 = -1 (invalid offset)',  dispatch: 'LOAD CR3, LED0 / DWRITE DR0, CR3, #led' },
+        'Toggle': { index: 2, input: 'none (LED = DWRITE offset 0\u20134 into LED_DEV GT)', output: 'DR0 = 1 (success) or DR0 = -1 (invalid offset)',  dispatch: 'LOAD CR3, LED0 / DWRITE DR1, CR3, #led (Set) or DWRITE DR0, CR3, #led (Clear)' },
+        'State':  { index: 3, input: 'none (LED = DWRITE offset 0\u20134 into LED_DEV GT)', output: 'DR0 = 1 (on), DR0 = 0 (off), DR0 = -1 (fault)',   dispatch: 'LOAD CR3, LED0 / DREAD DR0, CR3, #led', note: 'Signed return: \u22650 success, <0 fault. Caller checks BGE/BLT on DR0.' },
     },
     'SlideRule': {
         'Multiply':  { index: 0,  input: 'DR1 (a), DR2 (b)', output: 'DR1 = a * b',  dispatch: 'CALL 0, CRs, #imm' },
@@ -1888,7 +1888,7 @@ CALL   CR1              ; Navana.IDS scans:
 ; PassKey = ABSTRACTION GT (type=0b11=Abstract)
 ;   GT index encodes: device[15:8] | permMask[7:4] | id[3:0]
 ; Navana = gatekeeper. Validates PassKey,
-;   writes E-perm LED driver GT to C-list slot 8+N.
+;   writes E-perm LED driver GT to a free C-list slot (allocated at runtime).
 ; LED driver = callable. No DR args — the capability IS the LED.
 ; Caller never sees hardware address or NS index.
 ;
@@ -1912,18 +1912,19 @@ CALL   CR2                ; CALL Navana detects Abstract GT in CR1:
 ;   2. Decode index: device selector, perm mask
 ;   3. Lookup in Navana's PassKey registry
 ;   4. Check not revoked, not tampered
-;   5. Write E-perm LED driver GT into C-list slot 8+N (LED N)
+;   5. Write E-perm LED driver GT into a free C-list slot (Navana tracks the offset)
 ;   6. Store permMask for driver calls
-;   DR1 <- permMask granted
+;   DR1 <- permMask granted  DR0 <- C-list slot offset allocated
 ; If invalid: PERM fault — no hardware state changes
 
 ; ── STEP 3: CALL LED driver — set LED 3 ON ────
-; E-perm LED driver GT is now at C-list offset 11 (LED 3 = 8+3)
+; E-perm LED driver GT is now at the C-list offset returned by Navana in DR0
 ; No DR argument needed — the capability IS the LED
-CALL   0, CR6, #11       ; LED.Set on LED 3 (C-list offset 11):
+LOAD   CR4, DR0           ; CR4 <- slot offset from Navana (DR0)
+CALL   0, CR6, CR4        ; LED.Set on LED 3:
 ;   1. Method = 0 (Set) encoded in CALL immediate
-;   2. LED identity = C-list offset 11 (8 base + 3 for LED 3)
-;   3. Hardware write at 0xFE10 (invisible to caller)
+;   2. LED identity = Navana-allocated C-list offset
+;   3. Hardware write via LED_DEV GT (invisible to caller)
 ;   4. DR0 <- signed return (≥0 success, -1 invalid capability offset)
 ; Gate Log shows full chain of custody:
 ;   PassKey presented -> Navana validated ->
@@ -1931,8 +1932,8 @@ CALL   0, CR6, #11       ; LED.Set on LED 3 (C-list offset 11):
             'CallLEDDriver': `; LED via Navana PassKey — capability-offset API
 ;
 ; Assumes PassKey already validated (Step 1-2 done)
-; Navana writes LED driver GTs into C-list slots 8..13 (LED 0..5)
-; LED identity = C-list slot offset (8=LED0 ... 13=LED5)
+; Navana writes LED driver GTs into runtime-allocated C-list slots
+; DR0 from Step 2 holds the base slot offset; LED N = base+N
 ; No DR argument needed — the capability IS the LED
 
 ; ---- LED.Set on LED 2 (C-list offset 10) ----

@@ -42,3 +42,4 @@
 - [Efinity PT Unified device package PYTHONPATH gap](efinity-pt-unified-pythonpath.md) — efx_run_pt_unified.py imports device.service from pt/bin; skipping setup.sh drops it from PYTHONPATH, causing a silent exit-0 no-op, not a crash
 - [EFXPT_HOME needs /pt suffix](efxpt-home-must-include-pt-suffix.md) — must equal $EFINITY_HOME/pt or Interface Designer's device-name check silently always fails ("unusupported device")
 - [LUMP abstraction-name consistency scoping](lump-abstraction-name-consistency.md) — drift check must exempt user-compiled + dynamic/NULL lumps or it false-fails on legitimate non-registry names
+- [Boot DEMO_CLIST layout](demo-clist-layout.md) — 11-slot boot c-list: [3]=UART, [4]=LED_DEV, [5]=BTN, [6]=TIMER; LED0-4 share one GT; SlideRule is not a boot device

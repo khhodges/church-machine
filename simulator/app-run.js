@@ -914,9 +914,19 @@ function _injectClistNow() {
 
     const _hasUserCaps = !!(lastAssembledCapabilities && lastAssembledCapabilities.length > 0);
 
+    // Maps capability names (from `capabilities { }` blocks) to their
+    // index in sim.demoClistGTs.  The boot c-list is built by
+    // _initNamespaceTable via _getHardwareBootCatalog (8 slots):
+    //   [0] memory-manager GT   [1] Boot.NS   [2] Boot.Thread
+    //   [3] UART_DEV            [4] LED_DEV   [5] BTN_DEV
+    //   [6] TIMER_DEV           [7] SelfTest  [8..10] = 0 (null)
+    // LED0-LED5 all share the LED_DEV GT at index 4 (lim17=4 covers
+    // offsets 0-4 for LED0-LED4; offset 5 will RANGE-fault at runtime).
+    // SlideRule is omitted — it's not a boot-c-list device; the name falls
+    // through to the nsLabels lookup and resolves via its NS entry.
     const _devSlotMap = {
-        LED0: 8, LED1: 9, LED2: 10, LED3: 11, LED4: 12, LED5: 13,
-        UART: 14, BTN: 15, SlideRule: 16, Timer: 17, Display: 14,
+        LED0: 4, LED1: 4, LED2: 4, LED3: 4, LED4: 4, LED5: 4,
+        UART: 3, BTN: 5, Timer: 6, Display: 3,
     };
 
     // Boot.Abstr's NS slot is dynamic (sim.bootEntrySlot, default 6 = SelfTest
