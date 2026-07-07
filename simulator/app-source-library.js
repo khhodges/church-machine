@@ -46,7 +46,7 @@ const _SL_METADATA = {
     'billing':                  { name: 'BudgetTracker' },
     'physical_pool':            { name: 'DMABuffer' },
     'sliderule':                { name: 'SlideRule' },
-    'sliderule_hs':             { name: 'SlideRule (Haskell)' },
+    'sliderule_haskell':        { name: 'SlideRule (Haskell)' },
     'ada_note_g:assembly':      { name: 'NoteG (Assembly)' },
     'ada_note_g:symbolic':      { name: 'NoteG (Symbolic)' },
     'ada_note_g_published_bug': { name: 'NoteG (Published Bug)' },

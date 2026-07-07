@@ -350,7 +350,7 @@ const CODE_EXAMPLE_STORIES = {
         question: "Early computers also lacked multiply instructions. The ENIAC (1945) multiplied by repeated addition. Why would a chip designer leave out multiply? What's the trade-off?",
         era: "Algorithm Design"
     },
-    'sliderule_hs': {
+    'sliderule_haskell': {
         title: "SlideRule in Haskell \u2014 Same Machine, Different Mind",
         body: "This is the same SlideRule abstraction, but written in Haskell instead of JavaScript. Both compile to exactly the same 20-instruction Church Machine code. That's the point of a universal target \u2014 the language you think in doesn't change what the hardware runs.<br><br>Compare this with the JS version (click 'JS: SlideRule'). The Haskell version is more concise: <code>method Add(a, b) = a + b</code> versus a block with explicit return. Different syntax, identical output.",
         question: "If two languages compile to identical machine code, does the choice of language matter? What does each language make easier or harder to think about?",

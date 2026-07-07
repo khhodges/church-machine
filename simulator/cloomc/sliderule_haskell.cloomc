@@ -21,7 +21,7 @@
 -- ============================================================
 -- Proves both languages (CLOOMC++ JS and Haskell) compile to
 -- the same 20-instruction Church Machine hardware target.
-abstraction SlideRuleHS {
+abstraction SlideRule_Haskell {
     capabilities { Constants }
 
     -- Basic arithmetic

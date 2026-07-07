@@ -606,7 +606,7 @@ const LANG_EXAMPLE_GROUPS = {
     english:    ['cloomc_english_integer_ops', 'cloomc_english_packed_string', 'cloomc_english_loops', 'cloomc_english_contact', 'cloomc_english_contact_stage2', 'cloomc_english_dijkstra_flag'],
     assembly:   ['ada_note_g', 'capability_test', 'system_patterns', 'compute_demo', 'led_control', 'led_dr_test', 'salvation', 'constants_dot', 'perm_attack', 'bind_attack', 'scheduler_pause', 'scheduler_yield', 'scheduler_wait', 'dijkstra_flag', 'post_flash_selftest', 'gt_v1_1_test', 'petname_demo', 'private_helpers', 'led_pattern'],
     javascript: ['cloomc_integer_ops', 'cloomc_packed_string', 'cloomc_memory', 'cloomc_heap', 'cloomc_mint', 'cloomc_sliderule', 'cloomc_contact', 'cloomc_contact_stage2', 'cloomc_contact_call', 'cloomc_stack_overflow', 'cloomc_recall_demo', 'cloomc_billing', 'cloomc_turing_memory', 'cloomc_church_memory', 'cloomc_physical_pool', 'cloomc_dijkstra_flag'],
-    haskell:    ['cloomc_church_math', 'cloomc_church_pair', 'cloomc_church_case', 'cloomc_sliderule_hs', 'cloomc_dijkstra_flag_hs'],
+    haskell:    ['cloomc_church_math', 'cloomc_church_pair', 'cloomc_church_case', 'cloomc_sliderule_haskell', 'cloomc_dijkstra_flag_hs'],
     symbolic:   ['cloomc_ada_note_g', 'cloomc_ada_note_g_published_bug', 'cloomc_bernoulli_numbers', 'cloomc_dijkstra_flag_ada'],
     lambda:     ['cloomc_lambda_church_numerals', 'cloomc_lambda_church_encoding', 'cloomc_lambda_fixed_point', 'cloomc_lambda_sliderule', 'cloomc_lambda_rational', 'cloomc_lambda_dijkstra_flag'],
     personal:   []
@@ -623,7 +623,7 @@ const _CLOOMC_FILE_EXAMPLES = {
     'english_contact_stage2':  '/simulator/cloomc/english/ContactStage2.cloomc',
     'ada_note_g_published_bug':'/simulator/cloomc/ada_note_g_published_bug.cloomc',
     'memory':                  '/simulator/cloomc/memory.cloomc',
-    'sliderule_hs':            '/simulator/cloomc/sliderule_hs.cloomc',
+    'sliderule_haskell':       '/simulator/cloomc/sliderule_haskell.cloomc',
     'dijkstra_flag':           '/simulator/cloomc/dijkstra_flag.cloomc',
     'dijkstra_flag_hs':        '/simulator/cloomc/dijkstra_flag_hs.cloomc',
     'english_dijkstra_flag':   '/simulator/cloomc/english/dijkstra_flag.cloomc',
@@ -638,7 +638,7 @@ const _CLOOMC_FILE_LANGUAGES = {
     'english_contact_stage2':  'english',
     'ada_note_g_published_bug':'symbolic',
     'memory':                  'javascript',
-    'sliderule_hs':            'haskell',
+    'sliderule_haskell':       'haskell',
     'dijkstra_flag':           'javascript',
     'dijkstra_flag_hs':        'haskell',
     'english_dijkstra_flag':   'english',
@@ -4215,7 +4215,7 @@ abstraction DMABuffer {
 
     const sel = document.getElementById('langSelector');
     if (sel) {
-        const isHaskell = ['church_math','church_pair','church_case','sliderule_hs','dijkstra_flag_hs'].includes(name);
+        const isHaskell = ['church_math','church_pair','church_case','sliderule_haskell','dijkstra_flag_hs'].includes(name);
         const isSymbolic = ['ada_note_g', 'ada_note_g_published_bug', 'bernoulli_numbers', 'dijkstra_flag_ada'].includes(name);
         const isEnglish = ['english_integer_ops','english_packed_string','english_loops','english_contact','english_contact_stage2','english_dijkstra_flag'].includes(name);
         const isLambda = ['lambda_church_numerals','lambda_church_encoding','lambda_fixed_point','lambda_sliderule','lambda_rational','lambda_dijkstra_flag'].includes(name);

@@ -199,7 +199,7 @@ const STANDARD_METHOD_CONVENTIONS = (() => {
                 if (m.name) methodMap[m.name] = { index: idx };
             });
             // If the same abstraction name appears twice (variant groups like
-            // SlideRule/SlideRuleHS share the same NS slot), merge rather than
+            // SlideRule/SlideRule (Haskell) share the same NS slot), merge rather than
             // overwrite so both method sets are known.
             conv[name] = Object.assign(conv[name] || {}, methodMap);
         }

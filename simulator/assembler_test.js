@@ -7115,7 +7115,7 @@ abstraction VlcTest {
     //   Symbolic — ada_note_g (→ ada_note_g_symbolic.cloomc), bernoulli_numbers
     //
     // File-backed (no inline backtick string, compile-integrity test only):
-    //   sliderule_hs (EX-SRHS)
+    //   sliderule_haskell (EX-SRHS)
     //
     // DijkstraFlag-family canonical files (dijkstra_flag_ada.cloomc,
     // lambda/dijkstra_flag.cloomc, english/dijkstra_flag.cloomc) are excluded:
@@ -7635,16 +7635,16 @@ abstraction VlcTest {
             }
         }
 
-        // ── File-backed: EX-SRHS — sliderule_hs compile-integrity ────────────────
+        // ── File-backed: EX-SRHS — sliderule_haskell compile-integrity ──────────
         {
-            const appPath = extractFilePath('sliderule_hs');
-            assert('EX-SRHS: sliderule_hs path is declared in _CLOOMC_FILE_EXAMPLES',
-                !!appPath, 'sliderule_hs not found in _CLOOMC_FILE_EXAMPLES');
+            const appPath = extractFilePath('sliderule_haskell');
+            assert('EX-SRHS: sliderule_haskell path is declared in _CLOOMC_FILE_EXAMPLES',
+                !!appPath, 'sliderule_haskell not found in _CLOOMC_FILE_EXAMPLES');
             const absPath = path.join(
                 __dirname, appPath.replace(/^\/simulator\//, ''));
             const src    = fs.readFileSync(absPath, 'utf8');
             const result = new CLOOMCCompiler().compile(src);
-            assert('EX-SRHS: sliderule_hs.cloomc compiles without errors',
+            assert('EX-SRHS: sliderule_haskell.cloomc compiles without errors',
                 result.errors.length === 0,
                 result.errors.map(e => 'L' + e.line + ': ' + e.message).join('; '));
             for (const meth of [

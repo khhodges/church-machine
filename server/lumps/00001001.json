@@ -16,14 +16,14 @@
   "capabilities": [
     {
       "slot": 0,
-      "name": "SlideRuleHS.SelfDataR",
+      "name": "SlideRule (Haskell).SelfDataR",
       "note": "self-data read-only cap — grants read access to the embedded constant tables baked into the Haskell-style SlideRule lump body"
     }
   ],
   "pet_names": {
     "DR": {},
     "CR": {
-      "0": "SlideRuleHS.SelfDataR"
+      "0": "SlideRule (Haskell).SelfDataR"
     }
   }
 }
