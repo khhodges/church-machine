@@ -439,7 +439,8 @@ function assembleAndLoad() {
     sim.programLabels = result.labels || {};
     sim.programCapabilities = result.capabilities ? result.capabilities.slice() : [];
     const entryLabel = Object.keys(result.labels || {}).find(k => (result.labels[k] === 0)) || null;
-    sim.programName = entryLabel || (Object.keys(result.labels || {})[0]) || 'prog';
+    const _srcAbstrName = (source.match(/;\s*Abstraction:\s*(.+)/i) || [])[1]?.trim() || null;
+    sim.programName = _srcAbstrName || entryLabel || (sim.nsLabels && sim.nsLabels[sim.bootEntrySlot]) || 'SelfTest';
     window._assemblerSymbols = { labels: result.labels || {}, lumpName: sim.programName };
     _pendingSimLoad = true;
 
