@@ -2545,7 +2545,7 @@ function updateNamespace() {
                 }
             }
         }
-        html += `<td class="ns-label ns-label-clickable" style="${warmStyle}cursor:pointer;" onclick="_openNSEntryDetail(${i})" title="Inspect capability object for NS[${i}]">${nsLabelInner} <span class="ns-inspect-arrow">&#9656;</span></td>`;
+        html += `<td class="ns-label ns-label-clickable" style="${warmStyle}cursor:pointer;text-decoration:underline dotted;" onclick="_nsLabelOpen(${i})" title="Open full view for NS[${i}]">${nsLabelInner}</td>`;
         html += `<td style="${warmStyle}cursor:pointer;text-decoration:underline dotted;color:#4ec9b0;" title="Open memory view at this address" onclick="event.stopPropagation();jumpToMemory(${e.word0_location})">0x${e.word0_location.toString(16).toUpperCase().padStart(8, '0')}</td>`;
         if (codeNotResident) {
             const priorityTag = manifest.priority === 'hot' ? 'Hot' : (manifest.priority === 'cold' ? 'Cold' : 'Warm');
@@ -2616,6 +2616,43 @@ function updateNamespace() {
 
     html += '</tbody></table>';
     container.innerHTML = html;
+}
+
+// ── NS label click — open full view for the capability at that slot ───────────
+// Priority:
+//   1. Registered abstraction  → Abstractions view (showAbstractionDetail)
+//   2. LUMP in repository      → LUMP browser (_openLumpSource)
+//   3. Fallback                → Memory view at lump base address
+
+function _nsLabelOpen(slotIdx) {
+    if (!sim) return;
+    const e = sim.readNSEntry(slotIdx);
+
+    // 1 — registered abstraction
+    const _reg = (typeof abstractionRegistry !== 'undefined' && abstractionRegistry &&
+                  typeof abstractionRegistry.getAbstraction === 'function')
+        ? abstractionRegistry
+        : (sim.abstractionRegistry && typeof sim.abstractionRegistry.getAbstraction === 'function'
+            ? sim.abstractionRegistry : null);
+    if (_reg && _reg.getAbstraction(slotIdx)) {
+        if (typeof switchView === 'function') switchView('abstractions');
+        if (typeof showAbstractionDetail === 'function') {
+            setTimeout(() => showAbstractionDetail(slotIdx), 60);
+        }
+        return;
+    }
+
+    // 2 — LUMP in repository
+    const _srcLump = e ? _findSrcLump(slotIdx, e.label) : null;
+    if (_srcLump && _srcLump.token) {
+        _openLumpSource(_srcLump.token);
+        return;
+    }
+
+    // 3 — fallback: Memory view at lump base
+    if (e && e.word0_location > 0) {
+        jumpToMemory(e.word0_location);
+    }
 }
 
 // ── Memory dump view ──────────────────────────────────────────────────────────
