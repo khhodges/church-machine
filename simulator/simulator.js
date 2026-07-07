@@ -6394,7 +6394,7 @@ class ChurchSimulator {
         this.output = '';
         this.output += '=== HARDWARE BINARY LOADED (Tang Nano 20K) ===\n';
         this.output += `Namespace: ${nsEntryCount} entries written to NS_TABLE_BASE (0x${this.NS_TABLE_BASE.toString(16).toUpperCase()})\n`;
-        this.output += `LED flash: code at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}, C-List (${abstrClistCount} GTs) at 0x${(abstrLoc + abstrClistStart).toString(16).padStart(4,'0').toUpperCase()}\n`;
+        this.output += `Boot: code at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}, C-List (${abstrClistCount} GTs) at 0x${(abstrLoc + abstrClistStart).toString(16).padStart(4,'0').toUpperCase()}\n`;
         this.output += `Boot ROM: ${hwProgram.length} instructions at code region 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}\n`;
         if (abstractions) {
             for (const abs of abstractions) {
@@ -6421,7 +6421,7 @@ class ChurchSimulator {
                            (p.permissions.E ? 'E':'');
             this.output += `  [${i}] 0x${gt.toString(16).padStart(8,'0')} ${p.typeName.padEnd(8)} ${(permStr||'------').padEnd(6)} -> idx ${p.index}\n`;
         }
-        this.output += `\n--- CLOOMC Code (LED flash code region, at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}) ---\n`;
+        this.output += `\n--- CLOOMC Code (Boot code region, at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}) ---\n`;
         for (let i = 0; i < hwProgram.length; i++) {
             const w = hwProgram[i] >>> 0;
             if (w === 0) continue;
@@ -6522,7 +6522,7 @@ class ChurchSimulator {
         this.output = '';
         this.output += '=== BINARY IMAGE LOADED ===\n';
         this.output += `Namespace: ${nsEntryCount} entries at NS_TABLE_BASE (0x${this.NS_TABLE_BASE.toString(16).toUpperCase()})\n`;
-        this.output += `LED flash: code at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}, C-List (${abstrClistCount} GTs) at 0x${(abstrLoc + abstrClistStart).toString(16).padStart(4,'0').toUpperCase()}\n`;
+        this.output += `Boot: code at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}, C-List (${abstrClistCount} GTs) at 0x${(abstrLoc + abstrClistStart).toString(16).padStart(4,'0').toUpperCase()}\n`;
         this.output += '\n--- Namespace Entries ---\n';
         for (let i = 0; i < nsEntryCount; i++) {
             const base = this.NS_TABLE_BASE + i * this.NS_ENTRY_WORDS;
@@ -6544,7 +6544,7 @@ class ChurchSimulator {
             this.output += `  [${i}] 0x${gt.toString(16).padStart(8,'0')} ${p.typeName.padEnd(8)} ${(permStr||'-------').padEnd(7)} -> idx ${p.index}\n`;
         }
         if (hwBoot) {
-            this.output += `\n--- CLOOMC Code (LED flash code region, at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}) ---\n`;
+            this.output += `\n--- CLOOMC Code (Boot code region, at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}) ---\n`;
             for (let i = 0; i < hwBoot.length; i++) {
                 const w = hwBoot[i] >>> 0;
                 if (w === 0) continue;

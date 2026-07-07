@@ -370,7 +370,7 @@ class ChurchAssembler {
     //   • idxToken is a bare decimal  → tries the bracket form "NAME[N]"
     //     (handles the tokenizer splitting "LED[0]" into "LED" "0")
     //   • idxToken is a plain word    → tries the two-word form "NAME WORD"
-    //     (handles the tokenizer splitting "LED flash" into "LED" "flash")
+    //     (handles the tokenizer splitting "Symbolic Math" into "Symbolic" "Math")
     // Returns { slot, key, consumed } on success, or null on failure.
     _resolveNSNameBracket(nameToken, idxToken) {
         const name = (nameToken || '').replace(/,/g, '').trim();
@@ -387,7 +387,7 @@ class ChurchAssembler {
             if (slotBr !== null) return { slot: slotBr, key: combined, consumed: true };
         }
 
-        // 3. Two-word abstraction name: tokenizer split "LED flash" → "LED" + "flash".
+        // 3. Two-word abstraction name: tokenizer split "Symbolic Math" → "Symbolic" + "Math".
         //    Only when idxToken is a plain identifier (not a number, not empty).
         if (idx && /^[A-Za-z_]\w*$/.test(idx)) {
             const combined2 = name + ' ' + idx;

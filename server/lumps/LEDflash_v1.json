@@ -1,6 +1,6 @@
 {
   "token": "00000600",
-  "abstraction": "LED Flash",
+  "abstraction": "Boot",
   "filename": "LEDflash_v1.lump",
   "sidecar_file": "LEDflash_v1.json",
   "ns_slot": null,

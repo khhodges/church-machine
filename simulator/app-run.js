@@ -2321,7 +2321,7 @@ function showFaultModal(f) {
 
     // locationNs — the authoritative lump label and offset for display.
     // Prefers crSnapshot[14] (captured at fault time) over _nsSnapshot so
-    // heap-loaded lumps (e.g. LED flash) are shown instead of Boot.NS.
+    // heap-loaded lumps (e.g. Boot) are shown instead of Boot.NS.
     const _cr14snap = f.crSnapshot && f.crSnapshot[14];
     let locationNs;
     if (_cr14snap && _cr14snap.word0) {
@@ -7202,7 +7202,7 @@ BRANCHNE done
 done:
 HALT`,
         'led_control': `; ============================================================
-; Abstraction:  LED Flash
+; Abstraction:  Boot
 ; Description:  LED control — Section 1: LED blink (Ti60 F225 nucleus) / Section 2: Turing DR Test (full ISA exercise)
 ; Author:       Church Machine Educational Platform
 ; Version:      1.2
