@@ -925,8 +925,8 @@ function _injectClistNow() {
     // SlideRule is omitted — it's not a boot-c-list device; the name falls
     // through to the nsLabels lookup and resolves via its NS entry.
     const _devSlotMap = {
-        LED0: 4, LED1: 4, LED2: 4, LED3: 4, LED4: 4, LED5: 4,
-        UART: 3, BTN: 5, Timer: 6, Display: 3,
+        LED0: 3, LED1: 3, LED2: 3, LED3: 3, LED4: 3, LED5: 3,
+        UART: 2, BTN: 4, Timer: 5, Display: 2,
     };
 
     // Boot.Abstr's NS slot is dynamic (sim.bootEntrySlot, default 6 = SelfTest

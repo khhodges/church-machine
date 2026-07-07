@@ -619,32 +619,32 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
 
 // ── LED[N] Abstract GT bracket syntax ────────────────────────────────────────
 
-// L1: LOAD CR3, LED[0]  →  same word as  LOAD CR3, CR6, #4
-// (All LED[N] resolve to boot c-list slot 4 = LED_DEV GT; individual LEDs
+// L1: LOAD CR3, LED[0]  →  same word as  LOAD CR3, CR6, #3
+// (All LED[N] resolve to boot c-list slot 3 = LED_DEV GT; individual LEDs
 //  are selected by the DWRITE offset, not by separate GTs.)
 {
     const a1 = new ChurchAssembler();
-    const r1 = a1.assemble('LOAD CR3, CR6, #4');
+    const r1 = a1.assemble('LOAD CR3, CR6, #3');
     const a2 = new ChurchAssembler();
     const r2 = a2.assemble('LOAD CR3, LED[0]');
     assert('L1 LED[0]: no assembly errors', a2.errors.length === 0,
         a2.errors.map(e => e.message).join('; '));
-    assert('L1 LED[0]: same word as LOAD CR3, CR6, #4',
+    assert('L1 LED[0]: same word as LOAD CR3, CR6, #3',
         r1.words[0] === r2.words[0],
         `explicit=0x${(r1.words[0]>>>0).toString(16)} bracket=0x${(r2.words[0]>>>0).toString(16)}`);
 }
 
-// L2: LOAD CR5, LED[5]  →  same word as  LOAD CR5, CR6, #4
-// (LED[5] shares LED_DEV GT at slot 4; offset 5 will RANGE-fault at DWRITE time
+// L2: LOAD CR5, LED[5]  →  same word as  LOAD CR5, CR6, #3
+// (LED[5] shares LED_DEV GT at slot 3; offset 5 will RANGE-fault at DWRITE time
 //  since lim17=4, but the LOAD itself is valid.)
 {
     const a1 = new ChurchAssembler();
-    const r1 = a1.assemble('LOAD CR5, CR6, #4');
+    const r1 = a1.assemble('LOAD CR5, CR6, #3');
     const a2 = new ChurchAssembler();
     const r2 = a2.assemble('LOAD CR5, LED[5]');
     assert('L2 LED[5]: no assembly errors', a2.errors.length === 0,
         a2.errors.map(e => e.message).join('; '));
-    assert('L2 LED[5]: same word as LOAD CR5, CR6, #4',
+    assert('L2 LED[5]: same word as LOAD CR5, CR6, #3',
         r1.words[0] === r2.words[0],
         `explicit=0x${(r1.words[0]>>>0).toString(16)} bracket=0x${(r2.words[0]>>>0).toString(16)}`);
 }
@@ -660,12 +660,12 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
 // L4: lower-case led[0] is accepted (case-insensitive) → same slot as LED[0]
 {
     const a1 = new ChurchAssembler();
-    const r1 = a1.assemble('LOAD CR3, CR6, #4');
+    const r1 = a1.assemble('LOAD CR3, CR6, #3');
     const a2 = new ChurchAssembler();
     const r2 = a2.assemble('LOAD CR3, led[0]');
     assert('L4 led[0] lowercase: no errors', a2.errors.length === 0,
         a2.errors.map(e => e.message).join('; '));
-    assert('L4 led[0] lowercase: same word as LOAD CR3, CR6, #4',
+    assert('L4 led[0] lowercase: same word as LOAD CR3, CR6, #3',
         r1.words[0] === r2.words[0],
         `explicit=0x${(r1.words[0]>>>0).toString(16)} bracket=0x${(r2.words[0]>>>0).toString(16)}`);
 }
@@ -5032,7 +5032,7 @@ function symCompile(body, caps) {
     ChurchAssembler._sharedNsSymbols = {};
 
     {
-        // BC97: LOAD CR5, UART — resolves to boot c-list slot 3 (UART_DEV)
+        // BC97: LOAD CR5, UART — resolves to boot c-list slot 2 (UART_DEV)
         const a = new ChurchAssembler({});
         const r = a.assemble('LOAD CR5, UART\nHALT');
         assert('BC97 LOAD CR5, UART without cap block — no errors',
@@ -5045,13 +5045,13 @@ function symCompile(body, caps) {
             const imm   = w & 0x7FFF;
             assert('BC97 LOAD CR5, UART — crSrc=6 (c-list root)',
                 crSrc === 6, `got crSrc=${crSrc}`);
-            assert('BC97 LOAD CR5, UART — imm=3 (UART boot c-list slot)',
-                imm === 3, `got imm=${imm}`);
+            assert('BC97 LOAD CR5, UART — imm=2 (UART boot c-list slot)',
+                imm === 2, `got imm=${imm}`);
         }
     }
 
     {
-        // BC98: LOAD CR1, BTN — resolves to boot c-list slot 5 (BTN_DEV)
+        // BC98: LOAD CR1, BTN — resolves to boot c-list slot 4 (BTN_DEV)
         const a = new ChurchAssembler({});
         const r = a.assemble('LOAD CR1, BTN\nHALT');
         assert('BC98 LOAD CR1, BTN without cap block — no errors',
@@ -5059,8 +5059,8 @@ function symCompile(body, caps) {
         {
             const w   = r.words[0] >>> 0;
             const imm = w & 0x7FFF;
-            assert('BC98 LOAD CR1, BTN — imm=5 (BTN boot c-list slot)',
-                imm === 5, `got imm=${imm}`);
+            assert('BC98 LOAD CR1, BTN — imm=4 (BTN boot c-list slot)',
+                imm === 4, `got imm=${imm}`);
         }
     }
 
@@ -5076,7 +5076,7 @@ function symCompile(body, caps) {
     }
 
     {
-        // BC100: LOAD CR3, Timer — resolves to boot c-list slot 6 (TIMER_DEV)
+        // BC100: LOAD CR3, Timer — resolves to boot c-list slot 5 (TIMER_DEV)
         const a = new ChurchAssembler({});
         const r = a.assemble('LOAD CR3, Timer\nHALT');
         assert('BC100 LOAD CR3, Timer without cap block — no errors',
@@ -5084,8 +5084,8 @@ function symCompile(body, caps) {
         {
             const w   = r.words[0] >>> 0;
             const imm = w & 0x7FFF;
-            assert('BC100 LOAD CR3, Timer — imm=6 (Timer boot c-list slot)',
-                imm === 6, `got imm=${imm}`);
+            assert('BC100 LOAD CR3, Timer — imm=5 (Timer boot c-list slot)',
+                imm === 5, `got imm=${imm}`);
         }
     }
 

@@ -453,19 +453,19 @@ class ChurchAssembler {
             return this._clistSlots[name];
 
         // 3. LED<N> shorthand — all LED0–LED5 share the LED_DEV GT at boot
-        //    c-list slot 4 (clistGTs[4] = LED_DEV, MMIO 0x40000000, lim17=4).
-        //    LOAD CR3, LED0  →  LOAD CR3, CR6, #4  (same slot for all LEDs;
+        //    c-list slot 3 (clistGTs[3] = LED_DEV, MMIO 0x40000000, lim17=4).
+        //    LOAD CR3, LED0  →  LOAD CR3, CR6, #3  (same slot for all LEDs;
         //    individual LEDs are selected by the DWRITE offset: 0=LED0…4=LED4).
         //    Legacy bracket form LED[N] is still accepted for back-compat.
         const ledMatch = name.match(/^LED(\d)$/i) || name.match(/^LED\[(\d)\]$/i);
         if (ledMatch) {
             const n = parseInt(ledMatch[1], 10);
-            if (n >= 0 && n <= 5) return 4;   // all LEDs → LED_DEV GT at clistGTs[4]
+            if (n >= 0 && n <= 5) return 3;   // all LEDs → LED_DEV GT at clistGTs[3]
         }
 
         // 3.2. Hardware device shorthands — boot c-list positions in the current
         //      11-slot DEMO_CLIST built by _getHardwareBootCatalog:
-        //        [3] UART_DEV  [4] LED_DEV  [5] BTN_DEV  [6] TIMER_DEV
+        //        [2] UART_DEV  [3] LED_DEV  [4] BTN_DEV  [5] TIMER_DEV
         //      These are checked AFTER nsSymbols so that an explicit namespace table
         //      (set via setNamespace) takes priority when the abstraction is mounted
         //      in the Namespace Table for method dispatch (ELOADCALL).  When no
@@ -476,9 +476,9 @@ class ChurchAssembler {
         //      it appears in the Namespace Table and resolves via nsSymbols above.
         {
             const nameUC = name.toUpperCase();
-            if (nameUC === 'UART')  return 3;
-            if (nameUC === 'BTN')   return 5;
-            if (nameUC === 'TIMER') return 6;
+            if (nameUC === 'UART')  return 2;
+            if (nameUC === 'BTN')   return 4;
+            if (nameUC === 'TIMER') return 5;
         }
 
         // 3.5. Boot-image fixed capability names — always present in the boot c-list
@@ -1992,15 +1992,15 @@ class ChurchAssembler {
 
     // Build a slot-number → capability-name map suitable for passing to disassemble().
     // Always includes the boot c-list positions from the current 11-slot DEMO_CLIST:
-    //   UART→3, LED_DEV→4, BTN→5, Timer→6
+    //   UART→2, LED_DEV→3, BTN→4, Timer→5
     // caps: array of {name} objects or strings from an assembled program's capability list.
     // nsLabels: sim.nsLabels — maps NS slot index → label string; used to resolve
     //   non-device abstractions (e.g. Tunnel at slot 31).
     static buildSlotNames(caps, nsLabels) {
         // Boot c-list positions in the current 11-slot DEMO_CLIST:
-        //   [3] UART_DEV  [4] LED_DEV (LED0–LED4)  [5] BTN_DEV  [6] TIMER_DEV
+        //   [2] UART_DEV  [3] LED_DEV (LED0–LED4)  [4] BTN_DEV  [5] TIMER_DEV
         const slotNames = {
-            3: 'UART', 4: 'LED_DEV', 5: 'BTN', 6: 'Timer',
+            2: 'UART', 3: 'LED_DEV', 4: 'BTN', 5: 'Timer',
         };
         if (caps && nsLabels) {
             for (const cap of caps) {
