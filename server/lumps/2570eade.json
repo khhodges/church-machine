@@ -1,6 +1,6 @@
 {
   "token": "2570eade",
-  "abstraction": "PostFlashSelftest",
+  "abstraction": "Post-Flash Self-Test",
   "ns_slot": null,
   "ns_slot_policy": "dynamic",
   "lump_size": 1024,

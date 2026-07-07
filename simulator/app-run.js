@@ -7192,7 +7192,7 @@ BRANCHNE done
 done:
 HALT`,
         'led_control': `; ============================================================
-; Abstraction:  LedControl
+; Abstraction:  LED Flash
 ; Description:  LED control — Section 1: LED blink (Ti60 F225 nucleus) / Section 2: Turing DR Test (full ISA exercise)
 ; Author:       Church Machine Educational Platform
 ; Version:      1.2

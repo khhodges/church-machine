@@ -488,7 +488,7 @@
   },
   {
     "token": "00001001",
-    "abstraction": "SlideRuleHS",
+    "abstraction": "SlideRule (Haskell)",
     "ns_slot": 16,
     "variant_group": "sliderule",
     "lump_size": 256,
@@ -1413,34 +1413,6 @@
     "lump_version": 0
   },
   {
-    "token": "904adefe",
-    "abstraction": "LED flash",
-    "ns_slot": null,
-    "ns_slot_policy": "dynamic",
-    "lump_size": 64,
-    "cw": 18,
-    "cc": 2,
-    "author": "",
-    "version": "1.0.1",
-    "methods": [
-      {
-        "name": "main",
-        "offset": 0,
-        "length": 18,
-        "pet_names": {
-          "CR": {
-            "0": "LED0",
-            "1": "Tunnel"
-          }
-        }
-      }
-    ],
-    "grants": [
-      "E"
-    ],
-    "lump_version": 0
-  },
-  {
     "token": "00003300",
     "abstraction": "Ethernet",
     "ns_slot": 42,
@@ -1550,31 +1522,8 @@
     ]
   },
   {
-    "token": "6902f517",
-    "abstraction": "LED Blink \u2014 Ti60 F225 Hardware Nucleus Code",
-    "ns_slot": null,
-    "ns_slot_policy": "dynamic",
-    "lump_size": 64,
-    "cw": 17,
-    "cc": 0,
-    "author": "",
-    "version": "2026.05.18",
-    "lump_version": 1,
-    "compiled_at": 1779100305.9586787,
-    "methods": [
-      {
-        "name": "run",
-        "offset": 0,
-        "length": 17
-      }
-    ],
-    "grants": [
-      "E"
-    ]
-  },
-  {
     "token": "13812cdf",
-    "abstraction": "Church Machine Post-Flash Exhaustive Self-Test v1.1",
+    "abstraction": "Post-Flash Self-Test",
     "ns_slot": null,
     "ns_slot_policy": "dynamic",
     "lump_size": 1024,
@@ -1596,60 +1545,8 @@
     ]
   },
   {
-    "token": "13ade9a4",
-    "abstraction": "Abstraction:  LedControl",
-    "ns_slot": null,
-    "lump_size": 64,
-    "cw": 17,
-    "cc": 1,
-    "author": "",
-    "version": "2026.05.18",
-    "lump_version": 1,
-    "compiled_at": 1779128895.8574944,
-    "methods": [
-      {
-        "name": "run",
-        "offset": 0,
-        "length": 17
-      }
-    ],
-    "grants": [
-      "E"
-    ],
-    "source": "simulator/examples/led_control.cloomc"
-  },
-  {
-    "token": "ee298a27",
-    "abstraction": "Abstraction:  CapabilityTest",
-    "ns_slot": null,
-    "lump_size": 64,
-    "cw": 23,
-    "cc": 6,
-    "author": "",
-    "version": "2026.05.18",
-    "lump_version": 1,
-    "compiled_at": 1779134196.3786364,
-    "methods": [
-      {
-        "name": "run",
-        "offset": 0,
-        "length": 23,
-        "pet_names": {
-          "DR": {},
-          "CR": {
-            "0": "LED0"
-          }
-        }
-      }
-    ],
-    "grants": [
-      "E"
-    ],
-    "source": "simulator/examples/capability_test.cloomc"
-  },
-  {
     "token": "0baf5e0e",
-    "abstraction": "NoteGPublishedBug",
+    "abstraction": "NoteG",
     "ns_slot": null,
     "lump_size": 64,
     "cw": 47,
@@ -1851,7 +1748,7 @@
   },
   {
     "token": "50789581",
-    "abstraction": "Keystone  (22 words, cc=2, 39 free)",
+    "abstraction": "Keystone",
     "ns_slot": null,
     "lump_size": 64,
     "cw": 22,
@@ -1870,29 +1767,6 @@
     "grants": [
       "E"
     ]
-  },
-  {
-    "token": "4ea370af",
-    "abstraction": "Abstraction:  NoteGAssembly",
-    "ns_slot": null,
-    "lump_size": 256,
-    "cw": 141,
-    "cc": 0,
-    "author": "",
-    "version": "2026.05.20",
-    "lump_version": 2,
-    "compiled_at": 1779283497.204894,
-    "methods": [
-      {
-        "name": "run",
-        "offset": 0,
-        "length": 141
-      }
-    ],
-    "grants": [
-      "E"
-    ],
-    "source": "simulator/examples/ada_note_g.cloomc"
   },
   {
     "token": "95a651e7",
@@ -2060,7 +1934,7 @@
   },
   {
     "token": "2570eade",
-    "abstraction": "PostFlashSelftest",
+    "abstraction": "Post-Flash Self-Test",
     "ns_slot": null,
     "ns_slot_policy": "dynamic",
     "variant_group": null,
@@ -2074,7 +1948,7 @@
   },
   {
     "token": "8e37e416",
-    "abstraction": "Tunnel(37words,cc=1,25free)",
+    "abstraction": "Tunnel",
     "filename": "Tunnel_37words_cc_1_25free_v2.lump",
     "sidecar_file": "Tunnel_37words_cc_1_25free_v2.json",
     "ns_slot": null,
@@ -2094,7 +1968,7 @@
   },
   {
     "token": "00000600",
-    "abstraction": "LEDflash",
+    "abstraction": "LED Flash",
     "filename": "LEDflash_v1.lump",
     "sidecar_file": "LEDflash_v1.json",
     "ns_slot": null,

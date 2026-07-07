@@ -642,9 +642,9 @@ LIVE_ABSTRACTION_NAMES = _live_abstraction_names()
 # fix the sidecar/manifest `abstraction` field or the registry name instead
 # of adding it here.
 KNOWN_NON_REGISTRY_ABSTRACTIONS = {
-    "SlideRuleHS": "Haskell-frontend SlideRule variant (variant_group=sliderule); "
-                   "browsable via the LUMP repository only, never wired into the "
-                   "Abstractions view/registry.",
+    "SlideRule (Haskell)": "Haskell-frontend SlideRule variant (variant_group=sliderule); "
+                           "browsable via the LUMP repository only, never wired into the "
+                           "Abstractions view/registry.",
 }
 
 

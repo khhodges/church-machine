@@ -1731,8 +1731,8 @@ function getMethodPurposes(abs) {
             'Kill':     'Thread.Kill(thread_GT) — terminates the target thread: suspends it via CHANGE, releases its lump via Memory.Free, revokes its Thread GT via Mint.Revoke (incrementing gt_seq so all live copies of the GT become instantly invalid). Requires E perm on thread_GT.',
             'Compile':  'Thread.Compile(f_GT) \u2014 creates a new Thread Abstraction whose initial start abstraction is f. Calls Memory.Allocate for a fresh lump (GT zone + LIFO stack + heap + DR file), calls Mint.Encode(Inform, lumpSize, 0) to mint a zero-perm thread stack GT (CR12 of the new thread), stores f_GT into the new thread\u2019s c-list as CR0 (the return/first-call slot), and returns the new Thread GT to the caller. The new thread is ready to run as soon as switchTo is called on its GT.',
         },
-        'LED flash': {
-            'Run': 'LED flash.Run \u2014 method selector 0. Drives the on-board LED through a Set \u2192 delay \u2192 Clear cycle using the LED[0] Abstract GT in c-list slot 0, then RETURNs. Caller writes DR0=0 (method index) before CALL.',
+        'LED Flash': {
+            'Run': 'LED Flash.Run \u2014 method selector 0. Drives the on-board LED through a Set \u2192 delay \u2192 Clear cycle using the LED[0] Abstract GT in c-list slot 0, then RETURNs. Caller writes DR0=0 (method index) before CALL.',
         },
         'Boot.Thread': {
             'run': 'Boot.Thread.run \u2014 The initial thread\u2019s continuous existence as the hardware execution context. ' +
@@ -1757,11 +1757,11 @@ function getMethodPurposes(abs) {
 
 function getMethodExamples(abs) {
     const examples = {
-        'LED flash': {
-            'Run': `; LED flash.Run — method selector 0
+        'LED Flash': {
+            'Run': `; LED Flash.Run — method selector 0
 ; c-list[0] = LED[0] Abstract GT (device_class=LED, device_data=0)
 ; Caller: DWRITE DR0, 0  ; method = Run
-;         CALL   CR6, 0xF ; enter LED flash
+;         CALL   CR6, 0xF ; enter LED Flash
 
 ; ── Turn LED on ────────────────────────────────────────────────────────
       DR0   <- 0x01       ; cmd = Set, ledIdx = 0

@@ -289,8 +289,8 @@ class AbstractionRegistry {
         // Slot 2 freed — Startup.Config removed. Hardware ISA owns M-state per CR register;
         // Thread.CR[0] is pre-populated by the boot image; CALL CR0 drops M automatically.
 
-        this.createAbstraction(3, 'LED flash', 0, ['Run'],
-            'LED flash — combined code (CR14) + c-list (CR6) in one slot; Run flashes the on-board LED to confirm hardware is alive',
+        this.createAbstraction(3, 'LED Flash', 0, ['Run'],
+            'LED Flash — combined code (CR14) + c-list (CR6) in one slot; Run flashes the on-board LED to confirm hardware is alive',
             { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(4, 'Salvation', 1,

@@ -1,6 +1,6 @@
 {
   "token": "00001001",
-  "abstraction": "SlideRuleHS",
+  "abstraction": "SlideRule (Haskell)",
   "ns_slot": 16,
   "variant_group": "sliderule",
   "lump_size": 256,
