@@ -289,8 +289,8 @@ class AbstractionRegistry {
         // Slot 2 freed — Startup.Config removed. Hardware ISA owns M-state per CR register;
         // Thread.CR[0] is pre-populated by the boot image; CALL CR0 drops M automatically.
 
-        this.createAbstraction(3, 'Boot', 0, ['Boot'],
-            'Boot — hardware boot entry point; three instructions (LOAD/CHANGE/CALL) that load the initial capability into CR15, update CR12, then CALL CR0 (the programmable Golden Token that decides what runs after boot)',
+        this.createAbstraction(3, 'LED Flash', 0, ['Run'],
+            'LED Flash — startup test abstraction; Run flashes the on-board LED to confirm hardware is alive after boot',
             { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(4, 'Salvation', 1,
