@@ -356,8 +356,8 @@ function _getSyntaxSuggestion(msg) {
     if (/cannot compile statement|cannot parse.*statement/i.test(msg)) {
         return {
             title: 'Unrecognised statement',
-            body: 'This line couldn\'t be compiled. Check the language you\'ve selected in the dropdown.',
-            example: '/* JavaScript / CLOOMC++ */\nabstraction MyIdea {\n    method DoSomething() {\n        Write 1 to the result\n    }\n}'
+            body: 'This line couldn\'t be compiled. Use CLOOMC++ instructions like <code>IADD</code>, <code>DREAD</code>, or <code>RETURN</code> inside method bodies.',
+            example: '/* JavaScript / CLOOMC++ */\nabstraction MyIdea {\n    method DoSomething() {\n        IADD   DR1, DR0, #1   ; add 1 to DR0, store in DR1\n        RETURN DR1             ; return the result\n    }\n}'
         };
     }
     if (/cannot understand/i.test(msg)) {
