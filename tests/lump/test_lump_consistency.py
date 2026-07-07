@@ -19,6 +19,12 @@ R14  Every archive binary has a matching sidecar .json (both old <token>-vN and 
 R16  A statically-slotted, system-baseline lump's `abstraction` field must name a
      currently-live entry in simulator/abstractions.js (catches abstraction-name
      drift after a rename, at build/merge time instead of only as a runtime toast).
+R17  Every example-tab button in simulator/index.html whose tooltip label or display
+     text is a case-insensitive match to a live abstraction name must use the exact
+     registered casing (e.g. "LED Flash" not "LED flash" or "LED Control").
+R18  Every top-level key of the knownPurposes dict in simulator/app-absdetail.js must
+     name a currently-live entry in the abstraction registry (catches stale or
+     wrongly-cased method-doc keys after an abstraction rename).
 
 Failure messages are written to be self-diagnosing: they state what was found,
 what was expected, and which file to correct.
@@ -46,6 +52,14 @@ import pytest
 LUMPS_DIR = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "..", "server", "lumps")
 )
+
+_SIMULATOR_DIR = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "simulator")
+)
+_INDEX_HTML     = os.path.join(_SIMULATOR_DIR, "index.html")
+_ABSDETAIL_JS   = os.path.join(_SIMULATOR_DIR, "app-absdetail.js")
+
+_DECORATOR_STRIP_RE = _re.compile(r"[\u2726\u2605\s]+$")
 
 
 # ── Manifest + path helpers ────────────────────────────────────────────────────
@@ -778,6 +792,161 @@ def _read_all_words(token: str):
     return list(struct.unpack_from(f">{n}I", data))
 
 
+# ── R17/R18 helpers ────────────────────────────────────────────────────────────
+
+def _example_tab_labels():
+    """Extract display labels from example-tab buttons in simulator/index.html.
+
+    For each <button class="example-tab" ...> element, returns a dict with:
+        tooltip_label    — text before the first ' — ' (em-dash) in data-tooltip,
+                           with trailing decorators (✦ ★) and whitespace stripped.
+        button_text      — button inner text with trailing decorators and whitespace
+                           stripped.
+        raw_tooltip      — the full, unmodified data-tooltip attribute value.
+        data_example     — value of the data-example attribute (or "").
+        data_abstraction — value of the data-abstraction attribute (or "").
+                           When non-empty this declares that the button is the
+                           canonical demo for that named abstraction; R17
+                           verifies both tooltip_label and button_text equal it.
+
+    All buttons that carry class="example-tab" are returned, including those
+    without a data-tooltip attribute (they may still carry data-abstraction).
+    """
+    with open(_INDEX_HTML, encoding="utf-8") as f:
+        content = f.read()
+
+    # Match every <button ...>...</button> that carries class="example-tab".
+    # Each such button lives on its own line so DOTALL is not needed, but we
+    # use it for safety in case of future multi-line reformatting.
+    button_re = _re.compile(
+        r'<button\b([^>]*class="[^"]*\bexample-tab\b[^"]*"[^>]*)>(.*?)</button>',
+        _re.DOTALL,
+    )
+    tooltip_attr_re     = _re.compile(r'\bdata-tooltip="([^"]*)"')
+    example_attr_re     = _re.compile(r'\bdata-example="([^"]*)"')
+    abstraction_attr_re = _re.compile(r'\bdata-abstraction="([^"]*)"')
+
+    results = []
+    for m in button_re.finditer(content):
+        attrs_str, inner = m.group(1), m.group(2)
+
+        tm = tooltip_attr_re.search(attrs_str)
+        raw_tooltip = tm.group(1) if tm else ""
+
+        # The separator is a literal em-dash (U+2014) surrounded by spaces.
+        em_sep = " \u2014 "
+        sep_idx = raw_tooltip.find(em_sep)
+        if sep_idx >= 0:
+            tooltip_label = raw_tooltip[:sep_idx]
+        else:
+            tooltip_label = raw_tooltip
+        tooltip_label = _DECORATOR_STRIP_RE.sub("", tooltip_label).strip()
+
+        # Strip HTML tags from inner text (buttons don't have child elements
+        # in practice, but be defensive) then strip decorators.
+        button_text = _re.sub(r"<[^>]+>", "", inner).strip()
+        button_text = _DECORATOR_STRIP_RE.sub("", button_text).strip()
+
+        em = example_attr_re.search(attrs_str)
+        am = abstraction_attr_re.search(attrs_str)
+
+        results.append(
+            dict(
+                tooltip_label=tooltip_label,
+                button_text=button_text,
+                raw_tooltip=raw_tooltip,
+                data_example=em.group(1) if em else "",
+                data_abstraction=am.group(1) if am else "",
+            )
+        )
+    return results
+
+
+def _known_purposes_keys():
+    """Return the ordered list of top-level keys of the knownPurposes dict in
+    simulator/app-absdetail.js.
+
+    Uses a Node.js subprocess to locate the dict, walk it with brace-depth
+    tracking (correctly skipping string contents), and extract depth-1 keys —
+    the same technique used by _live_abstraction_names() for abstractions.js.
+    """
+    script = r"""
+const fs = require('fs');
+const content = fs.readFileSync(%r, 'utf8');
+
+const startMarker = 'const knownPurposes = {';
+const startIdx = content.indexOf(startMarker);
+if (startIdx < 0) { console.log('[]'); process.exit(0); }
+
+// Walk from the opening '{' tracking brace depth, correctly skipping string
+// literals so that braces inside method-doc strings are ignored.
+let depth = 0;
+let i = startIdx + startMarker.length - 1; // position of '{'
+let inStr = false, strCh = '';
+const blockStart = i;
+
+while (i < content.length) {
+    const c = content[i];
+    if (inStr) {
+        if (c === '\\') { i += 2; continue; }  // skip escaped char
+        if (c === strCh) inStr = false;
+    } else {
+        if (c === '"' || c === "'" || c === '`') { inStr = true; strCh = c; }
+        else if (c === '{') depth++;
+        else if (c === '}') { depth--; if (depth === 0) break; }
+    }
+    i++;
+}
+const block = content.slice(blockStart, i + 1);
+
+// Direct (depth-1) keys are lines indented by exactly 8 spaces followed
+// by a single-quoted identifier then a colon.  This matches the consistent
+// formatting used throughout app-absdetail.js and avoids picking up the
+// nested method-name keys (which are indented 12+ spaces).
+const keyRe = /^        '([^']+)'\s*:/mg;
+const keys = [];
+let m;
+while ((m = keyRe.exec(block)) !== null) keys.push(m[1]);
+console.log(JSON.stringify(keys));
+""" % _ABSDETAIL_JS
+    out = subprocess.run(
+        ["node", "-e", script], capture_output=True, text=True, check=True
+    ).stdout
+    return json.loads(out)
+
+
+# Build module-level collections once so parametrize can use them.
+_EXAMPLE_TAB_LABELS = _example_tab_labels()
+_KNOWN_PURPOSES_KEYS = _known_purposes_keys()
+
+# Build a case-folded lookup table  lower_name -> canonical_name  from the
+# live abstraction registry, used by both R17 and R18.
+_LIVE_NAMES_BY_LOWER = {name.lower(): name for name in LIVE_ABSTRACTION_NAMES}
+
+# ── R17 allowlist ──────────────────────────────────────────────────────────────
+# data-abstraction values that intentionally reference an abstraction name that
+# is not (yet) live in the registry.  Add an entry here ONLY for a planned-but-
+# not-yet-implemented abstraction whose demo button is being authored ahead of
+# the registry entry.  Do NOT add an entry to suppress a casing mistake or a
+# wrong name — fix the HTML instead.
+# (Currently empty: all data-abstraction values match live registry names.)
+KNOWN_NON_REGISTRY_EXAMPLE_LABELS: frozenset = frozenset()
+
+# ── R18 allowlist ──────────────────────────────────────────────────────────────
+# knownPurposes keys that intentionally do not (yet) correspond to a live
+# simulator/abstractions.js registry entry.  Add an entry here ONLY when the
+# mismatch is deliberate (e.g. a planned but not-yet-implemented abstraction
+# whose method documentation is being authored ahead of the implementation).
+# Fix the key name or add it to the registry rather than adding entries here
+# for mere renames or typos.
+KNOWN_NON_REGISTRY_PURPOSES = {
+    "Negotiate": (
+        "Planned dual-approval negotiation abstraction; method docs authored "
+        "ahead of the registry entry.  Add to abstractions.js when implemented."
+    ),
+}
+
+
 @pytest.mark.parametrize("token", LUMP_TOKENS)
 class TestR15_DreadDwriteImmediateModeBit:
     """R15 (ECO-001B): Every DREAD (opcode=10) and DWRITE (opcode=11) instruction in
@@ -820,4 +989,228 @@ class TestR15_DreadDwriteImmediateModeBit:
             f"[words 1..{cw}] have bit14=0 (legacy immediate, not migrated to ECO-001B).\n"
             + "\n".join(violations)
             + "\n  Fix: set bit14=1 (OR 0x4000) on each listed word in the binary."
+        )
+
+
+# ── R17: Example-tab display-name casing ───────────────────────────────────────
+
+# ── R17a: casing-drift cases ───────────────────────────────────────────────────
+# One entry per unique label string that is a case-insensitive match to a live
+# abstraction name.  Labels with no case-insensitive match at all are silently
+# ignored (they are plain example names, not abstraction names).
+def _r17_casing_cases():
+    cases = []
+    seen: set = set()
+    for entry in _EXAMPLE_TAB_LABELS:
+        for kind, raw in (
+            ("tooltip_label", entry["tooltip_label"]),
+            ("button_text",   entry["button_text"]),
+        ):
+            if not raw or raw in seen:
+                continue
+            canonical = _LIVE_NAMES_BY_LOWER.get(raw.lower())
+            if canonical is not None:
+                seen.add(raw)
+                cases.append((kind, raw, canonical))
+    return cases
+
+
+# ── R17b: data-abstraction semantic cases ──────────────────────────────────────
+# One entry per button that carries a data-abstraction attribute.  These buttons
+# explicitly declare which abstraction they demonstrate; R17b verifies that:
+#   (a) the declared name is a live registry entry (or allowlisted exception),
+#   (b) the tooltip label equals the declared name (catches wrong name like
+#       "LED Control" when data-abstraction="LED Flash"),
+#   (c) the button text (stripped) equals the declared name (same check on the
+#       visible label the user actually reads).
+# Checks (b) and (c) catch both semantic drift ("LED Control" vs "LED Flash")
+# and casing drift ("LED flash" vs "LED Flash") on the declared buttons.
+def _r17_abstraction_cases():
+    cases = []
+    seen_keys: set = set()
+    for entry in _EXAMPLE_TAB_LABELS:
+        da = entry["data_abstraction"]
+        de = entry["data_example"] or entry["tooltip_label"] or da
+        if not da or da in seen_keys:
+            continue
+        seen_keys.add(da)
+        cases.append((de, da, entry["tooltip_label"], entry["button_text"]))
+    return cases
+
+
+_R17_CASING_CASES      = _r17_casing_cases()
+_R17_ABSTRACTION_CASES = _r17_abstraction_cases()
+
+
+class TestR17_ExampleTabDisplayNames:
+    """R17: Example-tab button labels that reference a live abstraction must
+    use its exact registered name and casing.
+
+    Two complementary sub-checks
+    ----------------------------
+    R17a  (casing drift)  — For any tooltip label or button text that is a
+          case-insensitive match to a live abstraction name, the string must be
+          an *exact* match.  Catches "LED flash" vs "LED Flash".  Generic
+          labels like "Capability Test" that have no case-insensitive match at
+          all are silently ignored.
+
+    R17b  (semantic + casing drift via data-abstraction)  — For buttons that
+          carry a data-abstraction attribute (the authoritative declaration that
+          a button is the canonical demo for a specific named abstraction):
+            • the attribute value must be a live registry name (or be in
+              KNOWN_NON_REGISTRY_EXAMPLE_LABELS),
+            • the tooltip label must equal the attribute value exactly,
+            • the button text (decorators stripped) must equal the attribute
+              value exactly.
+          Catches both a completely wrong name ("LED Control" when the
+          abstraction is "LED Flash") and casing drift ("LED flash").
+
+    How to fix a failure
+    --------------------
+    R17a: update the data-tooltip / button text in simulator/index.html to use
+          the canonical casing shown in the error message.
+    R17b (wrong abstraction name): update the data-tooltip and button text to
+          match the data-abstraction value, or correct the data-abstraction
+          value itself if it was set incorrectly.
+    R17b (unrecognised data-abstraction value): either add the abstraction to
+          abstractions.js or add it to KNOWN_NON_REGISTRY_EXAMPLE_LABELS with
+          a documented reason.
+    """
+
+    # ── R17a ──────────────────────────────────────────────────────────────────
+
+    @pytest.mark.parametrize(
+        "label_kind,raw_label,canonical",
+        _R17_CASING_CASES,
+        ids=[f"{k}-{r}" for k, r, _ in _R17_CASING_CASES],
+    )
+    def test_label_casing_matches_registry(self, label_kind, raw_label, canonical):
+        assert raw_label == canonical, (
+            f"simulator/index.html example-tab {label_kind} = {raw_label!r} "
+            f"matches live abstraction name case-insensitively "
+            f"but is not an exact match.\n"
+            f"  Found:    {raw_label!r}\n"
+            f"  Expected: {canonical!r}  (the registered name in abstractions.js)\n"
+            f"  Fix: update the data-tooltip / button text in simulator/index.html "
+            f"to use the exact spelling shown above."
+        )
+
+    # ── R17b ──────────────────────────────────────────────────────────────────
+
+    @pytest.mark.parametrize(
+        "example_key,data_abstraction,tooltip_label,button_text",
+        _R17_ABSTRACTION_CASES,
+        ids=[f"{de}-{da}" for de, da, _, __ in _R17_ABSTRACTION_CASES],
+    )
+    def test_data_abstraction_label_matches(
+        self, example_key, data_abstraction, tooltip_label, button_text
+    ):
+        """R17b: When data-abstraction is set on an example-tab button:
+          (1) the declared abstraction name must be live in the registry.
+          (2) the tooltip label must equal the declared name.
+          (3) the button text (decorators stripped) must equal the declared name.
+        """
+        # (1) declared name must be a live registry entry or allowlisted
+        assert (
+            data_abstraction in LIVE_ABSTRACTION_NAMES
+            or data_abstraction in KNOWN_NON_REGISTRY_EXAMPLE_LABELS
+        ), (
+            f"simulator/index.html: data-abstraction={data_abstraction!r} on "
+            f"button data-example={example_key!r} is not a live abstraction name "
+            f"in abstractions.js and is not in KNOWN_NON_REGISTRY_EXAMPLE_LABELS.\n"
+            f"  Fix: correct the data-abstraction value to the canonical registry "
+            f"name, add the abstraction to abstractions.js, or add it to "
+            f"KNOWN_NON_REGISTRY_EXAMPLE_LABELS in this test file with a reason."
+        )
+        # (2) tooltip label must match the declared abstraction name exactly
+        assert tooltip_label == data_abstraction, (
+            f"simulator/index.html: button data-example={example_key!r} has "
+            f"data-abstraction={data_abstraction!r} but its tooltip label is "
+            f"{tooltip_label!r}.\n"
+            f"  Found:    tooltip label = {tooltip_label!r}\n"
+            f"  Expected: {data_abstraction!r}  (the data-abstraction value)\n"
+            f"  Fix: update the data-tooltip in simulator/index.html so that the "
+            f"text before ' \u2014 ' exactly matches the data-abstraction value."
+        )
+        # (3) visible button text (stripped) must match the declared name exactly
+        assert button_text == data_abstraction, (
+            f"simulator/index.html: button data-example={example_key!r} has "
+            f"data-abstraction={data_abstraction!r} but its visible text is "
+            f"{button_text!r}.\n"
+            f"  Found:    button text = {button_text!r}\n"
+            f"  Expected: {data_abstraction!r}  (the data-abstraction value)\n"
+            f"  Fix: update the button inner text in simulator/index.html to "
+            f"match the data-abstraction value (decorators like ✦ may remain)."
+        )
+
+
+# ── R18: knownPurposes keys match live abstraction names ───────────────────────
+
+class TestR18_KnownPurposesKeys:
+    """R18: Every top-level key of the knownPurposes dict in
+    simulator/app-absdetail.js must name a currently-live entry in the
+    abstraction registry (or appear in KNOWN_NON_REGISTRY_PURPOSES as a
+    documented exception).
+
+    Background
+    ----------
+    knownPurposes maps abstraction names to per-method documentation strings
+    shown in the Abstractions panel.  When an abstraction is renamed, the
+    corresponding knownPurposes key must be updated in the same commit — if it
+    is not, the renamed abstraction silently loses all its method-doc tooltips
+    at runtime (the lookup simply finds no entry and falls back to the generic
+    "Dispatched via CALL" string).  This rule catches such drift at merge time.
+
+    How to fix a failure
+    --------------------
+    • If the abstraction was renamed: update the key in knownPurposes to the
+      new canonical name (shown in the "expected one of" list).
+    • If the abstraction is planned but not yet in abstractions.js: add the key
+      to KNOWN_NON_REGISTRY_PURPOSES in this test file with a reason.
+    • If the abstraction was removed entirely: delete the key from knownPurposes.
+    """
+
+    def test_all_keys_are_live(self):
+        failures = []
+        for key in _KNOWN_PURPOSES_KEYS:
+            if key in KNOWN_NON_REGISTRY_PURPOSES:
+                continue
+            if key not in LIVE_ABSTRACTION_NAMES:
+                canonical = _LIVE_NAMES_BY_LOWER.get(key.lower())
+                hint = (
+                    f" (case-insensitive match: {canonical!r} — "
+                    f"update the key casing)"
+                    if canonical
+                    else " (no case-insensitive match — "
+                    "rename, add to abstractions.js, or delete the key)"
+                )
+                failures.append(
+                    f"  knownPurposes key {key!r}{hint}"
+                )
+        assert not failures, (
+            "simulator/app-absdetail.js: knownPurposes key(s) do not match any "
+            "live abstraction name in simulator/abstractions.js:\n"
+            + "\n".join(failures)
+            + "\n\nFix: rename the key to the canonical abstraction name, "
+            "add the abstraction to abstractions.js, or add it to "
+            "KNOWN_NON_REGISTRY_PURPOSES in tests/lump/test_lump_consistency.py "
+            "with a documented reason."
+        )
+
+    @pytest.mark.parametrize(
+        "allowlisted_key", sorted(KNOWN_NON_REGISTRY_PURPOSES),
+    )
+    def test_allowlist_entry_is_not_stale(self, allowlisted_key):
+        """Companion guard for KNOWN_NON_REGISTRY_PURPOSES: every entry must
+        still correspond to an actual key in knownPurposes.  If the key has
+        been removed or renamed, remove the stale allowlist entry too —
+        leaving it in place risks silently masking a future collision.
+        """
+        assert allowlisted_key in _KNOWN_PURPOSES_KEYS, (
+            f"KNOWN_NON_REGISTRY_PURPOSES entry {allowlisted_key!r} no longer "
+            "matches any key in the knownPurposes dict in "
+            "simulator/app-absdetail.js.\n"
+            "  The key was likely renamed or removed.  Delete this allowlist "
+            "entry from KNOWN_NON_REGISTRY_PURPOSES in "
+            "tests/lump/test_lump_consistency.py to keep the guard clean."
         )
