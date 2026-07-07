@@ -9557,6 +9557,170 @@ Add a method called Run
         'bin=0x' + r.words[0].toString(16) + ' dec=0x' + r2.words[0].toString(16));
 }
 
+// ── BC109–BC117: Capabilities-block slot resolution and boot-slot guard ──────
+//
+// BC109: XLOADLAMBDA with device name absent from capabilities block → error.
+// BC110: Three-operand LOAD uses _parseImm for the slot; with capabilities block
+//        active and device name not declared, _parseImm must emit an error.
+// BC111–BC113: LOAD with LED0 at capabilities-block positions 0, 1, and 3
+//              must encode the correct 0-based offset (not boot slot 8).
+// BC114: SAVE with LED0 at capabilities-block position 0 → encodes slot 0.
+// BC115: ELOADCALL two-operand with LED0 at capabilities-block position 0 →
+//        no assembler error; encodes row=0.
+// BC116–BC117: XLOADLAMBDA with device name at capabilities-block positions 0
+//              and 2 → correct 0-based offset encoded.
+
+{
+    // BC109: XLOADLAMBDA LED0 absent from capabilities block → error.
+    const a = new ChurchAssembler();
+    const r = a.assemble('capabilities { Salvation E }\nXLOADLAMBDA CR3, LED0\nHALT');
+    assert('BC109 XLOADLAMBDA with undeclared device name → error',
+        a.errors.length >= 1,
+        `expected >=1 error, got ${a.errors.length}: ${a.errors.map(e => e.message).join('; ')}`);
+    const errMsg = a.errors[0] ? a.errors[0].message : '';
+    assert('BC109 XLOADLAMBDA error mentions the undeclared name',
+        /LED0/.test(errMsg), `error message was: "${errMsg}"`);
+}
+
+{
+    // BC110: Three-operand LOAD with device name as immediate, capabilities block
+    //        active, device not declared → _parseImm emits error.
+    const a = new ChurchAssembler();
+    a.assemble('capabilities { Salvation E }\nLOAD CR3, CR6, LED0\nHALT');
+    assert('BC110 three-operand LOAD with undeclared device name in _parseImm → error',
+        a.errors.length >= 1,
+        `expected >=1 error, got ${a.errors.length}: ${a.errors.map(e => e.message).join('; ')}`);
+    const errMsg = a.errors[0] ? a.errors[0].message : '';
+    assert('BC110 _parseImm error mentions the device name',
+        /LED0/.test(errMsg), `error message was: "${errMsg}"`);
+    assert('BC110 _parseImm error mentions boot slot',
+        /boot slot/.test(errMsg), `error message was: "${errMsg}"`);
+}
+
+{
+    // BC111: LOAD CR3, LED0 — capabilities block with LED0 at position 0.
+    // Encodes imm=0 (capabilities-block position), NOT imm=8 (boot slot).
+    const a = new ChurchAssembler();
+    const r = a.assemble('capabilities { LED0 RW }\nLOAD CR3, LED0\nHALT');
+    assert('BC111 LOAD with LED0 at cap-block position 0 — no errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    assert('BC111 LOAD with LED0 at cap-block position 0 — emits 2 words',
+        r.words.length === 2, `got ${r.words.length}`);
+    {
+        const w   = r.words[0] >>> 0;
+        const opc = (w >>> 27) & 0x1F;
+        const imm = w & 0x7FFF;
+        assert('BC111 LOAD CR3,LED0 — opcode=0 (LOAD)', opc === 0, `got opcode=${opc}`);
+        assert('BC111 LOAD CR3,LED0 — imm=0 (cap-block position 0, not boot slot 8)',
+            imm === 0, `got imm=${imm}`);
+    }
+}
+
+{
+    // BC112: LOAD CR3, LED1 — capabilities block { LED0 RW, LED1 RW }; LED1 at position 1.
+    const a = new ChurchAssembler();
+    const r = a.assemble('capabilities {\n LED0 RW\n LED1 RW\n}\nLOAD CR3, LED1\nHALT');
+    assert('BC112 LOAD with LED1 at cap-block position 1 — no errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    {
+        const w   = r.words[0] >>> 0;
+        const imm = w & 0x7FFF;
+        assert('BC112 LOAD CR3,LED1 — imm=1 (cap-block position 1, not boot slot 9)',
+            imm === 1, `got imm=${imm}`);
+    }
+}
+
+{
+    // BC113: LOAD CR3, LED0 — capabilities block { Salvation E, Navana E, Mint E, LED0 RW };
+    //        LED0 at position 3.
+    const a = new ChurchAssembler();
+    const r = a.assemble(
+        'capabilities {\n Salvation E\n Navana E\n Mint E\n LED0 RW\n}\nLOAD CR3, LED0\nHALT'
+    );
+    assert('BC113 LOAD with LED0 at cap-block position 3 — no errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    {
+        const w   = r.words[0] >>> 0;
+        const imm = w & 0x7FFF;
+        assert('BC113 LOAD CR3,LED0 — imm=3 (cap-block position 3, not boot slot 8)',
+            imm === 3, `got imm=${imm}`);
+    }
+}
+
+{
+    // BC114: SAVE CR3, LED0 — capabilities block with LED0 at position 0.
+    // SAVE two-operand shorthand uses the same _resolveNSNameBracket path;
+    // must encode imm=0 (cap-block position), NOT imm=8 (boot slot).
+    const a = new ChurchAssembler();
+    const r = a.assemble('capabilities { LED0 RW }\nSAVE CR3, LED0\nHALT');
+    assert('BC114 SAVE with LED0 at cap-block position 0 — no errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    assert('BC114 SAVE with LED0 at cap-block position 0 — emits 2 words',
+        r.words.length === 2, `got ${r.words.length}`);
+    {
+        const w   = r.words[0] >>> 0;
+        const opc = (w >>> 27) & 0x1F;
+        const imm = w & 0x7FFF;
+        assert('BC114 SAVE CR3,LED0 — opcode=1 (SAVE)', opc === 1, `got opcode=${opc}`);
+        assert('BC114 SAVE CR3,LED0 — imm=0 (cap-block position 0, not boot slot 8)',
+            imm === 0, `got imm=${imm}`);
+    }
+}
+
+{
+    // BC115: ELOADCALL CR0, LED0 — capabilities block with LED0 at position 0.
+    // Two-operand form; assembler must encode row=0 (cap-block position).
+    const a = new ChurchAssembler();
+    const r = a.assemble('capabilities { LED0 RW }\nELOADCALL CR0, LED0\nHALT');
+    assert('BC115 ELOADCALL with LED0 at cap-block position 0 — no assembler errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    {
+        const w   = r.words[0] >>> 0;
+        const opc = (w >>> 27) & 0x1F;
+        const row = w & 0x1F;
+        assert('BC115 ELOADCALL CR0,LED0 — opcode=8 (ELOADCALL)', opc === 8, `got opcode=${opc}`);
+        assert('BC115 ELOADCALL CR0,LED0 — row=0 (cap-block position 0, not boot slot 8)',
+            row === 0, `got row=${row}`);
+    }
+}
+
+{
+    // BC116: XLOADLAMBDA CR3, LED0 — capabilities block with LED0 at position 0.
+    // The newly-added _checkCapDeclared must NOT fire (name IS declared).
+    // imm must be 0 (cap-block position), not 8 (boot slot).
+    const a = new ChurchAssembler();
+    const r = a.assemble('capabilities { LED0 RW }\nXLOADLAMBDA CR3, LED0\nHALT');
+    assert('BC116 XLOADLAMBDA with LED0 at cap-block position 0 — no errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    assert('BC116 XLOADLAMBDA with LED0 at cap-block position 0 — emits 2 words',
+        r.words.length === 2, `got ${r.words.length}`);
+    {
+        const w   = r.words[0] >>> 0;
+        const opc = (w >>> 27) & 0x1F;
+        const imm = w & 0x7FFF;
+        assert('BC116 XLOADLAMBDA CR3,LED0 — opcode=9 (XLOADLAMBDA)', opc === 9, `got opcode=${opc}`);
+        assert('BC116 XLOADLAMBDA CR3,LED0 — imm=0 (cap-block position 0, not boot slot 8)',
+            imm === 0, `got imm=${imm}`);
+    }
+}
+
+{
+    // BC117: XLOADLAMBDA CR3, LED0 — capabilities block { Salvation E, Navana E, LED0 RW };
+    //        LED0 at position 2.
+    const a = new ChurchAssembler();
+    const r = a.assemble(
+        'capabilities {\n Salvation E\n Navana E\n LED0 RW\n}\nXLOADLAMBDA CR3, LED0\nHALT'
+    );
+    assert('BC117 XLOADLAMBDA with LED0 at cap-block position 2 — no errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    {
+        const w   = r.words[0] >>> 0;
+        const imm = w & 0x7FFF;
+        assert('BC117 XLOADLAMBDA CR3,LED0 — imm=2 (cap-block position 2, not boot slot 8)',
+            imm === 2, `got imm=${imm}`);
+    }
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);

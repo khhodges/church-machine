@@ -1476,6 +1476,7 @@ class ChurchAssembler {
                 this._checkPrivCR(crDst, 'XLOADLAMBDA', lineNum);
                 const res9 = this._resolveNSNameBracket(parts[2], parts[3]);
                 if (res9 !== null && (!parts[3] || res9.consumed)) {
+                    this._checkCapDeclared(res9.key, lineNum);
                     crSrc = 6;
                     imm   = res9.slot;
                 } else {
@@ -1902,7 +1903,27 @@ class ChurchAssembler {
         }
 
         const nsSlotImm = this._resolveNSName(token);
-        if (nsSlotImm !== null) return nsSlotImm & 0xFFFF;
+        if (nsSlotImm !== null) {
+            // Guard: if a capabilities block is active and this token is a
+            // hardware device name, it must have been declared in the block.
+            // Without a declaration the name falls through to the boot-slot
+            // fallback in _resolveNSName and silently encodes the wrong slot.
+            if (this._hasCapBlock && ChurchAssembler._isHardwareCapName(token)) {
+                const tokenUC = token.toUpperCase();
+                const found = Object.keys(this._capBlockSlots).some(
+                    k => k.toUpperCase() === tokenUC
+                );
+                if (!found) {
+                    this.errors.push({
+                        line: lineNum,
+                        ...this._tokenCols(this._currentLineText, token),
+                        message: `device name '${token}' resolves to boot slot ${nsSlotImm} — declare it in your capabilities block first:\n  capabilities { ${token} RW }`
+                    });
+                    return 0;
+                }
+            }
+            return nsSlotImm & 0xFFFF;
+        }
 
         let val = 0;
         if (token.startsWith('0x') || token.startsWith('0X')) {

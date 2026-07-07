@@ -3750,7 +3750,7 @@ const _TURING_DR_TEST_SOURCE = `; ==============================================
 ; Version:      1.1
 ; Created:      2026-05-09
 ; Language:     Assembly
-; Dependencies: LED device (Abstract GT — boot C-List slot 8)
+; Dependencies: LED device (Abstract GT — capabilities-block positions 0–5)
 ; ============================================================
 ; Capabilities required by this lump:
 capabilities {
@@ -3794,11 +3794,11 @@ capabilities {
 ;   DR0 = 0 (hardwired zero, never a write destination)
 ;   DR1 = 1 (LED-on constant; tested last in each phase,
 ;            restored with IADD DR1, DR0, #1 afterward)
-;   CR3 = LED device (C-List[8] loaded in setup)
+;   CR3 = LED device (capabilities-block position 0, loaded in setup)
 ; ============================================================
 
 ; ── Setup ────────────────────────────────────────────────────
-LOAD CR3, LED0            ; LED0 Abstract GT → CR3 (boot C-List slot 8, R+W)
+LOAD CR3, LED0            ; LED0 Abstract GT → CR3 (capabilities-block position 0, R+W)
 IADD DR1, DR0, #1         ; DR1 = 1 (LED on-constant throughout)
 DWRITE DR0, CR3, 0        ; clear all LEDs
 DWRITE DR0, CR3, 1
@@ -7198,7 +7198,7 @@ HALT`,
 ; Version:      1.2
 ; Created:      2026-05-09
 ; Language:     Assembly
-; Dependencies: LED device (Abstract GT — boot C-List slot 8)
+; Dependencies: LED device (Abstract GT — capabilities-block position 0)
 ; ============================================================
 ; Capabilities required by this lump:
 capabilities { LED0 RW }
@@ -7226,16 +7226,16 @@ capabilities { LED0 RW }
 ;
 ; Equivalent raw form (slot number explicit):
 ;
-;   LOAD CR3, CR6, 8          ; CR6 = boot C-List; slot 8 = LED0
+;   LOAD CR3, CR6, 0          ; CR6 = c-list root; slot 0 = LED0 (capabilities-block position 0)
 ;
 ; Both produce identical machine code.  The named form (used here)
-; is preferred: it stays correct if the boot C-List is renumbered.
+; is preferred: it stays correct if the capabilities block is reordered.
 ;
 ; LED0 is a device GT (W-perm only) — it is accessed with DWRITE,
 ; not CALL.  Device GTs have no callable methods, so named method selectors
 ; do not apply here; two-operand shorthand for LOAD is still recommended.
 ;
-; Path: LOAD CR3, LED0   → resolves LED0 → C-List[8] → LED_DEV GT
+; Path: LOAD CR3, LED0   → resolves LED0 → C-List[0] → LED_DEV GT
 ;       DWRITE DR1, CR3, 0 → LED0 on
 ;       DWRITE DR0, CR3, 0 → LED0 off
 ;
@@ -7243,9 +7243,9 @@ capabilities { LED0 RW }
 ; per phase → 1 Hz blink total.
 ; ============================================
 
-; --- Load LED0 Abstract GT from the boot C-List (two-operand shorthand) ---
-; Named load: equiv. to raw form  LOAD CR3, CR6, 8
-LOAD CR3, LED0            ; LED0 Abstract GT → CR3 (boot C-List slot 8)
+; --- Load LED0 Abstract GT via the two-operand shorthand ---
+; Named load: equiv. to raw form  LOAD CR3, CR6, 0  (capabilities-block position 0)
+LOAD CR3, LED0            ; LED0 Abstract GT → CR3 (capabilities-block position 0, R+W)
 
 ; --- DR1 = 1 (the "on" value) ---
 IADD DR1, DR0, #1

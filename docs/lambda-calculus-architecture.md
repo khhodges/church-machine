@@ -336,6 +336,11 @@ LOAD CR3, CR6, 7       ; CR3 ← Γ₀(7)   — resolve variable "Memory"
                         ; λ equivalent:  x₇ where Γ₀(x₇) = Memory
 
 LOAD CR4, CR6, 8       ; CR4 ← Γ₀(8)   — resolve variable "LED[0]"
+                        ; Boot C-List / theoretical context only (no capabilities block).
+                        ; In a compiled LUMP program, declare the device and use the
+                        ; two-operand shorthand instead:
+                        ;   capabilities { LED0 RW }
+                        ;   LOAD CR4, LED0   ; resolves to capabilities-block position 0
                         ; λ equivalent:  x₈ where Γ₀(x₈) = LED (Abstract GT)
 
 ; — Type assertions (Γ ⊢ fᵢ : Tᵢ) ─────────────────────────────────────
