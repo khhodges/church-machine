@@ -28,9 +28,9 @@ const { test, expect } = require('@playwright/test');
 
 // ─── Shared constants ─────────────────────────────────────────────────────────
 
-// 'Navana' is at NS slot 4 in the static abstraction catalog.
-// It is a reliable anchor label that is always set by _initNamespaceTable().
-const CATALOG_LABEL = 'Navana';
+// 'SelfTest' is at NS slot 6 in the hardware boot catalog.
+// It is a reliable anchor label that is always set by loadBootImage() HARDWARE_LABELS.
+const CATALOG_LABEL = 'SelfTest';
 
 // A custom label injected into a free slot (slot 64 is above the catalog and
 // pool range 50–63, and starts as empty/null after _initNamespaceTable).

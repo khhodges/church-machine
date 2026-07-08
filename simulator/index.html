@@ -45,10 +45,11 @@
     <link rel="icon" type="image/svg+xml" sizes="32x32" href="favicon.svg">
     <link rel="icon" type="image/svg+xml" sizes="16x16" href="favicon.svg">
     <link rel="stylesheet" href="styles-base.css?v=20260619a">
-    <link rel="stylesheet" href="styles-toolbar.css?v=20260526c">
+    <link rel="stylesheet" href="styles-landing.css?v=20260708a">
+    <link rel="stylesheet" href="styles-toolbar.css?v=20260708b">
     <link rel="stylesheet" href="styles-editor.css?v=20260521a">
-    <link rel="stylesheet" href="styles-dashboard.css?v=20260616b">
-    <link rel="stylesheet" href="styles-lumps.css?v=20260601b">
+    <link rel="stylesheet" href="styles-dashboard.css?v=20260708b">
+    <link rel="stylesheet" href="styles-lumps.css?v=20260708b">
     <link rel="stylesheet" href="styles-gatelog.css?v=20260513a">
     <link rel="stylesheet" href="styles-fault.css?v=20260527a">
     <link rel="stylesheet" href="styles-tools.css?v=20260619b">
@@ -100,6 +101,10 @@
         .ham-separator { height:1px; background:var(--border,#2a2a4a); margin:0.3rem 0; }
         .ham-debug-section { display:none; flex-direction:column; }
         html.r1-debug-mode .ham-debug-section { display:flex; }
+        .ham-subhead.ham-learn-section { display:none; }
+        html.r1-learn-mode .ham-subhead.ham-learn-section { display:block; }
+        .ham-group.ham-learn-section { display:none; }
+        html.r1-learn-mode .ham-group.ham-learn-section { display:flex; }
         .ham-subhead { font-size:0.6rem; font-weight:700; letter-spacing:0.09em; color:#44446a; text-transform:uppercase; padding:0.5rem 0.75rem 0.05rem; }
         /* tutorial selector bar */
         .btn-tut-select { transition:background 0.15s,border-color 0.15s; }
@@ -150,6 +155,7 @@
                                 <span class="ham-bolt-hint">Drag to set default page</span>
                                 <button id="hamDefaultClear" class="ham-bolt-clear" style="display:none;" onclick="_clearDefaultView()" data-tooltip="Remove default page — next load will resume the last visited page">✕ clear default</button>
                             </div>
+                            <button class="ham-item" id="hamItem-home" onclick="switchView('home');closeHamburger()">&#x1F3E0; Home<kbd class="ham-kbd">C+H</kbd></button>
                             <!-- Develop -->
                             <div class="ham-subhead">Develop</div>
                             <div class="ham-group" id="ham-grp-main">
@@ -166,9 +172,9 @@
                                 <button class="ham-item" id="fpgaBridgeBtn" onclick="fpgaBridgeConnect()" style="display:none;">Bridge</button>
                                 <button class="ham-item" id="fpgaReadBRAMBtn" onclick="fpgaReadBRAM()" style="display:none;">BRAM</button>
                             </div>
-                            <!-- Learn -->
-                            <div class="ham-subhead">Learn</div>
-                            <div class="ham-group">
+                            <!-- Learn — visible in ?learn=1 mode -->
+                            <div class="ham-subhead ham-learn-section">Learn</div>
+                            <div class="ham-group ham-learn-section">
                                 <button class="ham-item" id="hamItem-start" onclick="switchView('start');closeHamburger()">&#x1F680; Get Started</button>
                                 <button class="ham-item" id="hamItem-tutorial" onclick="switchView('tutorial');closeHamburger()">Tutorials</button>
                                 <button class="ham-item" id="hamItem-docs" onclick="openDocAnchor('quick-start.md');closeHamburger()">Docs<kbd class="ham-kbd">C+Y</kbd></button>
@@ -182,10 +188,10 @@
                                 <button class="ham-item" id="hamItem-dashboard" onclick="openSimulatorFromMenu()">Simulator<kbd class="ham-kbd">C+D</kbd></button>
                                 <button class="ham-item" id="hamItem-namespace" onclick="switchView('namespace');closeHamburger()">Namespace<kbd class="ham-kbd">C+N</kbd></button>
                                 <button class="ham-item" id="hamItem-abstractions" onclick="switchView('abstractions');closeHamburger()">Logic Catalog<kbd class="ham-kbd">C+A</kbd></button>
-                                <button class="ham-item" id="hamItem-pipeline" onclick="switchView('pipeline');closeHamburger()" style="display:none;">Pipeline<kbd class="ham-kbd">C+P</kbd></button>
-                                <button class="ham-item" id="hamItem-trace" onclick="switchView('trace');closeHamburger()" style="display:none;">Trace<kbd class="ham-kbd">C+T</kbd></button>
-                                <button class="ham-item" id="hamItem-gc" onclick="switchView('gc');closeHamburger()" style="display:none;">GC<kbd class="ham-kbd">C+G</kbd></button>
-                                <button class="ham-item" id="hamItem-memory" onclick="switchView('memory');closeHamburger()" style="display:none;">Memory Dump</button>
+                                <button class="ham-item" id="hamItem-pipeline" onclick="switchView('pipeline');closeHamburger()">Pipeline<kbd class="ham-kbd">C+P</kbd></button>
+                                <button class="ham-item" id="hamItem-trace" onclick="switchView('trace');closeHamburger()">Trace<kbd class="ham-kbd">C+T</kbd></button>
+                                <button class="ham-item" id="hamItem-gc" onclick="switchView('gc');closeHamburger()">GC<kbd class="ham-kbd">C+G</kbd></button>
+                                <button class="ham-item" id="hamItem-memory" onclick="switchView('memory');closeHamburger()">Memory Dump</button>
                                 <button class="ham-item" id="hamItem-lumps" onclick="switchView('lumps');closeHamburger()">LUMP<kbd class="ham-kbd">C+L</kbd></button>
                             </div>
                             <!-- Deploy -->
@@ -197,6 +203,44 @@
                                 <button class="ham-item" id="hamItem-github2" onclick="switchView('github');closeHamburger()" style="display:none;">GitHub Community</button>
                             </div>
                         </div>
+                    </div>
+                    <div class="core-nav-bar" id="coreNavBar">
+                        <button class="core-nav-btn" id="coreBtn-hardware"
+                                onclick="switchView('builder');switchBuilderViewTab('ti60-connect')"
+                                data-views="builder"
+                                data-tooltip="Hardware — Flash, connect, and verify your Ti60 F225 board">
+                            <span class="core-nav-btn-icon">🔌</span><span class="core-nav-label">Hardware</span>
+                        </button>
+                        <button class="core-nav-btn" id="coreBtn-namespace"
+                                onclick="switchView('namespace')"
+                                data-views="namespace"
+                                data-tooltip="Namespace — Browse all capability table entries">
+                            <span class="core-nav-btn-icon">🗂️</span><span class="core-nav-label">Namespace</span>
+                        </button>
+                        <button class="core-nav-btn" id="coreBtn-workshop"
+                                onclick="switchView('abstractions')"
+                                data-views="abstractions"
+                                data-tooltip="Workshop — Build and inspect abstractions">
+                            <span class="core-nav-btn-icon">🧩</span><span class="core-nav-label">Workshop</span>
+                        </button>
+                        <button class="core-nav-btn" id="coreBtn-code"
+                                onclick="switchView('editor')"
+                                data-views="editor"
+                                data-tooltip="Code — Write and compile CLOOMC programs">
+                            <span class="core-nav-btn-icon">📝</span><span class="core-nav-label">Code</span>
+                        </button>
+                        <button class="core-nav-btn" id="coreBtn-simulator"
+                                onclick="switchView('dashboard')"
+                                data-views="dashboard"
+                                data-tooltip="Simulator — Step and run the Church Machine">
+                            <span class="core-nav-btn-icon">⚙️</span><span class="core-nav-label">Simulator</span>
+                        </button>
+                        <button class="core-nav-btn" id="coreBtn-deploy"
+                                onclick="switchView('builder')"
+                                data-views="builder"
+                                data-tooltip="Deploy — Build LUMPs and deploy to hardware">
+                            <span class="core-nav-btn-icon">🚀</span><span class="core-nav-label">Deploy</span>
+                        </button>
                     </div>
                 </div>
                 <div id="toolbarGroupSim" class="toolbar-group">
@@ -276,6 +320,96 @@
         </header>
         <div id="capPopover" class="toolbar-cap-popover" style="display:none;" aria-live="polite"></div>
         <div id="flagsPopover" class="toolbar-flags-popover" style="display:none;" aria-live="polite"></div>
+    </div>
+
+    <div id="home" class="view">
+        <div class="home-hero">
+            <div class="home-hero-title">Church Machine IDE</div>
+            <div class="home-hero-sub">Capability-secured computing on the Ti60 FPGA — write, simulate, and deploy CLOOMC programs.</div>
+        </div>
+
+        <!-- Core functions -->
+        <div class="home-section">
+            <div class="home-section-title">Core Functions</div>
+        </div>
+        <div class="home-core-grid">
+            <div class="home-tile" onclick="switchView('builder');switchBuilderViewTab('ti60-connect')" data-tooltip="Hardware — Flash, connect, and verify your Ti60 F225 board">
+                <div class="home-tile-icon">🔌</div>
+                <div class="home-tile-name">Hardware</div>
+                <div class="home-tile-desc">Flash &amp; connect your Ti60 F225 board</div>
+            </div>
+            <div class="home-tile" onclick="switchView('namespace')" data-tooltip="Namespace — Browse and inspect all capability entries">
+                <div class="home-tile-icon">🗂️</div>
+                <div class="home-tile-name">Namespace</div>
+                <div class="home-tile-desc">Browse all capability table entries</div>
+            </div>
+            <div class="home-tile" onclick="switchView('abstractions')" data-tooltip="Workshop — Build, inspect, and manage abstractions">
+                <div class="home-tile-icon">🧩</div>
+                <div class="home-tile-name">Workshop</div>
+                <div class="home-tile-desc">Build and inspect abstractions</div>
+            </div>
+            <div class="home-tile" onclick="switchView('editor')" data-tooltip="Code — Write CLOOMC programs and compile them">
+                <div class="home-tile-icon">📝</div>
+                <div class="home-tile-name">Code</div>
+                <div class="home-tile-desc">Write and compile CLOOMC programs</div>
+            </div>
+            <div class="home-tile" onclick="switchView('dashboard')" data-tooltip="Simulator — Step, run, and inspect the Church Machine">
+                <div class="home-tile-icon">⚙️</div>
+                <div class="home-tile-name">Simulator</div>
+                <div class="home-tile-desc">Step and run the Church Machine</div>
+            </div>
+            <div class="home-tile" onclick="switchView('builder')" data-tooltip="Deploy — Build LUMPs and deploy to hardware">
+                <div class="home-tile-icon">🚀</div>
+                <div class="home-tile-name">Deploy</div>
+                <div class="home-tile-desc">Build LUMPs and deploy to hardware</div>
+            </div>
+        </div>
+
+        <!-- Educational tools -->
+        <div class="home-section">
+            <div class="home-section-title">Learning Tools</div>
+        </div>
+        <div class="home-card-row">
+            <div class="home-card" onclick="switchView('tutorial')" data-tooltip="Tutorials — Step-by-step guides to CLOOMC, capabilities, and secure boot">
+                <div class="home-card-icon">📘</div>
+                <div class="home-card-name">Tutorials</div>
+                <div class="home-card-desc">Step-by-step CLOOMC guides</div>
+            </div>
+            <div class="home-card" onclick="switchView('repl')" data-tooltip="Math REPL — Evaluate expressions with Church Machine trace">
+                <div class="home-card-icon">🧮</div>
+                <div class="home-card-name">Math REPL</div>
+                <div class="home-card-desc">Evaluate symbolic math with trace</div>
+            </div>
+            <div class="home-card" onclick="switchView('start')" data-tooltip="Get Started — Three-step onboarding: Flash · Connect · Write">
+                <div class="home-card-icon">🚦</div>
+                <div class="home-card-name">Get Started</div>
+                <div class="home-card-desc">Flash · Connect · Write your first program</div>
+            </div>
+        </div>
+
+        <!-- Documentation -->
+        <div class="home-section">
+            <div class="home-section-title">Documentation</div>
+        </div>
+        <div class="home-card-row">
+            <div class="home-card home-doc-card" onclick="switchView('reference')" data-tooltip="ISA Reference — Full Church Machine instruction set reference">
+                <div class="home-card-icon">📖</div>
+                <div class="home-card-name">ISA Reference</div>
+                <div class="home-card-desc">Full instruction set reference</div>
+            </div>
+            <div class="home-card home-doc-card" onclick="switchView('docs')" data-tooltip="Docs — Hardware guide, CLOOMC++ guide, API reference">
+                <div class="home-card-icon">📚</div>
+                <div class="home-card-name">All Docs</div>
+                <div class="home-card-desc">Hardware, language, and API guides</div>
+            </div>
+            <div class="home-card home-doc-card" onclick="switchView('hello-mum')" data-tooltip="Mum Tunnel — Share abstractions through the community library">
+                <div class="home-card-icon">🌐</div>
+                <div class="home-card-name">Mum Tunnel</div>
+                <div class="home-card-desc">Share abstractions with the community</div>
+            </div>
+        </div>
+
+        <div class="home-learn-hint">Learning Tools in hamburger menu: <a onclick="window.location.search='?learn=1'" style="cursor:pointer;">?learn=1</a> &nbsp;&middot;&nbsp; Advanced views: <a onclick="window.location.search='?debug=1'" style="cursor:pointer;">?debug=1</a></div>
     </div>
 
     <div id="dashboard" class="view">
@@ -1800,6 +1934,12 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     </div>
 
     <div id="docs" class="view">
+        <div class="docs-tab-bar" id="docsTabBar">
+            <button class="docs-tab-btn" id="docsTab-isa" onclick="switchDocsTab('isa')" data-tooltip="ISA Reference — Full Church Machine instruction set, opcodes, and capability encoding">&#x1F4D6; ISA Reference</button>
+            <button class="docs-tab-btn" id="docsTab-hardware" onclick="switchDocsTab('hardware')" data-tooltip="Hardware Guide — Ti60 F225 setup, USB ports, APB3 registers, and LED assignments">&#x1F527; Hardware Guide</button>
+            <button class="docs-tab-btn" id="docsTab-cloomc" onclick="switchDocsTab('cloomc')" data-tooltip="CLOOMC++ Guide — CLOOMC ISA, capability model, PP250 heritage, and boot architecture">&#x1F4DC; CLOOMC++ Guide</button>
+            <button class="docs-tab-btn" id="docsTab-api" onclick="switchDocsTab('api')" data-tooltip="API Reference — REST endpoints, WebSerial protocol, and server API">&#x1F50C; API Reference</button>
+        </div>
         <div class="docs-layout">
             <div class="docs-sidebar">
                 <div class="panel docs-sidebar-panel">
@@ -2475,13 +2615,13 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script async src="builder.js"></script>
     <script async src="app-ti60-connect.js?v=20260619a"></script>
     <script defer src="app-startup-wizard.js?v=20260619a"></script>
-    <script src="app-shell.js?v=20260701a"></script>
+    <script src="app-shell.js?v=20260708b"></script>
     <script src="app-tools.js?v=20260521a"></script>
     <script src="app-cr-display.js?v=20260521a"></script>
     <script src="app-cr-detail.js?v=20260707a"></script>
     <script src="tab-correction.js?v=20260501a"></script>
     <script src="pet_name_audit.js"></script>
-    <script src="app-memory.js?v=20260707j"></script>
+    <script src="app-memory.js?v=20260708a"></script>
     <script src="app-abstractions.js?v=20260616a"></script>
     <script src="lump-audit.js?v=20260601a"></script>
     <script src="rci-show-errs.js?v=20260519a"></script>
@@ -2491,7 +2631,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
          via window._cloomcLangExampleGroups); both must precede app-source-library. -->
     <script src="app-compile.js?v=20260707d"></script>
     <script src="app-lump-editor.js?v=20260516e"></script>
-    <script src="app-run.js?v=20260707m"></script>
+    <script src="app-run.js?v=20260708b"></script>
     <script src="app-source-library.js?v=20260509d"></script>
     <script src="app-invoke.js?v=20260521a"></script>
     <script src="app-misc.js?v=20260702a"></script>

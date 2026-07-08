@@ -267,6 +267,37 @@ a.next-step-link:hover {
     box-shadow: 0 0 6px rgba(251,191,36,0.4);
 }
 
+/* ── NS three-tier display ─────────────────────────────── */
+.ns-tier-header td {
+    padding: 5px 8px 4px;
+    font-size: 0.67rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    border-top: 2px solid;
+    border-bottom: none;
+    background: rgba(0,0,0,0.18);
+    font-family: inherit;
+}
+.ns-tier-hw-header td {
+    color: #f87171;
+    border-color: rgba(248,113,113,0.3);
+}
+.ns-tier-boot-header td {
+    color: #fbbf24;
+    border-color: rgba(251,191,36,0.3);
+}
+.ns-tier-prog-header td {
+    color: #60a5fa;
+    border-color: rgba(96,165,250,0.3);
+}
+.ns-tier-hw-row td {
+    background: rgba(248,113,113,0.03);
+}
+.ns-tier-boot-row td {
+    background: rgba(251,191,36,0.03);
+}
+
 .boot-image-view {
     padding: 0.4rem 0.6rem 0.8rem;
     font-size: 0.78rem;

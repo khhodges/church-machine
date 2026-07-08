@@ -1954,9 +1954,9 @@
     },
     {
         "token": "00000600",
-        "abstraction": "SelfTest",
-        "filename": "LEDflash_v1.lump",
-        "sidecar_file": "LEDflash_v1.json",
+        "abstraction": "Boot3",
+        "filename": "Boot3.lump",
+        "sidecar_file": "Boot3.json",
         "ns_slot": null,
         "lump_size": 64,
         "cw": 1,

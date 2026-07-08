@@ -241,6 +241,9 @@ register_suite "callhome-reconnect-tests" \
 register_suite "check-slot-index-leak" \
     'node scripts/check-slot-index-leak.js'
 
+register_suite "check-ns-slot-annotations" \
+    'node scripts/check-ns-slot-annotations.js'
+
 # ---------------------------------------------------------------------------
 # Group registry — map a short group name to a list of suite names
 # ---------------------------------------------------------------------------

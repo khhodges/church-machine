@@ -2485,7 +2485,9 @@ function updateNamespace() {
     // _lumpsCacheWarmPending  — in-flight guard; cleared on settle.
     // _lumpsCacheWarmAttempted — set after the first settled fetch so a genuinely
     //   empty repository (zero lumps) does not trigger a fetch on every render.
-    if ((typeof _lumpsCache === 'undefined' || !Array.isArray(_lumpsCache) || _lumpsCache.length === 0)
+    // NOTE: if _lumpsCache is already an Array (even empty) it was set by another
+    //   code path (e.g. app-lumps.js init fetch) — do not fetch again.
+    if ((typeof _lumpsCache === 'undefined' || !Array.isArray(_lumpsCache))
             && !window._lumpsCacheWarmPending
             && !window._lumpsCacheWarmAttempted) {
         window._lumpsCacheWarmPending = true;
@@ -2508,6 +2510,8 @@ function updateNamespace() {
     html += '</tr></thead><tbody>';
 
     const typeNames = ['NULL','Inform','Outform','Abstract'];
+    const NS_TIER_HW_MAX   = 5;
+    const NS_TIER_BOOT_MAX = 10;
     for (let i = 0; i < sim.nsCount; i++) {
         const e = sim.readNSEntry(i);
         if (!e) continue;
@@ -2526,7 +2530,15 @@ function updateNamespace() {
         const isBootNS = (i === bootEntrySlot);
         const warmStyle = codeNotResident ? 'color:#f0a040;font-style:italic;' : '';
         const rowOpacity = codeNotResident ? 'opacity:0.8;' : '';
-        html += `<tr id="ns-row-${i}" class="ns-row" style="${rowOpacity}">`;
+        if (i === 0) {
+            html += '<tr class="ns-tier-header ns-tier-hw-header"><td colspan="10">&#x1F512; Hardware &mdash; slots 0&#x2013;5 &mdash; hardwired at design time, frozen into FPGA bitstream</td></tr>';
+        } else if (i === NS_TIER_HW_MAX + 1) {
+            html += '<tr class="ns-tier-header ns-tier-boot-header"><td colspan="10">&#x1F97E; Boot &mdash; slots 6&#x2013;10 &mdash; loaded from the boot image before the first instruction</td></tr>';
+        } else if (i === NS_TIER_BOOT_MAX + 1) {
+            html += '<tr class="ns-tier-header ns-tier-prog-header"><td colspan="10">&#x270F;&#xFE0F; Programmer &mdash; slots 11+ &mdash; allocated at runtime by programmer code</td></tr>';
+        }
+        const tierClass = i <= NS_TIER_HW_MAX ? 'ns-tier-hw-row' : (i <= NS_TIER_BOOT_MAX ? 'ns-tier-boot-row' : 'ns-tier-prog-row');
+        html += `<tr id="ns-row-${i}" class="ns-row ${tierClass}" style="${rowOpacity}">`;
         html += `<td class="ns-idx-cell"><span class="ns-boot-btn${isBootNS ? ' boot-entry-active' : ''}" onclick="event.stopPropagation();setBootEntrySlot(${i})" title="${isBootNS ? 'Current boot entry' : 'Set as boot entry'}">${isBootNS ? '\u26a1' : i}</span></td>`;
         let nsLabelInner = e.label || '-';
         {

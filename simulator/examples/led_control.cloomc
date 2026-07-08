@@ -5,7 +5,7 @@
 ; Version:      1.2
 ; Created:      2026-05-09
 ; Language:     Assembly
-; Dependencies: LED device (LED_DEV GT — boot C-List slot 4)
+; Dependencies: LED device (Abstract GT — capabilities-block position 0)
 ; ============================================================
 ; Capabilities required by this lump:
 capabilities { LED0 RW }
@@ -33,16 +33,16 @@ capabilities { LED0 RW }
 ;
 ; Equivalent raw form (slot number explicit):
 ;
-;   LOAD CR3, CR6, 4          ; CR6 = boot C-List; slot 4 = LED_DEV GT
+;   LOAD CR3, CR6, 0          ; CR6 = c-list root; slot 0 = LED0 (capabilities-block position 0)
 ;
 ; Both produce identical machine code.  The named form (used here)
-; is preferred: it stays correct if the boot C-List is renumbered.
+; is preferred: it stays correct if the capabilities block is reordered.
 ;
-; LED0 is a device GT (W-perm, MMIO 0x40000000, lim17=4) — accessed
-; with DWRITE, not CALL.  Offsets 0–4 select LED0–LED4 within the same GT.
-; Two-operand shorthand for LOAD is recommended over raw slot numbers.
+; LED0 is a device GT (W-perm only) — it is accessed with DWRITE,
+; not CALL.  Device GTs have no callable methods, so named method selectors
+; do not apply here; two-operand shorthand for LOAD is still recommended.
 ;
-; Path: LOAD CR3, LED0   → resolves LED0 → C-List[4] → LED_DEV GT
+; Path: LOAD CR3, LED0   → resolves LED0 → C-List[0] → LED_DEV GT
 ;       DWRITE DR1, CR3, 0 → LED0 on
 ;       DWRITE DR0, CR3, 0 → LED0 off
 ;
@@ -50,9 +50,9 @@ capabilities { LED0 RW }
 ; per phase → 1 Hz blink total.
 ; ============================================
 
-; --- Load LED_DEV GT from the boot C-List (two-operand shorthand) ---
-; Named load: equiv. to raw form  LOAD CR3, CR6, 4
-LOAD CR3, LED0            ; LED_DEV GT → CR3 (boot C-List slot 4, MMIO 0x40000000)
+; --- Load LED0 Abstract GT via the two-operand shorthand ---
+; Named load: equiv. to raw form  LOAD CR3, CR6, 0  (capabilities-block position 0)
+LOAD CR3, LED0            ; LED0 Abstract GT → CR3 (capabilities-block position 0, R+W)
 
 ; --- DR1 = 1 (the "on" value) ---
 IADD DR1, DR0, #1

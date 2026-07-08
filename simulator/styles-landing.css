@@ -1,0 +1,184 @@
+/* ── Landing page (#home view) ─────────────────────────────────────── */
+
+#home {
+    padding: 0;
+    overflow-y: auto;
+    background: var(--church-bg, #0f1117);
+}
+
+/* Hero */
+.home-hero {
+    text-align: center;
+    padding: 2.5rem 1rem 1.5rem;
+    border-bottom: 1px solid rgba(218,165,32,0.15);
+}
+
+.home-hero-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--church-gold, #daa520);
+    letter-spacing: 0.02em;
+    margin-bottom: 0.35rem;
+}
+
+.home-hero-sub {
+    font-size: 0.9rem;
+    color: #9ca3af;
+    max-width: 480px;
+    margin: 0 auto;
+}
+
+/* Section headers */
+.home-section {
+    padding: 1.25rem 1rem 0.5rem;
+}
+
+.home-section-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #6b7280;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Core functions grid — 6 tiles, 3 cols on desktop, 2 on mobile, 1 on tiny */
+.home-core-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.65rem;
+    padding: 0 1rem 0.5rem;
+}
+
+@media (max-width: 600px) {
+    .home-core-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 360px) {
+    .home-core-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.home-tile {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(218,165,32,0.18);
+    border-radius: 8px;
+    padding: 1rem 0.85rem 0.9rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.12s;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    text-align: left;
+    user-select: none;
+}
+
+.home-tile:hover {
+    background: rgba(218,165,32,0.09);
+    border-color: rgba(218,165,32,0.45);
+    transform: translateY(-1px);
+}
+
+.home-tile:active {
+    transform: translateY(0);
+}
+
+.home-tile-icon {
+    font-size: 1.5rem;
+    line-height: 1;
+}
+
+.home-tile-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--church-gold, #daa520);
+}
+
+.home-tile-desc {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    line-height: 1.4;
+}
+
+/* Educational and Docs rows — horizontal scrolling cards */
+.home-card-row {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0 1rem 1rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.home-card-row::-webkit-scrollbar {
+    display: none;
+}
+
+.home-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 7px;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    flex: 0 0 auto;
+    min-width: 140px;
+    max-width: 180px;
+}
+
+.home-card:hover {
+    background: rgba(255,255,255,0.07);
+    border-color: rgba(218,165,32,0.3);
+}
+
+.home-card-icon {
+    font-size: 1.25rem;
+    margin-bottom: 0.35rem;
+}
+
+.home-card-name {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #e5e7eb;
+    margin-bottom: 0.2rem;
+}
+
+.home-card-desc {
+    font-size: 0.72rem;
+    color: #6b7280;
+    line-height: 1.4;
+}
+
+/* Docs section — slightly different colour */
+.home-doc-card {
+    background: rgba(30,58,138,0.12);
+    border-color: rgba(59,130,246,0.15);
+}
+
+.home-doc-card:hover {
+    background: rgba(59,130,246,0.1);
+    border-color: rgba(59,130,246,0.35);
+}
+
+/* Learn mode note — shown when ?learn=1 is absent */
+.home-learn-hint {
+    text-align: center;
+    font-size: 0.75rem;
+    color: #4b5563;
+    padding: 0.5rem 1rem 1.5rem;
+}
+
+.home-learn-hint a {
+    color: #6b7280;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.home-learn-hint a:hover {
+    color: #9ca3af;
+}

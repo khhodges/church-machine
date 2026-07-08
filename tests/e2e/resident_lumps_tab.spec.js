@@ -59,13 +59,15 @@ async function openResidentLumpsTab(page) {
     await page.goto('/simulator/');
     await page.waitForLoadState('networkidle');
 
-    // S-IDE v1: #hamItem-builder has a hardcoded inline style="display:none"
-    // (it is a debug-only view hidden by default).  Remove the inline override
-    // so the menu item is clickable in E2E tests without requiring a real user
-    // to have ?debug=1 in their URL.
+    // S-IDE v1: #hamItem-builder and #builderViewTab-lump-resident both have
+    // hardcoded inline style="display:none" (debug-only views hidden by default).
+    // Remove the inline overrides so they are accessible in E2E tests without
+    // requiring ?debug=1 in the URL.
     await page.evaluate(() => {
         const btn = document.getElementById('hamItem-builder');
         if (btn) btn.style.display = '';
+        const tab = document.getElementById('builderViewTab-lump-resident');
+        if (tab) tab.style.display = '';
     });
 
     // Open the hamburger menu.

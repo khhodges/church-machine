@@ -371,16 +371,16 @@ console.log('\n--- LLB-08: NS[3].word2 seal consistent with EXTENDED_BASE and cw
         `stored=0x${storedWord2.toString(16)} expected=0x${expected.toString(16)}`);
 }
 
-// ── LLB-RBA: Real LED Flash binary (LEDflash_v1.lump, token 00000600) ─────────
-// Fixture: server/lumps/LEDflash_v1.lump — canonical abstraction name "LED Flash"
-// per sidecar JSON (server/lumps/LEDflash_v1.json), token 00000600, cw=1, cc=1.
+// ── LLB-RBA: Real Boot3 binary (Boot3.lump, token 00000600) ──────────────────
+// Fixture: server/lumps/Boot3.lump — canonical abstraction name "Boot3"
+// per sidecar JSON (server/lumps/Boot3.json), token 00000600, cw=1, cc=1.
 // Reads the file as big-endian uint32 words — the same format served by the
 // Flask /api/lump/00000600/words endpoint.
-console.log('\n--- LLB-RBA: Real LED Flash binary (LEDflash_v1.lump, token 00000600) ---');
+console.log('\n--- LLB-RBA: Real Boot3 binary (Boot3.lump, token 00000600) ---');
 {
-    const lumpPath = path.join(__dirname, '..', 'server', 'lumps', 'LEDflash_v1.lump');
+    const lumpPath = path.join(__dirname, '..', 'server', 'lumps', 'Boot3.lump');
     const lumpExists = fs.existsSync(lumpPath);
-    check('LLB-RBA-0: LEDflash_v1.lump fixture file exists on disk', lumpExists,
+    check('LLB-RBA-0: Boot3.lump fixture file exists on disk', lumpExists,
         lumpPath);
 
     if (lumpExists) {
@@ -397,10 +397,10 @@ console.log('\n--- LLB-RBA: Real LED Flash binary (LEDflash_v1.lump, token 00000
         check('LLB-RBA-2: fixture header magic = 0x1F (valid LUMP)',
             hdr0.valid,
             `magic=0x${hdr0.magic.toString(16)} word[0]=0x${(rawWords[0]>>>0).toString(16)}`);
-        check('LLB-RBA-3: fixture header cw = 1 (LED Flash)',
+        check('LLB-RBA-3: fixture header cw = 1 (Boot3)',
             hdr0.cw === 1,
             `got cw=${hdr0.cw}`);
-        check('LLB-RBA-4: fixture header cc = 1 (LED Flash)',
+        check('LLB-RBA-4: fixture header cc = 1 (Boot3)',
             hdr0.cc === 1,
             `got cc=${hdr0.cc}`);
         check('LLB-RBA-5: fixture header lumpSize = 64',
@@ -429,14 +429,14 @@ console.log('\n--- LLB-RBA: Real LED Flash binary (LEDflash_v1.lump, token 00000
 
         // LLB-RBA-11: Sidecar JSON metadata — prevents future token/name drift.
         // The sidecar file must identify the correct token and abstraction name.
-        const sidecarPath = path.join(__dirname, '..', 'server', 'lumps', 'LEDflash_v1.json');
+        const sidecarPath = path.join(__dirname, '..', 'server', 'lumps', 'Boot3.json');
         if (fs.existsSync(sidecarPath)) {
             const sidecar = JSON.parse(fs.readFileSync(sidecarPath, 'utf8'));
-            check('LLB-RBA-11: sidecar token = 00000600 (canonical token for LED Flash)',
+            check('LLB-RBA-11: sidecar token = 00000600 (canonical token for Boot3)',
                 sidecar.token === '00000600',
                 `got token=${sidecar.token}`);
         } else {
-            console.log('SKIP LLB-RBA-11 (sidecar LEDflash_v1.json not found)');
+            console.log('SKIP LLB-RBA-11 (sidecar Boot3.json not found)');
         }
     }
 }

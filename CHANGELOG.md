@@ -2,6 +2,37 @@
 
 ---
 
+## IDE v2 Reorganisation — Landing Page, Six-Button Toolbar, NS Three-Tier Display, Learning Mode, Docs Tabs (2026-07-08)
+
+Complete view-layer reorganisation around six named core functions, plus stale-data fixes and Boot3 rename.
+
+### New features
+
+- **Home landing page (`#home`)** — default view on first load; 6-tile Core Functions grid (Hardware · Namespace · Workshop · Code · Simulator · Deploy), Learning Tools section, Documentation section, and a `?learn=1` / `?debug=1` hint footer. `whatsNewModal` no longer auto-pops on startup.
+- **Six-button core nav bar** — persistent toolbar row (🔌 Hardware · 🗂️ Namespace · 🧩 Workshop · 📝 Code · ⚙️ Simulator · 🚀 Deploy) with Church Gold active state; hides labels ≤860 px, hides entirely ≤520 px; active state tracked by `switchView()`.
+- **NS three-tier display** — `updateNamespace()` now injects coloured tier separator rows: 🔒 Hardware (slots 0–5, red, hardwired at design time), 🥾 Boot (slots 6–10, amber, from boot image), ✏️ Programmer (slots 11+, blue, runtime allocation). Each data row gains a matching tinted background.
+- **Learning Mode (`?learn=1`)** — Learn hamburger section (Get Started / Tutorials / Docs / Reference / Mum Tunnel) is hidden by default; `?learn=1` adds `r1-learn-mode` to `<html>` and reveals it. Home hint updated to advertise both `?learn=1` and `?debug=1`.
+- **Docs four-tab bar** — ISA Reference · Hardware Guide · CLOOMC++ Guide · API Reference shortcut buttons added above the docs sidebar; `switchDocsTab(tabId)` in `app-shell.js` sets active state and calls `openDocAnchor()` for the matching file.
+
+### Fixes (T001 / T002 — stale data)
+
+- `sync_guard.js` now emits `process.exit(1)` on error and prints `OK` on success (sync-guard-tests pass).
+- `run-all-tests.sh` includes `check-ns-slot-annotations`.
+- `tests/e2e/pet_name_persistence.spec.js` — `CATALOG_LABEL` updated to `"SelfTest"`.
+- `tests/e2e/ns_ghost_entries.spec.js` — expected label map updated for slots 0–7.
+- `tests/e2e/resident_lumps_tab.spec.js` — `?debug=1` added to `openResidentLumpsTab`.
+- **Boot3 rename** — `server/lumps/LEDflash_v1.json` → `Boot3.json`; 5 sidecar fields corrected; `manifest.json` token `00000600` abstraction set to `"Boot3"`; `abstractions.js` / `system_abstractions.js` updated; `_nsLabels` boot-tier map corrected.
+
+### Files changed
+
+`simulator/index.html`, `simulator/app-shell.js`, `simulator/app-memory.js`, `simulator/styles-toolbar.css` (new `.core-nav-bar` block), `simulator/styles-landing.css` (new), `simulator/styles-dashboard.css` (NS tier CSS), `simulator/styles-lumps.css` (docs tab CSS + `docs-layout` height fix), `server/lumps/Boot3.json` (renamed from `LEDflash_v1.json`), `server/lumps/manifest.json`, `simulator/abstractions.js`, `simulator/system_abstractions.js`, `scripts/sync_guard.js`, `scripts/run-all-tests.sh`, three e2e spec files.
+
+### Version tags bumped
+
+`app-shell.js` → `?v=20260708b`, `styles-toolbar.css` → `?v=20260708b`, `styles-dashboard.css` → `?v=20260708b`, `styles-lumps.css` → `?v=20260708b`.
+
+---
+
 ## v2.0 ISA opcode-staleness sweep across `server/lumps/` (37 of 108 lumps carried pre-v2.0 opcodes 10–19)
 
 A reusable audit found that 37 of the 108 binaries in `server/lumps/` still encoded

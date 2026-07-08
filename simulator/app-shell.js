@@ -5,6 +5,11 @@
     window._r1DebugMode = true;
     document.documentElement.classList.add('r1-debug-mode');
     window._r1DebugViews = new Set();
+    var _qLearn = new URLSearchParams(window.location.search).get('learn');
+    if (_qLearn === '1') {
+        window._r1LearnMode = true;
+        document.documentElement.classList.add('r1-learn-mode');
+    }
 })();
 // S-IDE v1 auto-progress helpers
 window._r1SetStep = function(step) {
@@ -126,7 +131,7 @@ let englishStringTutorial = null;
 let englishContactTutorial = null;
 let activeTutorial = 'sliderule';
 let cloomcCompiler = null;
-let currentView = 'dashboard';
+let currentView = 'home';
 let previousView = null;
 let lastAssembledWords = null;
 let lastAssembledCapabilities = null;
@@ -886,7 +891,7 @@ function init() {
         }
     }).catch(function() { window._hasOpenAIKey = false; });
     checkBootId();
-    const views = ['repl','editor','start','tutorial','dashboard','namespace','hello-mum','abstractions','lumps','pipeline','trace','reference','docs','builder','sitemap','gc','devices','github','memory','gt-view'];
+    const views = ['home','repl','editor','start','tutorial','dashboard','namespace','hello-mum','abstractions','lumps','pipeline','trace','reference','docs','builder','sitemap','gc','devices','github','memory','gt-view'];
     const rawHash = window.location.hash.replace('#', '');
     const [hashView, hashQuery] = rawHash.split('?');
     const hashParams = {};
@@ -915,7 +920,10 @@ function init() {
     if (!startView) {
         try { const saved = localStorage.getItem('church_lastView'); if (saved && views.includes(saved)) startView = saved; } catch(e) {}
     }
-    if (!startView) startView = 'dashboard';
+    if (!startView) startView = 'home';
+    // Always arm the guard so slowBoot()'s switchView('dashboard') cannot
+    // override whatever view was chosen here (including the 'home' default).
+    if (!window._startupDefaultView) window._startupDefaultView = startView;
     switchView(startView);
     if (startView === 'builder' && hashParams.tab) {
         const _hashBuilderTab = hashParams.tab;
@@ -964,6 +972,7 @@ function init() {
             a: 'abstractions',   // Abstractions
             b: 'builder',        // Builder / Hardware
             d: 'dashboard',      // Dashboard / Simulator
+            h: 'home',           // Home landing page
             f: 'reference',      // reFerences docs (r is reserved for Reboot)
             g: 'gc',             // Garbage Collector
             l: 'lumps',          // Lumps repository
@@ -1072,7 +1081,7 @@ function checkBootId() {
             {
                 const lastWhatsNewVersion = localStorage.getItem('church_whatsnew_version');
                 if (lastWhatsNewVersion !== WHATS_NEW_VERSION) {
-                    setTimeout(() => showWhatsNew(), 1500);
+                    localStorage.setItem('church_whatsnew_version', WHATS_NEW_VERSION);
                 }
             }
         })
@@ -1092,6 +1101,22 @@ function toggleHamburger() {
 function closeHamburger() {
     const dd = document.getElementById('hamDropdown');
     if (dd) dd.classList.remove('ham-open');
+}
+
+function switchDocsTab(tabId) {
+    var docsMap = {
+        'isa':      'instruction-set.md',
+        'hardware': 'HARDWARE.md',
+        'cloomc':   'cloomc-foundation.md',
+        'api':      'api-reference.md'
+    };
+    document.querySelectorAll('.docs-tab-btn').forEach(function(btn) {
+        btn.classList.remove('docs-tab-active');
+    });
+    var activeBtn = document.getElementById('docsTab-' + tabId);
+    if (activeBtn) activeBtn.classList.add('docs-tab-active');
+    var filename = docsMap[tabId];
+    if (filename && typeof openDocAnchor === 'function') openDocAnchor(filename);
 }
 
 const _hamCtxActions = {
@@ -1351,6 +1376,10 @@ function switchView(viewId) {
     document.querySelectorAll('.ham-item').forEach(btn => btn.classList.remove('ham-active'));
     const activeHamItem = document.getElementById('hamItem-' + viewId);
     if (activeHamItem) activeHamItem.classList.add('ham-active');
+    document.querySelectorAll('.core-nav-btn').forEach(function(btn) {
+        var btnViews = (btn.dataset.views || '').split(',');
+        btn.classList.toggle('core-nav-active', btnViews.indexOf(viewId) !== -1);
+    });
 
     if (viewId === 'dashboard') { restoreAutoBootPref(); updateDashboard(); }
     if (viewId === 'github') loadGitHubCommunity();
@@ -1464,7 +1493,7 @@ let _pendingGCPhases = null;   // phases[] from the current in-progress GC run
 
 // ── Default-view lightning bolt drag-and-drop ──────────────────────────────
 function _initDefaultViewBolt() {
-    const views = ['repl','editor','start','tutorial','dashboard','namespace','hello-mum','abstractions','lumps','pipeline','trace','reference','docs','builder','sitemap','gc','devices','github','memory','gt-view'];
+    const views = ['home','repl','editor','start','tutorial','dashboard','namespace','hello-mum','abstractions','lumps','pipeline','trace','reference','docs','builder','sitemap','gc','devices','github','memory','gt-view'];
     const bolt = document.getElementById('hamDefaultBolt');
     const clearBtn = document.getElementById('hamDefaultClear');
     if (!bolt) return;

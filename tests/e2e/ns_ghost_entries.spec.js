@@ -26,10 +26,13 @@
 
 const { test, expect } = require('@playwright/test');
 
-// The 14 canonical boot slots and their expected hardware labels.
-// These are the slots guaranteed to have non-zero NS entries in the boot
-// binary.  HARDWARE_LABELS in simulator.js loadBootImage() sets these names
-// as a priority override over the abstractionRegistry catalog.
+// The 7 canonical boot slots and their expected hardware labels.
+// These are the slots guaranteed to have non-zero NS entries in the DEFAULT
+// boot binary (3-LUMP starter kit).  HARDWARE_LABELS in simulator.js
+// loadBootImage() sets these names as a priority override over the catalog.
+// Slots 8+ (SlideRule, Constants, Loader, Tunnel, Keystone, Ethernet,
+// EventRouter) are lazy-load LUMPs — they have labels in nsLabels but NO
+// NS entry in the boot binary until first called; they are NOT checked here.
 const CANONICAL_BOOT_SLOTS = {
      0: 'Boot.NS',
      1: 'Boot.Thread',
@@ -38,13 +41,6 @@ const CANONICAL_BOOT_SLOTS = {
      4: 'BTN_DEV',
      5: 'TIMER_DEV',
      6: 'SelfTest',
-     8: 'SlideRule',
-     9: 'Constants',
-    10: 'Loader',
-    22: 'Tunnel',
-    23: 'Keystone',
-    42: 'Ethernet',
-    43: 'EventRouter',
 };
 
 // Ghost names pruned from the catalog — must not appear as NS labels.
