@@ -861,7 +861,6 @@ class CLOOMCCompiler {
             const t = line.trim();
             if (!t || t.startsWith('//') || t.startsWith('--') || t.startsWith(';')) continue;
             if (/^abstraction\s+\w+/i.test(t)) return true;
-            if (/^capabilities\s*\{/i.test(t)) return true;
             if (/^(?:public\s+|private\s+)?method\s+\w+/i.test(t)) return true;
         }
         return false;
@@ -3722,12 +3721,23 @@ class CLOOMCCompiler {
     }
 
     _detectEnglish(source) {
+        // Raw Church Machine mnemonic lines (e.g. "CALL Scheduler.pause",
+        // "LOAD Contact") are conventionally ALL-CAPS and structurally
+        // identical to assembly instructions, not English sentences. Without
+        // this guard, lines like "CALL DijkstraFlag.Signal" match the
+        // "^call\s+" heuristic below and push otherwise-pure-assembly source
+        // files over the englishScore >= 3 threshold, hijacking them away
+        // from _detectAssembly. Skip any line whose raw (pre-lowercase) first
+        // token is a known CM mnemonic before scoring it.
+        const _cmMnemonicLine = /^(LOAD|SAVE|CALL|RETURN|CHANGE|SWITCH|TPERM|LAMBDA|ELOADCALL|XLOADLAMBDA|DREAD|DWRITE|BFEXT|BFINS|MCMP|IADD|ISUB|BRANCH(?:EQ|NE|CS|CC|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV)?|SHL|SHR|WORD|NOP)(\s|$|\.)/;
         const lines = source.split('\n');
         let englishScore = 0;
         let hasBlockMethod = false;
         let hasEnglishBody = false;
         for (const line of lines) {
-            const t = line.trim().toLowerCase();
+            const rawTrim = line.trim();
+            if (!rawTrim || _cmMnemonicLine.test(rawTrim)) continue;
+            const t = rawTrim.toLowerCase();
             if (!t || t.startsWith('//') || t.startsWith('--')) continue;
             if (t.match(/^english\s+abstraction\s+/)) return true;
             if (t.match(/^(create|define|make)\s+(an?\s+)?abstraction\s+(called|named)\s+/)) englishScore += 3;
