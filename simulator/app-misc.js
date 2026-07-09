@@ -663,7 +663,16 @@ function showNextSteps(context) {
     // after a successful save — by the time the user clicks this link that flag is long
     // gone.  window._editorLastSavedToken is not consumed anywhere else, so re-arm the
     // pending flag from it right before switching views, every time this link is clicked.
-    const openLumpLink = (label) => `<a class="next-step-link" href="#" onclick="event.preventDefault();_openLastCompiledLump()">${label}</a>`;
+    //
+    // This alone is still a race: the link is rendered synchronously right after compile,
+    // before the async /api/lumps/save request that actually sets _editorLastSavedToken
+    // has resolved.  A click landing in that gap would silently fall back to whatever
+    // lump is "live" (the boot trampoline).  window._lumpSaveInFlight closes that gap —
+    // it is true for the entire duration of the save request, so the link is rendered
+    // inert while saving and _openLastCompiledLump() refuses to act until it clears.
+    // Correctness (never open the wrong lump) always wins over responsiveness here.
+    const _lumpSaving = !!window._lumpSaveInFlight;
+    const openLumpLink = (label) => `<a id="nsOpenLumpLink" class="next-step-link${_lumpSaving ? ' next-step-link-disabled' : ''}" href="#" onclick="event.preventDefault();_openLastCompiledLump()">${_lumpSaving ? 'Saving\u2026' : label}</a>`;
     const btn  = (icon, label, fn, extra) =>
         `<button class="next-step-btn${extra ? ' ' + extra : ''}" onclick="${fn}" title="${label}">${icon} ${label}</button>`;
     const steps = {
@@ -714,11 +723,36 @@ function showNextSteps(context) {
 // automatically right after a successful save.  Re-arming the pending token
 // from the durable one here means clicking "Open Lump" always opens the
 // lump that was just compiled, on the first click and every click after.
+//
+// Guarded by window._lumpSaveInFlight (set/cleared by the /api/lumps/save
+// callers in app-compile.js) so a click that lands before the save has
+// actually finished does nothing, rather than racing ahead and opening
+// whatever lump happens to be "live" in the simulator.  Logic over speed:
+// once the save completes, _refreshOpenLumpLink() re-enables this link and
+// the click works exactly as normal.
 function _openLastCompiledLump() {
+    if (window._lumpSaveInFlight) return;
     if (window._editorLastSavedToken) {
         window._pendingLumpToken = window._editorLastSavedToken;
     }
     if (typeof switchView === 'function') switchView('lumps');
+}
+
+// Called by the /api/lumps/save success/failure/catch handlers in
+// app-compile.js right after window._lumpSaveInFlight changes.  Updates the
+// already-rendered "Open Lump" link in place (rather than re-running
+// showNextSteps(), which would need to know the current context) so it
+// reflects the current save state without a full re-render.
+function _refreshOpenLumpLink() {
+    const a = document.getElementById('nsOpenLumpLink');
+    if (!a) return;
+    if (window._lumpSaveInFlight) {
+        a.classList.add('next-step-link-disabled');
+        a.textContent = 'Saving\u2026';
+    } else {
+        a.classList.remove('next-step-link-disabled');
+        a.textContent = 'Open Lump';
+    }
 }
 
 function initConsoleAutoSwitch() {

@@ -79,6 +79,19 @@ a.next-step-link:hover {
     border-bottom-style: solid;
 }
 
+a.next-step-link.next-step-link-disabled {
+    color: #888;
+    border-bottom-color: rgba(150, 150, 150, 0.3);
+    cursor: default;
+    pointer-events: none;
+}
+
+a.next-step-link.next-step-link-disabled:hover {
+    color: #888;
+    border-bottom-color: rgba(150, 150, 150, 0.3);
+    border-bottom-style: dashed;
+}
+
 .next-steps-box ul {
     margin: 0.3rem 0 0 0;
     padding-left: 1.2rem;

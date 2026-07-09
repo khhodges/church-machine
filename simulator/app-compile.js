@@ -1104,6 +1104,10 @@ function _doWipVersionSave() {
     // Clear WIP token — this abstraction is now a proper released version
     try { localStorage.removeItem('church_wip_token'); } catch (_e) {}
 
+    // "Open Lump" must never race this save — see _lumpSaveInFlight in app-misc.js.
+    window._lumpSaveInFlight = true;
+    if (typeof _refreshOpenLumpLink === 'function') _refreshOpenLumpLink();
+
     fetch('/api/lumps/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1143,7 +1147,13 @@ function _doWipVersionSave() {
         } else {
             appendOutput(`Server save failed: ${resp.error || 'unknown error'}`, 'error');
         }
-    }).catch(err => { appendOutput(`Server save error: ${err.message}`, 'error'); });
+        window._lumpSaveInFlight = false;
+        if (typeof _refreshOpenLumpLink === 'function') _refreshOpenLumpLink();
+    }).catch(err => {
+        appendOutput(`Server save error: ${err.message}`, 'error');
+        window._lumpSaveInFlight = false;
+        if (typeof _refreshOpenLumpLink === 'function') _refreshOpenLumpLink();
+    });
 }
 
 function _queueLumpRelease(data) {
@@ -1229,6 +1239,10 @@ function _confirmLumpRelease() {
     data.savePayload.metadata.version = ver;
     if (notes) data.savePayload.metadata.release_notes = notes;
 
+    // "Open Lump" must never race this save — see _lumpSaveInFlight in app-misc.js.
+    window._lumpSaveInFlight = true;
+    if (typeof _refreshOpenLumpLink === 'function') _refreshOpenLumpLink();
+
     fetch('/api/lumps/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1262,7 +1276,13 @@ function _confirmLumpRelease() {
         } else {
             appendOutput(`Server save failed: ${resp.error || 'unknown error'}`, 'error');
         }
-    }).catch(err => { appendOutput(`Server save error: ${err.message}`, 'error'); });
+        window._lumpSaveInFlight = false;
+        if (typeof _refreshOpenLumpLink === 'function') _refreshOpenLumpLink();
+    }).catch(err => {
+        appendOutput(`Server save error: ${err.message}`, 'error');
+        window._lumpSaveInFlight = false;
+        if (typeof _refreshOpenLumpLink === 'function') _refreshOpenLumpLink();
+    });
 }
 
 function compileAndBuild() {
@@ -1600,6 +1620,10 @@ function compileAndBuild() {
         return;
     }
 
+    // "Open Lump" must never race this save — see _lumpSaveInFlight in app-misc.js.
+    window._lumpSaveInFlight = true;
+    if (typeof _refreshOpenLumpLink === 'function') _refreshOpenLumpLink();
+
     fetch('/api/lumps/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1637,6 +1661,8 @@ function compileAndBuild() {
         } else {
             appendOutput(`Server save failed: ${resp.error || 'unknown error'}`, 'error');
         }
+        window._lumpSaveInFlight = false;
+        if (typeof _refreshOpenLumpLink === 'function') _refreshOpenLumpLink();
     }).catch(err => { appendOutput(`Server save error: ${err.message}`, 'error'); });
 
     trackAction('build_lump', { name: absName, lang: result.language, size: lumpSize });
