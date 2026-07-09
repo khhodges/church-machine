@@ -657,36 +657,11 @@ function showNextSteps(context) {
     if (!box) return;
 
     const link = (label, view) => `<a class="next-step-link" href="#" onclick="event.preventDefault();switchView('${view}')">${label}</a>`;
-    // "Open Lump" must always target the lump that was just compiled/saved, not whatever
-    // happens to be "live" in the simulator's CR14 state.  window._pendingLumpToken is
-    // one-shot and gets consumed by the renderLumps() call that already runs immediately
-    // after a successful save — by the time the user clicks this link that flag is long
-    // gone.  window._editorLastSavedToken is not consumed anywhere else, so re-arm the
-    // pending flag from it right before switching views, every time this link is clicked.
-    //
-    // This alone is still a race: the link is rendered synchronously right after compile,
-    // before the async /api/lumps/save request that actually sets _editorLastSavedToken
-    // has resolved.  A click landing in that gap would silently fall back to whatever
-    // lump is "live" (the boot trampoline).  window._lumpSaveInFlight closes that gap —
-    // it is true for the entire duration of the save request, so the link is rendered
-    // inert while saving and _openLastCompiledLump() refuses to act until it clears.
-    // Correctness (never open the wrong lump) always wins over responsiveness here.
-    const _lumpSaving = !!window._lumpSaveInFlight;
-    // The WIP version-testing gate (see _renderWipMethodGate() in app-compile.js)
-    // shows this same 'compiled' context *before* any save has been requested —
-    // the real /api/lumps/save call is deferred until every method is ticked as
-    // tested, so at render time _lumpSaveInFlight is still false AND
-    // _editorLastSavedToken is still null (nothing to open yet). Previously the
-    // link rendered as a normal, clickable "Open Lump" in that gap, but clicking
-    // it did nothing because _openLastCompiledLump() correctly refuses to act
-    // without a resolved token — a dead-looking-alive link. Gate on token
-    // presence too, so it only ever renders active once there is something to open.
-    const _hasToken = !!window._editorLastSavedToken;
-    const openLumpLink = (label) => {
-        const disabled = _lumpSaving || !_hasToken;
-        const text = _lumpSaving ? 'Saving\u2026' : label;
-        return `<a id="nsOpenLumpLink" class="next-step-link${disabled ? ' next-step-link-disabled' : ''}" href="#" onclick="event.preventDefault();_openLastCompiledLump()">${text}</a>`;
-    };
+    // "Open Lump" is always shown enabled. It targets the most recently
+    // compiled/saved lump if one is known (window._editorLastSavedToken);
+    // see _openLastCompiledLump() for the fallback when it isn't.
+    const openLumpLink = (label) =>
+        `<a id="nsOpenLumpLink" class="next-step-link" href="#" onclick="event.preventDefault();_openLastCompiledLump()">${label}</a>`;
     const btn  = (icon, label, fn, extra) =>
         `<button class="next-step-btn${extra ? ' ' + extra : ''}" onclick="${fn}" title="${label}">${icon} ${label}</button>`;
     const steps = {
@@ -730,82 +705,20 @@ function showNextSteps(context) {
     box.innerHTML = `<div class="next-steps-header" onclick="toggleNextSteps()"><span class="next-steps-arrow">${arrowChar}</span><span class="next-steps-label">Next Steps</span></div><div class="next-steps-body" style="${bodyDisplay}">${bodyHTML}</div>`;
 }
 
-// Explicit "Open Lump" handler for the Next Steps panel.  Always targets the
-// most recently compiled/saved lump (window._editorLastSavedToken), which is
-// never consumed elsewhere — unlike window._pendingLumpToken, which is a
-// one-shot flag already burned by the renderLumps() call that runs
-// automatically right after a successful save.  Re-arming the pending token
-// from the durable one here means clicking "Open Lump" always opens the
-// lump that was just compiled, on the first click and every click after.
-//
-// Guarded by window._lumpSaveInFlight (set/cleared by the /api/lumps/save
-// callers in app-compile.js) so a click that lands before the save has
-// actually finished does nothing, rather than racing ahead and opening
-// whatever lump happens to be "live" in the simulator.  Logic over speed:
-// once the save completes, _refreshOpenLumpLink() re-enables this link and
-// the click works exactly as normal.
-//
-// Second guard: window._editorLastSavedToken can also legitimately become
-// null after this link has already been rendered — e.g. a reboot that
-// reloads a different program, or any of the other call sites that null it
-// (clearPseudoEditContext, selectUserTab, openLumpInEditor, …). Previously
-// this function fell through to switchView('lumps') with no pending token
-// whenever that happened, and renderLumps() would silently auto-select
-// whatever lump is "live" on CR14 (typically the boot trampoline) — the
-// "misnamed lump" bug. Never navigate without a resolved token: do nothing
-// instead of guessing.
+// "Open Lump" handler for the Next Steps panel. Opens the most recently
+// compiled/saved lump (window._editorLastSavedToken) if one is known; if
+// not (nothing compiled yet, or the token was invalidated by an edit since
+// the last compile), it just opens the Lumps view with no pre-selection.
 function _openLastCompiledLump() {
-    if (window._lumpSaveInFlight) return;
-    if (!window._editorLastSavedToken) return;
-    window._pendingLumpToken = window._editorLastSavedToken;
+    if (window._editorLastSavedToken) window._pendingLumpToken = window._editorLastSavedToken;
     if (typeof switchView === 'function') switchView('lumps');
 }
 
-// Single choke point for invalidating window._editorLastSavedToken.
-//
-// Previously ~9 call sites scattered across app-shell.js, app-lumps.js,
-// app-absdetail.js, and app-run.js each did `window._editorLastSavedToken =
-// null;` directly (tab switch, catalog method open, pseudo-edit context
-// clear, history-version restore, reboot, fault clear, ...). None of them
-// told the already-rendered Next Steps "Open Lump" link that its target had
-// just gone away — that link is only (re)rendered by showNextSteps() on
-// explicit compile/run/step events, so it kept sitting on screen looking
-// clickable long after _openLastCompiledLump() started refusing to act.
-//
-// Every current and future invalidation site should call this instead of
-// assigning the field directly, so the UI can never drift out of sync with
-// the state it depends on again.
+// Single choke point for invalidating window._editorLastSavedToken whenever
+// the previously-compiled/saved lump becomes stale (edit, tab switch,
+// reboot, fault clear, ...).
 function _invalidateLastSavedToken() {
     window._editorLastSavedToken = null;
-    if (typeof _refreshOpenLumpLink === 'function') _refreshOpenLumpLink();
-}
-
-// Called by the /api/lumps/save success/failure/catch handlers in
-// app-compile.js right after window._lumpSaveInFlight changes, and by
-// _invalidateLastSavedToken() above whenever the token itself goes away.
-// Updates the already-rendered "Open Lump" link in place (rather than
-// re-running showNextSteps(), which would need to know the current
-// context) so it always reflects the current, real state:
-//   - no token at all      -> link removed entirely (nothing to open)
-//   - save in flight       -> disabled "Saving..." placeholder
-//   - token present, saved -> normal clickable "Open Lump" link
-function _refreshOpenLumpLink() {
-    const a = document.getElementById('nsOpenLumpLink');
-    if (!a) return;
-    if (!window._editorLastSavedToken) {
-        // The action row this link lives in may also contain Step/Walk/Run
-        // buttons that are still valid, so only remove the link itself
-        // rather than the whole Next Steps box.
-        a.remove();
-        return;
-    }
-    if (window._lumpSaveInFlight) {
-        a.classList.add('next-step-link-disabled');
-        a.textContent = 'Saving\u2026';
-    } else {
-        a.classList.remove('next-step-link-disabled');
-        a.textContent = 'Open Lump';
-    }
 }
 
 function initConsoleAutoSwitch() {
