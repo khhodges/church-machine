@@ -45,3 +45,4 @@
 - [LUMP abstraction-name consistency scoping](lump-abstraction-name-consistency.md) — drift check must exempt user-compiled + dynamic/NULL lumps or it false-fails on legitimate non-registry names
 - [Boot DEMO_CLIST layout](demo-clist-layout.md) — 11-slot boot c-list: [3]=UART, [4]=LED_DEV, [5]=BTN, [6]=TIMER; LED0-4 share one GT; SlideRule is not a boot device
 - [Stale-version redirect strips query strings](stale-version-redirect-strips-query.md) — server AND client cache-bust redirects must each forward the full query string or URL flags (?debug=1 etc.) silently die on every page load
+- [Async in-flight flag needs catch reset](async-inflight-flag-needs-catch-reset.md) — an in-flight/saving boolean gating a disabled UI control must reset on ALL 3 async outcomes (success, explicit failure, AND rejected promise) or the control sticks disabled forever

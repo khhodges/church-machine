@@ -1663,7 +1663,20 @@ function compileAndBuild() {
         }
         window._lumpSaveInFlight = false;
         if (typeof _refreshOpenLumpLink === 'function') _refreshOpenLumpLink();
-    }).catch(err => { appendOutput(`Server save error: ${err.message}`, 'error'); });
+    }).catch(err => {
+        appendOutput(`Server save error: ${err.message}`, 'error');
+        // Unlike the resp.ok/else branch above, a rejected promise (network
+        // failure, or a non-JSON error response that made r.json() throw)
+        // never reaches the `window._lumpSaveInFlight = false` line above.
+        // Without resetting it here, the "Open Lump" link in Next Steps
+        // stays stuck on its disabled "Saving…" placeholder forever — a
+        // clean compile with a failed save looked identical to "still
+        // saving" with no way to recover short of recompiling. Match the
+        // other two save call sites (_doWipVersionSave, _confirmLumpRelease)
+        // which already reset both here.
+        window._lumpSaveInFlight = false;
+        if (typeof _refreshOpenLumpLink === 'function') _refreshOpenLumpLink();
+    });
 
     trackAction('build_lump', { name: absName, lang: result.language, size: lumpSize });
     appendOutput(`Built LUMP: "${absName}" [${langLabel}] \u2014 ${cw} words, cc=${cc}, ${sizeBytes} bytes \u00b7 v${_autoVer}`, 'info');
