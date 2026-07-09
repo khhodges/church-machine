@@ -1123,10 +1123,10 @@ function _doWipVersionSave() {
             window._editorLastSavedToken = resp.token;
             window._pendingLumpToken = resp.token;
             if (typeof switchView === 'function') switchView('lumps');
-            const _rlP = typeof renderLumps === 'function' ? renderLumps() : Promise.resolve();
-            (_rlP && _rlP.then ? _rlP : Promise.resolve()).then(() => {
-                if (typeof showLumpDetail === 'function') showLumpDetail(resp.token);
-            });
+            // switchView('lumps') already calls renderLumps(); the pending token
+            // ensures the compiled lump is selected.  Do NOT call renderLumps()
+            // again — a second call would overwrite the selection with the live-lump
+            // auto-detect (which sees the boot abstraction still in CR14).
             let _fl = listing;
             _fl += `  Version:    v${_autoVer} (auto)\n`;
             _fl += `\n  Downloaded: ${_dlN} (${sizeBytes} bytes)\n`;
@@ -1249,10 +1249,8 @@ function _confirmLumpRelease() {
             const savedToken = resp.token;
             window._pendingLumpToken = savedToken;
             if (typeof switchView === 'function') switchView('lumps');
-            const _rlProm = renderLumps ? renderLumps() : Promise.resolve();
-            (_rlProm && _rlProm.then ? _rlProm : Promise.resolve()).then(() => {
-                if (typeof showLumpDetail === 'function') showLumpDetail(savedToken);
-            });
+            // switchView('lumps') already calls renderLumps(); the pending token
+            // ensures the compiled lump is selected.  No second renderLumps().
             let listing = data.listing;
             listing += `  Version:   v${ver}\n`;
             if (notes) listing += `  Notes:     ${notes}\n`;
@@ -1622,10 +1620,8 @@ function compileAndBuild() {
             const _savedToken = resp.token;
             window._pendingLumpToken = _savedToken;
             if (typeof switchView === 'function') switchView('lumps');
-            const _rlProm2 = renderLumps ? renderLumps() : Promise.resolve();
-            (_rlProm2 && _rlProm2.then ? _rlProm2 : Promise.resolve()).then(() => {
-                if (typeof showLumpDetail === 'function') showLumpDetail(_savedToken);
-            });
+            // switchView('lumps') already calls renderLumps(); the pending token
+            // ensures the compiled lump is selected.  No second renderLumps().
             let _finalListing = listing;
             _finalListing += `  Version:    v${_autoVer} (auto)\n`;
             _finalListing += `\n  Downloaded: ${_dlName} (${sizeBytes} bytes)\n`;
