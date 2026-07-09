@@ -527,9 +527,16 @@ function lumpAudit(words, manifest, lineNums) {
                 .join(', ');
             results.push({
                 ruleId: 'RSM',
-                severity: 'error',
+                // Advisory only (see docs/lump-reference.md \u00a7 11) \u2014 a method whose
+                // body is a single bare RETURN is ambiguous: it may be a genuinely
+                // missing implementation, OR a legitimate trivial method that just
+                // returns its own parameters unchanged (e.g. `return(a, b)` where a
+                // and b already sit in the correct return registers, so the compiler
+                // emits no instruction besides RETURN). The binary cannot distinguish
+                // the two cases, so this must never block save/build \u2014 only warn.
+                severity: 'warn',
                 message: `Stub method${_n !== 1 ? 's' : ''} \u2014 ${_n} method${_n !== 1 ? 's' : ''} ha${_n !== 1 ? 've' : 's'} no code body (bare RETURN).`,
-                detail: `Compiler error: ${_stubNames} ${_n !== 1 ? 'are' : 'is a'} bare RETURN stub${_n !== 1 ? 's' : ''} with no code body. Re-compile the abstraction to fix the missing method implementation.`,
+                detail: `${_stubNames} ${_n !== 1 ? 'are' : 'is a'} bare RETURN with no other instructions. This is expected for a method that only returns its own parameters unchanged; if that wasn't intended, re-compile the abstraction to fill in the missing implementation.`,
             });
         }
     }

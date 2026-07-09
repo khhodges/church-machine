@@ -1,0 +1,57 @@
+{
+  "token": "c3963aed",
+  "abstraction": "Memory",
+  "filename": "Memory_v1.lump",
+  "sidecar_file": "Memory_v1.json",
+  "ns_slot": null,
+  "lump_size": 64,
+  "typ": 0,
+  "content_type": "code",
+  "cw": 19,
+  "cc": 0,
+  "profile": "IoT",
+  "language": "javascript",
+  "author": "",
+  "version": "2026.07.09",
+  "release_notes": "",
+  "methods": [
+    {
+      "name": "Allocate",
+      "offset": 0,
+      "length": 14
+    },
+    {
+      "name": "Free",
+      "offset": 14,
+      "length": 4
+    },
+    {
+      "name": "Resize",
+      "offset": 18,
+      "length": 1
+    }
+  ],
+  "capabilities": [],
+  "pet_names": {
+    "DR": {},
+    "CR": {}
+  },
+  "mtbf": {
+    "consecutive_clean": 0,
+    "total_runs": 0,
+    "status": "unknown",
+    "source_hash": "e3201d15"
+  },
+  "deployment": {
+    "target_board": "ti60-f225",
+    "profile": "IoT",
+    "built_at": "2026-07-09T20:59:42.914486Z",
+    "builder": "CLOOMC++ IDE v1.0"
+  },
+  "grants": [
+    "E"
+  ],
+  "source": "// ============================================================\n// Abstraction:  Memory\n// Description:  Raw physical word allocator (NS slot 7)\n// Author:       Church Machine Educational Platform\n// Version:      1.0\n// Created:      2026-05-09\n// Language:     CLOOMC++\n// Dependencies: None\n// ============================================================\n// Methods:\n//   1. Allocate(size) \u2014 reserve size words; return (location, actual_size)\n//   2. Free(location) \u2014 release a previously allocated block\n//   3. Resize(location, newSize) \u2014 resize an existing block in-place\n// ============================================================\nabstraction Memory {\n    capabilities {\n    }\n    method Allocate(size) {\n        var needed = size + 255\n        needed = needed >> 8\n        needed = needed << 8\n        var location = read(CR7, 0)\n        var newFree = location + needed\n        write(CR7, 0, newFree)\n        return(location, needed)\n    }\n    method Free(location) {\n        write(CR7, 1, location)\n        return(0)\n    }\n    method Resize(location, newSize) {\n        return(location, newSize)\n    }\n}\n",
+  "lump_version": 1,
+  "compiled_at": 1783630782.9145057
+}
