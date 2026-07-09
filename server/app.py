@@ -4116,7 +4116,7 @@ def _load_bundled_lumps():
 
 _load_bundled_lumps()
 
-# ── Boot Abstraction lump (NS slot 3, "LED flash") ───────────────────────────────
+# ── Boot Abstraction lump (NS slot 6, "Boot.Abstr") ───────────────────────────────
 # The boot lump is baked directly into boot-image.bin rather than stored as a
 # standalone .lump file.  Extract it at startup so the Lump Repository can show it.
 
@@ -4167,7 +4167,7 @@ def _load_boot_abstr_lump():
         LAZY_LUMPS['00000600'] = _struct.pack(f'>{lump_size}I', *lump_words)
         _BOOT_ABSTR_META.update({
             "token":       "00000600",
-            "abstraction": "LED flash",
+            "abstraction": "Boot.Abstr",
             "ns_slot":     BOOT_ABSTR_NS_SLOT,
             "lump_size":   lump_size,
             "cw":          cw,

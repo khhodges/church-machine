@@ -1953,6 +1953,22 @@
         ]
     },
     {
+        "token": "00000300",
+        "abstraction": "LED Flash",
+        "filename": "LED_flash_v1.lump",
+        "sidecar_file": "LED_flash_v1.json",
+        "ns_slot": 3,
+        "lump_size": 64,
+        "cw": 17,
+        "cc": 18,
+        "grants": [
+            "E"
+        ],
+        "lump_version": 1,
+        "compiled_at": 1781356509.3377318,
+        "methods": []
+    },
+    {
         "token": "00000600",
         "abstraction": "Boot3",
         "filename": "Boot3.lump",

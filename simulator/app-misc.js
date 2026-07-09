@@ -657,6 +657,13 @@ function showNextSteps(context) {
     if (!box) return;
 
     const link = (label, view) => `<a class="next-step-link" href="#" onclick="event.preventDefault();switchView('${view}')">${label}</a>`;
+    // "Open Lump" must always target the lump that was just compiled/saved, not whatever
+    // happens to be "live" in the simulator's CR14 state.  window._pendingLumpToken is
+    // one-shot and gets consumed by the renderLumps() call that already runs immediately
+    // after a successful save — by the time the user clicks this link that flag is long
+    // gone.  window._editorLastSavedToken is not consumed anywhere else, so re-arm the
+    // pending flag from it right before switching views, every time this link is clicked.
+    const openLumpLink = (label) => `<a class="next-step-link" href="#" onclick="event.preventDefault();_openLastCompiledLump()">${label}</a>`;
     const btn  = (icon, label, fn, extra) =>
         `<button class="next-step-btn${extra ? ' ' + extra : ''}" onclick="${fn}" title="${label}">${icon} ${label}</button>`;
     const steps = {
@@ -664,28 +671,28 @@ function showNextSteps(context) {
             <div class="next-step-actions">
                 ${btn('\uD83D\uDC63', 'Step', 'stepSim()')}
                 ${btn('\uD83D\uDEB6', 'Walk', 'walkToggle()', 'ns-btn-walk')}
-                ${link('Open Lump', 'lumps')}
+                ${openLumpLink('Open Lump')}
             </div>`,
         'assembled': `
             <div class="next-step-actions">
                 ${btn('\uD83D\uDC63', 'Step', 'stepSim()')}
                 ${btn('\uD83D\uDEB6', 'Walk', 'walkToggle()', 'ns-btn-walk')}
                 ${btn('\uD83C\uDFC3', 'Run', 'onRunBtnClick()', 'ns-btn-run')}
-                ${link('Open Lump', 'lumps')}
+                ${openLumpLink('Open Lump')}
             </div>`,
         'ran-clean': `
             <div class="next-step-actions">
                 ${btn('\uD83D\uDC63', 'Step', 'stepSim()')}
                 ${btn('\uD83D\uDEB6', 'Walk', 'walkToggle()', 'ns-btn-walk')}
                 ${btn('\uD83C\uDFC3', 'Run', 'onRunBtnClick()', 'ns-btn-run')}
-                ${link('Open Lump', 'lumps')}
+                ${openLumpLink('Open Lump')}
             </div>`,
         'ran-fault': `
             <div class="next-step-actions">
                 ${btn('\uD83D\uDC63', 'Step', 'stepSim()')}
                 ${btn('\uD83D\uDEB6', 'Walk', 'walkToggle()', 'ns-btn-walk')}
                 ${btn('\uD83C\uDFC3', 'Run', 'onRunBtnClick()', 'ns-btn-run')}
-                ${link('Open Lump', 'lumps')}
+                ${openLumpLink('Open Lump')}
             </div>`,
         'created': ``,
         'error': ``,
@@ -698,6 +705,20 @@ function showNextSteps(context) {
     const arrowChar = _nextStepsHidden ? '▶' : '▼';
     const bodyDisplay = _nextStepsHidden ? 'display:none' : '';
     box.innerHTML = `<div class="next-steps-header" onclick="toggleNextSteps()"><span class="next-steps-arrow">${arrowChar}</span><span class="next-steps-label">Next Steps</span></div><div class="next-steps-body" style="${bodyDisplay}">${bodyHTML}</div>`;
+}
+
+// Explicit "Open Lump" handler for the Next Steps panel.  Always targets the
+// most recently compiled/saved lump (window._editorLastSavedToken), which is
+// never consumed elsewhere — unlike window._pendingLumpToken, which is a
+// one-shot flag already burned by the renderLumps() call that runs
+// automatically right after a successful save.  Re-arming the pending token
+// from the durable one here means clicking "Open Lump" always opens the
+// lump that was just compiled, on the first click and every click after.
+function _openLastCompiledLump() {
+    if (window._editorLastSavedToken) {
+        window._pendingLumpToken = window._editorLastSavedToken;
+    }
+    if (typeof switchView === 'function') switchView('lumps');
 }
 
 function initConsoleAutoSwitch() {
