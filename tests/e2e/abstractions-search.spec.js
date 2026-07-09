@@ -26,7 +26,11 @@ const { test, expect } = require('@playwright/test');
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function openAbstractionsPanel(page) {
-    await page.goto('/simulator/');
+    // S-IDE v1 hides the "Learn" hamburger group (which contains the
+    // Reference item) behind ?learn=1 — see .ham-group.ham-learn-section
+    // in simulator/index.html. Without it, #hamItem-reference stays
+    // display:none and this helper times out waiting for it to be visible.
+    await page.goto('/simulator/?learn=1');
     await page.waitForLoadState('networkidle');
 
     // Open hamburger menu.

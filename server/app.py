@@ -2608,7 +2608,13 @@ def starter_versioned(version):
 def simulator_index():
     # Redirect to a versioned URL (= git hash) that changes on every merge,
     # busting any proxy or browser cache automatically without a hard refresh.
-    resp = redirect(f"/simulator/~/{_SIMULATOR_HTML_VERSION}", code=302)
+    # Preserve the original query string (e.g. ?learn=1, ?debug=1) — without
+    # this, any query param a caller attaches to /simulator/ is silently
+    # dropped by the redirect and never reaches the versioned page.
+    target = f"/simulator/~/{_SIMULATOR_HTML_VERSION}"
+    if request.query_string:
+        target += "?" + request.query_string.decode("utf-8")
+    resp = redirect(target, code=302)
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"

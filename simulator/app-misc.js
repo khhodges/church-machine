@@ -672,7 +672,21 @@ function showNextSteps(context) {
     // inert while saving and _openLastCompiledLump() refuses to act until it clears.
     // Correctness (never open the wrong lump) always wins over responsiveness here.
     const _lumpSaving = !!window._lumpSaveInFlight;
-    const openLumpLink = (label) => `<a id="nsOpenLumpLink" class="next-step-link${_lumpSaving ? ' next-step-link-disabled' : ''}" href="#" onclick="event.preventDefault();_openLastCompiledLump()">${_lumpSaving ? 'Saving\u2026' : label}</a>`;
+    // The WIP version-testing gate (see _renderWipMethodGate() in app-compile.js)
+    // shows this same 'compiled' context *before* any save has been requested —
+    // the real /api/lumps/save call is deferred until every method is ticked as
+    // tested, so at render time _lumpSaveInFlight is still false AND
+    // _editorLastSavedToken is still null (nothing to open yet). Previously the
+    // link rendered as a normal, clickable "Open Lump" in that gap, but clicking
+    // it did nothing because _openLastCompiledLump() correctly refuses to act
+    // without a resolved token — a dead-looking-alive link. Gate on token
+    // presence too, so it only ever renders active once there is something to open.
+    const _hasToken = !!window._editorLastSavedToken;
+    const openLumpLink = (label) => {
+        const disabled = _lumpSaving || !_hasToken;
+        const text = _lumpSaving ? 'Saving\u2026' : label;
+        return `<a id="nsOpenLumpLink" class="next-step-link${disabled ? ' next-step-link-disabled' : ''}" href="#" onclick="event.preventDefault();_openLastCompiledLump()">${text}</a>`;
+    };
     const btn  = (icon, label, fn, extra) =>
         `<button class="next-step-btn${extra ? ' ' + extra : ''}" onclick="${fn}" title="${label}">${icon} ${label}</button>`;
     const steps = {

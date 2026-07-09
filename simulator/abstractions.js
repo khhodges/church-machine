@@ -566,7 +566,10 @@ if (typeof module !== 'undefined' && module.exports) {
     var _VER = 'r20260429e';
     var _path = window.location.pathname;
     if (_path.indexOf('/simulator/') === 0 && !_path.startsWith('/simulator/~/' + _VER)) {
-        window.location.replace('/simulator/~/' + _VER + (window.location.hash || ''));
+        // Preserve query string (e.g. ?learn=1, ?debug=1) — without this,
+        // any query param a caller attaches is silently dropped on every
+        // simulator page load, since this guard fires on every visit.
+        window.location.replace('/simulator/~/' + _VER + (window.location.search || '') + (window.location.hash || ''));
     }
 })();
 
