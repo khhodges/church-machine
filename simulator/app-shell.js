@@ -1376,10 +1376,6 @@ function switchView(viewId) {
     document.querySelectorAll('.ham-item').forEach(btn => btn.classList.remove('ham-active'));
     const activeHamItem = document.getElementById('hamItem-' + viewId);
     if (activeHamItem) activeHamItem.classList.add('ham-active');
-    document.querySelectorAll('.core-nav-btn').forEach(function(btn) {
-        var btnViews = (btn.dataset.views || '').split(',');
-        btn.classList.toggle('core-nav-active', btnViews.indexOf(viewId) !== -1);
-    });
 
     if (viewId === 'dashboard') { restoreAutoBootPref(); updateDashboard(); }
     if (viewId === 'github') loadGitHubCommunity();
