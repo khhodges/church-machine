@@ -1336,7 +1336,7 @@ function _lumpSrcEditMethod(absIdx, mName) {
     const outEl = document.getElementById('assemblyOutput');
     if (outEl) outEl.innerHTML = '';
     window._pseudoEditContext = { absIdx: absIdx, methodName: mName };
-    window._editorLastSavedToken = null;
+    if (typeof _invalidateLastSavedToken === 'function') _invalidateLastSavedToken(); else window._editorLastSavedToken = null;
     if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
     if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
 }

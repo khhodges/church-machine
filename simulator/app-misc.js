@@ -747,14 +747,44 @@ function _openLastCompiledLump() {
     if (typeof switchView === 'function') switchView('lumps');
 }
 
+// Single choke point for invalidating window._editorLastSavedToken.
+//
+// Previously ~9 call sites scattered across app-shell.js, app-lumps.js,
+// app-absdetail.js, and app-run.js each did `window._editorLastSavedToken =
+// null;` directly (tab switch, catalog method open, pseudo-edit context
+// clear, history-version restore, reboot, fault clear, ...). None of them
+// told the already-rendered Next Steps "Open Lump" link that its target had
+// just gone away — that link is only (re)rendered by showNextSteps() on
+// explicit compile/run/step events, so it kept sitting on screen looking
+// clickable long after _openLastCompiledLump() started refusing to act.
+//
+// Every current and future invalidation site should call this instead of
+// assigning the field directly, so the UI can never drift out of sync with
+// the state it depends on again.
+function _invalidateLastSavedToken() {
+    window._editorLastSavedToken = null;
+    if (typeof _refreshOpenLumpLink === 'function') _refreshOpenLumpLink();
+}
+
 // Called by the /api/lumps/save success/failure/catch handlers in
-// app-compile.js right after window._lumpSaveInFlight changes.  Updates the
-// already-rendered "Open Lump" link in place (rather than re-running
-// showNextSteps(), which would need to know the current context) so it
-// reflects the current save state without a full re-render.
+// app-compile.js right after window._lumpSaveInFlight changes, and by
+// _invalidateLastSavedToken() above whenever the token itself goes away.
+// Updates the already-rendered "Open Lump" link in place (rather than
+// re-running showNextSteps(), which would need to know the current
+// context) so it always reflects the current, real state:
+//   - no token at all      -> link removed entirely (nothing to open)
+//   - save in flight       -> disabled "Saving..." placeholder
+//   - token present, saved -> normal clickable "Open Lump" link
 function _refreshOpenLumpLink() {
     const a = document.getElementById('nsOpenLumpLink');
     if (!a) return;
+    if (!window._editorLastSavedToken) {
+        // The action row this link lives in may also contain Step/Walk/Run
+        // buttons that are still valid, so only remove the link itself
+        // rather than the whole Next Steps box.
+        a.remove();
+        return;
+    }
     if (window._lumpSaveInFlight) {
         a.classList.add('next-step-link-disabled');
         a.textContent = 'Saving\u2026';

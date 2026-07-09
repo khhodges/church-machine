@@ -931,7 +931,7 @@ function absOpenMethodInEditor(absIdx, methodName, tabEl, panelId) {
 
     // Set catalog edit context so Save button shows "↑ Compile & Save"
     window._pseudoEditContext = { absIdx: absIdx, methodName: methodName };
-    window._editorLastSavedToken = null;
+    if (typeof _invalidateLastSavedToken === 'function') _invalidateLastSavedToken(); else window._editorLastSavedToken = null;
     if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
     if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
 }
@@ -1002,7 +1002,7 @@ function absRestoreMethodVersion(absIdx, methodName, histIdx) {
     if (outEl) outEl.innerHTML = '';
 
     window._pseudoEditContext = { absIdx: absIdx, methodName: methodName };
-    window._editorLastSavedToken = null;
+    if (typeof _invalidateLastSavedToken === 'function') _invalidateLastSavedToken(); else window._editorLastSavedToken = null;
     window._absActiveMethod = window._absActiveMethod || {};
     window._absActiveMethod[absIdx] = methodName;
     if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
@@ -1427,7 +1427,7 @@ function absGenerateMethod(absIdx, methodName) {
                 if (typeof updateLineNumbers === 'function') updateLineNumbers();
             }
             window._pseudoEditContext = { absIdx: absIdx, methodName: methodName };
-            window._editorLastSavedToken = null;
+            if (typeof _invalidateLastSavedToken === 'function') _invalidateLastSavedToken(); else window._editorLastSavedToken = null;
             if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
             if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
             const outEl = document.getElementById('assemblyOutput');

@@ -1295,7 +1295,7 @@ function compileAndBuild() {
     // Capture any active LUMP-edit draft token before resetting to null.
     // Both compile success paths use _compileDraftToken to delete the draft.
     _compileDraftToken = window._editorLastSavedToken;
-    window._editorLastSavedToken = null;
+    if (typeof _invalidateLastSavedToken === 'function') _invalidateLastSavedToken(); else window._editorLastSavedToken = null;
     _runStopped = true;
     sim.running = false;
 

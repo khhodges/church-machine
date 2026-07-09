@@ -218,7 +218,7 @@ function selectUserTab(id) {
     _updateEditorCodeName(tab.name);
     // Leaving catalog edit context when user picks a personal tab
     window._pseudoEditContext = null;
-    window._editorLastSavedToken = null;
+    if (typeof _invalidateLastSavedToken === 'function') _invalidateLastSavedToken(); else window._editorLastSavedToken = null;
     if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
     const editor = document.getElementById('asmEditor');
     if (editor) editor.value = tab.code;
@@ -276,7 +276,7 @@ function updateSavePseudoBtn() {
 
 function clearPseudoEditContext() {
     window._pseudoEditContext = null;
-    window._editorLastSavedToken = null;
+    if (typeof _invalidateLastSavedToken === 'function') _invalidateLastSavedToken(); else window._editorLastSavedToken = null;
     updateSavePseudoBtn();
     if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
 }
