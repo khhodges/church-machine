@@ -730,11 +730,20 @@ function showNextSteps(context) {
 // whatever lump happens to be "live" in the simulator.  Logic over speed:
 // once the save completes, _refreshOpenLumpLink() re-enables this link and
 // the click works exactly as normal.
+//
+// Second guard: window._editorLastSavedToken can also legitimately become
+// null after this link has already been rendered — e.g. a reboot that
+// reloads a different program, or any of the other call sites that null it
+// (clearPseudoEditContext, selectUserTab, openLumpInEditor, …). Previously
+// this function fell through to switchView('lumps') with no pending token
+// whenever that happened, and renderLumps() would silently auto-select
+// whatever lump is "live" on CR14 (typically the boot trampoline) — the
+// "misnamed lump" bug. Never navigate without a resolved token: do nothing
+// instead of guessing.
 function _openLastCompiledLump() {
     if (window._lumpSaveInFlight) return;
-    if (window._editorLastSavedToken) {
-        window._pendingLumpToken = window._editorLastSavedToken;
-    }
+    if (!window._editorLastSavedToken) return;
+    window._pendingLumpToken = window._editorLastSavedToken;
     if (typeof switchView === 'function') switchView('lumps');
 }
 

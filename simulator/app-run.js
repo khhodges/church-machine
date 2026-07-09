@@ -2074,7 +2074,10 @@ function faultRecall() {
 function faultClear() {
     _lastFault = null;
     faultAlertOff();
-    _defaultProgramLoaded = false;
+    // Do NOT clear _defaultProgramLoaded — see resetSim() comment. Same
+    // regression as faultModalReboot(): clearing it forces the cold-start
+    // loadExample('capability_test') branch in _autoLoadDefaultProgram(),
+    // discarding the user's program and nulling _editorLastSavedToken.
     _bootAuditAccum = [];
     _clearLumpPetNames();
     try { localStorage.removeItem(_FAULT_LOG_LS_KEY); } catch(e) {}
@@ -2915,7 +2918,14 @@ function faultModalReboot() {
     if (sim && sim.faultLog) sim.faultLog = [];
     try { localStorage.removeItem(_FAULT_LOG_LS_KEY); } catch(e) {}
     if (pipelineViz) pipelineViz.setNIA(null);
-    _defaultProgramLoaded = false;
+    // Do NOT clear _defaultProgramLoaded — see resetSim() comment.  Clearing it
+    // here forced _autoLoadDefaultProgram() down the cold-start branch
+    // (loadExample('capability_test')), which discards the user's compiled
+    // program and nulls window._editorLastSavedToken via clearPseudoEditContext().
+    // Any "Open Lump" link rendered before this reboot would then silently
+    // fall back to whatever lump is "live" (the boot trampoline) instead of
+    // doing nothing or reopening the user's actual program — see
+    // _openLastCompiledLump() in app-misc.js for the matching guard.
     _bootAuditAccum = [];
     sim.reset();
     _initLazyLoadManifest();
@@ -8228,7 +8238,7 @@ const _JS_TAB_FILES = [
     { name: 'boot_uploads.js',       label: 'boot_uploads',       desc: 'Boot ROM upload handling — sends binary to FPGA over WebSerial' },
     { name: 'system_abstractions.js',label: 'system_abstractions',desc: 'System abstraction definitions loaded into the NS table at boot' },
     { name: 'device_abstractions.js',label: 'device_abstractions',desc: 'Device register abstractions (MMIO, UART, GPIO, …)' },
-    { name: 'app.js',                label: 'app',                desc: 'IDE front-end — views, panels, GC UI, CR table rendering' },
+    { name: 'app-shell.js',          label: 'app',                desc: 'IDE front-end — views, panels, GC UI, CR table rendering' },
     {
         name: 'call_overflow_guard',
         label: 'call-overflow',
