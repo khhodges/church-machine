@@ -13368,6 +13368,22 @@ function showApiAbstractionDetail(slot) {
     window._asmExampleSources = seed;
 })();
 
+// ── Persist "Break at entry" checkbox across page reloads ─────────────────────
+(function _initBreakAtEntryPersist() {
+    const LS_KEY = 'simBreakAtEntry';
+    window.addEventListener('load', function() {
+        const chk = document.getElementById('breakAtEntryChk');
+        if (!chk) return;
+        try {
+            const saved = localStorage.getItem(LS_KEY);
+            if (saved !== null) chk.checked = (saved === '1');
+        } catch(e) {}
+        chk.addEventListener('change', function() {
+            try { localStorage.setItem(LS_KEY, chk.checked ? '1' : '0'); } catch(e) {}
+        });
+    });
+})();
+
 // ── URL search-param routing (?view=devices, ?view=builder&tab=ti60-connect) ──
 // Wraps window.init (defined in app-shell.js) so the ?view= param is applied
 // *after* init() has finished setting the default view — avoiding the race
