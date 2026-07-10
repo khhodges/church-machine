@@ -4173,7 +4173,7 @@ def _load_boot_abstr_lump():
         LAZY_LUMPS['00000600'] = _struct.pack(f'>{lump_size}I', *lump_words)
         _BOOT_ABSTR_META.update({
             "token":       "00000600",
-            "abstraction": "Boot.Abstr",
+            "abstraction": "SelfTest",
             "ns_slot":     BOOT_ABSTR_NS_SLOT,
             "lump_size":   lump_size,
             "cw":          cw,
@@ -4181,9 +4181,10 @@ def _load_boot_abstr_lump():
             "lump_type":   "boot",
             "language":    "ISA",
             "description": (
-                "Boot Abstraction (Boot.Abstr) — the lump executed by the hardware ROM "
-                "during boot phases B:01–B:07.  Loads NS, Thread, and Boot.Abstr lumps, "
-                "then CALL CR0 (Thread.CR[0]) enters the configured first abstraction directly."
+                "SelfTest (a.k.a. Boot.Abstr) — the lump executed by the hardware ROM "
+                "during boot phases B:01–B:07.  Loads NS, Thread, and SelfTest/Boot.Abstr "
+                "lumps, then CALL CR0 (Thread.CR[0]) enters the configured first "
+                "abstraction directly."
             ),
             "methods": [
                 {

@@ -2,6 +2,42 @@
 
 ---
 
+## Fix: NS slot 6 boot lump named "Boot.Abstr" server-side but "SelfTest" client-side (2026-07-10)
+
+Discovered while inspecting Boot: the Lump Repository / detail view showed a
+different name for the NS slot 6 boot lump than the CR14/NS6 live-lump popup,
+even though both are looking at the exact same lump (token `00000600`).
+
+Root cause: `server/app.py`'s `_load_boot_abstr_lump()` hardcoded
+`"abstraction": "Boot.Abstr"` in the `_BOOT_ABSTR_META` dict it builds from
+`boot-image.bin` — the single source of truth served by `GET
+/api/lumps/list` for that lump. Meanwhile the client-side hardware boot
+catalog (`simulator.js` `_getHardwareBootCatalog()`, which drives the
+CR14/NS6 popup) already labeled the same slot `'SelfTest'`, matching the
+60+ versioned save-file sidecars under `server/lumps/SelfTest_v*.json`
+(`"abstraction": "SelfTest"`, `"ns_slot": 6`). Only the live in-memory
+extraction path in `app.py` disagreed with the rest of the system.
+
+- **`server/app.py`** — `_BOOT_ABSTR_META["abstraction"]` changed from
+  `"Boot.Abstr"` to `"SelfTest"`; the accompanying `"description"` string
+  updated to lead with "SelfTest" and mention "Boot.Abstr" only as a
+  parenthetical historical alias. `"Boot.Abstr"` remains valid as an
+  internal/architectural name in comments, docstrings, and log lines — it
+  is only the user-facing `abstraction` display field that changes. Every
+  UI surface that reads `lump.abstraction` from the API response (Lump
+  Repository list, detail-panel title, "Viewing: …" label, Open-in-Abstraction
+  button) picks up the corrected name automatically with no further changes.
+- **Regression test:** `tests/boot/test_boot_abstr_selftest_naming.py` — new,
+  read-only test asserting (1) `GET /api/lumps/list`'s NS slot 6 entry
+  reports `"SelfTest"`, and (2) `simulator.js`'s `_getHardwareBootCatalog()`
+  still labels slot 6 `'SelfTest'`, so client and server can never drift
+  apart on this name again. Deliberately does not exercise
+  `/api/lumps/save` or touch on-disk lump files (unlike
+  `tests/boot/test_boot_abstr_cw_cc.py`), so it is safe to run standalone
+  and repeatedly.
+- **Files changed:** `server/app.py`,
+  `tests/boot/test_boot_abstr_selftest_naming.py`.
+
 ## Fix: POLA cleanup falling through to the wrong C-List view when it empties the block (2026-07-10)
 
 Bug reported right after the POLA button shipped: clicking "⚖ POLA" in the
