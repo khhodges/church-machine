@@ -868,6 +868,11 @@ let walkTimer = null;
 // ── Run popover ─────────────────────────────────────────────────────────────
 let runBatchSize = 500;
 let _runStopped = false;
+// _simRunActive is true from the moment runSim() starts its async batch loop
+// until finishRun() clears it.  It covers the gaps between setTimeout(runBatch)
+// calls when sim.running is momentarily false — preventing a second runSimGo()
+// call (e.g. double-click on Boot) from spawning a concurrent runBatch() loop.
+let _simRunActive = false;
 
 let _runClickTimer = null;
 
@@ -1114,6 +1119,13 @@ function _applyPendingSimLoad() {
 }
 
 function runSimGo() {
+    // Guard: if a run batch loop is already active (either mid-batch where
+    // sim.running is true, or between setTimeout(runBatch) ticks where
+    // sim.running has temporarily returned to false), do nothing.
+    // This prevents a double-click on the Boot button — or a race between
+    // two boot-complete callbacks — from spawning a second concurrent
+    // runBatch() loop and corrupting simulation state.
+    if (sim.running || _simRunActive) return;
     const sel = document.getElementById('runBatchSelect');
     if (sel) runBatchSize = parseInt(sel.value, 10) || 500;
     hideRunPopover();
@@ -1555,6 +1567,7 @@ function runSim() {
     const runBtn      = document.getElementById('btnRunSim');
 
     _runStopped = false;
+    _simRunActive = true;
     _showStopBtn(true);
 
     // Switch to the dashboard with CR14 open so the user sees live execution state
@@ -1617,6 +1630,9 @@ function runSim() {
 
             // Absent-lump: sim suspended mid-run waiting for a lazy fetch.
             if (sim.awaitingLump) {
+                // Clear _simRunActive so the resume call to runSimGo() (fired by
+                // triggerLazyLoad after the lump arrives) is not blocked.
+                _simRunActive = false;
                 _showStopBtn(false);
                 if (con) {
                     const al = sim.awaitingLump;
@@ -1631,6 +1647,9 @@ function runSim() {
             }
             // Lazy-resolve NULL GT: sim suspended waiting for IDE to supply the GT (Task #1519).
             if (sim._lazySuspended) {
+                // Clear _simRunActive so the resume call (from _registerLazyResolvePending
+                // callback) can proceed via runSimGo() without hitting the guard.
+                _simRunActive = false;
                 _showStopBtn(false);
                 if (con) {
                     const pending = [...(sim._pendingResolves || new Map()).values()];
@@ -1668,6 +1687,7 @@ function runSim() {
     }
 
     function finishRun(stopReason, breakpointAddr) {
+        _simRunActive = false;
         _showStopBtn(false);
         console.log('[finishRun] stopReason=', stopReason, 'halted=', sim.halted, 'bootComplete=', sim.bootComplete, 'faultLog=', sim.faultLog.length, 'steps=', totalSteps);
         if (sim.faultLog.length > 0) console.log('[finishRun] FAULTS:', JSON.stringify(sim.faultLog.map(f => f.type + ': ' + f.message)));
