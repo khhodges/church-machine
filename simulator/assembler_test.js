@@ -222,6 +222,96 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
         errors.length > 0 ? errors[0].message : '(no error)');
 }
 
+// ── Salvation abstraction method conventions (task-2032) ────────────────────
+// Mirrors simulator/abstractions.js Salvation method table: Create=0,
+// Release=1, Find=2, Transfer=3, Validate=4, Audit=5, main=14 (boot c-list
+// row 4, per capability_test.cloomc TEST 7/8).
+
+const SALVATION_CONVENTIONS = {
+    'Salvation': {
+        'Create':   { index: 0 },
+        'Release':  { index: 1 },
+        'Find':     { index: 2 },
+        'Transfer': { index: 3 },
+        'Validate': { index: 4 },
+        'Audit':    { index: 5 },
+        'main':     { index: 14 },
+    }
+};
+
+const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
+
+// T-SALV1: CALL Salvation.main assembles without "No method conventions" error
+// and encodes imm=15 (main index 14 → 1-based).
+{
+    const a = new ChurchAssembler(SALVATION_CONVENTIONS);
+    a.setNamespace(SALVATION_NS_SYMBOLS);
+    const result = a.assemble('LOAD CR0, Salvation\nCALL Salvation.main');
+    const errors = a.errors;
+    const word   = result.words[1];
+    const opcode = (word >>> 27) & 0x1F;
+    const imm    = word & 0x7FFF;
+    assert('T-SALV1 CALL Salvation.main assembles with no errors',
+        errors.length === 0, errors.map(e => e.message).join('; '));
+    assert('T-SALV1 opcode=2 (CALL)', opcode === 2, 'got ' + opcode);
+    assert('T-SALV1 imm=15 (main index 14 → 1-based imm)', imm === 15, 'got ' + imm);
+}
+
+// T-SALV2: ELOADCALL CR0, Salvation, main (two-operand + named method) assembles
+// without "No method conventions" error and encodes row=4, method=15 (1-based)
+// → imm = (15<<5)|4 = 484.
+{
+    const a = new ChurchAssembler(SALVATION_CONVENTIONS);
+    a.setNamespace(SALVATION_NS_SYMBOLS);
+    // Salvation occupies c-list row 0 here since it's the only declared
+    // capability (row is the position in the capabilities{} block, matching
+    // capability_test.cloomc's boot c-list row 4 for its own layout).
+    const result = a.assemble('capabilities {\n  Salvation E\n}\nELOADCALL CR0, Salvation, main');
+    const errors = a.errors;
+    const idx    = result.words.length - 1;
+    const word   = result.words[idx];
+    const opcode = (word >>> 27) & 0x1F;
+    const crDst  = (word >>> 19) & 0xF;
+    const crSrc  = (word >>> 15) & 0xF;
+    const imm    = word & 0x7FFF;
+    assert('T-SALV2 ELOADCALL CR0, Salvation, main assembles with no errors',
+        errors.length === 0, errors.map(e => e.message).join('; '));
+    assert('T-SALV2 opcode=8 (ELOADCALL)', opcode === 8, 'got ' + opcode);
+    assert('T-SALV2 crDst=0', crDst === 0, 'got ' + crDst);
+    assert('T-SALV2 crSrc=6 (CR6 c-list)', crSrc === 6, 'got ' + crSrc);
+    assert('T-SALV2 imm=480 (row=0, method=15 1-based)', imm === 480, 'got ' + imm);
+}
+
+// T-SALV3: without registered Salvation conventions, CALL Salvation.main
+// produces the original "No method conventions registered" regression error.
+{
+    const a = new ChurchAssembler({});   // empty conventions
+    a.setNamespace(SALVATION_NS_SYMBOLS);
+    const result = a.assemble('LOAD CR0, Salvation\nCALL Salvation.main');
+    const errors = a.errors;
+    assert('T-SALV3 CALL Salvation.main (no conventions) produces an error',
+        errors.length > 0, 'expected at least one error');
+    assert('T-SALV3 error mentions "No method conventions"',
+        errors.length > 0 && errors[0].message.includes('No method conventions'),
+        errors.length > 0 ? errors[0].message : '(no error)');
+}
+
+// T-SALV4: unknown method against Salvation lists the real method set,
+// confirming reserved slots 6-13 are intentionally not exposed.
+{
+    const a = new ChurchAssembler(SALVATION_CONVENTIONS);
+    a.setNamespace(SALVATION_NS_SYMBOLS);
+    const result = a.assemble('LOAD CR0, Salvation\nCALL Salvation.UnknownMethod');
+    const errors = a.errors;
+    assert('T-SALV4 CALL Salvation.UnknownMethod produces an error',
+        errors.length > 0, 'expected at least one error');
+    assert('T-SALV4 error lists known methods including main and Audit',
+        errors.length > 0 &&
+        errors[0].message.includes('main') &&
+        errors[0].message.includes('Audit'),
+        errors.length > 0 ? errors[0].message : '(no error)');
+}
+
 // ── Disassembly: method name resolution (task-483) ───────────────────────────
 
 // T6: disassemble() resolves CALL CR11, 0 → "CALL  CR11, Multiply" after binding.

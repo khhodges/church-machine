@@ -84,7 +84,7 @@ LOAD CR0, Salvation    ; CR0 = Salvation          — equiv: LOAD CR0, CR6, 4
 CALL Salvation.main    ; enter Salvation (atomic) — equiv: CALL CR0, 0xF
 
 ; --- TEST 8: ELOADCALL - fused Load+TPERM+Call (two-operand shorthand + named method selectors) ---
-ELOADCALL CR0, Salvation, main  ; Load + E check + call — equiv: ELOADCALL CR0, CR6, 4
+ELOADCALL CR0, Salvation, main  ; Load + E check + call — equiv: ELOADCALL CR0, CR6, 4, 14
 
 ; --- All tests complete ---
 HALT

@@ -2,6 +2,51 @@
 
 ---
 
+## Fix: `Salvation` dot-name CALL/ELOADCALL failed with "No method conventions registered" (2026-07-10)
+
+`simulator/examples/capability_test.cloomc` TEST 7/8 (`CALL Salvation.main` and
+`ELOADCALL CR0, Salvation, main`) failed to compile because `Salvation` had no
+entry in `simulator/app-absdetail.js`'s `_ABSTRACTION_CONVENTIONS` table — the
+runtime method-name registry the assembler consults for dot-name `CALL` /
+`ELOADCALL` resolution. Every other boot abstraction (`Scheduler`, `LED`,
+`Memory`, `Mint`, `Tunnel`, etc.) had a registered entry; `Salvation` did not,
+so both instructions hit the "No method conventions registered" guard even
+though the abstraction, its NS binding, and its compiled method table
+(`simulator/abstractions.js`) were all otherwise correct.
+
+- **`simulator/app-absdetail.js`** — added a `'Salvation'` entry to
+  `_ABSTRACTION_CONVENTIONS` mirroring `simulator/abstractions.js`'s method
+  table: `Create`=0, `Release`=1, `Find`=2, `Transfer`=3, `Validate`=4,
+  `Audit`=5, `main`=14. Reserved slots 6–13 are intentionally left
+  unregistered (not real callable methods).
+- **`simulator/examples/capability_test.cloomc`** — TEST 8's inline "equiv:"
+  comment was wrong: `ELOADCALL CR0, Salvation, main` fuses the c-list row
+  (4, Salvation's position in this example's boot c-list) with the 0-based
+  method index (14, `main`) into the ELOADCALL imm field
+  (`imm = (methodIdx+1)<<5 | row`), not the bare row alone. Corrected from
+  `ELOADCALL CR0, CR6, 4` to `ELOADCALL CR0, CR6, 4, 14` (explicit
+  `CRdst, CRsrc, #row, methodIdx` form). TEST 7's `CALL Salvation.main` equiv
+  comment (`CALL CR0, 0xF`) was already correct — dot-name `CALL` only
+  encodes the 1-based method index (14+1=15=0xF), no c-list row involved.
+- **Regression tests (`simulator/assembler_test.js`):** `T-SALV1`–`T-SALV4`
+  cover `CALL Salvation.main` (dot-name, imm=15), `ELOADCALL CR0, Salvation,
+  main` (two-operand + named method, imm=(15<<5)|row), the original
+  "No method conventions registered" failure mode with an empty conventions
+  table (regression guard), and an unknown-method error listing the real
+  method set (confirming reserved slots 6–13 stay hidden).
+- **Scope:** `Salvation` only, per task. `Navana`, `Mint`, and `Memory` (also
+  referenced in `capability_test.cloomc`'s boot c-list comments) already have
+  registered conventions except where noted as a follow-up; no other
+  abstractions were touched.
+- **Verification:** `node simulator/assembler_test.js` — 1899 passed, 0
+  failed. `scripts/run-all-tests.sh assembler-tests` (includes
+  `check-capabilities-blocks` over all `.cloomc` examples) — PASSED,
+  `capability_test.cloomc` now resolves dot-notation successfully.
+- **Files changed:** `simulator/app-absdetail.js`,
+  `simulator/examples/capability_test.cloomc`, `simulator/assembler_test.js`.
+
+---
+
 ## Fix: NS slot 6 boot lump named "Boot.Abstr" server-side but "SelfTest" client-side (2026-07-10)
 
 Discovered while inspecting Boot: the Lump Repository / detail view showed a

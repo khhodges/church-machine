@@ -3609,6 +3609,15 @@ B:02  INIT_THRD
 // Method order matches _methodDocs insertion order (which reflects the
 // abstraction's compiled method table).
 const _ABSTRACTION_CONVENTIONS = {
+    'Salvation': {
+        'Create':    { index: 0,  input: 'CR2=PassKey_GT, ...',  output: 'DR1' },
+        'Release':   { index: 1,  input: 'CR2=PassKey_GT, ...',  output: 'DR1' },
+        'Find':      { index: 2,  input: 'CR2=PassKey_GT, ...',  output: 'DR1' },
+        'Transfer':  { index: 3,  input: 'CR2=PassKey_GT, ...',  output: 'DR1' },
+        'Validate':  { index: 4,  input: 'CR2=PassKey_GT, ...',  output: 'DR1' },
+        'Audit':     { index: 5,  input: 'CR2=PassKey_GT, ...',  output: 'DR1' },
+        'main':      { index: 14, input: '',                     output: '' },
+    },
     'Scheduler': {
         'Yield':  { index: 0, input: '',                        output: 'DR1' },
         'Spawn':  { index: 1, input: 'CR2=code_GT, DR1=entry',  output: 'DR1=threadID' },
