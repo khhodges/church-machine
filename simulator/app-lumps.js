@@ -4369,12 +4369,33 @@ async function openLumpInEditor(token) {
                 ', cc=' + lhdr.cc + ', ' + _lhFree2 + ' free)'
             ];
             // Inject capabilities { } block from sidecar metadata when available.
+            // Richer manifest schemas (e.g. wired-at-boot / lazy-filled Tunnel
+            // capabilities) describe the slot's actual GT instead of a plain
+            // grants/rights array, so `c.grants`/`c.rights` can be empty even
+            // though the capability is perfectly valid. Fall through before
+            // giving up, so the decompiled source is always syntactically
+            // valid and re-compilable:
+            //   1. c.grants / c.rights, when the sidecar already has them.
+            //   2. Server-precomputed lump.clist_entries[slot].perms — already
+            //      type-aware (an Outform GT's bits mean something different
+            //      than an Inform/capability GT's), so it beats a naive raw
+            //      bit-decode of the GT word here.
+            //   3. Final fallback: 'E' — by project convention, c-list slots
+            //      only ever carry E (call/execute) permission, so a slot with
+            //      no discoverable rights (e.g. a NULL GT awaiting runtime
+            //      injection, like Tunnel.mymother) still decompiles cleanly.
             var _lCaps = lump.capabilities;
             if (Array.isArray(_lCaps) && _lCaps.length > 0) {
-                var _capItems = _lCaps.map(function(c) {
+                var _clistEntries = Array.isArray(lump.clist_entries) ? lump.clist_entries : null;
+                var _capItems = _lCaps.map(function(c, idx) {
                     var _n = c.name || String(c);
+                    var _slot = (typeof c.slot === 'number') ? c.slot : idx;
                     var _r = (c.grants || c.rights || []).join('');
-                    return _r ? (_n + ' ' + _r) : _n;
+                    if (!_r && _clistEntries && _clistEntries[_slot] && !_clistEntries[_slot].null) {
+                        _r = _clistEntries[_slot].perms || '';
+                    }
+                    if (!_r) _r = 'E';
+                    return _n + ' ' + _r;
                 }).filter(Boolean).join(', ');
                 disasmLines.push('capabilities { ' + _capItems + ' }');
                 disasmLines.push('');
