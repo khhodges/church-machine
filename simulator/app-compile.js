@@ -1359,10 +1359,15 @@ function compileAndBuild() {
         const capRights = typeof cap === 'string' ? [] : (cap.rights || []);
         let target = -1;
         if (sim && sim.abstractionRegistry) {
-            const allAbs = sim.abstractionRegistry.abstractions || [];
-            for (let j = 0; j < allAbs.length; j++) {
+            // sim.abstractionRegistry.abstractions is a plain object keyed by
+            // numeric index (see AbstractionRegistry.createAbstraction), NOT
+            // an array — Object.keys() is required, .length/[j] would always
+            // resolve to undefined and silently produce a NULL GT (0x00000000)
+            // in the c-list for every capability. See NoteG/SlideRule bug.
+            const allAbs = sim.abstractionRegistry.abstractions || {};
+            for (const j of Object.keys(allAbs)) {
                 if (allAbs[j] && allAbs[j].name && allAbs[j].name.toUpperCase() === capName.toUpperCase()) {
-                    target = j;
+                    target = Number(j);
                     break;
                 }
             }
@@ -1377,7 +1382,18 @@ function compileAndBuild() {
     }
     const clistStart = lumpSize - cc;
     for (let i = 0; i < cc; i++) {
-        lumpWords[clistStart + i] = resolvedCaps[i].nsIndex >= 0 ? (resolvedCaps[i].nsIndex & 0xFFFFFFFF) : 0x00000000;
+        // A c-list slot must hold a full Golden Token word (type + perm bits +
+        // index), not a bare NS index — see simulator.js parseGT/createGT.
+        // Per project convention ("C-Lists only have E permission"), every
+        // resolved capability GT is an Inform-type (type=1), E-permission-only
+        // token: gt_seq=0, dom=1, perm3=E(0b100) -> 0x4A000000 | index.
+        if (resolvedCaps[i].nsIndex >= 0) {
+            lumpWords[clistStart + i] = (sim && typeof sim.createGT === 'function')
+                ? (sim.createGT(0, resolvedCaps[i].nsIndex, { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, 1) >>> 0)
+                : ((0x4A000000 | (resolvedCaps[i].nsIndex & 0xFFFF)) >>> 0);
+        } else {
+            lumpWords[clistStart + i] = 0x00000000;
+        }
     }
 
     // ── Pre-save audit — run on assembled binary BEFORE download or server save ──
@@ -1478,10 +1494,12 @@ function compileAndBuild() {
 
     let resolvedNsSlot = null;
     if (sim && sim.abstractionRegistry) {
-        const allAbs = sim.abstractionRegistry.abstractions || [];
-        for (let j = 0; j < allAbs.length; j++) {
+        // See note above: abstractions is a plain object keyed by numeric
+        // index, not an array — must use Object.keys(), not .length/[j].
+        const allAbs = sim.abstractionRegistry.abstractions || {};
+        for (const j of Object.keys(allAbs)) {
             if (allAbs[j] && allAbs[j].name && allAbs[j].name.toUpperCase() === absName.toUpperCase()) {
-                resolvedNsSlot = j;
+                resolvedNsSlot = Number(j);
                 break;
             }
         }
@@ -1958,10 +1976,12 @@ function compileAndCreateAbstraction() {
         const capRights = typeof cap === 'string' ? [] : (cap.rights || []);
         let target = -1;
         if (sim.abstractionRegistry) {
-            const allAbs = sim.abstractionRegistry.abstractions || [];
-            for (let i = 0; i < allAbs.length; i++) {
+            // See note above: abstractions is a plain object keyed by numeric
+            // index, not an array — must use Object.keys(), not .length/[i].
+            const allAbs = sim.abstractionRegistry.abstractions || {};
+            for (const i of Object.keys(allAbs)) {
                 if (allAbs[i] && allAbs[i].name && allAbs[i].name.toUpperCase() === capName.toUpperCase()) {
-                    target = i;
+                    target = Number(i);
                     break;
                 }
             }

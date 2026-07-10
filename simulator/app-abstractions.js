@@ -397,6 +397,11 @@ function renderAbstractions() {
     const listEl = document.getElementById('absLayerList');
     if (!listEl) return;
 
+    const _prevSearchInput = document.getElementById('absSearchInput');
+    const _searchHadFocus = !!(_prevSearchInput && document.activeElement === _prevSearchInput);
+    const _searchSelStart = _searchHadFocus ? _prevSearchInput.selectionStart : null;
+    const _searchSelEnd = _searchHadFocus ? _prevSearchInput.selectionEnd : null;
+
     const all = Object.values(abstractionRegistry.abstractions)
         .sort((a, b) => a.name.localeCompare(b.name));
     const q = _absSearchQuery.toLowerCase().trim();
@@ -450,8 +455,8 @@ function renderAbstractions() {
                 const _absNameEsc = abs.name.replace(/'/g, "\\'");
                 const _mEsc = _m.replace(/'/g, "\\'");
                 html += `<span class="abs-item-method-pill${_isMain ? ' abs-item-method-main' : ''}"`;
-                html += ` title="Selector #${mi + 1} \u2014 click to copy: CALL ${abs.name}.${_m}"`;
-                html += ` onclick="event.stopPropagation();_absCopyCall('${_absNameEsc}','${_mEsc}',this)">`;
+                html += ` title="Selector #${mi + 1} \u2014 click to review this method (CALL ${abs.name}.${_m})"`;
+                html += ` onclick="event.stopPropagation();showAbstractionDetail(${abs.index},'${_mEsc}')">`;
                 html += `<span class="abs-item-method-sel">#${mi + 1}</span>${_m}`;
                 html += `</span>`;
             }
@@ -471,6 +476,20 @@ function renderAbstractions() {
             _absHighlightText(card.querySelector('.abs-item-name'), q);
             _absHighlightText(card.querySelector('.abs-item-desc'), q);
         });
+    }
+
+    // The search input is destroyed and recreated on every keystroke (the
+    // whole list innerHTML is rebuilt above), which would otherwise drop
+    // keyboard focus after each character typed. Restore focus + cursor
+    // position on the freshly-created input so typing feels continuous.
+    if (_searchHadFocus) {
+        const _newSearchInput = document.getElementById('absSearchInput');
+        if (_newSearchInput) {
+            _newSearchInput.focus();
+            try {
+                _newSearchInput.setSelectionRange(_searchSelStart, _searchSelEnd);
+            } catch (e) { /* setSelectionRange unsupported on this input type — ignore */ }
+        }
     }
 }
 

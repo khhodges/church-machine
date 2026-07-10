@@ -10,7 +10,7 @@
   "cw": 1,
   "cc": 1,
   "status": "wip",
-  "source": "; Constants  (18 words, cc=2, 43 free)\ncapabilities {\n}\n\nLOAD  CR0, CR6[0x0000]\nDREAD  DR0, CR0, #0, DR0\nRETURN\nLOAD  CR0, CR6[0x0000]\nDREAD  DR0, CR0, #0, DR1\nRETURN\nLOAD  CR0, CR6[0x0000]\nDREAD  DR0, CR0, #0, DR2\nRETURN\nLOAD  CR0, CR6[0x0000]\nDREAD  DR0, CR0, #0, DR3\nRETURN\nLOAD  CR0, CR6[0x0000]\nDREAD  DR0, CR0, #0, DR4\nRETURN\nLOAD  CR1, CR6[0x0001]\nL0:\nDWRITE  DR0, CR1, #0, DR0\nRETURN",
+  "source": "; Keystone  (22 words, cc=2, 39 free)\ncapabilities {\n    Tunnel E\n}\n\nIADD  DR12, DR0, DR0\nMCMP  DR1, DR12\nBRANCHNE  +4\nIADD  DR12, DR0, DR0\nIADD  DR1, DR12, DR0\nRETURN\nSHR  DR12, DR1, 28\nIADD  DR4, DR12, DR0\nIADD  DR12, DR0, #1\nMCMP  DR4, DR12\nBRANCHEQ  +4\nIADD  DR12, DR0, DR0\nIADD  DR1, DR12, DR0\nRETURN\nIADD  DR12, DR0, #1\nIADD  DR1, DR12, DR0\nRETURN\nLOAD  CR0, CR6]\nCALL  CR0\nIADD  DR4, DR1, DR0\nIADD  DR1, DR4, DR0\nRETURN",
   "description": "Boot3 \u2014 the boot trampoline lump (token 00000600, NS slot 6) executed by the hardware ROM during boot phases B:01\u2013B:07.  Loads NS, Thread, and Boot3 lumps, then CALL CR0 (Thread.CR[0]) enters the configured first abstraction directly.",
   "methods": [
     {
@@ -43,5 +43,5 @@
   },
   "lump_version": 1,
   "compiled_at": 1783359752.751318,
-  "last_edited_at": 1783700238.925055
+  "last_edited_at": 1783715983.411661
 }

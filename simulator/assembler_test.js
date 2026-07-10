@@ -8949,7 +8949,9 @@ Add a method called Run
 // Line ranges (1-indexed) extracted below must be kept in sync with source:
 //   app-compile.js      _absHighlightNodes  lines 110–133
 //   app-compile.js      _absHighlightText   lines 138–149
-//   app-abstractions.js renderAbstractions  lines 387–475
+//   app-abstractions.js renderAbstractions  lines 388–494 (incl. module-level
+//                                            `let _absSearchQuery` at line 388,
+//                                            which renderAbstractions() reads/writes)
 {
     const { JSDOM } = require('jsdom');
     const fs   = require('fs');
@@ -8963,7 +8965,7 @@ Add a method called Run
     // Extract real function source text (slice uses 0-based indices).
     const highlightNodesSrc = compileLines.slice(109, 133).join('\n');
     const highlightTextSrc  = compileLines.slice(137, 149).join('\n');
-    const renderAbsSrc      = absLines.slice(386, 475).join('\n');
+    const renderAbsSrc      = absLines.slice(387, 494).join('\n');
 
     // Verify extraction found the right functions — fail fast rather than giving
     // misleading results if line numbers drift after a refactor.
@@ -8975,7 +8977,7 @@ Add a method called Run
         'Line range 122-133 no longer contains _absHighlightText — update the slice');
     assert('ABS-H-SRC3: extracted renderAbstractions from app-abstractions.js',
         renderAbsSrc.includes('function renderAbstractions('),
-        'Line range 387-475 no longer contains renderAbstractions — update the slice');
+        'Line range 388-494 no longer contains renderAbstractions — update the slice');
 
     // Build a jsdom window to provide real DOM APIs.
     const dom  = new JSDOM('<!DOCTYPE html><body><div id="absLayerList"></div></body>');
@@ -9814,6 +9816,97 @@ Add a method called Run
         assert('BC117 XLOADLAMBDA CR3,LED0 — imm=2 (cap-block position 2, not boot slot 8)',
             imm === 2, `got imm=${imm}`);
     }
+}
+
+// ── CAP-GT: NoteG/SlideRule NULL-GT-in-c-list regression ─────────────────────
+// Root cause (task: RNC "NULL GT in c-list" warning on NoteG reopen):
+//   1. sim.abstractionRegistry.abstractions is a plain object keyed by numeric
+//      index (see AbstractionRegistry.createAbstraction), NOT an array. Code
+//      that resolved a capability name to an NS index via
+//      `for (let j = 0; j < allAbs.length; j++)` always saw `.length ===
+//      undefined`, so the loop body never ran and every capability resolved
+//      to nsIndex = -1 — regardless of language front-end or capability name.
+//   2. Even once resolved, the c-list slot was written as the bare NS index
+//      (e.g. 16) rather than a full Golden Token word. parseGT() decodes the
+//      type field from bits [26:25]; a bare small integer always decodes as
+//      type=NULL, so the RNC audit's `word === 0` check would eventually be
+//      dodged but the capability would still be non-functional at runtime.
+// This test extracts the REAL capability-resolution and c-list-write code
+// from app-compile.js (compileAndBuild) and runs it against a real
+// ChurchSimulator + AbstractionRegistry (production shapes), proving:
+//   - the capability name resolves to the correct nsIndex (not -1)
+//   - the c-list slot holds a non-null, correctly-typed Golden Token GT
+{
+    const fs   = require('fs');
+    const path = require('path');
+    const ChurchSimulator    = require('./simulator.js');
+    const AbstractionRegistry = require('./abstractions.js');
+
+    const compileLines = fs.readFileSync(
+        path.join(__dirname, 'app-compile.js'), 'utf8').split('\n');
+    // Line ranges (1-indexed) must be kept in sync with app-compile.js:
+    //   resolvedCaps capability-name → nsIndex resolution: lines 1357–1376
+    //   lumpWords allocation + c-list Golden Token write: lines 1378–1397
+    const resolveSrc = compileLines.slice(1356, 1376).join('\n');
+    const clistSrc    = compileLines.slice(1377, 1397).join('\n');
+
+    assert('CAP-GT-SRC1: extracted resolvedCaps block from app-compile.js',
+        resolveSrc.includes('const resolvedCaps = caps.map('),
+        'Line range 1357-1376 no longer contains the resolvedCaps block — update the slice');
+    assert('CAP-GT-SRC2: extracted c-list write block from app-compile.js',
+        clistSrc.includes('const lumpWords = new Uint32Array(lumpSize);') &&
+        clistSrc.includes('const clistStart = lumpSize - cc;') && clistSrc.includes('lumpWords[clistStart + i]'),
+        'Line range 1378-1397 no longer contains the lumpWords/c-list write block — update the slice');
+
+    // Real production registry shape: object keyed by numeric index.
+    const registry = new AbstractionRegistry();
+    registry.createAbstraction(16, 'SlideRule', 3, ['Multiply', 'Divide'], 'Analog slide rule');
+
+    const sim = new ChurchSimulator();
+    sim.initAbstractions(registry, {}, {});
+
+    const factory = new Function('sim', 'caps', 'cc', 'lumpSize', 'cw', 'codeRegion', 'header', `
+        "use strict";
+        ${resolveSrc}
+        ${clistSrc}
+        return { resolvedCaps, lumpWords, clistStart };
+    `);
+
+    const cc = 1, cw = 1, lumpSize = 8;
+    const { resolvedCaps, lumpWords, clistStart } = factory(
+        sim, [{ name: 'SlideRule', rights: ['E'] }], cc, lumpSize, cw, [0], 0);
+
+    assert('CAP-GT-1: SlideRule capability resolves to nsIndex 16 (not -1)',
+        resolvedCaps[0].nsIndex === 16,
+        `got nsIndex=${resolvedCaps[0].nsIndex}`);
+
+    const clistWord = lumpWords[clistStart] >>> 0;
+    assert('CAP-GT-2: c-list slot is NOT a NULL GT (0x00000000)',
+        clistWord !== 0,
+        `c-list slot = 0x${clistWord.toString(16)}`);
+
+    const parsed = sim.parseGT(clistWord);
+    assert('CAP-GT-3: c-list GT decodes to type=Inform (1)',
+        parsed.type === 1,
+        `got type=${parsed.type} (${parsed.typeName}), word=0x${clistWord.toString(16)}`);
+    assert('CAP-GT-4: c-list GT index points at NS[16] (SlideRule)',
+        parsed.index === 16,
+        `got index=${parsed.index}`);
+    assert('CAP-GT-5: c-list GT carries exactly E permission (C-Lists only have E permission)',
+        parsed.permissions.E === 1 && !parsed.permissions.R && !parsed.permissions.W &&
+        !parsed.permissions.X && !parsed.permissions.L && !parsed.permissions.S,
+        `got permissions=${JSON.stringify(parsed.permissions)}`);
+
+    // An unresolvable capability name must still write a NULL GT (0x00000000),
+    // not throw or silently write garbage — confirms the -1 fallback path.
+    const { resolvedCaps: unresolvedCaps, lumpWords: unresolvedWords, clistStart: unresolvedStart } = factory(
+        sim, [{ name: 'TotallyUnknownCapability', rights: ['E'] }], cc, lumpSize, cw, [0], 0);
+    assert('CAP-GT-6: unknown capability name resolves to nsIndex -1',
+        unresolvedCaps[0].nsIndex === -1,
+        `got nsIndex=${unresolvedCaps[0].nsIndex}`);
+    assert('CAP-GT-7: unresolved capability still writes a NULL GT (0x00000000), not garbage',
+        (unresolvedWords[unresolvedStart] >>> 0) === 0,
+        `c-list slot = 0x${(unresolvedWords[unresolvedStart] >>> 0).toString(16)}`);
 }
 
 // ── Summary ──────────────────────────────────────────────────────────────────
