@@ -5014,6 +5014,12 @@ async function runSelftestLump() {
 
         let steps = 0;
         while (!sim.halted && steps < MAX_STEPS) {
+            if (!sim.bootComplete) {
+                const advanced = sim._bootStep();
+                steps++;
+                if (!advanced && !sim.bootComplete) break;
+                continue;
+            }
             sim.step();
             steps++;
         }
