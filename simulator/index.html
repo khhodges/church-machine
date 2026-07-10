@@ -46,7 +46,7 @@
     <link rel="icon" type="image/svg+xml" sizes="16x16" href="favicon.svg">
     <link rel="stylesheet" href="styles-base.css?v=20260619a">
     <link rel="stylesheet" href="styles-landing.css?v=20260708a">
-    <link rel="stylesheet" href="styles-toolbar.css?v=20260708b">
+    <link rel="stylesheet" href="styles-toolbar.css?v=20260710a">
     <link rel="stylesheet" href="styles-editor.css?v=20260710a">
     <link rel="stylesheet" href="styles-dashboard.css?v=20260708b">
     <link rel="stylesheet" href="styles-lumps.css?v=20260708b">
@@ -246,6 +246,7 @@
                         <span id="faultFreeCounter" class="fault-free-badge ff-zero" data-tooltip="Fault-Free Instructions — accumulates across clean runs; reach 1,000 to unlock LUMP save">0&#x202F;/&#x202F;1K</span>
                         <button class="btn btn-invoke sim-icon-btn" id="btnInvokeMethod" onclick="openInvokeModal()" style="display:none;" data-tooltip="Invoke Method — Set up a method call: choose method, fill in arguments, configure registers">&#x2609;</button>
                         <button class="btn btn-warning sim-icon-btn" onclick="resetSim()" data-tooltip="Boot — Reset and run the boot sequence (C+R)">&#x21BA;</button>
+                        <label class="break-at-entry-label" id="breakAtEntryLabel" data-tooltip="Break at entry — Pause automatically at the very first instruction after boot (one-shot; clears itself after firing)"><input type="checkbox" id="breakAtEntryChk"> Break at entry</label>
                         <button class="btn btn-lazy sim-icon-btn" onclick="runLazyLoadTest()" data-tooltip="Lazy Load Test — Load absent Math.Add lump on demand, verify end-to-end lazy fetch">&#x29BF;</button>
                     </div>
                 </div>
@@ -2592,7 +2593,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
          via window._cloomcLangExampleGroups); both must precede app-source-library. -->
     <script src="app-compile.js?v=20260710d"></script>
     <script src="app-lump-editor.js?v=20260516e"></script>
-    <script src="app-run.js?v=20260710c"></script>
+    <script src="app-run.js?v=20260710d"></script>
     <script src="app-source-library.js?v=20260509d"></script>
     <script src="app-invoke.js?v=20260521a"></script>
     <script src="app-misc.js?v=20260709a"></script>

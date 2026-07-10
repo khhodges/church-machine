@@ -1440,3 +1440,32 @@
 
 .btn-info:hover { background: #155e75; }
 
+/* ── Break at entry checkbox label ──────────────────────────────────── */
+.break-at-entry-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.75rem;
+    color: #c9aa71;
+    cursor: pointer;
+    white-space: nowrap;
+    padding: 0.18rem 0.4rem;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    transition: border-color 0.15s, background 0.15s;
+    user-select: none;
+}
+
+.break-at-entry-label:hover {
+    border-color: rgba(218,165,32,0.45);
+    background: rgba(218,165,32,0.08);
+}
+
+.break-at-entry-label input[type="checkbox"] {
+    accent-color: #daa520;
+    cursor: pointer;
+    width: 0.85rem;
+    height: 0.85rem;
+    margin: 0;
+}
+

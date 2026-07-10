@@ -701,6 +701,7 @@ function stepSim() {
             }
             if (ok) {
                 switchView('dashboard');
+                _setEntryBreakpoint();
                 runSimGo();
             }
             return;
@@ -756,8 +757,9 @@ function stepSim() {
             updateDashboard();
             if (!sim.halted) {
                 // Boot completed cleanly — cascade straight into continuous execution.
-                // The user can pause at the first instruction by setting a breakpoint
-                // at that address before booting.
+                // "Break at entry" (if checked) inserts a one-shot breakpoint at the
+                // very first instruction so the user lands paused there automatically.
+                _setEntryBreakpoint();
                 runSimGo();
             } else {
                 switchView('lumps');
@@ -1141,6 +1143,32 @@ document.addEventListener('mousedown', function(e) {
 // ── Breakpoints ────────────────────────────────────────────────────────────
 const simBreakpoints = new Set();
 
+// One-shot breakpoints: removed automatically the moment they fire.
+// Used by "Break at entry" so the pause does not persist across later runs.
+const _oneShotBreakpoints = new Set();
+
+// _setEntryBreakpoint — called right before runSimGo() after boot completes.
+// If the "Break at entry" checkbox is checked, registers a one-shot breakpoint
+// at the very first instruction address the simulator is about to execute.
+function _setEntryBreakpoint() {
+    const chk = document.getElementById('breakAtEntryChk');
+    if (!chk || !chk.checked) return;
+    if (!sim || !sim.bootComplete || sim.halted) return;
+    const addr = (typeof sim._nextPhysicalAddr === 'function') ? sim._nextPhysicalAddr() : -1;
+    if (addr < 0) return;
+    const a32 = addr >>> 0;
+    simBreakpoints.add(a32);
+    _oneShotBreakpoints.add(a32);
+    updateBreakpointBtn();
+    renderBreakList();
+    const con = document.getElementById('editorConsole');
+    if (con) {
+        con.textContent += `\n[Break at entry] One-shot breakpoint set at 0x${a32.toString(16).toUpperCase().padStart(4,'0')} — will clear after firing.`;
+        con.scrollTop = con.scrollHeight;
+    }
+    console.log('[breakAtEntry] one-shot BP registered at', '0x' + a32.toString(16).padStart(4,'0'));
+}
+
 function updateBreakpointBtn() {
     const btn = document.getElementById('toolBreakBtn');
     if (!btn) return;
@@ -1452,8 +1480,9 @@ function slowBoot() {
                     window._startupDefaultView = null;
                     switchView(_dest);
                     // Boot completed cleanly — cascade straight into continuous execution.
-                    // The user can pause at the first instruction by setting a breakpoint
-                    // at that address before booting.
+                    // "Break at entry" (if checked) inserts a one-shot breakpoint at the
+                    // very first instruction so the user lands paused there automatically.
+                    _setEntryBreakpoint();
                     runSimGo();
                 }
                 return;
@@ -1666,6 +1695,14 @@ function runSim() {
             } else if (stopReason === 'halted' || sim.halted) {
                 status = sim.faultLog.length > 0 ? 'Faulted.' : 'Done.';
             } else if (stopReason === 'breakpoint' && breakpointAddr != null) {
+                const bpAddr32 = breakpointAddr >>> 0;
+                if (_oneShotBreakpoints.has(bpAddr32)) {
+                    _oneShotBreakpoints.delete(bpAddr32);
+                    simBreakpoints.delete(bpAddr32);
+                    updateBreakpointBtn();
+                    renderBreakList();
+                    console.log('[breakAtEntry] one-shot BP at', '0x' + bpAddr32.toString(16).padStart(4,'0'), 'fired and cleared');
+                }
                 status = `Breakpoint at 0x${breakpointAddr.toString(16).toUpperCase().padStart(4,'0')}.`;
             } else if (stopReason === 'maxSteps') {
                 status = `Max steps (${totalSteps}) reached.`;
