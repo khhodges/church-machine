@@ -1822,6 +1822,7 @@
     border-radius: 6px;
     box-shadow: 0 8px 28px rgba(0,0,0,0.7);
     width: 480px;
+    max-width: calc(100vw - 24px);
     max-height: 320px;
     display: none;
     flex-direction: column;
@@ -1833,6 +1834,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
+    row-gap: 4px;
     padding: 5px 10px;
     border-bottom: 1px solid #2a2a4a;
     flex-shrink: 0;
@@ -1842,11 +1845,17 @@
     color: #f4b942;
     font-size: 0.68rem;
     font-weight: 600;
+    white-space: nowrap;
+    margin-right: 8px;
 }
 
 .clist-viewer-hint {
     color: #555;
     font-size: 0.62rem;
+    white-space: nowrap;
+    flex-basis: 100%;
+    text-align: right;
+    margin-top: 2px;
 }
 
 .clist-viewer-body {
