@@ -83,6 +83,9 @@
             var addBtn = e.target.closest('[data-action="show-picker"]');
             if (addBtn) { showPicker(); return; }
 
+            var polaBtn = e.target.closest('[data-action="pola-cleanup"]');
+            if (polaBtn) { _removeUnusedCapabilities(); return; }
+
             var permToggle = e.target.closest('.clist-perm-toggle[data-perm]');
             if (permToggle) { permToggle.classList.toggle('clist-perm-toggle--on'); return; }
 
@@ -434,10 +437,83 @@
             '<span class="clist-viewer-title">C-List' + (titleExtra ? ' \u2014 ' + titleExtra : ' (CR6)') + '</span>' +
             '<span style="display:flex;align-items:center;gap:6px;">' +
             '<button class="clist-add-btn" data-action="show-picker" title="Add a capability to the source c-list">\u2295 Add</button>' +
+            '<button class="clist-pola-btn" data-action="pola-cleanup" title="POLA: remove capabilities never referenced elsewhere in the code (Principle of Least Authority)">\u2696 POLA</button>' +
             '<span class="clist-viewer-hint">\u2191\u2193 navigate \u00b7 Enter insert \u00b7 Esc close</span>' +
             '</span>' +
             '</div>' +
             '<div class="clist-viewer-body">' + rows + '</div>';
+    }
+
+    // ── POLA cleanup: drop capabilities-block entries never referenced ────────
+    // elsewhere in the source. "Unused" = the declared name does not appear as
+    // a whole word anywhere outside the capabilities { } block itself.
+    function _showPolaToast(popup, msg) {
+        var toast = popup.querySelector('.clist-pola-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.className = 'clist-pola-toast';
+            popup.appendChild(toast);
+        }
+        toast.textContent = msg;
+        /* Force a reflow so re-triggering the class restarts the transition
+           even when the toast is already visible from a previous action. */
+        toast.classList.remove('clist-pola-toast--show');
+        void toast.offsetWidth;
+        toast.classList.add('clist-pola-toast--show');
+        clearTimeout(toast._hideTimer);
+        toast._hideTimer = setTimeout(function () {
+            toast.classList.remove('clist-pola-toast--show');
+        }, 3200);
+    }
+
+    function _removeUnusedCapabilities() {
+        var ed = activeEditor || document.getElementById('asmEditor');
+        var popup = getOrCreatePopup();
+        if (!ed) return;
+
+        var src = ed.value;
+        var capRe = /capabilities\s*\{([^}]*)\}/;
+        var cm = capRe.exec(src);
+        if (!cm) {
+            _showPolaToast(popup, 'No capabilities block found in source \u2014 nothing to clean up.');
+            return;
+        }
+
+        var entries = _parseCapEntries(cm[1]);
+        if (!entries.length) {
+            _showPolaToast(popup, 'C-List is already empty.');
+            return;
+        }
+
+        var before = src.slice(0, cm.index);
+        var after  = src.slice(cm.index + cm[0].length);
+        var restOfSource = before + after;
+
+        var kept = [];
+        var removedNames = [];
+        entries.forEach(function (entry) {
+            var name = entry[0];
+            var escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            var usedRe = new RegExp('\\b' + escaped + '\\b');
+            if (usedRe.test(restOfSource)) {
+                kept.push(entry);
+            } else {
+                removedNames.push(name);
+            }
+        });
+
+        if (!removedNames.length) {
+            _showPolaToast(popup, '\u2713 No unused capabilities \u2014 C-List already follows POLA.');
+            return;
+        }
+
+        var newBlock = _formatCapBlock(kept);
+        ed.value = before + newBlock + after;
+        ed.dispatchEvent(new Event('input', { bubbles: true }));
+
+        var msg = '\u2702 Removed ' + removedNames.length + ' unused capabilit' +
+            (removedNames.length === 1 ? 'y' : 'ies') + ': ' + removedNames.join(', ');
+        showViewer(msg);
     }
 
     // ── Async builder: live-sim takes priority when booted; static-binary otherwise ──
@@ -947,7 +1023,7 @@
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
-    function showViewer() {
+    function showViewer(toastMsg) {
         // Mutual exclusion: close the instruction picker if open
         if (window.AsmInstructionPicker && window.AsmInstructionPicker.hide) {
             window.AsmInstructionPicker.hide();
@@ -973,6 +1049,9 @@
             if (popup.style.display !== 'none') {
                 popup.innerHTML = html;
                 positionPopup();
+                // Re-render happened after a POLA cleanup (or similar action) —
+                // surface what changed via a transient toast on the fresh DOM.
+                if (toastMsg) _showPolaToast(popup, toastMsg);
             }
         }).catch(function () {
             if (popup.style.display !== 'none') {

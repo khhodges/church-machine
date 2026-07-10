@@ -2,6 +2,44 @@
 
 ---
 
+## Feature: POLA cleanup button in the C-List viewer (2026-07-10)
+
+Added a "⚖ POLA" (Principle of Least Authority) button to the C-List viewer
+popup header in the Code Editor, alongside the existing "+ Add" button.
+Clicking it strips capabilities-block entries whose declared name is never
+referenced anywhere else in the editor source — the same idea as an unused-
+import cleanup, applied to Golden Token capabilities.
+
+- **`simulator/clist-viewer.js`** — `_wrapRows()` now renders the POLA button
+  (`data-action="pola-cleanup"`) in all three C-List render paths (source,
+  live sim, saved binary). New `_removeUnusedCapabilities()` parses the
+  `capabilities { }` block via the existing `_parseCapEntries`, keeps only
+  entries whose name appears as a whole word elsewhere in the source, and
+  rebuilds the block via `_formatCapBlock`. A new `_showPolaToast()` shows a
+  bottom-of-popup confirmation naming the removed capabilities (or an
+  informational message when the block is missing, already empty, or already
+  fully used). `showViewer()` gained an optional `toastMsg` parameter so the
+  toast survives the async re-render it triggers.
+- **`simulator/styles-editor.css`** — `.clist-pola-btn` (green-accented,
+  matches the existing `.clist-add-btn` styling) and
+  `.clist-pola-toast` / `.clist-pola-toast--show` (bottom banner with
+  fade/slide transition).
+- **Regression tests:**
+  - `tests/simulator/sim_clist_pola_cleanup.js` — static wiring checks plus
+    functional scenarios: mixed used/unused entries, all-used no-op, no
+    capabilities block, empty block. Wired into the `selftest-lump-runs`
+    suite in `scripts/run-all-tests.sh`.
+  - `tests/e2e/clist_pola_cleanup.spec.js` — Playwright coverage of the full
+    click-handler wiring: button renders in the live popup, clicking it
+    removes an unused capability and shows a toast, and an all-used C-List is
+    a no-op with an informational toast.
+- **Files changed:** `simulator/clist-viewer.js`, `simulator/styles-editor.css`,
+  `simulator/index.html` (`clist-viewer.js` / `styles-editor.css` version tag
+  bumps), `scripts/run-all-tests.sh`, `tests/simulator/sim_clist_pola_cleanup.js`
+  (new), `tests/e2e/clist_pola_cleanup.spec.js` (new).
+
+---
+
 ## Fix: stale BFEXT/BFINS `pos=N, w=N` syntax re-surfacing via main editor's own localStorage snapshot (2026-07-10)
 
 The earlier BFEXT/BFINS operand-syntax migration (`_migrateBfextBfinsSyntax` in

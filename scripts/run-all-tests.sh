@@ -176,7 +176,7 @@ register_suite "pet-name-mem-tests" \
     'node simulator/test_pet_name_mem.js'
 
 register_suite "selftest-lump-runs" \
-    'python -m pytest tests/simulator/test_selftest_lump_runs.py tests/simulator/test_run_lump_boots_slot3.py -v && node tests/simulator/sim_selftest_reboot_midrun.js && node tests/simulator/sim_editor_bfext_migration.js'
+    'python -m pytest tests/simulator/test_selftest_lump_runs.py tests/simulator/test_run_lump_boots_slot3.py -v && node tests/simulator/sim_selftest_reboot_midrun.js && node tests/simulator/sim_editor_bfext_migration.js && node tests/simulator/sim_clist_pola_cleanup.js'
 
 register_suite "boot-image-matches-sim" \
     'python3 -m pytest tests/boot/test_boot_image_matches_simulator.py -v'
