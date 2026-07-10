@@ -2,6 +2,34 @@
 
 ---
 
+## Fix: stale BFEXT/BFINS `pos=N, w=N` syntax re-surfacing via main editor's own localStorage snapshot (2026-07-10)
+
+The earlier BFEXT/BFINS operand-syntax migration (`_migrateBfextBfinsSyntax` in
+`simulator/app-lumps.js`) only covered the lump-editor draft (`cm_lump_draft_*`)
+and custom user-tab (`church_user_tabs`) persistence paths. It missed a third,
+independent persistence path: the main code editor's own generic session
+snapshot, `church_editor_code`, saved by `saveEditorState()` and restored by
+`loadEditorState()` in `simulator/app-run.js` on every page load — regardless
+of which tab (built-in example or custom) is active. Any browser holding a
+stale snapshot written back when the disassembler still emitted the old,
+never-valid `pos=<N>, w=<N>` syntax kept restoring that broken text on every
+reload, indistinguishable from the original "COMPILE FAILED" bug reappearing,
+even though the disassembler and the other two migration call sites had
+already been fixed.
+
+- **Fix:** `loadEditorState()` now runs the restored `church_editor_code`
+  value through `_migrateBfextBfinsSyntax()` before assigning it into the
+  editor and re-persists the migrated text, closing the gap.
+- **Regression test:** `tests/simulator/sim_editor_bfext_migration.js` —
+  exercises the migration helper directly and statically verifies
+  `loadEditorState()` calls it, in the correct order, before use. Wired into
+  the `selftest-lump-runs` suite in `scripts/run-all-tests.sh`.
+- **Files changed:** `simulator/app-run.js`, `simulator/index.html`
+  (`app-run.js` version tag bump), `scripts/run-all-tests.sh`,
+  `tests/simulator/sim_editor_bfext_migration.js` (new).
+
+---
+
 ## IDE v2 Reorganisation — Landing Page, Six-Button Toolbar, NS Three-Tier Display, Learning Mode, Docs Tabs (2026-07-08)
 
 Complete view-layer reorganisation around six named core functions, plus stale-data fixes and Boot3 rename.

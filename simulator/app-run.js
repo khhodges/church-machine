@@ -9276,8 +9276,20 @@ function saveEditorState() {
 function loadEditorState() {
     const editor = document.getElementById('asmEditor');
     if (editor) {
-        const saved = localStorage.getItem('church_editor_code');
+        let saved = localStorage.getItem('church_editor_code');
         if (saved) {
+            // Migrate stale pos=N, w=N BFEXT/BFINS operand syntax (from a since-fixed
+            // disassembler bug) to the current #N, #N syntax before restoring into the
+            // editor — otherwise a browser with an old cached snapshot re-surfaces the
+            // "recreated" compile-error bug on every reload. See _migrateBfextBfinsSyntax
+            // in app-lumps.js (also applied to lump-editor drafts and user tabs).
+            if (typeof window._migrateBfextBfinsSyntax === 'function') {
+                const migrated = window._migrateBfextBfinsSyntax(saved);
+                if (migrated !== saved) {
+                    saved = migrated;
+                    try { localStorage.setItem('church_editor_code', saved); } catch (e) {}
+                }
+            }
             editor.value = saved;
         }
     }
