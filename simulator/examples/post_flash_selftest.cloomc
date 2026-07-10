@@ -32,6 +32,24 @@
 ;   Slot 7  (Boot.Nucs)  = X-GT  Turing domain  dom=0  perm[2]=X=1
 ;   Slot 3  (Boot.Abstr) = E-GT  Church domain  dom=1  perm[2]=E=1
 ;
+; The capabilities block below declares all 8 boot c-list positions, in the
+; exact order built by scripts/build_selftest_lump.js, so this program's
+; runtime c-list injection (browser "Run" path) resolves Boot.Nucs/Boot.Abstr
+; to real GTs instead of the generic device-oriented DEMO_CLIST (which has no
+; slot 7 entry and previously caused a NULL_CAP fault on `LOAD CR1, Boot.Nucs`).
+; Reserved0/Reserved6 are unused placeholders that keep the other six names at
+; their correct 0-based block positions (1, 2, 3, 4, 5, 7).
+capabilities {
+    Reserved0    E,
+    Boot.Thread  E,
+    Mint         E,
+    Boot.Abstr   E,
+    Salvation    E,
+    Navana       E,
+    Reserved6    E,
+    Boot.Nucs    X
+}
+;
 ; Fail-fast pattern (every instruction on its own line, ; is comment):
 ;   BRANCHEQ ok_N        -- Z=1 = correct, skip fail
 ;   IADD DR0, DR0, #N    -- set result = test number

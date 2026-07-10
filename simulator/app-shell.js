@@ -169,6 +169,18 @@ function loadUserTabs() {
     try {
         const raw = localStorage.getItem('church_user_tabs');
         userTabs = raw ? JSON.parse(raw) : [];
+        // Migrate any stale BFEXT/BFINS `pos=N, w=N` syntax captured before the
+        // disassembler fix, so re-opened tabs never show unparseable code.
+        if (typeof window._migrateBfextBfinsSyntax === 'function') {
+            let _migratedAny = false;
+            for (const t of userTabs) {
+                if (t && typeof t.code === 'string') {
+                    const migrated = window._migrateBfextBfinsSyntax(t.code);
+                    if (migrated !== t.code) { t.code = migrated; _migratedAny = true; }
+                }
+            }
+            if (_migratedAny) saveUserTabsToStorage();
+        }
     } catch (e) { userTabs = []; }
 }
 

@@ -952,6 +952,24 @@ function _injectClistNow() {
             const rights  = typeof cap === 'string' ? [] : (cap.rights || []);
             if (!capName) { sim.memory[clistBase + i] = 0; continue; }
 
+            // Boot-image fixed capability names — always resolvable to a real GT
+            // regardless of which abstractions are installed in the Namespace Table.
+            // Mirrors the assembler's own hardcoded fallback (_resolveNSName §3.5):
+            // these two names are never NS-labelled abstractions themselves, so the
+            // generic devKey/nsIdx lookups below would otherwise leave them as a
+            // "pending" sentinel and any LOAD of them would fault as NULL_CAP at
+            // runtime (Boot.Nucs is a Turing X-GT at NS slot 1; Boot.Abstr is a
+            // Church E-GT at the current boot-entry slot, which has migrated over
+            // time — do NOT hardcode 3, use sim.bootEntrySlot).
+            if (capName.toUpperCase() === 'BOOT.NUCS') {
+                sim.memory[clistBase + i] = sim.createGT(0, 1, {X:1}, 1) >>> 0;
+                continue;
+            }
+            if (capName.toUpperCase() === 'BOOT.ABSTR') {
+                sim.memory[clistBase + i] = sim.createGT(0, sim.bootEntrySlot, {E:1}, 1) >>> 0;
+                continue;
+            }
+
             const devKey = Object.keys(_devSlotMap)
                 .find(k => k.toLowerCase() === capName.toLowerCase());
             if (devKey !== undefined) {

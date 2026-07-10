@@ -77,3 +77,16 @@ the page's JS reads localStorage on startup.
 After `sim.reset()` with `window.bootImage = null`, `_initNamespaceTable()` calls
 `_getHardwareBootCatalog()` which returns 7 entries (slots 0–6). `sim.nsCount = 7`.
 Slot 7 is null/programmable and produces no NS table row.
+
+## When Playwright navigation itself is flaky, drop to a Node harness instead
+
+Fresh Playwright contexts sometimes landed on inconsistent pages (editor vs.
+"FPGA Disconnected" vs. `window.sim` undefined) when trying to reproduce a
+specific fault (e.g. capability-resolution bugs in `_injectClistNow`). This
+was navigation/environment flakiness, not a real bug — confirmed by writing a
+plain Node script that requires `simulator.js`/`app-run.js` directly (same
+technique as `scripts/check_selftest_lump_stale.js`), drives boot + assemble +
+run programmatically, and copies the exact logic under test verbatim. This
+gives a deterministic, fast repro and isolates "is the fix correct" from "is
+Playwright navigating correctly today". Prefer this over retrying flaky
+browser E2E when the bug is deep in simulator state logic rather than DOM/UI.

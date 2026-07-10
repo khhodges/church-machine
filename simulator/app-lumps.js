@@ -2206,6 +2206,23 @@ async function _saveLumpMeta(token, metaId) {
 }
 
 const _DRAFT_LS_PREFIX = 'cm_lump_draft_';
+// _migrateBfextBfinsSyntax(text)
+// One-shot migration for text that may contain the old, never-valid,
+// disassembler-only `BFEXT`/`BFINS ... pos=<N>, w=<N>` argument syntax
+// (produced only by a since-fixed disassembler bug). Rewrites it to the
+// correct, re-parseable `#<N>, #<N>` form. No-op when the pattern is not
+// present, so it is safe to run unconditionally on any stored text (drafts,
+// tab code, etc.) before it is rendered into an editor.
+function _migrateBfextBfinsSyntax(text) {
+    if (!text || typeof text !== 'string') return text;
+    if (!/\bBF(?:EXT|INS)\b/i.test(text)) return text;
+    return text.replace(
+        /(\bBF(?:EXT|INS)\b[^\n]*?)\bpos\s*=\s*(\d+)\s*,\s*w\s*=\s*(\d+)/gi,
+        function(_m, prefix, pos, w) { return prefix + '#' + pos + ', #' + w; }
+    );
+}
+window._migrateBfextBfinsSyntax = _migrateBfextBfinsSyntax;
+
 function _draftLsKey(tk)  { return _DRAFT_LS_PREFIX + tk; }
 function _draftLsGet(tk)  { try { return localStorage.getItem(_draftLsKey(tk)); } catch(_) { return null; } }
 function _draftLsSet(tk, v) { try { localStorage.setItem(_draftLsKey(tk), v); } catch(_) {} }
@@ -2214,9 +2231,10 @@ function _draftLsDel(tk)  { try { localStorage.removeItem(_draftLsKey(tk)); } ca
 function _buildTextEditor(token, text, bodyEl, lump, renderFn) {
     const tk = token.replace(/[^a-z0-9]/gi, '');
     const hasDraft = Object.prototype.hasOwnProperty.call(_lumpEditorDraftText, tk);
-    const lsDraft  = _draftLsGet(tk);
+    let lsDraft  = _draftLsGet(tk);
+    if (lsDraft !== null) lsDraft = _migrateBfextBfinsSyntax(lsDraft);
     const hasLsDraft = lsDraft !== null && lsDraft !== text;
-    const initialText = hasDraft ? _lumpEditorDraftText[tk] : text;
+    const initialText = hasDraft ? _migrateBfextBfinsSyntax(_lumpEditorDraftText[tk]) : text;
     const startOpen   = !!_lumpEditorOpen[tk];
 
     const wrapper = document.createElement('div');
@@ -4395,6 +4413,7 @@ async function openLumpInEditor(token) {
 
         // ── Check for a saved draft from a previous session ───────────────
         var _savedDraft = _draftLsGet(token);
+        if (_savedDraft !== null) _savedDraft = _migrateBfextBfinsSyntax(_savedDraft);
         var _hasDraft   = _savedDraft !== null && _savedDraft !== _compiledDisasm;
 
         if (_hasDraft) {
