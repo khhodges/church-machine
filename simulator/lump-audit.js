@@ -263,7 +263,7 @@ function lumpAudit(words, manifest, lineNums) {
                         ` but that slot contains a NULL GT (0x00000000).` +
                         ` The ${_nullCapName || 'capability'} GT was not written into the c-list.`;
                     const _nullSrcLine = lineNums && lineNums[wi] != null ? lineNums[wi] : null;
-                    _rncViolations.push({ msg: _nullMsg, sourceLine: _nullSrcLine, slot });
+                    _rncViolations.push({ msg: _nullMsg, sourceLine: _nullSrcLine, slot, wordIndex: codeIdx });
                 }
             } else if (_rciChurchOps.has(op) && crSrc === 6 && cc > 0 && slot >= cc) {
                 // Slot is beyond the declared c-list (slot >= cc) — always a structural error.
@@ -280,7 +280,7 @@ function lumpAudit(words, manifest, lineNums) {
                 const _rciMsg = `Instruction ${wi} (${_rciOpName[op]}) tries to access capability slot ${slot}` +
                     `, but this lump only has ${cc} capability slot${cc !== 1 ? 's' : ''}${_slotNameHint}.${_fixHint}`;
                 const _rciSrcLine = lineNums && lineNums[wi] != null ? lineNums[wi] : null;
-                _rciViolations.push({ msg: _rciMsg, sourceLine: _rciSrcLine, slot });
+                _rciViolations.push({ msg: _rciMsg, sourceLine: _rciSrcLine, slot, wordIndex: codeIdx });
             }
 
             if (op === _rciBranchOp) {
@@ -626,7 +626,13 @@ function lumpAuditRenderPanel(container, results, opts) {
         row.appendChild(content);
         body.appendChild(row);
 
-        if (r.ruleId === 'RCI' && r.severity === 'error' && Array.isArray(r.violations)) {
+        // Any warning/failure row that carries per-violation location data gets a
+        // precise "↑ line N" jump button (RCI errors, RNC warnings, and any future
+        // rule that pushes a `violations` array). Rows with no per-instruction
+        // location (RFS, RMC, RPN, RSM) instead get a single row-level
+        // "Open in editor" affordance so the control is never a dead end.
+        const _isActionable = (r.severity === 'error' || r.severity === 'warn');
+        if (_isActionable && Array.isArray(r.violations) && r.violations.length > 0) {
             for (const v of r.violations) {
                 const vRow = document.createElement('div');
                 vRow.className = 'lump-audit-row lump-audit-violation-row';
@@ -643,20 +649,44 @@ function lumpAuditRenderPanel(container, results, opts) {
                 vRow.appendChild(vMsg);
 
                 const ln = v.sourceLine != null ? (v.sourceLine | 0) : null;
-                if (ln != null) {
+                const wi = v.wordIndex != null ? (v.wordIndex | 0) : null;
+                if (ln != null || wi != null || o.token) {
                     const jumpBtn = document.createElement('button');
                     jumpBtn.className = 'lump-audit-jump-btn';
-                    jumpBtn.textContent = '\u2191 line ' + ln;
-                    jumpBtn.title = 'Jump to line ' + ln + ' in the editor';
+                    jumpBtn.textContent = ln != null ? ('\u2191 line ' + ln) : 'Open in editor';
+                    jumpBtn.title = ln != null
+                        ? 'Jump to line ' + ln + ' in the editor'
+                        : 'Open this lump in the editor near the offending instruction';
                     jumpBtn.addEventListener('click', function (e) {
                         e.stopPropagation();
-                        if (typeof _jumpToAsmLine === 'function') _jumpToAsmLine(ln);
+                        if (typeof _lumpAuditJump === 'function') {
+                            _lumpAuditJump(o.token || null, ln, wi);
+                        } else if (typeof _jumpToAsmLine === 'function' && ln != null) {
+                            _jumpToAsmLine(ln);
+                        }
                     });
                     vRow.appendChild(jumpBtn);
                 }
 
                 body.appendChild(vRow);
             }
+        } else if (_isActionable && o.token) {
+            // No per-violation data (RFS / RMC / RPN / RSM) — still give the user
+            // an active affordance, but keep it visually distinct from a precise
+            // line jump so it never implies more precision than it has.
+            const openRow = document.createElement('div');
+            openRow.className = 'lump-audit-row lump-audit-violation-row';
+
+            const openBtn = document.createElement('button');
+            openBtn.className = 'lump-audit-jump-btn lump-audit-open-btn';
+            openBtn.textContent = 'Open in editor';
+            openBtn.title = 'Open this lump in the editor to investigate';
+            openBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                if (typeof _lumpAuditJump === 'function') _lumpAuditJump(o.token, null, null);
+            });
+            openRow.appendChild(openBtn);
+            body.appendChild(openRow);
         }
     }
 
@@ -684,7 +714,7 @@ function lumpAuditRenderPanel(container, results, opts) {
  * opts      — forwarded to lumpAuditRenderPanel
  */
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { lumpAudit, lumpAuditHasErrors, lumpAuditHasWarnings };
+    module.exports = { lumpAudit, lumpAuditHasErrors, lumpAuditHasWarnings, lumpAuditRenderPanel };
 }
 
 async function lumpAuditFromServer(token, manifest, container, opts) {
@@ -700,8 +730,45 @@ async function lumpAuditFromServer(token, manifest, container, opts) {
         const data = await resp.json();
         const words = data.words || [];
         if (!words.length) throw new Error('Empty binary returned from server');
+
+        // Best-effort: reassemble the lump's saved source (if any) so violation
+        // messages carry a real sourceLine instead of falling back to a
+        // word-index-based "Open in editor" affordance. This mirrors how
+        // app-compile.js builds lineNums right after a compile — here we do it
+        // lazily for lumps viewed from the Repository panel, whose source may
+        // not be the one currently open in the editor at all.
+        let lineNums = null;
+        try {
+            const cw = (manifest && manifest.cw != null) ? parseInt(manifest.cw) : null;
+            if (typeof ChurchAssembler !== 'undefined' && typeof fetch === 'function') {
+                // Route through the shared de-duped cache (app-lumps.js) when available
+                // so this best-effort lookup never fires a second GET for a token whose
+                // detail is already being fetched by the Source tab render in parallel.
+                const srcData = (typeof window !== 'undefined' && typeof window._fetchLumpDetailCached === 'function')
+                    ? await window._fetchLumpDetailCached(token).catch(() => null)
+                    : await (async () => {
+                        const srcResp = await fetch(`/api/lumps/${token}/detail`, { cache: 'no-store' });
+                        return srcResp.ok ? srcResp.json() : null;
+                    })();
+                if (srcData && typeof srcData.source === 'string' && srcData.source.trim().length > 0) {
+                    const asm = new ChurchAssembler();
+                    const asmResult = asm.assemble(srcData.source);
+                    // Only trust the mapping when the reassembled word count matches
+                    // the audited binary's code-word count — otherwise the source has
+                    // drifted from the binary and per-word indices would be wrong.
+                    if (asmResult && Array.isArray(asmResult.lineNums) &&
+                        (cw == null || asmResult.words.length === cw)) {
+                        lineNums = [null, ...asmResult.lineNums];
+                    }
+                }
+            }
+        } catch (_srcErr) {
+            // Reassembly is best-effort only — fall through with lineNums = null,
+            // the renderer's wordIndex fallback still makes every row clickable.
+        }
+
         container.innerHTML = '';
-        const results = lumpAudit(words, manifest);
+        const results = lumpAudit(words, manifest, lineNums);
         return lumpAuditRenderPanel(container, results, opts);
     } catch (err) {
         container.innerHTML = '';

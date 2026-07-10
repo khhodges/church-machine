@@ -363,7 +363,7 @@ function showLumpDetail(token) {
             const _manifest = _auditLump ? { cw: _auditLump.cw, cc: _auditLump.cc, lump_size: _auditLump.lump_size, pet_names: _auditLump.pet_names || null, capabilities: _auditLump.capabilities || [] } : null;
             if (typeof lumpAuditFromServer === 'function') {
                 auditBtn.disabled = true;
-                lumpAuditFromServer(_auditToken, _manifest, _auditWrap, { collapsible: true, startOpen: true })
+                lumpAuditFromServer(_auditToken, _manifest, _auditWrap, { collapsible: true, startOpen: true, token: _auditToken })
                     .finally(() => { auditBtn.disabled = false; });
             }
         });
@@ -376,7 +376,7 @@ function showLumpDetail(token) {
         if (_autoAuditWrap) {
             const _autoManifest = { cw: lump.cw, cc: lump.cc, lump_size: lump.lump_size, pet_names: lump.pet_names || null, capabilities: lump.capabilities || [] };
             if (auditBtn) auditBtn.disabled = true;
-            lumpAuditFromServer(token, _autoManifest, _autoAuditWrap, { collapsible: true })
+            lumpAuditFromServer(token, _autoManifest, _autoAuditWrap, { collapsible: true, token: token })
                 .finally(() => { if (auditBtn) auditBtn.disabled = false; });
         }
     }
@@ -1730,6 +1730,72 @@ function _populateLumpApiTab(lump, panelId) {
 }
 
 const _lumpSavedSrcLoaded = {};
+
+// ── Shared, de-duplicated fetch for /api/lumps/<token>/detail ──
+// Multiple call sites (Source tab render, audit best-effort source lookup)
+// may want this JSON for the same token in the same tick. Without dedup that
+// fires two identical GETs; this cache keys on token and returns the same
+// in-flight (or just-settled) promise to every caller instead.
+const _lumpDetailFetchCache = {};
+function _fetchLumpDetailCached(token) {
+    if (!token) return Promise.reject(new Error('no token'));
+    const cached = _lumpDetailFetchCache[token];
+    if (cached) return cached;
+    const p = fetch(`/api/lumps/${token}/detail`, { cache: 'no-store' })
+        .then(resp => {
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            return resp.json();
+        })
+        .catch(err => {
+            // Don't poison the cache with a rejected promise — let the next
+            // caller retry instead of being stuck with a stale failure.
+            delete _lumpDetailFetchCache[token];
+            throw err;
+        });
+    _lumpDetailFetchCache[token] = p;
+    return p;
+}
+if (typeof window !== 'undefined') window._fetchLumpDetailCached = _fetchLumpDetailCached;
+// ── Shared jump handler for lump-audit.js's clickable warning/failure rows ──
+// token      — lump token to open in the editor first (null when the editor
+//              already shows the audited source, e.g. the post-compile audit
+//              or the not-yet-saved inline content editor).
+// sourceLine — precise 1-based source line, when the audit could resolve one.
+// wordIndex  — 0-based index into the code section, used as a best-effort
+//              fallback when no sourceLine is available (e.g. a lump audited
+//              from the Repository panel whose saved source didn't reassemble
+//              to a matching layout). Counts non-comment, non-capabilities
+//              lines in the decompiled/source text so a click never no-ops.
+async function _lumpAuditJump(token, sourceLine, wordIndex) {
+    if (token && typeof openLumpInEditor === 'function') {
+        try { await openLumpInEditor(token); } catch (_e) {}
+    } else if (typeof switchView === 'function' && document.getElementById('asmEditor')) {
+        switchView('editor');
+    }
+    if (sourceLine != null) {
+        if (typeof _jumpToAsmLine === 'function') _jumpToAsmLine(sourceLine);
+    } else if (wordIndex != null) {
+        _jumpToDecompiledInstruction(wordIndex);
+    }
+}
+
+function _jumpToDecompiledInstruction(wordIndex) {
+    const editor = document.getElementById('asmEditor');
+    if (!editor || wordIndex == null) return;
+    const lines = editor.value.split('\n');
+    let count = -1;
+    let targetLine = null;
+    for (let i = 0; i < lines.length; i++) {
+        const t = lines[i].trim();
+        if (!t || t.startsWith(';') || /^capabilities\s*\{/i.test(t) || t === '}') continue;
+        count++;
+        if (count === wordIndex) { targetLine = i + 1; break; }
+    }
+    // Never a dead click: fall back to the top of the editor when the exact
+    // instruction line can't be located (e.g. draft text no longer matches).
+    if (typeof _jumpToAsmLine === 'function') _jumpToAsmLine(targetLine != null ? targetLine : 1);
+}
+
 async function _fetchAndShowLumpSavedSource(token, lump, tk) {
     const _tk = (tk || token || '').replace(/[^a-z0-9]/gi, '');
     if (_lumpSavedSrcLoaded[_tk]) return;
@@ -1738,9 +1804,7 @@ async function _fetchAndShowLumpSavedSource(token, lump, tk) {
     if (!el) return;
     const e = _escHtml;
     try {
-        const resp = await fetch(`/api/lumps/${token}/detail`, { cache: 'no-store' });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
+        const data = await _fetchLumpDetailCached(token);
         if (data.source && data.source.trim().length > 0) {
             const _lang = e(data.language || lump.language || 'cloomc');
             const _compiledAt = data.compiled_at

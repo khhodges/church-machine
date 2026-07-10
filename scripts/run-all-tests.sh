@@ -161,7 +161,7 @@ register_suite "openin-links-tests" \
     'node simulator/test_openin_links.js'
 
 register_suite "lump-warning-tests" \
-    'node simulator/lump_warning_test.js'
+    'node simulator/lump_warning_test.js && node simulator/test_lump_audit_jump.js'
 
 register_suite "disasm-panel-tests" \
     'node simulator/disasm_panel_test.js'

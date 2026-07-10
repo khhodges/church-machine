@@ -1767,7 +1767,7 @@ function auditLumpOnly() {
     for (const r of auditResults) {
         const _sym = r.severity === 'pass' ? '\u2713' : r.severity === 'warn' ? '\u26a0' : '\u2717';
         listing += `    ${_sym} [${_auditHE(r.ruleId)}] ${_auditHE(r.message)} \u2014 ${_auditHE(r.detail)}\n`;
-        if (r.ruleId === 'RCI' && r.severity === 'error' && Array.isArray(r.violations)) {
+        if ((r.severity === 'error' || r.severity === 'warn') && Array.isArray(r.violations)) {
             for (const v of r.violations) {
                 const _ln = v.sourceLine != null ? (v.sourceLine | 0) : null;
                 const _lineHint = _ln != null ? ` (line ${_ln})` : '';
