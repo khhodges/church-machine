@@ -1057,6 +1057,32 @@ function _applyPendingSimLoad() {
     console.log('[applyPendingSimLoad] v20260513k caps=', JSON.stringify(lastAssembledCapabilities));
     sim.loadProgram(lastAssembledWords, 0);
     if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
+    // Compile+Run does not go through the real boot sequence's NUC_CLIST step,
+    // which normally pushes a sentinel CALL frame (returnPC=0x7FFF poison value)
+    // before jumping into user code. Without it, a program's trailing RETURN
+    // underflows an empty call stack and faults with STACK_UNDERFLOW even though
+    // the same program runs cleanly via a real boot-lump install. Push an
+    // equivalent sentinel frame here so Compile+Run matches real-boot behavior.
+    // loadProgram() above resets callStack to [], so this is always the first frame.
+    if (sim.callStack && sim.callStack.length === 0) {
+        const sp_max = 243; // THREAD_CAPS_OFFSET(244) - 1, mirrors simulator.js NUC_CLIST sentinel
+        const sentinelFrameWord = sim._packFrameWordRaw(0x7FFF, 1, sp_max);
+        sim.callStack.push({
+            sentinel: true,
+            returnPC: 0x7FFF,
+            savedCRs: sim.cr.map(c => ({...c})),
+            savedDRs: [...sim.dr],
+            savedFlags: {...sim.flags},
+            savedSTO: sp_max,
+            sz: 1,
+            frameWord: sentinelFrameWord,
+        });
+        const threadBase = sim.cr[12] && sim.cr[12].word1;
+        if (threadBase) {
+            sim.memory[threadBase + sp_max] = sentinelFrameWord;
+        }
+        sim.sto = sp_max - 2;
+    }
     // Skip past the lump header (word 0) and method table so PC starts at the
     // first real instruction, matching _autoLoadDefaultProgram() on boot/reset.
     if (lastMethodTableSize > 0) sim.pc = lastMethodTableSize;
