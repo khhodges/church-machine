@@ -7493,6 +7493,28 @@ function scrollExamples(dir) {
     }
 }
 
+function filterExampleTabs(query) {
+    const container = document.getElementById('exampleTabsScroll');
+    if (!container) return;
+    const needle = (query || '').trim().toLowerCase();
+    const tabs = container.querySelectorAll('.example-tab');
+    tabs.forEach(tab => {
+        // Respect language-based visibility: a tab already hidden by the
+        // per-language allowedSet logic in updateEditorForLang() must stay
+        // hidden regardless of the search text.
+        if (tab.dataset.langHidden === '1') return;
+        if (!needle) {
+            tab.style.display = '';
+            return;
+        }
+        const label = (tab.textContent || '').toLowerCase();
+        const exampleName = (tab.getAttribute('data-example') || '').toLowerCase();
+        const abstractionName = (tab.getAttribute('data-abstraction') || '').toLowerCase();
+        const matches = label.includes(needle) || exampleName.includes(needle) || abstractionName.includes(needle);
+        tab.style.display = matches ? '' : 'none';
+    });
+}
+
 let currentChallenge = null;
 
 function generateChallenge() {

@@ -102,6 +102,29 @@
     border-color: #059669;
 }
 
+/* ── Example search box (asm-picker-toolbar) ─────────── */
+.example-search-box {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 0.78rem;
+    padding: 0.28rem 0.6rem;
+    margin-left: auto;
+    width: 200px;
+    max-width: 40vw;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.example-search-box::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.75;
+}
+.example-search-box:focus {
+    outline: none;
+    border-color: var(--church-gold);
+    box-shadow: 0 0 0 2px rgba(218,165,32,0.2);
+}
+
 /* ── Hamburger menu ──────────────────────────────────── */
 .ham-wrap {
     position: relative;

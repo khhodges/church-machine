@@ -682,12 +682,18 @@ function onLangChange(restoring) {
             const ex = tab.getAttribute('data-example');
             const visible = allowedSet.includes(ex);
             tab.style.display = visible ? '' : 'none';
+            tab.dataset.langHidden = visible ? '0' : '1';
             // Deactivate tabs that are being hidden (belong to a different language)
             if (!visible) tab.classList.remove('active');
         });
         // User tabs container: only visible in personal mode
         const userTabsCont = document.getElementById('userTabsContainer');
         if (userTabsCont) userTabsCont.style.display = lang === 'personal' ? '' : 'none';
+
+        // Re-apply any active search filter now that language-based visibility
+        // has been recomputed, so the two rules compose correctly.
+        const searchBox = document.getElementById('exampleSearchBox');
+        if (searchBox && searchBox.value) filterExampleTabs(searchBox.value);
     }
 
     // Only update the tab's stored lang when switching to a real language (not 'personal')
