@@ -1522,29 +1522,6 @@
     ]
   },
   {
-    "token": "13812cdf",
-    "abstraction": "Post-Flash Self-Test",
-    "ns_slot": null,
-    "ns_slot_policy": "dynamic",
-    "lump_size": 1024,
-    "cw": 512,
-    "cc": 0,
-    "author": "",
-    "version": "2026.05.18",
-    "lump_version": 1,
-    "compiled_at": 1779115570.180924,
-    "methods": [
-      {
-        "name": "run",
-        "offset": 0,
-        "length": 512
-      }
-    ],
-    "grants": [
-      "E"
-    ]
-  },
-  {
     "token": "0baf5e0e",
     "abstraction": "NoteG",
     "ns_slot": null,
