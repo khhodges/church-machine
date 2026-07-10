@@ -694,12 +694,15 @@ function stepSim() {
                     const nWords  = (lastAssembledWords  && lastAssembledWords.length)  || 0;
                     const nMeth   = lastMethodTableSize || 0;
                     const mLabel  = nMeth === 1 ? 'method' : 'methods';
-                    con.textContent = `Auto-booted \u2014 \u201c${name}\u201d loaded \u2014 ${nWords} words, ${nMeth} ${mLabel} \u2014 click Step or Run`;
+                    con.textContent = `Auto-booted \u2014 \u201c${name}\u201d loaded \u2014 ${nWords} words, ${nMeth} ${mLabel}`;
                 } else {
                     con.textContent = 'Auto-boot failed \u2014 machine halted during boot sequence';
                 }
             }
-            if (ok) switchView('dashboard');
+            if (ok) {
+                switchView('dashboard');
+                runSimGo();
+            }
             return;
         }
         // If the boot animation is running (Boot button was clicked), cancel it
@@ -751,8 +754,15 @@ function stepSim() {
             sim.auditLog = [];
             _autoLoadDefaultProgram();
             updateDashboard();
-            switchView('lumps');
-            openCRDetail(14);
+            if (!sim.halted) {
+                // Boot completed cleanly — cascade straight into continuous execution.
+                // The user can pause at the first instruction by setting a breakpoint
+                // at that address before booting.
+                runSimGo();
+            } else {
+                switchView('lumps');
+                openCRDetail(14);
+            }
         } else {
             updateDashboard();
             switchView('pipeline');  // keep boot-step overview in view while stepping through boot
@@ -1441,6 +1451,10 @@ function slowBoot() {
                     const _dest = window._startupDefaultView || 'lumps';
                     window._startupDefaultView = null;
                     switchView(_dest);
+                    // Boot completed cleanly — cascade straight into continuous execution.
+                    // The user can pause at the first instruction by setting a breakpoint
+                    // at that address before booting.
+                    runSimGo();
                 }
                 return;
             }
