@@ -55,7 +55,24 @@ function updateCRDetail() {
     if (cr.isNull) {
         titleEl.innerHTML = '';
         titleEl.style.display = 'none';
-        contentEl.innerHTML = '<div style="color:var(--text-secondary);padding:1rem;">Register is empty (all words zero).</div>';
+        // Pre-boot / reset state is not a violation of any post-boot invariant —
+        // CR14 (and CR12) are only guaranteed populated once bootComplete flips
+        // true (simulator.js B:07 NUC_CODE loads CR14 from Thread.CR0, then
+        // Navana.Init runs, then bootComplete ← true). Showing the generic
+        // "Register is empty" message in that window reads as a bug even though
+        // it is expected, so call out the not-yet-booted case explicitly.
+        if (!sim.bootComplete) {
+            const bootHint = (crIdx === 14 || crIdx === 12)
+                ? `CR${crIdx} is loaded from Thread.CR0 when the boot sequence finishes — it will not stay empty after boot.`
+                : `CR${crIdx} may be populated during the boot sequence.`;
+            contentEl.innerHTML =
+                `<div style="color:var(--text-secondary);padding:1rem;">` +
+                `<div style="margin-bottom:0.5rem;">Machine not booted yet (BOOT ${sim.bootStep}/4 · RESET) — context registers are still zero.</div>` +
+                `<div>${bootHint} Click <b>Boot</b> (top-right) to run the boot sequence.</div>` +
+                `</div>`;
+        } else {
+            contentEl.innerHTML = '<div style="color:var(--text-secondary);padding:1rem;">Register is empty (all words zero).</div>';
+        }
         contentEl.classList.remove('crd-content-thread');
         return;
     }
