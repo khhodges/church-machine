@@ -2203,17 +2203,21 @@ class ChurchAssembler {
             case 17:
                 if (imm & 0x4000) return `${mnemonic}  DR${crDst}, CR${crSrc}, #${imm & 0x3FFF}`;
                 return `${mnemonic}  DR${crDst}, CR${crSrc}, #${(imm >> 4) & 0x3FF}, DR${imm & 0xF}`;
-            // BFEXT DRd, DRs, pos, w  — bit-field extract
+            // BFEXT DRd, DRs, #pos, #w  — bit-field extract
+            // NOTE: must stay re-parseable by this same assembler's #-prefixed
+            // immediate syntax (see _parseImm) — Open Lump feeds this text
+            // straight back into the compiler, so a display-only "pos=/w="
+            // format here would make any BFEXT/BFINS lump fail to recompile.
             case 18: {
                 const pos   = (imm >>> 5) & 0x1F;
                 const width = imm & 0x1F;
-                return `${mnemonic}  DR${crDst}, DR${crSrc}, pos=${pos}, w=${width}`;
+                return `${mnemonic}  DR${crDst}, DR${crSrc}, #${pos}, #${width}`;
             }
-            // BFINS DRd, DRs, pos, w  — bit-field insert
+            // BFINS DRd, DRs, #pos, #w  — bit-field insert
             case 19: {
                 const pos   = (imm >>> 5) & 0x1F;
                 const width = imm & 0x1F;
-                return `${mnemonic}  DR${crDst}, DR${crSrc}, pos=${pos}, w=${width}`;
+                return `${mnemonic}  DR${crDst}, DR${crSrc}, #${pos}, #${width}`;
             }
             // MCMP DRd, DRs  — compare, update condition flags
             case 20: return `${mnemonic}  DR${crDst}, DR${crSrc}`;
