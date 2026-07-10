@@ -2,6 +2,44 @@
 
 ---
 
+## Fix: POLA cleanup falling through to the wrong C-List view when it empties the block (2026-07-10)
+
+Bug reported right after the POLA button shipped: clicking "⚖ POLA" in the
+C-List popup appeared to *add* Golden Tokens (Boot.NS, Boot.Thread, UART_DEV,
+LED_DEV, BTN_DEV, TIMER_DEV, SelfTest) instead of removing unused ones.
+
+Root cause: `_removeUnusedCapabilities()` always operates on the editor's own
+`capabilities { }` source block, correctly stripping every unreferenced entry.
+But `buildContentAsync()`'s Path 0 (source-declared view) only rendered when
+`capSrcEntries.length > 0`. When POLA removed *all* entries — a fully correct
+cleanup — the resulting empty block fell through that check to Path 1
+(live-sim CR6), an unrelated data source showing the boot-hardwired register
+c-list. From the user's perspective the popup appeared to swap in a much
+longer, unrelated list right after clicking POLA, looking exactly like GTs
+had been added.
+
+- **`simulator/clist-viewer.js`** — Path 0 in `buildContentAsync()` now
+  renders whenever a `capabilities { }` block is found in source, regardless
+  of entry count. An empty block renders an explicit
+  `"No capabilities declared in source."` empty-state row instead of falling
+  through to Path 1, keeping the popup's data source consistent with what the
+  user is editing.
+- **Regression tests:**
+  - `tests/simulator/sim_clist_pola_cleanup.js` — new scenarios E/F/G extract
+    and directly exercise the Path 0 selection logic: non-empty block → Path
+    0 with rows, POLA-emptied block → Path 0 with the empty-state message
+    (and no leaked live-sim boot capability names), no block at all → falls
+    through as before.
+  - `tests/e2e/clist_pola_cleanup.spec.js` — new end-to-end case: an
+    all-unused capabilities block, once cleaned by POLA, keeps the popup
+    title reading "source" (not the live-sim "(CR6)" default) and never shows
+    boot-hardwired capabilities in the body.
+- **Files changed:** `simulator/clist-viewer.js`, `simulator/index.html`
+  (`clist-viewer.js` version tag bump), `tests/simulator/sim_clist_pola_cleanup.js`,
+  `tests/e2e/clist_pola_cleanup.spec.js`.
+
+---
+
 ## Feature: POLA cleanup button in the C-List viewer (2026-07-10)
 
 Added a "⚖ POLA" (Principle of Least Authority) button to the C-List viewer

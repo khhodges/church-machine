@@ -546,9 +546,15 @@
                         return name ? { name: name, rights: rights } : null;
                     })
                     .filter(Boolean);
+                // A capabilities { } block exists in the source — always treat
+                // this as the authoritative view, even when it is now empty
+                // (e.g. right after POLA removed every unused entry). Falling
+                // through to the live-sim/boot register view here would swap
+                // in a completely different data source and look like POLA
+                // "added" capabilities instead of cleaning them up.
+                var srcRows = '';
+                var _srcSim = (typeof sim !== 'undefined') ? sim : null;
                 if (capSrcEntries.length > 0) {
-                    var srcRows = '';
-                    var _srcSim = (typeof sim !== 'undefined') ? sim : null;
                     for (var si = 0; si < capSrcEntries.length; si++) {
                         var se = capSrcEntries[si];
                         var rightsHtml = se.rights.length > 0
@@ -566,8 +572,10 @@
                             '<span class="clist-name">' + escHtml(se.name) + '</span>' +
                             '</div>';
                     }
-                    return _wrapRows('source', srcRows);
+                } else {
+                    srcRows = '<div class="clist-viewer-empty">No capabilities declared in source.</div>';
                 }
+                return _wrapRows('source', srcRows);
             }
         }
 

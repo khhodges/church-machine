@@ -195,5 +195,70 @@ if (parseCapEntriesSrc && formatCapBlockSrc && showPolaToastSrc && removeUnusedS
         'scenario D: toast reports the C-List is already empty');
 }
 
+// ---------------------------------------------------------------------------
+// 3. Regression: buildContentAsync's Path 0 (source view) must stay selected
+//    even when POLA empties the capabilities block, instead of falling
+//    through to Path 1 (live-sim CR6), which shows an unrelated data source
+//    (boot-hardwired capabilities like UART_DEV/LED_DEV/etc.) and makes it
+//    look like POLA "added" GTs rather than removing unused ones.
+// ---------------------------------------------------------------------------
+function extractBlock(startMarker, endMarker) {
+    const startIdx = src.indexOf(startMarker);
+    const endIdx = src.indexOf(endMarker, startIdx);
+    if (startIdx === -1 || endIdx === -1) return null;
+    return src.slice(startIdx, endIdx);
+}
+
+const path0Src = extractBlock(
+    '// \u2500\u2500 Path 0: source-declared capabilities',
+    '// \u2500\u2500 Path 1: live sim'
+);
+check(!!path0Src, 'Path 0 block extracted from buildContentAsync for regression testing');
+
+if (path0Src) {
+    function runPath0(srcText) {
+        const sandbox = {
+            activeEditor: null,
+            document: {
+                getElementById(id) { return id === 'asmEditor' ? { value: srcText } : null; },
+            },
+            sim: null,
+            PERM_COLORS: {},
+            _namedBadgeHtml: function () { return ''; },
+            escHtml: function (s) { return s; },
+            _wrapRows: function (titleExtra, rows) { return { titleExtra: titleExtra, rows: rows }; },
+            console,
+        };
+        vm.createContext(sandbox);
+        const wrapped = '(function () {\n' + path0Src + '\n})()';
+        return vm.runInContext(wrapped, sandbox);
+    }
+
+    // -- Scenario E: non-empty capabilities block resolves to Path 0 ---------
+    const nonEmptySrc = 'capabilities {\n    Navana E\n}\nCALL Navana\nRETURN\n';
+    const resultE = runPath0(nonEmptySrc);
+    check(!!resultE && resultE.titleExtra === 'source',
+        'scenario E: non-empty capabilities block renders Path 0 ("source")');
+    check(!!resultE && /Navana/.test(resultE.rows),
+        'scenario E: Path 0 rows include the declared capability name');
+
+    // -- Scenario F: POLA-emptied capabilities block still resolves to Path 0,
+    //    NOT falling through to Path 1 (live sim) ------------------------------
+    const emptiedSrc = 'capabilities {\n}\nRETURN\n';
+    const resultF = runPath0(emptiedSrc);
+    check(!!resultF && resultF.titleExtra === 'source',
+        'scenario F: POLA-emptied capabilities block still renders Path 0 ("source"), not Path 1 (live sim)');
+    check(!!resultF && /No capabilities declared/.test(resultF.rows),
+        'scenario F: empty Path 0 shows an explicit "no capabilities declared" message');
+    check(!!resultF && !/UART_DEV|LED_DEV|BTN_DEV|TIMER_DEV|Boot\.NS|Boot\.Thread/.test(resultF.rows),
+        'scenario F: empty Path 0 never leaks live-sim boot capability names');
+
+    // -- Scenario G: no capabilities block at all returns undefined (falls through) --
+    const noBlockSrc2 = 'IADD DR0, DR0, #1\nRETURN\n';
+    const resultG = runPath0(noBlockSrc2);
+    check(resultG === undefined,
+        'scenario G: source with no capabilities block does not short-circuit Path 0 (falls through to Path 1)');
+}
+
 console.log(failures === 0 ? '\nAll checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

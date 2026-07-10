@@ -108,4 +108,46 @@ test.describe('POLA cleanup button in the C-List viewer', () => {
         expect(editorValue).toMatch(/BTN/);
     });
 
+    test('clicking POLA that empties the block keeps showing the source view, not the live boot c-list', async ({ page }) => {
+        // Every declared capability here is unused, so POLA should strip all
+        // of them, leaving an empty capabilities { } block. Regression check
+        // for a bug where the popup then fell through to Path 1 (live-sim
+        // CR6), which shows unrelated boot-hardwired capabilities and made it
+        // look like POLA had *added* GTs instead of removing unused ones.
+        const allUnusedSource = [
+            'capabilities {',
+            '  UNUSED_ONE R',
+            '  UNUSED_TWO R',
+            '}',
+            '',
+            'HALT',
+        ].join('\n');
+
+        await openClistPopup(page, allUnusedSource);
+
+        const polaBtn = page.locator('.clist-viewer-popup [data-action="pola-cleanup"]');
+        await polaBtn.waitFor({ state: 'visible' });
+        await polaBtn.click();
+
+        // The popup title must still read the source-view label, not the
+        // live-sim "C-List (CR6)" default title.
+        const title = page.locator('.clist-viewer-popup .clist-viewer-title');
+        await expect(title).toHaveText(/source/);
+        await expect(title).not.toHaveText(/\(CR6\)/);
+
+        // No boot-hardwired live capabilities should have appeared.
+        const body = page.locator('.clist-viewer-popup .clist-viewer-body');
+        await expect(body).not.toContainText('UART_DEV');
+        await expect(body).not.toContainText('LED_DEV');
+        await expect(body).not.toContainText('Boot.NS');
+        await expect(body).not.toContainText('Boot.Thread');
+
+        // Instead, an explicit empty-state message is shown.
+        await expect(body).toContainText('No capabilities declared');
+
+        const editorValue = await page.locator('#asmEditor').inputValue();
+        expect(editorValue).not.toMatch(/UNUSED_ONE/);
+        expect(editorValue).not.toMatch(/UNUSED_TWO/);
+    });
+
 });
