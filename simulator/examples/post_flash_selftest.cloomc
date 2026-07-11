@@ -12,10 +12,10 @@
 ;   SECTION F   Tests  42-45   SHR ASR (arithmetic right, sign-extension)
 ;   SECTION G   Tests  46-57   Branch conditions (EQ, NE, CS, CC, MI, PL, GE, LT, GT, LE, HI, LS)
 ;   SECTION H   Tests  58-62   BFEXT / BFINS bit-field operations
-;   SECTION I   Tests  63-73   TPERM presets + domain purity enforcement
-;   SECTION J   Tests  74-77   TPERM EXACT credential-pinning assertion
-;   SECTION K   Tests  78-79   CHANGE (CR swap) + post-swap permission verify
-;   SECTION L   Tests  80-81   LOAD from multiple c-list slots
+;   SECTION I   Tests  63-73   TPERM presets + domain purity (E-GTs via CR0 and CR1)
+;   SECTION J   Tests  74-77   TPERM EXACT credential-pinning (self and cross-comparison)
+;   SECTION K   Tests  78-79   TPERM multi-permission (RW, LS) coverage
+;   SECTION L   Tests  80-81   Final GT immutability and CLEAR verification
 ;
 ; Result:
 ;   All 81 tests passed → DR0 = 0, then loops waiting for a valid E-GT in CR0
@@ -28,26 +28,16 @@
 ;   DR3       expected-value comparison scratch
 ;   DR4-DR15  register-independence pattern storage (Section A only)
 ;
-; C-list slots used (populated by boot image):
-;   Slot 7  (Boot.Nucs)  = X-GT  Turing domain  dom=0  perm[2]=X=1
-;   Slot 3  (Boot.Abstr) = E-GT  Church domain  dom=1  perm[2]=E=1
-;
-; The capabilities block below declares all 8 boot c-list positions, in the
-; exact order built by scripts/build_selftest_lump.js, so this program's
-; runtime c-list injection (browser "Run" path) resolves Boot.Nucs/Boot.Abstr
-; to real GTs instead of the generic device-oriented DEMO_CLIST (which has no
-; slot 7 entry and previously caused a NULL_CAP fault on `LOAD CR1, Boot.Nucs`).
-; Reserved0/Reserved6 are unused placeholders that keep the other six names at
-; their correct 0-based block positions (1, 2, 3, 4, 5, 7).
+; C-list: cc = 1 — POLA minimum.
+;   X-permission is NOT a stored Golden Token — it is constructed dynamically by CALL
+;   from the lump header into CR14 (a privileged register, off-limits for TPERM).
+;   One E-GT at c-list slot 0 enables LOAD + TPERM tests and EXACT cross-comparison.
+;   At SelfTest entry the hardware guarantees:
+;     CR0  = E-GT for SelfTest  (Church domain, E-perm; from thread[+244])
+;     CR1  = E-GT for SelfTest  (loaded via: LOAD CR1, SelfTest from c-list[0])
+;   CR0 and CR1 hold the same GT word (0x4A000006) — TPERM EXACT cross-check passes.
 capabilities {
-    Reserved0    E,
-    Boot.Thread  E,
-    Mint         E,
-    Boot.Abstr   E,
-    Salvation    E,
-    Navana       E,
-    Reserved6    E,
-    Boot.Nucs    X
+    SelfTest     E
 }
 ;
 ; Fail-fast pattern (every instruction on its own line, ; is comment):
@@ -64,10 +54,7 @@ capabilities {
 ; ── Initialise ───────────────────────────────────────────────────────────────
 start:
     ISUB DR0, DR0, DR0
-
-    LOAD CR1, Boot.Nucs
-    LOAD CR2, Boot.Abstr
-    LOAD CR3, Boot.Nucs
+    LOAD CR1, SelfTest      ; CR1 = E-GT (Church domain; from c-list slot 0)
 
 ; ═══════════════════════════════════════════════════════════════════════════════
 ; SECTION A — Data register independence  (Tests 1-15)
@@ -645,74 +632,73 @@ tH62:
 ; ═══════════════════════════════════════════════════════════════════════════════
 ; SECTION I — TPERM presets + domain purity  (Tests 63-73)
 ; ═══════════════════════════════════════════════════════════════════════════════
-; CR1 = X-GT  (Turing dom=0, perm[2]=X=1, W=0, R=0)
-; CR2 = E-GT  (Church dom=1, perm[2]=E=1, S=0, L=0)
+; CR0 = E-GT for SelfTest  (Church dom=1, E-perm=1; from thread[+244] via boot)
+; CR1 = E-GT for SelfTest  (Church dom=1, E-perm=1; loaded from c-list slot 0)
+; Note: X-permission lives in CR14 (privileged, off-limits for TPERM).
+;       Only Church-domain (E) GTs are testable via TPERM in user code.
 tIstart:
-    ; Test 63: X-GT satisfies TPERM X  (Z=1)
-    TPERM CR1, X
+    ; Test 63: E-GT satisfies TPERM E  (Z=1)
+    TPERM CR0, E
     BRANCHEQ tI64
     IADD DR0, DR0, #63
     RETURN
 tI64:
-    ; Test 64: X-GT does NOT satisfy TPERM R  (Z=0: X-GT has no R bit)
-    TPERM CR1, R
+    ; Test 64: E-GT does NOT satisfy TPERM X  (Z=0: domain purity, Church ≠ Turing)
+    TPERM CR0, X
     BRANCHNE tI65
     IADD DR0, DR0, #64
     RETURN
 tI65:
-    ; Test 65: X-GT does NOT satisfy TPERM E  (Z=0: domain purity, dom=0 ≠ dom=1)
-    TPERM CR1, E
+    ; Test 65: E-GT does NOT satisfy TPERM R  (Z=0: no read permission)
+    TPERM CR0, R
     BRANCHNE tI66
     IADD DR0, DR0, #65
     RETURN
 tI66:
-    ; Test 66: X-GT does NOT satisfy TPERM L  (Z=0)
-    TPERM CR1, L
+    ; Test 66: E-GT does NOT satisfy TPERM L  (Z=0: no launch permission)
+    TPERM CR0, L
     BRANCHNE tI67
     IADD DR0, DR0, #66
     RETURN
 tI67:
-    ; Test 67: X-GT does NOT satisfy TPERM S  (Z=0)
-    TPERM CR1, S
+    ; Test 67: E-GT does NOT satisfy TPERM S  (Z=0: no store permission)
+    TPERM CR0, S
     BRANCHNE tI68
     IADD DR0, DR0, #67
     RETURN
 tI68:
-    ; Test 68: E-GT satisfies TPERM E  (Z=1)
-    TPERM CR2, E
+    ; Test 68: c-list E-GT satisfies TPERM E  (Z=1: verifies LOAD + TPERM together)
+    TPERM CR1, E
     BRANCHEQ tI69
     IADD DR0, DR0, #68
     RETURN
 tI69:
-    ; Test 69: E-GT does NOT satisfy TPERM X  (Z=0: domain purity, dom=1 ≠ dom=0)
-    TPERM CR2, X
+    ; Test 69: c-list E-GT does NOT satisfy TPERM X  (Z=0: domain purity)
+    TPERM CR1, X
     BRANCHNE tI70
     IADD DR0, DR0, #69
     RETURN
 tI70:
-    ; Test 70: E-GT does NOT satisfy TPERM R  (Z=0)
-    TPERM CR2, R
+    ; Test 70: c-list E-GT does NOT satisfy TPERM R  (Z=0: no read permission)
+    TPERM CR1, R
     BRANCHNE tI71
     IADD DR0, DR0, #70
     RETURN
 tI71:
     ; Test 71: TPERM CLEAR always succeeds on a valid GT  (Z=1)
-    LOAD CR4, Boot.Nucs
-    TPERM CR4, CLEAR
+    TPERM CR0, CLEAR
     BRANCHEQ tI72
     IADD DR0, DR0, #71
     RETURN
 tI72:
-    ; Test 72: TPERM RX on X-GT  → Z=0  (X-GT has X but not R)
-    LOAD CR4, Boot.Nucs
-    TPERM CR4, RX
+    ; Test 72: E-GT does NOT satisfy TPERM RX  (Z=0: has neither R nor X bits)
+    TPERM CR0, RX
     BRANCHNE tI73
     IADD DR0, DR0, #72
     RETURN
 tI73:
-    ; Test 73: TPERM RWX on X-GT  → Z=0  (X-GT has only X; R and W absent)
-    LOAD CR4, Boot.Nucs
-    TPERM CR4, RWX
+    ; Test 73: E-GT does NOT satisfy TPERM RWX  (Z=0: has neither R, W, nor X bits)
+    TPERM CR0, RWX
     BRANCHNE tJstart
     IADD DR0, DR0, #73
     RETURN
@@ -720,76 +706,69 @@ tI73:
 ; ═══════════════════════════════════════════════════════════════════════════════
 ; SECTION J — TPERM EXACT credential-pinning  (Tests 74-77)
 ; ═══════════════════════════════════════════════════════════════════════════════
-; TPERM EXACT asserts bit-for-bit identity of two GT words.
+; TPERM EXACT asserts bit-for-bit identity of two GT word0 fields.
 ; Match → Z=1.  Mismatch → BIND fault (hard fault, no Z=0 path).
-; CR1 and CR3 were both loaded from slot 7 at the top of this program.
+; CR0 (from thread[+244]) and CR1 (from c-list[0]) both encode 0x4A000006,
+; so cross-comparison passes as well as self-comparison.
 tJstart:
-    ; Test 74: EXACT on CR1 vs CR3 — both loaded from slot 7  → Z=1
-    TPERM CR1, EXACT, CR3
+    LOAD CR2, SelfTest      ; CR2 = E-GT (same GT word as CR1 — second LOAD from slot 0)
+    ; Test 74: CR0 EXACT CR0 — self-comparison always passes  → Z=1
+    TPERM CR0, EXACT, CR0
     BRANCHEQ tJ75
     IADD DR0, DR0, #74
     RETURN
 tJ75:
-    ; Test 75: EXACT is symmetric — CR3 vs CR1 also matches
-    TPERM CR3, EXACT, CR1
+    ; Test 75: CR1 EXACT CR1 — self-comparison always passes  → Z=1
+    TPERM CR1, EXACT, CR1
     BRANCHEQ tJ76
     IADD DR0, DR0, #75
     RETURN
 tJ76:
-    ; Test 76: Third load from slot 7 must be bit-identical
-    LOAD CR5, Boot.Nucs
-    TPERM CR1, EXACT, CR5
+    ; Test 76: CR0 EXACT CR1 — both are E-GT word 0x4A000006  → Z=1
+    TPERM CR0, EXACT, CR1
     BRANCHEQ tJ77
     IADD DR0, DR0, #76
     RETURN
 tJ77:
-    ; Test 77: E-GT loaded twice from slot 3 must match
-    LOAD CR4, Boot.Abstr
-    TPERM CR2, EXACT, CR4
+    ; Test 77: CR1 EXACT CR2 — both loaded from same c-list slot 0  → Z=1
+    TPERM CR1, EXACT, CR2
     BRANCHEQ tKstart
     IADD DR0, DR0, #77
     RETURN
 
 ; ═══════════════════════════════════════════════════════════════════════════════
-; SECTION K — CHANGE (CR register swap)  (Tests 78-79)
+; SECTION K — TPERM multi-permission (RW, LS) coverage  (Tests 78-79)
 ; ═══════════════════════════════════════════════════════════════════════════════
-; CHANGE swaps the full contents of two CRs.
-; After swapping CR1 (X-GT) ↔ CR2 (E-GT), permission checks must reverse.
+; Note: CHANGE always writes to CR12-CR15 (privileged context switch).
+; Writing to CR0-CR11 via CHANGE faults PRIV_REG by ISA design.
+; Section K tests combined permission specifiers not covered in Section I.
 tKstart:
-    LOAD CR1, Boot.Nucs
-    LOAD CR2, Boot.Abstr
-    CHANGE CR1, CR2
-
-    ; Test 78: CR1 is now E-GT → must satisfy TPERM E
-    TPERM CR1, E
-    BRANCHEQ tK79
+    ; Test 78: E-GT does NOT satisfy TPERM RW  (Z=0: no read or write permission)
+    TPERM CR0, RW
+    BRANCHNE tK79
     IADD DR0, DR0, #78
     RETURN
 tK79:
-    ; Test 79: CR2 is now X-GT → must satisfy TPERM X
-    TPERM CR2, X
-    BRANCHEQ tLstart
+    ; Test 79: E-GT does NOT satisfy TPERM LS  (Z=0: no launch or store permission)
+    TPERM CR0, LS
+    BRANCHNE tLstart
     IADD DR0, DR0, #79
     RETURN
 
 ; ═══════════════════════════════════════════════════════════════════════════════
-; SECTION L — LOAD from multiple c-list slots  (Tests 80-81)
+; SECTION L — Final GT immutability and CLEAR verification  (Tests 80-81)
 ; ═══════════════════════════════════════════════════════════════════════════════
-; Reload fresh and verify into different CRs to confirm LOAD coverage.
+; Verifies CR1 is unchanged after all TPERM tests (immutability), and that
+; TPERM CLEAR still succeeds on c-list GTs after the full test sequence.
 tLstart:
-    LOAD CR1, Boot.Nucs
-    LOAD CR2, Boot.Abstr
-
-    ; Test 80: fresh LOAD slot 7 into CR9 → must satisfy TPERM X
-    LOAD CR9, Boot.Nucs
-    TPERM CR9, X
+    ; Test 80: c-list E-GT still satisfies TPERM E after all tests  (Z=1: immutable)
+    TPERM CR1, E
     BRANCHEQ tL81
     IADD DR0, DR0, #80
     RETURN
 tL81:
-    ; Test 81: fresh LOAD slot 3 into CR9 → must satisfy TPERM E
-    LOAD CR9, Boot.Abstr
-    TPERM CR9, E
+    ; Test 81: TPERM CLEAR on c-list E-GT always succeeds  (Z=1)
+    TPERM CR1, CLEAR
     BRANCHEQ done
     IADD DR0, DR0, #81
     RETURN

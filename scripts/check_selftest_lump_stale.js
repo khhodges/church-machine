@@ -62,15 +62,10 @@ if (result.errors.length > 0) {
 const words = result.words;
 
 // ── C-List (must match build_selftest_lump.js exactly) ──────────────────────
+// cc = 1  — POLA minimum: one E-GT for NS slot 6 (SelfTest).
+// Loaded into CR1 via LOAD CR1, SelfTest; used in TPERM and EXACT cross-checks.
 const CLIST = [
-    { gt: 0x00000000 },
-    { gt: 0x48800001 },
-    { gt: 0x48800006 },
-    { gt: 0x48800003 },
-    { gt: 0x48800004 },
-    { gt: 0x48800005 },
-    { gt: 0x00000000 },
-    { gt: 0x40800001 },
+    { gt: 0x4A000006 }, // 0  SelfTest  E  NS slot 6
 ];
 
 // ── Pack LUMP binary ─────────────────────────────────────────────────────────

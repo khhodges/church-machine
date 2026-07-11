@@ -2,7 +2,7 @@
 //
 // Headless harness used by tests/simulator/test_selftest_lump_runs.py.
 //
-// Loads server/lumps/2570eade.lump into a fresh boot image via
+// Loads the PostFlashSelftest lump (token read from manifest.json) into a fresh boot image via
 // ChurchSimulator.loadLumpBinary(), runs the simulator to completion, and
 // verifies that DR0 === 0 (all 81 self-tests passed).
 //
@@ -81,8 +81,21 @@ if (!sim.bootComplete) {
     process.exit(1);
 }
 
-// ── Load 2570eade.lump binary ─────────────────────────────────────────────────
-const LUMP_PATH = path.join(ROOT, 'server', 'lumps', '2570eade.lump');
+// ── Load PostFlashSelftest lump — token read dynamically from manifest.json ───
+const MANIFEST_PATH = path.join(ROOT, 'server', 'lumps', 'manifest.json');
+const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'));
+const selftestEntry = manifest.find(e => e.abstraction === 'PostFlashSelftest');
+if (!selftestEntry) {
+    process.stdout.write(JSON.stringify({
+        bootComplete: true, loaded: false, steps: 0, dr0: null,
+        faultType: null, faultMessage: null,
+        terminatedBy: 'LUMP_NOT_FOUND', pass: false,
+        failMessage: 'No PostFlashSelftest entry found in manifest.json',
+    }) + '\n');
+    process.exit(1);
+}
+const LUMP_TOKEN = selftestEntry.token;
+const LUMP_PATH  = path.join(ROOT, 'server', 'lumps', `${LUMP_TOKEN}.lump`);
 let lumpBytes;
 try {
     lumpBytes = fs.readFileSync(LUMP_PATH);

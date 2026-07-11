@@ -1,8 +1,9 @@
 """Post-Flash Self-Test lump load-and-run test (Task #1285).
 
-Verifies that 2570eade.lump can be loaded into a fresh simulator boot image
-via ChurchSimulator.loadLumpBinary() and that the 81-test selftest suite runs
-to completion with DR0 === 0 (all tests passed).
+Verifies that the PostFlashSelftest lump (token from manifest.json) can be
+loaded into a fresh simulator boot image via ChurchSimulator.loadLumpBinary()
+and that the 81-test selftest suite runs to completion with DR0 === 0 (all
+tests passed).
 
 The selftest (simulator/examples/post_flash_selftest.cloomc) covers:
   SECTION A  Tests  1-15  Data register independence
@@ -13,10 +14,10 @@ The selftest (simulator/examples/post_flash_selftest.cloomc) covers:
   SECTION F  Tests 42-45  SHR arithmetic right
   SECTION G  Tests 46-57  Branch conditions
   SECTION H  Tests 58-62  BFEXT / BFINS bit-field operations
-  SECTION I  Tests 63-73  TPERM presets + domain purity
-  SECTION J  Tests 74-77  TPERM EXACT credential-pinning
-  SECTION K  Tests 78-79  CHANGE (CR swap) + permission verify
-  SECTION L  Tests 80-81  LOAD from multiple c-list slots
+  SECTION I  Tests 63-73  TPERM presets + domain purity (E-GT on CR0 and CR1)
+  SECTION J  Tests 74-77  TPERM EXACT credential-pinning (CR0/CR1/CR2 identity)
+  SECTION K  Tests 78-79  Combined-permission (RW, LS) domain purity checks
+  SECTION L  Tests 80-81  Final GT immutability and CLEAR verification
 
 Result convention:
   DR0 = 0  — all 81 tests passed
@@ -113,7 +114,7 @@ def test_selftest_lump_loads_and_boots():
         f'Report: {report}'
     )
     assert report.get('loaded') is True, (
-        'loadLumpBinary() returned false — lump could not be installed in NS slot 3. '
+        'loadLumpBinary() returned false — lump could not be installed in NS slot 6. '
         f'failMessage: {report.get("failMessage")}'
     )
 

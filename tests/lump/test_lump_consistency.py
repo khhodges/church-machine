@@ -537,10 +537,16 @@ def _decode_gt(word):
 
 BOOT_ABSTR_E_GT = 0x48800003
 BOOT_NUCS_X_GT  = 0x40800001
+SELFTEST_E_GT   = 0x4A000006  # SelfTest E-GT — NS slot 6, Church domain, E permission
 
+# cc=8 lumps: Boot.Abstr E-GT at slot 3, Boot.Nucs X-GT at slot 7
 SELFTEST_LUMP_CASES = [
-    ("2570eade", "PostFlashSelftest"),
     ("cb8739cf", "GT Encoding v1.1 Hardware Self-Test"),
+]
+
+# cc=1 lumps: single SelfTest E-GT at slot 0 (POLA redesign — no Boot.Nucs needed)
+SELFTEST_LUMP_CASES_CC1 = [
+    ("d15413e8", "PostFlashSelftest"),
 ]
 
 
@@ -626,6 +632,45 @@ class TestR13_SelftestClistGTs:
         )
 
 
+class TestR13b_NewSelftestClistGT:
+    """R13b: POLA-redesigned selftest lumps (cc=1) carry the expected SelfTest E-GT
+    at c-list slot 0 — Church domain, E permission, NS slot 6.
+
+    These lumps dropped Boot.Nucs (no privileged CR14 needed) in favour of a
+    minimal single-capability design: one E-GT pointing at the SelfTest NS slot.
+    """
+
+    @pytest.mark.parametrize("token,label", SELFTEST_LUMP_CASES_CC1)
+    def test_slot0_raw_value(self, token, label):
+        actual = _read_clist_word(token, 0)
+        assert actual == SELFTEST_E_GT, (
+            f"{token} ({label}): c-list[0] = {actual:#010x}, "
+            f"expected SelfTest E-GT = {SELFTEST_E_GT:#010x}.\n"
+            "  Repack the binary so that slot 0 holds the SelfTest E capability "
+            "(NS slot 6, Church domain, E permission)."
+        )
+
+    @pytest.mark.parametrize("token,label", SELFTEST_LUMP_CASES_CC1)
+    def test_slot0_church_domain_e_permission(self, token, label):
+        word = _read_clist_word(token, 0)
+        gt = _decode_gt(word)
+        assert gt["dom"] == 1, (
+            f"{token} ({label}): c-list[0] = {word:#010x}: dom={gt['dom']} "
+            f"({gt['dom_name']}), expected Church (1).\n"
+            "  SelfTest E-GT must have bit[27]=1 (Church domain)."
+        )
+        assert gt["perms"]["E"] == 1, (
+            f"{token} ({label}): c-list[0] = {word:#010x}: E-permission is not set "
+            f"(perm3={gt['perm3']:#05b}).\n"
+            "  SelfTest E-GT must carry E permission (perm3 bit[2]=1)."
+        )
+        assert gt["perms"]["L"] == 0 and gt["perms"]["S"] == 0, (
+            f"{token} ({label}): c-list[0] = {word:#010x}: unexpected L or S permission "
+            f"set alongside E (perm3={gt['perm3']:#05b}).\n"
+            "  E-GTs must carry exactly one Church permission bit."
+        )
+
+
 def _live_abstraction_names() -> set:
     """Return the set of abstraction names currently registered in
     simulator/abstractions.js by actually instantiating AbstractionRegistry
@@ -659,6 +704,10 @@ KNOWN_NON_REGISTRY_ABSTRACTIONS = {
     "SlideRule (Haskell)": "Haskell-frontend SlideRule variant (variant_group=sliderule); "
                            "browsable via the LUMP repository only, never wired into the "
                            "Abstractions view/registry.",
+    "PostFlashSelftest":   "Boot-resident hardware diagnostic lump; wired statically at "
+                           "NS slot 6 by the boot image builder. Not a user-facing "
+                           "abstraction — accessed only via the Builder tab (Run Self-Test) "
+                           "and loadLumpBinary(), never via the Abstractions view/registry.",
 }
 
 

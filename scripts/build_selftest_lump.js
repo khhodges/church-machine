@@ -11,15 +11,8 @@
 // The token is the CRC-32 of all binary bytes, lower-cased 8-hex-char string.
 // The manifest.json entry is printed to stdout for manual insertion or patch.
 //
-// C-List (cc=8) — tail of the lump, slots 0..7:
-//   Slot 0  0x00000000       unused (reserved)
-//   Slot 1  0x48800001  E    Boot.Thread   (NS slot 1)  — Church domain enter
-//   Slot 2  0x48800006  E    Mint          (NS slot 6)  — GT lifecycle manager
-//   Slot 3  0x48800003  E    Boot.Abstr    (NS slot 3)  — Section I/J/K/L TPERM E tests
-//   Slot 4  0x48800004  E    Salvation     (NS slot 4)  — Church domain enter
-//   Slot 5  0x48800005  E    Navana        (NS slot 5)  — Church domain enter
-//   Slot 6  0x00000000       unused (reserved)
-//   Slot 7  0x40800001  X    Boot.Nucs     (NS slot 1)  — Turing domain; Section I/J TPERM X tests
+// C-List (cc=1) — tail of the lump, 1 slot:
+//   Slot 0  0x4A000006  E    SelfTest (NS slot 6) — one E-GT loaded into CR1 for TPERM/EXACT tests
 //
 // Usage:
 //   node scripts/build_selftest_lump.js
@@ -72,22 +65,23 @@ console.log(`Assembled ${words.length} instruction words.`);
 
 // ── C-List definition ─────────────────────────────────────────────────────────
 //
-// cc=8 slots placed at the lump TAIL (words lumpSize-cc .. lumpSize-1).
-// Preserving these values on every recompile is the purpose of this script.
-//
-// GT format: magic(5)|n(4)|...|perm(8)  — see ISA reference for full encoding.
+// cc = 1  — POLA minimum (one E-GT for LOAD + TPERM + EXACT cross-checks).
+// X-permission is NOT stored in a c-list (constructed dynamically by CALL into CR14,
+// a privileged register blocked from TPERM by the assembler).  The c-list holds
+// exactly one slot: E-GT for NS slot 6 (SelfTest).  At SelfTest entry:
+//   CR0  = E-GT for SelfTest  (Church domain, E-perm; from thread[+244])
+//   CR1  = E-GT for SelfTest  (loaded via LOAD CR1, SelfTest from c-list[0])
+// CR0 and CR1 are bit-identical (same GT word 0x4A000006) — EXACT cross-checks pass.
+// Sections I-L use CR0 and CR1 — no CR14 in TPERM (CR14 is privileged).
 //
 const CLIST = [
-    // slot  GT value      name           grants  NS slot  note
-    { gt: 0x00000000 }, // 0  null        —       —        reserved
-    { gt: 0x48800001 }, // 1  Boot.Thread E       1        Church domain enter
-    { gt: 0x48800006 }, // 2  Mint        E       6        GT lifecycle manager
-    { gt: 0x48800003 }, // 3  Boot.Abstr  E       3        TPERM E tests (Sections I/J/K/L)
-    { gt: 0x48800004 }, // 4  Salvation   E       4        Church domain enter
-    { gt: 0x48800005 }, // 5  Navana      E       5        Church domain enter
-    { gt: 0x00000000 }, // 6  null        —       —        reserved
-    { gt: 0x40800001 }, // 7  Boot.Nucs   X       1        Turing domain; TPERM X tests (Sections I/J)
+    { gt: 0x4A000006 }, // 0  SelfTest  E  NS slot 6  (POLA: minimum — one E-GT for LOAD+TPERM tests)
 ];
+// cc = 1: one E-GT pointing to NS slot 6.  Loaded into CR1 at start so that:
+//   a) TPERM CR1, E tests the LOAD instruction as well as TPERM
+//   b) TPERM CR0, EXACT, CR1 confirms two independently-sourced E-GTs are bit-identical
+// X-permission is NOT stored in a c-list (constructed dynamically by CALL → CR14,
+// which is a privileged register off-limits to TPERM).  No X entries here.
 
 // ── Pack LUMP binary ─────────────────────────────────────────────────────────
 //
@@ -98,12 +92,12 @@ const CLIST = [
 //   Words lumpSize-cc..lumpSize-1 : c-list (cc GT words, at lump tail)
 //
 // cw  = instruction word count (len(words))
-// cc  = 8  (8 GT slots at lump tail; see CLIST above)
+// cc  = 1  (one E-GT for SelfTest; POLA applied — see CLIST comment above)
 // typ = 0  (standard lump, not thread/outform)
 // lump_size = next power-of-2 >= (1 + cw + cc)
 
 const cw = words.length;
-const cc = CLIST.length;   // 8
+const cc = CLIST.length;   // 1
 const totalNeeded = 1 + cw + cc;
 
 let lumpSize = 64;
@@ -178,14 +172,7 @@ console.log(`Written: ${lumpPath} (${bytes.length} bytes)`);
 
 // ── Write sidecar .json ───────────────────────────────────────────────────────
 const capabilities = [
-    { name: 'null',         grants: [],    gt: '0x00000000',                  note: 'unused (slot 0 reserved)' },
-    { name: 'Boot.Thread',  grants: ['E'], gt: '0x48800001', ns_slot: 1,      note: 'Boot.Thread E-GT — Church domain enter' },
-    { name: 'Mint',         grants: ['E'], gt: '0x48800006', ns_slot: 6,      note: 'Mint E-GT — Church domain enter; GT lifecycle manager (NS slot 2 freed, Mint fills this position)' },
-    { name: 'Boot.Abstr',   grants: ['E'], gt: '0x48800003', ns_slot: 3,      note: 'Boot.Abstr E-GT — Church domain enter; Section I/J/K/L TPERM E tests' },
-    { name: 'Salvation',    grants: ['E'], gt: '0x48800004', ns_slot: 4,      note: 'Salvation E-GT — Church domain enter' },
-    { name: 'Navana',       grants: ['E'], gt: '0x48800005', ns_slot: 5,      note: 'Navana E-GT — Church domain enter' },
-    { name: 'null',         grants: [],    gt: '0x00000000',                  note: 'unused (slot 6 reserved)' },
-    { name: 'Boot.Nucs',    grants: ['X'], gt: '0x40800001', ns_slot: 1,      note: 'Boot.Nucs X-GT (nucleus execute) — Turing domain; Section I/J TPERM X tests' },
+    { name: 'SelfTest', grants: ['E'], gt: '0x4A000006', ns_slot: 6, note: 'SelfTest E-GT — loaded into CR1 for TPERM and EXACT cross-checks (POLA minimum)' },
 ];
 
 const sidecar = {
@@ -212,16 +199,9 @@ fs.writeFileSync(sidecarPath, JSON.stringify(sidecar, null, 2) + '\n');
 console.log(`Written: ${sidecarPath}`);
 
 // ── Print c-list note ─────────────────────────────────────────────────────────
-console.log('\nC-List GT slot assignments (cc=8, tail-packed):');
+console.log('\nC-List GT slot assignments (cc=1, tail-packed):');
 const slotNames = [
-    'null (reserved)',
-    'Boot.Thread  E  NS-slot 1  — Church domain enter',
-    'Mint         E  NS-slot 6  — GT lifecycle manager',
-    'Boot.Abstr   E  NS-slot 3  — Section I/J/K/L TPERM E tests',
-    'Salvation    E  NS-slot 4  — Church domain enter',
-    'Navana       E  NS-slot 5  — Church domain enter',
-    'null (reserved)',
-    'Boot.Nucs    X  NS-slot 1  — Turing domain; Section I/J TPERM X tests',
+    'SelfTest  E  NS-slot 6  — POLA minimum; loaded into CR1 for TPERM/EXACT tests',
 ];
 for (let i = 0; i < CLIST.length; i++) {
     const gt = '0x' + CLIST[i].gt.toString(16).padStart(8, '0');

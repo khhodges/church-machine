@@ -1251,11 +1251,10 @@ class ChurchSimulator {
         this.memory[threadLoc] = this.packLumpHeader(THREAD_N_MINUS_6, THREAD_SW, THREAD_CC, 2);
 
         // Thread caps zone — CR0 home slot at word offset +244 is pre-set to an E-GT
-        // for bootEntrySlot (default: slot 6, SelfTest) so the board boots standalone
-        // without needing setBootEntrySlot() from the IDE.  Mirrors server/boot_image.py
-        // which writes create_gt(0, boot_entry_slot, {"E":1}, 1) at thread_loc+244.
-        // The IDE overwrites this when the user picks a different entry.  The "if empty"
-        // guard in the INIT_ABSTR boot path (line ~1688) becomes a harmless no-op.
+        // for bootEntrySlot so the SelfTest has a valid E-GT in CR0 at entry.
+        // The SelfTest's done: loop calls TPERM CR0, E to decide when to dispatch
+        // to the programmer's abstraction; INIT_ABSTR overwrites this slot when
+        // the user loads their program, and the next Scheduler reschedule updates CR0.
         this.memory[threadLoc + THREAD_CAPS_OFFSET] =
             this.createGT(0, this.bootEntrySlot, {E: 1}, 1);
 
@@ -3226,7 +3225,7 @@ class ChurchSimulator {
             // crDst encodes a CR index only for Church opcodes (0–9).
             // Turing opcodes (16–25) put a DR index in the same bit field — do not fence them.
             const isChurchOp = (d.opcode <= 9);
-            if (isChurchOp && d.crDst >= 12) {
+            if (isChurchOp && d.crDst >= 12 && !this.mElevation) {
                 this.fault('PRIV_REG', `${this.opName(d.opcode)}: CR${d.crDst} is privileged — only CHANGE may write CR12–CR15`);
                 return null;
             }
