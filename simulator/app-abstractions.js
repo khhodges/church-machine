@@ -536,6 +536,13 @@ function _syncBootEntryFromSim() {
 
 function _applyBootEntryToSim() {
     if (!sim) return;
+    const _maxSlots = (sim.MAX_NS_ENTRIES > 0) ? sim.MAX_NS_ENTRIES : 256;
+    if (bootEntrySlot >= _maxSlots || !sim.isNSEntryValid(bootEntrySlot)) {
+        const _fallback = sim.isNSEntryValid(6) ? 6 : 3;
+        console.warn(`[bootEntrySlot] stored slot ${bootEntrySlot} is out of bounds for this boot image (max ${_maxSlots}); resetting to ${_fallback}`);
+        bootEntrySlot = _fallback;
+        try { localStorage.setItem('bootEntrySlot', String(_fallback)); } catch (e) {}
+    }
     if (sim.bootEntrySlot !== bootEntrySlot) {
         sim.bootEntrySlot = bootEntrySlot;
     }
