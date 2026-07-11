@@ -75,7 +75,7 @@ check(sim.bootComplete, 'T1: initial boot completes');
 
 // ── Load the self-test lump (mirrors runSelftestLump()'s sim.loadProgram) ─
 const fs = require('fs');
-const LUMP_PATH = path.join(ROOT, 'server', 'lumps', '2570eade.lump');
+const LUMP_PATH = path.join(ROOT, 'server', 'lumps', 'd15413e8.lump');
 const lumpBytes = fs.readFileSync(LUMP_PATH);
 const wordCount = lumpBytes.length / 4;
 const lumpWords = [];

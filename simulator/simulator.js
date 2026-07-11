@@ -138,15 +138,16 @@ const SCHEDULER_IRQ_CLIST = [
     { name: 'CR13_MBIT', target: 22, grants: { E: 1 } },
 ];
 
-// Pre-computed 32-bit instruction words from hardware/boot_rom.py BOOT_PROGRAM.
-// Written into Boot.Abstr lump code region during _initNamespaceTable() so the
-// binary matches what the hardware ROM contains. The IDE-chosen abstraction (lightning
-// bolt) is written to Thread.caps[0] (thread[+244]) by setBootEntrySlot(); CHANGE
-// RESTORE_CALL loads it into CR0, then CALL enters it directly.
+// Pre-computed 32-bit instruction words for the Boot.Abstr lump (NS slot 6, cc=0).
+// Written into the Boot.Abstr lump code region during _initNamespaceTable().
+// The IDE-chosen abstraction E-GT lives in Thread.caps[0] (thread[+244]); CHANGE
+// switches to Boot.Thread (slot 1) which RESTORE_CALLs it into CR0; TPERM attenuates
+// CR0 to E-only; CALL enters the first abstraction.  No LOAD CR15 — no privileged
+// register access needed.
 const BOOT_ROM_WORDS = [
-    0x077F8000, // [0]  LOAD   AL, CR15, CR15[0]   — load namespace cap from NS slot 0 into CR15
-    0x27678001, // [1]  CHANGE AL, CR12, CR15, #1  — switch to Boot.Thread via CR15 namespace; RESTORE loads CR0 from thread[+244]
-    0x17000000, // [2]  CALL   AL, CR0,  CR0        — enter IDE-chosen first abstraction (lightning bolt)
+    0x27660001, // [0]  CHANGE AL, CR12, CR12, #1  — switch to Boot.Thread (slot 1); RESTORE_CALL loads CR0–CR11 from thread[+244..+255]; CR0 = boot entry E-GT
+    0x37000008, // [1]  TPERM  AL, CR0,  E          — attenuate CR0 to E-permission only
+    0x17000000, // [2]  CALL   AL, CR0,  CR0         — enter IDE-chosen first abstraction (lightning bolt)
 ];
 
 class ChurchSimulator {
@@ -269,8 +270,14 @@ class ChurchSimulator {
             return false;
         }
         // Update instance variables to match the loaded binary's actual layout.
+        // NS_TABLE_BASE comes from the tag's discovered position, NOT from
+        // (this.memory.length - NS_TABLE_RESERVE).  When the image is smaller
+        // than the simulator's full memory window (e.g. a 16384-word image in
+        // a 65536-word simulator), the two are different and using memory.length
+        // would point into the zeroed upper region, giving magic=0x0 for every
+        // lump the NS table references.
         this.NS_TABLE_RESERVE = discoveredNsTableReserve;
-        this.NS_TABLE_BASE    = this.memory.length - this.NS_TABLE_RESERVE;
+        this.NS_TABLE_BASE    = discoveredNsTableBase;
         this.MAX_NS_ENTRIES   = (discoveredNsTableReserve / this.NS_ENTRY_WORDS) | 0;
 
         // Boot-entry slot: stored at mem[NS_TABLE_BASE - 2] by the generator.

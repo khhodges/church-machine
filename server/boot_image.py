@@ -82,12 +82,13 @@ _MANDATORY_NS_SLOTS = (0, 1, BOOT_ABSTR_NS_SLOT)  # slots 0, 1, 6
 # can reject stale binaries.
 BOOT_IMAGE_FORMAT_TAG = 0xB0070563  # "BOOT 0563" — must match simulator.js; bumped Task #563/568 (dynamic Boot.Abstr placement)
 
-# Pre-computed 32-bit instruction words from hardware/boot_rom.py BOOT_PROGRAM.
-# Must stay in sync with simulator.js BOOT_ROM_WORDS and hardware/boot_rom.py BOOT_PROGRAM.
+# Pre-computed 32-bit instruction words for the Boot.Abstr lump (NS slot 6, cc=0).
+# Must stay in sync with simulator.js BOOT_ROM_WORDS.
+# No LOAD CR15 — no privileged register access needed.
 BOOT_ROM_WORDS = [
-    0x077F8000, # [0]  LOAD   AL, CR15, CR15[0]   — load namespace cap from NS slot 0 into CR15
-    0x27678001, # [1]  CHANGE AL, CR12, CR15, #1  — switch to Boot.Thread via CR15 namespace; RESTORE loads CR0 from thread[+244]
-    0x17000000, # [2]  CALL   AL, CR0,  CR0        — enter IDE-chosen first abstraction (lightning bolt)
+    0x27660001, # [0]  CHANGE AL, CR12, CR12, #1  — switch to Boot.Thread (slot 1); RESTORE_CALL loads CR0–CR11 from thread[+244..+255]; CR0 = boot entry E-GT
+    0x37000008, # [1]  TPERM  AL, CR0,  E          — attenuate CR0 to E-permission only
+    0x17000000, # [2]  CALL   AL, CR0,  CR0         — enter IDE-chosen first abstraction (lightning bolt)
 ]
 
 
@@ -735,7 +736,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     #
     # Fallback (00000600.lump absent): cc=0, cw=NUC_CODE_WORDS=3.
     #   Word  0:      Lump header (n_minus_6, cw=3, cc=0)
-    #   Words 1–3:    Code region: LOAD→CHANGE→CALL (3 instructions)
+    #   Words 1–3:    Code region: CHANGE→TPERM→CALL (3 instructions; no LOAD CR15)
     #   Words 4..end: Freespace (no c-list)
     #   CHANGE first-activation restores CR0..CR11 from thread caps zone,
     #   giving CR0 = IDE-chosen E-GT (set by setBootEntrySlot()).
@@ -814,6 +815,10 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     _manifest_path = os.path.join(lumps_dir, "manifest.json")
     _token_map     = _load_catalog_token_map(_manifest_path)
     for _slot, _tok in _load_boot_resident_entries(_manifest_path):
+        if _slot == BOOT_ABSTR_NS_SLOT:
+            # Boot.Abstr is always synthesised above (or loaded from 00000600.lump).
+            # A manifest boot_resident entry at the same slot must not overwrite it.
+            continue
         _phys = locations.get(_slot)
         if _phys is None:
             continue
