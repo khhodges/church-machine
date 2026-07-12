@@ -3,7 +3,7 @@
 // step_button_stays_paused.spec.js — Playwright E2E test
 //
 // Verifies that clicking the Step button does NOT trigger continuous execution
-// after boot completes. Two scenarios are covered:
+// after boot completes. Three scenarios are covered:
 //
 //   Scenario A (Path 1 — instant boot):
 //     A compiled program is pending in the assembler buffer (_pendingSimLoad=true).
@@ -14,6 +14,12 @@
 //     No pending program. The user clicks Step 8 times to step manually through
 //     all 8 boot phases (B:00…B:07). After the final click the simulator must
 //     be paused — not in a continuous run loop.
+//
+//   Scenario C (Boot → Step race — cancel guard):
+//     The user clicks Boot (starting slowBoot() animation, bootAnimating=true),
+//     waits 200 ms (mid-animation), then clicks Step.  stepSim() must cancel
+//     the animation (clearTimeout + bootAnimating=false) and return paused after
+//     running one manual boot phase.  No continuous execution loop may start.
 //
 // Approach:
 //   Auto-boot is disabled via localStorage before page load (prevents slowBoot()
@@ -294,6 +300,89 @@ test.describe('Step button stays paused — Scenario B (manual boot, 8 clicks, P
 
         // ── 3. Assert paused state ─────────────────────────────────────────────
         await assertPausedState(page);
+    });
+
+});
+
+// ─── Scenario C — Boot → Step race (bootAnimating cancel guard) ───────────────
+//
+// The user clicks Boot (which calls slowBoot() and sets bootAnimating=true),
+// waits 200 ms while the animation is mid-flight, then clicks Step.
+// stepSim() must detect bootAnimating===true, cancel the pending timer via
+// clearTimeout(_bootAnimTimer), clear bootAnimating=false, and run ONE manual
+// boot phase (B:00 FAULT_RST).  After that it returns without calling
+// runSimGo() or walkToggle(), so the sim must stay paused.
+//
+// Why this scenario cannot use assertPausedState():
+//   assertPausedState() checks sim.bootComplete===true, but after cancelling the
+//   animation and running only B:00, bootComplete is still false (only one of
+//   the eight phases ran).  The critical invariants are sim.running===false and
+//   a stable stepCount over 1300 ms — those are what this scenario asserts.
+
+test.describe('Step button stays paused — Scenario C (Boot→Step race, cancel guard)', () => {
+
+    test('clicking Step mid-boot-animation cancels it and leaves the sim paused', async ({ page }) => {
+        test.setTimeout(60000);
+
+        await loadSimulator(page);
+
+        // ── 1. Force pre-boot state ────────────────────────────────────────────
+        //
+        // slowBoot() returns immediately if sim.bootComplete or sim.halted.
+        // Clear them so the animation actually starts.
+        await page.evaluate(() => {
+            sim.bootComplete = false;
+            sim.bootStep     = 0;
+            sim.halted       = false;
+            sim.running      = false;
+        });
+
+        // ── 2. Start slowBoot() — this sets bootAnimating=true and schedules
+        //       the first _bootAnimTimer tick (800 ms from now).
+        await page.evaluate(() => slowBoot());
+
+        // Confirm animation has started before proceeding.
+        const animStarted = await page.evaluate(() => bootAnimating === true);
+        expect(animStarted, 'slowBoot() must set bootAnimating=true before Step is clicked').toBe(true);
+
+        // ── 3. Wait 200 ms (well within the 800 ms tick) then click Step ──────
+        //
+        // stepSim() will see bootAnimating===true at line 711 of app-run.js,
+        // cancel the pending timeout, clear bootAnimating, then run one manual
+        // boot phase (B:00 FAULT_RST).  It returns without calling runSimGo().
+        await page.waitForTimeout(200);
+
+        const stepBtn = page.locator('#toolStepBtn');
+        await stepBtn.waitFor({ state: 'visible' });
+        await stepBtn.click();
+
+        // Allow the click handler and any microtasks to settle.
+        await page.waitForTimeout(400);
+
+        // ── 4. Assert cancel guard fired and sim is paused ────────────────────
+
+        const state = await page.evaluate(() => ({
+            bootAnimating:   bootAnimating,
+            bootAnimTimer:   _bootAnimTimer,
+            running:         sim.running,
+            halted:          sim.halted,
+            stepCount:       sim.stepCount,
+        }));
+
+        expect(state.bootAnimating, 'bootAnimating must be false — cancel guard must have fired').toBe(false);
+        expect(state.bootAnimTimer, '_bootAnimTimer must be null — clearTimeout must have been called').toBeNull();
+        expect(state.running,       'sim.running must be false — no batch loop may start').toBe(false);
+        expect(state.halted,        'sim must not be halted after B:00').toBe(false);
+
+        // Wait longer than one walk tick to confirm no hidden execution loop.
+        await page.waitForTimeout(1300);
+
+        const stepCountAfter = await page.evaluate(() => sim.stepCount);
+        expect(stepCountAfter, 'stepCount must not increase — no continuous execution loop active').toBe(state.stepCount);
+
+        // Step button must still be interactive.
+        await expect(stepBtn).toBeVisible();
+        await expect(stepBtn).not.toBeDisabled();
     });
 
 });
