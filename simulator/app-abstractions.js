@@ -536,9 +536,19 @@ function _syncBootEntryFromSim() {
 
 function _applyBootEntryToSim() {
     if (!sim) return;
+    const _archCanonical = (typeof sim._bootAbstrSlot === 'number') ? sim._bootAbstrSlot : 6;
+    // Migrate stale localStorage: slots 2–5 are hardware MMIO devices, never valid boot
+    // entries.  A stored value in this range pre-dates the Boot.Abstr slot 3→6 migration.
+    // isNSEntryValid(3) returns true for LED_DEV (non-zero MMIO entry), so the bounds
+    // check below won't catch it — we must guard here explicitly.
+    if (bootEntrySlot >= 2 && bootEntrySlot <= 5) {
+        console.warn(`[bootEntrySlot] slot ${bootEntrySlot} is a hardware MMIO device slot, not a valid boot entry; migrating stale localStorage to canonical slot ${_archCanonical}`);
+        bootEntrySlot = _archCanonical;
+        try { localStorage.setItem('bootEntrySlot', String(_archCanonical)); } catch (e) {}
+    }
     const _maxSlots = (sim.MAX_NS_ENTRIES > 0) ? sim.MAX_NS_ENTRIES : 256;
     if (bootEntrySlot >= _maxSlots || !sim.isNSEntryValid(bootEntrySlot)) {
-        const _fallback = sim.isNSEntryValid(6) ? 6 : 3;
+        const _fallback = sim.isNSEntryValid(_archCanonical) ? _archCanonical : 6;
         console.warn(`[bootEntrySlot] stored slot ${bootEntrySlot} is out of bounds for this boot image (max ${_maxSlots}); resetting to ${_fallback}`);
         bootEntrySlot = _fallback;
         try { localStorage.setItem('bootEntrySlot', String(_fallback)); } catch (e) {}

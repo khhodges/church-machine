@@ -1644,7 +1644,7 @@ class ChurchSimulator {
 
             // ════════════════════════════════════════════════════════════════════
             // B:05  INIT_ABSTR  (case 5)
-            // Load Boot.Abstr (NS Slot 3) into CR6 with E-perm.
+            // Load Boot.Abstr (NS Slot 6 = SelfTest) into CR6 with E-perm.
             // Slot 2 is a free/null entry — Task #247.
             // The E-type GT written here is snapshotted as oldCR6GT in B:06 and
             // saved to the sentinel call frame in the thread stack.

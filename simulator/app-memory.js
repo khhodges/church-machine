@@ -2853,7 +2853,7 @@ function _closeCRDetailMenuOnce() {
 
 let selectedAbsIndex = null;
 let absCollapsedLayers = {};
-let bootEntrySlot = (() => { const s = parseInt(localStorage.getItem('bootEntrySlot'), 10); return Number.isFinite(s) ? Math.max(0, Math.min(255, s)) : 3; })();
+let bootEntrySlot = (() => { const s = parseInt(localStorage.getItem('bootEntrySlot'), 10); return Number.isFinite(s) ? Math.max(0, Math.min(255, s)) : 6; })();
 let userMethodData = {};
 let userMethodLists = {};
 

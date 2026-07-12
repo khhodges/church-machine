@@ -308,7 +308,7 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
 
     Checks that the format-version tag at mem[ns_table_base - 1] equals
     BOOT_IMAGE_FORMAT_TAG, and that every mandatory NS slot (0, 1,
-    BOOT_ABSTR_NS_SLOT=3) is non-zero.  A wrong or zero tag means the
+    BOOT_ABSTR_NS_SLOT=6) is non-zero.  A wrong or zero tag means the
     image was produced by a stale generator and would be rejected by
     loadBootImage() in the simulator; a zeroed mandatory slot causes
     isNSEntryValid() to return false, producing a BOOT fault at runtime.
@@ -454,8 +454,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     Step 2 / Step 3 are optional. Returns a `bytes` object whose length
     is `step1.totalNamespaceWords * 4`.
 
-    `boot_entry_slot` – NS slot the boot ROM will jump to (default: BOOT_ABSTR_NS_SLOT=3).
-    The layout always places the LED-flash lump at BOOT_ABSTR_NS_SLOT; this parameter
+    `boot_entry_slot` – NS slot the boot ROM will jump to (default: BOOT_ABSTR_NS_SLOT=6).
+    The layout always places the SelfTest lump at BOOT_ABSTR_NS_SLOT; this parameter
     records which slot the hardware / simulator should treat as the boot entry point.
     """
     if boot_entry_slot is None:
@@ -695,8 +695,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     # ----- Foundational lump headers -------------------------------------
     # Thread lump (NS slot 1): cw=32, cc=12, typ=2.
     # cc=12: c-list spans words +244..+255 (256-12=244=THREAD_CAPS_OFFSET).
-    # thread[+244] = CR0 home slot — E-GT for boot_entry_slot (default: slot 3, LED flash).
-    # Pre-set here so the board boots into LED flash standalone without needing
+    # thread[+244] = CR0 home slot — E-GT for boot_entry_slot (default: slot 6, SelfTest).
+    # Pre-set here so the board boots into SelfTest standalone without needing
     # setBootEntrySlot() from the IDE.  The IDE overwrites this when the user
     # chooses a different entry point; the simulator's "if empty" guard is a no-op
     # when loading a boot image that already carries this word.
@@ -795,7 +795,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
 
     # Boot-entry slot: stored at NS_TABLE_BASE - 2 so that loadBootImage()
     # can restore the user's selected boot entry when loading the image.
-    # Default is BOOT_ABSTR_NS_SLOT (= 3); only the low byte is used.
+    # Default is BOOT_ABSTR_NS_SLOT (= 6); only the low byte is used.
     mem[ns_table_base - 2] = boot_entry_slot & 0xFF
     # Format-version tag: written immediately before the NS table so that
     # loadBootImage() can detect and reject stale pre-Task-#229 binaries.
