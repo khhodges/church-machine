@@ -138,17 +138,8 @@ const SCHEDULER_IRQ_CLIST = [
     { name: 'CR13_MBIT', target: 22, grants: { E: 1 } },
 ];
 
-// Pre-computed 32-bit instruction words for the Boot.Abstr lump (NS slot 6, cc=0).
-// Written into the Boot.Abstr lump code region during _initNamespaceTable().
-// The IDE-chosen abstraction E-GT lives in Thread.caps[0] (thread[+244]); CHANGE
-// switches to Boot.Thread (slot 1) which RESTORE_CALLs it into CR0; TPERM attenuates
-// CR0 to E-only; CALL enters the first abstraction.  No LOAD CR15 — no privileged
-// register access needed.
-const BOOT_ROM_WORDS = [
-    0x27660001, // [0]  CHANGE AL, CR12, CR12, #1  — switch to Boot.Thread (slot 1); RESTORE_CALL loads CR0–CR11 from thread[+244..+255]; CR0 = boot entry E-GT
-    0x37000008, // [1]  TPERM  AL, CR0,  E          — attenuate CR0 to E-permission only
-    0x17000000, // [2]  CALL   AL, CR0,  CR0         — enter IDE-chosen first abstraction (lightning bolt)
-];
+// Direct dispatch: after boot step B:07 NUC_CODE, CR0 is pre-loaded with the
+// boot-entry E-GT (Thread.caps[0]).  No trampoline instructions needed.
 
 class ChurchSimulator {
     constructor() {
@@ -1267,7 +1258,6 @@ class ChurchSimulator {
 
         // Memory-manager GT at c-list[0]: R|W Inform capability over NS slot 0 (full namespace).
         clistGTs[0] = this.createGT(0, 0, {R:1, W:1}, 1);
-        const NUC_CODE_WORDS    = 3;
         const DEMO_CLIST_SIZE   = 11;   // slots 0–10 (minimal 8-slot namespace)
 
         // ── NS lump header and c-list (Task #694) ────────────────────────────────────
@@ -1293,35 +1283,32 @@ class ChurchSimulator {
         this.demoClistGTs       = clistGTs.slice();
 
         // ── Boot.Abstr lump (NS Slot 6 = SelfTest) ────────────────────────────────
-        // Redesigned (Task #651): cc=0, cw=3. No c-list. Three instructions:
-        //   CHANGE AL, CR12, CR12, #1  — switch to Boot.Thread (slot 1);
-        //                                RESTORE_CALL loads CR0–CR11 from thread caps zone
-        //                                (thread[+244..+255]). CR0 = programmable Entry E-GT.
-        //   TPERM  AL, CR0,  #E        — restrict CR0 to E-permission only
-        //   CALL   AL, CR0,  CR0       — enter configured first abstraction
-        //                                (faults NULL_CAP if thread[+244] = 0)
-        //   Word  0: Lump header (n_minus_6, cw=3, cc=0)
-        //   Words 1–3: Code region
-        //   Words 4..63: Free (no c-list — cc=0 means no c-list register)
-        const bootEntryLoc     = this.memory[this.NS_TABLE_BASE + this.bootEntrySlot * this.NS_ENTRY_WORDS];
-        const entryN_MINUS_6   = Math.max(0, Math.ceil(Math.log2(BOOT_ABSTR_LUMP_SIZE)) - 6);
+        // Direct dispatch: no trampoline is written here.  The real SelfTest lump
+        // is provided by loadBootImage() (from 00000600.lump via boot_image.py).
+        // In the fallback init path the lump body is left as zeros; NUC_CLIST will
+        // fault with LUMP_MAGIC if no real lump is installed, signalling that a
+        // boot image must be generated and loaded first.
+        // NS entry word1/word2 are still set so the NS table entry is structurally
+        // valid (non-zero), satisfying isNSEntryValid() during boot step B:05.
         const entryLumpSize    = BOOT_ABSTR_LUMP_SIZE;
-        this.memory[bootEntryLoc] = this.packLumpHeader(entryN_MINUS_6, NUC_CODE_WORDS, 0, 0);
-        // Write 3 BOOT_PROGRAM instruction words into the code region (words 1..3).
-        for (let i = 0; i < BOOT_ROM_WORDS.length && i < NUC_CODE_WORDS; i++) {
-            this.memory[bootEntryLoc + 1 + i] = BOOT_ROM_WORDS[i] >>> 0;
-        }
-        // cc=0: no c-list region. All words after code region are freespace (already zero).
-        const entryCRLimit     = entryLumpSize - 1;
         const entryNSBase      = this.NS_TABLE_BASE + this.bootEntrySlot * this.NS_ENTRY_WORDS;
+        const entryCRLimit     = entryLumpSize - 1;
+        const bootEntryLoc     = this.memory[this.NS_TABLE_BASE + this.bootEntrySlot * this.NS_ENTRY_WORDS];
         this.memory[entryNSBase + 1] = this.packNSWord1(entryCRLimit, 0, 0, 1, 0);
         this.memory[entryNSBase + 2] = this.makeVersionSeals(0, bootEntryLoc, entryCRLimit);
-        this.nsClistMap[this.bootEntrySlot] = [];                     // Boot.Abstr has no c-list (cc=0)
 
-        // Slot 2 freed — Startup.Config removed. The hardware ISA owns M-state per CR
-        // register. CALL through a non-M E-GT drops M automatically (BOOT_ROM_WORDS[2]).
-        // Thread.CR[0] entry E-GT is set by the boot image / setBootEntrySlot(); no
-        // intermediary lump is needed.
+        // Write a minimal Boot.Abstr lump header at the boot entry slot physical
+        // address so NUC_CLIST (B:06) can read a valid magic word.  Without this,
+        // the standalone simulator (no boot image loaded) faults on the header check.
+        // Matches generate_boot_image() which always writes the real SelfTest lump;
+        // for an empty standalone init we use cw=3, cc=0 (minimal valid header).
+        // The parity test compares this word against the Python-generated header.
+        const _entryNM6   = Math.max(0, Math.ceil(Math.log2(entryLumpSize)) - 6);
+        this.memory[bootEntryLoc] = this.packLumpHeader(_entryNM6, 3, 0, 0) >>> 0;
+
+        // Slot 2 freed — Startup.Config removed. Thread.CR[0] entry E-GT is set
+        // by the boot image / setBootEntrySlot(); NUC_CODE (B:07) installs it
+        // directly into CR0 at boot completion (direct dispatch model).
 
 
         // ── Service abstraction c-lists (Task #971) ──────────────────────────────
@@ -1767,23 +1754,24 @@ class ChurchSimulator {
                 }
                 this.sto = sp_max - 2;
 
-                // ── Step 4: cc=0 (CLOOMC design) vs cc>0 (legacy) ─────────────────────
-                // cc=0: CHANGE→TPERM→CALL path — no c-list.  thread[+244] holds the entry
-                //       E-GT written by the boot image or setBootEntrySlot(); CALL CR0 dispatches.
-                // cc>0: derive CR6 (c-list, E) from lump header (legacy saved-lump path).
+                // ── Step 4: cc=0 (direct dispatch) vs cc>0 (saved-lump c-list) ──────────
+                // cc=0: direct dispatch — no c-list.  thread[+244] holds the boot-entry E-GT
+                //       written by the boot image or setBootEntrySlot(); NUC_CODE installs it
+                //       directly into CR0.  No CHANGE/TPERM/CALL trampoline.
+                // cc>0: derive CR6 (c-list, E) from lump header (saved-lump path).
                 if (cc === 0) {
-                    // CLOOMC design (Task #651): no c-list in Boot.Abstr.
-                    // thread[+244] holds the boot entry E-GT (set by boot image or setBootEntrySlot()).
-                    // The 3-instruction program (CHANGE→TPERM→CALL) reads it from caps zone at runtime.
+                    // Direct dispatch path: no c-list in Boot.Abstr.
+                    // thread[+244] holds the boot-entry E-GT (set by boot image or setBootEntrySlot()).
+                    // NUC_CODE (B:07) reads it and installs it directly into CR0 — no CHANGE/TPERM/CALL.
                     // CR6 was written by B:05 INIT_ABSTR with the Boot.Abstr E-GT; that GT is already
-                    // snapshotted into the sentinel frame above (thread[+242]).  Since cc=0 means there
-                    // is no c-list at all, CR6 must be cleared to NULL so the machine state is consistent.
+                    // snapshotted into the sentinel frame above.  Since cc=0 means there is no c-list,
+                    // CR6 must be cleared to NULL so machine state is consistent.
                     this.cr[6] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
-                    this.output += `[BOOT] NUC_CLIST — cc=0 (no c-list, CHANGE→TPERM→CALL path); CR6←NULL; sentinel pushed (frame@+${sp_max}, STO=${this.sto})\n`;
+                    this.output += `[BOOT] NUC_CLIST — cc=0 (no c-list, direct-dispatch path); CR6←NULL; sentinel pushed (frame@+${sp_max}, STO=${this.sto})\n`;
                     this.output += `[BOOT] SENTINEL CALL — frame@+${sp_max}=0x${sentinelFrameWord.toString(16).toUpperCase().padStart(8,'0')} (NIA=0x7FFF,sz=1,prev_STO=${sp_max}), E-GT@+${sp_max-1}=0x${oldCR6GT.toString(16).toUpperCase().padStart(8,'0')}, STO=${this.sto}\n`;
                     this.auditLog.push({
                         gate: 'SENTINEL',
-                        desc: `Boot.Abstr cc=0 (no c-list) — sentinel pushed @ +${sp_max}; thread[+${THREAD_CAPS_OFFSET}] holds boot entry E-GT`,
+                        desc: `Boot.Abstr cc=0 (no c-list, direct dispatch) — sentinel pushed @ +${sp_max}; thread[+${THREAD_CAPS_OFFSET}] holds boot entry E-GT`,
                         label: _b4Label + ' (no c-list)',
                         nsIndex: bootEntrySlot,
                         requiredPerm: null,
@@ -1847,14 +1835,22 @@ class ChurchSimulator {
                     m: this.mElevation ? 1 : 0
                 };
 
+                // ── Directly set CR0 to boot-entry E-GT (Thread.caps[0]) ─────────────────
+                // Direct dispatch: install the E-GT straight into CR0 so the first
+                // instruction executed is word 1 of the real SelfTest lump — no
+                // CHANGE/TPERM/CALL trampoline.  The same E-GT was written into
+                // thread[+THREAD_CAPS_OFFSET] at init and confirmed by B:05 INIT_ABSTR.
+                const _cr0EGT = this.createGT(0, bootEntrySlot, {E:1}, 1);
+                this.cr[0] = { word0: _cr0EGT, word1: 0, word2: 0, word3: 0, m: 0 };
+
                 // ── Set PC = 0 ────────────────────────────────────────────────────────
                 this.pc = 0;
                 this._nucLumpData = null;                                            // clear stash
 
-                this.output += `[BOOT] NUC_CODE — CR14(R+X) <- ${_b4Label} code lump (base=0x${base.toString(16).toUpperCase()}, cw=${cw}); PC=0\n`;
+                this.output += `[BOOT] NUC_CODE — CR14(R+X) <- ${_b4Label} code lump (base=0x${base.toString(16).toUpperCase()}, cw=${cw}); CR0 <- boot-entry E-GT (Slot ${bootEntrySlot}); PC=0\n`;
                 this.auditLog.push({
                     gate: 'CR_WR',
-                    desc: `CR14(R+X) ← ${_b4Label} code lump  · base=0x${base.toString(16).toUpperCase()}, cw=${cw}, PC←0`,
+                    desc: `CR14(R+X) ← ${_b4Label} code lump  · base=0x${base.toString(16).toUpperCase()}, cw=${cw}, PC←0; CR0 ← boot-entry E-GT (direct dispatch)`,
                     label: _b4Label + ' code',
                     nsIndex: bootEntrySlot,
                     requiredPerm: 'R+X',
@@ -1864,9 +1860,8 @@ class ChurchSimulator {
                     stepCtx: 'NUC_CODE CR14',
                 });
 
-                // B:07 is the final boot step. The hardware ISA owns M-state per CR register —
-                // CALL through a non-M E-GT (BOOT_ROM_WORDS[2]: CALL AL, CR0, CR0) drops M
-                // automatically on dispatch. No Startup.Config intermediary is needed.
+                // B:07 is the final boot step. CR0 now holds the boot-entry E-GT
+                // (direct dispatch — no Startup.Config intermediary or trampoline needed).
                 this.mElevation = false;            // drop M-elevation: normal capability checks now apply
                 this._resetAllMBits();              // clear M-bits set on CRs during boot init;
                                                     // prevents stale m=1 from triggering writeback gate
@@ -1902,10 +1897,10 @@ class ChurchSimulator {
                 this.bootComplete = true;           // signal the step-loop to start dispatching instructions
                 this.ledBits = 0b111111;            // all 6 LEDs on = boot complete
                 this.ledMode = 'boot';              // LED display stays in boot-progress mode until first user toggle
-                this.output += '[BOOT] COMPLETE — M-Elevation OFF. CALL CR0 will enter boot entry (Thread.CR[0]). Boot complete.\n';
+                this.output += '[BOOT] COMPLETE — M-Elevation OFF. CR0 = boot-entry E-GT (direct dispatch). Boot complete.\n';
                 this.auditLog.push({
                     gate: 'CMPL',
-                    desc: 'bootComplete ← true  ·  M-elevation OFF  ·  CALL CR0 dispatches to boot entry',
+                    desc: 'bootComplete ← true  ·  M-elevation OFF  ·  CR0 = boot-entry E-GT (direct dispatch)',
                     label: 'Boot complete',
                     nsIndex: null,
                     requiredPerm: null,

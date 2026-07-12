@@ -40,9 +40,9 @@ import json
 import os
 import struct
 try:
-    from boot_constants import NUC_CODE_WORDS, DEMO_CLIST_SIZE, BOOT_ABSTR_DEFAULT_SIZE
+    from boot_constants import DEMO_CLIST_SIZE, BOOT_ABSTR_DEFAULT_SIZE
 except ImportError:
-    from server.boot_constants import NUC_CODE_WORDS, DEMO_CLIST_SIZE, BOOT_ABSTR_DEFAULT_SIZE
+    from server.boot_constants import DEMO_CLIST_SIZE, BOOT_ABSTR_DEFAULT_SIZE
 
 NS_ENTRY_WORDS   = 4
 MAX_NS_ENTRIES   = 1024         # GT bits[15:0] support 65535; 1024 is the practical cap
@@ -82,14 +82,8 @@ _MANDATORY_NS_SLOTS = (0, 1, BOOT_ABSTR_NS_SLOT)  # slots 0, 1, 6
 # can reject stale binaries.
 BOOT_IMAGE_FORMAT_TAG = 0xB0070563  # "BOOT 0563" — must match simulator.js; bumped Task #563/568 (dynamic Boot.Abstr placement)
 
-# Pre-computed 32-bit instruction words for the Boot.Abstr lump (NS slot 6, cc=0).
-# Must stay in sync with simulator.js BOOT_ROM_WORDS.
-# No LOAD CR15 — no privileged register access needed.
-BOOT_ROM_WORDS = [
-    0x27660001, # [0]  CHANGE AL, CR12, CR12, #1  — switch to Boot.Thread (slot 1); RESTORE_CALL loads CR0–CR11 from thread[+244..+255]; CR0 = boot entry E-GT
-    0x37000008, # [1]  TPERM  AL, CR0,  E          — attenuate CR0 to E-permission only
-    0x17000000, # [2]  CALL   AL, CR0,  CR0         — enter IDE-chosen first abstraction (lightning bolt)
-]
+# Direct dispatch: NUC_CODE (B:07) pre-loads CR0 with the boot-entry E-GT.
+# No CHANGE→TPERM→CALL trampoline — 00000600.lump must always be present.
 
 
 def _encode_perm(perms_dict):
@@ -755,17 +749,17 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         mem[entry_ns_base + 1] = pack_ns_word1(entry_cr_limit, 0, 0, 0, 1, _saved_cc)
         mem[entry_ns_base + 2] = make_version_seals(0, boot_entry_loc, entry_cr_limit)
     else:
-        # No saved lump — synthesise the default Boot.Abstr at 64 words.
-        # Task #651: cc=0, cw=3. No c-list. Entry E-GT read from thread caps zone (thread[+244]).
-        mem[boot_entry_loc] = pack_lump_header(
-            _ns_n_minus_6(actual_abstr_size), NUC_CODE_WORDS, 0, 0)
-        # Write 3 BOOT_PROGRAM instruction words into the code region (words 1..3).
-        for i, word in enumerate(BOOT_ROM_WORDS[:NUC_CODE_WORDS]):
-            mem[boot_entry_loc + 1 + i] = word & 0xFFFFFFFF
-        # cc=0: no c-list region. All words after the code region are freespace (already zero).
-        entry_cr_limit = actual_abstr_size - 1
-        mem[entry_ns_base + 1] = pack_ns_word1(entry_cr_limit, 0, 0, 0, 1, 0)
-        mem[entry_ns_base + 2] = make_version_seals(0, boot_entry_loc, entry_cr_limit)
+        # No saved lump — the trampoline is eliminated (direct dispatch via CR0).
+        # The real SelfTest lump (00000600.lump) must always be present.
+        # Raise a clear error so the operator knows to generate a boot image with
+        # the SelfTest lump rather than silently producing a broken image.
+        lump_filename = f"{BOOT_ABSTR_NS_SLOT << 8:08x}.lump"
+        raise ValueError(
+            f"Boot.Abstr lump '{lump_filename}' not found in lumps directory.\n"
+            f"The direct-dispatch boot model requires the real SelfTest lump to be\n"
+            f"present. Generate or restore '{lump_filename}' and retry.\n"
+            f"(Looked in: {lumps_dir})"
+        )
 
     # Thread.CR[0] entry E-GT is pre-set to boot_entry_slot above; IDE overwrites on connect.
 

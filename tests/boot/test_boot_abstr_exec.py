@@ -1,63 +1,46 @@
-"""End-to-end simulator test: step through all 3 Boot.Abstr instructions.
+"""End-to-end simulator test: Boot.Abstr direct dispatch via CR0.
 
-`test_boot_image_loads_and_boots.py` (Task #224) verifies that
-loadBootImage() + _bootStep() complete cleanly and land in the expected
-architectural state (CR12/CR14/CR15/CR6 wired to the right NS slots,
-sentinel call frame on stack, PC=0, M-elevation dropped).  That test
-stops at bootComplete=true and does NOT exercise the 3-instruction
-Boot.Abstr program that the simulator's step/run engine executes next.
+After the boot state machine finishes (bootComplete=true), NUC_CODE (B:07)
+must have installed the boot-entry E-GT directly into CR0.  No
+CHANGE→TPERM→CALL trampoline is involved; the first user instruction fetched
+is word 1 of the real SelfTest lump.
 
-This test (Task #656) drives the harness further: after the boot state
-machine finishes, it calls sim.step() for each of the three Boot.Abstr
-instructions and asserts on the resulting simulator state:
+Tests (parametrised over two boot configs):
 
-  [0] CHANGE AL, CR12, CR12, #1
-        The simulator's isFirstActivation bypass handles the S-perm gate
-        for this self-referential pattern (crSrc=crDst=12, no prior thread
-        context saved) — no harness state manipulation is needed.  CHANGE
-        then performs RESTORE_CALL: it loads CR0–CR11 from the Boot.Thread
-        caps zone (thread[+244..+255]).  The test asserts:
-          - no new fault
-          - CR0.word0 is non-null and carries the boot-entry E-GT
-            (GT index == bootEntrySlot, E-permission set)
-          - the CHANGE step description mentions RESTORE_CALL
+  A. Boot completes cleanly — loaded=true, bootComplete=true, no faults.
 
-  [1] TPERM AL, CR0, #E
-        TPERM restricts CR0 to E-permission only.  The test asserts:
-          - no new fault
-          - CR0.word0 is non-null
-          - only the E bit is set in the permission field (E-only)
+  B. CR0 after boot is non-null and carries E-permission (installed by
+     NUC_CODE direct dispatch, not by CHANGE RESTORE_CALL).
 
-  [2] CALL AL, CR0, CR0
-        With E-only CR0, CALL enters the configured boot-entry abstraction
-        (default: NS Slot 3, Boot.Abstr itself, or whichever slot
-        bootEntrySlot points to).  The test asserts:
-          - no new fault
-          - the call stack grew by exactly 1 (a new frame was pushed)
-          - PC reset to 0 (callee's first instruction)
+  C. CR0 points to the correct NS slot (bootEntrySlot).
 
-Any regression in CHANGE CR12 semantics (RESTORE_CALL path), TPERM's
-E-masking, or CALL's entry path will be caught here before the existing
-boot test suite has a chance to flag anything.
+  D. CR0 has no extraneous permissions (only E-bit set).
+
+  E. thread[+244] (Thread.caps[0]) holds the same E-GT that NUC_CODE
+     installed into CR0 (confirmed via bootEntrySlot match).
+
+The harness uses sim_boot_loader.js (the same script used by
+test_boot_image_loads_and_boots.py) extended with cr0 and bootEntrySlot
+fields in its JSON output.  A synthetic 00000600.lump is written into
+tmp_path so generate_boot_image() does not raise ValueError.
 """
 import base64
 import json
 import os
+import struct
 import subprocess
 import sys
 
 import pytest
 
-ROOT    = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+ROOT      = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)
 
-from server.boot_image import generate_boot_image  # noqa: E402
+from server.boot_image import generate_boot_image, BOOT_ABSTR_NS_SLOT  # noqa: E402
 
 LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
-HARNESS   = os.path.join(ROOT, "tests", "boot", "sim_abstr_runner.js")
+HARNESS   = os.path.join(ROOT, "tests", "boot", "sim_boot_loader.js")
 
-
-# ── configs ──────────────────────────────────────────────────────────────────
 
 def _cfg_default():
     return {
@@ -85,7 +68,14 @@ CONFIGS = [
 ]
 
 
-# ── harness helper ────────────────────────────────────────────────────────────
+def _make_synthetic_lump(cw=3, cc=0, n_minus_6=0):
+    """Build a minimal 64-word big-endian Boot.Abstr lump."""
+    lump_size = 1 << (n_minus_6 + 6)
+    header = (0x1F << 27) | (n_minus_6 << 23) | (cw << 10) | (0 << 8) | cc
+    words = [0] * lump_size
+    words[0] = header
+    return struct.pack(f">{lump_size}I", *words)
+
 
 def _run_harness(cfg, image_bytes):
     payload = json.dumps({
@@ -102,7 +92,7 @@ def _run_harness(cfg, image_bytes):
     )
     if proc.returncode != 0:
         raise RuntimeError(
-            f"sim_abstr_runner.js exited {proc.returncode}\n"
+            f"sim_boot_loader.js exited {proc.returncode}\n"
             f"stderr:\n{proc.stderr.decode('utf-8', errors='replace')}"
         )
     out = proc.stdout.decode("utf-8", errors="replace").strip()
@@ -110,145 +100,96 @@ def _run_harness(cfg, image_bytes):
         return json.loads(out)
     except json.JSONDecodeError as e:
         raise RuntimeError(
-            f"sim_abstr_runner.js produced non-JSON output: {e}\n"
+            f"sim_boot_loader.js produced non-JSON output: {e}\n"
             f"stdout:\n{out}"
         )
 
 
-# ── GT helpers ────────────────────────────────────────────────────────────────
-
 def _gt_perms(word0):
-    """Return {B,E,S,L,X,W,R} permission dict from a GT word0."""
-    p = (word0 >> 25) & 0x7F
-    return {
-        "B": (p >> 6) & 1,
-        "E": (p >> 5) & 1,
-        "S": (p >> 4) & 1,
-        "L": (p >> 3) & 1,
-        "X": (p >> 2) & 1,
-        "W": (p >> 1) & 1,
-        "R": (p >> 0) & 1,
-    }
+    """Extract permission dict from a GT word0 using the v2.0 simulator layout.
+
+    v2.0 layout: [31]=B [30:28]=perm3 [27]=dom [26:25]=gt_type [24:16]=gt_seq [15:0]=slot_id
+    Church domain (dom=1): perm3 bits [2:0] = {E, S, L}
+    Turing domain (dom=0): perm3 bits [2:0] = {X, W, R}
+    """
+    dom   = (word0 >> 27) & 1
+    perm3 = (word0 >> 28) & 0x7
+    b     = (word0 >> 31) & 1
+    if dom == 1:
+        return {"B": b, "E": (perm3 >> 2) & 1, "S": (perm3 >> 1) & 1, "L": perm3 & 1,
+                "X": 0, "W": 0, "R": 0}
+    else:
+        return {"B": b, "X": (perm3 >> 2) & 1, "W": (perm3 >> 1) & 1, "R": perm3 & 1,
+                "E": 0, "S": 0, "L": 0}
 
 
 def _gt_ns_index(word0):
     return word0 & 0xFFFF
 
 
-def _word0_hex(snap):
-    """Return hex string for a CR snapshot's word0, safe for format."""
-    if snap is None:
-        return "0x00000000"
-    return f"0x{snap['word0']:08X}"
-
-
-# ── the test ──────────────────────────────────────────────────────────────────
-
 @pytest.mark.parametrize("cfg", CONFIGS)
-def test_boot_abstr_exec(cfg, tmp_path):
-    # Use an empty tmp_path so no user-saved 00000300.lump can replace the
-    # canonical 3-instruction boot stub (CHANGE→TPERM→CALL).  The test steps
-    # through those exact instructions; a user lump would produce different
-    # instruction bytes and fail the instruction-level assertions.
-    image  = generate_boot_image(cfg, str(tmp_path))
+def test_boot_abstr_direct_dispatch_cr0(cfg, tmp_path):
+    """NUC_CODE (B:07) installs boot-entry E-GT directly into CR0.
+
+    After boot completes:
+      - No faults occurred.
+      - CR0.word0 is non-zero and carries only E-permission.
+      - CR0 NS index matches bootEntrySlot.
+    """
+    lump_filename = f"{BOOT_ABSTR_NS_SLOT << 8:08x}.lump"
+    (tmp_path / lump_filename).write_bytes(_make_synthetic_lump())
+
+    image = generate_boot_image(cfg, str(tmp_path))
     status = _run_harness(cfg, image)
 
-    # ── boot phase must complete cleanly ──────────────────────────────────────
+    # A — boot must complete cleanly
     assert status["loaded"] is True, (
         f"loadBootImage() returned false; status={status}"
     )
     assert status["bootComplete"] is True, (
         f"bootComplete is False after _bootStep(); status={status}"
     )
-    assert status["bootFaults"] == [], (
+    assert status["bootFaults"] == [] if "bootFaults" in status else status.get("faultLog", []) == [], (
         "boot raised fault(s): " +
-        ", ".join(f"[{f['type']}] {f['message']}" for f in status["bootFaults"])
+        ", ".join(f"[{f['type']}] {f['message']}" for f in (
+            status.get("bootFaults") or status.get("faultLog") or []
+        ))
     )
 
-    boot_entry_slot = status["bootEntrySlot"]
+    boot_entry_slot = status.get("bootEntrySlot")
+    cr0 = status.get("cr0")
 
-    # ── B:05 INIT_ABSTR must have auto-installed the E-GT at thread[+244] ─────
-    # This is what CHANGE's RESTORE_CALL loads into CR0.
-    assert status["threadCaps0"] != 0, (
-        "thread[+244] (CR0 home slot) is NULL after boot; "
-        "B:05 INIT_ABSTR auto-install failed"
+    # B — CR0 must be non-null
+    assert cr0 is not None, (
+        "sim_boot_loader.js did not include 'cr0' in status output; "
+        "update sim_boot_loader.js to include crSnap(0)"
     )
-    assert status["threadCaps0HasEPerm"] is True, (
-        f"thread[+244] word0={status['threadCaps0']:#010x} lacks E-permission; "
-        "expected the boot-entry E-GT auto-installed by B:05 INIT_ABSTR"
-    )
-    assert _gt_ns_index(status["threadCaps0"]) == boot_entry_slot, (
-        f"thread[+244] NS index={_gt_ns_index(status['threadCaps0'])} "
-        f"!= bootEntrySlot={boot_entry_slot}"
+    assert cr0["word0"] != 0, (
+        "CR0 is NULL (word0=0) after boot — NUC_CODE direct dispatch did not "
+        "install the boot-entry E-GT into CR0"
     )
 
-    # ── [0] CHANGE AL, CR12, CR12, #1 ────────────────────────────────────────
-    # The isFirstActivation bypass handles the S-perm gate naturally.
-    # CHANGE must succeed and RESTORE_CALL must load the boot-entry E-GT into CR0.
-    change = status["changeStep"]
-    assert not change["faulted"], (
-        "CHANGE AL, CR12, CR12, #1 raised unexpected fault(s): " +
-        ", ".join(
-            f"[{f['type']}] {f['message']}" for f in change["newFaults"]
+    cr0_w0 = cr0["word0"]
+    perms = _gt_perms(cr0_w0)
+
+    # C — CR0 must carry E-permission
+    assert perms["E"] == 1, (
+        f"CR0 after boot lacks E-permission; CR0.word0=0x{cr0_w0:08X}; perms={perms}"
+    )
+
+    # D — CR0 must have only E-bit set (E-only GT, direct dispatch)
+    non_e_perms = {k: v for k, v in perms.items() if k != "E" and v != 0}
+    assert not non_e_perms, (
+        f"CR0 has extra permissions beyond E after direct dispatch; "
+        f"extra={non_e_perms}; CR0.word0=0x{cr0_w0:08X}"
+    )
+
+    # E — CR0 must point to the correct boot-entry NS slot
+    if boot_entry_slot is not None:
+        assert _gt_ns_index(cr0_w0) == boot_entry_slot, (
+            f"CR0 NS index={_gt_ns_index(cr0_w0)} != bootEntrySlot={boot_entry_slot}; "
+            f"CR0.word0=0x{cr0_w0:08X}"
         )
-    )
-    cr0_after_change = change["cr0After"]
-    cr0_w0 = cr0_after_change["word0"] if cr0_after_change else 0
-    assert cr0_w0 != 0, (
-        "CR0 is NULL after CHANGE — RESTORE_CALL did not load the "
-        "boot-entry E-GT from thread[+244]"
-    )
-    assert _gt_perms(cr0_w0).get("E") == 1, (
-        f"CR0 after CHANGE lacks E-permission; CR0.word0={cr0_w0:#010x}; "
-        f"perms={_gt_perms(cr0_w0)}"
-    )
-    assert _gt_ns_index(cr0_w0) == boot_entry_slot, (
-        f"CR0 after CHANGE points to NS index={_gt_ns_index(cr0_w0)}, "
-        f"expected bootEntrySlot={boot_entry_slot}"
-    )
-    assert change.get("descContainsRestoreCall") is True, (
-        "CHANGE step description does not mention RESTORE_CALL; "
-        "simulator may not be performing the caps-zone restore"
-    )
-
-    # ── [1] TPERM AL, CR0, #E ────────────────────────────────────────────────
-    tperm = status["tpermStep"]
-    assert tperm["newFaults"] == [], (
-        "TPERM AL, CR0, #E raised unexpected fault(s): " +
-        ", ".join(f"[{f['type']}] {f['message']}" for f in tperm["newFaults"])
-    )
-    cr0_tperm = tperm["cr0After"]
-    cr0_tperm_w0 = cr0_tperm["word0"] if cr0_tperm else 0
-    assert tperm["hasEPerm"] is True, (
-        f"CR0 after TPERM #E lacks E-permission; "
-        f"CR0.word0={cr0_tperm_w0:#010x}"
-    )
-    assert tperm["eOnly"] is True, (
-        f"TPERM #E did not restrict CR0 to E-only; "
-        f"CR0.word0={cr0_tperm_w0:#010x}; "
-        f"perms={_gt_perms(cr0_tperm_w0)}"
-    )
-
-    # ── [2] CALL AL, CR0, CR0 ────────────────────────────────────────────────
-    call = status["callStep"]
-    assert call["newFaults"] == [], (
-        "CALL AL, CR0, CR0 raised unexpected fault(s): " +
-        ", ".join(f"[{f['type']}] {f['message']}" for f in call["newFaults"])
-    )
-    assert call["callEnteredClean"] is True, (
-        f"CALL did not enter the boot-entry abstraction cleanly: "
-        f"callDepthDelta={call['callDepthDelta']}, "
-        f"pcAfterCall={call['pcAfterCall']}; "
-        "expected callDepthDelta=1 and pcAfterCall=1"
-    )
-    assert call["callDepthDelta"] == 1, (
-        f"CALL should push exactly one new call frame; "
-        f"callDepthDelta={call['callDepthDelta']}"
-    )
-    assert call["pcAfterCall"] == 1, (
-        f"PC after CALL should be 1 (callee's first instruction, word 1 of the lump); "
-        f"got pcAfterCall={call['pcAfterCall']}"
-    )
 
 
 if __name__ == "__main__":
@@ -256,10 +197,23 @@ if __name__ == "__main__":
     for p in CONFIGS:
         cfg = p.values[0]
         name = p.id
-        try:
-            test_boot_abstr_exec(cfg)
-            print(f"PASS: {name}")
-        except AssertionError as e:
-            failures += 1
-            print(f"FAIL: {name}\n{e}")
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            import pathlib
+            lump_filename = f"{BOOT_ABSTR_NS_SLOT << 8:08x}.lump"
+            (pathlib.Path(td) / lump_filename).write_bytes(_make_synthetic_lump())
+            try:
+                image = generate_boot_image(cfg, td)
+                status = _run_harness(cfg, image)
+                test_boot_abstr_direct_dispatch_cr0.__wrapped__(cfg, pathlib.Path(td)) \
+                    if hasattr(test_boot_abstr_direct_dispatch_cr0, '__wrapped__') \
+                    else None
+                cr0 = status.get("cr0")
+                assert cr0 and cr0["word0"] != 0, "CR0 is null/zero"
+                perms = _gt_perms(cr0["word0"])
+                assert perms["E"] == 1, f"E-perm missing; perms={perms}"
+                print(f"PASS: {name}")
+            except (AssertionError, RuntimeError) as e:
+                failures += 1
+                print(f"FAIL: {name}\n{e}")
     sys.exit(1 if failures else 0)

@@ -663,7 +663,7 @@ const _BOOT_STEPS = [
     { addrStr: 'B:04', disasm: 'CALL_HOME',  label: 'Tunnel.Register \u2192 23-byte packet \u00b7 await ACK',                         offset: null, prog: 'boot' },
     { addrStr: 'B:05', disasm: 'INIT_ABSTR', label: 'CR6(E) \u2190 NS[3] Boot.Abstr',                                                 offset: null, prog: 'boot' },
     { addrStr: 'B:06', disasm: 'NUC_CLIST',  label: 'CR6(E) \u2190 lump c-list \u00b7 push sentinel',                                 offset: null, prog: 'boot' },
-    { addrStr: 'B:07', disasm: 'NUC_CODE',   label: 'CR14(R+X) \u2190 lump code \u00b7 PC\u21900 \u00b7 CALL CR0 \u2192 dispatch begins', offset: null, prog: 'boot' },
+    { addrStr: 'B:07', disasm: 'NUC_CODE',   label: 'CR14(R+X) \u2190 lump code \u00b7 CR0 \u2190 boot-entry E-GT \u00b7 PC\u21900 \u00b7 direct dispatch', offset: null, prog: 'boot' },
 ];
 
 function _bootNIARows(bootStep) {

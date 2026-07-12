@@ -31,7 +31,7 @@ import pytest
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)
 
-from server.boot_constants import NUC_CODE_WORDS, DEMO_CLIST_SIZE  # noqa: E402
+from server.boot_constants import DEMO_CLIST_SIZE  # noqa: E402
 
 LUMPS_DIR      = os.path.join(ROOT, "server", "lumps")
 LUMP_600_PATH  = os.path.join(LUMPS_DIR, "00000600.lump")
@@ -132,6 +132,47 @@ def reset_boot_abstr_meta():
     _app._BOOT_ABSTR_META.update(original)
 
 
+BOOT_CONFIG_PATH = os.path.join(ROOT, "server", "boot-config.json")
+
+
+@pytest.fixture()
+def reset_boot_config():
+    """Back up boot-config.json, replace with a minimal valid config, then restore.
+
+    The on-disk boot-config.json may contain Step 2 lump references (e.g. NS
+    slot 18) whose lump files have since been deleted.  When those invalid
+    references exist, the save endpoint's boot-image regeneration fails with
+    a Step 2 validation error, causing boot_image_refreshed=False.
+
+    This fixture ensures a known-good minimal config is in place for tests
+    that rely on successful boot-image regeneration.
+    """
+    import json
+    _MINIMAL_JSON = {
+        "schemaVersion": 1,
+        "targetBoard": "ti60-f225",
+        "step1": {
+            "totalNamespaceWords": 16384,
+            "namespaceLumpWords":     64,
+            "threadLumpWords":       256,
+        },
+    }
+    _backed_cfg: bytes | None = None
+    if os.path.isfile(BOOT_CONFIG_PATH):
+        with open(BOOT_CONFIG_PATH, "rb") as fh:
+            _backed_cfg = fh.read()
+    with open(BOOT_CONFIG_PATH, "w") as fh:
+        json.dump(_MINIMAL_JSON, fh, indent=2)
+
+    yield
+
+    if os.path.isfile(BOOT_CONFIG_PATH):
+        os.remove(BOOT_CONFIG_PATH)
+    if _backed_cfg is not None:
+        with open(BOOT_CONFIG_PATH, "wb") as fh:
+            fh.write(_backed_cfg)
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _write_lump_300(cw=SAVED_CW, cc=SAVED_CC):
@@ -139,6 +180,15 @@ def _write_lump_300(cw=SAVED_CW, cc=SAVED_CC):
     words = _make_lump_words(cw, cc)
     with open(LUMP_600_PATH, "wb") as fh:
         fh.write(struct.pack(f">{LUMP_SIZE_WORDS}I", *words))
+
+
+_MINIMAL_BOOT_CFG = {
+    "step1": {
+        "totalNamespaceWords": 16384,
+        "namespaceLumpWords":     64,
+        "threadLumpWords":       256,
+    }
+}
 
 
 def _simulate_server_restart():
@@ -149,16 +199,21 @@ def _simulate_server_restart():
     boot-image.bin (written during a previous test or user session) causes
     _load_boot_abstr_lump() to report cw/cc from the old image rather than
     the current on-disk state of the lumps directory.
+
+    If the saved boot config is absent or fails Step 2 validation (e.g. a
+    previously-configured lump at NS slot 18 is no longer in the catalog),
+    we fall back to _MINIMAL_BOOT_CFG so the regeneration always succeeds.
     """
     import server.app as _app
     from server.boot_image import generate_boot_image as _gen_bi
     try:
         cfg, err = _app._read_saved_boot_config()
-        if not err:
-            blob = _gen_bi(cfg, LUMPS_DIR)
-            boot_path = os.path.join(LUMPS_DIR, "boot-image.bin")
-            with open(boot_path, "wb") as fh:
-                fh.write(blob)
+        if err:
+            cfg = _MINIMAL_BOOT_CFG
+        blob = _gen_bi(cfg, LUMPS_DIR)
+        boot_path = os.path.join(LUMPS_DIR, "boot-image.bin")
+        with open(boot_path, "wb") as fh:
+            fh.write(blob)
     except Exception:
         pass
     _app._load_boot_abstr_lump()
@@ -196,7 +251,7 @@ BOOT_CONFIG_ON_DISK = os.path.join(ROOT, "server", "boot-config.json")
     reason="boot-image.bin or boot-config.json absent; save endpoint cannot "
            "auto-refresh _BOOT_ABSTR_META",
 )
-def test_save_ns_slot3_updates_list_immediately(client, clean_300, reset_boot_abstr_meta):
+def test_save_ns_slot3_updates_list_immediately(client, clean_300, reset_boot_abstr_meta, reset_boot_config):
     """POST /api/lumps/save (ns_slot=6, cw=17, cc=18) must cause GET /api/lumps/list
     to return the new cw/cc immediately — no page reload or server restart needed.
 
@@ -244,7 +299,7 @@ def test_save_ns_slot3_updates_list_immediately(client, clean_300, reset_boot_ab
 
 # ── Test 2: values survive a simulated server restart ─────────────────────────
 
-def test_saved_cw_cc_survive_server_restart(client, clean_300, reset_boot_abstr_meta):
+def test_saved_cw_cc_survive_server_restart(client, clean_300, reset_boot_abstr_meta, reset_boot_config):
     """With 00000600.lump on disk, _load_boot_abstr_lump() called twice
     (simulating two sequential boots) must return cw=17 / cc=18 each time."""
     _write_lump_300(SAVED_CW, SAVED_CC)
@@ -262,30 +317,27 @@ def test_saved_cw_cc_survive_server_restart(client, clean_300, reset_boot_abstr_
         )
 
 
-# ── Test 3: no 00000300.lump → defaults from boot-image.bin (cw=3, cc=0) ─────
+# ── Test 3: no 00000600.lump → generate_boot_image() raises ValueError ────────
 
-@pytest.mark.skipif(
-    not os.path.isfile(BOOT_IMAGE_ON_DISK),
-    reason="boot-image.bin not present on disk; cannot verify fallback defaults",
-)
-def test_no_saved_lump_returns_boot_image_defaults(client, clean_300, reset_boot_abstr_meta):
-    """When 00000600.lump and all sidecar JSONs are absent, _load_boot_abstr_lump()
-    reads the NS slot 6 (SelfTest/Boot.Abstr) lump directly from boot-image.bin.
+def test_no_saved_lump_raises_value_error(clean_300, tmp_path):
+    """When 00000600.lump is absent, generate_boot_image() must raise ValueError.
 
-    The canonical Boot.Abstr embedded in boot-image.bin has cw=NUC_CODE_WORDS=3
-    and cc=0.  GET /api/lumps/list must reflect these defaults, confirming no
-    regression in the no-saved-lump code path.
+    The direct-dispatch boot model has no fallback trampoline.  The real
+    SelfTest lump must always be present when generating a boot image.
+    This test confirms the error is raised with an informative message rather
+    than silently producing a broken image.
     """
+    import tempfile
+    from server.boot_image import generate_boot_image as _gen_bi
+
     assert not os.path.isfile(LUMP_600_PATH), "Precondition: 00000600.lump must not exist"
-    assert not os.path.isfile(JSON_600_PATH), "Precondition: 00000600.json must not exist"
-    assert not os.path.isfile(JSON_003_PATH), "Precondition: 00000003.json must not exist"
 
-    _simulate_server_restart()
-
-    entry = _get_boot_abstr_from_list(client)
-    assert entry.get("cw") == NUC_CODE_WORDS, (
-        f"Expected default cw={NUC_CODE_WORDS}, got cw={entry.get('cw')!r}"
-    )
-    assert entry.get("cc") == 0, (
-        f"Expected default cc=0, got cc={entry.get('cc')!r}"
-    )
+    cfg = {
+        "step1": {
+            "totalNamespaceWords": 16384,
+            "namespaceLumpWords":     64,
+            "threadLumpWords":       256,
+        },
+    }
+    with pytest.raises(ValueError, match="00000600.lump"):
+        _gen_bi(cfg, str(tmp_path))

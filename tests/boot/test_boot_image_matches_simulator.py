@@ -159,7 +159,7 @@ def _resident_body_ranges(cfg):
     return out
 
 
-def _compare(py_bytes, sim_words, cfg):
+def _compare(py_bytes, sim_words, cfg, extra_skips=None):
     step1 = cfg["step1"]
     total       = step1["totalNamespaceWords"]
     ns_size     = step1["namespaceLumpWords"]
@@ -175,7 +175,7 @@ def _compare(py_bytes, sim_words, cfg):
     )
 
     py_words = list(struct.unpack(f"<{total}I", py_bytes))
-    skip_ranges = _resident_body_ranges(cfg)
+    skip_ranges = _resident_body_ranges(cfg) + (extra_skips or [])
 
     def _skip(i):
         for s, e in skip_ranges:
@@ -204,12 +204,52 @@ def _compare(py_bytes, sim_words, cfg):
 
 # ---- the test -------------------------------------------------------------
 
+def _write_synthetic_boot_abstr_lump(lumps_dir, lump_size=64, cw=3, cc=0):
+    """Write a minimal synthetic Boot.Abstr lump to lumps_dir.
+
+    The lump has a valid header (magic=0x1F, n_minus_6, cw, cc=0) and
+    zeros everywhere else — matching what the JS simulator's
+    _initNamespaceTable() produces at the boot entry slot when the
+    direct-dispatch path is active (no trampoline written, just the
+    header word).
+    """
+    import math
+    n_minus_6 = max(0, int(math.ceil(math.log2(lump_size))) - 6)
+    hdr = (0x1F << 27) | (n_minus_6 << 23) | (cw << 10) | cc
+    words = [0] * lump_size
+    words[0] = hdr
+    from server.boot_image import BOOT_ABSTR_NS_SLOT
+    lump_name = f"{BOOT_ABSTR_NS_SLOT << 8:08x}.lump"
+    lump_path = os.path.join(lumps_dir, lump_name)
+    with open(lump_path, "wb") as f:
+        f.write(struct.pack(f">{lump_size}I", *words))
+    return lump_path, lump_size
+
+
+def _boot_entry_body_range(cfg):
+    """Return (start_word, end_word_exclusive) for the Boot.Abstr lump body.
+
+    The JS simulator's _initNamespaceTable() writes zeros at this range
+    (no lump content), while the Python generator embeds a synthetic lump.
+    The range must be excluded from the parity comparison.
+    """
+    step1       = cfg["step1"]
+    ns_size     = step1["namespaceLumpWords"]
+    thread_size = step1["threadLumpWords"]
+    start       = ns_size + thread_size          # Boot.Abstr physical base
+    end         = start + BOOT_ABSTR_DEFAULT_SIZE
+    return (start, end)
+
+
 @pytest.mark.parametrize("cfg", CONFIGS)
 def test_boot_image_matches_simulator(cfg, tmp_path):
-    # Use an empty temporary lumps directory so that user-saved lumps (e.g.
-    # 00000300.lump with a POLA-modified cc) never influence the boot image
-    # generated here.  The simulator harness always uses its own hardcoded
-    # defaults, so the Python generator must too for this parity test.
+    # Write a minimal synthetic Boot.Abstr lump into tmp_path so that
+    # generate_boot_image() succeeds (the direct-dispatch model requires the
+    # real SelfTest lump; we use a synthetic stand-in here).
+    # The JS simulator now writes the same minimal lump header at the boot
+    # entry slot body (via _initNamespaceTable), so no extra_skips needed.
+    _write_synthetic_boot_abstr_lump(str(tmp_path))
+
     py_bytes  = generate_boot_image(cfg, str(tmp_path))
     sim_words = _run_simulator(cfg)
     _compare(py_bytes, sim_words, cfg)
@@ -255,7 +295,7 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
     """
     from server.boot_image import (
         generate_boot_image, NS_TABLE_RESERVE, NS_ENTRY_WORDS,
-        BOOT_ABSTR_NS_SLOT, NUC_CODE_WORDS, DEMO_CLIST_SIZE,
+        BOOT_ABSTR_NS_SLOT, DEMO_CLIST_SIZE,
         pack_ns_word1,
     )
 
@@ -308,7 +348,7 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
     expected_nm6 = max(0, int(math.ceil(math.log2(lump_size))) - 6)
     assert hdr_magic == 0x1F, f"lump header magic={hdr_magic:#x} != 0x1F"
     assert hdr_nm6 == expected_nm6, f"lump header n_minus_6={hdr_nm6} != {expected_nm6}"
-    assert hdr_cw == NUC_CODE_WORDS, f"lump header cw={hdr_cw} != {NUC_CODE_WORDS}"
+    assert hdr_cw == 3, f"lump header cw={hdr_cw} != 3 (synthetic lump nuc_code_words default)"
     assert hdr_cc == cc, f"lump header cc={hdr_cc} != {cc}"
 
 

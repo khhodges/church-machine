@@ -110,6 +110,8 @@ process.stdin.on('end', () => {
             (sim.callStack && sim.callStack.length > 0)
                 ? sim.callStack[sim.callStack.length - 1].sentinel === true
                 : false,
+        bootEntrySlot: (sim.bootEntrySlot != null) ? sim.bootEntrySlot | 0 : null,
+        cr0: crSnap(0),
         cr6: crSnap(6),
         cr12: crSnap(12),
         cr14: crSnap(14),
