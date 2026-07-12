@@ -1444,6 +1444,8 @@ def boot_image_generate():
             f.write(blob)
     except Exception as e:
         return jsonify({"ok": False, "error": f"Failed to write boot-image.bin: {e}"}), 500
+    _load_boot_abstr_lump()
+    _load_boot_ns_lump()
     return jsonify({
         "ok": True,
         "bytes": len(blob),
