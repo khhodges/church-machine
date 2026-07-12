@@ -3440,8 +3440,8 @@ async function _loadLumpTokens(token, lump) {
     for (let s = 0; s < cc; s++) {
         const wIdx  = clistStart + s;
         const wVal  = wIdx < words.length ? (words[wIdx] >>> 0) : 0;
-        const gtType = (wVal >>> 23) & 0x3;
-        const gtSeq  = (wVal >>> 16) & 0x7F;
+        const gtType = (wVal >>> 25) & 0x3;
+        const gtSeq  = (wVal >>> 16) & 0x1FF;
 
         if (!wVal) {
             const _capMeta = lump.capabilities && lump.capabilities[s];
@@ -3492,13 +3492,14 @@ async function _loadLumpTokens(token, lump) {
             const gtPerms   = (wVal >>> 25) & 0x3F;
             const gtTypeStr = ['NULL','Inf','Out','Abs'][gtType];
             const permStr   = 'RWXLSE'.split('').map((c, i) => (gtPerms >> i) & 1 ? c : '-').join('');
+            const _capMeta2    = lump.capabilities && lump.capabilities[s];
+            const _capName2    = _capMeta2 ? (_capMeta2.name || (typeof _capMeta2 === 'string' ? _capMeta2 : '')) : '';
             const manifestName = _gtCRPetNames[s] || _gtCRPetNames[String(s)] || '';
-            const tokenName    = _tokenToName(wVal);
             const simNsName    = (typeof sim !== 'undefined' && sim && sim.nsLabels)
                 ? (sim.nsLabels[gtSlotId] || '')
                 : '';
-            const displayName  = manifestName || tokenName || simNsName;
-            const inputPlaceholder = `NS[${gtSlotId}]`;
+            const displayName  = _capName2 || manifestName || simNsName || `GT#${s}`;
+            const inputPlaceholder = displayName;
             html += `<div class="lump-gt-chip" data-slot="${s}" data-ns-slot="${gtSlotId}">` +
                     `<span class="lump-gt-chip-dot"></span>` +
                     `<input class="lump-gt-name-input${displayName ? '' : ' lump-gt-name-unresolved'}" ` +
