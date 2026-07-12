@@ -3,7 +3,7 @@ name: Simulator E2E boot-state testing
 description: How to reliably establish cold-boot simulator state in Playwright E2E tests for the Church Machine IDE.
 ---
 
-## The pattern that works
+## The pattern that works (NS-slot tests — no real boot image needed)
 
 ```javascript
 // 1. Pre-suppress modals before page load
@@ -32,14 +32,95 @@ await page.waitForTimeout(300);
 await page.evaluate(() => { sim.bootComplete = true; });
 ```
 
-## Why instantBoot() doesn't work in tests
+## The pattern that works (full boot via real binary — step/run tests)
 
-`instantBoot()` runs `sim._bootStep()` synchronously in a while-loop (30 iterations).
-Boot phase **B:04 CALL_HOME** starts an async network fetch inside `_bootStep()`.
-The fetch's `.then()` callback (which increments `bootStep` from 4 → 5) is a
-Promise microtask — it cannot run while the synchronous while-loop is executing.
-Result: `instantBoot()` runs 30 iterations all stuck at `bootStep = 4` and returns
-`false` with `bootComplete` still false.
+```javascript
+await page.addInitScript(() => {
+    localStorage.setItem('church_whatsnew_dismissed_perm', '1');
+    localStorage.setItem('churchMachine_autoBootOnOpen', '0');
+    // CRITICAL: set bootEntrySlot to 6 (Boot.Abstr post slot-3→6 migration).
+    // Without this, _applyBootEntryToSim() finds LED_DEV (slot 3) valid and
+    // clobbers sim.bootEntrySlot to 3 → B:06 NUC_CLIST faults with magic=0x0.
+    localStorage.setItem('bootEntrySlot', '6');
+});
+await page.goto('/simulator/');
+await page.waitForLoadState('networkidle');
+
+// Wait for boot image fetch + sim.loadBootImage() overlay to complete.
+await page.waitForFunction(
+    () => typeof sim !== 'undefined'
+       && typeof instantBoot === 'function'
+       && window.bootImageAvailable === true,
+    { timeout: 10000 }
+);
+
+// Call instantBoot() directly — synchronous 8-phase loop, no async I/O.
+const bootResult = await page.evaluate(() => {
+    const ok = instantBoot();
+    if (ok) return { ok: true };
+    return { ok: false, bootStep: sim.bootStep, halted: sim.halted,
+             bootComplete: sim.bootComplete,
+             faultLog: JSON.stringify((sim.faultLog||[]).slice(0,5)),
+             output: (sim.output||'').slice(-800) };
+});
+if (!bootResult.ok) throw new Error(`instantBoot() failed — ${JSON.stringify(bootResult)}`);
+
+// instantBoot() called directly does NOT call switchView('dashboard').
+// Must do it explicitly so #toolStepBtn is visible for subsequent clicks.
+await page.evaluate(() => switchView('dashboard'));
+```
+
+## bootEntrySlot localStorage trap (slot-3→6 migration)
+
+`_applyBootEntryToSim()` reads the **module-level `bootEntrySlot` variable**
+(declared in `app-abstractions.js`, init'd from localStorage). In a fresh test
+environment, localStorage has no `bootEntrySlot` key → the variable defaults to
+**3** (the pre-migration value). `sim.isNSEntryValid(3)` is **true** (LED_DEV IS
+a valid NS entry in the binary NS table), so the fallback branch is NOT taken,
+and `sim.bootEntrySlot` is **overwritten to 3**.
+
+This overrides the correct value (6) that `sim.loadBootImage()` already read from
+the binary's tag (`NS_TABLE_BASE - 2`). B:05 INIT_ABSTR then loads LED_DEV, and
+B:06 NUC_CLIST faults: "LED_DEV lump header magic=0x0".
+
+**Fix:** `addInitScript(() => localStorage.setItem('bootEntrySlot', '6'))`.
+
+**Why:** The module-level variable initialises before the binary is fetched;
+`_applyBootEntryToSim()` must see 6 in localStorage so it doesn't overwrite the
+value that `sim.loadBootImage()` correctly derived from the binary.
+
+## Do NOT call sim.reset() from page.evaluate() in full-boot tests
+
+`sim.reset()` was already called by `init()` during page load.  A second call
+from `page.evaluate()` re-fires the 'reset' event, triggering `updateDashboard()`
+and other DOM handlers that can interfere with in-flight page state.  It also
+does NOT re-call `_applyBootEntryToSim()`, so if there is any stale
+module-level `bootEntrySlot` it stays stale.
+
+After page load with `bootImageAvailable === true`, the sim is already in the
+correct pre-boot state: `bootComplete=false`, `bootStep=0`, `halted=false`, and
+`sim.memory` has the binary overlay from the `.then()` handler.  Just call
+`instantBoot()` directly.
+
+## Why instantBoot() works (CALL_HOME is synchronous in the simulator)
+
+**Old note claimed** B:04 CALL_HOME starts an async network fetch → the while-loop
+stalls at bootStep=4.  **This is wrong for the simulator context.**
+
+In the browser simulator, B:04 CALL_HOME calls `abstractionRegistry.dispatchMethod`
+synchronously (no real network fetch), so `instantBoot()`'s while-loop advances
+through all 8 phases (B:00–B:07) and returns `true`.
+
+The async-fetch problem only occurs when the test intercepts or blocks
+`/api/boot-image/binary` (the 404 pattern above) — in that case `instantBoot()`
+cannot advance past B:04 because the NS table data is never loaded.
+
+## instantBoot() called directly does NOT switch the view
+
+`stepSim()` calls `switchView('dashboard')` after `instantBoot()` returns.
+Calling `instantBoot()` directly from `page.evaluate()` bypasses that.  The page
+stays on the Home panel where the toolbar is hidden.  Always call
+`switchView('dashboard')` from `page.evaluate()` after `instantBoot()`.
 
 ## Why slowBoot() doesn't work after sim.reset() in a test
 
