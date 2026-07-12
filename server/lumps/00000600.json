@@ -11,18 +11,24 @@
   "cc": 1,
   "profile": "IoT",
   "language": "assembly",
-  "description": "Post-Flash Exhaustive Self-Test — 81 hardware correctness tests (DR independence, ALU, shifts, branches, BFEXT/BFINS, TPERM, CHANGE, LOAD). DR0=0 on full pass, DR0=N on first failure. Boot-resident at NS slot 6; FPGA ROM jumps here immediately after power-on.",
+  "description": "Post-Flash Exhaustive Self-Test \u2014 81 hardware correctness tests (DR independence, ALU, shifts, branches, BFEXT/BFINS, TPERM, CHANGE, LOAD). DR0=0 on full pass, DR0=N on first failure. Boot-resident at NS slot 6; FPGA ROM jumps here immediately after power-on.",
   "capabilities": [
     {
       "name": "SelfTest",
-      "grants": ["E"],
+      "grants": [
+        "E"
+      ],
       "gt": "0x4A000006",
       "ns_slot": 6,
-      "note": "SelfTest E-GT — loaded into CR1 for TPERM and EXACT cross-checks (POLA minimum)"
+      "note": "SelfTest E-GT \u2014 loaded into CR1 for TPERM and EXACT cross-checks (POLA minimum)"
     }
   ],
-  "grants": ["E"],
+  "grants": [
+    "E"
+  ],
   "author": "Church Machine",
   "version": "1.1",
-  "lump_version": 0
+  "lump_version": 0,
+  "source": "; Constants  (18 words, cc=2, 43 free)\ncapabilities {\n}\n\nDREAD  DR0, CR0, #0, DR0\nRETURN\nLOAD  CR0, CR6[0x0000]\nDREAD  DR0, CR0, #0, DR1\nRETURN\nLOAD  CR0, CR6[0x0000]\nDREAD  DR0, CR0, #0, DR2\nRETURN\nLOAD  CR0, CR6[0x0000]\nDREAD  DR0, CR0, #0, DR3\nRETURN\nLOAD  CR0, CR6[0x0000]\nDREAD  DR0, CR0, #0, DR4\nRETURN\nLOAD  CR1, CR6[0x0001]\nL0:\nDWRITE  DR0, CR1, #0, DR0\nRETURN",
+  "last_edited_at": 1783850919.945638
 }

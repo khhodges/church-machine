@@ -371,56 +371,60 @@ console.log('\n--- LLB-08: NS[3].word2 seal consistent with EXTENDED_BASE and cw
         `stored=0x${storedWord2.toString(16)} expected=0x${expected.toString(16)}`);
 }
 
-// ── LLB-RBA: Real Boot3 binary (Boot3.lump, token 00000600) ──────────────────
-// Fixture: server/lumps/Boot3.lump — canonical abstraction name "Boot3"
-// per sidecar JSON (server/lumps/Boot3.json), token 00000600, cw=1, cc=1.
+// ── LLB-RBA: Real PostFlashSelftest binary (4c7380cb.lump, Boot.Abstr slot) ──
+// Fixture: server/lumps/4c7380cb.lump — canonical abstraction name "PostFlashSelftest"
+// per sidecar JSON (server/lumps/4c7380cb.json), token 4c7380cb, cw=502, cc=1,
+// lumpSize=512 (2048-byte file).  This is the Boot.Abstr lump (NS slot 6) that
+// the simulator loads into the boot entry slot at startup.
 // Reads the file as big-endian uint32 words — the same format served by the
-// Flask /api/lump/00000600/words endpoint.
-console.log('\n--- LLB-RBA: Real Boot3 binary (Boot3.lump, token 00000600) ---');
+// Flask /api/lump/4c7380cb/words endpoint.
+console.log('\n--- LLB-RBA: Real PostFlashSelftest binary (4c7380cb.lump, Boot.Abstr slot) ---');
 {
-    const lumpPath = path.join(__dirname, '..', 'server', 'lumps', 'Boot3.lump');
+    const lumpPath = path.join(__dirname, '..', 'server', 'lumps', '4c7380cb.lump');
     const lumpExists = fs.existsSync(lumpPath);
-    check('LLB-RBA-0: Boot3.lump fixture file exists on disk', lumpExists,
+    check('LLB-RBA-0: 4c7380cb.lump fixture file exists on disk', lumpExists,
         lumpPath);
 
     if (lumpExists) {
         // Read as big-endian uint32 — matches Flask: struct.unpack(f'>{n}I', data)
         const rawWords = readLumpFile(lumpPath);
 
-        check('LLB-RBA-1: rawWords has 64 entries (256-byte file)',
-            rawWords.length === 64,
+        check('LLB-RBA-1: rawWords has 512 entries (2048-byte file)',
+            rawWords.length === 512,
             `got ${rawWords.length}`);
 
-        // Parse the header word from the fixture — must decode as cw=1, cc=1
+        // Parse the header word — must decode as cw=502, cc=1, lumpSize=512
         const sim = new ChurchSimulator();
         const hdr0 = sim.parseLumpHeader(rawWords[0] >>> 0);
         check('LLB-RBA-2: fixture header magic = 0x1F (valid LUMP)',
             hdr0.valid,
             `magic=0x${hdr0.magic.toString(16)} word[0]=0x${(rawWords[0]>>>0).toString(16)}`);
-        check('LLB-RBA-3: fixture header cw = 1 (Boot3)',
-            hdr0.cw === 1,
+        check('LLB-RBA-3: fixture header cw = 502 (PostFlashSelftest)',
+            hdr0.cw === 502,
             `got cw=${hdr0.cw}`);
-        check('LLB-RBA-4: fixture header cc = 1 (Boot3)',
+        check('LLB-RBA-4: fixture header cc = 1 (PostFlashSelftest)',
             hdr0.cc === 1,
             `got cc=${hdr0.cc}`);
-        check('LLB-RBA-5: fixture header lumpSize = 64',
-            hdr0.lumpSize === 64,
+        check('LLB-RBA-5: fixture header lumpSize = 512',
+            hdr0.lumpSize === 512,
             `got lumpSize=${hdr0.lumpSize}`);
 
-        // Now load the real binary into a fresh simulator
+        // Now load the real binary into a fresh simulator.
+        // lumpSize=512 > default Boot.Abstr slot (64w), so loadLumpBinary uses
+        // the extended-code area (EXTENDED_BASE=0x0400).
         const { sim: sim2, nsBase } = setupSimForBinary();
         const loaded = sim2.loadLumpBinary(rawWords);
         check('LLB-RBA-6: loadLumpBinary returns true for real fixture',
             loaded === true);
-        check('LLB-RBA-7: NS[3].word0 = EXTENDED_BASE (0x0400) after real load',
+        check('LLB-RBA-7: NS[bootEntrySlot].word0 = EXTENDED_BASE (0x0400) after real load',
             sim2.memory[nsBase + 0] === EXTENDED_BASE,
             `got 0x${sim2.memory[nsBase+0].toString(16)}`);
 
         const p = sim2.parseNSWord1(sim2.memory[nsBase + 1]);
-        check('LLB-RBA-8: NS[3].word1 limit = 1 (cw from real fixture)',
-            p.limit === 1,
+        check('LLB-RBA-8: NS[bootEntrySlot].word1 limit = 502 (cw from real fixture)',
+            p.limit === 502,
             `got limit=${p.limit}`);
-        check('LLB-RBA-9: NS[3].word1 clistCount = 1 (cc from real fixture)',
+        check('LLB-RBA-9: NS[bootEntrySlot].word1 clistCount = 1 (cc from real fixture)',
             p.clistCount === 1,
             `got clistCount=${p.clistCount}`);
         check('LLB-RBA-10: CR14.word1 = EXTENDED_BASE after real load',
@@ -428,15 +432,14 @@ console.log('\n--- LLB-RBA: Real Boot3 binary (Boot3.lump, token 00000600) ---')
             `got 0x${sim2.cr[14].word1.toString(16)}`);
 
         // LLB-RBA-11: Sidecar JSON metadata — prevents future token/name drift.
-        // The sidecar file must identify the correct token and abstraction name.
-        const sidecarPath = path.join(__dirname, '..', 'server', 'lumps', 'Boot3.json');
+        const sidecarPath = path.join(__dirname, '..', 'server', 'lumps', '4c7380cb.json');
         if (fs.existsSync(sidecarPath)) {
             const sidecar = JSON.parse(fs.readFileSync(sidecarPath, 'utf8'));
-            check('LLB-RBA-11: sidecar token = 00000600 (canonical token for Boot3)',
-                sidecar.token === '00000600',
+            check('LLB-RBA-11: sidecar token = 4c7380cb (canonical token for PostFlashSelftest)',
+                sidecar.token === '4c7380cb',
                 `got token=${sidecar.token}`);
         } else {
-            console.log('SKIP LLB-RBA-11 (sidecar Boot3.json not found)');
+            console.log('SKIP LLB-RBA-11 (sidecar 4c7380cb.json not found)');
         }
     }
 }

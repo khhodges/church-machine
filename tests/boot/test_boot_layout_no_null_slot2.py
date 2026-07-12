@@ -64,7 +64,7 @@ def _parse_image(image_bytes, total_words):
 
 
 def _compute_catalog_pool_start(ns_size, thread_size,
-                                abstr_size=BOOT_ABSTR_DEFAULT_SIZE):
+                                abstr_size=None):
     """Return the word offset where the dynamic pool begins.
 
     Mirrors generate_boot_image()'s running_offset progression through
@@ -75,7 +75,26 @@ def _compute_catalog_pool_start(ns_size, thread_size,
     non-None catalog entry, regardless of whether that entry's lump body is
     actually written into the image (some entries have no code or c-list and
     therefore remain all-zero, but their physical slot is still reserved).
+
+    abstr_size defaults to the lump_size read from the saved Boot.Abstr lump
+    on disk (mirroring generate_boot_image()), falling back to
+    BOOT_ABSTR_DEFAULT_SIZE if the file is absent or unreadable.
     """
+    if abstr_size is None:
+        _boot_lump = os.path.join(
+            LUMPS_DIR, f"{BOOT_ABSTR_NS_SLOT << 8:08x}.lump")
+        abstr_size = BOOT_ABSTR_DEFAULT_SIZE
+        if os.path.isfile(_boot_lump):
+            try:
+                with open(_boot_lump, "rb") as _f:
+                    _raw = _f.read(4)
+                if len(_raw) == 4:
+                    _hdr = struct.unpack(">I", _raw)[0]
+                    if (_hdr >> 27) == 0x1F:
+                        _nm6 = (_hdr >> 23) & 0xF
+                        abstr_size = 1 << (_nm6 + 6)
+            except Exception:
+                pass
     slot_sizes = {
         0:                  ns_size,
         1:                  thread_size,

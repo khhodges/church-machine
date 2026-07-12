@@ -1129,7 +1129,15 @@ class ChurchAssembler {
                 if (res0 !== null && (!parts[3] || res0.consumed)) {
                     this._checkCapDeclared(res0.key, lineNum);
                     crSrc = 6;   // CR6 = c-list root by convention
-                    imm   = res0.slot;
+                    // _resolveNSName path-1 returns the CR register number stored in
+                    // nsLoaded (e.g. 1 for CR1), not the c-list slot index.  For a
+                    // 2-operand LOAD the programmer intends a fresh c-list access; use
+                    // _capBlockSlots directly so slot=0 is encoded, not the CR number.
+                    if (!parts[3] && this._capBlockSlots && this._capBlockSlots[res0.key] !== undefined) {
+                        imm = this._capBlockSlots[res0.key];
+                    } else {
+                        imm = res0.slot;
+                    }
                     this.nsLoaded[res0.key] = crDst;
                 } else {
                     crSrc = this._parseCR(parts[2], lineNum);
@@ -1144,7 +1152,11 @@ class ChurchAssembler {
                 const res1 = this._resolveNSNameBracket(parts[2], parts[3]);
                 if (res1 !== null && (!parts[3] || res1.consumed)) {
                     crSrc = 6;
-                    imm   = res1.slot;
+                    if (!parts[3] && this._capBlockSlots && this._capBlockSlots[res1.key] !== undefined) {
+                        imm = this._capBlockSlots[res1.key];
+                    } else {
+                        imm = res1.slot;
+                    }
                     this.nsLoaded[res1.key] = crDst;
                 } else {
                     crSrc = this._parseCR(parts[2], lineNum);
