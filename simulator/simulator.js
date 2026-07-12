@@ -239,7 +239,7 @@ class ChurchSimulator {
         // so we discover the reserve by finding the tag rather than using a
         // hardcoded offset. Scan limit: 8192 words covers up to 1024-slot NS tables
         // (4096 words) plus the 2 sentinel words and future headroom.
-        const BOOT_IMAGE_FORMAT_TAG = 0xB0070563;  // must match boot_image.py; bumped Task #563/568
+        const BOOT_IMAGE_FORMAT_TAG = 0xB0072046;  // must match boot_image.py; bumped for direct-dispatch (trampoline removal)
         let tagIdx = -1;
         const scanLimit = Math.min(8192, src.length);
         for (let _si = 1; _si <= scanLimit; _si++) {
@@ -260,7 +260,37 @@ class ChurchSimulator {
             this.output += `[BOOTIMG] WARNING: invalid NS table reserve ${discoveredNsTableReserve} (not a positive multiple of ${this.NS_ENTRY_WORDS}) derived from tag at word ${tagIdx}; ignoring binary.\n`;
             return false;
         }
-        // Update instance variables to match the loaded binary's actual layout.
+        const discoveredMaxNsEntries = (discoveredNsTableReserve / this.NS_ENTRY_WORDS) | 0;
+
+        // Boot-entry slot: stored at mem[NS_TABLE_BASE - 2] by the generator.
+        // Read into a local so we can validate without mutating this.bootEntrySlot.
+        let discoveredBootEntrySlot = this.bootEntrySlot;
+        const entrySlotIdx = tagIdx - 1;
+        if (entrySlotIdx >= 0 && entrySlotIdx < src.length) {
+            discoveredBootEntrySlot = src[entrySlotIdx] & 0xFF;
+        }
+
+        // Stale-trampoline guard — checked against src BEFORE any mutation of
+        // simulator state or memory.  Any boot image from before direct-dispatch
+        // has CHANGE (opcode 4) as the first instruction of the Boot.Abstr lump
+        // body.  With direct dispatch CR0 is pre-loaded from the boot-entry E-GT
+        // before the first instruction executes, so those old trampoline words run
+        // as real code and produce silently wrong behaviour on hardware.
+        // NS_ENTRY_WORDS is fixed (4) and never changes between image and instance.
+        if (discoveredBootEntrySlot < discoveredMaxNsEntries) {
+            const _abstrNsBase = discoveredNsTableBase + discoveredBootEntrySlot * this.NS_ENTRY_WORDS;
+            const _abstrLoc    = src[_abstrNsBase] >>> 0;
+            if (_abstrLoc > 0 && (_abstrLoc + 1) < discoveredNsTableBase && (_abstrLoc + 1) < src.length) {
+                const _bodyWord1 = src[_abstrLoc + 1] >>> 0;
+                const _op1       = (_bodyWord1 >>> 27) & 0x1F;
+                if (_op1 === 4 /* CHANGE */) {
+                    this.output += `[BOOTIMG] ERROR: stale trampoline-era boot image — Boot.Abstr lump (slot ${discoveredBootEntrySlot}) first body word is CHANGE (0x${_bodyWord1.toString(16).padStart(8, '0')}). This image pre-dates direct-dispatch and is unsafe to load. Rejected.\n`;
+                    return false;
+                }
+            }
+        }
+
+        // All validation passed — commit discovered layout to instance state.
         // NS_TABLE_BASE comes from the tag's discovered position, NOT from
         // (this.memory.length - NS_TABLE_RESERVE).  When the image is smaller
         // than the simulator's full memory window (e.g. a 16384-word image in
@@ -269,16 +299,10 @@ class ChurchSimulator {
         // lump the NS table references.
         this.NS_TABLE_RESERVE = discoveredNsTableReserve;
         this.NS_TABLE_BASE    = discoveredNsTableBase;
-        this.MAX_NS_ENTRIES   = (discoveredNsTableReserve / this.NS_ENTRY_WORDS) | 0;
-
-        // Boot-entry slot: stored at mem[NS_TABLE_BASE - 2] by the generator.
-        const entrySlotIdx = tagIdx - 1;
-        if (entrySlotIdx >= 0 && entrySlotIdx < src.length) {
-            const storedSlot = src[entrySlotIdx] & 0xFF;
-            if (storedSlot !== this.bootEntrySlot) {
-                this.bootEntrySlot = storedSlot;
-                this.output += `[BOOTIMG] Boot entry restored from image: Slot ${storedSlot}\n`;
-            }
+        this.MAX_NS_ENTRIES   = discoveredMaxNsEntries;
+        if (discoveredBootEntrySlot !== this.bootEntrySlot) {
+            this.bootEntrySlot = discoveredBootEntrySlot;
+            this.output += `[BOOTIMG] Boot entry restored from image: Slot ${discoveredBootEntrySlot}\n`;
         }
 
         const n   = Math.min(src.length, this.memory.length);
@@ -1368,7 +1392,7 @@ class ChurchSimulator {
         // stale binaries. Bumped to 0x563 (Task #568) — Boot.Abstr placement is now
         // dynamic (64w default or saved lump size); abstractionLumpWords deprecated.
         // Must match boot_image.py BOOT_IMAGE_FORMAT_TAG and loadBootImage().
-        const BOOT_IMAGE_FORMAT_TAG_INIT = 0xB0070563;  // bumped Task #568 (dynamic Boot.Abstr placement)
+        const BOOT_IMAGE_FORMAT_TAG_INIT = 0xB0072046;  // bumped for direct-dispatch (trampoline removal)
         this.memory[this.NS_TABLE_BASE - 1] = BOOT_IMAGE_FORMAT_TAG_INIT >>> 0;
     }
 
