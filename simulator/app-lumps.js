@@ -292,11 +292,10 @@ function showLumpDetail(token) {
     if (caps.length > 0) {
         html += '<div class="lump-detail-section">';
         html += '<div class="lump-section-title">Capabilities</div>';
-        html += '<table class="lump-detail-table"><thead><tr><th>#</th><th>Name</th><th>NS Index</th></tr></thead><tbody>';
+        html += '<table class="lump-detail-table"><thead><tr><th>#</th><th>Name</th></tr></thead><tbody>';
         for (let i = 0; i < caps.length; i++) {
             const c = caps[i];
-            const nsStr = (c.nsIndex !== undefined && c.nsIndex >= 0) ? `NS[${c.nsIndex}]` : 'unresolved';
-            html += `<tr><td>${i}</td><td>${e(c.name)}</td><td>${nsStr}</td></tr>`;
+            html += `<tr><td>${i}</td><td>${e(c.name)}</td></tr>`;
         }
         html += '</tbody></table>';
         html += '</div>';
@@ -3267,8 +3266,8 @@ function _renderLumpCodeContent(bodyEl, lump, words, token) {
         for (let _gs = 0; _gs < cc; _gs++) {
             const _wIdx  = _clistStart + _gs;
             const _wVal  = _wIdx < words.length ? (words[_wIdx] >>> 0) : 0;
-            const _gType = (_wVal >>> 23) & 0x3;
-            const _gSeq  = (_wVal >>> 16) & 0x7F;
+            const _gType = (_wVal >>> 25) & 0x3;
+            const _gSeq  = (_wVal >>> 16) & 0x1FF;
             if (!_wVal) {
                 const _capMeta = lump.capabilities && lump.capabilities[_gs];
                 const _capName = _capMeta ? (_capMeta.name || (typeof _capMeta === 'string' ? _capMeta : '')) : '';
@@ -3307,10 +3306,13 @@ function _renderLumpCodeContent(bodyEl, lump, words, token) {
                 const _gPerms  = (_wVal >>> 25) & 0x3F;
                 const _gTStr   = ['NULL','Inf','Out','Abs'][_gType];
                 const _pStr    = 'RWXLSE'.split('').map((c, i) => (_gPerms >> i) & 1 ? c : '-').join('');
-                const _mName   = _gtCRPetNames[_gs] || _gtCRPetNames[String(_gs)] || '';
+                const _capMeta2 = lump.capabilities && lump.capabilities[_gs];
+                const _capName2 = _capMeta2 ? (_capMeta2.name || (typeof _capMeta2 === 'string' ? _capMeta2 : '')) : '';
+                const _mName   = _capName2 || _gtCRPetNames[_gs] || _gtCRPetNames[String(_gs)] ||
+                                 (sim && sim.nsLabels && sim.nsLabels[_slotId]) || '';
                 const _nameHtml = _mName
                     ? `<span class="lump-gt-chip-name">${e(_mName)}</span>`
-                    : `<span class="lump-gt-chip-name lump-gt-name-unresolved">NS[${_slotId}]</span>`;
+                    : `<span class="lump-gt-chip-name lump-gt-name-unresolved">GT#${_gs}</span>`;
                 html += `<div class="lump-gt-chip" data-slot="${_gs}">` +
                         `<span class="lump-gt-chip-dot"></span>` +
                         _nameHtml +
@@ -4362,13 +4364,12 @@ async function openLumpInEditor(token) {
             var trimLen = rawWords.length;
             while (trimLen > 0 && rawWords[trimLen - 1] === 0) trimLen--;
             var trimmed = rawWords.slice(0, trimLen);
-            var nsTag   = resolvedNsIdx !== null ? ('NS[' + resolvedNsIdx + ']  ') : '';
             var addrStr = baseLoc !== null
                 ? ('@ 0x' + baseLoc.toString(16).toUpperCase().padStart(4, '0') + '  ')
                 : '';
             var _lhFree2 = lhdr.lumpSize - 1 - lhdr.cw - lhdr.cc;
             disasmLines = [
-                '; ' + lumpName + '  ' + nsTag + addrStr +
+                '; ' + lumpName + '  ' + addrStr +
                 '(' + codeLimit + ' word' + (codeLimit !== 1 ? 's' : '') +
                 ', cc=' + lhdr.cc + ', ' + _lhFree2 + ' free)'
             ];
