@@ -5940,12 +5940,16 @@ def resize_lump(token_hex):
         # boot-image.bin is little-endian, mirroring _load_boot_abstr_lump()
         mem_bi = list(_struct.unpack(f'<{n_words}I', raw[:n_words * 4]))
 
-        # Locate NS slot 3 entry (NS_TABLE_RESERVE=1024, NS_ENTRY_WORDS=4, BOOT_ABSTR_NS_SLOT=3)
+        # Locate Boot.Abstr NS entry via symbolic constants (NS_ENTRY_WORDS=4, BOOT_ABSTR_NS_SLOT=6).
+        # Never hardcode the slot number here — Boot.Abstr migrated from slot 3 to slot 6 and
+        # any hardcoded integer would silently read the wrong NS entry on the next migration.
+        _ns_entry_words  = _boot_image_gen.NS_ENTRY_WORDS      # 4 words per NS entry
+        _boot_abstr_slot = _boot_image_gen.BOOT_ABSTR_NS_SLOT  # 6 (was 3 before slot migration)
         ns_table_base = n_words - 1024
-        boot_ns_base  = ns_table_base + 3 * 4
+        boot_ns_base  = ns_table_base + _boot_abstr_slot * _ns_entry_words
         word0_location = mem_bi[boot_ns_base]
         if word0_location == 0 or word0_location + 1 >= n_words:
-            return jsonify({"error": "Boot lump location in NS slot 3 is invalid"}), 400
+            return jsonify({"error": f"Boot.Abstr (NS slot {_boot_abstr_slot}) location is invalid"}), 400
 
         # Parse lump header (little-endian word, same bit layout as big-endian .lump)
         hdr = mem_bi[word0_location]
@@ -5988,7 +5992,7 @@ def resize_lump(token_hex):
         for i in range(new_size, old_size):
             mem_bi[word0_location + i] = 0
 
-        # Update NS slot 3 word 1 (new cr_limit) and word 2 (recomputed CRC-16/XMODEM seal)
+        # Update Boot.Abstr NS entry word 1 (new cr_limit) and word 2 (recomputed seal)
         new_cr_limit = new_size - cc - 1
         mem_bi[boot_ns_base + 1] = _boot_image_gen.pack_ns_word1(
             new_cr_limit, 0, 0, 0, 0, 1, cc)
@@ -7295,10 +7299,11 @@ def boot_rom_words():
 
 @app.route("/api/boot-lump-words")
 def boot_lump_words():
-    """Return c-list and code words for Boot.Abstr (NS slot 3) from the boot image.
+    """Return c-list and code words for Boot.Abstr from the boot image.
 
-    Used by the Connect tab stream panel to disassemble NIA lines and display
-    the Golden Token (GT) value the instruction would access in the c-list.
+    The NS slot is read from boot_image_gen.BOOT_ABSTR_NS_SLOT (currently 6);
+    never hardcode the slot number here.  Used by the Connect tab stream panel
+    to disassemble NIA lines and display the GT the instruction accesses.
     """
     import struct as _struct
     boot_img = os.path.join(os.path.dirname(__file__), "lumps", "boot-image.bin")
@@ -7323,7 +7328,7 @@ def boot_lump_words():
     ns_table_base   = tag_idx + 1
     slot_entry_base = ns_table_base + BOOT_ABSTR_SLOT * NS_ENTRY_WORDS
     if slot_entry_base + 3 >= n_words:
-        return jsonify({"ok": False, "error": "NS slot 3 entry out of range"})
+        return jsonify({"ok": False, "error": "Boot.Abstr NS slot entry out of range"})
     lump_base = int(words[slot_entry_base])
     if lump_base == 0 or lump_base + 1 >= n_words:
         return jsonify({"ok": False, "error": f"invalid lump base {lump_base}"})

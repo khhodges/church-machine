@@ -484,9 +484,16 @@ class ChurchAssembler {
         // 3.5. Boot-image fixed capability names — always present in the boot c-list
         //      regardless of which abstractions are installed.
         //      Boot.Nucs  — Nucleus/Turing-domain X-GT  (slot 7, dom=0, perm=X)
-        //      Boot.Abstr — Abstraction E-GT             (slot 3, dom=1, perm=E)
+        //      Boot.Abstr — SelfTest E-GT               (slot 6, dom=1, perm=E)
+        //      Slot 6 is the Boot.Abstr/SelfTest NS slot; _getHardwareBootCatalog maps
+        //      each NS slot index directly to the same-numbered c-list position.
+        //      IMPORTANT: slots 0–7 in the DEMO_CLIST mirror NS slots 0–7 exactly:
+        //        [0]=Boot.NS [1]=Boot.Thread [2]=UART_DEV [3]=LED_DEV
+        //        [4]=BTN_DEV [5]=TIMER_DEV  [6]=SelfTest  [7]=null
+        //      Boot.Abstr was historically at slot 3 (before the NS slot migration to 6).
+        //      Do NOT revert to 3 — that slot is LED_DEV and the CALL would silently misfire.
         if (name === 'Boot.Nucs')  return 7;
-        if (name === 'Boot.Abstr') return 3;
+        if (name === 'Boot.Abstr') return 6;
 
         // 4. Abstract registry (last resort — returns the abstraction's own index)
         const reg = ChurchAssembler._sharedRegistry;
