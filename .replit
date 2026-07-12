@@ -163,6 +163,10 @@ args = "lump-warning-tests"
 task = "workflow.run"
 args = "check-ns-slot-annotations"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "lump-gt-display-tests"
+
 [[workflows.workflow]]
 name = "Church Machine IDE"
 author = "agent"
@@ -581,6 +585,17 @@ args = "node scripts/check-ns-slot-annotations.js"
 
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow]]
+name = "lump-gt-display-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node tests/lump/test_lump_gt_display.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[ports]]
 localPort = 5000

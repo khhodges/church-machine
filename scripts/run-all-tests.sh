@@ -145,6 +145,9 @@ register_suite "lump-binary-tests" \
 register_suite "lump-roundtrip" \
     'node simulator/test_lump_roundtrip.js'
 
+register_suite "lump-gt-display-tests" \
+    'node tests/lump/test_lump_gt_display.js'
+
 register_suite "lump-builder-dispatch-tests" \
     'node simulator/test_lump_builder_dispatch.js'
 
@@ -253,7 +256,7 @@ declare -A ALL_GROUPS
 
 ALL_GROUPS["boot"]="boot-image-matches-sim boot-image-loads-and-boots boot-image-upload-endpoint boot-image-serve-endpoints boot-layout-regression"
 
-ALL_GROUPS["lump"]="lump-consistency lump-binary-tests lump-roundtrip update-lump-tests"
+ALL_GROUPS["lump"]="lump-consistency lump-binary-tests lump-roundtrip lump-gt-display-tests update-lump-tests"
 
 ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests pet-name-mem-tests warning-panel-tests disasm-panel-tests boot-entry-sync-tests selftest-lump-runs pet-name-memory-tests lump-builder-dispatch-tests openin-links-tests lump-warning-tests"
 

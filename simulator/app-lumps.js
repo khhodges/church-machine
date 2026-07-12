@@ -5302,3 +5302,50 @@ async function _lumpOverviewCREdit(token, crSlot, btnEl) {
     });
 }
 
+/* ---- GT_DECODE_UNIT_TEST_EXPORT_START ----
+ * Pure functions extracted for unit testing (tests/lump/test_lump_gt_display.js).
+ * No DOM dependencies.  Keep in sync with _renderLumpGTSection loop.
+ * ---- */
+
+/**
+ * Decode the type and sequence fields from a raw 32-bit GT word.
+ *
+ * Bit layout (Live and Abstract GTs):
+ *   bits[26:25] — gtType  (1=Inform, 2=Outform, 3=Abstract, 0=Null)
+ *   bits[24:16] — gtSeq   (9-bit version/sequence counter)
+ *
+ * @param {number} wVal  Raw 32-bit word (unsigned).
+ * @returns {{ gtType: number, gtSeq: number }}
+ */
+function _gtDecodeWord(wVal) {
+    const w = (wVal >>> 0);
+    return {
+        gtType: (w >>> 25) & 0x3,
+        gtSeq:  (w >>> 16) & 0x1FF,
+    };
+}
+
+/**
+ * Resolve the display name for a Live GT (non-Abstract, non-null) c-list slot.
+ *
+ * Priority order (mirrors _renderLumpGTSection):
+ *   1. capabilities[slot].name  — declared in the manifest capabilities block
+ *   2. petName                  — from pet_names.CR[slot] in the manifest
+ *   3. nsLabel                  — from sim.nsLabels[gtSlotId]
+ *   4. "GT#<slot>"              — final fallback; never produces "NS[N]"
+ *
+ * @param {number}                  slot       C-list slot index (0-based).
+ * @param {object|string|null}      capMeta    Entry from lump.capabilities[slot], or null.
+ * @param {string}                  petName    Pet name from manifest pet_names.CR, or ''.
+ * @param {string}                  nsLabel    Label from sim.nsLabels, or ''.
+ * @returns {string}
+ */
+function _gtLiveDisplayName(slot, capMeta, petName, nsLabel) {
+    const capName = capMeta
+        ? (capMeta.name || (typeof capMeta === 'string' ? capMeta : ''))
+        : '';
+    return capName || petName || nsLabel || `GT#${slot}`;
+}
+
+/* ---- GT_DECODE_UNIT_TEST_EXPORT_END ---- */
+
