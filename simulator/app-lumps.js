@@ -3462,8 +3462,8 @@ async function _loadLumpTokens(token, lump) {
             }
         } else if (gtType === 3) {
             const abType   = (wVal >>> 27) & 0x1F;
-            const rBit     = (wVal >>> 26) & 1;
-            const wBit     = (wVal >>> 25) & 1;
+            const rBit     = (wVal >>> 24) & 1;   // bit[24] per createAbstractGT/parseAbstractGT
+            const wBit     = (wVal >>> 23) & 1;   // bit[23] per createAbstractGT/parseAbstractGT
             const abData   = wVal & 0xFFFF;
             const devClass = (abData >>> 8) & 0xFF;
             const devData  = abData & 0xFF;
@@ -3489,9 +3489,12 @@ async function _loadLumpTokens(token, lump) {
                     `</div>`;
         } else {
             const gtSlotId  = wVal & 0xFFFF;
-            const gtPerms   = (wVal >>> 25) & 0x3F;
+            const perm3     = (wVal >>> 28) & 0x7;   // bits[30:28]: 3 perm bits
+            const dom       = (wVal >>> 27) & 0x1;   // bit[27]: 0=Turing(RWX), 1=Church(ESL)
             const gtTypeStr = ['NULL','Inf','Out','Abs'][gtType];
-            const permStr   = 'RWXLSE'.split('').map((c, i) => (gtPerms >> i) & 1 ? c : '-').join('');
+            const permStr   = dom === 0
+                ? (((perm3>>2)&1 ? 'X' : '-') + ((perm3>>1)&1 ? 'W' : '-') + ((perm3>>0)&1 ? 'R' : '-'))
+                : (((perm3>>2)&1 ? 'E' : '-') + ((perm3>>1)&1 ? 'S' : '-') + ((perm3>>0)&1 ? 'L' : '-'));
             const _capMeta2    = lump.capabilities && lump.capabilities[s];
             const _capName2    = _capMeta2 ? (_capMeta2.name || (typeof _capMeta2 === 'string' ? _capMeta2 : '')) : '';
             const manifestName = _gtCRPetNames[s] || _gtCRPetNames[String(s)] || '';
