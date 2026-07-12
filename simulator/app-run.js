@@ -701,8 +701,8 @@ function stepSim() {
             }
             if (ok) {
                 switchView('dashboard');
-                _setEntryBreakpoint();
-                runSimGo();
+                openCRDetail(14);
+                updateDashboard();
             }
             return;
         }
@@ -756,11 +756,11 @@ function stepSim() {
             _autoLoadDefaultProgram();
             updateDashboard();
             if (!sim.halted) {
-                // Boot completed cleanly — cascade straight into continuous execution.
-                // "Break at entry" (if checked) inserts a one-shot breakpoint at the
-                // very first instruction so the user lands paused there automatically.
-                _setEntryBreakpoint();
-                runSimGo();
+                // Boot completed cleanly — paused at first instruction.
+                // Press Step or Run to continue.
+                switchView('dashboard');
+                openCRDetail(14);
+                updateDashboard();
             } else {
                 switchView('lumps');
                 openCRDetail(14);
