@@ -196,6 +196,13 @@ class CMCapCore(Elaboratable):
         # Combinatorial assignments are filled in later alongside the XLOADLAMBDA dispatch.
         xloadlambda_fire = Signal()
         xloadlambda_nia  = Signal(32)
+        # xloadlambda_redirect_pending: set on the xloadlambda_fire cycle; cleared after the
+        # NIA redirect lands on the following cycle.  Mirrors ELOADCALL behaviour: the core
+        # holds NIA during the fire cycle (xloadlambda_valid=1) and redirects one cycle later.
+        # External IRQ dispatch is expected to assert irq_dispatch_busy while processing
+        # xloadlambda_valid, which prevents double-execution in production hardware.
+        xloadlambda_redirect_pending = Signal()
+        xloadlambda_nia_lat          = Signal(32)  # xloadlambda_nia latched from the fire cycle
 
         lambda_start_sig = Signal()
         m.d.comb += lambda_start_sig.eq(
@@ -594,17 +601,24 @@ class CMCapCore(Elaboratable):
         ]
 
         with m.If(clear_all):
-            m.d.sync += nia_reg.eq(0)
+            m.d.sync += [nia_reg.eq(0), xloadlambda_redirect_pending.eq(0)]
         with m.Elif(self.irq_dispatch_nia_set):
-            m.d.sync += nia_reg.eq(self.irq_dispatch_nia_value)
+            # External IRQ dispatch overrides everything; also clear any pending
+            # xloadlambda redirect so it does not fire spuriously afterwards.
+            m.d.sync += [nia_reg.eq(self.irq_dispatch_nia_value),
+                         xloadlambda_redirect_pending.eq(0)]
         with m.Elif(u_lambda.nia_set):
             m.d.sync += nia_reg.eq(u_lambda.nia_value)
         with m.Elif(u_return.nia_set):
             m.d.sync += nia_reg.eq(u_return.nia_value)
         with m.Elif(u_call.nia_set):
             m.d.sync += nia_reg.eq(u_call.nia_value)
-        with m.Elif(xloadlambda_fire):
-            m.d.sync += nia_reg.eq(xloadlambda_nia)
+        with m.Elif(xloadlambda_redirect_pending):
+            # Deferred NIA redirect: apply the lambda body address latched on the previous
+            # xloadlambda_fire cycle.  NIA is held during that cycle (xloadlambda_valid=1),
+            # matching ELOADCALL's hold-then-redirect behaviour.
+            m.d.sync += [nia_reg.eq(xloadlambda_nia_lat),
+                         xloadlambda_redirect_pending.eq(0)]
         with m.Elif(jump_taken):
             m.d.sync += nia_reg.eq(jump_target)
         with m.Elif(branch_taken):
@@ -798,6 +812,17 @@ class CMCapCore(Elaboratable):
             View(CAP_REG_LAYOUT, u_regs.cr_rd_data).word1_location[:32]
             + u_decoder.cap_index
         )
+
+        # Latch the target address and set xloadlambda_redirect_pending on the fire cycle.
+        # The deferred redirect fires in the NIA chain on the following cycle, once
+        # xloadlambda_valid has been observed by the external lambda-loader dispatch.
+        # This makes XLOADLAMBDA symmetric with ELOADCALL: NIA holds during the fire cycle
+        # and is redirected one cycle later.
+        with m.If(xloadlambda_fire):
+            m.d.sync += [
+                xloadlambda_redirect_pending.eq(1),
+                xloadlambda_nia_lat.eq(xloadlambda_nia),
+            ]
 
         # -----------------------------------------------------------------------
         # M-window FSM
