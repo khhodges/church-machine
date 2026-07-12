@@ -44,7 +44,8 @@ try:
 except ImportError:
     from server.boot_constants import DEMO_CLIST_SIZE, BOOT_ABSTR_DEFAULT_SIZE
 
-NS_ENTRY_WORDS   = 4
+NS_ENTRY_WORDS   = 4            # words per NS entry (stride-4, 16 bytes per slot)
+NS_BUS_WORDS     = 4            # hardware ns_rd_data/ns_wr_data bus width in 32-bit words
 MAX_NS_ENTRIES   = 1024         # GT bits[15:0] support 65535; 1024 is the practical cap
 NS_TABLE_RESERVE = MAX_NS_ENTRIES * NS_ENTRY_WORDS  # 4096 words = 1024 entries × 4
 SLOT_SIZE        = 0x40         # 64 words

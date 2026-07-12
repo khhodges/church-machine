@@ -42,7 +42,7 @@ NS_DEPTH   = 32
 # IMEM_DEPTH must exceed (NS_WORD0_LOCATION>>2) + SCHEDULER_IRQ_METHOD_IDX
 # = (0x100>>2) + 5 = 64 + 5 = 69 → use 128
 IMEM_DEPTH = 128
-NS_WIDTH   = 32 * 3
+NS_WIDTH   = 32 * 4  # NS_ENTRY_WORDS=4 (stride-4, 16 bytes/slot)
 
 
 # ---------------------------------------------------------------------------

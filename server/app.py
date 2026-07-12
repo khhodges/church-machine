@@ -6351,12 +6351,13 @@ def build_namespace():
     entries = payload.get("entries", [])
 
     lump_size = 1 << n
+    # NS_ENTRY_WORDS=4 (stride-4); matches simulator and boot_image.py
     if ns_table_start < 1:
-        ns_table_start = lump_size - (len(entries) * 3)
+        ns_table_start = lump_size - (len(entries) * 4)
         if ns_table_start < 1:
             return jsonify({"error": "Too many entries for the given lump size"}), 400
 
-    ns_table_words_needed = len(entries) * 3
+    ns_table_words_needed = len(entries) * 4
     if ns_table_start + ns_table_words_needed > lump_size:
         return jsonify({"error": "NS Table exceeds lump size"}), 400
 
@@ -6371,15 +6372,16 @@ def build_namespace():
     for entry in entries:
         slot = int(entry.get("slot", 0))
         state = entry.get("state", "null").lower()
-        word_offset = ns_table_start + slot * 3
+        word_offset = ns_table_start + slot * 4  # NS_ENTRY_WORDS=4 (stride-4)
 
-        if word_offset + 2 >= lump_size:
+        if word_offset + 3 >= lump_size:
             return jsonify({"error": f"Slot {slot} exceeds lump size at offset {word_offset}"}), 400
 
         if state == "null":
             words[word_offset] = 0
             words[word_offset + 1] = 0
             words[word_offset + 2] = 0
+            words[word_offset + 3] = 0  # word3_seals (zero)
 
         elif state == "outform":
             hash_prefix = entry.get("hash_prefix", "").strip()
@@ -6407,6 +6409,7 @@ def build_namespace():
             words[word_offset] = w1
             words[word_offset + 1] = w2
             words[word_offset + 2] = w3
+            words[word_offset + 3] = 0  # word3_seals (zero; outform entries have no seal at build time)
 
         elif state == "bundled" or state == "live":
             lump_token = entry.get("lump_token", "").strip()
@@ -6437,6 +6440,7 @@ def build_namespace():
             words[word_offset] = w1
             words[word_offset + 1] = w2
             words[word_offset + 2] = w3
+            words[word_offset + 3] = 0  # word3_seals (zero; populated later by commissioning flow)
 
             label = entry.get("label", lump_token)
             bundled_files[f"{label}.bin"] = lump_binary

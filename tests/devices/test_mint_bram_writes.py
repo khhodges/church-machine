@@ -20,7 +20,7 @@ test_mint_bram_writes
           ns[slot*4 + 0] == alloc_base      (lump base pointer)
           ns[slot*4 + 1] == W1              (gt_seq=1, limit_offset=63)
           ns[slot*4 + 2] == integrity32     (parallel 32-bit check, replaces CRC-16)
-          ns[slot*4 + 3] == 0               (pad word)
+          ns[slot*4 + 3] == 0               (word3_seals=0 by design; Mint FSM writes no seal at mint time)
           clist[caller]  == E-GT            (E-perm, Inform, seq=1, slot_id)
 """
 
@@ -183,9 +183,9 @@ class ChurchCoreMintHarness(Elaboratable):
       words 0..255   : zero-initialised (not used by Mint FSM in this harness)
       words 256..511 : lump payload written by outform during simulation
 
-    NS memory (192 words = 64 slots × 3 words):
-      slot s → word indices 3s, 3s+1, 3s+2
-      (When cr15.word1_location=0 at reset, mint_ns_entry_base = slot_id*12)
+    NS memory (256 words = 64 slots × 4 words; NS_ENTRY_WORDS=4):
+      slot s → word indices 4s, 4s+1, 4s+2, 4s+3
+      (When cr15.word1_location=0 at reset, mint_ns_entry_base = slot_id*16)
 
     clist memory (clist_depth words, default 64):
       E-GT written at word index core.clist_addr >> 2
@@ -436,7 +436,7 @@ def test_mint_bram_writes():
     ns[slot*4+0]  == alloc_base               (lump pointer)
     ns[slot*4+1]  == W1 = (1<<21)|(63)        (gt_seq=1, limit_offset=63)
     ns[slot*4+2]  == integrity32(W0, W1)      (parallel 32-bit check)
-    ns[slot*4+3]  == 0                         (pad word)
+    ns[slot*4+3]  == 0                         (word3_seals=0 by design; Mint FSM writes no seal at mint time)
     clist[caller] == E-GT                      (E-perm, Inform, seq=1, slot)
     """
     SLOT_ID         = 0
@@ -485,7 +485,8 @@ def test_mint_bram_writes():
         exp_ns0  = ALLOC_BASE
         exp_ns1  = ref_w2(LUMP_WORDS)
         exp_ns2  = ref_integrity32(ALLOC_BASE, exp_ns1)
-        exp_ns3  = 0   # pad word
+        exp_ns3  = 0   # word3_seals=0 by design: Mint FSM (MINT_WRITE_NS3) explicitly writes 0;
+                       # seals are populated later by the commissioning flow, not at mint time.
 
         # NS entry byte addresses for slot_id=0 with cr15.word1_location=0:
         #   mint_ns_entry_base = 0 + (0 << 4) = 0  (16-byte stride)
@@ -751,7 +752,7 @@ def test_mint_bram_writes_with_cc():
         exp_ns0  = ALLOC_BASE
         exp_ns1  = ref_w2(LUMP_WORDS)
         exp_ns2  = ref_integrity32(ALLOC_BASE, exp_ns1)
-        exp_ns3  = 0   # pad word
+        exp_ns3  = 0   # word3_seals=0 by design: Mint FSM (MINT_WRITE_NS3) explicitly writes 0
 
         ns_ba0 = SLOT_ID * 16 + 0
         ns_ba1 = SLOT_ID * 16 + 4

@@ -21,6 +21,10 @@ class CTMMCore(Elaboratable):
 
         self.ns_addr = Signal(32)
         self.ns_rd_en = Signal()
+        # ctmm_amaranth uses 64-bit words; NS entries are 64*3 = 192 bits per slot.
+        # TODO: confirm whether this should be 64*4 = 256 bits (matching the 4-word
+        # stride-4 layout of the 32-bit variants) or whether the 64-bit ISA uses a
+        # different entry format.  Do not change without auditing the CTMMCall unit.
         self.ns_rd_data = Signal(64 * 3)
         self.ns_wr_data = Signal(64 * 3)
         self.ns_wr_en = Signal()

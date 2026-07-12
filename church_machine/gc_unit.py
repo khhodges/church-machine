@@ -12,10 +12,12 @@ from .layouts import NS_ENTRY_LAYOUT, NS_LIMIT_LAYOUT, SEALS_LAYOUT
 #   Sweep: Entries still with G=1 are garbage — bump version in seals,
 #          zero the entry, clear G.
 #
-# Uses the core's 96-bit namespace port (3 × 32-bit words per entry):
+# Uses the core's 128-bit namespace port (4 × 32-bit words per entry;
+# NS_ENTRY_WORDS=4, stride = slot_id << 4, i.e. 16 bytes per slot):
 #   word0: location (32 bits)
 #   word1: limit[16:0] | reserved[28:17] | G[29] | F[30] | B[31]
-#   word2: seal[24:0] | version[31:25]
+#   word2: integrity32(word0, word1)
+#   word3: seal[24:0] | version[31:25]   (FNV seal for mLoad validation)
 class ChurchGCUnit(Elaboratable):
     def __init__(self):
         self.gc_start = Signal()
@@ -26,8 +28,8 @@ class ChurchGCUnit(Elaboratable):
 
         self.ns_addr = Signal(32)
         self.ns_rd_en = Signal()
-        self.ns_rd_data = Signal(32 * 3)
-        self.ns_wr_data = Signal(32 * 3)
+        self.ns_rd_data = Signal(32 * 4)  # NS_ENTRY_WORDS=4 (stride-4, 16 bytes/slot)
+        self.ns_wr_data = Signal(32 * 4)  # NS_ENTRY_WORDS=4 (stride-4, 16 bytes/slot)
         self.ns_wr_en = Signal()
 
         self.ns_start_index = Signal(17)
@@ -47,16 +49,17 @@ class ChurchGCUnit(Elaboratable):
         mark_counter = Signal(32)
         garbage_counter = Signal(32)
 
-        latched_entry = Signal(32 * 3)
+        latched_entry = Signal(32 * 4)  # NS_ENTRY_WORDS=4; word3=seals carries version
         latched_w0 = latched_entry.word_select(0, 32)
         latched_w1 = latched_entry.word_select(1, 32)
-        latched_w2 = latched_entry.word_select(2, 32)
+        latched_w2 = latched_entry.word_select(2, 32)  # integrity (not used by GC)
+        latched_w3 = latched_entry.word_select(3, 32)  # seals: version|seal
 
         w1_view = View(NS_LIMIT_LAYOUT, latched_w1)
-        w2_view = View(SEALS_LAYOUT, latched_w2)
+        w3_view = View(SEALS_LAYOUT, latched_w3)
 
         next_version = Signal(7)
-        m.d.comb += next_version.eq(w2_view.version + 1)
+        m.d.comb += next_version.eq(w3_view.version + 1)
 
         with m.FSM(name="gc") as fsm:
             with m.State("IDLE"):
@@ -84,7 +87,7 @@ class ChurchGCUnit(Elaboratable):
                 m.next = "MARK_WRITE"
 
             with m.State("MARK_WRITE"):
-                wr_entry = Signal(32 * 3)
+                wr_entry = Signal(32 * 4)  # NS_ENTRY_WORDS=4
                 wr_w1 = wr_entry.word_select(1, 32)
                 wr_w1_view = View(NS_LIMIT_LAYOUT, wr_w1)
                 m.d.comb += wr_entry.eq(latched_entry)
@@ -130,13 +133,13 @@ class ChurchGCUnit(Elaboratable):
                         m.next = "SWEEP_READ"
 
             with m.State("SWEEP_WRITE"):
-                swept_entry = Signal(32 * 3)
-                swept_w2 = swept_entry.word_select(2, 32)
-                swept_w2_view = View(SEALS_LAYOUT, swept_w2)
+                swept_entry = Signal(32 * 4)  # NS_ENTRY_WORDS=4
+                swept_w3 = swept_entry.word_select(3, 32)  # seals at word3
+                swept_w3_view = View(SEALS_LAYOUT, swept_w3)
                 m.d.comb += [
                     swept_entry.eq(0),
-                    swept_w2_view.version.eq(next_version),
-                    swept_w2_view.seal.eq(0),
+                    swept_w3_view.version.eq(next_version),
+                    swept_w3_view.seal.eq(0),
                 ]
                 m.d.comb += [
                     self.ns_addr.eq(current_index),

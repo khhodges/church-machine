@@ -63,8 +63,8 @@ class ChurchCore(Elaboratable):
 
         self.ns_addr = Signal(32)
         self.ns_rd_en = Signal()
-        self.ns_rd_data = Signal(32 * 3)
-        self.ns_wr_data = Signal(32 * 3)
+        self.ns_rd_data = Signal(32 * 4)  # NS_ENTRY_WORDS=4 (stride-4, 16 bytes/slot)
+        self.ns_wr_data = Signal(32 * 4)  # NS_ENTRY_WORDS=4 (stride-4, 16 bytes/slot)
         self.ns_wr_en = Signal()
 
         self.clist_addr = Signal(32)
@@ -2406,7 +2406,7 @@ class ChurchCore(Elaboratable):
                 m.d.comb += [
                     self.ns_addr.eq(mint_ns_addr),
                     self.ns_rd_en.eq(0),
-                    self.ns_wr_data.eq(Cat(mint_ns_wr_data, Const(0, 64))),
+                    self.ns_wr_data.eq(Cat(mint_ns_wr_data, Const(0, 96))),  # 32+96=128 bits (NS_ENTRY_WORDS=4)
                     self.ns_wr_en.eq(1),
                 ]
             with m.Elif(u_gc.gc_busy):
@@ -2428,7 +2428,7 @@ class ChurchCore(Elaboratable):
                 m.d.comb += [
                     self.ns_addr.eq(mint_ns_addr),
                     self.ns_rd_en.eq(0),
-                    self.ns_wr_data.eq(Cat(mint_ns_wr_data, Const(0, 64))),
+                    self.ns_wr_data.eq(Cat(mint_ns_wr_data, Const(0, 96))),  # 32+96=128 bits (NS_ENTRY_WORDS=4)
                     self.ns_wr_en.eq(1),
                 ]
             with m.Else():

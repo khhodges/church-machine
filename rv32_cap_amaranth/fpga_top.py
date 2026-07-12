@@ -158,7 +158,7 @@ class RV32CapFPGATop(Elaboratable):
             dmem_wr.en.eq(core.dmem_wr_en),
         ]
 
-        ns_width = 32 * 3
+        ns_width = 32 * 4  # NS_ENTRY_WORDS=4 (stride-4, 16 bytes/slot); matches boot_image.py
         ns_mem = Memory(width=ns_width, depth=NS_DEPTH, init=[0] * NS_DEPTH)
         m.submodules.ns_mem = ns_mem
         ns_rd = ns_mem.read_port()
