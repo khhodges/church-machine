@@ -264,6 +264,39 @@ if [ -f "$PERI_SRC" ]; then
 else
     _warn "church_soc_cm.peri.xml not found at $PERI_SRC — skipping (existing SoC copy will be used)"
 fi
+
+# Deploy top.v and apb3_cm_bridge.v from repo.
+#
+# CRITICAL: these files are NOT auto-deployed by Efinity or any other step —
+# synthesis uses whatever copy already exists in $SOC_DIR.  A stale top.v
+# with jtagCtrl_reset(1'b0) keeps the debug clock domain in permanent reset,
+# which propagates to io_systemReset → system_reset stays HIGH → LED0 OFF,
+# UART silent, SoC never runs firmware.  This was the root cause of the
+# Jul 2026 "board says nothing" incident (green FPGA-configured LED on,
+# all 3 user LEDs off).  Always deploy both files so the bitstream matches
+# the repo.
+TOP_V_SRC="$HW/top.v"
+TOP_V_DST="$SOC_DIR/top.v"
+if [ -f "$TOP_V_SRC" ]; then
+    cp "$TOP_V_SRC" "$TOP_V_DST"
+    _ok "top.v deployed from repo"
+    if grep -qE "jtagCtrl_reset[[:space:]]*\([[:space:]]*1'b1" "$TOP_V_DST"; then
+        _ok "top.v: jtagCtrl_reset=1'b1 confirmed (SoC will not be stuck in reset)"
+    else
+        _fail "top.v: jtagCtrl_reset is NOT 1'b1 — SoC would stay in permanent reset (LED0 OFF, UART silent). Fix hardware/soc_combined/top.v before proceeding."
+    fi
+else
+    _fail "top.v not found at $TOP_V_SRC — cannot deploy to $SOC_DIR. Check hardware/soc_combined/."
+fi
+
+APB3_SRC="$HW/apb3_cm_bridge.v"
+APB3_DST="$SOC_DIR/apb3_cm_bridge.v"
+if [ -f "$APB3_SRC" ]; then
+    cp "$APB3_SRC" "$APB3_DST"
+    _ok "apb3_cm_bridge.v deployed from repo"
+else
+    _warn "apb3_cm_bridge.v not found at $APB3_SRC — using existing SoC copy (may be stale)"
+fi
 echo ""
 
 # ── Pre-synthesis patch guard ────────────────────────────────────────────────
