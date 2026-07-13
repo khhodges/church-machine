@@ -270,7 +270,37 @@ static inline __attribute__((always_inline)) void uart_putc(char c)
 
 static void uart_puts(const char *s)
 {
-    while (*s) uart_putc(*s++);
+    /* Use word loads (lw) rather than byte loads (lbu) throughout.
+     *
+     * Root cause of the "only 'C' appears" hang: after a UART APB write
+     * (sw to 0xF8010000), a subsequent lbu from ROM BRAM at byte lane 1,
+     * 2, or 3 (i.e. address & 3 != 0) stalls the dBus forever on this
+     * SoC/BRAM configuration — the same byte-enable hardware defect that
+     * makes sb to 0xF9007xxx hang (see uart_putc comment above).  The
+     * first char 'C' loads from lane 0 (string is 4-aligned in .rodata,
+     * addr & 3 == 0) — that works.  The second char 'H' is at lane 1 —
+     * that hangs.
+     *
+     * Fix: read 32 bits at a time via lw (safe full-word read), extract
+     * individual bytes with right-shifts (register-only, no lbu).
+     * Handles any starting alignment by loading the containing word and
+     * discarding leading bytes before s[0].
+     */
+    uint32_t align = (uintptr_t)s & 3u;
+    const uint32_t *wp = (const uint32_t *)((uintptr_t)s - align);
+    uint32_t w = *wp++;               /* lw — safe full-word load     */
+    uint32_t remaining = 4u - align;
+    w >>= (align << 3);               /* discard bytes before s[0]    */
+    for (;;) {
+        char c = (char)(w & 0xFFu);
+        if (!c) return;
+        uart_putc(c);
+        w >>= 8;
+        if (--remaining == 0u) {
+            w = *wp++;                /* lw — next full word          */
+            remaining = 4u;
+        }
+    }
 }
 
 /* Returns received byte (0–255) if available, -1 if nothing waiting. */
@@ -293,10 +323,15 @@ static int uart_getc_blocking(void)
 /* Emit 32-bit value as 8 lowercase hex digits (no prefix). */
 static void uart_puthex32_lower(uint32_t v)
 {
-    static const char hex[] = "0123456789abcdef";
+    /* Avoid lbu from static const char hex[] — same root cause as
+     * the uart_puts / sb-to-stack hang: byte-lane sub-word reads from
+     * ROM BRAM after a UART APB write stall the dBus.  Compute the
+     * nibble→char mapping arithmetically instead (all registers). */
     int i;
-    for (i = 28; i >= 0; i -= 4)
-        uart_putc(hex[(v >> i) & 0xFu]);
+    for (i = 28; i >= 0; i -= 4) {
+        uint32_t nib = (v >> i) & 0xFu;
+        uart_putc((char)(nib < 10u ? ('0' + nib) : ('a' + (nib - 10u))));
+    }
 }
 
 /* Emit a decimal number (0..999999).
