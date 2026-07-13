@@ -1,48 +1,45 @@
 ---
-name: Sapphire BRAM lbu hang after UART APB write
-description: lbu (byte load) from ROM BRAM at byte lane 1-3 hangs dBus after a prior UART APB store — same root cause as the sb hang; only lw/sw are safe.
+name: CM APB3 bus contention — banner hang root cause
+description: CM core grabs shared APB3 bus immediately after CM_CTRL_RELEASED, stalling the SoC mid-banner. Banner must be fully sent BEFORE releasing the CM core.
 ---
 
 ## The Rule
-After any store to APB space (0xF8xxxxxx), a subsequent `lbu` from the
-combined ROM/RAM BRAM at a non-lane-0 byte address (i.e. `addr & 3 != 0`)
-stalls the dBus forever on the Ti60 Sapphire SoC. `lw` (full 32-bit word
-reads) always work.
+The boot banner (and any UART output) MUST be fully transmitted **before**
+writing `CM_CTRL = CM_CTRL_RELEASED`. The CM core starts executing the
+instant it is released and immediately accesses the shared APB3 bridge.
+Once the CM wins APB bus arbitration, the Sapphire SoC stalls mid-write —
+only the first character escapes.
 
 ## Why
-The Efinix Ti60 Sapphire SoC dBus byte-enable path for sub-word reads from
-the system_ramA BRAM appears to malfunction for byte lanes 1, 2, 3 when
-there has been a prior outstanding or recently-completed APB transaction.
-Byte lane 0 (`addr & 3 == 0`) works. This is the same hardware defect as
-the known `sb`-to-BRAM hang — the byte-enable circuitry is unreliable for
-both reads and writes at sub-word granularity.
+The Sapphire SoC UART and the CM APB3 bridge share one APB bus. There is
+no hardware arbitration priority that favours the SoC. After
+`CM_CTRL_RELEASED`, the CM core begins its boot sequence within a handful
+of clock cycles and can grab the APB bus before the SoC finishes a UART
+write. The TX FIFO write stalls (PREADY never returns), the SoC hangs,
+and only whatever was already in the FIFO before the stall is transmitted.
+
+For a 25 MHz clock and a 57600-baud UART, a 3000-cycle inter-character
+delay is ~120 µs — far longer than the CM core needs (~tens of cycles) to
+start accessing APB3.
 
 ## How to Apply
-**Never call `lbu`/`lb`/`lhu`/`lh` (sub-word loads) from ROM BRAM after
-any UART or APB write, anywhere in the firmware.**
+In `main.c`:
+1. Output the full banner (`uart_puts` + `uart_putc` digits) as step 2,
+   right after `UART_CLOCKDIV`.
+2. Write `CM_UID_LO / CM_UID_HI` and emit the UID line next (APB3 writes
+   to the bridge are fine here because the CM is not yet running).
+3. Write `CM_CTRL = CM_CTRL_RELEASED` **last**, as step 4.
+4. All subsequent `uart_puts` calls (boot_complete wait, CALLHOME, etc.)
+   happen after release — but by then the banner is safely in the FIFO.
 
-Specifically:
-- `uart_puts(s)`: must use `lw` + bit-shift, NOT `while (*s) uart_putc(*s++)`.
-  The word-load loop reads 4 chars at once via `lw`, extracts bytes via
-  `>>` and `& 0xFF` (register-only), no `lbu` from ROM at any point.
-  Handles non-4-aligned string starts by loading the containing word and
-  discarding bytes before `s[0]`.
+## Regression History
+- **June 12 bitstream**: CM Verilog (pre-NS-stride-4 regen) was slower to
+  access APB3 after release — banner transmitted before contention.
+- **July 2026 bitstream**: NS stride-4 regen (`4a8593cc`) produced a CM
+  core that accesses APB3 faster → only 'C' survived → regression.
 
-- `uart_puthex32_lower(v)`: must NOT use `static const char hex[]` table.
-  The `hex[nib]` access is a `lbu` from .rodata — hangs for nib values whose
-  byte lane != 0. Use arithmetic: `nib < 10 ? '0'+nib : 'a'+(nib-10)`.
-
-- Any future code that indexes into a `char[]` or `const char[]` in .rodata
-  AFTER a UART write must be converted to word-load + shift/mask.
-
-- `_rx_buf[i]` byte-index accesses in the command parser are `lbu`/`sb`
-  from/to RAM (0xF9007xxx) — they also need to be word-aligned or replaced
-  with word-load patterns.
-
-## Known Symptom That Led Here
-`uart_puts("CHURCH Ti60 SoC+CM v")` output only 'C' then hung. 'C' is at
-byte lane 0 of the first aligned word — works. 'H' is at lane 1 — hangs.
-The 128-entry TX FIFO and immediate PREADY completely ruled out any FIFO
-stall. ROM initialization is correct (both lw for instructions and lw for
-data work). The hang is purely the byte-enable path in the dBus → BRAM
-connection.
+## Secondary defensive fixes (kept)
+- `uart_puts`: lw-based word extraction instead of `lbu` — guards against
+  any BRAM byte-enable sub-word read issues after APB writes.
+- `uart_puthex32_lower`: arithmetic nibble→char instead of `hex[]` table —
+  no `lbu` from .rodata after a UART write.

@@ -610,27 +610,32 @@ int main(void)
     /* ---- Step 1: Baud rate (MUST be first) ---- */
     UART_CLOCKDIV = UART_DIV_57600;
 
-    /* ---- Step 2: Write UID to APB3 bridge registers before any CALLHOME ---- */
-    CM_UID_LO = BOARD_UID_LO;
-    CM_UID_HI = BOARD_UID_HI;
-
-    /* ---- Step 3: Release push_button (keep CM running) ---- */
-    CM_CTRL = CM_CTRL_RELEASED;
-
-    /* ---- Step 4: Boot banner ----
+    /* ---- Step 2: Boot banner (BEFORE releasing CM core) ----
+     *
+     * CRITICAL ORDERING: The banner MUST be fully transmitted before
+     * CM_CTRL_RELEASED (Step 3).  The CM core, once released, immediately
+     * begins executing and can access the shared APB3 bridge.  The Sapphire
+     * SoC and the CM core share one APB bus; if the CM grabs it mid-banner,
+     * the SoC stalls mid-write and only the first character ('C') escapes.
+     *
      * Version digits are derived from FW_MAJOR/FW_MINOR (not hardcoded) so
-     * the banner can never drift out of sync with the #define bump — this
-     * is the root cause of the v2.3-vs-v2.4 stale-banner incident. Single
-     * uart_putc digit, no division, matches the fw_major/fw_minor emission
-     * used in the CALLHOME JSON above. */
+     * the banner can never drift out of sync with the #define bump. */
     uart_puts("CHURCH Ti60 SoC+CM v");
     uart_putc((char)('0' + (FW_MAJOR % 10u)));
     uart_putc('.');
     uart_putc((char)('0' + (FW_MINOR % 10u)));
     uart_puts("\r\n");
+
+    /* ---- Step 3: Write UID to APB3 bridge registers ---- */
+    CM_UID_LO = BOARD_UID_LO;
+    CM_UID_HI = BOARD_UID_HI;
+
     uart_puts("UID=");
     emit_uid();
     uart_puts("\r\n");
+
+    /* ---- Step 4: Release CM core (APB3 bus now shared with CM) ---- */
+    CM_CTRL = CM_CTRL_RELEASED;
 
     /* ---- Step 5: Wait for CM boot_complete (timeout ~3 s) ---- */
     uart_puts("Waiting for CM boot_complete...\r\n");

@@ -31,7 +31,7 @@
 - [Sapphire BRAM symbol file generation](sapphire-bram-symbol-gen.md) — ELF has 4096-byte page-align prefix before ROM; must use hardcoded ROM_BASE=0xF9000000 not min(paddr); files go in soc_combined/ not firmware/
 - [Sapphire firmware uart_putdec hang](sapphire-uart-putdec-hang.md) — uart_putdec using divu/remu hangs at runtime even with always_inline uart_putc; replaced with uart_puthex32_lower+uart_putc in callhome path
 - [Sapphire BRAM byte-store hang](sapphire-bram-byte-store-hang.md) — ANY sb to 0xF9007xxx hangs CPU; sha256.h/hkdf all use sb; precompute tokens or stub; only sw/lw safe in firmware
-- [Sapphire BRAM lbu hang after UART APB write](sapphire-bram-lbu-hang.md) — lbu from ROM BRAM at byte lanes 1-3 also stalls dBus after any APB store; uart_puts must use lw+shift, uart_puthex32_lower must use arithmetic not hex[] table
+- [CM APB3 bus contention](sapphire-bram-lbu-hang.md) — banner MUST be sent before CM_CTRL_RELEASED; CM grabs shared APB bus in ~tens of cycles, stalling SoC mid-UART-write; only first char escapes
 - [top.res.csv wrong sync file](top-res-csv-backslash.md) — Interface Designer writes outflow/<circuit>.interface.csv NOT top.res.csv; top.res.csv is MAP resource report; passing it to efx_pnr crashes "unknown escape sequence" on \t
 - [CM DMEM Thread.caps[0] boot fix](cm-dmem-thread-caps.md) — DMEM word 125 = Thread.caps[0]; must be 0x4A000004 (E-GT→Salvation/NUC_PROGRAM slot 4); CM DMEM patch is now gen_cm_dmem_direct.py, not patch_cm_bram.py
 - [OBBS single-patch-location bug class](obbs-single-patch-location.md) — a newer patch step + an un-removed older patch step for the same artifact eventually double-run; make the later step a read-only self-test, not a fallback patch
