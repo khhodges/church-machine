@@ -117,10 +117,10 @@ module top (
     //
     // Correct approach: start at 0x00 (actual HW power-up value), count UP,
     // assert reset while MSB is 0, deassert once MSB sets.
-    // (* keep = "true" *) (NOT syn_keep) prevents efx_map from pruning the
-    // counter, while still allowing the sequential logic to run correctly.
+    // No keep/syn_keep attribute needed — por_cnt drives io_asyncReset which is
+    // a module port input on the Sapphire SoC, so efx_map cannot prune it.
     // ----------------------------------------------------------------
-    (* keep = "true" *) reg [7:0] por_cnt = 8'h00;
+    reg [7:0] por_cnt = 8'h00;
     always @(posedge clk)
         if (!por_cnt[7]) por_cnt <= por_cnt + 1'b1;
     wire por_reset = ~por_cnt[7];    // HIGH for 128 cycles then LOW forever
