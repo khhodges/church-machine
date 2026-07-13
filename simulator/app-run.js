@@ -10145,7 +10145,7 @@ function _renderBuildNextSteps(isTi60, board) {
             'Extract the zip — all files land in one folder',
             'Run setup_ti60_peri.py with Efinity\'s Python to add the PLL (see BUILD.md)',
             'In the SDC file: switch from Phase A (25 MHz) to Phase B (50 MHz) per the comments',
-            'File → Open Project → church_ti60_f225.xml',
+            'File → Open Project → ti60_f225_project.xml',
             'Run Synthesis → P&R → Generate Bitstream',
             'Tool → Programmer → Program (JTAG / USB)',
         ];
@@ -11625,7 +11625,7 @@ async function downloadFPGAPackage() {
         }
         _buildLogAppend('\nPackage contents:\n');
         if (isTi60) {
-            _buildLogAppend('  church_ti60_f225.xml      — Efinity project file (open this in Efinity IDE)\n');
+            _buildLogAppend('  ti60_f225_project.xml     — Efinity project file (open this in Efinity IDE)\n');
             _buildLogAppend('  church_ti60_f225.v        — Synthesisable Verilog\n');
             _buildLogAppend('  church_ti60_f225.sdc      — Timing constraints\n');
             _buildLogAppend('  church_ti60_f225.peri.xml — Periphery I/O configuration\n');

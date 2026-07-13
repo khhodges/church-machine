@@ -1221,7 +1221,7 @@
                                     <li>Unzip the project you downloaded in Step 1 into a working folder</li>
                                     <li>Launch <strong>Efinity Programmer</strong>:<br>
                                         Open Efinity IDE, then go to <strong>Tool → Programmer</strong><br>
-                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">(or run standalone: <code>C:\Efinity\2025.2\bin\programmer.exe</code>)</span></li>
+                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">(or run standalone: <code>C:\Efinity\2026.1\bin\programmer.exe</code>)</span></li>
                                     <li>Cable dropdown: select <strong>Efinix USB2.0 Device</strong></li>
                                     <li>Mode: <strong>JTAG</strong> &nbsp;·&nbsp; Operation: <strong>Active Serial Programming</strong><br>
                                         <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">(Active Serial writes to SPI flash — the board keeps it after power-off)</span></li>
@@ -1263,9 +1263,9 @@
                             <!-- Windows / Mac build steps -->
                             <div class="sw-os-win">
                                 <ol class="sw-list">
-                                    <li><strong>Download and install Efinity 2025.2</strong> from <a href="https://www.efinixinc.com/support/efinity.php" target="_blank" rel="noopener">efinixinc.com/support/efinity.php</a> — required before any of the steps below.</li>
+                                    <li><strong>Download and install Efinity 2026.1</strong> from <a href="https://www.efinixinc.com/support/efinity.php" target="_blank" rel="noopener">efinixinc.com/support/efinity.php</a> — required before any of the steps below.</li>
                                     <li>Unzip the downloaded project into a working folder.</li>
-                                    <li>Open the <strong>Efinity Terminal</strong> (Start menu → Efinity 2025.2 → Efinity Terminal) — this shell pre-sets Efinity's Python path. Then <code>cd</code> into the folder and run <code>setup_ti60_peri.py</code>. The script is inside the ZIP; do not type it as a bare system command:<br>
+                                    <li>Open the <strong>Efinity Terminal</strong> (Start menu → Efinity 2026.1 → Efinity Terminal) — this shell pre-sets Efinity's Python path. Then <code>cd</code> into the folder and run <code>setup_ti60_peri.py</code>. The script is inside the ZIP; do not type it as a bare system command:<br>
 <pre style="margin:0.3rem 0 0.2rem;">cd C:\path\to\church_ti60_f225_project
 python setup_ti60_peri.py</pre>
                                         <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">You should see <em>"SUCCESS — church_ti60_f225.peri.xml written"</em></span></li>
@@ -1281,20 +1281,20 @@ python setup_ti60_peri.py</pre>
                             <!-- Linux / Chromebook build steps -->
                             <div class="sw-os-linux" style="display:none;">
                                 <ol class="sw-list">
-                                    <li><strong>Download and install Efinity 2025.2</strong> from <a href="https://www.efinixinc.com/support/efinity.php" target="_blank" rel="noopener">efinixinc.com/support/efinity.php</a> — required before any of the steps below.</li>
+                                    <li><strong>Download and install Efinity 2026.1</strong> from <a href="https://www.efinixinc.com/support/efinity.php" target="_blank" rel="noopener">efinixinc.com/support/efinity.php</a> — required before any of the steps below.</li>
                                     <li>Unzip the downloaded project into a working folder.</li>
                                     <li>If you have an OSS CAD Suite or any other venv active, deactivate it first — then <code>cd</code> into the extracted folder and run <code>setup_ti60_peri.py</code> using <strong>Efinity's own Python</strong>. The script is inside the ZIP; it is not a system command, do not type it bare:<br>
 <pre style="margin:0.3rem 0 0.2rem;">deactivate   # skip if no venv is active
 cd ~/path/to/church_ti60_f225_project
-PYTHONPATH=$HOME/efinity/2025.2/lib:$HOME/efinity/2025.2/pt/bin \
-EFXPT_HOME=$HOME/efinity/2025.2/pt \
-  $HOME/efinity/2025.2/bin/python3.11 setup_ti60_peri.py</pre>
+PYTHONPATH=$HOME/efinity/2026.1/lib:$HOME/efinity/2026.1/pt/bin \
+EFXPT_HOME=$HOME/efinity/2026.1/pt \
+  $HOME/efinity/2026.1/bin/python3.11 setup_ti60_peri.py</pre>
                                         <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">You should see <em>"SUCCESS — church_ti60_f225.peri.xml written"</em></span></li>
                                     <li><strong>Enable SoC / UART</strong> &mdash; open <code>church_ti60_f225.sdc</code> and switch Phase A → Phase B per the comments (Phase B = 50 MHz with SoC/UART):<br>
 <pre style="margin:0.3rem 0 0.2rem;">nano church_ti60_f225.sdc</pre>
                                         <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">Comment out the Phase A line and uncomment Phase B exactly as the comments direct.</span></li>
                                     <li>Launch Efinity IDE:<br>
-<pre style="margin:0.3rem 0 0.2rem;">QT_QPA_PLATFORM=xcb LIBGL_ALWAYS_SOFTWARE=1 ~/efinity/2025.2/bin/efinity &amp;</pre></li>
+<pre style="margin:0.3rem 0 0.2rem;">QT_QPA_PLATFORM=xcb LIBGL_ALWAYS_SOFTWARE=1 ~/efinity/2026.1/bin/efinity &amp;</pre></li>
                                     <li><strong>File → Open Project</strong> → select <code>church_soc_cm.xml</code></li>
                                     <li>Run <strong>Synthesis → Place &amp; Route → Generate Bitstream</strong><br>
                                         <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">Takes ~30 min. When done, <code>outflow/church_soc_cm.hex</code> is the programming file.</span></li>
@@ -2593,7 +2593,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
          via window._cloomcLangExampleGroups); both must precede app-source-library. -->
     <script src="app-compile.js?v=20260710d"></script>
     <script src="app-lump-editor.js?v=20260516e"></script>
-    <script src="app-run.js?v=20260710d"></script>
+    <script src="app-run.js?v=20260713a"></script>
     <script src="app-source-library.js?v=20260509d"></script>
     <script src="app-invoke.js?v=20260521a"></script>
     <script src="app-misc.js?v=20260709a"></script>
