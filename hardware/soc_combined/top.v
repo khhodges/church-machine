@@ -241,10 +241,6 @@ module top (
         .uart_tx          (cm_uart_tx),          // CM UART TX → GPIOL_P_03 → ttyUSB3
         .uart_rx          (cm_uart_rx_int),       // relay_tx | GPIOL_N_03 ← ttyUSB3
         .push_button      (cm_push_button_driven),
-        .dbg_boot_complete(cm_boot_complete),     // → APB3 STATUS[0] → SoC CALLHOME
-        .dbg_fault_valid  (cm_fault_valid),       // → APB3 STATUS[1]
-        .dbg_fault        (cm_fault_raw),           // → APB3 FAULT[3:0]
-        .dbg_nia          (cm_nia),               // → APB3 NIA
 
         // CM LEDs — individual 1-bit outputs from generated Verilog
         .led0        (cm_led0),
@@ -253,10 +249,15 @@ module top (
         .led3        (cm_led3)
     );
 
-    // Route CM signals to APB3 bridge inputs.
-    // dbg_boot_complete / dbg_fault_valid / dbg_fault / dbg_nia are now wired
-    // directly from the church_ti60f225 port list above.
-    assign cm_fault         = {1'b0, cm_fault_raw}; // bit 4 not driven by CM core
+    // CM debug signals — tied to 0 because the current build/church_ti60_f225.v
+    // (Yosys-generated) exposes these as internal wires, not module ports.
+    // Regenerate with 'python hardware/gen_verilog.py' (Amaranth backend) to
+    // restore live dbg_boot_complete/dbg_fault_valid/dbg_fault/dbg_nia telemetry.
+    assign cm_boot_complete = 1'b0;
+    assign cm_fault_valid   = 1'b0;
+    assign cm_nia           = 32'b0;
+    assign cm_fault_raw     = 4'b0;
+    assign cm_fault         = {1'b0, cm_fault_raw}; // bit 4 always 0
     assign cm_fault_gt      = 32'b0;
     assign cm_fault_instr   = 32'b0;
     assign cm_fault_cr14    = 32'b0;
