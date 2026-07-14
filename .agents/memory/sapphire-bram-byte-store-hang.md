@@ -34,6 +34,27 @@ This pattern is now in `uart_puts()` at the start (to clear the calling code's l
 - `sha256.h`/`hkdf` functions → `sb` to ctx->buf[] on stack → hangs (Bug B)
 - `uart_puts("KHURCH...")` with the old implementation → first `lw` from ROM after `uart_putc('Z')` in main() → hangs silently; board outputs only 'Z' then reboots (Bug C)
 
+## Bug D — function prolog stall (discovered during Bug C fix)
+
+The RISC-V function prolog emits `sw ra, N(sp)` (save return address to BRAM
+stack) **before any C source line in the function runs**. If the caller just
+did `uart_putc()`, the dBus stall is still active, and the prolog `sw` hangs
+silently. No C code in the called function ever executes.
+
+**Symptom**: a diagnostic probe `uart_putc('!')` placed as the FIRST C
+statement of a function never appears in output, even though the probe is a
+simple immediate-value UART write with no ROM reads. The function appears
+dead, but the real hang is in the invisible prolog.
+
+**Fix**: the fence MUST be in the CALLER, placed between the last
+`uart_putc()` and the next `uart_puts()` (or any function) call. Fencing
+inside the callee is too late — the prolog runs first.
+
+**Also fixed**: the loop fence in uart_puts was inside `if (--remaining == 0)`
+— but `--remaining` itself is a BRAM stack read that happens BEFORE the fence.
+Moved the fence to immediately after `uart_putc(c)`, unconditionally, so all
+subsequent stack accesses (`w >>= 8`, `--remaining`, `*wp++`) are safe.
+
 ## Observed symptom for Bug C
 Board outputs 'Z' (from `uart_putc('Z')` in main), then reboots. Serial monitor shows "ZZZ" (3 rapid reboots from watchdog). No banner characters ever appear. The 'Z' itself works because it is a direct `uart_putc` call with an immediate value — no ROM read. `uart_puts` hangs on its very first `lw` from .rodata.
 

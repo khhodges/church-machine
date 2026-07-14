@@ -309,28 +309,38 @@ static inline __attribute__((always_inline)) void uart_putc(uint32_t c)
  *   '@' — emitted after the first lw succeeds; confirms Bug C fix works. */
 static void __attribute__((optimize("O0"))) uart_puts(const char *s)
 {
+    /* Bug C fix — FENCE BEFORE ANYTHING ELSE.
+     *
+     * The function prolog emits "sw ra, N(sp)" (a BRAM write) before any
+     * C source line runs.  If the caller just did uart_putc(), the UART
+     * write stalls the dBus and that prolog sw hangs — the function never
+     * reaches its first line.  The caller MUST fence before calling us.
+     *
+     * We also fence here defensively for callers that don't fence, AND to
+     * clear the stall introduced by the prolog sw itself (BRAM write does
+     * NOT trigger the stall, only UART writes do — so this is a no-op when
+     * the caller already fenced, but harmless).
+     *
+     * Loop invariant: fence × 2 is issued immediately after every
+     * uart_putc(c), before any stack or ROM access, so BRAM is always
+     * clear when we reach w >>= 8, --remaining, *wp++, or return. */
+    CM_UID_LO = BOARD_UID_LO;         /* fence 1 */
+    CM_UID_LO = BOARD_UID_LO;         /* fence 2 */
     uint32_t align = (uintptr_t)s & 3u;
     const uint32_t *wp = (const uint32_t *)((uintptr_t)s - align);
-    /* Bug C fix: emit probe, then fence, then lw — no UART write between
-     * fence and lw or the stall is re-triggered before the load. */
-    uart_putc('!');                   /* PROBE — its UART write is flushed by fence below */
-    CM_UID_LO = BOARD_UID_LO;         /* fence write 1: clears dBus stall   */
-    CM_UID_LO = BOARD_UID_LO;         /* fence write 2: belt-and-suspenders */
-    uint32_t w = *wp++;               /* lw — immediately after fence, safe */
-    uart_putc('@');                   /* PROBE — lw succeeded               */
+    uint32_t w = *wp++;               /* lw — safe: fence above cleared stall */
     uint32_t remaining = 4u - align;
-    w >>= (align << 3);               /* discard bytes before s[0]          */
+    w >>= (align << 3);               /* discard bytes before s[0] */
     for (;;) {
-        uint32_t c = w & 0xFFu;       /* uint32_t: spills as sw not sb      */
+        uint32_t c = w & 0xFFu;       /* uint32_t: spills as sw not sb */
         if (c == 0u) return;
-        uart_putc(c);                 /* UART write — re-stalls dBus        */
+        uart_putc(c);                 /* UART write → stalls BRAM */
+        CM_UID_LO = BOARD_UID_LO;     /* fence 1 — peripheral write, not stalled */
+        CM_UID_LO = BOARD_UID_LO;     /* fence 2 */
+        /* All stack and ROM accesses below are safe — fence cleared the stall */
         w >>= 8;
         if (--remaining == 0u) {
-            /* Re-fence: last uart_putc re-stalled dBus; clear before lw.
-             * No UART write between these fence writes and the lw below. */
-            CM_UID_LO = BOARD_UID_LO;
-            CM_UID_LO = BOARD_UID_LO;
-            w = *wp++;                /* lw immediately after fence         */
+            w = *wp++;                /* ROM lw — safe after fence */
             remaining = 4u;
         }
     }
@@ -665,6 +675,11 @@ int main(void)
      * If 'Z' appears the fence is working and uart_putc is alive.
      * If 'C' still appears before 'Z', the 'C' is from an old/stale bitstream. */
     uart_putc(FW_BUILD_LETTER);  /* cycles each rebuild: Z→A→B→…→Z */
+    /* FENCE: uart_putc above stalls the dBus.  uart_puts prolog emits
+     * "sw ra, N(sp)" (BRAM write) before any C source line — if stalled
+     * it hangs silently.  Fence here so prolog and first ROM lw both work. */
+    CM_UID_LO = BOARD_UID_LO;
+    CM_UID_LO = BOARD_UID_LO;
 
     /* ---- Step 3: Boot banner (BEFORE releasing CM core) ----
      *
@@ -676,9 +691,15 @@ int main(void)
     uart_putc((char)('0' + (FW_MAJOR % 10u)));
     uart_putc('.');
     uart_putc((char)('0' + (FW_MINOR % 10u)));
+    /* FENCE: three uart_putc above re-stalled dBus; clear before uart_puts prolog. */
+    CM_UID_LO = BOARD_UID_LO;
+    CM_UID_LO = BOARD_UID_LO;
     uart_puts("\r\n");
     uart_puts("UID=");
     emit_uid();
+    /* FENCE: emit_uid() ends with uart_putc; clear before uart_puts prolog. */
+    CM_UID_LO = BOARD_UID_LO;
+    CM_UID_LO = BOARD_UID_LO;
     uart_puts("\r\n");
 
     /* ---- Step 4: Release CM core (APB3 bus now shared with CM) ---- */
