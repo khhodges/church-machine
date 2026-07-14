@@ -362,12 +362,27 @@ else
 fi
 echo ""
 
+# ── Step 3b: Deploy symbol bins to PNR search paths ─────────────────────────
+# EFX_MAP keeps $readmemb as a bare-filename reference in map.v (does NOT
+# inline data into INIT_0).  EFX_PNR must resolve those bare filenames at
+# P&R time from its own working directory.  Efinity 2026.1 searches at least
+# three locations: work_pnr/, the project root (SOC_DIR/), and outflow/.
+# We already deployed to work_syn/ above; copy to the remaining candidates
+# so PNR always finds them regardless of internal CWD changes.
+mkdir -p "$SOC_DIR/work_pnr"
+cp "$HW"/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol*.bin "$SOC_DIR/work_pnr/"
+cp "$HW"/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol*.bin "$SOC_DIR/"
+mkdir -p "$SOC_DIR/outflow"
+cp "$HW"/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol*.bin "$SOC_DIR/outflow/"
+_ok "Sapphire symbol bins deployed to work_pnr/, project root, and outflow/ (PNR \$readmemb paths)"
+echo ""
+
 # ── Step 4: Place & Route (EFX_PNR, Efinity 2026.1) ────────────────────────
 _info "Step 4/8: Place & Route (efx_pnr — Efinity 2026.1, ~5 min)"
 # tail -30 (not -8): run_efx_pnr.sh's Interface Designer failure path now
 # ends with a multi-line interface.log error digest that must survive this
 # truncation — an -8 tail previously hid the real crash reason, leaving only
-# the generic "did not produce ... .interface.csv" line visible.
+# the generic "did not provide ... .interface.csv" line visible.
 bash "$HW/run_efx_pnr.sh" "$SOC_DIR/church_soc_cm.xml" 2>&1 | tee /tmp/build_pnr.log | tail -30
 LBF="$SOC_DIR/work_pnr/${CIRCUIT}.lbf"
 if [ ! -f "$LBF" ]; then
