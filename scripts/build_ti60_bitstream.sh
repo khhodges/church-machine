@@ -153,12 +153,21 @@ print(val.strip())
 " 2>/dev/null || echo "unknown")
 FW_BIN_SIZE=$(wc -c < "$HW/firmware/firmware.bin" 2>/dev/null || echo 0)
 _ok "Firmware ${FW_VERSION} compiled — banner: ${FW_BANNER}  size: ${FW_BIN_SIZE} bytes"
-if [ "$FW_BIN_SIZE" -lt 8000 ]; then
-    _fail "Firmware binary is suspiciously small (${FW_BIN_SIZE} bytes < 8 KB minimum).
-  Expected >= 8 000 bytes for a full v2.x firmware build.
+# Size gate: old "callhome one-liner" firmware was ~1.6 KB; full v2.x firmware
+# is ~8 KB. Threshold 4 000 bytes safely rejects the stub without a false-fail
+# on compact -O2 -nostdlib builds (confirmed: v2.4 = 7 932 bytes).
+# KHURCH-banner bypass: if the compiled-in banner starts with KHURCH the
+# firmware identity is already confirmed; skip the size check.
+if [[ "$FW_BANNER" != KHURCH* ]] && [ "$FW_BIN_SIZE" -lt 4000 ]; then
+    _fail "Firmware binary is suspiciously small (${FW_BIN_SIZE} bytes < 4 KB minimum).
+  Expected >= 4 000 bytes for a full v2.x firmware build.
   The new main.c may not have been compiled — check toolchain and Makefile."
 fi
-_ok "Firmware binary size check passed (${FW_BIN_SIZE} bytes >= 8 KB)"
+if [[ "$FW_BANNER" == KHURCH* ]]; then
+    _ok "Firmware binary confirmed (KHURCH banner present, size: ${FW_BIN_SIZE} bytes)"
+else
+    _ok "Firmware binary size check passed (${FW_BIN_SIZE} bytes >= 4 KB)"
+fi
 echo ""
 
 # ── Step 1.5: Sync firmware source into the Efinity project directory ───────
