@@ -389,7 +389,7 @@ static void uart_emit_callhome(uint32_t boot_reason)
     uint32_t fault_latched = (status & CM_STATUS_FAULT_LATCHED) ? 1u : 0u;
     uint32_t fault_code    = fault_latched ? (CM_FAULT & 0x1Fu) : 0u;
 
-    uart_puts("CALLHOME:{\"board\":\"Ti60F225\",\"uid\":\"");
+    uart_puts("ALLHOME:{\"board\":\"Ti60F225\",\"uid\":\"");
     emit_uid();
     uart_puts("\",\"nia\":\"0x");
     uart_puthex32_lower(nia);
