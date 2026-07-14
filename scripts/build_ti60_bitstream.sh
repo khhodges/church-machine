@@ -315,7 +315,35 @@ bash "$SCRIPTS/check_sapphire_patch_fresh.sh" "$SAPPHIRE_V" || {
 echo ""
 
 # ── Step 3: Synthesis (EFX_MAP, Efinity 2026.1) ─────────────────────────────
-_info "Step 3/8: Synthesis (efx_map — Efinity 2026.1, ~4 min)"
+_info "Step 3/8: Synthesis (efx_map — Efinity 2026.1, ~45 min)"
+
+# Force fresh synthesis by deleting any cached VDB.
+#
+# EFX_MAP decides whether to re-synthesise by comparing Verilog source file
+# mtimes against the existing VDB.  The Sapphire ROM firmware lives in four
+# .bin files (symbol0..3) that are referenced via $readmemb in sapphire.v.
+# sapphire.v's OWN mtime does not change when the .bin files are updated
+# (patch_sapphire_init.py is idempotent after the first patch, by design —
+# see scripts/check_sapphire_patch_fresh.sh header for the full history).
+# MAP therefore sees "Verilog unchanged, VDB is fresh" and exits in seconds
+# while quietly baking the OLD firmware bytes into the new bitstream.
+#
+# Deleting the VDB forces MAP to run a full synthesis pass (the expected
+# 30–45 min) and re-read the .bin files from work_syn/ on every build.
+# This is the correct trade-off: the alternative is firmware that never
+# changes on the board no matter how many times you rebuild.
+for _vdb in \
+    "$SOC_DIR/outflow/church_soc_cm.vdb" \
+    "$SOC_DIR/work_syn/church_soc_cm.vdb" \
+    "$SOC_DIR/outflow/top.vdb" \
+    "$SOC_DIR/work_syn/top.vdb"; do
+    if [ -f "$_vdb" ]; then
+        rm -f "$_vdb"
+        _ok "Removed stale VDB cache: $_vdb"
+    fi
+done
+_ok "VDB cache cleared — MAP will perform full synthesis (reads fresh firmware .bin files)"
+echo ""
 
 # Efinity GUI re-injects infer_set_reset / infer_clk_enable into the local
 # project XML whenever the project is opened.  These params crash efx_map
