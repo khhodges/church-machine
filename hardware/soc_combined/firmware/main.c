@@ -644,7 +644,7 @@ int main(void)
      * CM_CTRL_RELEASED (Step 4).  Once the CM core is released it
      * immediately starts executing and can win APB3 bus arbitration,
      * stalling any mid-banner UART_DATA write and truncating the output. */
-    uart_puts("CHURCH Ti60 SoC+CM v");
+    uart_puts("KHURCH Ti60 SoC+CM v");
     uart_putc((char)('0' + (FW_MAJOR % 10u)));
     uart_putc('.');
     uart_putc((char)('0' + (FW_MINOR % 10u)));
