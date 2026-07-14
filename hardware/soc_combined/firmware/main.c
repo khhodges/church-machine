@@ -610,26 +610,35 @@ int main(void)
     /* ---- Step 1: Baud rate (MUST be first) ---- */
     UART_CLOCKDIV = UART_DIV_57600;
 
-    /* ---- Step 2: Boot banner (BEFORE releasing CM core) ----
+    /* ---- Step 2: CM APB3 register writes (act as APB bus fence) ----
      *
-     * CRITICAL ORDERING: The banner MUST be fully transmitted before
-     * CM_CTRL_RELEASED (Step 3).  The CM core, once released, immediately
-     * begins executing and can access the shared APB3 bridge.  The Sapphire
-     * SoC and the CM core share one APB bus; if the CM grabs it mid-banner,
-     * the SoC stalls mid-write and only the first character ('C') escapes.
+     * These writes to the CM APB3 slave (0xF8100000) are placed BEFORE the
+     * first uart_puts to serve a dual purpose:
+     *   a) Store the board UID in the APB3 bridge before any CALLHOME output.
+     *   b) APB FENCE: a write to the UART CLOCKDIV register (0xF8010008)
+     *      leaves the Sapphire SoC dBus in a state where the next lw from
+     *      ROM BRAM hangs.  Performing one or more APB writes to a DIFFERENT
+     *      slave (CM APB3, 0xF8100000) between UART_CLOCKDIV and the first
+     *      ROM read flushes whatever internal state caused the stall.
+     *      Removing these writes causes the first uart_puts lw from ROM to
+     *      hang silently — no output at all.
      *
-     * Version digits are derived from FW_MAJOR/FW_MINOR (not hardcoded) so
-     * the banner can never drift out of sync with the #define bump. */
+     * CM_CTRL_RELEASED is deliberately held back until AFTER the full banner
+     * is transmitted — see Step 4. */
+    CM_UID_LO = BOARD_UID_LO;
+    CM_UID_HI = BOARD_UID_HI;
+
+    /* ---- Step 3: Boot banner (BEFORE releasing CM core) ----
+     *
+     * Must come after the CM APB3 fence writes (Step 2) and before
+     * CM_CTRL_RELEASED (Step 4).  Once the CM core is released it
+     * immediately starts executing and can win APB3 bus arbitration,
+     * stalling any mid-banner UART_DATA write and truncating the output. */
     uart_puts("CHURCH Ti60 SoC+CM v");
     uart_putc((char)('0' + (FW_MAJOR % 10u)));
     uart_putc('.');
     uart_putc((char)('0' + (FW_MINOR % 10u)));
     uart_puts("\r\n");
-
-    /* ---- Step 3: Write UID to APB3 bridge registers ---- */
-    CM_UID_LO = BOARD_UID_LO;
-    CM_UID_HI = BOARD_UID_HI;
-
     uart_puts("UID=");
     emit_uid();
     uart_puts("\r\n");

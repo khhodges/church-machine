@@ -1,45 +1,59 @@
 ---
-name: CM APB3 bus contention — banner hang root cause
-description: CM core grabs shared APB3 bus immediately after CM_CTRL_RELEASED, stalling the SoC mid-banner. Banner must be fully sent BEFORE releasing the CM core.
+name: Sapphire SoC boot UART ordering — three hard constraints
+description: Correct main() ordering for boot banner output: fence + banner before CM release. Violating any constraint causes silent hang or truncated output.
 ---
 
-## The Rule
-The boot banner (and any UART output) MUST be fully transmitted **before**
-writing `CM_CTRL = CM_CTRL_RELEASED`. The CM core starts executing the
-instant it is released and immediately accesses the shared APB3 bridge.
-Once the CM wins APB bus arbitration, the Sapphire SoC stalls mid-write —
-only the first character escapes.
+## The Three Constraints
 
-## Why
-The Sapphire SoC UART and the CM APB3 bridge share one APB bus. There is
-no hardware arbitration priority that favours the SoC. After
-`CM_CTRL_RELEASED`, the CM core begins its boot sequence within a handful
-of clock cycles and can grab the APB bus before the SoC finishes a UART
-write. The TX FIFO write stalls (PREADY never returns), the SoC hangs,
-and only whatever was already in the FIFO before the stall is transmitted.
+### Constraint 1 — APB fence after UART_CLOCKDIV
+After writing `UART_CLOCKDIV`, the Sapphire SoC dBus is left in a state
+where the next `lw` from ROM BRAM hangs silently (no output at all).
+A write to a **different** APB slave (the CM APB3 bridge at `0xF8100000`)
+flushes this state. The `CM_UID_LO` / `CM_UID_HI` writes serve as this
+fence.
 
-For a 25 MHz clock and a 57600-baud UART, a 3000-cycle inter-character
-delay is ~120 µs — far longer than the CM core needs (~tens of cycles) to
-start accessing APB3.
+**Symptom when violated:** nothing output — not even the first 'C'.
 
-## How to Apply
-In `main.c`:
-1. Output the full banner (`uart_puts` + `uart_putc` digits) as step 2,
-   right after `UART_CLOCKDIV`.
-2. Write `CM_UID_LO / CM_UID_HI` and emit the UID line next (APB3 writes
-   to the bridge are fine here because the CM is not yet running).
-3. Write `CM_CTRL = CM_CTRL_RELEASED` **last**, as step 4.
-4. All subsequent `uart_puts` calls (boot_complete wait, CALLHOME, etc.)
-   happen after release — but by then the banner is safely in the FIFO.
+### Constraint 2 — Banner before CM_CTRL_RELEASED
+Once `CM_CTRL = CM_CTRL_RELEASED` is written, the CM core starts executing
+within tens of clock cycles and can win APB3 bus arbitration. The Sapphire
+SoC stalls mid-UART-write when the CM grabs the bus. Only the character(s)
+already in the TX pipeline before the stall escape.
 
-## Regression History
-- **June 12 bitstream**: CM Verilog (pre-NS-stride-4 regen) was slower to
-  access APB3 after release — banner transmitted before contention.
-- **July 2026 bitstream**: NS stride-4 regen (`4a8593cc`) produced a CM
-  core that accesses APB3 faster → only 'C' survived → regression.
+**Symptom when violated:** only the first char ('C') or first few chars
+output, then silence.
 
-## Secondary defensive fixes (kept)
-- `uart_puts`: lw-based word extraction instead of `lbu` — guards against
-  any BRAM byte-enable sub-word read issues after APB writes.
-- `uart_puthex32_lower`: arithmetic nibble→char instead of `hex[]` table —
-  no `lbu` from .rodata after a UART write.
+### Constraint 3 — Fence comes before banner
+The fence writes (CM_UID_LO/HI) must come before `uart_puts`, not after.
+Putting the banner before the fence re-triggers Constraint 1.
+
+## Correct Ordering
+
+```
+UART_CLOCKDIV = UART_DIV_57600;    // Step 1: baud rate
+CM_UID_LO = BOARD_UID_LO;          // Step 2a: fence write (different APB slave)
+CM_UID_HI = BOARD_UID_HI;          // Step 2b: fence write + UID stored
+uart_puts("CHURCH Ti60 SoC+CM v"); // Step 3: banner — no CM contention yet
+...banner digits and UID emit...
+CM_CTRL = CM_CTRL_RELEASED;        // Step 4: release CM — APB now shared
+...boot_complete wait, CALLHOME... // Step 5+: CM running, APB shared
+```
+
+## Why the Fence Happens
+
+Suspected cause: the Sapphire SoC's AXI/APB bridge for the UART
+(0xF8010008) leaves an internal "pending" state after a CLOCKDIV write
+that blocks the dBus (BRAM path) until another APB transaction on any
+slave completes the pipeline. This is NOT observed after CM APB writes
+(0xF8100000), suggesting the UART APB slave has a longer PREADY pipeline
+or a different AXI response timing.
+
+## History
+
+- June 2026 bitstream: CM Verilog was slow enough that banner transmitted
+  before CM grabbed APB3 → worked despite Constraint 2 technically violated.
+- July 2026 regen (NS stride-4): CM grabs APB3 faster → only 'C' survived.
+- Fix attempt 1: moved banner before CM release but dropped fence writes
+  → nothing output (Constraint 1 violated).
+- Fix attempt 2: restored fence writes before banner, CM release after
+  → all three constraints satisfied.
