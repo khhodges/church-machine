@@ -7,24 +7,38 @@ description: Correct main() ordering for boot banner output: fence + banner befo
 
 ### Constraint 1 — APB fence after UART_CLOCKDIV
 After writing `UART_CLOCKDIV`, the Sapphire SoC dBus is left in a state
-where the next `lw` from ROM BRAM hangs silently (no output at all).
-A write to a **different** APB slave (the CM APB3 bridge at `0xF8100000`)
-flushes this state. The `CM_UID_LO` / `CM_UID_HI` writes serve as this
-fence.
+where the next `lw` from ROM BRAM may hang silently (no output at all) unless
+a write to a **different** APB slave occurs first. The `CM_UID_LO` / `CM_UID_HI`
+writes to the CM APB3 bridge (0xF8100000) serve as this fence.
 
 **Symptom when violated:** nothing output — not even the first 'C'.
 
 ### Constraint 2 — Banner before CM_CTRL_RELEASED
 Once `CM_CTRL = CM_CTRL_RELEASED` is written, the CM core starts executing
 within tens of clock cycles and can win APB3 bus arbitration. The Sapphire
-SoC stalls mid-UART-write when the CM grabs the bus. Only the character(s)
-already in the TX pipeline before the stall escape.
+SoC stalls mid-UART-write when the CM grabs the bus.
 
 **Symptom when violated:** only the first char ('C') or first few chars
 output, then silence.
 
-### Constraint 3 — Fence comes before banner
-The fence writes (CM_UID_LO/HI) must come before `uart_puts`, not after.
+### Constraint 3 — uart_putc and uart_puts must be compiled at -O0
+**Root cause of one-'C' hang:** Firmware is compiled with `-O2`. GCC with -O2
+sees the explicit `lw + (w >> 8) & 0xFF` byte-extraction pattern and
+"helpfully" rewrites it back to `lbu` instructions. `lbu` from byte-lane
+1, 2, or 3 (i.e. any address where `addr & 3 != 0`) stalls the dBus
+forever after any APB write on this SoC/BRAM configuration. Byte lane 0
+('C' = first char, 4-aligned string in .rodata) works fine — that's why
+exactly one 'C' appears. Byte lane 1 ('H') hangs.
+
+**Symptom when violated:** exactly one 'C' per boot (first byte of "CHURCH"),
+nothing else.
+
+**Fix:** `__attribute__((optimize("O0")))` on `uart_putc` and `uart_puts`.
+This preserves the explicit lw+shift code literally, preventing the -O2
+lbu re-optimization.
+
+### Constraint 4 — Fence writes come before uart_puts (not after)
+The fence (CM_UID_LO/HI writes) must precede the first `uart_puts` call.
 Putting the banner before the fence re-triggers Constraint 1.
 
 ## Correct Ordering
@@ -39,21 +53,25 @@ CM_CTRL = CM_CTRL_RELEASED;        // Step 4: release CM — APB now shared
 ...boot_complete wait, CALLHOME... // Step 5+: CM running, APB shared
 ```
 
-## Why the Fence Happens
+## Compiler Attribute Required on UART Functions
 
-Suspected cause: the Sapphire SoC's AXI/APB bridge for the UART
-(0xF8010008) leaves an internal "pending" state after a CLOCKDIV write
-that blocks the dBus (BRAM path) until another APB transaction on any
-slave completes the pipeline. This is NOT observed after CM APB writes
-(0xF8100000), suggesting the UART APB slave has a longer PREADY pipeline
-or a different AXI response timing.
+```c
+static void __attribute__((optimize("O0"))) uart_putc(char c) { ... }
+static void __attribute__((optimize("O0"))) uart_puts(const char *s) { ... }
+```
 
-## History
+These attributes MUST stay on those functions even if the optimization level
+changes for the rest of the file. Without them, any -O1 or higher silently
+destroys the lw+shift byte extraction.
 
-- June 2026 bitstream: CM Verilog was slow enough that banner transmitted
-  before CM grabbed APB3 → worked despite Constraint 2 technically violated.
+## History of Bug Discovery
+
+- June 2026 bitstream: CM core slow enough that banner transmitted before APB
+  contention occurred — worked despite ordering violations.
 - July 2026 regen (NS stride-4): CM grabs APB3 faster → only 'C' survived.
-- Fix attempt 1: moved banner before CM release but dropped fence writes
-  → nothing output (Constraint 1 violated).
-- Fix attempt 2: restored fence writes before banner, CM release after
-  → all three constraints satisfied.
+- Attempted fix 1: moved banner before CM release, removed fence writes
+  → nothing output (Constraint 1 violated — lw from ROM after UART_CLOCKDIV).
+- Attempted fix 2: restored fence writes before banner
+  → still only 'C' (Constraint 3 violated — -O2 rewrote lw→lbu in uart_puts).
+- Fix 3: added `__attribute__((optimize("O0")))` to uart_putc and uart_puts
+  → preserves lw+shift literally, all three constraints satisfied.

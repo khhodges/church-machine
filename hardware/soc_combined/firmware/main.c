@@ -255,7 +255,11 @@ static cm_key_entry_t cm_key_table[9];  /* zero-initialised at reset */
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
-static inline __attribute__((always_inline)) void uart_putc(char c)
+/* __attribute__((optimize("O0"))): prevent GCC -O2 from re-emitting lbu.
+ * -O2 sees the lw+shift pattern and "helpfully" converts it back to lbu.
+ * lbu from byte-lane 1,2,3 of ROM BRAM hangs on this SoC after any APB
+ * write.  -O0 on these two functions is the only reliable guard. */
+static void __attribute__((optimize("O0"))) uart_putc(char c)
 {
     UART_DATA = (1u << 8) | (uint32_t)(unsigned char)c;
     /* Register-only delay — loop counter stays in a CPU register.
@@ -268,7 +272,9 @@ static inline __attribute__((always_inline)) void uart_putc(char c)
     __asm__ volatile("1: addi %0,%0,-1\n bne %0,zero,1b\n" : "+r"(_d));
 }
 
-static void uart_puts(const char *s)
+/* See uart_putc comment: __attribute__((optimize("O0"))) prevents GCC -O2
+ * from converting the explicit lw+shift byte extraction back to lbu. */
+static void __attribute__((optimize("O0"))) uart_puts(const char *s)
 {
     /* Use word loads (lw) rather than byte loads (lbu) throughout.
      *
@@ -285,7 +291,8 @@ static void uart_puts(const char *s)
      * individual bytes with right-shifts (register-only, no lbu).
      * Handles any starting alignment by loading the containing word and
      * discarding leading bytes before s[0].
-     */
+     * __attribute__((optimize("O0"))): prevents GCC -O2 from re-emitting
+     * lbu.  Without it the lw+shift is silently rewritten to lbu. */
     uint32_t align = (uintptr_t)s & 3u;
     const uint32_t *wp = (const uint32_t *)((uintptr_t)s - align);
     uint32_t w = *wp++;               /* lw — safe full-word load     */
