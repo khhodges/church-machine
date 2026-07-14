@@ -377,15 +377,19 @@ else
     _ok "  map.v: $MAP_V"
     _info "  Running post-synthesis BRAM INIT_0 guard..."
     BRAM_GUARD_RC=0
-    bash "$SCRIPTS/check_bram_init_zero.sh" "$MAP_V" || BRAM_GUARD_RC=$?
+    bash "$SCRIPTS/check_bram_init_zero.sh" "$MAP_V" "$SOC_DIR/work_syn" || BRAM_GUARD_RC=$?
     if [ "$BRAM_GUARD_RC" -eq 1 ]; then
         _fail "BRAM INIT_0 guard failed — all lanes zero. Aborting before P&R.
   Run: python3 scripts/patch_sapphire_init.py"
     elif [ "$BRAM_GUARD_RC" -eq 2 ]; then
         _warn "  BRAM INIT_0 guard returned inconclusive (instance names differ) — continuing."
         _warn "  Verify BRAM manually after P&R: grep INIT_0 $MAP_V | grep ram_symbol | head -4"
+    elif [ "$BRAM_GUARD_RC" -eq 3 ]; then
+        _fail "BRAM content mismatch — synthesis embedded a DIFFERENT firmware version than compiled.
+  Stale symbol files in $SOC_DIR/work_syn/ were used by MAP.
+  Fix: delete work_syn/*.bin, rebuild firmware, re-copy symbol bins, delete VDB, retry."
     else
-        _ok "All 4 BRAM INIT_0 lanes non-zero — firmware embedded"
+        _ok "All 4 BRAM INIT_0 lanes non-zero and content matches compiled firmware"
     fi
 fi
 echo ""
