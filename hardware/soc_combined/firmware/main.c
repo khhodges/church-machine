@@ -638,6 +638,11 @@ int main(void)
     CM_UID_LO = BOARD_UID_LO;
     CM_UID_HI = BOARD_UID_HI;
 
+    /* PROBE: 'Z' via uart_putc (always_inline, immediate value — no ROM read).
+     * If 'Z' appears the fence is working and uart_putc is alive.
+     * If 'C' still appears before 'Z', the 'C' is from an old/stale bitstream. */
+    uart_putc('Z');
+
     /* ---- Step 3: Boot banner (BEFORE releasing CM core) ----
      *
      * Must come after the CM APB3 fence writes (Step 2) and before
