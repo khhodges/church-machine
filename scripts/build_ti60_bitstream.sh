@@ -202,18 +202,23 @@ _ok "sapphire.v deployed to $SOC_DIR/sapphire.v"
 
 # sapphire.v only contains $readmemb("<bare filename>", ram_symbolN) calls —
 # the actual bin *contents* still have to be found on disk by EFX_MAP at
-# synthesis time. EFX_MAP resolves those bare filenames relative to
-# --work_dir (work_syn/), NOT hardware/soc_combined/ and NOT $SOC_DIR itself
-# (see .agents/memory/efx-map-readmemb.md — empirically confirmed). Deploying
-# sapphire.v without also deploying the bins into $SOC_DIR/work_syn/ leaves
-# whatever bins (possibly stale, possibly none) already happen to be sitting
-# there, which MAP will silently embed with no error.
+# synthesis time. EDA tools (including Efinity efx_run_map.py) resolve
+# $readmemb bare filenames relative to the DIRECTORY CONTAINING THE SOURCE
+# FILE (i.e. $SOC_DIR/ where sapphire.v lives), NOT relative to --work_dir.
+# The work_syn/ copy is kept for the run_efx_map.sh freshness self-test, but
+# the canonical copy that MAP actually reads must be in $SOC_DIR/ itself.
+# Deploying only to work_syn/ silently leaves whatever old bins are already
+# in $SOC_DIR/ — MAP embeds those without any error.
 mkdir -p "$SOC_DIR/work_syn"
 cp "$HW"/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol*.bin "$SOC_DIR/work_syn/"
+cp "$HW"/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol*.bin "$SOC_DIR/"
 if ! bash "$SCRIPTS/check_sapphire_symbol_bins_fresh.sh" "$HW" "$SOC_DIR/work_syn"; then
     _fail "Sapphire symbol bins in $SOC_DIR/work_syn are stale after copy — see guard output above"
 fi
-_ok "Sapphire symbol bins deployed to $SOC_DIR/work_syn/ and verified fresh"
+if ! bash "$SCRIPTS/check_sapphire_symbol_bins_fresh.sh" "$HW" "$SOC_DIR"; then
+    _fail "Sapphire symbol bins in $SOC_DIR (project root, MAP reads from here) are stale after copy"
+fi
+_ok "Sapphire symbol bins deployed to $SOC_DIR/ (MAP reads here) and $SOC_DIR/work_syn/ (freshness guard)"
 echo ""
 
 # ── Step 2.5: Copy CM Verilog and peri.xml to SoC project ───────────────────

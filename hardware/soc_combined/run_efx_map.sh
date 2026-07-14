@@ -158,16 +158,24 @@ if [ -f "$SOC_DIR/firmware/main.c" ]; then
 else
     echo "    (no $SOC_DIR/firmware/main.c to check — skipping banner guard)"
 fi
-# sapphire.v itself only references the symbol bins by bare filename — the
-# actual bin CONTENTS must separately exist in work_syn/ (EFX_MAP's
-# --work_dir), which build_ti60_bitstream.sh deploys them into right after
-# patching sapphire.v. If a stale build's bins were left in work_syn/ from a
-# previous run, MAP would silently embed OLD firmware with every other guard
-# above still passing (they never look inside work_syn/).
+# sapphire.v references the symbol bins by bare filename. EDA tools resolve
+# $readmemb bare filenames relative to the DIRECTORY CONTAINING THE SOURCE
+# FILE — i.e. $SOC_DIR/ (where sapphire.v lives), NOT relative to --work_dir.
+# build_ti60_bitstream.sh Step 2 deploys fresh bins to both $SOC_DIR/ AND
+# work_syn/ before this script is called. The $SOC_DIR/ copy is what MAP
+# actually reads; the work_syn/ copy exists for this freshness self-test.
+# Check both: if either is stale the wrong firmware gets baked in.
 if [ -f "$SCRIPT_DIR/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin" ]; then
     bash "$SCRIPT_DIR/../../scripts/check_sapphire_symbol_bins_fresh.sh" \
         "$SCRIPT_DIR" "$SOC_DIR/work_syn" || {
         echo "[FAIL] Sapphire symbol bins in $SOC_DIR/work_syn are stale or missing." >&2
+        echo "[FAIL] This should never happen when invoked via build_ti60_bitstream.sh —" >&2
+        echo "[FAIL] re-run it from the repo root rather than patching manually." >&2
+        exit 1
+    }
+    bash "$SCRIPT_DIR/../../scripts/check_sapphire_symbol_bins_fresh.sh" \
+        "$SCRIPT_DIR" "$SOC_DIR" || {
+        echo "[FAIL] Sapphire symbol bins in $SOC_DIR (project root — where MAP reads them) are stale." >&2
         echo "[FAIL] This should never happen when invoked via build_ti60_bitstream.sh —" >&2
         echo "[FAIL] re-run it from the repo root rather than patching manually." >&2
         exit 1
