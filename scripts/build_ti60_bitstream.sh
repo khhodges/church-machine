@@ -99,6 +99,9 @@ echo ""
 # .elf/.bin (touch main.c is unreliable across git stash/pull cycles) so the
 # board ends up running old firmware bytes and shows the wrong FW= version.
 _info "Step 1/8: Build SoC firmware"
+# Advance the build-sequence letter (Z→A→B→…→Z) so the startup probe byte
+# immediately confirms new firmware is running on the board.
+bash "$SCRIPTS/bump_build_letter.sh" || _fail "bump_build_letter.sh failed"
 make -C "$HW/firmware" clean 2>&1 | tail -2
 make -C "$HW/firmware" 2>&1 | tee /tmp/build_fw.log | grep -E "gcc|riscv|Wrote|error|Error" | head -20
 SYM0="$HW/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin"

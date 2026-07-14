@@ -102,6 +102,7 @@
 /* Standard freestanding headers only — no libc                       */
 /* ------------------------------------------------------------------ */
 #include <stdint.h>
+#include "build_seq.h"     /* FW_BUILD_LETTER — cycles A→B→…→Z→A per rebuild */
 
 /* ------------------------------------------------------------------ */
 /* Board identity                                                      */
@@ -663,7 +664,7 @@ int main(void)
     /* PROBE: 'Z' via uart_putc (always_inline, immediate value — no ROM read).
      * If 'Z' appears the fence is working and uart_putc is alive.
      * If 'C' still appears before 'Z', the 'C' is from an old/stale bitstream. */
-    uart_putc('Z');
+    uart_putc(FW_BUILD_LETTER);  /* cycles each rebuild: Z→A→B→…→Z */
 
     /* ---- Step 3: Boot banner (BEFORE releasing CM core) ----
      *
