@@ -22,8 +22,11 @@ TOOLCHAIN ?= $(HOME)/efinity/efinity-riscv-ide-2025.2/toolchain/bin
 CC        := $(TOOLCHAIN)/riscv-none-embed-gcc
 OBJCOPY   := $(TOOLCHAIN)/riscv-none-embed-objcopy
 
+# -B$(TOOLCHAIN): tell collect2 to search the Efinity toolchain bin dir first
+# for auxiliary programs (ld, as, etc.) so riscv-none-embed-ld is used instead
+# of any system riscv64-linux-gnu-ld that may be in PATH.
 CFLAGS := -march=rv32im -mabi=ilp32 -O2 -nostdlib -ffreestanding \
-          -Wall -Wextra
+          -Wall -Wextra -B$(TOOLCHAIN)
 
 SRCS   := crt0.S main.c
 TARGET := firmware

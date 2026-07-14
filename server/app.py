@@ -9289,6 +9289,14 @@ def _dev_serve_maincfirmware():
                      download_name='main.c')
 
 
+@app.route('/dev/firmware/Makefile')
+def _dev_serve_makefile():
+    _src = os.path.join(os.path.dirname(_SERVER_DIR),
+                        'hardware', 'soc_combined', 'firmware', 'Makefile')
+    return send_file(_src, mimetype='text/plain', as_attachment=False,
+                     download_name='Makefile')
+
+
 if __name__ == "__main__":
     _port = int(os.environ.get("E2E_PORT", 5000))
     logging.info("Starting Church Machine server on port %d", _port)
