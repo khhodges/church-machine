@@ -135,14 +135,30 @@ if [ "$FW_MAIN_C" -nt "$FW_ARTIFACT" ]; then
 fi
 _ok "Firmware ${FW_VERSION} compiled"
 
-# Show the firmware banner string that was compiled in (informational only)
+# Show the firmware banner string that was compiled in.
+# Searches for the KHURCH banner specifically (not just any uart_puts call).
 FW_BANNER=$(python3 -c "
 import re, pathlib
 mc = pathlib.Path('$HW/firmware/main.c').read_text()
-m = re.search(r'uart_puts\(\"([^\"]+)\"', mc)
-print(m.group(1).strip() if m else 'unknown')
+# Find the KHURCH boot banner line specifically
+m = re.search(r'uart_puts\(\"(KHURCH[^\"]+)\"', mc)
+if not m:
+    # Fall back: find any uart_puts in main() body (after 'int main')
+    main_body = mc[mc.find('int main'):]
+    m2 = re.search(r'uart_puts\(\"([^\"]+)\"', main_body)
+    val = m2.group(1) if m2 else 'unknown'
+else:
+    val = m.group(1)
+print(val.strip())
 " 2>/dev/null || echo "unknown")
-_ok "Firmware built — banner: $FW_BANNER  symbol files in $HW/"
+FW_BIN_SIZE=$(wc -c < "$HW/firmware/firmware.bin" 2>/dev/null || echo 0)
+_ok "Firmware ${FW_VERSION} compiled — banner: ${FW_BANNER}  size: ${FW_BIN_SIZE} bytes"
+if [ "$FW_BIN_SIZE" -lt 8000 ]; then
+    _fail "Firmware binary is suspiciously small (${FW_BIN_SIZE} bytes < 8 KB minimum).
+  Expected >= 8 000 bytes for a full v2.x firmware build.
+  The new main.c may not have been compiled — check toolchain and Makefile."
+fi
+_ok "Firmware binary size check passed (${FW_BIN_SIZE} bytes >= 8 KB)"
 echo ""
 
 # ── Step 1.5: Sync firmware source into the Efinity project directory ───────
