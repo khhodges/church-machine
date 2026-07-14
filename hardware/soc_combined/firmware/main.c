@@ -275,7 +275,7 @@ static inline __attribute__((always_inline)) void uart_putc(uint32_t c)
 
 /* uart_puts — compiled at -O0 with uint32_t loop variable.
  *
- * TWO independent BRAM byte-enable bugs interact here:
+ * THREE independent BRAM / APB bugs interact here:
  *
  *   Bug A — lbu from non-zero byte lane:
  *     After any APB write (UART_DATA, UART_CLOCKDIV, CM APB3), a subsequent
@@ -291,22 +291,45 @@ static inline __attribute__((always_inline)) void uart_putc(uint32_t c)
  *     Fix: use uint32_t for the extracted-character variable; spills then
  *     use sw (4-byte store) which is safe on this BRAM.
  *
- * Combined fix: -O0 (no lbu) + uint32_t c (no sb).  uart_putc must be
- * always_inline (see above) so its char parameter never hits the stack. */
+ *   Bug C — uart_putc re-triggers dBus stall:
+ *     ANY UART_DATA write (i.e. every uart_putc call) re-stalls the dBus
+ *     for the next ROM lw, exactly like UART_CLOCKDIV does.  The one-time
+ *     CM APB3 fence in main() clears the CLOCKDIV stall but not subsequent
+ *     per-character UART writes.  Fix: two CM APB3 writes immediately before
+ *     every lw from ROM (no UART write between the fence and the lw).
+ *
+ * Combined fix: -O0 (no lbu) + uint32_t c (no sb) + CM APB3 re-fence before
+ * every lw.  uart_putc must be always_inline (see above) so its char
+ * parameter never hits the stack.
+ *
+ * Diagnostic probes (remove after confirmed working):
+ *   '!' — emitted by the first uart_putc inside uart_puts; its own UART
+ *         write triggers the stall that the following fence then clears.
+ *   '@' — emitted after the first lw succeeds; confirms Bug C fix works. */
 static void __attribute__((optimize("O0"))) uart_puts(const char *s)
 {
     uint32_t align = (uintptr_t)s & 3u;
     const uint32_t *wp = (const uint32_t *)((uintptr_t)s - align);
-    uint32_t w = *wp++;               /* lw — safe full-word load     */
+    /* Bug C fix: emit probe, then fence, then lw — no UART write between
+     * fence and lw or the stall is re-triggered before the load. */
+    uart_putc('!');                   /* PROBE — its UART write is flushed by fence below */
+    CM_UID_LO = BOARD_UID_LO;         /* fence write 1: clears dBus stall   */
+    CM_UID_LO = BOARD_UID_LO;         /* fence write 2: belt-and-suspenders */
+    uint32_t w = *wp++;               /* lw — immediately after fence, safe */
+    uart_putc('@');                   /* PROBE — lw succeeded               */
     uint32_t remaining = 4u - align;
-    w >>= (align << 3);               /* discard bytes before s[0]    */
+    w >>= (align << 3);               /* discard bytes before s[0]          */
     for (;;) {
-        uint32_t c = w & 0xFFu;       /* uint32_t: spills as sw not sb */
+        uint32_t c = w & 0xFFu;       /* uint32_t: spills as sw not sb      */
         if (c == 0u) return;
-        uart_putc(c);
+        uart_putc(c);                 /* UART write — re-stalls dBus        */
         w >>= 8;
         if (--remaining == 0u) {
-            w = *wp++;                /* lw — next full word          */
+            /* Re-fence: last uart_putc re-stalled dBus; clear before lw.
+             * No UART write between these fence writes and the lw below. */
+            CM_UID_LO = BOARD_UID_LO;
+            CM_UID_LO = BOARD_UID_LO;
+            w = *wp++;                /* lw immediately after fence         */
             remaining = 4u;
         }
     }

@@ -1,33 +1,48 @@
 ---
-name: Sapphire BRAM byte-store hang
-description: BRAM dBus on Sapphire SoC does not support byte-enable writes; any sb instruction to 0xF9007xxx hangs the CPU permanently
+name: Sapphire BRAM dBus hang — byte-store, lbu, and uart_putc re-trigger
+description: Three related dBus hang bugs on Efinix Ti60 Sapphire SoC; any sb, lbu lane 1/2/3, or uart_putc after CLOCKDIV write hangs the CPU
 ---
 
 ## Rule
-Any `sb` (byte store) instruction targeting the BRAM data region (0xF9007000–0xF9007FFF — stack and .bss) hangs the RISC-V CPU permanently on this Efinity Ti60 Sapphire SoC implementation. Only word stores (`sw`) and word loads (`lw`) are safe.
+Three distinct bugs can hang the RISC-V dBus on the Efinix Ti60 Sapphire SoC:
+
+### Bug A — lbu from non-zero byte lane (partially wrong analysis — see BmbOnChipRam note)
+After any APB write (UART_DATA, UART_CLOCKDIV, CM APB3), a subsequent `lbu` from ROM BRAM at byte lane 1, 2, or 3 stalls the dBus forever. Lane 0 works. GCC -O2 rewrites explicit `lw+shift+mask` to `lbu`, so `__attribute__((optimize("O0")))` is required to keep the `lw`.
+
+**BmbOnChipRam hardware note**: The module always reads ALL 4 byte lanes simultaneously (single 32-bit wide read port). The per-lane stall theory may be incomplete — the real issue may be that ANY dBus read from the BRAM stalls after certain APB writes, not just non-zero byte lanes. Confirmed: lw from ROM ALSO stalls (Bug C below).
+
+### Bug B — sb to stack (0xF9007xxx)
+Any `sb` instruction to the BRAM data region (0xF9007000–0xF9007FFF) hangs the CPU permanently. Only `sw` (4-byte stores) and `lw` (4-byte loads) are safe. Fix: use `uint32_t` for all local variables in functions compiled at -O0 so spills use `sw` not `sb`.
+
+### Bug C — uart_putc re-triggers dBus stall (confirmed rebuild11)
+**Every UART_DATA write (every `uart_putc` call) re-triggers the same dBus stall** that `UART_CLOCKDIV` initially causes. The one-time CM APB3 fence in `main()` clears the CLOCKDIV stall but is consumed; each subsequent `uart_putc` re-stalls the dBus for the next ROM lw.
+
+**Fix pattern**: immediately before every `lw` from ROM, emit two CM APB3 writes (fence), with NO UART write between the fence and the lw:
+```c
+uart_putc(something);            // UART write → re-stalls dBus
+// ... register-only ops (shifts, ands, comparisons) ...
+CM_UID_LO = BOARD_UID_LO;        // fence write 1 — clears stall
+CM_UID_LO = BOARD_UID_LO;        // fence write 2 — belt-and-suspenders
+w = *wp++;                        // lw — immediately after fence, safe
+```
+
+This pattern is now in `uart_puts()` at the start (to clear the calling code's last uart_putc stall) and in the inner `--remaining == 0` branch (to clear the per-character uart_putc stalls).
 
 ## Confirmed hang-triggering patterns
-- `volatile uint32_t i` in a delay loop → GCC emits `sw`+`lw` to stack → hangs (fixed by using asm `"+r"` constraint)
-- `char buf[N]` local array written with `buf[i] = x` → GCC emits `sb` → hangs
-- `uint8_t buf[64]` struct field written via `_sha256_update` (ctx->buf[ctx->datalen++] = data[i]) → sb to stack → hangs
-- `_sha256_memcpy` / `_sha256_memset` with byte pointers → sb → hangs
-- `_rx_buf[_rx_len++] = c` — static char[] in .bss at 0xF9007xxx → sb → hangs (only triggered on UART RX command receipt)
+- `volatile uint32_t i` delay loop → GCC emits `sw`+`lw` to stack → hangs (Bug B — fixed by asm `"+r"` constraint)
+- `char buf[N]` local array → GCC emits `sb` → hangs (Bug B)
+- `sha256.h`/`hkdf` functions → `sb` to ctx->buf[] on stack → hangs (Bug B)
+- `uart_puts("KHURCH...")` with the old implementation → first `lw` from ROM after `uart_putc('Z')` in main() → hangs silently; board outputs only 'Z' then reboots (Bug C)
 
-## Observed symptom
-Output always truncates at exactly the point where the first `sb` instruction executes. Four consecutive firmware builds all stopped at `"fault_code":` — because sha256.h was included and sha32()/hkdf() were reachable via the inlined function call graph, causing sb to appear in the CALLHOME code path.
+## Observed symptom for Bug C
+Board outputs 'Z' (from `uart_putc('Z')` in main), then reboots. Serial monitor shows "ZZZ" (3 rapid reboots from watchdog). No banner characters ever appear. The 'Z' itself works because it is a direct `uart_putc` call with an immediate value — no ROM read. `uart_puts` hangs on its very first `lw` from .rodata.
 
-## Fixes applied in firmware v2.4
-1. **sha32 tokens precomputed** — `_NS_TOKENS[9]` table of `const uint32_t` replaces all `sha32(ogt)` calls; no sha256.h byte stores in CALLHOME path
-2. **cm_derive_keys loop disabled** — hkdf_sha256 byte stores suppressed; keys stay zero until a byte-store-safe sha256 implementation is written
-3. **Diagnostic uart_putc('X')** added before `uart_puthex32_lower(fault_code)` to distinguish call-site hang vs inside-function hang
-4. **CALLHOME moved before 3-second delay** — tests whether a time-triggered AXI glitch was also a factor
-
-## Why
-The Efinix BRAM macro used for Sapphire ROM/RAM is configured without byte-enable outputs on the write port (or they are undriven). The SpinalHDL AXI→BRAM bridge emits a byte-write strobe that the BRAM ignores or that stalls PREADY on the data bus indefinitely.
+## Why (Bug C)
+The UART APB slave and the BRAM dBus share internal AXI routing through the Sapphire SoC BmbDecoder. Writing to UART_DATA leaves some internal bus arbiter state that prevents the next read transaction to the BRAM from completing. Two writes to a DIFFERENT APB slave (CM APB3 at 0xF8100000) cycle the arbiter state machine back to a ready condition.
 
 ## How to apply
-- ANY local `uint8_t` array written to → must be replaced with `uint32_t` arrays with manual packing
-- ANY `memcpy`/`memset` from/to byte arrays → must use word-aligned 4-byte copies
-- ALL sha256.h functions (`sha256`, `hmac_sha256`, `hkdf_sha256`, `sha32`) → avoid at runtime; precompute or stub out
-- `uart_putdec` was already rewritten to use only scalar `uint32_t` arithmetic (no char array)
-- static `char` arrays written via `sb` (e.g. `_rx_buf`) → safe only when write path is never triggered
+- `uart_puts()`: fence × 2 before EVERY `lw` from .rodata (both the first word and the per-4-chars inner word)
+- Any function that does ROM reads after UART output: add fence × 2 immediately before each `lw`, with no `uart_putc` between fence and `lw`
+- `uart_putc` remains `always_inline` — no stack, no ROM reads, safe to call freely
+- `uart_puthex32_lower` does arithmetic only (no ROM reads) — safe after uart_putc
+- All `sb` patterns → still must be avoided (Bug B still present independently of Bug C)
