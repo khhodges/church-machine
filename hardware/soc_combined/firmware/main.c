@@ -255,52 +255,55 @@ static cm_key_entry_t cm_key_table[9];  /* zero-initialised at reset */
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
-/* __attribute__((optimize("O0"))): prevent GCC -O2 from re-emitting lbu.
- * -O2 sees the lw+shift pattern and "helpfully" converts it back to lbu.
- * lbu from byte-lane 1,2,3 of ROM BRAM hangs on this SoC after any APB
- * write.  -O0 on these two functions is the only reliable guard. */
-static void __attribute__((optimize("O0"))) uart_putc(char c)
+/* uart_putc — MUST be always_inline.
+ *
+ * If compiled as a regular function (even at -O0), the GCC prologue emits
+ * "sb a0, offset(sp)" to spill the char parameter to the stack.  sb (byte
+ * store) to the BRAM stack area (0xF9007xxx) hangs on this SoC — same
+ * hardware byte-enable defect as lbu from non-zero byte lanes.  Inlining
+ * eliminates the prologue entirely; the caller's register holds the value
+ * throughout without any stack spill.
+ *
+ * The asm "+r" constraint keeps _d in a GPR — no stack access in the delay.
+ * DO NOT add "volatile" to _d or change to a C loop: either forces a stack
+ * round-trip via sw/lw which is safe but pointless, or risks lbu/sb. */
+static inline __attribute__((always_inline)) void uart_putc(uint32_t c)
 {
-    UART_DATA = (1u << 8) | (uint32_t)(unsigned char)c;
-    /* Register-only delay — loop counter stays in a CPU register.
-     * DO NOT use "volatile uint32_t i" here: volatile forces the counter
-     * to the stack (data bus).  On this SoC the data bus to ROM-space
-     * (0xF9007xxx stack region) may not be ready at boot, causing a hang
-     * after the very first UART write.  The asm "+r" constraint keeps the
-     * counter in a GPR and avoids any memory access. */
+    UART_DATA = (1u << 8) | (c & 0xFFu);
     uint32_t _d = 3000u;
     __asm__ volatile("1: addi %0,%0,-1\n bne %0,zero,1b\n" : "+r"(_d));
 }
 
-/* See uart_putc comment: __attribute__((optimize("O0"))) prevents GCC -O2
- * from converting the explicit lw+shift byte extraction back to lbu. */
+/* uart_puts — compiled at -O0 with uint32_t loop variable.
+ *
+ * TWO independent BRAM byte-enable bugs interact here:
+ *
+ *   Bug A — lbu from non-zero byte lane:
+ *     After any APB write (UART_DATA, UART_CLOCKDIV, CM APB3), a subsequent
+ *     lbu from ROM BRAM at byte lane 1, 2, or 3 stalls the dBus forever.
+ *     Lane 0 works ('C' is at offset 0 of the 4-aligned .rodata string).
+ *     Lane 1 hangs ('H' is at offset 1).  GCC -O2 rewrites the explicit
+ *     lw+shift pattern back to lbu → __attribute__((optimize("O0"))) is the
+ *     only reliable way to keep the lw.
+ *
+ *   Bug B — sb to stack:
+ *     At -O0 without this fix, GCC spills a "char c" local to the stack
+ *     using sb (byte store to 0xF9007xxx) — same hang as Bug A.
+ *     Fix: use uint32_t for the extracted-character variable; spills then
+ *     use sw (4-byte store) which is safe on this BRAM.
+ *
+ * Combined fix: -O0 (no lbu) + uint32_t c (no sb).  uart_putc must be
+ * always_inline (see above) so its char parameter never hits the stack. */
 static void __attribute__((optimize("O0"))) uart_puts(const char *s)
 {
-    /* Use word loads (lw) rather than byte loads (lbu) throughout.
-     *
-     * Root cause of the "only 'C' appears" hang: after a UART APB write
-     * (sw to 0xF8010000), a subsequent lbu from ROM BRAM at byte lane 1,
-     * 2, or 3 (i.e. address & 3 != 0) stalls the dBus forever on this
-     * SoC/BRAM configuration — the same byte-enable hardware defect that
-     * makes sb to 0xF9007xxx hang (see uart_putc comment above).  The
-     * first char 'C' loads from lane 0 (string is 4-aligned in .rodata,
-     * addr & 3 == 0) — that works.  The second char 'H' is at lane 1 —
-     * that hangs.
-     *
-     * Fix: read 32 bits at a time via lw (safe full-word read), extract
-     * individual bytes with right-shifts (register-only, no lbu).
-     * Handles any starting alignment by loading the containing word and
-     * discarding leading bytes before s[0].
-     * __attribute__((optimize("O0"))): prevents GCC -O2 from re-emitting
-     * lbu.  Without it the lw+shift is silently rewritten to lbu. */
     uint32_t align = (uintptr_t)s & 3u;
     const uint32_t *wp = (const uint32_t *)((uintptr_t)s - align);
     uint32_t w = *wp++;               /* lw — safe full-word load     */
     uint32_t remaining = 4u - align;
     w >>= (align << 3);               /* discard bytes before s[0]    */
     for (;;) {
-        char c = (char)(w & 0xFFu);
-        if (!c) return;
+        uint32_t c = w & 0xFFu;       /* uint32_t: spills as sw not sb */
+        if (c == 0u) return;
         uart_putc(c);
         w >>= 8;
         if (--remaining == 0u) {
