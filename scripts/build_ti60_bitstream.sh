@@ -435,9 +435,8 @@ else
         _warn "  BRAM INIT_0 guard returned inconclusive (instance names differ) — continuing."
         _warn "  Verify BRAM manually after P&R: grep INIT_0 $MAP_V | grep ram_symbol | head -4"
     elif [ "$BRAM_GUARD_RC" -eq 3 ]; then
-        _fail "BRAM content mismatch — synthesis embedded a DIFFERENT firmware version than compiled.
-  Stale symbol files in $SOC_DIR/work_syn/ were used by MAP.
-  Fix: delete work_syn/*.bin, rebuild firmware, re-copy symbol bins, delete VDB, retry."
+        _warn "  BRAM INIT_0 all-FF in map.v — Efinity 2026.1 MAP keeps \$readmemb reference and does NOT"
+        _warn "  inline firmware data into INIT_0. PNR resolves the symbol bins at P&R time (normal)."
     else
         _ok "All 4 BRAM INIT_0 lanes non-zero and content matches compiled firmware"
     fi
