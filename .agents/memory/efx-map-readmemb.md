@@ -3,6 +3,31 @@ name: EFX_MAP $readmemb path resolution + VDB caching trap
 description: MAP resolves $readmemb relative to $SOC_DIR/ (not work_syn/); 2026.1 MAP does NOT inline $readmemb data into INIT_0 in map.v — PNR resolves symbol bins at P&R time.
 ---
 
+## Root cause D: PNR run against stale VDB when OBBS crashes mid-flight
+
+**Confirmed 2026-07-15:** The OBBS deletes the VDB before MAP, then MAP writes a
+fresh VDB.  But if the OBBS crashes (syntax error, port error, etc.) BETWEEN the
+symbol-bin copy (Step 2) and MAP (Step 3), the next OBBS run may:
+
+1. Bump the build letter and regenerate symbol bins (Step 1+2) ✓
+2. Crash **before** the VDB deletion (Step 3) — leaving the OLD VDB intact
+3. A subsequent manual PNR run uses the OLD VDB → board shows the OLD build letter
+
+**Symptom:** build_seq.h shows letter `X`, board shows letter `X-N` (many
+letters behind) because multiple OBBS runs bumped the letter but MAP only
+ran once (writing a VDB with the letter from that single successful run).
+
+**VDB timestamp guard (must run before every PNR):**
+```bash
+ls -lt $SOC_DIR/outflow/church_soc_cm.vdb \
+       $SOC_DIR/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin
+```
+The VDB **must be newer** than the symbol bins.  If the VDB is older, MAP used
+a cached database and the bitstream will have stale firmware.
+
+**Fix:** delete ALL VDB files before MAP, then verify timestamp ordering
+after MAP completes and before PNR starts.
+
 ## Root cause A: MAP VDB caching silently reuses stale firmware
 
 EFX_MAP decides whether to re-synthesise by comparing Verilog source mtimes
