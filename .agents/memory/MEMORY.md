@@ -56,3 +56,4 @@
 - [Assembler nsLoaded vs _capBlockSlots slot confusion](assembler-nsloaded-slot-confusion.md) — for 2-op LOAD/SAVE, nsLoaded stores CR register number (not c-list slot); _capBlockSlots[name] is always the correct slot for a fresh c-list access
 - [Sapphire BRAM guard false-positive modes](sapphire-bram-guard-false-positive.md) — RC=3 has 2 modes: stale real content (bad) vs all-FF MAP placeholder (2026.1 normal/false-positive); RC=1 (all-zero) is always fatal
 - [GitHub API PUT for cross-repo file delivery](github-api-put-delivery.md) — when git histories diverge, PUT individual files via Contents API from Replit bash ($GITHUB_PAT); droplet uses `git checkout origin/main -- <file>` to receive them
+- [Ti60 firmware update pipeline](ti60-firmware-update-pipeline.md) — PNR-only skips 3 required steps (patch sapphire.v, delete VDB, MAP); must run full OBBS; serve hex from $SOC_DIR/outflow/ not repo bitstreams/ (git pull overwrites)
