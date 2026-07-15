@@ -161,10 +161,15 @@ fi
 # sapphire.v references the symbol bins by bare filename. EDA tools resolve
 # $readmemb bare filenames relative to the DIRECTORY CONTAINING THE SOURCE
 # FILE — i.e. $SOC_DIR/ (where sapphire.v lives), NOT relative to --work_dir.
-# build_ti60_bitstream.sh Step 2 deploys fresh bins to both $SOC_DIR/ AND
-# work_syn/ before this script is called. The $SOC_DIR/ copy is what MAP
-# actually reads; the work_syn/ copy exists for this freshness self-test.
-# Check both: if either is stale the wrong firmware gets baked in.
+#
+# When invoked via build_ti60_bitstream.sh (OBBS): bins are intentionally
+# ABSENT from $SOC_DIR/ during MAP — the OBBS purges them before synthesis so
+# MAP produces all-FF placeholders for all 4 BRAM lanes rather than
+# inconsistently embedding whichever stale bins happen to be on disk.
+# Step 3b of the OBBS deploys fresh bins AFTER MAP for PNR to resolve.
+# work_syn/ bins are still present and verified fresh — check that only.
+#
+# When invoked standalone (not via OBBS): check both $SOC_DIR/ and work_syn/.
 if [ -f "$SCRIPT_DIR/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin" ]; then
     bash "$SCRIPT_DIR/../../scripts/check_sapphire_symbol_bins_fresh.sh" \
         "$SCRIPT_DIR" "$SOC_DIR/work_syn" || {
@@ -173,13 +178,17 @@ if [ -f "$SCRIPT_DIR/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin
         echo "[FAIL] re-run it from the repo root rather than patching manually." >&2
         exit 1
     }
-    bash "$SCRIPT_DIR/../../scripts/check_sapphire_symbol_bins_fresh.sh" \
-        "$SCRIPT_DIR" "$SOC_DIR" || {
-        echo "[FAIL] Sapphire symbol bins in $SOC_DIR (project root — where MAP reads them) are stale." >&2
-        echo "[FAIL] This should never happen when invoked via build_ti60_bitstream.sh —" >&2
-        echo "[FAIL] re-run it from the repo root rather than patching manually." >&2
-        exit 1
-    }
+    if [ "${_OBBS_RUN:-0}" = "1" ]; then
+        echo "    (OBBS: bins intentionally absent from $SOC_DIR/ during MAP — PNR resolves from Step 3b bins)"
+    else
+        bash "$SCRIPT_DIR/../../scripts/check_sapphire_symbol_bins_fresh.sh" \
+            "$SCRIPT_DIR" "$SOC_DIR" || {
+            echo "[FAIL] Sapphire symbol bins in $SOC_DIR (project root — where MAP reads them) are stale." >&2
+            echo "[FAIL] This should never happen when invoked via build_ti60_bitstream.sh —" >&2
+            echo "[FAIL] re-run it from the repo root rather than patching manually." >&2
+            exit 1
+        }
+    fi
 else
     echo "    (no symbol bins found in $SCRIPT_DIR — skipping bins freshness check)"
 fi
