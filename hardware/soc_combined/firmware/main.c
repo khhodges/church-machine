@@ -270,7 +270,13 @@ static cm_key_entry_t cm_key_table[9];  /* zero-initialised at reset */
 static inline __attribute__((always_inline)) void uart_putc(uint32_t c)
 {
     UART_DATA = (1u << 8) | (c & 0xFFu);
-    uint32_t _d = 3000u;
+    /* 10 000-cycle register-only delay (~400 µs at 25 MHz).
+     * One UART character at 57 600 baud takes 4 340 cycles (174 µs).
+     * The BRAM dBus stalls after every UART_DATA write until TX finishes.
+     * 10 000 > 4 340, so the stall is guaranteed clear before we return.
+     * DO NOT add any APB write between this delay and the next ROM lw —
+     * any APB write resets the stall timer. */
+    uint32_t _d = 10000u;
     __asm__ volatile("1: addi %0,%0,-1\n bne %0,zero,1b\n" : "+r"(_d));
 }
 
@@ -309,39 +315,23 @@ static inline __attribute__((always_inline)) void uart_putc(uint32_t c)
  *   '@' — emitted after the first lw succeeds; confirms Bug C fix works. */
 static void __attribute__((optimize("O0"))) uart_puts(const char *s)
 {
-    /* Bug C fix — FENCE BEFORE ANYTHING ELSE.
-     *
-     * The function prolog emits "sw ra, N(sp)" (a BRAM write) before any
-     * C source line runs.  If the caller just did uart_putc(), the UART
-     * write stalls the dBus and that prolog sw hangs — the function never
-     * reaches its first line.  The caller MUST fence before calling us.
-     *
-     * We also fence here defensively for callers that don't fence, AND to
-     * clear the stall introduced by the prolog sw itself (BRAM write does
-     * NOT trigger the stall, only UART writes do — so this is a no-op when
-     * the caller already fenced, but harmless).
-     *
-     * Loop invariant: fence × 2 is issued immediately after every
-     * uart_putc(c), before any stack or ROM access, so BRAM is always
-     * clear when we reach w >>= 8, --remaining, *wp++, or return. */
-    CM_UID_LO = BOARD_UID_LO;         /* fence 1 — write to +0x10 */
-    CM_UID_HI = BOARD_UID_HI;         /* fence 2 — write to +0x14 (DIFFERENT address,
-                                        * prevents store-buffer coalescing into 1 txn) */
+    /* No APB fence writes here — any APB write resets the BRAM stall timer.
+     * The caller's uart_putc() already waited 10 000 cycles (> one full TX
+     * char at 57 600 baud), so the stall is guaranteed clear on entry.
+     * Inside the loop, uart_putc(c) also waits 10 000 cycles before returning,
+     * so every subsequent ROM lw (*wp++) is safe without extra fences. */
     uint32_t align = (uintptr_t)s & 3u;
     const uint32_t *wp = (const uint32_t *)((uintptr_t)s - align);
-    uint32_t w = *wp++;               /* lw — safe: two-address fence cleared stall */
+    uint32_t w = *wp++;
     uint32_t remaining = 4u - align;
-    w >>= (align << 3);               /* discard bytes before s[0] */
+    w >>= (align << 3);
     for (;;) {
         uint32_t c = w & 0xFFu;       /* uint32_t: spills as sw not sb */
         if (c == 0u) return;
-        uart_putc(c);                 /* UART write → stalls BRAM lw */
-        CM_UID_LO = BOARD_UID_LO;     /* fence 1 — +0x10 */
-        CM_UID_HI = BOARD_UID_HI;     /* fence 2 — +0x14 (different addr, two txns) */
-        /* All stack and ROM accesses below are safe — stall cleared */
+        uart_putc(c);                 /* 10 000-cycle delay inside — stall clears */
         w >>= 8;
         if (--remaining == 0u) {
-            w = *wp++;                /* ROM lw — safe after fence */
+            w = *wp++;                /* ROM lw — safe: stall cleared by uart_putc delay */
             remaining = 4u;
         }
     }
@@ -676,11 +666,7 @@ int main(void)
      * If 'Z' appears the fence is working and uart_putc is alive.
      * If 'C' still appears before 'Z', the 'C' is from an old/stale bitstream. */
     uart_putc(FW_BUILD_LETTER);  /* cycles each rebuild: Z→A→B→…→Z */
-    /* FENCE: uart_putc above stalls BRAM lw.  Two writes to DIFFERENT APB
-     * addresses (+0x10, +0x14) guarantee two separate bus transactions —
-     * same pattern as the original CLOCKDIV fence at lines 661-662. */
-    CM_UID_LO = BOARD_UID_LO;   /* +0x10 */
-    CM_UID_HI = BOARD_UID_HI;   /* +0x14 */
+    /* uart_putc's 10 000-cycle delay clears the BRAM stall — no fence needed */
 
     /* ---- Step 3: Boot banner (BEFORE releasing CM core) ----
      *
@@ -692,15 +678,9 @@ int main(void)
     uart_putc((char)('0' + (FW_MAJOR % 10u)));
     uart_putc('.');
     uart_putc((char)('0' + (FW_MINOR % 10u)));
-    /* FENCE: three uart_putc above re-stalled BRAM lw; two different addresses. */
-    CM_UID_LO = BOARD_UID_LO;   /* +0x10 */
-    CM_UID_HI = BOARD_UID_HI;   /* +0x14 */
     uart_puts("\r\n");
     uart_puts("UID=");
     emit_uid();
-    /* FENCE: emit_uid() ends with uart_putc; clear before uart_puts. */
-    CM_UID_LO = BOARD_UID_LO;   /* +0x10 */
-    CM_UID_HI = BOARD_UID_HI;   /* +0x14 */
     uart_puts("\r\n");
 
     /* ---- Step 4: Release CM core (APB3 bus now shared with CM) ---- */
