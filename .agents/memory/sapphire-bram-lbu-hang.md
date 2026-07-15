@@ -72,3 +72,33 @@ by UART_CLOCKDIV on the first lw from ROM.
 - `uart_puthex32_lower`: uses `int i` and `uint32_t nib` locals (4-byte, safe). Calls uart_putc inline. Arithmetic nibble→char (no table lbu). Safe.
 - `uart_putdec`: uses `uint32_t tmp` (4-byte, safe). Calls uart_putc inline. Safe.
 - Any NEW helper that calls uart_putc and uses char locals needs `uint32_t` locals or `always_inline` treatment.
+
+## Confirmed root cause — BRAM stall is a latch, not a timer (2026-07-15)
+
+**Observation:** probe char 'C' (from `uart_putc`) arrives on UART, but
+the entire `uart_puts` banner that follows is silent. The first ROM `lw`
+inside `uart_puts` hangs permanently.
+
+**Root cause confirmed:** The BRAM dBus stall triggered by `UART_DATA`
+APB writes **latches** — it does NOT self-clear on a timer.  The
+10,000-cycle busy-loop in `uart_putc` handles baud timing only.  Only a
+CM APB3 bus write (any write to 0xF8100000+) clears the latch.
+
+Stack `sw`/`lw` (to RAM) and further `UART_DATA` writes are unaffected
+by the BRAM stall — only BRAM (ROM) `lw` deadlocks.
+
+**Fix (uart_puts):**
+- Entry fence: `CM_UID_LO = BOARD_UID_LO; CM_UID_HI = BOARD_UID_HI;`
+  before the first `*wp++` — clears stall from caller's `uart_putc`
+- Loop fence: same two writes inside the for-loop, before each `*wp++`
+  (only when `remaining == 0`, i.e. every 4 chars) — clears stall from
+  `uart_putc(c)`
+
+`uart_puthex32_lower` does NO ROM `lw` (register arithmetic only) so
+needs no fence writes. `emit_uid()` and adjacent `uart_puts("\r\n")`
+calls are safe because `uart_puts` entry fence clears the stall from the
+preceding `uart_puthex32_lower`'s last `uart_putc`.
+
+**Rebuild shortcut:** PNR reads `$readmemb` from symbol bins at P&R time
+(Efinity 2026.1 BRAM). Only `make -C firmware` + PNR is needed — no
+45-min MAP re-run.

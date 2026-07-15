@@ -315,11 +315,26 @@ static inline __attribute__((always_inline)) void uart_putc(uint32_t c)
  *   '@' — emitted after the first lw succeeds; confirms Bug C fix works. */
 static void __attribute__((optimize("O0"))) uart_puts(const char *s)
 {
-    /* No APB fence writes here — any APB write resets the BRAM stall timer.
-     * The caller's uart_putc() already waited 10 000 cycles (> one full TX
-     * char at 57 600 baud), so the stall is guaranteed clear on entry.
-     * Inside the loop, uart_putc(c) also waits 10 000 cycles before returning,
-     * so every subsequent ROM lw (*wp++) is safe without extra fences. */
+    /* BRAM dBus stall — root cause (confirmed 2026-07-15):
+     *
+     * UART_DATA APB writes (every uart_putc) trigger a BRAM dBus stall that
+     * LATCHES and does NOT self-clear on a timer.  Only a CM APB3 bus access
+     * (write to 0xF8100000+) clears the latch.  The 10 000-cycle delay in
+     * uart_putc handles baud timing only — it does NOT clear the stall.
+     *
+     * Any ROM lw attempted while the latch is set hangs the CPU permanently.
+     * Stack sw/lw (RAM) and further UART_DATA writes are unaffected by the
+     * BRAM stall — only BRAM (ROM) reads deadlock.
+     *
+     * Fence strategy:
+     *   (a) Entry fence: clear the stall left by the caller's last uart_putc.
+     *   (b) Loop fence: clear the new stall before each ROM word load (*wp++).
+     *
+     * CM_UID_LO / CM_UID_HI are R/W registers — safe to write repeatedly.
+     * The values were already set in main() Step 2; re-writing is idempotent. */
+    CM_UID_LO = BOARD_UID_LO;        /* (a) entry fence — clears caller's stall */
+    CM_UID_HI = BOARD_UID_HI;
+
     uint32_t align = (uintptr_t)s & 3u;
     const uint32_t *wp = (const uint32_t *)((uintptr_t)s - align);
     uint32_t w = *wp++;
@@ -328,10 +343,12 @@ static void __attribute__((optimize("O0"))) uart_puts(const char *s)
     for (;;) {
         uint32_t c = w & 0xFFu;       /* uint32_t: spills as sw not sb */
         if (c == 0u) return;
-        uart_putc(c);                 /* 10 000-cycle delay inside — stall clears */
+        uart_putc(c);                 /* triggers a new BRAM dBus stall latch */
         w >>= 8;
         if (--remaining == 0u) {
-            w = *wp++;                /* ROM lw — safe: stall cleared by uart_putc delay */
+            CM_UID_LO = BOARD_UID_LO; /* (b) loop fence — clears uart_putc stall */
+            CM_UID_HI = BOARD_UID_HI;
+            w = *wp++;                /* ROM lw — safe: latch cleared by fence */
             remaining = 4u;
         }
     }
