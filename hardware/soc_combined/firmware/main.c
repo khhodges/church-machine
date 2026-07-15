@@ -691,14 +691,20 @@ int main(void)
      * CM_CTRL_RELEASED (Step 4).  Once the CM core is released it
      * immediately starts executing and can win APB3 bus arbitration,
      * stalling any mid-banner UART_DATA write and truncating the output. */
-    uart_puts("KHURCH Ti60 SoC+CM v");
+    /* Banner — individual uart_putc only (no uart_puts = no ROM lw).
+     * Each call is always_inline with an immediate value; zero ROM reads. */
+    uart_putc('K'); uart_putc('H'); uart_putc('U'); uart_putc('R');
+    uart_putc('C'); uart_putc('H'); uart_putc(' ');
+    uart_putc('T'); uart_putc('i'); uart_putc('6'); uart_putc('0'); uart_putc(' ');
+    uart_putc('S'); uart_putc('o'); uart_putc('C'); uart_putc('+');
+    uart_putc('C'); uart_putc('M'); uart_putc(' '); uart_putc('v');
     uart_putc((char)('0' + (FW_MAJOR % 10u)));
     uart_putc('.');
     uart_putc((char)('0' + (FW_MINOR % 10u)));
-    uart_puts("\r\n");
-    uart_puts("UID=");
+    uart_putc('\r'); uart_putc('\n');
+    uart_putc('U'); uart_putc('I'); uart_putc('D'); uart_putc('=');
     emit_uid();
-    uart_puts("\r\n");
+    uart_putc('\r'); uart_putc('\n');
 
     /* ---- Step 4: Release CM core (APB3 bus now shared with CM) ---- */
     CM_CTRL = CM_CTRL_RELEASED;

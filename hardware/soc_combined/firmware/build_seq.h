@@ -6,9 +6,9 @@
  * first character emitted on ttyUSB2 immediately confirms which firmware is
  * running without checking version strings or timestamps.
  *
- * Current letter is 'Z' — next build will bump to 'A'.
+ * Current letter is 'D' — set for banner debug build.
  */
 #ifndef BUILD_SEQ_H
 #define BUILD_SEQ_H
-#define FW_BUILD_LETTER 'Z'
+#define FW_BUILD_LETTER 'D'
 #endif
