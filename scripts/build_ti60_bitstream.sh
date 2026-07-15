@@ -253,8 +253,25 @@ cp "$CM_V_SRC" "$CM_V_DST"
 # Yosys flattens the Amaranth design into 'module top'; top.v instantiates
 # 'church_ti60f225' (no underscore).  Rename so there is no duplicate 'top'.
 sed -i 's/^module top(/module church_ti60f225(/' "$CM_V_DST"
+# Promote dbg_* internal wires to output ports so top.v named-port connections work.
+# Yosys emits these as internal wires with assignments; top.v expects them as ports.
+sed -i 's/^module church_ti60f225(push_button, clk, uart_tx,/module church_ti60f225(push_button, clk, uart_tx, dbg_nia, dbg_fault, dbg_fault_valid, dbg_boot_complete,/' "$CM_V_DST"
+sed -i 's/^  wire dbg_boot_complete;/  output dbg_boot_complete;/' "$CM_V_DST"
+sed -i 's/^  wire \[3:0\] dbg_fault;/  output [3:0] dbg_fault;/' "$CM_V_DST"
+sed -i 's/^  wire dbg_fault_valid;/  output dbg_fault_valid;/' "$CM_V_DST"
+sed -i 's/^  wire \[31:0\] dbg_nia;/  output [31:0] dbg_nia;/' "$CM_V_DST"
+# Self-test: verify all four debug ports appear in the module declaration line
+_MODULE_LINE=$(grep "^module church_ti60f225(" "$CM_V_DST" 2>/dev/null || true)
+if echo "$_MODULE_LINE" | grep -qv 'dbg_boot_complete' || \
+   echo "$_MODULE_LINE" | grep -qv 'dbg_fault_valid' || \
+   echo "$_MODULE_LINE" | grep -qv 'dbg_nia' || \
+   echo "$_MODULE_LINE" | grep -qv 'dbg_fault'; then
+    _fail "church_ti60_f225.v debug-port promotion failed — module line missing dbg_* ports.
+       Module line: $_MODULE_LINE
+       (check sed patterns vs Yosys port-list format)"
+fi
 NON_ZERO=$(grep -c "dmem\[" "$CM_V_DST" || true)
-_ok "church_ti60_f225.v deployed ($NON_ZERO non-zero dmem[] lines)"
+_ok "church_ti60_f225.v deployed ($NON_ZERO non-zero dmem[] lines, dbg_* ports promoted)"
 
 # ── gen_cm_dmem_direct: replace inferred dmem with explicit EFX_RAM10 ────────
 # EFX_MAP 2026.1 silently drops ALL forms of BRAM init for inferred arrays:
