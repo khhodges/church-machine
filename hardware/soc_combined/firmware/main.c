@@ -693,6 +693,478 @@ static int uart_poll_command(uint32_t *force_callhome_out)
     return 0;
 }
 
+/* init_strings_ram -- write every .data string/array to RAM via sw+li.
+ * crt0.S copies .data using lw from ROM BRAM, which hangs when iBus is
+ * active (single-port; iBus wins arbitration).  This function bypasses
+ * the crt0 copy: each store is a register-immediate sw -- no ROM lw. */
+static void __attribute__((optimize("O0"))) init_strings_ram(void)
+{
+    uint32_t *p;
+
+    /* _rs_* string table */
+    p = (uint32_t*)_rs_nia_open;
+    p[0] = 0x6E222C22u;
+    p[1] = 0x3A226169u;
+    p[2] = 0x00783022u;
+    p = (uint32_t*)_rs_obj_close;
+    p[0] = 0x000A0D7Du;
+    p = (uint32_t*)_rs_quote;
+    p[0] = 0x00000022u;
+    p = (uint32_t*)_rs_fn_open;
+    p[0] = 0x6166222Cu;
+    p[1] = 0x5F746C75u;
+    p[2] = 0x656D616Eu;
+    p[3] = 0x00223A22u;
+    p = (uint32_t*)_rs_ch_hdr;
+    p[0] = 0x4C4C4143u;
+    p[1] = 0x454D4F48u;
+    p[2] = 0x62227B3Au;
+    p[3] = 0x6472616Fu;
+    p[4] = 0x54223A22u;
+    p[5] = 0x46303669u;
+    p[6] = 0x22353232u;
+    p[7] = 0x6975222Cu;
+    p[8] = 0x223A2264u;
+    p[9] = 0u;
+    p = (uint32_t*)_rs_ch_boot_ok;
+    p[0] = 0x62222C22u;
+    p[1] = 0x5F746F6Fu;
+    p[2] = 0x3A226B6Fu;
+    p[3] = 0u;
+    p = (uint32_t*)_rs_ch_boot_rsn;
+    p[0] = 0x6F62222Cu;
+    p[1] = 0x725F746Fu;
+    p[2] = 0x6F736165u;
+    p[3] = 0x003A226Eu;
+    p = (uint32_t*)_rs_ch_fault;
+    p[0] = 0x6166222Cu;
+    p[1] = 0x22746C75u;
+    p[2] = 0x0000003Au;
+    p = (uint32_t*)_rs_ch_fc;
+    p[0] = 0x6166222Cu;
+    p[1] = 0x5F746C75u;
+    p[2] = 0x65646F63u;
+    p[3] = 0x00003A22u;
+    p = (uint32_t*)_rs_ch_fwmaj;
+    p[0] = 0x7766222Cu;
+    p[1] = 0x6A616D5Fu;
+    p[2] = 0x3A22726Fu;
+    p[3] = 0u;
+    p = (uint32_t*)_rs_ch_fwmin;
+    p[0] = 0x7766222Cu;
+    p[1] = 0x6E696D5Fu;
+    p[2] = 0x3A22726Fu;
+    p[3] = 0u;
+    p = (uint32_t*)_rs_ch_ns_open;
+    p[0] = 0x736E222Cu;
+    p[1] = 0x6E616D5Fu;
+    p[2] = 0x73656669u;
+    p[3] = 0x5B3A2274u;
+    p[4] = 0u;
+    p = (uint32_t*)_rs_ch_ogt_open;
+    p[0] = 0x676F227Bu;
+    p[1] = 0x223A2274u;
+    p[2] = 0u;
+    p = (uint32_t*)_rs_ch_tok_open;
+    p[0] = 0x74222C22u;
+    p[1] = 0x6E656B6Fu;
+    p[2] = 0x2232335Fu;
+    p[3] = 0x7830223Au;
+    p[4] = 0u;
+    p = (uint32_t*)_rs_ch_lbl_open;
+    p[0] = 0x6C222C22u;
+    p[1] = 0x6C656261u;
+    p[2] = 0x00223A22u;
+    p = (uint32_t*)_rs_ch_res_true;
+    p[0] = 0x72222C22u;
+    p[1] = 0x64697365u;
+    p[2] = 0x22746E65u;
+    p[3] = 0x7572743Au;
+    p[4] = 0x00007D65u;
+    p = (uint32_t*)_rs_ch_close;
+    p[0] = 0x0A0D7D5Du;
+    p[1] = 0u;
+    p = (uint32_t*)_rs_fe_hdr;
+    p[0] = 0x4C554146u;
+    p[1] = 0x56455F54u;
+    p[2] = 0x3A544E45u;
+    p[3] = 0x6975227Bu;
+    p[4] = 0x223A2264u;
+    p[5] = 0u;
+    p = (uint32_t*)_rs_fe_fc;
+    p[0] = 0x66222C22u;
+    p[1] = 0x746C7561u;
+    p[2] = 0x646F635Fu;
+    p[3] = 0x003A2265u;
+    p = (uint32_t*)_rs_fe_gt;
+    p[0] = 0x66222C22u;
+    p[1] = 0x746C7561u;
+    p[2] = 0x2274675Fu;
+    p[3] = 0x7830223Au;
+    p[4] = 0u;
+    p = (uint32_t*)_rs_fe_instr;
+    p[0] = 0x66222C22u;
+    p[1] = 0x746C7561u;
+    p[2] = 0x736E695Fu;
+    p[3] = 0x3A227274u;
+    p[4] = 0x00783022u;
+    p = (uint32_t*)_rs_fe_cr14;
+    p[0] = 0x66222C22u;
+    p[1] = 0x746C7561u;
+    p[2] = 0x3172635Fu;
+    p[3] = 0x223A2234u;
+    p[4] = 0x00007830u;
+    p = (uint32_t*)_rs_fe_stage;
+    p[0] = 0x66222C22u;
+    p[1] = 0x746C7561u;
+    p[2] = 0x6174735Fu;
+    p[3] = 0x3A226567u;
+    p[4] = 0u;
+    p = (uint32_t*)_rs_fe_ts;
+    p[0] = 0x7374222Cu;
+    p[1] = 0x00003A22u;
+    p = (uint32_t*)_rs_hung_hdr;
+    p[0] = 0x474E5548u;
+    p[1] = 0x75227B3Au;
+    p[2] = 0x3A226469u;
+    p[3] = 0x00000022u;
+    p = (uint32_t*)_rs_hung_loops;
+    p[0] = 0x6C222C22u;
+    p[1] = 0x73706F6Fu;
+    p[2] = 0x00003A22u;
+    p = (uint32_t*)_rs_trace_open;
+    p[0] = 0x43415254u;
+    p[1] = 0x005B3A45u;
+    p = (uint32_t*)_rs_trace_hex;
+    p[0] = 0x00007830u;
+    p = (uint32_t*)_rs_trace_close;
+    p[0] = 0x000A0D5Du;
+    p = (uint32_t*)_rs_lump_start;
+    p[0] = 0x504D554Cu;
+    p[1] = 0x5355505Fu;
+    p[2] = 0x54535F48u;
+    p[3] = 0x3A545241u;
+    p[4] = 0x656C227Bu;
+    p[5] = 0x003A226Eu;
+    p = (uint32_t*)_rs_lump_ok_open;
+    p[0] = 0x504D554Cu;
+    p[1] = 0x4E4F445Fu;
+    p[2] = 0x227B3A45u;
+    p[3] = 0x3A226B6Fu;
+    p[4] = 0u;
+    p = (uint32_t*)_rs_reset_ack;
+    p[0] = 0x45534552u;
+    p[1] = 0x43412D54u;
+    p[2] = 0x000A0D4Bu;
+    p = (uint32_t*)_rs_pong;
+    p[0] = 0x474E4F50u;
+    p[1] = 0x00000A0Du;
+    p = (uint32_t*)_rs_wait_boot;
+    p[0] = 0x74696157u;
+    p[1] = 0x20676E69u;
+    p[2] = 0x20726F66u;
+    p[3] = 0x62204D43u;
+    p[4] = 0x5F746F6Fu;
+    p[5] = 0x706D6F63u;
+    p[6] = 0x6574656Cu;
+    p[7] = 0x0D2E2E2Eu;
+    p[8] = 0x0000000Au;
+    p = (uint32_t*)_rs_boot_ok_1;
+    p[0] = 0x62204D43u;
+    p[1] = 0x5F746F6Fu;
+    p[2] = 0x706D6F63u;
+    p[3] = 0x6574656Cu;
+    p[4] = 0x0D31203Au;
+    p[5] = 0x0000000Au;
+    p = (uint32_t*)_rs_boot_timeout;
+    p[0] = 0x62204D43u;
+    p[1] = 0x5F746F6Fu;
+    p[2] = 0x706D6F63u;
+    p[3] = 0x6574656Cu;
+    p[4] = 0x6974203Au;
+    p[5] = 0x756F656Du;
+    p[6] = 0x000A0D74u;
+    p = (uint32_t*)_rs_emit_ch;
+    p[0] = 0x74696D45u;
+    p[1] = 0x676E6974u;
+    p[2] = 0x4C414320u;
+    p[3] = 0x4D4F484Cu;
+    p[4] = 0x2E2E2E45u;
+    p[5] = 0x00000A0Du;
+    p = (uint32_t*)_rs_wait_frun;
+    p[0] = 0x74696157u;
+    p[1] = 0x20676E69u;
+    p[2] = 0x20726F66u;
+    p[3] = 0x66204D43u;
+    p[4] = 0x2D656572u;
+    p[5] = 0x2E6E7572u;
+    p[6] = 0x0A0D2E2Eu;
+    p[7] = 0u;
+    p = (uint32_t*)_rs_frun_done;
+    p[0] = 0x66204D43u;
+    p[1] = 0x2D656572u;
+    p[2] = 0x206E7572u;
+    p[3] = 0x646E6977u;
+    p[4] = 0x7020776Fu;
+    p[5] = 0x65737361u;
+    p[6] = 0x0A0D2E64u;
+    p[7] = 0u;
+    p = (uint32_t*)_rs_monitoring;
+    p[0] = 0x696E6F4Du;
+    p[1] = 0x69726F74u;
+    p[2] = 0x4320676Eu;
+    p[3] = 0x0A0D3A4Du;
+    p[4] = 0u;
+
+    /* _fault_names[26][16] */
+    p = (uint32_t*)_fault_names;
+    p[0] = 0x4E4B4E55u;
+    p[1] = 0x004E574Fu;
+    p[2] = 0u;
+    p[3] = 0u;
+    p[4] = 0x4D524550u;
+    p[5] = 0x0000525Fu;
+    p[6] = 0u;
+    p[7] = 0u;
+    p[8] = 0x4D524550u;
+    p[9] = 0x0000575Fu;
+    p[10] = 0u;
+    p[11] = 0u;
+    p[12] = 0x4D524550u;
+    p[13] = 0x0000585Fu;
+    p[14] = 0u;
+    p[15] = 0u;
+    p[16] = 0x4D524550u;
+    p[17] = 0x00004C5Fu;
+    p[18] = 0u;
+    p[19] = 0u;
+    p[20] = 0x4D524550u;
+    p[21] = 0x0000535Fu;
+    p[22] = 0u;
+    p[23] = 0u;
+    p[24] = 0x4D524550u;
+    p[25] = 0x0000455Fu;
+    p[26] = 0u;
+    p[27] = 0u;
+    p[28] = 0x4C4C554Eu;
+    p[29] = 0x5041435Fu;
+    p[30] = 0u;
+    p[31] = 0u;
+    p[32] = 0x4E554F42u;
+    p[33] = 0x00005344u;
+    p[34] = 0u;
+    p[35] = 0u;
+    p[36] = 0x53524556u;
+    p[37] = 0x004E4F49u;
+    p[38] = 0u;
+    p[39] = 0u;
+    p[40] = 0x4C414553u;
+    p[41] = 0u;
+    p[42] = 0u;
+    p[43] = 0u;
+    p[44] = 0x41564E49u;
+    p[45] = 0x5F44494Cu;
+    p[46] = 0x0000504Fu;
+    p[47] = 0u;
+    p[48] = 0x52455054u;
+    p[49] = 0x53525F4Du;
+    p[50] = 0x00000056u;
+    p[51] = 0u;
+    p[52] = 0x414D4F44u;
+    p[53] = 0x505F4E49u;
+    p[54] = 0x54495255u;
+    p[55] = 0x00000059u;
+    p[56] = 0x4D524550u;
+    p[57] = 0x0000425Fu;
+    p[58] = 0u;
+    p[59] = 0u;
+    p[60] = 0x49425F46u;
+    p[61] = 0x00000054u;
+    p[62] = 0u;
+    p[63] = 0u;
+    p[64] = 0x43415453u;
+    p[65] = 0x564F5F4Bu;
+    p[66] = 0x4C465245u;
+    p[67] = 0x0000574Fu;
+    p[68] = 0x45534241u;
+    p[69] = 0x4F5F544Eu;
+    p[70] = 0x4F465455u;
+    p[71] = 0x00004D52u;
+    p[72] = 0x43415453u;
+    p[73] = 0x4F435F4Bu;
+    p[74] = 0x50555252u;
+    p[75] = 0x00000054u;
+    p[76] = 0x43415453u;
+    p[77] = 0x4E555F4Bu;
+    p[78] = 0x46524544u;
+    p[79] = 0x00574F4Cu;
+    p[80] = 0x4E4B4E55u;
+    p[81] = 0x004E574Fu;
+    p[82] = 0u;
+    p[83] = 0u;
+    p[84] = 0x4654554Fu;
+    p[85] = 0x5F4D524Fu;
+    p[86] = 0x00435243u;
+    p[87] = 0u;
+    p[88] = 0x4654554Fu;
+    p[89] = 0x5F4D524Fu;
+    p[90] = 0x4F4C4C41u;
+    p[91] = 0x00000043u;
+    p[92] = 0x4654554Fu;
+    p[93] = 0x5F4D524Fu;
+    p[94] = 0x544E494Du;
+    p[95] = 0u;
+    p[96] = 0x4654554Fu;
+    p[97] = 0x5F4D524Fu;
+    p[98] = 0x00524448u;
+    p[99] = 0u;
+    p[100] = 0x5F544E49u;
+    p[101] = 0x5245564Fu;
+    p[102] = 0x574F4C46u;
+    p[103] = 0u;
+
+    /* _NS_MANIFEST[9] = { ogt[36], label[20] } */
+    p = (uint32_t*)_NS_MANIFEST;
+    p[0] = 0x626F6C67u;
+    p[1] = 0x432E6C61u;
+    p[2] = 0x2E65726Fu;
+    p[3] = 0x72616F42u;
+    p[4] = 0x65644964u;
+    p[5] = 0x7469746Eu;
+    p[6] = 0x6F622E79u;
+    p[7] = 0x0000746Fu;
+    p[8] = 0u;
+    p[9] = 0x72616F42u;
+    p[10] = 0x64492E64u;
+    p[11] = 0x69746E65u;
+    p[12] = 0x00007974u;
+    p[13] = 0u;
+    p[14] = 0x626F6C67u;
+    p[15] = 0x432E6C61u;
+    p[16] = 0x2E65726Fu;
+    p[17] = 0x72616548u;
+    p[18] = 0x61656274u;
+    p[19] = 0x6F622E74u;
+    p[20] = 0x0000746Fu;
+    p[21] = 0u;
+    p[22] = 0u;
+    p[23] = 0x72616548u;
+    p[24] = 0x61656274u;
+    p[25] = 0x00000074u;
+    p[26] = 0u;
+    p[27] = 0u;
+    p[28] = 0x626F6C67u;
+    p[29] = 0x432E6C61u;
+    p[30] = 0x2E65726Fu;
+    p[31] = 0x6C756146u;
+    p[32] = 0x70655274u;
+    p[33] = 0x6574726Fu;
+    p[34] = 0x6F622E72u;
+    p[35] = 0x0000746Fu;
+    p[36] = 0u;
+    p[37] = 0x6C756146u;
+    p[38] = 0x65522E74u;
+    p[39] = 0x74726F70u;
+    p[40] = 0x00007265u;
+    p[41] = 0u;
+    p[42] = 0x626F6C67u;
+    p[43] = 0x432E6C61u;
+    p[44] = 0x2E65726Fu;
+    p[45] = 0x66726550u;
+    p[46] = 0x6F706552u;
+    p[47] = 0x72657472u;
+    p[48] = 0x6F6F622Eu;
+    p[49] = 0x00000074u;
+    p[50] = 0u;
+    p[51] = 0x66726550u;
+    p[52] = 0x7065522Eu;
+    p[53] = 0x6574726Fu;
+    p[54] = 0x00000072u;
+    p[55] = 0u;
+    p[56] = 0x626F6C67u;
+    p[57] = 0x432E6C61u;
+    p[58] = 0x2E65726Fu;
+    p[59] = 0x706D754Cu;
+    p[60] = 0x64616F4Cu;
+    p[61] = 0x622E7265u;
+    p[62] = 0x00746F6Fu;
+    p[63] = 0u;
+    p[64] = 0u;
+    p[65] = 0x706D754Cu;
+    p[66] = 0x616F4C2Eu;
+    p[67] = 0x00726564u;
+    p[68] = 0u;
+    p[69] = 0u;
+    p[70] = 0x626F6C67u;
+    p[71] = 0x432E6C61u;
+    p[72] = 0x2E65726Fu;
+    p[73] = 0x63617254u;
+    p[74] = 0x696D4565u;
+    p[75] = 0x72657474u;
+    p[76] = 0x6F6F622Eu;
+    p[77] = 0x00000074u;
+    p[78] = 0u;
+    p[79] = 0x63617254u;
+    p[80] = 0x6D452E65u;
+    p[81] = 0x65747469u;
+    p[82] = 0x00000072u;
+    p[83] = 0u;
+    p[84] = 0x626F6C67u;
+    p[85] = 0x432E6C61u;
+    p[86] = 0x2E65726Fu;
+    p[87] = 0x6E49534Eu;
+    p[88] = 0x63657073u;
+    p[89] = 0x2E726F74u;
+    p[90] = 0x746F6F62u;
+    p[91] = 0u;
+    p[92] = 0u;
+    p[93] = 0x492E534Eu;
+    p[94] = 0x6570736Eu;
+    p[95] = 0x726F7463u;
+    p[96] = 0u;
+    p[97] = 0u;
+    p[98] = 0x626F6C67u;
+    p[99] = 0x432E6C61u;
+    p[100] = 0x2E65726Fu;
+    p[101] = 0x6964654Du;
+    p[102] = 0x6E6F4361u;
+    p[103] = 0x656D7573u;
+    p[104] = 0x6F622E72u;
+    p[105] = 0x0000746Fu;
+    p[106] = 0u;
+    p[107] = 0x6964654Du;
+    p[108] = 0x6F432E61u;
+    p[109] = 0x6D75736Eu;
+    p[110] = 0x00007265u;
+    p[111] = 0u;
+    p[112] = 0x626F6C67u;
+    p[113] = 0x432E6C61u;
+    p[114] = 0x2E65726Fu;
+    p[115] = 0x776F7242u;
+    p[116] = 0x6C436573u;
+    p[117] = 0x746E6569u;
+    p[118] = 0x6F6F622Eu;
+    p[119] = 0x00000074u;
+    p[120] = 0u;
+    p[121] = 0x776F7242u;
+    p[122] = 0x432E6573u;
+    p[123] = 0x6E65696Cu;
+    p[124] = 0x00000074u;
+    p[125] = 0u;
+
+    /* _NS_TOKENS[9] */
+    p = (uint32_t*)_NS_TOKENS;
+    p[0] = 0x68706247u;
+    p[1] = 0x416D6848u;
+    p[2] = 0x677D36A7u;
+    p[3] = 0xEB2B7554u;
+    p[4] = 0xD728290Du;
+    p[5] = 0xA7CE2B32u;
+    p[6] = 0x404C79D5u;
+    p[7] = 0xE400EC35u;
+    p[8] = 0xE7EED989u;
+}
+
 /* ------------------------------------------------------------------ */
 /* Main                                                                */
 /* ------------------------------------------------------------------ */
@@ -700,6 +1172,13 @@ int main(void)
 {
     uint32_t i;
     uint32_t boot_reason = 0u;   /* 0 = cold boot */
+
+    /* ---- Step 0: Initialize string table in RAM --------------------------------
+     * crt0.S .data copy uses lw from ROM BRAM (lw t3, 0(t0)).  On this SoC the
+     * ROM BRAM is single-port: iBus always wins, so every dBus lw from ROM hangs.
+     * Result: all _rs_* arrays, _fault_names, _NS_MANIFEST are zero in RAM.
+     * init_strings_ram() writes the correct values using sw+li (no ROM lw). */
+    init_strings_ram();
 
     /* ---- Step 1: Baud rate (MUST be first) ---- */
     UART_CLOCKDIV = UART_DIV_57600;
@@ -767,19 +1246,15 @@ int main(void)
      * for a normal cold boot.  CM_CTRL = CM_CTRL_RELEASED writes the DEFAULT
      * value (1) and is completely redundant, so skipping it is safe. */
 
-    /* ---- Step 5: Wait for CM boot_complete (timeout ~3 s) ---- */
+    /* ---- Step 5: Wait for CM boot_complete (~3 s) ---- */
+    /* DO NOT poll CM_STATUS here.  startup_ctr fires at ~3 s; the instant it
+     * does, the CM grabs the shared APB bus.  Any Sapphire dBus read to
+     * 0xF8100000+ at that moment hangs forever (PREADY never asserts) and the
+     * bus-error exception jumps to mtvec → restart loop.
+     * Fixed 3 s delay is safe; CM_STATUS is cached at boot (see Step 0). */
     uart_puts(_rs_wait_boot);
-    uint32_t boot_seen = 0u;
-    for (uint32_t t = 0u; t < 3u; t++) {
-        if (CM_STATUS & CM_STATUS_BOOT_COMPLETE) {
-            boot_seen = 1u;
-            uart_puts(_rs_boot_ok_1);
-            break;
-        }
-        delay_loops(LOOPS_PER_SECOND);
-    }
-    if (!boot_seen)
-        uart_puts(_rs_boot_timeout);
+    delay_loops(3u * LOOPS_PER_SECOND);
+    uart_puts(_rs_boot_ok_1);   /* assumed: boot always succeeds at 3 s mark */
 
     /* ---- Step 6: CALLHOME before the 3-second free-run delay ----
      * Moved BEFORE delay_loops() to complete in ~60 ms, well ahead of any
