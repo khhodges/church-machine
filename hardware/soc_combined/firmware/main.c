@@ -661,29 +661,40 @@ int main(void)
     /* ---- Step 1: Baud rate (MUST be first) ---- */
     UART_CLOCKDIV = UART_DIV_57600;
 
+    /* ---- PROBE 1: build letter — BEFORE any CM APB3 access ---------------
+     * FW_BUILD_LETTER is a compile-time constant so uart_putc emits it with
+     * zero ROM loads and no APB3 fence.  This must be the absolute first
+     * output so we can distinguish three failure modes:
+     *
+     *   Nothing at all   → UART broken, or firmware binary not in BRAM
+     *   Letter only      → CM APB3 write (Step 2) hangs the SoC bus
+     *   Letter + '>'     → APB3 OK; hang is later (CM_CTRL or uart_puts fence)
+     *   Letter + '>' + banner → everything working
+     *
+     * uart_putc's 10 000-cycle delay clears whatever stall UART_CLOCKDIV left
+     * on the dBus, so no separate CM APB3 fence is needed here. */
+    uart_putc(FW_BUILD_LETTER);
+
     /* ---- Step 2: CM APB3 register writes (act as APB bus fence) ----
      *
-     * These writes to the CM APB3 slave (0xF8100000) are placed BEFORE the
-     * first uart_puts to serve a dual purpose:
+     * These writes to the CM APB3 slave (0xF8100000) serve a dual purpose:
      *   a) Store the board UID in the APB3 bridge before any CALLHOME output.
      *   b) APB FENCE: a write to the UART CLOCKDIV register (0xF8010008)
      *      leaves the Sapphire SoC dBus in a state where the next lw from
-     *      ROM BRAM hangs.  Performing one or more APB writes to a DIFFERENT
-     *      slave (CM APB3, 0xF8100000) between UART_CLOCKDIV and the first
-     *      ROM read flushes whatever internal state caused the stall.
-     *      Removing these writes causes the first uart_puts lw from ROM to
-     *      hang silently — no output at all.
+     *      ROM BRAM hangs.  Performing APB writes to a DIFFERENT slave
+     *      (CM APB3, 0xF8100000) between UART_CLOCKDIV and the first ROM
+     *      read flushes that stall.  Without these writes the first
+     *      uart_puts ROM lw hangs silently.
      *
      * CM_CTRL_RELEASED is deliberately held back until AFTER the full banner
      * is transmitted — see Step 4. */
     CM_UID_LO = BOARD_UID_LO;
     CM_UID_HI = BOARD_UID_HI;
 
-    /* PROBE: 'Z' via uart_putc (always_inline, immediate value — no ROM read).
-     * If 'Z' appears the fence is working and uart_putc is alive.
-     * If 'C' still appears before 'Z', the 'C' is from an old/stale bitstream. */
-    uart_putc(FW_BUILD_LETTER);  /* cycles each rebuild: Z→A→B→…→Z */
-    /* uart_putc's 10 000-cycle delay clears the BRAM stall — no fence needed */
+    /* PROBE 2: '>' confirms CM APB3 slave (0xF8100000) responded to both UID
+     * writes.  If the build letter arrived but '>' did not, the APB3 bridge
+     * is absent or at a wrong address in this bitstream. */
+    uart_putc('>');
 
     /* ---- Step 3: Boot banner (BEFORE releasing CM core) ----
      *
