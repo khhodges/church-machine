@@ -364,25 +364,21 @@ bash "$SCRIPTS/check_sapphire_patch_fresh.sh" "$SAPPHIRE_V" || {
 }
 echo ""
 
-# ── Pre-MAP: purge symbol bins from $SOC_DIR/ ──────────────────────────────
-# Efinity 2026.1 MAP resolves $readmemb bare filenames relative to the
-# directory containing sapphire.v ($SOC_DIR/).  When old bins are present
-# there from a previous build, MAP embeds them into the VDB even if fresh
-# bins exist in work_syn/.  The result is MIXED BRAM content: some lanes get
-# stale firmware embedded, others get the all-FF placeholder — causing the
-# board to run wrong firmware despite a full rebuild.
+# ── Pre-MAP: symbol bins stay in $SOC_DIR/ ─────────────────────────────────
+# efx_map resolves bare $readmemb filenames relative to the directory
+# containing sapphire.v ($SOC_DIR/).  If they are absent, elaboration fails
+# immediately with VERI-1012 "cannot open file" before any synthesis runs.
 #
-# Correct 2026.1 flow:
-#   1. No bins in $SOC_DIR/ → MAP cannot read them → all 4 lanes → all-FF
-#   2. Step 3b (after MAP) deploys fresh bins to $SOC_DIR/, work_pnr/, outflow/
-#   3. PNR resolves all 4 $readmemb references from the fresh bins → correct firmware
+# Efinity 2026.1 MAP always writes all-FF placeholder INIT values into the
+# VDB regardless of bin content — it does NOT embed the actual bin bytes.
+# PNR is what resolves $readmemb at P&R time and produces the correct
+# bitstream.  Bins therefore need to be present in $SOC_DIR/ for MAP
+# elaboration, but their content during MAP does not affect the bitstream.
 #
-# work_syn/ bins are left in place (they were verified fresh by the Step 2
-# freshness check) so run_efx_map.sh's self-test passes.  The _OBBS_RUN=1
-# env var tells run_efx_map.sh to skip the $SOC_DIR/ freshness check since
-# bins are intentionally absent there during MAP.
-rm -f "$SOC_DIR"/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol*.bin
-_ok "Symbol bins purged from $SOC_DIR/ — MAP will produce all-FF placeholder for all 4 BRAM lanes"
+# Fresh bins were deployed to $SOC_DIR/ and $SOC_DIR/work_syn/ in Step 2
+# and verified fresh by check_sapphire_symbol_bins_fresh.sh.  No purge
+# needed — stale bins cannot sneak in because Step 2 always overwrites them.
+_ok "VDB cache cleared — MAP will perform full synthesis (reads fresh firmware .bin files)"
 echo ""
 
 # ── Step 3: Synthesis (EFX_MAP, Efinity 2026.1) ─────────────────────────────

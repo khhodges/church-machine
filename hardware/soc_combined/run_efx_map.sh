@@ -162,12 +162,12 @@ fi
 # $readmemb bare filenames relative to the DIRECTORY CONTAINING THE SOURCE
 # FILE — i.e. $SOC_DIR/ (where sapphire.v lives), NOT relative to --work_dir.
 #
-# When invoked via build_ti60_bitstream.sh (OBBS): bins are intentionally
-# ABSENT from $SOC_DIR/ during MAP — the OBBS purges them before synthesis so
-# MAP produces all-FF placeholders for all 4 BRAM lanes rather than
-# inconsistently embedding whichever stale bins happen to be on disk.
-# Step 3b of the OBBS deploys fresh bins AFTER MAP for PNR to resolve.
-# work_syn/ bins are still present and verified fresh — check that only.
+# When invoked via build_ti60_bitstream.sh (OBBS): bins are present in
+# $SOC_DIR/ (freshly deployed by OBBS Step 2 and verified by
+# check_sapphire_symbol_bins_fresh.sh) so MAP elaboration succeeds.
+# Efinity 2026.1 MAP writes all-FF INIT placeholder into the VDB regardless
+# of bin content — PNR resolves the actual $readmemb bytes at P&R time.
+# Both $SOC_DIR/ and work_syn/ bins are fresh — check both.
 #
 # When invoked standalone (not via OBBS): check both $SOC_DIR/ and work_syn/.
 if [ -f "$SCRIPT_DIR/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin" ]; then
