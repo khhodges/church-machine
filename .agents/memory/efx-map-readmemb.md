@@ -118,6 +118,36 @@ previous build's $SOC_DIR/ bins). Non-zero INIT_0 guard always passed, masking
 the stale-bins bug. Only confirmed after finding KHURCH in firmware.bin but
 board still outputting 'C' despite 8+ full rebuilds.
 
+## Root cause E: purging bins from $SOC_DIR/ before MAP → VERI-1012 elaboration failure
+
+**Confirmed 2026-07-16:** OBBS had a "pre-MAP purge" step that ran
+`rm -f "$SOC_DIR"/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol*.bin`
+before synthesis to force MAP to produce all-FF placeholder output.
+
+This assumption was wrong on two counts:
+1. efx_map resolves bare `$readmemb` filenames relative to `$SOC_DIR/`
+   (where sapphire.v lives). If the bins are absent, efx_map exits
+   immediately with VERI-1012 "cannot open file" before any synthesis runs.
+2. Efinity 2026.1 MAP produces all-FF VDB placeholder **regardless** of
+   whether the bins are present — removing them is unnecessary.
+
+**Symptom:** `ERROR: cannot open file 'EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin' [VERI-1012]`
+
+**Fix:** Remove the purge entirely. Fresh bins are already deployed to
+$SOC_DIR/ in Step 2 and verified by check_sapphire_symbol_bins_fresh.sh.
+MAP elaborates cleanly; VDB is still all-FF; PNR resolves the correct bytes
+from the same $SOC_DIR/ bins.
+
+## Root cause F: OBBS must run from ~/church-machine (repo root), not $SOC_DIR
+
+bump_build_letter.sh and other OBBS helpers resolve
+`hardware/soc_combined/firmware/build_seq.h` relative to the current working
+directory. Running `bash ~/church-machine/scripts/build_ti60_bitstream.sh`
+from `/root/church_project/SoC/` causes an immediate Step 1 failure:
+`build_seq.h not found at hardware/soc_combined/firmware/build_seq.h`.
+
+**Fix:** always `cd ~/church-machine && bash scripts/build_ti60_bitstream.sh`
+
 ## What does NOT work
 
 | Approach | Result |
@@ -127,6 +157,7 @@ board still outputting 'C' despite 8+ full rebuilds.
 | `$readmemb` with fresh bins only in work_syn/ but stale VDB deleted | ❌ MAP re-synthesises but still reads $SOC_DIR/ |
 | Patching INIT_0 in map.v after synthesis | ❌ PNR reads BRAM from VDB not patched map.v |
 | Post-synthesis INIT_0 content check in map.v (Efinity 2026.1) | ❌ Always all-FF placeholder; use RC=1 only |
+| Purging bins from $SOC_DIR/ before MAP | ❌ VERI-1012 elaboration failure — MAP needs bins there |
 
 ## CM DMEM — no caching issue
 
