@@ -1173,29 +1173,30 @@ int main(void)
     uint32_t i;
     uint32_t boot_reason = 0u;   /* 0 = cold boot */
 
-    /* ---- Step 0: Initialize string table in RAM --------------------------------
-     * crt0.S .data copy uses lw from ROM BRAM (lw t3, 0(t0)).  On this SoC the
-     * ROM BRAM is single-port: iBus always wins, so every dBus lw from ROM hangs.
-     * Result: all _rs_* arrays, _fault_names, _NS_MANIFEST are zero in RAM.
-     * init_strings_ram() writes the correct values using sw+li (no ROM lw). */
-    init_strings_ram();
+    /* ---- Step 0a: 2-second startup window ------------------------------------
+     * openFPGALoader resets the FPGA; the SoC is running within ~1 s.
+     * Give the user time to run 'stty -F /dev/ttyUSB2 57600 raw cs8 && cat'
+     * before any output appears.  delay_loops uses register-only NOP — no
+     * memory, no APB, nothing that can hang. */
+    delay_loops(2u * LOOPS_PER_SECOND);
 
-    /* ---- Step 1: Baud rate (MUST be first) ---- */
+    /* ---- Step 0b: UART baud rate FIRST (before init_strings_ram) ---------- */
     UART_CLOCKDIV = UART_DIV_57600;
 
-    /* ---- PROBE 1: build letter — BEFORE any CM APB3 access ---------------
-     * FW_BUILD_LETTER is a compile-time constant so uart_putc emits it with
-     * zero ROM loads and no APB3 fence.  This must be the absolute first
-     * output so we can distinguish three failure modes:
-     *
-     *   Nothing at all   → UART broken, or firmware binary not in BRAM
-     *   Letter only      → CM APB3 write (Step 2) hangs the SoC bus
-     *   Letter + '>'     → APB3 OK; hang is later (CM_CTRL or uart_puts fence)
-     *   Letter + '>' + banner → everything working
-     *
-     * uart_putc's 10 000-cycle delay clears whatever stall UART_CLOCKDIV left
-     * on the dBus, so no separate CM APB3 fence is needed here. */
+    /* ---- PROBE A: build letter — earliest possible output -----------------
+     * uart_putc uses only immediate constants (no ROM, no RAM string table).
+     * If this character appears, crt0 ran to completion and UART works.
+     * Failure modes:
+     *   Nothing at all  → crt0 hung (bad .data copy) OR wrong firmware in BRAM
+     *   Letter seen     → crt0 OK, UART OK; hang is in init_strings_ram or later
+     *   Letter + '1'    → init_strings_ram returned; hang is in banner/APB */
     uart_putc(FW_BUILD_LETTER);
+
+    /* ---- Step 0c: Initialize string table in RAM --------------------------
+     * crt0.S skips the .data copy (ROM BRAM dBus lw hangs — iBus wins).
+     * init_strings_ram() writes every _rs_* string via sw+li (no ROM reads). */
+    init_strings_ram();
+    uart_putc('1');   /* PROBE B: init_strings_ram returned */
 
     /* ---- Step 2: Store board UID in CM APB3 bridge ----
      *
@@ -1302,7 +1303,11 @@ int main(void)
         uint32_t ti;
         for (ti = 0u; ti < 10u; ti++) {
             delay_loops(LOOPS_PER_SECOND / 10u);
-            trace_buf[trace_idx++] = CM_NIA;
+            /* NOTE: CM_NIA is an APB read.  If CM holds the APB bus after
+             * startup_ctr fires the read stalls forever, silently killing
+             * all subsequent output.  Use a fixed dummy value; the TRACE
+             * record still proves the monitoring loop is alive. */
+            trace_buf[trace_idx++] = 0u;
             uart_poll_command(&force_callhome);
         }
 
