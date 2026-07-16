@@ -6,9 +6,9 @@
  * first character emitted on ttyUSB2 immediately confirms which firmware is
  * running without checking version strings or timestamps.
  *
- * Current letter is 'E' — set for banner debug build.
+ * Current letter is 'G' — RAM-string fix (H after next OBBS bump).
  */
 #ifndef BUILD_SEQ_H
 #define BUILD_SEQ_H
-#define FW_BUILD_LETTER 'E'
+#define FW_BUILD_LETTER 'G'
 #endif

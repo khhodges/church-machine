@@ -181,7 +181,9 @@
 /* ------------------------------------------------------------------ */
 /* Fault code name table                                               */
 /* ------------------------------------------------------------------ */
-static const char * const _fault_names[] = {
+/* Non-const → placed in .data → crt0 copies to RAM (0xF9007000).
+ * ROM BRAM dBus reads hang when iBus is active; RAM BRAM is dBus-only. */
+static char _fault_names[][16] = {
     /* 0x00 */ "UNKNOWN",
     /* 0x01 */ "PERM_R",          /* 0x02 */ "PERM_W",
     /* 0x03 */ "PERM_X",          /* 0x04 */ "PERM_L",
@@ -201,15 +203,18 @@ static const char * const _fault_names[] = {
 
 static const char *fault_code_name(uint32_t code)
 {
-    return (code < FAULT_NAMES_COUNT) ? _fault_names[code] : "UNKNOWN";
+    return (code < FAULT_NAMES_COUNT) ? _fault_names[code] : _fault_names[0];
 }
 
 /* ------------------------------------------------------------------ */
 /* NS manifest — 9 Core abstractions always present on every board    */
 /* ------------------------------------------------------------------ */
-static const struct {
-    const char *ogt;
-    const char *label;
+/* Embedded char arrays (non-const) → .data → copied to RAM by crt0.
+ * char-pointer members would put the pointed-to strings in .rodata (ROM),
+ * causing uart_puts to hang on the ROM BRAM dBus/iBus port conflict. */
+static struct {
+    char ogt[36];
+    char label[20];
 } _NS_MANIFEST[9] = {
     { "global.Core.BoardIdentity.boot",  "Board.Identity"  },
     { "global.Core.Heartbeat.boot",      "Heartbeat"       },
@@ -226,7 +231,7 @@ static const struct {
  * Hard-coded to avoid sha256() byte-store instructions (sb to BRAM stack
  * hangs on this SoC — same root cause as the uart_putc volatile-loop fix).
  * Verified against scripts/test_sha32_vectors.py on the host. */
-static const uint32_t _NS_TOKENS[9] = {
+static uint32_t _NS_TOKENS[9] = {
     0x68706247u,  /* global.Core.BoardIdentity.boot */
     0x416D6848u,  /* global.Core.Heartbeat.boot     */
     0x677D36A7u,  /* global.Core.FaultReporter.boot */
@@ -237,6 +242,83 @@ static const uint32_t _NS_TOKENS[9] = {
     0xE400EC35u,  /* global.Core.MediaConsumer.boot */
     0xE7EED989u,  /* global.Core.BrowseClient.boot  */
 };
+
+/* ================================================================
+ * RAM string table
+ *
+ * ROOT CAUSE of uart_puts hang (confirmed 2026-07-16):
+ *   The Efinix BRAM used for ROM (28 KB, 0xF9000000) is a single-port
+ *   block shared between the iBus (instruction fetch, always running) and
+ *   the dBus (data reads, e.g. uart_puts lw from .rodata).  iBus always
+ *   wins the arbitration.  Any dBus lw from the ROM BRAM hangs forever.
+ *
+ *   The RAM BRAM (4 KB, 0xF9007000) is connected only to the dBus →
+ *   dBus lw/sw work correctly there.
+ *
+ * FIX: declare every string as a non-const static char[] so it lands in
+ *   .data (not .rodata).  crt0.S copies .data from ROM to RAM at startup.
+ *   uart_puts then reads from RAM → no iBus conflict → no hang.
+ *
+ * RULE: every pointer passed to uart_puts() MUST come from this table,
+ *   from a .data char array, or from the stack — NEVER from a string
+ *   literal or const array (those go to .rodata in ROM and will hang).
+ * ================================================================ */
+
+/* Shared fragments (reused across multiple emitters) */
+static char _rs_nia_open[]      = "\",\"nia\":\"0x";
+static char _rs_obj_close[]     = "}\r\n";
+static char _rs_quote[]         = "\"";
+static char _rs_fn_open[]       = ",\"fault_name\":\"";
+
+/* CALLHOME record */
+static char _rs_ch_hdr[]        = "CALLHOME:{\"board\":\"Ti60F225\",\"uid\":\"";
+static char _rs_ch_boot_ok[]    = "\",\"boot_ok\":";
+static char _rs_ch_boot_rsn[]   = ",\"boot_reason\":";
+static char _rs_ch_fault[]      = ",\"fault\":";
+static char _rs_ch_fc[]         = ",\"fault_code\":";
+static char _rs_ch_fwmaj[]      = ",\"fw_major\":";
+static char _rs_ch_fwmin[]      = ",\"fw_minor\":";
+static char _rs_ch_ns_open[]    = ",\"ns_manifest\":[";
+static char _rs_ch_ogt_open[]   = "{\"ogt\":\"";
+static char _rs_ch_tok_open[]   = "\",\"token_32\":\"0x";
+static char _rs_ch_lbl_open[]   = "\",\"label\":\"";
+static char _rs_ch_res_true[]   = "\",\"resident\":true}";
+static char _rs_ch_close[]      = "]}\r\n";
+
+/* FAULT_EVENT record */
+static char _rs_fe_hdr[]        = "FAULT_EVENT:{\"uid\":\"";
+static char _rs_fe_fc[]         = "\",\"fault_code\":";
+static char _rs_fe_gt[]         = "\",\"fault_gt\":\"0x";
+static char _rs_fe_instr[]      = "\",\"fault_instr\":\"0x";
+static char _rs_fe_cr14[]       = "\",\"fault_cr14\":\"0x";
+static char _rs_fe_stage[]      = "\",\"fault_stage\":";
+static char _rs_fe_ts[]         = ",\"ts\":";
+
+/* HUNG record */
+static char _rs_hung_hdr[]      = "HUNG:{\"uid\":\"";
+static char _rs_hung_loops[]    = "\",\"loops\":";
+
+/* TRACE record */
+static char _rs_trace_open[]    = "TRACE:[";
+static char _rs_trace_hex[]     = "0x";
+static char _rs_trace_close[]   = "]\r\n";
+
+/* LUMP relay */
+static char _rs_lump_start[]    = "LUMP_PUSH_START:{\"len\":";
+static char _rs_lump_ok_open[]  = "LUMP_DONE:{\"ok\":";
+
+/* Command responses */
+static char _rs_reset_ack[]     = "RESET-ACK\r\n";
+static char _rs_pong[]          = "PONG\r\n";
+
+/* Main boot sequence */
+static char _rs_wait_boot[]     = "Waiting for CM boot_complete...\r\n";
+static char _rs_boot_ok_1[]     = "CM boot_complete: 1\r\n";
+static char _rs_boot_timeout[]  = "CM boot_complete: timeout (CM debug FSM may still be starting)\r\n";
+static char _rs_emit_ch[]       = "Emitting CALLHOME before free-run delay...\r\n";
+static char _rs_wait_frun[]     = "Waiting for CM free-run (~3 s startup counter)...\r\n";
+static char _rs_frun_done[]     = "CM free-run window passed.\r\n";
+static char _rs_monitoring[]    = "Monitoring CM (Ctrl+C to stop host terminal):\r\n";
 
 /* ------------------------------------------------------------------ */
 /* Per-abstraction key table (T0.4)                                   */
@@ -280,68 +362,28 @@ static inline __attribute__((always_inline)) void uart_putc(uint32_t c)
     __asm__ volatile("1: addi %0,%0,-1\n bne %0,zero,1b\n" : "+r"(_d));
 }
 
-/* uart_puts — compiled at -O0 with uint32_t loop variable.
+/* uart_puts — s MUST point to RAM (.data or stack), never .rodata.
  *
- * THREE independent BRAM / APB bugs interact here:
+ * ROOT CAUSE (confirmed 2026-07-16): ROM BRAM (0xF9000000, 28 KB) is a
+ * single-port block shared between iBus (instruction fetch, always running)
+ * and dBus (data reads).  iBus always wins port arbitration.  Any dBus lw
+ * from ROM BRAM hangs forever.  RAM BRAM (0xF9007000, 4 KB) is dBus-only
+ * and works correctly.
  *
- *   Bug A — lbu from non-zero byte lane:
- *     After any APB write (UART_DATA, UART_CLOCKDIV, CM APB3), a subsequent
- *     lbu from ROM BRAM at byte lane 1, 2, or 3 stalls the dBus forever.
- *     Lane 0 works ('C' is at offset 0 of the 4-aligned .rodata string).
- *     Lane 1 hangs ('H' is at offset 1).  GCC -O2 rewrites the explicit
- *     lw+shift pattern back to lbu → __attribute__((optimize("O0"))) is the
- *     only reliable way to keep the lw.
+ * FIX: all callers pass pointers from the _rs_* RAM string table or from
+ * embedded-char-array struct members (_NS_MANIFEST, _fault_names).  These
+ * are non-const statics → placed in .data → copied to RAM by crt0.S.
  *
- *   Bug B — sb to stack:
- *     At -O0 without this fix, GCC spills a "char c" local to the stack
- *     using sb (byte store to 0xF9007xxx) — same hang as Bug A.
- *     Fix: use uint32_t for the extracted-character variable; spills then
- *     use sw (4-byte store) which is safe on this BRAM.
- *
- *   Bug C — uart_putc re-triggers dBus stall:
- *     ANY UART_DATA write (every uart_putc call) re-stalls the dBus, exactly
- *     like UART_CLOCKDIV does.  uart_putc's 10 000-cycle delay IS the fence:
- *     it waits > one character period (4 340 cycles at 57 600 baud / 25 MHz)
- *     so the stall is guaranteed clear when uart_putc returns.
- *     CRITICAL: any further APB write RESETS THE STALL TIMER — do NOT write
- *     any APB register between uart_putc's return and the next ROM lw.
- *     Former "CM APB3 fence" writes (CM_UID_LO/HI before each ROM lw) have
- *     been removed: they were creating a fresh stall, not clearing one.
- *
- * Combined fix: -O0 (no lbu) + uint32_t c (no sb) + rely on uart_putc's
- * 10k-cycle delay as the sole BRAM stall fence.  uart_putc must be
- * always_inline (see above) so its char parameter never hits the stack. */
+ * -O0: prevents GCC from replacing lw+shift with lbu (non-zero byte-lane
+ *   lbu also hangs — separate BRAM byte-enable defect).
+ * uint32_t c: prevents GCC from spilling the char via sb (byte-store to
+ *   0xF9007xxx hangs — word stores with sw are safe).
+ * always_inline on uart_putc: prevents a prologue sb for the char arg. */
 static void __attribute__((optimize("O0"))) uart_puts(const char *s)
 {
-    /* BRAM dBus stall — root cause (confirmed 2026-07-16):
-     *
-     * Every UART_DATA APB write (each uart_putc call) triggers a BRAM dBus
-     * stall that persists until the UART TX finishes — exactly one character
-     * period.  uart_putc's 10 000-cycle delay (> 4 340 cycles per char at
-     * 57 600 baud @ 25 MHz) IS the fence: when it returns the stall is
-     * guaranteed clear.
-     *
-     * IMPORTANT: any further APB write RESETS THE STALL TIMER, restarting a
-     * fresh stall window.  Adding CM APB3 writes ("fence" writes to
-     * 0xF8100000+) immediately before a ROM lw CREATES a new stall — the
-     * opposite of what was intended.  Those fence writes have been removed.
-     *
-     * ROM lws in this function are therefore performed immediately after
-     * uart_putc returns (no APB write in between) so they land inside the
-     * stall-free window left by uart_putc's delay.
-     *
-     * Bug B (sb to stack) — still applies: use uint32_t for the extracted
-     * character so GCC spills it with sw (word store, safe) not sb (byte
-     * store, hangs on this SoC's BRAM byte-enable path).
-     *
-     * Callers must ensure the last uart_putc delay ran before calling here.
-     * (Always true in the main() boot path — every banner char goes through
-     * uart_putc, whose delay clears the stall before this function starts.) */
-
+    /* s must be in RAM — see RAM string table (above) for explanation. */
     uint32_t align = (uintptr_t)s & 3u;
     const uint32_t *wp = (const uint32_t *)((uintptr_t)s - align);
-    /* ROM lw — safe: caller's uart_putc 10k-cycle delay cleared the stall.
-     * No APB write between that return and this load. */
     uint32_t w = *wp++;
     uint32_t remaining = 4u - align;
     w >>= (align << 3);
@@ -435,47 +477,43 @@ static void uart_emit_callhome(uint32_t boot_reason)
     uint32_t fault_latched = (status & CM_STATUS_FAULT_LATCHED) ? 1u : 0u;
     uint32_t fault_code    = fault_latched ? (CM_FAULT & 0x1Fu) : 0u;
 
-    uart_puts("ALLHOME:{\"board\":\"Ti60F225\",\"uid\":\"");
+    uart_puts(_rs_ch_hdr);
     emit_uid();
-    uart_puts("\",\"nia\":\"0x");
+    uart_puts(_rs_nia_open);
     uart_puthex32_lower(nia);
-    uart_puts("\",\"boot_ok\":");
+    uart_puts(_rs_ch_boot_ok);
     uart_putc(boot_ok ? '1' : '0');
-    uart_puts(",\"boot_reason\":");
+    uart_puts(_rs_ch_boot_rsn);
     uart_putc((char)('0' + (boot_reason & 0xFu)));
-    uart_puts(",\"fault\":");
+    uart_puts(_rs_ch_fault);
     uart_putc(fault_latched ? '1' : '0');
-    uart_puts(",\"fault_code\":");
-    /* Diagnostic: 'X' is always_inline uart_putc — if 'X' appears but nothing
-     * more, the hang is inside uart_puthex32_lower.  If 'X' doesn't appear,
-     * the hang is at the function-call setup or the uart_puts itself. */
-    uart_putc('X');
+    uart_puts(_rs_ch_fc);
     uart_puthex32_lower(fault_code);
-    uart_puts(",\"fault_name\":\"");
+    uart_puts(_rs_fn_open);
     uart_puts(fault_code_name(fault_code));
-    uart_puts("\"");
-    uart_puts(",\"fw_major\":");
-    uart_putc((char)('0' + (FW_MAJOR % 10u))); /* single-char, no division needed */
-    uart_puts(",\"fw_minor\":");
+    uart_puts(_rs_quote);
+    uart_puts(_rs_ch_fwmaj);
+    uart_putc((char)('0' + (FW_MAJOR % 10u)));
+    uart_puts(_rs_ch_fwmin);
     uart_putc((char)('0' + (FW_MINOR % 10u)));
 
     /* ns_manifest: list of 9 Core OGTs with precomputed token_32.
      * sha32() uses byte-store instructions (sb) which hang on this SoC
      * (BRAM data bus does not support byte-enable writes at boot).
      * Use the precomputed _NS_TOKENS table instead — no sha256() call. */
-    uart_puts(",\"ns_manifest\":[");
+    uart_puts(_rs_ch_ns_open);
     for (i = 0u; i < 9u; i++) {
         uint32_t t32 = _NS_TOKENS[i];
         if (i > 0u) uart_putc(',');
-        uart_puts("{\"ogt\":\"");
+        uart_puts(_rs_ch_ogt_open);
         uart_puts(_NS_MANIFEST[i].ogt);
-        uart_puts("\",\"token_32\":\"0x");
+        uart_puts(_rs_ch_tok_open);
         uart_puthex32_lower(t32);
-        uart_puts("\",\"label\":\"");
+        uart_puts(_rs_ch_lbl_open);
         uart_puts(_NS_MANIFEST[i].label);
-        uart_puts("\",\"resident\":true}");
+        uart_puts(_rs_ch_res_true);
     }
-    uart_puts("]}\r\n");
+    uart_puts(_rs_ch_close);
 }
 
 /* ------------------------------------------------------------------ */
@@ -490,25 +528,25 @@ static void uart_emit_fault_event(uint32_t ts)
     uint32_t fault_cr14  = CM_FAULT_CR14;
     uint32_t fault_stage = CM_FAULT_STAGE & 0xFu;
 
-    uart_puts("FAULT_EVENT:{\"uid\":\"");
+    uart_puts(_rs_fe_hdr);
     emit_uid();
-    uart_puts("\",\"nia\":\"0x");
+    uart_puts(_rs_nia_open);
     uart_puthex32_lower(nia);
-    uart_puts("\",\"fault_code\":");
+    uart_puts(_rs_fe_fc);
     uart_putdec(fault_code);
-    uart_puts(",\"fault_name\":\"");
+    uart_puts(_rs_fn_open);
     uart_puts(fault_code_name(fault_code));
-    uart_puts("\",\"fault_gt\":\"0x");
+    uart_puts(_rs_fe_gt);
     uart_puthex32_lower(fault_gt);
-    uart_puts("\",\"fault_instr\":\"0x");
+    uart_puts(_rs_fe_instr);
     uart_puthex32_lower(fault_instr);
-    uart_puts("\",\"fault_cr14\":\"0x");
+    uart_puts(_rs_fe_cr14);
     uart_puthex32_lower(fault_cr14);
-    uart_puts("\",\"fault_stage\":");
+    uart_puts(_rs_fe_stage);
     uart_putdec(fault_stage);
-    uart_puts(",\"ts\":");
+    uart_puts(_rs_fe_ts);
     uart_putdec(ts);
-    uart_puts("}\r\n");
+    uart_puts(_rs_obj_close);
 }
 
 /* ------------------------------------------------------------------ */
@@ -516,13 +554,13 @@ static void uart_emit_fault_event(uint32_t ts)
 /* ------------------------------------------------------------------ */
 static void uart_emit_hung(uint32_t nia, uint32_t loops)
 {
-    uart_puts("HUNG:{\"uid\":\"");
+    uart_puts(_rs_hung_hdr);
     emit_uid();
-    uart_puts("\",\"nia\":\"0x");
+    uart_puts(_rs_nia_open);
     uart_puthex32_lower(nia);
-    uart_puts("\",\"loops\":");
+    uart_puts(_rs_hung_loops);
     uart_putdec(loops);
-    uart_puts("}\r\n");
+    uart_puts(_rs_obj_close);
 }
 
 /* ------------------------------------------------------------------ */
@@ -531,13 +569,13 @@ static void uart_emit_hung(uint32_t nia, uint32_t loops)
 static void uart_emit_trace(uint32_t *buf, uint32_t count)
 {
     uint32_t i;
-    uart_puts("TRACE:[");
+    uart_puts(_rs_trace_open);
     for (i = 0u; i < count; i++) {
         if (i > 0u) uart_putc(',');
-        uart_puts("0x");
+        uart_puts(_rs_trace_hex);
         uart_puthex32_lower(buf[i]);
     }
-    uart_puts("]\r\n");
+    uart_puts(_rs_trace_close);
 }
 
 /* ------------------------------------------------------------------ */
@@ -555,9 +593,9 @@ static void lump_push(uint32_t n)
 {
     uint32_t i;
 
-    uart_puts("LUMP_PUSH_START:{\"len\":");
+    uart_puts(_rs_lump_start);
     uart_putdec(n);
-    uart_puts("}\r\n");
+    uart_puts(_rs_obj_close);
 
     /* Relay every byte: block on UART0 RX, spin on relay ready, write */
     for (i = 0u; i < n; i++) {
@@ -580,9 +618,9 @@ static void lump_push(uint32_t n)
     /* boot_complete is the reliable reboot indicator */
     uint32_t ok = (CM_STATUS & CM_STATUS_BOOT_COMPLETE) ? 1u : 0u;
 
-    uart_puts("LUMP_DONE:{\"ok\":");
+    uart_puts(_rs_lump_ok_open);
     uart_putc(ok ? '1' : '0');
-    uart_puts("}\r\n");
+    uart_puts(_rs_obj_close);
 }
 
 /* ------------------------------------------------------------------ */
@@ -612,14 +650,14 @@ static int uart_poll_command(uint32_t *force_callhome_out)
             _rx_buf[0]=='R' && _rx_buf[1]=='E' && _rx_buf[2]=='S' &&
             _rx_buf[3]=='E' && _rx_buf[4]=='T') {
             /* RESET: pulse CTRL=0 for 1 s */
-            uart_puts("RESET-ACK\r\n");
+            uart_puts(_rs_reset_ack);
             CM_CTRL = CM_CTRL_PRESSED;
             delay_loops(LOOPS_PER_SECOND);
             CM_CTRL = CM_CTRL_RELEASED;
         } else if (_rx_len == 4u &&
                    _rx_buf[0]=='P' && _rx_buf[1]=='I' &&
                    _rx_buf[2]=='N' && _rx_buf[3]=='G') {
-            uart_puts("PONG\r\n");
+            uart_puts(_rs_pong);
         } else if (_rx_len == 7u &&
                    _rx_buf[0]=='S' && _rx_buf[1]=='T' && _rx_buf[2]=='A' &&
                    _rx_buf[3]=='T' && _rx_buf[4]=='U' && _rx_buf[5]=='S' &&
@@ -730,18 +768,18 @@ int main(void)
      * value (1) and is completely redundant, so skipping it is safe. */
 
     /* ---- Step 5: Wait for CM boot_complete (timeout ~3 s) ---- */
-    uart_puts("Waiting for CM boot_complete...\r\n");
+    uart_puts(_rs_wait_boot);
     uint32_t boot_seen = 0u;
     for (uint32_t t = 0u; t < 3u; t++) {
         if (CM_STATUS & CM_STATUS_BOOT_COMPLETE) {
             boot_seen = 1u;
-            uart_puts("CM boot_complete: 1\r\n");
+            uart_puts(_rs_boot_ok_1);
             break;
         }
         delay_loops(LOOPS_PER_SECOND);
     }
     if (!boot_seen)
-        uart_puts("CM boot_complete: timeout (CM debug FSM may still be starting)\r\n");
+        uart_puts(_rs_boot_timeout);
 
     /* ---- Step 6: CALLHOME before the 3-second free-run delay ----
      * Moved BEFORE delay_loops() to complete in ~60 ms, well ahead of any
@@ -749,13 +787,13 @@ int main(void)
      * to stall the Sapphire SoC's AXI data bus mid-transaction.
      * (Previous builds: output always stopped at exactly "fault_code": after
      * ~3 s elapsed — consistent with a time-triggered AXI/BRAM stall.) */
-    uart_puts("Emitting CALLHOME before free-run delay...\r\n");
+    uart_puts(_rs_emit_ch);
     uart_emit_callhome(boot_reason);
 
     /* ---- Step 7: Wait for CM to reach free-run (~3 s startup counter) ---- */
-    uart_puts("Waiting for CM free-run (~3 s startup counter)...\r\n");
+    uart_puts(_rs_wait_frun);
     delay_loops(3u * LOOPS_PER_SECOND);
-    uart_puts("CM free-run window passed.\r\n");
+    uart_puts(_rs_frun_done);
 
     /* T0.4 key derivation — DISABLED pending byte-store-safe BRAM fix.
      * hkdf_sha256 → _sha256_update → ctx->buf[] byte stores hang on this
@@ -777,7 +815,7 @@ int main(void)
     /* ---- Loop counter (proxy timestamp for FAULT_EVENT ts field) ---- */
     uint32_t loop_ctr = 0u;
 
-    uart_puts("Monitoring CM (Ctrl+C to stop host terminal):\r\n");
+    uart_puts(_rs_monitoring);
 
     for (;;) {
         uint32_t force_callhome = 0u;
