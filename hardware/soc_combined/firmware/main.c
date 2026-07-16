@@ -720,6 +720,12 @@ int main(void)
     /* ---- Step 4: Release CM core (APB3 bus now shared with CM) ---- */
     CM_CTRL = CM_CTRL_RELEASED;
 
+    /* PROBE 3: '|' — CM_CTRL write succeeded without hanging.
+     * If banner+UID appear but '|' does not, the CM_CTRL APB3 write itself
+     * is the reset trigger.  If '|' appears but nothing more, the hang is
+     * inside uart_puts (ROM lw or CM APB3 fence after CM release). */
+    uart_putc('|');
+
     /* ---- Step 5: Wait for CM boot_complete (timeout ~3 s) ---- */
     uart_puts("Waiting for CM boot_complete...\r\n");
     uint32_t boot_seen = 0u;
