@@ -717,14 +717,18 @@ int main(void)
     emit_uid();
     uart_putc('\r'); uart_putc('\n');
 
-    /* ---- Step 4: Release CM core (APB3 bus now shared with CM) ---- */
-    CM_CTRL = CM_CTRL_RELEASED;
-
-    /* PROBE 3: '|' — CM_CTRL write succeeded without hanging.
-     * If banner+UID appear but '|' does not, the CM_CTRL APB3 write itself
-     * is the reset trigger.  If '|' appears but nothing more, the hang is
-     * inside uart_puts (ROM lw or CM APB3 fence after CM release). */
-    uart_putc('|');
+    /* ---- Step 4: CM core is already running (cm_pb default = 1 = released).
+     *
+     * DO NOT write CM_CTRL here.  Empirically confirmed: after ~50 uart_putc
+     * calls (the banner + UID output), a write to CM_CTRL (APB3 offset 0x00)
+     * hangs the Sapphire SoC APB bus permanently.  Writes to CM_UID_LO/HI
+     * (offsets +0x10/+0x14) work fine both before and after the banner, but
+     * offset +0x00 causes an unrecoverable APB stall after the banner.
+     *
+     * The CM hardware startup_ctr (~3 s, 75 M cycles) controls when the CM
+     * core begins executing — firmware does not need to write CM_CTRL at all
+     * for a normal cold boot.  CM_CTRL = CM_CTRL_RELEASED writes the DEFAULT
+     * value (1) and is completely redundant, so skipping it is safe. */
 
     /* ---- Step 5: Wait for CM boot_complete (timeout ~3 s) ---- */
     uart_puts("Waiting for CM boot_complete...\r\n");
