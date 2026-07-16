@@ -63,6 +63,16 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
+    proxy: {
+      "/api": "http://localhost:5000",
+      "/report": "http://localhost:5000",
+      "/internal": "http://localhost:5000",
+      "/upload": "http://localhost:5000",
+      "/dl": "http://localhost:5000",
+      "/callhome_bridge.py": "http://localhost:5000",
+      "/local_bridge.py": "http://localhost:5000",
+      "/health": "http://localhost:5000",
+    },
   },
   preview: {
     port,
