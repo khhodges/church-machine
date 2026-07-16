@@ -299,56 +299,61 @@ static inline __attribute__((always_inline)) void uart_putc(uint32_t c)
  *     use sw (4-byte store) which is safe on this BRAM.
  *
  *   Bug C — uart_putc re-triggers dBus stall:
- *     ANY UART_DATA write (i.e. every uart_putc call) re-stalls the dBus
- *     for the next ROM lw, exactly like UART_CLOCKDIV does.  The one-time
- *     CM APB3 fence in main() clears the CLOCKDIV stall but not subsequent
- *     per-character UART writes.  Fix: two CM APB3 writes immediately before
- *     every lw from ROM (no UART write between the fence and the lw).
+ *     ANY UART_DATA write (every uart_putc call) re-stalls the dBus, exactly
+ *     like UART_CLOCKDIV does.  uart_putc's 10 000-cycle delay IS the fence:
+ *     it waits > one character period (4 340 cycles at 57 600 baud / 25 MHz)
+ *     so the stall is guaranteed clear when uart_putc returns.
+ *     CRITICAL: any further APB write RESETS THE STALL TIMER — do NOT write
+ *     any APB register between uart_putc's return and the next ROM lw.
+ *     Former "CM APB3 fence" writes (CM_UID_LO/HI before each ROM lw) have
+ *     been removed: they were creating a fresh stall, not clearing one.
  *
- * Combined fix: -O0 (no lbu) + uint32_t c (no sb) + CM APB3 re-fence before
- * every lw.  uart_putc must be always_inline (see above) so its char
- * parameter never hits the stack.
- *
- * Diagnostic probes (remove after confirmed working):
- *   '!' — emitted by the first uart_putc inside uart_puts; its own UART
- *         write triggers the stall that the following fence then clears.
- *   '@' — emitted after the first lw succeeds; confirms Bug C fix works. */
+ * Combined fix: -O0 (no lbu) + uint32_t c (no sb) + rely on uart_putc's
+ * 10k-cycle delay as the sole BRAM stall fence.  uart_putc must be
+ * always_inline (see above) so its char parameter never hits the stack. */
 static void __attribute__((optimize("O0"))) uart_puts(const char *s)
 {
-    /* BRAM dBus stall — root cause (confirmed 2026-07-15):
+    /* BRAM dBus stall — root cause (confirmed 2026-07-16):
      *
-     * UART_DATA APB writes (every uart_putc) trigger a BRAM dBus stall that
-     * LATCHES and does NOT self-clear on a timer.  Only a CM APB3 bus access
-     * (write to 0xF8100000+) clears the latch.  The 10 000-cycle delay in
-     * uart_putc handles baud timing only — it does NOT clear the stall.
+     * Every UART_DATA APB write (each uart_putc call) triggers a BRAM dBus
+     * stall that persists until the UART TX finishes — exactly one character
+     * period.  uart_putc's 10 000-cycle delay (> 4 340 cycles per char at
+     * 57 600 baud @ 25 MHz) IS the fence: when it returns the stall is
+     * guaranteed clear.
      *
-     * Any ROM lw attempted while the latch is set hangs the CPU permanently.
-     * Stack sw/lw (RAM) and further UART_DATA writes are unaffected by the
-     * BRAM stall — only BRAM (ROM) reads deadlock.
+     * IMPORTANT: any further APB write RESETS THE STALL TIMER, restarting a
+     * fresh stall window.  Adding CM APB3 writes ("fence" writes to
+     * 0xF8100000+) immediately before a ROM lw CREATES a new stall — the
+     * opposite of what was intended.  Those fence writes have been removed.
      *
-     * Fence strategy:
-     *   (a) Entry fence: clear the stall left by the caller's last uart_putc.
-     *   (b) Loop fence: clear the new stall before each ROM word load (*wp++).
+     * ROM lws in this function are therefore performed immediately after
+     * uart_putc returns (no APB write in between) so they land inside the
+     * stall-free window left by uart_putc's delay.
      *
-     * CM_UID_LO / CM_UID_HI are R/W registers — safe to write repeatedly.
-     * The values were already set in main() Step 2; re-writing is idempotent. */
-    CM_UID_LO = BOARD_UID_LO;        /* (a) entry fence — clears caller's stall */
-    CM_UID_HI = BOARD_UID_HI;
+     * Bug B (sb to stack) — still applies: use uint32_t for the extracted
+     * character so GCC spills it with sw (word store, safe) not sb (byte
+     * store, hangs on this SoC's BRAM byte-enable path).
+     *
+     * Callers must ensure the last uart_putc delay ran before calling here.
+     * (Always true in the main() boot path — every banner char goes through
+     * uart_putc, whose delay clears the stall before this function starts.) */
 
     uint32_t align = (uintptr_t)s & 3u;
     const uint32_t *wp = (const uint32_t *)((uintptr_t)s - align);
+    /* ROM lw — safe: caller's uart_putc 10k-cycle delay cleared the stall.
+     * No APB write between that return and this load. */
     uint32_t w = *wp++;
     uint32_t remaining = 4u - align;
     w >>= (align << 3);
     for (;;) {
         uint32_t c = w & 0xFFu;       /* uint32_t: spills as sw not sb */
         if (c == 0u) return;
-        uart_putc(c);                 /* triggers a new BRAM dBus stall latch */
+        uart_putc(c);                 /* 10k-cycle delay clears this stall */
         w >>= 8;
         if (--remaining == 0u) {
-            CM_UID_LO = BOARD_UID_LO; /* (b) loop fence — clears uart_putc stall */
-            CM_UID_HI = BOARD_UID_HI;
-            w = *wp++;                /* ROM lw — safe: latch cleared by fence */
+            /* uart_putc delay cleared the stall — ROM lw is safe directly.
+             * Do NOT write any APB register here: that resets the timer. */
+            w = *wp++;
             remaining = 4u;
         }
     }
@@ -675,19 +680,13 @@ int main(void)
      * on the dBus, so no separate CM APB3 fence is needed here. */
     uart_putc(FW_BUILD_LETTER);
 
-    /* ---- Step 2: CM APB3 register writes (act as APB bus fence) ----
+    /* ---- Step 2: Store board UID in CM APB3 bridge ----
      *
-     * These writes to the CM APB3 slave (0xF8100000) serve a dual purpose:
-     *   a) Store the board UID in the APB3 bridge before any CALLHOME output.
-     *   b) APB FENCE: a write to the UART CLOCKDIV register (0xF8010008)
-     *      leaves the Sapphire SoC dBus in a state where the next lw from
-     *      ROM BRAM hangs.  Performing APB writes to a DIFFERENT slave
-     *      (CM APB3, 0xF8100000) between UART_CLOCKDIV and the first ROM
-     *      read flushes that stall.  Without these writes the first
-     *      uart_puts ROM lw hangs silently.
-     *
-     * CM_CTRL_RELEASED is deliberately held back until AFTER the full banner
-     * is transmitted — see Step 4. */
+     * Write board UID to the CM APB3 slave (0xF8100000) so it is available
+     * to CALLHOME emitters later.  These APB writes DO re-trigger the BRAM
+     * dBus stall timer, but that is harmless: the subsequent PROBE 2
+     * uart_putc('>') and all banner uart_putcs each run their 10 000-cycle
+     * delay which clears the stall before any ROM lw is attempted. */
     CM_UID_LO = BOARD_UID_LO;
     CM_UID_HI = BOARD_UID_HI;
 
