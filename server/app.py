@@ -447,6 +447,7 @@ def api_bitstream_status():
         "ok": True,
         "present": present,
         "built_at": meta.get("built_at"),
+        "build_letter": meta.get("build_letter"),
         "firmware_version": meta.get("firmware_version"),
         "size_bytes": meta.get("size_bytes"),
         "git_sha": meta.get("git_sha"),
