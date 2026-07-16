@@ -1,10 +1,10 @@
 ---
-name: Sapphire BRAM dBus hang — byte-store, lbu, uart_putc timing
-description: Three related dBus hang bugs on Efinix Ti60 Sapphire SoC; any sb, lbu lane 1/2/3, or uart_putc before ROM lw hangs the CPU
+name: Sapphire BRAM dBus hang — byte-store, lbu, uart_putc timing, and -O2 dead-call elimination
+description: Four related dBus/compiler bugs on Efinix Ti60 Sapphire SoC; any sb, lbu lane 1/2/3, uart_putc before ROM lw, or -O2 killing init_strings_ram() call
 ---
 
 ## Rule
-Three distinct bugs can hang the RISC-V dBus on the Efinix Ti60 Sapphire SoC:
+Four distinct bugs affect firmware correctness on the Efinix Ti60 Sapphire SoC:
 
 ### Bug A — lbu from non-zero byte lane
 After any APB write, a subsequent `lbu` from ROM BRAM at byte lane 1, 2, or 3 stalls the dBus. Lane 0 works. GCC -O2 rewrites explicit `lw+shift+mask` to `lbu`, so `__attribute__((optimize("O0")))` is required on any function that reads string literals from ROM.
@@ -63,9 +63,19 @@ static void __attribute__((optimize("O0"))) uart_puts(const char *s)
 - `char buf[N]` local array → GCC emits `sb` → hangs (Bug B, independent)
 - `sb` to any 0xF9007xxx address → hangs (Bug B)
 
+### Bug D — GCC -O2 dead-call elimination of init_strings_ram()
+`init_strings_ram()` writes the same byte values as the `.data` initializers (it is the workaround for crt0's failed ROM dBus copy). At `-O2`, GCC performs intra-TU IPA on this `static` function and determines the call is a no-op (writes identical to already-initialized values), then **eliminates the call entirely**. Result: `.data` stays all-zeros, `uart_puts` sees `\0` on first byte, returns instantly, nothing printed.
+
+**Fix: compile firmware at `-O0`** (Makefile `CFLAGS` flag). `-O0` disables IPA dead-call elimination and constant propagation. The `__attribute__((optimize("O0")))` on individual functions is NOT sufficient — the CALLER (main) at `-O2` removes the call site before entering the callee.
+
+```makefile
+CFLAGS := -march=rv32im -mabi=ilp32 -O0 -nostdlib -ffreestanding ...
+```
+
 ## How to apply
 - `uart_putc`: always use 10 000-cycle register-only asm delay (never 3 000)
 - `uart_puts`: NO fence writes, NO APB writes of any kind
 - Between `uart_putc` and next ROM-reading function: NO APB writes
 - `uart_puthex32_lower`: arithmetic only, no ROM reads — safe after uart_putc
 - All `sb` patterns → still must be avoided (Bug B independent of Bug C)
+- **Firmware Makefile must use `-O0`** — `-O2` silently kills init_strings_ram()

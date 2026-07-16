@@ -25,7 +25,7 @@ OBJCOPY   := $(TOOLCHAIN)/riscv-none-embed-objcopy
 # -B$(TOOLCHAIN): tell collect2 to search the Efinity toolchain bin dir first
 # for auxiliary programs (ld, as, etc.) so riscv-none-embed-ld is used instead
 # of any system riscv64-linux-gnu-ld that may be in PATH.
-CFLAGS := -march=rv32im -mabi=ilp32 -O2 -nostdlib -ffreestanding \
+CFLAGS := -march=rv32im -mabi=ilp32 -O0 -nostdlib -ffreestanding \
           -Wall -Wextra -B$(TOOLCHAIN)
 
 SRCS   := crt0.S main.c
@@ -48,26 +48,26 @@ SYM3 := $(SYM_PREFIX)3.bin
 all: $(TARGET).hex $(SYM0) $(SYM1) $(SYM2) $(SYM3)
 
 $(TARGET).elf: $(SRCS) link.ld
-	$(CC) $(CFLAGS) -T link.ld -o $@ $(SRCS)
+        $(CC) $(CFLAGS) -T link.ld -o $@ $(SRCS)
 
 $(TARGET).bin: $(TARGET).elf
-	$(OBJCOPY) -O binary $< $@
+        $(OBJCOPY) -O binary $< $@
 
 $(TARGET).hex: $(TARGET).bin
-	python3 -c "\
+        python3 -c "\
 import struct, sys; \
 data = open('$(TARGET).bin','rb').read(); \
 pad = (4 - len(data) % 4) % 4; \
 data += b'\x00' * pad; \
 [print(f'{struct.unpack_from(\"<I\",data,i)[0]:08x}') for i in range(0,len(data),4)]" \
-	> $@
+        > $@
 
 # Generate four byte-lane $readmemb files for sapphire.v.
 # Each file has ROM_WORDS lines; each line is an 8-bit binary string.
 # symbol0=bits[7:0], symbol1=bits[15:8], symbol2=bits[23:16], symbol3=bits[31:24]
 # Words beyond the firmware image are zero-padded.
 $(SYM0) $(SYM1) $(SYM2) $(SYM3): $(TARGET).bin
-	python3 -c "\
+        python3 -c "\
 import struct; \
 ROM = $(ROM_WORDS); \
 data = open('$(TARGET).bin','rb').read(); \
@@ -83,5 +83,5 @@ names = ['$(SYM0)','$(SYM1)','$(SYM2)','$(SYM3)']; \
 print(f'Wrote $(ROM_WORDS) words -> 4 symbol files in $(DESTDIR)/')"
 
 clean:
-	rm -f $(TARGET).elf $(TARGET).bin $(TARGET).hex
-	rm -f $(SYM0) $(SYM1) $(SYM2) $(SYM3)
+        rm -f $(TARGET).elf $(TARGET).bin $(TARGET).hex
+        rm -f $(SYM0) $(SYM1) $(SYM2) $(SYM3)
