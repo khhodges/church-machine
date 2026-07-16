@@ -3,7 +3,7 @@
 #
 # Single-command Ti60 F225 bitstream build pipeline.
 # Runs: firmware compile → patch_sapphire_init.py → efx_map → efx_pnr → efx_pgm
-# → copies output to bitstreams/church_ti60_f225.hex and writes a metadata sidecar.
+# → copies output to bitstreams/church_ti60_f225.hex + church_ti60_f225_<letter>.hex and writes a metadata sidecar.
 #
 # Usage (from repo root):
 #   bash scripts/build_ti60_bitstream.sh
@@ -102,6 +102,8 @@ _info "Step 1/8: Build SoC firmware"
 # Advance the build-sequence letter (Z→A→B→…→Z) so the startup probe byte
 # immediately confirms new firmware is running on the board.
 bash "$SCRIPTS/bump_build_letter.sh" || _fail "bump_build_letter.sh failed"
+BUILD_LETTER=$(grep -oP "(?<=#define FW_BUILD_LETTER ')." "$HW/firmware/build_seq.h")
+_info "  Build letter: $BUILD_LETTER  (will be embedded in firmware banner and hex filename)"
 make -C "$HW/firmware" clean 2>&1 | tail -2
 make -C "$HW/firmware" 2>&1 | tee /tmp/build_fw.log | grep -E "gcc|riscv|Wrote|error|Error" | head -20
 SYM0="$HW/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin"
@@ -503,8 +505,10 @@ echo ""
 _info "Step 6/8: Copy output to $BITSTREAMS/"
 mkdir -p "$BITSTREAMS"
 cp "$HEX_SRC" "$BITSTREAMS/church_ti60_f225.hex"
+cp "$HEX_SRC" "$BITSTREAMS/church_ti60_f225_${BUILD_LETTER}.hex"
 if [ -f "$SOC_DIR/outflow/${CIRCUIT}.bit" ]; then
     cp "$SOC_DIR/outflow/${CIRCUIT}.bit" "$BITSTREAMS/church_ti60_f225.bit"
+    cp "$SOC_DIR/outflow/${CIRCUIT}.bit" "$BITSTREAMS/church_ti60_f225_${BUILD_LETTER}.bit"
 fi
 
 # Detect firmware version directly from the #define FW_MAJOR/FW_MINOR lines —
@@ -526,12 +530,14 @@ BUILT_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 cat > "$BITSTREAMS/church_ti60_f225.json" <<ENDJSON
 {
   "built_at": "$BUILT_AT",
+  "build_letter": "$BUILD_LETTER",
   "firmware_version": "$FW_VERSION",
   "size_bytes": $HEX_SIZE
 }
 ENDJSON
 
-_ok "Copied to $BITSTREAMS/church_ti60_f225.hex"
+_ok "Copied to $BITSTREAMS/church_ti60_f225.hex  (canonical)"
+_ok "Copied to $BITSTREAMS/church_ti60_f225_${BUILD_LETTER}.hex  (versioned)"
 _ok "Metadata written to $BITSTREAMS/church_ti60_f225.json"
 echo ""
 
@@ -566,11 +572,12 @@ fi
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  BUILD COMPLETE"
-echo "  Output: $BITSTREAMS/church_ti60_f225.hex"
+echo "  BUILD COMPLETE  (firmware letter: $BUILD_LETTER)"
+echo "  Output: $BITSTREAMS/church_ti60_f225.hex            ← canonical URL"
+echo "  Also:   $BITSTREAMS/church_ti60_f225_${BUILD_LETTER}.hex  ← versioned"
 echo "  Meta:   $BITSTREAMS/church_ti60_f225.json"
 echo ""
 echo "  Good-build commit ritual:"
 echo "    git add bitstreams/"
-echo "    git commit -m \"bitstream: Ti60 $(date -u +%Y-%m-%d)\""
+echo "    git commit -m \"bitstream: Ti60 $(date -u +%Y-%m-%d) build-$BUILD_LETTER\""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
