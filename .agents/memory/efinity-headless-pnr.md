@@ -55,8 +55,10 @@ earlier tool version once produced.
 ## Required env vars (set before any step)
 ```bash
 export EFINITY_HOME=$HOME/efinity/2026.1
-export EFINITY_USER_DIR_INI=$HOME/.efinity   # prevents KeyError in efx_run/efx_run.py
-export EFXPT_HOME=$EFINITY_HOME              # prevents KeyError in efx_run/efx_run.py
+export EFINITY_USER_DIR_INI=$HOME/.efinity_user  # prevents KeyError in efx_run/efx_run.py
+export EFXPT_HOME=$EFINITY_HOME/pt               # must have /pt suffix — bare $EFINITY_HOME silently fails device check
+export EFXPGM_HOME=$EFINITY_HOME/pgm             # prevents KeyError in efx_run_pgm.py (PGM step)
+export PYTHONPATH="$EFINITY_HOME/pt/bin:${PYTHONPATH:-}"  # lets efx_run_pt_unified import device.service
 export PATH=$EFINITY_HOME/bin:$PATH
 export LD_LIBRARY_PATH=$EFINITY_HOME/lib:${LD_LIBRARY_PATH:-}
 mkdir -p $EFINITY_USER_DIR_INI
