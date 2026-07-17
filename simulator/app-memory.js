@@ -2647,41 +2647,187 @@ function updateNamespace() {
     container.innerHTML = html;
 }
 
-// ── NS label click — open full view for the capability at that slot ───────────
-// Priority:
-//   1. Registered abstraction  → Abstractions view (showAbstractionDetail)
-//   2. LUMP in repository      → LUMP browser (_openLumpSource)
-//   3. Fallback                → Memory view at lump base address
+// ── NS label click — dispatch on GT type ──────────────────────────────────────
+// Rule: Inform → lump detail modal (header + c-list + disassembly)
+//       Null / Outform / Abstract → type description panel
 
 function _nsLabelOpen(slotIdx) {
     if (!sim) return;
     const e = sim.readNSEntry(slotIdx);
+    if (!e) { _showNSTypeDescModal(slotIdx, null); return; }
+    if (e.gtType === 1) {
+        _showNSLumpModal(slotIdx, e);
+    } else {
+        _showNSTypeDescModal(slotIdx, e);
+    }
+}
 
-    // 1 — registered abstraction
-    const _reg = (typeof abstractionRegistry !== 'undefined' && abstractionRegistry &&
-                  typeof abstractionRegistry.getAbstraction === 'function')
-        ? abstractionRegistry
-        : (sim.abstractionRegistry && typeof sim.abstractionRegistry.getAbstraction === 'function'
-            ? sim.abstractionRegistry : null);
-    if (_reg && _reg.getAbstraction(slotIdx)) {
-        if (typeof switchView === 'function') switchView('abstractions');
-        if (typeof showAbstractionDetail === 'function') {
-            setTimeout(() => showAbstractionDetail(slotIdx), 60);
+// ── Lump detail modal — Inform entries only ───────────────────────────────────
+function _showNSLumpModal(slotIdx, nsEntry) {
+    const _existingNsModal = document.getElementById('_nsLumpModalOverlay');
+    if (_existingNsModal) _existingNsModal.remove();
+
+    const label = (nsEntry.label || `NS[${slotIdx}]`).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const base  = nsEntry.word0_location;
+
+    const hdrWord = sim.memory ? (sim.memory[base] >>> 0) : 0;
+    const hdr     = (typeof sim.parseLumpHeader === 'function') ? sim.parseLumpHeader(hdrWord) : null;
+
+    const _nsMT = `style="border-collapse:collapse;width:100%;font-size:0.8rem;"`;
+    const _nsTD = `style="padding:3px 8px;border-bottom:1px solid rgba(255,255,255,0.05);"`;
+    const _nsTH = `style="padding:3px 8px;border-bottom:1px solid rgba(200,155,60,0.2);color:#888;font-weight:500;text-align:left;"`;
+
+    let headerHtml = '', clistHtml = '', codeHtml = '', tokenHtml = '';
+
+    if (hdr && hdr.valid) {
+        const { cw, cc, lumpSize } = hdr;
+
+        headerHtml = `<div style="margin-bottom:14px;">
+            <div style="color:#c89b3c;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">LUMP HEADER</div>
+            <table ${_nsMT}>
+                <tr><td ${_nsTD} style="color:#888;">Raw word</td><td ${_nsTD}><code>0x${hdrWord.toString(16).toUpperCase().padStart(8,'0')}</code></td></tr>
+                <tr><td ${_nsTD} style="color:#888;">Magic</td><td ${_nsTD}><code>0x${hdr.magic.toString(16).toUpperCase()}</code> <span style="color:#4ec9b0;">✓ valid</span></td></tr>
+                <tr><td ${_nsTD} style="color:#888;">Code words (cw)</td><td ${_nsTD}>${cw}</td></tr>
+                <tr><td ${_nsTD} style="color:#888;">C-list words (cc)</td><td ${_nsTD}>${cc}</td></tr>
+                <tr><td ${_nsTD} style="color:#888;">Total lump size</td><td ${_nsTD}>${lumpSize} words</td></tr>
+                <tr><td ${_nsTD} style="color:#888;">Base address</td><td ${_nsTD}><code>0x${(base*4).toString(16).toUpperCase().padStart(4,'0')}</code></td></tr>
+            </table></div>`;
+
+        if (cc > 0 && sim.memory) {
+            const clistBase = base + lumpSize - cc;
+            let rows = '';
+            for (let _ci = 0; _ci < cc; _ci++) {
+                const gtw = sim.memory[clistBase + _ci] >>> 0;
+                const parsed = (typeof sim.parseGT === 'function') ? sim.parseGT(gtw) : null;
+                let permStr = '—', nameStr = '(null)', slotStr = '—';
+                if (parsed && gtw !== 0) {
+                    const p = parsed.permissions || {};
+                    permStr = ['R','W','X','E','S','L'].filter(k => p[k]).join('') || '∅';
+                    slotStr = parsed.type === 3 ? '—' : String(parsed.index);
+                    const lbl = (parsed.type !== 3 && sim.nsLabels) ? sim.nsLabels[parsed.index] : null;
+                    nameStr = lbl || (parsed.type === 3 ? '(Abstract)' : `NS[${parsed.index}]`);
+                }
+                rows += `<tr>
+                    <td ${_nsTD} style="color:#888;">${_ci}</td>
+                    <td ${_nsTD}><code style="font-size:0.75rem;">0x${gtw.toString(16).toUpperCase().padStart(8,'0')}</code></td>
+                    <td ${_nsTD} style="color:#888;">${slotStr}</td>
+                    <td ${_nsTD} style="color:#4ec9b0;">${nameStr}</td>
+                    <td ${_nsTD}><span class="ns-perm-chip" style="font-size:0.65rem;">${permStr}</span></td>
+                </tr>`;
+            }
+            clistHtml = `<div style="margin-bottom:14px;">
+                <div style="color:#c89b3c;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">C-LIST (${cc} entries)</div>
+                <table ${_nsMT}>
+                    <thead><tr><th ${_nsTH}>#</th><th ${_nsTH}>GT word</th><th ${_nsTH}>Slot</th><th ${_nsTH}>Name</th><th ${_nsTH}>Perms</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table></div>`;
+        } else {
+            clistHtml = `<div style="margin-bottom:14px;">
+                <div style="color:#c89b3c;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">C-LIST</div>
+                <span style="color:#6b7280;font-size:0.8rem;">cc = 0 — no c-list entries</span></div>`;
         }
-        return;
+
+        if (cw > 0 && sim.memory) {
+            const maxShow = Math.min(cw, 32);
+            let rows2 = '';
+            for (let _ki = 0; _ki < maxShow; _ki++) {
+                const widx = base + 1 + _ki;
+                const w = sim.memory[widx] >>> 0;
+                const dis = (typeof assembler !== 'undefined' && assembler && typeof assembler.disassemble === 'function')
+                    ? assembler.disassemble(w).replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                    : `0x${w.toString(16).toUpperCase().padStart(8,'0')}`;
+                rows2 += `<tr>
+                    <td ${_nsTD} style="color:#888;">${_ki}</td>
+                    <td ${_nsTD} style="color:#555;font-family:monospace;font-size:0.72rem;">+0x${(_ki+1).toString(16)}</td>
+                    <td ${_nsTD}><code style="font-size:0.75rem;">0x${w.toString(16).toUpperCase().padStart(8,'0')}</code></td>
+                    <td ${_nsTD} style="color:#dcdcaa;font-family:monospace;font-size:0.8rem;">${dis}</td>
+                </tr>`;
+            }
+            const truncNote = cw > maxShow ? `<div style="color:#6b7280;font-size:0.75rem;margin-top:4px;">… ${cw - maxShow} more words not shown</div>` : '';
+            codeHtml = `<div style="margin-bottom:14px;">
+                <div style="color:#c89b3c;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">CODE (${cw} words)</div>
+                <table ${_nsMT}>
+                    <thead><tr><th ${_nsTH}>Offset</th><th ${_nsTH}>+word</th><th ${_nsTH}>Word</th><th ${_nsTH}>Disassembly</th></tr></thead>
+                    <tbody>${rows2}</tbody>
+                </table>${truncNote}</div>`;
+        }
+
+        const srcLump = (typeof _findSrcLump === 'function') ? _findSrcLump(slotIdx, nsEntry.label) : null;
+        if (srcLump && srcLump.token) {
+            tokenHtml = `<div style="margin-bottom:12px;display:flex;align-items:center;gap:10px;">
+                <span style="color:#888;font-size:0.78rem;">Token:</span>
+                <code style="color:#c89b3c;">${srcLump.token}</code>
+                <button class="btn btn-xs" onclick="document.getElementById('_nsLumpModalOverlay').remove();_openLumpSource('${srcLump.token}')"
+                    style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);">Open in Repository →</button>
+            </div>`;
+        } else {
+            tokenHtml = `<div style="margin-bottom:12px;color:#6b7280;font-size:0.78rem;">Token: not in library — boot-resident or compiled in-memory</div>`;
+        }
+    } else {
+        const loc = `0x${(base*4).toString(16).toUpperCase().padStart(8,'0')}`;
+        headerHtml = `<div style="margin-bottom:14px;color:#f0a040;">
+            <div style="color:#f0a040;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">HARDWARE MMIO DEVICE</div>
+            <p style="margin:0;color:#ccc;line-height:1.5;">Base address <code>${loc}</code> — this NS entry maps to a hardware register bank, not a software lump. No lump header, c-list, or code words are stored here; the capability is enforced by the hardware address decoder.</p>
+        </div>`;
     }
 
-    // 2 — LUMP in repository
-    const _srcLump = e ? _findSrcLump(slotIdx, e.label) : null;
-    if (_srcLump && _srcLump.token) {
-        _openLumpSource(_srcLump.token);
-        return;
-    }
+    const overlay = document.createElement('div');
+    overlay.id = '_nsLumpModalOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+        <div style="background:#1a1a2e;border:1px solid rgba(200,155,60,0.35);border-radius:10px;padding:20px 24px;max-width:740px;width:95vw;max-height:82vh;overflow-y:auto;position:relative;box-shadow:0 8px 40px rgba(0,0,0,0.6);">
+            <button onclick="document.getElementById('_nsLumpModalOverlay').remove()"
+                style="position:absolute;top:12px;right:16px;background:none;border:none;color:#666;font-size:1.3rem;cursor:pointer;line-height:1;" title="Close (Esc)">&times;</button>
+            <div style="color:#c89b3c;font-weight:700;font-size:1.05rem;margin-bottom:2px;">&#x1F4E6; ${label}</div>
+            <div style="color:#6b7280;font-size:0.76rem;margin-bottom:14px;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:10px;">
+                NS[${slotIdx}] &nbsp;·&nbsp; <span style="color:#4ec9b0;">Inform</span> &nbsp;·&nbsp; physically resident in DMEM
+            </div>
+            ${tokenHtml}${headerHtml}${clistHtml}${codeHtml}
+        </div>`;
 
-    // 3 — fallback: Memory view at lump base
-    if (e && e.word0_location > 0) {
-        jumpToMemory(e.word0_location);
-    }
+    function _nsLumpEsc(ev) { if (ev.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', _nsLumpEsc); } }
+    document.addEventListener('keydown', _nsLumpEsc);
+    overlay.addEventListener('click', ev => { if (ev.target === overlay) { overlay.remove(); document.removeEventListener('keydown', _nsLumpEsc); } });
+    document.body.appendChild(overlay);
+}
+
+// ── Type description modal — Null / Outform / Abstract entries ────────────────
+function _showNSTypeDescModal(slotIdx, nsEntry) {
+    const _existingDesc = document.getElementById('_nsTypeDescModalOverlay');
+    if (_existingDesc) _existingDesc.remove();
+
+    const typeNames = ['NULL','Inform','Outform','Abstract'];
+    const gtType = nsEntry ? (nsEntry.gtType || 0) : 0;
+    const label  = (nsEntry ? (nsEntry.label || `NS[${slotIdx}]`) : `NS[${slotIdx}]`).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const loc    = nsEntry ? `0x${(nsEntry.word0_location*4).toString(16).toUpperCase().padStart(8,'0')}` : '—';
+
+    const descs = {
+        0: { icon: '○', color: '#6b7280', title: 'Empty slot',
+             body: 'No lump is installed at this namespace slot. The entry exists in the table but has no backing lump, c-list, or code. Deploy a compiled abstraction here to make it callable.' },
+        2: { icon: '⇥', color: '#60a5fa', title: 'Output endpoint',
+             body: 'This entry defines an outgoing capability — a firmware download trigger, device binding, or external service reference. The capability system resolves it to a concrete lump at runtime when first accessed (lazy-load). It cannot be entered with a CALL until the lump is fetched and promoted to Inform.' },
+        3: { icon: '◇', color: '#a78bfa', title: 'Advisory capability',
+             body: 'No lump is directly resident here. This entry carries a permission-profile annotation used for authority delegation by the capability system. It is invisible to user-mode LOAD instructions (M-bit gated) and holds no code, no c-list, and no lump header.' },
+    };
+    const d = descs[gtType] || descs[0];
+
+    const overlay = document.createElement('div');
+    overlay.id = '_nsTypeDescModalOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+        <div style="background:#1a1a2e;border:1px solid rgba(107,114,128,0.35);border-radius:10px;padding:20px 24px;max-width:460px;width:90vw;position:relative;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+            <button onclick="document.getElementById('_nsTypeDescModalOverlay').remove()"
+                style="position:absolute;top:12px;right:16px;background:none;border:none;color:#666;font-size:1.3rem;cursor:pointer;line-height:1;" title="Close (Esc)">&times;</button>
+            <div style="color:${d.color};font-weight:700;font-size:1.05rem;margin-bottom:4px;">${d.icon} ${d.title}</div>
+            <div style="color:#6b7280;font-size:0.76rem;margin-bottom:14px;">NS[${slotIdx}] &nbsp;·&nbsp; ${typeNames[gtType] || 'Unknown'} &nbsp;·&nbsp; ${label}</div>
+            <p style="color:#ccc;line-height:1.65;margin:0 0 14px;font-size:0.88rem;">${d.body}</p>
+            <div style="color:#6b7280;font-size:0.76rem;">Base address: <code>${loc}</code></div>
+        </div>`;
+
+    function _nsDescEsc(ev) { if (ev.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', _nsDescEsc); } }
+    document.addEventListener('keydown', _nsDescEsc);
+    overlay.addEventListener('click', ev => { if (ev.target === overlay) { overlay.remove(); document.removeEventListener('keydown', _nsDescEsc); } });
+    document.body.appendChild(overlay);
 }
 
 // ── Memory dump view ──────────────────────────────────────────────────────────
