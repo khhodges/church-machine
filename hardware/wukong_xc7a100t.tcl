@@ -18,14 +18,11 @@
 ##     → Program Device → select church_wukong_xc7a100t.bit
 ##   Option B — Vivado Hardware Manager (batch):
 ##     See the Tcl snippet printed at the end of this script.
-##   Option C — OpenOCD (Linux/macOS):
-##     openocd -f interface/ftdi/digilent_jtag_smt2.cfg \
-##             -f target/xilinx_a100t.cfg \
-##             -c "adapter speed 10000; init; \
-##                 pld load 0 church_wukong_xc7a100t.bit; exit"
+##   Option C — xc3sprog (Chromebook Linux with Platform Cable USB II):
+##     xc3sprog -c xpc -p 0 church_wukong_xc7a100t.bit
 ## ============================================================================
 
-set PART     "xc7a100tfgg676-1"
+set PART     "xc7a100tfgg676-2"
 set TOP      "church_wukong_xc7a100t"
 set PROJ_DIR "./vivado_wukong"
 set JOBS     4

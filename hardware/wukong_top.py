@@ -1,14 +1,14 @@
 """hardware/wukong_top.py — QMTECH Wukong XC7A100T minimal Church Machine top-level
 ======================================================================================
 
-Minimal top-level for the QMTECH Wukong XC7A100T (Artix-7 XC7A100T-1FGG676C).
+Minimal top-level for the QMTECH Wukong Board V3 (Artix-7 XC7A100T-2FGG676C).
 LED blink only — no Ethernet, no UART bridge.  First-flash "is the board alive?" build.
 
-Pin assignments (xc7a100tfgg676-1 / LVCMOS33 — verified from QMTECH Wukong v1.1 schematic):
-  clk    H4   50 MHz oscillator
+Pin assignments (xc7a100tfgg676-2 / LVCMOS33 — verified from QMTECH Wukong Board V3 schematic):
+  clk    E3   50 MHz oscillator
   rst_n  T2   Active-low push button (Switch 0)  — input only, not yet wired to soft reset
-  led[0] J4   User LED D1 (active HIGH)
-  led[1] H6   User LED D2 (active HIGH)
+  led[0] J19  User LED D1 (active HIGH)
+  led[1] H19  User LED D2 (active HIGH)
 
 What you will see:
   Booting  (~microseconds): led[0] solid ON (booting indicator)
@@ -32,7 +32,7 @@ class ChurchWukongXC7A100T(Elaboratable):
     Parameters
     ----------
     clk_freq : int
-        Input clock frequency in Hz.  Default 50 000 000 (50 MHz oscillator at H4).
+        Input clock frequency in Hz.  Default 50 000 000 (50 MHz oscillator at E3).
     baud : int
         Unused — kept for interface parity with gen_rtlil.py.
     sim_mode : bool
@@ -42,9 +42,9 @@ class ChurchWukongXC7A100T(Elaboratable):
 
     Ports
     -----
-    clk    in  50 MHz oscillator (H4)
+    clk    in  50 MHz oscillator (E3)
     rst_n  in  Active-low push button (T2)  — reserved, not yet wired
-    led    out [2] Physical LED outputs (J4, H6), active HIGH
+    led    out [2] Physical LED outputs (J19, H19), active HIGH
     """
 
     def __init__(self, clk_freq=50_000_000, baud=115200, sim_mode=False, build_sig=None):
@@ -52,7 +52,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         self.baud     = baud
         self.sim_mode = sim_mode
 
-        self.clk   = Signal()        # 50 MHz oscillator  (H4)
+        self.clk   = Signal()        # 50 MHz oscillator  (E3)
         self.rst_n = Signal(init=1)  # Active-low button   (T2) — constrained, reserved
 
         self.led = [Signal(name=f"led{i}") for i in range(2)]
@@ -126,8 +126,8 @@ class ChurchWukongXC7A100T(Elaboratable):
         # ── MMIO decode ────────────────────────────────────────────────────────
         # MMIO range: bit[30]=1, bit[31]=0  →  addresses 0x40000000–0x7FFFFFFF
         # Registers (word-addressed, reg = addr[2:6] = bits[5:2]):
-        #   0  LED0_RGB   bits[2:0]={B,G,R}; bit 0 = R → led[0]  (J4)
-        #   1  LED1_RGB   bits[2:0]={B,G,R}; bit 0 = R → led[1]  (H6)
+        #   0  LED0_RGB   bits[2:0]={B,G,R}; bit 0 = R → led[0]  (J19)
+        #   1  LED1_RGB   bits[2:0]={B,G,R}; bit 0 = R → led[1]  (H19)
         #   2  LED2_RGB   (no physical pin on this minimal build)
         #  11  TIMER.TICKS_LO   32-bit free-running counter, low word
         #  12  TIMER.TICKS_HI   32-bit free-running counter, high word
