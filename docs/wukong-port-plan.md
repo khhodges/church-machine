@@ -263,7 +263,7 @@ GMII timing.
 | P1.3 wukong_top.py docstring | ✅ | All old pins removed |
 | P1.4 Verilog generation | ✅ | 6.5 MB, 142k lines, clean |
 | P1.5 Transfer to droplet | ✅ | GitHub sync (6a1d0550) |
-| P1.6 Vivado synth + impl | ☐ | ~20 min |
+| P1.6 Vivado synth + impl | ✅ | WNS=0.000 ns, 12 min |
 | P1.7 Bitstream to Chromebook | ☐ | scp |
 | P1.8 Program board | ☐ | xc3sprog |
 | P1.9 LED behaviour verified | ☐ | Visual check |
