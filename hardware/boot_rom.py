@@ -93,7 +93,7 @@ while len(BOOT_PROGRAM) < 256:
 #   DR1 = 1  ("on" value for DWRITE, set once at startup via IADD)
 #   DR2 = inner delay counter (0..16383)
 #   DR3 = outer delay counter (0..380)
-#   CR3 = LED_DEV capability (loaded from DEMO_CLIST slot 8 via LOAD CR3, CR6[8])
+#   CR3 = LED_DEV capability (loaded from DEMO_CLIST slot 5 via LOAD CR3, CR6[5])
 #
 # Timing (50 MHz):  each ISUB+BRANCH pair = 4 cycles.
 #   inner = 16383 iterations × 4 cycles = 65532 cycles
@@ -131,8 +131,8 @@ while len(BOOT_PROGRAM) < 256:
 # Top-of-loop:                 target=2,  branch at 16 → -14 → 0x7FF2
 
 NUC_PROGRAM = [
-    # 0: load LED_DEV capability into CR3 from c-list slot 8 (via CR6)
-    encode_church(ChurchOpcode.LOAD, CondCode.AL, cr_dst=3, cr_src=6, imm=8),
+    # 0: load LED_DEV capability into CR3 from c-list slot 5 (via CR6)
+    encode_church(ChurchOpcode.LOAD, CondCode.AL, cr_dst=3, cr_src=6, imm=5),
     # 1: DR1 = 1 (DWRITE "on" value)
     encode_turing(TuringOpcode.IADD, CondCode.AL, dr_dst=1, dr_src=0, imm=1),
     # ── LED0 ON phase ──────────────────────────────────────────────────────────
