@@ -246,14 +246,12 @@ class ChurchWukongXC7A100T(Elaboratable):
             m.d.sync += [hb_ctr.eq(0), hb_blink.eq(~hb_blink)]
 
         # ── LED output mux ─────────────────────────────────────────────────────
-        # Pre-boot  → led[0] solid ON (booting), led[1] heartbeat (clock alive)
-        # Post-boot → led[0] follows MMIO reg0 bit0 (NUC_PROGRAM blinks it ~1 Hz)
-        #             led[1] follows MMIO reg1 bit0 | fault_latched
+        # DIAG BUILD: bypass CM, drive LEDs directly from heartbeat counter.
+        # D1 (J19) and D2 (H19) alternate at 1 Hz.  If both blink → clock OK.
+        # Active-HIGH: D1 ON when hb_blink=1.  Active-LOW: D1 ON when hb_blink=0.
         m.d.comb += [
-            self.led[0].eq(Mux(core.boot_complete, mmio_led_reg[0][0], C(1, 1))),
-            self.led[1].eq(Mux(core.boot_complete,
-                               mmio_led_reg[1][0] | fault_latched,
-                               hb_blink)),
+            self.led[0].eq(hb_blink),
+            self.led[1].eq(~hb_blink),
         ]
 
         # ── Boot trigger (16-cycle POR delay then pulse boot_start) ───────────
