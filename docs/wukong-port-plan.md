@@ -275,10 +275,10 @@ Set IOSTANDARD to LVCMOS33. Add `set_input_delay` / `set_output_delay` for GMII 
 | P1.4 Verilog regen | ✅ | 76K lines, 2.6 MB, clean |
 | P1.5 Transfer to droplet | ✅ | scp |
 | P1.6 Diagnostic build | ✅ | Counter blink — M21/G21/G20 hardware confirmed |
-| P1.6 CM build | 🔄 | Vivado running (tmux `vivado_cm` on droplet) |
-| P1.7 Bitstream to Chromebook | ☐ | After CM build completes |
-| P1.8 Program board | ☐ | xc3sprog |
-| P1.9 LED behaviour verified | ☐ | Visual check |
+| P1.6 CM build | ✅ | EXIT_0, write_bitstream complete, 3,826,002 bytes |
+| P1.7 Bitstream to Chromebook | ✅ | `/upload/wukong-bit` → `/dl/wukong-bit` pipeline live |
+| P1.8 Program board | ✅ | xc3sprog confirmed, 30.6 Mbit, 17.9 s |
+| P1.9 LED behaviour verified | ☐ | Awaiting report |
 | P2 UART callhome | ☐ | Skip if no FTDI dongle |
 | P3.1 GMII pin audit | ☐ | Needs schematic |
 | P3.2 gmii_mac.py | ☐ | New file |
