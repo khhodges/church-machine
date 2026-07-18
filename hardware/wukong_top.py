@@ -13,8 +13,16 @@ Pin assignments (xc7a100tfgg676-2 / LVCMOS33 — hardware-confirmed on real boar
 Note: Do NOT use Instance("BUFG") explicitly — Vivado drops it during opt_design for
 SRCC pins in this design.  Use a direct comb assignment so Vivado auto-infers IBUF→BUFG.
 
+BRAM initialisation note:
+  Vivado does not reliably apply Verilog `initial` blocks to inferred BRAM when the
+  Verilog originates from Yosys (the blocks are treated as simulation-only).  To
+  guarantee correct DMEM state before the CM boots, a hardware init sequencer writes
+  every non-zero DMEM word via the write port in the first ~50 cycles after GSR, then
+  pulses boot_start.  The `init=dmem_init` parameter on LibMemory is kept for
+  simulation accuracy only.
+
 What you will see:
-  Booting  (16-cycle POR + boot_start pulse):
+  Booting  (16-cycle POR + ~40 cycle DMEM init):
     led[0] solid ON  (G21 LOW = active-LOW ON = booting indicator)
     led[1] 1 Hz heartbeat blink  (clock alive)
   Running  (NUC_PROGRAM MMIO LED demo):
@@ -93,7 +101,10 @@ class ChurchWukongXC7A100T(Elaboratable):
         ]
 
         # ── Data memory (BRAM, 16 384 × 32-bit = 64 KB) ───────────────────────
-        # Pre-loaded with the boot namespace table + demo c-list, same as Ti60.
+        # init= is used for simulation accuracy only.  On real FPGA hardware the
+        # hw_init sequencer (below) writes every non-zero word via the write port
+        # before boot_start fires — Vivado does not reliably apply Verilog
+        # `initial` blocks to inferred BRAM when the source is Yosys-generated.
         ns_init = list(DEMO_NAMESPACE)
         while len(ns_init) < 255:
             ns_init.append(0)
@@ -125,6 +136,13 @@ class ChurchWukongXC7A100T(Elaboratable):
             abstract_gt=_abstract_gt_word(PERM_MASK_E))
         for _w, _val in enumerate(_selftest_ns):
             dmem_init[SELFTEST_NS_SLOT * 4 + _w] = _val
+
+        # ── Hardware DMEM init table ───────────────────────────────────────────
+        # Every non-zero entry in dmem_init must be written by the hw_init
+        # sequencer before boot_start.  Only non-zero words are written (BRAM
+        # GSR leaves all bits at 0, matching the all-zero default of dmem_init).
+        hw_init_pairs = [(addr, val)
+                         for addr, val in enumerate(dmem_init) if val != 0]
 
         dmem = m.submodules.dmem = LibMemory(
             shape=unsigned(32), depth=16384, init=dmem_init)
@@ -225,6 +243,13 @@ class ChurchWukongXC7A100T(Elaboratable):
         m.d.sync += _dmem_rd_valid_r.eq(core.dmem_rd_en & ~is_mmio)
         m.d.comb += core.dmem_rd_valid.eq(_dmem_rd_valid_r | is_mmio_read)
 
+        # ── hw_init sequencer write path ───────────────────────────────────────
+        # Writes every non-zero DMEM word (one per cycle) before boot_start.
+        # Takes priority over the CPU write path (CPU is idle until boot_complete).
+        hw_init_wr_en   = Signal()
+        hw_init_wr_addr = Signal(14)
+        hw_init_wr_data = Signal(32)
+
         # ── Memory write path ──────────────────────────────────────────────────
         cpu_wr_data = Signal(32)
         cpu_wr_en   = Signal()
@@ -235,11 +260,18 @@ class ChurchWukongXC7A100T(Elaboratable):
         with m.Elif(~is_mmio):
             m.d.comb += [cpu_wr_data.eq(core.dmem_wr_data), cpu_wr_en.eq(core.dmem_wr_en)]
 
-        m.d.comb += [
-            dmem_wr.addr.eq(mem_addr),
-            dmem_wr.data.eq(cpu_wr_data),
-            dmem_wr.en.eq(cpu_wr_en),
-        ]
+        with m.If(hw_init_wr_en):
+            m.d.comb += [
+                dmem_wr.addr.eq(hw_init_wr_addr),
+                dmem_wr.data.eq(hw_init_wr_data),
+                dmem_wr.en.eq(1),
+            ]
+        with m.Else():
+            m.d.comb += [
+                dmem_wr.addr.eq(mem_addr),
+                dmem_wr.data.eq(cpu_wr_data),
+                dmem_wr.en.eq(cpu_wr_en),
+            ]
 
         # ── Core control signals ───────────────────────────────────────────────
         fault_latched = Signal()
@@ -260,14 +292,44 @@ class ChurchWukongXC7A100T(Elaboratable):
         with m.If(hb_ctr == self.clk_freq - 1):
             m.d.sync += [hb_ctr.eq(0), hb_blink.eq(~hb_blink)]
 
-        # ── Boot trigger (16-cycle POR delay then pulse boot_start) ───────────
+        # ── Boot sequence: POR delay → hw_init writes → boot_start ────────────
+        #
+        # Phase 1 (16 cycles): boot_delay counts to 0xF — waits for GSR to
+        #   complete and all FFs to settle at their init values.
+        #
+        # Phase 2 (~N cycles, one per hw_init_pair): hw_init_ctr counts through
+        #   hw_init_pairs, writing each non-zero DMEM word via the write port.
+        #   This bypasses the Vivado BRAM `initial`-block inference problem.
+        #
+        # Phase 3 (1 cycle): boot_start pulsed; boot_triggered latched.
+        #   The LED mux switches to CM-controlled outputs.
+        N_INIT = len(hw_init_pairs)
         boot_delay     = Signal(4, init=0)
+        hw_init_ctr    = Signal(range(N_INIT + 1), init=0)
         boot_triggered = Signal()
+
         with m.If(~boot_triggered):
-            m.d.sync += boot_delay.eq(boot_delay + 1)
-            with m.If(boot_delay == 0xF):
-                m.d.sync += boot_triggered.eq(1)
+            # Phase 1: wait for boot_delay to reach 0xF
+            with m.If(boot_delay < 0xF):
+                m.d.sync += boot_delay.eq(boot_delay + 1)
+
+            # Phase 2: write non-zero DMEM words one per cycle
+            with m.Elif(hw_init_ctr < N_INIT):
+                m.d.sync += hw_init_ctr.eq(hw_init_ctr + 1)
+                m.d.comb += hw_init_wr_en.eq(1)
+                with m.Switch(hw_init_ctr):
+                    for idx, (addr, val) in enumerate(hw_init_pairs):
+                        with m.Case(idx):
+                            m.d.comb += [
+                                hw_init_wr_addr.eq(addr),
+                                hw_init_wr_data.eq(val),
+                            ]
+
+            # Phase 3: all writes done — pulse boot_start and latch boot_triggered
+            with m.Else():
                 m.d.comb += core.boot_start.eq(1)
+                m.d.sync += boot_triggered.eq(1)
+
         with m.Else():
             m.d.comb += core.boot_start.eq(0)
 
