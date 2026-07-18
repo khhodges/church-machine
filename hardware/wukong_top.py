@@ -103,6 +103,14 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         dmem_init[511] = SLIDERULE_LUMP_HEADER
 
+        # Thread.caps[0] → SelfTest E-GT (slot 6); without this the CM faults
+        # immediately on first CALL SelfTest and rapid-boot-loops.
+        dmem_init[125] = 0x4A000006
+        # SelfTest lazy stub at DMEM byte 0x0600 (word 384); NS slot 6 location
+        # points here.  Without this the CM reads 0x00000000 as the lump header,
+        # takes a fault, and loops back to boot indefinitely.
+        dmem_init[384] = 0xF8000000
+
         dmem = m.submodules.dmem = LibMemory(
             shape=unsigned(32), depth=16384, init=dmem_init)
         dmem_rd = dmem.read_port(domain="sync")
