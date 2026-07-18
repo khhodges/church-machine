@@ -34,7 +34,7 @@
 - [Sapphire BRAM byte-store hang](sapphire-bram-byte-store-hang.md) — ANY sb to 0xF9007xxx hangs CPU; sha256.h/hkdf all use sb; precompute tokens or stub; only sw/lw safe in firmware
 - [CM APB3 bus contention](sapphire-bram-lbu-hang.md) — banner MUST be sent before CM_CTRL_RELEASED; CM grabs shared APB bus in ~tens of cycles, stalling SoC mid-UART-write; only first char escapes
 - [top.res.csv wrong sync file](top-res-csv-backslash.md) — Interface Designer writes outflow/<circuit>.interface.csv NOT top.res.csv; top.res.csv is MAP resource report; passing it to efx_pnr crashes "unknown escape sequence" on \t
-- [CM DMEM Thread.caps[0] boot fix](cm-dmem-thread-caps.md) — DMEM word 125 = Thread.caps[0]; must be 0x4A000004 (E-GT→Salvation/NUC_PROGRAM slot 4); CM DMEM patch is now gen_cm_dmem_direct.py, not patch_cm_bram.py
+- [CM DMEM Thread.caps[0] boot fix](cm-dmem-thread-caps.md) — word 125=0x4A000006 (E-GT→slot 6 SelfTest); word 384=0xF8000000 lazy stub; regen: gen_verilog --ti60 then gen_cm_dmem_direct.py build/
 - [OBBS single-patch-location bug class](obbs-single-patch-location.md) — a newer patch step + an un-removed older patch step for the same artifact eventually double-run; make the later step a read-only self-test, not a fallback patch
 - [Ti60 one-button build](ti60-one-button-build.md) — CM DMEM/firmware patches must happen BEFORE synthesis (build_ti60_bitstream.sh, not run_efx_map.sh); patching map.v in PNR is ignored (PNR reads BRAM from top.vdb written by MAP)
 - [Boot namespace architecture rules](boot-namespace-rules.md) — 2 hardwired slots only; namespace liveness rule; authority = Abstract GT not NS entry; 3-layer boot model; SelfTest loop/CALL pattern

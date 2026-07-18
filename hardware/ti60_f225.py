@@ -98,11 +98,22 @@ class ChurchTi60F225(Elaboratable):
             dmem_init.append(0)
 
         dmem_init[511] = SLIDERULE_LUMP_HEADER
-        # Thread.caps[0] must be an E-GT → Salvation (NS slot 4 / NUC_PROGRAM) for
-        # standalone FPGA boot.  Thread lump is at DMEM byte 0x100 (word 64);
-        # caps zone is at byte offset +244 = DMEM word 125.
-        # make_gt(GT_TYPE_INFORM, PERM_MASK_E, slot_id=4, gt_seq=0) = 0x4A000004
-        dmem_init[125] = 0x4A000004
+        # Thread.caps[0]: E-GT → SelfTest (NS slot SELFTEST_NS_SLOT = 6) for CM boot.
+        # Thread lump is at DMEM byte 0x100 (word 64); caps zone is at byte
+        # offset +244 = DMEM word 125.
+        # make_gt(GT_TYPE_INFORM, PERM_MASK_E, slot_id=SELFTEST_NS_SLOT, gt_seq=0) = 0x4A000006
+        # (Was 0x4A000004 = slot 4 = BTN_DEV MMIO — stale from when slot 4 was Salvation/NUC_PROGRAM.)
+        dmem_init[125] = 0x4A000006  # E-GT → NS slot 6 (SelfTest)
+
+        # SelfTest lazy-load stub at DMEM byte 0x0600 (word 384 = 0x0600 / 4).
+        # NS slot 6 word0_location = 0x0600.  On first CALL after boot, the CM reads
+        # this word as the lump header: magic=0x1F (bits 31:27) + cw=0 means
+        # CODE_NOT_RESIDENT → lazy_load_irq asserts → ChurchIRQDispatch looks up
+        # Scheduler.IRQ (NS slot 8) → slot 8 is zero in the 8-slot BRAM namespace →
+        # null_base_fault → FaultType.IRQ_NULL_BASE → Sapphire callhome → IDE serves
+        # real SelfTest lump via PATCH_LUMP → CM retries → SelfTest runs.
+        # Callhome is the lump-fetch transport for the lazy-load path, not a crash handler.
+        dmem_init[384] = 0xF8000000  # DMEM 0x0600: lazy-load stub (magic=0x1F, cw=0)
 
         # depth=16384 (64 KB, 14-bit address) — matches the full boot image size
         # (totalNamespaceWords=16384).  The Ti60 F225 has 256 KB embedded BRAM so
