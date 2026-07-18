@@ -1,36 +1,49 @@
 ---
 name: QMTECH Wukong V3 XC7A100T FGG676 pin assignments
-description: Correct FPGA pin assignments for QMTECH Wukong V3 board — do NOT revert to old wrong pins
+description: Correct FPGA pin assignments for QMTECH Wukong V3 board — hardware-confirmed by counter test and LED behavioral evidence
 ---
 
 # QMTECH Wukong V3 (XC7A100T-2FGG676C) Correct Pins
 
-**Source:** LiteX litex-hub/litex-boards `qmtech_wukong.py` `_io_v3` block — community-verified on real hardware.
+**Source:** Hardware-confirmed on real board via counter-blink diagnostic test.
 
 ## Pin Table
 
 | Signal      | Pin  | Notes |
 |-------------|------|-------|
-| `clk`       | M21  | 50 MHz oscillator, MRCC-capable bank-34 pin |
-| `led[0]`    | G21  | User LED D1 |
-| `led[1]`    | G20  | User LED D2 |
-| `rst_n`     | M6   | Active-low reset button (Key1) |
-| `btn`       | H7   | User button (Key0) |
+| `clk`       | M21  | 50 MHz oscillator, IO_L14P_T2_SRCC_34, bank 34 — **hardware confirmed** |
+| `led[0]`    | G21  | User LED D1, **ACTIVE-LOW** (pin LOW = LED ON) |
+| `led[1]`    | G20  | User LED D2, **ACTIVE-LOW** (pin LOW = LED ON) |
+| `rst_n`     | M6   | Active-low reset button (bank 34) |
 | `serial_tx` | E3   | UART TX — **E3 is NOT a clock pin on this board** |
 | `serial_rx` | F3   | UART RX |
 
 ## Wrong Pins (do not revert)
 
-The design originally used these WRONG assignments:
-- `clk` = E3 (E3 is UART TX on the PCB, wired to a UART transceiver, not the oscillator)
+- `clk` = E3 (E3 is UART TX on PCB), M22 (no oscillator), E3 (no oscillator)
 - `led[0]` = J19 (not connected to any LED on V3)
 - `led[1]` = H19 (not connected to any LED on V3)
 - `rst_n` = T2 (not the reset button on V3)
 
+## Critical Amaranth/Vivado BUFG Trap
+
+**Do NOT use `Instance("BUFG", i_I=self.clk, o_O=ClockSignal("sync"))` in Amaranth for this board.**
+
+Vivado's opt_design silently drops the explicit BUFG (BUFGCTRL: 1→0 from synth→impl), leaving all registers unclocked (counter stays 0, LEDs appear solid). The fix is:
+
+```python
+m.domains += ClockDomain("sync")
+m.d.comb += ClockSignal("sync").eq(self.clk)  # Vivado auto-infers IBUF→BUFG
+```
+
+This auto-infers `clk_IBUF_BUFG_inst` (BUFGCTRL_X0Y0) and keeps it through implementation.
+
+**Why:** With an explicit BUFG driven directly by a top-level port, Vivado inserts an IBUF automatically between the port and the BUFG. The resulting IBUF→BUFG chain is seen as redundant buffering and opt_design removes the explicit BUFG, leaving only the IBUF routing through general interconnect. The auto-inferred chain is NOT dropped because Vivado knows it's load-bearing.
+
 ## Board LED Layout (physical)
 
-- 2 solid LEDs near board edge = power rail indicators (not FPGA-controlled, always on)
-- 2 soft LEDs near FPGA/JTAG = DONE LED + user LEDs at G21/G20
+- 2 solid LEDs near board edge = power rail indicators (always on, not FPGA-controlled)
+- 2 user LEDs near FPGA/JTAG = G21 (led0) and G20 (led1), active-LOW
 
 ## XDC Template
 
@@ -42,4 +55,4 @@ set_property -dict { PACKAGE_PIN G20  IOSTANDARD LVCMOS33 } [get_ports { led1 }]
 set_property -dict { PACKAGE_PIN M6   IOSTANDARD LVCMOS33 } [get_ports { rst_n }];
 ```
 
-**Why:** E3 was mistakenly assumed to be the clock based on it being an SRCC-capable pin in Artix-7, but on the QMTECH Wukong V3 PCB it is routed to a UART transceiver. The 50 MHz oscillator is routed to M21. The LED PCB traces go to G21/G20 (not J19/H19). None of the original pin guesses matched the actual PCB routing.
+No `CLOCK_DEDICATED_ROUTE FALSE` needed — M21 is SRCC and routes through dedicated clock path correctly when Vivado auto-infers the IBUF→BUFG chain.

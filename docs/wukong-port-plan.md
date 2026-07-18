@@ -7,148 +7,156 @@
 
 ---
 
-## V3 Board Facts (locked — LiteX-verified)
+## V3 Board Facts (hardware-confirmed)
 
-Source: `litex-hub/litex-boards` `qmtech_wukong.py` `_io_v3` block, tested on real hardware.
+All pins confirmed on real hardware via counter-blink diagnostic (two LEDs blinking
+at different rates = clock confirmed alive at M21; G21/G20 confirmed as user LEDs).
 
 | Signal  | Pin | Notes                                             |
 |---------|-----|---------------------------------------------------|
-| `clk`   | M21 | 50 MHz oscillator (MRCC-capable, bank 34)         |
-| `led[0]`| G21 | User LED D1                                       |
-| `led[1]`| G20 | User LED D2                                       |
+| `clk`   | M21 | 50 MHz oscillator — IO_L14P_T2_SRCC_34, bank 34 **HARDWARE CONFIRMED** |
+| `led[0]`| G21 | User LED D1 — **ACTIVE-LOW** (FPGA low = LED on) **HARDWARE CONFIRMED** |
+| `led[1]`| G20 | User LED D2 — **ACTIVE-LOW** (FPGA low = LED on) **HARDWARE CONFIRMED** |
 | `rst_n` | M6  | Active-low reset button (Key1)                    |
-| `btn`   | H7  | User button (Key0)                                |
 | `serial_tx` | E3 | UART TX (E3 is **NOT** a clock pin on this board) |
 | `serial_rx` | F3 | UART RX                                       |
 | Part    | `xc7a100tfgg676-2` | Speed grade -2                      |
 | Ethernet| GMII (not RGMII) | RTL8211E-compatible                   |
 
-**Previously wrong pins (J19/H19 for LEDs, E3 for clock, T2 for reset) — do not revert.**
-E3 is wired to a UART transceiver on the PCB, not the 50 MHz oscillator.
+**Previously wrong pins — do not revert:**
+- `clk` = E3 (E3 is UART TX on PCB, not the oscillator), M22 (no oscillator there either)
+- `led[0]` = J19, `led[1]` = H19 (not connected to any LED on V3)
+- `rst_n` = T2 (not the reset button on V3)
 
-The 2 solid LEDs near the board edge = power rail indicators (not FPGA-controlled).
-The 2 soft LEDs near FPGA/JTAG = DONE LED + user LED D1 at G21 (or D1+D2 at G21/G20).
+**Physical LED layout:**
+- 2 solid LEDs near board edge = power rail indicators (always on, not FPGA-controlled)
+- 2 user LEDs near FPGA/JTAG = G21 (led0) and G20 (led1), active-LOW
 
 ---
 
-## Phase 1 — Minimal LED Blink (Toolchain + Hardware Verified)
+## Critical Amaranth + Vivado BUFG Trap
 
-**Goal:** Get `wukong_top.py` (LED-only, no Ethernet) synthesised, placed,
-routed, and running on the physical board. Proves the full build pipeline works
-end-to-end before touching any Ethernet logic.
+**Do NOT use `Instance("BUFG", i_I=self.clk, o_O=ClockSignal("sync"))` in Amaranth.**
 
-### P1.1 — Fix XDC pin assignments for V3
+Vivado's `opt_design` silently drops the explicit BUFG (BUFGCTRL: 1→0 from synth→impl),
+leaving all flip-flops unclocked. The counter stays 0, LEDs appear solid regardless of
+polarity — a clock-dead symptom that looks like a wrong-LED-pin problem.
+
+**Fix:** Use a direct comb assignment so Vivado auto-infers the IBUF→BUFG chain:
+
+```python
+m.domains += ClockDomain("sync")
+m.d.comb += ClockSignal("sync").eq(self.clk)   # Vivado infers IBUF→BUFG_inst
+```
+
+This creates `clk_IBUF_BUFG_inst` (BUFGCTRL_X0Y0) which is NOT dropped by opt_design.
+
+No `CLOCK_DEDICATED_ROUTE FALSE` constraint is needed — M21 is SRCC and routes through
+the dedicated clock path correctly with the auto-inferred chain.
+
+---
+
+## Phase 1 — Minimal LED Blink (COMPLETE ✅)
+
+**Goal:** Prove full build pipeline and confirmed board pins before CM build.
+
+### P1.1 — Fix XDC pin assignments for V3 ✅
 
 **File:** `hardware/wukong_xc7a100t.xdc`
 
-Changes required:
-- Clock pin: `H4` → `E3`
-- `led0` pin: `J4` → `J19`
-- `led1` pin: `H6` → `H19`
-- Part comment: `-1` → `-2`
+Current state (correct):
+```tcl
+set_property -dict { PACKAGE_PIN M21  IOSTANDARD LVCMOS33 } [get_ports { clk }];
+create_clock -add -name sys_clk_pin -period 20.00 -waveform {0 10} [get_ports { clk }];
+set_property -dict { PACKAGE_PIN G21  IOSTANDARD LVCMOS33 } [get_ports { led0 }];
+set_property -dict { PACKAGE_PIN G20  IOSTANDARD LVCMOS33 } [get_ports { led1 }];
+set_property -dict { PACKAGE_PIN M6   IOSTANDARD LVCMOS33 } [get_ports { rst_n }];
+set_false_path -from [get_ports { rst_n }];
+```
 
-**Test:** `grep PACKAGE_PIN hardware/wukong_xc7a100t.xdc` must show `E3`, `J19`, `H19`. No `H4`, `J4`, or `H6` anywhere.
-
-### P1.2 — Fix TCL build script
+### P1.2 — Fix TCL build script ✅
 
 **File:** `hardware/wukong_xc7a100t.tcl`
 
-Changes required:
-- `set PART "xc7a100tfgg676-1"` → `"xc7a100tfgg676-2"`
-- Update LED comments to reference J19 / H19
-- Update programming section to show `xc3sprog` command (not OpenOCD)
-- Add Vivado path note: `/opt/Xilinx/2026.1/Vivado/settings64.sh`
+Part = `xc7a100tfgg676-2`, output = `church_wukong_xc7a100t.bit`.
 
-**Test:** `grep -E "PART|xc3sprog" hardware/wukong_xc7a100t.tcl` shows `-2` and `xc3sprog`.
-
-### P1.3 — Fix wukong_top.py docstring for V3
+### P1.3 — Fix wukong_top.py for V3 + BUFG + active-LOW LEDs ✅
 
 **File:** `hardware/wukong_top.py`
 
-Changes required (docstring only — code has no hardcoded pins):
-- All pin references: H4→E3, J4→J19, H6→H19
-- Part string: `xc7a100tfgg676-1C` → `xc7a100tfgg676-2`
+Key changes confirmed:
+- Removed `Instance("BUFG", ...)` — replaced with `m.d.comb += ClockSignal("sync").eq(self.clk)`
+- Active-LOW LED mux: boot phase = led0 solid ON, led1 heartbeat blink; running = CM MMIO-controlled with invert
+- MMIO comment: G21/G20 pins, ACTIVE-LOW noted
+- `rst_n` declared as port (M6, XDC constrained) but intentionally unconnected to soft reset for now
 
-**Test:** `grep -E "H4|J4|H6|-1FGG" hardware/wukong_top.py` returns nothing.
-
-### P1.4 — Generate Verilog from Amaranth (on Replit)
+### P1.4 — Generate Verilog from Amaranth ✅
 
 **Command:**
 ```bash
 python -m hardware.gen_rtlil --wukong
 ```
 
-**Output:** `build/church_wukong_xc7a100t.v`
+**Output:** `build/church_wukong_xc7a100t.v` — 76,051 lines, 2.6 MB, clean (no $macc/$alu cells).
 
-**Test:** File exists and contains `module church_wukong_xc7a100t`. No Python
-errors or Amaranth warnings about undriven signals.
+### P1.5 — Transfer build files to droplet ✅
 
-### P1.5 — Transfer build files to droplet
-
-**Command (from Replit shell):**
 ```bash
-DROPLET=165.227.190.84
-rsync -avz build/church_wukong_xc7a100t.v \
-           hardware/wukong_xc7a100t.xdc \
-           hardware/wukong_xc7a100t.tcl \
-      root@$DROPLET:~/wukong_build/
+scp build/church_wukong_xc7a100t.v hardware/wukong_xc7a100t.xdc root@165.227.190.84:~/wukong_build/
 ```
 
-**Test:** `ssh root@$DROPLET ls ~/wukong_build/` shows all three files with
-today's timestamp.
+### P1.6 — Synthesise + Implement on droplet (Vivado) ✅ (diagnostic) / 🔄 (CM build running)
 
-### P1.6 — Synthesise + Implement on droplet (Vivado)
+**Diagnostic build (counter blink) — VERIFIED on hardware:**
+- M21 clock alive (both LEDs blinked)
+- G21/G20 are the correct user LED pins
 
-**Command (on droplet, inside tmux):**
+**CM build — in progress (tmux session `vivado_cm`):**
 ```bash
-source /opt/Xilinx/2026.1/Vivado/settings64.sh
 cd ~/wukong_build
-vivado -mode batch -source wukong_xc7a100t.tcl 2>&1 | tee vivado_build.log
+source /opt/Xilinx/2026.1/Vivado/settings64.sh
+vivado -mode batch -source wukong_xc7a100t.tcl > vivado_cm.log 2>&1
 ```
 
-Expected duration: 15–30 min (Artix-7, small design).
+Expected duration: 30–60 min (full CM design, 76K-line Verilog).
 
 **Tests:**
-1. `grep "Synthesis complete\|Implementation complete" vivado_build.log` — both lines present.
-2. `grep "Timing clean\|WNS" vivado_build.log` — WNS ≥ 0.0 ns (must not be negative at 50 MHz).
-3. `ls ~/wukong_build/church_wukong_xc7a100t.bit` — file exists, size ≥ 1 MB.
+1. `grep -E "write_bitstream complete|ERROR" ~/wukong_build/vivado_cm.log` — no ERROR, complete line present.
+2. `grep "WNS" ~/wukong_build/vivado_cm.log` — WNS ≥ 0.0 ns.
+3. `ls -lh ~/wukong_build/church_wukong_xc7a100t.bit` — file updated (newer timestamp than diagnostic build).
 
-**Failure paths:**
-- Synthesis error → check `vivado_wukong/church_wukong_xc7a100t.runs/synth_1/*.log`
-- Timing violation → WNS < 0 is a warning only at 50 MHz; investigate if < −1 ns
+### P1.7 — Transfer bitstream to Chromebook ☐
 
-### P1.7 — Transfer bitstream to Chromebook
-
-**Command (on Chromebook):**
 ```bash
 scp root@165.227.190.84:~/wukong_build/church_wukong_xc7a100t.bit ~/
 ```
 
-**Test:** `ls -lh ~/church_wukong_xc7a100t.bit` shows file present.
+Or fetch from IDE download endpoint: `GET /dl/wukong-bit` (served from `build/church_wukong_xc7a100t.bit`
+after `scp` back to Replit).
 
-### P1.8 — Program the board with xc3sprog
+### P1.8 — Program the board with xc3sprog ☐
 
 **Prerequisites:** Platform Cable USB II plugged into Chromebook, Wukong powered.
 
-**Command (on Chromebook):**
 ```bash
-xc3sprog -c xpc -p 0 ~/church_wukong_xc7a100t.bit
+sudo xc3sprog -c xpc -p 0 -v ~/church_wukong_xc7a100t.bit
 ```
 
-**Tests:**
-1. Command exits 0.
-2. `xc3sprog -c xpc -j` after programming still shows `XA7A100T` (board alive).
+JTAG IDCODE = `0x13631093` (XA7A100T FGG676). Command exits 0.
 
-### P1.9 — Verify LED behaviour on physical board
+### P1.9 — Verify LED behaviour on physical board ☐
 
-| Time         | `led[0]` (J19)          | `led[1]` (H19)         |
-|--------------|-------------------------|------------------------|
-| Boot (~µs)   | Solid ON                | 1 Hz heartbeat blink   |
-| Running      | Blinks ~1 Hz (NUC_PROGRAM LED demo) | Solid OFF |
-| Fault        | Any                     | Solid ON (fault latched) |
+Expected after CM bitstream is flashed:
 
-**Pass criterion:** Observe the boot→running transition within 1–2 seconds of programming.
-If `led[0]` stays solid and `led[1]` keeps blinking indefinitely → boot stalled (check fault path).
+| Time         | `led[0]` (G21)            | `led[1]` (G20)              |
+|--------------|---------------------------|-----------------------------|
+| Boot (~16 cyc POR) | Solid ON (active-LOW driven 0) | 1 Hz heartbeat blink |
+| Running      | CM MMIO reg 0 bit 0 (inverted) | Solid ON (no fault) |
+| Fault        | CM MMIO-controlled        | Solid ON (fault_latched=1 → ~1=0 LOW → ON) |
+
+**Pass:** Boot→running transition within ~1 second of programming.  
+**Fail (clock dead):** Both LEDs solid, no blink ever → M21 not clocking (should not happen — hardware confirmed).  
+**Fail (boot stalled):** led0 solid ON, led1 keeps blinking indefinitely → boot_start never asserted or CM fault at step B:01.
 
 ---
 
@@ -162,20 +170,19 @@ Ethernet proves easier.
 > a 3.3 V FTDI/CP2102 dongle connected to spare FPGA GPIO pins. If no dongle
 > is available, go directly to Phase 3.
 
-### P2.1 — Identify spare GPIO pins for UART TX
+### P2.1 — Identify spare GPIO pins for UART TX ☐
 
 Pick two available LVCMOS33 pins not used by LEDs/clock/button. Candidates
 (from the FGG676 package, IO bank 14/15): document chosen pins here before
 editing XDC.
 
-**Test:** `xc3sprog -c xpc -j` shows board still alive after new XDC applied.
-
-### P2.2 — Add UART TX to wukong_top.py
+### P2.2 — Add UART TX to wukong_top.py ☐
 
 Wire a minimal UART-TX module (reuse `hardware/uart_tx.py`) to the CM UART
 capability. Baud 57600 (matches existing callhome bridge).
 
-**Test:** Connect dongle, run `python server/callhome_bridge.py --port /dev/ttyUSB0 --baud 57600`, observe callhome packet appearing in IDE dashboard within 60 s of power-on.
+**Test:** Connect dongle, run `python server/callhome_bridge.py --port /dev/ttyUSB0 --baud 57600`,
+observe callhome packet appearing in IDE dashboard within 60 s of power-on.
 
 ---
 
@@ -184,16 +191,15 @@ capability. Baud 57600 (matches existing callhome bridge).
 **Goal:** Replace RGMII MAC with GMII, get UDP callhome packet reaching the
 server over Ethernet. This is the proper long-term callhome path for the Wukong.
 
-### P3.1 — Audit V3 Ethernet pins
+### P3.1 — Audit V3 Ethernet pins ☐
 
-The existing `hardware/wukong_xc7a100t.py` docstring lists RGMII pin names
-and `W19` as the 200 MHz clock — both wrong for V3. Audit schematic / confirm
-actual GMII pin assignments and document them here before any code changes.
+The Wukong V3 uses GMII (not RGMII) with an RTL8211E PHY. Audit the schematic
+to confirm actual GMII pin assignments and document them here before any code changes.
 
 **Required pin list:** CLK, TX_CLK, TXD[7:0], TX_EN, TX_ER, RX_CLK, RXD[7:0],
 RX_DV, RX_ER, MDC, MDIO, RSTN.
 
-### P3.2 — Write gmii_mac.py
+### P3.2 — Write gmii_mac.py ☐
 
 Create `hardware/gmii_mac.py` — a GMII MAC that sends periodic UDP callhome
 frames. Derive from `hardware/rgmii_mac.py` but:
@@ -201,27 +207,20 @@ frames. Derive from `hardware/rgmii_mac.py` but:
 - Remove nibble-to-byte conversion (GMII is already 8-bit)
 - Keep ARP reply and UDP TX state machines unchanged
 
-**Test (simulation):** Unit test that drives mock GMII RX with an ARP request
-and checks the module replies with a correct ARP response.
-
-### P3.3 — Update wukong_xc7a100t.py for V3 / GMII
+### P3.3 — Update wukong_xc7a100t.py for V3 / GMII ☐
 
 Changes:
-- MMCM input: `p_CLKIN1_PERIOD = 5.0` (200 MHz) → `20.0` (50 MHz)
-- MMCM multiplier: `CLKFBOUT_MULT_F = 5.0` → `20.0` (VCO = 50 × 20 = 1000 MHz)
-- Port rename: `clk_200mhz` → `clk`
+- MMCM input: `p_CLKIN1_PERIOD = 20.0` (50 MHz input from M21)
+- MMCM multiplier adjusted for 1 GHz VCO target
 - Replace `RgmiiMac` → `GmiiMac`
 - Update XDC with confirmed GMII pin names
 
-**Test (synthesis):** Vivado reports no unconnected ports, timing clean.
-
-### P3.4 — XDC for full Ethernet build
+### P3.4 — XDC for full Ethernet build ☐
 
 Add GMII pin constraints to `wukong_xc7a100t.xdc` (separate `_eth` block).
-Set IOSTANDARD to LVCMOS33. Add `set_input_delay` / `set_output_delay` for
-GMII timing.
+Set IOSTANDARD to LVCMOS33. Add `set_input_delay` / `set_output_delay` for GMII timing.
 
-### P3.5 — End-to-end callhome test
+### P3.5 — End-to-end callhome test ☐
 
 1. Power on Wukong with Ethernet cable plugged into router/switch.
 2. Wait ≤ 60 s.
@@ -233,7 +232,7 @@ GMII timing.
 ## Build Pipeline Quick Reference
 
 ```
-┌─────────────────┐        rsync         ┌────────────────────┐
+┌─────────────────┐        scp           ┌────────────────────┐
 │   Replit        │ ──────────────────→  │   Droplet          │
 │                 │  .v + .xdc + .tcl    │  165.227.190.84    │
 │  gen_rtlil.py  │                       │  Vivado 2026.1     │
@@ -254,12 +253,14 @@ GMII timing.
 | Step | Location | Command |
 |------|----------|---------|
 | Generate Verilog | Replit | `python -m hardware.gen_rtlil --wukong` |
-| Push to droplet | Replit | `rsync -avz build/*.v hardware/wukong*.xdc hardware/wukong*.tcl root@165.227.190.84:~/wukong_build/` |
+| Push to droplet | Replit | `scp build/church_wukong_xc7a100t.v hardware/wukong_xc7a100t.xdc root@165.227.190.84:~/wukong_build/` |
 | Source Vivado | Droplet | `source /opt/Xilinx/2026.1/Vivado/settings64.sh` |
-| Build bitstream | Droplet | `cd ~/wukong_build && vivado -mode batch -source wukong_xc7a100t.tcl` |
-| Fetch bitstream | Chromebook | `scp root@165.227.190.84:~/wukong_build/church_wukong_xc7a100t.bit ~/` |
-| Detect board | Chromebook | `xc3sprog -c xpc -j` |
-| Program board | Chromebook | `xc3sprog -c xpc -p 0 ~/church_wukong_xc7a100t.bit` |
+| Build bitstream | Droplet | `cd ~/wukong_build && tmux new-session -d -s vivado_cm 'vivado -mode batch -source wukong_xc7a100t.tcl > vivado_cm.log 2>&1; echo EXIT_$? >> vivado_cm.log'` |
+| Check progress | Droplet | `tail -5 ~/wukong_build/vivado_cm.log` |
+| Fetch bitstream | Replit | `scp root@165.227.190.84:~/wukong_build/church_wukong_xc7a100t.bit build/` |
+| Detect board | Chromebook | `xc3sprog -c xpc -j` (IDCODE=0x13631093) |
+| Program board | Chromebook | `sudo xc3sprog -c xpc -p 0 -v ~/church_wukong_xc7a100t.bit` |
+| Serve bitstream | IDE | `GET /dl/wukong-bit` (requires board to hit endpoint) |
 
 ---
 
@@ -267,19 +268,21 @@ GMII timing.
 
 | Step | Status | Notes |
 |------|--------|-------|
-| P1.1 XDC pin fix | ✅ | E3, J19, H19, -2 |
-| P1.2 TCL fix | ✅ | Part -2, xc3sprog |
-| P1.3 wukong_top.py docstring | ✅ | All old pins removed |
-| P1.4 Verilog generation | ✅ | 6.5 MB, 142k lines, clean |
-| P1.5 Transfer to droplet | ✅ | GitHub sync (6a1d0550) |
-| P1.6 Vivado synth + impl | ✅ | WNS=0.000 ns, 12 min |
-| P1.7 Bitstream to Chromebook | ☐ | scp |
+| JTAG detect | ✅ | IDCODE 0x13631093, XA7A100T FGG676 |
+| P1.1 XDC pins | ✅ | M21, G21, G20, M6 — HARDWARE CONFIRMED |
+| P1.2 TCL fix | ✅ | Part xc7a100tfgg676-2, xc3sprog |
+| P1.3 wukong_top.py | ✅ | BUFG fix, active-LOW LED mux, M21/G21/G20 |
+| P1.4 Verilog regen | ✅ | 76K lines, 2.6 MB, clean |
+| P1.5 Transfer to droplet | ✅ | scp |
+| P1.6 Diagnostic build | ✅ | Counter blink — M21/G21/G20 hardware confirmed |
+| P1.6 CM build | 🔄 | Vivado running (tmux `vivado_cm` on droplet) |
+| P1.7 Bitstream to Chromebook | ☐ | After CM build completes |
 | P1.8 Program board | ☐ | xc3sprog |
 | P1.9 LED behaviour verified | ☐ | Visual check |
 | P2 UART callhome | ☐ | Skip if no FTDI dongle |
 | P3.1 GMII pin audit | ☐ | Needs schematic |
 | P3.2 gmii_mac.py | ☐ | New file |
-| P3.3 wukong_xc7a100t.py V3 | ☐ | 50MHz MMCM + GMII |
+| P3.3 wukong_xc7a100t.py V3 | ☐ | 50MHz input + GMII |
 | P3.4 XDC Ethernet | ☐ | GMII timing |
 | P3.5 End-to-end callhome | ☐ | IDE dashboard |
 
@@ -289,8 +292,10 @@ GMII timing.
 
 | Risk | Mitigation |
 |------|-----------|
+| Vivado drops explicit BUFG | Never use `Instance("BUFG", ...)` in Amaranth for Vivado; use `m.d.comb += ClockSignal("sync").eq(self.clk)` |
 | V3 Ethernet pins not documented | Audit schematic before P3 — do not guess |
 | GMII timing closure at 100 MHz | Use MMCM (already present), verify WNS ≥ 0 |
 | xc3sprog -c xpc hangs | Replug cable, re-enable in Crostini USB settings |
 | Crostini loses USB device on sleep | `lsusb` to confirm, toggle in Linux settings |
 | Vivado licence expires | BASIC licence valid until 2027-06-27 |
+| rst_n Vivado warning | Intentional — constrained but unconnected, `set_false_path` in XDC silences timing errors |

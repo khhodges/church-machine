@@ -2,19 +2,24 @@
 ======================================================================================
 
 Minimal top-level for the QMTECH Wukong Board V3 (Artix-7 XC7A100T-2FGG676C).
-LED blink only — no Ethernet, no UART bridge.  First-flash "is the board alive?" build.
+LED blink only — no Ethernet, no UART bridge.
 
-Pin assignments (xc7a100tfgg676-2 / LVCMOS33 — verified from QMTECH Wukong Board V3 schematic):
-  clk    E3   50 MHz oscillator
-  rst_n  T2   Active-low push button (Switch 0)  — input only, not yet wired to soft reset
-  led[0] J19  User LED D1 (active HIGH)
-  led[1] H19  User LED D2 (active HIGH)
+Pin assignments (xc7a100tfgg676-2 / LVCMOS33 — hardware-confirmed on real board):
+  clk    M21  50 MHz oscillator (IO_L14P_T2_SRCC_34, bank 34 — confirmed by counter test)
+  rst_n  M6   Active-low push button  — constrained but not wired to soft reset
+  led[0] G21  User LED D1 (ACTIVE-LOW: FPGA drives LOW → LED ON)
+  led[1] G20  User LED D2 (ACTIVE-LOW: FPGA drives LOW → LED ON)
+
+Note: Do NOT use Instance("BUFG") explicitly — Vivado drops it during opt_design for
+SRCC pins in this design.  Use a direct comb assignment so Vivado auto-infers IBUF→BUFG.
 
 What you will see:
-  Booting  (~microseconds): led[0] solid ON (booting indicator)
-                             led[1] 1 Hz heartbeat blink (clock alive)
-  Running  (NUC_PROGRAM):   led[0] blinks at ~1 Hz (boot ROM LED demo, calibrated for 50 MHz)
-                             led[1] solid OFF unless a fault fires (lit = fault latched)
+  Booting  (16-cycle POR + boot_start pulse):
+    led[0] solid ON  (G21 LOW = active-LOW ON = booting indicator)
+    led[1] 1 Hz heartbeat blink  (clock alive)
+  Running  (NUC_PROGRAM MMIO LED demo):
+    led[0] blinks at ~1 Hz via MMIO reg 0 writes (CM-controlled, active-LOW inverted)
+    led[1] solid ON (no fault) or briefly OFF (fault latched — rare)
 """
 
 from amaranth import *
@@ -32,7 +37,7 @@ class ChurchWukongXC7A100T(Elaboratable):
     Parameters
     ----------
     clk_freq : int
-        Input clock frequency in Hz.  Default 50 000 000 (50 MHz oscillator at E3).
+        Input clock frequency in Hz.  Default 50 000 000 (50 MHz oscillator at M21).
     baud : int
         Unused — kept for interface parity with gen_rtlil.py.
     sim_mode : bool
@@ -42,9 +47,9 @@ class ChurchWukongXC7A100T(Elaboratable):
 
     Ports
     -----
-    clk    in  50 MHz oscillator (E3)
-    rst_n  in  Active-low push button (T2)  — reserved, not yet wired
-    led    out [2] Physical LED outputs (J19, H19), active HIGH
+    clk    in  50 MHz oscillator (M21, SRCC bank 34 — hardware confirmed)
+    rst_n  in  Active-low push button (M6)  — reserved, not yet wired
+    led    out [2] Physical LED outputs (G21, G20), ACTIVE-LOW
     """
 
     def __init__(self, clk_freq=50_000_000, baud=115200, sim_mode=False, build_sig=None):
@@ -52,8 +57,8 @@ class ChurchWukongXC7A100T(Elaboratable):
         self.baud     = baud
         self.sim_mode = sim_mode
 
-        self.clk   = Signal()        # 50 MHz oscillator  (E3)
-        self.rst_n = Signal(init=1)  # Active-low button   (T2) — constrained, reserved
+        self.clk   = Signal()        # 50 MHz oscillator  (M21, SRCC bank 34)
+        self.rst_n = Signal(init=1)  # Active-low button   (M6) — constrained, reserved
 
         self.led = [Signal(name=f"led{i}") for i in range(2)]
 
@@ -61,15 +66,12 @@ class ChurchWukongXC7A100T(Elaboratable):
         m = Module()
 
         # ── Sync clock domain ──────────────────────────────────────────────────
-        # Route the 50 MHz oscillator through a Xilinx BUFG so it lands on a
-        # global clock network.  No PLL/MMCM needed at 50 MHz.
+        # Direct assignment — Vivado auto-infers IBUF→BUFG for the M21 SRCC pin.
+        # Do NOT use Instance("BUFG") explicitly: Vivado's opt_design drops the
+        # explicit BUFG for SRCC-sourced clocks, leaving registers without a
+        # global clock buffer.  The auto-inferred chain (clk_IBUF_BUFG) is kept.
         m.domains += ClockDomain("sync")
-
-        m.submodules.bufg = Instance(
-            "BUFG",
-            i_I=self.clk,
-            o_O=ClockSignal("sync"),
-        )
+        m.d.comb += ClockSignal("sync").eq(self.clk)
 
         # Synchronous reset: deassert after 16 cycles so BRAM init settles.
         rst_sr = Signal(4, init=0xF)
@@ -134,8 +136,8 @@ class ChurchWukongXC7A100T(Elaboratable):
         # ── MMIO decode ────────────────────────────────────────────────────────
         # MMIO range: bit[30]=1, bit[31]=0  →  addresses 0x40000000–0x7FFFFFFF
         # Registers (word-addressed, reg = addr[2:6] = bits[5:2]):
-        #   0  LED0_RGB   bits[2:0]={B,G,R}; bit 0 = R → led[0]  (J19)
-        #   1  LED1_RGB   bits[2:0]={B,G,R}; bit 0 = R → led[1]  (H19)
+        #   0  LED0_RGB   bits[2:0]={B,G,R}; bit 0 = R → led[0]  (G21, ACTIVE-LOW)
+        #   1  LED1_RGB   bits[2:0]={B,G,R}; bit 0 = R → led[1]  (G20, ACTIVE-LOW)
         #   2  LED2_RGB   (no physical pin on this minimal build)
         #  11  TIMER.TICKS_LO   32-bit free-running counter, low word
         #  12  TIMER.TICKS_HI   32-bit free-running counter, high word
@@ -245,15 +247,6 @@ class ChurchWukongXC7A100T(Elaboratable):
         with m.If(hb_ctr == self.clk_freq - 1):
             m.d.sync += [hb_ctr.eq(0), hb_blink.eq(~hb_blink)]
 
-        # ── LED output mux ─────────────────────────────────────────────────────
-        # DIAG BUILD: raw counter MSBs — no comparison needed, just free-running.
-        # At 50 MHz: bit25 toggles at ~0.75 Hz, bit24 at ~1.49 Hz.
-        # Both off → clock dead (M21 wrong pin).  Both blinking → clock alive.
-        m.d.comb += [
-            self.led[0].eq(hb_ctr[25]),
-            self.led[1].eq(hb_ctr[24]),
-        ]
-
         # ── Boot trigger (16-cycle POR delay then pulse boot_start) ───────────
         boot_delay     = Signal(4, init=0)
         boot_triggered = Signal()
@@ -264,5 +257,23 @@ class ChurchWukongXC7A100T(Elaboratable):
                 m.d.comb += core.boot_start.eq(1)
         with m.Else():
             m.d.comb += core.boot_start.eq(0)
+
+        # ── LED output mux  (ACTIVE-LOW: output 0 = LED ON, output 1 = LED OFF) ──
+        # Before boot_triggered: led0 solid ON (booting), led1 heartbeat blink.
+        # After  boot_triggered: led0 CM-controlled via MMIO reg 0 (inverted for
+        #   active-LOW), led1 solid ON (no fault) or OFF if fault latched.
+        with m.If(~boot_triggered):
+            m.d.comb += [
+                self.led[0].eq(0),           # LOW → LED ON  (booting indicator)
+                self.led[1].eq(hb_blink),    # blink: LOW=ON / HIGH=OFF at 1 Hz
+            ]
+        with m.Else():
+            m.d.comb += [
+                # CM writes 1-to-light: invert for active-LOW physical LEDs
+                self.led[0].eq(~mmio_led_reg[0][0]),
+                # fault_latched=0 → ~0=1 → HIGH → LED OFF (normal)
+                # fault_latched=1 → ~1=0 → LOW  → LED ON  (fault visible)
+                self.led[1].eq(~fault_latched),
+            ]
 
         return m

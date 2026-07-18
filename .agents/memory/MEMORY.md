@@ -58,4 +58,4 @@
 - [Sapphire BRAM guard false-positive modes](sapphire-bram-guard-false-positive.md) — RC=3 has 2 modes: stale real content (bad) vs all-FF MAP placeholder (2026.1 normal/false-positive); RC=1 (all-zero) is always fatal
 - [GitHub API PUT for cross-repo file delivery](github-api-put-delivery.md) — when git histories diverge, PUT individual files via Contents API from Replit bash ($GITHUB_PAT); droplet uses `git checkout origin/main -- <file>` to receive them
 - [Ti60 firmware update pipeline](ti60-firmware-update-pipeline.md) — PNR-only skips 3 required steps (patch sapphire.v, delete VDB, MAP); must run full OBBS; serve hex from $SOC_DIR/outflow/ not repo bitstreams/ (git pull overwrites)
-- [QMTECH Wukong V3 pinout](wukong-v3-pinout.md) — clk=M21, led=G21/G20, rst=M6; E3 is UART TX not clock; old J19/H19 pins are wrong
+- [QMTECH Wukong V3 pinout + BUFG trap](wukong-v3-pinout.md) — clk=M21 SRCC bank34, led=G21/G20 active-LOW; never use Instance("BUFG") in Amaranth for Vivado — opt_design silently drops it; use direct comb assign so Vivado auto-infers IBUF→BUFG
