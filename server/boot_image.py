@@ -726,20 +726,44 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     # ----- Boot.Abstr lump (NS slot 6 = SelfTest) -------------------------
     # The Boot Abstraction: directly loaded by B:06 (INIT_ABSTR), no director hop.
     #
-    # When 00000600.lump is present (normal case):
-    #   The saved SelfTest lump is loaded.  It has cc=1, cw=17 (64-word allocation).
+    # Resident mode (boot_resident=true, default):
+    #   The saved SelfTest lump body (00000600.lump) is copied into the image at
+    #   boot_entry_loc.  The simulator executes it immediately on first Run.
     #
-    # Fallback (00000600.lump absent): cc=0, cw=NUC_CODE_WORDS=3.
-    #   Word  0:      Lump header (n_minus_6, cw=3, cc=0)
-    #   Words 1–3:    Code region: CHANGE→TPERM→CALL (3 instructions; no LOAD CR15)
-    #   Words 4..end: Freespace (no c-list)
-    #   CHANGE first-activation restores CR0..CR11 from thread caps zone,
-    #   giving CR0 = IDE-chosen E-GT (set by setBootEntrySlot()).
+    # Lazy mode (boot_resident=false in manifest):
+    #   A minimal CODE_NOT_RESIDENT stub header (magic=0x1F, cw=0, cc=0) is written
+    #   at boot_entry_loc.  The simulator detects cw=0 on the first execution attempt
+    #   and triggers a lazy fetch of the canonical SelfTest lump (4c7380cb.lump).
+    #   This mirrors the FPGA BRAM model where the 512-word body does not fit in BRAM
+    #   and only the 64-word stub is stored on-chip.
     boot_entry_loc  = locations[BOOT_ABSTR_NS_SLOT]
     entry_ns_base   = ns_table_base + BOOT_ABSTR_NS_SLOT * NS_ENTRY_WORDS
 
-    if abstr_words is not None:
-        # Saved lump present and validated — copy it directly into the image.
+    # Read manifest to determine whether SelfTest is lazy-load or boot-resident.
+    _mf_path_bi = os.path.join(lumps_dir, "manifest.json")
+    _selftest_lazy = False
+    if os.path.isfile(_mf_path_bi):
+        try:
+            with open(_mf_path_bi) as _mf_bi:
+                for _me in json.load(_mf_bi):
+                    if (isinstance(_me, dict)
+                            and _me.get("ns_slot") == BOOT_ABSTR_NS_SLOT
+                            and _me.get("ns_slot_policy") == "static"
+                            and _me.get("boot_resident") is False):
+                        _selftest_lazy = True
+                        break
+        except Exception:
+            pass
+
+    if _selftest_lazy:
+        # Lazy mode: write CODE_NOT_RESIDENT stub (cw=0).  Simulator lazy-loads the
+        # real lump body on first call; NS entry points here with alloc=64 words.
+        mem[boot_entry_loc] = pack_lump_header(_ns_n_minus_6(actual_abstr_size), 0, 0, 0)
+        entry_cr_limit = actual_abstr_size - 1  # cc=0 stub has no c-list
+        mem[entry_ns_base + 1] = pack_ns_word1(entry_cr_limit, 0, 0, 0, 1, 0)
+        mem[entry_ns_base + 2] = make_version_seals(0, boot_entry_loc, entry_cr_limit)
+    elif abstr_words is not None:
+        # Resident mode: saved lump present and validated — copy body into image.
         # abstr_words was parsed from big-endian disk format into Python ints;
         # writing them into mem[] produces correct little-endian output at pack time.
         for _i, _w in enumerate(abstr_words):
@@ -750,10 +774,10 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         mem[entry_ns_base + 1] = pack_ns_word1(entry_cr_limit, 0, 0, 0, 1, _saved_cc)
         mem[entry_ns_base + 2] = make_version_seals(0, boot_entry_loc, entry_cr_limit)
     else:
-        # No saved lump — the trampoline is eliminated (direct dispatch via CR0).
-        # The real SelfTest lump (00000600.lump) must always be present.
-        # Raise a clear error so the operator knows to generate a boot image with
-        # the SelfTest lump rather than silently producing a broken image.
+        # No saved lump and resident mode required — the trampoline is eliminated
+        # (direct dispatch via CR0).  Raise a clear error so the operator knows to
+        # generate a boot image with the SelfTest lump rather than silently producing
+        # a broken image.
         lump_filename = f"{BOOT_ABSTR_NS_SLOT << 8:08x}.lump"
         raise ValueError(
             f"Boot.Abstr lump '{lump_filename}' not found in lumps directory.\n"

@@ -916,6 +916,11 @@
     border-color: rgba(251, 191, 36, 0.28);
     color: #fbbf24;
 }
+.lump-lazy-chip {
+    background: rgba(99, 200, 160, 0.10);
+    border-color: rgba(99, 200, 160, 0.30);
+    color: #63c8a0;
+}
 
 .lump-hs-label {
     font-size: 0.6rem;

@@ -1,8 +1,9 @@
 {
   "token": "4c7380cb",
   "abstraction": "PostFlashSelftest",
-  "ns_slot": null,
-  "ns_slot_policy": "dynamic",
+  "ns_slot": 6,
+  "ns_slot_policy": "static",
+  "boot_resident": false,
   "lump_size": 512,
   "typ": 0,
   "content_type": "code",

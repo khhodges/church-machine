@@ -1992,7 +1992,7 @@
             "E"
         ],
         "lump_version": 0,
-        "boot_resident": true,
+        "boot_resident": false,
         "source": "simulator/examples/post_flash_selftest.cloomc"
     }
 ]

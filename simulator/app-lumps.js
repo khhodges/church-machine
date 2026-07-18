@@ -46,6 +46,8 @@ function showLumpDetail(token) {
     _headerStrip += `<span class="lump-hs-chip"><span class="lump-hs-label">Token</span>0x${_e(lump.token || '')}</span>`;
     if (lump.ns_slot !== null && lump.ns_slot !== undefined)
         _headerStrip += `<span class="lump-hs-chip"><span class="lump-hs-label">NS</span>${parseInt(lump.ns_slot)}</span>`;
+    if (lump.ns_slot !== null && lump.ns_slot !== undefined && lump.ns_slot_policy === 'static' && lump.boot_resident === false)
+        _headerStrip += `<span class="lump-hs-chip lump-lazy-chip" title="LazyLoad \u2014 NS slot is statically assigned; lump body is fetched on first call (mirrors FPGA BRAM model)">\u29d6 LazyLoad</span>`;
     {
         const _verNum = lump.lump_version != null ? parseInt(lump.lump_version) : null;
         if (_verNum != null)
