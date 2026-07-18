@@ -430,6 +430,34 @@ def upload_ti60_bit():
     return jsonify({"ok": True, "size_bytes": size})
 
 
+@app.route("/upload/wukong-bit", methods=["POST"])
+def upload_wukong_bit():
+    """Accept a new Wukong XC7A100T bitstream upload, save it to build/.
+
+    Usage from Chromebook or droplet:
+      curl -X POST <ide-url>/upload/wukong-bit \
+           -H "Authorization: Bearer <REPORT_TOKEN>" \
+           -F "file=@church_wukong_xc7a100t.bit"
+    """
+    token = os.environ.get("REPORT_TOKEN", "")
+    auth = request.headers.get("Authorization", "")
+    q_token = request.args.get("token", "")
+    if token and auth != f"Bearer {token}" and q_token != token:
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+    if "file" not in request.files:
+        return jsonify({"ok": False, "error": "No file field in request"}), 400
+    f = request.files["file"]
+    if not f.filename:
+        return jsonify({"ok": False, "error": "Empty filename"}), 400
+    build_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "build"))
+    os.makedirs(build_dir, exist_ok=True)
+    bit_path = os.path.join(build_dir, "church_wukong_xc7a100t.bit")
+    f.save(bit_path)
+    size = os.path.getsize(bit_path)
+    app.logger.info("Wukong bit uploaded: %d bytes", size)
+    return jsonify({"ok": True, "size_bytes": size})
+
+
 @app.route("/api/bitstream-status")
 def api_bitstream_status():
     """Return metadata about the pre-built Ti60 hex file for the IDE panel."""
