@@ -134,8 +134,22 @@ class ChurchWukongXC7A100T(Elaboratable):
             GT_TYPE_INFORM, PERM_MASK_E, SELFTEST_NS_SLOT, 0,
             NUC_LUMP_BASE, 64,
             abstract_gt=_abstract_gt_word(PERM_MASK_E))
+        # Patch at byte-0 mirror (used by LOAD CR15, CR15[0] initial read)
         for _w, _val in enumerate(_selftest_ns):
             dmem_init[SELFTEST_NS_SLOT * 4 + _w] = _val
+
+        # ── NS table mirror at NS_TABLE_BASE = 0xFD00 ─────────────────────────
+        # LOAD CR15, CR15[0] reads NS slot 0 at DMEM byte 0 (CR15.word1_location=0
+        # from boot FSM), then updates CR15.word1_location to NS slot 0's location
+        # field = 0xFD00.  The CALL unit then uses CR15.word1_location=0xFD00 as the
+        # NS base for all subsequent GT lookups.  The NS table must therefore ALSO
+        # exist at byte 0xFD00 (word 16192).  Word 16192+32=16224 ≤ 16384 (fits).
+        _NS_WORD_BASE = 0xFD00 // 4   # 16192
+        for _i in range(32):          # 8 slots × 4 words
+            dmem_init[_NS_WORD_BASE + _i] = DEMO_NAMESPACE[_i]
+        # Patch NS slot 6 in the relocated mirror too
+        for _w, _val in enumerate(_selftest_ns):
+            dmem_init[_NS_WORD_BASE + SELFTEST_NS_SLOT * 4 + _w] = _val
 
         # ── Hardware DMEM init table ───────────────────────────────────────────
         # Every non-zero entry in dmem_init must be written by the hw_init
