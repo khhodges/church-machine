@@ -7,18 +7,27 @@
 
 ---
 
-## V3 Board Facts (locked)
+## V3 Board Facts (locked — LiteX-verified)
 
-| Signal  | Pin | Notes                        |
-|---------|-----|------------------------------|
-| `clk`   | E3  | 50 MHz oscillator            |
-| `led[0]`| J19 | User LED D1 (active HIGH)    |
-| `led[1]`| H19 | User LED D2 (active HIGH)    |
-| `rst_n` | T2  | Active-low push button       |
-| Part    | `xc7a100tfgg676-2` | Speed grade -2 |
-| Ethernet| GMII (not RGMII) | RTL8211E-compatible |
+Source: `litex-hub/litex-boards` `qmtech_wukong.py` `_io_v3` block, tested on real hardware.
 
-Factory demo: LEDs alternating = running. Two solid = power+DONE.
+| Signal  | Pin | Notes                                             |
+|---------|-----|---------------------------------------------------|
+| `clk`   | M21 | 50 MHz oscillator (MRCC-capable, bank 34)         |
+| `led[0]`| G21 | User LED D1                                       |
+| `led[1]`| G20 | User LED D2                                       |
+| `rst_n` | M6  | Active-low reset button (Key1)                    |
+| `btn`   | H7  | User button (Key0)                                |
+| `serial_tx` | E3 | UART TX (E3 is **NOT** a clock pin on this board) |
+| `serial_rx` | F3 | UART RX                                       |
+| Part    | `xc7a100tfgg676-2` | Speed grade -2                      |
+| Ethernet| GMII (not RGMII) | RTL8211E-compatible                   |
+
+**Previously wrong pins (J19/H19 for LEDs, E3 for clock, T2 for reset) — do not revert.**
+E3 is wired to a UART transceiver on the PCB, not the 50 MHz oscillator.
+
+The 2 solid LEDs near the board edge = power rail indicators (not FPGA-controlled).
+The 2 soft LEDs near FPGA/JTAG = DONE LED + user LED D1 at G21 (or D1+D2 at G21/G20).
 
 ---
 
