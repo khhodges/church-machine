@@ -182,6 +182,13 @@ def download_wukong_bit():
                      download_name="church_wukong_xc7a100t.bit",
                      mimetype="application/octet-stream")
 
+@app.route("/dl/wukong-verilog")
+def download_wukong_verilog():
+    p = os.path.join(os.path.dirname(__file__), "..", "build", "church_wukong_xc7a100t.v")
+    return send_file(os.path.abspath(p), as_attachment=True,
+                     download_name="church_wukong_xc7a100t.v",
+                     mimetype="text/plain")
+
 @app.route("/dl/ti60v")
 def download_ti60v():
     v_path = os.path.join(os.path.dirname(__file__), "..", "build", "church_ti60_f225.v")

@@ -1,3 +1,4 @@
+- [Amaranth sync-domain self-deadlocking reset](amaranth-sync-reset-deadlock.md) — rst_sr in sync domain driving ResetSignal("sync") locks reset HIGH forever; use reset_less=True + GSR instead
 - [Sapphire ROM BRAM iBus/dBus conflict](sapphire-rom-bram-dbus-hang.md) — ROM BRAM single-port: iBus wins always; any dBus lw from ROM hangs; all firmware strings must be static char[] (.data/RAM)
 - [Boot c-list slot index trap](boot-clist-slot-index.md) — clistGTs[0] is overwritten in-place (not prepended); UART=2, LED=3, BTN=4, TIMER=5 direct from _getHardwareBootCatalog() order
 - [LUMP binary is big-endian](lump-binary-big-endian.md) — raw .lump file words are big-endian; ad-hoc LE reads/writes silently corrupt header/c-list, verify with lump-audit.js

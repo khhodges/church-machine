@@ -70,13 +70,16 @@ class ChurchWukongXC7A100T(Elaboratable):
         # Do NOT use Instance("BUFG") explicitly: Vivado's opt_design drops the
         # explicit BUFG for SRCC-sourced clocks, leaving registers without a
         # global clock buffer.  The auto-inferred chain (clk_IBUF_BUFG) is kept.
-        m.domains += ClockDomain("sync")
+        #
+        # reset_less=True: Artix-7 GSR (Global Set/Reset) fires after bitstream
+        # load and initialises all FFs/BRAMs to their init values before user
+        # logic starts — no soft POR shift-register needed.  A soft rst_sr in
+        # the sync domain that drives ResetSignal("sync") self-deadlocks: under
+        # reset the register is reset to its init value (0xF) every cycle,
+        # keeping reset asserted permanently → boot_triggered never fires →
+        # both LEDs held LOW (active-LOW ON) → 4 solid red forever.
+        m.domains += ClockDomain("sync", reset_less=True)
         m.d.comb += ClockSignal("sync").eq(self.clk)
-
-        # Synchronous reset: deassert after 16 cycles so BRAM init settles.
-        rst_sr = Signal(4, init=0xF)
-        m.d.sync += rst_sr.eq(Cat(C(0, 1), rst_sr[:-1]))
-        m.d.comb += ResetSignal("sync").eq(rst_sr.any())
 
         # ── ChurchCore ─────────────────────────────────────────────────────────
         core = m.submodules.core = ChurchCore()
