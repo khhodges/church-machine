@@ -4,12 +4,14 @@
 ##
 ## Apply with: add_files -fileset constrs_1 wukong_xc7a100t.xdc
 
-## ── System clock (50 MHz, pin M22 = MRCC-capable in FGG676 bank 34) ──────────
-## M21 (V3 per LiteX) has no oscillator on this board; M22 confirmed by counter test.
-set_property -dict { PACKAGE_PIN M22  IOSTANDARD LVCMOS33 } [get_ports { clk }];
+## ── System clock (50 MHz, pin E3 — original design spec) ─────────────────────
+## M21 (LiteX V3) and M22 (LiteX V1) both confirmed dead on this board.
+## E3 was the pin in the original wukong_top.py — testing now with correct LED pins.
+## E3 = IO_L1P_T0_AD4P_35 (bank 35, non-clock-capable) → needs CLOCK_DEDICATED_ROUTE FALSE.
+set_property -dict { PACKAGE_PIN E3   IOSTANDARD LVCMOS33 } [get_ports { clk }];
 create_clock -add -name sys_clk_pin -period 20.00 -waveform {0 10} [get_ports { clk }];
-## CLOCK_DEDICATED_ROUTE FALSE required for M22 — matches LiteX V1 workaround:
-set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets { clk_IBUF }];
+## Use hierarchical wildcard — 'clk_IBUF' net name varies with synthesis; wildcard catches it:
+set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets -hierarchical -filter {NAME =~ *clk*}];
 
 ## ── User LEDs (G21=led0, G20=led1 — V3 verified) ─────────────────────────────
 ## led[0] — D1 (G21):  solid ON while booting, then blinks ~1 Hz after boot
