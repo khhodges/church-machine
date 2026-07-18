@@ -28,7 +28,8 @@ from amaranth.lib.memory import Memory as LibMemory
 from .hw_types import *
 from .core import ChurchCore
 from .boot_rom import (BootRom, FULL_ROM, DEMO_NAMESPACE, DEMO_CLIST,
-                       NUC_LUMP_HEADER, SLIDERULE_LUMP_HEADER, SLIDERULE_SLOT)
+                       NUC_LUMP_HEADER, NUC_LUMP_BASE, SLIDERULE_LUMP_HEADER, SLIDERULE_SLOT,
+                       SELFTEST_NS_SLOT, _make_ns_entry, _abstract_gt_word)
 
 
 class ChurchWukongXC7A100T(Elaboratable):
@@ -108,13 +109,22 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         dmem_init[511] = SLIDERULE_LUMP_HEADER
 
-        # Thread.caps[0] → SelfTest E-GT (slot 6); without this the CM faults
-        # immediately on first CALL SelfTest and rapid-boot-loops.
+        # Thread.caps[0] → SelfTest E-GT (slot 6).
+        # Encoded as make_gt(Inform, E, slot=6): dom=1, perm3=4, gt_type=1 → 0x4A000006.
         dmem_init[125] = 0x4A000006
-        # SelfTest lazy stub at DMEM byte 0x0600 (word 384); NS slot 6 location
-        # points here.  Without this the CM reads 0x00000000 as the lump header,
-        # takes a fault, and loops back to boot indefinitely.
-        dmem_init[384] = 0xF8000000
+
+        # Fix NS slot 6 (SelfTest) location.
+        # DEMO_NAMESPACE generates location = SELFTEST_NS_SLOT * 0x100 = 0x600, which
+        # points to a cw=0 lazy stub → BOUNDS fault on first CALL.
+        # For Wukong standalone (no IDE/SoC loading lumps at runtime), slot 6 must
+        # point to NUC_LUMP_BASE (0x3FC) so CALL reads NUC_LUMP_HEADER (cw=17) at
+        # DMEM word 255 and jumps to NUC_PROGRAM[0] at ROM index 256 (byte 0x400).
+        _selftest_ns = _make_ns_entry(
+            GT_TYPE_INFORM, PERM_MASK_E, SELFTEST_NS_SLOT, 0,
+            NUC_LUMP_BASE, 64,
+            abstract_gt=_abstract_gt_word(PERM_MASK_E))
+        for _w, _val in enumerate(_selftest_ns):
+            dmem_init[SELFTEST_NS_SLOT * 4 + _w] = _val
 
         dmem = m.submodules.dmem = LibMemory(
             shape=unsigned(32), depth=16384, init=dmem_init)
