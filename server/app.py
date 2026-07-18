@@ -175,6 +175,13 @@ def add_cache_control(response):
     response.headers["Permissions-Policy"] = "serial=(self)"
     return response
 
+@app.route("/dl/wukong-bit")
+def download_wukong_bit():
+    p = os.path.join(os.path.dirname(__file__), "..", "build", "church_wukong_xc7a100t.bit")
+    return send_file(os.path.abspath(p), as_attachment=True,
+                     download_name="church_wukong_xc7a100t.bit",
+                     mimetype="application/octet-stream")
+
 @app.route("/dl/ti60v")
 def download_ti60v():
     v_path = os.path.join(os.path.dirname(__file__), "..", "build", "church_ti60_f225.v")
