@@ -4,14 +4,11 @@
 ##
 ## Apply with: add_files -fileset constrs_1 wukong_xc7a100t.xdc
 
-## ── System clock (50 MHz, pin E3 — original design spec) ─────────────────────
-## M21 (LiteX V3) and M22 (LiteX V1) both confirmed dead on this board.
-## E3 was the pin in the original wukong_top.py — testing now with correct LED pins.
-## E3 = IO_L1P_T0_AD4P_35 (bank 35, non-clock-capable) → needs CLOCK_DEDICATED_ROUTE FALSE.
-set_property -dict { PACKAGE_PIN E3   IOSTANDARD LVCMOS33 } [get_ports { clk }];
+## ── System clock — M21 re-test with minimal Verilog (no Amaranth BUFG) ────────
+## M21 = IO_L14P_T2_SRCC_34 (bank 34, SRCC-capable → dedicated clock routing OK)
+## Re-testing because previous builds had BUFG optimized away by Vivado.
+set_property -dict { PACKAGE_PIN M21  IOSTANDARD LVCMOS33 } [get_ports { clk }];
 create_clock -add -name sys_clk_pin -period 20.00 -waveform {0 10} [get_ports { clk }];
-## Use hierarchical wildcard — 'clk_IBUF' net name varies with synthesis; wildcard catches it:
-set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets -hierarchical -filter {NAME =~ *clk*}];
 
 ## ── User LEDs (G21=led0, G20=led1 — V3 verified) ─────────────────────────────
 ## led[0] — D1 (G21):  solid ON while booting, then blinks ~1 Hz after boot
