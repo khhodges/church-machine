@@ -4,9 +4,11 @@
 ##
 ## Apply with: add_files -fileset constrs_1 wukong_xc7a100t.xdc
 
-## ── System clock (50 MHz, pin M21 = MRCC-capable in FGG676 bank 34) ──────────
+## ── System clock (50 MHz, pin M21 = SRCC-capable in FGG676 bank 34) ──────────
 set_property -dict { PACKAGE_PIN M21  IOSTANDARD LVCMOS33 } [get_ports { clk }];
 create_clock -add -name sys_clk_pin -period 20.00 -waveform {0 10} [get_ports { clk }];
+## Allow Vivado to route M21 through general routing if dedicated clock route fails:
+set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets { clk_IBUF }];
 
 ## ── User LEDs (G21=led0, G20=led1 — V3 verified) ─────────────────────────────
 ## led[0] — D1 (G21):  solid ON while booting, then blinks ~1 Hz after boot

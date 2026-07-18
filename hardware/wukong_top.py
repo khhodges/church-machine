@@ -246,12 +246,12 @@ class ChurchWukongXC7A100T(Elaboratable):
             m.d.sync += [hb_ctr.eq(0), hb_blink.eq(~hb_blink)]
 
         # ── LED output mux ─────────────────────────────────────────────────────
-        # DIAG BUILD: bypass CM, drive LEDs directly from heartbeat counter.
-        # D1 (J19) and D2 (H19) alternate at 1 Hz.  If both blink → clock OK.
-        # Active-HIGH: D1 ON when hb_blink=1.  Active-LOW: D1 ON when hb_blink=0.
+        # DIAG BUILD: raw counter MSBs — no comparison needed, just free-running.
+        # At 50 MHz: bit25 toggles at ~0.75 Hz, bit24 at ~1.49 Hz.
+        # Both off → clock dead (M21 wrong pin).  Both blinking → clock alive.
         m.d.comb += [
-            self.led[0].eq(hb_blink),
-            self.led[1].eq(~hb_blink),
+            self.led[0].eq(hb_ctr[25]),
+            self.led[1].eq(hb_ctr[24]),
         ]
 
         # ── Boot trigger (16-cycle POR delay then pulse boot_start) ───────────

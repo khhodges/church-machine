@@ -202,8 +202,7 @@ module \top
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:56"
   wire width 1 input 1  \rst_n
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:243"
-  attribute \init 1'0
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:58"
   wire width 1 output 2  \led0
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:58"
@@ -326,7 +325,7 @@ module \top
     connect \mem_rd_valid \dmem_rd_valid [0]
     connect \imem_valid \imem_valid [0]
     connect \clk \clk$4 [0]
-    connect \port$3951$0 \dmem_rd__data [31:0]
+    connect \port$3950$0 \dmem_rd__data [31:0]
     connect \boot_start \boot_start [0]
     connect \clist_addr \clist_addr [31:0]
     connect \clist_wr_data \clist_wr_data [31:0]
@@ -483,7 +482,7 @@ module \top
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \led0 [0]
+    connect \A \hb_blink [0]
     connect \Y $12
   end
 
@@ -637,17 +636,8 @@ module \top
     connect \Y \imem_valid
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:254"
-  cell $not $64
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \led0 [0]
-    connect \Y \led1
-  end
-
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:260"
-  cell $not $65
+  cell $not $64
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
@@ -656,7 +646,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:262"
-  cell $eq $66
+  cell $eq $65
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -674,7 +664,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:114"
-  cell $meminit_v2 $67
+  cell $meminit_v2 $66
     parameter \MEMID "\\dmem"
     parameter \ABITS 0
     parameter \WIDTH 32
@@ -686,7 +676,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/lib/memory.py:402"
-  cell $memwr_v2 $68
+  cell $memwr_v2 $67
     parameter \MEMID "\\dmem"
     parameter \ABITS 14
     parameter \WIDTH 32
@@ -701,7 +691,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/lib/memory.py:241"
-  cell $memrd_v2 $69
+  cell $memrd_v2 $68
     parameter \MEMID "\\dmem"
     parameter \ABITS 14
     parameter \WIDTH 32
@@ -722,7 +712,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:75"
-  process $70
+  process $69
     assign $22 [3:0] { \rst_sr [2:0] 1'0 }
     switch \rst [0]
       case 1'1
@@ -731,7 +721,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:75"
-  cell $dff $71
+  cell $dff $70
     parameter \WIDTH 4
     parameter \CLK_POLARITY 1
     connect \D $22 [3:0]
@@ -740,7 +730,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:152"
-  process $72
+  process $71
     assign $23 [31:0] $1 [31:0]
     switch \rst [0]
       case 1'1
@@ -749,7 +739,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:152"
-  cell $dff $73
+  cell $dff $72
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
     connect \D $23 [31:0]
@@ -758,7 +748,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:153"
-  process $74
+  process $73
     assign $24 [31:0] \timer_hi [31:0]
     switch $2 [0]
       case 1'1
@@ -771,7 +761,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:153"
-  cell $dff $75
+  cell $dff $74
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
     connect \D $24 [31:0]
@@ -780,7 +770,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:157"
-  process $76
+  process $75
     assign $25 [0] \alarm_fired [0]
     switch $5 [0]
       case 1'1
@@ -811,7 +801,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:157"
-  cell $dff $77
+  cell $dff $76
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
     connect \D $25 [0]
@@ -820,7 +810,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:150"
-  process $78
+  process $77
     assign $26 [2:0] \mmio_led0 [2:0]
     switch \is_mmio_write [0]
       case 1'1
@@ -841,7 +831,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:150"
-  cell $dff $79
+  cell $dff $78
     parameter \WIDTH 3
     parameter \CLK_POLARITY 1
     connect \D $26 [2:0]
@@ -850,7 +840,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:150"
-  process $80
+  process $79
     assign $27 [2:0] \mmio_led1 [2:0]
     switch \is_mmio_write [0]
       case 1'1
@@ -871,7 +861,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:150"
-  cell $dff $81
+  cell $dff $80
     parameter \WIDTH 3
     parameter \CLK_POLARITY 1
     connect \D $27 [2:0]
@@ -880,7 +870,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:150"
-  process $82
+  process $81
     assign $28 [2:0] \mmio_led2 [2:0]
     switch \is_mmio_write [0]
       case 1'1
@@ -901,7 +891,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:150"
-  cell $dff $83
+  cell $dff $82
     parameter \WIDTH 3
     parameter \CLK_POLARITY 1
     connect \D $28 [2:0]
@@ -910,7 +900,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:154"
-  process $84
+  process $83
     assign $29 [31:0] \tod_epoch [31:0]
     switch \is_mmio_write [0]
       case 1'1
@@ -931,7 +921,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:154"
-  cell $dff $85
+  cell $dff $84
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
     connect \D $29 [31:0]
@@ -940,7 +930,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:155"
-  process $86
+  process $85
     assign $30 [31:0] \alarm_cmp [31:0]
     switch \is_mmio_write [0]
       case 1'1
@@ -961,7 +951,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:155"
-  cell $dff $87
+  cell $dff $86
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
     connect \D $30 [31:0]
@@ -970,7 +960,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:156"
-  process $88
+  process $87
     assign $31 [0] \alarm_armed [0]
     switch \is_mmio_write [0]
       case 1'1
@@ -994,7 +984,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:156"
-  cell $dff $89
+  cell $dff $88
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
     connect \D $31 [0]
@@ -1003,7 +993,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:209"
-  process $90
+  process $89
     assign $32 [0] $8 [0]
     switch \rst [0]
       case 1'1
@@ -1012,7 +1002,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:209"
-  cell $dff $91
+  cell $dff $90
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
     connect \D $32 [0]
@@ -1021,7 +1011,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:230"
-  process $92
+  process $91
     assign $33 [0] $9 [0]
     switch \rst [0]
       case 1'1
@@ -1030,7 +1020,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:230"
-  cell $dff $93
+  cell $dff $92
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
     connect \D $33 [0]
@@ -1039,7 +1029,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:242"
-  process $94
+  process $93
     assign $34 [25:0] $10 [25:0]
     switch $11 [0]
       case 1'1
@@ -1052,7 +1042,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:242"
-  cell $dff $95
+  cell $dff $94
     parameter \WIDTH 26
     parameter \CLK_POLARITY 1
     connect \D $34 [25:0]
@@ -1061,8 +1051,8 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:243"
-  process $96
-    assign $35 [0] \led0 [0]
+  process $95
+    assign $35 [0] \hb_blink [0]
     switch $11 [0]
       case 1'1
         assign $35 [0] $12 [0]
@@ -1074,16 +1064,16 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:243"
-  cell $dff $97
+  cell $dff $96
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
     connect \D $35 [0]
     connect \CLK \clk$4 [0]
-    connect \Q \led0
+    connect \Q \hb_blink
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:258"
-  process $98
+  process $97
     assign $36 [3:0] \boot_delay [3:0]
     switch $13 [0]
       case 1'1
@@ -1097,7 +1087,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:258"
-  cell $dff $99
+  cell $dff $98
     parameter \WIDTH 4
     parameter \CLK_POLARITY 1
     connect \D $36 [3:0]
@@ -1106,7 +1096,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:259"
-  process $100
+  process $99
     assign $37 [0] \boot_triggered [0]
     switch $13 [0]
       case 1'1
@@ -1123,7 +1113,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:259"
-  cell $dff $101
+  cell $dff $100
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
     connect \D $37 [0]
@@ -1132,7 +1122,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:120"
-  process $102
+  process $101
     assign \mem_addr [13:0] 14'00000000000000
     switch { $17 [0] $16 [0] }
       case 2'-1
@@ -1145,7 +1135,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:187"
-  process $103
+  process $102
     assign \mmio_rd_data [31:0] 32'00000000000000000000000000000000
     switch \dmem_addr [5:2]
       case 4'0000
@@ -1170,7 +1160,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:214"
-  process $104
+  process $103
     assign \cpu_wr_data [31:0] 32'00000000000000000000000000000000
     switch { $19 [0] \clist_wr_en [0] \ns_wr_en [0] }
       case 3'--1
@@ -1183,7 +1173,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:215"
-  process $105
+  process $104
     assign \cpu_wr_en [0] 1'0
     switch { $19 [0] \clist_wr_en [0] \ns_wr_en [0] }
       case 3'--1
@@ -1196,7 +1186,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:76"
-  process $106
+  process $105
     assign \boot_start [0] 1'0
     switch $20 [0]
       case 1'1
@@ -1210,7 +1200,6 @@ module \top
   end
 
 connect \mmio_reg_sel \dmem_addr [5:2]
-connect \hb_blink \led0 [0]
 connect \addr \imem_addr [11:2]
 connect \data \imem_data [31:0]
 connect \clist_rd_en 1'0
@@ -1224,6 +1213,8 @@ connect \halted 1'0
 connect \free_run_start 1'0
 connect \free_run_nia 32'00000000000000000000000000000000
 connect \gc_start 1'0
+connect \led0 \hb_ctr [25]
+connect \led1 \hb_ctr [24]
 connect \clist_rd_data.slot_id \dmem_rd__data [15:0]
 connect \clist_rd_data.gt_seq \dmem_rd__data [24:16]
 connect \clist_rd_data.gt_type \dmem_rd__data [26:25]
@@ -3609,7 +3600,7 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:66"
   wire width 1 input 4  \clk
 
-  wire width 32 input 5  \port$3951$0
+  wire width 32 input 5  \port$3950$0
 
   attribute \src "/home/runner/workspace/hardware/core.py:76"
   wire width 1 input 6  \boot_start
@@ -7056,7 +7047,7 @@ module \top.core
     connect \mgt_ns_seals \mgt_ns_seals [31:0]
     connect \mload_fault_type \fault_type$649 [4:0]
     connect \thread_hdr \thread_hdr [31:0]
-    connect \port$5251$0 \instruction [18:0]
+    connect \port$5250$0 \instruction [18:0]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:179"
@@ -7105,7 +7096,7 @@ module \top.core
     connect \fault_type \fault_type$645 [3:0]
     connect \tperm_z_result \tperm_z_result [0]
     connect \preset \instruction [3:0]
-    connect \port$5251$15 \instruction [22:15]
+    connect \port$5250$15 \instruction [22:15]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:181"
@@ -7126,7 +7117,7 @@ module \top.core
     connect \mem_wr_en \mem_wr_en$718 [0]
     connect \mem_wr_addr \mem_wr_addr$732 [31:0]
     connect \mem_wr_data \mem_wr_data$733 [31:0]
-    connect \port$5251$0 \instruction [22:0]
+    connect \port$5250$0 \instruction [22:0]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:182"
@@ -7142,7 +7133,7 @@ module \top.core
     connect \mload_done \mload_done [0]
     connect \mload_start \mload_start$690 [0]
     connect \fault_type \fault_type$649 [4:0]
-    connect \port$5251$0 \instruction [22:0]
+    connect \port$5250$0 \instruction [22:0]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:184"
@@ -7187,7 +7178,7 @@ module \top.core
     connect \rst \rst [0]
     connect \clk \clk [0]
     connect \gc_busy \gc_busy [0]
-    connect \port$3951$0 \port$3951$0 [31:0]
+    connect \port$3950$0 \port$3950$0 [31:0]
     connect \g_bit_reset \valid_key_access [0]
     connect \ns_addr \ns_addr$755 [31:0]
     connect \ns_rd_en \ns_rd_en$756 [0]
@@ -7237,7 +7228,7 @@ module \top.core
     connect \change_fault \change_fault [0]
     connect \fault_type \fault_type$650 [4:0]
     connect \thread_hdr_reg \thread_hdr [31:0]
-    connect \port$5251$0 \instruction [22:0]
+    connect \port$5250$0 \instruction [22:0]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:212"
@@ -7256,7 +7247,7 @@ module \top.core
     connect \cr_wr_addr \cr_wr_addr$140 [3:0]
     connect \cr_wr_data \cr_wr_data$153 [95:0]
     connect \cr_wr_en \cr_wr_en$168 [0]
-    connect \port$5251$0 \instruction [17:0]
+    connect \port$5250$0 \instruction [17:0]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:213"
@@ -7280,7 +7271,7 @@ module \top.core
     connect \cr_wr_addr \cr_wr_addr$139 [3:0]
     connect \cr_wr_data \cr_wr_data$152 [95:0]
     connect \cr_wr_en \cr_wr_en$165 [0]
-    connect \port$5251$0 \instruction [22:0]
+    connect \port$5250$0 \instruction [22:0]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:214"
@@ -7304,7 +7295,7 @@ module \top.core
     connect \cr_wr_addr \cr_wr_addr$138 [3:0]
     connect \cr_wr_data \cr_wr_data$151 [95:0]
     connect \cr_wr_en \cr_wr_en$166 [0]
-    connect \port$5251$0 \instruction [22:0]
+    connect \port$5250$0 \instruction [22:0]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:215"
@@ -7358,7 +7349,7 @@ module \top.core
     connect \dr_wr_data \dr_wr_data$106 [31:0]
     connect \dr_wr_en \dr_wr_en [0]
     connect \dr_rd_addr \dr_rd_addr$411 [3:0]
-    connect \port$5251$0 \instruction [22:0]
+    connect \port$5250$0 \instruction [22:0]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:219"
@@ -7378,7 +7369,7 @@ module \top.core
     connect \dmem_wr_data \dmem_wr_data$739 [31:0]
     connect \dmem_wr_en \dmem_wr_en$721 [0]
     connect \dr_rd_addr2 \dr_rd_addr2$410 [3:0]
-    connect \port$5251$0 \instruction [22:0]
+    connect \port$5250$0 \instruction [22:0]
   end
 
   attribute \src "/home/runner/workspace/hardware/core.py:220"
@@ -15682,8 +15673,8 @@ connect \gc_mark_en 1'1
 connect \gc_sweep_en 1'1
 connect \ns_start_index 16'0000000000000001
 connect \ns_end_index 16'0001000000000000
-connect \ns_rd_data { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \port$3951$0 [31:0] }
-connect \ns_rd_data$79 { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \port$3951$0 [31:0] }
+connect \ns_rd_data { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \port$3950$0 [31:0] }
+connect \ns_rd_data$79 { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \port$3950$0 [31:0] }
 connect \gc_busy$80 \gc_busy [0]
 connect \garbage_count \gc_garbage_count [31:0]
 connect \cr_rd_data_gt \cr_rd_data [31:0]
@@ -23778,7 +23769,7 @@ module \top.core.u_call
   attribute \src "/home/runner/workspace/hardware/call.py:80"
   wire width 32 input 44  \thread_hdr
 
-  wire width 19 input 45  \port$5251$0
+  wire width 19 input 45  \port$5250$0
 
   wire width 5 $1
 
@@ -24475,7 +24466,7 @@ module \top.core.u_call
     parameter \A_WIDTH 4
     parameter \B_WIDTH 4
     parameter \Y_WIDTH 1
-    connect \A \port$5251$0 [18:15]
+    connect \A \port$5250$0 [18:15]
     connect \B 4'1011
     connect \Y \src_in_range
   end
@@ -24484,7 +24475,7 @@ module \top.core.u_call
   cell $mux $117
     parameter \WIDTH 4
     connect \S \phase [0]
-    connect \A \port$5251$0 [18:15]
+    connect \A \port$5250$0 [18:15]
     connect \B 4'0110
     connect \Y \mload_src
   end
@@ -25514,9 +25505,9 @@ module \top.core.u_call
     switch \call_state [4:0]
       case 5'00000
       case 5'00001
-        assign \cr_rd_addr [3:0] \port$5251$0 [18:15]
+        assign \cr_rd_addr [3:0] \port$5250$0 [18:15]
       case 5'00011
-        assign \cr_rd_addr [3:0] \port$5251$0 [18:15]
+        assign \cr_rd_addr [3:0] \port$5250$0 [18:15]
       case 5'00100
       case 5'00110
       case 5'00111
@@ -26407,7 +26398,7 @@ module \top.core.u_call
       case 5'00000
         switch \call_start [0]
           case 1'1
-            assign $87 [14:0] \port$5251$0 [14:0]
+            assign $87 [14:0] \port$5250$0 [14:0]
         end
       case 5'00001
       case 5'00011
@@ -27462,7 +27453,7 @@ connect \sp_max $4 [14:0]
 connect \sp_min_base $5 [14:0]
 connect \sp_min $6 [14:0]
 connect \frame_word { 1'1 $7 [14:0] \sp_latched [15:0] }
-connect \cr_src \port$5251$0 [18:15]
+connect \cr_src \port$5250$0 [18:15]
 connect \index 16'0000000000000000
 connect \sub_start_reg \mload_start [0]
 connect \mload_cr_src \mload_src [3:0]
@@ -27492,7 +27483,7 @@ connect \ns_auth_lat \mgt_ns_authority [31:0]
 connect \ns_int_lat \mgt_ns_integrity [31:0]
 connect \ns_seal_lat \mgt_ns_seals [31:0]
 connect \mask 16'0000000000000000
-connect \call_imm \port$5251$0 [14:0]
+connect \call_imm \port$5250$0 [14:0]
 connect \nia_computed $18 [31:0]
 connect \code_lo_out $24 [31:0]
 connect \code_hi_out $26 [31:0]
@@ -29369,7 +29360,7 @@ module \top.core.u_tperm
   attribute \src "/home/runner/workspace/hardware/tperm.py:13"
   wire width 4 input 13  \preset
 
-  wire width 8 input 14  \port$5251$15
+  wire width 8 input 14  \port$5250$15
 
   wire width 6 $1
 
@@ -29868,11 +29859,11 @@ module \top.core.u_tperm
     switch \tperm_state [3:0]
       case 4'0000
       case 4'0001
-        assign \cr_rd_addr [3:0] \port$5251$15 [7:4]
+        assign \cr_rd_addr [3:0] \port$5250$15 [7:4]
       case 4'0010
       case 4'0101
       case 4'0100
-        assign \cr_rd_addr [3:0] \port$5251$15 [3:0]
+        assign \cr_rd_addr [3:0] \port$5250$15 [3:0]
       case 4'1000
       case 4'0110
       case 4'0111
@@ -29961,7 +29952,7 @@ module \top.core.u_tperm
       case 4'0100
       case 4'1000
       case 4'0110
-        assign \cr_wr_addr [3:0] \port$5251$15 [7:4]
+        assign \cr_wr_addr [3:0] \port$5250$15 [7:4]
       case 4'0111
       case 4'0011
     end
@@ -30275,8 +30266,8 @@ module \top.core.u_tperm
     connect \Q \ref_cap
   end
 
-connect \cr_target \port$5251$15 [7:4]
-connect \cr_src \port$5251$15 [3:0]
+connect \cr_target \port$5250$15 [7:4]
+connect \cr_src \port$5250$15 [3:0]
 connect \fault_flag \tperm_fault [0]
 connect \fault_latched \fault_type [3:0]
 connect \z_result_reg \tperm_z_result [0]
@@ -30487,7 +30478,7 @@ module \top.core.u_save
   attribute \src "/home/runner/workspace/hardware/msave.py:23"
   wire width 32 output 15  \mem_wr_data
 
-  wire width 23 input 16  \port$5251$0
+  wire width 23 input 16  \port$5250$0
 
   wire width 1 $1
 
@@ -30697,7 +30688,7 @@ module \top.core.u_save
     connect \mem_wr_addr \mem_wr_addr [31:0]
     connect \mem_wr_data \mem_wr_data [31:0]
     connect \sub_fault_type \sub_fault_type [3:0]
-    connect \port$5251$0 \port$5251$0 [14:0]
+    connect \port$5250$0 \port$5250$0 [14:0]
   end
 
   attribute \src "/home/runner/workspace/hardware/save.py:53"
@@ -30707,7 +30698,7 @@ module \top.core.u_save
     parameter \A_WIDTH 4
     parameter \B_WIDTH 3
     parameter \Y_WIDTH 1
-    connect \A \port$5251$0 [22:19]
+    connect \A \port$5250$0 [22:19]
     connect \B 3'110
     connect \Y \dst_in_range
   end
@@ -30808,11 +30799,11 @@ module \top.core.u_save
     switch \save_wrapper_state [2:0]
       case 3'000
       case 3'001
-        assign \cr_rd_addr [3:0] \port$5251$0 [22:19]
+        assign \cr_rd_addr [3:0] \port$5250$0 [22:19]
       case 3'010
-        assign \cr_rd_addr [3:0] \port$5251$0 [18:15]
+        assign \cr_rd_addr [3:0] \port$5250$0 [18:15]
       case 3'011
-        assign \cr_rd_addr [3:0] \port$5251$0 [18:15]
+        assign \cr_rd_addr [3:0] \port$5250$0 [18:15]
       case 3'100
     end
   end
@@ -31069,12 +31060,12 @@ module \top.core.u_save
     connect \Q \sub_start
   end
 
-connect \cr_dst \port$5251$0 [22:19]
+connect \cr_dst \port$5250$0 [22:19]
 connect \sub_start$3 \sub_start [0]
 connect \dst_reg_latched \sub_dst_cap [95:0]
 connect \sub_src_gt \src_reg_latched [31:0]
-connect \sub_index { 1'0 \port$5251$0 [14:0] }
-connect \index { 1'0 \port$5251$0 [14:0] }
+connect \sub_index { 1'0 \port$5250$0 [14:0] }
+connect \index { 1'0 \port$5250$0 [14:0] }
 connect \mem_wr_done 1'1
 connect \mem_wr_done$11 1'1
 connect \cr15_namespace$13 \cr15_namespace [95:0]
@@ -31086,7 +31077,7 @@ connect \mem_wr_en$23 \mem_wr_en [0]
 connect \mem_rd_addr$25 \mem_rd_addr [31:0]
 connect \mem_rd_en$27 \mem_rd_en [0]
 connect \sub_start_reg \sub_start [0]
-connect \cr_src \port$5251$0 [18:15]
+connect \cr_src \port$5250$0 [18:15]
 connect \fault_latched \save_fault [0]
 connect \fault_type_latched \fault_type [3:0]
 connect \sub_dst_cap.word0_gt \sub_dst_cap [31:0]
@@ -31267,7 +31258,7 @@ module \top.core.u_save.u_msave
   attribute \init 4'0000
   wire width 4 output 15  \sub_fault_type
 
-  wire width 15 input 16  \port$5251$0
+  wire width 15 input 16  \port$5250$0
 
   wire width 19 $1
 
@@ -31960,7 +31951,7 @@ module \top.core.u_save.u_msave
       case 4'0000
         switch \sub_start [0]
           case 1'1
-            assign $27 [15:0] { 1'0 \port$5251$0 [14:0] }
+            assign $27 [15:0] { 1'0 \port$5250$0 [14:0] }
         end
       case 4'0001
       case 4'0011
@@ -32251,7 +32242,7 @@ connect \ns_entry_addr $4 [31:0]
 connect \w0_rot { \ns_location_reg [24:0] \ns_location_reg [31:25] }
 connect \w1_rot { \w1_masked [18:0] \w1_masked [31:19] }
 connect \fault_type_reg \sub_fault_type [3:0]
-connect \sub_index { 1'0 \port$5251$0 [14:0] }
+connect \sub_index { 1'0 \port$5250$0 [14:0] }
 connect \mem_wr_done 1'1
 connect \dst_cap_reg.word0_gt \dst_cap_reg [31:0]
 connect \dst_cap_reg.word0_gt.slot_id \dst_cap_reg [15:0]
@@ -32354,7 +32345,7 @@ module \top.core.u_load
   attribute \src "/home/runner/workspace/hardware/load.py:28"
   wire width 5 input 10  \fault_type
 
-  wire width 23 input 11  \port$5251$0
+  wire width 23 input 11  \port$5250$0
 
   wire width 1 $1
 
@@ -32375,7 +32366,7 @@ module \top.core.u_load
     parameter \A_WIDTH 4
     parameter \B_WIDTH 3
     parameter \Y_WIDTH 1
-    connect \A \port$5251$0 [18:15]
+    connect \A \port$5250$0 [18:15]
     connect \B 3'110
     connect \Y \mload_m_elevated
   end
@@ -32523,12 +32514,12 @@ module \top.core.u_load
     connect \Q \load_wrapper_state
   end
 
-connect \mload_cr_src \port$5251$0 [18:15]
-connect \cr_src \port$5251$0 [18:15]
-connect \mload_cr_dst \port$5251$0 [22:19]
-connect \cr_dst \port$5251$0 [22:19]
-connect \mload_index { 1'0 \port$5251$0 [14:0] }
-connect \index { 1'0 \port$5251$0 [14:0] }
+connect \mload_cr_src \port$5250$0 [18:15]
+connect \cr_src \port$5250$0 [18:15]
+connect \mload_cr_dst \port$5250$0 [22:19]
+connect \cr_dst \port$5250$0 [22:19]
+connect \mload_index { 1'0 \port$5250$0 [14:0] }
+connect \index { 1'0 \port$5250$0 [14:0] }
 connect \mload_direct 1'0
 connect \mload_direct_gt 32'00000000000000000000000000000000
 connect \mload_fault_type \fault_type [4:0]
@@ -35327,7 +35318,7 @@ module \top.core.u_gc_unit
   attribute \src "/home/runner/workspace/hardware/gc_unit.py:13"
   wire width 1 output 2  \gc_busy
 
-  wire width 32 input 3  \port$3951$0
+  wire width 32 input 3  \port$3950$0
 
   attribute \src "/home/runner/workspace/hardware/gc_unit.py:28"
   wire width 1 input 4  \g_bit_reset
@@ -35945,10 +35936,10 @@ module \top.core.u_gc_unit
     switch \gc_state [2:0]
       case 3'000
       case 3'001
-        assign $25 [127:0] { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \port$3951$0 [31:0] }
+        assign $25 [127:0] { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \port$3950$0 [31:0] }
       case 3'011
       case 3'010
-        assign $25 [127:0] { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \port$3951$0 [31:0] }
+        assign $25 [127:0] { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \port$3950$0 [31:0] }
       case 3'101
       case 3'110
       case 3'100
@@ -35976,7 +35967,7 @@ connect \gc_start 1'0
 connect \gc_mark_en 1'1
 connect \gc_sweep_en 1'1
 connect \ns_start_index 16'0000000000000001
-connect \ns_rd_data { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \port$3951$0 [31:0] }
+connect \ns_rd_data { 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 \port$3950$0 [31:0] }
 connect \ns_end_index 16'0001000000000000
 
 end
@@ -36748,7 +36739,7 @@ module \top.core.u_change
   attribute \init 32'00000000000000000000000000000000
   wire width 32 output 22  \thread_hdr_reg
 
-  wire width 23 input 23  \port$5251$0
+  wire width 23 input 23  \port$5250$0
 
   wire width 17 $1
 
@@ -37226,7 +37217,7 @@ module \top.core.u_change
     parameter \A_WIDTH 4
     parameter \B_WIDTH 4
     parameter \Y_WIDTH 1
-    connect \A \port$5251$0 [22:19]
+    connect \A \port$5250$0 [22:19]
     connect \B 4'1100
     connect \Y $5
   end
@@ -37712,7 +37703,7 @@ module \top.core.u_change
     parameter \A_WIDTH 4
     parameter \B_WIDTH 4
     parameter \Y_WIDTH 1
-    connect \A \port$5251$0 [22:19]
+    connect \A \port$5250$0 [22:19]
     connect \B 4'1100
     connect \Y $38
   end
@@ -37724,7 +37715,7 @@ module \top.core.u_change
     parameter \A_WIDTH 4
     parameter \B_WIDTH 4
     parameter \Y_WIDTH 1
-    connect \A \port$5251$0 [22:19]
+    connect \A \port$5250$0 [22:19]
     connect \B 4'1101
     connect \Y $39
   end
@@ -37946,11 +37937,11 @@ module \top.core.u_change
         assign \cr_rd_addr [3:0] 4'0111
       case 5'00010
         assign \cr_rd_addr [3:0] 4'0111
-        assign \cr_rd_addr [3:0] \port$5251$0 [18:15]
+        assign \cr_rd_addr [3:0] \port$5250$0 [18:15]
       case 5'00011
-        assign \cr_rd_addr [3:0] \port$5251$0 [18:15]
+        assign \cr_rd_addr [3:0] \port$5250$0 [18:15]
       case 5'00100
-        assign \cr_rd_addr [3:0] \port$5251$0 [18:15]
+        assign \cr_rd_addr [3:0] \port$5250$0 [18:15]
       case 5'00101
       case 5'01000
       case 5'00111
@@ -37980,12 +37971,12 @@ module \top.core.u_change
       case 5'00100
       case 5'00101
       case 5'01000
-        assign \sub_cr_src [3:0] \port$5251$0 [18:15]
+        assign \sub_cr_src [3:0] \port$5250$0 [18:15]
       case 5'00111
       case 5'01010
       case 5'01011
       case 5'01100
-        assign \sub_cr_src [3:0] \port$5251$0 [18:15]
+        assign \sub_cr_src [3:0] \port$5250$0 [18:15]
       case 5'01101
         assign \sub_cr_src [3:0] 4'1000
       case 5'01111
@@ -38010,7 +38001,7 @@ module \top.core.u_change
       case 5'00100
       case 5'00101
       case 5'01000
-        assign \sub_cr_dst [3:0] \port$5251$0 [22:19]
+        assign \sub_cr_dst [3:0] \port$5250$0 [22:19]
       case 5'00111
       case 5'01010
       case 5'01011
@@ -38572,7 +38563,7 @@ module \top.core.u_change
       case 5'00000
         switch \change_start [0]
           case 1'1
-            assign $56 [15:0] { 1'0 \port$5251$0 [14:0] }
+            assign $56 [15:0] { 1'0 \port$5250$0 [14:0] }
         end
       case 5'00001
       case 5'00010
@@ -39150,7 +39141,7 @@ module \top.core.u_change
   end
 
 connect \effective_mask $1 [15:0]
-connect \cr_dst \port$5251$0 [22:19]
+connect \cr_dst \port$5250$0 [22:19]
 connect \pc_offset $8 [31:0]
 connect \packed_pc_word { \flags [3:0] $8 [27:0] }
 connect \mload_start_reg \sub_start [0]
@@ -39171,10 +39162,10 @@ connect \thread_wr_en$58 \thread_wr_en [0]
 connect \thread_wr_idx$60 \thread_wr_idx [3:0]
 connect \thread_wr_data$62 \thread_wr_data [31:0]
 connect \thread_hdr_out \thread_hdr_reg [31:0]
-connect \cr_src \port$5251$0 [18:15]
+connect \cr_src \port$5250$0 [18:15]
 connect \fault_latched \change_fault [0]
 connect \fault_type_latched \fault_type [4:0]
-connect \index { 1'0 \port$5251$0 [14:0] }
+connect \index { 1'0 \port$5250$0 [14:0] }
 connect \change_mask 16'0000000000000000
 connect \mem_wr_done 1'1
 connect \crn_reg_latched.word0_gt \crn_reg_latched [31:0]
@@ -42183,7 +42174,7 @@ module \top.core.u_switch
   attribute \src "/home/runner/workspace/hardware/mload.py:54"
   wire width 1 output 13  \cr_wr_en
 
-  wire width 18 input 14  \port$5251$0
+  wire width 18 input 14  \port$5250$0
 
   wire width 5 $1
 
@@ -42441,7 +42432,7 @@ module \top.core.u_switch
     connect \cr_wr_data \cr_wr_data [95:0]
     connect \cr_wr_en \cr_wr_en [0]
     connect \sub_fault_type \sub_fault_type [4:0]
-    connect \port$5251$0 \port$5251$0 [17:0]
+    connect \port$5250$0 \port$5250$0 [17:0]
   end
 
   attribute \src "/home/runner/workspace/hardware/switch.py:45"
@@ -42452,7 +42443,7 @@ module \top.core.u_switch
     parameter \B_WIDTH 3
     parameter \Y_WIDTH 5
     connect \A 4'1000
-    connect \B \port$5251$0 [2:0]
+    connect \B \port$5250$0 [2:0]
     connect \Y $1
   end
 
@@ -42463,7 +42454,7 @@ module \top.core.u_switch
     parameter \A_WIDTH 3
     parameter \B_WIDTH 3
     parameter \Y_WIDTH 1
-    connect \A \port$5251$0 [17:15]
+    connect \A \port$5250$0 [17:15]
     connect \B 3'111
     connect \Y \src_in_range
   end
@@ -42487,7 +42478,7 @@ module \top.core.u_switch
     parameter \A_WIDTH 3
     parameter \B_WIDTH 3
     parameter \Y_WIDTH 1
-    connect \A \port$5251$0 [2:0]
+    connect \A \port$5250$0 [2:0]
     connect \B 3'101
     connect \Y $2
   end
@@ -42520,7 +42511,7 @@ module \top.core.u_switch
     parameter \A_WIDTH 3
     parameter \B_WIDTH 3
     parameter \Y_WIDTH 1
-    connect \A \port$5251$0 [2:0]
+    connect \A \port$5250$0 [2:0]
     connect \B 3'101
     connect \Y $3
   end
@@ -42532,7 +42523,7 @@ module \top.core.u_switch
     parameter \A_WIDTH 3
     parameter \B_WIDTH 3
     parameter \Y_WIDTH 1
-    connect \A \port$5251$0 [2:0]
+    connect \A \port$5250$0 [2:0]
     connect \B 3'111
     connect \Y $4
   end
@@ -42760,9 +42751,9 @@ module \top.core.u_switch
       case 4'0000
       case 4'0001
       case 4'0010
-        assign \local_cr_rd_addr [3:0] { 1'0 \port$5251$0 [17:15] }
+        assign \local_cr_rd_addr [3:0] { 1'0 \port$5250$0 [17:15] }
       case 4'0011
-        assign \local_cr_rd_addr [3:0] { 1'0 \port$5251$0 [17:15] }
+        assign \local_cr_rd_addr [3:0] { 1'0 \port$5250$0 [17:15] }
       case 4'0100
       case 4'0101
       case 4'0110
@@ -42995,13 +42986,13 @@ module \top.core.u_switch
   end
 
 connect \dest_cr $1 [3:0]
-connect \target \port$5251$0 [2:0]
-connect \cr_src \port$5251$0 [17:15]
+connect \target \port$5250$0 [2:0]
+connect \cr_src \port$5250$0 [17:15]
 connect \sub_start$10 \sub_start [0]
-connect \sub_cr_src { 1'0 \port$5251$0 [17:15] }
+connect \sub_cr_src { 1'0 \port$5250$0 [17:15] }
 connect \sub_cr_dst $1 [3:0]
-connect \sub_index { 1'0 \port$5251$0 [14:0] }
-connect \index { 1'0 \port$5251$0 [14:0] }
+connect \sub_index { 1'0 \port$5250$0 [14:0] }
+connect \index { 1'0 \port$5250$0 [14:0] }
 connect \sub_direct 1'0
 connect \sub_direct_gt 32'00000000000000000000000000000000
 connect \sub_m_elevated 1'1
@@ -43335,7 +43326,7 @@ module \top.core.u_switch.u_mload
   attribute \init 5'00000
   wire width 5 output 20  \sub_fault_type
 
-  wire width 18 input 21  \port$5251$0
+  wire width 18 input 21  \port$5250$0
 
   wire width 19 $1
 
@@ -44343,7 +44334,7 @@ module \top.core.u_switch.u_mload
       case 4'0000
         switch \sub_start [0]
           case 1'1
-            assign $25 [3:0] { 1'0 \port$5251$0 [17:15] }
+            assign $25 [3:0] { 1'0 \port$5250$0 [17:15] }
         end
       case 4'0001
       case 4'0011
@@ -44419,7 +44410,7 @@ module \top.core.u_switch.u_mload
       case 4'0000
         switch \sub_start [0]
           case 1'1
-            assign $27 [15:0] { 1'0 \port$5251$0 [14:0] }
+            assign $27 [15:0] { 1'0 \port$5250$0 [14:0] }
         end
       case 4'0001
       case 4'0011
@@ -45001,8 +44992,8 @@ connect \fault_type_reg \sub_fault_type [4:0]
 connect \outform_gt_raw_reg \outform_gt_raw [31:0]
 connect \outform_slot_id_reg \outform_slot_id [15:0]
 connect \outform_clist_addr_reg \outform_clist_addr [31:0]
-connect \sub_cr_src { 1'0 \port$5251$0 [17:15] }
-connect \sub_index { 1'0 \port$5251$0 [14:0] }
+connect \sub_cr_src { 1'0 \port$5250$0 [17:15] }
+connect \sub_index { 1'0 \port$5250$0 [14:0] }
 connect \sub_direct 1'0
 connect \sub_direct_gt 32'00000000000000000000000000000000
 connect \sub_m_elevated 1'1
@@ -46089,7 +46080,7 @@ module \top.core.u_eloadcall
   attribute \src "/home/runner/workspace/hardware/mload.py:54"
   wire width 1 output 18  \cr_wr_en
 
-  wire width 23 input 19  \port$5251$0
+  wire width 23 input 19  \port$5250$0
 
   wire width 5 $1
 
@@ -46437,7 +46428,7 @@ module \top.core.u_eloadcall
     parameter \A_WIDTH 4
     parameter \B_WIDTH 3
     parameter \Y_WIDTH 1
-    connect \A \port$5251$0 [18:15]
+    connect \A \port$5250$0 [18:15]
     connect \B 3'101
     connect \Y \src_in_range
   end
@@ -46873,9 +46864,9 @@ module \top.core.u_eloadcall
     assign \mload_src [3:0] 4'0000
     switch \phase [1:0]
       case 2'00
-        assign \mload_src [3:0] \port$5251$0 [18:15]
+        assign \mload_src [3:0] \port$5250$0 [18:15]
       case 2'01
-        assign \mload_src [3:0] \port$5251$0 [22:19]
+        assign \mload_src [3:0] \port$5250$0 [22:19]
       case
         assign \mload_src [3:0] 4'0110
     end
@@ -46886,7 +46877,7 @@ module \top.core.u_eloadcall
     assign \mload_dst [3:0] 4'0000
     switch \phase [1:0]
       case 2'00
-        assign \mload_dst [3:0] \port$5251$0 [22:19]
+        assign \mload_dst [3:0] \port$5250$0 [22:19]
       case 2'01
         assign \mload_dst [3:0] 4'0110
       case
@@ -46899,7 +46890,7 @@ module \top.core.u_eloadcall
     assign \mload_index [15:0] 16'0000000000000000
     switch \phase [1:0]
       case 2'00
-        assign \mload_index [15:0] { 8'00000000 \port$5251$0 [7:0] }
+        assign \mload_index [15:0] { 8'00000000 \port$5250$0 [7:0] }
       case 2'01
         assign \mload_index [15:0] 16'0000000000000000
       case
@@ -46938,7 +46929,7 @@ module \top.core.u_eloadcall
       case 4'0001
       case 4'0011
       case 4'0100
-        assign \local_cr_rd_addr [3:0] \port$5251$0 [22:19]
+        assign \local_cr_rd_addr [3:0] \port$5250$0 [22:19]
       case 4'0101
       case 4'0111
       case 4'1000
@@ -47344,7 +47335,7 @@ module \top.core.u_eloadcall
       case 4'0000
         switch \start [0]
           case 1'1
-            assign $36 [14:0] { 8'00000000 \port$5251$0 [14:8] }
+            assign $36 [14:0] { 8'00000000 \port$5250$0 [14:8] }
         end
       case 4'0001
       case 4'0011
@@ -47382,7 +47373,7 @@ module \top.core.u_eloadcall
       case 4'0000
         switch \start [0]
           case 1'1
-            assign $37 [15:0] { 8'00000000 \port$5251$0 [7:0] }
+            assign $37 [15:0] { 8'00000000 \port$5250$0 [7:0] }
         end
       case 4'0001
       case 4'0011
@@ -47670,9 +47661,9 @@ module \top.core.u_eloadcall
     connect \Q \method_entry_reg
   end
 
-connect \cr_src \port$5251$0 [18:15]
-connect \cr_dst \port$5251$0 [22:19]
-connect \index { 8'00000000 \port$5251$0 [7:0] }
+connect \cr_src \port$5250$0 [18:15]
+connect \cr_dst \port$5250$0 [22:19]
+connect \index { 8'00000000 \port$5250$0 [7:0] }
 connect \sub_start$11 \sub_start [0]
 connect \sub_cr_src \mload_src [3:0]
 connect \sub_cr_dst \mload_dst [3:0]
@@ -47700,7 +47691,7 @@ connect \nia_value $7 [31:0]
 connect \index_latched \lazy_resolve_slot [15:0]
 connect \pet_name_rd_addr \lazy_resolve_slot [15:0]
 connect \mask 16'0000000000000000
-connect \call_imm { 8'00000000 \port$5251$0 [14:8] }
+connect \call_imm { 8'00000000 \port$5250$0 [14:8] }
 connect \nia_computed $7 [31:0]
 connect \loaded_cap.word0_gt \loaded_cap [31:0]
 connect \loaded_cap.word0_gt.slot_id \loaded_cap [15:0]
@@ -50710,7 +50701,7 @@ module \top.core.u_xloadlambda
   attribute \src "/home/runner/workspace/hardware/mload.py:54"
   wire width 1 output 18  \cr_wr_en
 
-  wire width 23 input 19  \port$5251$0
+  wire width 23 input 19  \port$5250$0
 
   wire width 1 $1
 
@@ -50957,7 +50948,7 @@ module \top.core.u_xloadlambda
     connect \cr_wr_data \cr_wr_data [95:0]
     connect \cr_wr_en \cr_wr_en [0]
     connect \sub_fault_type \sub_fault_type [4:0]
-    connect \port$5251$0 \port$5251$0 [22:0]
+    connect \port$5250$0 \port$5250$0 [22:0]
   end
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:410"
@@ -50979,7 +50970,7 @@ module \top.core.u_xloadlambda
     parameter \A_WIDTH 4
     parameter \B_WIDTH 3
     parameter \Y_WIDTH 1
-    connect \A \port$5251$0 [18:15]
+    connect \A \port$5250$0 [18:15]
     connect \B 3'110
     connect \Y \sub_m_elevated
   end
@@ -51151,7 +51142,7 @@ module \top.core.u_xloadlambda
       case 3'000
       case 3'001
       case 3'011
-        assign \local_cr_rd_addr [3:0] \port$5251$0 [22:19]
+        assign \local_cr_rd_addr [3:0] \port$5250$0 [22:19]
       case 3'100
       case 3'110
       case 3'111
@@ -51386,7 +51377,7 @@ module \top.core.u_xloadlambda
       case 3'000
         switch \start [0]
           case 1'1
-            assign $15 [15:0] { 1'0 \port$5251$0 [14:0] }
+            assign $15 [15:0] { 1'0 \port$5250$0 [14:0] }
         end
       case 3'001
       case 3'011
@@ -51497,12 +51488,12 @@ module \top.core.u_xloadlambda
   end
 
 connect \sub_start_reg \sub_start [0]
-connect \sub_cr_src \port$5251$0 [18:15]
-connect \cr_src \port$5251$0 [18:15]
-connect \sub_cr_dst \port$5251$0 [22:19]
-connect \cr_dst \port$5251$0 [22:19]
-connect \sub_index { 1'0 \port$5251$0 [14:0] }
-connect \index { 1'0 \port$5251$0 [14:0] }
+connect \sub_cr_src \port$5250$0 [18:15]
+connect \cr_src \port$5250$0 [18:15]
+connect \sub_cr_dst \port$5250$0 [22:19]
+connect \cr_dst \port$5250$0 [22:19]
+connect \sub_index { 1'0 \port$5250$0 [14:0] }
+connect \index { 1'0 \port$5250$0 [14:0] }
 connect \sub_direct 1'0
 connect \sub_direct_gt 32'00000000000000000000000000000000
 connect \cr_rd_data$14 \cr_rd_data [95:0]
@@ -51837,7 +51828,7 @@ module \top.core.u_xloadlambda.u_mload
   attribute \init 5'00000
   wire width 5 output 19  \sub_fault_type
 
-  wire width 23 input 20  \port$5251$0
+  wire width 23 input 20  \port$5250$0
 
   wire width 19 $1
 
@@ -52845,7 +52836,7 @@ module \top.core.u_xloadlambda.u_mload
       case 4'0000
         switch \sub_start [0]
           case 1'1
-            assign $25 [3:0] \port$5251$0 [18:15]
+            assign $25 [3:0] \port$5250$0 [18:15]
         end
       case 4'0001
       case 4'0011
@@ -52883,7 +52874,7 @@ module \top.core.u_xloadlambda.u_mload
       case 4'0000
         switch \sub_start [0]
           case 1'1
-            assign $26 [3:0] \port$5251$0 [22:19]
+            assign $26 [3:0] \port$5250$0 [22:19]
         end
       case 4'0001
       case 4'0011
@@ -52921,7 +52912,7 @@ module \top.core.u_xloadlambda.u_mload
       case 4'0000
         switch \sub_start [0]
           case 1'1
-            assign $27 [15:0] { 1'0 \port$5251$0 [14:0] }
+            assign $27 [15:0] { 1'0 \port$5250$0 [14:0] }
         end
       case 4'0001
       case 4'0011
@@ -53503,9 +53494,9 @@ connect \fault_type_reg \sub_fault_type [4:0]
 connect \outform_gt_raw_reg \outform_gt_raw [31:0]
 connect \outform_slot_id_reg \outform_slot_id [15:0]
 connect \outform_clist_addr_reg \outform_clist_addr [31:0]
-connect \sub_cr_src \port$5251$0 [18:15]
-connect \sub_cr_dst \port$5251$0 [22:19]
-connect \sub_index { 1'0 \port$5251$0 [14:0] }
+connect \sub_cr_src \port$5250$0 [18:15]
+connect \sub_cr_dst \port$5250$0 [22:19]
+connect \sub_index { 1'0 \port$5250$0 [14:0] }
 connect \sub_direct 1'0
 connect \sub_direct_gt 32'00000000000000000000000000000000
 connect \outform_fault_in 1'0
@@ -61370,7 +61361,7 @@ module \top.core.u_dread
   attribute \src "/home/runner/workspace/hardware/dread.py:52"
   wire width 4 output 15  \dr_rd_addr
 
-  wire width 23 input 16  \port$5251$0
+  wire width 23 input 16  \port$5250$0
 
   wire width 1 $1
 
@@ -61517,7 +61508,7 @@ module \top.core.u_dread
   cell $mux $31
     parameter \WIDTH 4
     connect \S \busy [0]
-    connect \A \port$5251$0 [18:15]
+    connect \A \port$5250$0 [18:15]
     connect \B \cr_src_reg [3:0]
     connect \Y \cr_rd_addr
   end
@@ -61629,7 +61620,7 @@ module \top.core.u_dread
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \port$5251$0 [14]
+    connect \A \port$5250$0 [14]
     connect \Y $12
   end
 
@@ -61843,7 +61834,7 @@ module \top.core.u_dread
       case 3'000
         switch \start [0]
           case 1'1
-            assign $19 [3:0] \port$5251$0 [18:15]
+            assign $19 [3:0] \port$5250$0 [18:15]
         end
       case 3'001
       case 3'010
@@ -61872,7 +61863,7 @@ module \top.core.u_dread
       case 3'000
         switch \start [0]
           case 1'1
-            assign $20 [3:0] \port$5251$0 [22:19]
+            assign $20 [3:0] \port$5250$0 [22:19]
         end
       case 3'001
       case 3'010
@@ -61901,7 +61892,7 @@ module \top.core.u_dread
       case 3'000
         switch \start [0]
           case 1'1
-            assign $21 [14:0] \port$5251$0 [14:0]
+            assign $21 [14:0] \port$5250$0 [14:0]
         end
       case 3'001
       case 3'010
@@ -62036,9 +62027,9 @@ module \top.core.u_dread
   end
 
 connect \limit \cr_rd_data [79:64]
-connect \cr_src \port$5251$0 [18:15]
-connect \dr_dst \port$5251$0 [22:19]
-connect \imm \port$5251$0 [14:0]
+connect \cr_src \port$5250$0 [18:15]
+connect \dr_dst \port$5250$0 [22:19]
+connect \imm \port$5250$0 [14:0]
 connect \dr_rd_addr \imm_reg [3:0]
 connect \cr_rd_data.word0_gt \cr_rd_data [31:0]
 connect \cr_rd_data.word0_gt.slot_id \cr_rd_data [15:0]
@@ -62156,7 +62147,7 @@ module \top.core.u_dwrite
   attribute \src "/home/runner/workspace/hardware/dwrite.py:55"
   wire width 4 output 14  \dr_rd_addr2
 
-  wire width 23 input 15  \port$5251$0
+  wire width 23 input 15  \port$5250$0
 
   wire width 1 $1
 
@@ -62301,7 +62292,7 @@ module \top.core.u_dwrite
   cell $mux $30
     parameter \WIDTH 4
     connect \S \busy [0]
-    connect \A \port$5251$0 [18:15]
+    connect \A \port$5250$0 [18:15]
     connect \B \cr_src_reg [3:0]
     connect \Y \cr_rd_addr
   end
@@ -62310,7 +62301,7 @@ module \top.core.u_dwrite
   cell $mux $31
     parameter \WIDTH 4
     connect \S \busy [0]
-    connect \A \port$5251$0 [22:19]
+    connect \A \port$5250$0 [22:19]
     connect \B \dr_src_reg [3:0]
     connect \Y \dr_rd_addr
   end
@@ -62398,7 +62389,7 @@ module \top.core.u_dwrite
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \port$5251$0 [14]
+    connect \A \port$5250$0 [14]
     connect \Y $10
   end
 
@@ -62578,7 +62569,7 @@ module \top.core.u_dwrite
       case 2'00
         switch \start [0]
           case 1'1
-            assign $17 [3:0] \port$5251$0 [18:15]
+            assign $17 [3:0] \port$5250$0 [18:15]
         end
       case 2'01
       case 2'10
@@ -62606,7 +62597,7 @@ module \top.core.u_dwrite
       case 2'00
         switch \start [0]
           case 1'1
-            assign $18 [3:0] \port$5251$0 [22:19]
+            assign $18 [3:0] \port$5250$0 [22:19]
         end
       case 2'01
       case 2'10
@@ -62634,7 +62625,7 @@ module \top.core.u_dwrite
       case 2'00
         switch \start [0]
           case 1'1
-            assign $19 [14:0] \port$5251$0 [14:0]
+            assign $19 [14:0] \port$5250$0 [14:0]
         end
       case 2'01
       case 2'10
@@ -62796,9 +62787,9 @@ module \top.core.u_dwrite
   end
 
 connect \limit \cr_rd_data [79:64]
-connect \cr_src \port$5251$0 [18:15]
-connect \dr_src \port$5251$0 [22:19]
-connect \imm \port$5251$0 [14:0]
+connect \cr_src \port$5250$0 [18:15]
+connect \dr_src \port$5250$0 [22:19]
+connect \imm \port$5250$0 [14:0]
 connect \dr_rd_addr2 \imm_reg [3:0]
 connect \cr_rd_data.word0_gt \cr_rd_data [31:0]
 connect \cr_rd_data.word0_gt.slot_id \cr_rd_data [15:0]
