@@ -1934,7 +1934,7 @@
         "abstraction": "LED Flash",
         "filename": "LED_flash_v1.lump",
         "sidecar_file": "LED_flash_v1.json",
-        "ns_slot": 3,
+        "ns_slot": 7,
         "lump_size": 64,
         "cw": 17,
         "cc": 18,

@@ -2581,15 +2581,19 @@ function updateNamespace() {
         html += `<td style="${warmStyle}">${ver}</td>`;
         html += `<td style="${warmStyle}">0x${seal.toString(16).toUpperCase().padStart(4, '0')}</td>`;
         {
-            const _srcLump = _findSrcLump(i, e.label);
-            const _srcToken = _srcLump ? _srcLump.token : null;
-            if (codeNotResident) {
-                html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span></td>`;
+            if (i <= NS_TIER_HW_MAX) {
+                html += `<td class="ns-entry-actions"></td>`;
             } else {
-                const _srcBtn = _srcToken
-                    ? `<button class="btn btn-xs" onclick="event.stopPropagation();_openLumpSource('${_srcToken}')" style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);" title="Open source in Repository view">Source</button>`
-                    : '';
-                html += `<td class="ns-entry-actions">${_srcBtn}</td>`;
+                const _srcLump = _findSrcLump(i, e.label);
+                const _srcToken = _srcLump ? _srcLump.token : null;
+                if (codeNotResident) {
+                    html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span></td>`;
+                } else {
+                    const _srcBtn = _srcToken
+                        ? `<button class="btn btn-xs" onclick="event.stopPropagation();_openLumpSource('${_srcToken}')" style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);" title="Open source in Repository view">Source</button>`
+                        : '';
+                    html += `<td class="ns-entry-actions">${_srcBtn}</td>`;
+                }
             }
         }
         html += '</tr>';
