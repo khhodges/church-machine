@@ -2545,7 +2545,7 @@ function updateNamespace() {
         } else if (i === NS_TIER_HW_MAX + 1) {
             html += '<tr class="ns-tier-header ns-tier-boot-header"><td colspan="10">&#x1F97E; Boot &mdash; slots 6&#x2013;10 &mdash; loaded from the boot image before the first instruction</td></tr>';
         } else if (i === NS_TIER_BOOT_MAX + 1) {
-            html += '<tr class="ns-tier-header ns-tier-prog-header"><td colspan="10">&#x270F;&#xFE0F; Programmer &mdash; slots 11+ &mdash; allocated at runtime by programmer code</td></tr>';
+            html += '<tr class="ns-tier-header ns-tier-prog-header"><td colspan="9">&#x270F;&#xFE0F; Programmer &mdash; slots 11+ &mdash; allocated at runtime by programmer code</td><td class="ns-entry-actions" style="text-align:right;padding-right:4px;"><button onclick="event.stopPropagation();_nsTableAdd()" style="background:#1a2e1a;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);border-radius:3px;padding:2px 8px;font-size:0.7rem;cursor:pointer;white-space:nowrap;" title="Install a LUMP from the repository into the next free NS slot">+ Add LUMP</button></td></tr>';
         }
         const tierClass = i <= NS_TIER_HW_MAX ? 'ns-tier-hw-row' : (i <= NS_TIER_BOOT_MAX ? 'ns-tier-boot-row' : 'ns-tier-prog-row');
         html += `<tr id="ns-row-${i}" class="ns-row ${tierClass}" style="${rowOpacity}">`;
@@ -2581,18 +2581,21 @@ function updateNamespace() {
         html += `<td style="${warmStyle}">${ver}</td>`;
         html += `<td style="${warmStyle}">0x${seal.toString(16).toUpperCase().padStart(4, '0')}</td>`;
         {
+            const _clearBtn = (i >= 7 && i !== bootEntrySlot)
+                ? `<button class="btn btn-xs" onclick="event.stopPropagation();_nsTableClear(${i})" style="background:#2e1a1a;color:#f87171;border:1px solid rgba(248,113,113,0.35);margin-left:3px;" title="Clear slot — bumps the GT cycle count to revoke all existing tokens for this slot">Clear</button>`
+                : '';
             if (i <= NS_TIER_HW_MAX) {
                 html += `<td class="ns-entry-actions"></td>`;
             } else {
                 const _srcLump = _findSrcLump(i, e.label);
                 const _srcToken = _srcLump ? _srcLump.token : null;
                 if (codeNotResident) {
-                    html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span></td>`;
+                    html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span>${_clearBtn}</td>`;
                 } else {
                     const _srcBtn = _srcToken
                         ? `<button class="btn btn-xs" onclick="event.stopPropagation();_openLumpSource('${_srcToken}')" style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);" title="Open source in Repository view">Source</button>`
                         : '';
-                    html += `<td class="ns-entry-actions">${_srcBtn}</td>`;
+                    html += `<td class="ns-entry-actions">${_srcBtn}${_clearBtn}</td>`;
                 }
             }
         }
@@ -2642,6 +2645,157 @@ function updateNamespace() {
 
     html += '</tbody></table>';
     container.innerHTML = html;
+}
+
+// ── NS table: Add LUMP ────────────────────────────────────────────────────────
+// Fetch the server lump list, filter out lumps already live in the NS table,
+// and show a picker modal. On confirm, copy the lump binary into the extended
+// DMEM region for the allocated slot and write a valid NS entry.
+function _nsTableAdd() {
+    if (!sim) return;
+    const _existing = document.getElementById('_nsAddModalOverlay');
+    if (_existing) _existing.remove();
+
+    // Show loading overlay immediately
+    const _overlay = document.createElement('div');
+    _overlay.id = '_nsAddModalOverlay';
+    _overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center;';
+    _overlay.innerHTML = '<div style="background:#12121f;border:1px solid #2a2a4a;border-radius:8px;padding:24px 28px;min-width:340px;max-width:480px;color:#d0d0e8;font-size:0.85rem;"><div style="color:#c89b3c;font-size:1rem;font-weight:600;margin-bottom:12px;">+ Add LUMP to Namespace</div><div id="_nsAddStatus" style="color:#888;">Loading LUMP list\u2026</div></div>';
+    _overlay.addEventListener('click', function(ev) { if (ev.target === _overlay) _overlay.remove(); });
+    document.body.appendChild(_overlay);
+
+    fetch('/api/lumps/list')
+        .then(function(r) { return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
+        .then(function(list) {
+            if (!Array.isArray(list) || list.length === 0) {
+                document.getElementById('_nsAddStatus').textContent = 'No LUMPs available on the server.';
+                return;
+            }
+
+            // Build set of tokens already in the NS table (by _tokenSlotMap or fixed ns_slot)
+            const _occupied = new Set();
+            if (sim._tokenSlotMap) {
+                for (const [tok] of sim._tokenSlotMap) _occupied.add(tok);
+            }
+            // Also match by ns_slot in the list against currently-valid NS entries
+            const _available = list.filter(function(l) {
+                if (_occupied.has(l.token)) return false;
+                if (l.ns_slot !== null && l.ns_slot !== undefined) {
+                    const slot = parseInt(l.ns_slot, 10);
+                    if (!isNaN(slot) && sim.isNSEntryValid(slot)) return false;
+                }
+                return true;
+            });
+
+            if (_available.length === 0) {
+                document.getElementById('_nsAddStatus').textContent = 'All server LUMPs are already installed in the namespace.';
+                return;
+            }
+
+            // Render picker
+            const inner = _overlay.querySelector('div');
+            let optHtml = '';
+            for (const l of _available) {
+                const name = (l.abstraction || l.name || l.token).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                optHtml += `<option value="${l.token}">${name}</option>`;
+            }
+            inner.innerHTML = `
+                <div style="color:#c89b3c;font-size:1rem;font-weight:600;margin-bottom:12px;">+ Add LUMP to Namespace</div>
+                <div style="margin-bottom:10px;color:#888;font-size:0.8rem;">${_available.length} LUMP${_available.length === 1 ? '' : 's'} available</div>
+                <select id="_nsAddSelect" style="width:100%;background:#0d0d1a;color:#d0d0e8;border:1px solid #2a2a4a;border-radius:4px;padding:6px 8px;font-size:0.85rem;margin-bottom:14px;">${optHtml}</select>
+                <div id="_nsAddError" style="color:#f87171;font-size:0.78rem;min-height:1.2em;margin-bottom:8px;"></div>
+                <div style="display:flex;gap:8px;justify-content:flex-end;">
+                    <button onclick="document.getElementById('_nsAddModalOverlay').remove()" style="background:transparent;color:#888;border:1px solid #2a2a4a;border-radius:4px;padding:5px 14px;font-size:0.82rem;cursor:pointer;">Cancel</button>
+                    <button id="_nsAddConfirmBtn" onclick="_nsTableAddConfirm()" style="background:#1a4a2e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.4);border-radius:4px;padding:5px 14px;font-size:0.82rem;cursor:pointer;font-weight:600;">Install</button>
+                </div>`;
+        })
+        .catch(function(err) {
+            const st = document.getElementById('_nsAddStatus');
+            if (st) st.textContent = 'Failed to load LUMP list: ' + err;
+        });
+}
+
+function _nsTableAddConfirm() {
+    const sel = document.getElementById('_nsAddSelect');
+    const errEl = document.getElementById('_nsAddError');
+    const confirmBtn = document.getElementById('_nsAddConfirmBtn');
+    if (!sel || !sim) return;
+    const token = sel.value;
+    const name = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : token;
+    if (!token) { if (errEl) errEl.textContent = 'Please select a LUMP.'; return; }
+    if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Installing\u2026'; }
+    if (errEl) errEl.textContent = '';
+
+    fetch('/api/lump/' + token + '/words')
+        .then(function(r) { return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
+        .then(function(data) {
+            const words = Array.isArray(data) ? data : (data && Array.isArray(data.words) ? data.words : null);
+            if (!words || words.length === 0) return Promise.reject('Empty word list from server');
+
+            const hdr = sim.parseLumpHeader(words[0] >>> 0);
+            if (!hdr.valid) return Promise.reject('Invalid LUMP header (magic mismatch)');
+
+            const slot = sim.allocOrFindNsSlot(token, name);
+            if (slot === null) return Promise.reject('Namespace table is full');
+
+            // Copy lump words into this slot's extended DMEM region
+            const EXTENDED_BASE   = 0x0400;
+            const EXTENDED_STRIDE = 0x0100;
+            const PROG_SLOT       = 7;
+            const slotOffset      = Math.max(0, slot - PROG_SLOT);
+            const lumpBase        = EXTENDED_BASE + slotOffset * EXTENDED_STRIDE;
+
+            const copyLen = Math.min(words.length, EXTENDED_STRIDE);
+            for (let wi = 0; wi < copyLen; wi++) {
+                sim.memory[lumpBase + wi] = words[wi] >>> 0;
+            }
+
+            // Write NS entry: Inform GT (type=1), limit17=cw, cc from header
+            sim.writeNSEntry(slot, lumpBase, hdr.cw, 0, 0, 1, 0, hdr.cc, 0);
+            sim.nsLabels[slot] = name;
+
+            const _overlay = document.getElementById('_nsAddModalOverlay');
+            if (_overlay) _overlay.remove();
+            if (typeof updateNamespace === 'function') updateNamespace();
+        })
+        .catch(function(err) {
+            if (errEl) errEl.textContent = 'Error: ' + err;
+            if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Install'; }
+        });
+}
+
+// ── NS table: Clear slot ──────────────────────────────────────────────────────
+// Revokes all existing GTs for the slot by bumping the gt_seq cycle count,
+// then zeroes the entry. Any pre-Clear GT will fail GT validation on next use.
+function _nsTableClear(slot) {
+    if (!sim) return;
+    if (slot < 7) return;
+
+    // Read current cycle count from word2 bits[31:25]
+    const word2 = sim.memory[sim.NS_TABLE_BASE + slot * sim.NS_ENTRY_WORDS + 2] >>> 0;
+    const curSeq = (word2 >>> 25) & 0x7F;
+    const newSeq = (curSeq + 1) & 0x7F;
+
+    // Zero the entry but write the bumped sequence through makeVersionSeals so
+    // the GT validator detects nsGtSeq !== gt_seq for any pre-Clear token.
+    sim.writeNSEntry(slot, 0, 0, 0, 0, 0, newSeq, 0, 0);
+
+    // Clear label and token-slot map
+    if (sim.nsLabels) delete sim.nsLabels[slot];
+    if (sim._tokenSlotMap) {
+        for (const [tok, s] of sim._tokenSlotMap) {
+            if (s === slot) { sim._tokenSlotMap.delete(tok); break; }
+        }
+    }
+
+    // Shrink nsCount if this was the last valid entry
+    if (slot === sim.nsCount - 1) {
+        let newCount = slot;
+        while (newCount > 0 && !sim.isNSEntryValid(newCount - 1)) newCount--;
+        sim.nsCount = newCount;
+    }
+
+    if (typeof updateNamespace === 'function') updateNamespace();
 }
 
 // ── NS label click — dispatch on GT type ──────────────────────────────────────
