@@ -4290,6 +4290,37 @@ function _scrollToLumpMethod(tk, methodName, _attempt) {
 // (baseLoc / nsIdx / crIdx) needed by the patch bar and c-list picker.
 async function openLumpInEditor(token) {
     var lump = _lumpsCache.find(function(l) { return l.token === token; });
+
+    // ── In-memory assembled lump fallback ─────────────────────────────────
+    // When the token is not in the server cache (e.g. just assembled, not yet
+    // saved or submitted to the server), check whether it matches the token
+    // computed from the current in-memory assembly (lastAssembledWords +
+    // lastAssembledCapabilities).  If it matches, build a synthetic lump
+    // descriptor so the rest of this function can proceed identically.
+    var _inMemoryLump = false;
+    if (!lump && typeof lastAssembledWords !== 'undefined' && lastAssembledWords &&
+        lastAssembledWords.length > 0 && typeof window._computeLumpToken === 'function') {
+        var _memCaps = (typeof lastAssembledCapabilities !== 'undefined' && lastAssembledCapabilities)
+            ? lastAssembledCapabilities : [];
+        var _memToken = window._computeLumpToken(lastAssembledWords, _memCaps);
+        if (_memToken === token) {
+            _inMemoryLump = true;
+            var _memName = (typeof sim !== 'undefined' && sim && sim.programName)
+                ? sim.programName : ('Lump 0x' + token);
+            lump = {
+                token:       token,
+                abstraction: _memName,
+                ns_slot:     null,
+                capabilities: _memCaps,
+                cw:          lastAssembledWords.length,
+                cc:          _memCaps.length,
+                lump_type:   'code',
+                content_type: 'code',
+                language:    'assembly',
+            };
+        }
+    }
+
     if (!lump) return;
     var lumpName = lump.abstraction || ('Lump 0x' + token);
 
@@ -4342,17 +4373,33 @@ async function openLumpInEditor(token) {
         }
     }
 
-    // ── Fetch authoritative words from server ──────────────────────────────
-    // Reads from the same source as Binary / Content / Audit tabs so the
-    // editor disassembly is always consistent with every other view.
+    // ── Fetch authoritative words from server (or use in-memory words) ───────
+    // For server-persisted lumps: reads from /api/lump/<token>/words so the
+    // editor disassembly is consistent with every other view.
+    // For in-memory assembled lumps (not yet saved): build serverWords directly
+    // from lastAssembledWords so no server round-trip is needed.
     var serverWords = null;
-    try {
-        var _wr = await fetch('/api/lump/' + token + '/words', { cache: 'no-store' });
-        if (_wr.ok) {
-            var _wj = await _wr.json();
-            if (_wj && Array.isArray(_wj.words)) serverWords = _wj.words;
-        }
-    } catch (_fe) {}
+    if (_inMemoryLump && typeof lastAssembledWords !== 'undefined' && lastAssembledWords &&
+        lastAssembledWords.length > 0) {
+        var _memCaps2 = (typeof lastAssembledCapabilities !== 'undefined' && lastAssembledCapabilities)
+            ? lastAssembledCapabilities : [];
+        var _memCw = lastAssembledWords.length;
+        var _memCc = _memCaps2.length;
+        var _memNeeded = 1 + _memCw + _memCc;
+        var _memLumpSize = 64;
+        while (_memLumpSize < _memNeeded) _memLumpSize <<= 1;
+        var _memNm6 = Math.round(Math.log2(_memLumpSize)) - 6;
+        var _memHdr = (0x1F << 27) | ((_memNm6 & 0xF) << 23) | ((_memCw & 0x1FFF) << 10) | (_memCc & 0xFF);
+        serverWords = [_memHdr >>> 0].concat(lastAssembledWords.map(function(w) { return w >>> 0; }));
+    } else {
+        try {
+            var _wr = await fetch('/api/lump/' + token + '/words', { cache: 'no-store' });
+            if (_wr.ok) {
+                var _wj = await _wr.json();
+                if (_wj && Array.isArray(_wj.words)) serverWords = _wj.words;
+            }
+        } catch (_fe) {}
+    }
 
     // ── Disassemble from server words (authoritative) ──────────────────────
     var disasmLines = null;
@@ -4488,17 +4535,20 @@ async function openLumpInEditor(token) {
         // ── Try to restore original source from sidecar detail endpoint ──────
         // Only override _compiledDisasm when a non-empty source is found;
         // older LUMPs (compiled before this feature) silently fall through.
+        // Skip for in-memory lumps — the disasm IS the source.
         var _sourceRestored = false;
-        try {
-            var _dr = await fetch('/api/lumps/' + token + '/detail', { cache: 'no-store' });
-            if (_dr.ok) {
-                var _dj = await _dr.json();
-                if (_dj && typeof _dj.source === 'string' && _dj.source.trim().length > 0) {
-                    _compiledDisasm = _dj.source;
-                    _sourceRestored = true;
+        if (!_inMemoryLump) {
+            try {
+                var _dr = await fetch('/api/lumps/' + token + '/detail', { cache: 'no-store' });
+                if (_dr.ok) {
+                    var _dj = await _dr.json();
+                    if (_dj && typeof _dj.source === 'string' && _dj.source.trim().length > 0) {
+                        _compiledDisasm = _dj.source;
+                        _sourceRestored = true;
+                    }
                 }
-            }
-        } catch (_dfe) {}
+            } catch (_dfe) {}
+        }
 
         // ── Record original (compiled) text for dirty comparison ──────────
         window._editorOriginalDisasm = _compiledDisasm;

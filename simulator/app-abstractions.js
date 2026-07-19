@@ -633,12 +633,31 @@ async function renderLumps() {
         // live auto-select above cannot override the user's explicit slot click.
         // _pendingLumpTab is only honoured when the token resolves successfully;
         // a stale/missing token clears both to avoid applying a tab to the wrong lump.
+        //
+        // In-memory lump fallback: when the pending token is not in the server cache
+        // (e.g. freshly assembled but not yet saved), check if it matches the
+        // currently in-memory assembled lump.  If so, defer openLumpInEditor() so
+        // the editor opens with the in-memory content rather than silently failing.
         if (window._pendingLumpToken) {
-            const _ptMatch = lumps.find(l => l.token === window._pendingLumpToken);
+            const _ptToken = window._pendingLumpToken;
+            const _ptMatch = lumps.find(l => l.token === _ptToken);
             if (_ptMatch) {
                 _selectedLumpToken = _ptMatch.token;
             } else {
-                window._pendingLumpTab = null;
+                var _inMemResolved = false;
+                if (typeof lastAssembledWords !== 'undefined' && lastAssembledWords &&
+                    lastAssembledWords.length > 0 &&
+                    typeof window._computeLumpToken === 'function') {
+                    var _memCapsRl = (typeof lastAssembledCapabilities !== 'undefined' && lastAssembledCapabilities)
+                        ? lastAssembledCapabilities : [];
+                    if (window._computeLumpToken(lastAssembledWords, _memCapsRl) === _ptToken) {
+                        _inMemResolved = true;
+                        setTimeout(function() {
+                            if (typeof openLumpInEditor === 'function') openLumpInEditor(_ptToken);
+                        }, 0);
+                    }
+                }
+                if (!_inMemResolved) window._pendingLumpTab = null;
             }
             window._pendingLumpToken = null;
         }

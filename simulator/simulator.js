@@ -138,6 +138,13 @@ const SCHEDULER_IRQ_CLIST = [
     { name: 'CR13_MBIT', target: 22, grants: { E: 1 } },
 ];
 
+// ── Boot slot constants ────────────────────────────────────────────────────
+// The ONLY two legitimate slot-number literals in the entire simulator
+// navigation stack.  Every other slot reference must go through lumpTokenAtSlot
+// or the NS label index — never a raw integer literal.
+const BOOT_NS_SLOT_HEADER = 0;   // Boot.NS header LUMP (covers entire memory)
+const BOOT_NS_SLOT_THREAD = 1;   // Thread entry LUMP (TCB / boot Thread)
+
 // Direct dispatch: after boot step B:07 NUC_CODE, CR0 is pre-loaded with the
 // boot-entry E-GT (Thread.caps[0]).  No trampoline instructions needed.
 
@@ -1281,7 +1288,7 @@ class ChurchSimulator {
             this.createGT(0, this.bootEntrySlot, {E: 1}, 1);
 
         // Memory-manager GT at c-list[0]: R|W Inform capability over NS slot 0 (full namespace).
-        clistGTs[0] = this.createGT(0, 0, {R:1, W:1}, 1);
+        clistGTs[0] = this.createGT(0, BOOT_NS_SLOT_HEADER, {R:1, W:1}, 1);
         const DEMO_CLIST_SIZE   = 11;   // slots 0–10 (minimal 8-slot namespace)
 
         // ── NS lump header and c-list (Task #694) ────────────────────────────────────
@@ -1494,7 +1501,7 @@ class ChurchSimulator {
             // CR15; it is only used internally by mLoad for bounds/version checks.
             // ════════════════════════════════════════════════════════════════════
             case 1: {
-                const gt15 = this.createGT(0, 0, {R:0,W:0,X:0,L:0,S:0,E:0}, 1); // zero-perm Inform GT for NS Slot 0 (the namespace table itself)
+                const gt15 = this.createGT(0, BOOT_NS_SLOT_HEADER, {R:0,W:0,X:0,L:0,S:0,E:0}, 1); // zero-perm Inform GT for NS Slot 0 (the namespace table itself)
                 const check = this.mLoad(gt15, null, undefined);                   // mLoad with M-elevation; reads NS word0/word1 for Slot 0
                 if (!check.ok) {
                     this.fault('BOOT', `LOAD_NS mLoad failed: ${check.message}`);  // NS entry missing or corrupted — unrecoverable
@@ -1517,7 +1524,7 @@ class ChurchSimulator {
             // issue mLoad/mSave through CR12 directly.
             // ════════════════════════════════════════════════════════════════════
             case 2: {
-                const gt12 = this.createGT(0, 1, {R:0,W:0,X:0,L:0,S:0,E:0}, 1); // zero-perm Inform GT for NS Slot 1 (thread lump)
+                const gt12 = this.createGT(0, BOOT_NS_SLOT_THREAD, {R:0,W:0,X:0,L:0,S:0,E:0}, 1); // zero-perm Inform GT for NS Slot 1 (thread lump)
                 const check12 = this.mLoad(gt12, null, undefined);                 // M-elevation mLoad; reads thread lump NS entry
                 if (!check12.ok) {
                     this.fault('BOOT', `INIT_THRD mLoad(Thread) failed: ${check12.message}`);
@@ -1550,7 +1557,7 @@ class ChurchSimulator {
                 const _threadCC12     = _threadHdr12.valid ? _threadHdr12.cc : 0;
                 const _heapStart12    = 1 + 16 + _threadCC12;                     // first word above header + DR zone + c-list
                 const _spMax12        = (_threadHdr12.valid ? _threadHdr12.lumpSize : 256) - 12 - 1;
-                const gt5 = this.createGT(0, 1, {R:1,W:1,X:0,L:0,S:0,E:0}, 1);  // RW Inform GT for the thread lump (Slot 1)
+                const gt5 = this.createGT(0, BOOT_NS_SLOT_THREAD, {R:1,W:1,X:0,L:0,S:0,E:0}, 1);  // RW Inform GT for the thread lump (Slot 1)
                 this._writeCR(5, gt5, _initThrdEntry);                             // CR5 ← heap RW token (base=thread lump, perms=RW)
                 this.output += `[BOOT] INIT_HEAP — CR5 <- thread heap (RW, Inform, Slot 1) heap=[+${_heapStart12}..+${_spMax12}] (CHANGE-consistent)\n`;
                 // Synthetic audit entry so the TSB Audit panel shows the CR5 heap
@@ -1558,8 +1565,8 @@ class ChurchSimulator {
                 // created directly by the boot state machine, CHANGE-consistent).
                 this.auditLog.push({
                     gate: 'HEAP',
-                    label: this.nsLabels[1] || 'Boot.Thread',
-                    nsIndex: 1,
+                    label: this.nsLabels[BOOT_NS_SLOT_THREAD] || 'Boot.Thread',
+                    nsIndex: BOOT_NS_SLOT_THREAD,
                     requiredPerm: null,
                     checks: {
                         version: { pass: true },
@@ -1673,7 +1680,7 @@ class ChurchSimulator {
                 // Bridges the gap between IDE convention (double-click to install) and the boot
                 // sequence: a user who boots without manually installing CR0 will no longer see
                 // CR0 as NULL during simulation.
-                const _b5ThreadEntry = this.readNSEntry(1);
+                const _b5ThreadEntry = this.readNSEntry(BOOT_NS_SLOT_THREAD);
                 if (_b5ThreadEntry && _b5ThreadEntry.word0_location) {
                     const _b5CR0Addr = (_b5ThreadEntry.word0_location >>> 0) + THREAD_CAPS_OFFSET;
                     if ((this.memory[_b5CR0Addr] >>> 0) === 0) {
@@ -6762,7 +6769,7 @@ class ChurchSimulator {
     // because limit17 encodes the code-region limit, not the full slot size.
     _findFreeSlot(lumpSize) {
         let highWater = 0;
-        for (let i = 1; i < this.nsCount; i++) {   // skip slot 0 (namespace descriptor)
+        for (let i = BOOT_NS_SLOT_THREAD; i < this.nsCount; i++) {   // skip BOOT_NS_SLOT_HEADER (namespace descriptor)
             const entry = this.readNSEntry(i);
             if (!entry) continue;
             const entryW1 = this.parseNSWord1(entry.word1_limit);
@@ -6882,6 +6889,50 @@ class ChurchSimulator {
             sealGtSeq: sealGtSeq,
             sealCRC: sealCRC,
         };
+    }
+
+    // ── lumpTokenAtSlot ────────────────────────────────────────────────────
+    // Universal slot→token converter.  Reads the lump at NS slot idx from
+    // simulator memory, packs it into a big-endian byte buffer, runs CRC-32
+    // (IEEE 802.3) over the whole buffer, and returns the 8-hex-digit token
+    // string — exactly matching the fingerprint produced by _computeLumpToken.
+    // Returns null if the slot has no valid lump.
+    lumpTokenAtSlot(idx) {
+        try {
+            const entry = this.readNSEntry(idx);
+            if (!entry) return null;
+            const loc = entry.word0_location >>> 0;
+            const hdrW = loc < this.memory.length ? (this.memory[loc] >>> 0) : 0;
+            const hdr = this.parseLumpHeader ? this.parseLumpHeader(hdrW) : null;
+            if (!hdr || !hdr.valid) return null;
+            const cw = hdr.cw;
+            const cc = hdr.cc;
+            const nMinus6 = hdr.n_minus_6 !== undefined ? hdr.n_minus_6 : (hdr.lump_size ? Math.round(Math.log2(hdr.lump_size)) - 6 : 0);
+            const lumpSize = 64 << Math.max(0, nMinus6);
+            const byteLen = lumpSize * 4;
+            const buf = new Uint8Array(byteLen);
+            const words = [];
+            for (let i = 0; i < lumpSize; i++) {
+                words.push(loc + i < this.memory.length ? (this.memory[loc + i] >>> 0) : 0);
+            }
+            for (let i = 0; i < lumpSize; i++) {
+                const v = words[i];
+                const off = i * 4;
+                buf[off]     = (v >>> 24) & 0xFF;
+                buf[off + 1] = (v >>> 16) & 0xFF;
+                buf[off + 2] = (v >>>  8) & 0xFF;
+                buf[off + 3] =  v         & 0xFF;
+            }
+            const crcTable = new Uint32Array(256);
+            for (let n = 0; n < 256; n++) {
+                let c = n;
+                for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+                crcTable[n] = c;
+            }
+            let crc = 0xFFFFFFFF;
+            for (let b = 0; b < byteLen; b++) crc = crcTable[(crc ^ buf[b]) & 0xFF] ^ (crc >>> 8);
+            return ((crc ^ 0xFFFFFFFF) >>> 0).toString(16).toLowerCase().padStart(8, '0');
+        } catch (_e) { return null; }
     }
 
     saveToNamespace(label, words, perms, gtType, caps) {

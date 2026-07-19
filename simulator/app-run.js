@@ -3001,19 +3001,18 @@ function faultModalOpenEditor(lineNum) {
 
 function faultModalOpenBinaryLump(nsIdx) {
     faultModalDismiss();
-    // Prefer opening the lump directly in the editor (CREATE view).
-    if (typeof _lumpsCache !== 'undefined' && _lumpsCache) {
-        var lump = null;
-        for (var li = 0; li < _lumpsCache.length; li++) {
-            var ns = parseInt(_lumpsCache[li].ns_slot);
-            if (!isNaN(ns) && ns === nsIdx) { lump = _lumpsCache[li]; break; }
-        }
-        if (lump && lump.token && typeof openLumpInEditor === 'function') {
-            openLumpInEditor(lump.token);
-            return;
-        }
+    // Primary path: resolve slot → token via simulator memory, then navigate
+    // by token.  This is independent of server-side lump cache slot assignment
+    // and correctly handles user-compiled lumps not yet in _lumpsCache.
+    var token = null;
+    if (typeof sim !== 'undefined' && sim && typeof sim.lumpTokenAtSlot === 'function') {
+        token = sim.lumpTokenAtSlot(nsIdx);
     }
-    // Fallback: open namespace view scrolled to the relevant slot.
+    if (token && typeof openLumpInEditor === 'function') {
+        openLumpInEditor(token);
+        return;
+    }
+    // Last-resort fallback: open namespace view scrolled to the relevant slot.
     switchView('namespace');
     setTimeout(function() {
         var row = document.getElementById('ns-row-' + nsIdx);
@@ -11267,6 +11266,13 @@ function confirmSaveToNamespace() {
     }
     closeSaveDialog();
     saveNamespaceState();
+
+    // Compute and store the token for the just-saved lump so "Open Lump"
+    // navigates by token after a Save to NS (Step 2 of token-first navigation).
+    if (typeof window._computeLumpToken === 'function') {
+        window._editorLastSavedToken = window._computeLumpToken(lastAssembledWords, _caps);
+    }
+
     const con = document.getElementById('editorConsole');
     if (con) {
         const _ccMsg = _caps.length ? ` cc=${_caps.length} (${_caps.map(c=>c.name).join(', ')})` : '';

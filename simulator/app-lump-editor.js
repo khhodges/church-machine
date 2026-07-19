@@ -1283,6 +1283,52 @@
         if (typeof generateBootImage === 'function') generateBootImage();
     };
 
+    // ── _computeLumpToken ──────────────────────────────────────────────────
+    // Shared helper: given instruction words + capability declarations,
+    // builds the canonical LUMP binary (big-endian, zero-padded to next
+    // power-of-2 ≥ 64 words) and returns the CRC-32 token string (8 hex
+    // digits, no "0x" prefix).  Used by buildLumpFromAssembly, assembleAndLoad,
+    // confirmSaveToNamespace, and faultModalOpenBinaryLump so they all derive
+    // exactly the same fingerprint from the same content.
+    window._computeLumpToken = function (words, caps) {
+        caps = caps || [];
+        var cw          = words.length;
+        var cc          = caps.length;
+        var totalNeeded = 1 + cw + cc;
+        var lumpSize    = 64;
+        while (lumpSize < totalNeeded) lumpSize <<= 1;
+
+        var n_minus_6 = Math.round(Math.log2(lumpSize)) - 6;
+        var hdr       = packHdr(n_minus_6, cw, cc, 0);
+
+        var byteLen = lumpSize * 4;
+        var buf     = new Uint8Array(byteLen);
+
+        function writeU32BE(offset, val) {
+            val = val >>> 0;
+            buf[offset]     = (val >>> 24) & 0xFF;
+            buf[offset + 1] = (val >>> 16) & 0xFF;
+            buf[offset + 2] = (val >>>  8) & 0xFF;
+            buf[offset + 3] =  val         & 0xFF;
+        }
+
+        writeU32BE(0, hdr);
+        for (var i = 0; i < cw; i++) writeU32BE((1 + i) * 4, words[i]);
+
+        var crcTable = (function () {
+            var t = new Uint32Array(256);
+            for (var n = 0; n < 256; n++) {
+                var c = n;
+                for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+                t[n] = c;
+            }
+            return t;
+        }());
+        var crc = 0xFFFFFFFF;
+        for (var b = 0; b < buf.length; b++) crc = crcTable[(crc ^ buf[b]) & 0xFF] ^ (crc >>> 8);
+        return ((crc ^ 0xFFFFFFFF) >>> 0).toString(16).toLowerCase().padStart(8, '0');
+    };
+
     // ── buildLumpFromAssembly ──────────────────────────────────────────────
     // Packages the most-recently assembled instruction words (lastAssembledWords)
     // into a floating LUMP binary and triggers a browser download.
@@ -1332,19 +1378,7 @@
         writeU32BE(0, hdr);
         for (var i = 0; i < cw; i++) writeU32BE((1 + i) * 4, words[i]);
 
-        // Compute CRC-32 (IEEE 802.3) for the token
-        var crcTable = (function () {
-            var t = new Uint32Array(256);
-            for (var n = 0; n < 256; n++) {
-                var c = n;
-                for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-                t[n] = c;
-            }
-            return t;
-        }());
-        var crc = 0xFFFFFFFF;
-        for (var b = 0; b < buf.length; b++) crc = crcTable[(crc ^ buf[b]) & 0xFF] ^ (crc >>> 8);
-        var token = ((crc ^ 0xFFFFFFFF) >>> 0).toString(16).toLowerCase().padStart(8, '0');
+        var token = window._computeLumpToken(words, caps);
 
         var filename = token + '.lump';
         var blob     = new Blob([buf], { type: 'application/octet-stream' });

@@ -1858,6 +1858,14 @@ function loadCLOOMCIntoSim() {
     window._assemblerSymbols = { labels, lumpName: sim.programName };
     _pendingSimLoad          = true;
 
+    // Compute and store the token for this assembled lump so "Open Lump"
+    // navigates by token (not by NS slot index) immediately after assembly,
+    // even before a Save to NS or server-side persist has occurred.
+    if (typeof window._computeLumpToken === 'function') {
+        const _asmCaps = (result.capabilities && result.capabilities.length > 0) ? result.capabilities : [];
+        window._editorLastSavedToken = window._computeLumpToken(words, _asmCaps);
+    }
+
     // If the machine is not yet booted, silently complete the full boot sequence
     // now so the user lands on the dashboard ready to Step immediately — no
     // manual boot clicking required.
