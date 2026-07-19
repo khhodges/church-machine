@@ -710,15 +710,17 @@ function showNextSteps(context) {
 // not (nothing compiled yet, or the token was invalidated by an edit since
 // the last compile), it just opens the Lumps view with no pre-selection.
 function _openLastCompiledLump() {
-    if (window._editorLastSavedToken) window._pendingLumpToken = window._editorLastSavedToken;
+    const cur = window.LumpRegistry?.getCurrent();
+    if (cur) window.LumpRegistry.setPending(cur);
     if (typeof switchView === 'function') switchView('lumps');
 }
 
-// Single choke point for invalidating window._editorLastSavedToken whenever
-// the previously-compiled/saved lump becomes stale (edit, tab switch,
-// reboot, fault clear, ...).
+// Single choke point for invalidating the previously-compiled/saved lump
+// whenever it becomes stale (edit, tab switch, reboot, fault clear, ...).
+// Evicts the in-memory content from the registry so resolveWords() falls
+// back to the server (or returns null if not yet persisted).
 function _invalidateLastSavedToken() {
-    window._editorLastSavedToken = null;
+    if (window.LumpRegistry) window.LumpRegistry.evictMemory(window.LumpRegistry.getCurrent());
 }
 
 function initConsoleAutoSwitch() {

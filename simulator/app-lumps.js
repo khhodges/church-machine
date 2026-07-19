@@ -1,6 +1,6 @@
 function showLumpDetail(token) {
     _lumpEditDirty = false;
-    _selectedLumpToken = token;
+    if (window.LumpRegistry) window.LumpRegistry.setCurrent(token);
     if (typeof _lumpRecordView === 'function') _lumpRecordView(token);
     if (typeof _updateLumpViewingLabel === 'function') _updateLumpViewingLabel(token);
     const listEl = document.getElementById('lumpsListContent');
@@ -1337,7 +1337,7 @@ function _lumpSrcEditMethod(absIdx, mName) {
     const outEl = document.getElementById('assemblyOutput');
     if (outEl) outEl.innerHTML = '';
     window._pseudoEditContext = { absIdx: absIdx, methodName: mName };
-    if (typeof _invalidateLastSavedToken === 'function') _invalidateLastSavedToken(); else window._editorLastSavedToken = null;
+    if (typeof _invalidateLastSavedToken === 'function') _invalidateLastSavedToken();
     if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
     if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
 }
@@ -3836,7 +3836,7 @@ function deleteLump(token) {
         .then(r => { if (!r.ok && r.status !== 404) throw new Error(`HTTP ${r.status}`); return r.json(); })
         .then(resp => {
             if (resp.ok) {
-                _selectedLumpToken = null;
+                if (window.LumpRegistry) { window.LumpRegistry.evictMemory(token); window.LumpRegistry.setCurrent(null); }
                 const titleEl = document.getElementById('lumpsDetailTitle');
                 const contentEl = document.getElementById('lumpsDetailContent');
                 if (titleEl) titleEl.textContent = 'Select a lump';
@@ -3857,7 +3857,7 @@ function deleteLump(token) {
 let _nsBuilderSlots = [];
 
 function showNamespaceBuilder() {
-    _selectedLumpToken = null;
+    if (window.LumpRegistry) window.LumpRegistry.setCurrent(null);
     _nsBuilderSlots = [{ label: '', state: 'null', hash_prefix: '', loc_idx: 0, flag_required: false, flag_bundle: false, flag_pinned: false, lump_token: '' }];
 
     const listEl = document.getElementById('lumpsListContent');
@@ -4103,13 +4103,13 @@ async function _absOpenInEditorByName(name, methodName) {
     }
 
     // Fallback: no specific method context — open the whole saved LUMP, as before.
-    if (_lumpsCache.length === 0) {
+    if (!window.LumpRegistry || window.LumpRegistry.getServerList().length === 0) {
         try {
             const r = await fetch('/api/lumps/list');
-            if (r.ok) _lumpsCache = await r.json();
+            if (r.ok) { const _fbl = await r.json(); if (window.LumpRegistry) window.LumpRegistry.registerFromServer(_fbl); }
         } catch (e) {}
     }
-    const existing = _lumpsCache.find(l => l.abstraction === name);
+    const existing = window.LumpRegistry ? window.LumpRegistry.getServerList().find(l => l.abstraction === name) : null;
     if (!existing) {
         if (typeof _showFpgaToast === 'function') {
             _showFpgaToast('No LUMP found', 'No compiled LUMP found for \u201c' + name + '\u201d \u2014 cannot open in editor', 'warn', 2000);
@@ -4136,8 +4136,8 @@ async function _goToLumpByAbstractionName(name, methodName, targetTab) {
     // range for that method — see _scrollToLumpHexMethod().
     _pendingLumpMethodTarget = (targetTab === 'hexdump') ? 'hexdump' : 'content';
     // Warm cache: check immediately without a network round-trip.
-    if (_lumpsCache.length > 0) {
-        const existing = _lumpsCache.find(l => l.abstraction === name);
+    if (window.LumpRegistry && window.LumpRegistry.getServerList().length > 0) {
+        const existing = window.LumpRegistry.getServerList().find(l => l.abstraction === name);
         if (!existing) {
             _showFpgaToast('No LUMP found', 'No compiled LUMP found for \u201c' + name + '\u201d', 'warn', 2000);
             return;
@@ -4153,7 +4153,7 @@ async function _goToLumpByAbstractionName(name, methodName, targetTab) {
         const r = await fetch('/api/lumps/list');
         if (!r.ok) return;
         const lumps = await r.json();
-        _lumpsCache = lumps;
+        if (window.LumpRegistry) window.LumpRegistry.registerFromServer(lumps);
         const existing = lumps.find(l => l.abstraction === name);
         if (!existing) {
             _showFpgaToast('No LUMP found', 'No compiled LUMP found for \u201c' + name + '\u201d', 'warn', 2000);
@@ -4225,7 +4225,7 @@ function _lumpVersionLabel(lump) {
 // so the live-lump auto-select cannot clobber the explicit choice.
 function _switchToLumpVersionAndScroll(token, methodName) {
     if (!token) return;
-    window._pendingLumpToken = token;
+    if (window.LumpRegistry) window.LumpRegistry.setPending(token);
     window._pendingLumpTab = 'content';
     _pendingLumpMethodName = methodName || null;
     if (typeof renderLumps === 'function') renderLumps();
@@ -4289,31 +4289,25 @@ function _scrollToLumpMethod(tk, methodName, _attempt) {
 // every other view.  sim.memory is used only for structural location info
 // (baseLoc / nsIdx / crIdx) needed by the patch bar and c-list picker.
 async function openLumpInEditor(token) {
-    var lump = _lumpsCache.find(function(l) { return l.token === token; });
+    var lump = window.LumpRegistry ? (window.LumpRegistry.resolve(token)?.sources?.server || null) : null;
 
     // ── In-memory assembled lump fallback ─────────────────────────────────
     // When the token is not in the server cache (e.g. just assembled, not yet
-    // saved or submitted to the server), check whether it matches the token
-    // computed from the current in-memory assembly (lastAssembledWords +
-    // lastAssembledCapabilities).  If it matches, build a synthetic lump
-    // descriptor so the rest of this function can proceed identically.
+    // saved), check the registry's memory source.  If it matches, build a
+    // synthetic lump descriptor so the rest of this function proceeds identically.
     var _inMemoryLump = false;
-    if (!lump && typeof lastAssembledWords !== 'undefined' && lastAssembledWords &&
-        lastAssembledWords.length > 0 && typeof window._computeLumpToken === 'function') {
-        var _memCaps = (typeof lastAssembledCapabilities !== 'undefined' && lastAssembledCapabilities)
-            ? lastAssembledCapabilities : [];
-        var _memToken = window._computeLumpToken(lastAssembledWords, _memCaps);
-        if (_memToken === token) {
-            _inMemoryLump = true;
-            var _memName = (typeof sim !== 'undefined' && sim && sim.programName)
-                ? sim.programName : ('Lump 0x' + token);
+    var _regMemData = window.LumpRegistry ? window.LumpRegistry.resolve(token)?.sources?.memory : null;
+    if (!lump && _regMemData && _regMemData.words && _regMemData.words.length > 0) {
+        _inMemoryLump = true;
+        var _memName = _regMemData.abstraction || ((typeof sim !== 'undefined' && sim && sim.programName)
+            ? sim.programName : ('Lump 0x' + token));
             lump = {
                 token:       token,
                 abstraction: _memName,
                 ns_slot:     null,
-                capabilities: _memCaps,
-                cw:          lastAssembledWords.length,
-                cc:          _memCaps.length,
+                capabilities: _regMemData.capabilities || [],
+                cw:          _regMemData.words.length,
+                cc:          (_regMemData.capabilities || []).length,
                 lump_type:   'code',
                 content_type: 'code',
                 language:    'assembly',
@@ -4385,18 +4379,16 @@ async function openLumpInEditor(token) {
     // For in-memory assembled lumps (not yet saved): build serverWords directly
     // from lastAssembledWords so no server round-trip is needed.
     var serverWords = null;
-    if (_inMemoryLump && typeof lastAssembledWords !== 'undefined' && lastAssembledWords &&
-        lastAssembledWords.length > 0) {
-        var _memCaps2 = (typeof lastAssembledCapabilities !== 'undefined' && lastAssembledCapabilities)
-            ? lastAssembledCapabilities : [];
-        var _memCw = lastAssembledWords.length;
+    if (_inMemoryLump && _regMemData && _regMemData.words && _regMemData.words.length > 0) {
+        var _memCaps2 = _regMemData.capabilities || [];
+        var _memCw = _regMemData.words.length;
         var _memCc = _memCaps2.length;
         var _memNeeded = 1 + _memCw + _memCc;
         var _memLumpSize = 64;
         while (_memLumpSize < _memNeeded) _memLumpSize <<= 1;
         var _memNm6 = Math.round(Math.log2(_memLumpSize)) - 6;
         var _memHdr = (0x1F << 27) | ((_memNm6 & 0xF) << 23) | ((_memCw & 0x1FFF) << 10) | (_memCc & 0xFF);
-        serverWords = [_memHdr >>> 0].concat(lastAssembledWords.map(function(w) { return w >>> 0; }));
+        serverWords = [_memHdr >>> 0].concat(_regMemData.words.map(function(w) { return w >>> 0; }));
     } else {
         try {
             var _wr = await fetch('/api/lump/' + token + '/words', { cache: 'no-store' });
@@ -4653,7 +4645,7 @@ async function openLumpInEditor(token) {
         }
         window._editorLumpDirtyToken       = null;
         window._editorLumpDirtyListener    = null;
-        window._editorLastSavedToken       = null;
+        if (window.LumpRegistry) window.LumpRegistry.evictMemory(window.LumpRegistry.getCurrent());
         // Remove banners and the button itself
         var _db = document.getElementById('_lumpDraftBanner');
         if (_db) _db.remove();
@@ -4671,7 +4663,7 @@ async function openLumpInEditor(token) {
     // c-list without requiring a recompile.  The compile-start path already
     // clears this to null (app-compile.js line ~1158) so mid-edit state is
     // never stale.
-    window._editorLastSavedToken = token;
+    if (window.LumpRegistry) window.LumpRegistry.setCurrent(token);
     // Opening a saved LUMP is a distinct context from a catalog-method edit —
     // clear any stale abstraction/method context so the jump links reflect
     // this LUMP, not a previously-edited method.
@@ -5148,7 +5140,10 @@ async function runSelftestLump() {
 
         sim.loadProgram(words, 0);
         if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
-        if (typeof lastAssembledWords !== 'undefined') lastAssembledWords = words.slice();
+        if (window.LumpRegistry) {
+            window.LumpRegistry.registerMemory(SELFTEST_TOKEN, SELFTEST_NAME, words.slice(), []);
+            window.LumpRegistry.setCurrent(SELFTEST_TOKEN);
+        }
         if (typeof _defaultProgramLoaded !== 'undefined') window._defaultProgramLoaded = true;
         if (typeof _injectClistNow === 'function') {
             _injectClistNow();

@@ -86,6 +86,40 @@ const ALL_SRC = [TOAST_SRC, ABS_TO_EDITOR_SRC, ABS_TO_LUMP_SRC,
                  REFRESH_LINKS_SRC, EDITOR_TO_LUMP_SRC, EDITOR_TO_ABS_SRC,
                  RENDER_LUMPS_SRC].join('\n\n');
 
+// ── Minimal LumpRegistry mock ────────────────────────────────────────────────
+// Provides the same API as lump-registry.js (window.LumpRegistry) without
+// requiring localStorage or the full registry module.  Production code guards
+// all calls with `if (window.LumpRegistry)` so only the used methods need
+// implementation here.
+function _makeMockRegistry(initialLumps) {
+    let _cur = null;
+    let _pend = null;
+    let _serverList = (initialLumps || []).slice();
+    const _mem = new Map();
+    return {
+        registerFromServer(lumps) { _serverList = (lumps || []).slice(); },
+        registerMemory(tok, abstr, words, caps) {
+            _mem.set(tok, { token: tok, abstraction: abstr, sources: {
+                memory: { words: (words||[]).slice(), capabilities: (caps||[]).slice() }
+            }});
+        },
+        setCurrent(tok)    { _cur  = tok; },
+        getCurrent()       { return _cur; },
+        setPending(tok)    { _pend = tok; },
+        getPending()       { return _pend; },
+        consumePending()   { const t = _pend; _pend = null; return t; },
+        getServerList()    { return _serverList; },
+        resolve(tok) {
+            if (_mem.has(tok)) return _mem.get(tok);
+            const srv = _serverList.find(l => l.token === tok);
+            return srv ? { token: tok, abstraction: srv.abstraction, sources: { server: srv } } : null;
+        },
+        has(tok)           { return _mem.has(tok) || _serverList.some(l => l.token === tok); },
+        list()             { return _serverList.slice(); },
+        evictMemory(tok)   { _mem.delete(tok); },
+    };
+}
+
 // ── VM context factory ───────────────────────────────────────────────────────
 // Builds a jsdom document (with the two editor jump buttons present, matching
 // index.html) plus a real _lumpsCache / abstractionRegistry pair and spies for
@@ -128,12 +162,15 @@ function makeCtx({ lumpsCache = [], abstractions = [], fetchImpl = null,
     // when the test asserts on it shortly afterward.
     const timeoutFn = fastTimers ? (fn, ms) => setTimeout(fn, ms === 100 ? 0 : ms) : setTimeout;
 
+    const _reg = _makeMockRegistry(lumpsCache);
+
     const sandbox = {
         document,
         setTimeout: timeoutFn, clearTimeout,
         Promise,
         window: { _pseudoEditContext: null, _editorLastSavedToken: null, _editorJumpTargets: null,
-                  _pendingLumpTab: null, _pendingLumpToken: null },
+                  _pendingLumpTab: null, _pendingLumpToken: null,
+                  LumpRegistry: _reg },
         _lumpsCache: lumpsCache,
         _pendingLumpAbstractionName: null,
         _pendingLumpMethodName: null,
@@ -515,8 +552,8 @@ trackAsync((async function t14() {
     await vm.runInContext('renderLumps()', ctx);
 
     assert('T14 renderLumps resolved _selectedLumpToken to the versioned floating fork (not boot-resident)',
-        vm.runInContext('_selectedLumpToken', ctx) === 'WIDGETV2FLOAT',
-        vm.runInContext('_selectedLumpToken', ctx));
+        vm.runInContext('window.LumpRegistry.getCurrent()', ctx) === 'WIDGETV2FLOAT',
+        vm.runInContext('window.LumpRegistry.getCurrent()', ctx));
     assert('T14 renderLumps requested the Content tab for the RESOLVED token',
         calls.switchLumpTab.length === 1 && calls.switchLumpTab[0][0] === 'WIDGETV2FLOAT' && calls.switchLumpTab[0][1] === 'content',
         calls.switchLumpTab);
@@ -592,9 +629,9 @@ trackAsync((async function t15() {
     actionBtn.dispatchEvent(new (document.defaultView.Event)('click'));
     await new Promise(resolve => setTimeout(resolve, 50));
     assert('T15 action switches window._pendingLumpToken to the sibling lump',
-        vm.runInContext('window._pendingLumpToken', ctx) === null && // consumed by renderLumps() re-run
-        vm.runInContext('_selectedLumpToken', ctx) === 'WIDGETBOOT',
-        { selected: vm.runInContext('_selectedLumpToken', ctx) });
+        vm.runInContext('window.LumpRegistry.getPending()', ctx) === null && // consumed by renderLumps() re-run
+        vm.runInContext('window.LumpRegistry.getCurrent()', ctx) === 'WIDGETBOOT',
+        { selected: vm.runInContext('window.LumpRegistry.getCurrent()', ctx) });
 })());
 
 // ── Summary ───────────────────────────────────────────────────────────────────

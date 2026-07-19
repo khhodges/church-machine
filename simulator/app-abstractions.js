@@ -558,8 +558,8 @@ function _applyBootEntryToSim() {
     }
 }
 
-let _lumpsCache = [];
-let _selectedLumpToken = null;
+
+
 let _pendingLumpAbstractionName = null;
 let _pendingLumpMethodName = null;
 let _nsdgTooltipData = {};
@@ -597,87 +597,59 @@ async function renderLumps() {
         const r = await fetch('/api/lumps/list');
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const lumps = await r.json();
-        _lumpsCache = lumps;
         if (window.LumpRegistry) window.LumpRegistry.registerFromServer(lumps);
+
+        // Abstraction-name-based pending navigation (set by _goToLumpByAbstractionName).
+        // Prefer user-saved (versioned, floating) over boot-resident when names clash.
         if (_pendingLumpAbstractionName) {
-            // Prefer user-saved (versioned, floating) over boot-resident when names clash.
             const _allMatched = lumps.filter(l => l.abstraction === _pendingLumpAbstractionName);
             const _matched = _allMatched.find(l => l.version && (l.ns_slot === null || l.ns_slot === undefined))
                           || _allMatched[0];
-            if (_matched) _selectedLumpToken = _matched.token;
-            _pendingLumpAbstractionName = null;
-            if (_pendingLumpMethodName && _selectedLumpToken) {
-                window._pendingLumpTab = (typeof _pendingLumpMethodTarget !== 'undefined' && _pendingLumpMethodTarget === 'hexdump')
-                    ? 'hexdump' : 'content';
-            }
-        }
-
-        // Pending NS→Source navigation (_openLumpSource) — must run BEFORE the live-state
-        // auto-select so an explicit "Open Lump" is never overridden by the slot lookup.
-        // _pendingLumpTab is only honoured when the token resolves successfully;
-        // a stale/missing token clears both to avoid applying a tab to the wrong lump.
-        //
-        // In-memory lump fallback: when the pending token is not in the server cache
-        // (e.g. freshly assembled but not yet saved), check if it matches the
-        // currently in-memory assembled lump.  If so, defer openLumpInEditor() so
-        // the editor opens with the in-memory content rather than silently failing.
-        var _pendingTokenResolved = false;
-        if (window._pendingLumpToken) {
-            const _ptToken = window._pendingLumpToken;
-            const _ptMatch = lumps.find(l => l.token === _ptToken);
-            if (_ptMatch) {
-                _selectedLumpToken = _ptMatch.token;
-                _pendingTokenResolved = true;
-            } else {
-                var _inMemResolved = false;
-                if (typeof lastAssembledWords !== 'undefined' && lastAssembledWords &&
-                    lastAssembledWords.length > 0 &&
-                    typeof window._computeLumpToken === 'function') {
-                    var _memCapsRl = (typeof lastAssembledCapabilities !== 'undefined' && lastAssembledCapabilities)
-                        ? lastAssembledCapabilities : [];
-                    if (window._computeLumpToken(lastAssembledWords, _memCapsRl) === _ptToken) {
-                        _inMemResolved = true;
-                        _pendingTokenResolved = true;
-                        // Pin the selection to the in-memory token so the localStorage
-                        // restore below cannot override it with whatever was last viewed.
-                        // showLumpDetail() returns immediately (token not in server cache);
-                        // openLumpInEditor() renders the full detail via its own in-memory path.
-                        _selectedLumpToken = _ptToken;
-                        setTimeout(function() {
-                            if (typeof openLumpInEditor === 'function') openLumpInEditor(_ptToken);
-                        }, 0);
-                    }
+            if (_matched && window.LumpRegistry) {
+                window.LumpRegistry.setCurrent(_matched.token);
+                if (_pendingLumpMethodName && _matched.token) {
+                    window._pendingLumpTab = (typeof _pendingLumpMethodTarget !== 'undefined' && _pendingLumpMethodTarget === 'hexdump')
+                        ? 'hexdump' : 'content';
                 }
-                if (!_inMemResolved) window._pendingLumpTab = null;
             }
-            window._pendingLumpToken = null;
+            _pendingLumpAbstractionName = null;
         }
 
-        // Auto-select the live lump by computing its token from simulator memory —
-        // never by matching slot numbers (slot indices are physical addresses that
-        // collide across different abstractions occupying the same slot).
-        // Only runs when no explicit pending token already resolved above.
-        if (!_pendingTokenResolved) {
+        // Token-first pending navigation — atomically consume from the registry.
+        // Must run BEFORE the live-state auto-select so an explicit "Open Lump"
+        // is never overridden by the slot lookup.
+        var _pendingTokenResolved = false;
+        if (window.LumpRegistry) {
+            const _ptToken = window.LumpRegistry.consumePending();
+            if (_ptToken) {
+                window.LumpRegistry.setCurrent(_ptToken);
+                _pendingTokenResolved = true;
+                // If the token is not in the server list (freshly assembled, not yet saved),
+                // fall back to the in-memory path via openLumpInEditor.
+                const _ptEntry = window.LumpRegistry.resolve(_ptToken);
+                if (!_ptEntry || !_ptEntry.sources || !_ptEntry.sources.server) {
+                    if (!window._pendingLumpTab) window._pendingLumpTab = null;
+                    setTimeout(function() {
+                        if (typeof openLumpInEditor === 'function') openLumpInEditor(_ptToken);
+                    }, 0);
+                }
+            }
+        }
+
+        // Live-state default: token-first, never slot-first.
+        // Only runs when no explicit pending token has already established a selection,
+        // and the registry has no remembered selection (e.g. first page load).
+        if (!_pendingTokenResolved && window.LumpRegistry && !window.LumpRegistry.getCurrent()) {
             const _liveState = (typeof _getLiveLumpState === 'function') ? _getLiveLumpState() : null;
             if (_liveState && _liveState.nsIdx !== null && _liveState.nsIdx !== undefined) {
                 const _liveToken = (typeof sim !== 'undefined' && sim &&
                                    typeof sim.lumpTokenAtSlot === 'function')
                     ? sim.lumpTokenAtSlot(_liveState.nsIdx) : null;
-                if (_liveToken) {
-                    const _liveMatch = lumps.find(l => l.token === _liveToken);
-                    if (_liveMatch) _selectedLumpToken = _liveMatch.token;
-                }
+                if (_liveToken) window.LumpRegistry.setCurrent(_liveToken);
             }
         }
 
-        // Restore last-viewed lump from localStorage (e.g. after a page reload)
-        // only when nothing else (pending name, pending token, or live lump) has already set a token.
-        if (!_selectedLumpToken) {
-            const _saved = localStorage.getItem('lastSelectedLumpToken');
-            if (_saved && lumps.find(l => l.token === _saved)) {
-                _selectedLumpToken = _saved;
-            }
-        }
+        const _selTok = window.LumpRegistry ? window.LumpRegistry.getCurrent() : null;
 
         let html = '';
         if (!lumps || lumps.length === 0) {
@@ -705,7 +677,7 @@ async function renderLumps() {
                 const size    = lump.lump_size ? `${lump.lump_size}w` : '';
                 const dateStr = _lumpDateStr(lump);
                 const label   = [name, ver, badge, nsSlot, size, dateStr].filter(Boolean).join('  ');
-                const sel     = _selectedLumpToken === token ? ' selected' : '';
+                const sel     = _selTok === token ? ' selected' : '';
                 html += `<option value="${_escHtml(token)}"${sel}>${_escHtml(label)}</option>`;
             }
             html += `</select>`;
@@ -715,15 +687,15 @@ async function renderLumps() {
         const _ss = document.getElementById('lumpSortSelect');
         if (_ss) _ss.value = _lumpSortOrder;
 
-        if (_selectedLumpToken) {
+        if (_selTok) {
             // Always re-render the detail panel so compress/POLA/save changes
             // (lump_size, cc, etc.) are reflected without a manual click.
-            showLumpDetail(_selectedLumpToken);
+            showLumpDetail(_selTok);
         }
         // If a pending tab was requested (e.g. from _openLumpSource), apply it now
         // after showLumpDetail has built the tab panels.
         if (window._pendingLumpTab) {
-            const _ptk = (_selectedLumpToken || '').replace(/[^a-z0-9]/gi, '');
+            const _ptk = (_selTok || '').replace(/[^a-z0-9]/gi, '');
             if (typeof _switchLumpTab === 'function') _switchLumpTab(_ptk, window._pendingLumpTab);
             window._pendingLumpTab = null;
         }
@@ -735,7 +707,7 @@ async function renderLumps() {
             const _pendingMethod = _pendingLumpMethodName;
             const _target = (typeof _pendingLumpMethodTarget !== 'undefined') ? _pendingLumpMethodTarget : 'content';
             _pendingLumpMethodName = null;
-            const _mtk = (_selectedLumpToken || '').replace(/[^a-z0-9]/gi, '');
+            const _mtk = (_selTok || '').replace(/[^a-z0-9]/gi, '');
             if (_target === 'hexdump' && typeof _scrollToLumpHexMethod === 'function') {
                 _scrollToLumpHexMethod(_mtk, _pendingMethod);
             } else if (typeof _scrollToLumpMethod === 'function') {
@@ -783,9 +755,8 @@ function _updateLumpRepoCount(x, y) {
 // Called by the lump picker <select> when the user chooses a different lump.
 window.lumpPickerChanged = function(token) {
     if (!token) { _updateLumpViewingLabel(''); return; }
-    _selectedLumpToken = token;
+    if (window.LumpRegistry) window.LumpRegistry.setCurrent(token);
     _lumpRecordView(token);
-    try { localStorage.setItem('lastSelectedLumpToken', token); } catch(e) {}
     showLumpDetail(token);
 };
 
@@ -793,8 +764,8 @@ window.lumpPickerChanged = function(token) {
 function _updateLumpViewingLabel(token) {
     const el = document.getElementById('lumpViewingLabel');
     if (!el) return;
-    if (!token || !_lumpsCache) { el.style.display = 'none'; el.textContent = ''; return; }
-    const lump = _lumpsCache.find(l => l.token === token);
+    if (!token || !window.LumpRegistry) { el.style.display = 'none'; el.textContent = ''; return; }
+    const lump = window.LumpRegistry.resolve(token)?.sources?.server;
     if (!lump) { el.style.display = 'none'; return; }
     const lt      = (lump.lump_type    || '').toLowerCase();
     const ct      = (lump.content_type || '').toLowerCase();
@@ -816,8 +787,8 @@ function _updateLumpViewingLabel(token) {
 // edit (e.g. version or pet-name change), without triggering a full re-render.
 // Also re-syncs the Viewing label if this token is currently selected.
 function _refreshLumpPickerOption(token) {
-    if (!token || !_lumpsCache) return;
-    const lump = _lumpsCache.find(l => l.token === token);
+    if (!token || !window.LumpRegistry) return;
+    const lump = window.LumpRegistry.resolve(token)?.sources?.server;
     if (!lump) return;
     const sel = document.getElementById('lumpPickerSelect');
     if (!sel) return;
@@ -839,7 +810,7 @@ function _refreshLumpPickerOption(token) {
     const size   = lump.lump_size ? `${lump.lump_size}w` : '';
     const name   = lump.abstraction || 'Unknown';
     opt.textContent = [name, ver, badge, nsSlot, size].filter(Boolean).join('  ');
-    if (_selectedLumpToken === token) _updateLumpViewingLabel(token);
+    if (window.LumpRegistry?.getCurrent() === token) _updateLumpViewingLabel(token);
 }
 
 // Returns a sorted copy of the lumps array according to _lumpSortOrder.
@@ -869,8 +840,9 @@ window._lumpSortChanged = function(val) {
     _lumpSortOrder = val;
     try { localStorage.setItem('lumpSortOrder', val); } catch(e) {}
     const sel = document.getElementById('lumpPickerSelect');
-    if (!sel || !_lumpsCache || !_lumpsCache.length) return;
-    const sorted = _lumpsSorted(_lumpsCache);
+    const _rlc = window.LumpRegistry ? window.LumpRegistry.getServerList() : [];
+    if (!sel || !_rlc.length) return;
+    const sorted = _lumpsSorted(_rlc);
     const e = _escHtml;
     let opts = `<option value="">— pick a lump —</option>`;
     for (const lump of sorted) {
@@ -892,7 +864,7 @@ window._lumpSortChanged = function(val) {
         const size    = lump.lump_size ? `${lump.lump_size}w`  : '';
         const dateStr = _lumpDateStr(lump);
         const label   = [name, ver, badge, nsSlot, size, dateStr].filter(Boolean).join('  ');
-        const chosen  = _selectedLumpToken === token ? ' selected' : '';
+        const chosen  = window.LumpRegistry?.getCurrent() === token ? ' selected' : '';
         opts += `<option value="${e(token)}"${chosen}>${e(label)}</option>`;
     }
     sel.innerHTML = opts;
@@ -924,11 +896,14 @@ function updateLiveLumpBanner() {
     if (nsChanged) {
         _liveLumpInputCache = { name: '', version: '' };
         // Pre-populate version from the most recently saved lump for this NS slot.
-        if (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) {
-            const saved = _lumpsCache.find(l =>
-                l.ns_slot !== null && l.ns_slot !== undefined &&
-                parseInt(l.ns_slot) === state.nsIdx);
-            if (saved && saved.version) _liveLumpInputCache.version = saved.version;
+        // Look up by token from simulator memory — never by slot-number join.
+        const _lsToken = (typeof sim !== 'undefined' && sim &&
+                         typeof sim.lumpTokenAtSlot === 'function')
+            ? sim.lumpTokenAtSlot(state.nsIdx) : null;
+        if (_lsToken && window.LumpRegistry) {
+            const _lsEntry = window.LumpRegistry.resolve(_lsToken);
+            const _lsSrv   = _lsEntry && _lsEntry.sources && _lsEntry.sources.server;
+            if (_lsSrv && _lsSrv.version) _liveLumpInputCache.version = _lsSrv.version;
         }
     } else {
         const nameEl    = document.getElementById('liveLumpName');
@@ -1401,9 +1376,15 @@ function _buildDnaGraph(lump, allLumps) {
     const rows = entries.map((ent, i) => {
         if (ent.null) return { slot: i, null: true };
         const nsIdx = ent.ns_index;
-        const target = (allLumps || []).find(l => parseInt(l.ns_slot) === nsIdx);
-        const rawLabel = target
-            ? (target.label || target.abstraction || target.token)
+        // Resolve label by token — never by slot-number join.
+        const _dnaToken = (typeof sim !== 'undefined' && sim &&
+                          typeof sim.lumpTokenAtSlot === 'function')
+            ? sim.lumpTokenAtSlot(nsIdx) : null;
+        const _dnaEntry = (_dnaToken && window.LumpRegistry)
+            ? window.LumpRegistry.resolve(_dnaToken) : null;
+        const _dnaSrv = _dnaEntry && _dnaEntry.sources && _dnaEntry.sources.server;
+        const rawLabel = _dnaSrv
+            ? (_dnaSrv.label || _dnaSrv.abstraction || _dnaSrv.token)
             : `NS[${nsIdx}]`;
         return {
             slot: i, null: false,

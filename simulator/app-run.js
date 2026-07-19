@@ -215,8 +215,8 @@ function assembleAndLoad() {
         for (const m of methods) {
             for (const w of (m.code || [])) words.push(w);
         }
-        lastAssembledWords = words.slice();
-        lastAssembledCapabilities = (result.capabilities && result.capabilities.length > 0) ? result.capabilities.slice() : null;
+        const _cluWords = words.slice();
+        const _cluCaps  = (result.capabilities && result.capabilities.length > 0) ? result.capabilities.slice() : [];
         lastAssembledNamedSlots = (result.namedSlots && result.namedSlots.length > 0) ? result.namedSlots.slice() : null;
         lastMethodTableSize = methodTableSize;
         _defaultProgramLoaded = true;
@@ -226,9 +226,11 @@ function assembleAndLoad() {
         window._assemblerSymbols = { labels, lumpName: sim.programName };
         _pendingSimLoad = true;
         if (typeof window._computeLumpToken === 'function') {
-            const _cluTok = window._computeLumpToken(lastAssembledWords, lastAssembledCapabilities || []);
-            window._editorLastSavedToken = _cluTok;
-            if (window.LumpRegistry) window.LumpRegistry.registerMemory(_cluTok, lastAssembledWords, lastAssembledCapabilities || [], sim.programName);
+            const _cluTok = window._computeLumpToken(_cluWords, _cluCaps);
+            if (window.LumpRegistry) {
+                window.LumpRegistry.registerMemory(_cluTok, sim.programName, _cluWords, _cluCaps);
+                window.LumpRegistry.setCurrent(_cluTok);
+            }
         }
         const manifestByMethod = {};
         if (result.manifest) {
@@ -419,9 +421,8 @@ function assembleAndLoad() {
         const errText = result.errors.map(e => `Line ${e.line}: ${e.message}`).join('\n');
         if (con) con.textContent = `Assembly errors:\n${errText}`;
         window._assemblerSymbols = null;
-        lastAssembledWords = null;
-        lastAssembledCapabilities = null;
         lastAssembledNamedSlots = null;
+        if (window.LumpRegistry) window.LumpRegistry.evictMemory(window.LumpRegistry.getCurrent());
         const _errSaveBtn = document.getElementById('btnSaveNS');
         if (_errSaveBtn) _errSaveBtn.disabled = true;
         const _errExpBtn = document.getElementById('btnExportLump');
@@ -435,9 +436,9 @@ function assembleAndLoad() {
     if (typeof _clearAsmErrors === 'function') _clearAsmErrors();
     if (typeof _showAsmWarnings === 'function') _showAsmWarnings(result.warnings || []);
 
-    lastAssembledWords = result.words.slice();
-    lastAssembledCapabilities = (result.capabilities && result.capabilities.length > 0)
-        ? result.capabilities.slice() : null;
+    const _rawWords = result.words.slice();
+    const _rawCaps  = (result.capabilities && result.capabilities.length > 0)
+        ? result.capabilities.slice() : [];
     lastAssembledNamedSlots = (result.namedSlots && result.namedSlots.length > 0)
         ? result.namedSlots.slice() : null;
     _defaultProgramLoaded = true;
@@ -449,9 +450,11 @@ function assembleAndLoad() {
     window._assemblerSymbols = { labels: result.labels || {}, lumpName: sim.programName };
     _pendingSimLoad = true;
     if (typeof window._computeLumpToken === 'function') {
-        const _asmTok = window._computeLumpToken(lastAssembledWords, lastAssembledCapabilities || []);
-        window._editorLastSavedToken = _asmTok;
-        if (window.LumpRegistry) window.LumpRegistry.registerMemory(_asmTok, lastAssembledWords, lastAssembledCapabilities || [], sim.programName);
+        const _asmTok = window._computeLumpToken(_rawWords, _rawCaps);
+        if (window.LumpRegistry) {
+            window.LumpRegistry.registerMemory(_asmTok, sim.programName, _rawWords, _rawCaps);
+            window.LumpRegistry.setCurrent(_asmTok);
+        }
     }
 
     const _srcComments = (() => {
@@ -701,7 +704,7 @@ function stepSim() {
                 if (ok) {
                     const r = window._lastCLOOMCResult;
                     const name    = (r && r.abstractionName) || 'abstraction';
-                    const nWords  = (lastAssembledWords  && lastAssembledWords.length)  || 0;
+                    const nWords  = (window.LumpRegistry?.resolve(window.LumpRegistry?.getCurrent())?.sources?.memory?.words?.length) || 0;
                     const nMeth   = lastMethodTableSize || 0;
                     const mLabel  = nMeth === 1 ? 'method' : 'methods';
                     con.textContent = `Auto-booted \u2014 \u201c${name}\u201d loaded \u2014 ${nWords} words, ${nMeth} ${mLabel}`;
@@ -940,7 +943,11 @@ function _injectClistNow() {
     // in program B (which never declared those slots).
     sim.resetNamedSlots();
 
-    const _hasUserCaps = !!(lastAssembledCapabilities && lastAssembledCapabilities.length > 0);
+    const _curRegMem = window.LumpRegistry
+        ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())?.sources?.memory
+        : null;
+    const _curCapsAll = _curRegMem ? (_curRegMem.capabilities || []) : [];
+    const _hasUserCaps = !!(_curCapsAll.length > 0);
 
     // Maps capability names (from `capabilities { }` blocks) to their
     // index in sim.demoClistGTs.  The boot c-list is built by
@@ -970,11 +977,11 @@ function _injectClistNow() {
 
     if (_hasUserCaps) {
         // ── CASE B: block-position injection ────────────────────────────────
-        const cc        = lastAssembledCapabilities.length;
+        const cc        = _curCapsAll.length;
         const clistBase = lumpBase + SLOT_SIZE - cc;
 
         for (let i = 0; i < cc; i++) {
-            const cap     = lastAssembledCapabilities[i];
+            const cap     = _curCapsAll[i];
             const capName = (typeof cap === 'string' ? cap : (cap.name || '')).trim();
             const rights  = typeof cap === 'string' ? [] : (cap.rights || []);
             if (!capName) { sim.memory[clistBase + i] = 0; continue; }
@@ -1080,9 +1087,13 @@ function _injectClistNow() {
 }
 
 function _applyPendingSimLoad() {
-    if (!_pendingSimLoad || !lastAssembledWords || !lastAssembledWords.length) return;
-    console.log('[applyPendingSimLoad] v20260513k caps=', JSON.stringify(lastAssembledCapabilities));
-    sim.loadProgram(lastAssembledWords, 0);
+    const _aplMem = window.LumpRegistry
+        ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())?.sources?.memory
+        : null;
+    const _aplWords = _aplMem ? (_aplMem.words || []) : [];
+    if (!_pendingSimLoad || !_aplWords.length) return;
+    console.log('[applyPendingSimLoad] v20260719g caps=', JSON.stringify(_aplMem ? _aplMem.capabilities : []));
+    sim.loadProgram(_aplWords, 0);
     if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
     // Compile+Run does not go through the real boot sequence's NUC_CLIST step,
     // which normally pushes a sentinel CALL frame (returnPC=0x7FFF poison value)
@@ -1404,8 +1415,12 @@ function _autoLoadDefaultProgram() {
     if (typeof _reapplyStickyPatches === 'function') _reapplyStickyPatches();
 
     if (_defaultProgramLoaded) {
-        if (lastAssembledWords && lastAssembledWords.length > 0) {
-            sim.loadProgram(lastAssembledWords, 0);
+        const _bootMem = window.LumpRegistry
+            ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())?.sources?.memory
+            : null;
+        const _bootWords = _bootMem ? (_bootMem.words || []) : [];
+        if (_bootWords.length > 0) {
+            sim.loadProgram(_bootWords, 0);
             if (lastMethodTableSize > 0) {
                 // Skip method table so PC lands on the first instruction (body at word N).
                 sim.pc = lastMethodTableSize;
@@ -1414,7 +1429,7 @@ function _autoLoadDefaultProgram() {
         }
         // Only apply boot lump pet names when no source-compiled program is
         // loaded — in source-assembled context the compiler owns the alias maps.
-        if (!lastAssembledWords || lastAssembledWords.length === 0) {
+        if (!_bootWords.length) {
             _applyBootLumpPetNames();
         }
         if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
@@ -9531,7 +9546,9 @@ function showSaveToNamespace() {
     document.getElementById('permS').checked = false;
     document.getElementById('permE').checked = false;
     const info = document.getElementById('saveNSInfo');
-    info.textContent = `Code size: ${lastAssembledWords.length} words (${lastAssembledWords.length * 4} bytes)`;
+    const _csWords = window.LumpRegistry?.resolve(window.LumpRegistry?.getCurrent())?.sources?.memory?.words;
+    const _csLen = _csWords ? _csWords.length : 0;
+    info.textContent = `Code size: ${_csLen} words (${_csLen * 4} bytes)`;
     document.getElementById('saveNSDialog').style.display = '';
     document.getElementById('saveNSLabel').focus();
 }
@@ -11265,14 +11282,17 @@ function confirmSaveToNamespace() {
         E: document.getElementById('permE').checked ? 1 : 0,
     };
     const gtType = parseInt(document.getElementById('saveNSType').value) || 0;
-    const _caps = (typeof lastAssembledCapabilities !== 'undefined' && lastAssembledCapabilities)
-        ? lastAssembledCapabilities : [];
+    const _svRegMem = window.LumpRegistry
+        ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())?.sources?.memory
+        : null;
+    const _svWords = _svRegMem ? (_svRegMem.words || []) : [];
+    const _caps    = _svRegMem ? (_svRegMem.capabilities || []).slice() : [];
     let idx;
     if (slotSel.value === 'new') {
-        idx = sim.saveToNamespace(label, lastAssembledWords, perms, gtType, _caps);
+        idx = sim.saveToNamespace(label, _svWords, perms, gtType, _caps);
     } else {
         idx = parseInt(slotSel.value);
-        sim.saveToNamespaceAt(idx, label, lastAssembledWords, perms, gtType, _caps);
+        sim.saveToNamespaceAt(idx, label, _svWords, perms, gtType, _caps);
     }
     closeSaveDialog();
     saveNamespaceState();
@@ -11280,16 +11300,18 @@ function confirmSaveToNamespace() {
     // Compute and store the token for the just-saved lump so "Open Lump"
     // navigates by token after a Save to NS (Step 2 of token-first navigation).
     if (typeof window._computeLumpToken === 'function') {
-        const _svTok = window._computeLumpToken(lastAssembledWords, _caps);
-        window._editorLastSavedToken = _svTok;
-        if (window.LumpRegistry) window.LumpRegistry.registerMemory(_svTok, lastAssembledWords, _caps,
-            (sim.nsLabels && sim.nsLabels[idx]) ? sim.nsLabels[idx] : label);
+        const _svTok = window._computeLumpToken(_svWords, _caps);
+        if (window.LumpRegistry) {
+            const _svLabel = (sim.nsLabels && sim.nsLabels[idx]) ? sim.nsLabels[idx] : label;
+            window.LumpRegistry.registerMemory(_svTok, _svLabel, _svWords, _caps);
+            window.LumpRegistry.setCurrent(_svTok);
+        }
     }
 
     const con = document.getElementById('editorConsole');
     if (con) {
         const _ccMsg = _caps.length ? ` cc=${_caps.length} (${_caps.map(c=>c.name).join(', ')})` : '';
-        con.textContent += `\nSaved ${lastAssembledWords.length} words to namespace[${idx}] "${label}" (cw=${lastAssembledWords.length}${_ccMsg})`;
+        con.textContent += `\nSaved ${_svWords.length} words to namespace[${idx}] "${label}" (cw=${_svWords.length}${_ccMsg})`;
         con.scrollTop = con.scrollHeight;
     }
     updateDashboard();

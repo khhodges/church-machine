@@ -658,9 +658,10 @@ function onLangChange(restoring) {
     }
 
     const btnSaveNS = document.getElementById('btnSaveNS');
-    if (btnSaveNS) btnSaveNS.disabled = (lang !== 'assembly' || !lastAssembledWords);
+    const _hasMemLump = !!(window.LumpRegistry?.resolve(window.LumpRegistry?.getCurrent())?.sources?.memory);
+    if (btnSaveNS) btnSaveNS.disabled = (lang !== 'assembly' || !_hasMemLump);
     const btnExportLump = document.getElementById('btnExportLump');
-    if (btnExportLump) btnExportLump.disabled = (lang !== 'assembly' || !lastAssembledWords);
+    if (btnExportLump) btnExportLump.disabled = (lang !== 'assembly' || !_hasMemLump);
 
     const langExampleGroups = LANG_EXAMPLE_GROUPS;
 
@@ -1126,8 +1127,7 @@ function _doWipVersionSave() {
             URL.revokeObjectURL(_dlU);
             appendOutput(`Saved to library: lumps/${resp.lump} \u2014 token 0x${resp.token} \u00b7 v${_autoVer}`, 'info');
             if (_compileDraftToken && typeof _draftLsDel === 'function') { _draftLsDel(_compileDraftToken); _compileDraftToken = null; }
-            window._editorLastSavedToken = resp.token;
-            window._pendingLumpToken = resp.token;
+            if (window.LumpRegistry) { window.LumpRegistry.setCurrent(resp.token); window.LumpRegistry.setPending(resp.token); }
             if (typeof switchView === 'function') switchView('lumps');
             // switchView('lumps') already calls renderLumps(); the pending token
             // ensures the compiled lump is selected.  Do NOT call renderLumps()
@@ -1253,9 +1253,7 @@ function _confirmLumpRelease() {
             URL.revokeObjectURL(dlUrl);
             appendOutput(`Saved to library: lumps/${resp.lump} \u2014 token 0x${resp.token} \u00b7 v${ver}`, 'info');
             if (_compileDraftToken && typeof _draftLsDel === 'function') { _draftLsDel(_compileDraftToken); _compileDraftToken = null; }
-            window._editorLastSavedToken = resp.token;
-            const savedToken = resp.token;
-            window._pendingLumpToken = savedToken;
+            if (window.LumpRegistry) { window.LumpRegistry.setCurrent(resp.token); window.LumpRegistry.setPending(resp.token); }
             if (typeof switchView === 'function') switchView('lumps');
             // switchView('lumps') already calls renderLumps(); the pending token
             // ensures the compiled lump is selected.  No second renderLumps().
@@ -1284,8 +1282,8 @@ function compileAndBuild() {
     switchCodeTab('console');
     // Capture any active LUMP-edit draft token before resetting to null.
     // Both compile success paths use _compileDraftToken to delete the draft.
-    _compileDraftToken = window._editorLastSavedToken;
-    if (typeof _invalidateLastSavedToken === 'function') _invalidateLastSavedToken(); else window._editorLastSavedToken = null;
+    _compileDraftToken = window.LumpRegistry ? window.LumpRegistry.getCurrent() : null;
+    if (typeof _invalidateLastSavedToken === 'function') _invalidateLastSavedToken();
     _runStopped = true;
     sim.running = false;
 
@@ -1644,9 +1642,7 @@ function compileAndBuild() {
             URL.revokeObjectURL(_dlUrl);
             appendOutput(`Saved to library: lumps/${resp.lump} \u2014 token 0x${resp.token} \u00b7 v${_autoVer}`, 'info');
             if (_compileDraftToken && typeof _draftLsDel === 'function') { _draftLsDel(_compileDraftToken); _compileDraftToken = null; }
-            window._editorLastSavedToken = resp.token;
-            const _savedToken = resp.token;
-            window._pendingLumpToken = _savedToken;
+            if (window.LumpRegistry) { window.LumpRegistry.setCurrent(resp.token); window.LumpRegistry.setPending(resp.token); }
             if (typeof switchView === 'function') switchView('lumps');
             // switchView('lumps') already calls renderLumps(); the pending token
             // ensures the compiled lump is selected.  No second renderLumps().
@@ -1846,9 +1842,6 @@ function loadCLOOMCIntoSim() {
         for (const w of (m.code || [])) words.push(w);
     }
 
-    lastAssembledWords      = words.slice();
-    lastAssembledCapabilities = (result.capabilities && result.capabilities.length > 0)
-        ? result.capabilities.slice() : null;
     lastAssembledNamedSlots = (result.namedSlots && result.namedSlots.length > 0)
         ? result.namedSlots.slice() : null;
     lastMethodTableSize     = methodTableSize;
@@ -1862,10 +1855,12 @@ function loadCLOOMCIntoSim() {
     // navigates by token (not by NS slot index) immediately after assembly,
     // even before a Save to NS or server-side persist has occurred.
     if (typeof window._computeLumpToken === 'function') {
-        const _asmCaps = (result.capabilities && result.capabilities.length > 0) ? result.capabilities : [];
+        const _asmCaps = (result.capabilities && result.capabilities.length > 0) ? result.capabilities.slice() : [];
         const _cmpTok = window._computeLumpToken(words, _asmCaps);
-        window._editorLastSavedToken = _cmpTok;
-        if (window.LumpRegistry) window.LumpRegistry.registerMemory(_cmpTok, words, _asmCaps, sim.programName);
+        if (window.LumpRegistry) {
+            window.LumpRegistry.registerMemory(_cmpTok, sim.programName, words.slice(), _asmCaps);
+            window.LumpRegistry.setCurrent(_cmpTok);
+        }
     }
 
     // If the machine is not yet booted, silently complete the full boot sequence
