@@ -1359,9 +1359,10 @@
 
         // Brief console confirmation
         if (typeof appendCompileOutput === 'function') {
+            var _capNames = caps.map(function(c){ return c.name; }).join(', ');
             appendCompileOutput(
                 'LUMP exported: ' + filename +
-                '  (cw=' + cw + ' cc=0 lump_size=' + lumpSize + ')',
+                '  (cw=' + cw + ' cc=' + cc + (cc > 0 ? ' [' + _capNames + ']' : '') + ' lump_size=' + lumpSize + ')',
                 'info'
             );
         }

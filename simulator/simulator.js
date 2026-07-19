@@ -6884,7 +6884,7 @@ class ChurchSimulator {
         };
     }
 
-    saveToNamespace(label, words, perms, gtType) {
+    saveToNamespace(label, words, perms, gtType, caps) {
         perms = perms || {R:0,W:0,X:1,L:0,S:0,E:0};
         gtType = (gtType !== undefined && gtType !== null) ? gtType : 1;
         let idx = -1;
@@ -6896,7 +6896,9 @@ class ChurchSimulator {
         }
         const loc = idx * this.SLOT_SIZE;
         const codeLen = words.length;
-        const cc = 0;
+        // cc comes from the capabilities block declared in the source (e.g. `capabilities { LED0 RW }`).
+        // Callers pass lastAssembledCapabilities; default 0 if absent.
+        const cc = (caps && caps.length) ? caps.length : 0;
         // Lump must be a power-of-2 block >= 64 words that fits header + code + c-list.
         let lumpSize = 64;
         while (lumpSize < 1 + codeLen + cc) lumpSize <<= 1;
@@ -6924,12 +6926,14 @@ class ChurchSimulator {
         return idx;
     }
 
-    saveToNamespaceAt(idx, label, words, perms, gtType) {
+    saveToNamespaceAt(idx, label, words, perms, gtType, caps) {
         perms = perms || {R:0,W:0,X:1,L:0,S:0,E:0};
         gtType = (gtType !== undefined && gtType !== null) ? gtType : 1;
         const loc = idx * this.SLOT_SIZE;
         const codeLen = words.length;
-        const cc = 0;
+        // cc comes from the capabilities block declared in the source (e.g. `capabilities { LED0 RW }`).
+        // Callers pass lastAssembledCapabilities; default 0 if absent.
+        const cc = (caps && caps.length) ? caps.length : 0;
         // Lump must be a power-of-2 block >= 64 words that fits header + code + c-list.
         let lumpSize = 64;
         while (lumpSize < 1 + codeLen + cc) lumpSize <<= 1;

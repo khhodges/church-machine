@@ -11256,18 +11256,21 @@ function confirmSaveToNamespace() {
         E: document.getElementById('permE').checked ? 1 : 0,
     };
     const gtType = parseInt(document.getElementById('saveNSType').value) || 0;
+    const _caps = (typeof lastAssembledCapabilities !== 'undefined' && lastAssembledCapabilities)
+        ? lastAssembledCapabilities : [];
     let idx;
     if (slotSel.value === 'new') {
-        idx = sim.saveToNamespace(label, lastAssembledWords, perms, gtType);
+        idx = sim.saveToNamespace(label, lastAssembledWords, perms, gtType, _caps);
     } else {
         idx = parseInt(slotSel.value);
-        sim.saveToNamespaceAt(idx, label, lastAssembledWords, perms, gtType);
+        sim.saveToNamespaceAt(idx, label, lastAssembledWords, perms, gtType, _caps);
     }
     closeSaveDialog();
     saveNamespaceState();
     const con = document.getElementById('editorConsole');
     if (con) {
-        con.textContent += `\nSaved ${lastAssembledWords.length} words to namespace[${idx}] "${label}" (${lastAssembledWords.length * 4} bytes)`;
+        const _ccMsg = _caps.length ? ` cc=${_caps.length} (${_caps.map(c=>c.name).join(', ')})` : '';
+        con.textContent += `\nSaved ${lastAssembledWords.length} words to namespace[${idx}] "${label}" (cw=${lastAssembledWords.length}${_ccMsg})`;
         con.scrollTop = con.scrollHeight;
     }
     updateDashboard();
