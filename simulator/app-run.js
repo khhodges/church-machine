@@ -225,6 +225,9 @@ function assembleAndLoad() {
         sim.programName = result.abstractionName || (methods.length > 0 ? methods[0].name : 'prog');
         window._assemblerSymbols = { labels, lumpName: sim.programName };
         _pendingSimLoad = true;
+        if (typeof window._computeLumpToken === 'function') {
+            window._editorLastSavedToken = window._computeLumpToken(lastAssembledWords, lastAssembledCapabilities || []);
+        }
         const manifestByMethod = {};
         if (result.manifest) {
             for (const entry of result.manifest) {
@@ -443,6 +446,9 @@ function assembleAndLoad() {
     sim.programName = _srcAbstrName || entryLabel || (sim.nsLabels && sim.nsLabels[sim.bootEntrySlot]) || 'SelfTest';
     window._assemblerSymbols = { labels: result.labels || {}, lumpName: sim.programName };
     _pendingSimLoad = true;
+    if (typeof window._computeLumpToken === 'function') {
+        window._editorLastSavedToken = window._computeLumpToken(lastAssembledWords, lastAssembledCapabilities || []);
+    }
 
     const _srcComments = (() => {
         const out = [];
