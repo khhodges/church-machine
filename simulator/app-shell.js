@@ -305,11 +305,10 @@ async function _refreshEditorJumpLinks() {
     var absIdx = (pec && pec.absIdx != null) ? pec.absIdx : null;
 
     // Warm the lump cache lazily — only needed for cross-referencing.
-    if ((!token || absIdx == null) && (typeof _lumpsCache === 'undefined' || !_lumpsCache || _lumpsCache.length === 0)) {
-        try {
-            const r = await fetch('/api/lumps/list');
-            if (r.ok) _lumpsCache = await r.json();
-        } catch (e) {}
+    // warmServerList() shares one in-flight fetch across all concurrent callers.
+    if ((!token || absIdx == null) && window.LumpRegistry
+            && !window.LumpRegistry.isServerListFetched()) {
+        await window.LumpRegistry.warmServerList();
     }
 
     var lump = (token && typeof _lumpsCache !== 'undefined' && _lumpsCache)

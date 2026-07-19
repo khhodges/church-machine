@@ -946,7 +946,9 @@ function _injectClistNow() {
     const _curRegMem = window.LumpRegistry
         ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())?.sources?.memory
         : null;
-    const _curCapsAll = _curRegMem ? (_curRegMem.capabilities || []) : [];
+    const _curCapsAll = _curRegMem
+        ? (_curRegMem.capabilities || [])
+        : (typeof lastAssembledCapabilities !== 'undefined' ? (lastAssembledCapabilities || []) : []);
     const _hasUserCaps = !!(_curCapsAll.length > 0);
 
     // Maps capability names (from `capabilities { }` blocks) to their

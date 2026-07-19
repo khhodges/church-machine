@@ -2497,24 +2497,17 @@ function updateNamespace() {
     const container = document.getElementById('namespaceTable');
     if (!container) return;
     if (!sim) return;
-    // Lazily warm _lumpsCache so Source buttons appear even on first NS view load,
-    // before the user has visited the Repository view.
-    // _lumpsCacheWarmPending  — in-flight guard; cleared on settle.
-    // _lumpsCacheWarmAttempted — set after the first settled fetch so a genuinely
-    //   empty repository (zero lumps) does not trigger a fetch on every render.
-    // NOTE: if _lumpsCache is already an Array (even empty) it was set by another
-    //   code path (e.g. app-lumps.js init fetch) — do not fetch again.
-    if ((typeof _lumpsCache === 'undefined' || !Array.isArray(_lumpsCache))
-            && !window._lumpsCacheWarmPending
-            && !window._lumpsCacheWarmAttempted) {
-        window._lumpsCacheWarmPending = true;
-        fetch('/api/lumps/list').then(r => r.ok ? r.json() : null).then(lumps => {
-            window._lumpsCacheWarmPending  = false;
-            window._lumpsCacheWarmAttempted = true;
-            if (lumps && lumps.length > 0) { _lumpsCache = lumps; updateNamespace(); }
-        }).catch(() => {
-            window._lumpsCacheWarmPending  = false;
-            window._lumpsCacheWarmAttempted = true;
+    // Lazily warm the LumpRegistry server list so Source buttons appear even on
+    // first NS view load, before the user has visited the Repository view.
+    // _lumpsCacheWarmPending — in-flight guard; cleared on settle.
+    //
+    // Guard uses LumpRegistry.isServerListFetched() which is set by
+    // registerFromServer() on any settled fetch (even an empty-repo result),
+    // so renderLumps() fetching at page init correctly suppresses a second
+    // fetch here — regardless of how many lumps the server returned.
+    if (window.LumpRegistry && !window.LumpRegistry.isServerListFetched()) {
+        window.LumpRegistry.warmServerList().then(function (lumps) {
+            if (lumps && lumps.length > 0) updateNamespace();
         });
     }
     let html = '<div class="ns-layout-header">NS_ENTRY_LAYOUT: 4 words per entry (128 bits; word3 reserved) \u2014 click a row to inspect memory</div>';

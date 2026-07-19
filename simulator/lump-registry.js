@@ -24,6 +24,9 @@
 //   LumpRegistry.list()               → sorted entry array
 //   LumpRegistry.getServerList()      → flat server-metadata array (compat)
 //   LumpRegistry.has(token)           → boolean
+//   LumpRegistry.isServerListFetched()→ boolean
+//   LumpRegistry.warmServerList()     → Promise<serverList> — shared in-flight fetch;
+//                                       all concurrent callers share one network request
 
 (function () {
     'use strict';
@@ -31,6 +34,8 @@
     var _current = null;   // token of currently selected/compiled lump
     var _pending  = null;  // token pending navigation to Lumps view
     var _entries  = new Map(); // token → { token, abstraction, sources }
+    var _serverListFetched = false; // true after first registerFromServer() call
+    var _serverListFetchPromise = null; // in-flight warmServerList() promise (shared)
 
     // Restore last-viewed token from localStorage on startup
     try {
@@ -63,7 +68,10 @@
 
         // Bulk-register server metadata from /api/lumps/list.
         // Merges into existing entries — in-memory content is preserved.
+        // Sets _serverListFetched = true even for an empty list so callers
+        // can distinguish "never fetched" from "fetched but repo is empty".
         registerFromServer: function (serverLumps) {
+            _serverListFetched = true;
             var now   = Date.now();
             var lumps = serverLumps || [];
             for (var i = 0; i < lumps.length; i++) {
@@ -96,6 +104,28 @@
         },
 
         // ── Consumers ─────────────────────────────────────────────────────────
+
+        // Returns true once registerFromServer() has been called at least once
+        // (even for an empty list). Lets updateNamespace() skip its prefetch
+        // when renderLumps() or another path has already fetched the server list.
+        isServerListFetched: function () { return _serverListFetched; },
+
+        // Warm the server list with at most one in-flight network request.
+        // All concurrent callers share the same Promise — no duplicate fetches.
+        // Resolves to the flat server-metadata array (same shape as getServerList()).
+        warmServerList: function () {
+            if (_serverListFetched) return Promise.resolve(LumpRegistry.getServerList());
+            if (_serverListFetchPromise) return _serverListFetchPromise;
+            _serverListFetchPromise = fetch('/api/lumps/list')
+                .then(function (r) { return r.ok ? r.json() : []; })
+                .catch(function () { return []; })
+                .then(function (lumps) {
+                    _serverListFetchPromise = null;
+                    LumpRegistry.registerFromServer(lumps || []);
+                    return LumpRegistry.getServerList();
+                });
+            return _serverListFetchPromise;
+        },
 
         getCurrent: function () { return _current; },
         getPending: function () { return _pending; },

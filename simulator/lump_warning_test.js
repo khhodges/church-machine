@@ -123,6 +123,20 @@ function makeCtx({ lumpsCache = [], fetchImpl = null } = {}) {
         // Mutable cache exposed via context so the cold-cache path can update it.
         _lumpsCache: lumpsCache,
         _pendingLumpAbstractionName: null,
+        // LumpRegistry mock — getServerList() returns the lumpsCache so the
+        // warm-cache branch of _goToLumpByAbstractionName sees the same data
+        // the test injected via _lumpsCache.  registerFromServer is a no-op
+        // because cold-cache tests supply a fetchImpl that bypasses the server.
+        window: {
+            LumpRegistry: {
+                getServerList:       () => lumpsCache,
+                registerFromServer:  () => {},
+                getCurrent:          () => null,
+                setCurrent:          () => {},
+                resolve:             () => null,
+                registerMemory:      () => {},
+            },
+        },
         // fetch stub passed in per test.
         fetch: fetchImpl || (async () => { throw new Error('fetch not configured'); }),
         // Required by async function support in vm.

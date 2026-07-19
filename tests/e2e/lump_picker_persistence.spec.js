@@ -209,7 +209,8 @@ test.describe('LUMP picker — selection restored after page reload', () => {
         await expect(label).toContainText('LED');
 
         // Verify localStorage was written (sanity check before reload).
-        const storedToken = await page.evaluate(() => localStorage.getItem('lastSelectedLumpToken'));
+        // GPNN stores the current selection under 'lumpRegistryCurrent' via LumpRegistry.setCurrent().
+        const storedToken = await page.evaluate(() => localStorage.getItem('lumpRegistryCurrent'));
         expect(storedToken).toBe(STUB_TOKEN_A);
 
         // ── Reload: API stubs must be re-installed before navigation ──────────

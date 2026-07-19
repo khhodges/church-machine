@@ -42,9 +42,10 @@
     function _fetchNsSlotNames() {
         if (_nsSlotNameCache !== null) return Promise.resolve(_nsSlotNameCache);
         if (_nsSlotNamePromise !== null) return _nsSlotNamePromise;
-        _nsSlotNamePromise = fetch('/api/lumps/list').then(function (resp) {
-            return resp.ok ? resp.json() : [];
-        }).then(function (lumps) {
+        var listPromise = window.LumpRegistry
+            ? window.LumpRegistry.warmServerList()
+            : fetch('/api/lumps/list').then(function (resp) { return resp.ok ? resp.json() : []; });
+        _nsSlotNamePromise = listPromise.then(function (lumps) {
             var map = {};
             if (Array.isArray(lumps)) {
                 lumps.forEach(function (entry) {

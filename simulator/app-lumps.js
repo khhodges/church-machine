@@ -4312,7 +4312,6 @@ async function openLumpInEditor(token) {
                 content_type: 'code',
                 language:    'assembly',
             };
-        }
     }
 
     if (!lump) return;
