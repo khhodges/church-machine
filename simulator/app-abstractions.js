@@ -636,16 +636,30 @@ async function renderLumps() {
             }
         }
 
-        // Live-state default: token-first, never slot-first.
-        // Only runs when no explicit pending token has already established a selection,
-        // and the registry has no remembered selection (e.g. first page load).
+        // Live-state default: browsing history wins over boot state.
+        // Priority order:
+        //   1. Pending token (already consumed above) — highest priority.
+        //   2. lastSelectedLumpToken from localStorage — explicit user pick
+        //      survives reload and is never overridden by the boot CR14 state.
+        //   3. Live CR14 slot via sim.lumpTokenAtSlot() — only when the user
+        //      has never selected a lump in this browser (first-ever visit).
         if (!_pendingTokenResolved && window.LumpRegistry && !window.LumpRegistry.getCurrent()) {
-            const _liveState = (typeof _getLiveLumpState === 'function') ? _getLiveLumpState() : null;
-            if (_liveState && _liveState.nsIdx !== null && _liveState.nsIdx !== undefined) {
-                const _liveToken = (typeof sim !== 'undefined' && sim &&
-                                   typeof sim.lumpTokenAtSlot === 'function')
-                    ? sim.lumpTokenAtSlot(_liveState.nsIdx) : null;
-                if (_liveToken) window.LumpRegistry.setCurrent(_liveToken);
+            // Check explicit user-selection history before touching live state.
+            let _histToken = null;
+            try { _histToken = localStorage.getItem('lastSelectedLumpToken'); } catch (_e) {}
+            if (_histToken) {
+                window.LumpRegistry.setCurrent(_histToken);
+            } else {
+                // True first-visit fallback: use whatever CR14 currently points
+                // to (may be SelfTest at boot, but that is acceptable when the
+                // user has never chosen anything from the Lumps view before).
+                const _liveState = (typeof _getLiveLumpState === 'function') ? _getLiveLumpState() : null;
+                if (_liveState && _liveState.nsIdx !== null && _liveState.nsIdx !== undefined) {
+                    const _liveToken = (typeof sim !== 'undefined' && sim &&
+                                       typeof sim.lumpTokenAtSlot === 'function')
+                        ? sim.lumpTokenAtSlot(_liveState.nsIdx) : null;
+                    if (_liveToken) window.LumpRegistry.setCurrent(_liveToken);
+                }
             }
         }
 
@@ -690,7 +704,13 @@ async function renderLumps() {
         if (_selTok) {
             // Always re-render the detail panel so compress/POLA/save changes
             // (lump_size, cc, etc.) are reflected without a manual click.
-            showLumpDetail(_selTok);
+            if (typeof window.showLumpDetail === 'function') window.showLumpDetail(_selTok);
+            else if (typeof showLumpDetail === 'function') showLumpDetail(_selTok);
+            // Sync the "Viewing: <name>" label directly — showLumpDetail is async
+            // so the label would stay hidden until the fetch completes. Calling
+            // _updateLumpViewingLabel here covers the synchronous restore path
+            // (e.g. after a page reload when the registry is already populated).
+            _updateLumpViewingLabel(_selTok);
         }
         // If a pending tab was requested (e.g. from _openLumpSource), apply it now
         // after showLumpDetail has built the tab panels.
@@ -756,8 +776,11 @@ function _updateLumpRepoCount(x, y) {
 window.lumpPickerChanged = function(token) {
     if (!token) { _updateLumpViewingLabel(''); return; }
     if (window.LumpRegistry) window.LumpRegistry.setCurrent(token);
+    try { localStorage.setItem('lastSelectedLumpToken', token); } catch (_e) {}
     _lumpRecordView(token);
-    showLumpDetail(token);
+    _updateLumpViewingLabel(token);
+    if (typeof window.showLumpDetail === 'function') window.showLumpDetail(token);
+    else if (typeof showLumpDetail === 'function') showLumpDetail(token);
 };
 
 // Updates the "Viewing: <name> [TYPE]" label below the picker.
@@ -765,7 +788,9 @@ function _updateLumpViewingLabel(token) {
     const el = document.getElementById('lumpViewingLabel');
     if (!el) return;
     if (!token || !window.LumpRegistry) { el.style.display = 'none'; el.textContent = ''; return; }
-    const lump = window.LumpRegistry.resolve(token)?.sources?.server;
+    const lump = window.LumpRegistry.resolve(token)?.sources?.server
+              || window.LumpRegistry.getServerList().find(l => l.token === token)
+              || null;
     if (!lump) { el.style.display = 'none'; return; }
     const lt      = (lump.lump_type    || '').toLowerCase();
     const ct      = (lump.content_type || '').toLowerCase();

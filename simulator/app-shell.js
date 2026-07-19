@@ -341,7 +341,8 @@ function _editorJumpToLump() {
     var t = window._editorJumpTargets && window._editorJumpTargets.token;
     if (!t) return;
     if (typeof switchView === 'function') switchView('lumps');
-    if (typeof showLumpDetail === 'function') showLumpDetail(t);
+    if (typeof window.showLumpDetail === 'function') window.showLumpDetail(t);
+    else if (typeof showLumpDetail === 'function') showLumpDetail(t);
 }
 
 function _editorJumpToAbstraction() {

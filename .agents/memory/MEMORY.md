@@ -61,3 +61,4 @@
 - [GitHub API PUT for cross-repo file delivery](github-api-put-delivery.md) — when git histories diverge, PUT individual files via Contents API from Replit bash ($GITHUB_PAT); droplet uses `git checkout origin/main -- <file>` to receive them
 - [Ti60 firmware update pipeline](ti60-firmware-update-pipeline.md) — PNR-only skips 3 required steps (patch sapphire.v, delete VDB, MAP); must run full OBBS; serve hex from $SOC_DIR/outflow/ not repo bitstreams/ (git pull overwrites)
 - [QMTECH Wukong V3 pinout + BUFG trap](wukong-v3-pinout.md) — clk=M21 SRCC bank34, led=G21/G20 active-LOW; never use Instance("BUFG") in Amaranth for Vivado — opt_design silently drops it; use direct comb assign so Vivado auto-infers IBUF→BUFG
+- [LUMP Viewing label sync](lump-viewing-label-sync.md) — renderLumps() must call _updateLumpViewingLabel() directly; showLumpDetail is async and never calls it; also: cross-script bare function declarations need window.X = X
