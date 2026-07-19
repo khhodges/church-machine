@@ -143,10 +143,19 @@ class ChurchWukongXC7A100T(Elaboratable):
         #   clist_gt_addr = 0x400 + 5*4 = 0x414 = word 261 = DEMO_CLIST[5] ✓
         #   ns_gate reads NS slot 3 at byte 0 + 3*16 = 48 = word 12 ✓
         #   NS slot 3 integrity verified (0xdead3ecf matches) ✓
+        # ── Minimal one-GT c-list ─────────────────────────────────────────────
+        # Church Machine least-authority principle: the boot c-list starts with
+        # AT MOST ONE capability — the single GT this abstraction actually needs.
+        # NUC_PROGRAM only uses LED_DEV (LOAD CR3, CR6[5]).  All other slots
+        # (UART_DEV, BTN_DEV, TIMER_DEV, SelfTest, etc.) are null: the program
+        # has no authority over devices it does not use.
+        _clist_one_gt = [0] * 64
+        _clist_one_gt[5] = DEMO_CLIST[5]           # LED_DEV GT — the only one
+
         dmem_init = list(DEMO_NAMESPACE)           # words 0-31
         while len(dmem_init) < 256:
             dmem_init.append(0)                    # words 32-255 = zero
-        dmem_init += list(DEMO_CLIST[:64])         # words 256-319
+        dmem_init += _clist_one_gt                 # words 256-319: one GT only
         while len(dmem_init) < 16384:
             dmem_init.append(0)
 

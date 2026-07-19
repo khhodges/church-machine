@@ -34,8 +34,15 @@ with the memory-manager GT — it does NOT insert, so nothing shifts.
     After migration to NS slot 6, c-list slot 3 became LED_DEV. Any code returning 3 for Boot.Abstr
     is a silent wrong-CALL bug (would invoke LED_DEV instead of SelfTest).
 
+**Wukong standalone exception:** For `hardware/wukong_top.py`, the boot c-list
+uses a **one-GT minimal c-list** (not the full DEMO_CLIST) — only LED_DEV
+(0xb2000003) at slot 5.  All other slots are null.  This is the correct
+least-authority posture: NUC_PROGRAM only touches LED_DEV.
+
 **Why:** The DEMO_CLIST slots mirror NS slot indices 0–7 directly (hardware catalog indices).
 The memory-manager overwrite at [0] is the only deviation from a pure 1:1 mapping.
+Pre-populating 8+ GTs in the boot c-list violates Church Machine least-authority principle.
 
 **How to apply:** Verify device slots against `_getHardwareBootCatalog()` in simulator.js.
 Count from 0. clistGTs[0] is always mem-manager. UART=2, LED=3, BTN=4, TIMER=5, SelfTest=6.
+For Wukong hardware: boot c-list has exactly one GT — the device the NUC abstraction uses.
