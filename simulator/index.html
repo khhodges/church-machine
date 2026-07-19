@@ -659,12 +659,7 @@
     <div id="namespace" class="view">
         <div class="panel">
             <div class="panel-title">Namespace Table -- Golden Token Entries</div>
-            <div class="ns-toolbar">
-                <button class="btn btn-primary btn-sm" onclick="exportAllNamespace()" data-tooltip="Export All — Download all namespace entries as a JSON file">Export All</button>
-                <button class="btn btn-primary btn-sm" onclick="importNamespaceFile()" data-tooltip="Import — Load namespace entries from a JSON or binary file">Import</button>
-                <button class="btn btn-primary btn-sm" onclick="downloadNamespaceLump()" data-tooltip="Download Namespace JSON — Export a self-describing manifest of every namespace slot">Download Namespace JSON</button>
-                <input type="file" id="nsImportFile" style="display:none;" accept=".json,.bin" onchange="handleNSImport(event)">
-            </div>
+
             <div id="namespaceTable"></div>
         </div>
     </div>
@@ -2657,7 +2652,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="app-cr-detail.js?v=20260707a"></script>
     <script src="tab-correction.js?v=20260501a"></script>
     <script src="pet_name_audit.js"></script>
-    <script src="app-memory.js?v=20260719k"></script>
+    <script src="app-memory.js?v=20260719l"></script>
     <script src="app-abstractions.js?v=20260719h"></script>
     <script src="lump-audit.js?v=20260601a"></script>
     <script src="rci-show-errs.js?v=20260519a"></script>
@@ -2667,7 +2662,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
          via window._cloomcLangExampleGroups); both must precede app-source-library. -->
     <script src="app-compile.js?v=20260719e"></script>
     <script src="app-lump-editor.js?v=20260719b"></script>
-    <script src="app-run.js?v=20260719i"></script>
+    <script src="app-run.js?v=20260719l"></script>
     <script src="app-source-library.js?v=20260509d"></script>
     <script src="app-invoke.js?v=20260521a"></script>
     <script src="app-misc.js?v=20260709a"></script>

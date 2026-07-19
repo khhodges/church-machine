@@ -2516,7 +2516,7 @@ function updateNamespace() {
     html += '<th>W0: Location</th>';
     html += '<th>W1: Type</th><th>W1: F</th><th>W1: G</th><th>W1: Limit</th>';
     html += '<th>W2: Seq</th><th>W2: CRC Seal</th>';
-    html += '<th>Actions</th>';
+    html += '<th>Source</th>';
     html += '</tr></thead><tbody>';
 
     const typeNames = ['NULL','Inform','Outform','Abstract'];
@@ -2587,9 +2587,9 @@ function updateNamespace() {
                 html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span></td>`;
             } else {
                 const _srcBtn = _srcToken
-                    ? ` <button class="btn btn-xs" onclick="event.stopPropagation();_openLumpSource('${_srcToken}')" style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);" title="Open source in Repository view">Source</button>`
+                    ? `<button class="btn btn-xs" onclick="event.stopPropagation();_openLumpSource('${_srcToken}')" style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);" title="Open source in Repository view">Source</button>`
                     : '';
-                html += `<td class="ns-entry-actions"><button class="btn btn-primary btn-xs" onclick="event.stopPropagation();exportEntryMemory(${i})">Export</button> <button class="btn btn-xs" onclick="event.stopPropagation();importEntryMemory(${i})" style="background:#3a86ff;color:#fff;border:none;">Import</button>${_srcBtn}</td>`;
+                html += `<td class="ns-entry-actions">${_srcBtn}</td>`;
             }
         }
         html += '</tr>';
