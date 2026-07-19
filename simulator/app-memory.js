@@ -2541,7 +2541,8 @@ function updateNamespace() {
     html += _statChip('Lazy Load',_cntLazy,     '#f0a040', 'Slots evicted — code loads on first CALL');
     html += _statChip('Garbage',  _cntGarbage,  '#f87171', 'Cleared slots — GT cycle count bumped, content zeroed');
     html += _statChip('Free',     _cntFree,     '#6a9f6a', 'Slots available for allocation');
-    html += `<button onclick="event.stopPropagation();_nsTableAdd()" style="margin-left:auto;background:#1a2e1a;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Install a LUMP from the repository into the next free NS slot">+ Add LUMP</button>`;
+    html += `<button onclick="event.stopPropagation();_nsTableSave(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save all NS table changes to the boot image — changes survive resets and reconnects">\u{1F4BE} Save NS Table</button>`;
+    html += `<button onclick="event.stopPropagation();_nsTableAdd()" style="background:#1a2e1a;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Install a LUMP from the repository into the next free NS slot">+ Add LUMP</button>`;
     html += '</div>';
     html += '<table class="ns-table"><thead><tr>';
     html += '<th>Idx</th><th class="ns-label-col">Label</th>';
@@ -2829,6 +2830,83 @@ function _nsTableClear(slot) {
 
     if (typeof updateNamespace === 'function') updateNamespace();
 }
+
+// ── NS table: Save — snapshot current sim.memory → upload as boot image ───────
+// Persists all NS table changes (Add LUMP, Clear slot, boot-entry change) to
+// server/lumps/boot-image.bin via /api/boot-image/upload so they survive resets
+// and reconnects.  The boot image binary is little-endian 32-bit words
+// (struct.pack "<{n}I"), matching Uint32Array's native byte order on x86/x64.
+window._nsTableSave = async function(btn) {
+    if (!sim) return;
+
+    // Check a boot image binary has actually been loaded (NS_TABLE_BASE must
+    // have been set by loadBootImage — the default 0xF000 is valid too, but
+    // if no binary was ever applied the upload would overwrite the server with
+    // an uninitialised memory image).
+    if (!window.bootImage || !window.bootImageAvailable) {
+        const msg = 'No boot image loaded — reset the simulator first, or upload a boot-image.bin from the Boot Image Designer.';
+        if (btn) { const _orig = btn.textContent; btn.textContent = '\u26a0\ufe0f ' + msg; btn.style.color = '#f87171'; setTimeout(() => { btn.textContent = _orig; btn.style.color = ''; }, 4000); }
+        return;
+    }
+
+    const origText = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; btn.style.color = '#ccc'; }
+
+    try {
+        // The boot image occupies exactly sim.NS_TABLE_BASE + sim.NS_TABLE_RESERVE
+        // words, because the generator writes the NS table at the tail and the
+        // format-tag scanner computes: NS_TABLE_BASE = tagIdx + 1, and
+        // NS_TABLE_RESERVE = src.length - NS_TABLE_BASE  →  total = NS_TABLE_BASE + NS_TABLE_RESERVE.
+        const bootWordCount = (sim.NS_TABLE_BASE >>> 0) + (sim.NS_TABLE_RESERVE >>> 0);
+        if (bootWordCount < 8 || bootWordCount > sim.memory.length) {
+            throw new Error(`Unexpected boot image size: ${bootWordCount} words`);
+        }
+
+        // Snapshot current sim.memory into a fresh Uint32Array of exactly that size.
+        const words = new Uint32Array(bootWordCount);
+        for (let i = 0; i < bootWordCount; i++) words[i] = sim.memory[i] >>> 0;
+
+        // Keep the boot-entry sentinel in sync with the current UI selection.
+        const sentinelIdx = (sim.NS_TABLE_BASE >>> 0) - 2;
+        if (sentinelIdx >= 0 && sentinelIdx < bootWordCount) {
+            words[sentinelIdx] = bootEntrySlot & 0xFF;
+        }
+
+        // Encode as base64 (little-endian bytes — matches struct.pack "<{n}I").
+        const bytes = new Uint8Array(words.buffer);
+        let binary = '';
+        const chunk = 8192;
+        for (let i = 0; i < bytes.length; i += chunk) {
+            binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+        }
+        const data_b64 = btoa(binary);
+
+        const resp = await fetch('/api/boot-image/upload', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ data_b64 }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.ok === false) throw new Error((data && data.error) || `HTTP ${resp.status}`);
+
+        // Replace cached binary so the next reset re-applies the new image.
+        window.bootImage          = words.buffer;
+        window.bootImageAvailable = true;
+
+        if (btn) {
+            btn.textContent = '\u2713 Saved';
+            btn.style.color = '#4ec9b0';
+            setTimeout(() => { btn.disabled = false; btn.textContent = origText; btn.style.color = ''; }, 2000);
+        }
+    } catch (err) {
+        console.error('[_nsTableSave]', err);
+        if (btn) {
+            btn.textContent = '\u2717 ' + err.message;
+            btn.style.color = '#f87171';
+            setTimeout(() => { btn.disabled = false; btn.textContent = origText; btn.style.color = ''; }, 4000);
+        }
+    }
+};
 
 // ── NS label click — dispatch on GT type ──────────────────────────────────────
 // Rule: Inform → lump detail modal (header + c-list + disassembly)
