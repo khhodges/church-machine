@@ -611,26 +611,8 @@ async function renderLumps() {
             }
         }
 
-        // Auto-select the live lump (CR14 NS slot) every time the panel renders.
-        const _liveState = (typeof _getLiveLumpState === 'function') ? _getLiveLumpState() : null;
-        if (_liveState && _liveState.nsIdx !== null && _liveState.nsIdx !== undefined) {
-            const _liveMatch = lumps.find(l =>
-                l.ns_slot !== null && l.ns_slot !== undefined &&
-                parseInt(l.ns_slot) === _liveState.nsIdx);
-            if (_liveMatch) _selectedLumpToken = _liveMatch.token;
-        }
-
-        // Restore last-viewed lump from localStorage (e.g. after a page reload)
-        // only when nothing else (pending name or live lump) has already set a token.
-        if (!_selectedLumpToken) {
-            const _saved = localStorage.getItem('lastSelectedLumpToken');
-            if (_saved && lumps.find(l => l.token === _saved)) {
-                _selectedLumpToken = _saved;
-            }
-        }
-
-        // Pending NS→Source navigation (_openLumpSource) — takes final priority so the
-        // live auto-select above cannot override the user's explicit slot click.
+        // Pending NS→Source navigation (_openLumpSource) — must run BEFORE the live-state
+        // auto-select so an explicit "Open Lump" is never overridden by the slot lookup.
         // _pendingLumpTab is only honoured when the token resolves successfully;
         // a stale/missing token clears both to avoid applying a tab to the wrong lump.
         //
@@ -638,11 +620,13 @@ async function renderLumps() {
         // (e.g. freshly assembled but not yet saved), check if it matches the
         // currently in-memory assembled lump.  If so, defer openLumpInEditor() so
         // the editor opens with the in-memory content rather than silently failing.
+        var _pendingTokenResolved = false;
         if (window._pendingLumpToken) {
             const _ptToken = window._pendingLumpToken;
             const _ptMatch = lumps.find(l => l.token === _ptToken);
             if (_ptMatch) {
                 _selectedLumpToken = _ptMatch.token;
+                _pendingTokenResolved = true;
             } else {
                 var _inMemResolved = false;
                 if (typeof lastAssembledWords !== 'undefined' && lastAssembledWords &&
@@ -652,6 +636,7 @@ async function renderLumps() {
                         ? lastAssembledCapabilities : [];
                     if (window._computeLumpToken(lastAssembledWords, _memCapsRl) === _ptToken) {
                         _inMemResolved = true;
+                        _pendingTokenResolved = true;
                         setTimeout(function() {
                             if (typeof openLumpInEditor === 'function') openLumpInEditor(_ptToken);
                         }, 0);
@@ -660,6 +645,32 @@ async function renderLumps() {
                 if (!_inMemResolved) window._pendingLumpTab = null;
             }
             window._pendingLumpToken = null;
+        }
+
+        // Auto-select the live lump by computing its token from simulator memory —
+        // never by matching slot numbers (slot indices are physical addresses that
+        // collide across different abstractions occupying the same slot).
+        // Only runs when no explicit pending token already resolved above.
+        if (!_pendingTokenResolved) {
+            const _liveState = (typeof _getLiveLumpState === 'function') ? _getLiveLumpState() : null;
+            if (_liveState && _liveState.nsIdx !== null && _liveState.nsIdx !== undefined) {
+                const _liveToken = (typeof sim !== 'undefined' && sim &&
+                                   typeof sim.lumpTokenAtSlot === 'function')
+                    ? sim.lumpTokenAtSlot(_liveState.nsIdx) : null;
+                if (_liveToken) {
+                    const _liveMatch = lumps.find(l => l.token === _liveToken);
+                    if (_liveMatch) _selectedLumpToken = _liveMatch.token;
+                }
+            }
+        }
+
+        // Restore last-viewed lump from localStorage (e.g. after a page reload)
+        // only when nothing else (pending name, pending token, or live lump) has already set a token.
+        if (!_selectedLumpToken) {
+            const _saved = localStorage.getItem('lastSelectedLumpToken');
+            if (_saved && lumps.find(l => l.token === _saved)) {
+                _selectedLumpToken = _saved;
+            }
         }
 
         let html = '';
