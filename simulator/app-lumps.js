@@ -4332,16 +4332,22 @@ async function openLumpInEditor(token) {
     var resolvedCRIdx = null;
 
     if (typeof sim !== 'undefined' && sim && sim.memory && sim.readNSEntry) {
-        // 1. Via the stored ns_slot
+        // 1. Via the stored ns_slot — verified by token so a different lump
+        //    now occupying this slot at runtime (e.g. LED Flash loaded into
+        //    Boot.Abstr at slot 6) cannot masquerade as this lump.
         var nsSlot = (lump.ns_slot !== null && lump.ns_slot !== undefined)
             ? parseInt(lump.ns_slot) : null;
         if (nsSlot !== null) {
-            var nsEnt = sim.readNSEntry(nsSlot);
-            if (nsEnt) {
-                var loc0 = nsEnt.word0_location >>> 0;
-                var hw0  = loc0 < sim.memory.length ? (sim.memory[loc0] >>> 0) : 0;
-                var hdr0 = sim.parseLumpHeader ? sim.parseLumpHeader(hw0) : null;
-                if (hdr0 && hdr0.valid) { baseLoc = loc0; resolvedNsIdx = nsSlot; }
+            var _nsSlotTok = (typeof sim.lumpTokenAtSlot === 'function')
+                ? sim.lumpTokenAtSlot(nsSlot) : null;
+            if (_nsSlotTok === null || _nsSlotTok === token) {
+                var nsEnt = sim.readNSEntry(nsSlot);
+                if (nsEnt) {
+                    var loc0 = nsEnt.word0_location >>> 0;
+                    var hw0  = loc0 < sim.memory.length ? (sim.memory[loc0] >>> 0) : 0;
+                    var hdr0 = sim.parseLumpHeader ? sim.parseLumpHeader(hw0) : null;
+                    if (hdr0 && hdr0.valid) { baseLoc = loc0; resolvedNsIdx = nsSlot; }
+                }
             }
         }
         // 2. Fallback: the token encodes the lump's base address

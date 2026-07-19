@@ -637,6 +637,11 @@ async function renderLumps() {
                     if (window._computeLumpToken(lastAssembledWords, _memCapsRl) === _ptToken) {
                         _inMemResolved = true;
                         _pendingTokenResolved = true;
+                        // Pin the selection to the in-memory token so the localStorage
+                        // restore below cannot override it with whatever was last viewed.
+                        // showLumpDetail() returns immediately (token not in server cache);
+                        // openLumpInEditor() renders the full detail via its own in-memory path.
+                        _selectedLumpToken = _ptToken;
                         setTimeout(function() {
                             if (typeof openLumpInEditor === 'function') openLumpInEditor(_ptToken);
                         }, 0);
