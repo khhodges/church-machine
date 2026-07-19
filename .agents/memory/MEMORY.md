@@ -1,3 +1,4 @@
+- [Wukong boot PERM_L trap](wukong-boot-perm-l-trap.md) — BOOT_PROGRAM[0] = LOAD CR15,CR15[0] always faults on standalone FPGA; fix: NUC_PROGRAM at ROM[0] (uses CR6 → m_elevated)
 - [Amaranth sync-domain self-deadlocking reset](amaranth-sync-reset-deadlock.md) — rst_sr in sync domain driving ResetSignal("sync") locks reset HIGH forever; use reset_less=True + GSR instead
 - [Sapphire ROM BRAM iBus/dBus conflict](sapphire-rom-bram-dbus-hang.md) — ROM BRAM single-port: iBus wins always; any dBus lw from ROM hangs; all firmware strings must be static char[] (.data/RAM)
 - [Boot c-list slot index trap](boot-clist-slot-index.md) — clistGTs[0] is overwritten in-place (not prepended); UART=2, LED=3, BTN=4, TIMER=5 direct from _getHardwareBootCatalog() order

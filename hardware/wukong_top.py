@@ -21,13 +21,28 @@ BRAM initialisation note:
   pulses boot_start.  The `init=dmem_init` parameter on LibMemory is kept for
   simulation accuracy only.
 
+ROM layout (WUKONG_ROM):
+  ROM[0..16]   = NUC_PROGRAM (17 words of LED-blink CLOOMC)
+  ROM[17..1023] = 0
+
+Why NUC_PROGRAM at offset 0?
+  After boot_complete, nia_reg=0 and boot_rom.data=ROM[0].  BOOT_PROGRAM[0] is
+  `LOAD CR15, CR15[0]` which ALWAYS faults with PERM_L on standalone hardware:
+    - mload_m_elevated is only set when cr_src == CR_CLIST (CR6); here cr_src=15
+    - CR15.word0_gt = 0x02000000 has perm[30:28]=0 → has_l_perm=0
+    - ~has_l_perm & ~m_elevated → PERM_L fault
+  Starting with NUC_PROGRAM[0] = LOAD CR3, CR6[5] (cr_src=6=CR_CLIST) grants
+  m_elevated=1, bypassing the PERM_L gate entirely.
+  Code bounds are (0,0) = inactive at boot_complete (only set by CALL/CLOAD),
+  so any nia in [0, ROM_TOP) executes without fetch_bounds_fault.
+
 What you will see:
-  Booting  (16-cycle POR + ~40 cycle DMEM init):
+  Booting  (16-cycle POR + ~50 cycle DMEM init):
     led[0] solid ON  (G21 LOW = active-LOW ON = booting indicator)
     led[1] 1 Hz heartbeat blink  (clock alive)
   Running  (NUC_PROGRAM MMIO LED demo):
     led[0] blinks at ~1 Hz via MMIO reg 0 writes (CM-controlled, active-LOW inverted)
-    led[1] solid ON (no fault) or briefly OFF (fault latched — rare)
+    led[1] solid ON (no fault) or ON (fault latched — rare)
 """
 
 from amaranth import *
@@ -35,9 +50,16 @@ from amaranth.lib.memory import Memory as LibMemory
 
 from .hw_types import *
 from .core import ChurchCore
-from .boot_rom import (BootRom, FULL_ROM, DEMO_NAMESPACE, DEMO_CLIST,
-                       NUC_LUMP_HEADER, NUC_LUMP_BASE, SLIDERULE_LUMP_HEADER, SLIDERULE_SLOT,
-                       SELFTEST_NS_SLOT, _make_ns_entry, _abstract_gt_word)
+from .boot_rom import (BootRom, NUC_PROGRAM, DEMO_NAMESPACE, DEMO_CLIST)
+
+
+# ── Wukong ROM: NUC_PROGRAM starting at word 0 ────────────────────────────────
+# NUC_PROGRAM is the LED-blink CLOOMC sequence (17 words).  Pad to 1024 words.
+# BOOT_PROGRAM is deliberately omitted — see module docstring for the PERM_L
+# fault root cause.
+_WUKONG_ROM = list(NUC_PROGRAM)
+while len(_WUKONG_ROM) < 1024:
+    _WUKONG_ROM.append(0)
 
 
 class ChurchWukongXC7A100T(Elaboratable):
@@ -94,7 +116,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         core = m.submodules.core = ChurchCore()
 
         # ── Boot ROM (instruction fetch — read-only BRAM tile) ─────────────────
-        boot_rom = m.submodules.boot_rom = BootRom(FULL_ROM)
+        boot_rom = m.submodules.boot_rom = BootRom(_WUKONG_ROM)
         m.d.comb += [
             boot_rom.addr.eq(core.imem_addr[2:12]),
             core.imem_data.eq(boot_rom.data),
@@ -103,58 +125,31 @@ class ChurchWukongXC7A100T(Elaboratable):
         # ── Data memory (BRAM, 16 384 × 32-bit = 64 KB) ───────────────────────
         # init= is used for simulation accuracy only.  On real FPGA hardware the
         # hw_init sequencer (below) writes every non-zero word via the write port
-        # before boot_start fires — Vivado does not reliably apply Verilog
-        # `initial` blocks to inferred BRAM when the source is Yosys-generated.
-        ns_init = list(DEMO_NAMESPACE)
-        while len(ns_init) < 255:
-            ns_init.append(0)
-        ns_init.append(NUC_LUMP_HEADER)
-
-        clist_init = list(DEMO_CLIST[:64])
-        while len(clist_init) < 64:
-            clist_init.append(0)
-
-        dmem_init = ns_init + clist_init
+        # before boot_start fires.
+        #
+        # Layout:
+        #   words   0-31  : DEMO_NAMESPACE  (8 NS slots × 4 words)
+        #                   NS slot 3 (LED_DEV MMIO) is at words 12-15
+        #   words  32-255 : zeros
+        #   words 256-319 : DEMO_CLIST      (64 c-list entries)
+        #                   c-list slot 5 (LED_DEV GT 0xb2000003) at word 261
+        #   words 320+    : zeros
+        #
+        # Boot FSM initialises:
+        #   CR15.word1_location = 0    (NS at byte 0)
+        #   CR6.word1_location  = 0x400 (c-list at byte 0x400 = word 256)
+        #
+        # NUC_PROGRAM[0] = LOAD CR3, CR6[5]:
+        #   clist_gt_addr = 0x400 + 5*4 = 0x414 = word 261 = DEMO_CLIST[5] ✓
+        #   ns_gate reads NS slot 3 at byte 0 + 3*16 = 48 = word 12 ✓
+        #   NS slot 3 integrity verified (0xdead3ecf matches) ✓
+        dmem_init = list(DEMO_NAMESPACE)           # words 0-31
+        while len(dmem_init) < 256:
+            dmem_init.append(0)                    # words 32-255 = zero
+        dmem_init += list(DEMO_CLIST[:64])         # words 256-319
         while len(dmem_init) < 16384:
             dmem_init.append(0)
 
-        dmem_init[511] = SLIDERULE_LUMP_HEADER
-
-        # Thread.caps[0] → SelfTest E-GT (slot 6).
-        # Encoded as make_gt(Inform, E, slot=6): dom=1, perm3=4, gt_type=1 → 0x4A000006.
-        dmem_init[125] = 0x4A000006
-
-        # Fix NS slot 6 (SelfTest) location.
-        # DEMO_NAMESPACE generates location = SELFTEST_NS_SLOT * 0x100 = 0x600, which
-        # points to a cw=0 lazy stub → BOUNDS fault on first CALL.
-        # For Wukong standalone (no IDE/SoC loading lumps at runtime), slot 6 must
-        # point to NUC_LUMP_BASE (0x3FC) so CALL reads NUC_LUMP_HEADER (cw=17) at
-        # DMEM word 255 and jumps to NUC_PROGRAM[0] at ROM index 256 (byte 0x400).
-        _selftest_ns = _make_ns_entry(
-            GT_TYPE_INFORM, PERM_MASK_E, SELFTEST_NS_SLOT, 0,
-            NUC_LUMP_BASE, 64,
-            abstract_gt=_abstract_gt_word(PERM_MASK_E))
-        # Patch at byte-0 mirror (used by LOAD CR15, CR15[0] initial read)
-        for _w, _val in enumerate(_selftest_ns):
-            dmem_init[SELFTEST_NS_SLOT * 4 + _w] = _val
-
-        # ── NS table mirror at NS_TABLE_BASE = 0xFD00 ─────────────────────────
-        # LOAD CR15, CR15[0] reads NS slot 0 at DMEM byte 0 (CR15.word1_location=0
-        # from boot FSM), then updates CR15.word1_location to NS slot 0's location
-        # field = 0xFD00.  The CALL unit then uses CR15.word1_location=0xFD00 as the
-        # NS base for all subsequent GT lookups.  The NS table must therefore ALSO
-        # exist at byte 0xFD00 (word 16192).  Word 16192+32=16224 ≤ 16384 (fits).
-        _NS_WORD_BASE = 0xFD00 // 4   # 16192
-        for _i in range(32):          # 8 slots × 4 words
-            dmem_init[_NS_WORD_BASE + _i] = DEMO_NAMESPACE[_i]
-        # Patch NS slot 6 in the relocated mirror too
-        for _w, _val in enumerate(_selftest_ns):
-            dmem_init[_NS_WORD_BASE + SELFTEST_NS_SLOT * 4 + _w] = _val
-
-        # ── Hardware DMEM init table ───────────────────────────────────────────
-        # Every non-zero entry in dmem_init must be written by the hw_init
-        # sequencer before boot_start.  Only non-zero words are written (BRAM
-        # GSR leaves all bits at 0, matching the all-zero default of dmem_init).
         hw_init_pairs = [(addr, val)
                          for addr, val in enumerate(dmem_init) if val != 0]
 
@@ -174,7 +169,7 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         m.d.comb += [
             dmem_rd.addr.eq(mem_addr),
-            core.ns_rd_data.eq(Cat(dmem_rd.data, C(0, 64))),
+            core.ns_rd_data.eq(Cat(dmem_rd.data, C(0, 96))),
             core.clist_rd_data.eq(dmem_rd.data),
         ]
 
