@@ -634,6 +634,84 @@ trackAsync((async function t15() {
         { selected: vm.runInContext('window.LumpRegistry.getCurrent()', ctx) });
 })());
 
+// ── T16 (Task #2079): Save-to-NS flow — Open Lump still resolves to the
+// assembled program, not the boot-resident SelfTest lump (CR14's slot).
+//
+// Full user flow under test:
+//   1. User assembles "LED Flash" in the editor.
+//   2. The patched spots in app-run.js (lines 218-233, 439-454) call
+//      LumpRegistry.registerMemory(token, 'LED Flash', …) and
+//      LumpRegistry.setCurrent(token) immediately after assembly.
+//      window._editorLastSavedToken is set to the same token.
+//   3. User clicks Patch / Save-to-NS (may reset other UI state but must NOT
+//      clear the LumpRegistry selection that was established in step 2).
+//   4. User clicks "Open Lump" which calls renderLumps().
+//   5. renderLumps() must honour the existing getCurrent() selection (LED Flash)
+//      rather than falling back to the live-state path that would pick SelfTest
+//      via the simulator's CR14 → NS slot 6.
+//
+// The live-state fallback at app-abstractions.js ~642-650 only fires when
+// getCurrent() === null.  Because step 2 set it to LED Flash's token, the
+// fallback must be skipped and showLumpDetail must be called with LED Flash's
+// token — not SelfTest's.
+(async function t16() {
+    const LED_FLASH_TOKEN = 'LEDFLASH00';
+    const SELFTEST_TOKEN  = 'SELFTEST06';
+
+    // Server list: only SelfTest is resident (what CR14 → NS slot 6 points to).
+    // LED Flash is in-memory only (not yet saved to the server).
+    const serverLumps = [
+        { abstraction: 'SelfTest', token: SELFTEST_TOKEN, ns_slot: 6, version: null },
+    ];
+
+    const { ctx, calls } = makeCtx({
+        lumpsCache: serverLumps,
+        fetchImpl: async () => ({ ok: true, json: async () => serverLumps }),
+    });
+
+    // ── Step 1: Simulate assembleAndLoad() / assembleSource() completing.
+    // These two lines mirror the patched spots in app-run.js that constitute
+    // the fix: after every successful assembly the compiled program is placed
+    // in the registry and made the current selection.
+    vm.runInContext(`
+        window.LumpRegistry.registerMemory(
+            '${LED_FLASH_TOKEN}', 'LED Flash', [0x10000003, 0x34000001], []);
+        window.LumpRegistry.setCurrent('${LED_FLASH_TOKEN}');
+        window._editorLastSavedToken = '${LED_FLASH_TOKEN}';
+    `, ctx);
+
+    // ── Step 2: Confirm _editorLastSavedToken is the assembled token (not null,
+    // not the boot-resident SelfTest token from CR14).
+    assert('T16 assembly sets _editorLastSavedToken to the assembled token',
+        vm.runInContext('window._editorLastSavedToken', ctx) === LED_FLASH_TOKEN,
+        vm.runInContext('window._editorLastSavedToken', ctx));
+
+    assert('T16 LumpRegistry.getCurrent() is the assembled token after assembly',
+        vm.runInContext('window.LumpRegistry.getCurrent()', ctx) === LED_FLASH_TOKEN,
+        vm.runInContext('window.LumpRegistry.getCurrent()', ctx));
+
+    // ── Step 3: Simulate the user clicking "Open Lump" (triggers renderLumps()).
+    // The live-state fallback only fires when getCurrent() === null.
+    // Since getCurrent() already returns LED_FLASH_TOKEN, the fallback must be
+    // skipped — renderLumps() must not clobber the selection with SelfTest.
+    await vm.runInContext('renderLumps()', ctx);
+
+    // ── Step 4: Selection must still be LED Flash, not SelfTest.
+    const selectedToken = vm.runInContext('window.LumpRegistry.getCurrent()', ctx);
+    assert('T16 Open Lump after Save-to-NS: selected token is LED Flash (not SelfTest)',
+        selectedToken === LED_FLASH_TOKEN,
+        { selected: selectedToken, expected: LED_FLASH_TOKEN });
+
+    // ── Step 5: showLumpDetail must have been called with the assembled token.
+    // renderLumps() calls showLumpDetail(_selTok) at line ~693 of
+    // app-abstractions.js whenever _selTok is truthy — this drives the detail
+    // panel that the user sees when "Open Lump" opens.
+    assert('T16 showLumpDetail called with assembled LED Flash token, not SelfTest',
+        calls.showLumpDetail.includes(LED_FLASH_TOKEN) &&
+        !calls.showLumpDetail.includes(SELFTEST_TOKEN),
+        { showLumpDetail: calls.showLumpDetail });
+})();
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 (function waitAndSummarize() {
     setTimeout(function() {
