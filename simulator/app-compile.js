@@ -1863,7 +1863,9 @@ function loadCLOOMCIntoSim() {
     // even before a Save to NS or server-side persist has occurred.
     if (typeof window._computeLumpToken === 'function') {
         const _asmCaps = (result.capabilities && result.capabilities.length > 0) ? result.capabilities : [];
-        window._editorLastSavedToken = window._computeLumpToken(words, _asmCaps);
+        const _cmpTok = window._computeLumpToken(words, _asmCaps);
+        window._editorLastSavedToken = _cmpTok;
+        if (window.LumpRegistry) window.LumpRegistry.registerMemory(_cmpTok, words, _asmCaps, sim.programName);
     }
 
     // If the machine is not yet booted, silently complete the full boot sequence

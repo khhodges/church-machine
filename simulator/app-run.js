@@ -226,7 +226,9 @@ function assembleAndLoad() {
         window._assemblerSymbols = { labels, lumpName: sim.programName };
         _pendingSimLoad = true;
         if (typeof window._computeLumpToken === 'function') {
-            window._editorLastSavedToken = window._computeLumpToken(lastAssembledWords, lastAssembledCapabilities || []);
+            const _cluTok = window._computeLumpToken(lastAssembledWords, lastAssembledCapabilities || []);
+            window._editorLastSavedToken = _cluTok;
+            if (window.LumpRegistry) window.LumpRegistry.registerMemory(_cluTok, lastAssembledWords, lastAssembledCapabilities || [], sim.programName);
         }
         const manifestByMethod = {};
         if (result.manifest) {
@@ -447,7 +449,9 @@ function assembleAndLoad() {
     window._assemblerSymbols = { labels: result.labels || {}, lumpName: sim.programName };
     _pendingSimLoad = true;
     if (typeof window._computeLumpToken === 'function') {
-        window._editorLastSavedToken = window._computeLumpToken(lastAssembledWords, lastAssembledCapabilities || []);
+        const _asmTok = window._computeLumpToken(lastAssembledWords, lastAssembledCapabilities || []);
+        window._editorLastSavedToken = _asmTok;
+        if (window.LumpRegistry) window.LumpRegistry.registerMemory(_asmTok, lastAssembledWords, lastAssembledCapabilities || [], sim.programName);
     }
 
     const _srcComments = (() => {
@@ -11276,7 +11280,10 @@ function confirmSaveToNamespace() {
     // Compute and store the token for the just-saved lump so "Open Lump"
     // navigates by token after a Save to NS (Step 2 of token-first navigation).
     if (typeof window._computeLumpToken === 'function') {
-        window._editorLastSavedToken = window._computeLumpToken(lastAssembledWords, _caps);
+        const _svTok = window._computeLumpToken(lastAssembledWords, _caps);
+        window._editorLastSavedToken = _svTok;
+        if (window.LumpRegistry) window.LumpRegistry.registerMemory(_svTok, lastAssembledWords, _caps,
+            (sim.nsLabels && sim.nsLabels[idx]) ? sim.nsLabels[idx] : label);
     }
 
     const con = document.getElementById('editorConsole');

@@ -598,6 +598,7 @@ async function renderLumps() {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const lumps = await r.json();
         _lumpsCache = lumps;
+        if (window.LumpRegistry) window.LumpRegistry.registerFromServer(lumps);
         if (_pendingLumpAbstractionName) {
             // Prefer user-saved (versioned, floating) over boot-resident when names clash.
             const _allMatched = lumps.filter(l => l.abstraction === _pendingLumpAbstractionName);
