@@ -8,9 +8,13 @@
 // /api/lumps/list when _lumpsCache is empty.
 //
 // Suite 1 — Source button appears on first NS load (no Repository visit):
-//   Intercept /api/lumps/list to return a stub lump assigned to NS slot 4.
+//   Intercept /api/lumps/list to return a stub lump assigned to NS slot 6.
 //   Navigate straight to the Namespace view and confirm the Source button
-//   renders in the row for slot 4.
+//   renders in the row for slot 6.
+//   (Slot 4 is hardware-tier — no Source button; slot 6 = Boot.Abstr/SelfTest
+//   is boot-tier and always present in the NS table regardless of whether a
+//   full boot image has loaded.  Slots 7–10 are lazy-loaded and their NS rows
+//   only appear after the boot image binary is applied.)
 //
 // Suite 2 — No Source button when /api/lumps/list fails:
 //   Intercept /api/lumps/list to return a 500 error.
@@ -27,7 +31,7 @@ const { test, expect } = require('@playwright/test');
 const STUB_LUMP = {
     token:       'ab1e86af',
     abstraction: 'WordString',
-    ns_slot:     4,
+    ns_slot:     6,
     lump_size:   64,
     lump_version: 1,
 };
@@ -54,7 +58,7 @@ async function openNamespaceView(page) {
 
 test.describe('NS Source button — first load without Repository visit', () => {
 
-    test('Source button appears in slot 4 row after cache warms', async ({ page }) => {
+    test('Source button appears in slot 6 row after cache warms', async ({ page }) => {
         test.setTimeout(40000);
 
         await page.route('**/api/lumps/list', async route => {
@@ -68,8 +72,11 @@ test.describe('NS Source button — first load without Repository visit', () => 
         await openNamespaceView(page);
 
         // The pre-fetch completes asynchronously; updateNamespace() re-renders
-        // once the cache is warm.  Wait up to 8 s for the Source button in slot 4.
-        const sourceBtn = page.locator('#ns-row-4 button', { hasText: 'Source' });
+        // once the cache is warm.  Wait up to 8 s for the Source button in slot 6.
+        // Slot 6 = Boot.Abstr / SelfTest — always rendered after cold boot.
+        // (Slots 7–10 are lazy-loaded and only appear once the boot image binary
+        // has been applied, making them unreliable as e2e anchor points.)
+        const sourceBtn = page.locator('#ns-row-6 button', { hasText: 'Source' });
         await expect(sourceBtn).toBeVisible({ timeout: 8000 });
     });
 

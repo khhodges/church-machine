@@ -2510,7 +2510,38 @@ function updateNamespace() {
             if (lumps && lumps.length > 0) updateNamespace();
         });
     }
+    // --- Slot count stats ---
+    let _cntResident = 0, _cntLazy = 0, _cntGarbage = 0;
+    const _cntMax = (sim.MAX_NS_ENTRIES != null) ? sim.MAX_NS_ENTRIES : 0;
+    const _scanTo = Math.min(sim.nsCount || 0, _cntMax);
+    for (let _si = 0; _si < _scanTo; _si++) {
+        const _sBase = sim.NS_TABLE_BASE + _si * sim.NS_ENTRY_WORDS;
+        const _sw0 = sim.memory ? (sim.memory[_sBase] || 0) : 0;
+        const _sw1 = sim.memory ? (sim.memory[_sBase + 1] || 0) : 0;
+        const _sw2 = sim.memory ? (sim.memory[_sBase + 2] || 0) : 0;
+        if ((_sw0 !== 0) || (_sw1 !== 0)) {
+            const _mfe = sim.lazyManifest ? sim.lazyManifest[_si] : null;
+            let _notResident = false;
+            if (_mfe && _sw0 > 0 && sim.parseLumpHeader) {
+                const _hdr = sim.parseLumpHeader(sim.memory[_sw0]);
+                if (_hdr && !_hdr.valid) _notResident = true;
+            }
+            if (_notResident) _cntLazy++; else _cntResident++;
+        } else if (((_sw2 >>> 25) & 0x7F) > 0) {
+            _cntGarbage++;
+        }
+    }
+    const _cntFree = Math.max(0, _cntMax - _cntResident - _cntLazy - _cntGarbage);
+    const _statChip = (label, val, color, title) =>
+        `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px 2px 7px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);font-size:0.72rem;white-space:nowrap;" title="${title}"><span style="color:${color};font-weight:600;">${label}</span><span style="color:#ccc;">${val}</span></span>`;
     let html = '<div class="ns-layout-header">NS_ENTRY_LAYOUT: 4 words per entry (128 bits; word3 reserved) \u2014 click a row to inspect memory</div>';
+    html += `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 10px 4px;border-bottom:1px solid rgba(255,255,255,0.07);">`;
+    html += _statChip('Max',      _cntMax,      '#a0a0b0', 'Total NS slots available in this boot image');
+    html += _statChip('Resident', _cntResident, '#4ec9b0', 'Slots with lump code fully resident in DMEM');
+    html += _statChip('Lazy Load',_cntLazy,     '#f0a040', 'Slots evicted — code loads on first CALL');
+    html += _statChip('Garbage',  _cntGarbage,  '#f87171', 'Cleared slots — GT cycle count bumped, content zeroed');
+    html += _statChip('Free',     _cntFree,     '#6a9f6a', 'Slots available for allocation');
+    html += '</div>';
     html += '<table class="ns-table"><thead><tr>';
     html += '<th>Idx</th><th class="ns-label-col">Label</th>';
     html += '<th>W0: Location</th>';
