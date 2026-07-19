@@ -17,6 +17,7 @@
     "build-guard-tests",
     "update-lump-tests",
     "check-slot-index-leak",
-    "callhome-reconnect-tests"
+    "callhome-reconnect-tests",
+    "ns-slot-dynamic-tests"
   ]
 }

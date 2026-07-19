@@ -157,6 +157,9 @@ register_suite "catalog-compile-tests" \
 register_suite "boot-entry-sync-tests" \
     'node simulator/test_boot_entry_sync.js'
 
+register_suite "ns-slot-dynamic-tests" \
+    'node simulator/test_ns_slot_dynamic.js'
+
 register_suite "warning-panel-tests" \
     'node simulator/test_asm_warning_panel.js'
 
@@ -258,7 +261,7 @@ ALL_GROUPS["boot"]="boot-image-matches-sim boot-image-loads-and-boots boot-image
 
 ALL_GROUPS["lump"]="lump-consistency lump-binary-tests lump-roundtrip lump-gt-display-tests update-lump-tests"
 
-ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests pet-name-mem-tests warning-panel-tests disasm-panel-tests boot-entry-sync-tests selftest-lump-runs pet-name-memory-tests lump-builder-dispatch-tests openin-links-tests lump-warning-tests"
+ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests pet-name-mem-tests warning-panel-tests disasm-panel-tests boot-entry-sync-tests ns-slot-dynamic-tests selftest-lump-runs pet-name-memory-tests lump-builder-dispatch-tests openin-links-tests lump-warning-tests"
 
 ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabilities-blocks check-api-reference-stale ti60-utilisation ti60-uart-dry-run callhome-parser-tests callhome-reconnect-tests build-guard-tests check-slot-index-leak"
 

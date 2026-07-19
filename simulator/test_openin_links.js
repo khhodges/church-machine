@@ -109,6 +109,8 @@ function _makeMockRegistry(initialLumps) {
         getPending()       { return _pend; },
         consumePending()   { const t = _pend; _pend = null; return t; },
         getServerList()    { return _serverList; },
+        isServerListFetched() { return _serverList.length > 0; },
+        warmServerList()   { return Promise.resolve(_serverList.slice()); },
         resolve(tok) {
             if (_mem.has(tok)) return _mem.get(tok);
             const srv = _serverList.find(l => l.token === tok);

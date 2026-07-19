@@ -62,6 +62,7 @@ const DEFAULT_SCRIPT_ONLY_SUITES = [
     'update-lump-tests',
     'check-slot-index-leak',
     'callhome-reconnect-tests',
+    'ns-slot-dynamic-tests',
 ];
 
 const configPath = path.join(__dirname, 'test-workflow-config.json');

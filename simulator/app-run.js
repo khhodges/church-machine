@@ -1094,8 +1094,36 @@ function _applyPendingSimLoad() {
         : null;
     const _aplWords = _aplMem ? (_aplMem.words || []) : [];
     if (!_pendingSimLoad || !_aplWords.length) return;
-    console.log('[applyPendingSimLoad] v20260719g caps=', JSON.stringify(_aplMem ? _aplMem.capabilities : []));
+    console.log('[applyPendingSimLoad] v20260719h caps=', JSON.stringify(_aplMem ? _aplMem.capabilities : []));
+
+    // Dynamic NS slot allocation from compiled token (Task #2084).
+    // Instead of patching the hardcoded bootEntrySlot (SelfTest, slot [6]),
+    // allocate NS[7] (the boot-reserved programmable slot) for the compiled
+    // program so SelfTest remains intact at slot [6].
+    const _aplToken = window.LumpRegistry ? window.LumpRegistry.getCurrent() : null;
+    const _aplCaps  = _aplMem ? (_aplMem.capabilities || []) : [];
+    let   _progSlot = null;
+    if (sim.bootComplete && _aplToken && typeof sim.allocOrFindNsSlot === 'function') {
+        const _aplName  = sim.programName || 'prog';
+        _progSlot = sim.allocOrFindNsSlot(_aplToken, _aplName);
+        if (_progSlot !== null) {
+            sim.writeNsEntryForProgram(_progSlot, { words: _aplWords, caps: _aplCaps, label: _aplName });
+            sim.bootEntrySlot = _progSlot;
+        }
+    }
+
     sim.loadProgram(_aplWords, 0);
+    // Update CR14.word0 to a fresh R+X GT for the program slot so that
+    // _fetchInstruction's mLoad('X') check passes.  loadProgram() only updates
+    // CR14.word1/word2/word3 (the lump base/seals); without this the old boot GT
+    // (e.g. slot [6] SelfTest, E-perm) stays in CR14.word0 while CR14.word1
+    // already points to the new slot [7] lump at 0x0400 — every instruction
+    // fetch faults the bounds check before stepCount++ is reached.
+    if (_progSlot !== null && sim.bootComplete && sim.cr[14]) {
+        const _cr14GT = sim.createGT(0, _progSlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1) >>> 0;
+        sim.cr[14].word0 = _cr14GT;
+        sim.cr[14].m = 0;
+    }
     if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
     // Compile+Run does not go through the real boot sequence's NUC_CLIST step,
     // which normally pushes a sentinel CALL frame (returnPC=0x7FFF poison value)
@@ -1129,14 +1157,36 @@ function _applyPendingSimLoad() {
     if (pipelineViz) pipelineViz.setNIA(null);
     const abstrBase2 = sim.NS_TABLE_BASE + 2 * sim.NS_ENTRY_WORDS;
     const abstrBase3 = sim.NS_TABLE_BASE + sim.bootEntrySlot * sim.NS_ENTRY_WORDS;
-    // When Boot.Abstr (slot sim.bootEntrySlot, default 6 post slot 3→6 migration)
-    // was relocated to the extended-code area for a large program (base >= 0x0400),
-    // use that base+1 as the code start so labels resolve correctly.  For ordinary
-    // small programs the existing slot-2 base is used unchanged.
+    // When the compiled program's slot was relocated to the extended-code area
+    // (base >= 0x0400, which is always the case for slot [7] allocations), use
+    // that base+1 as the code start so labels resolve correctly.  For ordinary
+    // small programs through the unbooted fallback path, the slot-2 base is used.
     const slot3Base  = sim.bootComplete ? (sim.memory[abstrBase3] >>> 0) : 0;
     const slot2Base  = sim.bootComplete ? (sim.memory[abstrBase2] || (2 * sim.SLOT_SIZE)) : 0;
     const progBase   = (slot3Base >= 0x0400) ? slot3Base + 1 : slot2Base;
     sim.programBaseAddr = progBase;
+
+    // Update Thread.CR0 to the compiled program's NS slot E-GT (Task #2084).
+    // This replaces the SelfTest E-GT that the boot sequence installed at
+    // thread[+THREAD_CAPS_OFFSET=244], making CR0 reference the user's program.
+    if (_progSlot !== null && sim.bootComplete) {
+        const _progGT = sim.createGT(0, _progSlot, {E:1}, 1) >>> 0;
+        sim.cr[0] = { word0: _progGT, word1: 0, word2: 0, word3: 0, m: 0 };
+        const _thEntry = sim.readNSEntry(1);
+        if (_thEntry && _thEntry.word0_location > 0) {
+            sim.memory[(_thEntry.word0_location + 244) >>> 0] = _progGT;
+        }
+        // Patch Boot.NS c-list entry [_progSlot] with the new GT so the
+        // dependency graph shows a named entry rather than null/free.
+        const _nsLumpHdr = sim.parseLumpHeader(sim.memory[0] >>> 0);
+        if (_nsLumpHdr.valid && _progSlot < _nsLumpHdr.cc) {
+            sim.memory[_nsLumpHdr.lumpSize - _nsLumpHdr.cc + _progSlot] = _progGT;
+            if (sim.demoClistGTs && _progSlot < sim.demoClistGTs.length) {
+                sim.demoClistGTs[_progSlot] = _progGT;
+            }
+        }
+    }
+
     _injectClistNow();
     _pendingSimLoad = false;
 }

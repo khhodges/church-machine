@@ -62,3 +62,4 @@
 - [Ti60 firmware update pipeline](ti60-firmware-update-pipeline.md) — PNR-only skips 3 required steps (patch sapphire.v, delete VDB, MAP); must run full OBBS; serve hex from $SOC_DIR/outflow/ not repo bitstreams/ (git pull overwrites)
 - [QMTECH Wukong V3 pinout + BUFG trap](wukong-v3-pinout.md) — clk=M21 SRCC bank34, led=G21/G20 active-LOW; never use Instance("BUFG") in Amaranth for Vivado — opt_design silently drops it; use direct comb assign so Vivado auto-infers IBUF→BUFG
 - [LUMP Viewing label sync](lump-viewing-label-sync.md) — renderLumps() must call _updateLumpViewingLabel() directly; showLumpDetail is async and never calls it; also: cross-script bare function declarations need window.X = X
+- [CR14.word0 GT update on NS slot migration](cr14-gt-update-on-slot-migration.md) — loadProgram only updates CR14.word1/word2/word3; after changing bootEntrySlot you must also set CR14.word0 to a fresh R+X GT or every fetch faults before stepCount++

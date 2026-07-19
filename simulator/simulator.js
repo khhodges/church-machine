@@ -759,6 +759,9 @@ class ChurchSimulator {
         this.lazyManifest = {};
         this._lastLoadTargetSlot = null;
         this._loaderSlot = 10;
+        // Token→NS slot map: tracks which slot a compiled lump was last allocated to.
+        // Cleared on reset so a page-reload starts fresh.
+        this._tokenSlotMap = new Map();
 
         this._initNamespaceTable();
         this.output += '--- HARD RESET: all registers zeroed ---\n';
@@ -956,6 +959,98 @@ class ChurchSimulator {
         this.memory[base + 2] = this.makeVersionSeals(version || 0, location, limit17);
         this.memory[base + 3] = (abstract_gt || 0) >>> 0;
         if (idx >= this.nsCount) this.nsCount = idx + 1;
+    }
+
+    // ── Dynamic NS slot allocator (Task #2084) ────────────────────────────────
+    // Returns the NS slot index to use for a compiled program identified by
+    // `token`.  Resolution order:
+    //   1. Token→slot map: if the same token was allocated before, reuse it.
+    //   2. NS[7] (the boot-reserved programmable slot): the boot catalog entry
+    //      at index 7 is null, meaning "reserved for user programs".  This is
+    //      always the first choice so SelfTest (slot [6]) is never overwritten.
+    //
+    // All slot-number decisions are centralised here.  Callers (including
+    // _applyPendingSimLoad) never reference a raw slot integer for user
+    // programs — they go through this function.
+    allocOrFindNsSlot(token, name) {
+        if (!this._tokenSlotMap) this._tokenSlotMap = new Map();
+
+        // 1. Token→slot reuse: if this exact binary was previously allocated a
+        //    slot, return the same slot — the NS entry is already correct.
+        if (token && this._tokenSlotMap.has(token)) {
+            const reuse = this._tokenSlotMap.get(token);
+            if (reuse >= 0 && reuse < this.MAX_NS_ENTRIES) return reuse;
+        }
+
+        // 2. Prefer the boot-reserved programmable slot (7) when it is free.
+        //    _getHardwareBootCatalog() index [7] is null / '(free)' / [programmable].
+        const PROG_SLOT      = 7;
+        const FIRST_DYN_SLOT = 8;   // slots 0–7 are boot-reserved; 8+ are dynamic
+
+        if (!this.isNSEntryValid(PROG_SLOT)) {
+            if (token) this._tokenSlotMap.set(token, PROG_SLOT);
+            return PROG_SLOT;
+        }
+
+        // 3. Slot 7 is occupied — scan upward for the next free slot.
+        for (let s = FIRST_DYN_SLOT; s < this.MAX_NS_ENTRIES; s++) {
+            if (!this.isNSEntryValid(s)) {
+                if (token) this._tokenSlotMap.set(token, s);
+                return s;
+            }
+        }
+
+        // 4. Namespace table is full.
+        this.output += `[allocNS] WARNING: namespace table full (${this.MAX_NS_ENTRIES} slots) — cannot allocate slot for "${name || 'unknown'}"\n`;
+        return null;
+    }
+
+    // ── NS entry writer for compiled programs (Task #2084) ───────────────────
+    // Prepares NS `slot` to host the compiled program described by `opts`.
+    // Writes a properly-sized lump header at EXTENDED_BASE (0x0400) and the
+    // corresponding NS table entry, so `loadProgram()` can use the patch-in-
+    // place path (it finds a valid header at the slot's location and writes
+    // code directly into it).
+    //
+    //   opts.words  — instruction word array (used to size the lump)
+    //   opts.caps   — capabilities array (reserves c-list region)
+    //   opts.label  — human-readable name stored in nsLabels
+    writeNsEntryForProgram(slot, opts) {
+        // Each allocated slot gets its own 256-word (0x100) region in extended
+        // memory so lumps never overlap when multiple compiled programs coexist.
+        //   Slot 7 (primary programmable) → 0x0400
+        //   Slot 8                        → 0x0500
+        //   Slot 9                        → 0x0600  … and so on.
+        const EXTENDED_BASE    = 0x0400;
+        const EXTENDED_STRIDE  = 0x0100;   // 256 words per slot; enough for any program
+        const PROG_SLOT        = 7;        // primary programmable slot
+        const slotOffset       = Math.max(0, slot - PROG_SLOT);
+        const lumpBase         = EXTENDED_BASE + slotOffset * EXTENDED_STRIDE;
+
+        const DEMO_CC = 18;  // max c-list entries used by DEMO_CLIST injection
+        const words  = (opts && opts.words) || [];
+        const caps   = (opts && opts.caps)  || [];
+        const label  = (opts && opts.label) || `slot_${slot}`;
+        const cw     = words.length;
+
+        // Next power-of-2 lump large enough for header + code + DEMO_CLIST.
+        // Matches loadProgram() new-lump sizing so the patch-in-place path fits.
+        let newLumpSize = 64;
+        while (newLumpSize < 1 + cw + Math.max(caps.length, DEMO_CC)) newLumpSize <<= 1;
+        const n_minus_6 = Math.max(0, Math.log2(newLumpSize) - 6) | 0;
+
+        // Write a valid lump header at this slot's region (cc=0: let
+        // _injectClistNow fill the c-list lazily in the same apply-call).
+        if (lumpBase + newLumpSize <= this.NS_TABLE_BASE) {
+            this.memory[lumpBase] = this.packLumpHeader(n_minus_6, cw, 0, 0);
+        }
+
+        // NS entry: Inform GT (type=1), limit17=cw, cc=0 (updated by loadProgram
+        // and _injectClistNow that follow immediately in _applyPendingSimLoad).
+        this.writeNSEntry(slot, lumpBase, cw, 0, 0, 1, 0, 0, 0);
+        this.nsLabels[slot] = label;
+
+        this.output += `[allocNS] NS[${slot}] "${label}" \u2192 0x${lumpBase.toString(16)} (${newLumpSize} words, cw=${cw})\n`;
     }
 
     readNSEntry(idx) {
