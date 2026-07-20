@@ -363,7 +363,7 @@ function showAbstractionDetail(index, methodName) {
     html += `<div class="abs-detail-badge layer-${abs.layer}">Layer ${abs.layer} \u2014 ${layerName}</div>`;
     html += ` <span class="abs-profile-badge ${detailProfileClass}" style="margin-left:4px;font-size:0.62rem;">${detailProfile}</span>`;
     html += `<div class="abs-detail-actions" style="margin:0.4rem 0;display:flex;gap:0.4rem;flex-wrap:wrap;">`;
-    html += `<button class="btn btn-sm abs-jump-btn" onclick="_absOpenInEditorByName(abstractionRegistry.getAbstraction(${abs.index}).name,(window._absActiveMethod&&window._absActiveMethod[${abs.index}])||null)" data-tooltip="Open in Editor \u2014 Load this abstraction's saved LUMP (or the currently-active method) into the code editor">&#8594; Editor</button>`;
+    html += `<button class="btn btn-sm abs-jump-btn" onclick="_absOpenInEditorByName(abstractionRegistry.getAbstraction(${abs.index}).name)" data-tooltip="Open in Editor \u2014 Load this abstraction's full LUMP source into the code editor">&#8594; Editor</button>`;
     html += `<button class="btn btn-sm abs-jump-btn" onclick="_goToLumpByAbstractionName(abstractionRegistry.getAbstraction(${abs.index}).name,(window._absActiveMethod&&window._absActiveMethod[${abs.index}])||null)" data-tooltip="Open in LUMP Browser \u2014 Jump to this abstraction's compiled LUMP">&#8594; LUMP</button>`;
     if (window._absActiveMethod && window._absActiveMethod[abs.index]) {
         html += `<button class="btn btn-sm abs-jump-btn" onclick="_goToLumpByAbstractionName(abstractionRegistry.getAbstraction(${abs.index}).name,(window._absActiveMethod&&window._absActiveMethod[${abs.index}])||null,'hexdump')" data-tooltip="Open in LUMP Browser \u2014 Jump straight to this method's byte range in the Hex Dump tab">&#8594; Hex</button>`;
@@ -899,41 +899,6 @@ function absOpenMethodInEditor(absIdx, methodName, tabEl, panelId) {
     absSelectMethod(tabEl, panelId);
     window._absActiveMethod = window._absActiveMethod || {};
     window._absActiveMethod[absIdx] = methodName;
-
-    // Method-tab clicks always load catalog source into the editor and set the
-    // edit context. The backing LUMP (if any) is a reference file accessible from
-    // the Lumps view — clicking a method tab is specifically a "write this method"
-    // action, so we never redirect to openLumpInEditor here.
-    const key = `${absIdx}:${methodName}`;
-    const abs = (typeof abstractionRegistry !== 'undefined' && abstractionRegistry)
-                    ? abstractionRegistry.getAbstraction(absIdx) : null;
-
-    // Prefer userMethodData.example (catalog source, persisted), then static examples.
-    let code;
-    if (userMethodData[key] && userMethodData[key].example) {
-        code = userMethodData[key].example;
-    } else {
-        const examples = abs ? getMethodExamples(abs) : {};
-        code = (examples && examples[methodName])
-            || `; ${abs ? abs.name + '.' : ''}${methodName}\n; Write CLOOMC++ assembly here and click Compile & Save.\n`;
-    }
-
-    if (typeof switchView === 'function') switchView('editor');
-    const sel = document.getElementById('langSelector');
-    if (sel) sel.value = 'assembly';
-    const asmEd = document.getElementById('asmEditor');
-    if (asmEd) {
-        asmEd.value = code;
-        if (typeof updateLineNumbers === 'function') updateLineNumbers();
-    }
-    const outEl = document.getElementById('assemblyOutput');
-    if (outEl) outEl.innerHTML = '';
-
-    // Set catalog edit context so Save button shows "↑ Compile & Save"
-    window._pseudoEditContext = { absIdx: absIdx, methodName: methodName };
-    if (typeof _invalidateLastSavedToken === 'function') _invalidateLastSavedToken(); else window._editorLastSavedToken = null;
-    if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
-    if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
 }
 
 function absShowAddForm(absIdx) {

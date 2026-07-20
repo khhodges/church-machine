@@ -4097,19 +4097,7 @@ function _goToAbstractionByName(name, methodName) {
 async function _absOpenInEditorByName(name, methodName) {
     if (!name) return;
 
-    // Method-level jump: if a specific method was active in the abstraction
-    // detail view, load that method's own catalog source directly (same
-    // helper the LUMP Source tab uses) instead of opening the whole LUMP.
-    if (methodName && typeof abstractionRegistry !== 'undefined' && abstractionRegistry) {
-        const abs = abstractionRegistry.getByName(name);
-        if (abs && abs.methods && abs.methods.indexOf(methodName) !== -1 && typeof _lumpSrcEditMethod === 'function') {
-            _lumpSrcEditMethod(abs.index, methodName);
-            if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
-            return;
-        }
-    }
-
-    // Fallback: no specific method context — open the whole saved LUMP, as before.
+    // Always open the full LUMP source so the user can edit all methods together.
     if (!window.LumpRegistry || window.LumpRegistry.getServerList().length === 0) {
         try {
             const r = await fetch('/api/lumps/list');
