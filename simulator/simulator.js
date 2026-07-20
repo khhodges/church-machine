@@ -588,6 +588,18 @@ class ChurchSimulator {
 
         entry.loaded = true;
         entry.loadCount = (entry.loadCount || 0) + 1;
+
+        // After code is resident, re-evaluate the stub flag for this slot.
+        // Must run after memory writes so the check sees real code, not zeros.
+        this._nsStubFlags = this._nsStubFlags || {};
+        {
+            const _stubWords = [];
+            for (let _si = 0; _si <= totalCodeWords && (loc + _si) < this.memory.length; _si++) {
+                _stubWords.push(this.memory[loc + _si] >>> 0);
+            }
+            this._nsStubFlags[slotIndex] = this._lumpIsStub(_stubWords, totalCodeWords);
+        }
+
         const dataNote = totalDataWords > 0 ? `, ${totalDataWords} data words` : '';
         this.output += `[LOADER] ${label} code installed at 0x${loc.toString(16)} (${lumpSize} words, ${totalCodeWords} code words${dataNote}, load #${entry.loadCount}) — GT preserved, seal recomputed\n`;
 
@@ -712,6 +724,7 @@ class ChurchSimulator {
         this.gcPolarity = 0;
         this.nsHandlers = {};
         this.nsClistMap = {};
+        this._nsStubFlags = {};   // slot → true when every code word in the LUMP is opcode RETURN
 
         this.bootComplete = false;
         this.mElevation = false;
@@ -943,6 +956,31 @@ class ChurchSimulator {
         // (call.py line 282: base = NS_base + (lumpSize − cc) × 4).
         const lumpSize  = 1 << (n_minus_6 + 6);
         return { magic, n_minus_6, lumpSize, cw, typ, cc, valid: magic === 0x1F };
+    }
+
+    // Returns true when every non-zero word in the code region (words[1..cw])
+    // has opcode 3 (RETURN) AND at least one such word exists.  Predicate:
+    //   "every non-zero code word is a RETURN"
+    //
+    // Edge-case policy (explicit):
+    //   • All-zero code region  → false.  Zero words decode as opcode 0 (LOAD),
+    //     not RETURN.  An all-zero region is uninitialized/reserved, not a stub.
+    //   • cw = 0 (no code words) → false.  No callable surface; handled upstream
+    //     as CODE_NOT_RESIDENT, not as a stub.
+    //   • Mixed RETURN + zero   → true iff all non-zero words are RETURN.
+    //     A compiler may pad unused code slots with 0x00000000; those pads should
+    //     not break stub detection for a real all-RETURN placeholder.
+    _lumpIsStub(words, cw) {
+        if (!cw || cw <= 0) return false;
+        let hasReturn = false;
+        for (let i = 1; i <= cw && i < words.length; i++) {
+            const w = (words[i] >>> 0);
+            if (w === 0) continue;           // zero pad — not a RETURN, skip
+            const op = (w >>> 27) & 0x1F;
+            if (op !== 3) return false;      // non-zero, non-RETURN → not a stub
+            hasReturn = true;
+        }
+        return hasReturn;                    // true only if ≥1 RETURN seen
     }
 
     writeNSEntry(idx, location, limit17, bFlag, gBit, gtType, version, clistCount, abstract_gt) {
@@ -3901,6 +3939,15 @@ class ChurchSimulator {
             }
         }
 
+        // ── Stub-LUMP fault: resident code but every method body is bare RETURN ──
+        // Checked after the JS abstraction path so system abstractions (which
+        // have no lump at all) never trigger this check.
+        if (this._nsStubFlags && this._nsStubFlags[check.index] === true) {
+            const _stubLabel = this.nsLabels[check.index] || `NS[${check.index}]`;
+            this.fault('STUB_METHOD', `CALL CR${d.crDst}: "${_stubLabel}" is a stub LUMP (all methods are bare RETURN — abstraction not yet implemented)`);
+            return null;
+        }
+
         // ── Lazy-Load: valid header but cw=0 means code section evicted ─────────
         // Checked here — BEFORE callStack.push / sto decrement / _resetAllMBits —
         // so that a LAZY_LOAD suspension leaves no partial call-frame in the stack
@@ -5189,6 +5236,14 @@ class ChurchSimulator {
             this.fault(tpermCheck.fault, `ELOADCALL TPERM: CR${d.crDst}: ${tpermCheck.message}`);
             return null;
         }
+
+        // ── Stub-LUMP fault: resident code but every method body is bare RETURN ──
+        if (this._nsStubFlags && this._nsStubFlags[targetIdx] === true) {
+            const _stubLabel = this.nsLabels[targetIdx] || `NS[${targetIdx}]`;
+            this.fault('STUB_METHOD', `ELOADCALL CR${d.crDst}: "${_stubLabel}" is a stub LUMP (all methods are bare RETURN — abstraction not yet implemented)`);
+            return null;
+        }
+
         const clistEntry = tpermCheck.entry;
         const clistLoc = clistEntry.word0_location;
         const cr14Read = this.mLoad(slotGT, 'E', undefined, clistLoc);
@@ -6381,6 +6436,16 @@ class ChurchSimulator {
         this.memory[nsBase + 1] = this.packNSWord1(hdr.cw, w1f.b, w1f.g, w1f.gtType, hdr.cc);
         this.memory[nsBase + 2] = this.makeVersionSeals(existingGtSeq, EXTENDED_BASE, hdr.cw);
 
+        // Stub detection: tag the NS slot when every code word is a bare RETURN.
+        // Uses the raw words[] array (not memory[]) so the scan is immune to any
+        // concurrent writes that may happen before this point.
+        this._nsStubFlags = this._nsStubFlags || {};
+        const _isStub = this._lumpIsStub(words, hdr.cw);
+        this._nsStubFlags[abstrSlot] = _isStub;
+        if (_isStub) {
+            this.output += `[loadLumpBinary] NOTE: NS[${abstrSlot}] is a stub LUMP — all code words are RETURN; CALL will fault with STUB_METHOD.\n`;
+        }
+
         // CR14 update strategy depends on the target slot:
         //
         // • abstrSlot === this.bootEntrySlot — interactive execution path
@@ -6587,6 +6652,20 @@ class ChurchSimulator {
         this.stepCount = 0;
         this.callStack = [];
         this.sto = 243;  // sp_max reset
+
+        // Stub detection: scan all loaded NS slots and flag any whose resident LUMP
+        // contains only RETURN words.  Must run after memory[] is fully populated.
+        this._nsStubFlags = this._nsStubFlags || {};
+        for (let _ssi = 0; _ssi < (this.nsCount || 0); _ssi++) {
+            const _ssiBase = this.NS_TABLE_BASE + _ssi * this.NS_ENTRY_WORDS;
+            const _ssiLoc  = this.memory[_ssiBase] >>> 0;
+            if (_ssiLoc === 0) { this._nsStubFlags[_ssi] = false; continue; }
+            const _ssiHdr  = this.parseLumpHeader(this.memory[_ssiLoc]);
+            if (!_ssiHdr.valid || _ssiHdr.cw === 0) { this._nsStubFlags[_ssi] = false; continue; }
+            const _ssiEnd  = Math.min(_ssiLoc + _ssiHdr.lumpSize, this.memory.length);
+            const _ssiWords = Array.from(this.memory.subarray(_ssiLoc, _ssiEnd));
+            this._nsStubFlags[_ssi] = this._lumpIsStub(_ssiWords, _ssiHdr.cw);
+        }
 
         this.emit('programLoaded', { addr: 0, length: hwProgram.length });
         this.emit('stateChange', this.getState());
@@ -7161,7 +7240,7 @@ ChurchSimulator.FAULT_CODES = {
     HANDLER: null, PERMISSION: null, TYPE: null, THREAD: null,
     LUMP_MAGIC: null, LUMP_SIZE: null, LUMP_LAYOUT: null, LUMP_OOM: null,
     NO_CODE: null, PRIVATE_METHOD: null, CODE_NOT_RESIDENT: null, PRIV_REG: null,
-    LAZY_RESOLVE_PENDING: null,
+    LAZY_RESOLVE_PENDING: null, STUB_METHOD: null,
 };
 
 // Task #1530: Scheduler IRQ c-list — exposed for external test code.

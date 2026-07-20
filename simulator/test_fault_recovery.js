@@ -1969,6 +1969,72 @@ console.log('\n--- T018: LAZY_RESOLVE wired from _execLoad (petNameMemory) ---')
     }
 }
 
+// ── T019: STUB_METHOD fault — all-RETURN LUMP faults at CALL time ─────────────
+//
+//   Verifies the full stub-lump detection and fault-recovery path:
+//   T019a: _lumpIsStub() correctly identifies all-RETURN code region.
+//   T019b-f: CALL into stub LUMP fires STUB_METHOD fault; Tier 1 .catch recovers.
+//
+console.log('\n--- T019: STUB_METHOD fault (all-RETURN stub LUMP) ---');
+{
+    const { sim, registry } = makeTestSim();
+    sim.bootComplete = false;
+
+    const STUB_SLOT = 20;
+    const STUB_BASE = 0x200;
+
+    // Build a minimal stub LUMP:
+    //   header: magic=0x1F, n_minus_6=0 (lumpSize=64), cw=2, typ=1, cc=1
+    //   code region (words 1-2): RETURN cond=AL
+    const RETURN_INSTR = ((3 << 27) | (14 << 23)) >>> 0;
+    const stubWords = new Array(64).fill(0);
+    stubWords[0] = ((0x1F << 27) | (0 << 23) | (2 << 10) | (1 << 8) | 1) >>> 0;
+    stubWords[1] = RETURN_INSTR;
+    stubWords[2] = RETURN_INSTR;
+
+    for (let _wi = 0; _wi < stubWords.length; _wi++) {
+        sim.memory[STUB_BASE + _wi] = stubWords[_wi] >>> 0;
+    }
+
+    sim.writeNSEntry(STUB_SLOT, STUB_BASE, 2, 0, 0, 1, 1, 1, 0);
+    sim.nsLabels[STUB_SLOT] = 'StubAbstraction';
+
+    sim._nsStubFlags = sim._nsStubFlags || {};
+    sim._nsStubFlags[STUB_SLOT] = sim._lumpIsStub(stubWords, 2);
+
+    check('T019a: _lumpIsStub detects all-RETURN code region as stub',
+        sim._nsStubFlags[STUB_SLOT] === true);
+
+    // Point CR14 at the stub slot so fault recovery finds the .catch handler
+    sim.cr[14] = { word0: STUB_SLOT, word1: STUB_BASE, word2: 0, word3: 0, m: 0 };
+
+    // Bind a .catch handler on STUB_SLOT so Tier 1 recovery fires
+    let t019_catchCalled = false;
+    registry.bindMethod(STUB_SLOT, '.catch', () => {
+        t019_catchCalled = true;
+        return { handled: true };
+    });
+
+    // Load E-GT for stub slot into CR0, write CALL CR0 at PC=0
+    const stubGT = sim.createGT(1, STUB_SLOT, { E: 1 }, 1);
+    sim.cr[0] = { word0: stubGT, word1: 0, word2: 0, word3: 0, m: 0 };
+    sim.memory[0] = ((2 << 27) | (14 << 23) | 0) >>> 0;
+    sim.pc = 0;
+
+    sim.step();
+
+    check('T019b: faultLog has exactly one entry after calling stub LUMP',
+        sim.faultLog.length === 1);
+    check('T019c: fault type is STUB_METHOD',
+        sim.faultLog[0] && sim.faultLog[0].type === 'STUB_METHOD');
+    check('T019d: Tier 1 .catch was invoked for STUB_METHOD',
+        t019_catchCalled === true);
+    check('T019e: faultLog entry tier === 1 (Tier 1 recovery fired)',
+        sim.faultLog[0] && sim.faultLog[0].tier === 1);
+    check('T019f: machine did NOT halt (Tier 1 recovered)',
+        !sim.halted);
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

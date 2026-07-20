@@ -1263,3 +1263,86 @@ class TestR18_KnownPurposesKeys:
             "entry from KNOWN_NON_REGISTRY_PURPOSES in "
             "tests/lump/test_lump_consistency.py to keep the guard clean."
         )
+
+
+# ─── R19: No production lump is an all-stub LUMP ──────────────────────────────
+
+def _lump_is_all_stub(data: bytes) -> bool:
+    """Return True when every *non-zero* code word in the LUMP is a RETURN
+    instruction AND at least one such word exists.
+
+    Predicate: "every non-zero code word is a RETURN"
+
+    Edge-case policy (mirrors simulator.js _lumpIsStub):
+    - All-zero code region → False.  Zero words decode as opcode 0 (LOAD),
+      not RETURN; an all-zero region is uninitialized/reserved, not a stub.
+    - cw = 0 → False.  No callable surface.
+    - Mixed RETURN + zero padding → True iff all non-zero words are RETURN.
+      Compilers may pad unused code slots with 0x00000000.
+    """
+    if len(data) < 4:
+        return False
+    header = int.from_bytes(data[:4], "big")
+    if ((header >> 27) & 0x1F) != 0x1F:  # magic check
+        return False
+    cw = (header >> 10) & 0x1FFF
+    if cw == 0:
+        return False
+    has_return = False
+    for word_idx in range(1, cw + 1):
+        offset = word_idx * 4
+        if offset + 4 > len(data):
+            return False  # truncated / undersized binary
+        word = int.from_bytes(data[offset : offset + 4], "big")
+        if word == 0:
+            continue                           # zero pad — skip
+        if ((word >> 27) & 0x1F) != 3:        # 3 = RETURN opcode
+            return False
+        has_return = True
+    return has_return
+
+
+# R19 scope: registry lumps only (ns_slot is an integer, non-dynamic).
+# WIP tokens are intentional placeholder stubs — also excluded.
+# NULL/dynamic/floating lumps are never callable by slot, so stub detection
+# doesn't apply to them; they are excluded from this rule.
+_R19_WIP_TOKENS: set = {
+    _me.get("token", "").lower()
+    for _me in MANIFEST
+    if _me.get("status", "") == "wip"
+}
+_R19_REGISTRY_TOKENS: set = {
+    _me.get("token", "").lower()
+    for _me in MANIFEST
+    if isinstance(_me.get("ns_slot"), int)
+    and _me.get("ns_slot_policy", "static") != "dynamic"
+}
+_R19_NON_WIP_TOKENS = sorted(
+    t for t in _TOKEN_PATHS
+    if t not in _R19_WIP_TOKENS and t in _R19_REGISTRY_TOKENS
+)
+
+
+class TestR19_NoProductionStubLumps:
+    """R19: No shipped .lump binary in server/lumps/ may have an all-RETURN code
+    region.  An all-RETURN LUMP is a stub — every callable method returns
+    immediately, which triggers STUB_METHOD faults at runtime.  This rule
+    prevents accidentally merging a compiler placeholder as a real abstraction.
+    (WIP-status lumps are excluded — they are allowed to be stubs while in
+    development.)
+    """
+
+    @pytest.mark.parametrize("token", _R19_NON_WIP_TOKENS)
+    def test_no_production_lump_is_all_stub(self, token):
+        lump_path = _TOKEN_PATHS[token]["lump"]
+        if not os.path.exists(lump_path):
+            pytest.skip(f"lump file not on disk: {lump_path}")
+        with open(lump_path, "rb") as _f:
+            data = _f.read()
+        name = os.path.basename(lump_path)
+        cw = (int.from_bytes(data[:4], "big") >> 10) & 0x1FFF if len(data) >= 4 else 0
+        assert not _lump_is_all_stub(data), (
+            f"{name} (token {token}): all {cw} code word(s) are RETURN instructions "
+            "— this is a stub LUMP.  Implement the methods or mark status='wip' "
+            "if still in development."
+        )

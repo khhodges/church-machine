@@ -46,6 +46,13 @@ function showLumpDetail(token) {
     _headerStrip += `<span class="lump-hs-chip"><span class="lump-hs-label">Token</span>0x${_e(lump.token || '')}</span>`;
     if (lump.ns_slot !== null && lump.ns_slot !== undefined)
         _headerStrip += `<span class="lump-hs-chip"><span class="lump-hs-label">NS</span>${parseInt(lump.ns_slot)}</span>`;
+    {
+        const _isStubSlot = (lump.ns_slot !== null && lump.ns_slot !== undefined
+            && typeof sim !== 'undefined' && sim && sim._nsStubFlags
+            && sim._nsStubFlags[parseInt(lump.ns_slot)]);
+        if (_isStubSlot)
+            _headerStrip += `<span class="lump-hs-chip lump-stub-badge" title="Every method in this LUMP is a bare RETURN \u2014 calls will trigger a STUB_METHOD fault">\u26d4 Stub fault</span>`;
+    }
     if (lump.ns_slot !== null && lump.ns_slot !== undefined && lump.ns_slot_policy === 'static' && lump.boot_resident === false)
         _headerStrip += `<span class="lump-hs-chip lump-lazy-chip" title="LazyLoad \u2014 NS slot is statically assigned; lump body is fetched on first call (mirrors FPGA BRAM model)">\u29d6 LazyLoad</span>`;
     {
@@ -3112,7 +3119,7 @@ function _renderLumpCodeContent(bodyEl, lump, words, token) {
                 const cardId = `lump-mc-${_methodCardIdx++}`;
                 _inStubMethod = _stubMethods.has(i);
                 const _stubBadge = _inStubMethod
-                    ? `<span class="lump-meth-stub-badge" title="Compiler error \u2014 method has no code body (bare RETURN stub)">&#x26A0; Empty stub</span>`
+                    ? `<span class="lump-meth-stub-badge lump-meth-stub-fault" title="Stub fault \u2014 method has no real code; calls will fault">&#x26D4; Stub fault</span>`
                     : '';
                 html += `<div class="lump-method-card${_inStubMethod ? ' lump-method-card-stub' : ''}" id="${cardId}" data-method-name="${e(mb[i])}">` +
                         `<div class="lump-method-card-header">` +

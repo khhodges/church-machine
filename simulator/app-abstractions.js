@@ -690,7 +690,10 @@ async function renderLumps() {
                 const ver     = lump.version ? `v${lump.version}` : '';
                 const size    = lump.lump_size ? `${lump.lump_size}w` : '';
                 const dateStr = _lumpDateStr(lump);
-                const label   = [name, ver, badge, nsSlot, size, dateStr].filter(Boolean).join('  ');
+                const _isStubList = (!isFloat
+                    && typeof sim !== 'undefined' && sim && sim._nsStubFlags
+                    && sim._nsStubFlags[parseInt(lump.ns_slot)]);
+                const label   = [_isStubList ? '\u26d4 STUB' : '', name, ver, badge, nsSlot, size, dateStr].filter(Boolean).join('  ');
                 const sel     = _selTok === token ? ' selected' : '';
                 html += `<option value="${_escHtml(token)}"${sel}>${_escHtml(label)}</option>`;
             }

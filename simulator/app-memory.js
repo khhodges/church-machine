@@ -2573,6 +2573,9 @@ function updateNamespace() {
         const isBootNS = (i === bootEntrySlot);
         const warmStyle = codeNotResident ? 'color:#f0a040;font-style:italic;' : '';
         const rowOpacity = codeNotResident ? 'opacity:0.8;' : '';
+        const isStub = sim._nsStubFlags && sim._nsStubFlags[i] === true;
+        const stubLabelStyle = isStub ? 'color:#f87171;' : '';
+        const stubBadge = isStub ? ' <span style="color:#f87171;font-size:0.7rem;" title="Stub fault \u2014 all methods are bare stubs; calls will fault">\u26d4</span>' : '';
         if (i === 0) {
             html += '<tr class="ns-tier-header ns-tier-hw-header"><td colspan="10">&#x1F512; Hardware &mdash; slots 0&#x2013;5 &mdash; hardwired at design time, frozen into FPGA bitstream</td></tr>';
         } else if (i === NS_TIER_HW_MAX + 1) {
@@ -2603,7 +2606,7 @@ function updateNamespace() {
                 }
             }
         }
-        html += `<td class="ns-label ns-label-clickable" style="${warmStyle}cursor:pointer;text-decoration:underline dotted;" onclick="_nsLabelOpen(${i})" title="Open full view for NS[${i}]">${nsLabelInner}</td>`;
+        html += `<td class="ns-label ns-label-clickable" style="${warmStyle}${stubLabelStyle}cursor:pointer;text-decoration:underline dotted;" onclick="_nsLabelOpen(${i})" title="Open full view for NS[${i}]">${nsLabelInner}${stubBadge}</td>`;
         html += `<td style="${warmStyle}cursor:pointer;text-decoration:underline dotted;color:#4ec9b0;" title="Open memory view at this address" onclick="event.stopPropagation();jumpToMemory(${e.word0_location})">0x${e.word0_location.toString(16).toUpperCase().padStart(8, '0')}</td>`;
         if (codeNotResident) {
             const priorityTag = manifest.priority === 'hot' ? 'Hot' : (manifest.priority === 'cold' ? 'Cold' : 'Warm');
