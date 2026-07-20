@@ -3091,7 +3091,7 @@ function _renderLumpCodeContent(bodyEl, lump, words, token) {
 
     let html = '<div class="lump-content-code">';
     html += '<div class="lump-methods-section">';
-    html += '<div class="lump-methods-title">MyMethods</div>';
+    html += '<div class="lump-methods-title" data-token="' + e(token) + '">' + e(abstName) + '</div>';
     if (effEnd <= 1) {
         html += '<div class="lumps-placeholder">No code words in this lump.</div>';
     } else {
