@@ -1619,6 +1619,19 @@ function compileAndBuild() {
     if (_wipTokNow) {
         _pendingWipSave   = { savePayload, listing, con, binaryBuf, sizeBytes, absName, methodMeta, _autoVer };
         _wipTestedMethods = new Set();
+        // Immediately persist the compiled binary so the Content tab shows real
+        // code while the user works through the method gate.  This does NOT
+        // satisfy the gate — _doWipVersionSave() still runs a second save
+        // (incrementing the version) once all methods are ticked as tested.
+        fetch('/api/lumps/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(savePayload)
+        }).then(function(r) { return r.json(); }).then(function(resp) {
+            if (resp && resp.ok && window.LumpRegistry) {
+                window.LumpRegistry.setCurrent(resp.token);
+            }
+        }).catch(function() {});
         _renderWipMethodGate(con, methodMeta, listing);
         trackAction('build_lump', { name: absName, lang: result.language, size: lumpSize });
         appendOutput(`Built LUMP: "${absName}" [${langLabel}] \u2014 ${cw} words, cc=${cc}, ${sizeBytes} bytes \u00b7 v${_autoVer} \u2014 test all methods to unlock version save`, 'info');
