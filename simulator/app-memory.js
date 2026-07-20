@@ -3303,7 +3303,12 @@ function _nsLabelOpen(slotIdx) {
     if (!sim) return;
     const e = sim.readNSEntry(slotIdx);
     if (!e) { _showNSTypeDescModal(slotIdx, null); return; }
-    if (e.gtType === 1) {
+    // If a server-side LUMP is registered for this slot, always show the lump
+    // detail modal — even when the boot-image NS entry has gtType != 1.
+    // Boot-image lazy stubs pack gtType=3 in the hardware bit layout until the
+    // lump is promoted to Inform at runtime; the server binary is authoritative.
+    const _hasSrcLump = typeof _findSrcLump === 'function' && !!_findSrcLump(slotIdx, e.label);
+    if (e.gtType === 1 || _hasSrcLump) {
         _showNSLumpModal(slotIdx, e);
     } else {
         _showNSTypeDescModal(slotIdx, e);
@@ -3326,6 +3331,7 @@ function _showNSLumpModal(slotIdx, nsEntry) {
     const _nsTH = `style="padding:3px 8px;border-bottom:1px solid rgba(200,155,60,0.2);color:#888;font-weight:500;text-align:left;"`;
 
     let headerHtml = '', clistHtml = '', codeHtml = '', tokenHtml = '';
+    let _lazyFetchToken = null;
 
     if (hdr && hdr.valid) {
         const { cw, cc, lumpSize } = hdr;
@@ -3412,11 +3418,28 @@ function _showNSLumpModal(slotIdx, nsEntry) {
             tokenHtml = `<div style="margin-bottom:12px;color:#6b7280;font-size:0.78rem;">Token: not in library — boot-resident or compiled in-memory</div>`;
         }
     } else {
-        const loc = `0x${(base*4).toString(16).toUpperCase().padStart(8,'0')}`;
-        headerHtml = `<div style="margin-bottom:14px;color:#f0a040;">
-            <div style="color:#f0a040;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">HARDWARE MMIO DEVICE</div>
-            <p style="margin:0;color:#ccc;line-height:1.5;">Base address <code>${loc}</code> — this NS entry maps to a hardware register bank, not a software lump. No lump header, c-list, or code words are stored here; the capability is enforced by the hardware address decoder.</p>
-        </div>`;
+        // Lump header is invalid at this NS entry's location (out-of-range MMIO
+        // address, evicted lazy stub, or not-yet-loaded after Add+Save).
+        // Distinguish: (a) known server binary → lazy fetch and render;
+        //              (b) pure hardware MMIO → keep the "no lump" message.
+        const _lazyEntry = (typeof _findSrcLump === 'function') ? _findSrcLump(slotIdx, nsEntry.label) : null;
+        if (_lazyEntry && _lazyEntry.token) {
+            _lazyFetchToken = _lazyEntry.token;
+            tokenHtml = `<div style="margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span style="color:#888;font-size:0.78rem;">Token:</span>
+                <code style="color:#c89b3c;">${_lazyFetchToken}</code>
+                <span style="color:#f0a040;font-size:0.72rem;padding:2px 8px;border:1px solid rgba(240,160,64,0.35);border-radius:10px;">Lazy Load</span>
+                <button class="btn btn-xs" onclick="document.getElementById('_nsLumpModalOverlay').remove();_openLumpSource('${_lazyFetchToken}')"
+                    style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);">Open in Repository \u2192</button>
+            </div>`;
+            headerHtml = `<div id="_nsLumpLazyBody" style="color:#f0a040;font-size:0.8rem;padding:8px 0;">&#9680; Loading lump data\u2026</div>`;
+        } else {
+            const loc = `0x${(base*4).toString(16).toUpperCase().padStart(8,'0')}`;
+            headerHtml = `<div style="margin-bottom:14px;color:#f0a040;">
+                <div style="color:#f0a040;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">HARDWARE MMIO DEVICE</div>
+                <p style="margin:0;color:#ccc;line-height:1.5;">Base address <code>${loc}</code> — this NS entry maps to a hardware register bank, not a software lump. No lump header, c-list, or code words are stored here; the capability is enforced by the hardware address decoder.</p>
+            </div>`;
+        }
     }
 
     const overlay = document.createElement('div');
@@ -3428,7 +3451,9 @@ function _showNSLumpModal(slotIdx, nsEntry) {
                 style="position:absolute;top:12px;right:16px;background:none;border:none;color:#666;font-size:1.3rem;cursor:pointer;line-height:1;" title="Close (Esc)">&times;</button>
             <div style="color:#c89b3c;font-weight:700;font-size:1.05rem;margin-bottom:2px;">&#x1F4E6; ${label}</div>
             <div style="color:#6b7280;font-size:0.76rem;margin-bottom:14px;border-bottom:1px solid rgba(255,255,255,0.06);padding-bottom:10px;">
-                NS[${slotIdx}] &nbsp;·&nbsp; <span style="color:#4ec9b0;">Inform</span> &nbsp;·&nbsp; physically resident in DMEM
+                NS[${slotIdx}] &nbsp;·&nbsp; ${_lazyFetchToken
+                    ? `<span style="color:#f0a040;">Lazy Load</span> &nbsp;·&nbsp; code fetched on demand`
+                    : `<span style="color:#4ec9b0;">Inform</span> &nbsp;·&nbsp; physically resident in DMEM`}
             </div>
             ${tokenHtml}${headerHtml}${clistHtml}${codeHtml}
         </div>`;
@@ -3437,6 +3462,124 @@ function _showNSLumpModal(slotIdx, nsEntry) {
     document.addEventListener('keydown', _nsLumpEsc);
     overlay.addEventListener('click', ev => { if (ev.target === overlay) { overlay.remove(); document.removeEventListener('keydown', _nsLumpEsc); } });
     document.body.appendChild(overlay);
+
+    // ── Async fetch for lazy/evicted lumps ────────────────────────────────────
+    // When _lazyFetchToken is set the modal was opened for a lump whose binary is
+    // not in sim.memory (out-of-range MMIO stub, post-Add+Save reload, etc.).
+    // Fetch the real binary from the server and replace the loading placeholder.
+    if (_lazyFetchToken) {
+        const _lzTok = _lazyFetchToken;
+        (async () => {
+            const _lazyBody = document.getElementById('_nsLumpLazyBody');
+            if (!_lazyBody) return;
+            try {
+                const [wordsResp] = await Promise.all([
+                    fetch(`/api/lump/${_lzTok}/words`)
+                ]);
+                const _lazyBody2 = document.getElementById('_nsLumpLazyBody');
+                if (!_lazyBody2) return;
+                if (!wordsResp.ok) {
+                    _lazyBody2.innerHTML = `<div style="color:#f87171;font-size:0.8rem;">&#9888; Server returned ${wordsResp.status} for token ${_lzTok}.</div>`;
+                    return;
+                }
+                const wordsData = await wordsResp.json();
+                const _lazyBody3 = document.getElementById('_nsLumpLazyBody');
+                if (!_lazyBody3) return;
+                const rawWords = wordsData && wordsData.words ? wordsData.words : null;
+                if (!rawWords || rawWords.length === 0) {
+                    _lazyBody3.innerHTML = `<div style="color:#f87171;font-size:0.8rem;">&#9888; No binary data returned for token ${_lzTok}.</div>`;
+                    return;
+                }
+                const _hdr2 = sim.parseLumpHeader(rawWords[0] >>> 0);
+                if (!_hdr2 || !_hdr2.valid) {
+                    _lazyBody3.innerHTML = `<div style="color:#f87171;font-size:0.8rem;">&#9888; Binary header invalid (magic mismatch) for token ${_lzTok}.</div>`;
+                    return;
+                }
+                const { cw, cc, lumpSize } = _hdr2;
+                let fetchHtml = '';
+
+                // Header table
+                fetchHtml += `<div style="margin-bottom:14px;">
+                    <div style="color:#c89b3c;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">LUMP HEADER <span style="color:#f0a040;font-weight:400;">(lazy \u2014 fetched from server)</span></div>
+                    <table ${_nsMT}><tbody>
+                        <tr><td ${_nsTD} style="color:#888;width:140px;">Magic</td><td ${_nsTD}><code>0x${_hdr2.magic.toString(16).toUpperCase()}</code> <span style="color:#4ec9b0;">&#10003; valid</span></td></tr>
+                        <tr><td ${_nsTD} style="color:#888;">Code words (cw)</td><td ${_nsTD}>${cw}</td></tr>
+                        <tr><td ${_nsTD} style="color:#888;">C-list words (cc)</td><td ${_nsTD}>${cc}</td></tr>
+                        <tr><td ${_nsTD} style="color:#888;">Total lump size</td><td ${_nsTD}>${lumpSize} words (2<sup>${_hdr2.n_minus_6 + 6}</sup>)</td></tr>
+                    </tbody></table></div>`;
+
+                // C-list table
+                if (cc > 0) {
+                    const clistStart = lumpSize - cc;
+                    let rows = '';
+                    for (let _ci = 0; _ci < cc; _ci++) {
+                        const gtw = (rawWords[clistStart + _ci] || 0) >>> 0;
+                        let permStr = '\u2014', nameStr = '(null)', slotStr = '\u2014';
+                        if (gtw !== 0 && typeof sim.parseGT === 'function') {
+                            const parsed = sim.parseGT(gtw);
+                            const p = parsed.permissions || {};
+                            permStr = ['R','W','X','E','S','L'].filter(k => p[k]).join('') || '\u2205';
+                            slotStr = parsed.type === 3 ? '\u2014' : String(parsed.index);
+                            const lbl = (parsed.type !== 3 && sim.nsLabels) ? sim.nsLabels[parsed.index] : null;
+                            nameStr = lbl || (parsed.type === 3 ? '(Abstract)' : `NS[${parsed.index}]`);
+                        }
+                        rows += `<tr>
+                            <td ${_nsTD} style="color:#888;">${_ci}</td>
+                            <td ${_nsTD}><code style="font-size:0.75rem;">0x${gtw.toString(16).toUpperCase().padStart(8,'0')}</code></td>
+                            <td ${_nsTD} style="color:#888;">${slotStr}</td>
+                            <td ${_nsTD} style="color:#4ec9b0;">${nameStr}</td>
+                            <td ${_nsTD}><span class="ns-perm-chip" style="font-size:0.65rem;">${permStr}</span></td>
+                        </tr>`;
+                    }
+                    fetchHtml += `<div style="margin-bottom:14px;">
+                        <div style="color:#c89b3c;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">C-LIST (${cc} entries)</div>
+                        <table ${_nsMT}>
+                            <thead><tr><th ${_nsTH}>#</th><th ${_nsTH}>GT word</th><th ${_nsTH}>Slot</th><th ${_nsTH}>Name</th><th ${_nsTH}>Perms</th></tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table></div>`;
+                } else {
+                    fetchHtml += `<div style="margin-bottom:14px;">
+                        <div style="color:#c89b3c;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">C-LIST</div>
+                        <span style="color:#6b7280;font-size:0.8rem;">cc = 0 \u2014 no c-list entries</span></div>`;
+                }
+
+                // Code table
+                if (cw > 0) {
+                    const maxShow = Math.min(cw, 32);
+                    let rows2 = '';
+                    for (let _ki = 0; _ki < maxShow; _ki++) {
+                        const w = (rawWords[1 + _ki] || 0) >>> 0;
+                        let dis = `0x${w.toString(16).toUpperCase().padStart(8,'0')}`;
+                        if (typeof assembler !== 'undefined' && assembler && typeof assembler.disassemble === 'function') {
+                            try { dis = assembler.disassemble(w).replace(/</g,'&lt;').replace(/>/g,'&gt;'); } catch (_) {}
+                        }
+                        rows2 += `<tr>
+                            <td ${_nsTD} style="color:#888;">${_ki}</td>
+                            <td ${_nsTD} style="color:#555;font-size:0.72rem;">+0x${(_ki+1).toString(16)}</td>
+                            <td ${_nsTD}><code style="font-size:0.75rem;">0x${w.toString(16).toUpperCase().padStart(8,'0')}</code></td>
+                            <td ${_nsTD} style="color:#dcdcaa;font-family:monospace;font-size:0.8rem;">${dis}</td>
+                        </tr>`;
+                    }
+                    const truncNote = cw > maxShow
+                        ? `<div style="color:#6b7280;font-size:0.75rem;margin-top:4px;">\u2026 ${cw - maxShow} more word${cw - maxShow === 1 ? '' : 's'} not shown</div>`
+                        : '';
+                    fetchHtml += `<div style="margin-bottom:14px;">
+                        <div style="color:#c89b3c;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">CODE (${cw} word${cw === 1 ? '' : 's'})</div>
+                        <table ${_nsMT}>
+                            <thead><tr><th ${_nsTH}>Offset</th><th ${_nsTH}>+word</th><th ${_nsTH}>Word</th><th ${_nsTH}>Disassembly</th></tr></thead>
+                            <tbody>${rows2}</tbody>
+                        </table>${truncNote}</div>`;
+                } else {
+                    fetchHtml += `<span style="color:#6b7280;font-size:0.8rem;">cw = 0 \u2014 no code words</span>`;
+                }
+
+                _lazyBody3.innerHTML = fetchHtml;
+            } catch (err) {
+                const _lb = document.getElementById('_nsLumpLazyBody');
+                if (_lb) _lb.innerHTML = `<div style="color:#f87171;font-size:0.8rem;">&#9888; Failed to load: ${String(err).replace(/</g,'&lt;')}</div>`;
+            }
+        })();
+    }
 }
 
 // ── Type description modal — Null / Outform / Abstract entries ────────────────
