@@ -233,14 +233,15 @@ function _slSourcesAvailable() {
 /* ── Sub-tab switching ───────────────────────────────────────────────────── */
 
 function switchAbsSubtab(tab) {
-    ['catalog', 'sources'].forEach(t => {
+    ['catalog', 'sources', 'registry'].forEach(t => {
         const btn = document.getElementById('absSubtab-' + t);
         const panel = document.getElementById('absSubpanel-' + t);
         const active = t === tab;
         if (btn)   btn.classList.toggle('abs-subtab-active', active);
         if (panel) panel.style.display = active ? '' : 'none';
     });
-    if (tab === 'sources') _openSourceLibrary();
+    if (tab === 'sources')  _openSourceLibrary();
+    if (tab === 'registry') _openLumpRegistryPanel();
 }
 
 /* ── Open / render ───────────────────────────────────────────────────────── */
@@ -480,6 +481,93 @@ function _applySourceLibraryFilter() {
         group.style.display = (visiblePerGroup[lang] > 0) ? '' : 'none';
     });
 }
+
+/* ── Lump Registry panel ─────────────────────────────────────────────────── */
+
+function _openLumpRegistryPanel() {
+    const container = document.getElementById('lrContent');
+    if (!container) return;
+    container.innerHTML = '<div class="sl-placeholder">Loading registry\u2026</div>';
+    if (typeof LumpRegistry === 'undefined') {
+        container.innerHTML = '<div class="sl-placeholder">LumpRegistry not available.</div>';
+        return;
+    }
+    LumpRegistry.warmServerList().then(() => _renderLumpRegistry());
+}
+
+function _filterLumpRegistry() {
+    const el = document.getElementById('lrSearch');
+    _renderLumpRegistry(el ? el.value.trim().toLowerCase() : '');
+}
+
+function _lrEsc(s) {
+    return String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function _renderLumpRegistry(filter) {
+    const container = document.getElementById('lrContent');
+    if (!container || typeof LumpRegistry === 'undefined') return;
+
+    const entries = LumpRegistry.list();
+    const q = (filter || '').toLowerCase();
+    const visible = q
+        ? entries.filter(e =>
+            e.token.toLowerCase().includes(q) ||
+            (e.abstraction || '').toLowerCase().includes(q))
+        : entries;
+
+    if (!visible.length) {
+        container.innerHTML = `<div class="sl-placeholder">${
+            q ? 'No entries match &ldquo;' + _lrEsc(q) + '&rdquo;.'
+              : 'Registry is empty \u2014 compile a LUMP or open the Lumps view.'
+        }</div>`;
+        return;
+    }
+
+    let html = '<table class="lr-table"><thead><tr>'
+        + '<th>Token</th><th>Abstraction</th><th>Sources</th><th>NS&nbsp;Slot</th><th></th>'
+        + '</tr></thead><tbody>';
+
+    for (const entry of visible) {
+        const srv = entry.sources && entry.sources.server;
+        const mem = entry.sources && entry.sources.memory;
+        const nsSlot  = (srv && srv.ns_slot != null) ? srv.ns_slot : '\u2014';
+        const methods = (srv && srv.methods && srv.methods.length) ? srv.methods.length : null;
+        const absName = _lrEsc(entry.abstraction || entry.token);
+
+        const badges = [
+            srv ? '<span class="lr-badge lr-badge-server">server</span>' : '',
+            mem ? '<span class="lr-badge lr-badge-memory">memory</span>' : '',
+        ].filter(Boolean).join(' ');
+
+        const methodHint = methods !== null
+            ? ` <span class="lr-method-count">${methods} method${methods !== 1 ? 's' : ''}</span>` : '';
+
+        html += `<tr class="lr-row">
+            <td><span class="lr-token">${_lrEsc(entry.token)}</span></td>
+            <td class="lr-name">${absName}${methodHint}</td>
+            <td>${badges}</td>
+            <td class="lr-ns">${nsSlot}</td>
+            <td><button class="btn lr-open-btn" onclick="_lrOpenEntry('${_lrEsc(entry.token)}')" data-tooltip="Open in Lump Repository">Open</button></td>
+        </tr>`;
+    }
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function _lrOpenEntry(token) {
+    if (!token) return;
+    if (typeof LumpRegistry !== 'undefined') LumpRegistry.setPending(token);
+    if (typeof switchView === 'function') switchView('lumps');
+    if (typeof renderLumps === 'function') renderLumps();
+}
+window._filterLumpRegistry = _filterLumpRegistry;
+window._lrOpenEntry = _lrOpenEntry;
 
 /* ── Startup assertion ───────────────────────────────────────────────────────
  * Verify that required structural globals were set by app-compile.js and

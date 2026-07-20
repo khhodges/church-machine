@@ -812,6 +812,7 @@
         <div class="abs-subtabbar">
             <button class="abs-subtab abs-subtab-active" id="absSubtab-catalog" onclick="switchAbsSubtab('catalog')" data-tooltip="Logic Catalog — Browse all abstractions by name, date, and MTBF">Logic Catalog</button>
             <button class="abs-subtab" id="absSubtab-sources" onclick="switchAbsSubtab('sources')" data-tooltip="Source Library — Browse all example scaffolds grouped by language">Source Library</button>
+            <button class="abs-subtab" id="absSubtab-registry" onclick="switchAbsSubtab('registry')" data-tooltip="Lump Registry — Every compiled and server-stored LUMP, identified by token">Lump Registry</button>
         </div>
         <div id="absSubpanel-catalog" class="abs-subpanel">
             <div class="abs-layout">
@@ -841,6 +842,15 @@
             </div>
             <div id="slContent" class="sl-content">
                 <div class="sl-placeholder">Select <em>Source Library</em> to browse all example scaffolds.</div>
+            </div>
+        </div>
+        <div id="absSubpanel-registry" class="abs-subpanel" style="display:none;">
+            <div class="sl-toolbar">
+                <input type="text" id="lrSearch" class="sl-search" placeholder="Search by token or abstraction name&hellip;" oninput="_filterLumpRegistry()" autocomplete="off" spellcheck="false">
+                <span class="sl-toolbar-hint">Every compiled and server-stored LUMP, identified by token. Click <strong>Open</strong> to inspect.</span>
+            </div>
+            <div id="lrContent" class="sl-content">
+                <div class="sl-placeholder">Loading registry&hellip;</div>
             </div>
         </div>
     </div>
@@ -2662,7 +2672,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="app-compile.js?v=20260720c"></script>
     <script src="app-lump-editor.js?v=20260719b"></script>
     <script src="app-run.js?v=20260719l"></script>
-    <script src="app-source-library.js?v=20260720d"></script>
+    <script src="app-source-library.js?v=20260720h"></script>
     <script src="app-invoke.js?v=20260521a"></script>
     <script src="app-misc.js?v=20260720j"></script>
     <script src="asm-instruction-picker.js?v=20260602e"></script>
