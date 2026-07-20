@@ -984,6 +984,101 @@ trackAsync((async function t15() {
         })(), output);
 })();
 
+// ── T20: _absOpenInEditorByName — template path for uncompiled abstractions ───
+// When existing is null (no compiled LUMP) but the abstraction IS in the
+// registry, the function must:
+//   - NOT show a "No LUMP found" toast
+//   - NOT call openLumpInEditor
+//   - Populate #asmEditor with a template (header comment + capabilities { } +
+//     one method stub per method in correct selector order)
+//   - Call switchView('editor')
+(async function t20() {
+    const ABACUS_ABS = {
+        index: 17,
+        name: 'Abacus',
+        methods: ['Add', 'Sub', 'Mul', 'Div', 'Mod', 'Abs'],
+    };
+
+    // No compiled LUMP in the server list — triggers the template branch.
+    const { ctx, document, calls } = makeCtx({
+        lumpsCache: [],
+        abstractions: [ABACUS_ABS],
+        fetchImpl: async () => ({ ok: true, json: async () => [] }),
+    });
+
+    // Add #asmEditor textarea so the production code can populate it.
+    const asmEd = document.createElement('textarea');
+    asmEd.id = 'asmEditor';
+    document.body.appendChild(asmEd);
+
+    await vm.runInContext('_absOpenInEditorByName("Abacus")', ctx);
+
+    // 1. Must NOT show a toast.
+    const toastEl = document.getElementById('fpgaToastEl');
+    assert('T20 template path: no "No LUMP found" toast shown', toastEl === null);
+
+    // 2. Must NOT call openLumpInEditor (there is no token to open).
+    assert('T20 template path: openLumpInEditor NOT called',
+        calls.openLumpInEditor.length === 0, calls.openLumpInEditor);
+
+    // 3. Must call switchView('editor').
+    assert('T20 template path: switchView("editor") called',
+        calls.switchView.includes('editor'), calls.switchView);
+
+    // 4. #asmEditor must contain the abstraction header comment.
+    const editorValue = asmEd.value;
+    assert('T20 template path: editor contains header comment with abstraction name',
+        editorValue.includes('; Abacus'), JSON.stringify(editorValue.slice(0, 80)));
+
+    // 5. Editor must contain capabilities { } block.
+    assert('T20 template path: editor contains capabilities { } block',
+        editorValue.includes('capabilities { }'), JSON.stringify(editorValue.slice(0, 200)));
+
+    // 6. Editor must contain one method stub per method in correct order.
+    const methods = ['Add', 'Sub', 'Mul', 'Div', 'Mod', 'Abs'];
+    for (let mi = 0; mi < methods.length; mi++) {
+        assert('T20 template path: editor contains method stub for ' + methods[mi],
+            editorValue.includes('method ' + methods[mi] + ' {'), editorValue);
+        assert('T20 template path: method ' + methods[mi] + ' has selector #' + (mi + 1),
+            editorValue.includes('method ' + methods[mi] + ' {  ; selector #' + (mi + 1)), editorValue);
+    }
+
+    // 7. Selector order must be correct (Add before Sub before Mul, etc.).
+    const addIdx = editorValue.indexOf('method Add {');
+    const subIdx = editorValue.indexOf('method Sub {');
+    const absIdx = editorValue.indexOf('method Abs {');
+    assert('T20 template path: method order is Add < Sub < Abs',
+        addIdx < subIdx && subIdx < absIdx,
+        { addIdx, subIdx, absIdx });
+
+    // 8. "No LUMP found" string must NOT appear anywhere in the editor.
+    assert('T20 template path: editor does not contain "No LUMP found"',
+        !editorValue.includes('No LUMP found'), editorValue);
+})();
+
+// ── T20b: _absOpenInEditorByName — toast still fires when NOT in registry ─────
+// When existing is null AND the name is not in abstractionRegistry, the
+// original "No LUMP found" toast must still be shown as the final fallback.
+(async function t20b() {
+    const { ctx, document, calls } = makeCtx({
+        lumpsCache: [],
+        abstractions: [],
+        fetchImpl: async () => ({ ok: true, json: async () => [] }),
+    });
+
+    await vm.runInContext('_absOpenInEditorByName("UnknownWidget")', ctx);
+
+    assert('T20b fallback: openLumpInEditor NOT called',
+        calls.openLumpInEditor.length === 0, calls.openLumpInEditor);
+    assert('T20b fallback: switchView NOT called (no navigation)',
+        calls.switchView.length === 0, calls.switchView);
+    const toastEl = document.getElementById('fpgaToastEl');
+    assert('T20b fallback: "No LUMP found" toast shown', toastEl !== null);
+    const titleEl = toastEl && toastEl.querySelector('.fpga-toast-title');
+    assert('T20b fallback: toast title is "No LUMP found"',
+        titleEl && titleEl.textContent === 'No LUMP found', titleEl && titleEl.textContent);
+})();
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 (function waitAndSummarize() {
     setTimeout(function() {

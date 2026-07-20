@@ -4106,6 +4106,31 @@ async function _absOpenInEditorByName(name, methodName) {
     }
     const existing = window.LumpRegistry ? window.LumpRegistry.getServerList().find(l => l.abstraction === name) : null;
     if (!existing) {
+        // No compiled LUMP — if the abstraction is in the registry, open a ready-to-fill
+        // template so the user can start writing code immediately.
+        var _absEntry = (typeof abstractionRegistry !== 'undefined' && typeof abstractionRegistry.getByName === 'function')
+            ? abstractionRegistry.getByName(name) : null;
+        if (_absEntry) {
+            var _tmplLines = [
+                '; ' + name + '  (uncompiled \u2014 fill in method bodies and save)',
+                'capabilities { }',
+                ''
+            ];
+            var _tmplMethods = Array.isArray(_absEntry.methods) ? _absEntry.methods : [];
+            for (var _mi = 0; _mi < _tmplMethods.length; _mi++) {
+                var _mn = (_tmplMethods[_mi] && (_tmplMethods[_mi].name || _tmplMethods[_mi])) || ('Method' + (_mi + 1));
+                _tmplLines.push('method ' + _mn + ' {  ; selector #' + (_mi + 1));
+                _tmplLines.push('  ; TODO');
+                _tmplLines.push('}');
+                _tmplLines.push('');
+            }
+            var _langSel = document.getElementById('langSelector');
+            if (_langSel) _langSel.value = 'assembly';
+            var _asmEd = document.getElementById('asmEditor');
+            if (_asmEd) { _asmEd.readOnly = false; _asmEd.value = _tmplLines.join('\n'); }
+            switchView('editor');
+            return;
+        }
         if (typeof _showFpgaToast === 'function') {
             _showFpgaToast('No LUMP found', 'No compiled LUMP found for \u201c' + name + '\u201d \u2014 cannot open in editor', 'warn', 2000);
         }
