@@ -1626,7 +1626,10 @@ function compileAndBuild() {
         // Token-first: LumpRegistry is updated with the server-assigned token
         // so all subsequent IDE object lookups use the canonical token.
         var _wipSaveDone = function(tok) {
-            if (tok && window.LumpRegistry) window.LumpRegistry.setCurrent(tok);
+            if (tok && window.LumpRegistry) {
+                window.LumpRegistry.setCurrent(tok);
+                window.LumpRegistry.setPending(tok);
+            }
             _renderWipMethodGate(con, methodMeta, listing);
             trackAction('build_lump', { name: absName, lang: result.language, size: lumpSize });
             appendOutput('Built LUMP: "' + absName + '" [' + langLabel + '] \u2014 ' + cw + ' words, cc=' + cc + ', ' + sizeBytes + ' bytes \u00b7 v' + _autoVer + ' \u2014 test all methods to unlock version save', 'info');
