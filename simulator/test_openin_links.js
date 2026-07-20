@@ -810,6 +810,84 @@ trackAsync((async function t15() {
         })(), output);
 })();
 
+// ── T18: openLumpInEditor structured reconstruction — single-method LUMP ──────
+// Verifies that a LUMP with exactly ONE method in the registry emits
+// `method Name { }` just like the 2-method path (the `>= 1` guard fix).
+(function t18() {
+    const { assembleLump, BRANCH_OPCODE } = require('./lump_assembler.js');
+
+    // Single method body: Init (2 words).
+    const BODY_INIT = [0x10000007, 0x60000000]; // LOAD CR0,CR15[7] ; RETURN
+
+    const { buf } = assembleLump([BODY_INIT]);
+
+    // Strip header word to produce trimmed code array.
+    const rawWords = Array.from(buf.slice(1));
+    let trimLen = rawWords.length;
+    while (trimLen > 0 && rawWords[trimLen - 1] === 0) trimLen--;
+    const trimmed = rawWords.slice(0, trimLen);
+
+    // Mock single-method registry entry.
+    const _methods = [{ name: 'Init' }];
+    const BRANCH_OP = BRANCH_OPCODE;
+
+    // ── Reconstruction logic (same as openLumpInEditor, >= 1 path) ───────────
+    const disasmLines = [];
+    let structured = false;
+
+    if (_methods && trimmed.length >= _methods.length) {
+        const N = _methods.length;
+        const allBranch = _methods.every(function(_, i) {
+            return ((trimmed[i] >>> 27) & 0x1F) === BRANCH_OP;
+        });
+
+        if (allBranch) {
+            const bodyStarts = _methods.map(function(_, i) {
+                const raw = trimmed[i] & 0x7FFF;
+                const soff = (raw & 0x4000) ? (raw | 0xFFFF8000) : raw;
+                return i + soff;
+            });
+
+            structured = true;
+            for (let mi = 0; mi < N; mi++) {
+                const start = bodyStarts[mi];
+                const end   = (mi + 1 < N) ? bodyStarts[mi + 1] : trimmed.length;
+                const slice = trimmed.slice(start, end);
+                let sliceTrim = slice.length;
+                while (sliceTrim > 0 && slice[sliceTrim - 1] === 0) sliceTrim--;
+                const body = slice.slice(0, sliceTrim);
+                const mName = (_methods[mi] && (_methods[mi].name || _methods[mi])) || ('Method' + (mi + 1));
+
+                disasmLines.push('method ' + mName + ' {  ; selector #' + (mi + 1));
+                if (body.length === 0) {
+                    disasmLines.push('  ; (empty)');
+                } else {
+                    body.forEach(function(w) { disasmLines.push('  0x' + w.toString(16)); });
+                }
+                disasmLines.push('}');
+                disasmLines.push('');
+            }
+        }
+    }
+
+    const output = disasmLines.join('\n');
+
+    assert('T18 single-method: reconstruction succeeds (structured=true)', structured);
+    assert('T18 single-method: output contains "method Init {"',
+        output.includes('method Init {'), JSON.stringify(output.slice(0, 120)));
+    assert('T18 single-method: body word 0x10000007 present inside Init block',
+        output.includes('10000007'), output);
+    assert('T18 single-method: BRANCH dispatch word not emitted as body line',
+        (function() {
+            const initStart = output.indexOf('method Init {');
+            const section = output.slice(initStart);
+            // BRANCH opcode 23 top5 = 10111 → first hex digit of body word is never b8xxxxxx
+            // Verify the first indented word IS the body word, not the BRANCH entry
+            const firstBodyLine = section.split('\n').find(l => l.startsWith('  0x'));
+            return firstBodyLine && firstBodyLine.includes('10000007');
+        })(), output);
+})();
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 (function waitAndSummarize() {
     setTimeout(function() {

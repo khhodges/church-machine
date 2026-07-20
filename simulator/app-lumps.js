@@ -4451,12 +4451,12 @@ async function openLumpInEditor(token) {
             } else {
                 // Attempt structured reconstruction when:
                 //   a) abstraction name is known
-                //   b) registry has method list (> 1 method)
+                //   b) registry has method list (>= 1 method)
                 //   c) first registry.methods.length words are all opcode-23 BRANCH
                 var _absName  = lump.abstraction || null;
                 var _absReg   = (_absName && typeof abstractionRegistry !== 'undefined')
                                     ? abstractionRegistry.getByName(_absName) : null;
-                var _methods  = (_absReg && _absReg.methods && _absReg.methods.length > 1)
+                var _methods  = (_absReg && _absReg.methods && _absReg.methods.length >= 1)
                                     ? _absReg.methods : null;
                 var BRANCH_OP = 23;  // v2.0 ISA BRANCH opcode — matches lump_assembler.js
                 var structured  = false;
