@@ -4164,6 +4164,39 @@ def _load_bundled_lumps():
             LAZY_LUMPS[stem.lstrip('0') or '0'] = data
         except Exception as exc:
             print(f'[lumps] error loading {path}: {exc}', flush=True)
+    # Second pass: read manifest.json and re-register each named file under its
+    # canonical token.  Human-readable filenames like "LEDFlash_v2.lump" don't
+    # produce a valid token8 from their stem, so the loop above keys them under
+    # a garbage string.  This pass ensures LAZY_LUMPS["00000300"] always holds
+    # the manifest-designated binary, overriding any stale library-fetched copy.
+    _mf_path = os.path.join(lumps_dir, 'manifest.json')
+    if os.path.isfile(_mf_path):
+        try:
+            with open(_mf_path) as _mf:
+                _mf_data = json.load(_mf)
+            for _me in _mf_data:
+                _tok = _me.get('token', '')
+                _fn  = _me.get('filename', '')
+                if not (_tok and _fn):
+                    continue
+                _np = os.path.join(lumps_dir, _fn)
+                if not os.path.isfile(_np):
+                    continue
+                try:
+                    with open(_np, 'rb') as _fh:
+                        _d = _fh.read()
+                    if len(_d) < 4:
+                        continue
+                    _h = _struct.unpack('>I', _d[:4])[0]
+                    if (_h >> 27) & 0x1F != 0x1F:
+                        continue
+                    _t8 = _tok.lower().zfill(8)[:8]
+                    LAZY_LUMPS[_t8] = _d
+                    LAZY_LUMPS[_t8.lstrip('0') or '0'] = _d
+                except Exception:
+                    pass
+        except Exception as exc:
+            print(f'[lumps] manifest pass error: {exc}', flush=True)
 
 _load_bundled_lumps()
 
