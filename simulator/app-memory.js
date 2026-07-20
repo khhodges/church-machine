@@ -2682,18 +2682,32 @@ function updateNamespace() {
 
 // ── NS table: Add LUMP ────────────────────────────────────────────────────────
 // Fetch the server lump list, filter out lumps already live in the NS table,
-// and show a picker modal. On confirm, copy the lump binary into the extended
-// DMEM region for the allocated slot and write a valid NS entry.
+// and show a picker modal with a full metadata panel. On Install, copy the
+// lump binary into the extended DMEM region and write a valid NS entry using
+// the programmer's chosen load mode, slot, policy and GT type.
+
+// Module-level state shared between _nsTableAdd and _nsTableAddConfirm.
+window._nsAddCurrentSidecar  = null;   // sidecar object for currently-selected LUMP
+window._nsAddAvailableList   = null;   // full _available array from last list fetch
+window._nsAddCurrentWords        = null;   // cached words[] from per-selection /words fetch
+window._nsAddCurrentToken        = null;   // token these cached words belong to
+window._nsAddCurrentDetailSidecar = null;  // full sidecar from /api/lumps/<token>/detail
+
 function _nsTableAdd() {
     if (!sim) return;
     const _existing = document.getElementById('_nsAddModalOverlay');
     if (_existing) _existing.remove();
+    window._nsAddCurrentSidecar       = null;
+    window._nsAddAvailableList        = null;
+    window._nsAddCurrentWords         = null;
+    window._nsAddCurrentToken         = null;
+    window._nsAddCurrentDetailSidecar = null;
 
     // Show loading overlay immediately
     const _overlay = document.createElement('div');
     _overlay.id = '_nsAddModalOverlay';
-    _overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center;';
-    _overlay.innerHTML = '<div style="background:#12121f;border:1px solid #2a2a4a;border-radius:8px;padding:24px 28px;min-width:340px;max-width:480px;color:#d0d0e8;font-size:0.85rem;"><div style="color:#c89b3c;font-size:1rem;font-weight:600;margin-bottom:12px;">+ Add LUMP to Namespace</div><div id="_nsAddStatus" style="color:#888;">Loading LUMP list\u2026</div></div>';
+    _overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
+    _overlay.innerHTML = '<div style="background:#12121f;border:1px solid #2a2a4a;border-radius:8px;padding:24px 28px;min-width:340px;max-width:580px;width:100%;color:#d0d0e8;font-size:0.85rem;max-height:90vh;overflow-y:auto;"><div style="color:#c89b3c;font-size:1rem;font-weight:600;margin-bottom:12px;">+ Add LUMP to Namespace</div><div id="_nsAddStatus" style="color:#888;">Loading LUMP list\u2026</div></div>';
     _overlay.addEventListener('click', function(ev) { if (ev.target === _overlay) _overlay.remove(); });
     document.body.appendChild(_overlay);
 
@@ -2710,20 +2724,19 @@ function _nsTableAdd() {
             if (sim._tokenSlotMap) {
                 for (const [tok] of sim._tokenSlotMap) _occupied.add(tok);
             }
-            // Also match by ns_slot in the list against currently-valid NS entries
+            // Only exclude LUMPs whose token is already installed (occupied slot is not
+            // a pre-filter: the programmer can override the slot in the Install Options
+            // section, so the LUMP stays selectable even if its default ns_slot is taken).
             const _available = list.filter(function(l) {
-                if (_occupied.has(l.token)) return false;
-                if (l.ns_slot !== null && l.ns_slot !== undefined) {
-                    const slot = parseInt(l.ns_slot, 10);
-                    if (!isNaN(slot) && sim.isNSEntryValid(slot)) return false;
-                }
-                return true;
+                return !_occupied.has(l.token);
             });
 
             if (_available.length === 0) {
                 document.getElementById('_nsAddStatus').textContent = 'All server LUMPs are already installed in the namespace.';
                 return;
             }
+
+            window._nsAddAvailableList = _available;
 
             // Render picker
             const inner = _overlay.querySelector('div');
@@ -2734,18 +2747,228 @@ function _nsTableAdd() {
             }
             inner.innerHTML = `
                 <div style="color:#c89b3c;font-size:1rem;font-weight:600;margin-bottom:12px;">+ Add LUMP to Namespace</div>
-                <div style="margin-bottom:10px;color:#888;font-size:0.8rem;">${_available.length} LUMP${_available.length === 1 ? '' : 's'} available</div>
-                <select id="_nsAddSelect" style="width:100%;background:#0d0d1a;color:#d0d0e8;border:1px solid #2a2a4a;border-radius:4px;padding:6px 8px;font-size:0.85rem;margin-bottom:14px;">${optHtml}</select>
+                <div style="margin-bottom:8px;color:#888;font-size:0.8rem;">${_available.length} LUMP${_available.length === 1 ? '' : 's'} available</div>
+                <select id="_nsAddSelect" style="width:100%;background:#0d0d1a;color:#d0d0e8;border:1px solid #2a2a4a;border-radius:4px;padding:6px 8px;font-size:0.85rem;margin-bottom:10px;">${optHtml}</select>
+                <div id="_nsAddMeta" style="margin-bottom:8px;"></div>
                 <div id="_nsAddError" style="color:#f87171;font-size:0.78rem;min-height:1.2em;margin-bottom:8px;"></div>
                 <div style="display:flex;gap:8px;justify-content:flex-end;">
                     <button onclick="document.getElementById('_nsAddModalOverlay').remove()" style="background:transparent;color:#888;border:1px solid #2a2a4a;border-radius:4px;padding:5px 14px;font-size:0.82rem;cursor:pointer;">Cancel</button>
                     <button id="_nsAddConfirmBtn" onclick="_nsTableAddConfirm()" style="background:#1a4a2e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.4);border-radius:4px;padding:5px 14px;font-size:0.82rem;cursor:pointer;font-weight:600;">Install</button>
                 </div>`;
+
+            // Wire change event → populate metadata panel
+            const sel = document.getElementById('_nsAddSelect');
+            sel.addEventListener('change', function() { _nsPopulateAddMeta(sel.value); });
+            // Populate for the initially selected LUMP immediately
+            _nsPopulateAddMeta(sel.value);
         })
         .catch(function(err) {
             const st = document.getElementById('_nsAddStatus');
             if (st) st.textContent = 'Failed to load LUMP list: ' + err;
         });
+}
+
+// ── Render the metadata panel below the LUMP dropdown ─────────────────────────
+// Called on initial render and every time the dropdown changes.
+// Performs a real per-selection fetch of /api/lump/<token>/words to get
+// authoritative cw/cc from the binary; shows spinner while loading, error inline
+// on failure. Caches fetched words in window._nsAddCurrentWords for confirm.
+async function _nsPopulateAddMeta(token) {
+    const container = document.getElementById('_nsAddMeta');
+    if (!container) return;
+
+    const sidecar = (window._nsAddAvailableList || []).find(function(l) { return l.token === token; }) || null;
+    window._nsAddCurrentSidecar = sidecar;
+
+    if (!sidecar) { container.innerHTML = ''; return; }
+
+    // ── Per-selection fetch: sidecar detail + binary words in parallel ─────────
+    // Show spinner immediately; replace with panel once both fetches complete.
+    // The /detail endpoint returns the full authoritative sidecar (including
+    // capability permissions / grants that the lean list may omit).
+    // The /words endpoint provides binary-authoritative cw / cc / lumpSize.
+    container.innerHTML = '<div style="color:#888;font-size:0.78rem;padding:6px 0;">&#9680; Loading LUMP metadata\u2026</div>';
+
+    // Disable Install while metadata is loading so confirm cannot run with stale data.
+    const _cfBtn = document.getElementById('_nsAddConfirmBtn');
+    if (_cfBtn) { _cfBtn.disabled = true; _cfBtn.title = 'Waiting for LUMP metadata\u2026'; }
+
+    // detailSidecar starts as the lean list entry; overridden by /detail response.
+    let detailSidecar = sidecar;
+    let binaryCw      = sidecar.cw  != null ? sidecar.cw  : null;
+    let binaryCc      = sidecar.cc  != null ? sidecar.cc  : null;
+
+    // Cache hit: same token, both words and full sidecar already fetched.
+    if (window._nsAddCurrentToken === token && window._nsAddCurrentWords && window._nsAddCurrentDetailSidecar) {
+        const hdr = sim ? sim.parseLumpHeader(window._nsAddCurrentWords[0] >>> 0) : null;
+        if (hdr && hdr.valid) { binaryCw = hdr.cw; binaryCc = hdr.cc; }
+        detailSidecar = window._nsAddCurrentDetailSidecar;
+    } else {
+        try {
+            // Fetch full sidecar detail + binary words in parallel.
+            const [detailResp, wordsResp] = await Promise.all([
+                fetch('/api/lumps/' + token + '/detail'),
+                fetch('/api/lump/'  + token + '/words')
+            ]);
+
+            // Stale-guard: abort if user changed selection while fetching.
+            const nowSel = document.getElementById('_nsAddSelect');
+            if (!nowSel || nowSel.value !== token) return;
+
+            if (!wordsResp.ok) throw new Error('HTTP ' + wordsResp.status + ' from /words');
+
+            const [detailData, wordsData] = await Promise.all([
+                detailResp.ok ? detailResp.json() : Promise.resolve(null),
+                wordsResp.json()
+            ]);
+
+            // Override lean sidecar with full detail (has capability permissions, source, etc.)
+            if (detailData && !detailData.error) {
+                detailSidecar = detailData;
+                window._nsAddCurrentDetailSidecar = detailData;
+                window._nsAddCurrentSidecar       = detailData;
+            }
+
+            // Cache words + parse authoritative cw/cc/lumpSize from binary header.
+            const words = Array.isArray(wordsData) ? wordsData
+                        : (wordsData && Array.isArray(wordsData.words) ? wordsData.words : null);
+            if (!words || words.length === 0) throw new Error('Empty word list from /words');
+
+            window._nsAddCurrentWords = words;
+            window._nsAddCurrentToken = token;
+
+            const hdr = sim ? sim.parseLumpHeader(words[0] >>> 0) : null;
+            if (hdr && hdr.valid) { binaryCw = hdr.cw; binaryCc = hdr.cc; }
+
+        } catch (fetchErr) {
+            const nowSel2 = document.getElementById('_nsAddSelect');
+            if (!nowSel2 || nowSel2.value !== token) return;
+            container.innerHTML = `<div style="color:#f87171;font-size:0.78rem;padding:4px 0;">&#9888; Failed to load LUMP: ${String(fetchErr).replace(/</g,'&lt;')}</div>`;
+            return;
+        }
+    }
+
+    // ── Editable-field defaults from detailSidecar ────────────────────────────
+    const bootResident  = !!(detailSidecar.boot_resident);
+    const rawSlot       = detailSidecar.ns_slot;
+    const nsSlotVal     = (rawSlot !== null && rawSlot !== undefined) ? String(rawSlot) : '';
+    const policy        = detailSidecar.ns_slot_policy ||
+                          (nsSlotVal !== '' ? 'static' : 'dynamic');
+    const contentType   = detailSidecar.content_type || 'code';
+    const typField      = typeof detailSidecar.typ === 'number' ? detailSidecar.typ : 0;
+    const gtTypeDefault = (contentType === 'outform' || typField === 2) ? 2 : 1;
+
+    // ── Read-only display helpers ─────────────────────────────────────────────
+    const esc = function(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+    const grants    = Array.isArray(detailSidecar.grants) ? detailSidecar.grants.join(', ') : esc(detailSidecar.grants || 'E');
+    const descText  = esc(detailSidecar.description || '');
+
+    // Capabilities table — shows index, name, target NS slot, and permissions.
+    let capsHtml = '<span style="color:#6b7280;font-size:0.75rem;">None</span>';
+    if (Array.isArray(detailSidecar.capabilities) && detailSidecar.capabilities.length > 0) {
+        capsHtml = '<table style="width:100%;border-collapse:collapse;font-size:0.72rem;margin-top:3px;">'
+            + '<tr style="color:#a78bfa;">'
+            + '<th style="text-align:left;padding:1px 5px;">#</th>'
+            + '<th style="text-align:left;padding:1px 5px;">Name</th>'
+            + '<th style="text-align:left;padding:1px 5px;">NS slot</th>'
+            + '<th style="text-align:left;padding:1px 5px;">Perm</th></tr>';
+        for (let ci = 0; ci < detailSidecar.capabilities.length; ci++) {
+            const cap           = detailSidecar.capabilities[ci];
+            const capName       = esc(cap.name || '—');
+            const nsSlotDisplay = cap.ns_slot != null ? cap.ns_slot : '—';
+            const permDisplay   = Array.isArray(cap.grants) ? cap.grants.join(',')
+                                : (cap.grants ? esc(cap.grants) : (cap.permissions ? esc(cap.permissions) : 'E'));
+            capsHtml += `<tr>`
+                + `<td style="padding:1px 5px;color:#888;">${ci}</td>`
+                + `<td style="padding:1px 5px;">${capName}</td>`
+                + `<td style="padding:1px 5px;color:#6b7280;">${nsSlotDisplay}</td>`
+                + `<td style="padding:1px 5px;color:#4ec9b0;">${permDisplay}</td></tr>`;
+        }
+        capsHtml += '</table>';
+    }
+
+    // ── Shared style strings ──────────────────────────────────────────────────
+    const sLabel   = 'color:#a78bfa;font-size:0.7rem;font-weight:600;letter-spacing:0.04em;margin-bottom:3px;display:block;text-transform:uppercase;';
+    const sRoVal   = 'color:#d0d0e8;font-size:0.79rem;';
+    const sInput   = 'background:#0d0d1a;color:#d0d0e8;border:1px solid #2a2a4a;border-radius:3px;padding:3px 6px;font-size:0.79rem;width:100%;box-sizing:border-box;';
+    const sSelect  = 'background:#0d0d1a;color:#d0d0e8;border:1px solid #2a2a4a;border-radius:3px;padding:3px 5px;font-size:0.79rem;width:100%;box-sizing:border-box;';
+    const sCard    = 'background:#0d0d1a;border:1px solid #1e1e3a;border-radius:6px;padding:10px 12px;margin-bottom:6px;';
+    const sGH      = 'color:#c89b3c;font-size:0.7rem;font-weight:700;letter-spacing:0.06em;margin-bottom:7px;';
+
+    const cwDisplay = binaryCw != null ? binaryCw : '—';
+    const ccDisplay = binaryCc != null ? binaryCc : '—';
+
+    container.innerHTML = `
+        <div style="${sCard}">
+            <div style="${sGH}">INSTALL OPTIONS</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div>
+                    <span style="${sLabel}">Load Mode</span>
+                    <label style="display:block;cursor:pointer;font-size:0.79rem;margin-bottom:2px;">
+                        <input type="radio" name="_nsLoadMode" value="lazy" ${!bootResident ? 'checked' : ''} style="margin-right:4px;">
+                        Lazy Load <span style="color:#6b7280;font-size:0.7rem;">(stub)</span>
+                    </label>
+                    <label style="display:block;cursor:pointer;font-size:0.79rem;">
+                        <input type="radio" name="_nsLoadMode" value="resident" ${bootResident ? 'checked' : ''} style="margin-right:4px;">
+                        Boot Resident <span style="color:#6b7280;font-size:0.7rem;">(full)</span>
+                    </label>
+                </div>
+                <div>
+                    <span style="${sLabel}">NS Slot</span>
+                    <input type="number" id="_nsSlotInput" min="7" max="${sim.MAX_NS_ENTRIES - 1}"
+                           placeholder="Auto-assign" value="${nsSlotVal}" style="${sInput}">
+                    <div style="color:#6b7280;font-size:0.68rem;margin-top:2px;">Blank = auto (≥ 7)</div>
+                </div>
+                <div>
+                    <span style="${sLabel}">Slot Policy</span>
+                    <select id="_nsSlotPolicy" style="${sSelect}">
+                        <option value="static"  ${policy === 'static'  ? 'selected' : ''}>Static</option>
+                        <option value="dynamic" ${policy === 'dynamic' ? 'selected' : ''}>Dynamic</option>
+                    </select>
+                </div>
+                <div>
+                    <span style="${sLabel}">GT Type</span>
+                    <select id="_nsGtType" style="${sSelect}">
+                        <option value="1" ${gtTypeDefault === 1 ? 'selected' : ''}>Inform (code/thread)</option>
+                        <option value="2" ${gtTypeDefault === 2 ? 'selected' : ''}>Outform (data)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div style="${sCard}">
+            <div style="${sGH}">LUMP METADATA</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px 12px;font-size:0.78rem;">
+                <div><span style="${sLabel}">Token</span>
+                     <span style="${sRoVal};font-family:monospace;">${esc(detailSidecar.token || '—')}</span></div>
+                <div><span style="${sLabel}">Name</span>
+                     <span style="${sRoVal}">${esc(detailSidecar.abstraction || detailSidecar.name || '—')}</span></div>
+                <div><span style="${sLabel}">Code Words (CW)</span>
+                     <span style="${sRoVal}">${cwDisplay}</span></div>
+                <div><span style="${sLabel}">C-List (CC)</span>
+                     <span style="${sRoVal}">${ccDisplay}</span></div>
+                <div><span style="${sLabel}">Grants</span>
+                     <span style="${sRoVal}">${grants}</span></div>
+                <div><span style="${sLabel}">Language</span>
+                     <span style="${sRoVal}">${esc(detailSidecar.language || '—')}</span></div>
+                <div><span style="${sLabel}">Version</span>
+                     <span style="${sRoVal}">${esc(detailSidecar.version || '—')}</span></div>
+                <div><span style="${sLabel}">Author</span>
+                     <span style="${sRoVal}">${esc(detailSidecar.author || '—')}</span></div>
+                ${detailSidecar.profile ? `<div><span style="${sLabel}">Profile</span>
+                     <span style="${sRoVal}">${esc(detailSidecar.profile)}</span></div>` : ''}
+                ${descText ? `<div style="grid-column:1/-1"><span style="${sLabel}">Description</span>
+                     <div style="color:#b0b0c8;font-size:0.74rem;max-height:52px;overflow-y:auto;line-height:1.4;">${descText}</div></div>` : ''}
+            </div>
+            ${(Array.isArray(detailSidecar.capabilities) && detailSidecar.capabilities.length > 0) ? `
+            <div style="margin-top:8px;">
+                <span style="${sLabel}">Capabilities</span>
+                ${capsHtml}
+            </div>` : ''}
+        </div>`;
+
+    // Metadata fully loaded — re-enable Install.
+    const _cfBtn2 = document.getElementById('_nsAddConfirmBtn');
+    if (_cfBtn2) { _cfBtn2.disabled = false; _cfBtn2.title = ''; }
 }
 
 function _nsTableAddConfirm() {
@@ -2756,45 +2979,188 @@ function _nsTableAddConfirm() {
     const token = sel.value;
     const name = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : token;
     if (!token) { if (errEl) errEl.textContent = 'Please select a LUMP.'; return; }
+
+    // Guard: refuse to install if sidecar detail + words haven't been fetched for this token.
+    // _nsPopulateAddMeta keeps Install disabled while loading, but this catch handles
+    // any race where confirm fires before the async fetch completes.
+    if (!window._nsAddCurrentWords || window._nsAddCurrentToken !== token) {
+        if (errEl) errEl.textContent = 'LUMP metadata is still loading — please wait a moment and try again.';
+        return;
+    }
+
+    const sidecar = window._nsAddCurrentSidecar;
+
+    // ── Read editable field values ────────────────────────────────────────────
+    const loadModeRadio = document.querySelector('input[name="_nsLoadMode"]:checked');
+    const loadMode      = loadModeRadio ? loadModeRadio.value : 'lazy';
+    const slotInputEl   = document.getElementById('_nsSlotInput');
+    const slotInputVal  = slotInputEl ? slotInputEl.value.trim() : '';
+    const gtTypeEl      = document.getElementById('_nsGtType');
+    const gtType        = gtTypeEl ? parseInt(gtTypeEl.value, 10) : 1;
+    const policyEl      = document.getElementById('_nsSlotPolicy');
+    const slotPolicy    = policyEl ? policyEl.value : 'static';
+
+    // ── NS slot validation (only for static policy with explicit slot) ─────────
+    let userSlot = null;
+    if (slotPolicy !== 'dynamic' && slotInputVal !== '') {
+        userSlot = parseInt(slotInputVal, 10);
+        if (isNaN(userSlot) || userSlot < 7 || userSlot >= sim.MAX_NS_ENTRIES) {
+            if (errEl) errEl.textContent = `Slot must be between 7 and ${sim.MAX_NS_ENTRIES - 1}.`;
+            return;
+        }
+        if (sim.isNSEntryValid(userSlot)) {
+            if (errEl) errEl.textContent = `Slot ${userSlot} is already occupied. Choose a free slot.`;
+            return;
+        }
+    }
+
     if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Installing\u2026'; }
     if (errEl) errEl.textContent = '';
 
-    fetch('/api/lump/' + token + '/words')
-        .then(function(r) { return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
-        .then(function(data) {
-            const words = Array.isArray(data) ? data : (data && Array.isArray(data.words) ? data.words : null);
-            if (!words || words.length === 0) return Promise.reject('Empty word list from server');
+    // Use cached words from the per-selection fetch if available; otherwise fetch now.
+    const _doInstall = function(words) {
+        const hdr = sim.parseLumpHeader(words[0] >>> 0);
+        if (!hdr.valid) return Promise.reject('Invalid LUMP header (magic mismatch)');
 
-            const hdr = sim.parseLumpHeader(words[0] >>> 0);
-            if (!hdr.valid) return Promise.reject('Invalid LUMP header (magic mismatch)');
+        // ── Determine target NS slot based on Slot Policy ─────────────────────
+        // Dynamic: always auto-allocate (slot may change between reboots).
+        // Static: use user-specified slot, or fall back to auto-allocate.
+        let slot;
+        if (slotPolicy === 'dynamic') {
+            slot = sim.allocOrFindNsSlot(token, name);
+        } else if (userSlot !== null) {
+            slot = userSlot;
+            if (sim._tokenSlotMap) sim._tokenSlotMap.set(token, slot);
+        } else {
+            slot = sim.allocOrFindNsSlot(token, name);
+        }
+        if (slot === null) return Promise.reject('Namespace table is full');
 
-            const slot = sim.allocOrFindNsSlot(token, name);
-            if (slot === null) return Promise.reject('Namespace table is full');
+        // Copy lump words into this slot's extended DMEM region
+        const EXTENDED_BASE   = 0x0400;
+        const EXTENDED_STRIDE = 0x0100;
+        const PROG_SLOT       = 7;
+        const slotOffset      = Math.max(0, slot - PROG_SLOT);
+        const lumpBase        = EXTENDED_BASE + slotOffset * EXTENDED_STRIDE;
 
-            // Copy lump words into this slot's extended DMEM region
-            const EXTENDED_BASE   = 0x0400;
-            const EXTENDED_STRIDE = 0x0100;
-            const PROG_SLOT       = 7;
-            const slotOffset      = Math.max(0, slot - PROG_SLOT);
-            const lumpBase        = EXTENDED_BASE + slotOffset * EXTENDED_STRIDE;
+        const copyLen = Math.min(words.length, EXTENDED_STRIDE);
+        for (let wi = 0; wi < copyLen; wi++) {
+            sim.memory[lumpBase + wi] = words[wi] >>> 0;
+        }
 
-            const copyLen = Math.min(words.length, EXTENDED_STRIDE);
-            for (let wi = 0; wi < copyLen; wi++) {
-                sim.memory[lumpBase + wi] = words[wi] >>> 0;
+        // limit17: 0 for Lazy Load (stub), hdr.cw for Boot Resident (full)
+        const limit17    = (loadMode === 'resident') ? hdr.cw : 0;
+        const abstractGt = (sidecar && sidecar.abstract_gt) ? (sidecar.abstract_gt >>> 0) : 0;
+
+        // Write NS entry with programmer-chosen options
+        sim.writeNSEntry(slot, lumpBase, limit17, 0, 0, gtType, 0, hdr.cc, abstractGt);
+        sim.nsLabels[slot] = name;
+
+        // ── Populate c-list GTs in DMEM from sidecar capabilities ─────────────
+        // c-list lives at lumpBase + (lumpSize - cc) per parseLumpHeader:
+        // "c-list starts at lumpBase + (lumpSize - cc)" — call.py line 282.
+        //
+        // Real sidecars use a variety of field names across schema versions:
+        //   slot     — c-list write position (REQUIRED, else fall back to iteration index)
+        //   gt / abstract_gt — pre-computed GT: use directly (highest priority)
+        //   ns_slot / target_ns / nsIndex — NS table slot ref: build live Inform GT
+        //   grants / rights — permissions array/string; defaults to {E:1}
+        //   filled_by — capability filled programmatically at boot: skip (leave binary GT)
+        //   intentionally_null — explicitly null slot: skip (leave binary GT)
+        //
+        // We do NOT overwrite with 0 when no GT can be resolved: the binary copy above
+        // (copyLen words) already placed the compiled-in GT; leaving it is safer than
+        // zeroing it and triggering a CALL fault.
+        if (sidecar && Array.isArray(sidecar.capabilities) && sidecar.capabilities.length > 0) {
+            // Helper: parse grants/rights into a createGT permissions object.
+            const _parseCapPerms = function(cap) {
+                const _p = {R:0,W:0,X:0,L:0,S:0,E:0};
+                const _src = cap.grants || cap.rights || [];
+                const _g   = Array.isArray(_src) ? _src : [String(_src)];
+                _g.forEach(function(g) {
+                    for (const ch of String(g).toUpperCase()) if (ch in _p) _p[ch] = 1;
+                });
+                return Object.values(_p).some(Boolean) ? _p : {E:1};
+            };
+
+            const caps    = sidecar.capabilities;
+            const cBase   = lumpBase + (hdr.lumpSize - hdr.cc);
+            for (let capIdx = 0; capIdx < caps.length; capIdx++) {
+                const cap = caps[capIdx];
+
+                // Skip slots filled at boot or explicitly null (leave binary GT intact).
+                if (cap.filled_by || cap.intentionally_null || cap.wired_at_boot) continue;
+
+                // c-list write position: declared slot field or iteration index.
+                const clistSlotIdx = (cap.slot != null) ? parseInt(cap.slot, 10) : capIdx;
+                if (isNaN(clistSlotIdx) || clistSlotIdx < 0 || clistSlotIdx >= hdr.cc) continue;
+
+                const writeAddr = cBase + clistSlotIdx;
+
+                // 1. NS table slot reference (PRIMARY) → build live Inform GT.
+                //    Must run BEFORE precomputed GT: sidecar `gt` is documentation only when
+                //    `ns_slot`/`target_ns`/`nsIndex` is also present — live NS state is authoritative.
+                //    Normalize across all sidecar schema variants found in server/lumps/*.json:
+                //      ns_slot (00000600, 4c7380cb), target_ns (00002000, 00130000, 50789581),
+                //      nsIndex (Human_Hand_* lumps). Treat negative/sentinel values as absent.
+                const nsSlotRef = (cap.ns_slot  != null) ? cap.ns_slot
+                                : (cap.target_ns != null) ? cap.target_ns
+                                : (cap.nsIndex   != null) ? cap.nsIndex : null;
+                if (nsSlotRef != null) {
+                    const refSlot = parseInt(nsSlotRef, 10);
+                    if (!isNaN(refSlot) && refSlot >= 0 && sim.isNSEntryValid(refSlot)) {
+                        // Read live gt_seq from NS word2 bits[31:25] so the GT passes
+                        // version checks even if this slot has been cleared+reinstalled.
+                        const nsW2      = sim.memory[sim.NS_TABLE_BASE + refSlot * sim.NS_ENTRY_WORDS + 2];
+                        const liveGtSeq = (nsW2 >>> 25) & 0x7F;
+                        sim.memory[writeAddr] = sim.createGT(liveGtSeq, refSlot, _parseCapPerms(cap), 1) >>> 0;
+                    } else {
+                        // NS slot not yet loaded — write null GT (0); runtime lazy-resolve fills it.
+                        sim.memory[writeAddr] = 0x00000000;
+                    }
+                    continue;
+                }
+
+                // 2. Precomputed GT (FALLBACK) — only when no NS slot is declared.
+                //    Applies to self-contained caps: 00001f00.json abstract_gt, cb8739cf.json slot 7.
+                const preGtStr = cap.gt || cap.abstract_gt;
+                if (preGtStr) {
+                    const parsed = parseInt(String(preGtStr), 16);
+                    if (!isNaN(parsed)) { sim.memory[writeAddr] = parsed >>> 0; }
+                    continue;
+                }
+
+                // 3. No GT source at all: write null GT (0); lazy-resolve at runtime.
+                sim.memory[writeAddr] = 0x00000000;
             }
+        }
 
-            // Write NS entry: Inform GT (type=1), limit17=cw, cc from header
-            sim.writeNSEntry(slot, lumpBase, hdr.cw, 0, 0, 1, 0, hdr.cc, 0);
-            sim.nsLabels[slot] = name;
+        const _overlay = document.getElementById('_nsAddModalOverlay');
+        if (_overlay) _overlay.remove();
+        if (typeof updateNamespace === 'function') updateNamespace();
+        return Promise.resolve();
+    };
 
-            const _overlay = document.getElementById('_nsAddModalOverlay');
-            if (_overlay) _overlay.remove();
-            if (typeof updateNamespace === 'function') updateNamespace();
-        })
-        .catch(function(err) {
-            if (errEl) errEl.textContent = 'Error: ' + err;
-            if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Install'; }
-        });
+    const _onError = function(err) {
+        if (errEl) errEl.textContent = 'Error: ' + err;
+        if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Install'; }
+    };
+
+    // Re-use cached words from per-selection fetch when token matches.
+    if (window._nsAddCurrentToken === token && window._nsAddCurrentWords) {
+        _doInstall(window._nsAddCurrentWords).catch(_onError);
+    } else {
+        fetch('/api/lump/' + token + '/words')
+            .then(function(r) { return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
+            .then(function(data) {
+                const words = Array.isArray(data) ? data : (data && Array.isArray(data.words) ? data.words : null);
+                if (!words || words.length === 0) return Promise.reject('Empty word list from server');
+                window._nsAddCurrentWords = words;
+                window._nsAddCurrentToken = token;
+                return _doInstall(words);
+            })
+            .catch(_onError);
+    }
 }
 
 // ── NS table: Clear slot ──────────────────────────────────────────────────────
@@ -2870,6 +3236,27 @@ window._nsTableSave = async function(btn) {
         const sentinelIdx = (sim.NS_TABLE_BASE >>> 0) - 2;
         if (sentinelIdx >= 0 && sentinelIdx < bootWordCount) {
             words[sentinelIdx] = bootEntrySlot & 0xFF;
+        }
+
+        // ── Re-seal every active NS slot before encoding ───────────────────────
+        // Recomputes word2 (the CRC seal) from word0/word1 so no stale seal
+        // survives from an Add, Clear, or direct memory edit.
+        // gt_seq is preserved from the existing word2 bits[31:25].
+        {
+            const nsBase  = sim.NS_TABLE_BASE >>> 0;
+            const nsWords = sim.NS_ENTRY_WORDS;     // = 4
+            const maxSl   = sim.MAX_NS_ENTRIES;
+            for (let si = 0; si < maxSl; si++) {
+                const b = nsBase + si * nsWords;
+                if (b + 3 >= bootWordCount) break;
+                const w0 = words[b] >>> 0;
+                if (w0 === 0) continue;             // unoccupied slot — skip
+                const w1     = words[b + 1] >>> 0;
+                const w2     = words[b + 2] >>> 0;
+                const gtSeq  = (w2 >>> 25) & 0x7F;
+                const lim17  = w1 & 0x1FFFF;
+                words[b + 2] = sim.makeVersionSeals(gtSeq, w0, lim17) >>> 0;
+            }
         }
 
         // Encode as base64 (little-endian bytes — matches struct.pack "<{n}I").
