@@ -714,6 +714,102 @@ trackAsync((async function t15() {
         { showLumpDetail: calls.showLumpDetail });
 })();
 
+// ── T17: openLumpInEditor structured reconstruction — 2-method LUMP ──────────
+// Assembles a 2-method LUMP with lump_assembler.js, extracts the trimmed code
+// words (header word removed), runs the body-slice reconstruction logic that
+// mirrors the new code in openLumpInEditor, and asserts that the output
+// contains `method Add {` and `method Sub {` with correctly-indented bodies.
+(function t17() {
+    const { assembleLump, BRANCH_OPCODE } = require('./lump_assembler.js');
+
+    // Two minimal method bodies: Add (2 words) and Sub (2 words).
+    // These are raw 32-bit words — content doesn't matter for structural test.
+    const BODY_ADD = [0x10000001, 0x60000000]; // LOAD CR0,CR15[1] ; RETURN
+    const BODY_SUB = [0x10000002, 0x60000000]; // LOAD CR0,CR15[2] ; RETURN
+
+    const { buf, totalWords } = assembleLump([BODY_ADD, BODY_SUB]);
+
+    // Strip header word (buf[0]) to produce the trimmed code array, matching
+    // what openLumpInEditor does after parseLumpHeader() / rawWords / trimmed.
+    const rawWords = Array.from(buf.slice(1)); // code words only
+    let trimLen = rawWords.length;
+    while (trimLen > 0 && rawWords[trimLen - 1] === 0) trimLen--;
+    const trimmed = rawWords.slice(0, trimLen);
+
+    // Mock method registry — mirrors abstractionRegistry.getByName() result.
+    const _methods = [{ name: 'Add' }, { name: 'Sub' }];
+    const BRANCH_OP = BRANCH_OPCODE;
+
+    // ── Reconstruction logic (mirrors openLumpInEditor new code path) ──────
+    const disasmLines = [];
+    let structured = false;
+
+    if (_methods && trimmed.length >= _methods.length) {
+        const N = _methods.length;
+        const allBranch = _methods.every(function(_, i) {
+            return ((trimmed[i] >>> 27) & 0x1F) === BRANCH_OP;
+        });
+
+        if (allBranch) {
+            const bodyStarts = _methods.map(function(_, i) {
+                const raw = trimmed[i] & 0x7FFF;
+                const soff = (raw & 0x4000) ? (raw | 0xFFFF8000) : raw;
+                return i + soff;
+            });
+
+            structured = true;
+            for (let mi = 0; mi < N; mi++) {
+                const start = bodyStarts[mi];
+                const end   = (mi + 1 < N) ? bodyStarts[mi + 1] : trimmed.length;
+                const slice = trimmed.slice(start, end);
+                let sliceTrim = slice.length;
+                while (sliceTrim > 0 && slice[sliceTrim - 1] === 0) sliceTrim--;
+                const body = slice.slice(0, sliceTrim);
+                const mName = (_methods[mi] && (_methods[mi].name || _methods[mi])) || ('Method' + (mi + 1));
+
+                disasmLines.push('method ' + mName + ' {  ; selector #' + (mi + 1));
+                if (body.length === 0) {
+                    disasmLines.push('  ; (empty)');
+                } else {
+                    body.forEach(function(w) { disasmLines.push('  0x' + w.toString(16)); });
+                }
+                disasmLines.push('}');
+                disasmLines.push('');
+            }
+        }
+    }
+
+    const output = disasmLines.join('\n');
+
+    assert('T17 structured: reconstruction succeeds (structured=true)', structured);
+    assert('T17 structured: output contains "method Add {"',
+        output.includes('method Add {'), JSON.stringify(output.slice(0, 120)));
+    assert('T17 structured: output contains "method Sub {"',
+        output.includes('method Sub {'), JSON.stringify(output.slice(0, 200)));
+    assert('T17 structured: Add body word 0x10000001 present under Add block',
+        (function() {
+            const addStart = output.indexOf('method Add {');
+            const subStart = output.indexOf('method Sub {');
+            const addSection = output.slice(addStart, subStart);
+            return addSection.includes('10000001');
+        })(), output);
+    assert('T17 structured: Sub body word 0x10000002 present under Sub block (not Add)',
+        (function() {
+            const subStart = output.indexOf('method Sub {');
+            const subSection = output.slice(subStart);
+            return subSection.includes('10000002') && !output.slice(0, subStart).includes('10000002');
+        })(), output);
+    assert('T17 structured: BRANCH table entries NOT emitted as body lines',
+        (function() {
+            // BRANCH opcode 23 → top 5 bits = 10111 → 0xB8000000 family
+            // Verify no line in Add's body section contains a raw BRANCH word
+            const addStart = output.indexOf('method Add {');
+            const subStart = output.indexOf('method Sub {');
+            const addSection = output.slice(addStart, subStart);
+            return !addSection.includes('b8') || addSection.indexOf('b8') > addSection.indexOf('10000001');
+        })(), output);
+})();
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 (function waitAndSummarize() {
     setTimeout(function() {

@@ -4448,8 +4448,69 @@ async function openLumpInEditor(token) {
             }
             if (trimmed.length === 0) {
                 disasmLines.push('; (empty lump)');
-            } else if (typeof ChurchAssembler !== 'undefined') {
-                disasmLines.push.apply(disasmLines, ChurchAssembler.decompileWords(trimmed));
+            } else {
+                // Attempt structured reconstruction when:
+                //   a) abstraction name is known
+                //   b) registry has method list (> 1 method)
+                //   c) first registry.methods.length words are all opcode-23 BRANCH
+                var _absName  = lump.abstraction || null;
+                var _absReg   = (_absName && typeof abstractionRegistry !== 'undefined')
+                                    ? abstractionRegistry.getByName(_absName) : null;
+                var _methods  = (_absReg && _absReg.methods && _absReg.methods.length > 1)
+                                    ? _absReg.methods : null;
+                var BRANCH_OP = 23;  // v2.0 ISA BRANCH opcode — matches lump_assembler.js
+                var structured  = false;
+
+                if (_methods && trimmed.length >= _methods.length) {
+                    // Verify all N dispatch entries are opcode-23 BRANCH
+                    var N = _methods.length;
+                    var allBranch = _methods.every(function(_, i) {
+                        return ((trimmed[i] >>> 27) & 0x1F) === BRANCH_OP;
+                    });
+
+                    if (allBranch) {
+                        // Decode body slice offsets from BRANCH table.
+                        // decodeBranchEntry formula (from lump_assembler.js):
+                        //   soff = signed 15-bit (trimmed[i] & 0x7FFF)
+                        //   bodyLumpPC = i + soff   (lump-relative PC of body start)
+                        //   trim index = bodyLumpPC (0-based into trimmed array)
+                        var bodyStarts = _methods.map(function(_, i) {
+                            var raw = trimmed[i] & 0x7FFF;
+                            var soff = (raw & 0x4000) ? (raw | 0xFFFF8000) : raw;
+                            return i + soff;   // lump-relative PC of body (= index into trimmed)
+                        });
+
+                        // Emit one `method Name { ... }` block per method
+                        structured = true;
+                        for (var mi = 0; mi < N; mi++) {
+                            var _mStart = bodyStarts[mi];
+                            var _mEnd   = (mi + 1 < N) ? bodyStarts[mi + 1] : trimmed.length;
+                            var _slice  = trimmed.slice(_mStart, _mEnd);
+                            // Trim trailing zeros within slice
+                            var _sliceTrim = _slice.length;
+                            while (_sliceTrim > 0 && _slice[_sliceTrim - 1] === 0) _sliceTrim--;
+                            var _body = _slice.slice(0, _sliceTrim);
+                            var _mName = (_methods[mi] && (_methods[mi].name || _methods[mi])) || ('Method' + (mi + 1));
+
+                            disasmLines.push('method ' + _mName + ' {' +
+                                             '  ; selector #' + (mi + 1));
+                            if (_body.length === 0) {
+                                disasmLines.push('  ; (empty)');
+                            } else {
+                                var _bodyLines = (typeof ChurchAssembler !== 'undefined')
+                                    ? ChurchAssembler.decompileWords(_body)
+                                    : _body.map(function(w) { return '  0x' + w.toString(16); });
+                                _bodyLines.forEach(function(l) { disasmLines.push('  ' + l); });
+                            }
+                            disasmLines.push('}');
+                            disasmLines.push('');
+                        }
+                    }
+                }
+
+                if (!structured && typeof ChurchAssembler !== 'undefined') {
+                    disasmLines.push.apply(disasmLines, ChurchAssembler.decompileWords(trimmed));
+                }
             }
         }
     }
