@@ -705,13 +705,13 @@ function showNextSteps(context) {
     box.innerHTML = `<div class="next-steps-header" onclick="toggleNextSteps()"><span class="next-steps-arrow">${arrowChar}</span><span class="next-steps-label">Next Steps</span></div><div class="next-steps-body" style="${bodyDisplay}">${bodyHTML}</div>`;
 }
 
-// "Open Lump" handler for the Next Steps panel. Opens the most recently
-// compiled/saved lump (window._editorLastSavedToken) if one is known; if
-// not (nothing compiled yet, or the token was invalidated by an edit since
-// the last compile), it just opens the Lumps view with no pre-selection.
+// Opens the LUMP Repository view, selecting the most recently compiled/saved
+// lump when one is known (via LumpRegistry.getCurrent()).  Does NOT use
+// setPending — that path triggers an openLumpInEditor redirect for
+// memory-only (assembled but not yet saved) lumps.  getCurrent() is already
+// consumed directly by renderLumps() as _selTok, so saved lumps are
+// auto-selected without a pending token race.
 function _openLastCompiledLump() {
-    const cur = window.LumpRegistry?.getCurrent();
-    if (cur) window.LumpRegistry.setPending(cur);
     if (typeof switchView === 'function') switchView('lumps');
 }
 
