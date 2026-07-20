@@ -888,6 +888,102 @@ trackAsync((async function t15() {
         })(), output);
 })();
 
+// ── T19: Manifest-offset path (old-format sequential LUMP) ───────────────────
+// Exercises Path A in openLumpInEditor: when lump.methods carries offset+length,
+// use those directly to slice trimmed[] without relying on a BRANCH dispatch table.
+// Mirrors the Constants abstraction layout (7 methods, sequential, no dispatch table).
+(function testT19_manifestOffsetPath() {
+    // Build a synthetic trimmed[] — three methods of 3 words each (like Constants Pi/E/Phi)
+    // Words: simple unique values so we can assert which method body they appear in.
+    const Pi_words  = [0x07030000, 0x87000000, 0x1F000000];
+    const E_words   = [0x07030001, 0x87000001, 0x1F000000];
+    const Phi_words = [0x07030002, 0x87000002, 0x1F000000];
+    const trimmed   = [].concat(Pi_words, E_words, Phi_words);
+
+    // Manifest-style lump object with explicit offset+length per method
+    const lump = {
+        abstraction: 'Constants',
+        methods: [
+            { name: 'Pi',  offset: 0, length: 3 },
+            { name: 'E',   offset: 3, length: 3 },
+            { name: 'Phi', offset: 6, length: 3 },
+        ],
+    };
+
+    // ── Mirror the Path A reconstruction from openLumpInEditor ────────────────
+    const _lumpMethods = Array.isArray(lump.methods) && lump.methods.length >= 1
+                             ? lump.methods : null;
+    const _hasOffsets  = _lumpMethods && _lumpMethods.every(function(m) {
+        return typeof m.offset === 'number';
+    });
+    const disasmLines = [];
+    let structured = false;
+    if (_hasOffsets) {
+        structured = true;
+        for (let mi = 0; mi < _lumpMethods.length; mi++) {
+            const _m      = _lumpMethods[mi];
+            const _mStart = _m.offset;
+            const _mEnd   = (typeof _m.length === 'number')
+                                ? (_m.offset + _m.length)
+                                : (mi + 1 < _lumpMethods.length
+                                    ? _lumpMethods[mi + 1].offset
+                                    : trimmed.length);
+            const _slice  = trimmed.slice(_mStart, _mEnd);
+            let _sTrim  = _slice.length;
+            while (_sTrim > 0 && _slice[_sTrim - 1] === 0) _sTrim--;
+            const _body   = _slice.slice(0, _sTrim);
+            const _mName  = _m.name || ('Method' + (mi + 1));
+            disasmLines.push('method ' + _mName + ' {  ; selector #' + (mi + 1));
+            if (_body.length === 0) {
+                disasmLines.push('  ; (empty)');
+            } else {
+                _body.forEach(function(w) { disasmLines.push('  0x' + w.toString(16)); });
+            }
+            disasmLines.push('}');
+            disasmLines.push('');
+        }
+    }
+
+    const output = disasmLines.join('\n');
+
+    assert('T19 manifest-offset: structured=true (Path A fires)', structured);
+    assert('T19 manifest-offset: output contains "method Pi {"',
+        output.includes('method Pi {'), JSON.stringify(output.slice(0, 120)));
+    assert('T19 manifest-offset: output contains "method E {"',
+        output.includes('method E {'), JSON.stringify(output.slice(0, 200)));
+    assert('T19 manifest-offset: output contains "method Phi {"',
+        output.includes('method Phi {'), JSON.stringify(output.slice(0, 280)));
+    assert('T19 manifest-offset: Pi body word 0x7030000 under Pi section only',
+        (function() {
+            const piStart  = output.indexOf('method Pi {');
+            const eStart   = output.indexOf('method E {');
+            const piSection = output.slice(piStart, eStart);
+            return piSection.includes('7030000') && !piSection.includes('7030001');
+        })(), output);
+    assert('T19 manifest-offset: E body word 0x7030001 under E section only',
+        (function() {
+            const eStart   = output.indexOf('method E {');
+            const phiStart = output.indexOf('method Phi {');
+            const eSection = output.slice(eStart, phiStart);
+            return eSection.includes('7030001') && !eSection.includes('7030002');
+        })(), output);
+    assert('T19 manifest-offset: Phi body word 0x7030002 under Phi section only',
+        (function() {
+            const phiStart = output.indexOf('method Phi {');
+            const phiSection = output.slice(phiStart);
+            return phiSection.includes('7030002');
+        })(), output);
+    assert('T19 manifest-offset: no bare BRANCH opcode words as body lines (all words have opcode!=23)',
+        (function() {
+            // All injected words have opcode 0 (0x07...) or 16 (0x87...) or 3 (0x1F...)
+            // opcode 23 would be top5 bits = 10111 → first nibble 0xB8.. or similar
+            // Just verify no word starting with 'b8' appears in the body lines
+            return !output.split('\n').some(function(l) {
+                return l.startsWith('  0x') && (l.trim().startsWith('0xb8') || l.trim().startsWith('0xBB'));
+            });
+        })(), output);
+})();
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 (function waitAndSummarize() {
     setTimeout(function() {

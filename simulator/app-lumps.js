@@ -4461,7 +4461,50 @@ async function openLumpInEditor(token) {
                 var BRANCH_OP = 23;  // v2.0 ISA BRANCH opcode — matches lump_assembler.js
                 var structured  = false;
 
-                if (_methods && trimmed.length >= _methods.length) {
+                // ── Path A: Manifest-offset reconstruction ─────────────────
+                // Old-format LUMPs (e.g. Constants, SlideRule) lay methods out
+                // sequentially without a BRANCH dispatch table.  The server
+                // manifest carries explicit offset+length per method; use those
+                // to slice trimmed[] directly — no dispatch table needed.
+                var _lumpMethods = Array.isArray(lump.methods) && lump.methods.length >= 1
+                                       ? lump.methods : null;
+                var _hasOffsets  = _lumpMethods && _lumpMethods.every(function(m) {
+                    return typeof m.offset === 'number';
+                });
+                if (_hasOffsets) {
+                    structured = true;
+                    for (var mi = 0; mi < _lumpMethods.length; mi++) {
+                        var _m      = _lumpMethods[mi];
+                        var _mStart = _m.offset;
+                        var _mEnd   = (typeof _m.length === 'number')
+                                          ? (_m.offset + _m.length)
+                                          : (mi + 1 < _lumpMethods.length
+                                              ? _lumpMethods[mi + 1].offset
+                                              : trimmed.length);
+                        var _slice  = trimmed.slice(_mStart, _mEnd);
+                        var _sTrim  = _slice.length;
+                        while (_sTrim > 0 && _slice[_sTrim - 1] === 0) _sTrim--;
+                        var _body   = _slice.slice(0, _sTrim);
+                        var _mName  = _m.name || ('Method' + (mi + 1));
+                        disasmLines.push('method ' + _mName + ' {  ; selector #' + (mi + 1));
+                        if (_body.length === 0) {
+                            disasmLines.push('  ; (empty)');
+                        } else {
+                            var _bodyLines = (typeof ChurchAssembler !== 'undefined')
+                                ? ChurchAssembler.decompileWords(_body)
+                                : _body.map(function(w) { return '  0x' + w.toString(16); });
+                            _bodyLines.forEach(function(bl) { disasmLines.push('  ' + bl); });
+                        }
+                        disasmLines.push('}');
+                        disasmLines.push('');
+                    }
+                }
+
+                // ── Path B: BRANCH-dispatch reconstruction ─────────────────
+                // New-format LUMPs assembled by _assembleLumpFromCatalog have an
+                // opcode-23 BRANCH entry at position i pointing to method body i.
+                // Only runs if Path A did not already reconstruct the source.
+                if (!structured && _methods && trimmed.length >= _methods.length) {
                     // Verify all N dispatch entries are opcode-23 BRANCH
                     var N = _methods.length;
                     var allBranch = _methods.every(function(_, i) {
