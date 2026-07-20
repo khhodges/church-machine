@@ -1473,7 +1473,11 @@
     "grants": [
       "E"
     ],
-    "lump_version": 0
+    "lump_version": 0,
+    "filename": "00003300.lump",
+    "sidecar_file": "00003300.json",
+    "language": "ISA",
+    "status": "released"
   },
   {
     "token": "cb8739cf",
@@ -1966,8 +1970,8 @@
   {
     "token": "4c7380cb",
     "abstraction": "PostFlashSelftest",
-    "ns_slot": 6,
-    "ns_slot_policy": "static",
+    "ns_slot": null,
+    "ns_slot_policy": "dynamic",
     "variant_group": null,
     "lump_size": 512,
     "cw": 502,
@@ -1999,5 +2003,26 @@
         "description": "Main function"
       }
     ]
+  },
+  {
+    "token": "00000600",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest_v75.lump",
+    "sidecar_file": "SelfTest_v75.json",
+    "ns_slot": 6,
+    "ns_slot_policy": "static",
+    "boot_resident": false,
+    "lump_size": 64,
+    "cw": 17,
+    "cc": 8,
+    "grants": [
+      "E"
+    ],
+    "language": "ISA",
+    "author": "Church Machine",
+    "version": "1.1",
+    "lump_version": 75,
+    "status": "released",
+    "description": "SelfTest (a.k.a. Boot.Abstr) \u2014 the lump executed by the hardware ROM during boot phases B:01-B:07."
   }
 ]

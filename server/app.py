@@ -4282,52 +4282,76 @@ def _load_boot_abstr_lump():
             ]
         print(f'[boot] Boot.Abstr extracted: {lump_size}w at mem[{word0_location}], '
               f'cw={cw}, cc={cc}', flush=True)
-        # SINGLE SOURCE OF TRUTH: LAZY_LUMPS['00000600'] always holds the binary
-        # extracted from boot-image.bin above.  We deliberately do NOT override it
-        # with any saved programmer lump (00000300.lump) because that would create
-        # two different binaries under the same token — one shown by the Code View
-        # (which reads sim.memory from boot-image.bin) and another shown by the LUMP
-        # panel and audit (which read LAZY_LUMPS).  Any such divergence silently
-        # misleads the programmer.  cw / cc / lump_size are authoritative from the
-        # boot-image header already set above.
-        #
-        # Sidecar annotations (author, version, pet_names, capabilities) are
-        # programmer-supplied metadata and are safe to merge — they do not affect the
-        # binary.  Prefer 00000600.json (written by /api/lumps/save for ns_slot=6);
-        # fall back to 00000003.json for backward-compat.
-        _saved600_path = os.path.join(os.path.dirname(__file__), 'lumps', '00000600.lump')
-        if os.path.isfile(_saved600_path):
+        # Manifest override: if manifest.json names a canonical file for token
+        # 00000600 (the compiled SelfTest binary), prefer it over the boot-image
+        # stub (which is just a lazy placeholder with cw=0, cc=0).  The manifest
+        # file IS the real SelfTest code; the stub in boot-image.bin merely marks
+        # the slot reserved so the boot ROM can lazy-load it on demand.
+        _lumps_dir_mo = os.path.join(os.path.dirname(__file__), 'lumps')
+        _mf_mo_path = os.path.join(_lumps_dir_mo, 'manifest.json')
+        _canonical_loaded = False
+        if os.path.isfile(_mf_mo_path):
             try:
-                with open(_saved600_path, 'rb') as _s600f:
-                    _s600raw = _s600f.read()
-                _s600n = len(_s600raw) // 4
-                if _s600n >= 1:
-                    _boot_raw = LAZY_LUMPS.get('00000600', b'')
-                    if _s600raw[:len(_boot_raw)] != _boot_raw:
-                        print('[boot] WARNING: 00000600.lump differs from boot-image.bin binary '
-                              '— ignoring saved binary to keep Code View and LUMP panel in sync.',
-                              flush=True)
-                    else:
-                        print('[boot] 00000600.lump matches boot-image.bin binary — consistent.',
-                              flush=True)
-            except Exception as _e600:
-                print(f'[boot] 00000600.lump consistency check failed: {_e600}', flush=True)
-        _lumps_dir_sc = os.path.dirname(__file__)
-        _sidecar_600 = os.path.join(_lumps_dir_sc, 'lumps', '00000600.json')
-        _sidecar_003 = os.path.join(_lumps_dir_sc, 'lumps', '00000003.json')
-        _sidecar_path = _sidecar_600 if os.path.isfile(_sidecar_600) else (
-            _sidecar_003 if os.path.isfile(_sidecar_003) else None)
-        if _sidecar_path:
-            try:
-                with open(_sidecar_path) as _s03f:
-                    _s03 = json.load(_s03f)
-                # Only merge annotation fields — never cw/cc/lump_size, which must
-                # always reflect the actual boot-image binary already set above.
-                for _f03 in ('author', 'version', 'pet_names', 'capabilities'):
-                    if _f03 in _s03:
-                        _BOOT_ABSTR_META[_f03] = _s03[_f03]
-            except Exception:
-                pass
+                with open(_mf_mo_path) as _mf_mo_f:
+                    _mf_mo = json.load(_mf_mo_f)
+                for _me_mo in _mf_mo:
+                    if _me_mo.get('token') == '00000600':
+                        _fn_mo = _me_mo.get('filename', '')
+                        _np_mo = os.path.join(_lumps_dir_mo, _fn_mo) if _fn_mo else ''
+                        if _fn_mo and os.path.isfile(_np_mo):
+                            with open(_np_mo, 'rb') as _fh_mo:
+                                _d_mo = _fh_mo.read()
+                            _n_mo = len(_d_mo) // 4
+                            if _n_mo >= 1:
+                                _h_mo = _struct.unpack('>I', _d_mo[:4])[0]
+                                if (_h_mo >> 27) & 0x1F == 0x1F:
+                                    LAZY_LUMPS['00000600'] = _d_mo
+                                    LAZY_LUMPS['600'] = _d_mo
+                                    _cw_mo  = (_h_mo >> 10) & 0x1FFF
+                                    _cc_mo  = _h_mo & 0xFF
+                                    _ls_mo  = 1 << (((_h_mo >> 23) & 0xF) + 6)
+                                    _BOOT_ABSTR_META.update({
+                                        'cw': _cw_mo, 'cc': _cc_mo, 'lump_size': _ls_mo,
+                                        'lump_version': _me_mo.get('lump_version', 0),
+                                    })
+                                    if _cc_mo > 0:
+                                        _wds_mo = list(_struct.unpack(f'>{_n_mo}I', _d_mo))
+                                        _BOOT_ABSTR_META['clist_entries'] = [
+                                            _decode_gt_word(_wds_mo[_ls_mo - _cc_mo + _ci])
+                                            for _ci in range(_cc_mo)
+                                        ]
+                                    _canonical_loaded = True
+                                    print(f'[boot] SelfTest canonical binary loaded: {_fn_mo} '
+                                          f'cw={_cw_mo} cc={_cc_mo}', flush=True)
+                        # Merge sidecar annotation fields from the manifest-designated sidecar
+                        _sc_mo_file = _me_mo.get('sidecar_file', '')
+                        _sc_mo_path = os.path.join(_lumps_dir_mo, _sc_mo_file) if _sc_mo_file else ''
+                        if _sc_mo_path and os.path.isfile(_sc_mo_path):
+                            try:
+                                with open(_sc_mo_path) as _sc_mo_f:
+                                    _sc_mo = json.load(_sc_mo_f)
+                                for _fld in ('author', 'version', 'pet_names', 'capabilities',
+                                             'description', 'methods'):
+                                    if _fld in _sc_mo and _sc_mo[_fld]:
+                                        _BOOT_ABSTR_META[_fld] = _sc_mo[_fld]
+                            except Exception:
+                                pass
+                        break
+            except Exception as _e_mo:
+                print(f'[boot] manifest override for 00000600 failed: {_e_mo}', flush=True)
+        if not _canonical_loaded:
+            # Fall back to annotation-only merge from legacy sidecar files
+            _lumps_dir_sc = os.path.dirname(__file__)
+            _sidecar_003 = os.path.join(_lumps_dir_sc, 'lumps', '00000003.json')
+            if os.path.isfile(_sidecar_003):
+                try:
+                    with open(_sidecar_003) as _s03f:
+                        _s03 = json.load(_s03f)
+                    for _f03 in ('author', 'version', 'pet_names', 'capabilities'):
+                        if _f03 in _s03:
+                            _BOOT_ABSTR_META[_f03] = _s03[_f03]
+                except Exception:
+                    pass
     except Exception as exc:
         print(f'[boot] Failed to extract Boot.Abstr lump: {exc}', flush=True)
 
