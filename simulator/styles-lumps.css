@@ -5733,8 +5733,7 @@ pre:hover .code-copy-btn {
     flex-shrink: 0;
 }
 
-.sl-load-btn,
-.sl-toggle-btn {
+.sl-load-btn {
     font-size: 0.7rem;
     padding: 2px 9px;
     border-radius: 3px;
@@ -5742,8 +5741,6 @@ pre:hover .code-copy-btn {
     border: 1px solid transparent;
     transition: background 0.12s, color 0.12s, border-color 0.12s;
     white-space: nowrap;
-}
-.sl-load-btn {
     background: rgba(180,140,60,0.14);
     color: #c8a040;
     border-color: rgba(180,140,60,0.35);
@@ -5753,39 +5750,12 @@ pre:hover .code-copy-btn {
     color: #e8c060;
     border-color: rgba(180,140,60,0.6);
 }
-.sl-toggle-btn {
-    background: rgba(255,255,255,0.05);
-    color: #8888a8;
-    border-color: rgba(255,255,255,0.12);
-}
-.sl-toggle-btn:hover {
-    background: rgba(255,255,255,0.10);
-    color: #aaaace;
-}
-
-/* ── Read-only source pane ── */
-.sl-source-pre {
-    font-family: 'Consolas', 'Fira Code', 'Source Code Pro', monospace;
-    font-size: 0.73rem;
-    line-height: 1.55;
-    color: #b8c8d8;
-    background: rgba(0,0,0,0.35);
-    border-top: 1px solid rgba(255,255,255,0.07);
-    padding: 0.7rem 1rem;
-    margin: 0;
-    white-space: pre;
-    overflow-x: auto;
-    max-height: 420px;
-    overflow-y: auto;
-}
 
 /* Mobile responsiveness */
 @media (max-width: 600px) {
     .sl-card-header { gap: 0.35rem; padding: 0.45rem 0.55rem; }
     .sl-card-name   { font-size: 0.78rem; }
-    .sl-load-btn,
-    .sl-toggle-btn  { font-size: 0.67rem; padding: 2px 7px; }
-    .sl-source-pre  { font-size: 0.68rem; }
+    .sl-load-btn    { font-size: 0.67rem; padding: 2px 7px; }
 }
 
 /* ── Boot.NS Binary Decoder view (abs-nsdecoder-*) ───────────────────────── */

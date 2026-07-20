@@ -382,11 +382,8 @@ function _drawSourceLibrary(container) {
     <div class="sl-card-actions">
       <button class="sl-load-btn" onclick="slLoadEntry('${entry.key}','${entry.loader}','${lang}')"
               title="Load into editor">Load \u2192 Editor</button>
-      <button class="sl-toggle-btn" onclick="slToggleCard('${cardId}')"
-              title="Show/hide source">Source \u25BE</button>
     </div>
   </div>
-  <pre class="sl-source-pre" style="display:none">${_esc(src || '(source not available)')}</pre>
 </div>`;
         }
 
@@ -455,17 +452,6 @@ function slLoadEntry(key, loader, lang) {
         if (typeof onLangChange === 'function') onLangChange(true);
         if (typeof loadCLOOMCExample === 'function') loadCLOOMCExample(key);
     }
-}
-
-function slToggleCard(cardId) {
-    const card = document.getElementById(cardId);
-    if (!card) return;
-    const pre = card.querySelector('.sl-source-pre');
-    const btn = card.querySelector('.sl-toggle-btn');
-    if (!pre) return;
-    const visible = pre.style.display !== 'none';
-    pre.style.display = visible ? 'none' : 'block';
-    if (btn) btn.textContent = visible ? 'Source \u25BE' : 'Source \u25B4';
 }
 
 /* ── Search / filter ─────────────────────────────────────────────────────── */
