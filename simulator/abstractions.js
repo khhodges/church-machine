@@ -503,7 +503,8 @@ class AbstractionRegistry {
         this.createAbstraction(46, 'Circle', 3,
             ['Area', 'Circumference'],
             'Geometry via SlideRule — declares own Area and Circumference methods; inherits all SlideRule maths (Multiply, Sqrt, Sin, Cos, \u2026) from parent SlideRule',
-            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, parent: 16 });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, parent: 16,
+              capabilities: [{ name: 'SlideRule', grants: 'E' }] });
 
         this.createAbstraction(47, 'Billing', 1,
             ['Open', 'Charge', 'Reissue', 'Close', 'Balance'],

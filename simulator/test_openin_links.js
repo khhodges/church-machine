@@ -984,25 +984,27 @@ trackAsync((async function t15() {
         })(), output);
 })();
 
-// ── T20: _absOpenInEditorByName — template path for uncompiled abstractions ───
+// ── T20: _absOpenInEditorByName — template path, capabilities pre-fill ────────
 // When existing is null (no compiled LUMP) but the abstraction IS in the
-// registry, the function must:
-//   - NOT show a "No LUMP found" toast
-//   - NOT call openLumpInEditor
-//   - Populate #asmEditor with a template (header comment + capabilities { } +
-//     one method stub per method in correct selector order)
+// registry AND it has a non-empty capabilities array, the template must:
+//   - Pre-fill the capabilities { } block with the registry entries
+//   - Include the description in the header comment
+//   - Emit one method stub per method in correct selector order
+//   - NOT show a "No LUMP found" toast, NOT call openLumpInEditor
 //   - Call switchView('editor')
 (async function t20() {
-    const ABACUS_ABS = {
-        index: 17,
-        name: 'Abacus',
-        methods: ['Add', 'Sub', 'Mul', 'Div', 'Mod', 'Abs'],
+    const CIRCLE_ABS = {
+        index: 46,
+        name: 'Circle',
+        description: 'Geometry via SlideRule',
+        methods: ['Area', 'Circumference'],
+        capabilities: [{ name: 'SlideRule', grants: 'E' }],
     };
 
     // No compiled LUMP in the server list — triggers the template branch.
     const { ctx, document, calls } = makeCtx({
         lumpsCache: [],
-        abstractions: [ABACUS_ABS],
+        abstractions: [CIRCLE_ABS],
         fetchImpl: async () => ({ ok: true, json: async () => [] }),
     });
 
@@ -1011,7 +1013,7 @@ trackAsync((async function t15() {
     asmEd.id = 'asmEditor';
     document.body.appendChild(asmEd);
 
-    await vm.runInContext('_absOpenInEditorByName("Abacus")', ctx);
+    await vm.runInContext('_absOpenInEditorByName("Circle")', ctx);
 
     // 1. Must NOT show a toast.
     const toastEl = document.getElementById('fpgaToastEl');
@@ -1025,17 +1027,26 @@ trackAsync((async function t15() {
     assert('T20 template path: switchView("editor") called',
         calls.switchView.includes('editor'), calls.switchView);
 
-    // 4. #asmEditor must contain the abstraction header comment.
+    // 4. #asmEditor must contain the abstraction name in the header comment.
     const editorValue = asmEd.value;
     assert('T20 template path: editor contains header comment with abstraction name',
-        editorValue.includes('; Abacus'), JSON.stringify(editorValue.slice(0, 80)));
+        editorValue.includes('; Circle'), JSON.stringify(editorValue.slice(0, 120)));
 
-    // 5. Editor must contain capabilities { } block.
-    assert('T20 template path: editor contains capabilities { } block',
-        editorValue.includes('capabilities { }'), JSON.stringify(editorValue.slice(0, 200)));
+    // 5. Header comment must include the description.
+    assert('T20 template path: header comment includes description',
+        editorValue.includes('Geometry via SlideRule'), JSON.stringify(editorValue.slice(0, 200)));
 
-    // 6. Editor must contain one method stub per method in correct order.
-    const methods = ['Add', 'Sub', 'Mul', 'Div', 'Mod', 'Abs'];
+    // 6. capabilities block must be pre-filled with registry entries.
+    assert('T20 template path: capabilities block pre-filled with SlideRule E',
+        editorValue.includes('capabilities { SlideRule E }'),
+        JSON.stringify(editorValue.slice(0, 200)));
+
+    // 7. The raw empty form must NOT appear when entries exist.
+    assert('T20 template path: empty capabilities { } not emitted when entries present',
+        !editorValue.includes('capabilities { }'), JSON.stringify(editorValue.slice(0, 200)));
+
+    // 8. Editor must contain one method stub per method in correct selector order.
+    const methods = ['Area', 'Circumference'];
     for (let mi = 0; mi < methods.length; mi++) {
         assert('T20 template path: editor contains method stub for ' + methods[mi],
             editorValue.includes('method ' + methods[mi] + ' {'), editorValue);
@@ -1043,17 +1054,55 @@ trackAsync((async function t15() {
             editorValue.includes('method ' + methods[mi] + ' {  ; selector #' + (mi + 1)), editorValue);
     }
 
-    // 7. Selector order must be correct (Add before Sub before Mul, etc.).
-    const addIdx = editorValue.indexOf('method Add {');
-    const subIdx = editorValue.indexOf('method Sub {');
-    const absIdx = editorValue.indexOf('method Abs {');
-    assert('T20 template path: method order is Add < Sub < Abs',
-        addIdx < subIdx && subIdx < absIdx,
-        { addIdx, subIdx, absIdx });
+    // 9. Selector order: Area before Circumference.
+    const areaIdx = editorValue.indexOf('method Area {');
+    const circIdx = editorValue.indexOf('method Circumference {');
+    assert('T20 template path: method order is Area < Circumference',
+        areaIdx >= 0 && areaIdx < circIdx,
+        { areaIdx, circIdx });
 
-    // 8. "No LUMP found" string must NOT appear anywhere in the editor.
+    // 10. "No LUMP found" string must NOT appear anywhere in the editor.
     assert('T20 template path: editor does not contain "No LUMP found"',
         !editorValue.includes('No LUMP found'), editorValue);
+})();
+
+// ── T20c: _absOpenInEditorByName — empty capabilities stays as capabilities { }
+// When the registry entry has an empty capabilities array, the block must
+// remain "capabilities { }" — no pre-fill, no crash.  Description is still
+// injected into the header comment.
+(async function t20c() {
+    const ABACUS_ABS = {
+        index: 17,
+        name: 'Abacus',
+        description: '32-bit integer arithmetic',
+        methods: ['Add', 'Sub', 'Mul', 'Div', 'Mod', 'Abs'],
+        capabilities: [],
+    };
+
+    const { ctx, document, calls } = makeCtx({
+        lumpsCache: [],
+        abstractions: [ABACUS_ABS],
+        fetchImpl: async () => ({ ok: true, json: async () => [] }),
+    });
+
+    const asmEd = document.createElement('textarea');
+    asmEd.id = 'asmEditor';
+    document.body.appendChild(asmEd);
+
+    await vm.runInContext('_absOpenInEditorByName("Abacus")', ctx);
+
+    const editorValue = asmEd.value;
+    assert('T20c empty caps: switchView("editor") called',
+        calls.switchView.includes('editor'), calls.switchView);
+    assert('T20c empty caps: header contains abstraction name',
+        editorValue.includes('; Abacus'), editorValue.slice(0, 80));
+    assert('T20c empty caps: description included in header',
+        editorValue.includes('32-bit integer arithmetic'), editorValue.slice(0, 200));
+    assert('T20c empty caps: capabilities { } block stays empty',
+        editorValue.includes('capabilities { }'), editorValue.slice(0, 200));
+    assert('T20c empty caps: all 6 method stubs present',
+        ['Add', 'Sub', 'Mul', 'Div', 'Mod', 'Abs'].every(m => editorValue.includes('method ' + m + ' {')),
+        editorValue);
 })();
 
 // ── T20b: _absOpenInEditorByName — toast still fires when NOT in registry ─────

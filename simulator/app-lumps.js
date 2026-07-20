@@ -4111,9 +4111,14 @@ async function _absOpenInEditorByName(name, methodName) {
         var _absEntry = (typeof abstractionRegistry !== 'undefined' && typeof abstractionRegistry.getByName === 'function')
             ? abstractionRegistry.getByName(name) : null;
         if (_absEntry) {
+            var _capEntries = Array.isArray(_absEntry.capabilities) ? _absEntry.capabilities : [];
+            var _capBlock = _capEntries.length > 0
+                ? 'capabilities { ' + _capEntries.map(function(c) { return c.name + ' ' + c.grants; }).join(', ') + ' }'
+                : 'capabilities { }';
+            var _descSuffix = _absEntry.description ? '  \u2014 ' + _absEntry.description : '';
             var _tmplLines = [
-                '; ' + name + '  (uncompiled \u2014 fill in method bodies and save)',
-                'capabilities { }',
+                '; ' + name + _descSuffix + '  (uncompiled \u2014 fill in method bodies and save)',
+                _capBlock,
                 ''
             ];
             var _tmplMethods = Array.isArray(_absEntry.methods) ? _absEntry.methods : [];
