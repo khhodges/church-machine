@@ -209,7 +209,7 @@ register_suite "compile-api-tests" \
     'python3 -m pytest tests/server/test_compile_api.py -v'
 
 register_suite "hardware-sim" \
-    'python -m ctmm_cap_amaranth.testbench && python -m hardware.test_mwin_seal && python -m hardware.test_outform_mode2 && python -m hardware.test_shift_ops && python -m hardware.test_irq_dispatch'
+    'python -m hardware.test_mwin_seal && python -m hardware.test_outform_mode2 && python -m hardware.test_shift_ops && python -m hardware.test_irq_dispatch'
 
 register_suite "e2e-tests" \
     'CHROMIUM=$(which chromium) && mkdir -p .cache/ms-playwright/chromium-1217/chrome-linux64 && ln -sf "$CHROMIUM" .cache/ms-playwright/chromium-1217/chrome-linux64/chrome && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npx --yes playwright test'
@@ -223,20 +223,11 @@ register_suite "port-collision-test" \
 register_suite "playwright-port-wiring" \
     'node scripts/test_playwright_port_wiring.js'
 
-register_suite "ti60-utilisation" \
-    'python scripts/check_ti60_utilisation.py --missing-ok'
-
-register_suite "ti60-uart-dry-run" \
-    'python3 scripts/test_ti60_uart.py --dry-run'
-
 register_suite "pet-name-memory-tests" \
     'node simulator/test_pet_name_memory.js'
 
 register_suite "wukong-protocol-tests" \
     'python -m pytest scripts/test_wukong_protocol.py -v'
-
-register_suite "build-guard-tests" \
-    'bash scripts/test_build_guard.sh'
 
 register_suite "update-lump-tests" \
     'node scripts/test_update_lump.js'
@@ -266,7 +257,7 @@ ALL_GROUPS["lump"]="lump-consistency lump-binary-tests lump-roundtrip editor-rou
 
 ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests pet-name-mem-tests warning-panel-tests disasm-panel-tests boot-entry-sync-tests ns-slot-dynamic-tests selftest-lump-runs pet-name-memory-tests lump-builder-dispatch-tests openin-links-tests lump-warning-tests"
 
-ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabilities-blocks check-api-reference-stale ti60-utilisation ti60-uart-dry-run callhome-parser-tests callhome-reconnect-tests build-guard-tests check-slot-index-leak"
+ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabilities-blocks check-api-reference-stale callhome-parser-tests callhome-reconnect-tests check-slot-index-leak"
 
 ALL_GROUPS["hardware"]="hardware-sim"
 

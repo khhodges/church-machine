@@ -49,10 +49,6 @@ args = "pet-name-mem-tests"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "ti60-uart-dry-run"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "port-collision-test"
 
 [[workflows.workflow.tasks]]
@@ -142,10 +138,6 @@ args = "check-capabilities-blocks"
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "ti60-utilisation"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "lambda-exec-tests"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
@@ -267,17 +259,6 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node simulator/test_pet_name_mem.js"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
-name = "ti60-uart-dry-run"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python3 scripts/test_ti60_uart.py --dry-run"
 
 [workflows.workflow.metadata]
 outputType = "console"
@@ -531,17 +512,6 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python scripts/check_ti60_utilisation.py --missing-ok"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
-name = "lambda-exec-tests"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node simulator/test_lambda_exec.js"
 
 [workflows.workflow.metadata]
 outputType = "console"

@@ -3,7 +3,6 @@ import re
 import sys
 from amaranth.back.verilog import convert
 from .core import ChurchCore
-from .ti60_f225 import ChurchTi60F225
 
 
 _STALE_CR7_PATTERN = "cr7_wr_"
@@ -160,36 +159,6 @@ def generate_core_verilog(output_dir="build"):
     return output_path
 
 
-def generate_tang_nano_20k_verilog(output_dir="build"):
-    from .tang_nano_20k import ChurchTangNano20K
-    os.makedirs(output_dir, exist_ok=True)
-
-    top = ChurchTangNano20K(clk_freq=27_000_000, baud=115200, sim_mode=False)
-
-    ports = [
-        top.uart_tx, top.uart_rx, top.push_button,
-    ] + top.led
-
-    verilog_text = convert(top, ports=ports)
-    verilog_text = _patch_clocks(verilog_text)
-    verilog_text = _patch_rst(verilog_text)
-
-    output_path = os.path.join(output_dir, "church_tang_nano_20k.v")
-    _check_stale_cr7(verilog_text, output_path)
-
-    with open(output_path, "w") as f:
-        f.write(verilog_text)
-
-    print(f"Generated: {output_path}")
-    print(f"  File size: {len(verilog_text):,} bytes")
-    print(f"  Lines: {verilog_text.count(chr(10)):,}")
-
-    module_count = verilog_text.count("module ")
-    print(f"  Verilog modules: {module_count}")
-
-    return output_path
-
-
 def generate_core_iot_verilog(output_dir="build"):
     os.makedirs(output_dir, exist_ok=True)
 
@@ -209,36 +178,6 @@ def generate_core_iot_verilog(output_dir="build"):
     verilog_text = convert(core, ports=ports)
 
     output_path = os.path.join(output_dir, "church_core_iot.v")
-    _check_stale_cr7(verilog_text, output_path)
-
-    with open(output_path, "w") as f:
-        f.write(verilog_text)
-
-    print(f"Generated: {output_path}")
-    print(f"  File size: {len(verilog_text):,} bytes")
-    print(f"  Lines: {verilog_text.count(chr(10)):,}")
-
-    module_count = verilog_text.count("module ")
-    print(f"  Verilog modules: {module_count}")
-
-    return output_path
-
-
-def generate_tang_nano_20k_iot_verilog(output_dir="build"):
-    from .tang_nano_20k import ChurchTangNano20K
-    os.makedirs(output_dir, exist_ok=True)
-
-    top = ChurchTangNano20K(clk_freq=27_000_000, baud=115200, sim_mode=False, iot_profile=True)
-
-    ports = [
-        top.uart_tx, top.uart_rx, top.push_button,
-    ] + top.led
-
-    verilog_text = convert(top, ports=ports)
-    verilog_text = _patch_clocks(verilog_text)
-    verilog_text = _patch_rst(verilog_text)
-
-    output_path = os.path.join(output_dir, "church_tang_nano_20k_iot.v")
     _check_stale_cr7(verilog_text, output_path)
 
     with open(output_path, "w") as f:
@@ -279,75 +218,16 @@ def _patch_module_name(verilog_text, old_name, new_name):
     return text
 
 
-def generate_ti60_f225_verilog(output_dir="build"):
-    """Generate Church Machine RTL for the Efinix Ti60F225.
-
-    Converts ``hardware/ti60_f225.py`` (``ChurchTi60F225``) to Verilog using
-    Amaranth's ``convert()`` backend, then applies the standard clock and reset
-    patches plus a module rename so the module can be instantiated as a
-    submodule inside the combined SoC+CM project.
-
-    Output: ``build/church_ti60_f225.v``   (module name: ``church_ti60f225``)
-
-    To use in the combined project (``hardware/soc_combined/``):
-
-    .. code-block:: bash
-
-        python hardware/gen_verilog.py --ti60
-        cp build/church_ti60_f225.v hardware/soc_combined/
-    """
-    os.makedirs(output_dir, exist_ok=True)
-
-    top = ChurchTi60F225(clk_freq=25_000_000, baud=57600, sim_mode=False)
-
-    ports = [
-        top.uart_tx,
-        top.uart_rx,
-        top.push_button,
-        top.dbg_nia,
-        top.dbg_fault,
-        top.dbg_fault_valid,
-        top.dbg_boot_complete,
-    ] + top.led
-
-    verilog_text = convert(top, ports=ports)
-    verilog_text = _patch_clocks(verilog_text)
-    verilog_text = _patch_rst(verilog_text)
-    verilog_text = _patch_module_name(verilog_text, "top", "church_ti60f225")
-
-    output_path = os.path.join(output_dir, "church_ti60_f225.v")
-    _check_stale_cr7(verilog_text, output_path)
-
-    with open(output_path, "w") as f:
-        f.write(verilog_text)
-
-    print(f"Generated: {output_path}")
-    print(f"  File size: {len(verilog_text):,} bytes")
-    print(f"  Lines: {verilog_text.count(chr(10)):,}")
-
-    module_count = verilog_text.count("module ")
-    print(f"  Verilog modules: {module_count}")
-
-    return output_path
-
-
 if __name__ == "__main__":
     output_dir = "build"
     iot_only = False
-    ti60 = False
     for arg in sys.argv[1:]:
         if arg == "--iot":
             iot_only = True
-        elif arg == "--ti60":
-            ti60 = True
         elif not arg.startswith("--"):
             output_dir = arg
 
-    if ti60:
-        generate_ti60_f225_verilog(output_dir)
-    elif iot_only:
+    if iot_only:
         generate_core_iot_verilog(output_dir)
-        generate_tang_nano_20k_iot_verilog(output_dir)
     else:
         generate_core_verilog(output_dir)
-        generate_tang_nano_20k_verilog(output_dir)
