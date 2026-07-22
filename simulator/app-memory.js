@@ -1808,7 +1808,7 @@ function renderBootNSImage() {
 
     // ── Section 2: NS Table ────────────────────────────────────────────────
     const nsWords = sim.nsCount * sim.NS_ENTRY_WORDS;
-    html += `<div class="boot-section-label">② NS Table &nbsp;<span class="boot-section-note">at 0x${sim.NS_TABLE_BASE.toString(16).toUpperCase().padStart(4,'0')} · ${sim.nsCount} entries × 3 words = ${nsWords} words (${nsWords*4} bytes)</span></div>`;
+    html += `<div class="boot-section-label">② NS Table &nbsp;<span class="boot-section-note">at 0x${sim.NS_TABLE_BASE.toString(16).toUpperCase().padStart(4,'0')} · ${sim.nsCount} entries × 4 words = ${nsWords} words (${nsWords*4} bytes)</span></div>`;
     html += '<table class="ns-mem-table boot-ns-table"><thead><tr>';
     html += '<th>Entry</th><th>Label</th><th>W0 · Base Addr</th><th>W1 · Type / Flags / Limit</th><th>W2 · Ver · CRC</th><th>C-list</th>';
     html += '</tr></thead><tbody>';

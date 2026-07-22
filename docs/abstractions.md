@@ -98,7 +98,7 @@ Boot.NS  (n-6=8, cw=0, cc=3, typ=10):  0xFF00_0003   ← 16 384-word space
 App.NS   (n-6=4, cw=0, cc=4, typ=10):  0xFA00_0004   ← 1 024-word space
 ```
 
-The body of a Namespace lump is **not** a code section or a GT c-list — it is the NS Table itself: `N × 3 words` of Binary Data (base / limit+gt_seq / CRC+G entries). Mint validates each slot's CRC-16 at install time.
+The body of a Namespace lump is **not** a code section or a GT c-list — it is the NS Table itself: `N × 4 words` of Binary Data (base / limit+gt_seq / CRC+G / abstract_gt entries). Mint validates each slot's CRC-16 at install time.
 
 ---
 
@@ -251,7 +251,7 @@ The Namespace controller and sole NS entry writer. Navana runs indefinitely — 
 | 1     | Init | `Init() → ok` | E | Initialize all higher-layer abstractions and register them in the namespace. Idempotent — safe to call post-boot by any E-authorised caller. |
 
 - **Init** (method index 1): Initialize all higher-layer abstractions and register them in the namespace
-- **Add**: Find free NS slot, write 3-word entry with clistCount, return nsIndex + version
+- **Add**: Find free NS slot, write 4-word entry with clistCount, return nsIndex + version
 - **Remove**: Revoke GT (increment version), free NS slot
 - **Abstraction.Add**: Process compiled abstraction, allocate lump (power-of-2, minimum 64 words), write method table + code at offset 0, write c-list GTs at allocSize-clistCount, create NS entry with clistCount, forge Inform E-GT. Validates: codeSize + clistCount <= allocSize, clistCount <= 511, power-of-2 allocation, capability delegation rights.
 - **Abstraction.Update**: Re-carve lump or migrate to larger allocation

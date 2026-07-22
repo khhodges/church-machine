@@ -257,11 +257,12 @@ function formatGTBinary(gt) {
     return BigInt(gt).toString(2).padStart(64, '0');
 }
 
-// ==================== NAMESPACE ENTRY (3-word triplet) ====================
-// Word 1: Location (Physical RAM address OR URL)
-// Word 2: Limit (Object size in bytes/words)
-// Word 3: Seals = MetaData[0:31] + Type[32:47] + MAC[48:63]
-// MAC = Hash(GT_Offset + W1 + W2 + W3_Meta)
+// ==================== NAMESPACE ENTRY (4-word entry) ====================
+// Word 0: Location (Physical RAM address OR URL)
+// Word 1: Limit (Object size in bytes/words) + gt_seq + g_bit
+// Word 2: Seals = integrity32 check over Word 0 and Word 1
+// Word 3: abstract_gt (Abstract Golden Token for capability delegation)
+// MAC = Hash(GT_Offset + W0 + W1 + W2)
 
 const OBJECT_TYPES = {
     0x0000: 'Null',
@@ -336,7 +337,7 @@ function formatLocation(value, isFar) {
 // Boot state including cold restart detection
 let coldRestart = true;
 
-// Namespace Table: Raw 3-word entries (W1: Location, W2: Limit, W3: Seals/MAC)
+// Namespace Table: Raw 4-word entries (W0: Location, W1: Limit+gt_seq, W2: Seals/integrity32, W3: abstract_gt)
 // GT permissions are defined in Boot C-List or Services C-List, NOT here
 // Offset = index into this table
 // Minimal boot namespace — grows at runtime via CALL(Thread.Mint(type, size, access))
@@ -2203,7 +2204,7 @@ function getContentTabInfo(cap) {
             tooltip: 'Namespace Table — all entries in the DNA tree',
             html: `<div class="content-tab-section">
                 <div class="content-tab-heading">Namespace Table (${count} entries)</div>
-                <div class="content-tab-desc">Root of all capability addressing. Each entry is a 3-word descriptor (Location, Limit, Seals). M elevated on CR15 by microcode — never stored in GT.</div>
+                <div class="content-tab-desc">Root of all capability addressing. Each entry is a 4-word descriptor (Location, Limit, Seals, abstract_gt). M elevated on CR15 by microcode — never stored in GT.</div>
                 <div class="clist-tab-entries" style="margin-top:0.4rem;">${renderCListEntries(nsEntries, 'Namespace')}</div>
             </div>`
         };
@@ -5811,7 +5812,7 @@ const lessons = [
                     </div>
                     <div class="demo-explanation">
                         <p>This is a <strong>Golden Token (GT)</strong> - a 64-bit capability key containing an offset, type, and permission bits.</p>
-                        <p>Each GT points to a <strong>3-word Namespace Entry</strong> that describes the resource's location, size, and security seals.</p>
+                        <p>Each GT points to a <strong>4-word Namespace Entry</strong> that describes the resource's location, size, and security seals.</p>
                     </div>
                 </div>`
             },
@@ -5910,17 +5911,18 @@ const lessons = [
                         </div>
                     </div>
                     <div class="demo-explanation">
-                        <p>The Offset points to a 3-word entry in the Namespace Table. Permissions determine what operations are allowed.</p>
+                        <p>The Offset points to a 4-word entry in the Namespace Table. Permissions determine what operations are allowed.</p>
                     </div>
                 </div>`
             },
             {
-                text: `<h3>The 3-Word Namespace Entry</h3>
-                <p>Each GT Offset points to a <strong>3-word (192-bit) Namespace Entry</strong> describing the resource:</p>
+                text: `<h3>The 4-Word Namespace Entry</h3>
+                <p>Each GT Offset points to a <strong>4-word (128-bit) Namespace Entry</strong> describing the resource:</p>
                 <ul>
-                    <li><strong>Word 1 (W1)</strong> - <em>Location</em>: Physical address (or URL if F permission set)</li>
-                    <li><strong>Word 2 (W2)</strong> - <em>Limit</em>: Object size in bytes</li>
-                    <li><strong>Word 3 (W3)</strong> - <em>Seals</em>: Metadata, Type, and MAC for integrity</li>
+                    <li><strong>Word 0 (W0)</strong> - <em>Location</em>: Physical address (or URL if F permission set)</li>
+                    <li><strong>Word 1 (W1)</strong> - <em>Limit</em>: Object size, gt_seq, and g_bit</li>
+                    <li><strong>Word 2 (W2)</strong> - <em>Seals</em>: integrity32 check over W0 and W1</li>
+                    <li><strong>Word 3 (W3)</strong> - <em>abstract_gt</em>: Abstract Golden Token for capability delegation</li>
                 </ul>
                 <div class="highlight">
                     The isFar property on a capability changes how W1 &amp; W2 are interpreted: local memory address vs. remote URL.
@@ -8282,7 +8284,7 @@ first_fault:
                 <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 1rem 0;">
                     <tr style="background: var(--bg-tertiary);"><th style="padding: 0.5rem; text-align: left;">Register</th><th style="padding: 0.5rem; text-align: left;">Input</th><th style="padding: 0.5rem; text-align: left;">Description</th></tr>
                     <tr><td style="padding: 0.5rem;"><strong>DR0</strong></td><td>Object Type</td><td>0 = Data object, 1 = C-List object</td></tr>
-                    <tr style="background: var(--bg-tertiary);"><td style="padding: 0.5rem;"><strong>DR1</strong></td><td>Size</td><td>Size in words (3-word Namespace entry limit)</td></tr>
+                    <tr style="background: var(--bg-tertiary);"><td style="padding: 0.5rem;"><strong>DR1</strong></td><td>Size</td><td>Size in words (4-word Namespace entry limit)</td></tr>
                 </table>
                 <p>After the CALL returns, <strong>CR0</strong> contains the new Golden Token with appropriate permissions.</p>
                 <div class="highlight">
@@ -12193,10 +12195,11 @@ B GT fault          ; Size > 65536 -> FAULT
 ; === NAMESPACE ALLOCATION ===
 ; Step 3: Find free slot in Namespace Table
 ; Hardware searches for unused entry (W0[valid]=0)
-; Allocates 3-word descriptor:
+; Allocates 4-word descriptor:
 ;   W0: Location (base address in memory)
-;   W1: Limit (size in words - 1)
-;   W2: Seals (MAC, type metadata)
+;   W1: Limit (size in words - 1) + gt_seq + g_bit
+;   W2: Seals (integrity32 over W0 and W1)
+;   W3: abstract_gt (Abstract Golden Token)
 
 ; Step 4: Allocate memory for the object
 ; Hardware allocates DR1 words of zeroed memory
@@ -12686,10 +12689,11 @@ B GT fault          ; Size > 65536 -> FAULT
 ; === NAMESPACE ALLOCATION ===
 ; Step 4: Find free namespace entry
 ; Hardware searches for unused slot (version=0, valid=0)
-; Allocates 3-word descriptor:
+; Allocates 4-word descriptor:
 ;   W0: Location (base address)
-;   W1: Limit (size - 1)
-;   W2: Seals (MAC + version + type bits)
+;   W1: Limit (size - 1) + gt_seq + g_bit
+;   W2: Seals (integrity32 + version + type bits)
+;   W3: abstract_gt (Abstract Golden Token)
 
 ; Step 5: Compute MAC seal
 ; MAC = FNV-1a(location, limit, version)

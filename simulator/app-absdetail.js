@@ -1950,7 +1950,7 @@ CALL   CR1                ; Navana.MintPassKey:
 ;   2. CALL Memory.Allocate(size) for backing storage (returns location)
 ;   3. Find free NS entry (Mint manages NS table)
 ;   4. Increment version (never reset — monotonic)
-;   5. Write 3-word NS entry with B/F flags + seal
+;   5. Write 4-word NS entry with B/F flags + seal
 ;   6. Pack GT, return ready to use
 ;
 ; Returns: GT packed as Version(7)|Index(17)|Perms(6)|Type(2)
@@ -3197,7 +3197,7 @@ DWRITE DR1, #0x0100     ; Memory address to inspect
 
 CALL   CR1              ; Debugger.Inspect:
 ;   1. If address is in NS table range (>= 0xFD00):
-;      read NS entry (3 words), decode fields
+;      read NS entry (4 words), decode fields
 ;   2. If address is in data memory:
 ;      DREAD the word at that address
 ;   3. Return decoded view (GT fields, NS entry fields)

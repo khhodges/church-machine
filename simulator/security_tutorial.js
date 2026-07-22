@@ -58,7 +58,7 @@ class SecurityTutorial {
 </div>
 <div class="sr-pro-item">
 <div class="sr-pro-title">Auditable simplicity</div>
-<p>20 instructions. 3-word NS entries. 32-bit tokens. A motivated undergraduate can understand the entire architecture in a semester.</p>
+<p>20 instructions. 4-word NS entries. 32-bit tokens. A motivated undergraduate can understand the entire architecture in a semester.</p>
 </div>
 </div>`
             },

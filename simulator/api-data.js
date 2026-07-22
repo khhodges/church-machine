@@ -108,7 +108,7 @@ const API_DATA = [
         implemented: true, profile: 'Full',
         methods: [
             { name: 'Init',                signature: 'Init() → ok',                                   perms: 'E', description: 'Initialize all higher-layer abstractions and register them. Idempotent.', implemented: true },
-            { name: 'ADD',                 signature: 'ADD(location, limit, gtType, label) → nsIndex',  perms: 'E', description: 'Find a free NS slot and write a 3-word entry. Returns nsIndex + version.', implemented: true },
+            { name: 'ADD',                 signature: 'ADD(location, limit, gtType, label) → nsIndex',  perms: 'E', description: 'Find a free NS slot and write a 4-word entry. Returns nsIndex + version.', implemented: true },
             { name: 'REMOVE',              signature: 'REMOVE(nsIndex) → ok',                           perms: 'E', description: 'Revoke GT (increment version) and free NS slot.', implemented: true },
             { name: 'ValidatePassKey',     signature: 'ValidatePassKey(passKeyGT) → ok',                perms: 'E', description: 'Verify a PassKey GT issued by Navana against the internal registry.', implemented: true },
             { name: 'MintPassKey',         signature: 'MintPassKey(device, permMask) → passKeyGT',      perms: 'E', description: 'Issue a device PassKey GT encoding device selector and permission mask.', implemented: true },

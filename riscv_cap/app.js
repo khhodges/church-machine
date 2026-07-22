@@ -635,7 +635,7 @@ function updateGTDiagram(crIndex) {
     detail.innerHTML = `
         <div class="gt-detail-row"><span>Type:</span><span class="type-badge type-${gt.typeName.toLowerCase()}">${gt.typeName}</span></div>
         <div class="gt-detail-row"><span>Version:</span><span>${gt.version}</span></div>
-        <div class="gt-detail-row"><span>Index:</span><span>${gt.index} (slot address: ${gt.index * 3})</span></div>
+        <div class="gt-detail-row"><span>Index:</span><span>${gt.index} (slot address: ${gt.index * 4})</span></div>
         <div class="gt-detail-row"><span>Raw:</span><span class="mono">${toHex32(cr.word0)}</span></div>
         <div class="gt-detail-row"><span>Binary:</span><span class="mono">${cr.word0.toString(2).padStart(32, '0')}</span></div>
         <div class="gt-detail-row"><span>Word 1:</span><span class="mono">${toHex32(cr.word1)}</span></div>

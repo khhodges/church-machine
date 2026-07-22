@@ -49,7 +49,7 @@ Namespace Master Controller. Sole NS table writer. Runs indefinitely — does no
 | Method | Signature | Perms | Status | Description |
 |--------|-----------|-------|--------|-------------|
 | Init | `Init() → ok` | E | ✅ | Initialize all higher-layer abstractions and register them. Idempotent. |
-| ADD | `ADD(location, limit, gtType, label) → nsIndex` | E | ✅ | Find a free NS slot and write a 3-word entry. Returns nsIndex + version. |
+| ADD | `ADD(location, limit, gtType, label) → nsIndex` | E | ✅ | Find a free NS slot and write a 4-word entry. Returns nsIndex + version. |
 | REMOVE | `REMOVE(nsIndex) → ok` | E | ✅ | Revoke GT (increment version) and free NS slot. |
 | ValidatePassKey | `ValidatePassKey(passKeyGT) → ok` | E | ✅ | Verify a PassKey GT issued by Navana against the internal registry. |
 | MintPassKey | `MintPassKey(device, permMask) → passKeyGT` | E | ✅ | Issue a device PassKey GT encoding device selector and permission mask. |

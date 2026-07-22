@@ -9,7 +9,7 @@ The Church Machine IDE uses JSON for all namespace table import, export, and loc
 
 ## Common: the `entry` object
 
-Every format embeds or references the **entry object**, which is the decoded in-memory representation of one three-word NS table slot.
+Every format embeds or references the **entry object**, which is the decoded in-memory representation of one four-word NS table slot.
 
 ```json
 {
@@ -204,7 +204,7 @@ The outer array is indexed by NS slot. `null` means the slot was empty.
 
 | Field       | Type     | Description |
 |-------------|----------|-------------|
-| `nsWords`   | number[3]| The three raw 32-bit hardware words of the slot: `[word0, word1, word2]`. Written directly into `sim.memory[NS_TABLE_BASE + idx * 3 + 0..2]`. |
+| `nsWords`   | number[4]| The four raw 32-bit hardware words of the slot: `[word0, word1, word2, word3]`. Written directly into `sim.memory[NS_TABLE_BASE + idx * 4 + 0..3]`. |
 | `label`     | string   | Human-readable name. Stored in `sim.nsLabels`. |
 | `dataWords` | number[] | Contents of the backing memory region. The first word is the GT (`sim.memory[loc]`); subsequent words are code/data. Written starting at `word0_location` (decoded from `nsWords[0]`). |
 

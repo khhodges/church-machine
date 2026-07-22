@@ -54,7 +54,7 @@ class ChurchMSave(Elaboratable):
         m.d.comb += write_addr.eq(dst_view.word1_location + (index_reg << 2))
 
         ns_entry_addr = Signal(32)
-        m.d.comb += ns_entry_addr.eq(ns_view.word1_location + (src_gt_view.index << 3) + (src_gt_view.index << 2))
+        m.d.comb += ns_entry_addr.eq(ns_view.word1_location + (src_gt_view.index << 4))
 
         ns_location_reg = Signal(32)
         ns_limit_reg = Signal(32)

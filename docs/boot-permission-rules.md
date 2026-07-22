@@ -91,7 +91,7 @@ The permission bits `perms[30:25]` and the bind flag `B[31]` are **excluded** fr
 When Boot creates a Thread (e.g., Kenneth, Matthew, Daniel), it uses `Namespace.Mint(Thread, size, access)`:
 
 1. Boot microcode has M elevation — it can access the Namespace before any Threads exist (the bootstrap chicken-and-egg).
-2. `Namespace.Mint` allocates a namespace entry for the new Thread (3-word descriptor: Location, Limit, Seals).
+2. `Namespace.Mint` allocates a namespace entry for the new Thread (4-word entry: Location, Authority, Integrity, Abstract_GT).
 3. Mint computes the MAC, initializes version to 0, assigns the offset.
 4. Boot places a Services C-List GT [L+S] in the new Thread's CR5.
 5. The Services C-List contains `self` [E] → Namespace [E] → Mint, GC, Lookup, etc.

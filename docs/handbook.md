@@ -34,7 +34,7 @@ The fundamental particle of this universe is the Golden Token (GT) — a 32-bit 
 | R2 | Limit | Object size bound, plus B (Bind) and F (Far) flags. |
 | R3 | Seal | Integrity check — CRC-16/CCITT (poly 0x1021, init 0xFFFF) over 89 bits. Ensures the namespace entry is untampered. |
 
-> **Naming convention:** R0–R3 refer to the four 32-bit words of a Capability Register. W0–W2 refer to the three 32-bit words of a Namespace (NS) entry. This avoids ambiguity — if you see R3 it is always the CR seal word; if you see W2 it is always the NS seal word.
+> **Naming convention:** R0–R3 refer to the four 32-bit words of a Capability Register. W0–W3 refer to the four 32-bit words of a Namespace (NS) entry. This avoids ambiguity — if you see R3 it is always the CR seal word; if you see W3 it is always the NS abstract_gt word.
 
 ---
 

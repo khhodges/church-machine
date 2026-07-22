@@ -205,7 +205,7 @@ Offset +2   Word 2 — integrity [31:0]   integrity32 parallel check
 - **R2**: NS Entry W1 (`spare | g_bit | gt_seq | limit_offset`)
 - **R3**: NS Entry W2 (integrity32 parallel check)
 
-> **Convention:** R0–R3 = the 4 words of a Capability Register. W0–W2 = the 3 words of an NS entry.
+> **Convention:** R0–R3 = the 4 words of a Capability Register. W0–W3 = the 4 words of an NS entry.
 
 Special assignments (from `hardware/hw_types.py`):
 - **CR5**:  Heap pointer (CR_HEAP) — bump-allocation frontier
@@ -282,11 +282,12 @@ provisioning protocol and security model.
 
 ### Namespace Entries
 
-Each namespace entry is **3 words (12 bytes)**, stride = `slot_id × 12` from the NS table base:
+Each namespace entry is **4 words (16 bytes)**, stride = `slot_id × 16` from the NS table base:
 
 - **Word 0** (base): 32-bit lump base byte address
 - **Word 1** (WORD2_LAYOUT): `spare[31:29] | g_bit[28] | gt_seq[27:21] | limit_offset[20:0]`
 - **Word 2** (integrity32 check): 32-bit parallel check over Word 0 and Word 1 (g_bit masked)
+- **Word 3** (abstract_gt): Abstract Golden Token for capability delegation
 
 The NS table supports up to 65,536 entries (16-bit `slot_id`).
 
@@ -442,7 +443,7 @@ Outform GTs (type=10) with F-bit=1 represent remote resources:
 
 Navana (NS[5]) is the sole namespace entry writer. All NS table modifications go through Navana:
 
-- **Navana.Add**: Find free NS slot, write 3-word entry (base, g_bit+gt_seq+limit_offset, integrity32), return `slot_id` + `gt_seq`
+- **Navana.Add**: Find free NS slot, write 4-word entry (base, g_bit+gt_seq+limit_offset, integrity32, abstract_gt), return `slot_id` + `gt_seq`
 - **Navana.Remove**: Revoke GT (increment `gt_seq` in NS Entry Word 1), free NS slot
 - **Navana.Abstraction.Add**: Process compiled abstraction, allocate power-of-2 lump, write lump header (`cc`, `n_minus_6`), write code + c-list GTs, create NS entry, forge E-GT
 - **Navana.Abstraction.Update**: Re-carve lump or migrate to larger allocation

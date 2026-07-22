@@ -42,7 +42,7 @@ Each risk has a severity rating, a description of the fix, a reference to the ta
 **Problem:** The single-NS-entry model — one lump, one Inform GT, CALL splits by clistCount — is the central architectural idea, but it existed only in text descriptions. A visual was needed for the tutorial and documentation.
 
 **Solution:** Created `simulator/namespace_diagram.svg` showing:
-- The Namespace Table with 3-word NS entries (W0: location, W1: B|F|G|chain|type|clistCount|limit, W2: seals)
+- The Namespace Table with 4-word NS entries (W0: location, W1: B|F|G|chain|type|clistCount|limit, W2: seals, W3: abstract_gt)
 - A lump with three regions: Method Table + Code (offset 0), FREESPACE (padding), C-List (GT slots at allocSize - clistCount)
 - CALL split arrows showing CR14 (code, X-only) and CR6 (c-list, L-only)
 - The E-GT format: Version(7) | Index(17) | Perms=E(6) | Type=01(2)
@@ -420,7 +420,7 @@ The Analytical Engine had visible store columns. You could look at the machine a
 The Church Machine has:
 - 16 context registers (CR0–CR15) — each holds a 128-bit Golden Token, visible in the IDE
 - 16 data registers (DR0–DR15) — each holds a 32-bit value, visible in the IDE
-- A namespace table — every entry is 3 words, visible in the Namespace tab
+- A namespace table — every entry is 4 words (16 bytes), visible in the Namespace tab
 - A program counter, a stack depth, four condition flags (N, Z, C, V) — all visible
 
 There is no hidden state. No address translation cache. No branch predictor. No speculative execution buffer. Conventional processors contain dozens of invisible internal caches and buffers that affect program behaviour in ways the programmer cannot see or control. The Church Machine has none of these. If you can see the registers and the namespace table, you know the complete state of the machine.
