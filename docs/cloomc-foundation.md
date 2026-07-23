@@ -310,6 +310,14 @@ There are no other configuration parameters.
 - **NS table** is the NS LUMP — it lives at the top (to grow down) of
   memory. `totalNamespaceWords` is the programmer's choice, encoded in the
   NS LUMP header, set by the IDE.
+- **NS slot addressing** counts down from the top of the NS LUMP.
+  Slot 0 occupies the four words at the highest address in the NS LUMP
+  (`totalNamespaceWords − 4` through `totalNamespaceWords − 1`).
+  Slot N occupies words at `totalNamespaceWords − 4 − N × 4`.
+  Equivalently: `slot_word_address(N) = NS_TABLE_BASE + NS_TABLE_RESERVE − 4 − N × 4`.
+  The LUMP header word sits at the lowest address of the block (`NS_TABLE_BASE`).
+  On A7 (`totalNamespaceWords = 131,072`): slot 0 → `0x1FFFC`, slot 1 → `0x1FFF8`,
+  slot 255 → `0x1FC04`, LUMP header → `0x1FC00`.
 - **cc field** (8 bits) limits c-list rows to 255 per abstraction. It does not limit
   NS slots — the GT `slot_id` field is 16 bits, allowing up to 65,535 slots.
 - **limit17** (17 bits) caps the pool at 131,071 words — enough headroom for the
@@ -376,6 +384,14 @@ top         NS Lump       1,024     max RAM Necessary — NS root
 bottom      Thread Lump     256     Necessary — boot thread (slot 1)
 top−0x400   NS Table      1,024     Necessary — capability table
 ────────────────────────────────────────────────────────────
+
+NS Table slot layout (A7, totalNamespaceWords = 131,072):
+  0x1FFFC  — slot  0  (NS LUMP root, 4 words)       ← highest address
+  0x1FFF8  — slot  1  (Thread LUMP, 4 words)
+  0x1FFF4  — slot  2  (first dynamic slot, 4 words)
+     …
+  0x1FC04  — slot 255 (last of 256 slots, 4 words)
+  0x1FC00  — LUMP header word                        ← NS_TABLE_BASE (lowest)
 ```
 
 The 3-instruction boot ROM program lives in IMEM (separate from DMEM),
@@ -476,6 +492,7 @@ network is the library.
 | NS_TABLE_BASE | 0x1FC00 |
 | Pool ceiling | 0x1FBFF |
 | `limit17` | 0x1FBFF |
+| `slot_0_word_address` | 0x1FFFC (`totalNamespaceWords − 4`) |
 
 ### Why limit17 Matters
 
