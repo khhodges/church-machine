@@ -8061,6 +8061,14 @@ def device_fault_submit():
     fault_name = str(data.get("fault_name", data.get("mnemonic", "")))[:32]
 
     abstraction_name = str(data.get("abstraction_name", "") or "").strip()[:128] or None
+
+    # gt_snapshot and pet_names — nullable JSON blobs (v1.2 §3 extension)
+    _gt_snapshot = data.get("gt_snapshot")
+    gt_snapshot_json = json.dumps(_gt_snapshot) if isinstance(_gt_snapshot, dict) and _gt_snapshot else None
+    _pet_names = data.get("pet_names")
+    pet_names_json = json.dumps(_pet_names) if isinstance(_pet_names, dict) and _pet_names else None
+
+
     fe = FaultEvent(
         device_uid=uid,
         fault_type=fault_type,
@@ -8082,6 +8090,8 @@ def device_fault_submit():
         fault_instr=str(data.get("fault_instr", ""))[:32],
         raw_type="FAULT_EVENT" if data.get("fault_latched") is not None else "fault",
         abstraction_name=abstraction_name,
+        gt_snapshot=gt_snapshot_json,
+        pet_names=pet_names_json,
     )
     db.session.add(fe)
     db.session.commit()
@@ -8729,6 +8739,8 @@ with app.app_context():
         ("fault_gt",          "VARCHAR(32) DEFAULT ''"),
         ("fault_instr",       "VARCHAR(32) DEFAULT ''"),
         ("abstraction_name",  "VARCHAR(128) DEFAULT NULL"),
+        ("gt_snapshot",       "TEXT DEFAULT NULL"),
+        ("pet_names",         "TEXT DEFAULT NULL"),
     ]:
         if _fe_col not in _existing_fe_cols:
             db.session.execute(_sa_text(f"ALTER TABLE fault_events ADD COLUMN {_fe_col} {_fe_def}"))

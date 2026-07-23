@@ -326,6 +326,86 @@ class TestFaultEventParser:
 
 
 # ===========================================================================
+# TestFaultEventGTSnapshot — v1.2 §3 gt_snapshot and pet_names extension
+# ===========================================================================
+
+class TestFaultEventGTSnapshot:
+    """Tests for the additive gt_snapshot and pet_names fields in FAULT_EVENT."""
+
+    def _gt_snapshot_line(self):
+        """Return the transcript line that carries gt_snapshot and pet_names."""
+        return next(
+            l for l in TRANSCRIPT_LINES
+            if l.startswith("FAULT_EVENT:") and "gt_snapshot" in l
+        )
+
+    def test_gt_snapshot_line_present_in_transcript(self):
+        lines = [l for l in TRANSCRIPT_LINES
+                 if l.startswith("FAULT_EVENT:") and "gt_snapshot" in l]
+        assert len(lines) >= 1, "No FAULT_EVENT with gt_snapshot found in transcript"
+
+    def test_gt_snapshot_parsed_as_dict(self):
+        pkt = parse_fault_event(self._gt_snapshot_line())
+        assert pkt is not None
+        snap = pkt.get("gt_snapshot")
+        assert isinstance(snap, dict), f"gt_snapshot should be dict, got {type(snap)}"
+
+    def test_gt_snapshot_contains_expected_registers(self):
+        pkt = parse_fault_event(self._gt_snapshot_line())
+        snap = pkt["gt_snapshot"]
+        assert "CR0" in snap
+        assert "CR6" in snap
+        assert "CR14" in snap
+
+    def test_gt_snapshot_values_are_hex_strings(self):
+        pkt = parse_fault_event(self._gt_snapshot_line())
+        for reg, val in pkt["gt_snapshot"].items():
+            assert isinstance(val, str), f"{reg} value should be string"
+            assert val.startswith("0x"), f"{reg} value should start with 0x, got {val!r}"
+
+    def test_pet_names_parsed_as_dict(self):
+        pkt = parse_fault_event(self._gt_snapshot_line())
+        assert pkt is not None
+        pnames = pkt.get("pet_names")
+        assert isinstance(pnames, dict), f"pet_names should be dict, got {type(pnames)}"
+
+    def test_pet_names_contains_expected_entries(self):
+        pkt = parse_fault_event(self._gt_snapshot_line())
+        pnames = pkt["pet_names"]
+        assert pnames.get("CR3") == "LED"
+        assert pnames.get("DR0") == "counter"
+
+    def test_required_fields_still_present_with_extension(self):
+        pkt = parse_fault_event(self._gt_snapshot_line())
+        for field in ("uid", "nia", "fault_code", "fault_name"):
+            assert field in pkt, f"Required field {field!r} missing alongside extension fields"
+
+    def test_extension_fields_absent_in_minimal_record(self):
+        """A minimal FAULT_EVENT without gt_snapshot/pet_names still parses fine."""
+        line = 'FAULT_EVENT:{"uid":"c0ffee0100000001","nia":"0x00000099","fault_code":1,"fault_name":"BOUNDS"}'
+        pkt = parse_fault_event(line)
+        assert pkt is not None
+        assert pkt.get("gt_snapshot") is None
+        assert pkt.get("pet_names") is None
+
+    def test_inline_gt_snapshot_without_transcript(self):
+        """Inline round-trip: build a line with gt_snapshot and verify parse."""
+        payload = {
+            "uid": "deadbeefdeadbeef",
+            "nia": "0x00000100",
+            "fault_code": 5,
+            "fault_name": "PERM_L",
+            "gt_snapshot": {"CR0": "0x4A000006", "CR14": "0x52000003"},
+            "pet_names": {"CR0": "myAbstr", "DR1": "loopCount"},
+        }
+        line = "FAULT_EVENT:" + json.dumps(payload)
+        pkt = parse_fault_event(line)
+        assert pkt is not None
+        assert pkt["gt_snapshot"] == {"CR0": "0x4A000006", "CR14": "0x52000003"}
+        assert pkt["pet_names"] == {"CR0": "myAbstr", "DR1": "loopCount"}
+
+
+# ===========================================================================
 # TestHungParser
 # ===========================================================================
 

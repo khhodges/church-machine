@@ -86,6 +86,8 @@ def register_models(db):
         fault_gt = Column(String(32), default="")
         fault_instr = Column(String(32), default="")
         abstraction_name = Column(String(128), default=None)
+        gt_snapshot = Column(Text, default=None)
+        pet_names = Column(Text, default=None)
 
     class NiaTrace(db.Model):
         __tablename__ = "nia_traces"

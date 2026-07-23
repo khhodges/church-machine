@@ -23,11 +23,19 @@ function _applyLumpPetNames(lump, methodIdx) {
     }
     _petNameDRMap = mergedDR;
     _petNameCRMap = mergedCR;
+    if (typeof sim !== 'undefined' && sim) {
+        sim._petNameCRMap = mergedCR;
+        sim._petNameDRMap = mergedDR;
+    }
 }
 
 function _clearLumpPetNames() {
     _petNameDRMap = {};
     _petNameCRMap = {};
+    if (typeof sim !== 'undefined' && sim) {
+        sim._petNameCRMap = {};
+        sim._petNameDRMap = {};
+    }
 }
 
 // Cache of lump binary words for tier-4 boot matching (null = not started).
@@ -2898,6 +2906,47 @@ function showFaultModal(f) {
         }
     }
 
+    // ── GT Snapshot section — compact table of all non-null CRs at fault time ─
+    let gtSnapshotSection = '';
+    {
+        const snap = f.gt_snapshot || {};
+        const pnames = f.pet_names || {};
+        const snapKeys = Object.keys(snap);
+        if (snapKeys.length > 0) {
+            let snapRows = '';
+            for (const regKey of snapKeys) {
+                const gtHex = snap[regKey];
+                const petName = pnames[regKey] || '';
+                snapRows += `<tr>
+                    <td class="freg-name">${regKey}</td>
+                    <td class="freg-base"><code>${gtHex}</code></td>
+                    <td class="freg-petname">${petName ? `<span class="fault-clist-petname">${petName.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>` : ''}</td>
+                </tr>`;
+            }
+            // Also list any DR pet names that aren't in the CR snapshot
+            const drPetEntries = Object.entries(pnames).filter(([k]) => k.startsWith('DR'));
+            if (drPetEntries.length > 0) {
+                for (const [regKey, petName] of drPetEntries) {
+                    snapRows += `<tr>
+                        <td class="freg-name">${regKey}</td>
+                        <td class="freg-base"></td>
+                        <td class="freg-petname"><span class="fault-clist-petname">${petName.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span></td>
+                    </tr>`;
+                }
+            }
+            gtSnapshotSection = `
+        <div class="fault-regs-section">
+            <div class="fault-regs-label">GT Snapshot <span class="fault-regs-legend" style="font-size:0.7em;color:#555577">(non-null CRs at fault)</span></div>
+            <div class="fault-regs-scroll">
+                <table class="fault-regs-table">
+                    <thead><tr><th>Reg</th><th>GT Word</th><th>Pet Name</th></tr></thead>
+                    <tbody>${snapRows}</tbody>
+                </table>
+            </div>
+        </div>`;
+        }
+    }
+
     const instrTrace = f.instrHistory || [];
     let traceTableHtml = '';
     if (instrTrace.length > 0) {
@@ -3026,6 +3075,7 @@ function showFaultModal(f) {
         </div>
         <div class="${_msgClass}" ${_editOnclick}>${_transformFaultMsg(f.message)}${_editBadge}</div>
         ${descSection}
+        ${gtSnapshotSection}
         <div class="fault-user-note-row">
             <label class="fault-user-note-label" for="faultUserNoteInput">Note</label>
             <input id="faultUserNoteInput" class="fault-user-note-input" type="text" maxlength="300"

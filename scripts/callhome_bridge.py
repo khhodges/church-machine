@@ -194,6 +194,9 @@ def parse_fault_event(line):
 
     Required fields: uid, nia, fault_code, fault_name.
     Optional fields: fault_gt, fault_instr, fault_cr14, fault_stage.
+    Extended fields (v1.2 §3 — additive, backward-compatible):
+      gt_snapshot  — dict of non-null CR values at fault, e.g. {"CR0":"0x4A000006","CR6":"0x4A000002"}
+      pet_names    — dict of active register labels, e.g. {"CR3":"LED","DR0":"counter"}
     """
     if not line.startswith("FAULT_EVENT:"):
         return None

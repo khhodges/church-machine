@@ -64,6 +64,11 @@ FAULT_EVENT:{"uid":"c0ffee0100000001","nia":"0x0000004c","fault_code":3,"fault_n
 FAULT_EVENT:{"uid":"c0ffee0100000001","nia":"0x00000099","fault_code":1,"fault_name":"BOUNDS"}
 
 # ---------------------------------------------------------------------------
+# FAULT_EVENT — with v1.2 §3 gt_snapshot and pet_names extension fields
+# ---------------------------------------------------------------------------
+FAULT_EVENT:{"uid":"c0ffee0100000001","nia":"0x0000004c","fault_code":3,"fault_name":"PERM_X","fault_gt":"0x4A000002","fault_instr":"0x12345678","fault_cr14":"0x00000010","fault_stage":2,"gt_snapshot":{"CR0":"0x4A000006","CR6":"0x4A000002","CR14":"0x52000003"},"pet_names":{"CR3":"LED","DR0":"counter"}}
+
+# ---------------------------------------------------------------------------
 # HUNG — NIA unchanged for 3 consecutive 1-second samples → CM reset
 # ---------------------------------------------------------------------------
 HUNG:{"uid":"c0ffee0100000001","nia":"0x0000abcd","loops":3}

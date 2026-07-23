@@ -178,6 +178,12 @@ class ChurchSimulator {
         this.deviceAbstractions = null;
         this.abstractGTManager = new AbstractGTManager();
 
+        // Active CR/DR pet name maps — set by app-shell/_applyLumpPetNames so
+        // fault() can capture them in the fault record without coupling to the UI layer.
+        // Keys are numeric register indices (integers), values are name strings.
+        this._petNameCRMap = {};
+        this._petNameDRMap = {};
+
         // Which NS slot the boot sequence jumps to at B:05/B:06.
         // Defaults to 6 (SelfTest); overridden by app.js
         // when the user selects a different boot-entry abstraction.
@@ -3010,6 +3016,30 @@ class ChurchSimulator {
         // Structured fields — Task #1077: shared between Fault Popup and .catch handler
         const faultCode = ChurchSimulator.FAULT_CODES.hasOwnProperty(type) ? ChurchSimulator.FAULT_CODES[type] : null;
         const faultingMnemonic = this._currentInstrLabel ? this._currentInstrLabel.opName : null;
+
+        // gt_snapshot: all non-null CRs at fault time, keyed by register name
+        const _gtSnapshot = {};
+        if (this.cr) {
+            for (let _gi = 0; _gi < this.cr.length; _gi++) {
+                const _gc = this.cr[_gi];
+                if (_gc && (_gc.word0 >>> 0) !== 0) {
+                    _gtSnapshot[`CR${_gi}`] = '0x' + (_gc.word0 >>> 0).toString(16).toUpperCase().padStart(8, '0');
+                }
+            }
+        }
+        // pet_names: active CR and DR labels from the per-session name registry
+        const _petNames = {};
+        for (const [_pidx, _pname] of Object.entries(this._petNameCRMap || {})) {
+            if (_pname) _petNames[`CR${_pidx}`] = _pname;
+        }
+        for (const [_pidx, _pname] of Object.entries(this._petNameDRMap || {})) {
+            if (_pname) _petNames[`DR${_pidx}`] = _pname;
+        }
+        // primary_gt: hex string of the GT directly involved in the fault (backward-compat)
+        const _primaryGT = (meta && meta.gt != null)
+            ? '0x' + (meta.gt >>> 0).toString(16).toUpperCase().padStart(8, '0')
+            : null;
+
         const entry = {
             type, message, pc: this.pc, physicalPC: this.physicalPC, step: this.stepCount,
             crSnapshot: this.cr ? this.cr.map(c => c ? {...c} : null) : [],
@@ -3029,6 +3059,10 @@ class ChurchSimulator {
             catchInvoked: false,
             irqInvoked: false,
             tier3Recovery: false,
+            // v1.2 §3 fault record additions
+            primary_gt: _primaryGT,
+            gt_snapshot: _gtSnapshot,
+            pet_names: _petNames,
             ...(meta || {}),
         };
 
