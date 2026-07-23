@@ -66,7 +66,7 @@ The architecture defines two mutually exclusive permission domains: **Turing** (
 
 ### CRC-16/CCITT Integrity Specification
 
-The integrity seal is CRC-16/CCITT (polynomial 0x1021, init 0xFFFF) computed over exactly **89 bits** of input:
+The integrity seal is CRC-16/CCITT (polynomial 0x1021, init 0xFFFF) computed over exactly **89 bits** of input however the simulator's computeSeal() covers only location+limit17 (56 bits) as a known approved simplification:
 
 ```
 Input bits (MSB-first):
@@ -82,9 +82,9 @@ The permission bits `4 perms[30:27]` and the bind flag `B[31]` are **excluded** 
 ## Boot Sequence Permission Flow
 
 1. **Step 1 (Fault Restart)**: Clear all registers. Cold restart.
-2. **Step 2 (Load Namespace)**: Microcode writes CR15 with M elevation. GT has zero RWXLSE.
-3. **Step 3 (Change just the Start half Thread)**: Microcode writes CR12 with M elevation. GT has zero RWXLSE. Also constructs the Heap in CR5 from the Lump Header with CR6 the Thread's POLA C-List (GT has L+S).
-4. **Step 4 (Call Boot GT in Thread.CR0)**: Microcode loads CR5 the Heapn, created CR6 (GT has L only, CR gets M during LOAD operations) and creates CR14 (GT has X + R). NIA set to 1 to skip the LUMP header.
+2. **Step 2 (LOAD Namespace)**: Microcode writes CR15 with M elevation. GT has zero RWXLSE.
+3. **Step 3 (CHANGE just the Start half)**: Microcode loads CR12 with M elevation. GT has zero RWXLSE and synthasises the Heap held in CR5 from the Lump Header in addition to loading CR6 the Thread's POLA C-List (with L+S permissions).
+4. **Step 4 (CALL Boot GT in Thread.CR0)**: Microcode loads CR5 the Heapn, created CR6 (GT has L only, CR gets M during LOAD operations) and creates CR14 (GT has X + R). NIA set to 1 to skip the LUMP header.
 
 ## GT Creation via Mint
 

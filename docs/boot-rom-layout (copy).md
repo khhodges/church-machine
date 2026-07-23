@@ -1,6 +1,6 @@
 # Boot ROM Layout
 
-**v1.0 — 2026-04-29**
+**v1.1 — 2026-04-29**
 **CONFIDENTIAL**
 
 The Boot ROM is a 1024-word (4 KiB) read-only instruction memory, defined in
