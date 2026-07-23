@@ -45,6 +45,7 @@ const DEFAULT_INFRASTRUCTURE_WORKFLOWS = [
     'Church Machine IDE',
     'all-tests',
     'artifacts/mockup-sandbox: Component Preview Server',
+    'ti60-utilisation',
 ];
 
 /**
@@ -63,6 +64,8 @@ const DEFAULT_SCRIPT_ONLY_SUITES = [
     'check-slot-index-leak',
     'callhome-reconnect-tests',
     'ns-slot-dynamic-tests',
+    'lambda-exec-tests',
+    'hardware-sim',
 ];
 
 const configPath = path.join(__dirname, 'test-workflow-config.json');

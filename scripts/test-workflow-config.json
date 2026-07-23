@@ -5,7 +5,8 @@
     "Project",
     "Church Machine IDE",
     "all-tests",
-    "artifacts/mockup-sandbox: Component Preview Server"
+    "artifacts/mockup-sandbox: Component Preview Server",
+    "ti60-utilisation"
   ],
   "_scriptOnlySuites_comment": "scriptOnlySuites are test suites registered in run-all-tests.sh that run as direct shell/Python scripts. They have no dedicated workflow entry in .replit (and do not need one). Add a suite here when the workflow limit is reached or when a suite is too lightweight to warrant a persistent workflow.",
   "scriptOnlySuites": [
@@ -18,6 +19,8 @@
     "update-lump-tests",
     "check-slot-index-leak",
     "callhome-reconnect-tests",
-    "ns-slot-dynamic-tests"
+    "ns-slot-dynamic-tests",
+    "lambda-exec-tests",
+    "hardware-sim"
   ]
 }

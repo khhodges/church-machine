@@ -86,7 +86,7 @@ _require_pat_scope() {
     fi
 
     local scopes
-    scopes=$(echo "$response_headers" | grep -i '^X-OAuth-Scopes:' | sed 's/^X-OAuth-Scopes:[[:space:]]*//' | tr '[:upper:]' '[:lower:]' | tr -d '\r')
+    scopes=$(echo "$response_headers" | grep -i '^X-OAuth-Scopes:' | tr '[:upper:]' '[:lower:]' | sed 's/^x-oauth-scopes:[[:space:]]*//' | tr -d '\r')
 
     if [ -z "$scopes" ]; then
         echo "${script_name}: WARNING — X-OAuth-Scopes header absent (fine-grained PAT or GitHub Apps token)."
