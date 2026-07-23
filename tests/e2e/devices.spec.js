@@ -210,12 +210,9 @@ test.describe('Reliability tab — board filter population', () => {
         // After filter change, loadReliabilityPanel() fires and the table re-renders.
         await expect(page.locator('#relTableWrap .rel-table')).toBeVisible({ timeout: 8000 });
 
-        // Only Alpha Board rows should appear in the table body.
+        // After filtering to uid-alpha, the uid-beta (LED / Beta Board) row must be absent.
         const rows = page.locator('#relTableWrap .rel-table tbody tr');
-        const count = await rows.count();
-        for (let i = 0; i < count; i++) {
-            await expect(rows.nth(i).locator('td.rel-td-board')).toHaveText('Alpha Board');
-        }
+        await expect(rows.filter({ has: page.locator('td.rel-td-abstr', { hasText: 'LED' }) })).toHaveCount(0);
     });
 
 });
@@ -248,7 +245,7 @@ test.describe('Reliability tab — sort toolbar', () => {
 
         // First data row corresponds to the red (lowest MTBF) entry.
         const firstRow = page.locator('#relTableWrap .rel-table tbody tr').first();
-        await expect(firstRow.locator('td.rel-td-mnemonic')).toHaveText('MLOAD');
+        await expect(firstRow.locator('td.rel-td-abstr')).toHaveText('Boot.Abstr');
     });
 
     test('clicking Desc sort puts the highest-MTBF row first', async ({ page }) => {
@@ -265,7 +262,7 @@ test.describe('Reliability tab — sort toolbar', () => {
 
         // First data row must now be the green (highest MTBF) entry.
         const firstRow = page.locator('#relTableWrap .rel-table tbody tr').first();
-        await expect(firstRow.locator('td.rel-td-mnemonic')).toHaveText('CALL');
+        await expect(firstRow.locator('td.rel-td-abstr')).toHaveText('Scheduler');
     });
 
     test('clicking Asc after Desc restores least-reliable-first order', async ({ page }) => {
@@ -282,7 +279,7 @@ test.describe('Reliability tab — sort toolbar', () => {
 
         // First row must be the lowest-MTBF entry again.
         const firstRow = page.locator('#relTableWrap .rel-table tbody tr').first();
-        await expect(firstRow.locator('td.rel-td-mnemonic')).toHaveText('MLOAD');
+        await expect(firstRow.locator('td.rel-td-abstr')).toHaveText('Boot.Abstr');
     });
 
 });
@@ -308,9 +305,9 @@ test.describe('Reliability tab — MTBF colour classes', () => {
         await openReliabilityTab(page);
         await expect(page.locator('#relTableWrap .rel-table')).toBeVisible({ timeout: 8000 });
 
-        // Use exact-match regex so 'CALL' doesn't match any other mnemonic.
+        // Use exact-match regex so 'Scheduler' doesn't match any other abstraction.
         const greenRow = page.locator('#relTableWrap .rel-table tbody tr').filter({
-            has: page.locator('td.rel-td-mnemonic', { hasText: /^CALL$/ }),
+            has: page.locator('td.rel-td-abstr', { hasText: /^Scheduler$/ }),
         });
         await expect(greenRow.locator('td.rel-td-mtbf')).toHaveClass(/mtbf-green/);
     });
@@ -320,9 +317,9 @@ test.describe('Reliability tab — MTBF colour classes', () => {
         await openReliabilityTab(page);
         await expect(page.locator('#relTableWrap .rel-table')).toBeVisible({ timeout: 8000 });
 
-        // Use exact-match regex to avoid 'LOAD' substring matching 'MLOAD'.
+        // Use exact-match regex to avoid 'LED' substring matching any other name.
         const amberRow = page.locator('#relTableWrap .rel-table tbody tr').filter({
-            has: page.locator('td.rel-td-mnemonic', { hasText: /^LOAD$/ }),
+            has: page.locator('td.rel-td-abstr', { hasText: /^LED$/ }),
         });
         await expect(amberRow.locator('td.rel-td-mtbf')).toHaveClass(/mtbf-amber/);
     });
@@ -333,7 +330,7 @@ test.describe('Reliability tab — MTBF colour classes', () => {
         await expect(page.locator('#relTableWrap .rel-table')).toBeVisible({ timeout: 8000 });
 
         const redRow = page.locator('#relTableWrap .rel-table tbody tr').filter({
-            has: page.locator('td.rel-td-mnemonic', { hasText: /^MLOAD$/ }),
+            has: page.locator('td.rel-td-abstr', { hasText: /^Boot\.Abstr$/ }),
         });
         await expect(redRow.locator('td.rel-td-mtbf')).toHaveClass(/mtbf-red/);
     });
