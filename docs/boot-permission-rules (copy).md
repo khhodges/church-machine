@@ -21,11 +21,11 @@ The M (Meta/Microcode) permission is a **transient hardware elevation** — set 
 - **CR elevation: M only**
 - The Thread object is pure metadata — it holds the Machine State of a named thread identity, shadows the CR state by caching the GT used by the Church Instruction LOAD in real time. This means the CHANGE instruction does not need to save any GT since they are alreay save whenever a CR is reloaded executed by the mLoad TSB. The Machine state in ACTIVE or SUSPENDED set and reset by the Start and Stop halves of the CHANGE Instruction. Like the Namespace, it is isolated from all regular permissions. Only microcode (via M) can inspect or update thread state. No user instruction operates on CR8 directly.
 
-### CR5 — Synthsised Heap Encapsulated in a Thread zone
+### CR5 — Program "Heap" Encapsulated in a Thread zone
 
 - **GT permission: RW**
 - **CR elevation: M not required**
-- Stable — set at Thread creation either by the IDE or dynamically by a Thread Manager Abstraction, transparent GT created from THREAD header change on CHANGE to CR12.
+- Dynamic cronstructio from LUMP header — engineered at Thread creation either by programmer using the IDE or dynamically by a Thread Manager Abstraction, transparent GT created from THREAD header change on CHANGE to CR12.
 
 ### CR6 — Abstraction C-List of services
 
@@ -83,7 +83,7 @@ The permission bits `4 perms[30:27]` and the bind flag `B[31]` are **excluded** 
 
 1. **Step 1 (Fault Restart)**: Clear all registers. Cold restart.
 2. **Step 2 (Load Namespace)**: Microcode writes CR15 with M elevation. GT has zero RWXLSE.
-3. **Step 3 (Change just the Start half Thread)**: Microcode writes CR12 with M elevation. GT has zero RWXLSE. Also writes CR5 with the Thread's Services C-List (GT has L+S).
+3. **Step 3 (Change just the Start half Thread)**: Microcode writes CR12 with M elevation. GT has zero RWXLSE. Also constructs the Heap in CR5 from the Lump Header with CR6 the Thread's POLA C-List (GT has L+S).
 4. **Step 4 (Call Boot GT in Thread.CR0)**: Microcode loads CR5 the Heapn, created CR6 (GT has L only, CR gets M during LOAD operations) and creates CR14 (GT has X + R). NIA set to 1 to skip the LUMP header.
 
 ## GT Creation via Mint

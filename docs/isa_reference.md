@@ -592,7 +592,7 @@ Encoding: op[4:0]=0x00 | cond[4] | CRd[4] | CRs[4] | row[15]
 
 **Semantics:** Loads the 32-bit GT word from the c-list addressed by CRs at word offset `row` into `CRd`. The full NS entry is then read and installed into CRd's three-word cache (word0=GT, word1=NS Word 1, word2=NS seals).
 
-- **CRs = CR6** (c-list root): mLoad validates version and CRC seal; L permission check is skipped because CALL already validated E before the call frame was created.
+- **CRs = CR6** (c-list root): mLoad validates version and CRC seal; L permission check is not skipped because CALL synthisyses CR6 with L permission after validating E as the call frame and zones are created.
 - **CRs ≠ CR6**: mLoad validates L permission on CRs itself, reads the lump header to locate the c-list region, then validates the slot.
 - **Abstract GT in slot**: installed directly into CRd without an NS table lookup (hardware device handle path).
 - **Outform GT in slot**: triggers lazy-load (Mode 1 or Mode 2); NS entry is promoted Outform→Inform on completion.
