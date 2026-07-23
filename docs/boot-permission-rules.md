@@ -1,5 +1,7 @@
 # Church Machine Boot Permission Rules
 
+> **SUPERSEDED by Foundation v1.2 (2026-07-23).** CR8 is not the thread register; CR12 is canonical. CR5 is Heap, not Services C-List.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 
