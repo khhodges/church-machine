@@ -47,8 +47,8 @@ def _cfg_default():
     return {
         "step1": {
             "totalNamespaceWords": 16384,
-            "namespaceLumpWords":     64,
-            "threadLumpWords":       256,
+            "namespaceLumpWords":  1024,
+            "threadLumpWords":      256,
         },
     }
 
@@ -60,8 +60,8 @@ def _cfg_custom_step1():
     return {
         "step1": {
             "totalNamespaceWords": 32768,
-            "namespaceLumpWords":     64,
-            "threadLumpWords":       512,
+            "namespaceLumpWords":  1024,
+            "threadLumpWords":      512,
         },
     }
 
@@ -98,8 +98,8 @@ BOOT_ABSTR_DEFAULT_SIZE  = 64  # Boot.Abstr default size when no saved lump (Tas
 def _region_of(word_index, total_words, ns_size, thread_size, entry_size):
     """Human-readable name for the foundation region containing word_index.
 
-    After Task #1205: null slot 2 gap removed; Boot.Abstr (NS slot 3) starts
-    immediately after Boot.Thread at ns_size + thread_size.
+    A7 v1.2 layout: Thread LUMP at word 0; Boot.Abstr immediately after Thread;
+    NS TABLE at NS_TABLE_BASE = total_words - NS_TABLE_RESERVE.
     """
     ns_table_base = total_words - NS_TABLE_RESERVE
     if word_index >= ns_table_base:
@@ -109,13 +109,11 @@ def _region_of(word_index, total_words, ns_size, thread_size, entry_size):
         k     = NS_ENTRY_WORDS - 1 - (r % NS_ENTRY_WORDS)
         field = ["word0_location", "word1_limits", "word2_seals", "word3_abstract_gt"][k]
         return f"NS table slot {slot} ({field})"
-    if word_index < ns_size:
-        return "Boot.NS lump"
-    if word_index < ns_size + thread_size:
+    if word_index < thread_size:
         return "Boot.Thread lump"
-    boot_abstr_end = ns_size + thread_size + entry_size
+    boot_abstr_end = thread_size + entry_size
     if word_index < boot_abstr_end:
-        return "Boot.Abstr lump (slot 3)"
+        return "Boot.Abstr lump (slot 6)"
     return "resident / free region"
 
 
@@ -231,14 +229,14 @@ def _write_synthetic_boot_abstr_lump(lumps_dir, lump_size=64, cw=3, cc=0):
 def _boot_entry_body_range(cfg):
     """Return (start_word, end_word_exclusive) for the Boot.Abstr lump body.
 
+    A7 v1.2: Boot.Abstr starts immediately after Thread at word thread_size.
     The JS simulator's _initNamespaceTable() writes zeros at this range
     (no lump content), while the Python generator embeds a synthetic lump.
     The range must be excluded from the parity comparison.
     """
     step1       = cfg["step1"]
-    ns_size     = step1["namespaceLumpWords"]
     thread_size = step1["threadLumpWords"]
-    start       = ns_size + thread_size          # Boot.Abstr physical base
+    start       = thread_size                    # A7 v1.2: Boot.Abstr at thread_size (not ns_size+thread_size)
     end         = start + BOOT_ABSTR_DEFAULT_SIZE
     return (start, end)
 
@@ -322,8 +320,11 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
     ns_base  = total - (BOOT_ABSTR_NS_SLOT + 1) * NS_ENTRY_WORDS
     boot_loc = words[ns_base]
 
-    # Expected physical address: after Boot.NS(64) + Boot.Thread(256) — null slot 2 gap removed (Task #1205)
-    expected_loc = 64 + 256
+    # Expected physical address: A7 v1.2 — Boot.Abstr starts immediately after Thread.
+    # Thread is at word 0 with size 256, so Boot.Abstr base = 256.
+    # (Old v1.1 formula was ns_size + thread_size = 64 + 256.)
+    thread_size = cfg["step1"]["threadLumpWords"]
+    expected_loc = thread_size
     assert boot_loc == expected_loc, (
         f"Boot.Abstr physical address {boot_loc} != expected {expected_loc}"
     )

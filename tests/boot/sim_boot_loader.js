@@ -40,7 +40,7 @@ process.stdin.on('end', () => {
     if (env.skipWindow) {
         // Leave global.window undefined so the simulator takes the
         // "no project bootConfig" branch in _namespaceMemoryWords()
-        // (defaults to the historical 65536-word memory window).
+        // (defaults to 131072-word A7 v1.2 memory window).
     } else {
         global.window = { bootConfig: cfg || {} };
     }

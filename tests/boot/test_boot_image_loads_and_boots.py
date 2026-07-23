@@ -54,8 +54,8 @@ def _cfg_default():
     return {
         "step1": {
             "totalNamespaceWords": 16384,
-            "namespaceLumpWords":     64,
-            "threadLumpWords":       256,
+            "namespaceLumpWords":  1024,
+            "threadLumpWords":      256,
         },
     }
 
@@ -64,8 +64,8 @@ def _cfg_custom_step1():
     return {
         "step1": {
             "totalNamespaceWords": 32768,
-            "namespaceLumpWords":     64,
-            "threadLumpWords":       512,
+            "namespaceLumpWords":  1024,
+            "threadLumpWords":      512,
         },
     }
 
@@ -88,14 +88,14 @@ def _cfg_step3_reservation():
 
 
 def _cfg_no_window():
-    # Image sized to the simulator's *historical default* memory window
-    # (65536 words). Used together with skip_window=True so the harness
-    # never defines `global.window`, exercising the IDE's "no project
-    # bootConfig has been saved yet" startup path through loadBootImage().
+    # Image sized to the simulator's A7 v1.2 default memory window (131072 words).
+    # Used together with skip_window=True so the harness never defines
+    # `global.window`, exercising the IDE's "no project bootConfig has been
+    # saved yet" startup path through loadBootImage().
     return {
         "step1": {
-            "totalNamespaceWords": 65536,
-            "namespaceLumpWords":     64,
+            "totalNamespaceWords": 131072,
+            "namespaceLumpWords":   1024,
             "threadLumpWords":       256,
         },
     }
@@ -163,9 +163,9 @@ def test_boot_image_loads_and_boots(cfg, skip_window, expected_ns_count):
     assert status["loaded"] is True, (
         f"loadBootImage() returned false; status={status}"
     )
-    # When the harness suppresses window.bootConfig the simulator falls
-    # back to its 65536-word default; the image was generated to match.
-    expected_mem = (65536 if skip_window
+    # When the harness suppresses window.bootConfig the simulator falls back
+    # to its A7 v1.2 default (131072 words); the image was generated to match.
+    expected_mem = (131072 if skip_window
                     else cfg["step1"]["totalNamespaceWords"])
     assert status["memoryWords"] == expected_mem, (
         f"simulator memory size {status['memoryWords']} != "

@@ -20,9 +20,10 @@ if (typeof module !== 'undefined' && typeof AbstractGTManager === 'undefined') {
 //     Instantiated once in app.js as `sim`.  Emits 'stateChange' events so the
 //     IDE UI can re-render after every instruction or boot step.
 //
-// MEMORY MAP  (all addresses are word-addressed 32-bit words)
-//   0x0000 – 0xFBFF   Object lumps  (heap / stack / thread lumps)
-//   0xF000 – 0xFFFF   Namespace (NS) table  — up to 1024 × 4-word entries (NS_TABLE_RESERVE=0x1000)
+// MEMORY MAP  (all addresses are word-addressed 32-bit words, A7 v1.2 layout)
+//   0x00000 – NS_TABLE_BASE−1   Thread LUMP (at 0x00000), Boot.Abstr, dynamic pool
+//   NS_TABLE_BASE – memory.length−1  Namespace (NS) table — 256 × 4-word entries
+//                                    (NS_TABLE_RESERVE=0x400; NS_TABLE_BASE = memory.length − 0x400)
 //   (I/O segment and Boot ROM are overlaid in the lump area at NS-registered addresses)
 //
 // NAMESPACE TABLE (NS)
@@ -152,11 +153,11 @@ class ChurchSimulator {
     constructor() {
         this._listeners = {};
         // NS_TABLE_BASE is recomputed in reset() (and in the binary loaders) to
-        // memory.length − NS_TABLE_RESERVE. For a 65536-word space: 0xF000.
-        this.NS_TABLE_RESERVE = 0x1000;  // default 1024 entries × 4 words; updated in reset() from binary
-        this.NS_TABLE_BASE = 0xF000;    // for 65536-word space: 0x10000 - 0x1000; recomputed in reset()
+        // memory.length − NS_TABLE_RESERVE. For a 131072-word A7 space: 0x1FC00.
+        this.NS_TABLE_RESERVE = 0x400;  // A7 v1.2: 256 entries × 4 words = 1024; updated in reset() from binary
+        this.NS_TABLE_BASE = 0x1FC00;   // for 131072-word A7 space: 0x20000 - 0x400; recomputed in reset()
         this.NS_ENTRY_WORDS = 4;
-        this.MAX_NS_ENTRIES = 1024;     // default; updated in reset() to match actual NS_TABLE_RESERVE
+        this.MAX_NS_ENTRIES = 256;      // A7 v1.2: 256 slots max; updated in reset() to match NS_TABLE_RESERVE
         this.SLOT_SIZE = 0x40;   // 64 words — FPGA minimum slot allocation (boot_rom.py line 339)
 
         // TPERM preset → required-permission array.
@@ -227,7 +228,7 @@ class ChurchSimulator {
                        && window.bootConfig.step1 && window.bootConfig.step1.totalNamespaceWords);
             if (Number.isInteger(t) && t >= 64) return t;
         } catch (_) { /* no window in tests */ }
-        return 65536;
+        return 131072;
     }
 
     // Task #217: overlay a server-generated boot image onto the namespace
@@ -252,7 +253,7 @@ class ChurchSimulator {
         // so we discover the reserve by finding the tag rather than using a
         // hardcoded offset. Scan limit: 8192 words covers up to 1024-slot NS tables
         // (4096 words) plus the 2 sentinel words and future headroom.
-        const BOOT_IMAGE_FORMAT_TAG = 0xB0072046;  // must match boot_image.py; bumped for direct-dispatch (trampoline removal)
+        const BOOT_IMAGE_FORMAT_TAG = 0xB0072128;  // must match boot_image.py; bumped for A7 v1.2 layout inversion (Thread@0, NS@top)
         let tagIdx = -1;
         const scanLimit = Math.min(8192, src.length);
         for (let _si = 1; _si <= scanLimit; _si++) {
@@ -321,19 +322,31 @@ class ChurchSimulator {
 
         const n   = Math.min(src.length, this.memory.length);
         for (let i = 0; i < n; i++) this.memory[i] = src[i] >>> 0;
-        // Recount NS entries from the table now that it's been replaced.
+        // Read the stored nsCount from NS_TABLE_BASE-3 (tagIdx-2).
+        // This value is written by both boot_image.py and _initNamespaceTable()
+        // (scan before c-list + empty_count) and avoids counting c-list entries
+        // at the NS table tail as populated NS entries (which inflate to 256).
         const maxEntries = (this.NS_TABLE_RESERVE / this.NS_ENTRY_WORDS) | 0;
-        let count = 0;
-        for (let i = 0; i < maxEntries; i++) {
-            const base = this._nsSlotBase(i);
-            if (this.memory[base] !== 0 || this.memory[base + 1] !== 0) {
-                count = i + 1;
-            }
-        }
+        const _storedNsCountIdx = tagIdx - 2;  // = NS_TABLE_BASE - 3
+        const _storedNsCount = (_storedNsCountIdx >= 0 && _storedNsCountIdx < src.length)
+            ? ((src[_storedNsCountIdx] >>> 0) & 0xFFFF) : 0;
+        let count = (_storedNsCount > 0 && _storedNsCount <= maxEntries)
+            ? _storedNsCount
+            : (() => {
+                // Fallback: forward scan (belt-and-suspenders; images with wrong tag
+                // are rejected above, so this path should never be reached in practice).
+                let _c = 0;
+                for (let i = 0; i < maxEntries; i++) {
+                    const base = this._nsSlotBase(i);
+                    if (this.memory[base] !== 0 || this.memory[base + 1] !== 0) _c = i + 1;
+                }
+                return _c;
+            })();
         // Honour Step 3 empty-slot reservations from the saved boot config:
         // those NS entries are intentionally zeroed in the binary but must
         // still count toward nsCount so the namespace exposes the reserved
-        // capacity to the runtime.
+        // capacity to the runtime.  The stored count already includes
+        // step3.emptySlotCount; baseNamedNsCount can push it higher still.
         const cfg = (typeof window !== 'undefined') ? window.bootConfig : null;
         const baseNamed = (cfg && cfg.step3 && Number.isInteger(cfg.step3.baseNamedNsCount))
             ? cfg.step3.baseNamedNsCount : 0;
@@ -1289,7 +1302,7 @@ class ChurchSimulator {
         // loadBootImage() uses the actual size from the generator.  Defaulting to 64w
         // keeps this path consistent with server/boot_image.py BOOT_ABSTR_DEFAULT_SIZE.
         const BOOT_ABSTR_LUMP_SIZE = 64;
-        const NS_LUMP_SIZE         = (_bcStep1 && _bcStep1.namespaceLumpWords) || this.SLOT_SIZE;
+        const NS_LUMP_SIZE         = (_bcStep1 && _bcStep1.namespaceLumpWords) || this.NS_TABLE_RESERVE;
         // Boot.Abstr at bootEntrySlot (default 6 = SelfTest).
         // Slots 2-5 are MMIO — no RAM body, no slotSizes entry needed.
         const slotSizes = {};
@@ -1332,13 +1345,15 @@ class ChurchSimulator {
             // Step 2 physAddr override replaces runningOffset for resident lump slots.
             const MMIO_ADDRS = { 2: 0x40000014, 3: 0x40000000, 4: 0x40000028, 5: 0x4000002C };
             const overrideLoc = physAddrOverride[i];
-            const loc = (i === 0) ? 0
+            // A7 v1.2 layout: NS LUMP (slot 0) lives at NS_TABLE_BASE (top of memory).
+            // Thread LUMP (slot 1) starts at word 0. runningOffset is NOT advanced for
+            // slot 0 so that slot 1 naturally gets loc = 0.
+            const loc = (i === 0) ? this.NS_TABLE_BASE
                       : (MMIO_ADDRS[i] !== undefined ? MMIO_ADDRS[i]
                       : (overrideLoc !== undefined ? overrideLoc : runningOffset));
             // Only advance runningOffset for RAM-backed slots (not slot 0, not MMIO, not overrides).
-            if (i === 0) runningOffset = NS_LUMP_SIZE;
-            else if (MMIO_ADDRS[i] === undefined && overrideLoc === undefined) runningOffset += mySize;
-            const lim17 = (i === 0) ? (this.memory.length - 1)
+            if (MMIO_ADDRS[i] === undefined && overrideLoc === undefined && i !== 0) runningOffset += mySize;
+            const lim17 = (i === 0) ? (this.NS_TABLE_RESERVE - 1)
                         : (DEVICE_REG_LIMITS[i] !== undefined ? DEVICE_REG_LIMITS[i]
                         : (mySize - 1));
             const nsTableCount = (i === 0) ? abstractions.length : 0;
@@ -1415,6 +1430,13 @@ class ChurchSimulator {
             this.nsCount = endIdx;
         }
 
+        // ── Stored nsCount word (NS_TABLE_BASE - 3) ─────────────────────────────
+        // Write this.nsCount (after step3) at NS_TABLE_BASE-3 so that
+        // loadBootImage() can read the clean count without being confused by
+        // c-list entries at the NS TABLE tail.  Must match boot_image.py's
+        // _ns_count_stored computation (scan before c-list + empty_count).
+        this.memory[this.NS_TABLE_BASE - 3] = (this.nsCount >>> 0);
+
         const THREAD_SW = 32;
         const THREAD_CC = 12;
         // n_minus_6 is derived from the actual lump size so a programmer
@@ -1438,18 +1460,18 @@ class ChurchSimulator {
         clistGTs[0] = this.createGT(0, BOOT_NS_SLOT_HEADER, {R:1, W:1}, 1);
         const DEMO_CLIST_SIZE   = 11;   // slots 0–10 (minimal 8-slot namespace)
 
-        // ── NS lump header and c-list (Task #694) ────────────────────────────────────
-        // Write a valid lump header at memory[0] for the NS lump (Slot 0):
-        //   magic=0x1F, n_minus_6=log2(NS_LUMP_SIZE)-6, cw=0, cc=catalog count, typ=0.
-        // Write one GT word per catalog slot (named or null) into the NS lump c-list tail
-        // at words NS_LUMP_SIZE−nsCatalogCount through NS_LUMP_SIZE−1.
-        // This must happen BEFORE clistGTs is truncated to DEMO_CLIST_SIZE so that
-        // catalog slots beyond 17 still have their NS-loop GT values available.
-        const nsLumpNMinus6   = Math.max(0, Math.ceil(Math.log2(NS_LUMP_SIZE)) - 6);
+        // ── NS lump c-list (A7 v1.2 layout) ─────────────────────────────────────────
+        // A7 layout: NS LUMP IS the NS TABLE at NS_TABLE_BASE. No separate lump header
+        // is written — NS slot 0 word0 (= NS_TABLE_BASE, the self-referential location)
+        // occupies memory[NS_TABLE_BASE+0] and is set by writeNSEntry above.
+        // The c-list tail lives in the last nsCatalogCount words of the NS TABLE region
+        // (at NS_TABLE_BASE + NS_TABLE_RESERVE − nsCatalogCount .. NS_TABLE_BASE + NS_TABLE_RESERVE − 1).
+        // These overlap with null slots near the end of the NS table, which is safe since
+        // those entries are always zero (unused). This must happen BEFORE clistGTs is
+        // truncated to DEMO_CLIST_SIZE so all catalog slot GT values are available.
         const nsCatalogCount  = abstractions.length;
-        this.memory[0] = this.packLumpHeader(nsLumpNMinus6, 0, nsCatalogCount, 0);
         for (let ci = 0; ci < nsCatalogCount; ci++) {
-            this.memory[NS_LUMP_SIZE - nsCatalogCount + ci] = (clistGTs[ci] || 0) >>> 0;
+            this.memory[this.NS_TABLE_BASE + this.NS_TABLE_RESERVE - nsCatalogCount + ci] = (clistGTs[ci] || 0) >>> 0;
         }
 
         // Slots 0–16 map to NS slots 0–16 (or contain hardware-device Abstract GTs at 8–15).
@@ -1546,7 +1568,7 @@ class ChurchSimulator {
         // stale binaries. Bumped to 0x563 (Task #568) — Boot.Abstr placement is now
         // dynamic (64w default or saved lump size); abstractionLumpWords deprecated.
         // Must match boot_image.py BOOT_IMAGE_FORMAT_TAG and loadBootImage().
-        const BOOT_IMAGE_FORMAT_TAG_INIT = 0xB0072046;  // bumped for direct-dispatch (trampoline removal)
+        const BOOT_IMAGE_FORMAT_TAG_INIT = 0xB0072128;  // bumped for A7 v1.2 layout inversion (Thread@0, NS@top)
         this.memory[this.NS_TABLE_BASE - 1] = BOOT_IMAGE_FORMAT_TAG_INIT >>> 0;
     }
 

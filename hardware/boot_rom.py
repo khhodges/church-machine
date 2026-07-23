@@ -527,9 +527,9 @@ for _i in range(NS_SLOT_COUNT):
     elif _i == 7:
         _entry = _make_ns_entry(GT_TYPE_NULL, 0, _i, 0, 0, 0)  # [programmable]
     else:
-        # Slot 1: Boot.Thread (default: location=0x100, alloc=64 words, RW)
+        # Slot 1: Boot.Thread — A7 v1.2 layout: Thread LUMP at word 0x0000.
         _entry = _make_ns_entry(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, _i, 0,
-                                _i * 0x100, 64,
+                                0, 64,
                                 abstract_gt=_abstract_gt_word(PERM_MASK_R | PERM_MASK_W))
     DEMO_NAMESPACE.extend(_entry)
 

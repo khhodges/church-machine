@@ -46,8 +46,8 @@ except ImportError:
 
 NS_ENTRY_WORDS   = 4            # words per NS entry (stride-4, 16 bytes per slot)
 NS_BUS_WORDS     = 4            # hardware ns_rd_data/ns_wr_data bus width in 32-bit words
-MAX_NS_ENTRIES   = 1024         # GT bits[15:0] support 65535; 1024 is the practical cap
-NS_TABLE_RESERVE = MAX_NS_ENTRIES * NS_ENTRY_WORDS  # 4096 words = 1024 entries × 4
+MAX_NS_ENTRIES   = 256          # A7 v1.2: 256 slots — GT bits[15:0] could hold more but 256 is the hardware cap
+NS_TABLE_RESERVE = MAX_NS_ENTRIES * NS_ENTRY_WORDS  # 1024 words = 256 entries × 4
 SLOT_SIZE        = 0x40         # 64 words
 
 
@@ -81,7 +81,7 @@ _MANDATORY_NS_SLOTS = (0, 1, BOOT_ABSTR_NS_SLOT)  # slots 0, 1, 6
 
 # Format-version tag written to mem[NS_TABLE_BASE - 1] so loadBootImage()
 # can reject stale binaries.
-BOOT_IMAGE_FORMAT_TAG = 0xB0072046  # bumped for direct-dispatch (trampoline removal); must match simulator.js
+BOOT_IMAGE_FORMAT_TAG = 0xB0072128  # bumped for A7 v1.2 layout inversion (Thread@0, NS@top); must match simulator.js
 
 # Direct dispatch: NUC_CODE (B:07) pre-loads CR0 with the boot-entry E-GT.
 # No CHANGE→TPERM→CALL trampoline — 00000600.lump must always be present.
@@ -606,8 +606,9 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         label, perms, chainable = entry
         override = phys_override.get(i)
         if i == 0:
-            loc = 0
-            running_offset = ns_size
+            # A7 v1.2: NS LUMP lives at NS_TABLE_BASE (self-referential).
+            # runningOffset is NOT advanced so Thread (slot 1) naturally gets loc=0.
+            loc = ns_table_base
         elif i in _MMIO_SLOT_SPECS:
             # MMIO NS slot: physical MMIO byte address, no RAM body allocated.
             loc = _MMIO_SLOT_SPECS[i][0]
@@ -620,10 +621,10 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
                 running_offset += my_size
         locations[i] = loc
 
-        # Slot 0: limit covers the entire programmer-budgeted namespace.
+        # Slot 0: limit covers the NS TABLE region (NS_TABLE_RESERVE words).
         # MMIO slots: lim17 from _MMIO_SLOT_SPECS (device register count - 1).
         if i == 0:
-            lim17 = (total - 1) & 0x1FFFF
+            lim17 = (NS_TABLE_RESERVE - 1) & 0x1FFFF
             clist_count = len(catalog)
         elif i in _MMIO_SLOT_SPECS:
             lim17 = _MMIO_SLOT_SPECS[i][1]
@@ -688,9 +689,19 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
             f"abstraction catalog count ({ns_count}); the NS table would not fit all "
             f"catalog entries. Increase nsSlotsMax to at least {ns_count}."
         )
-    # Empty entries are already zero (mem is zero-initialised); just
-    # advance the conceptual nsCount. We don't write a count word — the
-    # simulator scans for non-zero entries.
+    # ----- Stored nsCount word (NS_TABLE_BASE - 3) -----------------------
+    # Scan the NS table BEFORE the c-list is written to get the "clean"
+    # forward-scan count (highest non-null entry + 1).  Adding empty_count
+    # mirrors what _initNamespaceTable() writes after its step3 block.
+    # loadBootImage() reads this word instead of rescanning, so c-list
+    # entries at the NS table tail cannot inflate nsCount to MAX_NS_ENTRIES.
+    _ns_count_stored = 0
+    for _sc_i in range(MAX_NS_ENTRIES):
+        _sc_base = ns_table_base + _sc_i * NS_ENTRY_WORDS
+        if mem[_sc_base] != 0 or mem[_sc_base + 1] != 0:
+            _ns_count_stored = _sc_i + 1
+    _ns_count_stored += empty_count
+    mem[ns_table_base - 3] = _ns_count_stored & 0xFFFFFFFF
 
     # ----- Foundational lump headers -------------------------------------
     # Thread lump (NS slot 1): cw=32, cc=12, typ=2.
@@ -708,17 +719,19 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     mem_mgr_gt = create_gt(0, 0, {"R":1, "W":1}, 1)
     clist_gts[0] = mem_mgr_gt
 
-    # ── NS lump header and c-list (Task #694) ────────────────────────────────────
-    # Write a valid lump header at mem[0] for the NS lump (Slot 0):
-    #   magic=0x1F, n_minus_6=log2(ns_size)-6, cw=0, cc=catalog count, typ=0.
-    # Write one GT word per catalog slot (named or null) into the NS lump c-list tail
-    # at words ns_size − ns_catalog_count through ns_size − 1.
-    # This must happen BEFORE clist_gts is truncated so that catalog slots beyond
-    # DEMO_CLIST_SIZE still have their NS-loop GT values available.
+    # ── NS lump c-list (A7 v1.2 layout) ─────────────────────────────────────────
+    # A7 layout: NS LUMP IS the NS TABLE at ns_table_base. No separate lump header
+    # is written — NS slot 0 word0 (= ns_table_base, self-referential location)
+    # is already set by the NS entries loop above.
+    # The c-list tail lives in the last ns_catalog_count words of the NS TABLE region
+    # (ns_table_base + NS_TABLE_RESERVE − ns_catalog_count .. ns_table_base + NS_TABLE_RESERVE − 1).
+    # These overlap with null slots near the end of the NS table, which is safe.
+    # This must happen BEFORE clist_gts is truncated so all catalog GT values are available.
     ns_catalog_count = len(catalog)
-    mem[0] = pack_lump_header(_ns_n_minus_6(ns_size), 0, ns_catalog_count, 0)
     for ci in range(ns_catalog_count):
-        mem[ns_size - ns_catalog_count + ci] = clist_gts[ci] if ci < len(clist_gts) else 0
+        mem[ns_table_base + NS_TABLE_RESERVE - ns_catalog_count + ci] = (
+            clist_gts[ci] if ci < len(clist_gts) else 0
+        )
 
     # Truncate to DEMO_CLIST_SIZE (11 entries for minimal 8-slot namespace).
     clist_gts = clist_gts[:DEMO_CLIST_SIZE]

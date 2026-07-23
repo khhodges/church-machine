@@ -1,32 +1,27 @@
-"""Regression test: Boot.Abstr sits immediately after Thread lump — no null-slot-2 gap.
+"""Regression test: A7 v1.2 memory layout — Thread LUMP at word 0, NS LUMP/TABLE at top.
 
-Task #1205 removed the 64-word physical reservation that used to hold a zeroed
-NS slot 2 body between the Thread lump and Boot.Abstr.  This test enforces that
-the gap is absent from every boot image produced by generate_boot_image().
+A7 v1.2 inverts the v1.1 layout:
+  - Thread LUMP body is at word 0 (was at ns_size in v1.1).
+  - Boot.Abstr lump body immediately follows Thread (was at ns_size+thread_size).
+  - NS LUMP IS the NS TABLE, placed at NS_TABLE_BASE = total − NS_TABLE_RESERVE.
+  - NS slot 0 word0 = NS_TABLE_BASE (self-referential location).
+  - NS slot 1 word0 = 0 (Thread at word 0).
+  - NS slot 6 word0 = thread_size (Boot.Abstr immediately after Thread).
 
-Layout under test (default config: ns=64, thread=256):
+Layout under test (default config: thread=256, total=16384):
 
-    [0x0000 .. 0x003F]  Namespace lump body  (64 words)
-    [0x0040 .. 0x013F]  Thread lump body     (256 words)
-    [0x0140 .. 0x017F]  Boot.Abstr lump body (64 words) ← must start HERE
-    [0x0180 .. 0x08BF]  Resident catalog lump bodies (service c-lists etc.)
-    [0x08C0 .. 0x3BFF]  Dynamic pool         (all-zero at boot time)
-    [0x3C00 .. 0x3FFF]  NS table (256 entries × 4 words)
+    [0x0000 .. 0x00FF]  Thread LUMP body     (256 words)
+    [0x0100 .. 0x013F]  Boot.Abstr LUMP body (64 words)
+    [0x0140 .. 0x3BFD]  Resident catalog lump bodies + dynamic pool (all-zero)
+    [0x3BFE]            boot_entry_slot sentinel
+    [0x3BFF]            BOOT_IMAGE_FORMAT_TAG
+    [0x3C00 .. 0x3FFF]  NS TABLE (256 entries × 4 words)
+                          slot 0 word0 = 0x3C00  (self-referential NS location)
+                          slot 1 word0 = 0x0000  (Thread at word 0)
+                          slot 6 word0 = 0x0100  (Boot.Abstr at thread_size)
 
-Before Task #1205 a zeroed 64-word block occupied 0x0140–0x017F (the old NS
-slot 2 physical reservation), pushing Boot.Abstr to 0x0180.  The assertions
-below prove that the old gap region is no longer all-zero, that Boot.Abstr's
-lump header magic is present at the exact offset physAddr = ns_size + thread_size,
-and that the dynamic pool (the zero region between resident lumps and the NS
-table) is correctly initialized to zero.
-
-Dynamic pool note
------------------
-The dynamic pool does NOT start at 0x0180 — that region is occupied by the
-service c-list lump bodies for resident catalog abstractions (Salvation,
-Navana, Mint, etc.).  The pool starts at the word address immediately after the
-last resident catalog lump, computed by mirroring generate_boot_image()'s
-running_offset progression through DEFAULT_ABSTRACTION_CATALOG.
+These tests fail if generate_boot_image() regresses to the old v1.1 layout
+(NS lump at word 0, Thread above it, Boot.Abstr at ns_size+thread_size).
 """
 import os
 import struct
@@ -63,22 +58,18 @@ def _parse_image(image_bytes, total_words):
     return list(struct.unpack(f"<{total_words}I", image_bytes))
 
 
-def _compute_catalog_pool_start(ns_size, thread_size,
-                                abstr_size=None):
+def _compute_catalog_pool_start(ns_size, thread_size, abstr_size=None):
     """Return the word offset where the dynamic pool begins.
 
     Mirrors generate_boot_image()'s running_offset progression through
-    DEFAULT_ABSTRACTION_CATALOG so we know exactly where the last catalog
-    lump ends and the unallocated (all-zero) pool begins.
+    DEFAULT_ABSTRACTION_CATALOG under A7 v1.2 layout rules:
+      - Slot 0 (NS) is at NS_TABLE_BASE (top); does NOT advance running_offset.
+      - Slot 1 (Thread) starts at running_offset=0 and advances by thread_size.
+      - Slot 6 (Boot.Abstr) advances by abstr_size.
+      - All other catalog entries advance by SLOT_SIZE.
 
     The pool starts immediately after the physical region assigned to the last
-    non-None catalog entry, regardless of whether that entry's lump body is
-    actually written into the image (some entries have no code or c-list and
-    therefore remain all-zero, but their physical slot is still reserved).
-
-    abstr_size defaults to the lump_size read from the saved Boot.Abstr lump
-    on disk (mirroring generate_boot_image()), falling back to
-    BOOT_ABSTR_DEFAULT_SIZE if the file is absent or unreadable.
+    non-None catalog entry with a RAM body.
     """
     if abstr_size is None:
         _boot_lump = os.path.join(
@@ -96,21 +87,20 @@ def _compute_catalog_pool_start(ns_size, thread_size,
             except Exception:
                 pass
     slot_sizes = {
-        0:                  ns_size,
+        0:                  ns_size,      # unused: slot 0 at NS_TABLE_BASE
         1:                  thread_size,
         BOOT_ABSTR_NS_SLOT: abstr_size,
     }
     running_offset = 0
     for i, entry in enumerate(DEFAULT_ABSTRACTION_CATALOG):
         if entry is None:
-            if i == 0:
-                running_offset = slot_sizes[0]
+            continue
+        if i == 0:
+            # A7 v1.2: NS LUMP at NS_TABLE_BASE (top), not in RAM pool.
+            # Don't advance running_offset — Thread (slot 1) gets loc=0.
             continue
         my_size = slot_sizes.get(i, SLOT_SIZE)
-        if i == 0:
-            running_offset = my_size
-        else:
-            running_offset += my_size
+        running_offset += my_size
     return running_offset
 
 
@@ -118,47 +108,49 @@ def _default_cfg():
     return {
         "step1": {
             "totalNamespaceWords": 16384,
-            "namespaceLumpWords":     64,
-            "threadLumpWords":       256,
+            "namespaceLumpWords":  1024,
+            "threadLumpWords":      256,
         },
     }
 
 
 def _custom_cfg():
-    """Non-default ns/thread sizes to confirm the no-gap formula holds generally."""
+    """Non-default thread size to confirm the no-gap formula holds generally."""
     return {
         "step1": {
             "totalNamespaceWords": 16384,
-            "namespaceLumpWords":    128,
-            "threadLumpWords":       512,
+            "namespaceLumpWords":  1024,
+            "threadLumpWords":      512,
         },
     }
 
 
-def _assert_boot_abstr_at(words, ns_size, thread_size, label):
-    """Core assertions: Boot.Abstr header is at physAddr = ns_size + thread_size
-    with no null-gap between the Thread lump and Boot.Abstr.
+def _assert_boot_abstr_at(words, thread_size, label):
+    """Core A7 v1.2 assertion: Boot.Abstr header is at physAddr = thread_size.
+
+    In A7 v1.2 the Thread LUMP occupies [0 .. thread_size-1] and Boot.Abstr
+    immediately follows at [thread_size .. thread_size+63].
 
     Checks:
-    1. The word at physAddr carries the 0x1F LUMP magic in bits [31:27].
-    2. The entire Boot.Abstr region (physAddr .. physAddr+63) is NOT all-zero.
+    1. The word at thread_size carries the 0x1F LUMP magic in bits [31:27].
+    2. The Boot.Abstr region is NOT all-zero.
     """
-    phys_abstr = ns_size + thread_size
+    phys_abstr = thread_size
 
     header_word = words[phys_abstr]
     actual_magic = header_word >> 27
     assert actual_magic == LUMP_HEADER_MAGIC, (
         f"{label}: Expected LUMP magic 0x1F at word 0x{phys_abstr:04X} "
-        f"(ns_size={ns_size}, thread_size={thread_size}), "
+        f"(thread_size={thread_size}), "
         f"but got 0x{actual_magic:02X} (full word=0x{header_word:08X}).  "
-        "Boot.Abstr may have been pushed forward by a null-slot-2 gap."
+        "Boot.Abstr should start immediately after Thread in A7 v1.2 layout."
     )
 
     abstr_region = words[phys_abstr : phys_abstr + BOOT_ABSTR_DEFAULT_SIZE]
     assert any(w != 0 for w in abstr_region), (
         f"{label}: Words 0x{phys_abstr:04X}–"
         f"0x{phys_abstr + BOOT_ABSTR_DEFAULT_SIZE - 1:04X} are all-zero.  "
-        "This looks like the old null-slot-2 gap, not a Boot.Abstr lump body."
+        "Expected Boot.Abstr lump body, not an empty gap."
     )
 
 
@@ -166,117 +158,162 @@ def _assert_boot_abstr_at(words, ns_size, thread_size, label):
 # Tests
 # ---------------------------------------------------------------------------
 
-def test_default_config_boot_abstr_at_0x0140():
-    """Default config (ns=64, thread=256): Boot.Abstr header must be at 0x0140.
+def test_thread_lump_at_word_zero():
+    """A7 v1.2: Thread LUMP header must be at word 0 (not NS lump).
 
-    If the null-slot-2 gap were still present, Boot.Abstr would be at 0x0180
-    and 0x0140–0x017F would be all-zero.  This test fails in that scenario.
+    In v1.1 word 0 held the NS lump header. In A7 v1.2 the Thread LUMP starts
+    at word 0, and the NS LUMP/TABLE is at NS_TABLE_BASE = total − 1024.
     """
     cfg   = _default_cfg()
-    ns    = int(cfg["step1"]["namespaceLumpWords"])
-    th    = int(cfg["step1"]["threadLumpWords"])
-    total = int(cfg["step1"]["totalNamespaceWords"])
-
-    expected_phys = ns + th  # 64 + 256 = 320 = 0x0140
-    assert expected_phys == 0x0140, (
-        f"Test assumption: physAddr should be 0x0140 but got 0x{expected_phys:04X}"
-    )
-
-    image = generate_boot_image(cfg, LUMPS_DIR)
-    words = _parse_image(image, total)
-
-    old_gap_region = words[0x0140 : 0x0180]
-    assert any(w != 0 for w in old_gap_region), (
-        "Words 0x0140–0x017F are all-zero — the null-slot-2 gap appears to have "
-        "been reintroduced.  Boot.Abstr must occupy this region directly."
-    )
-
-    _assert_boot_abstr_at(words, ns, th, "default config")
-
-
-def test_default_config_boot_abstr_header_word_is_correct():
-    """Boot.Abstr header word at 0x0140 carries the 0x1F magic (not an all-zero gap word)."""
-    cfg   = _default_cfg()
+    th    = int(cfg["step1"]["threadLumpWords"])   # 256
     total = int(cfg["step1"]["totalNamespaceWords"])
 
     image = generate_boot_image(cfg, LUMPS_DIR)
     words = _parse_image(image, total)
 
-    header_word  = words[0x0140]
+    header_word  = words[0]
     actual_magic = header_word >> 27
     assert actual_magic == LUMP_HEADER_MAGIC, (
-        f"Word 0x0140 = 0x{header_word:08X}: expected LUMP magic 0x1F in bits [31:27] "
-        f"but got 0x{actual_magic:02X}.  "
-        "The null-slot-2 gap (all-zero) may have been reintroduced before Boot.Abstr."
+        f"Word 0x0000 = 0x{header_word:08X}: expected Thread LUMP magic 0x1F "
+        f"in bits [31:27] but got 0x{actual_magic:02X}.  "
+        "In A7 v1.2 the Thread LUMP must start at word 0."
+    )
+
+    # Verify the Thread region is not all-zero.
+    thread_region = words[0:th]
+    assert any(w != 0 for w in thread_region), (
+        f"Thread LUMP region [0x0000..0x{th - 1:04X}] is entirely zero — "
+        "something failed to write it."
     )
 
 
-def test_custom_config_boot_abstr_immediately_follows_thread_lump():
-    """Custom config (ns=128, thread=512): Boot.Abstr is at ns+thread = 0x0280.
+def test_boot_abstr_immediately_follows_thread_default():
+    """Default config (thread=256): Boot.Abstr header at 0x0100 (= thread_size).
 
-    With the null-slot-2 gap removed, physAddr = namespaceLumpWords + threadLumpWords
-    in all configurations.  A custom config exercises the general formula.
+    In A7 v1.2 physAddr(Boot.Abstr) = threadLumpWords = 256 = 0x0100.
+    """
+    cfg   = _default_cfg()
+    th    = int(cfg["step1"]["threadLumpWords"])   # 256
+    total = int(cfg["step1"]["totalNamespaceWords"])
+
+    assert th == 0x100, f"Test assumption: thread_size should be 0x100 got 0x{th:04X}"
+
+    image = generate_boot_image(cfg, LUMPS_DIR)
+    words = _parse_image(image, total)
+
+    _assert_boot_abstr_at(words, th, "default config (thread=256)")
+
+
+def test_boot_abstr_immediately_follows_thread_custom():
+    """Custom config (thread=512): Boot.Abstr header at 0x200 (= thread_size).
+
+    Exercises the general physAddr=thread_size formula with a non-default size.
     """
     cfg   = _custom_cfg()
-    ns    = int(cfg["step1"]["namespaceLumpWords"])   # 128
-    th    = int(cfg["step1"]["threadLumpWords"])       # 512
+    th    = int(cfg["step1"]["threadLumpWords"])   # 512
     total = int(cfg["step1"]["totalNamespaceWords"])
 
-    expected_phys = ns + th  # 128 + 512 = 640 = 0x0280
-    assert expected_phys == 0x0280, (
-        f"Test assumption: physAddr should be 0x0280 but got 0x{expected_phys:04X}"
-    )
+    assert th == 0x200, f"Test assumption: thread_size should be 0x200 got 0x{th:04X}"
 
     image = generate_boot_image(cfg, LUMPS_DIR)
     words = _parse_image(image, total)
 
-    _assert_boot_abstr_at(words, ns, th, "custom config (ns=128, thread=512)")
+    _assert_boot_abstr_at(words, th, "custom config (thread=512)")
 
 
-def test_no_null_gap_in_default_image():
-    """Comprehensive null-gap regression: no 64-word all-zero block at the old gap address.
+def test_ns_slot0_word0_is_ns_table_base():
+    """NS slot 0 word0 must equal NS_TABLE_BASE (self-referential in A7 v1.2).
 
-    Before Task #1205 a 64-word zeroed block sat at 0x0140–0x017F.
-    This test fails if any future change reintroduces such a block.
+    The NS LUMP IS the NS TABLE. Slot 0 word0 stores the physical base of the
+    NS lump, which is NS_TABLE_BASE = totalNamespaceWords − NS_TABLE_RESERVE.
     """
     cfg   = _default_cfg()
     total = int(cfg["step1"]["totalNamespaceWords"])
 
+    ns_table_base = total - NS_TABLE_RESERVE  # 16384 − 1024 = 15360 = 0x3C00
+
     image = generate_boot_image(cfg, LUMPS_DIR)
     words = _parse_image(image, total)
 
-    candidate = words[0x0140 : 0x0180]
-    assert any(w != 0 for w in candidate), (
-        "Words 0x0140–0x017F (the old null-slot-2 gap region) are entirely zero.  "
-        "The null-slot-2 physical reservation has been reintroduced.  "
-        "Boot.Abstr must occupy 0x0140–0x017F directly (no gap before it)."
+    slot0_word0 = words[ns_table_base + 0 * NS_ENTRY_WORDS]
+    assert slot0_word0 == ns_table_base, (
+        f"NS slot 0 word0 = 0x{slot0_word0:05X}; "
+        f"expected NS_TABLE_BASE = 0x{ns_table_base:05X}.  "
+        "In A7 v1.2 NS slot 0 is self-referential (points to NS_TABLE_BASE)."
     )
 
 
-def test_boot_abstr_ns_entry_points_to_0x0140():
-    """NS table entry for Boot.Abstr (NS slot 3) must record physAddr = 0x0140.
-
-    The NS entry word0 stores the physical base address.  If the null-slot-2 gap
-    were present, the entry would point to 0x0180 instead.
-    """
+def test_ns_slot1_word0_is_zero():
+    """NS slot 1 (Thread) word0 must be 0 — Thread LUMP is at word 0 in A7 v1.2."""
     cfg   = _default_cfg()
-    ns    = int(cfg["step1"]["namespaceLumpWords"])    # 64
-    th    = int(cfg["step1"]["threadLumpWords"])        # 256
     total = int(cfg["step1"]["totalNamespaceWords"])
 
-    expected_phys = ns + th  # 0x0140
+    ns_table_base = total - NS_TABLE_RESERVE
 
     image = generate_boot_image(cfg, LUMPS_DIR)
     words = _parse_image(image, total)
 
-    # NS slots count DOWN from the top: slot N starts at total − (N+1)×NS_ENTRY_WORDS.
-    slot_base = total - (BOOT_ABSTR_NS_SLOT + 1) * NS_ENTRY_WORDS
-    ns_word0  = words[slot_base]   # physAddr stored in word0
+    slot1_word0 = words[ns_table_base + 1 * NS_ENTRY_WORDS]
+    assert slot1_word0 == 0, (
+        f"NS slot 1 (Thread) word0 = 0x{slot1_word0:08X}; expected 0 "
+        "(Thread LUMP is at word 0 in A7 v1.2).  "
+        "v1.1 would place Thread at ns_size (e.g. 0x0040 or 0x0400)."
+    )
+
+
+def test_boot_abstr_ns_entry_points_to_thread_size():
+    """NS entry for Boot.Abstr (slot 6) word0 must equal thread_size = 0x0100.
+
+    In A7 v1.2 Boot.Abstr starts immediately after Thread (at thread_size),
+    so the NS entry records physAddr = thread_size, not ns_size + thread_size.
+    """
+    cfg   = _default_cfg()
+    th    = int(cfg["step1"]["threadLumpWords"])   # 256
+    total = int(cfg["step1"]["totalNamespaceWords"])
+
+    expected_phys = th   # 0x0100
+
+    image = generate_boot_image(cfg, LUMPS_DIR)
+    words = _parse_image(image, total)
+
+    ns_table_base = total - NS_TABLE_RESERVE
+    slot_base     = ns_table_base + BOOT_ABSTR_NS_SLOT * NS_ENTRY_WORDS
+    ns_word0      = words[slot_base]
 
     assert ns_word0 == expected_phys, (
         f"NS slot {BOOT_ABSTR_NS_SLOT} (Boot.Abstr) word0 = 0x{ns_word0:04X}; "
-        f"expected physAddr 0x{expected_phys:04X} (= ns_size + thread_size).  "
-        "If word0 = 0x0180, the null-slot-2 gap has been reintroduced."
+        f"expected 0x{expected_phys:04X} (= thread_size in A7 v1.2).  "
+        "v1.1 would record ns_size + thread_size = 0x0140."
+    )
+
+
+def test_ns_table_at_top_not_at_zero():
+    """The NS TABLE must be at NS_TABLE_BASE (top of memory), not at word 0.
+
+    In v1.1 words [0..ns_size-1] held the NS lump. In A7 v1.2 those words hold
+    the Thread LUMP. The NS TABLE lives at NS_TABLE_BASE = total − NS_TABLE_RESERVE.
+    """
+    cfg   = _default_cfg()
+    total = int(cfg["step1"]["totalNamespaceWords"])
+
+    ns_table_base = total - NS_TABLE_RESERVE  # e.g. 0x3C00
+
+    image = generate_boot_image(cfg, LUMPS_DIR)
+    words = _parse_image(image, total)
+
+    # At the NS TABLE base, slot 0 word0 should be ns_table_base (self-ref).
+    ns_table_first_word = words[ns_table_base]
+    assert ns_table_first_word == ns_table_base, (
+        f"NS_TABLE_BASE (word 0x{ns_table_base:04X}) = 0x{ns_table_first_word:08X}; "
+        f"expected 0x{ns_table_base:08X} (NS slot 0 self-referential location).  "
+        "NS TABLE must be at the top of memory in A7 v1.2."
+    )
+
+    # Word 0 should be a LUMP header (Thread), not the NS slot 0 entry.
+    word0_magic = words[0] >> 27
+    assert word0_magic == LUMP_HEADER_MAGIC, (
+        f"Word 0x0000 = 0x{words[0]:08X}: expected Thread LUMP header (magic 0x1F) "
+        f"but got magic 0x{word0_magic:02X}.  NS TABLE must not start at word 0."
     )
 
 
@@ -288,14 +325,7 @@ def test_dynamic_pool_is_zeroed_at_boot_time():
     just before the two control words that precede the NS table
     (boot_entry_slot at ns_table_base-2, format tag at ns_table_base-1).
 
-    This test is checked for both the default config and the custom config so
-    that _compute_catalog_pool_start's formula is exercised with different
-    ns/thread sizes.
-
-    Note: the pool does NOT start at 0x0180 — that region is occupied by
-    resident service c-list lump bodies (Salvation, Navana, Mint, etc.).
-    The pool start depends on the number of non-None catalog entries and
-    their sizes.
+    Checked for both default and custom configs.
     """
     for label, cfg in [("default config", _default_cfg()),
                        ("custom config",  _custom_cfg())]:
@@ -305,9 +335,11 @@ def test_dynamic_pool_is_zeroed_at_boot_time():
 
         pool_start    = _compute_catalog_pool_start(ns, th)
         ns_table_base = total - NS_TABLE_RESERVE
-        # ns_table_base-2 = boot_entry_slot word (non-zero)
-        # ns_table_base-1 = BOOT_IMAGE_FORMAT_TAG (non-zero)
-        pool_end      = ns_table_base - 2
+        # Three non-zero control words precede the NS table (A7 v1.2):
+        #   ns_table_base-3 = stored nsCount (non-zero)
+        #   ns_table_base-2 = boot_entry_slot word (non-zero)
+        #   ns_table_base-1 = BOOT_IMAGE_FORMAT_TAG (non-zero)
+        pool_end      = ns_table_base - 3
 
         assert pool_start < pool_end, (
             f"{label}: pool_start=0x{pool_start:04X} is not before pool_end=0x{pool_end:04X}"
