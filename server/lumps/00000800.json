@@ -1,0 +1,45 @@
+{
+  "token": "00000800",
+  "abstraction": "Scheduler.IRQ",
+  "ns_slot": null,
+  "ns_slot_policy": "dynamic",
+  "lump_size": 64,
+  "cw": 1,
+  "cc": 0,
+  "profile": "system",
+  "language": "assembly",
+  "author": "Church Machine Platform",
+  "version": "2026.07.23",
+  "source": "simulator/examples/scheduler_irq.cloomc",
+  "methods": [
+    {
+      "name": "Escalate",
+      "offset": 0,
+      "length": 1,
+      "description": "Tier 2 fault escalation entry point. The CM IRQ microcode handles context save, thread sweep, and fault recovery. This RETURN is the minimal formal LUMP body; the simulator implements the logic in _fireSchedulerIRQ().",
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "capabilities": [],
+  "pet_names": {
+    "DR": {},
+    "CR": {}
+  },
+  "mtbf": {
+    "consecutive_clean": 0,
+    "total_runs": 0,
+    "status": "unknown",
+    "source_hash": ""
+  },
+  "deployment": {
+    "target_board": "ti60-f225",
+    "profile": "system",
+    "built_at": "2026-07-23T00:00:00Z",
+    "builder": "CLOOMC++ IDE v1.0"
+  },
+  "grants": [
+    "E"
+  ],
+  "lump_version": 1
+}

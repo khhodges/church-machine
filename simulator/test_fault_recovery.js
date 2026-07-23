@@ -48,6 +48,11 @@ function makeTestSim() {
     sim.nsLabels = sim.nsLabels || {};
     sim.nsLabels[8] = 'Scheduler';
     sim.nsLabels[50] = 'Scheduler.IRQ.Thread';
+    // v1.2 §4: seed irqLumpSlot=8 so lazy _preRegisterIrqLump() is bypassed.
+    // These tests set up slot 8 manually (nsLabels, NS entries, CR0 GT) and rely
+    // on dispatch going to slot 8; letting lazy registration run would overwrite
+    // their setup or pick a different slot.
+    if (sim.irqState) sim.irqState.irqLumpSlot = 8;
     return { sim, registry, sysAbs };
 }
 
