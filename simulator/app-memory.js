@@ -2541,6 +2541,7 @@ function updateNamespace() {
     html += _statChip('Lazy Load',_cntLazy,     '#f0a040', 'Slots evicted — code loads on first CALL');
     html += _statChip('Garbage',  _cntGarbage,  '#f87171', 'Cleared slots — GT cycle count bumped, content zeroed');
     html += _statChip('Free',     _cntFree,     '#6a9f6a', 'Slots available for allocation');
+    html += `<span id="nsBoltDrag" class="ns-bolt-drag" draggable="true" title="Drag \u26a1 onto any NS row to crown that abstraction as Boot.Thread.CR0 \u2014 the first abstraction invoked after boot">\u26a1 Boot entry</span>`;
     html += `<button onclick="event.stopPropagation();_nsTableSave(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save all NS table changes to the boot image — changes survive resets and reconnects">\u{1F4BE} Save NS Table</button>`;
     html += `<button onclick="event.stopPropagation();_nsTableAdd()" style="background:#1a2e1a;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Install a LUMP from the repository into the next free NS slot">+ Add LUMP</button>`;
     html += '</div>';
@@ -2587,7 +2588,7 @@ function updateNamespace() {
         const _clearBtn = (i >= 7 && i !== bootEntrySlot)
             ? `<button class="btn btn-xs" onclick="event.stopPropagation();_nsTableClear(${i})" style="background:#2e1a1a;color:#f87171;border:1px solid rgba(248,113,113,0.35);margin-right:4px;font-size:0.65rem;padding:1px 5px;" title="Clear slot — bumps the GT cycle count to revoke all existing tokens for this slot">Clear</button>`
             : '';
-        html += `<tr id="ns-row-${i}" class="ns-row ${tierClass}" style="${rowOpacity}">`;
+        html += `<tr id="ns-row-${i}" class="ns-row ${tierClass}" data-ns-slot="${i}" style="${rowOpacity}">`;
         html += `<td class="ns-idx-cell" style="white-space:nowrap;">${_clearBtn}<span class="ns-boot-btn${isBootNS ? ' boot-entry-active' : ''}" onclick="event.stopPropagation();setBootEntrySlot(${i})" title="${isBootNS ? 'Current boot entry' : 'Set as boot entry'}">${isBootNS ? '\u26a1' : i}</span></td>`;
         let nsLabelInner = e.label || '-';
         {
@@ -2681,6 +2682,39 @@ function updateNamespace() {
 
     html += '</tbody></table>';
     container.innerHTML = html;
+    _initNSBolt();
+}
+
+// ── NS table: boot-entry drag bolt ────────────────────────────────────────────
+// Wires up drag-and-drop on the ⚡ bolt in the NS table toolbar.
+// Dragging the bolt onto any NS row calls setBootEntrySlot(i), crowning that
+// abstraction as Boot.Thread.CR0 — the first abstraction invoked after boot.
+function _initNSBolt() {
+    const bolt = document.getElementById('nsBoltDrag');
+    if (!bolt) return;
+
+    bolt.addEventListener('dragstart', function(e) {
+        e.dataTransfer.setData('text/plain', 'nsBoot');
+        e.dataTransfer.effectAllowed = 'move';
+    });
+
+    document.querySelectorAll('#namespaceTable tr[data-ns-slot]').forEach(function(row) {
+        const slotIdx = parseInt(row.getAttribute('data-ns-slot'), 10);
+        row.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            row.classList.add('ns-row-drop-active');
+        });
+        row.addEventListener('dragleave', function() {
+            row.classList.remove('ns-row-drop-active');
+        });
+        row.addEventListener('drop', function(e) {
+            e.preventDefault();
+            row.classList.remove('ns-row-drop-active');
+            if (e.dataTransfer.getData('text/plain') !== 'nsBoot') return;
+            if (typeof setBootEntrySlot === 'function') setBootEntrySlot(slotIdx);
+        });
+    });
 }
 
 // ── NS table: Add LUMP ────────────────────────────────────────────────────────

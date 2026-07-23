@@ -267,6 +267,26 @@ a.next-step-link:hover {
     box-shadow: 0 0 6px rgba(251,191,36,0.4);
 }
 
+/* ── NS table: boot-entry drag bolt ─────────────────────── */
+.ns-bolt-drag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.78rem;
+    cursor: grab;
+    user-select: none;
+    color: #daa520;
+    padding: 2px 8px 2px 6px;
+    border: 1px dashed rgba(218,165,32,0.45);
+    border-radius: 4px;
+    white-space: nowrap;
+    transition: background 0.15s, box-shadow 0.15s;
+    margin-left: 4px;
+}
+.ns-bolt-drag:hover { background: rgba(218,165,32,0.14); box-shadow: 0 0 5px rgba(218,165,32,0.2); }
+.ns-bolt-drag:active { cursor: grabbing; }
+.ns-row-drop-active td { background: rgba(251,191,36,0.13) !important; outline: 1px solid rgba(251,191,36,0.45); }
+
 /* ── NS three-tier display ─────────────────────────────── */
 .ns-tier-header td {
     padding: 5px 8px 4px;
