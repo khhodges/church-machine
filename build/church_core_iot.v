@@ -416,17 +416,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire \boot_cap0_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap0_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire [6:0] \boot_cap0_wr_gt.gt_seq ;
+  wire [8:0] \boot_cap0_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [1:0] \boot_cap0_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [2:0] \boot_cap0_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [15:0] \boot_cap0_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap0_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:837" *)
   wire boot_cap10_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
@@ -436,17 +432,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire \boot_cap10_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap10_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire [6:0] \boot_cap10_wr_gt.gt_seq ;
+  wire [8:0] \boot_cap10_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [1:0] \boot_cap10_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [2:0] \boot_cap10_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [15:0] \boot_cap10_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap10_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:837" *)
   wire boot_cap11_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
@@ -456,37 +448,29 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire \boot_cap11_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap11_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire [6:0] \boot_cap11_wr_gt.gt_seq ;
+  wire [8:0] \boot_cap11_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [1:0] \boot_cap11_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [2:0] \boot_cap11_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [15:0] \boot_cap11_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap11_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:837" *)
-  wire boot_cap12_wr_en;
+  reg boot_cap12_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire [31:0] boot_cap12_wr_gt;
+  reg [31:0] boot_cap12_wr_gt;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire \boot_cap12_wr_gt.b_flag ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire \boot_cap12_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap12_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire [6:0] \boot_cap12_wr_gt.gt_seq ;
+  wire [8:0] \boot_cap12_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [1:0] \boot_cap12_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [2:0] \boot_cap12_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [15:0] \boot_cap12_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap12_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:837" *)
   wire boot_cap13_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
@@ -496,17 +480,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire \boot_cap13_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap13_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire [6:0] \boot_cap13_wr_gt.gt_seq ;
+  wire [8:0] \boot_cap13_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [1:0] \boot_cap13_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [2:0] \boot_cap13_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [15:0] \boot_cap13_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap13_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:837" *)
   reg boot_cap14_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
@@ -516,17 +496,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire \boot_cap14_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap14_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire [6:0] \boot_cap14_wr_gt.gt_seq ;
+  wire [8:0] \boot_cap14_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [1:0] \boot_cap14_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [2:0] \boot_cap14_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [15:0] \boot_cap14_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap14_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:837" *)
   wire boot_cap15_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
@@ -536,17 +512,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire \boot_cap15_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap15_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire [6:0] \boot_cap15_wr_gt.gt_seq ;
+  wire [8:0] \boot_cap15_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [1:0] \boot_cap15_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [2:0] \boot_cap15_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [15:0] \boot_cap15_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap15_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:837" *)
   wire boot_cap1_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
@@ -556,17 +528,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire \boot_cap1_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap1_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire [6:0] \boot_cap1_wr_gt.gt_seq ;
+  wire [8:0] \boot_cap1_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [1:0] \boot_cap1_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [2:0] \boot_cap1_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [15:0] \boot_cap1_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap1_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:837" *)
   wire boot_cap2_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
@@ -576,17 +544,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire \boot_cap2_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap2_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire [6:0] \boot_cap2_wr_gt.gt_seq ;
+  wire [8:0] \boot_cap2_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [1:0] \boot_cap2_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [2:0] \boot_cap2_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [15:0] \boot_cap2_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap2_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:837" *)
   wire boot_cap3_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
@@ -596,17 +560,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire \boot_cap3_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap3_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire [6:0] \boot_cap3_wr_gt.gt_seq ;
+  wire [8:0] \boot_cap3_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [1:0] \boot_cap3_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [2:0] \boot_cap3_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [15:0] \boot_cap3_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap3_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:837" *)
   wire boot_cap4_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
@@ -616,17 +576,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire \boot_cap4_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap4_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire [6:0] \boot_cap4_wr_gt.gt_seq ;
+  wire [8:0] \boot_cap4_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [1:0] \boot_cap4_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [2:0] \boot_cap4_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [15:0] \boot_cap4_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap4_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:837" *)
   wire boot_cap5_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
@@ -636,17 +592,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire \boot_cap5_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap5_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire [6:0] \boot_cap5_wr_gt.gt_seq ;
+  wire [8:0] \boot_cap5_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [1:0] \boot_cap5_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [2:0] \boot_cap5_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [15:0] \boot_cap5_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap5_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:837" *)
   wire boot_cap6_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
@@ -656,17 +608,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire \boot_cap6_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap6_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire [6:0] \boot_cap6_wr_gt.gt_seq ;
+  wire [8:0] \boot_cap6_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [1:0] \boot_cap6_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [2:0] \boot_cap6_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [15:0] \boot_cap6_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap6_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:837" *)
   wire boot_cap7_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
@@ -676,37 +624,29 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire \boot_cap7_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap7_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire [6:0] \boot_cap7_wr_gt.gt_seq ;
+  wire [8:0] \boot_cap7_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [1:0] \boot_cap7_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [2:0] \boot_cap7_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [15:0] \boot_cap7_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap7_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:837" *)
-  reg boot_cap8_wr_en;
+  wire boot_cap8_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  reg [31:0] boot_cap8_wr_gt;
+  wire [31:0] boot_cap8_wr_gt;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire \boot_cap8_wr_gt.b_flag ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire \boot_cap8_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap8_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire [6:0] \boot_cap8_wr_gt.gt_seq ;
+  wire [8:0] \boot_cap8_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [1:0] \boot_cap8_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [2:0] \boot_cap8_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [15:0] \boot_cap8_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap8_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:837" *)
   wire boot_cap9_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
@@ -716,17 +656,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire \boot_cap9_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap9_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire [6:0] \boot_cap9_wr_gt.gt_seq ;
+  wire [8:0] \boot_cap9_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [1:0] \boot_cap9_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [2:0] \boot_cap9_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:838" *)
   wire [15:0] \boot_cap9_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:838" *)
-  wire \boot_cap9_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:631" *)
   reg [3:0] boot_cap_wr_addr;
   (* src = "/home/runner/workspace/hardware/core.py:632" *)
@@ -738,17 +674,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:632" *)
   wire \boot_cap_wr_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:632" *)
-  wire \boot_cap_wr_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:632" *)
-  wire [6:0] \boot_cap_wr_data.word0_gt.gt_seq ;
+  wire [8:0] \boot_cap_wr_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:632" *)
   wire [1:0] \boot_cap_wr_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:632" *)
   wire [2:0] \boot_cap_wr_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:632" *)
   wire [15:0] \boot_cap_wr_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:632" *)
-  wire \boot_cap_wr_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:632" *)
   wire [31:0] \boot_cap_wr_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/core.py:632" *)
@@ -826,17 +758,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:73" *)
   wire \clist_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:73" *)
-  wire \clist_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:73" *)
-  wire [6:0] \clist_wr_data.gt_seq ;
+  wire [8:0] \clist_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:73" *)
   wire [1:0] \clist_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:73" *)
   wire [2:0] \clist_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:73" *)
   wire [15:0] \clist_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:73" *)
-  wire \clist_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:74" *)
   reg clist_wr_en;
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
@@ -874,17 +802,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr0_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr0_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr0_gt_wr_data.gt_seq ;
+  wire [8:0] \cr0_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr0_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr0_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr0_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr0_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   wire cr0_gt_wr_en;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
@@ -894,17 +818,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr10_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr10_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr10_gt_wr_data.gt_seq ;
+  wire [8:0] \cr10_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr10_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr10_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr10_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr10_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   wire cr10_gt_wr_en;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
@@ -914,17 +834,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr11_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr11_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr11_gt_wr_data.gt_seq ;
+  wire [8:0] \cr11_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr11_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr11_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr11_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr11_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   wire cr11_gt_wr_en;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
@@ -934,17 +850,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr12_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr12_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr12_gt_wr_data.gt_seq ;
+  wire [8:0] \cr12_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr12_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr12_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr12_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr12_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   wire cr12_gt_wr_en;
   (* src = "/home/runner/workspace/hardware/call.py:74" *)
@@ -958,17 +870,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:38" *)
   wire \cr12_thread$299.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:38" *)
-  wire \cr12_thread$299.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:38" *)
-  wire [6:0] \cr12_thread$299.word0_gt.gt_seq ;
+  wire [8:0] \cr12_thread$299.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:38" *)
   wire [1:0] \cr12_thread$299.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:38" *)
   wire [2:0] \cr12_thread$299.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:38" *)
   wire [15:0] \cr12_thread$299.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:38" *)
-  wire \cr12_thread$299.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:38" *)
   wire [31:0] \cr12_thread$299.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:38" *)
@@ -982,17 +890,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/ret.py:47" *)
   wire \cr12_thread$315.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/ret.py:47" *)
-  wire \cr12_thread$315.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/ret.py:47" *)
-  wire [6:0] \cr12_thread$315.word0_gt.gt_seq ;
+  wire [8:0] \cr12_thread$315.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/ret.py:47" *)
   wire [1:0] \cr12_thread$315.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/ret.py:47" *)
   wire [2:0] \cr12_thread$315.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/ret.py:47" *)
   wire [15:0] \cr12_thread$315.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/ret.py:47" *)
-  wire \cr12_thread$315.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/ret.py:47" *)
   wire [31:0] \cr12_thread$315.word1_location ;
   (* src = "/home/runner/workspace/hardware/ret.py:47" *)
@@ -1004,17 +908,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/call.py:74" *)
   wire \cr12_thread.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/call.py:74" *)
-  wire \cr12_thread.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/call.py:74" *)
-  wire [6:0] \cr12_thread.word0_gt.gt_seq ;
+  wire [8:0] \cr12_thread.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/call.py:74" *)
   wire [1:0] \cr12_thread.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/call.py:74" *)
   wire [2:0] \cr12_thread.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/call.py:74" *)
   wire [15:0] \cr12_thread.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/call.py:74" *)
-  wire \cr12_thread.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/call.py:74" *)
   wire [31:0] \cr12_thread.word1_location ;
   (* src = "/home/runner/workspace/hardware/call.py:74" *)
@@ -1026,17 +926,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr13_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr13_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr13_gt_wr_data.gt_seq ;
+  wire [8:0] \cr13_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr13_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr13_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr13_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr13_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   wire cr13_gt_wr_en;
   (* src = "/home/runner/workspace/hardware/call.py:60" *)
@@ -1050,17 +946,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:40" *)
   wire \cr14_code$291.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:40" *)
-  wire \cr14_code$291.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:40" *)
-  wire [6:0] \cr14_code$291.word0_gt.gt_seq ;
+  wire [8:0] \cr14_code$291.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:40" *)
   wire [1:0] \cr14_code$291.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:40" *)
   wire [2:0] \cr14_code$291.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:40" *)
   wire [15:0] \cr14_code$291.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:40" *)
-  wire \cr14_code$291.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:40" *)
   wire [31:0] \cr14_code$291.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:40" *)
@@ -1072,17 +964,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/call.py:60" *)
   wire \cr14_code.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/call.py:60" *)
-  wire \cr14_code.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/call.py:60" *)
-  wire [6:0] \cr14_code.word0_gt.gt_seq ;
+  wire [8:0] \cr14_code.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/call.py:60" *)
   wire [1:0] \cr14_code.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/call.py:60" *)
   wire [2:0] \cr14_code.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/call.py:60" *)
   wire [15:0] \cr14_code.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/call.py:60" *)
-  wire \cr14_code.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/call.py:60" *)
   wire [31:0] \cr14_code.word1_location ;
   (* src = "/home/runner/workspace/hardware/call.py:60" *)
@@ -1094,17 +982,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:888" *)
   wire \cr14_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:888" *)
-  wire \cr14_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:888" *)
-  wire [6:0] \cr14_gt.gt_seq ;
+  wire [8:0] \cr14_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:888" *)
   wire [1:0] \cr14_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:888" *)
   wire [2:0] \cr14_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:888" *)
   wire [15:0] \cr14_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:888" *)
-  wire \cr14_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [31:0] cr14_gt_wr_data;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
@@ -1112,17 +996,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr14_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr14_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr14_gt_wr_data.gt_seq ;
+  wire [8:0] \cr14_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr14_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr14_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr14_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr14_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   wire cr14_gt_wr_en;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
@@ -1132,17 +1012,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr15_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr15_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr15_gt_wr_data.gt_seq ;
+  wire [8:0] \cr15_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr15_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr15_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr15_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr15_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   wire cr15_gt_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:156" *)
@@ -1166,17 +1042,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/call.py:57" *)
   wire \cr15_namespace$289.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/call.py:57" *)
-  wire \cr15_namespace$289.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/call.py:57" *)
-  wire [6:0] \cr15_namespace$289.word0_gt.gt_seq ;
+  wire [8:0] \cr15_namespace$289.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/call.py:57" *)
   wire [1:0] \cr15_namespace$289.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/call.py:57" *)
   wire [2:0] \cr15_namespace$289.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/call.py:57" *)
   wire [15:0] \cr15_namespace$289.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/call.py:57" *)
-  wire \cr15_namespace$289.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/call.py:57" *)
   wire [31:0] \cr15_namespace$289.word1_location ;
   (* src = "/home/runner/workspace/hardware/call.py:57" *)
@@ -1190,17 +1062,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/cload.py:63" *)
   wire \cr15_namespace$321.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/cload.py:63" *)
-  wire \cr15_namespace$321.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/cload.py:63" *)
-  wire [6:0] \cr15_namespace$321.word0_gt.gt_seq ;
+  wire [8:0] \cr15_namespace$321.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/cload.py:63" *)
   wire [1:0] \cr15_namespace$321.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/cload.py:63" *)
   wire [2:0] \cr15_namespace$321.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/cload.py:63" *)
   wire [15:0] \cr15_namespace$321.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/cload.py:63" *)
-  wire \cr15_namespace$321.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/cload.py:63" *)
   wire [31:0] \cr15_namespace$321.word1_location ;
   (* src = "/home/runner/workspace/hardware/cload.py:63" *)
@@ -1214,17 +1082,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/save.py:33" *)
   wire \cr15_namespace$339.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/save.py:33" *)
-  wire \cr15_namespace$339.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/save.py:33" *)
-  wire [6:0] \cr15_namespace$339.word0_gt.gt_seq ;
+  wire [8:0] \cr15_namespace$339.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/save.py:33" *)
   wire [1:0] \cr15_namespace$339.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/save.py:33" *)
   wire [2:0] \cr15_namespace$339.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/save.py:33" *)
   wire [15:0] \cr15_namespace$339.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/save.py:33" *)
-  wire \cr15_namespace$339.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/save.py:33" *)
   wire [31:0] \cr15_namespace$339.word1_location ;
   (* src = "/home/runner/workspace/hardware/save.py:33" *)
@@ -1238,17 +1102,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/mload.py:56" *)
   wire \cr15_namespace$542.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/mload.py:56" *)
-  wire \cr15_namespace$542.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/mload.py:56" *)
-  wire [6:0] \cr15_namespace$542.word0_gt.gt_seq ;
+  wire [8:0] \cr15_namespace$542.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/mload.py:56" *)
   wire [1:0] \cr15_namespace$542.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/mload.py:56" *)
   wire [2:0] \cr15_namespace$542.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/mload.py:56" *)
   wire [15:0] \cr15_namespace$542.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/mload.py:56" *)
-  wire \cr15_namespace$542.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/mload.py:56" *)
   wire [31:0] \cr15_namespace$542.word1_location ;
   (* src = "/home/runner/workspace/hardware/mload.py:56" *)
@@ -1260,17 +1120,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:41" *)
   wire \cr15_namespace.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:41" *)
-  wire \cr15_namespace.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:41" *)
-  wire [6:0] \cr15_namespace.word0_gt.gt_seq ;
+  wire [8:0] \cr15_namespace.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:41" *)
   wire [1:0] \cr15_namespace.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:41" *)
   wire [2:0] \cr15_namespace.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:41" *)
   wire [15:0] \cr15_namespace.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:41" *)
-  wire \cr15_namespace.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:41" *)
   wire [31:0] \cr15_namespace.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:41" *)
@@ -1282,17 +1138,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr1_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr1_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr1_gt_wr_data.gt_seq ;
+  wire [8:0] \cr1_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr1_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr1_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr1_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr1_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   wire cr1_gt_wr_en;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
@@ -1302,17 +1154,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr2_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr2_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr2_gt_wr_data.gt_seq ;
+  wire [8:0] \cr2_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr2_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr2_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr2_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr2_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   wire cr2_gt_wr_en;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
@@ -1322,17 +1170,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr3_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr3_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr3_gt_wr_data.gt_seq ;
+  wire [8:0] \cr3_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr3_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr3_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr3_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr3_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   wire cr3_gt_wr_en;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
@@ -1342,17 +1186,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr4_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr4_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr4_gt_wr_data.gt_seq ;
+  wire [8:0] \cr4_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr4_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr4_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr4_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr4_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   wire cr4_gt_wr_en;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
@@ -1362,17 +1202,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr5_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr5_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr5_gt_wr_data.gt_seq ;
+  wire [8:0] \cr5_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr5_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr5_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr5_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr5_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   wire cr5_gt_wr_en;
   (* src = "/home/runner/workspace/hardware/call.py:64" *)
@@ -1386,17 +1222,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:36" *)
   wire \cr5_heap$296.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:36" *)
-  wire \cr5_heap$296.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:36" *)
-  wire [6:0] \cr5_heap$296.word0_gt.gt_seq ;
+  wire [8:0] \cr5_heap$296.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:36" *)
   wire [1:0] \cr5_heap$296.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:36" *)
   wire [2:0] \cr5_heap$296.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:36" *)
   wire [15:0] \cr5_heap$296.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:36" *)
-  wire \cr5_heap$296.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:36" *)
   wire [31:0] \cr5_heap$296.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:36" *)
@@ -1410,17 +1242,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/ret.py:46" *)
   wire \cr5_heap$314.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/ret.py:46" *)
-  wire \cr5_heap$314.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/ret.py:46" *)
-  wire [6:0] \cr5_heap$314.word0_gt.gt_seq ;
+  wire [8:0] \cr5_heap$314.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/ret.py:46" *)
   wire [1:0] \cr5_heap$314.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/ret.py:46" *)
   wire [2:0] \cr5_heap$314.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/ret.py:46" *)
   wire [15:0] \cr5_heap$314.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/ret.py:46" *)
-  wire \cr5_heap$314.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/ret.py:46" *)
   wire [31:0] \cr5_heap$314.word1_location ;
   (* src = "/home/runner/workspace/hardware/ret.py:46" *)
@@ -1432,17 +1260,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/call.py:64" *)
   wire \cr5_heap.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/call.py:64" *)
-  wire \cr5_heap.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/call.py:64" *)
-  wire [6:0] \cr5_heap.word0_gt.gt_seq ;
+  wire [8:0] \cr5_heap.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/call.py:64" *)
   wire [1:0] \cr5_heap.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/call.py:64" *)
   wire [2:0] \cr5_heap.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/call.py:64" *)
   wire [15:0] \cr5_heap.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/call.py:64" *)
-  wire \cr5_heap.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/call.py:64" *)
   wire [31:0] \cr5_heap.word1_location ;
   (* src = "/home/runner/workspace/hardware/call.py:64" *)
@@ -1454,17 +1278,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr6_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr6_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr6_gt_wr_data.gt_seq ;
+  wire [8:0] \cr6_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr6_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr6_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr6_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr6_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   wire cr6_gt_wr_en;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
@@ -1474,17 +1294,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr7_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr7_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr7_gt_wr_data.gt_seq ;
+  wire [8:0] \cr7_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr7_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr7_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr7_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr7_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   wire cr7_gt_wr_en;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
@@ -1494,17 +1310,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr8_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr8_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr8_gt_wr_data.gt_seq ;
+  wire [8:0] \cr8_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr8_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr8_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr8_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr8_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   wire cr8_gt_wr_en;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
@@ -1514,17 +1326,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr9_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr9_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr9_gt_wr_data.gt_seq ;
+  wire [8:0] \cr9_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr9_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr9_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr9_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr9_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   wire cr9_gt_wr_en;
   (* src = "/home/runner/workspace/hardware/registers.py:64" *)
@@ -1568,17 +1376,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/call.py:25" *)
   wire \cr_rd_data$288.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/call.py:25" *)
-  wire \cr_rd_data$288.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/call.py:25" *)
-  wire [6:0] \cr_rd_data$288.word0_gt.gt_seq ;
+  wire [8:0] \cr_rd_data$288.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/call.py:25" *)
   wire [1:0] \cr_rd_data$288.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/call.py:25" *)
   wire [2:0] \cr_rd_data$288.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/call.py:25" *)
   wire [15:0] \cr_rd_data$288.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/call.py:25" *)
-  wire \cr_rd_data$288.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/call.py:25" *)
   wire [31:0] \cr_rd_data$288.word1_location ;
   (* src = "/home/runner/workspace/hardware/call.py:25" *)
@@ -1592,17 +1396,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/ret.py:22" *)
   wire \cr_rd_data$309.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/ret.py:22" *)
-  wire \cr_rd_data$309.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/ret.py:22" *)
-  wire [6:0] \cr_rd_data$309.word0_gt.gt_seq ;
+  wire [8:0] \cr_rd_data$309.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/ret.py:22" *)
   wire [1:0] \cr_rd_data$309.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/ret.py:22" *)
   wire [2:0] \cr_rd_data$309.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/ret.py:22" *)
   wire [15:0] \cr_rd_data$309.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/ret.py:22" *)
-  wire \cr_rd_data$309.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/ret.py:22" *)
   wire [31:0] \cr_rd_data$309.word1_location ;
   (* src = "/home/runner/workspace/hardware/ret.py:22" *)
@@ -1616,17 +1416,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/tperm.py:34" *)
   wire \cr_rd_data$330.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/tperm.py:34" *)
-  wire \cr_rd_data$330.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/tperm.py:34" *)
-  wire [6:0] \cr_rd_data$330.word0_gt.gt_seq ;
+  wire [8:0] \cr_rd_data$330.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/tperm.py:34" *)
   wire [1:0] \cr_rd_data$330.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/tperm.py:34" *)
   wire [2:0] \cr_rd_data$330.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/tperm.py:34" *)
   wire [15:0] \cr_rd_data$330.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/tperm.py:34" *)
-  wire \cr_rd_data$330.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/tperm.py:34" *)
   wire [31:0] \cr_rd_data$330.word1_location ;
   (* src = "/home/runner/workspace/hardware/tperm.py:34" *)
@@ -1640,17 +1436,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/save.py:21" *)
   wire \cr_rd_data$338.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/save.py:21" *)
-  wire \cr_rd_data$338.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/save.py:21" *)
-  wire [6:0] \cr_rd_data$338.word0_gt.gt_seq ;
+  wire [8:0] \cr_rd_data$338.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/save.py:21" *)
   wire [1:0] \cr_rd_data$338.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/save.py:21" *)
   wire [2:0] \cr_rd_data$338.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/save.py:21" *)
   wire [15:0] \cr_rd_data$338.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/save.py:21" *)
-  wire \cr_rd_data$338.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/save.py:21" *)
   wire [31:0] \cr_rd_data$338.word1_location ;
   (* src = "/home/runner/workspace/hardware/save.py:21" *)
@@ -1664,17 +1456,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/dread.py:49" *)
   wire \cr_rd_data$350.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/dread.py:49" *)
-  wire \cr_rd_data$350.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/dread.py:49" *)
-  wire [6:0] \cr_rd_data$350.word0_gt.gt_seq ;
+  wire [8:0] \cr_rd_data$350.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/dread.py:49" *)
   wire [1:0] \cr_rd_data$350.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/dread.py:49" *)
   wire [2:0] \cr_rd_data$350.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/dread.py:49" *)
   wire [15:0] \cr_rd_data$350.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/dread.py:49" *)
-  wire \cr_rd_data$350.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/dread.py:49" *)
   wire [31:0] \cr_rd_data$350.word1_location ;
   (* src = "/home/runner/workspace/hardware/dread.py:49" *)
@@ -1688,17 +1476,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/dwrite.py:48" *)
   wire \cr_rd_data$360.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/dwrite.py:48" *)
-  wire \cr_rd_data$360.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/dwrite.py:48" *)
-  wire [6:0] \cr_rd_data$360.word0_gt.gt_seq ;
+  wire [8:0] \cr_rd_data$360.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/dwrite.py:48" *)
   wire [1:0] \cr_rd_data$360.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/dwrite.py:48" *)
   wire [2:0] \cr_rd_data$360.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/dwrite.py:48" *)
   wire [15:0] \cr_rd_data$360.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/dwrite.py:48" *)
-  wire \cr_rd_data$360.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/dwrite.py:48" *)
   wire [31:0] \cr_rd_data$360.word1_location ;
   (* src = "/home/runner/workspace/hardware/dwrite.py:48" *)
@@ -1712,17 +1496,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/mload.py:50" *)
   wire \cr_rd_data$541.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/mload.py:50" *)
-  wire \cr_rd_data$541.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/mload.py:50" *)
-  wire [6:0] \cr_rd_data$541.word0_gt.gt_seq ;
+  wire [8:0] \cr_rd_data$541.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/mload.py:50" *)
   wire [1:0] \cr_rd_data$541.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/mload.py:50" *)
   wire [2:0] \cr_rd_data$541.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/mload.py:50" *)
   wire [15:0] \cr_rd_data$541.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/mload.py:50" *)
-  wire \cr_rd_data$541.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/mload.py:50" *)
   wire [31:0] \cr_rd_data$541.word1_location ;
   (* src = "/home/runner/workspace/hardware/mload.py:50" *)
@@ -1734,17 +1514,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:21" *)
   wire \cr_rd_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:21" *)
-  wire \cr_rd_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:21" *)
-  wire [6:0] \cr_rd_data.word0_gt.gt_seq ;
+  wire [8:0] \cr_rd_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:21" *)
   wire [1:0] \cr_rd_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:21" *)
   wire [2:0] \cr_rd_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:21" *)
   wire [15:0] \cr_rd_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:21" *)
-  wire \cr_rd_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:21" *)
   wire [31:0] \cr_rd_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:21" *)
@@ -1756,17 +1532,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:481" *)
   wire \cr_rd_data_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:481" *)
-  wire \cr_rd_data_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:481" *)
-  wire [6:0] \cr_rd_data_gt.gt_seq ;
+  wire [8:0] \cr_rd_data_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:481" *)
   wire [1:0] \cr_rd_data_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:481" *)
   wire [2:0] \cr_rd_data_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:481" *)
   wire [15:0] \cr_rd_data_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:481" *)
-  wire \cr_rd_data_gt.spare ;
   (* src = "/home/runner/workspace/hardware/decoder.py:52" *)
   wire [3:0] cr_src;
   (* src = "/home/runner/workspace/hardware/call.py:14" *)
@@ -1810,17 +1582,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/cload.py:66" *)
   wire \cr_wr_data$134.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/cload.py:66" *)
-  wire \cr_wr_data$134.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/cload.py:66" *)
-  wire [6:0] \cr_wr_data$134.word0_gt.gt_seq ;
+  wire [8:0] \cr_wr_data$134.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/cload.py:66" *)
   wire [1:0] \cr_wr_data$134.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/cload.py:66" *)
   wire [2:0] \cr_wr_data$134.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/cload.py:66" *)
   wire [15:0] \cr_wr_data$134.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/cload.py:66" *)
-  wire \cr_wr_data$134.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/cload.py:66" *)
   wire [31:0] \cr_wr_data$134.word1_location ;
   (* src = "/home/runner/workspace/hardware/cload.py:66" *)
@@ -1834,17 +1602,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/church_outform.py:41" *)
   wire \cr_wr_data$135.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:41" *)
-  wire \cr_wr_data$135.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/church_outform.py:41" *)
-  wire [6:0] \cr_wr_data$135.word0_gt.gt_seq ;
+  wire [8:0] \cr_wr_data$135.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:41" *)
   wire [1:0] \cr_wr_data$135.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:41" *)
   wire [2:0] \cr_wr_data$135.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:41" *)
   wire [15:0] \cr_wr_data$135.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/church_outform.py:41" *)
-  wire \cr_wr_data$135.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:41" *)
   wire [31:0] \cr_wr_data$135.word1_location ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:41" *)
@@ -1858,17 +1622,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/ret.py:24" *)
   wire \cr_wr_data$137.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/ret.py:24" *)
-  wire \cr_wr_data$137.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/ret.py:24" *)
-  wire [6:0] \cr_wr_data$137.word0_gt.gt_seq ;
+  wire [8:0] \cr_wr_data$137.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/ret.py:24" *)
   wire [1:0] \cr_wr_data$137.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/ret.py:24" *)
   wire [2:0] \cr_wr_data$137.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/ret.py:24" *)
   wire [15:0] \cr_wr_data$137.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/ret.py:24" *)
-  wire \cr_wr_data$137.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/ret.py:24" *)
   wire [31:0] \cr_wr_data$137.word1_location ;
   (* src = "/home/runner/workspace/hardware/ret.py:24" *)
@@ -1882,17 +1642,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/call.py:27" *)
   wire \cr_wr_data$138.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/call.py:27" *)
-  wire \cr_wr_data$138.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/call.py:27" *)
-  wire [6:0] \cr_wr_data$138.word0_gt.gt_seq ;
+  wire [8:0] \cr_wr_data$138.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/call.py:27" *)
   wire [1:0] \cr_wr_data$138.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/call.py:27" *)
   wire [2:0] \cr_wr_data$138.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/call.py:27" *)
   wire [15:0] \cr_wr_data$138.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/call.py:27" *)
-  wire \cr_wr_data$138.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/call.py:27" *)
   wire [31:0] \cr_wr_data$138.word1_location ;
   (* src = "/home/runner/workspace/hardware/call.py:27" *)
@@ -1906,17 +1662,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/tperm.py:37" *)
   wire \cr_wr_data$139.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/tperm.py:37" *)
-  wire \cr_wr_data$139.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/tperm.py:37" *)
-  wire [6:0] \cr_wr_data$139.word0_gt.gt_seq ;
+  wire [8:0] \cr_wr_data$139.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/tperm.py:37" *)
   wire [1:0] \cr_wr_data$139.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/tperm.py:37" *)
   wire [2:0] \cr_wr_data$139.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/tperm.py:37" *)
   wire [15:0] \cr_wr_data$139.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/tperm.py:37" *)
-  wire \cr_wr_data$139.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/tperm.py:37" *)
   wire [31:0] \cr_wr_data$139.word1_location ;
   (* src = "/home/runner/workspace/hardware/tperm.py:37" *)
@@ -1930,17 +1682,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/mload.py:53" *)
   wire \cr_wr_data$140.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/mload.py:53" *)
-  wire \cr_wr_data$140.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/mload.py:53" *)
-  wire [6:0] \cr_wr_data$140.word0_gt.gt_seq ;
+  wire [8:0] \cr_wr_data$140.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/mload.py:53" *)
   wire [1:0] \cr_wr_data$140.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/mload.py:53" *)
   wire [2:0] \cr_wr_data$140.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/mload.py:53" *)
   wire [15:0] \cr_wr_data$140.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/mload.py:53" *)
-  wire \cr_wr_data$140.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/mload.py:53" *)
   wire [31:0] \cr_wr_data$140.word1_location ;
   (* src = "/home/runner/workspace/hardware/mload.py:53" *)
@@ -1952,17 +1700,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/registers.py:24" *)
   wire \cr_wr_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:24" *)
-  wire \cr_wr_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:24" *)
-  wire [6:0] \cr_wr_data.word0_gt.gt_seq ;
+  wire [8:0] \cr_wr_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:24" *)
   wire [1:0] \cr_wr_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:24" *)
   wire [2:0] \cr_wr_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:24" *)
   wire [15:0] \cr_wr_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:24" *)
-  wire \cr_wr_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:24" *)
   wire [31:0] \cr_wr_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:24" *)
@@ -1994,17 +1738,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:128" *)
   wire \dbg_cr_wr_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:128" *)
-  wire \dbg_cr_wr_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:128" *)
-  wire [6:0] \dbg_cr_wr_data.word0_gt.gt_seq ;
+  wire [8:0] \dbg_cr_wr_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:128" *)
   wire [1:0] \dbg_cr_wr_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:128" *)
   wire [2:0] \dbg_cr_wr_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:128" *)
   wire [15:0] \dbg_cr_wr_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:128" *)
-  wire \dbg_cr_wr_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:128" *)
   wire [31:0] \dbg_cr_wr_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/core.py:128" *)
@@ -2116,14 +1856,14 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:92" *)
   reg [31:0] fault_instr = 32'd0;
   (* init = 32'd0 *)
-  (* src = "/home/runner/workspace/hardware/core.py:2224" *)
+  (* src = "/home/runner/workspace/hardware/core.py:2227" *)
   wire [31:0] fault_instr_latch;
   (* src = "/home/runner/workspace/hardware/core.py:94" *)
   reg [3:0] fault_stage = 4'h0;
   (* init = 4'h0 *)
-  (* src = "/home/runner/workspace/hardware/core.py:2225" *)
+  (* src = "/home/runner/workspace/hardware/core.py:2228" *)
   wire [3:0] fault_stage_latch;
-  (* src = "/home/runner/workspace/hardware/core.py:2200" *)
+  (* src = "/home/runner/workspace/hardware/core.py:2203" *)
   reg [3:0] fault_stage_w;
   (* src = "/home/runner/workspace/hardware/perm_check.py:55" *)
   wire [3:0] fault_type;
@@ -2218,17 +1958,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/perm_check.py:34" *)
   wire \gt_in.dom ;
   (* src = "/home/runner/workspace/hardware/perm_check.py:34" *)
-  wire \gt_in.f_flag ;
-  (* src = "/home/runner/workspace/hardware/perm_check.py:34" *)
-  wire [6:0] \gt_in.gt_seq ;
+  wire [8:0] \gt_in.gt_seq ;
   (* src = "/home/runner/workspace/hardware/perm_check.py:34" *)
   wire [1:0] \gt_in.gt_type ;
   (* src = "/home/runner/workspace/hardware/perm_check.py:34" *)
   wire [2:0] \gt_in.perm ;
   (* src = "/home/runner/workspace/hardware/perm_check.py:34" *)
   wire [15:0] \gt_in.slot_id ;
-  (* src = "/home/runner/workspace/hardware/perm_check.py:34" *)
-  wire \gt_in.spare ;
   (* src = "/home/runner/workspace/hardware/outform_iot.py:41" *)
   wire [31:0] gt_raw;
   (* src = "/home/runner/workspace/hardware/core.py:86" *)
@@ -2601,9 +2337,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:320" *)
   wire \mwin_cr_wr_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:320" *)
-  wire \mwin_cr_wr_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:320" *)
-  wire [6:0] \mwin_cr_wr_data.word0_gt.gt_seq ;
+  wire [8:0] \mwin_cr_wr_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:320" *)
   wire [1:0] \mwin_cr_wr_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:320" *)
@@ -2611,15 +2345,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:320" *)
   wire [15:0] \mwin_cr_wr_data.word0_gt.slot_id ;
   (* src = "/home/runner/workspace/hardware/core.py:320" *)
-  wire \mwin_cr_wr_data.word0_gt.spare ;
-  (* src = "/home/runner/workspace/hardware/core.py:320" *)
   wire [31:0] \mwin_cr_wr_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/core.py:320" *)
   wire [31:0] \mwin_cr_wr_data.word2_w2 ;
   (* src = "/home/runner/workspace/hardware/core.py:319" *)
   reg mwin_cr_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:2049" *)
-  wire [6:0] mwin_dr11_gt_seq;
+  wire [8:0] mwin_dr11_gt_seq;
   (* src = "/home/runner/workspace/hardware/core.py:2030" *)
   reg [31:0] mwin_dr11_lat = 32'd0;
   (* src = "/home/runner/workspace/hardware/core.py:2038" *)
@@ -2627,7 +2359,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:2031" *)
   reg [31:0] mwin_dr12_lat = 32'd0;
   (* src = "/home/runner/workspace/hardware/core.py:2050" *)
-  wire [6:0] mwin_dr13_gt_seq;
+  wire [8:0] mwin_dr13_gt_seq;
   (* src = "/home/runner/workspace/hardware/core.py:2032" *)
   reg [31:0] mwin_dr13_lat = 32'd0;
   (* src = "/home/runner/workspace/hardware/core.py:2033" *)
@@ -2682,7 +2414,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   output ns_rd_en;
   reg ns_rd_en;
   (* src = "/home/runner/workspace/hardware/core.py:67" *)
-  reg [95:0] ns_wr_data;
+  reg [127:0] ns_wr_data;
   (* src = "/home/runner/workspace/hardware/core.py:68" *)
   output ns_wr_en;
   reg ns_wr_en;
@@ -2757,17 +2489,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:415" *)
   wire \perm_gt_sig.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:415" *)
-  wire \perm_gt_sig.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:415" *)
-  wire [6:0] \perm_gt_sig.gt_seq ;
+  wire [8:0] \perm_gt_sig.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:415" *)
   wire [1:0] \perm_gt_sig.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:415" *)
   wire [2:0] \perm_gt_sig.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:415" *)
   wire [15:0] \perm_gt_sig.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:415" *)
-  wire \perm_gt_sig.spare ;
   (* src = "/home/runner/workspace/hardware/tperm.py:13" *)
   wire [3:0] preset;
   (* src = "/home/runner/workspace/hardware/ret.py:19" *)
@@ -2796,17 +2524,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire \rt_cap0_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap0_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire [6:0] \rt_cap0_wr_gt.gt_seq ;
+  wire [8:0] \rt_cap0_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [1:0] \rt_cap0_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [2:0] \rt_cap0_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [15:0] \rt_cap0_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap0_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:908" *)
   wire rt_cap10_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
@@ -2816,17 +2540,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire \rt_cap10_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap10_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire [6:0] \rt_cap10_wr_gt.gt_seq ;
+  wire [8:0] \rt_cap10_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [1:0] \rt_cap10_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [2:0] \rt_cap10_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [15:0] \rt_cap10_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap10_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:908" *)
   wire rt_cap11_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
@@ -2836,17 +2556,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire \rt_cap11_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap11_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire [6:0] \rt_cap11_wr_gt.gt_seq ;
+  wire [8:0] \rt_cap11_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [1:0] \rt_cap11_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [2:0] \rt_cap11_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [15:0] \rt_cap11_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap11_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:908" *)
   wire rt_cap12_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
@@ -2856,17 +2572,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire \rt_cap12_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap12_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire [6:0] \rt_cap12_wr_gt.gt_seq ;
+  wire [8:0] \rt_cap12_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [1:0] \rt_cap12_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [2:0] \rt_cap12_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [15:0] \rt_cap12_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap12_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:908" *)
   wire rt_cap13_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
@@ -2876,17 +2588,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire \rt_cap13_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap13_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire [6:0] \rt_cap13_wr_gt.gt_seq ;
+  wire [8:0] \rt_cap13_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [1:0] \rt_cap13_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [2:0] \rt_cap13_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [15:0] \rt_cap13_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap13_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:908" *)
   wire rt_cap14_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
@@ -2896,17 +2604,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire \rt_cap14_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap14_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire [6:0] \rt_cap14_wr_gt.gt_seq ;
+  wire [8:0] \rt_cap14_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [1:0] \rt_cap14_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [2:0] \rt_cap14_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [15:0] \rt_cap14_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap14_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:908" *)
   wire rt_cap15_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
@@ -2916,17 +2620,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire \rt_cap15_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap15_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire [6:0] \rt_cap15_wr_gt.gt_seq ;
+  wire [8:0] \rt_cap15_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [1:0] \rt_cap15_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [2:0] \rt_cap15_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [15:0] \rt_cap15_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap15_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:908" *)
   wire rt_cap1_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
@@ -2936,17 +2636,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire \rt_cap1_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap1_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire [6:0] \rt_cap1_wr_gt.gt_seq ;
+  wire [8:0] \rt_cap1_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [1:0] \rt_cap1_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [2:0] \rt_cap1_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [15:0] \rt_cap1_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap1_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:908" *)
   wire rt_cap2_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
@@ -2956,17 +2652,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire \rt_cap2_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap2_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire [6:0] \rt_cap2_wr_gt.gt_seq ;
+  wire [8:0] \rt_cap2_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [1:0] \rt_cap2_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [2:0] \rt_cap2_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [15:0] \rt_cap2_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap2_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:908" *)
   wire rt_cap3_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
@@ -2976,17 +2668,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire \rt_cap3_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap3_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire [6:0] \rt_cap3_wr_gt.gt_seq ;
+  wire [8:0] \rt_cap3_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [1:0] \rt_cap3_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [2:0] \rt_cap3_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [15:0] \rt_cap3_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap3_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:908" *)
   wire rt_cap4_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
@@ -2996,17 +2684,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire \rt_cap4_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap4_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire [6:0] \rt_cap4_wr_gt.gt_seq ;
+  wire [8:0] \rt_cap4_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [1:0] \rt_cap4_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [2:0] \rt_cap4_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [15:0] \rt_cap4_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap4_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:908" *)
   wire rt_cap5_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
@@ -3016,17 +2700,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire \rt_cap5_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap5_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire [6:0] \rt_cap5_wr_gt.gt_seq ;
+  wire [8:0] \rt_cap5_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [1:0] \rt_cap5_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [2:0] \rt_cap5_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [15:0] \rt_cap5_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap5_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:908" *)
   wire rt_cap6_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
@@ -3036,17 +2716,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire \rt_cap6_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap6_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire [6:0] \rt_cap6_wr_gt.gt_seq ;
+  wire [8:0] \rt_cap6_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [1:0] \rt_cap6_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [2:0] \rt_cap6_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [15:0] \rt_cap6_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap6_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:908" *)
   wire rt_cap7_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
@@ -3056,17 +2732,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire \rt_cap7_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap7_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire [6:0] \rt_cap7_wr_gt.gt_seq ;
+  wire [8:0] \rt_cap7_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [1:0] \rt_cap7_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [2:0] \rt_cap7_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [15:0] \rt_cap7_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap7_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:908" *)
   wire rt_cap8_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
@@ -3076,17 +2748,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire \rt_cap8_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap8_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire [6:0] \rt_cap8_wr_gt.gt_seq ;
+  wire [8:0] \rt_cap8_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [1:0] \rt_cap8_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [2:0] \rt_cap8_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [15:0] \rt_cap8_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap8_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/core.py:908" *)
   wire rt_cap9_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
@@ -3096,17 +2764,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire \rt_cap9_wr_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap9_wr_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire [6:0] \rt_cap9_wr_gt.gt_seq ;
+  wire [8:0] \rt_cap9_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [1:0] \rt_cap9_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [2:0] \rt_cap9_wr_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:909" *)
   wire [15:0] \rt_cap9_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:909" *)
-  wire \rt_cap9_wr_gt.spare ;
   (* src = "/home/runner/workspace/hardware/outform_iot.py:48" *)
   wire [7:0] rx_data;
   (* src = "/home/runner/workspace/hardware/outform_iot.py:47" *)
@@ -3178,17 +2842,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/church_outform.py:36" *)
   wire \src_cr_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:36" *)
-  wire \src_cr_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/church_outform.py:36" *)
-  wire [6:0] \src_cr_data.word0_gt.gt_seq ;
+  wire [8:0] \src_cr_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:36" *)
   wire [1:0] \src_cr_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:36" *)
   wire [2:0] \src_cr_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:36" *)
   wire [15:0] \src_cr_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/church_outform.py:36" *)
-  wire \src_cr_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:36" *)
   wire [31:0] \src_cr_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:36" *)
@@ -3228,17 +2888,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:857" *)
   wire \thrd_gt.dom ;
   (* src = "/home/runner/workspace/hardware/core.py:857" *)
-  wire \thrd_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:857" *)
-  wire [6:0] \thrd_gt.gt_seq ;
+  wire [8:0] \thrd_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:857" *)
   wire [1:0] \thrd_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:857" *)
   wire [2:0] \thrd_gt.perm ;
   (* src = "/home/runner/workspace/hardware/core.py:857" *)
   wire [15:0] \thrd_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:857" *)
-  wire \thrd_gt.spare ;
   (* src = "/home/runner/workspace/hardware/call.py:71" *)
   wire [31:0] thread_base;
   (* src = "/home/runner/workspace/hardware/call.py:80" *)
@@ -3273,23 +2929,23 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire [7:0] tx_data;
   (* src = "/home/runner/workspace/hardware/outform_iot.py:44" *)
   wire tx_valid;
-  (* src = "/home/runner/workspace/hardware/integrity32.py:58" *)
+  (* src = "/home/runner/workspace/hardware/integrity32.py:59" *)
   wire [31:0] w0_rot;
-  (* src = "/home/runner/workspace/hardware/integrity32.py:58" *)
+  (* src = "/home/runner/workspace/hardware/integrity32.py:59" *)
   wire [31:0] \w0_rot$459 ;
-  (* src = "/home/runner/workspace/hardware/integrity32.py:58" *)
+  (* src = "/home/runner/workspace/hardware/integrity32.py:59" *)
   wire [31:0] \w0_rot$491 ;
-  (* src = "/home/runner/workspace/hardware/integrity32.py:57" *)
+  (* src = "/home/runner/workspace/hardware/integrity32.py:58" *)
   wire [31:0] w1_masked;
-  (* src = "/home/runner/workspace/hardware/integrity32.py:57" *)
+  (* src = "/home/runner/workspace/hardware/integrity32.py:58" *)
   wire [31:0] \w1_masked$458 ;
-  (* src = "/home/runner/workspace/hardware/integrity32.py:57" *)
+  (* src = "/home/runner/workspace/hardware/integrity32.py:58" *)
   wire [31:0] \w1_masked$489 ;
-  (* src = "/home/runner/workspace/hardware/integrity32.py:59" *)
+  (* src = "/home/runner/workspace/hardware/integrity32.py:60" *)
   wire [31:0] w1_rot;
-  (* src = "/home/runner/workspace/hardware/integrity32.py:59" *)
+  (* src = "/home/runner/workspace/hardware/integrity32.py:60" *)
   wire [31:0] \w1_rot$461 ;
-  (* src = "/home/runner/workspace/hardware/integrity32.py:59" *)
+  (* src = "/home/runner/workspace/hardware/integrity32.py:60" *)
   wire [31:0] \w1_rot$493 ;
   (* src = "/home/runner/workspace/hardware/core.py:1540" *)
   reg [31:0] watermark_reg = 32'd256;
@@ -3334,8 +2990,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign cr_rd_addr = sub_busy ? (* src = "/home/runner/workspace/hardware/core.py:407" *) \cr_rd_addr$64  : \$32 ;
   assign \$33  = imem_data[18:15] == (* src = "/home/runner/workspace/hardware/core.py:421" *) 3'h6;
   assign \$34  = \$33  ? (* src = "/home/runner/workspace/hardware/core.py:421" *) 4'h0 : 4'h8;
-  assign \$35  = cr_rd_data[24:23] == (* src = "/home/runner/workspace/hardware/core.py:429" *) 2'h3;
-  assign \$36  = cr_rd_data[24:23] == (* src = "/home/runner/workspace/hardware/core.py:430" *) 2'h2;
+  assign \$35  = cr_rd_data[26:25] == (* src = "/home/runner/workspace/hardware/core.py:429" *) 2'h3;
+  assign \$36  = cr_rd_data[26:25] == (* src = "/home/runner/workspace/hardware/core.py:430" *) 2'h2;
   assign \$37  = \$35  | (* src = "/home/runner/workspace/hardware/core.py:429" *) \$36 ;
   assign check_valid = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:454" *) is_church_op;
   assign \$38  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:456" *) is_church_op;
@@ -3362,15 +3018,15 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \$60  = \$59  | (* src = "/home/runner/workspace/hardware/core.py:683" *) \cr_wr_en$120 ;
   assign \$62  = \cr_wr_en$124  | (* src = "/home/runner/workspace/hardware/core.py:658" *) \cr_wr_en$123 ;
   assign \cr_wr_en$143  = \$61  | (* src = "/home/runner/workspace/hardware/core.py:683" *) \$63 ;
-  assign \$64  = { cr15_namespace[56:32], cr15_namespace[63:57] } ^ (* src = "/home/runner/workspace/hardware/integrity32.py:66" *) { w1_masked[18:0], w1_masked[31:19] };
+  assign \$64  = { cr15_namespace[56:32], cr15_namespace[63:57] } ^ (* src = "/home/runner/workspace/hardware/integrity32.py:67" *) { w1_masked[18:0], w1_masked[31:19] };
   assign m_set_dr11 = mgt_set_trigger ? (* src = "/home/runner/workspace/hardware/core.py:720" *) mgt_gt_word : cr15_namespace[31:0];
   assign m_set_dr12 = mgt_set_trigger ? (* src = "/home/runner/workspace/hardware/core.py:724" *) mgt_ns_location : cr15_namespace[63:32];
   assign m_set_dr13 = mgt_set_trigger ? (* src = "/home/runner/workspace/hardware/core.py:728" *) mgt_ns_authority : cr15_namespace[95:64];
   assign m_set_dr14 = mgt_set_trigger ? (* src = "/home/runner/workspace/hardware/core.py:732" *) mgt_ns_integrity : cr15_m_set_integrity;
   assign m_set_dr15 = mgt_set_trigger ? (* src = "/home/runner/workspace/hardware/core.py:736" *) mgt_ns_seals : 32'd0;
-  assign cr8_gt_wr_data = boot_cap8_wr_en ? (* src = "/home/runner/workspace/hardware/core.py:932" *) boot_cap8_wr_gt : 32'd0;
+  assign cr12_gt_wr_data = boot_cap12_wr_en ? (* src = "/home/runner/workspace/hardware/core.py:932" *) boot_cap12_wr_gt : 32'd0;
   assign cr14_gt_wr_data = boot_cap14_wr_en ? (* src = "/home/runner/workspace/hardware/core.py:932" *) boot_cap14_wr_gt : 32'd0;
-  assign call_src_is_outform = cr_rd_data[24:23] == (* src = "/home/runner/workspace/hardware/core.py:941" *) 2'h2;
+  assign call_src_is_outform = cr_rd_data[26:25] == (* src = "/home/runner/workspace/hardware/core.py:941" *) 2'h2;
   assign \$65  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:947" *) is_church_op;
   assign \$66  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:947" *) 2'h2;
   assign \$67  = \$65  & (* src = "/home/runner/workspace/hardware/core.py:947" *) \$66 ;
@@ -3506,7 +3162,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \$166  = cr15_namespace[63:32] + (* src = "/home/runner/workspace/hardware/core.py:1594" *) \$165 ;
   assign mint_slot_id_p3 = mint_slot_id_reg + (* src = "/home/runner/workspace/hardware/core.py:1606" *) 2'h3;
   assign \$168  = mint_lump_size_reg - (* src = "/home/runner/workspace/hardware/core.py:1616" *) 1'h1;
-  assign \$170  = { mint_base_reg[24:0], mint_base_reg[31:25] } ^ (* src = "/home/runner/workspace/hardware/integrity32.py:66" *) { \w1_masked$458 [18:0], \w1_masked$458 [31:19] };
+  assign \$170  = { mint_base_reg[24:0], mint_base_reg[31:25] } ^ (* src = "/home/runner/workspace/hardware/integrity32.py:67" *) { \w1_masked$458 [18:0], \w1_masked$458 [31:19] };
   assign \$171  = mint_hdr_reg[26:23] + (* src = "/home/runner/workspace/hardware/core.py:1646" *) 3'h6;
   assign \$172  = 1'h1 << (* src = "/home/runner/workspace/hardware/core.py:1646" *) \$171 ;
   assign \$173  = mint_lump_size_reg - (* src = "/home/runner/workspace/hardware/core.py:1668" *) mint_cc_reg;
@@ -3523,10 +3179,10 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign mint_busy = ~ (* src = "/home/runner/workspace/hardware/core.py:1776" *) \$204 ;
   assign \$187  = call_normal_complete | (* src = "/home/runner/workspace/hardware/core.py:2025" *) complete;
   assign mwin_trigger = \$188  & (* src = "/home/runner/workspace/hardware/core.py:2025" *) cr15_m_flag;
-  assign mwin_dr11_valid = | (* src = "/home/runner/workspace/hardware/core.py:2039" *) dbg_m_dr11[24:23];
-  assign \$189  = { mwin_dr12_lat[24:0], mwin_dr12_lat[31:25] } ^ (* src = "/home/runner/workspace/hardware/integrity32.py:66" *) { \w1_masked$489 [18:0], \w1_masked$489 [31:19] };
+  assign mwin_dr11_valid = | (* src = "/home/runner/workspace/hardware/core.py:2039" *) dbg_m_dr11[26:25];
+  assign \$189  = { mwin_dr12_lat[24:0], mwin_dr12_lat[31:25] } ^ (* src = "/home/runner/workspace/hardware/integrity32.py:67" *) { \w1_masked$489 [18:0], \w1_masked$489 [31:19] };
   assign mwin_integrity_ok = mwin_integrity_computed == (* src = "/home/runner/workspace/hardware/core.py:2045" *) mwin_dr14_lat;
-  assign mwin_gtseq_ok = mwin_dr11_lat[22:16] == (* src = "/home/runner/workspace/hardware/core.py:2055" *) mwin_dr13_lat[27:21];
+  assign mwin_gtseq_ok = mwin_dr11_lat[24:16] == (* src = "/home/runner/workspace/hardware/core.py:2055" *) mwin_dr13_lat[29:21];
   assign \$190  = mwin_fnv_xor * (* src = "/home/runner/workspace/hardware/core.py:2072" *) 25'h1000193;
   assign mwin_seal_computed = \$190 [31:0] ^ (* src = "/home/runner/workspace/hardware/core.py:2074" *) mwin_dr13_lat;
   assign mwin_seal_ok = mwin_seal_computed[24:0] == (* src = "/home/runner/workspace/hardware/core.py:2076" *) mwin_dr15_lat[24:0];
@@ -3542,7 +3198,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign fetch_bounds_fault = \$197  & (* src = "/home/runner/workspace/hardware/core.py:2147" *) \$200 ;
   assign \$201  = ~ (* src = "/home/runner/workspace/hardware/core.py:2187" *) outform_mode2_active;
   assign \$202  = outform_fault & (* src = "/home/runner/workspace/hardware/core.py:2187" *) \$201 ;
-  assign \$203  = mem_rd_en | (* src = "/home/runner/workspace/hardware/core.py:2300" *) mem_wr_en;
+  assign \$203  = mem_rd_en | (* src = "/home/runner/workspace/hardware/core.py:2303" *) mem_wr_en;
   assign \$204  = ! (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) mint_state;
   assign \$205  = mint_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 1'h1;
   assign \$206  = mint_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 2'h2;
@@ -3734,10 +3390,10 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144" *)
   always @(posedge clk)
     mwin_state <= \$323 ;
-  (* src = "/home/runner/workspace/hardware/core.py:2224" *)
+  (* src = "/home/runner/workspace/hardware/core.py:2227" *)
   always @(posedge clk)
     fault_instr <= \$324 ;
-  (* src = "/home/runner/workspace/hardware/core.py:2225" *)
+  (* src = "/home/runner/workspace/hardware/core.py:2228" *)
   always @(posedge clk)
     fault_stage <= \$325 ;
   assign \$auto$rtlil.cc:2739:Not$12  = ~ { \$170 [31:30], \$170 [28:25], \$170 [23], \$170 [21], \$170 [19:18], \$170 [16:15], \$170 [13:9], \$170 [7:5], \$170 [3:0] };
@@ -3948,8 +3604,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
     .cr11_gt_wr_data(32'd0),
     .cr11_gt_wr_en(1'h0),
     .cr12(cr12_thread),
-    .cr12_gt_wr_data(32'd0),
-    .cr12_gt_wr_en(1'h0),
+    .cr12_gt_wr_data(cr12_gt_wr_data),
+    .cr12_gt_wr_en(cr12_gt_wr_en),
     .cr13_gt_wr_data(32'd0),
     .cr13_gt_wr_en(1'h0),
     .cr14(cr14_code),
@@ -3974,8 +3630,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
     .cr6_gt_wr_en(1'h0),
     .cr7_gt_wr_data(32'd0),
     .cr7_gt_wr_en(1'h0),
-    .cr8_gt_wr_data(cr8_gt_wr_data),
-    .cr8_gt_wr_en(cr8_gt_wr_en),
+    .cr8_gt_wr_data(32'd0),
+    .cr8_gt_wr_en(1'h0),
     .cr9_gt_wr_data(32'd0),
     .cr9_gt_wr_en(1'h0),
     .cr_b_clear_mask(cr_b_clear_mask),
@@ -4313,24 +3969,24 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
     boot_cap_wr_data = 96'h000000000000000000000000;
     casez (boot_state)
       3'h2:
-          boot_cap_wr_data = 96'h000000120000000000800000;
+          boot_cap_wr_data = 96'h000000120000000002000000;
       3'h3:
           /* empty */;
       3'h4:
-          boot_cap_wr_data = 96'h0000003f0000040048800002;
+          boot_cap_wr_data = 96'h0000003f000004004a000002;
     endcase
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
-    { thrd_gt[30:27], thrd_gt[24:0] } = 29'h00000000;
+    thrd_gt[30:0] = 31'h00000000;
     casez (boot_state)
       3'h2:
           /* empty */;
       3'h3:
         begin
           thrd_gt[15:0] = 16'h0001;
-          thrd_gt[22:16] = 7'h00;
-          thrd_gt[24:23] = 2'h1;
+          thrd_gt[24:16] = 9'h000;
+          thrd_gt[26:25] = 2'h1;
           thrd_gt[27] = 1'h0;
           thrd_gt[30:28] = 3'h0;
         end
@@ -4338,27 +3994,27 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
-    boot_cap8_wr_en = 1'h0;
+    boot_cap12_wr_en = 1'h0;
     casez (boot_state)
       3'h2:
           /* empty */;
       3'h3:
-          boot_cap8_wr_en = 1'h1;
+          boot_cap12_wr_en = 1'h1;
     endcase
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
-    boot_cap8_wr_gt = 32'd0;
+    boot_cap12_wr_gt = 32'd0;
     casez (boot_state)
       3'h2:
           /* empty */;
       3'h3:
-          boot_cap8_wr_gt = thrd_gt;
+          boot_cap12_wr_gt = thrd_gt;
     endcase
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
-    { cr14_gt[30:27], cr14_gt[24:0] } = 29'h00000000;
+    cr14_gt[30:0] = 31'h00000000;
     casez (boot_state)
       3'h2:
           /* empty */;
@@ -4369,8 +4025,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
       3'h5:
         begin
           cr14_gt[15:0] = 16'h0003;
-          cr14_gt[22:16] = 7'h00;
-          cr14_gt[24:23] = 2'h1;
+          cr14_gt[24:16] = 9'h000;
+          cr14_gt[26:25] = 2'h1;
           cr14_gt[27] = 1'h0;
           cr14_gt[30:28] = 3'h4;
         end
@@ -5186,9 +4842,9 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
     if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
     (* full_case = 32'd1 *)
     if (mint_ns_wr_en) begin
-      ns_wr_data = { 64'h0000000000000000, mint_ns_wr_data };
+      ns_wr_data = { 96'h000000000000000000000000, mint_ns_wr_data };
     end else begin
-      ns_wr_data = 96'h000000000000000000000000;
+      ns_wr_data = 128'h00000000000000000000000000000000;
     end
   end
   always @* begin
@@ -5924,8 +5580,10 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign rt_cap7_wr_en = 1'h0;
   assign rt_cap7_wr_gt = 32'd0;
   assign boot_cap7_wr_gt = 32'd0;
+  assign boot_cap8_wr_en = 1'h0;
   assign rt_cap8_wr_en = 1'h0;
   assign rt_cap8_wr_gt = 32'd0;
+  assign boot_cap8_wr_gt = 32'd0;
   assign boot_cap9_wr_en = 1'h0;
   assign rt_cap9_wr_en = 1'h0;
   assign rt_cap9_wr_gt = 32'd0;
@@ -5938,10 +5596,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign rt_cap11_wr_en = 1'h0;
   assign rt_cap11_wr_gt = 32'd0;
   assign boot_cap11_wr_gt = 32'd0;
-  assign boot_cap12_wr_en = 1'h0;
   assign rt_cap12_wr_en = 1'h0;
   assign rt_cap12_wr_gt = 32'd0;
-  assign boot_cap12_wr_gt = 32'd0;
   assign boot_cap13_wr_en = 1'h0;
   assign rt_cap13_wr_en = 1'h0;
   assign rt_cap13_wr_gt = 32'd0;
@@ -6071,8 +5727,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign cr15_m_writeback_trigger = 1'h0;
   assign \w0_rot$491  = { mwin_dr12_lat[24:0], mwin_dr12_lat[31:25] };
   assign \w1_rot$493  = { \w1_masked$489 [18:0], \w1_masked$489 [31:19] };
-  assign mwin_dr11_gt_seq = mwin_dr11_lat[22:16];
-  assign mwin_dr13_gt_seq = mwin_dr13_lat[27:21];
+  assign mwin_dr11_gt_seq = mwin_dr11_lat[24:16];
+  assign mwin_dr13_gt_seq = mwin_dr13_lat[29:21];
   assign mwin_fnv_mul = \$190 [31:0];
   assign mwin_seal_masked = mwin_seal_computed[24:0];
   assign cr15_m_set = 1'h0;
@@ -6127,45 +5783,35 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \flags$27.C  = flags[2];
   assign \flags$27.V  = flags[3];
   assign \perm_gt_sig.slot_id  = cr_rd_data[15:0];
-  assign \perm_gt_sig.gt_seq  = cr_rd_data[22:16];
-  assign \perm_gt_sig.gt_type  = cr_rd_data[24:23];
-  assign \perm_gt_sig.f_flag  = cr_rd_data[25];
-  assign \perm_gt_sig.spare  = cr_rd_data[26];
+  assign \perm_gt_sig.gt_seq  = cr_rd_data[24:16];
+  assign \perm_gt_sig.gt_type  = cr_rd_data[26:25];
   assign \perm_gt_sig.dom  = cr_rd_data[27];
   assign \perm_gt_sig.perm  = cr_rd_data[30:28];
   assign \perm_gt_sig.b_flag  = cr_rd_data[31];
   assign \cr_rd_data.word0_gt  = cr_rd_data[31:0];
   assign \cr_rd_data.word0_gt.slot_id  = cr_rd_data[15:0];
-  assign \cr_rd_data.word0_gt.gt_seq  = cr_rd_data[22:16];
-  assign \cr_rd_data.word0_gt.gt_type  = cr_rd_data[24:23];
-  assign \cr_rd_data.word0_gt.f_flag  = cr_rd_data[25];
-  assign \cr_rd_data.word0_gt.spare  = cr_rd_data[26];
+  assign \cr_rd_data.word0_gt.gt_seq  = cr_rd_data[24:16];
+  assign \cr_rd_data.word0_gt.gt_type  = cr_rd_data[26:25];
   assign \cr_rd_data.word0_gt.dom  = cr_rd_data[27];
   assign \cr_rd_data.word0_gt.perm  = cr_rd_data[30:28];
   assign \cr_rd_data.word0_gt.b_flag  = cr_rd_data[31];
   assign \cr_rd_data.word1_location  = cr_rd_data[63:32];
   assign \cr_rd_data.word2_w2  = cr_rd_data[95:64];
   assign \gt_in.slot_id  = cr_rd_data[15:0];
-  assign \gt_in.gt_seq  = cr_rd_data[22:16];
-  assign \gt_in.gt_type  = cr_rd_data[24:23];
-  assign \gt_in.f_flag  = cr_rd_data[25];
-  assign \gt_in.spare  = cr_rd_data[26];
+  assign \gt_in.gt_seq  = cr_rd_data[24:16];
+  assign \gt_in.gt_type  = cr_rd_data[26:25];
   assign \gt_in.dom  = cr_rd_data[27];
   assign \gt_in.perm  = cr_rd_data[30:28];
   assign \gt_in.b_flag  = cr_rd_data[31];
   assign \cr_rd_data_gt.slot_id  = cr_rd_data[15:0];
-  assign \cr_rd_data_gt.gt_seq  = cr_rd_data[22:16];
-  assign \cr_rd_data_gt.gt_type  = cr_rd_data[24:23];
-  assign \cr_rd_data_gt.f_flag  = cr_rd_data[25];
-  assign \cr_rd_data_gt.spare  = cr_rd_data[26];
+  assign \cr_rd_data_gt.gt_seq  = cr_rd_data[24:16];
+  assign \cr_rd_data_gt.gt_type  = cr_rd_data[26:25];
   assign \cr_rd_data_gt.dom  = cr_rd_data[27];
   assign \cr_rd_data_gt.perm  = cr_rd_data[30:28];
   assign \cr_rd_data_gt.b_flag  = cr_rd_data[31];
   assign \clist_wr_data.slot_id  = clist_wr_data[15:0];
-  assign \clist_wr_data.gt_seq  = clist_wr_data[22:16];
-  assign \clist_wr_data.gt_type  = clist_wr_data[24:23];
-  assign \clist_wr_data.f_flag  = clist_wr_data[25];
-  assign \clist_wr_data.spare  = clist_wr_data[26];
+  assign \clist_wr_data.gt_seq  = clist_wr_data[24:16];
+  assign \clist_wr_data.gt_type  = clist_wr_data[26:25];
   assign \clist_wr_data.dom  = clist_wr_data[27];
   assign \clist_wr_data.perm  = clist_wr_data[30:28];
   assign \clist_wr_data.b_flag  = clist_wr_data[31];
@@ -6207,10 +5853,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \tperm_flags_sig.V  = tperm_flags_sig[3];
   assign \cr_wr_data.word0_gt  = cr_wr_data[31:0];
   assign \cr_wr_data.word0_gt.slot_id  = cr_wr_data[15:0];
-  assign \cr_wr_data.word0_gt.gt_seq  = cr_wr_data[22:16];
-  assign \cr_wr_data.word0_gt.gt_type  = cr_wr_data[24:23];
-  assign \cr_wr_data.word0_gt.f_flag  = cr_wr_data[25];
-  assign \cr_wr_data.word0_gt.spare  = cr_wr_data[26];
+  assign \cr_wr_data.word0_gt.gt_seq  = cr_wr_data[24:16];
+  assign \cr_wr_data.word0_gt.gt_type  = cr_wr_data[26:25];
   assign \cr_wr_data.word0_gt.dom  = cr_wr_data[27];
   assign \cr_wr_data.word0_gt.perm  = cr_wr_data[30:28];
   assign \cr_wr_data.word0_gt.b_flag  = cr_wr_data[31];
@@ -6218,10 +5862,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr_wr_data.word2_w2  = cr_wr_data[95:64];
   assign \cr_wr_data$134.word0_gt  = \cr_wr_data$134 [31:0];
   assign \cr_wr_data$134.word0_gt.slot_id  = \cr_wr_data$134 [15:0];
-  assign \cr_wr_data$134.word0_gt.gt_seq  = \cr_wr_data$134 [22:16];
-  assign \cr_wr_data$134.word0_gt.gt_type  = \cr_wr_data$134 [24:23];
-  assign \cr_wr_data$134.word0_gt.f_flag  = \cr_wr_data$134 [25];
-  assign \cr_wr_data$134.word0_gt.spare  = \cr_wr_data$134 [26];
+  assign \cr_wr_data$134.word0_gt.gt_seq  = \cr_wr_data$134 [24:16];
+  assign \cr_wr_data$134.word0_gt.gt_type  = \cr_wr_data$134 [26:25];
   assign \cr_wr_data$134.word0_gt.dom  = \cr_wr_data$134 [27];
   assign \cr_wr_data$134.word0_gt.perm  = \cr_wr_data$134 [30:28];
   assign \cr_wr_data$134.word0_gt.b_flag  = \cr_wr_data$134 [31];
@@ -6229,10 +5871,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr_wr_data$134.word2_w2  = \cr_wr_data$134 [95:64];
   assign \cr_wr_data$135.word0_gt  = \cr_wr_data$135 [31:0];
   assign \cr_wr_data$135.word0_gt.slot_id  = \cr_wr_data$135 [15:0];
-  assign \cr_wr_data$135.word0_gt.gt_seq  = \cr_wr_data$135 [22:16];
-  assign \cr_wr_data$135.word0_gt.gt_type  = \cr_wr_data$135 [24:23];
-  assign \cr_wr_data$135.word0_gt.f_flag  = \cr_wr_data$135 [25];
-  assign \cr_wr_data$135.word0_gt.spare  = \cr_wr_data$135 [26];
+  assign \cr_wr_data$135.word0_gt.gt_seq  = \cr_wr_data$135 [24:16];
+  assign \cr_wr_data$135.word0_gt.gt_type  = \cr_wr_data$135 [26:25];
   assign \cr_wr_data$135.word0_gt.dom  = \cr_wr_data$135 [27];
   assign \cr_wr_data$135.word0_gt.perm  = \cr_wr_data$135 [30:28];
   assign \cr_wr_data$135.word0_gt.b_flag  = \cr_wr_data$135 [31];
@@ -6240,10 +5880,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr_wr_data$135.word2_w2  = \cr_wr_data$135 [95:64];
   assign \dbg_cr_wr_data.word0_gt  = 32'd0;
   assign \dbg_cr_wr_data.word0_gt.slot_id  = 16'h0000;
-  assign \dbg_cr_wr_data.word0_gt.gt_seq  = 7'h00;
+  assign \dbg_cr_wr_data.word0_gt.gt_seq  = 9'h000;
   assign \dbg_cr_wr_data.word0_gt.gt_type  = 2'h0;
-  assign \dbg_cr_wr_data.word0_gt.f_flag  = 1'h0;
-  assign \dbg_cr_wr_data.word0_gt.spare  = 1'h0;
   assign \dbg_cr_wr_data.word0_gt.dom  = 1'h0;
   assign \dbg_cr_wr_data.word0_gt.perm  = 3'h0;
   assign \dbg_cr_wr_data.word0_gt.b_flag  = 1'h0;
@@ -6251,10 +5889,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \dbg_cr_wr_data.word2_w2  = 32'd0;
   assign \cr_wr_data$137.word0_gt  = 32'd0;
   assign \cr_wr_data$137.word0_gt.slot_id  = 16'h0000;
-  assign \cr_wr_data$137.word0_gt.gt_seq  = 7'h00;
+  assign \cr_wr_data$137.word0_gt.gt_seq  = 9'h000;
   assign \cr_wr_data$137.word0_gt.gt_type  = 2'h0;
-  assign \cr_wr_data$137.word0_gt.f_flag  = 1'h0;
-  assign \cr_wr_data$137.word0_gt.spare  = 1'h0;
   assign \cr_wr_data$137.word0_gt.dom  = 1'h0;
   assign \cr_wr_data$137.word0_gt.perm  = 3'h0;
   assign \cr_wr_data$137.word0_gt.b_flag  = 1'h0;
@@ -6262,10 +5898,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr_wr_data$137.word2_w2  = 32'd0;
   assign \cr_wr_data$138.word0_gt  = \cr_wr_data$138 [31:0];
   assign \cr_wr_data$138.word0_gt.slot_id  = \cr_wr_data$138 [15:0];
-  assign \cr_wr_data$138.word0_gt.gt_seq  = \cr_wr_data$138 [22:16];
-  assign \cr_wr_data$138.word0_gt.gt_type  = \cr_wr_data$138 [24:23];
-  assign \cr_wr_data$138.word0_gt.f_flag  = \cr_wr_data$138 [25];
-  assign \cr_wr_data$138.word0_gt.spare  = \cr_wr_data$138 [26];
+  assign \cr_wr_data$138.word0_gt.gt_seq  = \cr_wr_data$138 [24:16];
+  assign \cr_wr_data$138.word0_gt.gt_type  = \cr_wr_data$138 [26:25];
   assign \cr_wr_data$138.word0_gt.dom  = \cr_wr_data$138 [27];
   assign \cr_wr_data$138.word0_gt.perm  = \cr_wr_data$138 [30:28];
   assign \cr_wr_data$138.word0_gt.b_flag  = \cr_wr_data$138 [31];
@@ -6273,10 +5907,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr_wr_data$138.word2_w2  = \cr_wr_data$138 [95:64];
   assign \cr_wr_data$139.word0_gt  = \cr_wr_data$139 [31:0];
   assign \cr_wr_data$139.word0_gt.slot_id  = \cr_wr_data$139 [15:0];
-  assign \cr_wr_data$139.word0_gt.gt_seq  = \cr_wr_data$139 [22:16];
-  assign \cr_wr_data$139.word0_gt.gt_type  = \cr_wr_data$139 [24:23];
-  assign \cr_wr_data$139.word0_gt.f_flag  = \cr_wr_data$139 [25];
-  assign \cr_wr_data$139.word0_gt.spare  = \cr_wr_data$139 [26];
+  assign \cr_wr_data$139.word0_gt.gt_seq  = \cr_wr_data$139 [24:16];
+  assign \cr_wr_data$139.word0_gt.gt_type  = \cr_wr_data$139 [26:25];
   assign \cr_wr_data$139.word0_gt.dom  = \cr_wr_data$139 [27];
   assign \cr_wr_data$139.word0_gt.perm  = \cr_wr_data$139 [30:28];
   assign \cr_wr_data$139.word0_gt.b_flag  = \cr_wr_data$139 [31];
@@ -6284,10 +5916,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr_wr_data$139.word2_w2  = \cr_wr_data$139 [95:64];
   assign \cr_wr_data$140.word0_gt  = \cr_wr_data$140 [31:0];
   assign \cr_wr_data$140.word0_gt.slot_id  = \cr_wr_data$140 [15:0];
-  assign \cr_wr_data$140.word0_gt.gt_seq  = \cr_wr_data$140 [22:16];
-  assign \cr_wr_data$140.word0_gt.gt_type  = \cr_wr_data$140 [24:23];
-  assign \cr_wr_data$140.word0_gt.f_flag  = \cr_wr_data$140 [25];
-  assign \cr_wr_data$140.word0_gt.spare  = \cr_wr_data$140 [26];
+  assign \cr_wr_data$140.word0_gt.gt_seq  = \cr_wr_data$140 [24:16];
+  assign \cr_wr_data$140.word0_gt.gt_type  = \cr_wr_data$140 [26:25];
   assign \cr_wr_data$140.word0_gt.dom  = \cr_wr_data$140 [27];
   assign \cr_wr_data$140.word0_gt.perm  = \cr_wr_data$140 [30:28];
   assign \cr_wr_data$140.word0_gt.b_flag  = \cr_wr_data$140 [31];
@@ -6295,10 +5925,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr_wr_data$140.word2_w2  = \cr_wr_data$140 [95:64];
   assign \boot_cap_wr_data.word0_gt  = boot_cap_wr_data[31:0];
   assign \boot_cap_wr_data.word0_gt.slot_id  = boot_cap_wr_data[15:0];
-  assign \boot_cap_wr_data.word0_gt.gt_seq  = boot_cap_wr_data[22:16];
-  assign \boot_cap_wr_data.word0_gt.gt_type  = boot_cap_wr_data[24:23];
-  assign \boot_cap_wr_data.word0_gt.f_flag  = boot_cap_wr_data[25];
-  assign \boot_cap_wr_data.word0_gt.spare  = boot_cap_wr_data[26];
+  assign \boot_cap_wr_data.word0_gt.gt_seq  = boot_cap_wr_data[24:16];
+  assign \boot_cap_wr_data.word0_gt.gt_type  = boot_cap_wr_data[26:25];
   assign \boot_cap_wr_data.word0_gt.dom  = boot_cap_wr_data[27];
   assign \boot_cap_wr_data.word0_gt.perm  = boot_cap_wr_data[30:28];
   assign \boot_cap_wr_data.word0_gt.b_flag  = boot_cap_wr_data[31];
@@ -6306,10 +5934,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \boot_cap_wr_data.word2_w2  = boot_cap_wr_data[95:64];
   assign \mwin_cr_wr_data.word0_gt  = mwin_cr_wr_data[31:0];
   assign \mwin_cr_wr_data.word0_gt.slot_id  = mwin_cr_wr_data[15:0];
-  assign \mwin_cr_wr_data.word0_gt.gt_seq  = mwin_cr_wr_data[22:16];
-  assign \mwin_cr_wr_data.word0_gt.gt_type  = mwin_cr_wr_data[24:23];
-  assign \mwin_cr_wr_data.word0_gt.f_flag  = mwin_cr_wr_data[25];
-  assign \mwin_cr_wr_data.word0_gt.spare  = mwin_cr_wr_data[26];
+  assign \mwin_cr_wr_data.word0_gt.gt_seq  = mwin_cr_wr_data[24:16];
+  assign \mwin_cr_wr_data.word0_gt.gt_type  = mwin_cr_wr_data[26:25];
   assign \mwin_cr_wr_data.word0_gt.dom  = mwin_cr_wr_data[27];
   assign \mwin_cr_wr_data.word0_gt.perm  = mwin_cr_wr_data[30:28];
   assign \mwin_cr_wr_data.word0_gt.b_flag  = mwin_cr_wr_data[31];
@@ -6317,10 +5943,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \mwin_cr_wr_data.word2_w2  = mwin_cr_wr_data[95:64];
   assign \cr15_namespace.word0_gt  = cr15_namespace[31:0];
   assign \cr15_namespace.word0_gt.slot_id  = cr15_namespace[15:0];
-  assign \cr15_namespace.word0_gt.gt_seq  = cr15_namespace[22:16];
-  assign \cr15_namespace.word0_gt.gt_type  = cr15_namespace[24:23];
-  assign \cr15_namespace.word0_gt.f_flag  = cr15_namespace[25];
-  assign \cr15_namespace.word0_gt.spare  = cr15_namespace[26];
+  assign \cr15_namespace.word0_gt.gt_seq  = cr15_namespace[24:16];
+  assign \cr15_namespace.word0_gt.gt_type  = cr15_namespace[26:25];
   assign \cr15_namespace.word0_gt.dom  = cr15_namespace[27];
   assign \cr15_namespace.word0_gt.perm  = cr15_namespace[30:28];
   assign \cr15_namespace.word0_gt.b_flag  = cr15_namespace[31];
@@ -6331,411 +5955,309 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \flags$177.C  = flags[2];
   assign \flags$177.V  = flags[3];
   assign \thrd_gt.slot_id  = thrd_gt[15:0];
-  assign \thrd_gt.gt_seq  = thrd_gt[22:16];
-  assign \thrd_gt.gt_type  = thrd_gt[24:23];
-  assign \thrd_gt.f_flag  = thrd_gt[25];
-  assign \thrd_gt.spare  = thrd_gt[26];
+  assign \thrd_gt.gt_seq  = thrd_gt[24:16];
+  assign \thrd_gt.gt_type  = thrd_gt[26:25];
   assign \thrd_gt.dom  = thrd_gt[27];
   assign \thrd_gt.perm  = thrd_gt[30:28];
   assign \thrd_gt.b_flag  = thrd_gt[31];
-  assign \boot_cap8_wr_gt.slot_id  = boot_cap8_wr_gt[15:0];
-  assign \boot_cap8_wr_gt.gt_seq  = boot_cap8_wr_gt[22:16];
-  assign \boot_cap8_wr_gt.gt_type  = boot_cap8_wr_gt[24:23];
-  assign \boot_cap8_wr_gt.f_flag  = boot_cap8_wr_gt[25];
-  assign \boot_cap8_wr_gt.spare  = boot_cap8_wr_gt[26];
-  assign \boot_cap8_wr_gt.dom  = boot_cap8_wr_gt[27];
-  assign \boot_cap8_wr_gt.perm  = boot_cap8_wr_gt[30:28];
-  assign \boot_cap8_wr_gt.b_flag  = boot_cap8_wr_gt[31];
+  assign \boot_cap12_wr_gt.slot_id  = boot_cap12_wr_gt[15:0];
+  assign \boot_cap12_wr_gt.gt_seq  = boot_cap12_wr_gt[24:16];
+  assign \boot_cap12_wr_gt.gt_type  = boot_cap12_wr_gt[26:25];
+  assign \boot_cap12_wr_gt.dom  = boot_cap12_wr_gt[27];
+  assign \boot_cap12_wr_gt.perm  = boot_cap12_wr_gt[30:28];
+  assign \boot_cap12_wr_gt.b_flag  = boot_cap12_wr_gt[31];
   assign \cr14_gt.slot_id  = cr14_gt[15:0];
-  assign \cr14_gt.gt_seq  = cr14_gt[22:16];
-  assign \cr14_gt.gt_type  = cr14_gt[24:23];
-  assign \cr14_gt.f_flag  = cr14_gt[25];
-  assign \cr14_gt.spare  = cr14_gt[26];
+  assign \cr14_gt.gt_seq  = cr14_gt[24:16];
+  assign \cr14_gt.gt_type  = cr14_gt[26:25];
   assign \cr14_gt.dom  = cr14_gt[27];
   assign \cr14_gt.perm  = cr14_gt[30:28];
   assign \cr14_gt.b_flag  = cr14_gt[31];
   assign \boot_cap14_wr_gt.slot_id  = boot_cap14_wr_gt[15:0];
-  assign \boot_cap14_wr_gt.gt_seq  = boot_cap14_wr_gt[22:16];
-  assign \boot_cap14_wr_gt.gt_type  = boot_cap14_wr_gt[24:23];
-  assign \boot_cap14_wr_gt.f_flag  = boot_cap14_wr_gt[25];
-  assign \boot_cap14_wr_gt.spare  = boot_cap14_wr_gt[26];
+  assign \boot_cap14_wr_gt.gt_seq  = boot_cap14_wr_gt[24:16];
+  assign \boot_cap14_wr_gt.gt_type  = boot_cap14_wr_gt[26:25];
   assign \boot_cap14_wr_gt.dom  = boot_cap14_wr_gt[27];
   assign \boot_cap14_wr_gt.perm  = boot_cap14_wr_gt[30:28];
   assign \boot_cap14_wr_gt.b_flag  = boot_cap14_wr_gt[31];
   assign \cr0_gt_wr_data.slot_id  = cr0_gt_wr_data[15:0];
-  assign \cr0_gt_wr_data.gt_seq  = cr0_gt_wr_data[22:16];
-  assign \cr0_gt_wr_data.gt_type  = cr0_gt_wr_data[24:23];
-  assign \cr0_gt_wr_data.f_flag  = cr0_gt_wr_data[25];
-  assign \cr0_gt_wr_data.spare  = cr0_gt_wr_data[26];
+  assign \cr0_gt_wr_data.gt_seq  = cr0_gt_wr_data[24:16];
+  assign \cr0_gt_wr_data.gt_type  = cr0_gt_wr_data[26:25];
   assign \cr0_gt_wr_data.dom  = cr0_gt_wr_data[27];
   assign \cr0_gt_wr_data.perm  = cr0_gt_wr_data[30:28];
   assign \cr0_gt_wr_data.b_flag  = cr0_gt_wr_data[31];
   assign \rt_cap0_wr_gt.slot_id  = 16'h0000;
-  assign \rt_cap0_wr_gt.gt_seq  = 7'h00;
+  assign \rt_cap0_wr_gt.gt_seq  = 9'h000;
   assign \rt_cap0_wr_gt.gt_type  = 2'h0;
-  assign \rt_cap0_wr_gt.f_flag  = 1'h0;
-  assign \rt_cap0_wr_gt.spare  = 1'h0;
   assign \rt_cap0_wr_gt.dom  = 1'h0;
   assign \rt_cap0_wr_gt.perm  = 3'h0;
   assign \rt_cap0_wr_gt.b_flag  = 1'h0;
   assign \boot_cap0_wr_gt.slot_id  = 16'h0000;
-  assign \boot_cap0_wr_gt.gt_seq  = 7'h00;
+  assign \boot_cap0_wr_gt.gt_seq  = 9'h000;
   assign \boot_cap0_wr_gt.gt_type  = 2'h0;
-  assign \boot_cap0_wr_gt.f_flag  = 1'h0;
-  assign \boot_cap0_wr_gt.spare  = 1'h0;
   assign \boot_cap0_wr_gt.dom  = 1'h0;
   assign \boot_cap0_wr_gt.perm  = 3'h0;
   assign \boot_cap0_wr_gt.b_flag  = 1'h0;
   assign \cr1_gt_wr_data.slot_id  = cr1_gt_wr_data[15:0];
-  assign \cr1_gt_wr_data.gt_seq  = cr1_gt_wr_data[22:16];
-  assign \cr1_gt_wr_data.gt_type  = cr1_gt_wr_data[24:23];
-  assign \cr1_gt_wr_data.f_flag  = cr1_gt_wr_data[25];
-  assign \cr1_gt_wr_data.spare  = cr1_gt_wr_data[26];
+  assign \cr1_gt_wr_data.gt_seq  = cr1_gt_wr_data[24:16];
+  assign \cr1_gt_wr_data.gt_type  = cr1_gt_wr_data[26:25];
   assign \cr1_gt_wr_data.dom  = cr1_gt_wr_data[27];
   assign \cr1_gt_wr_data.perm  = cr1_gt_wr_data[30:28];
   assign \cr1_gt_wr_data.b_flag  = cr1_gt_wr_data[31];
   assign \rt_cap1_wr_gt.slot_id  = 16'h0000;
-  assign \rt_cap1_wr_gt.gt_seq  = 7'h00;
+  assign \rt_cap1_wr_gt.gt_seq  = 9'h000;
   assign \rt_cap1_wr_gt.gt_type  = 2'h0;
-  assign \rt_cap1_wr_gt.f_flag  = 1'h0;
-  assign \rt_cap1_wr_gt.spare  = 1'h0;
   assign \rt_cap1_wr_gt.dom  = 1'h0;
   assign \rt_cap1_wr_gt.perm  = 3'h0;
   assign \rt_cap1_wr_gt.b_flag  = 1'h0;
   assign \boot_cap1_wr_gt.slot_id  = 16'h0000;
-  assign \boot_cap1_wr_gt.gt_seq  = 7'h00;
+  assign \boot_cap1_wr_gt.gt_seq  = 9'h000;
   assign \boot_cap1_wr_gt.gt_type  = 2'h0;
-  assign \boot_cap1_wr_gt.f_flag  = 1'h0;
-  assign \boot_cap1_wr_gt.spare  = 1'h0;
   assign \boot_cap1_wr_gt.dom  = 1'h0;
   assign \boot_cap1_wr_gt.perm  = 3'h0;
   assign \boot_cap1_wr_gt.b_flag  = 1'h0;
   assign \cr2_gt_wr_data.slot_id  = cr2_gt_wr_data[15:0];
-  assign \cr2_gt_wr_data.gt_seq  = cr2_gt_wr_data[22:16];
-  assign \cr2_gt_wr_data.gt_type  = cr2_gt_wr_data[24:23];
-  assign \cr2_gt_wr_data.f_flag  = cr2_gt_wr_data[25];
-  assign \cr2_gt_wr_data.spare  = cr2_gt_wr_data[26];
+  assign \cr2_gt_wr_data.gt_seq  = cr2_gt_wr_data[24:16];
+  assign \cr2_gt_wr_data.gt_type  = cr2_gt_wr_data[26:25];
   assign \cr2_gt_wr_data.dom  = cr2_gt_wr_data[27];
   assign \cr2_gt_wr_data.perm  = cr2_gt_wr_data[30:28];
   assign \cr2_gt_wr_data.b_flag  = cr2_gt_wr_data[31];
   assign \rt_cap2_wr_gt.slot_id  = 16'h0000;
-  assign \rt_cap2_wr_gt.gt_seq  = 7'h00;
+  assign \rt_cap2_wr_gt.gt_seq  = 9'h000;
   assign \rt_cap2_wr_gt.gt_type  = 2'h0;
-  assign \rt_cap2_wr_gt.f_flag  = 1'h0;
-  assign \rt_cap2_wr_gt.spare  = 1'h0;
   assign \rt_cap2_wr_gt.dom  = 1'h0;
   assign \rt_cap2_wr_gt.perm  = 3'h0;
   assign \rt_cap2_wr_gt.b_flag  = 1'h0;
   assign \boot_cap2_wr_gt.slot_id  = 16'h0000;
-  assign \boot_cap2_wr_gt.gt_seq  = 7'h00;
+  assign \boot_cap2_wr_gt.gt_seq  = 9'h000;
   assign \boot_cap2_wr_gt.gt_type  = 2'h0;
-  assign \boot_cap2_wr_gt.f_flag  = 1'h0;
-  assign \boot_cap2_wr_gt.spare  = 1'h0;
   assign \boot_cap2_wr_gt.dom  = 1'h0;
   assign \boot_cap2_wr_gt.perm  = 3'h0;
   assign \boot_cap2_wr_gt.b_flag  = 1'h0;
   assign \cr3_gt_wr_data.slot_id  = cr3_gt_wr_data[15:0];
-  assign \cr3_gt_wr_data.gt_seq  = cr3_gt_wr_data[22:16];
-  assign \cr3_gt_wr_data.gt_type  = cr3_gt_wr_data[24:23];
-  assign \cr3_gt_wr_data.f_flag  = cr3_gt_wr_data[25];
-  assign \cr3_gt_wr_data.spare  = cr3_gt_wr_data[26];
+  assign \cr3_gt_wr_data.gt_seq  = cr3_gt_wr_data[24:16];
+  assign \cr3_gt_wr_data.gt_type  = cr3_gt_wr_data[26:25];
   assign \cr3_gt_wr_data.dom  = cr3_gt_wr_data[27];
   assign \cr3_gt_wr_data.perm  = cr3_gt_wr_data[30:28];
   assign \cr3_gt_wr_data.b_flag  = cr3_gt_wr_data[31];
   assign \rt_cap3_wr_gt.slot_id  = 16'h0000;
-  assign \rt_cap3_wr_gt.gt_seq  = 7'h00;
+  assign \rt_cap3_wr_gt.gt_seq  = 9'h000;
   assign \rt_cap3_wr_gt.gt_type  = 2'h0;
-  assign \rt_cap3_wr_gt.f_flag  = 1'h0;
-  assign \rt_cap3_wr_gt.spare  = 1'h0;
   assign \rt_cap3_wr_gt.dom  = 1'h0;
   assign \rt_cap3_wr_gt.perm  = 3'h0;
   assign \rt_cap3_wr_gt.b_flag  = 1'h0;
   assign \boot_cap3_wr_gt.slot_id  = 16'h0000;
-  assign \boot_cap3_wr_gt.gt_seq  = 7'h00;
+  assign \boot_cap3_wr_gt.gt_seq  = 9'h000;
   assign \boot_cap3_wr_gt.gt_type  = 2'h0;
-  assign \boot_cap3_wr_gt.f_flag  = 1'h0;
-  assign \boot_cap3_wr_gt.spare  = 1'h0;
   assign \boot_cap3_wr_gt.dom  = 1'h0;
   assign \boot_cap3_wr_gt.perm  = 3'h0;
   assign \boot_cap3_wr_gt.b_flag  = 1'h0;
   assign \cr4_gt_wr_data.slot_id  = cr4_gt_wr_data[15:0];
-  assign \cr4_gt_wr_data.gt_seq  = cr4_gt_wr_data[22:16];
-  assign \cr4_gt_wr_data.gt_type  = cr4_gt_wr_data[24:23];
-  assign \cr4_gt_wr_data.f_flag  = cr4_gt_wr_data[25];
-  assign \cr4_gt_wr_data.spare  = cr4_gt_wr_data[26];
+  assign \cr4_gt_wr_data.gt_seq  = cr4_gt_wr_data[24:16];
+  assign \cr4_gt_wr_data.gt_type  = cr4_gt_wr_data[26:25];
   assign \cr4_gt_wr_data.dom  = cr4_gt_wr_data[27];
   assign \cr4_gt_wr_data.perm  = cr4_gt_wr_data[30:28];
   assign \cr4_gt_wr_data.b_flag  = cr4_gt_wr_data[31];
   assign \rt_cap4_wr_gt.slot_id  = 16'h0000;
-  assign \rt_cap4_wr_gt.gt_seq  = 7'h00;
+  assign \rt_cap4_wr_gt.gt_seq  = 9'h000;
   assign \rt_cap4_wr_gt.gt_type  = 2'h0;
-  assign \rt_cap4_wr_gt.f_flag  = 1'h0;
-  assign \rt_cap4_wr_gt.spare  = 1'h0;
   assign \rt_cap4_wr_gt.dom  = 1'h0;
   assign \rt_cap4_wr_gt.perm  = 3'h0;
   assign \rt_cap4_wr_gt.b_flag  = 1'h0;
   assign \boot_cap4_wr_gt.slot_id  = 16'h0000;
-  assign \boot_cap4_wr_gt.gt_seq  = 7'h00;
+  assign \boot_cap4_wr_gt.gt_seq  = 9'h000;
   assign \boot_cap4_wr_gt.gt_type  = 2'h0;
-  assign \boot_cap4_wr_gt.f_flag  = 1'h0;
-  assign \boot_cap4_wr_gt.spare  = 1'h0;
   assign \boot_cap4_wr_gt.dom  = 1'h0;
   assign \boot_cap4_wr_gt.perm  = 3'h0;
   assign \boot_cap4_wr_gt.b_flag  = 1'h0;
   assign \cr5_gt_wr_data.slot_id  = cr5_gt_wr_data[15:0];
-  assign \cr5_gt_wr_data.gt_seq  = cr5_gt_wr_data[22:16];
-  assign \cr5_gt_wr_data.gt_type  = cr5_gt_wr_data[24:23];
-  assign \cr5_gt_wr_data.f_flag  = cr5_gt_wr_data[25];
-  assign \cr5_gt_wr_data.spare  = cr5_gt_wr_data[26];
+  assign \cr5_gt_wr_data.gt_seq  = cr5_gt_wr_data[24:16];
+  assign \cr5_gt_wr_data.gt_type  = cr5_gt_wr_data[26:25];
   assign \cr5_gt_wr_data.dom  = cr5_gt_wr_data[27];
   assign \cr5_gt_wr_data.perm  = cr5_gt_wr_data[30:28];
   assign \cr5_gt_wr_data.b_flag  = cr5_gt_wr_data[31];
   assign \rt_cap5_wr_gt.slot_id  = 16'h0000;
-  assign \rt_cap5_wr_gt.gt_seq  = 7'h00;
+  assign \rt_cap5_wr_gt.gt_seq  = 9'h000;
   assign \rt_cap5_wr_gt.gt_type  = 2'h0;
-  assign \rt_cap5_wr_gt.f_flag  = 1'h0;
-  assign \rt_cap5_wr_gt.spare  = 1'h0;
   assign \rt_cap5_wr_gt.dom  = 1'h0;
   assign \rt_cap5_wr_gt.perm  = 3'h0;
   assign \rt_cap5_wr_gt.b_flag  = 1'h0;
   assign \boot_cap5_wr_gt.slot_id  = 16'h0000;
-  assign \boot_cap5_wr_gt.gt_seq  = 7'h00;
+  assign \boot_cap5_wr_gt.gt_seq  = 9'h000;
   assign \boot_cap5_wr_gt.gt_type  = 2'h0;
-  assign \boot_cap5_wr_gt.f_flag  = 1'h0;
-  assign \boot_cap5_wr_gt.spare  = 1'h0;
   assign \boot_cap5_wr_gt.dom  = 1'h0;
   assign \boot_cap5_wr_gt.perm  = 3'h0;
   assign \boot_cap5_wr_gt.b_flag  = 1'h0;
   assign \cr6_gt_wr_data.slot_id  = cr6_gt_wr_data[15:0];
-  assign \cr6_gt_wr_data.gt_seq  = cr6_gt_wr_data[22:16];
-  assign \cr6_gt_wr_data.gt_type  = cr6_gt_wr_data[24:23];
-  assign \cr6_gt_wr_data.f_flag  = cr6_gt_wr_data[25];
-  assign \cr6_gt_wr_data.spare  = cr6_gt_wr_data[26];
+  assign \cr6_gt_wr_data.gt_seq  = cr6_gt_wr_data[24:16];
+  assign \cr6_gt_wr_data.gt_type  = cr6_gt_wr_data[26:25];
   assign \cr6_gt_wr_data.dom  = cr6_gt_wr_data[27];
   assign \cr6_gt_wr_data.perm  = cr6_gt_wr_data[30:28];
   assign \cr6_gt_wr_data.b_flag  = cr6_gt_wr_data[31];
   assign \rt_cap6_wr_gt.slot_id  = 16'h0000;
-  assign \rt_cap6_wr_gt.gt_seq  = 7'h00;
+  assign \rt_cap6_wr_gt.gt_seq  = 9'h000;
   assign \rt_cap6_wr_gt.gt_type  = 2'h0;
-  assign \rt_cap6_wr_gt.f_flag  = 1'h0;
-  assign \rt_cap6_wr_gt.spare  = 1'h0;
   assign \rt_cap6_wr_gt.dom  = 1'h0;
   assign \rt_cap6_wr_gt.perm  = 3'h0;
   assign \rt_cap6_wr_gt.b_flag  = 1'h0;
   assign \boot_cap6_wr_gt.slot_id  = 16'h0000;
-  assign \boot_cap6_wr_gt.gt_seq  = 7'h00;
+  assign \boot_cap6_wr_gt.gt_seq  = 9'h000;
   assign \boot_cap6_wr_gt.gt_type  = 2'h0;
-  assign \boot_cap6_wr_gt.f_flag  = 1'h0;
-  assign \boot_cap6_wr_gt.spare  = 1'h0;
   assign \boot_cap6_wr_gt.dom  = 1'h0;
   assign \boot_cap6_wr_gt.perm  = 3'h0;
   assign \boot_cap6_wr_gt.b_flag  = 1'h0;
   assign \cr7_gt_wr_data.slot_id  = cr7_gt_wr_data[15:0];
-  assign \cr7_gt_wr_data.gt_seq  = cr7_gt_wr_data[22:16];
-  assign \cr7_gt_wr_data.gt_type  = cr7_gt_wr_data[24:23];
-  assign \cr7_gt_wr_data.f_flag  = cr7_gt_wr_data[25];
-  assign \cr7_gt_wr_data.spare  = cr7_gt_wr_data[26];
+  assign \cr7_gt_wr_data.gt_seq  = cr7_gt_wr_data[24:16];
+  assign \cr7_gt_wr_data.gt_type  = cr7_gt_wr_data[26:25];
   assign \cr7_gt_wr_data.dom  = cr7_gt_wr_data[27];
   assign \cr7_gt_wr_data.perm  = cr7_gt_wr_data[30:28];
   assign \cr7_gt_wr_data.b_flag  = cr7_gt_wr_data[31];
   assign \rt_cap7_wr_gt.slot_id  = 16'h0000;
-  assign \rt_cap7_wr_gt.gt_seq  = 7'h00;
+  assign \rt_cap7_wr_gt.gt_seq  = 9'h000;
   assign \rt_cap7_wr_gt.gt_type  = 2'h0;
-  assign \rt_cap7_wr_gt.f_flag  = 1'h0;
-  assign \rt_cap7_wr_gt.spare  = 1'h0;
   assign \rt_cap7_wr_gt.dom  = 1'h0;
   assign \rt_cap7_wr_gt.perm  = 3'h0;
   assign \rt_cap7_wr_gt.b_flag  = 1'h0;
   assign \boot_cap7_wr_gt.slot_id  = 16'h0000;
-  assign \boot_cap7_wr_gt.gt_seq  = 7'h00;
+  assign \boot_cap7_wr_gt.gt_seq  = 9'h000;
   assign \boot_cap7_wr_gt.gt_type  = 2'h0;
-  assign \boot_cap7_wr_gt.f_flag  = 1'h0;
-  assign \boot_cap7_wr_gt.spare  = 1'h0;
   assign \boot_cap7_wr_gt.dom  = 1'h0;
   assign \boot_cap7_wr_gt.perm  = 3'h0;
   assign \boot_cap7_wr_gt.b_flag  = 1'h0;
   assign \cr8_gt_wr_data.slot_id  = cr8_gt_wr_data[15:0];
-  assign \cr8_gt_wr_data.gt_seq  = cr8_gt_wr_data[22:16];
-  assign \cr8_gt_wr_data.gt_type  = cr8_gt_wr_data[24:23];
-  assign \cr8_gt_wr_data.f_flag  = cr8_gt_wr_data[25];
-  assign \cr8_gt_wr_data.spare  = cr8_gt_wr_data[26];
+  assign \cr8_gt_wr_data.gt_seq  = cr8_gt_wr_data[24:16];
+  assign \cr8_gt_wr_data.gt_type  = cr8_gt_wr_data[26:25];
   assign \cr8_gt_wr_data.dom  = cr8_gt_wr_data[27];
   assign \cr8_gt_wr_data.perm  = cr8_gt_wr_data[30:28];
   assign \cr8_gt_wr_data.b_flag  = cr8_gt_wr_data[31];
   assign \rt_cap8_wr_gt.slot_id  = 16'h0000;
-  assign \rt_cap8_wr_gt.gt_seq  = 7'h00;
+  assign \rt_cap8_wr_gt.gt_seq  = 9'h000;
   assign \rt_cap8_wr_gt.gt_type  = 2'h0;
-  assign \rt_cap8_wr_gt.f_flag  = 1'h0;
-  assign \rt_cap8_wr_gt.spare  = 1'h0;
   assign \rt_cap8_wr_gt.dom  = 1'h0;
   assign \rt_cap8_wr_gt.perm  = 3'h0;
   assign \rt_cap8_wr_gt.b_flag  = 1'h0;
+  assign \boot_cap8_wr_gt.slot_id  = 16'h0000;
+  assign \boot_cap8_wr_gt.gt_seq  = 9'h000;
+  assign \boot_cap8_wr_gt.gt_type  = 2'h0;
+  assign \boot_cap8_wr_gt.dom  = 1'h0;
+  assign \boot_cap8_wr_gt.perm  = 3'h0;
+  assign \boot_cap8_wr_gt.b_flag  = 1'h0;
   assign \cr9_gt_wr_data.slot_id  = cr9_gt_wr_data[15:0];
-  assign \cr9_gt_wr_data.gt_seq  = cr9_gt_wr_data[22:16];
-  assign \cr9_gt_wr_data.gt_type  = cr9_gt_wr_data[24:23];
-  assign \cr9_gt_wr_data.f_flag  = cr9_gt_wr_data[25];
-  assign \cr9_gt_wr_data.spare  = cr9_gt_wr_data[26];
+  assign \cr9_gt_wr_data.gt_seq  = cr9_gt_wr_data[24:16];
+  assign \cr9_gt_wr_data.gt_type  = cr9_gt_wr_data[26:25];
   assign \cr9_gt_wr_data.dom  = cr9_gt_wr_data[27];
   assign \cr9_gt_wr_data.perm  = cr9_gt_wr_data[30:28];
   assign \cr9_gt_wr_data.b_flag  = cr9_gt_wr_data[31];
   assign \rt_cap9_wr_gt.slot_id  = 16'h0000;
-  assign \rt_cap9_wr_gt.gt_seq  = 7'h00;
+  assign \rt_cap9_wr_gt.gt_seq  = 9'h000;
   assign \rt_cap9_wr_gt.gt_type  = 2'h0;
-  assign \rt_cap9_wr_gt.f_flag  = 1'h0;
-  assign \rt_cap9_wr_gt.spare  = 1'h0;
   assign \rt_cap9_wr_gt.dom  = 1'h0;
   assign \rt_cap9_wr_gt.perm  = 3'h0;
   assign \rt_cap9_wr_gt.b_flag  = 1'h0;
   assign \boot_cap9_wr_gt.slot_id  = 16'h0000;
-  assign \boot_cap9_wr_gt.gt_seq  = 7'h00;
+  assign \boot_cap9_wr_gt.gt_seq  = 9'h000;
   assign \boot_cap9_wr_gt.gt_type  = 2'h0;
-  assign \boot_cap9_wr_gt.f_flag  = 1'h0;
-  assign \boot_cap9_wr_gt.spare  = 1'h0;
   assign \boot_cap9_wr_gt.dom  = 1'h0;
   assign \boot_cap9_wr_gt.perm  = 3'h0;
   assign \boot_cap9_wr_gt.b_flag  = 1'h0;
   assign \cr10_gt_wr_data.slot_id  = cr10_gt_wr_data[15:0];
-  assign \cr10_gt_wr_data.gt_seq  = cr10_gt_wr_data[22:16];
-  assign \cr10_gt_wr_data.gt_type  = cr10_gt_wr_data[24:23];
-  assign \cr10_gt_wr_data.f_flag  = cr10_gt_wr_data[25];
-  assign \cr10_gt_wr_data.spare  = cr10_gt_wr_data[26];
+  assign \cr10_gt_wr_data.gt_seq  = cr10_gt_wr_data[24:16];
+  assign \cr10_gt_wr_data.gt_type  = cr10_gt_wr_data[26:25];
   assign \cr10_gt_wr_data.dom  = cr10_gt_wr_data[27];
   assign \cr10_gt_wr_data.perm  = cr10_gt_wr_data[30:28];
   assign \cr10_gt_wr_data.b_flag  = cr10_gt_wr_data[31];
   assign \rt_cap10_wr_gt.slot_id  = 16'h0000;
-  assign \rt_cap10_wr_gt.gt_seq  = 7'h00;
+  assign \rt_cap10_wr_gt.gt_seq  = 9'h000;
   assign \rt_cap10_wr_gt.gt_type  = 2'h0;
-  assign \rt_cap10_wr_gt.f_flag  = 1'h0;
-  assign \rt_cap10_wr_gt.spare  = 1'h0;
   assign \rt_cap10_wr_gt.dom  = 1'h0;
   assign \rt_cap10_wr_gt.perm  = 3'h0;
   assign \rt_cap10_wr_gt.b_flag  = 1'h0;
   assign \boot_cap10_wr_gt.slot_id  = 16'h0000;
-  assign \boot_cap10_wr_gt.gt_seq  = 7'h00;
+  assign \boot_cap10_wr_gt.gt_seq  = 9'h000;
   assign \boot_cap10_wr_gt.gt_type  = 2'h0;
-  assign \boot_cap10_wr_gt.f_flag  = 1'h0;
-  assign \boot_cap10_wr_gt.spare  = 1'h0;
   assign \boot_cap10_wr_gt.dom  = 1'h0;
   assign \boot_cap10_wr_gt.perm  = 3'h0;
   assign \boot_cap10_wr_gt.b_flag  = 1'h0;
   assign \cr11_gt_wr_data.slot_id  = cr11_gt_wr_data[15:0];
-  assign \cr11_gt_wr_data.gt_seq  = cr11_gt_wr_data[22:16];
-  assign \cr11_gt_wr_data.gt_type  = cr11_gt_wr_data[24:23];
-  assign \cr11_gt_wr_data.f_flag  = cr11_gt_wr_data[25];
-  assign \cr11_gt_wr_data.spare  = cr11_gt_wr_data[26];
+  assign \cr11_gt_wr_data.gt_seq  = cr11_gt_wr_data[24:16];
+  assign \cr11_gt_wr_data.gt_type  = cr11_gt_wr_data[26:25];
   assign \cr11_gt_wr_data.dom  = cr11_gt_wr_data[27];
   assign \cr11_gt_wr_data.perm  = cr11_gt_wr_data[30:28];
   assign \cr11_gt_wr_data.b_flag  = cr11_gt_wr_data[31];
   assign \rt_cap11_wr_gt.slot_id  = 16'h0000;
-  assign \rt_cap11_wr_gt.gt_seq  = 7'h00;
+  assign \rt_cap11_wr_gt.gt_seq  = 9'h000;
   assign \rt_cap11_wr_gt.gt_type  = 2'h0;
-  assign \rt_cap11_wr_gt.f_flag  = 1'h0;
-  assign \rt_cap11_wr_gt.spare  = 1'h0;
   assign \rt_cap11_wr_gt.dom  = 1'h0;
   assign \rt_cap11_wr_gt.perm  = 3'h0;
   assign \rt_cap11_wr_gt.b_flag  = 1'h0;
   assign \boot_cap11_wr_gt.slot_id  = 16'h0000;
-  assign \boot_cap11_wr_gt.gt_seq  = 7'h00;
+  assign \boot_cap11_wr_gt.gt_seq  = 9'h000;
   assign \boot_cap11_wr_gt.gt_type  = 2'h0;
-  assign \boot_cap11_wr_gt.f_flag  = 1'h0;
-  assign \boot_cap11_wr_gt.spare  = 1'h0;
   assign \boot_cap11_wr_gt.dom  = 1'h0;
   assign \boot_cap11_wr_gt.perm  = 3'h0;
   assign \boot_cap11_wr_gt.b_flag  = 1'h0;
   assign \cr12_gt_wr_data.slot_id  = cr12_gt_wr_data[15:0];
-  assign \cr12_gt_wr_data.gt_seq  = cr12_gt_wr_data[22:16];
-  assign \cr12_gt_wr_data.gt_type  = cr12_gt_wr_data[24:23];
-  assign \cr12_gt_wr_data.f_flag  = cr12_gt_wr_data[25];
-  assign \cr12_gt_wr_data.spare  = cr12_gt_wr_data[26];
+  assign \cr12_gt_wr_data.gt_seq  = cr12_gt_wr_data[24:16];
+  assign \cr12_gt_wr_data.gt_type  = cr12_gt_wr_data[26:25];
   assign \cr12_gt_wr_data.dom  = cr12_gt_wr_data[27];
   assign \cr12_gt_wr_data.perm  = cr12_gt_wr_data[30:28];
   assign \cr12_gt_wr_data.b_flag  = cr12_gt_wr_data[31];
   assign \rt_cap12_wr_gt.slot_id  = 16'h0000;
-  assign \rt_cap12_wr_gt.gt_seq  = 7'h00;
+  assign \rt_cap12_wr_gt.gt_seq  = 9'h000;
   assign \rt_cap12_wr_gt.gt_type  = 2'h0;
-  assign \rt_cap12_wr_gt.f_flag  = 1'h0;
-  assign \rt_cap12_wr_gt.spare  = 1'h0;
   assign \rt_cap12_wr_gt.dom  = 1'h0;
   assign \rt_cap12_wr_gt.perm  = 3'h0;
   assign \rt_cap12_wr_gt.b_flag  = 1'h0;
-  assign \boot_cap12_wr_gt.slot_id  = 16'h0000;
-  assign \boot_cap12_wr_gt.gt_seq  = 7'h00;
-  assign \boot_cap12_wr_gt.gt_type  = 2'h0;
-  assign \boot_cap12_wr_gt.f_flag  = 1'h0;
-  assign \boot_cap12_wr_gt.spare  = 1'h0;
-  assign \boot_cap12_wr_gt.dom  = 1'h0;
-  assign \boot_cap12_wr_gt.perm  = 3'h0;
-  assign \boot_cap12_wr_gt.b_flag  = 1'h0;
   assign \cr13_gt_wr_data.slot_id  = cr13_gt_wr_data[15:0];
-  assign \cr13_gt_wr_data.gt_seq  = cr13_gt_wr_data[22:16];
-  assign \cr13_gt_wr_data.gt_type  = cr13_gt_wr_data[24:23];
-  assign \cr13_gt_wr_data.f_flag  = cr13_gt_wr_data[25];
-  assign \cr13_gt_wr_data.spare  = cr13_gt_wr_data[26];
+  assign \cr13_gt_wr_data.gt_seq  = cr13_gt_wr_data[24:16];
+  assign \cr13_gt_wr_data.gt_type  = cr13_gt_wr_data[26:25];
   assign \cr13_gt_wr_data.dom  = cr13_gt_wr_data[27];
   assign \cr13_gt_wr_data.perm  = cr13_gt_wr_data[30:28];
   assign \cr13_gt_wr_data.b_flag  = cr13_gt_wr_data[31];
   assign \rt_cap13_wr_gt.slot_id  = 16'h0000;
-  assign \rt_cap13_wr_gt.gt_seq  = 7'h00;
+  assign \rt_cap13_wr_gt.gt_seq  = 9'h000;
   assign \rt_cap13_wr_gt.gt_type  = 2'h0;
-  assign \rt_cap13_wr_gt.f_flag  = 1'h0;
-  assign \rt_cap13_wr_gt.spare  = 1'h0;
   assign \rt_cap13_wr_gt.dom  = 1'h0;
   assign \rt_cap13_wr_gt.perm  = 3'h0;
   assign \rt_cap13_wr_gt.b_flag  = 1'h0;
   assign \boot_cap13_wr_gt.slot_id  = 16'h0000;
-  assign \boot_cap13_wr_gt.gt_seq  = 7'h00;
+  assign \boot_cap13_wr_gt.gt_seq  = 9'h000;
   assign \boot_cap13_wr_gt.gt_type  = 2'h0;
-  assign \boot_cap13_wr_gt.f_flag  = 1'h0;
-  assign \boot_cap13_wr_gt.spare  = 1'h0;
   assign \boot_cap13_wr_gt.dom  = 1'h0;
   assign \boot_cap13_wr_gt.perm  = 3'h0;
   assign \boot_cap13_wr_gt.b_flag  = 1'h0;
   assign \cr14_gt_wr_data.slot_id  = cr14_gt_wr_data[15:0];
-  assign \cr14_gt_wr_data.gt_seq  = cr14_gt_wr_data[22:16];
-  assign \cr14_gt_wr_data.gt_type  = cr14_gt_wr_data[24:23];
-  assign \cr14_gt_wr_data.f_flag  = cr14_gt_wr_data[25];
-  assign \cr14_gt_wr_data.spare  = cr14_gt_wr_data[26];
+  assign \cr14_gt_wr_data.gt_seq  = cr14_gt_wr_data[24:16];
+  assign \cr14_gt_wr_data.gt_type  = cr14_gt_wr_data[26:25];
   assign \cr14_gt_wr_data.dom  = cr14_gt_wr_data[27];
   assign \cr14_gt_wr_data.perm  = cr14_gt_wr_data[30:28];
   assign \cr14_gt_wr_data.b_flag  = cr14_gt_wr_data[31];
   assign \rt_cap14_wr_gt.slot_id  = 16'h0000;
-  assign \rt_cap14_wr_gt.gt_seq  = 7'h00;
+  assign \rt_cap14_wr_gt.gt_seq  = 9'h000;
   assign \rt_cap14_wr_gt.gt_type  = 2'h0;
-  assign \rt_cap14_wr_gt.f_flag  = 1'h0;
-  assign \rt_cap14_wr_gt.spare  = 1'h0;
   assign \rt_cap14_wr_gt.dom  = 1'h0;
   assign \rt_cap14_wr_gt.perm  = 3'h0;
   assign \rt_cap14_wr_gt.b_flag  = 1'h0;
   assign \cr15_gt_wr_data.slot_id  = cr15_gt_wr_data[15:0];
-  assign \cr15_gt_wr_data.gt_seq  = cr15_gt_wr_data[22:16];
-  assign \cr15_gt_wr_data.gt_type  = cr15_gt_wr_data[24:23];
-  assign \cr15_gt_wr_data.f_flag  = cr15_gt_wr_data[25];
-  assign \cr15_gt_wr_data.spare  = cr15_gt_wr_data[26];
+  assign \cr15_gt_wr_data.gt_seq  = cr15_gt_wr_data[24:16];
+  assign \cr15_gt_wr_data.gt_type  = cr15_gt_wr_data[26:25];
   assign \cr15_gt_wr_data.dom  = cr15_gt_wr_data[27];
   assign \cr15_gt_wr_data.perm  = cr15_gt_wr_data[30:28];
   assign \cr15_gt_wr_data.b_flag  = cr15_gt_wr_data[31];
   assign \rt_cap15_wr_gt.slot_id  = 16'h0000;
-  assign \rt_cap15_wr_gt.gt_seq  = 7'h00;
+  assign \rt_cap15_wr_gt.gt_seq  = 9'h000;
   assign \rt_cap15_wr_gt.gt_type  = 2'h0;
-  assign \rt_cap15_wr_gt.f_flag  = 1'h0;
-  assign \rt_cap15_wr_gt.spare  = 1'h0;
   assign \rt_cap15_wr_gt.dom  = 1'h0;
   assign \rt_cap15_wr_gt.perm  = 3'h0;
   assign \rt_cap15_wr_gt.b_flag  = 1'h0;
   assign \boot_cap15_wr_gt.slot_id  = 16'h0000;
-  assign \boot_cap15_wr_gt.gt_seq  = 7'h00;
+  assign \boot_cap15_wr_gt.gt_seq  = 9'h000;
   assign \boot_cap15_wr_gt.gt_type  = 2'h0;
-  assign \boot_cap15_wr_gt.f_flag  = 1'h0;
-  assign \boot_cap15_wr_gt.spare  = 1'h0;
   assign \boot_cap15_wr_gt.dom  = 1'h0;
   assign \boot_cap15_wr_gt.perm  = 3'h0;
   assign \boot_cap15_wr_gt.b_flag  = 1'h0;
   assign \src_cr_data.word0_gt  = cr_rd_data[31:0];
   assign \src_cr_data.word0_gt.slot_id  = cr_rd_data[15:0];
-  assign \src_cr_data.word0_gt.gt_seq  = cr_rd_data[22:16];
-  assign \src_cr_data.word0_gt.gt_type  = cr_rd_data[24:23];
-  assign \src_cr_data.word0_gt.f_flag  = cr_rd_data[25];
-  assign \src_cr_data.word0_gt.spare  = cr_rd_data[26];
+  assign \src_cr_data.word0_gt.gt_seq  = cr_rd_data[24:16];
+  assign \src_cr_data.word0_gt.gt_type  = cr_rd_data[26:25];
   assign \src_cr_data.word0_gt.dom  = cr_rd_data[27];
   assign \src_cr_data.word0_gt.perm  = cr_rd_data[30:28];
   assign \src_cr_data.word0_gt.b_flag  = cr_rd_data[31];
@@ -6743,10 +6265,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \src_cr_data.word2_w2  = cr_rd_data[95:64];
   assign \cr_rd_data$288.word0_gt  = cr_rd_data[31:0];
   assign \cr_rd_data$288.word0_gt.slot_id  = cr_rd_data[15:0];
-  assign \cr_rd_data$288.word0_gt.gt_seq  = cr_rd_data[22:16];
-  assign \cr_rd_data$288.word0_gt.gt_type  = cr_rd_data[24:23];
-  assign \cr_rd_data$288.word0_gt.f_flag  = cr_rd_data[25];
-  assign \cr_rd_data$288.word0_gt.spare  = cr_rd_data[26];
+  assign \cr_rd_data$288.word0_gt.gt_seq  = cr_rd_data[24:16];
+  assign \cr_rd_data$288.word0_gt.gt_type  = cr_rd_data[26:25];
   assign \cr_rd_data$288.word0_gt.dom  = cr_rd_data[27];
   assign \cr_rd_data$288.word0_gt.perm  = cr_rd_data[30:28];
   assign \cr_rd_data$288.word0_gt.b_flag  = cr_rd_data[31];
@@ -6754,10 +6274,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr_rd_data$288.word2_w2  = cr_rd_data[95:64];
   assign \cr15_namespace$289.word0_gt  = cr15_namespace[31:0];
   assign \cr15_namespace$289.word0_gt.slot_id  = cr15_namespace[15:0];
-  assign \cr15_namespace$289.word0_gt.gt_seq  = cr15_namespace[22:16];
-  assign \cr15_namespace$289.word0_gt.gt_type  = cr15_namespace[24:23];
-  assign \cr15_namespace$289.word0_gt.f_flag  = cr15_namespace[25];
-  assign \cr15_namespace$289.word0_gt.spare  = cr15_namespace[26];
+  assign \cr15_namespace$289.word0_gt.gt_seq  = cr15_namespace[24:16];
+  assign \cr15_namespace$289.word0_gt.gt_type  = cr15_namespace[26:25];
   assign \cr15_namespace$289.word0_gt.dom  = cr15_namespace[27];
   assign \cr15_namespace$289.word0_gt.perm  = cr15_namespace[30:28];
   assign \cr15_namespace$289.word0_gt.b_flag  = cr15_namespace[31];
@@ -6765,10 +6283,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr15_namespace$289.word2_w2  = cr15_namespace[95:64];
   assign \cr14_code.word0_gt  = cr14_code[31:0];
   assign \cr14_code.word0_gt.slot_id  = cr14_code[15:0];
-  assign \cr14_code.word0_gt.gt_seq  = cr14_code[22:16];
-  assign \cr14_code.word0_gt.gt_type  = cr14_code[24:23];
-  assign \cr14_code.word0_gt.f_flag  = cr14_code[25];
-  assign \cr14_code.word0_gt.spare  = cr14_code[26];
+  assign \cr14_code.word0_gt.gt_seq  = cr14_code[24:16];
+  assign \cr14_code.word0_gt.gt_type  = cr14_code[26:25];
   assign \cr14_code.word0_gt.dom  = cr14_code[27];
   assign \cr14_code.word0_gt.perm  = cr14_code[30:28];
   assign \cr14_code.word0_gt.b_flag  = cr14_code[31];
@@ -6776,10 +6292,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr14_code.word2_w2  = cr14_code[95:64];
   assign \cr14_code$291.word0_gt  = cr14_code[31:0];
   assign \cr14_code$291.word0_gt.slot_id  = cr14_code[15:0];
-  assign \cr14_code$291.word0_gt.gt_seq  = cr14_code[22:16];
-  assign \cr14_code$291.word0_gt.gt_type  = cr14_code[24:23];
-  assign \cr14_code$291.word0_gt.f_flag  = cr14_code[25];
-  assign \cr14_code$291.word0_gt.spare  = cr14_code[26];
+  assign \cr14_code$291.word0_gt.gt_seq  = cr14_code[24:16];
+  assign \cr14_code$291.word0_gt.gt_type  = cr14_code[26:25];
   assign \cr14_code$291.word0_gt.dom  = cr14_code[27];
   assign \cr14_code$291.word0_gt.perm  = cr14_code[30:28];
   assign \cr14_code$291.word0_gt.b_flag  = cr14_code[31];
@@ -6787,10 +6301,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr14_code$291.word2_w2  = cr14_code[95:64];
   assign \cr5_heap.word0_gt  = cr5_heap[31:0];
   assign \cr5_heap.word0_gt.slot_id  = cr5_heap[15:0];
-  assign \cr5_heap.word0_gt.gt_seq  = cr5_heap[22:16];
-  assign \cr5_heap.word0_gt.gt_type  = cr5_heap[24:23];
-  assign \cr5_heap.word0_gt.f_flag  = cr5_heap[25];
-  assign \cr5_heap.word0_gt.spare  = cr5_heap[26];
+  assign \cr5_heap.word0_gt.gt_seq  = cr5_heap[24:16];
+  assign \cr5_heap.word0_gt.gt_type  = cr5_heap[26:25];
   assign \cr5_heap.word0_gt.dom  = cr5_heap[27];
   assign \cr5_heap.word0_gt.perm  = cr5_heap[30:28];
   assign \cr5_heap.word0_gt.b_flag  = cr5_heap[31];
@@ -6798,10 +6310,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr5_heap.word2_w2  = cr5_heap[95:64];
   assign \cr5_heap$296.word0_gt  = cr5_heap[31:0];
   assign \cr5_heap$296.word0_gt.slot_id  = cr5_heap[15:0];
-  assign \cr5_heap$296.word0_gt.gt_seq  = cr5_heap[22:16];
-  assign \cr5_heap$296.word0_gt.gt_type  = cr5_heap[24:23];
-  assign \cr5_heap$296.word0_gt.f_flag  = cr5_heap[25];
-  assign \cr5_heap$296.word0_gt.spare  = cr5_heap[26];
+  assign \cr5_heap$296.word0_gt.gt_seq  = cr5_heap[24:16];
+  assign \cr5_heap$296.word0_gt.gt_type  = cr5_heap[26:25];
   assign \cr5_heap$296.word0_gt.dom  = cr5_heap[27];
   assign \cr5_heap$296.word0_gt.perm  = cr5_heap[30:28];
   assign \cr5_heap$296.word0_gt.b_flag  = cr5_heap[31];
@@ -6809,10 +6319,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr5_heap$296.word2_w2  = cr5_heap[95:64];
   assign \cr12_thread.word0_gt  = cr12_thread[31:0];
   assign \cr12_thread.word0_gt.slot_id  = cr12_thread[15:0];
-  assign \cr12_thread.word0_gt.gt_seq  = cr12_thread[22:16];
-  assign \cr12_thread.word0_gt.gt_type  = cr12_thread[24:23];
-  assign \cr12_thread.word0_gt.f_flag  = cr12_thread[25];
-  assign \cr12_thread.word0_gt.spare  = cr12_thread[26];
+  assign \cr12_thread.word0_gt.gt_seq  = cr12_thread[24:16];
+  assign \cr12_thread.word0_gt.gt_type  = cr12_thread[26:25];
   assign \cr12_thread.word0_gt.dom  = cr12_thread[27];
   assign \cr12_thread.word0_gt.perm  = cr12_thread[30:28];
   assign \cr12_thread.word0_gt.b_flag  = cr12_thread[31];
@@ -6820,10 +6328,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr12_thread.word2_w2  = cr12_thread[95:64];
   assign \cr12_thread$299.word0_gt  = cr12_thread[31:0];
   assign \cr12_thread$299.word0_gt.slot_id  = cr12_thread[15:0];
-  assign \cr12_thread$299.word0_gt.gt_seq  = cr12_thread[22:16];
-  assign \cr12_thread$299.word0_gt.gt_type  = cr12_thread[24:23];
-  assign \cr12_thread$299.word0_gt.f_flag  = cr12_thread[25];
-  assign \cr12_thread$299.word0_gt.spare  = cr12_thread[26];
+  assign \cr12_thread$299.word0_gt.gt_seq  = cr12_thread[24:16];
+  assign \cr12_thread$299.word0_gt.gt_type  = cr12_thread[26:25];
   assign \cr12_thread$299.word0_gt.dom  = cr12_thread[27];
   assign \cr12_thread$299.word0_gt.perm  = cr12_thread[30:28];
   assign \cr12_thread$299.word0_gt.b_flag  = cr12_thread[31];
@@ -6831,10 +6337,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr12_thread$299.word2_w2  = cr12_thread[95:64];
   assign \cr_rd_data$309.word0_gt  = cr_rd_data[31:0];
   assign \cr_rd_data$309.word0_gt.slot_id  = cr_rd_data[15:0];
-  assign \cr_rd_data$309.word0_gt.gt_seq  = cr_rd_data[22:16];
-  assign \cr_rd_data$309.word0_gt.gt_type  = cr_rd_data[24:23];
-  assign \cr_rd_data$309.word0_gt.f_flag  = cr_rd_data[25];
-  assign \cr_rd_data$309.word0_gt.spare  = cr_rd_data[26];
+  assign \cr_rd_data$309.word0_gt.gt_seq  = cr_rd_data[24:16];
+  assign \cr_rd_data$309.word0_gt.gt_type  = cr_rd_data[26:25];
   assign \cr_rd_data$309.word0_gt.dom  = cr_rd_data[27];
   assign \cr_rd_data$309.word0_gt.perm  = cr_rd_data[30:28];
   assign \cr_rd_data$309.word0_gt.b_flag  = cr_rd_data[31];
@@ -6842,10 +6346,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr_rd_data$309.word2_w2  = cr_rd_data[95:64];
   assign \cr5_heap$314.word0_gt  = cr5_heap[31:0];
   assign \cr5_heap$314.word0_gt.slot_id  = cr5_heap[15:0];
-  assign \cr5_heap$314.word0_gt.gt_seq  = cr5_heap[22:16];
-  assign \cr5_heap$314.word0_gt.gt_type  = cr5_heap[24:23];
-  assign \cr5_heap$314.word0_gt.f_flag  = cr5_heap[25];
-  assign \cr5_heap$314.word0_gt.spare  = cr5_heap[26];
+  assign \cr5_heap$314.word0_gt.gt_seq  = cr5_heap[24:16];
+  assign \cr5_heap$314.word0_gt.gt_type  = cr5_heap[26:25];
   assign \cr5_heap$314.word0_gt.dom  = cr5_heap[27];
   assign \cr5_heap$314.word0_gt.perm  = cr5_heap[30:28];
   assign \cr5_heap$314.word0_gt.b_flag  = cr5_heap[31];
@@ -6853,10 +6355,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr5_heap$314.word2_w2  = cr5_heap[95:64];
   assign \cr12_thread$315.word0_gt  = cr12_thread[31:0];
   assign \cr12_thread$315.word0_gt.slot_id  = cr12_thread[15:0];
-  assign \cr12_thread$315.word0_gt.gt_seq  = cr12_thread[22:16];
-  assign \cr12_thread$315.word0_gt.gt_type  = cr12_thread[24:23];
-  assign \cr12_thread$315.word0_gt.f_flag  = cr12_thread[25];
-  assign \cr12_thread$315.word0_gt.spare  = cr12_thread[26];
+  assign \cr12_thread$315.word0_gt.gt_seq  = cr12_thread[24:16];
+  assign \cr12_thread$315.word0_gt.gt_type  = cr12_thread[26:25];
   assign \cr12_thread$315.word0_gt.dom  = cr12_thread[27];
   assign \cr12_thread$315.word0_gt.perm  = cr12_thread[30:28];
   assign \cr12_thread$315.word0_gt.b_flag  = cr12_thread[31];
@@ -6864,10 +6364,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr12_thread$315.word2_w2  = cr12_thread[95:64];
   assign \cr15_namespace$321.word0_gt  = cr15_namespace[31:0];
   assign \cr15_namespace$321.word0_gt.slot_id  = cr15_namespace[15:0];
-  assign \cr15_namespace$321.word0_gt.gt_seq  = cr15_namespace[22:16];
-  assign \cr15_namespace$321.word0_gt.gt_type  = cr15_namespace[24:23];
-  assign \cr15_namespace$321.word0_gt.f_flag  = cr15_namespace[25];
-  assign \cr15_namespace$321.word0_gt.spare  = cr15_namespace[26];
+  assign \cr15_namespace$321.word0_gt.gt_seq  = cr15_namespace[24:16];
+  assign \cr15_namespace$321.word0_gt.gt_type  = cr15_namespace[26:25];
   assign \cr15_namespace$321.word0_gt.dom  = cr15_namespace[27];
   assign \cr15_namespace$321.word0_gt.perm  = cr15_namespace[30:28];
   assign \cr15_namespace$321.word0_gt.b_flag  = cr15_namespace[31];
@@ -6875,10 +6373,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr15_namespace$321.word2_w2  = cr15_namespace[95:64];
   assign \cr_rd_data$330.word0_gt  = cr_rd_data[31:0];
   assign \cr_rd_data$330.word0_gt.slot_id  = cr_rd_data[15:0];
-  assign \cr_rd_data$330.word0_gt.gt_seq  = cr_rd_data[22:16];
-  assign \cr_rd_data$330.word0_gt.gt_type  = cr_rd_data[24:23];
-  assign \cr_rd_data$330.word0_gt.f_flag  = cr_rd_data[25];
-  assign \cr_rd_data$330.word0_gt.spare  = cr_rd_data[26];
+  assign \cr_rd_data$330.word0_gt.gt_seq  = cr_rd_data[24:16];
+  assign \cr_rd_data$330.word0_gt.gt_type  = cr_rd_data[26:25];
   assign \cr_rd_data$330.word0_gt.dom  = cr_rd_data[27];
   assign \cr_rd_data$330.word0_gt.perm  = cr_rd_data[30:28];
   assign \cr_rd_data$330.word0_gt.b_flag  = cr_rd_data[31];
@@ -6886,10 +6382,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr_rd_data$330.word2_w2  = cr_rd_data[95:64];
   assign \cr_rd_data$338.word0_gt  = cr_rd_data[31:0];
   assign \cr_rd_data$338.word0_gt.slot_id  = cr_rd_data[15:0];
-  assign \cr_rd_data$338.word0_gt.gt_seq  = cr_rd_data[22:16];
-  assign \cr_rd_data$338.word0_gt.gt_type  = cr_rd_data[24:23];
-  assign \cr_rd_data$338.word0_gt.f_flag  = cr_rd_data[25];
-  assign \cr_rd_data$338.word0_gt.spare  = cr_rd_data[26];
+  assign \cr_rd_data$338.word0_gt.gt_seq  = cr_rd_data[24:16];
+  assign \cr_rd_data$338.word0_gt.gt_type  = cr_rd_data[26:25];
   assign \cr_rd_data$338.word0_gt.dom  = cr_rd_data[27];
   assign \cr_rd_data$338.word0_gt.perm  = cr_rd_data[30:28];
   assign \cr_rd_data$338.word0_gt.b_flag  = cr_rd_data[31];
@@ -6897,10 +6391,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr_rd_data$338.word2_w2  = cr_rd_data[95:64];
   assign \cr15_namespace$339.word0_gt  = cr15_namespace[31:0];
   assign \cr15_namespace$339.word0_gt.slot_id  = cr15_namespace[15:0];
-  assign \cr15_namespace$339.word0_gt.gt_seq  = cr15_namespace[22:16];
-  assign \cr15_namespace$339.word0_gt.gt_type  = cr15_namespace[24:23];
-  assign \cr15_namespace$339.word0_gt.f_flag  = cr15_namespace[25];
-  assign \cr15_namespace$339.word0_gt.spare  = cr15_namespace[26];
+  assign \cr15_namespace$339.word0_gt.gt_seq  = cr15_namespace[24:16];
+  assign \cr15_namespace$339.word0_gt.gt_type  = cr15_namespace[26:25];
   assign \cr15_namespace$339.word0_gt.dom  = cr15_namespace[27];
   assign \cr15_namespace$339.word0_gt.perm  = cr15_namespace[30:28];
   assign \cr15_namespace$339.word0_gt.b_flag  = cr15_namespace[31];
@@ -6908,10 +6400,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr15_namespace$339.word2_w2  = cr15_namespace[95:64];
   assign \cr_rd_data$350.word0_gt  = cr_rd_data[31:0];
   assign \cr_rd_data$350.word0_gt.slot_id  = cr_rd_data[15:0];
-  assign \cr_rd_data$350.word0_gt.gt_seq  = cr_rd_data[22:16];
-  assign \cr_rd_data$350.word0_gt.gt_type  = cr_rd_data[24:23];
-  assign \cr_rd_data$350.word0_gt.f_flag  = cr_rd_data[25];
-  assign \cr_rd_data$350.word0_gt.spare  = cr_rd_data[26];
+  assign \cr_rd_data$350.word0_gt.gt_seq  = cr_rd_data[24:16];
+  assign \cr_rd_data$350.word0_gt.gt_type  = cr_rd_data[26:25];
   assign \cr_rd_data$350.word0_gt.dom  = cr_rd_data[27];
   assign \cr_rd_data$350.word0_gt.perm  = cr_rd_data[30:28];
   assign \cr_rd_data$350.word0_gt.b_flag  = cr_rd_data[31];
@@ -6919,10 +6409,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr_rd_data$350.word2_w2  = cr_rd_data[95:64];
   assign \cr_rd_data$360.word0_gt  = cr_rd_data[31:0];
   assign \cr_rd_data$360.word0_gt.slot_id  = cr_rd_data[15:0];
-  assign \cr_rd_data$360.word0_gt.gt_seq  = cr_rd_data[22:16];
-  assign \cr_rd_data$360.word0_gt.gt_type  = cr_rd_data[24:23];
-  assign \cr_rd_data$360.word0_gt.f_flag  = cr_rd_data[25];
-  assign \cr_rd_data$360.word0_gt.spare  = cr_rd_data[26];
+  assign \cr_rd_data$360.word0_gt.gt_seq  = cr_rd_data[24:16];
+  assign \cr_rd_data$360.word0_gt.gt_type  = cr_rd_data[26:25];
   assign \cr_rd_data$360.word0_gt.dom  = cr_rd_data[27];
   assign \cr_rd_data$360.word0_gt.perm  = cr_rd_data[30:28];
   assign \cr_rd_data$360.word0_gt.b_flag  = cr_rd_data[31];
@@ -6930,10 +6418,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr_rd_data$360.word2_w2  = cr_rd_data[95:64];
   assign \cr_rd_data$541.word0_gt  = cr_rd_data[31:0];
   assign \cr_rd_data$541.word0_gt.slot_id  = cr_rd_data[15:0];
-  assign \cr_rd_data$541.word0_gt.gt_seq  = cr_rd_data[22:16];
-  assign \cr_rd_data$541.word0_gt.gt_type  = cr_rd_data[24:23];
-  assign \cr_rd_data$541.word0_gt.f_flag  = cr_rd_data[25];
-  assign \cr_rd_data$541.word0_gt.spare  = cr_rd_data[26];
+  assign \cr_rd_data$541.word0_gt.gt_seq  = cr_rd_data[24:16];
+  assign \cr_rd_data$541.word0_gt.gt_type  = cr_rd_data[26:25];
   assign \cr_rd_data$541.word0_gt.dom  = cr_rd_data[27];
   assign \cr_rd_data$541.word0_gt.perm  = cr_rd_data[30:28];
   assign \cr_rd_data$541.word0_gt.b_flag  = cr_rd_data[31];
@@ -6941,10 +6427,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr_rd_data$541.word2_w2  = cr_rd_data[95:64];
   assign \cr15_namespace$542.word0_gt  = cr15_namespace[31:0];
   assign \cr15_namespace$542.word0_gt.slot_id  = cr15_namespace[15:0];
-  assign \cr15_namespace$542.word0_gt.gt_seq  = cr15_namespace[22:16];
-  assign \cr15_namespace$542.word0_gt.gt_type  = cr15_namespace[24:23];
-  assign \cr15_namespace$542.word0_gt.f_flag  = cr15_namespace[25];
-  assign \cr15_namespace$542.word0_gt.spare  = cr15_namespace[26];
+  assign \cr15_namespace$542.word0_gt.gt_seq  = cr15_namespace[24:16];
+  assign \cr15_namespace$542.word0_gt.gt_type  = cr15_namespace[26:25];
   assign \cr15_namespace$542.word0_gt.dom  = cr15_namespace[27];
   assign \cr15_namespace$542.word0_gt.perm  = cr15_namespace[30:28];
   assign \cr15_namespace$542.word0_gt.b_flag  = cr15_namespace[31];
@@ -6979,11 +6463,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign iadd_flags_sig[1] = \$105 ;
   assign iadd_flags_sig[0] = iadd_result[31];
   always @*
-    cr14_gt[26:25] = 2'h0;
-  always @*
     cr14_gt[31] = 1'h0;
-  always @*
-    thrd_gt[26:25] = 2'h0;
   always @*
     thrd_gt[31] = 1'h0;
   assign \$43  = \$42 ;
@@ -6992,8 +6472,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \$52  = \$51 ;
   assign \$61  = \$60 ;
   assign \$63  = \$62 ;
-  assign w1_masked[28] = 1'h0;
-  assign { w1_masked[31:29], w1_masked[27:0] } = { cr15_namespace[95:93], cr15_namespace[91:64] };
+  assign w1_masked[31:30] = 2'h0;
+  assign w1_masked[29:0] = cr15_namespace[93:64];
   assign { cr15_m_set_integrity[29], cr15_m_set_integrity[24], cr15_m_set_integrity[22], cr15_m_set_integrity[20], cr15_m_set_integrity[17], cr15_m_set_integrity[14], cr15_m_set_integrity[8], cr15_m_set_integrity[4] } = { \$64 [29], \$64 [24], \$64 [22], \$64 [20], \$64 [17], \$64 [14], \$64 [8], \$64 [4] };
   assign { cr15_m_set_integrity[31:30], cr15_m_set_integrity[28:25], cr15_m_set_integrity[23], cr15_m_set_integrity[21], cr15_m_set_integrity[19:18], cr15_m_set_integrity[16:15], cr15_m_set_integrity[13:9], cr15_m_set_integrity[7:5], cr15_m_set_integrity[3:0] } = \$auto$rtlil.cc:2739:Not$10 ;
   assign cr0_gt_wr_en = 1'h0;
@@ -7012,15 +6492,15 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign cr6_gt_wr_data = 32'd0;
   assign cr7_gt_wr_en = 1'h0;
   assign cr7_gt_wr_data = 32'd0;
-  assign cr8_gt_wr_en = boot_cap8_wr_en;
+  assign cr8_gt_wr_en = 1'h0;
+  assign cr8_gt_wr_data = 32'd0;
   assign cr9_gt_wr_en = 1'h0;
   assign cr9_gt_wr_data = 32'd0;
   assign cr10_gt_wr_en = 1'h0;
   assign cr10_gt_wr_data = 32'd0;
   assign cr11_gt_wr_en = 1'h0;
   assign cr11_gt_wr_data = 32'd0;
-  assign cr12_gt_wr_en = 1'h0;
-  assign cr12_gt_wr_data = 32'd0;
+  assign cr12_gt_wr_en = boot_cap12_wr_en;
   assign cr13_gt_wr_en = 1'h0;
   assign cr13_gt_wr_data = 32'd0;
   assign cr14_gt_wr_en = boot_cap14_wr_en;
@@ -7033,20 +6513,20 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign result_gt_in = outform_result_gt;
   assign \$164  = { 1'h0, \$156 [31:0], 2'h0 };
   assign \$165  = { 3'h0, mint_slot_id_reg, 4'h0 };
-  assign { \$167 [29:28], \$167 [26:24], \$167 [22:17], \$167 [15:0] } = { 11'h000, mint_slot_id_reg };
-  assign { \$167 [30], \$167 [27], \$167 [23], \$167 [16] } = 4'hf;
+  assign { \$167 [29:28], \$167 [26], \$167 [24:17], \$167 [15:0] } = { 11'h000, mint_slot_id_reg };
+  assign { \$167 [30], \$167 [27], \$167 [25], \$167 [16] } = 4'hf;
   assign \$169 [20:0] = { 5'h00, \$168  };
   assign \$169 [21] = 1'h1;
-  assign \w1_masked$458 [28] = 1'h0;
-  assign { \w1_masked$458 [31:29], \w1_masked$458 [27:0] } = { 15'h0020, \$168  };
+  assign \w1_masked$458 [31:30] = 2'h0;
+  assign \w1_masked$458 [29:0] = { 14'h0020, \$168  };
   assign { mint_integrity[29], mint_integrity[24], mint_integrity[22], mint_integrity[20], mint_integrity[17], mint_integrity[14], mint_integrity[8], mint_integrity[4] } = { \$170 [29], \$170 [24], \$170 [22], \$170 [20], \$170 [17], \$170 [14], \$170 [8], \$170 [4] };
   assign { mint_integrity[31:30], mint_integrity[28:25], mint_integrity[23], mint_integrity[21], mint_integrity[19:18], mint_integrity[16:15], mint_integrity[13:9], mint_integrity[7:5], mint_integrity[3:0] } = \$auto$rtlil.cc:2739:Not$12 ;
   assign \$176  = { 1'h0, mint_scan_idx_reg, 2'h0 };
   assign \$183  = { 1'h0, cc_off, 2'h0 };
   assign \$185  = { 1'h0, mint_copy_idx_reg, 2'h0 };
   assign \$188  = \$187 ;
-  assign \w1_masked$489 [28] = 1'h0;
-  assign { \w1_masked$489 [31:29], \w1_masked$489 [27:0] } = { mwin_dr13_lat[31:29], mwin_dr13_lat[27:0] };
+  assign \w1_masked$489 [31:30] = 2'h0;
+  assign \w1_masked$489 [29:0] = mwin_dr13_lat[29:0];
   assign { mwin_integrity_computed[29], mwin_integrity_computed[24], mwin_integrity_computed[22], mwin_integrity_computed[20], mwin_integrity_computed[17], mwin_integrity_computed[14], mwin_integrity_computed[8], mwin_integrity_computed[4] } = { \$189 [29], \$189 [24], \$189 [22], \$189 [20], \$189 [17], \$189 [14], \$189 [8], \$189 [4] };
   assign { mwin_integrity_computed[31:30], mwin_integrity_computed[28:25], mwin_integrity_computed[23], mwin_integrity_computed[21], mwin_integrity_computed[19:18], mwin_integrity_computed[16:15], mwin_integrity_computed[13:9], mwin_integrity_computed[7:5], mwin_integrity_computed[3:0] } = \$auto$rtlil.cc:2739:Not$14 ;
   assign { mwin_fnv_xor[30:25], mwin_fnv_xor[23:21], mwin_fnv_xor[17:16], mwin_fnv_xor[14:13], mwin_fnv_xor[9], mwin_fnv_xor[5:3], mwin_fnv_xor[1] } = { mwin_dr12_lat[30:25], mwin_dr12_lat[23:21], mwin_dr12_lat[17:16], mwin_dr12_lat[14:13], mwin_dr12_lat[9], mwin_dr12_lat[5:3], mwin_dr12_lat[1] };
@@ -7217,17 +6697,13 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   (* src = "/home/runner/workspace/hardware/call.py:74" *)
   wire \cr12_thread.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/call.py:74" *)
-  wire \cr12_thread.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/call.py:74" *)
-  wire [6:0] \cr12_thread.word0_gt.gt_seq ;
+  wire [8:0] \cr12_thread.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/call.py:74" *)
   wire [1:0] \cr12_thread.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/call.py:74" *)
   wire [2:0] \cr12_thread.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/call.py:74" *)
   wire [15:0] \cr12_thread.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/call.py:74" *)
-  wire \cr12_thread.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/call.py:74" *)
   wire [31:0] \cr12_thread.word1_location ;
   (* src = "/home/runner/workspace/hardware/call.py:74" *)
@@ -7242,17 +6718,13 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   (* src = "/home/runner/workspace/hardware/call.py:60" *)
   wire \cr14_code.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/call.py:60" *)
-  wire \cr14_code.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/call.py:60" *)
-  wire [6:0] \cr14_code.word0_gt.gt_seq ;
+  wire [8:0] \cr14_code.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/call.py:60" *)
   wire [1:0] \cr14_code.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/call.py:60" *)
   wire [2:0] \cr14_code.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/call.py:60" *)
   wire [15:0] \cr14_code.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/call.py:60" *)
-  wire \cr14_code.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/call.py:60" *)
   wire [31:0] \cr14_code.word1_location ;
   (* src = "/home/runner/workspace/hardware/call.py:60" *)
@@ -7266,17 +6738,13 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   (* src = "/home/runner/workspace/hardware/call.py:201" *)
   wire \cr14_latched.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/call.py:201" *)
-  wire \cr14_latched.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/call.py:201" *)
-  wire [6:0] \cr14_latched.word0_gt.gt_seq ;
+  wire [8:0] \cr14_latched.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/call.py:201" *)
   wire [1:0] \cr14_latched.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/call.py:201" *)
   wire [2:0] \cr14_latched.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/call.py:201" *)
   wire [15:0] \cr14_latched.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/call.py:201" *)
-  wire \cr14_latched.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/call.py:201" *)
   wire [31:0] \cr14_latched.word1_location ;
   (* src = "/home/runner/workspace/hardware/call.py:201" *)
@@ -7290,17 +6758,13 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   (* src = "/home/runner/workspace/hardware/call.py:304" *)
   wire \cr14_with_limit.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/call.py:304" *)
-  wire \cr14_with_limit.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/call.py:304" *)
-  wire [6:0] \cr14_with_limit.word0_gt.gt_seq ;
+  wire [8:0] \cr14_with_limit.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/call.py:304" *)
   wire [1:0] \cr14_with_limit.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/call.py:304" *)
   wire [2:0] \cr14_with_limit.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/call.py:304" *)
   wire [15:0] \cr14_with_limit.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/call.py:304" *)
-  wire \cr14_with_limit.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/call.py:304" *)
   wire [31:0] \cr14_with_limit.word1_location ;
   (* src = "/home/runner/workspace/hardware/call.py:304" *)
@@ -7314,17 +6778,13 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   (* src = "/home/runner/workspace/hardware/call.py:269" *)
   wire \cr14_with_m.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/call.py:269" *)
-  wire \cr14_with_m.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/call.py:269" *)
-  wire [6:0] \cr14_with_m.word0_gt.gt_seq ;
+  wire [8:0] \cr14_with_m.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/call.py:269" *)
   wire [1:0] \cr14_with_m.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/call.py:269" *)
   wire [2:0] \cr14_with_m.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/call.py:269" *)
   wire [15:0] \cr14_with_m.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/call.py:269" *)
-  wire \cr14_with_m.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/call.py:269" *)
   wire [31:0] \cr14_with_m.word1_location ;
   (* src = "/home/runner/workspace/hardware/call.py:269" *)
@@ -7339,17 +6799,13 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   (* src = "/home/runner/workspace/hardware/call.py:57" *)
   wire \cr15_namespace.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/call.py:57" *)
-  wire \cr15_namespace.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/call.py:57" *)
-  wire [6:0] \cr15_namespace.word0_gt.gt_seq ;
+  wire [8:0] \cr15_namespace.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/call.py:57" *)
   wire [1:0] \cr15_namespace.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/call.py:57" *)
   wire [2:0] \cr15_namespace.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/call.py:57" *)
   wire [15:0] \cr15_namespace.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/call.py:57" *)
-  wire \cr15_namespace.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/call.py:57" *)
   wire [31:0] \cr15_namespace.word1_location ;
   (* src = "/home/runner/workspace/hardware/call.py:57" *)
@@ -7366,17 +6822,13 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   (* src = "/home/runner/workspace/hardware/call.py:64" *)
   wire \cr5_heap.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/call.py:64" *)
-  wire \cr5_heap.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/call.py:64" *)
-  wire [6:0] \cr5_heap.word0_gt.gt_seq ;
+  wire [8:0] \cr5_heap.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/call.py:64" *)
   wire [1:0] \cr5_heap.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/call.py:64" *)
   wire [2:0] \cr5_heap.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/call.py:64" *)
   wire [15:0] \cr5_heap.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/call.py:64" *)
-  wire \cr5_heap.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/call.py:64" *)
   wire [31:0] \cr5_heap.word1_location ;
   (* src = "/home/runner/workspace/hardware/call.py:64" *)
@@ -7392,17 +6844,13 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   (* src = "/home/runner/workspace/hardware/call.py:334" *)
   wire \cr6_adjusted.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/call.py:334" *)
-  wire \cr6_adjusted.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/call.py:334" *)
-  wire [6:0] \cr6_adjusted.word0_gt.gt_seq ;
+  wire [8:0] \cr6_adjusted.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/call.py:334" *)
   wire [1:0] \cr6_adjusted.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/call.py:334" *)
   wire [2:0] \cr6_adjusted.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/call.py:334" *)
   wire [15:0] \cr6_adjusted.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/call.py:334" *)
-  wire \cr6_adjusted.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/call.py:334" *)
   wire [31:0] \cr6_adjusted.word1_location ;
   (* src = "/home/runner/workspace/hardware/call.py:334" *)
@@ -7416,17 +6864,13 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   (* src = "/home/runner/workspace/hardware/call.py:324" *)
   wire \cr6_latched.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/call.py:324" *)
-  wire \cr6_latched.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/call.py:324" *)
-  wire [6:0] \cr6_latched.word0_gt.gt_seq ;
+  wire [8:0] \cr6_latched.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/call.py:324" *)
   wire [1:0] \cr6_latched.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/call.py:324" *)
   wire [2:0] \cr6_latched.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/call.py:324" *)
   wire [15:0] \cr6_latched.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/call.py:324" *)
-  wire \cr6_latched.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/call.py:324" *)
   wire [31:0] \cr6_latched.word1_location ;
   (* src = "/home/runner/workspace/hardware/call.py:324" *)
@@ -7450,17 +6894,13 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   (* src = "/home/runner/workspace/hardware/call.py:25" *)
   wire \cr_rd_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/call.py:25" *)
-  wire \cr_rd_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/call.py:25" *)
-  wire [6:0] \cr_rd_data.word0_gt.gt_seq ;
+  wire [8:0] \cr_rd_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/call.py:25" *)
   wire [1:0] \cr_rd_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/call.py:25" *)
   wire [2:0] \cr_rd_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/call.py:25" *)
   wire [15:0] \cr_rd_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/call.py:25" *)
-  wire \cr_rd_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/call.py:25" *)
   wire [31:0] \cr_rd_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/call.py:25" *)
@@ -7480,17 +6920,13 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   (* src = "/home/runner/workspace/hardware/call.py:27" *)
   wire \cr_wr_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/call.py:27" *)
-  wire \cr_wr_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/call.py:27" *)
-  wire [6:0] \cr_wr_data.word0_gt.gt_seq ;
+  wire [8:0] \cr_wr_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/call.py:27" *)
   wire [1:0] \cr_wr_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/call.py:27" *)
   wire [2:0] \cr_wr_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/call.py:27" *)
   wire [15:0] \cr_wr_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/call.py:27" *)
-  wire \cr_wr_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/call.py:27" *)
   wire [31:0] \cr_wr_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/call.py:27" *)
@@ -7530,17 +6966,13 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   (* src = "/home/runner/workspace/hardware/call.py:134" *)
   wire \local_cr_wr_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/call.py:134" *)
-  wire \local_cr_wr_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/call.py:134" *)
-  wire [6:0] \local_cr_wr_data.word0_gt.gt_seq ;
+  wire [8:0] \local_cr_wr_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/call.py:134" *)
   wire [1:0] \local_cr_wr_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/call.py:134" *)
   wire [2:0] \local_cr_wr_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/call.py:134" *)
   wire [15:0] \local_cr_wr_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/call.py:134" *)
-  wire \local_cr_wr_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/call.py:134" *)
   wire [31:0] \local_cr_wr_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/call.py:134" *)
@@ -7688,17 +7120,13 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   (* src = "/home/runner/workspace/hardware/call.py:119" *)
   wire \src_reg_latched.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/call.py:119" *)
-  wire \src_reg_latched.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/call.py:119" *)
-  wire [6:0] \src_reg_latched.word0_gt.gt_seq ;
+  wire [8:0] \src_reg_latched.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/call.py:119" *)
   wire [1:0] \src_reg_latched.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/call.py:119" *)
   wire [2:0] \src_reg_latched.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/call.py:119" *)
   wire [15:0] \src_reg_latched.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/call.py:119" *)
-  wire \src_reg_latched.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/call.py:119" *)
   wire [31:0] \src_reg_latched.word1_location ;
   (* src = "/home/runner/workspace/hardware/call.py:119" *)
@@ -7719,10 +7147,10 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   (* src = "/home/runner/workspace/hardware/call.py:129" *)
   reg use_method_table = 1'h0;
   assign \$7  = caller_pc + (* src = "/home/runner/workspace/hardware/call.py:183" *) 1'h1;
-  assign cr5_null = ! (* src = "/home/runner/workspace/hardware/call.py:191" *) cr5_heap[24:23];
+  assign cr5_null = ! (* src = "/home/runner/workspace/hardware/call.py:191" *) cr5_heap[26:25];
   assign \$8  = ~ (* src = "/home/runner/workspace/hardware/call.py:192" *) cr5_heap[27];
   assign cr5_has_r = \$8  & (* src = "/home/runner/workspace/hardware/call.py:192" *) cr5_heap[28];
-  assign cr12_null = ! (* src = "/home/runner/workspace/hardware/call.py:198" *) cr12_thread[24:23];
+  assign cr12_null = ! (* src = "/home/runner/workspace/hardware/call.py:198" *) cr12_thread[26:25];
   assign src_in_range = \port$0$2 [18:15] <= (* src = "/home/runner/workspace/hardware/call.py:206" *) 4'hb;
   assign mload_src = phase ? (* src = "/home/runner/workspace/hardware/call.py:216" *) 4'h6 : \port$0$2 [18:15];
   assign mload_dst = phase ? (* src = "/home/runner/workspace/hardware/call.py:217" *) 4'he : 4'h6;
@@ -7781,7 +7209,7 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   assign \$65  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h1b;
   assign mgt_set_trigger = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h1c;
   assign \$66  = ~ (* src = "/home/runner/workspace/hardware/call.py:388" *) src_in_range;
-  assign \$67  = src_reg_latched[24:23] == (* src = "/home/runner/workspace/hardware/call.py:400" *) 2'h3;
+  assign \$67  = src_reg_latched[26:25] == (* src = "/home/runner/workspace/hardware/call.py:400" *) 2'h3;
   assign \$68  = src_reg_latched[27] & (* src = "/home/runner/workspace/hardware/perm_check.py:29" *) src_reg_latched[30];
   assign \$69  = ~ (* src = "/home/runner/workspace/hardware/call.py:406" *) \$68 ;
   assign \$70  = mem_rd_data[26:23] + (* src = "/home/runner/workspace/hardware/call.py:481" *) 3'h6;
@@ -8973,10 +8401,8 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   assign code_hi_out = \$26 [31:0];
   assign \cr5_heap.word0_gt  = cr5_heap[31:0];
   assign \cr5_heap.word0_gt.slot_id  = cr5_heap[15:0];
-  assign \cr5_heap.word0_gt.gt_seq  = cr5_heap[22:16];
-  assign \cr5_heap.word0_gt.gt_type  = cr5_heap[24:23];
-  assign \cr5_heap.word0_gt.f_flag  = cr5_heap[25];
-  assign \cr5_heap.word0_gt.spare  = cr5_heap[26];
+  assign \cr5_heap.word0_gt.gt_seq  = cr5_heap[24:16];
+  assign \cr5_heap.word0_gt.gt_type  = cr5_heap[26:25];
   assign \cr5_heap.word0_gt.dom  = cr5_heap[27];
   assign \cr5_heap.word0_gt.perm  = cr5_heap[30:28];
   assign \cr5_heap.word0_gt.b_flag  = cr5_heap[31];
@@ -8984,10 +8410,8 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   assign \cr5_heap.word2_w2  = cr5_heap[95:64];
   assign \cr12_thread.word0_gt  = cr12_thread[31:0];
   assign \cr12_thread.word0_gt.slot_id  = cr12_thread[15:0];
-  assign \cr12_thread.word0_gt.gt_seq  = cr12_thread[22:16];
-  assign \cr12_thread.word0_gt.gt_type  = cr12_thread[24:23];
-  assign \cr12_thread.word0_gt.f_flag  = cr12_thread[25];
-  assign \cr12_thread.word0_gt.spare  = cr12_thread[26];
+  assign \cr12_thread.word0_gt.gt_seq  = cr12_thread[24:16];
+  assign \cr12_thread.word0_gt.gt_type  = cr12_thread[26:25];
   assign \cr12_thread.word0_gt.dom  = cr12_thread[27];
   assign \cr12_thread.word0_gt.perm  = cr12_thread[30:28];
   assign \cr12_thread.word0_gt.b_flag  = cr12_thread[31];
@@ -8995,10 +8419,8 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   assign \cr12_thread.word2_w2  = cr12_thread[95:64];
   assign \cr_wr_data.word0_gt  = cr_wr_data[31:0];
   assign \cr_wr_data.word0_gt.slot_id  = cr_wr_data[15:0];
-  assign \cr_wr_data.word0_gt.gt_seq  = cr_wr_data[22:16];
-  assign \cr_wr_data.word0_gt.gt_type  = cr_wr_data[24:23];
-  assign \cr_wr_data.word0_gt.f_flag  = cr_wr_data[25];
-  assign \cr_wr_data.word0_gt.spare  = cr_wr_data[26];
+  assign \cr_wr_data.word0_gt.gt_seq  = cr_wr_data[24:16];
+  assign \cr_wr_data.word0_gt.gt_type  = cr_wr_data[26:25];
   assign \cr_wr_data.word0_gt.dom  = cr_wr_data[27];
   assign \cr_wr_data.word0_gt.perm  = cr_wr_data[30:28];
   assign \cr_wr_data.word0_gt.b_flag  = cr_wr_data[31];
@@ -9006,10 +8428,8 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   assign \cr_wr_data.word2_w2  = cr_wr_data[95:64];
   assign \local_cr_wr_data.word0_gt  = cr_wr_data[31:0];
   assign \local_cr_wr_data.word0_gt.slot_id  = cr_wr_data[15:0];
-  assign \local_cr_wr_data.word0_gt.gt_seq  = cr_wr_data[22:16];
-  assign \local_cr_wr_data.word0_gt.gt_type  = cr_wr_data[24:23];
-  assign \local_cr_wr_data.word0_gt.f_flag  = cr_wr_data[25];
-  assign \local_cr_wr_data.word0_gt.spare  = cr_wr_data[26];
+  assign \local_cr_wr_data.word0_gt.gt_seq  = cr_wr_data[24:16];
+  assign \local_cr_wr_data.word0_gt.gt_type  = cr_wr_data[26:25];
   assign \local_cr_wr_data.word0_gt.dom  = cr_wr_data[27];
   assign \local_cr_wr_data.word0_gt.perm  = cr_wr_data[30:28];
   assign \local_cr_wr_data.word0_gt.b_flag  = cr_wr_data[31];
@@ -9017,10 +8437,8 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   assign \local_cr_wr_data.word2_w2  = cr_wr_data[95:64];
   assign \cr15_namespace.word0_gt  = cr15_namespace[31:0];
   assign \cr15_namespace.word0_gt.slot_id  = cr15_namespace[15:0];
-  assign \cr15_namespace.word0_gt.gt_seq  = cr15_namespace[22:16];
-  assign \cr15_namespace.word0_gt.gt_type  = cr15_namespace[24:23];
-  assign \cr15_namespace.word0_gt.f_flag  = cr15_namespace[25];
-  assign \cr15_namespace.word0_gt.spare  = cr15_namespace[26];
+  assign \cr15_namespace.word0_gt.gt_seq  = cr15_namespace[24:16];
+  assign \cr15_namespace.word0_gt.gt_type  = cr15_namespace[26:25];
   assign \cr15_namespace.word0_gt.dom  = cr15_namespace[27];
   assign \cr15_namespace.word0_gt.perm  = cr15_namespace[30:28];
   assign \cr15_namespace.word0_gt.b_flag  = cr15_namespace[31];
@@ -9028,10 +8446,8 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   assign \cr15_namespace.word2_w2  = cr15_namespace[95:64];
   assign \cr14_code.word0_gt  = cr14_code[31:0];
   assign \cr14_code.word0_gt.slot_id  = cr14_code[15:0];
-  assign \cr14_code.word0_gt.gt_seq  = cr14_code[22:16];
-  assign \cr14_code.word0_gt.gt_type  = cr14_code[24:23];
-  assign \cr14_code.word0_gt.f_flag  = cr14_code[25];
-  assign \cr14_code.word0_gt.spare  = cr14_code[26];
+  assign \cr14_code.word0_gt.gt_seq  = cr14_code[24:16];
+  assign \cr14_code.word0_gt.gt_type  = cr14_code[26:25];
   assign \cr14_code.word0_gt.dom  = cr14_code[27];
   assign \cr14_code.word0_gt.perm  = cr14_code[30:28];
   assign \cr14_code.word0_gt.b_flag  = cr14_code[31];
@@ -9039,10 +8455,8 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   assign \cr14_code.word2_w2  = cr14_code[95:64];
   assign \cr14_with_m.word0_gt  = cr14_with_m[31:0];
   assign \cr14_with_m.word0_gt.slot_id  = cr14_with_m[15:0];
-  assign \cr14_with_m.word0_gt.gt_seq  = cr14_with_m[22:16];
-  assign \cr14_with_m.word0_gt.gt_type  = cr14_with_m[24:23];
-  assign \cr14_with_m.word0_gt.f_flag  = cr14_with_m[25];
-  assign \cr14_with_m.word0_gt.spare  = cr14_with_m[26];
+  assign \cr14_with_m.word0_gt.gt_seq  = cr14_with_m[24:16];
+  assign \cr14_with_m.word0_gt.gt_type  = cr14_with_m[26:25];
   assign \cr14_with_m.word0_gt.dom  = cr14_with_m[27];
   assign \cr14_with_m.word0_gt.perm  = cr14_with_m[30:28];
   assign \cr14_with_m.word0_gt.b_flag  = cr14_with_m[31];
@@ -9050,10 +8464,8 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   assign \cr14_with_m.word2_w2  = cr14_with_m[95:64];
   assign \cr14_latched.word0_gt  = cr14_latched[31:0];
   assign \cr14_latched.word0_gt.slot_id  = cr14_latched[15:0];
-  assign \cr14_latched.word0_gt.gt_seq  = cr14_latched[22:16];
-  assign \cr14_latched.word0_gt.gt_type  = cr14_latched[24:23];
-  assign \cr14_latched.word0_gt.f_flag  = cr14_latched[25];
-  assign \cr14_latched.word0_gt.spare  = cr14_latched[26];
+  assign \cr14_latched.word0_gt.gt_seq  = cr14_latched[24:16];
+  assign \cr14_latched.word0_gt.gt_type  = cr14_latched[26:25];
   assign \cr14_latched.word0_gt.dom  = cr14_latched[27];
   assign \cr14_latched.word0_gt.perm  = cr14_latched[30:28];
   assign \cr14_latched.word0_gt.b_flag  = cr14_latched[31];
@@ -9061,10 +8473,8 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   assign \cr14_latched.word2_w2  = cr14_latched[95:64];
   assign \cr14_with_limit.word0_gt  = cr14_with_limit[31:0];
   assign \cr14_with_limit.word0_gt.slot_id  = cr14_with_limit[15:0];
-  assign \cr14_with_limit.word0_gt.gt_seq  = cr14_with_limit[22:16];
-  assign \cr14_with_limit.word0_gt.gt_type  = cr14_with_limit[24:23];
-  assign \cr14_with_limit.word0_gt.f_flag  = cr14_with_limit[25];
-  assign \cr14_with_limit.word0_gt.spare  = cr14_with_limit[26];
+  assign \cr14_with_limit.word0_gt.gt_seq  = cr14_with_limit[24:16];
+  assign \cr14_with_limit.word0_gt.gt_type  = cr14_with_limit[26:25];
   assign \cr14_with_limit.word0_gt.dom  = cr14_with_limit[27];
   assign \cr14_with_limit.word0_gt.perm  = cr14_with_limit[30:28];
   assign \cr14_with_limit.word0_gt.b_flag  = cr14_with_limit[31];
@@ -9072,10 +8482,8 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   assign \cr14_with_limit.word2_w2  = cr14_with_limit[95:64];
   assign \cr6_adjusted.word0_gt  = cr6_adjusted[31:0];
   assign \cr6_adjusted.word0_gt.slot_id  = cr6_adjusted[15:0];
-  assign \cr6_adjusted.word0_gt.gt_seq  = cr6_adjusted[22:16];
-  assign \cr6_adjusted.word0_gt.gt_type  = cr6_adjusted[24:23];
-  assign \cr6_adjusted.word0_gt.f_flag  = cr6_adjusted[25];
-  assign \cr6_adjusted.word0_gt.spare  = cr6_adjusted[26];
+  assign \cr6_adjusted.word0_gt.gt_seq  = cr6_adjusted[24:16];
+  assign \cr6_adjusted.word0_gt.gt_type  = cr6_adjusted[26:25];
   assign \cr6_adjusted.word0_gt.dom  = cr6_adjusted[27];
   assign \cr6_adjusted.word0_gt.perm  = cr6_adjusted[30:28];
   assign \cr6_adjusted.word0_gt.b_flag  = cr6_adjusted[31];
@@ -9083,10 +8491,8 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   assign \cr6_adjusted.word2_w2  = cr6_adjusted[95:64];
   assign \cr6_latched.word0_gt  = cr6_latched[31:0];
   assign \cr6_latched.word0_gt.slot_id  = cr6_latched[15:0];
-  assign \cr6_latched.word0_gt.gt_seq  = cr6_latched[22:16];
-  assign \cr6_latched.word0_gt.gt_type  = cr6_latched[24:23];
-  assign \cr6_latched.word0_gt.f_flag  = cr6_latched[25];
-  assign \cr6_latched.word0_gt.spare  = cr6_latched[26];
+  assign \cr6_latched.word0_gt.gt_seq  = cr6_latched[24:16];
+  assign \cr6_latched.word0_gt.gt_type  = cr6_latched[26:25];
   assign \cr6_latched.word0_gt.dom  = cr6_latched[27];
   assign \cr6_latched.word0_gt.perm  = cr6_latched[30:28];
   assign \cr6_latched.word0_gt.b_flag  = cr6_latched[31];
@@ -9094,10 +8500,8 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   assign \cr6_latched.word2_w2  = cr6_latched[95:64];
   assign \src_reg_latched.word0_gt  = src_reg_latched[31:0];
   assign \src_reg_latched.word0_gt.slot_id  = src_reg_latched[15:0];
-  assign \src_reg_latched.word0_gt.gt_seq  = src_reg_latched[22:16];
-  assign \src_reg_latched.word0_gt.gt_type  = src_reg_latched[24:23];
-  assign \src_reg_latched.word0_gt.f_flag  = src_reg_latched[25];
-  assign \src_reg_latched.word0_gt.spare  = src_reg_latched[26];
+  assign \src_reg_latched.word0_gt.gt_seq  = src_reg_latched[24:16];
+  assign \src_reg_latched.word0_gt.gt_type  = src_reg_latched[26:25];
   assign \src_reg_latched.word0_gt.dom  = src_reg_latched[27];
   assign \src_reg_latched.word0_gt.perm  = src_reg_latched[30:28];
   assign \src_reg_latched.word0_gt.b_flag  = src_reg_latched[31];
@@ -9105,48 +8509,43 @@ module \top.u_call (mem_rd_data, clk, rst, call_start, cr_rd_data, mload_src, ml
   assign \src_reg_latched.word2_w2  = src_reg_latched[95:64];
   assign \cr_rd_data.word0_gt  = cr_rd_data[31:0];
   assign \cr_rd_data.word0_gt.slot_id  = cr_rd_data[15:0];
-  assign \cr_rd_data.word0_gt.gt_seq  = cr_rd_data[22:16];
-  assign \cr_rd_data.word0_gt.gt_type  = cr_rd_data[24:23];
-  assign \cr_rd_data.word0_gt.f_flag  = cr_rd_data[25];
-  assign \cr_rd_data.word0_gt.spare  = cr_rd_data[26];
+  assign \cr_rd_data.word0_gt.gt_seq  = cr_rd_data[24:16];
+  assign \cr_rd_data.word0_gt.gt_type  = cr_rd_data[26:25];
   assign \cr_rd_data.word0_gt.dom  = cr_rd_data[27];
   assign \cr_rd_data.word0_gt.perm  = cr_rd_data[30:28];
   assign \cr_rd_data.word0_gt.b_flag  = cr_rd_data[31];
   assign \cr_rd_data.word1_location  = cr_rd_data[63:32];
   assign \cr_rd_data.word2_w2  = cr_rd_data[95:64];
-  assign cr6_adjusted[92] = 1'h0;
-  assign cr6_adjusted[95:93] = 3'h0;
-  assign cr6_adjusted[91:85] = cr6_latched[91:85];
+  assign cr6_adjusted[95] = 1'h0;
+  assign cr6_adjusted[94] = 1'h0;
+  assign cr6_adjusted[93:85] = cr6_latched[93:85];
   assign cr6_adjusted[84:64] = { \$23 [8], \$23 [8], \$23 [8], \$23 [8], \$23 [8], \$23 [8], \$23 [8], \$23 [8], \$23 [8], \$23 [8], \$23 [8], \$23 [8], \$23  };
   assign cr6_adjusted[63:32] = \$22 [31:0];
   assign cr6_adjusted[31] = cr6_latched[31];
   assign cr6_adjusted[30:28] = 3'h4;
   assign cr6_adjusted[27] = 1'h1;
-  assign cr6_adjusted[24:23] = cr6_latched[24:23];
-  assign cr6_adjusted[22:16] = cr6_latched[22:16];
+  assign cr6_adjusted[26:25] = cr6_latched[26:25];
+  assign cr6_adjusted[24:16] = cr6_latched[24:16];
   assign cr6_adjusted[15:0] = cr6_latched[15:0];
-  assign cr6_adjusted[26:25] = 2'h0;
-  assign cr14_with_limit[92] = 1'h0;
-  assign cr14_with_limit[95:93] = 3'h0;
-  assign cr14_with_limit[91:85] = cr14_latched[91:85];
+  assign cr14_with_limit[95] = 1'h0;
+  assign cr14_with_limit[94] = 1'h0;
+  assign cr14_with_limit[93:85] = cr14_latched[93:85];
   assign cr14_with_limit[84:64] = { \$19 [13], \$19 [13], \$19 [13], \$19 [13], \$19 [13], \$19 [13], \$19 [13], \$19  };
   assign cr14_with_limit[63:32] = cr14_with_m[63:32];
   assign cr14_with_limit[31] = cr14_with_m[31];
   assign cr14_with_limit[30:28] = cr14_with_m[30:28];
   assign cr14_with_limit[27] = cr14_with_m[27];
-  assign cr14_with_limit[24:23] = cr14_with_m[24:23];
-  assign cr14_with_limit[22:16] = cr14_with_m[22:16];
+  assign cr14_with_limit[26:25] = cr14_with_m[26:25];
+  assign cr14_with_limit[24:16] = cr14_with_m[24:16];
   assign cr14_with_limit[15:0] = cr14_with_m[15:0];
-  assign cr14_with_limit[26:25] = 2'h0;
   assign cr14_with_m[95:64] = cr14_latched[95:64];
   assign cr14_with_m[63:32] = \$13 [31:0];
   assign cr14_with_m[31] = cr14_latched[31];
   assign cr14_with_m[30:28] = { 2'h2, cr14_latched[28] };
   assign cr14_with_m[27] = 1'h0;
-  assign cr14_with_m[24:23] = cr14_latched[24:23];
-  assign cr14_with_m[22:16] = cr14_latched[22:16];
+  assign cr14_with_m[26:25] = cr14_latched[26:25];
+  assign cr14_with_m[24:16] = cr14_latched[24:16];
   assign cr14_with_m[15:0] = cr14_latched[15:0];
-  assign cr14_with_m[26:25] = 2'h0;
   assign \$1  = 5'h06;
   assign \$2  = 46'h000000000040;
   assign mload_index = 16'h0000;
@@ -9229,17 +8628,13 @@ module \top.u_cload (clk, rst, mem_addr, mem_rd_en, cload_busy, cload_fault, clo
   (* src = "/home/runner/workspace/hardware/cload.py:110" *)
   wire \cr14_out.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/cload.py:110" *)
-  wire \cr14_out.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/cload.py:110" *)
-  wire [6:0] \cr14_out.word0_gt.gt_seq ;
+  wire [8:0] \cr14_out.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/cload.py:110" *)
   wire [1:0] \cr14_out.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/cload.py:110" *)
   wire [2:0] \cr14_out.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/cload.py:110" *)
   wire [15:0] \cr14_out.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/cload.py:110" *)
-  wire \cr14_out.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/cload.py:110" *)
   wire [31:0] \cr14_out.word1_location ;
   (* src = "/home/runner/workspace/hardware/cload.py:110" *)
@@ -9256,17 +8651,13 @@ module \top.u_cload (clk, rst, mem_addr, mem_rd_en, cload_busy, cload_fault, clo
   (* src = "/home/runner/workspace/hardware/cload.py:63" *)
   wire \cr15_namespace$1.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/cload.py:63" *)
-  wire \cr15_namespace$1.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/cload.py:63" *)
-  wire [6:0] \cr15_namespace$1.word0_gt.gt_seq ;
+  wire [8:0] \cr15_namespace$1.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/cload.py:63" *)
   wire [1:0] \cr15_namespace$1.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/cload.py:63" *)
   wire [2:0] \cr15_namespace$1.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/cload.py:63" *)
   wire [15:0] \cr15_namespace$1.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/cload.py:63" *)
-  wire \cr15_namespace$1.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/cload.py:63" *)
   wire [31:0] \cr15_namespace$1.word1_location ;
   (* src = "/home/runner/workspace/hardware/cload.py:63" *)
@@ -9278,17 +8669,13 @@ module \top.u_cload (clk, rst, mem_addr, mem_rd_en, cload_busy, cload_fault, clo
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
   wire \cr15_namespace.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
-  wire \cr15_namespace.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
-  wire [6:0] \cr15_namespace.word0_gt.gt_seq ;
+  wire [8:0] \cr15_namespace.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
   wire [1:0] \cr15_namespace.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
   wire [2:0] \cr15_namespace.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
   wire [15:0] \cr15_namespace.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
-  wire \cr15_namespace.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
   wire [31:0] \cr15_namespace.word1_location ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
@@ -9302,17 +8689,13 @@ module \top.u_cload (clk, rst, mem_addr, mem_rd_en, cload_busy, cload_fault, clo
   (* src = "/home/runner/workspace/hardware/cload.py:130" *)
   wire \cr6_out.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/cload.py:130" *)
-  wire \cr6_out.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/cload.py:130" *)
-  wire [6:0] \cr6_out.word0_gt.gt_seq ;
+  wire [8:0] \cr6_out.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/cload.py:130" *)
   wire [1:0] \cr6_out.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/cload.py:130" *)
   wire [2:0] \cr6_out.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/cload.py:130" *)
   wire [15:0] \cr6_out.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/cload.py:130" *)
-  wire \cr6_out.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/cload.py:130" *)
   wire [31:0] \cr6_out.word1_location ;
   (* src = "/home/runner/workspace/hardware/cload.py:130" *)
@@ -9330,17 +8713,13 @@ module \top.u_cload (clk, rst, mem_addr, mem_rd_en, cload_busy, cload_fault, clo
   (* src = "/home/runner/workspace/hardware/cload.py:66" *)
   wire \cr_wr_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/cload.py:66" *)
-  wire \cr_wr_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/cload.py:66" *)
-  wire [6:0] \cr_wr_data.word0_gt.gt_seq ;
+  wire [8:0] \cr_wr_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/cload.py:66" *)
   wire [1:0] \cr_wr_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/cload.py:66" *)
   wire [2:0] \cr_wr_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/cload.py:66" *)
   wire [15:0] \cr_wr_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/cload.py:66" *)
-  wire \cr_wr_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/cload.py:66" *)
   wire [31:0] \cr_wr_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/cload.py:66" *)
@@ -9371,17 +8750,13 @@ module \top.u_cload (clk, rst, mem_addr, mem_rd_en, cload_busy, cload_fault, clo
   (* src = "/home/runner/workspace/hardware/cload.py:145" *)
   wire \local_cr_wr_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/cload.py:145" *)
-  wire \local_cr_wr_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/cload.py:145" *)
-  wire [6:0] \local_cr_wr_data.word0_gt.gt_seq ;
+  wire [8:0] \local_cr_wr_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/cload.py:145" *)
   wire [1:0] \local_cr_wr_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/cload.py:145" *)
   wire [2:0] \local_cr_wr_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/cload.py:145" *)
   wire [15:0] \local_cr_wr_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/cload.py:145" *)
-  wire \local_cr_wr_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/cload.py:145" *)
   wire [31:0] \local_cr_wr_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/cload.py:145" *)
@@ -9454,8 +8829,8 @@ module \top.u_cload (clk, rst, mem_addr, mem_rd_en, cload_busy, cload_fault, clo
   assign \$13  = cload_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h6;
   assign \$14  = cload_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h7;
   assign cload_done = cload_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'h8;
-  assign \$15  = e_gt_latched[24:23] == (* src = "/home/runner/workspace/hardware/cload.py:180" *) 1'h1;
-  assign \$16  = e_gt_latched[24:23] == (* src = "/home/runner/workspace/hardware/cload.py:181" *) 2'h3;
+  assign \$15  = e_gt_latched[26:25] == (* src = "/home/runner/workspace/hardware/cload.py:180" *) 1'h1;
+  assign \$16  = e_gt_latched[26:25] == (* src = "/home/runner/workspace/hardware/cload.py:181" *) 2'h3;
   assign \$17  = \$15  | (* src = "/home/runner/workspace/hardware/cload.py:180" *) \$16 ;
   assign \$18  = ~ (* src = "/home/runner/workspace/hardware/cload.py:183" *) \$17 ;
   assign \$19  = e_gt_latched[27] & (* src = "/home/runner/workspace/hardware/cload.py:186" *) e_gt_latched[30];
@@ -9821,10 +9196,8 @@ module \top.u_cload (clk, rst, mem_addr, mem_rd_en, cload_busy, cload_fault, clo
   assign fault_type_reg = cload_fault_type;
   assign \cr15_namespace.word0_gt  = cr15_namespace[31:0];
   assign \cr15_namespace.word0_gt.slot_id  = cr15_namespace[15:0];
-  assign \cr15_namespace.word0_gt.gt_seq  = cr15_namespace[22:16];
-  assign \cr15_namespace.word0_gt.gt_type  = cr15_namespace[24:23];
-  assign \cr15_namespace.word0_gt.f_flag  = cr15_namespace[25];
-  assign \cr15_namespace.word0_gt.spare  = cr15_namespace[26];
+  assign \cr15_namespace.word0_gt.gt_seq  = cr15_namespace[24:16];
+  assign \cr15_namespace.word0_gt.gt_type  = cr15_namespace[26:25];
   assign \cr15_namespace.word0_gt.dom  = cr15_namespace[27];
   assign \cr15_namespace.word0_gt.perm  = cr15_namespace[30:28];
   assign \cr15_namespace.word0_gt.b_flag  = cr15_namespace[31];
@@ -9832,10 +9205,8 @@ module \top.u_cload (clk, rst, mem_addr, mem_rd_en, cload_busy, cload_fault, clo
   assign \cr15_namespace.word2_w2  = cr15_namespace[95:64];
   assign \cr15_namespace$1.word0_gt  = cr15_namespace[31:0];
   assign \cr15_namespace$1.word0_gt.slot_id  = cr15_namespace[15:0];
-  assign \cr15_namespace$1.word0_gt.gt_seq  = cr15_namespace[22:16];
-  assign \cr15_namespace$1.word0_gt.gt_type  = cr15_namespace[24:23];
-  assign \cr15_namespace$1.word0_gt.f_flag  = cr15_namespace[25];
-  assign \cr15_namespace$1.word0_gt.spare  = cr15_namespace[26];
+  assign \cr15_namespace$1.word0_gt.gt_seq  = cr15_namespace[24:16];
+  assign \cr15_namespace$1.word0_gt.gt_type  = cr15_namespace[26:25];
   assign \cr15_namespace$1.word0_gt.dom  = cr15_namespace[27];
   assign \cr15_namespace$1.word0_gt.perm  = cr15_namespace[30:28];
   assign \cr15_namespace$1.word0_gt.b_flag  = cr15_namespace[31];
@@ -9843,10 +9214,8 @@ module \top.u_cload (clk, rst, mem_addr, mem_rd_en, cload_busy, cload_fault, clo
   assign \cr15_namespace$1.word2_w2  = cr15_namespace[95:64];
   assign \cr14_out.word0_gt  = cr14_out[31:0];
   assign \cr14_out.word0_gt.slot_id  = cr14_out[15:0];
-  assign \cr14_out.word0_gt.gt_seq  = cr14_out[22:16];
-  assign \cr14_out.word0_gt.gt_type  = cr14_out[24:23];
-  assign \cr14_out.word0_gt.f_flag  = cr14_out[25];
-  assign \cr14_out.word0_gt.spare  = cr14_out[26];
+  assign \cr14_out.word0_gt.gt_seq  = cr14_out[24:16];
+  assign \cr14_out.word0_gt.gt_type  = cr14_out[26:25];
   assign \cr14_out.word0_gt.dom  = cr14_out[27];
   assign \cr14_out.word0_gt.perm  = cr14_out[30:28];
   assign \cr14_out.word0_gt.b_flag  = cr14_out[31];
@@ -9854,10 +9223,8 @@ module \top.u_cload (clk, rst, mem_addr, mem_rd_en, cload_busy, cload_fault, clo
   assign \cr14_out.word2_w2  = cr14_out[95:64];
   assign \cr6_out.word0_gt  = cr6_out[31:0];
   assign \cr6_out.word0_gt.slot_id  = cr6_out[15:0];
-  assign \cr6_out.word0_gt.gt_seq  = cr6_out[22:16];
-  assign \cr6_out.word0_gt.gt_type  = cr6_out[24:23];
-  assign \cr6_out.word0_gt.f_flag  = cr6_out[25];
-  assign \cr6_out.word0_gt.spare  = cr6_out[26];
+  assign \cr6_out.word0_gt.gt_seq  = cr6_out[24:16];
+  assign \cr6_out.word0_gt.gt_type  = cr6_out[26:25];
   assign \cr6_out.word0_gt.dom  = cr6_out[27];
   assign \cr6_out.word0_gt.perm  = cr6_out[30:28];
   assign \cr6_out.word0_gt.b_flag  = cr6_out[31];
@@ -9865,10 +9232,8 @@ module \top.u_cload (clk, rst, mem_addr, mem_rd_en, cload_busy, cload_fault, clo
   assign \cr6_out.word2_w2  = cr6_out[95:64];
   assign \cr_wr_data.word0_gt  = cr_wr_data[31:0];
   assign \cr_wr_data.word0_gt.slot_id  = cr_wr_data[15:0];
-  assign \cr_wr_data.word0_gt.gt_seq  = cr_wr_data[22:16];
-  assign \cr_wr_data.word0_gt.gt_type  = cr_wr_data[24:23];
-  assign \cr_wr_data.word0_gt.f_flag  = cr_wr_data[25];
-  assign \cr_wr_data.word0_gt.spare  = cr_wr_data[26];
+  assign \cr_wr_data.word0_gt.gt_seq  = cr_wr_data[24:16];
+  assign \cr_wr_data.word0_gt.gt_type  = cr_wr_data[26:25];
   assign \cr_wr_data.word0_gt.dom  = cr_wr_data[27];
   assign \cr_wr_data.word0_gt.perm  = cr_wr_data[30:28];
   assign \cr_wr_data.word0_gt.b_flag  = cr_wr_data[31];
@@ -9876,33 +9241,30 @@ module \top.u_cload (clk, rst, mem_addr, mem_rd_en, cload_busy, cload_fault, clo
   assign \cr_wr_data.word2_w2  = cr_wr_data[95:64];
   assign \local_cr_wr_data.word0_gt  = cr_wr_data[31:0];
   assign \local_cr_wr_data.word0_gt.slot_id  = cr_wr_data[15:0];
-  assign \local_cr_wr_data.word0_gt.gt_seq  = cr_wr_data[22:16];
-  assign \local_cr_wr_data.word0_gt.gt_type  = cr_wr_data[24:23];
-  assign \local_cr_wr_data.word0_gt.f_flag  = cr_wr_data[25];
-  assign \local_cr_wr_data.word0_gt.spare  = cr_wr_data[26];
+  assign \local_cr_wr_data.word0_gt.gt_seq  = cr_wr_data[24:16];
+  assign \local_cr_wr_data.word0_gt.gt_type  = cr_wr_data[26:25];
   assign \local_cr_wr_data.word0_gt.dom  = cr_wr_data[27];
   assign \local_cr_wr_data.word0_gt.perm  = cr_wr_data[30:28];
   assign \local_cr_wr_data.word0_gt.b_flag  = cr_wr_data[31];
   assign \local_cr_wr_data.word1_location  = cr_wr_data[63:32];
   assign \local_cr_wr_data.word2_w2  = cr_wr_data[95:64];
-  assign cr6_out[92] = 1'h0;
-  assign cr6_out[95:93] = 3'h0;
-  assign cr6_out[91:85] = e_gt_latched[22:16];
+  assign cr6_out[95] = 1'h0;
+  assign cr6_out[94] = 1'h0;
+  assign cr6_out[93:85] = e_gt_latched[24:16];
   assign cr6_out[84:64] = { \$6 [8], \$6 [8], \$6 [8], \$6 [8], \$6 [8], \$6 [8], \$6 [8], \$6 [8], \$6 [8], \$6 [8], \$6 [8], \$6 [8], \$6  };
   assign cr6_out[63:32] = \$5 [31:0];
   assign cr6_out[31:0] = e_gt_latched;
-  assign cr14_out[92] = 1'h0;
-  assign cr14_out[95:93] = 3'h0;
-  assign cr14_out[91:85] = e_gt_latched[22:16];
+  assign cr14_out[95] = 1'h0;
+  assign cr14_out[94] = 1'h0;
+  assign cr14_out[93:85] = e_gt_latched[24:16];
   assign cr14_out[84:64] = { \$2 [13], \$2 [13], \$2 [13], \$2 [13], \$2 [13], \$2 [13], \$2 [13], \$2  };
   assign cr14_out[63:32] = \$1 [31:0];
   assign cr14_out[31] = 1'h0;
   assign cr14_out[30:28] = 3'h5;
   assign cr14_out[27] = 1'h0;
-  assign cr14_out[24:23] = e_gt_latched[24:23];
-  assign cr14_out[22:16] = e_gt_latched[22:16];
+  assign cr14_out[26:25] = e_gt_latched[26:25];
+  assign cr14_out[24:16] = e_gt_latched[24:16];
   assign cr14_out[15:0] = e_gt_latched[15:0];
-  assign cr14_out[26:25] = 2'h0;
   assign mem_rd_valid = 1'h0;
   assign \$4  = { \$3 [15], \$3 , 2'h0 };
 endmodule
@@ -9948,17 +9310,13 @@ module \top.u_cload.u_ns_gate (clk, rst, mem_rd_valid, ns_gate_busy, ns_gate_fau
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
   wire \cr15_namespace.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
-  wire \cr15_namespace.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
-  wire [6:0] \cr15_namespace.word0_gt.gt_seq ;
+  wire [8:0] \cr15_namespace.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
   wire [1:0] \cr15_namespace.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
   wire [2:0] \cr15_namespace.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
   wire [15:0] \cr15_namespace.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
-  wire \cr15_namespace.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
   wire [31:0] \cr15_namespace.word1_location ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
@@ -10030,15 +9388,15 @@ module \top.u_cload.u_ns_gate (clk, rst, mem_rd_valid, ns_gate_busy, ns_gate_fau
   wire rst;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:106" *)
   wire seal_ok;
-  (* src = "/home/runner/workspace/hardware/integrity32.py:58" *)
-  wire [31:0] w0_rot;
-  (* src = "/home/runner/workspace/hardware/integrity32.py:57" *)
-  wire [31:0] w1_masked;
   (* src = "/home/runner/workspace/hardware/integrity32.py:59" *)
+  wire [31:0] w0_rot;
+  (* src = "/home/runner/workspace/hardware/integrity32.py:58" *)
+  wire [31:0] w1_masked;
+  (* src = "/home/runner/workspace/hardware/integrity32.py:60" *)
   wire [31:0] w1_rot;
   assign \$2  = cr15_namespace[63:32] + (* src = "/home/runner/workspace/hardware/ns_gate.py:93" *) \$1 ;
-  assign gt_seq_match = gt_latched[22:16] == (* src = "/home/runner/workspace/hardware/ns_gate.py:100" *) raw_w2_reg[27:21];
-  assign \$3  = { raw_base_reg[24:0], raw_base_reg[31:25] } ^ (* src = "/home/runner/workspace/hardware/integrity32.py:66" *) { w1_masked[18:0], w1_masked[31:19] };
+  assign gt_seq_match = gt_latched[24:16] == (* src = "/home/runner/workspace/hardware/ns_gate.py:100" *) raw_w2_reg[29:21];
+  assign \$3  = { raw_base_reg[24:0], raw_base_reg[31:25] } ^ (* src = "/home/runner/workspace/hardware/integrity32.py:67" *) { w1_masked[18:0], w1_masked[31:19] };
   assign seal_ok = computed_integrity == (* src = "/home/runner/workspace/hardware/ns_gate.py:107" *) raw_integrity_reg;
   assign \$4  = \$2 [31:0] + (* src = "/home/runner/workspace/hardware/ns_gate.py:135" *) 3'h4;
   assign \$5  = \$2 [31:0] + (* src = "/home/runner/workspace/hardware/ns_gate.py:148" *) 4'h8;
@@ -10285,18 +9643,16 @@ module \top.u_cload.u_ns_gate (clk, rst, mem_rd_valid, ns_gate_busy, ns_gate_fau
   assign ns_entry_addr_out = \$2 [31:0];
   assign \cr15_namespace.word0_gt  = cr15_namespace[31:0];
   assign \cr15_namespace.word0_gt.slot_id  = cr15_namespace[15:0];
-  assign \cr15_namespace.word0_gt.gt_seq  = cr15_namespace[22:16];
-  assign \cr15_namespace.word0_gt.gt_type  = cr15_namespace[24:23];
-  assign \cr15_namespace.word0_gt.f_flag  = cr15_namespace[25];
-  assign \cr15_namespace.word0_gt.spare  = cr15_namespace[26];
+  assign \cr15_namespace.word0_gt.gt_seq  = cr15_namespace[24:16];
+  assign \cr15_namespace.word0_gt.gt_type  = cr15_namespace[26:25];
   assign \cr15_namespace.word0_gt.dom  = cr15_namespace[27];
   assign \cr15_namespace.word0_gt.perm  = cr15_namespace[30:28];
   assign \cr15_namespace.word0_gt.b_flag  = cr15_namespace[31];
   assign \cr15_namespace.word1_location  = cr15_namespace[63:32];
   assign \cr15_namespace.word2_w2  = cr15_namespace[95:64];
   assign \$1  = { 3'h0, gt_latched[15:0], 4'h0 };
-  assign w1_masked[28] = 1'h0;
-  assign { w1_masked[31:29], w1_masked[27:0] } = { raw_w2_reg[31:29], raw_w2_reg[27:0] };
+  assign w1_masked[31:30] = 2'h0;
+  assign w1_masked[29:0] = raw_w2_reg[29:0];
   assign { computed_integrity[29], computed_integrity[24], computed_integrity[22], computed_integrity[20], computed_integrity[17], computed_integrity[14], computed_integrity[8], computed_integrity[4] } = { \$3 [29], \$3 [24], \$3 [22], \$3 [20], \$3 [17], \$3 [14], \$3 [8], \$3 [4] };
   assign { computed_integrity[31:30], computed_integrity[28:25], computed_integrity[23], computed_integrity[21], computed_integrity[19:18], computed_integrity[16:15], computed_integrity[13:9], computed_integrity[7:5], computed_integrity[3:0] } = \$auto$rtlil.cc:2739:Not$4 ;
 endmodule
@@ -10652,17 +10008,13 @@ module \top.u_dread (dmem_rd_data, clk, rst, start, cr_rd_data, dr_rd_data, cr_r
   (* src = "/home/runner/workspace/hardware/dread.py:49" *)
   wire \cr_rd_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/dread.py:49" *)
-  wire \cr_rd_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/dread.py:49" *)
-  wire [6:0] \cr_rd_data.word0_gt.gt_seq ;
+  wire [8:0] \cr_rd_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/dread.py:49" *)
   wire [1:0] \cr_rd_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/dread.py:49" *)
   wire [2:0] \cr_rd_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/dread.py:49" *)
   wire [15:0] \cr_rd_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/dread.py:49" *)
-  wire \cr_rd_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/dread.py:49" *)
   wire [31:0] \cr_rd_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/dread.py:49" *)
@@ -10740,7 +10092,7 @@ module \top.u_dread (dmem_rd_data, clk, rst, start, cr_rd_data, dr_rd_data, cr_r
   assign eff_off = imm_reg[14] ? (* src = "/home/runner/workspace/hardware/dread.py:90" *) { 19'h00000, imm_reg[13:0] } : \$2 ;
   assign in_bounds = eff_off <= (* src = "/home/runner/workspace/hardware/dread.py:93" *) cr_rd_data[79:64];
   assign cr_rd_addr = busy ? (* src = "/home/runner/workspace/hardware/dread.py:97" *) cr_src_reg : \port$0$2 [18:15];
-  assign \$3  = cr_rd_data[24:23] == (* src = "/home/runner/workspace/hardware/dread.py:128" *) 2'h3;
+  assign \$3  = cr_rd_data[26:25] == (* src = "/home/runner/workspace/hardware/dread.py:128" *) 2'h3;
   assign \$4  = ~ (* src = "/home/runner/workspace/hardware/dread.py:131" *) has_r;
   assign \$5  = ~ (* src = "/home/runner/workspace/hardware/dread.py:134" *) in_bounds;
   assign \$6  = | (* src = "/home/runner/workspace/hardware/dread.py:156" *) dr_dst_reg;
@@ -10752,7 +10104,7 @@ module \top.u_dread (dmem_rd_data, clk, rst, start, cr_rd_data, dr_rd_data, cr_r
   assign \$12  = ~ (* src = "/home/runner/workspace/hardware/dread.py:110" *) \port$0$2 [14];
   assign \$13  = ! (* src = "/home/runner/workspace/hardware/dread.py:120" *) imm_reg[3:0];
   assign \$14  = \$13  ? (* src = "/home/runner/workspace/hardware/dread.py:120" *) 32'd0 : dr_rd_data;
-  assign \$15  = cr_rd_data[24:23] == (* src = "/home/runner/workspace/hardware/dread.py:128" *) 2'h3;
+  assign \$15  = cr_rd_data[26:25] == (* src = "/home/runner/workspace/hardware/dread.py:128" *) 2'h3;
   assign \$16  = ~ (* src = "/home/runner/workspace/hardware/dread.py:131" *) has_r;
   assign \$17  = ~ (* src = "/home/runner/workspace/hardware/dread.py:134" *) in_bounds;
   assign \$18  = cr_rd_data[63:32] + (* src = "/home/runner/workspace/hardware/dread.py:140" *) { eff_off[15:0], 2'h0 };
@@ -11042,10 +10394,8 @@ module \top.u_dread (dmem_rd_data, clk, rst, start, cr_rd_data, dr_rd_data, cr_r
   assign dr_rd_addr = imm_reg[3:0];
   assign \cr_rd_data.word0_gt  = cr_rd_data[31:0];
   assign \cr_rd_data.word0_gt.slot_id  = cr_rd_data[15:0];
-  assign \cr_rd_data.word0_gt.gt_seq  = cr_rd_data[22:16];
-  assign \cr_rd_data.word0_gt.gt_type  = cr_rd_data[24:23];
-  assign \cr_rd_data.word0_gt.f_flag  = cr_rd_data[25];
-  assign \cr_rd_data.word0_gt.spare  = cr_rd_data[26];
+  assign \cr_rd_data.word0_gt.gt_seq  = cr_rd_data[24:16];
+  assign \cr_rd_data.word0_gt.gt_type  = cr_rd_data[26:25];
   assign \cr_rd_data.word0_gt.dom  = cr_rd_data[27];
   assign \cr_rd_data.word0_gt.perm  = cr_rd_data[30:28];
   assign \cr_rd_data.word0_gt.b_flag  = cr_rd_data[31];
@@ -11101,17 +10451,13 @@ module \top.u_dwrite (clk, rst, start, cr_rd_data, dr_rd_data2, dr_rd_data, cr_r
   (* src = "/home/runner/workspace/hardware/dwrite.py:48" *)
   wire \cr_rd_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/dwrite.py:48" *)
-  wire \cr_rd_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/dwrite.py:48" *)
-  wire [6:0] \cr_rd_data.word0_gt.gt_seq ;
+  wire [8:0] \cr_rd_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/dwrite.py:48" *)
   wire [1:0] \cr_rd_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/dwrite.py:48" *)
   wire [2:0] \cr_rd_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/dwrite.py:48" *)
   wire [15:0] \cr_rd_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/dwrite.py:48" *)
-  wire \cr_rd_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/dwrite.py:48" *)
   wire [31:0] \cr_rd_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/dwrite.py:48" *)
@@ -11189,7 +10535,7 @@ module \top.u_dwrite (clk, rst, start, cr_rd_data, dr_rd_data2, dr_rd_data, cr_r
   assign in_bounds = eff_off <= (* src = "/home/runner/workspace/hardware/dwrite.py:92" *) cr_rd_data[79:64];
   assign cr_rd_addr = busy ? (* src = "/home/runner/workspace/hardware/dwrite.py:96" *) cr_src_reg : \port$0$2 [18:15];
   assign dr_rd_addr = busy ? (* src = "/home/runner/workspace/hardware/dwrite.py:98" *) dr_src_reg : \port$0$2 [22:19];
-  assign \$3  = cr_rd_data[24:23] == (* src = "/home/runner/workspace/hardware/dwrite.py:130" *) 2'h3;
+  assign \$3  = cr_rd_data[26:25] == (* src = "/home/runner/workspace/hardware/dwrite.py:130" *) 2'h3;
   assign \$4  = ~ (* src = "/home/runner/workspace/hardware/dwrite.py:133" *) has_w;
   assign \$5  = ~ (* src = "/home/runner/workspace/hardware/dwrite.py:136" *) in_bounds;
   assign \$6  = ! (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) dwrite_fsm_state;
@@ -11199,7 +10545,7 @@ module \top.u_dwrite (clk, rst, start, cr_rd_data, dr_rd_data2, dr_rd_data, cr_r
   assign \$10  = ~ (* src = "/home/runner/workspace/hardware/dwrite.py:112" *) \port$0$2 [14];
   assign \$11  = ! (* src = "/home/runner/workspace/hardware/dwrite.py:122" *) imm_reg[3:0];
   assign \$12  = \$11  ? (* src = "/home/runner/workspace/hardware/dwrite.py:122" *) 32'd0 : dr_rd_data2;
-  assign \$13  = cr_rd_data[24:23] == (* src = "/home/runner/workspace/hardware/dwrite.py:130" *) 2'h3;
+  assign \$13  = cr_rd_data[26:25] == (* src = "/home/runner/workspace/hardware/dwrite.py:130" *) 2'h3;
   assign \$14  = ~ (* src = "/home/runner/workspace/hardware/dwrite.py:133" *) has_w;
   assign \$15  = ~ (* src = "/home/runner/workspace/hardware/dwrite.py:136" *) in_bounds;
   assign \$16  = cr_rd_data[63:32] + (* src = "/home/runner/workspace/hardware/dwrite.py:143" *) { eff_off[15:0], 2'h0 };
@@ -11480,10 +10826,8 @@ module \top.u_dwrite (clk, rst, start, cr_rd_data, dr_rd_data2, dr_rd_data, cr_r
   assign dr_rd_addr2 = imm_reg[3:0];
   assign \cr_rd_data.word0_gt  = cr_rd_data[31:0];
   assign \cr_rd_data.word0_gt.slot_id  = cr_rd_data[15:0];
-  assign \cr_rd_data.word0_gt.gt_seq  = cr_rd_data[22:16];
-  assign \cr_rd_data.word0_gt.gt_type  = cr_rd_data[24:23];
-  assign \cr_rd_data.word0_gt.f_flag  = cr_rd_data[25];
-  assign \cr_rd_data.word0_gt.spare  = cr_rd_data[26];
+  assign \cr_rd_data.word0_gt.gt_seq  = cr_rd_data[24:16];
+  assign \cr_rd_data.word0_gt.gt_type  = cr_rd_data[26:25];
   assign \cr_rd_data.word0_gt.dom  = cr_rd_data[27];
   assign \cr_rd_data.word0_gt.perm  = cr_rd_data[30:28];
   assign \cr_rd_data.word0_gt.b_flag  = cr_rd_data[31];
@@ -12900,17 +12244,13 @@ module \top.u_outform_fsm (clk, rst, intercept_start, outform_done_in, outform_f
   (* src = "/home/runner/workspace/hardware/church_outform.py:41" *)
   wire \cr_wr_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:41" *)
-  wire \cr_wr_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/church_outform.py:41" *)
-  wire [6:0] \cr_wr_data.word0_gt.gt_seq ;
+  wire [8:0] \cr_wr_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:41" *)
   wire [1:0] \cr_wr_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:41" *)
   wire [2:0] \cr_wr_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:41" *)
   wire [15:0] \cr_wr_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/church_outform.py:41" *)
-  wire \cr_wr_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:41" *)
   wire [31:0] \cr_wr_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:41" *)
@@ -12962,17 +12302,13 @@ module \top.u_outform_fsm (clk, rst, intercept_start, outform_done_in, outform_f
   (* src = "/home/runner/workspace/hardware/church_outform.py:95" *)
   wire \promoted_cap.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:95" *)
-  wire \promoted_cap.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/church_outform.py:95" *)
-  wire [6:0] \promoted_cap.word0_gt.gt_seq ;
+  wire [8:0] \promoted_cap.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:95" *)
   wire [1:0] \promoted_cap.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:95" *)
   wire [2:0] \promoted_cap.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:95" *)
   wire [15:0] \promoted_cap.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/church_outform.py:95" *)
-  wire \promoted_cap.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:95" *)
   wire [31:0] \promoted_cap.word1_location ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:95" *)
@@ -13000,17 +12336,13 @@ module \top.u_outform_fsm (clk, rst, intercept_start, outform_done_in, outform_f
   (* src = "/home/runner/workspace/hardware/church_outform.py:36" *)
   wire \src_cr_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:36" *)
-  wire \src_cr_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/church_outform.py:36" *)
-  wire [6:0] \src_cr_data.word0_gt.gt_seq ;
+  wire [8:0] \src_cr_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:36" *)
   wire [1:0] \src_cr_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:36" *)
   wire [2:0] \src_cr_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:36" *)
   wire [15:0] \src_cr_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/church_outform.py:36" *)
-  wire \src_cr_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:36" *)
   wire [31:0] \src_cr_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:36" *)
@@ -13024,17 +12356,13 @@ module \top.u_outform_fsm (clk, rst, intercept_start, outform_done_in, outform_f
   (* src = "/home/runner/workspace/hardware/church_outform.py:65" *)
   wire \src_cr_data_lat.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:65" *)
-  wire \src_cr_data_lat.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/church_outform.py:65" *)
-  wire [6:0] \src_cr_data_lat.word0_gt.gt_seq ;
+  wire [8:0] \src_cr_data_lat.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:65" *)
   wire [1:0] \src_cr_data_lat.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:65" *)
   wire [2:0] \src_cr_data_lat.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:65" *)
   wire [15:0] \src_cr_data_lat.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/church_outform.py:65" *)
-  wire \src_cr_data_lat.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:65" *)
   wire [31:0] \src_cr_data_lat.word1_location ;
   (* src = "/home/runner/workspace/hardware/church_outform.py:65" *)
@@ -13302,10 +12630,8 @@ module \top.u_outform_fsm (clk, rst, intercept_start, outform_done_in, outform_f
   assign outform_clist_addr_out = 32'd0;
   assign \src_cr_data_lat.word0_gt  = src_cr_data_lat[31:0];
   assign \src_cr_data_lat.word0_gt.slot_id  = src_cr_data_lat[15:0];
-  assign \src_cr_data_lat.word0_gt.gt_seq  = src_cr_data_lat[22:16];
-  assign \src_cr_data_lat.word0_gt.gt_type  = src_cr_data_lat[24:23];
-  assign \src_cr_data_lat.word0_gt.f_flag  = src_cr_data_lat[25];
-  assign \src_cr_data_lat.word0_gt.spare  = src_cr_data_lat[26];
+  assign \src_cr_data_lat.word0_gt.gt_seq  = src_cr_data_lat[24:16];
+  assign \src_cr_data_lat.word0_gt.gt_type  = src_cr_data_lat[26:25];
   assign \src_cr_data_lat.word0_gt.dom  = src_cr_data_lat[27];
   assign \src_cr_data_lat.word0_gt.perm  = src_cr_data_lat[30:28];
   assign \src_cr_data_lat.word0_gt.b_flag  = src_cr_data_lat[31];
@@ -13313,10 +12639,8 @@ module \top.u_outform_fsm (clk, rst, intercept_start, outform_done_in, outform_f
   assign \src_cr_data_lat.word2_w2  = src_cr_data_lat[95:64];
   assign \promoted_cap.word0_gt  = promoted_cap[31:0];
   assign \promoted_cap.word0_gt.slot_id  = promoted_cap[15:0];
-  assign \promoted_cap.word0_gt.gt_seq  = promoted_cap[22:16];
-  assign \promoted_cap.word0_gt.gt_type  = promoted_cap[24:23];
-  assign \promoted_cap.word0_gt.f_flag  = promoted_cap[25];
-  assign \promoted_cap.word0_gt.spare  = promoted_cap[26];
+  assign \promoted_cap.word0_gt.gt_seq  = promoted_cap[24:16];
+  assign \promoted_cap.word0_gt.gt_type  = promoted_cap[26:25];
   assign \promoted_cap.word0_gt.dom  = promoted_cap[27];
   assign \promoted_cap.word0_gt.perm  = promoted_cap[30:28];
   assign \promoted_cap.word0_gt.b_flag  = promoted_cap[31];
@@ -13324,10 +12648,8 @@ module \top.u_outform_fsm (clk, rst, intercept_start, outform_done_in, outform_f
   assign \promoted_cap.word2_w2  = promoted_cap[95:64];
   assign \cr_wr_data.word0_gt  = cr_wr_data[31:0];
   assign \cr_wr_data.word0_gt.slot_id  = cr_wr_data[15:0];
-  assign \cr_wr_data.word0_gt.gt_seq  = cr_wr_data[22:16];
-  assign \cr_wr_data.word0_gt.gt_type  = cr_wr_data[24:23];
-  assign \cr_wr_data.word0_gt.f_flag  = cr_wr_data[25];
-  assign \cr_wr_data.word0_gt.spare  = cr_wr_data[26];
+  assign \cr_wr_data.word0_gt.gt_seq  = cr_wr_data[24:16];
+  assign \cr_wr_data.word0_gt.gt_type  = cr_wr_data[26:25];
   assign \cr_wr_data.word0_gt.dom  = cr_wr_data[27];
   assign \cr_wr_data.word0_gt.perm  = cr_wr_data[30:28];
   assign \cr_wr_data.word0_gt.b_flag  = cr_wr_data[31];
@@ -13335,10 +12657,8 @@ module \top.u_outform_fsm (clk, rst, intercept_start, outform_done_in, outform_f
   assign \cr_wr_data.word2_w2  = cr_wr_data[95:64];
   assign \src_cr_data.word0_gt  = src_cr_data[31:0];
   assign \src_cr_data.word0_gt.slot_id  = src_cr_data[15:0];
-  assign \src_cr_data.word0_gt.gt_seq  = src_cr_data[22:16];
-  assign \src_cr_data.word0_gt.gt_type  = src_cr_data[24:23];
-  assign \src_cr_data.word0_gt.f_flag  = src_cr_data[25];
-  assign \src_cr_data.word0_gt.spare  = src_cr_data[26];
+  assign \src_cr_data.word0_gt.gt_seq  = src_cr_data[24:16];
+  assign \src_cr_data.word0_gt.gt_type  = src_cr_data[26:25];
   assign \src_cr_data.word0_gt.dom  = src_cr_data[27];
   assign \src_cr_data.word0_gt.perm  = src_cr_data[30:28];
   assign \src_cr_data.word0_gt.b_flag  = src_cr_data[31];
@@ -13350,10 +12670,9 @@ module \top.u_outform_fsm (clk, rst, intercept_start, outform_done_in, outform_f
   assign promoted_gt[31] = src_cr_data_lat[31];
   assign promoted_gt[30:28] = src_cr_data_lat[30:28];
   assign promoted_gt[27] = src_cr_data_lat[27];
-  assign promoted_gt[24:23] = 2'h1;
-  assign promoted_gt[22:16] = result_gt_in[22:16];
+  assign promoted_gt[26:25] = 2'h1;
+  assign promoted_gt[24:16] = result_gt_in[24:16];
   assign promoted_gt[15:0] = src_cr_data_lat[15:0];
-  assign promoted_gt[26:25] = 2'h0;
 endmodule
 
 (* src = "/home/runner/workspace/hardware/perm_check.py:62" *)
@@ -13440,17 +12759,13 @@ module \top.u_perm_check (gt_in, required_perms, fault_valid, fault_type, check_
   (* src = "/home/runner/workspace/hardware/perm_check.py:34" *)
   wire \gt_in.dom ;
   (* src = "/home/runner/workspace/hardware/perm_check.py:34" *)
-  wire \gt_in.f_flag ;
-  (* src = "/home/runner/workspace/hardware/perm_check.py:34" *)
-  wire [6:0] \gt_in.gt_seq ;
+  wire [8:0] \gt_in.gt_seq ;
   (* src = "/home/runner/workspace/hardware/perm_check.py:34" *)
   wire [1:0] \gt_in.gt_type ;
   (* src = "/home/runner/workspace/hardware/perm_check.py:34" *)
   wire [2:0] \gt_in.perm ;
   (* src = "/home/runner/workspace/hardware/perm_check.py:34" *)
   wire [15:0] \gt_in.slot_id ;
-  (* src = "/home/runner/workspace/hardware/perm_check.py:34" *)
-  wire \gt_in.spare ;
   (* src = "/home/runner/workspace/hardware/perm_check.py:72" *)
   wire [5:0] gt_perms;
   (* src = "/home/runner/workspace/hardware/perm_check.py:43" *)
@@ -13478,7 +12793,7 @@ module \top.u_perm_check (gt_in, required_perms, fault_valid, fault_type, check_
   assign \$46  = \$43  & (* src = "/home/runner/workspace/hardware/perm_check.py:124" *) \$45 ;
   assign \$47  = | (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:551" *) \$46 ;
   assign gt_perms = gt_in[27] ? (* src = "/home/runner/workspace/hardware/perm_check.py:74" *) { gt_in[30:28], 3'h0 } : { 3'h0, gt_in[30:28] };
-  assign is_null_gt = ! (* src = "/home/runner/workspace/hardware/perm_check.py:84" *) gt_in[24:23];
+  assign is_null_gt = ! (* src = "/home/runner/workspace/hardware/perm_check.py:84" *) gt_in[26:25];
   assign \$1  = gt_perms & (* src = "/home/runner/workspace/hardware/perm_check.py:85" *) required_perms;
   assign perms_match = \$1  == (* src = "/home/runner/workspace/hardware/perm_check.py:85" *) required_perms;
   assign \$2  = ~ (* src = "/home/runner/workspace/hardware/perm_check.py:86" *) is_null_gt;
@@ -13559,10 +12874,8 @@ module \top.u_perm_check (gt_in, required_perms, fault_valid, fault_type, check_
   assign calculated_seal = 16'h0000;
   assign stored_seal = 16'h0000;
   assign \gt_in.slot_id  = gt_in[15:0];
-  assign \gt_in.gt_seq  = gt_in[22:16];
-  assign \gt_in.gt_type  = gt_in[24:23];
-  assign \gt_in.f_flag  = gt_in[25];
-  assign \gt_in.spare  = gt_in[26];
+  assign \gt_in.gt_seq  = gt_in[24:16];
+  assign \gt_in.gt_type  = gt_in[26:25];
   assign \gt_in.dom  = gt_in[27];
   assign \gt_in.perm  = gt_in[30:28];
   assign \gt_in.b_flag  = gt_in[31];
@@ -13675,17 +12988,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire \cr0.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr0.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire [6:0] \cr0.word0_gt.gt_seq ;
+  wire [8:0] \cr0.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [1:0] \cr0.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [2:0] \cr0.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [15:0] \cr0.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr0.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [31:0] \cr0.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
@@ -13698,17 +13007,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr0_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr0_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr0_gt_wr_data.gt_seq ;
+  wire [8:0] \cr0_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr0_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr0_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr0_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr0_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   input cr0_gt_wr_en;
   wire cr0_gt_wr_en;
@@ -13721,17 +13026,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire \cr1.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr1.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire [6:0] \cr1.word0_gt.gt_seq ;
+  wire [8:0] \cr1.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [1:0] \cr1.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [2:0] \cr1.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [15:0] \cr1.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr1.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [31:0] \cr1.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
@@ -13745,17 +13046,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire \cr10.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr10.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire [6:0] \cr10.word0_gt.gt_seq ;
+  wire [8:0] \cr10.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [1:0] \cr10.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [2:0] \cr10.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [15:0] \cr10.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr10.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [31:0] \cr10.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
@@ -13768,17 +13065,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr10_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr10_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr10_gt_wr_data.gt_seq ;
+  wire [8:0] \cr10_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr10_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr10_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr10_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr10_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   input cr10_gt_wr_en;
   wire cr10_gt_wr_en;
@@ -13791,17 +13084,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire \cr11.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr11.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire [6:0] \cr11.word0_gt.gt_seq ;
+  wire [8:0] \cr11.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [1:0] \cr11.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [2:0] \cr11.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [15:0] \cr11.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr11.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [31:0] \cr11.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
@@ -13814,17 +13103,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr11_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr11_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr11_gt_wr_data.gt_seq ;
+  wire [8:0] \cr11_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr11_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr11_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr11_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr11_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   input cr11_gt_wr_en;
   wire cr11_gt_wr_en;
@@ -13838,17 +13123,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire \cr12.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr12.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire [6:0] \cr12.word0_gt.gt_seq ;
+  wire [8:0] \cr12.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [1:0] \cr12.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [2:0] \cr12.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [15:0] \cr12.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr12.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [31:0] \cr12.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
@@ -13861,17 +13142,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr12_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr12_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr12_gt_wr_data.gt_seq ;
+  wire [8:0] \cr12_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr12_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr12_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr12_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr12_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   input cr12_gt_wr_en;
   wire cr12_gt_wr_en;
@@ -13885,17 +13162,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:38" *)
   wire \cr12_thread.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:38" *)
-  wire \cr12_thread.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:38" *)
-  wire [6:0] \cr12_thread.word0_gt.gt_seq ;
+  wire [8:0] \cr12_thread.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:38" *)
   wire [1:0] \cr12_thread.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:38" *)
   wire [2:0] \cr12_thread.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:38" *)
   wire [15:0] \cr12_thread.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:38" *)
-  wire \cr12_thread.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:38" *)
   wire [31:0] \cr12_thread.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:38" *)
@@ -13909,17 +13182,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire \cr13.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr13.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire [6:0] \cr13.word0_gt.gt_seq ;
+  wire [8:0] \cr13.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [1:0] \cr13.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [2:0] \cr13.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [15:0] \cr13.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr13.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [31:0] \cr13.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
@@ -13932,17 +13201,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr13_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr13_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr13_gt_wr_data.gt_seq ;
+  wire [8:0] \cr13_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr13_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr13_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr13_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr13_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   input cr13_gt_wr_en;
   wire cr13_gt_wr_en;
@@ -13956,17 +13221,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:39" *)
   wire \cr13_interrupt.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:39" *)
-  wire \cr13_interrupt.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:39" *)
-  wire [6:0] \cr13_interrupt.word0_gt.gt_seq ;
+  wire [8:0] \cr13_interrupt.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:39" *)
   wire [1:0] \cr13_interrupt.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:39" *)
   wire [2:0] \cr13_interrupt.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:39" *)
   wire [15:0] \cr13_interrupt.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:39" *)
-  wire \cr13_interrupt.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:39" *)
   wire [31:0] \cr13_interrupt.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:39" *)
@@ -13981,17 +13242,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire \cr14.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr14.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire [6:0] \cr14.word0_gt.gt_seq ;
+  wire [8:0] \cr14.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [1:0] \cr14.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [2:0] \cr14.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [15:0] \cr14.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr14.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [31:0] \cr14.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
@@ -14006,17 +13263,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:40" *)
   wire \cr14_code.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:40" *)
-  wire \cr14_code.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:40" *)
-  wire [6:0] \cr14_code.word0_gt.gt_seq ;
+  wire [8:0] \cr14_code.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:40" *)
   wire [1:0] \cr14_code.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:40" *)
   wire [2:0] \cr14_code.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:40" *)
   wire [15:0] \cr14_code.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:40" *)
-  wire \cr14_code.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:40" *)
   wire [31:0] \cr14_code.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:40" *)
@@ -14029,17 +13282,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr14_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr14_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr14_gt_wr_data.gt_seq ;
+  wire [8:0] \cr14_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr14_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr14_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr14_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr14_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   input cr14_gt_wr_en;
   wire cr14_gt_wr_en;
@@ -14053,17 +13302,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire \cr15.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr15.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire [6:0] \cr15.word0_gt.gt_seq ;
+  wire [8:0] \cr15.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [1:0] \cr15.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [2:0] \cr15.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [15:0] \cr15.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr15.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [31:0] \cr15.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
@@ -14076,17 +13321,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr15_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr15_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr15_gt_wr_data.gt_seq ;
+  wire [8:0] \cr15_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr15_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr15_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr15_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr15_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   input cr15_gt_wr_en;
   wire cr15_gt_wr_en;
@@ -14106,17 +13347,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:41" *)
   wire \cr15_namespace.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:41" *)
-  wire \cr15_namespace.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:41" *)
-  wire [6:0] \cr15_namespace.word0_gt.gt_seq ;
+  wire [8:0] \cr15_namespace.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:41" *)
   wire [1:0] \cr15_namespace.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:41" *)
   wire [2:0] \cr15_namespace.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:41" *)
   wire [15:0] \cr15_namespace.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:41" *)
-  wire \cr15_namespace.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:41" *)
   wire [31:0] \cr15_namespace.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:41" *)
@@ -14129,17 +13366,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr1_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr1_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr1_gt_wr_data.gt_seq ;
+  wire [8:0] \cr1_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr1_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr1_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr1_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr1_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   input cr1_gt_wr_en;
   wire cr1_gt_wr_en;
@@ -14152,17 +13385,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire \cr2.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr2.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire [6:0] \cr2.word0_gt.gt_seq ;
+  wire [8:0] \cr2.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [1:0] \cr2.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [2:0] \cr2.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [15:0] \cr2.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr2.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [31:0] \cr2.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
@@ -14175,17 +13404,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr2_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr2_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr2_gt_wr_data.gt_seq ;
+  wire [8:0] \cr2_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr2_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr2_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr2_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr2_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   input cr2_gt_wr_en;
   wire cr2_gt_wr_en;
@@ -14198,17 +13423,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire \cr3.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr3.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire [6:0] \cr3.word0_gt.gt_seq ;
+  wire [8:0] \cr3.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [1:0] \cr3.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [2:0] \cr3.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [15:0] \cr3.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr3.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [31:0] \cr3.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
@@ -14221,17 +13442,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr3_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr3_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr3_gt_wr_data.gt_seq ;
+  wire [8:0] \cr3_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr3_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr3_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr3_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr3_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   input cr3_gt_wr_en;
   wire cr3_gt_wr_en;
@@ -14244,17 +13461,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire \cr4.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr4.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire [6:0] \cr4.word0_gt.gt_seq ;
+  wire [8:0] \cr4.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [1:0] \cr4.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [2:0] \cr4.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [15:0] \cr4.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr4.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [31:0] \cr4.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
@@ -14267,17 +13480,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr4_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr4_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr4_gt_wr_data.gt_seq ;
+  wire [8:0] \cr4_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr4_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr4_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr4_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr4_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   input cr4_gt_wr_en;
   wire cr4_gt_wr_en;
@@ -14291,17 +13500,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire \cr5.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr5.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire [6:0] \cr5.word0_gt.gt_seq ;
+  wire [8:0] \cr5.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [1:0] \cr5.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [2:0] \cr5.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [15:0] \cr5.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr5.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [31:0] \cr5.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
@@ -14314,17 +13519,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr5_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr5_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr5_gt_wr_data.gt_seq ;
+  wire [8:0] \cr5_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr5_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr5_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr5_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr5_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   input cr5_gt_wr_en;
   wire cr5_gt_wr_en;
@@ -14338,17 +13539,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:36" *)
   wire \cr5_heap.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:36" *)
-  wire \cr5_heap.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:36" *)
-  wire [6:0] \cr5_heap.word0_gt.gt_seq ;
+  wire [8:0] \cr5_heap.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:36" *)
   wire [1:0] \cr5_heap.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:36" *)
   wire [2:0] \cr5_heap.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:36" *)
   wire [15:0] \cr5_heap.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:36" *)
-  wire \cr5_heap.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:36" *)
   wire [31:0] \cr5_heap.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:36" *)
@@ -14362,17 +13559,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire \cr6.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr6.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire [6:0] \cr6.word0_gt.gt_seq ;
+  wire [8:0] \cr6.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [1:0] \cr6.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [2:0] \cr6.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [15:0] \cr6.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr6.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [31:0] \cr6.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
@@ -14387,17 +13580,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:37" *)
   wire \cr6_clist.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:37" *)
-  wire \cr6_clist.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:37" *)
-  wire [6:0] \cr6_clist.word0_gt.gt_seq ;
+  wire [8:0] \cr6_clist.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:37" *)
   wire [1:0] \cr6_clist.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:37" *)
   wire [2:0] \cr6_clist.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:37" *)
   wire [15:0] \cr6_clist.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:37" *)
-  wire \cr6_clist.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:37" *)
   wire [31:0] \cr6_clist.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:37" *)
@@ -14410,17 +13599,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr6_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr6_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr6_gt_wr_data.gt_seq ;
+  wire [8:0] \cr6_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr6_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr6_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr6_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr6_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   input cr6_gt_wr_en;
   wire cr6_gt_wr_en;
@@ -14433,17 +13618,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire \cr7.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr7.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire [6:0] \cr7.word0_gt.gt_seq ;
+  wire [8:0] \cr7.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [1:0] \cr7.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [2:0] \cr7.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [15:0] \cr7.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr7.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [31:0] \cr7.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
@@ -14456,17 +13637,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr7_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr7_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr7_gt_wr_data.gt_seq ;
+  wire [8:0] \cr7_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr7_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr7_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr7_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr7_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   input cr7_gt_wr_en;
   wire cr7_gt_wr_en;
@@ -14479,17 +13656,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire \cr8.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr8.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire [6:0] \cr8.word0_gt.gt_seq ;
+  wire [8:0] \cr8.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [1:0] \cr8.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [2:0] \cr8.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [15:0] \cr8.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr8.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [31:0] \cr8.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
@@ -14502,17 +13675,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr8_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr8_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr8_gt_wr_data.gt_seq ;
+  wire [8:0] \cr8_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr8_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr8_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr8_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr8_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   input cr8_gt_wr_en;
   wire cr8_gt_wr_en;
@@ -14525,17 +13694,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire \cr9.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr9.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire [6:0] \cr9.word0_gt.gt_seq ;
+  wire [8:0] \cr9.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [1:0] \cr9.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [2:0] \cr9.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [15:0] \cr9.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:101" *)
-  wire \cr9.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
   wire [31:0] \cr9.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:101" *)
@@ -14548,17 +13713,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire \cr9_gt_wr_data.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr9_gt_wr_data.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire [6:0] \cr9_gt_wr_data.gt_seq ;
+  wire [8:0] \cr9_gt_wr_data.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [1:0] \cr9_gt_wr_data.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [2:0] \cr9_gt_wr_data.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [15:0] \cr9_gt_wr_data.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:43" *)
-  wire \cr9_gt_wr_data.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   input cr9_gt_wr_en;
   wire cr9_gt_wr_en;
@@ -14581,17 +13742,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:21" *)
   wire \cr_rd_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:21" *)
-  wire \cr_rd_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:21" *)
-  wire [6:0] \cr_rd_data.word0_gt.gt_seq ;
+  wire [8:0] \cr_rd_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:21" *)
   wire [1:0] \cr_rd_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:21" *)
   wire [2:0] \cr_rd_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:21" *)
   wire [15:0] \cr_rd_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:21" *)
-  wire \cr_rd_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:21" *)
   wire [31:0] \cr_rd_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:21" *)
@@ -14623,17 +13780,13 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   (* src = "/home/runner/workspace/hardware/registers.py:24" *)
   wire \cr_wr_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/registers.py:24" *)
-  wire \cr_wr_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/registers.py:24" *)
-  wire [6:0] \cr_wr_data.word0_gt.gt_seq ;
+  wire [8:0] \cr_wr_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/registers.py:24" *)
   wire [1:0] \cr_wr_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/registers.py:24" *)
   wire [2:0] \cr_wr_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/registers.py:24" *)
   wire [15:0] \cr_wr_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/registers.py:24" *)
-  wire \cr_wr_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/registers.py:24" *)
   wire [31:0] \cr_wr_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/registers.py:24" *)
@@ -16236,10 +15389,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign m_flag_restore_val = 1'h0;
   assign \cr_rd_data.word0_gt  = cr_rd_data[31:0];
   assign \cr_rd_data.word0_gt.slot_id  = cr_rd_data[15:0];
-  assign \cr_rd_data.word0_gt.gt_seq  = cr_rd_data[22:16];
-  assign \cr_rd_data.word0_gt.gt_type  = cr_rd_data[24:23];
-  assign \cr_rd_data.word0_gt.f_flag  = cr_rd_data[25];
-  assign \cr_rd_data.word0_gt.spare  = cr_rd_data[26];
+  assign \cr_rd_data.word0_gt.gt_seq  = cr_rd_data[24:16];
+  assign \cr_rd_data.word0_gt.gt_type  = cr_rd_data[26:25];
   assign \cr_rd_data.word0_gt.dom  = cr_rd_data[27];
   assign \cr_rd_data.word0_gt.perm  = cr_rd_data[30:28];
   assign \cr_rd_data.word0_gt.b_flag  = cr_rd_data[31];
@@ -16247,10 +15398,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr_rd_data.word2_w2  = cr_rd_data[95:64];
   assign \cr0.word0_gt  = cr0[31:0];
   assign \cr0.word0_gt.slot_id  = cr0[15:0];
-  assign \cr0.word0_gt.gt_seq  = cr0[22:16];
-  assign \cr0.word0_gt.gt_type  = cr0[24:23];
-  assign \cr0.word0_gt.f_flag  = cr0[25];
-  assign \cr0.word0_gt.spare  = cr0[26];
+  assign \cr0.word0_gt.gt_seq  = cr0[24:16];
+  assign \cr0.word0_gt.gt_type  = cr0[26:25];
   assign \cr0.word0_gt.dom  = cr0[27];
   assign \cr0.word0_gt.perm  = cr0[30:28];
   assign \cr0.word0_gt.b_flag  = cr0[31];
@@ -16258,10 +15407,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr0.word2_w2  = cr0[95:64];
   assign \cr1.word0_gt  = cr1[31:0];
   assign \cr1.word0_gt.slot_id  = cr1[15:0];
-  assign \cr1.word0_gt.gt_seq  = cr1[22:16];
-  assign \cr1.word0_gt.gt_type  = cr1[24:23];
-  assign \cr1.word0_gt.f_flag  = cr1[25];
-  assign \cr1.word0_gt.spare  = cr1[26];
+  assign \cr1.word0_gt.gt_seq  = cr1[24:16];
+  assign \cr1.word0_gt.gt_type  = cr1[26:25];
   assign \cr1.word0_gt.dom  = cr1[27];
   assign \cr1.word0_gt.perm  = cr1[30:28];
   assign \cr1.word0_gt.b_flag  = cr1[31];
@@ -16269,10 +15416,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr1.word2_w2  = cr1[95:64];
   assign \cr2.word0_gt  = cr2[31:0];
   assign \cr2.word0_gt.slot_id  = cr2[15:0];
-  assign \cr2.word0_gt.gt_seq  = cr2[22:16];
-  assign \cr2.word0_gt.gt_type  = cr2[24:23];
-  assign \cr2.word0_gt.f_flag  = cr2[25];
-  assign \cr2.word0_gt.spare  = cr2[26];
+  assign \cr2.word0_gt.gt_seq  = cr2[24:16];
+  assign \cr2.word0_gt.gt_type  = cr2[26:25];
   assign \cr2.word0_gt.dom  = cr2[27];
   assign \cr2.word0_gt.perm  = cr2[30:28];
   assign \cr2.word0_gt.b_flag  = cr2[31];
@@ -16280,10 +15425,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr2.word2_w2  = cr2[95:64];
   assign \cr3.word0_gt  = cr3[31:0];
   assign \cr3.word0_gt.slot_id  = cr3[15:0];
-  assign \cr3.word0_gt.gt_seq  = cr3[22:16];
-  assign \cr3.word0_gt.gt_type  = cr3[24:23];
-  assign \cr3.word0_gt.f_flag  = cr3[25];
-  assign \cr3.word0_gt.spare  = cr3[26];
+  assign \cr3.word0_gt.gt_seq  = cr3[24:16];
+  assign \cr3.word0_gt.gt_type  = cr3[26:25];
   assign \cr3.word0_gt.dom  = cr3[27];
   assign \cr3.word0_gt.perm  = cr3[30:28];
   assign \cr3.word0_gt.b_flag  = cr3[31];
@@ -16291,10 +15434,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr3.word2_w2  = cr3[95:64];
   assign \cr4.word0_gt  = cr4[31:0];
   assign \cr4.word0_gt.slot_id  = cr4[15:0];
-  assign \cr4.word0_gt.gt_seq  = cr4[22:16];
-  assign \cr4.word0_gt.gt_type  = cr4[24:23];
-  assign \cr4.word0_gt.f_flag  = cr4[25];
-  assign \cr4.word0_gt.spare  = cr4[26];
+  assign \cr4.word0_gt.gt_seq  = cr4[24:16];
+  assign \cr4.word0_gt.gt_type  = cr4[26:25];
   assign \cr4.word0_gt.dom  = cr4[27];
   assign \cr4.word0_gt.perm  = cr4[30:28];
   assign \cr4.word0_gt.b_flag  = cr4[31];
@@ -16302,10 +15443,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr4.word2_w2  = cr4[95:64];
   assign \cr5.word0_gt  = cr5[31:0];
   assign \cr5.word0_gt.slot_id  = cr5[15:0];
-  assign \cr5.word0_gt.gt_seq  = cr5[22:16];
-  assign \cr5.word0_gt.gt_type  = cr5[24:23];
-  assign \cr5.word0_gt.f_flag  = cr5[25];
-  assign \cr5.word0_gt.spare  = cr5[26];
+  assign \cr5.word0_gt.gt_seq  = cr5[24:16];
+  assign \cr5.word0_gt.gt_type  = cr5[26:25];
   assign \cr5.word0_gt.dom  = cr5[27];
   assign \cr5.word0_gt.perm  = cr5[30:28];
   assign \cr5.word0_gt.b_flag  = cr5[31];
@@ -16313,10 +15452,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr5.word2_w2  = cr5[95:64];
   assign \cr6.word0_gt  = cr6[31:0];
   assign \cr6.word0_gt.slot_id  = cr6[15:0];
-  assign \cr6.word0_gt.gt_seq  = cr6[22:16];
-  assign \cr6.word0_gt.gt_type  = cr6[24:23];
-  assign \cr6.word0_gt.f_flag  = cr6[25];
-  assign \cr6.word0_gt.spare  = cr6[26];
+  assign \cr6.word0_gt.gt_seq  = cr6[24:16];
+  assign \cr6.word0_gt.gt_type  = cr6[26:25];
   assign \cr6.word0_gt.dom  = cr6[27];
   assign \cr6.word0_gt.perm  = cr6[30:28];
   assign \cr6.word0_gt.b_flag  = cr6[31];
@@ -16324,10 +15461,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr6.word2_w2  = cr6[95:64];
   assign \cr7.word0_gt  = cr7[31:0];
   assign \cr7.word0_gt.slot_id  = cr7[15:0];
-  assign \cr7.word0_gt.gt_seq  = cr7[22:16];
-  assign \cr7.word0_gt.gt_type  = cr7[24:23];
-  assign \cr7.word0_gt.f_flag  = cr7[25];
-  assign \cr7.word0_gt.spare  = cr7[26];
+  assign \cr7.word0_gt.gt_seq  = cr7[24:16];
+  assign \cr7.word0_gt.gt_type  = cr7[26:25];
   assign \cr7.word0_gt.dom  = cr7[27];
   assign \cr7.word0_gt.perm  = cr7[30:28];
   assign \cr7.word0_gt.b_flag  = cr7[31];
@@ -16335,10 +15470,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr7.word2_w2  = cr7[95:64];
   assign \cr8.word0_gt  = cr8[31:0];
   assign \cr8.word0_gt.slot_id  = cr8[15:0];
-  assign \cr8.word0_gt.gt_seq  = cr8[22:16];
-  assign \cr8.word0_gt.gt_type  = cr8[24:23];
-  assign \cr8.word0_gt.f_flag  = cr8[25];
-  assign \cr8.word0_gt.spare  = cr8[26];
+  assign \cr8.word0_gt.gt_seq  = cr8[24:16];
+  assign \cr8.word0_gt.gt_type  = cr8[26:25];
   assign \cr8.word0_gt.dom  = cr8[27];
   assign \cr8.word0_gt.perm  = cr8[30:28];
   assign \cr8.word0_gt.b_flag  = cr8[31];
@@ -16346,10 +15479,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr8.word2_w2  = cr8[95:64];
   assign \cr9.word0_gt  = cr9[31:0];
   assign \cr9.word0_gt.slot_id  = cr9[15:0];
-  assign \cr9.word0_gt.gt_seq  = cr9[22:16];
-  assign \cr9.word0_gt.gt_type  = cr9[24:23];
-  assign \cr9.word0_gt.f_flag  = cr9[25];
-  assign \cr9.word0_gt.spare  = cr9[26];
+  assign \cr9.word0_gt.gt_seq  = cr9[24:16];
+  assign \cr9.word0_gt.gt_type  = cr9[26:25];
   assign \cr9.word0_gt.dom  = cr9[27];
   assign \cr9.word0_gt.perm  = cr9[30:28];
   assign \cr9.word0_gt.b_flag  = cr9[31];
@@ -16357,10 +15488,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr9.word2_w2  = cr9[95:64];
   assign \cr10.word0_gt  = cr10[31:0];
   assign \cr10.word0_gt.slot_id  = cr10[15:0];
-  assign \cr10.word0_gt.gt_seq  = cr10[22:16];
-  assign \cr10.word0_gt.gt_type  = cr10[24:23];
-  assign \cr10.word0_gt.f_flag  = cr10[25];
-  assign \cr10.word0_gt.spare  = cr10[26];
+  assign \cr10.word0_gt.gt_seq  = cr10[24:16];
+  assign \cr10.word0_gt.gt_type  = cr10[26:25];
   assign \cr10.word0_gt.dom  = cr10[27];
   assign \cr10.word0_gt.perm  = cr10[30:28];
   assign \cr10.word0_gt.b_flag  = cr10[31];
@@ -16368,10 +15497,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr10.word2_w2  = cr10[95:64];
   assign \cr11.word0_gt  = cr11[31:0];
   assign \cr11.word0_gt.slot_id  = cr11[15:0];
-  assign \cr11.word0_gt.gt_seq  = cr11[22:16];
-  assign \cr11.word0_gt.gt_type  = cr11[24:23];
-  assign \cr11.word0_gt.f_flag  = cr11[25];
-  assign \cr11.word0_gt.spare  = cr11[26];
+  assign \cr11.word0_gt.gt_seq  = cr11[24:16];
+  assign \cr11.word0_gt.gt_type  = cr11[26:25];
   assign \cr11.word0_gt.dom  = cr11[27];
   assign \cr11.word0_gt.perm  = cr11[30:28];
   assign \cr11.word0_gt.b_flag  = cr11[31];
@@ -16379,10 +15506,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr11.word2_w2  = cr11[95:64];
   assign \cr12.word0_gt  = cr12[31:0];
   assign \cr12.word0_gt.slot_id  = cr12[15:0];
-  assign \cr12.word0_gt.gt_seq  = cr12[22:16];
-  assign \cr12.word0_gt.gt_type  = cr12[24:23];
-  assign \cr12.word0_gt.f_flag  = cr12[25];
-  assign \cr12.word0_gt.spare  = cr12[26];
+  assign \cr12.word0_gt.gt_seq  = cr12[24:16];
+  assign \cr12.word0_gt.gt_type  = cr12[26:25];
   assign \cr12.word0_gt.dom  = cr12[27];
   assign \cr12.word0_gt.perm  = cr12[30:28];
   assign \cr12.word0_gt.b_flag  = cr12[31];
@@ -16390,10 +15515,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr12.word2_w2  = cr12[95:64];
   assign \cr13.word0_gt  = cr13[31:0];
   assign \cr13.word0_gt.slot_id  = cr13[15:0];
-  assign \cr13.word0_gt.gt_seq  = cr13[22:16];
-  assign \cr13.word0_gt.gt_type  = cr13[24:23];
-  assign \cr13.word0_gt.f_flag  = cr13[25];
-  assign \cr13.word0_gt.spare  = cr13[26];
+  assign \cr13.word0_gt.gt_seq  = cr13[24:16];
+  assign \cr13.word0_gt.gt_type  = cr13[26:25];
   assign \cr13.word0_gt.dom  = cr13[27];
   assign \cr13.word0_gt.perm  = cr13[30:28];
   assign \cr13.word0_gt.b_flag  = cr13[31];
@@ -16401,10 +15524,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr13.word2_w2  = cr13[95:64];
   assign \cr14.word0_gt  = cr14[31:0];
   assign \cr14.word0_gt.slot_id  = cr14[15:0];
-  assign \cr14.word0_gt.gt_seq  = cr14[22:16];
-  assign \cr14.word0_gt.gt_type  = cr14[24:23];
-  assign \cr14.word0_gt.f_flag  = cr14[25];
-  assign \cr14.word0_gt.spare  = cr14[26];
+  assign \cr14.word0_gt.gt_seq  = cr14[24:16];
+  assign \cr14.word0_gt.gt_type  = cr14[26:25];
   assign \cr14.word0_gt.dom  = cr14[27];
   assign \cr14.word0_gt.perm  = cr14[30:28];
   assign \cr14.word0_gt.b_flag  = cr14[31];
@@ -16412,10 +15533,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr14.word2_w2  = cr14[95:64];
   assign \cr15.word0_gt  = cr15[31:0];
   assign \cr15.word0_gt.slot_id  = cr15[15:0];
-  assign \cr15.word0_gt.gt_seq  = cr15[22:16];
-  assign \cr15.word0_gt.gt_type  = cr15[24:23];
-  assign \cr15.word0_gt.f_flag  = cr15[25];
-  assign \cr15.word0_gt.spare  = cr15[26];
+  assign \cr15.word0_gt.gt_seq  = cr15[24:16];
+  assign \cr15.word0_gt.gt_type  = cr15[26:25];
   assign \cr15.word0_gt.dom  = cr15[27];
   assign \cr15.word0_gt.perm  = cr15[30:28];
   assign \cr15.word0_gt.b_flag  = cr15[31];
@@ -16423,10 +15542,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr15.word2_w2  = cr15[95:64];
   assign \cr5_heap.word0_gt  = cr5[31:0];
   assign \cr5_heap.word0_gt.slot_id  = cr5[15:0];
-  assign \cr5_heap.word0_gt.gt_seq  = cr5[22:16];
-  assign \cr5_heap.word0_gt.gt_type  = cr5[24:23];
-  assign \cr5_heap.word0_gt.f_flag  = cr5[25];
-  assign \cr5_heap.word0_gt.spare  = cr5[26];
+  assign \cr5_heap.word0_gt.gt_seq  = cr5[24:16];
+  assign \cr5_heap.word0_gt.gt_type  = cr5[26:25];
   assign \cr5_heap.word0_gt.dom  = cr5[27];
   assign \cr5_heap.word0_gt.perm  = cr5[30:28];
   assign \cr5_heap.word0_gt.b_flag  = cr5[31];
@@ -16434,10 +15551,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr5_heap.word2_w2  = cr5[95:64];
   assign \cr6_clist.word0_gt  = cr6[31:0];
   assign \cr6_clist.word0_gt.slot_id  = cr6[15:0];
-  assign \cr6_clist.word0_gt.gt_seq  = cr6[22:16];
-  assign \cr6_clist.word0_gt.gt_type  = cr6[24:23];
-  assign \cr6_clist.word0_gt.f_flag  = cr6[25];
-  assign \cr6_clist.word0_gt.spare  = cr6[26];
+  assign \cr6_clist.word0_gt.gt_seq  = cr6[24:16];
+  assign \cr6_clist.word0_gt.gt_type  = cr6[26:25];
   assign \cr6_clist.word0_gt.dom  = cr6[27];
   assign \cr6_clist.word0_gt.perm  = cr6[30:28];
   assign \cr6_clist.word0_gt.b_flag  = cr6[31];
@@ -16445,10 +15560,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr6_clist.word2_w2  = cr6[95:64];
   assign \cr12_thread.word0_gt  = cr12[31:0];
   assign \cr12_thread.word0_gt.slot_id  = cr12[15:0];
-  assign \cr12_thread.word0_gt.gt_seq  = cr12[22:16];
-  assign \cr12_thread.word0_gt.gt_type  = cr12[24:23];
-  assign \cr12_thread.word0_gt.f_flag  = cr12[25];
-  assign \cr12_thread.word0_gt.spare  = cr12[26];
+  assign \cr12_thread.word0_gt.gt_seq  = cr12[24:16];
+  assign \cr12_thread.word0_gt.gt_type  = cr12[26:25];
   assign \cr12_thread.word0_gt.dom  = cr12[27];
   assign \cr12_thread.word0_gt.perm  = cr12[30:28];
   assign \cr12_thread.word0_gt.b_flag  = cr12[31];
@@ -16456,10 +15569,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr12_thread.word2_w2  = cr12[95:64];
   assign \cr13_interrupt.word0_gt  = cr13[31:0];
   assign \cr13_interrupt.word0_gt.slot_id  = cr13[15:0];
-  assign \cr13_interrupt.word0_gt.gt_seq  = cr13[22:16];
-  assign \cr13_interrupt.word0_gt.gt_type  = cr13[24:23];
-  assign \cr13_interrupt.word0_gt.f_flag  = cr13[25];
-  assign \cr13_interrupt.word0_gt.spare  = cr13[26];
+  assign \cr13_interrupt.word0_gt.gt_seq  = cr13[24:16];
+  assign \cr13_interrupt.word0_gt.gt_type  = cr13[26:25];
   assign \cr13_interrupt.word0_gt.dom  = cr13[27];
   assign \cr13_interrupt.word0_gt.perm  = cr13[30:28];
   assign \cr13_interrupt.word0_gt.b_flag  = cr13[31];
@@ -16467,10 +15578,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr13_interrupt.word2_w2  = cr13[95:64];
   assign \cr14_code.word0_gt  = cr14[31:0];
   assign \cr14_code.word0_gt.slot_id  = cr14[15:0];
-  assign \cr14_code.word0_gt.gt_seq  = cr14[22:16];
-  assign \cr14_code.word0_gt.gt_type  = cr14[24:23];
-  assign \cr14_code.word0_gt.f_flag  = cr14[25];
-  assign \cr14_code.word0_gt.spare  = cr14[26];
+  assign \cr14_code.word0_gt.gt_seq  = cr14[24:16];
+  assign \cr14_code.word0_gt.gt_type  = cr14[26:25];
   assign \cr14_code.word0_gt.dom  = cr14[27];
   assign \cr14_code.word0_gt.perm  = cr14[30:28];
   assign \cr14_code.word0_gt.b_flag  = cr14[31];
@@ -16478,10 +15587,8 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \cr14_code.word2_w2  = cr14[95:64];
   assign \cr15_namespace.word0_gt  = cr15[31:0];
   assign \cr15_namespace.word0_gt.slot_id  = cr15[15:0];
-  assign \cr15_namespace.word0_gt.gt_seq  = cr15[22:16];
-  assign \cr15_namespace.word0_gt.gt_type  = cr15[24:23];
-  assign \cr15_namespace.word0_gt.f_flag  = cr15[25];
-  assign \cr15_namespace.word0_gt.spare  = cr15[26];
+  assign \cr15_namespace.word0_gt.gt_seq  = cr15[24:16];
+  assign \cr15_namespace.word0_gt.gt_type  = cr15[26:25];
   assign \cr15_namespace.word0_gt.dom  = cr15[27];
   assign \cr15_namespace.word0_gt.perm  = cr15[30:28];
   assign \cr15_namespace.word0_gt.b_flag  = cr15[31];
@@ -16497,140 +15604,106 @@ module \top.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_
   assign \flags_reg.V  = flags[3];
   assign \cr_wr_data.word0_gt  = cr_wr_data[31:0];
   assign \cr_wr_data.word0_gt.slot_id  = cr_wr_data[15:0];
-  assign \cr_wr_data.word0_gt.gt_seq  = cr_wr_data[22:16];
-  assign \cr_wr_data.word0_gt.gt_type  = cr_wr_data[24:23];
-  assign \cr_wr_data.word0_gt.f_flag  = cr_wr_data[25];
-  assign \cr_wr_data.word0_gt.spare  = cr_wr_data[26];
+  assign \cr_wr_data.word0_gt.gt_seq  = cr_wr_data[24:16];
+  assign \cr_wr_data.word0_gt.gt_type  = cr_wr_data[26:25];
   assign \cr_wr_data.word0_gt.dom  = cr_wr_data[27];
   assign \cr_wr_data.word0_gt.perm  = cr_wr_data[30:28];
   assign \cr_wr_data.word0_gt.b_flag  = cr_wr_data[31];
   assign \cr_wr_data.word1_location  = cr_wr_data[63:32];
   assign \cr_wr_data.word2_w2  = cr_wr_data[95:64];
   assign \cr0_gt_wr_data.slot_id  = cr0_gt_wr_data[15:0];
-  assign \cr0_gt_wr_data.gt_seq  = cr0_gt_wr_data[22:16];
-  assign \cr0_gt_wr_data.gt_type  = cr0_gt_wr_data[24:23];
-  assign \cr0_gt_wr_data.f_flag  = cr0_gt_wr_data[25];
-  assign \cr0_gt_wr_data.spare  = cr0_gt_wr_data[26];
+  assign \cr0_gt_wr_data.gt_seq  = cr0_gt_wr_data[24:16];
+  assign \cr0_gt_wr_data.gt_type  = cr0_gt_wr_data[26:25];
   assign \cr0_gt_wr_data.dom  = cr0_gt_wr_data[27];
   assign \cr0_gt_wr_data.perm  = cr0_gt_wr_data[30:28];
   assign \cr0_gt_wr_data.b_flag  = cr0_gt_wr_data[31];
   assign \cr1_gt_wr_data.slot_id  = cr1_gt_wr_data[15:0];
-  assign \cr1_gt_wr_data.gt_seq  = cr1_gt_wr_data[22:16];
-  assign \cr1_gt_wr_data.gt_type  = cr1_gt_wr_data[24:23];
-  assign \cr1_gt_wr_data.f_flag  = cr1_gt_wr_data[25];
-  assign \cr1_gt_wr_data.spare  = cr1_gt_wr_data[26];
+  assign \cr1_gt_wr_data.gt_seq  = cr1_gt_wr_data[24:16];
+  assign \cr1_gt_wr_data.gt_type  = cr1_gt_wr_data[26:25];
   assign \cr1_gt_wr_data.dom  = cr1_gt_wr_data[27];
   assign \cr1_gt_wr_data.perm  = cr1_gt_wr_data[30:28];
   assign \cr1_gt_wr_data.b_flag  = cr1_gt_wr_data[31];
   assign \cr2_gt_wr_data.slot_id  = cr2_gt_wr_data[15:0];
-  assign \cr2_gt_wr_data.gt_seq  = cr2_gt_wr_data[22:16];
-  assign \cr2_gt_wr_data.gt_type  = cr2_gt_wr_data[24:23];
-  assign \cr2_gt_wr_data.f_flag  = cr2_gt_wr_data[25];
-  assign \cr2_gt_wr_data.spare  = cr2_gt_wr_data[26];
+  assign \cr2_gt_wr_data.gt_seq  = cr2_gt_wr_data[24:16];
+  assign \cr2_gt_wr_data.gt_type  = cr2_gt_wr_data[26:25];
   assign \cr2_gt_wr_data.dom  = cr2_gt_wr_data[27];
   assign \cr2_gt_wr_data.perm  = cr2_gt_wr_data[30:28];
   assign \cr2_gt_wr_data.b_flag  = cr2_gt_wr_data[31];
   assign \cr3_gt_wr_data.slot_id  = cr3_gt_wr_data[15:0];
-  assign \cr3_gt_wr_data.gt_seq  = cr3_gt_wr_data[22:16];
-  assign \cr3_gt_wr_data.gt_type  = cr3_gt_wr_data[24:23];
-  assign \cr3_gt_wr_data.f_flag  = cr3_gt_wr_data[25];
-  assign \cr3_gt_wr_data.spare  = cr3_gt_wr_data[26];
+  assign \cr3_gt_wr_data.gt_seq  = cr3_gt_wr_data[24:16];
+  assign \cr3_gt_wr_data.gt_type  = cr3_gt_wr_data[26:25];
   assign \cr3_gt_wr_data.dom  = cr3_gt_wr_data[27];
   assign \cr3_gt_wr_data.perm  = cr3_gt_wr_data[30:28];
   assign \cr3_gt_wr_data.b_flag  = cr3_gt_wr_data[31];
   assign \cr4_gt_wr_data.slot_id  = cr4_gt_wr_data[15:0];
-  assign \cr4_gt_wr_data.gt_seq  = cr4_gt_wr_data[22:16];
-  assign \cr4_gt_wr_data.gt_type  = cr4_gt_wr_data[24:23];
-  assign \cr4_gt_wr_data.f_flag  = cr4_gt_wr_data[25];
-  assign \cr4_gt_wr_data.spare  = cr4_gt_wr_data[26];
+  assign \cr4_gt_wr_data.gt_seq  = cr4_gt_wr_data[24:16];
+  assign \cr4_gt_wr_data.gt_type  = cr4_gt_wr_data[26:25];
   assign \cr4_gt_wr_data.dom  = cr4_gt_wr_data[27];
   assign \cr4_gt_wr_data.perm  = cr4_gt_wr_data[30:28];
   assign \cr4_gt_wr_data.b_flag  = cr4_gt_wr_data[31];
   assign \cr5_gt_wr_data.slot_id  = cr5_gt_wr_data[15:0];
-  assign \cr5_gt_wr_data.gt_seq  = cr5_gt_wr_data[22:16];
-  assign \cr5_gt_wr_data.gt_type  = cr5_gt_wr_data[24:23];
-  assign \cr5_gt_wr_data.f_flag  = cr5_gt_wr_data[25];
-  assign \cr5_gt_wr_data.spare  = cr5_gt_wr_data[26];
+  assign \cr5_gt_wr_data.gt_seq  = cr5_gt_wr_data[24:16];
+  assign \cr5_gt_wr_data.gt_type  = cr5_gt_wr_data[26:25];
   assign \cr5_gt_wr_data.dom  = cr5_gt_wr_data[27];
   assign \cr5_gt_wr_data.perm  = cr5_gt_wr_data[30:28];
   assign \cr5_gt_wr_data.b_flag  = cr5_gt_wr_data[31];
   assign \cr6_gt_wr_data.slot_id  = cr6_gt_wr_data[15:0];
-  assign \cr6_gt_wr_data.gt_seq  = cr6_gt_wr_data[22:16];
-  assign \cr6_gt_wr_data.gt_type  = cr6_gt_wr_data[24:23];
-  assign \cr6_gt_wr_data.f_flag  = cr6_gt_wr_data[25];
-  assign \cr6_gt_wr_data.spare  = cr6_gt_wr_data[26];
+  assign \cr6_gt_wr_data.gt_seq  = cr6_gt_wr_data[24:16];
+  assign \cr6_gt_wr_data.gt_type  = cr6_gt_wr_data[26:25];
   assign \cr6_gt_wr_data.dom  = cr6_gt_wr_data[27];
   assign \cr6_gt_wr_data.perm  = cr6_gt_wr_data[30:28];
   assign \cr6_gt_wr_data.b_flag  = cr6_gt_wr_data[31];
   assign \cr7_gt_wr_data.slot_id  = cr7_gt_wr_data[15:0];
-  assign \cr7_gt_wr_data.gt_seq  = cr7_gt_wr_data[22:16];
-  assign \cr7_gt_wr_data.gt_type  = cr7_gt_wr_data[24:23];
-  assign \cr7_gt_wr_data.f_flag  = cr7_gt_wr_data[25];
-  assign \cr7_gt_wr_data.spare  = cr7_gt_wr_data[26];
+  assign \cr7_gt_wr_data.gt_seq  = cr7_gt_wr_data[24:16];
+  assign \cr7_gt_wr_data.gt_type  = cr7_gt_wr_data[26:25];
   assign \cr7_gt_wr_data.dom  = cr7_gt_wr_data[27];
   assign \cr7_gt_wr_data.perm  = cr7_gt_wr_data[30:28];
   assign \cr7_gt_wr_data.b_flag  = cr7_gt_wr_data[31];
   assign \cr8_gt_wr_data.slot_id  = cr8_gt_wr_data[15:0];
-  assign \cr8_gt_wr_data.gt_seq  = cr8_gt_wr_data[22:16];
-  assign \cr8_gt_wr_data.gt_type  = cr8_gt_wr_data[24:23];
-  assign \cr8_gt_wr_data.f_flag  = cr8_gt_wr_data[25];
-  assign \cr8_gt_wr_data.spare  = cr8_gt_wr_data[26];
+  assign \cr8_gt_wr_data.gt_seq  = cr8_gt_wr_data[24:16];
+  assign \cr8_gt_wr_data.gt_type  = cr8_gt_wr_data[26:25];
   assign \cr8_gt_wr_data.dom  = cr8_gt_wr_data[27];
   assign \cr8_gt_wr_data.perm  = cr8_gt_wr_data[30:28];
   assign \cr8_gt_wr_data.b_flag  = cr8_gt_wr_data[31];
   assign \cr9_gt_wr_data.slot_id  = cr9_gt_wr_data[15:0];
-  assign \cr9_gt_wr_data.gt_seq  = cr9_gt_wr_data[22:16];
-  assign \cr9_gt_wr_data.gt_type  = cr9_gt_wr_data[24:23];
-  assign \cr9_gt_wr_data.f_flag  = cr9_gt_wr_data[25];
-  assign \cr9_gt_wr_data.spare  = cr9_gt_wr_data[26];
+  assign \cr9_gt_wr_data.gt_seq  = cr9_gt_wr_data[24:16];
+  assign \cr9_gt_wr_data.gt_type  = cr9_gt_wr_data[26:25];
   assign \cr9_gt_wr_data.dom  = cr9_gt_wr_data[27];
   assign \cr9_gt_wr_data.perm  = cr9_gt_wr_data[30:28];
   assign \cr9_gt_wr_data.b_flag  = cr9_gt_wr_data[31];
   assign \cr10_gt_wr_data.slot_id  = cr10_gt_wr_data[15:0];
-  assign \cr10_gt_wr_data.gt_seq  = cr10_gt_wr_data[22:16];
-  assign \cr10_gt_wr_data.gt_type  = cr10_gt_wr_data[24:23];
-  assign \cr10_gt_wr_data.f_flag  = cr10_gt_wr_data[25];
-  assign \cr10_gt_wr_data.spare  = cr10_gt_wr_data[26];
+  assign \cr10_gt_wr_data.gt_seq  = cr10_gt_wr_data[24:16];
+  assign \cr10_gt_wr_data.gt_type  = cr10_gt_wr_data[26:25];
   assign \cr10_gt_wr_data.dom  = cr10_gt_wr_data[27];
   assign \cr10_gt_wr_data.perm  = cr10_gt_wr_data[30:28];
   assign \cr10_gt_wr_data.b_flag  = cr10_gt_wr_data[31];
   assign \cr11_gt_wr_data.slot_id  = cr11_gt_wr_data[15:0];
-  assign \cr11_gt_wr_data.gt_seq  = cr11_gt_wr_data[22:16];
-  assign \cr11_gt_wr_data.gt_type  = cr11_gt_wr_data[24:23];
-  assign \cr11_gt_wr_data.f_flag  = cr11_gt_wr_data[25];
-  assign \cr11_gt_wr_data.spare  = cr11_gt_wr_data[26];
+  assign \cr11_gt_wr_data.gt_seq  = cr11_gt_wr_data[24:16];
+  assign \cr11_gt_wr_data.gt_type  = cr11_gt_wr_data[26:25];
   assign \cr11_gt_wr_data.dom  = cr11_gt_wr_data[27];
   assign \cr11_gt_wr_data.perm  = cr11_gt_wr_data[30:28];
   assign \cr11_gt_wr_data.b_flag  = cr11_gt_wr_data[31];
   assign \cr12_gt_wr_data.slot_id  = cr12_gt_wr_data[15:0];
-  assign \cr12_gt_wr_data.gt_seq  = cr12_gt_wr_data[22:16];
-  assign \cr12_gt_wr_data.gt_type  = cr12_gt_wr_data[24:23];
-  assign \cr12_gt_wr_data.f_flag  = cr12_gt_wr_data[25];
-  assign \cr12_gt_wr_data.spare  = cr12_gt_wr_data[26];
+  assign \cr12_gt_wr_data.gt_seq  = cr12_gt_wr_data[24:16];
+  assign \cr12_gt_wr_data.gt_type  = cr12_gt_wr_data[26:25];
   assign \cr12_gt_wr_data.dom  = cr12_gt_wr_data[27];
   assign \cr12_gt_wr_data.perm  = cr12_gt_wr_data[30:28];
   assign \cr12_gt_wr_data.b_flag  = cr12_gt_wr_data[31];
   assign \cr13_gt_wr_data.slot_id  = cr13_gt_wr_data[15:0];
-  assign \cr13_gt_wr_data.gt_seq  = cr13_gt_wr_data[22:16];
-  assign \cr13_gt_wr_data.gt_type  = cr13_gt_wr_data[24:23];
-  assign \cr13_gt_wr_data.f_flag  = cr13_gt_wr_data[25];
-  assign \cr13_gt_wr_data.spare  = cr13_gt_wr_data[26];
+  assign \cr13_gt_wr_data.gt_seq  = cr13_gt_wr_data[24:16];
+  assign \cr13_gt_wr_data.gt_type  = cr13_gt_wr_data[26:25];
   assign \cr13_gt_wr_data.dom  = cr13_gt_wr_data[27];
   assign \cr13_gt_wr_data.perm  = cr13_gt_wr_data[30:28];
   assign \cr13_gt_wr_data.b_flag  = cr13_gt_wr_data[31];
   assign \cr14_gt_wr_data.slot_id  = cr14_gt_wr_data[15:0];
-  assign \cr14_gt_wr_data.gt_seq  = cr14_gt_wr_data[22:16];
-  assign \cr14_gt_wr_data.gt_type  = cr14_gt_wr_data[24:23];
-  assign \cr14_gt_wr_data.f_flag  = cr14_gt_wr_data[25];
-  assign \cr14_gt_wr_data.spare  = cr14_gt_wr_data[26];
+  assign \cr14_gt_wr_data.gt_seq  = cr14_gt_wr_data[24:16];
+  assign \cr14_gt_wr_data.gt_type  = cr14_gt_wr_data[26:25];
   assign \cr14_gt_wr_data.dom  = cr14_gt_wr_data[27];
   assign \cr14_gt_wr_data.perm  = cr14_gt_wr_data[30:28];
   assign \cr14_gt_wr_data.b_flag  = cr14_gt_wr_data[31];
   assign \cr15_gt_wr_data.slot_id  = cr15_gt_wr_data[15:0];
-  assign \cr15_gt_wr_data.gt_seq  = cr15_gt_wr_data[22:16];
-  assign \cr15_gt_wr_data.gt_type  = cr15_gt_wr_data[24:23];
-  assign \cr15_gt_wr_data.f_flag  = cr15_gt_wr_data[25];
-  assign \cr15_gt_wr_data.spare  = cr15_gt_wr_data[26];
+  assign \cr15_gt_wr_data.gt_seq  = cr15_gt_wr_data[24:16];
+  assign \cr15_gt_wr_data.gt_type  = cr15_gt_wr_data[26:25];
   assign \cr15_gt_wr_data.dom  = cr15_gt_wr_data[27];
   assign \cr15_gt_wr_data.perm  = cr15_gt_wr_data[30:28];
   assign \cr15_gt_wr_data.b_flag  = cr15_gt_wr_data[31];
@@ -16714,17 +15787,13 @@ module \top.u_return (mem_rd_data, clk, rst, return_start, cr_rd_data, cr_rd_add
   (* src = "/home/runner/workspace/hardware/ret.py:47" *)
   wire \cr12_thread.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/ret.py:47" *)
-  wire \cr12_thread.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/ret.py:47" *)
-  wire [6:0] \cr12_thread.word0_gt.gt_seq ;
+  wire [8:0] \cr12_thread.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/ret.py:47" *)
   wire [1:0] \cr12_thread.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/ret.py:47" *)
   wire [2:0] \cr12_thread.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/ret.py:47" *)
   wire [15:0] \cr12_thread.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/ret.py:47" *)
-  wire \cr12_thread.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/ret.py:47" *)
   wire [31:0] \cr12_thread.word1_location ;
   (* src = "/home/runner/workspace/hardware/ret.py:47" *)
@@ -16743,17 +15812,13 @@ module \top.u_return (mem_rd_data, clk, rst, return_start, cr_rd_data, cr_rd_add
   (* src = "/home/runner/workspace/hardware/ret.py:46" *)
   wire \cr5_heap.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/ret.py:46" *)
-  wire \cr5_heap.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/ret.py:46" *)
-  wire [6:0] \cr5_heap.word0_gt.gt_seq ;
+  wire [8:0] \cr5_heap.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/ret.py:46" *)
   wire [1:0] \cr5_heap.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/ret.py:46" *)
   wire [2:0] \cr5_heap.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/ret.py:46" *)
   wire [15:0] \cr5_heap.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/ret.py:46" *)
-  wire \cr5_heap.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/ret.py:46" *)
   wire [31:0] \cr5_heap.word1_location ;
   (* src = "/home/runner/workspace/hardware/ret.py:46" *)
@@ -16773,17 +15838,13 @@ module \top.u_return (mem_rd_data, clk, rst, return_start, cr_rd_data, cr_rd_add
   (* src = "/home/runner/workspace/hardware/ret.py:22" *)
   wire \cr_rd_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/ret.py:22" *)
-  wire \cr_rd_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/ret.py:22" *)
-  wire [6:0] \cr_rd_data.word0_gt.gt_seq ;
+  wire [8:0] \cr_rd_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/ret.py:22" *)
   wire [1:0] \cr_rd_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/ret.py:22" *)
   wire [2:0] \cr_rd_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/ret.py:22" *)
   wire [15:0] \cr_rd_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/ret.py:22" *)
-  wire \cr_rd_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/ret.py:22" *)
   wire [31:0] \cr_rd_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/ret.py:22" *)
@@ -16802,17 +15863,13 @@ module \top.u_return (mem_rd_data, clk, rst, return_start, cr_rd_data, cr_rd_add
   (* src = "/home/runner/workspace/hardware/ret.py:24" *)
   wire \cr_wr_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/ret.py:24" *)
-  wire \cr_wr_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/ret.py:24" *)
-  wire [6:0] \cr_wr_data.word0_gt.gt_seq ;
+  wire [8:0] \cr_wr_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/ret.py:24" *)
   wire [1:0] \cr_wr_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/ret.py:24" *)
   wire [2:0] \cr_wr_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/ret.py:24" *)
   wire [15:0] \cr_wr_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/ret.py:24" *)
-  wire \cr_wr_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/ret.py:24" *)
   wire [31:0] \cr_wr_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/ret.py:24" *)
@@ -16919,17 +15976,13 @@ module \top.u_return (mem_rd_data, clk, rst, return_start, cr_rd_data, cr_rd_add
   (* src = "/home/runner/workspace/hardware/ret.py:65" *)
   wire \return_cap.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/ret.py:65" *)
-  wire \return_cap.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/ret.py:65" *)
-  wire [6:0] \return_cap.word0_gt.gt_seq ;
+  wire [8:0] \return_cap.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/ret.py:65" *)
   wire [1:0] \return_cap.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/ret.py:65" *)
   wire [2:0] \return_cap.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/ret.py:65" *)
   wire [15:0] \return_cap.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/ret.py:65" *)
-  wire \return_cap.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/ret.py:65" *)
   wire [31:0] \return_cap.word1_location ;
   (* src = "/home/runner/workspace/hardware/ret.py:65" *)
@@ -16962,13 +16015,13 @@ module \top.u_return (mem_rd_data, clk, rst, return_start, cr_rd_data, cr_rd_add
   (* src = "/home/runner/workspace/hardware/ret.py:95" *)
   always @(posedge clk)
     prev_sto_latched <= \$38 ;
-  assign is_null_cap = ! (* src = "/home/runner/workspace/hardware/ret.py:71" *) return_cap[24:23];
-  assign cr5_null = ! (* src = "/home/runner/workspace/hardware/ret.py:79" *) cr5_heap[24:23];
+  assign is_null_cap = ! (* src = "/home/runner/workspace/hardware/ret.py:71" *) return_cap[26:25];
+  assign cr5_null = ! (* src = "/home/runner/workspace/hardware/ret.py:79" *) cr5_heap[26:25];
   assign \$1  = ~ (* src = "/home/runner/workspace/hardware/ret.py:80" *) cr5_heap[27];
   assign cr5_has_r = \$1  & (* src = "/home/runner/workspace/hardware/ret.py:80" *) cr5_heap[28];
   assign \$2  = ~ (* src = "/home/runner/workspace/hardware/ret.py:81" *) cr5_heap[27];
   assign cr5_has_w = \$2  & (* src = "/home/runner/workspace/hardware/ret.py:81" *) cr5_heap[29];
-  assign cr12_null = ! (* src = "/home/runner/workspace/hardware/ret.py:87" *) cr12_thread[24:23];
+  assign cr12_null = ! (* src = "/home/runner/workspace/hardware/ret.py:87" *) cr12_thread[26:25];
   assign cr_rd_addr = local_cr_rd_en ? (* src = "/home/runner/workspace/hardware/ret.py:109" *) { 1'h0, cr_src } : 4'h0;
   assign \$3  = sto_latched + (* src = "/home/runner/workspace/hardware/stack_frame.py:42" *) 2'h2;
   assign \$5  = thread_base_latched + (* src = "/home/runner/workspace/hardware/stack_frame.py:42" *) \$4 ;
@@ -17460,10 +16513,8 @@ module \top.u_return (mem_rd_data, clk, rst, return_start, cr_rd_data, cr_rd_add
   assign mem_rd_valid = 1'h0;
   assign \return_cap.word0_gt  = return_cap[31:0];
   assign \return_cap.word0_gt.slot_id  = return_cap[15:0];
-  assign \return_cap.word0_gt.gt_seq  = return_cap[22:16];
-  assign \return_cap.word0_gt.gt_type  = return_cap[24:23];
-  assign \return_cap.word0_gt.f_flag  = return_cap[25];
-  assign \return_cap.word0_gt.spare  = return_cap[26];
+  assign \return_cap.word0_gt.gt_seq  = return_cap[24:16];
+  assign \return_cap.word0_gt.gt_type  = return_cap[26:25];
   assign \return_cap.word0_gt.dom  = return_cap[27];
   assign \return_cap.word0_gt.perm  = return_cap[30:28];
   assign \return_cap.word0_gt.b_flag  = return_cap[31];
@@ -17471,10 +16522,8 @@ module \top.u_return (mem_rd_data, clk, rst, return_start, cr_rd_data, cr_rd_add
   assign \return_cap.word2_w2  = return_cap[95:64];
   assign \cr5_heap.word0_gt  = cr5_heap[31:0];
   assign \cr5_heap.word0_gt.slot_id  = cr5_heap[15:0];
-  assign \cr5_heap.word0_gt.gt_seq  = cr5_heap[22:16];
-  assign \cr5_heap.word0_gt.gt_type  = cr5_heap[24:23];
-  assign \cr5_heap.word0_gt.f_flag  = cr5_heap[25];
-  assign \cr5_heap.word0_gt.spare  = cr5_heap[26];
+  assign \cr5_heap.word0_gt.gt_seq  = cr5_heap[24:16];
+  assign \cr5_heap.word0_gt.gt_type  = cr5_heap[26:25];
   assign \cr5_heap.word0_gt.dom  = cr5_heap[27];
   assign \cr5_heap.word0_gt.perm  = cr5_heap[30:28];
   assign \cr5_heap.word0_gt.b_flag  = cr5_heap[31];
@@ -17482,10 +16531,8 @@ module \top.u_return (mem_rd_data, clk, rst, return_start, cr_rd_data, cr_rd_add
   assign \cr5_heap.word2_w2  = cr5_heap[95:64];
   assign \cr12_thread.word0_gt  = cr12_thread[31:0];
   assign \cr12_thread.word0_gt.slot_id  = cr12_thread[15:0];
-  assign \cr12_thread.word0_gt.gt_seq  = cr12_thread[22:16];
-  assign \cr12_thread.word0_gt.gt_type  = cr12_thread[24:23];
-  assign \cr12_thread.word0_gt.f_flag  = cr12_thread[25];
-  assign \cr12_thread.word0_gt.spare  = cr12_thread[26];
+  assign \cr12_thread.word0_gt.gt_seq  = cr12_thread[24:16];
+  assign \cr12_thread.word0_gt.gt_type  = cr12_thread[26:25];
   assign \cr12_thread.word0_gt.dom  = cr12_thread[27];
   assign \cr12_thread.word0_gt.perm  = cr12_thread[30:28];
   assign \cr12_thread.word0_gt.b_flag  = cr12_thread[31];
@@ -17493,10 +16540,8 @@ module \top.u_return (mem_rd_data, clk, rst, return_start, cr_rd_data, cr_rd_add
   assign \cr12_thread.word2_w2  = cr12_thread[95:64];
   assign \cr_wr_data.word0_gt  = 32'd0;
   assign \cr_wr_data.word0_gt.slot_id  = 16'h0000;
-  assign \cr_wr_data.word0_gt.gt_seq  = 7'h00;
+  assign \cr_wr_data.word0_gt.gt_seq  = 9'h000;
   assign \cr_wr_data.word0_gt.gt_type  = 2'h0;
-  assign \cr_wr_data.word0_gt.f_flag  = 1'h0;
-  assign \cr_wr_data.word0_gt.spare  = 1'h0;
   assign \cr_wr_data.word0_gt.dom  = 1'h0;
   assign \cr_wr_data.word0_gt.perm  = 3'h0;
   assign \cr_wr_data.word0_gt.b_flag  = 1'h0;
@@ -17504,10 +16549,8 @@ module \top.u_return (mem_rd_data, clk, rst, return_start, cr_rd_data, cr_rd_add
   assign \cr_wr_data.word2_w2  = 32'd0;
   assign \cr_rd_data.word0_gt  = cr_rd_data[31:0];
   assign \cr_rd_data.word0_gt.slot_id  = cr_rd_data[15:0];
-  assign \cr_rd_data.word0_gt.gt_seq  = cr_rd_data[22:16];
-  assign \cr_rd_data.word0_gt.gt_type  = cr_rd_data[24:23];
-  assign \cr_rd_data.word0_gt.f_flag  = cr_rd_data[25];
-  assign \cr_rd_data.word0_gt.spare  = cr_rd_data[26];
+  assign \cr_rd_data.word0_gt.gt_seq  = cr_rd_data[24:16];
+  assign \cr_rd_data.word0_gt.gt_type  = cr_rd_data[26:25];
   assign \cr_rd_data.word0_gt.dom  = cr_rd_data[27];
   assign \cr_rd_data.word0_gt.perm  = cr_rd_data[30:28];
   assign \cr_rd_data.word0_gt.b_flag  = cr_rd_data[31];
@@ -17551,17 +16594,13 @@ module \top.u_save (mem_rd_data, clk, rst, save_start, cr_rd_data, save_busy, cr
   (* src = "/home/runner/workspace/hardware/save.py:33" *)
   wire \cr15_namespace$13.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/save.py:33" *)
-  wire \cr15_namespace$13.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/save.py:33" *)
-  wire [6:0] \cr15_namespace$13.word0_gt.gt_seq ;
+  wire [8:0] \cr15_namespace$13.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/save.py:33" *)
   wire [1:0] \cr15_namespace$13.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/save.py:33" *)
   wire [2:0] \cr15_namespace$13.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/save.py:33" *)
   wire [15:0] \cr15_namespace$13.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/save.py:33" *)
-  wire \cr15_namespace$13.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/save.py:33" *)
   wire [31:0] \cr15_namespace$13.word1_location ;
   (* src = "/home/runner/workspace/hardware/save.py:33" *)
@@ -17573,17 +16612,13 @@ module \top.u_save (mem_rd_data, clk, rst, save_start, cr_rd_data, save_busy, cr
   (* src = "/home/runner/workspace/hardware/msave.py:32" *)
   wire \cr15_namespace.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/msave.py:32" *)
-  wire \cr15_namespace.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/msave.py:32" *)
-  wire [6:0] \cr15_namespace.word0_gt.gt_seq ;
+  wire [8:0] \cr15_namespace.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/msave.py:32" *)
   wire [1:0] \cr15_namespace.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/msave.py:32" *)
   wire [2:0] \cr15_namespace.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/msave.py:32" *)
   wire [15:0] \cr15_namespace.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/msave.py:32" *)
-  wire \cr15_namespace.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/msave.py:32" *)
   wire [31:0] \cr15_namespace.word1_location ;
   (* src = "/home/runner/workspace/hardware/msave.py:32" *)
@@ -17603,17 +16638,13 @@ module \top.u_save (mem_rd_data, clk, rst, save_start, cr_rd_data, save_busy, cr
   (* src = "/home/runner/workspace/hardware/save.py:21" *)
   wire \cr_rd_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/save.py:21" *)
-  wire \cr_rd_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/save.py:21" *)
-  wire [6:0] \cr_rd_data.word0_gt.gt_seq ;
+  wire [8:0] \cr_rd_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/save.py:21" *)
   wire [1:0] \cr_rd_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/save.py:21" *)
   wire [2:0] \cr_rd_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/save.py:21" *)
   wire [15:0] \cr_rd_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/save.py:21" *)
-  wire \cr_rd_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/save.py:21" *)
   wire [31:0] \cr_rd_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/save.py:21" *)
@@ -17632,17 +16663,13 @@ module \top.u_save (mem_rd_data, clk, rst, save_start, cr_rd_data, save_busy, cr
   (* src = "/home/runner/workspace/hardware/save.py:43" *)
   wire \dst_reg_latched.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/save.py:43" *)
-  wire \dst_reg_latched.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/save.py:43" *)
-  wire [6:0] \dst_reg_latched.word0_gt.gt_seq ;
+  wire [8:0] \dst_reg_latched.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/save.py:43" *)
   wire [1:0] \dst_reg_latched.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/save.py:43" *)
   wire [2:0] \dst_reg_latched.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/save.py:43" *)
   wire [15:0] \dst_reg_latched.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/save.py:43" *)
-  wire \dst_reg_latched.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/save.py:43" *)
   wire [31:0] \dst_reg_latched.word1_location ;
   (* src = "/home/runner/workspace/hardware/save.py:43" *)
@@ -17723,17 +16750,13 @@ module \top.u_save (mem_rd_data, clk, rst, save_start, cr_rd_data, save_busy, cr
   (* src = "/home/runner/workspace/hardware/save.py:44" *)
   wire \src_reg_latched.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/save.py:44" *)
-  wire \src_reg_latched.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/save.py:44" *)
-  wire [6:0] \src_reg_latched.word0_gt.gt_seq ;
+  wire [8:0] \src_reg_latched.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/save.py:44" *)
   wire [1:0] \src_reg_latched.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/save.py:44" *)
   wire [2:0] \src_reg_latched.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/save.py:44" *)
   wire [15:0] \src_reg_latched.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/save.py:44" *)
-  wire \src_reg_latched.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/save.py:44" *)
   wire [31:0] \src_reg_latched.word1_location ;
   (* src = "/home/runner/workspace/hardware/save.py:44" *)
@@ -17751,17 +16774,13 @@ module \top.u_save (mem_rd_data, clk, rst, save_start, cr_rd_data, save_busy, cr
   (* src = "/home/runner/workspace/hardware/msave.py:14" *)
   wire \sub_dst_cap.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/msave.py:14" *)
-  wire \sub_dst_cap.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/msave.py:14" *)
-  wire [6:0] \sub_dst_cap.word0_gt.gt_seq ;
+  wire [8:0] \sub_dst_cap.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/msave.py:14" *)
   wire [1:0] \sub_dst_cap.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/msave.py:14" *)
   wire [2:0] \sub_dst_cap.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/msave.py:14" *)
   wire [15:0] \sub_dst_cap.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/msave.py:14" *)
-  wire \sub_dst_cap.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/msave.py:14" *)
   wire [31:0] \sub_dst_cap.word1_location ;
   (* src = "/home/runner/workspace/hardware/msave.py:14" *)
@@ -18042,10 +17061,8 @@ module \top.u_save (mem_rd_data, clk, rst, save_start, cr_rd_data, save_busy, cr
   assign fault_type_latched = fault_type;
   assign \sub_dst_cap.word0_gt  = sub_dst_cap[31:0];
   assign \sub_dst_cap.word0_gt.slot_id  = sub_dst_cap[15:0];
-  assign \sub_dst_cap.word0_gt.gt_seq  = sub_dst_cap[22:16];
-  assign \sub_dst_cap.word0_gt.gt_type  = sub_dst_cap[24:23];
-  assign \sub_dst_cap.word0_gt.f_flag  = sub_dst_cap[25];
-  assign \sub_dst_cap.word0_gt.spare  = sub_dst_cap[26];
+  assign \sub_dst_cap.word0_gt.gt_seq  = sub_dst_cap[24:16];
+  assign \sub_dst_cap.word0_gt.gt_type  = sub_dst_cap[26:25];
   assign \sub_dst_cap.word0_gt.dom  = sub_dst_cap[27];
   assign \sub_dst_cap.word0_gt.perm  = sub_dst_cap[30:28];
   assign \sub_dst_cap.word0_gt.b_flag  = sub_dst_cap[31];
@@ -18053,10 +17070,8 @@ module \top.u_save (mem_rd_data, clk, rst, save_start, cr_rd_data, save_busy, cr
   assign \sub_dst_cap.word2_w2  = sub_dst_cap[95:64];
   assign \dst_reg_latched.word0_gt  = sub_dst_cap[31:0];
   assign \dst_reg_latched.word0_gt.slot_id  = sub_dst_cap[15:0];
-  assign \dst_reg_latched.word0_gt.gt_seq  = sub_dst_cap[22:16];
-  assign \dst_reg_latched.word0_gt.gt_type  = sub_dst_cap[24:23];
-  assign \dst_reg_latched.word0_gt.f_flag  = sub_dst_cap[25];
-  assign \dst_reg_latched.word0_gt.spare  = sub_dst_cap[26];
+  assign \dst_reg_latched.word0_gt.gt_seq  = sub_dst_cap[24:16];
+  assign \dst_reg_latched.word0_gt.gt_type  = sub_dst_cap[26:25];
   assign \dst_reg_latched.word0_gt.dom  = sub_dst_cap[27];
   assign \dst_reg_latched.word0_gt.perm  = sub_dst_cap[30:28];
   assign \dst_reg_latched.word0_gt.b_flag  = sub_dst_cap[31];
@@ -18064,10 +17079,8 @@ module \top.u_save (mem_rd_data, clk, rst, save_start, cr_rd_data, save_busy, cr
   assign \dst_reg_latched.word2_w2  = sub_dst_cap[95:64];
   assign \src_reg_latched.word0_gt  = src_reg_latched[31:0];
   assign \src_reg_latched.word0_gt.slot_id  = src_reg_latched[15:0];
-  assign \src_reg_latched.word0_gt.gt_seq  = src_reg_latched[22:16];
-  assign \src_reg_latched.word0_gt.gt_type  = src_reg_latched[24:23];
-  assign \src_reg_latched.word0_gt.f_flag  = src_reg_latched[25];
-  assign \src_reg_latched.word0_gt.spare  = src_reg_latched[26];
+  assign \src_reg_latched.word0_gt.gt_seq  = src_reg_latched[24:16];
+  assign \src_reg_latched.word0_gt.gt_type  = src_reg_latched[26:25];
   assign \src_reg_latched.word0_gt.dom  = src_reg_latched[27];
   assign \src_reg_latched.word0_gt.perm  = src_reg_latched[30:28];
   assign \src_reg_latched.word0_gt.b_flag  = src_reg_latched[31];
@@ -18075,10 +17088,8 @@ module \top.u_save (mem_rd_data, clk, rst, save_start, cr_rd_data, save_busy, cr
   assign \src_reg_latched.word2_w2  = src_reg_latched[95:64];
   assign \cr15_namespace.word0_gt  = cr15_namespace[31:0];
   assign \cr15_namespace.word0_gt.slot_id  = cr15_namespace[15:0];
-  assign \cr15_namespace.word0_gt.gt_seq  = cr15_namespace[22:16];
-  assign \cr15_namespace.word0_gt.gt_type  = cr15_namespace[24:23];
-  assign \cr15_namespace.word0_gt.f_flag  = cr15_namespace[25];
-  assign \cr15_namespace.word0_gt.spare  = cr15_namespace[26];
+  assign \cr15_namespace.word0_gt.gt_seq  = cr15_namespace[24:16];
+  assign \cr15_namespace.word0_gt.gt_type  = cr15_namespace[26:25];
   assign \cr15_namespace.word0_gt.dom  = cr15_namespace[27];
   assign \cr15_namespace.word0_gt.perm  = cr15_namespace[30:28];
   assign \cr15_namespace.word0_gt.b_flag  = cr15_namespace[31];
@@ -18086,10 +17097,8 @@ module \top.u_save (mem_rd_data, clk, rst, save_start, cr_rd_data, save_busy, cr
   assign \cr15_namespace.word2_w2  = cr15_namespace[95:64];
   assign \cr15_namespace$13.word0_gt  = cr15_namespace[31:0];
   assign \cr15_namespace$13.word0_gt.slot_id  = cr15_namespace[15:0];
-  assign \cr15_namespace$13.word0_gt.gt_seq  = cr15_namespace[22:16];
-  assign \cr15_namespace$13.word0_gt.gt_type  = cr15_namespace[24:23];
-  assign \cr15_namespace$13.word0_gt.f_flag  = cr15_namespace[25];
-  assign \cr15_namespace$13.word0_gt.spare  = cr15_namespace[26];
+  assign \cr15_namespace$13.word0_gt.gt_seq  = cr15_namespace[24:16];
+  assign \cr15_namespace$13.word0_gt.gt_type  = cr15_namespace[26:25];
   assign \cr15_namespace$13.word0_gt.dom  = cr15_namespace[27];
   assign \cr15_namespace$13.word0_gt.perm  = cr15_namespace[30:28];
   assign \cr15_namespace$13.word0_gt.b_flag  = cr15_namespace[31];
@@ -18097,10 +17106,8 @@ module \top.u_save (mem_rd_data, clk, rst, save_start, cr_rd_data, save_busy, cr
   assign \cr15_namespace$13.word2_w2  = cr15_namespace[95:64];
   assign \cr_rd_data.word0_gt  = cr_rd_data[31:0];
   assign \cr_rd_data.word0_gt.slot_id  = cr_rd_data[15:0];
-  assign \cr_rd_data.word0_gt.gt_seq  = cr_rd_data[22:16];
-  assign \cr_rd_data.word0_gt.gt_type  = cr_rd_data[24:23];
-  assign \cr_rd_data.word0_gt.f_flag  = cr_rd_data[25];
-  assign \cr_rd_data.word0_gt.spare  = cr_rd_data[26];
+  assign \cr_rd_data.word0_gt.gt_seq  = cr_rd_data[24:16];
+  assign \cr_rd_data.word0_gt.gt_type  = cr_rd_data[26:25];
   assign \cr_rd_data.word0_gt.dom  = cr_rd_data[27];
   assign \cr_rd_data.word0_gt.perm  = cr_rd_data[30:28];
   assign \cr_rd_data.word0_gt.b_flag  = cr_rd_data[31];
@@ -18160,17 +17167,13 @@ module \top.u_save.u_msave (mem_rd_data, clk, rst, sub_fault, sub_done, cr15_nam
   (* src = "/home/runner/workspace/hardware/msave.py:32" *)
   wire \cr15_namespace.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/msave.py:32" *)
-  wire \cr15_namespace.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/msave.py:32" *)
-  wire [6:0] \cr15_namespace.word0_gt.gt_seq ;
+  wire [8:0] \cr15_namespace.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/msave.py:32" *)
   wire [1:0] \cr15_namespace.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/msave.py:32" *)
   wire [2:0] \cr15_namespace.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/msave.py:32" *)
   wire [15:0] \cr15_namespace.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/msave.py:32" *)
-  wire \cr15_namespace.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/msave.py:32" *)
   wire [31:0] \cr15_namespace.word1_location ;
   (* src = "/home/runner/workspace/hardware/msave.py:32" *)
@@ -18184,17 +17187,13 @@ module \top.u_save.u_msave (mem_rd_data, clk, rst, sub_fault, sub_done, cr15_nam
   (* src = "/home/runner/workspace/hardware/msave.py:37" *)
   wire \dst_cap_reg.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/msave.py:37" *)
-  wire \dst_cap_reg.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/msave.py:37" *)
-  wire [6:0] \dst_cap_reg.word0_gt.gt_seq ;
+  wire [8:0] \dst_cap_reg.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/msave.py:37" *)
   wire [1:0] \dst_cap_reg.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/msave.py:37" *)
   wire [2:0] \dst_cap_reg.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/msave.py:37" *)
   wire [15:0] \dst_cap_reg.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/msave.py:37" *)
-  wire \dst_cap_reg.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/msave.py:37" *)
   wire [31:0] \dst_cap_reg.word1_location ;
   (* src = "/home/runner/workspace/hardware/msave.py:37" *)
@@ -18264,17 +17263,13 @@ module \top.u_save.u_msave (mem_rd_data, clk, rst, sub_fault, sub_done, cr15_nam
   (* src = "/home/runner/workspace/hardware/msave.py:14" *)
   wire \sub_dst_cap.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/msave.py:14" *)
-  wire \sub_dst_cap.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/msave.py:14" *)
-  wire [6:0] \sub_dst_cap.word0_gt.gt_seq ;
+  wire [8:0] \sub_dst_cap.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/msave.py:14" *)
   wire [1:0] \sub_dst_cap.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/msave.py:14" *)
   wire [2:0] \sub_dst_cap.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/msave.py:14" *)
   wire [15:0] \sub_dst_cap.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/msave.py:14" *)
-  wire \sub_dst_cap.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/msave.py:14" *)
   wire [31:0] \sub_dst_cap.word1_location ;
   (* src = "/home/runner/workspace/hardware/msave.py:14" *)
@@ -18293,19 +17288,19 @@ module \top.u_save.u_msave (mem_rd_data, clk, rst, sub_fault, sub_done, cr15_nam
   (* src = "/home/runner/workspace/hardware/msave.py:13" *)
   input sub_start;
   wire sub_start;
-  (* src = "/home/runner/workspace/hardware/integrity32.py:58" *)
-  wire [31:0] w0_rot;
-  (* src = "/home/runner/workspace/hardware/integrity32.py:57" *)
-  wire [31:0] w1_masked;
   (* src = "/home/runner/workspace/hardware/integrity32.py:59" *)
+  wire [31:0] w0_rot;
+  (* src = "/home/runner/workspace/hardware/integrity32.py:58" *)
+  wire [31:0] w1_masked;
+  (* src = "/home/runner/workspace/hardware/integrity32.py:60" *)
   wire [31:0] w1_rot;
   (* src = "/home/runner/workspace/hardware/msave.py:54" *)
   wire [31:0] write_addr;
   assign index_in_bounds = index_reg < (* src = "/home/runner/workspace/hardware/msave.py:52" *) dst_cap_reg[79:64];
   assign \$2  = dst_cap_reg[63:32] + (* src = "/home/runner/workspace/hardware/msave.py:55" *) \$1 ;
   assign \$4  = cr15_namespace[63:32] + (* src = "/home/runner/workspace/hardware/msave.py:59" *) \$3 ;
-  assign gt_seq_match = src_gt_reg[22:16] == (* src = "/home/runner/workspace/hardware/msave.py:69" *) ns_w1_reg[27:21];
-  assign \$5  = { ns_location_reg[24:0], ns_location_reg[31:25] } ^ (* src = "/home/runner/workspace/hardware/integrity32.py:66" *) { w1_masked[18:0], w1_masked[31:19] };
+  assign gt_seq_match = src_gt_reg[24:16] == (* src = "/home/runner/workspace/hardware/msave.py:69" *) ns_w1_reg[29:21];
+  assign \$5  = { ns_location_reg[24:0], ns_location_reg[31:25] } ^ (* src = "/home/runner/workspace/hardware/integrity32.py:67" *) { w1_masked[18:0], w1_masked[31:19] };
   assign seal_ok = computed_integrity == (* src = "/home/runner/workspace/hardware/msave.py:75" *) ns_integrity_reg;
   assign \$6  = \$4 [31:0] + (* src = "/home/runner/workspace/hardware/msave.py:127" *) 3'h4;
   assign \$7  = \$4 [31:0] + (* src = "/home/runner/workspace/hardware/msave.py:140" *) 4'h8;
@@ -18649,10 +17644,8 @@ module \top.u_save.u_msave (mem_rd_data, clk, rst, sub_fault, sub_done, cr15_nam
   assign mem_wr_done = 1'h1;
   assign \dst_cap_reg.word0_gt  = dst_cap_reg[31:0];
   assign \dst_cap_reg.word0_gt.slot_id  = dst_cap_reg[15:0];
-  assign \dst_cap_reg.word0_gt.gt_seq  = dst_cap_reg[22:16];
-  assign \dst_cap_reg.word0_gt.gt_type  = dst_cap_reg[24:23];
-  assign \dst_cap_reg.word0_gt.f_flag  = dst_cap_reg[25];
-  assign \dst_cap_reg.word0_gt.spare  = dst_cap_reg[26];
+  assign \dst_cap_reg.word0_gt.gt_seq  = dst_cap_reg[24:16];
+  assign \dst_cap_reg.word0_gt.gt_type  = dst_cap_reg[26:25];
   assign \dst_cap_reg.word0_gt.dom  = dst_cap_reg[27];
   assign \dst_cap_reg.word0_gt.perm  = dst_cap_reg[30:28];
   assign \dst_cap_reg.word0_gt.b_flag  = dst_cap_reg[31];
@@ -18660,10 +17653,8 @@ module \top.u_save.u_msave (mem_rd_data, clk, rst, sub_fault, sub_done, cr15_nam
   assign \dst_cap_reg.word2_w2  = dst_cap_reg[95:64];
   assign \cr15_namespace.word0_gt  = cr15_namespace[31:0];
   assign \cr15_namespace.word0_gt.slot_id  = cr15_namespace[15:0];
-  assign \cr15_namespace.word0_gt.gt_seq  = cr15_namespace[22:16];
-  assign \cr15_namespace.word0_gt.gt_type  = cr15_namespace[24:23];
-  assign \cr15_namespace.word0_gt.f_flag  = cr15_namespace[25];
-  assign \cr15_namespace.word0_gt.spare  = cr15_namespace[26];
+  assign \cr15_namespace.word0_gt.gt_seq  = cr15_namespace[24:16];
+  assign \cr15_namespace.word0_gt.gt_type  = cr15_namespace[26:25];
   assign \cr15_namespace.word0_gt.dom  = cr15_namespace[27];
   assign \cr15_namespace.word0_gt.perm  = cr15_namespace[30:28];
   assign \cr15_namespace.word0_gt.b_flag  = cr15_namespace[31];
@@ -18671,10 +17662,8 @@ module \top.u_save.u_msave (mem_rd_data, clk, rst, sub_fault, sub_done, cr15_nam
   assign \cr15_namespace.word2_w2  = cr15_namespace[95:64];
   assign \sub_dst_cap.word0_gt  = sub_dst_cap[31:0];
   assign \sub_dst_cap.word0_gt.slot_id  = sub_dst_cap[15:0];
-  assign \sub_dst_cap.word0_gt.gt_seq  = sub_dst_cap[22:16];
-  assign \sub_dst_cap.word0_gt.gt_type  = sub_dst_cap[24:23];
-  assign \sub_dst_cap.word0_gt.f_flag  = sub_dst_cap[25];
-  assign \sub_dst_cap.word0_gt.spare  = sub_dst_cap[26];
+  assign \sub_dst_cap.word0_gt.gt_seq  = sub_dst_cap[24:16];
+  assign \sub_dst_cap.word0_gt.gt_type  = sub_dst_cap[26:25];
   assign \sub_dst_cap.word0_gt.dom  = sub_dst_cap[27];
   assign \sub_dst_cap.word0_gt.perm  = sub_dst_cap[30:28];
   assign \sub_dst_cap.word0_gt.b_flag  = sub_dst_cap[31];
@@ -18682,8 +17671,8 @@ module \top.u_save.u_msave (mem_rd_data, clk, rst, sub_fault, sub_done, cr15_nam
   assign \sub_dst_cap.word2_w2  = sub_dst_cap[95:64];
   assign \$1  = { 1'h0, index_reg, 2'h0 };
   assign \$3  = { 3'h0, src_gt_reg[15:0], 4'h0 };
-  assign w1_masked[28] = 1'h0;
-  assign { w1_masked[31:29], w1_masked[27:0] } = { ns_w1_reg[31:29], ns_w1_reg[27:0] };
+  assign w1_masked[31:30] = 2'h0;
+  assign w1_masked[29:0] = ns_w1_reg[29:0];
   assign { computed_integrity[29], computed_integrity[24], computed_integrity[22], computed_integrity[20], computed_integrity[17], computed_integrity[14], computed_integrity[8], computed_integrity[4] } = { \$5 [29], \$5 [24], \$5 [22], \$5 [20], \$5 [17], \$5 [14], \$5 [8], \$5 [4] };
   assign { computed_integrity[31:30], computed_integrity[28:25], computed_integrity[23], computed_integrity[21], computed_integrity[19:18], computed_integrity[16:15], computed_integrity[13:9], computed_integrity[7:5], computed_integrity[3:0] } = \$auto$rtlil.cc:2739:Not$8 ;
 endmodule
@@ -18750,17 +17739,13 @@ module \top.u_shared_mload (clk, rst, outform_done_in, outform_fault_in, cr_rd_d
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
   wire \cr15_namespace$8.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
-  wire \cr15_namespace$8.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
-  wire [6:0] \cr15_namespace$8.word0_gt.gt_seq ;
+  wire [8:0] \cr15_namespace$8.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
   wire [1:0] \cr15_namespace$8.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
   wire [2:0] \cr15_namespace$8.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
   wire [15:0] \cr15_namespace$8.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
-  wire \cr15_namespace$8.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
   wire [31:0] \cr15_namespace$8.word1_location ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
@@ -18772,17 +17757,13 @@ module \top.u_shared_mload (clk, rst, outform_done_in, outform_fault_in, cr_rd_d
   (* src = "/home/runner/workspace/hardware/mload.py:56" *)
   wire \cr15_namespace.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/mload.py:56" *)
-  wire \cr15_namespace.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/mload.py:56" *)
-  wire [6:0] \cr15_namespace.word0_gt.gt_seq ;
+  wire [8:0] \cr15_namespace.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/mload.py:56" *)
   wire [1:0] \cr15_namespace.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/mload.py:56" *)
   wire [2:0] \cr15_namespace.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/mload.py:56" *)
   wire [15:0] \cr15_namespace.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/mload.py:56" *)
-  wire \cr15_namespace.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/mload.py:56" *)
   wire [31:0] \cr15_namespace.word1_location ;
   (* src = "/home/runner/workspace/hardware/mload.py:56" *)
@@ -18802,17 +17783,13 @@ module \top.u_shared_mload (clk, rst, outform_done_in, outform_fault_in, cr_rd_d
   (* src = "/home/runner/workspace/hardware/mload.py:50" *)
   wire \cr_rd_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/mload.py:50" *)
-  wire \cr_rd_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/mload.py:50" *)
-  wire [6:0] \cr_rd_data.word0_gt.gt_seq ;
+  wire [8:0] \cr_rd_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/mload.py:50" *)
   wire [1:0] \cr_rd_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/mload.py:50" *)
   wire [2:0] \cr_rd_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/mload.py:50" *)
   wire [15:0] \cr_rd_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/mload.py:50" *)
-  wire \cr_rd_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/mload.py:50" *)
   wire [31:0] \cr_rd_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/mload.py:50" *)
@@ -18832,17 +17809,13 @@ module \top.u_shared_mload (clk, rst, outform_done_in, outform_fault_in, cr_rd_d
   (* src = "/home/runner/workspace/hardware/mload.py:53" *)
   wire \cr_wr_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/mload.py:53" *)
-  wire \cr_wr_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/mload.py:53" *)
-  wire [6:0] \cr_wr_data.word0_gt.gt_seq ;
+  wire [8:0] \cr_wr_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/mload.py:53" *)
   wire [1:0] \cr_wr_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/mload.py:53" *)
   wire [2:0] \cr_wr_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/mload.py:53" *)
   wire [15:0] \cr_wr_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/mload.py:53" *)
-  wire \cr_wr_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/mload.py:53" *)
   wire [31:0] \cr_wr_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/mload.py:53" *)
@@ -18967,17 +17940,13 @@ module \top.u_shared_mload (clk, rst, outform_done_in, outform_fault_in, cr_rd_d
   (* src = "/home/runner/workspace/hardware/mload.py:101" *)
   wire \result_cap.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/mload.py:101" *)
-  wire \result_cap.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/mload.py:101" *)
-  wire [6:0] \result_cap.word0_gt.gt_seq ;
+  wire [8:0] \result_cap.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/mload.py:101" *)
   wire [1:0] \result_cap.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/mload.py:101" *)
   wire [2:0] \result_cap.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/mload.py:101" *)
   wire [15:0] \result_cap.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/mload.py:101" *)
-  wire \result_cap.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/mload.py:101" *)
   wire [31:0] \result_cap.word1_location ;
   (* src = "/home/runner/workspace/hardware/mload.py:101" *)
@@ -18994,17 +17963,13 @@ module \top.u_shared_mload (clk, rst, outform_done_in, outform_fault_in, cr_rd_d
   (* src = "/home/runner/workspace/hardware/mload.py:100" *)
   wire \src_cap.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/mload.py:100" *)
-  wire \src_cap.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/mload.py:100" *)
-  wire [6:0] \src_cap.word0_gt.gt_seq ;
+  wire [8:0] \src_cap.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/mload.py:100" *)
   wire [1:0] \src_cap.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/mload.py:100" *)
   wire [2:0] \src_cap.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/mload.py:100" *)
   wire [15:0] \src_cap.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/mload.py:100" *)
-  wire \src_cap.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/mload.py:100" *)
   wire [31:0] \src_cap.word1_location ;
   (* src = "/home/runner/workspace/hardware/mload.py:100" *)
@@ -19077,7 +18042,7 @@ module \top.u_shared_mload (clk, rst, outform_done_in, outform_fault_in, cr_rd_d
   (* src = "/home/runner/workspace/hardware/mload.py:128" *)
   always @(posedge clk)
     ns_w1_saved <= \$38 ;
-  assign src_is_null = ! (* src = "/home/runner/workspace/hardware/mload.py:113" *) src_cap[24:23];
+  assign src_is_null = ! (* src = "/home/runner/workspace/hardware/mload.py:113" *) src_cap[26:25];
   assign bounds_ok = index_reg < (* src = "/home/runner/workspace/hardware/mload.py:117" *) src_cap[79:64];
   assign \$2  = src_cap[63:32] + (* src = "/home/runner/workspace/hardware/mload.py:120" *) \$1 ;
   assign ns_index_in_bounds = result_cap[15:0] < (* src = "/home/runner/workspace/hardware/mload.py:126" *) cr15_namespace[79:64];
@@ -19106,8 +18071,8 @@ module \top.u_shared_mload (clk, rst, outform_done_in, outform_fault_in, cr_rd_d
   assign \$19  = ~ (* src = "/home/runner/workspace/hardware/mload.py:185" *) sub_m_elevated;
   assign \$20  = \$18  & (* src = "/home/runner/workspace/hardware/mload.py:185" *) \$19 ;
   assign \$21  = ~ (* src = "/home/runner/workspace/hardware/mload.py:192" *) bounds_ok;
-  assign \$22  = mem_rd_data[24:23] == (* src = "/home/runner/workspace/hardware/mload.py:205" *) 2'h3;
-  assign \$23  = mem_rd_data[24:23] == (* src = "/home/runner/workspace/hardware/mload.py:212" *) 2'h2;
+  assign \$22  = mem_rd_data[26:25] == (* src = "/home/runner/workspace/hardware/mload.py:205" *) 2'h3;
+  assign \$23  = mem_rd_data[26:25] == (* src = "/home/runner/workspace/hardware/mload.py:212" *) 2'h2;
   assign \$24  = ~ (* src = "/home/runner/workspace/hardware/mload.py:223" *) ns_index_in_bounds;
   (* src = "/home/runner/workspace/hardware/mload.py:94" *)
   always @(posedge clk)
@@ -19812,10 +18777,8 @@ module \top.u_shared_mload (clk, rst, outform_done_in, outform_fault_in, cr_rd_d
   assign outform_clist_addr_reg = outform_clist_addr;
   assign \src_cap.word0_gt  = src_cap[31:0];
   assign \src_cap.word0_gt.slot_id  = src_cap[15:0];
-  assign \src_cap.word0_gt.gt_seq  = src_cap[22:16];
-  assign \src_cap.word0_gt.gt_type  = src_cap[24:23];
-  assign \src_cap.word0_gt.f_flag  = src_cap[25];
-  assign \src_cap.word0_gt.spare  = src_cap[26];
+  assign \src_cap.word0_gt.gt_seq  = src_cap[24:16];
+  assign \src_cap.word0_gt.gt_type  = src_cap[26:25];
   assign \src_cap.word0_gt.dom  = src_cap[27];
   assign \src_cap.word0_gt.perm  = src_cap[30:28];
   assign \src_cap.word0_gt.b_flag  = src_cap[31];
@@ -19823,10 +18786,8 @@ module \top.u_shared_mload (clk, rst, outform_done_in, outform_fault_in, cr_rd_d
   assign \src_cap.word2_w2  = src_cap[95:64];
   assign \result_cap.word0_gt  = result_cap[31:0];
   assign \result_cap.word0_gt.slot_id  = result_cap[15:0];
-  assign \result_cap.word0_gt.gt_seq  = result_cap[22:16];
-  assign \result_cap.word0_gt.gt_type  = result_cap[24:23];
-  assign \result_cap.word0_gt.f_flag  = result_cap[25];
-  assign \result_cap.word0_gt.spare  = result_cap[26];
+  assign \result_cap.word0_gt.gt_seq  = result_cap[24:16];
+  assign \result_cap.word0_gt.gt_type  = result_cap[26:25];
   assign \result_cap.word0_gt.dom  = result_cap[27];
   assign \result_cap.word0_gt.perm  = result_cap[30:28];
   assign \result_cap.word0_gt.b_flag  = result_cap[31];
@@ -19834,10 +18795,8 @@ module \top.u_shared_mload (clk, rst, outform_done_in, outform_fault_in, cr_rd_d
   assign \result_cap.word2_w2  = result_cap[95:64];
   assign \cr15_namespace.word0_gt  = cr15_namespace[31:0];
   assign \cr15_namespace.word0_gt.slot_id  = cr15_namespace[15:0];
-  assign \cr15_namespace.word0_gt.gt_seq  = cr15_namespace[22:16];
-  assign \cr15_namespace.word0_gt.gt_type  = cr15_namespace[24:23];
-  assign \cr15_namespace.word0_gt.f_flag  = cr15_namespace[25];
-  assign \cr15_namespace.word0_gt.spare  = cr15_namespace[26];
+  assign \cr15_namespace.word0_gt.gt_seq  = cr15_namespace[24:16];
+  assign \cr15_namespace.word0_gt.gt_type  = cr15_namespace[26:25];
   assign \cr15_namespace.word0_gt.dom  = cr15_namespace[27];
   assign \cr15_namespace.word0_gt.perm  = cr15_namespace[30:28];
   assign \cr15_namespace.word0_gt.b_flag  = cr15_namespace[31];
@@ -19845,10 +18804,8 @@ module \top.u_shared_mload (clk, rst, outform_done_in, outform_fault_in, cr_rd_d
   assign \cr15_namespace.word2_w2  = cr15_namespace[95:64];
   assign \cr15_namespace$8.word0_gt  = cr15_namespace[31:0];
   assign \cr15_namespace$8.word0_gt.slot_id  = cr15_namespace[15:0];
-  assign \cr15_namespace$8.word0_gt.gt_seq  = cr15_namespace[22:16];
-  assign \cr15_namespace$8.word0_gt.gt_type  = cr15_namespace[24:23];
-  assign \cr15_namespace$8.word0_gt.f_flag  = cr15_namespace[25];
-  assign \cr15_namespace$8.word0_gt.spare  = cr15_namespace[26];
+  assign \cr15_namespace$8.word0_gt.gt_seq  = cr15_namespace[24:16];
+  assign \cr15_namespace$8.word0_gt.gt_type  = cr15_namespace[26:25];
   assign \cr15_namespace$8.word0_gt.dom  = cr15_namespace[27];
   assign \cr15_namespace$8.word0_gt.perm  = cr15_namespace[30:28];
   assign \cr15_namespace$8.word0_gt.b_flag  = cr15_namespace[31];
@@ -19856,10 +18813,8 @@ module \top.u_shared_mload (clk, rst, outform_done_in, outform_fault_in, cr_rd_d
   assign \cr15_namespace$8.word2_w2  = cr15_namespace[95:64];
   assign \cr_wr_data.word0_gt  = cr_wr_data[31:0];
   assign \cr_wr_data.word0_gt.slot_id  = cr_wr_data[15:0];
-  assign \cr_wr_data.word0_gt.gt_seq  = cr_wr_data[22:16];
-  assign \cr_wr_data.word0_gt.gt_type  = cr_wr_data[24:23];
-  assign \cr_wr_data.word0_gt.f_flag  = cr_wr_data[25];
-  assign \cr_wr_data.word0_gt.spare  = cr_wr_data[26];
+  assign \cr_wr_data.word0_gt.gt_seq  = cr_wr_data[24:16];
+  assign \cr_wr_data.word0_gt.gt_type  = cr_wr_data[26:25];
   assign \cr_wr_data.word0_gt.dom  = cr_wr_data[27];
   assign \cr_wr_data.word0_gt.perm  = cr_wr_data[30:28];
   assign \cr_wr_data.word0_gt.b_flag  = cr_wr_data[31];
@@ -19867,10 +18822,8 @@ module \top.u_shared_mload (clk, rst, outform_done_in, outform_fault_in, cr_rd_d
   assign \cr_wr_data.word2_w2  = cr_wr_data[95:64];
   assign \cr_rd_data.word0_gt  = cr_rd_data[31:0];
   assign \cr_rd_data.word0_gt.slot_id  = cr_rd_data[15:0];
-  assign \cr_rd_data.word0_gt.gt_seq  = cr_rd_data[22:16];
-  assign \cr_rd_data.word0_gt.gt_type  = cr_rd_data[24:23];
-  assign \cr_rd_data.word0_gt.f_flag  = cr_rd_data[25];
-  assign \cr_rd_data.word0_gt.spare  = cr_rd_data[26];
+  assign \cr_rd_data.word0_gt.gt_seq  = cr_rd_data[24:16];
+  assign \cr_rd_data.word0_gt.gt_type  = cr_rd_data[26:25];
   assign \cr_rd_data.word0_gt.dom  = cr_rd_data[27];
   assign \cr_rd_data.word0_gt.perm  = cr_rd_data[30:28];
   assign \cr_rd_data.word0_gt.b_flag  = cr_rd_data[31];
@@ -19878,8 +18831,8 @@ module \top.u_shared_mload (clk, rst, outform_done_in, outform_fault_in, cr_rd_d
   assign \cr_rd_data.word2_w2  = cr_rd_data[95:64];
   assign \$1  = { 1'h0, index_reg, 2'h0 };
   assign mem_rd_valid = 1'h0;
-  assign \$3 [28] = 1'h0;
-  assign { \$3 [32:29], \$3 [27:0] } = { 1'h0, ns_w1_saved[31:29], ns_w1_saved[27:0] };
+  assign \$3 [30] = 1'h0;
+  assign { \$3 [32:31], \$3 [29:0] } = { 1'h0, ns_w1_saved[31], ns_w1_saved[29:0] };
 endmodule
 
 (* src = "/home/runner/workspace/hardware/ns_gate.py:80" *)
@@ -19923,17 +18876,13 @@ module \top.u_shared_mload.u_ns_gate (clk, rst, mem_rd_valid, ns_entry_addr, ns_
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
   wire \cr15_namespace.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
-  wire \cr15_namespace.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
-  wire [6:0] \cr15_namespace.word0_gt.gt_seq ;
+  wire [8:0] \cr15_namespace.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
   wire [1:0] \cr15_namespace.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
   wire [2:0] \cr15_namespace.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
   wire [15:0] \cr15_namespace.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
-  wire \cr15_namespace.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
   wire [31:0] \cr15_namespace.word1_location ;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:67" *)
@@ -20007,15 +18956,15 @@ module \top.u_shared_mload.u_ns_gate (clk, rst, mem_rd_valid, ns_entry_addr, ns_
   wire rst;
   (* src = "/home/runner/workspace/hardware/ns_gate.py:106" *)
   wire seal_ok;
-  (* src = "/home/runner/workspace/hardware/integrity32.py:58" *)
-  wire [31:0] w0_rot;
-  (* src = "/home/runner/workspace/hardware/integrity32.py:57" *)
-  wire [31:0] w1_masked;
   (* src = "/home/runner/workspace/hardware/integrity32.py:59" *)
+  wire [31:0] w0_rot;
+  (* src = "/home/runner/workspace/hardware/integrity32.py:58" *)
+  wire [31:0] w1_masked;
+  (* src = "/home/runner/workspace/hardware/integrity32.py:60" *)
   wire [31:0] w1_rot;
   assign \$2  = cr15_namespace[63:32] + (* src = "/home/runner/workspace/hardware/ns_gate.py:93" *) \$1 ;
-  assign gt_seq_match = gt_latched[22:16] == (* src = "/home/runner/workspace/hardware/ns_gate.py:100" *) raw_w2_reg[27:21];
-  assign \$3  = { raw_base_reg[24:0], raw_base_reg[31:25] } ^ (* src = "/home/runner/workspace/hardware/integrity32.py:66" *) { w1_masked[18:0], w1_masked[31:19] };
+  assign gt_seq_match = gt_latched[24:16] == (* src = "/home/runner/workspace/hardware/ns_gate.py:100" *) raw_w2_reg[29:21];
+  assign \$3  = { raw_base_reg[24:0], raw_base_reg[31:25] } ^ (* src = "/home/runner/workspace/hardware/integrity32.py:67" *) { w1_masked[18:0], w1_masked[31:19] };
   assign seal_ok = computed_integrity == (* src = "/home/runner/workspace/hardware/ns_gate.py:107" *) raw_integrity_reg;
   assign \$4  = \$2 [31:0] + (* src = "/home/runner/workspace/hardware/ns_gate.py:135" *) 3'h4;
   assign \$5  = \$2 [31:0] + (* src = "/home/runner/workspace/hardware/ns_gate.py:148" *) 4'h8;
@@ -20262,18 +19211,16 @@ module \top.u_shared_mload.u_ns_gate (clk, rst, mem_rd_valid, ns_entry_addr, ns_
   assign ns_entry_addr = \$2 [31:0];
   assign \cr15_namespace.word0_gt  = cr15_namespace[31:0];
   assign \cr15_namespace.word0_gt.slot_id  = cr15_namespace[15:0];
-  assign \cr15_namespace.word0_gt.gt_seq  = cr15_namespace[22:16];
-  assign \cr15_namespace.word0_gt.gt_type  = cr15_namespace[24:23];
-  assign \cr15_namespace.word0_gt.f_flag  = cr15_namespace[25];
-  assign \cr15_namespace.word0_gt.spare  = cr15_namespace[26];
+  assign \cr15_namespace.word0_gt.gt_seq  = cr15_namespace[24:16];
+  assign \cr15_namespace.word0_gt.gt_type  = cr15_namespace[26:25];
   assign \cr15_namespace.word0_gt.dom  = cr15_namespace[27];
   assign \cr15_namespace.word0_gt.perm  = cr15_namespace[30:28];
   assign \cr15_namespace.word0_gt.b_flag  = cr15_namespace[31];
   assign \cr15_namespace.word1_location  = cr15_namespace[63:32];
   assign \cr15_namespace.word2_w2  = cr15_namespace[95:64];
   assign \$1  = { 3'h0, gt_latched[15:0], 4'h0 };
-  assign w1_masked[28] = 1'h0;
-  assign { w1_masked[31:29], w1_masked[27:0] } = { raw_w2_reg[31:29], raw_w2_reg[27:0] };
+  assign w1_masked[31:30] = 2'h0;
+  assign w1_masked[29:0] = raw_w2_reg[29:0];
   assign { computed_integrity[29], computed_integrity[24], computed_integrity[22], computed_integrity[20], computed_integrity[17], computed_integrity[14], computed_integrity[8], computed_integrity[4] } = { \$3 [29], \$3 [24], \$3 [22], \$3 [20], \$3 [17], \$3 [14], \$3 [8], \$3 [4] };
   assign { computed_integrity[31:30], computed_integrity[28:25], computed_integrity[23], computed_integrity[21], computed_integrity[19:18], computed_integrity[16:15], computed_integrity[13:9], computed_integrity[7:5], computed_integrity[3:0] } = \$auto$rtlil.cc:2739:Not$6 ;
 endmodule
@@ -20322,17 +19269,13 @@ module \top.u_tperm (\port$0$17 , clk, rst, tperm_start, cr_rd_data, tperm_busy,
   (* src = "/home/runner/workspace/hardware/tperm.py:34" *)
   wire \cr_rd_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/tperm.py:34" *)
-  wire \cr_rd_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/tperm.py:34" *)
-  wire [6:0] \cr_rd_data.word0_gt.gt_seq ;
+  wire [8:0] \cr_rd_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/tperm.py:34" *)
   wire [1:0] \cr_rd_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/tperm.py:34" *)
   wire [2:0] \cr_rd_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/tperm.py:34" *)
   wire [15:0] \cr_rd_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/tperm.py:34" *)
-  wire \cr_rd_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/tperm.py:34" *)
   wire [31:0] \cr_rd_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/tperm.py:34" *)
@@ -20354,17 +19297,13 @@ module \top.u_tperm (\port$0$17 , clk, rst, tperm_start, cr_rd_data, tperm_busy,
   (* src = "/home/runner/workspace/hardware/tperm.py:37" *)
   wire \cr_wr_data.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/tperm.py:37" *)
-  wire \cr_wr_data.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/tperm.py:37" *)
-  wire [6:0] \cr_wr_data.word0_gt.gt_seq ;
+  wire [8:0] \cr_wr_data.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/tperm.py:37" *)
   wire [1:0] \cr_wr_data.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/tperm.py:37" *)
   wire [2:0] \cr_wr_data.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/tperm.py:37" *)
   wire [15:0] \cr_wr_data.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/tperm.py:37" *)
-  wire \cr_wr_data.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/tperm.py:37" *)
   wire [31:0] \cr_wr_data.word1_location ;
   (* src = "/home/runner/workspace/hardware/tperm.py:37" *)
@@ -20405,17 +19344,13 @@ module \top.u_tperm (\port$0$17 , clk, rst, tperm_start, cr_rd_data, tperm_busy,
   (* src = "/home/runner/workspace/hardware/tperm.py:47" *)
   wire \ref_cap.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/tperm.py:47" *)
-  wire \ref_cap.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/tperm.py:47" *)
-  wire [6:0] \ref_cap.word0_gt.gt_seq ;
+  wire [8:0] \ref_cap.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/tperm.py:47" *)
   wire [1:0] \ref_cap.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/tperm.py:47" *)
   wire [2:0] \ref_cap.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/tperm.py:47" *)
   wire [15:0] \ref_cap.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/tperm.py:47" *)
-  wire \ref_cap.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/tperm.py:47" *)
   wire [31:0] \ref_cap.word1_location ;
   (* src = "/home/runner/workspace/hardware/tperm.py:47" *)
@@ -20429,17 +19364,13 @@ module \top.u_tperm (\port$0$17 , clk, rst, tperm_start, cr_rd_data, tperm_busy,
   (* src = "/home/runner/workspace/hardware/tperm.py:173" *)
   wire \result_cap.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/tperm.py:173" *)
-  wire \result_cap.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/tperm.py:173" *)
-  wire [6:0] \result_cap.word0_gt.gt_seq ;
+  wire [8:0] \result_cap.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/tperm.py:173" *)
   wire [1:0] \result_cap.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/tperm.py:173" *)
   wire [2:0] \result_cap.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/tperm.py:173" *)
   wire [15:0] \result_cap.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/tperm.py:173" *)
-  wire \result_cap.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/tperm.py:173" *)
   wire [31:0] \result_cap.word1_location ;
   (* src = "/home/runner/workspace/hardware/tperm.py:173" *)
@@ -20464,17 +19395,13 @@ module \top.u_tperm (\port$0$17 , clk, rst, tperm_start, cr_rd_data, tperm_busy,
   (* src = "/home/runner/workspace/hardware/tperm.py:43" *)
   wire \target_cap.word0_gt.dom ;
   (* src = "/home/runner/workspace/hardware/tperm.py:43" *)
-  wire \target_cap.word0_gt.f_flag ;
-  (* src = "/home/runner/workspace/hardware/tperm.py:43" *)
-  wire [6:0] \target_cap.word0_gt.gt_seq ;
+  wire [8:0] \target_cap.word0_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/tperm.py:43" *)
   wire [1:0] \target_cap.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/tperm.py:43" *)
   wire [2:0] \target_cap.word0_gt.perm ;
   (* src = "/home/runner/workspace/hardware/tperm.py:43" *)
   wire [15:0] \target_cap.word0_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/tperm.py:43" *)
-  wire \target_cap.word0_gt.spare ;
   (* src = "/home/runner/workspace/hardware/tperm.py:43" *)
   wire [31:0] \target_cap.word1_location ;
   (* src = "/home/runner/workspace/hardware/tperm.py:43" *)
@@ -21007,10 +19934,8 @@ module \top.u_tperm (\port$0$17 , clk, rst, tperm_start, cr_rd_data, tperm_busy,
   assign stack_has_frame = 1'h0;
   assign \target_cap.word0_gt  = target_cap[31:0];
   assign \target_cap.word0_gt.slot_id  = target_cap[15:0];
-  assign \target_cap.word0_gt.gt_seq  = target_cap[22:16];
-  assign \target_cap.word0_gt.gt_type  = target_cap[24:23];
-  assign \target_cap.word0_gt.f_flag  = target_cap[25];
-  assign \target_cap.word0_gt.spare  = target_cap[26];
+  assign \target_cap.word0_gt.gt_seq  = target_cap[24:16];
+  assign \target_cap.word0_gt.gt_type  = target_cap[26:25];
   assign \target_cap.word0_gt.dom  = target_cap[27];
   assign \target_cap.word0_gt.perm  = target_cap[30:28];
   assign \target_cap.word0_gt.b_flag  = target_cap[31];
@@ -21018,10 +19943,8 @@ module \top.u_tperm (\port$0$17 , clk, rst, tperm_start, cr_rd_data, tperm_busy,
   assign \target_cap.word2_w2  = target_cap[95:64];
   assign \result_cap.word0_gt  = result_cap[31:0];
   assign \result_cap.word0_gt.slot_id  = result_cap[15:0];
-  assign \result_cap.word0_gt.gt_seq  = result_cap[22:16];
-  assign \result_cap.word0_gt.gt_type  = result_cap[24:23];
-  assign \result_cap.word0_gt.f_flag  = result_cap[25];
-  assign \result_cap.word0_gt.spare  = result_cap[26];
+  assign \result_cap.word0_gt.gt_seq  = result_cap[24:16];
+  assign \result_cap.word0_gt.gt_type  = result_cap[26:25];
   assign \result_cap.word0_gt.dom  = result_cap[27];
   assign \result_cap.word0_gt.perm  = result_cap[30:28];
   assign \result_cap.word0_gt.b_flag  = result_cap[31];
@@ -21029,10 +19952,8 @@ module \top.u_tperm (\port$0$17 , clk, rst, tperm_start, cr_rd_data, tperm_busy,
   assign \result_cap.word2_w2  = result_cap[95:64];
   assign \cr_wr_data.word0_gt  = cr_wr_data[31:0];
   assign \cr_wr_data.word0_gt.slot_id  = cr_wr_data[15:0];
-  assign \cr_wr_data.word0_gt.gt_seq  = cr_wr_data[22:16];
-  assign \cr_wr_data.word0_gt.gt_type  = cr_wr_data[24:23];
-  assign \cr_wr_data.word0_gt.f_flag  = cr_wr_data[25];
-  assign \cr_wr_data.word0_gt.spare  = cr_wr_data[26];
+  assign \cr_wr_data.word0_gt.gt_seq  = cr_wr_data[24:16];
+  assign \cr_wr_data.word0_gt.gt_type  = cr_wr_data[26:25];
   assign \cr_wr_data.word0_gt.dom  = cr_wr_data[27];
   assign \cr_wr_data.word0_gt.perm  = cr_wr_data[30:28];
   assign \cr_wr_data.word0_gt.b_flag  = cr_wr_data[31];
@@ -21040,10 +19961,8 @@ module \top.u_tperm (\port$0$17 , clk, rst, tperm_start, cr_rd_data, tperm_busy,
   assign \cr_wr_data.word2_w2  = cr_wr_data[95:64];
   assign \cr_rd_data.word0_gt  = cr_rd_data[31:0];
   assign \cr_rd_data.word0_gt.slot_id  = cr_rd_data[15:0];
-  assign \cr_rd_data.word0_gt.gt_seq  = cr_rd_data[22:16];
-  assign \cr_rd_data.word0_gt.gt_type  = cr_rd_data[24:23];
-  assign \cr_rd_data.word0_gt.f_flag  = cr_rd_data[25];
-  assign \cr_rd_data.word0_gt.spare  = cr_rd_data[26];
+  assign \cr_rd_data.word0_gt.gt_seq  = cr_rd_data[24:16];
+  assign \cr_rd_data.word0_gt.gt_type  = cr_rd_data[26:25];
   assign \cr_rd_data.word0_gt.dom  = cr_rd_data[27];
   assign \cr_rd_data.word0_gt.perm  = cr_rd_data[30:28];
   assign \cr_rd_data.word0_gt.b_flag  = cr_rd_data[31];
@@ -21051,10 +19970,8 @@ module \top.u_tperm (\port$0$17 , clk, rst, tperm_start, cr_rd_data, tperm_busy,
   assign \cr_rd_data.word2_w2  = cr_rd_data[95:64];
   assign \ref_cap.word0_gt  = ref_cap[31:0];
   assign \ref_cap.word0_gt.slot_id  = ref_cap[15:0];
-  assign \ref_cap.word0_gt.gt_seq  = ref_cap[22:16];
-  assign \ref_cap.word0_gt.gt_type  = ref_cap[24:23];
-  assign \ref_cap.word0_gt.f_flag  = ref_cap[25];
-  assign \ref_cap.word0_gt.spare  = ref_cap[26];
+  assign \ref_cap.word0_gt.gt_seq  = ref_cap[24:16];
+  assign \ref_cap.word0_gt.gt_type  = ref_cap[26:25];
   assign \ref_cap.word0_gt.dom  = ref_cap[27];
   assign \ref_cap.word0_gt.perm  = ref_cap[30:28];
   assign \ref_cap.word0_gt.b_flag  = ref_cap[31];

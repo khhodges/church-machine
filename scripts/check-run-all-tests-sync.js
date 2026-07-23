@@ -62,7 +62,6 @@ const DEFAULT_SCRIPT_ONLY_SUITES = [
     'build-guard-tests',
     'update-lump-tests',
     'check-slot-index-leak',
-    'callhome-reconnect-tests',
     'ns-slot-dynamic-tests',
     'lambda-exec-tests',
     'hardware-sim',

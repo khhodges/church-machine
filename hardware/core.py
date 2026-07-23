@@ -863,7 +863,7 @@ class ChurchCore(Elaboratable):
                     thrd_gt_view.dom.eq(0),   # Turing, no perms (M-only, transient)
                     thrd_gt_view.perm.eq(0),
                 ]
-                m.d.comb += [boot_wr_en[8].eq(1), boot_wr_gt[8].eq(thrd_gt)]
+                m.d.comb += [boot_wr_en[12].eq(1), boot_wr_gt[12].eq(thrd_gt)]
             with m.Case(BootState.INIT_CLIST):
                 # CR6 (c-list cap): full 96-bit write to include word1_location=0x400
                 # (DEMO_CLIST at dmem byte 0x400 = word 256) and word2_w2=63

@@ -36,13 +36,13 @@ class ChurchSwitch(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
-        CR8_BASE = 8
+        CR_PRIV_BASE = 8  # arithmetic base: 8+5=CR13, 8+7=CR15 (valid SWITCH targets only)
 
         u_mload = ChurchMLoad()
         m.submodules.u_mload = u_mload
 
         dest_cr = Signal(4)
-        m.d.comb += dest_cr.eq(CR8_BASE + Cat(self.target, Const(0, 1)))
+        m.d.comb += dest_cr.eq(CR_PRIV_BASE + Cat(self.target, Const(0, 1)))
 
         src_reg_latched = Signal(CAP_REG_LAYOUT)
         fault_latched = Signal()

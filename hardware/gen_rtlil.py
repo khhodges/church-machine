@@ -323,57 +323,6 @@ def _rtlil_to_verilog(il_path, v_path, module_name=None):
         return None
 
 
-def generate_rtlil_tang_nano(output_dir="build"):
-    from .tang_nano_20k import ChurchTangNano20K
-    os.makedirs(output_dir, exist_ok=True)
-
-    top = ChurchTangNano20K(clk_freq=27_000_000, baud=115200, sim_mode=False)
-
-    ports = [
-        top.uart_tx, top.uart_rx, top.push_button,
-        ClockSignal("sync"),
-    ] + [led for i, led in enumerate(top.led) if i != 3]
-
-    rtlil_text = convert(top, ports=ports)
-
-    output_path = os.path.join(output_dir, "church_tang_nano_20k.il")
-    with open(output_path, "w") as f:
-        f.write(rtlil_text)
-
-    print(f"Generated: {output_path}")
-    print(f"  File size: {len(rtlil_text):,} bytes")
-    print(f"  Lines: {rtlil_text.count(chr(10)):,}")
-
-    return output_path
-
-
-def generate_rtlil_ti60(output_dir="build"):
-    from .ti60_f225 import ChurchTi60F225
-    os.makedirs(output_dir, exist_ok=True)
-
-    top = ChurchTi60F225(clk_freq=25_000_000, baud=57600, sim_mode=False)
-
-    ports = [
-        top.uart_tx, top.uart_rx, top.push_button,
-        ClockSignal("sync"),
-    ] + top.led
-
-    rtlil_text = convert(top, ports=ports)
-
-    il_path = os.path.join(output_dir, "church_ti60_f225.il")
-    with open(il_path, "w") as f:
-        f.write(rtlil_text)
-
-    print(f"Generated: {il_path}")
-    print(f"  File size: {len(rtlil_text):,} bytes")
-    print(f"  Lines: {rtlil_text.count(chr(10)):,}")
-
-    v_path = os.path.join(output_dir, "church_ti60_f225.v")
-    _rtlil_to_verilog(il_path, v_path, module_name="church_ti60_f225")
-
-    return il_path
-
-
 def generate_rtlil_wukong(output_dir="build"):
     """Generate RTLIL + Verilog for QMTECH Wukong Artix-7 XC7A100T.
 
@@ -404,23 +353,13 @@ def generate_rtlil_wukong(output_dir="build"):
 
 
 def generate_rtlil(output_dir="build"):
-    return generate_rtlil_tang_nano(output_dir)
+    return generate_rtlil_wukong(output_dir)
 
 
 if __name__ == "__main__":
     output_dir = "build"
-    board = "tang-nano-20k-iot"
     for arg in sys.argv[1:]:
         if not arg.startswith("--"):
             output_dir = arg
-        elif arg == "--ti60":
-            board = "ti60-f225"
-        elif arg == "--wukong":
-            board = "wukong-xc7a100t"
 
-    if board == "ti60-f225":
-        generate_rtlil_ti60(output_dir)
-    elif board == "wukong-xc7a100t":
-        generate_rtlil_wukong(output_dir)
-    else:
-        generate_rtlil_tang_nano(output_dir)
+    generate_rtlil_wukong(output_dir)

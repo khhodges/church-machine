@@ -2074,10 +2074,10 @@ module \top.core
   wire width 32 \thrd_gt
 
   attribute \src "/home/runner/workspace/hardware/core.py:837"
-  wire width 1 \boot_cap8_wr_en
+  wire width 1 \boot_cap12_wr_en
 
   attribute \src "/home/runner/workspace/hardware/core.py:838"
-  wire width 32 \boot_cap8_wr_gt
+  wire width 32 \boot_cap12_wr_gt
 
   attribute \src "/home/runner/workspace/hardware/core.py:888"
   wire width 32 \cr14_gt
@@ -2295,8 +2295,14 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:44"
   wire width 1 \cr8_gt_wr_en
 
+  attribute \src "/home/runner/workspace/hardware/core.py:837"
+  wire width 1 \boot_cap8_wr_en
+
   attribute \src "/home/runner/workspace/hardware/registers.py:43"
   wire width 32 \cr8_gt_wr_data
+
+  attribute \src "/home/runner/workspace/hardware/core.py:838"
+  wire width 32 \boot_cap8_wr_gt
 
   attribute \src "/home/runner/workspace/hardware/registers.py:44"
   wire width 1 \cr9_gt_wr_en
@@ -2337,14 +2343,8 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:44"
   wire width 1 \cr12_gt_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/core.py:837"
-  wire width 1 \boot_cap12_wr_en
-
   attribute \src "/home/runner/workspace/hardware/registers.py:43"
   wire width 32 \cr12_gt_wr_data
-
-  attribute \src "/home/runner/workspace/hardware/core.py:838"
-  wire width 32 \boot_cap12_wr_gt
 
   attribute \src "/home/runner/workspace/hardware/registers.py:44"
   wire width 1 \cr13_gt_wr_en
@@ -5340,22 +5340,22 @@ module \top.core
   wire width 1 \thrd_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/core.py:838"
-  wire width 16 \boot_cap8_wr_gt.slot_id
+  wire width 16 \boot_cap12_wr_gt.slot_id
 
   attribute \src "/home/runner/workspace/hardware/core.py:838"
-  wire width 9 \boot_cap8_wr_gt.gt_seq
+  wire width 9 \boot_cap12_wr_gt.gt_seq
 
   attribute \src "/home/runner/workspace/hardware/core.py:838"
-  wire width 2 \boot_cap8_wr_gt.gt_type
+  wire width 2 \boot_cap12_wr_gt.gt_type
 
   attribute \src "/home/runner/workspace/hardware/core.py:838"
-  wire width 1 \boot_cap8_wr_gt.dom
+  wire width 1 \boot_cap12_wr_gt.dom
 
   attribute \src "/home/runner/workspace/hardware/core.py:838"
-  wire width 3 \boot_cap8_wr_gt.perm
+  wire width 3 \boot_cap12_wr_gt.perm
 
   attribute \src "/home/runner/workspace/hardware/core.py:838"
-  wire width 1 \boot_cap8_wr_gt.b_flag
+  wire width 1 \boot_cap12_wr_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/core.py:888"
   wire width 16 \cr14_gt.slot_id
@@ -6005,6 +6005,24 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/registers.py:43"
   wire width 1 \cr8_gt_wr_data.b_flag
 
+  attribute \src "/home/runner/workspace/hardware/core.py:838"
+  wire width 16 \boot_cap8_wr_gt.slot_id
+
+  attribute \src "/home/runner/workspace/hardware/core.py:838"
+  wire width 9 \boot_cap8_wr_gt.gt_seq
+
+  attribute \src "/home/runner/workspace/hardware/core.py:838"
+  wire width 2 \boot_cap8_wr_gt.gt_type
+
+  attribute \src "/home/runner/workspace/hardware/core.py:838"
+  wire width 1 \boot_cap8_wr_gt.dom
+
+  attribute \src "/home/runner/workspace/hardware/core.py:838"
+  wire width 3 \boot_cap8_wr_gt.perm
+
+  attribute \src "/home/runner/workspace/hardware/core.py:838"
+  wire width 1 \boot_cap8_wr_gt.b_flag
+
   attribute \src "/home/runner/workspace/hardware/registers.py:43"
   wire width 16 \cr9_gt_wr_data.slot_id
 
@@ -6130,24 +6148,6 @@ module \top.core
 
   attribute \src "/home/runner/workspace/hardware/registers.py:43"
   wire width 1 \cr12_gt_wr_data.b_flag
-
-  attribute \src "/home/runner/workspace/hardware/core.py:838"
-  wire width 16 \boot_cap12_wr_gt.slot_id
-
-  attribute \src "/home/runner/workspace/hardware/core.py:838"
-  wire width 9 \boot_cap12_wr_gt.gt_seq
-
-  attribute \src "/home/runner/workspace/hardware/core.py:838"
-  wire width 2 \boot_cap12_wr_gt.gt_type
-
-  attribute \src "/home/runner/workspace/hardware/core.py:838"
-  wire width 1 \boot_cap12_wr_gt.dom
-
-  attribute \src "/home/runner/workspace/hardware/core.py:838"
-  wire width 3 \boot_cap12_wr_gt.perm
-
-  attribute \src "/home/runner/workspace/hardware/core.py:838"
-  wire width 1 \boot_cap12_wr_gt.b_flag
 
   attribute \src "/home/runner/workspace/hardware/registers.py:43"
   wire width 16 \cr13_gt_wr_data.slot_id
@@ -9350,7 +9350,7 @@ module \top.core
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A \boot_cap8_wr_en [0]
+    connect \A 1'0
     connect \B \rt_cap8_wr_en [0]
     connect \Y \cr8_gt_wr_en
   end
@@ -9358,9 +9358,9 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/core.py:932"
   cell $mux $569
     parameter \WIDTH 32
-    connect \S \boot_cap8_wr_en [0]
+    connect \S 1'0
     connect \A \rt_cap8_wr_gt [31:0]
-    connect \B \boot_cap8_wr_gt [31:0]
+    connect \B 32'00000000000000000000000000000000
     connect \Y \cr8_gt_wr_data
   end
 
@@ -9434,7 +9434,7 @@ module \top.core
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A 1'0
+    connect \A \boot_cap12_wr_en [0]
     connect \B \rt_cap12_wr_en [0]
     connect \Y \cr12_gt_wr_en
   end
@@ -9442,9 +9442,9 @@ module \top.core
   attribute \src "/home/runner/workspace/hardware/core.py:932"
   cell $mux $577
     parameter \WIDTH 32
-    connect \S 1'0
+    connect \S \boot_cap12_wr_en [0]
     connect \A \rt_cap12_wr_gt [31:0]
-    connect \B 32'00000000000000000000000000000000
+    connect \B \boot_cap12_wr_gt [31:0]
     connect \Y \cr12_gt_wr_data
   end
 
@@ -13386,11 +13386,11 @@ module \top.core
 
   attribute \src "/home/runner/workspace/hardware/core.py:837"
   process $915
-    assign \boot_cap8_wr_en [0] 1'0
+    assign \boot_cap12_wr_en [0] 1'0
     switch \boot_state [2:0]
       case 3'010
       case 3'011
-        assign \boot_cap8_wr_en [0] 1'1
+        assign \boot_cap12_wr_en [0] 1'1
       case 3'100
       case 3'101
     end
@@ -13398,11 +13398,11 @@ module \top.core
 
   attribute \src "/home/runner/workspace/hardware/core.py:838"
   process $916
-    assign \boot_cap8_wr_gt [31:0] 32'00000000000000000000000000000000
+    assign \boot_cap12_wr_gt [31:0] 32'00000000000000000000000000000000
     switch \boot_state [2:0]
       case 3'010
       case 3'011
-        assign \boot_cap8_wr_gt [31:0] \thrd_gt [31:0]
+        assign \boot_cap12_wr_gt [31:0] \thrd_gt [31:0]
       case 3'100
       case 3'101
     end
@@ -15717,14 +15717,14 @@ connect \boot_cap7_wr_en 1'0
 connect \rt_cap7_wr_en 1'0
 connect \rt_cap7_wr_gt 32'00000000000000000000000000000000
 connect \boot_cap7_wr_gt 32'00000000000000000000000000000000
+connect \boot_cap8_wr_en 1'0
+connect \boot_cap8_wr_gt 32'00000000000000000000000000000000
 connect \boot_cap9_wr_en 1'0
 connect \boot_cap9_wr_gt 32'00000000000000000000000000000000
 connect \boot_cap10_wr_en 1'0
 connect \boot_cap10_wr_gt 32'00000000000000000000000000000000
 connect \boot_cap11_wr_en 1'0
 connect \boot_cap11_wr_gt 32'00000000000000000000000000000000
-connect \boot_cap12_wr_en 1'0
-connect \boot_cap12_wr_gt 32'00000000000000000000000000000000
 connect \boot_cap13_wr_en 1'0
 connect \boot_cap13_wr_gt 32'00000000000000000000000000000000
 connect \boot_cap15_wr_en 1'0
@@ -16174,12 +16174,12 @@ connect \thrd_gt.gt_type \thrd_gt [26:25]
 connect \thrd_gt.dom \thrd_gt [27]
 connect \thrd_gt.perm \thrd_gt [30:28]
 connect \thrd_gt.b_flag \thrd_gt [31]
-connect \boot_cap8_wr_gt.slot_id \boot_cap8_wr_gt [15:0]
-connect \boot_cap8_wr_gt.gt_seq \boot_cap8_wr_gt [24:16]
-connect \boot_cap8_wr_gt.gt_type \boot_cap8_wr_gt [26:25]
-connect \boot_cap8_wr_gt.dom \boot_cap8_wr_gt [27]
-connect \boot_cap8_wr_gt.perm \boot_cap8_wr_gt [30:28]
-connect \boot_cap8_wr_gt.b_flag \boot_cap8_wr_gt [31]
+connect \boot_cap12_wr_gt.slot_id \boot_cap12_wr_gt [15:0]
+connect \boot_cap12_wr_gt.gt_seq \boot_cap12_wr_gt [24:16]
+connect \boot_cap12_wr_gt.gt_type \boot_cap12_wr_gt [26:25]
+connect \boot_cap12_wr_gt.dom \boot_cap12_wr_gt [27]
+connect \boot_cap12_wr_gt.perm \boot_cap12_wr_gt [30:28]
+connect \boot_cap12_wr_gt.b_flag \boot_cap12_wr_gt [31]
 connect \cr14_gt.slot_id \cr14_gt [15:0]
 connect \cr14_gt.gt_seq \cr14_gt [24:16]
 connect \cr14_gt.gt_type \cr14_gt [26:25]
@@ -16396,6 +16396,12 @@ connect \cr8_gt_wr_data.gt_type \cr8_gt_wr_data [26:25]
 connect \cr8_gt_wr_data.dom \cr8_gt_wr_data [27]
 connect \cr8_gt_wr_data.perm \cr8_gt_wr_data [30:28]
 connect \cr8_gt_wr_data.b_flag \cr8_gt_wr_data [31]
+connect \boot_cap8_wr_gt.slot_id 16'0000000000000000
+connect \boot_cap8_wr_gt.gt_seq 9'000000000
+connect \boot_cap8_wr_gt.gt_type 2'00
+connect \boot_cap8_wr_gt.dom 1'0
+connect \boot_cap8_wr_gt.perm 3'000
+connect \boot_cap8_wr_gt.b_flag 1'0
 connect \cr9_gt_wr_data.slot_id \cr9_gt_wr_data [15:0]
 connect \cr9_gt_wr_data.gt_seq \cr9_gt_wr_data [24:16]
 connect \cr9_gt_wr_data.gt_type \cr9_gt_wr_data [26:25]
@@ -16438,12 +16444,6 @@ connect \cr12_gt_wr_data.gt_type \cr12_gt_wr_data [26:25]
 connect \cr12_gt_wr_data.dom \cr12_gt_wr_data [27]
 connect \cr12_gt_wr_data.perm \cr12_gt_wr_data [30:28]
 connect \cr12_gt_wr_data.b_flag \cr12_gt_wr_data [31]
-connect \boot_cap12_wr_gt.slot_id 16'0000000000000000
-connect \boot_cap12_wr_gt.gt_seq 9'000000000
-connect \boot_cap12_wr_gt.gt_type 2'00
-connect \boot_cap12_wr_gt.dom 1'0
-connect \boot_cap12_wr_gt.perm 3'000
-connect \boot_cap12_wr_gt.b_flag 1'0
 connect \cr13_gt_wr_data.slot_id \cr13_gt_wr_data [15:0]
 connect \cr13_gt_wr_data.gt_seq \cr13_gt_wr_data [24:16]
 connect \cr13_gt_wr_data.gt_type \cr13_gt_wr_data [26:25]

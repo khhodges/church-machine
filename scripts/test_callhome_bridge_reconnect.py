@@ -148,7 +148,7 @@ def test_partial_line_discarded_on_reconnect():
     concatenated with the first line received after reconnect.
     """
     partial = b'CALLHOME:{"board":"Ti60F225","uid":"c0ffee0100000001"'  # no trailing \n
-    first = FakeSerial([partial, bridge.serial.SerialException("no data")])
+    first = FakeSerial([partial, _MockSerialException("no data")])
     second = FakeSerial([b"CHURCH Ti60 SoC+CM v2.4\n"])
 
     processed = _run_reader_thread_to_completion(first, second)
@@ -167,7 +167,7 @@ def test_partial_line_discarded_does_not_corrupt_json():
     reconnect and produce something that fails json.loads().
     """
     partial = b'CALLHOME:{"board":"Ti60F225","uid":"c0ffee0100000001","nia":"0x0000'
-    first = FakeSerial([partial, bridge.serial.SerialException("device reports readiness but no data")])
+    first = FakeSerial([partial, _MockSerialException("device reports readiness but no data")])
     clean_json = (
         'CALLHOME:{"board":"Ti60F225","uid":"c0ffee0100000001",'
         '"nia":"0x00000010","boot_ok":1,"boot_reason":0,'
@@ -190,7 +190,7 @@ def test_clean_disconnect_with_no_partial_data_still_reconnects():
     Sanity check: when there is no partial buffer at disconnect time (clean
     line boundary), reconnect still works and the next line arrives intact.
     """
-    first = FakeSerial([bridge.serial.SerialException("port vanished")])
+    first = FakeSerial([_MockSerialException("port vanished")])
     second = FakeSerial([b"CHURCH Ti60 SoC+CM v2.4\n"])
 
     processed = _run_reader_thread_to_completion(first, second)
