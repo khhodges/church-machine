@@ -36,7 +36,7 @@ class ChurchLoad(Elaboratable):
             self.mload_index.eq(self.index),
             self.mload_direct.eq(0),
             self.mload_direct_gt.eq(0),
-            self.mload_m_elevated.eq(self.cr_src == CR_CLIST),
+            self.mload_m_elevated.eq(0),
         ]
 
         with m.FSM(name="load_wrapper") as fsm:

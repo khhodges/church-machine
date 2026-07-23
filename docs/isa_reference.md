@@ -76,7 +76,7 @@ which is verified inline and discarded.
 | Range    | Name                 | Notes                                          |
 |----------|----------------------|------------------------------------------------|
 | CR0–CR5  | User CRs             | General-purpose; caller context preserved by CALL |
-| CR6      | C-list root          | E-permission token for current abstraction's c-list; re-derived by CALL/RETURN |
+| CR6      | C-list root          | L-permission token for current abstraction's c-list; re-synthesised by CALL/RETURN |
 | CR7–CR11 | User CRs             | General-purpose; caller context preserved by CALL |
 | CR12     | Thread stack         | Privileged; system-wide; unchanged by CALL/RETURN; only writeable via CHANGE |
 | CR13     | Interrupt handler    | Privileged; system-wide; only writeable via SWITCH (hardware: PassKey gate) |
@@ -592,7 +592,7 @@ Encoding: op[4:0]=0x00 | cond[4] | CRd[4] | CRs[4] | row[15]
 
 **Semantics:** Loads the 32-bit GT word from the c-list addressed by CRs at word offset `row` into `CRd`. The full NS entry is then read and installed into CRd's three-word cache (word0=GT, word1=NS Word 1, word2=NS seals).
 
-- **CRs = CR6** (c-list root): mLoad validates version and CRC seal; L permission check is not skipped because CALL synthisyses CR6 with L permission after validating E as the call frame and zones are created.
+- **CRs = CR6** (c-list root): mLoad validates version and CRC seal; normal L-check applies. CALL validates E on the target abstraction and then synthesises an L-GT for CR6; subsequent LOAD from CR6 applies the normal L-check which passes.
 - **CRs ≠ CR6**: mLoad validates L permission on CRs itself, reads the lump header to locate the c-list region, then validates the slot.
 - **Abstract GT in slot**: installed directly into CRd without an NS table lookup (hardware device handle path).
 - **Outform GT in slot**: triggers lazy-load (Mode 1 or Mode 2); NS entry is promoted Outform→Inform on completion.
@@ -603,7 +603,7 @@ Encoding: op[4:0]=0x00 | cond[4] | CRd[4] | CRs[4] | row[15]
 | Fault | Condition |
 |-------|-----------|
 | `NULL_CAP` | CRs is NULL, or c-list slot at `row` is 0 |
-| `PERM` | CRs lacks L permission (except when CRs = CR6) |
+| `PERM` | CRs lacks L permission |
 | `BOUNDS` | `row` is outside the c-list range |
 | `SEAL` | NS entry CRC-16 validation fails |
 | `F_BIT` | Source GT is in a Far namespace (F=1) |
@@ -670,7 +670,7 @@ Encoding: op[4:0]=0x02 | cond[4] | CRs[4] | 0[4] | method[15]
 3. Push 2-word call frame to thread stack (see A.12):
    - `memory[STO]` = frame word (packed returnPC, sz=1, flags, savedSTO)
    - `memory[STO-1]` = caller's E-GT (CR6 value before call)
-4. CR6 ← callee c-list GT (E-only). CR14 ← callee code GT (X-only, privileged).
+4. CR6 ← callee c-list GT (L-only, synthesised by CALL FSM from callee lump header). CR14 ← callee code GT (X-only, privileged).
 5. PC ← NIA (lump_base + method entry, or lump_base + 4 for fast path).
 
 Callee inherits DR0–DR15, CR0–CR5, CR7–CR11 from the caller. CR12 and CR13 are system-wide (unchanged). CR15 is per-thread (unchanged by CALL itself — restored by RETURN).
@@ -704,7 +704,7 @@ Syntax:  RETURN [#mask]
 Encoding: op[4:0]=0x03 | cond[4] | 0[4] | 0[4] | mask[12] | 0[3]
 ```
 
-`mask` is a 12-bit field in `imm15[11:0]`. **Bit N = 1 → preserve CR_N** (callee's value is kept as a return value to the caller). Bit N = 0 → restore the caller's saved CR_N, or scrub to NULL if not saved. Bit 6 is architecturally reserved (CR6 is always re-derived from the E-GT; the mask bit is ignored). Bare `RETURN` (mask = 0) is the secure default — all callee CRs revert to the caller's context.
+`mask` is a 12-bit field in `imm15[11:0]`. **Bit N = 1 → preserve CR_N** (callee's value is kept as a return value to the caller). Bit N = 0 → restore the caller's saved CR_N, or scrub to NULL if not saved. Bit 6 is architecturally reserved (CR6 is always re-synthesised as an L-GT by CALL; the mask bit is ignored). Bare `RETURN` (mask = 0) is the secure default — all callee CRs revert to the caller's context.
 
 **Semantics** (see A.12, A.13):
 1. M-window writeback fires; faults `INVALID_OP` if writeback fails.

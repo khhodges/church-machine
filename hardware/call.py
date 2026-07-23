@@ -326,9 +326,9 @@ class ChurchCall(Elaboratable):
         cr6_lat_gt   = View(GT_LAYOUT, cr6_lat_view.word0_gt)
         cr6_lat_w2   = View(WORD2_LAYOUT, cr6_lat_view.word2_w2)
 
-        # CR6 with corrected base, limit; perms fixed to E-only — matching boot LOAD_NUC convention.
-        # CR6 always carries E perm (enables recursive CALL via CR6), regardless of source GT perms.
-        # Device GTs (L+S+E) have L and S stripped; regular E-GTs are unchanged.
+        # CR6 with corrected base, limit; perms fixed to L-only — architectural invariant.
+        # CR6 always carries L perm (allows LOAD to extract capabilities from the c-list via mLoad).
+        # Device GTs (L+S+E) have S and E stripped; regular L-GTs are unchanged.
         # M-elevation for CR6 is implicit: CALL FSM always sets mload_m_elevated=1 (Phase 1).
         # It is NOT encoded as a perm bit — contrast with CR14 where PERM_X = M flag.
         cr6_adjusted = Signal(CAP_REG_LAYOUT)
@@ -339,10 +339,10 @@ class ChurchCall(Elaboratable):
             cr6_adj_gt.slot_id.eq(cr6_lat_gt.slot_id),
             cr6_adj_gt.gt_seq.eq(cr6_lat_gt.gt_seq),
             cr6_adj_gt.gt_type.eq(cr6_lat_gt.gt_type),
-            # Fixed E-only — CR6 always carries E (recursive CALL; matches boot LOAD_NUC).
-            # Church domain (dom=1), perm[2]=E.
+            # Fixed L-only — CR6 always carries L (mLoad path for c-list access).
+            # Church domain (dom=1), perm[0]=L.
             cr6_adj_gt.dom.eq(1),
-            cr6_adj_gt.perm.eq(0b100),   # E = perm[2] in Church domain
+            cr6_adj_gt.perm.eq(0b001),   # L = perm[0] in Church domain
             cr6_adj_gt.b_flag.eq(cr6_lat_gt.b_flag),
             # base = NS_base + (lumpSize − cc) × 4  (byte address of c-list word 0)
             cr6_adj_view.word1_location.eq(
@@ -518,7 +518,7 @@ class ChurchCall(Elaboratable):
 
             with m.State("SET_CR6_BASE"):
                 # cc=0: c-list absent — write NULL GT to CR6 per spec step 7
-                # cc>0: read CR6 (Phase 1 deposited the E-GT there) to latch for adjustment
+                # cc>0: read CR6 (Phase 1 deposited the raw GT there) to latch for L-only adjustment
                 with m.If(cc_reg == 0):
                     m.d.comb += [
                         local_cr_wr_en.eq(1),

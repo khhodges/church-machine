@@ -93,7 +93,7 @@ mLoad(source_capability, required_permission, index, destCR):
 
   5. CRC-16/CCITT Integrity (ChurchNSGate — CHECK_VERSION)
      Recompute CRC-16/CCITT (poly=0x1021, init=0xFFFF) over:
-       gt_word0[24:0] + NS Entry Word 0 + NS Entry Word 1  [89 bits]
+       gt_word0[26:0] + NS Entry Word 0 + NS Entry Word 1  [89 bits]
      Compare against NS Entry Word 2 bits [15:0] (crc field).
      Failure → FAULT SEAL (tampered NS entry)
 

@@ -2081,7 +2081,7 @@ class ChurchSimulator {
                         stepCtx: 'NUC_CLIST sentinel-only',
                     });
                 } else {
-                    const cr6GT = this.createGT(0, bootEntrySlot, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);   // E-perm c-list token
+                    const cr6GT = this.createGT(0, bootEntrySlot, {R:0,W:0,X:0,L:1,S:0,E:0}, 1);   // L-perm c-list token
                     this.cr[6] = {
                         word0: cr6GT,
                         word1: (base + clistStart) >>> 0,
@@ -2089,14 +2089,14 @@ class ChurchSimulator {
                         word3: entryNSEntry.word2_seals,
                         m: this.mElevation ? 1 : 0
                     };
-                    this.output += `[BOOT] NUC_CLIST — CR6(E) <- c-list of ${_b4Label} (base=0x${(base+clistStart).toString(16).toUpperCase()}, cc=${cc}); sentinel pushed (frame@+${sp_max}, STO=${this.sto})\n`;
+                    this.output += `[BOOT] NUC_CLIST — CR6(L) <- c-list of ${_b4Label} (base=0x${(base+clistStart).toString(16).toUpperCase()}, cc=${cc}); sentinel pushed (frame@+${sp_max}, STO=${this.sto})\n`;
                     this.output += `[BOOT] SENTINEL CALL — frame@+${sp_max}=0x${sentinelFrameWord.toString(16).toUpperCase().padStart(8,'0')} (NIA=0x7FFF,sz=1,prev_STO=${sp_max}), E-GT@+${sp_max-1}=0x${oldCR6GT.toString(16).toUpperCase().padStart(8,'0')}, STO=${this.sto}\n`;
                     this.auditLog.push({
                         gate: 'CR_WR',
-                        desc: `CR6(E) ← ${_b4Label} c-list  · base=0x${(base+clistStart).toString(16).toUpperCase()}, cc=${cc}, sentinel pushed`,
+                        desc: `CR6(L) ← ${_b4Label} c-list  · base=0x${(base+clistStart).toString(16).toUpperCase()}, cc=${cc}, sentinel pushed`,
                         label: _b4Label + ' c-list',
                         nsIndex: bootEntrySlot,
-                        requiredPerm: 'E',
+                        requiredPerm: 'L',
                         checks: { install: { pass: true } },
                         b: 0, f: 0,
                         result: 'pass',
