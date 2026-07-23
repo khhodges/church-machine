@@ -58,9 +58,11 @@ def make_gt(gt_type=GT_TYPE_NULL, perms=0, slot_id=0, gt_seq=0, b_flag=0):
 #         Load the full namespace capability from NS slot 0 into CR15.
 #         Hardware provides a bootstrap CR15 at reset; this refreshes it
 #         from the uploaded boot image so the full namespace is live.
-#   [1] CHANGE AL, CR12, CR12, #1
-#         Switch to Boot.Thread (NS slot 1). Hardware RESTORE_CALL FSM reads
-#         CR0–CR11 from thread caps zone (thread[+244..+255]).
+#   [1] CHANGE AL, CR12, CR15, #1
+#         Switch to Boot.Thread (NS slot 1). CR12 is system-wide; thread save
+#         is skipped (no SAVE_DR) to prevent error loops at boot and on fault.
+#         Hardware RESTORE_CALL FSM reads CR0–CR11 from thread caps zone
+#         (thread[+244..+255]).
 #         CR0 ← thread[+244] = IDE-configured Entry E-GT (set by setBootEntrySlot()).
 #   [2] CALL   AL, CR0,  CR0
 #         Enter the IDE-chosen first abstraction (lightning bolt).

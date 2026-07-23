@@ -29,7 +29,7 @@ Secure-boot firmware.  Three real instructions, remainder zero-padded to 256.
 | Word | Instruction              | Comment                                                   |
 |------|--------------------------|-----------------------------------------------------------|
 | 0    | `LOAD CR15, Slot 0`      | Load Namespace from Slot 0 into CR15                      |
-| 1    | `CHANGE CR12, CR15, #1`  | Suspend current thread; start Boot.Thread at NS Slot 1    |
+| 1    | `CHANGE CR12, CR15, #1`  | Start Boot.Thread at NS Slot 1 — thread save skipped at boot and on fault to prevent error loops |
 | 2    | `CALL CR0`               | Enter IDE-selected first abstraction (lightning bolt); CR5 and CR14 inserted by IDE |
 
 ---
