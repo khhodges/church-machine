@@ -2211,7 +2211,7 @@ def start_here():
       <ul class="checklist">
         <li>Connect a Ti60 F225 board via WebSerial</li>
         <li>The board sends call-home telemetry to the IDE on every fault event</li>
-        <li>Open the <strong>Dashboard</strong> to see live MTBF scores per namespace slot</li>
+        <li>Open the <strong>Dashboard</strong> to see live MTBF scores per named abstraction</li>
         <li>A dropping MTBF score flags an abstraction for review before it causes a production outage</li>
         <li>Update the LUMP, re-run the consistency gate, and re-deploy — MTBF resets for the new version</li>
       </ul>
@@ -5906,6 +5906,23 @@ def post_lump_mtbf(token):
     if not isinstance(mtbf, dict):
         mtbf = {}
 
+    incoming_version = payload.get("lump_version")
+    if incoming_version is not None:
+        try:
+            incoming_version = int(incoming_version)
+        except (ValueError, TypeError):
+            incoming_version = None
+    stored_version = mtbf.get("lump_version")
+    if stored_version is not None:
+        try:
+            stored_version = int(stored_version)
+        except (ValueError, TypeError):
+            stored_version = None
+    if incoming_version is not None and stored_version is not None and incoming_version > stored_version:
+        mtbf["consecutive_clean"] = 0
+    if incoming_version is not None:
+        mtbf["lump_version"] = incoming_version
+
     total_runs        = int(mtbf.get("total_runs", 0)) + 1
     consecutive_clean = int(mtbf.get("consecutive_clean", 0))
 
@@ -6759,6 +6776,7 @@ def _ingest_fault_entries(device_uid, entries, timestamp):
             f_step_count = int(entry.get("step_count", 0))
         except (ValueError, TypeError):
             f_step_count = 0
+        f_abstraction_name = str(entry.get("abstraction_name", "") or "").strip()[:128] or None
         fe = FaultEvent(
             device_uid=device_uid,
             fault_type=f_type,
@@ -6772,6 +6790,7 @@ def _ingest_fault_entries(device_uid, entries, timestamp):
             pipeline_stage=str(entry.get("pipeline_stage", ""))[:32],
             recovery_tier=f_recovery_tier,
             step_count=f_step_count,
+            abstraction_name=f_abstraction_name,
         )
         db.session.add(fe)
         count += 1
@@ -7079,6 +7098,7 @@ def _write_fault_event_from_callhome(entry):
             cr15=str(entry.get("cr15") or ""),
             boot_count_at_fault=int(entry.get("boot_count", 0)),
             raw_type=entry.get("type", "callhome"),
+            abstraction_name=str(entry.get("abstraction_name", "") or "").strip()[:128] or None,
         )
         db.session.add(fe)
     except Exception as _fe_err:
@@ -7583,40 +7603,33 @@ def device_uart_log():
 
 @app.route("/api/device/mtbf")
 def device_mtbf():
-    """Return MTBF (mean time between failures) in hours, broken down by machine,
-    abstraction, and instruction.
+    """Return MTBF (mean time between failures) in hours, grouped by
+    (abstraction_name, lump_version) as the primary key.
 
-    Optional query parameters to filter/group:
+    Optional query parameters:
       ?uid=<device_uid>    — filter to a specific machine
-      ?ns_slot=<int>       — filter to a specific namespace slot
       ?mnemonic=<str>      — filter to a specific instruction mnemonic
 
-    Response: { "ok": true, "rows": [ { "machine_uid", "board_name",
+    Response: { "ok": true, "rows": [ { "abstraction_name", "lump_version",
       "ns_slot", "abstraction_label", "mnemonic", "fault_count",
-      "first_fault_ts", "last_fault_ts", "mtbf_hours" }, ... ] }
+      "first_fault_ts", "last_fault_ts", "mtbf_hours",
+      "machine_uid", "board_name" }, ... ] }
 
+    Rows are grouped by (abstraction_name, lump_version) so MTBF history
+    survives slot reassignment and resets cleanly on each version bump.
     Rows are sorted by mtbf_hours ascending (least reliable first).
     Groups with fewer than 2 events have mtbf_hours of null.
     """
-    uid_filter = request.args.get("uid", "").strip()
-    try:
-        ns_slot_filter = int(request.args.get("ns_slot", ""))
-        has_ns_slot = True
-    except (ValueError, TypeError):
-        ns_slot_filter = None
-        has_ns_slot = False
+    uid_filter      = request.args.get("uid", "").strip()
     mnemonic_filter = request.args.get("mnemonic", "").strip()
 
     if FaultEvent is None:
         return jsonify({"ok": False, "error": "model not ready"}), 503
 
     try:
-        from sqlalchemy import func as _sqlfunc
         q = FaultEvent.query
         if uid_filter:
             q = q.filter(FaultEvent.device_uid == uid_filter)
-        if has_ns_slot:
-            q = q.filter(FaultEvent.ns_slot == ns_slot_filter)
         if mnemonic_filter:
             q = q.filter(FaultEvent.mnemonic == mnemonic_filter)
 
@@ -7625,36 +7638,35 @@ def device_mtbf():
         from collections import defaultdict
         groups = defaultdict(list)
         for ev in events:
-            key = (
-                ev.device_uid or "",
-                ev.board_name or "",
-                ev.ns_slot,
-                ev.abstraction_label or "",
-                ev.mnemonic or "",
-            )
-            groups[key].append(ev.timestamp or 0.0)
+            abs_name = ev.abstraction_name or ev.abstraction_label or ""
+            lump_ver = ev.lump_version if ev.lump_version is not None else 0
+            key = (abs_name, lump_ver)
+            groups[key].append(ev)
 
         rows = []
-        for (machine_uid, board_name, ns_slot, abstraction_label, mnemonic), tss in groups.items():
-            tss_sorted = sorted(t for t in tss if t)
+        for (abs_name, lump_ver), evs in groups.items():
+            tss_sorted = sorted((e.timestamp or 0.0) for e in evs if e.timestamp)
             fault_count = len(tss_sorted)
             first_ts = tss_sorted[0] if tss_sorted else None
-            last_ts = tss_sorted[-1] if tss_sorted else None
+            last_ts  = tss_sorted[-1] if tss_sorted else None
             if fault_count >= 2 and first_ts is not None and last_ts is not None:
                 span_hours = (last_ts - first_ts) / 3600.0
-                mtbf_hours = span_hours / (fault_count - 1) if fault_count > 1 else None
+                mtbf_hours = span_hours / (fault_count - 1)
             else:
                 mtbf_hours = None
+            sample = evs[0]
             rows.append({
-                "machine_uid":       machine_uid,
-                "board_name":        board_name,
-                "ns_slot":           ns_slot,
-                "abstraction_label": abstraction_label,
-                "mnemonic":          mnemonic,
+                "abstraction_name":  abs_name or None,
+                "lump_version":      lump_ver,
+                "ns_slot":           sample.ns_slot,
+                "abstraction_label": sample.abstraction_label or abs_name or "",
+                "mnemonic":          sample.mnemonic or "",
                 "fault_count":       fault_count,
                 "first_fault_ts":    first_ts,
                 "last_fault_ts":     last_ts,
                 "mtbf_hours":        mtbf_hours,
+                "machine_uid":       sample.device_uid or "",
+                "board_name":        sample.board_name or "",
             })
 
         rows.sort(key=lambda r: (r["mtbf_hours"] is None, r["mtbf_hours"] or 0))
@@ -8048,6 +8060,7 @@ def device_fault_submit():
     # fault_name used as mnemonic when present (bridge); fall back to mnemonic field
     fault_name = str(data.get("fault_name", data.get("mnemonic", "")))[:32]
 
+    abstraction_name = str(data.get("abstraction_name", "") or "").strip()[:128] or None
     fe = FaultEvent(
         device_uid=uid,
         fault_type=fault_type,
@@ -8068,6 +8081,7 @@ def device_fault_submit():
         fault_gt=str(data.get("fault_gt", ""))[:32],
         fault_instr=str(data.get("fault_instr", ""))[:32],
         raw_type="FAULT_EVENT" if data.get("fault_latched") is not None else "fault",
+        abstraction_name=abstraction_name,
     )
     db.session.add(fe)
     db.session.commit()
@@ -8158,6 +8172,8 @@ def device_faults_rich():
             "fault_gt": e.fault_gt or "",
             "fault_instr": e.fault_instr or "",
             "raw_type": e.raw_type or "fault",
+            "abstraction_name": e.abstraction_name or None,
+            "lump_version": e.lump_version if e.lump_version is not None else 0,
         })
     return jsonify({"ok": True, "events": result})
 
@@ -8460,6 +8476,8 @@ def device_fault_log():
             "fault_nia": e.fault_nia,
             "boot_reason": e.boot_reason,
             "timestamp": e.timestamp,
+            "abstraction_name": e.abstraction_name or None,
+            "lump_version": e.lump_version if e.lump_version is not None else 0,
         })
     mtbf_by_nia = {}
     from collections import defaultdict
@@ -8710,6 +8728,7 @@ with app.app_context():
         ("raw_type",          "VARCHAR(16) DEFAULT ''"),
         ("fault_gt",          "VARCHAR(32) DEFAULT ''"),
         ("fault_instr",       "VARCHAR(32) DEFAULT ''"),
+        ("abstraction_name",  "VARCHAR(128) DEFAULT NULL"),
     ]:
         if _fe_col not in _existing_fe_cols:
             db.session.execute(_sa_text(f"ALTER TABLE fault_events ADD COLUMN {_fe_col} {_fe_def}"))

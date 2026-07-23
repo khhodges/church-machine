@@ -3471,8 +3471,7 @@ function _renderReliabilityTable(rows) {
     var sortArrow = _relSortDir === 'asc' ? '&#x25B2;' : '&#x25BC;';
     var html = '<div class="rel-table-wrap"><table class="rel-table"><thead><tr>' +
         '<th>Abstraction</th>' +
-        '<th>Board</th>' +
-        '<th>Mnemonic</th>' +
+        '<th style="text-align:center">Version</th>' +
         '<th style="text-align:center">Slot</th>' +
         '<th style="text-align:center">Faults</th>' +
         '<th style="text-align:right" onclick="setReliabilitySort(_relSortDir===\'asc\'?\'desc\':\'asc\')">' +
@@ -3480,17 +3479,16 @@ function _renderReliabilityTable(rows) {
         '</tr></thead><tbody>';
 
     sorted.forEach(function(r) {
-        var abstrLabel = r.abstraction_label || ('Slot ' + (r.ns_slot !== null ? r.ns_slot : '?'));
-        var boardLabel = r.board_name || r.machine_uid || '—';
-        var mnemonic   = r.mnemonic || '—';
+        var abstrLabel = r.abstraction_name || r.abstraction_label || ('Slot ' + (r.ns_slot !== null ? r.ns_slot : '?'));
+        var verStr     = (r.lump_version !== null && r.lump_version !== undefined && r.lump_version > 0)
+                         ? 'v' + r.lump_version : (r.lump_version === 0 ? 'system' : '—');
         var slotStr    = (r.ns_slot !== null && r.ns_slot !== undefined) ? String(r.ns_slot) : '—';
         var mtbfClass  = _mtbfHoursClass(r.mtbf_hours);
         var mtbfStr    = _formatMTBFHours(r.mtbf_hours);
 
         html += '<tr>' +
             '<td class="rel-td-abstr">' + _escHtml(abstrLabel) + '</td>' +
-            '<td class="rel-td-board">' + _escHtml(boardLabel) + '</td>' +
-            '<td class="rel-td-mnemonic">' + _escHtml(mnemonic) + '</td>' +
+            '<td class="rel-td-ver" style="text-align:center">' + _escHtml(verStr) + '</td>' +
             '<td class="rel-td-slot">' + _escHtml(slotStr) + '</td>' +
             '<td class="rel-td-faults">' + r.fault_count + '</td>' +
             '<td class="rel-td-mtbf ' + mtbfClass + '">' + mtbfStr + '</td>' +
