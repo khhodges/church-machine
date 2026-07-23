@@ -4268,13 +4268,13 @@ class ChurchSimulator {
                 m: 1    // CALL Phase 1 mLoad is always M-elevated
             };
 
-            // CR6: E-only GT — same slot/seq/type as source, perms fixed to E alone.
-            // E allows recursive CALL via CR6 directly. Device GTs (L+S+E) have L/S stripped.
-            // Matches boot LOAD_NUC convention (line 624): CR6 always carries E perm.
+            // CR6: L-only GT — same slot/seq/type as source, perms fixed to L alone.
+            // L allows LOAD to extract capabilities from the c-list via mLoad.
+            // Matches hardware call.py: cr6_adj_gt.perm.eq(0b001) (L = perm[0] in Church domain).
             // M is recorded in cr.m = 1 (not in the GT perms field).
-            const cr6GT = this.createGT(srcParsed.gt_seq, check.index, {R:0,W:0,X:0,L:0,S:0,E:1}, srcParsed.type);
+            const cr6GT = this.createGT(srcParsed.gt_seq, check.index, {R:0,W:0,X:0,L:1,S:0,E:0}, srcParsed.type);
             this.cr[6] = {
-                word0: cr6GT,                       // E-only (recursive CALL via CR6; matches boot LOAD_NUC CR6)
+                word0: cr6GT,                       // L-only (c-list access via LOAD; matches hardware call.py perm=0b001)
                 word1: (base + clistStart) >>> 0,
                 word2: nsEntry.word1_limit >>> 0,
                 word3: nsEntry.word2_seals,
@@ -4282,11 +4282,11 @@ class ChurchSimulator {
             };
             // CR6 lives in the CALL stack frame (written above); NOT in the caps zone
 
-            cr14Desc = `, hdr=0x${hdrWord.toString(16).toUpperCase().padStart(8,'0')} → CR14+CR6 simultaneous: CR14(RX M=1,cw=${cw},lim=0..${cw-1}) CR6(E M=1,cc=${cc},base=0x${(base+clistStart).toString(16).toUpperCase()})`;
+            cr14Desc = `, hdr=0x${hdrWord.toString(16).toUpperCase().padStart(8,'0')} → CR14+CR6 simultaneous: CR14(RX M=1,cw=${cw},lim=0..${cw-1}) CR6(L M=1,cc=${cc},base=0x${(base+clistStart).toString(16).toUpperCase()})`;
         } else {
-            // Non-lump-header path: write E-only GT to CR6 (strip L/S from device GT) + M.
-            // Matches boot LOAD_NUC convention: CR6 = E perm (recursive CALL via CR6).
-            const cr6GTnorm = this.createGT(srcParsed.gt_seq, check.index, {R:0,W:0,X:0,L:0,S:0,E:1}, srcParsed.type);
+            // Non-lump-header path: write L-only GT to CR6 + M.
+            // Matches hardware call.py: cr6_adj_gt.perm.eq(0b001) (L = perm[0] in Church domain).
+            const cr6GTnorm = this.createGT(srcParsed.gt_seq, check.index, {R:0,W:0,X:0,L:1,S:0,E:0}, srcParsed.type);
             this._writeCR(6, cr6GTnorm, nsEntry);
             this.cr[6].m = 1;   // M set (CALL always M-elevated; _writeCR uses global mElevation which may be 0 post-boot)
 

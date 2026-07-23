@@ -187,6 +187,9 @@ register_suite "pet-name-mem-tests" \
 register_suite "selftest-lump-runs" \
     'python -m pytest tests/simulator/test_selftest_lump_runs.py tests/simulator/test_run_lump_boots_slot3.py -v && node tests/simulator/sim_selftest_reboot_midrun.js && node tests/simulator/sim_editor_bfext_migration.js && node tests/simulator/sim_clist_pola_cleanup.js'
 
+register_suite "call-cr6-l-perm-tests" \
+    'node tests/simulator/sim_call_cr6_l_perm.js'
+
 register_suite "boot-image-matches-sim" \
     'python3 -m pytest tests/boot/test_boot_image_matches_simulator.py -v'
 
@@ -252,7 +255,7 @@ ALL_GROUPS["boot"]="boot-image-matches-sim boot-image-loads-and-boots boot-image
 
 ALL_GROUPS["lump"]="lump-consistency lump-binary-tests lump-roundtrip editor-roundtrip-tests lump-gt-display-tests update-lump-tests"
 
-ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests pet-name-mem-tests warning-panel-tests disasm-panel-tests boot-entry-sync-tests ns-slot-dynamic-tests selftest-lump-runs pet-name-memory-tests lump-builder-dispatch-tests openin-links-tests lump-warning-tests"
+ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests pet-name-mem-tests warning-panel-tests disasm-panel-tests boot-entry-sync-tests ns-slot-dynamic-tests selftest-lump-runs pet-name-memory-tests lump-builder-dispatch-tests openin-links-tests lump-warning-tests call-cr6-l-perm-tests"
 
 ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabilities-blocks check-api-reference-stale callhome-parser-tests check-slot-index-leak"
 
