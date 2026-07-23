@@ -160,6 +160,13 @@ class ChurchCore(Elaboratable):
         self.dbg_m_dr14               = Signal(32)
         self.dbg_m_dr15               = Signal(32)
 
+        # dbg_cr12_gt / dbg_cr8_gt — combinatorial reads of CR12 and CR8 GT word0.
+        # Simulation-only observability; tied to 0 at the synthesis boundary.
+        # CR12 must hold an Inform GT (slot_id=1) after boot.
+        # CR8 must remain NULL (0x00000000) after boot — it is never written by the FSM.
+        self.dbg_cr12_gt = Signal(32)   # CR12 thread-stack GT word0 — INFORM(slot=1) after boot
+        self.dbg_cr8_gt  = Signal(32)   # CR8 GT word0 — must remain NULL (0) after boot
+
     def elaborate(self, platform):
         m = Module()
 
@@ -694,6 +701,15 @@ class ChurchCore(Elaboratable):
             self.dbg_m_dr13.eq(u_regs.m_dr13),
             self.dbg_m_dr14.eq(u_regs.m_dr14),
             self.dbg_m_dr15.eq(u_regs.m_dr15),
+            # Test-observability: CR12 GT word0 — must be INFORM(slot=1) after boot
+            self.dbg_cr12_gt.eq(View(CAP_REG_LAYOUT, u_regs.cr12_thread).word0_gt),
+        ]
+        # Test-observability: CR8 GT word0 via the cr_word_rd port (unused at runtime).
+        # cr_word_rd_addr/sel are driven statically here; no runtime logic uses this port.
+        m.d.comb += [
+            u_regs.cr_word_rd_addr.eq(8),
+            u_regs.cr_word_rd_sel.eq(0),  # sel=0 → word0 (GT)
+            self.dbg_cr8_gt.eq(u_regs.cr_word_rd_data),
         ]
 
         # CHANGE restore signals only exist on the full profile (not IoT)
