@@ -126,9 +126,8 @@ def test_keystone_gt_points_to_slot_32(boot_words):
 
 def _keystone_phys_addr(boot_words):
     """Return NS[23] physAddr from the NS table in the boot image."""
-    total         = len(boot_words)
-    ns_table_base = total - NS_TABLE_RESERVE   # NS_TABLE_RESERVE = 4096 (1024 entries × 4)
-    base23        = ns_table_base + KEYSTONE_SLOT * 4   # 4 words per NS entry
+    total  = len(boot_words)
+    base23 = total - (KEYSTONE_SLOT + 1) * 4   # 4 words per NS entry, count-down
     return boot_words[base23]
 
 

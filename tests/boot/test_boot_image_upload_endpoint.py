@@ -60,8 +60,7 @@ def _default_cfg():
 def _zero_ns_slot(image_bytes, cfg, slot):
     """Return a copy of image_bytes with word0 and word1 of NS slot zeroed."""
     total = int(cfg["step1"]["totalNamespaceWords"])
-    ns_table_base = total - NS_TABLE_RESERVE
-    slot_base = ns_table_base + slot * NS_ENTRY_WORDS
+    slot_base = total - (slot + 1) * NS_ENTRY_WORDS
     words = list(struct.unpack(f"<{total}I", image_bytes))
     words[slot_base]     = 0
     words[slot_base + 1] = 0

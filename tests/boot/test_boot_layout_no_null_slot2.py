@@ -269,9 +269,9 @@ def test_boot_abstr_ns_entry_points_to_0x0140():
     image = generate_boot_image(cfg, LUMPS_DIR)
     words = _parse_image(image, total)
 
-    ns_table_base = total - NS_TABLE_RESERVE
-    slot_base     = ns_table_base + BOOT_ABSTR_NS_SLOT * NS_ENTRY_WORDS
-    ns_word0      = words[slot_base]   # physAddr stored in word0
+    # NS slots count DOWN from the top: slot N starts at total − (N+1)×NS_ENTRY_WORDS.
+    slot_base = total - (BOOT_ABSTR_NS_SLOT + 1) * NS_ENTRY_WORDS
+    ns_word0  = words[slot_base]   # physAddr stored in word0
 
     assert ns_word0 == expected_phys, (
         f"NS slot {BOOT_ABSTR_NS_SLOT} (Boot.Abstr) word0 = 0x{ns_word0:04X}; "

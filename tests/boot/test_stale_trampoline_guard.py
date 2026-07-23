@@ -103,11 +103,12 @@ def _inject_change_into_boot_abstr(image_bytes):
         f"in generated image (last {scan_limit} words)"
     )
 
-    ns_table_base  = tag_idx + 1   # word index of first NS entry (word 0 of slot 0)
     ns_entry_words = 4
 
     # NS entry word 0 for the Boot.Abstr slot is the lump's physAddr (word index).
-    abstr_ns_base = ns_table_base + BOOT_ABSTR_NS_SLOT * ns_entry_words
+    # NS slots count DOWN from the top: slot N starts at total − (N+1)×4.
+    ns_table_base  = tag_idx + 1
+    abstr_ns_base = total - (BOOT_ABSTR_NS_SLOT + 1) * ns_entry_words
     phys_addr = words[abstr_ns_base]
     assert phys_addr > 0, (
         f"Boot.Abstr physAddr (NS slot {BOOT_ABSTR_NS_SLOT}) must be non-zero"

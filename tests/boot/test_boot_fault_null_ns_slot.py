@@ -96,8 +96,7 @@ def _zero_ns_slot_word0_word1(image_bytes, cfg, slot):
     _auditNSType is reached and B:04 records a BOOT fault.
     """
     total          = int(cfg["step1"]["totalNamespaceWords"])
-    ns_table_base  = total - NS_TABLE_RESERVE
-    slot_base      = ns_table_base + slot * NS_ENTRY_WORDS
+    slot_base      = total - (slot + 1) * NS_ENTRY_WORDS
 
     words = list(struct.unpack(f"<{total}I", image_bytes))
     words[slot_base]     = 0

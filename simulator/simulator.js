@@ -291,7 +291,8 @@ class ChurchSimulator {
         // as real code and produce silently wrong behaviour on hardware.
         // NS_ENTRY_WORDS is fixed (4) and never changes between image and instance.
         if (discoveredBootEntrySlot < discoveredMaxNsEntries) {
-            const _abstrNsBase = discoveredNsTableBase + discoveredBootEntrySlot * this.NS_ENTRY_WORDS;
+            // Slots count DOWN from the top: slot N → src.length − (N+1)×4.
+            const _abstrNsBase = src.length - (discoveredBootEntrySlot + 1) * this.NS_ENTRY_WORDS;
             const _abstrLoc    = src[_abstrNsBase] >>> 0;
             if (_abstrLoc > 0 && (_abstrLoc + 1) < discoveredNsTableBase && (_abstrLoc + 1) < src.length) {
                 const _bodyWord1 = src[_abstrLoc + 1] >>> 0;
@@ -324,7 +325,7 @@ class ChurchSimulator {
         const maxEntries = (this.NS_TABLE_RESERVE / this.NS_ENTRY_WORDS) | 0;
         let count = 0;
         for (let i = 0; i < maxEntries; i++) {
-            const base = this.NS_TABLE_BASE + i * this.NS_ENTRY_WORDS;
+            const base = this._nsSlotBase(i);
             if (this.memory[base] !== 0 || this.memory[base + 1] !== 0) {
                 count = i + 1;
             }
@@ -350,7 +351,7 @@ class ChurchSimulator {
         // call is the only prior source of truth).
         const _bootCatalog = this._getHardwareBootCatalog();
         for (let _bi = 0; _bi < count; _bi++) {
-            const _bBase = this.NS_TABLE_BASE + _bi * this.NS_ENTRY_WORDS;
+            const _bBase = this._nsSlotBase(_bi);
             const _hasEntry = (this.memory[_bBase] !== 0 || this.memory[_bBase + 1] !== 0);
             if (!_hasEntry) {
                 // Slot is zeroed in the binary (free/reserved) — mark as free
@@ -456,7 +457,7 @@ class ChurchSimulator {
                 // path fires in _execCall when a CALL arrives on this slot.
                 // Warm entries keep gtType=1 (Inform) so Mode 1 restore fires
                 // correctly on them — do not change warm entries here.
-                const coldNsBase = this.NS_TABLE_BASE + slot * this.NS_ENTRY_WORDS;
+                const coldNsBase = this._nsSlotBase(slot);
                 const coldW1 = this.memory[coldNsBase + 1];
                 const coldW1f = this.parseNSWord1(coldW1);
                 this.memory[coldNsBase + 1] = this.packNSWord1(
@@ -565,7 +566,7 @@ class ChurchSimulator {
         // recompute the seal (word2).  Type, limit, and gt_seq are never changed.
         // This is Mode 1 (Restore): the Loader places the lump within the existing
         // grant; no new authority is minted.
-        const nsBase = this.NS_TABLE_BASE + slotIndex * this.NS_ENTRY_WORDS;
+        const nsBase = this._nsSlotBase(slotIndex);
         const nsW0Prev = this.memory[nsBase + 0];
         const nsW1     = this.memory[nsBase + 1];
         const nsW2Prev = this.memory[nsBase + 2];
@@ -581,7 +582,7 @@ class ChurchSimulator {
         // the lump is resident.  Subsequent GT derivations from this NS entry will
         // carry type=1 so the normal Inform CALL path fires without re-triggering Mode 2.
         {
-            const promNsBase = this.NS_TABLE_BASE + slotIndex * this.NS_ENTRY_WORDS;
+            const promNsBase = this._nsSlotBase(slotIndex);
             const promW1 = this.memory[promNsBase + 1];
             const promW1f = this.parseNSWord1(promW1);
             if (promW1f.gtType === 2) {
@@ -989,6 +990,13 @@ class ChurchSimulator {
         return hasReturn;                    // true only if ≥1 RETURN seen
     }
 
+    // NS slots count DOWN from the top of the NS region (cloomc-foundation.md §5).
+    // Slot 0 → highest address (NS_TABLE_BASE + NS_TABLE_RESERVE − 4),
+    // slot N → NS_TABLE_BASE + NS_TABLE_RESERVE − (N+1)×NS_ENTRY_WORDS.
+    _nsSlotBase(idx) {
+        return this.NS_TABLE_BASE + this.NS_TABLE_RESERVE - (idx + 1) * this.NS_ENTRY_WORDS;
+    }
+
     writeNSEntry(idx, location, limit17, bFlag, gBit, gtType, version, clistCount, abstract_gt) {
         if (gtType === 3) {
             throw new Error(
@@ -997,7 +1005,7 @@ class ChurchSimulator {
                 `See docs/abstract-io-addressing.md.`
             );
         }
-        const base = this.NS_TABLE_BASE + idx * this.NS_ENTRY_WORDS;
+        const base = this._nsSlotBase(idx);
         this.memory[base + 0] = location >>> 0;
         this.memory[base + 1] = this.packNSWord1(limit17, bFlag, gBit, gtType, clistCount || 0);
         this.memory[base + 2] = this.makeVersionSeals(version || 0, location, limit17);
@@ -1099,7 +1107,7 @@ class ChurchSimulator {
 
     readNSEntry(idx) {
         if (idx < 0 || idx >= this.MAX_NS_ENTRIES) return null;
-        const base = this.NS_TABLE_BASE + idx * this.NS_ENTRY_WORDS;
+        const base = this._nsSlotBase(idx);
         const w0 = this.memory[base + 0];
         const w1 = this.memory[base + 1];
         const w2 = this.memory[base + 2];
@@ -1121,7 +1129,7 @@ class ChurchSimulator {
 
     isNSEntryValid(idx) {
         if (idx < 0 || idx >= this.MAX_NS_ENTRIES) return false;
-        const base = this.NS_TABLE_BASE + idx * this.NS_ENTRY_WORDS;
+        const base = this._nsSlotBase(idx);
         return (this.memory[base] !== 0 || this.memory[base + 1] !== 0);
     }
 
@@ -1398,7 +1406,7 @@ class ChurchSimulator {
                     `enlarge the namespace table.`);
             }
             for (let idx = startIdx; idx < endIdx; idx++) {
-                const base = this.NS_TABLE_BASE + idx * this.NS_ENTRY_WORDS;
+                const base = this._nsSlotBase(idx);
                 this.memory[base + 0] = 0;
                 this.memory[base + 1] = 0;
                 this.memory[base + 2] = 0;
@@ -1415,7 +1423,7 @@ class ChurchSimulator {
         // drifted from server/boot_image.py for custom Step-1 sizes — see
         // tests/test_boot_image_matches_simulator.py).
         const THREAD_N_MINUS_6 = Math.max(0, Math.ceil(Math.log2(THREAD_LUMP_SIZE)) - 6);
-        const threadLoc = this.memory[this.NS_TABLE_BASE + 1 * this.NS_ENTRY_WORDS];
+        const threadLoc = this.memory[this._nsSlotBase(1)];
         this.memory[threadLoc] = this.packLumpHeader(THREAD_N_MINUS_6, THREAD_SW, THREAD_CC, 2);
 
         // Thread caps zone — CR0 home slot at word offset +244 is pre-set to an E-GT
@@ -1461,9 +1469,9 @@ class ChurchSimulator {
         // NS entry word1/word2 are still set so the NS table entry is structurally
         // valid (non-zero), satisfying isNSEntryValid() during boot step B:05.
         const entryLumpSize    = BOOT_ABSTR_LUMP_SIZE;
-        const entryNSBase      = this.NS_TABLE_BASE + this.bootEntrySlot * this.NS_ENTRY_WORDS;
+        const entryNSBase      = this._nsSlotBase(this.bootEntrySlot);
         const entryCRLimit     = entryLumpSize - 1;
-        const bootEntryLoc     = this.memory[this.NS_TABLE_BASE + this.bootEntrySlot * this.NS_ENTRY_WORDS];
+        const bootEntryLoc     = this.memory[this._nsSlotBase(this.bootEntrySlot)];
         this.memory[entryNSBase + 1] = this.packNSWord1(entryCRLimit, 0, 0, 1, 0);
         this.memory[entryNSBase + 2] = this.makeVersionSeals(0, bootEntryLoc, entryCRLimit);
 
@@ -1504,7 +1512,7 @@ class ChurchSimulator {
         const SERVICE_CLIST_DEFS = [];
         for (const [cslot, entries] of SERVICE_CLIST_DEFS) {
             const cc  = entries.length;
-            const loc = this.memory[this.NS_TABLE_BASE + cslot * this.NS_ENTRY_WORDS];
+            const loc = this.memory[this._nsSlotBase(cslot)];
             if (!loc || !cc) continue;
             const sz    = slotSizes[cslot] || this.SLOT_SIZE;
             const lim17 = (sz - cc - 1) & 0x1FFFF;
@@ -1525,7 +1533,7 @@ class ChurchSimulator {
                 this.memory[loc + sz - cc + ci] = gt >>> 0;
             }
             // Update NS entry word1 (lim17 + cc) and word2 (seal)
-            const nsBase    = this.NS_TABLE_BASE + cslot * this.NS_ENTRY_WORDS;
+            const nsBase    = this._nsSlotBase(cslot);
             this.memory[nsBase + 1] = this.packNSWord1(lim17, 0, 0, 1, cc) >>> 0;
             this.memory[nsBase + 2] = this.makeVersionSeals(0, loc, lim17) >>> 0;
         }
@@ -2455,7 +2463,7 @@ class ChurchSimulator {
         // Matches hardware mload.py RESET_GBIT: clears G-bit (Word1[28]) on successful load.
         // G-bit at bit[28] — excluded from CRC-16 seal (seal covers location+limit17 only),
         // so this write requires no seal recomputation. Real-time update matches hardware.
-        const base = this.NS_TABLE_BASE + idx * this.NS_ENTRY_WORDS;
+        const base = this._nsSlotBase(idx);
         const w1 = this.memory[base + 1];
         if (this.gcPolarity === 0) {
             this.memory[base + 1] = (w1 | (1 << 28)) >>> 0;
@@ -2466,7 +2474,7 @@ class ChurchSimulator {
 
     markGarbage(idx) {
         // Matches hardware GC mark phase: sets G-bit (Word1[28]) to suspect.
-        const base = this.NS_TABLE_BASE + idx * this.NS_ENTRY_WORDS;
+        const base = this._nsSlotBase(idx);
         const w1 = this.memory[base + 1];
         if (this.gcPolarity === 0) {
             this.memory[base + 1] = (w1 & ~(1 << 28)) >>> 0;
@@ -2476,7 +2484,7 @@ class ChurchSimulator {
     }
 
     getGBit(idx) {
-        const base = this.NS_TABLE_BASE + idx * this.NS_ENTRY_WORDS;
+        const base = this._nsSlotBase(idx);
         return (this.memory[base + 1] >>> 28) & 1;
     }
 
@@ -2520,7 +2528,7 @@ class ChurchSimulator {
         if (cr15gt !== 0) {
             const cr15parsed = this.parseGT(cr15gt);
             const cr15idx = cr15parsed.index;
-            const cr15base = this.NS_TABLE_BASE + cr15idx * this.NS_ENTRY_WORDS;
+            const cr15base = this._nsSlotBase(cr15idx);
             const cr15w1 = this.memory[cr15base + 1];
             const cr15limit = cr15w1 & 0x1FFFF;
             const cr15label = this.nsLabels[cr15idx] || '(unnamed)';
@@ -2613,7 +2621,7 @@ class ChurchSimulator {
             const typeName  = w1parsed ? (_GT_TYPE_NAMES[w1parsed.gtType] || '?') : '?';
             const limit     = w1parsed ? w1parsed.limit : 0;
             const clistCnt  = w1parsed ? w1parsed.clistCount : 0;
-            const w2base    = this.NS_TABLE_BASE + i * this.NS_ENTRY_WORDS + 2;
+            const w2base    = this._nsSlotBase(i) + 2;
             const version   = (this.memory[w2base] >>> 25) & 0x7F;
             candidates.push({ index: i, label, loc });
             p3Lines.push(`NS[${i}]  "${label}"`);
@@ -6559,7 +6567,7 @@ class ChurchSimulator {
             const loc  = hwNamespace[i * 4 + 0];
             const w1   = hwNamespace[i * 4 + 1];
             const parsed1 = this.parseNSWord1(w1);
-            const base = this.NS_TABLE_BASE + i * this.NS_ENTRY_WORDS;
+            const base = this._nsSlotBase(i);
             this.memory[base + 0] = loc >>> 0;
             this.memory[base + 1] = w1 >>> 0;
             this.memory[base + 2] = this.makeVersionSeals(0, loc, parsed1.limit);
@@ -6630,7 +6638,7 @@ class ChurchSimulator {
         }
         this.output += '\n--- Namespace Entries ---\n';
         for (let i = 0; i < nsEntryCount; i++) {
-            const base = this.NS_TABLE_BASE + i * this.NS_ENTRY_WORDS;
+            const base = this._nsSlotBase(i);
             const loc = this.memory[base];
             const w1 = this.memory[base + 1];
             const parsed = this.parseNSWord1(w1);
@@ -6691,7 +6699,7 @@ class ChurchSimulator {
         // contains only RETURN words.  Must run after memory[] is fully populated.
         this._nsStubFlags = this._nsStubFlags || {};
         for (let _ssi = 0; _ssi < (this.nsCount || 0); _ssi++) {
-            const _ssiBase = this.NS_TABLE_BASE + _ssi * this.NS_ENTRY_WORDS;
+            const _ssiBase = this._nsSlotBase(_ssi);
             const _ssiLoc  = this.memory[_ssiBase] >>> 0;
             if (_ssiLoc === 0) { this._nsStubFlags[_ssi] = false; continue; }
             const _ssiHdr  = this.parseLumpHeader(this.memory[_ssiLoc]);
@@ -6722,7 +6730,7 @@ class ChurchSimulator {
             const loc = nsWords[i * 4 + 0] >>> 0;
             const w1  = nsWords[i * 4 + 1] >>> 0;
             const w2  = nsWords[i * 4 + 2] >>> 0;
-            const base = this.NS_TABLE_BASE + i * this.NS_ENTRY_WORDS;
+            const base = this._nsSlotBase(i);
             this.memory[base + 0] = loc;
             this.memory[base + 1] = w1;
             this.memory[base + 2] = w2;
@@ -6765,7 +6773,7 @@ class ChurchSimulator {
         this.output += `Boot: code at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}, C-List (${abstrClistCount} GTs) at 0x${(abstrLoc + abstrClistStart).toString(16).padStart(4,'0').toUpperCase()}\n`;
         this.output += '\n--- Namespace Entries ---\n';
         for (let i = 0; i < nsEntryCount; i++) {
-            const base = this.NS_TABLE_BASE + i * this.NS_ENTRY_WORDS;
+            const base = this._nsSlotBase(i);
             const loc = this.memory[base];
             const w1 = this.memory[base + 1];
             const parsed = this.parseNSWord1(w1);
@@ -6822,7 +6830,7 @@ class ChurchSimulator {
         const nsWords = new Uint32Array(NS_WORDS);
         const nsEntries = Math.min(this.nsCount || 16, 64);
         for (let i = 0; i < nsEntries; i++) {
-            const base = this.NS_TABLE_BASE + i * this.NS_ENTRY_WORDS;
+            const base = this._nsSlotBase(i);
             nsWords[i * 4 + 0] = this.memory[base + 0] >>> 0;
             nsWords[i * 4 + 1] = this.memory[base + 1] >>> 0;
             nsWords[i * 4 + 2] = this.memory[base + 2] >>> 0;
@@ -6830,7 +6838,7 @@ class ChurchSimulator {
         }
 
         const clistWords = new Uint32Array(CLIST_WORDS);
-        const abstrNSBase = this.NS_TABLE_BASE + 2 * this.NS_ENTRY_WORDS;
+        const abstrNSBase = this._nsSlotBase(2);
         const abstrLoc = this.memory[abstrNSBase] || (2 * this.SLOT_SIZE);
         const abstrW1 = this.memory[abstrNSBase + 1];
         const abstrParsed = this.parseNSWord1(abstrW1);
@@ -7248,7 +7256,7 @@ class ChurchSimulator {
     getNSTableMemoryDump() {
         const dump = [];
         for (let i = 0; i < this.nsCount; i++) {
-            const base = this.NS_TABLE_BASE + i * this.NS_ENTRY_WORDS;
+            const base = this._nsSlotBase(i);
             dump.push({
                 index: i,
                 label: this.nsLabels[i] || '',

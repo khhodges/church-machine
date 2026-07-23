@@ -103,9 +103,11 @@ def _region_of(word_index, total_words, ns_size, thread_size, entry_size):
     """
     ns_table_base = total_words - NS_TABLE_RESERVE
     if word_index >= ns_table_base:
-        slot = (word_index - ns_table_base) // NS_ENTRY_WORDS
-        field = ["word0_location", "word1_limits", "word2_seals", "word3_abstract_gt"][
-            (word_index - ns_table_base) % NS_ENTRY_WORDS]
+        # Slots count down from the top: slot 0 at top-4, slot N at top-(N+1)*4.
+        r = total_words - 1 - word_index   # 0-indexed distance from top word
+        slot  = r // NS_ENTRY_WORDS
+        k     = NS_ENTRY_WORDS - 1 - (r % NS_ENTRY_WORDS)
+        field = ["word0_location", "word1_limits", "word2_seals", "word3_abstract_gt"][k]
         return f"NS table slot {slot} ({field})"
     if word_index < ns_size:
         return "Boot.NS lump"
@@ -316,10 +318,8 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
     img = generate_boot_image(cfg, str(tmp_path))
     total = 16384
     words = list(struct.unpack(f"<{total}I", img))
-    ns_table_base = total - NS_TABLE_RESERVE
-
-    # NS table slot 3 word0 = physical location
-    ns_base = ns_table_base + BOOT_ABSTR_NS_SLOT * NS_ENTRY_WORDS
+    # NS table slot 3 word0 = physical location (count-down: slot N at total-(N+1)*4)
+    ns_base  = total - (BOOT_ABSTR_NS_SLOT + 1) * NS_ENTRY_WORDS
     boot_loc = words[ns_base]
 
     # Expected physical address: after Boot.NS(64) + Boot.Thread(256) — null slot 2 gap removed (Task #1205)

@@ -1,8 +1,8 @@
 {
   "token": "00000600",
   "abstraction": "SelfTest",
-  "filename": "SelfTest_v31.lump",
-  "sidecar_file": "SelfTest_v31.json",
+  "filename": "SelfTest_v76.lump",
+  "sidecar_file": "SelfTest_v76.json",
   "ns_slot": 6,
   "lump_size": 64,
   "typ": 0,
@@ -29,13 +29,13 @@
   "deployment": {
     "target_board": "ti60-f225",
     "profile": "IoT",
-    "built_at": "2026-07-01T12:03:00.904976Z",
+    "built_at": "2026-07-23T14:34:15.966264Z",
     "builder": "CLOOMC++ IDE v1.0"
   },
   "grants": [
     "E"
   ],
   "source": "",
-  "lump_version": 31,
-  "compiled_at": 1782907380.90499
+  "lump_version": 76,
+  "compiled_at": 1784817255.966281
 }

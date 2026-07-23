@@ -369,7 +369,7 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
         )
 
     for slot in _MANDATORY_NS_SLOTS:
-        base = ns_table_base + slot * NS_ENTRY_WORDS
+        base = n_words - (slot + 1) * NS_ENTRY_WORDS
         if base + 1 >= n_words:
             raise ValueError(
                 f"validate_boot_image: image too small to contain NS slot {slot} "
@@ -632,7 +632,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
             lim17 = (my_size - 1) & 0x1FFFF
             clist_count = 0
 
-        base = ns_table_base + i * NS_ENTRY_WORDS
+        base = total - (i + 1) * NS_ENTRY_WORDS
         mem[base + 0] = loc & 0xFFFFFFFF
         mem[base + 1] = pack_ns_word1(lim17, 0, 0, 0, 1, clist_count)
         mem[base + 2] = make_version_seals(0, loc, lim17)
@@ -662,7 +662,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         _e2_size  = int(_e2.get("lumpSize") or SLOT_SIZE)
         _e2_lim17 = (_e2_size - 1) & 0x1FFFF
         _e2_perms = {"E": 1}   # callable abstraction
-        _e2_base  = ns_table_base + _e2_slot * NS_ENTRY_WORDS
+        _e2_base  = total - (_e2_slot + 1) * NS_ENTRY_WORDS
         mem[_e2_base + 0] = _e2_phys & 0xFFFFFFFF
         mem[_e2_base + 1] = pack_ns_word1(_e2_lim17, 0, 0, 0, 1, 0)
         mem[_e2_base + 2] = make_version_seals(0, _e2_phys, _e2_lim17)
@@ -737,7 +737,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     #   This mirrors the FPGA BRAM model where the 512-word body does not fit in BRAM
     #   and only the 64-word stub is stored on-chip.
     boot_entry_loc  = locations[BOOT_ABSTR_NS_SLOT]
-    entry_ns_base   = ns_table_base + BOOT_ABSTR_NS_SLOT * NS_ENTRY_WORDS
+    entry_ns_base   = total - (BOOT_ABSTR_NS_SLOT + 1) * NS_ENTRY_WORDS
 
     # Read manifest to determine whether SelfTest is lazy-load or boot-resident.
     _mf_path_bi = os.path.join(lumps_dir, "manifest.json")

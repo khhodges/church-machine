@@ -90,7 +90,7 @@ process.stdin.on('end', () => {
     if (nullifyMode) {
         // Blank NS slot 1 so readNSEntry(1) returns null when B:05 runs.
         // We keep cr0Addr derived above so we can assert CR0 was not written.
-        const ns1Base = sim.NS_TABLE_BASE + 1 * sim.NS_ENTRY_WORDS;
+        const ns1Base = sim._nsSlotBase(1);
         sim.memory[ns1Base + 0] = 0;
         sim.memory[ns1Base + 1] = 0;
         sim.memory[ns1Base + 2] = 0;

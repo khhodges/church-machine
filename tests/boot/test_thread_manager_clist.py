@@ -152,8 +152,8 @@ def _thread_manager_lump_base(boot_words_list):
         f"BOOT_IMAGE_FORMAT_TAG not found at expected index {tag_idx}; "
         f"got 0x{boot_words_list[tag_idx]:08X}"
     )
-    ns_table_base = tag_idx + 1
-    tm_ns_base = ns_table_base + THREAD_MANAGER_NS_SLOT * NS_ENTRY_WORDS
+    total = len(boot_words_list)
+    tm_ns_base = total - (THREAD_MANAGER_NS_SLOT + 1) * NS_ENTRY_WORDS
     return boot_words_list[tm_ns_base]
 
 

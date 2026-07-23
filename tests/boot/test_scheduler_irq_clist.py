@@ -144,9 +144,7 @@ def test_scheduler_irq_clist_s_perm():
 def _scheduler_lump_base(boot_words_list):
     """Return the word offset where the Scheduler lump begins."""
     total = len(boot_words_list)
-    # NS_TABLE_RESERVE = 4096 (1024 entries × 4 words); format tag at ns_table_base-1
-    ns_table_base = total - NS_TABLE_RESERVE
-    sched_ns_base = ns_table_base + SCHEDULER_NS_SLOT * NS_ENTRY_WORDS
+    sched_ns_base = total - (SCHEDULER_NS_SLOT + 1) * NS_ENTRY_WORDS
     return boot_words_list[sched_ns_base]
 
 

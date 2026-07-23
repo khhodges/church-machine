@@ -120,7 +120,7 @@ process.stdin.on('end', () => {
     // ── Build a valid Inform E-GT for Navana ─────────────────────────────────
     // mLoad requires gt_seq to match NS entry word2[31:25]; read it from the
     // live NS table so the version check passes.
-    const nsW2  = sim.memory[sim.NS_TABLE_BASE + NAVANA_NS * sim.NS_ENTRY_WORDS + 2] >>> 0;
+    const nsW2  = sim.memory[sim._nsSlotBase(NAVANA_NS) + 2] >>> 0;
     const gtSeq = (nsW2 >>> 25) & 0x7F;
     const navanaGT = sim.createGT(gtSeq, NAVANA_NS, { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, 1);
 
