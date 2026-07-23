@@ -159,6 +159,10 @@ args = "editor-roundtrip-tests"
 task = "workflow.run"
 args = "call-cr6-l-perm-tests"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "return-cr6-l-perm-tests"
+
 [[workflows.workflow]]
 name = "Church Machine IDE"
 author = "agent"
@@ -563,6 +567,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node tests/simulator/sim_call_cr6_l_perm.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "return-cr6-l-perm-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node tests/simulator/sim_return_cr6_l_perm.js"
 
 [workflows.workflow.metadata]
 outputType = "console"
