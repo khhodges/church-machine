@@ -68,8 +68,45 @@ When `window.bootConfig.step1.totalNamespaceWords = 16384`:
 
 ## 2. Namespace (NS) Table
 
-Base address: `NS_TABLE_BASE`.  Entry `i` starts at `NS_TABLE_BASE + i × 4`.
+Base address: `NS_TABLE_BASE` (lowest address of the NS LUMP block).
 Each entry is exactly **4 consecutive 32-bit words**.
+
+### 2.0 Slot-addressing formula
+
+NS entries are numbered **starting from the top of the NS LUMP and counting
+downward**.  Slot 0 occupies the four words at the **highest** address in the
+NS LUMP; slot 1 is immediately below it; and so on.
+
+```
+slot_word_address(N) = NS_TABLE_BASE + NS_TABLE_RESERVE − 4 − N × 4
+```
+
+For the **16 384-word runtime profile** (`NS_TABLE_BASE = 0x3C00`,
+`NS_TABLE_RESERVE = 0x400 = 1 024`):
+
+| Slot N | Word address (NS entry start) |
+|-------:|:------------------------------|
+|      0 | `0x3FFC`  (= `0x3C00 + 0x400 − 4`) |
+|      1 | `0x3FF8` |
+|      2 | `0x3FF4` |
+|    255 | `0x3C04` |
+| header | `0x3C00`  (LUMP header word — not an NS entry) |
+
+For the **A7 profile** (`totalNamespaceWords = 131 072 = 0x20000`,
+`NS_TABLE_BASE = 0x1FC00`, `NS_TABLE_RESERVE = 0x400`):
+
+| Slot N | Word address (NS entry start) |
+|-------:|:------------------------------|
+|      0 | `0x1FFFC`  ← highest address |
+|      1 | `0x1FFF8` |
+|      2 | `0x1FFF4` |
+|    255 | `0x1FC04` |
+| header | `0x1FC00`  (LUMP header word — not an NS entry) |
+
+> **Do not confuse the NS entry's own word address (above) with W0 `location`
+> (the lump base address stored inside the entry).** The tables in §2.2 and
+> §6 list W0 `location` values — where each named lump lives in the lump heap.
+> The formula above gives where the NS *entry itself* sits inside the NS table.
 
 ### 2.1 NS entry word layout
 
