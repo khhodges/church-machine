@@ -66,7 +66,7 @@ function setupSim(extWords) {
     const hdrWord  = ((0x1F << 27) | (0 << 23) | (INIT_CW << 10) | 0) >>> 0;
     sim.memory[LUMP_BASE] = hdrWord;
 
-    const nsBase = sim.NS_TABLE_BASE + LUMP_SLOT * sim.NS_ENTRY_WORDS;
+    const nsBase = sim._nsSlotBase(LUMP_SLOT);
     sim.memory[nsBase + 0] = LUMP_BASE;
     sim.memory[nsBase + 1] = sim.packNSWord1(INIT_CW, 0, 0, 0, 0, 0);
     sim.memory[nsBase + 2] = sim.makeVersionSeals(GT_SEQ, LUMP_BASE, INIT_CW);

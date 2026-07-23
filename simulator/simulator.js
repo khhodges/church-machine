@@ -6452,7 +6452,7 @@ class ChurchSimulator {
 
     loadProgram(words, startAddr) {
         const abstrSlot = this.bootEntrySlot;  // active boot-entry slot (default 3 = Boot.Abstr, Task #247)
-        const abstrBase = this.NS_TABLE_BASE + abstrSlot * this.NS_ENTRY_WORDS;
+        const abstrBase = this._nsSlotBase(abstrSlot);
         const codeLoc = this.memory[abstrBase] || (abstrSlot * this.SLOT_SIZE);
         const baseAddr = this.bootComplete ? codeLoc : (startAddr || 0);
 
@@ -6488,7 +6488,7 @@ class ChurchSimulator {
                         }
 
                         // Update NS slot 3: point to new lump, limit17 = words.length, cc=0
-                        const nsBase        = this.NS_TABLE_BASE + abstrSlot * this.NS_ENTRY_WORDS;
+                        const nsBase        = this._nsSlotBase(abstrSlot);
                         const oldW1         = this.memory[nsBase + 1] >>> 0;
                         const oldW2         = this.memory[nsBase + 2] >>> 0;
                         const w1f           = this.parseNSWord1(oldW1);
@@ -6553,7 +6553,7 @@ class ChurchSimulator {
                 const clistStart = hdr.lumpSize - hdr.cc;
                 const maxCW      = Math.max(0, clistStart - 1);
                 const newCW      = Math.min(words.length, maxCW);
-                const nsBase     = this.NS_TABLE_BASE + abstrSlot * this.NS_ENTRY_WORDS;
+                const nsBase     = this._nsSlotBase(abstrSlot);
                 const nsStoredBase = this.memory[nsBase + 0] >>> 0;
                 const cr14Current  = this.cr[14];
                 const cr14Base     = cr14Current ? (cr14Current.word1 >>> 0) : baseAddr;
@@ -6641,7 +6641,7 @@ class ChurchSimulator {
             this.memory[EXTENDED_BASE + i] = (i < words.length ? words[i] : 0) >>> 0;
         }
 
-        const nsBase       = this.NS_TABLE_BASE + abstrSlot * this.NS_ENTRY_WORDS;
+        const nsBase       = this._nsSlotBase(abstrSlot);
         const oldW1        = this.memory[nsBase + 1] >>> 0;
         const oldW2        = this.memory[nsBase + 2] >>> 0;
         const w1f          = this.parseNSWord1(oldW1);
@@ -6678,7 +6678,7 @@ class ChurchSimulator {
             // bounds check uses this slot's limits, then confirm bootEntrySlot.
             const cr14 = this.cr[14];
             if (cr14) {
-                cr14.word0 = this.createGT(0, this.bootEntrySlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);
+                cr14.word0 = this.createGT(existingGtSeq, this.bootEntrySlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);
                 cr14.word1 = EXTENDED_BASE >>> 0;
                 cr14.word2 = this.memory[nsBase + 1];
                 cr14.word3 = this.memory[nsBase + 2];
@@ -6693,7 +6693,7 @@ class ChurchSimulator {
         if (this.cr[6]) {
             if (hdr.cc > 0) {
                 const clistBase = EXTENDED_BASE + lumpSize - hdr.cc;
-                const cr6GT = this.createGT(0, abstrSlot, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
+                const cr6GT = this.createGT(existingGtSeq, abstrSlot, {R:0,W:0,X:0,L:1,S:0,E:0}, 1);
                 this.cr[6] = {
                     word0: cr6GT,
                     word1: clistBase >>> 0,

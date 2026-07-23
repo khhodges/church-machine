@@ -128,7 +128,7 @@ function setupAndLoad({ cw, cc, codeWord = 0, n_minus_6 = 0 }) {
     const GT_SEQ   = 5;
     const INIT_BASE = 0x80;
     const INIT_CW   = 64;
-    const nsBase = sim.NS_TABLE_BASE + sim.bootEntrySlot * sim.NS_ENTRY_WORDS;
+    const nsBase = sim._nsSlotBase(sim.bootEntrySlot);
     sim.memory[nsBase + 0] = INIT_BASE;
     sim.memory[nsBase + 1] = sim.packNSWord1(INIT_CW, 0, 0, 0, 0);
     sim.memory[nsBase + 2] = sim.makeVersionSeals(GT_SEQ, INIT_BASE, INIT_CW);
@@ -175,7 +175,7 @@ function setupSimForBinary() {
     const GT_SEQ    = 1;
     const INIT_BASE = 0x80;
     const INIT_CW   = 64;
-    const nsBase = sim.NS_TABLE_BASE + sim.bootEntrySlot * sim.NS_ENTRY_WORDS;
+    const nsBase = sim._nsSlotBase(sim.bootEntrySlot);
     sim.memory[nsBase + 0] = INIT_BASE;
     sim.memory[nsBase + 1] = sim.packNSWord1(INIT_CW, 0, 0, 0, 0);
     sim.memory[nsBase + 2] = sim.makeVersionSeals(GT_SEQ, INIT_BASE, INIT_CW);
@@ -994,7 +994,7 @@ console.log('\n--- LLB-18: n_minus_6=10 (out of range) — loadLumpBinary return
     const GT_SEQ    = 7;
     const INIT_BASE = 0x80;
     const INIT_CW   = 64;
-    const nsBase = sim.NS_TABLE_BASE + sim.bootEntrySlot * sim.NS_ENTRY_WORDS;
+    const nsBase = sim._nsSlotBase(sim.bootEntrySlot);
 
     const sentinelW0 = INIT_BASE >>> 0;
     const sentinelW1 = sim.packNSWord1(INIT_CW, 0, 0, 0, 0);

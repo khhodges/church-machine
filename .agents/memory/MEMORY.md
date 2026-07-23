@@ -24,6 +24,7 @@
 - [Sapphire SoC as Trusted Security Base](sapphire-soc-tsb.md) — RISC-V private RAM is the keystore; APB3 register map; 5 free capabilities; FAULT_RST gap; FP verdict; SHA32 commissioning impact
 - [Makefile tab rule](makefile-tab-rule.md) — edit tool converts tabs→spaces in recipe lines, breaking make; always use write tool for Makefile changes
 - [NS entry stride is 4 words](ns-entry-stride.md) — each NS slot is 4 words (16 bytes): [location, word1_authority, word2_integrity, abstract_gt]; slot N starts at byte N×16; never 3
+- [NS slot base inverted layout](ns-slot-base-inverted-layout.md) — _nsSlotBase() = NS_TABLE_BASE+NS_TABLE_RESERVE-(idx+1)*4 (inverted); never use NS_TABLE_BASE+idx*4 in loaders or tests
 - [BRAM NUC_PROGRAM staleness trap](bram-nuc-program-staleness.md) — church_ti60_f225.v BRAM goes stale when boot_rom.py NUC_PROGRAM changes; regen or patch via gen_cm_dmem_direct.py
 - [Verilog/RTLIL regeneration procedure](verilog-regen-procedure.md) — 9 gen commands for all actively-synthesised targets; legacy-frozen files; builder tab visibility trap
 - [ChurchAssembler Node global shim](church-assembler-node-shim.md) — compileAssembly() checks typeof global; set global.ChurchAssembler before requiring CLOOMCCompiler in Node subprocesses
