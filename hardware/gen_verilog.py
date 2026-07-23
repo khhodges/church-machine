@@ -7,6 +7,9 @@ from .core import ChurchCore
 
 _STALE_CR7_PATTERN = "cr7_wr_"
 
+_BOOT_THRD_MUST_HAVE = "reg boot_cap12_wr_en"
+_BOOT_THRD_MUST_NOT  = "reg boot_cap8_wr_en"
+
 
 def _check_stale_cr7(verilog_text, output_path):
     """Abort if stale CR7 signal names are present in freshly-generated Verilog.
@@ -26,6 +29,57 @@ def _check_stale_cr7(verilog_text, output_path):
         print(
             "Verify that hardware/core.py uses the CR14 names throughout "
             "and re-run generation.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
+def _check_boot_thrd_cr(verilog_text, output_path):
+    """Abort if the INIT_THRD boot state writes the thread GT to the wrong CR.
+
+    CR_THREAD_STACK is CR12 (hw_types.py).  The INIT_THRD case in core.py must
+    drive boot_cap12_wr_en high (not boot_cap8_wr_en).  This guard catches
+    any future regression — such as the CR8→CR12 boot-register bug — at
+    generation time rather than silently producing a netlist that faults on
+    real hardware.
+
+    Implementation note — why 'reg' prefix:
+      Amaranth emits every Signal that is driven from a procedural always-block
+      as ``reg``.  Signals that are never driven (only wired to a constant
+      default) are emitted as ``wire ... assign ... = 1'h0``.  So in a correct
+      build ``reg boot_cap12_wr_en`` appears (actively driven) while
+      ``boot_cap8_wr_en`` is only a ``wire``.  A regression flips this: CR8
+      becomes the ``reg`` and CR12 degrades to a ``wire``.  Matching on the
+      ``reg`` prefix distinguishes active use from an Amaranth constant-zero
+      default without needing to parse the full Verilog AST.
+
+    Checks:
+      1. 'reg boot_cap12_wr_en' must appear (thread GT driven into CR12).
+      2. 'reg boot_cap8_wr_en' must NOT appear (CR8 must stay a default wire).
+    """
+    if _BOOT_THRD_MUST_HAVE not in verilog_text:
+        print(
+            f"\nERROR: {output_path} does not contain '{_BOOT_THRD_MUST_HAVE}'.",
+            file=sys.stderr,
+        )
+        print(
+            "INIT_THRD boot state must write the thread GT into CR12 "
+            "(CR_THREAD_STACK=12).  Check hardware/core.py INIT_THRD case — "
+            "boot_wr_en index should be 12.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    bad_count = verilog_text.count(_BOOT_THRD_MUST_NOT)
+    if bad_count:
+        print(
+            f"\nERROR: {output_path} contains {bad_count} occurrence(s) of "
+            f"'{_BOOT_THRD_MUST_NOT}' — thread GT must go to CR12, not CR8.",
+            file=sys.stderr,
+        )
+        print(
+            "Check hardware/core.py INIT_THRD case: boot_wr_en index must be "
+            "12 (CR_THREAD_STACK), not 8.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -145,6 +199,7 @@ def generate_core_verilog(output_dir="build"):
 
     output_path = os.path.join(output_dir, "church_core.v")
     _check_stale_cr7(verilog_text, output_path)
+    _check_boot_thrd_cr(verilog_text, output_path)
 
     with open(output_path, "w") as f:
         f.write(verilog_text)
@@ -179,6 +234,7 @@ def generate_core_iot_verilog(output_dir="build"):
 
     output_path = os.path.join(output_dir, "church_core_iot.v")
     _check_stale_cr7(verilog_text, output_path)
+    _check_boot_thrd_cr(verilog_text, output_path)
 
     with open(output_path, "w") as f:
         f.write(verilog_text)
