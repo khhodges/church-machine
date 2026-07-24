@@ -39,12 +39,12 @@ class ChurchPermCheck(Elaboratable):
         self.limit = Signal(32)
         self.check_bounds = Signal()
 
-        self.stored_gt_seq = Signal(7)
-        self.gt_seq = Signal(7)
+        self.stored_gt_seq = Signal(9)
+        self.gt_seq = Signal(9)
         self.check_version = Signal()
 
-        self.calculated_seal = Signal(16)
-        self.stored_seal = Signal(16)
+        self.calculated_seal = Signal(32)
+        self.stored_seal = Signal(32)
         self.check_seal = Signal()
 
         self.perm_granted = Signal()

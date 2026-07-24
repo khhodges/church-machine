@@ -315,12 +315,13 @@ NUC_LUMP_HEADER = (0x1F << 27) | (NUC_PROGRAM_CW << 10)  # magic=0x1F, cw=17, n_
 
 
 def _abstract_gt_word(perms):
-    """Encode a permission mask as an Abstract GT word using the v1.1 dom+perm encoding.
+    """Encode a permission mask as an Abstract GT word using the v2.0 dom+perm encoding.
 
-    Abstract GTs are advisory annotations stored in NS entry word3.  They encode
-    only the permission intent for the slot; slot_id, gt_seq, gt_type, and
-    b_flag are all zero.  Hardware never checks this field; ChurchMLoad gates its
-    output on M-bit so user-mode LOAD cannot observe it.
+    Abstract GTs are advisory annotations stored in NS entry word3 (gt_type=NULL
+    is correct; this field is informational only).  They encode only the permission
+    intent for the slot; slot_id, gt_seq, gt_type, and b_flag are all zero.
+    Hardware never checks this field; ChurchMLoad gates its output on M-bit so
+    user-mode LOAD cannot observe it.
 
     Layout: [30:28]=perm[2:0], [27]=dom, all other bits zero.
     """

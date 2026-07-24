@@ -12,8 +12,8 @@ class ChurchMLoad(Elaboratable):
 
     Security gate
     ─────────────
-    The NS integrity check (3 reads + gt_seq + CRC) is performed by the
-    shared ChurchNSGate sub-module.  mLoad adds the c-list walk before the
+    The NS integrity32 check (3 reads + gt_seq + integrity32) is performed by
+    the shared ChurchNSGate sub-module.  mLoad adds the c-list walk before the
     gate and g-bit reset + CR write after it.
 
     FSM (seal-check enabled)
