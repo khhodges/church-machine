@@ -207,13 +207,19 @@ frames. Derive from `hardware/rgmii_mac.py` but:
 - Remove nibble-to-byte conversion (GMII is already 8-bit)
 - Keep ARP reply and UDP TX state machines unchanged
 
-### P3.3 — Update wukong_xc7a100t.py for V3 / GMII ☐
+### P3.3 — Create wukong_ethernet_v3.py (new file) ☐
 
-Changes:
+> **Note:** `hardware/wukong_xc7a100t.py` was the orphaned v1.1 Ethernet top-level
+> (200 MHz W19 clock, RTL8211E RGMII). It was never wired into the build pipeline
+> (`gen_rtlil.py` always imported from `wukong_top.py`) and has been deleted to
+> prevent build mix-ups. Do not restore it.
+
+Create a new `hardware/wukong_ethernet_v3.py` top-level for the full V3 Ethernet
+build (keep `wukong_top.py` as the LED-blink / UART-only build target):
 - MMCM input: `p_CLKIN1_PERIOD = 20.0` (50 MHz input from M21)
 - MMCM multiplier adjusted for 1 GHz VCO target
-- Replace `RgmiiMac` → `GmiiMac`
-- Update XDC with confirmed GMII pin names
+- Wire `GmiiMac` (from P3.2) into CM MMIO EthernetDevice capability
+- Update XDC with confirmed GMII pin names (from P3.1)
 
 ### P3.4 — XDC for full Ethernet build ☐
 
@@ -282,7 +288,7 @@ Set IOSTANDARD to LVCMOS33. Add `set_input_delay` / `set_output_delay` for GMII 
 | P2 UART callhome | ☐ | Skip if no FTDI dongle |
 | P3.1 GMII pin audit | ☐ | Needs schematic |
 | P3.2 gmii_mac.py | ☐ | New file |
-| P3.3 wukong_xc7a100t.py V3 | ☐ | 50MHz input + GMII |
+| P3.3 wukong_ethernet_v3.py | ☐ | New file; old wukong_xc7a100t.py (v1.1 orphan) deleted |
 | P3.4 XDC Ethernet | ☐ | GMII timing |
 | P3.5 End-to-end callhome | ☐ | IDE dashboard |
 

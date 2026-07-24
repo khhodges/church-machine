@@ -327,7 +327,7 @@ def test_copy_fsm_timing():
 
 
 def test_callhome_payload_roundtrip():
-    """End-to-end dry-run: _CALLHOME_PAYLOAD bytes parse correctly via server parser.
+    """End-to-end dry-run: a minimal callhome payload parses correctly via server parser.
 
     Verifies:
     - Payload starts with CALLHOME_MAGIC (0xCE110001)
@@ -340,8 +340,11 @@ def test_callhome_payload_roundtrip():
     import os
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
     from server.wukong_udp import (
-        parse_callhome_frame, CALLHOME_MAGIC, ETHERNET_TOKEN)
-    from hardware.wukong_xc7a100t import _CALLHOME_PAYLOAD
+        parse_callhome_frame, build_callhome_frame,
+        CALLHOME_MAGIC, ETHERNET_TOKEN)
+
+    _CALLHOME_PAYLOAD = build_callhome_frame(
+        src_mac=bytes(6), cm_version=0, uptime=0, requests=[])
 
     assert _CALLHOME_PAYLOAD[:4] == CALLHOME_MAGIC.to_bytes(4, 'big'), (
         f"_CALLHOME_PAYLOAD[0:4]={_CALLHOME_PAYLOAD[:4].hex()} "
