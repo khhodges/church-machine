@@ -2014,7 +2014,7 @@
         "boot_resident": true,
         "lump_size": 512,
         "cw": 502,
-        "cc": 8,
+        "cc": 1,
         "grants": [
             "E"
         ],
