@@ -739,13 +739,22 @@ function stepSim() {
         }
         sim.auditLog = [];
         const _stepPhaseNum = sim.bootStep + 1;  // capture before _bootStep() — case 6 (COMPLETE) doesn't increment bootStep
+        // Redirect boot to the canonical resident slot (_bootAbstrSlot, always slot 6 =
+        // SelfTest) so B:05 INIT_ABSTR never tries mLoad on the user-selected slot (which
+        // may be the gap slot with limit17=0 after a Tier-3 fault-recovery reset clears
+        // bootComplete while preserving memory).  We restore bootEntrySlot immediately
+        // after _bootStep() so _autoLoadDefaultProgram() sees the user's selection.
+        const _savedBootEntryStep = sim.bootEntrySlot;
+        sim.bootEntrySlot = sim._bootAbstrSlot;
         try {
             sim._bootStep();
         } catch(e) {
+            sim.bootEntrySlot = _savedBootEntryStep;
             console.error('stepSim _bootStep error:', e);
             updateDashboard();
             return;
         }
+        sim.bootEntrySlot = _savedBootEntryStep;
         // Accumulate this step's gate entries into the persistent boot audit trail
         if (sim.auditLog.length > 0) {
             _bootAuditAccum.push(...sim.auditLog);
@@ -1529,11 +1538,18 @@ function instantBoot() {
     }
     _bootAuditAccum = [];
     sim.auditLog = [];
+    // Redirect to canonical resident slot so B:05 INIT_ABSTR never tries mLoad on
+    // a user-selected slot that may be empty (gap slot, limit17=0) after a Tier-3
+    // fault-recovery reset.  Callers that already set sim.bootEntrySlot=_bootAbstrSlot
+    // (e.g. _loadLumpBinaryIntoSim) see a harmless no-op save/restore.
+    const _savedBootEntryInst = sim.bootEntrySlot;
+    sim.bootEntrySlot = sim._bootAbstrSlot;
     let safety = 0;
     while (!sim.bootComplete && !sim.halted && safety++ < 30) {
         try { sim._bootStep(); } catch(e) { console.error('instantBoot error:', e); break; }
         if (sim.auditLog.length > 0) { _bootAuditAccum.push(...sim.auditLog); sim.auditLog = []; }
     }
+    sim.bootEntrySlot = _savedBootEntryInst;
     if (sim.bootComplete && !sim.halted) {
         sim.auditLog = [];
         _autoLoadDefaultProgram();
@@ -1546,12 +1562,19 @@ function instantBoot() {
 function slowBoot() {
     if (bootAnimating || sim.bootComplete || sim.halted) return;
     bootAnimating = true;
+    // Redirect to canonical resident slot so B:05 INIT_ABSTR never tries mLoad on
+    // a user-selected slot that may be empty after a Tier-3 fault-recovery reset.
+    // _savedBootEntrySlow is captured by the nextPhase closure so the restore
+    // survives across multiple setTimeout callbacks.
+    const _savedBootEntrySlow = sim.bootEntrySlot;
+    sim.bootEntrySlot = sim._bootAbstrSlot;
     if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(0)); pipelineViz.render(); }  // prime NIA to B:00 before first step
     switchView('pipeline');  // show pipeline so boot-step overview is immediately visible
     const delay = 800;
     function nextPhase() {
         try {
             if (sim.bootComplete || sim.halted) {
+                sim.bootEntrySlot = _savedBootEntrySlow;
                 bootAnimating = false;
                 _bootAnimTimer = null;
                 const con = document.getElementById('editorConsole');
@@ -1625,6 +1648,7 @@ function slowBoot() {
             updateDashboard();
             _bootAnimTimer = setTimeout(nextPhase, delay);
         } catch(e) {
+            sim.bootEntrySlot = _savedBootEntrySlow;
             bootAnimating = false;
             _bootAnimTimer = null;
             console.error('slowBoot nextPhase error:', e);
@@ -1636,10 +1660,18 @@ function slowBoot() {
 }
 
 function runSim() {
+    // Redirect boot to the canonical resident slot (_bootAbstrSlot, always slot 6 =
+    // SelfTest) so B:05 INIT_ABSTR never tries mLoad on the user-selected slot (which
+    // may be the gap slot with limit17=0 after a Tier-3 fault-recovery reset clears
+    // bootComplete while preserving memory).  Restore before _autoLoadDefaultProgram()
+    // so it re-applies the user's program at the correct slot.
+    const _savedBootEntryRun = sim.bootEntrySlot;
+    sim.bootEntrySlot = sim._bootAbstrSlot;
     while (!sim.bootComplete && !sim.halted) {
         try {
             sim._bootStep();
         } catch(e) {
+            sim.bootEntrySlot = _savedBootEntryRun;
             console.error('runSim _bootStep error:', e);
             if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(sim.bootStep)); pipelineViz.render(); }
             updateDashboard();
@@ -1648,6 +1680,7 @@ function runSim() {
             return;
         }
     }
+    sim.bootEntrySlot = _savedBootEntryRun;
     if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(sim.bootStep)); pipelineViz.render(); }
     // Clear boot-microcode gate entries so the Gate Log starts empty for
     // user-code debugging after a clean boot.
