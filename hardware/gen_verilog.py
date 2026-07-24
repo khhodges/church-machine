@@ -10,6 +10,78 @@ _STALE_CR7_PATTERN = "cr7_wr_"
 _BOOT_THRD_MUST_HAVE = "reg boot_cap12_wr_en"
 _BOOT_THRD_MUST_NOT  = "reg boot_cap8_wr_en"
 
+_PERM_CHECK_GT_SEQ_MIN_BITS = 9
+_PERM_CHECK_SEAL_MIN_BITS   = 32
+
+
+def _validate_perm_check_widths(gt_seq_w, stored_gt_seq_w,
+                               calculated_seal_w, stored_seal_w,
+                               output_path):
+    """Core width validation for ChurchPermCheck signals.
+
+    Separated from _check_perm_check_widths so that tests can exercise the
+    logic directly without needing to mock the ChurchPermCheck class.
+
+    Raises SystemExit(1) if any width is below its required minimum.
+    """
+    checks = [
+        ("gt_seq",          gt_seq_w,          _PERM_CHECK_GT_SEQ_MIN_BITS),
+        ("stored_gt_seq",   stored_gt_seq_w,   _PERM_CHECK_GT_SEQ_MIN_BITS),
+        ("calculated_seal", calculated_seal_w, _PERM_CHECK_SEAL_MIN_BITS),
+        ("stored_seal",     stored_seal_w,     _PERM_CHECK_SEAL_MIN_BITS),
+    ]
+
+    failed = []
+    for name, width, min_bits in checks:
+        if width < min_bits:
+            failed.append(
+                f"  ChurchPermCheck.{name}: {width} bits (need \u2265 {min_bits})"
+            )
+
+    if failed:
+        print(
+            f"\nERROR: perm-check signal width regression detected for {output_path}:",
+            file=sys.stderr,
+        )
+        for msg in failed:
+            print(msg, file=sys.stderr)
+        print(
+            "Update the Signal() width in hardware/perm_check.py.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
+def _check_perm_check_widths(verilog_text, output_path):
+    """Abort if ChurchPermCheck signal widths fall below the widened spec.
+
+    Reads signal widths directly from the ChurchPermCheck Python class —
+    the authoritative source — rather than from the generated Verilog text.
+    (Amaranth's backend may optimise away signals that are not connected to
+    observable ports, so the .v file alone is not a reliable width witness.)
+
+    Signals checked and their required minima:
+
+      gt_seq, stored_gt_seq  — widened to 9 bits to accommodate the full
+                               version counter; must be \u2265 9 bits.
+
+      calculated_seal, stored_seal — widened to 32 bits for a full-word
+                                     integrity seal; must be \u2265 32 bits.
+
+    This guard fires at generation time so that a future accidental
+    Signal() narrowing (e.g. Signal(9) \u2192 Signal(8)) is caught before
+    the netlist reaches synthesis.
+    """
+    from .perm_check import ChurchPermCheck
+    pc = ChurchPermCheck()
+    _validate_perm_check_widths(
+        gt_seq_w=pc.gt_seq.shape().width,
+        stored_gt_seq_w=pc.stored_gt_seq.shape().width,
+        calculated_seal_w=pc.calculated_seal.shape().width,
+        stored_seal_w=pc.stored_seal.shape().width,
+        output_path=output_path,
+    )
+
 
 def _check_stale_cr7(verilog_text, output_path):
     """Abort if stale CR7 signal names are present in freshly-generated Verilog.
@@ -200,6 +272,7 @@ def generate_core_verilog(output_dir="build"):
     output_path = os.path.join(output_dir, "church_core.v")
     _check_stale_cr7(verilog_text, output_path)
     _check_boot_thrd_cr(verilog_text, output_path)
+    _check_perm_check_widths(verilog_text, output_path)
 
     with open(output_path, "w") as f:
         f.write(verilog_text)
@@ -235,6 +308,7 @@ def generate_core_iot_verilog(output_dir="build"):
     output_path = os.path.join(output_dir, "church_core_iot.v")
     _check_stale_cr7(verilog_text, output_path)
     _check_boot_thrd_cr(verilog_text, output_path)
+    _check_perm_check_widths(verilog_text, output_path)
 
     with open(output_path, "w") as f:
         f.write(verilog_text)
