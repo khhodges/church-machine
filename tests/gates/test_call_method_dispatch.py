@@ -34,6 +34,7 @@ from hardware.hw_types import (
     FaultType, PERM_MASK_E, PERM_MASK_R, PERM_MASK_W,
     GT_TYPE_INFORM,
     PERM_E,
+    make_gt,
 )
 from hardware.layouts import CAP_REG_LAYOUT
 
@@ -41,7 +42,7 @@ LUMP_BASE     = 0x9000
 SP_STORE_ADDR = 0x3000
 THREAD_BASE   = 0x4000
 CALLER_PC     = 10
-CALLEE_EGT    = 0x40800001
+CALLEE_EGT    = 0x4A000001
 
 CALLEE_N6 = 0
 CALLEE_CC = 4
@@ -56,12 +57,8 @@ INITIAL_STO = SP_MAX
 
 
 def _build_gt(slot_id=0, gt_seq=0, gt_type=GT_TYPE_INFORM, perms=0, b_flag=0):
-    gt  = (slot_id & 0xFFFF)
-    gt |= (gt_seq  & 0x7F) << 16
-    gt |= (gt_type & 0x03) << 23
-    gt |= (perms   & 0x3F) << 25
-    gt |= (b_flag  & 0x01) << 31
-    return gt
+    return make_gt(gt_type=gt_type, perms=perms, slot_id=slot_id,
+                   gt_seq=gt_seq, b_flag=b_flag)
 
 
 def _build_cap(slot_id=0, perms=0, location=0):

@@ -39,12 +39,13 @@ from hardware.hw_types import (
     FaultType, PERM_MASK_E, PERM_MASK_X, PERM_MASK_R, PERM_MASK_W,
     GT_TYPE_INFORM,
     PERM_E,
+    make_gt,
 )
 from hardware.layouts import GT_LAYOUT, CAP_REG_LAYOUT
 
 THREAD_BASE   = 0x4000
 SP_STORE_ADDR = 0x3000
-CALLEE_EGT    = 0x40800001
+CALLEE_EGT    = 0x4A000001
 CALLER_PC     = 42
 
 THR_N6  = 2    # n_minus_6 for 256-word thread
@@ -57,12 +58,8 @@ SP_MIN    = LUMP_SIZE - THR_CC - THR_SW + 2  # 214
 
 
 def _build_gt(slot_id=0, gt_seq=0, gt_type=GT_TYPE_INFORM, perms=0, b_flag=0):
-    gt  = (slot_id & 0xFFFF)
-    gt |= (gt_seq  & 0x7F) << 16
-    gt |= (gt_type & 0x03) << 23
-    gt |= (perms   & 0x3F) << 25
-    gt |= (b_flag  & 0x01) << 31
-    return gt
+    return make_gt(gt_type=gt_type, perms=perms, slot_id=slot_id,
+                   gt_seq=gt_seq, b_flag=b_flag)
 
 
 def _build_cap(slot_id=0, perms=0, location=0):
