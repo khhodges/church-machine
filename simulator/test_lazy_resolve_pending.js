@@ -114,7 +114,8 @@ console.log('\n--- T002: _execLoad instant resolution ---');
         console.log('SKIP T002: boot did not complete');
     } else {
         // Install a valid NS entry at slot 5 so isNSEntryValid(5) === true.
-        const NS5_BASE = sim.NS_TABLE_BASE + 5 * sim.NS_ENTRY_WORDS;
+        // NS table is TOP-DOWN: use _nsSlotBase() not the ascending formula.
+        const NS5_BASE = sim._nsSlotBase(5);
         sim.memory[NS5_BASE]     = 0x00000001 >>> 0;  // non-zero word0 (lump base)
         sim.memory[NS5_BASE + 1] = 0x00000041 >>> 0;  // non-zero word1 (limit field)
         if (sim.nsCount < 6) sim.nsCount = 6;
@@ -290,7 +291,8 @@ console.log('\n--- T004: _injectClistNow CASE B — integration test ---');
         // Boot.Abstr lump (NS slot sim2.bootEntrySlot, default 6 post slot 3→6
         // migration): lumpBase=0x140=320, lumpSize=64.
         // CASE B clistBase = lumpBase + lumpSize − cc = 320 + 64 − 1 = 383.
-        const ns3Base  = sim2.NS_TABLE_BASE + sim2.bootEntrySlot * sim2.NS_ENTRY_WORDS;
+        // NS table is TOP-DOWN: use _nsSlotBase() not the ascending formula.
+        const ns3Base  = sim2._nsSlotBase(sim2.bootEntrySlot);
         const lumpBase = sim2.memory[ns3Base] >>> 0;
         const lumpHdr  = sim2.memory[lumpBase] >>> 0;
         const lumpSize = sim2.parseLumpHeader(lumpHdr).lumpSize;
@@ -555,7 +557,8 @@ console.log('\n--- T009: resolvePendingSlot — NULL slot (Task #1519 path) ---'
         console.log('SKIP T009: boot did not complete');
     } else {
         // Seed a valid NS entry at slot 6.
-        const NS6_BASE = sim.NS_TABLE_BASE + 6 * sim.NS_ENTRY_WORDS;
+        // NS table is TOP-DOWN: use _nsSlotBase() not the ascending formula.
+        const NS6_BASE = sim._nsSlotBase(6);
         sim.memory[NS6_BASE]     = 0x00000001 >>> 0;
         sim.memory[NS6_BASE + 1] = 0x00000041 >>> 0;
         if (sim.nsCount < 7) sim.nsCount = 7;
@@ -656,7 +659,8 @@ console.log('\n--- T011: NULL GT instant inline resolution when NS label is vali
         console.log('SKIP T011: boot did not complete');
     } else {
         // Seed a fully valid NS entry at slot 9.
-        const NS9_BASE = sim.NS_TABLE_BASE + 9 * sim.NS_ENTRY_WORDS;
+        // NS table is TOP-DOWN: use _nsSlotBase() not the ascending formula.
+        const NS9_BASE = sim._nsSlotBase(9);
         sim.memory[NS9_BASE]     = 0x00000001 >>> 0;
         sim.memory[NS9_BASE + 1] = 0x00000041 >>> 0;
         if (sim.nsCount < 10) sim.nsCount = 10;

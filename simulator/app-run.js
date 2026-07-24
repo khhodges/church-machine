@@ -1170,8 +1170,10 @@ function _applyPendingSimLoad() {
     // first real instruction, matching _autoLoadDefaultProgram() on boot/reset.
     if (lastMethodTableSize > 0) sim.pc = lastMethodTableSize;
     if (pipelineViz) pipelineViz.setNIA(null);
-    const abstrBase2 = sim.NS_TABLE_BASE + 2 * sim.NS_ENTRY_WORDS;
-    const abstrBase3 = sim.NS_TABLE_BASE + sim.bootEntrySlot * sim.NS_ENTRY_WORDS;
+    // NS table is TOP-DOWN: slot N is at NS_TABLE_BASE + NS_TABLE_RESERVE − (N+1)×NS_ENTRY_WORDS.
+    // Using the ascending formula (NS_TABLE_BASE + N×NS_ENTRY_WORDS) reads garbage for any slot > 0.
+    const abstrBase2 = sim._nsSlotBase(2);
+    const abstrBase3 = sim._nsSlotBase(sim.bootEntrySlot);
     // When the compiled program's slot was relocated to the extended-code area
     // (base >= 0x0400, which is always the case for slot [7] allocations), use
     // that base+1 as the code start so labels resolve correctly.  For ordinary
