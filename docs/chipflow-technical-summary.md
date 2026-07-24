@@ -50,7 +50,7 @@ Permission Bits (perms[30:25]):
   [29] S — Save       (Church domain)
   [30] E — Enter      (Church domain)
 
-GT Type Field (gt_type[24:23]):
+GT Type Field (gt_type[26:25]):
   00 — NULL     (empty/invalid)
   01 — Inform   (local reference — NS lookup, lump in local memory)
   10 — Outform  (calls the IDE — absent lump, Locator fires on first LOAD)

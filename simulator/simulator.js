@@ -1187,7 +1187,7 @@ class ChurchSimulator {
 
         // Accept 0xFEED pending sentinels (Task #1448) and NULL GTs that are
         // registered in _pendingResolves due to a lazy-suspend (Task #1519).
-        if (!ChurchSimulator.isPendingGT(existing) && !(existing === 0 && hasLazyEntry)) {
+        if (!ChurchSimulator.isPendingGT(existing) && !(ChurchSimulator.isNullGT(existing) && hasLazyEntry)) {
             return { ok: false, error: `Slot ${slotIdx} does not hold a pending sentinel` };
         }
 
@@ -2324,6 +2324,13 @@ class ChurchSimulator {
         return { ok: true };
     }
 
+    // NULL GT type-field test: returns true if the 2-bit gt_type field [26:25] is 0b00.
+    // Hardware faults on the type field alone — not on the 32-bit all-zeros comparison.
+    // Any word with gt_type=0b00 is a NULL GT regardless of what the lower fields contain.
+    static isNullGT(word32) {
+        return ((word32 >>> 25) & 0x3) === 0;
+    }
+
     createGT(gt_seq, slotId, perms, type) {
         const purity = ChurchSimulator.isDomainPure(perms);
         if (!purity.ok) {
@@ -2465,6 +2472,12 @@ class ChurchSimulator {
     }
 
     mLoad(gt32, requiredPerm, srcCRIdx, absoluteAddress, rangeOverride) {
+        // Gate 0: early NULL type-field check — gt_type=0b00 → NULL_CAP before any NS lookup.
+        // Catches corrupted tokens (e.g. gt_type flipped 0b01→0b00) that are not all-zeros
+        // and would otherwise pass the old word0===0 guard and slip through to NS[slot_id].
+        if (!gt32 || ChurchSimulator.isNullGT(gt32)) {
+            return { ok: false, fault: 'NULL_CAP', message: 'GT is NULL (gt_type=0b00)' };
+        }
         const parsed = this.parseGT(gt32);
         if (parsed.index >= this.nsCount) {
             return { ok: false, fault: 'BOUNDS', message: `namespace index ${parsed.index} out of bounds` };
@@ -3092,7 +3105,7 @@ class ChurchSimulator {
 
     _capRead(crIdx, absAddr, perm, label) {
         const cr = this.cr[crIdx];
-        if (!cr || cr.word0 === 0) {
+        if (!cr || ChurchSimulator.isNullGT(cr.word0)) {
             return { ok: false, fault: 'NULL_CAP', message: `${label}: CR${crIdx} is NULL` };
         }
         const check = this.mLoad(cr.word0, perm, crIdx, absAddr);
@@ -3104,7 +3117,7 @@ class ChurchSimulator {
 
     _threadRead(absAddr, label) {
         const cr12 = this.cr[12];
-        if (!cr12 || cr12.word0 === 0) {
+        if (!cr12 || ChurchSimulator.isNullGT(cr12.word0)) {
             this.fault('NULL_CAP', `${label}: CR12 (thread stack) is NULL`);
             return { ok: false };
         }
@@ -3118,7 +3131,7 @@ class ChurchSimulator {
 
     _threadWrite(absAddr, value, label) {
         const cr12 = this.cr[12];
-        if (!cr12 || cr12.word0 === 0) {
+        if (!cr12 || ChurchSimulator.isNullGT(cr12.word0)) {
             this.fault('NULL_CAP', `${label}: CR12 (thread stack) is NULL`);
             return false;
         }
@@ -3515,7 +3528,7 @@ class ChurchSimulator {
             return this.pc;
         }
         const cr14 = this.cr[14];
-        if (!cr14 || cr14.word0 === 0) return -1;
+        if (!cr14 || ChurchSimulator.isNullGT(cr14.word0)) return -1;
         const cr14Parsed = this.parseGT(cr14.word0);
         if (!cr14Parsed.permissions.X) return -1;
         const entry = this.readNSEntry(cr14Parsed.index);
@@ -3533,7 +3546,7 @@ class ChurchSimulator {
         }
 
         const cr14 = this.cr[14];
-        if (!cr14 || cr14.word0 === 0) {
+        if (!cr14 || ChurchSimulator.isNullGT(cr14.word0)) {
             return { ok: false, fault: 'NULL_CAP', message: 'CR14 (code register) is NULL — no code capability' };
         }
         const fetchAddr = cr14.word1 + 1 + this.pc;
@@ -3764,7 +3777,7 @@ class ChurchSimulator {
             return null;
         }
         let slotGT = this.memory[clistLoc + d.imm] || 0;
-        if (slotGT === 0) {
+        if (ChurchSimulator.isNullGT(slotGT)) {
             const _pc = this.programCapabilities;
             const _pce = _pc && _pc[d.imm];
             const _pcn = _pce ? (typeof _pce === 'string' ? _pce : (_pce.name || null)) : null;
@@ -5024,7 +5037,7 @@ class ChurchSimulator {
 
         // 3. PassKey type check — source must be Abstract GT (gt_type == 3).
         //    NULL (type 0), Inform (type 1), and Outform (type 2) all fault here.
-        if (srcCR.word0 === 0) {
+        if (ChurchSimulator.isNullGT(srcCR.word0)) {
             this.fault('INVALID_OP', `SWITCH: CR${d.crSrc} is NULL — must be an Abstract PassKey GT`);
             return null;
         }
@@ -5358,7 +5371,7 @@ class ChurchSimulator {
         }
 
         let slotGT = this.memory[srcLoc + ecRow] || 0;
-        if (slotGT === 0) {
+        if (ChurchSimulator.isNullGT(slotGT)) {
             const _pc = this.programCapabilities;
             const _pce = _pc && _pc[ecRow];
             const _pcn = _pce ? (typeof _pce === 'string' ? _pce : (_pce.name || null)) : null;
@@ -7001,7 +7014,7 @@ class ChurchSimulator {
         this.output += '\n--- C-List GTs ---\n';
         for (let i = 0; i < clistCount; i++) {
             const gt = clistWords[i] >>> 0;
-            if (gt === 0) continue;
+            if (ChurchSimulator.isNullGT(gt)) continue;
             const p = this.parseGT(gt);
             const permStr = (p.permissions.B ? 'B':'') + (p.permissions.R ? 'R':'') +
                            (p.permissions.W ? 'W':'') + (p.permissions.X ? 'X':'') +
@@ -7283,7 +7296,7 @@ class ChurchSimulator {
 
     getFormattedCR(idx) {
         const cr = this.cr[idx];
-        const isEmpty = !cr || (cr.word0 === 0 && cr.word1 === 0 && cr.word2 === 0 && cr.word3 === 0 && cr.m === 0);
+        const isEmpty = !cr || ChurchSimulator.isNullGT(cr.word0 >>> 0);
         if (isEmpty) {
             return {
                 index: idx, isNull: true, mBit: 0,

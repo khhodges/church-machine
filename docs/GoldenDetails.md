@@ -81,9 +81,11 @@ hardware can validate them.
 | `0b10` | Outform | Pet-Name reference. `slot_id` → NS table → Outform LUMP. **[IDE]** resolves the Pet-Name to actual LUMP content. `f_flag` in the NS SLOT indicates whether the resolving IDE node is local or Far. |
 | `0b11` | Abstract | Self-describing device capability. No NS SLOT lookup, no LUMP. The GT word itself encodes the authority via `perm` and `ab_data` (see Abstract GT spec). |
 
-> **NULL GT = `0x00000000`** — The hardware checks the entire 32-bit word for
-> zero. NULL is not just a `gt_type` value; it is the all-zero word. Setting any
-> other field while leaving `gt_type = 0b00` is undefined.
+> **NULL GT = `gt_type 0b00`** — The hardware checks only the 2-bit `[26:25]`
+> type field. Any word whose `gt_type` bits are `0b00` is a NULL GT — the register
+> holds no capability. Any use faults immediately. The natural/reset value
+> `0x00000000` is always NULL, but NULL is defined by the type field alone; a word
+> with `gt_type = 0b00` and non-zero lower fields is still a NULL GT.
 
 ### Permission Bits (`dom` × `perm`)
 

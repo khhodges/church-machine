@@ -19,27 +19,12 @@ The 2-bit Type field in every Golden Token classifies four categories:
 
 | Value | Type | Description |
 |-------|------|-------------|
-| 00 | **Inform** | Local reference — data or code in the local namespace. Requires dereferencing through mLoad: MAC validation, version check, permissions check, namespace lookup. |
-| 01 | **Outform** | Remote reference — data or service at a network URL. Requires evaluation through HTTPS fetch/flush or RPC tunnel. |
-| 10 | **NULL** | Empty/invalid/revoked capability — any operation FAULTs. The register holds no capability. |
+| 00 | **NULL** | Empty/invalid/revoked capability — any operation FAULTs. The register holds no capability. |
+| 01 | **Inform** | Local reference — data or code in the local namespace. Requires dereferencing through mLoad: MAC validation, version check, permissions check, namespace lookup. |
+| 10 | **Outform** | Remote reference — data or service at a network URL. Requires evaluation through HTTPS fetch/flush or RPC tunnel. |
 | 11 | **Abstract** | Unforgeable constant value (e.g., pi) — immutable, no namespace dereference. |
 
-### Inform (Type = 00)
-A *local name* — a reference to a resource in the local namespace. The GT format holds:
-- **Version** (7 bits): Cross-checked against the namespace entry to detect revocation
-- **Index** (17 bits): The namespace table index
-- **Permissions** (6 bits): Access rights (R, W, X, L, S, E)
-
-Any instruction that uses an Inform GT goes through the mLoad validation path: MAC integrity check, version match, permission verification, namespace lookup. This ensures that every capability access is controlled, validated, and revocable.
-
-### Outform (Type = 01)
-A *remote name* — a reference to a resource at a network location (a URL, service endpoint, or RPC tunnel). The GT format is identical to Inform, but the hardware interprets the Index and Version differently:
-- The **Index** encodes the network location or tunnel identifier
-- Dereferencing goes through HTTPS fetch/flush or the RPC tunnel (if a cryptographic key is stored at that namespace entry)
-
-Outform enables network-transparent access while maintaining capability-based security — the reference is unforgeable, and revocation is instant (version bump on garbage collection).
-
-### NULL (Type = 10)
+### NULL (Type = 00)
 The *empty* or *invalid* capability state. Any operation on a NULL-typed GT causes an immediate FAULT:
 - Load, save, call, branch, mLoad, or any other capability operation
 - A clear diagnostic: the register holds no valid capability
@@ -53,7 +38,22 @@ When a thread is created, capability registers that are not explicitly loaded wi
 When a capability must be revoked (access withdrawn, resource deallocated, session terminated), the capability register is set to NULL. Any subsequent attempt to use the revoked capability FAULTs immediately, with a clear cause: the register holds NULL.
 
 #### Garbage Collection
-The NULL type allows the GC scanner to unambiguously distinguish empty registers from valid capabilities. A register holding all zeros could be confused with an Inform GT pointing to namespace index 0 with version 0 and no permissions — but Type = 10 (NULL) is unambiguous. The scanner knows immediately the register does not reference any namespace entry.
+The NULL type allows the GC scanner to unambiguously distinguish empty registers from valid capabilities. A register holding all zeros could be confused with an Inform GT pointing to namespace index 0 with version 0 and no permissions — but Type = 00 (NULL) is unambiguous. The scanner knows immediately the register does not reference any namespace entry.
+
+### Inform (Type = 01)
+A *local name* — a reference to a resource in the local namespace. The GT format holds:
+- **Version** (7 bits): Cross-checked against the namespace entry to detect revocation
+- **Index** (17 bits): The namespace table index
+- **Permissions** (6 bits): Access rights (R, W, X, L, S, E)
+
+Any instruction that uses an Inform GT goes through the mLoad validation path: MAC integrity check, version match, permission verification, namespace lookup. This ensures that every capability access is controlled, validated, and revocable.
+
+### Outform (Type = 10)
+A *remote name* — a reference to a resource at a network location (a URL, service endpoint, or RPC tunnel). The GT format is identical to Inform, but the hardware interprets the Index and Version differently:
+- The **Index** encodes the network location or tunnel identifier
+- Dereferencing goes through HTTPS fetch/flush or the RPC tunnel (if a cryptographic key is stored at that namespace entry)
+
+Outform enables network-transparent access while maintaining capability-based security — the reference is unforgeable, and revocation is instant (version bump on garbage collection).
 
 ### Abstract (Type = 11)
 An unforgeable, self-describing token whose `word1_location` field holds a **hardware-routed Abstract Address** — a 32-bit value in the reserved I/O and network range. Abstract GTs require no namespace dereference and no NS slot; the address *is* the identity.
@@ -72,7 +72,7 @@ See [Abstract GT I/O and Network Addressing](abstract-io-addressing.md) for the 
 
 ## Why GT-Literals Were Removed
 
-The original GT-Literal concept (Type = 10, later replaced by NULL) attempted to embed a 30-bit value directly in a capability register by reclaiming the Version and Permissions fields as value bits. This approach had several fundamental problems:
+The original GT-Literal concept (formerly occupying a type slot in an earlier pre-v2.0 encoding, before the current NULL=00/Inform=01/Outform=10/Abstract=11 assignment was settled) attempted to embed a 30-bit value directly in a capability register by reclaiming the Version and Permissions fields as value bits. This approach had several fundamental problems:
 
 ### The "Oil and Water" Problem
 Capability registers are designed to hold unforgeable references. Data registers are designed to hold values. The GT-Literal conflation tried to store values in CRs, mixing the two domains. This added complexity:
@@ -124,13 +124,13 @@ The alternative — silent no-ops or undefined behavior — is unacceptable in a
 
 ### GC Scanning Without Ambiguity
 The garbage collector must identify which registers hold live capabilities and which hold nothing. Without NULL:
-- A register holding zero bits: is this a valid Inform GT (Type = 00, Version = 0, Index = 0, no Permissions) or an empty slot?
+- A register holding zero bits: is this a valid Inform GT (Type = 01, Version = 0, Index = 0, no Permissions) or an empty slot?
 - The GC would have to use a separate "presence" bit or bitmap to track which registers are actually in use
 - Revocation would require both setting a register to zero AND updating a presence bitmap
 
 With NULL:
-- Type = 10 unambiguously means "this register is empty" — the GC can skip it
-- Type = 00 with Index = 0 unambiguously means "this register holds a valid Inform GT pointing to namespace index 0" — the GC must scan that capability
+- Type = 00 unambiguously means "this register is empty" — the GC can skip it
+- Type = 01 with Index = 0 unambiguously means "this register holds a valid Inform GT pointing to namespace index 0" — the GC must scan that capability
 - No separate bitmap needed; the Type field alone is sufficient
 
 ---
@@ -232,17 +232,18 @@ The architecture is built on the marriage of two computational models, each with
 
 The following concepts were part of earlier architectural proposals and have been removed:
 
-### Direct GT-Literal (Type = 10, Self-Contained Value)
+### Direct GT-Literal (old bit pattern 0b10, now reassigned to Outform)
 A 30-bit value embedded in a capability register by reclaiming the Version and Permissions fields. Removed because:
 - Mixed CR (reference) and DR (value) domains
 - Created type ambiguity across register copies
 - Added complexity without sufficient benefit
+- The bit pattern 0b10 has since been assigned to Outform (remote reference)
 
 ### Indirect GT-Literal (Namespace-Backed Handle)
 A GT pointing to a namespace entry containing a secret value. Removed because:
 - The same result is achieved with a standard Inform GT and CAP.LOAD with R permission
 - No special type needed; the namespace already handles secrets securely
-- The Type field is now available for other purposes (NULL, Abstract)
+- All four type codes are now fully assigned: NULL=00, Inform=01, Outform=10, Abstract=11 — no spare codes remain
 
 ### LDL Instruction (Load Literal)
 Created a direct GT-Literal from a 30-bit immediate or data register value. Removed with the GT-Literal concept.

@@ -1687,7 +1687,8 @@ function _populateLumpApiTab(lump, panelId) {
             const cap  = caps.find(c => c.slot === si);
             const name = cap ? (cap.name || '\u2014') : '\u2014';
             const gtRaw = cap ? (cap.gt || '') : '';
-            const isNull = !gtRaw || gtRaw === '0x00000000';
+            const gtWord = gtRaw ? (parseInt(gtRaw, 16) >>> 0) : 0;
+            const isNull = !gtRaw || ((gtWord >>> 25) & 0x3) === 0;
             const gtDisplay = isNull
                 ? (cap && cap.initial === 'NULL_GT' ? '<span style="color:var(--text-secondary);font-style:italic;">NULL \u2014 runtime</span>' : '\u2014')
                 : `<code>${e(gtRaw)}</code>`;

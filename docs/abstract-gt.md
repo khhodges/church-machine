@@ -285,7 +285,7 @@ IDLE ──(trigger + valid DR11)──→ WRITEBACK ──→ IDLE
 WRITEBACK applies three checks in order; any failure raises `INVALID_OP` and clears M:
 
 1. **NULL GT**: DR11 `gt_type` field must be non-NULL.
-   - ctmm: GT_TYPE_NULL = `0b10`; bits `[1:0]` of XR11.
+   - ctmm: GT_TYPE_NULL = `0b00`; bits `[1:0]` of XR11.
    - hardware: GT_TYPE_NULL = `0b00`; bits `[24:23]` of DR11.
 2. **Integrity**: `integrity32(DR12, DR13) == DR14` (shadow consistency tag).
 3. **Version**: `GT.version == seals.version` — `DR11.version` (ctmm bits `[31:25]`) must

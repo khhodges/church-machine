@@ -80,7 +80,7 @@ function runMethod(methodName, args) {
     // The Lambda arithmetic instructions (IADD, ISUB, MCMP, BRANCH, RETURN) only
     // trigger mLoad during instruction fetch (_fetchInstruction), never for data.
     sim.mLoad = function (gt, perm, crIdx, addr) {
-        if (!gt || gt === 0) {
+        if (!gt || ChurchSimulator.isNullGT(gt)) {
             return { ok: false, fault: 'NULL_CAP', message: 'null GT' };
         }
         return {
@@ -329,7 +329,7 @@ function runMethod2(methodName, args) {
     const cr14GT = sim.createGT(0, 3, { R: 1, W: 0, X: 1, L: 0, S: 0, E: 0 }, 1);
     sim.cr[14] = { word0: cr14GT, word1: CODE_BASE, word2: 0, word3: 0, m: 0 };
     sim.mLoad = function (gt) {
-        if (!gt || gt === 0) return { ok: false, fault: 'NULL_CAP', message: 'null GT' };
+        if (!gt || ChurchSimulator.isNullGT(gt)) return { ok: false, fault: 'NULL_CAP', message: 'null GT' };
         return { ok: true, parsed: { index: 3, gt_seq: 0, permissions: { R: 1, X: 1 } }, entry: { word0_location: CODE_BASE, word1_limit: CODE_BASE + 0x1000 }, index: 3 };
     };
     sim.dr.fill(0);
@@ -428,7 +428,7 @@ function runHaskellMethod(methodName, args) {
     const cr14GT = sim.createGT(0, 3, { R: 1, W: 0, X: 1, L: 0, S: 0, E: 0 }, 1);
     sim.cr[14] = { word0: cr14GT, word1: CODE_BASE, word2: 0, word3: 0, m: 0 };
     sim.mLoad = function (gt) {
-        if (!gt || gt === 0) return { ok: false, fault: 'NULL_CAP', message: 'null GT' };
+        if (!gt || ChurchSimulator.isNullGT(gt)) return { ok: false, fault: 'NULL_CAP', message: 'null GT' };
         return { ok: true, parsed: { index: 3, gt_seq: 0, permissions: { R: 1, X: 1 } }, entry: { word0_location: CODE_BASE, word1_limit: CODE_BASE + 0x1000 }, index: 3 };
     };
     sim.dr.fill(0);

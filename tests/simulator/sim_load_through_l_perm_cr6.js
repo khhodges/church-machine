@@ -294,7 +294,7 @@ console.log('\n--- PHASE E2E: full fetch/decode/execute via sim.step() ---');
     sim.writeNSEntry(TARGET_SLOT, TARGET_BASE, 63, 0, 0, 1, 0, 0, 0);
 
     // ── CR14: code register for caller lump (RX-perm) ────────────────────────
-    const cr14GT = sim.createGT(0, CALLER_SLOT, {R:1, X:1}, 0);  // Turing RX
+    const cr14GT = sim.createGT(0, CALLER_SLOT, {R:1, X:1}, 1);  // Turing RX, type=1 (Inform)
     sim.cr[14] = {
         word0: cr14GT,
         word1: CALLER_BASE,   // fetchAddr = CALLER_BASE + 1 + pc (pc=0)

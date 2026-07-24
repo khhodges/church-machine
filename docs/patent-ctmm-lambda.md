@@ -132,7 +132,7 @@ The present invention provides a processor architecture, the Church-Turing Meta-
 
 1. **Golden Token (GT) Type Field**: A 2-bit field in every capability token that architecturally classifies four categories: Inform (local reference), Outform (remote reference), NULL (empty/invalid), and Abstract (unforgeable constant value, e.g., pi). The Type field determines the hardware execution path at every instruction. The clean architectural rule is: capability registers (CRs) hold capabilities only, data registers (DRs) hold values only. No mixing.
 
-2. **NULL Type (Type = 10)**: A capability register encoding that represents an empty, invalid, or revoked capability. Any operation on a NULL-typed GT causes an immediate FAULT. NULL enables clean initialization (freshly created threads have all CRs set to NULL), safe revocation (revoking a capability sets the register to NULL), and unambiguous garbage collection (the scanner can distinguish empty registers from valid capabilities with index zero).
+2. **NULL Type (Type = 00)**: A capability register encoding that represents an empty, invalid, or revoked capability. Any operation on a NULL-typed GT causes an immediate FAULT. NULL enables clean initialization (freshly created threads have all CRs set to NULL), safe revocation (revoking a capability sets the register to NULL), and unambiguous garbage collection (the scanner can distinguish empty registers from valid capabilities with index zero).
 
 3. **LAMBDA Instruction**: A dedicated hardware instruction for Church's function application: `LAMBDA CRn, x`. CRn holds a Golden Token with X (Execute) permission pointing to a code body in the same protection domain. The data register x holds the argument. LAMBDA saves only the return address (PC+4) to a machine status register, sets the LAMBDA-active flag, and branches to the code body. Arguments and results flow through data registers. Unlike CALL (E permission, domain crossing, full stack frame), LAMBDA stays within the current protection domain with near-zero overhead — a macro that doesn't replicate the code base.
 
@@ -186,9 +186,9 @@ The 2-bit Type field classifies every Golden Token:
 
 | Value | Type | Semantic Category | Hardware Behavior |
 |-------|------|------------------|-------------------|
-| 00 | Inform | Name (local) | Dereference through mLoad: validate MAC, version, permissions, namespace lookup |
-| 01 | Outform | Name (remote) | Dereference through HTTPS fetch/flush or RPC tunnel |
-| 10 | NULL | Empty/invalid | FAULT on any operation — register is empty, revoked, or uninitialized |
+| 00 | NULL | Empty/invalid | FAULT on any operation — register is empty, revoked, or uninitialized |
+| 01 | Inform | Name (local) | Dereference through mLoad: validate MAC, version, permissions, namespace lookup |
+| 10 | Outform | Name (remote) | Dereference through HTTPS fetch/flush or RPC tunnel |
 | 11 | Abstract | Unforgeable constant (e.g., pi) | Returns encoded immutable value; no namespace dereference |
 
 This classification reflects the clean architectural separation:
@@ -202,13 +202,13 @@ The Type field is checked by hardware at every instruction. A NULL GT cannot be 
 
 #### 2.3 The NULL Type
 
-The NULL type (10) serves three critical architectural roles:
+The NULL type (00) serves three critical architectural roles:
 
 **Initialization**: When a thread is created, all capability registers that are not explicitly loaded with valid GTs are set to NULL. This provides a clean, unambiguous initial state — the hardware knows these registers hold nothing, rather than potentially valid capabilities with coincidental bit patterns.
 
 **Revocation**: When a capability must be revoked (e.g., access rights withdrawn, resource deallocated), the capability register is set to NULL. Any subsequent attempt to use the revoked capability FAULTs immediately with a clear diagnostic: the register holds NULL, not a stale or forged reference.
 
-**Garbage Collection**: The NULL type enables the GC scanner to unambiguously distinguish empty registers from valid capabilities. Without NULL, a register holding all zeros could be confused with a valid Inform GT pointing to namespace index 0 with version 0 and no permissions. With NULL (Type = 10), the scanner knows immediately that the register does not reference any namespace entry and can be skipped.
+**Garbage Collection**: The NULL type enables the GC scanner to unambiguously distinguish empty registers from valid capabilities. Without NULL, a register holding all zeros could be confused with a valid Inform GT pointing to namespace index 0 with version 0 and no permissions. With NULL (Type = 00), the scanner knows immediately that the register does not reference any namespace entry and can be skipped.
 
 ### 3. The LAMBDA Instruction
 
@@ -227,7 +227,7 @@ LAMBDA CRn, x
 #### 3.2 Execution Sequence
 
 ```
-Step 1: Verify CRn.Type = Inform (00) → FAULT if NULL (10), Outform (01), or Abstract (11)
+Step 1: Verify CRn.Type = Inform (01) → FAULT if NULL (00), Outform (10), or Abstract (11)
 Step 2: Check X permission on CRn → FAULT if X bit not set
 Step 3: Check LAMBDA-active flag in machine status → FAULT if already set (non-nestable)
 Step 4: Save return address (PC+4) to machine status register (LAMBDA_PC)
@@ -367,7 +367,7 @@ The NULL type provides fail-safe behavior for uninitialized, revoked, or empty c
 
 2. **NULL is unforgeable**: The Type field (bits [1:0]) is set by hardware during initialization and revocation. Software cannot construct a NULL GT by writing arbitrary bits to a capability register — only mLoad and the hardware initialization/revocation path can set the Type field.
 
-3. **NULL is unambiguous**: The NULL type (10) is distinct from all valid capability types. A NULL GT cannot be confused with an Inform GT, an Outform GT, or an Abstract GT. The 2-bit Type field makes the distinction at every instruction cycle.
+3. **NULL is unambiguous**: The NULL type (00) is distinct from all valid capability types. A NULL GT cannot be confused with an Inform GT, an Outform GT, or an Abstract GT. The 2-bit Type field makes the distinction at every instruction cycle.
 
 #### 4.3 LAMBDA Security
 
@@ -558,7 +558,7 @@ done:
 
 ### 8. Network Transparency Integration
 
-The GT Type field enables seamless network transparency through the Outform type (01). Outform GTs reference remote resources accessed via standard HTTPS:
+The GT Type field enables seamless network transparency through the Outform type (10). Outform GTs reference remote resources accessed via standard HTTPS:
 
 - **R on Outform**: Object fetch via standard HTTPS GET (browser mechanisms: TLS, ETag, Cache-Control)
 - **W on Outform**: Object flush via standard HTTPS PUT (ETag/If-Match for conflict detection)
@@ -756,7 +756,7 @@ The machine-status fast path eliminates stack access entirely for the lightweigh
 
 ### Claim 1 — GT Type Field with NULL Type
 
-A processor architecture comprising a capability register file wherein each register holds a Golden Token (GT) having a Type field of at least two bits that architecturally classifies the token content as one of: a local reference (Inform, Type = 00), a remote reference (Outform, Type = 01), a null/empty/invalid capability (NULL, Type = 10), or an unforgeable constant value (Abstract, Type = 11, e.g., mathematical or physical constants such as pi); wherein the Type field is checked by hardware at each instruction to determine the execution path; wherein a NULL-typed token causes an immediate hardware fault on any operation, providing an unambiguous representation for empty, uninitialized, or revoked capability registers; and wherein an Abstract-typed token encodes an immutable value that requires no namespace dereference, enabling hardware-protected constants that cannot be forged, modified, or confused with capabilities.
+A processor architecture comprising a capability register file wherein each register holds a Golden Token (GT) having a Type field of at least two bits that architecturally classifies the token content as one of: a null/empty/invalid capability (NULL, Type = 00), a local reference (Inform, Type = 01), a remote reference (Outform, Type = 10), or an unforgeable constant value (Abstract, Type = 11, e.g., mathematical or physical constants such as pi); wherein the Type field is checked by hardware at each instruction to determine the execution path; wherein a NULL-typed token causes an immediate hardware fault on any operation, providing an unambiguous representation for empty, uninitialized, or revoked capability registers; and wherein an Abstract-typed token encodes an immutable value that requires no namespace dereference, enabling hardware-protected constants that cannot be forged, modified, or confused with capabilities.
 
 ### Claim 2 — NULL Type for Initialization, Revocation, and Garbage Collection
 
@@ -772,7 +772,7 @@ The architecture of Claim 1, wherein the NULL type serves three architectural ro
 
 The architecture of Claim 1, further comprising a LAMBDA instruction having two operands: a capability register (CRn) holding a Golden Token with Execute (X) permission referencing executable code, and a data register (x) holding an argument value; wherein said LAMBDA instruction:
 
-(a) verifies that CRn holds a token of Inform type (00) with Execute (X) permission;
+(a) verifies that CRn holds a token of Inform type (01) with Execute (X) permission;
 
 (b) saves the return address (PC+4) to a machine status register;
 
@@ -856,7 +856,7 @@ A processor architecture, the Church-Turing Meta-Machine (CM), that integrates C
 
 ### Figure 1: GT Format and Type Field
 
-Diagram showing the bit layout of all four GT types side by side: Inform (Version|Index|Permissions|Type=00), Outform (Version|Index|Permissions|Type=01), NULL (all fields meaningless|Type=10), Abstract (unforgeable constant|Type=11). Highlights the NULL type as architecturally distinct from all valid reference types.
+Diagram showing the bit layout of all four GT types side by side: NULL (all fields ignored|Type=00), Inform (Version|Index|Permissions|Type=01), Outform (Version|Index|Permissions|Type=10), Abstract (unforgeable constant|Type=11). Highlights the NULL type as architecturally distinct from all valid reference types.
 
 ### Figure 2: LAMBDA vs. CALL Execution Paths
 

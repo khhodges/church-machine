@@ -70,7 +70,7 @@ Claims are grouped by filing. All claims in each group are numbered sequentially
 
 **Claim 1 — GT Type Field with NULL and Abstract Types**
 
-A processor architecture comprising a capability register file wherein each register holds a Golden Token (GT) having a Type field of at least two bits that architecturally classifies the token content as one of: a local reference (Inform, Type = 00), a remote reference (Outform, Type = 01), a null/empty/invalid capability (NULL, Type = 10), or an unforgeable constant value (Abstract, Type = 11, e.g., mathematical or physical constants such as pi); wherein the Type field is checked by hardware at each instruction to determine the execution path; wherein a NULL-typed token causes an immediate hardware fault on any operation, providing an unambiguous representation for empty, uninitialized, or revoked capability registers; and wherein an Abstract-typed token encodes an immutable value that requires no namespace dereference, enabling hardware-protected constants that cannot be forged, modified, or confused with capabilities.
+A processor architecture comprising a capability register file wherein each register holds a Golden Token (GT) having a Type field of at least two bits that architecturally classifies the token content as one of: a null/empty/invalid capability (NULL, Type = 00), a local reference (Inform, Type = 01), a remote reference (Outform, Type = 10), or an unforgeable constant value (Abstract, Type = 11, e.g., mathematical or physical constants such as pi); wherein the Type field is checked by hardware at each instruction to determine the execution path; wherein a NULL-typed token causes an immediate hardware fault on any operation, providing an unambiguous representation for empty, uninitialized, or revoked capability registers; and wherein an Abstract-typed token encodes an immutable value that requires no namespace dereference, enabling hardware-protected constants that cannot be forged, modified, or confused with capabilities.
 
 ---
 
@@ -90,7 +90,7 @@ The architecture of Claim 1, wherein the NULL type serves three architectural ro
 
 The architecture of Claim 1, further comprising a LAMBDA instruction having two operands: a capability register (CRn) holding a Golden Token with Execute (X) permission referencing executable code, and a data register (x) holding an argument value; wherein said LAMBDA instruction:
 
-(a) verifies that CRn holds a token of Inform type (00) with Execute (X) permission;
+(a) verifies that CRn holds a token of Inform type (01) with Execute (X) permission;
 
 (b) saves the return address (PC+4) to a machine status register;
 
