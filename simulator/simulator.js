@@ -1820,6 +1820,17 @@ class ChurchSimulator {
                 }
                 this._writeCR(15, gt15, check.entry);                              // write validated GT + NS entry into CR15
                 this.output += `[BOOT] LOAD_NS — CR15 <- mLoad(Slot 0) Namespace (base=0x0000, size=${this.memory.length} words, NS table entries=${this.nsCount})\n`;
+                this.auditLog.push({
+                    gate: 'CR_WR',
+                    desc: `CR15(NS) ← Namespace descriptor  · base=0x0000, size=${this.memory.length} words, NS entries=${this.nsCount}`,
+                    label: (this.nsLabels && this.nsLabels[BOOT_NS_SLOT_HEADER]) || 'Namespace',
+                    nsIndex: BOOT_NS_SLOT_HEADER,
+                    requiredPerm: 'NS',
+                    checks: { install: { pass: true } },
+                    b: 0, f: 0,
+                    result: 'pass',
+                    stepCtx: 'LOAD_NS CR15',
+                });
                 this.bootStep++;                  // advance state machine → B:02
                 this.ledBits = 0b000011;          // LED bit 1 ON = LOAD_NS complete
                 break;
@@ -1845,6 +1856,17 @@ class ChurchSimulator {
                 }
                 this._writeCR(12, gt12, check12.entry);                            // CR12 ← thread stack token (encodes lump base + size)
                 this.output += `[BOOT] INIT_THRD — CR12 <- mLoad(Slot 1) thread stack GT (zero perms, Inform)\n`;
+                this.auditLog.push({
+                    gate: 'CR_WR',
+                    desc: `CR12(E) ← Thread stack GT  · NS slot ${BOOT_NS_SLOT_THREAD}, zero perms (Inform), M-elevation`,
+                    label: (this.nsLabels && this.nsLabels[BOOT_NS_SLOT_THREAD]) || 'Boot.Thread',
+                    nsIndex: BOOT_NS_SLOT_THREAD,
+                    requiredPerm: 'E',
+                    checks: { install: { pass: true } },
+                    b: 0, f: 0,
+                    result: 'pass',
+                    stepCtx: 'INIT_THRD CR12',
+                });
                 // Stash the thread NS entry for use in B:03 INIT_HEAP (case 3)
                 this._initThrdEntry = check12.entry;
                 this.bootStep++;                  // advance state machine → B:03
@@ -1879,6 +1901,7 @@ class ChurchSimulator {
                 // created directly by the boot state machine, CHANGE-consistent).
                 this.auditLog.push({
                     gate: 'HEAP',
+                    desc: `CR5(RW) ← thread heap  · base=0x${(_threadBase12).toString(16).toUpperCase()}, heap=[+${_heapStart12}..+${_spMax12}] (CHANGE-consistent, RW Inform)`,
                     label: this.nsLabels[BOOT_NS_SLOT_THREAD] || 'Boot.Thread',
                     nsIndex: BOOT_NS_SLOT_THREAD,
                     requiredPerm: null,
@@ -1989,6 +2012,17 @@ class ChurchSimulator {
                 }
                 this._writeCR(6, gt6, check6.entry);                                               // CR6 ← E-type token for boot entry (saved to sentinel frame in B:06)
                 this.output += `[BOOT] INIT_ABSTR — CR6 <- mLoad(Slot ${this.bootEntrySlot}, ${_b3Label}) (E, M-elevation)\n`;
+                this.auditLog.push({
+                    gate: 'CR_WR',
+                    desc: `CR6(E) ← Boot entry E-GT  · NS slot ${this.bootEntrySlot} (${_b3Label}), M-elevation; snapshotted to sentinel frame in B:06`,
+                    label: _b3Label,
+                    nsIndex: this.bootEntrySlot,
+                    requiredPerm: 'E',
+                    checks: { install: { pass: true } },
+                    b: 0, f: 0,
+                    result: 'pass',
+                    stepCtx: 'INIT_ABSTR CR6',
+                });
 
                 // Auto-install boot-entry E-GT into Zone ① CR0 (thread offset +244) if empty.
                 // Bridges the gap between IDE convention (double-click to install) and the boot
