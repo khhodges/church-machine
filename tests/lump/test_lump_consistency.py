@@ -513,10 +513,13 @@ def _read_clist_word(token: str, slot_index: int) -> int:
 
 
 def _decode_gt(word):
-    word = word & 0xFFFFFFFF
-    gt_type = (word >> 23) & 0x3
+    word    = word & 0xFFFFFFFF
+    gt_type = (word >> 25) & 0x3   # v2.0: gt_type at [26:25], was [24:23]
+    R       = (word >> 24) & 0x1   # v2.0: R flag at [24] (Abstract GT R-perm / gt_seq bit 8)
+    W       = (word >> 23) & 0x1   # v2.0: W flag at [23] (Abstract GT W-perm / gt_seq bit 7)
     dom     = (word >> 27) & 0x1
     perm3   = (word >> 28) & 0x7
+    gt_seq  = (word >> 16) & 0x1FF  # v2.0: 9-bit sequence counter at [24:16]
     slot_id =  word        & 0xFFFF
     if dom == 0:
         perms = {"R": (perm3 >> 0) & 1, "W": (perm3 >> 1) & 1, "X": (perm3 >> 2) & 1,
@@ -527,16 +530,19 @@ def _decode_gt(word):
     return {
         "type": gt_type,
         "type_name": ["NULL", "Inform", "Outform", "Abstract"][gt_type],
+        "R": R,
+        "W": W,
         "dom": dom,
         "dom_name": "Church" if dom else "Turing",
         "perm3": perm3,
+        "gt_seq": gt_seq,
         "slot_id": slot_id,
         "perms": perms,
     }
 
 
-BOOT_ABSTR_E_GT = 0x48800003
-BOOT_NUCS_X_GT  = 0x40800001
+BOOT_ABSTR_E_GT = 0x4A000003  # v2.0: Inform E-GT, gt_type at [26:25]=01, Church dom, slot 3
+BOOT_NUCS_X_GT  = 0x42000001  # v2.0: Inform X-GT, gt_type at [26:25]=01, Turing dom, slot 1
 SELFTEST_E_GT   = 0x4A000006  # SelfTest E-GT — NS slot 6, Church domain, E permission
 
 # cc=8 lumps: Boot.Abstr E-GT at slot 3, Boot.Nucs X-GT at slot 7
@@ -578,7 +584,7 @@ class TestR13_SelftestClistGTs:
         assert gt["type"] == 1, (
             f"{token} ({label}): c-list[3] = {word:#010x} decodes as "
             f"type={gt['type']} ({gt['type_name']}), expected Inform (1).\n"
-            "  GT type bits[24:23] must equal 0b01."
+            "  GT type bits[26:25] must equal 0b01 (v2.0 layout)."
         )
 
     @pytest.mark.parametrize("token,label", SELFTEST_LUMP_CASES)
@@ -588,7 +594,29 @@ class TestR13_SelftestClistGTs:
         assert gt["type"] == 1, (
             f"{token} ({label}): c-list[7] = {word:#010x} decodes as "
             f"type={gt['type']} ({gt['type_name']}), expected Inform (1).\n"
-            "  GT type bits[24:23] must equal 0b01."
+            "  GT type bits[26:25] must equal 0b01 (v2.0 layout)."
+        )
+
+    @pytest.mark.parametrize("token,label", SELFTEST_LUMP_CASES)
+    def test_slot3_rw_bits_clear(self, token, label):
+        word = _read_clist_word(token, 3)
+        gt = _decode_gt(word)
+        assert gt["R"] == 0 and gt["W"] == 0, (
+            f"{token} ({label}): c-list[3] = {word:#010x}: R={gt['R']}, W={gt['W']}, "
+            f"expected both 0 for a zero-gt_seq Inform GT.\n"
+            "  v2.0 layout: bits[24:23] are the top two bits of gt_seq, not R/W flags "
+            "for non-Abstract GTs.  Non-zero means a non-zero gt_seq was encoded."
+        )
+
+    @pytest.mark.parametrize("token,label", SELFTEST_LUMP_CASES)
+    def test_slot7_rw_bits_clear(self, token, label):
+        word = _read_clist_word(token, 7)
+        gt = _decode_gt(word)
+        assert gt["R"] == 0 and gt["W"] == 0, (
+            f"{token} ({label}): c-list[7] = {word:#010x}: R={gt['R']}, W={gt['W']}, "
+            f"expected both 0 for a zero-gt_seq Inform GT.\n"
+            "  v2.0 layout: bits[24:23] are the top two bits of gt_seq, not R/W flags "
+            "for non-Abstract GTs.  Non-zero means a non-zero gt_seq was encoded."
         )
 
     @pytest.mark.parametrize("token,label", SELFTEST_LUMP_CASES)

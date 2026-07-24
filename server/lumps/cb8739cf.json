@@ -44,7 +44,7 @@
       "name": "Boot.Abstr.E",
       "target_ns": 3,
       "note": "Boot.Abstr E-GT (NS[3]) — Church domain enter; subject of TPERM E tests (Tests 3, 4)",
-      "gt": "0x48800003"
+      "gt": "0x4A000003"
     },
     {
       "slot": 4,
@@ -68,7 +68,7 @@
       "slot": 7,
       "name": "Boot.Nucs.X",
       "note": "Boot.Thread X-GT (NS[1], Turing X-perm) — nucleus execute; subject of TPERM X tests (Tests 1, 2, 5)",
-      "gt": "0x40800001"
+      "gt": "0x42000001"
     }
   ],
   "pet_names": {
