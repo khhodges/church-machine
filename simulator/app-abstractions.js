@@ -547,8 +547,18 @@ function _applyBootEntryToSim() {
         try { localStorage.setItem('bootEntrySlot', String(_archCanonical)); } catch (e) {}
     }
     const _maxSlots = (sim.MAX_NS_ENTRIES > 0) ? sim.MAX_NS_ENTRIES : 256;
-    if (bootEntrySlot >= _maxSlots || !sim.isNSEntryValid(bootEntrySlot)) {
-        const _fallback = sim.isNSEntryValid(_archCanonical) ? _archCanonical : 6;
+    // Do NOT check isNSEntryValid(bootEntrySlot) here.  _applyBootEntryToSim() is called
+    // immediately after loadBootImage(), before any runtime LUMPs (e.g. LEDFlash at slot 7)
+    // are installed.  At that point every non-resident slot reads as all-zeros, so
+    // isNSEntryValid() returns false for a perfectly valid user-selected slot — causing
+    // bootEntrySlot to be silently reset from 7 → 6 (SelfTest).  loadLumpBinary() then
+    // sees abstrSlot(7) ≠ bootEntrySlot(6) and skips the CR14 update, leaving CR14 pointing
+    // at SelfTest (limit17=3) instead of LEDFlash (limit17=17).  On the first single-step the
+    // fetch address falls outside SelfTest's range → CR14 RANGE fault.
+    // Bounds checking alone is sufficient: if the slot is in range we trust it — the LUMP will
+    // be installed shortly after (or if it never is, mLoad produces a clear LUMP_MAGIC fault).
+    if (bootEntrySlot >= _maxSlots) {
+        const _fallback = _archCanonical < _maxSlots ? _archCanonical : 6;
         console.warn(`[bootEntrySlot] stored slot ${bootEntrySlot} is out of bounds for this boot image (max ${_maxSlots}); resetting to ${_fallback}`);
         bootEntrySlot = _fallback;
         try { localStorage.setItem('bootEntrySlot', String(_fallback)); } catch (e) {}

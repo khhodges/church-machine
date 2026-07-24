@@ -978,7 +978,14 @@ function _injectClistNow() {
     // since the slot 3→6 migration) — do NOT hardcode 3 here, or CASE B reads
     // garbage from an unrelated NS entry and every capability resolves wrong.
     const BOOT_ABSTR_SLOT = sim.bootEntrySlot;
-    const nsBase    = sim.NS_TABLE_BASE + BOOT_ABSTR_SLOT * sim.NS_ENTRY_WORDS;
+    // IMPORTANT: the NS table is stored TOP-DOWN.  Slot 0 is at the HIGHEST address
+    // (NS_TABLE_BASE + NS_TABLE_RESERVE − 4) and slot N at
+    // (NS_TABLE_BASE + NS_TABLE_RESERVE − (N+1)×NS_ENTRY_WORDS).
+    // Using the ascending formula (NS_TABLE_BASE + slot × NS_ENTRY_WORDS) is wrong —
+    // for slot 6 it lands at NS_TABLE_BASE+24 instead of NS_TABLE_BASE+996, reading
+    // garbage lumpBase ≈ 0, then corrupting Thread-lump memory around addr 249 and
+    // setting CR6.word2 with limit17=0 → every subsequent LOAD through CR6 faults.
+    const nsBase    = sim._nsSlotBase(BOOT_ABSTR_SLOT);
     const w1f       = sim.parseNSWord1(sim.memory[nsBase + 1]);
     const lumpBase  = sim.memory[nsBase] >>> 0;
     const lumpHdr   = sim.memory[lumpBase] >>> 0;
