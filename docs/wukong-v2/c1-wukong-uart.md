@@ -35,16 +35,19 @@ The same 57 600 baud matches the existing IDE `BAUD_RATE` constant in
 | `hardware/gen_rtlil.py` | No change needed — already generates from `wukong_top.py` |
 
 ## Wukong V3 UART Pin Assignment
-The QMTECH Wukong V3 schematic maps the CH340 TX/RX to:
-- UART_TX (FPGA output → CH340 RX): **D3**  (bank 34, LVCMOS33)
-- UART_RX (CH340 TX → FPGA input):  **C4**  (bank 34, LVCMOS33)
+**Hardware-confirmed** — the CH340 USB-UART bridge is physically present on the board
+(USB socket visible). The FPGA-side pins are:
+- UART_TX (FPGA output → CH340 RX): **E3**  (bank 34, LVCMOS33)
+- UART_RX (CH340 TX → FPGA input):  **F3**  (bank 34, LVCMOS33)
 
-These must be confirmed against the board schematic PDF before committing the XDC.
-If different, update the pin names. Add to `wukong_xc7a100t.xdc`:
+Note: E3 was previously mis-used as the clock pin in an early bitstream. E3 is **not**
+a clock-capable pin — it is the UART TX trace on the PCB. The correct clock pin is M21.
+
+Add to `hardware/wukong_xc7a100t.xdc` (create if it doesn't exist):
 ```
-set_property PACKAGE_PIN D3 [get_ports uart_tx]
+set_property PACKAGE_PIN E3 [get_ports uart_tx]
 set_property IOSTANDARD LVCMOS33 [get_ports uart_tx]
-set_property PACKAGE_PIN C4 [get_ports uart_rx]
+set_property PACKAGE_PIN F3 [get_ports uart_rx]
 set_property IOSTANDARD LVCMOS33 [get_ports uart_rx]
 ```
 
