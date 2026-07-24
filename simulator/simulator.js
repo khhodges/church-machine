@@ -1481,12 +1481,48 @@ class ChurchSimulator {
         // occupies memory[NS_TABLE_BASE+0] and is set by writeNSEntry above.
         // The c-list tail lives in the last nsCatalogCount words of the NS TABLE region
         // (at NS_TABLE_BASE + NS_TABLE_RESERVE − nsCatalogCount .. NS_TABLE_BASE + NS_TABLE_RESERVE − 1).
-        // These overlap with null slots near the end of the NS table, which is safe since
-        // those entries are always zero (unused). This must happen BEFORE clistGTs is
-        // truncated to DEMO_CLIST_SIZE so all catalog slot GT values are available.
+        // In the inverted NS layout, low slot numbers occupy the HIGHEST physical
+        // addresses (slot 0 at NS_TABLE_BASE+NS_TABLE_RESERVE-4, slot 1 at -8, …).
+        // The c-list tail is placed at the same high addresses, so for a catalog
+        // with nsCatalogCount entries the write below overwrites:
+        //   • All 4 words of NS slot 0 when nsCatalogCount >= 4
+        //   • Words 1-3 of NS slot 1 when nsCatalogCount >= 5
+        //   • Word 3 of NS slot 2 when nsCatalogCount >= 9 (etc.)
+        // After the c-list write we restore NS slots 0 and 1 so that validateMAC
+        // (seal check) passes in _bootStep B:01 and B:02.  demoClistGTs is saved
+        // from the JS-array clistGTs (not from memory), so it is unaffected.
+        // This must happen BEFORE clistGTs is truncated to DEMO_CLIST_SIZE so all
+        // catalog slot GT values are available for the c-list write.
         const nsCatalogCount  = abstractions.length;
         for (let ci = 0; ci < nsCatalogCount; ci++) {
             this.memory[this.NS_TABLE_BASE + this.NS_TABLE_RESERVE - nsCatalogCount + ci] = (clistGTs[ci] || 0) >>> 0;
+        }
+
+        // ── Restore NS slot 0 and NS slot 1 after c-list write ──────────────────
+        // The c-list write above has overwritten the seals (and sometimes the
+        // location/limit words) of NS slots 0 and 1.  Re-write them from the
+        // same parameters used in the catalog loop so that mLoad's validateMAC
+        // check passes when _bootStep B:01 / B:02 load these entries.
+        // The physical c-list entries at those addresses are intentionally
+        // replaced here; downstream code uses this.demoClistGTs (set below),
+        // not the physical words, so nothing is lost.
+        {
+            const _ns0Loc = this.NS_TABLE_BASE;
+            const _ns0Lim = (this.NS_TABLE_RESERVE - 1) & 0x1FFFF;
+            const _ns0W1  = this.packNSWord1(_ns0Lim, 0, 0, 1, nsCatalogCount);
+            this.memory[this._nsSlotBase(0) + 0] = _ns0Loc >>> 0;
+            this.memory[this._nsSlotBase(0) + 1] = _ns0W1  >>> 0;
+            this.memory[this._nsSlotBase(0) + 2] = this.makeVersionSeals(0, _ns0Loc, _ns0Lim);
+            this.memory[this._nsSlotBase(0) + 3] = 0;
+
+            // NS slot 1 (Thread): word0 (location) is not overwritten by the
+            // c-list, so we read it back; words 1-3 need to be restored.
+            const _ns1Loc = this.memory[this._nsSlotBase(1) + 0] >>> 0;
+            const _ns1Lim = (THREAD_LUMP_SIZE - 1) & 0x1FFFF;
+            const _ns1W1  = this.packNSWord1(_ns1Lim, 0, 0, 1, 0);
+            this.memory[this._nsSlotBase(1) + 1] = _ns1W1  >>> 0;
+            this.memory[this._nsSlotBase(1) + 2] = this.makeVersionSeals(0, _ns1Loc, _ns1Lim);
+            this.memory[this._nsSlotBase(1) + 3] = 0;
         }
 
         // Slots 0–16 map to NS slots 0–16 (or contain hardware-device Abstract GTs at 8–15).
@@ -1770,7 +1806,9 @@ class ChurchSimulator {
             // CR15; it is only used internally by mLoad for bounds/version checks.
             // ════════════════════════════════════════════════════════════════════
             case 1: {
-                const gt15 = this.createGT(0, BOOT_NS_SLOT_HEADER, {R:0,W:0,X:0,L:0,S:0,E:0}, 1); // zero-perm Inform GT for NS Slot 0 (the namespace table itself)
+                const _nsEntry0 = this.readNSEntry(BOOT_NS_SLOT_HEADER);
+                const _seq0 = _nsEntry0 ? ((_nsEntry0.word2_seals >>> 25) & 0x7F) : 0;
+                const gt15 = this.createGT(_seq0, BOOT_NS_SLOT_HEADER, {R:0,W:0,X:0,L:0,S:0,E:0}, 1); // zero-perm Inform GT for NS Slot 0 (the namespace table itself)
                 const check = this.mLoad(gt15, null, undefined);                   // mLoad with M-elevation; reads NS word0/word1 for Slot 0
                 if (!check.ok) {
                     this.fault('BOOT', `LOAD_NS mLoad failed: ${check.message}`);  // NS entry missing or corrupted — unrecoverable
@@ -1793,7 +1831,9 @@ class ChurchSimulator {
             // issue mLoad/mSave through CR12 directly.
             // ════════════════════════════════════════════════════════════════════
             case 2: {
-                const gt12 = this.createGT(0, BOOT_NS_SLOT_THREAD, {R:0,W:0,X:0,L:0,S:0,E:0}, 1); // zero-perm Inform GT for NS Slot 1 (thread lump)
+                const _nsEntry1 = this.readNSEntry(BOOT_NS_SLOT_THREAD);
+                const _seq1 = _nsEntry1 ? ((_nsEntry1.word2_seals >>> 25) & 0x7F) : 0;
+                const gt12 = this.createGT(_seq1, BOOT_NS_SLOT_THREAD, {R:0,W:0,X:0,L:0,S:0,E:0}, 1); // zero-perm Inform GT for NS Slot 1 (thread lump)
                 const check12 = this.mLoad(gt12, null, undefined);                 // M-elevation mLoad; reads thread lump NS entry
                 if (!check12.ok) {
                     this.fault('BOOT', `INIT_THRD mLoad(Thread) failed: ${check12.message}`);
@@ -1826,7 +1866,8 @@ class ChurchSimulator {
                 const _threadCC12     = _threadHdr12.valid ? _threadHdr12.cc : 0;
                 const _heapStart12    = 1 + 16 + _threadCC12;                     // first word above header + DR zone + c-list
                 const _spMax12        = (_threadHdr12.valid ? _threadHdr12.lumpSize : 256) - 12 - 1;
-                const gt5 = this.createGT(0, BOOT_NS_SLOT_THREAD, {R:1,W:1,X:0,L:0,S:0,E:0}, 1);  // RW Inform GT for the thread lump (Slot 1)
+                const _seq1h = (_initThrdEntry.word2_seals >>> 25) & 0x7F;
+                const gt5 = this.createGT(_seq1h, BOOT_NS_SLOT_THREAD, {R:1,W:1,X:0,L:0,S:0,E:0}, 1);  // RW Inform GT for the thread lump (Slot 1)
                 this._writeCR(5, gt5, _initThrdEntry);                             // CR5 ← heap RW token (base=thread lump, perms=RW)
                 this.output += `[BOOT] INIT_HEAP — CR5 <- thread heap (RW, Inform, Slot 1) heap=[+${_heapStart12}..+${_spMax12}] (CHANGE-consistent)\n`;
                 // Synthetic audit entry so the TSB Audit panel shows the CR5 heap

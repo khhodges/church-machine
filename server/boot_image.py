@@ -640,7 +640,11 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         mem[base + 3] = _abstract_gt_word(perms)
         clist_gts.append(create_gt(0, i, perms, 1))
 
-    ns_count = len(catalog)
+    # Count only non-null catalog entries: the highest non-null slot index + 1.
+    # len(catalog) overcounts by including the trailing null slot (slot 7).
+    # JS simulator tracks nsCount via writeNSEntry which skips null slots, so
+    # this matches the JS value (7 for the default 8-entry catalog).
+    ns_count = max((i + 1 for i, e in enumerate(catalog) if e is not None), default=0)
 
     # ----- Step 2 augmentation: NS entries for extended slots (≥8) ------
     # The 8-slot hardware catalog loop above only creates NS entries for
@@ -690,18 +694,12 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
             f"catalog entries. Increase nsSlotsMax to at least {ns_count}."
         )
     # ----- Stored nsCount word (NS_TABLE_BASE - 3) -----------------------
-    # Scan the NS table BEFORE the c-list is written to get the "clean"
-    # forward-scan count (highest non-null entry + 1).  Adding empty_count
-    # mirrors what _initNamespaceTable() writes after its step3 block.
-    # loadBootImage() reads this word instead of rescanning, so c-list
-    # entries at the NS table tail cannot inflate nsCount to MAX_NS_ENTRIES.
-    _ns_count_stored = 0
-    for _sc_i in range(MAX_NS_ENTRIES):
-        _sc_base = ns_table_base + _sc_i * NS_ENTRY_WORDS
-        if mem[_sc_base] != 0 or mem[_sc_base + 1] != 0:
-            _ns_count_stored = _sc_i + 1
-    _ns_count_stored += empty_count
-    mem[ns_table_base - 3] = _ns_count_stored & 0xFFFFFFFF
+    # Write ns_count + empty_count directly, mirroring _initNamespaceTable()
+    # in simulator.js which writes this.nsCount after the step3 reservation.
+    # The previous forward physical scan gave MAX_NS_ENTRIES (256) because
+    # the inverted NS layout places logical slot 0 at the highest physical
+    # address (always non-null), regardless of how many slots are used.
+    mem[ns_table_base - 3] = (ns_count + empty_count) & 0xFFFFFFFF
 
     # ----- Foundational lump headers -------------------------------------
     # Thread lump (NS slot 1): cw=32, cc=12, typ=2.
@@ -725,13 +723,37 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     # is already set by the NS entries loop above.
     # The c-list tail lives in the last ns_catalog_count words of the NS TABLE region
     # (ns_table_base + NS_TABLE_RESERVE − ns_catalog_count .. ns_table_base + NS_TABLE_RESERVE − 1).
-    # These overlap with null slots near the end of the NS table, which is safe.
+    # In the inverted NS layout, low slot numbers occupy the HIGHEST physical
+    # addresses (slot 0 at ns_table_base+NS_TABLE_RESERVE-4, slot 1 at -8, …).
+    # The c-list tail is placed at those same high addresses, so the write below
+    # overwrites NS slots 0 and 1 with c-list GT values.  After the write we
+    # restore them so that validateMAC passes in _bootStep B:01 / B:02.
     # This must happen BEFORE clist_gts is truncated so all catalog GT values are available.
     ns_catalog_count = len(catalog)
     for ci in range(ns_catalog_count):
         mem[ns_table_base + NS_TABLE_RESERVE - ns_catalog_count + ci] = (
             clist_gts[ci] if ci < len(clist_gts) else 0
         )
+
+    # ── Restore NS slots 0 and 1 after c-list write ──────────────────────────
+    # Re-write both entries from the same parameters used in the catalog loop
+    # so that validateMAC (seal check) passes in _bootStep B:01 / B:02.
+    # Downstream code uses clist_gts (the Python list), not physical memory
+    # words, so the c-list GT values at those addresses can be safely replaced.
+    _ns0_base = total - NS_ENTRY_WORDS           # _ns_slot_base(0) in JS
+    _ns0_loc  = ns_table_base
+    _ns0_lim  = (NS_TABLE_RESERVE - 1) & 0x1FFFF
+    mem[_ns0_base + 0] = _ns0_loc
+    mem[_ns0_base + 1] = pack_ns_word1(_ns0_lim, 0, 0, 0, 1, ns_catalog_count)
+    mem[_ns0_base + 2] = make_version_seals(0, _ns0_loc, _ns0_lim)
+    mem[_ns0_base + 3] = 0
+
+    _ns1_base = total - 2 * NS_ENTRY_WORDS       # _ns_slot_base(1) in JS
+    _ns1_loc  = mem[_ns1_base + 0]               # word0 not overwritten by c-list
+    _ns1_lim  = (thread_size - 1) & 0x1FFFF
+    mem[_ns1_base + 1] = pack_ns_word1(_ns1_lim, 0, 0, 0, 1, 0)
+    mem[_ns1_base + 2] = make_version_seals(0, _ns1_loc, _ns1_lim)
+    mem[_ns1_base + 3] = 0
 
     # Truncate to DEMO_CLIST_SIZE (11 entries for minimal 8-slot namespace).
     clist_gts = clist_gts[:DEMO_CLIST_SIZE]

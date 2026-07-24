@@ -107,7 +107,8 @@ function bootSim() {
     assert(loaded === true,
         `[T2] loadLumpBinary should return true but returned ${loaded}`);
 
-    const nsBase = sim.NS_TABLE_BASE + 3 * sim.NS_ENTRY_WORDS;
+    // Inverted NS layout: slot i is at NS_TABLE_BASE + NS_TABLE_RESERVE − (i+1)×NS_ENTRY_WORDS
+    const nsBase = sim._nsSlotBase(3);
     const slot3Word0 = sim.memory[nsBase] >>> 0;
     assert(slot3Word0 === EXTENDED_BASE,
         `[T2] NS slot 3 word0 should be EXTENDED_BASE (0x${EXTENDED_BASE.toString(16)}) but is 0x${slot3Word0.toString(16)}`);
@@ -126,7 +127,8 @@ function bootSim() {
         return;
     }
 
-    const nsBase51 = sim.NS_TABLE_BASE + 51 * sim.NS_ENTRY_WORDS;
+    // Inverted NS layout: slot i is at NS_TABLE_BASE + NS_TABLE_RESERVE − (i+1)×NS_ENTRY_WORDS
+    const nsBase51 = sim._nsSlotBase(51);
     const slot51Loc = sim.memory[nsBase51] >>> 0;
 
     // Slot 51 location should be 0 (no lump installed) or point to memory

@@ -235,7 +235,9 @@ def test_ns_slot0_word0_is_ns_table_base():
     image = generate_boot_image(cfg, LUMPS_DIR)
     words = _parse_image(image, total)
 
-    slot0_word0 = words[ns_table_base + 0 * NS_ENTRY_WORDS]
+    # Inverted NS layout: slot i lives at total − (i+1) × NS_ENTRY_WORDS.
+    # Slot 0 is at the highest physical address in the NS table region.
+    slot0_word0 = words[total - (0 + 1) * NS_ENTRY_WORDS]
     assert slot0_word0 == ns_table_base, (
         f"NS slot 0 word0 = 0x{slot0_word0:05X}; "
         f"expected NS_TABLE_BASE = 0x{ns_table_base:05X}.  "
@@ -277,8 +279,9 @@ def test_boot_abstr_ns_entry_points_to_thread_size():
     words = _parse_image(image, total)
 
     ns_table_base = total - NS_TABLE_RESERVE
-    slot_base     = ns_table_base + BOOT_ABSTR_NS_SLOT * NS_ENTRY_WORDS
-    ns_word0      = words[slot_base]
+    # Inverted NS layout: slot i lives at total − (i+1) × NS_ENTRY_WORDS.
+    slot_base = total - (BOOT_ABSTR_NS_SLOT + 1) * NS_ENTRY_WORDS
+    ns_word0  = words[slot_base]
 
     assert ns_word0 == expected_phys, (
         f"NS slot {BOOT_ABSTR_NS_SLOT} (Boot.Abstr) word0 = 0x{ns_word0:04X}; "
@@ -301,11 +304,12 @@ def test_ns_table_at_top_not_at_zero():
     image = generate_boot_image(cfg, LUMPS_DIR)
     words = _parse_image(image, total)
 
-    # At the NS TABLE base, slot 0 word0 should be ns_table_base (self-ref).
-    ns_table_first_word = words[ns_table_base]
-    assert ns_table_first_word == ns_table_base, (
-        f"NS_TABLE_BASE (word 0x{ns_table_base:04X}) = 0x{ns_table_first_word:08X}; "
-        f"expected 0x{ns_table_base:08X} (NS slot 0 self-referential location).  "
+    # Inverted NS layout: slot 0 word0 lives at total − NS_ENTRY_WORDS (highest
+    # physical address in the NS table region), not at ns_table_base + 0.
+    ns_slot0_word0 = words[total - NS_ENTRY_WORDS]
+    assert ns_slot0_word0 == ns_table_base, (
+        f"NS slot 0 word0 (at word 0x{total - NS_ENTRY_WORDS:04X}) = 0x{ns_slot0_word0:08X}; "
+        f"expected NS_TABLE_BASE = 0x{ns_table_base:08X} (NS slot 0 is self-referential).  "
         "NS TABLE must be at the top of memory in A7 v1.2."
     )
 
