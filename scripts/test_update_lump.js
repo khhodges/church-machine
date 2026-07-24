@@ -299,7 +299,7 @@ console.log('\n── Update mode ───────────────�
 
 // T10: c-list words are preserved through update
 {
-    const clistGT = [0x48800003, 0x40800001];  // 2 GT words
+    const clistGT = [0x4A000003, 0x42000001];  // 2 GT words (v2.0: type in bits[26:25])
     setupTestEntry({ cw: 2, cc: 2 });
     writeSource(SIMPLE_SOURCE);
     buildAndWriteLump(SIMPLE_SOURCE, clistGT);
