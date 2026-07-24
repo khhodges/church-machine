@@ -217,12 +217,13 @@ function lumpAudit(words, manifest, lineNums) {
     //   carries its own c-list (cc > 0) the slot must be in range 0..cc-1.
     //   When cc=0 the LUMP uses the ambient boot c-list at runtime, so no
     //   per-LUMP slot-bounds check is possible or meaningful — slots are exempt.
-    //   BRANCH (opcode 17): sign-extended 15-bit offset must land in [0, cw-1].
+    //   BRANCH (opcode 23, v2.0 ISA): sign-extended 15-bit offset must land in [0, cw-1].
+    //   Note: opcode 17 = DWRITE (device write) — not BRANCH — in v2.0.
     // Skipped when binary size or bounds checks have already failed.
     if (actualWords === lumpSize && contentWords <= lumpSize && cw >= 1) {
         const _rciChurchOps = new Set([0, 1, 8, 9]);
         const _rciOpName    = { 0: 'LOAD', 1: 'SAVE', 8: 'ELOADCALL', 9: 'XLOADLAMBDA' };
-        const _rciBranchOp  = 17;
+        const _rciBranchOp  = 23;  // v2.0 ISA: BRANCH is opcode 23 (opcode 17 = DWRITE)
         const _rciViolations = [];
         const _rncViolations = [];  // RNC — NULL GT in a valid c-list slot (warning)
 
@@ -342,7 +343,8 @@ function lumpAudit(words, manifest, lineNums) {
                 ruleId: 'RNC',
                 severity: 'warn',
                 message: `NULL GT in c-list \u2014 ${_slotLabel} contain${_nullSlots.length === 1 ? 's' : ''} a NULL GT (0x00000000).`,
-                detail: _rncViolations.map(v => v.msg).join(' '),
+                detail: _rncViolations.map(v => v.msg).join(' ') +
+                    ' Note: c-list slots are always 0x00000000 in a freshly compiled binary \u2014 the runtime fills them at load time. This warning is expected for any lump that has not yet been deployed to the namespace.',
                 violations: _rncViolations,
             });
         }

@@ -174,8 +174,8 @@ function loadViaSlot(slot) {
 // ── RCI6: BRANCH violation also threads lineNums when provided ────────────────
 {
     // Build a lump where the single code word is a BRANCH with out-of-range offset.
-    // BRANCH opcode=17, cond=AL, offset=10 (target codeIdx=0+10=10, but cw=1 so out-of-range)
-    const BRANCH_AL_FAR = encodeInstr(17, AL, 0, 0, 10);
+    // BRANCH opcode=23 (v2.0 ISA), cond=AL, offset=10 (target codeIdx=0+10=10, but cw=1 so out-of-range)
+    const BRANCH_AL_FAR = encodeInstr(23, AL, 0, 0, 10);
     const words    = buildLump64([BRANCH_AL_FAR], 0 /* cc=0 */);
     const lineNums = [null, 99]; // word[1] came from source line 99
     const results  = lumpAudit(words, null, lineNums);
@@ -372,7 +372,7 @@ function loadViaSlot(slot) {
 
 // DSP8: BRANCH violation with sourceLine → line set on entry
 {
-    const BRANCH_FAR = encodeInstr(17, AL, 0, 0, 10); // offset 10 out-of-range for cw=1
+    const BRANCH_FAR = encodeInstr(23, AL, 0, 0, 10); // offset 10 out-of-range for cw=1 (v2.0: BRANCH=opcode 23)
     const words      = buildLump64([BRANCH_FAR], 0);
     const lineNums   = [null, 99];
     const errors     = lumpAudit(words, null, lineNums).filter(r => r.severity === 'error');
