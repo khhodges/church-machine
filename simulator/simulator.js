@@ -27,18 +27,14 @@ if (typeof module !== 'undefined' && typeof AbstractGTManager === 'undefined') {
 //   (I/O segment and Boot ROM are overlaid in the lump area at NS-registered addresses)
 //
 // NAMESPACE TABLE (NS)
-//   Each entry is 4 words wide (stride = 16 bytes); word3 at +12 is reserved (always zero):
-//     word0  location   — base address of the abstraction's lump (Golden Token)
-//     word1  limit/meta — bits[16:0] lump size in words; bits[25:17] c-list
-//                         count; bits[27:26] GT type (Null/Inform/Outform/
-//                         Abstract); bit[28] G-bit (GC liveness — matches
-//                         hardware Word1[28], excluded from CRC/integrity32
-//                         by design so GC can set/clear without resealing);
-//                         bit[29] reserved; bit[30] reserved (f_flag moved
-//                         to GT word bit[25], per-token not per-NS-entry);
-//                         bit[31] b-flag
-//     word2  seals      — bits[31:25] version; bits[15:0] CRC-16 seal
-//     word3  reserved   — must be zero; reserved for future Navana per-slot GT
+//   Each entry is 4 words wide (stride = 16 bytes); layout matches hardware WORD2_LAYOUT: ★v2.0
+//     word0  location   — lump base byte address (32-bit pointer)
+//     word1  authority  — WORD2_LAYOUT: limit_offset[20:0] | gt_seq[29:21] | g_bit[30] | f_flag[31]
+//                         g_bit[30]: GC liveness mark — mutable; masked from integrity32 (no reseal needed)
+//                         f_flag[31]: Far indicator — 0=local, 1=remote IDE node; also masked from integrity32
+//                         Both g_bit and f_flag are NS SLOT properties, not GT word fields. ★v2.0
+//     word2  integrity  — integrity32(word0, word1 with g_bit[30] and f_flag[31] cleared); 32-bit parallel check
+//     word3  abstract_gt — advisory Abstract GT annotation (M-bit gated; invisible to user-mode LOAD)
 //
 // THREAD LUMP LAYOUT  (256 words, NS[1] "Boot.Thread")
 //   +0        Header word
@@ -2644,32 +2640,32 @@ class ChurchSimulator {
     }
 
     markLive(idx) {
-        // Matches hardware mload.py RESET_GBIT: clears G-bit (Word1[28]) on successful load.
-        // G-bit at bit[28] — excluded from CRC-16 seal (seal covers location+limit17 only),
-        // so this write requires no seal recomputation. Real-time update matches hardware.
+        // Matches hardware mload.py RESET_GBIT: clears G-bit (WORD2_LAYOUT Word1[30]) on successful load.
+        // g_bit at bit[30] — excluded from integrity32 (both g_bit[30] and f_flag[31] masked),
+        // so this write requires no seal recomputation. Real-time update matches hardware. ★v2.0
         const base = this._nsSlotBase(idx);
         const w1 = this.memory[base + 1];
         if (this.gcPolarity === 0) {
-            this.memory[base + 1] = (w1 | (1 << 28)) >>> 0;
+            this.memory[base + 1] = (w1 | (1 << 30)) >>> 0;
         } else {
-            this.memory[base + 1] = (w1 & ~(1 << 28)) >>> 0;
+            this.memory[base + 1] = (w1 & ~(1 << 30)) >>> 0;
         }
     }
 
     markGarbage(idx) {
-        // Matches hardware GC mark phase: sets G-bit (Word1[28]) to suspect.
+        // Matches hardware GC mark phase: sets G-bit (WORD2_LAYOUT Word1[30]) to suspect. ★v2.0
         const base = this._nsSlotBase(idx);
         const w1 = this.memory[base + 1];
         if (this.gcPolarity === 0) {
-            this.memory[base + 1] = (w1 & ~(1 << 28)) >>> 0;
+            this.memory[base + 1] = (w1 & ~(1 << 30)) >>> 0;
         } else {
-            this.memory[base + 1] = (w1 | (1 << 28)) >>> 0;
+            this.memory[base + 1] = (w1 | (1 << 30)) >>> 0;
         }
     }
 
     getGBit(idx) {
         const base = this._nsSlotBase(idx);
-        return (this.memory[base + 1] >>> 28) & 1;
+        return (this.memory[base + 1] >>> 30) & 1;  // g_bit at WORD2_LAYOUT[30] ★v2.0
     }
 
     isGarbage(idx) {
@@ -2997,10 +2993,11 @@ class ChurchSimulator {
     // Only CR15 can hold M=1 (hardware enforces via single 4-input AND gate).
 
     _integrity32(w0, w1) {
-        // ROL(w0, 7) XOR ROL(w1 & ~(1<<28), 13) XOR 0xDEADBEEF
-        // Matches hardware/integrity32.py: G-bit (bit 28) is masked from w1.
+        // ROL(w0, 7) XOR ROL(w1_masked, 13) XOR 0xDEADBEEF
+        // Matches hardware/integrity32.py G_BIT_MASK_32 = 0x3FFFFFFF:
+        // both g_bit[30] and f_flag[31] are masked from w1 before the check. ★v2.0
         const rol32 = (x, n) => (((x << n) | (x >>> (32 - n))) >>> 0);
-        const w1m = (w1 & 0xEFFFFFFF) >>> 0;
+        const w1m = (w1 & 0x3FFFFFFF) >>> 0;
         return (rol32(w0 >>> 0, 7) ^ rol32(w1m, 13) ^ 0xDEADBEEF) >>> 0;
     }
 

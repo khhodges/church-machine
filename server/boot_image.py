@@ -144,9 +144,9 @@ def create_abstract_sperm_gt():
 def create_abstract_gt(ab_type, rw_perms, gt_seq, ab_data):
     """Encode a self-describing Abstract GT word (type=0b11).
 
-    Layout: [31:27]=ab_type  [26:25]=R/W  [24:23]=0b11  [22:16]=gt_seq  [15:0]=ab_data
+    v2.0 Layout: [31:27]=ab_type  [26:25]=gt_type=0b11  [24]=R  [23]=W  [22:16]=gt_seq  [15:0]=ab_data
     Only R and W are valid perm bits; X/L/S/E/B are repurposed as ab_type.
-    Mirrors simulator.js createAbstractGT().
+    Mirrors simulator.js createAbstractGT() (★v2.0 bit positions).
 
     Raises ValueError if any of X/L/S/E/B are present in rw_perms — those bits
     are repurposed as ab_type and must never appear as perm keys.
@@ -157,14 +157,14 @@ def create_abstract_gt(ab_type, rw_perms, gt_seq, ab_data):
             f"create_abstract_gt: {', '.join(illegal)} are not valid perm bits for "
             f"Abstract GTs — they are repurposed as ab_type.  Use only R and W."
         )
-    # Layout: bit[26]=R, bit[25]=W  (R is the higher bit per spec)
+    # v2.0 layout: gt_type=0b11 at [26:25], R at bit[24], W at bit[23] ★v2.0
     r_bit = 1 if rw_perms.get("R") else 0
     w_bit = 1 if rw_perms.get("W") else 0
     return _u32(
         ((ab_type & 0x1F) << 27) |
-        (r_bit            << 26) |   # R at bit[26]
-        (w_bit            << 25) |   # W at bit[25]
-        (0b11             << 23) |
+        (0b11             << 25) |   # gt_type=Abstract at [26:25] ★v2.0
+        (r_bit            << 24) |   # R at bit[24] ★v2.0
+        (w_bit            << 23) |   # W at bit[23] ★v2.0
         ((gt_seq & 0x7F)  << 16) |
         (ab_data & 0xFFFF)
     )

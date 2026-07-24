@@ -1323,6 +1323,93 @@ _R19_NON_WIP_TOKENS = sorted(
 )
 
 
+def _parse_abstract_gt_v2(gt32):
+    """Parse a 32-bit Abstract GT word using v2.0 bit positions.
+
+    v2.0 layout:
+      [31:27] ab_type      — Abstract category (0x00=I/O)
+      [26:25] gt_type      — must be 0b11 (Abstract)
+      [24]    R            — Read permission
+      [23]    W            — Write permission
+      [22:16] gt_seq       — Version/generation counter (7-bit in Abstract GTs)
+      [15:0]  ab_data      — Device-specific payload
+        [15:8]  device_class
+        [7:0]   device_data
+
+    Mirrors simulator.js parseAbstractGT() ★v2.0.
+    """
+    gt32 = gt32 & 0xFFFFFFFF
+    ab_type      = (gt32 >> 27) & 0x1F
+    gt_type      = (gt32 >> 25) & 0x3
+    R            = (gt32 >> 24) & 1
+    W            = (gt32 >> 23) & 1
+    gt_seq       = (gt32 >> 16) & 0x7F
+    ab_data      = gt32 & 0xFFFF
+    device_class = (ab_data >> 8) & 0xFF
+    device_data  = ab_data & 0xFF
+    return dict(ab_type=ab_type, gt_type=gt_type, R=R, W=W,
+                gt_seq=gt_seq, ab_data=ab_data,
+                device_class=device_class, device_data=device_data)
+
+
+# Known Abstract GT literals from the boot catalog (v2.0 bit positions).
+# Layout: (gt_word, label, expected_fields)
+# expected_fields: ab_type, gt_type, R, W, device_class, device_data
+_ABSTRACT_GT_CASES = [
+    (0x07800100, "LED[0]  R+W",  dict(ab_type=0, gt_type=3, R=1, W=1, device_class=1, device_data=0)),
+    (0x07800101, "LED[1]  R+W",  dict(ab_type=0, gt_type=3, R=1, W=1, device_class=1, device_data=1)),
+    (0x07800102, "LED[2]  R+W",  dict(ab_type=0, gt_type=3, R=1, W=1, device_class=1, device_data=2)),
+    (0x07800103, "LED[3]  R+W",  dict(ab_type=0, gt_type=3, R=1, W=1, device_class=1, device_data=3)),
+    (0x07800104, "LED[4]  R+W",  dict(ab_type=0, gt_type=3, R=1, W=1, device_class=1, device_data=4)),
+    (0x07800105, "LED[5]  R+W",  dict(ab_type=0, gt_type=3, R=1, W=1, device_class=1, device_data=5)),
+    (0x07800200, "UART[0] R+W",  dict(ab_type=0, gt_type=3, R=1, W=1, device_class=2, device_data=0)),
+    (0x07000300, "BTN[0]  R",    dict(ab_type=0, gt_type=3, R=1, W=0, device_class=3, device_data=0)),
+    (0x07800400, "TIMER[0] R+W", dict(ab_type=0, gt_type=3, R=1, W=1, device_class=4, device_data=0)),
+]
+
+
+class TestR20_BootCatalogAbstractGTRoundTrip:
+    """R20: Boot-catalog Abstract GT literals round-trip through parseAbstractGT (v2.0 layout).
+
+    Catches any future v3 layout change that silently produces wrong decoded fields.
+    The Button literal (R-only) is the sentinel: v1 encoded 0x05800300 (gt_type at [24:23],
+    R at [26]); v2.0 corrects it to 0x07000300 (gt_type at [26:25], R at [24]).
+    """
+
+    @pytest.mark.parametrize("gt_word,label,expected", _ABSTRACT_GT_CASES,
+                             ids=[c[1] for c in _ABSTRACT_GT_CASES])
+    def test_abstract_gt_decode(self, gt_word, label, expected):
+        decoded = _parse_abstract_gt_v2(gt_word)
+        for field, exp_val in expected.items():
+            actual = decoded[field]
+            assert actual == exp_val, (
+                f"Abstract GT {label} (0x{gt_word:08X}): "
+                f"{field} = {actual}, expected {exp_val}.\n"
+                f"  Full decode: {decoded}\n"
+                f"  If this fails after a layout change, update both the literal "
+                f"  and this test table together — never update just one."
+            )
+
+    def test_button_gt_is_v2_not_v1(self):
+        """Button R-only GT must be 0x07000300 (v2.0), not 0x05800300 (v1)."""
+        v1_stale = 0x05800300
+        v2_correct = 0x07000300
+        v1_decoded = _parse_abstract_gt_v2(v1_stale)
+        v2_decoded = _parse_abstract_gt_v2(v2_correct)
+        assert v2_decoded["gt_type"] == 3, (
+            f"v2.0 Button GT 0x{v2_correct:08X}: gt_type should be 3 (Abstract), "
+            f"got {v2_decoded['gt_type']}."
+        )
+        assert v2_decoded["R"] == 1 and v2_decoded["W"] == 0, (
+            f"v2.0 Button GT 0x{v2_correct:08X}: R=1, W=0 expected; "
+            f"got R={v2_decoded['R']}, W={v2_decoded['W']}."
+        )
+        assert v1_decoded["gt_type"] != 3 or v1_decoded["R"] != 1 or v1_decoded["W"] != 0, (
+            f"v1 stale literal 0x{v1_stale:08X} incorrectly passes v2.0 decode — "
+            "sentinel check is no longer distinguishing v1 from v2."
+        )
+
+
 class TestR19_NoProductionStubLumps:
     """R19: No shipped .lump binary in server/lumps/ may have an all-RETURN code
     region.  An all-RETURN LUMP is a stub — every callable method returns

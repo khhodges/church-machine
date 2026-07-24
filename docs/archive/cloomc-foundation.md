@@ -66,8 +66,8 @@ Three things are new in the Church Machine:
    hardware words. The Church Machine encodes the full capability — slot
    index, revocation sequence, permission bits, bind flag, and type — into
    a single 32-bit word. Every GT is a complete, self-contained run-time capability
-   expression that can be validated, forged with machine secret, and instantly
-   revoked in O(1) by incrementing a 7-bit version counter.
+   expression that can be validated, formed and signed, and instantly
+   revoked in O(1) by incrementing a 9-bit version counter. ★v2.0
 
 ---
 
@@ -80,10 +80,16 @@ functionality. The 32-bit GT word encodes:
 
 - **What** can be accessed (`slot_id`, 16 bits — the namespace index)
 - **How** it can be accessed (`dom` + `perm[2:0]`, 4 bits — domain selector (0=Turing {X,W,R}, 1=Church {E,S,L}) plus 3-bit permission payload; Turing/Church domains are mutualy exclusive structurally enforced by the `dom` (domain) bit.
-- **Whether** this instance is current (`gt_seq`, 7 bits — revocation counter)
+- **Whether** this instance is current (`gt_seq`, 9 bits — revocation counter) ★v2.0
 - **What kind** of resource it is (`gt_type`, 2 bits — Null, Inform, Outform, Abstract)
 - **Whether** it can be propagated (`b_flag`, 1 bit — bind permission)
-- **Whether** it targets a far/remote resource (`f_flag`, 1 bit — Far indicator, per-token)
+
+Total: 16 + 9 + 2 + 1 + 3 + 1 = 32 bits exactly. ★v2.0
+
+> **Note (v2.0):** `f_flag` (Far indicator) has moved from the GT word to NS Slot Word 1
+> bit [31] — it is a property of the namespace entry, not of the token itself.  Both
+> `f_flag` and `g_bit` (NS Slot Word 1 bit [30]) are masked out before integrity32 is
+> computed so the IDE can set them freely without resealing.
 
 The permissions are not advisory. The hardware reads the permission bits
 before permitting any microcoded instruction step to proceed. A program that holds only an

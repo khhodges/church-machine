@@ -36,7 +36,13 @@ class ChurchSwitch(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
-        CR_PRIV_BASE = 8  # arithmetic base: 8+5=CR13, 8+7=CR15 (valid SWITCH targets only)
+        # §8 answer (GT v2.0 spec open question): CR8→CR12 migration status.
+        # CR_PRIV_BASE=8 is an arithmetic encoding constant — it maps SWITCH's
+        # 3-bit target field to 4-bit CR addresses: target=4→CR12, target=5→CR13,
+        # target=6→CR14, target=7→CR15.  This is NOT a stale CR8 reference.
+        # The "second thread register" lives at CR12 (loaded at boot by CHANGE AL,CR12,CR15,#1).
+        # The CR8→CR12 migration is fully resolved; no outstanding stale CR8 usage remains.
+        CR_PRIV_BASE = 8  # arithmetic base: 8+4=CR12, 8+5=CR13, 8+7=CR15
 
         u_mload = ChurchMLoad()
         m.submodules.u_mload = u_mload

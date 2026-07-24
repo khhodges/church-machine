@@ -4609,6 +4609,13 @@ def get_lump(token_hex):
     tokens the first 8 hex chars encode word0_location (the lump identity);
     the remaining 16 chars carry word1_limit and word2_seals from the NS entry
     and are used only for cross-validation in the library fallback.
+
+    §8 answer (GT v2.0 spec open question): Content verifiability.
+    The response includes both a CRC-32 preamble word (prepended to the payload
+    by _lump_with_crc) for corruption detection and an X-Lump-Hash: sha256:<hex>
+    response header carrying the SHA-256 of the raw lump bytes (before CRC prefix).
+    The caller can verify the lump is authentic by computing sha256(raw_lump_bytes)
+    and comparing against the X-Lump-Hash header value.
     """
     from flask import Response
     # 96-bit IDE token = 24 hex chars (word0||word1||word2 of NS Outform entry).
@@ -4632,10 +4639,13 @@ def get_lump(token_hex):
                           ' (GitHub not configured — Mum Tunnel Library unavailable)'
             return jsonify({"error": f"Unknown lump token 0x{key8}{github_hint}"}), 404
 
+    import hashlib as _hashlib_lump
     payload = _lump_with_crc(data)
+    lump_sha256 = _hashlib_lump.sha256(data).hexdigest()
     resp = Response(payload, mimetype='application/octet-stream',
                     headers={'Content-Length': str(len(payload)),
-                             'X-Lump-Source': source})
+                             'X-Lump-Source': source,
+                             'X-Lump-Hash': f'sha256:{lump_sha256}'})
     return resp
 
 

@@ -1,6 +1,6 @@
 # Abstract GTs — Self-Describing Device Capabilities
 
-**v1.0 — 2026-04-29**
+**v2.0 — 2026-07-24**
 **CONFIDENTIAL**
 
 *Introduced in Task #406; UART, Button, and Timer migrated in Task #431.*
@@ -30,17 +30,17 @@ For 6 LEDs:
 ## Word Layout
 
 ```
- 31  30  29  28  27 | 26  25 | 24  23 | 22  ..  16 | 15  ..  0
-[   ab_type (5b)   ] [R] [W] [ type ] [  gt_seq  ] [  ab_data  ]
-      32 types          I/O   = 0b11     version     16-bit payload
+ 31  30  29  28  27 | 26  25  | 24 | 23 | 22  ..  16 | 15  ..  0
+[   ab_type (5b)   ] [ type ] [R] [W] [  gt_seq  ] [  ab_data  ]
+      32 types        = 0b11   R/W      version     16-bit payload
 ```
 
 | Field     | Bits    | Width | Notes |
 |-----------|---------|-------|-------|
 | `ab_type` | [31:27] | 5     | Abstract category (32 possible) |
-| `R`       | [26]    | 1     | Read permission |
-| `W`       | [25]    | 1     | Write permission |
-| `type`    | [24:23] | 2     | = `0b11` — identifies Abstract GT |
+| `gt_type` | [26:25] | 2     | = `0b11` — identifies Abstract GT ★v2.0 |
+| `R`       | [24]    | 1     | Read permission ★v2.0 |
+| `W`       | [23]    | 1     | Write permission ★v2.0 |
 | `gt_seq`  | [22:16] | 7     | Version/generation counter |
 | `ab_data` | [15:0]  | 16    | Device-specific payload |
 
@@ -88,9 +88,9 @@ Slot 13: Abstract GT  ab_type=I/O  R|W  LED[5]  → 0x07800105
 
 Word breakdown for `0x07800100` (LED[0]):
 - bits[31:27] = `0b00000` → ab_type = 0x00 (I/O)
-- bit[26]     = `1`       → R permission
-- bit[25]     = `1`       → W permission
-- bits[24:23] = `0b11`    → type = Abstract
+- bits[26:25] = `0b11`    → gt_type = Abstract ★v2.0
+- bit[24]     = `1`       → R permission ★v2.0
+- bit[23]     = `1`       → W permission ★v2.0
 - bits[22:16] = `0b0000000` → gt_seq = 0
 - bits[15:8]  = `0x01`    → device_class = LED
 - bits[7:0]   = `0x00`    → device_data = pin 0
@@ -99,7 +99,7 @@ Word breakdown for `0x07800100` (LED[0]):
 
 ```
 Slot 14: Abstract GT  ab_type=I/O  R|W  UART[0]   → 0x07800200  (TX register)
-Slot 15: Abstract GT  ab_type=I/O  R    Button[0]  → 0x05800300  (state register)
+Slot 15: Abstract GT  ab_type=I/O  R    Button[0]  → 0x07000300  (state register) ★v2.0
 Slot 16: Abstract GT  ab_type=I/O  R|W  Timer[0]   → 0x07800400  (TICKS_LO register)
 ```
 
@@ -285,11 +285,10 @@ IDLE ──(trigger + valid DR11)──→ WRITEBACK ──→ IDLE
 WRITEBACK applies three checks in order; any failure raises `INVALID_OP` and clears M:
 
 1. **NULL GT**: DR11 `gt_type` field must be non-NULL.
-   - ctmm: GT_TYPE_NULL = `0b00`; bits `[1:0]` of XR11.
-   - hardware: GT_TYPE_NULL = `0b00`; bits `[24:23]` of DR11.
+   - `gt_type = 0b00` at bits `[26:25]` of the 32-bit GT word (hardware WORD2_LAYOUT) means NULL. ★v2.0
 2. **Integrity**: `integrity32(DR12, DR13) == DR14` (shadow consistency tag).
-3. **Version**: `GT.version == seals.version` — `DR11.version` (ctmm bits `[31:25]`) must
-   equal `DR15.version` (ctmm bits `[31:25]`); hardware compares `dr11.gt_seq` vs `dr13.gt_seq`.
+3. **Version**: `GT.gt_seq == ns_slot.gt_seq` — `DR11.gt_seq` (bits `[24:16]`, 9-bit) must
+   match `DR13.gt_seq` (NS Slot Word1 WORD2_LAYOUT bits `[29:21]`, 9-bit). ★v2.0
    This revocation check catches writes using a stale M-window from a reclaimed GT slot.
 
 A valid writeback packs DR11–DR14 back into CR15 and clears M.
