@@ -24,11 +24,11 @@
 //   #dashPanel-crdetail within the dashboard but does not switch the top-level
 //   view, so we must do that first to make the ancestors visible.
 //
-// Bit-layout for word0 (GT format v1.1):
-//   [31]=b_flag [30:28]=perm[2:0] [27]=dom [26]=spare [25]=f_flag [24:23]=gt_type [22:16]=gt_seq [15:0]=index
+// Bit-layout for word0 (GT format v2.0):
+//   [31]=b_flag [30:28]=perm[2:0] [27]=dom [26:25]=gt_type [24:16]=gt_seq [15:0]=index
 //   dom=0 (Turing): perm[2]=X, perm[1]=W, perm[0]=R
-//   X-only: dom=0, perm3=0b100 → bits[30:28]=100 → 0x40000000; Inform type (01<<23=0x00800000) → 0x40800001
-//   R-only: dom=0, perm3=0b001 → bits[30:28]=001 → 0x10000000; Inform type → 0x10800001
+//   X-only: dom=0, perm=0b100 → bits[30:28]=100 → 0x40000000; Inform type (01<<25=0x02000000) → 0x42000001
+//   R-only: dom=0, perm=0b001 → bits[30:28]=001 → 0x10000000; Inform type → 0x12000001
 //   A non-zero index in bits [15:0] ensures the CR is not treated as null.
 
 const { test, expect } = require('@playwright/test');
@@ -43,7 +43,7 @@ const { test, expect } = require('@playwright/test');
  *
  * @param {import('@playwright/test').Page} page
  * @param {number} crIdx  - CR slot index (0–15)
- * @param {number} word0  - encoded GT word0 (v1.1 layout: b[31] perm[30:28] dom[27] spare[26] f[25] type[24:23] seq[22:16] idx[15:0])
+ * @param {number} word0  - encoded GT word0 (v2.0 layout: b[31] perm[30:28] dom[27] type[26:25] seq[24:16] idx[15:0])
  */
 async function injectCRAndOpen(page, crIdx, word0) {
     await page.evaluate(({ crIdx, word0 }) => {
@@ -61,7 +61,7 @@ async function injectCRAndOpen(page, crIdx, word0) {
  *
  * @param {import('@playwright/test').Page} page
  * @param {number} crIdx  - CR slot index (0–15)
- * @param {number} word0  - encoded GT word0 (v1.1 layout: b[31] perm[30:28] dom[27] spare[26] f[25] type[24:23] seq[22:16] idx[15:0])
+ * @param {number} word0  - encoded GT word0 (v2.0 layout: b[31] perm[30:28] dom[27] type[26:25] seq[24:16] idx[15:0])
  */
 async function injectCRAndClick(page, crIdx, word0) {
     await page.evaluate(({ crIdx, word0 }) => {
@@ -92,12 +92,12 @@ test.describe('CR detail tab correction in the live UI', () => {
 
     // ── Test 1: code CR keeps the "code" tab ──────────────────────────────────
     //
-    // word0 = 0x40800001: X=1 (perm[2]=bit30, dom=0) + Inform type (bit23) + index=1.
+    // word0 = 0x42000001: X=1 (perm[2]=bit30, dom=0) + Inform type (bits[26:25]=01) + index=1.
     // showCode=true → correctCRDetailTab('code', true, false, false) = 'code'.
     // Expected: #crdPanel-code is visible; the correction makes no change.
 
     test('shows Code panel for a code CR (hasX=true)', async ({ page }) => {
-        await injectCRAndOpen(page, 0, 0x40800001);
+        await injectCRAndOpen(page, 0, 0x42000001);
 
         const codePanel = page.locator('#crdPanel-code');
         await codePanel.waitFor({ state: 'attached' });
@@ -106,13 +106,13 @@ test.describe('CR detail tab correction in the live UI', () => {
 
     // ── Test 2: data CR corrects tab from "code" to "register" ───────────────
     //
-    // word0 = 0x10800001: R=1 (perm[0]=bit28, dom=0) + Inform type (bit23) + index=1; no X, no L.
+    // word0 = 0x12000001: R=1 (perm[0]=bit28, dom=0) + Inform type (bits[26:25]=01) + index=1; no X, no L.
     // showCode=false, showCList=false, showData=true.
     // correctCRDetailTab('code', false, false, true) → 'register'.
     // Expected: #crdPanel-register is visible; #crdPanel-code absent.
 
     test('corrects tab from "code" to "register" for a data CR (hasR=true, no X)', async ({ page }) => {
-        await injectCRAndOpen(page, 1, 0x10800001);
+        await injectCRAndOpen(page, 1, 0x12000001);
 
         const registerPanel = page.locator('#crdPanel-register');
         await registerPanel.waitFor({ state: 'attached' });
@@ -125,7 +125,7 @@ test.describe('CR detail tab correction in the live UI', () => {
 
     // ── Test 3: Rule 2 — code-only CR snaps 'register' back to 'code' ────────
     //
-    // word0 = 0x40800001: X=1 (perm[2]=bit30, dom=0) + Inform type (bit23) + index=1; no R → showData=false.
+    // word0 = 0x42000001: X=1 (perm[2]=bit30, dom=0) + Inform type (bits[26:25]=01) + index=1; no R → showData=false.
     // After openCRDetail resets crDetailTab to 'code' we manually set it to
     // 'register' (simulating a stale tab value) and call updateCRDetail() again.
     // correctCRDetailTab('register', true, false, false) must return 'code'.
@@ -133,7 +133,7 @@ test.describe('CR detail tab correction in the live UI', () => {
 
     test('Rule 2: snaps "register" back to "code" for a code-only CR (hasX=true, no R)', async ({ page }) => {
         // Step 1: open a code CR so the panel DOM is initialised.
-        await injectCRAndOpen(page, 2, 0x40800001);   // CR2: X-only
+        await injectCRAndOpen(page, 2, 0x42000001);   // CR2: X-only
 
         // Step 2: override crDetailTab to the invalid value and re-run the
         // correction by calling updateCRDetail() directly.
@@ -152,7 +152,7 @@ test.describe('CR detail tab correction in the live UI', () => {
 
     // ── Test 4: Rule 3 — CR without C-List snaps 'clist' to 'register' ───────
     //
-    // word0 = 0x10800001: R=1 (perm[0]=bit28, dom=0) + Inform type (bit23) + index=1; no X, no L → showCList=false.
+    // word0 = 0x12000001: R=1 (perm[0]=bit28, dom=0) + Inform type (bits[26:25]=01) + index=1; no X, no L → showCList=false.
     // After openCRDetail resets crDetailTab to 'code' (then corrects to
     // 'register'), we manually set crDetailTab to 'clist' and call
     // updateCRDetail() again.
@@ -161,7 +161,7 @@ test.describe('CR detail tab correction in the live UI', () => {
 
     test('Rule 3: snaps "clist" to "register" for an R-only CR (no C-List, no code)', async ({ page }) => {
         // Step 1: open an R-only CR so the panel DOM is initialised.
-        await injectCRAndOpen(page, 4, 0x10800001);   // CR4: R-only
+        await injectCRAndOpen(page, 4, 0x12000001);   // CR4: R-only
 
         // Step 2: override crDetailTab to 'clist' (the CR has no C-List) and
         // re-run the correction.
@@ -188,10 +188,10 @@ test.describe('CR detail tab correction in the live UI', () => {
     //
     // A data CR (R-only, no X) is injected so the tab correction must fire
     // ('code' → 'register'), making the test sensitive to wiring regressions.
-    // word0 = 0x10800001: R=1 (perm[0]=bit28, dom=0) + Inform type (bit23) + index=1.
+    // word0 = 0x12000001: R=1 (perm[0]=bit28, dom=0) + Inform type (bits[26:25]=01) + index=1.
 
     test('tab correction fires via a real CR row click (click-handler wiring)', async ({ page }) => {
-        await injectCRAndClick(page, 3, 0x10800001);   // CR3: R-only, no X
+        await injectCRAndClick(page, 3, 0x12000001);   // CR3: R-only, no X
 
         // After the click, openCRDetail(3) has run, crDetailTab was corrected
         // from 'code' to 'register', and #dashPanel-crdetail is now active.
