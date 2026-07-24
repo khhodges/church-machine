@@ -1171,6 +1171,10 @@ class ChurchSimulator {
         }
 
         const cr6 = this.cr && this.cr[6];
+        // UI-layer presence check: all-zeros word0 means no c-list register is loaded.
+        // This is intentionally === 0 (not isNullGT), because we only need to know
+        // whether a CR6 object has been populated at all — we are not enforcing the
+        // hardware capability-type gate (that is isNullGT's job inside mLoad/_fetchInstruction).
         if (!cr6 || (cr6.word0 >>> 0) === 0) return { ok: false, error: 'CR6 is null — no active c-list' };
 
         const clistBase = cr6.word1 >>> 0;
