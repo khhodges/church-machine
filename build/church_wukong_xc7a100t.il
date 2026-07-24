@@ -9,7 +9,7 @@ module \top
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:112"
   wire width 1 \clk$4
 
-  attribute \src "/home/runner/workspace/hardware/boot_rom.py:621"
+  attribute \src "/home/runner/workspace/hardware/boot_rom.py:623"
   wire width 10 \addr
 
   attribute \src "/home/runner/workspace/hardware/core.py:53"
@@ -18,7 +18,7 @@ module \top
   attribute \src "/home/runner/workspace/hardware/core.py:54"
   wire width 32 \imem_data
 
-  attribute \src "/home/runner/workspace/hardware/boot_rom.py:622"
+  attribute \src "/home/runner/workspace/hardware/boot_rom.py:624"
   wire width 32 \data
 
   attribute \src "/home/runner/workspace/hardware/core.py:65"
@@ -73857,23 +73857,23 @@ connect \src_cr_data.word2_w2 \src_cr_data [95:64]
 end
 
 attribute \generator "Amaranth"
-attribute \src "/home/runner/workspace/hardware/boot_rom.py:625"
+attribute \src "/home/runner/workspace/hardware/boot_rom.py:627"
 module \top.boot_rom
 
-  attribute \src "/home/runner/workspace/hardware/boot_rom.py:627"
+  attribute \src "/home/runner/workspace/hardware/boot_rom.py:629"
   wire width 32 \rom_comb
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:112"
   wire width 1 input 0  \clk
 
-  attribute \src "/home/runner/workspace/hardware/boot_rom.py:621"
+  attribute \src "/home/runner/workspace/hardware/boot_rom.py:623"
   wire width 10 input 1  \addr
 
-  attribute \src "/home/runner/workspace/hardware/boot_rom.py:622"
+  attribute \src "/home/runner/workspace/hardware/boot_rom.py:624"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 output 2  \data
 
-  attribute \src "/home/runner/workspace/hardware/boot_rom.py:627"
+  attribute \src "/home/runner/workspace/hardware/boot_rom.py:629"
   process $1
     assign \rom_comb [31:0] 32'00000000000000000000000000000000
     switch \addr [9:0]
@@ -73916,7 +73916,7 @@ module \top.boot_rom
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/boot_rom.py:622"
+  attribute \src "/home/runner/workspace/hardware/boot_rom.py:624"
   cell $dff $2
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1

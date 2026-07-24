@@ -1403,12 +1403,53 @@ def boot_config_post():
         cfg["step2"] = {"lumps": norm}
     if step3 is not None:
         cfg["step3"] = {"emptySlotCount": int(step3.get("emptySlotCount", 0) or 0)}
+    # Preserve slotLabels from the existing file — they are written by the
+    # /api/boot-config/slot-label endpoint and must not be wiped by a
+    # Boot Image Designer save that doesn't include them.
+    if os.path.exists(BOOT_CONFIG_PATH):
+        try:
+            with open(BOOT_CONFIG_PATH) as _f:
+                _existing = json.load(_f)
+            if isinstance(_existing.get("slotLabels"), dict):
+                cfg["slotLabels"] = _existing["slotLabels"]
+        except Exception:
+            pass
     try:
         with open(BOOT_CONFIG_PATH, "w") as f:
             json.dump(cfg, f, indent=2)
     except Exception as e:
         return jsonify({"ok": False, "error": f"Failed to write boot-config.json: {e}"}), 500
     return jsonify({"ok": True, "config": cfg})
+
+
+@app.route("/api/boot-config/slot-label", methods=["POST"])
+def boot_config_slot_label():
+    """Merge a single NS slot → label mapping into boot-config.json.
+    Called by +Add LUMP so the label survives hard resets without touching
+    the step1/step2/step3 fields written by the Boot Image Designer."""
+    data = request.get_json(silent=True) or {}
+    slot = data.get("slot")
+    label = str(data.get("label", "") or "").strip()
+    if not isinstance(slot, int) or slot < 0 or slot >= 256:
+        return jsonify({"ok": False, "error": "slot must be an integer 0–255"}), 400
+    if not label:
+        return jsonify({"ok": False, "error": "label must be a non-empty string"}), 400
+    cfg = {}
+    if os.path.exists(BOOT_CONFIG_PATH):
+        try:
+            with open(BOOT_CONFIG_PATH) as f:
+                cfg = json.load(f)
+        except Exception:
+            pass
+    if not isinstance(cfg.get("slotLabels"), dict):
+        cfg["slotLabels"] = {}
+    cfg["slotLabels"][str(slot)] = label
+    try:
+        with open(BOOT_CONFIG_PATH, "w") as f:
+            json.dump(cfg, f, indent=2)
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to write boot-config.json: {e}"}), 500
+    return jsonify({"ok": True, "slot": slot, "label": label})
 
 # ---------------------------------------------------------------------------
 # Boot image binary generator (Task #217)

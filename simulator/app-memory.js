@@ -3093,6 +3093,15 @@ function _nsTableAddConfirm() {
         sim.writeNSEntry(slot, lumpBase, limit17, 0, 0, gtType, 0, hdr.cc, abstractGt);
         sim.nsLabels[slot] = name;
 
+        // Persist slot→label to boot-config so the label survives hard resets.
+        // Uses a lightweight PATCH endpoint that merges into the existing config
+        // without wiping step1/step2/step3 fields.
+        fetch('/api/boot-config/slot-label', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ slot: slot, label: name })
+        }).catch(function(e) { console.warn('[NSADD] slot-label persist failed:', e); });
+
         // ── Populate c-list GTs in DMEM from sidecar capabilities ─────────────
         // c-list lives at lumpBase + (lumpSize - cc) per parseLumpHeader:
         // "c-list starts at lumpBase + (lumpSize - cc)" — call.py line 282.

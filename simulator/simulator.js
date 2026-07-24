@@ -375,8 +375,12 @@ class ChurchSimulator {
             }
             if (_bootCatalog[_bi]) {
                 this.nsLabels[_bi] = _bootCatalog[_bi].label;
-            } else if (!this.nsLabels[_bi] || this.nsLabels[_bi] === '(free)') {
-                this.nsLabels[_bi] = `slot_${_bi}`;
+            } else if (!this.nsLabels[_bi] || this.nsLabels[_bi] === '(free)' || this.nsLabels[_bi] === '(reserved)') {
+                // Slot has binary data but no catalog entry — use user-saved label from
+                // bootConfig.slotLabels (persisted by +Add LUMP) or fall back to slot_N.
+                // Also clears stale '(reserved)' that step3 wrote before the image was loaded.
+                const _savedLabel = cfg && cfg.slotLabels && cfg.slotLabels[_bi];
+                this.nsLabels[_bi] = _savedLabel || `slot_${_bi}`;
             }
         }
 
