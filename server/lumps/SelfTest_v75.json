@@ -37,5 +37,6 @@
   ],
   "source": "",
   "lump_version": 75,
-  "compiled_at": 1784384244.1230512
+  "compiled_at": 1784384244.1230512,
+  "boot_resident": true
 }

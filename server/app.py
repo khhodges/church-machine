@@ -1511,12 +1511,58 @@ def boot_image_download():
     return send_file(io.BytesIO(_image_bytes), mimetype="application/octet-stream",
                      as_attachment=True, download_name="boot-image.bin")
 
+def _boot_image_is_stale():
+    """Return True if any tracked LUMP source is newer than boot-image.bin.
+
+    Checked files: 00000600.lump (Boot.Abstr binary) and manifest.json
+    (controls boot_resident flag).  If boot-image.bin does not exist the
+    function returns False so callers fall through to their own 404 path.
+    """
+    if not os.path.isfile(BOOT_IMAGE_PATH):
+        return False
+    try:
+        _img_mtime = os.path.getmtime(BOOT_IMAGE_PATH)
+        _lumps_dir = os.path.dirname(BOOT_IMAGE_PATH)
+        for _fname in ("00000600.lump", "manifest.json"):
+            _p = os.path.join(_lumps_dir, _fname)
+            if os.path.isfile(_p) and os.path.getmtime(_p) > _img_mtime:
+                return True
+    except OSError:
+        pass
+    return False
+
+
+def _auto_regen_boot_image():
+    """Regenerate boot-image.bin from current LUMPs and saved config.
+
+    Returns (img_bytes, error_string).  error_string is None on success.
+    """
+    try:
+        _cfg, _err = _read_saved_boot_config()
+        if _err:
+            return None, f"Cannot read boot config: {_err}"
+        _blob = _boot_image_gen.generate_boot_image(_cfg, LUMPS_DIR)
+        with open(BOOT_IMAGE_PATH, "wb") as _fh:
+            _fh.write(_blob)
+        _load_boot_abstr_lump()
+        _load_boot_ns_lump()
+        logging.info("boot_image_binary: auto-regenerated boot-image.bin (LUMP source was newer)")
+        return _blob, None
+    except Exception as _exc:
+        logging.warning("boot_image_binary: auto-regenerate failed: %s", _exc)
+        return None, str(_exc)
+
+
 @app.route("/api/boot-image/binary", methods=["GET"])
 def boot_image_binary():
     """Same file as /download, served inline so the simulator can fetch
     it as an ArrayBuffer at boot without triggering a download dialog."""
     if not os.path.isfile(BOOT_IMAGE_PATH):
         return jsonify({"error": "boot-image.bin not generated yet"}), 404
+    if _boot_image_is_stale():
+        _new_bytes, _regen_err = _auto_regen_boot_image()
+        if _regen_err:
+            logging.warning("boot_image_binary: staleness regen failed (%s); serving cached copy", _regen_err)
     with open(BOOT_IMAGE_PATH, "rb") as _f:
         _image_bytes = _f.read()
     try:

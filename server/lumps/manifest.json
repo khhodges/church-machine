@@ -2011,7 +2011,7 @@
         "sidecar_file": "SelfTest_v75.json",
         "ns_slot": 6,
         "ns_slot_policy": "static",
-        "boot_resident": false,
+        "boot_resident": true,
         "lump_size": 512,
         "cw": 502,
         "cc": 8,
