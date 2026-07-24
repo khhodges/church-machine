@@ -7,29 +7,26 @@
   "lump_size": 64,
   "typ": 0,
   "content_type": "code",
-  "cw": 1,
+  "cw": 17,
   "cc": 1,
-  "status": "wip",
-  "source": "; LEDFlash abstraction\n; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\nabstraction LEDFlash {\n    capabilities {\n        ; (none \u2014 add capability grants here)\n    }\n\n    method run {\n        ; Main function\n        ; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n        ; TODO: write your code here\n\n        RETURN\n    }\n}",
+  "status": "live",
+  "source": "; ============================================================\n; Abstraction:  LED Flash\n; Description:  LED control — Section 1: LED blink (Ti60 F225 nucleus) / Section 2: Turing DR Test (full ISA exercise)\n; Author:       Church Machine Educational Platform\n; Version:      1.2\n; Created:      2026-05-09\n; Language:     Assembly\n; Dependencies: LED device (Abstract GT — capabilities-block position 0)\n; ============================================================\n; Capabilities required by this lump:\ncapabilities { LED0 RW }\n; Methods:\n;   1. blink — toggle LED0 at 1 Hz using nested delay loops (Ti60 F225 nucleus program)\n; ============================================================\n; ============================================\n; LED Blink — Ti60 F225 Hardware Nucleus Code\n; ============================================\n;\n; This is the exact binary burned into the\n; Ti60 F225 FPGA. It produces the 1 Hz LED\n; blink you can see on the board right now.\n;\n; HOW TO WATCH THIS IN THE SIMULATOR:\n; 1. Boot the machine (click Boot, or Step x6).\n; 2. Assemble this code, then click Step.\n; 3. Switch to Ti60 255 IDE — watch the Ti60 F225\n;    LED strip: LED0 (green) toggles with each\n;    DWRITE, exactly as on the physical board.\n;\n; ── Two-operand shorthand for LOAD (recommended) ────────────\n;\n;   LOAD CR3, LED0            ; two-operand shorthand — resolves by device name\n;\n; Equivalent raw form (slot number explicit):\n;\n;   LOAD CR3, CR6, 0          ; CR6 = c-list root; slot 0 = LED0 (capabilities-block position 0)\n;\n; Both produce identical machine code.  The named form (used here)\n; is preferred: it stays correct if the capabilities block is reordered.\n;\n; LED0 is a device GT (W-perm only) — it is accessed with DWRITE,\n; not CALL.  Device GTs have no callable methods, so named method selectors\n; do not apply here; two-operand shorthand for LOAD is still recommended.\n;\n; Path: LOAD CR3, LED0   → resolves LED0 → C-List[0] → LED_DEV GT\n;       DWRITE DR1, CR3, 0 → LED0 on\n;       DWRITE DR0, CR3, 0 → LED0 off\n;\n; On the FPGA (50 MHz): 380 × 16383 iters ≈ 0.5 s\n; per phase → 1 Hz blink total.\n; ============================================\n\n; --- Load LED0 Abstract GT via the two-operand shorthand ---\n; Named load: equiv. to raw form  LOAD CR3, CR6, 0  (capabilities-block position 0)\nLOAD CR3, LED0            ; LED0 Abstract GT → CR3 (capabilities-block position 0, R+W)\n\n; --- DR1 = 1 (the \"on\" value) ---\nIADD DR1, DR0, #1\n\n; ── LED ON phase ─────────────────────────────\nled_on:\nDWRITE DR1, CR3, 0        ; LED0 = 1  (write 1 through gate)\nIADD DR3, DR0, #3         ; outer delay count  (FPGA: 380)\nouter_on:\nIADD DR2, DR0, #3         ; inner delay count  (FPGA: 16383)\ninner_on:\nISUB DR2, DR2, #1\nBRANCHNE inner_on\nISUB DR3, DR3, #1\nBRANCHNE outer_on\n\n; ── LED OFF phase ────────────────────────────\nDWRITE DR0, CR3, 0        ; LED0 = 0  (write 0 through gate)\nIADD DR3, DR0, #3\nouter_off:\nIADD DR2, DR0, #3\ninner_off:\nISUB DR2, DR2, #1\nBRANCHNE inner_off\nISUB DR3, DR3, #1\nBRANCHNE outer_off\n\nBRANCH led_on             ; loop forever\n",
   "description": "",
   "methods": [
     {
-      "name": "run",
+      "name": "blink",
       "offset": 0,
-      "length": 1,
-      "description": "Main function"
+      "length": 17,
+      "description": "Toggle LED0 at ~1 Hz using nested delay loops"
     }
   ],
   "capabilities": [
     {
-      "name": "self",
+      "name": "LED0",
       "rights": [
-        "E"
-      ],
-      "grants": [
-        "E"
-      ],
-      "nsIndex": -1
+        "R",
+        "W"
+      ]
     }
   ],
   "pet_names": {
@@ -42,5 +39,5 @@
     "status": "unknown"
   },
   "lump_version": 2,
-  "compiled_at": 1784544392.980453
+  "compiled_at": 1784881229.431
 }

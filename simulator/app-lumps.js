@@ -4659,8 +4659,9 @@ async function openLumpInEditor(token) {
         }
 
         // ── Try to restore original source from sidecar detail endpoint ──────
-        // Only override _compiledDisasm when a non-empty source is found;
-        // older LUMPs (compiled before this feature) silently fall through.
+        // Only override _compiledDisasm when a non-empty, non-stub source is
+        // found; older LUMPs and stub WIP skeletons silently fall through so
+        // the real disassembly is shown instead of a TODO placeholder.
         // Skip for in-memory lumps — the disasm IS the source.
         var _sourceRestored = false;
         if (!_inMemoryLump) {
@@ -4669,8 +4670,14 @@ async function openLumpInEditor(token) {
                 if (_dr.ok) {
                     var _dj = await _dr.json();
                     if (_dj && typeof _dj.source === 'string' && _dj.source.trim().length > 0) {
-                        _compiledDisasm = _dj.source;
-                        _sourceRestored = true;
+                        // Guard: never restore a stub/WIP placeholder as if it were
+                        // meaningful compiled source — that hides the real disasm.
+                        var _isStubSource = _dj.source.indexOf('; TODO: write your code here') !== -1
+                                         || _dj.source.indexOf('; TODO: write your code') !== -1;
+                        if (!_isStubSource) {
+                            _compiledDisasm = _dj.source;
+                            _sourceRestored = true;
+                        }
                     }
                 }
             } catch (_dfe) {}
