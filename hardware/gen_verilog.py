@@ -13,6 +13,10 @@ _BOOT_THRD_MUST_NOT  = "reg boot_cap8_wr_en"
 _PERM_CHECK_GT_SEQ_MIN_BITS = 9
 _PERM_CHECK_SEAL_MIN_BITS   = 32
 
+_PERM_CHECK_VERILOG_MODULE = r"\\top\.u_perm_check"
+_PERM_CHECK_SEAL_SIGNALS   = ("calculated_seal", "stored_seal")
+_PERM_CHECK_SEQ_SIGNALS    = ("gt_seq", "stored_gt_seq")
+
 
 def _validate_perm_check_widths(gt_seq_w, stored_gt_seq_w,
                                calculated_seal_w, stored_seal_w,
@@ -52,24 +56,126 @@ def _validate_perm_check_widths(gt_seq_w, stored_gt_seq_w,
         sys.exit(1)
 
 
+def _extract_perm_check_module_body(verilog_text):
+    """Return the full text of the \top.u_perm_check Verilog module, or '' if absent.
+
+    Amaranth emits submodules as escaped-identifier modules whose names encode
+    the elaboration hierarchy (e.g. ``\top.u_perm_check``).  When check_seal
+    or check_version are wired to a constant 0, Amaranth optimises out the
+    seal/version comparison logic entirely and the corresponding signals
+    (calculated_seal, stored_seal, gt_seq, stored_gt_seq) are absent from the
+    module body.  The caller uses this to decide whether the Verilog-text width
+    check is applicable.
+    """
+    m = re.search(
+        r'module\s+\\top\.u_perm_check\b.*?endmodule',
+        verilog_text,
+        re.DOTALL,
+    )
+    return m.group(0) if m else ""
+
+
+def _validate_verilog_perm_check_widths(module_body, output_path):
+    """Validate seal and gt_seq signal widths in the \top.u_perm_check Verilog module.
+
+    This is a second line of defence that catches Amaranth backend regressions
+    where the Python Signal() is correctly sized but the emitted Verilog carries
+    a narrowed declaration (e.g. because a dead-code elimination pass truncates
+    an incompletely-wired comparison).
+
+    The check is *conditional* on the enable signals being non-trivially wired:
+
+      - Seal signals (calculated_seal, stored_seal) are only checked when
+        check_seal is NOT assigned a constant 1'h0 in the module body.
+        When check_seal = 1'h0, Amaranth constant-folds seal_valid to 1 and
+        emits narrowed placeholder wires for the dead comparison operands.
+        The guard skips the [31:0] assertion in that case to avoid false positives.
+
+      - gt_seq signals (gt_seq, stored_gt_seq) follow the same pattern for
+        check_version.  The guard skips the [8:0] assertion when check_version
+        is constant-zero.
+
+    Observability is detected by the presence of the constant assignment:
+        assign check_seal    = 1'h0;   -- seal check trivially off
+        assign check_version = 1'h0;   -- version check trivially off
+
+    When those assignments are absent, the enable is driven by real logic and
+    the comparison operands must carry their correct full-width declarations.
+
+    ``module_body`` should be the text returned by
+    ``_extract_perm_check_module_body``.  Passing an empty string (module not
+    found in the Verilog) is always a no-op.
+
+    Raises SystemExit(1) if a narrowed declaration is detected.
+    """
+    if not module_body:
+        return
+
+    _SEAL_CONST_ZERO    = "assign check_seal = 1'h0;"
+    _VERSION_CONST_ZERO = "assign check_version = 1'h0;"
+
+    seal_trivially_off    = _SEAL_CONST_ZERO    in module_body
+    version_trivially_off = _VERSION_CONST_ZERO in module_body
+
+    failed = []
+
+    if not seal_trivially_off:
+        for sig in _PERM_CHECK_SEAL_SIGNALS:
+            if re.search(r'\b' + re.escape(sig) + r'\b', module_body):
+                if not re.search(r'\[31:0\]\s+' + re.escape(sig) + r'\b', module_body):
+                    failed.append(
+                        f"  \\top.u_perm_check.{sig}: expected [31:0] in Verilog declaration"
+                    )
+
+    if not version_trivially_off:
+        for sig in _PERM_CHECK_SEQ_SIGNALS:
+            if re.search(r'\b' + re.escape(sig) + r'\b', module_body):
+                if not re.search(r'\[8:0\]\s+' + re.escape(sig) + r'\b', module_body):
+                    failed.append(
+                        f"  \\top.u_perm_check.{sig}: expected [8:0] in Verilog declaration"
+                    )
+
+    if failed:
+        print(
+            f"\nERROR: perm-check Verilog width regression detected for {output_path}:",
+            file=sys.stderr,
+        )
+        for msg in failed:
+            print(msg, file=sys.stderr)
+        print(
+            "The generated Verilog for \\top.u_perm_check carries narrowed signal\n"
+            "declarations.  This can cause silent truncation on silicon.\n"
+            "Verify Signal() widths in hardware/perm_check.py and re-run generation.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 def _check_perm_check_widths(verilog_text, output_path):
     """Abort if ChurchPermCheck signal widths fall below the widened spec.
 
-    Reads signal widths directly from the ChurchPermCheck Python class —
-    the authoritative source — rather than from the generated Verilog text.
-    (Amaranth's backend may optimise away signals that are not connected to
-    observable ports, so the .v file alone is not a reliable width witness.)
+    Two complementary checks are performed:
+
+    1. Python-class check (always active):
+       Reads signal widths directly from the ChurchPermCheck Python class ---
+       the authoritative source.  Catches accidental Signal() narrowing
+       (e.g. Signal(9) to Signal(8)) regardless of Amaranth's optimisations.
+
+    2. Verilog-text check (conditional --- skipped while signals are dead logic):
+       Extracts the \top.u_perm_check module section from the generated
+       Verilog and regex-checks that observable seal and gt_seq signals carry
+       the correct bit-width declarations ([31:0] and [8:0] respectively).
+       This fires only when check_seal or check_version are non-trivially
+       connected; when both are wired to 0, Amaranth removes the signals
+       entirely and the regex step is skipped.
 
     Signals checked and their required minima:
 
-      gt_seq, stored_gt_seq  — widened to 9 bits to accommodate the full
-                               version counter; must be \u2265 9 bits.
+      gt_seq, stored_gt_seq  --- widened to 9 bits to accommodate the full
+                               version counter; must be >= 9 bits.
 
-      calculated_seal, stored_seal — widened to 32 bits for a full-word
-                                     integrity seal; must be \u2265 32 bits.
+      calculated_seal, stored_seal --- widened to 32 bits for a full-word
+                                     integrity seal; must be >= 32 bits.
 
-    This guard fires at generation time so that a future accidental
-    Signal() narrowing (e.g. Signal(9) \u2192 Signal(8)) is caught before
+    Both guards fire at generation time so that regressions are caught before
     the netlist reaches synthesis.
     """
     from .perm_check import ChurchPermCheck
@@ -82,7 +188,8 @@ def _check_perm_check_widths(verilog_text, output_path):
         output_path=output_path,
     )
 
-
+    module_body = _extract_perm_check_module_body(verilog_text)
+    _validate_verilog_perm_check_widths(module_body, output_path)
 def _check_stale_cr7(verilog_text, output_path):
     """Abort if stale CR7 signal names are present in freshly-generated Verilog.
 
