@@ -628,12 +628,20 @@ WUKONG_DEMO_CLIST[10] = 0   # Constants R-GT cleared: NS slot 9 absent in Wukong
 # WUKONG_NUC_PROGRAM — Wukong V2 callhome boot program
 #
 # Executed from ROM[0] immediately after hw_init and boot_start.
-# Sequence:
+# Sequence (every ~1 Hz loop iteration):
 #   1. Load LED_DEV (c-list slot 5 → CR3) and UART_DEV (c-list slot 6 → CR4)
-#   2. Turn LED0 on (visible boot indicator)
-#   3. Transmit banner "CM:WUKONG\r\n" over UART at 57600 baud, polling
-#      STATUS (UART MMIO word 1) between bytes
-#   4. Enter ~1 Hz LED0 blink loop forever
+#   2. ── loop top ──
+#      a. Turn LED0 on
+#      b. Transmit banner "CM:WUKONG\r\n" over UART at 57600 baud, polling
+#         STATUS (UART MMIO word 1) between bytes
+#      c. Delay ~0.498 s (on phase)
+#      d. Turn LED0 off
+#      e. Delay ~0.498 s (off phase)
+#      f. Branch back to loop top
+#
+# Moving the banner into the blink loop means the banner repeats once per
+# second (~1 Hz) continuously.  Connecting the serial port at any time
+# causes the next "CM:WUKONG\r\n" to arrive within 1 second.
 #
 # MMIO layout (base = 0x40000000, word-addressed via DWRITE/DREAD):
 #   CR3 (LED_DEV,  NS slot 3): word 0 = LED0 {B,G,R}; bit 0 = R → physical pin
@@ -643,7 +651,7 @@ WUKONG_DEMO_CLIST[10] = 0   # Constants R-GT cleared: NS slot 9 absent in Wukong
 #   DR0 = 0 (zero register, never written)
 #   DR1 = 1 (LED "on" value)
 #   DR2 = inner delay counter
-#   DR3 = outer delay counter (re-used; CR3 is re-loaded at setup only)
+#   DR3 = outer delay counter
 #   DR5 = UART byte value
 #   DR6 = UART STATUS read
 #   DR7 = STATUS - 1 scratch (EQ=0 means busy)
@@ -659,6 +667,28 @@ WUKONG_DEMO_CLIST[10] = 0   # Constants R-GT cleared: NS slot 9 absent in Wukong
 #   inner = 16383 iterations × 4 cycles = ~65532 cycles
 #   outer = 380   iterations  → 380 × 65532 ≈ 24,902,160 cycles ≈ 0.498 s per phase
 #   → LED0 on ~0.498 s, off ~0.498 s  →  ~1 Hz blink
+#
+# Word-offset table (base = ROM word 0):
+#   0  LOAD  CR3, CR6[5]        — LED_DEV → CR3
+#   1  LOAD  CR4, CR6[6]        — UART_DEV → CR4
+#   2  IADD  DR1, DR0, #1       — DR1 = 1
+#   ── loop top ──────────────────────────────────────────────── index 3
+#   3  DWRITE CR3[0], DR1       — LED0 = on
+#   4-58  banner "CM:WUKONG\r\n"  (11 bytes × 5 instrs = 55 words)
+#  59  IADD  DR3, DR0, #380     — on-phase outer count
+#  60  IADD  DR2, DR0, #16383   — on-phase inner count  ← outer-on-top
+#  61  ISUB  DR2, DR2, #1       ← inner-on-top
+#  62  BRANCH NE, #-1           → 61
+#  63  ISUB  DR3, DR3, #1
+#  64  BRANCH NE, #-4           → 60
+#  65  DWRITE CR3[0], DR0       — LED0 = off
+#  66  IADD  DR3, DR0, #380     — off-phase outer count
+#  67  IADD  DR2, DR0, #16383   — off-phase inner count  ← outer-off-top
+#  68  ISUB  DR2, DR2, #1       ← inner-off-top
+#  69  BRANCH NE, #-1           → 68
+#  70  ISUB  DR3, DR3, #1
+#  71  BRANCH NE, #-4           → 67
+#  72  BRANCH AL, #-69          → 3 (loop top: LED on + banner)
 # ---------------------------------------------------------------------------
 
 def _uart_send_byte(char_val):
@@ -674,61 +704,58 @@ def _uart_send_byte(char_val):
 _WUKONG_BANNER = b"CM:WUKONG\r\n"
 
 WUKONG_NUC_PROGRAM = [
-    # ── Setup (indices 0-3) ──────────────────────────────────────────────────
+    # ── Setup (indices 0-2) — one-time capability loads ──────────────────────
     # 0: load LED_DEV capability into CR3 (c-list slot 5)
     encode_church(ChurchOpcode.LOAD, CondCode.AL, cr_dst=3, cr_src=6, imm=5),
     # 1: load UART_DEV capability into CR4 (c-list slot 6)
     encode_church(ChurchOpcode.LOAD, CondCode.AL, cr_dst=4, cr_src=6, imm=6),
     # 2: DR1 = 1  (LED "on" value)
-    encode_turing(TuringOpcode.IADD,   CondCode.AL, dr_dst=1, dr_src=0, imm=1),
-    # 3: LED0 = on (boot indicator, stays on until banner sent)
+    encode_turing(TuringOpcode.IADD, CondCode.AL, dr_dst=1, dr_src=0, imm=1),
+    # ── Loop top (index 3) — repeated every ~1 Hz ────────────────────────────
+    # 3: LED0 = on  ← unconditional branch target from index 72
     encode_turing(TuringOpcode.DWRITE, CondCode.AL, dr_dst=1, dr_src=3, imm=0),
 ]
 
-# ── UART callhome banner: "CM:WUKONG\r\n" (5 instructions × 11 bytes = 55) ──
-# Indices 4-58 inclusive.
+# ── UART callhome banner: "CM:WUKONG\r\n" inside the loop ────────────────────
+# Indices 4-58 inclusive (11 bytes × 5 instructions = 55 words).
 for _wukong_ch in _WUKONG_BANNER:
     WUKONG_NUC_PROGRAM.extend(_uart_send_byte(_wukong_ch))
 
-# ── LED blink loop (~1 Hz forever after banner) ──────────────────────────────
-# Indices 59-73.
-# _BLINK_TOP = 59  (DWRITE DR1→CR3[0]: LED0 on — also the unconditional branch target)
-_WUKONG_BLINK_START = len(WUKONG_NUC_PROGRAM)   # = 4 + 11*5 = 59
+# ── On-delay + LED off + off-delay + loop branch (indices 59-72) ─────────────
+_WUKONG_LOOP_TOP = 3   # index of "LED0 = on" — branch target for BRANCH AL
 
 WUKONG_NUC_PROGRAM += [
-    # 59: LED0 = on  ← top of blink loop (unconditional branch target)
-    encode_turing(TuringOpcode.DWRITE, CondCode.AL, dr_dst=1, dr_src=3, imm=0),
-    # 60: outer delay count
+    # 59: on-phase outer count
     encode_turing(TuringOpcode.IADD,   CondCode.AL, dr_dst=3, dr_src=0, imm=380),
-    # 61: inner delay count  ← outer-on-top (reset inner each outer iteration)
+    # 60: on-phase inner count  ← outer-on-top
     encode_turing(TuringOpcode.IADD,   CondCode.AL, dr_dst=2, dr_src=0, imm=16383),
-    # 62: inner decrement  ← inner-on-top
+    # 61: inner decrement  ← inner-on-top
     encode_turing(TuringOpcode.ISUB,   CondCode.AL, dr_dst=2, dr_src=2, imm=1),
-    # 63: BRANCH NE → inner-on-top (62)     offset = 62-63 = -1
+    # 62: BRANCH NE → inner-on-top (61)   offset = 61-62 = -1
     encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=(-1) & 0x7FFF),
-    # 64: outer decrement
+    # 63: outer decrement
     encode_turing(TuringOpcode.ISUB,   CondCode.AL, dr_dst=3, dr_src=3, imm=1),
-    # 65: BRANCH NE → outer-on-top (61)     offset = 61-65 = -4
+    # 64: BRANCH NE → outer-on-top (60)   offset = 60-64 = -4
     encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=(-4) & 0x7FFF),
-    # 66: LED0 = off
+    # 65: LED0 = off
     encode_turing(TuringOpcode.DWRITE, CondCode.AL, dr_dst=0, dr_src=3, imm=0),
-    # 67: outer delay count (off phase)
+    # 66: off-phase outer count
     encode_turing(TuringOpcode.IADD,   CondCode.AL, dr_dst=3, dr_src=0, imm=380),
-    # 68: inner delay count  ← outer-off-top
+    # 67: off-phase inner count  ← outer-off-top
     encode_turing(TuringOpcode.IADD,   CondCode.AL, dr_dst=2, dr_src=0, imm=16383),
-    # 69: inner decrement  ← inner-off-top
+    # 68: inner decrement  ← inner-off-top
     encode_turing(TuringOpcode.ISUB,   CondCode.AL, dr_dst=2, dr_src=2, imm=1),
-    # 70: BRANCH NE → inner-off-top (69)    offset = 69-70 = -1
+    # 69: BRANCH NE → inner-off-top (68)  offset = 68-69 = -1
     encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=(-1) & 0x7FFF),
-    # 71: outer decrement
+    # 70: outer decrement
     encode_turing(TuringOpcode.ISUB,   CondCode.AL, dr_dst=3, dr_src=3, imm=1),
-    # 72: BRANCH NE → outer-off-top (68)    offset = 68-72 = -4
+    # 71: BRANCH NE → outer-off-top (67)  offset = 67-71 = -4
     encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=(-4) & 0x7FFF),
-    # 73: BRANCH AL → blink-top (59)        offset = 59-73 = -14
-    encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=(-14) & 0x7FFF),
+    # 72: BRANCH AL → loop top (3)        offset = 3-72 = -69
+    encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=(-69) & 0x7FFF),
 ]
 
-assert len(WUKONG_NUC_PROGRAM) == 74, f"WUKONG_NUC_PROGRAM length = {len(WUKONG_NUC_PROGRAM)}, expected 74"
+assert len(WUKONG_NUC_PROGRAM) == 73, f"WUKONG_NUC_PROGRAM length = {len(WUKONG_NUC_PROGRAM)}, expected 73"
 
 
 class BootRom(Elaboratable):

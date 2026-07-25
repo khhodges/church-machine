@@ -283,10 +283,11 @@ Set IOSTANDARD to LVCMOS33. Add `set_input_delay` / `set_output_delay` for GMII 
 | P1.6 Diagnostic build | ✅ | Counter blink — M21/G21/G20 hardware confirmed |
 | P1.6 CM build (V1, LED-only) | ✅ | EXIT_0, write_bitstream complete, 3,826,002 bytes |
 | P1.6 CM build (V2, UART+LED) | ✅ | EXIT_0, WNS=3.593 ns, 3,736,048 bytes — Jul 25 2026 |
+| P1.6 CM build (V3, repeating banner) | ☐ | Rebuild after WUKONG_NUC_PROGRAM restructure — banner now inside blink loop |
 | P1.7 Bitstream to Chromebook | ✅ | `build/church_wukong_xc7a100t.bit` in repo; `/dl/wukong-bit` endpoint live |
-| P1.8 Program board | ✅ | xc3sprog confirmed, 30.6 Mbit, 17.9 s (V1); re-flash with V2 bit |
-| P1.9 LED + UART behaviour | ☐ | Flash V2 bit; expect "CM:WUKONG\r\n" at 57600 baud on E3 + 1 Hz blink |
-| P2 UART callhome (CH340) | ✅ | UART TX wired to E3 (LVCMOS33); baud 57600; NUC_PROGRAM sends banner |
+| P1.8 Program board | ✅ | xc3sprog confirmed, 30.6 Mbit, 17.9 s (V1); re-flash with V3 bit |
+| P1.9 LED + UART behaviour | ☐ | Flash V3 bit; expect "CM:WUKONG\r\n" repeating at ~1 Hz on E3 + 1 Hz blink |
+| P2 UART callhome (CH340) | ✅ | UART TX wired to E3 (LVCMOS33); baud 57600; NUC_PROGRAM sends repeating banner |
 | P3.1 GMII pin audit | ☐ | Needs schematic |
 | P3.2 gmii_mac.py | ☐ | New file |
 | P3.3 wukong_ethernet_v3.py | ☐ | New file; old wukong_xc7a100t.py (v1.1 orphan) deleted |

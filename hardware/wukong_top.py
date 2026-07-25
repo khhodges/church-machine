@@ -56,9 +56,12 @@ from .uart_tx import UartTx
 
 # ── Wukong ROM: WUKONG_NUC_PROGRAM starting at word 0 ────────────────────────
 # WUKONG_NUC_PROGRAM:
-#   [0-3]   Setup: load LED_DEV (CR3) + UART_DEV (CR4), DR1=1, LED on
+#   [0-2]   Setup: load LED_DEV (CR3) + UART_DEV (CR4), DR1=1
+#   [3]     Loop top: LED0 on  ← unconditional branch target
 #   [4-58]  UART banner "CM:WUKONG\r\n" (11 bytes × 5 instructions)
-#   [59-73] 1 Hz LED blink loop (forever)
+#   [59-72] ~0.498s on-delay + LED0 off + ~0.498s off-delay + branch to [3]
+# The banner repeats every ~1 Hz so connecting the serial port at any time
+# yields a message within 1 second.
 # BOOT_PROGRAM is deliberately omitted — see module docstring for the PERM_L
 # fault root cause (LOAD CR15,CR15[0] faults on standalone FPGA).
 _WUKONG_ROM = list(WUKONG_NUC_PROGRAM)
