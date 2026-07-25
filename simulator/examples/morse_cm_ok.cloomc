@@ -1,0 +1,599 @@
+; ============================================================
+; Abstraction:  MorseCmOk
+; Description:  Blinks "CM OK" in Morse code on LED0.
+;               Every dit and dah is a CM DWRITE instruction executing.
+;               If the pattern appears on a physical board, the Church
+;               Machine is provably running — no heartbeat counter can
+;               forge a recognisable message.
+; Author:       Church Machine Educational Platform
+; Version:      1.0
+; Created:      2026-07-25
+; Language:     Assembly
+; Dependencies: LED device (Abstract GT — capabilities-block position 0)
+; ============================================================
+; Capabilities required by this lump:
+capabilities { LED0 RW }
+; Methods:
+;   1. morse — endless "CM OK" Morse loop on LED0
+; ============================================================
+;
+; MORSE REFERENCE
+; ═══════════════
+;   C  = -.-. (dah dit dah dit)
+;   M  = --   (dah dah)
+;   O  = ---  (dah dah dah)
+;   K  = -.-  (dah dit dah)
+;
+; TIMING RULES (standard Morse)
+;   dit     = 1 unit ON
+;   dah     = 3 units ON
+;   element gap  = 1 unit OFF  (between elements of same letter)
+;   letter gap   = 3 units OFF (between letters — 1 element gap + 2 extra)
+;   word gap     = 7 units OFF (between words   — 1 element gap + 6 extra)
+;
+; DELAY LOOP STRUCTURE (4-level nested)
+;   DR5 = scale  (1 = dit,  3 = dah,  N = N dits of silence)
+;   DR4 = outer  loop count
+;   DR3 = mid    loop count
+;   DR2 = inner  loop count (tight, 2 cycles per iteration)
+;
+;   Approximate cycles per dit = scale × outer × mid × inner × 2
+;
+; ─── SIMULATOR STEPPING (values baked into code) ─────────────
+;   DR4 = #2, DR3 = #2, DR2 = #2
+;   → 8 inner iterations per dit-unit; fast enough to step through
+;
+; ─── FPGA at 50 MHz — calibrated for ≈200 ms per dit ─────────
+;   Change EVERY #2 → #125 (DR4 outer) and the inner two #2 → #200
+;   Specifically: in each delay block, replace:
+;     IADD DR4, DR0, #2   →  IADD DR4, DR0, #125
+;     IADD DR3, DR0, #2   →  IADD DR3, DR0, #200
+;     IADD DR2, DR0, #2   →  IADD DR2, DR0, #200
+;   Keep DR5 (scale) values unchanged — they set dit vs dah vs gap.
+;   Result: 1×125×200×200×2 / 50 MHz ≈ 200 ms per dit
+;           3×125×200×200×2 / 50 MHz ≈ 600 ms per dah
+;
+; HOW TO WATCH THIS IN THE SIMULATOR:
+;   1. Boot the machine (click Boot, or Step × 6).
+;   2. Assemble this code, then click Step or Run.
+;   3. Switch to Ti60 255 IDE — watch LED0 (green) toggle:
+;      short = dit, long = dah, silence = gap.
+;   4. To read the live pattern on a physical FPGA board, update
+;      the delay counts to the FPGA values above, re-assemble,
+;      and deploy. A Morse-code reader or patient eye confirms
+;      the sequence: C  M  O  K
+;
+; ============================================================
+
+; --- Load LED0 Abstract GT via the two-operand shorthand ---
+LOAD CR3, LED0            ; LED0 device GT → CR3
+
+; --- DR1 = 1 (the "on" value) ---
+IADD DR1, DR0, #1
+
+; ════════════════════════════════════════════════════════════
+; Main loop — repeats "CM OK" indefinitely
+; ════════════════════════════════════════════════════════════
+morse:
+
+; ────────────────────────────────────────────────────────────
+; Letter C  =  -.-. (dah dit dah dit)
+; ────────────────────────────────────────────────────────────
+
+c_dah1:
+DWRITE DR1, CR3, 0            ; LED0 = 1
+IADD DR5, DR0, #3             ; dah = 3 units  (FPGA: #3 — unchanged)
+c_dah1_s:
+IADD DR4, DR0, #2             ; (FPGA: #125)
+c_dah1_o:
+IADD DR3, DR0, #2             ; (FPGA: #200)
+c_dah1_m:
+IADD DR2, DR0, #2             ; (FPGA: #200)
+c_dah1_i:
+ISUB DR2, DR2, #1
+BRANCHNE c_dah1_i
+ISUB DR3, DR3, #1
+BRANCHNE c_dah1_m
+ISUB DR4, DR4, #1
+BRANCHNE c_dah1_o
+ISUB DR5, DR5, #1
+BRANCHNE c_dah1_s
+DWRITE DR0, CR3, 0            ; LED0 = 0 (element gap)
+IADD DR5, DR0, #1             ; 1 dit silence
+c_dah1g_s:
+IADD DR4, DR0, #2
+c_dah1g_o:
+IADD DR3, DR0, #2
+c_dah1g_m:
+IADD DR2, DR0, #2
+c_dah1g_i:
+ISUB DR2, DR2, #1
+BRANCHNE c_dah1g_i
+ISUB DR3, DR3, #1
+BRANCHNE c_dah1g_m
+ISUB DR4, DR4, #1
+BRANCHNE c_dah1g_o
+ISUB DR5, DR5, #1
+BRANCHNE c_dah1g_s
+
+c_dit1:
+DWRITE DR1, CR3, 0            ; LED0 = 1
+IADD DR5, DR0, #1             ; dit = 1 unit
+c_dit1_s:
+IADD DR4, DR0, #2
+c_dit1_o:
+IADD DR3, DR0, #2
+c_dit1_m:
+IADD DR2, DR0, #2
+c_dit1_i:
+ISUB DR2, DR2, #1
+BRANCHNE c_dit1_i
+ISUB DR3, DR3, #1
+BRANCHNE c_dit1_m
+ISUB DR4, DR4, #1
+BRANCHNE c_dit1_o
+ISUB DR5, DR5, #1
+BRANCHNE c_dit1_s
+DWRITE DR0, CR3, 0            ; LED0 = 0 (element gap)
+IADD DR5, DR0, #1
+c_dit1g_s:
+IADD DR4, DR0, #2
+c_dit1g_o:
+IADD DR3, DR0, #2
+c_dit1g_m:
+IADD DR2, DR0, #2
+c_dit1g_i:
+ISUB DR2, DR2, #1
+BRANCHNE c_dit1g_i
+ISUB DR3, DR3, #1
+BRANCHNE c_dit1g_m
+ISUB DR4, DR4, #1
+BRANCHNE c_dit1g_o
+ISUB DR5, DR5, #1
+BRANCHNE c_dit1g_s
+
+c_dah2:
+DWRITE DR1, CR3, 0            ; LED0 = 1
+IADD DR5, DR0, #3             ; dah
+c_dah2_s:
+IADD DR4, DR0, #2
+c_dah2_o:
+IADD DR3, DR0, #2
+c_dah2_m:
+IADD DR2, DR0, #2
+c_dah2_i:
+ISUB DR2, DR2, #1
+BRANCHNE c_dah2_i
+ISUB DR3, DR3, #1
+BRANCHNE c_dah2_m
+ISUB DR4, DR4, #1
+BRANCHNE c_dah2_o
+ISUB DR5, DR5, #1
+BRANCHNE c_dah2_s
+DWRITE DR0, CR3, 0            ; LED0 = 0 (element gap)
+IADD DR5, DR0, #1
+c_dah2g_s:
+IADD DR4, DR0, #2
+c_dah2g_o:
+IADD DR3, DR0, #2
+c_dah2g_m:
+IADD DR2, DR0, #2
+c_dah2g_i:
+ISUB DR2, DR2, #1
+BRANCHNE c_dah2g_i
+ISUB DR3, DR3, #1
+BRANCHNE c_dah2g_m
+ISUB DR4, DR4, #1
+BRANCHNE c_dah2g_o
+ISUB DR5, DR5, #1
+BRANCHNE c_dah2g_s
+
+c_dit2:
+DWRITE DR1, CR3, 0            ; LED0 = 1
+IADD DR5, DR0, #1             ; dit
+c_dit2_s:
+IADD DR4, DR0, #2
+c_dit2_o:
+IADD DR3, DR0, #2
+c_dit2_m:
+IADD DR2, DR0, #2
+c_dit2_i:
+ISUB DR2, DR2, #1
+BRANCHNE c_dit2_i
+ISUB DR3, DR3, #1
+BRANCHNE c_dit2_m
+ISUB DR4, DR4, #1
+BRANCHNE c_dit2_o
+ISUB DR5, DR5, #1
+BRANCHNE c_dit2_s
+DWRITE DR0, CR3, 0            ; LED0 = 0 (element gap — 1 dit done)
+IADD DR5, DR0, #1
+c_dit2g_s:
+IADD DR4, DR0, #2
+c_dit2g_o:
+IADD DR3, DR0, #2
+c_dit2g_m:
+IADD DR2, DR0, #2
+c_dit2g_i:
+ISUB DR2, DR2, #1
+BRANCHNE c_dit2g_i
+ISUB DR3, DR3, #1
+BRANCHNE c_dit2g_m
+ISUB DR4, DR4, #1
+BRANCHNE c_dit2g_o
+ISUB DR5, DR5, #1
+BRANCHNE c_dit2g_s
+; C → M letter gap: 2 extra dits silence (1 dit element gap already done)
+c_lg:
+IADD DR5, DR0, #2
+c_lg_s:
+IADD DR4, DR0, #2
+c_lg_o:
+IADD DR3, DR0, #2
+c_lg_m:
+IADD DR2, DR0, #2
+c_lg_i:
+ISUB DR2, DR2, #1
+BRANCHNE c_lg_i
+ISUB DR3, DR3, #1
+BRANCHNE c_lg_m
+ISUB DR4, DR4, #1
+BRANCHNE c_lg_o
+ISUB DR5, DR5, #1
+BRANCHNE c_lg_s
+
+; ────────────────────────────────────────────────────────────
+; Letter M  =  -- (dah dah)
+; ────────────────────────────────────────────────────────────
+
+m_dah1:
+DWRITE DR1, CR3, 0            ; LED0 = 1
+IADD DR5, DR0, #3             ; dah
+m_dah1_s:
+IADD DR4, DR0, #2
+m_dah1_o:
+IADD DR3, DR0, #2
+m_dah1_m:
+IADD DR2, DR0, #2
+m_dah1_i:
+ISUB DR2, DR2, #1
+BRANCHNE m_dah1_i
+ISUB DR3, DR3, #1
+BRANCHNE m_dah1_m
+ISUB DR4, DR4, #1
+BRANCHNE m_dah1_o
+ISUB DR5, DR5, #1
+BRANCHNE m_dah1_s
+DWRITE DR0, CR3, 0            ; LED0 = 0 (element gap)
+IADD DR5, DR0, #1
+m_dah1g_s:
+IADD DR4, DR0, #2
+m_dah1g_o:
+IADD DR3, DR0, #2
+m_dah1g_m:
+IADD DR2, DR0, #2
+m_dah1g_i:
+ISUB DR2, DR2, #1
+BRANCHNE m_dah1g_i
+ISUB DR3, DR3, #1
+BRANCHNE m_dah1g_m
+ISUB DR4, DR4, #1
+BRANCHNE m_dah1g_o
+ISUB DR5, DR5, #1
+BRANCHNE m_dah1g_s
+
+m_dah2:
+DWRITE DR1, CR3, 0            ; LED0 = 1
+IADD DR5, DR0, #3             ; dah
+m_dah2_s:
+IADD DR4, DR0, #2
+m_dah2_o:
+IADD DR3, DR0, #2
+m_dah2_m:
+IADD DR2, DR0, #2
+m_dah2_i:
+ISUB DR2, DR2, #1
+BRANCHNE m_dah2_i
+ISUB DR3, DR3, #1
+BRANCHNE m_dah2_m
+ISUB DR4, DR4, #1
+BRANCHNE m_dah2_o
+ISUB DR5, DR5, #1
+BRANCHNE m_dah2_s
+DWRITE DR0, CR3, 0            ; LED0 = 0 (element gap — 1 dit done)
+IADD DR5, DR0, #1
+m_dah2g_s:
+IADD DR4, DR0, #2
+m_dah2g_o:
+IADD DR3, DR0, #2
+m_dah2g_m:
+IADD DR2, DR0, #2
+m_dah2g_i:
+ISUB DR2, DR2, #1
+BRANCHNE m_dah2g_i
+ISUB DR3, DR3, #1
+BRANCHNE m_dah2g_m
+ISUB DR4, DR4, #1
+BRANCHNE m_dah2g_o
+ISUB DR5, DR5, #1
+BRANCHNE m_dah2g_s
+; M → O word gap: 6 extra dits silence (1 dit element gap already done → total 7)
+m_wg:
+IADD DR5, DR0, #6
+m_wg_s:
+IADD DR4, DR0, #2
+m_wg_o:
+IADD DR3, DR0, #2
+m_wg_m:
+IADD DR2, DR0, #2
+m_wg_i:
+ISUB DR2, DR2, #1
+BRANCHNE m_wg_i
+ISUB DR3, DR3, #1
+BRANCHNE m_wg_m
+ISUB DR4, DR4, #1
+BRANCHNE m_wg_o
+ISUB DR5, DR5, #1
+BRANCHNE m_wg_s
+
+; ────────────────────────────────────────────────────────────
+; Letter O  =  --- (dah dah dah)
+; ────────────────────────────────────────────────────────────
+
+o_dah1:
+DWRITE DR1, CR3, 0            ; LED0 = 1
+IADD DR5, DR0, #3             ; dah
+o_dah1_s:
+IADD DR4, DR0, #2
+o_dah1_o:
+IADD DR3, DR0, #2
+o_dah1_m:
+IADD DR2, DR0, #2
+o_dah1_i:
+ISUB DR2, DR2, #1
+BRANCHNE o_dah1_i
+ISUB DR3, DR3, #1
+BRANCHNE o_dah1_m
+ISUB DR4, DR4, #1
+BRANCHNE o_dah1_o
+ISUB DR5, DR5, #1
+BRANCHNE o_dah1_s
+DWRITE DR0, CR3, 0            ; LED0 = 0 (element gap)
+IADD DR5, DR0, #1
+o_dah1g_s:
+IADD DR4, DR0, #2
+o_dah1g_o:
+IADD DR3, DR0, #2
+o_dah1g_m:
+IADD DR2, DR0, #2
+o_dah1g_i:
+ISUB DR2, DR2, #1
+BRANCHNE o_dah1g_i
+ISUB DR3, DR3, #1
+BRANCHNE o_dah1g_m
+ISUB DR4, DR4, #1
+BRANCHNE o_dah1g_o
+ISUB DR5, DR5, #1
+BRANCHNE o_dah1g_s
+
+o_dah2:
+DWRITE DR1, CR3, 0            ; LED0 = 1
+IADD DR5, DR0, #3             ; dah
+o_dah2_s:
+IADD DR4, DR0, #2
+o_dah2_o:
+IADD DR3, DR0, #2
+o_dah2_m:
+IADD DR2, DR0, #2
+o_dah2_i:
+ISUB DR2, DR2, #1
+BRANCHNE o_dah2_i
+ISUB DR3, DR3, #1
+BRANCHNE o_dah2_m
+ISUB DR4, DR4, #1
+BRANCHNE o_dah2_o
+ISUB DR5, DR5, #1
+BRANCHNE o_dah2_s
+DWRITE DR0, CR3, 0            ; LED0 = 0 (element gap)
+IADD DR5, DR0, #1
+o_dah2g_s:
+IADD DR4, DR0, #2
+o_dah2g_o:
+IADD DR3, DR0, #2
+o_dah2g_m:
+IADD DR2, DR0, #2
+o_dah2g_i:
+ISUB DR2, DR2, #1
+BRANCHNE o_dah2g_i
+ISUB DR3, DR3, #1
+BRANCHNE o_dah2g_m
+ISUB DR4, DR4, #1
+BRANCHNE o_dah2g_o
+ISUB DR5, DR5, #1
+BRANCHNE o_dah2g_s
+
+o_dah3:
+DWRITE DR1, CR3, 0            ; LED0 = 1
+IADD DR5, DR0, #3             ; dah
+o_dah3_s:
+IADD DR4, DR0, #2
+o_dah3_o:
+IADD DR3, DR0, #2
+o_dah3_m:
+IADD DR2, DR0, #2
+o_dah3_i:
+ISUB DR2, DR2, #1
+BRANCHNE o_dah3_i
+ISUB DR3, DR3, #1
+BRANCHNE o_dah3_m
+ISUB DR4, DR4, #1
+BRANCHNE o_dah3_o
+ISUB DR5, DR5, #1
+BRANCHNE o_dah3_s
+DWRITE DR0, CR3, 0            ; LED0 = 0 (element gap — 1 dit done)
+IADD DR5, DR0, #1
+o_dah3g_s:
+IADD DR4, DR0, #2
+o_dah3g_o:
+IADD DR3, DR0, #2
+o_dah3g_m:
+IADD DR2, DR0, #2
+o_dah3g_i:
+ISUB DR2, DR2, #1
+BRANCHNE o_dah3g_i
+ISUB DR3, DR3, #1
+BRANCHNE o_dah3g_m
+ISUB DR4, DR4, #1
+BRANCHNE o_dah3g_o
+ISUB DR5, DR5, #1
+BRANCHNE o_dah3g_s
+; O → K letter gap: 2 extra dits silence
+o_lg:
+IADD DR5, DR0, #2
+o_lg_s:
+IADD DR4, DR0, #2
+o_lg_o:
+IADD DR3, DR0, #2
+o_lg_m:
+IADD DR2, DR0, #2
+o_lg_i:
+ISUB DR2, DR2, #1
+BRANCHNE o_lg_i
+ISUB DR3, DR3, #1
+BRANCHNE o_lg_m
+ISUB DR4, DR4, #1
+BRANCHNE o_lg_o
+ISUB DR5, DR5, #1
+BRANCHNE o_lg_s
+
+; ────────────────────────────────────────────────────────────
+; Letter K  =  -.- (dah dit dah)
+; ────────────────────────────────────────────────────────────
+
+k_dah1:
+DWRITE DR1, CR3, 0            ; LED0 = 1
+IADD DR5, DR0, #3             ; dah
+k_dah1_s:
+IADD DR4, DR0, #2
+k_dah1_o:
+IADD DR3, DR0, #2
+k_dah1_m:
+IADD DR2, DR0, #2
+k_dah1_i:
+ISUB DR2, DR2, #1
+BRANCHNE k_dah1_i
+ISUB DR3, DR3, #1
+BRANCHNE k_dah1_m
+ISUB DR4, DR4, #1
+BRANCHNE k_dah1_o
+ISUB DR5, DR5, #1
+BRANCHNE k_dah1_s
+DWRITE DR0, CR3, 0            ; LED0 = 0 (element gap)
+IADD DR5, DR0, #1
+k_dah1g_s:
+IADD DR4, DR0, #2
+k_dah1g_o:
+IADD DR3, DR0, #2
+k_dah1g_m:
+IADD DR2, DR0, #2
+k_dah1g_i:
+ISUB DR2, DR2, #1
+BRANCHNE k_dah1g_i
+ISUB DR3, DR3, #1
+BRANCHNE k_dah1g_m
+ISUB DR4, DR4, #1
+BRANCHNE k_dah1g_o
+ISUB DR5, DR5, #1
+BRANCHNE k_dah1g_s
+
+k_dit1:
+DWRITE DR1, CR3, 0            ; LED0 = 1
+IADD DR5, DR0, #1             ; dit
+k_dit1_s:
+IADD DR4, DR0, #2
+k_dit1_o:
+IADD DR3, DR0, #2
+k_dit1_m:
+IADD DR2, DR0, #2
+k_dit1_i:
+ISUB DR2, DR2, #1
+BRANCHNE k_dit1_i
+ISUB DR3, DR3, #1
+BRANCHNE k_dit1_m
+ISUB DR4, DR4, #1
+BRANCHNE k_dit1_o
+ISUB DR5, DR5, #1
+BRANCHNE k_dit1_s
+DWRITE DR0, CR3, 0            ; LED0 = 0 (element gap)
+IADD DR5, DR0, #1
+k_dit1g_s:
+IADD DR4, DR0, #2
+k_dit1g_o:
+IADD DR3, DR0, #2
+k_dit1g_m:
+IADD DR2, DR0, #2
+k_dit1g_i:
+ISUB DR2, DR2, #1
+BRANCHNE k_dit1g_i
+ISUB DR3, DR3, #1
+BRANCHNE k_dit1g_m
+ISUB DR4, DR4, #1
+BRANCHNE k_dit1g_o
+ISUB DR5, DR5, #1
+BRANCHNE k_dit1g_s
+
+k_dah2:
+DWRITE DR1, CR3, 0            ; LED0 = 1
+IADD DR5, DR0, #3             ; dah
+k_dah2_s:
+IADD DR4, DR0, #2
+k_dah2_o:
+IADD DR3, DR0, #2
+k_dah2_m:
+IADD DR2, DR0, #2
+k_dah2_i:
+ISUB DR2, DR2, #1
+BRANCHNE k_dah2_i
+ISUB DR3, DR3, #1
+BRANCHNE k_dah2_m
+ISUB DR4, DR4, #1
+BRANCHNE k_dah2_o
+ISUB DR5, DR5, #1
+BRANCHNE k_dah2_s
+DWRITE DR0, CR3, 0            ; LED0 = 0 (element gap — 1 dit done)
+IADD DR5, DR0, #1
+k_dah2g_s:
+IADD DR4, DR0, #2
+k_dah2g_o:
+IADD DR3, DR0, #2
+k_dah2g_m:
+IADD DR2, DR0, #2
+k_dah2g_i:
+ISUB DR2, DR2, #1
+BRANCHNE k_dah2g_i
+ISUB DR3, DR3, #1
+BRANCHNE k_dah2g_m
+ISUB DR4, DR4, #1
+BRANCHNE k_dah2g_o
+ISUB DR5, DR5, #1
+BRANCHNE k_dah2g_s
+; K → C word gap: 6 extra dits silence (1 dit element gap already done → total 7)
+k_wg:
+IADD DR5, DR0, #6
+k_wg_s:
+IADD DR4, DR0, #2
+k_wg_o:
+IADD DR3, DR0, #2
+k_wg_m:
+IADD DR2, DR0, #2
+k_wg_i:
+ISUB DR2, DR2, #1
+BRANCHNE k_wg_i
+ISUB DR3, DR3, #1
+BRANCHNE k_wg_m
+ISUB DR4, DR4, #1
+BRANCHNE k_wg_o
+ISUB DR5, DR5, #1
+BRANCHNE k_wg_s
+
+BRANCH morse              ; loop forever
