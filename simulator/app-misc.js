@@ -2885,8 +2885,19 @@ function _cmBuildDisasmHtml(niaInt, words) {
             ? ' data-desc="' + plainEngRow.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '"'
             : '';
         var addrAttr = ' data-addr="' + entry.wordAddr + '"';
+        var hwBpArmed = (typeof _hwBreakpoints !== 'undefined') &&
+                        _hwBreakpoints.has(entry.wordAddr >>> 0);
+        var hwBpCls   = 'nia-col-hwbp' + (hwBpArmed ? ' nia-hwbp-armed' : '');
+        var hwBpTitle = hwBpArmed
+            ? 'HW breakpoint armed \u2014 click to disarm'
+            : ((typeof _wukongIsConnected === 'function' && _wukongIsConnected())
+                ? 'Click to arm hardware breakpoint at ' + addrStr
+                : 'Board not connected');
         rowsHtml +=
             '<div class="' + rowCls + '"' + descAttr + addrAttr + '>' +
+                '<span class="' + hwBpCls + '" title="' + hwBpTitle + '">' +
+                    (hwBpArmed ? '\u25CF' : '\u25CB') +
+                '</span>' +
                 '<span class="nia-col-rel">'  + _escHtml(relStr)       + '</span>' +
                 '<span class="nia-col-addr">' + _escHtml(addrStr)      + '</span>' +
                 '<span class="nia-col-hex">'  + _escHtml(decoded.hex)  + '</span>' +
@@ -3032,6 +3043,17 @@ function _openCallhomeModal(row) {
         }
 
         disasmBody.addEventListener('click', function(e) {
+            // Hardware breakpoint gutter — intercept before row-expansion logic.
+            var hwbpMarker = e.target.closest('.nia-col-hwbp');
+            if (hwbpMarker) {
+                var bpRow = hwbpMarker.closest('.nia-disasm-row');
+                if (bpRow && bpRow.dataset.addr !== undefined &&
+                        typeof _wukongSetHwBreakpoint === 'function') {
+                    _wukongSetHwBreakpoint(parseInt(bpRow.dataset.addr, 10));
+                }
+                return;
+            }
+
             var clickedRow = e.target.closest('.nia-disasm-row');
             if (!clickedRow || clickedRow.classList.contains('nia-disasm-current') || !clickedRow.dataset.desc) return;
 

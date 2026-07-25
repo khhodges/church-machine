@@ -2452,7 +2452,7 @@
 .nia-disasm-body { padding: 0.2rem 0; }
 .nia-disasm-row {
     display: grid;
-    grid-template-columns: 2.5ch 6ch 9ch 1fr auto;
+    grid-template-columns: 1.4ch 2.5ch 6ch 9ch 1fr auto;
     gap: 0.5rem;
     padding: 0.12rem 0.8rem;
     color: #b0b8c8;
@@ -2478,6 +2478,45 @@
     border-bottom: 1px solid #1e2535;
     margin-bottom: 0.1rem;
 }
+/* Hardware breakpoint gutter marker */
+.nia-col-hwbp {
+    color: #2e3847;
+    cursor: pointer;
+    font-size: 0.72rem;
+    line-height: 1.4;
+    text-align: center;
+    user-select: none;
+    transition: color 0.12s;
+}
+.nia-col-hwbp:hover { color: #7a3030; }
+.nia-hwbp-armed {
+    color: #c0392b !important;
+}
+.nia-hwbp-armed:hover { color: #e74c3c !important; }
+
+/* Flash animation when "BP HIT" link is clicked */
+@keyframes _niaBpFlash {
+    0%   { background: #5a0000; }
+    40%  { background: #8b0000; }
+    100% { background: transparent; }
+}
+.nia-hwbp-flash {
+    animation: _niaBpFlash 1.2s ease-out forwards;
+}
+
+/* "BP HIT" clickable link in the console trace */
+.wukong-bp-hit-link {
+    background: none;
+    border: none;
+    color: #c0392b;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: inherit;
+    padding: 0;
+    text-decoration: underline dotted;
+}
+.wukong-bp-hit-link:hover { color: #e74c3c; }
+
 .nia-col-rel   { color: inherit; text-align: right; }
 .nia-col-addr  { color: #374151; }
 .nia-disasm-current .nia-col-addr { color: #b8860b; }
@@ -2537,7 +2576,7 @@
         flex-direction: column;
     }
     .nia-disasm-row {
-        grid-template-columns: 2.5ch 9ch 1fr auto;
+        grid-template-columns: 1.4ch 2.5ch 9ch 1fr auto;
     }
     .nia-col-hex { display: none; }
 }

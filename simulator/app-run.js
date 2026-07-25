@@ -14062,10 +14062,60 @@ let _wukongHWRunning   = false;   // true = board is in free-run mode
 let _wukongLastTraceTs = 0;       // unix timestamp (seconds) of last trace packet
 const _WUKONG_STALE_MS = 10000;   // 10 s without a packet → disconnected
 
+// Set of NIA word addresses (unsigned 32-bit) with an armed hardware breakpoint.
+const _hwBreakpoints = new Set();
+window._hwBreakpoints = _hwBreakpoints;
+
 function _wukongIsConnected() {
     return _wukongLastTraceTs > 0 &&
            (Date.now() - _wukongLastTraceTs * 1000) < _WUKONG_STALE_MS;
 }
+
+// Refresh every .nia-col-hwbp gutter marker in any open disassembly modal.
+function _wukongRefreshHwbpGutters() {
+    const connected = _wukongIsConnected();
+    document.querySelectorAll('.nia-disasm-row').forEach(function(row) {
+        const addr = parseInt(row.dataset.addr, 10);
+        if (isNaN(addr)) return;
+        const marker = row.querySelector('.nia-col-hwbp');
+        if (!marker) return;
+        const armed = _hwBreakpoints.has(addr >>> 0);
+        marker.classList.toggle('nia-hwbp-armed', armed);
+        if (armed) {
+            marker.title = 'HW breakpoint armed — click to disarm';
+        } else if (connected) {
+            marker.title = 'Click to arm hardware breakpoint at ' +
+                '0x' + (addr >>> 0).toString(16).toUpperCase().padStart(4, '0');
+        } else {
+            marker.title = 'Board not connected';
+        }
+    });
+}
+window._wukongRefreshHwbpGutters = _wukongRefreshHwbpGutters;
+
+// Toggle a hardware breakpoint at the given NIA word address.
+// Armed → sends 0xFFFFFFFF to disarm; disarmed → sends the address to arm.
+// No-op when the board is not connected.
+async function _wukongSetHwBreakpoint(nia) {
+    if (!_wukongIsConnected()) return;
+    const addr = nia >>> 0;
+    const armed = _hwBreakpoints.has(addr);
+    const sendNia = armed ? 0xFFFFFFFF : addr;
+    try {
+        await fetch('/hardware/wukong/command', {
+            method : 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body   : JSON.stringify({cmd: 'b', nia: sendNia})
+        });
+        if (armed) {
+            _hwBreakpoints.delete(addr);
+        } else {
+            _hwBreakpoints.add(addr);
+        }
+        _wukongRefreshHwbpGutters();
+    } catch(e) {}
+}
+window._wukongSetHwBreakpoint = _wukongSetHwBreakpoint;
 
 function _wukongUpdateBtn() {
     const btn = document.getElementById('toolHWRunBtn');
@@ -14107,17 +14157,39 @@ function _wukongFlagsStr(flags) {
 function _wukongAppendTrace(data) {
     const con = document.getElementById('editorConsole');
     if (!con) return;
-    const nia   = '0x' + ((data.nia >>> 0).toString(16).padStart(8, '0').toUpperCase());
-    const flags = _wukongFlagsStr(data.flags || 0);
-    let state;
+    const niaInt = data.nia >>> 0;
+    const nia    = '0x' + niaInt.toString(16).padStart(8, '0').toUpperCase();
+    const flags  = _wukongFlagsStr(data.flags || 0);
+    let stateStr;
     if (data.fault_valid) {
         const name = _WUKONG_FAULT_NAMES[data.fault_code] || ('FAULT_' + data.fault_code);
-        state = '\u26A1 ' + name;
+        stateStr = '\u26A1 ' + name;
     } else {
-        state = 'ok';
+        stateStr = 'ok';
     }
-    const bp  = data.bp_hit  ? '  \u25CF BP HIT'  : '';
-    con.textContent += '\nHW: NIA=' + nia + '  flags=' + flags + '  ' + state + bp;
+    // Build the trace line as a div so "BP HIT" can be a clickable button.
+    const line = document.createElement('div');
+    line.className = 'wukong-trace-line';
+    line.appendChild(document.createTextNode(
+        '\nHW: NIA=' + nia + '  flags=' + flags + '  ' + stateStr));
+    if (data.bp_hit) {
+        const bpBtn = document.createElement('button');
+        bpBtn.className = 'wukong-bp-hit-link';
+        bpBtn.textContent = '  \u25CF BP HIT';
+        bpBtn.title = 'Scroll to NIA ' + nia + ' in disassembly panel';
+        bpBtn.addEventListener('click', function() {
+            // Find the matching row in any open disassembly modal and flash it.
+            const row = document.querySelector(
+                '.nia-disasm-row[data-addr="' + niaInt + '"]');
+            if (row) {
+                row.scrollIntoView({behavior: 'smooth', block: 'center'});
+                row.classList.add('nia-hwbp-flash');
+                setTimeout(function() { row.classList.remove('nia-hwbp-flash'); }, 1200);
+            }
+        });
+        line.appendChild(bpBtn);
+    }
+    con.appendChild(line);
     con.scrollTop = con.scrollHeight;
 }
 
