@@ -90,14 +90,19 @@ Full incident history (banner drift, firmware double-build, CM DMEM double-patch
 
 ## Gotchas / Known Traps
 
-### Adding a new Assembly example tab (MUST DO BOTH steps)
+### Adding a new Assembly example tab (MUST DO ALL THREE steps)
 
 1. Add the `<button class="example-tab" ...>` to `simulator/index.html` (in the `#exampleTabsScroll` container).
 2. **Also add the `data-example` key to the `langExampleGroups.assembly` array in `simulator/app-compile.js`** (around line 369).
+3. **Also add the full source as an inline backtick string inside the `examples` object in `loadExample()` in `simulator/app-run.js`** (just before the closing `};` of the `examples` object, after the last entry). Format: `'key_name': \`...source...\`,`
 
-If step 2 is missed, `app-compile.js` will call `tab.style.display = 'none'` on the button whenever Assembly mode is active (which is the default). The button will be present in the HTML source and visible to curl, but invisible to the user — a very difficult bug to diagnose remotely.
+If step 2 is missed, `app-compile.js` will call `tab.style.display = 'none'` on the button whenever Assembly mode is active. The button will be present in the HTML source and visible to curl, but invisible to the user.
 
-After both edits, bump the `app-compile.js` version tag in `index.html` (e.g. `?v=20260429e`) so browsers fetch the updated file.
+If step 3 is missed, clicking the tab calls `loadExample('key_name')` which looks up `examples['key_name']`, gets `undefined`, and silently does nothing — the editor stays blank with no error.
+
+**Note on `sync-canonical-examples.js`:** this script goes ONE-WAY — it writes from the inline `examples` object in `app-run.js` **out** to `simulator/examples/*.cloomc` files. It cannot inject a new example into `app-run.js` from a file; that must be done manually (step 3).
+
+After all three edits, bump the `app-run.js` version tag in `index.html` (e.g. `?v=20260725a`) so browsers fetch the updated file.
 
 ### Large Assembly programs — extended-code LUMP (simulator.js `loadProgram`)
 
