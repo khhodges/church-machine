@@ -73,3 +73,4 @@
 - [lump-audit BRANCH opcode drift](lump-audit-branch-opcode.md) — lump-audit.js _rciBranchOp must equal 23 (v2.0); opcode 17=DWRITE; c-list zeros are expected at compile time (runtime fills them)
 - [NS slot label persistence across hard resets](ns-slot-label-persistence.md) — step3 labels slots '(reserved)' before loadBootImage restores binary data; reseed loop must include '(reserved)' in its override condition; labels persisted via /api/boot-config/slot-label + bootConfig.slotLabels
 - [Boot.Abstr c-list must be pre-populated](boot-abstr-clist-must-be-prepopulated.md) — boot path skips lazy GT injection; LUMP needs correct GTs baked in; JS vs Python GT formats differ; manifest filename field governs lump-consistency binary reads
+- [Wukong droplet SSH key](wukong-droplet-ssh.md) — how to SSH to 165.227.190.84 from Replit; key setup, build workflow, regeneration if rejected
