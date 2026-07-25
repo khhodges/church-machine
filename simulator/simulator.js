@@ -916,10 +916,12 @@ class ChurchSimulator {
     parseNSWord1(word1) {
         return {
             b: (word1 >>> 31) & 1,
-            // f: far-lump flag — REMOVED in v2.0; bit[30] is always 0 in the simulator's
-            //    NS Word1 layout.  Exposed here so callers (mSave, boot, CALL) that check
-            //    .f === 1 always see false and skip the far-lump restriction path.
-            f: (word1 >>> 30) & 1,      // ★ v2.0: always 0; retained for API compatibility
+            // f: far-lump flag — REMOVED in v2.0; hardcoded 0 here because bit[30] is now
+            //    the hardware GC liveness mark (markLive/getGBit write/read bit[30] per
+            //    WORD2_LAYOUT).  Reading bit[30] as F would produce false F_BIT faults
+            //    whenever mLoad marks a slot live during boot.  Callers that check .f === 1
+            //    always see false and skip the far-lump restriction path. ★v2.0 fix
+            f: 0,
             g: (word1 >>> 29) & 1,      // G-bit at bit[29] — matches packNSWord1 and boot_image.py.
             // bit[28] reserved — chainable is NOT in Word 1; see this.nsChainable[] side-table.
             gtType: (word1 >>> 26) & 3,
@@ -2076,10 +2078,8 @@ class ChurchSimulator {
                 }
                 const entryNSEntry  = entryCheck.entry;                             // NS entry for boot entry abstraction
                 const entryNSParsed = this.parseNSWord1(entryNSEntry.word1_limit);
-                if (entryNSParsed.f === 1) {                                        // Far-lumps not supported at boot
-                    this.fault('F_BIT', `NUC_CLIST: ${_b4Label} has F-bit set (Far) — not supported at boot`);
-                    return false;
-                }
+                // F-bit check removed: f is hardcoded 0 in parseNSWord1 (v2.0 fix —
+                // bit[30] is the GC liveness mark, not the far-lump flag). ★v2.0
                 const bootEntrySlot = this.bootEntrySlot;
 
                 // ── Step 2: Read Boot.Abstr lump header (word 0) ──────────────────────

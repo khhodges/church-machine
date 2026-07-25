@@ -12066,12 +12066,17 @@ function saveNamespaceState() {
     const entries = [];
     for (let i = 0; i < sim.nsCount; i++) {
         const e = sim.readNSEntry(i);
-        if (!e) { entries.push(null); continue; }
+        const customLabel = (sim.nsLabels && sim.nsLabels[i]) || null;
+        if (!e && !customLabel) { entries.push(null); continue; }
+        if (!e) {
+            entries.push({ nsWords: [], label: customLabel, dataWords: [] });
+            continue;
+        }
         const mem = sim.getEntryMemory(i);
-        const base = sim.NS_TABLE_BASE + i * sim.NS_ENTRY_WORDS;
+        const base = sim._nsSlotBase(i);
         entries.push({
             nsWords: [sim.memory[base], sim.memory[base + 1], sim.memory[base + 2]],
-            label: e.label,
+            label: e.label || customLabel,
             dataWords: mem ? [mem.gt, ...mem.words] : [],
         });
     }
@@ -12088,7 +12093,7 @@ function loadNamespaceState() {
             if (!item) continue;
             if (sim.isNSEntryValid(i)) continue;
             if (item.nsWords && item.nsWords.length === 3) {
-                const base = sim.NS_TABLE_BASE + i * sim.NS_ENTRY_WORDS;
+                const base = sim._nsSlotBase(i);
                 sim.memory[base + 0] = item.nsWords[0] >>> 0;
                 sim.memory[base + 1] = item.nsWords[1] >>> 0;
                 sim.memory[base + 2] = item.nsWords[2] >>> 0;
@@ -12100,6 +12105,9 @@ function loadNamespaceState() {
                         sim.memory[loc + j] = item.dataWords[j] >>> 0;
                     }
                 }
+            } else if (item.label && (!item.nsWords || item.nsWords.length === 0)) {
+                sim.nsLabels[i] = item.label;
+                if (i >= sim.nsCount) sim.nsCount = i + 1;
             } else if (item.entry) {
                 const loc = item.entry.word0_location || (i * sim.SLOT_SIZE);
                 const lim = sim.parseNSWord1(item.entry.word1_limit || 0);

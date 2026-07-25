@@ -169,7 +169,9 @@ test.describe('pet names in namespace table survive page reload', () => {
         // ── Inject custom label into free slot and persist ────────────────────
         const savedJson = await page.evaluate(({ slot, label }) => {
             // Write a minimal valid NS entry for the free slot.
-            const base = sim.NS_TABLE_BASE + slot * sim.NS_ENTRY_WORDS;
+            // NS table is INVERTED: slot N lives at NS_TABLE_BASE + NS_TABLE_RESERVE - (N+1)*NS_ENTRY_WORDS.
+            // Must use sim._nsSlotBase(slot) — NOT the forward formula NS_TABLE_BASE + slot*NS_ENTRY_WORDS.
+            const base = sim._nsSlotBase(slot);
             // word0: non-zero location to make isNSEntryValid return true
             sim.memory[base + 0] = 0x00000100;
             // word1: minimal limit field (16-bit = 63 words, GT type 1 = Inform)
