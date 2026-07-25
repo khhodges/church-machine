@@ -50,14 +50,18 @@ from amaranth.lib.memory import Memory as LibMemory
 
 from .hw_types import *
 from .core import ChurchCore
-from .boot_rom import (BootRom, NUC_PROGRAM, DEMO_NAMESPACE, DEMO_CLIST)
+from .boot_rom import (BootRom, WUKONG_NUC_PROGRAM, WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST)
+from .uart_tx import UartTx
 
 
-# ── Wukong ROM: NUC_PROGRAM starting at word 0 ────────────────────────────────
-# NUC_PROGRAM is the LED-blink CLOOMC sequence (17 words).  Pad to 1024 words.
+# ── Wukong ROM: WUKONG_NUC_PROGRAM starting at word 0 ────────────────────────
+# WUKONG_NUC_PROGRAM:
+#   [0-3]   Setup: load LED_DEV (CR3) + UART_DEV (CR4), DR1=1, LED on
+#   [4-58]  UART banner "CM:WUKONG\r\n" (11 bytes × 5 instructions)
+#   [59-73] 1 Hz LED blink loop (forever)
 # BOOT_PROGRAM is deliberately omitted — see module docstring for the PERM_L
-# fault root cause.
-_WUKONG_ROM = list(NUC_PROGRAM)
+# fault root cause (LOAD CR15,CR15[0] faults on standalone FPGA).
+_WUKONG_ROM = list(WUKONG_NUC_PROGRAM)
 while len(_WUKONG_ROM) < 1024:
     _WUKONG_ROM.append(0)
 
@@ -70,7 +74,7 @@ class ChurchWukongXC7A100T(Elaboratable):
     clk_freq : int
         Input clock frequency in Hz.  Default 50 000 000 (50 MHz oscillator at M21).
     baud : int
-        Unused — kept for interface parity with gen_rtlil.py.
+        UART baud rate.  Default 57 600 — matches CH340 callhome bridge (CLOCKDIV=53).
     sim_mode : bool
         Unused — kept for interface parity with gen_rtlil.py.
     build_sig : list[int] | None
@@ -78,18 +82,20 @@ class ChurchWukongXC7A100T(Elaboratable):
 
     Ports
     -----
-    clk    in  50 MHz oscillator (M21, SRCC bank 34 — hardware confirmed)
-    rst_n  in  Active-low push button (M6)  — reserved, not yet wired
-    led    out [2] Physical LED outputs (G21, G20), ACTIVE-LOW
+    clk          in  50 MHz oscillator (M21, SRCC bank 34 — hardware confirmed)
+    rst_n        in  Active-low push button (M6)  — reserved, not yet wired
+    led          out [2] Physical LED outputs (G21, G20), ACTIVE-LOW
+    uart_tx_pin  out UART TX (E3, bank 34, LVCMOS33) — idles HIGH; 8N1 at `baud`
     """
 
-    def __init__(self, clk_freq=50_000_000, baud=115200, sim_mode=False, build_sig=None):
+    def __init__(self, clk_freq=50_000_000, baud=57_600, sim_mode=False, build_sig=None):
         self.clk_freq = clk_freq
         self.baud     = baud
         self.sim_mode = sim_mode
 
-        self.clk   = Signal()        # 50 MHz oscillator  (M21, SRCC bank 34)
-        self.rst_n = Signal(init=1)  # Active-low button   (M6) — constrained, reserved
+        self.clk          = Signal()        # 50 MHz oscillator  (M21, SRCC bank 34)
+        self.rst_n        = Signal(init=1)  # Active-low button   (M6) — constrained, reserved
+        self.uart_tx_pin  = Signal(init=1)  # UART TX (E3) — idles HIGH
 
         self.led = [Signal(name=f"led{i}") for i in range(2)]
 
@@ -127,35 +133,34 @@ class ChurchWukongXC7A100T(Elaboratable):
         # hw_init sequencer (below) writes every non-zero word via the write port
         # before boot_start fires.
         #
+        # Boot FSM initialises:
+        #   CR15.word1_location = 0      (NS at byte 0)
+        #   CR6.word1_location  = 0x400  (c-list at byte 0x400 = word 256)
+        #
+        # WUKONG_NUC_PROGRAM[0] = LOAD CR3, CR6[5]  → LED_DEV into CR3
+        #   clist_gt_addr  = 0x400 + 5*4 = 0x414 = word 261 = WUKONG_DEMO_CLIST[5] ✓
+        #   ns_gate checks NS slot 3 at byte 0 + 3*16 = 48 = word 12 ✓
+        # WUKONG_NUC_PROGRAM[1] = LOAD CR4, CR6[6]  → UART_DEV into CR4
+        #   clist_gt_addr  = 0x400 + 6*4 = 0x418 = word 262 = WUKONG_DEMO_CLIST[6] ✓
+        #   ns_gate checks NS slot 2 at byte 0 + 2*16 = 32 = word 8 ✓
+        # ── DMEM initialisation data ──────────────────────────────────────────
         # Layout:
-        #   words   0-31  : DEMO_NAMESPACE  (8 NS slots × 4 words)
-        #                   NS slot 3 (LED_DEV MMIO) is at words 12-15
+        #   words   0-31  : WUKONG_DEMO_NAMESPACE (8 NS slots × 4 words)
         #   words  32-255 : zeros
-        #   words 256-319 : DEMO_CLIST      (64 c-list entries)
-        #                   c-list slot 5 (LED_DEV GT 0xb2000003) at word 261
+        #   words 256-319 : WUKONG_DEMO_CLIST     (64 c-list entries)
+        #                   [5]=LED_DEV, [6]=UART_DEV, [7]=BTN_DEV, [8]=TIMER_DEV
+        #                   [9]=0, [10]=0  (SlideRule/Constants absent in 8-slot NS)
         #   words 320+    : zeros
         #
-        # Boot FSM initialises:
-        #   CR15.word1_location = 0    (NS at byte 0)
-        #   CR6.word1_location  = 0x400 (c-list at byte 0x400 = word 256)
+        # WUKONG_DEMO_NAMESPACE vs DEMO_NAMESPACE:
+        #   slot 0 location = 0 (Wukong NS at DMEM byte 0, not NS_TABLE_BASE=0x1FC00)
+        #   integrity seal on slot 0 recomputed from new location
         #
-        # NUC_PROGRAM[0] = LOAD CR3, CR6[5]:
-        #   clist_gt_addr = 0x400 + 5*4 = 0x414 = word 261 = DEMO_CLIST[5] ✓
-        #   ns_gate reads NS slot 3 at byte 0 + 3*16 = 48 = word 12 ✓
-        #   NS slot 3 integrity verified (0xdead3ecf matches) ✓
-        # ── Minimal one-GT c-list ─────────────────────────────────────────────
-        # Church Machine least-authority principle: the boot c-list starts with
-        # AT MOST ONE capability — the single GT this abstraction actually needs.
-        # NUC_PROGRAM only uses LED_DEV (LOAD CR3, CR6[5]).  All other slots
-        # (UART_DEV, BTN_DEV, TIMER_DEV, SelfTest, etc.) are null: the program
-        # has no authority over devices it does not use.
-        _clist_one_gt = [0] * 64
-        _clist_one_gt[5] = DEMO_CLIST[5]           # LED_DEV GT — the only one
-
-        dmem_init = list(DEMO_NAMESPACE)           # words 0-31
+        # WUKONG_NUC_PROGRAM uses both LED_DEV (c-list[5]) and UART_DEV (c-list[6]).
+        dmem_init = list(WUKONG_DEMO_NAMESPACE)    # words 0-31
         while len(dmem_init) < 256:
             dmem_init.append(0)                    # words 32-255 = zero
-        dmem_init += _clist_one_gt                 # words 256-319: one GT only
+        dmem_init += list(WUKONG_DEMO_CLIST)       # words 256-319: full c-list
         while len(dmem_init) < 16384:
             dmem_init.append(0)
 
@@ -182,12 +187,23 @@ class ChurchWukongXC7A100T(Elaboratable):
             core.clist_rd_data.eq(dmem_rd.data),
         ]
 
+        # ── UART TX ────────────────────────────────────────────────────────────
+        # UartTx(50 MHz, 57600 baud) — 8N1 active-high idle, matches CH340 bridge.
+        # MMIO register 5 write = TX: one-cycle start pulse triggers byte transmit.
+        # MMIO register 6 read  = STATUS: bit[0] = tx_busy (poll before next byte).
+        # MMIO register 7 read  = RX: always 0 (RX not implemented in V2).
+        uart_tx = m.submodules.uart_tx = UartTx(clk_freq=self.clk_freq, baud=self.baud)
+        m.d.comb += self.uart_tx_pin.eq(uart_tx.tx)
+
         # ── MMIO decode ────────────────────────────────────────────────────────
         # MMIO range: bit[30]=1, bit[31]=0  →  addresses 0x40000000–0x7FFFFFFF
         # Registers (word-addressed, reg = addr[2:6] = bits[5:2]):
         #   0  LED0_RGB   bits[2:0]={B,G,R}; bit 0 = R → led[0]  (G21, ACTIVE-LOW)
         #   1  LED1_RGB   bits[2:0]={B,G,R}; bit 0 = R → led[1]  (G20, ACTIVE-LOW)
         #   2  LED2_RGB   (no physical pin on this minimal build)
+        #   5  UART.TX    write: byte[7:0] → start UART TX (8N1, 57600 baud, E3)
+        #   6  UART.STATUS read: bit[0]=tx_busy (poll before each TX write)
+        #   7  UART.RX    read: 0 (RX not implemented in V2)
         #  11  TIMER.TICKS_LO   32-bit free-running counter, low word
         #  12  TIMER.TICKS_HI   32-bit free-running counter, high word
         #  13  TIMER.TOD_EPOCH  Unix seconds (R/W, set by IDE at boot)
@@ -232,6 +248,13 @@ class ChurchWukongXC7A100T(Elaboratable):
                     with m.If(core.dmem_wr_data[1]):
                         m.d.sync += alarm_fired.eq(0)
 
+        # UART TX write (reg 5): one-cycle start pulse — combinatorial, not in the Switch
+        # so it fires on the same cycle as the DWRITE without needing a latched register.
+        m.d.comb += [
+            uart_tx.data.eq(core.dmem_wr_data[0:8]),
+            uart_tx.start.eq(is_mmio_write & (mmio_reg_sel == 5)),
+        ]
+
         is_mmio_read = Signal()
         m.d.comb += is_mmio_read.eq(is_mmio & core.dmem_rd_en)
 
@@ -240,6 +263,12 @@ class ChurchWukongXC7A100T(Elaboratable):
             for i in range(3):
                 with m.Case(i):
                     m.d.comb += mmio_rd_data.eq(mmio_led_reg[i])
+            with m.Case(6):
+                # UART STATUS: bit[0] = tx_busy  (poll before each TX write)
+                m.d.comb += mmio_rd_data.eq(Cat(uart_tx.busy, C(0, 31)))
+            with m.Case(7):
+                # UART RX: not implemented in V2; always returns 0
+                m.d.comb += mmio_rd_data.eq(0)
             with m.Case(11):
                 m.d.comb += mmio_rd_data.eq(timer_lo)
             with m.Case(12):

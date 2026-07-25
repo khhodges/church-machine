@@ -595,6 +595,142 @@ while len(DEMO_CLIST) < 64:
 DEMO_CLIST_NAMED_SLOTS = frozenset({0, 1, 2, 3, 5, 6, 7, 8, 9, 10})
 
 
+# ---------------------------------------------------------------------------
+# WUKONG_DEMO_NAMESPACE — 8-slot NS table for Wukong standalone boot
+#
+# Identical to DEMO_NAMESPACE except slot 0 (Boot.NS) has location = 0:
+#   Ti60:   NS table lives at NS_TABLE_BASE = 0x1FC00 (64 KB DMEM tail)
+#   Wukong: NS table placed at DMEM byte 0 (hw_init writes it there)
+#
+# The integrity seal on slot 0 word2 is recomputed from the new location.
+# All other slots are byte-for-byte identical to DEMO_NAMESPACE.
+# ---------------------------------------------------------------------------
+WUKONG_DEMO_NAMESPACE = list(DEMO_NAMESPACE)
+_wukong_ns0_loc  = 0                        # NS table at DMEM byte 0
+_wukong_ns0_auth = DEMO_NAMESPACE[1]        # word1_authority unchanged (limit=63)
+WUKONG_DEMO_NAMESPACE[0] = _wukong_ns0_loc
+WUKONG_DEMO_NAMESPACE[2] = integrity32(_wukong_ns0_loc, _wukong_ns0_auth)
+
+
+# ---------------------------------------------------------------------------
+# WUKONG_DEMO_CLIST — c-list for Wukong boot (8-slot namespace subset)
+#
+# Same as DEMO_CLIST except indices 9 and 10 are NULL: the Wukong minimal
+# namespace has only slots 0–7, so NS slots 8 (SlideRule) and 9 (Constants)
+# do not exist.  Accessing them would produce a BOUNDS fault.
+# ---------------------------------------------------------------------------
+WUKONG_DEMO_CLIST = list(DEMO_CLIST)
+WUKONG_DEMO_CLIST[9]  = 0   # SlideRule E-GT cleared: NS slot 8 absent in Wukong 8-slot NS
+WUKONG_DEMO_CLIST[10] = 0   # Constants R-GT cleared: NS slot 9 absent in Wukong 8-slot NS
+
+
+# ---------------------------------------------------------------------------
+# WUKONG_NUC_PROGRAM — Wukong V2 callhome boot program
+#
+# Executed from ROM[0] immediately after hw_init and boot_start.
+# Sequence:
+#   1. Load LED_DEV (c-list slot 5 → CR3) and UART_DEV (c-list slot 6 → CR4)
+#   2. Turn LED0 on (visible boot indicator)
+#   3. Transmit banner "CM:WUKONG\r\n" over UART at 57600 baud, polling
+#      STATUS (UART MMIO word 1) between bytes
+#   4. Enter ~1 Hz LED0 blink loop forever
+#
+# MMIO layout (base = 0x40000000, word-addressed via DWRITE/DREAD):
+#   CR3 (LED_DEV,  NS slot 3): word 0 = LED0 {B,G,R}; bit 0 = R → physical pin
+#   CR4 (UART_DEV, NS slot 2): word 0 = TX (write), word 1 = STATUS (read, bit0=busy)
+#
+# Register allocation:
+#   DR0 = 0 (zero register, never written)
+#   DR1 = 1 (LED "on" value)
+#   DR2 = inner delay counter
+#   DR3 = outer delay counter (re-used; CR3 is re-loaded at setup only)
+#   DR5 = UART byte value
+#   DR6 = UART STATUS read
+#   DR7 = STATUS - 1 scratch (EQ=0 means busy)
+#
+# UART busy-poll per byte (5 instructions):
+#   IADD  DR5, DR0, #byte       — load byte value
+#   DWRITE CR4[0], DR5          — write to UART TX
+#   DREAD  DR6, CR4[1]          — read STATUS (bit0=tx_busy)
+#   ISUB   DR7, DR6, #1         — DR7=0 if busy (→ EQ flag set)
+#   BRANCH EQ, #-2              — loop back to DREAD while busy
+#
+# LED blink timing (50 MHz clock):
+#   inner = 16383 iterations × 4 cycles = ~65532 cycles
+#   outer = 380   iterations  → 380 × 65532 ≈ 24,902,160 cycles ≈ 0.498 s per phase
+#   → LED0 on ~0.498 s, off ~0.498 s  →  ~1 Hz blink
+# ---------------------------------------------------------------------------
+
+def _uart_send_byte(char_val):
+    """Return 5-instruction sequence: load byte → DWRITE TX → poll STATUS."""
+    return [
+        encode_turing(TuringOpcode.IADD,   CondCode.AL, dr_dst=5, dr_src=0, imm=char_val),
+        encode_turing(TuringOpcode.DWRITE, CondCode.AL, dr_dst=5, dr_src=4, imm=0),
+        encode_turing(TuringOpcode.DREAD,  CondCode.AL, dr_dst=6, dr_src=4, imm=1),
+        encode_turing(TuringOpcode.ISUB,   CondCode.AL, dr_dst=7, dr_src=6, imm=1),
+        encode_turing(TuringOpcode.BRANCH, CondCode.EQ, imm=(-2) & 0x7FFF),
+    ]
+
+_WUKONG_BANNER = b"CM:WUKONG\r\n"
+
+WUKONG_NUC_PROGRAM = [
+    # ── Setup (indices 0-3) ──────────────────────────────────────────────────
+    # 0: load LED_DEV capability into CR3 (c-list slot 5)
+    encode_church(ChurchOpcode.LOAD, CondCode.AL, cr_dst=3, cr_src=6, imm=5),
+    # 1: load UART_DEV capability into CR4 (c-list slot 6)
+    encode_church(ChurchOpcode.LOAD, CondCode.AL, cr_dst=4, cr_src=6, imm=6),
+    # 2: DR1 = 1  (LED "on" value)
+    encode_turing(TuringOpcode.IADD,   CondCode.AL, dr_dst=1, dr_src=0, imm=1),
+    # 3: LED0 = on (boot indicator, stays on until banner sent)
+    encode_turing(TuringOpcode.DWRITE, CondCode.AL, dr_dst=1, dr_src=3, imm=0),
+]
+
+# ── UART callhome banner: "CM:WUKONG\r\n" (5 instructions × 11 bytes = 55) ──
+# Indices 4-58 inclusive.
+for _wukong_ch in _WUKONG_BANNER:
+    WUKONG_NUC_PROGRAM.extend(_uart_send_byte(_wukong_ch))
+
+# ── LED blink loop (~1 Hz forever after banner) ──────────────────────────────
+# Indices 59-73.
+# _BLINK_TOP = 59  (DWRITE DR1→CR3[0]: LED0 on — also the unconditional branch target)
+_WUKONG_BLINK_START = len(WUKONG_NUC_PROGRAM)   # = 4 + 11*5 = 59
+
+WUKONG_NUC_PROGRAM += [
+    # 59: LED0 = on  ← top of blink loop (unconditional branch target)
+    encode_turing(TuringOpcode.DWRITE, CondCode.AL, dr_dst=1, dr_src=3, imm=0),
+    # 60: outer delay count
+    encode_turing(TuringOpcode.IADD,   CondCode.AL, dr_dst=3, dr_src=0, imm=380),
+    # 61: inner delay count  ← outer-on-top (reset inner each outer iteration)
+    encode_turing(TuringOpcode.IADD,   CondCode.AL, dr_dst=2, dr_src=0, imm=16383),
+    # 62: inner decrement  ← inner-on-top
+    encode_turing(TuringOpcode.ISUB,   CondCode.AL, dr_dst=2, dr_src=2, imm=1),
+    # 63: BRANCH NE → inner-on-top (62)     offset = 62-63 = -1
+    encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=(-1) & 0x7FFF),
+    # 64: outer decrement
+    encode_turing(TuringOpcode.ISUB,   CondCode.AL, dr_dst=3, dr_src=3, imm=1),
+    # 65: BRANCH NE → outer-on-top (61)     offset = 61-65 = -4
+    encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=(-4) & 0x7FFF),
+    # 66: LED0 = off
+    encode_turing(TuringOpcode.DWRITE, CondCode.AL, dr_dst=0, dr_src=3, imm=0),
+    # 67: outer delay count (off phase)
+    encode_turing(TuringOpcode.IADD,   CondCode.AL, dr_dst=3, dr_src=0, imm=380),
+    # 68: inner delay count  ← outer-off-top
+    encode_turing(TuringOpcode.IADD,   CondCode.AL, dr_dst=2, dr_src=0, imm=16383),
+    # 69: inner decrement  ← inner-off-top
+    encode_turing(TuringOpcode.ISUB,   CondCode.AL, dr_dst=2, dr_src=2, imm=1),
+    # 70: BRANCH NE → inner-off-top (69)    offset = 69-70 = -1
+    encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=(-1) & 0x7FFF),
+    # 71: outer decrement
+    encode_turing(TuringOpcode.ISUB,   CondCode.AL, dr_dst=3, dr_src=3, imm=1),
+    # 72: BRANCH NE → outer-off-top (68)    offset = 68-72 = -4
+    encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=(-4) & 0x7FFF),
+    # 73: BRANCH AL → blink-top (59)        offset = 59-73 = -14
+    encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=(-14) & 0x7FFF),
+]
+
+assert len(WUKONG_NUC_PROGRAM) == 74, f"WUKONG_NUC_PROGRAM length = {len(WUKONG_NUC_PROGRAM)}, expected 74"
+
+
 class BootRom(Elaboratable):
     """Instruction ROM for Church Machine boot, demo, and abstraction code.
 
