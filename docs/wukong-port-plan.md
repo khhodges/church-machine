@@ -283,10 +283,10 @@ Set IOSTANDARD to LVCMOS33. Add `set_input_delay` / `set_output_delay` for GMII 
 | P1.6 Diagnostic build | ✅ | Counter blink — M21/G21/G20 hardware confirmed |
 | P1.6 CM build (V1, LED-only) | ✅ | EXIT_0, write_bitstream complete, 3,826,002 bytes |
 | P1.6 CM build (V2, UART+LED) | ✅ | EXIT_0, WNS=3.593 ns, 3,736,048 bytes — Jul 25 2026 |
-| P1.6 CM build (V3, repeating banner) | ☐ | Rebuild after WUKONG_NUC_PROGRAM restructure — banner now inside blink loop |
+| P1.6 CM build (V4, TraceUnit+UartRx) | ✅ | EXIT_0, WNS=1.791 ns (final route), 3,736,048 bytes — Jul 25 2026; uart_rx_pin (F3) + TraceUnit in build |
 | P1.7 Bitstream to Chromebook | ✅ | `build/church_wukong_xc7a100t.bit` in repo; `/dl/wukong-bit` endpoint live |
-| P1.8 Program board | ✅ | xc3sprog confirmed, 30.6 Mbit, 17.9 s (V1); re-flash with V3 bit |
-| P1.9 LED + UART behaviour | ☐ | Flash V3 bit; expect "CM:WUKONG\r\n" repeating at ~1 Hz on E3 + 1 Hz blink |
+| P1.8 Program board | ✅ | xc3sprog confirmed (V1); re-flash with V4 bit (uart_rx_pin live) |
+| P1.9 LED + UART behaviour | ☐ | Flash V4 bit; confirm 's' cmd → 0xAA trace packet on F3 bridge |
 | P2 UART callhome (CH340) | ✅ | UART TX wired to E3 (LVCMOS33); baud 57600; NUC_PROGRAM sends repeating banner |
 | P2b Single-step trace (UART RX) | ✅ | F3 RX wired (LVCMOS33); TraceUnit emits 11-byte 0xAA packets on every retire; command parser handles s/r/h/b; 4-NIA breakpoints; IDE polls /hardware/wukong/trace |
 | P3.1 GMII pin audit | ☐ | Needs schematic |
