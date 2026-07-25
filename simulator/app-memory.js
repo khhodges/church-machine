@@ -2042,21 +2042,22 @@ function renderThreadMemoryLayout(nsIndex) {
     html += '<div class="abs-clist-heading">GOLDEN TOKENS</div>';
     html += `<div class="abs-clist-count">cc\u00a0=\u00a0${TL.CAPS_WORDS} slots</div>`;
     html += '<table class="abs-clist-table"><thead><tr>';
-    html += '<th>#</th><th>GT (HEX)</th><th>PERMS</th><th>TYPE</th><th>RESOLVED NAME</th>';
+    html += '<th>CR</th><th>GT (HEX)</th><th>PERMS</th><th>TYPE</th><th>NAME</th>';
     html += '</tr></thead><tbody>';
     for (let i = 0; i < TL.CAPS_WORDS; i++) {
         const off  = TL.CAPS_START + i;
         const word = sim.memory[slotBase + off] || 0;
         const _cr0Hint = (i === 0 && word === 0 && sim.bootEntrySlot !== null && sim.bootEntrySlot !== undefined)
-            ? ` ondblclick="_installBootEntryGTIntoCR0()" style="cursor:pointer;" title="Double-click to install boot-entry E-GT (Slot ${sim.bootEntrySlot}) into CR0"`
+            ? ` ondblclick="_installBootEntryGTIntoCR0()" style="cursor:pointer;" title="Double-click to install boot-entry Enter-GT (Slot ${sim.bootEntrySlot}) into CR0"`
             : '';
         if (word === 0) {
-            let emptyCell = `<td colspan="4" class="abs-clist-empty-slot">\u2014 (empty slot)`;
+            let emptyCell = `<td colspan="4" class="abs-clist-empty-slot">\u2014 (empty)`;
             if (i === 0 && sim.bootEntrySlot !== null && sim.bootEntrySlot !== undefined) {
-                emptyCell += `<span style="color:#6b7280;font-size:0.8em;margin-left:8px;" title="Double-click this row to install the first-LUMP E-GT">\u26a1 double-click to install E-GT for Slot ${sim.bootEntrySlot}</span>`;
+                const _bLabel = (sim.nsLabels && sim.nsLabels[sim.bootEntrySlot]) || `Slot ${sim.bootEntrySlot}`;
+                emptyCell += `<span style="color:#6b7280;font-size:0.8em;margin-left:8px;" title="Double-click this row to install the Enter-GT">\u26a1 double-click to install Enter-GT for ${_bLabel}</span>`;
             }
             emptyCell += '</td>';
-            html += `<tr${_cr0Hint}><td class="abs-clist-idx">${i}</td>${emptyCell}</tr>`;
+            html += `<tr${_cr0Hint}><td class="abs-clist-idx">CR${i}</td>${emptyCell}</tr>`;
         } else {
             const parsed = sim.parseGT(word);
             const p = { ...parsed.permissions, F: parsed.type === 2 ? 1 : 0 };
@@ -2070,10 +2071,16 @@ function renderThreadMemoryLayout(nsIndex) {
                 (typeof abstractionRegistry !== 'undefined' && abstractionRegistry &&
                  abstractionRegistry.abstractions && abstractionRegistry.abstractions[nsIdx] &&
                  abstractionRegistry.abstractions[nsIdx].name) || null;
-            const nameStr = label ? `NS[${nsIdx}] \u2014 ${label}` : `NS[${nsIdx}]`;
+            // Boot-entry CR0: show ⚡ badge + name first, NS slot secondary
+            const isBootEntry = (i === 0 && p.E && nsIdx === sim.bootEntrySlot);
+            const nameStr = label
+                ? (isBootEntry
+                    ? `<span class="abs-nsdecoder-badge-boot">\u26a1</span> <strong>${label}</strong> <span style="color:#6b7280;font-size:0.8em;margin-left:4px;">NS[${nsIdx}]</span>`
+                    : `<strong>${label}</strong> <span style="color:#6b7280;font-size:0.8em;margin-left:4px;">NS[${nsIdx}]</span>`)
+                : `NS[${nsIdx}]`;
             const gtHex = '0x' + word.toString(16).toUpperCase().padStart(8, '0');
             html += `<tr${_cr0Hint}>`;
-            html += `<td class="abs-clist-idx">${i}</td>`;
+            html += `<td class="abs-clist-idx">CR${i}</td>`;
             html += `<td class="abs-clist-gt">${gtHex}</td>`;
             html += `<td class="abs-clist-perms">${permHtml}</td>`;
             html += `<td class="abs-clist-type">${parsed.typeName}</td>`;

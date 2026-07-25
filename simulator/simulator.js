@@ -1463,9 +1463,9 @@ class ChurchSimulator {
         const threadLoc = this.memory[this._nsSlotBase(1)];
         this.memory[threadLoc] = this.packLumpHeader(THREAD_N_MINUS_6, THREAD_SW, THREAD_CC, 2);
 
-        // Thread caps zone — CR0 home slot at word offset +244 is pre-set to an E-GT
-        // for bootEntrySlot so the SelfTest has a valid E-GT in CR0 at entry.
-        // The SelfTest's done: loop calls TPERM CR0, E to decide when to dispatch
+        // Thread caps zone — CR0 home slot at word offset +244 is pre-set to an Enter-GT
+        // for bootEntrySlot (the ⚡ lightning-bolt selection, e.g. LED Flash at slot 10).
+        // The boot entry's done: loop calls TPERM CR0, E to decide when to dispatch
         // to the programmer's abstraction; INIT_ABSTR overwrites this slot when
         // the user loads their program, and the next Scheduler reschedule updates CR0.
         this.memory[threadLoc + THREAD_CAPS_OFFSET] =
