@@ -175,9 +175,9 @@ def create_abstract_gt(ab_type, rw_perms, gt_seq, ab_data):
 # image is produced from this canonical list so server and simulator
 # agree on what the default boot ROM contains.
 #
-# Minimal 8-slot boot namespace (slots 0-7), followed by lazy-load abstractions.
-# Church HW Range authority slots 19-22 removed — CHANGE CR12/CR13 authority
-# is now a pre-baked Abstract S-perm GT (0x2E000000) in SERVICE_CLIST_DEFS.
+# Minimal 7-slot boot namespace (slots 0-6), followed by user-deployed abstractions.
+# Slot 7 and above have no special significance — the ⚡ lightning bolt sets Thread.CR0
+# to the E-GT of whichever slot the programmer chooses as the boot entry.
 DEFAULT_ABSTRACTION_CATALOG = [
     ("Boot.NS",      {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False),  # 0
     ("Boot.Thread",  {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False),  # 1
@@ -185,10 +185,9 @@ DEFAULT_ABSTRACTION_CATALOG = [
     ("LED_DEV",      {"R":1,"W":1,"X":0,"L":0,"S":0,"E":0}, False),  # 3  MMIO 0x40000000
     ("BTN_DEV",      {"R":1,"W":0,"X":0,"L":0,"S":0,"E":0}, False),  # 4  MMIO 0x40000028
     ("TIMER_DEV",    {"R":1,"W":1,"X":0,"L":0,"S":0,"E":0}, False),  # 5  MMIO 0x4000002C
-    ("SelfTest",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 6  boot entry point
-    None,                                                               # 7  [programmable]
+    ("SelfTest",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 6  default boot entry
 ]
-assert len(DEFAULT_ABSTRACTION_CATALOG) == 8, "catalog drift vs simulator.js"
+assert len(DEFAULT_ABSTRACTION_CATALOG) == 7, "catalog drift vs simulator.js"
 
 # MMIO NS slot specs: (mmio_byte_addr, lim17).
 # Slots 2-5 use physical MMIO addresses — no RAM body is allocated;

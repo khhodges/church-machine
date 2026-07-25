@@ -109,7 +109,7 @@ const M_BIT_PORT_CR14         = 0xFFFFFF1E; // M-bit authority port for CR14
 const M_BIT_PORT_CR15         = 0xFFFFFF1F; // M-bit authority port for CR15
 const IO_PORT_PET_NAME_WR     = 0xFFFFFF38; // DWRITE to this addr marks c-list slot (value & 0x3F) as named
 // Boot-default named slots — matches hardware/boot_rom.py DEMO_CLIST_NAMED_SLOTS.
-// Live slots: 0-6 (excl. 7), 8-10, 22 (Tunnel), 23 (Keystone), 42 (Ethernet), 43 (EventRouter).
+// Live slots: 0-6, 8-10, 22 (Tunnel), 23 (Keystone), 42 (Ethernet), 43 (EventRouter).
 const BOOT_NAMED_SLOTS = Object.freeze([0, 1, 2, 3, 4, 5, 6]);
 
 // DEPRECATED: fixed IRQ thread slot constant.
@@ -380,11 +380,11 @@ class ChurchSimulator {
             }
         }
 
-        // Integrity check: the minimum complete boot namespace has 8 slots
-        // (indices 0-7: Boot.NS, Boot.Thread, UART_DEV, LED_DEV,
-        // BTN_DEV, TIMER_DEV, SelfTest, [programmable]).
+        // Integrity check: the minimum complete boot namespace has 7 slots
+        // (indices 0-6: Boot.NS, Boot.Thread, UART_DEV, LED_DEV,
+        // BTN_DEV, TIMER_DEV, SelfTest).
         // Warn loudly in the console log when the binary is smaller than this.
-        const _BOOT_SLOT_MIN = 8;
+        const _BOOT_SLOT_MIN = 7;
         if (count < _BOOT_SLOT_MIN) {
             this.output += `[BOOTIMG] WARNING: only ${count} NS slots active (< ${_BOOT_SLOT_MIN} expected). Boot namespace may be incomplete.\n`;
         } else {
@@ -786,7 +786,7 @@ class ChurchSimulator {
         // Mirrors hardware/pet_name_mem.py and hardware/boot_rom.py DEMO_CLIST_NAMED_SLOTS.
         // Initialised with the boot c-list named slots; updated by DWRITE to IO_PORT_PET_NAME_WR
         // (0xFFFFFF38) and by markNamedSlots() when a program with a capabilities block loads.
-        // Boot named slots: {0-6 (excl.7), 8-10, 22, 23, 42, 43} — matches DEMO_CLIST_NAMED_SLOTS.
+        // Boot named slots: {0-6, 8-10, 22, 23, 42, 43} — matches DEMO_CLIST_NAMED_SLOTS.
         this.petNameMemory = new Set(BOOT_NAMED_SLOTS);
 
         // Lazy-Resolve: Transparent Thread Suspension (Task #1519)
@@ -1056,18 +1056,11 @@ class ChurchSimulator {
             if (reuse >= 0 && reuse < this.MAX_NS_ENTRIES) return reuse;
         }
 
-        // 2. Prefer the boot-reserved programmable slot (7) when it is free.
-        //    _getHardwareBootCatalog() index [7] is null / '(free)' / [programmable].
-        const PROG_SLOT      = 7;
-        const FIRST_DYN_SLOT = 8;   // slots 0–7 are boot-reserved; 8+ are dynamic
-
-        if (!this.isNSEntryValid(PROG_SLOT)) {
-            if (token) this._tokenSlotMap.set(token, PROG_SLOT);
-            return PROG_SLOT;
-        }
-
-        // 3. Slot 7 is occupied — scan upward for the next free slot.
-        for (let s = FIRST_DYN_SLOT; s < this.MAX_NS_ENTRIES; s++) {
+        // 2. Scan from slot 2 for the first free slot.
+        //    Slots 0 and 1 are hardware-fixed (NS root, Thread LUMP).
+        //    Slots 2–6 are system entries pre-populated by the boot image.
+        //    No slot above 1 has special priority — the first free slot wins.
+        for (let s = 2; s < this.MAX_NS_ENTRIES; s++) {
             if (!this.isNSEntryValid(s)) {
                 if (token) this._tokenSlotMap.set(token, s);
                 return s;
@@ -1266,8 +1259,10 @@ class ChurchSimulator {
     }
 
     _getHardwareBootCatalog() {
-        // Hardware cold-boot namespace: exactly 8 slots (0–7).
-        // Slots 8+ appear only after explicit LUMP deployment via the Builder.
+        // Hardware cold-boot namespace: exactly 7 slots (0–6).
+        // Slots 7+ appear only after explicit LUMP deployment via the Builder.
+        // No slot above 1 has special hardware significance — the ⚡ lightning
+        // bolt sets Thread.CR0 to whichever slot the programmer chooses.
         // This catalog NEVER derives from abstractionRegistry — the registry is
         // the application-level abstraction library, not the hardware boot image.
         return [
@@ -1277,8 +1272,7 @@ class ChurchSimulator {
             { label: 'LED_DEV',      perms: {R:1,W:1,X:0,L:0,S:0,E:0}, chainable: false },  // 3  MMIO 0x40000000
             { label: 'BTN_DEV',      perms: {R:1,W:0,X:0,L:0,S:0,E:0}, chainable: false },  // 4  MMIO 0x40000028
             { label: 'TIMER_DEV',    perms: {R:1,W:1,X:0,L:0,S:0,E:0}, chainable: false },  // 5  MMIO 0x4000002C
-            { label: 'SelfTest',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 6  boot entry point
-            null,                                                                               // 7  [programmable]
+            { label: 'SelfTest',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 6  default boot entry
         ];
     }
 
@@ -1388,9 +1382,9 @@ class ChurchSimulator {
             clistGTs.push(gtWord);
         }
 
-        // ── Step 2 augmentation: NS entries for extended slots (≥8) ──────────
-        // The 8-slot hardware catalog loop above only creates NS entries for
-        // slots 0–7. Resident Step-2 lumps targeting slots ≥ 8 need explicit
+        // ── Step 2 augmentation: NS entries for extended slots (≥7) ──────────
+        // The 7-slot hardware catalog loop above only creates NS entries for
+        // slots 0–6. Resident Step-2 lumps targeting slots ≥ 7 need explicit
         // NS entries. Lazy (resident=False) slots are left as all-zeros —
         // the runtime lazy loader writes their NS entry on first use.
         for (const _e2 of _bcStep2Lumps) {
@@ -1479,7 +1473,7 @@ class ChurchSimulator {
 
         // Memory-manager GT at c-list[0]: R|W Inform capability over NS slot 0 (full namespace).
         clistGTs[0] = this.createGT(0, BOOT_NS_SLOT_HEADER, {R:1, W:1}, 1);
-        const DEMO_CLIST_SIZE   = 11;   // slots 0–10 (minimal 8-slot namespace)
+        const DEMO_CLIST_SIZE   = 11;   // slots 0–10 (minimal 7-slot namespace)
 
         // ── NS lump c-list (A7 v1.2 layout) ─────────────────────────────────────────
         // A7 layout: NS LUMP IS the NS TABLE at NS_TABLE_BASE. No separate lump header
@@ -6544,7 +6538,7 @@ class ChurchSimulator {
     }
 
     loadProgram(words, startAddr) {
-        const abstrSlot = this.bootEntrySlot;  // active boot-entry slot (default 3 = Boot.Abstr, Task #247)
+        const abstrSlot = this.bootEntrySlot;  // active boot-entry slot (default 6 = SelfTest; set by ⚡ lightning bolt)
         const abstrBase = this._nsSlotBase(abstrSlot);
         const codeLoc = this.memory[abstrBase] || (abstrSlot * this.SLOT_SIZE);
         const baseAddr = this.bootComplete ? codeLoc : (startAddr || 0);

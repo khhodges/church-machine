@@ -1060,16 +1060,16 @@ DEFAULT_BOOT_CONFIG = {
 # At 4 words per entry this reserves up to 4096 words of the namespace LUMP.
 MAX_NS_ENTRIES = 1024
 # How many named NS entries are present after a cold boot.
-# The 8-slot boot model populates exactly slots 0–7 during
+# The 7-slot boot model populates exactly slots 0–6 during
 # _initNamespaceTable(): Boot.NS (0), Boot.Thread (1), UART_DEV (2),
-# LED_DEV (3), BTN_DEV (4), TIMER_DEV (5), SelfTest (6), null/programmable (7).
+# LED_DEV (3), BTN_DEV (4), TIMER_DEV (5), SelfTest (6).
 # Slots 2–5 are MMIO device windows backed by hardware registers, not RAM.
-# Slot 7 is a free programmable slot. Slots 8 and above only appear when
-# the user explicitly deploys a LUMP (via Step 2 or later); they are never
-# written automatically by the simulator at startup. Keep in sync with
-# simulator.js _getHardwareBootCatalog() and server/boot_image.py
-# DEFAULT_ABSTRACTION_CATALOG.
-BASE_NAMED_NS_COUNT = 8
+# Slot 7 and above only appear when the user explicitly deploys a LUMP;
+# no slot above 1 has special hardware significance. The ⚡ lightning bolt
+# sets Thread.CR0 to whichever slot the programmer chooses as boot entry.
+# Keep in sync with simulator.js _getHardwareBootCatalog() and
+# server/boot_image.py DEFAULT_ABSTRACTION_CATALOG.
+BASE_NAMED_NS_COUNT = 7
 
 # Slots reserved for foundational lumps (Step 1) and device MMIO regions —
 # the programmer cannot place an additional resident lump body here. Slots
