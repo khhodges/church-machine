@@ -55,19 +55,67 @@ function updateCRDetail() {
     if (cr.isNull) {
         titleEl.innerHTML = '';
         titleEl.style.display = 'none';
-        // Pre-boot / reset state is not a violation of any post-boot invariant —
-        // CR14 (and CR12) are only guaranteed populated once bootComplete flips
-        // true (simulator.js B:07 NUC_CODE loads CR14 from Thread.CR0, then
-        // Navana.Init runs, then bootComplete ← true). Showing the generic
-        // "Register is empty" message in that window reads as a bug even though
-        // it is expected, so call out the not-yet-booted case explicitly.
+        if (!sim.bootComplete && (crIdx === 12 || crIdx === 14)) {
+            // Pre-boot: CR12/CR14 are zero in context registers, but the Thread LUMP
+            // already holds the designed initial capability state in memory.
+            // Read it directly from NS slot 1 (Boot.Thread) offset +244…+255 and show
+            // the programmer exactly what they designed — no click-and-hope required.
+            let preBootHtml = '';
+            try {
+                const threadNSWord0Addr = sim._nsSlotBase(1);
+                const threadBase = threadNSWord0Addr !== undefined
+                    ? (sim.memory[threadNSWord0Addr] >>> 0) : 0;
+                if (threadBase > 0 && threadBase < sim.memory.length) {
+                    const CAPS_OFF = 244;
+                    const CAPS_N   = 12;
+                    const crLabel  = crIdx === 14
+                        ? 'CR14 will be loaded from Thread.CR0 on boot — this is its designed startup value:'
+                        : 'These are the capability registers (CR0–CR11) your machine will start with:';
+                    preBootHtml += `<div style="padding:0.75rem 1rem 0.25rem;color:#f4b942;font-weight:600;font-size:0.85rem;letter-spacing:0.04em;">DESIGNED BOOT STATE</div>`;
+                    preBootHtml += `<div style="padding:0 1rem 0.75rem;color:var(--text-secondary);font-size:0.8rem;">${crLabel}</div>`;
+                    preBootHtml += `<table class="abs-clist-table" style="margin:0 1rem 1rem;">`;
+                    preBootHtml += `<thead><tr><th>CR</th><th>GT (HEX)</th><th>PERMS</th><th>TYPE</th><th>NAME</th></tr></thead><tbody>`;
+                    const rowRange = (crIdx === 14) ? [0] : Array.from({length: CAPS_N}, (_,i) => i);
+                    for (const i of rowRange) {
+                        const word = sim.memory[threadBase + CAPS_OFF + i] >>> 0;
+                        if (word === 0) {
+                            preBootHtml += `<tr><td class="abs-clist-idx">CR${i}</td><td colspan="4" class="abs-clist-empty-slot">\u2014 (empty)</td></tr>`;
+                        } else {
+                            const parsed = sim.parseGT(word);
+                            const p = { ...parsed.permissions, F: parsed.type === 2 ? 1 : 0 };
+                            let permHtml = '';
+                            for (const bit of ['B','R','W','X','E','L','S','F']) {
+                                permHtml += `<span class="abs-perm-badge ${p[bit] ? 'perm-on' : 'perm-off'}">${bit}</span>`;
+                            }
+                            const nsIdx2 = parsed.index;
+                            const label2 = (sim.nsLabels && sim.nsLabels[nsIdx2]) || null;
+                            const isBootEntry = (i === 0 && p.E && nsIdx2 === sim.bootEntrySlot);
+                            const nameStr = label2
+                                ? (isBootEntry
+                                    ? `<span class="abs-nsdecoder-badge-boot">\u26a1</span> <strong>${label2}</strong> <span style="color:#6b7280;font-size:0.8em;margin-left:4px;">NS[${nsIdx2}]</span>`
+                                    : `<strong>${label2}</strong> <span style="color:#6b7280;font-size:0.8em;margin-left:4px;">NS[${nsIdx2}]</span>`)
+                                : `NS[${nsIdx2}]`;
+                            const gtHex = '0x' + word.toString(16).toUpperCase().padStart(8, '0');
+                            preBootHtml += `<tr><td class="abs-clist-idx">CR${i}</td><td class="abs-clist-gt">${gtHex}</td><td class="abs-clist-perms">${permHtml}</td><td class="abs-clist-type">${parsed.typeName}</td><td class="abs-clist-name">${nameStr}</td></tr>`;
+                        }
+                    }
+                    preBootHtml += `</tbody></table>`;
+                    preBootHtml += `<div style="padding:0 1rem 1rem;color:#4b5563;font-size:0.78rem;">Click <b style="color:var(--text-secondary);">Boot</b> to run the sequence and activate these registers.</div>`;
+                }
+            } catch(e) { /* fall through to generic message */ }
+            if (preBootHtml) {
+                contentEl.innerHTML = preBootHtml;
+                contentEl.classList.remove('crd-content-thread');
+                return;
+            }
+        }
         if (!sim.bootComplete) {
             const bootHint = (crIdx === 14 || crIdx === 12)
-                ? `CR${crIdx} is loaded from Thread.CR0 when the boot sequence finishes — it will not stay empty after boot.`
+                ? `CR${crIdx} will be loaded from the Thread LUMP on boot.`
                 : `CR${crIdx} may be populated during the boot sequence.`;
             contentEl.innerHTML =
                 `<div style="color:var(--text-secondary);padding:1rem;">` +
-                `<div style="margin-bottom:0.5rem;">Machine not booted yet (BOOT ${sim.bootStep}/4 · RESET) — context registers are still zero.</div>` +
+                `<div style="margin-bottom:0.5rem;">Machine not booted yet (BOOT ${sim.bootStep}/4 · RESET).</div>` +
                 `<div>${bootHint} Click <b>Boot</b> (top-right) to run the boot sequence.</div>` +
                 `</div>`;
         } else {
