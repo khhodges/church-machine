@@ -334,7 +334,7 @@ def generate_rtlil_wukong(output_dir="build"):
 
     top = ChurchWukongXC7A100T(clk_freq=50_000_000, baud=57_600, sim_mode=False)
 
-    ports = [top.clk, top.rst_n] + list(top.led) + [top.uart_tx_pin]
+    ports = [top.clk, top.rst_n] + list(top.led) + [top.uart_tx_pin, top.uart_rx_pin]
 
     rtlil_text = convert(top, ports=ports)
 

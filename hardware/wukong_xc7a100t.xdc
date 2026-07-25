@@ -23,10 +23,13 @@ set_property -dict { PACKAGE_PIN M6   IOSTANDARD LVCMOS33 } [get_ports { rst_n }
 set_property CFGBVS        VCCO [current_design];
 set_property CONFIG_VOLTAGE 3.3  [current_design];
 
-## ── UART TX (callhome — CH340 USB socket, 57600 8N1) ──────────────────────────
+## ── UART TX/RX (CH340 USB socket, 57600 8N1) ─────────────────────────────────
 ## E3 = IO_L5P_T0_34, bank 34, LVCMOS33 — hardware-confirmed (FPGA TX → CH340 RX)
-## Only TX is constrained; RX (F3) is not wired in V2 (TX-only callhome).
+## F3 = IO_L5N_T0_34, bank 34, LVCMOS33 — UART RX (CH340 TX → FPGA RX)
+## Used for: step/run/halt/breakpoint commands from wukong_bridge.py
 set_property -dict { PACKAGE_PIN E3  IOSTANDARD LVCMOS33 } [get_ports { uart_tx_pin }];
+set_property -dict { PACKAGE_PIN F3  IOSTANDARD LVCMOS33 } [get_ports { uart_rx_pin }];
 
 ## ── False paths (async inputs to sync domain) ──────────────────────────────────
 set_false_path -from [get_ports { rst_n }];
+set_false_path -from [get_ports { uart_rx_pin }];

@@ -9509,6 +9509,91 @@ def _bind_with_retry(port, max_attempts=5, backoff_seconds=0.3):
             _time.sleep(backoff_seconds)
 
 
+# ── Wukong hardware single-step trace endpoints ─────────────────────────────
+# Used by hardware/wukong_bridge.py and the IDE simulator.
+#
+# Bridge (on Chromebook):
+#   POST /hardware/wukong/trace   — bridge posts parsed 11-byte trace packet as JSON
+#   GET  /hardware/wukong/command — bridge polls for the next pending command byte
+#
+# IDE (browser):
+#   POST /hardware/wukong/command — IDE enqueues one command ('s','r','h','b'+NIA)
+#   GET  /hardware/wukong/trace   — IDE reads the latest trace packet as JSON
+
+import threading as _wk_threading
+
+_wukong_trace_lock    = _wk_threading.Lock()
+_wukong_command_lock  = _wk_threading.Lock()
+_wukong_latest_trace  = {}         # {nia, instr, flags, fault_code, fault_valid, bp_hit, ts}
+_wukong_pending_cmd   = None       # {'cmd': 's'|'r'|'h'|'b', 'nia': int|None}
+
+
+@app.route('/hardware/wukong/trace', methods=['POST'])
+def wukong_trace_post():
+    """Bridge posts a decoded 11-byte trace packet here."""
+    global _wukong_latest_trace
+    data = request.get_json(silent=True) or {}
+    entry = {
+        'nia':         int(data.get('nia', 0)),
+        'instr':       int(data.get('instr', 0)),
+        'flags':       int(data.get('flags', 0)),
+        'fault_code':  int(data.get('fault_code', 0)),
+        'fault_valid': bool(data.get('fault_valid', False)),
+        'bp_hit':      bool(data.get('bp_hit', False)),
+        'ts':          float(data.get('ts', 0.0)),
+    }
+    with _wukong_trace_lock:
+        _wukong_latest_trace = entry
+    return jsonify({'ok': True})
+
+
+@app.route('/hardware/wukong/trace', methods=['GET'])
+def wukong_trace_get():
+    """IDE reads the latest trace packet (or {} if no packet yet)."""
+    with _wukong_trace_lock:
+        entry = dict(_wukong_latest_trace)
+    return jsonify(entry)
+
+
+@app.route('/hardware/wukong/command', methods=['POST'])
+def wukong_command_post():
+    """IDE enqueues a command for the bridge to forward to the board.
+
+    Body JSON: {'cmd': 's'|'r'|'h'|'b', 'nia': <int>}
+    Only one command is queued at a time; a new POST overwrites any pending one.
+    """
+    global _wukong_pending_cmd
+    data = request.get_json(silent=True) or {}
+    cmd = str(data.get('cmd', '')).strip()
+    if cmd not in ('s', 'r', 'h', 'b'):
+        return jsonify({'ok': False, 'error': 'unknown cmd'}), 400
+    entry = {'cmd': cmd}
+    if cmd == 'b':
+        try:
+            entry['nia'] = int(data.get('nia', 0xFFFFFFFF)) & 0xFFFFFFFF
+        except (TypeError, ValueError):
+            entry['nia'] = 0xFFFFFFFF
+    with _wukong_command_lock:
+        _wukong_pending_cmd = entry
+    return jsonify({'ok': True})
+
+
+@app.route('/hardware/wukong/command', methods=['GET'])
+def wukong_command_get():
+    """Bridge polls here every 50 ms to dequeue the next pending command.
+
+    Returns {'cmd': ..., 'nia': ...} if a command is pending, else {}.
+    The command is consumed (set to None) on each successful GET.
+    """
+    global _wukong_pending_cmd
+    with _wukong_command_lock:
+        entry = _wukong_pending_cmd
+        _wukong_pending_cmd = None
+    if entry:
+        return jsonify(entry)
+    return jsonify({})
+
+
 @app.route('/dev/firmware/main.c')
 def _dev_serve_maincfirmware():
     _src = os.path.join(os.path.dirname(_SERVER_DIR),

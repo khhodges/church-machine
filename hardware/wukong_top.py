@@ -52,6 +52,7 @@ from .hw_types import *
 from .core import ChurchCore
 from .boot_rom import (BootRom, WUKONG_NUC_PROGRAM, WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST)
 from .uart_tx import UartTx
+from .uart_rx import UartRx
 
 
 # ── Wukong ROM: WUKONG_NUC_PROGRAM starting at word 0 ────────────────────────
@@ -99,6 +100,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         self.clk          = Signal()        # 50 MHz oscillator  (M21, SRCC bank 34)
         self.rst_n        = Signal(init=1)  # Active-low button   (M6) — constrained, reserved
         self.uart_tx_pin  = Signal(init=1)  # UART TX (E3) — idles HIGH
+        self.uart_rx_pin  = Signal(init=1)  # UART RX (F3) — idles HIGH; step/run/halt/bp cmds
 
         self.led = [Signal(name=f"led{i}") for i in range(2)]
 
@@ -194,9 +196,22 @@ class ChurchWukongXC7A100T(Elaboratable):
         # UartTx(50 MHz, 57600 baud) — 8N1 active-high idle, matches CH340 bridge.
         # MMIO register 5 write = TX: one-cycle start pulse triggers byte transmit.
         # MMIO register 6 read  = STATUS: bit[0] = tx_busy (poll before next byte).
-        # MMIO register 7 read  = RX: always 0 (RX not implemented in V2).
+        # MMIO register 7 read  = RX: always 0 (unused; F3 RX handled by UartRx below).
         uart_tx = m.submodules.uart_tx = UartTx(clk_freq=self.clk_freq, baud=self.baud)
         m.d.comb += self.uart_tx_pin.eq(uart_tx.tx)
+
+        # ── UART RX ────────────────────────────────────────────────────────────
+        # Receives step/run/halt/breakpoint commands from wukong_bridge.py.
+        # F3 = IO_L5N_T0_34, bank 34, LVCMOS33 — complementary to TX on E3.
+        # Two-stage synchroniser is built into UartRx (rx_sync register).
+        uart_rx = m.submodules.uart_rx = UartRx(clk_freq=self.clk_freq, baud=self.baud)
+        m.d.comb += uart_rx.rx.eq(self.uart_rx_pin)
+
+        # ── Trace TX arbitration signals ───────────────────────────────────────
+        # trace_tx_req / trace_tx_byte are driven by the TraceUnit FSM below.
+        # CM MMIO reg-5 writes always win over trace bytes.
+        trace_tx_req  = Signal()   # TraceUnit wants to send a byte
+        trace_tx_byte = Signal(8)  # byte from TraceUnit
 
         # ── MMIO decode ────────────────────────────────────────────────────────
         # MMIO range: bit[30]=1, bit[31]=0  →  addresses 0x40000000–0x7FFFFFFF
@@ -251,11 +266,19 @@ class ChurchWukongXC7A100T(Elaboratable):
                     with m.If(core.dmem_wr_data[1]):
                         m.d.sync += alarm_fired.eq(0)
 
-        # UART TX write (reg 5): one-cycle start pulse — combinatorial, not in the Switch
-        # so it fires on the same cycle as the DWRITE without needing a latched register.
+        # ── UART TX arbitrator ─────────────────────────────────────────────────
+        # CM MMIO reg-5 write = TX byte (one-cycle start pulse).  CM wins; trace
+        # bytes from the TraceUnit FSM fill idle TX cycles.
+        # cm_tx_start is the raw CM write signal; used by the TraceUnit to avoid
+        # colliding with in-flight CM bytes.
+        cm_tx_start = Signal()
+        m.d.comb += cm_tx_start.eq(is_mmio_write & (mmio_reg_sel == 5))
+
+        trace_tx_ack = Signal()  # TraceUnit byte accepted (one-cycle ack)
         m.d.comb += [
-            uart_tx.data.eq(core.dmem_wr_data[0:8]),
-            uart_tx.start.eq(is_mmio_write & (mmio_reg_sel == 5)),
+            uart_tx.data.eq(Mux(cm_tx_start, core.dmem_wr_data[0:8], trace_tx_byte)),
+            uart_tx.start.eq(cm_tx_start | (trace_tx_req & ~uart_tx.busy & ~cm_tx_start)),
+            trace_tx_ack.eq(trace_tx_req & ~uart_tx.busy & ~cm_tx_start),
         ]
 
         is_mmio_read = Signal()
@@ -327,13 +350,160 @@ class ChurchWukongXC7A100T(Elaboratable):
         fault_latched = Signal()
         m.d.sync += fault_latched.eq(fault_latched | core.fault_valid)
 
-        halted = Signal()
+        # step_mode=1 (default): CM halts after each retired instruction and waits
+        #   for an 's' command from the IDE before executing the next one.
+        # step_mode=0: CM executes freely; 'h' or a breakpoint hit re-enters step mode.
+        step_mode   = Signal(init=1)   # 1 = step mode
+        step_halted = Signal()          # 1 = CM currently held between instructions
+        step_grant  = Signal()          # 1-cycle pulse: step command received
+
+        # ── Breakpoints: 4 NIA slots ──────────────────────────────────────────
+        bp_nia   = [Signal(32, init=0xFFFFFFFF, name=f"bp_nia{i}") for i in range(4)]
+        bp_armed = [Signal(name=f"bp_armed{i}") for i in range(4)]
+        bp_wr_ptr = Signal(2)   # round-robin write pointer for arming slots
+
+        bp_hit = Signal()
+        m.d.comb += bp_hit.eq(
+            core.retire_valid & (
+                (bp_armed[0] & (core.retire_nia == bp_nia[0])) |
+                (bp_armed[1] & (core.retire_nia == bp_nia[1])) |
+                (bp_armed[2] & (core.retire_nia == bp_nia[2])) |
+                (bp_armed[3] & (core.retire_nia == bp_nia[3]))
+            )
+        )
+
+        # Breakpoint hit → force step_mode + halt; takes highest priority.
+        with m.If(bp_hit):
+            m.d.sync += [step_mode.eq(1), step_halted.eq(1)]
+        with m.Elif(step_grant & step_mode):
+            # step_grant clears halt for one retire (re-set on next retire_valid)
+            m.d.sync += step_halted.eq(0)
+        with m.Elif(core.retire_valid & step_mode & ~step_grant):
+            m.d.sync += step_halted.eq(1)
+        with m.Elif(~step_mode):
+            m.d.sync += step_halted.eq(0)
+
         m.d.comb += [
-            core.imem_valid.eq(~halted),
+            core.imem_valid.eq(~step_halted),
+            core.halt_req.eq(step_halted),
             core.free_run_start.eq(0),
             core.free_run_nia.eq(0),
             core.gc_start.eq(0),
         ]
+
+        # ── Command parser FSM ─────────────────────────────────────────────────
+        # Reads one-byte commands from the UART RX FIFO:
+        #   's' (0x73) — step: release CM for one retire (step_mode stays on)
+        #   'r' (0x72) — run:  clear step_mode; CM runs freely
+        #   'h' (0x68) — halt: assert step_mode + step_halted immediately
+        #   'b' (0x62) — breakpoint: read 4 big-endian NIA bytes, then arm/disarm
+        #
+        # Breakpoint 'b' + NIA: arms slot bp_wr_ptr with the given NIA.
+        # NIA==0xFFFFFFFF disarms the slot.  Pointer wraps 0→1→2→3→0.
+
+        bp_recv_bytes = [Signal(8, name=f"bp_recv_b{i}") for i in range(4)]
+        bp_recv_cnt   = Signal(2)
+
+        with m.FSM(name="cmd_parser"):
+            with m.State("IDLE"):
+                with m.If(uart_rx.valid):
+                    with m.Switch(uart_rx.data):
+                        with m.Case(0x73):  # 's'
+                            # Only grant a step if in step mode AND currently halted.
+                            # The combinatorial step_grant feeds the step_halted updater above.
+                            m.d.comb += step_grant.eq(step_mode & step_halted)
+                        with m.Case(0x72):  # 'r'
+                            m.d.sync += [step_mode.eq(0), step_halted.eq(0)]
+                        with m.Case(0x68):  # 'h'
+                            m.d.sync += [step_mode.eq(1), step_halted.eq(1)]
+                        with m.Case(0x62):  # 'b'
+                            m.d.sync += bp_recv_cnt.eq(0)
+                            m.next = "BP_RECV"
+
+            with m.State("BP_RECV"):
+                with m.If(uart_rx.valid):
+                    with m.Switch(bp_recv_cnt):
+                        for i in range(4):
+                            with m.Case(i):
+                                m.d.sync += [bp_recv_bytes[i].eq(uart_rx.data),
+                                             bp_recv_cnt.eq(i + 1)]
+                    with m.If(bp_recv_cnt == 3):
+                        m.next = "BP_COMMIT"
+
+            with m.State("BP_COMMIT"):
+                # Assemble big-endian NIA: byte[0]=MSB .. byte[3]=LSB
+                bp_nia_val = Signal(32)
+                m.d.comb += bp_nia_val.eq(
+                    Cat(bp_recv_bytes[3], bp_recv_bytes[2],
+                        bp_recv_bytes[1], bp_recv_bytes[0])
+                )
+                with m.Switch(bp_wr_ptr):
+                    for slot in range(4):
+                        with m.Case(slot):
+                            with m.If(bp_nia_val == 0xFFFFFFFF):
+                                m.d.sync += bp_armed[slot].eq(0)
+                            with m.Else():
+                                m.d.sync += [bp_nia[slot].eq(bp_nia_val),
+                                             bp_armed[slot].eq(1)]
+                m.d.sync += bp_wr_ptr.eq(bp_wr_ptr + 1)
+                m.next = "IDLE"
+
+        # ── TraceUnit FSM ──────────────────────────────────────────────────────
+        # On every retire_valid pulse (when IDLE), captures an 11-byte packet:
+        #   [0]    0xAA   magic
+        #   [1..4] NIA    big-endian uint32
+        #   [5..8] instr  big-endian uint32
+        #   [9]    flags  bits[3:0]=NZCV  bits[7:4]=0
+        #   [10]   fault  bits[4:0]=fault_code  bit[6]=fault_valid  bit[7]=bp_hit
+        # Packets fill idle UART TX cycles (CM MMIO TX wins via the arbitrator).
+        # If the TraceUnit is busy sending a previous packet when a new retire fires,
+        # that retire is silently skipped (acceptable in run mode; step mode ensures
+        # the TraceUnit is always idle before the next step fires).
+
+        trace_buf = [Signal(8, name=f"tbuf{i}") for i in range(11)]
+        trace_idx = Signal(4)
+
+        # bp_hit is combinatorial; latch it at the moment retire_valid fires so
+        # the TraceUnit FSM can include it in the fault byte one cycle later.
+        bp_hit_lat = Signal()
+
+        with m.FSM(name="trace_unit"):
+            with m.State("IDLE"):
+                m.d.comb += [trace_tx_req.eq(0), trace_tx_byte.eq(0)]
+                with m.If(core.retire_valid):
+                    m.d.sync += [
+                        trace_buf[0].eq(0xAA),
+                        trace_buf[1].eq(core.retire_nia[24:32]),
+                        trace_buf[2].eq(core.retire_nia[16:24]),
+                        trace_buf[3].eq(core.retire_nia[8:16]),
+                        trace_buf[4].eq(core.retire_nia[0:8]),
+                        trace_buf[5].eq(core.retire_instr[24:32]),
+                        trace_buf[6].eq(core.retire_instr[16:24]),
+                        trace_buf[7].eq(core.retire_instr[8:16]),
+                        trace_buf[8].eq(core.retire_instr[0:8]),
+                        trace_buf[9].eq(Cat(core.retire_flags.as_value()[:4], C(0, 4))),
+                        trace_buf[10].eq(Cat(
+                            core.retire_fault_code[:5],   # bits[4:0] fault_code
+                            C(0, 1),                       # bit[5] reserved
+                            core.retire_fault_valid,       # bit[6] fault_valid
+                            bp_hit,                        # bit[7] bp_hit
+                        )),
+                        bp_hit_lat.eq(bp_hit),
+                        trace_idx.eq(0),
+                    ]
+                    m.next = "SEND"
+
+            with m.State("SEND"):
+                # Drive trace_tx_req; arbitrator sends trace_tx_byte when TX is free.
+                m.d.comb += trace_tx_req.eq(1)
+                with m.Switch(trace_idx):
+                    for i in range(11):
+                        with m.Case(i):
+                            m.d.comb += trace_tx_byte.eq(trace_buf[i])
+                with m.If(trace_tx_ack):
+                    m.d.sync += trace_idx.eq(trace_idx + 1)
+                    with m.If(trace_idx == 10):
+                        m.next = "IDLE"
 
         # ── Heartbeat (1 Hz blink on led[1] during boot) ──────────────────────
         hb_ctr   = Signal(range(self.clk_freq))

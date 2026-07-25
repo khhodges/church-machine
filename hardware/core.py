@@ -85,6 +85,26 @@ class ChurchCore(Elaboratable):
         self.fault_valid = Signal()
         self.halt_valid = Signal()   # pulses when a zero instruction word is fetched post-boot
 
+        # ── Hardware trace / single-step ports ──────────────────────────────
+        # halt_req: input from platform; when asserted in step mode, imem_valid
+        #   is gated off externally (wukong_top manages this via step_halted).
+        #   Held here as a named port so the interface is explicit even though
+        #   the halt logic lives in the top-level.
+        self.halt_req = Signal()      # input: held by top when step-halted
+
+        # retire_valid: one-cycle pulse when an instruction commits (NIA changes)
+        #   or when a fault is taken.  Fires on the same cycle as the NIA update.
+        #   retire_nia  = NIA of the just-retired instruction (before advance)
+        #   retire_instr = instruction word at that NIA
+        #   retire_flags = condition flags after the instruction
+        #   retire_fault_code / retire_fault_valid: fault fields (valid together)
+        self.retire_valid      = Signal()
+        self.retire_nia        = Signal(32)
+        self.retire_instr      = Signal(32)
+        self.retire_flags      = Signal(COND_FLAGS_LAYOUT)
+        self.retire_fault_code = Signal(5)
+        self.retire_fault_valid = Signal()
+
         # GT fault telemetry — latched when fault_valid fires; held until FAULT_RST.
         # Exposed via APB3 registers +0x18..+0x24 for CALLHOME GT diagnostics.
         # fault_gt / fault_cr14 reserved: sub-unit wiring added in a future pass.
@@ -2254,6 +2274,59 @@ class ChurchCore(Elaboratable):
             self.fault_instr.eq(fault_instr_latch),
             self.fault_cr14.eq(0),
             self.fault_stage.eq(fault_stage_latch),
+        ]
+
+        # ── Retire trace signals ──────────────────────────────────────────────
+        # retire_valid pulses once per committed instruction (NIA changes) or
+        # when a fault is taken.  Mirrors the m.d.sync nia_reg update priority
+        # chain above but expressed combinatorially.
+        #
+        # Included conditions (in priority order matching nia update chain):
+        #   fault_valid — fault taken (NIA resets to 0 on next cycle)
+        #   u_call.nia_set — CALL / ELOADCALL complete (callee NIA set)
+        #   u_return.nia_set — RETURN complete (caller NIA restored)
+        #   branch_taken — BRANCH instruction (NIA += offset)
+        #   normal advance — all single-cycle ops (IADD/ISUB/SHL/SHR/BFEXT/BFINS/
+        #     MCMP/DREAD/DWRITE/TPERM etc.) AND multi-cycle op completion
+        #     (when busy drops and u_decoder.instr_valid is still asserted)
+        # Excluded: clear_all (reboot), free_run_start (jump without retire),
+        #           halt_valid (zero-word fetch stall).
+        #
+        # For non-IoT also includes Lambda/IRQ/XLoadLambda/ELoadCall nia_set.
+        #
+        # halt_req input: consumed externally by wukong_top (via step_halted),
+        # not used internally here — included on ChurchCore for clean API only.
+        _ = self.halt_req  # referenced to prevent "unused port" warnings
+
+        retire_norm = (
+            u_decoder.instr_valid & ~any_unit_busy &
+            ~fetch_bounds_fault & ~u_outform_fsm.intercept_start
+        )
+        retire_conds_base = (
+            self.fault_valid |
+            u_call.nia_set |
+            u_return.nia_set |
+            (branch_taken & ~fetch_bounds_fault) |
+            retire_norm
+        )
+        if not self.iot_profile:
+            retire_conds = (
+                retire_conds_base |
+                u_lambda.nia_set |
+                u_xloadlambda.nia_set |
+                u_eloadcall.nia_set |
+                u_irq_dispatch.nia_set
+            )
+        else:
+            retire_conds = retire_conds_base
+
+        m.d.comb += [
+            self.retire_valid.eq(self.boot_complete & retire_conds),
+            self.retire_nia.eq(nia_reg),
+            self.retire_instr.eq(self.imem_data),
+            self.retire_flags.eq(u_regs.flags),
+            self.retire_fault_code.eq(self.fault),
+            self.retire_fault_valid.eq(self.fault_valid & self.boot_complete),
         ]
 
         m.d.comb += [

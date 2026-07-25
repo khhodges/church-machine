@@ -288,6 +288,7 @@ Set IOSTANDARD to LVCMOS33. Add `set_input_delay` / `set_output_delay` for GMII 
 | P1.8 Program board | ✅ | xc3sprog confirmed, 30.6 Mbit, 17.9 s (V1); re-flash with V3 bit |
 | P1.9 LED + UART behaviour | ☐ | Flash V3 bit; expect "CM:WUKONG\r\n" repeating at ~1 Hz on E3 + 1 Hz blink |
 | P2 UART callhome (CH340) | ✅ | UART TX wired to E3 (LVCMOS33); baud 57600; NUC_PROGRAM sends repeating banner |
+| P2b Single-step trace (UART RX) | ✅ | F3 RX wired (LVCMOS33); TraceUnit emits 11-byte 0xAA packets on every retire; command parser handles s/r/h/b; 4-NIA breakpoints; IDE polls /hardware/wukong/trace |
 | P3.1 GMII pin audit | ☐ | Needs schematic |
 | P3.2 gmii_mac.py | ☐ | New file |
 | P3.3 wukong_ethernet_v3.py | ☐ | New file; old wukong_xc7a100t.py (v1.1 orphan) deleted |

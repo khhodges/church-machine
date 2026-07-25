@@ -816,6 +816,10 @@ function stepSim() {
     }
     // Track RETURN so the watch strip can highlight DR0 (the return value)
     window._lastStepWasReturn = !!(result && result.opName === 'RETURN');
+
+    // ── Wukong hardware step: mirror each sim step to the physical board ──
+    if (_wukongIsConnected() && !_wukongHWRunning) { _wukongStep(); }
+
     if (result && result.absent) {
         // Absent-lump: simulator suspended waiting for a lazy-load fetch.
         const con = document.getElementById('editorConsole');
@@ -14044,6 +14048,118 @@ function showApiAbstractionDetail(slot) {
         });
     });
 })();
+
+// ── Wukong hardware single-step trace ─────────────────────────────────────
+// Mirrors each IDE Step to the physical Wukong board via the bridge
+// (hardware/wukong_bridge.py) and the Flask endpoints in server/app.py.
+//
+// Connection detection: the bridge posts trace packets to /hardware/wukong/trace.
+// We poll that endpoint every 3 seconds to check for a recent timestamp.
+// If a packet arrived within the last 10 seconds, the board is "connected"
+// and the "▶ HW" / "⏸ HW" toolbar button is shown.
+
+let _wukongHWRunning   = false;   // true = board is in free-run mode
+let _wukongLastTraceTs = 0;       // unix timestamp (seconds) of last trace packet
+const _WUKONG_STALE_MS = 10000;   // 10 s without a packet → disconnected
+
+function _wukongIsConnected() {
+    return _wukongLastTraceTs > 0 &&
+           (Date.now() - _wukongLastTraceTs * 1000) < _WUKONG_STALE_MS;
+}
+
+function _wukongUpdateBtn() {
+    const btn = document.getElementById('toolHWRunBtn');
+    if (!btn) return;
+    btn.style.display = _wukongIsConnected() ? '' : 'none';
+    btn.textContent   = _wukongHWRunning ? '\u23F8 HW' : '\u25B6 HW';
+    btn.classList.toggle('btn-warning', _wukongHWRunning);
+    btn.classList.toggle('btn-secondary', !_wukongHWRunning);
+}
+
+// Poll for new trace packets every 3 seconds (connection detection)
+setInterval(async function _wukongPoll() {
+    try {
+        const r = await fetch('/hardware/wukong/trace');
+        if (!r.ok) return;
+        const data = await r.json();
+        if (data && data.ts && data.ts > _wukongLastTraceTs) {
+            _wukongLastTraceTs = data.ts;
+            _wukongUpdateBtn();
+        }
+    } catch(e) {}
+}, 3000);
+
+const _WUKONG_FAULT_NAMES = [
+    'NONE','PERM_R','PERM_W','PERM_E','PERM_L',
+    'NULL_CAP','BOUNDS','SEAL','INVALID_OP',
+    'STACK_UNDERFLOW','STACK_OVERFLOW'
+];
+
+function _wukongFlagsStr(flags) {
+    let s = '';
+    if (flags & 8) s += 'N';
+    if (flags & 4) s += 'Z';
+    if (flags & 2) s += 'C';
+    if (flags & 1) s += 'V';
+    return s || '-';
+}
+
+function _wukongAppendTrace(data) {
+    const con = document.getElementById('editorConsole');
+    if (!con) return;
+    const nia   = '0x' + ((data.nia >>> 0).toString(16).padStart(8, '0').toUpperCase());
+    const flags = _wukongFlagsStr(data.flags || 0);
+    let state;
+    if (data.fault_valid) {
+        const name = _WUKONG_FAULT_NAMES[data.fault_code] || ('FAULT_' + data.fault_code);
+        state = '\u26A1 ' + name;
+    } else {
+        state = 'ok';
+    }
+    const bp  = data.bp_hit  ? '  \u25CF BP HIT'  : '';
+    con.textContent += '\nHW: NIA=' + nia + '  flags=' + flags + '  ' + state + bp;
+    con.scrollTop = con.scrollHeight;
+}
+
+async function _wukongStep() {
+    try {
+        const beforeTs = _wukongLastTraceTs;
+        await fetch('/hardware/wukong/command', {
+            method : 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body   : JSON.stringify({cmd: 's'})
+        });
+        // Wait up to 500 ms for the trace response (new ts > beforeTs)
+        const deadline = Date.now() + 500;
+        while (Date.now() < deadline) {
+            await new Promise(function(res) { setTimeout(res, 30); });
+            try {
+                const r = await fetch('/hardware/wukong/trace');
+                if (!r.ok) break;
+                const data = await r.json();
+                if (data && data.ts && data.ts > beforeTs) {
+                    _wukongLastTraceTs = data.ts;
+                    _wukongUpdateBtn();
+                    _wukongAppendTrace(data);
+                    return;
+                }
+            } catch(e) { break; }
+        }
+    } catch(e) {}
+}
+
+async function hwRunToggle() {
+    _wukongHWRunning = !_wukongHWRunning;
+    _wukongUpdateBtn();
+    try {
+        await fetch('/hardware/wukong/command', {
+            method : 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body   : JSON.stringify({cmd: _wukongHWRunning ? 'r' : 'h'})
+        });
+    } catch(e) {}
+}
+window.hwRunToggle = hwRunToggle;
 
 // ── URL search-param routing (?view=devices, ?view=builder&tab=ti60-connect) ──
 // Wraps window.init (defined in app-shell.js) so the ?view= param is applied
