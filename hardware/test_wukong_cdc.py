@@ -363,9 +363,260 @@ def test_callhome_payload_roundtrip():
           f"mac={result['mac'].hex()}")
 
 
+class _UartTxStub(Elaboratable):
+    """Minimal UART TX stub for arbitration tests.
+
+    Mirrors the interface of the real UartTx:
+      data  (in)  — byte to transmit
+      start (in)  — one-cycle start pulse
+      busy  (out) — high for BUSY_CYCLES after start fires
+
+    busy goes high on the cycle AFTER start is sampled (registered).
+    """
+
+    BUSY_CYCLES = 3
+
+    def __init__(self):
+        self.data      = Signal(8)
+        self.start     = Signal()
+        self.busy      = Signal()
+        self.last_data = Signal(8)   # latches the byte accepted when start fires
+
+    def elaborate(self, platform):
+        m = Module()
+        ctr = Signal(range(self.BUSY_CYCLES + 1))
+        with m.If(self.start & ~self.busy):
+            m.d.sync += [ctr.eq(self.BUSY_CYCLES),
+                         self.last_data.eq(self.data)]
+        with m.Elif(ctr > 0):
+            m.d.sync += ctr.eq(ctr - 1)
+        m.d.comb += self.busy.eq(ctr > 0)
+        return m
+
+
+class TxArbRig(Elaboratable):
+    """UART TX arbitrator + minimal TraceUnit FSM for collision stress testing.
+
+    Replicates the arbitrator logic from wukong_top.py (~line 278) and the
+    TraceUnit FSM (~line 470) in a self-contained elaboratable so the test
+    needs no hardware platform or full WukongXC7A100T.
+
+    Inputs (all combinatorial / testbench-driven):
+      cm_byte       — byte the CM wants to send via MMIO reg-5
+      cm_tx_start   — asserted when CM is performing a MMIO reg-5 write
+      retire_valid  — one-cycle retire pulse; starts a new 11-byte trace packet
+      retire_byte   — value loaded into every trace_buf slot (simplified)
+
+    Outputs:
+      uart_data     — byte presented to UART (CM wins on collision)
+      uart_start    — UART start pulse (high when either source fires)
+      uart_busy     — UART busy flag (from _UartTxStub)
+      uart_last     — last byte latched by _UartTxStub
+      trace_tx_ack  — one-cycle ack: trace byte accepted (0 when CM fires or UART busy)
+      trace_idx     — current position in the 11-byte packet (registered)
+      trace_busy    — high while TraceUnit FSM is in SEND state
+    """
+
+    PACKET_LEN = 11
+
+    def __init__(self):
+        self.cm_byte      = Signal(8)
+        self.cm_tx_start  = Signal()
+        self.retire_valid = Signal()
+        self.retire_byte  = Signal(8)
+
+        self.uart_data    = Signal(8)
+        self.uart_start   = Signal()
+        self.uart_busy    = Signal()
+        self.uart_last    = Signal(8)
+        self.trace_tx_ack = Signal()
+        self.trace_idx    = Signal(4)
+        self.trace_busy   = Signal()
+
+    def elaborate(self, platform):
+        m = Module()
+        uart = m.submodules.uart = _UartTxStub()
+
+        trace_buf     = [Signal(8, name=f"tb{i}") for i in range(self.PACKET_LEN)]
+        trace_idx     = Signal(4)
+        trace_tx_req  = Signal()
+        trace_tx_byte = Signal(8)
+        trace_tx_ack  = Signal()
+
+        # ── Arbitrator (mirrors wukong_top.py lines 278-281) ───────────────────
+        m.d.comb += [
+            uart.data.eq(Mux(self.cm_tx_start,
+                             self.cm_byte, trace_tx_byte)),
+            uart.start.eq(self.cm_tx_start |
+                          (trace_tx_req & ~uart.busy & ~self.cm_tx_start)),
+            trace_tx_ack.eq(trace_tx_req & ~uart.busy & ~self.cm_tx_start),
+        ]
+
+        # ── TraceUnit FSM (mirrors wukong_top.py lines 470-506) ────────────────
+        with m.FSM(name="trace_unit"):
+            with m.State("IDLE"):
+                m.d.comb += [trace_tx_req.eq(0),
+                             trace_tx_byte.eq(0),
+                             self.trace_busy.eq(0)]
+                with m.If(self.retire_valid):
+                    for i in range(self.PACKET_LEN):
+                        m.d.sync += trace_buf[i].eq(self.retire_byte)
+                    m.d.sync += trace_idx.eq(0)
+                    m.next = "SEND"
+
+            with m.State("SEND"):
+                m.d.comb += [trace_tx_req.eq(1),
+                             self.trace_busy.eq(1)]
+                with m.Switch(trace_idx):
+                    for i in range(self.PACKET_LEN):
+                        with m.Case(i):
+                            m.d.comb += trace_tx_byte.eq(trace_buf[i])
+                with m.If(trace_tx_ack):
+                    m.d.sync += trace_idx.eq(trace_idx + 1)
+                    with m.If(trace_idx == self.PACKET_LEN - 1):
+                        m.next = "IDLE"
+
+        # ── Expose signals ────────────────────────────────────────────────────
+        m.d.comb += [
+            self.uart_data.eq(uart.data),
+            self.uart_start.eq(uart.start),
+            self.uart_busy.eq(uart.busy),
+            self.uart_last.eq(uart.last_data),
+            self.trace_tx_ack.eq(trace_tx_ack),
+            self.trace_idx.eq(trace_idx),
+        ]
+        return m
+
+
+def test_tx_arb_collision():
+    """TX arbitration stress test: CM write and TraceUnit TX collide on the same cycle.
+
+    Proves three properties of the arbitrator (wukong_top.py ~line 278):
+
+    A. CM byte wins the data mux: when cm_tx_start=1 and trace_tx_req=1 fire
+       on the same cycle, uart_tx.data == cm_byte (not the trace byte).
+
+    B. trace_tx_ack is suppressed: cm_tx_start blocks ack, so the TraceUnit
+       FSM does NOT advance trace_idx — no partial packet corruption.
+
+    C. Packet resumes cleanly: on the next idle TX cycle (cm_tx_start=0 and
+       uart not busy), trace_tx_ack=1 fires, trace_idx advances, and the full
+       11-byte packet eventually completes (TraceUnit returns to IDLE).
+    """
+
+    CM_BYTE    = 0x42
+    TRACE_BYTE = 0xAA
+
+    dut = TxArbRig()
+    sim = Simulator(dut)
+    sim.add_clock(10e-9, domain="sync")
+
+    results = {
+        # Collision cycle (combinatorial, read before clock edge)
+        "coll_uart_data"  : None,
+        "coll_trace_ack"  : None,
+        # After collision clock edge (registered)
+        "idx_after_coll"  : None,
+        # Whether trace resumed (ack fired at least once post-collision)
+        "resumed"         : False,
+        # Whether TraceUnit returned to IDLE after the full packet
+        "trace_idle_end"  : None,
+    }
+
+    async def tb(ctx):
+        # ── settle reset ────────────────────────────────────────────────────
+        for _ in range(4):
+            await ctx.tick("sync")
+
+        # ── prime the TraceUnit with one retire pulse ───────────────────────
+        # retire_valid=1 fires on this tick.  On the FOLLOWING edge:
+        #   - FSM state register → SEND
+        #   - trace_buf[] ← retire_byte  (all 11 slots)
+        #   - trace_idx   ← 0
+        ctx.set(dut.retire_byte, TRACE_BYTE)
+        ctx.set(dut.cm_byte, CM_BYTE)
+        ctx.set(dut.retire_valid, 1)
+        await ctx.tick("sync")   # <-- retire edge fires here
+        ctx.set(dut.retire_valid, 0)
+
+        # NOW (before any further tick) the combinatorial state shows:
+        #   FSM = SEND  →  trace_tx_req=1, trace_tx_byte=TRACE_BYTE
+        #   trace_idx = 0, uart.busy = 0
+        #   trace_tx_ack = 1  (UART idle, no CM write yet)
+        #
+        # Immediately assert cm_tx_start=1 to create the collision IN THIS
+        # SAME quantum — the next tick will see both trace_tx_req=1 AND
+        # cm_tx_start=1 simultaneously.  We read the combinatorial outputs
+        # with cm_tx_start already asserted.
+        assert ctx.get(dut.trace_busy) == 1, (
+            "Pre-collision: TraceUnit not in SEND state after retire_valid")
+        assert ctx.get(dut.trace_idx) == 0, (
+            "Pre-collision: trace_idx not 0 at start of packet")
+        assert ctx.get(dut.uart_busy) == 0, (
+            "Pre-collision: UART already busy (unexpected)")
+
+        # ── A + B: collision — CM fires while trace is pending ──────────────
+        ctx.set(dut.cm_tx_start, 1)
+        # Read combinatorial outputs NOW (cm_tx_start=1, trace_tx_req=1 simultaneously)
+        results["coll_uart_data"] = ctx.get(dut.uart_data)
+        results["coll_trace_ack"] = ctx.get(dut.trace_tx_ack)
+
+        await ctx.tick("sync")   # <-- collision edge: UART starts on CM byte, trace_idx unchanged
+        ctx.set(dut.cm_tx_start, 0)
+
+        # trace_idx must not have advanced (ack was suppressed)
+        results["idx_after_coll"] = ctx.get(dut.trace_idx)
+
+        # ── C: resume — trace resumes on next idle TX cycle ─────────────────
+        # Wait for UART busy to clear (BUSY_CYCLES ticks) then give the trace
+        # a generous window to finish the full 11-byte packet.
+        budget = (_UartTxStub.BUSY_CYCLES + 2 +
+                  TxArbRig.PACKET_LEN * (_UartTxStub.BUSY_CYCLES + 2))
+        for _ in range(budget):
+            await ctx.tick("sync")
+            if ctx.get(dut.trace_tx_ack):
+                results["resumed"] = True
+            if not ctx.get(dut.trace_busy):
+                break   # FSM back in IDLE — packet complete
+
+        results["trace_idle_end"] = not ctx.get(dut.trace_busy)
+
+    sim.add_testbench(tb)
+    with sim.write_vcd("/dev/null"):
+        sim.run()
+
+    # ── A: CM byte wins the data mux ────────────────────────────────────────
+    assert results["coll_uart_data"] == CM_BYTE, (
+        f"Collision: uart_data={hex(results['coll_uart_data'])} "
+        f"≠ CM byte {hex(CM_BYTE)} — trace byte leaked through the mux")
+
+    # ── B: trace_tx_ack suppressed; trace_idx did not advance ───────────────
+    assert results["coll_trace_ack"] == 0, (
+        f"Collision: trace_tx_ack={results['coll_trace_ack']} "
+        f"expected 0 (must be suppressed by cm_tx_start)")
+    assert results["idx_after_coll"] == 0, (
+        f"Collision: trace_idx={results['idx_after_coll']} after collision edge "
+        f"expected 0 — packet index advanced despite suppressed ack")
+
+    # ── C: trace packet resumes and completes cleanly ───────────────────────
+    assert results["resumed"], (
+        "Post-collision: trace_tx_ack never fired — TraceUnit did not resume "
+        "after UART became idle")
+    assert results["trace_idle_end"], (
+        "Post-collision: TraceUnit FSM never returned to IDLE — packet did not "
+        "complete after the collision")
+
+    print(
+        f"PASS: TX arbitration collision — "
+        f"CM byte 0x{CM_BYTE:02X} wins mux, trace_tx_ack suppressed, "
+        f"trace_idx held at 0, packet resumes and completes cleanly"
+    )
+
+
 if __name__ == "__main__":
     test_tx_cdc()
     test_rx_cdc()
     test_copy_fsm_timing()
     test_callhome_payload_roundtrip()
+    test_tx_arb_collision()
     print("All Wukong CDC simulation tests PASSED.")
