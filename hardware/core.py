@@ -904,14 +904,18 @@ class ChurchCore(Elaboratable):
                 # CR6 (c-list cap): full 96-bit write to include word1_location=0x400
                 # (DEMO_CLIST at dmem byte 0x400 = word 256) and word2_w2=63
                 # (limit: indices 0..63 accessible).
-                # cr6_gt: slot_id=2, GT_TYPE_INFORM, E-perm (Church dom=1, perm=0b100), gt_seq=0
+                # cr6_gt: slot_id=2, GT_TYPE_INFORM, L+E-perm (Church dom=1, perm=0b110), gt_seq=0
+                # L-perm (bit1) is required so boot code can LOAD capabilities out of the
+                # c-list via LOAD CR_dst, CR6[n].  E-only (0b100) faults on the L-perm
+                # check at the first instruction in WUKONG_NUC_PROGRAM (and any ROM that
+                # loads from CR6).
                 # v2.0 GT word layout: b_flag[31] | perm[30:28] | dom[27] | gt_type[26:25] | gt_seq[24:16] | slot[15:0]
-                # word0_gt = (0b100<<28)|(1<<27)|(GT_TYPE_INFORM<<25)|2 = 0x4A000002 ★v2.0
+                # word0_gt = (0b110<<28)|(1<<27)|(GT_TYPE_INFORM<<25)|2 = 0x6A000002 ★v2.0
                 m.d.comb += [
                     boot_cap_wr_en.eq(1),
                     boot_cap_wr_addr.eq(6),
                     boot_cap_wr_data.eq(Cat(
-                        C(0x4A000002, 32),  # word0_gt: Church E-perm (dom=1,perm=0b100), GT_TYPE_INFORM, slot=2 ★v2.0
+                        C(0x6A000002, 32),  # word0_gt: Church L+E-perm (dom=1,perm=0b110), GT_TYPE_INFORM, slot=2 ★v2.0
                         C(0x400,      32),  # word1_location = 0x400 (DEMO_CLIST base)
                         C(63,         32),  # word2_w2: limit_offset=63 (64 entries)
                     )),

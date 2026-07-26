@@ -1,50 +1,54 @@
 ---
-name: Wukong standalone boot — CALL NULL_CAP trap and ROM fix
-description: BOOT_PROGRAM faults on standalone FPGA at CALL CR0,CR0 (not LOAD); Wukong ROM must use WUKONG_NUC_PROGRAM
+name: Wukong standalone boot — two sequential faults and their fixes
+description: BOOT_PROGRAM faults at CALL CR0,CR0 (NULL_CAP); WUKONG_NUC_PROGRAM faults at LOAD CR3,CR6[5] (L-perm missing on CR6)
 ---
 
-## Root cause (hardware-confirmed)
+## Fault 1 — BOOT_PROGRAM: CALL NULL_CAP (hardware-confirmed)
 
-`BOOT_PROGRAM` has three instructions:
-1. `LOAD CR15, CR15[0]` — M-elevated during boot → **works**
-2. `CHANGE CR12, CR15, #1` — M-elevated during boot → **works**
-3. `CALL CR0, CR0` — CR0 = Thread.caps[0] — **faults NULL_CAP on standalone FPGA**
+`BOOT_PROGRAM[2] = CALL CR0, CR0`. CR0 = Thread.caps[0], which is only set by
+the IDE's `setBootEntrySlot()`. On standalone FPGA it is 0 → NULL_CAP fault →
+`fault_latched` → led[1] (G20) stuck ON, no UART.
 
-The fault is at step 3, not step 1. M-elevation (added to core.py) fixes the LOAD;
-it does NOT fix the CALL. `Thread.caps[0]` is only written by the IDE's
-`setBootEntrySlot()`. On a standalone FPGA with no IDE connected, it is 0 (NULL)
-→ NULL_CAP fault → `fault_latched = 1` → `led[1]` stuck ON.
+**Fix:** `wukong_top.py` ROM uses `WUKONG_NUC_PROGRAM` (73 words, no CALL).
 
-**Observed symptom:** After `xc3sprog`, led[1] (G20) ON, led[0] (G21) OFF, no UART.
+## Fault 2 — WUKONG_NUC_PROGRAM: LOAD from CR6 fails L-perm (hardware-confirmed)
 
-## Fix
+`WUKONG_NUC_PROGRAM[0] = LOAD CR3, CR6[5]`. CR6 was initialised by
+`BootState.INIT_CLIST` with GT word `0x4A000002` — E-perm only (perm=0b100).
+The L-perm check (perm bit 1) fires at instruction 0 → fault → same stuck
+LED symptom.
 
-`wukong_top.py` ROM must use `WUKONG_NUC_PROGRAM`, not `BOOT_PROGRAM`:
+**Critical misunderstanding:** The M-elevation fix in `core.py`
+(`boot_state_reg != BootState.COMPLETE` ORed into `sub_m_elevated`) does NOT
+help here. M-elevation is only active during boot FSM states (IDLE through
+LOAD_NUC). **Instruction execution starts after `boot_state_reg == COMPLETE`**,
+so M-elevation is already False when word 0 runs.
 
+**Fix:** `core.py` `BootState.INIT_CLIST` uses GT `0x6A000002` (perm=0b110 = L+E):
 ```python
-from .boot_rom import (BootRom, WUKONG_NUC_PROGRAM, WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST)
-_WUKONG_ROM = list(WUKONG_NUC_PROGRAM)
-while len(_WUKONG_ROM) < 1024:
-    _WUKONG_ROM.append(0)
+C(0x6A000002, 32),  # word0_gt: Church L+E-perm (dom=1,perm=0b110)
 ```
 
-`WUKONG_NUC_PROGRAM` (73 words):
-- [0] `LOAD CR3, CR6[5]` → LED_DEV (M-elevated, CR6.clist_base=0x400 at reset)
-- [1] `LOAD CR4, CR6[6]` → UART_DEV (same)
-- [2..72] loop: LED blink + TX "CM:WUKONG\r\n" at 57600 baud, no CALL
+## What M-elevation actually does
 
-## M-elevation is still real and correct
+`boot_state_reg != COMPLETE` ORed into `sub_m_elevated` elevates any LOAD
+that fires **during a boot FSM state** (e.g. hardware microcode injected by
+the init sequencer). Normal ROM code executes only after COMPLETE. The flag
+was added to support future boot-phase LOADs; it does not help ROM word 0.
 
-The hardware M-elevation rule (`boot_state_reg != BootState.COMPLETE` ORed into
-`sub_m_elevated` in core.py) IS correct and still needed for the LOADs in
-WUKONG_NUC_PROGRAM to bypass the L-perm gate. It fixes LOAD, not CALL.
+## Correct CR6 GT (post-fix)
+
+```
+0x6A000002 = b_flag=0 | perm=0b110(L+E) | dom=1(Church) | gt_type=INFORM | slot=2
+```
+
+location = 0x400 (WUKONG_DEMO_CLIST in DMEM), limit = 63 entries.
 
 ## How to apply
 
-- Wukong standalone: always `_WUKONG_ROM = list(WUKONG_NUC_PROGRAM)`.
-- IDE-connected: BOOT_PROGRAM is correct (IDE calls setBootEntrySlot before boot).
-- Any Wukong bitstream rebuild must regenerate Verilog after changing the ROM.
+- Any ROM that does `LOAD CR_dst, CR6[n]` requires CR6 to have L-perm.
+- Do not change CR6 back to E-only (0x4A000002) — it silently breaks standalone boot.
+- After any core.py or wukong_top.py change, regenerate Verilog and rebuild bitstream.
 
-**Why:** The previous note said "never use NUC_PROGRAM at ROM[0]" which is wrong
-for standalone. The CALL NULL_CAP trap only triggers on standalone FPGA where no
-IDE has wired up Thread.caps[0].
+**Why:** The L-perm gate on mLoad checks the source capability's perm bits
+regardless of which state the CPU is in. There is no auto-bypass for boot ROM.
