@@ -1,45 +1,50 @@
 ---
-name: LOAD hardware M-elevation — boot microcode rule
-description: During boot (boot_state_reg != COMPLETE), all LOAD instructions are M-elevated in core.py; NUC_PROGRAM workaround was wrong and has been removed
+name: Wukong standalone boot — CALL NULL_CAP trap and ROM fix
+description: BOOT_PROGRAM faults on standalone FPGA at CALL CR0,CR0 (not LOAD); Wukong ROM must use WUKONG_NUC_PROGRAM
 ---
 
-## The Rule
+## Root cause (hardware-confirmed)
 
-**During boot microcode** (`boot_state_reg != BootState.COMPLETE`): all LOAD
-instructions are M-elevated — boot microcode has full privilege, matching
-`change.py`'s pattern.
+`BOOT_PROGRAM` has three instructions:
+1. `LOAD CR15, CR15[0]` — M-elevated during boot → **works**
+2. `CHANGE CR12, CR15, #1` — M-elevated during boot → **works**
+3. `CALL CR0, CR0` — CR0 = Thread.caps[0] — **faults NULL_CAP on standalone FPGA**
 
-**After boot completes** (programmer code): LOAD to/from CR > 11 requires
-a passkey mechanism (future task) to get M-elevation.
+The fault is at step 3, not step 1. M-elevation (added to core.py) fixes the LOAD;
+it does NOT fix the CALL. `Thread.caps[0]` is only written by the IDE's
+`setBootEntrySlot()`. On a standalone FPGA with no IDE connected, it is 0 (NULL)
+→ NULL_CAP fault → `fault_latched = 1` → `led[1]` stuck ON.
 
-## Hardware fix (core.py)
+**Observed symptom:** After `xc3sprog`, led[1] (G20) ON, led[0] (G21) OFF, no UART.
+
+## Fix
+
+`wukong_top.py` ROM must use `WUKONG_NUC_PROGRAM`, not `BOOT_PROGRAM`:
 
 ```python
-u_shared_mload.sub_m_elevated.eq(
-    u_load.mload_m_elevated | (boot_state_reg != BootState.COMPLETE)
-)
+from .boot_rom import (BootRom, WUKONG_NUC_PROGRAM, WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST)
+_WUKONG_ROM = list(WUKONG_NUC_PROGRAM)
+while len(_WUKONG_ROM) < 1024:
+    _WUKONG_ROM.append(0)
 ```
 
-This mirrors `change.py` line: `u_change.m_elevated.eq(boot_state_reg != BootState.COMPLETE)`.
+`WUKONG_NUC_PROGRAM` (73 words):
+- [0] `LOAD CR3, CR6[5]` → LED_DEV (M-elevated, CR6.clist_base=0x400 at reset)
+- [1] `LOAD CR4, CR6[6]` → UART_DEV (same)
+- [2..72] loop: LED blink + TX "CM:WUKONG\r\n" at 57600 baud, no CALL
 
-## Simulator fix (simulator.js `_execLoad`)
+## M-elevation is still real and correct
 
-```js
-const check = this.mLoad(clistGT, (d.crSrc === 6 || !this.bootComplete) ? null : 'L', ...);
-```
+The hardware M-elevation rule (`boot_state_reg != BootState.COMPLETE` ORed into
+`sub_m_elevated` in core.py) IS correct and still needed for the LOADs in
+WUKONG_NUC_PROGRAM to bypass the L-perm gate. It fixes LOAD, not CALL.
 
-Bypasses L-perm check when `!this.bootComplete`.
+## How to apply
 
-## wukong_top.py
+- Wukong standalone: always `_WUKONG_ROM = list(WUKONG_NUC_PROGRAM)`.
+- IDE-connected: BOOT_PROGRAM is correct (IDE calls setBootEntrySlot before boot).
+- Any Wukong bitstream rebuild must regenerate Verilog after changing the ROM.
 
-`BOOT_PROGRAM` is now correctly at ROM[0]. The old NUC_PROGRAM workaround
-(using `cr_src=CR6` to sneak past PERM_L) was wrong and has been reverted.
-
-## Why the old note was wrong
-
-The old trap note claimed BOOT_PROGRAM[0] always faults on standalone FPGA.
-It does — but the fix is to elevate boot-phase LOAD in hardware, not to
-replace BOOT_PROGRAM with a workaround program.
-
-**How to apply:** Never put NUC_PROGRAM at ROM[0] as a PERM_L workaround.
-If BOOT_PROGRAM[0] faults, the hardware M-elevation gate needs fixing, not the ROM.
+**Why:** The previous note said "never use NUC_PROGRAM at ROM[0]" which is wrong
+for standalone. The CALL NULL_CAP trap only triggers on standalone FPGA where no
+IDE has wired up Thread.caps[0].
