@@ -47,18 +47,22 @@ from amaranth.lib.memory import Memory as LibMemory
 
 from .hw_types import *
 from .core import ChurchCore
-from .boot_rom import (BootRom, BOOT_PROGRAM, WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST)
+from .boot_rom import (BootRom, WUKONG_NUC_PROGRAM, WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST)
 from .uart_tx import UartTx
 from .uart_rx import UartRx
 
 
-# ── Wukong ROM: BOOT_PROGRAM at word 0 ────────────────────────────────────────
-# BOOT_PROGRAM (3 words):
-#   [0] LOAD   AL, CR15, CR15[0] — load NS capability (M-elevated during boot)
-#   [1] CHANGE AL, CR12, CR15, #1 — switch to Boot.Thread
-#   [2] CALL   AL, CR0, CR0       — enter boot entry abstraction
-# [3..1023] = 0
-_WUKONG_ROM = list(BOOT_PROGRAM)
+# ── Wukong ROM: WUKONG_NUC_PROGRAM at word 0 ──────────────────────────────────
+# WUKONG_NUC_PROGRAM (73 words) — standalone-safe boot, no CALL to IDE-config regs:
+#   [0] LOAD CR3, CR6[5]  → LED_DEV  (M-elevated during boot phase)
+#   [1] LOAD CR4, CR6[6]  → UART_DEV (M-elevated during boot phase)
+#   [2..72] LED blink loop + TX "CM:WUKONG\r\n" at 57600 baud
+#
+# Unlike BOOT_PROGRAM, this never executes CALL CR0,CR0.
+# BOOT_PROGRAM[2] = CALL CR0,CR0 faults NULL_CAP on standalone FPGA because
+# Thread.caps[0] is 0 when no IDE has called setBootEntrySlot().
+# [73..1023] = 0
+_WUKONG_ROM = list(WUKONG_NUC_PROGRAM)
 while len(_WUKONG_ROM) < 1024:
     _WUKONG_ROM.append(0)
 

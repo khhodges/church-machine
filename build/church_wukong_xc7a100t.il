@@ -1,15 +1,15 @@
 attribute \generator "Amaranth"
-attribute \src "/home/runner/workspace/hardware/wukong_top.py:116"
+attribute \src "/home/runner/workspace/hardware/wukong_top.py:107"
 attribute \top 1
 module \top
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:193"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:184"
   memory width 32 size 16384 \dmem
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:601"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:592"
   memory width 46 size 32 \init_rom
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 \clk$6
 
   attribute \src "/home/runner/workspace/hardware/boot_rom.py:787"
@@ -36,7 +36,7 @@ module \top
   attribute \src "/home/runner/workspace/hardware/core.py:74"
   wire width 1 \clist_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:199"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:190"
   wire width 14 \mem_addr
 
   attribute \src "/home/runner/workspace/hardware/core.py:64"
@@ -66,40 +66,40 @@ module \top
   attribute \src "/home/runner/workspace/hardware/uart_rx.py:19"
   wire width 1 \rx
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:265"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:256"
   wire width 1 \is_mmio
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:267"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:258"
   wire width 4 \mmio_reg_sel
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:286"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:277"
   wire width 1 \is_mmio_write
 
   attribute \src "/home/runner/workspace/hardware/core.py:62"
   wire width 1 \dmem_wr_en
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:312"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:303"
   wire width 1 \cm_tx_start
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:318"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:309"
   wire width 1 \sentinel_req
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:247"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:238"
   attribute \init 1'0
   wire width 1 \boot_triggered
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:248"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:239"
   attribute \init 1'0
   wire width 1 \sentinel_sent
 
   attribute \src "/home/runner/workspace/hardware/uart_tx.py:19"
   wire width 8 \data$33
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:249"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:240"
   attribute \init 1'0
   wire width 1 \sentinel_phase
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:232"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:223"
   wire width 8 \trace_tx_byte
 
   attribute \src "/home/runner/workspace/hardware/core.py:61"
@@ -111,54 +111,54 @@ module \top
   attribute \src "/home/runner/workspace/hardware/uart_tx.py:21"
   wire width 1 \busy
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:231"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:222"
   wire width 1 \trace_tx_req
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:326"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:317"
   wire width 1 \trace_tx_ack
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:341"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:332"
   wire width 1 \is_mmio_read
 
   attribute \src "/home/runner/workspace/hardware/core.py:58"
   wire width 1 \dmem_rd_en
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:344"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:335"
   wire width 32 \mmio_rd_data
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:270"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:261"
   attribute \init 3'000
   wire width 3 \mmio_led0
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:270"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:261"
   attribute \init 3'000
   wire width 3 \mmio_led1
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:270"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:261"
   attribute \init 3'000
   wire width 3 \mmio_led2
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:272"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:263"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \timer_lo
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:273"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:264"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \timer_hi
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:274"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:265"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \tod_epoch
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:275"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:266"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \alarm_cmp
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:276"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:267"
   attribute \init 1'0
   wire width 1 \alarm_armed
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:277"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:268"
   attribute \init 1'0
   wire width 1 \alarm_fired
 
@@ -168,85 +168,85 @@ module \top
   attribute \src "/home/runner/workspace/hardware/core.py:60"
   wire width 1 \dmem_rd_valid
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:372"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:363"
   attribute \init 1'0
   wire width 1 \_dmem_rd_valid_r
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:384"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:375"
   wire width 32 \cpu_wr_data
 
   attribute \src "/home/runner/workspace/hardware/core.py:67"
   wire width 128 \ns_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:385"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:376"
   wire width 1 \cpu_wr_en
 
   attribute \src "/home/runner/workspace/hardware/core.py:73"
   wire width 32 \clist_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:379"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:370"
   wire width 1 \hw_init_wr_en
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/lib/memory.py:401"
   wire width 14 \dmem_wr__addr
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:380"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:371"
   wire width 14 \hw_init_wr_addr
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/lib/memory.py:402"
   wire width 32 \dmem_wr__data
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:381"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:372"
   wire width 32 \hw_init_wr_data
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/lib/memory.py:400"
   wire width 1 \dmem_wr__en
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:422"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:413"
   wire width 1 \bp_hit
 
   attribute \src "/home/runner/workspace/hardware/core.py:101"
   wire width 1 \retire_valid
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:419"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:410"
   attribute \init 1'0
   wire width 1 \bp_armed0
 
   attribute \src "/home/runner/workspace/hardware/core.py:102"
   wire width 32 \retire_nia
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:418"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:409"
   attribute \init 32'11111111111111111111111111111111
   wire width 32 \bp_nia0
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:419"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:410"
   attribute \init 1'0
   wire width 1 \bp_armed1
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:418"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:409"
   attribute \init 32'11111111111111111111111111111111
   wire width 32 \bp_nia1
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:419"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:410"
   attribute \init 1'0
   wire width 1 \bp_armed2
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:418"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:409"
   attribute \init 32'11111111111111111111111111111111
   wire width 32 \bp_nia2
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:419"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:410"
   attribute \init 1'0
   wire width 1 \bp_armed3
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:418"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:409"
   attribute \init 32'11111111111111111111111111111111
   wire width 32 \bp_nia3
 
   attribute \src "/home/runner/workspace/hardware/core.py:55"
   wire width 1 \imem_valid
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:414"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:405"
   attribute \init 1'0
   wire width 1 \step_halted
 
@@ -273,29 +273,29 @@ module \top
   attribute \src "/home/runner/workspace/hardware/uart_rx.py:20"
   wire width 8 \data$85
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:415"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:406"
   wire width 1 \step_grant
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:413"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:404"
   attribute \init 1'1
   wire width 1 \step_mode
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:492"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:483"
   wire width 32 \bp_nia_val
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:461"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:452"
   attribute \init 8'00000000
   wire width 8 \bp_recv_b3
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:461"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:452"
   attribute \init 8'00000000
   wire width 8 \bp_recv_b2
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:461"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:452"
   attribute \init 8'00000000
   wire width 8 \bp_recv_b1
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:461"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:452"
   attribute \init 8'00000000
   wire width 8 \bp_recv_b0
 
@@ -303,66 +303,66 @@ module \top
   attribute \init 1'0
   wire width 1 \trace_unit_state
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:521"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:512"
   attribute \init 4'0000
   wire width 4 \trace_idx
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   attribute \init 8'00000000
   wire width 8 \tbuf0
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   attribute \init 8'00000000
   wire width 8 \tbuf1
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   attribute \init 8'00000000
   wire width 8 \tbuf2
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   attribute \init 8'00000000
   wire width 8 \tbuf3
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   attribute \init 8'00000000
   wire width 8 \tbuf4
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   attribute \init 8'00000000
   wire width 8 \tbuf5
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   attribute \init 8'00000000
   wire width 8 \tbuf6
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   attribute \init 8'00000000
   wire width 8 \tbuf7
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   attribute \init 8'00000000
   wire width 8 \tbuf8
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   attribute \init 8'00000000
   wire width 8 \tbuf9
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   attribute \init 8'00000000
   wire width 8 \tbuf10
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/lib/memory.py:240"
   wire width 5 \init_rom_rd__addr
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:591"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:582"
   attribute \init 6'000000
   wire width 6 \hw_init_ctr
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:590"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:581"
   attribute \init 4'0000
   wire width 4 \boot_delay
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:592"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:583"
   attribute \init 1'0
   wire width 1 \hw_init_done
 
@@ -372,22 +372,22 @@ module \top
   attribute \src "/home/runner/workspace/hardware/core.py:76"
   wire width 1 \boot_start
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:567"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:558"
   attribute \init 1'0
   wire width 1 \hb_blink
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:407"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:398"
   attribute \init 1'0
   wire width 1 \fault_latched
 
   attribute \src "/home/runner/workspace/hardware/core.py:85"
   wire width 1 \fault_valid
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:462"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:453"
   attribute \init 2'00
   wire width 2 \bp_recv_cnt
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:420"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:411"
   attribute \init 2'00
   wire width 2 \bp_wr_ptr
 
@@ -403,27 +403,27 @@ module \top
   attribute \src "/home/runner/workspace/hardware/core.py:106"
   wire width 1 \retire_fault_valid
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:525"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:516"
   attribute \init 1'0
   wire width 1 \bp_hit_lat
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:566"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:557"
   attribute \init 26'00000000000000000000000000
   wire width 26 \hb_ctr
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:109"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:100"
   wire width 1 input 1  \rst_n
 
   attribute \src "/home/runner/workspace/hardware/uart_rx.py:19"
   wire width 1 input 2  \uart_rx_pin
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:113"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:104"
   wire width 1 output 3  \led0
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:113"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:104"
   wire width 1 output 4  \led1
 
   attribute \src "/home/runner/workspace/hardware/uart_tx.py:23"
@@ -743,7 +743,7 @@ module \top
   attribute \src "/home/runner/workspace/hardware/core.py:104"
   wire width 1 \retire_flags.V
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:140"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:131"
   cell \top.core \core
     connect \clk \clk [0]
     connect \mem_rd_data \dmem_rd_data [31:0]
@@ -771,14 +771,14 @@ module \top
     connect \instruction \imem_data [31:0]
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:143"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:134"
   cell \top.boot_rom \boot_rom
     connect \clk \clk [0]
     connect \addr \imem_addr [11:2]
     connect \data \imem_data [31:0]
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:218"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:209"
   cell \top.uart_tx \uart_tx
     connect \clk \clk [0]
     connect \data \data$33 [7:0]
@@ -787,7 +787,7 @@ module \top
     connect \busy \busy [0]
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:225"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:216"
   cell \top.uart_rx \uart_rx
     connect \clk \clk [0]
     connect \rx \uart_rx_pin [0]
@@ -795,7 +795,7 @@ module \top
     connect \valid \valid [0]
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:200"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:191"
   cell $or $134
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -807,7 +807,7 @@ module \top
     connect \Y $1
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:202"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:193"
   cell $or $135
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -819,7 +819,7 @@ module \top
     connect \Y $2
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:266"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:257"
   cell $not $136
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -828,7 +828,7 @@ module \top
     connect \Y $3
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:266"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:257"
   cell $and $137
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -840,7 +840,7 @@ module \top
     connect \Y \is_mmio
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:287"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:278"
   cell $and $138
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -852,7 +852,7 @@ module \top
     connect \Y \is_mmio_write
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:313"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:304"
   cell $eq $139
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -864,7 +864,7 @@ module \top
     connect \Y $4
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:313"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:304"
   cell $and $140
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -876,7 +876,7 @@ module \top
     connect \Y \cm_tx_start
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:319"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:310"
   cell $not $141
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -885,7 +885,7 @@ module \top
     connect \Y $5
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:319"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:310"
   cell $and $142
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -897,7 +897,7 @@ module \top
     connect \Y \sentinel_req
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:330"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:321"
   cell $not $143
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -906,7 +906,7 @@ module \top
     connect \Y $6
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:330"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:321"
   cell $and $144
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -918,7 +918,7 @@ module \top
     connect \Y $7
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:331"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:322"
   cell $and $145
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -930,7 +930,7 @@ module \top
     connect \Y $8
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:331"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:322"
   cell $mux $146
     parameter \WIDTH 8
     connect \S $8 [0]
@@ -939,7 +939,7 @@ module \top
     connect \Y $9
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:330"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:321"
   cell $mux $147
     parameter \WIDTH 8
     connect \S $7 [0]
@@ -948,7 +948,7 @@ module \top
     connect \Y $10
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:329"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:320"
   cell $mux $148
     parameter \WIDTH 8
     connect \S \cm_tx_start [0]
@@ -957,7 +957,7 @@ module \top
     connect \Y \data$33
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:335"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:326"
   cell $not $149
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -966,7 +966,7 @@ module \top
     connect \Y $11
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:335"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:326"
   cell $and $150
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -978,7 +978,7 @@ module \top
     connect \Y $12
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:335"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:326"
   cell $not $151
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -987,7 +987,7 @@ module \top
     connect \Y $13
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:335"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:326"
   cell $and $152
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -999,7 +999,7 @@ module \top
     connect \Y $14
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:334"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:325"
   cell $or $153
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1011,7 +1011,7 @@ module \top
     connect \Y $15
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:336"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:327"
   cell $not $154
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1020,7 +1020,7 @@ module \top
     connect \Y $16
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:336"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:327"
   cell $and $155
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1032,7 +1032,7 @@ module \top
     connect \Y $17
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:336"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:327"
   cell $not $156
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1041,7 +1041,7 @@ module \top
     connect \Y $18
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:336"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:327"
   cell $and $157
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1053,7 +1053,7 @@ module \top
     connect \Y $19
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:336"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:327"
   cell $not $158
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1062,7 +1062,7 @@ module \top
     connect \Y $20
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:336"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:327"
   cell $and $159
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1074,7 +1074,7 @@ module \top
     connect \Y $21
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:334"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:325"
   cell $or $160
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1086,7 +1086,7 @@ module \top
     connect \Y \start
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:338"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:329"
   cell $not $161
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1095,7 +1095,7 @@ module \top
     connect \Y $22
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:338"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:329"
   cell $and $162
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1107,7 +1107,7 @@ module \top
     connect \Y $23
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:338"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:329"
   cell $not $163
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1116,7 +1116,7 @@ module \top
     connect \Y $24
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:338"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:329"
   cell $and $164
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1128,7 +1128,7 @@ module \top
     connect \Y $25
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:338"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:329"
   cell $not $165
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1137,7 +1137,7 @@ module \top
     connect \Y $26
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:338"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:329"
   cell $and $166
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1149,7 +1149,7 @@ module \top
     connect \Y \trace_tx_ack
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:342"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:333"
   cell $and $167
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1161,7 +1161,7 @@ module \top
     connect \Y \is_mmio_read
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:368"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:359"
   cell $mux $168
     parameter \WIDTH 32
     connect \S \is_mmio_read [0]
@@ -1170,7 +1170,7 @@ module \top
     connect \Y \dmem_rd_data
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:374"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:365"
   cell $or $169
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1182,7 +1182,7 @@ module \top
     connect \Y \dmem_rd_valid
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:390"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:381"
   cell $not $170
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1191,7 +1191,7 @@ module \top
     connect \Y $27
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:425"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:416"
   cell $eq $171
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1203,7 +1203,7 @@ module \top
     connect \Y $28
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:425"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:416"
   cell $and $172
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1215,7 +1215,7 @@ module \top
     connect \Y $29
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:426"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:417"
   cell $eq $173
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1227,7 +1227,7 @@ module \top
     connect \Y $30
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:426"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:417"
   cell $and $174
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1239,7 +1239,7 @@ module \top
     connect \Y $31
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:425"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:416"
   cell $or $175
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1251,7 +1251,7 @@ module \top
     connect \Y $32
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:427"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:418"
   cell $eq $176
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1263,7 +1263,7 @@ module \top
     connect \Y $33
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:427"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:418"
   cell $and $177
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1275,7 +1275,7 @@ module \top
     connect \Y $34
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:425"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:416"
   cell $or $178
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1287,7 +1287,7 @@ module \top
     connect \Y $35
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:428"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:419"
   cell $eq $179
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1299,7 +1299,7 @@ module \top
     connect \Y $36
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:428"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:419"
   cell $and $180
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1311,7 +1311,7 @@ module \top
     connect \Y $37
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:425"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:416"
   cell $or $181
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1323,7 +1323,7 @@ module \top
     connect \Y $38
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:424"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:415"
   cell $and $182
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1335,7 +1335,7 @@ module \top
     connect \Y \bp_hit
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:444"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:435"
   cell $not $183
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1344,7 +1344,7 @@ module \top
     connect \Y \imem_valid
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:471"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:462"
   cell $and $184
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1356,7 +1356,7 @@ module \top
     connect \Y $39
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:609"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:600"
   cell $not $185
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1365,7 +1365,7 @@ module \top
     connect \Y $40
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:611"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:602"
   cell $lt $186
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1377,7 +1377,7 @@ module \top
     connect \Y $41
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:615"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:606"
   cell $not $187
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1386,7 +1386,7 @@ module \top
     connect \Y $42
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:639"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:630"
   cell $not $188
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1395,7 +1395,7 @@ module \top
     connect \Y $43
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:647"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:638"
   cell $not $189
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1404,7 +1404,7 @@ module \top
     connect \Y $44
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:650"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:641"
   cell $not $190
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1473,7 +1473,7 @@ module \top
     connect \Y $50
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:279"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:270"
   cell $add $196
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1485,7 +1485,7 @@ module \top
     connect \Y $51
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:280"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:271"
   cell $eq $197
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1497,7 +1497,7 @@ module \top
     connect \Y $52
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:281"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:272"
   cell $add $198
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1509,7 +1509,7 @@ module \top
     connect \Y $53
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:282"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:273"
   cell $not $199
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1518,7 +1518,7 @@ module \top
     connect \Y $54
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:282"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:273"
   cell $and $200
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1530,7 +1530,7 @@ module \top
     connect \Y $55
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:283"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:274"
   cell $eq $201
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1542,7 +1542,7 @@ module \top
     connect \Y $56
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:320"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:311"
   cell $not $202
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1551,7 +1551,7 @@ module \top
     connect \Y $57
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:320"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:311"
   cell $and $203
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1563,7 +1563,7 @@ module \top
     connect \Y $58
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:320"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:311"
   cell $not $204
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1572,7 +1572,7 @@ module \top
     connect \Y $59
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:320"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:311"
   cell $and $205
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1584,7 +1584,7 @@ module \top
     connect \Y $60
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:321"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:312"
   cell $not $206
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1593,7 +1593,7 @@ module \top
     connect \Y $61
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:373"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:364"
   cell $not $207
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1602,7 +1602,7 @@ module \top
     connect \Y $62
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:373"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:364"
   cell $and $208
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1614,7 +1614,7 @@ module \top
     connect \Y $63
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:408"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:399"
   cell $or $209
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1626,7 +1626,7 @@ module \top
     connect \Y $64
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:435"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:426"
   cell $and $210
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1638,7 +1638,7 @@ module \top
     connect \Y $65
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:438"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:429"
   cell $and $211
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1650,7 +1650,7 @@ module \top
     connect \Y $66
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:438"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:429"
   cell $not $212
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1659,7 +1659,7 @@ module \top
     connect \Y $67
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:438"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:429"
   cell $and $213
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1671,7 +1671,7 @@ module \top
     connect \Y $68
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:440"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:431"
   cell $not $214
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1680,7 +1680,7 @@ module \top
     connect \Y $69
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:487"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:478"
   cell $eq $215
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1692,7 +1692,7 @@ module \top
     connect \Y $70
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:500"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:491"
   cell $eq $216
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1704,7 +1704,7 @@ module \top
     connect \Y $71
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:500"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:491"
   cell $eq $217
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1716,7 +1716,7 @@ module \top
     connect \Y $72
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:500"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:491"
   cell $eq $218
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1728,7 +1728,7 @@ module \top
     connect \Y $73
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:500"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:491"
   cell $eq $219
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1740,7 +1740,7 @@ module \top
     connect \Y $74
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:505"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:496"
   cell $add $220
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1752,7 +1752,7 @@ module \top
     connect \Y $75
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:561"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:552"
   cell $add $221
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1764,7 +1764,7 @@ module \top
     connect \Y $76
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:562"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:553"
   cell $eq $222
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1776,7 +1776,7 @@ module \top
     connect \Y $77
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:568"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:559"
   cell $add $223
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1788,7 +1788,7 @@ module \top
     connect \Y $78
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:569"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:560"
   cell $eq $224
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1800,7 +1800,7 @@ module \top
     connect \Y $79
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:570"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:561"
   cell $not $225
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1809,7 +1809,7 @@ module \top
     connect \Y $80
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:609"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:600"
   cell $not $226
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1818,7 +1818,7 @@ module \top
     connect \Y $81
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:611"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:602"
   cell $lt $227
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1830,7 +1830,7 @@ module \top
     connect \Y $82
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:615"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:606"
   cell $not $228
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -1839,7 +1839,7 @@ module \top
     connect \Y $83
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:612"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:603"
   cell $add $229
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1851,7 +1851,7 @@ module \top
     connect \Y $84
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:616"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:607"
   cell $add $230
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1863,7 +1863,7 @@ module \top
     connect \Y $85
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:624"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:615"
   cell $eq $231
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -1875,7 +1875,7 @@ module \top
     connect \Y $86
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:193"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:184"
   cell $meminit_v2 $232
     parameter \MEMID "\\dmem"
     parameter \ABITS 0
@@ -1923,7 +1923,7 @@ module \top
     connect \CLK \clk [0]
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:601"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:592"
   cell $meminit_v2 $235
     parameter \MEMID "\\init_rom"
     parameter \ABITS 0
@@ -1956,7 +1956,7 @@ module \top
     connect \CLK 1'0
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:199"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:190"
   process $237
     assign \mem_addr [13:0] 14'00000000000000
     switch { $2 [0] $1 [0] }
@@ -1969,7 +1969,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:344"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:335"
   process $238
     assign \mmio_rd_data [31:0] 32'00000000000000000000000000000000
     switch \dmem_addr [5:2]
@@ -1998,7 +1998,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:384"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:375"
   process $239
     assign \cpu_wr_data [31:0] 32'00000000000000000000000000000000
     switch { $27 [0] \clist_wr_en [0] \ns_wr_en [0] }
@@ -2011,7 +2011,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:385"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:376"
   process $240
     assign \cpu_wr_en [0] 1'0
     switch { $27 [0] \clist_wr_en [0] \ns_wr_en [0] }
@@ -2057,7 +2057,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:415"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:406"
   process $244
     assign \step_grant [0] 1'0
     switch \cmd_parser_state [1:0]
@@ -2077,7 +2077,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:492"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:483"
   process $245
     assign \bp_nia_val [31:0] 32'00000000000000000000000000000000
     switch \cmd_parser_state [1:0]
@@ -2088,7 +2088,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:231"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:222"
   process $246
     assign \trace_tx_req [0] 1'0
     switch \trace_unit_state [0]
@@ -2099,7 +2099,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:232"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:223"
   process $247
     assign \trace_tx_byte [7:0] 8'00000000
     switch \trace_unit_state [0]
@@ -2133,7 +2133,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:379"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:370"
   process $248
     assign \hw_init_wr_en [0] 1'0
     switch $40 [0]
@@ -2148,7 +2148,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:380"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:371"
   process $249
     assign \hw_init_wr_addr [13:0] 14'00000000000000
     switch $40 [0]
@@ -2163,7 +2163,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:381"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:372"
   process $250
     assign \hw_init_wr_data [31:0] 32'00000000000000000000000000000000
     switch $40 [0]
@@ -2194,7 +2194,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:113"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:104"
   process $252
     assign \led0 [0] 1'0
     switch $43 [0]
@@ -2205,7 +2205,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:113"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:104"
   process $253
     assign \led1 [0] 1'0
     switch $43 [0]
@@ -2216,7 +2216,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:272"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:263"
   cell $dff $254
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
@@ -2225,7 +2225,7 @@ module \top
     connect \Q \timer_lo
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:273"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:264"
   process $255
     assign $87 [31:0] \timer_hi [31:0]
     switch $52 [0]
@@ -2234,7 +2234,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:273"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:264"
   cell $dff $256
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
@@ -2243,7 +2243,7 @@ module \top
     connect \Q \timer_hi
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:277"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:268"
   process $257
     assign $88 [0] \alarm_fired [0]
     switch $55 [0]
@@ -2270,7 +2270,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:277"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:268"
   cell $dff $258
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -2279,7 +2279,7 @@ module \top
     connect \Q \alarm_fired
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:270"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:261"
   process $259
     assign $89 [2:0] \mmio_led0 [2:0]
     switch \is_mmio_write [0]
@@ -2296,7 +2296,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:270"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:261"
   cell $dff $260
     parameter \WIDTH 3
     parameter \CLK_POLARITY 1
@@ -2305,7 +2305,7 @@ module \top
     connect \Q \mmio_led0
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:270"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:261"
   process $261
     assign $90 [2:0] \mmio_led1 [2:0]
     switch \is_mmio_write [0]
@@ -2322,7 +2322,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:270"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:261"
   cell $dff $262
     parameter \WIDTH 3
     parameter \CLK_POLARITY 1
@@ -2331,7 +2331,7 @@ module \top
     connect \Q \mmio_led1
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:270"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:261"
   process $263
     assign $91 [2:0] \mmio_led2 [2:0]
     switch \is_mmio_write [0]
@@ -2348,7 +2348,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:270"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:261"
   cell $dff $264
     parameter \WIDTH 3
     parameter \CLK_POLARITY 1
@@ -2357,7 +2357,7 @@ module \top
     connect \Q \mmio_led2
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:274"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:265"
   process $265
     assign $92 [31:0] \tod_epoch [31:0]
     switch \is_mmio_write [0]
@@ -2374,7 +2374,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:274"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:265"
   cell $dff $266
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
@@ -2383,7 +2383,7 @@ module \top
     connect \Q \tod_epoch
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:275"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:266"
   process $267
     assign $93 [31:0] \alarm_cmp [31:0]
     switch \is_mmio_write [0]
@@ -2400,7 +2400,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:275"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:266"
   cell $dff $268
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
@@ -2409,7 +2409,7 @@ module \top
     connect \Q \alarm_cmp
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:276"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:267"
   process $269
     assign $94 [0] \alarm_armed [0]
     switch \is_mmio_write [0]
@@ -2429,7 +2429,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:276"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:267"
   cell $dff $270
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -2438,7 +2438,7 @@ module \top
     connect \Q \alarm_armed
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:249"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:240"
   process $271
     assign $95 [0] \sentinel_phase [0]
     switch $60 [0]
@@ -2451,7 +2451,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:249"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:240"
   cell $dff $272
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -2460,7 +2460,7 @@ module \top
     connect \Q \sentinel_phase
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:248"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:239"
   process $273
     assign $96 [0] \sentinel_sent [0]
     switch $60 [0]
@@ -2473,7 +2473,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:248"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:239"
   cell $dff $274
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -2482,7 +2482,7 @@ module \top
     connect \Q \sentinel_sent
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:372"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:363"
   cell $dff $275
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -2491,7 +2491,7 @@ module \top
     connect \Q \_dmem_rd_valid_r
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:407"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:398"
   cell $dff $276
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -2500,7 +2500,7 @@ module \top
     connect \Q \fault_latched
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:413"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:404"
   process $277
     assign $97 [0] \step_mode [0]
     switch { $69 [0] $68 [0] $65 [0] \bp_hit [0] }
@@ -2528,7 +2528,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:413"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:404"
   cell $dff $278
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -2537,7 +2537,7 @@ module \top
     connect \Q \step_mode
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:414"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:405"
   process $279
     assign $98 [0] \step_halted [0]
     switch { $69 [0] $68 [0] $65 [0] \bp_hit [0] }
@@ -2568,7 +2568,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:414"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:405"
   cell $dff $280
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -2577,7 +2577,7 @@ module \top
     connect \Q \step_halted
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:462"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:453"
   process $281
     assign $99 [1:0] \bp_recv_cnt [1:0]
     switch \cmd_parser_state [1:0]
@@ -2610,7 +2610,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:462"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:453"
   cell $dff $282
     parameter \WIDTH 2
     parameter \CLK_POLARITY 1
@@ -2656,7 +2656,7 @@ module \top
     connect \Q \cmd_parser_state
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:461"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:452"
   process $285
     assign $101 [7:0] \bp_recv_b0 [7:0]
     switch \cmd_parser_state [1:0]
@@ -2676,7 +2676,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:461"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:452"
   cell $dff $286
     parameter \WIDTH 8
     parameter \CLK_POLARITY 1
@@ -2685,7 +2685,7 @@ module \top
     connect \Q \bp_recv_b0
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:461"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:452"
   process $287
     assign $102 [7:0] \bp_recv_b1 [7:0]
     switch \cmd_parser_state [1:0]
@@ -2705,7 +2705,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:461"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:452"
   cell $dff $288
     parameter \WIDTH 8
     parameter \CLK_POLARITY 1
@@ -2714,7 +2714,7 @@ module \top
     connect \Q \bp_recv_b1
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:461"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:452"
   process $289
     assign $103 [7:0] \bp_recv_b2 [7:0]
     switch \cmd_parser_state [1:0]
@@ -2734,7 +2734,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:461"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:452"
   cell $dff $290
     parameter \WIDTH 8
     parameter \CLK_POLARITY 1
@@ -2743,7 +2743,7 @@ module \top
     connect \Q \bp_recv_b2
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:461"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:452"
   process $291
     assign $104 [7:0] \bp_recv_b3 [7:0]
     switch \cmd_parser_state [1:0]
@@ -2763,7 +2763,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:461"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:452"
   cell $dff $292
     parameter \WIDTH 8
     parameter \CLK_POLARITY 1
@@ -2772,7 +2772,7 @@ module \top
     connect \Q \bp_recv_b3
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:419"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:410"
   process $293
     assign $105 [0] \bp_armed0 [0]
     switch \cmd_parser_state [1:0]
@@ -2794,7 +2794,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:419"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:410"
   cell $dff $294
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -2803,7 +2803,7 @@ module \top
     connect \Q \bp_armed0
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:418"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:409"
   process $295
     assign $106 [31:0] \bp_nia0 [31:0]
     switch \cmd_parser_state [1:0]
@@ -2824,7 +2824,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:418"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:409"
   cell $dff $296
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
@@ -2833,7 +2833,7 @@ module \top
     connect \Q \bp_nia0
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:419"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:410"
   process $297
     assign $107 [0] \bp_armed1 [0]
     switch \cmd_parser_state [1:0]
@@ -2855,7 +2855,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:419"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:410"
   cell $dff $298
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -2864,7 +2864,7 @@ module \top
     connect \Q \bp_armed1
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:418"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:409"
   process $299
     assign $108 [31:0] \bp_nia1 [31:0]
     switch \cmd_parser_state [1:0]
@@ -2885,7 +2885,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:418"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:409"
   cell $dff $300
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
@@ -2894,7 +2894,7 @@ module \top
     connect \Q \bp_nia1
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:419"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:410"
   process $301
     assign $109 [0] \bp_armed2 [0]
     switch \cmd_parser_state [1:0]
@@ -2916,7 +2916,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:419"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:410"
   cell $dff $302
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -2925,7 +2925,7 @@ module \top
     connect \Q \bp_armed2
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:418"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:409"
   process $303
     assign $110 [31:0] \bp_nia2 [31:0]
     switch \cmd_parser_state [1:0]
@@ -2946,7 +2946,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:418"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:409"
   cell $dff $304
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
@@ -2955,7 +2955,7 @@ module \top
     connect \Q \bp_nia2
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:419"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:410"
   process $305
     assign $111 [0] \bp_armed3 [0]
     switch \cmd_parser_state [1:0]
@@ -2977,7 +2977,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:419"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:410"
   cell $dff $306
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -2986,7 +2986,7 @@ module \top
     connect \Q \bp_armed3
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:418"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:409"
   process $307
     assign $112 [31:0] \bp_nia3 [31:0]
     switch \cmd_parser_state [1:0]
@@ -3007,7 +3007,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:418"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:409"
   cell $dff $308
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
@@ -3016,7 +3016,7 @@ module \top
     connect \Q \bp_nia3
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:420"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:411"
   process $309
     assign $113 [1:0] \bp_wr_ptr [1:0]
     switch \cmd_parser_state [1:0]
@@ -3027,7 +3027,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:420"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:411"
   cell $dff $310
     parameter \WIDTH 2
     parameter \CLK_POLARITY 1
@@ -3036,7 +3036,7 @@ module \top
     connect \Q \bp_wr_ptr
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   process $311
     assign $114 [7:0] \tbuf0 [7:0]
     switch \trace_unit_state [0]
@@ -3049,7 +3049,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   cell $dff $312
     parameter \WIDTH 8
     parameter \CLK_POLARITY 1
@@ -3058,7 +3058,7 @@ module \top
     connect \Q \tbuf0
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   process $313
     assign $115 [7:0] \tbuf1 [7:0]
     switch \trace_unit_state [0]
@@ -3071,7 +3071,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   cell $dff $314
     parameter \WIDTH 8
     parameter \CLK_POLARITY 1
@@ -3080,7 +3080,7 @@ module \top
     connect \Q \tbuf1
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   process $315
     assign $116 [7:0] \tbuf2 [7:0]
     switch \trace_unit_state [0]
@@ -3093,7 +3093,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   cell $dff $316
     parameter \WIDTH 8
     parameter \CLK_POLARITY 1
@@ -3102,7 +3102,7 @@ module \top
     connect \Q \tbuf2
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   process $317
     assign $117 [7:0] \tbuf3 [7:0]
     switch \trace_unit_state [0]
@@ -3115,7 +3115,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   cell $dff $318
     parameter \WIDTH 8
     parameter \CLK_POLARITY 1
@@ -3124,7 +3124,7 @@ module \top
     connect \Q \tbuf3
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   process $319
     assign $118 [7:0] \tbuf4 [7:0]
     switch \trace_unit_state [0]
@@ -3137,7 +3137,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   cell $dff $320
     parameter \WIDTH 8
     parameter \CLK_POLARITY 1
@@ -3146,7 +3146,7 @@ module \top
     connect \Q \tbuf4
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   process $321
     assign $119 [7:0] \tbuf5 [7:0]
     switch \trace_unit_state [0]
@@ -3159,7 +3159,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   cell $dff $322
     parameter \WIDTH 8
     parameter \CLK_POLARITY 1
@@ -3168,7 +3168,7 @@ module \top
     connect \Q \tbuf5
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   process $323
     assign $120 [7:0] \tbuf6 [7:0]
     switch \trace_unit_state [0]
@@ -3181,7 +3181,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   cell $dff $324
     parameter \WIDTH 8
     parameter \CLK_POLARITY 1
@@ -3190,7 +3190,7 @@ module \top
     connect \Q \tbuf6
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   process $325
     assign $121 [7:0] \tbuf7 [7:0]
     switch \trace_unit_state [0]
@@ -3203,7 +3203,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   cell $dff $326
     parameter \WIDTH 8
     parameter \CLK_POLARITY 1
@@ -3212,7 +3212,7 @@ module \top
     connect \Q \tbuf7
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   process $327
     assign $122 [7:0] \tbuf8 [7:0]
     switch \trace_unit_state [0]
@@ -3225,7 +3225,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   cell $dff $328
     parameter \WIDTH 8
     parameter \CLK_POLARITY 1
@@ -3234,7 +3234,7 @@ module \top
     connect \Q \tbuf8
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   process $329
     assign $123 [7:0] \tbuf9 [7:0]
     switch \trace_unit_state [0]
@@ -3247,7 +3247,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   cell $dff $330
     parameter \WIDTH 8
     parameter \CLK_POLARITY 1
@@ -3256,7 +3256,7 @@ module \top
     connect \Q \tbuf9
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   process $331
     assign $124 [7:0] \tbuf10 [7:0]
     switch \trace_unit_state [0]
@@ -3269,7 +3269,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:520"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:511"
   cell $dff $332
     parameter \WIDTH 8
     parameter \CLK_POLARITY 1
@@ -3278,7 +3278,7 @@ module \top
     connect \Q \tbuf10
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:525"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:516"
   process $333
     assign $125 [0] \bp_hit_lat [0]
     switch \trace_unit_state [0]
@@ -3291,7 +3291,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:525"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:516"
   cell $dff $334
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -3300,7 +3300,7 @@ module \top
     connect \Q \bp_hit_lat
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:521"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:512"
   process $335
     assign $126 [3:0] \trace_idx [3:0]
     switch \trace_unit_state [0]
@@ -3317,7 +3317,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:521"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:512"
   cell $dff $336
     parameter \WIDTH 4
     parameter \CLK_POLARITY 1
@@ -3355,7 +3355,7 @@ module \top
     connect \Q \trace_unit_state
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:566"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:557"
   process $339
     assign $128 [25:0] $78 [25:0]
     switch $79 [0]
@@ -3364,7 +3364,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:566"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:557"
   cell $dff $340
     parameter \WIDTH 26
     parameter \CLK_POLARITY 1
@@ -3373,7 +3373,7 @@ module \top
     connect \Q \hb_ctr
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:567"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:558"
   process $341
     assign $129 [0] \hb_blink [0]
     switch $79 [0]
@@ -3382,7 +3382,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:567"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:558"
   cell $dff $342
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -3391,7 +3391,7 @@ module \top
     connect \Q \hb_blink
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:590"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:581"
   process $343
     assign $130 [3:0] \boot_delay [3:0]
     switch $81 [0]
@@ -3406,7 +3406,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:590"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:581"
   cell $dff $344
     parameter \WIDTH 4
     parameter \CLK_POLARITY 1
@@ -3415,7 +3415,7 @@ module \top
     connect \Q \boot_delay
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:591"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:582"
   process $345
     assign $131 [5:0] \hw_init_ctr [5:0]
     switch $81 [0]
@@ -3430,7 +3430,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:591"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:582"
   cell $dff $346
     parameter \WIDTH 6
     parameter \CLK_POLARITY 1
@@ -3439,7 +3439,7 @@ module \top
     connect \Q \hw_init_ctr
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:592"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:583"
   process $347
     assign $132 [0] \hw_init_done [0]
     switch $81 [0]
@@ -3457,7 +3457,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:592"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:583"
   cell $dff $348
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -3466,7 +3466,7 @@ module \top
     connect \Q \hw_init_done
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:247"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:238"
   process $349
     assign $133 [0] \boot_triggered [0]
     switch $81 [0]
@@ -3481,7 +3481,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:247"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:238"
   cell $dff $350
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -5903,7 +5903,7 @@ module \top.core
   attribute \init 13'0000000000000
   wire width 13 \mint_cw_reg_ni
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/mload.py:60"
@@ -19333,7 +19333,7 @@ module \top.core.u_registers
   attribute \src "/home/runner/workspace/hardware/registers.py:29"
   wire width 32 \cr_word_wr_data
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/registers.py:58"
@@ -25871,7 +25871,7 @@ module \top.core.u_call
   attribute \init 4'0000
   wire width 4 \n_minus_6_reg
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/call.py:48"
@@ -29874,7 +29874,7 @@ module \top.core.u_return
   attribute \init 1'0
   wire width 1 \sub_fault_latched
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/ret.py:51"
@@ -31398,7 +31398,7 @@ module \top.core.u_tperm
   attribute \init 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
   wire width 96 \ref_cap
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/tperm.py:10"
@@ -32480,7 +32480,7 @@ module \top.core.u_save
   attribute \src "/home/runner/workspace/hardware/msave.py:20"
   wire width 4 \sub_fault_type
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/save.py:30"
@@ -33225,7 +33225,7 @@ module \top.core.u_save.u_msave
   attribute \src "/home/runner/workspace/hardware/msave.py:25"
   wire width 1 \mem_wr_done
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/msave.py:29"
@@ -34296,7 +34296,7 @@ module \top.core.u_load
   attribute \src "/home/runner/workspace/hardware/load.py:28"
   wire width 5 \mload_fault_type
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/load.py:8"
@@ -34636,7 +34636,7 @@ module \top.core.u_shared_mload
   attribute \src "/home/runner/workspace/hardware/ns_gate.py:70"
   wire width 32 \raw_w2
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/mload.py:60"
@@ -36453,7 +36453,7 @@ module \top.core.u_shared_mload.u_ns_gate
   attribute \src "/home/runner/workspace/hardware/ns_gate.py:72"
   wire width 32 \ns_entry_addr_out
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/ns_gate.py:76"
@@ -37181,7 +37181,7 @@ module \top.core.u_gc_unit
   attribute \src "/home/runner/workspace/hardware/gc_unit.py:23"
   wire width 16 \ns_end_index
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/gc_unit.py:13"
@@ -37844,7 +37844,7 @@ module \top.core.u_lambda
   attribute \init 4'0000
   wire width 4 \fault_latched
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/lambda_unit.py:10"
@@ -38497,7 +38497,7 @@ module \top.core.u_change
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \fetched_gt_latched
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/change.py:34"
@@ -41208,7 +41208,7 @@ module \top.core.u_change.u_mload
   attribute \src "/home/runner/workspace/hardware/mload.py:83"
   wire width 5 \outform_fault_type_in
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/mload.py:60"
@@ -42992,7 +42992,7 @@ module \top.core.u_change.u_mload.u_ns_gate
   attribute \src "/home/runner/workspace/hardware/ns_gate.py:72"
   wire width 32 \ns_entry_addr_out
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/ns_gate.py:76"
@@ -43805,7 +43805,7 @@ module \top.core.u_switch
   attribute \src "/home/runner/workspace/hardware/mload.py:47"
   wire width 5 \sub_fault_type
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/switch.py:29"
@@ -44917,7 +44917,7 @@ module \top.core.u_switch.u_mload
   attribute \src "/home/runner/workspace/hardware/mload.py:83"
   wire width 5 \outform_fault_type_in
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/mload.py:60"
@@ -46705,7 +46705,7 @@ module \top.core.u_switch.u_mload.u_ns_gate
   attribute \src "/home/runner/workspace/hardware/ns_gate.py:72"
   wire width 32 \ns_entry_addr_out
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/ns_gate.py:76"
@@ -47584,7 +47584,7 @@ module \top.core.u_eloadcall
   attribute \src "/home/runner/workspace/hardware/mload.py:47"
   wire width 5 \sub_fault_type
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:34"
@@ -49456,7 +49456,7 @@ module \top.core.u_eloadcall.u_mload
   attribute \src "/home/runner/workspace/hardware/mload.py:83"
   wire width 5 \outform_fault_type_in
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/mload.py:60"
@@ -51245,7 +51245,7 @@ module \top.core.u_eloadcall.u_mload.u_ns_gate
   attribute \src "/home/runner/workspace/hardware/ns_gate.py:72"
   wire width 32 \ns_entry_addr_out
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/ns_gate.py:76"
@@ -52058,7 +52058,7 @@ module \top.core.u_xloadlambda
   attribute \src "/home/runner/workspace/hardware/mload.py:47"
   wire width 5 \sub_fault_type
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/fused_unit.py:367"
@@ -53148,7 +53148,7 @@ module \top.core.u_xloadlambda.u_mload
   attribute \src "/home/runner/workspace/hardware/mload.py:83"
   wire width 5 \outform_fault_type_in
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/mload.py:60"
@@ -54933,7 +54933,7 @@ module \top.core.u_xloadlambda.u_mload.u_ns_gate
   attribute \src "/home/runner/workspace/hardware/ns_gate.py:72"
   wire width 32 \ns_entry_addr_out
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/ns_gate.py:76"
@@ -55643,7 +55643,7 @@ module \top.core.u_irq_dispatch
   attribute \init 16'0000000000000000
   wire width 16 \pend_slot
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/irq_dispatch.py:52"
@@ -56544,7 +56544,7 @@ module \top.core.u_pet_name_mem
   attribute \init 1'0
   wire width 1 \pn_63
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/pet_name_mem.py:71"
@@ -62309,7 +62309,7 @@ module \top.core.u_dread
   attribute \src "/home/runner/workspace/hardware/dread.py:43"
   wire width 15 \imm
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/dread.py:61"
@@ -63071,7 +63071,7 @@ module \top.core.u_dwrite
   attribute \src "/home/runner/workspace/hardware/dwrite.py:42"
   wire width 15 \imm
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/dwrite.py:36"
@@ -63844,7 +63844,7 @@ module \top.core.u_cload
   attribute \src "/home/runner/workspace/hardware/ns_gate.py:70"
   wire width 32 \raw_w2$43
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/cload.py:71"
@@ -65059,7 +65059,7 @@ module \top.core.u_cload.u_ns_gate
   attribute \src "/home/runner/workspace/hardware/ns_gate.py:72"
   wire width 32 \ns_entry_addr_out
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/ns_gate.py:76"
@@ -65996,7 +65996,7 @@ module \top.core.u_outform
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \rle_rx_count
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/outform.py:79"
@@ -75624,7 +75624,7 @@ module \top.core.u_outform_fsm
   attribute \init 5'00000
   wire width 5 \fault_type_lat
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/church_outform.py:34"
@@ -76254,7 +76254,7 @@ module \top.boot_rom
   attribute \src "/home/runner/workspace/hardware/boot_rom.py:793"
   wire width 32 \rom_comb
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/boot_rom.py:787"
@@ -76453,7 +76453,7 @@ module \top.uart_tx
   attribute \init 4'0000
   wire width 4 \bit_pos
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/uart_tx.py:19"
@@ -76773,7 +76773,7 @@ module \top.uart_rx
   attribute \src "/home/runner/workspace/hardware/uart_rx.py:22"
   wire width 1 \error
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:135"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:126"
   wire width 1 input 0  \clk
 
   attribute \src "/home/runner/workspace/hardware/uart_rx.py:19"
