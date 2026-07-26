@@ -22,27 +22,24 @@ BRAM initialisation note:
   simulation accuracy only.
 
 ROM layout (WUKONG_ROM):
-  ROM[0..72]   = WUKONG_NUC_PROGRAM (73-word standalone callhome boot program)
-  ROM[73..1023] = 0
+  ROM[0..2]    = BOOT_PROGRAM (3-instruction boot microcode)
+  ROM[3..1023] = 0
 
-Standalone boot note:
-  BOOT_PROGRAM (3 words: LOAD/CHANGE/CALL) requires the IDE to pre-configure
-  Thread.caps[0] via setBootEntrySlot() before CALL CR0,CR0 executes.  On a
-  standalone FPGA with no IDE connected, Thread.caps[0] = 0 → NULL_CAP fault
-  → fault_latched immediately → led[1] ON stuck.
-
-  WUKONG_NUC_PROGRAM avoids the CALL entirely.  It uses only M-elevated LOADs
-  from CR6 (clist_base=0x400 at reset) and runs a self-contained
-  LED-blink + "CM:WUKONG\\r\\n" UART callhome loop that works with no IDE.
+Boot microcode M-elevation rule:
+  During boot (boot_state_reg != BootState.COMPLETE), all LOAD instructions are
+  M-elevated in core.py — boot microcode has full privilege.  This means
+  BOOT_PROGRAM[0] = `LOAD CR15, CR15[0]` executes correctly: the L-perm gate is
+  bypassed unconditionally during the boot phase, regardless of cr_src.  The old
+  NUC_PROGRAM workaround (which used cr_src=CR6 to get m_elevated=1) is no longer
+  needed.
 
 What you will see:
   Booting  (16-cycle POR + ~50 cycle DMEM init):
     led[0] solid ON  (G21 LOW = active-LOW ON = booting indicator)
     led[1] 1 Hz heartbeat blink  (clock alive)
-  Running  (WUKONG_NUC_PROGRAM blink loop):
-    led[0] ~1 Hz blink via DWRITE CR3[0] (CM-controlled, active-LOW inverted)
-    led[1] OFF (no fault); ON = fault latched
-  UART E3 at 57600 8N1: "CM:WUKONG\\r\\n" repeats once per ~1 s blink cycle
+  Running  (boot entry abstraction via BOOT_PROGRAM + CALL):
+    led[0] blinks at ~1 Hz via MMIO reg 0 writes (CM-controlled, active-LOW inverted)
+    led[1] OFF (normal / no fault); blinks ON only if fault_latched is set
 """
 
 from amaranth import *
@@ -50,28 +47,18 @@ from amaranth.lib.memory import Memory as LibMemory
 
 from .hw_types import *
 from .core import ChurchCore
-from .boot_rom import (BootRom, WUKONG_NUC_PROGRAM, WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST)
+from .boot_rom import (BootRom, BOOT_PROGRAM, WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST)
 from .uart_tx import UartTx
 from .uart_rx import UartRx
 
 
-# ── Wukong ROM: WUKONG_NUC_PROGRAM at word 0 ──────────────────────────────────
-# WUKONG_NUC_PROGRAM (73 words) — standalone callhome boot program.
-# Does NOT require IDE configuration of Thread.caps[0].
-#
-# BOOT_PROGRAM's CALL CR0,CR0 faults NULL_CAP on standalone FPGA because
-# Thread.caps[0] is only set by the IDE's setBootEntrySlot().  Without an
-# IDE connected, the CALL always faults.
-#
-# WUKONG_NUC_PROGRAM uses only M-elevated LOADs from CR6 (CR6.clist_base=0x400
-# at reset, m_elevated=1) and then runs a direct blink+callhome loop with no
-# CALL to any IDE-configured register:
-#   [0] LOAD  CR3, CR6[5]   → LED_DEV  (WUKONG_DEMO_CLIST[5], NS slot 3)
-#   [1] LOAD  CR4, CR6[6]   → UART_DEV (WUKONG_DEMO_CLIST[6], NS slot 2)
-#   [2] IADD  DR1, DR0, #1  → DR1 = 1 (LED on value)
-#   [3..72] loop: LED on, TX "CM:WUKONG\r\n", delay, LED off, delay, repeat
-# [73..1023] = 0
-_WUKONG_ROM = list(WUKONG_NUC_PROGRAM)
+# ── Wukong ROM: BOOT_PROGRAM at word 0 ────────────────────────────────────────
+# BOOT_PROGRAM (3 words):
+#   [0] LOAD   AL, CR15, CR15[0] — load NS capability (M-elevated during boot)
+#   [1] CHANGE AL, CR12, CR15, #1 — switch to Boot.Thread
+#   [2] CALL   AL, CR0, CR0       — enter boot entry abstraction
+# [3..1023] = 0
+_WUKONG_ROM = list(BOOT_PROGRAM)
 while len(_WUKONG_ROM) < 1024:
     _WUKONG_ROM.append(0)
 
