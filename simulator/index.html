@@ -379,24 +379,16 @@
     <div id="dashboard" class="view">
         <div class="flags-led-row">
             <div id="hwLedBar" class="hw-led-bar hw-led-bar-left">
-                <span class="hw-led-label" id="hwLedBoardLabel">Ti60 F225</span>
+                <span class="hw-led-label" id="hwLedBoardLabel">Wukong A7</span>
                 <div class="hw-led-item">
                     <div class="hw-led hw-led-green" id="hw-led0"></div>
-                    <span class="hw-led-name">LED0<br><span class="hw-led-role">Boot</span></span>
+                    <span class="hw-led-name">G21<br><span class="hw-led-role">Boot/User</span></span>
                 </div>
                 <div class="hw-led-item">
                     <div class="hw-led hw-led-red" id="hw-led1"></div>
-                    <span class="hw-led-name">LED1<br><span class="hw-led-role">Run</span></span>
+                    <span class="hw-led-name">G20<br><span class="hw-led-role">Fault/HB</span></span>
                 </div>
-                <div class="hw-led-item">
-                    <div class="hw-led hw-led-green" id="hw-led2"></div>
-                    <span class="hw-led-name">LED2<br><span class="hw-led-role">Fault</span></span>
-                </div>
-                <div class="hw-led-item">
-                    <div class="hw-led hw-led-green" id="hw-led3"></div>
-                    <span class="hw-led-name">LED3<br><span class="hw-led-role">Done</span></span>
-                </div>
-                <span class="hw-led-hint">← DWRITE CR3[0]</span>
+                <span class="hw-led-hint">← DWRITE LED[0]</span>
             </div>
             <div id="flagsDisplay" class="flags-bar"></div>
         </div>
@@ -2659,7 +2651,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script defer src="app-startup-wizard.js?v=20260619a"></script>
     <script src="lump-registry.js?v=20260719g"></script>
     <script src="app-shell.js?v=20260719h"></script>
-    <script src="app-tools.js?v=20260521a"></script>
+    <script src="app-tools.js?v=20260726a"></script>
     <script src="app-cr-display.js?v=20260521a"></script>
     <script src="app-cr-detail.js?v=20260725b"></script>
     <script src="tab-correction.js?v=20260501a"></script>

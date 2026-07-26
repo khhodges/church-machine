@@ -252,11 +252,21 @@ function updateLedStrip() {
         bitsEl.textContent = '0b' + bits.toString(2).padStart(6, '0') + ' = ' + bits;
     }
 
-    for (let i = 0; i < 4; i++) {
-        const hwEl = document.getElementById('hw-led' + i);
-        if (!hwEl) continue;
-        const lit = !!((bits >> i) & 1);
-        hwEl.classList.toggle('on', lit);
+    // ── Wukong A7 hardware LED bar ────────────────────────────────────────────
+    // LED0 (G21, green): solid ON during boot (booting indicator), follows
+    //   bit 0 of ledBits post-boot (CM MMIO / DWRITE LED[0]).
+    // LED1 (G20, red): 1 Hz heartbeat blink during boot, fault indicator
+    //   post-boot (ON = fault latched, OFF = normal).
+    const hw0 = document.getElementById('hw-led0');
+    if (hw0) {
+        const led0on = complete ? !!(bits & 1) : bits > 0;
+        hw0.classList.toggle('on', led0on);
+    }
+    const hw1 = document.getElementById('hw-led1');
+    if (hw1) {
+        const booting = !complete && bits > 0;
+        hw1.classList.toggle('hw-led-heartbeat', booting);
+        hw1.classList.toggle('on', !booting && !!(sim.faultLatch));
     }
 
     const readoutEl   = document.getElementById('ledDR0Readout');
