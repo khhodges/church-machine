@@ -3800,7 +3800,7 @@ class ChurchSimulator {
         }
         const absAddr = (clistLoc + d.imm) >>> 0;
         const clistRange = { base: clistLoc, upperBound: (clistLoc + clistSize - 1) >>> 0 };
-        const check = this.mLoad(clistGT, d.crSrc === 6 ? null : 'L', d.crSrc, absAddr, clistRange);
+        const check = this.mLoad(clistGT, (d.crSrc === 6 || !this.bootComplete) ? null : 'L', d.crSrc, absAddr, clistRange);
         if (!check.ok) {
             this.fault(check.fault, `LOAD: CR${d.crSrc}: ${check.message}`);
             return null;

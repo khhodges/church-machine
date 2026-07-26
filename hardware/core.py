@@ -2364,7 +2364,9 @@ class ChurchCore(Elaboratable):
                 u_shared_mload.sub_index.eq(u_load.mload_index),
                 u_shared_mload.sub_direct.eq(u_load.mload_direct),
                 u_shared_mload.sub_direct_gt.eq(u_load.mload_direct_gt),
-                u_shared_mload.sub_m_elevated.eq(u_load.mload_m_elevated),
+                u_shared_mload.sub_m_elevated.eq(
+                    u_load.mload_m_elevated | (boot_state_reg != BootState.COMPLETE)
+                ),
             ]
 
         m.d.comb += [

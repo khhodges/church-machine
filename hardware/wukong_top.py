@@ -22,25 +22,22 @@ BRAM initialisation note:
   simulation accuracy only.
 
 ROM layout (WUKONG_ROM):
-  ROM[0..16]   = NUC_PROGRAM (17 words of LED-blink CLOOMC)
-  ROM[17..1023] = 0
+  ROM[0..2]    = BOOT_PROGRAM (3-instruction boot microcode)
+  ROM[3..1023] = 0
 
-Why NUC_PROGRAM at offset 0?
-  After boot_complete, nia_reg=0 and boot_rom.data=ROM[0].  BOOT_PROGRAM[0] is
-  `LOAD CR15, CR15[0]` which ALWAYS faults with PERM_L on standalone hardware:
-    - mload_m_elevated is only set when cr_src == CR_CLIST (CR6); here cr_src=15
-    - CR15.word0_gt = 0x02000000 has perm[30:28]=0 → has_l_perm=0
-    - ~has_l_perm & ~m_elevated → PERM_L fault
-  Starting with NUC_PROGRAM[0] = LOAD CR3, CR6[5] (cr_src=6=CR_CLIST) grants
-  m_elevated=1, bypassing the PERM_L gate entirely.
-  Code bounds are (0,0) = inactive at boot_complete (only set by CALL/CLOAD),
-  so any nia in [0, ROM_TOP) executes without fetch_bounds_fault.
+Boot microcode M-elevation rule:
+  During boot (boot_state_reg != BootState.COMPLETE), all LOAD instructions are
+  M-elevated in core.py — boot microcode has full privilege.  This means
+  BOOT_PROGRAM[0] = `LOAD CR15, CR15[0]` executes correctly: the L-perm gate is
+  bypassed unconditionally during the boot phase, regardless of cr_src.  The old
+  NUC_PROGRAM workaround (which used cr_src=CR6 to get m_elevated=1) is no longer
+  needed.
 
 What you will see:
   Booting  (16-cycle POR + ~50 cycle DMEM init):
     led[0] solid ON  (G21 LOW = active-LOW ON = booting indicator)
     led[1] 1 Hz heartbeat blink  (clock alive)
-  Running  (NUC_PROGRAM MMIO LED demo):
+  Running  (boot entry abstraction via BOOT_PROGRAM + CALL):
     led[0] blinks at ~1 Hz via MMIO reg 0 writes (CM-controlled, active-LOW inverted)
     led[1] solid ON (no fault) or ON (fault latched — rare)
 """
@@ -50,22 +47,18 @@ from amaranth.lib.memory import Memory as LibMemory
 
 from .hw_types import *
 from .core import ChurchCore
-from .boot_rom import (BootRom, WUKONG_NUC_PROGRAM, WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST)
+from .boot_rom import (BootRom, BOOT_PROGRAM, WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST)
 from .uart_tx import UartTx
 from .uart_rx import UartRx
 
 
-# ── Wukong ROM: WUKONG_NUC_PROGRAM starting at word 0 ────────────────────────
-# WUKONG_NUC_PROGRAM:
-#   [0-2]   Setup: load LED_DEV (CR3) + UART_DEV (CR4), DR1=1
-#   [3]     Loop top: LED0 on  ← unconditional branch target
-#   [4-58]  UART banner "CM:WUKONG\r\n" (11 bytes × 5 instructions)
-#   [59-72] ~0.498s on-delay + LED0 off + ~0.498s off-delay + branch to [3]
-# The banner repeats every ~1 Hz so connecting the serial port at any time
-# yields a message within 1 second.
-# BOOT_PROGRAM is deliberately omitted — see module docstring for the PERM_L
-# fault root cause (LOAD CR15,CR15[0] faults on standalone FPGA).
-_WUKONG_ROM = list(WUKONG_NUC_PROGRAM)
+# ── Wukong ROM: BOOT_PROGRAM at word 0 ────────────────────────────────────────
+# BOOT_PROGRAM (3 words):
+#   [0] LOAD   AL, CR15, CR15[0] — load NS capability (M-elevated during boot)
+#   [1] CHANGE AL, CR12, CR15, #1 — switch to Boot.Thread
+#   [2] CALL   AL, CR0, CR0       — enter boot entry abstraction
+# [3..1023] = 0
+_WUKONG_ROM = list(BOOT_PROGRAM)
 while len(_WUKONG_ROM) < 1024:
     _WUKONG_ROM.append(0)
 
