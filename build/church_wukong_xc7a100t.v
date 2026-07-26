@@ -22208,7 +22208,7 @@ module church_wukong_xc7a100t(rst_n, uart_rx_pin, led0, led1, uart_tx_pin, clk);
   wire start;
   wire step_grant;
   reg step_halted = 1'h0;
-  reg step_mode = 1'h1;
+  reg step_mode = 1'h0;
   wire [7:0] tbuf0;
   reg [7:0] tbuf1 = 8'h00;
   wire [7:0] tbuf10;

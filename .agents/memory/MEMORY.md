@@ -1,7 +1,9 @@
 - [NULL GT type canonicalisation](null-gt-type-canon.md) — isNullGT checks bits[26:25]===0b00; only replace ===0 with isNullGT at hardware gates (mLoad, _fetchInstruction); UI presence checks (CR6 in resolvePendingSlot) must stay ===0
+- [THREAD_NS_SLOTS in E2E test GTs](thread-ns-slots-e2e-trap.md) — synthetic GT word0 index bits[15:0] must NOT be 1 or 45 (THREAD_NS_SLOTS); those trigger showThread→crDetailTab='lump' override; use index=0x20 (32) in test fixtures
 - [Wukong A7 orphaned file](wukong-a7-orphaned.md) — wukong_xc7a100t.py (v1.1 Ethernet) is NOT in the build; gen_rtlil.py builds from wukong_top.py (V3 LED-blink only)
 - [Wukong single-step trace architecture](wukong-trace-arch.md) — 11-byte 0xAA packets; uart_rx_pin=F3; retire_flags.as_value()[:4] for NZCV; COND_FLAGS_LAYOUT is 4-bit StructLayout; TraceUnit skips retire if busy (step mode guarantees idle); SelfTest F-bit failures pre-existed this task
 - [Wukong boot PERM_L trap](wukong-boot-perm-l-trap.md) — BOOT_PROGRAM[0] = LOAD CR15,CR15[0] always faults on standalone FPGA; fix: NUC_PROGRAM at ROM[0] (uses CR6 → m_elevated)
+- [Wukong standalone step_mode trap](wukong-step-mode-trap.md) — step_mode init=1 halts CM immediately after boot; standalone builds need init=0 or CM never executes
 - [Amaranth sync-domain self-deadlocking reset](amaranth-sync-reset-deadlock.md) — rst_sr in sync domain driving ResetSignal("sync") locks reset HIGH forever; use reset_less=True + GSR instead
 - [Sapphire ROM BRAM iBus/dBus conflict](sapphire-rom-bram-dbus-hang.md) — ROM BRAM single-port: iBus wins always; any dBus lw from ROM hangs; all firmware strings must be static char[] (.data/RAM)
 - [Boot c-list slot index trap](boot-clist-slot-index.md) — clistGTs[0] is overwritten in-place (not prepended); UART=2, LED=3, BTN=4, TIMER=5 direct from _getHardwareBootCatalog() order

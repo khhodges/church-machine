@@ -249,6 +249,20 @@ class ChurchWukongXC7A100T(Elaboratable):
         sentinel_sent   = Signal()
         sentinel_phase  = Signal()  # 0 = 0xBB not yet sent, 1 = N_INIT byte pending
 
+        # ── Hardware boot banner (declared early; driven by boot FSM below) ─────
+        # Sends "WUKONG\r\n" via UART TX during Phase 2.5 — after hw_init writes
+        # complete but BEFORE boot_start fires.  This gives hardware-level
+        # confirmation that the FPGA is alive and UART TX works, completely
+        # independent of whether the CM executes any instructions correctly.
+        # hw_init_done is also declared here (not in the boot FSM) so the UART
+        # arbitrator below can reference it.
+        _BANNER_BYTES = [ord(c) for c in "WUKONG\r\n"]
+        _N_BANNER = len(_BANNER_BYTES)   # 8
+
+        hw_init_done  = Signal()         # registered: set 1 cycle after last hw_init write
+        banner_idx    = Signal(range(_N_BANNER + 1), init=0)
+        banner_done   = Signal()         # registered: set after last banner byte accepted
+
         # ── MMIO decode ────────────────────────────────────────────────────────
         # MMIO range: bit[30]=1, bit[31]=0  →  addresses 0x40000000–0x7FFFFFFF
         # Registers (word-addressed, reg = addr[2:6] = bits[5:2]):
@@ -305,20 +319,40 @@ class ChurchWukongXC7A100T(Elaboratable):
         # ── UART TX arbitrator ─────────────────────────────────────────────────
         # Priority (highest to lowest):
         #   1. CM MMIO reg-5 write       — cm_tx_start
-        #   2. Boot sentinel (2 bytes)   — 0xBB then N_INIT&0xFF, once at boot
-        #   3. TraceUnit packets         — fill remaining idle TX cycles
+        #   2. HW boot banner            — "WUKONG\r\n", sent before boot_start
+        #   3. Boot sentinel (2 bytes)   — 0xBB then N_INIT&0xFF, once at boot
+        #   4. TraceUnit packets         — fill remaining idle TX cycles
         #
         # cm_tx_start is the raw CM write signal; used by the TraceUnit to avoid
         # colliding with in-flight CM bytes.
         cm_tx_start = Signal()
         m.d.comb += cm_tx_start.eq(is_mmio_write & (mmio_reg_sel == 5))
 
+        # ── Banner request logic ──────────────────────────────────────────────
+        # banner_req is active in Phase 2.5: hw_init done, banner not yet sent,
+        # boot not yet triggered (so CM is definitely idle).
+        banner_req  = Signal()
+        banner_byte = Signal(8)
+        m.d.comb += banner_req.eq(hw_init_done & ~banner_done & ~boot_triggered)
+        with m.Switch(banner_idx):
+            for i, b in enumerate(_BANNER_BYTES):
+                with m.Case(i):
+                    m.d.comb += banner_byte.eq(C(b, 8))
+            with m.Default():
+                m.d.comb += banner_byte.eq(0)
+        # Advance banner on each accepted byte (start pulse fired = accepted)
+        with m.If(banner_req & ~uart_tx.busy & ~cm_tx_start):
+            with m.If(banner_idx == _N_BANNER - 1):
+                m.d.sync += [banner_done.eq(1), banner_idx.eq(0)]
+            with m.Else():
+                m.d.sync += banner_idx.eq(banner_idx + 1)
+
         # sentinel_req: active until both sentinel bytes are accepted.
         # sentinel_phase=0 → send 0xBB; sentinel_phase=1 → send N_INIT & 0xFF.
         # After the second byte is accepted, sentinel_sent latches and req drops.
         sentinel_req = Signal()
         m.d.comb += sentinel_req.eq(boot_triggered & ~sentinel_sent)
-        with m.If(sentinel_req & ~uart_tx.busy & ~cm_tx_start):
+        with m.If(sentinel_req & ~uart_tx.busy & ~cm_tx_start & ~banner_req):
             with m.If(~sentinel_phase):
                 m.d.sync += sentinel_phase.eq(1)   # 0xBB accepted → queue N_INIT byte
             with m.Else():
@@ -328,15 +362,17 @@ class ChurchWukongXC7A100T(Elaboratable):
         m.d.comb += [
             uart_tx.data.eq(
                 Mux(cm_tx_start,                          core.dmem_wr_data[0:8],
+                Mux(banner_req,                            banner_byte,
                 Mux(sentinel_req & ~sentinel_phase,       C(0xBB, 8),
                 Mux(sentinel_req &  sentinel_phase,       C(N_INIT & 0xFF, 8),
-                                                          trace_tx_byte)))),
+                                                          trace_tx_byte))))),
             uart_tx.start.eq(
                 cm_tx_start |
-                (sentinel_req  & ~uart_tx.busy & ~cm_tx_start) |
-                (trace_tx_req  & ~uart_tx.busy & ~cm_tx_start & ~sentinel_req)),
+                (banner_req    & ~uart_tx.busy & ~cm_tx_start) |
+                (sentinel_req  & ~uart_tx.busy & ~cm_tx_start & ~banner_req) |
+                (trace_tx_req  & ~uart_tx.busy & ~cm_tx_start & ~sentinel_req & ~banner_req)),
             trace_tx_ack.eq(
-                trace_tx_req & ~uart_tx.busy & ~cm_tx_start & ~sentinel_req),
+                trace_tx_req & ~uart_tx.busy & ~cm_tx_start & ~sentinel_req & ~banner_req),
         ]
 
         is_mmio_read = Signal()
@@ -408,10 +444,12 @@ class ChurchWukongXC7A100T(Elaboratable):
         fault_latched = Signal()
         m.d.sync += fault_latched.eq(fault_latched | core.fault_valid)
 
-        # step_mode=1 (default): CM halts after each retired instruction and waits
-        #   for an 's' command from the IDE before executing the next one.
+        # step_mode=1 (default when IDE-connected): CM halts after each retired
+        #   instruction and waits for an 's' command before executing the next one.
         # step_mode=0: CM executes freely; 'h' or a breakpoint hit re-enters step mode.
-        step_mode   = Signal(init=1)   # 1 = step mode
+        # Wukong standalone: init=0 so the CM free-runs without requiring a bridge
+        # to send 'r' first.  The bridge can still send 'h' to enter step mode.
+        step_mode   = Signal(init=0)   # 0 = free-run (standalone-safe)
         step_halted = Signal()          # 1 = CM currently held between instructions
         step_grant  = Signal()          # 1-cycle pulse: step command received
 
@@ -590,7 +628,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         #   The UART TX arbitrator sends sentinel byte 0xBB (first free TX slot).
         boot_delay  = Signal(4, init=0)
         hw_init_ctr = Signal(range(N_INIT + 1), init=0)
-        hw_init_done = Signal()   # registered: set one cycle after last write
+        # hw_init_done declared earlier (near boot_triggered) for UART arbitrator use
 
         # ── Init LUTRAM (combinatorial read port → no MUX chain) ───────────────
         # Each entry packs dmem_addr[13:0] in bits[45:32] and dmem_data[31:0]
@@ -620,12 +658,19 @@ class ChurchWukongXC7A100T(Elaboratable):
                     hw_init_wr_addr.eq(init_rom_rd.data[32:46]),
                     hw_init_wr_data.eq(init_rom_rd.data[0:32]),
                 ]
-                # Latch done flag on the last write cycle so Phase 3 begins
+                # Latch done flag on the last write cycle so Phase 2.5 begins
                 # the very next cycle — no fencepost, no comparison folding.
                 with m.If(hw_init_ctr == N_INIT - 1):
                     m.d.sync += hw_init_done.eq(1)
 
-            # Phase 3: all writes done — pulse boot_start and latch boot_triggered
+            # Phase 2.5: send "WUKONG\r\n" hardware banner before CM starts.
+            # banner_req / banner_byte / banner_done are driven by the UART
+            # arbitrator section above; this Elif just holds boot_start low
+            # until the banner is fully transmitted.
+            with m.Elif(~banner_done):
+                pass  # banner logic in UART arbitrator drives the TX
+
+            # Phase 3: banner done — pulse boot_start and latch boot_triggered
             with m.Else():
                 m.d.comb += core.boot_start.eq(1)
                 m.d.sync += boot_triggered.eq(1)
