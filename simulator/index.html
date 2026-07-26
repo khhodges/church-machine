@@ -663,12 +663,11 @@
 
             <div id="namespaceTable"></div>
 
-            <!-- NS Config Snapshots panel -->
+            <!-- NS Config Snapshots panel (restore only — save via Save to NS in editor) -->
             <div id="nsSnapshotPanel" style="margin-top:12px;border-top:1px solid rgba(255,255,255,0.07);padding-top:10px;">
                 <div style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;padding:4px 0;" onclick="_nsSnapshotTogglePanel()">
                     <span class="ns-snap-chevron" style="font-size:0.75rem;color:#555577;">&#x25B6;</span>
                     <span style="font-size:0.82rem;font-weight:600;color:#8888aa;letter-spacing:0.04em;text-transform:uppercase;">Snapshots</span>
-                    <button onclick="event.stopPropagation();nsSnapshotOpenDialog()" style="margin-left:auto;background:#1a3a1f;color:#daa520;border:1px solid rgba(218,165,32,0.45);border-radius:4px;padding:3px 12px;font-size:0.78rem;font-weight:600;cursor:pointer;white-space:nowrap;" title="Save the current NS configuration as a named snapshot">&#128190; Save Snapshot</button>
                 </div>
                 <div class="ns-snap-body" style="display:none;padding-top:8px;" data-loaded="0"></div>
             </div>
@@ -2545,8 +2544,8 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
             <label class="modal-label">Namespace Slot:
                 <select id="saveNSSlot" class="modal-input" onchange="onSlotChange()"></select>
             </label>
-            <label class="modal-label">Label:
-                <input type="text" id="saveNSLabel" class="modal-input" placeholder="MyCode">
+            <label class="modal-label">Pet Name:
+                <input type="text" id="saveNSLabel" class="modal-input" placeholder="e.g. LED Blink, Math Demo…">
             </label>
             <label class="modal-label">GT Type:
                 <select id="saveNSType" class="modal-input">
