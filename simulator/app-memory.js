@@ -2566,14 +2566,16 @@ function updateNamespace() {
         });
     }
     // --- Slot count stats ---
+    // Use readNSEntry() so the inverted NS table layout is handled correctly.
     let _cntResident = 0, _cntLazy = 0, _cntGarbage = 0;
     const _cntMax = (sim.MAX_NS_ENTRIES != null) ? sim.MAX_NS_ENTRIES : 0;
     const _scanTo = Math.min(sim.nsCount || 0, _cntMax);
     for (let _si = 0; _si < _scanTo; _si++) {
-        const _sBase = sim.NS_TABLE_BASE + _si * sim.NS_ENTRY_WORDS;
-        const _sw0 = sim.memory ? (sim.memory[_sBase] || 0) : 0;
-        const _sw1 = sim.memory ? (sim.memory[_sBase + 1] || 0) : 0;
-        const _sw2 = sim.memory ? (sim.memory[_sBase + 2] || 0) : 0;
+        const _e = sim.readNSEntry(_si);
+        if (!_e) continue;
+        const _sw0 = _e.word0_location || 0;
+        const _sw1 = _e.word1_limit    || 0;
+        const _sw2 = _e.word2_seals    || 0;
         if ((_sw0 !== 0) || (_sw1 !== 0)) {
             const _mfe = sim.lazyManifest ? sim.lazyManifest[_si] : null;
             let _notResident = false;
