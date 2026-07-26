@@ -2662,7 +2662,7 @@ function updateNamespace() {
                 }
             }
         }
-        html += `<td class="ns-label ns-label-clickable" style="${warmStyle}${stubLabelStyle}cursor:pointer;text-decoration:underline dotted;" onclick="_nsLabelOpen(${i})" title="Open full view for NS[${i}]">${nsLabelInner}${stubBadge}</td>`;
+        html += `<td class="ns-label ns-label-clickable" style="${warmStyle}${stubLabelStyle}cursor:pointer;text-decoration:underline dotted;" onclick="_nsLabelOpen(${i})" title="Open full view for NS[${i}]">${nsLabelInner}${stubBadge}<span onclick="event.stopPropagation();_nsSetPetName(${i})" style="cursor:pointer;opacity:0.4;font-size:0.75rem;margin-left:5px;user-select:none;" title="Set pet name for this slot">&#x270F;</span></td>`;
         html += `<td style="${warmStyle}cursor:pointer;text-decoration:underline dotted;color:#4ec9b0;" title="Open memory view at this address" onclick="event.stopPropagation();jumpToMemory(${e.word0_location})">0x${e.word0_location.toString(16).toUpperCase().padStart(8, '0')}</td>`;
         if (codeNotResident) {
             const priorityTag = manifest.priority === 'hot' ? 'Hot' : (manifest.priority === 'cold' ? 'Cold' : 'Warm');
@@ -3256,6 +3256,27 @@ function _nsTableClear(slot) {
 
     if (typeof updateNamespace === 'function') updateNamespace();
 }
+
+// ── NS table: Set pet name for a slot ─────────────────────────────────────────
+window._nsSetPetName = function(slotIdx) {
+    if (!sim) return;
+    const current = (sim.nsLabels && sim.nsLabels[slotIdx]) || '';
+    const next = window.prompt('Pet name for NS slot ' + slotIdx + ':', current);
+    if (next === null) return; // cancelled
+    const trimmed = next.trim();
+    if (!sim.nsLabels) sim.nsLabels = {};
+    if (trimmed) {
+        sim.nsLabels[slotIdx] = trimmed;
+    } else {
+        delete sim.nsLabels[slotIdx];
+    }
+    fetch('/api/boot-config/slot-label', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slot: slotIdx, label: trimmed })
+    }).catch(function(e) { console.warn('[NS-RENAME] persist failed:', e); });
+    if (typeof updateNamespace === 'function') updateNamespace();
+};
 
 // ── NS table: Save — snapshot current sim.memory → upload as boot image ───────
 // Persists all NS table changes (Add LUMP, Clear slot, boot-entry change) to
