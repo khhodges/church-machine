@@ -35,9 +35,16 @@ vivado -mode batch -source hardware/wukong_xc7a100t.tcl
 # Output: church_wukong_xc7a100t.bit
 ```
 
-> **Tip:** Vivado will print the expected LED behaviour at the end of a
-> successful run.  If it prints a timing violation (WNS < 0) at 50 MHz,
-> stop — do not flash a timing-failing bitstream.
+> **Tip:** The build script enforces a timing gate: if WNS < 0, the TCL
+> script calls `error` and Vivado exits non-zero **before** writing a
+> bitstream.  A clean build prints `Timing clean (WNS = … ns)` and then
+> the expected LED behaviour summary.  No manual timing check is needed —
+> a broken bitstream can never be silently produced.
+>
+> To override for research builds only (not production):
+> ```
+> vivado -mode batch -source hardware/wukong_xc7a100t.tcl -tclargs --allow-timing-violations
+> ```
 
 ---
 
