@@ -818,7 +818,7 @@ function updateCRDetail() {
     // Thread memory layout (if applicable)
     if (showThread) {
         html += '<div class="cr-detail-section cr-detail-section-thread">';
-        html += renderThreadMemoryLayout(nsIdx);
+        html += renderThreadMemoryLayout(nsIdx, true);
         html += '</div>';
     }
 
