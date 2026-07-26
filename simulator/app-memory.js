@@ -148,11 +148,11 @@ function updateCRDetail() {
 
     const codeRegs = [7];
     const clistRegs = [6];
-    const threadRegs = [8, 12];
+    const threadRegs = [8, 12, 13];
     const nsRegs = [15];
     const showCode = hasX || (crMbit && codeRegs.includes(crIdx));
     const showCList = hasL || (crMbit && clistRegs.includes(crIdx));
-    const showThread = THREAD_NS_SLOTS.has(nsIdx) || (crMbit && threadRegs.includes(crIdx));
+    const showThread = THREAD_NS_SLOTS.has(nsIdx) || threadRegs.includes(crIdx);
     const showNS = crMbit && nsRegs.includes(crIdx);
     const showData = (hasR || hasW) && !showCode && !showCList;
 
@@ -164,6 +164,9 @@ function updateCRDetail() {
 
     // ── Correct default tab for this CR's capabilities ───────────────────────
     crDetailTab = correctCRDetailTab(crDetailTab, showCode, showCList, showData);
+    // Thread/IRQ registers always default to Lump tab so the 5 zones are
+    // immediately visible — the thread layout lives in crdPanel-lump.
+    if (showThread) crDetailTab = 'lump';
 
     // ── Hoist shared data used across multiple panels ─────────────────────────
     const _baseLoc      = cr.word1_location >>> 0;
