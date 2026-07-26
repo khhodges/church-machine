@@ -78,7 +78,7 @@ function updateCRDetail() {
                         hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(1)" onmouseenter="showZonePopup(event,1,${_nsIdx1})" onmouseleave="hideZonePopup()">&#x2460;\u202FCaps</button>`;
                         hBar += `</span>`;
                         hBar += '</div>';
-                        contentEl.innerHTML = hBar + renderThreadMemoryLayout(_nsIdx1);
+                        contentEl.innerHTML = hBar + renderThreadMemoryLayout(_nsIdx1, true);
                         contentEl.classList.add('crd-content-thread');
                         return;
                     }
@@ -1967,18 +1967,21 @@ const THREAD_LAYOUT = {
 };
 const THREAD_NS_SLOTS = new Set([1, 45]);
 
-function renderThreadMemoryLayout(nsIndex) {
+function renderThreadMemoryLayout(nsIndex, expandAll = false) {
     const entry = sim.readNSEntry(nsIndex);
     const slotBase = entry ? entry.word0_location : (nsIndex * sim.SLOT_SIZE);
     const label = sim.nsLabels[nsIndex] || ('Slot ' + nsIndex);
     const TL = THREAD_LAYOUT;
 
+    const _collapsedCls = expandAll ? '' : ' thread-zone-collapsed';
+    const _bodyDisplay  = expandAll ? '' : 'display:none;';
+    const _chevron      = expandAll ? '▼' : '▶';
     const secHdr = (num, title, note, color, id='') =>
         `<div class="thread-zone-wrap">` +
-        `<div class="thread-zone-hdr thread-zone-collapsed"${id ? ` id="${id}"` : ''} style="border-left-color:${color};" onclick="_tzToggle(this)">` +
-        `<span class="thread-zone-chevron">▶</span>${num} ${title}` +
+        `<div class="thread-zone-hdr${_collapsedCls}"${id ? ` id="${id}"` : ''} style="border-left-color:${color};" onclick="_tzToggle(this)">` +
+        `<span class="thread-zone-chevron">${_chevron}</span>${num} ${title}` +
         `<span class="thread-zone-note">${note}</span></div>` +
-        `<div class="thread-zone-body" style="display:none;">`;
+        `<div class="thread-zone-body" style="${_bodyDisplay}">`;
     const secBody = () => `</div></div>`;
 
     const addrOf = (off) => '0x' + (slotBase + off).toString(16).toUpperCase().padStart(4, '0');
