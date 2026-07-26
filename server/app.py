@@ -1459,94 +1459,6 @@ def boot_config_slot_label():
     return jsonify({"ok": True, "slot": slot, "label": label})
 
 # ---------------------------------------------------------------------------
-# NS Config Snapshots — Save & Restore
-# ---------------------------------------------------------------------------
-
-@app.route("/api/ns-snapshots", methods=["GET"])
-def ns_snapshots_list():
-    from sqlalchemy import text as _sa_text_snap
-    rows = db.session.execute(_sa_text_snap(
-        "SELECT id, name, created_at, payload FROM ns_snapshots ORDER BY created_at DESC"
-    )).fetchall()
-    result = []
-    for row in rows:
-        try:
-            payload = json.loads(row[3]) if row[3] else {}
-        except Exception:
-            payload = {}
-        slot_count = len([s for s in (payload.get("slots") or []) if s])
-        boot_slot = payload.get("bootEntrySlot")
-        boot_label = payload.get("bootEntryLabel", "")
-        result.append({
-            "id": row[0],
-            "name": row[1],
-            "created_at": row[2],
-            "slotCount": slot_count,
-            "bootEntrySlot": boot_slot,
-            "bootEntryLabel": boot_label,
-        })
-    return jsonify(result)
-
-
-@app.route("/api/ns-snapshots", methods=["POST"])
-def ns_snapshots_create():
-    import time as _time
-    from sqlalchemy import text as _sa_text_snap
-    data = request.get_json(silent=True) or {}
-    name = (data.get("name") or "").strip()
-    if not name:
-        return jsonify({"ok": False, "error": "name is required"}), 400
-    if len(name) > 120:
-        return jsonify({"ok": False, "error": "name too long (max 120 chars)"}), 400
-    payload = {
-        "slots": data.get("slots") or [],
-        "bootEntrySlot": data.get("bootEntrySlot"),
-        "bootEntryLabel": data.get("bootEntryLabel", ""),
-        "slotLabels": data.get("slotLabels") or {},
-        "stickyPatches": data.get("stickyPatches") or {},
-    }
-    created_at = _time.time()
-    db.session.execute(_sa_text_snap(
-        "INSERT INTO ns_snapshots (name, created_at, payload) VALUES (:name, :created_at, :payload)"
-    ), {"name": name, "created_at": created_at, "payload": json.dumps(payload)})
-    db.session.commit()
-    row = db.session.execute(_sa_text_snap(
-        "SELECT id FROM ns_snapshots WHERE name=:name AND created_at=:created_at ORDER BY id DESC LIMIT 1"
-    ), {"name": name, "created_at": created_at}).fetchone()
-    new_id = row[0] if row else None
-    return jsonify({"ok": True, "id": new_id, "name": name, "created_at": created_at})
-
-
-@app.route("/api/ns-snapshots/<int:snap_id>", methods=["GET"])
-def ns_snapshots_get(snap_id):
-    from sqlalchemy import text as _sa_text_snap
-    row = db.session.execute(_sa_text_snap(
-        "SELECT id, name, created_at, payload FROM ns_snapshots WHERE id=:id"
-    ), {"id": snap_id}).fetchone()
-    if not row:
-        return jsonify({"error": "not found"}), 404
-    try:
-        payload = json.loads(row[3]) if row[3] else {}
-    except Exception:
-        payload = {}
-    return jsonify({
-        "id": row[0],
-        "name": row[1],
-        "created_at": row[2],
-        "payload": payload,
-    })
-
-
-@app.route("/api/ns-snapshots/<int:snap_id>", methods=["DELETE"])
-def ns_snapshots_delete(snap_id):
-    from sqlalchemy import text as _sa_text_snap
-    db.session.execute(_sa_text_snap(
-        "DELETE FROM ns_snapshots WHERE id=:id"
-    ), {"id": snap_id})
-    db.session.commit()
-    return jsonify({"ok": True, "id": snap_id})
-
-# ---------------------------------------------------------------------------
 # Boot image binary generator (Task #217)
 # ---------------------------------------------------------------------------
 # The generator reads the saved boot-config.json and produces a raw 32-bit
@@ -9002,16 +8914,6 @@ with app.app_context():
         pass
     logging.info("ns_keystore table ready")
 
-    db.session.execute(_sa_text("""
-        CREATE TABLE IF NOT EXISTS ns_snapshots (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            name       TEXT    NOT NULL,
-            created_at REAL    NOT NULL DEFAULT 0.0,
-            payload    TEXT    NOT NULL DEFAULT '{}'
-        )
-    """))
-    db.session.commit()
-    logging.info("ns_snapshots table ready")
 
     _existing_launch = {t.test_id: t for t in LaunchTest.query.all()}
     for seed_id, seed_name, seed_desc, _auto in LAUNCH_TESTS_SEED:
