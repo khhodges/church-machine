@@ -16,6 +16,8 @@ Coverage:
     Test 1  — pure-Python formula: expected CR12 GT word from hw_types.make_gt
     Test 2  — ChurchCore simulation: boot_complete rises; CR12 = Inform GT with slot_id=1
     Test 3  — ChurchCore simulation: CR8 stays NULL after boot (wrong-target regression)
+    Test 4  — ChurchWukongXC7A100T simulation: hw_init FSM completes; boot_triggered
+              latches within 17 + N_INIT cycles (observable via led[1] transition)
 
 Reference: hardware/core.py INIT_THRD case
 
@@ -212,6 +214,84 @@ def test_boot_cr8_null():
 
 
 # ---------------------------------------------------------------------------
+# Test 4: ChurchWukongXC7A100T — hw_init FSM completes; boot_triggered latches
+# ---------------------------------------------------------------------------
+
+def test_wukong_boot_triggered():
+    """ChurchWukongXC7A100T simulation: boot_triggered latches within expected cycles.
+
+    The Wukong boot FSM has three phases:
+      Phase 1: 16 cycles  (boot_delay counts to 0xF)
+      Phase 2: N_INIT cycles  (one DMEM write per cycle via init LUTRAM)
+      Phase 3: 1 cycle    (boot_start pulse + boot_triggered latch)
+    Total: 17 + N_INIT cycles from GSR.
+
+    Observable without an internal debug port: led[1].
+      Before boot_triggered: led[1] = hb_blink (starts at 0, toggling every
+        50 M cycles — stays 0 for the entire short simulation window).
+      After boot_triggered:  led[1] = ~fault_latched = ~0 = 1 (HIGH = LED OFF).
+    So led[1] 0→1 transition within the expected window confirms the FSM latched.
+    """
+    from .wukong_top import ChurchWukongXC7A100T
+    from .boot_rom import WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST
+
+    # sim_mode=True: skips port-driven comb clock so sim.add_clock() can drive
+    # ClockSignal("sync") directly (no DriverConflict with self.clk port).
+    dut = ChurchWukongXC7A100T(sim_mode=True)
+    results = {}
+
+    # Mirror the hw_init_pairs computation from elaborate() to get N_INIT.
+    dmem_init = list(WUKONG_DEMO_NAMESPACE)
+    while len(dmem_init) < 256:
+        dmem_init.append(0)
+    dmem_init += list(WUKONG_DEMO_CLIST)
+    while len(dmem_init) < 16384:
+        dmem_init.append(0)
+    hw_init_pairs = [(addr, val) for addr, val in enumerate(dmem_init) if val != 0]
+    N_INIT = len(hw_init_pairs)
+
+    # Phase1=16 + Phase2=N_INIT + Phase3=1 = 17+N_INIT; allow +4 margin.
+    expected_cycle = 17 + N_INIT
+    max_cycles     = expected_cycle + 4
+
+    async def testbench(ctx):
+        boot_cycle = -1
+        for i in range(max_cycles):
+            led1 = ctx.get(dut.led[1])
+            if led1 == 1:
+                boot_cycle = i
+                break
+            await ctx.tick("sync")
+        results["boot_cycle"] = boot_cycle
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6, domain="sync")
+    sim.add_testbench(testbench)
+    with sim.write_vcd("/dev/null"):
+        sim.run()
+
+    print("\n=== Test 4: ChurchWukongXC7A100T — boot_triggered latches ===")
+    print(f"  N_INIT         = {N_INIT} non-zero DMEM words")
+    print(f"  Expected cycle = {expected_cycle}  (16 + {N_INIT} + 1)")
+    print(f"  Max allowed    = {max_cycles}")
+
+    boot_cycle = results["boot_cycle"]
+    if boot_cycle < 0:
+        assert False, (
+            f"boot_triggered never latched: led[1] stayed 0 for all "
+            f"{max_cycles} cycles — hw_init FSM stalled (N_INIT={N_INIT})"
+        )
+    if boot_cycle > expected_cycle + 4:
+        assert False, (
+            f"boot_triggered latched too late: cycle {boot_cycle} > "
+            f"{expected_cycle + 4} (expected {expected_cycle})"
+        )
+
+    print(f"  boot_triggered latched at cycle {boot_cycle}  ✓")
+    print("PASS")
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -221,6 +301,7 @@ if __name__ == "__main__":
         test_boot_gt_formula,
         test_boot_cr12_init,
         test_boot_cr8_null,
+        test_wukong_boot_triggered,
     ):
         try:
             fn()

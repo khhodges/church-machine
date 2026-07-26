@@ -113,8 +113,13 @@ class ChurchWukongXC7A100T(Elaboratable):
         # reset the register is reset to its init value (0xF) every cycle,
         # keeping reset asserted permanently → boot_triggered never fires →
         # both LEDs held LOW (active-LOW ON) → 4 solid red forever.
+        #
+        # sim_mode=True: skip the port-driven comb assignment so sim.add_clock()
+        # can drive ClockSignal("sync") directly without a DriverConflict.
+        # self.clk is left undriven (unused) in simulation.
         m.domains += ClockDomain("sync", reset_less=True)
-        m.d.comb += ClockSignal("sync").eq(self.clk)
+        if not self.sim_mode:
+            m.d.comb += ClockSignal("sync").eq(self.clk)
 
         # ── ChurchCore ─────────────────────────────────────────────────────────
         core = m.submodules.core = ChurchCore()
@@ -206,6 +211,12 @@ class ChurchWukongXC7A100T(Elaboratable):
         trace_tx_req  = Signal()   # TraceUnit wants to send a byte
         trace_tx_byte = Signal(8)  # byte from TraceUnit
 
+        # ── Boot-triggered / sentinel signals (declared early for arbitrator) ──
+        # boot_triggered is driven by the boot FSM below; sentinel_sent latches
+        # after the 0xBB byte is accepted by the UART TX.
+        boot_triggered = Signal()
+        sentinel_sent  = Signal()
+
         # ── MMIO decode ────────────────────────────────────────────────────────
         # MMIO range: bit[30]=1, bit[31]=0  →  addresses 0x40000000–0x7FFFFFFF
         # Registers (word-addressed, reg = addr[2:6] = bits[5:2]):
@@ -260,18 +271,34 @@ class ChurchWukongXC7A100T(Elaboratable):
                         m.d.sync += alarm_fired.eq(0)
 
         # ── UART TX arbitrator ─────────────────────────────────────────────────
-        # CM MMIO reg-5 write = TX byte (one-cycle start pulse).  CM wins; trace
-        # bytes from the TraceUnit FSM fill idle TX cycles.
+        # Priority (highest to lowest):
+        #   1. CM MMIO reg-5 write  — cm_tx_start
+        #   2. Boot sentinel 0xBB   — fires once when boot_triggered first rises
+        #   3. TraceUnit packets    — fill remaining idle TX cycles
+        #
         # cm_tx_start is the raw CM write signal; used by the TraceUnit to avoid
         # colliding with in-flight CM bytes.
         cm_tx_start = Signal()
         m.d.comb += cm_tx_start.eq(is_mmio_write & (mmio_reg_sel == 5))
 
+        # sentinel_req: active until the 0xBB byte is accepted; latches sentinel_sent.
+        sentinel_req = Signal()
+        m.d.comb += sentinel_req.eq(boot_triggered & ~sentinel_sent)
+        with m.If(sentinel_req & ~uart_tx.busy & ~cm_tx_start):
+            m.d.sync += sentinel_sent.eq(1)
+
         trace_tx_ack = Signal()  # TraceUnit byte accepted (one-cycle ack)
         m.d.comb += [
-            uart_tx.data.eq(Mux(cm_tx_start, core.dmem_wr_data[0:8], trace_tx_byte)),
-            uart_tx.start.eq(cm_tx_start | (trace_tx_req & ~uart_tx.busy & ~cm_tx_start)),
-            trace_tx_ack.eq(trace_tx_req & ~uart_tx.busy & ~cm_tx_start),
+            uart_tx.data.eq(
+                Mux(cm_tx_start,   core.dmem_wr_data[0:8],
+                Mux(sentinel_req,  C(0xBB, 8),
+                                   trace_tx_byte))),
+            uart_tx.start.eq(
+                cm_tx_start |
+                (sentinel_req  & ~uart_tx.busy & ~cm_tx_start) |
+                (trace_tx_req  & ~uart_tx.busy & ~cm_tx_start & ~sentinel_req)),
+            trace_tx_ack.eq(
+                trace_tx_req & ~uart_tx.busy & ~cm_tx_start & ~sentinel_req),
         ]
 
         is_mmio_read = Signal()
@@ -514,29 +541,52 @@ class ChurchWukongXC7A100T(Elaboratable):
         #   hw_init_pairs, writing each non-zero DMEM word via the write port.
         #   This bypasses the Vivado BRAM `initial`-block inference problem.
         #
+        #   The (addr, data) pair for each cycle comes from a small combinatorial
+        #   LUTRAM (init_rom) seeded with hw_init_pairs — one case in hardware,
+        #   no large MUX chain.  A registered hw_init_done flag (latches when
+        #   hw_init_ctr reaches N_INIT-1) replaces the synthesisable < N_INIT
+        #   comparison, eliminating any Vivado comparison-folding or off-by-one.
+        #
         # Phase 3 (1 cycle): boot_start pulsed; boot_triggered latched.
         #   The LED mux switches to CM-controlled outputs.
-        N_INIT = len(hw_init_pairs)
-        boot_delay     = Signal(4, init=0)
-        hw_init_ctr    = Signal(range(N_INIT + 1), init=0)
-        boot_triggered = Signal()
+        #   The UART TX arbitrator sends sentinel byte 0xBB (first free TX slot).
+        N_INIT      = len(hw_init_pairs)
+        boot_delay  = Signal(4, init=0)
+        hw_init_ctr = Signal(range(N_INIT + 1), init=0)
+        hw_init_done = Signal()   # registered: set one cycle after last write
 
+        # ── Init LUTRAM (combinatorial read port → no MUX chain) ───────────────
+        # Each entry packs dmem_addr[13:0] in bits[45:32] and dmem_data[31:0]
+        # in bits[31:0].  Vivado infers LUTRAM for the small depth (~50 entries).
+        _init_rom_contents = [
+            ((addr & 0x3FFF) << 32) | (val & 0xFFFFFFFF)
+            for addr, val in hw_init_pairs
+        ] or [0]   # guard: at least one entry so depth >= 1
+        init_rom    = m.submodules.init_rom = LibMemory(
+            shape=unsigned(46), depth=len(_init_rom_contents),
+            init=_init_rom_contents)
+        init_rom_rd = init_rom.read_port(domain="comb")
+        m.d.comb   += init_rom_rd.addr.eq(hw_init_ctr)
+
+        # boot_triggered declared early (before UART arbitrator) so the sentinel
+        # logic can reference it; driven here in the boot FSM.
         with m.If(~boot_triggered):
             # Phase 1: wait for boot_delay to reach 0xF
             with m.If(boot_delay < 0xF):
                 m.d.sync += boot_delay.eq(boot_delay + 1)
 
-            # Phase 2: write non-zero DMEM words one per cycle
-            with m.Elif(hw_init_ctr < N_INIT):
+            # Phase 2: write non-zero DMEM words one per cycle (ROM lookup)
+            with m.Elif(~hw_init_done):
                 m.d.sync += hw_init_ctr.eq(hw_init_ctr + 1)
-                m.d.comb += hw_init_wr_en.eq(1)
-                with m.Switch(hw_init_ctr):
-                    for idx, (addr, val) in enumerate(hw_init_pairs):
-                        with m.Case(idx):
-                            m.d.comb += [
-                                hw_init_wr_addr.eq(addr),
-                                hw_init_wr_data.eq(val),
-                            ]
+                m.d.comb += [
+                    hw_init_wr_en.eq(1),
+                    hw_init_wr_addr.eq(init_rom_rd.data[32:46]),
+                    hw_init_wr_data.eq(init_rom_rd.data[0:32]),
+                ]
+                # Latch done flag on the last write cycle so Phase 3 begins
+                # the very next cycle — no fencepost, no comparison folding.
+                with m.If(hw_init_ctr == N_INIT - 1):
+                    m.d.sync += hw_init_done.eq(1)
 
             # Phase 3: all writes done — pulse boot_start and latch boot_triggered
             with m.Else():
