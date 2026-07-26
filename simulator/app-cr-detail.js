@@ -1232,6 +1232,30 @@ function patchSimulator() {
     }
 }
 
+// Reload _stickyPatches from localStorage (cm_sticky_p_* keys).
+// Called by app-ns-snapshots.js after writing new sticky patch keys to
+// localStorage so that _reapplyStickyPatches() sees the updated set.
+window._loadStickyPatchesFromStorage = function() {
+    // Clear the in-memory store.
+    var k;
+    for (k in _stickyPatches) { if (Object.prototype.hasOwnProperty.call(_stickyPatches, k)) delete _stickyPatches[k]; }
+    // Re-read from localStorage (same logic as the startup IIFE).
+    try {
+        var PREFIX = 'cm_sticky_p_';
+        for (var i = localStorage.length - 1; i >= 0; i--) {
+            var lk = localStorage.key(i);
+            if (lk && lk.startsWith(PREFIX)) {
+                try {
+                    var p = JSON.parse(localStorage.getItem(lk));
+                    if (p && typeof p.nsIdx === 'number' && Array.isArray(p.words)) {
+                        _stickyPatches[p.nsIdx] = p;
+                    }
+                } catch(_) {}
+            }
+        }
+    } catch(_) {}
+};
+
 // Re-apply all sticky patches from _stickyPatches after a boot sequence.
 // Called by _autoLoadDefaultProgram() (app-run.js) on every boot completion.
 window._reapplyStickyPatches = function() {
