@@ -3641,14 +3641,10 @@ def _fpga_paths(board):
         zip_name = "church-wukong-package.zip"
         build_md = BUILD_MD_WUKONG
         gen_args = ["python3", "-m", "hardware.gen_rtlil", "build", "--wukong"]
-        synth_cmd_tpl = (
-            "read_rtlil {rtlil}; "
-            "hierarchy -top church_wukong_xc7a100t; "
-            "proc; flatten; "
-            "opt -mux_undef -undriven; opt; opt_reduce; opt_clean; opt -fast; "
-            "techmap; clean; "
-            "write_verilog -noattr {verilog}"
-        )
+        # gen_rtlil already runs Yosys internally to produce the .v file.
+        # A second Yosys pass here is redundant and fails/times out on the
+        # 2.6 MB RTLIL.  Set to None so the build route skips it.
+        synth_cmd_tpl = None
         return False, paths, zip_name, build_md, gen_args, synth_cmd_tpl
 
     # Default: Ti60 F225
@@ -3783,22 +3779,27 @@ def build_fpga():
         if not os.path.isfile(paths["rtlil"]):
             return jsonify({"error": "RTLIL file not generated", "stderr": ""}), 500
 
-        fmt_args = {k: v for k, v in paths.items()}
-        synth_cmd = synth_cmd_tpl.format(**fmt_args)
-
-        logging.info("FPGA build: running Yosys synthesis...")
         synth_warning = None
-        try:
-            synth_result = subprocess.run(["yosys", "-p", synth_cmd], cwd=BASE_DIR, capture_output=True, text=True, timeout=300)
-            if synth_result.returncode != 0:
-                synth_warning = "Yosys synthesis failed (RTLIL still available)"
-                logging.warning("Yosys synthesis returned non-zero: %s", synth_result.stderr[-500:] if synth_result.stderr else "")
-        except subprocess.TimeoutExpired:
-            synth_warning = "Yosys synthesis timed out (RTLIL still available)"
-            logging.warning("Yosys synthesis timed out")
-        except Exception as synth_exc:
-            synth_warning = f"Yosys synthesis error: {synth_exc} (RTLIL still available)"
-            logging.warning("Yosys synthesis exception: %s", synth_exc)
+        if synth_cmd_tpl is not None:
+            # Run a second Yosys synthesis pass (Ti60 path — gen_rtlil does not
+            # produce a .v for Ti60, so Yosys is needed here).
+            fmt_args = {k: v for k, v in paths.items()}
+            synth_cmd = synth_cmd_tpl.format(**fmt_args)
+            logging.info("FPGA build: running Yosys synthesis...")
+            try:
+                synth_result = subprocess.run(["yosys", "-p", synth_cmd], cwd=BASE_DIR, capture_output=True, text=True, timeout=300)
+                if synth_result.returncode != 0:
+                    synth_warning = "Yosys synthesis failed (RTLIL still available)"
+                    logging.warning("Yosys synthesis returned non-zero: %s", synth_result.stderr[-500:] if synth_result.stderr else "")
+            except subprocess.TimeoutExpired:
+                synth_warning = "Yosys synthesis timed out (RTLIL still available)"
+                logging.warning("Yosys synthesis timed out")
+            except Exception as synth_exc:
+                synth_warning = f"Yosys synthesis error: {synth_exc} (RTLIL still available)"
+                logging.warning("Yosys synthesis exception: %s", synth_exc)
+        else:
+            # gen_rtlil already produced the .v — no second Yosys pass needed.
+            logging.info("FPGA build: Verilog produced by gen_rtlil — skipping redundant Yosys pass.")
 
         marker_path = os.path.join(build_dir, "_last_board.txt")
         with open(marker_path, 'w') as f:
