@@ -170,6 +170,11 @@ class ChurchWukongXC7A100T(Elaboratable):
         hw_init_pairs = [(addr, val)
                          for addr, val in enumerate(dmem_init) if val != 0]
 
+        # N_INIT is computed here (before the UART mux) so C(N_INIT & 0xFF, 8)
+        # is available when the boot sentinel mux is elaborated.  The boot FSM
+        # below also uses N_INIT for Signal(range(N_INIT+1)) and the done-latch.
+        N_INIT = len(hw_init_pairs)
+
         dmem = m.submodules.dmem = LibMemory(
             shape=unsigned(32), depth=16384, init=dmem_init)
         dmem_rd = dmem.read_port(domain="sync")
@@ -213,9 +218,20 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         # ── Boot-triggered / sentinel signals (declared early for arbitrator) ──
         # boot_triggered is driven by the boot FSM below; sentinel_sent latches
-        # after the 0xBB byte is accepted by the UART TX.
-        boot_triggered = Signal()
-        sentinel_sent  = Signal()
+        # after both sentinel bytes have been accepted by the UART TX.
+        #
+        # Two-byte boot sentinel: 0xBB  N_INIT&0xFF
+        #   0xBB        — magic: board has booted and DMEM init is complete
+        #   N_INIT&0xFF — count of non-zero DMEM words written by hw_init sequencer
+        #
+        # The N_INIT byte is baked in at synthesis time from hw_init_pairs.
+        # The bridge (wukong_bridge.py) reads this byte and compares it against
+        # the count computed from the current boot_rom.py tables.  A mismatch
+        # means the bitstream was built with a different WUKONG_DEMO_NAMESPACE /
+        # WUKONG_DEMO_CLIST than the one currently in source — stale bitstream.
+        boot_triggered  = Signal()
+        sentinel_sent   = Signal()
+        sentinel_phase  = Signal()  # 0 = 0xBB not yet sent, 1 = N_INIT byte pending
 
         # ── MMIO decode ────────────────────────────────────────────────────────
         # MMIO range: bit[30]=1, bit[31]=0  →  addresses 0x40000000–0x7FFFFFFF
@@ -272,27 +288,33 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         # ── UART TX arbitrator ─────────────────────────────────────────────────
         # Priority (highest to lowest):
-        #   1. CM MMIO reg-5 write  — cm_tx_start
-        #   2. Boot sentinel 0xBB   — fires once when boot_triggered first rises
-        #   3. TraceUnit packets    — fill remaining idle TX cycles
+        #   1. CM MMIO reg-5 write       — cm_tx_start
+        #   2. Boot sentinel (2 bytes)   — 0xBB then N_INIT&0xFF, once at boot
+        #   3. TraceUnit packets         — fill remaining idle TX cycles
         #
         # cm_tx_start is the raw CM write signal; used by the TraceUnit to avoid
         # colliding with in-flight CM bytes.
         cm_tx_start = Signal()
         m.d.comb += cm_tx_start.eq(is_mmio_write & (mmio_reg_sel == 5))
 
-        # sentinel_req: active until the 0xBB byte is accepted; latches sentinel_sent.
+        # sentinel_req: active until both sentinel bytes are accepted.
+        # sentinel_phase=0 → send 0xBB; sentinel_phase=1 → send N_INIT & 0xFF.
+        # After the second byte is accepted, sentinel_sent latches and req drops.
         sentinel_req = Signal()
         m.d.comb += sentinel_req.eq(boot_triggered & ~sentinel_sent)
         with m.If(sentinel_req & ~uart_tx.busy & ~cm_tx_start):
-            m.d.sync += sentinel_sent.eq(1)
+            with m.If(~sentinel_phase):
+                m.d.sync += sentinel_phase.eq(1)   # 0xBB accepted → queue N_INIT byte
+            with m.Else():
+                m.d.sync += sentinel_sent.eq(1)    # N_INIT byte accepted → done
 
         trace_tx_ack = Signal()  # TraceUnit byte accepted (one-cycle ack)
         m.d.comb += [
             uart_tx.data.eq(
-                Mux(cm_tx_start,   core.dmem_wr_data[0:8],
-                Mux(sentinel_req,  C(0xBB, 8),
-                                   trace_tx_byte))),
+                Mux(cm_tx_start,                          core.dmem_wr_data[0:8],
+                Mux(sentinel_req & ~sentinel_phase,       C(0xBB, 8),
+                Mux(sentinel_req &  sentinel_phase,       C(N_INIT & 0xFF, 8),
+                                                          trace_tx_byte)))),
             uart_tx.start.eq(
                 cm_tx_start |
                 (sentinel_req  & ~uart_tx.busy & ~cm_tx_start) |
@@ -550,7 +572,6 @@ class ChurchWukongXC7A100T(Elaboratable):
         # Phase 3 (1 cycle): boot_start pulsed; boot_triggered latched.
         #   The LED mux switches to CM-controlled outputs.
         #   The UART TX arbitrator sends sentinel byte 0xBB (first free TX slot).
-        N_INIT      = len(hw_init_pairs)
         boot_delay  = Signal(4, init=0)
         hw_init_ctr = Signal(range(N_INIT + 1), init=0)
         hw_init_done = Signal()   # registered: set one cycle after last write
