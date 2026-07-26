@@ -39,7 +39,7 @@ What you will see:
     led[1] 1 Hz heartbeat blink  (clock alive)
   Running  (boot entry abstraction via BOOT_PROGRAM + CALL):
     led[0] blinks at ~1 Hz via MMIO reg 0 writes (CM-controlled, active-LOW inverted)
-    led[1] solid ON (no fault) or ON (fault latched — rare)
+    led[1] OFF (normal / no fault); blinks ON only if fault_latched is set
 """
 
 from amaranth import *

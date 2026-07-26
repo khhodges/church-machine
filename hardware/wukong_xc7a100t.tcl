@@ -98,8 +98,9 @@ if {[file exists $bit_src]} {
     puts "   program_hw_devices \[lindex \[get_hw_devices\] 0\]"
     puts ""
     puts " Expected LED behaviour after programming:"
-    puts "   D1 (J19):  solid ON during boot, then blinks ~1 Hz (NUC_PROGRAM running)"
-    puts "   D2 (H19):  1 Hz heartbeat during boot, then OFF (lit = fault detected)"
+    puts "   D1 (G21):  solid ON during boot (~50 cycles), then blinks ~1 Hz (CM MMIO-controlled)"
+    puts "   D2 (G20):  1 Hz heartbeat during boot, then OFF when running (lit = fault latched)"
+    puts "   UART E3:   0xBB sentinel byte at 57600 baud within ~1 s of power-on"
     puts "═══════════════════════════════════════════════════════════════════"
 } else {
     error "Bitstream not found at $bit_src — check implementation logs."
