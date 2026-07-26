@@ -158,6 +158,68 @@ loop or the MMIO write is missing.
 
 ---
 
+## Automated smoke test
+
+Criteria (a) and (c) can be verified without touching the IDE by running the
+smoke-test script directly from the workstation that has the board attached.
+Criterion (b) — D2 goes OFF — still requires a visual check at the bench.
+
+### Quick start
+
+```bash
+# Install the only dependency if you haven't already
+pip install pyserial
+
+# Run the smoke test (adjust --port as needed)
+python3 scripts/wukong_boot_smoke.py --port /dev/ttyUSB0
+```
+
+Example passing output:
+
+```
+Wukong boot smoke test  —  /dev/ttyUSB0 @ 57600 baud
+------------------------------------------------------------
+[a] Waiting up to 3.0 s for 0xBB sentinel …
+[a] PASS — 0xBB received after 0.83 s (buffer offset 0)
+[c] Sending 'r' (run-free) …
+[c] Waiting up to 3.0 s for a non-fault trace packet …
+[c] PASS — first non-fault trace packet received after 0.12 s  NIA=0x00000001  instr=0x...
+------------------------------------------------------------
+RESULT: PASS — board booted and is executing correctly.
+NOTE:   Criterion (b) — D2 goes OFF — must be verified visually.
+```
+
+Exit code `0` = pass, `1` = failure.  The script prints a clear failure
+message with triage hints when either criterion is not met.
+
+### Options
+
+| Flag | Default | Purpose |
+|------|---------|---------|
+| `--port PORT` | `/dev/ttyUSB0` | Serial device |
+| `--baud BAUD` | `57600` | Baud rate |
+| `--sentinel-timeout S` | `3` | Seconds to wait for 0xBB |
+| `--trace-timeout S` | `3` | Seconds to collect trace after `'r'` |
+
+### When to run it
+
+- **Before every re-flash** — confirms the current bitstream still boots, so
+  you have a baseline before overwriting it.
+- **After every re-flash** — confirms the new bitstream passes without manual
+  observation.
+- **In CI / pre-merge hooks** — wire it into your build pipeline on any
+  machine that has a board attached and the `pyserial` package installed.
+
+### What it does not cover
+
+| Gap | How to close it |
+|-----|----------------|
+| Criterion (b) — D2 LED | Visual check; no UART equivalent |
+| Fault-packet content | Script reports fault count; manual triage still needed |
+| Sustained execution beyond first packet | Extend `--trace-timeout` or run the full bridge |
+
+---
+
 ## Fault-triage quick reference
 
 | Symptom | Likely cause |
