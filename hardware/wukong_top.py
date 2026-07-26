@@ -66,6 +66,16 @@ _WUKONG_ROM = list(WUKONG_NUC_PROGRAM)
 while len(_WUKONG_ROM) < 1024:
     _WUKONG_ROM.append(0)
 
+# ── Safety guard: catch silent ROM revert ─────────────────────────────────────
+# BOOT_PROGRAM[2] = 0x17000000 (CALL CR0,CR0) faults NULL_CAP on standalone FPGA.
+# WUKONG_NUC_PROGRAM[2] must be a DWRITE or branch, never a CALL.
+_BOOT_PROGRAM_CALL_WORD = 0x17000000
+assert _WUKONG_ROM[2] != _BOOT_PROGRAM_CALL_WORD, (
+    "FATAL: _WUKONG_ROM[2] is BOOT_PROGRAM's CALL CR0,CR0 (0x17000000).\n"
+    "wukong_top.py was reverted to BOOT_PROGRAM — use WUKONG_NUC_PROGRAM.\n"
+    "BOOT_PROGRAM faults NULL_CAP on standalone FPGA (no IDE sets Thread.caps[0])."
+)
+
 
 class ChurchWukongXC7A100T(Elaboratable):
     """Minimal Church Machine top-level for QMTECH Wukong XC7A100T.
