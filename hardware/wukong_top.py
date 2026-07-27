@@ -406,9 +406,28 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         # ── dmem_rd_valid ──────────────────────────────────────────────────────
         # BRAM read has 1-cycle latency; MMIO reads are combinatorial.
+        #
+        # Address-stability guard — suppress spurious valid on first cycle after
+        # address changes.
+        #
+        # Background: the NS gate (inside mLoad) does sequential 32-bit reads:
+        #   FETCH_LOC → FETCH_W1 → FETCH_W2 → FETCH_W3
+        # Each state drives mem_rd_en=1 continuously.  Without the guard,
+        # _dmem_rd_valid_r fires on the FIRST cycle of FETCH_W1 (because
+        # dmem_rd_en was already 1 during FETCH_LOC), but the BRAM data is
+        # still from the FETCH_LOC address — one cycle stale.  The NS gate
+        # would latch NS_W0 into raw_w2_reg, causing a spurious SEAL fault.
+        #
+        # Fix: only assert dmem_rd_valid when the BRAM address has been stable
+        # for at least two consecutive cycles (_prev_mem_addr == mem_addr).
+        # This guarantees the BRAM output corresponds to the requested address.
         _dmem_rd_valid_r = Signal()
+        _prev_mem_addr   = Signal(14)
         m.d.sync += _dmem_rd_valid_r.eq(core.dmem_rd_en & ~is_mmio)
-        m.d.comb += core.dmem_rd_valid.eq(_dmem_rd_valid_r | is_mmio_read)
+        m.d.sync += _prev_mem_addr.eq(mem_addr)
+        m.d.comb += core.dmem_rd_valid.eq(
+            (_dmem_rd_valid_r & (_prev_mem_addr == mem_addr)) | is_mmio_read
+        )
 
         # ── hw_init sequencer write path ───────────────────────────────────────
         # Writes every non-zero DMEM word (one per cycle) before boot_start.
