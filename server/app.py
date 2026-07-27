@@ -189,6 +189,13 @@ def download_wukong_bit():
                      download_name="church_wukong_xc7a100t.bit",
                      mimetype="application/octet-stream")
 
+@app.route("/dl/wukong-bscan")
+def download_wukong_bscan():
+    p = os.path.join(os.path.dirname(__file__), "..", "build", "bscan_spi_xc7a100t_fgg676.bit")
+    return send_file(os.path.abspath(p), as_attachment=True,
+                     download_name="bscan_spi_xc7a100t_fgg676.bit",
+                     mimetype="application/octet-stream")
+
 @app.route("/dl/wukong-mcs")
 def download_wukong_mcs():
     p = os.path.join(os.path.dirname(__file__), "..", "build", "church_wukong_xc7a100t.mcs")
