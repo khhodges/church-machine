@@ -189,6 +189,13 @@ def download_wukong_bit():
                      download_name="church_wukong_xc7a100t.bit",
                      mimetype="application/octet-stream")
 
+@app.route("/dl/wukong-mcs")
+def download_wukong_mcs():
+    p = os.path.join(os.path.dirname(__file__), "..", "build", "church_wukong_xc7a100t.mcs")
+    return send_file(os.path.abspath(p), as_attachment=True,
+                     download_name="church_wukong_xc7a100t.mcs",
+                     mimetype="application/octet-stream")
+
 @app.route("/dl/wukong-verilog")
 def download_wukong_verilog():
     p = os.path.join(os.path.dirname(__file__), "..", "build", "church_wukong_xc7a100t.v")
