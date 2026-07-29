@@ -1006,6 +1006,18 @@ class ChurchAssembler {
                             instructions.push({ line: `ELOADCALL CR0, ${_bsAbs}, ${_bsMeth}`, lineNum: lineNum + 1,
                                 comment: `${_bsAbs} ${_bsMeth}` });
                             continue;
+                        } else if (this._resolveNSName(_bsAbs) !== null) {
+                            // Abstraction is in the namespace but method conventions are not
+                            // loaded yet (e.g. fresh page load before detail panel opened).
+                            // Emit ELOADCALL with method index 0 — the name cannot be
+                            // validated without conventions so a numeric placeholder is used.
+                            // The runtime will fault if method 0 is not the intended one.
+                            this.warnings.push({ line: lineNum + 1, colStart: 0, colEnd: line.length,
+                                message: `Method conventions for "${_bsAbs}" are not loaded; "${_bsMeth}" is emitted as index 0 (unvalidated). Open the ${_bsAbs} detail panel to load conventions.` });
+                            this._checkCapDeclared(_bsAbs, lineNum + 1);
+                            instructions.push({ line: `ELOADCALL CR0, ${_bsAbs}, 0`, lineNum: lineNum + 1,
+                                comment: `${_bsAbs} ${_bsMeth}` });
+                            continue;
                         }
                         // Not a known abstraction — fall through to normal unknown-instruction path.
                     }
