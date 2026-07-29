@@ -3647,6 +3647,19 @@ const _ABSTRACTION_CONVENTIONS = {
         'Fetch':    { index: 4, input: 'DR1=slot token, DR2=expected words, CR2=write-GT',                                                                 output: 'DR0=0 (installed) | error code' },
         'Connect':  { index: 5, input: 'CR2=remote GT (Outform/far-end abstraction)',                                                                       output: 'DR0=far-end return value' },
     },
+    // ── Boot-resident abstractions ────────────────────────────────────────────
+    // Conventions for lumps whose methods[] sidecar is empty (flat-assembly
+    // binary with no CLOOMC++ method-table metadata).  These are added here so
+    // bare-space sugar (e.g. "SelfTest Run") and dot-notation
+    // (e.g. CALL SelfTest.Run) resolve to the correct method index even on a
+    // fresh page load before the user has opened any detail panel.
+    'SelfTest': {
+        'Run':   { index: 0, input: '', output: 'DR0=0 all pass | N first-fail code' },
+        'Audit': { index: 1, input: '', output: 'DR0=0 all pass | N first-fail code' },
+    },
+    'LEDFlash': {
+        'Run':   { index: 0, input: '', output: 'LED flash cycle; returns on completion' },
+    },
 };
 
 // Register conventions class-wide so all ChurchAssembler instances created
