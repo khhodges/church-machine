@@ -1267,72 +1267,6 @@
     "lump_version": 0
   },
   {
-    "token": "00130000",
-    "abstraction": "Loader",
-    "ns_slot": 10,
-    "lump_size": 64,
-    "cw": 7,
-    "dw": 0,
-    "cc": 1,
-    "methods": [
-      {
-        "name": "Load",
-        "offset": 0,
-        "length": 3,
-        "description": "Fault-driven load. Delegates to Tunnel.Fetch to download and install the requested lump from the IDE. CR2 (memory write-GT) must be set by the caller (the fault handler). Returns 0 on success, non-zero on timeout/CRC/size error.",
-        "inputs": [
-          "CR2: Memory write-GT (write-perm buffer, set by fault handler)",
-          "DR1: NS slot token (identifies the requested abstraction)",
-          "DR2: expected lump size in words"
-        ],
-        "outputs": [
-          "DR0: 0 = lump installed | non-zero = error (timeout/CRC/size)"
-        ],
-        "comments": [
-          "LOAD CR1, CR6[0]  \u2014 load Tunnel GT from c-list slot 0 into CR1",
-          "CALL CR1, 4       \u2014 call Tunnel.Fetch (method 4); DR1=token, DR2=expected_words, CR2=write-GT",
-          "RETURN            \u2014 DR0 = Tunnel.Fetch result (0=installed / non-zero=error)"
-        ]
-      },
-      {
-        "name": "Prefetch",
-        "offset": 3,
-        "length": 3,
-        "description": "Hint-driven load. Identical to Load \u2014 calls Tunnel.Fetch which is idempotent (already-resident lumps are a no-op at the IDE bridge). Returns 0 if installed or already resident.",
-        "inputs": [
-          "CR2: Memory write-GT (write-perm buffer, set by caller)",
-          "DR1: NS slot token",
-          "DR2: expected lump size in words"
-        ],
-        "outputs": [
-          "DR0: 0 = installed or already resident | non-zero = error"
-        ],
-        "comments": [
-          "LOAD CR1, CR6[0]  \u2014 load Tunnel GT from c-list slot 0 into CR1",
-          "CALL CR1, 4       \u2014 call Tunnel.Fetch (method 4); idempotent \u2014 already-resident is fine",
-          "RETURN            \u2014 DR0 = Tunnel.Fetch result"
-        ]
-      },
-      {
-        "name": "Evict",
-        "offset": 6,
-        "length": 1,
-        "description": "Unload a cold abstraction to reclaim memory. Stub \u2014 returns 0 immediately. Full implementation requires a Memory abstraction (not yet defined). GT and c-list are preserved; the next CALL on this slot triggers Load again.",
-        "inputs": [
-          "DR1: NS slot token (not used by stub)"
-        ],
-        "outputs": [
-          "DR0: 0 (always \u2014 stub)"
-        ],
-        "comments": [
-          "RETURN  \u2014 stub: no Memory abstraction available yet; DR0 = 0 (no-op success)"
-        ]
-      }
-    ],
-    "grants": [],
-    "lump_version": 0
-  },
-  {
     "token": "00002000",
     "abstraction": "Keystone",
     "ns_slot": 23,
@@ -1984,27 +1918,6 @@
     "source": "simulator/examples/post_flash_selftest.cloomc"
   },
   {
-    "token": "00000300",
-    "abstraction": "LEDFlash",
-    "filename": "LEDFlash_v2.lump",
-    "sidecar_file": "LEDFlash_v2.json",
-    "ns_slot": null,
-    "lump_size": 64,
-    "cw": 17,
-    "cc": 1,
-    "lump_version": 2,
-    "compiled_at": 1784544392.980453,
-    "status": "live",
-    "methods": [
-      {
-        "name": "run",
-        "offset": 0,
-        "length": 1,
-        "description": "Main function"
-      }
-    ]
-  },
-  {
     "token": "00000600",
     "abstraction": "SelfTest",
     "filename": "SelfTest_v75.lump",
@@ -2060,6 +1973,48 @@
     "methods": [],
     "grants": [
       "E"
+    ]
+  },
+  {
+    "token": "00130000",
+    "abstraction": "Loader",
+    "filename": "Loader_v1.lump",
+    "sidecar_file": "Loader_v1.json",
+    "ns_slot": null,
+    "lump_size": 64,
+    "cw": 1,
+    "cc": 1,
+    "lump_version": 1,
+    "compiled_at": 1785333917.725582,
+    "status": "wip",
+    "methods": [
+      {
+        "name": "run",
+        "offset": 0,
+        "length": 1,
+        "description": "Main function"
+      }
+    ]
+  },
+  {
+    "token": "00000300",
+    "abstraction": "LEDFlash",
+    "filename": "LEDFlash_v3.lump",
+    "sidecar_file": "LEDFlash_v3.json",
+    "ns_slot": null,
+    "lump_size": 64,
+    "cw": 1,
+    "cc": 1,
+    "lump_version": 3,
+    "compiled_at": 1785334347.719854,
+    "status": "wip",
+    "methods": [
+      {
+        "name": "blink",
+        "offset": 0,
+        "length": 1,
+        "description": "Toggle LED0 at ~1 Hz using nested delay loops"
+      }
     ]
   }
 ]

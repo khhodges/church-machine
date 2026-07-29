@@ -1,0 +1,46 @@
+{
+  "token": "00000300",
+  "abstraction": "LEDFlash",
+  "filename": "LEDFlash_v3.lump",
+  "sidecar_file": "LEDFlash_v3.json",
+  "ns_slot": null,
+  "lump_size": 64,
+  "typ": 0,
+  "content_type": "code",
+  "cw": 1,
+  "cc": 1,
+  "status": "wip",
+  "source": "; Provides: blink\n; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\nabstraction LEDFlash {\n    capabilities {\n        LED0 E\n    }\n\n    method blink {\n        ; Toggle LED0 at ~1 Hz using nested delay loops\n        ; Depends on: LED0\n        ; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n        ; TODO: write your code here\n\n        RETURN\n    }\n}",
+  "description": "Provides: blink",
+  "methods": [
+    {
+      "name": "blink",
+      "offset": 0,
+      "length": 1,
+      "description": "Toggle LED0 at ~1 Hz using nested delay loops"
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "self",
+      "rights": [
+        "E"
+      ],
+      "grants": [
+        "E"
+      ],
+      "nsIndex": -1
+    }
+  ],
+  "pet_names": {
+    "DR": {},
+    "CR": {}
+  },
+  "mtbf": {
+    "consecutive_clean": 0,
+    "total_runs": 0,
+    "status": "unknown"
+  },
+  "lump_version": 3,
+  "compiled_at": 1785334347.719854
+}

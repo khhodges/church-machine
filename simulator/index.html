@@ -30,7 +30,15 @@
         });
         window.addEventListener('error', function(event) {
             if (!event.error) {
-                console.warn('[Church Machine] Caught non-Error window error:', event.message || '(no message)', 'at', event.filename + ':' + event.lineno);
+                // Suppress the well-known benign ResizeObserver notification — wrapping
+                // ResizeObserver callbacks in requestAnimationFrame is the real fix, but
+                // some browsers still emit this on the first frame; it is never actionable.
+                var msg = event.message || '';
+                if (msg.indexOf('ResizeObserver') !== -1) {
+                    event.preventDefault();
+                    return;
+                }
+                console.warn('[Church Machine] Caught non-Error window error:', msg || '(no message)', 'at', event.filename + ':' + event.lineno);
                 event.preventDefault();
             }
         });
@@ -2650,7 +2658,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script async src="app-ti60-connect.js?v=20260619a"></script>
     <script defer src="app-startup-wizard.js?v=20260619a"></script>
     <script src="lump-registry.js?v=20260719g"></script>
-    <script src="app-shell.js?v=20260719h"></script>
+    <script src="app-shell.js?v=20260729a"></script>
     <script src="app-tools.js?v=20260726a"></script>
     <script src="app-cr-display.js?v=20260521a"></script>
     <script src="app-cr-detail.js?v=20260725b"></script>
