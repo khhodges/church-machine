@@ -1002,6 +1002,7 @@ class ChurchAssembler {
                                     `"${_bsMeth}" is not a known method of ${_bsAbs}. Known methods: ${_known}.` });
                                 continue;
                             }
+                            this._checkCapDeclared(_bsAbs, lineNum + 1);
                             instructions.push({ line: `ELOADCALL CR0, ${_bsAbs}, ${_bsMeth}`, lineNum: lineNum + 1,
                                 comment: `${_bsAbs} ${_bsMeth}` });
                             continue;

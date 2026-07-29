@@ -9982,6 +9982,35 @@ Add a method called Run
         assert('BS5 real opcode "IADD" not intercepted by bare-space sugar (opcode=21)',
             opcode === 21, `got opcode=${opcode}, errors=${result.errors.map(e => e.message).join('; ')}`);
     }
+
+    // BS6: bare-space sugar with a capabilities block that does NOT declare the
+    // abstraction — must produce a "capability not declared" error matching the
+    // dot-paren sugar's _checkCapDeclared behaviour.
+    {
+        const a = new ChurchAssembler(BARE_SPACE_CONV);
+        a.setNamespace(BARE_SPACE_NS);
+        // The capabilities block exists (Scheduler is declared) but SelfTest is absent.
+        const result = a.assemble('capabilities {\n  Scheduler E\n}\nSelfTest Run');
+        assert('BS6 "SelfTest Run" with capabilities block missing SelfTest produces an error',
+            result.errors.length > 0, 'expected at least one error');
+        const msg = result.errors.length > 0 ? result.errors[0].message : '';
+        assert('BS6 error mentions "SelfTest" and capability declaration',
+            msg.includes('SelfTest') && (msg.includes('capabilities') || msg.includes('declared')),
+            msg);
+    }
+
+    // BS6b: bare-space sugar when the abstraction IS declared — no cap-declared error.
+    {
+        const a = new ChurchAssembler(BARE_SPACE_CONV);
+        a.setNamespace(BARE_SPACE_NS);
+        const result = a.assemble('capabilities {\n  SelfTest E\n}\nSelfTest Run');
+        assert('BS6b "SelfTest Run" with SelfTest declared in capabilities: no cap-declared error',
+            result.errors.length === 0,
+            result.errors.map(e => e.message).join('; '));
+        const opcode = result.words.length > 0 ? (result.words[0] >>> 27) & 0x1F : -1;
+        assert('BS6b "SelfTest Run" with declared capability: opcode=8 (ELOADCALL)',
+            opcode === 8, `got opcode=${opcode}`);
+    }
 }
 
 // ── Summary ──────────────────────────────────────────────────────────────────
