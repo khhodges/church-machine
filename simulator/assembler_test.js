@@ -10013,6 +10013,89 @@ Add a method called Run
     }
 }
 
+// ── Bare-space sugar with arguments: AbsName MethodName Arg1 [Arg2] ──────────
+//
+// Extends the zero-arg bare-space sugar to argument-carrying forms.
+// "SelfTest Check SlideRule"         → LOAD CR2, SlideRule + ELOADCALL (2 words)
+// "SelfTest Check CR5"               → ELOADCALL only (1 word, explicit CR skip)
+// "SelfTest Write 42"                → error (DR arg must be pre-loaded)
+// "SelfTest Send SlideRule Scheduler"→ LOAD CR2 + LOAD CR3 + ELOADCALL (3 words)
+{
+    const BS_ARG_CONV = {
+        'SelfTest': {
+            'Run':   { index: 0 },
+            'Check': { index: 1, input: 'CR2=target' },
+            'Send':  { index: 2, input: 'CR2=dst CR3=src' },
+            'Write': { index: 3, input: 'DR1=value' },
+        },
+    };
+    const BS_ARG_NS = { 'SelfTest': 6, 'SlideRule': 3, 'Scheduler': 5 };
+
+    // BS6: "SelfTest Check SlideRule" — 1-arg CR sugar: LOAD CR2, SlideRule + ELOADCALL.
+    {
+        const a = new ChurchAssembler(BS_ARG_CONV);
+        a.setNamespace(BS_ARG_NS);
+        const result = a.assemble('SelfTest Check SlideRule');
+        assert('BS6 "SelfTest Check SlideRule" produces no errors',
+            result.errors.length === 0,
+            result.errors.map(e => e.message).join('; '));
+        assert('BS6 emits 2 words (LOAD + ELOADCALL)',
+            result.words.length === 2,
+            `got ${result.words.length} words`);
+        const opcode0 = (result.words[0] >>> 27) & 0x1F;
+        const opcode1 = (result.words[1] >>> 27) & 0x1F;
+        assert('BS6 word[0] opcode=0 (LOAD)', opcode0 === 0, `got opcode=${opcode0}`);
+        assert('BS6 word[1] opcode=8 (ELOADCALL)', opcode1 === 8, `got opcode=${opcode1}`);
+    }
+
+    // BS7: "SelfTest Check CR5" — explicit CRn supplied → no LOAD emitted, just ELOADCALL.
+    {
+        const a = new ChurchAssembler(BS_ARG_CONV);
+        a.setNamespace(BS_ARG_NS);
+        const result = a.assemble('SelfTest Check CR5');
+        assert('BS7 "SelfTest Check CR5" (explicit CR) produces no errors',
+            result.errors.length === 0,
+            result.errors.map(e => e.message).join('; '));
+        assert('BS7 emits exactly 1 word (ELOADCALL only, no LOAD for explicit CR)',
+            result.words.length === 1,
+            `got ${result.words.length} words`);
+        const opcode = (result.words[0] >>> 27) & 0x1F;
+        assert('BS7 word[0] opcode=8 (ELOADCALL)', opcode === 8, `got opcode=${opcode}`);
+    }
+
+    // BS8: "SelfTest Write 42" — DR numeric arg → targeted pre-load error (same hint as dot-paren).
+    {
+        const a = new ChurchAssembler(BS_ARG_CONV);
+        a.setNamespace(BS_ARG_NS);
+        const result = a.assemble('SelfTest Write 42');
+        assert('BS8 "SelfTest Write 42" (DR numeric arg) produces an error',
+            result.errors.length > 0, 'expected at least one error');
+        const msg = result.errors[0].message;
+        assert('BS8 error mentions DR1 and pre-load hint',
+            msg.includes('DR1') && (msg.includes('DWRITE') || msg.includes('pre-load')),
+            msg);
+    }
+
+    // BS9: "SelfTest Send SlideRule Scheduler" — 2-arg CR sugar: 2 LOADs + ELOADCALL (3 words).
+    {
+        const a = new ChurchAssembler(BS_ARG_CONV);
+        a.setNamespace(BS_ARG_NS);
+        const result = a.assemble('SelfTest Send SlideRule Scheduler');
+        assert('BS9 "SelfTest Send SlideRule Scheduler" produces no errors',
+            result.errors.length === 0,
+            result.errors.map(e => e.message).join('; '));
+        assert('BS9 emits 3 words (LOAD + LOAD + ELOADCALL)',
+            result.words.length === 3,
+            `got ${result.words.length} words`);
+        const opcode0 = (result.words[0] >>> 27) & 0x1F;
+        const opcode1 = (result.words[1] >>> 27) & 0x1F;
+        const opcode2 = (result.words[2] >>> 27) & 0x1F;
+        assert('BS9 word[0] opcode=0 (LOAD)', opcode0 === 0, `got opcode=${opcode0}`);
+        assert('BS9 word[1] opcode=0 (LOAD)', opcode1 === 0, `got opcode=${opcode1}`);
+        assert('BS9 word[2] opcode=8 (ELOADCALL)', opcode2 === 8, `got opcode=${opcode2}`);
+    }
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);
