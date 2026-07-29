@@ -213,6 +213,15 @@ const STANDARD_METHOD_CONVENTIONS = (() => {
     if (!conv['Salvation']) conv['Salvation'] = {};
     conv['Salvation']['main'] = { index: 15 };
 
+    // Hardcoded supplement: SelfTest — boot-resident lump.  The manifest entry
+    // has no `methods` array, so conventions must be seeded here so that
+    // `SelfTest Run` in the bare-space sugar example resolves to index 0 (the
+    // fast-path entry point) rather than falling back to the unvalidated index-0
+    // placeholder with a warning.
+    if (!conv['SelfTest']) conv['SelfTest'] = {};
+    conv['SelfTest']['Run']  = { index: 0 };
+    conv['SelfTest']['Stop'] = { index: 1 };
+
     return conv;
 })();
 
@@ -254,6 +263,87 @@ for (const [name, source] of Object.entries(examples)) {
         const msgs = result.errors.map(e => `  line ${e.line}: ${e.message}`).join('\n');
         process.stderr.write(`[FAIL] ${name}:\n${msgs}\n`);
         ERRORS.push(name);
+    }
+}
+
+// ── Bare-space sugar method-index verification ────────────────────────────────
+//
+// Re-assembles the 'selftest_bare_space_sugar' example with the full shared
+// conventions active and verifies that:
+//   (a) it assembles with zero errors,
+//   (b) the first assembled word is an ELOADCALL instruction (opcode 8),
+//   (c) the c-list row encoded in imm[4:0] is 0 (SelfTest is the first and
+//       only capabilities entry, so it occupies slot 0), and
+//   (d) the method index encoded in imm[11:5] is 1 (1-based), i.e. method
+//       index 0 (Run) stored as 1-based = 1 in the 7-bit funct7 field.
+//
+// If any of these assertions fail, the suite exits non-zero just like a
+// regular assembly error would — so a future assembler change that silently
+// mis-encodes the bare-space sugar will be caught here.
+
+const BARE_SPACE_KEY = 'selftest_bare_space_sugar';
+const bsSrc = examples[BARE_SPACE_KEY];
+
+if (!bsSrc) {
+    process.stderr.write(`[FAIL] method-index check: example '${BARE_SPACE_KEY}' not found in examples object\n`);
+    ERRORS.push(BARE_SPACE_KEY + ':method-index-check');
+} else {
+    const bsAsm = new ChurchAssembler();
+    const bsResult = bsAsm.assemble(bsSrc);
+
+    let bsOk = true;
+
+    if (bsResult.errors.length > 0) {
+        const msgs = bsResult.errors.map(e => `  line ${e.line}: ${e.message}`).join('\n');
+        process.stderr.write(`[FAIL] ${BARE_SPACE_KEY} method-index check — assembly errors:\n${msgs}\n`);
+        bsOk = false;
+    }
+
+    if (bsResult.words.length === 0) {
+        process.stderr.write(`[FAIL] ${BARE_SPACE_KEY} method-index check — no words assembled (expected at least 1)\n`);
+        bsOk = false;
+    }
+
+    if (bsResult.words.length > 0) {
+        const w       = bsResult.words[0] >>> 0;
+        const opcode  = (w >>> 27) & 0x1F;
+        const imm15   = w & 0x7FFF;
+        const clistRow       = imm15 & 0x1F;
+        const methIdx1based  = (imm15 >>> 5) & 0x7F;
+        const methIdx0based  = methIdx1based - 1;
+
+        // opcode must be 8 (ELOADCALL)
+        if (opcode !== 8) {
+            process.stderr.write(
+                `[FAIL] ${BARE_SPACE_KEY} method-index check — first word opcode is ${opcode} (0x${opcode.toString(16)}), expected 8 (ELOADCALL)\n`);
+            bsOk = false;
+        }
+
+        // c-list row must be 0 (SelfTest is the sole capabilities entry)
+        if (clistRow !== 0) {
+            process.stderr.write(
+                `[FAIL] ${BARE_SPACE_KEY} method-index check — ELOADCALL c-list row is ${clistRow}, expected 0 (SelfTest declared as first capability)\n`);
+            bsOk = false;
+        }
+
+        // method index 0 (Run) is stored 1-based as 1 in bits[11:5]
+        if (methIdx1based !== 1) {
+            process.stderr.write(
+                `[FAIL] ${BARE_SPACE_KEY} method-index check — ELOADCALL method index (1-based) is ${methIdx1based}, expected 1 (method 0 = Run)\n` +
+                `       (0-based index decoded: ${methIdx0based}; c-list row: ${clistRow}; word: 0x${w.toString(16).padStart(8,'0')})\n`);
+            bsOk = false;
+        }
+
+        if (bsOk) {
+            process.stdout.write(
+                `[PASS] ${BARE_SPACE_KEY} method-index check — ` +
+                `ELOADCALL opcode=${opcode}, clist-row=${clistRow}, method-idx(0-based)=${methIdx0based} ` +
+                `(word=0x${w.toString(16).padStart(8,'0')})\n`);
+        }
+    }
+
+    if (!bsOk) {
+        ERRORS.push(BARE_SPACE_KEY + ':method-index-check');
     }
 }
 

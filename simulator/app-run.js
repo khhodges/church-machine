@@ -8240,6 +8240,34 @@ BRANCHNE k_wg_s
 
 BRANCH morse              ; loop forever
 `,
+
+        // ── Bare-space sugar smoke-test ──────────────────────────────────────────
+        // Used by tests/simulator/sim_asm_examples.js to catch regressions in the
+        // bare-space method-call sugar path (AbsName MethodName → ELOADCALL).
+        // If the method-index lookup or capabilities-block handling breaks, this
+        // example will fail to assemble cleanly and will be caught in CI.
+        'selftest_bare_space_sugar': `; ============================================================
+; Abstraction:  BareSpaceSugar
+; Description:  Bare-space sugar smoke test.
+;               "SelfTest Run" on its own line is syntactic sugar for
+;               ELOADCALL CR0, SelfTest, Run — loading the SelfTest
+;               abstraction from the c-list and invoking its Run method.
+;               This example verifies the full path:
+;                 capabilities block → c-list slot assignment →
+;                 ELOADCALL with correct method index
+; Language:     Assembly
+; ============================================================
+
+capabilities {
+  SelfTest E
+}
+
+; Bare-space sugar: AbsName MethodName compiles to ELOADCALL.
+; SelfTest is declared in the capabilities block above, so it
+; occupies c-list slot 0.  Run is method index 0.
+; Encoded as: ELOADCALL CR0, SelfTest, Run  (opcode 8, row=0, meth=0)
+SelfTest Run
+`,
     };
 
     window._asmExampleSources      = examples;
