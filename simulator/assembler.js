@@ -957,6 +957,60 @@ class ChurchAssembler {
                 }
             }
 
+            // ── Bare-space method call sugar: AbsName MethodName ─────────────────
+            // "SelfTest Run" on its own line expands to:
+            //   ELOADCALL CR0, SelfTest, Run
+            //
+            // Rules:
+            //   · Only matches lines of exactly two bare identifiers separated by
+            //     whitespace (no dots, no parens, no commas, no extra tokens).
+            //   · If the first token is a real opcode mnemonic (with or without a
+            //     condition-code suffix), the block is skipped so existing instructions
+            //     are unaffected — no regression for any two-word instruction form.
+            //   · If the first token is a known abstraction and the second is a known
+            //     method, expands to ELOADCALL CR0, AbsName, MethodName.
+            //   · If the abstraction is known but the method is not, a targeted error
+            //     lists the known methods — same UX as the dot-paren sugar.
+            //   · If the first token is not a known abstraction, falls through unchanged
+            //     to the normal "unknown instruction" error path.
+            {
+                const bsMatch = line.match(/^([A-Za-z]\w*)\s+([A-Za-z]\w*)$/);
+                if (bsMatch) {
+                    const tok0upper = bsMatch[1].toUpperCase();
+                    // Skip if the first token is a real opcode (optionally +condition).
+                    let _isRealOpcode = false;
+                    for (const name of Object.keys(this.opcodes)) {
+                        if (tok0upper === name) { _isRealOpcode = true; break; }
+                        if (tok0upper.startsWith(name)) {
+                            const _suf = tok0upper.substring(name.length);
+                            if (this.conditions[_suf] !== undefined) { _isRealOpcode = true; break; }
+                        }
+                    }
+                    // Also skip pass-1-only pseudo-instructions.
+                    if (!_isRealOpcode && (tok0upper === 'NOP' || tok0upper === 'HALT' ||
+                            /^MVN([A-Z]{2})?$/.test(tok0upper) || tok0upper === 'PETNAME')) {
+                        _isRealOpcode = true;
+                    }
+                    if (!_isRealOpcode) {
+                        const _bsAbs  = bsMatch[1];
+                        const _bsMeth = bsMatch[2];
+                        const _bsConv = this.methodConventions[_bsAbs];
+                        if (_bsConv) {
+                            if (!_bsConv[_bsMeth]) {
+                                const _known = Object.keys(_bsConv).join(', ');
+                                this.errors.push({ line: lineNum + 1, ...this._tokenCols(line, _bsMeth), message:
+                                    `"${_bsMeth}" is not a known method of ${_bsAbs}. Known methods: ${_known}.` });
+                                continue;
+                            }
+                            instructions.push({ line: `ELOADCALL CR0, ${_bsAbs}, ${_bsMeth}`, lineNum: lineNum + 1,
+                                comment: `${_bsAbs} ${_bsMeth}` });
+                            continue;
+                        }
+                        // Not a known abstraction — fall through to normal unknown-instruction path.
+                    }
+                }
+            }
+
             // ── MVN pseudo-instruction ─────────────────────────────────────────
             // MVN DRd, DRs  →  ~DRs  (ARM-style move-bitwise-NOT)
             // The Church Machine ISA has no native bitwise complement opcode, so

@@ -9909,6 +9909,81 @@ Add a method called Run
         `c-list slot = 0x${(unresolvedWords[unresolvedStart] >>> 0).toString(16)}`);
 }
 
+// ── Bare-space method call sugar: AbsName MethodName ─────────────────────────
+//
+// "SelfTest Run" on its own line should expand to ELOADCALL CR0, SelfTest, Run
+// without requiring the user to know the dot-paren or explicit ELOADCALL forms.
+{
+    const BARE_SPACE_CONV = {
+        'SelfTest':  { 'Run':   { index: 0 }, 'Audit': { index: 1 } },
+        'Scheduler': { 'pause': { index: 0 }, 'resume': { index: 1 } },
+    };
+    const BARE_SPACE_NS = { 'SelfTest': 6, 'Scheduler': 5 };
+
+    // BS1: "SelfTest Run" — zero-argument method call sugar, happy path.
+    {
+        const a = new ChurchAssembler(BARE_SPACE_CONV);
+        a.setNamespace(BARE_SPACE_NS);
+        const result = a.assemble('SelfTest Run');
+        assert('BS1 "SelfTest Run" produces no errors',
+            result.errors.length === 0,
+            result.errors.map(e => e.message).join('; '));
+        assert('BS1 "SelfTest Run" emits exactly one word',
+            result.words.length === 1,
+            `got ${result.words.length} words`);
+        const opcode = (result.words[0] >>> 27) & 0x1F;
+        assert('BS1 "SelfTest Run" opcode=8 (ELOADCALL)',
+            opcode === 8, `got opcode=${opcode}`);
+    }
+
+    // BS2: "Scheduler pause" — second known two-token pair.
+    {
+        const a = new ChurchAssembler(BARE_SPACE_CONV);
+        a.setNamespace(BARE_SPACE_NS);
+        const result = a.assemble('Scheduler pause');
+        assert('BS2 "Scheduler pause" produces no errors',
+            result.errors.length === 0,
+            result.errors.map(e => e.message).join('; '));
+        const opcode = (result.words[0] >>> 27) & 0x1F;
+        assert('BS2 "Scheduler pause" opcode=8 (ELOADCALL)',
+            opcode === 8, `got opcode=${opcode}`);
+    }
+
+    // BS3: unknown method on a known abstraction → targeted error listing known methods.
+    {
+        const a = new ChurchAssembler(BARE_SPACE_CONV);
+        a.setNamespace(BARE_SPACE_NS);
+        const result = a.assemble('SelfTest Vanish');
+        assert('BS3 "SelfTest Vanish" (unknown method) produces an error',
+            result.errors.length > 0, 'expected at least one error');
+        const msg = result.errors.length > 0 ? result.errors[0].message : '';
+        assert('BS3 error mentions "Vanish" and known methods',
+            msg.includes('Vanish') && (msg.includes('Run') || msg.includes('Audit')),
+            msg);
+    }
+
+    // BS4: unknown first word — falls through to normal "unknown instruction" error.
+    {
+        const a = new ChurchAssembler(BARE_SPACE_CONV);
+        a.setNamespace(BARE_SPACE_NS);
+        const result = a.assemble('FooBar Baz');
+        assert('BS4 "FooBar Baz" (unknown first word) produces an error',
+            result.errors.length > 0, 'expected an unknown-instruction error');
+    }
+
+    // BS5: real opcode as first token is NOT intercepted by the bare-space sugar.
+    {
+        const a = new ChurchAssembler(BARE_SPACE_CONV);
+        a.setNamespace(BARE_SPACE_NS);
+        // IADD is a real opcode — even though "IADD DR0" is syntactically wrong,
+        // it must not be misrouted through the bare-space abstraction-lookup path.
+        const result = a.assemble('IADD DR0, DR0, #0');
+        const opcode = result.words.length > 0 ? (result.words[0] >>> 27) & 0x1F : -1;
+        assert('BS5 real opcode "IADD" not intercepted by bare-space sugar (opcode=21)',
+            opcode === 21, `got opcode=${opcode}, errors=${result.errors.map(e => e.message).join('; ')}`);
+    }
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);
