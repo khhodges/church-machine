@@ -1,159 +1,154 @@
 'use strict';
-
 /**
- * server/compile_worker.js — Node.js stdin→stdout compile worker
+ * server/compile_worker.js — CLOOMC / Assembly compile subprocess worker
  *
- * Protocol
- * --------
- *   stdin:  one JSON object (the compile request)
- *   stdout: one JSON object (the compile response)
- *   exit:   always 0 — errors live in the JSON, not the exit code
+ * Reads one JSON object from stdin:
+ *   { source: string, language: string, namespace_hint?: { allocation_words?: number }, ... }
  *
- * Request fields
- * --------------
- *   source           string   required  Raw source text
- *   language         string   required  One of: english | javascript | haskell |
- *                                       symbolic | lambda | assembly
- *   abstraction_name string   optional  Overrides name detected from source
- *   namespace_hint   object   optional  {gt_type, allocation_words, clist_slots}
- *   (any extra fields are silently ignored)
+ * Writes one JSON object to stdout:
+ *   Success: { ok: true,  language, abstractionName, methods, words, lump_binary, warnings }
+ *   Failure: { ok: false, language, error, errors? }
  *
- * Response fields — success
- * -------------------------
- *   ok           true
- *   language     string    detected/normalised language name
- *   words        number[]  raw uint32 lump word array
- *   lump_binary  string    base64 of the same binary (for clients that prefer bytes)
- *   warnings     object[]  present when there are soft warnings (may be [])
+ * Language routing:
+ *   "assembly"    → CLOOMCCompiler.compileAssembly()  (needs ChurchAssembler shim)
+ *   "symbolic"    → CLOOMCCompiler.compileSymbolic()  (stateless; always fails w/o session)
+ *   "lambda"      → CLOOMCCompiler.compileLambda()
+ *   "haskell"     → CLOOMCCompiler.compileHaskell()
+ *   "javascript"  → CLOOMCCompiler.compileJS()
+ *   "english"     → CLOOMCCompiler.compile() auto-detect so that both natural-English
+ *                   prose and CLOOMC++ source (abstraction Name { ... }) are accepted
+ *   "auto"        → CLOOMCCompiler.compile() auto-detect
  *
- * Response fields — failure
- * -------------------------
- *   ok       false
- *   language string   (echo of request language, or "")
- *   error    string   human-readable compile error
+ * IMPORTANT: global.ChurchAssembler must be set before requiring CLOOMCCompiler
+ * because compileAssembly() checks typeof ChurchAssembler as a bare global lookup.
+ * See memory note: church-assembler-node-shim.md
  */
 
 const path = require('path');
 
-// ChurchAssembler must be a global before requiring the compiler so that
-// compileAssembly()'s `typeof ChurchAssembler !== 'undefined'` guard passes.
-// (The browser loads it as a <script> global; Node needs this explicit shim.)
-global.ChurchAssembler = require(path.join(__dirname, '..', 'simulator', 'assembler.js'));
+// ── Set up global shim before loading the compiler ──────────────────────────
+const SIM_DIR = path.join(__dirname, '..', 'simulator');
 
-const CLOOMCCompiler = require(path.join(__dirname, '..', 'simulator', 'cloomc_compiler.js'));
-const { buildLump }  = require(path.join(__dirname, '..', 'simulator', 'lump_builder.js'));
+global.ChurchAssembler = require(path.join(SIM_DIR, 'assembler.js'));
+const CLOOMCCompiler   = require(path.join(SIM_DIR, 'cloomc_compiler.js'));
+const { buildLump }    = require(path.join(SIM_DIR, 'lump_builder.js'));
 
-const LANG_MAP = {
-    'english'    : 'compileEnglish',
-    'javascript' : 'compileJS',
-    'haskell'    : 'compileHaskell',
-    'symbolic'   : 'compileSymbolic',
-    'lambda'     : 'compileLambda',
-    'assembly'   : 'compileAssembly',
-};
-
-const UNRESOLVED_PATTERNS = [
-    /not in capabilities list/i,
-    /not a known method/i,
-    /unknown abstraction/i,
-    /undeclared symbol/i,
-    /no binding/i,
-];
-
-function isUnresolvedError(err) {
-    const msg = err.message || '';
-    return UNRESOLVED_PATTERNS.some(p => p.test(msg));
+// ── Language → compiler method mapping ───────────────────────────────────────
+// "english" uses compile() auto-detect so that CLOOMC++ syntax (abstraction Name
+// { method ... }) compiles successfully, matching what the live API tests send.
+// All other named languages use their dedicated compiler path for correct semantics.
+function dispatch(compiler, language, source) {
+    switch (language) {
+        case 'assembly':   return compiler.compileAssembly(source);
+        case 'javascript': return compiler.compileJS(source);
+        case 'haskell':    return compiler.compileHaskell(source);
+        case 'lambda':     return compiler.compileLambda(source);
+        case 'symbolic':   return compiler.compileSymbolic(source);
+        // english + auto: use full auto-detect so CLOOMC++ and English prose both work
+        case 'english':
+        case 'auto':
+        default:           return compiler.compile(source);
+    }
 }
 
-function wordsToBase64(words) {
-    const buf = Buffer.alloc(words.length * 4);
+// ── Read stdin ────────────────────────────────────────────────────────────────
+let raw = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', chunk => { raw += chunk; });
+process.stdin.on('end', () => {
+    let payload;
+    try {
+        payload = JSON.parse(raw);
+    } catch (err) {
+        write({ ok: false, language: '', error: `Invalid JSON input: ${err.message}` });
+        return;
+    }
+
+    const source   = (payload.source   || '').toString();
+    const language = (payload.language || 'auto').toString().toLowerCase();
+
+    if (!source.trim()) {
+        write({ ok: false, language, error: '`source` must be a non-empty string' });
+        return;
+    }
+
+    let compileResult;
+    try {
+        const compiler = new CLOOMCCompiler();
+        compileResult  = dispatch(compiler, language, source);
+    } catch (err) {
+        write({ ok: false, language, error: `Compiler threw an exception: ${err.message}` });
+        return;
+    }
+
+    // ── Compile errors ───────────────────────────────────────────────────────
+    const errors   = compileResult.errors   || [];
+    const warnings = compileResult.warnings || [];
+
+    if (errors.length > 0) {
+        // Normalise errors to {line, message} objects
+        const normErrors = errors.map(e =>
+            (e && typeof e === 'object' && 'message' in e)
+                ? { line: e.line || 0, message: String(e.message) }
+                : { line: 0, message: String(e) }
+        );
+        write({
+            ok:       false,
+            language: compileResult.language || language,
+            error:    normErrors.map(e => `L${e.line}: ${e.message}`).join('\n'),
+            errors:   normErrors,
+            warnings,
+        });
+        return;
+    }
+
+    // ── Build LUMP binary ────────────────────────────────────────────────────
+    // Forward namespace_hint.allocation_words so callers can request a specific
+    // lump size (must be a power of 2, >= 64).
+    const nsHint   = payload.namespace_hint || {};
+    const lumpOpts = {};
+    if (nsHint.allocation_words && Number.isInteger(nsHint.allocation_words) &&
+            nsHint.allocation_words >= 64) {
+        lumpOpts.allocationWords = nsHint.allocation_words;
+    }
+
+    let lumpResult;
+    try {
+        lumpResult = buildLump(compileResult, lumpOpts);
+    } catch (err) {
+        write({ ok: false, language, error: `LUMP packing failed: ${err.message}` });
+        return;
+    }
+
+    const words = lumpResult.words;    // number[] — uint32 values
+
+    // Encode as big-endian binary (Church Machine native byte order)
+    const buf = Buffer.allocUnsafe(words.length * 4);
     for (let i = 0; i < words.length; i++) {
         buf.writeUInt32BE(words[i] >>> 0, i * 4);
     }
-    return buf.toString('base64');
-}
+    const lump_binary = buf.toString('base64');
 
-function failResp(language, message) {
-    return { ok: false, language: language || '', error: message };
-}
+    // Summarise methods for the caller (include aliasOf for alias entries)
+    const methods = (compileResult.methods || []).map(m => ({
+        name:       m.name,
+        visibility: m.visibility || 'public',
+        ...(m.aliasOf ? { aliasOf: m.aliasOf } : {}),
+    }));
 
-function run(req) {
-    const source          = req.source          || '';
-    const language        = req.language         || '';
-    const abstractionName = req.abstraction_name || null;
-    const namespaceHint   = req.namespace_hint   || {};
-
-    const compiler = new CLOOMCCompiler();
-
-    let result;
-    try {
-        const method = LANG_MAP[language];
-        if (method && typeof compiler[method] === 'function') {
-            result = compiler[method](source, []);
-        } else {
-            result = compiler.compile(source, []);
-        }
-    } catch (ex) {
-        return failResp(language, `Internal compiler error: ${ex.message}`);
-    }
-
-    const allErrors   = result.errors   || [];
-    const allWarnings = result.warnings  || [];
-
-    const hardErrors   = [];
-    const softWarnings = [];
-
-    for (const err of allErrors) {
-        if (isUnresolvedError(err)) {
-            softWarnings.push({
-                line:        err.line    || null,
-                message:     err.message,
-                severity:    'warning',
-                resolve_via: 'lazy_resolve',
-            });
-        } else {
-            hardErrors.push(err);
-        }
-    }
-    for (const w of allWarnings) {
-        softWarnings.push({ line: w.line || null, message: w.message, severity: 'warning' });
-    }
-
-    if (hardErrors.length > 0) {
-        const first = hardErrors[0].message;
-        return failResp(language, first || 'Compile failed');
-    }
-
-    const { words } = buildLump(result, {
-        allocationWords: namespaceHint.allocation_words,
-    });
-
-    const detectedLang = result.language || language || 'assembly';
-    const lump_binary  = wordsToBase64(words);
-
-    return {
-        ok:          true,
-        language:    detectedLang,
-        words:       Array.from(words.map(w => w >>> 0)),
+    write({
+        ok:              true,
+        language:        compileResult.language || language,
+        abstractionName: compileResult.abstractionName || '',
+        methods,
+        words:           Array.from(words),   // plain JS array for JSON serialisation
         lump_binary,
-        warnings:    softWarnings,
-    };
-}
-
-let inputData = '';
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', chunk => { inputData += chunk; });
-process.stdin.on('end', () => {
-    let req;
-    try {
-        req = JSON.parse(inputData);
-    } catch (ex) {
-        process.stdout.write(JSON.stringify(
-            failResp('', 'Invalid JSON request')
-        ) + '\n');
-        process.exit(0);
-    }
-    const resp = run(req);
-    process.stdout.write(JSON.stringify(resp) + '\n');
-    process.exit(0);
+        warnings:        warnings.map(w =>
+            (w && typeof w === 'object' && 'message' in w) ? w : { message: String(w) }
+        ),
+    });
 });
+
+function write(obj) {
+    process.stdout.write(JSON.stringify(obj) + '\n');
+}
