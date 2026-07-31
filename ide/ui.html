@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLOOMC IDE</title>
+<style>
+  /* Type: IBM Plex Mono throughout. This is an instrument for reading
+     32-bit words — a proportional face would misalign every hash and
+     header. The display weight carries the personality instead. */
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
+
+  :root {
+    --ink:      #12100c;
+    --paper:    #efece3;
+    --rule:     #cfc9ba;
+    --dim:      #7c7466;
+    --gold:     #a37e2c;   /* bound, live, verified */
+    --null:     #b3452e;   /* null GT — pending, not broken */
+    --deep:     #1c2b2b;
+    --sel:      #e3ddcd;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    font: 400 13px/1.55 'IBM Plex Mono', ui-monospace, monospace;
+    background: var(--paper);
+    color: var(--ink);
+    font-variant-ligatures: none;
+  }
+
+  /* ── frame ─────────────────────────────────────────────────────── */
+
+  header {
+    border-bottom: 1px solid var(--ink);
+    padding: 14px 20px 12px;
+    display: flex;
+    align-items: baseline;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  h1 {
+    font-size: 15px; font-weight: 600; margin: 0;
+    letter-spacing: .14em; text-transform: uppercase;
+  }
+  .whoami { color: var(--dim); font-size: 11px; margin-left: auto; }
+  .whoami b { color: var(--ink); font-weight: 500; }
+  .offline { color: var(--null); }
+
+  nav { display: flex; gap: 0; border-bottom: 1px solid var(--rule); }
+  nav button {
+    font: inherit; font-size: 11px; letter-spacing: .12em;
+    text-transform: uppercase;
+    background: none; border: none; border-bottom: 2px solid transparent;
+    padding: 11px 20px; cursor: pointer; color: var(--dim);
+  }
+  nav button:hover { color: var(--ink); }
+  nav button[aria-selected="true"] {
+    color: var(--ink); border-bottom-color: var(--gold);
+  }
+  nav button:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+
+  main { padding: 22px 20px 60px; max-width: 1180px; }
+  [hidden] { display: none !important; }
+
+  /* ── shared ────────────────────────────────────────────────────── */
+
+  .lede {
+    color: var(--dim); max-width: 62ch; margin: 0 0 22px;
+    font-size: 12px; line-height: 1.7;
+  }
+  .empty {
+    border: 1px dashed var(--rule); padding: 28px 22px;
+    color: var(--dim); max-width: 62ch;
+  }
+  .empty b { color: var(--ink); font-weight: 500; }
+
+  .hash { color: var(--dim); font-size: 11px; letter-spacing: .02em; }
+  .tag {
+    font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+    padding: 2px 6px; border: 1px solid currentColor;
+  }
+  .tag.live    { color: var(--gold); }
+  .tag.waiting { color: var(--null); }
+
+  button.act {
+    font: inherit; font-size: 11px; letter-spacing: .08em;
+    text-transform: uppercase; padding: 7px 14px; cursor: pointer;
+    background: var(--ink); color: var(--paper); border: 1px solid var(--ink);
+  }
+  button.act:hover { background: var(--deep); border-color: var(--deep); }
+  button.act[disabled] { opacity: .4; cursor: default; }
+  button.act.quiet { background: none; color: var(--ink); }
+  button.act.quiet:hover { background: var(--sel); }
+  button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  /* ── names ─────────────────────────────────────────────────────── */
+
+  .names { border-top: 1px solid var(--ink); }
+  .row {
+    border-bottom: 1px solid var(--rule);
+    padding: 13px 4px; cursor: pointer;
+    display: grid; grid-template-columns: 1fr auto; gap: 6px 16px;
+  }
+  .row:hover { background: var(--sel); }
+  .row .n { font-weight: 500; }
+  .row .n em { font-style: normal; color: var(--dim); }
+  .row .meta { grid-column: 1 / -1; color: var(--dim); font-size: 11px; }
+
+  /* ── version history — the signature element ───────────────────── */
+
+  /* A name is not a file with edits. It is a binding that has meant a
+     series of different things. The spine renders that literally: each
+     mark is one meaning, the last one is what the name means now. */
+  .detail { border-top: 1px solid var(--ink); padding-top: 18px; }
+  .detail h2 { font-size: 14px; font-weight: 600; margin: 0 0 4px; }
+  .detail .sub { color: var(--dim); font-size: 11px; margin-bottom: 24px; }
+
+  .spine { position: relative; margin-left: 7px; padding-left: 26px; }
+  .spine::before {
+    content: ''; position: absolute; left: 0; top: 6px; bottom: 12px;
+    width: 1px; background: var(--rule);
+  }
+  .ver { position: relative; padding: 0 0 26px; }
+  .ver::before {
+    content: ''; position: absolute; left: -30px; top: 5px;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--paper); border: 1px solid var(--dim);
+  }
+  .ver.current::before { background: var(--gold); border-color: var(--gold); }
+  .ver .vh { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .ver .vn { font-weight: 600; }
+  .ver .note { color: var(--dim); }
+  .ver .fields {
+    margin-top: 8px; color: var(--dim); font-size: 11px;
+    display: flex; gap: 18px; flex-wrap: wrap;
+  }
+  .ver .fields b { color: var(--ink); font-weight: 400; }
+
+  .clist { margin-top: 10px; display: flex; gap: 5px; flex-wrap: wrap; }
+  pre.src {
+    margin: 10px 0 0; padding: 12px 14px; background: #f7f5ef;
+    border: 1px solid var(--rule); border-left: 2px solid var(--gold);
+    font: inherit; font-size: 11px; line-height: 1.65;
+    white-space: pre-wrap; overflow-x: auto; color: var(--ink);
+  }
+  .slot {
+    font-size: 10px; padding: 3px 7px;
+    border: 1px solid var(--rule); color: var(--dim);
+  }
+  .slot.null { color: var(--null); border-color: var(--null); border-style: dashed; }
+
+  /* ── compose ───────────────────────────────────────────────────── */
+
+  .compose { display: grid; grid-template-columns: 1.25fr 1fr; gap: 26px; }
+  @media (max-width: 900px) { .compose { grid-template-columns: 1fr; } }
+
+  label {
+    display: block; font-size: 10px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--dim); margin: 0 0 6px;
+  }
+  input, textarea, select {
+    font: inherit; width: 100%; padding: 9px 11px;
+    background: #f7f5ef; border: 1px solid var(--rule); color: var(--ink);
+  }
+  input:focus, textarea:focus, select:focus {
+    outline: none; border-color: var(--gold); background: #fff;
+  }
+  textarea { min-height: 300px; resize: vertical; line-height: 1.6; }
+  .field { margin-bottom: 16px; }
+  .pair { display: grid; grid-template-columns: 1fr 150px; gap: 12px; }
+
+  .result { border: 1px solid var(--ink); padding: 16px; margin-top: 4px; }
+  .result h3 {
+    font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+    margin: 0 0 12px; color: var(--dim);
+  }
+  .result.bad { border-color: var(--null); }
+  .result.bad h3 { color: var(--null); }
+  .result .msg { white-space: pre-wrap; }
+  .result dl {
+    margin: 12px 0 0; display: grid;
+    grid-template-columns: auto 1fr; gap: 5px 14px; font-size: 11px;
+  }
+  .result dt { color: var(--dim); }
+  .result dd { margin: 0; }
+
+  .identity-line {
+    margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule);
+    font-size: 11px; color: var(--dim); word-break: break-all;
+  }
+  .identity-line b { color: var(--gold); font-weight: 500; }
+
+  /* ── resolve ───────────────────────────────────────────────────── */
+
+  .waiting-item {
+    border-left: 2px solid var(--null); padding: 12px 0 12px 16px;
+    margin-bottom: 14px; cursor: pointer;
+  }
+  .waiting-item:hover { background: var(--sel); }
+  .waiting-item .n { font-weight: 500; }
+  .waiting-item .d { color: var(--dim); font-size: 11px; margin-top: 3px; }
+  .complete-list { margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--rule); }
+  .complete-list div { color: var(--dim); padding: 5px 0; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .row, .waiting-item, nav button { transition: background .12s, color .12s; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>CLOOMC</h1>
+  <span class="hash">compile → hash → seal → bind</span>
+  <span class="whoami" id="whoami"></span>
+</header>
+
+<nav role="tablist">
+  <button role="tab" data-view="names"   aria-selected="true">Names</button>
+  <button role="tab" data-view="compose" aria-selected="false">Compose</button>
+  <button role="tab" data-view="resolve" aria-selected="false">Resolve</button>
+</nav>
+
+<main>
+  <!-- NAMES -->
+  <section id="v-names">
+    <p class="lede">
+      Every name and what it currently means. A name is a binding, not a file —
+      changing it mints a new Lump and points the name at it. Nothing is edited
+      in place, so every past meaning stays fetchable.
+    </p>
+    <div id="names-list"></div>
+    <div id="names-detail"></div>
+  </section>
+
+  <!-- COMPOSE -->
+  <section id="v-compose" hidden>
+    <p class="lede">
+      Write a Method, compile it, give it a name. The hash is the version —
+      identical source produces an identical hash, so there is nothing to
+      number.
+    </p>
+    <div class="compose">
+      <div>
+        <div class="field">
+          <label for="src">Source</label>
+          <textarea id="src" spellcheck="false"
+                    placeholder="abstraction Registry:&#10;  capabilities { Mint, Memory }&#10;  Add():&#10;    ..."></textarea>
+        </div>
+        <div class="pair">
+          <div class="field">
+            <label for="nm">Bind to name (optional)</label>
+            <input id="nm" placeholder="cloomc.lab.registry.EventRouter"
+                   spellcheck="false">
+          </div>
+          <div class="field">
+            <label for="lang">Language</label>
+            <select id="lang">
+              <option value="assembly" selected>assembly</option>
+              <option value="english">english</option>
+              <option value="javascript">javascript</option>
+              <option value="haskell">haskell</option>
+              <option value="symbolic">symbolic</option>
+              <option value="lambda">lambda</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="smode">Source</label>
+            <select id="smode">
+              <option value="full" selected>FULL — all source</option>
+              <option value="dna">DNA — code + capabilities</option>
+              <option value="none">NONE — omit source</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="note">Note</label>
+          <input id="note" placeholder="what changed" spellcheck="false">
+        </div>
+        <button class="act" id="go">Compile</button>
+      </div>
+      <div id="out"></div>
+    </div>
+  </section>
+
+  <!-- RESOLVE -->
+  <section id="v-resolve" hidden>
+    <p class="lede">
+      Lumps that declare a capability the namespace has not bound yet. The
+      compiler does not report these and is right not to — a declared
+      capability with a null Golden Token is a valid, deployable state, and
+      binding it is load-time work. This is that work.
+    </p>
+    <div id="resolve-list"></div>
+  </section>
+</main>
+
+<script>
+const $  = s => document.querySelector(s);
+const el = (t, c, x) => { const n = document.createElement(t);
+  if (c) n.className = c; if (x !== undefined) n.textContent = x; return n; };
+const api = async (p, o) => (await fetch(p, o)).json();
+const post = (p, b) => api(p, { method: 'POST',
+  headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
+const short = h => h ? h.slice(0, 16) + '…' : '—';
+const when  = t => new Date(t * 1000).toLocaleString(undefined,
+  { dateStyle: 'medium', timeStyle: 'short' });
+
+/* views */
+document.querySelectorAll('nav button').forEach(b =>
+  b.onclick = () => show(b.dataset.view));
+
+function show(v) {
+  document.querySelectorAll('nav button').forEach(b =>
+    b.setAttribute('aria-selected', String(b.dataset.view === v)));
+  ['names', 'compose', 'resolve'].forEach(x =>
+    $('#v-' + x).hidden = x !== v);
+  if (v === 'names')   loadNames();
+  if (v === 'resolve') loadResolve();
+}
+
+/* identity */
+api('/api/identity').then(i => {
+  $('#whoami').innerHTML =
+    `signing as <b>${i.signer}</b> · ` +
+    (i.offline ? '<span class="offline">offline compiler</span>'
+               : i.endpoint.replace(/^https?:\/\//, ''));
+});
+
+/* ── names ─────────────────────────────────────────────────────── */
+
+async function loadNames() {
+  const list = $('#names-list'), detail = $('#names-detail');
+  detail.innerHTML = '';
+  const names = await api('/api/names');
+  list.innerHTML = '';
+
+  if (!names.length) {
+    const e = el('div', 'empty');
+    e.innerHTML = 'Nothing bound yet. Write a Method in <b>Compose</b>, ' +
+                  'give it a name, and it will appear here with its history.';
+    list.append(e);
+    return;
+  }
+
+  const wrap = el('div', 'names');
+  names.forEach(n => {
+    const row = el('div', 'row');
+    row.onclick = () => openName(n.name);
+
+    const nm = el('div', 'n');
+    nm.append(document.createTextNode(n.name));
+    if (n.versions > 1) nm.append(el('em', null, `  ·  ${n.versions} versions`));
+    row.append(nm);
+
+    row.append(el('span', 'tag ' + (n.pending.length ? 'waiting' : 'live'),
+      n.pending.length ? `${n.pending.length} unbound` : 'live'));
+
+    const m = el('div', 'meta');
+    m.textContent = `sha256:${short(n.hash)}` +
+      (n.header ? `  ·  ${n.header.typ_name}  ·  ${n.header.size_words}w` +
+                  `  ·  cw ${n.header.cw}  ·  cc ${n.header.cc}` : '') +
+      (n.note ? `  ·  ${n.note}` : '');
+    row.append(m);
+
+    wrap.append(row);
+  });
+  list.append(wrap);
+}
+
+async function openName(name) {
+  const d = await api('/api/name/' + encodeURIComponent(name));
+  const box = $('#names-detail');
+  box.innerHTML = '';
+  if (d.error) { box.append(el('div', 'empty', d.error)); return; }
+
+  const wrap = el('div', 'detail');
+  wrap.append(el('h2', null, d.name));
+  wrap.append(el('div', 'sub',
+    `${d.versions.length} binding${d.versions.length > 1 ? 's' : ''} — ` +
+    'everything this name has meant, oldest first'));
+
+  const spine = el('div', 'spine');
+  d.versions.forEach(v => {
+    const row = el('div', 'ver' + (v.current ? ' current' : ''));
+
+    const h = el('div', 'vh');
+    h.append(el('span', 'vn', `${v.index}`));
+    h.append(el('span', 'hash', 'sha256:' + short(v.hash)));
+    if (v.current) h.append(el('span', 'tag live', 'current'));
+    if (v.note)    h.append(el('span', 'note', v.note));
+    row.append(h);
+
+    const f = el('div', 'fields');
+    const add = (k, val) => {
+      const s = el('span'); s.append(document.createTextNode(k + ' '));
+      s.append(el('b', null, val)); f.append(s);
+    };
+    add('bound', when(v.bound_at));
+    add('by', v.signer);
+    if (v.header) {
+      add('typ', v.header.typ_name);
+      add('size', v.header.size_words + 'w');
+      add('code', v.header.cw + 'w');
+    }
+    add('seal', v.seal_ok ? 'verified' : 'unverified');
+    row.append(f);
+
+    if (v.clist && v.clist.length) {
+      const c = el('div', 'clist');
+      v.clist.forEach((gt, i) => {
+        const isNull = /^0x0+$/.test(gt);
+        c.append(el('span', 'slot' + (isNull ? ' null' : ''),
+          `${i}: ${isNull ? 'null' : gt}`));
+      });
+      row.append(c);
+    }
+
+    if (v.source) {
+      const t = el('button', 'act quiet', 'Source');
+      t.style.marginTop = '10px';
+      const pre = el('pre', 'src');
+      pre.textContent = v.source;
+      pre.hidden = true;
+      t.onclick = () => { pre.hidden = !pre.hidden;
+        t.textContent = pre.hidden ? 'Source' : 'Hide source'; };
+      row.append(t, pre);
+    } else if (v.source_format && v.source_format !== 'none') {
+      row.append(el('div', 'fields', 'source ' + v.source_format));
+    }
+
+    if (!v.current) {
+      const b = el('button', 'act quiet', 'Rebind to this');
+      b.style.marginTop = '10px';
+      b.onclick = async () => {
+        const steps = d.versions.length - v.index;
+        const r = await post('/api/rollback', { name: d.name, steps });
+        if (r.ok) { await loadNames(); openName(d.name); }
+        else alert(r.error);
+      };
+      row.append(b);
+    }
+    spine.append(row);
+  });
+
+  wrap.append(spine);
+  box.append(wrap);
+  wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/* ── compose ───────────────────────────────────────────────────── */
+
+$('#go').onclick = async () => {
+  const btn = $('#go'), out = $('#out');
+  const source = $('#src').value;
+  if (!source.trim()) { out.innerHTML = ''; $('#src').focus(); return; }
+
+  btn.disabled = true; btn.textContent = 'Compiling…';
+  let r;
+  try {
+    r = await post('/api/compile', {
+      source, name: $('#nm').value.trim(),
+      language: $('#lang').value, source_mode: $('#smode').value,
+      note: $('#note').value.trim() });
+  } finally {
+    btn.disabled = false; btn.textContent = 'Compile';
+  }
+
+  out.innerHTML = '';
+  const box = el('div', 'result' + (r.ok && !r.rejected ? '' : ' bad'));
+
+  if (!r.ok) {
+    box.append(el('h3', null, r.transport ? 'Cannot reach compiler'
+                                          : 'Compile failed'));
+    box.append(el('div', 'msg', r.error));
+  } else if (r.rejected) {
+    box.append(el('h3', null, 'Compiled, but not stored'));
+    box.append(el('div', 'msg', r.rejected));
+    const p = el('div', 'identity-line');
+    p.textContent = 'The source compiled, but the header is not valid — ' +
+      'so the Lump has no identity and no name can point at it. ' +
+      'This usually means an encoder wrote a header field wrongly.';
+    box.append(p);
+  } else {
+    box.append(el('h3', null, r.bound ? 'Compiled and bound' : 'Compiled'));
+    const dl = el('dl');
+    const put = (k, v) => { dl.append(el('dt', null, k), el('dd', null, v)); };
+    put('language', r.language || 'assembly');
+    put('source', (r.source_mode || 'full').toUpperCase());
+    put('type', r.header.typ_name);
+    put('size', r.header.size_words + ' words');
+    put('code', r.header.cw + ' words');
+    put('c-list', r.header.cc + ' slots');
+    if (r.pending.length)
+      put('unbound', 'slot ' + r.pending.join(', '));
+    box.append(dl);
+
+    const id = el('div', 'identity-line');
+    id.innerHTML = 'identity <b>sha256:' + r.hash + '</b>';
+    box.append(id);
+
+    if (r.genotype) {
+      const g = el('div', 'identity-line');
+      g.innerHTML = 'genotype <b>sha256:' + r.genotype + '</b>';
+      g.style.color = 'var(--church, #6b5)';
+      g.title = 'the species identity — code and c-list, source excluded. ' +
+                'FULL, DNA and NONE forms of this program share it.';
+      box.append(g);
+    }
+
+    if (r.source_note) {
+      const sn = el('div', 'identity-line');
+      sn.textContent = r.source_note;
+      if (r.source_note.includes('not embedded')) sn.style.color = 'var(--null)';
+      box.append(sn);
+    }
+
+    if (r.pending.length) {
+      const n = el('div', 'identity-line');
+      n.textContent = `${r.pending.length} declared capability slot(s) ` +
+        'hold a null Golden Token. That is a valid deployable state — ' +
+        'see Resolve.';
+      box.append(n);
+    }
+  }
+  out.append(box);
+};
+
+/* ── resolve ───────────────────────────────────────────────────── */
+
+async function loadResolve() {
+  const d = await api('/api/resolve');
+  const box = $('#resolve-list');
+  box.innerHTML = '';
+
+  if (!d.waiting.length) {
+    const e = el('div', 'empty');
+    e.innerHTML = d.complete.length
+      ? `Nothing waiting. All <b>${d.complete.length}</b> bound ` +
+        'Lump(s) have every declared capability filled.'
+      : 'Nothing bound yet.';
+    box.append(e);
+  } else {
+    d.waiting.forEach(w => {
+      const it = el('div', 'waiting-item');
+      it.onclick = () => { show('names'); setTimeout(() => openName(w.name), 60); };
+      it.append(el('div', 'n', w.name));
+      it.append(el('div', 'd',
+        `c-list slot ${w.slots.join(', ')} — null Golden Token, awaiting bind`));
+      box.append(it);
+    });
+  }
+
+  if (d.complete.length) {
+    const c = el('div', 'complete-list');
+    c.append(el('label', null, 'fully bound'));
+    d.complete.forEach(n => c.append(el('div', null, n)));
+    box.append(c);
+  }
+}
+
+show('names');
+</script>
+</body>
+</html>
