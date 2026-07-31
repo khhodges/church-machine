@@ -9,7 +9,7 @@ echo "Post-merge setup complete (no dependencies to install)"
 LOCK_FILE="/tmp/church-post-merge.lock"
 
 (
-    flock -w 80 9 || { echo "post-merge: lock wait timed out — skipping GitHub sync"; exit 0; }
+    flock -w 30 9 || { echo "post-merge: lock wait timed out — skipping GitHub sync"; exit 0; }
 
     # Push to GitHub so the mirror never goes stale.
     # Requires GITHUB_PAT secret — see scripts/sync-to-github.sh for details.

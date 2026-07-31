@@ -1,7 +1,15 @@
 ---
 name: Ti60 SoC UART clockDivider
-description: Sapphire SoC UART baud config, clock architecture, and working firmware pattern for Ti60F225
+description: Sapphire SoC UART baud config for Ti60F225. Wukong A7 uses Amaranth UartTx with parameterized divisor — NO CLOCKDIV register involved.
 ---
+
+## ⚠️ Wukong A7 — completely different mechanism
+
+The Wukong uses Amaranth `UartTx(clk_freq=50_000_000, baud=57_600)`.
+Divisor is computed at elaboration time: `divisor = 50_000_000 // 57_600 = 868`.
+Actual baud = 57,603.7 Hz (0.006% error). There is **no CLOCKDIV register** — the
+Amaranth module embeds the counter at synthesis. The Ti60 CLOCKDIV=53 figure below
+is **Ti60 Sapphire RISC-V firmware only** and has nothing to do with the Wukong.
 
 ## Clock Architecture (Ti60F225 Devkit) — CONFIRMED WORKING
 

@@ -957,6 +957,146 @@ class ChurchAssembler {
                 }
             }
 
+            // ── Bare-space method call sugar: AbsName MethodName [Arg …] ─────────
+            // "SelfTest Run"              expands to: ELOADCALL CR0, SelfTest, Run
+            // "SelfTest Run MyArg"        expands to: LOAD CR2, MyArg
+            //                                         ELOADCALL CR0, SelfTest, Run
+            // "SelfTest Run A1 A2"        expands to: LOAD CR2, A1
+            //                                         LOAD CR3, A2
+            //                                         ELOADCALL CR0, SelfTest, Run
+            //
+            // Rules:
+            //   · Matches lines whose first two tokens are bare identifiers (no dots,
+            //     no parens, no commas).  Optional space-separated argument tokens may
+            //     follow the method name.
+            //   · If the first token is a real opcode mnemonic (with or without a
+            //     condition-code suffix), the block is skipped so existing instructions
+            //     are unaffected — no regression for any two-word instruction form.
+            //   · If the first token is a known abstraction and the second is a known
+            //     method, expands to [LOAD …] + ELOADCALL CR0, AbsName, MethodName.
+            //   · Arguments are resolved using the method convention's input spec
+            //     (same register-slot rules as the dot-paren bare-call sugar):
+            //       – CR args: LOAD CRn, Name emitted when the name resolves in NS;
+            //                  explicit CRn tokens bypass the LOAD.
+            //       – DR args: data values — cannot be auto-loaded; same targeted error
+            //                  as the dot-paren form.
+            //   · If the abstraction is known but the method is not, a targeted error
+            //     lists the known methods — same UX as the dot-paren sugar.
+            //   · If the first token is not a known abstraction, falls through unchanged
+            //     to the normal "unknown instruction" error path.
+            {
+                const bsMatch = line.match(/^([A-Za-z]\w*)\s+([A-Za-z]\w*)(\s+.*)?$/);
+                if (bsMatch) {
+                    const tok0upper = bsMatch[1].toUpperCase();
+                    // Skip if the first token is a real opcode (optionally +condition).
+                    let _isRealOpcode = false;
+                    for (const name of Object.keys(this.opcodes)) {
+                        if (tok0upper === name) { _isRealOpcode = true; break; }
+                        if (tok0upper.startsWith(name)) {
+                            const _suf = tok0upper.substring(name.length);
+                            if (this.conditions[_suf] !== undefined) { _isRealOpcode = true; break; }
+                        }
+                    }
+                    // Also skip pass-1-only pseudo-instructions.
+                    if (!_isRealOpcode && (tok0upper === 'NOP' || tok0upper === 'HALT' ||
+                            /^MVN([A-Z]{2})?$/.test(tok0upper) || tok0upper === 'PETNAME')) {
+                        _isRealOpcode = true;
+                    }
+                    if (!_isRealOpcode) {
+                        const _bsAbs  = bsMatch[1];
+                        const _bsMeth = bsMatch[2];
+                        const _bsConv = this.methodConventions[_bsAbs];
+                        if (_bsConv) {
+                            if (!_bsConv[_bsMeth]) {
+                                const _known = Object.keys(_bsConv).join(', ');
+                                this.errors.push({ line: lineNum + 1, ...this._tokenCols(line, _bsMeth), message:
+                                    `"${_bsMeth}" is not a known method of ${_bsAbs}. Known methods: ${_known}.` });
+                                continue;
+                            }
+                            // Parse optional space-separated argument tokens.
+                            const _argsRaw = (bsMatch[3] || '').trim();
+                            const _args = _argsRaw ? _argsRaw.split(/\s+/).filter(Boolean) : [];
+                            if (_args.length > 0) {
+                                // Resolve each argument against the method convention input spec,
+                                // applying the same CR/DR rules as the dot-paren bare-call sugar.
+                                const _methodEntry = _bsConv[_bsMeth];
+                                const _inputSpec   = _methodEntry.input || '';
+                                const _regOrder = [];
+                                const _regRe = /\b(CR|DR)(\d+)=/g;
+                                let _rm;
+                                while ((_rm = _regRe.exec(_inputSpec)) !== null) {
+                                    _regOrder.push({ type: _rm[1], n: parseInt(_rm[2]) });
+                                }
+                                for (let _ai = 0; _ai < _args.length; _ai++) {
+                                    const _arg = _args[_ai];
+                                    const _reg = _regOrder[_ai];
+                                    if (!_reg) continue; // extra arg beyond spec — skip silently
+                                    if (_reg.type === 'CR') {
+                                        if (/^CR\d+$/i.test(_arg)) {
+                                            // Explicit CRn supplied — caller pre-loaded it; no LOAD needed.
+                                        } else if (this._resolveNSName(_arg) !== null) {
+                                            // Known namespace abstraction — emit LOAD shorthand.
+                                            instructions.push({ line: `LOAD CR${_reg.n}, ${_arg}`, lineNum: lineNum + 1,
+                                                comment: `${_bsAbs} ${_bsMeth} ${_argsRaw} \u2190 LOAD ${_arg}` });
+                                        } else {
+                                            // Runtime GT not in namespace — targeted error.
+                                            const _knownSlot = (this._clistSlots && this._clistSlots[_arg] !== undefined)
+                                                ? this._clistSlots[_arg] : null;
+                                            const _slotHint = _knownSlot !== null
+                                                ? `CR6[0x${_knownSlot.toString(16).toUpperCase().padStart(4,'0')}]`
+                                                : `CR6[0x…]   ; find "${_arg}"'s slot in the C-List viewer`;
+                                            this.errors.push({ line: lineNum + 1, ...this._tokenCols(this._currentLineText, _arg), message:
+                                                `Argument ${_ai + 1} of ${_bsAbs}.${_bsMeth}() maps to CR${_reg.n}, which holds a capability GT. ` +
+                                                `"${_arg}" is not declared as a capability — add it to your capabilities block:\n` +
+                                                `  capabilities { ${_arg} }\n` +
+                                                `Then ${_bsAbs} ${_bsMeth} ${_arg} will compile directly.\n` +
+                                                `Alternatively, if "${_arg}" is already named in the C-List viewer, load it first:\n` +
+                                                `  LOAD  CR${_reg.n}, ${_slotHint}\n` +
+                                                `  ${_bsAbs} ${_bsMeth}(CR${_reg.n})` });
+                                        }
+                                    } else {
+                                        // DR argument — data value, cannot be auto-loaded from a name.
+                                        const _isNumericLiteral = /^-?\d+$/.test(_arg) || /^0x[0-9a-fA-F]+$/i.test(_arg);
+                                        const _isCharLiteral    = /^'.'$/.test(_arg);
+                                        if (_isNumericLiteral || _isCharLiteral) {
+                                            const _rawValue = _isCharLiteral ? _arg.charCodeAt(1) : _arg;
+                                            const _specDesc = (_inputSpec.match(new RegExp(`\\bDR${_reg.n}=(\\w+)`)) || [])[1] || 'val';
+                                            this.errors.push({ line: lineNum + 1, ...this._tokenCols(this._currentLineText, _arg), message:
+                                                `${_bsAbs}.${_bsMeth} uses DR${_reg.n} for the ${_specDesc} — ` +
+                                                `pre-load it with DWRITE DR${_reg.n}, #${_rawValue} before calling ${_bsAbs}.${_bsMeth}()\n` +
+                                                `  DWRITE DR${_reg.n}, #${_rawValue}\n` +
+                                                `  ${_bsAbs} ${_bsMeth}` });
+                                        } else {
+                                            this.errors.push({ line: lineNum + 1, ...this._tokenCols(this._currentLineText, _arg), message:
+                                                `Argument ${_ai + 1} of ${_bsAbs}.${_bsMeth}() maps to DR${_reg.n}, which holds a data value. ` +
+                                                `"${_arg}" cannot be auto-loaded into a DR — pre-load it before the call:\n` +
+                                                `  IADD  DR${_reg.n}, DR${_reg.n}, #${_arg}   ; small literal (fits in 14 bits)\n` +
+                                                `  ; — or — load a full 32-bit constant via a DREAD from an embedded constant` });
+                                        }
+                                    }
+                                }
+                            }
+                            instructions.push({ line: `ELOADCALL CR0, ${_bsAbs}, ${_bsMeth}`, lineNum: lineNum + 1,
+                                comment: `${_bsAbs} ${_bsMeth}${_args.length ? ' ' + _args.join(' ') : ''}` });
+                            continue;
+                        } else if (this._resolveNSName(_bsAbs) !== null) {
+                            // Abstraction is in the namespace but method conventions are not
+                            // loaded yet (e.g. fresh page load before detail panel opened).
+                            // Emit ELOADCALL with method index 0 — the name cannot be
+                            // validated without conventions so a numeric placeholder is used.
+                            // The runtime will fault if method 0 is not the intended one.
+                            this.warnings.push({ line: lineNum + 1, colStart: 0, colEnd: line.length,
+                                message: `Method conventions for "${_bsAbs}" are not loaded; "${_bsMeth}" is emitted as index 0 (unvalidated). Open the ${_bsAbs} detail panel to load conventions.` });
+                            this._checkCapDeclared(_bsAbs, lineNum + 1);
+                            instructions.push({ line: `ELOADCALL CR0, ${_bsAbs}, 0`, lineNum: lineNum + 1,
+                                comment: `${_bsAbs} ${_bsMeth}` });
+                            continue;
+                        }
+                        // Not a known abstraction — fall through to normal unknown-instruction path.
+                    }
+                }
+            }
+
             // ── MVN pseudo-instruction ─────────────────────────────────────────
             // MVN DRd, DRs  →  ~DRs  (ARM-style move-bitwise-NOT)
             // The Church Machine ISA has no native bitwise complement opcode, so

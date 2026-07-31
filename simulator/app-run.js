@@ -1249,7 +1249,7 @@ function _showStopBtn(show) {
 
 document.addEventListener('mousedown', function(e) {
     const wrap = document.getElementById('runWrap');
-    const pop = document.getElementById('runPopover');
+    const pop  = document.getElementById('runPopover');
     if (wrap && pop && pop.style.display !== 'none' && !wrap.contains(e.target)) {
         hideRunPopover();
     }
@@ -8240,6 +8240,34 @@ BRANCHNE k_wg_s
 
 BRANCH morse              ; loop forever
 `,
+
+        // ── Bare-space sugar smoke-test ──────────────────────────────────────────
+        // Used by tests/simulator/sim_asm_examples.js to catch regressions in the
+        // bare-space method-call sugar path (AbsName MethodName → ELOADCALL).
+        // If the method-index lookup or capabilities-block handling breaks, this
+        // example will fail to assemble cleanly and will be caught in CI.
+        'selftest_bare_space_sugar': `; ============================================================
+; Abstraction:  BareSpaceSugar
+; Description:  Bare-space sugar smoke test.
+;               "SelfTest Run" on its own line is syntactic sugar for
+;               ELOADCALL CR0, SelfTest, Run — loading the SelfTest
+;               abstraction from the c-list and invoking its Run method.
+;               This example verifies the full path:
+;                 capabilities block → c-list slot assignment →
+;                 ELOADCALL with correct method index
+; Language:     Assembly
+; ============================================================
+
+capabilities {
+  SelfTest E
+}
+
+; Bare-space sugar: AbsName MethodName compiles to ELOADCALL.
+; SelfTest is declared in the capabilities block above, so it
+; occupies c-list slot 0.  Run is method index 0.
+; Encoded as: ELOADCALL CR0, SelfTest, Run  (opcode 8, row=0, meth=0)
+SelfTest Run
+`,
     };
 
     window._asmExampleSources      = examples;
@@ -14231,7 +14259,59 @@ async function hwRunToggle() {
         });
     } catch(e) {}
 }
-window.hwRunToggle = hwRunToggle;
+
+// ── Pre-seed method conventions from server lumps ─────────────────────────────
+// Builds ChurchAssembler.setSharedMethodConventions() entries for every lump
+// that carries a non-empty methods array in its API metadata.  Called once at
+// page load (and can be called again after renderLumps() fetches fresh data) so
+// bare-space sugar like "Constants Pi" compiles with the correct method index
+// even on a cold load before the user has opened any detail panel.
+//
+// Convention format: { AbsName: { MethodName: { index, input, output } } }
+// Method index = position in the methods array (0-based), which matches the
+// lump's method-table dispatch order.
+//
+// Boot-resident abstractions whose methods[] sidecar is empty (e.g. SelfTest,
+// LEDFlash) are handled by the static _ABSTRACTION_CONVENTIONS table registered
+// by app-absdetail.js — this function only supplements them with lump-derived
+// entries and never overwrites a richer manually-authored spec.
+function _preSeedConventionsFromLumps(lumps) {
+    if (typeof ChurchAssembler === 'undefined') return;
+    if (!Array.isArray(lumps) || lumps.length === 0) return;
+    const map = {};
+    for (const lump of lumps) {
+        const absName = lump.abstraction;
+        if (!absName || !Array.isArray(lump.methods) || lump.methods.length === 0) continue;
+        // Do not overwrite conventions that were already registered by
+        // app-absdetail.js _ABSTRACTION_CONVENTIONS (they carry richer specs).
+        if (ChurchAssembler._sharedMethodConventions &&
+                ChurchAssembler._sharedMethodConventions[absName]) continue;
+        const entry = {};
+        for (let i = 0; i < lump.methods.length; i++) {
+            const m = lump.methods[i];
+            if (!m || !m.name) continue;
+            const inputSpec  = (Array.isArray(m.inputs)  && m.inputs.length  > 0)
+                ? m.inputs.join(', ') : '';
+            const outputSpec = (Array.isArray(m.outputs) && m.outputs.length > 0)
+                ? m.outputs[0] : (m.description || '');
+            entry[m.name] = { index: i, input: inputSpec, output: outputSpec };
+        }
+        if (Object.keys(entry).length > 0) map[absName] = entry;
+    }
+    if (Object.keys(map).length > 0) ChurchAssembler.setSharedMethodConventions(map);
+}
+window._preSeedConventionsFromLumps = _preSeedConventionsFromLumps;
+
+// Warm conventions at page load — one shared fetch via LumpRegistry so it
+// does not duplicate the fetch that renderLumps() / app-abstractions.js fires.
+// lump-registry.js is loaded before app-run.js so LumpRegistry is available.
+if (window.LumpRegistry) {
+    window.LumpRegistry.warmServerList().then(function(lumps) {
+        // warmServerList resolves with getServerList() — a flat array of server
+        // metadata objects with the same shape as /api/lumps/list items.
+        _preSeedConventionsFromLumps(lumps);
+    }).catch(function() {});
+}
 
 // ── URL search-param routing (?view=devices, ?view=builder&tab=ti60-connect) ──
 // Wraps window.init (defined in app-shell.js) so the ?view= param is applied

@@ -861,7 +861,9 @@ function init() {
         // ─────────────────────────────────────────────────────────────────────
         asmEd.addEventListener('scroll', syncLineScroll);
         if (typeof ResizeObserver !== 'undefined') {
-            new ResizeObserver(function() { syncLineScroll(); _debouncedErrorRecalc(); }).observe(asmEd);
+            new ResizeObserver(function() {
+                requestAnimationFrame(function() { syncLineScroll(); _debouncedErrorRecalc(); });
+            }).observe(asmEd);
         }
         asmEd.addEventListener('keydown', function(e) {
             if (e.key === 'Tab') {

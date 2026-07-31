@@ -1233,8 +1233,6 @@ function patchSimulator() {
 }
 
 // Reload _stickyPatches from localStorage (cm_sticky_p_* keys).
-// Called by app-ns-snapshots.js after writing new sticky patch keys to
-// localStorage so that _reapplyStickyPatches() sees the updated set.
 window._loadStickyPatchesFromStorage = function() {
     // Clear the in-memory store.
     var k;

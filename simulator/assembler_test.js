@@ -9909,6 +9909,193 @@ Add a method called Run
         `c-list slot = 0x${(unresolvedWords[unresolvedStart] >>> 0).toString(16)}`);
 }
 
+// ── Bare-space method call sugar: AbsName MethodName ─────────────────────────
+//
+// "SelfTest Run" on its own line should expand to ELOADCALL CR0, SelfTest, Run
+// without requiring the user to know the dot-paren or explicit ELOADCALL forms.
+{
+    const BARE_SPACE_CONV = {
+        'SelfTest':  { 'Run':   { index: 0 }, 'Audit': { index: 1 } },
+        'Scheduler': { 'pause': { index: 0 }, 'resume': { index: 1 } },
+    };
+    const BARE_SPACE_NS = { 'SelfTest': 6, 'Scheduler': 5 };
+
+    // BS1: "SelfTest Run" — zero-argument method call sugar, happy path.
+    {
+        const a = new ChurchAssembler(BARE_SPACE_CONV);
+        a.setNamespace(BARE_SPACE_NS);
+        const result = a.assemble('SelfTest Run');
+        assert('BS1 "SelfTest Run" produces no errors',
+            result.errors.length === 0,
+            result.errors.map(e => e.message).join('; '));
+        assert('BS1 "SelfTest Run" emits exactly one word',
+            result.words.length === 1,
+            `got ${result.words.length} words`);
+        const opcode = (result.words[0] >>> 27) & 0x1F;
+        assert('BS1 "SelfTest Run" opcode=8 (ELOADCALL)',
+            opcode === 8, `got opcode=${opcode}`);
+    }
+
+    // BS2: "Scheduler pause" — second known two-token pair.
+    {
+        const a = new ChurchAssembler(BARE_SPACE_CONV);
+        a.setNamespace(BARE_SPACE_NS);
+        const result = a.assemble('Scheduler pause');
+        assert('BS2 "Scheduler pause" produces no errors',
+            result.errors.length === 0,
+            result.errors.map(e => e.message).join('; '));
+        const opcode = (result.words[0] >>> 27) & 0x1F;
+        assert('BS2 "Scheduler pause" opcode=8 (ELOADCALL)',
+            opcode === 8, `got opcode=${opcode}`);
+    }
+
+    // BS3: unknown method on a known abstraction → targeted error listing known methods.
+    {
+        const a = new ChurchAssembler(BARE_SPACE_CONV);
+        a.setNamespace(BARE_SPACE_NS);
+        const result = a.assemble('SelfTest Vanish');
+        assert('BS3 "SelfTest Vanish" (unknown method) produces an error',
+            result.errors.length > 0, 'expected at least one error');
+        const msg = result.errors.length > 0 ? result.errors[0].message : '';
+        assert('BS3 error mentions "Vanish" and known methods',
+            msg.includes('Vanish') && (msg.includes('Run') || msg.includes('Audit')),
+            msg);
+    }
+
+    // BS4: unknown first word — falls through to normal "unknown instruction" error.
+    {
+        const a = new ChurchAssembler(BARE_SPACE_CONV);
+        a.setNamespace(BARE_SPACE_NS);
+        const result = a.assemble('FooBar Baz');
+        assert('BS4 "FooBar Baz" (unknown first word) produces an error',
+            result.errors.length > 0, 'expected an unknown-instruction error');
+    }
+
+    // BS5: real opcode as first token is NOT intercepted by the bare-space sugar.
+    {
+        const a = new ChurchAssembler(BARE_SPACE_CONV);
+        a.setNamespace(BARE_SPACE_NS);
+        // IADD is a real opcode — even though "IADD DR0" is syntactically wrong,
+        // it must not be misrouted through the bare-space abstraction-lookup path.
+        const result = a.assemble('IADD DR0, DR0, #0');
+        const opcode = result.words.length > 0 ? (result.words[0] >>> 27) & 0x1F : -1;
+        assert('BS5 real opcode "IADD" not intercepted by bare-space sugar (opcode=21)',
+            opcode === 21, `got opcode=${opcode}, errors=${result.errors.map(e => e.message).join('; ')}`);
+    }
+
+    // BS6: bare-space sugar with a capabilities block that does NOT declare the
+    // abstraction — must produce a "capability not declared" error matching the
+    // dot-paren sugar's _checkCapDeclared behaviour.
+    {
+        const a = new ChurchAssembler(BARE_SPACE_CONV);
+        a.setNamespace(BARE_SPACE_NS);
+        // The capabilities block exists (Scheduler is declared) but SelfTest is absent.
+        const result = a.assemble('capabilities {\n  Scheduler E\n}\nSelfTest Run');
+        assert('BS6 "SelfTest Run" with capabilities block missing SelfTest produces an error',
+            result.errors.length > 0, 'expected at least one error');
+        const msg = result.errors.length > 0 ? result.errors[0].message : '';
+        assert('BS6 error mentions "SelfTest" and capability declaration',
+            msg.includes('SelfTest') && (msg.includes('capabilities') || msg.includes('declared')),
+            msg);
+    }
+
+    // BS6b: bare-space sugar when the abstraction IS declared — no cap-declared error.
+    {
+        const a = new ChurchAssembler(BARE_SPACE_CONV);
+        a.setNamespace(BARE_SPACE_NS);
+        const result = a.assemble('capabilities {\n  SelfTest E\n}\nSelfTest Run');
+        assert('BS6b "SelfTest Run" with SelfTest declared in capabilities: no cap-declared error',
+            result.errors.length === 0,
+            result.errors.map(e => e.message).join('; '));
+        const opcode = result.words.length > 0 ? (result.words[0] >>> 27) & 0x1F : -1;
+        assert('BS6b "SelfTest Run" with declared capability: opcode=8 (ELOADCALL)',
+            opcode === 8, `got opcode=${opcode}`);
+    }
+}
+
+// ── Bare-space sugar with arguments: AbsName MethodName Arg1 [Arg2] ──────────
+//
+// Extends the zero-arg bare-space sugar to argument-carrying forms.
+// "SelfTest Check SlideRule"         → LOAD CR2, SlideRule + ELOADCALL (2 words)
+// "SelfTest Check CR5"               → ELOADCALL only (1 word, explicit CR skip)
+// "SelfTest Write 42"                → error (DR arg must be pre-loaded)
+// "SelfTest Send SlideRule Scheduler"→ LOAD CR2 + LOAD CR3 + ELOADCALL (3 words)
+{
+    const BS_ARG_CONV = {
+        'SelfTest': {
+            'Run':   { index: 0 },
+            'Check': { index: 1, input: 'CR2=target' },
+            'Send':  { index: 2, input: 'CR2=dst CR3=src' },
+            'Write': { index: 3, input: 'DR1=value' },
+        },
+    };
+    const BS_ARG_NS = { 'SelfTest': 6, 'SlideRule': 3, 'Scheduler': 5 };
+
+    // BS6: "SelfTest Check SlideRule" — 1-arg CR sugar: LOAD CR2, SlideRule + ELOADCALL.
+    {
+        const a = new ChurchAssembler(BS_ARG_CONV);
+        a.setNamespace(BS_ARG_NS);
+        const result = a.assemble('SelfTest Check SlideRule');
+        assert('BS6 "SelfTest Check SlideRule" produces no errors',
+            result.errors.length === 0,
+            result.errors.map(e => e.message).join('; '));
+        assert('BS6 emits 2 words (LOAD + ELOADCALL)',
+            result.words.length === 2,
+            `got ${result.words.length} words`);
+        const opcode0 = (result.words[0] >>> 27) & 0x1F;
+        const opcode1 = (result.words[1] >>> 27) & 0x1F;
+        assert('BS6 word[0] opcode=0 (LOAD)', opcode0 === 0, `got opcode=${opcode0}`);
+        assert('BS6 word[1] opcode=8 (ELOADCALL)', opcode1 === 8, `got opcode=${opcode1}`);
+    }
+
+    // BS7: "SelfTest Check CR5" — explicit CRn supplied → no LOAD emitted, just ELOADCALL.
+    {
+        const a = new ChurchAssembler(BS_ARG_CONV);
+        a.setNamespace(BS_ARG_NS);
+        const result = a.assemble('SelfTest Check CR5');
+        assert('BS7 "SelfTest Check CR5" (explicit CR) produces no errors',
+            result.errors.length === 0,
+            result.errors.map(e => e.message).join('; '));
+        assert('BS7 emits exactly 1 word (ELOADCALL only, no LOAD for explicit CR)',
+            result.words.length === 1,
+            `got ${result.words.length} words`);
+        const opcode = (result.words[0] >>> 27) & 0x1F;
+        assert('BS7 word[0] opcode=8 (ELOADCALL)', opcode === 8, `got opcode=${opcode}`);
+    }
+
+    // BS8: "SelfTest Write 42" — DR numeric arg → targeted pre-load error (same hint as dot-paren).
+    {
+        const a = new ChurchAssembler(BS_ARG_CONV);
+        a.setNamespace(BS_ARG_NS);
+        const result = a.assemble('SelfTest Write 42');
+        assert('BS8 "SelfTest Write 42" (DR numeric arg) produces an error',
+            result.errors.length > 0, 'expected at least one error');
+        const msg = result.errors[0].message;
+        assert('BS8 error mentions DR1 and pre-load hint',
+            msg.includes('DR1') && (msg.includes('DWRITE') || msg.includes('pre-load')),
+            msg);
+    }
+
+    // BS9: "SelfTest Send SlideRule Scheduler" — 2-arg CR sugar: 2 LOADs + ELOADCALL (3 words).
+    {
+        const a = new ChurchAssembler(BS_ARG_CONV);
+        a.setNamespace(BS_ARG_NS);
+        const result = a.assemble('SelfTest Send SlideRule Scheduler');
+        assert('BS9 "SelfTest Send SlideRule Scheduler" produces no errors',
+            result.errors.length === 0,
+            result.errors.map(e => e.message).join('; '));
+        assert('BS9 emits 3 words (LOAD + LOAD + ELOADCALL)',
+            result.words.length === 3,
+            `got ${result.words.length} words`);
+        const opcode0 = (result.words[0] >>> 27) & 0x1F;
+        const opcode1 = (result.words[1] >>> 27) & 0x1F;
+        const opcode2 = (result.words[2] >>> 27) & 0x1F;
+        assert('BS9 word[0] opcode=0 (LOAD)', opcode0 === 0, `got opcode=${opcode0}`);
+        assert('BS9 word[1] opcode=0 (LOAD)', opcode1 === 0, `got opcode=${opcode1}`);
+        assert('BS9 word[2] opcode=8 (ELOADCALL)', opcode2 === 8, `got opcode=${opcode2}`);
+    }
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);

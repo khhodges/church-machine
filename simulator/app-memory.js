@@ -56,58 +56,65 @@ function updateCRDetail() {
         titleEl.innerHTML = '';
         titleEl.style.display = 'none';
         if (!sim.bootComplete && (crIdx === 12 || crIdx === 14)) {
-            // Pre-boot: CR12/CR14 are zero in context registers, but the Thread LUMP
-            // already holds the designed initial capability state in memory.
-            // Read it directly from NS slot 1 (Boot.Thread) offset +244…+255 and show
-            // the programmer exactly what they designed — no click-and-hope required.
-            let preBootHtml = '';
             try {
                 const threadNSWord0Addr = sim._nsSlotBase(1);
                 const threadBase = threadNSWord0Addr !== undefined
                     ? (sim.memory[threadNSWord0Addr] >>> 0) : 0;
                 if (threadBase > 0 && threadBase < sim.memory.length) {
+                    if (crIdx === 12) {
+                        // CR12 pre-boot: render the full 5-zone thread memory layout
+                        // (⑤DR, ④Heap, ③Free, ②Stack, ①Caps) exactly as shown in
+                        // the tutorials, reading from Boot.Thread (NS slot 1) in
+                        // the bitstream-loaded memory.
+                        const _nsIdx1 = 1;
+                        let hBar = '<div class="crd-menu-bar">';
+                        hBar += `<span class="crd-menu-active-label">Boot.Thread \u2014 Designed Boot State</span>`;
+                        hBar += `<span class="crd-zone-nav" title="Jump to zone \u00b7 hover for live data">`;
+                        hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone('hdr')" onmouseenter="showZonePopup(event,'hdr',${_nsIdx1})" onmouseleave="hideZonePopup()">Hdr</button>`;
+                        hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(5)" onmouseenter="showZonePopup(event,5,${_nsIdx1})" onmouseleave="hideZonePopup()">&#x2464;\u202FDR</button>`;
+                        hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(4)" onmouseenter="showZonePopup(event,4,${_nsIdx1})" onmouseleave="hideZonePopup()">&#x2463;\u202FHeap</button>`;
+                        hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(3)" onmouseenter="showZonePopup(event,3,${_nsIdx1})" onmouseleave="hideZonePopup()">&#x2462;\u202FFree</button>`;
+                        hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(2)" onmouseenter="showZonePopup(event,2,${_nsIdx1})" onmouseleave="hideZonePopup()">&#x2461;\u202FStack</button>`;
+                        hBar += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(1)" onmouseenter="showZonePopup(event,1,${_nsIdx1})" onmouseleave="hideZonePopup()">&#x2460;\u202FCaps</button>`;
+                        hBar += `</span>`;
+                        hBar += '</div>';
+                        contentEl.innerHTML = hBar + renderThreadMemoryLayout(_nsIdx1, true);
+                        contentEl.classList.add('crd-content-thread');
+                        return;
+                    }
+                    // CR14 pre-boot: show the designed startup value (Thread.CR0 at offset +244)
                     const CAPS_OFF = 244;
-                    const CAPS_N   = 12;
-                    const crLabel  = crIdx === 14
-                        ? 'CR14 will be loaded from Thread.CR0 on boot — this is its designed startup value:'
-                        : 'These are the capability registers (CR0–CR11) your machine will start with:';
+                    const word = sim.memory[threadBase + CAPS_OFF] >>> 0;
+                    let preBootHtml = '';
                     preBootHtml += `<div style="padding:0.75rem 1rem 0.25rem;color:#f4b942;font-weight:600;font-size:0.85rem;letter-spacing:0.04em;">DESIGNED BOOT STATE</div>`;
-                    preBootHtml += `<div style="padding:0 1rem 0.75rem;color:var(--text-secondary);font-size:0.8rem;">${crLabel}</div>`;
-                    preBootHtml += `<table class="abs-clist-table" style="margin:0 1rem 1rem;">`;
-                    preBootHtml += `<thead><tr><th>CR</th><th>GT (HEX)</th><th>PERMS</th><th>TYPE</th><th>NAME</th></tr></thead><tbody>`;
-                    const rowRange = (crIdx === 14) ? [0] : Array.from({length: CAPS_N}, (_,i) => i);
-                    for (const i of rowRange) {
-                        const word = sim.memory[threadBase + CAPS_OFF + i] >>> 0;
-                        if (word === 0) {
-                            preBootHtml += `<tr><td class="abs-clist-idx">CR${i}</td><td colspan="4" class="abs-clist-empty-slot">\u2014 (empty)</td></tr>`;
-                        } else {
-                            const parsed = sim.parseGT(word);
-                            const p = { ...parsed.permissions, F: parsed.type === 2 ? 1 : 0 };
-                            let permHtml = '';
-                            for (const bit of ['B','R','W','X','E','L','S','F']) {
-                                permHtml += `<span class="abs-perm-badge ${p[bit] ? 'perm-on' : 'perm-off'}">${bit}</span>`;
-                            }
-                            const nsIdx2 = parsed.index;
-                            const label2 = (sim.nsLabels && sim.nsLabels[nsIdx2]) || null;
-                            const isBootEntry = (i === 0 && p.E && nsIdx2 === sim.bootEntrySlot);
-                            const nameStr = label2
-                                ? (isBootEntry
-                                    ? `<span class="abs-nsdecoder-badge-boot">\u26a1</span> <strong>${label2}</strong> <span style="color:#6b7280;font-size:0.8em;margin-left:4px;">NS[${nsIdx2}]</span>`
-                                    : `<strong>${label2}</strong> <span style="color:#6b7280;font-size:0.8em;margin-left:4px;">NS[${nsIdx2}]</span>`)
-                                : `NS[${nsIdx2}]`;
-                            const gtHex = '0x' + word.toString(16).toUpperCase().padStart(8, '0');
-                            preBootHtml += `<tr><td class="abs-clist-idx">CR${i}</td><td class="abs-clist-gt">${gtHex}</td><td class="abs-clist-perms">${permHtml}</td><td class="abs-clist-type">${parsed.typeName}</td><td class="abs-clist-name">${nameStr}</td></tr>`;
+                    preBootHtml += `<div style="padding:0 1rem 0.75rem;color:var(--text-secondary);font-size:0.8rem;">CR14 will be loaded from Thread.CR0 on boot \u2014 this is its designed startup value:</div>`;
+                    preBootHtml += `<table class="abs-clist-table" style="margin:0 1rem 1rem;"><thead><tr><th>CR</th><th>GT (HEX)</th><th>PERMS</th><th>TYPE</th><th>NAME</th></tr></thead><tbody>`;
+                    if (word === 0) {
+                        preBootHtml += `<tr><td class="abs-clist-idx">CR0</td><td colspan="4" class="abs-clist-empty-slot">\u2014 (empty)</td></tr>`;
+                    } else {
+                        const parsed = sim.parseGT(word);
+                        const p = { ...parsed.permissions, F: parsed.type === 2 ? 1 : 0 };
+                        let permHtml = '';
+                        for (const bit of ['B','R','W','X','E','L','S','F']) {
+                            permHtml += `<span class="abs-perm-badge ${p[bit] ? 'perm-on' : 'perm-off'}">${bit}</span>`;
                         }
+                        const nsIdx2 = parsed.index;
+                        const label2 = (sim.nsLabels && sim.nsLabels[nsIdx2]) || null;
+                        const isBootEntry = (p.E && nsIdx2 === sim.bootEntrySlot);
+                        const nameStr = label2
+                            ? (isBootEntry
+                                ? `<span class="abs-nsdecoder-badge-boot">\u26a1</span> <strong>${label2}</strong> <span style="color:#6b7280;font-size:0.8em;margin-left:4px;">NS[${nsIdx2}]</span>`
+                                : `<strong>${label2}</strong> <span style="color:#6b7280;font-size:0.8em;margin-left:4px;">NS[${nsIdx2}]</span>`)
+                            : `NS[${nsIdx2}]`;
+                        preBootHtml += `<tr><td class="abs-clist-idx">CR0</td><td class="abs-clist-gt">0x${word.toString(16).toUpperCase().padStart(8,'0')}</td><td class="abs-clist-perms">${permHtml}</td><td class="abs-clist-type">${parsed.typeName}</td><td class="abs-clist-name">${nameStr}</td></tr>`;
                     }
                     preBootHtml += `</tbody></table>`;
                     preBootHtml += `<div style="padding:0 1rem 1rem;color:#4b5563;font-size:0.78rem;">Click <b style="color:var(--text-secondary);">Boot</b> to run the sequence and activate these registers.</div>`;
+                    contentEl.innerHTML = preBootHtml;
+                    contentEl.classList.remove('crd-content-thread');
+                    return;
                 }
             } catch(e) { /* fall through to generic message */ }
-            if (preBootHtml) {
-                contentEl.innerHTML = preBootHtml;
-                contentEl.classList.remove('crd-content-thread');
-                return;
-            }
         }
         if (!sim.bootComplete) {
             const bootHint = (crIdx === 14 || crIdx === 12)
@@ -141,11 +148,11 @@ function updateCRDetail() {
 
     const codeRegs = [7];
     const clistRegs = [6];
-    const threadRegs = [8, 12];
+    const threadRegs = [8, 12, 13];
     const nsRegs = [15];
     const showCode = hasX || (crMbit && codeRegs.includes(crIdx));
     const showCList = hasL || (crMbit && clistRegs.includes(crIdx));
-    const showThread = THREAD_NS_SLOTS.has(nsIdx) || (crMbit && threadRegs.includes(crIdx));
+    const showThread = THREAD_NS_SLOTS.has(nsIdx) || threadRegs.includes(crIdx);
     const showNS = crMbit && nsRegs.includes(crIdx);
     const showData = (hasR || hasW) && !showCode && !showCList;
 
@@ -157,6 +164,9 @@ function updateCRDetail() {
 
     // ── Correct default tab for this CR's capabilities ───────────────────────
     crDetailTab = correctCRDetailTab(crDetailTab, showCode, showCList, showData);
+    // Thread/IRQ registers always default to Lump tab so the 5 zones are
+    // immediately visible — the thread layout lives in crdPanel-lump.
+    if (showThread) crDetailTab = 'lump';
 
     // ── Hoist shared data used across multiple panels ─────────────────────────
     const _baseLoc      = cr.word1_location >>> 0;
@@ -811,7 +821,7 @@ function updateCRDetail() {
     // Thread memory layout (if applicable)
     if (showThread) {
         html += '<div class="cr-detail-section cr-detail-section-thread">';
-        html += renderThreadMemoryLayout(nsIdx);
+        html += renderThreadMemoryLayout(nsIdx, true);
         html += '</div>';
     }
 
@@ -1960,18 +1970,21 @@ const THREAD_LAYOUT = {
 };
 const THREAD_NS_SLOTS = new Set([1, 45]);
 
-function renderThreadMemoryLayout(nsIndex) {
+function renderThreadMemoryLayout(nsIndex, expandAll = false) {
     const entry = sim.readNSEntry(nsIndex);
     const slotBase = entry ? entry.word0_location : (nsIndex * sim.SLOT_SIZE);
     const label = sim.nsLabels[nsIndex] || ('Slot ' + nsIndex);
     const TL = THREAD_LAYOUT;
 
+    const _collapsedCls = expandAll ? '' : ' thread-zone-collapsed';
+    const _bodyDisplay  = expandAll ? '' : 'display:none;';
+    const _chevron      = expandAll ? '▼' : '▶';
     const secHdr = (num, title, note, color, id='') =>
         `<div class="thread-zone-wrap">` +
-        `<div class="thread-zone-hdr thread-zone-collapsed"${id ? ` id="${id}"` : ''} style="border-left-color:${color};" onclick="_tzToggle(this)">` +
-        `<span class="thread-zone-chevron">▶</span>${num} ${title}` +
+        `<div class="thread-zone-hdr${_collapsedCls}"${id ? ` id="${id}"` : ''} style="border-left-color:${color};" onclick="_tzToggle(this)">` +
+        `<span class="thread-zone-chevron">${_chevron}</span>${num} ${title}` +
         `<span class="thread-zone-note">${note}</span></div>` +
-        `<div class="thread-zone-body" style="display:none;">`;
+        `<div class="thread-zone-body" style="${_bodyDisplay}">`;
     const secBody = () => `</div></div>`;
 
     const addrOf = (off) => '0x' + (slotBase + off).toString(16).toUpperCase().padStart(4, '0');
@@ -2566,14 +2579,16 @@ function updateNamespace() {
         });
     }
     // --- Slot count stats ---
+    // Use readNSEntry() so the inverted NS table layout is handled correctly.
     let _cntResident = 0, _cntLazy = 0, _cntGarbage = 0;
     const _cntMax = (sim.MAX_NS_ENTRIES != null) ? sim.MAX_NS_ENTRIES : 0;
     const _scanTo = Math.min(sim.nsCount || 0, _cntMax);
     for (let _si = 0; _si < _scanTo; _si++) {
-        const _sBase = sim.NS_TABLE_BASE + _si * sim.NS_ENTRY_WORDS;
-        const _sw0 = sim.memory ? (sim.memory[_sBase] || 0) : 0;
-        const _sw1 = sim.memory ? (sim.memory[_sBase + 1] || 0) : 0;
-        const _sw2 = sim.memory ? (sim.memory[_sBase + 2] || 0) : 0;
+        const _e = sim.readNSEntry(_si);
+        if (!_e) continue;
+        const _sw0 = _e.word0_location || 0;
+        const _sw1 = _e.word1_limit    || 0;
+        const _sw2 = _e.word2_seals    || 0;
         if ((_sw0 !== 0) || (_sw1 !== 0)) {
             const _mfe = sim.lazyManifest ? sim.lazyManifest[_si] : null;
             let _notResident = false;
