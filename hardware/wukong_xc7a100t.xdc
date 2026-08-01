@@ -20,8 +20,12 @@ set_property -dict { PACKAGE_PIN G20  IOSTANDARD LVCMOS33 } [get_ports { led1 }]
 set_property -dict { PACKAGE_PIN M6   IOSTANDARD LVCMOS33 } [get_ports { rst_n }];
 
 ## ── Bitstream / configuration settings ────────────────────────────────────────
-set_property CFGBVS        VCCO [current_design];
-set_property CONFIG_VOLTAGE 3.3  [current_design];
+set_property CFGBVS                   VCCO [current_design];
+set_property CONFIG_VOLTAGE           3.3  [current_design];
+## Enable Quad-SPI (x4) boot so write_cfgmem -interface SPIx4 works.
+## Without this the bitfile records SPI_BUSWIDTH=1 and write_cfgmem aborts.
+set_property BITSTREAM.CONFIG.SPI_BUSWIDTH 4 [current_design];
+set_property BITSTREAM.CONFIG.CONFIGRATE  33 [current_design];
 
 ## ── UART TX/RX (CH340 USB socket, 57600 8N1) ─────────────────────────────────
 ## E3 = IO_L5P_T0_34, bank 34, LVCMOS33 — hardware-confirmed (FPGA TX → CH340 RX)
