@@ -20,6 +20,8 @@
     "check-slot-index-leak",
     "ns-slot-dynamic-tests",
     "lambda-exec-tests",
-    "hardware-sim"
+    "hardware-sim",
+    "check-ila-probe-names",
+    "test-check-ila-probe-names"
   ]
 }
