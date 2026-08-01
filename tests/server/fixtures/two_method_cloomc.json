@@ -1,0 +1,6 @@
+{
+  "description": "Two-method CLOOMC abstraction (Math.zero, Math.one) — dispatch table + two bodies",
+  "language": "javascript",
+  "source": "abstraction Math {\n    method zero() {\n        return 0;\n    }\n    method one() {\n        return 1;\n    }\n}\n",
+  "words": [4160757760, 3, 6, 2942304256, 2936930304, 520093696, 2942320641, 2936930304, 520093696, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+}

@@ -1,0 +1,6 @@
+{
+  "description": "IADD DR0, DR0, #0 (no-op) followed by RETURN in Assembly — zeroing idiom",
+  "language": "assembly",
+  "source": "IADD DR0, DR0, #0\nRETURN\n",
+  "words": [4160752640, 2, 2936029184, 520093696, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+}

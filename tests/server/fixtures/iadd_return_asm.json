@@ -1,0 +1,6 @@
+{
+  "description": "IADD DR1, DR0, #42 followed by RETURN in Assembly — two-instruction lump",
+  "language": "assembly",
+  "source": "IADD DR1, DR0, #42\nRETURN\n",
+  "words": [4160752640, 2, 2936553514, 520093696, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+}

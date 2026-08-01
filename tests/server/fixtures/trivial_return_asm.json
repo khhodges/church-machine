@@ -1,0 +1,6 @@
+{
+  "description": "Trivial RETURN in Assembly — minimal one-instruction lump",
+  "language": "assembly",
+  "source": "RETURN\n",
+  "words": [4160751616, 2, 520093696, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+}

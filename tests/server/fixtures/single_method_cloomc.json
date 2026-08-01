@@ -1,0 +1,6 @@
+{
+  "description": "Single-method CLOOMC abstraction (Adder.add returns 1+2) — dispatch table + one body",
+  "language": "javascript",
+  "source": "abstraction Adder {\n    method add() {\n        return 1 + 2;\n    }\n}\n",
+  "words": [4160754688, 2, 2942320641, 2942713858, 2936930304, 520093696, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+}

@@ -374,6 +374,12 @@ def test_extra_fields_are_ignored(client):
     data = resp.get_json()
     assert isinstance(data.get('ok'), bool), f'unexpected response: {data}'
 
+def _load_fixture(name):
+    """Load a golden fixture from tests/server/fixtures/<name>.json."""
+    fixture_path = os.path.join(_FIXTURES_DIR, f'{name}.json')
+    with open(fixture_path, 'r', encoding='utf-8') as fh:
+        return json.load(fh)
+
 
 # ---------------------------------------------------------------------------
 # LRU cache — identical requests must not re-spawn Node
@@ -481,3 +487,82 @@ def test_cache_concurrent_hits_return_consistent_words():
     assert cache_size <= compile_api._CACHE_MAX, (
         f'cache grew to {cache_size} entries, exceeding _CACHE_MAX={compile_api._CACHE_MAX}'
     )
+
+class TestGoldenOutput:
+    """Pin exact compiled word arrays for canonical programs.
+
+    Each test compiles a known snippet via the live /api/compile endpoint and
+    compares the returned words[] against the stored fixture.  A mismatch means
+    the compiler or LUMP builder changed its output — see the HOW TO UPDATE
+    comment above for the update procedure.
+    """
+
+    def test_trivial_return_asm(self, client):
+        """Trivial RETURN assembly — minimal 1-instruction lump."""
+        fixture = _load_fixture('trivial_return_asm')
+        resp = _post(client, fixture['source'], fixture['language'])
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['ok'] is True, f"compile failed: {data.get('error')}"
+        assert data['words'] == fixture['words'], (
+            f"Golden mismatch for trivial_return_asm.\n"
+            f"  expected: {fixture['words']!r}\n"
+            f"  actual:   {data['words']!r}\n"
+            f"If this change is intentional, update tests/server/fixtures/trivial_return_asm.json."
+        )
+
+    def test_iadd_return_asm(self, client):
+        """IADD DR1, DR0, #42 then RETURN — two-instruction lump with immediate."""
+        fixture = _load_fixture('iadd_return_asm')
+        resp = _post(client, fixture['source'], fixture['language'])
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['ok'] is True, f"compile failed: {data.get('error')}"
+        assert data['words'] == fixture['words'], (
+            f"Golden mismatch for iadd_return_asm.\n"
+            f"  expected: {fixture['words']!r}\n"
+            f"  actual:   {data['words']!r}\n"
+            f"If this change is intentional, update tests/server/fixtures/iadd_return_asm.json."
+        )
+
+    def test_return_zero_asm(self, client):
+        """IADD DR0, DR0, #0 (zeroing no-op) then RETURN — immediate-zero encoding."""
+        fixture = _load_fixture('return_zero_asm')
+        resp = _post(client, fixture['source'], fixture['language'])
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['ok'] is True, f"compile failed: {data.get('error')}"
+        assert data['words'] == fixture['words'], (
+            f"Golden mismatch for return_zero_asm.\n"
+            f"  expected: {fixture['words']!r}\n"
+            f"  actual:   {data['words']!r}\n"
+            f"If this change is intentional, update tests/server/fixtures/return_zero_asm.json."
+        )
+
+    def test_single_method_cloomc(self, client):
+        """Single-method CLOOMC abstraction (Adder.add returns 1+2)."""
+        fixture = _load_fixture('single_method_cloomc')
+        resp = _post(client, fixture['source'], fixture['language'])
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['ok'] is True, f"compile failed: {data.get('error')}"
+        assert data['words'] == fixture['words'], (
+            f"Golden mismatch for single_method_cloomc.\n"
+            f"  expected: {fixture['words']!r}\n"
+            f"  actual:   {data['words']!r}\n"
+            f"If this change is intentional, update tests/server/fixtures/single_method_cloomc.json."
+        )
+
+    def test_two_method_cloomc(self, client):
+        """Two-method CLOOMC abstraction (Math.zero, Math.one) — dispatch table + two bodies."""
+        fixture = _load_fixture('two_method_cloomc')
+        resp = _post(client, fixture['source'], fixture['language'])
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['ok'] is True, f"compile failed: {data.get('error')}"
+        assert data['words'] == fixture['words'], (
+            f"Golden mismatch for two_method_cloomc.\n"
+            f"  expected: {fixture['words']!r}\n"
+            f"  actual:   {data['words']!r}\n"
+            f"If this change is intentional, update tests/server/fixtures/two_method_cloomc.json."
+        )
