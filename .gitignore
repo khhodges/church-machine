@@ -43,3 +43,4 @@ __pycache__/
 # (the hardware/soc_combined/ copies are handled by that directory's own .gitignore)
 /church_ti60_f225.v.pre_direct
 /cm_dmem_bram.v
+*.db-journal
