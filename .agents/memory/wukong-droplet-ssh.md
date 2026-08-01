@@ -1,6 +1,6 @@
 ---
 name: Wukong droplet SSH key
-description: SSH key setup for 165.227.190.84 droplet — how to connect from Replit
+description: SSH key setup for 165.227.190.84 droplet — how to connect from Replit, and the complete build workflow
 ---
 
 ## Droplet: 165.227.190.84 (root)
@@ -53,32 +53,50 @@ cat ~/.ssh/replit_droplet.pub
 ```
 Then store the private key (full PEM, multiline) as `DropletPrivateKey` Replit secret.
 
-## Build workflow
+## Full build workflow (Replit → droplet → Replit)
 
 ```bash
-# Generate Verilog (Replit)
-python -m hardware.gen_rtlil --wukong
+# 1. Regenerate Verilog (Replit)
+python3 -m hardware.gen_rtlil
 
-# Transfer (Replit)
+# 2. Transfer sources (Replit)
 scp -i ~/.ssh/replit_droplet -o StrictHostKeyChecking=no \
-  build/church_wukong_xc7a100t.v hardware/wukong_xc7a100t.xdc hardware/wukong_xc7a100t.tcl \
+  build/church_wukong_xc7a100t.v \
+  hardware/wukong_xc7a100t.xdc \
+  hardware/wukong_xc7a100t.tcl \
   root@165.227.190.84:~/wukong_build/
 
-# Build on droplet (in tmux) — takes ~25-30 min on 4-vCPU droplet
+# 3. Build on droplet in tmux (~25-30 min)
 ssh -i ~/.ssh/replit_droplet -o StrictHostKeyChecking=no root@165.227.190.84 \
-  "cd ~/wukong_build && rm -rf vivado_wukong && tmux new-session -d -s vivado_cm \
-  'source /opt/Xilinx/2026.1/Vivado/settings64.sh && vivado -mode batch -source wukong_xc7a100t.tcl > vivado_cm.log 2>&1; echo EXIT_\$? >> vivado_cm.log'"
+  "cd ~/wukong_build && rm -rf vivado_wukong && \
+   tmux new-session -d -s vivado_cm \
+   'source /opt/Xilinx/2026.1/Vivado/settings64.sh && \
+    vivado -mode batch -source wukong_xc7a100t.tcl > vivado_cm.log 2>&1; \
+    echo EXIT_\$? >> vivado_cm.log'"
 
-# Poll until done
+# 4. Poll (run repeatedly until done)
 ssh -i ~/.ssh/replit_droplet -o StrictHostKeyChecking=no root@165.227.190.84 \
-  "tail -5 ~/wukong_build/vivado_cm.log; tmux list-sessions | grep vivado_cm || echo DONE"
+  "grep -E 'EXIT_|SPI flash image ready|Bitstream ready|route_design completed|place_design completed' \
+   ~/wukong_build/vivado_cm.log 2>/dev/null | tail -5; \
+   tmux list-sessions | grep vivado_cm || echo SESSION_DONE"
 
-# Fetch bitstream (Replit)
+# 5. Fetch bitstream + MCS (Replit)
 scp -i ~/.ssh/replit_droplet -o StrictHostKeyChecking=no \
-  root@165.227.190.84:~/wukong_build/church_wukong_xc7a100t.bit build/
+  root@165.227.190.84:~/wukong_build/church_wukong_xc7a100t.bit \
+  root@165.227.190.84:~/wukong_build/church_wukong_xc7a100t.mcs \
+  build/
 
-# Expected: EXIT_0, WNS ≥ 0 ns, bitstream ~3.8 MB
+# Expected: EXIT_0, WNS ≥ 0 ns, .bit ~3.7 MB, .mcs ~10.5 MB
 ```
+
+## Known build pitfalls (all fixed in current TCL/XDC)
+
+| Problem | Root cause | Fix |
+|---|---|---|
+| `create_debug_core` fails EXIT_1 | BASIC license — ILA needs Standard/Enterprise | `INSERT_ILA 0` flag in TCL; pass `--insert-ila` when licensed |
+| DRC NSTD-1/UCIO-1 blocks bitstream | dbg_* ports have no LOC/IOSTANDARD (they're ILA-only, not board pins) | `set_property SEVERITY {Warning}` for both checks in XDC |
+| `write_cfgmem -interface SPIx4` fails | Bitstream built without `SPI_BUSWIDTH=4` set | `set_property BITSTREAM.CONFIG.SPI_BUSWIDTH 4` in XDC |
+| Reusing synth checkpoint for resume | `launch_runs impl_1 -to_step write_bitstream` can fail if run already at 100% | Use `open_checkpoint *_routed.dcp` + `write_bitstream` directly |
 
 **Why:** The container filesystem resets between sessions; the private key must
 come from a Replit secret or be regenerated and re-added each time.
