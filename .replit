@@ -167,6 +167,10 @@ args = "return-cr6-l-perm-tests"
 task = "workflow.run"
 args = "load-through-l-perm-cr6-tests"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "bare-space-ns-fallback-tests"
+
 [[workflows.workflow]]
 name = "Church Machine IDE"
 author = "agent"
@@ -593,6 +597,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node tests/simulator/sim_load_through_l_perm_cr6.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "bare-space-ns-fallback-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_bare_space_ns_fallback.js"
 
 [workflows.workflow.metadata]
 outputType = "console"
