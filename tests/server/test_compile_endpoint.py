@@ -30,6 +30,8 @@ import base64
 import json
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -38,6 +40,15 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from server.app import app
+
+# server/app.py does `from compile_api import …` (bare name), so the module is
+# registered in sys.modules as 'compile_api', not 'server.compile_api'.
+# Import it the same way so our cache/patch targets the exact same object.
+import sys
+import importlib
+if 'compile_api' not in sys.modules:
+    importlib.import_module('compile_api')
+import compile_api  # noqa: E402  (same object the Flask app uses)
 
 
 # ---------------------------------------------------------------------------
@@ -362,3 +373,111 @@ def test_extra_fields_are_ignored(client):
     assert resp.status_code == 200
     data = resp.get_json()
     assert isinstance(data.get('ok'), bool), f'unexpected response: {data}'
+
+
+# ---------------------------------------------------------------------------
+# LRU cache — identical requests must not re-spawn Node
+# ---------------------------------------------------------------------------
+
+def test_cache_hit_does_not_respawn_node_sequential(client):
+    """Two identical compile requests must produce the same words with only one
+    Node subprocess spawn (the second call is served from the in-process LRU
+    cache).
+    """
+    # Clear the cache before the test so prior test runs don't interfere.
+    compile_api._cache.clear()
+
+    unique_source = """\
+abstraction CacheHitProbe {
+    method probe() {
+        return 99;
+    }
+}
+"""
+
+    # Wrap _run_compile_uncached so we can count how many times it is called.
+    original_uncached = compile_api._run_compile_uncached
+    call_count = []
+
+    def counting_uncached(payload):
+        call_count.append(1)
+        return original_uncached(payload)
+
+    with patch.object(compile_api, '_run_compile_uncached', side_effect=counting_uncached):
+        resp1 = _post(client, unique_source, 'javascript')
+        resp2 = _post(client, unique_source, 'javascript')
+
+    assert resp1.status_code == 200
+    assert resp2.status_code == 200
+
+    data1 = resp1.get_json()
+    data2 = resp2.get_json()
+
+    assert data1['ok'] is True, f'first compile failed: {data1}'
+    assert data2['ok'] is True, f'second compile failed: {data2}'
+
+    # Both responses must carry identical word lists.
+    assert data1['words'] == data2['words'], (
+        'cache hit returned different words than the original compile'
+    )
+
+    # The subprocess must have been spawned exactly once.
+    assert len(call_count) == 1, (
+        f'expected 1 subprocess spawn (cache hit on 2nd call), got {len(call_count)}'
+    )
+
+
+def test_cache_concurrent_hits_return_consistent_words():
+    """N concurrent identical compile requests (called directly on run_compile,
+    bypassing Flask) must all return the same words, and the cache must not
+    exceed _CACHE_MAX entries — verifying the threading lock prevents races.
+    """
+    import threading
+
+    compile_api._cache.clear()
+
+    payload = {
+        'source': (
+            'abstraction ConcurrentCacheProbe {\n'
+            '    method value() {\n'
+            '        return 7;\n'
+            '    }\n'
+            '}\n'
+        ),
+        'language': 'javascript',
+    }
+
+    n_threads = 8
+    results = [None] * n_threads
+    errors = []
+    barrier = threading.Barrier(n_threads)
+
+    def do_compile(idx):
+        try:
+            barrier.wait()   # release all threads simultaneously for max contention
+            results[idx] = compile_api.run_compile(dict(payload))
+        except Exception as exc:
+            errors.append(exc)
+
+    threads = [threading.Thread(target=do_compile, args=(i,)) for i in range(n_threads)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors, f'concurrent compile calls raised exceptions: {errors}'
+
+    words_sets = [tuple(r['words']) for r in results if r and r.get('ok')]
+    assert len(words_sets) == n_threads, (
+        f'not all concurrent compiles succeeded: {results}'
+    )
+    assert len(set(words_sets)) == 1, (
+        'concurrent cache hits returned inconsistent words across threads'
+    )
+
+    # Cache must not have grown beyond the configured maximum.
+    with compile_api._cache_lock:
+        cache_size = len(compile_api._cache)
+    assert cache_size <= compile_api._CACHE_MAX, (
+        f'cache grew to {cache_size} entries, exceeding _CACHE_MAX={compile_api._CACHE_MAX}'
+    )
