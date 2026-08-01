@@ -65,6 +65,8 @@ const DEFAULT_SCRIPT_ONLY_SUITES = [
     'ns-slot-dynamic-tests',
     'lambda-exec-tests',
     'hardware-sim',
+    'check-ila-probe-names',
+    'test-check-ila-probe-names',
 ];
 
 const configPath = path.join(__dirname, 'test-workflow-config.json');
