@@ -72,9 +72,10 @@ puts "Synthesis complete."
 ##   probe1 [0]    dbg_fault_valid    — live CM fault signal (any fault type)
 ##   probe2 [31:0] dbg_nia            — NIA of the most-recently retired instruction
 ##   probe3 [31:0] dbg_fault          — packed fault telemetry:
-##                                        bits[4:0] = retire_fault_code (fault type)
-##                                        bit[5]    = retire_fault_valid
-##                                        bits[31:6] = 0 (reserved)
+##                                        bits[4:0]   = 0 (reserved)
+##                                        bit[5]      = retire_fault_valid
+##                                        bits[10:6]  = retire_fault_code (fault type)
+##                                        bits[31:11] = fault_gt[20:0] (GT word0 of faulting cap)
 ##   probe4 [1:0]  led                — physical LED state: [0]=led0 (D1), [1]=led1 (D2)
 ##                                      (ACTIVE-LOW: 0 = LED ON, 1 = LED OFF)
 ##

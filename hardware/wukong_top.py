@@ -122,9 +122,10 @@ class ChurchWukongXC7A100T(Elaboratable):
         #   dbg_fault_valid    — live CM fault signal (any fault type, any cycle)
         #   dbg_nia[31:0]      — NIA of the most-recently retired instruction
         #   dbg_fault[31:0]    — packed fault telemetry:
-        #                          bits[4:0] = retire_fault_code (fault type)
-        #                          bit[5]    = retire_fault_valid (fault on this retire)
-        #                          bits[31:6] = 0 (reserved)
+        #                          bits[4:0]  = 0 (reserved)
+        #                          bit[5]     = retire_fault_valid (fault on this retire)
+        #                          bits[10:6] = retire_fault_code (5-bit fault type)
+        #                          bits[31:11] = fault_gt[20:0] (GT word0 upper 21 bits)
         self.dbg_boot_complete = Signal()      # out — CM boot done
         self.dbg_fault_valid   = Signal()      # out — live fault
         self.dbg_nia           = Signal(32)    # out — retired NIA
@@ -723,13 +724,15 @@ class ChurchWukongXC7A100T(Elaboratable):
             self.dbg_fault_valid.eq(core.fault_valid),
             self.dbg_nia.eq(core.retire_nia),
             # Pack fault telemetry into a single 32-bit word:
-            #   bits[4:0] = retire_fault_code  (5-bit fault type)
-            #   bit[5]    = retire_fault_valid  (fault on this retire pulse)
-            #   bits[31:6] = 0 (reserved for future fields)
+            #   bits[4:0]   = 0 (reserved)
+            #   bit[5]      = retire_fault_valid  (fault on this retire pulse)
+            #   bits[10:6]  = retire_fault_code   (5-bit fault type)
+            #   bits[31:11] = fault_gt[20:0]       (GT word0 of the cap that faulted)
             self.dbg_fault.eq(Cat(
-                core.retire_fault_code,    # bits[4:0]
-                core.retire_fault_valid,   # bit[5]
-                C(0, 26),                  # bits[31:6]
+                C(0, 5),                   # bits[4:0]   = reserved
+                core.retire_fault_valid,   # bit[5]      = retire_fault_valid
+                core.retire_fault_code,    # bits[10:6]  = fault_code
+                core.fault_gt[:21],        # bits[31:11] = fault_gt upper 21 bits
             )),
         ]
 
