@@ -23,8 +23,12 @@ from collections import OrderedDict
 
 log = logging.getLogger(__name__)
 
-_WORKER          = os.path.join(os.path.dirname(__file__), 'compile_worker.js')
-_COMPILE_TIMEOUT = 30   # seconds
+_WORKER    = os.path.join(os.path.dirname(__file__), 'compile_worker.js')
+# 10 s is the primary enforcement boundary.  compile_worker.js enforces its own
+# matching deadline via worker_threads.terminate(), which is preemptive even for
+# CPU-bound synchronous code.  This Python-level timeout is the fallback that
+# SIGKILL's the Node subprocess if the worker thread somehow fails to report back.
+_COMPILE_TIMEOUT = 10  # seconds
 _CACHE_MAX       = 128  # maximum number of cached successful results
 
 # In-process LRU cache: OrderedDict used as an LRU (oldest item at front).

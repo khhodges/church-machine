@@ -374,6 +374,17 @@ def test_extra_fields_are_ignored(client):
     data = resp.get_json()
     assert isinstance(data.get('ok'), bool), f'unexpected response: {data}'
 
+def test_oversized_source_returns_400(client):
+    """A source string exceeding 64 KB must be rejected with HTTP 400 before
+    spawning the Node compile worker."""
+    huge_source = 'x' * (64 * 1024 + 1)  # one byte over the 64 KB limit
+    resp = _post(client, huge_source, 'javascript')
+    assert resp.status_code == 400, (
+        f'oversized source (>64 KB) should return HTTP 400, got {resp.status_code}'
+    )
+    data = resp.get_json()
+    assert 'error' in data, f'expected an error field in the 400 response: {data}'
+
 def _load_fixture(name):
     """Load a golden fixture from tests/server/fixtures/<name>.json."""
     fixture_path = os.path.join(_FIXTURES_DIR, f'{name}.json')
@@ -488,6 +499,51 @@ def test_cache_concurrent_hits_return_consistent_words():
         f'cache grew to {cache_size} entries, exceeding _CACHE_MAX={compile_api._CACHE_MAX}'
     )
 
+def test_source_at_limit_is_accepted(client):
+    """A valid source string of exactly 64 KB must pass the size guard.
+    The source must be real CLOOMC++ so it isn't rejected by the empty-source
+    check before reaching the size guard."""
+    # Pad a valid abstraction with inline comments to reach exactly 64 KB.
+    # The compiler will attempt to compile it; we only care that the size guard
+    # does NOT fire (i.e. no HTTP 400 mentioning 'maximum allowed size').
+    base = 'abstraction Big {\n    method run() {\n        return 0;\n    }\n}\n'
+    padding_needed = (64 * 1024) - len(base.encode('utf-8'))
+    # Fill with semicolons-commented lines that are syntactically inert
+    filler = ('; pad\n' * (padding_needed // 6 + 1))[:padding_needed]
+    at_limit = base + filler
+    assert len(at_limit.encode('utf-8')) == 64 * 1024
+
+    resp = _post(client, at_limit, 'javascript')
+    if resp.status_code == 400:
+        data = resp.get_json()
+        error_msg = (data or {}).get('error', '')
+        assert 'maximum allowed size' not in error_msg, (
+            f'source at exactly 64 KB must not be rejected by the size guard, got: {data}'
+        )
+
+def test_compile_timeout_returns_clean_error(client):
+    """When the Node subprocess times out, the API must return ok=False with a
+    descriptive 'timed out' message rather than a 5xx or an empty response.
+
+    The subprocess timeout is mocked so the test does not actually wait 10 s.
+    """
+    import subprocess
+    from unittest.mock import patch
+
+    with patch('compile_api.subprocess.run',
+               side_effect=subprocess.TimeoutExpired(['node', 'compile_worker.js'], 10)):
+        resp = _post(client, _JS_OK, 'javascript')
+
+    assert resp.status_code == 200, (
+        f'timeout must not produce a 5xx; got HTTP {resp.status_code}'
+    )
+    data = resp.get_json()
+    assert data is not None, 'response body must be valid JSON'
+    assert data['ok'] is False, f'timed-out compile must return ok=False, got: {data}'
+    assert 'timed out' in data.get('error', '').lower(), (
+        f"error message should mention 'timed out', got: {data.get('error')!r}"
+    )
+
 class TestGoldenOutput:
     """Pin exact compiled word arrays for canonical programs.
 
@@ -566,3 +622,11 @@ class TestGoldenOutput:
             f"  actual:   {data['words']!r}\n"
             f"If this change is intentional, update tests/server/fixtures/two_method_cloomc.json."
         )
+
+def test_compile_timeout_uses_10s_deadline():
+    """The compile API timeout must be ≤ 10 s (not the original 30 s) so
+    pathological sources do not block the API for 30 s each."""
+    import compile_api
+    assert compile_api._COMPILE_TIMEOUT <= 10, (
+        f'_COMPILE_TIMEOUT should be ≤10 s, got {compile_api._COMPILE_TIMEOUT}'
+    )

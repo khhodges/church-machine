@@ -9498,6 +9498,11 @@ def api_compile():
 
     if not isinstance(source, str) or not source.strip():
         return jsonify({'error': '`source` is required and must be a non-empty string'}), 400
+
+    _MAX_SOURCE_BYTES = 64 * 1024  # 64 KB
+    if len(source.encode('utf-8')) > _MAX_SOURCE_BYTES:
+        return jsonify({'error': f'`source` exceeds the maximum allowed size of {_MAX_SOURCE_BYTES // 1024} KB'}), 400
+
     if language not in VALID_LANGUAGES:
         return jsonify({'error': f'`language` must be one of: {", ".join(sorted(VALID_LANGUAGES))}'}), 400
 
