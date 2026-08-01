@@ -27,6 +27,7 @@ server/scheduler.db
 # Mum private key (Stage 3 — Keystone Hello Mum; generated on first run)
 server/mum_key.pem
 server/church_machine.db
+server/church_machine.db-journal
 server/github-sync-status.json
 
 # Agent screenshot attachments — LFS-tracked by Replit internally; exclude from pushes
