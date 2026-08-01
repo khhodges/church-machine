@@ -630,3 +630,82 @@ def test_compile_timeout_uses_10s_deadline():
     assert compile_api._COMPILE_TIMEOUT <= 10, (
         f'_COMPILE_TIMEOUT should be ≤10 s, got {compile_api._COMPILE_TIMEOUT}'
     )
+
+
+# ---------------------------------------------------------------------------
+# Worker-stamp cache invalidation — upgrading compile_worker.js must bust
+# the cache in a running process without a restart.
+# ---------------------------------------------------------------------------
+
+def test_worker_stamp_change_busts_cache():
+    """Simulating an upgrade to compile_worker.js must cause the next identical
+    request to bypass the cache and re-invoke the compiler.
+
+    Strategy: after priming the cache we set _WORKER_MTIME to an impossible
+    sentinel (-999.0) so the next run_compile call re-stats the file and sees
+    a changed mtime.  We also set _WORKER_STAMP to a fake old value so the
+    newly-computed real stamp differs from it, triggering a cache flush.
+    Then we assert that _run_compile_uncached is called a second time.
+    """
+    # ── 1. Reset state ──────────────────────────────────────────────────────
+    compile_api._cache.clear()
+    # Seed a known-good mtime/stamp so the cache builds normally.
+    compile_api._WORKER_MTIME = -1.0
+    compile_api._WORKER_STAMP = ''
+
+    payload = {
+        'source': (
+            'abstraction WorkerStampProbe {\n'
+            '    method value() {\n'
+            '        return 55;\n'
+            '    }\n'
+            '}\n'
+        ),
+        'language': 'javascript',
+    }
+
+    # ── 2. Prime the cache ──────────────────────────────────────────────────
+    result1 = compile_api.run_compile(dict(payload))
+    assert result1.get('ok') is True, f'prime compile failed: {result1}'
+
+    with compile_api._cache_lock:
+        assert len(compile_api._cache) == 1, 'cache should have one entry after prime'
+
+    # ── 3. Simulate an upgraded worker file ─────────────────────────────────
+    # _WORKER_MTIME to sentinel → next stat will see a different mtime.
+    # _WORKER_STAMP to a fake value → real hash will differ → cache flushed.
+    compile_api._WORKER_MTIME = -999.0
+    compile_api._WORKER_STAMP = 'old-fake-stamp-xxxx'
+
+    # ── 4. Second call — must be a cache miss ───────────────────────────────
+    call_count = []
+    original_uncached = compile_api._run_compile_uncached
+
+    def counting_uncached(p):
+        call_count.append(1)
+        return original_uncached(p)
+
+    with patch.object(compile_api, '_run_compile_uncached', side_effect=counting_uncached):
+        result2 = compile_api.run_compile(dict(payload))
+
+    assert result2.get('ok') is True, f'post-bust compile failed: {result2}'
+    assert len(call_count) == 1, (
+        f'expected 1 uncached call after stamp change (cache should have been '
+        f'flushed), got {len(call_count)}'
+    )
+
+    # ── 5. Third call — must now hit the fresh cache ─────────────────────────
+    call_count2 = []
+
+    def counting_uncached2(p):
+        call_count2.append(1)
+        return original_uncached(p)
+
+    with patch.object(compile_api, '_run_compile_uncached', side_effect=counting_uncached2):
+        result3 = compile_api.run_compile(dict(payload))
+
+    assert result3.get('ok') is True, f'post-bust second call failed: {result3}'
+    assert len(call_count2) == 0, (
+        f'expected 0 uncached calls on the call after a stamp-bust re-prime '
+        f'(should hit new cache), got {len(call_count2)}'
+    )
