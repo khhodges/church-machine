@@ -113,6 +113,23 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         self.led = [Signal(name=f"led{i}") for i in range(2)]
 
+        # ── ILA / debug observation ports ─────────────────────────────────────
+        # These are top-level output ports (no physical pin — ILA probes them
+        # internally over JTAG).  The Vivado TCL connects them to the ILA core
+        # so Vivado Hardware Manager can display Church Machine state in real-time.
+        #
+        #   dbg_boot_complete  — CM has exited the boot phase and is executing user code
+        #   dbg_fault_valid    — live CM fault signal (any fault type, any cycle)
+        #   dbg_nia[31:0]      — NIA of the most-recently retired instruction
+        #   dbg_fault[31:0]    — packed fault telemetry:
+        #                          bits[4:0] = retire_fault_code (fault type)
+        #                          bit[5]    = retire_fault_valid (fault on this retire)
+        #                          bits[31:6] = 0 (reserved)
+        self.dbg_boot_complete = Signal()      # out — CM boot done
+        self.dbg_fault_valid   = Signal()      # out — live fault
+        self.dbg_nia           = Signal(32)    # out — retired NIA
+        self.dbg_fault         = Signal(32)    # out — packed fault telemetry
+
     def elaborate(self, platform):
         m = Module()
 
@@ -695,5 +712,25 @@ class ChurchWukongXC7A100T(Elaboratable):
                 # fault_latched=1 → ~1=0 → LOW  → LED ON  (fault visible)
                 self.led[1].eq(~fault_latched),
             ]
+
+        # ── ILA debug observation port wiring ─────────────────────────────────
+        # Route internal CM signals to the top-level debug output ports so the
+        # Vivado ILA (inserted by wukong_xc7a100t.tcl after synthesis) can probe
+        # them.  These ports have no physical pin constraints — they are consumed
+        # entirely by the on-chip ILA core over the board's built-in JTAG chain.
+        m.d.comb += [
+            self.dbg_boot_complete.eq(core.boot_complete),
+            self.dbg_fault_valid.eq(core.fault_valid),
+            self.dbg_nia.eq(core.retire_nia),
+            # Pack fault telemetry into a single 32-bit word:
+            #   bits[4:0] = retire_fault_code  (5-bit fault type)
+            #   bit[5]    = retire_fault_valid  (fault on this retire pulse)
+            #   bits[31:6] = 0 (reserved for future fields)
+            self.dbg_fault.eq(Cat(
+                core.retire_fault_code,    # bits[4:0]
+                core.retire_fault_valid,   # bit[5]
+                C(0, 26),                  # bits[31:6]
+            )),
+        ]
 
         return m

@@ -62,6 +62,85 @@ if {[get_property PROGRESS [get_runs synth_1]] ne "100%"} {
 }
 puts "Synthesis complete."
 
+## ── ILA debug probe insertion (post-synthesis) ────────────────────────────
+## A Xilinx ILA (Integrated Logic Analyzer) core is inserted into the
+## synthesised netlist so Vivado Hardware Manager can capture Church Machine
+## state live over the board's built-in JTAG chain — no extra pins needed.
+##
+## Probe list (1024-sample capture depth):
+##   probe0 [0]    dbg_boot_complete  — CM boot phase done; transitions 0→1 at boot
+##   probe1 [0]    dbg_fault_valid    — live CM fault signal (any fault type)
+##   probe2 [31:0] dbg_nia            — NIA of the most-recently retired instruction
+##   probe3 [31:0] dbg_fault          — packed fault telemetry:
+##                                        bits[4:0] = retire_fault_code (fault type)
+##                                        bit[5]    = retire_fault_valid
+##                                        bits[31:6] = 0 (reserved)
+##   probe4 [1:0]  led                — physical LED state: [0]=led0 (D1), [1]=led1 (D2)
+##                                      (ACTIVE-LOW: 0 = LED ON, 1 = LED OFF)
+##
+## Trigger suggestions (set in Hardware Manager → ILA dashboard):
+##   • Trigger on probe1 (dbg_fault_valid) == 1 to halt capture on any CM fault.
+##   • Trigger on probe0 (dbg_boot_complete) == R (rising edge) to capture boot moment.
+##   • Trigger on probe2 (dbg_nia) == <address> to break on a specific instruction.
+##
+## The clock net pattern below matches the IBUF→BUFG chain that Vivado
+## auto-infers for the M21 SRCC pin (see wukong_top.py clock domain note).
+## If synthesis renames it, check: get_nets -hierarchical -filter {IS_CLOCK = 1}
+
+open_run synth_1 -name synth_1
+
+set ila [create_debug_core u_ila_0 ila]
+set_property C_DATA_DEPTH        1024  $ila
+set_property C_TRIGIN_EN         false $ila
+set_property C_EN_STRG_QUAL      false $ila
+set_property C_ADV_TRIGGER       false $ila
+set_property C_ALL_PROBE_SAME_MU_CNT 4 $ila
+
+## Clock: connect to the BUFG output that drives the sync domain
+set clk_net [get_nets -hierarchical -filter {NAME =~ *clk_IBUF_BUFG* && IS_CLOCK == 1}]
+if {$clk_net eq ""} {
+    ## Fallback: pick the first clock net in the hierarchy if the BUFG isn't found
+    ## by its default name (can happen with different Vivado versions).
+    set clk_net [lindex [get_nets -hierarchical -filter {IS_CLOCK == 1}] 0]
+    puts "ILA: clk_IBUF_BUFG not found by name; using fallback clock net: $clk_net"
+}
+connect_debug_port u_ila_0/clk $clk_net
+
+## probe0 — dbg_boot_complete (1-bit)
+create_debug_port u_ila_0 probe
+set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_0/probe0]
+set_property port_width 1               [get_debug_ports u_ila_0/probe0]
+connect_debug_port u_ila_0/probe0 [get_nets {dbg_boot_complete}]
+
+## probe1 — dbg_fault_valid (1-bit)
+create_debug_port u_ila_0 probe
+set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_0/probe1]
+set_property port_width 1               [get_debug_ports u_ila_0/probe1]
+connect_debug_port u_ila_0/probe1 [get_nets {dbg_fault_valid}]
+
+## probe2 — dbg_nia[31:0]
+create_debug_port u_ila_0 probe
+set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_0/probe2]
+set_property port_width 32              [get_debug_ports u_ila_0/probe2]
+connect_debug_port u_ila_0/probe2 [lsort -dictionary [get_nets {dbg_nia[*]}]]
+
+## probe3 — dbg_fault[31:0]
+create_debug_port u_ila_0 probe
+set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_0/probe3]
+set_property port_width 32              [get_debug_ports u_ila_0/probe3]
+connect_debug_port u_ila_0/probe3 [lsort -dictionary [get_nets {dbg_fault[*]}]]
+
+## probe4 — led[1:0]  (led0 = D1/G21, led1 = D2/G20)
+create_debug_port u_ila_0 probe
+set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_0/probe4]
+set_property port_width 2               [get_debug_ports u_ila_0/probe4]
+connect_debug_port u_ila_0/probe4 [lsort -dictionary [get_nets {led0 led1}]]
+
+implement_debug_core
+close_design
+
+puts "ILA debug core inserted — Hardware Manager will show 5 named probes."
+
 ## ── Implementation ───────────────────────────────────────────────────────
 puts "\n═══ Implementation starting (may take 10–25 min) ═══"
 launch_runs impl_1 -jobs ${JOBS}
@@ -109,18 +188,32 @@ if {[file exists $bit_src]} {
     puts "\n═══════════════════════════════════════════════════════════════════"
     puts " Bitstream ready: [pwd]/${TOP}.bit"
     puts "═══════════════════════════════════════════════════════════════════"
+
+    ## Write ILA probe file — Hardware Manager uses this to map raw probe
+    ## indices back to the names declared in the TCL (dbg_boot_complete, etc.)
+    ## Load it in Hardware Manager: Program Device → ... → Probes File → select .ltx
+    open_run impl_1 -name impl_1
+    write_debug_probes -force ${TOP}.ltx
+    close_design
+    puts " ILA probes file: [pwd]/${TOP}.ltx"
+    puts "═══════════════════════════════════════════════════════════════════"
     puts ""
     puts " To program via Vivado Hardware Manager (Tcl console):"
     puts "   open_hw_manager"
     puts "   connect_hw_server -allow_non_jtag"
     puts "   open_hw_target"
     puts "   set_property PROGRAM.FILE {[pwd]/${TOP}.bit} \[lindex \[get_hw_devices\] 0\]"
+    puts "   set_property PROBES.FILE  {[pwd]/${TOP}.ltx} \[lindex \[get_hw_devices\] 0\]"
     puts "   program_hw_devices \[lindex \[get_hw_devices\] 0\]"
     puts ""
     puts " Expected LED behaviour after programming:"
     puts "   D1 (G21):  solid ON during boot (~50 cycles), then blinks ~1 Hz (CM MMIO-controlled)"
     puts "   D2 (G20):  1 Hz heartbeat during boot, then OFF when running (lit = fault latched)"
     puts "   UART E3:   0xBB sentinel byte at 57600 baud within ~1 s of power-on"
+    puts ""
+    puts " ILA dashboard (Hardware Manager):"
+    puts "   Trigger on probe1 (dbg_fault_valid) = 1 to capture any CM fault."
+    puts "   Trigger on probe0 (dbg_boot_complete) rising edge to capture boot moment."
     puts "═══════════════════════════════════════════════════════════════════"
 } else {
     error "Bitstream not found at $bit_src — check implementation logs."

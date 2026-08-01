@@ -334,7 +334,15 @@ def generate_rtlil_wukong(output_dir="build"):
 
     top = ChurchWukongXC7A100T(clk_freq=50_000_000, baud=57_600, sim_mode=False)
 
-    ports = [top.clk, top.rst_n] + list(top.led) + [top.uart_tx_pin, top.uart_rx_pin]
+    ports = (
+        [top.clk, top.rst_n]
+        + list(top.led)
+        + [top.uart_tx_pin, top.uart_rx_pin]
+        # ILA observation ports — exposed as top-level outputs so Vivado can
+        # connect them to the ILA core by net name (wukong_xc7a100t.tcl).
+        # No physical pin constraints are needed; the ILA probes internally.
+        + [top.dbg_boot_complete, top.dbg_fault_valid, top.dbg_nia, top.dbg_fault]
+    )
 
     rtlil_text = convert(top, ports=ports)
 
