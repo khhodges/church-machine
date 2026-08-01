@@ -243,12 +243,14 @@ if {[file exists $bit_src]} {
 ## ── SPI flash image (MCS) ────────────────────────────────────────────────────
 ## Produces church_wukong_xc7a100t.mcs for programming the on-board SPI NOR flash.
 ##
-## Flash device (QMTECH Wukong V3): Winbond W25Q256JVSIQ
-##   Capacity : 256 Mb (32 MB)
+## Flash device (QMTECH Wukong V3): Micron N25Q064 (hardware-confirmed)
+##   Capacity : 64 Mb (8 MB)
 ##   Interface: SPI x1 / x2 / x4 (Quad SPI)
-##   Voltage  : 2.7–3.6 V
-##   Vivado part string: w25q256jvsiq-spi-x1_x2_x4
-##     (verify with: get_cfgmem_parts *w25q256* — or use *256* to list all 256 Mb parts)
+##   Voltage  : 3.3 V
+##   Vivado part string: n25q64-3.3v-spi-x1_x2_x4
+##     (verify with: get_cfgmem_parts *n25q64* in Vivado Tcl console)
+## NOTE: Vivado will report "Part selected w25q256jvq, but part n25q64-3.3v detected"
+##       if you accidentally select a w25q256 part — the chip is always n25q64.
 ##
 ## After programming the flash and pressing the reset button the Church Machine
 ## boots automatically without re-programming the SRAM.
@@ -256,7 +258,7 @@ set mcs_file "[pwd]/${TOP}.mcs"
 puts "\n═══ Generating SPI flash image (MCS) ═══"
 write_cfgmem \
     -format       mcs       \
-    -size         256       \
+    -size         64        \
     -interface    SPIx4     \
     -loadbit      "up 0x0 [pwd]/${TOP}.bit" \
     -file         ${mcs_file} \
@@ -275,7 +277,7 @@ puts "   refresh_hw_device -update_hw_probes false \$device"
 puts ""
 puts "   # -- attach flash and program it --"
 puts "   create_hw_cfgmem -hw_device \$device \\"
-puts "       \[lindex \[get_cfgmem_parts {w25q256jvsiq-spi-x1_x2_x4}\] 0\]"
+puts "       \[lindex \[get_cfgmem_parts {n25q64-3.3v-spi-x1_x2_x4}\] 0\]"
 puts "   set cfgmem \[get_property PROGRAM.HW_CFGMEM \$device\]"
 puts "   set_property PROGRAM.BLANK_CHECK  0          \$cfgmem"
 puts "   set_property PROGRAM.ERASE        1          \$cfgmem"
