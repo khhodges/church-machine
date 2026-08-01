@@ -125,3 +125,52 @@ if {[file exists $bit_src]} {
 } else {
     error "Bitstream not found at $bit_src — check implementation logs."
 }
+
+## ── SPI flash image (MCS) ────────────────────────────────────────────────────
+## Produces church_wukong_xc7a100t.mcs for programming the on-board SPI NOR flash.
+##
+## Flash device (QMTECH Wukong V3): Winbond W25Q256JVSIQ
+##   Capacity : 256 Mb (32 MB)
+##   Interface: SPI x1 / x2 / x4 (Quad SPI)
+##   Voltage  : 2.7–3.6 V
+##   Vivado part string: w25q256jvsiq-spi-x1_x2_x4
+##     (verify with: get_cfgmem_parts *w25q256* — or use *256* to list all 256 Mb parts)
+##
+## After programming the flash and pressing the reset button the Church Machine
+## boots automatically without re-programming the SRAM.
+set mcs_file "[pwd]/${TOP}.mcs"
+puts "\n═══ Generating SPI flash image (MCS) ═══"
+write_cfgmem \
+    -format       mcs       \
+    -size         256       \
+    -interface    SPIx4     \
+    -loadbit      "up 0x0 [pwd]/${TOP}.bit" \
+    -file         ${mcs_file} \
+    -force
+puts "\n═══════════════════════════════════════════════════════════════════"
+puts " SPI flash image ready: ${mcs_file}"
+puts "═══════════════════════════════════════════════════════════════════"
+puts ""
+puts " To program the SPI flash via Vivado Hardware Manager (Tcl console):"
+puts "   # -- open connection (same as SRAM programming) --"
+puts "   open_hw_manager"
+puts "   connect_hw_server -allow_non_jtag"
+puts "   open_hw_target"
+puts "   set device \[lindex \[get_hw_devices\] 0\]"
+puts "   refresh_hw_device -update_hw_probes false \$device"
+puts ""
+puts "   # -- attach flash and program it --"
+puts "   create_hw_cfgmem -hw_device \$device \\"
+puts "       \[lindex \[get_cfgmem_parts {w25q256jvsiq-spi-x1_x2_x4}\] 0\]"
+puts "   set cfgmem \[get_property PROGRAM.HW_CFGMEM \$device\]"
+puts "   set_property PROGRAM.BLANK_CHECK  0          \$cfgmem"
+puts "   set_property PROGRAM.ERASE        1          \$cfgmem"
+puts "   set_property PROGRAM.CFG_PROGRAM  1          \$cfgmem"
+puts "   set_property PROGRAM.VERIFY       1          \$cfgmem"
+puts "   set_property PROGRAM.FILES        \[list {${mcs_file}}\] \$cfgmem"
+puts "   program_hw_cfgmem \$cfgmem"
+puts "   boot_hw_device \$device"
+puts ""
+puts " After programming completes, press the RESET button on the Wukong board."
+puts " The Church Machine will boot automatically (no re-programming needed)."
+puts "═══════════════════════════════════════════════════════════════════"
