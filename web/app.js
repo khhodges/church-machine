@@ -1146,9 +1146,6 @@ function updateNamespaceDisplay() {
     html += '</tbody></table>';
     nsPanel.innerHTML = html;
 
-    if (hierPanel) {
-        hierPanel.innerHTML = buildHierarchyTree();
-    }
     attachContextMenuListeners();
 
     if (vocabularyViewActive) {
