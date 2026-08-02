@@ -3114,8 +3114,11 @@ function _nsTableAddConfirm() {
             sim.memory[lumpBase + wi] = words[wi] >>> 0;
         }
 
-        // limit17: 0 for Lazy Load (stub), hdr.cw for Boot Resident (full)
-        const limit17    = (loadMode === 'resident') ? hdr.cw : 0;
+        // limit17: always hdr.cw (real grant interval) regardless of load mode.
+        // For Lazy Load the header word is zeroed after the c-list is written so
+        // Mode 1 (Restore) fires on first CALL/LOAD rather than setting limit17=0
+        // (which would leave no callable range and break the seal after lazyLoad).
+        const limit17    = hdr.cw;
         const abstractGt = (sidecar && sidecar.abstract_gt) ? (sidecar.abstract_gt >>> 0) : 0;
 
         // Write NS entry with programmer-chosen options
@@ -3208,6 +3211,36 @@ function _nsTableAddConfirm() {
                 // 3. No GT source at all: write null GT (0); lazy-resolve at runtime.
                 sim.memory[writeAddr] = 0x00000000;
             }
+        }
+
+        // ── Lazy Load: zero header word + register manifest entry ─────────────
+        // Mode 1 (Restore) fires when CALL/LOAD finds magic=0 at lumpBase.
+        // Code words at lumpBase+1..+hdr.cw and c-list GTs at the tail are
+        // left in place; lazyLoad() rewrites the header + code section only and
+        // reseals word2. limit17 = hdr.cw was already written above, so the
+        // grant interval and seal are correct after restore.
+        if (loadMode === 'lazy') {
+            sim.memory[lumpBase] = 0;               // magic=0 ≠ 0x1F → not resident
+            if (!sim.lazyManifest) sim.lazyManifest = {};
+            const _lazyCode = Array.from(words.slice(1, 1 + hdr.cw));
+            sim.lazyManifest[slot] = {
+                label:     name,
+                source:    'ns-add',
+                priority:  'warm',
+                size:      hdr.lumpSize,
+                allocBase: lumpBase,
+                allocSize: hdr.lumpSize,
+                loaded:    false,
+                loadCount: 0,
+                bootUpload: {
+                    methods:      [{ code: _lazyCode }],
+                    data_words:   [],
+                    // null placeholders preserve the cc count so lazyLoad re-packs
+                    // the correct cc into the header without overwriting existing
+                    // c-list GTs (only self-data-R entries are handled by lazyLoad).
+                    capabilities: new Array(hdr.cc).fill(null),
+                },
+            };
         }
 
         const _overlay = document.getElementById('_nsAddModalOverlay');
