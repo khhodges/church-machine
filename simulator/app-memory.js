@@ -2624,30 +2624,17 @@ function updateNamespace() {
     html += '</tr></thead><tbody>';
 
     const typeNames = ['NULL','Inform','Outform','Abstract'];
-    const NS_TIER_HW_MAX   = 5;
-    const NS_TIER_BOOT_MAX = 10;
     for (let i = 0; i < sim.nsCount; i++) {
         const e = sim.readNSEntry(i);
-        // Always render the tier-section header even for gap rows, then show
-        // a (gap) placeholder so the slot number stays visible in the table.
-        const _isTierHeader = (i === 0) || (i === NS_TIER_HW_MAX + 1) || (i === NS_TIER_BOOT_MAX + 1);
         if (!e) {
-            if (_isTierHeader) {
-                if (i === 0) html += '<tr class="ns-tier-header ns-tier-hw-header"><td colspan="10">&#x1F512; Hardware &mdash; slots 0&#x2013;5 &mdash; hardwired at design time, frozen into FPGA bitstream</td></tr>';
-                else if (i === NS_TIER_HW_MAX + 1) html += '<tr class="ns-tier-header ns-tier-boot-header"><td colspan="10">&#x1F97E; Boot &mdash; slots 6&#x2013;10 &mdash; loaded from the boot image before the first instruction</td></tr>';
-                else if (i === NS_TIER_BOOT_MAX + 1) html += '<tr class="ns-tier-header ns-tier-prog-header"><td colspan="10">&#x270F;&#xFE0F; Programmer &mdash; slots 11+ &mdash; allocated at runtime by programmer code</td></tr>';
-            }
-            const tierClass = i <= NS_TIER_HW_MAX ? 'ns-tier-hw-row' : (i <= NS_TIER_BOOT_MAX ? 'ns-tier-boot-row' : 'ns-tier-prog-row');
-            html += `<tr id="ns-row-${i}" class="ns-row ${tierClass}" style="opacity:0.45;">`;
+            html += `<tr id="ns-row-${i}" class="ns-row" style="opacity:0.45;">`;
             html += `<td class="ns-idx-cell"><span style="color:#666;">${i}</span></td>`;
             const _gapLabel = (sim.nsLabels && sim.nsLabels[i] && sim.nsLabels[i] !== '(free)' && sim.nsLabels[i] !== '(reserved)') ? sim.nsLabels[i] : '';
-            const _isBitstreamOnly = sim._bitstreamSlots && sim._bitstreamSlots.has(i);
-            const _gapNote = _isBitstreamOnly ? '(bitstream-only — hardware GT, no DMEM body; slot reserved)' : '(gap — slot reserved, no entry installed)';
             if (_gapLabel) {
                 html += `<td style="color:#666;font-style:italic;">${_gapLabel}</td>`;
-                html += `<td colspan="7" style="color:#555;font-style:italic;font-size:0.8rem;">${_gapNote}</td>`;
+                html += `<td colspan="7" style="color:#555;font-style:italic;font-size:0.8rem;">(no DMEM entry)</td>`;
             } else {
-                html += `<td colspan="8" style="color:#555;font-style:italic;font-size:0.8rem;">${_gapNote}</td>`;
+                html += `<td colspan="8" style="color:#555;font-style:italic;font-size:0.8rem;">(no entry installed)</td>`;
             }
             html += `<td class="ns-entry-actions"></td>`;
             html += '</tr>';
@@ -2671,18 +2658,10 @@ function updateNamespace() {
         const isStub = sim._nsStubFlags && sim._nsStubFlags[i] === true;
         const stubLabelStyle = isStub ? 'color:#f87171;' : '';
         const stubBadge = isStub ? ' <span style="color:#f87171;font-size:0.7rem;" title="Stub fault \u2014 all methods are bare stubs; calls will fault">\u26d4</span>' : '';
-        if (i === 0) {
-            html += '<tr class="ns-tier-header ns-tier-hw-header"><td colspan="10">&#x1F512; Hardware &mdash; slots 0&#x2013;5 &mdash; hardwired at design time, frozen into FPGA bitstream</td></tr>';
-        } else if (i === NS_TIER_HW_MAX + 1) {
-            html += '<tr class="ns-tier-header ns-tier-boot-header"><td colspan="10">&#x1F97E; Boot &mdash; slots 6&#x2013;10 &mdash; loaded from the boot image before the first instruction</td></tr>';
-        } else if (i === NS_TIER_BOOT_MAX + 1) {
-            html += '<tr class="ns-tier-header ns-tier-prog-header"><td colspan="10">&#x270F;&#xFE0F; Programmer &mdash; slots 11+ &mdash; allocated at runtime by programmer code</td></tr>';
-        }
-        const tierClass = i <= NS_TIER_HW_MAX ? 'ns-tier-hw-row' : (i <= NS_TIER_BOOT_MAX ? 'ns-tier-boot-row' : 'ns-tier-prog-row');
-        const _clearBtn = (i >= 7 && i !== bootEntrySlot)
+        const _clearBtn = (i >= 2 && i !== bootEntrySlot)
             ? `<button class="btn btn-xs" onclick="event.stopPropagation();_nsTableClear(${i})" style="background:#2e1a1a;color:#f87171;border:1px solid rgba(248,113,113,0.35);margin-right:4px;font-size:0.65rem;padding:1px 5px;" title="Clear slot — bumps the GT cycle count to revoke all existing tokens for this slot">Clear</button>`
             : '';
-        html += `<tr id="ns-row-${i}" class="ns-row ${tierClass}" data-ns-slot="${i}" style="${rowOpacity}">`;
+        html += `<tr id="ns-row-${i}" class="ns-row" data-ns-slot="${i}" style="${rowOpacity}">`;
         html += `<td class="ns-idx-cell" style="white-space:nowrap;">${_clearBtn}<span class="ns-boot-btn${isBootNS ? ' boot-entry-active' : ''}" onclick="event.stopPropagation();setBootEntrySlot(${i})" title="${isBootNS ? 'Current boot entry' : 'Set as boot entry'}">${isBootNS ? '\u26a1' : i}</span></td>`;
         let nsLabelInner = e.label || '-';
         {
@@ -2715,19 +2694,15 @@ function updateNamespace() {
         html += `<td style="${warmStyle}">${ver}</td>`;
         html += `<td style="${warmStyle}">0x${seal.toString(16).toUpperCase().padStart(4, '0')}</td>`;
         {
-            if (i <= NS_TIER_HW_MAX) {
-                html += `<td class="ns-entry-actions"></td>`;
+            const _srcLump = _findSrcLump(i, e.label);
+            const _srcToken = _srcLump ? _srcLump.token : null;
+            if (codeNotResident) {
+                html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span></td>`;
             } else {
-                const _srcLump = _findSrcLump(i, e.label);
-                const _srcToken = _srcLump ? _srcLump.token : null;
-                if (codeNotResident) {
-                    html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span></td>`;
-                } else {
-                    const _srcBtn = _srcToken
-                        ? `<button class="btn btn-xs" onclick="event.stopPropagation();_openLumpSource('${_srcToken}')" style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);" title="Open source in Repository view">Source</button>`
-                        : '';
-                    html += `<td class="ns-entry-actions">${_srcBtn}</td>`;
-                }
+                const _srcBtn = _srcToken
+                    ? `<button class="btn btn-xs" onclick="event.stopPropagation();_openLumpSource('${_srcToken}')" style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);" title="Open source in Repository view">Source</button>`
+                    : '';
+                html += `<td class="ns-entry-actions">${_srcBtn}</td>`;
             }
         }
         html += '</tr>';
@@ -3094,8 +3069,8 @@ function _nsTableAddConfirm() {
     let userSlot = null;
     if (slotPolicy !== 'dynamic' && slotInputVal !== '') {
         userSlot = parseInt(slotInputVal, 10);
-        if (isNaN(userSlot) || userSlot < 7 || userSlot >= sim.MAX_NS_ENTRIES) {
-            if (errEl) errEl.textContent = `Slot must be between 7 and ${sim.MAX_NS_ENTRIES - 1}.`;
+        if (isNaN(userSlot) || userSlot < 0 || userSlot >= sim.MAX_NS_ENTRIES) {
+            if (errEl) errEl.textContent = `Slot must be between 0 and ${sim.MAX_NS_ENTRIES - 1}.`;
             return;
         }
         if (sim.isNSEntryValid(userSlot)) {
