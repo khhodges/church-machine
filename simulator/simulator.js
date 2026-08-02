@@ -2159,26 +2159,27 @@ class ChurchSimulator {
                         stepCtx: 'NUC_CLIST sentinel-only',
                     });
                 } else {
+                    // CALL ISA microcode (INIT_CLIST): CR6 ← L-perm c-list token via mLoad-validated
+                    // NS entry.  Only LOAD_NS (CR15) and INIT_THRD (CR12) are permitted raw writes;
+                    // every other CR must go through _writeCR using the mLoad-returned NS entry.
+                    // Synthesise a clist-entry whose word0_location points to the c-list start
+                    // (base + clistStart) so _writeCR sets CR6.word1 correctly.
                     const cr6GT = this.createGT(0, bootEntrySlot, {R:0,W:0,X:0,L:1,S:0,E:0}, 1);   // L-perm c-list token
-                    this.cr[6] = {
-                        word0: cr6GT,
-                        word1: (base + clistStart) >>> 0,
-                        word2: entryNSEntry.word1_limit >>> 0,
-                        word3: entryNSEntry.word2_seals,
-                        m: this.mElevation ? 1 : 0
-                    };
-                    this.output += `[BOOT] NUC_CLIST — CR6(L) <- c-list of ${_b4Label} (base=0x${(base+clistStart).toString(16).toUpperCase()}, cc=${cc}); sentinel pushed (frame@+${sp_max}, STO=${this.sto})\n`;
+                    const _clistEntry = Object.assign({}, entryNSEntry, { word0_location: (base + clistStart) >>> 0 });
+                    this._writeCR(6, cr6GT, _clistEntry);
+                    this.cr[6].m = 1;   // CALL is always M-elevated (matches CALL ISA call.py: mload_m_elevated=1)
+                    this.output += `[BOOT] NUC_CLIST — INIT_CLIST CR6(L) <- mLoad c-list of ${_b4Label} (base=0x${(base+clistStart).toString(16).toUpperCase()}, cc=${cc}); sentinel pushed (frame@+${sp_max}, STO=${this.sto})\n`;
                     this.output += `[BOOT] SENTINEL CALL — frame@+${sp_max}=0x${sentinelFrameWord.toString(16).toUpperCase().padStart(8,'0')} (NIA=0x7FFF,sz=1,prev_STO=${sp_max}), E-GT@+${sp_max-1}=0x${oldCR6GT.toString(16).toUpperCase().padStart(8,'0')}, STO=${this.sto}\n`;
                     this.auditLog.push({
                         gate: 'CR_WR',
-                        desc: `CR6(L) ← ${_b4Label} c-list  · base=0x${(base+clistStart).toString(16).toUpperCase()}, cc=${cc}, sentinel pushed`,
+                        desc: `CR6(L) ← mLoad INIT_CLIST · ${_b4Label} c-list  · base=0x${(base+clistStart).toString(16).toUpperCase()}, cc=${cc}, sentinel pushed`,
                         label: _b4Label + ' c-list',
                         nsIndex: bootEntrySlot,
                         requiredPerm: 'L',
                         checks: { install: { pass: true } },
                         b: 0, f: 0,
                         result: 'pass',
-                        stepCtx: 'NUC_CLIST CR6',
+                        stepCtx: 'NUC_CLIST INIT_CLIST CR6',
                     });
                 }
 
@@ -2203,15 +2204,13 @@ class ChurchSimulator {
                 }
                 const { base, hdrWord, cw, cc, lumpSz, clistStart, bootEntrySlot, label: _b4Label, entryNSEntry } = nd;
 
-                // ── Derive CR14 (code, R+X) from lump header ──────────────────────────
+                // ── Derive CR14 (code, R+X) via mLoad-validated NS entry (CALL ISA) ──────
+                // CALL ISA rule: only LOAD_NS (CR15) and INIT_THRD (CR12) are permitted raw
+                // writes.  CR14 must be installed through _writeCR using the NS entry
+                // returned by the E-perm mLoad in NUC_CLIST (B:06).
+                // _writeCR sets CR14.word1 = entryNSEntry.word0_location = lump base ✓
                 const cr14GT = this.createGT(0, bootEntrySlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);  // R+X code token
-                this.cr[14] = {
-                    word0: cr14GT,
-                    word1: base,                    // physical base of Boot.Abstr lump
-                    word2: entryNSEntry.word1_limit >>> 0,
-                    word3: entryNSEntry.word2_seals,
-                    m: this.mElevation ? 1 : 0
-                };
+                this._writeCR(14, cr14GT, entryNSEntry);
 
                 // ── Directly set CR0 to boot-entry E-GT (Thread.caps[0]) ─────────────────
                 // Direct dispatch: install the E-GT straight into CR0 so the first
