@@ -260,9 +260,8 @@ test.describe('Namespace panel — cold boot shows no dynamic slots (11+)', () =
     });
 
     // 1c — Slot 7 = WukongCallHome (valid NS entry, rendered row).
-    //      Slot 8 = Tunnel / bitstreamOnly (null NS entry from boot software,
-    //      no rendered DOM row — FPGA writes it at hardware power-on).
-    test('slot 7 has WukongCallHome entry; slot 8 (bitstreamOnly) has no NS entry', async ({ page }) => {
+    //      Slot 8 = Tunnel — boot image writes a real NS entry (same as all other boot slots).
+    test('slot 7 has WukongCallHome entry; slot 8 has Tunnel NS entry', async ({ page }) => {
         test.setTimeout(60000);
 
         await loadColdBoot(page);
@@ -292,19 +291,23 @@ test.describe('Namespace panel — cold boot shows no dynamic slots (11+)', () =
             'Slot 7 must be labelled "WukongCallHome"'
         ).toBe('WukongCallHome');
 
-        // Slot 8 is bitstreamOnly (Tunnel): boot software leaves NS memory at zeros;
-        // the FPGA writes the real entry when it powers on.
+        // Slot 8 is Tunnel — the IDE is the authority; the boot image writes a real
+        // NS entry for it just like every other boot slot.
         expect(
             slotData.slot8.entry,
-            'Slot 8 (Tunnel/bitstreamOnly) must have a null NS entry at sim cold boot'
-        ).toBeNull();
+            'Slot 8 (Tunnel) must have a valid NS entry at cold boot'
+        ).not.toBeNull();
+        expect(
+            slotData.slot8.label,
+            'Slot 8 must be labelled "Tunnel"'
+        ).toBe('Tunnel');
 
-        // Slot 8 must not produce a rendered row in the namespace table.
+        // Slot 8 must produce a rendered row in the namespace table.
         const row8Count = await page.locator('#namespaceTable #ns-row-8').count();
         expect(
             row8Count,
-            'Slot 8 (Tunnel/bitstreamOnly) must not produce a rendered namespace table row at cold boot'
-        ).toBe(0);
+            'Slot 8 (Tunnel) must produce a rendered namespace table row at cold boot'
+        ).toBe(1);
     });
 
 });

@@ -2699,7 +2699,7 @@ function updateNamespace() {
             if (codeNotResident) {
                 html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span></td>`;
             } else {
-                const _srcBtn = _srcToken
+                const _srcBtn = (_srcToken && _srcLump && _srcLump.has_source)
                     ? `<button class="btn btn-xs" onclick="event.stopPropagation();_openLumpSource('${_srcToken}')" style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);" title="Open source in Repository view">Source</button>`
                     : '';
                 html += `<td class="ns-entry-actions">${_srcBtn}</td>`;

@@ -5367,6 +5367,7 @@ def list_lumps():
                 with open(sidecar_path, 'r') as fh:
                     sidecar = json.load(fh)
                 lean = {k: v for k, v in sidecar.items() if k != 'source'}
+                lean['has_source'] = bool(sidecar.get('source', '').strip())
                 result.append(lean)
                 continue
             except Exception:
