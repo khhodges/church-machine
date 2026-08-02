@@ -11,8 +11,19 @@
 // The token is the CRC-32 of all binary bytes, lower-cased 8-hex-char string.
 //
 // C-List (cc=2) — tail of the lump, 2 slots:
-//   Slot 0  0x4A000006  E    SelfTest (NS slot 6)  — validate CM hardware
-//   Slot 1  0x4A000016  E    Tunnel   (NS slot 22) — CALL HOME
+//   Slot 0  LED0    (NS slot 3, RW)  — LED_DEV  MMIO 0x40000000
+//   Slot 1  UART_TX (NS slot 2, RW)  — UART_DEV MMIO 0x40000014
+//
+// GT encoding (v2.0):
+//   b_flag[31] | perm[30:28] | dom[27] | gt_type[26:25] | gt_seq[24:16] | slot[15:0]
+//   Turing RW: dom=0, perm3=0b011=3, gt_type=Inform=0b01
+//   LED_DEV  slot 3 → (3<<28)|(0<<27)|(1<<25)|3 = 0x32000003
+//   UART_DEV slot 2 → (3<<28)|(0<<27)|(1<<25)|2 = 0x32000002
+//
+// Note: UART_TX is declared `W` in the capabilities block but the binary c-list
+// carries an RW GT (0x32000002) because DREAD is used to poll the STATUS register.
+// The capabilities block declaration states the minimum requested right (TX write);
+// the stored GT grants full device access so STATUS reads don't fault.
 //
 // Usage:
 //   node scripts/build_wukong_callhome_lump.js
@@ -60,24 +71,35 @@ if (result.errors.length > 0) {
 const words = result.words;
 console.log(`Assembled ${words.length} instruction words.`);
 
+if (words.length !== 73) {
+    console.error(`ERROR: expected 73 words, got ${words.length}.`);
+    console.error('wukong_callhome.cloomc must produce exactly 73 instructions to match WUKONG_NUC_PROGRAM.');
+    process.exit(1);
+}
+
 // ── C-List definition ─────────────────────────────────────────────────────────
 //
-// cc = 2  (POLA minimum: one E-GT per external abstraction accessed).
-//   Slot 0: SelfTest E-GT (NS slot 6)  — ELOADCALL target for "SelfTest Run"
-//   Slot 1: Tunnel   E-GT (NS slot 22) — ELOADCALL target for "Tunnel Register"
+// cc = 2  (POLA minimum: one GT per device capability accessed).
 //
-// GT word layout (v2.0):
-//   b_flag[31] | perm[30:28] | dom[27] | gt_type[26:25] | gt_seq[24:16] | slot[15:0]
-//   E-only perm: bit30=1, bit29=0, bit28=0 → perm=0b100
-//   dom=1, GT_TYPE_INFORM=0b01
-//   SelfTest slot  6 = 0x06 → GT = 0x4A000006
-//   Tunnel   slot 22 = 0x16 → GT = 0x4A000016
+//   Slot 0: LED_DEV  — NS slot 3, MMIO 0x40000000, RW Inform GT
+//   Slot 1: UART_DEV — NS slot 2, MMIO 0x40000014, RW Inform GT
+//
+// GT layout (v2.0):
+//   [31]   b_flag  = 0  (hardware-bound flag; set by system configurator, not here)
+//   [30:28] perm3  = 0b011 (X=0, W=1, R=1 → Turing RW)
+//   [27]    dom    = 0   (Turing domain)
+//   [26:25] gt_type= 01  (Inform — concrete MMIO device)
+//   [24:16] gt_seq = 0
+//   [15:0]  slot   = NS slot index
+//
+//   LED_DEV  NS slot 3: (0b011 << 28) | (0 << 27) | (0b01 << 25) | 3 = 0x32000003
+//   UART_DEV NS slot 2: (0b011 << 28) | (0 << 27) | (0b01 << 25) | 2 = 0x32000002
 //
 const CLIST = [
-    { gt: 0x4A000006, name: 'SelfTest', ns_slot:  6, grants: ['E'],
-      note: 'SelfTest E-GT (NS slot 6)  — hardware correctness validator' },
-    { gt: 0x4A000016, name: 'Tunnel',   ns_slot: 22, grants: ['E'],
-      note: 'Tunnel E-GT   (NS slot 22) — IDE CALL HOME channel' },
+    { gt: 0x32000003, name: 'LED0',    ns_slot: 3, rights: ['R','W'],
+      note: 'LED_DEV  Inform GT (NS slot 3, MMIO 0x40000000, RW)' },
+    { gt: 0x32000002, name: 'UART_TX', ns_slot: 2, rights: ['R','W'],
+      note: 'UART_DEV Inform GT (NS slot 2, MMIO 0x40000014, RW — R needed for STATUS poll)' },
 ];
 
 // ── Pack LUMP binary ─────────────────────────────────────────────────────────
@@ -152,6 +174,21 @@ function crc32(buf) {
 const token = crc32(bytes).toString(16).toLowerCase().padStart(8, '0');
 console.log(`Token (CRC-32 of binary): ${token}`);
 
+// ── Remove old WukongCallHome lump files ─────────────────────────────────────
+const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
+const existingIdx = manifest.findIndex(e => e.abstraction === 'WukongCallHome');
+if (existingIdx !== -1) {
+    const oldToken = manifest[existingIdx].token;
+    if (oldToken && oldToken !== token) {
+        const oldLump     = path.join(LUMPS_DIR, `${oldToken}.lump`);
+        const oldSidecar  = path.join(LUMPS_DIR, `${oldToken}.json`);
+        if (fs.existsSync(oldLump))    { fs.unlinkSync(oldLump);    console.log(`Removed old: ${oldLump}`); }
+        if (fs.existsSync(oldSidecar)) { fs.unlinkSync(oldSidecar); console.log(`Removed old: ${oldSidecar}`); }
+    }
+    console.log('\nExisting WukongCallHome entry found — replacing it.');
+    manifest.splice(existingIdx, 1);
+}
+
 // ── Write .lump binary ───────────────────────────────────────────────────────
 const lumpPath    = path.join(LUMPS_DIR, `${token}.lump`);
 const sidecarPath = path.join(LUMPS_DIR, `${token}.json`);
@@ -160,9 +197,9 @@ fs.writeFileSync(lumpPath, bytes);
 console.log(`Written: ${lumpPath} (${bytes.length} bytes)`);
 
 // ── Write sidecar .json ───────────────────────────────────────────────────────
-const capabilities = CLIST.map(c => ({
+const capabilitiesJson = CLIST.map(c => ({
     name:    c.name,
-    grants:  c.grants,
+    rights:  c.rights,
     gt:      '0x' + c.gt.toString(16).padStart(8, '0'),
     ns_slot: c.ns_slot,
     note:    c.note,
@@ -171,6 +208,8 @@ const capabilities = CLIST.map(c => ({
 const sidecar = {
     token,
     abstraction:     'WukongCallHome',
+    filename:        `${token}.lump`,
+    sidecar_file:    `${token}.json`,
     ns_slot:         7,
     ns_slot_policy:  'static',
     lump_size:       lumpSize,
@@ -178,15 +217,20 @@ const sidecar = {
     content_type:    'code',
     cw,
     cc,
+    status:          'wip',
     profile:         'IoT',
     language:        'assembly',
-    description:     'Wukong boot coordinator: run SelfTest, CALL HOME via Tunnel.Register, ' +
-                     'return to IDE if online or spin offline. Wukong NS slot 7.',
-    capabilities,
+    description:     'Wukong board ROM boot program: LED0 blink at ~1 Hz and "CM:WUKONG\\r\\n" ' +
+                     'UART callhome banner. 73-instruction infinite loop, no CALL/RETURN. ' +
+                     'Transcribed from WUKONG_NUC_PROGRAM in hardware/boot_rom.py. ' +
+                     'See docs/wukong-boot.md for the NULL_CAP standalone problem this solves.',
+    source_file:     'simulator/examples/wukong_callhome.cloomc',
+    capabilities:    capabilitiesJson,
     grants:          ['E'],
     author:          'Church Machine',
     version:         '1.0',
-    lump_version:    0,
+    lump_version:    1,
+    compiled_at:     Date.now() / 1000,
 };
 
 fs.writeFileSync(sidecarPath, JSON.stringify(sidecar, null, 2) + '\n');
@@ -210,15 +254,9 @@ const manifestEntry = {
     cw,
     cc,
     grants:          ['E'],
-    lump_version:    0,
+    lump_version:    1,
 };
 
-const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
-const existingIdx = manifest.findIndex(e => e.abstraction === 'WukongCallHome');
-if (existingIdx !== -1) {
-    console.log('\nExisting WukongCallHome entry found — replacing it.');
-    manifest.splice(existingIdx, 1);
-}
 manifest.push(manifestEntry);
 fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 4) + '\n');
 console.log(`Updated: ${MANIFEST}`);

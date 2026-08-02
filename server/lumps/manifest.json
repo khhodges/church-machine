@@ -2018,17 +2018,17 @@
         ]
     },
     {
-        "token": "b7b0046b",
+        "token": "e186c4ec",
         "abstraction": "WukongCallHome",
         "ns_slot": 7,
         "ns_slot_policy": "static",
         "variant_group": null,
-        "lump_size": 64,
-        "cw": 9,
+        "lump_size": 128,
+        "cw": 73,
         "cc": 2,
         "grants": [
             "E"
         ],
-        "lump_version": 0
+        "lump_version": 1
     }
 ]

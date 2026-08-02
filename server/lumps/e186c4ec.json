@@ -1,0 +1,47 @@
+{
+  "token": "e186c4ec",
+  "abstraction": "WukongCallHome",
+  "filename": "e186c4ec.lump",
+  "sidecar_file": "e186c4ec.json",
+  "ns_slot": 7,
+  "ns_slot_policy": "static",
+  "lump_size": 128,
+  "typ": 0,
+  "content_type": "code",
+  "cw": 73,
+  "cc": 2,
+  "status": "wip",
+  "profile": "IoT",
+  "language": "assembly",
+  "description": "Wukong board ROM boot program: LED0 blink at ~1 Hz and \"CM:WUKONG\\r\\n\" UART callhome banner. 73-instruction infinite loop, no CALL/RETURN. Transcribed from WUKONG_NUC_PROGRAM in hardware/boot_rom.py. See docs/wukong-boot.md for the NULL_CAP standalone problem this solves.",
+  "source_file": "simulator/examples/wukong_callhome.cloomc",
+  "capabilities": [
+    {
+      "name": "LED0",
+      "rights": [
+        "R",
+        "W"
+      ],
+      "gt": "0x32000003",
+      "ns_slot": 3,
+      "note": "LED_DEV  Inform GT (NS slot 3, MMIO 0x40000000, RW)"
+    },
+    {
+      "name": "UART_TX",
+      "rights": [
+        "R",
+        "W"
+      ],
+      "gt": "0x32000002",
+      "ns_slot": 2,
+      "note": "UART_DEV Inform GT (NS slot 2, MMIO 0x40000014, RW — R needed for STATUS poll)"
+    }
+  ],
+  "grants": [
+    "E"
+  ],
+  "author": "Church Machine",
+  "version": "1.0",
+  "lump_version": 1,
+  "compiled_at": 1785708288.427
+}

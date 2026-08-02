@@ -53,6 +53,8 @@ from .uart_rx import UartRx
 
 
 # ── Wukong ROM: WUKONG_NUC_PROGRAM at word 0 ──────────────────────────────────
+# Human-readable CLOOMC source: simulator/examples/wukong_callhome.cloomc
+# Architecture doc:             docs/wukong-boot.md
 # WUKONG_NUC_PROGRAM (73 words) — standalone-safe boot, no CALL to IDE-config regs:
 #   [0] LOAD CR3, CR6[5]  → LED_DEV  (M-elevated during boot phase)
 #   [1] LOAD CR4, CR6[6]  → UART_DEV (M-elevated during boot phase)

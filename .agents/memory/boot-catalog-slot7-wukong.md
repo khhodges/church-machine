@@ -20,7 +20,7 @@ Hardware cold-boot catalog is **8 slots (0–7)**. Slot 7 = WukongCallHome (INFO
 7. `simulator/test_pet_name_memory.js` — BOOT_NAMED_SLOTS includes 7; T016/T022d/T024f/T025c updated
 8. `web/app.js` `updateNamespaceDisplay()` — replaced static demo namespace (Kenneth/Services/SlideRule) with real 8-slot hardware boot catalog table
 
-**Why:** WukongCallHome LUMP (token b7b0046b, NS slot 7) is the Wukong board's coordinator: calls SelfTest, then Tunnel.Register, then RETURNs to IDE if ACK=1. It must be present in the namespace for the user to set ⚡ to slot 7.
+**Why:** WukongCallHome LUMP (token e186c4ec, NS slot 7, lump_size=128, cw=73, cc=2) is the 73-instruction hardware ROM program: LED0 blink + "CM:WUKONG\r\n" UART callhome beacon, infinite loop, no CALL/RETURN. Replaces the old 9-instruction boot-coordinator LUMP (token b7b0046b). Human-readable source: simulator/examples/wukong_callhome.cloomc. Divergence guard: scripts/check_wukong_callhome_divergence.js.
 
 ## NS slot physical layout (default 256-word thread lump)
 - Slot 1 Boot.Thread:      word 0x0000 (size 256)

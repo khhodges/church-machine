@@ -627,6 +627,10 @@ WUKONG_DEMO_CLIST[10] = 0   # Constants R-GT cleared: NS slot 9 absent in Wukong
 # ---------------------------------------------------------------------------
 # WUKONG_NUC_PROGRAM — Wukong V2 callhome boot program
 #
+# Human-readable CLOOMC source: simulator/examples/wukong_callhome.cloomc
+# Divergence CI guard:          scripts/check_wukong_callhome_divergence.js
+# Architecture doc:             docs/wukong-boot.md
+#
 # Executed from ROM[0] immediately after hw_init and boot_start.
 # Sequence (every ~1 Hz loop iteration):
 #   1. Load LED_DEV (c-list slot 5 → CR3) and UART_DEV (c-list slot 6 → CR4)

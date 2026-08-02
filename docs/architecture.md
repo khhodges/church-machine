@@ -303,6 +303,15 @@ is derived from NS entry data read at runtime; the tables below show the exact b
 > **Cross-reference**: `hardware/core.py` boot FSM (`BootState` cases) and
 > `simulator/simulator.js` `_bootStep()` implement the same three-instruction sequence.
 
+
+### NULL_CAP Standalone Problem (Wukong)
+
+`BOOT_PROGRAM[2]` is `CALL CR0,CR0` — it invokes whatever capability the IDE placed in `Thread.caps[0]`. On a board that has never been connected to an IDE, `Thread.caps[0]` is `NULL` and the CALL faults immediately, leaving the board unresponsive.
+
+The Wukong FPGA ROM uses `WUKONG_NUC_PROGRAM` instead: a 73-instruction infinite loop that blinks LED0 and transmits `"CM:WUKONG\r\n"` at 57600 baud. It contains no `CALL` and no `RETURN`, so it is safe on an unconfigured board. Once the IDE connects and the user drags ⚡ to NS slot 7 (`WukongCallHome`), the next reset executes the coordinator LUMP.
+
+Human-readable source: `simulator/examples/wukong_callhome.cloomc` — see `docs/wukong-boot.md`.
+
 ### Lump Header Format
 
 Every lump word 0 has the following layout (`hardware/layouts.py` `LUMP_HEADER_LAYOUT`):
@@ -641,7 +650,7 @@ Auto-detection: the compiler identifies the language from source syntax (Haskell
 
 The c-list is the compiler's symbol table for external references. The Resident Object Model maps abstraction names to c-list offsets so that `call(Memory.Allocate(size))` compiles to the correct LOAD offset + CALL sequence. Offsets are generated directly from the upload's capabilities array — the compiler never guesses.
 
-### Calling Convention
+## Calling Convention
 
 | Registers | Purpose | Saved by |
 |-----------|---------|----------|
@@ -649,6 +658,8 @@ The c-list is the compiler's symbol table for external references. The Resident 
 | DR1-DR3 | Arguments / return values | Caller |
 | DR4-DR11 | Local variables | Callee |
 | DR12-DR15 | Temporaries (compiler scratch) | Caller |
+
+DR0 is hardwired to zero — it reads as 0 unconditionally after every instruction.
 
 ### Language Mapping
 

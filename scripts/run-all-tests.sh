@@ -114,6 +114,9 @@ register_suite "check-stale-cr7" \
 register_suite "check-selftest-lump-stale" \
     'node scripts/check_selftest_lump_stale.js && node scripts/test_check_selftest_lump_stale.js'
 
+register_suite "check-wukong-callhome-divergence" \
+    'node scripts/check_wukong_callhome_divergence.js'
+
 register_suite "check-capabilities-blocks" \
     'node scripts/check-capabilities-blocks.js'
 
@@ -275,7 +278,7 @@ ALL_GROUPS["lump"]="lump-consistency lump-binary-tests lump-roundtrip editor-rou
 
 ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests pet-name-mem-tests warning-panel-tests bare-space-ns-fallback-tests disasm-panel-tests boot-entry-sync-tests ns-slot-dynamic-tests selftest-lump-runs pet-name-memory-tests lump-builder-dispatch-tests openin-links-tests lump-warning-tests call-cr6-l-perm-tests return-cr6-l-perm-tests load-through-l-perm-cr6-tests"
 
-ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabilities-blocks check-api-reference-stale callhome-parser-tests check-slot-index-leak check-ila-probe-names test-check-ila-probe-names"
+ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-wukong-callhome-divergence check-capabilities-blocks check-api-reference-stale callhome-parser-tests check-slot-index-leak check-ila-probe-names test-check-ila-probe-names"
 
 ALL_GROUPS["hardware"]="hardware-sim"
 
