@@ -110,7 +110,7 @@ const M_BIT_PORT_CR15         = 0xFFFFFF1F; // M-bit authority port for CR15
 const IO_PORT_PET_NAME_WR     = 0xFFFFFF38; // DWRITE to this addr marks c-list slot (value & 0x3F) as named
 // Boot-default named slots — matches hardware/boot_rom.py DEMO_CLIST_NAMED_SLOTS.
 // Live slots: 0-6, 8-10, 22 (Tunnel), 23 (Keystone), 42 (Ethernet), 43 (EventRouter).
-const BOOT_NAMED_SLOTS = Object.freeze([0, 1, 2, 3, 4, 5, 6]);
+const BOOT_NAMED_SLOTS = Object.freeze([0, 1, 2, 3, 4, 5, 6, 7]);
 
 // DEPRECATED: fixed IRQ thread slot constant.
 // Under v1.2 §4 the Scheduler.IRQ LUMP is delivered lazily (ns_slot_policy=dynamic);
@@ -1039,9 +1039,10 @@ class ChurchSimulator {
     // Returns the NS slot index to use for a compiled program identified by
     // `token`.  Resolution order:
     //   1. Token→slot map: if the same token was allocated before, reuse it.
-    //   2. NS[7] (the boot-reserved programmable slot): the boot catalog entry
-    //      at index 7 is null, meaning "reserved for user programs".  This is
-    //      always the first choice so SelfTest (slot [6]) is never overwritten.
+    //   2. Scan from slot 2 for the first NS slot with no valid entry.
+    //      Slots 0–7 are hardware catalog entries (Boot.NS, Boot.Thread,
+    //      UART/LED/BTN/TIMER_DEV, SelfTest, WukongCallHome) — they are all
+    //      pre-populated, so the scan naturally skips past them.
     //
     // All slot-number decisions are centralised here.  Callers (including
     // _applyPendingSimLoad) never reference a raw slot integer for user

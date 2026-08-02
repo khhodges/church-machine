@@ -1021,59 +1021,134 @@ function resetCPU() {
 function updateNamespaceDisplay() {
     const nsPanel = document.getElementById('namespaceList');
     const hierPanel = document.getElementById('hierarchyTree');
-    if (!nsPanel || !hierPanel) return;
-    
-    if (!simulator.cr15 || simulator.cr15.name === 'NULL') {
-        nsPanel.innerHTML = '<div class="ns-empty">Namespace not loaded</div>';
-        hierPanel.innerHTML = '<div class="ns-empty">Boot system to view hierarchy</div>';
-        if (vocabularyViewActive) {
-            const content = document.getElementById('vocabularyContent');
-            if (content) content.innerHTML = buildVocabularyView();
-        }
-        return;
-    }
-    
-    let nsHtml = '<div class="ns-header">Namespace Table (CR15: ' + simulator.cr15.name + ')</div>';
-    nsHtml += '<div class="ns-table-header"><span class="ns-col-offset">Offset</span><span class="ns-col-name">Name</span><span class="ns-col-type">Type</span><span class="ns-col-word1">Word1 (Location)</span><span class="ns-col-word2">Word2 (Limit)</span><span class="ns-col-perms">Perms</span></div>';
-    
-    const typeTooltips = {
-        'System': 'System object - Namespace self-reference.',
-        'C-List': 'Capability List containing Golden Token entries.',
-        'Thread': 'User identity with its own C-List of capabilities.',
-        'Code': 'Executable code object (assembly).',
-        'Abstraction': 'Protected abstraction containing function Golden Tokens.'
+    if (!nsPanel) return;
+
+    // ── Hardware boot catalog — the real 8-slot namespace ───────────────────
+    // These are frozen into the FPGA bitstream at design time (slots 0–5) or
+    // loaded from the boot image before the first instruction (slots 6–7).
+    // NOT demo data — this is the actual Church Machine hardware namespace.
+    const HW_CATALOG = [
+        { slot: 0, label: 'Boot.NS',        perms: '',   tier: 'hw',
+          loc: null,       desc: 'Namespace root — hardware-managed 4-word capability table' },
+        { slot: 1, label: 'Boot.Thread',    perms: '',   tier: 'hw',
+          loc: 0x00000000, desc: 'Thread identity and stack LUMP (256 words)' },
+        { slot: 2, label: 'UART_DEV',       perms: 'RW', tier: 'hw',
+          loc: 0x40000014, desc: 'UART serial device — MMIO, 3 registers (TX/STATUS/RX)' },
+        { slot: 3, label: 'LED_DEV',        perms: 'RW', tier: 'hw',
+          loc: 0x40000000, desc: 'LED GPIO device — MMIO, 5 registers (LED0–LED4)' },
+        { slot: 4, label: 'BTN_DEV',        perms: 'R',  tier: 'hw',
+          loc: 0x40000028, desc: 'Button input — MMIO, 1 register (state)' },
+        { slot: 5, label: 'TIMER_DEV',      perms: 'RW', tier: 'hw',
+          loc: 0x4000002C, desc: 'Timer device — MMIO, 5 registers (TICKS_LO/HI, TOD_EPOCH, ALARM_CMP/CTL)' },
+        { slot: 6, label: 'SelfTest',       perms: 'E',  tier: 'boot',
+          loc: 0x00000100, desc: 'Hardware correctness validator — default ⚡ boot entry (64 words)' },
+        { slot: 7, label: 'WukongCallHome', perms: 'E',  tier: 'boot',
+          loc: 0x00000140, desc: 'Wukong call-home coordinator: SelfTest → Tunnel.Register → RETURN (64 words)' },
+    ];
+
+    // Use live simulator data when available
+    const _sim = (typeof simulator !== 'undefined' && simulator) ? simulator : null;
+    const simRunning = _sim && _sim.nsCount > 0;
+    const bootEntry  = simRunning ? (_sim.bootEntrySlot != null ? _sim.bootEntrySlot : 6) : 6;
+
+    const _he = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    // Tier section headers (shown once on first entry of that tier)
+    const tierHeaders = {
+        hw:   { shown: false,
+                html: '<tr style="background:rgba(220,90,0,0.08);"><td colspan="5" style="padding:3px 10px;font-size:0.65rem;color:#f0a040;letter-spacing:0.05em;font-weight:600;">' +
+                      '\uD83D\uDD12 HARDWARE \u2014 SLOTS 0\u20135 \u2014 HARDWIRED AT DESIGN TIME, FROZEN INTO FPGA BITSTREAM</td></tr>' },
+        boot: { shown: false,
+                html: '<tr style="background:rgba(0,140,220,0.08);"><td colspan="5" style="padding:3px 10px;font-size:0.65rem;color:#7eb8ff;letter-spacing:0.05em;font-weight:600;">' +
+                      '\uD83E\uDD7E BOOT \u2014 SLOTS 6\u20137 \u2014 LOADED FROM BOOT IMAGE BEFORE FIRST INSTRUCTION</td></tr>' },
     };
-    
-    const allObjects = namespaceObjects;
-    allObjects.forEach(obj => {
-        // Look up permissions from Boot C-List (authoritative source for GTs)
-        const gtEntry = getBootGT(obj.name);
-        const perms = obj.perms || (gtEntry ? gtEntry.perms : []);
-        const permStr = perms.join('');
-        const typeClass = obj.type.toLowerCase().replace('-', '');
-        const baseTypeTooltip = typeTooltips[obj.type] || 'Namespace object with capability-controlled access.';
-        const offset = obj.offset !== undefined ? obj.offset : '?';
-        const word1 = obj.word1_location !== undefined ? `0x${obj.word1_location.toString(16).toUpperCase().padStart(4, '0')}` : `0x${(obj.location || 0).toString(16).toUpperCase().padStart(4, '0')}`;
-        const word2 = obj.word2_limit !== undefined ? obj.word2_limit : (obj.size || 0);
-        const tooltip = `Offset ${offset}: ${obj.type} [${permStr}] | ${baseTypeTooltip}`;
-        const dynamicTag = obj.dynamic ? ' <span class="ns-dynamic-tag">(custom)</span>' : '';
-        nsHtml += `
-            <div class="ns-object ns-${typeClass}" data-name="${obj.name}" data-type="${obj.type}" data-tooltip="${tooltip}">
-                <div class="ns-obj-row">
-                    <span class="ns-col-offset">${offset}</span>
-                    <span class="ns-col-name">${obj.name}${dynamicTag}</span>
-                    <span class="ns-col-type">${obj.type}</span>
-                    <span class="ns-col-word1">${word1}</span>
-                    <span class="ns-col-word2">${word2}</span>
-                    <span class="ns-col-perms">[${permStr}]</span>
-                </div>
-            </div>
-        `;
-    });
-    nsPanel.innerHTML = nsHtml;
-    
-    hierPanel.innerHTML = buildHierarchyTree();
-    
+
+    let html = '';
+    html += '<div style="font-size:0.7rem;color:#7a8a9a;padding:5px 10px 4px;border-bottom:1px solid rgba(255,255,255,0.07);">' +
+            'NS_ENTRY_LAYOUT: 4 words per entry (128 bits) \u2014 8-slot hardware boot namespace' +
+            (simRunning ? ' \u2014 <span style="color:#4ec9b0;">live</span>' : ' \u2014 <span style="color:#666;">static (boot to see live data)</span>') +
+            '</div>';
+
+    html += '<table style="width:100%;border-collapse:collapse;font-size:0.78rem;">';
+    html += '<thead><tr style="border-bottom:1px solid rgba(255,255,255,0.1);color:#888;">' +
+            '<th style="padding:4px 8px;text-align:center;font-weight:500;width:2.5rem;">Idx</th>' +
+            '<th style="padding:4px 8px;text-align:left;font-weight:500;">Label</th>' +
+            '<th style="padding:4px 8px;text-align:left;font-weight:500;">W0: Location</th>' +
+            '<th style="padding:4px 8px;text-align:left;font-weight:500;">Perms</th>' +
+            '<th style="padding:4px 8px;text-align:left;font-weight:500;color:#555;">Description</th>' +
+            '</tr></thead>';
+    html += '<tbody>';
+
+    for (const entry of HW_CATALOG) {
+        const th = tierHeaders[entry.tier];
+        if (th && !th.shown) { html += th.html; th.shown = true; }
+
+        // Location: prefer live NS entry, then static
+        let locStr = '\u2014';
+        if (simRunning && typeof _sim.readNSEntry === 'function') {
+            const nsEnt = _sim.readNSEntry(entry.slot);
+            if (nsEnt && nsEnt.word0_location != null) {
+                locStr = '0x' + nsEnt.word0_location.toString(16).toUpperCase().padStart(8, '0');
+            }
+        } else if (entry.loc != null) {
+            locStr = '0x' + entry.loc.toString(16).toUpperCase().padStart(8, '0');
+        } else if (entry.slot === 0 && simRunning && _sim.NS_TABLE_BASE != null) {
+            locStr = '0x' + _sim.NS_TABLE_BASE.toString(16).toUpperCase().padStart(8, '0');
+        }
+
+        // Label: prefer live sim label
+        const liveLabel = (simRunning && _sim.nsLabels && _sim.nsLabels[entry.slot]) ? _sim.nsLabels[entry.slot] : entry.label;
+
+        const isBootEntry = (entry.slot === bootEntry);
+        const rowBg = isBootEntry ? 'background:rgba(251,191,36,0.06);' : '';
+
+        const idxCell = isBootEntry
+            ? '<span style="color:#fbbf24;font-size:1rem;" title="Current \u26a1 boot entry">\u26a1</span>'
+            : `<span style="color:#555;">${entry.slot}</span>`;
+
+        const permColor = entry.perms.includes('E') ? '#c8a84b'
+                        : entry.perms.includes('W') ? '#7eb8ff' : '#7dd3a8';
+        const permBadge = entry.perms
+            ? `<span style="color:${permColor};font-family:monospace;font-size:0.75rem;">[${_he(entry.perms)}]</span>`
+            : '<span style="color:#444;font-family:monospace;font-size:0.75rem;">[\u2014]</span>';
+
+        const labelColor = entry.tier === 'hw' ? '#f0a040' : '#4ec9b0';
+
+        html += `<tr style="border-bottom:1px solid rgba(255,255,255,0.04);${rowBg}" title="${_he(entry.desc)}">`;
+        html += `<td style="padding:5px 8px;text-align:center;">${idxCell}</td>`;
+        html += `<td style="padding:5px 8px;color:${labelColor};font-weight:500;font-family:monospace;">${_he(liveLabel)}</td>`;
+        html += `<td style="padding:5px 8px;color:#4ec9b0;font-family:monospace;font-size:0.74rem;">${locStr}</td>`;
+        html += `<td style="padding:5px 8px;">${permBadge}</td>`;
+        html += `<td style="padding:5px 8px;color:#666;font-size:0.7rem;">${_he(entry.desc)}</td>`;
+        html += '</tr>';
+    }
+
+    // Runtime slots allocated by programmer code
+    if (simRunning && _sim.nsCount > HW_CATALOG.length) {
+        const extra = _sim.nsCount - HW_CATALOG.length;
+        html += `<tr style="background:rgba(100,100,140,0.06);"><td colspan="5" style="padding:3px 10px;font-size:0.65rem;color:#8888bb;letter-spacing:0.05em;font-weight:600;">` +
+                `\u270F\uFE0F PROGRAMMER \u2014 SLOTS 8+ \u2014 ALLOCATED AT RUNTIME BY PROGRAMMER CODE` +
+                `</td></tr>`;
+        for (let i = HW_CATALOG.length; i < _sim.nsCount; i++) {
+            const nsEnt = typeof _sim.readNSEntry === 'function' ? _sim.readNSEntry(i) : null;
+            if (!nsEnt || (!nsEnt.word0_location && nsEnt.gtType === 0)) continue;
+            const lbl = (_sim.nsLabels && _sim.nsLabels[i]) || `slot ${i}`;
+            const loc2 = nsEnt.word0_location ? '0x' + nsEnt.word0_location.toString(16).toUpperCase().padStart(8, '0') : '\u2014';
+            html += `<tr style="border-bottom:1px solid rgba(255,255,255,0.03);">`;
+            html += `<td style="padding:4px 8px;text-align:center;color:#555;">${i}</td>`;
+            html += `<td style="padding:4px 8px;color:#8888bb;font-family:monospace;">${_he(lbl)}</td>`;
+            html += `<td style="padding:4px 8px;color:#4ec9b0;font-family:monospace;font-size:0.74rem;">${loc2}</td>`;
+            html += `<td style="padding:4px 8px;"></td><td style="padding:4px 8px;color:#555;font-size:0.7rem;">runtime allocation</td>`;
+            html += '</tr>';
+        }
+    }
+
+    html += '</tbody></table>';
+    nsPanel.innerHTML = html;
+
+    if (hierPanel) {
+        hierPanel.innerHTML = buildHierarchyTree();
+    }
     attachContextMenuListeners();
 
     if (vocabularyViewActive) {

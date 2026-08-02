@@ -641,9 +641,9 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         clist_gts.append(create_gt(0, i, perms, 1))
 
     # Count only non-null catalog entries: the highest non-null slot index + 1.
-    # len(catalog) overcounts by including the trailing null slot (slot 7).
-    # JS simulator tracks nsCount via writeNSEntry which skips null slots, so
-    # this matches the JS value (7 for the default 8-entry catalog).
+    # All 8 catalog entries are non-null (slots 0–7 including WukongCallHome),
+    # so ns_count = 8. JS simulator tracks nsCount via writeNSEntry which
+    # skips null slots, and this must match that value.
     ns_count = max((i + 1 for i, e in enumerate(catalog) if e is not None), default=0)
 
     # ----- Step 2 augmentation: NS entries for extended slots (≥8) ------
