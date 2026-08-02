@@ -2628,7 +2628,23 @@ function updateNamespace() {
     const NS_TIER_BOOT_MAX = 10;
     for (let i = 0; i < sim.nsCount; i++) {
         const e = sim.readNSEntry(i);
-        if (!e) continue;
+        // Always render the tier-section header even for gap rows, then show
+        // a (gap) placeholder so the slot number stays visible in the table.
+        const _isTierHeader = (i === 0) || (i === NS_TIER_HW_MAX + 1) || (i === NS_TIER_BOOT_MAX + 1);
+        if (!e) {
+            if (_isTierHeader) {
+                if (i === 0) html += '<tr class="ns-tier-header ns-tier-hw-header"><td colspan="10">&#x1F512; Hardware &mdash; slots 0&#x2013;5 &mdash; hardwired at design time, frozen into FPGA bitstream</td></tr>';
+                else if (i === NS_TIER_HW_MAX + 1) html += '<tr class="ns-tier-header ns-tier-boot-header"><td colspan="10">&#x1F97E; Boot &mdash; slots 6&#x2013;10 &mdash; loaded from the boot image before the first instruction</td></tr>';
+                else if (i === NS_TIER_BOOT_MAX + 1) html += '<tr class="ns-tier-header ns-tier-prog-header"><td colspan="10">&#x270F;&#xFE0F; Programmer &mdash; slots 11+ &mdash; allocated at runtime by programmer code</td></tr>';
+            }
+            const tierClass = i <= NS_TIER_HW_MAX ? 'ns-tier-hw-row' : (i <= NS_TIER_BOOT_MAX ? 'ns-tier-boot-row' : 'ns-tier-prog-row');
+            html += `<tr id="ns-row-${i}" class="ns-row ${tierClass}" style="opacity:0.45;">`;
+            html += `<td class="ns-idx-cell"><span style="color:#666;">${i}</span></td>`;
+            html += `<td colspan="8" style="color:#555;font-style:italic;font-size:0.8rem;">(gap — slot reserved, no entry installed)</td>`;
+            html += `<td class="ns-entry-actions"></td>`;
+            html += '</tr>';
+            continue;
+        }
         const manifest = sim.lazyManifest ? sim.lazyManifest[i] : null;
         let codeNotResident = false;
         if (manifest && e.word0_location > 0) {
