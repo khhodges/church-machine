@@ -2,29 +2,45 @@
 
 // ns_cold_boot_slots.spec.js
 //
-// Confirms that the Namespace panel shows only slots 0–7 on cold boot
-// (no boot binary, no saved boot config) and that slots 8+ appear only
+// Confirms that the Namespace panel shows only slots 0–10 on cold boot
+// (no boot binary, no saved boot config) and that slots 11+ appear only
 // after a LUMP is deployed through the Builder.
 //
-// The simulator's _getHardwareBootCatalog() returns exactly 8 entries
-// (indices 0–7, with slot 7 null/programmable).  Without a boot binary,
-// _initNamespaceTable() populates slots 0–6 with valid NS entries and
-// leaves slot 7 as all-zeros (free/programmable).  Slots 8–1023 must
-// remain absent until a LUMP is explicitly deployed.
+// The simulator's _getHardwareBootCatalog() returns exactly 11 entries
+// (indices 0–10).  Slot 8 (Tunnel) is bitstreamOnly: the FPGA writes its
+// NS entry at power-on; boot software intentionally leaves the memory
+// zeroed, so sim.readNSEntry(8) === null.  Slots 11–1023 must remain
+// absent until a LUMP is explicitly deployed.
+//
+// Hardware catalog layout:
+//   0  Boot.NS         (NS root)
+//   1  Boot.Thread     (Thread LUMP)
+//   2  UART_DEV        (MMIO RW)
+//   3  LED_DEV         (MMIO RW)
+//   4  BTN_DEV         (MMIO R)
+//   5  TIMER_DEV       (MMIO RW)
+//   6  SelfTest        (E-perm LUMP, boot entry)
+//   7  WukongCallHome  (E-perm LUMP)
+//   8  Tunnel          (bitstreamOnly — FPGA writes at power-on; sim leaves null)
+//   9  Ethernet        (E-perm hardware cap)
+//  10  CapTest         (E-perm LUMP)
 //
 // ─── Suites ───────────────────────────────────────────────────────────────
 //
-// Suite 1 — Cold boot: no extended slots (8+) visible
+// Suite 1 — Cold boot: no dynamic slots (11+) visible
 //
-//   1a. Primary invariant: sim.nsCount ≤ 8 after cold reset; no DOM row
-//       with id #ns-row-N for N ≥ 8 exists; every rendered row has index ≤ 7.
+//   1a. Primary invariant: sim.nsCount ≤ 11 after cold reset; no DOM row
+//       with id #ns-row-N for N ≥ 11 exists; every rendered row has index ≤ 10.
 //
-//   1b. Slot labels: slots 0–6 carry their canonical hardware labels from
-//       _getHardwareBootCatalog() (Boot.NS, Boot.Thread, UART_DEV, …).
+//   1b. Slot labels: hardware slots 0–7 and 9–10 carry their canonical labels
+//       from _getHardwareBootCatalog().  Slot 8 (Tunnel/bitstreamOnly) has
+//       no NS entry (FPGA writes it at power-on; sim leaves zeros).
 //
-//   1c. Slot 7: null/programmable — no NS entry, no rendered row.
+//   1c. Slot 7 = WukongCallHome (valid NS entry, rendered row).
+//       Slot 8 = Tunnel / bitstreamOnly (null NS entry from boot software,
+//       no rendered row at sim cold boot).
 //
-// Suite 2 — After LUMP deploy via the Builder: a new slot ≥ 8 appears
+// Suite 2 — After LUMP deploy via the Builder: a new slot ≥ 11 appears
 //
 //   2a. Builder compile + create flow: the IDE is navigated to the editor
 //       (Programs view), a minimal CLOOMC abstraction is compiled with
@@ -33,7 +49,7 @@
 //       the Navana registry at index 45 or above, per the slot search in
 //       system_abstractions.js) appears as a visible row in the namespace table.
 //
-//   2b. nsCount invariant: cold-boot nsCount stays ≤ 8 until the Builder
+//   2b. nsCount invariant: cold-boot nsCount stays ≤ 11 until the Builder
 //       deploy fires, then jumps to the new slot + 1.
 
 const { test, expect } = require('@playwright/test');
@@ -42,16 +58,20 @@ const { test, expect } = require('@playwright/test');
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Slots 0–6 are the only valid NS entries after cold boot.
-// Slot 7 is null (programmable).  Slots 8+ must be absent.
+// Hardware-boot slots that must carry valid NS entries after cold boot.
+// Slot 8 (Tunnel) is bitstreamOnly — boot software leaves zeros, so
+// readNSEntry(8) === null and it is intentionally omitted here.
 const COLD_BOOT_EXPECTED_LABELS = {
-    0: 'Boot.NS',
-    1: 'Boot.Thread',
-    2: 'UART_DEV',
-    3: 'LED_DEV',
-    4: 'BTN_DEV',
-    5: 'TIMER_DEV',
-    6: 'SelfTest',
+    0:  'Boot.NS',
+    1:  'Boot.Thread',
+    2:  'UART_DEV',
+    3:  'LED_DEV',
+    4:  'BTN_DEV',
+    5:  'TIMER_DEV',
+    6:  'SelfTest',
+    7:  'WukongCallHome',
+    9:  'Ethernet',
+    10: 'CapTest',
 };
 
 // Minimal CLOOMC++ abstraction that compiles successfully.
@@ -74,9 +94,9 @@ const MINIMAL_ABSTRACTION_SOURCE = `abstraction ColdBootTest {
  *   - Clear window.bootImage / window.bootConfig and any localStorage keys
  *     that could restore extended NS slots from a prior session.
  *   - Call sim.reset() so _initNamespaceTable() runs from
- *     _getHardwareBootCatalog() — 7 hardware slots, bootComplete = false.
+ *     _getHardwareBootCatalog() — 11 hardware slots, bootComplete = false.
  *
- * After this helper: sim.bootComplete = false, sim.nsCount = 7.
+ * After this helper: sim.bootComplete = false, sim.nsCount = 11.
  *
  * WHY bootComplete is intentionally left false here:
  *   Boot phase B:04 (CALL_HOME) starts an async network fetch inside
@@ -85,7 +105,7 @@ const MINIMAL_ABSTRACTION_SOURCE = `abstraction ColdBootTest {
  *   slowBoot()'s setTimeout delays let the Promise resolve between phases,
  *   but the page's own auto-boot already set bootAnimating = true, so a
  *   second slowBoot() call exits immediately.  Rather than fight the timing,
- *   Suite 1 tests only need nsCount = 7 (no bootComplete check), and Suite 2
+ *   Suite 1 tests only need nsCount = 11 (no bootComplete check), and Suite 2
  *   sets sim.bootComplete = true directly before calling
  *   compileAndCreateAbstraction() — that flag is the only guard that function
  *   checks.
@@ -150,19 +170,19 @@ async function openNamespaceView(page) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Suite 1 — Cold boot: no extended slots (8+) visible
+// Suite 1 — Cold boot: no dynamic slots (11+) visible
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('Namespace panel — cold boot shows no extended slots (8+)', () => {
+test.describe('Namespace panel — cold boot shows no dynamic slots (11+)', () => {
 
-    // 1a — Primary invariant: nsCount ≤ 8, no extended DOM rows, every row ≤ 7.
-    test('no slot ≥ 8 visible in the namespace table on fresh cold boot', async ({ page }) => {
+    // 1a — Primary invariant: nsCount ≤ 11, no dynamic DOM rows, every row ≤ 10.
+    test('no slot ≥ 11 visible in the namespace table on fresh cold boot', async ({ page }) => {
         test.setTimeout(60000);
 
         await loadColdBoot(page);
         await openNamespaceView(page);
 
-        // Ground-truth: sim.nsCount must be ≤ 8 (hardware catalog has 8 entries).
+        // Ground-truth: sim.nsCount must be ≤ 11 (hardware catalog has 11 entries).
         const nsCount = await page.evaluate(() => {
             if (typeof sim === 'undefined') throw new Error('sim is not accessible');
             return sim.nsCount;
@@ -170,37 +190,39 @@ test.describe('Namespace panel — cold boot shows no extended slots (8+)', () =
 
         expect(
             nsCount,
-            `sim.nsCount must be ≤ 8 at cold boot (got ${nsCount})`
-        ).toBeLessThanOrEqual(8);
+            `sim.nsCount must be ≤ 11 at cold boot (got ${nsCount})`
+        ).toBeLessThanOrEqual(11);
 
-        // DOM check: scan slots 8–43 (the historically problematic range);
+        // DOM check: scan slots 11–43 (dynamic range);
         // none should have a rendered row.
         const nsTable = page.locator('#namespaceTable');
         const extendedSlots = [];
-        for (let slot = 8; slot <= 43; slot++) {
+        for (let slot = 11; slot <= 43; slot++) {
             const c = await nsTable.locator(`#ns-row-${slot}`).count();
             if (c > 0) extendedSlots.push(slot);
         }
 
         expect(
             extendedSlots,
-            `Extended slot(s) ${extendedSlots.join(', ')} must not appear in the namespace table at cold boot`
+            `Dynamic slot(s) ${extendedSlots.join(', ')} must not appear in the namespace table at cold boot`
         ).toHaveLength(0);
 
-        // Tertiary: every rendered row must carry an index ≤ 7.
+        // Tertiary: every rendered row must carry an index ≤ 10.
         const allRowIndices = await nsTable.locator('[id^="ns-row-"]').evaluateAll(
             els => els.map(el => parseInt(el.id.replace('ns-row-', ''), 10))
         );
 
-        const outOfRange = allRowIndices.filter(idx => idx > 7);
+        const outOfRange = allRowIndices.filter(idx => idx > 10);
         expect(
             outOfRange,
-            `Row(s) with index ${outOfRange.join(', ')} exceed the 0–7 cold-boot range`
+            `Row(s) with index ${outOfRange.join(', ')} exceed the 0–10 cold-boot range`
         ).toHaveLength(0);
     });
 
-    // 1b — Canonical labels: cold-boot slots 0–6 carry the correct hardware labels.
-    test('cold-boot slots 0–6 have valid NS entries with canonical hardware labels', async ({ page }) => {
+    // 1b — Canonical labels: hardware-boot slots (0–7, 9–10) carry the correct labels.
+    //      Slot 8 (Tunnel/bitstreamOnly) is intentionally absent from COLD_BOOT_EXPECTED_LABELS
+    //      because boot software leaves its NS memory zeroed; the FPGA writes it at power-on.
+    test('cold-boot hardware slots have valid NS entries with canonical labels', async ({ page }) => {
         test.setTimeout(60000);
 
         await loadColdBoot(page);
@@ -223,7 +245,7 @@ test.describe('Namespace panel — cold boot shows no extended slots (8+)', () =
         const missing = slotInfo.filter(s => !s.hasEntry);
         expect(
             missing.map(s => `slot ${s.slot} (${s.expectedLabel})`),
-            'All 7 cold-boot slots (0–6) must have a valid NS entry'
+            'All hardware cold-boot slots (0–7, 9–10) must have a valid NS entry'
         ).toHaveLength(0);
 
         const mislabelled = slotInfo.filter(
@@ -237,40 +259,61 @@ test.describe('Namespace panel — cold boot shows no extended slots (8+)', () =
         ).toHaveLength(0);
     });
 
-    // 1c — Slot 7 is free/programmable: null NS entry, no rendered row.
-    test('slot 7 is null (programmable) and produces no namespace table row', async ({ page }) => {
+    // 1c — Slot 7 = WukongCallHome (valid NS entry, rendered row).
+    //      Slot 8 = Tunnel / bitstreamOnly (null NS entry from boot software,
+    //      no rendered DOM row — FPGA writes it at hardware power-on).
+    test('slot 7 has WukongCallHome entry; slot 8 (bitstreamOnly) has no NS entry', async ({ page }) => {
         test.setTimeout(60000);
 
         await loadColdBoot(page);
         await openNamespaceView(page);
 
-        const slot7 = await page.evaluate(() => {
+        const slotData = await page.evaluate(() => {
             if (typeof sim === 'undefined') throw new Error('sim is not accessible');
             return {
-                entry: sim.readNSEntry(7),
-                label: (sim.nsLabels && sim.nsLabels[7]) || '',
+                slot7: {
+                    entry: sim.readNSEntry(7),
+                    label: (sim.nsLabels && sim.nsLabels[7]) || '',
+                },
+                slot8: {
+                    entry: sim.readNSEntry(8),
+                    label: (sim.nsLabels && sim.nsLabels[8]) || '',
+                },
             };
         });
 
+        // Slot 7 must be WukongCallHome — a fully-wired E-perm LUMP entry.
         expect(
-            slot7.entry,
-            'Slot 7 must have a null NS entry (programmable/free at cold boot)'
+            slotData.slot7.entry,
+            'Slot 7 (WukongCallHome) must have a valid NS entry at cold boot'
+        ).not.toBeNull();
+        expect(
+            slotData.slot7.label,
+            'Slot 7 must be labelled "WukongCallHome"'
+        ).toBe('WukongCallHome');
+
+        // Slot 8 is bitstreamOnly (Tunnel): boot software leaves NS memory at zeros;
+        // the FPGA writes the real entry when it powers on.
+        expect(
+            slotData.slot8.entry,
+            'Slot 8 (Tunnel/bitstreamOnly) must have a null NS entry at sim cold boot'
         ).toBeNull();
 
-        const row7Count = await page.locator('#namespaceTable #ns-row-7').count();
+        // Slot 8 must not produce a rendered row in the namespace table.
+        const row8Count = await page.locator('#namespaceTable #ns-row-8').count();
         expect(
-            row7Count,
-            'Slot 7 must not produce a rendered namespace table row at cold boot'
+            row8Count,
+            'Slot 8 (Tunnel/bitstreamOnly) must not produce a rendered namespace table row at cold boot'
         ).toBe(0);
     });
 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Suite 2 — After LUMP deploy via the Builder: new slot 8+ appears
+// Suite 2 — After LUMP deploy via the Builder: new slot 11+ appears
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('Namespace panel — new slot ≥ 8 appears only after Builder deploy', () => {
+test.describe('Namespace panel — new slot ≥ 11 appears only after Builder deploy', () => {
 
     // 2a — Builder compile + create flow via compileAndCreateAbstraction().
     //
@@ -283,23 +326,23 @@ test.describe('Namespace panel — new slot ≥ 8 appears only after Builder dep
     //      Builder → Actions → "Create Abstraction".  This runs the CLOOMC
     //      compiler, then dispatches to Navana.Abstraction.Add (abstractionRegistry
     //      index 5), which allocates memory and calls sim.writeNSEntry(slot, …)
-    //      where slot is the first free index ≥ 45 (system_abstractions.js:815–823).
+    //      where slot is the first free index ≥ 45 (system_abstractions.js).
     //   5. Navigate to the Namespace view.
     //   6. Assert the new slot row is visible and carries the abstraction name.
-    test('compile and create an abstraction via the Builder adds a new NS slot ≥ 8', async ({ page }) => {
+    test('compile and create an abstraction via the Builder adds a new NS slot ≥ 11', async ({ page }) => {
         test.setTimeout(90000);
 
         await loadColdBoot(page);
 
-        // Confirm cold-boot state before deploy: nsCount ≤ 8.
+        // Confirm cold-boot state before deploy: nsCount ≤ 11.
         const nsCountBefore = await page.evaluate(() => {
             if (typeof sim === 'undefined') throw new Error('sim is not accessible');
             return sim.nsCount;
         });
         expect(
             nsCountBefore,
-            `nsCount before Builder deploy must be ≤ 8 (got ${nsCountBefore})`
-        ).toBeLessThanOrEqual(8);
+            `nsCount before Builder deploy must be ≤ 11 (got ${nsCountBefore})`
+        ).toBeLessThanOrEqual(11);
 
         // Step 1: Navigate to the Programs/editor view.
         const hamBtn = page.locator('#hamBtn');
@@ -371,10 +414,11 @@ test.describe('Namespace panel — new slot ≥ 8 appears only after Builder dep
         // Step 5: Navigate to the Namespace view.
         await openNamespaceView(page);
 
-        // Step 6: The new abstraction must occupy a slot ≥ 8.
+        // Step 6: The new abstraction must occupy a slot ≥ 11
+        //         (slots 0–10 are all hardware boot slots).
         const newSlot = await page.evaluate(() => {
             if (typeof sim === 'undefined') throw new Error('sim is not accessible');
-            for (let i = 8; i < sim.nsCount; i++) {
+            for (let i = 11; i < sim.nsCount; i++) {
                 const entry = sim.readNSEntry(i);
                 if (entry !== null) return i;
             }
@@ -383,8 +427,8 @@ test.describe('Namespace panel — new slot ≥ 8 appears only after Builder dep
 
         expect(
             newSlot,
-            'A new NS slot ≥ 8 must appear in the namespace table after Builder deploy'
-        ).toBeGreaterThanOrEqual(8);
+            'A new NS slot ≥ 11 must appear in the namespace table after Builder deploy'
+        ).toBeGreaterThanOrEqual(11);
 
         // The new slot must have a visible DOM row.
         const row = page.locator(`#namespaceTable #ns-row-${newSlot}`);
@@ -397,12 +441,12 @@ test.describe('Namespace panel — new slot ≥ 8 appears only after Builder dep
         const nsCountAfter = await page.evaluate(() => sim.nsCount);
         expect(
             nsCountAfter,
-            `nsCount must exceed 8 after Builder deploy (got ${nsCountAfter})`
-        ).toBeGreaterThan(8);
+            `nsCount must exceed 11 after Builder deploy (got ${nsCountAfter})`
+        ).toBeGreaterThan(11);
     });
 
-    // 2b — nsCount invariant: cold-boot nsCount stays ≤ 8, grows only after deploy.
-    test('nsCount stays ≤ 8 on cold boot and grows only after Builder deploy fires', async ({ page }) => {
+    // 2b — nsCount invariant: cold-boot nsCount stays ≤ 11, grows only after deploy.
+    test('nsCount stays ≤ 11 on cold boot and grows only after Builder deploy fires', async ({ page }) => {
         test.setTimeout(60000);
 
         await loadColdBoot(page);
@@ -415,8 +459,8 @@ test.describe('Namespace panel — new slot ≥ 8 appears only after Builder dep
 
         expect(
             nsCountColdBoot,
-            `nsCount at cold boot must be ≤ 8 (got ${nsCountColdBoot})`
-        ).toBeLessThanOrEqual(8);
+            `nsCount at cold boot must be ≤ 11 (got ${nsCountColdBoot})`
+        ).toBeLessThanOrEqual(11);
 
         // Navigate to the editor and trigger the Builder deploy.
         await page.evaluate(() => {
@@ -442,7 +486,7 @@ test.describe('Namespace panel — new slot ≥ 8 appears only after Builder dep
         });
         await page.waitForTimeout(300);
 
-        // After deploy, nsCount must have grown beyond 8.
+        // After deploy, nsCount must have grown beyond 11.
         const nsCountAfter = await page.evaluate(() => {
             if (typeof sim === 'undefined') throw new Error('sim is not accessible');
             return sim.nsCount;
@@ -450,15 +494,15 @@ test.describe('Namespace panel — new slot ≥ 8 appears only after Builder dep
 
         expect(
             nsCountAfter,
-            `nsCount must exceed 8 after Builder deploy (got ${nsCountAfter})`
-        ).toBeGreaterThan(8);
+            `nsCount must exceed 11 after Builder deploy (got ${nsCountAfter})`
+        ).toBeGreaterThan(11);
 
         // The absolute difference must account for the new slot being ≥ 45
         // (Navana assigns slots starting at 45; nsCount = new slot + 1).
         expect(
             nsCountAfter,
-            'nsCount after deploy must be consistent with a slot ≥ 8 being allocated'
-        ).toBeGreaterThanOrEqual(9);
+            'nsCount after deploy must be consistent with a slot ≥ 11 being allocated'
+        ).toBeGreaterThanOrEqual(12);
     });
 
 });
