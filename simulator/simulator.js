@@ -1059,9 +1059,11 @@ class ChurchSimulator {
 
         // 2. Scan from slot 2 for the first free slot.
         //    Slots 0 and 1 are hardware-fixed (NS root, Thread LUMP).
-        //    Slots 2–6 are system entries pre-populated by the boot image.
-        //    No slot above 1 has special priority — the first free slot wins.
+        //    Slots 2–10 are system entries pre-populated by the boot image or bitstream.
+        //    Bitstream-only slots (e.g. slot 8) have all-zero NS entries but are
+        //    still reserved — skip them via _bitstreamSlots.
         for (let s = 2; s < this.MAX_NS_ENTRIES; s++) {
+            if (this._bitstreamSlots && this._bitstreamSlots.has(s)) continue;
             if (!this.isNSEntryValid(s)) {
                 if (token) this._tokenSlotMap.set(token, s);
                 return s;
@@ -1281,7 +1283,7 @@ class ChurchSimulator {
             { label: 'TIMER_DEV',      perms: {R:1,W:1,X:0,L:0,S:0,E:0}, chainable: false },  // 5  MMIO 0x4000002C
             { label: 'SelfTest',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 6  default boot entry
             { label: 'WukongCallHome', perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 7  Wukong coordinator LUMP
-            { label: 'Tunnel',         perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 8  CALL HOME / IDE bridge
+            { label: 'Tunnel',         perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false, bitstreamOnly: true },  // 8  CALL HOME / IDE bridge
             { label: 'Ethernet',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 9  network I/O hardware cap
             { label: 'CapTest',        perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 10 capability validation LUMP
         ];
@@ -1359,6 +1361,22 @@ class ChurchSimulator {
                 continue;
             }
 
+            // Bitstream-written slot — NS entry is provided by the FPGA bitstream at
+            // power-on; boot software leaves the NS words as zeros (hardware fills them).
+            // runningOffset is not advanced (no RAM body allocated by boot ROM).
+            // Track in _bitstreamSlots so allocOrFindNsSlot reserves the slot even
+            // though isNSEntryValid(i) returns false (all-zero NS entry).
+            if (a.bitstreamOnly) {
+                if (!this._bitstreamSlots) this._bitstreamSlots = new Set();
+                this._bitstreamSlots.add(i);
+                this.nsLabels[i] = a.label;
+                this.nsChainable[i] = a.chainable || false;
+                if (i >= this.nsCount) this.nsCount = i + 1;
+                clistChildren.push(i);
+                clistGTs.push(this.createGT(0, i, a.perms, 1));
+                continue;
+            }
+
             // MMIO slots 2-5: use physical MMIO byte address; don't advance runningOffset.
             // Step 2 physAddr override replaces runningOffset for resident lump slots.
             const MMIO_ADDRS = { 2: 0x40000014, 3: 0x40000000, 4: 0x40000028, 5: 0x4000002C };
@@ -1394,7 +1412,7 @@ class ChurchSimulator {
         }
 
         // ── Step 2 augmentation: NS entries for extended slots (≥8) ──────────
-        // The 8-slot hardware catalog loop above creates NS entries for
+        // The 11-slot hardware catalog loop above creates NS entries for
         // slots 0–7. Resident Step-2 lumps targeting slots ≥ 8 need explicit
         // NS entries. Lazy (resident=False) slots are left as all-zeros —
         // the runtime lazy loader writes their NS entry on first use.

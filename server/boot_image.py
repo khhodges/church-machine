@@ -187,7 +187,7 @@ DEFAULT_ABSTRACTION_CATALOG = [
     ("TIMER_DEV",      {"R":1,"W":1,"X":0,"L":0,"S":0,"E":0}, False),  # 5  MMIO 0x4000002C
     ("SelfTest",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 6  default boot entry
     ("WukongCallHome", {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 7  Wukong coordinator LUMP
-    ("Tunnel",         {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 8  CALL HOME / IDE bridge
+    ("Tunnel",         {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False, True),  # 8  bitstream-written: NS entry provided by FPGA hardware
     ("Ethernet",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 9  network I/O hardware cap
     ("CapTest",        {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 10 capability validation LUMP
 ]
@@ -606,7 +606,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
             clist_gts.append(0)              # null GT in c-list at this position
             continue
 
-        label, perms, chainable = entry
+        label, perms, chainable, *_bsonly = entry
+        bitstream_only = bool(_bsonly and _bsonly[0])
         override = phys_override.get(i)
         if i == 0:
             # A7 v1.2: NS LUMP lives at NS_TABLE_BASE (self-referential).
@@ -619,9 +620,11 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         else:
             if override is not None:
                 loc = override
-            else:
+            elif not bitstream_only:
                 loc = running_offset
                 running_offset += my_size
+            else:
+                loc = 0   # placeholder; NS entry not written (bitstream fills it)
         locations[i] = loc
 
         # Slot 0: limit covers the NS TABLE region (NS_TABLE_RESERVE words).
@@ -636,6 +639,12 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
             lim17 = (my_size - 1) & 0x1FFFF
             clist_count = 0
 
+        if bitstream_only:
+            # Bitstream-written slot: NS entry provided by FPGA hardware, not boot software.
+            # Leave the NS table words as zeros (hardware fills them at power-on).
+            # runningOffset already not advanced (loc assignment already skipped above).
+            clist_gts.append(create_gt(0, i, perms, 1))
+            continue
         base = total - (i + 1) * NS_ENTRY_WORDS
         mem[base + 0] = loc & 0xFFFFFFFF
         mem[base + 1] = pack_ns_word1(lim17, 0, 0, 0, 1, clist_count)
@@ -644,14 +653,15 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         clist_gts.append(create_gt(0, i, perms, 1))
 
     # Count only non-null catalog entries: the highest non-null slot index + 1.
-    # All 8 catalog entries are non-null (slots 0–7 including WukongCallHome),
-    # so ns_count = 8. JS simulator tracks nsCount via writeNSEntry which
-    # skips null slots, and this must match that value.
+    # All 11 catalog entries are non-null (slots 0–10); slot 8 is bitstreamOnly
+    # (no NS entry written) but still contributes to ns_count so the allocator
+    # knows that slot is reserved. This must match simulator.js nsCount.
     ns_count = max((i + 1 for i, e in enumerate(catalog) if e is not None), default=0)
 
     # ----- Step 2 augmentation: NS entries for extended slots (≥8) ------
-    # The 8-slot hardware catalog loop above only creates NS entries for
-    # slots 0–7.  Resident Step-2 lumps targeting slots ≥ 8 need explicit
+    # The 11-slot hardware catalog loop above creates NS entries for
+    # slots 0–10 (slot 8 is bitstream-written and also skipped here).  Resident
+    # Step-2 lumps targeting slots ≥ 11 need explicit
     # NS entries written here.  Lazy (resident=False) slots are left as
     # all-zeros — the runtime lazy loader writes their NS entry on first use.
     for _e2 in step2_lumps:

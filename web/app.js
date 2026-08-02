@@ -1044,8 +1044,8 @@ function updateNamespaceDisplay() {
           loc: 0x00000100, desc: 'Hardware correctness validator — default ⚡ boot entry (64 words)' },
         { slot: 7, label: 'WukongCallHome', perms: 'E',  tier: 'boot',
           loc: 0x00000140, desc: 'Wukong call-home coordinator: SelfTest → Tunnel.Register → RETURN (64 words)' },
-        { slot: 8, label: 'Tunnel',         perms: 'E',  tier: 'boot',
-          loc: 0x00000180, desc: 'CALL HOME / IDE bridge — hardware capability (E-perm)' },
+        { slot: 8, label: 'Tunnel',         perms: 'E',  tier: 'bitstream',
+          loc: null,         desc: 'CALL HOME / IDE bridge — NS entry written by FPGA bitstream at power-on, not boot software' },
         { slot: 9, label: 'Ethernet',       perms: 'E',  tier: 'boot',
           loc: 0x000001C0, desc: 'Network I/O hardware capability (E-perm)' },
         { slot: 10, label: 'CapTest',       perms: 'E',  tier: 'boot',
@@ -1066,7 +1066,10 @@ function updateNamespaceDisplay() {
                       '\uD83D\uDD12 HARDWARE \u2014 SLOTS 0\u20135 \u2014 HARDWIRED AT DESIGN TIME, FROZEN INTO FPGA BITSTREAM</td></tr>' },
         boot: { shown: false,
                 html: '<tr style="background:rgba(0,140,220,0.08);"><td colspan="5" style="padding:3px 10px;font-size:0.65rem;color:#7eb8ff;letter-spacing:0.05em;font-weight:600;">' +
-                      '\uD83E\uDD7E BOOT \u2014 SLOTS 6\u201310 \u2014 LOADED FROM BOOT IMAGE BEFORE FIRST INSTRUCTION</td></tr>' },
+                      '\uD83E\uDD7E BOOT \u2014 SLOTS 6, 7, 9, 10 \u2014 LOADED FROM BOOT IMAGE BEFORE FIRST INSTRUCTION</td></tr>' },
+        bitstream: { shown: false,
+                html: '<tr style="background:rgba(130,80,200,0.08);"><td colspan="5" style="padding:3px 10px;font-size:0.65rem;color:#c084fc;letter-spacing:0.05em;font-weight:600;">' +
+                      '\uD83D\uDCE1 BITSTREAM \u2014 SLOT 8 \u2014 NS ENTRY WRITTEN BY FPGA BITSTREAM AT POWER-ON</td></tr>' },
     };
 
     let html = '';
@@ -1118,7 +1121,7 @@ function updateNamespaceDisplay() {
             ? `<span style="color:${permColor};font-family:monospace;font-size:0.75rem;">[${_he(entry.perms)}]</span>`
             : '<span style="color:#444;font-family:monospace;font-size:0.75rem;">[\u2014]</span>';
 
-        const labelColor = entry.tier === 'hw' ? '#f0a040' : '#4ec9b0';
+        const labelColor = entry.tier === 'hw' ? '#f0a040' : entry.tier === 'bitstream' ? '#c084fc' : '#4ec9b0';
 
         html += `<tr style="border-bottom:1px solid rgba(255,255,255,0.04);${rowBg}" title="${_he(entry.desc)}">`;
         html += `<td style="padding:5px 8px;text-align:center;">${idxCell}</td>`;
