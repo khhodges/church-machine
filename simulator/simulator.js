@@ -109,8 +109,8 @@ const M_BIT_PORT_CR14         = 0xFFFFFF1E; // M-bit authority port for CR14
 const M_BIT_PORT_CR15         = 0xFFFFFF1F; // M-bit authority port for CR15
 const IO_PORT_PET_NAME_WR     = 0xFFFFFF38; // DWRITE to this addr marks c-list slot (value & 0x3F) as named
 // Boot-default named slots — matches hardware/boot_rom.py DEMO_CLIST_NAMED_SLOTS.
-// Live slots: 0-6, 8-10, 22 (Tunnel), 23 (Keystone), 42 (Ethernet), 43 (EventRouter).
-const BOOT_NAMED_SLOTS = Object.freeze([0, 1, 2, 3, 4, 5, 6, 7]);
+// 11-slot catalog (0-10): hw MMIO 0-5, boot-entry LUMPs 6-7, hardware caps 8-10.
+const BOOT_NAMED_SLOTS = Object.freeze([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
 // DEPRECATED: fixed IRQ thread slot constant.
 // Under v1.2 §4 the Scheduler.IRQ LUMP is delivered lazily (ns_slot_policy=dynamic);
@@ -380,11 +380,11 @@ class ChurchSimulator {
             }
         }
 
-        // Integrity check: the minimum complete boot namespace has 8 slots
-        // (indices 0-7: Boot.NS, Boot.Thread, UART_DEV, LED_DEV,
-        // BTN_DEV, TIMER_DEV, SelfTest, WukongCallHome).
+        // Integrity check: the minimum complete boot namespace has 11 slots
+        // (indices 0-10: Boot.NS, Boot.Thread, UART_DEV, LED_DEV, BTN_DEV,
+        // TIMER_DEV, SelfTest, WukongCallHome, Tunnel, Ethernet, CapTest).
         // Warn loudly in the console log when the binary is smaller than this.
-        const _BOOT_SLOT_MIN = 8;
+        const _BOOT_SLOT_MIN = 11;
         if (count < _BOOT_SLOT_MIN) {
             this.output += `[BOOTIMG] WARNING: only ${count} NS slots active (< ${_BOOT_SLOT_MIN} expected). Boot namespace may be incomplete.\n`;
         } else {
@@ -786,7 +786,7 @@ class ChurchSimulator {
         // Mirrors hardware/pet_name_mem.py and hardware/boot_rom.py DEMO_CLIST_NAMED_SLOTS.
         // Initialised with the boot c-list named slots; updated by DWRITE to IO_PORT_PET_NAME_WR
         // (0xFFFFFF38) and by markNamedSlots() when a program with a capabilities block loads.
-        // Boot named slots: {0-6, 8-10, 22, 23, 42, 43} — matches DEMO_CLIST_NAMED_SLOTS.
+        // Boot named slots: {0-10} — 11-slot catalog (hw 0-5, boot LUMPs 6-7, hw caps 8-10).
         this.petNameMemory = new Set(BOOT_NAMED_SLOTS);
 
         // Lazy-Resolve: Transparent Thread Suspension (Task #1519)
@@ -1260,11 +1260,14 @@ class ChurchSimulator {
     }
 
     _getHardwareBootCatalog() {
-        // Hardware cold-boot namespace: 8 slots (0–7).
-        //   0–5  fixed hardware caps (Boot.NS, Boot.Thread, MMIO devices)
-        //   6    SelfTest  — default ⚡ boot entry (hardware correctness validator)
-        //   7    WukongCallHome — coordinator: SelfTest → Tunnel.Register → IDE RETURN
-        //        Set ⚡ to slot 7 to test the full Wukong call-home path in the IDE.
+        // Hardware cold-boot namespace: 11 slots (0–10).
+        //   0–5   fixed hardware caps (Boot.NS, Boot.Thread, MMIO devices)
+        //   6     SelfTest       — default ⚡ boot entry (hardware correctness validator)
+        //   7     WukongCallHome — coordinator: SelfTest → Tunnel.Register → IDE RETURN
+        //         Set ⚡ to slot 7 to test the full Wukong call-home path in the IDE.
+        //   8     Tunnel         — CALL HOME / IDE bridge (hardware E-perm cap)
+        //   9     Ethernet       — network I/O hardware cap (E-perm)
+        //  10     CapTest        — capability validation LUMP (E-perm, task #2274)
         // No slot above 1 has special hardware significance — the ⚡ lightning
         // bolt sets Thread.CR0 to whichever slot the programmer chooses.
         // This catalog NEVER derives from abstractionRegistry — the registry is
@@ -1278,6 +1281,9 @@ class ChurchSimulator {
             { label: 'TIMER_DEV',      perms: {R:1,W:1,X:0,L:0,S:0,E:0}, chainable: false },  // 5  MMIO 0x4000002C
             { label: 'SelfTest',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 6  default boot entry
             { label: 'WukongCallHome', perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 7  Wukong coordinator LUMP
+            { label: 'Tunnel',         perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 8  CALL HOME / IDE bridge
+            { label: 'Ethernet',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 9  network I/O hardware cap
+            { label: 'CapTest',        perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 10 capability validation LUMP
         ];
     }
 
@@ -1478,7 +1484,7 @@ class ChurchSimulator {
 
         // Memory-manager GT at c-list[0]: R|W Inform capability over NS slot 0 (full namespace).
         clistGTs[0] = this.createGT(0, BOOT_NS_SLOT_HEADER, {R:1, W:1}, 1);
-        const DEMO_CLIST_SIZE   = 11;   // slots 0–10 (minimal 8-slot namespace)
+        const DEMO_CLIST_SIZE   = 11;   // slots 0–10 (minimal 11-slot namespace)
 
         // ── NS lump c-list (A7 v1.2 layout) ─────────────────────────────────────────
         // A7 layout: NS LUMP IS the NS TABLE at NS_TABLE_BASE. No separate lump header
@@ -1633,7 +1639,7 @@ class ChurchSimulator {
     // free physical address after the boot catalog LUMPs).
     //
     // Creates an absent-body Outform NS entry for the Scheduler.IRQ LUMP at the
-    // first free dynamic slot (≥ FIRST_DYN_SLOT=8).  "Absent-body" means:
+    // first free dynamic slot (≥ FIRST_DYN_SLOT=11, after the 11-slot catalog).  "Absent-body" means:
     //   • NS entry location word points to `irqLoc` (the reserved physical address)
     //   • memory[irqLoc] = 0 (magic field = 0 ≠ 0x1F — body not yet resident)
     // On the first Tier 2 fault, _fireSchedulerIRQ() detects the absent body
@@ -1642,7 +1648,7 @@ class ChurchSimulator {
     // Stores the dynamically-allocated slot in irqState.irqLumpSlot so that
     // _fireSchedulerIRQ() can find it without hardcoding slot 8.
     _preRegisterIrqLump(runningOffset) {
-        const FIRST_DYN_SLOT = 8;
+        const FIRST_DYN_SLOT = 11;  // first slot after the 11-entry boot catalog (0-10)
         const IRQ_LUMP_SIZE  = 64;  // minimal 64-word LUMP (nm6=0)
 
         // Find the first free NS slot at or after FIRST_DYN_SLOT.
@@ -1941,7 +1947,7 @@ class ChurchSimulator {
 
                 if (this.abstractionRegistry) {
                     const _chResult = this.abstractionRegistry.dispatchMethod(
-                        this._slotByPetName('Tunnel', 22), 'Register', this,
+                        this._slotByPetName('Tunnel', 8), 'Register', this,
                         { dr1: _bootReason, dr2: _lastFault, dr3: _faultNIA }
                     );
                     if (_chResult && _chResult.ok !== false) {
@@ -3398,15 +3404,15 @@ class ChurchSimulator {
 
         // Resolve the IRQ LUMP slot.  v1.2 §4: the Scheduler.IRQ LUMP is
         // registered lazily — the first time _fireSchedulerIRQ() is called.
-        // _preRegisterIrqLump() allocates the first free NS slot ≥ 8, writes
-        // the Outform NS entry, and seeds the lazyManifest so lazyLoad() can
-        // install the CLOOMC body on demand.
+        // _preRegisterIrqLump() allocates the first free NS slot ≥ 11 (after the
+        // 11-entry boot catalog), writes the Outform NS entry, and seeds the
+        // lazyManifest so lazyLoad() can install the CLOOMC body on demand.
         if (this.irqState.irqLumpSlot === null) {
             this._preRegisterIrqLump(this.irqState.irqAllocBase || 0);
         }
         const _schedulerSlot = (this.irqState.irqLumpSlot != null)
             ? this.irqState.irqLumpSlot
-            : this._slotByPetName('Scheduler', 8);
+            : this._slotByPetName('Scheduler', 11);
         // IRQ thread slot: dynamic offset from the LUMP slot.
         // Kept for context-switch logging (not a hard dependency).
         const _irqThreadSlot = (this.irqState.irqLumpSlot != null)

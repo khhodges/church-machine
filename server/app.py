@@ -1083,7 +1083,7 @@ MAX_NS_ENTRIES = 1024
 # chooses as boot entry (default 6 = SelfTest; Wukong boards use 7).
 # Keep in sync with simulator.js _getHardwareBootCatalog() and
 # server/boot_image.py DEFAULT_ABSTRACTION_CATALOG.
-BASE_NAMED_NS_COUNT = 8
+BASE_NAMED_NS_COUNT = 11
 
 # Slots reserved for foundational lumps (Step 1) and device MMIO regions —
 # the programmer cannot place an additional resident lump body here. Slots

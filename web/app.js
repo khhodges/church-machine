@@ -1023,9 +1023,9 @@ function updateNamespaceDisplay() {
     const hierPanel = document.getElementById('hierarchyTree');
     if (!nsPanel) return;
 
-    // ── Hardware boot catalog — the real 8-slot namespace ───────────────────
+    // ── Hardware boot catalog — the real 11-slot namespace ──────────────────
     // These are frozen into the FPGA bitstream at design time (slots 0–5) or
-    // loaded from the boot image before the first instruction (slots 6–7).
+    // loaded from the boot image before the first instruction (slots 6–10).
     // NOT demo data — this is the actual Church Machine hardware namespace.
     const HW_CATALOG = [
         { slot: 0, label: 'Boot.NS',        perms: '',   tier: 'hw',
@@ -1044,6 +1044,12 @@ function updateNamespaceDisplay() {
           loc: 0x00000100, desc: 'Hardware correctness validator — default ⚡ boot entry (64 words)' },
         { slot: 7, label: 'WukongCallHome', perms: 'E',  tier: 'boot',
           loc: 0x00000140, desc: 'Wukong call-home coordinator: SelfTest → Tunnel.Register → RETURN (64 words)' },
+        { slot: 8, label: 'Tunnel',         perms: 'E',  tier: 'boot',
+          loc: 0x00000180, desc: 'CALL HOME / IDE bridge — hardware capability (E-perm)' },
+        { slot: 9, label: 'Ethernet',       perms: 'E',  tier: 'boot',
+          loc: 0x000001C0, desc: 'Network I/O hardware capability (E-perm)' },
+        { slot: 10, label: 'CapTest',       perms: 'E',  tier: 'boot',
+          loc: 0x00000200, desc: 'Capability validation LUMP — task #2274 (E-perm)' },
     ];
 
     // Use live simulator data when available
@@ -1060,12 +1066,12 @@ function updateNamespaceDisplay() {
                       '\uD83D\uDD12 HARDWARE \u2014 SLOTS 0\u20135 \u2014 HARDWIRED AT DESIGN TIME, FROZEN INTO FPGA BITSTREAM</td></tr>' },
         boot: { shown: false,
                 html: '<tr style="background:rgba(0,140,220,0.08);"><td colspan="5" style="padding:3px 10px;font-size:0.65rem;color:#7eb8ff;letter-spacing:0.05em;font-weight:600;">' +
-                      '\uD83E\uDD7E BOOT \u2014 SLOTS 6\u20137 \u2014 LOADED FROM BOOT IMAGE BEFORE FIRST INSTRUCTION</td></tr>' },
+                      '\uD83E\uDD7E BOOT \u2014 SLOTS 6\u201310 \u2014 LOADED FROM BOOT IMAGE BEFORE FIRST INSTRUCTION</td></tr>' },
     };
 
     let html = '';
     html += '<div style="font-size:0.7rem;color:#7a8a9a;padding:5px 10px 4px;border-bottom:1px solid rgba(255,255,255,0.07);">' +
-            'NS_ENTRY_LAYOUT: 4 words per entry (128 bits) \u2014 8-slot hardware boot namespace' +
+            'NS_ENTRY_LAYOUT: 4 words per entry (128 bits) \u2014 11-slot hardware boot namespace' +
             (simRunning ? ' \u2014 <span style="color:#4ec9b0;">live</span>' : ' \u2014 <span style="color:#666;">static (boot to see live data)</span>') +
             '</div>';
 
@@ -1127,7 +1133,7 @@ function updateNamespaceDisplay() {
     if (simRunning && _sim.nsCount > HW_CATALOG.length) {
         const extra = _sim.nsCount - HW_CATALOG.length;
         html += `<tr style="background:rgba(100,100,140,0.06);"><td colspan="5" style="padding:3px 10px;font-size:0.65rem;color:#8888bb;letter-spacing:0.05em;font-weight:600;">` +
-                `\u270F\uFE0F PROGRAMMER \u2014 SLOTS 8+ \u2014 ALLOCATED AT RUNTIME BY PROGRAMMER CODE` +
+                `\u270F\uFE0F PROGRAMMER \u2014 SLOTS 11+ \u2014 ALLOCATED AT RUNTIME BY PROGRAMMER CODE` +
                 `</td></tr>`;
         for (let i = HW_CATALOG.length; i < _sim.nsCount; i++) {
             const nsEnt = typeof _sim.readNSEntry === 'function' ? _sim.readNSEntry(i) : null;

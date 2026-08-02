@@ -175,7 +175,7 @@ def create_abstract_gt(ab_type, rw_perms, gt_seq, ab_data):
 # image is produced from this canonical list so server and simulator
 # agree on what the default boot ROM contains.
 #
-# Minimal 8-slot boot namespace (slots 0-7), followed by user-deployed abstractions.
+# Minimal 11-slot boot namespace (slots 0-10), followed by user-deployed abstractions.
 # The ⚡ lightning bolt sets Thread.CR0 to the E-GT of whichever slot the programmer
 # chooses as the boot entry.  Default is SelfTest (slot 6); Wukong boards use slot 7.
 DEFAULT_ABSTRACTION_CATALOG = [
@@ -187,8 +187,11 @@ DEFAULT_ABSTRACTION_CATALOG = [
     ("TIMER_DEV",      {"R":1,"W":1,"X":0,"L":0,"S":0,"E":0}, False),  # 5  MMIO 0x4000002C
     ("SelfTest",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 6  default boot entry
     ("WukongCallHome", {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 7  Wukong coordinator LUMP
+    ("Tunnel",         {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 8  CALL HOME / IDE bridge
+    ("Ethernet",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 9  network I/O hardware cap
+    ("CapTest",        {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 10 capability validation LUMP
 ]
-assert len(DEFAULT_ABSTRACTION_CATALOG) == 8, "catalog drift vs simulator.js"
+assert len(DEFAULT_ABSTRACTION_CATALOG) == 11, "catalog drift vs simulator.js"
 
 # MMIO NS slot specs: (mmio_byte_addr, lim17).
 # Slots 2-5 use physical MMIO addresses — no RAM body is allocated;
