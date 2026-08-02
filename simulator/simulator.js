@@ -1283,7 +1283,7 @@ class ChurchSimulator {
             { label: 'TIMER_DEV',      perms: {R:1,W:1,X:0,L:0,S:0,E:0}, chainable: false },  // 5  MMIO 0x4000002C
             { label: 'SelfTest',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 6  default boot entry
             { label: 'WukongCallHome', perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 7  Wukong coordinator LUMP
-            { label: 'Tunnel',         perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false, bitstreamOnly: true },  // 8  CALL HOME / IDE bridge
+            { label: 'Tunnel',         perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 8  CALL HOME / IDE bridge
             { label: 'Ethernet',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 9  network I/O hardware cap
             { label: 'CapTest',        perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 10 capability validation LUMP
         ];

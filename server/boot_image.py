@@ -187,7 +187,7 @@ DEFAULT_ABSTRACTION_CATALOG = [
     ("TIMER_DEV",      {"R":1,"W":1,"X":0,"L":0,"S":0,"E":0}, False),  # 5  MMIO 0x4000002C
     ("SelfTest",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 6  default boot entry
     ("WukongCallHome", {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 7  Wukong coordinator LUMP
-    ("Tunnel",         {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False, True),  # 8  bitstream-written: NS entry provided by FPGA hardware
+     ("Tunnel",         {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 8  CALL HOME / IDE bridge
     ("Ethernet",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 9  network I/O hardware cap
     ("CapTest",        {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 10 capability validation LUMP
 ]
@@ -653,14 +653,12 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         clist_gts.append(create_gt(0, i, perms, 1))
 
     # Count only non-null catalog entries: the highest non-null slot index + 1.
-    # All 11 catalog entries are non-null (slots 0–10); slot 8 is bitstreamOnly
-    # (no NS entry written) but still contributes to ns_count so the allocator
-    # knows that slot is reserved. This must match simulator.js nsCount.
+    # All 11 catalog entries are non-null (slots 0–10). This must match simulator.js nsCount.
     ns_count = max((i + 1 for i, e in enumerate(catalog) if e is not None), default=0)
 
     # ----- Step 2 augmentation: NS entries for extended slots (≥8) ------
     # The 11-slot hardware catalog loop above creates NS entries for
-    # slots 0–10 (slot 8 is bitstream-written and also skipped here).  Resident
+    # slots 0–10.  Resident
     # Step-2 lumps targeting slots ≥ 11 need explicit
     # NS entries written here.  Lazy (resident=False) slots are left as
     # all-zeros — the runtime lazy loader writes their NS entry on first use.
