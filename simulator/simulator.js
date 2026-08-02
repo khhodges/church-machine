@@ -1741,6 +1741,8 @@ class ChurchSimulator {
         // All boot CRs are Inform-type (type=1) GTs — they name concrete NS slots that have
         // physical lumps.  Abstract GTs (type=3) are only minted at runtime by Navana.Abstraction.Add
         // and Navana.MintPassKey; the boot ROM never creates them.
+        // Cross-reference: hardware/core.py BootState cases (LOAD_NS/INIT_THRD/LOAD_NUC)
+        // and docs/architecture.md "Boot Sequence" implement the same three-lump sequence.
         if (this.bootComplete) return false;   // nothing to do once boot has finished
         if (this.halted) return false;         // stop re-entering after a boot fault (prevents infinite loop in runSim)
 
@@ -1844,7 +1846,7 @@ class ChurchSimulator {
                     return false;
                 }
                 this._writeCR(15, gt15, check.entry);                              // write validated GT + NS entry into CR15
-                this.output += `[BOOT] LOAD_NS — CR15 <- mLoad(Slot 0) Namespace (base=0x0000, size=${this.memory.length} words, NS table entries=${this.nsCount})\n`;
+                this.output += `[BOOT] LOAD_NS — CR15 <- mLoad(Slot 0) Namespace (base=0x0000, size=${this.memory.length} words, NS table entries=${this.nsCount}) word0=0x${(this.cr[15].word0>>>0).toString(16).toUpperCase().padStart(8,'0')} word1=0x${(this.cr[15].word1>>>0).toString(16).toUpperCase().padStart(8,'0')} word2=0x${(this.cr[15].word2>>>0).toString(16).toUpperCase().padStart(8,'0')}\n`;
                 this.auditLog.push({
                     gate: 'CR_WR',
                     desc: `CR15(NS) ← Namespace descriptor  · base=0x0000, size=${this.memory.length} words, NS entries=${this.nsCount}`,
@@ -1880,7 +1882,7 @@ class ChurchSimulator {
                     return false;
                 }
                 this._writeCR(12, gt12, check12.entry);                            // CR12 ← thread stack token (encodes lump base + size)
-                this.output += `[BOOT] INIT_THRD — CR12 <- mLoad(Slot 1) thread stack GT (zero perms, Inform)\n`;
+                this.output += `[BOOT] INIT_THRD — CR12 <- mLoad(Slot 1) thread stack GT (zero perms, Inform) word0=0x${(this.cr[12].word0>>>0).toString(16).toUpperCase().padStart(8,'0')} word1=0x${(this.cr[12].word1>>>0).toString(16).toUpperCase().padStart(8,'0')} word2=0x${(this.cr[12].word2>>>0).toString(16).toUpperCase().padStart(8,'0')}\n`;
                 this.auditLog.push({
                     gate: 'CR_WR',
                     desc: `CR12(E) ← Thread stack GT  · NS slot ${BOOT_NS_SLOT_THREAD}, zero perms (Inform), M-elevation`,
@@ -1920,7 +1922,7 @@ class ChurchSimulator {
                 const _seq1h = (_initThrdEntry.word2_seals >>> 25) & 0x7F;
                 const gt5 = this.createGT(_seq1h, BOOT_NS_SLOT_THREAD, {R:1,W:1,X:0,L:0,S:0,E:0}, 1);  // RW Inform GT for the thread lump (Slot 1)
                 this._writeCR(5, gt5, _initThrdEntry);                             // CR5 ← heap RW token (base=thread lump, perms=RW)
-                this.output += `[BOOT] INIT_HEAP — CR5 <- thread heap (RW, Inform, Slot 1) heap=[+${_heapStart12}..+${_spMax12}] (CHANGE-consistent)\n`;
+                this.output += `[BOOT] INIT_HEAP — CR5 <- thread heap (RW, Inform, Slot 1) heap=[+${_heapStart12}..+${_spMax12}] (CHANGE-consistent) word0=0x${(this.cr[5].word0>>>0).toString(16).toUpperCase().padStart(8,'0')} word1=0x${(this.cr[5].word1>>>0).toString(16).toUpperCase().padStart(8,'0')} word2=0x${(this.cr[5].word2>>>0).toString(16).toUpperCase().padStart(8,'0')}\n`;
                 // Synthetic audit entry so the TSB Audit panel shows the CR5 heap
                 // synthesis as an explicit capability gate (not an mLoad — the GT is
                 // created directly by the boot state machine, CHANGE-consistent).
@@ -2036,7 +2038,7 @@ class ChurchSimulator {
                     return false;
                 }
                 this._writeCR(6, gt6, check6.entry);                                               // CR6 ← E-type token for boot entry (saved to sentinel frame in B:06)
-                this.output += `[BOOT] INIT_ABSTR — CR6 <- mLoad(Slot ${this.bootEntrySlot}, ${_b3Label}) (E, M-elevation)\n`;
+                this.output += `[BOOT] INIT_ABSTR — CR6 <- mLoad(Slot ${this.bootEntrySlot}, ${_b3Label}) (E, M-elevation) word0=0x${(this.cr[6].word0>>>0).toString(16).toUpperCase().padStart(8,'0')} word1=0x${(this.cr[6].word1>>>0).toString(16).toUpperCase().padStart(8,'0')} word2=0x${(this.cr[6].word2>>>0).toString(16).toUpperCase().padStart(8,'0')}\n`;
                 this.auditLog.push({
                     gate: 'CR_WR',
                     desc: `CR6(E) ← Boot entry E-GT  · NS slot ${this.bootEntrySlot} (${_b3Label}), M-elevation; snapshotted to sentinel frame in B:06`,
@@ -2169,7 +2171,7 @@ class ChurchSimulator {
                     // snapshotted into the sentinel frame above.  Since cc=0 means there is no c-list,
                     // CR6 must be cleared to NULL so machine state is consistent.
                     this.cr[6] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
-                    this.output += `[BOOT] NUC_CLIST — cc=0 (no c-list, direct-dispatch path); CR6←NULL; sentinel pushed (frame@+${sp_max}, STO=${this.sto})\n`;
+                    this.output += `[BOOT] NUC_CLIST — cc=0 (no c-list, direct-dispatch path); CR6←NULL word0=0x00000000 word1=0x00000000 word2=0x00000000; sentinel pushed (frame@+${sp_max}, STO=${this.sto})\n`;
                     this.output += `[BOOT] SENTINEL CALL — frame@+${sp_max}=0x${sentinelFrameWord.toString(16).toUpperCase().padStart(8,'0')} (NIA=0x7FFF,sz=1,prev_STO=${sp_max}), E-GT@+${sp_max-1}=0x${oldCR6GT.toString(16).toUpperCase().padStart(8,'0')}, STO=${this.sto}\n`;
                     this.auditLog.push({
                         gate: 'SENTINEL',
@@ -2192,7 +2194,7 @@ class ChurchSimulator {
                     const _clistEntry = Object.assign({}, entryNSEntry, { word0_location: (base + clistStart) >>> 0 });
                     this._writeCR(6, cr6GT, _clistEntry);
                     this.cr[6].m = 1;   // CALL is always M-elevated (matches CALL ISA call.py: mload_m_elevated=1)
-                    this.output += `[BOOT] NUC_CLIST — INIT_CLIST CR6(L) <- mLoad c-list of ${_b4Label} (base=0x${(base+clistStart).toString(16).toUpperCase()}, cc=${cc}); sentinel pushed (frame@+${sp_max}, STO=${this.sto})\n`;
+                    this.output += `[BOOT] NUC_CLIST — INIT_CLIST CR6(L) <- mLoad c-list of ${_b4Label} (base=0x${(base+clistStart).toString(16).toUpperCase()}, cc=${cc}); sentinel pushed (frame@+${sp_max}, STO=${this.sto}) word0=0x${(this.cr[6].word0>>>0).toString(16).toUpperCase().padStart(8,'0')} word1=0x${(this.cr[6].word1>>>0).toString(16).toUpperCase().padStart(8,'0')} word2=0x${(this.cr[6].word2>>>0).toString(16).toUpperCase().padStart(8,'0')}\n`;
                     this.output += `[BOOT] SENTINEL CALL — frame@+${sp_max}=0x${sentinelFrameWord.toString(16).toUpperCase().padStart(8,'0')} (NIA=0x7FFF,sz=1,prev_STO=${sp_max}), E-GT@+${sp_max-1}=0x${oldCR6GT.toString(16).toUpperCase().padStart(8,'0')}, STO=${this.sto}\n`;
                     this.auditLog.push({
                         gate: 'CR_WR',
@@ -2248,7 +2250,7 @@ class ChurchSimulator {
                 this.pc = 0;
                 this._nucLumpData = null;                                            // clear stash
 
-                this.output += `[BOOT] NUC_CODE — CR14(R+X) <- ${_b4Label} code lump (base=0x${base.toString(16).toUpperCase()}, cw=${cw}); CR0 <- boot-entry E-GT (Slot ${bootEntrySlot}); PC=0\n`;
+                this.output += `[BOOT] NUC_CODE — CR14(R+X) <- ${_b4Label} code lump (base=0x${base.toString(16).toUpperCase()}, cw=${cw}) word0=0x${(this.cr[14].word0>>>0).toString(16).toUpperCase().padStart(8,'0')} word1=0x${(this.cr[14].word1>>>0).toString(16).toUpperCase().padStart(8,'0')} word2=0x${(this.cr[14].word2>>>0).toString(16).toUpperCase().padStart(8,'0')}; CR0 <- boot-entry E-GT (Slot ${bootEntrySlot}) word0=0x${(this.cr[0].word0>>>0).toString(16).toUpperCase().padStart(8,'0')} word1=0x${(this.cr[0].word1>>>0).toString(16).toUpperCase().padStart(8,'0')} word2=0x${(this.cr[0].word2>>>0).toString(16).toUpperCase().padStart(8,'0')}; PC=0\n`;
                 this.auditLog.push({
                     gate: 'CR_WR',
                     desc: `CR14(R+X) ← ${_b4Label} code lump  · base=0x${base.toString(16).toUpperCase()}, cw=${cw}, PC←0; CR0 ← boot-entry E-GT (direct dispatch)`,

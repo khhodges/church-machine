@@ -160,6 +160,9 @@ register_suite "catalog-compile-tests" \
 register_suite "boot-entry-sync-tests" \
     'node simulator/test_boot_entry_sync.js'
 
+register_suite "boot-gt-words-tests" \
+    'node simulator/test_boot_gt_words.js'
+
 register_suite "ns-slot-dynamic-tests" \
     'node simulator/test_ns_slot_dynamic.js'
 

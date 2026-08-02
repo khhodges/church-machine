@@ -297,16 +297,165 @@ Integrity = integrity32 recomputed over NS Word 0 and NS Word 1 (`g_bit` masked)
 
 ## Boot Sequence
 
-The boot sequence follows a deterministic flow:
+Boot is defined by exactly three lumps and three standard ISA instructions. Every CR value
+is derived from NS entry data read at runtime; the tables below show the exact bit patterns.
 
-1. **FAULT_RST**: All CRs cleared to NULL, all DRs zeroed. M-Elevation ON.
-2. **LOAD_NS**: CR15 initialized with GT to Namespace Root (Slot 0).
-3. **INIT_THRD**: CR12 initialized with thread stack GT (Slot 1).
-4. **INIT_CLIST**: CR6 loaded with Boot C-List (Slot 2).
-5. **LOAD_NUC**: CR14 loaded with Boot Code ([CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html) from Slot 3, privileged). PC = 0.
-6. **COMPLETE**: M-Elevation OFF. Machine begins executing boot code.
+> **Cross-reference**: `hardware/core.py` boot FSM (`BootState` cases) and
+> `simulator/simulator.js` `_bootStep()` implement the same three-instruction sequence.
 
-After boot, the code CALLs Salvation (NS[4]) to verify the security pipeline. Salvation proves LOAD, TPERM, and LAMBDA work correctly, then transitions to Navana (NS[5]). Navana does not RETURN — it becomes the permanent namespace controller, managing all abstractions, intrusion detection (IDS), and system lifecycle indefinitely.
+### Lump Header Format
+
+Every lump word 0 has the following layout (`hardware/layouts.py` `LUMP_HEADER_LAYOUT`):
+
+| bits    | field       | set by           | meaning |
+|---------|-------------|------------------|---------|
+| [31:27] | magic       | architecture     | `0x1F` — traps if executed |
+| [26:23] | n_minus_6   | IDE slider       | `lumpSize = 2^(n_minus_6 + 6)` words (uniform bias=6 for all lump types) |
+| [22:10] | cw          | IDE slider       | code word count (0–8191) |
+| [9:8]   | typ         | build page       | `00`=lump, `01`=data, `10`=clist-only, `11`=Outform |
+| [7:0]   | cc          | IDE slider       | c-list slot count; for `typ=10` (clist-only): repurposed as heapWords |
+
+All lump types use the same `n_minus_6 + 6` bias. The field is 4 bits (`unsigned(4)`, 0..15).
+Hardware validates `n_minus_6 ≤ 8` (max 16,384 words); minimum is 64 words (`n_minus_6=0`).
+
+---
+
+### GT word0 Encoding
+
+GT word0 layout: `b_flag[31] | perm[30:28] | dom[27] | gt_type[26:25] | gt_seq[24:16] | slot_id[15:0]`
+
+For all boot GTs: `b_flag=0`, `gt_seq=0` (incremented if NS entry already exists), `gt_type=01` (Inform).
+
+| Step | CR         | dom | perm[2:0]        | word0 formula                     | hardwired example (gt_seq=0) |
+|------|------------|-----|-----------------|------------------------------------|-----------------------------|
+| B:01 | CR15       | 0   | `0b000` (none)   | `0x02000000 \| slot=0`            | `0x02000000`                |
+| B:02 | CR12       | 0   | `0b000` (none)   | `0x02000000 \| slot=1`            | `0x02000001`                |
+| B:03 | CR5        | 0   | `0b011` (R+W)    | `0x32000000 \| slot=1`            | `0x32000001`                |
+| INIT_CLIST | **CR6 (HW)** | 1 | `0b001` (L) | `0x1A000000 \| slot=2`          | `0x1A000002`                |
+| B:05 | CR6 (E-GT) | 1   | `0b100` (E)      | `0x4A000000 \| bootEntrySlot`     | `0x4A000006`                |
+| B:06 | CR6 (L c-list) | 1 | `0b001` (L) | `0x1A000000 \| bootEntrySlot`    | `0x1A000006`                |
+| B:07 | CR14       | 0   | `0b101` (R+X)    | `0x52000000 \| bootEntrySlot`     | `0x52000006`                |
+| B:07 | CR0        | 1   | `0b100` (E)      | `0x4A000000 \| bootEntrySlot`     | `0x4A000006`                |
+
+`INIT_CLIST` is a separate hardware FSM state that writes the **DEMO_CLIST** into CR6 with hardwired
+values (`word1=0x400`, `word2=63`) before `LOAD_NUC`. This is distinct from the simulator's B:05
+and B:06 steps which derive CR6 from the boot abstraction NS entry at runtime.
+
+word0 for Turing R+W (CR5): `(0b011<<28) | (0b01<<25) | 1 = 0x30000000 | 0x02000000 | 1 = 0x32000001`.
+word0 for Church L (CR6 INIT_CLIST / B:06): `(0b001<<28) | (1<<27) | (0b01<<25) | slot = 0x10000000 | 0x08000000 | 0x02000000 | slot = 0x1A000000 | slot`.
+word0 for Church E (CR6 B:05 / CR0 B:07): `(0b100<<28) | (1<<27) | (0b01<<25) | slot = 0x40000000 | 0x08000000 | 0x02000000 | slot = 0x4A000000 | slot`.
+word0 for Turing R+X (CR14): `(0b101<<28) | (0b01<<25) | slot = 0x50000000 | 0x02000000 | slot = 0x52000000 | slot`.
+
+---
+
+### Lump 1 — Namespace (NS Slot 0) — NS-load → CR15
+
+| CR    | word0                                        | word1                       | word2                    |
+|-------|----------------------------------------------|-----------------------------|--------------------------|
+| CR15  | `0x02000000` (zero-perm Inform, slot=0)      | `0` (NS table at DMEM base) | NS entry `limit_offset`  |
+
+Hardware: word2 is the hardwired constant `18` (slots 0–18 accessible).
+Simulator: word2 is read from the Namespace NS entry's `word1_limit` field at boot time.
+
+---
+
+### Lump 2 — Thread (NS Slot 1) — CHANGE CR12 → CR12, CR5
+
+CHANGE primary write → CR12. Synthesised hidden write → CR5.
+CR0 is set at NUC_CODE (B:07) from `thread[+244]` (the ⚡-selected E-GT).
+
+| CR    | word0                                         | word1                              | word2                          |
+|-------|-----------------------------------------------|------------------------------------|--------------------------------|
+| CR12  | `0x02000001` (zero-perm Inform, slot=1)       | thread lump base (NS entry W0)     | NS entry `limit_offset`        |
+| CR5   | `0x32000001` (R+W Turing, slot=1)             | thread lump base (NS entry W0)     | NS entry `limit_offset`        |
+
+CR5 is an Inform GT for the thread lump (slot=1). word1 and word2 come from the thread NS
+entry so CR5 covers the same memory object as CR12.
+
+---
+
+### Hardware — INIT_CLIST: CR6 Boot C-List (hardwired)
+
+The hardware FSM writes a **hardwired DEMO_CLIST** into CR6 immediately after CHANGE
+(the `INIT_CLIST` boot state). This is not derived from any lump header — all three words
+are constants baked into the boot ROM.
+
+| CR   | word0                                     | word1         | word2 |
+|------|-------------------------------------------|---------------|-------|
+| CR6  | `0x1A000002` (Church L-only, slot=2)      | `0x400`       | `63`  |
+
+`word0` derivation: Church domain (`dom=1`), `perm=0b001` (L-only at bit[28]), `GT_TYPE_INFORM`, `slot=2`:
+→ `(0b001<<28) | (1<<27) | (0b01<<25) | 2 = 0x10000000 | 0x08000000 | 0x02000000 | 2 = 0x1A000002`.
+
+`word1=0x400` = DEMO_CLIST byte address (word 256 in DMEM). `word2=63` = limit_offset (64 entries).
+
+The simulator does **not** have a separate DEMO_CLIST step. Instead, B:05 loads an E-GT
+into CR6 (temporary), and B:06 overwrites it with an L-perm c-list token derived from the
+boot abstraction NS entry.
+
+---
+
+### Lump 3 — Abstraction (NS Slot = ⚡ selection) — CALL → CR6, CR14, CR0
+
+CALL: mLoad (B:05) fetches the E-GT temporarily into CR6; cload (B:06+B:07) then overwrites
+CR6 with the L-perm c-list view and installs CR14. Both cload-written CRs carry `M=1`.
+CR0 is set directly to the boot-entry E-GT at B:07.
+
+**Hardware note**: The hardware `LOAD_NUC` state installs a *transient boot fence* into CR14
+(`word0=0x42000001`, X-only Turing GT for slot=1) that constrains instruction fetch while
+`BOOT_PROGRAM` runs. CALL/cload replaces it with the real abstraction R+X GT at runtime.
+
+| CR    | word0                                           | word1                              | word2                   | M |
+|-------|-------------------------------------------------|------------------------------------|-------------------------|---|
+| CR6 (B:05, temp E-GT) | `0x4A000000 \| bootEntrySlot` (E, slot=⚡) | lump base (NS entry W0) | NS entry `limit_offset` | — |
+| CR6 (B:06, L c-list)  | `0x1A000000 \| bootEntrySlot` (L, slot=⚡) | c-list base (NS entry W0 + offset) | NS entry `limit_offset` | 1 |
+| CR14  | `0x52000000 \| bootEntrySlot` (R+X, slot=⚡)    | lump base (NS entry W0)            | NS entry `limit_offset` | 1 |
+| CR0   | `0x4A000000 \| bootEntrySlot` (E, slot=⚡)      | `0`                                | `0`                     | — |
+
+word1 and word2 are read from the abstraction NS entry (not recomputed from the lump header).
+PC is set to 0 (first instruction word after the lump header).
+
+---
+
+### Hardware Boot FSM States and GT word0 Values
+
+| State       | CR written | GT word0 (hardwired)                               |
+|-------------|------------|----------------------------------------------------|
+| FAULT_RST   | all → NULL | `0x00000000` (NULL) |
+| LOAD_NS     | CR15       | `0x02000000` (zero-perm Inform, slot=0) |
+| INIT_THRD   | CR12       | `0x02000001` (zero-perm Inform, slot=1) |
+| INIT_CLIST  | **CR6**    | `0x1A000002` (Church L-only, slot=2; word1=0x400, word2=63) |
+| LOAD_NUC    | CR14 (transient) | `0x42000001` (X-only Turing, slot=1 — boot fence) |
+| COMPLETE + CALL/cload | CR14, CR6, CR5, CR0 | (runtime — replaces transient values) |
+
+CHANGE (INIT_THRD) hidden write: CR5 ← `0x32000001` (R+W Turing, slot=1; same word1/word2 as CR12).
+CALL/cload final values: CR14 ← `0x52000000|slot`, CR6 ← `0x1A000000|slot`, CR5 synthesised
+from thread lump, CR0 ← `0x4A000000|slot`.
+
+---
+
+### Simulator Boot Steps
+
+The simulator applies the lump-loading rules directly. Every step follows the ISA;
+B:04 is the only exception (no ISA equivalent). Each `[BOOT]` output line includes the actual
+`word0`/`word1`/`word2` hex values read from `this.cr[N]` after the write.
+
+| Step | CRs               | word0 written |
+|------|-------------------|---------------|
+| B:00 | all (→ NULL)      | FAULT_RST: all CRs cleared to NULL; DRs zeroed; M-elevation ON |
+| B:01 | CR15              | `0x02000000` (zero-perm Inform, slot=0) |
+| B:02 | CR12              | `0x02000001` (zero-perm Inform, slot=1) |
+| B:03 | **CR5**           | `0x32000001` (R+W Turing, slot=1) |
+| B:04 | none              | CALL_HOME — Tunnel.Register — **no ISA equivalent** |
+| B:05 | CR6 (temp E-GT)   | `0x4A000000 \| bootEntrySlot` (Church E, slot=⚡) — overwritten at B:06 |
+| B:06 | CR6 (L c-list or NULL) | cc=0: CR6←NULL (`0x00000000`) — direct dispatch, no c-list; cc>0: `0x1A000000 \| bootEntrySlot` (Church L-only, M=1); word1=c-list base |
+| B:07 | **CR14** + CR0; M-elevation OFF | CR14: `0x52000000\|slot` (R+X, M=1); CR0: `0x4A000000\|slot` (E); PC=0 |
+
+B:02+B:03 = CHANGE on Lump 2. B:05+B:06+B:07 = CALL on Lump 3 (B:05 is temporary;
+B:06 overwrites CR6 with the final L-perm c-list token).
+
+After boot, Navana (NS[5]) becomes the permanent namespace controller, managing all
+abstractions, intrusion detection (IDS), and system lifecycle indefinitely.
 
 ## Security Pipeline (mLoad + ChurchNSGate)
 

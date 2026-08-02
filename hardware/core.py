@@ -877,8 +877,12 @@ class ChurchCore(Elaboratable):
             with m.Case(BootState.LOAD_NS):
                 # CR15 (namespace cap): full 96-bit write to include word1_location=0
                 # (NS at dmem byte 0) and word2_w2=18 (limit: slots 0..18 accessible).
-                # ns_gt: slot_id=0, gt_seq=0, GT_TYPE_INFORM, perms=0
-                # word0_gt = (GT_TYPE_INFORM<<25) | 0 = 0x02000000 ★v2.0
+                # ISA: NS-load instruction → CR15. Lump 1 (Namespace, NS Slot 0).
+                # ns_gt: slot_id=0, gt_seq=0, GT_TYPE_INFORM, perms=0 (zero-perm)
+                # word0_gt = (GT_TYPE_INFORM<<25) | slot=0 = 0x02000000 ★v2.0
+                # word1 = 0 (NS table at DMEM start)
+                # word2 = 18 (hardwired constant; limit_offset=18 → slots 0-18 accessible)
+                # Cross-reference: simulator.js _bootStep() case 1 (B:01 LOAD_NS)
                 # Slots 16=SlideRule, 17=(empty), 18=Constants
                 m.d.comb += [
                     boot_cap_wr_en.eq(1),
@@ -890,6 +894,16 @@ class ChurchCore(Elaboratable):
                     )),
                 ]
             with m.Case(BootState.INIT_THRD):
+                # CR12 (thread stack cap): zero-perm Inform GT for NS Slot 1.
+                # ISA: CHANGE instruction primary write → CR12. Lump 2 (Thread, NS Slot 1).
+                # thrd_gt: slot_id=1, gt_seq=0, GT_TYPE_INFORM, dom=0, perm=0 (zero-perm)
+                # word0_gt = (GT_TYPE_INFORM<<25) | slot=1 = 0x02000001 ★v2.0
+                # word1 = thread lump base (from NS entry word0_location)
+                # word2 = NS entry limit_offset (from NS entry word1_limit)
+                # CHANGE hidden write (INSTALL_CR5 in change.py): CR5 ← RW heap token
+                #   CR5.word0 = 0x32000001 (dom=0 Turing, perm=0b011 R+W, GT_TYPE_INFORM, slot=1)
+                #   CR5.word1 = thread lump base; CR5.word2 = NS entry limit_offset (same as CR12)
+                # Cross-reference: simulator.js _bootStep() cases 2+3 (B:02 INIT_THRD + B:03 INIT_HEAP)
                 thrd_gt = Signal(GT_LAYOUT)
                 thrd_gt_view = View(GT_LAYOUT, thrd_gt)
                 m.d.comb += [
@@ -923,10 +937,18 @@ class ChurchCore(Elaboratable):
                     )),
                 ]
             with m.Case(BootState.LOAD_NUC):
-                # CR14 (code cap): boot code fence — uses Thread slot (1) as a transient
+                # CR14 (code cap): TRANSIENT BOOT FENCE — uses Thread slot (1) as a transient
                 # placeholder; no user-visible NS table entry needed. After the
                 # BOOT_PROGRAM CALL, CR14 is reloaded by cload with the Application
                 # LUMP's code capability (Boot.Abstr / SelfTest, slot 6).
+                # This is a microarchitectural detail — not the ISA-visible CALL result.
+                # cr14_gt: slot_id=1, gt_seq=0, GT_TYPE_INFORM, dom=0 (Turing), perm=0b100 (X-only)
+                # word0_gt = (0b100<<28) | (GT_TYPE_INFORM<<25) | slot=1 = 0x42000001 ★v2.0
+                # After CALL/cload executes, CR14 is replaced with the R+X abstraction token:
+                #   word0 = 0x52000000|bootEntrySlot (dom=0, perm=0b101 R+X, GT_TYPE_INFORM)
+                #   word1 = abstraction lump base (from NS entry word0_location)
+                #   word2 = NS entry limit_offset (from NS entry word1_limit)
+                # Cross-reference: simulator.js _bootStep() case 7 (B:07 NUC_CODE)
                 cr14_gt = Signal(GT_LAYOUT)
                 cr14_gt_view = View(GT_LAYOUT, cr14_gt)
                 m.d.comb += [

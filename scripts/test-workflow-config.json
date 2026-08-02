@@ -22,6 +22,7 @@
     "lambda-exec-tests",
     "hardware-sim",
     "check-ila-probe-names",
-    "test-check-ila-probe-names"
+    "test-check-ila-probe-names",
+    "boot-gt-words-tests"
   ]
 }
