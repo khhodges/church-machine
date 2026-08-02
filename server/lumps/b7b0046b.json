@@ -1,0 +1,40 @@
+{
+  "token": "b7b0046b",
+  "abstraction": "WukongCallHome",
+  "ns_slot": 7,
+  "ns_slot_policy": "static",
+  "lump_size": 64,
+  "typ": 0,
+  "content_type": "code",
+  "cw": 9,
+  "cc": 2,
+  "profile": "IoT",
+  "language": "assembly",
+  "description": "Wukong boot coordinator: run SelfTest, CALL HOME via Tunnel.Register, return to IDE if online or spin offline. Wukong NS slot 7.",
+  "capabilities": [
+    {
+      "name": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "gt": "0x4a000006",
+      "ns_slot": 6,
+      "note": "SelfTest E-GT (NS slot 6)  — hardware correctness validator"
+    },
+    {
+      "name": "Tunnel",
+      "grants": [
+        "E"
+      ],
+      "gt": "0x4a000016",
+      "ns_slot": 22,
+      "note": "Tunnel E-GT   (NS slot 22) — IDE CALL HOME channel"
+    }
+  ],
+  "grants": [
+    "E"
+  ],
+  "author": "Church Machine",
+  "version": "1.0",
+  "lump_version": 0
+}

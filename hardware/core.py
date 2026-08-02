@@ -904,17 +904,20 @@ class ChurchCore(Elaboratable):
                 # CR6 (c-list cap): full 96-bit write to include word1_location=0x400
                 # (DEMO_CLIST at dmem byte 0x400 = word 256) and word2_w2=63
                 # (limit: indices 0..63 accessible).
-                # cr6_gt: slot_id=2, GT_TYPE_INFORM, L+E-perm (Church dom=1, perm=0b101), gt_seq=0
+                # cr6_gt: slot_id=2, GT_TYPE_INFORM, L-only perm (Church dom=1, perm=0b001), gt_seq=0
                 # L-perm (perm[0]=bit28) is required so boot code can LOAD capabilities out
                 # of the c-list via LOAD CR_dst, CR6[n].  mLoad CHECK_L checks perm_bit(src,L)
                 # = dom & perm[0]; perm=0b110 (S+E) has perm[0]=0 → PERM_L fault on NUC[0].
+                # E-perm MUST NOT be set on CR6: CALL checks E-perm on the target GT, so
+                # L+E on CR6 would make "CALL CR6" architecturally valid during the boot window.
+                # CALL always delivers perm=0b001 (L only) to CR6 — see call.py line 345.
                 # v2.0 GT word layout: b_flag[31] | perm[30:28] | dom[27] | gt_type[26:25] | gt_seq[24:16] | slot[15:0]
-                # perm=0b101 (L+E): bit30=1(E), bit29=0, bit28=1(L) → word0_gt = 0x5A000002 ★v2.0
+                # perm=0b001 (L only): bit30=0(E off), bit29=0, bit28=1(L) → word0_gt = 0x1A000002 ★v2.0
                 m.d.comb += [
                     boot_cap_wr_en.eq(1),
                     boot_cap_wr_addr.eq(6),
                     boot_cap_wr_data.eq(Cat(
-                        C(0x5A000002, 32),  # word0_gt: Church L+E-perm (dom=1,perm=0b101), GT_TYPE_INFORM, slot=2 ★v2.0
+                        C(0x1A000002, 32),  # word0_gt: Church L-only perm (dom=1,perm=0b001), GT_TYPE_INFORM, slot=2 ★v2.0
                         C(0x400,      32),  # word1_location = 0x400 (DEMO_CLIST base)
                         C(63,         32),  # word2_w2: limit_offset=63 (64 entries)
                     )),

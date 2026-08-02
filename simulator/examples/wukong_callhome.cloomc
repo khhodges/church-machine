@@ -1,0 +1,52 @@
+; ============================================================
+; Abstraction:  WukongCallHome
+; Description:  Wukong board boot coordinator.
+;               Runs SelfTest, calls Tunnel.Register (CALL HOME),
+;               and returns to the IDE if online; spins offline.
+; Version:      1.0
+; Language:     Assembly
+; ============================================================
+;
+; Boot sequence (invoked as THREAD.CR0 from NUC_PROGRAM):
+;   1. SelfTest.Run         — validate CM hardware
+;   2. Tunnel.Register      — send identification + await IDE ACK
+;   3. If ACK=1 (online)    → RETURN to IDE control
+;   4. If ACK≤0 (offline)   → spin forever (extend with LED/UART for hw)
+;
+; Tunnel.Register inputs (DR convention):
+;   DR1 = boot_reason  — SelfTest result: 0=pass/cold, N=fail code
+;   DR2 = last_fault   — 0 (no prior fault on first boot)
+;   DR3 = fault_NIA    — 0 (no fault address)
+; Tunnel.Register output:
+;   DR0 = ACK          — 1=IDE connected, ≤0=offline/timeout
+;
+; c-list (cc=2, POLA minimum):
+;   [0]  SelfTest  E  NS slot 6   — 0x4A000006
+;   [1]  Tunnel    E  NS slot 22  — 0x4A000016
+; ============================================================
+
+capabilities {
+    SelfTest E,
+    Tunnel E
+}
+
+; --- Step 1: validate CM hardware ---
+SelfTest Run             ; DR0 = 0 (pass) or N (first failing test index)
+
+; --- Step 2: set up Tunnel.Register arguments ---
+IADD  DR1, DR0, #0      ; DR1 ← SelfTest result (boot_reason: 0=cold/pass)
+ISUB  DR2, DR0, DR0     ; DR2 ← 0              (last_fault: none)
+IADD  DR3, DR2, #0      ; DR3 ← 0              (fault_NIA:  none)
+
+; --- Step 3: CALL HOME ---
+Tunnel Register          ; DR0 ← ACK (1 = IDE online, ≤0 = offline)
+
+; --- Step 4: online gate ---
+; BRANCHNE #1 skips RETURN when Z=0 (offline), falling through to the spin.
+ISUB  DR7, DR0, #1      ; Z=1 iff DR0=1 (IDE online)
+BRANCHNE #1             ; if Z=0 (offline): skip RETURN, jump to spin
+RETURN                  ; if Z=1 (online):  return to IDE
+
+; --- Step 5: offline spin ---
+; Hardware targets: replace this with LED-blink + UART banner loop.
+BRANCH AL, #-1          ; spin in place until external reset

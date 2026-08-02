@@ -552,6 +552,19 @@ class AbstractionRegistry {
             ['Add', 'Remove', 'Resolve', 'List', 'Methods'],
             'Event-to-handler routing table — maps event Golden Tokens to handler capabilities. Private helpers (FindEvent, BindEvent, UnbindEvent, AllBoundEvents) enforce internal access control; their dispatch entries are 0 and external CALLs fault with PRIVATE_METHOD.',
             { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+
+        // Wukong NS slot 7 — WukongCallHome
+        // Default boot coordinator for the Wukong FPGA board.
+        // Sequence: SelfTest.Run → Tunnel.Register (CALL HOME) → RETURN to IDE if
+        // online (ACK=1), or spin offline.  DR1=SelfTest result sent as boot_reason.
+        // Wukong NS convention: slots 0-6 = hardware caps (shared with Ti60);
+        //   slot 7 = WukongCallHome (board-specific default boot entry, ⚡ target).
+        this.createAbstraction(53, 'WukongCallHome', 1,
+            ['Main'],
+            'Wukong board boot coordinator — runs SelfTest, calls Tunnel.Register (CALL HOME), ' +
+            'returns to IDE if online (ACK=1) or spins offline. ' +
+            'Wukong NS slot 7; set as ⚡ boot-entry to test the full call-home path in the IDE.',
+            { author: 'Church Machine', version: '1.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
     }
 }
 
