@@ -1259,20 +1259,24 @@ class ChurchSimulator {
     }
 
     _getHardwareBootCatalog() {
-        // Hardware cold-boot namespace: exactly 7 slots (0–6).
-        // Slots 7+ appear only after explicit LUMP deployment via the Builder.
+        // Hardware cold-boot namespace: 8 slots (0–7).
+        //   0–5  fixed hardware caps (Boot.NS, Boot.Thread, MMIO devices)
+        //   6    SelfTest  — default ⚡ boot entry (hardware correctness validator)
+        //   7    WukongCallHome — coordinator: SelfTest → Tunnel.Register → IDE RETURN
+        //        Set ⚡ to slot 7 to test the full Wukong call-home path in the IDE.
         // No slot above 1 has special hardware significance — the ⚡ lightning
         // bolt sets Thread.CR0 to whichever slot the programmer chooses.
         // This catalog NEVER derives from abstractionRegistry — the registry is
         // the application-level abstraction library, not the hardware boot image.
         return [
-            { label: 'Boot.NS',      perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false },  // 0
-            { label: 'Boot.Thread',  perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false },  // 1
-            { label: 'UART_DEV',     perms: {R:1,W:1,X:0,L:0,S:0,E:0}, chainable: false },  // 2  MMIO 0x40000014
-            { label: 'LED_DEV',      perms: {R:1,W:1,X:0,L:0,S:0,E:0}, chainable: false },  // 3  MMIO 0x40000000
-            { label: 'BTN_DEV',      perms: {R:1,W:0,X:0,L:0,S:0,E:0}, chainable: false },  // 4  MMIO 0x40000028
-            { label: 'TIMER_DEV',    perms: {R:1,W:1,X:0,L:0,S:0,E:0}, chainable: false },  // 5  MMIO 0x4000002C
-            { label: 'SelfTest',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 6  default boot entry
+            { label: 'Boot.NS',        perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false },  // 0
+            { label: 'Boot.Thread',    perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false },  // 1
+            { label: 'UART_DEV',       perms: {R:1,W:1,X:0,L:0,S:0,E:0}, chainable: false },  // 2  MMIO 0x40000014
+            { label: 'LED_DEV',        perms: {R:1,W:1,X:0,L:0,S:0,E:0}, chainable: false },  // 3  MMIO 0x40000000
+            { label: 'BTN_DEV',        perms: {R:1,W:0,X:0,L:0,S:0,E:0}, chainable: false },  // 4  MMIO 0x40000028
+            { label: 'TIMER_DEV',      perms: {R:1,W:1,X:0,L:0,S:0,E:0}, chainable: false },  // 5  MMIO 0x4000002C
+            { label: 'SelfTest',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 6  default boot entry
+            { label: 'WukongCallHome', perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 7  Wukong coordinator LUMP
         ];
     }
 

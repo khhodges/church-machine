@@ -494,8 +494,10 @@ _MMIO_ENTRIES = {
 # Minimal 8-slot boot namespace.
 # Church HW Range authority slots 19-22 removed — authority is now a
 # pre-baked Abstract S-perm GT (0x2E000000) in SCHEDULER_IRQ_CLIST.
+WUKONG_CALLHOME_NS_SLOT = 7   # Wukong boot coordinator LUMP (slot 7)
 _SYSTEM_ABSTRACTION_SLOTS = {
-    SELFTEST_NS_SLOT: ('SelfTest', PERM_MASK_E),  # boot entry point (slot 6)
+    SELFTEST_NS_SLOT:         ('SelfTest',       PERM_MASK_E),  # boot entry point (slot 6)
+    WUKONG_CALLHOME_NS_SLOT:  ('WukongCallHome', PERM_MASK_E),  # Wukong coordinator (slot 7)
 }
 
 NS_SLOT_COUNT = 8   # minimal boot namespace: slots 0-7
@@ -503,14 +505,14 @@ NS_SLOT_COUNT = 8   # minimal boot namespace: slots 0-7
 # ---------------------------------------------------------------------------
 # DEMO_NAMESPACE — minimal 8-slot NS table for hardware boot
 #
-#   Slot 0: Boot.NS      — NS root (location=NS_TABLE_BASE, limit=64)
-#   Slot 1: Boot.Thread  — Thread lump (base=0x0100, limit=63)
-#   Slot 2: UART_DEV     — MMIO 0x40000014, RW, limit=2 (3 words: TX/STATUS/RX)
-#   Slot 3: LED_DEV      — MMIO 0x40000000, RW, limit=4 (5 words)
-#   Slot 4: BTN_DEV      — MMIO 0x40000028, R,  limit=0 (1 word)
-#   Slot 5: TIMER_DEV    — MMIO 0x4000002C, RW, limit=4 (5 words)
-#   Slot 6: SelfTest     — lazy lump (base=0x0600, limit=63), E-perm
-#   Slot 7: [programmable] — null NS entry
+#   Slot 0: Boot.NS        — NS root (location=NS_TABLE_BASE, limit=64)
+#   Slot 1: Boot.Thread    — Thread lump (base=0x0100, limit=63)
+#   Slot 2: UART_DEV       — MMIO 0x40000014, RW, limit=2 (3 words: TX/STATUS/RX)
+#   Slot 3: LED_DEV        — MMIO 0x40000000, RW, limit=4 (5 words)
+#   Slot 4: BTN_DEV        — MMIO 0x40000028, R,  limit=0 (1 word)
+#   Slot 5: TIMER_DEV      — MMIO 0x4000002C, RW, limit=4 (5 words)
+#   Slot 6: SelfTest       — LUMP (base=0x0600, limit=63), E-perm; default ⚡ boot entry
+#   Slot 7: WukongCallHome — LUMP (base=0x0700, limit=63), E-perm; Wukong ⚡ boot entry
 # ---------------------------------------------------------------------------
 DEMO_NAMESPACE = []
 for _i in range(NS_SLOT_COUNT):
@@ -527,8 +529,6 @@ for _i in range(NS_SLOT_COUNT):
         _entry = _make_ns_entry(GT_TYPE_INFORM, _perms, _i, 0,
                                 _i * 0x100, 64,
                                 abstract_gt=_abstract_gt_word(_perms))
-    elif _i == 7:
-        _entry = _make_ns_entry(GT_TYPE_NULL, 0, _i, 0, 0, 0)  # [programmable]
     else:
         # Slot 1: Boot.Thread — A7 v1.2 layout: Thread LUMP at word 0x0000.
         _entry = _make_ns_entry(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, _i, 0,
