@@ -1431,7 +1431,7 @@ function _buildDnaGraph(lump, allLumps) {
             gt_type: ent.gt_type || '',
             gt_word: ent.gt_word || '',
             target_label: rawLabel,
-            target_token: target ? target.token : null,
+            target_token: _dnaToken || null,
         };
     });
     const active = rows.filter(r => !r.null);
