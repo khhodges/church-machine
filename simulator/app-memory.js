@@ -2640,7 +2640,15 @@ function updateNamespace() {
             const tierClass = i <= NS_TIER_HW_MAX ? 'ns-tier-hw-row' : (i <= NS_TIER_BOOT_MAX ? 'ns-tier-boot-row' : 'ns-tier-prog-row');
             html += `<tr id="ns-row-${i}" class="ns-row ${tierClass}" style="opacity:0.45;">`;
             html += `<td class="ns-idx-cell"><span style="color:#666;">${i}</span></td>`;
-            html += `<td colspan="8" style="color:#555;font-style:italic;font-size:0.8rem;">(gap — slot reserved, no entry installed)</td>`;
+            const _gapLabel = (sim.nsLabels && sim.nsLabels[i] && sim.nsLabels[i] !== '(free)' && sim.nsLabels[i] !== '(reserved)') ? sim.nsLabels[i] : '';
+            const _isBitstreamOnly = sim._bitstreamSlots && sim._bitstreamSlots.has(i);
+            const _gapNote = _isBitstreamOnly ? '(bitstream-only — hardware GT, no DMEM body; slot reserved)' : '(gap — slot reserved, no entry installed)';
+            if (_gapLabel) {
+                html += `<td style="color:#666;font-style:italic;">${_gapLabel}</td>`;
+                html += `<td colspan="7" style="color:#555;font-style:italic;font-size:0.8rem;">${_gapNote}</td>`;
+            } else {
+                html += `<td colspan="8" style="color:#555;font-style:italic;font-size:0.8rem;">${_gapNote}</td>`;
+            }
             html += `<td class="ns-entry-actions"></td>`;
             html += '</tr>';
             continue;
