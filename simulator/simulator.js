@@ -380,15 +380,15 @@ class ChurchSimulator {
             }
         }
 
-        // Integrity check: the minimum complete boot namespace has 7 slots
-        // (indices 0-6: Boot.NS, Boot.Thread, UART_DEV, LED_DEV,
-        // BTN_DEV, TIMER_DEV, SelfTest).
+        // Integrity check: the minimum complete boot namespace has 8 slots
+        // (indices 0-7: Boot.NS, Boot.Thread, UART_DEV, LED_DEV,
+        // BTN_DEV, TIMER_DEV, SelfTest, WukongCallHome).
         // Warn loudly in the console log when the binary is smaller than this.
-        const _BOOT_SLOT_MIN = 7;
+        const _BOOT_SLOT_MIN = 8;
         if (count < _BOOT_SLOT_MIN) {
             this.output += `[BOOTIMG] WARNING: only ${count} NS slots active (< ${_BOOT_SLOT_MIN} expected). Boot namespace may be incomplete.\n`;
         } else {
-            // Verify that every slot in the core 23 has a meaningful label.
+            // Verify that every slot in the core 8 has a meaningful label.
             const _unlabelled = [];
             for (let _ci = 0; _ci < _BOOT_SLOT_MIN; _ci++) {
                 const _lbl = this.nsLabels[_ci];
@@ -1387,9 +1387,9 @@ class ChurchSimulator {
             clistGTs.push(gtWord);
         }
 
-        // ── Step 2 augmentation: NS entries for extended slots (≥7) ──────────
-        // The 7-slot hardware catalog loop above only creates NS entries for
-        // slots 0–6. Resident Step-2 lumps targeting slots ≥ 7 need explicit
+        // ── Step 2 augmentation: NS entries for extended slots (≥8) ──────────
+        // The 8-slot hardware catalog loop above creates NS entries for
+        // slots 0–7. Resident Step-2 lumps targeting slots ≥ 8 need explicit
         // NS entries. Lazy (resident=False) slots are left as all-zeros —
         // the runtime lazy loader writes their NS entry on first use.
         for (const _e2 of _bcStep2Lumps) {
@@ -1478,7 +1478,7 @@ class ChurchSimulator {
 
         // Memory-manager GT at c-list[0]: R|W Inform capability over NS slot 0 (full namespace).
         clistGTs[0] = this.createGT(0, BOOT_NS_SLOT_HEADER, {R:1, W:1}, 1);
-        const DEMO_CLIST_SIZE   = 11;   // slots 0–10 (minimal 7-slot namespace)
+        const DEMO_CLIST_SIZE   = 11;   // slots 0–10 (minimal 8-slot namespace)
 
         // ── NS lump c-list (A7 v1.2 layout) ─────────────────────────────────────────
         // A7 layout: NS LUMP IS the NS TABLE at NS_TABLE_BASE. No separate lump header
