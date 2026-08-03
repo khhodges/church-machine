@@ -1990,17 +1990,20 @@ class ChurchSimulator {
                     stepCtx: 'INIT_ABSTR CR6',
                 });
 
-                // Auto-install boot-entry E-GT into Zone ① CR0 (thread offset +244) if empty.
-                // Bridges the gap between IDE convention (double-click to install) and the boot
-                // sequence: a user who boots without manually installing CR0 will no longer see
-                // CR0 as NULL during simulation.
+                // Write the boot-entry E-GT into Thread.caps[0] (Zone ① CR0 home slot,
+                // thread offset +244).  This is the boot-construction write: B:07 NUC_CODE
+                // reads it as the sole authority for CR0 at machine start.  Written
+                // unconditionally so a stale value from a previous session or from
+                // _initNamespaceTable() running with a different bootEntrySlot is always
+                // overridden by the canonical hardware boot abstraction.
                 const _b5ThreadEntry = this.readNSEntry(BOOT_NS_SLOT_THREAD);
-                if (_b5ThreadEntry && _b5ThreadEntry.word0_location) {
+                if (_b5ThreadEntry && typeof _b5ThreadEntry.word0_location === 'number') {
+                    // word0_location may be 0 (Thread lump lives at address 0 in the
+                    // simulator), so the old falsy guard `&& _b5ThreadEntry.word0_location`
+                    // silently skipped the write.  Use a typeof check instead.
                     const _b5CR0Addr = (_b5ThreadEntry.word0_location >>> 0) + THREAD_CAPS_OFFSET;
-                    if ((this.memory[_b5CR0Addr] >>> 0) === 0) {
-                        this.memory[_b5CR0Addr] = this.createGT(0, this.bootEntrySlot, {E:1}, 1);
-                        this.output += `[BOOT] INIT_ABSTR — CR0 home (offset +${THREAD_CAPS_OFFSET}) <- boot-entry E-GT auto-installed (Slot ${this.bootEntrySlot})\n`;
-                    }
+                    this.memory[_b5CR0Addr] = this.createGT(0, this.bootEntrySlot, {E:1}, 1);
+                    this.output += `[BOOT] INIT_ABSTR — Thread.caps[0] (offset +${THREAD_CAPS_OFFSET}) <- boot-entry E-GT (Slot ${this.bootEntrySlot})\n`;
                 }
 
                 this.bootStep++;                  // advance state machine → B:06
