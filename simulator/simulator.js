@@ -1590,9 +1590,10 @@ class ChurchSimulator {
             this.memory[this._nsSlotBase(0) + 2] = this.makeVersionSeals(0, _ns0Loc, _ns0Lim);
             this.memory[this._nsSlotBase(0) + 3] = 0;
 
-            // NS slot 1 (Thread): word0 (location) is not overwritten by the
-            // c-list, so we read it back; words 1-3 need to be restored.
-            const _ns1Loc = this.memory[this._nsSlotBase(1) + 0] >>> 0;
+            // NS slot 1 (Thread): use threadLoc captured before the c-list write;
+            // with nsCatalogCount >= 8 the write loop overwrites word0 of this slot
+            // with clistGTs[3] (an LED_DEV GT), so reading it back gives a wrong address.
+            const _ns1Loc = threadLoc >>> 0;
             const _ns1Lim = (THREAD_LUMP_SIZE - 1) & 0x1FFFF;
             const _ns1W1  = this.packNSWord1(_ns1Lim, 0, 0, 1, 0);
             this.memory[this._nsSlotBase(1) + 1] = _ns1W1  >>> 0;
