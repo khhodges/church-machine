@@ -1156,6 +1156,45 @@ class SystemAbstractions {
             };
         });
 
+        // RegisterOutform: register an absent-body (Outform) NS slot at a
+        // pre-determined physical address, without allocating physical memory.
+        // Used for lazy-loaded system services (e.g. Scheduler.IRQ) whose
+        // physical location is reserved at boot but whose body is installed on
+        // demand.  Mint is the sole authority; it routes through Navana.ADD
+        // (the NS writer) so no caller may bypass this gate.
+        this.registry.bindMethod(6, 'RegisterOutform', function(sim, args) {
+            const location = args.location;
+            const limit    = args.limit !== undefined ? args.limit : 0x3F;
+            const label    = args.label || 'Outform';
+
+            if (location === undefined || location === null) {
+                return { ok: false, fault: 'ARGS', message: 'Mint.RegisterOutform: location is required' };
+            }
+
+            const addResult = sim.abstractionRegistry.dispatchMethod(5, 'ADD', sim, {
+                location:   location,
+                limit:      limit,
+                clistCount: 0,
+                gtType:     2,   // Outform — body absent at registration time
+                label:      label,
+            });
+
+            if (!addResult || !addResult.ok) {
+                return { ok: false, fault: 'NS_FULL',
+                    message: `Mint.RegisterOutform: Navana.ADD failed — ${addResult ? addResult.message : 'no response'}` };
+            }
+
+            const nsIndex    = addResult.result.nsIndex;
+            const newVersion = addResult.result.version;
+            const gt         = sim.createGT(newVersion, nsIndex, { E: 1 }, 2);  // Outform E-GT
+
+            return {
+                ok: true,
+                result: { nsIndex, gt, location, version: newVersion },
+                message: `Mint.RegisterOutform: Outform GT seq${newVersion} → NS[${nsIndex}] @ 0x${location.toString(16).toUpperCase()} label="${label}" (via Navana.ADD)`,
+            };
+        });
+
         this.registry.bindMethod(6, 'Revoke', function(sim, args) {
             const nsIndex = args.nsIndex;
             if (nsIndex === undefined || nsIndex === null) {

@@ -78,4 +78,6 @@
 - [lump-audit BRANCH opcode drift](lump-audit-branch-opcode.md) — lump-audit.js _rciBranchOp must equal 23 (v2.0); opcode 17=DWRITE; c-list zeros are expected at compile time (runtime fills them)
 - [NS slot label persistence across hard resets](ns-slot-label-persistence.md) — step3 labels slots '(reserved)' before loadBootImage restores binary data; reseed loop must include '(reserved)' in its override condition; labels persisted via /api/boot-config/slot-label + bootConfig.slotLabels
 - [Boot.Abstr c-list must be pre-populated](boot-abstr-clist-must-be-prepopulated.md) — boot path skips lazy GT injection; LUMP needs correct GTs baked in; JS vs Python GT formats differ; manifest filename field governs lump-consistency binary reads
+- [B:07 Thread.caps[0] authority rule](b07-thread-caps0-authority.md) — B:07 must read CR0 from memory[threadBase+THREAD_CAPS_OFFSET], never synthesise from bootEntrySlot; consistency check: GT&0xFFFF must equal bootEntrySlot
+- [Mint gate for NS slot registration](mint-gate-ns-registration.md) — only Mint.RegisterOutform→Navana.ADD→writeNSEntry may add NS slots; _seedIrqLazyManifest handles post-allocation state; no direct writeNSEntry outside this chain
 - [Wukong droplet SSH key](wukong-droplet-ssh.md) — how to SSH to 165.227.190.84 from Replit; key setup, build workflow, regeneration if rejected

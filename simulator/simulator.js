@@ -1637,61 +1637,18 @@ class ChurchSimulator {
         this.memory[this.NS_TABLE_BASE - 1] = BOOT_IMAGE_FORMAT_TAG_INIT >>> 0;
     }
 
-    // ── v1.2 §4: Pre-register the Scheduler.IRQ LUMP in the namespace table ────────
-    // Called from _initNamespaceTable() with the current `runningOffset` (the next
-    // free physical address after the boot catalog LUMPs).
-    //
-    // Creates an absent-body Outform NS entry for the Scheduler.IRQ LUMP at the
-    // first free dynamic slot (≥ FIRST_DYN_SLOT=11, after the 11-slot catalog).  "Absent-body" means:
-    //   • NS entry location word points to `irqLoc` (the reserved physical address)
-    //   • memory[irqLoc] = 0 (magic field = 0 ≠ 0x1F — body not yet resident)
-    // On the first Tier 2 fault, _fireSchedulerIRQ() detects the absent body
-    // and calls lazyLoad() to install the minimal CLOOMC body.
-    //
-    // Stores the dynamically-allocated slot in irqState.irqLumpSlot so that
-    // _fireSchedulerIRQ() can find it without hardcoding slot 8.
-    _preRegisterIrqLump(runningOffset) {
-        const FIRST_DYN_SLOT = 11;  // first slot after the 11-entry boot catalog (0-10)
-        const IRQ_LUMP_SIZE  = 64;  // minimal 64-word LUMP (nm6=0)
+    // ── Seed the Scheduler.IRQ lazy manifest after Mint allocates its NS slot ───────
+    // Called from _fireSchedulerIRQ() after Mint.RegisterOutform → Navana.ADD has
+    // already written the NS entry.  This function only records the slot, seeds the
+    // lazy-load manifest, and updates irqState — it does NOT call writeNSEntry.
+    // That write is solely Mint's responsibility (through Navana).
+    _seedIrqLazyManifest(irqSlot, irqLoc, irqGT) {
+        const IRQ_LUMP_SIZE = 64;
 
-        // Find the first free NS slot at or after FIRST_DYN_SLOT.
-        // A slot is free when its NS entry location word and lim17/clistCount word
-        // are both zero (not yet written by boot or Step-2 augmentation).
-        let irqSlot = -1;
-        const maxSlots = (this.NS_TABLE_RESERVE / this.NS_ENTRY_WORDS) | 0;
-        for (let s = FIRST_DYN_SLOT; s < maxSlots; s++) {
-            const base = this._nsSlotBase(s);
-            if ((this.memory[base] >>> 0) === 0 && (this.memory[base + 1] >>> 0) === 0) {
-                irqSlot = s;
-                break;
-            }
-        }
-        if (irqSlot < 0) {
-            this.output += '[IRQ-LUMP] WARNING: no free dynamic NS slot for Scheduler.IRQ pre-registration\n';
-            return;
-        }
-
-        // Physical location for the absent-body LUMP placeholder.
-        // Uses the running offset passed in from _initNamespaceTable() — the next
-        // free address after all boot-catalog LUMPs.  memory[irqLoc] is left 0
-        // (absent body); the lazy-load gate in _fireSchedulerIRQ() installs the
-        // CLOOMC body there on first Tier 2 fault.
-        const irqLoc  = runningOffset;
-        const lim17   = (IRQ_LUMP_SIZE - 1) & 0x1FFFF;
-
-        // Write the NS entry as an Outform (gtType=2 = body absent, slot registered).
-        // writeNSEntry(slot, loc, lim17, d, b, gtType, gt_seq, cc, absGt)
-        this.writeNSEntry(irqSlot, irqLoc, lim17, 0, 0, 2 /* Outform */, 1, 0, 0);
-        this.nsLabels[irqSlot]    = 'Scheduler.IRQ';
         this.nsChainable[irqSlot] = false;
         if (irqSlot >= this.nsCount) this.nsCount = irqSlot + 1;
 
-        // Mint an E-GT for external callers (Tier 2 escalation path, test code).
-        const irqGT = this.createGT(0, irqSlot, { E: 1 }, 1);
-
-        // Seed the lazyManifest so lazyLoad(irqSlot) can install the body.
-        // The bootUpload describes the minimal CLOOMC body: a single RETURN AL
-        // instruction (opcode=3, cond=14 → word=0x1F000000) at code offset 0.
+        // Seed lazyManifest so lazyLoad(irqSlot) can install the minimal body.
         if (!this.lazyManifest) this.lazyManifest = {};
         this.lazyManifest[irqSlot] = {
             label:     'Scheduler.IRQ',
@@ -1704,21 +1661,19 @@ class ChurchSimulator {
             loaded:    false,
             loadCount: 0,
             bootUpload: {
-                // Minimal LUMP body: header + RETURN AL
                 methods: [{ code: [((3 << 27) | (14 << 23)) >>> 0] }],
                 capabilities: [],
                 data_words:   [],
             },
         };
 
-        // Record in irqState so _fireSchedulerIRQ can use the dynamic slot.
         if (this.irqState) {
             this.irqState.irqLumpSlot = irqSlot;
             this.irqState.irqLumpGT   = irqGT;
         }
 
-        this.output += `[IRQ-LUMP] Scheduler.IRQ pre-registered at NS[${irqSlot}] `
-            + `loc=0x${irqLoc.toString(16)} (absent-body Outform, E-GT=0x${irqGT.toString(16).toUpperCase()}) `
+        this.output += `[IRQ-LUMP] Scheduler.IRQ registered at NS[${irqSlot}] `
+            + `loc=0x${irqLoc.toString(16)} (Outform via Mint→Navana, E-GT=0x${(irqGT>>>0).toString(16).toUpperCase()}) `
             + `— body lazy-loads on first Tier 2 fault\n`;
     }
 
@@ -2222,19 +2177,31 @@ class ChurchSimulator {
                 const cr14GT = this.createGT(0, bootEntrySlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);  // R+X code token
                 this._writeCR(14, cr14GT, entryNSEntry);
 
-                // ── Directly set CR0 to boot-entry E-GT (Thread.caps[0]) ─────────────────
-                // Direct dispatch: install the E-GT straight into CR0 so the first
-                // instruction executed is word 1 of the real SelfTest lump — no
-                // CHANGE/TPERM/CALL trampoline.  The same E-GT was written into
-                // thread[+THREAD_CAPS_OFFSET] at init and confirmed by B:05 INIT_ABSTR.
-                const _cr0EGT = this.createGT(0, bootEntrySlot, {E:1}, 1);
+                // ── Read CR0 from Thread.caps[0] — Thread is the authority ───────────────
+                // Thread.caps[0] (memory[threadBase + THREAD_CAPS_OFFSET]) holds the
+                // boot-entry E-GT written during construction by _initNamespaceTable().
+                // B:07 reads it directly — it must NOT synthesise a new GT from
+                // bootEntrySlot.  The Thread itself carries the boot-entry credential.
+                const _threadBase = this.cr[12].word1 >>> 0;  // B:02 _writeCR → word1 = entry.word0_location
+                const _cr0EGT = this.memory[_threadBase + THREAD_CAPS_OFFSET] >>> 0;
+                if (_cr0EGT === 0) {
+                    this.fault('BOOT', 'NUC_CODE: Thread.caps[0] is NULL — boot-entry E-GT was not written into the Thread lump during construction');
+                    return false;
+                }
+                // Consistency check: slot encoded in Thread.caps[0] must match the
+                // NS entry mLoaded and validated by B:05 INIT_ABSTR / B:06 NUC_CLIST.
+                const _cr0Slot = _cr0EGT & 0xFFFF;
+                if (_cr0Slot !== bootEntrySlot) {
+                    this.fault('BOOT', `NUC_CODE: Thread.caps[0] encodes slot ${_cr0Slot} but B:05/B:06 validated slot ${bootEntrySlot} — boot-entry mismatch`);
+                    return false;
+                }
                 this.cr[0] = { word0: _cr0EGT, word1: 0, word2: 0, word3: 0, m: 0 };
 
                 // ── Set PC = 0 ────────────────────────────────────────────────────────
                 this.pc = 0;
                 this._nucLumpData = null;                                            // clear stash
 
-                this.output += `[BOOT] NUC_CODE — CR14(R+X) <- ${_b4Label} code lump (base=0x${base.toString(16).toUpperCase()}, cw=${cw}) word0=0x${(this.cr[14].word0>>>0).toString(16).toUpperCase().padStart(8,'0')} word1=0x${(this.cr[14].word1>>>0).toString(16).toUpperCase().padStart(8,'0')} word2=0x${(this.cr[14].word2>>>0).toString(16).toUpperCase().padStart(8,'0')}; CR0 <- boot-entry E-GT (Slot ${bootEntrySlot}) word0=0x${(this.cr[0].word0>>>0).toString(16).toUpperCase().padStart(8,'0')} word1=0x${(this.cr[0].word1>>>0).toString(16).toUpperCase().padStart(8,'0')} word2=0x${(this.cr[0].word2>>>0).toString(16).toUpperCase().padStart(8,'0')}; PC=0\n`;
+                this.output += `[BOOT] NUC_CODE — CR14(R+X) <- ${_b4Label} code lump (base=0x${base.toString(16).toUpperCase()}, cw=${cw}) word0=0x${(this.cr[14].word0>>>0).toString(16).toUpperCase().padStart(8,'0')} word1=0x${(this.cr[14].word1>>>0).toString(16).toUpperCase().padStart(8,'0')} word2=0x${(this.cr[14].word2>>>0).toString(16).toUpperCase().padStart(8,'0')}; CR0 <- Thread.caps[0] E-GT (slot ${_cr0Slot}) word0=0x${(this.cr[0].word0>>>0).toString(16).toUpperCase().padStart(8,'0')} word1=0x${(this.cr[0].word1>>>0).toString(16).toUpperCase().padStart(8,'0')} word2=0x${(this.cr[0].word2>>>0).toString(16).toUpperCase().padStart(8,'0')}; PC=0\n`;
                 this.auditLog.push({
                     gate: 'CR_WR',
                     desc: `CR14(R+X) ← ${_b4Label} code lump  · base=0x${base.toString(16).toUpperCase()}, cw=${cw}, PC←0; CR0 ← boot-entry E-GT (direct dispatch)`,
@@ -3406,13 +3373,23 @@ class ChurchSimulator {
         if (!this.abstractionRegistry) return null;
         if (!this.irqState || this.irqState.irqActive) return null;
 
-        // Resolve the IRQ LUMP slot.  v1.2 §4: the Scheduler.IRQ LUMP is
-        // registered lazily — the first time _fireSchedulerIRQ() is called.
-        // _preRegisterIrqLump() allocates the first free NS slot ≥ 11 (after the
-        // 11-entry boot catalog), writes the Outform NS entry, and seeds the
-        // lazyManifest so lazyLoad() can install the CLOOMC body on demand.
+        // Resolve the IRQ LUMP slot on first call.
+        // Mint (NS slot 6) is the sole authority for NS slot registration.
+        // Route: Mint.RegisterOutform → Navana.ADD → writeNSEntry.
+        // If Mint is unavailable or refuses, the IRQ cannot proceed.
         if (this.irqState.irqLumpSlot === null) {
-            this._preRegisterIrqLump(this.irqState.irqAllocBase || 0);
+            const _irqLoc  = this.irqState.irqAllocBase || 0;
+            const _mintResult = this.abstractionRegistry.dispatchMethod(6, 'RegisterOutform', this, {
+                location: _irqLoc,
+                limit:    (64 - 1) & 0x1FFFF,   // IRQ_LUMP_SIZE = 64
+                label:    'Scheduler.IRQ',
+            });
+            if (!_mintResult || !_mintResult.ok) {
+                this.output += `[IRQ] Scheduler.IRQ registration blocked — Mint.RegisterOutform refused: `
+                    + `${_mintResult ? _mintResult.message : 'Mint (NS slot 6) unavailable'}\n`;
+                return null;
+            }
+            this._seedIrqLazyManifest(_mintResult.result.nsIndex, _irqLoc, _mintResult.result.gt);
         }
         const _schedulerSlot = (this.irqState.irqLumpSlot != null)
             ? this.irqState.irqLumpSlot
