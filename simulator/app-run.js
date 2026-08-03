@@ -8215,6 +8215,194 @@ BRANCHNE k_wg_s
 
 BRANCH morse              ; loop forever
 `,
+        'old_boot': `; ============================================================
+; Abstraction:  WukongCallHome
+; Description:  Wukong board hardware ROM boot program — LED blink and
+;               UART callhome beacon.  Transcribed from WUKONG_NUC_PROGRAM
+;               in hardware/boot_rom.py (the authoritative human-readable form).
+;
+;               This is the exact 73-word program burned into the Wukong FPGA
+;               ROM and executed from word 0 on every power-up.  Every cycle
+;               (~1 Hz) it:
+;                 1. Turns LED0 on
+;                 2. Transmits "CM:WUKONG\r\n" over UART at 57600 baud
+;                 3. Waits ~0.498 s  (on-phase delay at 50 MHz)
+;                 4. Turns LED0 off
+;                 5. Waits ~0.498 s  (off-phase delay)
+;                 6. Jumps back to step 1
+;
+;               INFINITE LOOP — no RETURN and no CALL (intentional).
+;               This is the safe standalone answer to the NULL_CAP problem:
+;               BOOT_PROGRAM[2] = CALL CR0,CR0 faults NULL_CAP on a bare board
+;               because Thread.caps[0] is NULL when no IDE has called
+;               setBootEntrySlot().  This program avoids CALL entirely and
+;               runs safely on an unconfigured FPGA.
+;               See: docs/wukong-boot.md
+;
+; Timing (50 MHz clock):
+;   inner = 16383 iters x 4 cycles = 65 532 cycles
+;   outer =   380 iters  -> 380 x 65 532 = 24 902 160 cycles = 0.498 s/phase
+;   -> LED0 on = 0.498 s, off = 0.498 s  ->  ~1 Hz blink
+;
+; Register allocation:
+;   DR0  zero register — never written by this program
+;   DR1  constant 1   — LED "on" value AND DREAD STATUS offset (DR1=1 after setup)
+;   DR2  inner delay counter
+;   DR3  outer delay counter
+;   DR5  UART byte value scratch
+;   DR6  UART STATUS read
+;   DR7  STATUS - 1 scratch (EQ=0 means busy)
+;
+; MMIO (word-addressed via DWRITE/DREAD through capability GTs):
+;   CR3 (LED0,    c-list[0]): word 0 = LED0 {B,G,R}; bit 0 = R -> physical pin
+;   CR4 (UART_TX, c-list[1]): word 0 = TX (write), word 1 = STATUS (read, bit0=busy)
+;
+; UART busy-poll sequence per byte (5 instructions, words N..N+4):
+;   IADD  DR5, DR0, #byte         — load byte value
+;   DWRITE DR5, CR4, 0, DR0       — write TX   (indexed: offset = DR0 = 0)
+; poll_X:
+;   DREAD  DR6, CR4, 0, DR1       — read STATUS (indexed: offset = DR1 = 1)
+;   ISUB   DR7, DR6, #1           — DR7 = 0 iff busy (-> EQ flag)
+;   BRANCHEQ poll_X               — while busy: retry DREAD
+;
+; Cross-reference: hardware/boot_rom.py (WUKONG_NUC_PROGRAM)
+;                  hardware/wukong_top.py (_WUKONG_ROM)
+; ============================================================
+
+capabilities {
+    LED0    RW,
+    UART_TX W
+}
+
+; -- Setup (words 0-2) — one-time capability loads ----------------------------------------
+; NOTE: LOAD instructions here use LUMP c-list slots 0/1 (LED0, UART_TX).
+; The hardware ROM uses slots 5/6 from the Wukong boot c-list.  All other
+; instructions (words 2-72) are bit-for-bit identical to WUKONG_NUC_PROGRAM.
+setup:
+    LOAD  CR3, LED0               ; [0] LED_DEV -> CR3  (c-list[0], RW)
+    LOAD  CR4, UART_TX            ; [1] UART_DEV -> CR4  (c-list[1], W)
+    IADD  DR1, DR0, #1            ; [2] DR1 = 1  (LED "on"; also DREAD STATUS offset)
+
+; -- Loop top (word 3) — unconditional branch target from word 72 -------------------------
+loop_top:
+    DWRITE DR1, CR3, 0, DR0       ; [3] LED0 = on  (offset = DR0 = 0)
+
+; -- Banner send (words 4-58) — "CM:WUKONG\r\n" (11 bytes x 5 words = 55) ----------------
+banner_send:
+    ; 'C' = 67 (0x43)
+    IADD  DR5, DR0, #67           ; [4]
+    DWRITE DR5, CR4, 0, DR0       ; [5] TX <- 'C'
+poll_C:
+    DREAD  DR6, CR4, 0, DR1       ; [6] STATUS (offset = DR1 = 1)
+    ISUB   DR7, DR6, #1           ; [7] EQ=1 iff busy
+    BRANCHEQ poll_C               ; [8] while busy: retry
+
+    ; 'M' = 77 (0x4D)
+    IADD  DR5, DR0, #77           ; [9]
+    DWRITE DR5, CR4, 0, DR0       ; [10] TX <- 'M'
+poll_M:
+    DREAD  DR6, CR4, 0, DR1       ; [11]
+    ISUB   DR7, DR6, #1           ; [12]
+    BRANCHEQ poll_M               ; [13]
+
+    ; ':' = 58 (0x3A)
+    IADD  DR5, DR0, #58           ; [14]
+    DWRITE DR5, CR4, 0, DR0       ; [15] TX <- ':'
+poll_colon:
+    DREAD  DR6, CR4, 0, DR1       ; [16]
+    ISUB   DR7, DR6, #1           ; [17]
+    BRANCHEQ poll_colon           ; [18]
+
+    ; 'W' = 87 (0x57)
+    IADD  DR5, DR0, #87           ; [19]
+    DWRITE DR5, CR4, 0, DR0       ; [20] TX <- 'W'
+poll_W:
+    DREAD  DR6, CR4, 0, DR1       ; [21]
+    ISUB   DR7, DR6, #1           ; [22]
+    BRANCHEQ poll_W               ; [23]
+
+    ; 'U' = 85 (0x55)
+    IADD  DR5, DR0, #85           ; [24]
+    DWRITE DR5, CR4, 0, DR0       ; [25] TX <- 'U'
+poll_U:
+    DREAD  DR6, CR4, 0, DR1       ; [26]
+    ISUB   DR7, DR6, #1           ; [27]
+    BRANCHEQ poll_U               ; [28]
+
+    ; 'K' = 75 (0x4B)
+    IADD  DR5, DR0, #75           ; [29]
+    DWRITE DR5, CR4, 0, DR0       ; [30] TX <- 'K'
+poll_K:
+    DREAD  DR6, CR4, 0, DR1       ; [31]
+    ISUB   DR7, DR6, #1           ; [32]
+    BRANCHEQ poll_K               ; [33]
+
+    ; 'O' = 79 (0x4F)
+    IADD  DR5, DR0, #79           ; [34]
+    DWRITE DR5, CR4, 0, DR0       ; [35] TX <- 'O'
+poll_O:
+    DREAD  DR6, CR4, 0, DR1       ; [36]
+    ISUB   DR7, DR6, #1           ; [37]
+    BRANCHEQ poll_O               ; [38]
+
+    ; 'N' = 78 (0x4E)
+    IADD  DR5, DR0, #78           ; [39]
+    DWRITE DR5, CR4, 0, DR0       ; [40] TX <- 'N'
+poll_N:
+    DREAD  DR6, CR4, 0, DR1       ; [41]
+    ISUB   DR7, DR6, #1           ; [42]
+    BRANCHEQ poll_N               ; [43]
+
+    ; 'G' = 71 (0x47)
+    IADD  DR5, DR0, #71           ; [44]
+    DWRITE DR5, CR4, 0, DR0       ; [45] TX <- 'G'
+poll_G:
+    DREAD  DR6, CR4, 0, DR1       ; [46]
+    ISUB   DR7, DR6, #1           ; [47]
+    BRANCHEQ poll_G               ; [48]
+
+    ; '\r' = 13 (0x0D)
+    IADD  DR5, DR0, #13           ; [49]
+    DWRITE DR5, CR4, 0, DR0       ; [50] TX <- CR
+poll_cr:
+    DREAD  DR6, CR4, 0, DR1       ; [51]
+    ISUB   DR7, DR6, #1           ; [52]
+    BRANCHEQ poll_cr              ; [53]
+
+    ; '\n' = 10 (0x0A)
+    IADD  DR5, DR0, #10           ; [54]
+    DWRITE DR5, CR4, 0, DR0       ; [55] TX <- LF
+poll_lf:
+    DREAD  DR6, CR4, 0, DR1       ; [56]
+    ISUB   DR7, DR6, #1           ; [57]
+    BRANCHEQ poll_lf              ; [58]
+
+; -- On-phase delay (words 59-64) — ~0.498 s at 50 MHz -----------------------------------
+on_delay:
+    IADD  DR3, DR0, #380          ; [59] outer count = 380
+outer_on:
+    IADD  DR2, DR0, #16383        ; [60] inner count = 16383  (outer-on-top)
+inner_on:
+    ISUB  DR2, DR2, #1            ; [61] decrement inner  (inner-on-top)
+    BRANCHNE inner_on             ; [62] -> [61]  (inner loop: -1)
+    ISUB  DR3, DR3, #1            ; [63] decrement outer
+    BRANCHNE outer_on             ; [64] -> [60]  (outer loop: -4)
+
+; -- LED off + off-phase delay (words 65-71) ----------------------------------------------
+    DWRITE DR0, CR3, 0, DR0       ; [65] LED0 = off  (offset = DR0 = 0)
+off_delay:
+    IADD  DR3, DR0, #380          ; [66] outer count = 380
+outer_off:
+    IADD  DR2, DR0, #16383        ; [67] inner count = 16383  (outer-off-top)
+inner_off:
+    ISUB  DR2, DR2, #1            ; [68] decrement inner  (inner-off-top)
+    BRANCHNE inner_off            ; [69] -> [68]  (inner loop: -1)
+    ISUB  DR3, DR3, #1            ; [70] decrement outer
+    BRANCHNE outer_off            ; [71] -> [67]  (outer loop: -4)
+
+; -- Loop branch (word 72) — unconditional, back to LED on + banner -----------------------
+    BRANCH loop_top               ; [72] -> [3]   BRANCH AL, offset=-69
+`,
 
         // ── Bare-space sugar smoke-test ──────────────────────────────────────────
         // Used by tests/simulator/sim_asm_examples.js to catch regressions in the
