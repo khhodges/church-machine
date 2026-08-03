@@ -967,6 +967,7 @@ function hideRunPopover() {
 //   cc = lastAssembledCapabilities.length.
 function _injectClistNow() {
     if (!sim.bootComplete || !sim.demoClistGTs || !sim.demoClistGTs.length) return;
+    const _icn_pre244 = sim.memory[244] >>> 0;
 
     // Guard against stale named-slot entries from a previous program (Task #1547).
     // Reset petNameMemory to the hardware boot defaults before any markNamedSlots()
@@ -1123,6 +1124,12 @@ function _injectClistNow() {
             word3: sim.memory[nsBase + 2] >>> 0,
             m: 0,
         };
+    }
+    const _icn_post244 = sim.memory[244] >>> 0;
+    if (_icn_post244 !== _icn_pre244) {
+        console.warn('[_injectClistNow] mem[244] CHANGED: 0x' + _icn_pre244.toString(16) + ' → 0x' + _icn_post244.toString(16) + ' BOOT_ABSTR_SLOT=' + BOOT_ABSTR_SLOT + ' lumpBase=0x' + (sim.memory[sim._nsSlotBase(BOOT_ABSTR_SLOT)]>>>0).toString(16));
+    } else {
+        console.log('[_injectClistNow] mem[244] unchanged=0x' + _icn_post244.toString(16) + ' BOOT_ABSTR_SLOT=' + BOOT_ABSTR_SLOT);
     }
 }
 
@@ -1511,6 +1518,7 @@ function _autoLoadDefaultProgram() {
             ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())?.sources?.memory
             : null;
         const _bootWords = _bootMem ? (_bootMem.words || []) : [];
+        console.warn('[DBG] autoLoad2 getCurrent=' + (window.LumpRegistry ? window.LumpRegistry.getCurrent() : 'no-lr') + ' _bootWords.length=' + _bootWords.length + ' mem244_before=0x' + (sim.memory[244]>>>0).toString(16));
         if (_bootWords.length > 0) {
             sim.loadProgram(_bootWords, 0);
             if (lastMethodTableSize > 0) {
@@ -1588,6 +1596,7 @@ function slowBoot() {
     // _savedBootEntrySlow is captured by the nextPhase closure so the restore
     // survives across multiple setTimeout callbacks.
     const _savedBootEntrySlow = sim.bootEntrySlot;
+    console.warn('[DBG] slowBoot START bootEntrySlot=' + sim.bootEntrySlot + ' _bootAbstrSlot=' + sim._bootAbstrSlot);
     sim.bootEntrySlot = sim._bootAbstrSlot;
     if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(0)); pipelineViz.render(); }  // prime NIA to B:00 before first step
     switchView('pipeline');  // show pipeline so boot-step overview is immediately visible
@@ -1597,11 +1606,17 @@ function slowBoot() {
             if (sim.bootComplete || sim.halted) {
                 sim.bootEntrySlot = _savedBootEntrySlow;
                 // Patch CR0 and Thread.caps[0] if user's entry differs from Boot.Abstr.
+                const _dbgStart = '[DBG] slowBoot COMPLETE saved=' + _savedBootEntrySlow + ' abstr=' + sim._bootAbstrSlot + ' ok=' + (sim.bootComplete&&!sim.halted) + ' CR0_before=0x' + (sim.cr[0]&&sim.cr[0].word0!==undefined?(sim.cr[0].word0>>>0).toString(16):'?');
+                console.warn(_dbgStart);
                 if (_savedBootEntrySlow !== sim._bootAbstrSlot && sim.bootComplete && !sim.halted) {
                     const _slowEntryGT = sim.createGT(0, _savedBootEntrySlow, {E:1}, 1) >>> 0;
                     sim.cr[0] = { word0: _slowEntryGT, word1: 0, word2: 0, word3: 0 };
                     const _slowThreadLoc = sim.memory[sim._nsSlotBase(1)] >>> 0;
                     sim.memory[(_slowThreadLoc + 244) >>> 0] = _slowEntryGT;  // 244 = THREAD_CAPS_OFFSET
+                    const _dbgFix = '[DBG] slowBoot FIXUP fired: GT=0x' + _slowEntryGT.toString(16) + ' threadLoc=0x' + _slowThreadLoc.toString(16) + ' mem244=0x' + (sim.memory[244]>>>0).toString(16);
+                    console.warn(_dbgFix);
+                } else {
+                    console.warn('[DBG] slowBoot FIXUP skipped (saved===abstr OR halted)');
                 }
                 bootAnimating = false;
                 _bootAnimTimer = null;
@@ -1611,6 +1626,7 @@ function slowBoot() {
                         con.textContent += '\n--- Boot sequence FAULTED ---';
                     } else {
                         con.textContent += '\n--- Boot sequence complete ---';
+                        con.textContent += '\n[DBG] bootEntrySlot=' + sim.bootEntrySlot + ' mem[244]=0x' + (sim.memory[244]>>>0).toString(16);
                     }
                     con.scrollTop = con.scrollHeight;
                 }
@@ -1620,6 +1636,7 @@ function slowBoot() {
                     // empty for user-code debugging after a clean boot.
                     sim.auditLog = [];
                     _autoLoadDefaultProgram();
+                    console.log('[slowBoot] after _autoLoadDefaultProgram: CR0=0x' + (sim.cr[0] && sim.cr[0].word0 !== undefined ? (sim.cr[0].word0>>>0).toString(16) : '?') + ' mem244=0x' + (sim.memory[244]>>>0).toString(16));
                     // Restore user-assigned namespace labels that sim.reset()
                     // wiped (nsLabels = {}).  Must run after _autoLoadDefaultProgram
                     // so any program-load-triggered NS writes have already landed.
@@ -1715,12 +1732,14 @@ function runSim() {
         sim.cr[0] = { word0: _runEntryGT, word1: 0, word2: 0, word3: 0 };
         const _runThreadLoc = sim.memory[sim._nsSlotBase(1)] >>> 0;
         sim.memory[(_runThreadLoc + 244) >>> 0] = _runEntryGT;  // 244 = THREAD_CAPS_OFFSET
+        console.warn('[DBG] runSim FIXUP: GT=0x' + _runEntryGT.toString(16) + ' mem244=0x' + (sim.memory[244]>>>0).toString(16));
     }
     if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(sim.bootStep)); pipelineViz.render(); }
     // Clear boot-microcode gate entries so the Gate Log starts empty for
     // user-code debugging after a clean boot.
     if (!sim.halted) sim.auditLog = [];
     _autoLoadDefaultProgram();
+    console.warn('[DBG] runSim after autoLoad: mem244=0x' + (sim.memory[244]>>>0).toString(16) + ' CR0=0x' + (sim.cr[0]&&sim.cr[0].word0!==undefined?(sim.cr[0].word0>>>0).toString(16):'?'));
 
     const MAX_STEPS   = 10000;
     const BATCH_SIZE  = runBatchSize;

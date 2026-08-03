@@ -501,10 +501,13 @@ function setBootEntrySlot(idx) {
         sim.bootEntrySlot = idx;
         // Task #651: Write E-GT to thread caps zone CR0 slot (thread[+244]) so the
         // 3-instruction Boot.Abstr CHANGE → TPERM → CALL path picks up the new entry.
-        if (typeof sim.createGT === 'function') {
+        // NS table is INVERTED: slot N is at NS_TABLE_BASE+NS_TABLE_RESERVE−(N+1)×NS_ENTRY_WORDS.
+        // Must use sim._nsSlotBase(1), NOT the ascending formula NS_TABLE_BASE+1×NS_ENTRY_WORDS.
+        if (typeof sim.createGT === 'function' && typeof sim._nsSlotBase === 'function') {
             const capsOffset = (typeof THREAD_CAPS_OFFSET !== 'undefined') ? THREAD_CAPS_OFFSET : 244;
-            const threadBase = sim.memory[sim.NS_TABLE_BASE + 1 * sim.NS_ENTRY_WORDS] >>> 0;
+            const threadBase = sim.memory[sim._nsSlotBase(1)] >>> 0;
             sim.memory[threadBase + capsOffset] = sim.createGT(0, idx, {E:1}, 1) >>> 0;
+            console.log('[setBootEntrySlot] wrote GT=0x' + (sim.createGT(0, idx, {E:1}, 1)>>>0).toString(16) + ' to threadBase=0x' + threadBase.toString(16) + '+' + capsOffset + '=0x' + (threadBase+capsOffset).toString(16));
         }
         // Preflight: warn if the chosen slot has no installed lump
         const entry = sim.readNSEntry(idx);
