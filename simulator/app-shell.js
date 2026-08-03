@@ -399,6 +399,125 @@ function savePseudoCode() {
     }
 }
 
+// ── Open File ────────────────────────────────────────────────────────────────
+// Fetches the server file list, shows a searchable picker, and loads the
+// chosen file into the editor with its path tracked for Ctrl+Shift+F saves.
+
+var _openFileCache = null;  // cached [{path, name, dir}] from last fetch
+
+function showOpenFileDialog() {
+    var dlg = document.getElementById('openFileDialog');
+    if (!dlg) return;
+    dlg.style.display = 'flex';
+    var search = document.getElementById('openFileSearch');
+    if (search) { search.value = ''; search.focus(); }
+    _renderOpenFileList('');
+
+    if (!_openFileCache) {
+        fetch('/api/source-files')
+            .then(function(r) { return r.json(); })
+            .then(function(j) {
+                _openFileCache = j.files || [];
+                _renderOpenFileList(document.getElementById('openFileSearch')
+                                        ? document.getElementById('openFileSearch').value
+                                        : '');
+            })
+            .catch(function() {
+                var list = document.getElementById('openFileList');
+                if (list) list.innerHTML = '<div class="of-empty">Could not load file list.</div>';
+            });
+    }
+}
+
+function closeOpenFileDialog() {
+    var dlg = document.getElementById('openFileDialog');
+    if (dlg) dlg.style.display = 'none';
+}
+
+function _renderOpenFileList(query) {
+    var list = document.getElementById('openFileList');
+    if (!list) return;
+    if (!_openFileCache) {
+        list.innerHTML = '<div class="of-empty">Loading\u2026</div>';
+        return;
+    }
+    var q = (query || '').trim().toLowerCase();
+    var files = _openFileCache.filter(function(f) {
+        return !q || f.name.toLowerCase().includes(q) || f.dir.toLowerCase().includes(q);
+    });
+    if (!files.length) {
+        list.innerHTML = '<div class="of-empty">No files match.</div>';
+        return;
+    }
+    // Group by dir
+    var groups = {};
+    var order  = [];
+    files.forEach(function(f) {
+        var g = f.dir || 'simulator';
+        if (!groups[g]) { groups[g] = []; order.push(g); }
+        groups[g].push(f);
+    });
+    var html = '';
+    order.forEach(function(g) {
+        html += '<div class="of-group-title">' + _escHtml(g || 'simulator') + '/</div>';
+        groups[g].forEach(function(f) {
+            var active = (window._editorSourceFilePath === f.path) ? ' of-item-active' : '';
+            html += '<button class="of-item' + active + '" onclick="openSourceFile(' +
+                    JSON.stringify(f.path) + ')">' + _escHtml(f.name) + '<span class="of-item-ext">.cloomc</span></button>';
+        });
+    });
+    list.innerHTML = html;
+}
+
+function _escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function openSourceFile(path) {
+    closeOpenFileDialog();
+    fetch('/' + path)
+        .then(function(r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.text();
+        })
+        .then(function(code) {
+            var ed = document.getElementById('asmEditor');
+            if (!ed) return;
+            // Save active user tab if dirty before clobbering
+            if (typeof activeUserTabId !== 'undefined' && activeUserTabId &&
+                typeof userTabDirty !== 'undefined' && userTabDirty &&
+                typeof saveActiveUserTab === 'function') {
+                saveActiveUserTab();
+            }
+            ed.value = code;
+            window._editorSourceFilePath = path;
+            // Show filename in the editor header
+            var stem = path.split('/').pop().replace(/\.cloomc$/i, '');
+            if (typeof _updateEditorCodeName === 'function') _updateEditorCodeName(stem);
+            if (typeof saveEditorState === 'function') saveEditorState();
+            if (typeof updateLineNumbers === 'function') updateLineNumbers();
+            if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
+            // Show brief confirmation
+            var outEl = document.getElementById('assemblyOutput');
+            if (outEl) {
+                var msg = document.createElement('div');
+                msg.style.cssText = 'color:#8f8;font-style:italic;padding:2px 0;';
+                msg.textContent = '\u2713 Opened \u2192 ' + path;
+                outEl.appendChild(msg);
+                setTimeout(function() { if (msg.parentNode) msg.parentNode.removeChild(msg); }, 2500);
+            }
+        })
+        .catch(function(err) {
+            var outEl = document.getElementById('assemblyOutput');
+            if (outEl) {
+                var msg = document.createElement('div');
+                msg.style.cssText = 'color:#f88;padding:2px 0;';
+                msg.textContent = 'Open failed: ' + err;
+                outEl.appendChild(msg);
+            }
+        });
+}
+
 // ── Save Source File ─────────────────────────────────────────────────────────
 // Writes the editor content to a .cloomc file on the server.
 //
@@ -423,6 +542,7 @@ function _saveSourceFileToPath(path, callback) {
     .then(function(j) {
         if (j.ok) {
             window._editorSourceFilePath = j.path;
+            _openFileCache = null;  // bust picker cache so new file appears on next open
             var outEl = document.getElementById('assemblyOutput');
             if (outEl) {
                 var msg = document.createElement('div');

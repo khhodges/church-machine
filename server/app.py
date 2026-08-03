@@ -5843,6 +5843,41 @@ def get_lump_source(name):
     }), 404
 
 
+@app.route("/api/source-files", methods=["GET"])
+def list_source_files():
+    """Return every .cloomc file under simulator/, grouped by sub-directory.
+
+    Response: { "files": [ {"path": "simulator/examples/foo.cloomc",
+                             "name": "foo", "dir": "examples"}, ... ] }
+    Files are sorted: examples/ first, then cloomc/ (with sub-dirs after their
+    parent entries), alphabetically within each group.
+    """
+    _root = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))
+    scan_base = os.path.join(_root, 'simulator')
+    results = []
+    for dirpath, _dirs, files in os.walk(scan_base):
+        _dirs.sort()
+        for fname in sorted(files):
+            if not fname.endswith('.cloomc'):
+                continue
+            abs_f   = os.path.join(dirpath, fname)
+            rel_f   = os.path.relpath(abs_f, _root).replace('\\', '/')
+            rel_dir = os.path.relpath(dirpath, scan_base).replace('\\', '/')
+            if rel_dir == '.':
+                rel_dir = ''
+            stem = fname[:-len('.cloomc')]
+            results.append({'path': rel_f, 'name': stem, 'dir': rel_dir})
+
+    # Sort: examples/ before cloomc/, then by dir, then by name
+    def _sort_key(e):
+        d = e['dir']
+        order = 0 if d == 'examples' else (1 if d == 'cloomc' or d == '' else 2)
+        return (order, d, e['name'].lower())
+
+    results.sort(key=_sort_key)
+    return jsonify({'files': results})
+
+
 @app.route("/api/source-file/save", methods=["POST"])
 def save_source_file():
     """Write a .cloomc source file back to its location under simulator/.

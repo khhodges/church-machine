@@ -1120,6 +1120,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     e.preventDefault();
                     if (typeof saveSourceFile === 'function') saveSourceFile();
                 }
+                if (e.ctrlKey && e.shiftKey && (e.key === 'O' || e.key === 'o')) {
+                    e.preventDefault();
+                    if (typeof showOpenFileDialog === 'function') showOpenFileDialog();
+                }
             });
         }
     });

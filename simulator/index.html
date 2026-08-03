@@ -107,6 +107,14 @@
         .ham-item.ham-is-default { color:#daa520; }
         .ham-item.ham-is-default::after { content:'⚡'; font-size:0.7rem; margin-left:auto; color:#daa520; flex-shrink:0; }
         .ham-separator { height:1px; background:var(--border,#2a2a4a); margin:0.3rem 0; }
+        /* Open-file picker */
+        .of-group-title { padding:0.35rem 0.75rem 0.1rem; font-size:0.68rem; color:#55557a; text-transform:uppercase; letter-spacing:0.06em; user-select:none; }
+        .of-item { display:block; width:100%; box-sizing:border-box; padding:0.32rem 0.75rem; text-align:left; background:none; border:none; color:#c8c8e0; font-size:0.85rem; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .of-item:hover { background:rgba(255,255,255,0.06); color:#fff; }
+        .of-item-active { color:#daa520 !important; }
+        .of-item-active::before { content:'\2022 '; }
+        .of-item-ext { color:#55557a; font-size:0.78rem; }
+        .of-empty { padding:0.75rem; color:#55557a; font-style:italic; font-size:0.82rem; }
         .ham-debug-section { display:none; flex-direction:column; }
         html.r1-debug-mode .ham-debug-section { display:flex; }
         .ham-subhead.ham-learn-section { display:none; }
@@ -458,6 +466,11 @@
                         <div class="ham-wrap" id="editorActionsWrap">
                             <button class="btn ham-btn editor-actions-btn" id="editorActionsBtn" onclick="toggleEditorActions()" data-tooltip="Actions — Compile · Create · Save">&#9776;</button>
                             <div class="ham-dropdown editor-actions-dropdown" id="editorActionsDropdown" style="display:none;">
+                                <div class="ham-group-title">File</div>
+                                <button class="ham-item" onclick="showOpenFileDialog();closeEditorActions()" data-tooltip="Open File — Browse and open any .cloomc file from the server (C+Shift+O)">Open File&hellip;</button>
+                                <button class="ham-item" onclick="saveSourceFile();closeEditorActions()" data-tooltip="Save — Write editor source back to its open file (C+Shift+F)">Save</button>
+                                <button class="ham-item" onclick="saveSourceFileAs();closeEditorActions()" data-tooltip="Save As — Choose a new path to save this source">Save As&hellip;</button>
+                                <div class="ham-divider"></div>
                                 <div class="ham-group-title">Build</div>
                                 <button class="ham-item" onclick="smartCompile();closeEditorActions()" data-tooltip="Compile — Compile with auto-detected or selected source language">Compile</button>
                                 <button class="ham-item" onclick="compileDraft();closeEditorActions()" style="color:#C89B3C;" data-tooltip="Draft — Show compilation draft: methods, capabilities, and lump layout">Draft</button>
@@ -476,6 +489,8 @@
                                 <button class="ham-item" id="btnExportLump" disabled onclick="buildLumpFromAssembly();closeEditorActions()" style="color:#66bb6a;" data-tooltip="Export LUMP — Package assembled instruction words as a floating .lump binary and download it">Export LUMP ↓</button>
                                 <div class="ham-divider"></div>
                                 <div class="ham-group-title">Keyboard Shortcuts</div>
+                                <div class="ham-item" style="pointer-events:none;display:flex;justify-content:space-between;gap:0.5rem;">Open File<kbd class="ham-kbd">C+Shift+O</kbd></div>
+                                <div class="ham-item" style="pointer-events:none;display:flex;justify-content:space-between;gap:0.5rem;">Save File<kbd class="ham-kbd">C+Shift+F</kbd></div>
                                 <div class="ham-item" style="pointer-events:none;display:flex;justify-content:space-between;gap:0.5rem;">Compile<kbd class="ham-kbd">C+Enter</kbd></div>
                                 <div class="ham-item" style="pointer-events:none;display:flex;justify-content:space-between;gap:0.5rem;">Save Program<kbd class="ham-kbd">C+S</kbd></div>
                                 <div class="ham-item" style="pointer-events:none;display:flex;justify-content:space-between;gap:0.5rem;">Save File<kbd class="ham-kbd">C+Shift+F</kbd></div>
@@ -2565,6 +2580,22 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
                 <button class="btn btn-primary" onclick="confirmSaveToNamespace()" data-tooltip="Save — Save the assembled program to the selected namespace slot">Save</button>
                 <button class="btn btn-warning" onclick="closeSaveDialog()" data-tooltip="Cancel — Close without saving to namespace">Cancel</button>
             </div>
+        </div>
+    </div>
+
+    <!-- ── Open File dialog ─────────────────────────────────────────────── -->
+    <div id="openFileDialog" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeOpenFileDialog()">
+        <div class="modal-dialog" style="max-width:520px;width:92vw;max-height:80vh;display:flex;flex-direction:column;gap:0;">
+            <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+                <span>Open File</span>
+                <button onclick="closeOpenFileDialog()" style="background:none;border:none;color:#9ca3af;font-size:1.2rem;cursor:pointer;line-height:1;padding:0;">&times;</button>
+            </div>
+            <input type="text" id="openFileSearch" class="modal-input"
+                   placeholder="Filter by name or folder&hellip;"
+                   oninput="_renderOpenFileList(this.value)"
+                   onkeydown="if(event.key==='Escape')closeOpenFileDialog()"
+                   style="flex-shrink:0;margin-bottom:0.5rem;">
+            <div id="openFileList" style="overflow-y:auto;flex:1;min-height:120px;max-height:52vh;border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:2px 0;"></div>
         </div>
     </div>
 
