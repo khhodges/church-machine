@@ -4656,7 +4656,9 @@ async function openLumpInEditor(token) {
             _mfBanner.className = 'lump-malformed-banner';
             _mfBanner.innerHTML = _mfBannerMsg +
                 '<button class="lump-malformed-banner-dismiss" onclick="this.parentNode.remove()" title="Dismiss">\u00D7</button>';
-            if (asmEd.parentNode) asmEd.parentNode.insertBefore(_mfBanner, asmEd);
+            var _mfBannerParent = asmEd.parentNode && asmEd.parentNode.parentNode;
+            if (_mfBannerParent) _mfBannerParent.insertBefore(_mfBanner, asmEd.parentNode);
+            else if (asmEd.parentNode) asmEd.parentNode.insertBefore(_mfBanner, asmEd);
         }
 
         // ── Try to restore original source from sidecar detail endpoint ──────
@@ -4727,7 +4729,9 @@ async function openLumpInEditor(token) {
                 _srcBanner.innerHTML =
                     '<span>Source restored from saved LUMP</span>' +
                     '<button class="lump-malformed-banner-dismiss" onclick="this.parentNode.remove()" title="Dismiss">\u00D7</button>';
-                if (asmEd.parentNode) asmEd.parentNode.insertBefore(_srcBanner, asmEd);
+                var _srcBannerParent = asmEd.parentNode && asmEd.parentNode.parentNode;
+                if (_srcBannerParent) _srcBannerParent.insertBefore(_srcBanner, asmEd.parentNode);
+                else if (asmEd.parentNode) asmEd.parentNode.insertBefore(_srcBanner, asmEd);
             }
         }
 
