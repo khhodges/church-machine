@@ -1596,6 +1596,13 @@ function slowBoot() {
         try {
             if (sim.bootComplete || sim.halted) {
                 sim.bootEntrySlot = _savedBootEntrySlow;
+                // Patch CR0 and Thread.caps[0] if user's entry differs from Boot.Abstr.
+                if (_savedBootEntrySlow !== sim._bootAbstrSlot && sim.bootComplete && !sim.halted) {
+                    const _slowEntryGT = sim.createGT(0, _savedBootEntrySlow, {E:1}, 1) >>> 0;
+                    sim.cr[0] = { word0: _slowEntryGT, word1: 0, word2: 0, word3: 0 };
+                    const _slowThreadLoc = sim.memory[sim._nsSlotBase(1)] >>> 0;
+                    sim.memory[(_slowThreadLoc + 244) >>> 0] = _slowEntryGT;  // 244 = THREAD_CAPS_OFFSET
+                }
                 bootAnimating = false;
                 _bootAnimTimer = null;
                 const con = document.getElementById('editorConsole');
@@ -3623,13 +3630,23 @@ function resetAndStep() {
     const con = document.getElementById('editorConsole');
     if (con) con.textContent = '';
     // Complete boot immediately (no animation) so the machine is ready to step.
+    const _savedBootEntryRAS = sim.bootEntrySlot;
+    sim.bootEntrySlot = sim._bootAbstrSlot;
     while (!sim.bootComplete && !sim.halted) {
         try { sim._bootStep(); } catch(e) {
+            sim.bootEntrySlot = _savedBootEntryRAS;
             console.error('resetAndStep _bootStep error:', e);
             if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(sim.bootStep)); pipelineViz.render(); }
             updateDashboard();
             return;
         }
+    }
+    sim.bootEntrySlot = _savedBootEntryRAS;
+    if (_savedBootEntryRAS !== sim._bootAbstrSlot && sim.bootComplete && !sim.halted) {
+        const _rasEntryGT = sim.createGT(0, _savedBootEntryRAS, {E:1}, 1) >>> 0;
+        sim.cr[0] = { word0: _rasEntryGT, word1: 0, word2: 0, word3: 0 };
+        const _rasThreadLoc = sim.memory[sim._nsSlotBase(1)] >>> 0;
+        sim.memory[(_rasThreadLoc + 244) >>> 0] = _rasEntryGT;  // 244 = THREAD_CAPS_OFFSET
     }
     if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(sim.bootStep)); pipelineViz.render(); }
     if (!sim.halted) _autoLoadDefaultProgram();
