@@ -405,7 +405,13 @@ def _ns_n_minus_6(lump_words):
 
 
 def _read_lump_body(lumps_dir, token_hex):
-    """Read raw 32-bit LE words from server/lumps/<token>.lump if present."""
+    """Read raw 32-bit words from server/lumps/<token>.lump if present.
+
+    Lump files are stored big-endian on disk (written by build_*_lump.js and
+    /api/lumps/save).  Words are returned as native Python ints so they can
+    be written directly into mem[] and later packed as little-endian by
+    struct.pack('<...I', *mem).
+    """
     if not token_hex:
         return None
     path = os.path.join(lumps_dir, f"{token_hex}.lump")
@@ -414,7 +420,7 @@ def _read_lump_body(lumps_dir, token_hex):
     with open(path, "rb") as f:
         raw = f.read()
     n = len(raw) // 4
-    return list(struct.unpack(f"<{n}I", raw[: n * 4]))
+    return list(struct.unpack(f">{n}I", raw[: n * 4]))
 
 
 def _load_catalog_token_map(manifest_path):
@@ -892,6 +898,16 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         _n = min(len(_body), total - _phys)
         for _wi in range(_n):
             mem[_phys + _wi] = _body[_wi] & 0xFFFFFFFF
+        # Update NS entry word1 (lim17 + cc) and word2 (seal) to match the
+        # actual lump.  The catalog loop wrote cc=0 for non-MMIO non-SelfTest
+        # slots; boot-resident lumps may have cc > 0 (e.g. CapTest has cc=5).
+        _hdr     = _body[0] if _body else 0
+        _body_cc = _hdr & 0xFF
+        _body_sz = len(_body)
+        _br_lim17 = (_body_sz - _body_cc - 1) & 0x1FFFF
+        _br_ns_base = total - (_slot + 1) * NS_ENTRY_WORDS
+        mem[_br_ns_base + 1] = pack_ns_word1(_br_lim17, 0, 0, 0, 1, _body_cc)
+        mem[_br_ns_base + 2] = make_version_seals(0, _phys, _br_lim17)
 
     # ----- Resident lump bodies (Step 2) --------------------------------
     token_map = _token_map
