@@ -755,6 +755,16 @@ function stepSim() {
             return;
         }
         sim.bootEntrySlot = _savedBootEntryStep;
+        // If the user's chosen entry differs from Boot.Abstr (SelfTest), B:05 wrote
+        // the _bootAbstrSlot GT into Thread.caps[0] during the redirect and B:07
+        // copied it to CR0.  Now that the redirect is unwound, patch both so the
+        // machine boots into the correct entry point (e.g. WukongCallHome, slot 7).
+        if (_savedBootEntryStep !== sim._bootAbstrSlot && sim.bootComplete && !sim.halted) {
+            const _stepEntryGT = sim.createGT(0, _savedBootEntryStep, {E:1}, 1) >>> 0;
+            sim.cr[0] = { word0: _stepEntryGT, word1: 0, word2: 0, word3: 0 };
+            const _stepThreadLoc = sim.memory[sim._nsSlotBase(1)] >>> 0;
+            sim.memory[(_stepThreadLoc + 244) >>> 0] = _stepEntryGT;  // 244 = THREAD_CAPS_OFFSET
+        }
         // Accumulate this step's gate entries into the persistent boot audit trail
         if (sim.auditLog.length > 0) {
             _bootAuditAccum.push(...sim.auditLog);
@@ -1554,6 +1564,13 @@ function instantBoot() {
         if (sim.auditLog.length > 0) { _bootAuditAccum.push(...sim.auditLog); sim.auditLog = []; }
     }
     sim.bootEntrySlot = _savedBootEntryInst;
+    // Patch CR0 and Thread.caps[0] if user's entry differs from Boot.Abstr.
+    if (_savedBootEntryInst !== sim._bootAbstrSlot && sim.bootComplete && !sim.halted) {
+        const _instEntryGT = sim.createGT(0, _savedBootEntryInst, {E:1}, 1) >>> 0;
+        sim.cr[0] = { word0: _instEntryGT, word1: 0, word2: 0, word3: 0 };
+        const _instThreadLoc = sim.memory[sim._nsSlotBase(1)] >>> 0;
+        sim.memory[(_instThreadLoc + 244) >>> 0] = _instEntryGT;  // 244 = THREAD_CAPS_OFFSET
+    }
     if (sim.bootComplete && !sim.halted) {
         sim.auditLog = [];
         _autoLoadDefaultProgram();
@@ -1685,6 +1702,13 @@ function runSim() {
         }
     }
     sim.bootEntrySlot = _savedBootEntryRun;
+    // Patch CR0 and Thread.caps[0] if user's entry differs from Boot.Abstr.
+    if (_savedBootEntryRun !== sim._bootAbstrSlot && sim.bootComplete && !sim.halted) {
+        const _runEntryGT = sim.createGT(0, _savedBootEntryRun, {E:1}, 1) >>> 0;
+        sim.cr[0] = { word0: _runEntryGT, word1: 0, word2: 0, word3: 0 };
+        const _runThreadLoc = sim.memory[sim._nsSlotBase(1)] >>> 0;
+        sim.memory[(_runThreadLoc + 244) >>> 0] = _runEntryGT;  // 244 = THREAD_CAPS_OFFSET
+    }
     if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(sim.bootStep)); pipelineViz.render(); }
     // Clear boot-microcode gate entries so the Gate Log starts empty for
     // user-code debugging after a clean boot.
