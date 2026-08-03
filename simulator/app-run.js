@@ -755,15 +755,12 @@ function stepSim() {
             return;
         }
         sim.bootEntrySlot = _savedBootEntryStep;
-        // If the user's chosen entry differs from Boot.Abstr (SelfTest), B:05 wrote
-        // the _bootAbstrSlot GT into Thread.caps[0] during the redirect and B:07
-        // copied it to CR0.  Now that the redirect is unwound, patch both so the
-        // machine boots into the correct entry point (e.g. WukongCallHome, slot 7).
+        // If the user's chosen entry differs from Boot.Abstr (SelfTest), the sentinel
+        // frame holds E-GT=_bootAbstrSlot.  Patching CR0 here (before SelfTest runs)
+        // would cause a sentinel-mismatch fault on RETURN.  Stash as pending; finishRun()
+        // applies the patch after SelfTest halts cleanly.
         if (_savedBootEntryStep !== sim._bootAbstrSlot && sim.bootComplete && !sim.halted) {
-            const _stepEntryGT = sim.createGT(0, _savedBootEntryStep, {E:1}, 1) >>> 0;
-            sim.cr[0] = { word0: _stepEntryGT, word1: 0, word2: 0, word3: 0 };
-            const _stepThreadLoc = sim.memory[sim._nsSlotBase(1)] >>> 0;
-            sim.memory[(_stepThreadLoc + 244) >>> 0] = _stepEntryGT;  // 244 = THREAD_CAPS_OFFSET
+            _bootCR0FixupPending = _savedBootEntryStep;
         }
         // Accumulate this step's gate entries into the persistent boot audit trail
         if (sim.auditLog.length > 0) {
@@ -1507,6 +1504,11 @@ let _bootAnimTimer = null;
 // Cleared only when the sim is reset (resetSim / resetAndStep / faultClear).
 let _bootAuditAccum = [];
 let _defaultProgramLoaded = false;
+// Deferred CR0/Thread.caps[0] fixup: set to the user's boot slot (non-null only when the
+// user's ⚡ selection differs from _bootAbstrSlot).  Applied in finishRun() AFTER the
+// boot run completes cleanly so the sentinel frame's E-GT (always _bootAbstrSlot) stays
+// consistent with CR0 during execution and avoids a sentinel-mismatch fault on RETURN.
+let _bootCR0FixupPending = null;
 function _autoLoadDefaultProgram() {
     // Re-apply any sticky patches (set via patchSimulator()) that should survive
     // reset.  Safe to call here because the NS table and lump addresses are stable
@@ -1518,7 +1520,6 @@ function _autoLoadDefaultProgram() {
             ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())?.sources?.memory
             : null;
         const _bootWords = _bootMem ? (_bootMem.words || []) : [];
-        console.warn('[DBG] autoLoad2 getCurrent=' + (window.LumpRegistry ? window.LumpRegistry.getCurrent() : 'no-lr') + ' _bootWords.length=' + _bootWords.length + ' mem244_before=0x' + (sim.memory[244]>>>0).toString(16));
         if (_bootWords.length > 0) {
             sim.loadProgram(_bootWords, 0);
             if (lastMethodTableSize > 0) {
@@ -1572,12 +1573,10 @@ function instantBoot() {
         if (sim.auditLog.length > 0) { _bootAuditAccum.push(...sim.auditLog); sim.auditLog = []; }
     }
     sim.bootEntrySlot = _savedBootEntryInst;
-    // Patch CR0 and Thread.caps[0] if user's entry differs from Boot.Abstr.
+    // Stash pending CR0 fixup — applied by finishRun() after SelfTest halts cleanly
+    // (patching here, before SelfTest runs, would sentinel-mismatch fault on RETURN).
     if (_savedBootEntryInst !== sim._bootAbstrSlot && sim.bootComplete && !sim.halted) {
-        const _instEntryGT = sim.createGT(0, _savedBootEntryInst, {E:1}, 1) >>> 0;
-        sim.cr[0] = { word0: _instEntryGT, word1: 0, word2: 0, word3: 0 };
-        const _instThreadLoc = sim.memory[sim._nsSlotBase(1)] >>> 0;
-        sim.memory[(_instThreadLoc + 244) >>> 0] = _instEntryGT;  // 244 = THREAD_CAPS_OFFSET
+        _bootCR0FixupPending = _savedBootEntryInst;
     }
     if (sim.bootComplete && !sim.halted) {
         sim.auditLog = [];
@@ -1596,7 +1595,6 @@ function slowBoot() {
     // _savedBootEntrySlow is captured by the nextPhase closure so the restore
     // survives across multiple setTimeout callbacks.
     const _savedBootEntrySlow = sim.bootEntrySlot;
-    console.warn('[DBG] slowBoot START bootEntrySlot=' + sim.bootEntrySlot + ' _bootAbstrSlot=' + sim._bootAbstrSlot);
     sim.bootEntrySlot = sim._bootAbstrSlot;
     if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(0)); pipelineViz.render(); }  // prime NIA to B:00 before first step
     switchView('pipeline');  // show pipeline so boot-step overview is immediately visible
@@ -1605,18 +1603,11 @@ function slowBoot() {
         try {
             if (sim.bootComplete || sim.halted) {
                 sim.bootEntrySlot = _savedBootEntrySlow;
-                // Patch CR0 and Thread.caps[0] if user's entry differs from Boot.Abstr.
-                const _dbgStart = '[DBG] slowBoot COMPLETE saved=' + _savedBootEntrySlow + ' abstr=' + sim._bootAbstrSlot + ' ok=' + (sim.bootComplete&&!sim.halted) + ' CR0_before=0x' + (sim.cr[0]&&sim.cr[0].word0!==undefined?(sim.cr[0].word0>>>0).toString(16):'?');
-                console.warn(_dbgStart);
+                // Stash pending CR0 fixup — applied by finishRun() after SelfTest halts cleanly.
+                // We must NOT patch here: the sentinel frame holds E-GT=_bootAbstrSlot, so if
+                // CR0 were changed to the user's slot now, SelfTest's RETURN would sentinel-fault.
                 if (_savedBootEntrySlow !== sim._bootAbstrSlot && sim.bootComplete && !sim.halted) {
-                    const _slowEntryGT = sim.createGT(0, _savedBootEntrySlow, {E:1}, 1) >>> 0;
-                    sim.cr[0] = { word0: _slowEntryGT, word1: 0, word2: 0, word3: 0 };
-                    const _slowThreadLoc = sim.memory[sim._nsSlotBase(1)] >>> 0;
-                    sim.memory[(_slowThreadLoc + 244) >>> 0] = _slowEntryGT;  // 244 = THREAD_CAPS_OFFSET
-                    const _dbgFix = '[DBG] slowBoot FIXUP fired: GT=0x' + _slowEntryGT.toString(16) + ' threadLoc=0x' + _slowThreadLoc.toString(16) + ' mem244=0x' + (sim.memory[244]>>>0).toString(16);
-                    console.warn(_dbgFix);
-                } else {
-                    console.warn('[DBG] slowBoot FIXUP skipped (saved===abstr OR halted)');
+                    _bootCR0FixupPending = _savedBootEntrySlow;
                 }
                 bootAnimating = false;
                 _bootAnimTimer = null;
@@ -1626,7 +1617,6 @@ function slowBoot() {
                         con.textContent += '\n--- Boot sequence FAULTED ---';
                     } else {
                         con.textContent += '\n--- Boot sequence complete ---';
-                        con.textContent += '\n[DBG] bootEntrySlot=' + sim.bootEntrySlot + ' mem[244]=0x' + (sim.memory[244]>>>0).toString(16);
                     }
                     con.scrollTop = con.scrollHeight;
                 }
@@ -1636,7 +1626,6 @@ function slowBoot() {
                     // empty for user-code debugging after a clean boot.
                     sim.auditLog = [];
                     _autoLoadDefaultProgram();
-                    console.log('[slowBoot] after _autoLoadDefaultProgram: CR0=0x' + (sim.cr[0] && sim.cr[0].word0 !== undefined ? (sim.cr[0].word0>>>0).toString(16) : '?') + ' mem244=0x' + (sim.memory[244]>>>0).toString(16));
                     // Restore user-assigned namespace labels that sim.reset()
                     // wiped (nsLabels = {}).  Must run after _autoLoadDefaultProgram
                     // so any program-load-triggered NS writes have already landed.
@@ -1726,20 +1715,15 @@ function runSim() {
         }
     }
     sim.bootEntrySlot = _savedBootEntryRun;
-    // Patch CR0 and Thread.caps[0] if user's entry differs from Boot.Abstr.
+    // Stash pending CR0 fixup for finishRun() — see slowBoot() comment for why we defer.
     if (_savedBootEntryRun !== sim._bootAbstrSlot && sim.bootComplete && !sim.halted) {
-        const _runEntryGT = sim.createGT(0, _savedBootEntryRun, {E:1}, 1) >>> 0;
-        sim.cr[0] = { word0: _runEntryGT, word1: 0, word2: 0, word3: 0 };
-        const _runThreadLoc = sim.memory[sim._nsSlotBase(1)] >>> 0;
-        sim.memory[(_runThreadLoc + 244) >>> 0] = _runEntryGT;  // 244 = THREAD_CAPS_OFFSET
-        console.warn('[DBG] runSim FIXUP: GT=0x' + _runEntryGT.toString(16) + ' mem244=0x' + (sim.memory[244]>>>0).toString(16));
+        _bootCR0FixupPending = _savedBootEntryRun;
     }
     if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(sim.bootStep)); pipelineViz.render(); }
     // Clear boot-microcode gate entries so the Gate Log starts empty for
     // user-code debugging after a clean boot.
     if (!sim.halted) sim.auditLog = [];
     _autoLoadDefaultProgram();
-    console.warn('[DBG] runSim after autoLoad: mem244=0x' + (sim.memory[244]>>>0).toString(16) + ' CR0=0x' + (sim.cr[0]&&sim.cr[0].word0!==undefined?(sim.cr[0].word0>>>0).toString(16):'?'));
 
     const MAX_STEPS   = 10000;
     const BATCH_SIZE  = runBatchSize;
@@ -1925,6 +1909,19 @@ function runSim() {
         }
         // Guard: updateDashboard can crash (e.g. null NS entry after stack overflow fault);
         // catch here so the Run button is always re-enabled regardless.
+        // Deferred CR0/Thread.caps[0] fixup: now that SelfTest has halted cleanly,
+        // patch to the user's actual ⚡-selected boot entry.  This MUST happen after
+        // the run (not before) because the sentinel frame's E-GT is always the
+        // _bootAbstrSlot GT; patching CR0 before the run causes a sentinel-mismatch
+        // fault when SelfTest's RETURN pops that frame.
+        if (ranClean && sim.bootComplete && _bootCR0FixupPending !== null) {
+            const _fixupSlot = _bootCR0FixupPending;
+            _bootCR0FixupPending = null;
+            const _fixupGT = sim.createGT(0, _fixupSlot, {E:1}, 1) >>> 0;
+            sim.cr[0] = { word0: _fixupGT, word1: 0, word2: 0, word3: 0, m: 0 };
+            const _fixupThreadLoc = sim.memory[sim._nsSlotBase(1)] >>> 0;
+            sim.memory[(_fixupThreadLoc + 244) >>> 0] = _fixupGT;
+        }
         try { updateDashboard(); } catch(e) { console.error('finishRun updateDashboard:', e); }
         // Clean HALT (no faults, boot complete) → open LUMP page for save workflow.
         // faultFreeLimit: go to editor first, then render Next Steps so lumpBtn sees >= 1000.
@@ -3619,6 +3616,7 @@ function resetSim() {
     // reload the user's compiled program after boot completes so the PC
     // returns to the correct start instruction automatically.
     _bootAuditAccum = [];
+    _bootCR0FixupPending = null;  // discard any stale deferred fixup from a previous boot
     _clearLumpPetNames();
     sim.reset();
     _initLazyLoadManifest();
@@ -3661,11 +3659,9 @@ function resetAndStep() {
         }
     }
     sim.bootEntrySlot = _savedBootEntryRAS;
+    // Stash pending CR0 fixup — applied by finishRun() after SelfTest halts cleanly.
     if (_savedBootEntryRAS !== sim._bootAbstrSlot && sim.bootComplete && !sim.halted) {
-        const _rasEntryGT = sim.createGT(0, _savedBootEntryRAS, {E:1}, 1) >>> 0;
-        sim.cr[0] = { word0: _rasEntryGT, word1: 0, word2: 0, word3: 0 };
-        const _rasThreadLoc = sim.memory[sim._nsSlotBase(1)] >>> 0;
-        sim.memory[(_rasThreadLoc + 244) >>> 0] = _rasEntryGT;  // 244 = THREAD_CAPS_OFFSET
+        _bootCR0FixupPending = _savedBootEntryRAS;
     }
     if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(sim.bootStep)); pipelineViz.render(); }
     if (!sim.halted) _autoLoadDefaultProgram();
