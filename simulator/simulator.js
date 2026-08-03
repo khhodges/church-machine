@@ -407,6 +407,27 @@ class ChurchSimulator {
             }
         }
 
+        // ── NS slot 1 (Thread) location correction (binary-age-agnostic) ──────────
+        // Stale boot images generated before the A7 v1.2 direct-dispatch layout
+        // finalization may have DEMO_CLIST GT words written into the NS TABLE tail,
+        // which overwrites NS slot 1 word0 (Thread physical location) with a GT
+        // value such as 0x32000003 (an Inform GT for slot 3 = LED_DEV).  A GT word
+        // always has non-zero upper bits (≥ 0x02000000); a valid Thread lump
+        // location for A7 v1.2 is 0 (Thread@0 canonical) and is always less than
+        // NS_TABLE_BASE.  Detect and correct any out-of-range Thread location.
+        {
+            const _threadNsB  = this._nsSlotBase(1);
+            const _threadLoc  = this.memory[_threadNsB] >>> 0;
+            if (_threadLoc >= this.NS_TABLE_BASE) {
+                // Location is in or past the NS table — stale DEMO_CLIST stomp.
+                // Reset to canonical A7 v1.2 Thread location 0 and recompute seals.
+                const _threadLim17 = this.memory[_threadNsB + 1] & 0x1FFFF;
+                this.memory[_threadNsB]     = 0;
+                this.memory[_threadNsB + 2] = this.makeVersionSeals(0, 0, _threadLim17);
+                this.output += `[BOOTIMG] NS[1] Thread location corrected: 0x${_threadLoc.toString(16).padStart(8,'0')} → 0x00000000 (stale binary DEMO_CLIST stomp).\n`;
+            }
+        }
+
         // Integrity check: the minimum complete boot namespace has 11 slots
         // (indices 0-10: Boot.NS, Boot.Thread, UART_DEV, LED_DEV, BTN_DEV,
         // TIMER_DEV, SelfTest, WukongCallHome, Tunnel, Ethernet, CapTest).

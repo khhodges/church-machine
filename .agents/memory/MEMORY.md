@@ -1,4 +1,5 @@
 - [NS slot restore post-c-list-write read](ns-slot-restore-post-clist-read.md) — NS slot 1 location must be captured BEFORE the c-list write loop; same bug existed in both boot_image.py and simulator.js
+- [NS slot 1 DEMO_CLIST stomp (stale binary)](ns-slot1-demo-clist-stomp.md) — old generator wrote clist_gts into NS TABLE tail, stomping NS[1] word0 (Thread loc) with 0x32000003; fixed in loadBootImage() + binary patched
 - [NULL GT type canonicalisation](null-gt-type-canon.md) — isNullGT checks bits[26:25]===0b00; only replace ===0 with isNullGT at hardware gates (mLoad, _fetchInstruction); UI presence checks (CR6 in resolvePendingSlot) must stay ===0
 - [THREAD_NS_SLOTS in E2E test GTs](thread-ns-slots-e2e-trap.md) — synthetic GT word0 index bits[15:0] must NOT be 1 or 45 (THREAD_NS_SLOTS); those trigger showThread→crDetailTab='lump' override; use index=0x20 (32) in test fixtures
 - [Wukong A7 orphaned file](wukong-a7-orphaned.md) — wukong_xc7a100t.py (v1.1 Ethernet) is NOT in the build; gen_rtlil.py builds from wukong_top.py (V3 LED-blink only)
