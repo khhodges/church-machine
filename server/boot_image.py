@@ -79,7 +79,7 @@ except ImportError:
 
 # Mandatory NS slots — every valid boot image must have a non-zero entry here.
 # Minimal boot trio: NS root (0), Thread (1), SelfTest/boot-entry (6).
-_MANDATORY_NS_SLOTS = (0, 1, BOOT_ABSTR_NS_SLOT)  # slots 0, 1, 6
+_MANDATORY_NS_SLOTS = (0, 1, 2, 3, 4, 5, BOOT_ABSTR_NS_SLOT)  # slots 0, 1 (foundational), 2-5 (MMIO devices), 6 (Boot.Abstr)
 
 # Format-version tag written to mem[NS_TABLE_BASE - 1] so loadBootImage()
 # can reject stale binaries.
@@ -324,8 +324,8 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
     the explicit value from the config dict when available so the check is
     exact even if the image has trailing padding.
 
-    Foundational trio slots (0, 1, 3=Boot.Abstr) are checked.
-    Slot 2 freed — Startup.Config removed.
+    Foundational slots (0, 1, 6=Boot.Abstr) and MMIO device slots
+    (2=UART_DEV, 3=LED_DEV, 4=BTN_DEV, 5=TIMER_DEV) are all checked.
 
     Raises:
         ValueError: if the format-version tag is wrong, any mandatory slot

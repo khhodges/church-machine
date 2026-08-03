@@ -380,6 +380,52 @@ class ChurchSimulator {
             }
         }
 
+        // ── Foundational slot location correction (binary-age-agnostic) ─────────
+        // A7 v1.2 layout: Boot.NS (slot 0) is self-referential (word0 = NS_TABLE_BASE)
+        // and Boot.Thread (slot 1) starts at word 0. Stale binaries generated under
+        // older layouts may have wrong word0_location values here, causing the lump
+        // modal to look for a header at a garbage address (showing "HARDWARE MMIO
+        // DEVICE" instead of the real lump detail). Correct unconditionally.
+        {
+            const _ns0B = this._nsSlotBase(0);
+            if ((this.memory[_ns0B] >>> 0) !== (this.NS_TABLE_BASE >>> 0)) {
+                this.memory[_ns0B] = this.NS_TABLE_BASE >>> 0;
+                this.output += `[BOOTIMG] NS[0] (Boot.NS) word0_location corrected to NS_TABLE_BASE=0x${this.NS_TABLE_BASE.toString(16).toUpperCase()}.\n`;
+            }
+            const _ns1B = this._nsSlotBase(1);
+            if ((this.memory[_ns1B] >>> 0) !== 0) {
+                this.memory[_ns1B] = 0;
+                this.output += `[BOOTIMG] NS[1] (Boot.Thread) word0_location corrected to 0 (A7 v1.2 layout).\n`;
+            }
+        }
+
+        // ── MMIO slot format upgrade (binary-age-agnostic correction) ───────────
+        // Slots 2–5 are hardware MMIO register banks. Their NS word1 must carry
+        // gtType=1 (Inform). Stale binaries generated before this invariant was
+        // enforced may have the correct MMIO address in word0 but gtType=0 (NULL)
+        // in word1, causing the NS table to show "NULL" for UART/LED/BTN/TIMER.
+        // Re-write word0 and word1 unconditionally so binary age never affects
+        // runtime slot-type behaviour.
+        {
+            const _MMIO_REINIT = {
+                2: { addr: 0x40000014, lim17: 2 },   // UART_DEV:  TX/STATUS/RX
+                3: { addr: 0x40000000, lim17: 4 },   // LED_DEV:   LED0-LED4
+                4: { addr: 0x40000028, lim17: 0 },   // BTN_DEV:   state
+                5: { addr: 0x4000002C, lim17: 4 },   // TIMER_DEV: 5 registers
+            };
+            for (const [_slotStr, _spec] of Object.entries(_MMIO_REINIT)) {
+                const _slot  = Number(_slotStr);
+                const _nsB   = this._nsSlotBase(_slot);
+                const _w1    = this.memory[_nsB + 1];
+                const _pW1   = this.parseNSWord1(_w1);
+                if (_pW1.gtType !== 1) {
+                    this.memory[_nsB + 0] = _spec.addr >>> 0;
+                    this.memory[_nsB + 1] = this.packNSWord1(_spec.lim17, 0, 0, 1, 0);
+                    this.output += `[BOOTIMG] NS[${_slot}] MMIO gtType upgraded NULL→Inform (stale binary).\n`;
+                }
+            }
+        }
+
         // Integrity check: the minimum complete boot namespace has 11 slots
         // (indices 0-10: Boot.NS, Boot.Thread, UART_DEV, LED_DEV, BTN_DEV,
         // TIMER_DEV, SelfTest, WukongCallHome, Tunnel, Ethernet, CapTest).

@@ -127,7 +127,7 @@ if (!examples || typeof examples !== 'object') {
 const STANDARD_NS_SYMBOLS = {
     'Boot.NS':      0,
     'Boot.Thread':  1,
-    // slot 2 freed
+    // slot 2: UART_DEV MMIO (hardware register bank — no symbolic name in this legacy fixture)
     'LED flash':    3,
     'Salvation':    4,
     'Navana':       5,

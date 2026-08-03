@@ -109,13 +109,19 @@ def test_validate_boot_image_infers_total_from_length():
     validate_boot_image(image)
 
 
-def test_validate_boot_image_slot2_is_freed():
-    """Slot 2 is freed (Task #989, Startup.Config removed) — zeroing it must NOT raise."""
+def test_validate_boot_image_rejects_zeroed_slot2():
+    """validate_boot_image raises ValueError when UART_DEV (slot 2) is zeroed.
+
+    Slot 2 is the UART_DEV MMIO device.  It is always populated by the boot
+    image generator and is mandatory for hardware operation — zeroing it must
+    be caught by the validator.
+    """
     cfg = _default_cfg()
     image = generate_boot_image(cfg, LUMPS_DIR)
     null_image = _zero_ns_slot(image, cfg, 2)
     total = int(cfg["step1"]["totalNamespaceWords"])
-    validate_boot_image(null_image, total)  # must not raise
+    with pytest.raises(ValueError, match=r"mandatory NS slot 2"):
+        validate_boot_image(null_image, total)
 
 
 def test_validate_boot_image_error_message_is_descriptive():

@@ -3456,32 +3456,60 @@ function _showNSLumpModal(slotIdx, nsEntry) {
 
         if (cc > 0 && sim.memory) {
             const clistBase = base + lumpSize - cc;
+            // Snapshot current DR values for cross-reference
+            const _drSnap = (sim.dr && sim.dr.length) ? [...sim.dr] : [];
+            // Helper: format a 32-bit byte address
+            const _fmtB = v => '0x' + (v >>> 0).toString(16).toUpperCase().padStart(8, '0');
             let rows = '';
             for (let _ci = 0; _ci < cc; _ci++) {
                 const gtw = sim.memory[clistBase + _ci] >>> 0;
                 const parsed = (typeof sim.parseGT === 'function') ? sim.parseGT(gtw) : null;
-                let permStr = '—', nameStr = '(null)', slotStr = '—';
+                let permStr = '—', nameStr = '(null)', slotStr = '—', zoneStr = '—';
                 if (parsed && gtw !== 0) {
                     const p = parsed.permissions || {};
                     permStr = ['R','W','X','E','S','L'].filter(k => p[k]).join('') || '∅';
                     slotStr = parsed.type === 3 ? '—' : String(parsed.index);
                     const lbl = (parsed.type !== 3 && sim.nsLabels) ? sim.nsLabels[parsed.index] : null;
                     nameStr = lbl || (parsed.type === 3 ? '(Abstract)' : `NS[${parsed.index}]`);
+                    // Zone: [base_byte … limit_byte] from the NS entry for this slot
+                    if (parsed.type !== 3 && typeof sim._nsSlotBase === 'function' && typeof sim.parseNSWord1 === 'function') {
+                        const _nsB  = sim._nsSlotBase(parsed.index);
+                        const _nW0  = sim.memory[_nsB + 0] >>> 0;
+                        const _nW1  = sim.memory[_nsB + 1] >>> 0;
+                        if (_nW0 !== 0 || _nW1 !== 0) {
+                            const _pw1  = sim.parseNSWord1(_nW1);
+                            const _baseB = (_nW0 * 4) >>> 0;
+                            const _limB  = (_nW0 + _pw1.limit) * 4;
+                            zoneStr = `<span style="font-family:monospace;font-size:0.71rem;color:#9ca3af;">${_fmtB(_baseB)}<span style="color:#555;margin:0 2px;">…</span>${_fmtB(_limB)}</span>`;
+                        }
+                    }
                 }
                 rows += `<tr>
                     <td ${_nsTD} style="color:#888;">${_ci}</td>
                     <td ${_nsTD}><code style="font-size:0.75rem;">0x${gtw.toString(16).toUpperCase().padStart(8,'0')}</code></td>
                     <td ${_nsTD} style="color:#888;">${slotStr}</td>
                     <td ${_nsTD} style="color:#4ec9b0;">${nameStr}</td>
+                    <td ${_nsTD}>${zoneStr}</td>
                     <td ${_nsTD}><span class="ns-perm-chip" style="font-size:0.65rem;">${permStr}</span></td>
                 </tr>`;
             }
+            // Non-zero DR register snapshot
+            const _drRows = _drSnap.map((v, i) => ({ i, v: v >>> 0 })).filter(x => x.v !== 0)
+                .map(x => `<tr>
+                    <td ${_nsTD} style="color:#888;font-family:monospace;">DR${x.i}</td>
+                    <td ${_nsTD}><code style="color:#c89b3c;">${_fmtB(x.v)}</code></td>
+                    <td ${_nsTD} style="color:#6b7280;font-size:0.75rem;">${x.v >>> 0}</td>
+                </tr>`).join('');
+            const _drHtml = _drRows ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.06);">
+                <div style="color:#c89b3c;font-size:0.72rem;font-weight:600;letter-spacing:0.06em;margin-bottom:5px;">DATA REGISTERS (non-zero)</div>
+                <table ${_nsMT}><tbody>${_drRows}</tbody></table>
+            </div>` : '';
             clistHtml = `<div style="margin-bottom:14px;">
-                <div style="color:#c89b3c;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">C-LIST (${cc} entries)</div>
+                <div style="color:#c89b3c;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">C-LIST / ZONES (${cc} entries)</div>
                 <table ${_nsMT}>
-                    <thead><tr><th ${_nsTH}>#</th><th ${_nsTH}>GT word</th><th ${_nsTH}>Slot</th><th ${_nsTH}>Name</th><th ${_nsTH}>Perms</th></tr></thead>
+                    <thead><tr><th ${_nsTH}>#</th><th ${_nsTH}>GT word</th><th ${_nsTH}>Slot</th><th ${_nsTH}>Name</th><th ${_nsTH}>Zone [base…limit]</th><th ${_nsTH}>Perms</th></tr></thead>
                     <tbody>${rows}</tbody>
-                </table></div>`;
+                </table>${_drHtml}</div>`;
         } else {
             clistHtml = `<div style="margin-bottom:14px;">
                 <div style="color:#c89b3c;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">C-LIST</div>
@@ -3542,10 +3570,86 @@ function _showNSLumpModal(slotIdx, nsEntry) {
             headerHtml = `<div id="_nsLumpLazyBody" style="color:#f0a040;font-size:0.8rem;padding:8px 0;">&#9680; Loading lump data\u2026</div>`;
         } else {
             const loc = `0x${(base*4).toString(16).toUpperCase().padStart(8,'0')}`;
-            headerHtml = `<div style="margin-bottom:14px;color:#f0a040;">
-                <div style="color:#f0a040;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">HARDWARE MMIO DEVICE</div>
-                <p style="margin:0;color:#ccc;line-height:1.5;">Base address <code>${loc}</code> — this NS entry maps to a hardware register bank, not a software lump. No lump header, c-list, or code words are stored here; the capability is enforced by the hardware address decoder.</p>
-            </div>`;
+            // ── Hardware register table for known MMIO devices ────────────────────
+            const _LM_MMIO_REGS = {
+                'UART_DEV': {
+                    desc: 'Serial UART — 3 word-wide registers',
+                    regs: [
+                        { name: 'TX',     offset: 0, access: 'W',   desc: 'Transmit data word (write to send)' },
+                        { name: 'STATUS', offset: 1, access: 'R',   desc: 'Bit 0: TX ready · Bit 1: RX valid' },
+                        { name: 'RX',     offset: 2, access: 'R',   desc: 'Received data word (read to consume)' },
+                    ]
+                },
+                'LED_DEV': {
+                    desc: 'GPIO LEDs — 5 word-wide registers (one per LED)',
+                    regs: [
+                        { name: 'LED0', offset: 0, access: 'R/W', desc: 'LED 0 state (1 = on)' },
+                        { name: 'LED1', offset: 1, access: 'R/W', desc: 'LED 1 state' },
+                        { name: 'LED2', offset: 2, access: 'R/W', desc: 'LED 2 state' },
+                        { name: 'LED3', offset: 3, access: 'R/W', desc: 'LED 3 state' },
+                        { name: 'LED4', offset: 4, access: 'R/W', desc: 'LED 4 state' },
+                    ]
+                },
+                'BTN_DEV': {
+                    desc: 'GPIO button — 1 word-wide register',
+                    regs: [
+                        { name: 'BTN_STATE', offset: 0, access: 'R', desc: 'Button state (1 = pressed)' },
+                    ]
+                },
+                'TIMER_DEV': {
+                    desc: 'Hardware timer — 5 word-wide registers',
+                    regs: [
+                        { name: 'TICKS_LO',  offset: 0, access: 'R',   desc: 'Free-running tick counter, low 32 bits' },
+                        { name: 'TICKS_HI',  offset: 1, access: 'R',   desc: 'Free-running tick counter, high 32 bits' },
+                        { name: 'TOD_EPOCH', offset: 2, access: 'R/W', desc: 'Time-of-day epoch (Unix seconds)' },
+                        { name: 'ALARM_CMP', offset: 3, access: 'R/W', desc: 'Alarm compare value (triggers IRQ when TICKS_LO matches)' },
+                        { name: 'ALARM_CTL', offset: 4, access: 'R/W', desc: 'Bit 0: alarm enable · Bit 1: alarm armed (clear to ack)' },
+                    ]
+                },
+            };
+            const _mmioSpec = _LM_MMIO_REGS[nsEntry.label] || null;
+            if (_mmioSpec) {
+                const _baseB = (base * 4) >>> 0;
+                const _limB  = _baseB + (_mmioSpec.regs.length - 1) * 4;
+                const _fmt   = v => '0x' + (v >>> 0).toString(16).toUpperCase().padStart(8, '0');
+                const _tdS   = 'style="padding:3px 8px;border-bottom:1px solid rgba(255,255,255,0.05);font-size:0.78rem;"';
+                const _thS   = 'style="padding:3px 8px;border-bottom:1px solid rgba(255,255,255,0.1);font-size:0.72rem;color:#6b7280;font-weight:600;text-align:left;"';
+                let _regRows = '';
+                for (const r of _mmioSpec.regs) {
+                    const _bA = _baseB + r.offset * 4;
+                    const _ac = r.access === 'R' ? '#60a5fa' : r.access === 'W' ? '#f87171' : '#4ec9b0';
+                    _regRows += `<tr>
+                        <td ${_tdS}><code style="color:#c89b3c;">${r.name}</code></td>
+                        <td ${_tdS}><code style="color:#9ca3af;">${_fmt(_bA)}</code></td>
+                        <td ${_tdS}><span style="color:${_ac};font-family:monospace;">${r.access}</span></td>
+                        <td ${_tdS} style="color:#6b7280;">${r.desc}</td>
+                    </tr>`;
+                }
+                headerHtml = `<div style="margin-bottom:14px;">
+                    <div style="color:#f0a040;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">&#x1F527; HARDWARE MMIO DEVICE — ${_mmioSpec.desc}</div>
+                    <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
+                        <thead><tr>
+                            <th ${_thS}>Register</th>
+                            <th ${_thS}>Byte address</th>
+                            <th ${_thS}>Access</th>
+                            <th ${_thS}>Description</th>
+                        </tr></thead>
+                        <tbody>${_regRows}</tbody>
+                    </table>
+                    <div style="color:#6b7280;font-size:0.75rem;display:flex;gap:20px;">
+                        <span>Base: <code style="color:#9ca3af;">${_fmt(_baseB)}</code></span>
+                        <span>Limit: <code style="color:#9ca3af;">${_fmt(_limB)}</code></span>
+                    </div>
+                    <p style="margin:8px 0 0;color:#6b7280;font-size:0.8rem;line-height:1.5;">No lump header or c-list — capability enforced by the hardware address decoder.</p>
+                </div>`;
+            } else {
+                // Not a known MMIO device and no lazy source lump — lump body
+                // unavailable at this address (stale binary, evicted, or not yet loaded).
+                headerHtml = `<div style="margin-bottom:14px;">
+                    <div style="color:#888;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">LUMP BODY NOT AVAILABLE</div>
+                    <p style="margin:0;color:#aaa;line-height:1.5;font-size:0.82rem;">No valid lump header found at word address <code style="color:#9ca3af;">${loc}</code>. The boot image may be stale — regenerate it via the Resident Lumps tab to fix this.</p>
+                </div>`;
+            }
         }
     }
 
@@ -3709,17 +3813,100 @@ function _showNSTypeDescModal(slotIdx, nsEntry) {
     };
     const d = descs[gtType] || descs[0];
 
+    // ── MMIO register map (slots 2-5 are hardware devices, not software lumps) ──
+    // Registers are word-wide (4 bytes each); byte address = base + offset*4.
+    // Base byte address = word0_location * 4 (matches the loc variable above).
+    const _MMIO_REGS = {
+        'UART_DEV': {
+            desc: 'Serial UART — 3 word-wide registers',
+            regs: [
+                { name: 'TX',     offset: 0, access: 'W',  desc: 'Transmit data word (write to send)' },
+                { name: 'STATUS', offset: 1, access: 'R',  desc: 'Bit 0: TX ready · Bit 1: RX valid' },
+                { name: 'RX',     offset: 2, access: 'R',  desc: 'Received data word (read to consume)' },
+            ]
+        },
+        'LED_DEV': {
+            desc: 'GPIO LEDs — 5 word-wide registers (one per LED)',
+            regs: [
+                { name: 'LED0', offset: 0, access: 'R/W', desc: 'LED 0 state (1 = on)' },
+                { name: 'LED1', offset: 1, access: 'R/W', desc: 'LED 1 state' },
+                { name: 'LED2', offset: 2, access: 'R/W', desc: 'LED 2 state' },
+                { name: 'LED3', offset: 3, access: 'R/W', desc: 'LED 3 state' },
+                { name: 'LED4', offset: 4, access: 'R/W', desc: 'LED 4 state' },
+            ]
+        },
+        'BTN_DEV': {
+            desc: 'GPIO button — 1 word-wide register',
+            regs: [
+                { name: 'BTN_STATE', offset: 0, access: 'R', desc: 'Button state (1 = pressed)' },
+            ]
+        },
+        'TIMER_DEV': {
+            desc: 'Hardware timer — 5 word-wide registers',
+            regs: [
+                { name: 'TICKS_LO',  offset: 0, access: 'R',   desc: 'Free-running tick counter, low 32 bits' },
+                { name: 'TICKS_HI',  offset: 1, access: 'R',   desc: 'Free-running tick counter, high 32 bits' },
+                { name: 'TOD_EPOCH', offset: 2, access: 'R/W', desc: 'Time-of-day epoch (Unix seconds)' },
+                { name: 'ALARM_CMP', offset: 3, access: 'R/W', desc: 'Alarm compare value (triggers IRQ when TICKS_LO matches)' },
+                { name: 'ALARM_CTL', offset: 4, access: 'R/W', desc: 'Bit 0: alarm enable · Bit 1: alarm armed (clear to ack)' },
+            ]
+        },
+    };
+
+    // Strip HTML entities from label before using as a map key
+    const _rawLabel = (nsEntry ? (nsEntry.label || '') : '');
+    const _mmioInfo = _MMIO_REGS[_rawLabel] || null;
+    let mmioHtml = '';
+    if (_mmioInfo && nsEntry) {
+        const baseByteAddr = (nsEntry.word0_location * 4) >>> 0;
+        const _tdS = 'style="padding:3px 8px;border-bottom:1px solid rgba(255,255,255,0.05);font-size:0.78rem;"';
+        const _thS = 'style="padding:3px 8px;border-bottom:1px solid rgba(255,255,255,0.1);font-size:0.72rem;color:#6b7280;font-weight:600;text-align:left;"';
+        const limitByteAddr = baseByteAddr + (_mmioInfo.regs.length - 1) * 4;
+        const _fmtAddr = v => '0x' + (v >>> 0).toString(16).toUpperCase().padStart(8, '0');
+        let regRows = '';
+        for (const r of _mmioInfo.regs) {
+            const byteAddr = baseByteAddr + r.offset * 4;
+            const _accColor = r.access === 'R' ? '#60a5fa' : r.access === 'W' ? '#f87171' : '#4ec9b0';
+            regRows += `<tr>
+                <td ${_tdS}><code style="color:#c89b3c;">${r.name}</code></td>
+                <td ${_tdS}><code style="color:#9ca3af;">${_fmtAddr(byteAddr)}</code></td>
+                <td ${_tdS}><span style="color:${_accColor};font-family:monospace;">${r.access}</span></td>
+                <td ${_tdS} style="color:#6b7280;">${r.desc}</td>
+            </tr>`;
+        }
+        mmioHtml = `
+            <div style="margin-top:14px;border-top:1px solid rgba(255,255,255,0.07);padding-top:12px;">
+                <div style="color:#f0a040;font-size:0.72rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">&#x1F527; HARDWARE REGISTERS</div>
+                <div style="color:#6b7280;font-size:0.75rem;margin-bottom:8px;">${_mmioInfo.desc}</div>
+                <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
+                    <thead><tr>
+                        <th ${_thS}>Name</th>
+                        <th ${_thS}>Byte address</th>
+                        <th ${_thS}>Access</th>
+                        <th ${_thS}>Description</th>
+                    </tr></thead>
+                    <tbody>${regRows}</tbody>
+                </table>
+                <div style="color:#6b7280;font-size:0.75rem;display:flex;gap:20px;">
+                    <span>Base: <code style="color:#9ca3af;">${_fmtAddr(baseByteAddr)}</code></span>
+                    <span>Limit: <code style="color:#9ca3af;">${_fmtAddr(limitByteAddr)}</code></span>
+                </div>
+            </div>`;
+    } else {
+        mmioHtml = `<div style="color:#6b7280;font-size:0.76rem;margin-top:14px;">Base address: <code>${loc}</code></div>`;
+    }
+
     const overlay = document.createElement('div');
     overlay.id = '_nsTypeDescModalOverlay';
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9999;display:flex;align-items:center;justify-content:center;';
     overlay.innerHTML = `
-        <div style="background:#1a1a2e;border:1px solid rgba(107,114,128,0.35);border-radius:10px;padding:20px 24px;max-width:460px;width:90vw;position:relative;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+        <div style="background:#1a1a2e;border:1px solid rgba(107,114,128,0.35);border-radius:10px;padding:20px 24px;max-width:560px;width:90vw;position:relative;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
             <button onclick="document.getElementById('_nsTypeDescModalOverlay').remove()"
                 style="position:absolute;top:12px;right:16px;background:none;border:none;color:#666;font-size:1.3rem;cursor:pointer;line-height:1;" title="Close (Esc)">&times;</button>
             <div style="color:${d.color};font-weight:700;font-size:1.05rem;margin-bottom:4px;">${d.icon} ${d.title}</div>
             <div style="color:#6b7280;font-size:0.76rem;margin-bottom:14px;">NS[${slotIdx}] &nbsp;·&nbsp; ${typeNames[gtType] || 'Unknown'} &nbsp;·&nbsp; ${label}</div>
-            <p style="color:#ccc;line-height:1.65;margin:0 0 14px;font-size:0.88rem;">${d.body}</p>
-            <div style="color:#6b7280;font-size:0.76rem;">Base address: <code>${loc}</code></div>
+            <p style="color:#ccc;line-height:1.65;margin:0 0 0;font-size:0.88rem;">${d.body}</p>
+            ${mmioHtml}
         </div>`;
 
     function _nsDescEsc(ev) { if (ev.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', _nsDescEsc); } }

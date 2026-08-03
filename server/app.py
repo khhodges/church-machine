@@ -5760,29 +5760,90 @@ def get_lump_version_words(token, version):
 def get_lump_source(name):
     """Return the CLOOMC++ functional source for a named lump.
 
-    Looks in simulator/cloomc/<name>.cloomc (case-insensitive match).
-    Returns {"name": name, "source": "..."} on success.
-    Returns {"error": "...", "binary_only": true} with 404 if no functional
-    source file exists for this lump name.
+    Search order:
+      1. simulator/cloomc/<name>.cloomc  (case-insensitive)
+      2. simulator/examples/<name>.cloomc or any *.cloomc whose
+         'Abstraction:' header comment matches <name>  (case-insensitive)
+      3. source_file path recorded in the matching sidecar JSON under
+         server/lumps/ (the abstraction name is matched against sidecar
+         "abstraction" field)
+
+    Returns {"name": name, "source": "...", "source_path": "..."} on success.
+    Returns {"error": "...", "binary_only": true} with 404 if not found.
     """
     import re as _re
     if not _re.match(r'^[A-Za-z0-9_ .\-]+$', name):
         return jsonify({"error": "Invalid name"}), 400
 
-    cloomc_dir = os.path.join(os.path.dirname(__file__), '..', 'simulator', 'cloomc')
-    cloomc_dir = os.path.normpath(cloomc_dir)
+    _root = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))
 
+    def _read_source(path):
+        with open(path, 'r', encoding='utf-8', errors='replace') as fh:
+            return fh.read()
+
+    # 1. simulator/cloomc/ — exact then case-insensitive scan
+    cloomc_dir = os.path.join(_root, 'simulator', 'cloomc')
     candidate = os.path.join(cloomc_dir, f'{name}.cloomc')
     if os.path.isfile(candidate):
-        with open(candidate, 'r', encoding='utf-8', errors='replace') as fh:
-            source = fh.read()
-        return jsonify({"name": name, "source": source, "binary_only": False})
+        return jsonify({"name": name, "source": _read_source(candidate),
+                        "source_path": f"simulator/cloomc/{name}.cloomc",
+                        "binary_only": False})
+    if os.path.isdir(cloomc_dir):
+        for fname in os.listdir(cloomc_dir):
+            if fname.lower() == f'{name.lower()}.cloomc':
+                p = os.path.join(cloomc_dir, fname)
+                return jsonify({"name": name, "source": _read_source(p),
+                                "source_path": f"simulator/cloomc/{fname}",
+                                "binary_only": False})
 
-    for fname in os.listdir(cloomc_dir) if os.path.isdir(cloomc_dir) else []:
-        if fname.lower() == f'{name.lower()}.cloomc':
-            with open(os.path.join(cloomc_dir, fname), 'r', encoding='utf-8', errors='replace') as fh:
-                source = fh.read()
-            return jsonify({"name": name, "source": source, "binary_only": False})
+    # 2. simulator/examples/ — exact filename match then header comment scan
+    examples_dir = os.path.join(_root, 'simulator', 'examples')
+    if os.path.isdir(examples_dir):
+        for fname in os.listdir(examples_dir):
+            if not fname.endswith('.cloomc'):
+                continue
+            p = os.path.join(examples_dir, fname)
+            # Quick filename match (e.g. wukong_callhome → WukongCallHome)
+            stem = fname[:-len('.cloomc')]
+            if stem.lower().replace('_', '') == name.lower().replace('_', '').replace(' ', ''):
+                return jsonify({"name": name, "source": _read_source(p),
+                                "source_path": f"simulator/examples/{fname}",
+                                "binary_only": False})
+            # Check 'Abstraction:' header comment inside the file
+            try:
+                with open(p, 'r', encoding='utf-8', errors='replace') as fh:
+                    for line in fh:
+                        m = _re.match(r'[;#]\s*Abstraction\s*:\s*(.+)', line)
+                        if m and m.group(1).strip().lower() == name.lower():
+                            return jsonify({"name": name, "source": _read_source(p),
+                                            "source_path": f"simulator/examples/{fname}",
+                                            "binary_only": False})
+                        if not line.startswith(';') and not line.startswith('#') and line.strip():
+                            break  # past header block
+            except OSError:
+                pass
+
+    # 3. Sidecar source_file field — scan server/lumps/*.json for matching abstraction
+    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    if os.path.isdir(lumps_dir):
+        for fname in os.listdir(lumps_dir):
+            if not fname.endswith('.json'):
+                continue
+            try:
+                with open(os.path.join(lumps_dir, fname), 'r') as fh:
+                    sc = json.load(fh)
+            except Exception:
+                continue
+            if sc.get('abstraction', '').lower() != name.lower():
+                continue
+            sf = sc.get('source_file', '')
+            if not sf:
+                continue
+            abs_sf = os.path.normpath(os.path.join(_root, sf))
+            if os.path.isfile(abs_sf):
+                return jsonify({"name": name, "source": _read_source(abs_sf),
+                                "source_path": sf,
+                                "binary_only": False})
 
     return jsonify({
         "error": f"No functional CLOOMC++ source found for '{name}'",
