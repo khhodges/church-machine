@@ -612,7 +612,10 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
                             _ww = _bswords[_wi]
                             _op     = (_ww >> 27) & 0x1F
                             _cr_src = (_ww >> 15) & 0xF
-                            _slot   = _ww & 0x7FFF
+                            # Row lives in bits[4:0]; ELOADCALL/XLOADLAMBDA pack
+                            # methodIdx into bits[11:5], so & 0x7FFF would read the
+                            # method as part of the slot, causing false positives.
+                            _slot   = _ww & 0x1F
                             if _op in _CLIST_OPS and _cr_src == 6 and _slot >= _bscc:
                                 _needs_lazy = True
                                 break

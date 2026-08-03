@@ -4398,11 +4398,12 @@ window.lumpSaveLump = async function(nsIdx) {
     }
 
     // ── 6. Lump construction test: all c-list slot refs must be in-bounds ──
-    // Encoding: opcode=[31:27], crSrc=[18:15], slot=[14:0]
-    // LOAD=0 SAVE=1 ELOADCALL=8 XLOADLAMBDA=9 each read from crSrc=6 (CR6 = c-list root).
-    // If any slot operand >= cc the code was assembled against a different c-list
-    // layout than the one recorded in the lump header — saving would produce a
-    // lump that faults at runtime.  Catch it here before touching disk.
+    // Encoding: opcode=[31:27], crSrc=[18:15], slot=[4:0]
+    // LOAD=0, SAVE=1: imm15 = slot (5-bit, bits[4:0])
+    // ELOADCALL=8, XLOADLAMBDA=9: imm15 = (methodIdx<<5)|row — row is bits[4:0] only.
+    // Using & 0x7FFF (15-bit mask) would read the method index bits as part of the
+    // slot for ELOADCALL/XLOADLAMBDA, producing false positives (e.g. slot=32 when
+    // the actual row is 0).  Always mask with 0x1F (bits[4:0]).
     if (hdr.cc > 0) {
         const _CLIST_OPS = new Set([0, 1, 8, 9]);
         let _clistOk = true;
@@ -4410,7 +4411,7 @@ window.lumpSaveLump = async function(nsIdx) {
             const _ww    = (sim.memory[baseLoc + _wi] >>> 0);
             const _op    = (_ww >>> 27) & 0x1F;
             const _crSrc = (_ww >>> 15) & 0xF;
-            const _slot  = _ww & 0x7FFF;
+            const _slot  = _ww & 0x1F;   // row lives in bits[4:0] for all clist ops
             if (_CLIST_OPS.has(_op) && _crSrc === 6 && _slot >= hdr.cc) {
                 checks.push(
                     `\u2717 LUMP CONSTRUCTION ERROR: code[${_wi}]=0x${_ww.toString(16).toUpperCase().padStart(8,'0')} ` +
