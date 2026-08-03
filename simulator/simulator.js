@@ -313,8 +313,21 @@ class ChurchSimulator {
         this.NS_TABLE_BASE    = discoveredNsTableBase;
         this.MAX_NS_ENTRIES   = discoveredMaxNsEntries;
         if (discoveredBootEntrySlot !== this.bootEntrySlot) {
-            this.bootEntrySlot = discoveredBootEntrySlot;
-            this.output += `[BOOTIMG] Boot entry restored from image: Slot ${discoveredBootEntrySlot}\n`;
+            // Honour the binary's stored entry UNLESS the binary is merely reverting
+            // to the default Boot.Abstr slot (_bootAbstrSlot) while the user has
+            // already selected a non-default entry via ⚡.  In that case, preserve
+            // the user's choice so a reboot after ⚡ change doesn't silently reset
+            // the entry back to SelfTest.
+            // Rule: user's selection wins over the binary's DEFAULT; binary's
+            // explicit non-default wins over the user's selection.
+            const _userOverride = (this.bootEntrySlot !== this._bootAbstrSlot)   // user changed
+                                && (discoveredBootEntrySlot === this._bootAbstrSlot); // binary reverts
+            if (_userOverride) {
+                this.output += `[BOOTIMG] Boot entry: preserving user selection Slot ${this.bootEntrySlot} (image stored Slot ${discoveredBootEntrySlot}, ignored — user has a non-default ⚡ active).\n`;
+            } else {
+                this.bootEntrySlot = discoveredBootEntrySlot;
+                this.output += `[BOOTIMG] Boot entry restored from image: Slot ${discoveredBootEntrySlot}\n`;
+            }
         }
 
         const n   = Math.min(src.length, this.memory.length);
