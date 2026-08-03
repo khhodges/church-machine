@@ -1116,6 +1116,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     e.preventDefault();
                     if (typeof showEditorCListPopup === 'function') showEditorCListPopup(e);
                 }
+                if (e.ctrlKey && e.shiftKey && (e.key === 'F' || e.key === 'f')) {
+                    e.preventDefault();
+                    if (typeof saveSourceFile === 'function') saveSourceFile();
+                }
             });
         }
     });

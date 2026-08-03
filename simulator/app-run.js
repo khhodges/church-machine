@@ -5236,6 +5236,8 @@ function loadExample(name) {
     userTabDirty = false;
     // Loading a built-in example abandons any in-progress catalog edit context
     if (typeof clearPseudoEditContext === 'function') clearPseudoEditContext();
+    // Assembly examples are inline strings — no server file path to write back to.
+    window._editorSourceFilePath = null;
     renderUserTabs();
     updateSaveUserTabBtn();
 

@@ -399,6 +399,106 @@ function savePseudoCode() {
     }
 }
 
+// ── Save Source File ─────────────────────────────────────────────────────────
+// Writes the editor content to a .cloomc file on the server.
+//
+//   saveSourceFile()    — saves to _editorSourceFilePath if known, else opens
+//                         the "Save File As" dialog to pick a path.
+//   saveSourceFileAs()  — always opens the dialog (pre-filled with current path
+//                         or a name derived from the content / active tab).
+//   _saveSourceFileToPath(path, cb)  — low-level: POST to /api/source-file/save.
+
+function _saveSourceFileToPath(path, callback) {
+    const ed = document.getElementById('asmEditor');
+    if (!ed || !ed.value.trim()) {
+        if (callback) callback('Editor is empty');
+        return;
+    }
+    fetch('/api/source-file/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: path, content: ed.value })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(j) {
+        if (j.ok) {
+            window._editorSourceFilePath = j.path;
+            var outEl = document.getElementById('assemblyOutput');
+            if (outEl) {
+                var msg = document.createElement('div');
+                msg.style.cssText = 'color:#8f8;font-style:italic;padding:2px 0;';
+                msg.textContent = '\u2713 Saved \u2192 ' + j.path;
+                outEl.appendChild(msg);
+                setTimeout(function() { if (msg.parentNode) msg.parentNode.removeChild(msg); }, 2500);
+            }
+            if (callback) callback(null, j.path);
+        } else {
+            if (callback) callback(j.error || 'Save failed');
+        }
+    })
+    .catch(function(err) { if (callback) callback(String(err)); });
+}
+
+function saveSourceFile() {
+    if (window._editorSourceFilePath) {
+        _saveSourceFileToPath(window._editorSourceFilePath);
+    } else {
+        saveSourceFileAs();
+    }
+}
+
+function saveSourceFileAs() {
+    var dlg = document.getElementById('saveFileDialog');
+    if (!dlg) return;
+    var errEl = document.getElementById('saveFileError');
+    if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+    var pathInput = document.getElementById('saveFilePathInput');
+    if (pathInput) {
+        if (window._editorSourceFilePath) {
+            pathInput.value = window._editorSourceFilePath;
+        } else {
+            var ed = document.getElementById('asmEditor');
+            var defaultName = 'program';
+            if (ed) {
+                var m = ed.value.match(/^\s*abstraction\s+([A-Za-z_][A-Za-z0-9_]*)/m);
+                if (m) {
+                    defaultName = m[1].toLowerCase();
+                } else if (activeUserTabId) {
+                    var tab = userTabs.find(function(t) { return t.id === activeUserTabId; });
+                    if (tab && tab.name) {
+                        defaultName = tab.name.replace(/[^A-Za-z0-9_\-]/g, '_')
+                                              .replace(/^_+|_+$/g, '').toLowerCase() || 'program';
+                    }
+                }
+            }
+            pathInput.value = 'simulator/examples/' + defaultName + '.cloomc';
+        }
+        setTimeout(function() { pathInput.focus(); pathInput.select(); }, 50);
+    }
+    dlg.style.display = 'flex';
+}
+
+function closeSaveFileDialog() {
+    var dlg = document.getElementById('saveFileDialog');
+    if (dlg) dlg.style.display = 'none';
+}
+
+function confirmSaveFileDialog() {
+    var pathInput = document.getElementById('saveFilePathInput');
+    if (!pathInput) return;
+    var path = pathInput.value.trim();
+    if (!path) return;
+    var errEl = document.getElementById('saveFileError');
+    if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+    _saveSourceFileToPath(path, function(err, savedPath) {
+        if (err) {
+            if (errEl) { errEl.textContent = err; errEl.style.display = ''; }
+        } else {
+            closeSaveFileDialog();
+        }
+    });
+}
+
 // Maximum versions kept per method in the history stack
 var _METHOD_HISTORY_LIMIT = 20;
 

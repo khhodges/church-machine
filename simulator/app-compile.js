@@ -2107,6 +2107,8 @@ function loadCLOOMCExample(name) {
             .then(r => r.ok ? r.text() : Promise.reject('File not found'))
             .then(code => {
                 editor.value = code;
+                // Track the server-side path so "Save File" can write back to it.
+                window._editorSourceFilePath = fileExamples[name].replace(/^\//, '');
                 saveEditorState();
                 updateLineNumbers();
                 if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();

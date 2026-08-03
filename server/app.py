@@ -5843,6 +5843,34 @@ def get_lump_source(name):
     }), 404
 
 
+@app.route("/api/source-file/save", methods=["POST"])
+def save_source_file():
+    """Write a .cloomc source file back to its location under simulator/.
+
+    Body: { "path": "simulator/examples/foo.cloomc", "content": "..." }
+    The path must be under simulator/ and end with .cloomc.
+    Returns { "ok": true, "path": "simulator/examples/foo.cloomc" }.
+    """
+    data    = request.get_json(force=True, silent=True) or {}
+    raw_path = str(data.get('path', '')).strip()
+    content  = str(data.get('content', ''))
+
+    # Security: normalise, reject traversal, restrict to simulator/
+    norm = os.path.normpath(raw_path).replace('\\', '/')
+    parts = norm.split('/')
+    if '..' in parts or not norm.startswith('simulator/'):
+        return jsonify({'error': 'Path must be inside simulator/'}), 400
+    if not norm.endswith('.cloomc'):
+        return jsonify({'error': 'Only .cloomc files may be saved this way'}), 400
+
+    _root    = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))
+    abs_path = os.path.join(_root, norm)
+    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+    with open(abs_path, 'w', encoding='utf-8') as fh:
+        fh.write(content)
+    return jsonify({'ok': True, 'path': norm})
+
+
 _EDITABLE_CONTENT_TYPES = {'text', 'markdown', 'image', 'grayscale', 'binary', 'doc'}
 
 
