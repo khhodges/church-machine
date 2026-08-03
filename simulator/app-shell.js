@@ -462,8 +462,8 @@ function _renderOpenFileList(query) {
         html += '<div class="of-group-title">' + _escHtml(g || 'simulator') + '/</div>';
         groups[g].forEach(function(f) {
             var active = (window._editorSourceFilePath === f.path) ? ' of-item-active' : '';
-            html += '<button class="of-item' + active + '" onclick="openSourceFile(' +
-                    JSON.stringify(f.path) + ')">' + _escHtml(f.name) + '<span class="of-item-ext">.cloomc</span></button>';
+            html += '<button class="of-item' + active + '" onclick="openSourceFile(\'' +
+                    f.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\')">' + _escHtml(f.name) + '<span class="of-item-ext">.cloomc</span></button>';
         });
     });
     list.innerHTML = html;
