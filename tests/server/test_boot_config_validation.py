@@ -31,7 +31,6 @@ if ROOT not in sys.path:
 import server.app as _app_module
 from server.app import (
     HARDWARE_PROFILES,
-    FREE_SLOT_SIZE,
     _validate_step2,
 )
 
@@ -49,9 +48,10 @@ FAKE_CATALOG_ENTRY = {
     "token": "deadbeef",
 }
 
-# foundation_end = namespaceLumpWords + threadLumpWords + FREE_SLOT_SIZE + BOOT_ABSTR_DEFAULT_SIZE
-# With ns_lump=64, thread_lump=256, FREE_SLOT_SIZE=64, BOOT_ABSTR_DEFAULT_SIZE=64 → 448
-FOUNDATION_END = 64 + 256 + FREE_SLOT_SIZE + 64  # 448
+# foundation_end = namespaceLumpWords + threadLumpWords + BOOT_ABSTR_DEFAULT_SIZE
+# NS slots 2–5 are MMIO (no RAM body) — they do not contribute to foundation_end.
+# With ns_lump=64, thread_lump=256, BOOT_ABSTR_DEFAULT_SIZE=64 → 384
+FOUNDATION_END = 64 + 256 + 64  # 384
 
 
 def _fake_catalog():
@@ -214,14 +214,14 @@ class TestValidateStep2General:
 # ---------------------------------------------------------------------------
 
 # Profile A — small namespace window
-# usable_end_A = FOUNDATION_END + LUMP_SIZE + 100  = 448 + 64 + 100 = 612
-_SMALL_NS_TOTAL = FOUNDATION_END + LUMP_SIZE + 100 + _NS_TABLE_RESERVE   # 1636
-_USABLE_END_A   = _SMALL_NS_TOTAL - _NS_TABLE_RESERVE                    # 612
+# usable_end_A = FOUNDATION_END + LUMP_SIZE + 100  = 384 + 64 + 100 = 548
+_SMALL_NS_TOTAL = FOUNDATION_END + LUMP_SIZE + 100 + _NS_TABLE_RESERVE   # 1572
+_USABLE_END_A   = _SMALL_NS_TOTAL - _NS_TABLE_RESERVE                    # 548
 
 # Profile B — medium namespace window (distinct totalNamespaceWords)
-# usable_end_B = FOUNDATION_END + LUMP_SIZE + 500  = 448 + 64 + 500 = 1012
-_MEDIUM_NS_TOTAL = FOUNDATION_END + LUMP_SIZE + 500 + _NS_TABLE_RESERVE  # 2036
-_USABLE_END_B    = _MEDIUM_NS_TOTAL - _NS_TABLE_RESERVE                  # 1012
+# usable_end_B = FOUNDATION_END + LUMP_SIZE + 500  = 384 + 64 + 500 = 948
+_MEDIUM_NS_TOTAL = FOUNDATION_END + LUMP_SIZE + 500 + _NS_TABLE_RESERVE  # 1972
+_USABLE_END_B    = _MEDIUM_NS_TOTAL - _NS_TABLE_RESERVE                  # 948
 
 
 class TestUsableNamespaceRegion:

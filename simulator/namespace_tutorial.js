@@ -6,7 +6,7 @@ class NamespaceTutorial {
         this.NS_ENTRY_WORDS = 4;
         // Zone 1 — Bootstrap: NS root (slot 0) + boot thread (slot 1)
         // First abstraction is loaded from Thread.CR0 — set via ⚡ in the Namespace table.
-        // Slot 2 = first catalog slot (null NS entry). Slot 3 = boot code domain (hardware-privileged).
+        // Slots 2–5 are MMIO device-register windows (UART, LED, BTN, TIMER — NS entries point at physical hardware addresses).
         this.BOOTSTRAP_SLOTS = 2;
         this.BOOTSTRAP_WORDS = this.BOOTSTRAP_SLOTS * this.SLOT_SIZE;   // 2 × 64 = 128
         // Zone 2 — Resident: always-loaded IDE abstractions (IDE-set count)

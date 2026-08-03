@@ -25,16 +25,18 @@ Layout (all words 32-bit little-endian):
     [NS_LUMP_SIZE .. +THREAD_LUMP_SIZE)      Thread lump body    (header @0)
     [.. +ABSTR_LUMP_SIZE)                    Boot.Abstr body     (header @0,
                                               code + c-list at physical end;
-                                              NS slot 3, no gap before it)
+                                              NS slot 6, no gap before it)
     [resident lump bodies at programmer
      -chosen physAddr]
     [NS_TABLE_BASE .. +NS_TABLE_RESERVE)     Namespace table
        (256 entries × 4 words; named slots followed by Step-3 reserved
         empties; remainder zero)
 
-Note: NS slot 2 is null (no physical lump reservation).  Boot.Abstr
-occupies NS slot 3 and sits immediately after the Thread lump body.
-Slot 2 is the first slot available for catalog abstractions.
+NS slots 2–5 are MMIO device-register windows (UART, LED, BTN, TIMER).
+They carry NS entries pointing at physical hardware addresses but have no
+lump body in RAM — running_offset is not advanced for them.
+Boot.Abstr occupies NS slot 6 (SelfTest) and sits immediately after the
+Thread lump body at physAddr = threadLumpWords.
 """
 import json
 import os
@@ -596,11 +598,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         my_size  = slot_sizes.get(i, SLOT_SIZE)
 
         if entry is None:
-            # Null catalog slot: leave NS entry all-zeros.
-            # Slot 2 (and all other null slots) do NOT consume physical address
-            # space — no lump body is placed for them, so running_offset is
-            # unchanged.  (Formerly slot 2 advanced by SLOT_SIZE, producing a
-            # 64-word dead gap before Boot.Abstr; that gap is now removed.)
+            # Null/free catalog slot: leave NS entry all-zeros.
+            # No lump body is placed, so running_offset is unchanged.
             if i == 0:
                 running_offset = ns_size   # degenerate: slot 0 is never None
             clist_gts.append(0)              # null GT in c-list at this position

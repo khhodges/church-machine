@@ -1086,15 +1086,12 @@ MAX_NS_ENTRIES = 1024
 BASE_NAMED_NS_COUNT = 11
 
 # Slots reserved for foundational lumps (Step 1) and device MMIO regions —
-# the programmer cannot place an additional resident lump body here. Slots
-# 0–3 are foundational lumps (NS, Thread, free/null slot 2, Boot.Abstr);
-# 11–15 are device register windows (UART, LED, Button, Timer, Display)
-# backed by hardware MMIO not by lump memory.
+# the programmer cannot place an additional resident lump body here.
+# Slots 0–1: Boot.NS, Boot.Thread (foundational RAM lumps).
+# Slots 2–5: UART_DEV, LED_DEV, BTN_DEV, TIMER_DEV (MMIO windows; NS entries
+#            point at physical hardware addresses, no lump body in RAM).
+# Slots 2–3 are included in range(0, 4); 4–5 not yet in this set (pre-existing).
 RESERVED_NS_SLOTS = set(range(0, 4)) | set(range(11, 16))
-
-# Slot 2 is a free/null region (64 words) after Boot.Abstr director elimination (Task #247).
-# Still counted in the foundational footprint so Boot.Abstr (slot 3) stays at 0x0180.
-FREE_SLOT_SIZE = 64  # keep in sync with simulator.js SLOT_SIZE and boot_image.py
 LUMP_MAX_ARCHIVE_VERSIONS = 20  # max archived versions kept per token; oldest are pruned
 if LUMP_MAX_ARCHIVE_VERSIONS < 0:
     raise ValueError(f"LUMP_MAX_ARCHIVE_VERSIONS must be >= 0, got {LUMP_MAX_ARCHIVE_VERSIONS}")
@@ -1206,8 +1203,8 @@ def _validate_step2(step2, step1, target_board):
             pass
     foundation_end = (step1["namespaceLumpWords"] +
                       step1["threadLumpWords"] +
-                      FREE_SLOT_SIZE +                  # free/null slot 2 (64 words — Task #247)
                       _abstr_size_for_validation)       # Boot.Abstr: saved lump size or 64w default
+    # NS slots 2–5 are MMIO (no RAM body) — they do not contribute to foundation_end.
     usable_end = total - NS_TABLE_RESERVE
     seen_slots = set()
     occupied = []  # list of (start, end_exclusive, label) for resident lumps
@@ -1311,8 +1308,8 @@ def _validate_step1(target_board, step1):
     # lump size — abstractionLumpWords is ignored for the foundation_sum check.
     foundation_sum = (step1["namespaceLumpWords"] +
                       step1["threadLumpWords"] +
-                      FREE_SLOT_SIZE +               # free/null slot 2 (64 words — Task #247)
-                      BOOT_ABSTR_DEFAULT_SIZE)        # Boot.Abstr (slot 3) — always 64w minimum
+                      BOOT_ABSTR_DEFAULT_SIZE)        # Boot.Abstr (slot 6) — always 64w minimum
+    # NS slots 2–5 are MMIO (no RAM body) — they do not contribute to foundation_sum.
     if foundation_sum > total:
         return (f"Sum of foundational lump sizes ({foundation_sum}) exceeds "
                 f"totalNamespaceWords ({total})")

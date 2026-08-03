@@ -25,49 +25,49 @@
       "slot": 0,
       "name": "GTTest.Null0",
       "intentionally_null": true,
-      "note": "unused — slot 0 reserved; test suite accesses all caps by explicit slot index"
+      "note": "unused \u2014 slot 0 reserved; test suite accesses all caps by explicit slot index"
     },
     {
       "slot": 1,
       "name": "GTTest.Null1",
       "intentionally_null": true,
-      "note": "unused — reserved slot"
+      "note": "unused \u2014 reserved slot"
     },
     {
       "slot": 2,
       "name": "GTTest.Null2",
       "intentionally_null": true,
-      "note": "unused — NS slot 2 freed; null GT placed here to verify NULL_GT detection"
+      "note": "unused \u2014 intentionally null GT at c-list slot 2 to verify NULL_GT detection"
     },
     {
       "slot": 3,
       "name": "Boot.Abstr.E",
       "target_ns": 3,
-      "note": "Boot.Abstr E-GT (NS[3]) — Church domain enter; subject of TPERM E tests (Tests 3, 4)",
+      "note": "Boot.Abstr E-GT (NS[3]) \u2014 Church domain enter; subject of TPERM E tests (Tests 3, 4)",
       "gt": "0x4A000003"
     },
     {
       "slot": 4,
       "name": "GTTest.Null4",
       "intentionally_null": true,
-      "note": "unused — reserved slot"
+      "note": "unused \u2014 reserved slot"
     },
     {
       "slot": 5,
       "name": "GTTest.Null5",
       "intentionally_null": true,
-      "note": "unused — reserved slot"
+      "note": "unused \u2014 reserved slot"
     },
     {
       "slot": 6,
       "name": "GTTest.Null6",
       "intentionally_null": true,
-      "note": "unused — reserved slot"
+      "note": "unused \u2014 reserved slot"
     },
     {
       "slot": 7,
       "name": "Boot.Nucs.X",
-      "note": "Boot.Thread X-GT (NS[1], Turing X-perm) — nucleus execute; subject of TPERM X tests (Tests 1, 2, 5)",
+      "note": "Boot.Thread X-GT (NS[1], Turing X-perm) \u2014 nucleus execute; subject of TPERM X tests (Tests 1, 2, 5)",
       "gt": "0x42000001"
     }
   ],

@@ -1586,9 +1586,9 @@ class ChurchSimulator {
         const _entryNM6   = Math.max(0, Math.ceil(Math.log2(entryLumpSize)) - 6);
         this.memory[bootEntryLoc] = this.packLumpHeader(_entryNM6, 3, 0, 0) >>> 0;
 
-        // Slot 2 freed — Startup.Config removed. Thread.CR[0] entry E-GT is set
-        // by the boot image / setBootEntrySlot(); NUC_CODE (B:07) installs it
-        // directly into CR0 at boot completion (direct dispatch model).
+        // Thread.CR[0] entry E-GT is set by the boot image / setBootEntrySlot();
+        // NUC_CODE (B:07) installs it directly into CR0 at boot completion
+        // (direct dispatch model).
 
 
         // ── Service abstraction c-lists (Task #971) ──────────────────────────────
@@ -2016,7 +2016,6 @@ class ChurchSimulator {
             // ════════════════════════════════════════════════════════════════════
             // B:05  INIT_ABSTR  (case 5)
             // Load Boot.Abstr (NS Slot 6 = SelfTest) into CR6 with E-perm.
-            // Slot 2 is a free/null entry — Task #247.
             // The E-type GT written here is snapshotted as oldCR6GT in B:06 and
             // saved to the sentinel call frame in the thread stack.
             // ════════════════════════════════════════════════════════════════════
