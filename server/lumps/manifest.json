@@ -2030,5 +2030,21 @@
             "E"
         ],
         "lump_version": 1
+    },
+    {
+        "token": "00000a00",
+        "abstraction": "CapTest",
+        "ns_slot": 10,
+        "ns_slot_policy": "static",
+        "boot_resident": false,
+        "variant_group": null,
+        "lump_size": 64,
+        "cw": 23,
+        "cc": 5,
+        "grants": [
+            "E"
+        ],
+        "lump_version": 0,
+        "source": "simulator/examples/capability_test.cloomc"
     }
 ]

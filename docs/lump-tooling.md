@@ -52,7 +52,7 @@ Lumps with no discoverable `.cloomc` source (binary-only data lumps, hardware-co
 | `2570eade` | PostFlashSelftest | `simulator/examples/post_flash_selftest.cloomc` |
 | `b3076308` | EventRouter | `simulator/cloomc/EventRouter.cloomc` |
 | `13ade9a4` | LedControl | `simulator/examples/led_control.cloomc` |
-| `ee298a27` | CapabilityTest | `simulator/examples/capability_test.cloomc` |
+| `00000a00` | CapabilityTest | `simulator/examples/capability_test.cloomc` |
 | `0baf5e0e` | NoteGPublishedBug | `simulator/examples/ada_note_g_published_bug.cloomc` |
 | `4ea370af` | NoteGAssembly | `simulator/examples/ada_note_g.cloomc` |
 

@@ -3427,6 +3427,83 @@ function _showNSLumpModal(slotIdx, nsEntry) {
     const _existingNsModal = document.getElementById('_nsLumpModalOverlay');
     if (_existingNsModal) _existingNsModal.remove();
 
+    // ── Boot.NS (slot 0) is hardware ROM, not a lazy-loaded lump ────────────
+    // Show the 3 boot ROM instructions and hardware c-list inline; no server
+    // fetch required or valid for this slot.
+    if (slotIdx === 0) {
+        const _nsMT = `style="border-collapse:collapse;width:100%;font-size:0.8rem;"`;
+        const _nsTD = `style="padding:3px 8px;border-bottom:1px solid rgba(255,255,255,0.05);"`;
+        const _nsTH = `style="padding:3px 8px;border-bottom:1px solid rgba(200,155,60,0.2);color:#888;font-weight:500;text-align:left;"`;
+
+        // 3 hardware boot ROM words (from hw_binary.js HW_BOOT_PROGRAM)
+        const _hwProg = [
+            { w: 0x077F8000, dis: 'LOAD   AL, CR15, CR15[0]   — refresh Namespace cap (slot 0 → CR15)' },
+            { w: 0x27678001, dis: 'CHANGE AL, CR12, CR15, #1  — load Boot.Thread (slot 1) → CR0–CR11' },
+            { w: 0x17000000, dis: 'CALL   AL, CR0,  CR0       — enter Thread.CR0 (Application LUMP)' },
+        ];
+        const _progRows = _hwProg.map((r, i) =>
+            `<tr>
+                <td ${_nsTD} style="color:#888;">${i}</td>
+                <td ${_nsTD}><code style="font-size:0.74rem;">0x${r.w.toString(16).toUpperCase().padStart(8,'0')}</code></td>
+                <td ${_nsTD} style="color:#dcdcaa;font-family:monospace;font-size:0.78rem;">${r.dis}</td>
+            </tr>`
+        ).join('');
+
+        // Hardware boot c-list (from sim.demoClistGTs if booted, else static fallback)
+        const _clistSrc = (sim && sim.demoClistGTs && sim.demoClistGTs.length)
+            ? sim.demoClistGTs
+            : [0,0,0,0,0,0,0,0,0,0,0];
+        const _nsLbls = (sim && sim.nsLabels) || {};
+        const _clistRows = _clistSrc.map((gt, i) => {
+            const parsed = (sim && typeof sim.parseGT === 'function') ? sim.parseGT(gt >>> 0) : null;
+            let permStr = '—', nameStr = '—';
+            if (parsed && (gt >>> 0) !== 0) {
+                const p = parsed.permissions || {};
+                permStr = ['R','W','X','E','S','L'].filter(k => p[k]).join('') || '∅';
+                const lbl = (parsed.type !== 3 && _nsLbls) ? _nsLbls[parsed.index] : null;
+                nameStr = lbl || (parsed.type === 3 ? '(Abstract)' : `NS[${parsed.index}]`);
+            }
+            return `<tr>
+                <td ${_nsTD} style="color:#888;">${i}</td>
+                <td ${_nsTD}><code style="font-size:0.74rem;">0x${(gt>>>0).toString(16).toUpperCase().padStart(8,'0')}</code></td>
+                <td ${_nsTD} style="color:#4ec9b0;">${nameStr}</td>
+                <td ${_nsTD}><span class="ns-perm-chip" style="font-size:0.65rem;">${permStr}</span></td>
+            </tr>`;
+        }).join('');
+
+        const _hwModalHtml = `<div id="_nsLumpModalOverlay" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.72);" onclick="if(event.target===this)this.remove();">
+            <div style="background:#1e1e1e;border:1px solid rgba(200,155,60,0.35);border-radius:8px;padding:20px 24px;max-width:680px;width:92%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.7);">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                    <div>
+                        <span style="color:#c89b3c;font-weight:700;font-size:1rem;">Boot.NS</span>
+                        <span style="color:#6b7280;font-size:0.78rem;margin-left:8px;">NS[0] — Hardware Boot ROM</span>
+                    </div>
+                    <button onclick="document.getElementById('_nsLumpModalOverlay').remove()" style="background:none;border:none;color:#888;font-size:1.2rem;cursor:pointer;padding:0 4px;">✕</button>
+                </div>
+                <div style="margin-bottom:10px;padding:6px 10px;background:rgba(200,155,60,0.08);border-left:3px solid rgba(200,155,60,0.4);border-radius:3px;color:#9ca3af;font-size:0.78rem;">
+                    This slot is the hardware Boot ROM — 3 fixed instructions executed on every power-on reset. There is no lazy-loaded LUMP body.
+                </div>
+                <div style="margin-bottom:14px;">
+                    <div style="color:#c89b3c;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">BOOT ROM PROGRAM (3 words)</div>
+                    <table ${_nsMT}>
+                        <thead><tr><th ${_nsTH}>PC</th><th ${_nsTH}>Word</th><th ${_nsTH}>Instruction</th></tr></thead>
+                        <tbody>${_progRows}</tbody>
+                    </table>
+                </div>
+                <div style="margin-bottom:4px;">
+                    <div style="color:#c89b3c;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">HARDWARE BOOT C-LIST (${_clistSrc.length} entries)</div>
+                    <table ${_nsMT}>
+                        <thead><tr><th ${_nsTH}>#</th><th ${_nsTH}>GT word</th><th ${_nsTH}>Name</th><th ${_nsTH}>Perms</th></tr></thead>
+                        <tbody>${_clistRows}</tbody>
+                    </table>
+                </div>
+            </div>
+        </div>`;
+        document.body.insertAdjacentHTML('beforeend', _hwModalHtml);
+        return;
+    }
+    // ── End Boot.NS intercept ────────────────────────────────────────────────
+
     const label = (nsEntry.label || `NS[${slotIdx}]`).replace(/</g,'&lt;').replace(/>/g,'&gt;');
     const base  = nsEntry.word0_location;
 
