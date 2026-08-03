@@ -1,0 +1,43 @@
+; ============================================================
+; Abstraction:  WukongCallHome
+; Description:  Wukong board software boot coordinator — simulator / IDE side.
+;               Runs SelfTest, then calls Tunnel.Register with the result
+;               so the IDE receives the board's boot_reason payload.
+;
+;               This is the LUMP executed by the Church Machine simulator
+;               when the ⚡ boot entry is set to WukongCallHome (NS slot 7).
+;               It is distinct from wukong_callhome.cloomc, which is the
+;               exact hardware LED-blink ROM program burned into the Wukong
+;               FPGA (an infinite loop with no RETURN, no capability calls).
+;
+; Sequence:
+;   1. ELOADCALL SelfTest.Main  (c-list[0], NS slot 6)
+;      → executes the hardware self-test; result code arrives in DR0
+;   2. ELOADCALL Tunnel.Register (c-list[1], NS slot 8)
+;      → registers DR0 as the boot_reason with the IDE host
+;   3. RETURN to the boot-entry caller (IDE boot-complete handler)
+;
+; C-list layout (2 entries, injected by the lazy loader at runtime):
+;   c-list[0]  SelfTest   E  (NS slot 6)   E-GT: 0x4A000006
+;   c-list[1]  Tunnel     E  (NS slot 8)   E-GT: 0x4A000008
+;
+; Register usage:
+;   DR0  SelfTest result code (passed through to Tunnel.Register)
+;   All CRs are scratch; ELOADCALL manages CR internally.
+;
+; Slot:    NS slot 7  (WukongCallHome — Wukong board coordinator)
+; Token:   e186c4ec
+; Source:  simulator/examples/wukong_callhome_coordinator.cloomc
+; Author:  Church Machine
+; Version: 1.0
+; ============================================================
+
+capabilities {
+    SelfTest  E,
+    Tunnel    E
+}
+
+Main:
+    ELOADCALL CR0, SelfTest, 0    ; [0] call SelfTest.Main → DR0 = test result
+    ELOADCALL CR0, Tunnel, 0      ; [1] call Tunnel.Register(DR0) → IDE ACK
+    RETURN                        ; [2] return to boot-entry caller

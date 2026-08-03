@@ -427,14 +427,23 @@ def _ns_n_minus_6(lump_words):
     return n
 
 
-def _read_lump_body(lumps_dir, token_hex):
-    """Read raw 32-bit words from server/lumps/<token>.lump if present.
+def _read_lump_body(lumps_dir, token_hex, filename=None):
+    """Read raw 32-bit words from lumps_dir.
 
+    Prefers `filename` (a versioned name such as ``SelfTest_v75.lump``) when
+    provided and the file exists; otherwise falls back to ``{token_hex}.lump``.
     Lump files are stored big-endian on disk (written by build_*_lump.js and
     /api/lumps/save).  Words are returned as native Python ints so they can
     be written directly into mem[] and later packed as little-endian by
     struct.pack('<...I', *mem).
     """
+    if filename:
+        path = os.path.join(lumps_dir, filename)
+        if os.path.isfile(path):
+            with open(path, "rb") as f:
+                raw = f.read()
+            n = len(raw) // 4
+            return list(struct.unpack(f">{n}I", raw[: n * 4]))
     if not token_hex:
         return None
     path = os.path.join(lumps_dir, f"{token_hex}.lump")
@@ -444,6 +453,44 @@ def _read_lump_body(lumps_dir, token_hex):
         raw = f.read()
     n = len(raw) // 4
     return list(struct.unpack(f">{n}I", raw[: n * 4]))
+
+
+def find_lump_file_by_abstraction(lumps_dir, abstraction_name, ns_slot):
+    """Find the lump file for `abstraction_name` at `ns_slot` via manifest.json.
+
+    Reads ``manifest.json`` and returns the full path to the first matching
+    entry's lump file.  Prefers the versioned ``filename`` field; falls back to
+    ``{token}.lump`` when ``filename`` is absent or missing on disk.  Returns
+    ``None`` when no matching entry is found or no file exists.
+    """
+    mf_path = os.path.join(lumps_dir, "manifest.json")
+    if not os.path.isfile(mf_path):
+        return None
+    try:
+        with open(mf_path) as _f:
+            _entries = json.load(_f)
+        for _e in _entries if isinstance(_entries, list) else []:
+            if not isinstance(_e, dict):
+                continue
+            if _e.get("abstraction") != abstraction_name:
+                continue
+            if _e.get("ns_slot") != ns_slot:
+                continue
+            # Prefer versioned filename if present and on disk
+            _fname = _e.get("filename")
+            if _fname:
+                _p = os.path.join(lumps_dir, _fname)
+                if os.path.isfile(_p):
+                    return _p
+            # Fall back to token-named file
+            _tok = _e.get("token")
+            if _tok:
+                _p = os.path.join(lumps_dir, f"{_tok}.lump")
+                if os.path.isfile(_p):
+                    return _p
+    except Exception:
+        pass
+    return None
 
 
 def _load_catalog_token_map(manifest_path):
@@ -463,8 +510,14 @@ def _load_catalog_token_map(manifest_path):
 
 
 def _load_boot_resident_entries(manifest_path):
-    """Return list of (ns_slot, token_hex) for all manifest entries
-    with boot_resident=true and a non-empty token."""
+    """Return list of (ns_slot, token_hex, filename_or_none) for all manifest
+    entries with boot_resident=true and a non-empty token.
+
+    ``filename_or_none`` is the versioned filename (e.g. ``SelfTest_v75.lump``)
+    when the manifest entry carries a ``filename`` field, otherwise ``None``.
+    The caller should pass it to ``_read_lump_body`` so the versioned file is
+    preferred over the legacy token-named fallback.
+    """
     try:
         with open(manifest_path, "r") as f:
             entries = json.load(f)
@@ -477,7 +530,7 @@ def _load_boot_resident_entries(manifest_path):
         slot = e.get("ns_slot")
         tok  = e.get("token")
         if isinstance(slot, int) and isinstance(tok, str) and tok:
-            out.append((slot, tok))
+            out.append((slot, tok, e.get("filename")))
     return out
 
 
@@ -506,18 +559,21 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
 
     if "abstractionLumpWords" in step1:
         print("WARNING: abstractionLumpWords is deprecated and ignored; "
-              "Boot.Abstr size is determined by the saved lump (00000600.lump) "
-              "or defaults to 64 words.")
+              "Boot.Abstr size is determined by the saved SelfTest lump "
+              "(from manifest.json) or defaults to 64 words.")
 
-    # ── Load saved Boot.Abstr lump (00000600.lump) if present and valid ──────
+    # ── Load saved Boot.Abstr lump (SelfTest, looked up via manifest.json) ───
     # The saved lump is written big-endian by /api/lumps/save.  If it passes
     # all validation checks its declared size becomes the actual Boot.Abstr
     # allocation; otherwise the hardcoded default (64 words) is used.
-    _boot_saved_path = os.path.join(
-        lumps_dir, f"{BOOT_ABSTR_NS_SLOT << 8:08x}.lump")   # e.g. "00000600.lump" when slot=6
+    # The lump is located by searching manifest.json for the entry whose
+    # abstraction name is "SelfTest" at BOOT_ABSTR_NS_SLOT, preferring the
+    # versioned filename (e.g. SelfTest_v75.lump) over any token-named copy.
+    _boot_saved_path = find_lump_file_by_abstraction(
+        lumps_dir, "SelfTest", BOOT_ABSTR_NS_SLOT)
     actual_abstr_size = BOOT_ABSTR_DEFAULT_SIZE
     abstr_words = None
-    if os.path.isfile(_boot_saved_path):
+    if _boot_saved_path is not None:
         try:
             with open(_boot_saved_path, "rb") as _bsf:
                 _bsraw = _bsf.read()
@@ -826,12 +882,13 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         # (direct dispatch via CR0).  Raise a clear error so the operator knows to
         # generate a boot image with the SelfTest lump rather than silently producing
         # a broken image.
-        lump_filename = f"{BOOT_ABSTR_NS_SLOT << 8:08x}.lump"
         raise ValueError(
-            f"Boot.Abstr lump '{lump_filename}' not found in lumps directory.\n"
-            f"The direct-dispatch boot model requires the real SelfTest lump to be\n"
-            f"present. Generate or restore '{lump_filename}' and retry.\n"
-            f"(Looked in: {lumps_dir})"
+            f"Boot.Abstr (SelfTest) lump not found in lumps directory.\n"
+            f"The direct-dispatch boot model requires the real SelfTest lump.\n"
+            f"Save a SelfTest lump (NS slot {BOOT_ABSTR_NS_SLOT}) via the IDE "
+            f"and retry.\n"
+            f"(Manifest: {os.path.join(lumps_dir, 'manifest.json')})\n"
+            f"(Lumps dir: {lumps_dir})"
         )
 
     # Thread.CR[0] entry E-GT is pre-set to boot_entry_slot above; IDE overwrites on connect.
@@ -880,15 +937,15 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     # overwrite this placement in the loop below.
     _manifest_path = os.path.join(lumps_dir, "manifest.json")
     _token_map     = _load_catalog_token_map(_manifest_path)
-    for _slot, _tok in _load_boot_resident_entries(_manifest_path):
+    for _slot, _tok, _filename in _load_boot_resident_entries(_manifest_path):
         if _slot == BOOT_ABSTR_NS_SLOT:
-            # Boot.Abstr is always synthesised above (or loaded from 00000600.lump).
+            # Boot.Abstr is always synthesised above (via manifest lookup).
             # A manifest boot_resident entry at the same slot must not overwrite it.
             continue
         _phys = locations.get(_slot)
         if _phys is None:
             continue
-        _body = _read_lump_body(lumps_dir, _tok)
+        _body = _read_lump_body(lumps_dir, _tok, _filename)
         if _body is None:
             continue
         _n = min(len(_body), total - _phys)

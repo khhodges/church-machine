@@ -205,13 +205,17 @@ def _compare(py_bytes, sim_words, cfg, extra_skips=None):
 # ---- the test -------------------------------------------------------------
 
 def _write_synthetic_boot_abstr_lump(lumps_dir, lump_size=64, cw=3, cc=0):
-    """Write a minimal synthetic Boot.Abstr lump to lumps_dir.
+    """Write a minimal synthetic Boot.Abstr lump and a companion manifest to lumps_dir.
 
     The lump has a valid header (magic=0x1F, n_minus_6, cw, cc=0) and
     zeros everywhere else — matching what the JS simulator's
     _initNamespaceTable() produces at the boot entry slot when the
     direct-dispatch path is active (no trampoline written, just the
     header word).
+
+    A minimal manifest.json is written alongside so that
+    find_lump_file_by_abstraction() can locate the lump by abstraction
+    name ("SelfTest") rather than by the legacy token-encoded path.
     """
     import math
     n_minus_6 = max(0, int(math.ceil(math.log2(lump_size))) - 6)
@@ -219,10 +223,24 @@ def _write_synthetic_boot_abstr_lump(lumps_dir, lump_size=64, cw=3, cc=0):
     words = [0] * lump_size
     words[0] = hdr
     from server.boot_image import BOOT_ABSTR_NS_SLOT
-    lump_name = f"{BOOT_ABSTR_NS_SLOT << 8:08x}.lump"
+    lump_token = f"{BOOT_ABSTR_NS_SLOT << 8:08x}"
+    lump_name = f"{lump_token}.lump"
     lump_path = os.path.join(lumps_dir, lump_name)
     with open(lump_path, "wb") as f:
         f.write(struct.pack(f">{lump_size}I", *words))
+    # Write a minimal manifest so find_lump_file_by_abstraction() resolves
+    # "SelfTest" at BOOT_ABSTR_NS_SLOT.  No 'filename' field → falls back to
+    # the token-named file written above.
+    manifest_path = os.path.join(lumps_dir, "manifest.json")
+    if not os.path.isfile(manifest_path):
+        with open(manifest_path, "w") as _mf:
+            json.dump([{
+                "token": lump_token,
+                "abstraction": "SelfTest",
+                "ns_slot": BOOT_ABSTR_NS_SLOT,
+                "ns_slot_policy": "static",
+                "boot_resident": True,
+            }], _mf)
     return lump_path, lump_size
 
 
@@ -299,12 +317,24 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
         pack_ns_word1,
     )
 
-    # Write a synthetic saved lump into tmp_path using the filename that
-    # generate_boot_image() derives from BOOT_ABSTR_NS_SLOT.
+    # Write a synthetic saved lump into tmp_path using the token-named filename
+    # and a companion manifest so find_lump_file_by_abstraction() resolves it.
     saved_bytes = _make_boot_abstr_lump(lump_size, cc)
-    saved_filename = f"{BOOT_ABSTR_NS_SLOT << 8:08x}.lump"
+    saved_token    = f"{BOOT_ABSTR_NS_SLOT << 8:08x}"
+    saved_filename = f"{saved_token}.lump"
     saved_path = tmp_path / saved_filename
     saved_path.write_bytes(saved_bytes)
+    # Manifest without 'filename' field: find_lump_file_by_abstraction() falls
+    # back to the token-named file written above.
+    manifest_path = tmp_path / "manifest.json"
+    if not manifest_path.exists():
+        manifest_path.write_text(json.dumps([{
+            "token": saved_token,
+            "abstraction": "SelfTest",
+            "ns_slot": BOOT_ABSTR_NS_SLOT,
+            "ns_slot_policy": "static",
+            "boot_resident": True,
+        }]))
 
     cfg = {
         "step1": {

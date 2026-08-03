@@ -1174,11 +1174,13 @@ def _validate_step2(step2, step1, target_board):
     _ns_slots_max_v2 = int(step1.get("nsSlotsMax") or MAX_NS_ENTRIES)
     NS_TABLE_RESERVE = _boot_image_gen.ns_table_reserve_words(_ns_slots_max_v2)
     total = step1["totalNamespaceWords"]
-    # Determine actual Boot.Abstr size from saved 00000600.lump (Task #568, updated #1918).
-    # A resident step-2 lump must not overlap whichever Boot.Abstr will actually be placed.
+    # Determine actual Boot.Abstr size from the saved SelfTest lump (looked up via
+    # manifest.json).  A resident step-2 lump must not overlap whichever Boot.Abstr
+    # will actually be placed.
     _abstr_size_for_validation = BOOT_ABSTR_DEFAULT_SIZE
-    _saved_abstr_path = os.path.join(LUMPS_DIR, '00000600.lump')
-    if os.path.isfile(_saved_abstr_path):
+    _saved_abstr_path = _boot_image_gen.find_lump_file_by_abstraction(
+        LUMPS_DIR, "SelfTest", _boot_image_gen.BOOT_ABSTR_NS_SLOT)
+    if _saved_abstr_path is not None:
         try:
             import struct as _vstruct
             with open(_saved_abstr_path, "rb") as _fh:
@@ -1191,9 +1193,9 @@ def _validate_step2(step2, step1, target_board):
                 _cw        = (_hdr >> 10) & 0x1FFF
                 _cc        = _hdr & 0xFF
                 _declared  = 1 << (_n_minus_6 + 6)
-                # Use the same validation criteria as generate_boot_image() (Task #568)
-                # so that "placed size" is computed consistently between generation and
-                # validation; an invalid/truncated lump falls back to BOOT_ABSTR_DEFAULT_SIZE.
+                # Use the same validation criteria as generate_boot_image()
+                # so that "placed size" is computed consistently between generation
+                # and validation; an invalid/truncated lump falls back to the default.
                 if (_magic == 0x1F and
                         64 <= _declared <= 16384 and
                         _n_words >= _declared and
@@ -4947,16 +4949,6 @@ def save_lump():
     LAZY_LUMPS[token8] = lump_bytes
     LAZY_LUMPS[token8.lstrip('0') or '0'] = lump_bytes
 
-    # For the boot-abstr slot (token 00000600), also keep the canonical
-    # token-named file that generate_boot_image() reads directly from disk.
-    # The versioned filename (e.g. SelfTest_v17.lump) is kept for the archive,
-    # but boot-image regeneration needs the predictable 00000600.lump path.
-    _bi_boot_token = f"{_boot_image_gen.BOOT_ABSTR_NS_SLOT << 8:08x}"
-    if token8 == _bi_boot_token:
-        _canonical_lump = os.path.join(lumps_dir, f'{_bi_boot_token}.lump')
-        if os.path.abspath(lump_path) != os.path.abspath(_canonical_lump):
-            with open(_canonical_lump, 'wb') as _clfh:
-                _clfh.write(lump_bytes)
 
     # ── Phase 6: Build and write sidecar JSON ─────────────────────────────────
     sidecar = {
