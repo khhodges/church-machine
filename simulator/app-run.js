@@ -5870,91 +5870,86 @@ abstraction NoteGPublishedBug {
 `,
         'capability_test': `; ============================================================
 ; Abstraction:  CapabilityTest
-; Description:  Church Machine capability-based self-test: LOAD, TPERM, CALL
+; Description:  Church Machine capability test -- LOAD, TPERM, CALL
+;               using the real hardware boot namespace.
 ; Author:       Church Machine Educational Platform
-; Version:      1.1
-; Created:      2026-05-09
+; Version:      2.0
+; Created:      2026-08-03
 ; Language:     Assembly
-; Dependencies: None
 ; ============================================================
-; Methods:
-;   1. test1_load — LOAD all system abstractions from boot C-List
-;   2. test2_tperm_pass — TPERM: verify E/RW permissions pass
-;   3. test3_tperm_fail — TPERM: verify L permission fails (Z=0)
-;   4. test4_conditional — LOADEQ/LOADNE conditional loads
-;   5. test5_switch — SWITCH register swap
-;   6. test6_turing — IADD, ISUB, MCMP, SHL, SHR arithmetic
-;   7. test7_call — CALL Salvation via named method selectors
-;   8. test8_eloadcall — ELOADCALL fused Load+TPERM+Call
+; Single source of truth for the CapTest abstraction (NS slot 10).
+; The lump is built from this file by scripts/build_captest_lump.js,
+; which supplies hardware GT words for each declared capability.
+;
+; C-list layout (CapTest's own 5-entry c-list, injected at load):
+;   [0] SelfTest   E    (NS  6)  0x4A000006 -- entry-callable abstraction
+;   [1] LED_DEV    RW   (NS  3)  0x32000003 -- hardware LED register file
+;   [2] UART_DEV   RW   (NS  2)  0x32000002 -- hardware UART TX/STATUS/RX
+;   [3] BTN_DEV    R    (NS  4)  0x12000004 -- hardware button state
+;   [4] TIMER_DEV  RW   (NS  5)  0x32000005 -- hardware timer registers
 ; ============================================================
 
 capabilities {
-    Salvation E,
-    Navana E,
-    Mint E,
-    Memory E,
-    LED RW,
-    UART RW
+    SelfTest E,
+    LED_DEV RW,
+    UART_DEV RW,
+    BTN_DEV R,
+    TIMER_DEV RW
 }
 
-; ============================================
-; Church Machine Self-Test
-; Tests opcodes using boot C-List (12 entries)
-; Boot must complete before assembling
-; ============================================
-;
-; Two-operand shorthand and named method selectors are used throughout (recommended).
-; Each line shows the raw equivalent in the trailing comment.
-;
-; Boot C-List layout (indices into the boot thread's c-list; NS slot in parens):
-;   [0] Boot.NS (NS 0)  [1] Thread (NS 1)  [2] Boot.Abstr E-GT (NS 3)
-;   [3] (empty)  [4] Salvation (E, NS 4)  [5] Navana (E, NS 5)
-;   [6] Mint (E) [7] Memory (E)
-;   [8] LED (RW) [9] UART (RW) [10] BTN (R) [11] TIMER (RW)
+; ============================================================
+; TEST 1: LOAD -- materialise all declared capabilities from c-list
+; ============================================================
+LOAD CR0, SelfTest    ; CR0 = SelfTest  E-GT    (c-list[0])
+LOAD CR1, LED_DEV     ; CR1 = LED_DEV   RW-GT   (c-list[1])
+LOAD CR2, UART_DEV    ; CR2 = UART_DEV  RW-GT   (c-list[2])
+LOAD CR3, BTN_DEV     ; CR3 = BTN_DEV   R-GT    (c-list[3])
+LOAD CR4, TIMER_DEV   ; CR4 = TIMER_DEV RW-GT   (c-list[4])
 
-; --- TEST 1: LOAD system abstractions (two-operand shorthand) ---
-LOAD CR0, Salvation    ; CR0 = Salvation (E)   — equiv: LOAD CR0, CR6, 4
-LOAD CR1, Navana       ; CR1 = Navana    (E)   — equiv: LOAD CR1, CR6, 5
-LOAD CR2, Mint         ; CR2 = Mint      (E)   — equiv: LOAD CR2, CR6, 6
-LOAD CR3, Memory       ; CR3 = Memory    (E)   — equiv: LOAD CR3, CR6, 7
-LOAD CR4, LED          ; CR4 = LED       (RW)  — equiv: LOAD CR4, CR6, 8
-LOAD CR5, UART         ; CR5 = UART      (RW)  — equiv: LOAD CR5, CR6, 9
+; ============================================================
+; TEST 2: TPERM -- verify E permission on SelfTest
+; ============================================================
+TPERM CR0, E          ; SelfTest has E?  Z=1 (PASS)
 
-; --- TEST 2: TPERM - permission checks ---
-TPERM CR0, E           ; Salvation has E? PASS (Z=1)
-TPERM CR1, E           ; Navana has E? PASS (Z=1)
-TPERM CR4, RW          ; LED has R+W? PASS (Z=1)
-TPERM CR5, RW          ; UART has R+W? PASS (Z=1)
+; ============================================================
+; TEST 3: TPERM -- verify RW on hardware device caps
+; ============================================================
+TPERM CR1, RW         ; LED_DEV   has R+W?  Z=1 (PASS)
+TPERM CR2, RW         ; UART_DEV  has R+W?  Z=1 (PASS)
+TPERM CR4, RW         ; TIMER_DEV has R+W?  Z=1 (PASS)
 
-; --- TEST 3: TPERM failure ---
-TPERM CR0, L           ; Salvation has L? FAIL (Z=0)
+; ============================================================
+; TEST 4: TPERM deliberate failure -- wrong permission class
+; ============================================================
+TPERM CR0, L          ; SelfTest has L?  Z=0 (expected FAIL)
 
-; --- TEST 4: Conditional execution (two-operand shorthand) ---
-; Z=0 from failed TPERM above
-LOADEQ CR0, Navana     ; SKIP (Z=0, not equal)    — equiv: LOADEQ CR0, CR6, 5
-LOADNE CR0, Salvation  ; EXEC (Z=0, is not-equal) — equiv: LOADNE CR0, CR6, 4
+; ============================================================
+; TEST 5: Conditional LOADs (Z=0 from the L-perm TPERM above)
+; ============================================================
+LOADEQ CR0, LED_DEV   ; SKIP  -- condition EQ not met (Z=0)
+LOADNE CR0, SelfTest  ; EXEC  -- condition NE met (Z=0) -- restore CR0
 
-; --- TEST 5: SWITCH - swap registers ---
-SWITCH CR0, 1          ; CR0 <-> CR1
-; Now CR0=Navana, CR1=Salvation
-SWITCH CR0, 1          ; Swap back
-; CR0=Salvation, CR1=Navana again
+; ============================================================
+; TEST 6: SWITCH -- swap two registers and swap back
+; ============================================================
+SWITCH CR0, 1         ; CR0 <-> CR1  (CR0=LED_DEV, CR1=SelfTest)
+SWITCH CR0, 1         ; Swap back     (CR0=SelfTest, CR1=LED_DEV)
 
-; --- TEST 6: Turing ISA ---
-IADD DR1, DR0, #42     ; DR1 = 42
-IADD DR2, DR1, #8      ; DR2 = 50
-ISUB DR3, DR2, DR1     ; DR3 = 8
-MCMP DR1, DR2          ; 42 < 50 → N=1, Z=0
-IADD DR4, DR0, #1      ; DR4 = 1
-SHL DR4, DR4, 3        ; DR4 = 8
-SHR DR4, DR4, 1        ; DR4 = 4
+; ============================================================
+; TEST 7: Turing ISA -- integer arithmetic on data registers
+; ============================================================
+IADD DR1, DR0, #42    ; DR1 = 42
+IADD DR2, DR1, #8     ; DR2 = 50
+ISUB DR3, DR2, DR1    ; DR3 = 8
+MCMP DR1, DR2         ; 42 < 50  -> N=1, Z=0
+IADD DR4, DR0, #1     ; DR4 = 1
+SHL  DR4, DR4, 3      ; DR4 = 8
+SHR  DR4, DR4, 1      ; DR4 = 4
 
-; --- TEST 7: CALL (named method selectors) ---
-LOAD CR0, Salvation    ; CR0 = Salvation          — equiv: LOAD CR0, CR6, 4
-CALL Salvation.main    ; enter Salvation (atomic) — equiv: CALL CR0, 0xF
-
-; --- TEST 8: ELOADCALL - fused Load+TPERM+Call (two-operand shorthand + named method selectors) ---
-ELOADCALL CR0, Salvation, main  ; Load + E check + call — equiv: ELOADCALL CR0, CR6, 4
+; ============================================================
+; TEST 8: ELOADCALL -- fused Load + E-check + Call on SelfTest
+; ============================================================
+ELOADCALL CR0, SelfTest, 0     ; Load SelfTest into CR0, verify E, call entry 0
 
 ; --- All tests complete ---
 HALT
