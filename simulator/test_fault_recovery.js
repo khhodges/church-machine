@@ -1,14 +1,11 @@
 'use strict';
-// test_fault_recovery.js — Unit tests for Task #1077 three-tier fault recovery
+// test_fault_recovery.js — Scheduler timer / IRQ path tests
 // Run:  node simulator/test_fault_recovery.js
 //
 // Coverage:
-//   T001 — Tier 1: .catch method invoked when present on the faulting abstraction
-//   T002 — Tier 2: .catch absent, Scheduler.IRQ dispatched with registered handler
-//   T003 — Tier 3: double-fault (fault while irqActive=true) calls _returnToBoot
 //   T004 — pause timer fire: Scheduler.pause arms timer; step to deadline fires IRQ
 //   T005 — Wait flag-set wake: pendingWakeFlags signals sleeping thread via IRQ sweep
-//   T006 — Structured fault record: all new fields populated on an unhandled fault
+//   T006 — Structured fault record: fault always halts; tier/catchInvoked/irqInvoked=null/false
 //   T008 — Scheduler.pause method-table index 4: assembled ELOADCALL encodes index 4,
 //           dispatch chain resolves to pause handler, thread transitions to sleeping
 //   T010 — Continuous step() loop: timer fires naturally via natural stepCount
@@ -54,92 +51,6 @@ function makeTestSim() {
     // their setup or pick a different slot.
     if (sim.irqState) sim.irqState.irqLumpSlot = 8;
     return { sim, registry, sysAbs };
-}
-
-// ── T001: Tier 1 — .catch method invoked when present ─────────────────────────
-console.log('\n--- T001: Tier 1 (.catch) ---');
-{
-    const { sim, registry } = makeTestSim();
-    // Point CR14 at NS slot 10 (DijkstraFlag) as the "currently executing lump"
-    if (!sim.cr) sim.cr = new Array(16).fill(null);
-    sim.cr[14] = { word0: 10, word1: 0, word2: 0, word3: 0 };
-
-    // Bind a .catch handler on slot 10 that signals recovery
-    let catchCalled = false;
-    registry.bindMethod(10, '.catch', (s, args) => {
-        catchCalled = true;
-        return { handled: true };
-    });
-
-    const pcBefore = sim.pc;
-    sim.fault('PERM_R', 'Test Tier 1 catch');
-
-    check('T001a: machine NOT halted after Tier 1 catch', !sim.halted);
-    check('T001b: faultLog has exactly one entry', sim.faultLog.length === 1);
-    check('T001c: fault entry tier === 1', sim.faultLog[0].tier === 1);
-    check('T001d: fault entry catchInvoked === true', sim.faultLog[0].catchInvoked === true);
-    check('T001e: .catch function was actually called', catchCalled === true);
-    check('T001f: faultCode matches PERM_R', sim.faultLog[0].faultCode === ChurchSimulator.FAULT_CODES.PERM_R);
-    check('T001g: faultingAbstractionSlot === 10', sim.faultLog[0].faultingAbstractionSlot === 10);
-    check('T001h: PC advanced past faulting instruction', sim.pc === pcBefore + 1);
-    check('T001i: irqActive is false (not entered IRQ frame)', !sim.irqState.irqActive);
-}
-
-// ── T002: Tier 2 — .catch absent, Scheduler.IRQ succeeds ──────────────────────
-console.log('\n--- T002: Tier 2 (Scheduler.IRQ) ---');
-{
-    const { sim, registry, sysAbs } = makeTestSim();
-    // CR14 points at NS slot 10 but no .catch bound → Tier 1 skipped
-    if (!sim.cr) sim.cr = new Array(16).fill(null);
-    sim.cr[14] = { word0: 10, word1: 0, word2: 0, word3: 0 };
-
-    // Register a fault recovery handler so Tier 2 can succeed
-    let handlerCalled = false;
-    sysAbs._schedulerState.faultRecoveryHandler = (faultRecord) => {
-        handlerCalled = true;
-        return true;
-    };
-
-    const pcBefore = sim.pc;
-    sim.fault('PERM_W', 'Test Tier 2 IRQ escalation');
-
-    check('T002a: machine NOT halted after Tier 2 recovery', !sim.halted);
-    check('T002b: faultLog has exactly one entry', sim.faultLog.length === 1);
-    check('T002c: fault entry tier === 2', sim.faultLog[0].tier === 2);
-    check('T002d: fault entry irqInvoked === true', sim.faultLog[0].irqInvoked === true);
-    check('T002e: fault entry catchInvoked === false (Tier 1 was skipped)', !sim.faultLog[0].catchInvoked);
-    check('T002f: faultRecoveryHandler was called', handlerCalled === true);
-    check('T002g: irqActive reset to false after Tier 2', !sim.irqState.irqActive);
-    check('T002h: PC advanced past faulting instruction', sim.pc === pcBefore + 1);
-}
-
-// ── T003: Tier 3 — double-fault while irqActive=true ─────────────────────────
-console.log('\n--- T003: Tier 3 (double-fault) ---');
-{
-    const { sim } = makeTestSim();
-    // Simulate: fault fires while Scheduler.IRQ is already executing
-    sim.irqState.irqActive = true;
-
-    // Spy on _fastBoot so we can verify it's called without running the full boot sequence.
-    // _fastBoot(2) is the PP250 fast-boot entry point; it calls _returnToBoot() internally.
-    let fastBootCalled = false;
-    let fastBootReason = null;
-    const origFastBoot = sim._fastBoot ? sim._fastBoot.bind(sim) : null;
-    sim._fastBoot = (reason) => {
-        fastBootCalled = true;
-        fastBootReason = reason;
-        if (origFastBoot) origFastBoot(reason);
-    };
-
-    sim.fault('NULL_CAP', 'Test Tier 3 double-fault');
-
-    check('T003a: faultLog has exactly one entry', sim.faultLog.length === 1);
-    check('T003b: fault entry tier === 3', sim.faultLog[0].tier === 3);
-    check('T003c: fault entry tier3Recovery === true', sim.faultLog[0].tier3Recovery === true);
-    check('T003d: _fastBoot was called (PP250 instant re-boot path)', fastBootCalled === true);
-    check('T003d2: _fastBoot called with reason=2 (fault-recovery)', fastBootReason === 2);
-    check('T003e: irqActive cleared after Tier 3 recovery', !sim.irqState.irqActive);
-    check('T003f: machine is NOT permanently halted (Tier 3 resets to boot)', !sim.halted);
 }
 
 // ── T004: pause timer fire ────────────────────────────────────────────────────
@@ -212,18 +123,18 @@ console.log('\n--- T005: Scheduler.Wait(flag) / signal / wake ---');
     check('T005j: irqSweepCount incremented', sysAbs._schedulerState._irqSweepCount >= 1);
 }
 
-// ── T006: Structured fault record fields (baseline — unhandled fault) ─────────
-console.log('\n--- T006: Structured fault record (unhandled) ---');
+// ── T006: Structured fault record fields (baseline — fault always halts) ──────
+console.log('\n--- T006: Structured fault record (halt-always) ---');
 {
     const { sim } = makeTestSim();
-    sim.fault('BOUNDS', 'Test structured record fields (no recovery)');
+    sim.fault('BOUNDS', 'Test structured record fields');
 
     const entry = sim.faultLog[0];
     check('T006a: faultLog has one entry', sim.faultLog.length === 1);
     check('T006b: faultCode = BOUNDS code', entry.faultCode === ChurchSimulator.FAULT_CODES.BOUNDS);
-    check('T006c: tier is null (all tiers failed — halt)', entry.tier === null);
-    check('T006d: catchInvoked=false', entry.catchInvoked === false);
-    check('T006e: irqInvoked=true (Scheduler.IRQ always dispatched before halt)', entry.irqInvoked === true);
+    check('T006c: tier is null (no recovery attempted)', entry.tier === null);
+    check('T006d: catchInvoked=false (no Tier 1)', entry.catchInvoked === false);
+    check('T006e: irqInvoked=false (no Tier 2)', entry.irqInvoked === false);
     check('T006f: tier3Recovery=false', entry.tier3Recovery === false);
     check('T006g: machine halted', sim.halted === true);
     check('T006h: "Scheduler" pet name maps to NS slot 8',
@@ -234,35 +145,6 @@ console.log('\n--- T006: Structured fault record (unhandled) ---');
         ChurchSimulator.FAULT_CODES.PERM_R === 0x01);
     check('T006k: FAULT_CODES object has NULL_CAP key',
         ChurchSimulator.FAULT_CODES.NULL_CAP === 0x07);
-}
-
-// ── T007: .catch throws — catchInvoked=true, escalation continues ────────────
-// Verifies that catchInvoked is true even when the .catch handler throws,
-// and that the fault escalates to Tier 2/halt rather than being silently dropped.
-console.log('\n--- T007: .catch throws → catchInvoked=true, escalation ---');
-{
-    const { sim, registry } = makeTestSim();
-
-    // Bind a .catch method on NS slot 10 that throws
-    registry.abstractions[10] = registry.abstractions[10] || { dispatch: {} };
-    registry.abstractions[10].dispatch['.CATCH'] = function(_sim, _args) {
-        throw new Error('deliberate .catch failure for T007');
-    };
-
-    // Simulate CR14 pointing to NS slot 10 so fault() resolves faultingAbstractionSlot=10
-    sim.cr[14] = { word0: 10 };
-    // No faultRecoveryHandler → Tier 2 also fails → halt
-    sim.fault('PERM_R', 'T007 test — .catch throws');
-
-    const entry = sim.faultLog[0];
-    check('T007a: faultLog has one entry', sim.faultLog.length === 1);
-    check('T007b: catchInvoked=true (handler was called even though it threw)',
-        entry.catchInvoked === true);
-    check('T007c: irqInvoked=true (escalated to Scheduler.IRQ after .catch threw)',
-        entry.irqInvoked === true);
-    check('T007d: tier is null (all tiers exhausted — halt)', entry.tier === null);
-    check('T007e: machine halted', sim.halted === true);
-    check('T007f: output mentions .catch threw', sim.output.includes('threw'));
 }
 
 // ── T008: Scheduler.pause — assembled ELOADCALL + runtime dispatch integration ─
@@ -1976,13 +1858,13 @@ console.log('\n--- T018: LAZY_RESOLVE wired from _execLoad (petNameMemory) ---')
 
 // ── T019: STUB_METHOD fault — all-RETURN LUMP faults at CALL time ─────────────
 //
-//   Verifies the full stub-lump detection and fault-recovery path:
+//   Verifies the full stub-lump detection and halt path:
 //   T019a: _lumpIsStub() correctly identifies all-RETURN code region.
-//   T019b-f: CALL into stub LUMP fires STUB_METHOD fault; Tier 1 .catch recovers.
+//   T019b-d: CALL into stub LUMP fires STUB_METHOD fault; machine halts (no recovery).
 //
 console.log('\n--- T019: STUB_METHOD fault (all-RETURN stub LUMP) ---');
 {
-    const { sim, registry } = makeTestSim();
+    const { sim } = makeTestSim();
     sim.bootComplete = false;
 
     const STUB_SLOT = 20;
@@ -2010,15 +1892,8 @@ console.log('\n--- T019: STUB_METHOD fault (all-RETURN stub LUMP) ---');
     check('T019a: _lumpIsStub detects all-RETURN code region as stub',
         sim._nsStubFlags[STUB_SLOT] === true);
 
-    // Point CR14 at the stub slot so fault recovery finds the .catch handler
+    // Point CR14 at the stub slot
     sim.cr[14] = { word0: STUB_SLOT, word1: STUB_BASE, word2: 0, word3: 0, m: 0 };
-
-    // Bind a .catch handler on STUB_SLOT so Tier 1 recovery fires
-    let t019_catchCalled = false;
-    registry.bindMethod(STUB_SLOT, '.catch', () => {
-        t019_catchCalled = true;
-        return { handled: true };
-    });
 
     // Load E-GT for stub slot into CR0, write CALL CR0 at PC=0
     const stubGT = sim.createGT(1, STUB_SLOT, { E: 1 }, 1);
@@ -2032,12 +1907,8 @@ console.log('\n--- T019: STUB_METHOD fault (all-RETURN stub LUMP) ---');
         sim.faultLog.length === 1);
     check('T019c: fault type is STUB_METHOD',
         sim.faultLog[0] && sim.faultLog[0].type === 'STUB_METHOD');
-    check('T019d: Tier 1 .catch was invoked for STUB_METHOD',
-        t019_catchCalled === true);
-    check('T019e: faultLog entry tier === 1 (Tier 1 recovery fired)',
-        sim.faultLog[0] && sim.faultLog[0].tier === 1);
-    check('T019f: machine did NOT halt (Tier 1 recovered)',
-        !sim.halted);
+    check('T019d: machine halted after STUB_METHOD (no recovery)',
+        sim.halted === true);
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────

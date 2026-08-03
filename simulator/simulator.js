@@ -3311,60 +3311,9 @@ class ChurchSimulator {
             }
         };
 
-        // ── Three-tier fault recovery (Task #1077) ────────────────────────────
-        // Tier 3: double-fault — fault while Scheduler.IRQ frame is active
-        if (this.irqState && this.irqState.irqActive) {
-            entry.tier = 3;
-            entry.tier3Recovery = true;
-            this.faultLog.push(entry);
-            this.output += `FAULT [${type}] (DOUBLE-FAULT \u2014 Tier 3) at PC=${this.pc}: ${message}\n`;
-            _reportToRegistry();
-            this._tier3Recovery(entry);
-            this.emit('fault', entry);
-            this.emit('output', this.output);
-            return;
-        }
-
-        // Tier 1: .catch method on the faulting abstraction.
-        // catchInvoked is set true whenever .catch is ATTEMPTED, regardless of outcome.
-        // This matches the structured fault record schema: "whether .catch was called".
-        if (faultingAbstractionSlot !== null && this.abstractionRegistry) {
-            const catchResult = this._invokeCatch(faultingAbstractionSlot, entry);
-            if (catchResult !== null) {
-                entry.catchInvoked = true; // .catch was present and called
-            }
-            if (catchResult && catchResult.handled) {
-                entry.tier = 1;
-                this.faultLog.push(entry);
-                this.output += `FAULT [${type}] at PC=${this.pc} caught by .catch on NS[${faultingAbstractionSlot}] (Tier 1) \u2014 recovered\n`;
-                this.pc++;
-                _reportToRegistry();
-                this.emit('fault', entry);
-                this.emit('output', this.output);
-                return;
-            }
-        }
-
-        // Tier 2: escalate to Scheduler.IRQ.
-        // _fireSchedulerIRQ returns null when the IRQ frame was not entered (early guard),
-        // true when dispatched + recovered, false when dispatched + not recovered.
-        // irqInvoked reflects "was Scheduler.IRQ actually dispatched?" — null means no.
+        // Always halt on first fault — the capability system reports the error;
+        // the IDE does not attempt recovery or escalation.
         this.output += `FAULT [${type}] at PC=${this.pc}: ${message}\n`;
-        const irqResult = this._fireSchedulerIRQ('FAULT', entry);
-        if (irqResult !== null) {
-            entry.irqInvoked = true; // IRQ frame was entered (dispatch was attempted)
-        }
-        if (irqResult === true) {
-            entry.tier = 2;
-            this.faultLog.push(entry);
-            this.output += `  \u2192 Scheduler.IRQ (Tier 2): fault escalated and handled\n`;
-            _reportToRegistry();
-            this.emit('fault', entry);
-            this.emit('output', this.output);
-            return;
-        }
-
-        // All tiers exhausted — halt (preserves pre-Task-#1077 behaviour)
         this.faultLog.push(entry);
         this.halted = true;
         this.running = false;
@@ -3373,39 +3322,12 @@ class ChurchSimulator {
         this.emit('output', this.output);
     }
 
-    // ── Three-tier fault recovery helpers (Task #1077) ────────────────────────
-
-    // Tier 1: invoke the .catch method on the given NS slot, if bound.
-    // Return contract (distinguishes "not found" from "called"):
-    //   null                    — no .catch method on this slot (not dispatched)
-    //   { invoked:true, handled:true }  — dispatched; handler accepted the fault
-    //   { invoked:true, handled:false } — dispatched; handler declined or threw
-    // catchInvoked in the fault record is set true for any non-null return.
-    _invokeCatch(nsSlot, faultRecord) {
-        if (!this.abstractionRegistry) return null;
-        const a = this.abstractionRegistry.abstractions[nsSlot];
-        if (!a) return null;
-        const catchFn = a.dispatch['.CATCH'] || a.dispatch['CATCH'];
-        if (!catchFn) return null;
-        // .catch exists — dispatch it; catch throws so escalation continues
-        try {
-            const result = catchFn(this, { faultRecord });
-            const handled = !!(result && result.handled);
-            return { invoked: true, handled };
-        } catch(e) {
-            this.output += `  .catch handler on NS[${nsSlot}] threw: ${e.message} (catchInvoked=true, escalating)\n`;
-            return { invoked: true, handled: false };
-        }
-    }
-
-    // Tier 2: fire the Scheduler.IRQ method (hidden ELOADCALL semantics).
-    // Returns true if the IRQ handler accepted and handled the event.
-    // Called both from fault() (reason='FAULT') and from step() timer check (reason='TIMER').
-    // For TIMER: also clears irqState.timerArmed (idempotent when step() already cleared it).
+    // Fire the Scheduler.IRQ method for the timer path (Scheduler.pause wake-up).
+    // Called from step() when irqState.timerArmed and deadline reached.
     // Returns:
     //   null  — IRQ frame was NOT entered (early guard: no registry, or already in IRQ frame)
-    //   true  — IRQ frame was entered and handler returned ok=true (recovered / swept)
-    //   false — IRQ frame was entered but handler returned ok=false (not recovered)
+    //   true  — IRQ frame was entered and handler returned ok=true (swept)
+    //   false — IRQ frame was entered but handler returned ok=false (not swept)
     _fireSchedulerIRQ(reason, faultRecord, slot) {
         if (!this.abstractionRegistry) return null;
         if (!this.irqState || this.irqState.irqActive) return null;
@@ -3552,28 +3474,12 @@ class ChurchSimulator {
 
         if (result && result.ok) {
             this.output += `  Scheduler.IRQ: ${result.message}\n`;
-            if (reason === 'FAULT' && this.irqState.savedContext) {
-                // Resume past the faulting instruction
-                this.pc = this.irqState.savedContext.pc + 1;
-            }
             return true;
         }
 
         const errMsg = result ? result.message : 'no IRQ handler bound';
         this.output += `  Scheduler.IRQ failed: ${errMsg}\n`;
         return false;
-    }
-
-    // Tier 3: double-fault — CHANGE directly to GT burned into CR13 by PP250.
-    // Simulated as an instant re-boot via _fastBoot(2) — no permanent halt.
-    _tier3Recovery(faultRecord) {
-        const cr13GT = (this.cr && this.cr[13] && this.cr[13].word0)
-            ? (this.cr[13].word0 >>> 0) : 0;
-        this.output += `TIER 3 RECOVERY: double-fault \u2014 CHANGE to CR13 GT=0x${cr13GT.toString(16).toUpperCase().padStart(8, '0')} (PP250 fast-boot recovery)\n`;
-        if (this.irqState) this.irqState.irqActive = false;
-        this._fastBoot(2);
-        this.halted = false;
-        this.running = false;
     }
 
     // Compute the physical memory address of the NEXT instruction to be fetched,
