@@ -306,6 +306,29 @@ def make_version_seals(gt_seq, location, limit17):
     return _u32(((gt_seq & 0x7F) << 25) | (compute_seal(location, limit17) & 0xFFFF))
 
 
+def write_ns_entry(mem, total, ns_entry_words, slot, location, lim17,
+                   b, g, gt_type, gt_seq, clist_count, abstract_gt):
+    """Write a single NS table entry with internally-computed seal (word2).
+
+    This is the sole legitimate path for writing NS table entries in the
+    boot image generator — no caller may set word2 directly.  The seal is
+    always computed here from (location, lim17) and gt_seq, mirroring the
+    hardware mLoad gate.
+
+    Inverted layout: slot N starts at total - (N+1)*ns_entry_words.
+    """
+    if gt_type == 3:
+        raise ValueError(
+            f"write_ns_entry(slot {slot}): Abstract GTs (gt_type=3) must never "
+            f"have NS entries. Use only Inform (1) or Outform (2)."
+        )
+    base = total - (slot + 1) * ns_entry_words
+    mem[base + 0] = location & 0xFFFFFFFF
+    mem[base + 1] = pack_ns_word1(lim17, b, 0, g, gt_type, clist_count)
+    mem[base + 2] = make_version_seals(gt_seq, location, lim17)
+    mem[base + 3] = (abstract_gt or 0) & 0xFFFFFFFF
+
+
 # ----- pre-flight validator --------------------------------------------------
 
 def validate_boot_image(image_bytes, total_namespace_words=None):
@@ -636,7 +659,10 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         # MMIO slots: lim17 from _MMIO_SLOT_SPECS (device register count - 1).
         if i == 0:
             lim17 = (NS_TABLE_RESERVE - 1) & 0x1FFFF
-            clist_count = len(catalog)
+            # NS[0] (Boot.NS) has no physical c-list in the NS TABLE region.
+            # clistCount=0; the DEMO_CLIST is managed through clist_gts[] and
+            # lazily installed into Boot.Abstr at runtime.
+            clist_count = 0
         elif i in _MMIO_SLOT_SPECS:
             lim17 = _MMIO_SLOT_SPECS[i][1]
             clist_count = 0
@@ -650,11 +676,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
             # runningOffset already not advanced (loc assignment already skipped above).
             clist_gts.append(create_gt(0, i, perms, 1))
             continue
-        base = total - (i + 1) * NS_ENTRY_WORDS
-        mem[base + 0] = loc & 0xFFFFFFFF
-        mem[base + 1] = pack_ns_word1(lim17, 0, 0, 0, 1, clist_count)
-        mem[base + 2] = make_version_seals(0, loc, lim17)
-        mem[base + 3] = _abstract_gt_word(perms)
+        write_ns_entry(mem, total, NS_ENTRY_WORDS, i, loc, lim17,
+                       0, 0, 1, 0, clist_count, _abstract_gt_word(perms))
         clist_gts.append(create_gt(0, i, perms, 1))
 
     # Count only non-null catalog entries: the highest non-null slot index + 1.
@@ -683,11 +706,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         _e2_size  = int(_e2.get("lumpSize") or SLOT_SIZE)
         _e2_lim17 = (_e2_size - 1) & 0x1FFFF
         _e2_perms = {"E": 1}   # callable abstraction
-        _e2_base  = total - (_e2_slot + 1) * NS_ENTRY_WORDS
-        mem[_e2_base + 0] = _e2_phys & 0xFFFFFFFF
-        mem[_e2_base + 1] = pack_ns_word1(_e2_lim17, 0, 0, 0, 1, 0)
-        mem[_e2_base + 2] = make_version_seals(0, _e2_phys, _e2_lim17)
-        mem[_e2_base + 3] = _abstract_gt_word(_e2_perms)
+        write_ns_entry(mem, total, NS_ENTRY_WORDS, _e2_slot, _e2_phys, _e2_lim17,
+                       0, 0, 1, 0, 0, _abstract_gt_word(_e2_perms))
         locations[_e2_slot] = _e2_phys
         ns_count = max(ns_count, _e2_slot + 1)
 
@@ -733,47 +753,12 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     mem_mgr_gt = create_gt(0, 0, {"R":1, "W":1}, 1)
     clist_gts[0] = mem_mgr_gt
 
-    # ── NS lump c-list (A7 v1.2 layout) ─────────────────────────────────────────
-    # A7 layout: NS LUMP IS the NS TABLE at ns_table_base. No separate lump header
-    # is written — NS slot 0 word0 (= ns_table_base, self-referential location)
-    # is already set by the NS entries loop above.
-    # The c-list tail lives in the last ns_catalog_count words of the NS TABLE region
-    # (ns_table_base + NS_TABLE_RESERVE − ns_catalog_count .. ns_table_base + NS_TABLE_RESERVE − 1).
-    # In the inverted NS layout, low slot numbers occupy the HIGHEST physical
-    # addresses (slot 0 at ns_table_base+NS_TABLE_RESERVE-4, slot 1 at -8, …).
-    # The c-list tail is placed at those same high addresses, so the write below
-    # overwrites NS slots 0 and 1 with c-list GT values.  After the write we
-    # restore them so that validateMAC passes in _bootStep B:01 / B:02.
-    # This must happen BEFORE clist_gts is truncated so all catalog GT values are available.
-    ns_catalog_count = len(catalog)
-    for ci in range(ns_catalog_count):
-        mem[ns_table_base + NS_TABLE_RESERVE - ns_catalog_count + ci] = (
-            clist_gts[ci] if ci < len(clist_gts) else 0
-        )
-
-    # ── Restore NS slots 0 and 1 after c-list write ──────────────────────────
-    # Re-write both entries from the same parameters used in the catalog loop
-    # so that validateMAC (seal check) passes in _bootStep B:01 / B:02.
-    # Downstream code uses clist_gts (the Python list), not physical memory
-    # words, so the c-list GT values at those addresses can be safely replaced.
-    _ns0_base = total - NS_ENTRY_WORDS           # _ns_slot_base(0) in JS
-    _ns0_loc  = ns_table_base
-    _ns0_lim  = (NS_TABLE_RESERVE - 1) & 0x1FFFF
-    mem[_ns0_base + 0] = _ns0_loc
-    mem[_ns0_base + 1] = pack_ns_word1(_ns0_lim, 0, 0, 0, 1, ns_catalog_count)
-    mem[_ns0_base + 2] = make_version_seals(0, _ns0_loc, _ns0_lim)
-    mem[_ns0_base + 3] = 0
-
-    _ns1_base = total - 2 * NS_ENTRY_WORDS       # _ns_slot_base(1) in JS
-    _ns1_loc  = locations[1]                     # physical address of thread lump;
-    # NOTE: mem[_ns1_base+0] cannot be used here — with ns_catalog_count≥8 the c-list
-    # write loop overwrites that word with clist_gts[3] (an LED_DEV GT), not an address.
-    # All 4 words are restored explicitly; word0 must be written back too.
-    _ns1_lim  = (thread_size - 1) & 0x1FFFF
-    mem[_ns1_base + 0] = _ns1_loc
-    mem[_ns1_base + 1] = pack_ns_word1(_ns1_lim, 0, 0, 0, 1, 0)
-    mem[_ns1_base + 2] = make_version_seals(0, _ns1_loc, _ns1_lim)
-    mem[_ns1_base + 3] = 0
+    # ── DEMO_CLIST finalisation ─────────────────────────────────────────────────
+    # The c-list GT words are managed virtually in clist_gts[].  They are NOT
+    # written into the NS TABLE region — the NS TABLE is a flat table of NS
+    # entries only; it carries no c-list.  NS slots 0 and 1 were written
+    # correctly above by the catalog loop (using write_ns_entry via mem writes
+    # with clist_count=0 for NS[0]) and are never stomped by any c-list loop.
 
     # Truncate to DEMO_CLIST_SIZE (11 entries for minimal 8-slot namespace).
     clist_gts = clist_gts[:DEMO_CLIST_SIZE]
@@ -810,13 +795,20 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         except Exception:
             pass
 
+    # Preserve the abstract_gt word3 that the catalog loop wrote for Boot.Abstr.
+    # The lazy/resident paths below only need to update word1 (lim17+cc) and
+    # word2 (seal); word0 (location) and word3 (abstract_gt) stay from the loop.
+    _abstr_ns_base = total - (BOOT_ABSTR_NS_SLOT + 1) * NS_ENTRY_WORDS
+    _abstr_abstract_gt = mem[_abstr_ns_base + 3]
+
     if _selftest_lazy:
         # Lazy mode: write CODE_NOT_RESIDENT stub (cw=0).  Simulator lazy-loads the
         # real lump body on first call; NS entry points here with alloc=64 words.
         mem[boot_entry_loc] = pack_lump_header(_ns_n_minus_6(actual_abstr_size), 0, 0, 0)
         entry_cr_limit = actual_abstr_size - 1  # cc=0 stub has no c-list
-        mem[entry_ns_base + 1] = pack_ns_word1(entry_cr_limit, 0, 0, 0, 1, 0)
-        mem[entry_ns_base + 2] = make_version_seals(0, boot_entry_loc, entry_cr_limit)
+        write_ns_entry(mem, total, NS_ENTRY_WORDS, BOOT_ABSTR_NS_SLOT,
+                       boot_entry_loc, entry_cr_limit, 0, 0, 1, 0, 0,
+                       _abstr_abstract_gt)
     elif abstr_words is not None:
         # Resident mode: saved lump present and validated — copy body into image.
         # abstr_words was parsed from big-endian disk format into Python ints;
@@ -826,8 +818,9 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         # Derive cc from the saved lump header (already validated above).
         _saved_cc      = abstr_words[0] & 0xFF
         entry_cr_limit = actual_abstr_size - _saved_cc - 1
-        mem[entry_ns_base + 1] = pack_ns_word1(entry_cr_limit, 0, 0, 0, 1, _saved_cc)
-        mem[entry_ns_base + 2] = make_version_seals(0, boot_entry_loc, entry_cr_limit)
+        write_ns_entry(mem, total, NS_ENTRY_WORDS, BOOT_ABSTR_NS_SLOT,
+                       boot_entry_loc, entry_cr_limit, 0, 0, 1, 0, _saved_cc,
+                       _abstr_abstract_gt)
     else:
         # No saved lump and resident mode required — the trampoline is eliminated
         # (direct dispatch via CR0).  Raise a clear error so the operator knows to
@@ -867,10 +860,9 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
                 _, _ref_slot, _perms = _entry
                 _gt = create_gt(0, _ref_slot, _perms, 1)
             mem[_loc + _sz - _cc + _ci] = _gt & 0xFFFFFFFF
-        # Update NS entry: word1 (lim17 + cc) and word2 (seal)
-        _ns_base = ns_table_base + _cslot * NS_ENTRY_WORDS
-        mem[_ns_base + 1] = pack_ns_word1(_lim17, 0, 0, 0, 1, _cc)
-        mem[_ns_base + 2] = make_version_seals(0, _loc, _lim17)
+        # Update NS entry: rewrite with corrected lim17 and cc via the gated helper.
+        write_ns_entry(mem, total, NS_ENTRY_WORDS, _cslot, _loc, _lim17,
+                       0, 0, 1, 0, _cc, 0)
 
     # Boot-entry slot: stored at NS_TABLE_BASE - 2 so that loadBootImage()
     # can restore the user's selected boot entry when loading the image.
@@ -905,13 +897,15 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         # Update NS entry word1 (lim17 + cc) and word2 (seal) to match the
         # actual lump.  The catalog loop wrote cc=0 for non-MMIO non-SelfTest
         # slots; boot-resident lumps may have cc > 0 (e.g. CapTest has cc=5).
-        _hdr     = _body[0] if _body else 0
-        _body_cc = _hdr & 0xFF
-        _body_sz = len(_body)
+        # Preserve word3 (abstract_gt) from the catalog loop.
+        _hdr      = _body[0] if _body else 0
+        _body_cc  = _hdr & 0xFF
+        _body_sz  = len(_body)
         _br_lim17 = (_body_sz - _body_cc - 1) & 0x1FFFF
         _br_ns_base = total - (_slot + 1) * NS_ENTRY_WORDS
-        mem[_br_ns_base + 1] = pack_ns_word1(_br_lim17, 0, 0, 0, 1, _body_cc)
-        mem[_br_ns_base + 2] = make_version_seals(0, _phys, _br_lim17)
+        _br_abstract_gt = mem[_br_ns_base + 3]
+        write_ns_entry(mem, total, NS_ENTRY_WORDS, _slot, _phys, _br_lim17,
+                       0, 0, 1, 0, _body_cc, _br_abstract_gt)
 
     # ----- Resident lump bodies (Step 2) --------------------------------
     token_map = _token_map

@@ -380,25 +380,6 @@ class ChurchSimulator {
             }
         }
 
-        // ── Foundational slot location correction (binary-age-agnostic) ─────────
-        // A7 v1.2 layout: Boot.NS (slot 0) is self-referential (word0 = NS_TABLE_BASE)
-        // and Boot.Thread (slot 1) starts at word 0. Stale binaries generated under
-        // older layouts may have wrong word0_location values here, causing the lump
-        // modal to look for a header at a garbage address (showing "HARDWARE MMIO
-        // DEVICE" instead of the real lump detail). Correct unconditionally.
-        {
-            const _ns0B = this._nsSlotBase(0);
-            if ((this.memory[_ns0B] >>> 0) !== (this.NS_TABLE_BASE >>> 0)) {
-                this.memory[_ns0B] = this.NS_TABLE_BASE >>> 0;
-                this.output += `[BOOTIMG] NS[0] (Boot.NS) word0_location corrected to NS_TABLE_BASE=0x${this.NS_TABLE_BASE.toString(16).toUpperCase()}.\n`;
-            }
-            const _ns1B = this._nsSlotBase(1);
-            if ((this.memory[_ns1B] >>> 0) !== 0) {
-                this.memory[_ns1B] = 0;
-                this.output += `[BOOTIMG] NS[1] (Boot.Thread) word0_location corrected to 0 (A7 v1.2 layout).\n`;
-            }
-        }
-
         // ── MMIO slot format upgrade (binary-age-agnostic correction) ───────────
         // Slots 2–5 are hardware MMIO register banks. Their NS word1 must carry
         // gtType=1 (Inform). Stale binaries generated before this invariant was
@@ -1438,7 +1419,10 @@ class ChurchSimulator {
             const lim17 = (i === 0) ? (this.NS_TABLE_RESERVE - 1)
                         : (DEVICE_REG_LIMITS[i] !== undefined ? DEVICE_REG_LIMITS[i]
                         : (mySize - 1));
-            const nsTableCount = (i === 0) ? abstractions.length : 0;
+            // NS[0] (Boot.NS) has no physical c-list in the NS TABLE region —
+            // clistCount is 0. The DEMO_CLIST is managed through this.demoClistGTs
+            // and lazily installed into Boot.Abstr at runtime by _applyPendingSimLoad.
+            const nsTableCount = 0;
             // v2.0 GT layout: [31]=b_flag [30:28]=perm[2:0] [27]=dom ★[26:25]=gt_type ★[24:16]=gt_seq ...
             const _ap   = a.perms || {};
             const _dom  = (_ap.L || _ap.S || _ap.E) ? 1 : 0;
@@ -1550,61 +1534,13 @@ class ChurchSimulator {
         clistGTs[0] = this.createGT(0, BOOT_NS_SLOT_HEADER, {R:1, W:1}, 1);
         const DEMO_CLIST_SIZE   = 11;   // slots 0–10 (minimal 11-slot namespace)
 
-        // ── NS lump c-list (A7 v1.2 layout) ─────────────────────────────────────────
-        // A7 layout: NS LUMP IS the NS TABLE at NS_TABLE_BASE. No separate lump header
-        // is written — NS slot 0 word0 (= NS_TABLE_BASE, the self-referential location)
-        // occupies memory[NS_TABLE_BASE+0] and is set by writeNSEntry above.
-        // The c-list tail lives in the last nsCatalogCount words of the NS TABLE region
-        // (at NS_TABLE_BASE + NS_TABLE_RESERVE − nsCatalogCount .. NS_TABLE_BASE + NS_TABLE_RESERVE − 1).
-        // In the inverted NS layout, low slot numbers occupy the HIGHEST physical
-        // addresses (slot 0 at NS_TABLE_BASE+NS_TABLE_RESERVE-4, slot 1 at -8, …).
-        // The c-list tail is placed at the same high addresses, so for a catalog
-        // with nsCatalogCount entries the write below overwrites:
-        //   • All 4 words of NS slot 0 when nsCatalogCount >= 4
-        //   • Words 1-3 of NS slot 1 when nsCatalogCount >= 5
-        //   • Word 3 of NS slot 2 when nsCatalogCount >= 9 (etc.)
-        // After the c-list write we restore NS slots 0 and 1 so that validateMAC
-        // (seal check) passes in _bootStep B:01 and B:02.  demoClistGTs is saved
-        // from the JS-array clistGTs (not from memory), so it is unaffected.
-        // This must happen BEFORE clistGTs is truncated to DEMO_CLIST_SIZE so all
-        // catalog slot GT values are available for the c-list write.
-        const nsCatalogCount  = abstractions.length;
-        for (let ci = 0; ci < nsCatalogCount; ci++) {
-            this.memory[this.NS_TABLE_BASE + this.NS_TABLE_RESERVE - nsCatalogCount + ci] = (clistGTs[ci] || 0) >>> 0;
-        }
-
-        // ── Restore NS slot 0 and NS slot 1 after c-list write ──────────────────
-        // The c-list write above has overwritten the seals (and sometimes the
-        // location/limit words) of NS slots 0 and 1.  Re-write them from the
-        // same parameters used in the catalog loop so that mLoad's validateMAC
-        // check passes when _bootStep B:01 / B:02 load these entries.
-        // The physical c-list entries at those addresses are intentionally
-        // replaced here; downstream code uses this.demoClistGTs (set below),
-        // not the physical words, so nothing is lost.
-        {
-            const _ns0Loc = this.NS_TABLE_BASE;
-            const _ns0Lim = (this.NS_TABLE_RESERVE - 1) & 0x1FFFF;
-            const _ns0W1  = this.packNSWord1(_ns0Lim, 0, 0, 1, nsCatalogCount);
-            this.memory[this._nsSlotBase(0) + 0] = _ns0Loc >>> 0;
-            this.memory[this._nsSlotBase(0) + 1] = _ns0W1  >>> 0;
-            this.memory[this._nsSlotBase(0) + 2] = this.makeVersionSeals(0, _ns0Loc, _ns0Lim);
-            this.memory[this._nsSlotBase(0) + 3] = 0;
-
-            // NS slot 1 (Thread): use threadLoc captured before the c-list write;
-            // with nsCatalogCount >= 8 the write loop overwrites word0 of this slot
-            // with clistGTs[3] (an LED_DEV GT), so reading it back gives a wrong address.
-            // All 4 words must be restored — word0 is overwritten too.
-            const _ns1Loc = threadLoc >>> 0;
-            const _ns1Lim = (THREAD_LUMP_SIZE - 1) & 0x1FFFF;
-            const _ns1W1  = this.packNSWord1(_ns1Lim, 0, 0, 1, 0);
-            this.memory[this._nsSlotBase(1) + 0] = _ns1Loc;
-            this.memory[this._nsSlotBase(1) + 1] = _ns1W1  >>> 0;
-            this.memory[this._nsSlotBase(1) + 2] = this.makeVersionSeals(0, _ns1Loc, _ns1Lim);
-            this.memory[this._nsSlotBase(1) + 3] = 0;
-        }
-
-        // Slots 0–16 map to NS slots 0–16 (or contain hardware-device Abstract GTs at 8–15).
-        // Slot 17 (TIMER_DEV) is simulator-only; not present in the boot c-list on real hardware.
+        // ── DEMO_CLIST finalisation ──────────────────────────────────────────────
+        // The c-list GT words are managed virtually in clistGTs[] / demoClistGTs.
+        // They are NOT written into the NS TABLE region — the NS TABLE is a flat
+        // table of NS entries only; it carries no c-list.  demoClistGTs is
+        // lazily installed into Boot.Abstr at runtime by _applyPendingSimLoad().
+        // NS slots 0 and 1 were written correctly above by writeNSEntry() (with
+        // clistCount=0 for NS[0]) and are never stomped by any c-list write loop.
         clistGTs.length         = DEMO_CLIST_SIZE;
         // Save the completed DEMO_CLIST so _applyPendingSimLoad() (app-run.js) can
         // lazily install it into Boot.Abstr's free region when the NUC_PROGRAM is
