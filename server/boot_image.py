@@ -768,7 +768,9 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     _ns1_loc  = locations[1]                     # physical address of thread lump;
     # NOTE: mem[_ns1_base+0] cannot be used here — with ns_catalog_count≥8 the c-list
     # write loop overwrites that word with clist_gts[3] (an LED_DEV GT), not an address.
+    # All 4 words are restored explicitly; word0 must be written back too.
     _ns1_lim  = (thread_size - 1) & 0x1FFFF
+    mem[_ns1_base + 0] = _ns1_loc
     mem[_ns1_base + 1] = pack_ns_word1(_ns1_lim, 0, 0, 0, 1, 0)
     mem[_ns1_base + 2] = make_version_seals(0, _ns1_loc, _ns1_lim)
     mem[_ns1_base + 3] = 0
