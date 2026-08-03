@@ -10991,7 +10991,7 @@ function openSettings() {
     renderProgressReport();
     renderFamilyIntroQR();
     const releaseEl = document.getElementById('settingsReleasePublishedAt');
-    if (releaseEl) releaseEl.textContent = '2026-05-15 UTC';
+    if (releaseEl) releaseEl.textContent = '2026-08-03 UTC';
     const anyPerm = hasAnyPopupDismissedPerm();
     const showAllCheck = document.getElementById('showAllPopupsCheck');
     if (showAllCheck) showAllCheck.checked = !anyPerm;

@@ -3322,12 +3322,15 @@ class ChurchSimulator {
         this.emit('output', this.output);
     }
 
-    // Fire the Scheduler.IRQ method for the timer path (Scheduler.pause wake-up).
-    // Called from step() when irqState.timerArmed and deadline reached.
+    // ── Scheduler IRQ helper (timer / wake path only) ────────────────────────
+
+    // Fire the Scheduler.IRQ method (hidden ELOADCALL semantics).
+    // Called only from step() timer check (reason='TIMER').
+    // Clears irqState.timerArmed (idempotent when step() already cleared it).
     // Returns:
     //   null  — IRQ frame was NOT entered (early guard: no registry, or already in IRQ frame)
-    //   true  — IRQ frame was entered and handler returned ok=true (swept)
-    //   false — IRQ frame was entered but handler returned ok=false (not swept)
+    //   true  — IRQ frame was entered and handler returned ok=true (recovered / swept)
+    //   false — IRQ frame was entered but handler returned ok=false (not recovered)
     _fireSchedulerIRQ(reason, faultRecord, slot) {
         if (!this.abstractionRegistry) return null;
         if (!this.irqState || this.irqState.irqActive) return null;

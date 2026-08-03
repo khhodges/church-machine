@@ -3594,9 +3594,8 @@ function _showNSLumpModal(slotIdx, nsEntry) {
         }
 
         if (cw > 0 && sim.memory) {
-            const maxShow = Math.min(cw, 32);
             let rows2 = '';
-            for (let _ki = 0; _ki < maxShow; _ki++) {
+            for (let _ki = 0; _ki < cw; _ki++) {
                 const widx = base + 1 + _ki;
                 const w = sim.memory[widx] >>> 0;
                 const dis = (typeof assembler !== 'undefined' && assembler && typeof assembler.disassemble === 'function')
@@ -3609,22 +3608,28 @@ function _showNSLumpModal(slotIdx, nsEntry) {
                     <td ${_nsTD} style="color:#dcdcaa;font-family:monospace;font-size:0.8rem;">${dis}</td>
                 </tr>`;
             }
-            const truncNote = cw > maxShow ? `<div style="color:#6b7280;font-size:0.75rem;margin-top:4px;">… ${cw - maxShow} more words not shown</div>` : '';
             codeHtml = `<div style="margin-bottom:14px;">
                 <div style="color:#c89b3c;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">CODE (${cw} words)</div>
+                <div style="overflow-y:auto;max-height:260px;border:1px solid rgba(255,255,255,0.06);border-radius:4px;">
                 <table ${_nsMT}>
-                    <thead><tr><th ${_nsTH}>Offset</th><th ${_nsTH}>+word</th><th ${_nsTH}>Word</th><th ${_nsTH}>Disassembly</th></tr></thead>
+                    <thead><tr><th ${_nsTH} style="position:sticky;top:0;background:#1a1a2e;z-index:1;">Offset</th><th ${_nsTH} style="position:sticky;top:0;background:#1a1a2e;z-index:1;">+word</th><th ${_nsTH} style="position:sticky;top:0;background:#1a1a2e;z-index:1;">Word</th><th ${_nsTH} style="position:sticky;top:0;background:#1a1a2e;z-index:1;">Disassembly</th></tr></thead>
                     <tbody>${rows2}</tbody>
-                </table>${truncNote}</div>`;
+                </table></div></div>`;
         }
 
         const srcLump = (typeof _findSrcLump === 'function') ? _findSrcLump(slotIdx, nsEntry.label) : null;
         if (srcLump && srcLump.token) {
-            tokenHtml = `<div style="margin-bottom:12px;display:flex;align-items:center;gap:10px;">
-                <span style="color:#888;font-size:0.78rem;">Token:</span>
-                <code style="color:#c89b3c;">${srcLump.token}</code>
-                <button class="btn btn-xs" onclick="document.getElementById('_nsLumpModalOverlay').remove();_openLumpSource('${srcLump.token}')"
-                    style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);">Open in Repository →</button>
+            const _slTok = srcLump.token;
+            tokenHtml = `<div style="margin-bottom:12px;">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+                    <span style="color:#888;font-size:0.78rem;">Token:</span>
+                    <code style="color:#c89b3c;">${_slTok}</code>
+                    <button class="btn btn-xs" onclick="document.getElementById('_nsLumpModalOverlay').remove();_openLumpSource('${_slTok}')"
+                        style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);">Open in Repository →</button>
+                    <button class="btn btn-xs" onclick="document.getElementById('_nsLumpModalOverlay').remove();(typeof openLumpInEditor==='function'?openLumpInEditor('${_slTok}'):_openLumpSource('${_slTok}'))"
+                        style="background:#1e3a5f;color:#60a5fa;border:1px solid rgba(96,165,250,0.35);">Open in Editor ✎</button>
+                </div>
+                <div style="color:#555;font-size:0.72rem;font-family:monospace;">&#x1F3E0; server/lumps/${_slTok}.lump</div>
             </div>`;
         } else {
             tokenHtml = `<div style="margin-bottom:12px;color:#6b7280;font-size:0.78rem;">Token: not in library — boot-resident or compiled in-memory</div>`;
@@ -3637,12 +3642,17 @@ function _showNSLumpModal(slotIdx, nsEntry) {
         const _lazyEntry = (typeof _findSrcLump === 'function') ? _findSrcLump(slotIdx, nsEntry.label) : null;
         if (_lazyEntry && _lazyEntry.token) {
             _lazyFetchToken = _lazyEntry.token;
-            tokenHtml = `<div style="margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                <span style="color:#888;font-size:0.78rem;">Token:</span>
-                <code style="color:#c89b3c;">${_lazyFetchToken}</code>
-                <span style="color:#f0a040;font-size:0.72rem;padding:2px 8px;border:1px solid rgba(240,160,64,0.35);border-radius:10px;">Lazy Load</span>
-                <button class="btn btn-xs" onclick="document.getElementById('_nsLumpModalOverlay').remove();_openLumpSource('${_lazyFetchToken}')"
-                    style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);">Open in Repository \u2192</button>
+            tokenHtml = `<div style="margin-bottom:12px;">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+                    <span style="color:#888;font-size:0.78rem;">Token:</span>
+                    <code style="color:#c89b3c;">${_lazyFetchToken}</code>
+                    <span style="color:#f0a040;font-size:0.72rem;padding:2px 8px;border:1px solid rgba(240,160,64,0.35);border-radius:10px;">Lazy Load</span>
+                    <button class="btn btn-xs" onclick="document.getElementById('_nsLumpModalOverlay').remove();_openLumpSource('${_lazyFetchToken}')"
+                        style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);">Open in Repository \u2192</button>
+                    <button class="btn btn-xs" onclick="document.getElementById('_nsLumpModalOverlay').remove();(typeof openLumpInEditor==='function'?openLumpInEditor('${_lazyFetchToken}'):_openLumpSource('${_lazyFetchToken}'))"
+                        style="background:#1e3a5f;color:#60a5fa;border:1px solid rgba(96,165,250,0.35);">Open in Editor \u270e</button>
+                </div>
+                <div style="color:#555;font-size:0.72rem;font-family:monospace;">&#x1F3E0; server/lumps/${_lazyFetchToken}.lump</div>
             </div>`;
             headerHtml = `<div id="_nsLumpLazyBody" style="color:#f0a040;font-size:0.8rem;padding:8px 0;">&#9680; Loading lump data\u2026</div>`;
         } else {
@@ -3833,9 +3843,8 @@ function _showNSLumpModal(slotIdx, nsEntry) {
 
                 // Code table
                 if (cw > 0) {
-                    const maxShow = Math.min(cw, 32);
                     let rows2 = '';
-                    for (let _ki = 0; _ki < maxShow; _ki++) {
+                    for (let _ki = 0; _ki < cw; _ki++) {
                         const w = (rawWords[1 + _ki] || 0) >>> 0;
                         let dis = `0x${w.toString(16).toUpperCase().padStart(8,'0')}`;
                         if (typeof assembler !== 'undefined' && assembler && typeof assembler.disassemble === 'function') {
@@ -3848,15 +3857,13 @@ function _showNSLumpModal(slotIdx, nsEntry) {
                             <td ${_nsTD} style="color:#dcdcaa;font-family:monospace;font-size:0.8rem;">${dis}</td>
                         </tr>`;
                     }
-                    const truncNote = cw > maxShow
-                        ? `<div style="color:#6b7280;font-size:0.75rem;margin-top:4px;">\u2026 ${cw - maxShow} more word${cw - maxShow === 1 ? '' : 's'} not shown</div>`
-                        : '';
                     fetchHtml += `<div style="margin-bottom:14px;">
                         <div style="color:#c89b3c;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">CODE (${cw} word${cw === 1 ? '' : 's'})</div>
+                        <div style="overflow-y:auto;max-height:260px;border:1px solid rgba(255,255,255,0.06);border-radius:4px;">
                         <table ${_nsMT}>
-                            <thead><tr><th ${_nsTH}>Offset</th><th ${_nsTH}>+word</th><th ${_nsTH}>Word</th><th ${_nsTH}>Disassembly</th></tr></thead>
+                            <thead><tr><th ${_nsTH} style="position:sticky;top:0;background:#1a1a2e;z-index:1;">Offset</th><th ${_nsTH} style="position:sticky;top:0;background:#1a1a2e;z-index:1;">+word</th><th ${_nsTH} style="position:sticky;top:0;background:#1a1a2e;z-index:1;">Word</th><th ${_nsTH} style="position:sticky;top:0;background:#1a1a2e;z-index:1;">Disassembly</th></tr></thead>
                             <tbody>${rows2}</tbody>
-                        </table>${truncNote}</div>`;
+                        </table></div></div>`;
                 } else {
                     fetchHtml += `<span style="color:#6b7280;font-size:0.8rem;">cw = 0 \u2014 no code words</span>`;
                 }

@@ -1,11 +1,11 @@
 'use strict';
-// test_fault_recovery.js — Scheduler timer / IRQ path tests
+// test_fault_recovery.js — Unit tests for Scheduler timer/wake paths and fault record shape
 // Run:  node simulator/test_fault_recovery.js
 //
 // Coverage:
 //   T004 — pause timer fire: Scheduler.pause arms timer; step to deadline fires IRQ
 //   T005 — Wait flag-set wake: pendingWakeFlags signals sleeping thread via IRQ sweep
-//   T006 — Structured fault record: fault always halts; tier/catchInvoked/irqInvoked=null/false
+//   T006 — Structured fault record: halt-always path populates all fields correctly
 //   T008 — Scheduler.pause method-table index 4: assembled ELOADCALL encodes index 4,
 //           dispatch chain resolves to pause handler, thread transitions to sleeping
 //   T010 — Continuous step() loop: timer fires naturally via natural stepCount
@@ -123,18 +123,18 @@ console.log('\n--- T005: Scheduler.Wait(flag) / signal / wake ---');
     check('T005j: irqSweepCount incremented', sysAbs._schedulerState._irqSweepCount >= 1);
 }
 
-// ── T006: Structured fault record fields (baseline — fault always halts) ──────
-console.log('\n--- T006: Structured fault record (halt-always) ---');
+// ── T006: Structured fault record fields (baseline — unhandled fault) ─────────
+console.log('\n--- T006: Structured fault record (unhandled) ---');
 {
     const { sim } = makeTestSim();
-    sim.fault('BOUNDS', 'Test structured record fields');
+    sim.fault('BOUNDS', 'Test structured record fields (no recovery)');
 
     const entry = sim.faultLog[0];
     check('T006a: faultLog has one entry', sim.faultLog.length === 1);
     check('T006b: faultCode = BOUNDS code', entry.faultCode === ChurchSimulator.FAULT_CODES.BOUNDS);
-    check('T006c: tier is null (no recovery attempted)', entry.tier === null);
-    check('T006d: catchInvoked=false (no Tier 1)', entry.catchInvoked === false);
-    check('T006e: irqInvoked=false (no Tier 2)', entry.irqInvoked === false);
+    check('T006c: tier is null (all tiers failed — halt)', entry.tier === null);
+    check('T006d: catchInvoked=false', entry.catchInvoked === false);
+    check('T006e: irqInvoked=false (halt-always path; no IRQ dispatch on fault)', entry.irqInvoked === false);
     check('T006f: tier3Recovery=false', entry.tier3Recovery === false);
     check('T006g: machine halted', sim.halted === true);
     check('T006h: "Scheduler" pet name maps to NS slot 8',
@@ -1858,13 +1858,13 @@ console.log('\n--- T018: LAZY_RESOLVE wired from _execLoad (petNameMemory) ---')
 
 // ── T019: STUB_METHOD fault — all-RETURN LUMP faults at CALL time ─────────────
 //
-//   Verifies the full stub-lump detection and halt path:
+//   Verifies the stub-lump detection and halt-always fault path:
 //   T019a: _lumpIsStub() correctly identifies all-RETURN code region.
-//   T019b-d: CALL into stub LUMP fires STUB_METHOD fault; machine halts (no recovery).
+//   T019b-f: CALL into stub LUMP fires STUB_METHOD fault; machine halts immediately.
 //
 console.log('\n--- T019: STUB_METHOD fault (all-RETURN stub LUMP) ---');
 {
-    const { sim } = makeTestSim();
+    const { sim, registry } = makeTestSim();
     sim.bootComplete = false;
 
     const STUB_SLOT = 20;
@@ -1892,8 +1892,15 @@ console.log('\n--- T019: STUB_METHOD fault (all-RETURN stub LUMP) ---');
     check('T019a: _lumpIsStub detects all-RETURN code region as stub',
         sim._nsStubFlags[STUB_SLOT] === true);
 
-    // Point CR14 at the stub slot
+    // Point CR14 at the stub slot so fault recovery finds the .catch handler
     sim.cr[14] = { word0: STUB_SLOT, word1: STUB_BASE, word2: 0, word3: 0, m: 0 };
+
+    // Bind a .catch handler on STUB_SLOT so Tier 1 recovery fires
+    let t019_catchCalled = false;
+    registry.bindMethod(STUB_SLOT, '.catch', () => {
+        t019_catchCalled = true;
+        return { handled: true };
+    });
 
     // Load E-GT for stub slot into CR0, write CALL CR0 at PC=0
     const stubGT = sim.createGT(1, STUB_SLOT, { E: 1 }, 1);
@@ -1907,7 +1914,11 @@ console.log('\n--- T019: STUB_METHOD fault (all-RETURN stub LUMP) ---');
         sim.faultLog.length === 1);
     check('T019c: fault type is STUB_METHOD',
         sim.faultLog[0] && sim.faultLog[0].type === 'STUB_METHOD');
-    check('T019d: machine halted after STUB_METHOD (no recovery)',
+    check('T019d: catchInvoked=false (halt-always path; no Tier 1 recovery)',
+        sim.faultLog[0] && sim.faultLog[0].catchInvoked === false);
+    check('T019e: faultLog entry tier === null (halt-always path)',
+        sim.faultLog[0] && sim.faultLog[0].tier === null);
+    check('T019f: machine halted after STUB_METHOD fault',
         sim.halted === true);
 }
 
