@@ -976,7 +976,7 @@ function _injectClistNow() {
     // through to the nsLabels lookup and resolves via its NS entry.
     const _devSlotMap = {
         LED0: 3, LED1: 3, LED2: 3, LED3: 3, LED4: 3, LED5: 3,
-        UART: 2, BTN: 4, Timer: 5, Display: 2,
+        UART: 2, UART_TX: 2, UART_RX: 2, BTN: 4, Timer: 5, Display: 2,
     };
 
     // Boot.Abstr's NS slot is dynamic (sim.bootEntrySlot, default 6 = SelfTest

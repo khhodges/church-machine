@@ -476,7 +476,7 @@ class ChurchAssembler {
         //      it appears in the Namespace Table and resolves via nsSymbols above.
         {
             const nameUC = name.toUpperCase();
-            if (nameUC === 'UART')  return 2;
+            if (nameUC === 'UART' || nameUC === 'UART_TX' || nameUC === 'UART_RX')  return 2;
             if (nameUC === 'BTN')   return 4;
             if (nameUC === 'TIMER') return 5;
         }
@@ -643,7 +643,7 @@ class ChurchAssembler {
         }
 
         // Fixed hardware-device slot names — already resolved by other paths.
-        const _deviceRE = /^(UART|BTN|SlideRule|Timer|Display)$/i;
+        const _deviceRE = /^(UART|UART_TX|UART_RX|BTN|SlideRule|Timer|Display)$/i;
 
         // Every capability declared in the block — LED devices, NS-based abstractions,
         // and null-GT rows alike — gets its 0-based position as its c-list offset.
@@ -2122,7 +2122,7 @@ class ChurchAssembler {
     // These names are exempt from the bare-name (no rights letters) validation.
     static _isHardwareCapName(name) {
         return /^LED[0-5]$/i.test(name) ||
-               /^(UART|BTN|SlideRule|Timer|Display|Boot\.Nucs|Boot\.Abstr)$/i.test(name);
+               /^(UART|UART_TX|UART_RX|BTN|SlideRule|Timer|Display|Boot\.Nucs|Boot\.Abstr)$/i.test(name);
     }
 
     // Parse a single "NAME [RIGHTS]" capability item from a capabilities { } block.
