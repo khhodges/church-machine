@@ -1,3 +1,4 @@
+- [gen_cm_dmem_direct.py double-definition trap](gen-cm-dmem-double-definition.md) — appends cm_dmem_bram to church_ti60_f225.v AND writes cm_dmem_bram.v; delete the .v and strip XML entry before MAP
 - [NS slot restore post-c-list-write read](ns-slot-restore-post-clist-read.md) — NS slot 1 location must be captured BEFORE the c-list write loop; same bug existed in both boot_image.py and simulator.js
 - [NS slot 1 DEMO_CLIST stomp (stale binary)](ns-slot1-demo-clist-stomp.md) — old generator wrote clist_gts into NS TABLE tail, stomping NS[1] word0 (Thread loc) with 0x32000003; fixed in loadBootImage() + binary patched
 - [NULL GT type canonicalisation](null-gt-type-canon.md) — isNullGT checks bits[26:25]===0b00; only replace ===0 with isNullGT at hardware gates (mLoad, _fetchInstruction); UI presence checks (CR6 in resolvePendingSlot) must stay ===0
