@@ -620,7 +620,7 @@ function _clistTypeLabel(name) {
     // Peripheral name patterns — hardware capabilities not backed by a lump
     const up = name.toUpperCase();
     if (/^LED\d*$/.test(up) || /^GPIO\d*$/.test(up))             return 'IO';
-    if (/^UART\d*$/.test(up) || /^USART\d*$/.test(up))           return 'IO';
+    if (/^UART/.test(up) || /^USART/.test(up))                    return 'IO';
     if (/^SPI\d*$/.test(up) || /^I2C\d*$/.test(up))              return 'IO';
     if (/^PWM\d*$/.test(up) || /^TIMER\d*$/.test(up) || /^TIM\d*$/.test(up)) return 'IO';
     if (/^ADC\d*$/.test(up) || /^DAC\d*$/.test(up))              return 'IO';
