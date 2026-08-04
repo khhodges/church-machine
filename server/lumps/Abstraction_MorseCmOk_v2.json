@@ -32,7 +32,10 @@
         "R",
         "W"
       ],
-      "nsIndex": -1
+      "nsIndex": 3,
+      "gt": "0x32000003",
+      "ns_slot": 3,
+      "note": "LED_DEV Inform GT (NS slot 3, MMIO 0x40000000, R+W)"
     }
   ],
   "pet_names": {

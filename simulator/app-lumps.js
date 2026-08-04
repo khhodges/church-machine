@@ -707,7 +707,9 @@ function _runSelectedLumpInSim(btn) {
     // classic "LED flash LUMP stays in place" bug.  Passing null forces
     // loadLumpBinary to target BOOT_ABSTR_NS_SLOT so the new code is reachable
     // via CR14 immediately.
-    _loadLumpBinaryIntoSim(_selectedLumpToken, lump.abstraction || _selectedLumpToken, btn, null);
+    // Pass capabilities so _loadLumpBinaryIntoSim can inject device GTs for any
+    // NULL c-list slots in binaries compiled before the pet-name registry was wired.
+    _loadLumpBinaryIntoSim(_selectedLumpToken, lump.abstraction || _selectedLumpToken, btn, null, lump.capabilities || []);
 }
 
 function _showLumpWorkspaceTabs() {
@@ -5000,7 +5002,7 @@ async function _gtPickCommit(lumpToken, slotIndex) {
 // ns_slot field (passed as the optional nsSlot argument); when absent it falls
 // back to BOOT_ABSTR_NS_SLOT (slot 3) for backwards compatibility.  CR14 is
 // updated to match the chosen slot.  The assembler path (loadProgram) is unaffected.
-async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot) {
+async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
     if (!token) return;
     if (btn) { btn.disabled = true; btn.textContent = 'Loading\u2026'; }
     try {
@@ -5077,6 +5079,42 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot) {
         // lump binary by loadLumpBinary(), and CR6 has been updated to point to it.
         // Calling _injectClistNow() here would overwrite the loaded c-list and mutate the
         // header's cc field, destroying the LUMP integrity that this function now preserves.
+        //
+        // DEVICE GT INJECTION — covers binaries compiled before the pet-name registry was
+        // wired (NULL c-list slots for LED0, UART_TX, etc.).  For each capability with a
+        // NULL slot in sim.memory, resolve the GT via the universal pet-name registry
+        // (abstractionRegistry.abstractions[j].capabilities, populated from boot_uploads.js)
+        // and inject it.  Non-null slots are never overwritten.
+        if (Array.isArray(caps) && caps.length > 0 && sim.cr && sim.cr[6] && sim.cr[6].word1 != null) {
+            const _clistBase = sim.cr[6].word1 >>> 0;
+            const _allAbs = (sim.abstractionRegistry && sim.abstractionRegistry.abstractions) || {};
+            for (let _ci = 0; _ci < caps.length; _ci++) {
+                if ((sim.memory[_clistBase + _ci] >>> 0) !== 0) continue; // already filled
+                const _capName = (typeof caps[_ci] === 'string' ? caps[_ci] : (caps[_ci] && caps[_ci].name) || '').toUpperCase();
+                if (!_capName) continue;
+                // Search the capabilities arrays for a matching pet name
+                let _found = false;
+                for (const _jj of Object.keys(_allAbs)) {
+                    const _aa = _allAbs[_jj];
+                    if (!Array.isArray(_aa.capabilities)) continue;
+                    for (const _dc of _aa.capabilities) {
+                        if (_dc.name && _dc.name.toUpperCase() === _capName && _dc.target != null) {
+                            const _grants = Array.isArray(_dc.grants) ? _dc.grants : [];
+                            const _turing = _grants.some(g => g === 'R' || g === 'W' || g === 'X');
+                            const _perms = _turing
+                                ? { R: _grants.includes('R')?1:0, W: _grants.includes('W')?1:0, X: _grants.includes('X')?1:0, L:0, S:0, E:0 }
+                                : { R:0, W:0, X:0, L:0, S:0, E:1 };
+                            if (typeof sim.createGT === 'function') {
+                                sim.memory[_clistBase + _ci] = sim.createGT(0, _dc.target, _perms, 1) >>> 0;
+                            }
+                            _found = true;
+                            break;
+                        }
+                    }
+                    if (_found) break;
+                }
+            }
+        }
         if (sim.programName !== undefined) sim.programName = name || token;
 
         const hdr = rawWords.length ? sim.parseLumpHeader(rawWords[0] >>> 0) : null;

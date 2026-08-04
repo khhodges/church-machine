@@ -107,7 +107,18 @@ const BOOT_UPLOADS = [
         type: 'boot',
         index: 3,
         grants: [],
-        capabilities: [],
+        // Device pet names for the LED hardware (NS slot 3 = LED_DEV, MMIO R+W).
+        // LED0–LED5 all resolve to the same NS slot; the DWRITE offset selects
+        // the physical LED.  Defined here so resolvedCaps (app-compile.js) can
+        // look up "LED0" by name without hardcoding a slot literal.
+        capabilities: [
+            { name: 'LED0', target: 3, grants: ['R', 'W'] },
+            { name: 'LED1', target: 3, grants: ['R', 'W'] },
+            { name: 'LED2', target: 3, grants: ['R', 'W'] },
+            { name: 'LED3', target: 3, grants: ['R', 'W'] },
+            { name: 'LED4', target: 3, grants: ['R', 'W'] },
+            { name: 'LED5', target: 3, grants: ['R', 'W'] }
+        ],
         methods: []
     },
     {
@@ -214,7 +225,12 @@ const BOOT_UPLOADS = [
         type: 'boot',
         index: 11,
         grants: ['L', 'S', 'E'],
-        capabilities: [],
+        // UART device pet names → NS slot 2 (UART_DEV, MMIO R+W).
+        capabilities: [
+            { name: 'UART',    target: 2, grants: ['R', 'W'] },
+            { name: 'UART_TX', target: 2, grants: ['R', 'W'] },
+            { name: 'UART_RX', target: 2, grants: ['R', 'W'] }
+        ],
         methods: []
     },
     {
@@ -230,7 +246,11 @@ const BOOT_UPLOADS = [
         type: 'boot',
         index: 13,
         grants: ['L', 'E'],
-        capabilities: [],
+        // Button device pet names → NS slot 4 (BTN_DEV, MMIO R+W).
+        capabilities: [
+            { name: 'BTN',    target: 4, grants: ['R', 'W'] },
+            { name: 'BUTTON', target: 4, grants: ['R', 'W'] }
+        ],
         methods: []
     },
     {
@@ -238,7 +258,10 @@ const BOOT_UPLOADS = [
         type: 'boot',
         index: 14,
         grants: ['L', 'S', 'E'],
-        capabilities: [],
+        // Timer device pet names → NS slot 5 (TIMER_DEV, MMIO R+W).
+        capabilities: [
+            { name: 'TIMER', target: 5, grants: ['R', 'W'] }
+        ],
         methods: []
     },
     {

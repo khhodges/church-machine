@@ -1356,6 +1356,7 @@ function compileAndBuild() {
         const capName = typeof cap === 'string' ? cap : (cap.name || '');
         const capRights = typeof cap === 'string' ? [] : (cap.rights || []);
         let target = -1;
+        let capGrants = [];
         if (sim && sim.abstractionRegistry) {
             // sim.abstractionRegistry.abstractions is a plain object keyed by
             // numeric index (see AbstractionRegistry.createAbstraction), NOT
@@ -1363,14 +1364,33 @@ function compileAndBuild() {
             // resolve to undefined and silently produce a NULL GT (0x00000000)
             // in the c-list for every capability. See NoteG/SlideRule bug.
             const allAbs = sim.abstractionRegistry.abstractions || {};
+            // Search 1: match top-level abstraction name (e.g. 'SlideRule', 'Navana')
             for (const j of Object.keys(allAbs)) {
                 if (allAbs[j] && allAbs[j].name && allAbs[j].name.toUpperCase() === capName.toUpperCase()) {
                     target = Number(j);
                     break;
                 }
             }
+            // Search 2: match device pet name inside an abstraction's capabilities array.
+            // LED0–LED5, UART_TX, BTN, TIMER etc. are defined in boot_uploads.js and
+            // fed into abstractionRegistry.abstractions[j].capabilities by app-shell.js
+            // init.  This is the universal pet-name registry — never resolve by slot literal.
+            if (target < 0) {
+                outer:
+                for (const j2 of Object.keys(allAbs)) {
+                    const _a2 = allAbs[j2];
+                    if (!Array.isArray(_a2.capabilities)) continue;
+                    for (const _dc of _a2.capabilities) {
+                        if (_dc.name && _dc.name.toUpperCase() === capName.toUpperCase() && _dc.target != null) {
+                            target    = _dc.target;
+                            capGrants = Array.isArray(_dc.grants) ? _dc.grants : [];
+                            break outer;
+                        }
+                    }
+                }
+            }
         }
-        return { name: capName, rights: capRights, nsIndex: target };
+        return { name: capName, rights: capRights, nsIndex: target, grants: capGrants };
     });
 
     const lumpWords = new Uint32Array(lumpSize);
@@ -1386,9 +1406,18 @@ function compileAndBuild() {
         // resolved capability GT is an Inform-type (type=1), E-permission-only
         // token: gt_seq=0, dom=1, perm3=E(0b100) -> 0x4A000000 | index.
         if (resolvedCaps[i].nsIndex >= 0) {
-            lumpWords[clistStart + i] = (sim && typeof sim.createGT === 'function')
-                ? (sim.createGT(0, resolvedCaps[i].nsIndex, { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, 1) >>> 0)
-                : ((0x4A000000 | (resolvedCaps[i].nsIndex & 0xFFFF)) >>> 0);
+            if (sim && typeof sim.createGT === 'function') {
+                // Use the grants from the capability definition to build the correct GT:
+                // R/W/X grants → Turing-domain Inform GT; E grant (or default) → Church E-perm GT.
+                const _cg = resolvedCaps[i].grants || [];
+                const _hasTuring = _cg.some(g => g === 'R' || g === 'W' || g === 'X');
+                const _perms = _hasTuring
+                    ? { R: _cg.includes('R') ? 1 : 0, W: _cg.includes('W') ? 1 : 0, X: _cg.includes('X') ? 1 : 0, L: 0, S: 0, E: 0 }
+                    : { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 };
+                lumpWords[clistStart + i] = sim.createGT(0, resolvedCaps[i].nsIndex, _perms, 1) >>> 0;
+            } else {
+                lumpWords[clistStart + i] = (0x4A000000 | (resolvedCaps[i].nsIndex & 0xFFFF)) >>> 0;
+            }
         } else {
             lumpWords[clistStart + i] = 0x00000000;
         }
