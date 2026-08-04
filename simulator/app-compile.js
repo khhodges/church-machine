@@ -1948,7 +1948,7 @@ function loadCLOOMCIntoSim() {
                 _internal: isInternal
             };
         });
-        _lumpManifests[_bootSlot] = {
+        _lumpManifests[sim.bootEntrySlot] = {
             _methods: _manifestMethods,
             methods:  _methodsDict,
             pet_names: { DR: _globalPetDR, CR: {} }
