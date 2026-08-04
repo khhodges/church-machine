@@ -22201,7 +22201,7 @@ module church_wukong_xc7a100t(rst_n, uart_rx_pin, led0, led1, uart_tx_pin, dbg_b
   wire halt_req;
   reg hb_blink = 1'h0;
   reg [25:0] hb_ctr = 26'h0000000;
-  reg [5:0] hw_init_ctr = 6'h00;
+  wire [5:0] hw_init_ctr;
   reg hw_init_done = 1'h0;
   wire [13:0] hw_init_wr_addr;
   wire [31:0] hw_init_wr_data;
@@ -22209,7 +22209,7 @@ module church_wukong_xc7a100t(rst_n, uart_rx_pin, led0, led1, uart_tx_pin, dbg_b
   wire [31:0] imem_addr;
   wire [31:0] imem_data;
   wire imem_valid;
-  wire [4:0] init_rom_rd__addr;
+  reg [5:0] init_rom_rd__addr = 6'h00;
   wire [45:0] init_rom_rd__data;
   wire is_mmio;
   wire is_mmio_read;
@@ -24548,10 +24548,10 @@ module church_wukong_xc7a100t(rst_n, uart_rx_pin, led0, led1, uart_tx_pin, dbg_b
     dmem[25] = 32'd63;
     dmem[26] = 32'd3735641839;
     dmem[27] = 32'd1207959552;
-    dmem[28] = 32'd0;
-    dmem[29] = 32'd0;
-    dmem[30] = 32'd3735928559;
-    dmem[31] = 32'd0;
+    dmem[28] = 32'd1792;
+    dmem[29] = 32'd63;
+    dmem[30] = 32'd3735674607;
+    dmem[31] = 32'd1207959552;
     dmem[32] = 32'd0;
     dmem[33] = 32'd0;
     dmem[34] = 32'd0;
@@ -40914,7 +40914,7 @@ module church_wukong_xc7a100t(rst_n, uart_rx_pin, led0, led1, uart_tx_pin, dbg_b
     _91514_ <= dmem[mem_addr];
   end
   assign dmem_rd__data = _91514_;
-  reg [45:0] init_rom [31:0];
+  reg [45:0] init_rom [34:0];
   initial begin
     init_rom[0] = 46'h00010000003f;
     init_rom[1] = 46'h0002deaa5eef;
@@ -40941,15 +40941,18 @@ module church_wukong_xc7a100t(rst_n, uart_rx_pin, led0, led1, uart_tx_pin, dbg_b
     init_rom[22] = 46'h00190000003f;
     init_rom[23] = 46'h001adea95eef;
     init_rom[24] = 46'h001b48000000;
-    init_rom[25] = 46'h001edeadbeef;
-    init_rom[26] = 46'h010052000006;
-    init_rom[27] = 46'h01034a000006;
-    init_rom[28] = 46'h0105b2000003;
-    init_rom[29] = 46'h0106b2000002;
-    init_rom[30] = 46'h010792000004;
-    init_rom[31] = 46'h0108b2000005;
+    init_rom[25] = 46'h001c00000700;
+    init_rom[26] = 46'h001d0000003f;
+    init_rom[27] = 46'h001edea9deef;
+    init_rom[28] = 46'h001f48000000;
+    init_rom[29] = 46'h010052000006;
+    init_rom[30] = 46'h01034a000006;
+    init_rom[31] = 46'h0105b2000003;
+    init_rom[32] = 46'h0106b2000002;
+    init_rom[33] = 46'h010792000004;
+    init_rom[34] = 46'h0108b2000005;
   end
-  assign init_rom_rd__data = init_rom[hw_init_ctr[4:0]];
+  assign init_rom_rd__data = init_rom[init_rom_rd__addr];
   always @(posedge clk)
     timer_lo[0] <= _07802_[0];
   always @(posedge clk)
@@ -41909,17 +41912,17 @@ module church_wukong_xc7a100t(rst_n, uart_rx_pin, led0, led1, uart_tx_pin, dbg_b
       if (hw_init_done) hw_init_done <= 1'h1;
       else hw_init_done <= _00008_;
   always @(posedge clk)
-    if (_00671_) hw_init_ctr[0] <= _07841_[0];
+    if (_00671_) init_rom_rd__addr[0] <= _07841_[0];
   always @(posedge clk)
-    if (_00671_) hw_init_ctr[1] <= _07841_[1];
+    if (_00671_) init_rom_rd__addr[1] <= _07841_[1];
   always @(posedge clk)
-    if (_00671_) hw_init_ctr[2] <= _07841_[2];
+    if (_00671_) init_rom_rd__addr[2] <= _07841_[2];
   always @(posedge clk)
-    if (_00671_) hw_init_ctr[3] <= _07841_[3];
+    if (_00671_) init_rom_rd__addr[3] <= _07841_[3];
   always @(posedge clk)
-    if (_00671_) hw_init_ctr[4] <= _07841_[4];
+    if (_00671_) init_rom_rd__addr[4] <= _07841_[4];
   always @(posedge clk)
-    if (_00671_) hw_init_ctr[5] <= _07841_[5];
+    if (_00671_) init_rom_rd__addr[5] <= _07841_[5];
   always @(posedge clk)
     if (_00698_) \uart_tx.uart_tx_state [0] <= _07735_[0];
   always @(posedge clk)
@@ -76506,8 +76509,8 @@ module church_wukong_xc7a100t(rst_n, uart_rx_pin, led0, led1, uart_tx_pin, dbg_b
   assign _00202_[22] = 1'h0 ? _07843_[22] : _00197_[21];
   assign _00202_[23] = 1'h0 ? _07843_[23] : _00197_[22];
   assign _00202_[24] = 1'h0 ? _07843_[24] : _00197_[23];
-  assign _00010_[0] = _00007_ ? 1'h0 : trace_tx_byte[0];
-  assign _00010_[1] = _00007_ ? 1'h0 : trace_tx_byte[1];
+  assign _00010_[0] = _00007_ ? 1'h1 : trace_tx_byte[0];
+  assign _00010_[1] = _00007_ ? 1'h1 : trace_tx_byte[1];
   assign _00010_[2] = _00007_ ? 1'h0 : trace_tx_byte[2];
   assign _00010_[3] = _00007_ ? 1'h0 : trace_tx_byte[3];
   assign _00010_[4] = _00007_ ? 1'h0 : trace_tx_byte[4];
@@ -88067,12 +88070,12 @@ module church_wukong_xc7a100t(rst_n, uart_rx_pin, led0, led1, uart_tx_pin, dbg_b
   assign _07833_[1] = 1'h0 ? _09290_[1] : boot_delay[1];
   assign _07833_[2] = 1'h0 ? _09290_[2] : boot_delay[2];
   assign _07833_[3] = 1'h0 ? _09290_[3] : boot_delay[3];
-  assign _07838_[0] = 1'h0 ? _09294_[0] : hw_init_ctr[0];
-  assign _07838_[1] = 1'h0 ? _09294_[1] : hw_init_ctr[1];
-  assign _07838_[2] = 1'h0 ? _09294_[2] : hw_init_ctr[2];
-  assign _07838_[3] = 1'h0 ? _09294_[3] : hw_init_ctr[3];
-  assign _07838_[4] = 1'h0 ? _09294_[4] : hw_init_ctr[4];
-  assign _07838_[5] = 1'h0 ? _09294_[5] : hw_init_ctr[5];
+  assign _07838_[0] = 1'h0 ? _09294_[0] : init_rom_rd__addr[0];
+  assign _07838_[1] = 1'h0 ? _09294_[1] : init_rom_rd__addr[1];
+  assign _07838_[2] = 1'h0 ? _09294_[2] : init_rom_rd__addr[2];
+  assign _07838_[3] = 1'h0 ? _09294_[3] : init_rom_rd__addr[3];
+  assign _07838_[4] = 1'h0 ? _09294_[4] : init_rom_rd__addr[4];
+  assign _07838_[5] = 1'h0 ? _09294_[5] : init_rom_rd__addr[5];
   assign _07814_[0] = 1'h0 ? _09197_[0] : bp_wr_ptr[0];
   assign _07814_[1] = 1'h0 ? _09197_[1] : bp_wr_ptr[1];
   assign _07809_[0] = 1'h0 ? _09193_[0] : banner_idx[0];
@@ -91870,12 +91873,12 @@ module church_wukong_xc7a100t(rst_n, uart_rx_pin, led0, led1, uart_tx_pin, dbg_b
   assign _09290_[1] = ~boot_delay[1];
   assign _09290_[2] = ~boot_delay[2];
   assign _09290_[3] = ~boot_delay[3];
-  assign _09294_[0] = ~hw_init_ctr[0];
-  assign _09294_[1] = ~hw_init_ctr[1];
-  assign _09294_[2] = ~hw_init_ctr[2];
-  assign _09294_[3] = ~hw_init_ctr[3];
-  assign _09294_[4] = ~hw_init_ctr[4];
-  assign _09294_[5] = ~hw_init_ctr[5];
+  assign _09294_[0] = ~init_rom_rd__addr[0];
+  assign _09294_[1] = ~init_rom_rd__addr[1];
+  assign _09294_[2] = ~init_rom_rd__addr[2];
+  assign _09294_[3] = ~init_rom_rd__addr[3];
+  assign _09294_[4] = ~init_rom_rd__addr[4];
+  assign _09294_[5] = ~init_rom_rd__addr[5];
   assign _09197_[0] = ~bp_wr_ptr[0];
   assign _09197_[1] = ~bp_wr_ptr[1];
   assign _09193_[0] = ~banner_idx[0];
@@ -103267,7 +103270,7 @@ module church_wukong_xc7a100t(rst_n, uart_rx_pin, led0, led1, uart_tx_pin, dbg_b
   assign _07800_[13] = _09078_ | _09053_;
   assign _07800_[17] = _09080_ | _09054_;
   assign _07800_[21] = _09082_ | _09055_;
-  assign _04677_[0] = hw_init_ctr[0] ^ 1'h1;
+  assign _04677_[0] = init_rom_rd__addr[0] ^ 1'h0;
   assign _07800_[25] = _09084_ | _09056_;
   assign _07800_[29] = _09086_ | _09057_;
   assign _07800_[2] = _07803_[2] | _09058_;
@@ -103278,7 +103281,7 @@ module church_wukong_xc7a100t(rst_n, uart_rx_pin, led0, led1, uart_tx_pin, dbg_b
   assign _07800_[12] = _07803_[12] | _09063_;
   assign _07800_[14] = _07803_[14] | _09064_;
   assign _07800_[16] = _07803_[16] | _09065_;
-  assign _04677_[1] = hw_init_ctr[1] ^ 1'h1;
+  assign _04677_[1] = init_rom_rd__addr[1] ^ 1'h1;
   assign _07800_[18] = _07803_[18] | _09066_;
   assign _07800_[20] = _07803_[20] | _09067_;
   assign _07800_[22] = _07803_[22] | _09068_;
@@ -103288,7 +103291,7 @@ module church_wukong_xc7a100t(rst_n, uart_rx_pin, led0, led1, uart_tx_pin, dbg_b
   assign _07800_[30] = _07803_[30] | _09072_;
   assign _15973_ = _08808_[0] & 1'h1;
   assign _15974_ = _08808_[1] & _08807_[0];
-  assign _04677_[2] = hw_init_ctr[2] ^ 1'h1;
+  assign _04677_[2] = init_rom_rd__addr[2] ^ 1'h0;
   assign _15975_ = _08808_[3] & _08809_[2];
   assign _15976_ = _08808_[5] & _08809_[4];
   assign _15977_ = _08808_[7] & _08809_[6];
@@ -103299,19 +103302,19 @@ module church_wukong_xc7a100t(rst_n, uart_rx_pin, led0, led1, uart_tx_pin, dbg_b
   assign _15982_ = _08808_[5] & _08808_[4];
   assign _15983_ = _08808_[7] & _08808_[6];
   assign _15984_ = _15983_ & _15982_;
-  assign _04677_[3] = hw_init_ctr[3] ^ 1'h1;
+  assign _04677_[3] = init_rom_rd__addr[3] ^ 1'h0;
   assign _08807_[0] = _08809_[0] | _15973_;
   assign _08807_[1] = _08809_[1] | _15974_;
   assign _15985_ = _08809_[3] | _15975_;
   assign _15986_ = _08809_[5] | _15976_;
   assign _15987_ = _08809_[7] | _15977_;
   assign _08807_[3] = _15985_ | _15978_;
-  assign _04677_[4] = hw_init_ctr[4] ^ 1'h1;
+  assign _04677_[4] = init_rom_rd__addr[4] ^ 1'h0;
   assign _15988_ = _15987_ | _15979_;
   assign _08807_[7] = _15988_ | _15980_;
   assign _15971_ = _08803_[0] & 1'h0;
   assign _08802_[0] = _08805_[0] | _15971_;
-  assign _04677_[5] = hw_init_ctr[5] ^ 1'h0;
+  assign _04677_[5] = init_rom_rd__addr[5] ^ 1'h1;
   assign _15860_ = _08798_[0] & 1'h0;
   assign _15861_ = _08798_[1] & _08797_[0];
   assign _15862_ = _08798_[3] & _08800_[2];
@@ -111475,7 +111478,7 @@ module church_wukong_xc7a100t(rst_n, uart_rx_pin, led0, led1, uart_tx_pin, dbg_b
   assign _06834_[27] = 1'h1 & _06685_[1];
   assign _06834_[28] = 1'h1 & _06685_[1];
   assign _06834_[29] = 1'h0 & _06685_[1];
-  assign _06834_[30] = 1'h1 & _06685_[1];
+  assign _06834_[30] = 1'h0 & _06685_[1];
   assign _06834_[31] = 1'h0 & _06685_[1];
   assign _06834_[32] = 1'h0 & _06685_[1];
   assign _06834_[33] = 1'h0 & _06685_[1];
@@ -133676,10 +133679,10 @@ module church_wukong_xc7a100t(rst_n, uart_rx_pin, led0, led1, uart_tx_pin, dbg_b
   assign free_run_start = 1'h0;
   assign gc_start = 1'h0;
   assign halt_req = step_halted;
+  assign hw_init_ctr = init_rom_rd__addr;
   assign imem_addr = \core.imem_addr ;
   assign imem_data = \boot_rom.data ;
   assign imem_valid = \core.imem_valid ;
-  assign init_rom_rd__addr = hw_init_ctr[4:0];
   assign mmio_reg_sel = dmem_addr[5:2];
   assign { ns_addr[31:16], ns_addr[1:0] } = { \core.ns_addr [31:16], \core.ns_addr [1:0] };
   assign ns_rd_data = { 96'h000000000000000000000000, dmem_rd__data };
