@@ -186,59 +186,57 @@ if {$wns ne "" && $wns < 0} {
 }
 
 ## ── Bitstream generation ─────────────────────────────────────────────────
+## NOTE: We call write_bitstream directly (not via launch_runs -to_step) so that
+## the DRC severity overrides already set in this session (NSTD-1, UCIO-1) are
+## still in effect.  launch_runs -to_step write_bitstream spawns a fresh Vivado
+## sub-process that re-opens the routed checkpoint, losing all in-session property
+## overrides — causing spurious DRC failures on the unassigned ILA debug ports.
 puts "\n═══ Generating bitstream ═══"
-launch_runs impl_1 -to_step write_bitstream -jobs ${JOBS}
-wait_on_run impl_1
+open_run impl_1 -name impl_1
+set_property SEVERITY {Warning} [get_drc_checks NSTD-1]
+set_property SEVERITY {Warning} [get_drc_checks UCIO-1]
+write_bitstream -force ${TOP}.bit
 
-## Copy bitstream to working directory for easy access
-set bit_src "${PROJ_DIR}/${TOP}.runs/impl_1/${TOP}.bit"
-if {[file exists $bit_src]} {
-    file copy -force $bit_src ${TOP}.bit
-    puts "\n═══════════════════════════════════════════════════════════════════"
-    puts " Bitstream ready: [pwd]/${TOP}.bit"
+puts "\n═══════════════════════════════════════════════════════════════════"
+puts " Bitstream ready: [pwd]/${TOP}.bit"
+puts "═══════════════════════════════════════════════════════════════════"
+
+if {$INSERT_ILA} {
+    ## Write ILA probe file — Hardware Manager uses this to map raw probe
+    ## indices back to the names declared in the TCL (dbg_boot_complete, etc.)
+    ## Load it in Hardware Manager: Program Device → ... → Probes File → select .ltx
+    write_debug_probes -force ${TOP}.ltx
+    puts " ILA probes file: [pwd]/${TOP}.ltx"
     puts "═══════════════════════════════════════════════════════════════════"
-
-    if {$INSERT_ILA} {
-        ## Write ILA probe file — Hardware Manager uses this to map raw probe
-        ## indices back to the names declared in the TCL (dbg_boot_complete, etc.)
-        ## Load it in Hardware Manager: Program Device → ... → Probes File → select .ltx
-        open_run impl_1 -name impl_1
-        write_debug_probes -force ${TOP}.ltx
-        close_design
-        puts " ILA probes file: [pwd]/${TOP}.ltx"
-        puts "═══════════════════════════════════════════════════════════════════"
-        puts ""
-        puts " To program via Vivado Hardware Manager (Tcl console):"
-        puts "   open_hw_manager"
-        puts "   connect_hw_server -allow_non_jtag"
-        puts "   open_hw_target"
-        puts "   set_property PROGRAM.FILE {[pwd]/${TOP}.bit} \[lindex \[get_hw_devices\] 0\]"
-        puts "   set_property PROBES.FILE  {[pwd]/${TOP}.ltx} \[lindex \[get_hw_devices\] 0\]"
-        puts "   program_hw_devices \[lindex \[get_hw_devices\] 0\]"
-    } else {
-        puts ""
-        puts " To program via Vivado Hardware Manager (Tcl console):"
-        puts "   open_hw_manager"
-        puts "   connect_hw_server -allow_non_jtag"
-        puts "   open_hw_target"
-        puts "   set_property PROGRAM.FILE {[pwd]/${TOP}.bit} \[lindex \[get_hw_devices\] 0\]"
-        puts "   program_hw_devices \[lindex \[get_hw_devices\] 0\]"
-    }
     puts ""
-    puts " Expected LED behaviour after programming:"
-    puts "   D1 (G21):  solid ON during boot (~50 cycles), then blinks ~1 Hz (CM MMIO-controlled)"
-    puts "   D2 (G20):  1 Hz heartbeat during boot, then OFF when running (lit = fault latched)"
-    puts "   UART E3:   0xBB sentinel byte at 57600 baud within ~1 s of power-on"
-    if {$INSERT_ILA} {
-        puts ""
-        puts " ILA dashboard (Hardware Manager):"
-        puts "   Trigger on probe1 (dbg_fault_valid) = 1 to capture any CM fault."
-        puts "   Trigger on probe0 (dbg_boot_complete) rising edge to capture boot moment."
-    }
-    puts "═══════════════════════════════════════════════════════════════════"
+    puts " To program via Vivado Hardware Manager (Tcl console):"
+    puts "   open_hw_manager"
+    puts "   connect_hw_server -allow_non_jtag"
+    puts "   open_hw_target"
+    puts "   set_property PROGRAM.FILE {[pwd]/${TOP}.bit} \[lindex \[get_hw_devices\] 0\]"
+    puts "   set_property PROBES.FILE  {[pwd]/${TOP}.ltx} \[lindex \[get_hw_devices\] 0\]"
+    puts "   program_hw_devices \[lindex \[get_hw_devices\] 0\]"
 } else {
-    error "Bitstream not found at $bit_src — check implementation logs."
+    puts ""
+    puts " To program via Vivado Hardware Manager (Tcl console):"
+    puts "   open_hw_manager"
+    puts "   connect_hw_server -allow_non_jtag"
+    puts "   open_hw_target"
+    puts "   set_property PROGRAM.FILE {[pwd]/${TOP}.bit} \[lindex \[get_hw_devices\] 0\]"
+    puts "   program_hw_devices \[lindex \[get_hw_devices\] 0\]"
 }
+puts ""
+puts " Expected LED behaviour after programming:"
+puts "   D1 (G21):  solid ON during boot (~50 cycles), then blinks ~1 Hz (CM MMIO-controlled)"
+puts "   D2 (G20):  1 Hz heartbeat during boot, then OFF when running (lit = fault latched)"
+puts "   UART E3:   0xBB sentinel byte at 57600 baud within ~1 s of power-on"
+if {$INSERT_ILA} {
+    puts ""
+    puts " ILA dashboard (Hardware Manager):"
+    puts "   Trigger on probe1 (dbg_fault_valid) = 1 to capture any CM fault."
+    puts "   Trigger on probe0 (dbg_boot_complete) rising edge to capture boot moment."
+}
+puts "═══════════════════════════════════════════════════════════════════"
 
 ## ── SPI flash image (MCS) ────────────────────────────────────────────────────
 ## Produces church_wukong_xc7a100t.mcs for programming the on-board SPI NOR flash.
