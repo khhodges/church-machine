@@ -5,13 +5,19 @@ var _crDetailHighlightPC = null;
 // Secondary: floating-lump match — ns_slot is null/undefined but the lump's abstraction
 //            name matches the live NS entry's label (set when the Loader dynamically places
 //            the lump into slotIdx at runtime).
+// Tertiary:  name-only match — catches lumps whose manifest ns_slot diverges from the live
+//            slot (e.g. bootEntrySlot saved in localStorage predates a manifest update).
+//            Abstraction names are unique in the registry so this is safe.
 // Returns the matching lump cache entry, or null.
 function _findSrcLump(slotIdx, slotLabel) {
     if (typeof _lumpsCache === 'undefined' || !Array.isArray(_lumpsCache)) return null;
     const bySlot = _lumpsCache.find(l => l.ns_slot !== null && l.ns_slot !== undefined && parseInt(l.ns_slot) === slotIdx);
     if (bySlot) return bySlot;
     if (slotLabel) {
-        return _lumpsCache.find(l => (l.ns_slot === null || l.ns_slot === undefined) && l.abstraction === slotLabel) || null;
+        const byFloating = _lumpsCache.find(l => (l.ns_slot === null || l.ns_slot === undefined) && l.abstraction === slotLabel);
+        if (byFloating) return byFloating;
+        // Tertiary: manifest slot differs from live slot — match by name alone.
+        return _lumpsCache.find(l => l.abstraction === slotLabel) || null;
     }
     return null;
 }
