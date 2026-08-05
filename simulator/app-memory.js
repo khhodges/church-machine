@@ -1,22 +1,56 @@
 var _crDetailHighlightPC = null;
 
+// ── ns-state.json committed slot→token map ───────────────────────────────────
+// Fetched once at load and refreshed after every successful Save Namespace.
+// _findSrcLump uses this as its primary lookup to avoid the 3-level fallback.
+window._nsState = null;
+(function _initNsStateFetch() {
+    fetch('/api/boot-image/ns-state', { cache: 'no-store' })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(s) { if (s && typeof s === 'object') window._nsState = s; })
+        .catch(function() {});
+})();
+
+// ── NS table dirty tracking ──────────────────────────────────────────────────
+// Set to true when in-memory NS state diverges from committed boot-image.bin.
+// Cleared to false after a successful Save NS Table.
+window._nsTableDirty = false;
+
+// Update the Save NS button appearance to reflect dirty state.
+// Looks for #nsSaveBtn in the DOM (rendered by updateNamespace).
+function _setNsDirty(dirty) {
+    window._nsTableDirty = Boolean(dirty);
+    const btn = document.getElementById('nsSaveBtn');
+    if (!btn) return;
+    if (dirty) {
+        btn.textContent = '\u25cf Unsaved NS';
+        btn.style.color = '#f0a040';
+        btn.style.borderColor = 'rgba(240,160,64,0.5)';
+        btn.style.background  = '#2a1e0a';
+    } else {
+        btn.textContent = '\u{1F4BE} Save NS Table';
+        btn.style.color = '#7ec87e';
+        btn.style.borderColor = 'rgba(100,200,100,0.35)';
+        btn.style.background  = '#1a2a1f';
+    }
+}
+
 // _findSrcLump(slotIdx, slotLabel)
-// Primary:   fixed-slot match — lump manifest carries a non-null ns_slot equal to slotIdx.
-// Secondary: floating-lump match — ns_slot is null/undefined but the lump's abstraction
-//            name matches the live NS entry's label (set when the Loader dynamically places
-//            the lump into slotIdx at runtime).
-// Tertiary:  name-only match — catches lumps whose manifest ns_slot diverges from the live
-//            slot (e.g. bootEntrySlot saved in localStorage predates a manifest update).
-//            Abstraction names are unique in the registry so this is safe.
+// Primary:   direct slot→token lookup via committed ns-state.json.
+// Secondary: abstraction name match — catches in-memory additions not yet saved.
 // Returns the matching lump cache entry, or null.
 function _findSrcLump(slotIdx, slotLabel) {
     if (typeof _lumpsCache === 'undefined' || !Array.isArray(_lumpsCache)) return null;
-    const bySlot = _lumpsCache.find(l => l.ns_slot !== null && l.ns_slot !== undefined && parseInt(l.ns_slot) === slotIdx);
-    if (bySlot) return bySlot;
+    // Primary: ns-state.json committed map
+    if (window._nsState && window._nsState.slots) {
+        const token = window._nsState.slots[String(slotIdx)];
+        if (token) {
+            const byToken = _lumpsCache.find(l => l.token === token);
+            if (byToken) return byToken;
+        }
+    }
+    // Secondary: abstraction name match (covers unsaved in-memory additions)
     if (slotLabel) {
-        const byFloating = _lumpsCache.find(l => (l.ns_slot === null || l.ns_slot === undefined) && l.abstraction === slotLabel);
-        if (byFloating) return byFloating;
-        // Tertiary: manifest slot differs from live slot — match by name alone.
         return _lumpsCache.find(l => l.abstraction === slotLabel) || null;
     }
     return null;
@@ -2618,7 +2652,7 @@ function updateNamespace() {
     html += _statChip('Garbage',  _cntGarbage,  '#f87171', 'Cleared slots — GT cycle count bumped, content zeroed');
     html += _statChip('Free',     _cntFree,     '#6a9f6a', 'Slots available for allocation');
     html += `<span id="nsBoltDrag" class="ns-bolt-drag" draggable="true" title="Drag \u26a1 onto any NS row to crown that abstraction as Boot.Thread.CR0 \u2014 the first abstraction invoked after boot">\u26a1 Boot entry</span>`;
-    html += `<button onclick="event.stopPropagation();_nsTableSave(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save all NS table changes to the boot image — changes survive resets and reconnects">\u{1F4BE} Save NS Table</button>`;
+    html += `<button id="nsSaveBtn" onclick="event.stopPropagation();_nsTableSave(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save all NS table changes to boot-image.bin + ns-state.json — the single write path for NS mutations">\u{1F4BE} Save NS Table</button>`;
     html += `<button onclick="event.stopPropagation();_nsTableAdd()" style="background:#1a2e1a;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Install a LUMP from the repository into the next free NS slot">+ Add LUMP</button>`;
     html += '</div>';
     html += '<table class="ns-table"><thead><tr>';
@@ -2717,6 +2751,8 @@ function updateNamespace() {
     html += '</tbody></table>';
     container.innerHTML = html;
     _initNSBolt();
+    // Restore dirty indicator after re-render (innerHTML wipes the previous button state)
+    _setNsDirty(window._nsTableDirty);
 }
 
 // ── NS table: boot-entry drag bolt ────────────────────────────────────────────
@@ -2747,6 +2783,7 @@ function _initNSBolt() {
             row.classList.remove('ns-row-drop-active');
             if (e.dataTransfer.getData('text/plain') !== 'nsBoot') return;
             if (typeof setBootEntrySlot === 'function') setBootEntrySlot(slotIdx);
+            _setNsDirty(true);
         });
     });
 }
@@ -3250,6 +3287,7 @@ function _nsTableAddConfirm() {
 
         const _overlay = document.getElementById('_nsAddModalOverlay');
         if (_overlay) _overlay.remove();
+        _setNsDirty(true);
         if (typeof updateNamespace === 'function') updateNamespace();
         return Promise.resolve();
     };
@@ -3307,14 +3345,17 @@ function _nsTableClear(slot) {
         sim.nsCount = newCount;
     }
 
+    _setNsDirty(true);
     if (typeof updateNamespace === 'function') updateNamespace();
 }
 
-// ── NS table: Save — snapshot current sim.memory → upload as boot image ───────
-// Persists all NS table changes (Add LUMP, Clear slot, boot-entry change) to
-// server/lumps/boot-image.bin via /api/boot-image/upload so they survive resets
-// and reconnects.  The boot image binary is little-endian 32-bit words
-// (struct.pack "<{n}I"), matching Uint32Array's native byte order on x86/x64.
+// ── NS table: Save — the single write path for all NS mutations ───────────────
+// Persists in-memory NS state to server/lumps/boot-image.bin AND
+// server/lumps/ns-state.json via the /api/boot-image/save-ns endpoint.
+// All other NS mutations (Add LUMP, Clear slot, boot-entry drag) are in-memory
+// only until the user clicks Save NS Table.
+// The boot image binary is little-endian 32-bit words (struct.pack "<{n}I"),
+// matching Uint32Array's native byte order on x86/x64.
 window._nsTableSave = async function(btn) {
     if (!sim) return;
 
@@ -3372,6 +3413,16 @@ window._nsTableSave = async function(btn) {
             }
         }
 
+        // ── Build ns_state: slot→token map from live sim._tokenSlotMap ─────────
+        // sim._tokenSlotMap: token → slot (invert to slot → token for ns-state.json).
+        const nsSlots = {};
+        if (sim._tokenSlotMap) {
+            for (const [token, slot] of sim._tokenSlotMap) {
+                if (token && slot != null) nsSlots[String(slot)] = token;
+            }
+        }
+        const nsState = { slots: nsSlots, boot_entry_slot: bootEntrySlot };
+
         // Encode as base64 (little-endian bytes — matches struct.pack "<{n}I").
         const bytes = new Uint8Array(words.buffer);
         let binary = '';
@@ -3381,10 +3432,11 @@ window._nsTableSave = async function(btn) {
         }
         const data_b64 = btoa(binary);
 
-        const resp = await fetch('/api/boot-image/upload', {
+        // POST to the single-write-path endpoint that writes both files atomically.
+        const resp = await fetch('/api/boot-image/save-ns', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ data_b64 }),
+            body:    JSON.stringify({ data_b64, ns_state: nsState }),
         });
         const data = await resp.json();
         if (!resp.ok || data.ok === false) throw new Error((data && data.error) || `HTTP ${resp.status}`);
@@ -3393,17 +3445,29 @@ window._nsTableSave = async function(btn) {
         window.bootImage          = words.buffer;
         window.bootImageAvailable = true;
 
+        // Refresh the committed ns-state so _findSrcLump uses the new map.
+        window._nsState = nsState;
+
+        // Clear dirty flag — committed state now matches in-memory state.
+        _setNsDirty(false);
+
         if (btn) {
             btn.textContent = '\u2713 Saved';
             btn.style.color = '#4ec9b0';
-            setTimeout(() => { btn.disabled = false; btn.textContent = origText; btn.style.color = ''; }, 2000);
+            setTimeout(() => {
+                btn.disabled = false;
+                _setNsDirty(false);   // restore clean button state after timeout
+            }, 2000);
         }
     } catch (err) {
         console.error('[_nsTableSave]', err);
         if (btn) {
             btn.textContent = '\u2717 ' + err.message;
             btn.style.color = '#f87171';
-            setTimeout(() => { btn.disabled = false; btn.textContent = origText; btn.style.color = ''; }, 4000);
+            setTimeout(() => {
+                btn.disabled = false;
+                _setNsDirty(window._nsTableDirty);   // restore previous indicator
+            }, 4000);
         }
     }
 };
@@ -4470,12 +4534,13 @@ window.lumpSaveLump = async function(nsIdx) {
     for (let i = 0; i < hdr.lumpSize; i++) words.push(sim.memory[baseLoc + i] >>> 0);
     const typeNames = ['code', 'namespace', 'thread', '?'];
     const metadata = {
-        abstraction: absName,
-        ns_slot:     nsIdx,
+        abstraction:  absName,
+        // ns_slot intentionally omitted — ns-state.json is the authoritative
+        // slot→token map; slot assignment is committed via Save NS Table.
         content_type: typeNames[hdr.typ] || 'code',
-        cw:          hdr.cw,
-        cc:          hdr.cc,
-        lump_size:   hdr.lumpSize,
+        cw:           hdr.cw,
+        cc:           hdr.cc,
+        lump_size:    hdr.lumpSize,
     };
     if (_meta.version) metadata.version = _meta.version;
     try {
@@ -5173,6 +5238,15 @@ window.applyPOLA = async function(nsIdx) {
     if (typeof showPatchModal === 'function') showPatchModal(true, title, logLines.join('\n'));
     if (typeof renderLumps === 'function') renderLumps();
 };
+
+// ── Unsaved NS changes — browser unload guard ─────────────────────────────────
+// Warn the user if they try to navigate away with uncommitted NS changes so they
+// don't accidentally lose Add LUMP / Clear slot / boot-entry drag work.
+window.addEventListener('beforeunload', function _nsBeforeUnload(e) {
+    if (!window._nsTableDirty) return;
+    e.preventDefault();
+    return (e.returnValue = 'NS table has unsaved changes — click \u201cSave NS Table\u201d to persist them before leaving.');
+});
 
 // ── Boot Sequence Code ─────────────────────────────────────────────────────
 // Actual hardware boot steps that install each Layer-0 abstraction.

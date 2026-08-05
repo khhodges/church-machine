@@ -1481,6 +1481,8 @@ def boot_config_slot_label():
 # the simulator can fetch and apply it at boot via /api/boot-image/binary.
 BOOT_IMAGE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                "lumps", "boot-image.bin")
+NS_STATE_PATH   = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "lumps", "ns-state.json")
 LUMPS_DIR = os.path.dirname(LUMPS_MANIFEST_PATH)
 
 # Canonical list of server-managed tokens — excluded from the /api/lumps browser
@@ -1957,6 +1959,94 @@ def boot_image_upload():
         "downloadUrl": "/api/boot-image/download",
         "binaryUrl": "/api/boot-image/binary",
     })
+
+
+@app.route("/api/boot-image/ns-state", methods=["GET"])
+def boot_image_ns_state():
+    """Return the committed slot→token map (ns-state.json).
+
+    Used by the browser to seed _findSrcLump and _nsState.  When the file is
+    absent, derive it from manifest.json ns_slot fields (cold-start path).
+    """
+    _ensure_ns_state()
+    if not os.path.isfile(NS_STATE_PATH):
+        return jsonify({"slots": {}, "boot_entry_slot": 6})
+    try:
+        with open(NS_STATE_PATH) as _fh:
+            _state = json.load(_fh)
+        resp = jsonify(_state)
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        resp.headers["Pragma"] = "no-cache"
+        return resp
+    except Exception as _exc:
+        return jsonify({"error": str(_exc)}), 500
+
+
+@app.route("/api/boot-image/save-ns", methods=["POST"])
+def boot_image_save_ns():
+    """Single write path for NS table: writes boot-image.bin + ns-state.json atomically.
+
+    Body JSON:
+        {
+          "data_b64":  "<base64 of raw boot-image bytes>",
+          "ns_state":  { "slots": { "<slot>": "<token>", ... }, "boot_entry_slot": N }
+        }
+
+    This is the only endpoint that should be called for NS mutations.  All other
+    NS changes (Add LUMP, Clear slot, boot-entry drag) are in-memory only until
+    the user clicks Save NS Table, which posts here.
+    """
+    import base64 as _b64_sns
+    _payload = request.get_json(force=True, silent=True)
+    if not _payload:
+        return jsonify({"ok": False, "error": "Invalid JSON body"}), 400
+
+    _data_b64 = _payload.get("data_b64")
+    _ns_state  = _payload.get("ns_state") or {}
+
+    if _data_b64 is None:
+        return jsonify({"ok": False, "error": "Missing 'data_b64' field"}), 400
+
+    try:
+        _img_bytes = _b64_sns.b64decode(_data_b64, validate=True)
+    except Exception:
+        return jsonify({"ok": False, "error": "Invalid base64 data"}), 400
+
+    try:
+        _validate_boot_image_bytes(_img_bytes)
+    except ValueError as _exc:
+        return jsonify({"ok": False, "error": str(_exc)}), 400
+
+    try:
+        _boot_image_gen.validate_boot_image(_img_bytes)
+    except ValueError as _exc:
+        return jsonify({"ok": False, "error": str(_exc)}), 400
+
+    # Write boot-image.bin
+    try:
+        with open(BOOT_IMAGE_PATH, "wb") as _fh:
+            _fh.write(_img_bytes)
+    except Exception as _exc:
+        return jsonify({"ok": False, "error": f"Failed to write boot-image.bin: {_exc}"}), 500
+
+    # Write ns-state.json
+    try:
+        _ns_slots  = {str(k): str(v) for k, v in (_ns_state.get("slots") or {}).items() if k and v}
+        _ns_entry  = int(_ns_state.get("boot_entry_slot") or 6)
+        _write_ns_state(_ns_slots, _ns_entry)
+    except Exception as _nse:
+        print(f"[ns-state] save-ns: failed to write ns-state.json: {_nse}", flush=True)
+
+    _load_boot_ns_lump()   # refresh _BOOT_NS_META
+
+    return jsonify({
+        "ok":          True,
+        "bytes":       len(_img_bytes),
+        "words":       len(_img_bytes) // 4,
+        "downloadUrl": "/api/boot-image/download",
+        "binaryUrl":   "/api/boot-image/binary",
+    })
+
 
 @app.route("/six-laws-review.pdf")
 def six_laws_pdf():
@@ -4315,6 +4405,87 @@ _load_bundled_lumps()
 _BOOT_ABSTR_META = {}   # populated by _load_boot_abstr_lump(); empty means not found
 _BOOT_NS_META    = {}   # populated by _load_boot_ns_lump();    empty means not found
 
+
+# ── ns-state.json helpers ────────────────────────────────────────────────────
+# ns-state.json is the authoritative slot→token map written by the single
+# "Save Namespace" write path.  It is derived from manifest.json ns_slot fields
+# at cold-start (first boot, file absent) and updated atomically each time the
+# user clicks Save NS Table.
+
+def _derive_ns_state_slots():
+    """Build slot→token dict from manifest.json ns_slot fields (cold-start fallback)."""
+    _out = {}
+    _mf  = os.path.join(LUMPS_DIR, "manifest.json")
+    if not os.path.isfile(_mf):
+        return _out
+    try:
+        with open(_mf) as _fh:
+            _entries = json.load(_fh)
+        for _e in (_entries if isinstance(_entries, list) else []):
+            _slot = _e.get("ns_slot")
+            _tok  = _e.get("token")
+            if isinstance(_slot, int) and isinstance(_tok, str) and _tok:
+                _out[str(_slot)] = _tok
+    except Exception:
+        pass
+    return _out
+
+def _read_boot_entry_slot_from_image():
+    """Return the boot-entry sentinel byte from boot-image.bin, or None."""
+    if not os.path.isfile(BOOT_IMAGE_PATH):
+        return None
+    try:
+        with open(BOOT_IMAGE_PATH, "rb") as _fh:
+            _raw = _fh.read()
+        _n = len(_raw) // 4
+        if _n < 1024:
+            return None
+        _mem = list(_struct.unpack(f"<{_n}I", _raw[:_n * 4]))
+        _cfg, _ = _read_saved_boot_config()
+        _step1  = (_cfg or {}).get("step1", {})
+        _nsmax  = int(_step1.get("nsSlotsMax") or _boot_image_gen.MAX_NS_ENTRIES)
+        _nsres  = _boot_image_gen.ns_table_reserve_words(_nsmax)
+        _nsbase = _n - _nsres
+        _sidx   = _nsbase - 2
+        if 0 <= _sidx < _n:
+            return int(_mem[_sidx]) & 0xFF
+    except Exception:
+        pass
+    return None
+
+def _write_ns_state(slots, boot_entry_slot):
+    """Write ns-state.json atomically via a temp file + os.replace."""
+    import time as _tm_ns
+    _state = {
+        "slots":           {str(k): str(v) for k, v in (slots or {}).items()},
+        "boot_entry_slot": int(boot_entry_slot),
+        "generated_at":    _tm_ns.time(),
+    }
+    _tmp = NS_STATE_PATH + ".tmp"
+    try:
+        with open(_tmp, "w") as _fh:
+            json.dump(_state, _fh, indent=2)
+        os.replace(_tmp, NS_STATE_PATH)
+    except Exception:
+        try:
+            os.remove(_tmp)
+        except OSError:
+            pass
+        raise
+
+def _ensure_ns_state():
+    """Create ns-state.json from manifest + boot-image sentinel if the file is absent."""
+    if os.path.isfile(NS_STATE_PATH):
+        return
+    try:
+        _slots = _derive_ns_state_slots()
+        _entry = _read_boot_entry_slot_from_image() or 6
+        _write_ns_state(_slots, _entry)
+        print(f"[ns-state] created cold-start ns-state.json: "
+              f"{len(_slots)} slots, boot_entry_slot={_entry}", flush=True)
+    except Exception as _exc:
+        print(f"[ns-state] cold-start creation failed: {_exc}", flush=True)
+
 def _load_boot_abstr_lump():
     """Parse boot-image.bin, extract Boot.Abstr (NS slot 6) and cache in LAZY_LUMPS.
 
@@ -4558,6 +4729,8 @@ def _load_boot_ns_lump():
               f'{len(entries)} NS table entries', flush=True)
     except Exception as exc:
         print(f'[boot] Failed to extract Boot.NS lump: {exc}', flush=True)
+    # Cold-start: create ns-state.json if it doesn't exist yet
+    _ensure_ns_state()
 
 
 _load_boot_ns_lump()
@@ -5016,7 +5189,8 @@ def save_lump():
         "abstraction":   abs_name,
         "filename":      lump_filename,
         "sidecar_file":  sidecar_filename,
-        "ns_slot":       ns_slot,
+        # ns_slot intentionally omitted from new entries — ns-state.json is now
+        # the authoritative slot→token map; existing entries left as-is.
         "lump_size":     len(words),
         "cw":            sidecar["cw"],
         "cc":            sidecar["cc"],
@@ -5027,8 +5201,6 @@ def save_lump():
         "methods":       sidecar["methods"],
         "grants":        sidecar["grants"],
     }
-    if ns_slot is not None:
-        new_entry["variant_group"] = vg_key
     manifest.append(new_entry)
 
     with open(manifest_path, 'w') as fh:

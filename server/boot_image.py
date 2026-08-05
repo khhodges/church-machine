@@ -493,19 +493,38 @@ def find_lump_file_by_abstraction(lumps_dir, abstraction_name, ns_slot):
     return None
 
 
+def _load_ns_state_token_map(lumps_dir):
+    """slot→token from ns-state.json (authoritative single-write-path store)."""
+    _path = os.path.join(lumps_dir, "ns-state.json")
+    if not os.path.isfile(_path):
+        return {}
+    try:
+        with open(_path) as _f:
+            _state = json.load(_f)
+        _slots = _state.get("slots") or {}
+        return {int(k): str(v) for k, v in _slots.items()
+                if str(k).lstrip("-").isdigit() and v}
+    except Exception:
+        return {}
+
+
 def _load_catalog_token_map(manifest_path):
-    """ns_slot -> token_hex from server/lumps/manifest.json."""
+    """slot→token: ns-state.json (preferred) merged over manifest.json ns_slot fields."""
+    lumps_dir = os.path.dirname(manifest_path)
+    out = {}
+    # Manifest provides backward-compat for entries written before ns-state.json existed
     try:
         with open(manifest_path, "r") as f:
             entries = json.load(f)
     except Exception:
-        return {}
-    out = {}
+        entries = []
     for e in entries if isinstance(entries, list) else []:
         slot = e.get("ns_slot")
         tok  = e.get("token")
         if isinstance(slot, int) and isinstance(tok, str):
             out[slot] = tok
+    # ns-state.json overrides manifest where present (authoritative)
+    out.update(_load_ns_state_token_map(lumps_dir))
     return out
 
 
