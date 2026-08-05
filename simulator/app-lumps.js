@@ -44,8 +44,17 @@ function showLumpDetail(token) {
     let _headerStrip = `<div class="lump-header-strip">`;
     _headerStrip += _lumpTypeBadge(lump);
     _headerStrip += `<span class="lump-hs-chip"><span class="lump-hs-label">Token</span>0x${_e(lump.token || '')}</span>`;
-    if (lump.ns_slot !== null && lump.ns_slot !== undefined)
-        _headerStrip += `<span class="lump-hs-chip"><span class="lump-hs-label">NS</span>${parseInt(lump.ns_slot)}</span>`;
+    if (lump.ns_slot !== null && lump.ns_slot !== undefined) {
+        const _liveSlot = _lumpLiveNsSlot(token);
+        const _manifestSlot = parseInt(lump.ns_slot);
+        const _displaySlot = _liveSlot !== null ? _liveSlot : _manifestSlot;
+        const _isLive = _liveSlot !== null;
+        const _nsTitle = _isLive
+            ? `Live: confirmed at NS slot ${_displaySlot} in the running simulator`
+            : 'Manifest default NS slot — the namespace can be modified at runtime';
+        const _nsOpacity = !_isLive ? ' style="opacity:0.7;"' : '';
+        _headerStrip += `<span class="lump-hs-chip"${_nsOpacity} title="${_nsTitle}"><span class="lump-hs-label">NS</span>${_displaySlot}</span>`;
+    }
     {
         const _isStubSlot = (lump.ns_slot !== null && lump.ns_slot !== undefined
             && typeof sim !== 'undefined' && sim && sim._nsStubFlags
@@ -110,7 +119,7 @@ function showLumpDetail(token) {
     }
     _tabBar += `<button class="lump-tab${isNamespace ? ' lump-tab-active' : ''}" onclick="_switchLumpTab('${_tk}','overview')">Overview</button>`;
     if (!isNamespace) {
-        _tabBar += `<button class="lump-tab${(lump.source || lump.source_hash) ? '' : ' lump-tab-dim'}" onclick="_switchLumpTab('${_tk}','source')" title="${(lump.source || lump.source_hash) ? 'View original CLOOMC++ source' : 'No compiled source stored \u2014 LUMP predates source persistence'}">Source</button>`;
+        _tabBar += `<button class="lump-tab${lump.has_source ? '' : ' lump-tab-dim'}" onclick="_switchLumpTab('${_tk}','source')" title="${lump.has_source ? 'Compiled Source \u2014 the CLOOMC source that was compiled to produce this binary' : 'No compiled source stored \u2014 LUMP predates source persistence'}">Compiled Source</button>`;
         _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','content')">Content</button>`;
         _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','tokens')">Tokens</button>`;
         _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','versions')">Versions</button>`;
@@ -225,7 +234,15 @@ function showLumpDetail(token) {
         html += '<div class="lump-detail-section">';
         html += '<table class="lump-detail-table"><tbody>';
         html += `<tr><td>Token</td><td>0x${e(lump.token)}</td></tr>`;
-        if (lump.ns_slot !== null && lump.ns_slot !== undefined) html += `<tr><td>NS Slot</td><td>${parseInt(lump.ns_slot) || 0}</td></tr>`;
+        if (lump.ns_slot !== null && lump.ns_slot !== undefined) {
+            const _liveSlotOv = _lumpLiveNsSlot(token);
+            const _manifestSlotOv = parseInt(lump.ns_slot) || 0;
+            const _slotDisplayOv = _liveSlotOv !== null ? _liveSlotOv : _manifestSlotOv;
+            const _slotNoteOv = _liveSlotOv !== null
+                ? `<span style="font-size:0.72rem;color:#22c55e;margin-left:6px;" title="Confirmed in the running simulator">\u25cf live</span>`
+                : `<span style="font-size:0.72rem;color:var(--text-secondary);margin-left:6px;" title="Manifest default \u2014 the namespace can be modified at runtime">(default)</span>`;
+            html += `<tr><td>NS Slot</td><td>${_slotDisplayOv}${_slotNoteOv}</td></tr>`;
+        }
         html += `<tr><td>Lump Size</td><td>${parseInt(lump.lump_size) || 0} words (${(parseInt(lump.lump_size) || 0) * 4} bytes)</td></tr>`;
         html += `<tr><td>Code Words</td><td>${parseInt(lump.cw) || 0}</td></tr>`;
         html += `<tr><td>C-List Slots</td><td>${parseInt(lump.cc) || 0}</td></tr>`;
@@ -668,6 +685,31 @@ const _lumpEditorDraftText = {};
 // Populated by _patchCcFromBinary and reused by _renderLumpCodeContent / _loadLumpTokens.
 const _lumpBinaryHdrCache = {};
 
+// Converts a compiled_at field to a JS Date.
+// Accepts both Unix timestamps (number → ×1000 ms) and ISO date strings
+// (e.g. '2026-08-03T00:00:00Z').  Returns null for missing/invalid values.
+function _lumpTsToDate(ts) {
+    if (!ts) return null;
+    const d = typeof ts === 'number' ? new Date(ts * 1000) : new Date(ts);
+    return isNaN(d.getTime()) ? null : d;
+}
+function _lumpTsStr(ts, opts) {
+    const d = _lumpTsToDate(ts);
+    if (!d) return null;
+    return d.toLocaleString(undefined, opts || { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+// Returns the live NS slot index for a LUMP token if the simulator has that
+// LUMP loaded in its namespace table, otherwise null.
+function _lumpLiveNsSlot(token) {
+    if (!token || typeof sim === 'undefined' || !sim) return null;
+    if (sim._tokenSlotMap instanceof Map) {
+        const s = sim._tokenSlotMap.get(token);
+        return (s !== undefined && s !== null) ? s : null;
+    }
+    return null;
+}
+
 // ── Workspace outer tabs (Logic / Source / Binary) ────────────────────────
 
 let _lumpWsActiveTab = 'binary';
@@ -779,9 +821,7 @@ function _populateLumpLogicCatalog() {
         const absProfile = (typeof _getAbstractionProfile === 'function') ? _getAbstractionProfile(abs) : 'IoT';
         const profileBadgeClass = absProfile === 'Full' ? 'profile-badge-full' : absProfile === 'XC7A100T' ? 'profile-badge-xc7a100t' : 'profile-badge-iot';
         const matchLump = (typeof _lumpsCache !== 'undefined' ? _lumpsCache : []).find(l => l.abstraction === abs.name);
-        const compiledAt = matchLump?.compiled_at
-            ? new Date(matchLump.compiled_at * 1000).toLocaleString(undefined, {month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit'})
-            : null;
+        const compiledAt = matchLump?.compiled_at ? _lumpTsStr(matchLump.compiled_at) : null;
         const mtbf = matchLump?.mtbf || {};
         const mtbfSt = mtbf.status || 'unknown';
         const isUnknownMtbf = mtbfSt === 'unknown' || mtbfSt === 'untested';
@@ -862,9 +902,7 @@ function _populateLumpLogicTab(lump, targetId) {
     const profileClass = profile === 'Full' ? 'profile-badge-full' : profile === 'XC7A100T' ? 'profile-badge-xc7a100t' : 'profile-badge-iot';
     const perms = abs.perms || {};
     const permStr = (perms.B?'B':'')+(perms.R?'R':'')+(perms.W?'W':'')+(perms.X?'X':'')+(perms.L?'L':'')+(perms.S?'S':'')+(perms.E?'E':'') || 'none';
-    const _compiledAt = lump.compiled_at
-        ? new Date(lump.compiled_at * 1000).toLocaleString(undefined, {month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit'})
-        : null;
+    const _compiledAt = lump.compiled_at ? _lumpTsStr(lump.compiled_at) : null;
     const _lMtbf = lump.mtbf || {};
     const _lMtbfSt = _lMtbf.status || 'unknown';
     const _lMtbfUnknown = _lMtbfSt === 'unknown' || _lMtbfSt === 'untested';
@@ -1560,7 +1598,7 @@ function _switchLumpTab(tk, tab) {
     if (bar) {
         const btns = bar.querySelectorAll('.lump-tab');
         btns.forEach(btn => {
-            const labelMap = { api: 'API', clooms: 'CLOOMC', overview: 'Overview', source: 'Source', content: 'Content', tokens: 'Tokens', versions: 'Versions', history: 'History', dna: 'DNA', hexdump: 'Hex Dump' };
+            const labelMap = { api: 'API', clooms: 'CLOOMC', overview: 'Overview', source: 'Compiled Source', content: 'Content', tokens: 'Tokens', versions: 'Versions', history: 'History', dna: 'DNA', hexdump: 'Hex Dump' };
             btn.classList.toggle('lump-tab-active', btn.textContent.trim() === labelMap[tab]);
         });
     }
@@ -1729,8 +1767,8 @@ function _populateLumpApiTab(lump, panelId) {
     if (lump.author)  html += `<tr><td>Author</td><td>${e(lump.author)}</td></tr>`;
     if (lump.version) html += `<tr><td>Version</td><td>${e(lump.version)}</td></tr>`;
     if (lump.compiled_at) {
-        const d = new Date(lump.compiled_at * 1000).toLocaleString(undefined, {month:'short', day:'numeric', year:'numeric'});
-        html += `<tr><td>Compiled</td><td>${e(d)}</td></tr>`;
+        const _compiledDate = _lumpTsStr(lump.compiled_at, {month:'short', day:'numeric', year:'numeric'});
+        if (_compiledDate) html += `<tr><td>Compiled</td><td>${e(_compiledDate)}</td></tr>`;
     }
     if (lump.release_notes) html += `<tr><td>Notes</td><td>${e(lump.release_notes)}</td></tr>`;
     html += '</tbody></table>';
@@ -1820,8 +1858,8 @@ async function _fetchAndShowLumpSavedSource(token, lump, tk) {
             const _lang = e(data.language || lump.language || 'cloomc');
             const _compiledAt = data.compiled_at
                 ? (() => {
-                    const d = new Date(typeof data.compiled_at === 'number'
-                        ? data.compiled_at * 1000 : data.compiled_at);
+                    const d = _lumpTsToDate(data.compiled_at);
+                    if (!d) return null;
                     const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
                     return `${d.getDate()} ${mo} ${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
                 })()
@@ -1896,7 +1934,7 @@ async function _fetchAndShowLumpVersions(token, lump) {
                 const rowStyle = isCurrent ? ' style="background:var(--bg-selected,rgba(99,102,241,0.08));"' : '';
                 html += `<tr${rowStyle}>`;
                 const compiledStr = v.compiled_at
-                    ? new Date(v.compiled_at * 1000).toLocaleString(undefined, {month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit'})
+                    ? (_lumpTsStr(v.compiled_at) || (v.lump_version === 0 ? 'system' : '\u2014'))
                     : (v.lump_version === 0 ? 'system' : '\u2014');
                 html += `<td><strong>v${v.lump_version}</strong>${isCurrent ? ' <span style="font-size:0.65rem;color:#818cf8;">(this)</span>' : ''}<br><span style="font-size:0.65rem;color:var(--text-secondary)">${e(compiledStr)}</span></td>`;
                 html += `<td style="font-family:monospace;font-size:0.75rem;">0x${e(v.lump_token)}</td>`;

@@ -611,17 +611,37 @@ _wukong_ns0_auth = DEMO_NAMESPACE[1]        # word1_authority unchanged (limit=6
 WUKONG_DEMO_NAMESPACE[0] = _wukong_ns0_loc
 WUKONG_DEMO_NAMESPACE[2] = integrity32(_wukong_ns0_loc, _wukong_ns0_auth)
 
+# Fix slot 7 (WukongCallHome) alloc from 64 → 128 words.
+# DEMO_NAMESPACE was built with alloc=64 (lim17=63=0x3F) for all abstraction slots.
+# The WukongCallHome LUMP body is header + WUKONG_NUC_PROGRAM (73 words) = 74 words,
+# padded to 128 (next power of 2 ≥ 74).  Patch word1 (lim17=127) and recompute the
+# integrity seal so the CM's NS range-check passes during LUMP execution.
+_wch_word1_new = 0x0000007F               # lim17 = 127  →  alloc = 128 words
+_wch_loc_byte  = WUKONG_CALLHOME_NS_SLOT * 0x100   # 0x700 (unchanged)
+WUKONG_DEMO_NAMESPACE[WUKONG_CALLHOME_NS_SLOT * 4 + 1] = _wch_word1_new
+WUKONG_DEMO_NAMESPACE[WUKONG_CALLHOME_NS_SLOT * 4 + 2] = integrity32(_wch_loc_byte, _wch_word1_new)
+
 
 # ---------------------------------------------------------------------------
 # WUKONG_DEMO_CLIST — c-list for Wukong boot (8-slot namespace subset)
 #
-# Same as DEMO_CLIST except indices 9 and 10 are NULL: the Wukong minimal
-# namespace has only slots 0–7, so NS slots 8 (SlideRule) and 9 (Constants)
-# do not exist.  Accessing them would produce a BOUNDS fault.
+# Derived from DEMO_CLIST with three overrides:
+#
+#   idx  0 — WukongCallHome E-GT (slot 7, 0x4A000007)
+#             BOOT_PROGRAM[2] = CALL CR0, CR0[0] uses this entry.
+#             The boot FSM initialises CR6 → byte 0x400 (this c-list) before
+#             BOOT_PROGRAM runs, so the CALL resolves clist[0] here →
+#             E-GT for NS slot 7 → LUMP body at DMEM byte 0x0700.
+#             Without an IDE boot-image upload, standalone power-on always
+#             boots directly into WukongCallHome (LED blink + "CM:WUKONG\r\n").
+#
+#   idx  9 — SlideRule E-GT cleared: NS slot 8 absent in Wukong 8-slot NS
+#   idx 10 — Constants R-GT cleared: NS slot 9 absent in Wukong 8-slot NS
 # ---------------------------------------------------------------------------
 WUKONG_DEMO_CLIST = list(DEMO_CLIST)
-WUKONG_DEMO_CLIST[9]  = 0   # SlideRule E-GT cleared: NS slot 8 absent in Wukong 8-slot NS
-WUKONG_DEMO_CLIST[10] = 0   # Constants R-GT cleared: NS slot 9 absent in Wukong 8-slot NS
+WUKONG_DEMO_CLIST[0]  = 0x4A000007  # WukongCallHome E-GT (slot 7) — ⚡ standalone boot entry
+WUKONG_DEMO_CLIST[9]  = 0           # SlideRule E-GT cleared: NS slot 8 absent in Wukong 8-slot NS
+WUKONG_DEMO_CLIST[10] = 0           # Constants R-GT cleared: NS slot 9 absent in Wukong 8-slot NS
 
 
 # ---------------------------------------------------------------------------

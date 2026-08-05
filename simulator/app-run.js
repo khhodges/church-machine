@@ -2273,6 +2273,8 @@ function fpgaReadBRAM() {
 }
 
 let _lastFault = null;
+let _faultModalEditLineNum   = null;   // source line for the faulting instruction
+let _faultModalNsIdxForLump  = null;   // NS slot fallback when no line num
 let _lastRetryLump = null;
 
 function faultAlertOn() {
@@ -2748,6 +2750,10 @@ function showFaultModal(f) {
         return (typeof ln === 'number' && ln > 0) ? ln : null;
     })();
 
+    // Expose to faultModalInvestigate() which runs after the modal is dismissed.
+    _faultModalEditLineNum  = _editLineNum;
+    _faultModalNsIdxForLump = nsIdxForViewLump;
+
     // ── Find the faulting trace entry (used by scope section below) ───────────
     const _faultTraceEntry = (f.instrHistory || []).find(h => h.step === f.faultStep)
                           || ((f.instrHistory || []).length > 0 ? f.instrHistory[f.instrHistory.length - 1] : null);
@@ -3206,8 +3212,18 @@ function faultModalReboot() {
 
 function faultModalInvestigate() {
     faultModalDismiss();
-    switchView('dashboard');
-    switchDashTab('gatelog');
+    if (_faultModalEditLineNum) {
+        // Jump to the exact source line in the editor.
+        switchView('editor');
+        _jumpToAsmLine(_faultModalEditLineNum);
+    } else if (_faultModalNsIdxForLump != null) {
+        // No source line — open the compiled lump in the LUMP Repository.
+        faultModalOpenBinaryLump(_faultModalNsIdxForLump);
+    } else {
+        // No source mapping at all — fall back to the gate log.
+        switchView('dashboard');
+        switchDashTab('gatelog');
+    }
 }
 
 function faultModalClearAndDismiss() {

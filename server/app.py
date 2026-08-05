@@ -4442,6 +4442,9 @@ def _load_boot_abstr_lump():
                                              'description', 'methods'):
                                     if _fld in _sc_mo and _sc_mo[_fld]:
                                         _BOOT_ABSTR_META[_fld] = _sc_mo[_fld]
+                                _BOOT_ABSTR_META['has_source'] = bool(
+                                    (_sc_mo.get('source', '') or '').strip()
+                                )
                             except Exception:
                                 pass
                         break

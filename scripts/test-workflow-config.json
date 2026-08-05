@@ -23,6 +23,7 @@
     "hardware-sim",
     "check-ila-probe-names",
     "test-check-ila-probe-names",
-    "boot-gt-words-tests"
+    "boot-gt-words-tests",
+    "check-wukong-hw-init"
   ]
 }

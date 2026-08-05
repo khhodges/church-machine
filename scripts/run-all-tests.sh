@@ -241,6 +241,9 @@ register_suite "pet-name-memory-tests" \
 register_suite "wukong-protocol-tests" \
     'python -m pytest scripts/test_wukong_protocol.py -v'
 
+register_suite "check-wukong-hw-init" \
+    'python3 scripts/check_wukong_hw_init.py'
+
 register_suite "update-lump-tests" \
     'node scripts/test_update_lump.js'
 

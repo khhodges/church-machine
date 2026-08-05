@@ -47,35 +47,33 @@ from amaranth.lib.memory import Memory as LibMemory
 
 from .hw_types import *
 from .core import ChurchCore
-from .boot_rom import (BootRom, WUKONG_NUC_PROGRAM, WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST)
+from .boot_rom import (BootRom, BOOT_PROGRAM, WUKONG_NUC_PROGRAM,
+                       WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST)
 from .uart_tx import UartTx
 from .uart_rx import UartRx
 
 
-# ── Wukong ROM: WUKONG_NUC_PROGRAM at word 0 ──────────────────────────────────
-# Human-readable CLOOMC source: simulator/examples/wukong_callhome.cloomc
+# ── Wukong ROM: 3-instruction BOOT_PROGRAM ────────────────────────────────────
 # Architecture doc:             docs/wukong-boot.md
-# WUKONG_NUC_PROGRAM (73 words) — standalone-safe boot, no CALL to IDE-config regs:
-#   [0] LOAD CR3, CR6[5]  → LED_DEV  (M-elevated during boot phase)
-#   [1] LOAD CR4, CR6[6]  → UART_DEV (M-elevated during boot phase)
-#   [2..72] LED blink loop + TX "CM:WUKONG\r\n" at 57600 baud
+# BOOT_PROGRAM (3 words) — minimal boot microcode that calls into DMEM:
+#   [0] LOAD CR15, CR15[0]  → load NS root into CR15  (M-elevated during boot)
+#   [1] CHANGE              → load Thread lump; CR6 ← boot c-list at byte 0x400
+#   [2] CALL CR0, CR0[0]    → WUKONG_DEMO_CLIST[0] = WukongCallHome E-GT (slot 7)
+#                              → NS slot 7 → DMEM byte 0x0700 → WukongCallHome LUMP
+# [3..1023] = 0
 #
-# Unlike BOOT_PROGRAM, this never executes CALL CR0,CR0.
-# BOOT_PROGRAM[2] = CALL CR0,CR0 faults NULL_CAP on standalone FPGA because
-# Thread.caps[0] is 0 when no IDE has called setBootEntrySlot().
-# [73..1023] = 0
-_WUKONG_ROM = list(WUKONG_NUC_PROGRAM)
-while len(_WUKONG_ROM) < 1024:
-    _WUKONG_ROM.append(0)
+# Without an IDE boot-image upload, standalone power-on always reaches
+# WukongCallHome (LED blink + "CM:WUKONG\r\n") via WUKONG_DEMO_CLIST[0].
+# The WukongCallHome LUMP body is placed in dmem_init below at byte 0x0700.
+_WUKONG_ROM = list(BOOT_PROGRAM[:3]) + [0] * (1024 - 3)
 
-# ── Safety guard: catch silent ROM revert ─────────────────────────────────────
-# BOOT_PROGRAM[2] = 0x17000000 (CALL CR0,CR0) faults NULL_CAP on standalone FPGA.
-# WUKONG_NUC_PROGRAM[2] must be a DWRITE or branch, never a CALL.
-_BOOT_PROGRAM_CALL_WORD = 0x17000000
-assert _WUKONG_ROM[2] != _BOOT_PROGRAM_CALL_WORD, (
-    "FATAL: _WUKONG_ROM[2] is BOOT_PROGRAM's CALL CR0,CR0 (0x17000000).\n"
-    "wukong_top.py was reverted to BOOT_PROGRAM — use WUKONG_NUC_PROGRAM.\n"
-    "BOOT_PROGRAM faults NULL_CAP on standalone FPGA (no IDE sets Thread.caps[0])."
+# ── Synthesis-time LUMP overflow guard ────────────────────────────────────────
+# WukongCallHome LUMP alloc = 128 words (n_minus_6=1 → 2^7).
+# header (1 word) + code (WUKONG_NUC_PROGRAM) must fit.
+assert len(WUKONG_NUC_PROGRAM) <= 127, (
+    f"WUKONG_NUC_PROGRAM has grown to {len(WUKONG_NUC_PROGRAM)} instructions; "
+    f"header + code = {1 + len(WUKONG_NUC_PROGRAM)} words exceeds 128-word alloc. "
+    "Bump n_minus_6 to 2 (alloc=256) and update WUKONG_DEMO_NAMESPACE slot 7 lim17."
 )
 
 
@@ -176,32 +174,47 @@ class ChurchWukongXC7A100T(Elaboratable):
         #   CR15.word1_location = 0      (NS at byte 0)
         #   CR6.word1_location  = 0x400  (c-list at byte 0x400 = word 256)
         #
-        # WUKONG_NUC_PROGRAM[0] = LOAD CR3, CR6[5]  → LED_DEV into CR3
-        #   clist_gt_addr  = 0x400 + 5*4 = 0x414 = word 261 = WUKONG_DEMO_CLIST[5] ✓
-        #   ns_gate checks NS slot 3 at byte 0 + 3*16 = 48 = word 12 ✓
-        # WUKONG_NUC_PROGRAM[1] = LOAD CR4, CR6[6]  → UART_DEV into CR4
-        #   clist_gt_addr  = 0x400 + 6*4 = 0x418 = word 262 = WUKONG_DEMO_CLIST[6] ✓
-        #   ns_gate checks NS slot 2 at byte 0 + 2*16 = 32 = word 8 ✓
+        # BOOT_PROGRAM[2] = CALL CR0,CR0[0] → WUKONG_DEMO_CLIST[0] = WukongCallHome
+        # E-GT (slot 7) → NS slot 7 → DMEM byte 0x0700 (word 0x1C0) → LUMP body.
+        #
+        # WukongCallHome LUMP (cc=0): uses CR6 to reach the boot c-list directly.
+        #   WUKONG_NUC_PROGRAM[0] = LOAD CR3, CR6[5]  → LED_DEV (clist[5])
+        #   WUKONG_NUC_PROGRAM[1] = LOAD CR4, CR6[6]  → UART_DEV (clist[6])
+        #   clist_gt_addr LED  = 0x400 + 5*4 = 0x414 = word 261 = WUKONG_DEMO_CLIST[5] ✓
+        #   clist_gt_addr UART = 0x400 + 6*4 = 0x418 = word 262 = WUKONG_DEMO_CLIST[6] ✓
         # ── DMEM initialisation data ──────────────────────────────────────────
         # Layout:
         #   words   0-31  : WUKONG_DEMO_NAMESPACE (8 NS slots × 4 words)
+        #                   slot 7 lim17=127 (alloc=128 for WukongCallHome LUMP)
         #   words  32-255 : zeros
-        #   words 256-319 : WUKONG_DEMO_CLIST     (64 c-list entries)
+        #   words 256-319 : WUKONG_DEMO_CLIST (64 c-list entries)
+        #                   [0]=WukongCallHome E-GT 0x4A000007 (⚡ boot entry, slot 7)
         #                   [5]=LED_DEV, [6]=UART_DEV, [7]=BTN_DEV, [8]=TIMER_DEV
         #                   [9]=0, [10]=0  (SlideRule/Constants absent in 8-slot NS)
-        #   words 320+    : zeros
+        #   words 320-447 : zeros
+        #   words 448-521 : WukongCallHome LUMP body
+        #                   [448] header (magic=0x1F, n_minus_6=1, cw=73, cc=0)
+        #                   [449..521] WUKONG_NUC_PROGRAM[0..72]
+        #   words 522-575 : zeros (padding to end of 128-word alloc at word 575)
+        #   words 576+    : zeros
         #
-        # WUKONG_DEMO_NAMESPACE vs DEMO_NAMESPACE:
-        #   slot 0 location = 0 (Wukong NS at DMEM byte 0, not NS_TABLE_BASE=0x1FC00)
-        #   integrity seal on slot 0 recomputed from new location
-        #
-        # WUKONG_NUC_PROGRAM uses both LED_DEV (c-list[5]) and UART_DEV (c-list[6]).
+        # The LUMP body is derived from WUKONG_NUC_PROGRAM at module-load time, so
+        # any future change to WUKONG_NUC_PROGRAM propagates automatically.
+        # The overflow guard at the top of this file catches length growth.
         dmem_init = list(WUKONG_DEMO_NAMESPACE)    # words 0-31
         while len(dmem_init) < 256:
             dmem_init.append(0)                    # words 32-255 = zero
         dmem_init += list(WUKONG_DEMO_CLIST)       # words 256-319: full c-list
         while len(dmem_init) < 16384:
             dmem_init.append(0)
+
+        # WukongCallHome LUMP body at DMEM byte 0x0700 = word 0x1C0 = 448.
+        # cc=0 → no c-list tail; LUMP uses CR6 (boot c-list at byte 0x400) directly.
+        _wch_cw     = len(WUKONG_NUC_PROGRAM)           # 73 — auto-tracks changes
+        _wch_header = (0x1F << 27) | (1 << 23) | (_wch_cw << 10)  # n_minus_6=1
+        for _i, _v in enumerate([_wch_header] + list(WUKONG_NUC_PROGRAM)):
+            dmem_init[0x1C0 + _i] = _v
+        # Words 0x1EA..0x23F remain zero (padding to 128-word alloc boundary).
 
         hw_init_pairs = [(addr, val)
                          for addr, val in enumerate(dmem_init) if val != 0]

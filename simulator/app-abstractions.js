@@ -765,7 +765,10 @@ async function renderLumps() {
 // or '' if the lump has no compiled_at timestamp.
 function _lumpDateStr(lump) {
     if (!lump || !lump.compiled_at) return '';
-    const d  = new Date(lump.compiled_at * 1000);
+    const ts = lump.compiled_at;
+    // Accept both Unix timestamps (number) and ISO date strings (e.g. '2026-08-03T00:00:00Z').
+    const d  = typeof ts === 'number' ? new Date(ts * 1000) : new Date(ts);
+    if (isNaN(d.getTime())) return '';
     const yr = d.getFullYear();
     const mo = String(d.getMonth() + 1).padStart(2, '0');
     const dy = String(d.getDate()).padStart(2, '0');

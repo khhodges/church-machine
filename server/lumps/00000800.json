@@ -10,7 +10,7 @@
   "language": "assembly",
   "author": "Church Machine Platform",
   "version": "2026.07.23",
-  "source": "simulator/examples/scheduler_irq.cloomc",
+  "source": "; ============================================================\n; Abstraction:  Scheduler.IRQ (Tier 2 Fault-Escalation Handler)\n; Token:        00000800\n; ns_slot:      dynamic \u2014 allocated at first Tier 2 invocation\n; ns_slot_policy: dynamic\n;\n; Delivery model: lazy-loaded on first Tier 2 fault after boot.\n; This LUMP is NOT baked into the boot namespace (TSB).  Per\n; Church Machine v1.2 \u00a74, the IRQ handler is an abstraction\n; delivered as a LUMP; it need not be in the Trusted Security Base.\n;\n; Hardware behaviour on CALL (CM IRQ microcode):\n;   1.  CHANGE to the IRQ thread (context saved)\n;   2.  Sweep sleeping threads \u2014 wake any whose timer or flag fired\n;   3.  If reason=FAULT: invoke the registered fault-recovery handler\n;   4.  CHANGE back to the faulting thread (context restored)\n;   5.  Skip the faulting instruction (PC += 1) on success\n; Tier 3 fires when load fails or the handler declines the fault.\n;\n; The simulator implements this logic in _fireSchedulerIRQ().\n; This RETURN is the minimal formal body required by the LUMP spec.\n; ============================================================\n\nRETURN\n",
   "methods": [
     {
       "name": "Escalate",
