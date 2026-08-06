@@ -169,10 +169,16 @@ def main():
                     except Exception as exc:
                         print(f'  [trace POST error] {exc}')
 
-                    flag_str  = _flags_str(flags_byte)
-                    state_str = 'FAULT  stage=' + _fault_name(fault_code) if fault_valid else 'ok'
+                    flag_str       = _flags_str(flags_byte)
+                    ts_str         = time.strftime('%H:%M:%S', time.localtime())
+                    if fault_valid:
+                        fault_code_str = f'fault_code={fault_code} ({_fault_name(fault_code)})'
+                        state_str      = 'FAULT'
+                    else:
+                        fault_code_str = f'fault_code={fault_code}'
+                        state_str      = 'ok'
                     bp_str    = '  [BP HIT]' if bp_hit else ''
-                    print(f'HW: NIA=0x{nia:08X}  instr=0x{instr:08X}  flags={flag_str}  {state_str}{bp_str}')
+                    print(f'[{ts_str}] HW: NIA=0x{nia:08X}  instr=0x{instr:08X}  flags={flag_str}  {fault_code_str}  {state_str}{bp_str}')
                     i += TRACE_LEN
 
                 elif b == BOOT_SENTINEL:
