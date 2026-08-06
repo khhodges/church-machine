@@ -36,24 +36,15 @@ function _setNsDirty(dirty) {
 }
 
 // _findSrcLump(slotIdx, slotLabel)
-// Primary:   direct slot→token lookup via committed ns-state.json.
-// Secondary: abstraction name match — catches in-memory additions not yet saved.
+// Identity is the dot name — slot number is not part of the logical model.
+// Primary:   dot name is in the committed ns-state.json abstractions list.
+// Secondary: name match covers unsaved in-memory additions (the slot is already
+//            visible in the NS table, so membership is implied by its presence there).
 // Returns the matching lump cache entry, or null.
 function _findSrcLump(slotIdx, slotLabel) {
     if (typeof _lumpsCache === 'undefined' || !Array.isArray(_lumpsCache)) return null;
-    // Primary: ns-state.json committed map
-    if (window._nsState && window._nsState.slots) {
-        const token = window._nsState.slots[String(slotIdx)];
-        if (token) {
-            const byToken = _lumpsCache.find(l => l.token === token);
-            if (byToken) return byToken;
-        }
-    }
-    // Secondary: abstraction name match (covers unsaved in-memory additions)
-    if (slotLabel) {
-        return _lumpsCache.find(l => l.abstraction === slotLabel) || null;
-    }
-    return null;
+    if (!slotLabel) return null;
+    return _lumpsCache.find(l => l.abstraction === slotLabel) || null;
 }
 
 function _resolveCListPetName(gtWord) {
@@ -3413,15 +3404,30 @@ window._nsTableSave = async function(btn) {
             }
         }
 
-        // ── Build ns_state: slot→token map from live sim._tokenSlotMap ─────────
-        // sim._tokenSlotMap: token → slot (invert to slot → token for ns-state.json).
-        const nsSlots = {};
+        // ── Build ns_state: dot-name list from the live NS table ──────────────
+        // Slot numbers are a synthesis detail — ns-state.json stores only names.
+        // Resolve each token in sim._tokenSlotMap to its abstraction dot-name via
+        // _lumpsCache; fall back to sim.nsLabels[slot] for names not in the cache.
+        const nsAbstractions = [];
+        let bootEntryName = '';
         if (sim._tokenSlotMap) {
+            const _slotEntries = [];
             for (const [token, slot] of sim._tokenSlotMap) {
-                if (token && slot != null) nsSlots[String(slot)] = token;
+                if (token && slot != null) _slotEntries.push([slot, token]);
+            }
+            _slotEntries.sort((a, b) => a[0] - b[0]);
+            for (const [slot, token] of _slotEntries) {
+                const _lump = Array.isArray(_lumpsCache) && _lumpsCache.find(l => l.token === token);
+                const _name = (_lump && _lump.abstraction)
+                           || (sim.nsLabels && sim.nsLabels[slot])
+                           || null;
+                if (_name && _name !== '(reserved)') {
+                    nsAbstractions.push(_name);
+                    if (slot === bootEntrySlot) bootEntryName = _name;
+                }
             }
         }
-        const nsState = { slots: nsSlots, boot_entry_slot: bootEntrySlot };
+        const nsState = { abstractions: nsAbstractions, boot_entry: bootEntryName };
 
         // Encode as base64 (little-endian bytes — matches struct.pack "<{n}I").
         const bytes = new Uint8Array(words.buffer);

@@ -1879,5 +1879,28 @@
       "E"
     ],
     "variant_group": "compiled_sliderule"
+  },
+  {
+    "token": "87c45cc2",
+    "abstraction": "Abstraction:  WukongCallHome",
+    "filename": "Abstraction_WukongCallHome_v1.lump",
+    "sidecar_file": "Abstraction_WukongCallHome_v1.json",
+    "lump_size": 128,
+    "cw": 73,
+    "cc": 2,
+    "author": "",
+    "version": "2026.08.05",
+    "lump_version": 1,
+    "compiled_at": 1785971453.4553075,
+    "methods": [
+      {
+        "name": "run",
+        "offset": 0,
+        "length": 73
+      }
+    ],
+    "grants": [
+      "E"
+    ]
   }
 ]

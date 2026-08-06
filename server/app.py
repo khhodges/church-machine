@@ -1970,7 +1970,7 @@ def boot_image_ns_state():
     """
     _ensure_ns_state()
     if not os.path.isfile(NS_STATE_PATH):
-        return jsonify({"slots": {}, "boot_entry_slot": 6})
+        return jsonify({"abstractions": [], "boot_entry": "SelfTest"})
     try:
         with open(NS_STATE_PATH) as _fh:
             _state = json.load(_fh)
@@ -1989,7 +1989,7 @@ def boot_image_save_ns():
     Body JSON:
         {
           "data_b64":  "<base64 of raw boot-image bytes>",
-          "ns_state":  { "slots": { "<slot>": "<token>", ... }, "boot_entry_slot": N }
+          "ns_state":  { "abstractions": ["Name", ...], "boot_entry": "Name" }
         }
 
     This is the only endpoint that should be called for NS mutations.  All other
@@ -2029,11 +2029,11 @@ def boot_image_save_ns():
     except Exception as _exc:
         return jsonify({"ok": False, "error": f"Failed to write boot-image.bin: {_exc}"}), 500
 
-    # Write ns-state.json
+    # Write ns-state.json (dot-name format)
     try:
-        _ns_slots  = {str(k): str(v) for k, v in (_ns_state.get("slots") or {}).items() if k and v}
-        _ns_entry  = int(_ns_state.get("boot_entry_slot") or 6)
-        _write_ns_state(_ns_slots, _ns_entry)
+        _ns_names  = [str(n) for n in (_ns_state.get("abstractions") or []) if n]
+        _ns_entry  = str(_ns_state.get("boot_entry") or "SelfTest")
+        _write_ns_state(_ns_names, _ns_entry)
     except Exception as _nse:
         print(f"[ns-state] save-ns: failed to write ns-state.json: {_nse}", flush=True)
 
@@ -4407,28 +4407,28 @@ _BOOT_NS_META    = {}   # populated by _load_boot_ns_lump();    empty means not 
 
 
 # ── ns-state.json helpers ────────────────────────────────────────────────────
-# ns-state.json is the authoritative slot→token map written by the single
-# "Save Namespace" write path.  It is derived from manifest.json ns_slot fields
-# at cold-start (first boot, file absent) and updated atomically each time the
-# user clicks Save NS Table.
+# ns-state.json records the LOGICAL state of the namespace as an ordered list
+# of abstraction dot-names plus the boot-entry name.  Slot numbers are a
+# synthesis detail owned by boot_image.py (via manifest ns_slot fields) and
+# are NOT stored here.
 
-def _derive_ns_state_slots():
-    """Build slot→token dict from manifest.json ns_slot fields (cold-start fallback)."""
-    _out = {}
+def _derive_ns_state_names():
+    """Build ordered dot-name list from manifest.json ns_slot fields (cold-start fallback)."""
+    _out = {}   # slot → name (collect then sort for stable ordering)
     _mf  = os.path.join(LUMPS_DIR, "manifest.json")
     if not os.path.isfile(_mf):
-        return _out
+        return []
     try:
         with open(_mf) as _fh:
             _entries = json.load(_fh)
         for _e in (_entries if isinstance(_entries, list) else []):
             _slot = _e.get("ns_slot")
-            _tok  = _e.get("token")
-            if isinstance(_slot, int) and isinstance(_tok, str) and _tok:
-                _out[str(_slot)] = _tok
+            _name = _e.get("abstraction")
+            if isinstance(_slot, int) and isinstance(_name, str) and _name:
+                _out[_slot] = _name
     except Exception:
         pass
-    return _out
+    return [_out[k] for k in sorted(_out)]
 
 def _read_boot_entry_slot_from_image():
     """Return the boot-entry sentinel byte from boot-image.bin, or None."""
@@ -4453,13 +4453,29 @@ def _read_boot_entry_slot_from_image():
         pass
     return None
 
-def _write_ns_state(slots, boot_entry_slot):
-    """Write ns-state.json atomically via a temp file + os.replace."""
+def _read_boot_entry_name_from_image():
+    """Return the boot-entry abstraction dot-name derived from the binary sentinel + manifest."""
+    _slot = _read_boot_entry_slot_from_image()
+    if _slot is None:
+        return None
+    _mf = os.path.join(LUMPS_DIR, "manifest.json")
+    try:
+        with open(_mf) as _fh:
+            _entries = json.load(_fh)
+        for _e in (_entries if isinstance(_entries, list) else []):
+            if _e.get("ns_slot") == _slot:
+                return _e.get("abstraction") or None
+    except Exception:
+        pass
+    return None
+
+def _write_ns_state(names, boot_entry):
+    """Write ns-state.json atomically — logical dot-name list, no slot numbers."""
     import time as _tm_ns
     _state = {
-        "slots":           {str(k): str(v) for k, v in (slots or {}).items()},
-        "boot_entry_slot": int(boot_entry_slot),
-        "generated_at":    _tm_ns.time(),
+        "abstractions": list(names or []),
+        "boot_entry":   str(boot_entry or ""),
+        "generated_at": _tm_ns.time(),
     }
     _tmp = NS_STATE_PATH + ".tmp"
     try:
@@ -4474,15 +4490,27 @@ def _write_ns_state(slots, boot_entry_slot):
         raise
 
 def _ensure_ns_state():
-    """Create ns-state.json from manifest + boot-image sentinel if the file is absent."""
+    """Create ns-state.json (dot-name format) if absent; migrate old slot-keyed format."""
     if os.path.isfile(NS_STATE_PATH):
+        # Migrate old slot-keyed format if present.
+        try:
+            with open(NS_STATE_PATH) as _fh:
+                _existing = json.load(_fh)
+            if "slots" in _existing and "abstractions" not in _existing:
+                _names = _derive_ns_state_names()
+                _entry = _read_boot_entry_name_from_image() or "SelfTest"
+                _write_ns_state(_names, _entry)
+                print(f"[ns-state] migrated to dot-name format: "
+                      f"{len(_names)} abstractions, boot_entry={_entry!r}", flush=True)
+        except Exception as _exc:
+            print(f"[ns-state] migration check failed: {_exc}", flush=True)
         return
     try:
-        _slots = _derive_ns_state_slots()
-        _entry = _read_boot_entry_slot_from_image() or 6
-        _write_ns_state(_slots, _entry)
+        _names = _derive_ns_state_names()
+        _entry = _read_boot_entry_name_from_image() or "SelfTest"
+        _write_ns_state(_names, _entry)
         print(f"[ns-state] created cold-start ns-state.json: "
-              f"{len(_slots)} slots, boot_entry_slot={_entry}", flush=True)
+              f"{len(_names)} abstractions, boot_entry={_entry!r}", flush=True)
     except Exception as _exc:
         print(f"[ns-state] cold-start creation failed: {_exc}", flush=True)
 

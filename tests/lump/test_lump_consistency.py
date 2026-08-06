@@ -196,7 +196,8 @@ def _json_tokens():
         sc_stem_to_token[tok] = tok  # legacy
     result = set()
     for fn in os.listdir(LUMPS_DIR):
-        if not fn.endswith(".json") or fn in ("manifest.json", "server_managed_tokens.json"):
+        if not fn.endswith(".json") or fn in ("manifest.json", "server_managed_tokens.json",
+                                               "ns-state.json"):
             continue
         stem = fn[:-5]
         if _is_archive_stem(stem):

@@ -494,16 +494,45 @@ def find_lump_file_by_abstraction(lumps_dir, abstraction_name, ns_slot):
 
 
 def _load_ns_state_token_map(lumps_dir):
-    """slot→token from ns-state.json (authoritative single-write-path store)."""
+    """Dot-name list from ns-state.json → slot→token using manifest ns_slot for placement.
+
+    ns-state.json is the logical record (which abstractions are in the namespace).
+    Slot assignment is a synthesis detail owned by the manifest ns_slot fields.
+    """
     _path = os.path.join(lumps_dir, "ns-state.json")
     if not os.path.isfile(_path):
         return {}
     try:
         with open(_path) as _f:
             _state = json.load(_f)
-        _slots = _state.get("slots") or {}
-        return {int(k): str(v) for k, v in _slots.items()
-                if str(k).lstrip("-").isdigit() and v}
+        # Backward-compat: old slot-keyed format written before the dot-name migration.
+        if "slots" in _state and "abstractions" not in _state:
+            _slots = _state.get("slots") or {}
+            return {int(k): str(v) for k, v in _slots.items()
+                    if str(k).lstrip("-").isdigit() and v}
+        _names = _state.get("abstractions") or []
+        if not _names:
+            return {}
+        # Build name→{token, ns_slot} index from manifest.
+        _mf = os.path.join(lumps_dir, "manifest.json")
+        _name_info = {}
+        try:
+            with open(_mf) as _mf_f:
+                _entries = json.load(_mf_f)
+            for _e in (_entries if isinstance(_entries, list) else []):
+                _n = _e.get("abstraction")
+                _t = _e.get("token")
+                _s = _e.get("ns_slot")
+                if _n and _t and isinstance(_s, int):
+                    _name_info.setdefault(_n, {"token": _t, "ns_slot": _s})
+        except Exception:
+            pass
+        out = {}
+        for _name in _names:
+            _info = _name_info.get(_name)
+            if _info:
+                out[_info["ns_slot"]] = _info["token"]
+        return out
     except Exception:
         return {}
 
