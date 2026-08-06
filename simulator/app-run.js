@@ -14329,7 +14329,7 @@ window._wukongSetHwBreakpoint = _wukongSetHwBreakpoint;
 function _wukongUpdateBtn() {
     const btn = document.getElementById('toolHWRunBtn');
     if (!btn) return;
-    btn.style.display = _wukongIsConnected() ? '' : 'none';
+    btn.style.display = (_wukongIsConnected() || _wukongHWRunning) ? '' : 'none';
     btn.textContent   = _wukongHWRunning ? '\u23F8 HW' : '\u25B6 HW';
     btn.classList.toggle('btn-warning', _wukongHWRunning);
     btn.classList.toggle('btn-secondary', !_wukongHWRunning);
