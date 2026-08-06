@@ -1644,16 +1644,16 @@ def boot_image_exists():
     return jsonify({"exists": os.path.isfile(BOOT_IMAGE_PATH)})
 
 
-def _crc16_ccitt(data: bytes) -> int:
-    """CRC-16/CCITT-FALSE: poly=0x1021, init=0xFFFF, MSB-first, no reflection.
-    Matches callhome_bridge.py _crc16_ccitt() and hardware/uart_crc16.py exactly.
-    """
+def _crc16_ccitt(data_bytes):
     crc = 0xFFFF
-    for byte in data:
-        crc ^= byte << 8
+    for b in data_bytes:
+        crc ^= b << 8
         for _ in range(8):
-            crc = ((crc << 1) ^ 0x1021) if (crc & 0x8000) else (crc << 1)
-        crc &= 0xFFFF
+            if crc & 0x8000:
+                crc = (crc << 1) ^ 0x1021
+            else:
+                crc = crc << 1
+            crc &= 0xFFFF
     return crc
 
 
@@ -1963,14 +1963,14 @@ def boot_image_upload():
 
 @app.route("/api/boot-image/ns-state", methods=["GET"])
 def boot_image_ns_state():
-    """Return the committed slot→token map (ns-state.json).
+    """Return the committed NS table snapshot (ns-state.json).
 
     Used by the browser to seed _findSrcLump and _nsState.  When the file is
-    absent, derive it from manifest.json ns_slot fields (cold-start path).
+    absent, derive it from boot-image.bin (cold-start path).
     """
     _ensure_ns_state()
     if not os.path.isfile(NS_STATE_PATH):
-        return jsonify({"abstractions": [], "boot_entry": "SelfTest"})
+        return jsonify({"abstractions": []})
     try:
         with open(NS_STATE_PATH) as _fh:
             _state = json.load(_fh)
@@ -1989,7 +1989,14 @@ def boot_image_save_ns():
     Body JSON:
         {
           "data_b64":  "<base64 of raw boot-image bytes>",
-          "ns_state":  { "abstractions": ["Name", ...], "boot_entry": "Name" }
+          "ns_state":  {
+            "abstractions": [
+              { "name": "SelfTest", "slot": 6, "location": "0x00000100",
+                "type": "Inform", "f": 0, "g": 0, "limit": "0x001FE",
+                "seq": 0, "seal": "0x667F", "boot": true },
+              ...
+            ]
+          }
         }
 
     This is the only endpoint that should be called for NS mutations.  All other
@@ -2029,11 +2036,15 @@ def boot_image_save_ns():
     except Exception as _exc:
         return jsonify({"ok": False, "error": f"Failed to write boot-image.bin: {_exc}"}), 500
 
-    # Write ns-state.json (dot-name format)
+    # Write ns-state.json (rich per-slot format)
     try:
-        _ns_names  = [str(n) for n in (_ns_state.get("abstractions") or []) if n]
-        _ns_entry  = str(_ns_state.get("boot_entry") or "SelfTest")
-        _write_ns_state(_ns_names, _ns_entry)
+        _raw_abs = _ns_state.get("abstractions") or []
+        # Accept list of rich dicts; silently drop any malformed element.
+        _ns_entries = [
+            _a for _a in _raw_abs
+            if isinstance(_a, dict) and _a.get("name") and isinstance(_a.get("slot"), int)
+        ]
+        _write_ns_state(_ns_entries)
     except Exception as _nse:
         print(f"[ns-state] save-ns: failed to write ns-state.json: {_nse}", flush=True)
 
@@ -2990,7 +3001,6 @@ TEST_HARNESS_DIR = os.path.join(BASE_DIR, "test_harness")
 BUSINESS_DIR = os.path.join(DOCS_DIR, "business")
 
 
-
 @app.route("/business/plan.html")
 def business_plan():
     return send_from_directory(BUSINESS_DIR, "plan.html")
@@ -3608,8 +3618,6 @@ to the Wukong board's 14-pin JTAG header.
 """
 
 
-
-
 BUILD_MD_TI60 = """# Church Machine — Efinix Ti60 F225  SoC+CM Build Package
 
 ## What's Inside
@@ -3722,7 +3730,6 @@ sudo ~/oss-cad-suite/bin/openFPGALoader \\\\
 | ttyUSB2 | 57600  | Sapphire SoC greeting + CALLHOME JSON   |
 | ttyUSB3 | 115200 | Church Machine NIA trace / fault events |
 """
-
 
 
 def _fpga_paths(board):
@@ -4396,6 +4403,90 @@ def _load_bundled_lumps():
         except Exception as exc:
             print(f'[lumps] manifest pass error: {exc}', flush=True)
 
+def _derive_ns_state_entries():
+    """Build rich NS-entry list from boot-image.bin + manifest (cold-start fallback).
+
+    Reads the binary to get all column values; consults the manifest and
+    hardware boot catalog for slot names.  Returns a list of dicts matching
+    the ns-state.json "abstractions" element format.
+    """
+    import time as _tm_ns2
+    if not os.path.isfile(BOOT_IMAGE_PATH):
+        return []
+    try:
+        with open(BOOT_IMAGE_PATH, "rb") as _fh:
+            _raw = _fh.read()
+        _rows = _boot_image_gen.parse_ns_table(_raw)
+        if not _rows:
+            return []
+
+        # Build slot→name from manifest ns_slot fields.
+        _slot_names = {}
+        _mf = os.path.join(LUMPS_DIR, "manifest.json")
+        try:
+            with open(_mf) as _mf_fh:
+                _mf_entries = json.load(_mf_fh)
+            for _me in (_mf_entries if isinstance(_mf_entries, list) else []):
+                _ms = _me.get("ns_slot")
+                _mn = _me.get("abstraction")
+                if isinstance(_ms, int) and isinstance(_mn, str) and _mn:
+                    _slot_names.setdefault(_ms, _mn)
+        except Exception:
+            pass
+
+        # Hardware boot catalog names for fixed slots (fallback when not in manifest).
+        _HW_CATALOG = {
+            0: "Boot.NS", 1: "Boot.Thread",
+            2: "UART_DEV", 3: "LED_DEV", 4: "BTN_DEV", 5: "TIMER_DEV",
+            6: "SelfTest", 7: "WukongCallHome",
+            8: "Tunnel", 9: "Ethernet", 10: "CapTest",
+        }
+
+        # Read boot-entry slot from binary sentinel (NS_TABLE_BASE - 2).
+        _boot_slot = None
+        try:
+            _n2 = len(_raw) // 4
+            _mem2 = list(_struct.unpack(f"<{_n2}I", _raw[:_n2 * 4]))
+            _cfg2, _ = _read_saved_boot_config()
+            _step1b  = (_cfg2 or {}).get("step1", {})
+            _nsmax2  = int(_step1b.get("nsSlotsMax") or _boot_image_gen.MAX_NS_ENTRIES)
+            _nsres2  = _boot_image_gen.ns_table_reserve_words(_nsmax2)
+            _nsbase2 = _n2 - _nsres2
+            _sidx2   = _nsbase2 - 2
+            if 0 <= _sidx2 < _n2:
+                _boot_slot = int(_mem2[_sidx2]) & 0xFF
+        except Exception:
+            pass
+
+        _out = []
+        for _r in _rows:
+            _sl  = _r["slot"]
+            _loc = _r["location"]
+            _typ = _GT_TYPE_NAMES.get(_r["gt_type"], "Inform")
+            _lim = _r["limit17"]
+            _seq = _r["seq"]
+            _seal = _r["seal"]
+            _g    = _r["g"]
+            _nm   = _slot_names.get(_sl) or _HW_CATALOG.get(_sl) or f"slot_{_sl}"
+            _e = {
+                "name":     _nm,
+                "slot":     _sl,
+                "location": f"0x{_loc:08X}",
+                "type":     _typ,
+                "f":        0,
+                "g":        _g,
+                "limit":    f"0x{_lim:05X}",
+                "seq":      _seq,
+                "seal":     f"0x{_seal:04X}",
+            }
+            if _boot_slot is not None and _sl == _boot_slot:
+                _e["boot"] = True
+            _out.append(_e)
+        return _out
+    except Exception as _exc:
+        print(f"[ns-state] _derive_ns_state_entries failed: {_exc}", flush=True)
+        return []
+
 _load_bundled_lumps()
 
 # ── Boot Abstraction lump (NS slot 6, "Boot.Abstr") ───────────────────────────────
@@ -4430,28 +4521,6 @@ def _derive_ns_state_names():
         pass
     return [_out[k] for k in sorted(_out)]
 
-def _read_boot_entry_slot_from_image():
-    """Return the boot-entry sentinel byte from boot-image.bin, or None."""
-    if not os.path.isfile(BOOT_IMAGE_PATH):
-        return None
-    try:
-        with open(BOOT_IMAGE_PATH, "rb") as _fh:
-            _raw = _fh.read()
-        _n = len(_raw) // 4
-        if _n < 1024:
-            return None
-        _mem = list(_struct.unpack(f"<{_n}I", _raw[:_n * 4]))
-        _cfg, _ = _read_saved_boot_config()
-        _step1  = (_cfg or {}).get("step1", {})
-        _nsmax  = int(_step1.get("nsSlotsMax") or _boot_image_gen.MAX_NS_ENTRIES)
-        _nsres  = _boot_image_gen.ns_table_reserve_words(_nsmax)
-        _nsbase = _n - _nsres
-        _sidx   = _nsbase - 2
-        if 0 <= _sidx < _n:
-            return int(_mem[_sidx]) & 0xFF
-    except Exception:
-        pass
-    return None
 
 def _read_boot_entry_name_from_image():
     """Return the boot-entry abstraction dot-name derived from the binary sentinel + manifest."""
@@ -4469,12 +4538,11 @@ def _read_boot_entry_name_from_image():
         pass
     return None
 
-def _write_ns_state(names, boot_entry):
-    """Write ns-state.json atomically — logical dot-name list, no slot numbers."""
+def _write_ns_state(entries):
+    """Write ns-state.json atomically — rich list of NS row objects."""
     import time as _tm_ns
     _state = {
-        "abstractions": list(names or []),
-        "boot_entry":   str(boot_entry or ""),
+        "abstractions": list(entries or []),
         "generated_at": _tm_ns.time(),
     }
     _tmp = NS_STATE_PATH + ".tmp"
@@ -4490,27 +4558,39 @@ def _write_ns_state(names, boot_entry):
         raise
 
 def _ensure_ns_state():
-    """Create ns-state.json (dot-name format) if absent; migrate old slot-keyed format."""
+    """Create/migrate ns-state.json to the rich per-slot format on startup.
+
+    Migrates both legacy formats:
+      - Old slot-keyed format: {"slots": {...}}
+      - Old flat-name format:  {"abstractions": ["Name", ...], "boot_entry": "..."}
+    Both are converted to the new rich format by re-parsing boot-image.bin.
+    """
     if os.path.isfile(NS_STATE_PATH):
-        # Migrate old slot-keyed format if present.
         try:
             with open(NS_STATE_PATH) as _fh:
                 _existing = json.load(_fh)
-            if "slots" in _existing and "abstractions" not in _existing:
-                _names = _derive_ns_state_names()
-                _entry = _read_boot_entry_name_from_image() or "SelfTest"
-                _write_ns_state(_names, _entry)
-                print(f"[ns-state] migrated to dot-name format: "
-                      f"{len(_names)} abstractions, boot_entry={_entry!r}", flush=True)
+            _abs = _existing.get("abstractions")
+            _needs_migration = (
+                # old slot-keyed format
+                ("slots" in _existing and _abs is None)
+                # old flat-name format: abstractions is a list of strings
+                or (isinstance(_abs, list) and _abs and isinstance(_abs[0], str))
+                # old flat-name format with empty list but boot_entry present
+                or ("boot_entry" in _existing)
+            )
+            if _needs_migration:
+                _entries = _derive_ns_state_entries()
+                _write_ns_state(_entries)
+                print(f"[ns-state] migrated to rich format: "
+                      f"{len(_entries)} occupied slots", flush=True)
         except Exception as _exc:
             print(f"[ns-state] migration check failed: {_exc}", flush=True)
         return
     try:
-        _names = _derive_ns_state_names()
-        _entry = _read_boot_entry_name_from_image() or "SelfTest"
-        _write_ns_state(_names, _entry)
+        _entries = _derive_ns_state_entries()
+        _write_ns_state(_entries)
         print(f"[ns-state] created cold-start ns-state.json: "
-              f"{len(_names)} abstractions, boot_entry={_entry!r}", flush=True)
+              f"{len(_entries)} occupied slots", flush=True)
     except Exception as _exc:
         print(f"[ns-state] cold-start creation failed: {_exc}", flush=True)
 

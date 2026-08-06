@@ -492,12 +492,83 @@ def find_lump_file_by_abstraction(lumps_dir, abstraction_name, ns_slot):
         pass
     return None
 
+def parse_ns_table(image_bytes):
+    """Parse the NS table from a boot image binary.
 
+    Returns a list of dicts, one per occupied slot (w0 != 0 or w1 != 0):
+      { "slot": int, "location": int, "gt_type": int, "f": int, "g": int,
+        "limit17": int, "seq": int, "seal": int, "b": int, "clist_count": int }
+
+    gt_type: 0=Null, 1=Inform, 2=Outform, 3=Abstract.
+    seq:  bits[31:25] of word2 (7-bit gt_seq).
+    seal: bits[15:0]  of word2 (CRC-16 seal).
+    Returns [] when the image is unrecognisable.
+    """
+    n_words = len(image_bytes) // 4
+    if n_words < 16:
+        return []
+    mem = list(struct.unpack(f"<{n_words}I", image_bytes[: n_words * 4]))
+
+    # Backwards-scan for BOOT_IMAGE_FORMAT_TAG (mirrors validate_boot_image).
+    tag_idx = -1
+    scan_limit = min(8192, n_words)
+    for _i in range(1, scan_limit + 1):
+        _pos = n_words - _i
+        if mem[_pos] == BOOT_IMAGE_FORMAT_TAG:
+            tag_idx = _pos
+            break
+    if tag_idx < 0:
+        return []
+
+    ns_table_base    = tag_idx + 1
+    total            = n_words
+    ns_table_reserve = total - ns_table_base
+    if ns_table_reserve < NS_ENTRY_WORDS or ns_table_reserve % NS_ENTRY_WORDS != 0:
+        return []
+
+    # Read stored nsCount from tag_idx - 2 (= NS_TABLE_BASE - 3).
+    max_entries         = ns_table_reserve // NS_ENTRY_WORDS
+    stored_count_idx    = tag_idx - 2
+    if 0 <= stored_count_idx < total:
+        _sc = mem[stored_count_idx] & 0xFFFF
+        ns_count = _sc if 0 < _sc <= max_entries else max_entries
+    else:
+        ns_count = max_entries
+
+    entries = []
+    for slot in range(ns_count):
+        base = total - (slot + 1) * NS_ENTRY_WORDS
+        if base < 0 or base + 3 >= total:
+            break
+        w0 = mem[base + 0]
+        w1 = mem[base + 1]
+        w2 = mem[base + 2]
+        if w0 == 0 and w1 == 0:
+            continue  # unoccupied slot
+        entries.append({
+            "slot":        slot,
+            "location":    w0,
+            "gt_type":     (w1 >> 26) & 3,
+            "f":           0,               # removed in v2.0; always 0
+            "g":           (w1 >> 29) & 1,
+            "limit17":     w1 & 0x1FFFF,
+            "seq":         (w2 >> 25) & 0x7F,
+            "seal":        w2 & 0xFFFF,
+            "b":           (w1 >> 31) & 1,
+            "clist_count": (w1 >> 17) & 0x1FF,
+        })
+    return entries
 def _load_ns_state_token_map(lumps_dir):
-    """Dot-name list from ns-state.json → slot→token using manifest ns_slot for placement.
+    """ns-state.json → slot→token map used by the boot image generator.
 
-    ns-state.json is the logical record (which abstractions are in the namespace).
-    Slot assignment is a synthesis detail owned by the manifest ns_slot fields.
+    New format (abstractions is a list of rich dicts): use entry["slot"] and
+    resolve the token by name from the manifest.  Hardware MMIO slots (2-5)
+    have no manifest token and are skipped for token resolution.
+
+    Old flat-name format (abstractions is a list of strings): derive slot
+    placement from manifest ns_slot fields (backward compatibility).
+
+    Old slot-keyed format ({"slots": {...}}): returned directly.
     """
     _path = os.path.join(lumps_dir, "ns-state.json")
     if not os.path.isfile(_path):
@@ -505,15 +576,17 @@ def _load_ns_state_token_map(lumps_dir):
     try:
         with open(_path) as _f:
             _state = json.load(_f)
-        # Backward-compat: old slot-keyed format written before the dot-name migration.
+        # Backward-compat: very old slot-keyed format.
         if "slots" in _state and "abstractions" not in _state:
             _slots = _state.get("slots") or {}
             return {int(k): str(v) for k, v in _slots.items()
                     if str(k).lstrip("-").isdigit() and v}
-        _names = _state.get("abstractions") or []
-        if not _names:
+
+        _abstractions = _state.get("abstractions") or []
+        if not _abstractions:
             return {}
-        # Build name→{token, ns_slot} index from manifest.
+
+        # Build name→{token, ns_slot} index from manifest (used by both formats).
         _mf = os.path.join(lumps_dir, "manifest.json")
         _name_info = {}
         try:
@@ -527,9 +600,24 @@ def _load_ns_state_token_map(lumps_dir):
                     _name_info.setdefault(_n, {"token": _t, "ns_slot": _s})
         except Exception:
             pass
+
         out = {}
-        for _name in _names:
-            _info = _name_info.get(_name)
+
+        # New rich-dict format: each element is {"name", "slot", ...}.
+        if _abstractions and isinstance(_abstractions[0], dict):
+            for _entry in _abstractions:
+                _name = _entry.get("name") or ""
+                _slot = _entry.get("slot")
+                if not _name or not isinstance(_slot, int):
+                    continue
+                _info = _name_info.get(_name)
+                if _info and _info.get("token"):
+                    out[_slot] = _info["token"]
+            return out
+
+        # Old flat-name format: derive slot from manifest ns_slot.
+        for _name in _abstractions:
+            _info = _name_info.get(str(_name))
             if _info:
                 out[_info["ns_slot"]] = _info["token"]
         return out

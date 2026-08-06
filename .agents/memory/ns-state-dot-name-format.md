@@ -1,26 +1,32 @@
 ---
-name: ns-state.json dot-name format
-description: ns-state.json stores abstraction dot-names, not slot numbers or tokens — slot assignment is a synthesis detail owned by boot_image.py
+name: ns-state.json rich NS-entry format
+description: ns-state.json stores one rich object per occupied NS slot, including all column values and a boot marker — not a flat name list.
 ---
 
 ## Rule
-`server/lumps/ns-state.json` stores the LOGICAL state of the namespace:
+`server/lumps/ns-state.json` stores the FULL NS table snapshot as rendered in the IDE:
 
 ```json
 {
-  "abstractions": ["SelfTest", "WukongCallHome", "SlideRule", ...],
-  "boot_entry": "SelfTest",
+  "abstractions": [
+    { "name": "SelfTest", "slot": 6, "location": "0x00000100",
+      "type": "Inform", "f": 0, "g": 0, "limit": "0x001FE",
+      "seq": 0, "seal": "0x667F", "boot": true },
+    ...
+  ],
   "generated_at": <unix time>
 }
 ```
 
-Slot numbers and tokens are NOT stored here. They are synthesis details.
+Empty slots are omitted. `"boot": true` appears only on the ⚡ boot-entry slot. No top-level `boot_entry` field.
 
-**Why:** The Church Machine is based on logic, not physics. Slot numbers are physical addresses hidden by the CM model. The dot name is the only identity that belongs in the logical record.
+**Why:** The rich format lets the server reconstruct the full NS table state without re-parsing the binary, and lets readers see exactly what the IDE shows.
 
 **How to apply:**
-- `boot_image.py` resolves each name to a (slot, token) pair via the manifest `ns_slot` field — that's where physical placement lives.
-- `_findSrcLump(slotIdx, slotLabel)` uses `slotLabel` (the dot name) to find the lump; slot number is ignored.
-- The save-ns POST body sends `{ abstractions: [names...], boot_entry: "Name" }`.
-- `_ensure_ns_state()` in `app.py` detects the old slot-keyed format and migrates it automatically.
-- `tests/lump/test_lump_consistency.py` R4 excludes `ns-state.json` from the orphan-sidecar scan (it's not a lump sidecar).
+- `boot_image.py:parse_ns_table(image_bytes)` decodes the binary into raw slot dicts.
+- `boot_image.py:_load_ns_state_token_map()` reads `entry["slot"]` + resolves token by name from the manifest; MMIO slots (2-5) are skipped for token resolution.
+- `app.py:_derive_ns_state_entries()` calls `parse_ns_table()` + annotates with names from the manifest/HW catalog; called at cold-start to seed the file.
+- `app.py:_ensure_ns_state()` migrates both legacy formats (flat-name list, slot-keyed) automatically on startup.
+- `app.py:_write_ns_state(entries)` accepts a list of rich dicts; no `boot_entry` param.
+- `app-memory.js:_nsTableSave` builds `nsAbstractions` by iterating `sim.readNSEntry(i)` for `i = 0..sim.nsCount-1`.
+- `_findSrcLump(slotIdx, slotLabel)` is unchanged — still uses `slotLabel` (dot name) for lump identity.

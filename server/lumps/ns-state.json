@@ -1,14 +1,127 @@
 {
   "abstractions": [
-    "SelfTest",
-    "WukongCallHome",
-    "Constants",
-    "CapTest",
-    "SlideRule",
-    "Tunnel",
-    "Keystone",
-    "EventRouter"
+    {
+      "name": "Boot.NS",
+      "slot": 0,
+      "location": "0x00003C00",
+      "type": "Inform",
+      "f": 0,
+      "g": 0,
+      "limit": "0x003FF",
+      "seq": 0,
+      "seal": "0x3DA8"
+    },
+    {
+      "name": "Boot.Thread",
+      "slot": 1,
+      "location": "0x00000000",
+      "type": "Inform",
+      "f": 0,
+      "g": 0,
+      "limit": "0x000FF",
+      "seq": 0,
+      "seal": "0xEF3E"
+    },
+    {
+      "name": "UART_DEV",
+      "slot": 2,
+      "location": "0x40000014",
+      "type": "Inform",
+      "f": 0,
+      "g": 0,
+      "limit": "0x00002",
+      "seq": 0,
+      "seal": "0xDD36"
+    },
+    {
+      "name": "LED_DEV",
+      "slot": 3,
+      "location": "0x40000000",
+      "type": "Inform",
+      "f": 0,
+      "g": 0,
+      "limit": "0x00004",
+      "seq": 0,
+      "seal": "0x6CA6"
+    },
+    {
+      "name": "BTN_DEV",
+      "slot": 4,
+      "location": "0x40000028",
+      "type": "Inform",
+      "f": 0,
+      "g": 0,
+      "limit": "0x00000",
+      "seq": 0,
+      "seal": "0x9EAF"
+    },
+    {
+      "name": "TIMER_DEV",
+      "slot": 5,
+      "location": "0x4000002C",
+      "type": "Inform",
+      "f": 0,
+      "g": 0,
+      "limit": "0x00004",
+      "seq": 0,
+      "seal": "0x14DA"
+    },
+    {
+      "name": "SelfTest",
+      "slot": 6,
+      "location": "0x00000100",
+      "type": "Inform",
+      "f": 0,
+      "g": 0,
+      "limit": "0x001FE",
+      "seq": 0,
+      "seal": "0x667F",
+      "boot": true
+    },
+    {
+      "name": "WukongCallHome",
+      "slot": 7,
+      "location": "0x00000300",
+      "type": "Inform",
+      "f": 0,
+      "g": 0,
+      "limit": "0x0003D",
+      "seq": 0,
+      "seal": "0xF8E2"
+    },
+    {
+      "name": "Tunnel",
+      "slot": 8,
+      "location": "0x00000340",
+      "type": "Inform",
+      "f": 0,
+      "g": 0,
+      "limit": "0x0003F",
+      "seq": 0,
+      "seal": "0xB63C"
+    },
+    {
+      "name": "Ethernet",
+      "slot": 9,
+      "location": "0x00000380",
+      "type": "Inform",
+      "f": 0,
+      "g": 0,
+      "limit": "0x0003F",
+      "seq": 0,
+      "seal": "0x0598"
+    },
+    {
+      "name": "CapTest",
+      "slot": 10,
+      "location": "0x000003C0",
+      "type": "Inform",
+      "f": 0,
+      "g": 0,
+      "limit": "0x0003A",
+      "seq": 0,
+      "seal": "0x3BA1"
+    }
   ],
-  "boot_entry": "SelfTest",
-  "generated_at": 1785962321.7029262
+  "generated_at": 1785973925.0
 }

@@ -2398,14 +2398,14 @@ function renderMemoryDump(location, limit, nsIndex) {
     return html;
 }
 
-// ===========================================================================
+// ---------------------------------------------------------------------------
 // Boot Image Designer — Step 1: memory allocation (Task #214)
 // ---------------------------------------------------------------------------
 // Loads/saves a project-level boot config via /api/boot-config. The config is
 // also exposed as window.bootConfig so simulator.js (initSim) can pick up
 // programmer-chosen lump sizes when constructing the boot image.
 // See docs/foundation-lump-design.md §4 for the design rationale.
-// ===========================================================================
+// ---------------------------------------------------------------------------
 let _hardwareProfiles = null;
 let _lumpCatalog = [];          // [{abstraction, nsSlot, lumpSize, token}]
 let _bdLimits = { maxNsEntries: 256, baseNamedNsCount: 47 };
@@ -3404,30 +3404,40 @@ window._nsTableSave = async function(btn) {
             }
         }
 
-        // ── Build ns_state: dot-name list from the live NS table ──────────────
-        // Slot numbers are a synthesis detail — ns-state.json stores only names.
-        // Resolve each token in sim._tokenSlotMap to its abstraction dot-name via
-        // _lumpsCache; fall back to sim.nsLabels[slot] for names not in the cache.
+        // ── Build ns_state: rich per-slot objects from the live NS table ─────────
+        // Iterates sim.readNSEntry(i) for i = 0..sim.nsCount-1 to capture every
+        // column the user sees in the NS table view.  Mirrors the rendered table
+        // exactly: one object per occupied slot, "boot": true on bootEntrySlot.
+        const _GT_TYPE_NAMES = ['Null', 'Inform', 'Outform', 'Abstract'];
+        const _hex8  = v => '0x' + ((v >>> 0).toString(16).toUpperCase().padStart(8, '0'));
+        const _hex5  = v => '0x' + ((v >>> 0).toString(16).toUpperCase().padStart(5, '0'));
+        const _hex4  = v => '0x' + ((v >>> 0).toString(16).toUpperCase().padStart(4, '0'));
         const nsAbstractions = [];
-        let bootEntryName = '';
-        if (sim._tokenSlotMap) {
-            const _slotEntries = [];
-            for (const [token, slot] of sim._tokenSlotMap) {
-                if (token && slot != null) _slotEntries.push([slot, token]);
-            }
-            _slotEntries.sort((a, b) => a[0] - b[0]);
-            for (const [slot, token] of _slotEntries) {
-                const _lump = Array.isArray(_lumpsCache) && _lumpsCache.find(l => l.token === token);
-                const _name = (_lump && _lump.abstraction)
-                           || (sim.nsLabels && sim.nsLabels[slot])
-                           || null;
-                if (_name && _name !== '(reserved)') {
-                    nsAbstractions.push(_name);
-                    if (slot === bootEntrySlot) bootEntryName = _name;
-                }
-            }
+        for (let _si = 0; _si < sim.nsCount; _si++) {
+            const _e = sim.readNSEntry(_si);
+            if (!_e) continue;   // unoccupied slot
+            const _lbl = sim.nsLabels[_si] || `slot_${_si}`;
+            if (!_lbl || _lbl === '(free)' || _lbl === '(reserved)') continue;
+            const _pW1 = sim.parseNSWord1(_e.word1_limit);
+            const _loc  = _e.word0_location >>> 0;
+            const _lim  = _pW1.limit & 0x1FFFF;
+            const _seq  = (_e.word2_seals >>> 25) & 0x7F;
+            const _seal = _e.word2_seals & 0xFFFF;
+            const _rich = {
+                name:     _lbl,
+                slot:     _si,
+                location: _hex8(_loc),
+                type:     _GT_TYPE_NAMES[_pW1.gtType] || 'Inform',
+                f:        0,
+                g:        _pW1.g,
+                limit:    _hex5(_lim),
+                seq:      _seq,
+                seal:     _hex4(_seal),
+            };
+            if (_si === bootEntrySlot) _rich.boot = true;
+            nsAbstractions.push(_rich);
         }
-        const nsState = { abstractions: nsAbstractions, boot_entry: bootEntryName };
+        const nsState = { abstractions: nsAbstractions };
 
         // Encode as base64 (little-endian bytes — matches struct.pack "<{n}I").
         const bytes = new Uint8Array(words.buffer);
