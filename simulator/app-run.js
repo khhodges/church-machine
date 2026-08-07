@@ -14616,6 +14616,11 @@ function _wukongAppendTrace(data) {
         }
     }
 
+    // ── Keep the fault-disasm panel in sync with every trace event ───────────
+    // Must run before the CALL_PUSH / RETURN_POP early returns so those packets
+    // also trigger a stale-banner or NIA-rebuild when the panel is open.
+    _wukongSyncFaultDisasmPanel(!!data.fault_valid, niaInt);
+
     // ── ev_type 0x08 CALL_PUSH / 0x09 RETURN_POP — depth only ───────────────
     if (evType === 0x08) {
         if (typeof data.call_depth === 'number') {
@@ -15117,4 +15122,52 @@ function _wukongRebuildFaultDisasmContent(modal, niaInt) {
     var r = _wukongBuildFaultDisasmHtml(niaInt);
     _wukongApplyFaultDisasmContent(modal, niaInt, r.built, /*flashCurrent=*/true);
     if (!r.hasData) _wukongScheduleFaultDisasmRerender(modal, niaInt, 0);
+}
+
+// Keep the fault-disasm panel in sync when a new trace event arrives.
+// Called from _wukongAppendTrace after each decoded packet.
+//
+//   faultValid = true  → new (or continuing) fault at niaInt:
+//     • same NIA as panel  — leave the rows as-is (HW cursor is already updated
+//       by _wukongSetHwCursor); remove any stale banner if present.
+//     • different NIA      — rebuild the panel centred on the new address.
+//
+//   faultValid = false → fault cleared while panel is open:
+//     • Inject a "stale — fault cleared" banner and dim the disasm rows so the
+//       user can see the last fault but knows execution has continued.
+function _wukongSyncFaultDisasmPanel(faultValid, niaInt) {
+    var panel = document.getElementById('wukong-fault-disasm');
+    if (!panel) return;
+
+    if (faultValid) {
+        // Remove any stale banner left from a previous clear.
+        var oldStale = panel.querySelector('.wukong-fault-disasm-stale-banner');
+        if (oldStale) oldStale.remove();
+        var body = panel.querySelector('.nia-disasm-body');
+        if (body) body.style.opacity = '';
+
+        // If the NIA has changed, rebuild the disassembly content.
+        var panelNia = parseInt(panel.dataset.nia, 10);
+        if (panelNia !== niaInt) {
+            _wukongRebuildFaultDisasmContent(panel, niaInt);
+        }
+        // If same NIA, _wukongSetHwCursor already moved the HW-cursor row.
+    } else {
+        // Fault cleared — show stale indicator (only once).
+        if (!panel.querySelector('.wukong-fault-disasm-stale-banner')) {
+            var stale = document.createElement('div');
+            stale.className = 'wukong-fault-disasm-stale-banner';
+            stale.textContent = '\u2714 Fault cleared \u2014 disassembly is stale';
+            // Insert before the disasm body rows, or as the first child.
+            var insertBefore = panel.querySelector('.nia-disasm-body') || panel.firstChild;
+            if (insertBefore) {
+                panel.insertBefore(stale, insertBefore);
+            } else {
+                panel.appendChild(stale);
+            }
+        }
+        // Dim the rows to signal the snapshot is no longer live.
+        var disasmBody = panel.querySelector('.nia-disasm-body');
+        if (disasmBody) disasmBody.style.opacity = '0.4';
+    }
 }

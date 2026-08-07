@@ -44,10 +44,11 @@ const APPLY_FN       = extractFunction(APP_RUN_SRC, '_wukongApplyFaultDisasmCont
 const SCHEDULE_FN    = extractFunction(APP_RUN_SRC, '_wukongScheduleFaultDisasmRerender');
 const OPEN_FN        = extractFunction(APP_RUN_SRC, '_wukongOpenFaultDisasm');
 const REBUILD_FN     = extractFunction(APP_RUN_SRC, '_wukongRebuildFaultDisasmContent');
+const SYNC_FN        = extractFunction(APP_RUN_SRC, '_wukongSyncFaultDisasmPanel');
 const BUILD_HTML_SRC = extractFunction(APP_MISC_SRC, '_cmBuildDisasmHtml');
 
 const ALL_FAULT_FNS = [
-    LOOKUP_FN, WORDS_AROUND, BUILD_FN, APPLY_FN, SCHEDULE_FN, OPEN_FN, REBUILD_FN
+    LOOKUP_FN, WORDS_AROUND, BUILD_FN, APPLY_FN, SCHEDULE_FN, OPEN_FN, REBUILD_FN, SYNC_FN
 ].join('\n');
 
 // ── Test harness ──────────────────────────────────────────────────────────────
@@ -418,6 +419,201 @@ function makeContext(opts) {
         'current row addr does not match NIA_B');
 
     if (panel) panel.remove();
+}
+
+// ── FP-8: sync — fault_valid=true + same NIA — no rebuild, stale banner removed ─
+// Open the panel, inject a fake stale banner, then call sync with the same NIA.
+// The banner should disappear and the DOM row identity should be preserved.
+{
+    const NIA = 40;
+    const simMem = new Array(100).fill(null);
+    for (let i = NIA - 8; i <= NIA + 8; i++) simMem[i] = i === NIA ? 0x5 : 0x0;
+
+    const dom = new JSDOM('<!DOCTYPE html><body></body>');
+    const { ctx, document } = makeContext({ simMemory: simMem, dom });
+
+    // Open the panel.
+    ctx._wukongOpenFaultDisasm(NIA);
+    const panel = document.getElementById('wukong-fault-disasm');
+
+    // Inject a fake stale banner as if a previous fault-clear had run.
+    const fakeBanner = document.createElement('div');
+    fakeBanner.className = 'wukong-fault-disasm-stale-banner';
+    fakeBanner.textContent = 'stale';
+    if (panel && panel.firstChild) panel.insertBefore(fakeBanner, panel.firstChild);
+    else if (panel) panel.appendChild(fakeBanner);
+
+    // Also dim the body to simulate the cleared state.
+    const body = panel && panel.querySelector('.nia-disasm-body');
+    if (body) body.style.opacity = '0.4';
+
+    // Record the row identity before the sync call.
+    const rowBefore = panel && panel.querySelector('.nia-disasm-current');
+
+    // Sync: same NIA, fault still valid → banner removed, opacity restored, no rebuild.
+    ctx._wukongSyncFaultDisasmPanel(true, NIA);
+
+    assert('FP-8: stale banner removed when fault_valid=true at same NIA',
+        panel && panel.querySelector('.wukong-fault-disasm-stale-banner') === null,
+        'stale banner still present');
+    const bodyAfter = panel && panel.querySelector('.nia-disasm-body');
+    assert('FP-8: disasm body opacity restored after fault_valid=true',
+        bodyAfter && bodyAfter.style.opacity === '',
+        'opacity=' + (bodyAfter && bodyAfter.style.opacity));
+    const rowAfter = panel && panel.querySelector('.nia-disasm-current');
+    assert('FP-8: same DOM row retained (no rebuild) at same NIA',
+        rowBefore && rowAfter && rowBefore === rowAfter,
+        'row was replaced');
+
+    if (panel) panel.remove();
+}
+
+// ── FP-9: sync — fault_valid=true + different NIA — panel rebuilds ────────────
+{
+    const NIA_A = 20;
+    const NIA_B = 70;
+    const simMem = new Array(100).fill(null);
+    for (let i = NIA_A - 8; i <= NIA_A + 8; i++) simMem[i] = 0x1;
+    for (let i = NIA_B - 8; i <= NIA_B + 8; i++) simMem[i] = 0x2;
+
+    const dom = new JSDOM('<!DOCTYPE html><body></body>');
+    const { ctx, document } = makeContext({ simMemory: simMem, dom });
+
+    ctx._wukongOpenFaultDisasm(NIA_A);
+    const panel = document.getElementById('wukong-fault-disasm');
+
+    // Sync: different NIA, fault valid → rebuild.
+    ctx._wukongSyncFaultDisasmPanel(true, NIA_B);
+
+    assert('FP-9: panel data-nia updated to new NIA after sync rebuild',
+        panel && parseInt(panel.dataset.nia, 10) === NIA_B,
+        'data-nia=' + (panel && panel.dataset.nia));
+    const currentRow = panel && panel.querySelector('.nia-disasm-current');
+    assert('FP-9: rebuilt panel current row is at new NIA address',
+        currentRow && parseInt(currentRow.dataset.addr, 10) === NIA_B,
+        'current addr=' + (currentRow && currentRow.dataset.addr));
+
+    if (panel) panel.remove();
+}
+
+// ── FP-10: sync — fault_valid=false — stale banner + dimmed rows ─────────────
+{
+    const NIA = 30;
+    const simMem = new Array(100).fill(null);
+    for (let i = NIA - 8; i <= NIA + 8; i++) simMem[i] = i === NIA ? 0x7 : 0x0;
+
+    const dom = new JSDOM('<!DOCTYPE html><body></body>');
+    const { ctx, document } = makeContext({ simMemory: simMem, dom });
+
+    ctx._wukongOpenFaultDisasm(NIA);
+    const panel = document.getElementById('wukong-fault-disasm');
+
+    // Sync: fault cleared → stale banner injected, body dimmed.
+    ctx._wukongSyncFaultDisasmPanel(false, NIA);
+
+    const banner = panel && panel.querySelector('.wukong-fault-disasm-stale-banner');
+    assert('FP-10: stale banner injected when fault_valid=false',
+        banner !== null, 'stale banner not found');
+    const body = panel && panel.querySelector('.nia-disasm-body');
+    assert('FP-10: disasm body opacity dimmed when fault_valid=false',
+        body && parseFloat(body.style.opacity) < 1,
+        'opacity=' + (body && body.style.opacity));
+
+    if (panel) panel.remove();
+}
+
+// ── FP-11: sync — second fault-clear does not duplicate the banner ────────────
+{
+    const NIA = 35;
+    const simMem = new Array(100).fill(null);
+    for (let i = NIA - 8; i <= NIA + 8; i++) simMem[i] = i === NIA ? 0x8 : 0x0;
+
+    const dom = new JSDOM('<!DOCTYPE html><body></body>');
+    const { ctx, document } = makeContext({ simMemory: simMem, dom });
+
+    ctx._wukongOpenFaultDisasm(NIA);
+    const panel = document.getElementById('wukong-fault-disasm');
+
+    // Call sync twice with fault_valid=false.
+    ctx._wukongSyncFaultDisasmPanel(false, NIA);
+    ctx._wukongSyncFaultDisasmPanel(false, NIA);
+
+    const banners = panel ? panel.querySelectorAll('.wukong-fault-disasm-stale-banner') : [];
+    assert('FP-11: exactly one stale banner present after two fault-clear syncs',
+        banners.length === 1,
+        'banner count=' + banners.length);
+
+    if (panel) panel.remove();
+}
+
+// ── FP-12: ev_type 0x08 (CALL_PUSH) marks the disasm panel stale ─────────────
+// When a CALL_PUSH packet arrives while the panel shows a previous fault, the
+// panel must receive the stale banner (fault has cleared / execution moved on).
+{
+    const NIA_FAULT = 25;
+    const NIA_CALL  = 26;
+    const simMem = new Array(100).fill(null);
+    for (let i = NIA_FAULT - 8; i <= NIA_FAULT + 8; i++) simMem[i] = 0xA;
+    for (let i = NIA_CALL  - 8; i <= NIA_CALL  + 8; i++) simMem[i] = 0xB;
+
+    const dom = new JSDOM('<!DOCTYPE html><body></body>');
+    const { ctx, document } = makeContext({ simMemory: simMem, dom });
+
+    // Open the panel for a fault at NIA_FAULT.
+    ctx._wukongOpenFaultDisasm(NIA_FAULT);
+    const panel = document.getElementById('wukong-fault-disasm');
+
+    // Simulate a CALL_PUSH packet (fault_valid=false) arriving at NIA_CALL.
+    // _wukongSyncFaultDisasmPanel must be called even though ev_type 0x08 would
+    // normally trigger an early return in _wukongAppendTrace.
+    ctx._wukongSyncFaultDisasmPanel(false, NIA_CALL);
+
+    const banner = panel && panel.querySelector('.wukong-fault-disasm-stale-banner');
+    assert('FP-12: CALL_PUSH (ev_type 0x08) causes stale banner on open panel',
+        banner !== null, 'stale banner not found after CALL_PUSH sync');
+    const body = panel && panel.querySelector('.nia-disasm-body');
+    assert('FP-12: CALL_PUSH dims the disasm body',
+        body && parseFloat(body.style.opacity) < 1,
+        'opacity=' + (body && body.style.opacity));
+
+    if (panel) panel.remove();
+}
+
+// ── FP-13: ev_type 0x09 (RETURN_POP) marks the disasm panel stale ────────────
+{
+    const NIA_FAULT  = 35;
+    const NIA_RETURN = 36;
+    const simMem = new Array(100).fill(null);
+    for (let i = NIA_FAULT  - 8; i <= NIA_FAULT  + 8; i++) simMem[i] = 0xC;
+    for (let i = NIA_RETURN - 8; i <= NIA_RETURN + 8; i++) simMem[i] = 0xD;
+
+    const dom = new JSDOM('<!DOCTYPE html><body></body>');
+    const { ctx, document } = makeContext({ simMemory: simMem, dom });
+
+    ctx._wukongOpenFaultDisasm(NIA_FAULT);
+    const panel = document.getElementById('wukong-fault-disasm');
+
+    // Simulate a RETURN_POP packet (fault_valid=false).
+    ctx._wukongSyncFaultDisasmPanel(false, NIA_RETURN);
+
+    const banner = panel && panel.querySelector('.wukong-fault-disasm-stale-banner');
+    assert('FP-13: RETURN_POP (ev_type 0x09) causes stale banner on open panel',
+        banner !== null, 'stale banner not found after RETURN_POP sync');
+
+    if (panel) panel.remove();
+}
+
+// ── FP-14: integration — sync is called before CALL/RETURN early returns ──────
+// Verify that _wukongSyncFaultDisasmPanel appears BEFORE the CALL_PUSH block
+// in _wukongAppendTrace source so future edits cannot silently break coverage.
+{
+    const APPEND_FN_SRC = extractFunction(APP_RUN_SRC, '_wukongAppendTrace');
+    const syncCallIdx   = APPEND_FN_SRC.indexOf('_wukongSyncFaultDisasmPanel');
+    // The CALL_PUSH early-return block starts with "if (evType === 0x08)".
+    const callPushIdx   = APPEND_FN_SRC.indexOf('if (evType === 0x08)');
+    assert('FP-14: _wukongSyncFaultDisasmPanel call exists before CALL_PUSH block',
+        syncCallIdx !== -1 && callPushIdx !== -1 && syncCallIdx < callPushIdx,
+        'syncCall=' + syncCallIdx + ' callPush=' + callPushIdx);
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────

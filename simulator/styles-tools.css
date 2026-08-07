@@ -2624,6 +2624,17 @@
 /* Fault-triggered disassembly modal — reuses .chlog-modal scaffold */
 .wukong-fault-disasm-modal .chlog-modal-machine { color: #f5a623; }
 
+/* Stale-snapshot indicator injected when the fault clears while the panel is open */
+.wukong-fault-disasm-stale-banner {
+    background: #1a2010;
+    border-top: 1px solid #2e4020;
+    border-bottom: 1px solid #2e4020;
+    color: #6abf45;
+    font-size: 11px;
+    padding: 5px 12px;
+    letter-spacing: 0.02em;
+}
+
 /* ── Call-stack depth badge ──────────────────────────────────────────────── */
 .wukong-call-depth-badge {
     display: inline-block;
