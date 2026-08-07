@@ -38,6 +38,19 @@
   button { background:#1f2b3e; color:#c8d6e5; border:1px solid #2d3f5a;
            border-radius:5px; padding:3px 10px; font:inherit; cursor:pointer; }
   button:hover { background:#2d3f5a; }
+  button:disabled { opacity:.45; cursor:default; }
+  .ctlbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+            background:#111827; border:1px solid #1f2b3e; border-radius:8px;
+            padding:10px 14px; margin-bottom:16px; }
+  .ctlbar .lbl { font-size:11px; text-transform:uppercase; letter-spacing:1px;
+                 color:#5a6b82; margin-right:4px; }
+  .ctlbar button.primary { background:#1d4ed8; border-color:#2563eb; color:#fff; }
+  .ctlbar button.primary:hover { background:#2563eb; }
+  .ctlbar button.danger { background:#7f1d1d; border-color:#991b1b; color:#fecaca; }
+  .ctlbar button.danger:hover { background:#991b1b; }
+  .ctlbar input { background:#0d1320; color:#e8f0fe; border:1px solid #2d3f5a;
+                  border-radius:5px; padding:3px 8px; font:inherit; width:110px; }
+  .ctlbar .sep { width:1px; height:22px; background:#1f2b3e; margin:0 4px; }
 </style>
 </head>
 <body>
@@ -73,6 +86,18 @@
     <div class="row"><span class="k">CR6 GT</span><span class="v" id="cr6gt">—</span></div>
     <div class="row"><span class="k">CR14 GT</span><span class="v" id="cr14gt">—</span></div>
   </div>
+</div>
+
+<div class="ctlbar">
+  <span class="lbl">Board controls</span>
+  <button id="btnStep" title="Execute one instruction ('s')">Step</button>
+  <button id="btnRun"  class="primary" title="Free-run ('r')">Run ▶</button>
+  <button id="btnHalt" class="danger" title="Halt / enter step mode ('h')">Halt ■</button>
+  <span class="sep"></span>
+  <input id="bpNia" placeholder="BP NIA (hex)" spellcheck="false">
+  <button id="btnBp" title="Arm a breakpoint at this NIA ('b' + NIA)">Set BP</button>
+  <span class="sep"></span>
+  <button id="btnUpload" title="Send the current boot image to the board over UART ('u')">Upload boot image ⚡</button>
 </div>
 
 <div class="loghdr">
@@ -127,6 +152,67 @@
     addLine('[' + new Date().toLocaleTimeString() + '] ' + text, 'ev-note');
   }
   document.getElementById('clearBtn').onclick = function () { logEl.innerHTML = ''; };
+
+  // ── Board controls ────────────────────────────────────────────────────
+  // Single in-flight gate: while ANY control request is outstanding, all
+  // control buttons are disabled — prevents rapid commands overwriting each
+  // other in the server's one-slot pending-command queue, and prevents a
+  // command racing an upload for that slot.
+  var ctlBusy = false;
+  var CTL_IDS = ['btnStep', 'btnRun', 'btnHalt', 'btnBp', 'btnUpload'];
+  function setCtlBusy(b) {
+    ctlBusy = b;
+    CTL_IDS.forEach(function (id) { document.getElementById(id).disabled = b; });
+  }
+  function describeFailure(status, d, bodyText) {
+    if (status === 409) return 'upload in progress — wait for it to finish';
+    if (d && d.error) return 'HTTP ' + status + ': ' + d.error;
+    if (d) return 'HTTP ' + status + ': ' + JSON.stringify(d);
+    return 'HTTP ' + status + (bodyText ? ': ' + bodyText.slice(0, 120) : '');
+  }
+  function ctlFetch(url, body, label, okCheck, okMsg) {
+    if (ctlBusy) return;
+    setCtlBusy(true);
+    var opts = { method: 'POST' };
+    if (body) {
+      opts.headers = { 'Content-Type': 'application/json' };
+      opts.body = JSON.stringify(body);
+    }
+    fetch(url, opts)
+      .then(function (r) {
+        return r.text().then(function (t) {
+          var d = null;
+          try { d = JSON.parse(t); } catch (e) {}
+          if (r.ok && d && okCheck(d)) note(label + ' — ' + okMsg);
+          else note(label + ' FAILED: ' + describeFailure(r.status, d, t));
+        });
+      })
+      .catch(function (e) { note(label + ' FAILED: ' + e); })
+      .finally(function () { setCtlBusy(false); });
+  }
+  function sendCmd(body, label) {
+    ctlFetch('/hardware/wukong/command', body, label,
+             function (d) { return d.ok; }, 'queued for bridge');
+  }
+  document.getElementById('btnStep').onclick = function () { sendCmd({ cmd: 's' }, 'STEP'); };
+  document.getElementById('btnRun').onclick  = function () { sendCmd({ cmd: 'r' }, 'RUN'); };
+  document.getElementById('btnHalt').onclick = function () { sendCmd({ cmd: 'h' }, 'HALT'); };
+  document.getElementById('btnBp').onclick = function () {
+    var raw = document.getElementById('bpNia').value.trim();
+    if (!raw) { note('Set BP: enter an NIA first (hex, e.g. 0x200)'); return; }
+    if (!/^(0x)?[0-9a-fA-F]{1,8}$/.test(raw)) {
+      note('Set BP: "' + raw + '" is not a valid hex NIA (use e.g. 0x200 or 200)');
+      return;
+    }
+    var nia = parseInt(raw.replace(/^0x/i, ''), 16);
+    sendCmd({ cmd: 'b', nia: nia }, 'SET BP @ ' + hex(nia));
+  };
+  document.getElementById('btnUpload').onclick = function () {
+    note('UPLOAD boot image — sending to bridge…');
+    ctlFetch('/api/boot-image/send-to-hardware', null, 'UPLOAD',
+             function (d) { return d.queued; },
+             'queued — bridge will stream it to the board over UART');
+  };
 
   function renderEvent(e) {
     var t = e.ts ? new Date(e.ts * 1000).toLocaleTimeString() : '--:--:--';

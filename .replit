@@ -719,4 +719,4 @@ BUILD_SIGNING_KEY = "2026411604PMkjhh0590"
 
 [postMerge]
 path = "scripts/post-merge.sh"
-timeoutMs = 120000
+timeoutMs = 300000
