@@ -702,6 +702,63 @@ class TestCheckTraceFailure:
             f'Expected "step_mode" or "UART" in stderr for empty-stream failure path; '
             f'got: {stderr!r}'
         )
+
+    # ------------------------------------------------------------------
+    # Partial-packet / stalled-stream tests
+    # ------------------------------------------------------------------
+
+    def test_partial_packet_returns_false(self):
+        """Returns False when a partial 0xAA-prefixed chunk arrives and the stream stalls.
+
+        The partial-packet guard inside check_trace():
+
+            if len(buf) - i < TRACE_LEN:
+                break
+
+        must let the outer while loop expire the deadline rather than busy-
+        spinning or blocking forever.  Feeding fewer than TRACE_LEN bytes
+        starting with 0xAA simulates a stream that stalls mid-packet.
+        """
+        partial = _GOOD_TRACE_PKT[:6]          # 6 bytes — starts with 0xAA, incomplete
+        assert len(partial) < smoke.TRACE_LEN, "fixture must be shorter than TRACE_LEN"
+        assert partial[0] == smoke.TRACE_MAGIC, "fixture must start with TRACE_MAGIC"
+        result, _, _ = self._run_check_trace_with_stderr([partial], timeout=0.05)
+        assert result is False, (
+            'check_trace must return False when only a partial 0xAA packet arrives '
+            'and the stream goes silent; the partial-packet guard must let the timeout '
+            'expire instead of hanging'
+        )
+
+    def test_partial_packet_completes_within_deadline(self):
+        """check_trace() finishes within a reasonable wall-clock bound on a stalled stream.
+
+        If the partial-packet guard were removed, check_trace() could spin
+        tightly or block past the deadline.  A 3× margin over the requested
+        timeout is generous enough to absorb scheduler jitter while still
+        catching a genuine hang.
+        """
+        import time
+        partial  = _GOOD_TRACE_PKT[:4]
+        timeout  = 0.05
+        margin   = 3.0          # allow up to 3× the requested timeout
+        start    = time.monotonic()
+        self._run_check_trace_with_stderr([partial], timeout=timeout)
+        elapsed  = time.monotonic() - start
+        assert elapsed < timeout * margin, (
+            f'check_trace took {elapsed:.3f}s for a {timeout}s timeout — '
+            f'exceeds {margin}× margin; the partial-packet guard may be broken'
+        )
+
+    def test_partial_packet_emits_fail_on_stderr(self):
+        """Emits a FAIL diagnostic to stderr when only a partial packet arrives."""
+        partial = _GOOD_TRACE_PKT[:3]
+        _, _, stderr = self._run_check_trace_with_stderr([partial], timeout=0.05)
+        assert 'FAIL' in stderr, (
+            f'Expected "FAIL" in stderr when stream stalls mid-packet; '
+            f'got: {stderr!r}'
+        )
+
+
 class TestNoSentinel:
     """When no sentinel arrives within the timeout, check_sentinel returns False."""
 
