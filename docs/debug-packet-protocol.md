@@ -81,13 +81,52 @@ must be removed.
 
 ---
 
+## Packet format
+
+Each packet is **12 bytes**, big-endian, starting with magic byte `0xAA`:
+
+| Byte(s) | Field        | Description |
+|---------|--------------|-------------|
+| 0       | `magic`      | `0xAA` — packet start marker |
+| 1–4     | `nia`        | Retiring instruction NIA (uint32 big-endian) |
+| 5       | `ev_type`    | `TRACE_EV_*` constant — which CR changed, or stack push/pop |
+| 6–9     | `payload`    | GT word0 (uint32 big-endian); `0` for push/pop events |
+| 10      | `flags`      | bits\[3:0\]=NZCV; bits\[7:4\]=0 |
+| 11      | `fault`      | bits\[4:0\]=fault\_code; bit\[6\]=fault\_valid; bit\[7\]=bp\_hit |
+
+### Event type constants
+
+| Constant              | Value | Instruction | Meaning |
+|-----------------------|-------|-------------|---------|
+| `TRACE_EV_RESULT`     | 0x00  | any         | Single-packet result (DR→DR, SAVE, Function, etc.) |
+| `TRACE_EV_LOAD_SHADOW`| 0x01  | LOAD        | Old CR\_dst GT displaced (payload = old GT word0) |
+| `TRACE_EV_LOAD_NEW`   | 0x02  | LOAD        | New GT installed in CR\_dst (payload = new GT word0) |
+| `TRACE_EV_CHANGE_PUSH`| 0x03  | CHANGE      | Context stack push (payload = 0) |
+| `TRACE_EV_CHANGE_CR12`| 0x04  | CHANGE      | CR12 ← new thread GT (payload = new GT word0) |
+| `TRACE_EV_CHANGE_CR5` | 0x05  | CHANGE      | CR5 ← heap GT (payload = new GT word0) |
+| `TRACE_EV_CALL_CR6`   | 0x06  | CALL        | CR6 ← abstraction GT (payload = new GT word0) |
+| `TRACE_EV_CALL_CR14`  | 0x07  | CALL        | CR14 ← code/return GT (payload = new GT word0) |
+| `TRACE_EV_CALL_PUSH`  | 0x08  | CALL        | Caller frame stack push (payload = 0) |
+| `TRACE_EV_RETURN_POP` | 0x09  | RETURN      | Caller frame stack pop (payload = 0) |
+| `TRACE_EV_RETURN_CR6` | 0x0A  | RETURN      | CR6 ← restored from frame (payload = E-GT word0) |
+| `TRACE_EV_RETURN_CR14`| 0x0B  | RETURN      | CR14 ← restored from frame (payload ≈ callee CR14 word0) |
+
+Note: For `TRACE_EV_RETURN_CR14`, the payload is the *current* CR14 at retire
+time (the callee's code cap).  The exact restored value is written by the
+post-retire `cload` and is therefore not available at the retire-valid pulse.
+
+---
+
 ## Hardware TraceUnit requirement
 
-The TraceUnit in `hardware/wukong_top.py` must retire one packet per event
-in the table above, not one packet per instruction.  The current 11-byte
-`0xAA` packet covers one retired instruction; the format must be extended or
-multiplexed to carry per-event data for multi-packet instructions (LOAD,
-CHANGE, CALL, RETURN).
+The TraceUnit in `hardware/wukong_top.py` emits one 12-byte packet per event
+(per table above), using the format and event type constants defined in this
+document.
+
+**Backpressure guarantee**: the TraceUnit asserts `trace_stall` while events
+are pending.  `trace_stall` is OR-ed into `core.halt_req` so the CM cannot
+retire the next instruction until all event packets for the current instruction
+have been transmitted.  No retire event is silently dropped.
 
 ---
 

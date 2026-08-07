@@ -6,6 +6,7 @@
 - [THREAD_NS_SLOTS in E2E test GTs](thread-ns-slots-e2e-trap.md) — synthetic GT word0 index bits[15:0] must NOT be 1 or 45 (THREAD_NS_SLOTS); those trigger showThread→crDetailTab='lump' override; use index=0x20 (32) in test fixtures
 - [Wukong A7 orphaned file](wukong-a7-orphaned.md) — wukong_xc7a100t.py (v1.1 Ethernet) is NOT in the build; gen_rtlil.py builds from wukong_top.py (V3 LED-blink only)
 - [Wukong single-step trace architecture](wukong-trace-arch.md) — 11-byte 0xAA packets; uart_rx_pin=F3; retire_flags.as_value()[:4] for NZCV; COND_FLAGS_LAYOUT is 4-bit StructLayout; TraceUnit skips retire if busy (step mode guarantees idle); SelfTest F-bit failures pre-existed this task
+- [TraceUnit per-event packet format](trace-unit-per-event-format.md) — 12-byte per-event packets; multi-event queue (1–3 per retire); trace_stall backpressure; ELOADCALL/RETURN-CR14 known gaps
 - [Wukong boot three-bug root cause](wukong-boot-perm-l-trap.md) — three cooperating bugs (u_perm timing, CR6 S+E→L+E, BRAM address-stability valid); all fixed; NUC runs clean 2M+ cycles
 - [Wukong standalone step_mode trap](wukong-step-mode-trap.md) — step_mode init=1 halts CM immediately after boot; standalone builds need init=0 or CM never executes
 - [Amaranth sync-domain self-deadlocking reset](amaranth-sync-reset-deadlock.md) — rst_sr in sync domain driving ResetSignal("sync") locks reset HIGH forever; use reset_less=True + GSR instead

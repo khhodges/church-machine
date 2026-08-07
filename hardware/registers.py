@@ -40,6 +40,11 @@ class ChurchRegisters(Elaboratable):
         self.cr14_code = Signal(CAP_REG_LAYOUT)
         self.cr15_namespace = Signal(CAP_REG_LAYOUT)
 
+        # Trace read port: second combinatorial word0_gt read used by the TraceUnit
+        # (via core.py) to capture the old CR_dst GT at LOAD start time.
+        self.trace_rd_addr = Signal(4)
+        self.trace_rd_gt   = Signal(32)
+
         self.cr_gt_wr_data = [Signal(GT_LAYOUT, name=f"cr{i}_gt_wr_data") for i in range(16)]
         self.cr_gt_wr_en = [Signal(name=f"cr{i}_gt_wr_en") for i in range(16)]
 
@@ -106,6 +111,8 @@ class ChurchRegisters(Elaboratable):
         cr15_m_reg = Signal()
 
         m.d.comb += self.cr_rd_data.eq(cap_regs[self.cr_rd_addr])
+        m.d.comb += self.trace_rd_gt.eq(
+            View(CAP_REG_LAYOUT, cap_regs[self.trace_rd_addr]).word0_gt)
 
         with m.Switch(self.cr_word_rd_sel):
             with m.Case(0):

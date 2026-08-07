@@ -105,6 +105,25 @@ class ChurchCore(Elaboratable):
         self.retire_fault_code = Signal(5)
         self.retire_fault_valid = Signal()
 
+        # ── TraceUnit per-event GT signals ──────────────────────────────────────
+        # Combinatorial, valid at retire_valid time for their respective instruction
+        # classes.  The TraceUnit in wukong_top.py reads these to build event packets.
+        #
+        #   LOAD:   load_shadow_gt = old CR_dst GT (latched at load_start)
+        #           load_new_gt    = new GT being written by the mload bus
+        #   CHANGE: cr12_gt = new CR12 (committed to register file before retire)
+        #           cr5_gt  = new CR5  (committed to register file before retire)
+        #   CALL:   cr6_gt  = new CR6  (committed to register file before retire)
+        #           cr14_gt = new CR14 (committed to register file before retire)
+        #   RETURN: cr6_gt  = E-GT from stack frame (u_return.cload_e_gt)
+        #           cr14_gt = current CR14 (approximate; cload updates post-retire)
+        self.retire_trace_load_shadow_gt = Signal(32)
+        self.retire_trace_load_new_gt    = Signal(32)
+        self.retire_trace_cr5_gt         = Signal(32)
+        self.retire_trace_cr6_gt         = Signal(32)
+        self.retire_trace_cr12_gt        = Signal(32)
+        self.retire_trace_cr14_gt        = Signal(32)
+
         # GT fault telemetry — latched when fault_valid fires; held until FAULT_RST.
         # Exposed via APB3 registers +0x18..+0x24 for CALLHOME GT diagnostics.
         # fault_gt / fault_cr14 reserved: sub-unit wiring added in a future pass.
@@ -1393,6 +1412,17 @@ class ChurchCore(Elaboratable):
             u_load.index.eq(cap_index),
         ]
 
+        # ── TraceUnit support: trace read port + LOAD shadow latch ─────────────
+        # The trace port always mirrors cr_dst so the old GT is readable.
+        # At load_start_sig time (one cycle before the first mload bus access),
+        # the register file still holds the old CR_dst value; we latch it here
+        # so the TraceUnit can include it in the LOAD_SHADOW event packet.
+        m.d.comb += u_regs.trace_rd_addr.eq(cr_dst)
+
+        _trace_load_shadow_gt = Signal(32, name="trace_load_shadow_gt")
+        with m.If(load_start_sig):
+            m.d.sync += _trace_load_shadow_gt.eq(u_regs.trace_rd_gt)
+
         if not self.iot_profile:
             change_start_sig = Signal()
             m.d.comb += change_start_sig.eq(
@@ -2355,6 +2385,28 @@ class ChurchCore(Elaboratable):
             self.retire_flags.eq(u_regs.flags),
             self.retire_fault_code.eq(self.fault),
             self.retire_fault_valid.eq(self.fault_valid & self.boot_complete),
+        ]
+
+        # ── TraceUnit per-event GT signals ─────────────────────────────────────
+        # All combinatorial, valid at retire_valid time for their instruction class.
+        # For RETURN: retire_trace_cr6_gt carries the E-GT from the stack frame
+        #   (u_return.cload_e_gt), not the current register-file CR6 value.
+        #   retire_trace_cr14_gt carries the current CR14 (approximate; cload
+        #   updates CR14 after retire, so the restored value is not available here).
+        m.d.comb += [
+            self.retire_trace_load_shadow_gt.eq(_trace_load_shadow_gt),
+            self.retire_trace_load_new_gt.eq(
+                View(CAP_REG_LAYOUT, u_shared_mload.cr_wr_data).word0_gt),
+            self.retire_trace_cr5_gt.eq(
+                View(CAP_REG_LAYOUT, u_regs.cr5_heap).word0_gt),
+            self.retire_trace_cr6_gt.eq(
+                Mux(u_return.complete,
+                    u_return.cload_e_gt,
+                    View(CAP_REG_LAYOUT, u_regs.cr6_clist).word0_gt)),
+            self.retire_trace_cr12_gt.eq(
+                View(CAP_REG_LAYOUT, u_regs.cr12_thread).word0_gt),
+            self.retire_trace_cr14_gt.eq(
+                View(CAP_REG_LAYOUT, u_regs.cr14_code).word0_gt),
         ]
 
         m.d.comb += [

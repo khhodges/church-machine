@@ -404,7 +404,7 @@ class TxArbRig(Elaboratable):
     Inputs (all combinatorial / testbench-driven):
       cm_byte       — byte the CM wants to send via MMIO reg-5
       cm_tx_start   — asserted when CM is performing a MMIO reg-5 write
-      retire_valid  — one-cycle retire pulse; starts a new 11-byte trace packet
+      retire_valid  — one-cycle retire pulse; starts a new 12-byte trace packet
       retire_byte   — value loaded into every trace_buf slot (simplified)
 
     Outputs:
@@ -413,11 +413,11 @@ class TxArbRig(Elaboratable):
       uart_busy     — UART busy flag (from _UartTxStub)
       uart_last     — last byte latched by _UartTxStub
       trace_tx_ack  — one-cycle ack: trace byte accepted (0 when CM fires or UART busy)
-      trace_idx     — current position in the 11-byte packet (registered)
+      trace_idx     — current position in the 12-byte packet (registered)
       trace_busy    — high while TraceUnit FSM is in SEND state
     """
 
-    PACKET_LEN = 11
+    PACKET_LEN = 12
 
     def __init__(self):
         self.cm_byte      = Signal(8)
@@ -501,7 +501,7 @@ def test_tx_arb_collision():
 
     C. Packet resumes cleanly: on the next idle TX cycle (cm_tx_start=0 and
        uart not busy), trace_tx_ack=1 fires, trace_idx advances, and the full
-       11-byte packet eventually completes (TraceUnit returns to IDLE).
+       12-byte packet eventually completes (TraceUnit returns to IDLE).
     """
 
     CM_BYTE    = 0x42
@@ -569,7 +569,7 @@ def test_tx_arb_collision():
 
         # ── C: resume — trace resumes on next idle TX cycle ─────────────────
         # Wait for UART busy to clear (BUSY_CYCLES ticks) then give the trace
-        # a generous window to finish the full 11-byte packet.
+        # a generous window to finish the full 12-byte packet.
         budget = (_UartTxStub.BUSY_CYCLES + 2 +
                   TxArbRig.PACKET_LEN * (_UartTxStub.BUSY_CYCLES + 2))
         for _ in range(budget):

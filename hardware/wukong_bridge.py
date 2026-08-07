@@ -10,7 +10,7 @@ What it does
 ------------
 Reads bytes from the UART (57600 8N1):
   • ASCII bytes (bit-7 clear) are printed to stdout as CM program output.
-  • 0xAA-prefixed 11-byte trace packets are parsed and POSTed to
+  • 0xAA-prefixed 12-byte trace packets are parsed and POSTed to
     /hardware/wukong/trace as JSON.
 
 Polls GET /hardware/wukong/command every 50 ms and writes any pending command
@@ -21,12 +21,20 @@ byte to the serial port.  Commands from the IDE:
   {cmd: "h"}           → write b'h'  (halt immediately)
   {cmd: "b", nia: N}   → write b'b' + big-endian 4-byte NIA  (set/clear breakpoint)
 
-Trace packet format (11 bytes, big-endian):
-  [0]    0xAA magic
-  [1..4] NIA (uint32 big-endian)
-  [5..8] instruction word (uint32 big-endian)
-  [9]    flags byte  bits[3:0] = NZCV; bit[6]=fault_valid; bit[7]=bp_hit
-  [10]   fault_code  bits[4:0] = FaultType; bit[6]=fault_valid dup; bit[7]=bp_hit dup
+Trace packet format (12 bytes, big-endian) — one packet per state-change event:
+  [0]     0xAA      magic
+  [1..4]  NIA       retiring instruction NIA (uint32 big-endian)
+  [5]     ev_type   TRACE_EV_* constant (which CR changed, or stack push/pop)
+  [6..9]  payload   GT word0 (uint32 big-endian); 0 for push/pop events
+  [10]    flags     bits[3:0] = NZCV; bits[7:4] = 0
+  [11]    fault     bits[4:0]=fault_code; bit[6]=fault_valid; bit[7]=bp_hit
+
+Multi-event instructions emit multiple consecutive packets with the same NIA:
+  LOAD    → 2 packets (LOAD.shadow, LOAD.new)
+  CHANGE  → 3 packets (CHANGE.push, CHANGE.CR12, CHANGE.CR5)
+  CALL    → 3 packets (CALL.CR6, CALL.CR14, CALL.push)
+  RETURN  → 3 packets (RETURN.pop, RETURN.CR6, RETURN.CR14)
+  others  → 1 packet  (RESULT)
 """
 
 import argparse
@@ -49,7 +57,37 @@ except ImportError:
 
 
 TRACE_MAGIC    = 0xAA
-TRACE_LEN      = 11
+TRACE_LEN      = 12   # 12-byte per-event packet: magic(1)+NIA(4)+ev_type(1)+payload(4)+flags(1)+fault(1)
+
+# ── Event type constants ──────────────────────────────────────────────────────
+# Must match _TRACE_EV_* in wukong_top.py and docs/debug-packet-protocol.md.
+TRACE_EV_RESULT      = 0x00  # Single-packet result (DR→DR, SAVE, Function, etc.)
+TRACE_EV_LOAD_SHADOW = 0x01  # LOAD: old CR_dst GT displaced
+TRACE_EV_LOAD_NEW    = 0x02  # LOAD: new GT installed in CR_dst
+TRACE_EV_CHANGE_PUSH = 0x03  # CHANGE: context stack push
+TRACE_EV_CHANGE_CR12 = 0x04  # CHANGE: CR12 ← new thread GT
+TRACE_EV_CHANGE_CR5  = 0x05  # CHANGE: CR5  ← heap GT
+TRACE_EV_CALL_CR6    = 0x06  # CALL:   CR6  ← abstraction GT
+TRACE_EV_CALL_CR14   = 0x07  # CALL:   CR14 ← code / return GT
+TRACE_EV_CALL_PUSH   = 0x08  # CALL:   caller frame stack push
+TRACE_EV_RETURN_POP  = 0x09  # RETURN: caller frame stack pop
+TRACE_EV_RETURN_CR6  = 0x0A  # RETURN: CR6  ← restored from frame
+TRACE_EV_RETURN_CR14 = 0x0B  # RETURN: CR14 ← restored from frame
+
+_EV_NAMES = {
+    TRACE_EV_RESULT:      'RESULT',
+    TRACE_EV_LOAD_SHADOW: 'LOAD.shadow',
+    TRACE_EV_LOAD_NEW:    'LOAD.new',
+    TRACE_EV_CHANGE_PUSH: 'CHANGE.push',
+    TRACE_EV_CHANGE_CR12: 'CHANGE.CR12',
+    TRACE_EV_CHANGE_CR5:  'CHANGE.CR5',
+    TRACE_EV_CALL_CR6:    'CALL.CR6',
+    TRACE_EV_CALL_CR14:   'CALL.CR14',
+    TRACE_EV_CALL_PUSH:   'CALL.push',
+    TRACE_EV_RETURN_POP:  'RETURN.pop',
+    TRACE_EV_RETURN_CR6:  'RETURN.CR6',
+    TRACE_EV_RETURN_CR14: 'RETURN.CR14',
+}
 
 BOOT_SENTINEL  = 0xBB   # first byte of the 2-byte boot sentinel sequence
 SENTINEL_LEN   = 2      # 0xBB  N_INIT&0xFF
@@ -145,17 +183,19 @@ def main():
                     if len(buf) - i < TRACE_LEN:
                         break
                     pkt = buf[i:i + TRACE_LEN]
-                    nia        = struct.unpack('>I', pkt[1:5])[0]
-                    instr      = struct.unpack('>I', pkt[5:9])[0]
-                    flags_byte = pkt[9]
-                    raw10      = pkt[10]
-                    fault_valid = bool(raw10 & 0x40)
-                    bp_hit      = bool(raw10 & 0x80)
-                    fault_code  = raw10 & 0x1F
+                    nia         = struct.unpack('>I', pkt[1:5])[0]
+                    ev_type     = pkt[5]
+                    payload_gt  = struct.unpack('>I', pkt[6:10])[0]
+                    flags_byte  = pkt[10]
+                    raw11       = pkt[11]
+                    fault_valid = bool(raw11 & 0x40)
+                    bp_hit      = bool(raw11 & 0x80)
+                    fault_code  = raw11 & 0x1F
 
-                    payload = {
+                    post_payload = {
                         'nia':         nia,
-                        'instr':       instr,
+                        'ev_type':     ev_type,
+                        'payload_gt':  payload_gt,
                         'flags':       flags_byte,
                         'fault_code':  fault_code,
                         'fault_valid': fault_valid,
@@ -165,20 +205,21 @@ def main():
                     try:
                         requests.post(
                             f'{ide_base}/hardware/wukong/trace',
-                            json=payload, timeout=1, verify=verify_tls)
+                            json=post_payload, timeout=1, verify=verify_tls)
                     except Exception as exc:
                         print(f'  [trace POST error] {exc}')
 
-                    flag_str       = _flags_str(flags_byte)
-                    ts_str         = time.strftime('%H:%M:%S', time.localtime())
+                    flag_str   = _flags_str(flags_byte)
+                    ts_str     = time.strftime('%H:%M:%S', time.localtime())
+                    ev_name    = _EV_NAMES.get(ev_type, f'EV_0x{ev_type:02X}')
+                    gt_str     = f'  GT=0x{payload_gt:08X}' if payload_gt else ''
                     if fault_valid:
-                        fault_code_str = f'fault_code={fault_code} ({_fault_name(fault_code)})'
-                        state_str      = 'FAULT'
+                        fault_str = f'  FAULT={_fault_name(fault_code)}'
                     else:
-                        fault_code_str = f'fault_code={fault_code}'
-                        state_str      = 'ok'
-                    bp_str    = '  [BP HIT]' if bp_hit else ''
-                    print(f'[{ts_str}] HW: NIA=0x{nia:08X}  instr=0x{instr:08X}  flags={flag_str}  {fault_code_str}  {state_str}{bp_str}')
+                        fault_str = ''
+                    bp_str = '  [BP HIT]' if bp_hit else ''
+                    print(f'[{ts_str}] HW: NIA=0x{nia:08X}  {ev_name}{gt_str}'
+                          f'  flags={flag_str}{fault_str}{bp_str}')
                     i += TRACE_LEN
 
                 elif b == BOOT_SENTINEL:

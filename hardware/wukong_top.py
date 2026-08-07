@@ -267,6 +267,10 @@ class ChurchWukongXC7A100T(Elaboratable):
         # CM MMIO reg-5 writes always win over trace bytes.
         trace_tx_req  = Signal()   # TraceUnit wants to send a byte
         trace_tx_byte = Signal(8)  # byte from TraceUnit
+        # trace_stall: asserted by TraceUnit while events are pending.
+        # OR-ed into halt_req/imem_valid so the CM cannot retire the next
+        # instruction until the TraceUnit drains all queued event packets.
+        trace_stall   = Signal()   # backpressure: stall CM while events pending
 
         # ── Boot-triggered / sentinel signals (declared early for arbitrator) ──
         # boot_triggered is driven by the boot FSM below; sentinel_sent latches
@@ -516,8 +520,10 @@ class ChurchWukongXC7A100T(Elaboratable):
             m.d.sync += step_halted.eq(0)
 
         m.d.comb += [
-            core.imem_valid.eq(~step_halted),
-            core.halt_req.eq(step_halted),
+            # trace_stall is OR-ed in so the TraceUnit can drain all event
+            # packets for one instruction before the next retire fires.
+            core.imem_valid.eq(~step_halted & ~trace_stall),
+            core.halt_req.eq(step_halted | trace_stall),
             core.free_run_start.eq(0),
             core.free_run_nia.eq(0),
             core.gc_start.eq(0),
@@ -581,61 +587,175 @@ class ChurchWukongXC7A100T(Elaboratable):
                 m.next = "IDLE"
 
         # ── TraceUnit FSM ──────────────────────────────────────────────────────
-        # On every retire_valid pulse (when IDLE), captures an 11-byte packet:
-        #   [0]    0xAA   magic
-        #   [1..4] NIA    big-endian uint32
-        #   [5..8] instr  big-endian uint32
-        #   [9]    flags  bits[3:0]=NZCV  bits[7:4]=0
-        #   [10]   fault  bits[4:0]=fault_code  bit[6]=fault_valid  bit[7]=bp_hit
-        # Packets fill idle UART TX cycles (CM MMIO TX wins via the arbitrator).
-        # If the TraceUnit is busy sending a previous packet when a new retire fires,
-        # that retire is silently skipped (acceptable in run mode; step mode ensures
-        # the TraceUnit is always idle before the next step fires).
+        #
+        # Emits one 12-byte 0xAA packet per *event*.  Multi-cycle instructions
+        # produce multiple events, each with its own packet:
+        #
+        #   Instruction    Events (in order)
+        #   ─────────────────────────────────────────────────────────────────
+        #   LOAD           LOAD_SHADOW (old CR_dst GT) + LOAD_NEW (new GT)
+        #   CHANGE         CHANGE_PUSH + CHANGE_CR12  + CHANGE_CR5
+        #   CALL           CALL_CR6   + CALL_CR14    + CALL_PUSH
+        #   RETURN         RETURN_POP + RETURN_CR6   + RETURN_CR14
+        #   all others     RESULT (single packet, payload=0)
+        #
+        # Packet format — 12 bytes, big-endian:
+        #   [0]     0xAA             magic
+        #   [1..4]  NIA              retiring instruction NIA (big-endian uint32)
+        #   [5]     event_type       TRACE_EV_* constant
+        #   [6..9]  payload          GT word0 (big-endian uint32; 0 for push/pop events)
+        #   [10]    flags            bits[3:0]=NZCV; bits[7:4]=0
+        #   [11]    fault            {bp_hit[7], fault_valid[6], 0[5], fault_code[4:0]}
+        #
+        # Backpressure (no silent drops): trace_stall is asserted while events
+        # are pending, and is OR-ed into core.halt_req / core.imem_valid so the
+        # CM cannot retire the next instruction until the queue drains.
+        #
+        # Must match TRACE_EV_* in wukong_bridge.py and debug-packet-protocol.md.
 
-        trace_buf = [Signal(8, name=f"tbuf{i}") for i in range(11)]
-        trace_idx = Signal(4)
+        # ── Event type constants ──────────────────────────────────────────────
+        _TRACE_MAGIC       = 0xAA
+        _TRACE_PKT_LEN     = 12   # bytes per packet (matches wukong_bridge.py TRACE_LEN)
 
-        # bp_hit is combinatorial; latch it at the moment retire_valid fires so
-        # the TraceUnit FSM can include it in the fault byte one cycle later.
-        bp_hit_lat = Signal()
+        _TRACE_EV_RESULT      = 0x00  # Single-packet result (DR→DR, SAVE, etc.)
+        _TRACE_EV_LOAD_SHADOW = 0x01  # LOAD: old CR_dst GT displaced
+        _TRACE_EV_LOAD_NEW    = 0x02  # LOAD: new GT installed in CR_dst
+        _TRACE_EV_CHANGE_PUSH = 0x03  # CHANGE: context stack push
+        _TRACE_EV_CHANGE_CR12 = 0x04  # CHANGE: CR12 ← new thread GT
+        _TRACE_EV_CHANGE_CR5  = 0x05  # CHANGE: CR5  ← heap GT
+        _TRACE_EV_CALL_CR6    = 0x06  # CALL:   CR6  ← abstraction GT
+        _TRACE_EV_CALL_CR14   = 0x07  # CALL:   CR14 ← code / return GT
+        _TRACE_EV_CALL_PUSH   = 0x08  # CALL:   caller frame stack push
+        _TRACE_EV_RETURN_POP  = 0x09  # RETURN: caller frame stack pop
+        _TRACE_EV_RETURN_CR6  = 0x0A  # RETURN: CR6  ← restored from frame
+        _TRACE_EV_RETURN_CR14 = 0x0B  # RETURN: CR14 ← restored from frame
+
+        # ── Event queue: up to 3 events per retire ────────────────────────────
+        # tq_type[0..2] / tq_data[0..2]: event type + payload for each slot.
+        # tq_len:  total events queued (1, 2, or 3).
+        # tq_ptr:  index of the event currently being sent.
+        # tq_bidx: byte index within the 12-byte packet for the current event.
+        # tq_nia / tq_flags / tq_fault: shared across all events for one retire.
+        tq_type  = [Signal(8,  name=f"tq_type{i}")  for i in range(3)]
+        tq_data  = [Signal(32, name=f"tq_data{i}")  for i in range(3)]
+        tq_len   = Signal(2,  name="tq_len")
+        tq_ptr   = Signal(2,  name="tq_ptr")
+        tq_bidx  = Signal(4,  name="tq_bidx")
+        tq_nia   = Signal(32, name="tq_nia")
+        tq_flags = Signal(8,  name="tq_flags")   # bits[3:0]=NZCV; bits[7:4]=0
+        tq_fault = Signal(8,  name="tq_fault")   # {bp_hit[7], fault_valid[6], 0[5], fault_code[4:0]}
+
+        # Current event's type and payload (combinatorial mux of tq_ptr)
+        _cur_ev_type = Signal(8,  name="cur_ev_type")
+        _cur_ev_data = Signal(32, name="cur_ev_data")
+        with m.Switch(tq_ptr):
+            for _i in range(3):
+                with m.Case(_i):
+                    m.d.comb += [
+                        _cur_ev_type.eq(tq_type[_i]),
+                        _cur_ev_data.eq(tq_data[_i]),
+                    ]
 
         with m.FSM(name="trace_unit"):
             with m.State("IDLE"):
-                m.d.comb += [trace_tx_req.eq(0), trace_tx_byte.eq(0)]
+                m.d.comb += [trace_tx_req.eq(0), trace_tx_byte.eq(0),
+                             trace_stall.eq(0)]
+
                 with m.If(core.retire_valid):
+                    # Capture per-instruction shared fields
                     m.d.sync += [
-                        trace_buf[0].eq(0xAA),
-                        trace_buf[1].eq(core.retire_nia[24:32]),
-                        trace_buf[2].eq(core.retire_nia[16:24]),
-                        trace_buf[3].eq(core.retire_nia[8:16]),
-                        trace_buf[4].eq(core.retire_nia[0:8]),
-                        trace_buf[5].eq(core.retire_instr[24:32]),
-                        trace_buf[6].eq(core.retire_instr[16:24]),
-                        trace_buf[7].eq(core.retire_instr[8:16]),
-                        trace_buf[8].eq(core.retire_instr[0:8]),
-                        trace_buf[9].eq(Cat(core.retire_flags.as_value()[:4], C(0, 4))),
-                        trace_buf[10].eq(Cat(
-                            core.retire_fault_code[:5],   # bits[4:0] fault_code
+                        tq_nia.eq(core.retire_nia),
+                        tq_flags.eq(Cat(core.retire_flags.as_value()[:4], C(0, 4))),
+                        tq_fault.eq(Cat(
+                            core.retire_fault_code[:5],   # bits[4:0]
                             C(0, 1),                       # bit[5] reserved
-                            core.retire_fault_valid,       # bit[6] fault_valid
-                            bp_hit,                        # bit[7] bp_hit
+                            core.retire_fault_valid,       # bit[6]
+                            bp_hit,                        # bit[7]
                         )),
-                        bp_hit_lat.eq(bp_hit),
-                        trace_idx.eq(0),
+                        tq_ptr.eq(0),
+                        tq_bidx.eq(0),
                     ]
+
+                    # Decode opcode bits[30:27] to determine the event sequence
+                    with m.Switch(core.retire_instr[27:31]):
+                        with m.Case(ChurchOpcode.LOAD):    # 0b0000
+                            m.d.sync += [
+                                tq_len.eq(2),
+                                tq_type[0].eq(_TRACE_EV_LOAD_SHADOW),
+                                tq_data[0].eq(core.retire_trace_load_shadow_gt),
+                                tq_type[1].eq(_TRACE_EV_LOAD_NEW),
+                                tq_data[1].eq(core.retire_trace_load_new_gt),
+                            ]
+                        with m.Case(ChurchOpcode.CHANGE):  # 0b0100
+                            m.d.sync += [
+                                tq_len.eq(3),
+                                tq_type[0].eq(_TRACE_EV_CHANGE_PUSH),
+                                tq_data[0].eq(0),
+                                tq_type[1].eq(_TRACE_EV_CHANGE_CR12),
+                                tq_data[1].eq(core.retire_trace_cr12_gt),
+                                tq_type[2].eq(_TRACE_EV_CHANGE_CR5),
+                                tq_data[2].eq(core.retire_trace_cr5_gt),
+                            ]
+                        with m.Case(ChurchOpcode.CALL):    # 0b0010
+                            m.d.sync += [
+                                tq_len.eq(3),
+                                tq_type[0].eq(_TRACE_EV_CALL_CR6),
+                                tq_data[0].eq(core.retire_trace_cr6_gt),
+                                tq_type[1].eq(_TRACE_EV_CALL_CR14),
+                                tq_data[1].eq(core.retire_trace_cr14_gt),
+                                tq_type[2].eq(_TRACE_EV_CALL_PUSH),
+                                tq_data[2].eq(0),
+                            ]
+                        with m.Case(ChurchOpcode.RETURN):  # 0b0011
+                            m.d.sync += [
+                                tq_len.eq(3),
+                                tq_type[0].eq(_TRACE_EV_RETURN_POP),
+                                tq_data[0].eq(0),
+                                tq_type[1].eq(_TRACE_EV_RETURN_CR6),
+                                tq_data[1].eq(core.retire_trace_cr6_gt),
+                                tq_type[2].eq(_TRACE_EV_RETURN_CR14),
+                                tq_data[2].eq(core.retire_trace_cr14_gt),
+                            ]
+                        with m.Default():
+                            m.d.sync += [
+                                tq_len.eq(1),
+                                tq_type[0].eq(_TRACE_EV_RESULT),
+                                tq_data[0].eq(0),
+                            ]
                     m.next = "SEND"
 
             with m.State("SEND"):
-                # Drive trace_tx_req; arbitrator sends trace_tx_byte when TX is free.
-                m.d.comb += trace_tx_req.eq(1)
-                with m.Switch(trace_idx):
-                    for i in range(11):
-                        with m.Case(i):
-                            m.d.comb += trace_tx_byte.eq(trace_buf[i])
+                # Stall the CM while events are pending (no-drop guarantee)
+                m.d.comb += [trace_tx_req.eq(1), trace_stall.eq(1)]
+
+                # Select the byte for the current packet position
+                with m.Switch(tq_bidx):
+                    with m.Case(0):   m.d.comb += trace_tx_byte.eq(_TRACE_MAGIC)
+                    with m.Case(1):   m.d.comb += trace_tx_byte.eq(tq_nia[24:32])
+                    with m.Case(2):   m.d.comb += trace_tx_byte.eq(tq_nia[16:24])
+                    with m.Case(3):   m.d.comb += trace_tx_byte.eq(tq_nia[8:16])
+                    with m.Case(4):   m.d.comb += trace_tx_byte.eq(tq_nia[0:8])
+                    with m.Case(5):   m.d.comb += trace_tx_byte.eq(_cur_ev_type)
+                    with m.Case(6):   m.d.comb += trace_tx_byte.eq(_cur_ev_data[24:32])
+                    with m.Case(7):   m.d.comb += trace_tx_byte.eq(_cur_ev_data[16:24])
+                    with m.Case(8):   m.d.comb += trace_tx_byte.eq(_cur_ev_data[8:16])
+                    with m.Case(9):   m.d.comb += trace_tx_byte.eq(_cur_ev_data[0:8])
+                    with m.Case(10):  m.d.comb += trace_tx_byte.eq(tq_flags)
+                    with m.Case(11):  m.d.comb += trace_tx_byte.eq(tq_fault)
+                    with m.Default(): m.d.comb += trace_tx_byte.eq(0)
+
                 with m.If(trace_tx_ack):
-                    m.d.sync += trace_idx.eq(trace_idx + 1)
-                    with m.If(trace_idx == 10):
-                        m.next = "IDLE"
+                    with m.If(tq_bidx == _TRACE_PKT_LEN - 1):
+                        # Last byte of this event's packet
+                        m.d.sync += tq_bidx.eq(0)
+                        with m.If(tq_ptr == tq_len - 1):
+                            # All events for this retire sent → return to IDLE
+                            m.next = "IDLE"
+                        with m.Else():
+                            # More events remain → advance to next event
+                            m.d.sync += tq_ptr.eq(tq_ptr + 1)
+                    with m.Else():
+                        m.d.sync += tq_bidx.eq(tq_bidx + 1)
 
         # ── Heartbeat (1 Hz blink on led[1] during boot) ──────────────────────
         hb_ctr   = Signal(range(self.clk_freq))
