@@ -295,6 +295,17 @@ args = "node scripts/test_playwright_port_wiring.js"
 outputType = "console"
 
 [[workflows.workflow]]
+name = "wukong-toolbar-btn-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_wukong_toolbar_btn.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
 name = "disasm-panel-tests"
 author = "agent"
 

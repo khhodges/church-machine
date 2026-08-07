@@ -178,6 +178,9 @@ register_suite "lump-warning-tests" \
 register_suite "disasm-panel-tests" \
     'node simulator/disasm_panel_test.js'
 
+register_suite "wukong-toolbar-btn-tests" \
+    'node simulator/test_wukong_toolbar_btn.js'
+
 register_suite "rci-threading-tests" \
     'node simulator/test_rci_threading.js'
 
