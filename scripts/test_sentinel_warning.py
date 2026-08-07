@@ -1,6 +1,7 @@
 """scripts/test_sentinel_warning.py — Unit tests for boot sentinel stale-bitstream detection.
 
-Exercises two independent sentinel-detection paths without needing real hardware:
+Exercises the shared sentinel-detection helper and its callers without needing
+real hardware:
 
   (A) scripts/wukong_boot_smoke.py :: check_sentinel()
         - 0xBB + N_INIT byte stream → returns True AND emits "BITSTREAM WARNING" on stderr
@@ -9,6 +10,11 @@ Exercises two independent sentinel-detection paths without needing real hardware
   (B) Constant-alignment guard: sentinel magic values and lengths in
       hardware/wukong_bridge.py must match those in wukong_boot_smoke.py so
       that both parsers agree on which sentinel is stale.
+
+  (C) hardware/wukong_bridge.py :: parse_boot_sentinel()
+        Direct unit tests for the shared helper that both main() and
+        check_sentinel() delegate to.  A single test change here covers both
+        scripts simultaneously.
 
 Run:
     python -m pytest scripts/test_sentinel_warning.py -v
@@ -128,6 +134,8 @@ def _run_check_sentinel(payload: bytes, timeout: float = 2.0):
 # is accepted without an N_INIT mismatch warning.
 _N_INIT_BYTE  = 0x2A
 _TU_VERSION   = 0x02   # TU_VERSION_CALL_3PKT — current TraceUnit capability
+_TU_CURRENT   = bridge.TU_VERSION_CALL_3PKT        # 0x02 — current
+_TU_OLD       = bridge.TU_VERSION_CALL_3PKT - 1    # 0x01 — below minimum
 
 
 class TestStaleSentinel:
@@ -612,3 +620,130 @@ class TestConstantAlignment:
             'SENTINEL_V1 collides with TRACE_MAGIC — bridge will mis-classify it'
         assert smoke.SENTINEL_V2 != bridge.TRACE_MAGIC, \
             'SENTINEL_V2 collides with TRACE_MAGIC — bridge will mis-classify it'
+
+class TestParseBootSentinelV1:
+    """0xBB (stale 2-byte) sentinel."""
+
+    def _buf(self, prefix=b''):
+        return bytearray(prefix + bytes([bridge.BOOT_SENTINEL_V1, _N_INIT_BYTE]))
+
+    def test_returns_dict_for_v1(self):
+        result = bridge.parse_boot_sentinel(self._buf())
+        assert isinstance(result, dict), \
+            f'Expected dict for V1 sentinel, got {result!r}'
+
+    def test_magic_field(self):
+        result = bridge.parse_boot_sentinel(self._buf())
+        assert result['magic'] == bridge.BOOT_SENTINEL_V1
+
+    def test_n_init_byte_field(self):
+        result = bridge.parse_boot_sentinel(self._buf())
+        assert result['n_init_byte'] == _N_INIT_BYTE
+
+    def test_tu_version_is_none(self):
+        """V1 sentinels carry no TU_VERSION byte."""
+        result = bridge.parse_boot_sentinel(self._buf())
+        assert result['tu_version'] is None
+
+    def test_length_is_sentinel_v1_len(self):
+        result = bridge.parse_boot_sentinel(self._buf())
+        assert result['length'] == bridge.SENTINEL_V1_LEN
+
+    def test_stale_is_true(self):
+        result = bridge.parse_boot_sentinel(self._buf())
+        assert result['stale'] is True, \
+            'V1 sentinel must always be marked stale'
+
+    def test_returns_false_when_incomplete(self):
+        """Only the magic byte present — not enough bytes yet."""
+        buf = bytearray([bridge.BOOT_SENTINEL_V1])
+        result = bridge.parse_boot_sentinel(buf)
+        assert result is False, \
+            f'Expected False (need more bytes) for truncated V1, got {result!r}'
+
+    def test_with_nonzero_offset(self):
+        """Helper works correctly when the sentinel is not at position 0."""
+        buf = self._buf(prefix=b'ASCII garbage\r\n')
+        offset = buf.index(bridge.BOOT_SENTINEL_V1)
+        result = bridge.parse_boot_sentinel(buf, offset)
+        assert isinstance(result, dict)
+        assert result['stale'] is True
+        assert result['n_init_byte'] == _N_INIT_BYTE
+
+    def test_returns_none_for_non_sentinel_byte(self):
+        """Bytes that are not 0xBB or 0xBC must return None."""
+        result = bridge.parse_boot_sentinel(bytearray(b'Hello'))
+        assert result is None, \
+            f'Expected None for non-sentinel byte, got {result!r}'
+
+    def test_returns_none_for_empty_buf(self):
+        result = bridge.parse_boot_sentinel(bytearray(), 0)
+        assert result is None
+
+class TestParseBootSentinelV2Stale:
+    """0xBC with TU_VERSION < TU_VERSION_CALL_3PKT (stale TraceUnit in V2 wrapper)."""
+
+    def _buf(self):
+        return bytearray(
+            [bridge.BOOT_SENTINEL_V2, _N_INIT_BYTE, _TU_OLD]
+        )
+
+    def test_stale_is_true_for_old_tu_version(self):
+        result = bridge.parse_boot_sentinel(self._buf())
+        assert result['stale'] is True, \
+            f'V2 sentinel with TU_VERSION below minimum must be marked stale; got {result!r}'
+
+    def test_tu_version_field_preserved(self):
+        result = bridge.parse_boot_sentinel(self._buf())
+        assert result['tu_version'] == _TU_OLD
+
+    def test_magic_still_v2(self):
+        result = bridge.parse_boot_sentinel(self._buf())
+        assert result['magic'] == bridge.BOOT_SENTINEL_V2
+
+class TestParseBootSentinelV2Current:
+    """0xBC with TU_VERSION >= TU_VERSION_CALL_3PKT (current bitstream)."""
+
+    def _buf(self, prefix=b''):
+        return bytearray(
+            prefix + bytes([bridge.BOOT_SENTINEL_V2, _N_INIT_BYTE, _TU_CURRENT])
+        )
+
+    def test_returns_dict(self):
+        result = bridge.parse_boot_sentinel(self._buf())
+        assert isinstance(result, dict)
+
+    def test_magic_field(self):
+        result = bridge.parse_boot_sentinel(self._buf())
+        assert result['magic'] == bridge.BOOT_SENTINEL_V2
+
+    def test_n_init_byte_field(self):
+        result = bridge.parse_boot_sentinel(self._buf())
+        assert result['n_init_byte'] == _N_INIT_BYTE
+
+    def test_tu_version_field(self):
+        result = bridge.parse_boot_sentinel(self._buf())
+        assert result['tu_version'] == _TU_CURRENT
+
+    def test_length_is_sentinel_v2_len(self):
+        result = bridge.parse_boot_sentinel(self._buf())
+        assert result['length'] == bridge.SENTINEL_V2_LEN
+
+    def test_stale_is_false_for_current_tu(self):
+        result = bridge.parse_boot_sentinel(self._buf())
+        assert result['stale'] is False, \
+            f'Current TU_VERSION must not be marked stale; got {result!r}'
+
+    def test_returns_false_when_incomplete(self):
+        """Two bytes present (magic + N_INIT) but TU_VERSION missing."""
+        buf = bytearray([bridge.BOOT_SENTINEL_V2, _N_INIT_BYTE])
+        result = bridge.parse_boot_sentinel(buf)
+        assert result is False, \
+            f'Expected False for truncated V2, got {result!r}'
+
+    def test_with_nonzero_offset(self):
+        buf = self._buf(prefix=b'\x00\x01\x02')
+        offset = buf.index(bridge.BOOT_SENTINEL_V2)
+        result = bridge.parse_boot_sentinel(buf, offset)
+        assert isinstance(result, dict)
+        assert result['stale'] is False

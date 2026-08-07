@@ -109,6 +109,73 @@ SENTINEL_V2_LEN   = 3      # 0xBC  N_INIT&0xFF  TU_VERSION
 TU_VERSION_CALL_3PKT = 0x02  # must match _TU_VERSION_CALL_3PKT in wukong_top.py
 
 
+def parse_boot_sentinel(buf, i=0):
+    """Parse a boot sentinel starting at position *i* of *buf*.
+
+    Shared helper used by both the bridge's ``main()`` loop and the smoke
+    test's ``check_sentinel()``.  Centralising the parsing here means a
+    single change keeps both paths in sync.
+
+    Parameters
+    ----------
+    buf : bytes | bytearray
+        Receive buffer (may contain arbitrary bytes before and after the
+        sentinel).
+    i : int
+        Index of the candidate sentinel byte within *buf*.
+
+    Returns
+    -------
+    None
+        ``buf[i]`` is not a sentinel magic byte (0xBB or 0xBC); the caller
+        should advance ``i`` and try the next byte.
+    False
+        ``buf[i]`` *is* a sentinel magic byte, but the buffer does not yet
+        contain the full sentinel (not enough bytes).  The caller should
+        wait for more data without advancing ``i``.
+    dict
+        Fully-parsed sentinel.  Keys:
+
+        ``magic``       — sentinel magic byte (``BOOT_SENTINEL_V1`` or
+                          ``BOOT_SENTINEL_V2``)
+        ``n_init_byte`` — raw N_INIT byte sent by the board
+        ``tu_version``  — ``TU_VERSION`` byte for V2 sentinels; ``None``
+                          for V1 (stale) sentinels
+        ``length``      — number of bytes consumed (``SENTINEL_V1_LEN`` or
+                          ``SENTINEL_V2_LEN``)
+        ``stale``       — ``True`` when the sentinel indicates a stale
+                          TraceUnit FSM (V1 magic, or V2 with
+                          ``tu_version < TU_VERSION_CALL_3PKT``)
+    """
+    if i >= len(buf):
+        return None
+    b = buf[i]
+    if b == BOOT_SENTINEL_V1:
+        # Old 2-byte sentinel: 0xBB  N_INIT&0xFF
+        if len(buf) - i < SENTINEL_V1_LEN:
+            return False
+        return {
+            'magic':        b,
+            'n_init_byte':  buf[i + 1],
+            'tu_version':   None,
+            'length':       SENTINEL_V1_LEN,
+            'stale':        True,
+        }
+    elif b == BOOT_SENTINEL_V2:
+        # Current 3-byte sentinel: 0xBC  N_INIT&0xFF  TU_VERSION
+        if len(buf) - i < SENTINEL_V2_LEN:
+            return False
+        tu_version = buf[i + 2]
+        return {
+            'magic':        b,
+            'n_init_byte':  buf[i + 1],
+            'tu_version':   tu_version,
+            'length':       SENTINEL_V2_LEN,
+            'stale':        tu_version < TU_VERSION_CALL_3PKT,
+        }
+    return None
+
+
 def _compute_expected_n_init():
     """Return the N_INIT value expected from the current boot_rom.py tables.
 
@@ -272,77 +339,29 @@ def main():
                           f'  flags={flag_str}{fault_str}{bp_str}')
                     i += TRACE_LEN
 
-                elif b == BOOT_SENTINEL_V1:
-                    # Old/stale 2-byte boot sentinel: 0xBB  N_INIT&0xFF
-                    # Wait until both bytes are buffered.
-                    if len(buf) - i < SENTINEL_V1_LEN:
+                elif b in (BOOT_SENTINEL_V1, BOOT_SENTINEL_V2):
+                    # Delegate to the shared sentinel parser so the bridge and
+                    # the smoke test always interpret the byte stream identically.
+                    sentinel = parse_boot_sentinel(buf, i)
+                    if sentinel is False:
+                        # Magic byte seen but not enough bytes buffered yet.
                         break
-                    board_n_init_byte = buf[i + 1]
-                    if expected_n_init is not None:
-                        expected_byte = expected_n_init & 0xFF
-                        if board_n_init_byte == expected_byte:
-                            print(f'BOOT: board ready — N_INIT={expected_n_init} '
-                                  f'(0x{expected_byte:02X}) matches source  ✓')
-                        else:
-                            print(f'BOOT WARNING: N_INIT mismatch — '
-                                  f'board sent 0x{board_n_init_byte:02X} '
-                                  f'but source expects 0x{expected_byte:02X} '
-                                  f'(N_INIT={expected_n_init})',
-                                  file=sys.stderr)
-                            print('  The bitstream was built with a different '
-                                  'WUKONG_DEMO_NAMESPACE / WUKONG_DEMO_CLIST.',
-                                  file=sys.stderr)
-                            print('  Run: python3 hardware/check_dmem_count.py --check',
-                                  file=sys.stderr)
-                    else:
-                        print(f'BOOT: board ready — N_INIT byte=0x{board_n_init_byte:02X} '
-                              f'(validation skipped: boot_rom not importable)')
-                    # Stale bitstream warning: old sentinel (0xBB) means the
-                    # TraceUnit FSM predates the 3-packet CALL sequence for
-                    # ELOADCALL/XLOADLAMBDA.  Those instructions emit a single
-                    # TRACE_EV_RESULT instead of CALL_CR6+CALL_CR14+CALL_PUSH,
-                    # so the IDE will show wrong CR6/CR14 state silently.
-                    print('BITSTREAM WARNING: old sentinel (0xBB) — stale TraceUnit FSM detected.',
-                          file=sys.stderr)
-                    print('  ELOADCALL and XLOADLAMBDA emit a single RESULT packet instead of',
-                          file=sys.stderr)
-                    print('  the 3-packet CALL sequence (CALL_CR6 + CALL_CR14 + CALL_PUSH).',
-                          file=sys.stderr)
-                    print('  CR6 and CR14 state shown in the IDE will be wrong after any',
-                          file=sys.stderr)
-                    print('  ELOADCALL or XLOADLAMBDA instruction executes.',
-                          file=sys.stderr)
-                    print('  Rebuild and reflash the bitstream to get the current TraceUnit.',
-                          file=sys.stderr)
-                    # Notify the IDE so it can show a visible warning banner.
-                    try:
-                        requests.post(
-                            f'{ide_base}/hardware/wukong/boot-info',
-                            json={'stale_tu': True, 'tu_version': 0x01},
-                            timeout=1, verify=verify_tls)
-                    except Exception as exc:
-                        print(f'  [boot-info POST error] {exc}')
-                    i += SENTINEL_V1_LEN
 
-                elif b == BOOT_SENTINEL_V2:
-                    # Current 3-byte boot sentinel: 0xBC  N_INIT&0xFF  TU_VERSION
-                    # Wait until all three bytes are buffered.
-                    if len(buf) - i < SENTINEL_V2_LEN:
-                        break
-                    board_n_init_byte = buf[i + 1]
-                    tu_version        = buf[i + 2]
+                    board_n_init_byte = sentinel['n_init_byte']
+                    tu_version        = sentinel['tu_version']  # None for V1
+                    tu_str            = (f'  TU_VERSION=0x{tu_version:02X}'
+                                         if tu_version is not None else '')
+
                     if expected_n_init is not None:
                         expected_byte = expected_n_init & 0xFF
                         if board_n_init_byte == expected_byte:
                             print(f'BOOT: board ready — N_INIT={expected_n_init} '
-                                  f'(0x{expected_byte:02X}) matches source  ✓  '
-                                  f'TU_VERSION=0x{tu_version:02X}')
+                                  f'(0x{expected_byte:02X}) matches source  ✓{tu_str}')
                         else:
                             print(f'BOOT WARNING: N_INIT mismatch — '
                                   f'board sent 0x{board_n_init_byte:02X} '
                                   f'but source expects 0x{expected_byte:02X} '
-                                  f'(N_INIT={expected_n_init})  '
-                                  f'TU_VERSION=0x{tu_version:02X}',
+                                  f'(N_INIT={expected_n_init}){tu_str}',
                                   file=sys.stderr)
                             print('  The bitstream was built with a different '
                                   'WUKONG_DEMO_NAMESPACE / WUKONG_DEMO_CLIST.',
@@ -351,25 +370,35 @@ def main():
                                   file=sys.stderr)
                     else:
                         print(f'BOOT: board ready — N_INIT byte=0x{board_n_init_byte:02X} '
-                              f'(validation skipped: boot_rom not importable)  '
-                              f'TU_VERSION=0x{tu_version:02X}')
-                    # Warn if the TraceUnit capability version is below the
-                    # minimum required for correct ELOADCALL/XLOADLAMBDA tracing.
-                    if tu_version < TU_VERSION_CALL_3PKT:
-                        print(f'BITSTREAM WARNING: TU_VERSION=0x{tu_version:02X} is below '
-                              f'required 0x{TU_VERSION_CALL_3PKT:02X}.',
+                              f'(validation skipped: boot_rom not importable){tu_str}')
+
+                    if sentinel['stale']:
+                        if tu_version is None:
+                            # V1 sentinel — TraceUnit FSM predates 3-packet CALL.
+                            print('BITSTREAM WARNING: old sentinel (0xBB) — '
+                                  'stale TraceUnit FSM detected.',
+                                  file=sys.stderr)
+                        else:
+                            # V2 sentinel but TU_VERSION too low.
+                            print(f'BITSTREAM WARNING: TU_VERSION=0x{tu_version:02X} is below '
+                                  f'required 0x{TU_VERSION_CALL_3PKT:02X}.',
+                                  file=sys.stderr)
+                        print('  ELOADCALL and XLOADLAMBDA emit a single RESULT packet instead of',
                               file=sys.stderr)
-                        print('  ELOADCALL and XLOADLAMBDA may not emit the 3-packet CALL',
+                        print('  the 3-packet CALL sequence (CALL_CR6 + CALL_CR14 + CALL_PUSH).',
                               file=sys.stderr)
-                        print('  sequence. CR6/CR14 state in the IDE may be wrong.',
+                        print('  CR6 and CR14 state shown in the IDE will be wrong after any',
+                              file=sys.stderr)
+                        print('  ELOADCALL or XLOADLAMBDA instruction executes.',
                               file=sys.stderr)
                         print('  Rebuild and reflash the bitstream to get the current TraceUnit.',
                               file=sys.stderr)
                         # Notify the IDE so it can show a visible warning banner.
+                        post_tu = tu_version if tu_version is not None else 0x01
                         try:
                             requests.post(
                                 f'{ide_base}/hardware/wukong/boot-info',
-                                json={'stale_tu': True, 'tu_version': tu_version},
+                                json={'stale_tu': True, 'tu_version': post_tu},
                                 timeout=1, verify=verify_tls)
                         except Exception as exc:
                             print(f'  [boot-info POST error] {exc}')
@@ -382,7 +411,8 @@ def main():
                                 timeout=1, verify=verify_tls)
                         except Exception as exc:
                             print(f'  [boot-info POST error] {exc}')
-                    i += SENTINEL_V2_LEN
+
+                    i += sentinel['length']
 
                 else:
                     ch = buf[i]

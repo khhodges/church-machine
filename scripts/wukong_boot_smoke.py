@@ -23,6 +23,7 @@ visually at the bench.  This script covers the two automatable criteria.
 """
 
 import argparse
+import os
 import struct
 import sys
 import time
@@ -38,18 +39,30 @@ try:
 except ImportError:
     _requests = None  # IDE notifications silently skipped if requests is absent
 
+# Re-export sentinel constants and the shared parser from wukong_bridge so that
+# (a) this script stays in sync with the bridge automatically, and (b) tests can
+# import everything from a single place.
+_HERE     = os.path.dirname(os.path.abspath(__file__))
+_ROOT     = os.path.dirname(_HERE)
+_HW_DIR   = os.path.join(_ROOT, 'hardware')
+if _HW_DIR not in sys.path:
+    sys.path.insert(0, _HW_DIR)
+
+from wukong_bridge import (
+    BOOT_SENTINEL_V1 as SENTINEL_V1,
+    BOOT_SENTINEL_V2 as SENTINEL_V2,
+    SENTINEL_V1_LEN,
+    SENTINEL_V2_LEN,
+    TU_VERSION_CALL_3PKT,
+    parse_boot_sentinel,
+)
+
 TRACE_MAGIC      = 0xAA
 # 12-byte per-event packet: magic(1)+NIA(4)+ev_type(1)+payload(4)+flags(1)+fault(1)
 # Must match TRACE_LEN in wukong_bridge.py and the TraceUnit in wukong_top.py.
 TRACE_LEN        = 12
-SENTINEL_V1      = 0xBB   # old/stale 2-byte sentinel (stale TraceUnit FSM)
-SENTINEL_V2      = 0xBC   # current 3-byte sentinel
 DEFAULT_PORT     = "/dev/ttyUSB0"
 DEFAULT_BAUD     = 57600
-
-# Minimum TU_VERSION required for correct ELOADCALL/XLOADLAMBDA tracing.
-# Must match TU_VERSION_CALL_3PKT in hardware/wukong_bridge.py.
-TU_VERSION_CALL_3PKT = 0x02
 
 
 def _fault_name(code: int) -> str:
@@ -116,6 +129,9 @@ def check_sentinel(ser: "serial.Serial", timeout: float,
     TraceUnit FSM emits RESULT instead of the 3-packet CALL sequence for
     ELOADCALL/XLOADLAMBDA, so CR6/CR14 state in the IDE will be wrong.
 
+    Delegates to ``parse_boot_sentinel()`` (shared with ``wukong_bridge.py``)
+    so both scripts interpret the byte stream identically.
+
     When *ide_base* is non-empty and the *requests* package is available,
     POSTs {stale_tu, tu_version} to <ide_base>/hardware/wukong/boot-info so
     the IDE can show or clear a visible warning banner — consistent with what
@@ -134,55 +150,45 @@ def check_sentinel(ser: "serial.Serial", timeout: float,
         if chunk:
             buf.extend(chunk)
 
-        # Check for 0xBC (current 3-byte sentinel) first so it is not
-        # shadowed by a search for 0xBB (which has a different prefix bit).
-        if SENTINEL_V2 in buf:
-            idx = buf.index(SENTINEL_V2)
-            # Need all 3 bytes: magic + N_INIT + TU_VERSION.
-            if len(buf) - idx < 3:
-                # Not enough bytes yet; keep reading.
+        # Scan the buffer for a sentinel magic byte using the shared parser.
+        for idx in range(len(buf)):
+            sentinel = parse_boot_sentinel(buf, idx)
+            if sentinel is None:
+                # Not a sentinel byte — keep scanning.
                 continue
-            tu_version = buf[idx + 2]
+            if sentinel is False:
+                # Magic byte found but not enough bytes yet — wait for more.
+                break
+
             elapsed = timeout - (deadline - time.monotonic())
-            print(f"[a] PASS — 0x{SENTINEL_V2:02X} (current) sentinel received "
-                  f"after {elapsed:.2f} s (buffer offset {idx})  "
-                  f"TU_VERSION=0x{tu_version:02X}")
-            if tu_version < TU_VERSION_CALL_3PKT:
-                print(f"[a] BITSTREAM WARNING: TU_VERSION=0x{tu_version:02X} is below "
-                      f"required 0x{TU_VERSION_CALL_3PKT:02X} — stale TraceUnit FSM.",
-                      file=sys.stderr)
-                print("     ELOADCALL/XLOADLAMBDA may not emit the 3-packet CALL sequence.",
-                      file=sys.stderr)
-                print("     CR6/CR14 state in the IDE may be wrong after any such instruction.",
-                      file=sys.stderr)
+            label   = 'stale' if sentinel['stale'] else 'current'
+            print(f"[a] PASS — 0x{sentinel['magic']:02X} ({label}) sentinel received "
+                  f"after {elapsed:.2f} s (buffer offset {idx})")
+
+            if sentinel['stale']:
+                if sentinel['tu_version'] is None:
+                    # V1 (0xBB) — TraceUnit predates 3-packet CALL entirely.
+                    print("[a] BITSTREAM WARNING: old sentinel (0xBB) — stale "
+                          "TraceUnit FSM.", file=sys.stderr)
+                    post_tu_version = 0x01
+                else:
+                    # V2 (0xBC) but TU_VERSION below minimum.
+                    print(f"[a] BITSTREAM WARNING: TU_VERSION=0x{sentinel['tu_version']:02X} "
+                          f"is below required 0x{TU_VERSION_CALL_3PKT:02X} — "
+                          "stale TraceUnit FSM.", file=sys.stderr)
+                    post_tu_version = sentinel['tu_version']
+                print("     ELOADCALL/XLOADLAMBDA emit RESULT not the 3-packet "
+                      "CALL sequence.", file=sys.stderr)
+                print("     CR6/CR14 state in the IDE will be wrong after any "
+                      "such instruction.", file=sys.stderr)
                 print("     Rebuild and reflash the bitstream to resolve this.",
                       file=sys.stderr)
-                # Notify the IDE so it shows a visible warning banner.
                 _post_boot_info(ide_base, verify_tls, stale_tu=True,
-                                tu_version=tu_version)
+                                tu_version=post_tu_version)
             else:
                 # Current bitstream — clear any previous stale warning in the IDE.
                 _post_boot_info(ide_base, verify_tls, stale_tu=False,
-                                tu_version=tu_version)
-            return True
-
-        if SENTINEL_V1 in buf:
-            idx = buf.index(SENTINEL_V1)
-            elapsed = timeout - (deadline - time.monotonic())
-            print(f"[a] PASS — 0x{SENTINEL_V1:02X} (stale) sentinel received "
-                  f"after {elapsed:.2f} s (buffer offset {idx})")
-            print("[a] BITSTREAM WARNING: old sentinel (0xBB) — stale "
-                  "TraceUnit FSM.", file=sys.stderr)
-            print("     ELOADCALL/XLOADLAMBDA emit RESULT not the 3-packet "
-                  "CALL sequence.", file=sys.stderr)
-            print("     CR6/CR14 state in the IDE will be wrong after any "
-                  "such instruction.", file=sys.stderr)
-            print("     Rebuild and reflash the bitstream to resolve this.",
-                  file=sys.stderr)
-            # Notify the IDE — tu_version=0x01 matches wukong_bridge.py's
-            # convention for old-sentinel stale bitstreams.
-            _post_boot_info(ide_base, verify_tls, stale_tu=True,
-                            tu_version=0x01)
+                                tu_version=sentinel['tu_version'])
             return True
 
     print(f"[a] FAIL — no boot sentinel received within {timeout} s.", file=sys.stderr)
