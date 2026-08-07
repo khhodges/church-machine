@@ -14264,12 +14264,17 @@ function showApiAbstractionDetail(slot) {
 //
 // Connection detection: the bridge posts trace packets to /hardware/wukong/trace.
 // We poll that endpoint every 3 seconds to check for a recent timestamp.
-// If a packet arrived within the last 10 seconds, the board is "connected"
-// and the "▶ HW" / "⏸ HW" toolbar button is shown.
+// Two staleness windows are used:
+//   _WUKONG_STALE_MS     (10 s) — "is connected" for action gating (step button etc.)
+//   _WUKONG_BTN_VIS_MS   (60 s) — button VISIBILITY: stays shown after halt so the
+//                                  user can restart without the button vanishing.
+// When the board is halted, traces stop immediately, so the 10 s window would hide
+// the button on the very next toggle — hence the longer visibility window.
 
 let _wukongHWRunning   = false;   // true = board is in free-run mode
 let _wukongLastTraceTs = 0;       // unix timestamp (seconds) of last trace packet
-const _WUKONG_STALE_MS = 10000;   // 10 s without a packet → disconnected
+const _WUKONG_STALE_MS   = 10000; // 10 s without a packet → disconnected
+const _WUKONG_BTN_VIS_MS = 60000; // 60 s — keep button visible after halt
 
 // Set of NIA word addresses (unsigned 32-bit) with an armed hardware breakpoint.
 const _hwBreakpoints = new Set();
@@ -14326,10 +14331,76 @@ async function _wukongSetHwBreakpoint(nia) {
 }
 window._wukongSetHwBreakpoint = _wukongSetHwBreakpoint;
 
+// ── Hardware activity strip (timestamp / NIA / decoded instr / step count) ──
+let _wukongHWStepCount = 0;
+
+function _wukongFormatTraceTime(ts) {
+    const d = new Date(ts * 1000);
+    const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    return DAYS[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()] +
+           '\u00a0' + hh + ':' + mm + ':' + ss;
+}
+
+function _wukongUpdateActivityStrip(data) {
+    const strip = document.getElementById('wk-activity-strip');
+    if (!strip) return;
+
+    // Reveal the strip on first packet.
+    strip.classList.add('active');
+
+    // Last packet time.
+    const timeEl = document.getElementById('wk-last-time');
+    if (timeEl && data.ts) {
+        timeEl.textContent = _wukongFormatTraceTime(data.ts);
+        timeEl.classList.add('wk-act-lit');
+    }
+
+    // NIA in hex.
+    const niaEl = document.getElementById('wk-last-nia');
+    if (niaEl && data.nia !== undefined) {
+        niaEl.textContent = '0x' + (data.nia >>> 0).toString(16).toUpperCase().padStart(8, '0');
+        niaEl.classList.add('wk-act-lit');
+    }
+
+    // Decoded instruction — try ChurchAssembler first, fall back to raw hex.
+    const instrEl = document.getElementById('wk-last-instr');
+    if (instrEl && data.instr !== undefined) {
+        const raw = data.instr >>> 0;
+        let decoded = '0x' + raw.toString(16).toUpperCase().padStart(8, '0');
+        try {
+            if (typeof ChurchAssembler !== 'undefined') {
+                const dis = new ChurchAssembler().disassemble(raw);
+                if (dis && dis.trim()) decoded = dis.trim();
+            }
+        } catch(_e) {}
+        instrEl.textContent = decoded;
+        instrEl.title = decoded;   // full text on hover when truncated
+        instrEl.classList.add('wk-act-lit');
+    }
+
+    // Running step count (each trace update = one retired instruction or sample).
+    _wukongHWStepCount++;
+    const stepEl = document.getElementById('wk-step-count');
+    if (stepEl) {
+        stepEl.textContent = _wukongHWStepCount.toLocaleString();
+        stepEl.classList.add('wk-act-lit');
+    }
+}
+
 function _wukongUpdateBtn() {
     const btn = document.getElementById('toolHWRunBtn');
     if (!btn) return;
-    btn.style.display = (_wukongIsConnected() || _wukongHWRunning) ? '' : 'none';
+    // Use the longer visibility window so the button stays after a halt.
+    // _wukongIsConnected() (10 s) is used for action gating elsewhere;
+    // here we want the button to remain visible for 60 s after last trace
+    // so the user can restart the board without the button vanishing.
+    const recentlyConnected = _wukongLastTraceTs > 0 &&
+        (Date.now() - _wukongLastTraceTs * 1000) < _WUKONG_BTN_VIS_MS;
+    btn.style.display = (recentlyConnected || _wukongHWRunning) ? '' : 'none';
     btn.textContent   = _wukongHWRunning ? '\u23F8 HW' : '\u25B6 HW';
     btn.classList.toggle('btn-warning', _wukongHWRunning);
     btn.classList.toggle('btn-secondary', !_wukongHWRunning);
@@ -14344,6 +14415,7 @@ setInterval(async function _wukongPoll() {
         if (data && data.ts && data.ts > _wukongLastTraceTs) {
             _wukongLastTraceTs = data.ts;
             _wukongUpdateBtn();
+            _wukongUpdateActivityStrip(data);
         }
     } catch(e) {}
 }, 3000);
@@ -14400,6 +14472,7 @@ function _wukongAppendTrace(data) {
     }
     con.appendChild(line);
     con.scrollTop = con.scrollHeight;
+    _wukongUpdateActivityStrip(data);
 }
 
 async function _wukongStep() {

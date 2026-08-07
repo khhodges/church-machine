@@ -67,7 +67,7 @@ def extract_tcl_probe_nets(tcl_text):
     # Match: connect_debug_port <port> … get_nets {<patterns>} …
     # The patterns inside {} may include spaces (multiple nets) or [*] globs.
     pattern = re.compile(
-        r'^connect_debug_port\s+(\S+)\s+.*get_nets\s+\{([^}]+)\}',
+        r'^\s*connect_debug_port\s+(\S+)\s+.*get_nets\s+\{([^}]+)\}',
         re.MULTILINE,
     )
     for m in pattern.finditer(tcl_text):

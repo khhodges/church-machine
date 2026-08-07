@@ -16,7 +16,9 @@ Features
 * --port   Override auto-detection with a specific device path.
 * --ide    IDE server base URL for forwarding packets.
 * --baud   Baud rate (default 57600 — matches UART_CLOCKDIV=53 at 25 MHz).
-* --run    Bridge mode: keep reading and forwarding until Ctrl-C.
+* --run      Bridge mode: keep reading and forwarding until Ctrl-C.
+* --insecure Skip TLS certificate verification (suppresses urllib3 warnings).
+             Required when the IDE is on lab.cloomc.org with a proxy cert.
 
 Port auto-detection is Linux / ChromeOS only.  Pass --port=/dev/ttyUSBN on
 Windows.
@@ -48,6 +50,7 @@ Exit codes
 import sys
 import json
 import time
+import ssl
 
 # ---------------------------------------------------------------------------
 # Argument parsing
@@ -59,6 +62,7 @@ _IDE_URL    = None
 _RUN        = False
 _PROBE_ONLY = False
 _VERBOSE    = False
+_INSECURE   = False
 
 for _a in sys.argv[1:]:
     if _a == '--auto':
@@ -75,11 +79,22 @@ for _a in sys.argv[1:]:
         _PROBE_ONLY = True
     elif _a == '--verbose':
         _VERBOSE = True
+    elif _a == '--insecure':
+        _INSECURE = True
     elif _a in ('-h', '--help'):
         print(__doc__)
         sys.exit(0)
     elif _a.startswith('--'):
         print(f"WARNING: unknown flag {_a!r} ignored", file=sys.stderr)
+
+# Suppress urllib3's InsecureRequestWarning when --insecure is in use.
+# The warning fires on every POST, flooding the terminal with noise.
+if _INSECURE:
+    try:
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    except Exception:
+        pass
 
 # ---------------------------------------------------------------------------
 # Parser — GREETING line
@@ -333,7 +348,7 @@ def auto_detect_port(serial_mod, baud, verbose=False):
 # IDE forwarding
 # ---------------------------------------------------------------------------
 
-def _post_to_ide(ide_url, endpoint, payload, verbose=False):
+def _post_to_ide(ide_url, endpoint, payload, verbose=False, ssl_ctx=None):
     """POST *payload* dict as JSON to ide_url/endpoint.  Errors are logged."""
     try:
         import urllib.request
@@ -344,7 +359,7 @@ def _post_to_ide(ide_url, endpoint, payload, verbose=False):
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        resp = urllib.request.urlopen(req, timeout=5)
+        resp = urllib.request.urlopen(req, timeout=5, context=ssl_ctx)
         if verbose:
             result = json.loads(resp.read())
             print(f"  [ide] POST {endpoint} → {result}", file=sys.stderr)
@@ -352,59 +367,63 @@ def _post_to_ide(ide_url, endpoint, payload, verbose=False):
         print(f"  [ide] POST {endpoint} failed: {exc}", file=sys.stderr)
 
 
-def forward_line(line, ide_url, verbose=False):
+def _tod():
+    """Return current time as HH:MM:SS string."""
+    return time.strftime('%H:%M:%S', time.localtime())
+
+
+def forward_line(line, ide_url, verbose=False, ssl_ctx=None):
     """
     Parse *line* and forward any recognised packet type to the IDE server.
+    Prints a [HH:MM:SS] summary to stdout for every recognised packet.
     Returns True if the line was recognised (regardless of forwarding success).
     """
     if is_greeting(line):
-        if verbose:
-            print(f"  [bridge] GREETING: {line!r}", file=sys.stderr)
+        print(f"[{_tod()}] GREETING: {line}")
         return True
 
     if parse_nia(line) is not None:
+        # NIA lines are high-frequency — only echo in verbose mode.
         if verbose:
-            print(f"  [bridge] NIA: {line!r}", file=sys.stderr)
+            print(f"[{_tod()}] NIA: {line}")
         return True
 
     pkt = parse_callhome(line)
     if pkt is not None:
-        if verbose:
-            print(f"  [bridge] CALLHOME board={pkt.get('board')} nia={pkt.get('nia')}",
-                  file=sys.stderr)
+        print(f"[{_tod()}] CALLHOME  board={pkt.get('board')}  nia={pkt.get('nia')}  "
+              f"boot_ok={pkt.get('boot_ok')}  fault={pkt.get('fault')}")
         if ide_url:
-            _post_to_ide(ide_url, "/api/device/callhome", pkt, verbose=verbose)
+            _post_to_ide(ide_url, "/api/device/callhome", pkt,
+                         verbose=verbose, ssl_ctx=ssl_ctx)
         return True
 
     trace = parse_trace(line)
     if trace is not None:
-        if verbose:
-            print(f"  [bridge] TRACE {len(trace)} sample(s)", file=sys.stderr)
+        print(f"[{_tod()}] TRACE     {len(trace)} sample(s)  {trace[:4]}"
+              f"{'…' if len(trace) > 4 else ''}")
         if ide_url:
             _post_to_ide(ide_url, "/api/device/trace",
-                         {"samples": trace}, verbose=verbose)
+                         {"samples": trace}, verbose=verbose, ssl_ctx=ssl_ctx)
         return True
 
     fe = parse_fault_event(line)
     if fe is not None:
-        if verbose:
-            print(f"  [bridge] FAULT_EVENT fault_name={fe.get('fault_name')!r}",
-                  file=sys.stderr)
+        print(f"[{_tod()}] FAULT     nia={fe.get('nia')}  fault_name={fe.get('fault_name')!r}")
         if ide_url:
-            _post_to_ide(ide_url, "/api/device/fault", fe, verbose=verbose)
+            _post_to_ide(ide_url, "/api/device/fault", fe,
+                         verbose=verbose, ssl_ctx=ssl_ctx)
         return True
 
     h = parse_hung(line)
     if h is not None:
-        if verbose:
-            print(f"  [bridge] HUNG nia={h.get('nia')} loops={h.get('loops')}",
-                  file=sys.stderr)
+        print(f"[{_tod()}] HUNG      nia={h.get('nia')}  loops={h.get('loops')}")
         if ide_url:
-            _post_to_ide(ide_url, "/api/device/hung", h, verbose=verbose)
+            _post_to_ide(ide_url, "/api/device/hung", h,
+                         verbose=verbose, ssl_ctx=ssl_ctx)
         return True
 
     if verbose:
-        print(f"  [bridge] (unrecognised) {line!r}", file=sys.stderr)
+        print(f"[{_tod()}] (unrecognised) {line!r}", file=sys.stderr)
     return False
 
 
@@ -412,7 +431,7 @@ def forward_line(line, ide_url, verbose=False):
 # Bridge run loop
 # ---------------------------------------------------------------------------
 
-def run_bridge(port, baud, ide_url, verbose=False):
+def run_bridge(port, baud, ide_url, verbose=False, insecure=False):
     """Open *port* and forward lines to *ide_url* until interrupted."""
     try:
         import serial as _serial
@@ -420,6 +439,13 @@ def run_bridge(port, baud, ide_url, verbose=False):
         print("ERROR: pyserial not installed.  Run: pip3 install pyserial",
               file=sys.stderr)
         sys.exit(1)
+
+    # Build an unverified SSL context once so every POST reuses it.
+    ssl_ctx = None
+    if insecure and ide_url and ide_url.startswith("https://"):
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
 
     print(f"  [bridge] Opening {port} at {baud} baud …", file=sys.stderr)
     try:
@@ -430,7 +456,8 @@ def run_bridge(port, baud, ide_url, verbose=False):
         print(f"ERROR: could not open {port}: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"  [bridge] Running.  Forwarding to: {ide_url or '(no IDE URL set)'}",
+    print(f"  [bridge] Running.  Forwarding to: {ide_url or '(no IDE URL set)'}"
+          f"{'  (TLS verify disabled)' if ssl_ctx else ''}",
           file=sys.stderr)
     print(f"  [bridge] Press Ctrl-C to stop.", file=sys.stderr)
 
@@ -449,7 +476,8 @@ def run_bridge(port, baud, ide_url, verbose=False):
                     buf = buf[idx + 1:]
                     line = raw.rstrip(b"\r").decode("utf-8", errors="replace")
                     if line:
-                        forward_line(line, ide_url, verbose=verbose)
+                        forward_line(line, ide_url, verbose=verbose,
+                                     ssl_ctx=ssl_ctx)
             else:
                 time.sleep(0.02)
     except KeyboardInterrupt:
@@ -495,7 +523,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     if _RUN:
-        run_bridge(port, _BAUD, _IDE_URL, verbose=_VERBOSE)
+        run_bridge(port, _BAUD, _IDE_URL, verbose=_VERBOSE, insecure=_INSECURE)
     else:
         print(f"Selected port: {port}")
         print("(pass --run to start forwarding, or --probe-only to exit after selection)")

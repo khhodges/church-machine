@@ -1036,6 +1036,36 @@
     flex-wrap: wrap;
 }
 
+/* ── Wukong status bar — lives inside .fixed-toolbar, flows below the header ── */
+#hw-led-bar-global {
+    height: 40px;
+    padding: 0 0.75rem;
+    background: #080e18;
+    border-top: 1px solid #1a2636;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+}
+#hw-led-bar-global .hw-led-bar {
+    height: 100%;
+    margin-bottom: 0;
+    border: none;
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+}
+/* Suppress the two-line role label ("Boot/User", "Fault/HB") to fit 40px bar */
+#hw-led-bar-global .hw-led-role {
+    display: none;
+}
+#hw-led-bar-global .hw-led-item {
+    gap: 2px;
+}
+#hw-led-bar-global .hw-led-name {
+    font-size: 0.52rem;
+    line-height: 1;
+}
+
 .hw-led-bar {
     display: flex;
     align-items: center;

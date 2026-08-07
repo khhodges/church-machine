@@ -37,6 +37,7 @@ const LED_FLASH_STUB = {
     ns_slot:      7,
     lump_size:    64,
     lump_version: 1,
+    has_source:   true,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

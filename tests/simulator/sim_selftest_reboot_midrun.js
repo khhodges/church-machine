@@ -88,10 +88,12 @@ check(loaded, 'T2: self-test lump loads');
 for (let i = 0; i < 5 && !sim.halted; i++) sim.step();
 
 const faultLogLenBeforeReboot = sim.faultLog.length;
-sim._tier3Recovery({ type: 'PRIV_REG', message: 'synthetic double-fault for regression test' });
+// _tier3Recovery was replaced by _fastBoot(reason=2) — reason 2 is the
+// fault-recovery re-boot path (same hardware FSM: FAULT_RST→LOAD_NS→COMPLETE).
+sim._fastBoot(2);
 
 check(sim.bootComplete === false, 'T3: bootComplete is false immediately after forced Tier-3 double-fault');
-check(sim.halted === false, 'T4: sim is not halted after Tier-3 recovery (matches _tier3Recovery contract)');
+check(sim.halted === false, 'T4: sim is not halted after Tier-3 recovery (matches _fastBoot contract)');
 
 // ── Drive the boot-aware loop (identical pattern to the fixed runSelftestLump) ─
 let bootStepCallsWhileNotBooted = 0;

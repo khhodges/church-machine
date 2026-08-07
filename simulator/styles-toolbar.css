@@ -346,7 +346,7 @@
 .view {
     display: none;
     position: fixed;
-    top: 52px;
+    top: var(--toolbar-h, 92px);   /* set dynamically by ResizeObserver on .fixed-toolbar */
     left: 0; right: 0; bottom: 0;
     overflow-y: auto;
     padding: 0.5rem;

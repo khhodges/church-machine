@@ -250,6 +250,9 @@ test.describe('Namespace panel — freed slot DOM rows carry no ghost label', ()
             // Row exists — the label must NOT be the old ghost name, and must
             // not be any other known ghost name.
             const labelCell = row.locator('.ns-label');
+            // Dim "no entry" rows have no .ns-label td — if absent, there is no
+            // label to be ghostly, so we skip this slot.
+            if (await labelCell.count() === 0) continue;
             const labelText = (await labelCell.textContent() || '').trim();
 
             expect(
