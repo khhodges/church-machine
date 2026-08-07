@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FPGA Status — Church Machine</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'SF Mono','Cascadia Code',Menlo,Consolas,monospace;
+         background:#0a0e17; color:#c8d6e5; padding:18px; font-size:13px; }
+  h1 { font-size:17px; color:#e8f0fe; margin-bottom:2px; }
+  .sub { color:#5a6b82; margin-bottom:16px; font-size:11px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+          gap:12px; margin-bottom:16px; }
+  .card { background:#111827; border:1px solid #1f2b3e; border-radius:8px; padding:12px 14px; }
+  .card h2 { font-size:11px; text-transform:uppercase; letter-spacing:1px;
+             color:#5a6b82; margin-bottom:8px; }
+  .row { display:flex; justify-content:space-between; padding:2px 0; gap:8px; }
+  .row .k { color:#7a8ba3; }
+  .row .v { color:#e8f0fe; text-align:right; word-break:break-all; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; }
+  .ok   { background:#22c55e; box-shadow:0 0 6px #22c55e; }
+  .bad  { background:#ef4444; box-shadow:0 0 6px #ef4444; }
+  .warn { background:#f59e0b; box-shadow:0 0 6px #f59e0b; }
+  .big { font-size:14px; font-weight:600; }
+  .fault { color:#f87171; }
+  .good  { color:#4ade80; }
+  .dim   { color:#5a6b82; }
+  #log { background:#0d1320; border:1px solid #1f2b3e; border-radius:8px;
+         padding:10px 12px; height:340px; overflow-y:auto; white-space:pre; font-size:12px; }
+  #log .ev-call   { color:#60a5fa; }
+  #log .ev-return { color:#c084fc; }
+  #log .ev-load   { color:#34d399; }
+  #log .ev-fault  { color:#f87171; }
+  #log .ev-note   { color:#f59e0b; }
+  .loghdr { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+  .loghdr h2 { font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#5a6b82; }
+  button { background:#1f2b3e; color:#c8d6e5; border:1px solid #2d3f5a;
+           border-radius:5px; padding:3px 10px; font:inherit; cursor:pointer; }
+  button:hover { background:#2d3f5a; }
+</style>
+</head>
+<body>
+<h1>Wukong FPGA — Server Status</h1>
+<div class="sub">This page shows exactly what the server knows. It polls once per second and never interferes with the IDE.</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>Bridge</h2>
+    <div class="row"><span class="k">Connection</span><span class="v big" id="bridgeState"><span class="dot bad"></span>—</span></div>
+    <div class="row"><span class="k">Last command poll</span><span class="v" id="bridgeAge">—</span></div>
+    <div class="row"><span class="k">Last trace packet</span><span class="v" id="traceAge">—</span></div>
+  </div>
+  <div class="card">
+    <h2>Board</h2>
+    <div class="row"><span class="k">Activity</span><span class="v big" id="boardState"><span class="dot bad"></span>—</span></div>
+    <div class="row"><span class="k">Last NIA</span><span class="v" id="lastNia">—</span></div>
+    <div class="row"><span class="k">Flags (NZCV)</span><span class="v" id="lastFlags">—</span></div>
+    <div class="row"><span class="k">Fault</span><span class="v" id="lastFault">—</span></div>
+    <div class="row"><span class="k">Call depth</span><span class="v" id="callDepth">—</span></div>
+  </div>
+  <div class="card">
+    <h2>Boot / Firmware</h2>
+    <div class="row"><span class="k">Boot sentinel</span><span class="v" id="bootSentinel">not seen this session</span></div>
+    <div class="row"><span class="k">TraceUnit version</span><span class="v" id="tuVersion">—</span></div>
+    <div class="row"><span class="k">Upload in flight</span><span class="v" id="uploadState">no</span></div>
+    <div class="row"><span class="k">Pending command</span><span class="v" id="pendingCmd">none</span></div>
+  </div>
+  <div class="card">
+    <h2>Server</h2>
+    <div class="row"><span class="k">Events received</span><span class="v" id="serverSeq">0</span></div>
+    <div class="row"><span class="k">Queue length</span><span class="v" id="queueLen">0</span></div>
+    <div class="row"><span class="k">CR6 GT</span><span class="v" id="cr6gt">—</span></div>
+    <div class="row"><span class="k">CR14 GT</span><span class="v" id="cr14gt">—</span></div>
+  </div>
+</div>
+
+<div class="loghdr">
+  <h2>Live event log (newest at bottom)</h2>
+  <button id="clearBtn">Clear</button>
+</div>
+<div id="log"></div>
+
+<script>
+(function () {
+  'use strict';
+  var EV_NAMES = {
+    0x00:'RESULT', 0x01:'LOAD shadow GT', 0x02:'LOAD new GT',
+    0x03:'CHANGE push', 0x04:'CHANGE CR12', 0x05:'CHANGE CR5',
+    0x06:'CALL CR6', 0x07:'CALL CR14', 0x08:'CALL push',
+    0x09:'RETURN pop', 0x0A:'RETURN CR6', 0x0B:'RETURN CR14'
+  };
+  var FAULT_NAMES = {
+    1:'PERM', 2:'RANGE', 3:'TYPE', 4:'SEAL', 5:'NULLGT',
+    6:'DEPTH', 7:'ALIGN', 8:'OPCODE', 9:'INTEGRITY'
+  };
+  var cursor = 0;
+  var logEl = document.getElementById('log');
+  var lastServerSeq = null;
+
+  function hex(v) { return '0x' + (v >>> 0).toString(16).toUpperCase().padStart(8, '0'); }
+  function flags(f) {
+    return ((f & 8) ? 'N' : '·') + ((f & 4) ? 'Z' : '·') +
+           ((f & 2) ? 'C' : '·') + ((f & 1) ? 'V' : '·');
+  }
+  function ageStr(a) {
+    if (a === null || a === undefined) return 'never';
+    if (a < 2) return a.toFixed(1) + 's ago';
+    if (a < 120) return Math.round(a) + 's ago';
+    if (a < 7200) return Math.round(a / 60) + 'min ago';
+    return Math.round(a / 3600) + 'h ago';
+  }
+  function setState(id, cls, text) {
+    document.getElementById(id).innerHTML =
+      '<span class="dot ' + cls + '"></span>' + text;
+  }
+  function addLine(text, cls) {
+    var div = document.createElement('div');
+    if (cls) div.className = cls;
+    div.textContent = text;
+    var stick = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 8;
+    logEl.appendChild(div);
+    while (logEl.childNodes.length > 1500) logEl.removeChild(logEl.firstChild);
+    if (stick) logEl.scrollTop = logEl.scrollHeight;
+  }
+  function note(text) {
+    addLine('[' + new Date().toLocaleTimeString() + '] ' + text, 'ev-note');
+  }
+  document.getElementById('clearBtn').onclick = function () { logEl.innerHTML = ''; };
+
+  function renderEvent(e) {
+    var t = e.ts ? new Date(e.ts * 1000).toLocaleTimeString() : '--:--:--';
+    var evName = EV_NAMES[e.ev_type] !== undefined ? EV_NAMES[e.ev_type]
+               : ('EV_0x' + (e.ev_type || 0).toString(16).toUpperCase());
+    var line = '[' + t + '] #' + e.seq + '  NIA=' + hex(e.nia) + '  ' + evName;
+    if (e.payload_gt) line += '  GT=' + hex(e.payload_gt);
+    line += '  flags=' + flags(e.flags || 0);
+    if (e.call_depth !== undefined) line += '  depth=' + e.call_depth;
+    var cls = '';
+    if (e.ev_type >= 6 && e.ev_type <= 8) cls = 'ev-call';
+    else if (e.ev_type >= 9 && e.ev_type <= 11) cls = 'ev-return';
+    else if (e.ev_type === 1 || e.ev_type === 2) cls = 'ev-load';
+    if (e.fault_valid) {
+      line += '  FAULT=' + (FAULT_NAMES[e.fault_code] || ('0x' + (e.fault_code || 0).toString(16)));
+      cls = 'ev-fault';
+    }
+    if (e.bp_hit) line += '  [BP HIT]';
+    addLine(line, cls);
+  }
+
+  function pollStatus() {
+    fetch('/hardware/wukong/status').then(function (r) { return r.json(); }).then(function (s) {
+      if (s.bridge_connected) setState('bridgeState', 'ok', 'connected');
+      else if (s.bridge_poll_age !== null && s.bridge_poll_age !== undefined)
+        setState('bridgeState', 'bad', 'disconnected');
+      else setState('bridgeState', 'bad', 'never seen');
+      document.getElementById('bridgeAge').textContent = ageStr(s.bridge_poll_age);
+      document.getElementById('traceAge').textContent = ageStr(s.last_trace_age);
+
+      var lt = s.latest_trace || {};
+      if (s.last_trace_age !== null && s.last_trace_age !== undefined && s.last_trace_age < 3)
+        setState('boardState', 'ok', 'tracing');
+      else if (lt.fault_valid)
+        setState('boardState', 'warn', 'halted on fault');
+      else if (s.server_seq > 0)
+        setState('boardState', 'warn', 'idle / halted');
+      else
+        setState('boardState', 'bad', 'no trace yet');
+      document.getElementById('lastNia').textContent = lt.nia !== undefined ? hex(lt.nia) : '—';
+      document.getElementById('lastFlags').textContent = lt.flags !== undefined ? flags(lt.flags) : '—';
+      var fEl = document.getElementById('lastFault');
+      if (lt.fault_valid) {
+        fEl.textContent = FAULT_NAMES[lt.fault_code] || ('0x' + (lt.fault_code || 0).toString(16));
+        fEl.className = 'v fault';
+      } else { fEl.textContent = 'none'; fEl.className = 'v good'; }
+      document.getElementById('callDepth').textContent = s.call_depth;
+
+      var bi = s.boot_info || {};
+      if (bi.tu_version !== undefined && Object.keys(bi).length) {
+        document.getElementById('bootSentinel').textContent =
+          bi.stale_tu ? 'seen — STALE bitstream' : 'seen — current bitstream';
+        document.getElementById('bootSentinel').className = bi.stale_tu ? 'v fault' : 'v good';
+        document.getElementById('tuVersion').textContent = bi.tu_version;
+      }
+      document.getElementById('uploadState').textContent = s.upload_in_flight ? 'YES' : 'no';
+      document.getElementById('pendingCmd').textContent =
+        s.pending_command ? JSON.stringify(s.pending_command) : 'none';
+      document.getElementById('serverSeq').textContent = s.server_seq;
+      document.getElementById('queueLen').textContent = s.queue_len;
+      document.getElementById('cr6gt').textContent  = s.cr6_gt  != null ? hex(s.cr6_gt)  : '—';
+      document.getElementById('cr14gt').textContent = s.cr14_gt != null ? hex(s.cr14_gt) : '—';
+
+      if (lastServerSeq !== null && s.server_seq < lastServerSeq) {
+        note('server restarted — event counter reset (' + lastServerSeq + ' → ' + s.server_seq + ')');
+        cursor = 0;
+      }
+      lastServerSeq = s.server_seq;
+    }).catch(function () {
+      setState('bridgeState', 'bad', 'server unreachable');
+    });
+  }
+
+  function pollEvents() {
+    fetch('/hardware/wukong/events?after=' + cursor)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.server_seq < cursor) {            // server restarted
+          cursor = 0;                           // reset and re-fetch from 0 on
+          return;                               // the next poll — do not process
+        }                                       // this stale response
+        if (d.queue_min_seq > cursor + 1 && cursor > 0)
+          note((d.queue_min_seq - cursor - 1) + ' events lost to queue overflow');
+        (d.events || []).forEach(function (e) {
+          renderEvent(e);
+          if (e.seq > cursor) cursor = e.seq;
+        });
+      })
+      .catch(function () {});
+  }
+
+  note('FPGA status page opened — waiting for data…');
+  pollStatus();
+  pollEvents();
+  setInterval(pollStatus, 1000);
+  setInterval(pollEvents, 1000);
+})();
+</script>
+</body>
+</html>

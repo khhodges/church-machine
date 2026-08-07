@@ -9873,6 +9873,12 @@ _WUKONG_EVENT_QUEUE_MAXLEN = 2048
 # the client can display and resync accurate depth even after a queue overflow gap
 # or server restart without needing to replay lost intermediate events.
 _wukong_call_depth     = 0
+# Heartbeat timestamps for the /fpga status page (time.time() floats).
+#   _wukong_last_bridge_poll — updated on every bridge GET /hardware/wukong/command
+#   _wukong_last_trace_post  — updated on every bridge POST /hardware/wukong/trace
+import time as _wk_time
+_wukong_last_bridge_poll = 0.0
+_wukong_last_trace_post  = 0.0
 
 
 @app.route('/hardware/wukong/trace', methods=['POST'])
@@ -9894,7 +9900,8 @@ def wukong_trace_post():
         ts          — float timestamp
     """
     global _wukong_latest_trace, _wukong_latest_cr_gts, _wukong_event_seq, \
-           _wukong_call_depth
+           _wukong_call_depth, _wukong_last_trace_post
+    _wukong_last_trace_post = _wk_time.time()
     data = request.get_json(silent=True) or {}
     ev_type    = int(data.get('ev_type', 0))
     payload_gt = int(data.get('payload_gt', 0))
@@ -10059,13 +10066,64 @@ def wukong_command_get():
     Returns {'cmd': ..., 'nia': ...} if a command is pending, else {}.
     The command is consumed (set to None) on each successful GET.
     """
-    global _wukong_pending_cmd
+    global _wukong_pending_cmd, _wukong_last_bridge_poll
+    _wukong_last_bridge_poll = _wk_time.time()
     with _wukong_command_lock:
         entry = _wukong_pending_cmd
         _wukong_pending_cmd = None
     if entry:
         return jsonify(entry)
     return jsonify({})
+
+
+@app.route('/hardware/wukong/status', methods=['GET'])
+def wukong_status_get():
+    """Aggregate, non-consuming status snapshot for the /fpga page.
+
+    Unlike GET /hardware/wukong/upload-ack (which consumes the result) this
+    endpoint only reads state, so polling it never disturbs the IDE's flows.
+    """
+    now = _wk_time.time()
+    with _wukong_trace_lock:
+        latest    = dict(_wukong_latest_trace)
+        seq       = _wukong_event_seq
+        qlen      = len(_wukong_event_queue)
+        depth     = _wukong_call_depth
+        cr_gts    = dict(_wukong_latest_cr_gts)
+    with _wukong_boot_info_lock:
+        boot_info = dict(_wukong_boot_info)
+    with _upload_in_flight_lock:
+        upl       = _upload_in_flight
+    with _wukong_command_lock:
+        pending   = dict(_wukong_pending_cmd) if _wukong_pending_cmd else None
+    if pending and 'data' in pending:
+        pending = {'cmd': pending.get('cmd'), 'data_bytes': len(pending['data'])}
+    bridge_age = (now - _wukong_last_bridge_poll) if _wukong_last_bridge_poll else None
+    trace_age  = (now - _wukong_last_trace_post)  if _wukong_last_trace_post  else None
+    return jsonify({
+        'server_time':        now,
+        'bridge_connected':   bridge_age is not None and bridge_age < 3.0,
+        'bridge_poll_age':    bridge_age,
+        'last_trace_age':     trace_age,
+        'server_seq':         seq,
+        'queue_len':          qlen,
+        'call_depth':         depth,
+        'latest_trace':       latest,
+        'cr6_gt':             cr_gts.get(6),
+        'cr14_gt':            cr_gts.get(14),
+        'boot_info':          boot_info,
+        'upload_in_flight':   upl,
+        'pending_command':    pending,
+    })
+
+
+@app.route('/fpga')
+def fpga_status_page():
+    """Standalone FPGA status page — shows exactly what the server knows about
+    the Wukong board, bridge, and trace stream.  Independent of the IDE."""
+    resp = make_response(send_from_directory(_SERVER_DIR, 'fpga_status.html'))
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
 
 
 # ── Wukong boot-info endpoint ─────────────────────────────────────────────────
