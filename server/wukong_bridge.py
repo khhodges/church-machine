@@ -16,12 +16,18 @@ Flags:
     --insecure    Skip SSL verification (needed on ChromeOS Crostini)
     --scan        List all serial ports and their first few bytes, then exit
 
-Trace packet format (11 bytes, magic 0xAA):
-    [0]    0xAA   magic
-    [1..4] NIA    big-endian uint32
-    [5..8] instr  big-endian uint32
-    [9]    flags  bits[3:0]=NZCV
-    [10]   fault  bits[4:0]=fault_code  bit[6]=fault_valid  bit[7]=bp_hit
+Trace packet format (12 bytes, magic 0xAA):
+    [0]     0xAA      magic
+    [1..4]  NIA       big-endian uint32
+    [5]     ev_type   TRACE_EV_* constant (0x00-0x0B)
+    [6..9]  payload   GT word0 (uint32 big-endian); 0 for push/pop events
+    [10]    flags     bits[3:0]=NZCV
+    [11]    fault     bits[4:0]=fault_code  bit[6]=fault_valid  bit[7]=bp_hit
+
+Relevant ev_type values for CR display:
+    0x06 = TRACE_EV_CALL_CR6  → CR6  ← payload_gt
+    0x07 = TRACE_EV_CALL_CR14 → CR14 ← payload_gt
+    0x08 = TRACE_EV_CALL_PUSH → caller frame push (payload_gt=0)
 """
 import sys, json, time, struct, threading, signal
 
@@ -34,7 +40,7 @@ except ImportError:
 
 BAUD        = 57600
 PKT_MAGIC   = 0xAA
-PKT_LEN     = 11
+PKT_LEN     = 12   # 12-byte per-event packet (magic+NIA+ev_type+payload+flags+fault)
 
 _positional = [a for a in sys.argv[1:] if not a.startswith('--')]
 SERIAL_PORT = _positional[0] if _positional else '/dev/ttyUSB0'
@@ -66,19 +72,39 @@ def _urlopen(url, data=None, timeout=5):
     return _ur.urlopen(req, timeout=timeout)
 
 
+_EV_NAMES = {
+    0x00: 'RESULT',      0x01: 'LOAD.shadow', 0x02: 'LOAD.new',
+    0x03: 'CHANGE.push', 0x04: 'CHANGE.CR12', 0x05: 'CHANGE.CR5',
+    0x06: 'CALL.CR6',    0x07: 'CALL.CR14',   0x08: 'CALL.push',
+    0x09: 'RETURN.pop',  0x0A: 'RETURN.CR6',  0x0B: 'RETURN.CR14',
+}
+
+
 def _post_trace(pkt_bytes):
-    """Parse raw 11-byte packet and POST to IDE."""
+    """Parse a 12-byte trace packet and POST to IDE.
+
+    Packet layout (12 bytes, big-endian):
+        [0]     0xAA      magic
+        [1..4]  NIA       uint32
+        [5]     ev_type   TRACE_EV_* constant
+        [6..9]  payload   GT word0 (uint32); 0 for push/pop events
+        [10]    flags     bits[3:0]=NZCV
+        [11]    fault     bits[4:0]=fault_code  bit[6]=fault_valid  bit[7]=bp_hit
+    """
     if len(pkt_bytes) != PKT_LEN or pkt_bytes[0] != PKT_MAGIC:
         return
-    nia   = struct.unpack('>I', pkt_bytes[1:5])[0]
-    instr = struct.unpack('>I', pkt_bytes[5:9])[0]
-    flags = pkt_bytes[9] & 0x0F
-    fault_byte = pkt_bytes[10]
+    nia        = struct.unpack('>I', pkt_bytes[1:5])[0]
+    ev_type    = pkt_bytes[5]
+    payload_gt = struct.unpack('>I', pkt_bytes[6:10])[0]
+    flags      = pkt_bytes[10] & 0x0F
+    fault_byte = pkt_bytes[11]
     fault_code  = fault_byte & 0x1F
     fault_valid = bool(fault_byte & 0x40)
     bp_hit      = bool(fault_byte & 0x80)
 
-    print(f'  [TRACE] NIA=0x{nia:08X}  instr=0x{instr:08X}  '
+    ev_name = _EV_NAMES.get(ev_type, f'EV_0x{ev_type:02X}')
+    gt_str  = f'  GT=0x{payload_gt:08X}' if payload_gt else ''
+    print(f'  [TRACE] NIA=0x{nia:08X}  {ev_name}{gt_str}  '
           f'NZCV={flags:04b}  '
           f'{"FAULT(" + str(fault_code) + ")" if fault_valid else "ok"}'
           f'{" BP" if bp_hit else ""}')
@@ -87,7 +113,8 @@ def _post_trace(pkt_bytes):
         return
     payload = json.dumps({
         'nia':         nia,
-        'instr':       instr,
+        'ev_type':     ev_type,
+        'payload_gt':  payload_gt,
         'flags':       flags,
         'fault_code':  fault_code,
         'fault_valid': fault_valid,

@@ -171,6 +171,10 @@ args = "load-through-l-perm-cr6-tests"
 task = "workflow.run"
 args = "bare-space-ns-fallback-tests"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "return-cr14-trace-tests"
+
 [[workflows.workflow]]
 name = "Church Machine IDE"
 author = "agent"
@@ -608,6 +612,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node simulator/test_bare_space_ns_fallback.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "return-cr14-trace-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_return_cr14_trace.js"
 
 [workflows.workflow.metadata]
 outputType = "console"

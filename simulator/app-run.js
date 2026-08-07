@@ -14335,7 +14335,36 @@ function _wukongUpdateBtn() {
     btn.classList.toggle('btn-secondary', !_wukongHWRunning);
 }
 
-// Poll for new trace packets every 3 seconds (connection detection)
+// Apply CR6/CR14 word0 updates from a hardware trace GET response.
+//
+// The server persists the last GT seen for each CALL-type event separately:
+//   data.cr6_gt  — last payload_gt for TRACE_EV_CALL_CR6  (ev_type 0x06)
+//   data.cr14_gt — last payload_gt for TRACE_EV_CALL_CR14 (ev_type 0x07)
+//
+// Reading these persistent fields (rather than ev_type+payload_gt) is necessary
+// because a CALL instruction emits 3 consecutive packets (CR6, CR14, PUSH) and
+// the server's single-latest-trace slot would be overwritten by CALL_PUSH before
+// the IDE polls if we relied solely on ev_type.
+//
+// No-op when sim or sim.cr is absent, or when a field is not present in data
+// (meaning no CALL_CR6 / CALL_CR14 packet has arrived yet).
+function _wukongApplyCRUpdate(data) {
+    if (!data || !sim || !sim.cr) return;
+    let updated = false;
+    if (data.cr6_gt !== undefined && sim.cr[6]) {
+        sim.cr[6].word0 = data.cr6_gt >>> 0;
+        updated = true;
+    }
+    if (data.cr14_gt !== undefined && sim.cr[14]) {
+        sim.cr[14].word0 = data.cr14_gt >>> 0;
+        updated = true;
+    }
+    if (updated && typeof updateCRDisplay === 'function') {
+        updateCRDisplay();
+    }
+}
+
+// Poll for new trace packets every 3 seconds (connection detection + CR update)
 setInterval(async function _wukongPoll() {
     try {
         const r = await fetch('/hardware/wukong/trace');
@@ -14344,6 +14373,7 @@ setInterval(async function _wukongPoll() {
         if (data && data.ts && data.ts > _wukongLastTraceTs) {
             _wukongLastTraceTs = data.ts;
             _wukongUpdateBtn();
+            _wukongApplyCRUpdate(data);
         }
     } catch(e) {}
 }, 3000);
@@ -14422,6 +14452,7 @@ async function _wukongStep() {
                     _wukongLastTraceTs = data.ts;
                     _wukongUpdateBtn();
                     _wukongAppendTrace(data);
+                    _wukongApplyCRUpdate(data);
                     return;
                 }
             } catch(e) { break; }

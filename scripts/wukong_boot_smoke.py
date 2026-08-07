@@ -31,7 +31,7 @@ except ImportError:
     sys.exit(1)
 
 TRACE_MAGIC      = 0xAA
-TRACE_LEN        = 11
+TRACE_LEN        = 12   # 12-byte per-event packet: magic+NIA+ev_type+payload+flags+fault
 SENTINEL         = 0xBB
 DEFAULT_PORT     = "/dev/ttyUSB0"
 DEFAULT_BAUD     = 57600
@@ -47,17 +47,27 @@ def _fault_name(code: int) -> str:
 
 
 def _parse_trace_packet(pkt: bytes) -> dict:
-    """Decode an 11-byte 0xAA trace packet.  Returns a dict with fields:
-       nia, instr, fault_valid, bp_hit, fault_code.
+    """Decode a 12-byte 0xAA trace packet.
+
+    Packet layout (12 bytes, big-endian):
+        [0]     0xAA      magic
+        [1..4]  NIA       uint32
+        [5]     ev_type   TRACE_EV_* constant (0x00-0x0B)
+        [6..9]  payload   GT word0 (uint32); 0 for push/pop events
+        [10]    flags     bits[3:0]=NZCV
+        [11]    fault     bits[4:0]=fault_code  bit[6]=fault_valid  bit[7]=bp_hit
+
+    Returns a dict with keys: nia, ev_type, payload_gt, fault_valid, bp_hit, fault_code.
     """
     nia        = struct.unpack(">I", pkt[1:5])[0]
-    instr      = struct.unpack(">I", pkt[5:9])[0]
-    raw10      = pkt[10]
-    fault_valid = bool(raw10 & 0x40)
-    bp_hit      = bool(raw10 & 0x80)
-    fault_code  = raw10 & 0x1F
-    return dict(nia=nia, instr=instr, fault_valid=fault_valid,
-                bp_hit=bp_hit, fault_code=fault_code)
+    ev_type    = pkt[5]
+    payload_gt = struct.unpack(">I", pkt[6:10])[0]
+    raw11      = pkt[11]
+    fault_valid = bool(raw11 & 0x40)
+    bp_hit      = bool(raw11 & 0x80)
+    fault_code  = raw11 & 0x1F
+    return dict(nia=nia, ev_type=ev_type, payload_gt=payload_gt,
+                fault_valid=fault_valid, bp_hit=bp_hit, fault_code=fault_code)
 
 
 def check_sentinel(ser: "serial.Serial", timeout: float) -> bool:

@@ -9855,7 +9855,11 @@ import threading as _wk_threading
 
 _wukong_trace_lock    = _wk_threading.Lock()
 _wukong_command_lock  = _wk_threading.Lock()
-_wukong_latest_trace  = {}         # {nia, instr, flags, fault_code, fault_valid, bp_hit, ts}
+_wukong_latest_trace  = {}         # {nia, ev_type, payload_gt, flags, fault_code, fault_valid, bp_hit, ts}
+# Latest GT word0 seen for each CALL-type event, keyed by CR index (6 or 14).
+# Maintained separately from _wukong_latest_trace so that a subsequent CALL_PUSH
+# packet (ev_type=0x08) cannot overwrite a CR6/CR14 update before the IDE polls.
+_wukong_latest_cr_gts = {}         # {6: int, 14: int}
 _wukong_pending_cmd   = None       # {'cmd': 's'|'r'|'h'|'b', 'nia': int|None}
 
 
@@ -9877,12 +9881,14 @@ def wukong_trace_post():
         bp_hit      — bool
         ts          — float timestamp
     """
-    global _wukong_latest_trace
+    global _wukong_latest_trace, _wukong_latest_cr_gts
     data = request.get_json(silent=True) or {}
+    ev_type    = int(data.get('ev_type', 0))
+    payload_gt = int(data.get('payload_gt', 0))
     entry = {
         'nia':         int(data.get('nia', 0)),
-        'ev_type':     int(data.get('ev_type', 0)),
-        'payload_gt':  int(data.get('payload_gt', 0)),
+        'ev_type':     ev_type,
+        'payload_gt':  payload_gt,
         'instr':       int(data.get('instr', 0)),
         'flags':       int(data.get('flags', 0)),
         'fault_code':  int(data.get('fault_code', 0)),
@@ -9892,14 +9898,36 @@ def wukong_trace_post():
     }
     with _wukong_trace_lock:
         _wukong_latest_trace = entry
+        # Persist CR GT updates separately so a subsequent CALL_PUSH packet
+        # (ev_type=0x08, payload_gt=0) cannot overwrite the CR6/CR14 GTs
+        # before the IDE polls GET /hardware/wukong/trace.
+        if ev_type == 0x06:    # TRACE_EV_CALL_CR6
+            _wukong_latest_cr_gts[6]  = payload_gt
+        elif ev_type == 0x07:  # TRACE_EV_CALL_CR14
+            _wukong_latest_cr_gts[14] = payload_gt
     return jsonify({'ok': True})
 
 
 @app.route('/hardware/wukong/trace', methods=['GET'])
 def wukong_trace_get():
-    """IDE reads the latest trace packet (or {} if no packet yet)."""
+    """IDE reads the latest trace packet (or {} if no packet yet).
+
+    Extra fields added to the response to survive packet ordering:
+        cr6_gt  — last payload_gt seen for ev_type=0x06 (TRACE_EV_CALL_CR6);
+                  absent until a CALL_CR6 packet has been received
+        cr14_gt — last payload_gt seen for ev_type=0x07 (TRACE_EV_CALL_CR14);
+                  absent until a CALL_CR14 packet has been received
+
+    These are preserved separately so that the subsequent CALL_PUSH packet
+    (ev_type=0x08, payload_gt=0) cannot overwrite a CR6/CR14 update in
+    _wukong_latest_trace before the IDE polls this endpoint.
+    """
     with _wukong_trace_lock:
         entry = dict(_wukong_latest_trace)
+        if 6 in _wukong_latest_cr_gts:
+            entry['cr6_gt']  = _wukong_latest_cr_gts[6]
+        if 14 in _wukong_latest_cr_gts:
+            entry['cr14_gt'] = _wukong_latest_cr_gts[14]
     return jsonify(entry)
 
 
