@@ -10,26 +10,37 @@ What it does
 ------------
 Reads bytes from the UART (57600 8N1):
   • ASCII bytes (bit-7 clear) are printed to stdout as CM program output.
-  • 0xAA-prefixed 11-byte trace packets are parsed and POSTed to
+  • 0xAA-prefixed 12-byte trace packets are parsed and POSTed to
     /hardware/wukong/trace as JSON.
 
 Polls GET /hardware/wukong/command every 50 ms and writes any pending command
 byte to the serial port.  Commands from the IDE:
 
-  {cmd: "s"}           → write b's'  (step: execute one instruction)
-  {cmd: "r"}           → write b'r'  (run free)
-  {cmd: "h"}           → write b'h'  (halt immediately)
-  {cmd: "b", nia: N}   → write b'b' + big-endian 4-byte NIA  (set/clear breakpoint)
+  {cmd: "s"}                    → write b's'  (step: execute one instruction)
+  {cmd: "r"}                    → write b'r'  (run free)
+  {cmd: "h"}                    → write b'h'  (halt immediately)
+  {cmd: "b", nia: N}            → write b'b' + big-endian 4-byte NIA  (set/clear breakpoint)
+  {cmd: "u", data: "<base64>"}  → decode boot-image bytes, write 0x75+len(4 BE)+bytes
+                                   to UART, then POST result to /hardware/wukong/upload-ack
 
-Trace packet format (11 bytes, big-endian):
-  [0]    0xAA magic
-  [1..4] NIA (uint32 big-endian)
-  [5..8] instruction word (uint32 big-endian)
-  [9]    flags byte  bits[3:0] = NZCV; bit[6]=fault_valid; bit[7]=bp_hit
-  [10]   fault_code  bits[4:0] = FaultType; bit[6]=fault_valid dup; bit[7]=bp_hit dup
+Trace packet format (12 bytes, big-endian) — one packet per state-change event:
+  [0]     0xAA      magic
+  [1..4]  NIA       retiring instruction NIA (uint32 big-endian)
+  [5]     ev_type   TRACE_EV_* constant (which CR changed, or stack push/pop)
+  [6..9]  payload   GT word0 (uint32 big-endian); 0 for push/pop events
+  [10]    flags     bits[3:0] = NZCV; bits[7:4] = 0
+  [11]    fault     bits[4:0]=fault_code; bit[6]=fault_valid; bit[7]=bp_hit
+
+Multi-event instructions emit multiple consecutive packets with the same NIA:
+  LOAD    → 2 packets (LOAD.shadow, LOAD.new)
+  CHANGE  → 3 packets (CHANGE.push, CHANGE.CR12, CHANGE.CR5)
+  CALL    → 3 packets (CALL.CR6, CALL.CR14, CALL.push)
+  RETURN  → 3 packets (RETURN.pop, RETURN.CR6, RETURN.CR14)
+  others  → 1 packet  (RESULT)
 """
 
 import argparse
+import base64
 import os
 import struct
 import sys
@@ -44,15 +55,127 @@ except ImportError:
 try:
     import requests
 except ImportError:
-    print("ERROR: requests not installed.  Run: pip install requests", file=sys.stderr)
-    sys.exit(1)
+    requests = None  # IDE notifications silently skipped; bridge main() will exit if None
 
 
 TRACE_MAGIC    = 0xAA
-TRACE_LEN      = 11
+TRACE_LEN      = 12   # 12-byte per-event packet: magic(1)+NIA(4)+ev_type(1)+payload(4)+flags(1)+fault(1)
 
-BOOT_SENTINEL  = 0xBB   # first byte of the 2-byte boot sentinel sequence
-SENTINEL_LEN   = 2      # 0xBB  N_INIT&0xFF
+# ── Event type constants ──────────────────────────────────────────────────────
+# Must match _TRACE_EV_* in wukong_top.py and docs/debug-packet-protocol.md.
+TRACE_EV_RESULT      = 0x00  # Single-packet result (DR→DR, SAVE, Function, etc.)
+TRACE_EV_LOAD_SHADOW = 0x01  # LOAD: old CR_dst GT displaced
+TRACE_EV_LOAD_NEW    = 0x02  # LOAD: new GT installed in CR_dst
+TRACE_EV_CHANGE_PUSH = 0x03  # CHANGE: context stack push
+TRACE_EV_CHANGE_CR12 = 0x04  # CHANGE: CR12 ← new thread GT
+TRACE_EV_CHANGE_CR5  = 0x05  # CHANGE: CR5  ← heap GT
+TRACE_EV_CALL_CR6    = 0x06  # CALL:   CR6  ← abstraction GT
+TRACE_EV_CALL_CR14   = 0x07  # CALL:   CR14 ← code / return GT
+TRACE_EV_CALL_PUSH   = 0x08  # CALL:   caller frame stack push
+TRACE_EV_RETURN_POP  = 0x09  # RETURN: caller frame stack pop
+TRACE_EV_RETURN_CR6  = 0x0A  # RETURN: CR6  ← restored from frame
+TRACE_EV_RETURN_CR14 = 0x0B  # RETURN: CR14 ← restored from frame
+
+_EV_NAMES = {
+    TRACE_EV_RESULT:      'RESULT',
+    TRACE_EV_LOAD_SHADOW: 'LOAD.shadow',
+    TRACE_EV_LOAD_NEW:    'LOAD.new',
+    TRACE_EV_CHANGE_PUSH: 'CHANGE.push',
+    TRACE_EV_CHANGE_CR12: 'CHANGE.CR12',
+    TRACE_EV_CHANGE_CR5:  'CHANGE.CR5',
+    TRACE_EV_CALL_CR6:    'CALL.CR6',
+    TRACE_EV_CALL_CR14:   'CALL.CR14',
+    TRACE_EV_CALL_PUSH:   'CALL.push',
+    TRACE_EV_RETURN_POP:  'RETURN.pop',
+    TRACE_EV_RETURN_CR6:  'RETURN.CR6',
+    TRACE_EV_RETURN_CR14: 'RETURN.CR14',
+}
+
+# ── Boot sentinel constants ───────────────────────────────────────────────────
+# Old (stale) bitstreams emit a 2-byte sentinel:  0xBB  N_INIT&0xFF
+# New bitstreams emit a 3-byte sentinel:           0xBC  N_INIT&0xFF  TU_VERSION
+#
+# TU_VERSION encodes TraceUnit FSM capability:
+#   0x02 = ELOADCALL and XLOADLAMBDA emit 3-packet CALL sequence
+#          (CALL_CR6 + CALL_CR14 + CALL_PUSH) — current standard.
+#
+# If the bridge sees 0xBB it knows the TraceUnit is old: ELOADCALL and
+# XLOADLAMBDA will emit a single RESULT packet instead of the 3-packet CALL
+# sequence, so CR6/CR14 state shown in the IDE will be silently wrong.
+BOOT_SENTINEL_V1  = 0xBB   # old/stale 2-byte sentinel magic
+BOOT_SENTINEL_V2  = 0xBC   # current 3-byte sentinel magic
+SENTINEL_V1_LEN   = 2      # 0xBB  N_INIT&0xFF
+SENTINEL_V2_LEN   = 3      # 0xBC  N_INIT&0xFF  TU_VERSION
+
+# Minimum TU_VERSION required to guarantee correct ELOADCALL/XLOADLAMBDA trace.
+TU_VERSION_CALL_3PKT = 0x02  # must match _TU_VERSION_CALL_3PKT in wukong_top.py
+
+
+def parse_boot_sentinel(buf, i=0):
+    """Parse a boot sentinel starting at position *i* of *buf*.
+
+    Shared helper used by both the bridge's ``main()`` loop and the smoke
+    test's ``check_sentinel()``.  Centralising the parsing here means a
+    single change keeps both paths in sync.
+
+    Parameters
+    ----------
+    buf : bytes | bytearray
+        Receive buffer (may contain arbitrary bytes before and after the
+        sentinel).
+    i : int
+        Index of the candidate sentinel byte within *buf*.
+
+    Returns
+    -------
+    None
+        ``buf[i]`` is not a sentinel magic byte (0xBB or 0xBC); the caller
+        should advance ``i`` and try the next byte.
+    False
+        ``buf[i]`` *is* a sentinel magic byte, but the buffer does not yet
+        contain the full sentinel (not enough bytes).  The caller should
+        wait for more data without advancing ``i``.
+    dict
+        Fully-parsed sentinel.  Keys:
+
+        ``magic``       — sentinel magic byte (``BOOT_SENTINEL_V1`` or
+                          ``BOOT_SENTINEL_V2``)
+        ``n_init_byte`` — raw N_INIT byte sent by the board
+        ``tu_version``  — ``TU_VERSION`` byte for V2 sentinels; ``None``
+                          for V1 (stale) sentinels
+        ``length``      — number of bytes consumed (``SENTINEL_V1_LEN`` or
+                          ``SENTINEL_V2_LEN``)
+        ``stale``       — ``True`` when the sentinel indicates a stale
+                          TraceUnit FSM (V1 magic, or V2 with
+                          ``tu_version < TU_VERSION_CALL_3PKT``)
+    """
+    if i >= len(buf):
+        return None
+    b = buf[i]
+    if b == BOOT_SENTINEL_V1:
+        # Old 2-byte sentinel: 0xBB  N_INIT&0xFF
+        if len(buf) - i < SENTINEL_V1_LEN:
+            return False
+        return {
+            'magic':        b,
+            'n_init_byte':  buf[i + 1],
+            'tu_version':   None,
+            'length':       SENTINEL_V1_LEN,
+            'stale':        True,
+        }
+    elif b == BOOT_SENTINEL_V2:
+        # Current 3-byte sentinel: 0xBC  N_INIT&0xFF  TU_VERSION
+        if len(buf) - i < SENTINEL_V2_LEN:
+            return False
+        tu_version = buf[i + 2]
+        return {
+            'magic':        b,
+            'n_init_byte':  buf[i + 1],
+            'tu_version':   tu_version,
+            'length':       SENTINEL_V2_LEN,
+            'stale':        tu_version < TU_VERSION_CALL_3PKT,
+        }
+    return None
 
 
 def _compute_expected_n_init():
@@ -98,7 +221,56 @@ def _fault_name(code):
     return _names.get(code, f'FAULT_{code}')
 
 
+def decode_trace_packet(pkt):
+    """Decode a single 12-byte trace packet into a dict.
+
+    Parameters
+    ----------
+    pkt : bytes | bytearray
+        Exactly 12 bytes starting with TRACE_MAGIC (0xAA).
+
+    Returns
+    -------
+    dict with keys:
+        nia         — retiring instruction NIA (int)
+        ev_type     — TRACE_EV_* constant (int)
+        payload_gt  — GT word0 from packet bytes 6-9 (int); 0 for push/pop events
+        flags       — raw flags byte (int); bits[3:0] = NZCV
+        fault_code  — 5-bit fault code (int)
+        fault_valid — bool
+        bp_hit      — bool
+
+    The decode is purely mechanical: it unpacks bytes 1-11 of the packet.
+    All TRACE_EV_* values are forwarded as-is, including CALL sequences:
+        TRACE_EV_CALL_CR6  (0x06) — CR6  ← abstraction GT  (payload_gt = new GT word0)
+        TRACE_EV_CALL_CR14 (0x07) — CR14 ← code/return GT  (payload_gt = new GT word0)
+        TRACE_EV_CALL_PUSH (0x08) — caller frame push        (payload_gt = 0)
+    Three consecutive packets with the same NIA covering CALL_CR6, CALL_CR14,
+    and CALL_PUSH correspond to one ELOADCALL or XLOADLAMBDA retire.
+    """
+    if len(pkt) != TRACE_LEN or pkt[0] != TRACE_MAGIC:
+        raise ValueError(f'decode_trace_packet: expected {TRACE_LEN}-byte packet '
+                         f'starting with 0x{TRACE_MAGIC:02X}, got {bytes(pkt).hex()}')
+    nia        = struct.unpack('>I', pkt[1:5])[0]
+    ev_type    = pkt[5]
+    payload_gt = struct.unpack('>I', pkt[6:10])[0]
+    raw11      = pkt[11]
+    return {
+        'nia':         nia,
+        'ev_type':     ev_type,
+        'payload_gt':  payload_gt,
+        'flags':       pkt[10],
+        'fault_code':  raw11 & 0x1F,
+        'fault_valid': bool(raw11 & 0x40),
+        'bp_hit':      bool(raw11 & 0x80),
+    }
+
+
 def main():
+    if requests is None:
+        print("ERROR: requests not installed.  Run: pip install requests", file=sys.stderr)
+        sys.exit(1)
+
     parser = argparse.ArgumentParser(description='Wukong UART ↔ IDE bridge')
     parser.add_argument('--port', default='/dev/ttyUSB0', help='Serial port')
     parser.add_argument('--baud', type=int, default=57600, help='Baud rate')
@@ -107,13 +279,28 @@ def main():
                         help='Skip TLS certificate verification')
     args = parser.parse_args()
 
-    verify_tls = not args.insecure
     ide_base   = args.ide.rstrip('/')
 
+    # For https:// IDE URLs the common case is a self-signed / lab certificate
+    # (e.g. lab.cloomc.org), which floods the terminal with one urllib3
+    # InsecureRequestWarning per HTTP request and drowns out the HW trace.
+    # Default to skipping verification for https and suppress the per-request
+    # warnings, printing a single one-line notice at startup instead.
+    verify_tls = not (args.insecure or ide_base.startswith('https://'))
+    if not verify_tls:
+        try:
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        except Exception:
+            pass
+
     print(f'Wukong bridge: {args.port} @ {args.baud} baud → {ide_base}')
+    if not verify_tls:
+        print('SSL verification disabled — add a cert to enable')
 
     # Compute the expected N_INIT from the current boot_rom.py tables once at
-    # startup.  Used to validate the N_INIT byte that the board sends after 0xBB.
+    # startup.  Used to validate the N_INIT byte that the board sends after the
+    # sentinel magic byte (0xBB for old/stale bitstreams, 0xBC for current ones).
     expected_n_init = _compute_expected_n_init()
     if expected_n_init is None:
         print('WARNING: boot_rom not importable — N_INIT sentinel byte will not be validated',
@@ -145,52 +332,56 @@ def main():
                     if len(buf) - i < TRACE_LEN:
                         break
                     pkt = buf[i:i + TRACE_LEN]
-                    nia        = struct.unpack('>I', pkt[1:5])[0]
-                    instr      = struct.unpack('>I', pkt[5:9])[0]
-                    flags_byte = pkt[9]
-                    raw10      = pkt[10]
-                    fault_valid = bool(raw10 & 0x40)
-                    bp_hit      = bool(raw10 & 0x80)
-                    fault_code  = raw10 & 0x1F
+                    decoded = decode_trace_packet(pkt)
+                    decoded['ts'] = time.time()
 
-                    payload = {
-                        'nia':         nia,
-                        'instr':       instr,
-                        'flags':       flags_byte,
-                        'fault_code':  fault_code,
-                        'fault_valid': fault_valid,
-                        'bp_hit':      bp_hit,
-                        'ts':          time.time(),
-                    }
                     try:
                         requests.post(
                             f'{ide_base}/hardware/wukong/trace',
-                            json=payload, timeout=1, verify=verify_tls)
+                            json=decoded, timeout=1, verify=verify_tls)
                     except Exception as exc:
                         print(f'  [trace POST error] {exc}')
 
-                    flag_str  = _flags_str(flags_byte)
-                    state_str = 'FAULT  stage=' + _fault_name(fault_code) if fault_valid else 'ok'
-                    bp_str    = '  [BP HIT]' if bp_hit else ''
-                    print(f'HW: NIA=0x{nia:08X}  instr=0x{instr:08X}  flags={flag_str}  {state_str}{bp_str}')
+                    ev_type    = decoded['ev_type']
+                    payload_gt = decoded['payload_gt']
+                    nia        = decoded['nia']
+                    flags_byte = decoded['flags']
+                    flag_str   = _flags_str(flags_byte)
+                    ts_str     = time.strftime('%H:%M:%S', time.localtime())
+                    ev_name    = _EV_NAMES.get(ev_type, f'EV_0x{ev_type:02X}')
+                    gt_str     = f'  GT=0x{payload_gt:08X}' if payload_gt else ''
+                    if decoded['fault_valid']:
+                        fault_str = f'  FAULT={_fault_name(decoded["fault_code"])}'
+                    else:
+                        fault_str = ''
+                    bp_str = '  [BP HIT]' if decoded['bp_hit'] else ''
+                    print(f'[{ts_str}] HW: NIA=0x{nia:08X}  {ev_name}{gt_str}'
+                          f'  flags={flag_str}{fault_str}{bp_str}')
                     i += TRACE_LEN
 
-                elif b == BOOT_SENTINEL:
-                    # Two-byte boot sentinel: 0xBB  N_INIT&0xFF
-                    # Wait until both bytes are buffered.
-                    if len(buf) - i < SENTINEL_LEN:
+                elif b in (BOOT_SENTINEL_V1, BOOT_SENTINEL_V2):
+                    # Delegate to the shared sentinel parser so the bridge and
+                    # the smoke test always interpret the byte stream identically.
+                    sentinel = parse_boot_sentinel(buf, i)
+                    if sentinel is False:
+                        # Magic byte seen but not enough bytes buffered yet.
                         break
-                    board_n_init_byte = buf[i + 1]
+
+                    board_n_init_byte = sentinel['n_init_byte']
+                    tu_version        = sentinel['tu_version']  # None for V1
+                    tu_str            = (f'  TU_VERSION=0x{tu_version:02X}'
+                                         if tu_version is not None else '')
+
                     if expected_n_init is not None:
                         expected_byte = expected_n_init & 0xFF
                         if board_n_init_byte == expected_byte:
                             print(f'BOOT: board ready — N_INIT={expected_n_init} '
-                                  f'(0x{expected_byte:02X}) matches source  ✓')
+                                  f'(0x{expected_byte:02X}) matches source  ✓{tu_str}')
                         else:
                             print(f'BOOT WARNING: N_INIT mismatch — '
                                   f'board sent 0x{board_n_init_byte:02X} '
                                   f'but source expects 0x{expected_byte:02X} '
-                                  f'(N_INIT={expected_n_init})',
+                                  f'(N_INIT={expected_n_init}){tu_str}',
                                   file=sys.stderr)
                             print('  The bitstream was built with a different '
                                   'WUKONG_DEMO_NAMESPACE / WUKONG_DEMO_CLIST.',
@@ -199,8 +390,58 @@ def main():
                                   file=sys.stderr)
                     else:
                         print(f'BOOT: board ready — N_INIT byte=0x{board_n_init_byte:02X} '
-                              f'(validation skipped: boot_rom not importable)')
-                    i += SENTINEL_LEN
+                              f'(validation skipped: boot_rom not importable){tu_str}')
+
+                    # Send 'h' immediately so the board enters step mode as soon
+                    # as the bridge attaches.  This means any fault that fires
+                    # during free-run (before the user clicks ▶ HW) will be
+                    # visible rather than running past unnoticed.
+                    try:
+                        ser.write(b'h')
+                    except Exception as exc:
+                        print(f'  [halt send error] {exc}')
+
+                    if sentinel['stale']:
+                        if tu_version is None:
+                            # V1 sentinel — TraceUnit FSM predates 3-packet CALL.
+                            print('BITSTREAM WARNING: old sentinel (0xBB) — '
+                                  'stale TraceUnit FSM detected.',
+                                  file=sys.stderr)
+                        else:
+                            # V2 sentinel but TU_VERSION too low.
+                            print(f'BITSTREAM WARNING: TU_VERSION=0x{tu_version:02X} is below '
+                                  f'required 0x{TU_VERSION_CALL_3PKT:02X}.',
+                                  file=sys.stderr)
+                        print('  ELOADCALL and XLOADLAMBDA emit a single RESULT packet instead of',
+                              file=sys.stderr)
+                        print('  the 3-packet CALL sequence (CALL_CR6 + CALL_CR14 + CALL_PUSH).',
+                              file=sys.stderr)
+                        print('  CR6 and CR14 state shown in the IDE will be wrong after any',
+                              file=sys.stderr)
+                        print('  ELOADCALL or XLOADLAMBDA instruction executes.',
+                              file=sys.stderr)
+                        print('  Rebuild and reflash the bitstream to get the current TraceUnit.',
+                              file=sys.stderr)
+                        # Notify the IDE so it can show a visible warning banner.
+                        post_tu = tu_version if tu_version is not None else 0x01
+                        try:
+                            requests.post(
+                                f'{ide_base}/hardware/wukong/boot-info',
+                                json={'stale_tu': True, 'tu_version': post_tu},
+                                timeout=1, verify=verify_tls)
+                        except Exception as exc:
+                            print(f'  [boot-info POST error] {exc}')
+                    else:
+                        # Current bitstream — clear any previous stale warning in the IDE.
+                        try:
+                            requests.post(
+                                f'{ide_base}/hardware/wukong/boot-info',
+                                json={'stale_tu': False, 'tu_version': tu_version},
+                                timeout=1, verify=verify_tls)
+                        except Exception as exc:
+                            print(f'  [boot-info POST error] {exc}')
+
+                    i += sentinel['length']
 
                 else:
                     ch = buf[i]
@@ -224,6 +465,29 @@ def main():
                             ser.write(b'b' + struct.pack('>I', nia_val))
                         elif cmd in ('s', 'r', 'h'):
                             ser.write(cmd.encode('ascii'))
+                        elif cmd == 'u':
+                            try:
+                                _leftover = _handle_upload(
+                                    data, ser, ide_base, verify_tls)
+                                if _leftover:
+                                    # Bytes read during the ACK wait that are
+                                    # NOT the 0x06 ACK byte (e.g. trace packets
+                                    # emitted the moment the board starts
+                                    # executing the new image).  Prepend them
+                                    # back into the main receive buffer so the
+                                    # trace parser sees them on the next loop.
+                                    buf[0:0] = _leftover
+                            except Exception as _upload_exc:
+                                print(f'  [upload] ERROR: unexpected handler '
+                                      f'failure: {_upload_exc}', flush=True)
+                                try:
+                                    requests.post(
+                                        f'{ide_base}/hardware/wukong/upload-ack',
+                                        json={'ok': False,
+                                              'error': f'handler exception: {_upload_exc}'},
+                                        timeout=2, verify=verify_tls)
+                                except Exception:
+                                    pass
                 except Exception:
                     pass
 
@@ -231,6 +495,150 @@ def main():
         print('\nBridge stopped.')
     finally:
         ser.close()
+
+
+def _handle_upload(data, ser, ide_base, verify_tls):
+    """Decode a base64 boot-image payload and write it to the board over UART.
+
+    Protocol sent to the board (framing that the RTL upload FSM expects):
+        1. Magic byte 0x75 ('u') — upload start
+        2. 4-byte big-endian payload length in bytes
+        3. Raw boot-image bytes
+
+    After writing, posts the result to /hardware/wukong/upload-ack so the
+    IDE can poll for completion before issuing a step/run command.
+
+    Parameters
+    ----------
+    data : dict
+        Command payload from the server (must contain 'data' key with the
+        base64-encoded boot image).
+    ser : serial.Serial
+        Open serial port connected to the Wukong board.
+    ide_base : str
+        Base URL of the IDE server (e.g. 'https://...replit.dev').
+    verify_tls : bool
+        Whether to verify the TLS certificate on IDE requests.
+    """
+    # Bytes read from the serial port during the ACK wait that are NOT the 0x06
+    # ACK byte (e.g. trace packets the board emits as soon as it starts executing
+    # the freshly loaded image).  The caller must prepend these back into the
+    # main receive buffer so the trace parser can process them normally.
+    leftover = bytearray()
+
+    b64_payload = data.get('data', '')
+    if not b64_payload:
+        print('  [upload] ERROR: empty data payload', flush=True)
+        try:
+            requests.post(f'{ide_base}/hardware/wukong/upload-ack',
+                          json={'ok': False, 'error': 'empty payload'},
+                          timeout=2, verify=verify_tls)
+        except Exception:
+            pass
+        return leftover
+
+    try:
+        raw = base64.b64decode(b64_payload)
+    except Exception as exc:
+        print(f'  [upload] ERROR: base64 decode failed: {exc}', flush=True)
+        try:
+            requests.post(f'{ide_base}/hardware/wukong/upload-ack',
+                          json={'ok': False, 'error': f'base64 decode: {exc}'},
+                          timeout=2, verify=verify_tls)
+        except Exception:
+            pass
+        return leftover
+
+    # boot-image.bin stores each 32-bit word little-endian (struct.pack('<...I')).
+    # The RTL upload FSM assembles the first received byte as the MSByte of each
+    # DMEM word (big-endian on the wire).  Byte-swap every complete word so the
+    # board reconstructs the same word values the generator wrote.
+    n_words = len(raw) // 4
+    if n_words > 0:
+        raw = (struct.pack(f'>{n_words}I',
+                           *struct.unpack(f'<{n_words}I', raw[:n_words * 4]))
+               + raw[n_words * 4:])   # trailing partial word (if any) passed as-is
+
+    n_bytes = len(raw)
+
+    # Drain any stale bytes already in the UART RX buffer BEFORE sending the
+    # upload frame.  These are pre-upload trace events queued in the hardware
+    # FIFO (e.g. from a previous run before the 'u' command was issued).
+    # Draining now — before any bytes are sent — guarantees the drain window is
+    # clear of any byte we ourselves write.  After the frame is sent, the board
+    # is already halted (RTL sets step_mode=1 / step_halted=1 on 'u' reception)
+    # so no new trace bytes arrive during the upload or the subsequent ACK wait.
+    # This makes the board's 0x06 ACK (UPLOAD_ACK state) unambiguous: the only
+    # byte that can arrive between the end of the write and the ACK timeout is
+    # the RTL's completion signal.
+    _stale = ser.read(ser.in_waiting) if ser.in_waiting else b''
+    if _stale:
+        print(f'  [upload] drained {len(_stale)} stale RX byte(s) before upload '
+              f'frame', flush=True)
+        leftover.extend(_stale)
+
+    print(f'  [upload] writing {n_bytes} bytes to UART (LE→BE swapped)…', flush=True)
+    try:
+        # Frame: magic(1) + length(4 BE) + byte-swapped payload
+        # The RTL upload FSM (UPLOAD_LEN / UPLOAD_DATA / UPLOAD_ACK states in
+        # wukong_top.py) receives this frame, writes words to DMEM, then sends
+        # a single 0x06 ACK byte back via UART TX.
+        header = b'\x75' + struct.pack('>I', n_bytes)
+        ser.write(header + raw)
+        ser.flush()
+        print(f'  [upload] write complete ({n_bytes} bytes) — waiting for board ACK…',
+              flush=True)
+    except Exception as exc:
+        print(f'  [upload] ERROR: UART write failed: {exc}', flush=True)
+        try:
+            requests.post(f'{ide_base}/hardware/wukong/upload-ack',
+                          json={'ok': False, 'error': f'UART write: {exc}'},
+                          timeout=2, verify=verify_tls)
+        except Exception:
+            pass
+        return leftover
+
+    # Wait for the single unambiguous 0x06 ACK byte.
+    # The CM is halted (RTL guarantees step_mode=1 from 'u' reception), so the
+    # only byte that can arrive after draining + sending the frame is the board's
+    # 0x06 ACK.  Any unexpected bytes are preserved in leftover as a safety net.
+    _ACK_TIMEOUT_S = max(10.0, n_bytes * 0.0002)   # ≥10 s, 0.2 ms/byte headroom
+    ack_deadline = time.time() + _ACK_TIMEOUT_S
+    ack_found = False
+    while time.time() < ack_deadline:
+        avail = ser.in_waiting
+        chunk = ser.read(avail if avail > 0 else 1)
+        for idx, b in enumerate(chunk):
+            if b == 0x06:
+                ack_found = True
+                # Bytes after the ACK in the same read are also preserved.
+                leftover.extend(chunk[idx + 1:])
+                break
+            leftover.append(b)
+        if ack_found:
+            break
+        time.sleep(0.005)
+
+    if ack_found:
+        print('  [upload] board ACK received — upload successful', flush=True)
+        try:
+            requests.post(f'{ide_base}/hardware/wukong/upload-ack',
+                          json={'ok': True},
+                          timeout=2, verify=verify_tls)
+        except Exception as exc:
+            print(f'  [upload] WARNING: could not POST upload-ack: {exc}', flush=True)
+    else:
+        errmsg = f'board ACK timeout after {_ACK_TIMEOUT_S:.0f} s'
+        print(f'  [upload] ERROR: {errmsg}', flush=True)
+        try:
+            requests.post(f'{ide_base}/hardware/wukong/upload-ack',
+                          json={'ok': False, 'error': errmsg},
+                          timeout=2, verify=verify_tls)
+        except Exception as exc:
+            print(f'  [upload] WARNING: could not POST upload-ack (timeout): {exc}',
+                  flush=True)
+
+    return leftover
 
 
 if __name__ == '__main__':
