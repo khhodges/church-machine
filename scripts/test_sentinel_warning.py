@@ -679,6 +679,29 @@ class TestCheckTraceFailure:
         assert 'fault packet' in stderr, (
             f'Expected fault-packet count mention in stderr; got: {stderr!r}'
         )
+
+    def test_empty_stream_returns_false(self):
+        """Returns False (not crash) when the stream is completely empty (no 0xAA bytes)."""
+        result, _, _ = self._run_check_trace_with_stderr([])
+        assert result is False, (
+            'check_trace must return False when the stream contains no trace packets at all; '
+            'got True instead'
+        )
+
+    def test_empty_stream_emits_fail_on_stderr(self):
+        """Emits a FAIL diagnostic to stderr when the stream is completely empty."""
+        _, _, stderr = self._run_check_trace_with_stderr([])
+        assert 'FAIL' in stderr, (
+            f'Expected "FAIL" in stderr when stream is empty; got: {stderr!r}'
+        )
+
+    def test_empty_stream_mentions_step_mode_or_uart(self):
+        """stderr diagnostic mentions step_mode or UART when no packets arrive at all."""
+        _, _, stderr = self._run_check_trace_with_stderr([])
+        assert 'step_mode' in stderr or 'UART' in stderr, (
+            f'Expected "step_mode" or "UART" in stderr for empty-stream failure path; '
+            f'got: {stderr!r}'
+        )
 class TestNoSentinel:
     """When no sentinel arrives within the timeout, check_sentinel returns False."""
 
