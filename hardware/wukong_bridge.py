@@ -280,6 +280,13 @@ def main():
     args = parser.parse_args()
 
     verify_tls = not args.insecure
+    if args.insecure:
+        try:
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        except Exception:
+            pass
+
     ide_base   = args.ide.rstrip('/')
 
     print(f'Wukong bridge: {args.port} @ {args.baud} baud → {ide_base}')

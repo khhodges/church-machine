@@ -14272,6 +14272,7 @@ let _wukongLastTraceTs  = 0;       // unix timestamp (seconds) of last trace pac
 const _WUKONG_STALE_MS  = 10000;   // 10 s without a packet → disconnected
 
 let _wukongCallDepth    = 0;       // call stack depth tracked via CALL_PUSH/POP events
+let _wukongWasConnected = false;   // previous connection state (for connect/disconnect msgs)
 
 let _wukongLastHwNIA    = null;    // last hardware NIA seen from trace packets
 let _wukongHwNia        = null;    // retiring NIA of last HW trace packet
@@ -14284,6 +14285,58 @@ function _wukongIsConnected() {
     return _wukongLastTraceTs > 0 &&
            (Date.now() - _wukongLastTraceTs * 1000) < _WUKONG_STALE_MS;
 }
+
+// ── Persistent HW trace log panel ─────────────────────────────────────────────
+// Injected into <body> once on load so trace messages are always visible
+// regardless of which IDE view (Dashboard, Namespace, etc.) is active.
+// The panel is hidden until the board connects.
+(function _injectWukongHwLogPanel() {
+    if (document.getElementById('wukong-hw-log')) return;
+    const panel = document.createElement('div');
+    panel.id = 'wukong-hw-log';
+    panel.style.cssText = [
+        'display:none',
+        'position:fixed',
+        'bottom:0',
+        'right:0',
+        'width:480px',
+        'max-width:100vw',
+        'height:180px',
+        'background:#1a1a2e',
+        'border:1px solid #3a3a5c',
+        'border-bottom:none',
+        'border-right:none',
+        'border-radius:6px 0 0 0',
+        'z-index:9998',
+        'flex-direction:column',
+        'font-family:monospace',
+        'font-size:11px',
+        'box-shadow:-2px -2px 12px rgba(0,0,0,0.5)',
+    ].join(';');
+    panel.innerHTML =
+        '<div id="wukong-hw-log-hdr" style="display:flex;align-items:center;justify-content:space-between;padding:3px 8px;background:#12122a;border-bottom:1px solid #3a3a5c;flex-shrink:0;cursor:pointer;" title="Click to collapse/expand">' +
+            '<span style="color:#f0c040;font-weight:bold;font-size:11px;">⚡ HW Trace</span>' +
+            '<span id="wukong-hw-log-nia" style="color:#8888cc;font-size:10px;flex:1;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:0 8px;"></span>' +
+            '<button id="wukong-hw-log-clear" title="Clear trace log" style="background:none;border:none;color:#8888cc;cursor:pointer;font-size:11px;padding:0 4px;line-height:1;" onclick="event.stopPropagation();var b=document.getElementById(\'wukong-hw-log-body\');if(b)b.innerHTML=\'\';">✕ clear</button>' +
+            '<button id="wukong-hw-log-collapse" title="Minimise" style="background:none;border:none;color:#8888cc;cursor:pointer;font-size:14px;padding:0 4px;line-height:1;">▼</button>' +
+        '</div>' +
+        '<div id="wukong-hw-log-body" style="flex:1;overflow-y:auto;padding:4px 8px;color:#ccccee;line-height:1.5;"></div>';
+    document.body.appendChild(panel);
+
+    // Collapse / expand on header click
+    var collapsed = false;
+    var hdr = document.getElementById('wukong-hw-log-hdr');
+    var colBtn = document.getElementById('wukong-hw-log-collapse');
+    if (hdr) {
+        hdr.addEventListener('click', function() {
+            collapsed = !collapsed;
+            var body = document.getElementById('wukong-hw-log-body');
+            if (body) body.style.display = collapsed ? 'none' : '';
+            panel.style.height = collapsed ? 'auto' : '180px';
+            if (colBtn) colBtn.textContent = collapsed ? '▲' : '▼';
+        });
+    }
+})();
 
 // Move the hardware-step cursor (nia-hw-cursor class) to the given word address.
 // Removes the class from any previously highlighted row so only one row carries
@@ -14356,8 +14409,31 @@ window._wukongSetHwBreakpoint = _wukongSetHwBreakpoint;
 
 function _wukongUpdateBtn() {
     const btn = document.getElementById('toolHWRunBtn');
-    if (!btn) return;
     const connected = _wukongIsConnected();
+
+    // Show or hide the persistent HW log panel.
+    const hwLog = document.getElementById('wukong-hw-log');
+    if (hwLog) hwLog.style.display = connected ? 'flex' : 'none';
+
+    // Emit a one-time connection-state message into the HW log.
+    if (connected !== _wukongWasConnected) {
+        _wukongWasConnected = connected;
+        const hwLogBody = document.getElementById('wukong-hw-log-body');
+        const con       = document.getElementById('editorConsole');
+        const msgText   = connected ? '\nHW: ✓ board connected' : '\nHW: ✗ connection lost — bridge disconnected';
+        const msgColor  = connected ? '#44dd88' : '#dd6644';
+        [hwLogBody, con].forEach(function(c) {
+            if (!c) return;
+            var el = document.createElement('div');
+            el.style.color = msgColor;
+            el.style.fontWeight = 'bold';
+            el.appendChild(document.createTextNode(msgText));
+            c.appendChild(el);
+            c.scrollTop = c.scrollHeight;
+        });
+    }
+
+    if (!btn) return;
     btn.style.display = (connected || _wukongHWRunning) ? '' : 'none';
     btn.textContent   = _wukongHWRunning ? '\u23F8 HW' : '\u25B6 HW';
     btn.classList.toggle('btn-warning', _wukongHWRunning);
@@ -14537,8 +14613,6 @@ function _wukongHideStaleBanner() {
     _wukongStaleBannerDismissed = false;
 }
 
-    const wasConnected = _wukongWasConnected;
-
 // Poll for new trace packets every 500 ms (connection detection + CR update).
 // Also polls boot-info to show/hide the stale-bitstream banner.
 setInterval(async function _wukongPoll() {
@@ -14588,9 +14662,18 @@ function _wukongFlagsStr(flags) {
     return s || '-';
 }
 
+// Maximum number of child elements kept in the persistent HW log body.
+// Older entries are pruned from the top when this limit is exceeded.
+const _WUKONG_HW_LOG_MAX = 300;
+
 function _wukongAppendTrace(data) {
-    const con = document.getElementById('editorConsole');
-    if (!con) return;
+    // Always write to the persistent panel (present regardless of current view).
+    // Also write to editorConsole when the user is on the Assembly tab.
+    const hwLogBody = document.getElementById('wukong-hw-log-body');
+    const con       = document.getElementById('editorConsole');
+    // If neither target exists yet (panel not injected, page still loading) bail.
+    if (!hwLogBody && !con) return;
+
     const evType = data.ev_type || 0;
     const niaInt = data.nia >>> 0;
 
@@ -14630,6 +14713,17 @@ function _wukongAppendTrace(data) {
     _wukongSyncFaultDisasmPanel(!!data.fault_valid, niaInt);
 
     // ── ev_type 0x08 CALL_PUSH / 0x09 RETURN_POP — depth only ───────────────
+    // Helper: append a child node to a container, pruning old entries if needed,
+    // then scroll to bottom.  Works for both editorConsole and hwLogBody.
+    function _appendToLog(container, node, maxChildren) {
+        if (!container) return;
+        container.appendChild(node.cloneNode(true));
+        if (maxChildren && container.childElementCount > maxChildren) {
+            container.removeChild(container.firstElementChild);
+        }
+        container.scrollTop = container.scrollHeight;
+    }
+
     if (evType === 0x08) {
         if (typeof data.call_depth === 'number') {
             _wukongCallDepth = data.call_depth;
@@ -14641,8 +14735,8 @@ function _wukongAppendTrace(data) {
         line.className = 'wukong-trace-line wukong-trace-call';
         line.appendChild(document.createTextNode(
             '\nHW: CALL push (depth ' + _wukongCallDepth + ')'));
-        con.appendChild(line);
-        con.scrollTop = con.scrollHeight;
+        _appendToLog(hwLogBody, line, _WUKONG_HW_LOG_MAX);
+        _appendToLog(con, line, 0);
         return;
     }
 
@@ -14657,8 +14751,8 @@ function _wukongAppendTrace(data) {
         line.className = 'wukong-trace-line wukong-trace-return';
         line.appendChild(document.createTextNode(
             '\nHW: RETURN (depth ' + _wukongCallDepth + ')'));
-        con.appendChild(line);
-        con.scrollTop = con.scrollHeight;
+        _appendToLog(hwLogBody, line, _WUKONG_HW_LOG_MAX);
+        _appendToLog(con, line, 0);
         return;
     }
 
@@ -14698,8 +14792,12 @@ function _wukongAppendTrace(data) {
         });
         line.appendChild(bpBtn);
     }
-    con.appendChild(line);
-    con.scrollTop = con.scrollHeight;
+    // Update the NIA ticker in the panel header.
+    var niaTicker = document.getElementById('wukong-hw-log-nia');
+    if (niaTicker) niaTicker.textContent = 'NIA ' + nia + (data.fault_valid ? ' ⚡' : ' ✓');
+
+    _appendToLog(hwLogBody, line, _WUKONG_HW_LOG_MAX);
+    _appendToLog(con, line, 0);
 }
 
 async function _wukongStep() {
@@ -14917,10 +15015,6 @@ if (window.LumpRegistry) {
         };
     } catch(e) {}
 })();
-
-    const nowConnected = _wukongIsConnected();
-
-let _wukongWasConnected = false;   // previous connected state for disconnect detection
 
 function _wukongShowDisconnectToast() {
     if (document.getElementById('wukong-disconnect-toast')) return;
