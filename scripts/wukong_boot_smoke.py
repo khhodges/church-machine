@@ -163,7 +163,8 @@ def check_trace(ser: "serial.Serial", timeout: float) -> bool:
                         print(f"[c] PASS — first non-fault trace packet received "
                               f"after {elapsed:.2f} s  "
                               f"NIA=0x{info['nia']:08X}  "
-                              f"ev_type=0x{info['ev_type']:02X}")
+                              f"ev_type=0x{info['ev_type']:02X}  "
+                              f"payload_gt=0x{info['payload_gt']:08X}")
                 i += TRACE_LEN
             else:
                 i += 1

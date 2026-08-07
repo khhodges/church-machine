@@ -473,6 +473,130 @@ console.log('\n--- PHASE 4: lambda-fast round-trip via real _execLambda→_execR
     }
 }
 
+// ── PHASE 5: Cross-domain, non-lump-header path (cc=0, CR14 from clist[0]) ────
+//
+// This phase exercises the second branch inside _execCall() — the
+// non-lump-header path where `hasLumpHeader = hdr.valid && hdr.cc > 0` is
+// false.  In this branch CR14 is NOT set simultaneously with CR6 from the lump
+// header; instead:
+//   1. CR6 is written (L-only GT).
+//   2. clistLoc = nsEntry.word0_location (callee lump base).
+//   3. memory[clistLoc] is read as a potential code GT (clist[0]).
+//   4. If that word is an Inform+X GT, CR14 is set to an RX GT derived from it.
+//
+// The snapshotting order is:
+//   callStack.push (line ~4240)  ← savedCRs[14] = callerCR14GT  (BEFORE any _writeCR)
+//   _writeCR(6, ...)             ← CR6 updated
+//   _writeCR(14, rxGT, ...)      ← CR14 overwritten with callee's code GT
+//
+// Key assertions:
+//   • frame.savedCRs[14].word0 === callerCR14GT  (snapshot captured caller's cap)
+//   • sim.cr[14].word0 has slot_id === CODE_SLOT  (callee's cap from clist[0])
+//   • The two values differ  (would be the bug if callStack.push moved after _writeCR)
+//
+// Setup: CALLEE_BASE contains a raw Inform+X GT for CODE_SLOT — NOT a lump
+// header — so parseLumpHeader() returns valid=false, triggering the non-lump-
+// header branch.
+console.log('\n--- PHASE 5: non-lump-header path (cc=0, CR14 from clist[0]) ---');
+{
+    const CALLER_SLOT = 4;
+    const CALLEE_SLOT = 11;
+    const CODE_SLOT   = 15;
+    const CALLER_BASE = 0x0300;
+    const CALLEE_BASE = 0x0600;
+    const CODE_BASE   = 0x0900;
+    const CALLER_CC   = 2;
+    const CALLER_CW   = 3;
+
+    const sim = makeSim();
+    const faults = installFaultCapture(sim);
+
+    // Write a valid lump header for the caller (cc=2) so the caller's NS
+    // entry looks legitimate.
+    writeLumpHdr(sim, CALLER_BASE, CALLER_CC, CALLER_CW);
+
+    // Populate NS entries for caller, callee, and code slots.
+    // writeNSEntry(idx, location, limit17, bFlag, gBit, gtType, version, clistCount, abstract_gt)
+    sim.writeNSEntry(CALLER_SLOT, CALLER_BASE, 63, 0, 0, 1, 0, CALLER_CC, 0);
+    sim.writeNSEntry(CALLEE_SLOT, CALLEE_BASE, 63, 0, 0, 1, 0, 0, 0);
+    sim.writeNSEntry(CODE_SLOT,   CODE_BASE,   63, 0, 0, 1, 0, 0, 0);
+
+    // Place a valid Inform+X GT for CODE_SLOT at memory[CALLEE_BASE].
+    // This is what the non-lump-header path reads as clist[0] to derive CR14.
+    // Using type=1 (Inform) + X permission, gt_seq=0 to match writeNSEntry(version=0).
+    const codeXGT = sim.createGT(0, CODE_SLOT, {X:1}, 1);
+    sim.memory[CALLEE_BASE] = codeXGT >>> 0;
+
+    // Confirm the lump header at CALLEE_BASE is NOT valid magic (so hasLumpHeader=false).
+    const hdrCheck = sim.parseLumpHeader(sim.memory[CALLEE_BASE]);
+    assert('P5-NO-HDR: memory[CALLEE_BASE] is NOT a valid lump header (triggers non-lump-header path)',
+        !hdrCheck.valid,
+        `magic=0x${hdrCheck.magic.toString(16)}, valid=${hdrCheck.valid}`);
+
+    // Caller context: CR14 = code GT for CALLER_SLOT (what the hardware trace must emit).
+    const callerCR14GT = sim.createGT(0, CALLER_SLOT, {R:1, X:1}, 1);
+    sim.cr[14] = { word0: callerCR14GT, word1: CALLER_BASE, word2: 63, word3: 0, m: 0 };
+
+    // CR6: caller's c-list GT (L).
+    const callerCR6GT = sim.createGT(0, CALLER_SLOT, {L:1}, 1);
+    sim.cr[6] = { word0: callerCR6GT, word1: CALLER_BASE, word2: 0, word3: 0, m: 0 };
+
+    // CR0: callee's E-GT — the CALL target.
+    const calleeEGT = sim.createGT(0, CALLEE_SLOT, {E:1}, 1);
+    sim.cr[0] = { word0: calleeEGT, word1: 0, word2: 0, word3: 0, m: 0 };
+
+    sim.pc = 5;
+
+    // Execute CALL — must take the non-lump-header branch.
+    const callResult = sim._execCall({ crDst: 0, imm: 0 });
+
+    assert('P5-CALL-OK: _execCall succeeded without fault (non-lump-header path)',
+        callResult !== null && faults.length === 0,
+        faults.map(f => `[${f.type}] ${f.message}`).join('; ') || 'callResult was null');
+
+    if (callResult !== null) {
+        const calleeCR14GT = sim.cr[14].word0 >>> 0;
+
+        // CR14 must now reference CODE_SLOT (derived from clist[0]).
+        assert('P5-CALLEE-CR14-CODE-SLOT: after CALL, CR14 slot_id is CODE_SLOT (from clist[0])',
+            (calleeCR14GT & 0xFFFF) === CODE_SLOT,
+            `got slot_id=${calleeCR14GT & 0xFFFF}, expected CODE_SLOT=${CODE_SLOT}`);
+
+        assert('P5-CALLEE-CR14-DIFFERS: callee CR14 ≠ caller CR14 (clist[0] path updated CR14)',
+            calleeCR14GT !== (callerCR14GT >>> 0),
+            `both=0x${calleeCR14GT.toString(16).toUpperCase()} (must differ)`);
+
+        // ── Key assertions: frame snapshot must carry the caller's cap ──────────
+        const frame = sim.callStack[sim.callStack.length - 1];
+        const tracePayload = frame.savedCRs[14].word0 >>> 0;
+
+        assert('P5-TRACE-PAYLOAD-CALLER: frame.savedCRs[14] = callerCR14GT (RETURN_CR14 payload = caller\'s cap)',
+            tracePayload === (callerCR14GT >>> 0),
+            `tracePayload=0x${tracePayload.toString(16).toUpperCase()}, callerCR14=0x${(callerCR14GT>>>0).toString(16).toUpperCase()}`);
+
+        assert('P5-TRACE-PAYLOAD-NOT-CALLEE: frame.savedCRs[14] ≠ callee CR14 from clist[0]',
+            tracePayload !== calleeCR14GT,
+            `tracePayload=0x${tracePayload.toString(16).toUpperCase()}, calleeCR14=0x${calleeCR14GT.toString(16).toUpperCase()}`);
+
+        assert('P5-TRACE-SLOT: trace payload slot_id matches caller slot (not CODE_SLOT or CALLEE_SLOT)',
+            (tracePayload & 0xFFFF) === CALLER_SLOT,
+            `got ${tracePayload & 0xFFFF}, expected CALLER_SLOT=${CALLER_SLOT}`);
+
+        faults.length = 0;
+
+        // Execute RETURN to unwind the frame.
+        const returnResult = sim._execReturn({ imm: 0, crDst: 0, crSrc: 0, raw: 0 });
+
+        assert('P5-RETURN-OK: _execReturn succeeded without fault',
+            returnResult !== null && faults.length === 0,
+            faults.map(f => `[${f.type}] ${f.message}`).join('; ') || 'returnResult was null');
+
+        assert('P5-RETURN-PC: PC restored to caller\'s instruction after RETURN',
+            returnResult && returnResult.pc === 6,   // 5 + 1
+            `got pc=${returnResult && returnResult.pc}`);
+    }
+}
+
 // ── Final summary ─────────────────────────────────────────────────────────────
 console.log('\n' + '─'.repeat(56));
 if (failed === 0) {
