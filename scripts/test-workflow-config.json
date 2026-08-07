@@ -24,6 +24,8 @@
     "check-ila-probe-names",
     "test-check-ila-probe-names",
     "boot-gt-words-tests",
-    "check-wukong-hw-init"
+    "check-wukong-hw-init",
+    "wukong-cr-update-tests",
+    "wukong-trace-cr-server-tests"
   ]
 }
