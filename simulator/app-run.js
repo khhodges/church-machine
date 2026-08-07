@@ -14272,6 +14272,8 @@ let _wukongLastTraceTs  = 0;       // unix timestamp (seconds) of last trace pac
 const _WUKONG_STALE_MS  = 10000;   // 10 s without a packet → disconnected
 
 let _wukongCallDepth    = 0;       // call stack depth tracked via CALL_PUSH/POP events
+
+let _wukongLastHwNIA    = null;    // last hardware NIA seen from trace packets
 let _wukongHwNia        = null;    // retiring NIA of last HW trace packet
 
 let _wukongLastEventSeq = 0;       // cursor into the server-side ordered event queue
@@ -14305,24 +14307,32 @@ function _wukongRefreshHwbpGutters() {
         const addr = parseInt(row.dataset.addr, 10);
         if (isNaN(addr)) return;
         const marker = row.querySelector('.nia-col-hwbp');
-        if (!marker) return;
-        const armed = _hwBreakpoints.has(addr >>> 0);
-        marker.classList.toggle('nia-hwbp-armed', armed);
-        if (armed) {
-            marker.title = 'HW breakpoint armed — click to disarm';
-        } else if (connected) {
-            marker.title = 'Click to arm hardware breakpoint at ' +
-                '0x' + (addr >>> 0).toString(16).toUpperCase().padStart(4, '0');
-        } else {
-            marker.title = 'Board not connected';
+        if (marker) {
+            const armed = _hwBreakpoints.has(addr >>> 0);
+            marker.classList.toggle('nia-hwbp-armed', armed);
+            if (armed) {
+                marker.title = 'HW breakpoint armed — click to disarm';
+            } else if (connected) {
+                marker.title = 'Click to arm hardware breakpoint at ' +
+                    '0x' + (addr >>> 0).toString(16).toUpperCase().padStart(4, '0');
+            } else {
+                marker.title = 'Board not connected';
+            }
         }
+        // Apply/remove the hardware NIA cursor highlight.
+        const isHwCurrent = (connected && _wukongLastHwNIA !== null && addr === _wukongLastHwNIA);
+        row.classList.toggle('nia-disasm-hw-current', isHwCurrent);
     });
 }
-window._wukongRefreshHwbpGutters = _wukongRefreshHwbpGutters;
 
-// Toggle a hardware breakpoint at the given NIA word address.
-// Armed → sends 0xFFFFFFFF to disarm; disarmed → sends the address to arm.
-// No-op when the board is not connected.
+function _wukongRefreshDisasmHwCursor() {
+    document.querySelectorAll('.nia-disasm-row').forEach(function(row) {
+        const addr = parseInt(row.dataset.addr, 10);
+        if (isNaN(addr)) return;
+        const isHwCurrent = (_wukongLastHwNIA !== null && addr === _wukongLastHwNIA);
+        row.classList.toggle('nia-disasm-hw-current', isHwCurrent);
+    });
+}
 async function _wukongSetHwBreakpoint(nia) {
     if (!_wukongIsConnected()) return;
     const addr = nia >>> 0;
@@ -14347,25 +14357,40 @@ window._wukongSetHwBreakpoint = _wukongSetHwBreakpoint;
 function _wukongUpdateBtn() {
     const btn = document.getElementById('toolHWRunBtn');
     if (!btn) return;
-    btn.style.display = (_wukongIsConnected() || _wukongHWRunning) ? '' : 'none';
+    const connected = _wukongIsConnected();
+    btn.style.display = (connected || _wukongHWRunning) ? '' : 'none';
     btn.textContent   = _wukongHWRunning ? '\u23F8 HW' : '\u25B6 HW';
     btn.classList.toggle('btn-warning', _wukongHWRunning);
     btn.classList.toggle('btn-secondary', !_wukongHWRunning);
+
+    // Update Step button label — "Step HW ▶" when board is connected.
+    const stepBtn = document.getElementById('toolStepBtn');
+    if (stepBtn) {
+        if (connected) {
+            stepBtn.textContent   = 'Step HW \u25B6';
+            stepBtn.dataset.tooltip = 'Step HW \u2014 Send one step command to the Wukong board';
+            stepBtn.style.fontSize = '11px';
+            stepBtn.style.padding  = '2px 6px';
+        } else {
+            stepBtn.innerHTML      = '&#x1F463;';
+            stepBtn.dataset.tooltip = 'Step \u2014 Execute one instruction';
+            stepBtn.style.fontSize = '';
+            stepBtn.style.padding  = '';
+        }
+    }
+
+    // Show/hide call-depth badge.
+    _wukongUpdateCallDepthBadge();
 }
 
-// Apply CR6/CR14 word0 updates from a hardware trace GET response.
-//
-// The server persists the last GT seen for each CALL-type event separately:
-//   data.cr6_gt  — last payload_gt for TRACE_EV_CALL_CR6  (ev_type 0x06)
-//   data.cr14_gt — last payload_gt for TRACE_EV_CALL_CR14 (ev_type 0x07)
-//
-// Reading these persistent fields (rather than ev_type+payload_gt) is necessary
-// because a CALL instruction emits 3 consecutive packets (CR6, CR14, PUSH) and
-// the server's single-latest-trace slot would be overwritten by CALL_PUSH before
-// the IDE polls if we relied solely on ev_type.
-//
-// No-op when sim or sim.cr is absent, or when a field is not present in data
-// (meaning no CALL_CR6 / CALL_CR14 packet has arrived yet).
+function _wukongUpdateCallDepthBadge() {
+    const badge = document.getElementById('wukongCallDepthBadge');
+    if (!badge) return;
+    const connected = _wukongIsConnected();
+    badge.style.display = connected ? '' : 'none';
+    badge.textContent   = '\u21C6 ' + _wukongCallDepth;
+    badge.title         = 'HW call-stack depth: ' + _wukongCallDepth;
+}
 function _wukongApplyCRUpdate(data) {
     if (!data || !sim || !sim.cr) return;
     let updated = false;
@@ -14455,12 +14480,12 @@ async function _wukongDrainEvents() {
     return true;
 }
 
-// ── Stale-bitstream warning banner ────────────────────────────────────────────
-// Shown when the bridge reports stale_tu:true (old 0xBB sentinel, or 0xBC with
-// tu_version below the minimum required for 3-packet CALL sequences).
-// Dismissed per-session by clicking ×; re-shown if the board reboots with the
-// same stale bitstream (stale_tu flag re-POSTed by the bridge on each boot).
-
+const _WUKONG_EV_INSTR_NAME = {
+    0x00: 'RESULT', 0x01: 'LOAD',   0x02: 'LOAD',
+    0x03: 'CHANGE', 0x04: 'CHANGE', 0x05: 'CHANGE',
+    0x06: 'CALL',   0x07: 'CALL',   0x08: 'CALL',
+    0x09: 'RETURN', 0x0A: 'RETURN', 0x0B: 'RETURN'
+};
 let _wukongStaleBannerDismissed = false;
 
 function _wukongShowStaleBanner() {
@@ -14497,6 +14522,8 @@ function _wukongHideStaleBanner() {
     if (existing) existing.remove();
     _wukongStaleBannerDismissed = false;
 }
+
+    const wasConnected = _wukongWasConnected;
 
 // Poll for new trace packets every 500 ms (connection detection + CR update).
 // Also polls boot-info to show/hide the stale-bitstream banner.
@@ -14554,6 +14581,7 @@ function _wukongAppendTrace(data) {
     const niaInt = data.nia >>> 0;
 
     // ── Move the HW cursor in any open disassembly panel ─────────────────────
+    // _wukongSetHwCursor also updates _wukongLastHwNIA.
     _wukongSetHwCursor(niaInt);
 
     // ── Apply CR register updates from ev_type + payload_gt ──────────────────
@@ -14589,6 +14617,7 @@ function _wukongAppendTrace(data) {
         } else {
             _wukongCallDepth++;
         }
+        _wukongUpdateCallDepthBadge();
         const line = document.createElement('div');
         line.className = 'wukong-trace-line wukong-trace-call';
         line.appendChild(document.createTextNode(
@@ -14604,6 +14633,7 @@ function _wukongAppendTrace(data) {
         } else {
             if (_wukongCallDepth > 0) _wukongCallDepth--;
         }
+        _wukongUpdateCallDepthBadge();
         const line = document.createElement('div');
         line.className = 'wukong-trace-line wukong-trace-return';
         line.appendChild(document.createTextNode(
@@ -14614,16 +14644,20 @@ function _wukongAppendTrace(data) {
     }
 
     // ── Render the console trace line ─────────────────────────────────────────
-    const nia    = '0x' + niaInt.toString(16).padStart(8, '0').toUpperCase();
-    const flags  = _wukongFlagsStr(data.flags || 0);
+    const nia   = '0x' + niaInt.toString(16).padStart(8, '0').toUpperCase();
+    const flags = _wukongFlagsStr(data.flags || 0);
     let stateStr;
     if (data.fault_valid) {
         const name = _WUKONG_FAULT_NAMES[data.fault_code] || ('FAULT_' + data.fault_code);
         stateStr = '\u26A1 ' + name;
+        // Show the fault detail panel above the console.
+        _wukongShowFaultPanel(data);
     } else {
         stateStr = 'ok';
+        // Clear any previous fault panel when execution resumes cleanly.
+        _wukongHideFaultPanel();
     }
-    // Fault lines get a red class so they stand out visually.
+    // Fault lines get a distinct class so they stand out visually.
     const line = document.createElement('div');
     line.className = 'wukong-trace-line' + (data.fault_valid ? ' wukong-trace-fault' : '');
     line.appendChild(document.createTextNode(
@@ -14766,3 +14800,93 @@ if (window.LumpRegistry) {
         };
     } catch(e) {}
 })();
+
+    const nowConnected = _wukongIsConnected();
+
+let _wukongWasConnected = false;   // previous connected state for disconnect detection
+
+function _wukongShowDisconnectToast() {
+    if (document.getElementById('wukong-disconnect-toast')) return;
+    const toast = document.createElement('div');
+    toast.id = 'wukong-disconnect-toast';
+    toast.className = 'wukong-disconnect-toast';
+
+    const msg = document.createElement('span');
+    msg.textContent = 'Board disconnected \u2014 switch to simulator?';
+    msg.style.flex = '1';
+
+    const simBtn = document.createElement('button');
+    simBtn.textContent = 'Simulate';
+    simBtn.className = 'wukong-disconnect-sim-btn';
+    simBtn.addEventListener('click', function() {
+        toast.remove();
+        // Ensure any running hw-driven loop is halted (slave-mode contract).
+        _wukongHWRunning = false;
+        _wukongUpdateBtn();
+    });
+
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '\u00D7';
+    closeBtn.title = 'Dismiss';
+    closeBtn.className = 'wukong-disconnect-close-btn';
+    closeBtn.addEventListener('click', function() { toast.remove(); });
+
+    toast.appendChild(msg);
+    toast.appendChild(simBtn);
+    toast.appendChild(closeBtn);
+    document.body.appendChild(toast);
+
+    // Auto-dismiss after 12 seconds.
+    setTimeout(function() {
+        if (toast.parentNode) toast.remove();
+    }, 12000);
+}
+
+function _wukongHideFaultPanel() {
+    const panel = document.getElementById('wukong-fault-panel');
+    if (panel) panel.remove();
+}
+
+function _wukongShowFaultPanel(data) {
+    const con = document.getElementById('editorConsole');
+    if (!con || !con.parentNode) return;
+    // Remove any existing panel before showing the new one.
+    const prev = document.getElementById('wukong-fault-panel');
+    if (prev) prev.remove();
+
+    const faultCode  = data.fault_code || 0;
+    const faultName  = _WUKONG_FAULT_NAMES[faultCode] || ('FAULT_' + faultCode);
+    const niaInt     = data.nia >>> 0;
+    const niaStr     = '0x' + niaInt.toString(16).toUpperCase().padStart(8, '0');
+    const evType     = data.ev_type || 0;
+    const instrName  = _WUKONG_EV_INSTR_NAME[evType] || 'UNKNOWN';
+
+    const panel = document.createElement('div');
+    panel.id = 'wukong-fault-panel';
+    panel.className = 'wukong-fault-panel';
+
+    const header = document.createElement('div');
+    header.className = 'wukong-fault-panel-header';
+    header.textContent = '\u26A1 Hardware Fault';
+
+    const dismiss = document.createElement('button');
+    dismiss.textContent = '\u00D7';
+    dismiss.title = 'Dismiss';
+    dismiss.className = 'wukong-fault-panel-close';
+    dismiss.addEventListener('click', function() { panel.remove(); });
+    header.appendChild(dismiss);
+
+    const body = document.createElement('div');
+    body.className = 'wukong-fault-panel-body';
+    body.innerHTML =
+        '<span class="wukong-fault-label">Fault</span>' +
+        '<span class="wukong-fault-value wukong-fault-name">' + _escHtml(faultName) + '</span>' +
+        '<span class="wukong-fault-label">NIA</span>' +
+        '<span class="wukong-fault-value wukong-fault-nia">' + _escHtml(niaStr) + '</span>' +
+        '<span class="wukong-fault-label">Instruction</span>' +
+        '<span class="wukong-fault-value wukong-fault-instr">' + _escHtml(instrName) + '</span>';
+
+    panel.appendChild(header);
+    panel.appendChild(body);
+    con.parentNode.insertBefore(panel, con);
+}

@@ -2460,14 +2460,25 @@
     line-height: 1.4;
 }
 .nia-disasm-row:hover { background: #151e2a; color: #6b7280; }
+/* Software sim cursor — blue */
 .nia-disasm-current {
-    background: #2a1e00;
-    border-left: 3px solid #daa520;
+    background: #0a1e2e;
+    border-left: 3px solid #38bdf8;
     padding-left: calc(0.8rem - 3px);
-    color: #daa520;
+    color: #38bdf8;
     font-weight: 600;
 }
-.nia-disasm-current:hover { background: #2f2200; }
+.nia-disasm-current:hover { background: #0d2438; }
+
+/* Hardware NIA cursor — amber, distinct from the sim cursor */
+.nia-disasm-hw-current {
+    background: #2a1e00;
+    border-left: 3px solid #f5a623;
+    padding-left: calc(0.8rem - 3px);
+    color: #f5a623;
+    font-weight: 600;
+}
+.nia-disasm-hw-current:hover { background: #331f00; }
 .nia-no-data { opacity: 0.38; }
 .nia-nodata-sep {
     text-align: center;
@@ -2534,12 +2545,132 @@
 
 .nia-col-rel   { color: inherit; text-align: right; }
 .nia-col-addr  { color: #374151; }
-.nia-disasm-current .nia-col-addr { color: #b8860b; }
+/* Sim cursor (blue) sub-element colours */
+.nia-disasm-current .nia-col-addr { color: #0e7ab5; }
 .nia-col-hex   { color: #334155; letter-spacing: 0.04em; }
-.nia-disasm-current .nia-col-hex  { color: #92681a; }
+.nia-disasm-current .nia-col-hex  { color: #0c5f8c; }
 .nia-col-text  { color: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nia-col-role  { color: #5a4a1a; font-size: 0.63rem; white-space: nowrap; align-self: center; }
-.nia-disasm-current .nia-col-role { color: #8a6e1a; }
+.nia-col-role  { color: #1a3a5a; font-size: 0.63rem; white-space: nowrap; align-self: center; }
+.nia-disasm-current .nia-col-role { color: #1a5a8a; }
+/* HW cursor (amber) sub-element colours */
+.nia-disasm-hw-current .nia-col-addr { color: #b8860b; }
+.nia-disasm-hw-current .nia-col-hex  { color: #92681a; }
+.nia-disasm-hw-current .nia-col-role { color: #8a6e1a; }
+
+/* ── Hardware fault detail panel ─────────────────────────────────────────── */
+.wukong-fault-panel {
+    background: #1c0a00;
+    border-left: 3px solid #f5a623;
+    border-bottom: 1px solid #3a1a00;
+    margin-bottom: 4px;
+    font-size: 12px;
+}
+.wukong-fault-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 10px 4px;
+    background: #2a1000;
+    color: #f5a623;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+}
+.wukong-fault-panel-close {
+    background: none;
+    border: none;
+    color: #f5a623;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0 2px;
+    opacity: 0.75;
+    flex-shrink: 0;
+}
+.wukong-fault-panel-close:hover { opacity: 1; }
+.wukong-fault-panel-body {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2px 10px;
+    padding: 6px 12px 8px;
+    color: #d4a050;
+}
+.wukong-fault-label {
+    color: #8a6030;
+    font-size: 11px;
+    align-self: center;
+    white-space: nowrap;
+}
+.wukong-fault-value {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+}
+.wukong-fault-name  { color: #f5a623; font-weight: 700; }
+.wukong-fault-nia   { color: #c8a04a; }
+.wukong-fault-instr { color: #c8a04a; }
+
+/* ── Call-stack depth badge ──────────────────────────────────────────────── */
+.wukong-call-depth-badge {
+    display: inline-block;
+    background: #1a2535;
+    border: 1px solid #2e3f55;
+    border-radius: 3px;
+    color: #7ea8cc;
+    font-size: 10px;
+    font-family: 'Courier New', Courier, monospace;
+    padding: 1px 5px;
+    margin-left: 2px;
+    vertical-align: middle;
+    white-space: nowrap;
+    cursor: default;
+}
+
+/* ── Board disconnect toast ──────────────────────────────────────────────── */
+.wukong-disconnect-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #1a2535;
+    border: 1px solid #2e4a6a;
+    border-left: 4px solid #38bdf8;
+    border-radius: 6px;
+    color: #cbd5e1;
+    font-size: 13px;
+    padding: 10px 14px;
+    box-shadow: 0 4px 16px #00000080;
+    animation: wukong-toast-in 0.2s ease;
+    max-width: 360px;
+}
+@keyframes wukong-toast-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.wukong-disconnect-sim-btn {
+    background: #1e4a6a;
+    border: 1px solid #38bdf8;
+    border-radius: 4px;
+    color: #38bdf8;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 3px 10px;
+    white-space: nowrap;
+    transition: background 0.12s;
+}
+.wukong-disconnect-sim-btn:hover { background: #2a5f88; }
+.wukong-disconnect-close-btn {
+    background: none;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0 2px;
+    flex-shrink: 0;
+}
+.wukong-disconnect-close-btn:hover { color: #d1d5db; }
 .nia-disasm-desc {
     padding: 0.18rem 0.8rem 0.22rem calc(0.8rem + 2.5ch + 0.5rem);
     background: #1e1500;
