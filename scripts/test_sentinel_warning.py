@@ -548,6 +548,46 @@ class TestCheckTraceSplitPacket:
         # Should not raise AttributeError or any other exception.
         ser.write(b"r")
 
+    def test_full_fault_then_partial_good_in_one_chunk_returns_true(self):
+        """Returns True when one chunk contains a full fault packet followed by a
+        partial good packet (first 3 bytes only), and the remainder arrives next.
+
+        This guards the ``del buf[:i]`` trimming in check_trace(): the fault packet
+        means good_packets stays 0 after the first chunk, so check_trace() MUST read
+        chunk2 to satisfy its success condition.  After the inner while-loop breaks
+        because only 3 of 12 bytes of the good packet have arrived, i must point at
+        the 0xAA of the partial fragment so the trim retains it.  If del buf[:i]
+        accidentally consumed that 0xAA, the second chunk would not start a valid
+        packet and check_trace() would return False (or timeout).
+        """
+        # Fault packet fills good_packets=0; partial good follows in the same read.
+        partial_len = 3
+        chunk1 = _FAULT_TRACE_PKT + _GOOD_TRACE_PKT[:partial_len]
+        # Second read delivers the remaining bytes to complete the good packet.
+        chunk2 = _GOOD_TRACE_PKT[partial_len:]
+        result, _ = self._run_check_trace([chunk1, chunk2])
+        assert result is True, (
+            'check_trace must return True when a fault packet is followed by a '
+            'partial good packet in the same chunk and the remainder arrives next'
+        )
+
+    def test_full_fault_then_partial_good_in_one_chunk_reports_pass(self):
+        """PASS is printed to stdout after the partial good packet is completed.
+
+        Complements test_full_fault_then_partial_good_in_one_chunk_returns_true by
+        verifying that the good-packet counter is incremented (not zero) and that
+        the PASS message is emitted — confirming the retained 0xAA fragment was
+        correctly reassembled from chunk2, not silently dropped.
+        """
+        partial_len = 3
+        chunk1 = _FAULT_TRACE_PKT + _GOOD_TRACE_PKT[:partial_len]
+        chunk2 = _GOOD_TRACE_PKT[partial_len:]
+        _, stdout = self._run_check_trace([chunk1, chunk2])
+        assert 'PASS' in stdout, (
+            f'Expected "PASS" in stdout after completing a partial trailing good '
+            f'packet whose 0xAA was retained by del buf[:i]; got: {stdout!r}'
+        )
+
 class TestCheckTraceMagicScan:
     """check_trace() must skip non-0xAA bytes via the ``else: i += 1`` branch.
 
