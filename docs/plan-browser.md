@@ -139,7 +139,7 @@ Child: Browser.Navigate(evil_site_GT)
 | Board | Display device | Renderer output |
 |-------|---------------|-----------------|
 | Tang Nano 20K | UART terminal (115200 baud) | ASCII text, 80-column, VT100 escape codes for bold/heading |
-| Ti60 F225 | UART or SPI LCD | ASCII text or pixel-addressed rendering |
+| Wukong A7 | UART or SPI LCD | ASCII text or pixel-addressed rendering |
 | Simulator (IDE) | Browser panel in the IDE | HTML-rendered text in a dedicated output area |
 
 The Renderer abstraction is the same on all targets. Only the Display
@@ -174,7 +174,7 @@ adapts to the connected hardware.
 
 - Write `display.cloomc` for NS slot 15
 - Tang Nano: UART write (reuse existing UART infrastructure)
-- Ti60: UART write initially, SPI LCD later
+- Wukong A7: UART write initially, SPI LCD later
 - Simulator: write to a dedicated Browser output div in the IDE
 
 ### Step 5: Browser abstraction — CLOOMC++ source
@@ -251,7 +251,7 @@ when the child stops browsing.
 4. Bookmark saves a site GT — Navigate(bookmark) works
 5. Search sends a query to an approved search engine GT
 6. Family.Oversight shows navigation log and blocked attempts
-7. Works on all three targets: simulator, Tang Nano UART, Ti60 UART
+7. Works on all three targets: simulator, Tang Nano UART, Wukong A7 UART
 8. MTBF = ∞ for Browser, HTTP, Renderer, and Display
 9. Total memory footprint under 14 KB with lazy load
 ---

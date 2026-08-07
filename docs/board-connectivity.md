@@ -9,10 +9,10 @@ where the project is headed.
 
 ## Two kinds of boards, two very different experiences
 
-### The Ti60 F225 — a local, tethered board
+### The Wukong A7 — a local, tethered board
 
-The Efinix Ti60 F225 is a compact FPGA development board connected to your
-computer by a **USB cable**. It has no network port of its own.
+The Wukong A7 (XC7A100T) is a compact FPGA development board connected to your
+computer by a **USB-serial bridge**. It has no network port of its own.
 
 Because the IDE lives on the internet and the board is on your desk, something
 has to carry data between them. That something is a small script called the
@@ -23,9 +23,9 @@ internet.
 ```
 Your desk                             lab.cloomc.org
 ──────────────────────────────        ──────────────────────────
-Ti60 board  ──USB cable──▶  bridge    ──HTTP──▶  IDE database
-                            (runs in               IDE dashboard
-                             your terminal)        IDE stream panel
+Wukong board  ──USB-serial──▶  bridge  ──HTTP──▶  IDE database
+                               (runs in            IDE dashboard
+                                your terminal)     IDE stream panel
 ```
 
 **What this means in practice:**
@@ -34,7 +34,7 @@ Ti60 board  ──USB cable──▶  bridge    ──HTTP──▶  IDE databas
 - The bridge only works while your terminal is open
 - Only people with a USB cable to the board can connect
 
-The Ti60 is ideal for **private development** — building, testing, and
+The Wukong A7 is ideal for **private development** — building, testing, and
 validating the Church Machine on your own bench. It is not designed for
 sharing with others over the internet.
 
@@ -68,14 +68,14 @@ rather than a developer's workbench.
 
 ---
 
-## Why the Ti60 exists at all, then
+## Why the USB-serial board exists at all, then
 
-The Ti60 is a **stepping stone** — its purpose is to prove that the Church
+The Wukong A7 is a **stepping stone** — its purpose is to prove that the Church
 Machine core works correctly before committing to a larger hardware effort.
 
-Everything validated on the Ti60 carries forward unchanged:
+Everything validated on the Wukong A7 carries forward unchanged:
 
-| What the Ti60 proves | How it carries forward |
+| What the Wukong A7 proves | How it carries forward |
 |---|---|
 | Boot sequence is correct | Same boot ROM, same LUMP format, all boards |
 | Capability security works | Same Golden Token hardware, all boards |
@@ -83,16 +83,16 @@ Everything validated on the Ti60 carries forward unchanged:
 | LUMP loading is reliable | Same Locator logic, all boards |
 | Fault recovery works | Same three-tier recovery, all boards |
 
-The Ti60 changes nothing about the architecture. It just uses USB where
+The Wukong A7 changes nothing about the architecture. It just uses USB-serial where
 Ethernet boards use a network packet. When you see the CALLHOME message
-arrive cleanly on the Ti60, you know the same message will arrive cleanly
+arrive cleanly on the Wukong A7, you know the same message will arrive cleanly
 from an Ethernet board — because the CM core that sends it is identical.
 
 ---
 
 ## The bridge will become invisible
 
-For Ti60 users who want a smoother experience, the plan is to make the
+For Wukong A7 users who want a smoother experience, the plan is to make the
 bridge a one-time install:
 
 ```
@@ -106,21 +106,21 @@ This installs a background service. From then on:
   - Your board appears in the IDE without any terminal
 ```
 
-After that one command, the Ti60 behaves like an Ethernet board from the
+After that one command, the Wukong A7 behaves like an Ethernet board from the
 user's perspective — the local USB detail is completely hidden.
 
 ---
 
 ## Summary
 
-| | Ti60 F225 | Ethernet board |
+| | Wukong A7 | Ethernet board |
 |---|---|---|
-| Connection | USB cable | Network (Ethernet / WiFi) |
+| Connection | USB-serial bridge | Network (Ethernet / WiFi) |
 | Bridge required | Yes (today) / Auto-start (soon) | No — never |
 | Works remotely | No | Yes |
 | Best for | Private development and testing | Shared, deployed use |
 | Status | Shipping today | In development |
 
-The Ti60 is where the Church Machine is proven. Ethernet boards are where
+The Wukong A7 is where the Church Machine is proven. Ethernet boards are where
 it is deployed. Both run the same CM core, the same CLOOMC programs, and
 connect to the same IDE — they just arrive there differently.

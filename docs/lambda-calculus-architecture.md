@@ -427,6 +427,6 @@ HALT
 
 ---
 
-*Document applies to: Church Machine IDE simulator · Tang Nano 20K · Efinix Ti60 F225 targets.*
+*Document applies to: Church Machine IDE simulator · Tang Nano 20K · Wukong A7 XC7A100T targets.*
 
 *Confidential — Kenneth Hamer-Hodges — May 2026*

@@ -5,7 +5,7 @@
 
 ## Root Cause
 `hardware/wukong_top.py` has no UART ports. The QMTECH Wukong V3 board has a CH340
-USB-UART bridge chip physically present (same connector used by the Ti60's callhome
+USB-UART bridge chip physically present (same connector used by the previous platform's callhome
 bridge), but the current minimal top-level never instantiates TX/RX logic or assigns
 the relevant XDC pins.
 
@@ -15,7 +15,7 @@ Without UART:
 - The IDE cannot deploy any CLOOMC program.
 
 ## Baud Rate Calculation (50 MHz oscillator)
-The Ti60 callhome bridge uses baud = 57 600 with a 25 MHz SoC clock:
+The previous platform's callhome bridge uses baud = 57 600 with a 25 MHz SoC clock:
   CLOCKDIV = (25 000 000 / 57 600 / 8) − 1 ≈ 53
 
 Wukong oscillator is **50 MHz**:
@@ -52,7 +52,7 @@ set_property IOSTANDARD LVCMOS33 [get_ports uart_rx]
 ```
 
 ## UART TX Implementation Approach
-The Ti60 uses the Sapphire SoC RISC-V firmware to drive UART. The Wukong has no
+The previous platform used a companion RISC-V firmware to drive UART. The Wukong has no
 SoC, so the UART must be driven directly by the Church Machine core via MMIO.
 
 Add a minimal 8N1 UART TX block (pure Amaranth RTL) to `wukong_top.py`:

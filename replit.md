@@ -1,13 +1,13 @@
 # S-IDE v1 — Church Machine Simplified IDE
 
 ## Overview
-S-IDE v1 is a simplified entry-point IDE built on the Church Machine codebase, published to **khhodges/s-ide-v1** on GitHub. It presents a focused, three-step onboarding experience: Flash the Ti60 FPGA, Connect and verify the board calls home, then Write and run a CLOOMC program. Advanced views (Math REPL, Namespace, Pipeline, Trace, GC, etc.) are hidden by default and accessible with `?debug=1` in the URL. The full Church Machine IDE source continues to live in **khhodges/church-machine** (unchanged).
+S-IDE v1 is a simplified entry-point IDE built on the Church Machine codebase, published to **khhodges/s-ide-v1** on GitHub. It presents a focused, three-step onboarding experience: Flash the Wukong A7 FPGA, Connect and verify the board calls home, then Write and run a CLOOMC program. Advanced views (Math REPL, Namespace, Pipeline, Trace, GC, etc.) are hidden by default and accessible with `?debug=1` in the URL. The full Church Machine IDE source continues to live in **khhodges/church-machine** (unchanged).
 
 ## User Preferences
 - **Core design principle**: Every improvement must logically abstract implementation details — hide complexity, expose only what matters, make the system easy to understand and use. Raw technical values (addresses, hex words, register numbers) should always be translated into human-readable pet names, labels, or plain-English descriptions wherever they appear in the UI.
 - Church Gold dark theme
 - Mobile-responsive for parent mode on handsets
-- All feature flags True for Ti60 F225 build
+- All feature flags True for Wukong A7 build
 - No separate dynamicObjects — all entries in namespaceObjects
 - B (Bind) bit defaults to 0, auto-cleared by CALL
 - C-Lists only have E permission, CLOOMC only X or RX
@@ -22,13 +22,13 @@ S-IDE v1 is a simplified entry-point IDE built on the Church Machine codebase, p
 ## System Architecture
 The system integrates an Amaranth HDL-based FPGA hardware with a web IDE (HTML/JS/CSS) and a Flask backend.
 
-**Authoritative Architectural Overview:** `docs/cloomc-foundation.md` is the single document explaining the CLOOMC ISA, the PP250 heritage, the capability model, the reliability model, the Trusted Security Base principle, memory architecture decisions (hardware-forced vs programmer choices vs natural consequences), the old 6-region boot layout and its problems, the 3-LUMP starter kit, and the Ti60 F225 board profile. Read this document first when working on the boot image, the memory map, or the ISA. For all Ti60 F225 hardware setup facts (USB port map, LED pin assignments, APB3 register map, firmware build steps, callhome bridge usage), see `docs/HARDWARE.md`.
+**Authoritative Architectural Overview:** `docs/cloomc-foundation.md` is the single document explaining the CLOOMC ISA, the PP250 heritage, the capability model, the reliability model, the Trusted Security Base principle, memory architecture decisions (hardware-forced vs programmer choices vs natural consequences), the old 6-region boot layout and its problems, the 3-LUMP starter kit, and the Wukong A7 board profile. Read this document first when working on the boot image, the memory map, or the ISA. For all Wukong A7 hardware setup facts (USB port map, LED pin assignments, APB3 register map, firmware build steps, callhome bridge usage), see `docs/HARDWARE.md`.
 
 **UI/UX Decisions:**
 The web IDE features ten interactive views (Math, Code, Tutorial, Dashboard, Namespace, Abstractions, Pipeline, Reference, Builder, Docs). It includes educational tools like Pure Math calculator, HP-35 Calculator, Abacus, and Slide Rule, all with Church Machine trace. Learning aids comprise a "Math Challenge" sidebar, "History Tab," "Syntax Tab," and a "Visual Namespace Builder" for drag-and-drop deployment topology design. Documentation is presented as an interactive book with educational popups and a global CSS tooltip system. The design is responsive, and editor state, settings, and progress are persisted via localStorage.
 
 **Technical Implementations:**
-The architecture uses a scale-free abstraction model with 47 abstractions in 9 layers for security. Capability-based security is enforced by 32-bit Golden Tokens, validated by the mLoad capability validation pipeline (validates version, CRC seal, bounds, and permissions on every capability access). Domain purity strictly separates capabilities from code/data. The multi-language CLOOMC++ Compiler targets a 20-instruction Church Machine ISA, supporting English, JavaScript, Haskell, Symbolic Math, and Lambda Calculus with automatic detection, producing compiled abstractions. Key optimizations include a LAMBDA NIA Cache for leaf lambda execution. The Locator manages on-demand lump loading, and the Navana Master Controller handles Namespace entries and secure deployment. The Instruction Set is optimized for capability-focused and data manipulation operations. The platform supports the Efinix Ti60 F225 (full profile), using WebSerial for deployment. FPGA Call-Home & Device Management allows FPGAs to register with the IDE, enabling secure remote code deployment and fault-triggered boot diagnostics, with server-side fault logging and MTBF calculation per instruction address.
+The architecture uses a scale-free abstraction model with 47 abstractions in 9 layers for security. Capability-based security is enforced by 32-bit Golden Tokens, validated by the mLoad capability validation pipeline (validates version, CRC seal, bounds, and permissions on every capability access). Domain purity strictly separates capabilities from code/data. The multi-language CLOOMC++ Compiler targets a 20-instruction Church Machine ISA, supporting English, JavaScript, Haskell, Symbolic Math, and Lambda Calculus with automatic detection, producing compiled abstractions. Key optimizations include a LAMBDA NIA Cache for leaf lambda execution. The Locator manages on-demand lump loading, and the Navana Master Controller handles Namespace entries and secure deployment. The Instruction Set is optimized for capability-focused and data manipulation operations. The platform supports the Wukong A7 (XC7A100T), using a USB-Serial bridge for deployment. FPGA Call-Home & Device Management allows FPGAs to register with the IDE, enabling secure remote code deployment and fault-triggered boot diagnostics, with server-side fault logging and MTBF calculation per instruction address.
 
 ## External Dependencies
 - **Python/Flask:** Backend web server.
@@ -66,27 +66,7 @@ An automated daily report emails `sipanticinc@gmail.com` at **05:00 UTC** every 
 - **From address:** Uses `onboarding@resend.dev` (Resend's pre-verified test domain) unless `RESEND_FROM_EMAIL` env var is set to a verified domain
 - **Auth:** Both endpoints require `Authorization: Bearer <token>` or `?token=<token>` where the token comes from the `REPORT_TOKEN` env var (set as a Replit secret; a random token is generated at startup if unset)
 - **GitHub sync alert opt-out:** Set `GITHUB_SYNC_ALERT_EMAIL=0` (or `false`) to suppress the immediate failure-alert email; sync status is still written to `server/github-sync-status.json` and included in the daily digest. Omitting the var (default) keeps alerts enabled.
-- **Six report sections:** tasks merged today, in progress, queued next, test suite status, Ti60 call-home status, cost summary with billing link
-
-## Sapphire SoC — Trusted Security Base & APB3 Bridge
-
-The Sapphire SoC (RISC-V rv32im soft-core, 16 KB ROM / 16 KB RAM) runs alongside the Church Machine core on the Ti60. Its private RAM is inaccessible to the CM core — making it the natural hardware security module for CM_MSG keys.
-
-**APB3 bridge registers:** The full register table (CTRL, STATUS, NIA, FAULT, UID_LO/HI, FAULT_GT, FAULT_INSTR, FAULT_CR14, FAULT_STAGE) with access types and firmware address reference is at **`docs/HARDWARE.md § 4. APB3 Register Map`** — that is the authoritative copy.
-
-**Key architectural decisions:**
-- FAULT_GT / FAULT_INSTR / FAULT_CR14 / FAULT_STAGE are already latched in hardware on every fault but the current `uart_emit_callhome()` never reads them — adding ~20 lines emits full telemetry with no FPGA changes.
-- `fault_latched` is sticky and not software-clearable. A `FAULT_RST` write-1-to-clear register in `apb3_cm_bridge.v` (~10 lines Verilog) would complete hardware 3-tier fault recovery.
-- NIA sampled at 10 Hz gives a free TraceEmitter (T2.3) with no LUMP binary.
-- K_enc/K_mac from HKDF must live in RISC-V private RAM — the CM core never reads them.
-
-**ROM budget:** 16 KB. Current firmware uses ~1.6 KB. SHA32+HMAC+HKDF adds ~3 KB. 72% free. No FP coprocessor needed — SlideRule trig is a CLOOMC abstraction, not RISC-V firmware.
-
-## Ti60 One-Build-Bitstream-Script (OBBS) Consolidation
-
-There is exactly ONE canonical build pipeline (`build_ti60_bitstream.sh` → `run_efx_map.sh` → `run_efx_pnr.sh` → `run_efx_pgm.sh`) and ONE firmware build location (`$SOC_DIR/firmware`, rsynced from repo sources and verified byte-identical every run). Every step is guarded by a read-only self-test that catches stale/drifted data *before* it reaches synthesis, rather than only surfacing as a wrong version string or silent misbuild on a physical board. `efx_run.py`'s exit code is not trusted — steps verify freshly-written output artifacts (VDB, sync CSV) instead.
-
-Full incident history (banner drift, firmware double-build, CM DMEM double-patch, sapphire.v patch guard false-positive, headless MAP KeyError, stale-VDB bug) is in `CHANGELOG.md`. Durable lessons for future Efinity/headless-build work are in `.agents/memory/efinity-headless-pnr.md` and `.agents/memory/obbs-single-patch-location.md`.
+- **Six report sections:** tasks merged today, in progress, queued next, test suite status, Wukong call-home status, cost summary with billing link
 
 ## Gotchas / Known Traps
 

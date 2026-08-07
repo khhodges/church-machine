@@ -1,30 +1,55 @@
-# Wukong Board Boot Program
+# Wukong Board Boot Program (WukongCallHome LUMP)
 
 ## Overview
 
-The Wukong FPGA board executes a 73-instruction ROM program from word 0 on every power-up.
-This document explains what the program does, why it exists, and how to read and simulate it
-in the Church Machine IDE.
+This document explains `WUKONG_NUC_PROGRAM` — the WukongCallHome abstraction body
+that lives in DMEM as a LUMP at NS slot 7. It is **not** in the boot ROM; the boot
+ROM contains only the 3-instruction `BOOT_PROGRAM` (see `docs/StartupCM.md`).
 
-## The NULL_CAP Standalone Problem
+The WukongCallHome LUMP is useful for diagnostics and standalone operation: it loops
+forever without ever executing a `CALL`, so it is safe on a board with an empty c-list.
 
-The 3-instruction boot ROM contains this instruction at word 2:
+---
 
+## Boot ROM vs DMEM LUMP
+
+| | Boot ROM | WukongCallHome LUMP |
+|---|---|---|
+| Location | ROM BRAM (`_WUKONG_ROM` in `wukong_top.py`) | DMEM NS slot 7 (embedded in bitstream via `WUKONG_DEMO_NAMESPACE`) |
+| Size | 3 instructions (`BOOT_PROGRAM`) | 73 instructions (`WUKONG_NUC_PROGRAM`) |
+| Executed by default | Always (ROM[0..2] on every power-on) | Only if the IDE or boot config selects NS slot 7 as the boot entry |
+| Standalone safe | Faults `NULL_CAP` at ROM[2] — `Thread.caps[0]` (DMEM word 244) = NULL | Yes — never executes `CALL`; loops unconditionally |
+
+**The 3-instruction boot ROM (`BOOT_PROGRAM`) always runs first:**
 ```
-CALL CR0, CR0    ; 0x17000000
+ROM[0]  LOAD   CR15, CR15[0]   ; load NS root from DMEM
+ROM[1]  CHANGE CR12, CR15, #1  ; switch to Boot.Thread
+ROM[2]  CALL   CR0             ; enter boot entry via Thread.caps[0]
 ```
 
-On a board connected to the IDE, `Thread.caps[0]` is populated by `setBootEntrySlot()` with
-an E-GT pointing to the boot entry LUMP (e.g. SelfTest or WukongCallHome).  The CALL works.
+On factory power-on, `Thread.caps[0]` is NULL and ROM[2] raises `NULL_CAP`.
+The board halts cleanly. This is the expected safe state.
 
-On a **standalone** Wukong board — powered on without an IDE connection — `Thread.caps[0]` is
-`NULL` (0x00000000) because no IDE has ever configured the boot slot.  `CALL CR0,CR0` faults
-`NULL_CAP` immediately, leaving the board stuck.
+To enter WukongCallHome on power-on, write a WukongCallHome E-GT (NS slot 7) into
+DMEM word 244 (`Thread.caps[0]`) in `hardware/wukong_top.py`'s `dmem_init` and
+rebuild/reflash the bitstream.
 
-## The Solution: WUKONG_NUC_PROGRAM
+---
 
-`WUKONG_NUC_PROGRAM` is the Wukong-specific ROM program.  It never executes `CALL` at all.
-Instead it loops forever:
+## The NULL_CAP Standalone Problem (historical context)
+
+In the current design, `Thread.caps[0]` (DMEM word 244) is zero in the factory
+bitstream, so standalone power-on always reaches `NULL_CAP` safely:
+1. DMEM word 244 = 0 (NULL) in the factory image
+2. `CALL CR0` with a NULL GT raises `NULL_CAP` and halts
+3. WukongCallHome (NS slot 7) is available as an opt-in boot abstraction — configure
+   DMEM word 244 in `hardware/wukong_top.py` to point to it and rebuild
+
+---
+
+## What WukongCallHome Does
+
+`WUKONG_NUC_PROGRAM` is a 73-instruction loop that runs forever:
 
 ```
 1. Turn LED0 on
@@ -35,8 +60,8 @@ Instead it loops forever:
 6. Jump back to step 1
 ```
 
-Because the loop never calls into the c-list for anything other than device I/O, it is
-completely safe on a board with a zero-filled c-list.
+Because the loop never calls into the c-list for anything other than device I/O,
+it is safe on a board with a zero-filled c-list.
 
 ### Register allocation
 
@@ -72,8 +97,31 @@ BRANCHEQ poll              ; while busy: retry
 ```
 
 The DREAD uses the 4-operand indexed form (`base=0, DRx=DR1`) so `offset = DR1 = 1`,
-addressing the STATUS word.  This keeps the encoded instruction word identical to
+addressing the STATUS word. This keeps the encoded instruction word identical to
 `encode_turing(DREAD, ..., imm=1)` in Python.
+
+---
+
+## C-List Differences (LUMP vs Hardware)
+
+The LUMP version loads capabilities from its own 2-entry c-list:
+
+| Word | Instruction | LUMP slot |
+|------|-------------|-----------|
+| 0 | `LOAD CR3, LED0` | c-list[0] = LED0 (RW) |
+| 1 | `LOAD CR4, UART_TX` | c-list[1] = UART_TX (W) |
+
+When running from the hardware boot c-list (if selected as NS slot 7 boot entry):
+
+| Word | Instruction | Hardware slot |
+|------|-------------|---------------|
+| 0 | `LOAD CR3, CR6[5]` | Slot 5 = LED_DEV |
+| 1 | `LOAD CR4, CR6[6]` | Slot 6 = UART_DEV |
+
+**Words 2-72 are bit-for-bit identical** to `WUKONG_NUC_PROGRAM[2:73]`.
+The divergence check (`scripts/check_wukong_callhome_divergence.js`) enforces this.
+
+---
 
 ## CLOOMC Source
 
@@ -90,31 +138,14 @@ in `hardware/boot_rom.py`.
 ### Simulating in the IDE
 
 1. Open the LUMP library and click **WukongCallHome**.
-2. The editor shows the CLOOMC source.  Click **Step** to step through instructions.
+2. The editor shows the CLOOMC source. Click **Step** to step through instructions.
 3. Switch to the **Wukong view** — LED0 toggles at each `DWRITE CR3` instruction.
 4. The UART output panel shows each character of "CM:WUKONG\r\n" as it is written.
 
-The program is an **infinite loop** — it has no RETURN.  This is intentional: the physical
+The program is an **infinite loop** — it has no RETURN. This is intentional: the physical
 FPGA also loops forever until reset.
 
-## C-List Differences (LUMP vs Hardware)
-
-The hardware ROM program loads capabilities from the Wukong boot c-list:
-
-| Word | Instruction | Hardware slot |
-|------|-------------|---------------|
-| 0 | `LOAD CR3, CR6[5]` | Slot 5 = LED_DEV |
-| 1 | `LOAD CR4, CR6[6]` | Slot 6 = UART_DEV |
-
-The CLOOMC LUMP uses its own two-entry c-list:
-
-| Word | Instruction | LUMP slot |
-|------|-------------|-----------|
-| 0 | `LOAD CR3, LED0` | c-list[0] = LED0 (RW) |
-| 1 | `LOAD CR4, UART_TX` | c-list[1] = UART_TX (W) |
-
-**Words 2-72 are bit-for-bit identical** to `WUKONG_NUC_PROGRAM[2:73]`.
-The divergence check (`scripts/check_wukong_callhome_divergence.js`) enforces this.
+---
 
 ## Divergence Guard
 
@@ -125,7 +156,7 @@ The CI script `scripts/check_wukong_callhome_divergence.js` assembles
 node scripts/check_wukong_callhome_divergence.js
 ```
 
-Exit 0 = consistent.  Exit 1 = diverged; fix the `.cloomc` file to match `boot_rom.py`.
+Exit 0 = consistent. Exit 1 = diverged; fix the `.cloomc` file to match `boot_rom.py`.
 
 **If you edit `WUKONG_NUC_PROGRAM` in `hardware/boot_rom.py`, you MUST also update
 `simulator/examples/wukong_callhome.cloomc` and rebuild the LUMP by running:**
@@ -134,13 +165,15 @@ Exit 0 = consistent.  Exit 1 = diverged; fix the `.cloomc` file to match `boot_r
 node scripts/build_wukong_callhome_lump.js
 ```
 
+---
+
 ## Relevant Files
 
 | File | Role |
 |------|------|
 | `simulator/examples/wukong_callhome.cloomc` | Human-readable CLOOMC source (73 instructions) |
 | `hardware/boot_rom.py` | `WUKONG_NUC_PROGRAM` — Python-encoded list, build-time source of truth |
-| `hardware/wukong_top.py` | `_WUKONG_ROM` — fills the FPGA BRAM from `WUKONG_NUC_PROGRAM` |
+| `hardware/wukong_top.py` | `WUKONG_DEMO_NAMESPACE` — includes WukongCallHome LUMP body at NS slot 7 |
 | `scripts/build_wukong_callhome_lump.js` | Assembles + packages the LUMP binary |
 | `scripts/check_wukong_callhome_divergence.js` | CI guard — fails if CLOOMC drifts from Python |
 | `server/lumps/` | Built `.lump` + `.json` files |

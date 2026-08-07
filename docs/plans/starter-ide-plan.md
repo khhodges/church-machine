@@ -125,7 +125,7 @@ any documentation. Time to first "Run": under 5 minutes.
 
 ### Phase 2 — Hardware Connection (one board, one button)
 
-**Goal:** A user who has a Tang Nano 20K or Ti60 F225 can connect it to
+**Goal:** A user who has a Tang Nano 20K or Wukong A7 can connect it to
 the Starter IDE without switching to Advanced Mode.
 
 **What gets built:**
@@ -142,7 +142,7 @@ the Starter IDE without switching to Advanced Mode.
   respond → "It's running on real silicon. The same capability rules apply."
 
 **Done looks like:**
-A user who owns a Tang Nano 20K or Ti60 and has run `./bridge.sh` can see
+A user who owns a Tang Nano 20K or Wukong A7 and has run `./bridge.sh` can see
 their board in the Starter IDE and deploy their first program with one click,
 without touching Advanced Mode.
 
@@ -244,7 +244,7 @@ Abstraction Challenge with hardware deployment.
 
 - Phase 1 has no external dependencies — all work is inside the existing
   simulator directory
-- Phase 2 depends on `local_bridge.py` (already shipped in the Ti60 and
+- Phase 2 depends on `local_bridge.py` (already shipped in the Wukong A7 and
   Tang Nano packages) and the existing `/api/call-home` endpoint (already
   implemented)
 - Phase 3 depends on the Mum Tunnel Library publish API and the

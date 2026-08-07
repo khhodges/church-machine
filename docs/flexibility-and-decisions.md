@@ -23,7 +23,7 @@ Consider three engineering disciplines:
 
 ### 2.1 Chip Pinout Design
 
-When you design an FPGA board — say the Efinix Ti60 F225 with its 225-pin BGA — you must commit to a pinout. Pin A3 is UART TX. Pin B7 is SPI MOSI. Pin C12 is an LED. These decisions are made before a single line of RTL is written, and they are permanent. The PCB is manufactured around them. The connector is soldered. The test jig is built.
+When you design an FPGA board — say the Wukong A7 XC7A100T with its FPGA package — you must commit to a pinout. Pin A3 is UART TX. Pin B7 is SPI MOSI. Pin C12 is an LED. These decisions are made before a single line of RTL is written, and they are permanent. The PCB is manufactured around them. The connector is soldered. The test jig is built.
 
 This feels painful. You agonise over whether JTAG needs five pins or four. You wonder if you have allocated enough GPIO for future expansion. You make the decision anyway, because the alternative — leaving it undefined — means you cannot build the board at all.
 

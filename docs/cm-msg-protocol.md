@@ -2,7 +2,7 @@
 
 **Status:** V1 — Released for distribution and review  
 **Date:** 2026-06-10  
-**Scope:** Ti60 F225 (initial target); architecture applies to all CM-connected boards
+**Scope:** Wukong A7 XC7A100T (current target); architecture applies to all CM-connected boards
 
 ---
 
@@ -79,7 +79,7 @@ This is not an add-on. It is the protocol's reason for existing.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│                    FPGA Board (Ti60 F225)                         │
+│                    FPGA Board (Wukong A7 XC7A100T)                │
 │                                                                  │
 │  Each abstraction has an encryption service (firmware-private):  │
 │                                                                  │
@@ -305,7 +305,7 @@ Full ns_manifest CALLHOME JSON fragment (firmware v1.2+):
 
 ```json
 CALLHOME:{
-  "board":"Ti60F225",
+  "board":"WukongA7",
   "uid":"c0ffee0100000001",
   "boot_ok":1,
   "fw_major":1,"fw_minor":2,
@@ -1340,7 +1340,7 @@ time, not per message — completely invisible in practice.
 At 115,200 baud a 64-byte frame takes ~5.6 ms to arrive on the wire. The crypto
 is invisible — the wire is always the bottleneck.
 
-At 3 Mbaud (Ti60 Sapphire SoC capability): ~170 μs per frame. Crypto still
+At 3 Mbaud (high-speed UART capability): ~170 μs per frame. Crypto still
 invisible.
 
 #### Fail-safe drop policy

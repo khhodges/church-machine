@@ -49,8 +49,12 @@ if needed for reference.
 ## Regenerating church_core.v
 
 ```bash
-python gen_verilog.py --ti60
+# For the Wukong A7 target (generates church_wukong_xc7a100t.v in build/):
+python3 -m hardware.gen_rtlil --wukong
+
+# For the Tang Nano 20K target (generates church_tang_nano_20k.v):
+python3 -m hardware.gen_verilog --iot
 ```
 
 See `docs/cloomc-foundation.md` for the full architectural overview, and
-`docs/HARDWARE.md` for Ti60 F225 board-specific synthesis steps.
+`docs/HARDWARE.md` for Wukong A7 board-specific synthesis steps.

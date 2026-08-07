@@ -121,7 +121,7 @@ The IDE runs in a web browser. It provides:
 
 - **A fault investigation system** that captures the complete machine state when a security violation occurs, so you can understand exactly what went wrong and why. Every fault contributes to the MTBF measurement of the abstraction that caused it — reliability is calibrated, not assumed.
 
-The IDE targets the Efinix Ti60 F225 FPGA — a chip with 60,000 logic elements that can be physically programmed with the Church Machine architecture. It also supports the smaller Tang Nano 20K for education and IoT applications.
+The IDE targets the Xilinx Artix-7 XC7A100T FPGA (Wukong board) — a chip with 100,000 logic cells that can be physically programmed with the Church Machine architecture. It also supports the smaller Tang Nano 20K for education and IoT applications.
 
 ---
 

@@ -692,7 +692,7 @@ total); 131,072 words (512 KB) are allocated to the Church Machine namespace.
 ### 11.2 Foundation Layout (Standard 4-Region Boot Config)
 
 The foundation lump layout at the bottom of memory is identical between the
-Ti60 F225 and the XC7A100T. Lump sizes are programmer choices; the board
+Wukong A7 XC7A100T and the simulator profile. Lump sizes are programmer choices; the board
 does not change them. The current demo boot image uses four regions: NS lump
 (64 w), Thread lump (256 w), free slot 2 remnant (64 w), and Boot.Abstr
 (64 w). Their sum gives `foundation_end = 0x01C0`.
@@ -706,7 +706,7 @@ does not change them. The current demo boot image uses four regions: NS lump
 | `0x001C0`  | `0x1FBFF`  | 129,088 | Dynamic pool (allocatable heap; ceiling = limit17) |
 
 `foundation_end = 0x01C0` — 64 + 256 + 64 + 64 = 448 words. This is
-arithmetic, not a board choice. It is identical to the Ti60 F225 value.
+arithmetic, not a board choice. It is identical across hardware targets.
 
 The pool ceiling is `0x1FBFF` (limit17 = 130,047), which is the last word
 the Memory Manager's pool GT is permitted to address. The simulator's format
@@ -718,12 +718,12 @@ outside the pool GT's limit and cannot be reached by the allocator.
 > **Note on the 3-LUMP clean model:** Once Task #1159 removes free slot 2,
 > the true 3-LUMP foundation will be 64 + 256 + 64 = 384 words and
 > `foundation_end` will drop to `0x0180`. On both boards only the pool
-> ceiling (`limit17`) changes between Ti60 and XC7A100T; `foundation_end`
+> ceiling (`limit17`) changes between hardware profiles; `foundation_end`
 > is identical because lump sizes are programmer choices, not board choices.
 
 ### 11.3 Pool and limit17
 
-| Field | Ti60 F225 | XC7A100T |
+| Field | Standard 65K | XC7A100T 131K |
 |:------|----------:|----------:|
 | `totalNamespaceWords` | 65,536 | 131,072 |
 | `NS_TABLE_BASE` | `0x0FC00` | `0x1FC00` |
@@ -733,7 +733,7 @@ outside the pool GT's limit and cannot be reached by the allocator.
 | Allocatable pool (words) | ~64,063 (~250 KB) | ~129,599 (~507 KB) |
 
 `limit17` is the **only value that changes** when retargeting the Memory
-Manager from Ti60 F225 to XC7A100T. It is the upper bound of the dynamic
+Manager between profiles. It is the upper bound of the dynamic
 pool — the largest word address the Memory Manager's pool GT permits
 allocation from. All other values are either hardware-forced (same on every
 board) or natural consequences of programmer-chosen lump sizes (also the
@@ -747,9 +747,8 @@ the 17-bit choice was deliberate.
 ### 11.4 Toolchain Note
 
 The XC7A100T is the only Church Machine target that uses the Xilinx/AMD
-Vivado toolchain (2020 or later required for place-and-route). The Ti60 F225
-uses the Efinix Efinity toolchain; the Tang Nano 20K uses the Gowin EDA
-toolchain. The CLOOMC ISA bitstream is the same across all three boards; only
+Vivado toolchain (2020 or later required for place-and-route). The Tang Nano 20K uses the Gowin EDA
+toolchain. The CLOOMC ISA bitstream is the same across boards; only
 the toolchain, the pin constraints, and the `limit17` value in the boot image
 differ.
 

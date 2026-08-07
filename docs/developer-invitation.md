@@ -51,7 +51,7 @@ The best abstraction submitted this quarter wins:
 - **Permanent credit** in the Mum Tunnel Library — your name on
   an abstraction that every Church Machine user can build on, forever
 - **Recognition** at CLOOMC.org as the Abstraction Challenge winner
-- **A Ti60 F225 development board** — the full Church Machine on silicon,
+- **A Wukong A7 development board** — the full Church Machine on silicon,
   so you can run your winning abstraction on real hardware
 
 ---
@@ -59,7 +59,7 @@ The best abstraction submitted this quarter wins:
 **What does a great abstraction look like?**
 
 It solves something people actually need. It runs on both the IoT profile
-(Tang Nano 20K, ~£5) and the full profile (Ti60 F225, ~£250) so it reaches
+(Tang Nano 20K, ~£5) and the full profile (Wukong A7, ~£50) so it reaches
 the widest audience. It requests the minimum permissions it needs — no
 more. And it runs clean: zero capability faults across every test case you
 can throw at it.
@@ -128,7 +128,7 @@ the hardware — all of it. No gatekeeping. You join by contributing.*
 > Every buffer overflow, every root exploit, every CVE — the Church
 > Machine hardware makes them impossible by design. We're challenging
 > developers to write the abstraction that proves it. Best entry wins a
-> Ti60 FPGA board. cloomc.org #CapabilitySecurity
+> Wukong A7 FPGA board. cloomc.org #CapabilitySecurity
 
 ---
 
@@ -142,7 +142,7 @@ the hardware — all of it. No gatekeeping. You join by contributing.*
 >
 > We're running an Abstraction Challenge for developers who want to build
 > something that matters: verified, capability-secured programs that other
-> developers can build on forever. Best submission wins a Ti60 F225 FPGA
+> developers can build on forever. Best submission wins a Wukong A7 FPGA
 > development board and permanent credit in the Mum Tunnel Library.
 >
 > No board required to enter. The simulator runs in Chrome, enforces every
@@ -183,7 +183,7 @@ the hardware — all of it. No gatekeeping. You join by contributing.*
 > - An educational sequence that teaches a kid what a capability IS
 >   by showing them what happens when they try to break one
 >
-> Best abstraction wins a **Ti60 F225 FPGA board** and permanent credit in
+> Best abstraction wins a **Wukong A7 FPGA board** and permanent credit in
 > the Mum Tunnel Library — your name on an abstraction every Church Machine
 > user can build on, forever.
 >

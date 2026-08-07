@@ -65,7 +65,7 @@ All deviations D-1 through D-12 are **CLOSED/RESOLVED**. No open hardware deviat
 
 ### D-6: FPGA MMIO / LED Pin Routing — CLOSED
 
-- **Decision (architect, May 2026)**: A short MMIO summary table added to `architecture.md` (Memory Architecture section). Per-platform detail (pin numbers, active polarity) remains in `hardware-tang-nano-20k.md` and `hardware-ti60-f225.md`.
+- **Decision (architect, May 2026)**: A short MMIO summary table added to `architecture.md` (Memory Architecture section). Per-platform detail (pin numbers, active polarity) remains in `hardware-tang-nano-20k.md` and `hardware-wukong-a7.md`.
 - **Action taken**: `architecture.md` updated with MMIO base address and register summary. **CLOSED.**
 
 ### D-7: SAVE Operand Roles — Hardware Mismatch in app.js INSTRUCTION_DATA
@@ -98,7 +98,7 @@ All deviations D-1 through D-12 are **CLOSED/RESOLVED**. No open hardware deviat
   2. No other changes. `ret.py`, `change.py`, `lambda_unit.py` unchanged. No new registers, no NIA repartition, no counter logic.
 - **Counter as optional enhancement**: A diagnostic counter (`lambda_depth_reg`, 8–16 bits) could be added later for performance monitoring or safety limits (FAULT on overflow to catch runaway recursion). This is not required for correctness or O(1) performance.
 - **Previous design (superseded)**: The initial D-9 proposed a 16-bit `lambda_depth_reg` counter to replace stack frames. Analysis showed the counter is redundant — the software's own argument is the counter, and the existing 1-bit flag + `lambda_pc` register already provide O(1) behavior with the idempotent re-entry rule. The counter was discarded on RETURN anyway (zeroed and thrown away), confirming it served no purpose.
-- **Platform strategy**: Change is minimal (FAULT condition refinement in `core.py` only). Safe to implement on both **Ti60 F225** and **Tang Nano 20K** simultaneously — no NIA format change, no stack format change.
+- **Platform strategy**: Change is minimal (FAULT condition refinement in `core.py` only). Safe to implement on both **Wukong A7** and **Tang Nano 20K** simultaneously — no NIA format change, no stack format change.
 - **Software impact**: None. The compiler already emits LAMBDA CR6 via `relambda()`. The simulator already models LAMBDA semantics correctly. The idempotent re-entry is purely a hardware-level refinement of the FAULT condition.
 - **Risk**: Extremely low. Single-line FAULT condition change in `core.py`. No format changes, no new registers, no multi-file impact.
 - **Affected files**: `hardware/core.py` (FAULT condition only)

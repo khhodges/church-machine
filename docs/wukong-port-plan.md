@@ -163,7 +163,7 @@ Expected after CM bitstream is flashed:
 ## Phase 2 — UART / USB-Serial Callhome (Optional bridge)
 
 **Goal:** Get a callhome packet reaching the server over a USB-serial bridge
-(same pattern as Ti60) before committing to the Ethernet MAC port. Skip if
+(same USB-serial bridge pattern) before committing to the Ethernet MAC port. Skip if
 Ethernet proves easier.
 
 > **Note:** The Wukong V3 has no onboard USB-UART bridge. This phase requires

@@ -15,7 +15,7 @@ with m.Case(2):
 Comment: `# LED2_RGB (no physical pin on this minimal build)`
 
 The Wukong V3 has exactly 2 user LEDs (G21, G20). The MMIO register map includes
-LED2_RGB for Ti60 compatibility (Ti60 has 3 user LEDs), but there is no physical
+LED2_RGB for backward compatibility (the previous platform has 3 user LEDs), but there is no physical
 connection for pin 2 on the Wukong.
 
 ## Options
@@ -33,7 +33,7 @@ This allows portable CLOOMC programs to query capability before use.
 
 ### Option B — Raise an INVALID_OP fault on write to reg 2
 Change the DWRITE handler for reg 2 to assert `core.fault_valid` with
-`FaultType.INVALID_OP`. This is more aggressive (breaks any Ti60-derived program that
+`FaultType.INVALID_OP`. This is more aggressive (breaks any program that
 writes all 3 LEDs unconditionally) and not recommended.
 
 ### Option C — Document the no-op (simplest)
@@ -58,7 +58,7 @@ correct (no misbehaviour, just a silent no-op).
 4. No existing test is broken (no test asserts on LED2 state for Wukong).
 
 ## Risks
-- **Ti60 compatibility**: The Ti60 has 3 LEDs. Programs compiled for Ti60 that write
+- **LED count difference**: The previous platform has 3 LEDs. Programs compiled for it that write
   all 3 LEDs will behave differently on Wukong (reg 2 is a no-op). This is inherent to
   the hardware difference. Document clearly; do not attempt to unify the behaviour.
 

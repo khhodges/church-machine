@@ -461,7 +461,7 @@ network is the library.
 
 ### Comparison Table
 
-| Field | Removed Ti60 F225 | XC7A100T |
+| Field | Previous Platform | XC7A100T |
 |-------|-----------|----------|
 | `totalNamespaceWords` | delete 65,536 | 131,072 |
 | `foundation_end` (NS + Thread only) |delete 0x0140 (320) | 0x0140 (320) |

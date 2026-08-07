@@ -124,7 +124,7 @@ On CALL/LOAD to a valid NS entry:
 | Board | Total BRAM | Boot lumps | Available for lazy load |
 |-------|-----------|------------|------------------------|
 | Tang Nano 20K | 64 KB | ~8 KB (Navana, Mint, Memory, Scheduler) | ~56 KB |
-| Ti60 F225 | 256 KB | ~16 KB | ~240 KB |
+| Wukong A7 | 256 KB | ~16 KB | ~240 KB |
 
 Lazy load is most valuable on the Tang Nano where 64 KB is tight.
 Without lazy load, all abstractions must fit simultaneously. With it,

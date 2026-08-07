@@ -1185,7 +1185,7 @@ issue GTs that reference addresses beyond the NS LUMP's limit.
 
 The NS Table lives at a **hardware-known fixed offset** within Boot.NS.
 On Tang Nano 20 K, `NS_TABLE_BASE = 0xFD00` is wired in the decoder;
-on Efinix Ti60 F225, the base is parameterised but fixed at synthesis time.
+on the Wukong A7, the base is parameterised but fixed at synthesis time.
 
 ---
 
@@ -1548,7 +1548,7 @@ already owns.
 
 ---
 
-*Document applies to: Church Machine IDE simulator · Boot.NS slots 0 (Boot.NS), 1 (Boot.Thread), 2 (Boot.Abstr), 45 (Thread) · Tang Nano 20 K + Efinix Ti60 F225 targets.*
+*Document applies to: Church Machine IDE simulator · Boot.NS slots 0 (Boot.NS), 1 (Boot.Thread), 2 (Boot.Abstr), 45 (Thread) · Tang Nano 20 K + Wukong A7 XC7A100T targets.*
 
 ---
 

@@ -226,7 +226,7 @@ The `source` field is the only sidecar field intentionally excluded from the man
 | `typ` | `integer` | — | Header `typ` field: 0=Abstraction, 1=Namespace, 2=Thread. 3 is undefined (see §3). |
 | `content_type` | `string` | — | Semantic sub-classification of `typ=0` Abstraction lumps: `"text"`, `"markdown"`, `"image"`, `"grayscale"`, `"code"`, etc. |
 | `lump_type` | `string` | — | Alternative type label used by some import flows. |
-| `profile` | `string` | — | Target hardware profile (e.g. `"IoT"`, `"ti60-f225"`). |
+| `profile` | `string` | — | Target hardware profile (e.g. `"IoT"`, `"wukong-a7"`). |
 | `language` | `string` | — | Source language: `"cloomc"`, `"assembly"`, `"haskell"`, `"lambda"`, `"unknown"`. |
 | `author` | `string` | — | Creator name. |
 | `version` | `string` | — | Human version string (e.g. `"1.0"`). |
@@ -287,7 +287,7 @@ Keys are string-formatted register indices. `DR` maps Data Registers; `CR` maps 
 
 | Field | Description |
 |:------|:------------|
-| `target_board` | Hardware target, e.g. `"ti60-f225"`, `"tang-nano-20k"`, `"wukong-artix7"`. |
+| `target_board` | Hardware target, e.g. `"wukong-a7"`, `"tang-nano-20k"`, `"wukong-artix7"`. |
 | `profile` | Profile at compile time (e.g. `"IoT"`, `"full"`). |
 | `built_at` | ISO 8601 timestamp. |
 | `builder` | Toolchain identifier (e.g. `"CLOOMC++ IDE v1.0"`). |

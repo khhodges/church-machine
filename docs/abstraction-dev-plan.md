@@ -102,7 +102,7 @@
 |---|-------------|-----|---------|---------|--------|-------|
 | T6.1 | **MediaConsumer** | `global.Core.MediaConsumer.boot` | assigned by boot | `Fetch(token)`, `StreamChunk(n)`, `Acknowledge` | `◯` | JPEG/audio chunked delivery; msg_types 0x09–0x0A; requires `CM.IDE.MediaServer` counterpart |
 | T6.2 | **BrowseClient** | `global.Core.BrowseClient.boot` | assigned by boot | `Request(url)`, `GetPage`, `Navigate(rel)` | `◯` | Capability-secured web access; C-list contains domain GTs (`CM.Domain.BBCNews`, etc.); msg_types 0x10–0x14; requires `CM.IDE.BrowseProxy` |
-| T6.3 | **Ethernet** | `global.Core.Ethernet.boot` | NS 40 (sim) | `Send(frame)`, `Receive`, `GetMAC`, `SetFilter` | `◐` | CLOOMC source in `simulator/cloomc/ethernet.cloomc`; depends on hardware Ethernet peripheral; Ti60 profile only |
+| T6.3 | **Ethernet** | `global.Core.Ethernet.boot` | NS 40 (sim) | `Send(frame)`, `Receive`, `GetMAC`, `SetFilter` | `◐` | CLOOMC source in `simulator/cloomc/ethernet.cloomc`; depends on hardware Ethernet peripheral; hardware profile only |
 
 ---
 
@@ -182,12 +182,12 @@ the firmware LUMP, not after.
 
 ---
 
-## Sapphire SoC as Trusted Security Base
+## Hardware Security Module as Trusted Security Base
 
 *Architectural note — does not require FPGA changes.*
 
-The Sapphire SoC (RISC-V rv32im soft-core) is already the physical Trusted Security
-Base for the CM_MSG protocol. Its RAM (`0xF9004000–0xF9007FFF`) is private — the
+The hardware security module (RISC-V rv32im soft-core) is already the physical Trusted Security
+Base for the CM_MSG protocol. Its RAM is private — the
 Church Machine core has no bus path to read it. This makes it the correct and
 natural home for K_enc/K_mac secrets derived by HKDF after each CALLHOME.
 
@@ -246,16 +246,16 @@ This completes the 3-tier fault recovery model at hardware level.
 
 ### FP coprocessor verdict
 
-Not needed, not recommended for the Ti60 UART starter kit. SHA-256 is pure integer
+Not needed, not recommended for the UART starter kit. SHA-256 is pure integer
 arithmetic (no FP). SlideRule trig runs on the CM core via CLOOMC methods, not the
 RISC-V. If MTBF averaging ever needs FP in firmware, a software CORDIC
 implementation fits in ~500 bytes of the 14+ KB of headroom remaining after SHA32.
-A hardware FPU would require Sapphire SoC regeneration with `rv32imf`, full
+A hardware FPU would require RISC-V core regeneration with `rv32imf`, full
 resynthesis, and an ABI change — not justified for the current use case.
 
 ### SHA32 commissioning impact
 
-Commissioning steps are identical (same `efx_pgm`, same `make`, same bridge
+Commissioning steps are identical (same `make`, same bridge
 command line). The firmware grows from ~1.6 KB to ~4.6 KB (28% of 16 KB ROM).
 Boot time adds ~100 ms for 9× SHA256 computations at startup. The CALLHOME JSON
 grows by ~700 chars (ns_manifest array); at 57600 baud this adds ~120 ms to the

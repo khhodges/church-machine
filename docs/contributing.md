@@ -160,7 +160,7 @@ exploited. Contact the maintainers through [CLOOMC.org](https://cloomc.org).
 
 - **Amaranth HDL** — the Church Machine processor core, namespace
   controller, and peripheral interfaces
-- **Board support** — porting to new FPGAs beyond Ti60 and Tang Nano
+- **Board support** — porting to new FPGAs beyond Wukong A7 and Tang Nano
 - **Boot ROM** — the initial capability grants and system setup
 - **Verification** — testbenches, formal verification, hardware
   simulation

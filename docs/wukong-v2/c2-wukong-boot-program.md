@@ -27,9 +27,9 @@ the IDE can load user programs.
 CR15's boot GT is `GT_TYPE_INFORM, perm = 0`. `has_l_perm = (perm >> 3) & 1 = 0`.
 Result: `FaultType.PERM_L`.
 
-The Ti60 avoids this because the Sapphire SoC uploads a fully-initialised boot image
+The previous platform avoids this because its companion firmware uploads a fully-initialised boot image
 (including a correctly-permissioned CR15) before the CM core starts executing. The
-Wukong has no SoC and no boot image upload path (yet), so the CM starts with the
+Wukong has no such companion firmware and no boot image upload path (yet), so the CM starts with the
 hardware-initialised CR15 directly.
 
 ## Chosen Fix: Wukong-Specific BOOT_PROGRAM
@@ -46,7 +46,7 @@ The hardware boot FSM already initialises:
 So the only work left for `BOOT_PROGRAM` is: switch to Boot.Thread and call the
 configured boot entry. The `LOAD CR15, CR15[0]` refresh step is only needed when the
 NS root lump has been swapped by a prior runtime; on cold boot it is a no-op for the
-Ti60 and a fault for the Wukong.
+a no-op on the previous platform and a fault for the Wukong.
 
 ### `WUKONG_BOOT_PROGRAM` (3 instructions, replacing `BOOT_PROGRAM` in Wukong ROM):
 ```python

@@ -399,6 +399,6 @@ See [`CHANGELOG.md`](../CHANGELOG.md) for full change details and formal change 
 ---
 
 *Document applies to: Church Machine IDE simulator · Tang Nano 20 K ·
-Efinix Ti60 F225 targets.*
+Wukong A7 XC7A100T targets.*
 
 *Confidential — Kenneth Hamer-Hodges — April 2026*

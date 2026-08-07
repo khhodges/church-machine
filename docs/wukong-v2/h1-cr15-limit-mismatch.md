@@ -62,7 +62,7 @@ and more conservative default. If Interpretation B is chosen, the fix is differe
 - If any existing test or boot program relies on slots 8–17 being accessible (even to
   SEAL-fault on them), tightening the limit to 8 will produce BOUNDS instead. Grep
   for `ns_slot` values > 7 in all test files before merging.
-- On the Ti60, the boot FSM also uses `C(18, 32)`. If the Ti60 runtime relies on the
+- On the previous platform, the boot FSM also uses `C(18, 32)`. If the previous-platform runtime relies on the
   18-slot headroom, the fix must only target the Wukong path or be made conditional
   on a parameter.
 

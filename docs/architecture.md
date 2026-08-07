@@ -238,7 +238,7 @@ The 16-bit physical address space is accessed through the GT gate via mLoad:
 
 ### MMIO Register Map
 
-All hardware I/O devices are mapped at base address `0x40000000` (bit 30 set, bit 31 clear). The register selector is `addr[5:2]` (4-bit word index within the MMIO range). Per-platform pin assignments and active polarity are in `hardware-tang-nano-20k.md` and `hardware-ti60-f225.md`.
+All hardware I/O devices are mapped at base address `0x40000000` (bit 30 set, bit 31 clear). The register selector is `addr[5:2]` (4-bit word index within the MMIO range). Per-platform pin assignments and active polarity are in `hardware-tang-nano-20k.md` and `HARDWARE.md`.
 
 | Offset | Address      | Device  | Register     | Description |
 |--------|-------------|---------|--------------|-------------|
@@ -306,9 +306,9 @@ is derived from NS entry data read at runtime; the tables below show the exact b
 
 ### NULL_CAP Standalone Problem (Wukong)
 
-`BOOT_PROGRAM[2]` is `CALL CR0,CR0` — it invokes whatever capability the IDE placed in `Thread.caps[0]`. On a board that has never been connected to an IDE, `Thread.caps[0]` is `NULL` and the CALL faults immediately, leaving the board unresponsive.
+`BOOT_PROGRAM[2]` is `CALL CR0` — it invokes whatever capability is stored in `Thread.caps[0]` (DMEM word 244, at `threadBase=0 + THREAD_CAPS_OFFSET=244`). In the factory bitstream this word is zero (NULL), so the CALL faults `NULL_CAP` and the CM halts permanently. There is no recovery path without a power-cycle and a rebuild.
 
-The Wukong FPGA ROM uses `WUKONG_NUC_PROGRAM` instead: a 73-instruction infinite loop that blinks LED0 and transmits `"CM:WUKONG\r\n"` at 57600 baud. It contains no `CALL` and no `RETURN`, so it is safe on an unconfigured board. Once the IDE connects and the user drags ⚡ to NS slot 7 (`WukongCallHome`), the next reset executes the coordinator LUMP.
+**The Wukong FPGA ROM always contains only the 3-instruction `BOOT_PROGRAM`.** `WUKONG_NUC_PROGRAM` is not in ROM — it is a 73-instruction DMEM LUMP at NS slot 7 (`WukongCallHome`). To use it as a standalone boot abstraction, set DMEM word 244 to a WukongCallHome E-GT in `hardware/wukong_top.py`'s `dmem_init`, rebuild, and reflash.
 
 Human-readable source: `simulator/examples/wukong_callhome.cloomc` — see `docs/wukong-boot.md`.
 
@@ -726,7 +726,7 @@ addressed exclusively by pet name — a Golden Token held in a c-list.
 **Layer 2 — Board Profile (hardware-specific, defined by the boot image generator)**
 
 MMIO device capabilities for the target board. The addresses, count, and permissions vary per
-board. For the Ti60 F225:
+board. For the Wukong A7:
 
 | Pet Name | What |
 |----------|------|

@@ -479,7 +479,7 @@ Phase 0 (Unblock) ──→ Phase 1 (Hardware) ──→ Phase 2 (Concurrency) �
 ### Hardware
 - Tang Nano 20K FPGA (for iterative testing)
 - USB UART adapter
-- Optional: Efinix Ti60 F225 (for parallel hardware development)
+- Optional: Wukong A7 XC7A100T (for parallel hardware development)
 
 ### Software Stack
 - Amaranth HDL (already in place)
