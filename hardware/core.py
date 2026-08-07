@@ -470,6 +470,14 @@ class ChurchCore(Elaboratable):
                                     cr_rd_addr_default)))))
             )
 
+        # ── Boot microcode M-elevation window (forward-declared for u_perm gating) ──
+        # boot_retire_count and boot_microcode_active are forward-declared here so
+        # u_perm.check_valid (line below) can gate on ~boot_microcode_active.
+        # The sync increment and comb assignment are wired later (after the CHANGE
+        # unit wiring block) together with the u_change.m_elevated connection.
+        boot_retire_count    = Signal(2, name="boot_retire_count")
+        boot_microcode_active = Signal(name="boot_microcode_active")
+
         perm_gt_sig = Signal(GT_LAYOUT)
         m.d.comb += perm_gt_sig.eq(View(CAP_REG_LAYOUT, u_regs.cr_rd_data).word0_gt)
 
@@ -509,7 +517,12 @@ class ChurchCore(Elaboratable):
         m.d.comb += [
             u_perm.gt_in.eq(perm_gt_sig),
             u_perm.required_perms.eq(required_perms),
-            u_perm.check_valid.eq(cond_exec_enable & is_church_op & ~any_unit_busy),
+            # Suppress perm check during boot microcode (BOOT_PROGRAM[0..2]).
+            # LOAD/CHANGE/CALL use null or partially-initialised caps; each unit
+            # performs its own M-elevated internal checks.
+            u_perm.check_valid.eq(
+                cond_exec_enable & is_church_op & ~any_unit_busy & ~boot_microcode_active
+            ),
             u_perm.check_domain_purity.eq(
                 cond_exec_enable & is_church_op & (church_op == ChurchOpcode.TPERM)
             ),
@@ -919,7 +932,10 @@ class ChurchCore(Elaboratable):
                     boot_cap_wr_en.eq(1),
                     boot_cap_wr_addr.eq(15),
                     boot_cap_wr_data.eq(Cat(
-                        C(0x02000000, 32),  # word0_gt: GT_TYPE_INFORM, slot_id=0 ★v2.0
+                        C(0x1A000000, 32),  # word0_gt: GT_TYPE_INFORM, Church dom=1, L-perm ★v2.0
+                        # 0x1A000000 = dom=1(Church) | perm=0b001(L) | GT_TYPE_INFORM<<25 | slot=0
+                        # L-perm is required so BOOT_PROGRAM[0]=LOAD CR15,CR15[0] passes
+                        # mload CHECK_L without needing the boot_microcode_active M-elevation window.
                         C(0,          32),  # word1_location = 0 (NS at dmem start)
                         C(18,         32),  # word2_w2: limit_offset=18 (slots 0-18)
                     )),
@@ -999,6 +1015,26 @@ class ChurchCore(Elaboratable):
                     code_lo_reg.eq(0),
                     code_hi_reg.eq(NUC_LUMP_BASE),
                 ]
+
+        # ── Boot microcode M-elevation window (connections) ────────────────────────
+        # boot_retire_count / boot_microcode_active were forward-declared above (before
+        # u_perm wiring) so they could gate u_perm.check_valid.  The sync increment
+        # and comb value are connected here, after the full retire machinery is wired.
+        #
+        # BOOT_PROGRAM[0..2] (LOAD→CHANGE→CALL) run immediately after boot_complete.
+        # These three instructions are architecturally M-elevated ("boot microcode"):
+        # they need full L/S/E perm bypass and NS-bounds bypass so that the boot
+        # ROM can load the namespace cap (CR15), switch to Boot.Thread (CR12), and
+        # call the IDE-configured entry abstraction (CR0) without requiring those
+        # caps to be fully permissioned at the hardware level.
+        #
+        # boot_retire_count tracks how many instructions have retired since boot_complete.
+        # boot_microcode_active is True for the first 3 retires (LOAD, CHANGE, CALL).
+        with m.If(self.boot_complete & self.retire_valid & (boot_retire_count < 3)):
+            m.d.sync += boot_retire_count.eq(boot_retire_count + 1)
+        m.d.comb += boot_microcode_active.eq(
+            self.boot_complete & (boot_retire_count < 3)
+        )
 
         runtime_wr_en = [Signal(name=f"rt_cap{i}_wr_en") for i in range(16)]
         runtime_wr_gt = [Signal(GT_LAYOUT, name=f"rt_cap{i}_wr_gt") for i in range(16)]
@@ -1444,7 +1480,9 @@ class ChurchCore(Elaboratable):
                 u_change.change_start.eq(change_start_sig),
                 u_change.cr_src.eq(cr_src),
                 u_change.cr_dst.eq(cr_dst),
-                u_change.m_elevated.eq(boot_state_reg != BootState.COMPLETE),
+                u_change.m_elevated.eq(
+                    (boot_state_reg != BootState.COMPLETE) | boot_microcode_active
+                ),
                 u_change.index.eq(cap_index),
                 u_change.change_mask.eq(u_decoder.call_mask),
                 u_change.cr_rd_data.eq(u_regs.cr_rd_data),
@@ -2464,7 +2502,9 @@ class ChurchCore(Elaboratable):
                 u_shared_mload.sub_direct.eq(u_load.mload_direct),
                 u_shared_mload.sub_direct_gt.eq(u_load.mload_direct_gt),
                 u_shared_mload.sub_m_elevated.eq(
-                    u_load.mload_m_elevated | (boot_state_reg != BootState.COMPLETE)
+                    u_load.mload_m_elevated
+                    | (boot_state_reg != BootState.COMPLETE)
+                    | boot_microcode_active
                 ),
             ]
 
@@ -2497,6 +2537,24 @@ class ChurchCore(Elaboratable):
                 self.dmem_wr_data.eq(u_shared_mload.mem_wr_data),
                 self.dmem_wr_en.eq(u_shared_mload.mem_wr_en),
             ]
+        if not self.iot_profile:
+            with m.Elif(u_change.mem_rd_en):
+                # CHANGE LOAD_THREAD / RESTORE_CALL / RESTORE_M_FLAG_RD /
+                # READ_THREAD_HDR: internal mload and direct reads need the
+                # DMEM bus.  Previously absent from this mux — the second
+                # CHANGE boot-ROM run hung because there was no other unit
+                # driving dmem_rd_valid for it to piggyback on.
+                m.d.comb += [
+                    self.dmem_addr.eq(u_change.mem_rd_addr),
+                    self.dmem_rd_en.eq(1),
+                ]
+            with m.Elif(u_change.mem_wr_en):
+                # CHANGE SAVE_DR / SAVE_PACKED_PC / SAVE_M_FLAG writes.
+                m.d.comb += [
+                    self.dmem_addr.eq(u_change.mem_wr_addr),
+                    self.dmem_wr_data.eq(u_change.mem_wr_data),
+                    self.dmem_wr_en.eq(1),
+                ]
         with m.Elif(u_call.mem_rd_en):
             # CALL FETCH_LUMP / STACK_READ_SP: data memory read
             m.d.comb += [

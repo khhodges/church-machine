@@ -241,6 +241,9 @@ register_suite "compile-api-tests" \
 register_suite "hardware-sim" \
     'python -m hardware.test_mwin_seal && python -m hardware.test_outform_mode2 && python -m hardware.test_shift_ops && python -m hardware.test_irq_dispatch'
 
+register_suite "boot-rom-no-false-halt" \
+    'python -m pytest hardware/test_boot_rom_no_false_halt.py tests/hardware/test_boot_rom_no_false_halt.py -v'
+
 register_suite "e2e-tests" \
     'CHROMIUM=$(which chromium) && mkdir -p .cache/ms-playwright/chromium-1217/chrome-linux64 && ln -sf "$CHROMIUM" .cache/ms-playwright/chromium-1217/chrome-linux64/chrome && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npx --yes playwright test'
 
@@ -298,7 +301,7 @@ ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests 
 
 ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabilities-blocks check-api-reference-stale callhome-parser-tests check-slot-index-leak check-ila-probe-names test-check-ila-probe-names"
 
-ALL_GROUPS["hardware"]="hardware-sim"
+ALL_GROUPS["hardware"]="hardware-sim boot-rom-no-false-halt"
 
 ALL_GROUPS["e2e"]="e2e-tests"
 

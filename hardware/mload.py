@@ -138,6 +138,10 @@ class ChurchMLoad(Elaboratable):
         local_mem_wr_data = Signal(32)
 
         m.d.comb += u_ns_gate.cr15_namespace.eq(self.cr15_namespace)
+        # M-elevated accesses bypass the ns_gate seal/version check so that
+        # the boot FSM and the 3-instruction BOOT_PROGRAM microcode window can
+        # read uninitialized or out-of-range NS slots without a SEAL fault.
+        m.d.comb += u_ns_gate.m_elevated.eq(self.sub_m_elevated)
 
         m.d.comb += [
             self.mem_addr.eq(
@@ -179,7 +183,14 @@ class ChurchMLoad(Elaboratable):
                     m.next = "CHECK_L"
 
             with m.State("CHECK_L"):
-                with m.If(src_is_null):
+                with m.If(src_is_null & ~self.sub_m_elevated):
+                    # M-elevated accesses (boot FSM states and BOOT_PROGRAM
+                    # microcode window) bypass NULL_CAP.  After BOOT_PROGRAM[0]
+                    # (LOAD CR15,CR15[0]) runs, CR15 holds a null GT (the NS slot 0
+                    # location word is 0x00000000 = null GT).  LOAD_THREAD and
+                    # RESTORE_CALL inside BOOT_PROGRAM[1] (CHANGE) must be able to
+                    # use CR15 as a c-list base even though its GT is null, so the
+                    # NULL_CAP check is suppressed for M-elevated accesses.
                     m.d.sync += fault_type_reg.eq(FaultType.NULL_CAP)
                     m.next = "FAULT"
                 with m.Elif(~has_l_perm & ~self.sub_m_elevated):
@@ -189,7 +200,10 @@ class ChurchMLoad(Elaboratable):
                     m.next = "CHECK_BOUNDS"
 
             with m.State("CHECK_BOUNDS"):
-                with m.If(~bounds_ok):
+                with m.If(~bounds_ok & ~self.sub_m_elevated):
+                    # M-elevated accesses (boot FSM states and BOOT_PROGRAM microcode
+                    # window) bypass c-list bounds so the boot ROM can read capability
+                    # registers that haven't been fully initialised yet.
                     m.d.sync += fault_type_reg.eq(FaultType.BOUNDS)
                     m.next = "FAULT"
                 with m.Else():
@@ -220,7 +234,11 @@ class ChurchMLoad(Elaboratable):
                         m.next = "CHECK_NS"
 
             with m.State("CHECK_NS"):
-                with m.If(~ns_index_in_bounds):
+                with m.If(~ns_index_in_bounds & ~self.sub_m_elevated):
+                    # M-elevated accesses bypass the NS slot bounds check.
+                    # The ns_gate still runs; slot_id out of range simply reads
+                    # zeroed DMEM (no NS entry at that address) and returns
+                    # raw_base=0 / raw_w2=0, which is harmless during boot microcode.
                     m.d.sync += fault_type_reg.eq(FaultType.BOUNDS)
                     m.next = "FAULT"
                 with m.Else():

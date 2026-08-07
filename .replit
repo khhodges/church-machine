@@ -117,6 +117,10 @@ args = "boot-layout-regression"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
+args = "boot-rom-no-false-halt"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
 args = "e2e-tests"
 
 [[workflows.workflow.tasks]]
@@ -462,6 +466,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python -m pytest tests/boot/test_boot_layout_no_null_slot2.py -v"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "boot-rom-no-false-halt"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python -m pytest hardware/test_boot_rom_no_false_halt.py tests/hardware/test_boot_rom_no_false_halt.py -v"
 
 [workflows.workflow.metadata]
 outputType = "console"

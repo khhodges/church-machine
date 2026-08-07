@@ -5,6 +5,12 @@ from .hw_types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT, LUMP_HEADER_LAYOUT
 from .mload import ChurchMLoad
 
+# Offset (in words) from the thread lump base to the first thread capability.
+# Thread.caps[0..14] live at thread_lump_base + THREAD_CAPS_OFFSET*4 .. +58.
+# RESTORE_CALL loads CR0–CR14 by reading CR8[THREAD_CAPS_OFFSET + cr_index].
+# Cross-reference: simulator.js THREAD_CAPS_OFFSET, hw_types.py §"Thread layout".
+THREAD_CAPS_OFFSET = 244
+
 
 class ChurchChange(Elaboratable):
     def __init__(self):
@@ -71,9 +77,11 @@ class ChurchChange(Elaboratable):
 
         cr_index = Signal(4)
         crn_reg_latched = Signal(CAP_REG_LAYOUT)
-        index_latched = Signal(16)
-        mask_latched = Signal(16)
-        fault_latched = Signal()
+        index_latched    = Signal(16)
+        mask_latched     = Signal(16)
+        cr_src_latched   = Signal(4)   # latched at change_start; self.cr_src is only valid
+        cr_dst_latched   = Signal(4)   # at the decode cycle; NIA advances before FSM runs
+        fault_latched    = Signal()
         fault_type_latched = Signal(5)
 
         # THREAD_HDR hidden register — loaded from Mem[thread_base+0] on thread restore.
@@ -105,7 +113,7 @@ class ChurchChange(Elaboratable):
         # the corresponding CR port address in the Church Hardware Address Range.
         cr_port_match = Signal()
         m.d.comb += cr_port_match.eq(
-            Mux(self.cr_dst == 12,
+            Mux(cr_dst_latched == 12,
                 crn_view.word1_location == CR_PORT_CR12,
                 crn_view.word1_location == CR_PORT_CR13)
         )
@@ -206,6 +214,8 @@ class ChurchChange(Elaboratable):
                     m.d.sync += [
                         index_latched.eq(self.index),
                         mask_latched.eq(self.change_mask),
+                        cr_src_latched.eq(self.cr_src),
+                        cr_dst_latched.eq(self.cr_dst),
                         cr_index.eq(0),
                         save_index.eq(0),
                     ]
@@ -220,17 +230,17 @@ class ChurchChange(Elaboratable):
                 m.d.comb += self.cr_rd_addr.eq(7)
                 cr7_rd_view = View(CAP_REG_LAYOUT, self.cr_rd_data)
                 m.d.sync += cr7_base.eq(cr7_rd_view.word1_location)
-                m.d.comb += self.cr_rd_addr.eq(self.cr_src)
+                m.d.comb += self.cr_rd_addr.eq(cr_src_latched)
                 m.next = "READ_CRN"
 
             with m.State("READ_CRN"):
-                m.d.comb += self.cr_rd_addr.eq(self.cr_src)
+                m.d.comb += self.cr_rd_addr.eq(cr_src_latched)
                 m.next = "LATCH_CRN"
 
             with m.State("LATCH_CRN"):
                 m.d.sync += crn_reg_latched.eq(self.cr_rd_data)
-                m.d.comb += self.cr_rd_addr.eq(self.cr_src)
-                with m.If((self.cr_dst == 12) | (self.cr_dst == 13)):
+                m.d.comb += self.cr_rd_addr.eq(cr_src_latched)
+                with m.If((cr_dst_latched == 12) | (cr_dst_latched == 13)):
                     # CR12/CR13 system-wide: authority check happens in next state
                     # (crn_reg_latched will be valid there)
                     m.next = "CHECK_CR12_AUTH"
@@ -245,11 +255,15 @@ class ChurchChange(Elaboratable):
 
             with m.State("CHECK_CR12_AUTH"):
                 # crn_reg_latched is valid here (latched at end of LATCH_CRN).
-                # M-elevated boot path bypasses authority; post-boot requires:
+                # M-elevated boot path bypasses authority and jumps directly to
+                # LOAD_THREAD (skipping SAVE_DR context save, as BOOT_PROGRAM
+                # runs before any thread context exists to save).  RESTORE_CALL
+                # then loads CR0–CR14 from the thread caps zone.
+                # Post-boot (m_elevated=False) requires:
                 #   • source cap carries S-perm
                 #   • source cap location matches the target CR's port address
                 with m.If(self.m_elevated):
-                    m.next = "CR12_CR13_LOAD"
+                    m.next = "LOAD_THREAD"
                 with m.Elif(~crn_has_s_perm):
                     m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_S)]
                     m.next = "FAULT"
@@ -263,8 +277,8 @@ class ChurchChange(Elaboratable):
                 # Load the GT from NS[index] (via source cap authority) directly
                 # into CR12 or CR13 — no per-thread context save/restore.
                 m.d.comb += [
-                    mload_src.eq(self.cr_src),
-                    mload_dst.eq(self.cr_dst),
+                    mload_src.eq(cr_src_latched),
+                    mload_dst.eq(cr_dst_latched),
                     mload_index.eq(index_latched),
                 ]
                 m.d.sync += mload_start_reg.eq(1)
@@ -313,7 +327,7 @@ class ChurchChange(Elaboratable):
 
             with m.State("LOAD_THREAD"):
                 m.d.comb += [
-                    mload_src.eq(self.cr_src),
+                    mload_src.eq(cr_src_latched),
                     mload_dst.eq(8),
                     mload_index.eq(index_latched),
                 ]
@@ -335,7 +349,11 @@ class ChurchChange(Elaboratable):
                 m.d.comb += [
                     mload_src.eq(8),
                     mload_dst.eq(cr_index),
-                    mload_index.eq(cr_index),
+                    # Thread.caps[n] is at thread_lump_base + (THREAD_CAPS_OFFSET+n)*4.
+                    # CR8.word1_location = thread_lump_base (set by LOAD_THREAD ns_gate).
+                    # Using THREAD_CAPS_OFFSET+cr_index addresses caps[0] at word 244
+                    # and caps[n] at word 244+n, matching the hardware thread layout.
+                    mload_index.eq(THREAD_CAPS_OFFSET + cr_index),
                 ]
                 with m.If(skip_current_cr):
                     m.d.sync += cr_index.eq(cr_index + 1)
@@ -385,9 +403,19 @@ class ChurchChange(Elaboratable):
                 # After RESTORE_CALL the incoming thread's CRs are all committed
                 # to the register file, so CR12 now holds the new thread capability.
                 # CR12 is M-elevated (perms always 0) — validate null only.
-                with m.If(cr12_null):
+                #
+                # M-elevated exception: during BOOT_PROGRAM microcode, the CHANGE
+                # mask is 0 (decoder scrubs call_mask to 0), so RESTORE_CALL skips
+                # all CR0–CR14 and CR12 remains null.  The boot path does not need
+                # thread-header validation (there is no existing thread stack to
+                # bound-check), so we bypass the null check and use thread_hdr=0.
+                with m.If(cr12_null & ~self.m_elevated):
                     m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.NULL_CAP)]
                     m.next = "FAULT"
+                with m.Elif(cr12_null & self.m_elevated):
+                    # M-elevated + null CR12: skip header read, default hdr=0.
+                    m.d.sync += thread_hdr_reg.eq(0)
+                    m.next = "INSTALL_CR5"
                 with m.Else():
                     m.next = "READ_THREAD_HDR"
 

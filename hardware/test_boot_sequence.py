@@ -233,7 +233,7 @@ def test_wukong_boot_triggered():
     So led[1] 0→1 transition within the expected window confirms the FSM latched.
     """
     from .wukong_top import ChurchWukongXC7A100T
-    from .boot_rom import WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST
+    from .boot_rom import WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST, WUKONG_NUC_PROGRAM
 
     # sim_mode=True: skips port-driven comb clock so sim.add_clock() can drive
     # ClockSignal("sync") directly (no DriverConflict with self.clk port).
@@ -241,12 +241,19 @@ def test_wukong_boot_triggered():
     results = {}
 
     # Mirror the hw_init_pairs computation from elaborate() to get N_INIT.
+    # Must include the WukongCallHome LUMP body at offset 0x1C0 (word 448) —
+    # elaborate() writes [_wch_header] + list(WUKONG_NUC_PROGRAM) there, adding
+    # ~74 non-zero DMEM words that the old formula omitted.
     dmem_init = list(WUKONG_DEMO_NAMESPACE)
     while len(dmem_init) < 256:
         dmem_init.append(0)
     dmem_init += list(WUKONG_DEMO_CLIST)
     while len(dmem_init) < 16384:
         dmem_init.append(0)
+    _wch_cw = len(WUKONG_NUC_PROGRAM)
+    _wch_header = (0x1F << 27) | (1 << 23) | (_wch_cw << 10)
+    for _i, _v in enumerate([_wch_header] + list(WUKONG_NUC_PROGRAM)):
+        dmem_init[0x1C0 + _i] = _v
     hw_init_pairs = [(addr, val) for addr, val in enumerate(dmem_init) if val != 0]
     N_INIT = len(hw_init_pairs)
 

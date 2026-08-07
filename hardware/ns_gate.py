@@ -63,6 +63,12 @@ class ChurchNSGate(Elaboratable):
         self.ns_gate_fault      = Signal()
         self.ns_gate_fault_type = Signal(5)
 
+        # When asserted, the seal (integrity) and version checks are bypassed.
+        # Used by M-elevated accesses (boot FSM and BOOT_PROGRAM microcode window)
+        # so that reads from uninitialized or out-of-range NS slots do not produce
+        # spurious SEAL faults.
+        self.m_elevated      = Signal()
+
         self.gt_word0        = Signal(32)
         self.cr15_namespace  = Signal(CAP_REG_LAYOUT)
 
@@ -153,7 +159,13 @@ class ChurchNSGate(Elaboratable):
                         m.next = "CHECK_INTEGRITY"
 
                 with m.State("CHECK_INTEGRITY"):
-                    with m.If(~gt_seq_match):
+                    with m.If(self.m_elevated):
+                        # M-elevated access: skip the seal and version checks.
+                        # Boot FSM states and the 3-instruction BOOT_PROGRAM
+                        # microcode window may read uninitialized NS slots whose
+                        # integrity words are zero; do not treat that as a fault.
+                        m.next = "FETCH_W3"
+                    with m.Elif(~gt_seq_match):
                         m.d.sync += fault_type_reg.eq(FaultType.VERSION)
                         m.next = "FAULT"
                     with m.Elif(~seal_ok):
