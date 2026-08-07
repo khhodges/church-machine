@@ -642,6 +642,17 @@ args = "node simulator/test_return_cr14_trace.js"
 [workflows.workflow.metadata]
 outputType = "console"
 
+[[workflows.workflow]]
+name = "return-fetch-lump-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node tests/simulator/sim_return_fetch_lump.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[ports]]
 localPort = 5000
 externalPort = 5000

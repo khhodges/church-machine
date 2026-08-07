@@ -208,6 +208,9 @@ register_suite "wukong-cr-update-tests" \
 register_suite "wukong-trace-cr-server-tests" \
     'python3 -m pytest tests/server/test_wukong_trace_cr_update.py -v'
 
+register_suite "return-fetch-lump-tests" \
+    'node tests/simulator/sim_return_fetch_lump.js'
+
 register_suite "boot-image-matches-sim" \
     'python3 -m pytest tests/boot/test_boot_image_matches_simulator.py -v'
 
@@ -285,7 +288,7 @@ ALL_GROUPS["boot"]="boot-image-matches-sim boot-image-loads-and-boots boot-image
 
 ALL_GROUPS["lump"]="lump-consistency lump-binary-tests lump-roundtrip editor-roundtrip-tests lump-gt-display-tests update-lump-tests"
 
-ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests pet-name-mem-tests warning-panel-tests bare-space-ns-fallback-tests disasm-panel-tests boot-entry-sync-tests ns-slot-dynamic-tests selftest-lump-runs pet-name-memory-tests lump-builder-dispatch-tests openin-links-tests lump-warning-tests call-cr6-l-perm-tests return-cr6-l-perm-tests load-through-l-perm-cr6-tests return-cr14-trace-tests wukong-cr-update-tests wukong-trace-cr-server-tests"
+ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests pet-name-mem-tests warning-panel-tests bare-space-ns-fallback-tests disasm-panel-tests boot-entry-sync-tests ns-slot-dynamic-tests selftest-lump-runs pet-name-memory-tests lump-builder-dispatch-tests openin-links-tests lump-warning-tests call-cr6-l-perm-tests return-cr6-l-perm-tests load-through-l-perm-cr6-tests return-cr14-trace-tests wukong-cr-update-tests wukong-trace-cr-server-tests return-fetch-lump-tests"
 
 ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabilities-blocks check-api-reference-stale callhome-parser-tests check-slot-index-leak check-ila-probe-names test-check-ila-probe-names"
 

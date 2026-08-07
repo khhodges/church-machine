@@ -4766,6 +4766,15 @@ class ChurchSimulator {
             this.output += desc + '\n';
             return { pc: cachedReturnPC, instr: d, desc, pipeline: this._returnPipeline(d, frame, mask) };
         }
+        // Restore CR14 for cross-domain RETURN (sz=1 CALL frame): mirrors the
+        // hardware cload that fires after RETURN to reload the caller's code
+        // capability from its NS entry.  Without this _fetchInstruction computes
+        // physicalPC from the callee's lump base (stale CR14.word1), so the next
+        // step fetches from the wrong location.
+        // Lambda frames (sz=0) never overwrite CR14, so no restoration is needed.
+        if (frame.sz === 1 && frame.savedCRs && frame.savedCRs[14] !== undefined) {
+            this.cr[14] = { ...frame.savedCRs[14] };
+        }
         const maskDesc = mask ? ` MASK=0b${mask.toString(2).padStart(12, '0')} preserved[${preservedCRs.join(',')||'none'}]` : '';
         const desc = `RETURN (${frameTag}/SZ=${frame.sz}) PC→${frame.returnPC}${maskDesc}`;
         this.output += desc + '\n';
