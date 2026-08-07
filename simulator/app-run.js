@@ -14272,6 +14272,7 @@ let _wukongLastTraceTs  = 0;       // unix timestamp (seconds) of last trace pac
 const _WUKONG_STALE_MS  = 10000;   // 10 s without a packet → disconnected
 
 let _wukongCallDepth    = 0;       // call stack depth tracked via CALL_PUSH/POP events
+let _wukongHwNia        = null;    // retiring NIA of last HW trace packet
 
 let _wukongLastEventSeq = 0;       // cursor into the server-side ordered event queue
 const _hwBreakpoints = new Set();
@@ -14280,6 +14281,21 @@ window._hwBreakpoints = _hwBreakpoints;
 function _wukongIsConnected() {
     return _wukongLastTraceTs > 0 &&
            (Date.now() - _wukongLastTraceTs * 1000) < _WUKONG_STALE_MS;
+}
+
+// Move the hardware-step cursor (nia-hw-cursor class) to the given word address.
+// Removes the class from any previously highlighted row so only one row carries
+// it at a time.  Does nothing when no disassembly panel is open.
+function _wukongSetHwCursor(niaInt) {
+    _wukongHwNia = niaInt;
+    document.querySelectorAll('.nia-disasm-row.nia-hw-cursor').forEach(function(r) {
+        r.classList.remove('nia-hw-cursor');
+    });
+    const row = document.querySelector('.nia-disasm-row[data-addr="' + niaInt + '"]');
+    if (row) {
+        row.classList.add('nia-hw-cursor');
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
 }
 
 // Refresh every .nia-col-hwbp gutter marker in any open disassembly modal.
@@ -14419,6 +14435,18 @@ async function _wukongDrainEvents() {
     // On reconnect reset local depth (per-event call_depth will re-establish it).
     if (!wasConnected) _wukongCallDepth = 0;
 
+    // Log a "board connected" message the first time events arrive after a gap.
+    if (!wasConnected && _wukongIsConnected()) {
+        const _rcon = document.getElementById('editorConsole');
+        if (_rcon) {
+            const _cl = document.createElement('div');
+            _cl.className = 'wukong-trace-line wukong-trace-connect';
+            _cl.appendChild(document.createTextNode('\nHW: board connected'));
+            _rcon.appendChild(_cl);
+            _rcon.scrollTop = _rcon.scrollHeight;
+        }
+    }
+
     for (const ev of events) {
         _wukongAppendTrace(ev);
     }
@@ -14470,13 +14498,27 @@ function _wukongHideStaleBanner() {
     _wukongStaleBannerDismissed = false;
 }
 
-// Poll for new trace packets every 3 seconds (connection detection + CR update).
+// Poll for new trace packets every 500 ms (connection detection + CR update).
 // Also polls boot-info to show/hide the stale-bitstream banner.
 setInterval(async function _wukongPoll() {
+    const _pollWasConnected = _wukongIsConnected();
     try {
         await _wukongDrainEvents();
         _wukongUpdateBtn();
     } catch(e) {}
+    // Detect disconnection: connection was live but now the last-packet timestamp
+    // is older than _WUKONG_STALE_MS.  Log once and update the toolbar button.
+    if (_pollWasConnected && !_wukongIsConnected()) {
+        const _dcon = document.getElementById('editorConsole');
+        if (_dcon) {
+            const _dl = document.createElement('div');
+            _dl.className = 'wukong-trace-line wukong-trace-disconnect';
+            _dl.appendChild(document.createTextNode('\nHW: connection lost'));
+            _dcon.appendChild(_dl);
+            _dcon.scrollTop = _dcon.scrollHeight;
+        }
+        _wukongUpdateBtn();
+    }
     // Also poll boot-info to show/hide the stale-bitstream banner.
     try {
         const bi = await fetch('/hardware/wukong/boot-info');
@@ -14488,7 +14530,7 @@ setInterval(async function _wukongPoll() {
             _wukongHideStaleBanner();
         }
     } catch(e) {}
-}, 3000);
+}, 500);
 
 const _WUKONG_FAULT_NAMES = [
     'NONE','PERM_R','PERM_W','PERM_E','PERM_L',
@@ -14509,15 +14551,38 @@ function _wukongAppendTrace(data) {
     const con = document.getElementById('editorConsole');
     if (!con) return;
     const evType = data.ev_type || 0;
+    const niaInt = data.nia >>> 0;
 
-    // ev_type 0x08 = TRACE_EV_CALL_PUSH: caller frame pushed onto call stack.
-    // ev_type 0x09 = TRACE_EV_CALL_POP:  caller frame popped (RETURN).
-    //
-    // Use the server-authoritative per-event call_depth field when present.
-    // This keeps the displayed depth correct even after a queue overflow gap
-    // or server restart, since the server tracked every push/pop in order.
-    // Fall back to local increment/decrement only when call_depth is absent
-    // (e.g. events from an older server that doesn't carry the field).
+    // ── Move the HW cursor in any open disassembly panel ─────────────────────
+    _wukongSetHwCursor(niaInt);
+
+    // ── Apply CR register updates from ev_type + payload_gt ──────────────────
+    // Only CRs explicitly reported in packets are touched; sim is not stepped.
+    //   0x02 LOAD_NEW   → CR_dst (decoded from instruction word bits[19:16])
+    //   0x04 CHANGE_CR12→ CR12
+    //   0x05 CHANGE_CR5 → CR5
+    //   0x06 CALL_CR6   → CR6      0x0A RETURN_CR6  → CR6
+    //   0x07 CALL_CR14  → CR14     0x0B RETURN_CR14 → CR14
+    if (sim && sim.cr) {
+        const gt = (data.payload_gt >>> 0);
+        let crIdx = -1;
+        if (evType === 0x02) {
+            // Decode CR_dst from the retiring instruction word bits[19:16].
+            const instrWord = (sim.memory && niaInt < sim.memory.length)
+                ? (sim.memory[niaInt] >>> 0) : 0;
+            crIdx = (instrWord >>> 16) & 0xF;
+        } else if (evType === 0x04) { crIdx = 12;
+        } else if (evType === 0x05) { crIdx = 5;
+        } else if (evType === 0x06 || evType === 0x0A) { crIdx = 6;
+        } else if (evType === 0x07 || evType === 0x0B) { crIdx = 14;
+        }
+        if (crIdx >= 0 && sim.cr[crIdx]) {
+            sim.cr[crIdx].word0 = gt;
+            if (typeof updateCRDisplay === 'function') updateCRDisplay();
+        }
+    }
+
+    // ── ev_type 0x08 CALL_PUSH / 0x09 RETURN_POP — depth only ───────────────
     if (evType === 0x08) {
         if (typeof data.call_depth === 'number') {
             _wukongCallDepth = data.call_depth;
@@ -14548,7 +14613,7 @@ function _wukongAppendTrace(data) {
         return;
     }
 
-    const niaInt = data.nia >>> 0;
+    // ── Render the console trace line ─────────────────────────────────────────
     const nia    = '0x' + niaInt.toString(16).padStart(8, '0').toUpperCase();
     const flags  = _wukongFlagsStr(data.flags || 0);
     let stateStr;
@@ -14558,9 +14623,9 @@ function _wukongAppendTrace(data) {
     } else {
         stateStr = 'ok';
     }
-    // Build the trace line as a div so "BP HIT" can be a clickable button.
+    // Fault lines get a red class so they stand out visually.
     const line = document.createElement('div');
-    line.className = 'wukong-trace-line';
+    line.className = 'wukong-trace-line' + (data.fault_valid ? ' wukong-trace-fault' : '');
     line.appendChild(document.createTextNode(
         '\nHW: NIA=' + nia + '  flags=' + flags + '  ' + stateStr));
     if (data.bp_hit) {

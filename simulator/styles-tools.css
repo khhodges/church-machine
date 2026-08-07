@@ -2517,6 +2517,21 @@
 }
 .wukong-bp-hit-link:hover { color: #e74c3c; }
 
+/* Fault / connect / disconnect console lines */
+.wukong-trace-fault      { color: #f87171; }
+.wukong-trace-connect    { color: #4ade80; }
+.wukong-trace-disconnect { color: #f59e0b; }
+
+/* HW cursor — distinct amber-blue highlight, separate from the sim gold cursor */
+.nia-hw-cursor {
+    background: #0f1e35;
+    border-left: 3px solid #7dd3fc;
+}
+.nia-hw-cursor .nia-col-addr { color: #7dd3fc; }
+.nia-hw-cursor .nia-col-hex  { color: #5a9fc2; }
+.nia-hw-cursor .nia-col-role { color: #4a7a9b; }
+.nia-hw-cursor:hover { background: #142438; }
+
 .nia-col-rel   { color: inherit; text-align: right; }
 .nia-col-addr  { color: #374151; }
 .nia-disasm-current .nia-col-addr { color: #b8860b; }
