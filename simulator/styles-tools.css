@@ -2605,8 +2605,24 @@
     font-size: 12px;
 }
 .wukong-fault-name  { color: #f5a623; font-weight: 700; }
-.wukong-fault-nia   { color: #c8a04a; }
+.wukong-fault-nia   { color: #c8a04a; display: flex; align-items: center; gap: 8px; }
 .wukong-fault-instr { color: #c8a04a; }
+.wukong-fault-view-link {
+    background: none;
+    border: none;
+    color: #60a5fa;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    padding: 0;
+    text-decoration: underline dotted;
+    white-space: nowrap;
+    opacity: 0.85;
+}
+.wukong-fault-view-link:hover { color: #93c5fd; opacity: 1; text-decoration: underline; }
+
+/* Fault-triggered disassembly modal — reuses .chlog-modal scaffold */
+.wukong-fault-disasm-modal .chlog-modal-machine { color: #f5a623; }
 
 /* ── Call-stack depth badge ──────────────────────────────────────────────── */
 .wukong-call-depth-badge {

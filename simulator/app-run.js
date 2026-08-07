@@ -14898,11 +14898,223 @@ function _wukongShowFaultPanel(data) {
         '<span class="wukong-fault-label">Fault</span>' +
         '<span class="wukong-fault-value wukong-fault-name">' + _escHtml(faultName) + '</span>' +
         '<span class="wukong-fault-label">NIA</span>' +
-        '<span class="wukong-fault-value wukong-fault-nia">' + _escHtml(niaStr) + '</span>' +
+        '<span class="wukong-fault-value wukong-fault-nia">' + _escHtml(niaStr) +
+            '<button class="wukong-fault-view-link" data-nia="' + niaInt + '">View instruction \u2192</button>' +
+        '</span>' +
         '<span class="wukong-fault-label">Instruction</span>' +
         '<span class="wukong-fault-value wukong-fault-instr">' + _escHtml(instrName) + '</span>';
+
+    body.querySelector('.wukong-fault-view-link').addEventListener('click', function() {
+        _wukongOpenFaultDisasm(parseInt(this.dataset.nia, 10));
+    });
 
     panel.appendChild(header);
     panel.appendChild(body);
     con.parentNode.insertBefore(panel, con);
+}
+
+// ── Fault-panel disassembly helpers ──────────────────────────────────────────
+
+// Look up a single word for the fault disassembly panel.
+// Priority: (1) ROM/LUMP callhome caches, (2) live simulator memory.
+// Returns null when neither source has the word.
+function _wukongLookupWordForFault(wordAddr) {
+    // 1. Callhome caches (boot ROM + active LUMP) — fastest when populated.
+    if (typeof _cmLookupWord === 'function') {
+        var cached = _cmLookupWord(wordAddr);
+        if (cached !== null && cached !== undefined) return cached;
+    }
+    // 2. Live simulator memory — always current after program load.
+    if (typeof sim !== 'undefined' && sim && sim.memory &&
+            wordAddr >= 0 && wordAddr < sim.memory.length) {
+        return sim.memory[wordAddr];
+    }
+    return null;
+}
+
+// Build a words array centred on niaInt using the live-aware lookup.
+function _wukongWordsAroundForFault(niaInt, radius) {
+    var results = [];
+    for (var i = niaInt - radius; i <= niaInt + radius; i++) {
+        var w = _wukongLookupWordForFault(i);
+        results.push({ wordAddr: i, word: (w === null || w === undefined) ? null : (w >>> 0) });
+    }
+    return results;
+}
+
+// Build the disassembly HTML for a fault NIA; falls back to a loading placeholder.
+function _wukongBuildFaultDisasmHtml(niaInt) {
+    var RADIUS = 8;
+    var words = _wukongWordsAroundForFault(niaInt, RADIUS);
+    var hasData = words.some(function(w) { return w.word !== null; });
+    if (hasData && typeof _cmBuildDisasmHtml === 'function') {
+        return { built: _cmBuildDisasmHtml(niaInt, words), hasData: true };
+    }
+    return {
+        built: {
+            rowsHtml: '<div class="nia-disasm-body"><div class="wukong-fault-disasm-loading" style="padding:8px;color:#9ca3af">Loading disassembly\u2026</div></div>',
+            spotlightHtml: ''
+        },
+        hasData: false
+    };
+}
+
+// Schedule one re-render of the fault-disasm panel once the ROM/LUMP caches
+// have been fetched (gives the fetch ~600 ms before the first retry, then
+// gives up after a second attempt at 2 s).
+// Guards with a NIA-match so a stale callback from fault A cannot overwrite
+// the panel after fault B has already rebuilt it for a different address.
+function _wukongScheduleFaultDisasmRerender(modal, niaInt, attempt) {
+    var delay = attempt === 0 ? 600 : 2000;
+    setTimeout(function() {
+        if (!document.body.contains(modal)) return;         // panel was closed
+        if (modal.dataset.nia !== String(niaInt)) return;   // panel rebuilt for a later fault
+        var stillLoading = modal.querySelector('.wukong-fault-disasm-loading');
+        if (!stillLoading) return;                          // already re-rendered
+        var r = _wukongBuildFaultDisasmHtml(niaInt);
+        if (r.hasData) {
+            _wukongApplyFaultDisasmContent(modal, niaInt, r.built, /*flash=*/true);
+        } else if (attempt === 0) {
+            _wukongScheduleFaultDisasmRerender(modal, niaInt, 1);
+        }
+    }, delay);
+}
+
+// Apply built disassembly HTML to an existing panel (create or update).
+function _wukongApplyFaultDisasmContent(modal, niaInt, built, flashCurrent) {
+    var niaStr = '0x' + niaInt.toString(16).toUpperCase().padStart(8, '0');
+
+    modal.dataset.nia = niaInt;
+
+    var titleEl = modal.querySelector('.chlog-modal-machine');
+    if (titleEl) titleEl.textContent = '\u26A1 Fault at ' + niaStr;
+
+    var spotlightEl = modal.querySelector('.wukong-fault-disasm-spotlight');
+    if (spotlightEl) spotlightEl.innerHTML = built.spotlightHtml;
+
+    var oldBody = modal.querySelector('.nia-disasm-body');
+    var tmp = document.createElement('div');
+    tmp.innerHTML = built.rowsHtml;
+    var newBody = tmp.firstElementChild;
+    if (oldBody && newBody) {
+        oldBody.replaceWith(newBody);
+    } else if (newBody) {
+        modal.appendChild(newBody);
+    }
+
+    requestAnimationFrame(function() {
+        var currentRow = modal.querySelector('.nia-disasm-current');
+        if (!currentRow) return;
+        currentRow.scrollIntoView({ block: 'center' });
+        if (flashCurrent) {
+            currentRow.classList.remove('nia-hwbp-flash');
+            void currentRow.offsetWidth;
+            currentRow.classList.add('nia-hwbp-flash');
+            currentRow.addEventListener('animationend', function onEnd() {
+                currentRow.classList.remove('nia-hwbp-flash');
+                currentRow.removeEventListener('animationend', onEnd);
+            });
+        }
+    });
+}
+
+function _wukongOpenFaultDisasm(niaInt) {
+    const PANEL_ID = 'wukong-fault-disasm';
+    const existing = document.getElementById(PANEL_ID);
+    if (existing) {
+        const existingNia = parseInt(existing.dataset.nia, 10);
+        if (existingNia === niaInt) {
+            // Same NIA — scroll and flash the current row.
+            const currentRow = existing.querySelector('.nia-disasm-current');
+            if (currentRow) {
+                currentRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                currentRow.classList.remove('nia-hwbp-flash');
+                void currentRow.offsetWidth;
+                currentRow.classList.add('nia-hwbp-flash');
+                currentRow.addEventListener('animationend', function onEnd() {
+                    currentRow.classList.remove('nia-hwbp-flash');
+                    currentRow.removeEventListener('animationend', onEnd);
+                });
+            }
+        } else {
+            // Different NIA — rebuild in-place for the new address.
+            _wukongRebuildFaultDisasmContent(existing, niaInt);
+        }
+        existing.style.zIndex = '10001';
+        return;
+    }
+
+    // No existing panel — create a new one.
+    var niaStr = '0x' + niaInt.toString(16).toUpperCase().padStart(8, '0');
+    var r = _wukongBuildFaultDisasmHtml(niaInt);
+
+    // Trigger background cache load (boot ROM + active LUMP endpoints) so that
+    // subsequent opens from the Devices view are instant. When we had no data
+    // on the first pass, a re-render is scheduled for when the fetch lands.
+    if (typeof _cmFetchWordCaches === 'function') _cmFetchWordCaches();
+
+    var modal = document.createElement('div');
+    modal.id = PANEL_ID;
+    modal.dataset.nia = niaInt;
+    modal.className = 'chlog-modal wukong-fault-disasm-modal';
+    modal.style.left = '120px';
+    modal.style.top  = '120px';
+    modal.style.zIndex = '10001';
+
+    modal.innerHTML =
+        '<div class="chlog-modal-header">' +
+            '<div class="chlog-modal-title">' +
+                '<span class="chlog-modal-machine">\u26A1 Fault at ' + _escHtml(niaStr) + '</span>' +
+            '</div>' +
+            '<button class="chlog-modal-close" title="Close">\u2715</button>' +
+        '</div>' +
+        '<div class="chlog-modal-body wukong-fault-disasm-spotlight">' +
+            r.built.spotlightHtml +
+        '</div>' +
+        r.built.rowsHtml;
+
+    document.body.appendChild(modal);
+
+    if (typeof _chlogMakeDraggable === 'function') _chlogMakeDraggable(modal);
+
+    modal.querySelector('.chlog-modal-close').addEventListener('click', function() {
+        modal.remove();
+    });
+
+    // Scroll current row into view after first paint.
+    requestAnimationFrame(function() {
+        var currentRow = modal.querySelector('.nia-disasm-current');
+        if (currentRow) currentRow.scrollIntoView({ block: 'center' });
+    });
+
+    // If caches were empty, schedule a re-render once the fetch completes.
+    if (!r.hasData) _wukongScheduleFaultDisasmRerender(modal, niaInt, 0);
+
+    // Bring to front on mousedown.
+    modal.addEventListener('mousedown', function() {
+        document.querySelectorAll('.chlog-modal').forEach(function(m) { m.style.zIndex = '9999'; });
+        modal.style.zIndex = '10000';
+    });
+
+    // Wire hardware-breakpoint gutter clicks.
+    modal.addEventListener('click', function(e) {
+        var hwbpMarker = e.target.closest('.nia-col-hwbp');
+        if (hwbpMarker) {
+            var bpRow = hwbpMarker.closest('.nia-disasm-row');
+            if (bpRow && bpRow.dataset.addr !== undefined &&
+                    typeof _wukongSetHwBreakpoint === 'function') {
+                _wukongSetHwBreakpoint(parseInt(bpRow.dataset.addr, 10));
+            }
+        }
+    });
+}
+
+// Rebuild the content of an existing fault-disasm panel for a new NIA address.
+// Replaces the title, spotlight, and disassembly rows in-place, preserving
+// the panel's position and z-index.
+function _wukongRebuildFaultDisasmContent(modal, niaInt) {
+    if (typeof _cmFetchWordCaches === 'function') _cmFetchWordCaches();
+    var r = _wukongBuildFaultDisasmHtml(niaInt);
+    _wukongApplyFaultDisasmContent(modal, niaInt, r.built, /*flashCurrent=*/true);
+    if (!r.hasData) _wukongScheduleFaultDisasmRerender(modal, niaInt, 0);
 }
