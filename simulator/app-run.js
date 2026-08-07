@@ -1246,8 +1246,8 @@ function _showStopBtn(show) {
 }
 
 document.addEventListener('mousedown', function(e) {
-    const wrap = document.getElementById('runWrap');
-    const pop  = document.getElementById('runPopover');
+    const wrap = document.getElementById('breakWrap');
+        const pop = document.getElementById('breakPopover');
     if (wrap && pop && pop.style.display !== 'none' && !wrap.contains(e.target)) {
         hideRunPopover();
     }
@@ -14267,11 +14267,13 @@ function showApiAbstractionDetail(slot) {
 // If a packet arrived within the last 10 seconds, the board is "connected"
 // and the "▶ HW" / "⏸ HW" toolbar button is shown.
 
-let _wukongHWRunning   = false;   // true = board is in free-run mode
-let _wukongLastTraceTs = 0;       // unix timestamp (seconds) of last trace packet
-const _WUKONG_STALE_MS = 10000;   // 10 s without a packet → disconnected
+let _wukongHWRunning    = false;   // true = board is in free-run mode
+let _wukongLastTraceTs  = 0;       // unix timestamp (seconds) of last trace packet
+const _WUKONG_STALE_MS  = 10000;   // 10 s without a packet → disconnected
 
-// Set of NIA word addresses (unsigned 32-bit) with an armed hardware breakpoint.
+let _wukongCallDepth    = 0;       // call stack depth tracked via CALL_PUSH/POP events
+
+let _wukongLastEventSeq = 0;       // cursor into the server-side ordered event queue
 const _hwBreakpoints = new Set();
 window._hwBreakpoints = _hwBreakpoints;
 
@@ -14364,6 +14366,67 @@ function _wukongApplyCRUpdate(data) {
     }
 }
 
+// Drain all trace events with seq > _wukongLastEventSeq from the server queue.
+// Updates _wukongLastEventSeq, _wukongLastTraceTs, and _wukongCallDepth; appends
+// a console line for every event (including 0x08 CALL_PUSH and 0x09 CALL_POP).
+//
+// Gap recovery: if the server's oldest retained event is newer than our cursor
+// (queue overflow), or the server seq counter was reset (server restart), we
+// resync _wukongCallDepth from the server's authoritative call_depth value.
+// Per-event call_depth fields ensure the displayed depth is always correct.
+//
+// Returns true if at least one new event arrived.
+async function _wukongDrainEvents() {
+    const r = await fetch('/hardware/wukong/events?after=' + _wukongLastEventSeq);
+    if (!r.ok) return false;
+    const data = await r.json();
+    if (!data) return false;
+
+    const serverSeq   = typeof data.server_seq   === 'number' ? data.server_seq   : null;
+    const queueMinSeq = typeof data.queue_min_seq === 'number' ? data.queue_min_seq : 0;
+    const events      = Array.isArray(data.events) ? data.events : [];
+
+    // Server restart: sequence counter was reset below our cursor.
+    // Reset cursor to 0 so the next drain call fetches all current events.
+    if (serverSeq !== null && _wukongLastEventSeq > 0 && serverSeq < _wukongLastEventSeq) {
+        _wukongLastEventSeq = 0;
+        _wukongCallDepth    = typeof data.call_depth === 'number' ? data.call_depth : 0;
+        return false;   // next poll/step will re-drain from after=0
+    }
+
+    if (events.length === 0) return false;
+
+    // Gap: queue overflow evicted entries between our cursor and the oldest
+    // retained event. Warn in the console; per-event call_depth keeps depth accurate.
+    if (queueMinSeq > 0 && queueMinSeq > _wukongLastEventSeq + 1) {
+        const con = document.getElementById('editorConsole');
+        if (con) {
+            const warn = document.createElement('div');
+            warn.className = 'wukong-trace-line wukong-trace-gap';
+            warn.appendChild(document.createTextNode(
+                '\nHW: \u26A0 trace gap \u2014 some events lost; depth resynced'));
+            con.appendChild(warn);
+            con.scrollTop = con.scrollHeight;
+        }
+    }
+
+    // Detect board reconnect before advancing the ts cursor.
+    const wasConnected = _wukongIsConnected();
+    for (const ev of events) {
+        if ((ev.seq || 0) > _wukongLastEventSeq) _wukongLastEventSeq = ev.seq;
+        if ((ev.ts  || 0) > _wukongLastTraceTs)  _wukongLastTraceTs  = ev.ts;
+    }
+    // On reconnect reset local depth (per-event call_depth will re-establish it).
+    if (!wasConnected) _wukongCallDepth = 0;
+
+    for (const ev of events) {
+        _wukongAppendTrace(ev);
+    }
+    // data carries cr6_gt / cr14_gt at top level (same shape as trace GET).
+    _wukongApplyCRUpdate(data);
+    return true;
+}
+
 // ── Stale-bitstream warning banner ────────────────────────────────────────────
 // Shown when the bridge reports stale_tu:true (old 0xBB sentinel, or 0xBC with
 // tu_version below the minimum required for 3-packet CALL sequences).
@@ -14407,17 +14470,12 @@ function _wukongHideStaleBanner() {
     _wukongStaleBannerDismissed = false;
 }
 
-// Poll for new trace packets every 3 seconds (connection detection + CR update)
+// Poll for new trace packets every 3 seconds (connection detection + CR update).
+// Also polls boot-info to show/hide the stale-bitstream banner.
 setInterval(async function _wukongPoll() {
     try {
-        const r = await fetch('/hardware/wukong/trace');
-        if (!r.ok) return;
-        const data = await r.json();
-        if (data && data.ts && data.ts > _wukongLastTraceTs) {
-            _wukongLastTraceTs = data.ts;
-            _wukongUpdateBtn();
-            _wukongApplyCRUpdate(data);
-        }
+        await _wukongDrainEvents();
+        _wukongUpdateBtn();
     } catch(e) {}
     // Also poll boot-info to show/hide the stale-bitstream banner.
     try {
@@ -14450,6 +14508,46 @@ function _wukongFlagsStr(flags) {
 function _wukongAppendTrace(data) {
     const con = document.getElementById('editorConsole');
     if (!con) return;
+    const evType = data.ev_type || 0;
+
+    // ev_type 0x08 = TRACE_EV_CALL_PUSH: caller frame pushed onto call stack.
+    // ev_type 0x09 = TRACE_EV_CALL_POP:  caller frame popped (RETURN).
+    //
+    // Use the server-authoritative per-event call_depth field when present.
+    // This keeps the displayed depth correct even after a queue overflow gap
+    // or server restart, since the server tracked every push/pop in order.
+    // Fall back to local increment/decrement only when call_depth is absent
+    // (e.g. events from an older server that doesn't carry the field).
+    if (evType === 0x08) {
+        if (typeof data.call_depth === 'number') {
+            _wukongCallDepth = data.call_depth;
+        } else {
+            _wukongCallDepth++;
+        }
+        const line = document.createElement('div');
+        line.className = 'wukong-trace-line wukong-trace-call';
+        line.appendChild(document.createTextNode(
+            '\nHW: CALL push (depth ' + _wukongCallDepth + ')'));
+        con.appendChild(line);
+        con.scrollTop = con.scrollHeight;
+        return;
+    }
+
+    if (evType === 0x09) {
+        if (typeof data.call_depth === 'number') {
+            _wukongCallDepth = data.call_depth;
+        } else {
+            if (_wukongCallDepth > 0) _wukongCallDepth--;
+        }
+        const line = document.createElement('div');
+        line.className = 'wukong-trace-line wukong-trace-return';
+        line.appendChild(document.createTextNode(
+            '\nHW: RETURN (depth ' + _wukongCallDepth + ')'));
+        con.appendChild(line);
+        con.scrollTop = con.scrollHeight;
+        return;
+    }
+
     const niaInt = data.nia >>> 0;
     const nia    = '0x' + niaInt.toString(16).padStart(8, '0').toUpperCase();
     const flags  = _wukongFlagsStr(data.flags || 0);
@@ -14488,25 +14586,20 @@ function _wukongAppendTrace(data) {
 
 async function _wukongStep() {
     try {
-        const beforeTs = _wukongLastTraceTs;
+        const beforeSeq = _wukongLastEventSeq;
         await fetch('/hardware/wukong/command', {
             method : 'POST',
             headers: {'Content-Type': 'application/json'},
             body   : JSON.stringify({cmd: 's'})
         });
-        // Wait up to 500 ms for the trace response (new ts > beforeTs)
+        // Wait up to 500 ms for at least one new event beyond beforeSeq.
         const deadline = Date.now() + 500;
         while (Date.now() < deadline) {
             await new Promise(function(res) { setTimeout(res, 30); });
             try {
-                const r = await fetch('/hardware/wukong/trace');
-                if (!r.ok) break;
-                const data = await r.json();
-                if (data && data.ts && data.ts > beforeTs) {
-                    _wukongLastTraceTs = data.ts;
+                const gotNew = await _wukongDrainEvents();
+                if (gotNew && _wukongLastEventSeq > beforeSeq) {
                     _wukongUpdateBtn();
-                    _wukongAppendTrace(data);
-                    _wukongApplyCRUpdate(data);
                     return;
                 }
             } catch(e) { break; }

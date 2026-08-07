@@ -35,8 +35,11 @@ from server.app import app
 def _reset_trace_state():
     """Reset the in-process trace globals between tests."""
     with _app_module._wukong_trace_lock:
-        _app_module._wukong_latest_trace  = {}
-        _app_module._wukong_latest_cr_gts = {}
+        _app_module._wukong_latest_trace   = {}
+        _app_module._wukong_latest_cr_gts  = {}
+        _app_module._wukong_event_queue[:] = []
+        _app_module._wukong_event_seq      = 0
+        _app_module._wukong_call_depth     = 0
 
 
 def _post(client, ev_type, payload_gt, nia=0x00000010, flags=0, fault_code=0,

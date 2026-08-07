@@ -9861,6 +9861,18 @@ _wukong_latest_trace  = {}         # {nia, ev_type, payload_gt, flags, fault_cod
 # packet (ev_type=0x08) cannot overwrite a CR6/CR14 update before the IDE polls.
 _wukong_latest_cr_gts = {}         # {6: int, 14: int}
 _wukong_pending_cmd   = None       # {'cmd': 's'|'r'|'h'|'b', 'nia': int|None}
+# Ordered event queue — every trace POST appends an entry (with a 'seq' field).
+# The IDE drains this via GET /hardware/wukong/events?after=N so that
+# intermediate CALL_PUSH/CALL_POP packets are never silently overwritten.
+_wukong_event_queue    = []        # list of entry dicts, each with 'seq'
+_wukong_event_seq      = 0         # monotonically increasing per-POST counter
+# 2048 slots ≈ 4 s of headroom at worst-case bridge throughput (~500 HTTP POSTs/s)
+# before the 3-second client poll.  Gap-recovery logic handles anything beyond that.
+_WUKONG_EVENT_QUEUE_MAXLEN = 2048
+# Authoritative call-stack depth maintained by the server.  Stored per-event so
+# the client can display and resync accurate depth even after a queue overflow gap
+# or server restart without needing to replay lost intermediate events.
+_wukong_call_depth     = 0
 
 
 @app.route('/hardware/wukong/trace', methods=['POST'])
@@ -9881,7 +9893,8 @@ def wukong_trace_post():
         bp_hit      — bool
         ts          — float timestamp
     """
-    global _wukong_latest_trace, _wukong_latest_cr_gts
+    global _wukong_latest_trace, _wukong_latest_cr_gts, _wukong_event_seq, \
+           _wukong_call_depth
     data = request.get_json(silent=True) or {}
     ev_type    = int(data.get('ev_type', 0))
     payload_gt = int(data.get('payload_gt', 0))
@@ -9897,6 +9910,20 @@ def wukong_trace_post():
         'ts':          float(data.get('ts', 0.0)),
     }
     with _wukong_trace_lock:
+        # Update authoritative call depth BEFORE assigning seq so that
+        # entry['call_depth'] reflects the state AFTER this event is applied.
+        if ev_type == 0x08:    # TRACE_EV_CALL_PUSH
+            _wukong_call_depth += 1
+        elif ev_type == 0x09:  # TRACE_EV_CALL_POP
+            if _wukong_call_depth > 0:
+                _wukong_call_depth -= 1
+        entry['call_depth'] = _wukong_call_depth
+
+        _wukong_event_seq += 1
+        entry['seq'] = _wukong_event_seq
+        _wukong_event_queue.append(entry)
+        if len(_wukong_event_queue) > _WUKONG_EVENT_QUEUE_MAXLEN:
+            del _wukong_event_queue[:-_WUKONG_EVENT_QUEUE_MAXLEN]
         _wukong_latest_trace = entry
         # Persist CR GT updates separately so a subsequent CALL_PUSH packet
         # (ev_type=0x08, payload_gt=0) cannot overwrite the CR6/CR14 GTs
@@ -9930,7 +9957,47 @@ def wukong_trace_get():
             entry['cr14_gt'] = _wukong_latest_cr_gts[14]
     return jsonify(entry)
 
+@app.route('/hardware/wukong/events', methods=['GET'])
+def wukong_events_get():
+    """IDE drains the ordered event queue since a given sequence cursor.
 
+    Query param:
+        after — sequence number of the last event the client has seen (default 0).
+                 Returns all events with seq > after in arrival order.
+
+    Response JSON:
+        events  — list of trace-entry dicts (each has 'seq' + all trace fields)
+        cr6_gt  — last payload_gt for TRACE_EV_CALL_CR6  (absent until seen)
+        cr14_gt — last payload_gt for TRACE_EV_CALL_CR14 (absent until seen)
+
+    By returning every event in order the client can track call stack depth
+    accurately even when CALL_PUSH (0x08) and CALL_POP (0x09) are sandwiched
+    between CALL_CR6/CR14 packets in rapid succession.
+    """
+    try:
+        after = int(request.args.get('after', 0))
+    except (TypeError, ValueError):
+        after = 0
+    with _wukong_trace_lock:
+        events = [e for e in _wukong_event_queue if e.get('seq', 0) > after]
+        resp = {
+            'events':        events,
+            # Authoritative call-stack depth after all events received so far.
+            # The client uses this to resync after a gap or server restart.
+            'call_depth':    _wukong_call_depth,
+            # Highest seq number ever assigned; used to detect server restarts
+            # (client cursor > server_seq means the counter was reset).
+            'server_seq':    _wukong_event_seq,
+            # Oldest seq still in the queue; client compares this against its
+            # cursor to detect overflow gaps (queue_min_seq > cursor + 1).
+            'queue_min_seq': _wukong_event_queue[0]['seq']
+                             if _wukong_event_queue else 0,
+        }
+        if 6 in _wukong_latest_cr_gts:
+            resp['cr6_gt']  = _wukong_latest_cr_gts[6]
+        if 14 in _wukong_latest_cr_gts:
+            resp['cr14_gt'] = _wukong_latest_cr_gts[14]
+    return jsonify(resp)
 @app.route('/hardware/wukong/command', methods=['POST'])
 def wukong_command_post():
     """IDE enqueues a command for the bridge to forward to the board.
