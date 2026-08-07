@@ -64,7 +64,12 @@ class _MockSerial:
     After the payload is exhausted, every subsequent read() call returns b''
     so that check_sentinel() loops until the sentinel is found (which happens
     on the first read) or times out (for the negative case).
+
+    ``timeout`` is set to a small positive value so the check_sentinel()
+    per-read-timeout assertion passes.
     """
+
+    timeout = 0.05  # satisfies check_sentinel()'s ser.timeout assertion
 
     def __init__(self, data: bytes):
         self._stream = io.BytesIO(data)
@@ -80,12 +85,13 @@ class _ChunkedMockSerial:
     the requested *n*), then b'' once all chunks are exhausted.  This lets
     tests simulate a sentinel whose bytes arrive across multiple separate
     read() calls — exercising the partial-buffer ``continue`` path inside
-    check_sentinel(), and the partial-packet ``break`` path inside
-    check_trace().
+    check_sentinel().
 
-    write() is a no-op stub so that check_trace()'s ``ser.write(b"r")`` call
-    does not raise AttributeError.
+    ``timeout`` is set to a small positive value so the check_sentinel()
+    per-read-timeout assertion passes.
     """
+
+    timeout = 0.05  # satisfies check_sentinel()'s ser.timeout assertion
 
     def __init__(self, chunks: list):
         self._chunks = list(chunks)
@@ -101,11 +107,27 @@ class _ChunkedMockSerial:
     def write(self, data: bytes) -> None:  # noqa: ARG002
         """Silently accept any write so check_trace()'s 'r' send does not fail."""
 
+class _BlockingMockSerial:
+    """Serial stand-in whose read() sleeps for *block_duration* seconds before
+    returning b''.
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+    Used to simulate a stalled USB-serial adapter: the read() call takes longer
+    than check_sentinel()'s overall *timeout*, verifying the function still
+    terminates and returns False rather than hanging forever.
 
+    ``timeout`` is set to *block_duration* to pass check_sentinel()'s
+    assertion (a real serial.Serial with timeout=block_duration would behave
+    identically for each individual call).
+    """
+
+    def __init__(self, block_duration: float):
+        self._block_duration = block_duration
+        self.timeout = block_duration  # satisfies check_sentinel() assertion
+
+    def read(self, n: int) -> bytes:  # noqa: ARG002
+        import time as _time
+        _time.sleep(self._block_duration)
+        return b''
 def _run_check_sentinel(payload: bytes, timeout: float = 2.0):
     """Call check_sentinel() with a mock serial carrying *payload*.
 
@@ -673,11 +695,157 @@ class TestNoSentinel:
             f'Spurious BITSTREAM WARNING on timeout; got: {stderr!r}'
         )
 
+class TestSmokeImportWithoutRequests:
+    """wukong_boot_smoke.py must be importable (and check_sentinel must work)
+    even when the *requests* package is not installed.
 
-# ---------------------------------------------------------------------------
-# Part B — constant alignment: bridge must agree with smoke test
-# ---------------------------------------------------------------------------
+    wukong_boot_smoke.py imports sentinel helpers from wukong_bridge, and
+    wukong_bridge previously called sys.exit(1) on a missing *requests* import.
+    That would break the smoke test on machines that have pyserial but not
+    requests.  The fix makes wukong_bridge treat requests as optional (None
+    fallback), deferring the hard exit to bridge.main() where it is genuinely
+    required.
 
+    These tests use a subprocess so the real import machinery is exercised
+    without affecting the current test process's module cache.
+    """
+
+    # Minimal Python snippet run in the subprocess.
+    _IMPORT_SCRIPT = """\
+import sys, types
+
+# Inject a stub 'requests' blocker so the import fails as if not installed.
+sys.modules['requests'] = None
+
+# Now importing wukong_boot_smoke must NOT call sys.exit().
+import importlib.util, os
+scripts_dir = os.path.dirname(os.path.abspath({script_path!r}))
+spec = importlib.util.spec_from_file_location(
+    'wukong_boot_smoke',
+    {script_path!r},
+)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+# Verify the sentinel constants are accessible.
+assert mod.SENTINEL_V1 == 0xBB, f'SENTINEL_V1 wrong: {{mod.SENTINEL_V1!r}}'
+assert mod.SENTINEL_V2 == 0xBC, f'SENTINEL_V2 wrong: {{mod.SENTINEL_V2!r}}'
+
+# Verify check_sentinel() still enforces the timeout assertion (raises
+# ValueError on a bad serial) rather than crashing with an ImportError.
+import io
+class _OkSerial:
+    timeout = 0.05
+    def read(self, n): return b''
+
+sys.stdout = io.StringIO()
+sys.stderr = io.StringIO()
+result = mod.check_sentinel(_OkSerial(), timeout=0.02)
+assert result is False, f'Expected False on empty stream, got {{result!r}}'
+sys.exit(0)
+"""
+
+    @pytest.fixture(autouse=True)
+    def _smoke_path(self):
+        self._script = os.path.join(_SCRIPTS_DIR, 'wukong_boot_smoke.py')
+
+    def _run_subprocess(self):
+        import subprocess, textwrap
+        script = self._IMPORT_SCRIPT.format(script_path=self._script)
+        result = subprocess.run(
+            [sys.executable, '-c', textwrap.dedent(script)],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        return result
+
+    def test_import_succeeds_without_requests(self):
+        """Importing wukong_boot_smoke must not call sys.exit() when requests is absent."""
+        r = self._run_subprocess()
+        assert r.returncode == 0, (
+            f'wukong_boot_smoke import failed without requests '
+            f'(exit={r.returncode}).\n'
+            f'stdout: {r.stdout!r}\n'
+            f'stderr: {r.stderr!r}'
+        )
+
+    def test_check_sentinel_works_without_requests(self):
+        """check_sentinel() must function correctly even when requests is absent."""
+        r = self._run_subprocess()
+        # If the subprocess exited 0 the inner assertions all passed.
+        assert r.returncode == 0, (
+            f'check_sentinel() failed without requests '
+            f'(exit={r.returncode}).\n'
+            f'stdout: {r.stdout!r}\n'
+            f'stderr: {r.stderr!r}'
+        )
+
+    def test_sentinel_constants_accessible_without_requests(self):
+        """SENTINEL_V1/V2 must be importable from wukong_boot_smoke without requests."""
+        r = self._run_subprocess()
+        assert r.returncode == 0, (
+            f'Sentinel constants unavailable without requests '
+            f'(exit={r.returncode}).\n'
+            f'stdout: {r.stdout!r}\n'
+            f'stderr: {r.stderr!r}'
+        )
+class TestSerialTimeoutEnforcement:
+    """check_sentinel() must raise ValueError when ser.timeout is not set correctly."""
+
+    def _make_bad_serial(self, timeout_value):
+        """Return a mock serial with the given timeout attribute."""
+        class _BadSerial:
+            pass
+        s = _BadSerial()
+        s.timeout = timeout_value
+        return s
+
+    def test_raises_on_none_timeout(self):
+        """ser.timeout=None must raise ValueError."""
+        ser = self._make_bad_serial(None)
+        with pytest.raises(ValueError, match='ser.timeout'):
+            smoke.check_sentinel(ser, timeout=0.1)
+
+    def test_raises_on_zero_timeout(self):
+        """ser.timeout=0 (non-blocking) must raise ValueError."""
+        ser = self._make_bad_serial(0)
+        with pytest.raises(ValueError, match='ser.timeout'):
+            smoke.check_sentinel(ser, timeout=0.1)
+
+    def test_raises_on_missing_timeout(self):
+        """A ser object with no timeout attribute must raise ValueError."""
+        class _NoTimeoutSerial:
+            def read(self, n):
+                return b''
+        with pytest.raises(ValueError, match='ser.timeout'):
+            smoke.check_sentinel(_NoTimeoutSerial(), timeout=0.1)
+
+    def test_raises_on_infinite_timeout(self):
+        """ser.timeout=inf must raise ValueError."""
+        import math
+        ser = self._make_bad_serial(math.inf)
+        with pytest.raises(ValueError, match='ser.timeout'):
+            smoke.check_sentinel(ser, timeout=0.1)
+
+    def test_raises_on_negative_timeout(self):
+        """ser.timeout=-1 must raise ValueError."""
+        ser = self._make_bad_serial(-1)
+        with pytest.raises(ValueError, match='ser.timeout'):
+            smoke.check_sentinel(ser, timeout=0.1)
+
+    def test_positive_timeout_does_not_raise(self):
+        """ser.timeout=0.05 (normal case) must NOT raise."""
+        ser = _MockSerial(b'')  # timeout=0.05, no sentinel → returns False
+        captured_stderr = io.StringIO()
+        captured_stdout = io.StringIO()
+        old_stderr, old_stdout = sys.stderr, sys.stdout
+        sys.stderr, sys.stdout = captured_stderr, captured_stdout
+        try:
+            result = smoke.check_sentinel(ser, timeout=0.02)
+        finally:
+            sys.stderr, sys.stdout = old_stderr, old_stdout
+        assert result is False  # no data → timeout, but no ValueError
 class TestConstantAlignment:
     """wukong_bridge.py and wukong_boot_smoke.py must use identical sentinels.
 
@@ -751,6 +919,83 @@ class TestConstantAlignment:
         assert smoke.SENTINEL_V2 != bridge.TRACE_MAGIC, \
             'SENTINEL_V2 collides with TRACE_MAGIC — bridge will mis-classify it'
 
+class TestStallTimeout:
+    """check_sentinel() must return False within bounded time even when
+    ser.read() blocks for longer than the function's *timeout* parameter.
+
+    A stalled USB-serial adapter may return from read() only after its own
+    OS-level timeout rather than immediately.  If one read() call outlasts the
+    check_sentinel() deadline, the function should still terminate (returning
+    False) once that read() finally unblocks — it must NOT hang indefinitely,
+    and it must NOT return True when no sentinel was ever received.
+    """
+
+    # Each read() call in the mock blocks for this many seconds.
+    _BLOCK_DURATION = 0.12
+
+    # check_sentinel() timeout is shorter than one blocking read — so the
+    # deadline will already have expired by the time the first read() returns.
+    _FUNCTION_TIMEOUT = 0.05
+
+    # The test itself must complete well within this wall-clock limit.
+    # Allow up to 3× the block duration as a generous upper bound.
+    _WALL_CLOCK_LIMIT = _BLOCK_DURATION * 3
+
+    def _run_blocking(self):
+        """Run check_sentinel() with a blocking mock; return (result, elapsed)."""
+        import time as _time
+        ser = _BlockingMockSerial(block_duration=self._BLOCK_DURATION)
+        captured_stderr = io.StringIO()
+        captured_stdout = io.StringIO()
+        old_stderr, old_stdout = sys.stderr, sys.stdout
+        sys.stderr, sys.stdout = captured_stderr, captured_stdout
+        try:
+            t0 = _time.monotonic()
+            result = smoke.check_sentinel(ser, timeout=self._FUNCTION_TIMEOUT)
+            elapsed = _time.monotonic() - t0
+        finally:
+            sys.stderr, sys.stdout = old_stderr, old_stdout
+        return result, elapsed
+
+    def test_stall_returns_false(self):
+        """check_sentinel() must return False when no sentinel ever arrives."""
+        result, _ = self._run_blocking()
+        assert result is False, (
+            'check_sentinel() must return False when the serial stalls '
+            'and no sentinel byte is received'
+        )
+
+    def test_stall_completes_within_bounded_time(self):
+        """check_sentinel() must not hang: must finish within _WALL_CLOCK_LIMIT."""
+        import time as _time
+        ser = _BlockingMockSerial(block_duration=self._BLOCK_DURATION)
+        captured_stderr = io.StringIO()
+        captured_stdout = io.StringIO()
+        old_stderr, old_stdout = sys.stderr, sys.stdout
+        sys.stderr, sys.stdout = captured_stderr, captured_stdout
+        try:
+            t0 = _time.monotonic()
+            smoke.check_sentinel(ser, timeout=self._FUNCTION_TIMEOUT)
+            elapsed = _time.monotonic() - t0
+        finally:
+            sys.stderr, sys.stdout = old_stderr, old_stdout
+        assert elapsed < self._WALL_CLOCK_LIMIT, (
+            f'check_sentinel() took {elapsed:.3f} s with a blocking serial '
+            f'(block_duration={self._BLOCK_DURATION} s, '
+            f'function_timeout={self._FUNCTION_TIMEOUT} s); '
+            f'expected completion within {self._WALL_CLOCK_LIMIT} s.  '
+            f'The function may be hanging inside ser.read().'
+        )
+
+    def test_stall_no_spurious_true(self):
+        """A stalling serial that never sends data must never produce True."""
+        # Run twice to rule out a lucky first-call fluke.
+        for _ in range(2):
+            result, _ = self._run_blocking()
+            assert result is not True, (
+                'check_sentinel() returned True even though the mock serial '
+                'never sent any bytes — a stall must not produce a false positive'
+            )
 class TestParseBootSentinelV1:
     """0xBB (stale 2-byte) sentinel."""
 

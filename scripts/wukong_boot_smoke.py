@@ -139,7 +139,27 @@ def check_sentinel(ser: "serial.Serial", timeout: float,
 
     Returns True on success (either format), prints a diagnostic and returns
     False if no sentinel is received within the timeout.
+
+    **Serial timeout requirement**: *ser* must be opened with a finite,
+    positive read timeout (e.g. ``serial.Serial(port, baud, timeout=0.05)``).
+    The deadline loop checks ``time.monotonic()`` only at the top of each
+    iteration; if ``ser.read()`` blocks indefinitely (e.g. a stalled
+    USB-serial adapter) the loop cannot exit until that call returns.  A
+    per-read timeout on *ser* bounds each call, guaranteeing the function
+    returns within ``timeout + ser.timeout`` wall-clock seconds.
+
+    Raises ``ValueError`` if ``ser.timeout`` is absent, ``None``, zero, or
+    infinite so that misconfigured callers fail fast rather than hanging.
     """
+    _t = getattr(ser, 'timeout', _MISSING := object())
+    if _t is _MISSING or _t is None or not (0 < _t < float('inf')):
+        raise ValueError(
+            "check_sentinel() requires ser.timeout to be set to a finite "
+            "positive value so that each ser.read() call is bounded.  "
+            "Open the port with e.g. serial.Serial(port, baud, timeout=0.05).  "
+            f"Got ser.timeout={getattr(ser, 'timeout', '<missing>')!r}"
+        )
+
     print(f"[a] Waiting up to {timeout} s for boot sentinel (0xBC current / "
           f"0xBB stale) …", flush=True)
     deadline = time.monotonic() + timeout

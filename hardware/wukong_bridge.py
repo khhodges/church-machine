@@ -52,8 +52,7 @@ except ImportError:
 try:
     import requests
 except ImportError:
-    print("ERROR: requests not installed.  Run: pip install requests", file=sys.stderr)
-    sys.exit(1)
+    requests = None  # IDE notifications silently skipped; bridge main() will exit if None
 
 
 TRACE_MAGIC    = 0xAA
@@ -265,6 +264,10 @@ def decode_trace_packet(pkt):
 
 
 def main():
+    if requests is None:
+        print("ERROR: requests not installed.  Run: pip install requests", file=sys.stderr)
+        sys.exit(1)
+
     parser = argparse.ArgumentParser(description='Wukong UART ↔ IDE bridge')
     parser.add_argument('--port', default='/dev/ttyUSB0', help='Serial port')
     parser.add_argument('--baud', type=int, default=57600, help='Baud rate')
