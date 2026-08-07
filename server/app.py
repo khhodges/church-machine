@@ -9970,6 +9970,49 @@ def wukong_command_get():
     return jsonify({})
 
 
+# ── Wukong boot-info endpoint ─────────────────────────────────────────────────
+# Bridge POSTs here when a boot sentinel is received so the IDE can show a
+# visible banner if the bitstream is stale (old TraceUnit FSM).
+#
+#   POST /hardware/wukong/boot-info  — bridge reports {stale_tu, tu_version}
+#   GET  /hardware/wukong/boot-info  — IDE polls for the latest boot-info
+
+_wukong_boot_info_lock = _wk_threading.Lock()
+_wukong_boot_info      = {}   # {stale_tu: bool, tu_version: int}
+
+
+@app.route('/hardware/wukong/boot-info', methods=['POST'])
+def wukong_boot_info_post():
+    """Bridge posts boot-info here when a boot sentinel is received.
+
+    Body JSON:
+        stale_tu   — true when the TraceUnit FSM predates the 3-packet CALL
+                     sequence (i.e. old 0xBB sentinel, or 0xBC with
+                     tu_version < TU_VERSION_CALL_3PKT)
+        tu_version — raw TU_VERSION byte from the sentinel (0x01 for 0xBB boards)
+    """
+    global _wukong_boot_info
+    data = request.get_json(silent=True) or {}
+    entry = {
+        'stale_tu':  bool(data.get('stale_tu', False)),
+        'tu_version': int(data.get('tu_version', 0)),
+    }
+    with _wukong_boot_info_lock:
+        _wukong_boot_info = entry
+    return jsonify({'ok': True})
+
+
+@app.route('/hardware/wukong/boot-info', methods=['GET'])
+def wukong_boot_info_get():
+    """IDE polls here to learn whether the connected bitstream is stale.
+
+    Returns {} when no boot sentinel has been received yet this session.
+    """
+    with _wukong_boot_info_lock:
+        entry = dict(_wukong_boot_info)
+    return jsonify(entry)
+
+
 @app.route('/dev/firmware/main.c')
 def _dev_serve_maincfirmware():
     _src = os.path.join(os.path.dirname(_SERVER_DIR),

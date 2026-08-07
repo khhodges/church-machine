@@ -14364,6 +14364,49 @@ function _wukongApplyCRUpdate(data) {
     }
 }
 
+// ── Stale-bitstream warning banner ────────────────────────────────────────────
+// Shown when the bridge reports stale_tu:true (old 0xBB sentinel, or 0xBC with
+// tu_version below the minimum required for 3-packet CALL sequences).
+// Dismissed per-session by clicking ×; re-shown if the board reboots with the
+// same stale bitstream (stale_tu flag re-POSTed by the bridge on each boot).
+
+let _wukongStaleBannerDismissed = false;
+
+function _wukongShowStaleBanner() {
+    if (_wukongStaleBannerDismissed) return;
+    if (document.getElementById('wukong-stale-banner')) return;
+    const con = document.getElementById('editorConsole');
+    if (!con || !con.parentNode) return;
+    const banner = document.createElement('div');
+    banner.id = 'wukong-stale-banner';
+    banner.style.cssText =
+        'background:#7c3317;color:#fff;padding:6px 10px;font-size:12px;' +
+        'border-radius:4px;margin-bottom:4px;display:flex;align-items:center;gap:8px;';
+    const msg = document.createElement('span');
+    msg.style.flex = '1';
+    msg.textContent =
+        '\u26A0\uFE0F Old bitstream \u2014 ELOADCALL/XLOADLAMBDA CR state may be wrong. Reflash.';
+    const dismiss = document.createElement('button');
+    dismiss.textContent = '\u00D7';
+    dismiss.title = 'Dismiss';
+    dismiss.style.cssText =
+        'background:none;border:none;color:#fff;cursor:pointer;font-size:16px;' +
+        'line-height:1;padding:0 2px;flex-shrink:0;';
+    dismiss.addEventListener('click', function() {
+        banner.remove();
+        _wukongStaleBannerDismissed = true;
+    });
+    banner.appendChild(msg);
+    banner.appendChild(dismiss);
+    con.parentNode.insertBefore(banner, con);
+}
+
+function _wukongHideStaleBanner() {
+    const existing = document.getElementById('wukong-stale-banner');
+    if (existing) existing.remove();
+    _wukongStaleBannerDismissed = false;
+}
+
 // Poll for new trace packets every 3 seconds (connection detection + CR update)
 setInterval(async function _wukongPoll() {
     try {
@@ -14374,6 +14417,17 @@ setInterval(async function _wukongPoll() {
             _wukongLastTraceTs = data.ts;
             _wukongUpdateBtn();
             _wukongApplyCRUpdate(data);
+        }
+    } catch(e) {}
+    // Also poll boot-info to show/hide the stale-bitstream banner.
+    try {
+        const bi = await fetch('/hardware/wukong/boot-info');
+        if (!bi.ok) return;
+        const bdata = await bi.json();
+        if (bdata && bdata.stale_tu) {
+            _wukongShowStaleBanner();
+        } else if (bdata && Object.keys(bdata).length > 0 && !bdata.stale_tu) {
+            _wukongHideStaleBanner();
         }
     } catch(e) {}
 }, 3000);

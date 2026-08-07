@@ -314,6 +314,14 @@ def main():
                           file=sys.stderr)
                     print('  Rebuild and reflash the bitstream to get the current TraceUnit.',
                           file=sys.stderr)
+                    # Notify the IDE so it can show a visible warning banner.
+                    try:
+                        requests.post(
+                            f'{ide_base}/hardware/wukong/boot-info',
+                            json={'stale_tu': True, 'tu_version': 0x01},
+                            timeout=1, verify=verify_tls)
+                    except Exception as exc:
+                        print(f'  [boot-info POST error] {exc}')
                     i += SENTINEL_V1_LEN
 
                 elif b == BOOT_SENTINEL_V2:
@@ -357,6 +365,23 @@ def main():
                               file=sys.stderr)
                         print('  Rebuild and reflash the bitstream to get the current TraceUnit.',
                               file=sys.stderr)
+                        # Notify the IDE so it can show a visible warning banner.
+                        try:
+                            requests.post(
+                                f'{ide_base}/hardware/wukong/boot-info',
+                                json={'stale_tu': True, 'tu_version': tu_version},
+                                timeout=1, verify=verify_tls)
+                        except Exception as exc:
+                            print(f'  [boot-info POST error] {exc}')
+                    else:
+                        # Current bitstream — clear any previous stale warning in the IDE.
+                        try:
+                            requests.post(
+                                f'{ide_base}/hardware/wukong/boot-info',
+                                json={'stale_tu': False, 'tu_version': tu_version},
+                                timeout=1, verify=verify_tls)
+                        except Exception as exc:
+                            print(f'  [boot-info POST error] {exc}')
                     i += SENTINEL_V2_LEN
 
                 else:
