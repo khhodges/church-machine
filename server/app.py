@@ -9861,11 +9861,28 @@ _wukong_pending_cmd   = None       # {'cmd': 's'|'r'|'h'|'b', 'nia': int|None}
 
 @app.route('/hardware/wukong/trace', methods=['POST'])
 def wukong_trace_post():
-    """Bridge posts a decoded 11-byte trace packet here."""
+    """Bridge posts a decoded 12-byte trace packet here.
+
+    Expected JSON fields (all from hardware/wukong_bridge.py decode_trace_packet):
+        nia         — retiring instruction NIA
+        ev_type     — TRACE_EV_* constant (0x00-0x0B); MUST be forwarded to the IDE
+                      so it can apply CR6/CR14 updates for CALL sequences:
+                        0x06 = TRACE_EV_CALL_CR6  → CR6  ← payload_gt
+                        0x07 = TRACE_EV_CALL_CR14 → CR14 ← payload_gt
+                        0x08 = TRACE_EV_CALL_PUSH → caller frame push (payload_gt=0)
+        payload_gt  — GT word0 extracted from bytes 6-9; 0 for push/pop events
+        flags       — raw flags byte (bits[3:0] = NZCV)
+        fault_code  — 5-bit fault code
+        fault_valid — bool
+        bp_hit      — bool
+        ts          — float timestamp
+    """
     global _wukong_latest_trace
     data = request.get_json(silent=True) or {}
     entry = {
         'nia':         int(data.get('nia', 0)),
+        'ev_type':     int(data.get('ev_type', 0)),
+        'payload_gt':  int(data.get('payload_gt', 0)),
         'instr':       int(data.get('instr', 0)),
         'flags':       int(data.get('flags', 0)),
         'fault_code':  int(data.get('fault_code', 0)),

@@ -136,6 +136,51 @@ def _fault_name(code):
     return _names.get(code, f'FAULT_{code}')
 
 
+def decode_trace_packet(pkt):
+    """Decode a single 12-byte trace packet into a dict.
+
+    Parameters
+    ----------
+    pkt : bytes | bytearray
+        Exactly 12 bytes starting with TRACE_MAGIC (0xAA).
+
+    Returns
+    -------
+    dict with keys:
+        nia         — retiring instruction NIA (int)
+        ev_type     — TRACE_EV_* constant (int)
+        payload_gt  — GT word0 from packet bytes 6-9 (int); 0 for push/pop events
+        flags       — raw flags byte (int); bits[3:0] = NZCV
+        fault_code  — 5-bit fault code (int)
+        fault_valid — bool
+        bp_hit      — bool
+
+    The decode is purely mechanical: it unpacks bytes 1-11 of the packet.
+    All TRACE_EV_* values are forwarded as-is, including CALL sequences:
+        TRACE_EV_CALL_CR6  (0x06) — CR6  ← abstraction GT  (payload_gt = new GT word0)
+        TRACE_EV_CALL_CR14 (0x07) — CR14 ← code/return GT  (payload_gt = new GT word0)
+        TRACE_EV_CALL_PUSH (0x08) — caller frame push        (payload_gt = 0)
+    Three consecutive packets with the same NIA covering CALL_CR6, CALL_CR14,
+    and CALL_PUSH correspond to one ELOADCALL or XLOADLAMBDA retire.
+    """
+    if len(pkt) != TRACE_LEN or pkt[0] != TRACE_MAGIC:
+        raise ValueError(f'decode_trace_packet: expected {TRACE_LEN}-byte packet '
+                         f'starting with 0x{TRACE_MAGIC:02X}, got {bytes(pkt).hex()}')
+    nia        = struct.unpack('>I', pkt[1:5])[0]
+    ev_type    = pkt[5]
+    payload_gt = struct.unpack('>I', pkt[6:10])[0]
+    raw11      = pkt[11]
+    return {
+        'nia':         nia,
+        'ev_type':     ev_type,
+        'payload_gt':  payload_gt,
+        'flags':       pkt[10],
+        'fault_code':  raw11 & 0x1F,
+        'fault_valid': bool(raw11 & 0x40),
+        'bp_hit':      bool(raw11 & 0x80),
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description='Wukong UART ↔ IDE bridge')
     parser.add_argument('--port', default='/dev/ttyUSB0', help='Serial port')
@@ -183,41 +228,29 @@ def main():
                     if len(buf) - i < TRACE_LEN:
                         break
                     pkt = buf[i:i + TRACE_LEN]
-                    nia         = struct.unpack('>I', pkt[1:5])[0]
-                    ev_type     = pkt[5]
-                    payload_gt  = struct.unpack('>I', pkt[6:10])[0]
-                    flags_byte  = pkt[10]
-                    raw11       = pkt[11]
-                    fault_valid = bool(raw11 & 0x40)
-                    bp_hit      = bool(raw11 & 0x80)
-                    fault_code  = raw11 & 0x1F
+                    decoded = decode_trace_packet(pkt)
+                    decoded['ts'] = time.time()
 
-                    post_payload = {
-                        'nia':         nia,
-                        'ev_type':     ev_type,
-                        'payload_gt':  payload_gt,
-                        'flags':       flags_byte,
-                        'fault_code':  fault_code,
-                        'fault_valid': fault_valid,
-                        'bp_hit':      bp_hit,
-                        'ts':          time.time(),
-                    }
                     try:
                         requests.post(
                             f'{ide_base}/hardware/wukong/trace',
-                            json=post_payload, timeout=1, verify=verify_tls)
+                            json=decoded, timeout=1, verify=verify_tls)
                     except Exception as exc:
                         print(f'  [trace POST error] {exc}')
 
+                    ev_type    = decoded['ev_type']
+                    payload_gt = decoded['payload_gt']
+                    nia        = decoded['nia']
+                    flags_byte = decoded['flags']
                     flag_str   = _flags_str(flags_byte)
                     ts_str     = time.strftime('%H:%M:%S', time.localtime())
                     ev_name    = _EV_NAMES.get(ev_type, f'EV_0x{ev_type:02X}')
                     gt_str     = f'  GT=0x{payload_gt:08X}' if payload_gt else ''
-                    if fault_valid:
-                        fault_str = f'  FAULT={_fault_name(fault_code)}'
+                    if decoded['fault_valid']:
+                        fault_str = f'  FAULT={_fault_name(decoded["fault_code"])}'
                     else:
                         fault_str = ''
-                    bp_str = '  [BP HIT]' if bp_hit else ''
+                    bp_str = '  [BP HIT]' if decoded['bp_hit'] else ''
                     print(f'[{ts_str}] HW: NIA=0x{nia:08X}  {ev_name}{gt_str}'
                           f'  flags={flag_str}{fault_str}{bp_str}')
                     i += TRACE_LEN
