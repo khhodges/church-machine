@@ -67,6 +67,28 @@ class _MockSerial:
         return self._stream.read(n)
 
 
+class _ChunkedMockSerial:
+    """Serial stand-in that delivers a pre-defined sequence of byte chunks.
+
+    Each call to read() returns the next chunk from *chunks* (regardless of
+    the requested *n*), then b'' once all chunks are exhausted.  This lets
+    tests simulate a sentinel whose bytes arrive across multiple separate
+    read() calls — exercising the partial-buffer ``continue`` path inside
+    check_sentinel().
+    """
+
+    def __init__(self, chunks: list):
+        self._chunks = list(chunks)
+        self._index = 0
+
+    def read(self, n: int) -> bytes:  # noqa: ARG002
+        if self._index >= len(self._chunks):
+            return b''
+        chunk = self._chunks[self._index]
+        self._index += 1
+        return bytes(chunk)
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -250,6 +272,117 @@ class TestLowTuVersion:
         result, stderr = _run_check_sentinel(payload)
         assert result is True
         assert 'BITSTREAM WARNING' in stderr
+
+
+class TestPartialBufferV2Sentinel:
+    """0xBC sentinel split across two reads must still be handled correctly.
+
+    The partial-buffer guard inside check_sentinel() reads:
+
+        if len(buf) - idx < 3:
+            continue
+
+    These tests verify that when only the first 2 bytes of the 3-byte V2
+    sentinel arrive on the first read(), check_sentinel() waits and correctly
+    processes the TU_VERSION byte once it arrives on the second read().  A
+    refactor that accidentally removes the ``continue`` would either index out
+    of range or silently skip the TU_VERSION check altogether.
+    """
+
+    def _run_chunked(self, chunks, timeout: float = 2.0):
+        """Run check_sentinel() with a chunked serial and return (result, stderr)."""
+        ser = _ChunkedMockSerial(chunks)
+        captured_stderr = io.StringIO()
+        captured_stdout = io.StringIO()
+        old_stderr, old_stdout = sys.stderr, sys.stdout
+        sys.stderr, sys.stdout = captured_stderr, captured_stdout
+        try:
+            result = smoke.check_sentinel(ser, timeout=timeout)
+        finally:
+            sys.stderr, sys.stdout = old_stderr, old_stdout
+        return result, captured_stderr.getvalue()
+
+    def test_split_low_tu_version_returns_true(self):
+        """Returns True when TU_VERSION=0x01 arrives one read after the magic+N_INIT."""
+        chunks = [
+            bytes([smoke.SENTINEL_V2, _N_INIT_BYTE]),  # first read: magic + N_INIT only
+            bytes([0x01]),                              # second read: TU_VERSION
+        ]
+        result, _ = self._run_chunked(chunks)
+        assert result is True, \
+            'check_sentinel must return True even when 0xBC sentinel arrives in two reads'
+
+    def test_split_low_tu_version_emits_warning(self):
+        """BITSTREAM WARNING is emitted when TU_VERSION=0x01 arrives in the second chunk."""
+        chunks = [
+            bytes([smoke.SENTINEL_V2, _N_INIT_BYTE]),
+            bytes([0x01]),
+        ]
+        _, stderr = self._run_chunked(chunks)
+        assert 'BITSTREAM WARNING' in stderr, (
+            f'Expected "BITSTREAM WARNING" for split 0xBC sentinel with TU_VERSION=0x01; '
+            f'got: {stderr!r}'
+        )
+
+    def test_split_low_tu_version_mentions_tu_version(self):
+        """The split-delivery warning must name TU_VERSION as the cause."""
+        chunks = [
+            bytes([smoke.SENTINEL_V2, _N_INIT_BYTE]),
+            bytes([0x01]),
+        ]
+        _, stderr = self._run_chunked(chunks)
+        assert 'TU_VERSION' in stderr or 'tu_version' in stderr.lower(), (
+            f'Warning should mention TU_VERSION; got: {stderr!r}'
+        )
+
+    def test_split_current_tu_version_no_warning(self):
+        """No BITSTREAM WARNING when TU_VERSION=0x02 arrives in the second chunk."""
+        chunks = [
+            bytes([smoke.SENTINEL_V2, _N_INIT_BYTE]),
+            bytes([0x02]),
+        ]
+        _, stderr = self._run_chunked(chunks)
+        assert 'BITSTREAM WARNING' not in stderr, (
+            f'Unexpected "BITSTREAM WARNING" for split 0xBC with TU_VERSION=0x02; '
+            f'got: {stderr!r}'
+        )
+
+    def test_split_current_tu_version_returns_true(self):
+        """Returns True when TU_VERSION>=0x02 arrives in the second chunk."""
+        chunks = [
+            bytes([smoke.SENTINEL_V2, _N_INIT_BYTE]),
+            bytes([0x02]),
+        ]
+        result, _ = self._run_chunked(chunks)
+        assert result is True, \
+            'check_sentinel must return True for split 0xBC with sufficient TU_VERSION'
+
+    def test_split_with_leading_garbage(self):
+        """Split sentinel still detected when first chunk has leading ASCII garbage."""
+        chunks = [
+            b'Boot output\r\n' + bytes([smoke.SENTINEL_V2, _N_INIT_BYTE]),
+            bytes([0x01]),
+        ]
+        result, stderr = self._run_chunked(chunks)
+        assert result is True
+        assert 'BITSTREAM WARNING' in stderr, (
+            f'Expected BITSTREAM WARNING for split sentinel with leading garbage; '
+            f'got: {stderr!r}'
+        )
+
+    def test_one_byte_at_a_time_low_tu_version(self):
+        """Warning is emitted even when each byte of the sentinel arrives separately."""
+        chunks = [
+            bytes([smoke.SENTINEL_V2]),  # magic only
+            bytes([_N_INIT_BYTE]),       # N_INIT
+            bytes([0x01]),               # TU_VERSION
+        ]
+        result, stderr = self._run_chunked(chunks)
+        assert result is True
+        assert 'BITSTREAM WARNING' in stderr, (
+            f'Expected BITSTREAM WARNING for byte-at-a-time delivery; '
+            f'got: {stderr!r}'
+        )
 
 
 class TestNoSentinel:
