@@ -14487,6 +14487,12 @@ const _WUKONG_EV_INSTR_NAME = {
     0x09: 'RETURN', 0x0A: 'RETURN', 0x0B: 'RETURN'
 };
 let _wukongStaleBannerDismissed = false;
+// Last hardware fault data (null when no active fault).
+// Populated by _wukongShowFaultPanel; cleared by _wukongHideFaultPanel.
+let _wukongLastFaultData = null;
+// Set to true when the user clicks × on the fault panel; cleared when the
+// fault condition ends (clean packet or board reset).
+let _wukongFaultDismissed = false;
 
 function _wukongShowStaleBanner() {
     if (_wukongStaleBannerDismissed) return;
@@ -14845,11 +14851,18 @@ function _wukongShowDisconnectToast() {
 function _wukongHideFaultPanel() {
     const panel = document.getElementById('wukong-fault-panel');
     if (panel) panel.remove();
+    // Clear stored fault so the panel does not reappear after navigation.
+    _wukongLastFaultData = null;
+    _wukongFaultDismissed = false;
 }
 
 function _wukongShowFaultPanel(data) {
+    // Per-session dismiss: once the user clicks ×, suppress until fault clears.
+    if (_wukongFaultDismissed) return;
     const con = document.getElementById('editorConsole');
     if (!con || !con.parentNode) return;
+    // Persist the fault data so the panel can be restored after view navigation.
+    _wukongLastFaultData = data;
     // Remove any existing panel before showing the new one.
     const prev = document.getElementById('wukong-fault-panel');
     if (prev) prev.remove();
@@ -14873,7 +14886,10 @@ function _wukongShowFaultPanel(data) {
     dismiss.textContent = '\u00D7';
     dismiss.title = 'Dismiss';
     dismiss.className = 'wukong-fault-panel-close';
-    dismiss.addEventListener('click', function() { panel.remove(); });
+    dismiss.addEventListener('click', function() {
+        panel.remove();
+        _wukongFaultDismissed = true;
+    });
     header.appendChild(dismiss);
 
     const body = document.createElement('div');

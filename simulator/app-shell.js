@@ -1623,6 +1623,12 @@ function switchView(viewId) {
         renderLumps();
     }
     if (viewId === 'editor' && typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
+    // Restore the hardware fault panel when returning to the editor view.
+    if (viewId === 'editor' && typeof _wukongLastFaultData !== 'undefined' &&
+            _wukongLastFaultData && typeof _wukongShowFaultPanel === 'function') {
+        // Use setTimeout so the editor DOM is fully rendered before inserting the panel.
+        setTimeout(function() { _wukongShowFaultPanel(_wukongLastFaultData); }, 0);
+    }
     if (viewId === 'gt-view') renderGTView();
     if (viewId === 'pipeline' && pipelineViz) pipelineViz.render();
     if (viewId === 'start') {
