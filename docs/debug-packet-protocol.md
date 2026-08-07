@@ -163,6 +163,36 @@ have been transmitted.  No retire event is silently dropped.
 
 ---
 
+## Fault-halt behaviour
+
+Any retire with `fault_valid=1` in the trace packet causes the board to
+automatically enter step mode and halt, exactly like a breakpoint hit.
+
+**RTL**: `fault_halt = retire_valid & retire_fault_valid` is OR-ed with
+`bp_hit` in the step/halt priority logic:
+
+```
+with m.If(bp_hit | fault_halt):
+    m.d.sync += [step_mode.eq(1), step_halted.eq(1)]
+```
+
+**Bridge**: immediately after receiving the boot sentinel the bridge writes
+`'h'` to the serial port so the board enters step mode as soon as it
+connects.  This means any fault that fires during free-run is caught before
+it silently retries.
+
+**IDE**: the `fault_valid` bit is already in byte 11 of every packet
+(`bit[6]`).  The IDE should surface the fault name from `fault_code[4:0]`
+and indicate that the board is halted at a fault (not a breakpoint).
+
+**Step through**: pressing Step after a fault-halt executes one instruction
+of the fault handler, then halts again.  The user can step through the
+entire handler to see exactly what the CM does in response to each fault.
+
+**TU_VERSION**: unchanged at `0x02` — the packet format is not modified.
+
+---
+
 ## IDE slave mode
 
 When `/dev/ttyUSB*` is present and the Wukong bridge is active:

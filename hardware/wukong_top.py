@@ -521,8 +521,14 @@ class ChurchWukongXC7A100T(Elaboratable):
             )
         )
 
-        # Breakpoint hit → force step_mode + halt; takes highest priority.
-        with m.If(bp_hit):
+        # Fault halt: any retire with fault_valid=True auto-enters step mode,
+        # exactly like a breakpoint hit.  This lets the IDE single-step through
+        # the fault handler without the CM silently retrying and continuing.
+        fault_halt = Signal()
+        m.d.comb += fault_halt.eq(core.retire_valid & core.retire_fault_valid)
+
+        # Breakpoint hit or fault → force step_mode + halt; takes highest priority.
+        with m.If(bp_hit | fault_halt):
             m.d.sync += [step_mode.eq(1), step_halted.eq(1)]
         with m.Elif(step_grant & step_mode):
             # step_grant clears halt for one retire (re-set on next retire_valid)

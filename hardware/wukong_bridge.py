@@ -375,6 +375,15 @@ def main():
                         print(f'BOOT: board ready — N_INIT byte=0x{board_n_init_byte:02X} '
                               f'(validation skipped: boot_rom not importable){tu_str}')
 
+                    # Send 'h' immediately so the board enters step mode as soon
+                    # as the bridge attaches.  This means any fault that fires
+                    # during free-run (before the user clicks ▶ HW) will be
+                    # visible rather than running past unnoticed.
+                    try:
+                        ser.write(b'h')
+                    except Exception as exc:
+                        print(f'  [halt send error] {exc}')
+
                     if sentinel['stale']:
                         if tu_version is None:
                             # V1 sentinel — TraceUnit FSM predates 3-packet CALL.
