@@ -9,8 +9,7 @@
 #   make tang-iot        -- IoT profile: generate Verilog + place-and-route + pack
 #   make prog            -- flash to Tang Nano 20K
 #   make prog-iot        -- flash IoT profile to Tang Nano 20K
-#   make ti60            -- generate synthesis-ready Verilog + CR7 check + resource report for Ti60 F225
-#   make check-cr7       -- check synthesised Verilog for stale CR7 signal names (also runs automatically inside ti60)
+#   make check-cr7       -- check synthesised Verilog for stale CR7 signal names
 #   make clean           -- remove generated files
 
 DEVICE   := GW2AR-LV18QN88C8/I7
@@ -28,7 +27,7 @@ JSON_IOT     := $(PROJ_IOT).json
 PNR_JSON_IOT := $(PROJ_IOT)_pnr.json
 PACK_IOT     := $(PROJ_IOT).fs
 
-.PHONY: pnr pack prog tang-iot pnr-iot pack-iot prog-iot clean ti60 check-cr7
+.PHONY: pnr pack prog tang-iot pnr-iot pack-iot prog-iot clean check-cr7
 
 pnr: $(PNR_JSON)
 $(PNR_JSON): $(JSON) $(CST)
@@ -67,10 +66,6 @@ $(PACK_IOT): $(PNR_JSON_IOT)
 prog-iot: $(PACK_IOT)
 	@echo "=== Uploading IoT profile to Tang Nano 20K ==="
 	openFPGALoader -b tangnano20k $(PACK_IOT)
-
-ti60:
-	@echo "=== Ti60 F225 Build Flow ==="
-	cd .. && ./build_ti60.sh build
 
 check-cr7:
 	@echo "=== Checking for stale CR7 signal names in synthesised Verilog ==="

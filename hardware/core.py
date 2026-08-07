@@ -167,7 +167,7 @@ class ChurchCore(Elaboratable):
 
         # ── Simulation-only debug ports ──────────────────────────────────────
         # These ports MUST be tied to 0 at the synthesis integration boundary
-        # (e.g., in ti60_f225.py).  They are never driven in production hardware;
+        # (e.g., in wukong_top.py).  They are never driven in production hardware;
         # Amaranth synthesizes undriven inputs as constant 0, so they add no
         # logic overhead, but the intent should be explicit.
         #

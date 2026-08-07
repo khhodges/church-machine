@@ -434,8 +434,8 @@ def _patch_module_name(verilog_text, old_name, new_name):
     """Rename a Verilog module and all its instantiations.
 
     Used to rename the Amaranth-generated ``module top`` to a project-specific
-    name so it can coexist with another ``top`` module in the same Efinity
-    project (e.g., the combined SoC+CM ``top.v``).
+    name so it can coexist with another ``top`` module in the same Yosys/Vivado
+    project (e.g., a combined SoC+CM ``top.v``).
 
     Renames:
       * ``module <old_name>(`` → ``module <new_name>(``
