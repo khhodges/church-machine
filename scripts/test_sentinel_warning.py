@@ -1,0 +1,259 @@
+"""scripts/test_sentinel_warning.py — Unit tests for boot sentinel stale-bitstream detection.
+
+Exercises two independent sentinel-detection paths without needing real hardware:
+
+  (A) scripts/wukong_boot_smoke.py :: check_sentinel()
+        - 0xBB + N_INIT byte stream → returns True AND emits "BITSTREAM WARNING" on stderr
+        - 0xBC + N_INIT + TU_VERSION stream → returns True AND emits NO "BITSTREAM WARNING"
+
+  (B) Constant-alignment guard: sentinel magic values and lengths in
+      hardware/wukong_bridge.py must match those in wukong_boot_smoke.py so
+      that both parsers agree on which sentinel is stale.
+
+Run:
+    python -m pytest scripts/test_sentinel_warning.py -v
+"""
+
+import io
+import os
+import struct
+import sys
+import importlib.util
+
+import pytest
+
+# ---------------------------------------------------------------------------
+# Module imports
+# ---------------------------------------------------------------------------
+
+_SCRIPTS_DIR  = os.path.dirname(os.path.abspath(__file__))
+_ROOT         = os.path.dirname(_SCRIPTS_DIR)
+_HARDWARE_DIR = os.path.join(_ROOT, 'hardware')
+
+# Import wukong_boot_smoke from its file path so tests work even when the
+# scripts/ directory is not on sys.path.
+def _load_smoke():
+    spec = importlib.util.spec_from_file_location(
+        'wukong_boot_smoke',
+        os.path.join(_SCRIPTS_DIR, 'wukong_boot_smoke.py'),
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+smoke = _load_smoke()
+
+# Import wukong_bridge from hardware/ for constant-alignment checks.
+sys.path.insert(0, _HARDWARE_DIR)
+import wukong_bridge as bridge
+
+
+# ---------------------------------------------------------------------------
+# Mock serial helper
+# ---------------------------------------------------------------------------
+
+class _MockSerial:
+    """Minimal serial.Serial stand-in that serves a fixed byte payload once.
+
+    After the payload is exhausted, every subsequent read() call returns b''
+    so that check_sentinel() loops until the sentinel is found (which happens
+    on the first read) or times out (for the negative case).
+    """
+
+    def __init__(self, data: bytes):
+        self._stream = io.BytesIO(data)
+
+    def read(self, n: int) -> bytes:
+        return self._stream.read(n)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _run_check_sentinel(payload: bytes, timeout: float = 2.0):
+    """Call check_sentinel() with a mock serial carrying *payload*.
+
+    Returns (result: bool, stderr_text: str).
+    Stdout is suppressed so test output stays clean.
+    """
+    ser = _MockSerial(payload)
+
+    captured_stderr = io.StringIO()
+    captured_stdout = io.StringIO()
+    old_stderr, old_stdout = sys.stderr, sys.stdout
+    sys.stderr, sys.stdout = captured_stderr, captured_stdout
+    try:
+        result = smoke.check_sentinel(ser, timeout=timeout)
+    finally:
+        sys.stderr, sys.stdout = old_stderr, old_stdout
+
+    return result, captured_stderr.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# Part A — smoke test sentinel detection
+# ---------------------------------------------------------------------------
+
+# Arbitrary N_INIT byte; the smoke test doesn't import boot_rom so any value
+# is accepted without an N_INIT mismatch warning.
+_N_INIT_BYTE  = 0x2A
+_TU_VERSION   = 0x02   # TU_VERSION_CALL_3PKT — current TraceUnit capability
+
+
+class TestStaleSentinel:
+    """0xBB (stale TraceUnit) must trigger a BITSTREAM WARNING on stderr."""
+
+    _PAYLOAD = bytes([smoke.SENTINEL_V1, _N_INIT_BYTE])
+
+    def test_returns_true(self):
+        result, _ = _run_check_sentinel(self._PAYLOAD)
+        assert result is True, \
+            'check_sentinel must return True when 0xBB sentinel is received'
+
+    def test_emits_bitstream_warning(self):
+        _, stderr = _run_check_sentinel(self._PAYLOAD)
+        assert 'BITSTREAM WARNING' in stderr, (
+            f'Expected "BITSTREAM WARNING" in stderr for 0xBB sentinel; '
+            f'got: {stderr!r}'
+        )
+
+    def test_warning_mentions_stale_or_old(self):
+        """The warning message must identify the bitstream as old/stale."""
+        _, stderr = _run_check_sentinel(self._PAYLOAD)
+        lower = stderr.lower()
+        assert 'stale' in lower or 'old' in lower, (
+            f'Warning should mention "stale" or "old"; got: {stderr!r}'
+        )
+
+    def test_warning_on_stderr_not_stdout(self):
+        """BITSTREAM WARNING must go to stderr, not swallowed silently."""
+        ser = _MockSerial(self._PAYLOAD)
+        captured_stderr = io.StringIO()
+        captured_stdout = io.StringIO()
+        old_stderr, old_stdout = sys.stderr, sys.stdout
+        sys.stderr, sys.stdout = captured_stderr, captured_stdout
+        try:
+            smoke.check_sentinel(ser, timeout=2.0)
+        finally:
+            sys.stderr, sys.stdout = old_stderr, old_stdout
+
+        assert 'BITSTREAM WARNING' in captured_stderr.getvalue(), \
+            'BITSTREAM WARNING must appear on stderr'
+        assert 'BITSTREAM WARNING' not in captured_stdout.getvalue(), \
+            'BITSTREAM WARNING must NOT appear on stdout'
+
+    def test_stale_sentinel_preceded_by_ascii_garbage(self):
+        """Sentinel is detected even when prefixed by ASCII program output."""
+        garbage = b'Hello from CM\r\n'
+        payload = garbage + bytes([smoke.SENTINEL_V1, _N_INIT_BYTE])
+        result, stderr = _run_check_sentinel(payload)
+        assert result is True
+        assert 'BITSTREAM WARNING' in stderr
+
+
+class TestCurrentSentinel:
+    """0xBC (current TraceUnit) must succeed silently — no BITSTREAM WARNING."""
+
+    _PAYLOAD = bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, _TU_VERSION])
+
+    def test_returns_true(self):
+        result, _ = _run_check_sentinel(self._PAYLOAD)
+        assert result is True, \
+            'check_sentinel must return True when 0xBC sentinel is received'
+
+    def test_no_bitstream_warning(self):
+        _, stderr = _run_check_sentinel(self._PAYLOAD)
+        assert 'BITSTREAM WARNING' not in stderr, (
+            f'Unexpected "BITSTREAM WARNING" in stderr for 0xBC sentinel; '
+            f'got: {stderr!r}'
+        )
+
+    def test_current_sentinel_preceded_by_ascii_garbage(self):
+        """Current sentinel is detected even when prefixed by ASCII output."""
+        garbage = b'Boot OK\r\n'
+        payload = garbage + bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, _TU_VERSION])
+        result, stderr = _run_check_sentinel(payload)
+        assert result is True
+        assert 'BITSTREAM WARNING' not in stderr
+
+
+class TestNoSentinel:
+    """When no sentinel arrives within the timeout, check_sentinel returns False."""
+
+    def test_empty_stream_returns_false(self):
+        # Use a very short timeout so the test finishes quickly.
+        result, _ = _run_check_sentinel(b'', timeout=0.02)
+        assert result is False, \
+            'check_sentinel must return False when no sentinel is received'
+
+    def test_no_bitstream_warning_on_timeout(self):
+        """A timeout (no bytes) must not produce a spurious BITSTREAM WARNING."""
+        _, stderr = _run_check_sentinel(b'', timeout=0.02)
+        assert 'BITSTREAM WARNING' not in stderr, (
+            f'Spurious BITSTREAM WARNING on timeout; got: {stderr!r}'
+        )
+
+
+# ---------------------------------------------------------------------------
+# Part B — constant alignment: bridge must agree with smoke test
+# ---------------------------------------------------------------------------
+
+class TestConstantAlignment:
+    """wukong_bridge.py and wukong_boot_smoke.py must use identical sentinels.
+
+    If these constants drift apart, one script will mis-classify a stale
+    bitstream as current (or vice versa) even though both scripts appear to
+    work individually.
+    """
+
+    def test_stale_sentinel_magic_matches(self):
+        assert bridge.BOOT_SENTINEL_V1 == smoke.SENTINEL_V1, (
+            f'Stale sentinel mismatch: bridge=0x{bridge.BOOT_SENTINEL_V1:02X}, '
+            f'smoke=0x{smoke.SENTINEL_V1:02X}'
+        )
+
+    def test_current_sentinel_magic_matches(self):
+        assert bridge.BOOT_SENTINEL_V2 == smoke.SENTINEL_V2, (
+            f'Current sentinel mismatch: bridge=0x{bridge.BOOT_SENTINEL_V2:02X}, '
+            f'smoke=0x{smoke.SENTINEL_V2:02X}'
+        )
+
+    def test_stale_sentinel_is_0xBB(self):
+        """Sentinel value must be the documented 0xBB literal."""
+        assert smoke.SENTINEL_V1 == 0xBB, \
+            f'Expected SENTINEL_V1 == 0xBB, got 0x{smoke.SENTINEL_V1:02X}'
+
+    def test_current_sentinel_is_0xBC(self):
+        """Sentinel value must be the documented 0xBC literal."""
+        assert smoke.SENTINEL_V2 == 0xBC, \
+            f'Expected SENTINEL_V2 == 0xBC, got 0x{smoke.SENTINEL_V2:02X}'
+
+    def test_stale_sentinel_length_is_2(self):
+        """Old sentinel is 2 bytes: magic + N_INIT."""
+        assert bridge.SENTINEL_V1_LEN == 2, \
+            f'Expected SENTINEL_V1_LEN==2, got {bridge.SENTINEL_V1_LEN}'
+
+    def test_current_sentinel_length_is_3(self):
+        """Current sentinel is 3 bytes: magic + N_INIT + TU_VERSION."""
+        assert bridge.SENTINEL_V2_LEN == 3, \
+            f'Expected SENTINEL_V2_LEN==3, got {bridge.SENTINEL_V2_LEN}'
+
+    def test_tu_version_call_3pkt_is_0x02(self):
+        """Minimum TU_VERSION for correct ELOADCALL/XLOADLAMBDA tracing is 0x02."""
+        assert bridge.TU_VERSION_CALL_3PKT == 0x02, (
+            f'Expected TU_VERSION_CALL_3PKT==0x02, '
+            f'got 0x{bridge.TU_VERSION_CALL_3PKT:02X}'
+        )
+
+    def test_stale_distinct_from_current(self):
+        """Stale and current sentinels must have different magic bytes."""
+        assert smoke.SENTINEL_V1 != smoke.SENTINEL_V2, \
+            'SENTINEL_V1 and SENTINEL_V2 must be distinct byte values'
+
+    def test_sentinels_not_trace_magic(self):
+        """Sentinel bytes must not collide with TRACE_MAGIC (0xAA)."""
+        assert smoke.SENTINEL_V1 != bridge.TRACE_MAGIC, \
+            'SENTINEL_V1 collides with TRACE_MAGIC — bridge will mis-classify it'
+        assert smoke.SENTINEL_V2 != bridge.TRACE_MAGIC, \
+            'SENTINEL_V2 collides with TRACE_MAGIC — bridge will mis-classify it'

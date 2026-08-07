@@ -244,6 +244,9 @@ register_suite "pet-name-memory-tests" \
 register_suite "wukong-protocol-tests" \
     'python -m pytest scripts/test_wukong_protocol.py -v'
 
+register_suite "sentinel-warning-tests" \
+    'python -m pytest scripts/test_sentinel_warning.py -v'
+
 register_suite "check-wukong-hw-init" \
     'python3 scripts/check_wukong_hw_init.py'
 
