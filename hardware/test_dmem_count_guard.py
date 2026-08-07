@@ -116,11 +116,12 @@ def test_reference_file_exists_and_matches():
 
 
 def test_n_init_sentinel_byte_value():
-    """Smoke-check the current N_INIT sentinel byte value matches expected 0x20."""
+    """Smoke-check the current N_INIT sentinel byte value matches expected 0x22."""
     n = _compute_n_init()
-    # Current design: 26 non-zero NS words + 6 non-zero CLIST words = 32 = 0x20.
+    # Current design: 29 non-zero NS words + 5 non-zero CLIST words = 34 = 0x22.
+    # CLIST[0] is NULL — IDE upload sets the ⚡ boot entry E-GT at runtime.
     # If this assertion fails, update the expected value AND rebuild the bitstream.
-    assert n & 0xFF == 0x20, (
+    assert n & 0xFF == 0x22, (
         f"N_INIT & 0xFF changed: now 0x{n & 0xFF:02X} (N_INIT={n}). "
         "Update expected value here AND rebuild the Wukong bitstream."
     )
@@ -143,11 +144,12 @@ def test_namespace_and_clist_counts():
     """NAMESPACE and CLIST non-zero word counts are stable at design values."""
     ns_nonzero    = sum(1 for v in WUKONG_DEMO_NAMESPACE if v != 0)
     clist_nonzero = sum(1 for v in WUKONG_DEMO_CLIST if v != 0)
-    # 8-slot NS: 7 real entries (slot 7 is null) × 4 words minus zero words ≈ 26
-    # CLIST: 6 named non-null entries (idx 0,3,5,6,7,8)
-    assert ns_nonzero == 26, (
-        f"WUKONG_DEMO_NAMESPACE non-zero word count changed: {ns_nonzero} (expected 26)"
+    # 8-slot NS: non-zero words = 29 (NS entries with non-zero fields)
+    # CLIST: 5 named non-null entries (idx 3,5,6,7,8)
+    #        idx 0 is NULL — IDE upload sets the ⚡ boot entry E-GT at runtime
+    assert ns_nonzero == 29, (
+        f"WUKONG_DEMO_NAMESPACE non-zero word count changed: {ns_nonzero} (expected 29)"
     )
-    assert clist_nonzero == 6, (
-        f"WUKONG_DEMO_CLIST non-zero word count changed: {clist_nonzero} (expected 6)"
+    assert clist_nonzero == 5, (
+        f"WUKONG_DEMO_CLIST non-zero word count changed: {clist_nonzero} (expected 5)"
     )

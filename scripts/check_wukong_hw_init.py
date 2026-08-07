@@ -4,9 +4,13 @@
 Checks three properties that the structural auto-derivation in wukong_top.py
 cannot catch because they live in separate modules:
 
-  1. WUKONG_DEMO_CLIST[0] is E-GT for WukongCallHome (slot 7, 0x4A000007).
-     BOOT_PROGRAM[2] = CALL CR0,CR0[0] uses this entry; the wrong value here
-     causes the CM to call the wrong LUMP (or fault) immediately after boot.
+  1. WUKONG_DEMO_CLIST[0] is NULL (zero).
+     BOOT_PROGRAM[2] = CALL CR0,CR0[0] uses this entry at factory reset.
+     The IDE boot-image upload overwrites it with the E-GT for the user's
+     chosen ⚡ boot abstraction; the factory NULL causes a clean fault if
+     the board is powered on without an IDE upload.
+     A non-zero value here means WukongCallHome (or another hardwired LUMP)
+     is silently stealing every power-on CALL.
 
   2. WUKONG_DEMO_NAMESPACE slot 7 alloc ≥ header + WUKONG_NUC_PROGRAM words.
      If the alloc is too small the CM fires a range fault the moment it tries
@@ -38,16 +42,18 @@ from hardware.wukong_top import _WUKONG_ROM   # noqa: F401  (triggers the assert
 
 FAILURES = []
 
-# ── Check 1: WUKONG_DEMO_CLIST[0] is E-GT for WukongCallHome (slot 7) ─────────
-EXPECTED_BOOT_ENTRY_GT = 0x4A000007
+# ── Check 1: WUKONG_DEMO_CLIST[0] is NULL (zero) ──────────────────────────────
+# The IDE boot-image upload sets Thread.caps[0] to the ⚡ configured E-GT.
+# The factory image must leave it zero so standalone power-on faults cleanly
+# instead of silently entering a hardwired default LUMP.
 actual = WUKONG_DEMO_CLIST[0]
-if actual == EXPECTED_BOOT_ENTRY_GT:
-    print(f"OK: WUKONG_DEMO_CLIST[0] = 0x{actual:08X}  (WukongCallHome E-GT, slot 7)")
+if actual == 0:
+    print("OK: WUKONG_DEMO_CLIST[0] = 0x00000000  (NULL — IDE upload sets ⚡ boot entry)")
 else:
     msg = (
-        f"FAIL: WUKONG_DEMO_CLIST[0] = 0x{actual:08X}, "
-        f"expected WukongCallHome E-GT 0x{EXPECTED_BOOT_ENTRY_GT:08X}.\n"
-        "       BOOT_PROGRAM CALL CR0,CR0[0] will call the wrong LUMP."
+        f"FAIL: WUKONG_DEMO_CLIST[0] = 0x{actual:08X}, expected NULL (0x00000000).\n"
+        "       A non-zero value hardwires a CALL target; the IDE-configured ⚡\n"
+        "       boot entry is bypassed.  Set WUKONG_DEMO_CLIST[0] = 0 in boot_rom.py."
     )
     print(msg)
     FAILURES.append(msg)

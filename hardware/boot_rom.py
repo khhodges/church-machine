@@ -81,7 +81,6 @@ while len(BOOT_PROGRAM) < 256:
     BOOT_PROGRAM.append(0x00000000)
 
 
-
 # ---------------------------------------------------------------------------
 # NUC_PROGRAM — first abstraction: LED0 blink demo via DWRITE/IADD/ISUB/BRANCH
 #
@@ -624,19 +623,21 @@ WUKONG_DEMO_NAMESPACE[WUKONG_CALLHOME_NS_SLOT * 4 + 2] = integrity32(_wch_loc_by
 #
 # Derived from DEMO_CLIST with three overrides:
 #
-#   idx  0 — WukongCallHome E-GT (slot 7, 0x4A000007)
-#             BOOT_PROGRAM[2] = CALL CR0, CR0[0] uses this entry.
+#   idx  0 — NULL (zero): BOOT_PROGRAM[2] = CALL CR0, CR0[0] uses this entry.
 #             The boot FSM initialises CR6 → byte 0x400 (this c-list) before
-#             BOOT_PROGRAM runs, so the CALL resolves clist[0] here →
-#             E-GT for NS slot 7 → LUMP body at DMEM byte 0x0700.
-#             Without an IDE boot-image upload, standalone power-on always
-#             boots directly into WukongCallHome (LED blink + "CM:WUKONG\r\n").
+#             BOOT_PROGRAM runs.  clist[0] is intentionally zeroed here so
+#             that the IDE-uploaded boot image's Thread.caps[0] — which holds
+#             the E-GT for the ⚡ configured boot abstraction — is the actual
+#             CALL target.  Without an IDE upload the CALL will fault cleanly
+#             rather than silently jumping into a hardwired default program.
+#             WukongCallHome remains in the namespace as a selectable
+#             abstraction (slot 7) but is no longer the default CALL target.
 #
 #   idx  9 — SlideRule E-GT cleared: NS slot 8 absent in Wukong 8-slot NS
 #   idx 10 — Constants R-GT cleared: NS slot 9 absent in Wukong 8-slot NS
 # ---------------------------------------------------------------------------
 WUKONG_DEMO_CLIST = list(DEMO_CLIST)
-WUKONG_DEMO_CLIST[0]  = 0x4A000007  # WukongCallHome E-GT (slot 7) — ⚡ standalone boot entry
+WUKONG_DEMO_CLIST[0]  = 0           # NULL — Thread.caps[0] set by IDE boot-image upload (⚡ entry)
 WUKONG_DEMO_CLIST[9]  = 0           # SlideRule E-GT cleared: NS slot 8 absent in Wukong 8-slot NS
 WUKONG_DEMO_CLIST[10] = 0           # Constants R-GT cleared: NS slot 9 absent in Wukong 8-slot NS
 

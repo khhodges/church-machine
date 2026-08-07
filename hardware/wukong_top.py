@@ -58,12 +58,15 @@ from .uart_rx import UartRx
 # BOOT_PROGRAM (3 words) — minimal boot microcode that calls into DMEM:
 #   [0] LOAD CR15, CR15[0]  → load NS root into CR15  (M-elevated during boot)
 #   [1] CHANGE              → load Thread lump; CR6 ← boot c-list at byte 0x400
-#   [2] CALL CR0, CR0[0]    → WUKONG_DEMO_CLIST[0] = WukongCallHome E-GT (slot 7)
-#                              → NS slot 7 → DMEM byte 0x0700 → WukongCallHome LUMP
+#   [2] CALL CR0, CR0[0]    → Thread.caps[0] = IDE-configured ⚡ boot entry E-GT
+#                              (set by the IDE boot-image upload; WUKONG_DEMO_CLIST[0]
+#                               is zeroed in boot_rom.py so standalone power-on
+#                               without an IDE upload faults cleanly instead of
+#                               silently entering WukongCallHome)
 # [3..1023] = 0
 #
-# Without an IDE boot-image upload, standalone power-on always reaches
-# WukongCallHome (LED blink + "CM:WUKONG\r\n") via WUKONG_DEMO_CLIST[0].
+# WukongCallHome remains in the namespace at slot 7 as a selectable abstraction
+# but is no longer the hardwired default CALL target.
 # The WukongCallHome LUMP body is placed in dmem_init below at byte 0x0700.
 _WUKONG_ROM = list(BOOT_PROGRAM[:3]) + [0] * (1024 - 3)
 
@@ -173,8 +176,9 @@ class ChurchWukongXC7A100T(Elaboratable):
         #   CR15.word1_location = 0      (NS at byte 0)
         #   CR6.word1_location  = 0x400  (c-list at byte 0x400 = word 256)
         #
-        # BOOT_PROGRAM[2] = CALL CR0,CR0[0] → WUKONG_DEMO_CLIST[0] = WukongCallHome
-        # E-GT (slot 7) → NS slot 7 → DMEM byte 0x0700 (word 0x1C0) → LUMP body.
+        # BOOT_PROGRAM[2] = CALL CR0,CR0[0] → Thread.caps[0] (WUKONG_DEMO_CLIST[0])
+        # WUKONG_DEMO_CLIST[0] is NULL (zero) in the factory image; the IDE boot-image
+        # upload overwrites it with the E-GT for the ⚡ configured boot abstraction.
         #
         # WukongCallHome LUMP (cc=0): uses CR6 to reach the boot c-list directly.
         #   WUKONG_NUC_PROGRAM[0] = LOAD CR3, CR6[5]  → LED_DEV (clist[5])
@@ -187,7 +191,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         #                   slot 7 lim17=127 (alloc=128 for WukongCallHome LUMP)
         #   words  32-255 : zeros
         #   words 256-319 : WUKONG_DEMO_CLIST (64 c-list entries)
-        #                   [0]=WukongCallHome E-GT 0x4A000007 (⚡ boot entry, slot 7)
+        #                   [0]=NULL (IDE upload sets this to ⚡ boot entry E-GT)
         #                   [5]=LED_DEV, [6]=UART_DEV, [7]=BTN_DEV, [8]=TIMER_DEV
         #                   [9]=0, [10]=0  (SlideRule/Constants absent in 8-slot NS)
         #   words 320-447 : zeros
