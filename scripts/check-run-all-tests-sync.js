@@ -67,6 +67,12 @@ const DEFAULT_SCRIPT_ONLY_SUITES = [
     'hardware-sim',
     'check-ila-probe-names',
     'test-check-ila-probe-names',
+    'boot-gt-words-tests',
+    'trace-packet-execution-tests',
+    'sentinel-warning-tests',
+    'check-wukong-hw-init',
+    'wukong-cr-update-tests',
+    'wukong-trace-cr-server-tests',
 ];
 
 const configPath = path.join(__dirname, 'test-workflow-config.json');

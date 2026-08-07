@@ -46,21 +46,22 @@ print(f"0xAA sync bytes found: {aa}  (~{aa} trace packets)")
 print("\nFirst packets (hex):")
 i = 0
 shown = 0
-while i < len(buf) - 11 and shown < 8:
+while i < len(buf) - 12 and shown < 8:
     if buf[i] == 0xAA:
-        pkt = buf[i:i+11]
-        nia   = int.from_bytes(pkt[1:5], 'big')
-        instr = int.from_bytes(pkt[5:9], 'big')
-        flags = pkt[9]
-        fault = pkt[10]
+        pkt     = buf[i:i+12]
+        nia     = int.from_bytes(pkt[1:5], 'big')
+        ev_type = pkt[5]
+        payload = int.from_bytes(pkt[6:10], 'big')
+        flags   = pkt[10]
+        fault   = pkt[11]
         fault_code  = fault & 0x1F
         fault_valid = bool(fault & 0x40)
         bp_hit      = bool(fault & 0x80)
         nzcv = f"N={flags>>3&1} Z={flags>>2&1} C={flags>>1&1} V={flags&1}"
-        print(f"  NIA=0x{nia:08x}  instr=0x{instr:08x}  {nzcv}"
+        print(f"  NIA=0x{nia:08x}  ev=0x{ev_type:02x}  payload=0x{payload:08x}  {nzcv}"
               f"  fault={'YES code='+str(fault_code) if fault_valid else 'no'}"
               f"{'  BP!' if bp_hit else ''}")
-        i += 11
+        i += 12
         shown += 1
     else:
         i += 1

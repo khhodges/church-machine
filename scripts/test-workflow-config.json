@@ -24,6 +24,8 @@
     "check-ila-probe-names",
     "test-check-ila-probe-names",
     "boot-gt-words-tests",
+    "trace-packet-execution-tests",
+    "sentinel-warning-tests",
     "check-wukong-hw-init",
     "wukong-cr-update-tests",
     "wukong-trace-cr-server-tests"

@@ -112,10 +112,18 @@ const IO_PORT_PET_NAME_WR     = 0xFFFFFF38; // DWRITE to this addr marks c-list 
 // 11-slot catalog (0-10): hw MMIO 0-5, boot-entry LUMPs 6-7, hardware caps 8-10.
 const BOOT_NAMED_SLOTS = Object.freeze([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
-// DEPRECATED: fixed IRQ thread slot constant.
-// Under v1.2 §4 the Scheduler.IRQ LUMP is delivered lazily (ns_slot_policy=dynamic);
-// the IRQ thread slot is now computed from irqState.irqLumpSlot rather than being
-// hardcoded here.  Retained for backwards-compat with any external references.
+const TRACE_EV_RESULT      = 0x00;  // Single-packet result (DR→DR, SAVE, Function, etc.)
+const TRACE_EV_LOAD_SHADOW = 0x01;  // LOAD: old CR_dst GT displaced
+const TRACE_EV_LOAD_NEW    = 0x02;  // LOAD: new GT installed in CR_dst
+const TRACE_EV_CHANGE_PUSH = 0x03;  // CHANGE: context stack push (payload=0)
+const TRACE_EV_CHANGE_CR12 = 0x04;  // CHANGE: CR12 ← new thread GT
+const TRACE_EV_CHANGE_CR5  = 0x05;  // CHANGE: CR5  ← heap GT
+const TRACE_EV_CALL_CR6    = 0x06;  // CALL:   CR6  ← abstraction GT
+const TRACE_EV_CALL_CR14   = 0x07;  // CALL:   CR14 ← code / return GT
+const TRACE_EV_CALL_PUSH   = 0x08;  // CALL:   caller frame stack push (payload=0)
+const TRACE_EV_RETURN_POP  = 0x09;  // RETURN: caller frame stack pop (payload=0)
+const TRACE_EV_RETURN_CR6  = 0x0A;  // RETURN: CR6  ← restored from frame
+const TRACE_EV_RETURN_CR14 = 0x0B;  // RETURN: CR14 ← restored from frame (caller's code cap)
 const SCHEDULER_IRQ_THREAD_SLOT = 41;
 
 
@@ -196,6 +204,35 @@ class ChurchSimulator {
         this._bootAbstrSlot = this.bootEntrySlot;
 
         this.reset();
+    }
+
+    // ── Trace packet helpers ──────────────────────────────────────────────────
+    // Return the current NZCV flags packed into bits[3:0] of a byte.
+    // Matches the hardware bridge JSON 'flags' field (wukong_bridge.py).
+    _flagsByte() {
+        return ((this.flags.N ? 8 : 0) |
+                (this.flags.Z ? 4 : 0) |
+                (this.flags.C ? 2 : 0) |
+                (this.flags.V ? 1 : 0));
+    }
+
+    // Append one per-event trace packet to the per-instruction buffer.
+    // The buffer is attached to the result object in step() and boot step returns.
+    // nia        — physical address of the retiring instruction (uint32)
+    // ev_type    — TRACE_EV_* constant (which CR changed, or push/pop)
+    // payload_gt — GT word0 (uint32); 0 for push/pop events
+    _emitTrace(nia, ev_type, payload_gt) {
+        const pkt = {
+            nia:         (nia >>> 0),
+            ev_type,
+            payload_gt:  (payload_gt >>> 0),
+            flags:       this._flagsByte(),
+            fault_code:  0,
+            fault_valid: false,
+            bp_hit:      false,
+        };
+        this._tracePacketsBuf.push(pkt);
+        return pkt;
     }
 
     // ── Pet-name slot resolver ────────────────────────────────────────────────
@@ -823,6 +860,7 @@ class ChurchSimulator {
         this.lastCapability = null;
         this.auditLog = [];
         this.awaitingLump = null;
+        this._tracePacketsBuf = [];  // per-instruction trace packet buffer (cleared before each step)
 
         // Three-tier fault recovery and scheduler interrupt state (Task #1077)
         this.irqState = {
@@ -1719,6 +1757,9 @@ class ChurchSimulator {
         // and docs/architecture.md "Boot Sequence" implement the same three-lump sequence.
         if (this.bootComplete) return false;   // nothing to do once boot has finished
         if (this.halted) return false;         // stop re-entering after a boot fault (prevents infinite loop in runSim)
+        // _tracePacketsBuf is NOT cleared here — boot packets accumulate across all _bootStep() calls
+        // so that after the full loop callers see all 8 packets (2+3+3) at once.
+        // The buffer is cleared by reset() and at the top of step() for post-boot instructions.
 
         switch (this.bootStep) {
 
@@ -1771,9 +1812,7 @@ class ChurchSimulator {
                         faultType:   _lfe.type    || '?',
                         faultMsg:    _lfe.message || '?',
                     };
-                    this.output += `[BOOT] FAULT_RST — Captured fault context: ` +
-                        `${_crLabel(_nsSlot)}.${_crLabel(_thrSlot)}.${_crLabel(_absSlot)}.${_methodStr} ` +
-                        `@ physPC=0x${_faultPC.toString(16).toUpperCase()} offset=+${_offset}\n`;
+                    // [BOOT] FAULT_RST captured fault context — replaced by per-event trace packets
                 } else {
                     this.faultViolationData = null;  // cold boot — no prior fault
                 }
@@ -1783,7 +1822,7 @@ class ChurchSimulator {
                 }
                 this.dr.fill(0);                  // zero all 16 data registers (DR0–DR15)
                 this.mElevation = true;           // enable M-elevation: mLoad bypasses R/W/X/L perms during boot
-                this.output += '[BOOT] FAULT_RST — All CRs cleared to NULL, all DRs zeroed. M-Elevation ON.\n';
+                // [BOOT] FAULT_RST — replaced by per-event trace packets
                 // Synthetic audit entry — registers the CR/DR wipe in the TSB Audit trail
                 this.auditLog.push({
                     gate: 'RST',
@@ -1820,7 +1859,9 @@ class ChurchSimulator {
                     return false;
                 }
                 this._writeCR(15, gt15, check.entry);                              // write validated GT + NS entry into CR15
-                this.output += `[BOOT] LOAD_NS — CR15 <- mLoad(Slot 0) Namespace (base=0x0000, size=${this.memory.length} words, NS table entries=${this.nsCount}) word0=0x${(this.cr[15].word0>>>0).toString(16).toUpperCase().padStart(8,'0')} word1=0x${(this.cr[15].word1>>>0).toString(16).toUpperCase().padStart(8,'0')} word2=0x${(this.cr[15].word2>>>0).toString(16).toUpperCase().padStart(8,'0')}\n`;
+                // Boot ROM instruction [0]: LOAD CR15, CR15[0] — 2 trace packets (hardware NIA=0)
+                this._emitTrace(0, TRACE_EV_LOAD_SHADOW, 0);               // CR15 was NULL before boot
+                this._emitTrace(0, TRACE_EV_LOAD_NEW, this.cr[15].word0 >>> 0);
                 this.auditLog.push({
                     gate: 'CR_WR',
                     desc: `CR15(NS) ← Namespace descriptor  · base=0x0000, size=${this.memory.length} words, NS entries=${this.nsCount}`,
@@ -1856,7 +1897,7 @@ class ChurchSimulator {
                     return false;
                 }
                 this._writeCR(12, gt12, check12.entry);                            // CR12 ← thread stack token (encodes lump base + size)
-                this.output += `[BOOT] INIT_THRD — CR12 <- mLoad(Slot 1) thread stack GT (zero perms, Inform) word0=0x${(this.cr[12].word0>>>0).toString(16).toUpperCase().padStart(8,'0')} word1=0x${(this.cr[12].word1>>>0).toString(16).toUpperCase().padStart(8,'0')} word2=0x${(this.cr[12].word2>>>0).toString(16).toUpperCase().padStart(8,'0')}\n`;
+                // [BOOT] INIT_THRD — replaced by per-event trace packets (CR12 captured in B:03 CHANGE_CR12)
                 this.auditLog.push({
                     gate: 'CR_WR',
                     desc: `CR12(E) ← Thread stack GT  · NS slot ${BOOT_NS_SLOT_THREAD}, zero perms (Inform), M-elevation`,
@@ -1896,7 +1937,10 @@ class ChurchSimulator {
                 const _seq1h = (_initThrdEntry.word2_seals >>> 25) & 0x7F;
                 const gt5 = this.createGT(_seq1h, BOOT_NS_SLOT_THREAD, {R:1,W:1,X:0,L:0,S:0,E:0}, 1);  // RW Inform GT for the thread lump (Slot 1)
                 this._writeCR(5, gt5, _initThrdEntry);                             // CR5 ← heap RW token (base=thread lump, perms=RW)
-                this.output += `[BOOT] INIT_HEAP — CR5 <- thread heap (RW, Inform, Slot 1) heap=[+${_heapStart12}..+${_spMax12}] (CHANGE-consistent) word0=0x${(this.cr[5].word0>>>0).toString(16).toUpperCase().padStart(8,'0')} word1=0x${(this.cr[5].word1>>>0).toString(16).toUpperCase().padStart(8,'0')} word2=0x${(this.cr[5].word2>>>0).toString(16).toUpperCase().padStart(8,'0')}\n`;
+                // Boot ROM instruction [1]: CHANGE CR12, CR15[1] — 3 trace packets (hardware NIA=1)
+                this._emitTrace(1, TRACE_EV_CHANGE_PUSH, 0);
+                this._emitTrace(1, TRACE_EV_CHANGE_CR12, this.cr[12].word0 >>> 0);
+                this._emitTrace(1, TRACE_EV_CHANGE_CR5,  this.cr[5].word0  >>> 0);
                 // Synthetic audit entry so the TSB Audit panel shows the CR5 heap
                 // synthesis as an explicit capability gate (not an mLoad — the GT is
                 // created directly by the boot state machine, CHANGE-consistent).
@@ -1956,15 +2000,8 @@ class ChurchSimulator {
                     _callHomeMode = _ack > 0 ? 'online' : 'offline';
                 }
 
-                this.output += `[BOOT] CALL_HOME — Tunnel.Register(boot_reason=${_bootReason}, last_fault=${_lastFault}, fault_NIA=0x${_faultNIA.toString(16).toUpperCase()}) ACK=${_ack} (${_callHomeMode})\n`;
-                if (this.faultViolationData) {
-                    const fv = this.faultViolationData;
-                    this.output +=
-                        `[BOOT] CALL_HOME — FaultViolation: ` +
-                        `${fv.namespace.label}.${fv.thread.label}.${fv.abstraction.label}.${fv.method} ` +
-                        `@ physPC=0x${fv.physicalPC.toString(16).toUpperCase()} offset=+${fv.offset} ` +
-                        `[${fv.faultType}: ${fv.faultMsg}]\n`;
-                }
+                // [BOOT] CALL_HOME — replaced by per-event trace packets
+                // (CALL_HOME is a firmware-level service call, not a hardware-ISA instruction)
                 this.callHomeStatus = _callHomeMode;
                 this.callHomeTimestamp = Date.now();
                 // Synthetic audit entry — shows the CALL_HOME registration in the TSB Audit trail
@@ -2011,7 +2048,7 @@ class ChurchSimulator {
                     return false;
                 }
                 this._writeCR(6, gt6, check6.entry);                                               // CR6 ← E-type token for boot entry (saved to sentinel frame in B:06)
-                this.output += `[BOOT] INIT_ABSTR — CR6 <- mLoad(Slot ${this.bootEntrySlot}, ${_b3Label}) (E, M-elevation) word0=0x${(this.cr[6].word0>>>0).toString(16).toUpperCase().padStart(8,'0')} word1=0x${(this.cr[6].word1>>>0).toString(16).toUpperCase().padStart(8,'0')} word2=0x${(this.cr[6].word2>>>0).toString(16).toUpperCase().padStart(8,'0')}\n`;
+                // [BOOT] INIT_ABSTR CR6 — replaced by per-event trace packets
                 this.auditLog.push({
                     gate: 'CR_WR',
                     desc: `CR6(E) ← Boot entry E-GT  · NS slot ${this.bootEntrySlot} (${_b3Label}), M-elevation; snapshotted to sentinel frame in B:06`,
@@ -2037,7 +2074,7 @@ class ChurchSimulator {
                     // silently skipped the write.  Use a typeof check instead.
                     const _b5CR0Addr = (_b5ThreadEntry.word0_location >>> 0) + THREAD_CAPS_OFFSET;
                     this.memory[_b5CR0Addr] = this.createGT(0, this.bootEntrySlot, {E:1}, 1);
-                    this.output += `[BOOT] INIT_ABSTR — Thread.caps[0] (offset +${THREAD_CAPS_OFFSET}) <- boot-entry E-GT (Slot ${this.bootEntrySlot})\n`;
+                    // [BOOT] INIT_ABSTR Thread.caps[0] — replaced by per-event trace packets
                 }
 
                 this.bootStep++;                  // advance state machine → B:06
@@ -2147,8 +2184,7 @@ class ChurchSimulator {
                     // snapshotted into the sentinel frame above.  Since cc=0 means there is no c-list,
                     // CR6 must be cleared to NULL so machine state is consistent.
                     this.cr[6] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
-                    this.output += `[BOOT] NUC_CLIST — cc=0 (no c-list, direct-dispatch path); CR6←NULL word0=0x00000000 word1=0x00000000 word2=0x00000000; sentinel pushed (frame@+${sp_max}, STO=${this.sto})\n`;
-                    this.output += `[BOOT] SENTINEL CALL — frame@+${sp_max}=0x${sentinelFrameWord.toString(16).toUpperCase().padStart(8,'0')} (NIA=0x7FFF,sz=1,prev_STO=${sp_max}), E-GT@+${sp_max-1}=0x${oldCR6GT.toString(16).toUpperCase().padStart(8,'0')}, STO=${this.sto}\n`;
+                    // [BOOT] NUC_CLIST cc=0 + SENTINEL — replaced by per-event trace packets
                     this.auditLog.push({
                         gate: 'SENTINEL',
                         desc: `Boot.Abstr cc=0 (no c-list, direct dispatch) — sentinel pushed @ +${sp_max}; thread[+${THREAD_CAPS_OFFSET}] holds boot entry E-GT`,
@@ -2170,8 +2206,7 @@ class ChurchSimulator {
                     const _clistEntry = Object.assign({}, entryNSEntry, { word0_location: (base + clistStart) >>> 0 });
                     this._writeCR(6, cr6GT, _clistEntry);
                     this.cr[6].m = 1;   // CALL is always M-elevated (matches CALL ISA call.py: mload_m_elevated=1)
-                    this.output += `[BOOT] NUC_CLIST — INIT_CLIST CR6(L) <- mLoad c-list of ${_b4Label} (base=0x${(base+clistStart).toString(16).toUpperCase()}, cc=${cc}); sentinel pushed (frame@+${sp_max}, STO=${this.sto}) word0=0x${(this.cr[6].word0>>>0).toString(16).toUpperCase().padStart(8,'0')} word1=0x${(this.cr[6].word1>>>0).toString(16).toUpperCase().padStart(8,'0')} word2=0x${(this.cr[6].word2>>>0).toString(16).toUpperCase().padStart(8,'0')}\n`;
-                    this.output += `[BOOT] SENTINEL CALL — frame@+${sp_max}=0x${sentinelFrameWord.toString(16).toUpperCase().padStart(8,'0')} (NIA=0x7FFF,sz=1,prev_STO=${sp_max}), E-GT@+${sp_max-1}=0x${oldCR6GT.toString(16).toUpperCase().padStart(8,'0')}, STO=${this.sto}\n`;
+                    // [BOOT] NUC_CLIST INIT_CLIST + SENTINEL — replaced by per-event trace packets
                     this.auditLog.push({
                         gate: 'CR_WR',
                         desc: `CR6(L) ← mLoad INIT_CLIST · ${_b4Label} c-list  · base=0x${(base+clistStart).toString(16).toUpperCase()}, cc=${cc}, sentinel pushed`,
@@ -2213,6 +2248,10 @@ class ChurchSimulator {
                 // _writeCR sets CR14.word1 = entryNSEntry.word0_location = lump base ✓
                 const cr14GT = this.createGT(0, bootEntrySlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);  // R+X code token
                 this._writeCR(14, cr14GT, entryNSEntry);
+                // Boot ROM instruction [2]: CALL CR0, CR0 — 3 trace packets (hardware NIA=2)
+                this._emitTrace(2, TRACE_EV_CALL_CR6,  this.cr[6].word0  >>> 0);
+                this._emitTrace(2, TRACE_EV_CALL_CR14, this.cr[14].word0 >>> 0);
+                this._emitTrace(2, TRACE_EV_CALL_PUSH, 0);
 
                 // ── Read CR0 from Thread.caps[0] — Thread is the authority ───────────────
                 // Thread.caps[0] (memory[threadBase + THREAD_CAPS_OFFSET]) holds the
@@ -2238,7 +2277,7 @@ class ChurchSimulator {
                 this.pc = 0;
                 this._nucLumpData = null;                                            // clear stash
 
-                this.output += `[BOOT] NUC_CODE — CR14(R+X) <- ${_b4Label} code lump (base=0x${base.toString(16).toUpperCase()}, cw=${cw}) word0=0x${(this.cr[14].word0>>>0).toString(16).toUpperCase().padStart(8,'0')} word1=0x${(this.cr[14].word1>>>0).toString(16).toUpperCase().padStart(8,'0')} word2=0x${(this.cr[14].word2>>>0).toString(16).toUpperCase().padStart(8,'0')}; CR0 <- Thread.caps[0] E-GT (slot ${_cr0Slot}) word0=0x${(this.cr[0].word0>>>0).toString(16).toUpperCase().padStart(8,'0')} word1=0x${(this.cr[0].word1>>>0).toString(16).toUpperCase().padStart(8,'0')} word2=0x${(this.cr[0].word2>>>0).toString(16).toUpperCase().padStart(8,'0')}; PC=0\n`;
+                // [BOOT] NUC_CODE — replaced by per-event trace packets (CALL_CR6/CALL_CR14/CALL_PUSH emitted above)
                 this.auditLog.push({
                     gate: 'CR_WR',
                     desc: `CR14(R+X) ← ${_b4Label} code lump  · base=0x${base.toString(16).toUpperCase()}, cw=${cw}, PC←0; CR0 ← boot-entry E-GT (direct dispatch)`,
@@ -2267,9 +2306,7 @@ class ChurchSimulator {
                 if (this.abstractionRegistry) {
                     const navaInit = this.abstractionRegistry.dispatchMethod(5, 'Init', this, {});
                     const navaOk   = !!(navaInit && navaInit.ok);
-                    this.output += navaOk
-                        ? `[BOOT] Navana.Init — complete (${navaInit.message || 'OK'})\n`
-                        : `[BOOT] Navana.Init — warning: ${(navaInit && navaInit.error) || 'no abstractionRegistry response'}\n`;
+                    // [BOOT] Navana.Init — replaced by per-event trace packets
                     this.auditLog.push({
                         gate: 'Navana.Init',
                         desc: navaOk
@@ -2288,7 +2325,7 @@ class ChurchSimulator {
                 this.bootComplete = true;           // signal the step-loop to start dispatching instructions
                 this.ledBits = 0b111111;            // all 6 LEDs on = boot complete
                 this.ledMode = 'boot';              // LED display stays in boot-progress mode until first user toggle
-                this.output += '[BOOT] COMPLETE — M-Elevation OFF. CR0 = boot-entry E-GT (direct dispatch). Boot complete.\n';
+                // [BOOT] COMPLETE — replaced by per-event trace packets
                 this.auditLog.push({
                     gate: 'CMPL',
                     desc: 'bootComplete ← true  ·  M-elevation OFF  ·  CR0 = boot-entry E-GT (direct dispatch)',
@@ -3547,6 +3584,7 @@ class ChurchSimulator {
         }
         if (this.halted) return null;
         this.auditLog = [];
+        this._tracePacketsBuf = [];  // clear per-instruction trace packet buffer
 
         // ── Scheduler timer interrupt check (Task #1077) ──────────────────────
         // Before fetching the next instruction: if the hardware alarm has fired
@@ -3563,6 +3601,7 @@ class ChurchSimulator {
                 pc: this.pc, physicalPC: this.physicalPC, instr: null,
                 desc: `Timer IRQ: Scheduler.IRQ injected at step ${this.stepCount} (hidden ELOADCALL)`,
                 timerIRQ: true,
+                tracePackets: [],  // timer-IRQ is a hidden ELOADCALL — no trace packets visible to IDE
             };
             timerResult.physicalPC = this.physicalPC;
             timerResult.auditPipeline = this._auditPipeline ? this._auditPipeline() : [];
@@ -3608,6 +3647,7 @@ class ChurchSimulator {
                 physicalPC: this.physicalPC,
                 instr: d,
                 skipped: true,
+                tracePackets: [],  // skipped instructions retire no state changes → no trace packets
                 desc: `${this.opName(d.opcode)}${this.condName(d.cond)} skipped (condition false)`,
             };
             this.pc++;
@@ -3710,6 +3750,7 @@ class ChurchSimulator {
             this._writeDR(0, 0);
             result.physicalPC = this.physicalPC;
             result.auditPipeline = this._auditPipeline();
+            result.tracePackets = this._tracePacketsBuf.slice();
             this.emit('step', result);
             this.emit('stateChange', this.getState());
         }
@@ -3718,6 +3759,7 @@ class ChurchSimulator {
 
     _execLoad(d) {
         const clistGT = this.cr[d.crSrc].word0;
+        const _loadOldGT = this.cr[d.crDst].word0 >>> 0;  // captured for LOAD_SHADOW before any _writeCR
         if (clistGT === 0) {
             this.fault('NULL_CAP', `LOAD: CR${d.crSrc} is NULL`);
             return null;
@@ -3879,6 +3921,8 @@ class ChurchSimulator {
             const desc = `LOAD CR${d.crDst}, [CR${d.crSrc} + ${d.imm}] \u2192 ${abLabel}`;
             this.output += desc + '\n';
             this.pc++;
+            this._emitTrace(this.physicalPC, TRACE_EV_LOAD_SHADOW, _loadOldGT);
+            this._emitTrace(this.physicalPC, TRACE_EV_LOAD_NEW, this.cr[d.crDst].word0 >>> 0);
             return { pc: this.pc - 1, instr: d, desc };
         }
 
@@ -3922,6 +3966,8 @@ class ChurchSimulator {
             const desc = `LOAD CR${d.crDst}, [CR${d.crSrc} + ${d.imm}] -> ${label} [Mode 2 lazy loaded]`;
             this.output += desc + '\n';
             this.pc++;
+            this._emitTrace(this.physicalPC, TRACE_EV_LOAD_SHADOW, _loadOldGT);
+            this._emitTrace(this.physicalPC, TRACE_EV_LOAD_NEW, this.cr[d.crDst].word0 >>> 0);
             return { pc: this.pc - 1, instr: d, desc };
         }
         if (this.lazyManifest[targetIdx] && !this.lazyManifest[targetIdx].loaded) {
@@ -3940,6 +3986,8 @@ class ChurchSimulator {
                     const desc = `LOAD CR${d.crDst}, [CR${d.crSrc} + ${d.imm}] -> ${label} [lazy loaded]`;
                     this.output += desc + '\n';
                     this.pc++;
+                    this._emitTrace(this.physicalPC, TRACE_EV_LOAD_SHADOW, _loadOldGT);
+                    this._emitTrace(this.physicalPC, TRACE_EV_LOAD_NEW, this.cr[d.crDst].word0 >>> 0);
                     return { pc: this.pc - 1, instr: d, desc };
                 }
                 this.fault('CODE_NOT_RESIDENT', `LOAD: slot ${targetIdx} lazy load failed`);
@@ -3964,6 +4012,8 @@ class ChurchSimulator {
         const desc = `LOAD CR${d.crDst}, [CR${d.crSrc} + ${d.imm}] -> ${label}`;
         this.output += desc + '\n';
         this.pc++;
+        this._emitTrace(this.physicalPC, TRACE_EV_LOAD_SHADOW, _loadOldGT);
+        this._emitTrace(this.physicalPC, TRACE_EV_LOAD_NEW, this.cr[d.crDst].word0 >>> 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: this._loadPipeline(d, label) };
     }
 
@@ -4057,6 +4107,7 @@ class ChurchSimulator {
         const desc = `SAVE CR${d.crDst} -> [CR${d.crSrc} + ${d.imm}] (${label})`;
         this.output += desc + '\n';
         this.pc++;
+        this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc };
     }
 
@@ -4379,6 +4430,9 @@ class ChurchSimulator {
                 this.pc = tableEntry;
             }
         }
+        this._emitTrace(this.physicalPC, TRACE_EV_CALL_CR6,  this.cr[6].word0  >>> 0);
+        this._emitTrace(this.physicalPC, TRACE_EV_CALL_CR14, this.cr[14].word0 >>> 0);
+        this._emitTrace(this.physicalPC, TRACE_EV_CALL_PUSH, 0);
         return { pc: prevPC, instr: d, desc, pipeline: this._callPipeline(d, label) };
     }
 
@@ -4716,6 +4770,12 @@ class ChurchSimulator {
 
         this._resetAllMBits();   // RETURN boundary: M is reset on all CRs (architecture rule)
 
+        // Capture the CALLER's saved CR14 from the frame — RETURN_CR14 payload per
+        // debug-packet-protocol.md: "CR14 ← restored from frame (caller's code cap)".
+        // frame.savedCRs includes all 16 CRs snapshotted at CALL/LAMBDA time.
+        const _retCallerCR14GT = (frame.savedCRs && frame.savedCRs[14])
+            ? (frame.savedCRs[14].word0 >>> 0) : 0;
+
         // Mask semantics: set bit = PRESERVE callee's CR (return value); clear bit = restore caller's.
         // One combined pass ensures callee internal GTs are never visible to the caller
         // unless explicitly preserved as return values.
@@ -4764,6 +4824,9 @@ class ChurchSimulator {
             const maskDesc = mask ? ` MASK=0b${mask.toString(2).padStart(12, '0')} preserved[${preservedCRs.join(',')||'none'}]` : '';
             const desc = `RETURN (LAMBDA/SZ=0) PC→${cachedReturnPC} [leaf — NIA cache, no memory read]${maskDesc}`;
             this.output += desc + '\n';
+            this._emitTrace(this.physicalPC, TRACE_EV_RETURN_POP,  0);
+            this._emitTrace(this.physicalPC, TRACE_EV_RETURN_CR6,  this.cr[6].word0  >>> 0);
+            this._emitTrace(this.physicalPC, TRACE_EV_RETURN_CR14, _retCallerCR14GT);
             return { pc: cachedReturnPC, instr: d, desc, pipeline: this._returnPipeline(d, frame, mask) };
         }
         // Restore CR14 for cross-domain RETURN (sz=1 CALL frame): mirrors the
@@ -4779,6 +4842,9 @@ class ChurchSimulator {
         const desc = `RETURN (${frameTag}/SZ=${frame.sz}) PC→${frame.returnPC}${maskDesc}`;
         this.output += desc + '\n';
         this.pc = frame.returnPC;
+        this._emitTrace(this.physicalPC, TRACE_EV_RETURN_POP,  0);
+        this._emitTrace(this.physicalPC, TRACE_EV_RETURN_CR6,  this.cr[6].word0  >>> 0);
+        this._emitTrace(this.physicalPC, TRACE_EV_RETURN_CR14, _retCallerCR14GT);
         return { pc: frame.returnPC, instr: d, desc, pipeline: this._returnPipeline(d, frame, mask) };
     }
 
@@ -4912,6 +4978,9 @@ class ChurchSimulator {
             const desc = `CHANGE CR${d.crDst} (system-wide${doRestoreCall ? `; RESTORE_CALL: CR0–CR11 loaded from thread[+${THREAD_CAPS_OFFSET}..+${THREAD_CAPS_OFFSET + 11}]` : '; CR12/CR13 unchanged by context switch'}) <- [CR${d.crSrc}+${targetIdx}]`;
             this.output += desc + '\n';
             this.pc++;
+            this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_PUSH, 0);
+            this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_CR12, this.cr[12].word0 >>> 0);
+            this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_CR5,  this.cr[5].word0  >>> 0);
             return { pc: this.pc - 1, instr: d, desc };
         }
 
@@ -4946,6 +5015,9 @@ class ChurchSimulator {
             const desc = `CHANGE CR${d.crDst} (context switch: CR0–CR11+CR14+CR15+DRs saved for slot ${outSlot !== null ? outSlot : 'boot'}; resuming slot ${targetIdx} at PC=${resumePC}; CR12/CR13 unchanged)`;
             this.output += desc + '\n';
             this.pc = resumePC;   // resume at saved PC (no additional increment)
+            this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_PUSH, 0);
+            this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_CR12, this.cr[12].word0 >>> 0);
+            this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_CR5,  this.cr[5].word0  >>> 0);
             return { pc: resumePC, instr: d, desc };
         }
 
@@ -4984,6 +5056,9 @@ class ChurchSimulator {
         const desc = `CHANGE CR${d.crDst} (context switch: CR0–CR11+CR14+CR15+DRs saved for slot ${outSlot !== null ? outSlot : 'boot'}; first activation of slot ${targetIdx} — starting at PC=0; CR0 restored from thread[+244]; CR12/CR13 unchanged) <- [CR${d.crSrc}+${targetIdx}]`;
         this.output += desc + '\n';
         this.pc = 0;   // first activation always begins at PC=0
+        this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_PUSH, 0);
+        this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_CR12, this.cr[12].word0 >>> 0);
+        this._emitTrace(this.physicalPC, TRACE_EV_CHANGE_CR5,  this.cr[5].word0  >>> 0);
         return { pc: 0, instr: d, desc };
     }
 
@@ -5042,6 +5117,7 @@ class ChurchSimulator {
         const desc = `SWITCH CR${d.crSrc} → CR${destCR} (PassKey install; source unchanged)`;
         this.output += desc + '\n';
         this.pc++;
+        this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc };
     }
 
@@ -5063,6 +5139,7 @@ class ChurchSimulator {
                 const desc = `TPERM CR${d.crDst}, ATTENUATE [MODE2] NULL source GT — Z=0`;
                 this.output += desc + '\n';
                 this.pc++;
+                this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
                 return { pc: this.pc - 1, instr: d, desc };
             }
 
@@ -5094,6 +5171,7 @@ class ChurchSimulator {
                 const desc = `TPERM CR${d.crDst}, ATTENUATE [MODE2] expansion {${reqPermStr}} ⊄ {${srcPermStr}} — Z=0`;
                 this.output += desc + '\n';
                 this.pc++;
+                this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
                 return { pc: this.pc - 1, instr: d, desc };
             }
 
@@ -5114,6 +5192,7 @@ class ChurchSimulator {
             const desc = `TPERM CR${d.crDst}, ATTENUATE [MODE2] {${srcPermStr}} → {${reqPermStr}} — Z=1`;
             this.output += desc + '\n';
             this.pc++;
+            this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
             return { pc: this.pc - 1, instr: d, desc };
         }
 
@@ -5137,6 +5216,7 @@ class ChurchSimulator {
             const descExact = `TPERM CR${d.crDst} EXACT [14]: credential match — Z=1`;
             this.output += descExact + '\n';
             this.pc++;
+            this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
             return { pc: this.pc - 1, instr: d, desc: descExact };
         }
 
@@ -5154,6 +5234,7 @@ class ChurchSimulator {
             const descFrame = `TPERM CR${d.crDst} FRAME [13]: ${hasFrame ? 'frame exists' : 'no frame'} (depth=${this.callStack.length}) — Z=${hasFrame ? 1 : 0}`;
             this.output += descFrame + '\n';
             this.pc++;
+            this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
             return { pc: this.pc - 1, instr: d, desc: descFrame };
         }
 
@@ -5170,6 +5251,7 @@ class ChurchSimulator {
             const desc = `TPERM CR${d.crDst} [NULL] — Z=0`;
             this.output += desc + '\n';
             this.pc++;
+            this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
             return { pc: this.pc - 1, instr: d, desc };
         }
 
@@ -5199,6 +5281,7 @@ class ChurchSimulator {
                 const desc = `TPERM CR${d.crDst}: GT bounds fail (${location}+${limitOffset}=${sumF64} >= NS=${this.NS_TABLE_BASE}) — Z=0`;
                 this.output += desc + '\n';
                 this.pc++;
+                this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
                 return { pc: this.pc - 1, instr: d, desc };
             }
         }
@@ -5239,6 +5322,7 @@ class ChurchSimulator {
         const desc = `TPERM CR${d.crDst}, ${permStr} -> ${result} (Z=${hasAll ? 1 : 0})${bMsg}`;
         this.output += desc + '\n';
         this.pc++;
+        this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: this._tpermPipeline(d, parsed, hasAll) };
     }
 
@@ -5309,6 +5393,7 @@ class ChurchSimulator {
         const desc = `LAMBDA CR${crIdx} -> ${label} [SZ=0, STO:${savedSTO}->${this.sto}]`;
         this.output += desc + '\n';
         this.pc++;
+        this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: this._lambdaPipeline(d, label) };
     }
 
@@ -5573,6 +5658,9 @@ class ChurchSimulator {
             this.fault('NO_CODE', `ELOADCALL CR${d.crDst}: target abstraction has no code capability`);
             return null;
         }
+        this._emitTrace(this.physicalPC, TRACE_EV_CALL_CR6,  this.cr[6].word0  >>> 0);
+        this._emitTrace(this.physicalPC, TRACE_EV_CALL_CR14, this.cr[14].word0 >>> 0);
+        this._emitTrace(this.physicalPC, TRACE_EV_CALL_PUSH, 0);
         return { pc: prevPC_ec, instr: d, desc, pipeline: this._eloadcallPipeline(d, label) };
     }
 
@@ -5721,6 +5809,9 @@ class ChurchSimulator {
         const desc = `XLOADLAMBDA CR${d.crDst}, [CR${d.crSrc} + ${d.imm}] -> ${label} (LOAD+TPERM+LAMBDA)`;
         this.output += desc + '\n';
         this.pc++;
+        this._emitTrace(this.physicalPC, TRACE_EV_CALL_CR6,  this.cr[6].word0  >>> 0);
+        this._emitTrace(this.physicalPC, TRACE_EV_CALL_CR14, this.cr[14].word0 >>> 0);
+        this._emitTrace(this.physicalPC, TRACE_EV_CALL_PUSH, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: this._xloadlambdaPipeline(d, label) };
     }
 
@@ -6020,6 +6111,7 @@ class ChurchSimulator {
         const desc = `DREAD DR${drIdx} ← ${value >>> 0} (0x${(value >>> 0).toString(16).toUpperCase()}) ← [CR${d.crSrc} + ${offset}] (${label})${readTag}`;
         this.output += desc + '\n';
         this.pc++;
+        this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: [
             { stage: 'DREAD', desc: `Read word ${offset} from ${label} into DR${drIdx}`, perm: 'R', status: 'pass' },
         ]};
@@ -6063,6 +6155,7 @@ class ChurchSimulator {
             const desc = `DWRITE DR${drIdx} → IO_PORT_PET_NAME_WR: c-list slot ${slotIdx} marked as named`;
             this.output += desc + '\n';
             this.pc++;
+            this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
             return { pc: this.pc - 1, instr: d, desc, pipeline: [
                 { stage: 'DWRITE', desc: `Mark c-list slot ${slotIdx} as named (PET_NAME_WR)`, perm: 'W', status: 'pass' },
             ]};
@@ -6117,6 +6210,7 @@ class ChurchSimulator {
         const desc = `DWRITE DR${drIdx}, [CR${d.crSrc} + ${offset}] ← ${value} (0x${value.toString(16).toUpperCase()}) → ${label}${devTag}`;
         this.output += desc + '\n';
         this.pc++;
+        this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: [
             { stage: 'DWRITE', desc: `Write DR${drIdx} to word ${offset} of ${label}`, perm: 'W', status: 'pass' },
         ]};
@@ -6169,6 +6263,7 @@ class ChurchSimulator {
         const desc = `BFEXT DR${drIdx}, DR${d.crSrc}, pos=${pos}, w=${width} -> 0x${value.toString(16).toUpperCase()} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=0 V=0]`;
         this.output += desc + '\n';
         this.pc++;
+        this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: [
             { stage: 'BFEXT', desc: `Extract bits [${pos}:${pos+width-1}] from DR${d.crSrc} into DR${drIdx}`, perm: '-', status: 'pass' },
         ]};
@@ -6194,6 +6289,7 @@ class ChurchSimulator {
         const desc = `BFINS DR${drIdx}, DR${d.crSrc}, pos=${pos}, w=${width} <- 0x${(insertVal & ((1 << width) - 1)).toString(16).toUpperCase()} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=0 V=0]`;
         this.output += desc + '\n';
         this.pc++;
+        this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: [
             { stage: 'BFINS', desc: `Insert bits [${pos}:${pos+width-1}] from DR${d.crSrc} into DR${drIdx}`, perm: '-', status: 'pass' },
         ]};
@@ -6206,6 +6302,7 @@ class ChurchSimulator {
         const desc = `MCMP DR${d.crDst}, DR${d.crSrc} -> ${a} vs ${b} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=${this.flags.C?1:0} V=${this.flags.V?1:0}]`;
         this.output += desc + '\n';
         this.pc++;
+        this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: [
             { stage: 'MCMP', desc: `Compare DR${d.crDst}(${a}) with DR${d.crSrc}(${b})`, status: 'pass' },
         ]};
@@ -6229,6 +6326,7 @@ class ChurchSimulator {
         const desc = `IADD DR${d.crDst}, DR${drA}, ${bDesc} -> ${a} + ${b} = ${result >>> 0} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=${this.flags.C?1:0} V=${this.flags.V?1:0}]`;
         this.output += desc + '\n';
         this.pc++;
+        this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: [
             { stage: 'IADD', desc: `DR${d.crDst} = DR${drA} + ${bDesc}`, status: 'pass' },
         ]};
@@ -6252,6 +6350,7 @@ class ChurchSimulator {
         const desc = `ISUB DR${d.crDst}, DR${drA}, ${bDesc} -> ${a} - ${b} = ${result >>> 0} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=${this.flags.C?1:0} V=${this.flags.V?1:0}]`;
         this.output += desc + '\n';
         this.pc++;
+        this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: [
             { stage: 'ISUB', desc: `DR${d.crDst} = DR${drA} - ${bDesc}`, status: 'pass' },
         ]};
@@ -6267,6 +6366,7 @@ class ChurchSimulator {
         const desc = `BRANCH ${soff >= 0 ? '+' : ''}${soff} -> PC=${target}`;
         this.output += desc + '\n';
         this.pc = target;
+        this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - soff, instr: d, desc, pipeline: [
             { stage: 'BRANCH', desc: `Branch to PC=${target} (offset ${soff})`, status: 'pass' },
         ]};
@@ -6286,6 +6386,7 @@ class ChurchSimulator {
         const desc = `SHL DR${d.crDst}, DR${drSrc}, ${shamt} -> 0x${result.toString(16).toUpperCase().padStart(8,'0')} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=${this.flags.C?1:0}]`;
         this.output += desc + '\n';
         this.pc++;
+        this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: [
             { stage: 'SHL', desc: `DR${d.crDst} = DR${drSrc} << ${shamt}`, status: 'pass' },
         ]};
@@ -6313,6 +6414,7 @@ class ChurchSimulator {
         const desc = `SHR DR${d.crDst}, DR${drSrc}, ${shamt} ${shType} -> 0x${result.toString(16).toUpperCase().padStart(8,'0')} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=${this.flags.C?1:0}]`;
         this.output += desc + '\n';
         this.pc++;
+        this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: [
             { stage: 'SHR', desc: `DR${d.crDst} = DR${drSrc} ${shType} ${shamt}`, status: 'pass' },
         ]};

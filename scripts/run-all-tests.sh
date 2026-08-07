@@ -211,6 +211,12 @@ register_suite "wukong-trace-cr-server-tests" \
 register_suite "return-fetch-lump-tests" \
     'node tests/simulator/sim_return_fetch_lump.js'
 
+register_suite "boot-gt-words-tests" \
+    'node simulator/test_boot_gt_words.js'
+
+register_suite "trace-packet-execution-tests" \
+    'node simulator/test_trace_packet_execution.js'
+
 register_suite "boot-image-matches-sim" \
     'python3 -m pytest tests/boot/test_boot_image_matches_simulator.py -v'
 

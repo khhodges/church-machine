@@ -1246,8 +1246,8 @@ function _showStopBtn(show) {
 }
 
 document.addEventListener('mousedown', function(e) {
-    const wrap = document.getElementById('runWrap');
-    const pop = document.getElementById('runPopover');
+    const wrap = document.getElementById('breakWrap');
+        const pop = document.getElementById('breakPopover');
     if (wrap && pop && pop.style.display !== 'none' && !wrap.contains(e.target)) {
         hideRunPopover();
     }
