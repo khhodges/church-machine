@@ -33,6 +33,11 @@ except ImportError:
     print("ERROR: pyserial not installed.  Run: pip install pyserial", file=sys.stderr)
     sys.exit(1)
 
+try:
+    import requests as _requests
+except ImportError:
+    _requests = None  # IDE notifications silently skipped if requests is absent
+
 TRACE_MAGIC      = 0xAA
 # 12-byte per-event packet: magic(1)+NIA(4)+ev_type(1)+payload(4)+flags(1)+fault(1)
 # Must match TRACE_LEN in wukong_bridge.py and the TraceUnit in wukong_top.py.
@@ -82,12 +87,39 @@ def _parse_trace_packet(pkt: bytes) -> dict:
                 fault_valid=fault_valid, bp_hit=bp_hit, fault_code=fault_code)
 
 
-def check_sentinel(ser: "serial.Serial", timeout: float) -> bool:
+def _post_boot_info(ide_base: str, verify_tls: bool,
+                    stale_tu: bool, tu_version: int) -> None:
+    """POST boot-info to the IDE so it can show (or clear) a stale-TU banner.
+
+    Mirrors the POST logic in hardware/wukong_bridge.py lines 369-384.
+    Silently no-ops if *ide_base* is empty, the *requests* package is absent,
+    or the server is unreachable.
+    """
+    if not ide_base or _requests is None:
+        return
+    try:
+        _requests.post(
+            f'{ide_base}/hardware/wukong/boot-info',
+            json={'stale_tu': stale_tu, 'tu_version': tu_version},
+            timeout=1,
+            verify=verify_tls,
+        )
+    except Exception as exc:
+        print(f"  [boot-info POST error] {exc}")
+
+
+def check_sentinel(ser: "serial.Serial", timeout: float,
+                   ide_base: str = "", verify_tls: bool = True) -> bool:
     """(a) Wait up to *timeout* seconds for a boot sentinel byte (0xBB or 0xBC).
 
     0xBC is the current format; 0xBB means the bitstream is stale — the
     TraceUnit FSM emits RESULT instead of the 3-packet CALL sequence for
     ELOADCALL/XLOADLAMBDA, so CR6/CR14 state in the IDE will be wrong.
+
+    When *ide_base* is non-empty and the *requests* package is available,
+    POSTs {stale_tu, tu_version} to <ide_base>/hardware/wukong/boot-info so
+    the IDE can show or clear a visible warning banner — consistent with what
+    hardware/wukong_bridge.py already does.
 
     Returns True on success (either format), prints a diagnostic and returns
     False if no sentinel is received within the timeout.
@@ -125,6 +157,13 @@ def check_sentinel(ser: "serial.Serial", timeout: float) -> bool:
                       file=sys.stderr)
                 print("     Rebuild and reflash the bitstream to resolve this.",
                       file=sys.stderr)
+                # Notify the IDE so it shows a visible warning banner.
+                _post_boot_info(ide_base, verify_tls, stale_tu=True,
+                                tu_version=tu_version)
+            else:
+                # Current bitstream — clear any previous stale warning in the IDE.
+                _post_boot_info(ide_base, verify_tls, stale_tu=False,
+                                tu_version=tu_version)
             return True
 
         if SENTINEL_V1 in buf:
@@ -140,6 +179,10 @@ def check_sentinel(ser: "serial.Serial", timeout: float) -> bool:
                   "such instruction.", file=sys.stderr)
             print("     Rebuild and reflash the bitstream to resolve this.",
                   file=sys.stderr)
+            # Notify the IDE — tu_version=0x01 matches wukong_bridge.py's
+            # convention for old-sentinel stale bitstreams.
+            _post_boot_info(ide_base, verify_tls, stale_tu=True,
+                            tu_version=0x01)
             return True
 
     print(f"[a] FAIL — no boot sentinel received within {timeout} s.", file=sys.stderr)
@@ -227,9 +270,26 @@ def main() -> int:
     parser.add_argument("--trace-timeout", type=float, default=3.0,
                         metavar="S",
                         help="Seconds to collect trace packets after 'r' (default: 3)")
+    parser.add_argument("--ide-url", default="",
+                        metavar="URL",
+                        help="Base URL of the Church Machine IDE "
+                             "(e.g. https://localhost:5000).  When provided, "
+                             "POSTs {stale_tu, tu_version} to "
+                             "/hardware/wukong/boot-info so the IDE can show a "
+                             "visible warning banner when TU_VERSION is too low.  "
+                             "Omit (default) to skip the POST.")
+    parser.add_argument("--insecure", action="store_true",
+                        help="Disable TLS certificate verification when posting "
+                             "to --ide-url (e.g. for self-signed dev certs).")
     args = parser.parse_args()
 
+    ide_base   = args.ide_url.rstrip("/")
+    verify_tls = not args.insecure
+
     print(f"Wukong boot smoke test  —  {args.port} @ {args.baud} baud")
+    if ide_base:
+        print(f"  IDE notifications → {ide_base}/hardware/wukong/boot-info"
+              f"{'  (TLS verify=off)' if not verify_tls else ''}")
     print("-" * 60)
 
     try:
@@ -240,7 +300,8 @@ def main() -> int:
 
     results = {}
     try:
-        results["a"] = check_sentinel(ser, args.sentinel_timeout)
+        results["a"] = check_sentinel(ser, args.sentinel_timeout,
+                                      ide_base=ide_base, verify_tls=verify_tls)
         if not results["a"]:
             print("\nStopping — sentinel not received; criterion (c) skipped.",
                   file=sys.stderr)
