@@ -57,10 +57,15 @@ def _extract_trace_ev_constants():
 
 _EV = _extract_trace_ev_constants()
 
-_TRACE_EV_RESULT    = _EV["_TRACE_EV_RESULT"]
-_TRACE_EV_CALL_CR6  = _EV["_TRACE_EV_CALL_CR6"]
-_TRACE_EV_CALL_CR14 = _EV["_TRACE_EV_CALL_CR14"]
-_TRACE_EV_CALL_PUSH = _EV["_TRACE_EV_CALL_PUSH"]
+_TRACE_EV_RESULT     = _EV["_TRACE_EV_RESULT"]
+_TRACE_EV_CALL_CR6   = _EV["_TRACE_EV_CALL_CR6"]
+_TRACE_EV_CALL_CR14  = _EV["_TRACE_EV_CALL_CR14"]
+_TRACE_EV_CALL_PUSH  = _EV["_TRACE_EV_CALL_PUSH"]
+_TRACE_EV_RETURN_POP  = _EV["_TRACE_EV_RETURN_POP"]
+_TRACE_EV_RETURN_CR6  = _EV["_TRACE_EV_RETURN_CR6"]
+_TRACE_EV_RETURN_CR14 = _EV["_TRACE_EV_RETURN_CR14"]
+
+_CORE_PY_PATH = os.path.join(ROOT, "hardware", "core.py")
 
 
 # ── Decode model ──────────────────────────────────────────────────────────────
@@ -250,4 +255,148 @@ class TestTraceUnitEloadcall:
         call_cr6_in_eloadcall = "_TRACE_EV_CALL_CR6" in src[eloadcall_idx:xloadlambda_idx]
         assert call_cr6_in_eloadcall, (
             "ELOADCALL case in wukong_top.py must assign _TRACE_EV_CALL_CR6 to tq_type[0]"
+        )
+
+
+class TestReturnCr14Trace:
+    """RETURN trace: RETURN_CR14 event carries the restored *caller* CR14, not the callee's.
+
+    The fix is a two-part mechanism:
+      1. core.py exposes retire_trace_return_cr14_valid / retire_trace_return_cr14_gt,
+         which pulse when u_cload commits the restored caller CR14 into CR14 (i.e. when
+         u_cload.cr_wr_en fires with cr_wr_addr == CR_CLOOMC==14).
+      2. The TraceUnit SEND state in wukong_top.py updates tq_data[2] on that pulse,
+         before it reaches the RETURN_CR14 packet (events 0+1 take 24 UART bytes first).
+    """
+
+    # ── RETURN event-type constants ────────────────────────────────────────────
+
+    def test_return_ev_constants_values(self):
+        """RETURN_POP=0x09, RETURN_CR6=0x0A, RETURN_CR14=0x0B."""
+        assert _TRACE_EV_RETURN_POP  == 0x09
+        assert _TRACE_EV_RETURN_CR6  == 0x0A
+        assert _TRACE_EV_RETURN_CR14 == 0x0B
+
+    # ── Decode model: RETURN maps to 3-event sequence ─────────────────────────
+
+    def test_return_emits_3_events(self):
+        """RETURN retire_instr decodes to tq_len=3."""
+        instr = _encode_instr(ChurchOpcode.RETURN)
+        result = _trace_unit_decode(instr)
+        assert result["tq_len"] == 3, (
+            f"RETURN should emit 3 events, got tq_len={result['tq_len']}"
+        )
+
+    def test_return_event0_is_return_pop(self):
+        """RETURN event[0] = RETURN_POP (0x09)."""
+        instr = _encode_instr(ChurchOpcode.RETURN)
+        result = _trace_unit_decode(instr)
+        assert result["tq_type"][0] == _TRACE_EV_RETURN_POP, (
+            f"RETURN event[0] should be RETURN_POP (0x09), got 0x{result['tq_type'][0]:02X}"
+        )
+
+    def test_return_event1_is_return_cr6(self):
+        """RETURN event[1] = RETURN_CR6 (0x0A)."""
+        instr = _encode_instr(ChurchOpcode.RETURN)
+        result = _trace_unit_decode(instr)
+        assert result["tq_type"][1] == _TRACE_EV_RETURN_CR6, (
+            f"RETURN event[1] should be RETURN_CR6 (0x0A), got 0x{result['tq_type'][1]:02X}"
+        )
+
+    def test_return_event2_is_return_cr14(self):
+        """RETURN event[2] = RETURN_CR14 (0x0B)."""
+        instr = _encode_instr(ChurchOpcode.RETURN)
+        result = _trace_unit_decode(instr)
+        assert result["tq_type"][2] == _TRACE_EV_RETURN_CR14, (
+            f"RETURN event[2] should be RETURN_CR14 (0x0B), got 0x{result['tq_type'][2]:02X}"
+        )
+
+    def test_return_not_result(self):
+        """RETURN must NOT fall through to the Default RESULT case."""
+        instr = _encode_instr(ChurchOpcode.RETURN)
+        result = _trace_unit_decode(instr)
+        assert result["tq_type"][0] != _TRACE_EV_RESULT, (
+            "RETURN must NOT emit a RESULT packet — it fell through to Default"
+        )
+
+    # ── core.py: retire_trace_return_cr14_valid / _gt signals exist ───────────
+
+    def test_core_has_return_cr14_valid_signal(self):
+        """core.py declares retire_trace_return_cr14_valid Signal."""
+        with open(_CORE_PY_PATH) as fh:
+            src = fh.read()
+        assert "retire_trace_return_cr14_valid" in src, (
+            "core.py must declare retire_trace_return_cr14_valid for the RETURN CR14 fix"
+        )
+
+    def test_core_has_return_cr14_gt_signal(self):
+        """core.py declares retire_trace_return_cr14_gt Signal."""
+        with open(_CORE_PY_PATH) as fh:
+            src = fh.read()
+        assert "retire_trace_return_cr14_gt" in src, (
+            "core.py must declare retire_trace_return_cr14_gt for the RETURN CR14 fix"
+        )
+
+    def test_core_wires_return_cr14_valid_to_cload(self):
+        """core.py wires retire_trace_return_cr14_valid via u_cload.cr_wr_en + CR_CLOOMC."""
+        with open(_CORE_PY_PATH) as fh:
+            src = fh.read()
+        # Search for the .eq() assignment form — unique to the elaborate() wiring block
+        wire_idx = src.find("retire_trace_return_cr14_valid.eq(")
+        assert wire_idx != -1, (
+            "core.py must have a .eq() assignment for retire_trace_return_cr14_valid"
+        )
+        ctx = src[wire_idx: wire_idx + 200]
+        assert "cr_wr_en" in ctx, (
+            "retire_trace_return_cr14_valid wiring must reference u_cload.cr_wr_en"
+        )
+        assert "CR_CLOOMC" in ctx, (
+            "retire_trace_return_cr14_valid wiring must gate on CR_CLOOMC (==14)"
+        )
+
+    def test_core_wires_return_cr14_gt_to_cload_wr_data(self):
+        """core.py wires retire_trace_return_cr14_gt from u_cload.cr_wr_data."""
+        with open(_CORE_PY_PATH) as fh:
+            src = fh.read()
+        # Search for the .eq() assignment form — unique to the elaborate() wiring block
+        wire_idx = src.find("retire_trace_return_cr14_gt.eq(")
+        assert wire_idx != -1, (
+            "core.py must have a .eq() assignment for retire_trace_return_cr14_gt"
+        )
+        ctx = src[wire_idx: wire_idx + 150]
+        assert "cr_wr_data" in ctx, (
+            "retire_trace_return_cr14_gt must be sourced from u_cload.cr_wr_data"
+        )
+
+    # ── wukong_top.py: SEND state patches tq_data[2] on the pulse ─────────────
+
+    def test_wukong_top_send_state_patches_tq_data2(self):
+        """wukong_top.py SEND state updates tq_data[2] when return_cr14_valid fires."""
+        with open(_WUKONG_TOP_PATH) as fh:
+            src = fh.read()
+        send_idx = src.find('"SEND"')
+        assert send_idx != -1, "SEND state not found in wukong_top.py"
+        # retire_trace_return_cr14_valid must appear after the SEND state marker
+        valid_in_send = src.find("retire_trace_return_cr14_valid", send_idx)
+        assert valid_in_send != -1, (
+            "wukong_top.py SEND state must reference retire_trace_return_cr14_valid "
+            "to patch tq_data[2] with the restored caller CR14"
+        )
+        # tq_data[2] assignment must appear near the signal reference
+        ctx = src[valid_in_send: valid_in_send + 200]
+        assert "tq_data[2]" in ctx, (
+            "wukong_top.py must assign tq_data[2] when retire_trace_return_cr14_valid fires"
+        )
+
+    def test_wukong_top_send_patches_with_return_cr14_gt(self):
+        """wukong_top.py patches tq_data[2] with retire_trace_return_cr14_gt."""
+        with open(_WUKONG_TOP_PATH) as fh:
+            src = fh.read()
+        send_idx = src.find('"SEND"')
+        assert send_idx != -1
+        valid_in_send = src.find("retire_trace_return_cr14_valid", send_idx)
+        assert valid_in_send != -1
+        ctx = src[valid_in_send: valid_in_send + 200]
+        assert "retire_trace_return_cr14_gt" in ctx, (
+            "wukong_top.py tq_data[2] patch must use core.retire_trace_return_cr14_gt"
         )
