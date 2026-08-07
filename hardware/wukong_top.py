@@ -87,7 +87,6 @@ class ChurchWukongXC7A100T(Elaboratable):
     baud : int
         UART baud rate.  Default 57 600 — matches CH340 callhome bridge.
         UartTx computes divisor = clk_freq // baud = 50_000_000 // 57_600 = 868 (0.006% error).
-        Note: CLOCKDIV=53 is a Ti60 Sapphire RISC-V firmware register (25 MHz SoC); unrelated.
     sim_mode : bool
         Unused — kept for interface parity with gen_rtlil.py.
     build_sig : list[int] | None

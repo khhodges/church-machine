@@ -414,8 +414,6 @@ def _make_ns_entry(gt_type, perms, slot_id, gt_seq, location, alloc_size, cw=0, 
 #             Distributed to: Scheduler.IRQ c-list only (E-perm GT; IRQ-manager territory).
 #
 # Physical LED mapping (R bit = bit 0 of each word):
-#   Ti60 F225 (4 LEDs active-HIGH):
-#     offset 0→led0, 1→led1, 2→led2, 3→led3; offset 4 = register-only (no pin)
 #   Tang Nano 20K (6 LEDs active-LOW, led3 pin absent):
 #     offset 0→led0, 1→led1, 2→led2, 3→led4, 4→led5; led3 pin not connected
 # ---------------------------------------------------------------------------
@@ -599,8 +597,7 @@ DEMO_CLIST_NAMED_SLOTS = frozenset({0, 1, 2, 3, 5, 6, 7, 8, 9, 10})
 # WUKONG_DEMO_NAMESPACE — 8-slot NS table for Wukong standalone boot
 #
 # Identical to DEMO_NAMESPACE except slot 0 (Boot.NS) has location = 0:
-#   Ti60:   NS table lives at NS_TABLE_BASE = 0x1FC00 (64 KB DMEM tail)
-#   Wukong: NS table placed at DMEM byte 0 (hw_init writes it there)
+#   NS table placed at DMEM byte 0 (hw_init writes it there)
 #
 # The integrity seal on slot 0 word2 is recomputed from the new location.
 # All other slots are byte-for-byte identical to DEMO_NAMESPACE.

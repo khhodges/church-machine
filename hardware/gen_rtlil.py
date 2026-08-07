@@ -32,9 +32,8 @@ def _fix_macc_cells(v_path):
     """Replace remaining \\$macc instantiations with behavioural Verilog.
 
     Yosys alumacc folds constant-coefficient multiplies into \\$macc cells that
-    write_verilog cannot lower to plain operators.  Efinity's synthesiser
-    rejects them.  This post-processor replaces each cell with a simple assign
-    statement that Efinity can synthesise directly.
+    write_verilog cannot lower to plain operators.  This post-processor replaces
+    each cell with a simple assign statement that Vivado can synthesise directly.
 
     A \\$macc with B_WIDTH=0 and a leading constant in A is a constant-
     coefficient multiply:  Y_main = A_signal * constant.
@@ -150,8 +149,8 @@ def _fix_alu_cells(v_path):
     """Replace remaining \\$alu instantiations with behavioural Verilog.
 
     Yosys alumacc folds add/sub into \\$alu cells that write_verilog cannot
-    lower to plain operators.  Efinity rejects them.  This post-processor
-    replaces each cell with assign statements that Efinity can synthesise.
+    lower to plain operators.  This post-processor replaces each cell with
+    assign statements that Vivado can synthesise directly.
 
     \\$alu ports: A, B, CI (carry-in), BI (B-invert), X (XOR), Y (sum), CO (carry-out).
     The arithmetic result is Y = A + (BI ? ~B : B) + CI.
@@ -277,17 +276,16 @@ def _decode_alu_block(block):
 
 
 def _rtlil_to_verilog(il_path, v_path, module_name=None):
-    """Convert Amaranth RTLIL to Verilog via Yosys for use in Efinity IDE.
+    """Convert Amaranth RTLIL to Verilog via Yosys for Vivado synthesis.
 
     The `techmap` pass before write_verilog is essential: it expands Yosys
-    internal cells ($alu, $macc) into standard RTL arithmetic that Efinity's
-    efx_map synthesiser recognises.  Without it, write_verilog emits these
-    as module instantiations of unknown modules and Efinity fails with
-    "instantiating unknown module '$alu'" / "$macc" errors.
+    internal cells ($alu, $macc) into standard RTL arithmetic that Vivado
+    recognises.  Without it, write_verilog emits these as module
+    instantiations of unknown modules and synthesis fails.
 
     If module_name is given, the Amaranth-generated 'top' module is renamed
-    to that name before writing Verilog, so Efinity's project top_module
-    setting matches the generated output.
+    to that name before writing Verilog, so Vivado's top_module setting
+    matches the generated output.
     """
     rename_pass = f"rename top {module_name}; " if module_name else ""
     script = (
