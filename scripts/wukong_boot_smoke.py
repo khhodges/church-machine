@@ -42,6 +42,10 @@ SENTINEL_V2      = 0xBC   # current 3-byte sentinel
 DEFAULT_PORT     = "/dev/ttyUSB0"
 DEFAULT_BAUD     = 57600
 
+# Minimum TU_VERSION required for correct ELOADCALL/XLOADLAMBDA tracing.
+# Must match TU_VERSION_CALL_3PKT in hardware/wukong_bridge.py.
+TU_VERSION_CALL_3PKT = 0x02
+
 
 def _fault_name(code: int) -> str:
     names = {
@@ -97,25 +101,46 @@ def check_sentinel(ser: "serial.Serial", timeout: float) -> bool:
         chunk = ser.read(128)
         if chunk:
             buf.extend(chunk)
-            for magic, label in ((SENTINEL_V2, 'current'), (SENTINEL_V1, 'stale')):
-                if magic in buf:
-                    idx = buf.index(magic)
-                    elapsed = timeout - (deadline - time.monotonic())
-                    if magic == SENTINEL_V2:
-                        print(f"[a] PASS — 0x{magic:02X} ({label}) sentinel received "
-                              f"after {elapsed:.2f} s (buffer offset {idx})")
-                    else:
-                        print(f"[a] PASS — 0x{magic:02X} ({label}) sentinel received "
-                              f"after {elapsed:.2f} s (buffer offset {idx})")
-                        print("[a] BITSTREAM WARNING: old sentinel (0xBB) — stale "
-                              "TraceUnit FSM.", file=sys.stderr)
-                        print("     ELOADCALL/XLOADLAMBDA emit RESULT not the 3-packet "
-                              "CALL sequence.", file=sys.stderr)
-                        print("     CR6/CR14 state in the IDE will be wrong after any "
-                              "such instruction.", file=sys.stderr)
-                        print("     Rebuild and reflash the bitstream to resolve this.",
-                              file=sys.stderr)
-                    return True
+
+        # Check for 0xBC (current 3-byte sentinel) first so it is not
+        # shadowed by a search for 0xBB (which has a different prefix bit).
+        if SENTINEL_V2 in buf:
+            idx = buf.index(SENTINEL_V2)
+            # Need all 3 bytes: magic + N_INIT + TU_VERSION.
+            if len(buf) - idx < 3:
+                # Not enough bytes yet; keep reading.
+                continue
+            tu_version = buf[idx + 2]
+            elapsed = timeout - (deadline - time.monotonic())
+            print(f"[a] PASS — 0x{SENTINEL_V2:02X} (current) sentinel received "
+                  f"after {elapsed:.2f} s (buffer offset {idx})  "
+                  f"TU_VERSION=0x{tu_version:02X}")
+            if tu_version < TU_VERSION_CALL_3PKT:
+                print(f"[a] BITSTREAM WARNING: TU_VERSION=0x{tu_version:02X} is below "
+                      f"required 0x{TU_VERSION_CALL_3PKT:02X} — stale TraceUnit FSM.",
+                      file=sys.stderr)
+                print("     ELOADCALL/XLOADLAMBDA may not emit the 3-packet CALL sequence.",
+                      file=sys.stderr)
+                print("     CR6/CR14 state in the IDE may be wrong after any such instruction.",
+                      file=sys.stderr)
+                print("     Rebuild and reflash the bitstream to resolve this.",
+                      file=sys.stderr)
+            return True
+
+        if SENTINEL_V1 in buf:
+            idx = buf.index(SENTINEL_V1)
+            elapsed = timeout - (deadline - time.monotonic())
+            print(f"[a] PASS — 0x{SENTINEL_V1:02X} (stale) sentinel received "
+                  f"after {elapsed:.2f} s (buffer offset {idx})")
+            print("[a] BITSTREAM WARNING: old sentinel (0xBB) — stale "
+                  "TraceUnit FSM.", file=sys.stderr)
+            print("     ELOADCALL/XLOADLAMBDA emit RESULT not the 3-packet "
+                  "CALL sequence.", file=sys.stderr)
+            print("     CR6/CR14 state in the IDE will be wrong after any "
+                  "such instruction.", file=sys.stderr)
+            print("     Rebuild and reflash the bitstream to resolve this.",
+                  file=sys.stderr)
+            return True
 
     print(f"[a] FAIL — no boot sentinel received within {timeout} s.", file=sys.stderr)
     print("     Check: UART wiring (TX→F3, RX→E3, GND), baud=57600, "

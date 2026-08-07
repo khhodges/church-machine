@@ -178,6 +178,80 @@ class TestCurrentSentinel:
         assert 'BITSTREAM WARNING' not in stderr
 
 
+class TestLowTuVersion:
+    """0xBC + TU_VERSION < 0x02 must trigger a BITSTREAM WARNING on stderr."""
+
+    _PAYLOAD_LOW = bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, 0x01])   # below minimum
+
+    def test_returns_true_on_low_tu_version(self):
+        result, _ = _run_check_sentinel(self._PAYLOAD_LOW)
+        assert result is True, \
+            'check_sentinel must return True when 0xBC sentinel is received (even if TU_VERSION is low)'
+
+    def test_emits_bitstream_warning_on_low_tu_version(self):
+        _, stderr = _run_check_sentinel(self._PAYLOAD_LOW)
+        assert 'BITSTREAM WARNING' in stderr, (
+            f'Expected "BITSTREAM WARNING" in stderr for 0xBC + TU_VERSION=0x01; '
+            f'got: {stderr!r}'
+        )
+
+    def test_warning_mentions_tu_version(self):
+        """The warning message must identify TU_VERSION as the problem."""
+        _, stderr = _run_check_sentinel(self._PAYLOAD_LOW)
+        assert 'TU_VERSION' in stderr or 'tu_version' in stderr.lower(), (
+            f'Warning should mention TU_VERSION; got: {stderr!r}'
+        )
+
+    def test_warning_on_stderr_not_stdout(self):
+        """BITSTREAM WARNING must go to stderr, not stdout."""
+        ser = _MockSerial(self._PAYLOAD_LOW)
+        captured_stderr = io.StringIO()
+        captured_stdout = io.StringIO()
+        old_stderr, old_stdout = sys.stderr, sys.stdout
+        sys.stderr, sys.stdout = captured_stderr, captured_stdout
+        try:
+            smoke.check_sentinel(ser, timeout=2.0)
+        finally:
+            sys.stderr, sys.stdout = old_stderr, old_stdout
+
+        assert 'BITSTREAM WARNING' in captured_stderr.getvalue(), \
+            'BITSTREAM WARNING must appear on stderr for low TU_VERSION'
+        assert 'BITSTREAM WARNING' not in captured_stdout.getvalue(), \
+            'BITSTREAM WARNING must NOT appear on stdout'
+
+    def test_tu_version_zero_emits_warning(self):
+        """TU_VERSION=0x00 (the absolute minimum) must also trigger a warning."""
+        payload = bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, 0x00])
+        _, stderr = _run_check_sentinel(payload)
+        assert 'BITSTREAM WARNING' in stderr, (
+            f'Expected BITSTREAM WARNING for TU_VERSION=0x00; got: {stderr!r}'
+        )
+
+    def test_tu_version_at_minimum_no_warning(self):
+        """TU_VERSION == TU_VERSION_CALL_3PKT (0x02) must NOT trigger a warning."""
+        payload = bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, 0x02])
+        _, stderr = _run_check_sentinel(payload)
+        assert 'BITSTREAM WARNING' not in stderr, (
+            f'Unexpected BITSTREAM WARNING for TU_VERSION=0x02; got: {stderr!r}'
+        )
+
+    def test_tu_version_above_minimum_no_warning(self):
+        """TU_VERSION > TU_VERSION_CALL_3PKT must NOT trigger a warning."""
+        payload = bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, 0x03])
+        _, stderr = _run_check_sentinel(payload)
+        assert 'BITSTREAM WARNING' not in stderr, (
+            f'Unexpected BITSTREAM WARNING for TU_VERSION=0x03; got: {stderr!r}'
+        )
+
+    def test_low_tu_version_preceded_by_ascii_garbage(self):
+        """Warning is emitted even when sentinel is prefixed by ASCII output."""
+        garbage = b'Starting up\r\n'
+        payload = garbage + bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, 0x01])
+        result, stderr = _run_check_sentinel(payload)
+        assert result is True
+        assert 'BITSTREAM WARNING' in stderr
+
+
 class TestNoSentinel:
     """When no sentinel arrives within the timeout, check_sentinel returns False."""
 
@@ -244,6 +318,20 @@ class TestConstantAlignment:
         assert bridge.TU_VERSION_CALL_3PKT == 0x02, (
             f'Expected TU_VERSION_CALL_3PKT==0x02, '
             f'got 0x{bridge.TU_VERSION_CALL_3PKT:02X}'
+        )
+
+    def test_smoke_tu_version_call_3pkt_is_0x02(self):
+        """smoke.TU_VERSION_CALL_3PKT must equal 0x02 (same as bridge constant)."""
+        assert smoke.TU_VERSION_CALL_3PKT == 0x02, (
+            f'Expected smoke.TU_VERSION_CALL_3PKT==0x02, '
+            f'got 0x{smoke.TU_VERSION_CALL_3PKT:02X}'
+        )
+
+    def test_smoke_and_bridge_tu_version_agree(self):
+        """smoke and bridge must use the same TU_VERSION_CALL_3PKT threshold."""
+        assert smoke.TU_VERSION_CALL_3PKT == bridge.TU_VERSION_CALL_3PKT, (
+            f'TU_VERSION_CALL_3PKT mismatch: smoke=0x{smoke.TU_VERSION_CALL_3PKT:02X}, '
+            f'bridge=0x{bridge.TU_VERSION_CALL_3PKT:02X}'
         )
 
     def test_stale_distinct_from_current(self):
