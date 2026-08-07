@@ -8,7 +8,7 @@ in the Church Machine IDE.
 
 ## The NULL_CAP Standalone Problem
 
-The standard `BOOT_PROGRAM` used on the Ti60 board contains this instruction at word 2:
+The 3-instruction boot ROM contains this instruction at word 2:
 
 ```
 CALL CR0, CR0    ; 0x17000000
@@ -91,7 +91,7 @@ in `hardware/boot_rom.py`.
 
 1. Open the LUMP library and click **WukongCallHome**.
 2. The editor shows the CLOOMC source.  Click **Step** to step through instructions.
-3. Switch to the **Ti60 view** — LED0 toggles at each `DWRITE CR3` instruction.
+3. Switch to the **Wukong view** — LED0 toggles at each `DWRITE CR3` instruction.
 4. The UART output panel shows each character of "CM:WUKONG\r\n" as it is written.
 
 The program is an **infinite loop** — it has no RETURN.  This is intentional: the physical

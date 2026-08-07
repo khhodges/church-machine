@@ -1,10 +1,8 @@
 # HARDWARE.md — Church Machine Hardware Reference
 
-Single source of truth for every hardware-setup fact about the Efinix Ti60 F225 devkit. When one value changes, update it here — all other docs point here.
+Single source of truth for every hardware-setup fact about the QMTECH Wukong A7 devkit. When one value changes, update it here — all other docs point here.
 
-For the end-to-end hardware validation runbook (callhome → lump push → board reboot), see **[docs/RUNBOOK.md](RUNBOOK.md)** or `/docs/runbook` in the IDE.
-
-For Wukong-specific wire protocol, see § 8 below.
+For the end-to-end hardware validation runbook (bridge → banner → IDE step trace), see **[docs/RUNBOOK.md](RUNBOOK.md)** or `/docs/runbook` in the IDE.
 
 ---
 
@@ -12,171 +10,120 @@ For Wukong-specific wire protocol, see § 8 below.
 
 | Feature | Value |
 |:--------|:------|
-| **Device** | Efinix Titanium EFT90A |
-| **Board** | Sipeed Ti60 F225 Development Kit |
-| **Process** | 90 nm |
-| **FPGA family** | Titanium (Efinity toolchain required; not compatible with yosys/nextpnr) |
-| **Clock** | 50 MHz on-board crystal (pin B8) |
-| **User LEDs** | **3** × active-HIGH (GPIOR_P_07, GPIOR_P_08, GPIOR_P_09) |
-| **Button** | 1 × active-LOW USER_PB (external pull-up on board) |
-| **USB bridge** | FTDI FT4232H (4-interface USB-UART/JTAG combo) |
-| **BRAM** | ~220 KB (176 EFX_RAM10 blocks) |
-| **Logic** | ~60 K logic elements |
-| **Synthesis toolchain** | Efinity 2026.1 (headless CLI: `efx_map`, `efx_pnr`, `efx_pgm`) |
+| **Device** | Xilinx Artix-7 XC7A100T |
+| **Board** | QMTECH Wukong A7 |
+| **Process** | 28 nm |
+| **FPGA family** | Artix-7 (Vivado toolchain) |
+| **Clock** | 50 MHz on-board crystal (pin M21, SRCC bank 34) |
+| **User LEDs** | **2** × active-LOW (G21, G20) |
+| **BRAM** | 4.86 Mb (135 × 36 Kb blocks) |
+| **Logic** | ~100 K logic cells |
+| **Synthesis toolchain** | Vivado (Xilinx; not compatible with Efinity or yosys/nextpnr for production builds) |
 
 ---
 
 ## 2. USB Port Map
 
-The FT4232H enumerates four serial interfaces on the host. On Linux they appear as `/dev/ttyUSB0`–`/dev/ttyUSB3`.
+The Wukong A7 exposes a single USB-UART bridge on the host.
 
-| Device | FT4232H interface | Purpose | Baud |
-|:-------|:-----------------|:--------|:-----|
-| `/dev/ttyUSB0` | Interface 0 | FPGA JTAG (openFPGALoader) | — |
-| `/dev/ttyUSB1` | Interface 1 | CPU debug JTAG (tied off in hardware) | — |
-| `/dev/ttyUSB2` | Interface 2 | **Sapphire SoC UART** — CALLHOME + smoke-test target | 57,600 |
-| `/dev/ttyUSB3` | Interface 3 | Church Machine debug UART — NIA trace + fault codes | 115,200 |
+| Device | Purpose | Baud |
+|:-------|:--------|:-----|
+| `/dev/ttyUSB0` | **Wukong UART** — CM banner, single-step trace packets, CALLHOME | 57,600 |
 
-> **ChromeOS / Crostini note:** On ChromeOS, `/dev/ttyUSB3` is also used as the **Crostini serial console**. Do not connect the Church Machine IDE to `/dev/ttyUSB3` on a Chromebook — use `/dev/ttyUSB2` (Sapphire SoC UART) for all CALLHOME and bridge traffic.
+> **Note:** Unlike the Ti60 devkit (which used an FT4232H with four USB-serial interfaces), the Wukong A7 presents a single serial port. All CM communication — banner detection, trace packets, and the IDE bridge — happens on `/dev/ttyUSB0`.
 
 ---
 
 ## 3. LED Pin Assignments
 
-The Ti60 F225 devkit has **exactly 3 user LEDs** (not 4). Each LED is active-HIGH.
+The Wukong A7 has **2 user LEDs**, both active-LOW.
 
-| LED | GPIO pin | Pre-boot meaning | Post-boot |
-|:----|:---------|:-----------------|:----------|
-| LED0 | `GPIOR_P_07` | ON when Sapphire SoC is out of reset | CPU/MMIO |
-| LED1 | `GPIOR_P_08` | ON within ~1 ms when CM boot ROM completes (sticky) | CPU/MMIO |
-| LED2 | `GPIOR_P_09` | ON ~3 s after power-on when CM banner is sent; **also ON on fault** | CPU/MMIO |
+| LED | FPGA pin | Active-LOW meaning | Post-boot |
+|:----|:---------|:-------------------|:----------|
+| LED0 | `G21` | OFF = on; driven LOW to illuminate | CM/MMIO |
+| LED1 | `G20` | OFF = on; driven LOW to illuminate | CM/MMIO |
 
-### Pre-boot signal definitions (from `hardware/ti60_f225.py`)
+> **Active-LOW:** Write `0` to the LED register to turn the LED on; write `1` (or leave undriven) to turn it off. This is the inverse of the Ti60 F225, which used active-HIGH LEDs.
 
-```python
-led_boot         = ~boot_complete               # LED0 ON while CM has never completed CALL
-led_run          = boot_complete & ~fault & ~halted   # ON when running post-boot
-led_halted_blink = halted & ~fault & heartbeat_blink  # 1 Hz blink when paused & healthy
-led_fault        = fault_latched                # sticky — stays ON until power-cycle
-```
+### Step-by-step LED guide (boot phase)
 
-### Step-by-step LED guide
-
-| Step | LED0 | LED1 | LED2 | What it means |
-|:-----|:-----|:-----|:-----|:--------------|
-| Power on | 🟡 solid | ⚫ off | ⚫ off | Sapphire RISC-V starting up |
-| Sapphire running, CM halted & healthy | 🟡 solid | 💫 1 Hz blink | ⚫ off | CM core live, waiting for boot image over UART |
-| CALLHOME sent (~0.5 s after power-on) | 🟡 solid | 💫 1 Hz blink | 🟡 solid | `banner_ever_sent` latched — stays ON from here |
-| IDE sends PATCH_LUMP frames | 🟡 solid | 💫 1 Hz blink | 🟡 solid | CM still halted, DMEM being written |
-| FREE_RUN (0xBE 0xAA) sent | 🟡 solid | ⚫ brief off | 🟡 solid | CM executing 3 boot ROM instructions |
-| Boot complete (`boot_complete=1`) | CPU | CPU | CPU | MMIO writes from your abstraction drive LEDs |
-
-**Fault indicator:** If the CM faults at any stage, LED1 goes dark (`led_halted_blink` gated by `~fault_latched`) and LED2 stays ON permanently from `fault_latched` (or `banner_ever_sent`, whichever lit it first).
+| Phase | LED0 | LED1 | What it means |
+|:------|:-----|:-----|:--------------|
+| Power on | ⚫ off | ⚫ off | FPGA configuring from flash |
+| CM running — standalone mode | 💫 ~1 Hz blink | ⚫ off | Boot ROM loop; `CM:WUKONG` banner being sent |
+| IDE connected and boot entry set | 🟡 solid | 🟡 solid | CM loaded and executing abstraction |
+| Fault | LED pattern depends on abstraction | | `fault_latched` set — read trace output for fault code |
 
 ---
 
-## 4. APB3 Register Map
+## 4. Boot ROM
 
-The Sapphire SoC accesses the CM bridge at `0xF8100000` (`IO_APB_SLAVE_0_INPUT`, `CM_APB_BASE` in `firmware/main.c`). Source: `hardware/soc_combined/apb3_cm_bridge.v`.
+The Wukong A7 uses a **3-instruction boot ROM** that runs on every power-on when an IDE has previously configured the boot entry slot:
 
-| Offset | Name | Access | Description |
-|:-------|:-----|:-------|:------------|
-| `0x00` | CTRL | R/W | `[0]` = cm_pb: 1 = released (default), 0 = pressed (active-low). Hold 0 for ≥ 1 s to enter free-run. |
-| `0x04` | STATUS | RO | `[0]` boot_complete · `[1]` fault_valid · `[2]` fault_latched |
-| `0x08` | NIA | RO | CM next-instruction address (live program counter) |
-| `0x0C` | FAULT | RO | `[4:0]` fault code |
-| `0x10` | UID_LO | R/W | Lower 32 bits of 64-bit device UID (written by firmware at boot; echoed in CALLHOME) |
-| `0x14` | UID_HI | R/W | Upper 32 bits of 64-bit device UID |
-| `0x18` | FAULT_GT | RO | GT word0 of faulting capability (latched on fault; reads 0 on older bitstreams) |
-| `0x1C` | FAULT_INSTR | RO | Instruction word at fault NIA |
-| `0x20` | FAULT_CR14 | RO | Active abstraction slot at fault |
-| `0x24` | FAULT_STAGE | RO | Pipeline stage: 0=Fetch 1=Decode 2=Perm 3=Lambda 4=TPERM 5=Call 6=Return 7=DataRW |
+```
+Word 0  LOAD CR3, CR6[5]   ; load LED capability from boot c-list slot 5
+Word 1  LOAD CR4, CR6[6]   ; load UART capability from boot c-list slot 6
+Word 2  CALL CR0, CR0      ; call boot entry abstraction via Thread.caps[0]
+```
 
-### Firmware address reference
-
-| Symbol | Value | Used by |
-|:-------|:------|:--------|
-| `UART_BASE` / `UART_DATA` | `0xF8010000` | `firmware/main.c`; write = TX, read = RX |
-| `UART_STATUS` | `0xF8010004` | bits[23:16] = TX avail |
-| `UART_CLOCKDIV` | `0xF8010008` | 25 MHz / (8 × (div+1)) = baud rate |
-| APB slave 0 (CM bridge) | `0xF8100000` | `CM_APB_BASE` in `firmware/main.c` |
-| Boot ROM base | `0xF9000000` | CPU reset vector, `link.ld` |
-
-**Baud rate:** firmware writes `CLOCKDIV = 53` → 25,000,000 / (8 × 54) = 57,870 ≈ 57,600 baud.
-
-### Key architectural notes
-- `FAULT_GT` / `FAULT_INSTR` / `FAULT_CR14` / `FAULT_STAGE` are already latched in hardware on every fault, but the current `uart_emit_callhome()` never reads them — adding ~20 lines would emit full telemetry with no FPGA changes.
-- `fault_latched` (STATUS bit[2]) is sticky until hardware reset. Only way to clear without a full power-cycle is to hold CTRL=0 for ≥ 1 s. Adding a `FAULT_RST` write-1-to-clear register in `apb3_cm_bridge.v` (~10 lines Verilog) would complete hardware 3-tier fault recovery.
-- NIA sampled at 10 Hz gives a free TraceEmitter with no LUMP binary.
+When no boot entry has been configured (standalone power-on), the CM executes `WUKONG_NUC_PROGRAM` — a 73-instruction loop that blinks LED0 and transmits `CM:WUKONG\r\n` over UART every ~1 second. See **[docs/wukong-boot.md](wukong-boot.md)** for the full standalone boot program.
 
 ---
 
-## 5. Firmware Build Steps
-
-Short-form checklist. See `hardware/soc_combined/BUILD_SOC_CM.md` for full Efinity-specific command flags and troubleshooting.
-
-```
-[ ] Step 1  Copy Sapphire SoC IP files into hardware/soc_combined/
-[ ] Step 2  Generate Church Machine RTL: python hardware/gen_verilog.py --ti60
-[ ] Step 3  Build firmware: make -C hardware/soc_combined/firmware
-[ ] Step 4  *** MANDATORY: python3 scripts/patch_sapphire_init.py sapphire.v symbol{0..3}.bin
-            Must re-run on EVERY firmware change before re-synthesising.
-[ ] Step 5  Verify: grep optimize-zero-init-rom church_soc_cm.xml  →  must show value="0"
-[ ] Step 5b Copy symbol files: bash hardware/soc_combined/scripts/prep_syn.sh
-[ ] Step 6  Synthesise: bash hardware/soc_combined/run_efx_map.sh
-            *** CHECK: all 4 BRAM lanes must show non-zero INIT_0 in outflow/church_soc_cm.map.v
-[ ] Step 7  Place & Route: bash hardware/soc_combined/run_efx_pnr.sh
-[ ] Step 8  Generate hex: bash hardware/soc_combined/run_efx_pgm.sh
-[ ] Step 9  Flash: sudo openFPGALoader -b titanium_ti60_f225_jtag -f outflow/church_soc_cm.hex
-```
-
-**Two steps that cannot be skipped:**
-1. **`patch_sapphire_init.py` (Step 4)** — without it, EFX_MAP embeds zeroed BRAM; the UART is silent and the board boot-loops.
-2. **INIT_0 check after synthesis (Step 6)** — confirms firmware is actually baked in before spending 5+ minutes on P&R.
-
-For firmware-only rebuilds (no RTL changes), skip Steps 1–2. See `BUILD_SOC_CM.md § Rebuild-from-firmware-change checklist` for the condensed command sequence.
-
----
-
-## 6. Callhome Bridge
+## 5. Callhome Bridge
 
 ### Basic invocation
 
 ```bash
-python3 ~/callhome_bridge.py \
-  --port=/dev/ttyUSB2 \
+python3 ~/wukong_bridge.py \
+  --port=/dev/ttyUSB0 \
   --baud=57600 \
   --ide=https://<your-replit-url>
 ```
 
-Replace `/dev/ttyUSB2` with your actual port (see § 2 for the port map).
-
-> **`--insecure` flag:** When the IDE is running on a local development server (HTTP, not HTTPS), pass `--insecure` to suppress TLS certificate errors:
-> ```bash
-> python3 ~/callhome_bridge.py --port=/dev/ttyUSB2 --baud=57600 \
->   --ide=http://localhost:5000 --insecure
-> ```
-
 ### What you should see
 
 ```
-Church Machine FPGA Bridge (HTTP)
-  Serial : /dev/ttyUSB2 @ 57600 baud
-  HTTP   : http://0.0.0.0:8766
-  ChromeOS bridge URL: http://localhost:8766
-  IDE Server: https://...replit.dev
+Wukong Church Machine Bridge
+  Serial : /dev/ttyUSB0 @ 57600 baud
+  IDE    : https://...replit.dev
 
 Press Ctrl+C to stop.
 
-💡 NIA stream: bridge will forward all UART output to the IDE stream panel.
-
-  [bridge] Pre-fetched device UID from IDE: c0ffee0100000001
-  [bridge] Drain thread started — forwarding UART to IDE server.
+[bridge] Waiting for CM:WUKONG banner...
+[bridge] Banner received — board is live.
+[bridge] Forwarding trace packets to IDE.
 ```
 
-The bridge is working if the prompt **does not** return immediately. If it returns immediately, paste the full output for diagnosis.
+The bridge is working if the prompt **does not** return immediately and you see the banner line within ~2 s of power-on.
 
-For ChromeOS-specific setup (Crostini port forwarding, OSS CAD Suite install, ttyUSB3 console warning), see `docs/bridge-setup-chromeos.md`.
+> **`--insecure` flag:** When pointing at a local HTTP development server, pass `--insecure` to suppress TLS certificate errors:
+> ```bash
+> python3 ~/wukong_bridge.py --port=/dev/ttyUSB0 --baud=57600 \
+>   --ide=http://localhost:5000 --insecure
+> ```
+
+For ChromeOS-specific setup (Crostini port forwarding), see `docs/bridge-setup-chromeos.md`.
+
+---
+
+## 6. Single-Step Trace Packets
+
+The Wukong trace unit emits **12-byte per-event packets** over `/dev/ttyUSB0` after the CM banner. Each packet is framed with `0xAA` and contains:
+
+| Offset | Bytes | Field |
+|:-------|:------|:------|
+| 0 | 1 | Frame marker `0xAA` |
+| 1 | 1 | Event type |
+| 2 | 4 | NIA (next instruction address) |
+| 3 | 4 | Instruction word |
+| 4 | 2 | NZCV flags (4-bit condition flags from `retire_flags`) |
+
+The IDE's **Step** button sends a single-step command to the bridge, which asserts the hardware step signal, waits for the next packet, and updates the register display.
+
+**Known gaps in trace coverage:**
+- `ELOADCALL` events are not yet traced
+- `RETURN-CR14` does not emit a packet in the current TraceUnit implementation
 
 ---
 
@@ -184,120 +131,35 @@ For ChromeOS-specific setup (Crostini port forwarding, OSS CAD Suite install, tt
 
 | Trap | Detail |
 |:-----|:-------|
-| **ttyUSB3 = Crostini console on ChromeOS** | On a Chromebook, `/dev/ttyUSB3` is claimed by the Crostini serial console — connecting the IDE to it will produce garbage or nothing. Always use `/dev/ttyUSB2` (Sapphire SoC UART) for CALLHOME and bridge traffic. |
-| **INIT_0 all-zero = `patch_sapphire_init.py` was skipped** | If all four BRAM lanes show `INIT_0 = 0` after synthesis, the firmware was not patched into `sapphire.v` before synthesis. Re-run Step 4 then re-synthesise. Symptom: UART silent, or boot loops at NIA=0x00000000 repeating. |
-| **`--insecure` required for local IDE** | The callhome bridge uses HTTPS by default. When pointing at an HTTP development server, omit `--insecure` and the bridge will refuse the connection with a TLS error. |
-| **`jtagCtrl_reset` must be tied to `1'b1`** | VexRiscv treats `jtagCtrl_reset = 0` as "JTAG TAP held in reset", which propagates into `io_systemReset` and keeps it HIGH permanently. Result: LED0 stays OFF and UART is silent even though the CM runs. Always tie `.jtagCtrl_reset(1'b1)` in `top.v` when JTAG is disabled. |
-| **The Ti60 F225 has exactly 3 user LEDs** | Some older docs show a 4-LED table — that reflects an earlier revision. The physical board (GPIOR_P_07/08/09) has 3 LEDs. See § 3 for the authoritative assignments. |
-| **Sapphire UART CLOCKDIV resets to 0x00** | The Sapphire SoC UART resets `CLOCKDIV` to `0x00` (not 53) on power-up. Firmware **must** write `CLOCKDIV = 53` before the first `uart_puts` call, or the UART runs at 25 MHz / 8 = 3.125 Mbaud and produces silence on any standard terminal. |
+| **LEDs are active-LOW** | Writing `1` to an LED register turns it OFF. Write `0` to illuminate. This is opposite to the Ti60 F225 (active-HIGH). |
+| **Single `/dev/ttyUSB0` for everything** | Banner, trace packets, and IDE bridge traffic all share one serial port. Do not open it with `screen` or `minicom` while `wukong_bridge.py` is running. |
+| **`--insecure` required for local IDE** | `wukong_bridge.py` uses HTTPS by default. Pass `--insecure` when pointing at an HTTP local server. |
+| **`step_mode` must be `0` in standalone builds** | The CM halts immediately after boot when `step_mode` initialises to `1`. Standalone (no-IDE) FPGA builds must use `step_mode = 0`. |
+| **Vivado `write_bitstream` DRC NSTD-1/UCIO-1** | Do not use `launch_runs -to_step write_bitstream` (it spawns a fresh session and drops XDC severity overrides). Use `open_run` then `write_bitstream` directly. |
+| **`BUFG` must not be instantiated explicitly** | Vivado's `opt_design` silently drops an explicit `Instance("BUFG")` in Amaranth-generated HDL. Use a direct combinational assign so Vivado auto-infers `IBUF→BUFG`. |
 
 ---
 
-## 8. Wukong Ethernet Protocol
+## 8. Vivado Build Steps
 
-The QMTECH Wukong XC7A100T communicates with the IDE server over Ethernet
-using UDP (no TCP, no TLS — capability security is the CM model).  This
-section defines the wire format for the two frame types.
+Short-form checklist for building a new bitstream. See `hardware/wukong_top.py` for the HDL entry point.
 
-**Port:** 5900 (both directions — board sends from an ephemeral src port;
-server listens on 5900 and replies to the board's source address).
+```
+[ ] Step 1  Generate Church Machine RTL: python hardware/gen_rtlil.py --wukong
+[ ] Step 2  Open Vivado and set top-level to wukong_top
+[ ] Step 3  Apply pin constraints from hardware/wukong_a7.xdc
+[ ] Step 4  Run Synthesis (synth_design)
+[ ] Step 5  Run Implementation (opt_design → place_design → route_design)
+[ ] Step 6  Generate bitstream: open_run impl_1; write_bitstream wukong_top.bit
+[ ] Step 7  Program board:
+            openFPGALoader -b arty_a7_100t wukong_top.bit
+            # or via Vivado Hardware Manager
+```
 
-**Byte order:** big-endian (network byte order) for all multi-byte integer
-fields.
-
-**Identity rule:** abstractions are identified by their Pet-Name GT token
-in every frame field.  NS slot numbers are NEVER used as identifiers in the
-wire protocol.  The Ethernet abstraction that sends the callhome frame is
-identified by token `0x00003300`, not by any slot number.
+**Two steps that cannot be skipped:**
+1. **XDC pin constraints (Step 3)** — without them, LEDs and UART are routed to random pins and the board is silent.
+2. **`open_run` before `write_bitstream` (Steps 6–7)** — using `launch_runs -to_step write_bitstream` drops DRC overrides; always use `open_run` + `write_bitstream` directly.
 
 ---
 
-### Frame A — Wukong Callhome Broadcast (board → IDE server)
-
-Sent by the Locator abstraction after Ethernet link comes up.  Addressed
-to UDP broadcast (255.255.255.255) so the IDE server receives it on any
-interface without requiring a configured server IP.
-
-```
-Offset  Bytes  Field
-------  -----  -----
-0       4      Magic = 0xCE110001  (identifies this as a Wukong callhome)
-4       4      Sender token = 0x00003300  (Ethernet abstraction Pet-Name GT)
-8       4      CM version word (u32)  — upper 16 bits: major, lower 16: minor
-12      6      Board MAC address (6 octets, as presented by the RGMII MAC)
-18      2      Pad = 0x0000
-20      4      Link-up uptime (u32, seconds since power-on)
-24      2      Request count N (u16) — number of lump tokens being requested
-26      N×4    Requested lump tokens (each u32) — tokens the Locator needs served
-```
-
-Minimum frame length: 26 bytes (N = 0, no requests).
-
-#### Notes
-
-- The server must look up each requested token in its lump store (LUMP
-  files registered in the manifest) and reply with a Frame B for each
-  token it can satisfy.
-- The CM version field allows the server to gate lump delivery by
-  compatibility.
-- Unknown tokens in the request list are silently skipped — the board
-  retries on the next callhome cycle.
-
----
-
-### Frame B — Lump-Serve Response (IDE server → board)
-
-Sent by the IDE server in reply to each requested lump token in Frame A.
-Addressed to the source (host, port) of the callhome broadcast.
-
-```
-Offset  Bytes  Field
-------  -----  -----
-0       4      Magic = 0xCE110002  (identifies this as a lump-serve response)
-4       4      Lump token (u32) — Pet-Name GT token of the lump being served
-8       4      Word count W (u32) — number of 32-bit LUMP words that follow
-12      W×4    LUMP data words (each u32, big-endian)
-```
-
-Minimum frame length: 12 bytes (W = 0 signals "token not found").
-
-#### Notes
-
-- The Locator verifies the token field against the token it requested.  A
-  response with an unexpected token is discarded.
-- LUMP words are the raw 32-bit words of the LUMP binary (header + body),
-  exactly as stored in the LUMP file.
-- After receiving all words, the Locator calls `Mint.Install()` to install
-  the lump, then `NSWrite.Promote()` to make the NS entry Live.
-
----
-
-### Protocol Flow
-
-```
-Board (Locator)                        IDE server (WukongUdpListener)
-──────────────────────────────         ──────────────────────────────
-power-on: Ethernet.Status() → poll
-link up detected
-send Frame A (broadcast, N=2)     ──►  parse_callhome_frame()
-  requests = [token_A, token_B]         log to _callhome_log
-                                         for each known token:
-                                ◄──      send Frame B (token_A, words)
-                                ◄──      send Frame B (token_B, words)
-receive Frame B (token_A)
-  Mint.Install(words)
-  NSWrite.Promote()
-receive Frame B (token_B)
-  Mint.Install(words)
-  NSWrite.Promote()
-... (repeat for subsequent lazy-load requests)
-```
-
----
-
-## Ti60 F225 Call-Home Protocol
-
-The Ti60 F225 uses a UART-based call-home protocol via the Sapphire SoC.
-See `docs/cloomc-foundation.md` for the full description of the Ti60 boot
-sequence and `server/app.py` (`/api/device/register` and
-`/api/device/callhome`) for the server-side handler.
+*For archived Ti60 F225 content, see [`docs/archive/hardware-ti60-f225-legacy.md`](archive/hardware-ti60-f225-legacy.md).*

@@ -1,6 +1,6 @@
 # End-to-End Hardware Integration Runbook
 
-**Purpose:** Step-by-step guide for validating the complete callhome → lump push → board reboot loop on a physical Ti60 F225 devkit. Each leg has a known status so you start exactly where you left off.
+**Purpose:** Step-by-step guide for validating the complete bridge → banner → IDE step-trace loop on a physical Wukong A7 board. Each leg has a known status so you start exactly where you left off.
 
 **Status legend:** ✅ Verified on hardware · ⚠️ Believed working, not recently re-tested · ❌ Known gap — implementation present but untested end-to-end
 
@@ -10,122 +10,119 @@
 
 | Leg | Summary | Status |
 |:----|:--------|:-------|
-| [Leg 1](#leg-1--flash-bitstream) | Flash bitstream to board | ✅ |
-| [Leg 2](#leg-2--soc-boot-banner-over-ttyusb2) | SoC boot banner over ttyUSB2 | ✅ |
-| [Leg 3](#leg-3--callhome-json-received-by-bridge) | CALLHOME JSON received by bridge | ✅ |
-| [Leg 4](#leg-4--ide-server-acknowledges-callhome) | IDE server acknowledges callhome | ✅ |
-| [Leg 5](#leg-5--ide-pushes-pending-lump-via-patch_lump-frame) | IDE pushes pending lump via PATCH_LUMP | ⚠️ |
-| [Leg 6](#leg-6--board-reboots-and-runs-new-abstraction) | Board reboots and runs new abstraction | ❌ |
+| [Leg 1](#leg-1--program-bitstream) | Program bitstream to board | ✅ |
+| [Leg 2](#leg-2--wukong-banner-over-ttyusb0) | Wukong banner over ttyUSB0 | ✅ |
+| [Leg 3](#leg-3--ide-bridge-running) | IDE bridge running | ✅ |
+| [Leg 4](#leg-4--single-step-trace-in-ide) | Single-step trace in IDE | ✅ |
+| [Leg 5](#leg-5--boot-entry-lump-push) | Boot entry lump push | ⚠️ |
+| [Leg 6](#leg-6--abstraction-runs-after-boot) | Abstraction runs after boot | ❌ |
 
 See [Known Traps](#known-traps) for common failure causes discovered during hardware sessions.
 
 ---
 
-## Leg 1 — Flash bitstream
+## Leg 1 — Program bitstream
 
 **Status: ✅ Verified**
 
 ### Prerequisites
 
-- Efinity 2026.1 installed at `~/efinity/2026.1`
-- Efinity RISC-V IDE 2025.2 toolchain at `~/efinity/efinity-riscv-ide-2025.2/toolchain/bin`
-- `oss-cad-suite` present at `~/oss-cad-suite/bin/openFPGALoader`
-- Board connected via USB; FT4232H enumerates as `/dev/ttyUSB0`–`/dev/ttyUSB3`
+- Vivado installed (any version supporting XC7A100T; tested with Vivado 2022.x+)
+- Wukong A7 board connected via USB; `/dev/ttyUSB0` visible on host
+- `openFPGALoader` present (for CLI programming) **or** Vivado Hardware Manager available
 
 ### Command
 
 ```bash
-# Option A — one-command build + flash (preferred):
+# Option A — Vivado TCL (preferred from a terminal):
 cd ~/church-machine
-make bitstream-flash
+vivado -mode batch -source hardware/scripts/program_wukong.tcl
 
-# Option B — use pre-built hex (if Efinity is not available locally):
-curl -O https://<your-ide-url>/dl/ti60-hex
-sudo ~/oss-cad-suite/bin/openFPGALoader \
-  -b titanium_ti60_f225_jtag \
-  -f church_ti60_f225.hex
+# Option B — openFPGALoader CLI:
+openFPGALoader -b arty_a7_100t wukong_top.bit
+
+# Option C — Vivado Hardware Manager (GUI):
+# Open Hardware Manager → Auto-Connect → Program Device → select wukong_top.bit
 ```
 
 ### Expected output
 
 ```
 ...
-[SUCCESS] Bitstream programmed successfully.
+[Vivado] Bitstream programmed successfully.
 ```
 
-The board power-cycles immediately after flashing. LED0 comes on within ~2 s.
+The board does **not** power-cycle after programming — the new design loads immediately into FPGA SRAM. Power-cycle manually (or hit the reset button) if you want a clean boot from flash.
 
 ### Failure modes
 
 | Symptom | Diagnosis |
 |:--------|:----------|
-| `openFPGALoader: no device found` | Wrong board flag — verify `-b titanium_ti60_f225_jtag`; try `sudo` |
-| Flash completes but board is dead | Hex is stale — re-run `make bitstream` then re-flash |
-| `BRAM INIT_0 = 0x00000000` after synth | `patch_sapphire_init.py` was skipped — see `hardware/soc_combined/BUILD_SOC_CM.md` Step 4 |
-| `optimize-zero-init-rom = 1` in XML | Run `sed -i 's/value="1"/value="0"/' hardware/soc_combined/church_soc_cm.xml` then re-synth |
+| `openFPGALoader: no device found` | Check USB cable and run `lsusb | grep -i xilinx`; try `sudo` |
+| Programming completes but board is silent | Wrong bitstream built — verify XDC constraints applied (`hardware/wukong_a7.xdc`) |
+| Vivado `NSTD-1` / `UCIO-1` DRC errors | Do not use `launch_runs -to_step write_bitstream`; use `open_run impl_1; write_bitstream wukong_top.bit` directly |
 
 ---
 
-## Leg 2 — SoC boot banner over ttyUSB2
+## Leg 2 — Wukong banner over ttyUSB0
 
 **Status: ✅ Verified**
 
 ### Prerequisites
 
-- Leg 1 complete (board flashed and powered)
+- Leg 1 complete (board programmed)
 - `pyserial` installed: `pip install pyserial`
-- On ChromeOS: do **not** use ttyUSB3 — it is the Crostini console (see [Known Traps](#known-traps))
 
 ### Command
 
 ```bash
-python3 scripts/test_ti60_uart.py --port=/dev/ttyUSB2 --timeout=30 --verbose
+# Quick check with screen (Ctrl+A K to quit):
+screen /dev/ttyUSB0 57600
+
+# Or with python:
+python3 -c "
+import serial, time
+s = serial.Serial('/dev/ttyUSB0', 57600, timeout=5)
+print(s.readline())
+"
 ```
 
-Or manually with `screen` or `minicom`:
-
-```bash
-screen /dev/ttyUSB2 57600
-# Press power button on board if already connected; or power-cycle
-```
+Power-cycle the board (or press reset) after opening the port.
 
 ### Expected output
 
 ```
-CHURCH Ti60 SoC+CM v2.0
-UID=c0ffee0100000001
-CALLHOME {"device_uid":"c0ffee0100000001","fw_major":2,"fw_minor":0,...}
+CM:WUKONG
 ```
 
-The banner arrives within ~3 s of power-on. LED2 goes solid once the banner is sent.
+The banner arrives within ~1 second of power-on and repeats every ~1 second in standalone mode (LED0 blinks at ~1 Hz). Once the IDE sends a boot entry, the loop stops and the CM executes the loaded abstraction.
 
 ### Failure modes
 
 | Symptom | Diagnosis |
 |:--------|:----------|
-| No output at all on ttyUSB2 | Firmware not embedded — `INIT_0` was all-zero; re-run Leg 1 with `patch_sapphire_init.py` |
-| Garbled output (random bytes) | Wrong baud rate — must be **57600** (CLOCKDIV=53, 25 MHz clock) |
-| `Permission denied: /dev/ttyUSB2` | Add user to `dialout` group: `sudo usermod -aG dialout $USER` then log out/in |
-| Port opens but instantly closes | Another app holds the port (minicom, screen, bridge); kill it first |
-| `jtagCtrl_reset` trap | LED0 stays OFF, UART silent — `jtagCtrl_reset` must be tied to `1'b1` in `top.v` (see [Known Traps](#known-traps)) |
+| No output at all on ttyUSB0 | Wrong bitstream or wrong port — verify `ls /dev/ttyUSB*`; check Vivado programming succeeded |
+| Garbled output (random bytes) | Wrong baud rate — must be **57600** |
+| `Permission denied: /dev/ttyUSB0` | Add user to `dialout` group: `sudo usermod -aG dialout $USER` then log out/in |
+| Port opens but instantly closes | Another app holds the port; kill `wukong_bridge.py`, `screen`, or `minicom` first |
 
 ---
 
-## Leg 3 — CALLHOME JSON received by bridge
+## Leg 3 — IDE bridge running
 
 **Status: ✅ Verified**
 
 ### Prerequisites
 
-- Leg 2 complete (board emitting CALLHOME over ttyUSB2)
-- Bridge script downloaded from the IDE: `/dl/callhome-bridge` or copied from `scripts/callhome_bridge.py`
+- Leg 2 complete (board emitting `CM:WUKONG` on `/dev/ttyUSB0`)
+- Bridge script at `~/wukong_bridge.py` (download from the IDE at `/dl/wukong-bridge`)
 - Python 3 + `pyserial` + `requests` installed on the host machine
 
 ### Command
 
 ```bash
-python3 ~/callhome_bridge.py \
-  --port=/dev/ttyUSB2 \
+python3 ~/wukong_bridge.py \
+  --port=/dev/ttyUSB0 \
   --baud=57600 \
   --ide=https://<your-replit-url>
 ```
@@ -133,8 +130,8 @@ python3 ~/callhome_bridge.py \
 For a local dev server (HTTP):
 
 ```bash
-python3 ~/callhome_bridge.py \
-  --port=/dev/ttyUSB2 \
+python3 ~/wukong_bridge.py \
+  --port=/dev/ttyUSB0 \
   --baud=57600 \
   --ide=http://localhost:5000 \
   --insecure
@@ -143,19 +140,15 @@ python3 ~/callhome_bridge.py \
 ### Expected output
 
 ```
-Church Machine FPGA Bridge (HTTP)
-  Serial : /dev/ttyUSB2 @ 57600 baud
-  HTTP   : http://0.0.0.0:8766
-  ChromeOS bridge URL: http://localhost:8766
-  IDE Server: https://...replit.dev
+Wukong Church Machine Bridge
+  Serial : /dev/ttyUSB0 @ 57600 baud
+  IDE    : https://...replit.dev
 
 Press Ctrl+C to stop.
 
-💡 NIA stream: bridge will forward all UART output to the IDE stream panel.
-
-  [bridge] Pre-fetched device UID from IDE: c0ffee0100000001
-  [bridge] Drain thread started — forwarding UART to IDE server.
-  [bridge] → POST /api/device/call-home  200 OK
+[bridge] Waiting for CM:WUKONG banner...
+[bridge] Banner received — board is live.
+[bridge] Forwarding trace packets to IDE.
 ```
 
 The bridge is working if it **does not** return immediately. A prompt that returns instantly means a startup error — paste the full output for diagnosis.
@@ -166,146 +159,103 @@ The bridge is working if it **does not** return immediately. A prompt that retur
 |:--------|:----------|
 | `TLS handshake error` or `SSL error` | Add `--insecure` flag when using a local HTTP server |
 | `Connection refused` to IDE | IDE server is not running; check Flask workflow status |
-| `Serial port not found` | Wrong port; run `ls /dev/ttyUSB*` and confirm the board is plugged in |
+| `Serial port not found` | Wrong port — run `ls /dev/ttyUSB*` and confirm board is plugged in |
 | Bridge returns immediately | Import error or missing dependency — run `pip install pyserial requests` |
-| No `→ POST` line appearing | Board is not sending CALLHOME; go back to Leg 2 |
+| `[bridge] Waiting for CM:WUKONG banner...` never resolves | Board is not sending banner; go back to Leg 2 |
 
 ---
 
-## Leg 4 — IDE server acknowledges callhome
+## Leg 4 — Single-step trace in IDE
 
 **Status: ✅ Verified**
 
 ### Prerequisites
 
-- Leg 3 complete (bridge running and forwarding)
-- IDE server running (Flask `server/app.py`)
+- Leg 3 complete (bridge running and connected to IDE)
+- IDE open in browser with the Wukong board visible in the Devices tab
 
-### Command
+### Procedure
 
-You can verify the endpoint without hardware using the health-check script:
+1. Open the IDE and navigate to the **Devices** tab — the board should appear with status **Live**.
+2. Click **Step** (or press the step key) — the IDE sends a single-step command through the bridge.
+3. The CM executes one instruction and the bridge receives a 12-byte trace packet.
+4. The IDE updates the register display (NIA, instruction word, NZCV flags).
 
-```bash
-python3 scripts/check_runbook_status.py --dry-run
+### Expected behaviour
+
+```
+Step 1 → NIA=0x0000  LOAD CR3, CR6[5]    flags=0000
+Step 2 → NIA=0x0001  LOAD CR4, CR6[6]    flags=0000
+Step 3 → NIA=0x0002  CALL CR0, CR0       flags=0000
 ```
 
-Or manually:
-
-```bash
-curl -s -X POST https://<your-ide-url>/api/device/call-home \
-  -H "Content-Type: application/json" \
-  -d '{"device_uid":"test-runbook-001","fw_major":2,"fw_minor":0,"board_type":1}' \
-  | python3 -m json.tool
-```
-
-### Expected output
-
-```json
-{
-  "ok": true,
-  "uid": "test-runbook-001",
-  "registered": true,
-  "pending_lump": null
-}
-```
-
-The server also logs the event and updates the Devices tab in the IDE.
+Each step takes < 100 ms round-trip (bridge latency + UART byte time at 57,600 baud).
 
 ### Failure modes
 
 | Symptom | Diagnosis |
 |:--------|:----------|
-| `{"ok": false, "error": "missing device_uid"}` | Payload missing `device_uid` field |
-| HTTP 500 | Database error — check server logs (`/tmp/logs/`) |
-| HTTP 404 | Wrong URL or IDE server not running |
-| `"registered": false` | First-time registration — normal; second call will show `true` |
+| Devices tab shows board as **Offline** | Bridge not running or lost connection — restart `wukong_bridge.py` |
+| Step button does nothing | Bridge connected but step command not forwarded — check bridge version |
+| NIA does not advance | Step mode not enabled in hardware — rebuild bitstream with `step_mode = 0` for standalone, or verify bridge is sending the step pulse |
+| `ELOADCALL` trace missing | Known gap — ELOADCALL events are not yet traced by the TraceUnit |
 
 ---
 
-## Leg 5 — IDE pushes pending lump via PATCH_LUMP frame
+## Leg 5 — Boot entry lump push
 
 **Status: ⚠️ Believed working, not recently tested end-to-end**
 
-The server-side pending-lump API exists at `GET /api/device/<uid>/pending-lump`. The bridge is expected to poll this endpoint and write PATCH_LUMP frames over the serial port. End-to-end validation on real hardware is pending.
+The server-side boot-entry API exists. The bridge is expected to receive the boot entry configuration from the IDE and load it into the CM DMEM boot slot. End-to-end validation on real hardware is pending.
 
 ### Prerequisites
 
-- Leg 4 complete (callhome acknowledged)
-- A lump queued for the device via the IDE (Builder → Deploy → select device → push)
+- Leg 4 complete (step trace verified)
+- A boot entry LUMP selected in the IDE (Builder → select LUMP → Deploy to board)
 
 ### Command
 
-Check the pending-lump API:
-
 ```bash
-# Replace <uid> with your board's device UID (from the Devices tab or Leg 2 banner)
+# Verify the pending boot-entry endpoint:
 curl -s https://<your-ide-url>/api/device/<uid>/pending-lump | python3 -m json.tool
 ```
 
-When a lump is queued, response will be:
-
-```json
-{
-  "ok": true,
-  "pending": true,
-  "token": "c0ffee01",
-  "lump_words": [...]
-}
-```
-
-The bridge polls this endpoint (default interval: 5 s) and writes PATCH_LUMP frames to the serial port when `pending == true`.
-
-Expected UART output on the board side (ttyUSB2):
+### Expected bridge output (when lump is pushed)
 
 ```
-PATCH_LUMP token=c0ffee01 words=64
-ACK OK
+[bridge] Boot entry received — installing LUMP (token=c0ffee01, words=73)
+[bridge] LUMP installed; sending FREE_RUN.
 ```
 
 ### Failure modes
 
 | Symptom | Diagnosis |
 |:--------|:----------|
-| `"pending": false` always | No lump queued — use Builder → Deploy → push lump to device |
-| Bridge does not write PATCH_LUMP | Confirm bridge version supports `--pending-poll`; may need `--enable-push` flag |
-| `ACK FAIL crc=...` on board | Framing error; restart bridge and retry |
-| No UART response from board after PATCH_LUMP | Board firmware does not yet handle PATCH_LUMP; this is a known gap |
+| `"pending": false` always | No LUMP queued — use Builder → Deploy to push one to this device |
+| Bridge shows lump received but CM does not advance | FREE_RUN signal not sent — check bridge firmware |
 
 ---
 
-## Leg 6 — Board reboots and runs new abstraction
+## Leg 6 — Abstraction runs after boot
 
-**Status: ❌ Known gap — end-to-end reboot-and-run not yet validated**
+**Status: ❌ Known gap — end-to-end reboot-and-run not yet validated on Wukong A7**
 
-After a successful PATCH_LUMP sequence, the firmware should write FREE_RUN bytes (`0xBE 0xAA`) to the APB3 CTRL register to release the Church Machine and execute the newly-loaded abstraction. This leg has not been validated on real hardware.
-
-### Prerequisites
-
-- Leg 5 complete (PATCH_LUMP accepted and ACK'd by board)
+After a successful lump push (Leg 5), the bridge sends a FREE_RUN signal to release the CM. The CM executes the 3-instruction boot ROM, which calls into the loaded abstraction. This leg has not been validated on real hardware.
 
 ### Expected sequence
 
-1. Firmware receives all PATCH_LUMP frames → writes lump words into CM DMEM via APB3 NIA/CTRL registers
-2. Firmware writes `FREE_RUN` command → releases CM core
-3. CM executes boot ROM → loads lump from DMEM → calls first method
-4. LED pattern changes to match the new abstraction's MMIO writes
-
-### Expected UART output
-
-```
-FREE_RUN sent
-BOOT_COMPLETE
-NIA=0x0001 (first instruction of new abstraction)
-```
+1. Bridge sends FREE_RUN signal
+2. CM executes boot ROM words 0–2: `LOAD` → `LOAD` → `CALL`
+3. CM enters the boot entry abstraction's first method
+4. LED pattern changes to match the abstraction's MMIO writes
 
 ### Failure modes
 
 | Symptom | Diagnosis |
 |:--------|:----------|
-| LEDs do not change after PATCH_LUMP | FREE_RUN not sent — firmware may not be wired to send it after PATCH_LUMP |
-| CM faults immediately | Lump CRC or bounds check failed — verify lump consistency gate passed |
-| NIA stuck at 0x00000000 | Boot ROM not starting — check APB3 CTRL = 1 (CM released) |
-| LED2 solid after FREE_RUN | `fault_latched` set — read APB3 FAULT register for fault code |
+| CM does not advance after FREE_RUN | `step_mode` still active — verify hardware build has `step_mode = 0` in non-step path |
+| CM faults immediately on CALL | `Thread.caps[0]` not set — bridge did not write the boot slot |
+| LEDs do not respond | DWRITE to wrong offset — Wukong LEDs are active-LOW; `0` = on |
 
 ---
 
@@ -315,20 +265,18 @@ Discoveries made during real hardware sessions that are easy to miss:
 
 | Trap | Detail |
 |:-----|:-------|
-| **ttyUSB3 = Crostini console on ChromeOS** | On a Chromebook, `/dev/ttyUSB3` is claimed by the Crostini serial console. Connecting the bridge to ttyUSB3 produces garbage or nothing. Always use `/dev/ttyUSB2` (Sapphire SoC UART) for CALLHOME and bridge traffic. |
-| **ttyUSB2 = SoC UART at 57600, not 115200** | ttyUSB2 runs at 57600 baud (`CLOCKDIV=53`, 25 MHz clock, 8× divider). Opening at 115200 produces garbled output. ttyUSB3 is the CM debug UART at 115200. |
-| **INIT_0 all-zero = `patch_sapphire_init.py` was skipped** | If all four BRAM lanes show `INIT_0 = 0x00000000` after synthesis, the firmware patch was not applied. Re-run `scripts/patch_sapphire_init.py` then re-synthesise. Symptom: UART silent, or NIA=0x00000000 looping. |
-| **`--insecure` required for local IDE** | The callhome bridge uses HTTPS by default. When pointing at an HTTP development server, pass `--insecure` or the bridge refuses with a TLS error. |
-| **`jtagCtrl_reset` polarity** | VexRiscv treats `jtagCtrl_reset=0` as "JTAG TAP in reset", which propagates into `io_systemReset` and keeps it HIGH permanently. Result: LED0 stays OFF and UART is silent even though the FPGA is programmed. Always tie `.jtagCtrl_reset(1'b1)` in `top.v`. |
-| **Sapphire UART `CLOCKDIV` resets to 0x00** | On every power-on, `CLOCKDIV` resets to 0x00 (not 53). Firmware **must** write `CLOCKDIV = 53` before the first `uart_puts` call. Without it the UART runs at 25 MHz/8 = 3.125 Mbaud and produces silence. |
-| **Ti60 F225 has exactly 3 user LEDs** | Some older docs describe 4 LEDs. The physical board (GPIOR_P_07/08/09) has exactly 3. See `docs/HARDWARE.md § 3` for the authoritative assignments. |
-| **`make` must run after `git pull`** | The callhome bridge firmware and scripts may have changed. Always rebuild with `make -C hardware/soc_combined/firmware` after pulling upstream changes, even if you only changed `.c` files. |
+| **LEDs are active-LOW** | The Wukong A7 LEDs (G21, G20) are active-LOW — write `0` to illuminate, `1` to extinguish. The Ti60 F225 was active-HIGH; this is the opposite polarity. |
+| **Single port for everything** | `/dev/ttyUSB0` carries the `CM:WUKONG` banner, per-event trace packets, and bridge traffic. Do not open it with `screen` or `minicom` while `wukong_bridge.py` is running. |
+| **57,600 baud — not 115,200** | The Wukong UART runs at 57,600 baud (`CLOCKDIV=53`, 50 MHz clock with appropriate divider). Opening at 115,200 produces garbled output. |
+| **`--insecure` required for local IDE** | `wukong_bridge.py` uses HTTPS by default. Pass `--insecure` when pointing at an HTTP development server. |
+| **`step_mode` init must be 0 in standalone builds** | The CM halts immediately after boot when `step_mode` initialises to `1`. Standalone FPGA builds need `step_mode = 0`. |
+| **`write_bitstream` DRC trap** | Using `launch_runs -to_step write_bitstream` spawns a fresh Vivado session and drops XDC severity overrides (DRC NSTD-1/UCIO-1 errors). Use `open_run impl_1; write_bitstream` directly. |
 
 ---
 
 ## Related documents
 
-- **`docs/HARDWARE.md`** — Authoritative USB port map, LED assignments, APB3 register table, firmware build steps
-- **`hardware/soc_combined/BUILD_SOC_CM.md`** — Full Efinity synthesis workflow with troubleshooting
-- **`scripts/check_runbook_status.py`** — Server-side health check (no hardware needed)
+- **`docs/HARDWARE.md`** — Authoritative board identity, USB port map, LED assignments, boot ROM description, Vivado build steps
+- **`docs/wukong-boot.md`** — Wukong standalone boot program (`WUKONG_NUC_PROGRAM`): 73-instruction loop, register allocation, CLOOMC source
+- **`docs/bridge-setup-chromeos.md`** — ChromeOS / Crostini-specific bridge setup
 - **`server/app.py`** routes: `/api/device/call-home`, `/api/device/<uid>/pending-lump`
