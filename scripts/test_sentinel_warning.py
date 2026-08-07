@@ -74,7 +74,11 @@ class _ChunkedMockSerial:
     the requested *n*), then b'' once all chunks are exhausted.  This lets
     tests simulate a sentinel whose bytes arrive across multiple separate
     read() calls — exercising the partial-buffer ``continue`` path inside
-    check_sentinel().
+    check_sentinel(), and the partial-packet ``break`` path inside
+    check_trace().
+
+    write() is a no-op stub so that check_trace()'s ``ser.write(b"r")`` call
+    does not raise AttributeError.
     """
 
     def __init__(self, chunks: list):
@@ -87,6 +91,9 @@ class _ChunkedMockSerial:
         chunk = self._chunks[self._index]
         self._index += 1
         return bytes(chunk)
+
+    def write(self, data: bytes) -> None:  # noqa: ARG002
+        """Silently accept any write so check_trace()'s 'r' send does not fail."""
 
 
 # ---------------------------------------------------------------------------
@@ -383,6 +390,133 @@ class TestPartialBufferV2Sentinel:
             f'Expected BITSTREAM WARNING for byte-at-a-time delivery; '
             f'got: {stderr!r}'
         )
+
+
+# ---------------------------------------------------------------------------
+# check_trace() — split-packet guard tests
+# ---------------------------------------------------------------------------
+
+# A minimal valid non-fault 12-byte 0xAA trace packet:
+#   [0]     0xAA  magic
+#   [1..4]  0x00000001  NIA (big-endian)
+#   [5]     0x00  ev_type
+#   [6..9]  0x00000000  payload_gt (big-endian)
+#   [10]    0x00  flags
+#   [11]    0x00  fault byte — fault_valid=bit6=0 → non-fault
+_GOOD_TRACE_PKT = bytes([0xAA, 0x00, 0x00, 0x00, 0x01,
+                          0x00, 0x00, 0x00, 0x00, 0x00,
+                          0x00, 0x00])
+assert len(_GOOD_TRACE_PKT) == smoke.TRACE_LEN
+
+# A fault trace packet — same layout but byte[11] has bit6 set (fault_valid=True).
+_FAULT_TRACE_PKT = bytes([0xAA, 0x00, 0x00, 0x00, 0x02,
+                           0x00, 0x00, 0x00, 0x00, 0x00,
+                           0x00, 0x40])
+assert len(_FAULT_TRACE_PKT) == smoke.TRACE_LEN
+
+
+class TestCheckTraceSplitPacket:
+    """check_trace() must handle a 12-byte trace packet that arrives across reads.
+
+    The partial-packet guard inside check_trace() reads:
+
+        if len(buf) - i < TRACE_LEN:
+            break
+
+    These tests verify that when only the first N bytes of the 12-byte packet
+    arrive on the first read(), check_trace() waits for the remainder rather
+    than indexing out of range or silently skipping the packet.  Removing or
+    mis-placing the guard would break these tests.
+    """
+
+    def _run_check_trace(self, chunks, timeout: float = 2.0):
+        """Run check_trace() with a _ChunkedMockSerial and return (result, stdout)."""
+        ser = _ChunkedMockSerial(chunks)
+        captured_stdout = io.StringIO()
+        captured_stderr = io.StringIO()
+        old_stdout, old_stderr = sys.stdout, sys.stderr
+        sys.stdout, sys.stderr = captured_stdout, captured_stderr
+        try:
+            result = smoke.check_trace(ser, timeout=timeout)
+        finally:
+            sys.stdout, sys.stderr = old_stdout, old_stderr
+        return result, captured_stdout.getvalue()
+
+    def test_split_packet_returns_true(self):
+        """Returns True when the 12-byte packet is split evenly across two reads."""
+        chunks = [
+            _GOOD_TRACE_PKT[:6],   # first 6 bytes — partial packet
+            _GOOD_TRACE_PKT[6:],   # remaining 6 bytes — completes the packet
+        ]
+        result, _ = self._run_check_trace(chunks)
+        assert result is True, (
+            'check_trace must return True when a complete non-fault packet '
+            'arrives across two reads'
+        )
+
+    def test_split_packet_reports_pass(self):
+        """PASS appears in stdout when the split packet is correctly parsed."""
+        chunks = [
+            _GOOD_TRACE_PKT[:6],
+            _GOOD_TRACE_PKT[6:],
+        ]
+        _, stdout = self._run_check_trace(chunks)
+        assert 'PASS' in stdout, (
+            f'Expected "PASS" in stdout after split-packet delivery; '
+            f'got: {stdout!r}'
+        )
+
+    def test_single_byte_per_read_returns_true(self):
+        """Returns True when each byte of the 12-byte packet arrives one at a time."""
+        chunks = [bytes([b]) for b in _GOOD_TRACE_PKT]
+        result, _ = self._run_check_trace(chunks)
+        assert result is True, (
+            'check_trace must return True when a packet arrives one byte per read'
+        )
+
+    def test_split_after_first_byte_returns_true(self):
+        """Returns True when only the magic byte arrives first, then the rest."""
+        chunks = [
+            _GOOD_TRACE_PKT[:1],   # magic byte only
+            _GOOD_TRACE_PKT[1:],   # remaining 11 bytes
+        ]
+        result, _ = self._run_check_trace(chunks)
+        assert result is True, (
+            'check_trace must return True when only the magic byte arrives first'
+        )
+
+    def test_leading_garbage_then_split_packet(self):
+        """Returns True when leading non-trace bytes precede a split trace packet."""
+        garbage = bytes([0x01, 0x02, 0x03])
+        chunks = [
+            garbage + _GOOD_TRACE_PKT[:4],   # garbage + partial packet
+            _GOOD_TRACE_PKT[4:],             # rest of packet
+        ]
+        result, _ = self._run_check_trace(chunks)
+        assert result is True, (
+            'check_trace must return True when leading garbage precedes a split packet'
+        )
+
+    def test_fault_then_good_split_packet(self):
+        """Returns True when a fault packet precedes a good split packet."""
+        chunks = [
+            _FAULT_TRACE_PKT,              # complete fault packet in first read
+            _GOOD_TRACE_PKT[:6],           # first half of good packet
+            _GOOD_TRACE_PKT[6:],           # second half of good packet
+        ]
+        result, stdout = self._run_check_trace(chunks)
+        assert result is True, (
+            'check_trace must return True when a fault packet precedes a split good packet'
+        )
+        assert 'PASS' in stdout, (
+            f'Expected "PASS" in stdout; got: {stdout!r}'
+        )
+
+    def test_write_stub_does_not_raise(self):
+        """_ChunkedMockSerial.write() must not raise — check_trace calls ser.write(b"r")."""
+        ser = _ChunkedMockSerial([_GOOD_TRACE_PKT])
+        # Should not raise AttributeError or any other exception.
+        ser.write(b"r")
 
 
 class TestNoSentinel:
