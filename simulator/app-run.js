@@ -14379,6 +14379,14 @@ function _wukongUpdateBtn() {
         }
     }
 
+    // ⚡ Load to Hardware button: visible whenever the board is connected or
+    // was recently connected (same condition as HW Run), but disabled while an
+    // upload is in progress so the user cannot double-fire it.
+    const loadBtn = document.getElementById('toolHWLoadBtn');
+    if (loadBtn) {
+        loadBtn.style.display = (connected || _wukongHWRunning) ? '' : 'none';
+    }
+
     // Show/hide call-depth badge.
     _wukongUpdateCallDepthBadge();
 }
@@ -14729,21 +14737,119 @@ async function hwRunToggle() {
     } catch(e) {}
 }
 
-// ── Pre-seed method conventions from server lumps ─────────────────────────────
-// Builds ChurchAssembler.setSharedMethodConventions() entries for every lump
-// that carries a non-empty methods array in its API metadata.  Called once at
-// page load (and can be called again after renderLumps() fetches fresh data) so
-// bare-space sugar like "Constants Pi" compiles with the correct method index
-// even on a cold load before the user has opened any detail panel.
-//
-// Convention format: { AbsName: { MethodName: { index, input, output } } }
-// Method index = position in the methods array (0-based), which matches the
-// lump's method-table dispatch order.
-//
-// Boot-resident abstractions whose methods[] sidecar is empty (e.g. SelfTest,
-// LEDFlash) are handled by the static _ABSTRACTION_CONVENTIONS table registered
-// by app-absdetail.js — this function only supplements them with lump-derived
-// entries and never overwrites a richer manually-authored spec.
+async function _wukongLoadToHardware() {
+    const loadBtn = document.getElementById('toolHWLoadBtn');
+    if (loadBtn) {
+        loadBtn.disabled = true;
+        loadBtn.textContent = '\u23F3 Loading\u2026';
+    }
+
+    function _loadLog(msg) {
+        const con = document.getElementById('editorConsole');
+        if (!con) return;
+        const line = document.createElement('div');
+        line.className = 'wukong-trace-line';
+        line.appendChild(document.createTextNode('\n\u26A1 ' + msg));
+        con.appendChild(line);
+        con.scrollTop = con.scrollHeight;
+    }
+
+    function _loadDone(ok) {
+        if (loadBtn) {
+            loadBtn.disabled = false;
+            loadBtn.textContent = '\u26A1 Load';
+        }
+        if (!ok && _wukongHWRunning) {
+            // Keep HW run state as-is; just restore the button.
+        }
+    }
+
+    try {
+        // Step 1: generate boot image.
+        _loadLog('Generating boot image\u2026');
+        const genResp = await fetch('/api/boot-image/generate', {
+            method : 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body   : JSON.stringify({})
+        });
+        if (!genResp.ok) {
+            const err = await genResp.json().catch(function() { return {}; });
+            _loadLog('ERROR: generate failed \u2014 ' + (err.error || genResp.status));
+            _loadDone(false);
+            return;
+        }
+
+        // Step 2: enqueue upload command for the bridge.
+        _loadLog('Queuing upload to bridge\u2026');
+        const sendResp = await fetch('/api/boot-image/send-to-hardware', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({})
+        });
+        if (!sendResp.ok) {
+            const err = await sendResp.json().catch(function() { return {}; });
+            if (sendResp.status === 409 && err.in_flight) {
+                // A previous upload is still in progress (e.g. double-click).
+                // Join the existing polling cycle rather than starting a new one.
+                _loadLog('Upload already in progress \u2014 waiting for bridge\u2026');
+            } else {
+                _loadLog('ERROR: queue failed \u2014 ' + (err.error || sendResp.status));
+                _loadDone(false);
+                return;
+            }
+        }
+        const sendData = await sendResp.json().catch(function() { return {}; });
+        _loadLog('Upload queued (' + (sendData.size || '?') + ' bytes) \u2014 waiting for bridge\u2026');
+
+        // Step 3: poll upload-ack until done (up to 30 s).
+        const deadline = Date.now() + 30000;
+        let ackOk = false;
+        while (Date.now() < deadline) {
+            await new Promise(function(res) { setTimeout(res, 200); });
+            try {
+                const ackResp = await fetch('/hardware/wukong/upload-ack');
+                if (ackResp.ok) {
+                    const ackData = await ackResp.json();
+                    if (ackData && typeof ackData.ok === 'boolean') {
+                        if (ackData.ok) {
+                            ackOk = true;
+                        } else {
+                            _loadLog('ERROR: bridge upload failed \u2014 ' +
+                                (ackData.error || 'unknown error'));
+                            _loadDone(false);
+                            return;
+                        }
+                        break;
+                    }
+                }
+            } catch(e) {}
+        }
+
+        if (!ackOk) {
+            _loadLog('ERROR: upload timed out \u2014 is the bridge running?');
+            _loadDone(false);
+            return;
+        }
+
+        _loadLog('Upload complete \u2014 starting board\u2026');
+
+        // Step 4: send run command so the board starts executing the new image.
+        _wukongHWRunning = true;
+        _wukongUpdateBtn();
+        await fetch('/hardware/wukong/command', {
+            method : 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body   : JSON.stringify({cmd: 'r'})
+        });
+
+        _loadLog('Board running \u2014 waiting for trace\u2026');
+        _loadDone(true);
+
+    } catch(e) {
+        _loadLog('ERROR: ' + (e && e.message ? e.message : String(e)));
+        _loadDone(false);
+    }
+}
 function _preSeedConventionsFromLumps(lumps) {
     if (typeof ChurchAssembler === 'undefined') return;
     if (!Array.isArray(lumps) || lumps.length === 0) return;

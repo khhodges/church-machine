@@ -231,6 +231,7 @@
                         <button class="btn btn-success sim-icon-btn" id="toolStepBtn" onclick="stepSim()" data-tooltip="Step — Execute one instruction">&#x1F463;</button>
                         <button class="btn btn-secondary sim-icon-btn" id="toolHWRunBtn" onclick="hwRunToggle()" style="display:none;font-size:11px;padding:2px 6px;" data-tooltip="HW Run/Halt — Toggle Wukong board free-run or step mode">&#x25B6; HW</button>
                         <span id="wukongCallDepthBadge" class="wukong-call-depth-badge" style="display:none;" title="HW call-stack depth: 0">&#x21C6; 0</span>
+                        <button class="btn btn-primary sim-icon-btn" id="toolHWLoadBtn" onclick="_wukongLoadToHardware()" style="display:none;font-size:11px;padding:2px 6px;" data-tooltip="Load to Hardware — Generate boot image and push it to the connected Wukong board">&#x26A1; Load</button>
                         <button class="btn btn-walk sim-icon-btn" id="toolWalkBtn" onclick="walkToggle()" data-tooltip="Walk — Animate step-by-step execution">&#x1F6B6;</button>
                         <div class="break-wrap" id="breakWrap">
                             <button class="btn btn-break sim-icon-btn" id="toolBreakBtn" onclick="toggleBreakPopover()" data-tooltip="Breakpoint — Set/clear PC breakpoints for Run and Walk">&#x25CF;</button>

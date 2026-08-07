@@ -133,6 +133,12 @@ class ChurchWukongXC7A100T(Elaboratable):
         self.dbg_nia           = Signal(32)    # out — retired NIA
         self.dbg_fault         = Signal(32)    # out — packed fault telemetry
 
+        # ── Halt-state signals — exposed for testability ───────────────────────
+        # Declared here so simulation testbenches can read them as top-level
+        # ports without needing a probe submodule.  Both are driven by elaborate().
+        self.step_mode   = Signal(init=0)  # 0 = free-run; 1 = step/halt mode
+        self.step_halted = Signal()        # 1 = CM currently held between retires
+
     def elaborate(self, platform):
         m = Module()
 
@@ -271,6 +277,35 @@ class ChurchWukongXC7A100T(Elaboratable):
         # OR-ed into halt_req/imem_valid so the CM cannot retire the next
         # instruction until the TraceUnit drains all queued event packets.
         trace_stall   = Signal()   # backpressure: stall CM while events pending
+
+        # ── Upload FSM signals (declared early — used in UART TX mux and dmem_wr) ──
+        # These are driven by the upload FSM states (UPLOAD_LEN / UPLOAD_DATA /
+        # UPLOAD_ACK) added to the cmd_parser FSM below.  They must be declared
+        # before the UART TX arbitrator and the dmem_wr write-port selector, both
+        # of which reference them as Python variables.
+        up_len_bytes    = [Signal(8,  name=f"up_len_b{i}") for i in range(4)]
+        up_len_cnt      = Signal(2)   # length-header bytes received so far (0-3)
+        up_byte_cnt     = Signal(17)  # payload bytes still to receive (max 65536)
+        up_word_buf     = [Signal(8,  name=f"up_wb{i}") for i in range(3)]
+        # up_word_buf[0..2] buffer bytes 0-2 (MSB first); byte 3 comes from uart_rx.data
+        up_byte_in_word = Signal(2)   # position within current 4-byte word (0=MSB, 3=LSB)
+        upload_wr_addr_r = Signal(14) # registered DMEM word address for next write
+        upload_wr_en    = Signal()    # combinatorial: write one word to DMEM this cycle
+        upload_wr_addr  = Signal(14)  # combinatorial: target DMEM word address
+        upload_wr_data  = Signal(32)  # combinatorial: 32-bit word to write (big-endian)
+        upload_ack_req  = Signal()    # asserted in UPLOAD_ACK; drives 0x06 onto TX
+        # Watchdog: aborts UPLOAD_LEN/UPLOAD_DATA if no byte arrives for
+        # _UPLOAD_WATCHDOG_LIMIT cycles.  Protects against stuck states when the
+        # UART drops bytes mid-frame (so the RTL does not remain in UPLOAD_DATA
+        # indefinitely, treating any future command bytes as DMEM payload).
+        # Threshold = 20 × one-byte period; safe floor of 1000 cycles.
+        # 20 complete 8N1 byte periods (= 20 × 10 bit-periods each).
+        # At 57 600 baud / 50 MHz: 1 byte = 10 × 868 = 8 680 cycles;
+        # 20 bytes = 173 600 cycles ≈ 3.5 ms.  This is comfortably wider than
+        # any normal inter-byte gap on a local USB-serial link, while still
+        # allowing the board to recover quickly after a truncated upload.
+        _UPLOAD_WATCHDOG_LIMIT = max(self.clk_freq // self.baud * 10 * 20, 1000)
+        upload_watchdog = Signal(range(_UPLOAD_WATCHDOG_LIMIT + 1))
 
         # ── Boot-triggered / sentinel signals (declared early for arbitrator) ──
         # boot_triggered is driven by the boot FSM below; sentinel_sent latches
@@ -418,14 +453,16 @@ class ChurchWukongXC7A100T(Elaboratable):
                 Mux(sentinel_req & (sentinel_phase == 0),    C(0xBC, 8),
                 Mux(sentinel_req & (sentinel_phase == 1),    C(N_INIT & 0xFF, 8),
                 Mux(sentinel_req & (sentinel_phase == 2),    C(_TU_VERSION_CALL_3PKT, 8),
-                                                              trace_tx_byte)))))),
+                Mux(upload_ack_req,                          C(0x06, 8),
+                                                              trace_tx_byte))))))),
             uart_tx.start.eq(
                 cm_tx_start |
-                (banner_req    & ~uart_tx.busy & ~cm_tx_start) |
-                (sentinel_req  & ~uart_tx.busy & ~cm_tx_start & ~banner_req) |
-                (trace_tx_req  & ~uart_tx.busy & ~cm_tx_start & ~sentinel_req & ~banner_req)),
+                (banner_req      & ~uart_tx.busy & ~cm_tx_start) |
+                (sentinel_req    & ~uart_tx.busy & ~cm_tx_start & ~banner_req) |
+                (upload_ack_req  & ~uart_tx.busy & ~cm_tx_start & ~sentinel_req & ~banner_req) |
+                (trace_tx_req    & ~uart_tx.busy & ~cm_tx_start & ~sentinel_req & ~banner_req & ~upload_ack_req)),
             trace_tx_ack.eq(
-                trace_tx_req & ~uart_tx.busy & ~cm_tx_start & ~sentinel_req & ~banner_req),
+                trace_tx_req & ~uart_tx.busy & ~cm_tx_start & ~sentinel_req & ~banner_req & ~upload_ack_req),
         ]
 
         is_mmio_read = Signal()
@@ -486,6 +523,13 @@ class ChurchWukongXC7A100T(Elaboratable):
                 dmem_wr.data.eq(hw_init_wr_data),
                 dmem_wr.en.eq(1),
             ]
+        with m.Elif(upload_wr_en):
+            # Upload takes priority over CPU writes (CM is halted during upload).
+            m.d.comb += [
+                dmem_wr.addr.eq(upload_wr_addr),
+                dmem_wr.data.eq(upload_wr_data),
+                dmem_wr.en.eq(1),
+            ]
         with m.Else():
             m.d.comb += [
                 dmem_wr.addr.eq(mem_addr),
@@ -502,8 +546,8 @@ class ChurchWukongXC7A100T(Elaboratable):
         # step_mode=0: CM executes freely; 'h' or a breakpoint hit re-enters step mode.
         # Wukong standalone: init=0 so the CM free-runs without requiring a bridge
         # to send 'r' first.  The bridge can still send 'h' to enter step mode.
-        step_mode   = Signal(init=0)   # 0 = free-run (standalone-safe)
-        step_halted = Signal()          # 1 = CM currently held between instructions
+        step_mode   = self.step_mode   # 0 = free-run (standalone-safe); see __init__
+        step_halted = self.step_halted # 1 = CM currently held between instructions
         step_grant  = Signal()          # 1-cycle pulse: step command received
 
         # ── Breakpoints: 4 NIA slots ──────────────────────────────────────────
@@ -550,13 +594,24 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         # ── Command parser FSM ─────────────────────────────────────────────────
         # Reads one-byte commands from the UART RX FIFO:
-        #   's' (0x73) — step: release CM for one retire (step_mode stays on)
-        #   'r' (0x72) — run:  clear step_mode; CM runs freely
-        #   'h' (0x68) — halt: assert step_mode + step_halted immediately
+        #   's' (0x73) — step:       release CM for one retire (step_mode stays on)
+        #   'r' (0x72) — run:        clear step_mode; CM runs freely
+        #   'h' (0x68) — halt:       assert step_mode + step_halted immediately
         #   'b' (0x62) — breakpoint: read 4 big-endian NIA bytes, then arm/disarm
+        #   'u' (0x75) — upload:     receive 4-byte big-endian byte-count header,
+        #                            then N raw bytes (big-endian 32-bit words).
+        #                            Halts CM, writes words to DMEM starting at word 0,
+        #                            then sends 0x06 ACK byte via UART TX.
         #
         # Breakpoint 'b' + NIA: arms slot bp_wr_ptr with the given NIA.
         # NIA==0xFFFFFFFF disarms the slot.  Pointer wraps 0→1→2→3→0.
+        #
+        # Upload 'u' protocol:
+        #   Byte 0:     0x75 ('u') — magic, already consumed in IDLE
+        #   Bytes 1-4:  big-endian uint32 — payload byte count (must be >0, ≤65536)
+        #   Bytes 5…:   raw big-endian 32-bit words, MSB first within each word
+        #   After last word: board sends 0x06 (ACK) via UART TX
+        # The bridge in wukong_bridge.py reads the ACK and POSTs upload_ok to the IDE.
 
         bp_recv_bytes = [Signal(8, name=f"bp_recv_b{i}") for i in range(4)]
         bp_recv_cnt   = Signal(2)
@@ -576,6 +631,15 @@ class ChurchWukongXC7A100T(Elaboratable):
                         with m.Case(0x62):  # 'b'
                             m.d.sync += bp_recv_cnt.eq(0)
                             m.next = "BP_RECV"
+                        with m.Case(0x75):  # 'u' — upload
+                            # Halt the CM immediately; it stays halted until
+                            # UPLOAD_ACK sends the 0x06 completion byte and the
+                            # bridge then issues 'r' to re-enable free-run.
+                            m.d.sync += [
+                                step_mode.eq(1), step_halted.eq(1),
+                                up_len_cnt.eq(0),
+                            ]
+                            m.next = "UPLOAD_LEN"
 
             with m.State("BP_RECV"):
                 with m.If(uart_rx.valid):
@@ -604,6 +668,105 @@ class ChurchWukongXC7A100T(Elaboratable):
                                              bp_armed[slot].eq(1)]
                 m.d.sync += bp_wr_ptr.eq(bp_wr_ptr + 1)
                 m.next = "IDLE"
+
+            # ── Upload FSM states ('u' = 0x75) ────────────────────────────────
+            with m.State("UPLOAD_LEN"):
+                # Receive 4 big-endian bytes encoding the total payload byte count.
+                with m.If(uart_rx.valid):
+                    m.d.sync += upload_watchdog.eq(0)
+                    with m.Switch(up_len_cnt):
+                        for _i in range(4):
+                            with m.Case(_i):
+                                m.d.sync += [up_len_bytes[_i].eq(uart_rx.data),
+                                             up_len_cnt.eq(_i + 1)]
+                    with m.If(up_len_cnt == 3):
+                        m.next = "UPLOAD_LEN_COMMIT"
+                with m.Else():
+                    m.d.sync += upload_watchdog.eq(upload_watchdog + 1)
+                    with m.If(upload_watchdog == _UPLOAD_WATCHDOG_LIMIT - 1):
+                        # Timed out waiting for length header — abort to IDLE.
+                        # step_mode / step_halted stay at 1 (fail-closed): the
+                        # CM remains halted; the bridge must send an explicit 'r'
+                        # after diagnosing the failure.
+                        m.d.sync += upload_watchdog.eq(0)
+                        m.next = "IDLE"
+
+            with m.State("UPLOAD_LEN_COMMIT"):
+                # Assemble big-endian byte count: byte[0]=MSB .. byte[3]=LSB.
+                # Reject if zero or exceeds DMEM capacity (65536 bytes = 16384 words).
+                up_len_val = Signal(32, name="up_len_val")
+                m.d.comb += up_len_val.eq(
+                    Cat(up_len_bytes[3], up_len_bytes[2],
+                        up_len_bytes[1], up_len_bytes[0]))
+                with m.If((up_len_val == 0) | (up_len_val > 65536)):
+                    # Malformed length: return to IDLE.
+                    # step_mode / step_halted stay at 1 (fail-closed): CM
+                    # remains halted; bridge sends explicit 'r' to resume.
+                    m.next = "IDLE"
+                with m.Else():
+                    m.d.sync += [
+                        up_byte_cnt.eq(up_len_val[0:17]),
+                        up_byte_in_word.eq(0),
+                        upload_wr_addr_r.eq(0),
+                    ]
+                    m.next = "UPLOAD_DATA"
+
+            with m.State("UPLOAD_DATA"):
+                # Receive payload bytes; assemble big-endian 32-bit words and
+                # write each complete word to DMEM as it arrives.
+                # Byte ordering: byte 0 = bits[31:24] (MSB), byte 3 = bits[7:0] (LSB).
+                #
+                # Watchdog: if no byte arrives for _UPLOAD_WATCHDOG_LIMIT cycles
+                # the UART has dropped bytes and we will never see the declared
+                # byte count.  Return to IDLE so subsequent frames are not
+                # silently corrupted by treating later UART traffic as payload.
+                with m.If(uart_rx.valid):
+                    m.d.sync += upload_watchdog.eq(0)
+                    # Buffer bytes 0-2 in registers; byte 3 is used directly from
+                    # uart_rx.data so it doesn't need a separate register.
+                    with m.Switch(up_byte_in_word):
+                        with m.Case(0): m.d.sync += up_word_buf[0].eq(uart_rx.data)
+                        with m.Case(1): m.d.sync += up_word_buf[1].eq(uart_rx.data)
+                        with m.Case(2): m.d.sync += up_word_buf[2].eq(uart_rx.data)
+
+                    # When byte 3 (LSB) arrives, assemble and write the word.
+                    with m.If(up_byte_in_word == 3):
+                        m.d.comb += [
+                            upload_wr_en.eq(1),
+                            upload_wr_addr.eq(upload_wr_addr_r),
+                            # Cat(LSB, b2, b1, MSB) → bits[31:24]=buf[0], bits[7:0]=rx
+                            upload_wr_data.eq(
+                                Cat(uart_rx.data, up_word_buf[2],
+                                    up_word_buf[1], up_word_buf[0])),
+                        ]
+                        m.d.sync += upload_wr_addr_r.eq(upload_wr_addr_r + 1)
+
+                    # Decrement byte counter; advance position or wrap on word boundary.
+                    m.d.sync += up_byte_cnt.eq(up_byte_cnt - 1)
+                    with m.If(up_byte_cnt == 1):
+                        # Last byte received — proceed to ACK state.
+                        m.next = "UPLOAD_ACK"
+                    with m.Else():
+                        m.d.sync += up_byte_in_word.eq(
+                            Mux(up_byte_in_word == 3, 0, up_byte_in_word + 1))
+                with m.Else():
+                    # No byte this cycle — advance watchdog.
+                    m.d.sync += upload_watchdog.eq(upload_watchdog + 1)
+                    with m.If(upload_watchdog == _UPLOAD_WATCHDOG_LIMIT - 1):
+                        # Timed out mid-payload — abort to IDLE so future 'u'
+                        # frames are not silently treated as continuation data.
+                        # step_mode / step_halted stay at 1 (fail-closed): the
+                        # CM remains halted; bridge sends explicit 'r' to resume.
+                        m.d.sync += upload_watchdog.eq(0)
+                        m.next = "IDLE"
+
+            with m.State("UPLOAD_ACK"):
+                # Assert upload_ack_req to inject 0x06 into the TX arbitrator.
+                # Transition to IDLE on the same cycle the start pulse fires
+                # (the byte is already latched into the UART TX shift register).
+                m.d.comb += upload_ack_req.eq(1)
+                with m.If(~uart_tx.busy & ~cm_tx_start & ~sentinel_req & ~banner_req):
+                    m.next = "IDLE"
 
         # ── TraceUnit FSM ──────────────────────────────────────────────────────
         #

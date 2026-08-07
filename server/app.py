@@ -10002,20 +10002,51 @@ def wukong_events_get():
 def wukong_command_post():
     """IDE enqueues a command for the bridge to forward to the board.
 
-    Body JSON: {'cmd': 's'|'r'|'h'|'b', 'nia': <int>}
+    Body JSON: {'cmd': 's'|'r'|'h'|'b'|'u', 'nia': <int>, 'data': '<base64>'}
     Only one command is queued at a time; a new POST overwrites any pending one.
     """
-    global _wukong_pending_cmd
+    global _wukong_pending_cmd, _upload_in_flight
     data = request.get_json(silent=True) or {}
     cmd = str(data.get('cmd', '')).strip()
-    if cmd not in ('s', 'r', 'h', 'b'):
+    if cmd not in ('s', 'r', 'h', 'b', 'u'):
         return jsonify({'ok': False, 'error': 'unknown cmd'}), 400
+
     entry = {'cmd': cmd}
+
     if cmd == 'b':
         try:
             entry['nia'] = int(data.get('nia', 0xFFFFFFFF)) & 0xFFFFFFFF
         except (TypeError, ValueError):
             entry['nia'] = 0xFFFFFFFF
+        # Reject board execution commands while an upload is in-flight.
+        with _upload_in_flight_lock:
+            if _upload_in_flight:
+                return jsonify({'ok': False,
+                                'error': 'upload in progress — retry after upload-ack'}), 409
+
+    elif cmd == 'u':
+        b64 = data.get('data', '')
+        if not b64:
+            return jsonify({'ok': False, 'error': 'missing data field'}), 400
+        entry['data'] = b64
+        # Atomic check-and-set: claim the in-flight slot under the lock so that
+        # a concurrent 'u' request cannot also pass the check and overwrite the
+        # pending command slot.  Mirrors the lifecycle enforced by
+        # /api/boot-image/send-to-hardware (which is the preferred route).
+        # The flag is cleared when the bridge POSTs /hardware/wukong/upload-ack.
+        with _upload_in_flight_lock:
+            if _upload_in_flight:
+                return jsonify({'ok': False,
+                                'error': 'upload in progress — retry after upload-ack'}), 409
+            _upload_in_flight = True
+
+    else:
+        # s / r / h — reject while any upload is in-flight.
+        with _upload_in_flight_lock:
+            if _upload_in_flight:
+                return jsonify({'ok': False,
+                                'error': 'upload in progress — retry after upload-ack'}), 409
+
     with _wukong_command_lock:
         _wukong_pending_cmd = entry
     return jsonify({'ok': True})
@@ -10046,6 +10077,123 @@ def wukong_command_get():
 
 _wukong_boot_info_lock = _wk_threading.Lock()
 _wukong_boot_info      = {}   # {stale_tu: bool, tu_version: int}
+
+
+# ── Wukong upload-ack endpoint ────────────────────────────────────────────────
+# Bridge POSTs here after completing (or failing) a boot-image upload so the
+# IDE can poll for completion and then trigger a step/run.
+#
+#   POST /hardware/wukong/upload-ack  — bridge reports {ok: bool, error: str}
+#   GET  /hardware/wukong/upload-ack  — IDE polls for the latest upload result
+
+_wukong_upload_ack_lock   = _wk_threading.Lock()
+_wukong_upload_ack        = {}   # {} = no upload attempted yet; {ok, error?}
+# True while the bridge is writing a boot image over UART.  Execution commands
+# (s/r/h/b) are rejected during this window: the UART is a shared serial
+# channel, and an s/r/h/b byte sent mid-upload would land as DMEM data,
+# silently corrupting the boot image.  Cleared when the bridge POSTs upload-ack.
+_upload_in_flight         = False
+_upload_in_flight_lock    = _wk_threading.Lock()
+
+
+@app.route('/hardware/wukong/upload-ack', methods=['POST'])
+def wukong_upload_ack_post():
+    """Bridge reports the result of a boot-image upload here.
+
+    Body JSON:
+        ok    — true on success, false on failure
+        error — optional human-readable error string (present when ok=false)
+    """
+    global _wukong_upload_ack, _upload_in_flight
+    data  = request.get_json(silent=True) or {}
+    entry = {
+        'ok':    bool(data.get('ok', False)),
+        'error': str(data.get('error', '')) if not data.get('ok') else '',
+    }
+    with _wukong_upload_ack_lock:
+        _wukong_upload_ack = entry
+    # Clear the in-flight flag so execution commands are accepted again.
+    with _upload_in_flight_lock:
+        _upload_in_flight = False
+    return jsonify({'ok': True})
+
+
+@app.route('/hardware/wukong/upload-ack', methods=['GET'])
+def wukong_upload_ack_get():
+    """IDE polls here to learn whether the in-progress upload has finished.
+
+    Returns {} when no upload has been attempted this session.
+    Returns {ok: true} on success, {ok: false, error: '...'} on failure.
+    The result is consumed (reset to {}) on each successful GET so that a
+    second upload cycle starts clean.
+    """
+    global _wukong_upload_ack
+    with _wukong_upload_ack_lock:
+        entry = dict(_wukong_upload_ack)
+        if entry:
+            _wukong_upload_ack = {}
+    return jsonify(entry)
+
+
+@app.route('/api/boot-image/send-to-hardware', methods=['POST'])
+def boot_image_send_to_hardware():
+    """Read the generated boot image and enqueue it as an upload command for
+    the Wukong bridge.
+
+    The bridge polls GET /hardware/wukong/command every 50 ms; on receiving
+    {cmd:'u', data:'<base64>'} it decodes and writes the bytes to the board
+    over UART, then POSTs the result to /hardware/wukong/upload-ack.
+
+    Returns:
+        {queued: true}  — image read and upload command enqueued successfully
+        {error: '...'}  — boot-image.bin missing or command lock unavailable
+    """
+    global _wukong_pending_cmd, _wukong_upload_ack, _upload_in_flight
+    import base64 as _b64
+
+    # Atomically claim the in-flight slot under the lock.
+    # Checking then releasing and later setting is NOT safe: two concurrent
+    # requests can both pass the check before either sets the flag, then both
+    # enqueue to the single command slot (second silently overwrites the first).
+    # Holding the lock across both the check and the set makes the reservation
+    # atomic.  Roll back the flag on every pre-enqueue failure path.
+    with _upload_in_flight_lock:
+        if _upload_in_flight:
+            return jsonify({'error': 'upload in progress — wait for upload-ack',
+                            'in_flight': True}), 409
+        _upload_in_flight = True   # slot reserved — rolled back on any failure
+
+    _rollback = True   # cleared only on successful enqueue
+    try:
+        _boot_bin = os.path.join(_SERVER_DIR, 'lumps', 'boot-image.bin')
+        if not os.path.isfile(_boot_bin):
+            return jsonify({'error': 'boot-image.bin not found — generate it first'}), 404
+
+        try:
+            with open(_boot_bin, 'rb') as _fh:
+                _raw = _fh.read()
+        except OSError as _exc:
+            return jsonify({'error': f'could not read boot-image.bin: {_exc}'}), 500
+
+        _encoded = _b64.b64encode(_raw).decode('ascii')
+
+        # Clear any stale ACK from a previous upload BEFORE making the new
+        # upload command observable to the bridge.  Clearing after would create
+        # a race: a fast bridge could complete and POST the new ACK in the
+        # interval between the command enqueue and the clear, causing the IDE
+        # poll to time out on a stale {} response.
+        with _wukong_upload_ack_lock:
+            _wukong_upload_ack = {}
+
+        with _wukong_command_lock:
+            _wukong_pending_cmd = {'cmd': 'u', 'data': _encoded}
+
+        _rollback = False   # committed — in-flight flag stays set
+        return jsonify({'queued': True, 'size': len(_raw)})
+    finally:
+        if _rollback:
+            with _upload_in_flight_lock:
+                _upload_in_flight = False
 
 
 @app.route('/hardware/wukong/boot-info', methods=['POST'])

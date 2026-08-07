@@ -16,10 +16,12 @@ Reads bytes from the UART (57600 8N1):
 Polls GET /hardware/wukong/command every 50 ms and writes any pending command
 byte to the serial port.  Commands from the IDE:
 
-  {cmd: "s"}           → write b's'  (step: execute one instruction)
-  {cmd: "r"}           → write b'r'  (run free)
-  {cmd: "h"}           → write b'h'  (halt immediately)
-  {cmd: "b", nia: N}   → write b'b' + big-endian 4-byte NIA  (set/clear breakpoint)
+  {cmd: "s"}                    → write b's'  (step: execute one instruction)
+  {cmd: "r"}                    → write b'r'  (run free)
+  {cmd: "h"}                    → write b'h'  (halt immediately)
+  {cmd: "b", nia: N}            → write b'b' + big-endian 4-byte NIA  (set/clear breakpoint)
+  {cmd: "u", data: "<base64>"}  → decode boot-image bytes, write 0x75+len(4 BE)+bytes
+                                   to UART, then POST result to /hardware/wukong/upload-ack
 
 Trace packet format (12 bytes, big-endian) — one packet per state-change event:
   [0]     0xAA      magic
@@ -38,6 +40,7 @@ Multi-event instructions emit multiple consecutive packets with the same NIA:
 """
 
 import argparse
+import base64
 import os
 import struct
 import sys
@@ -448,6 +451,29 @@ def main():
                             ser.write(b'b' + struct.pack('>I', nia_val))
                         elif cmd in ('s', 'r', 'h'):
                             ser.write(cmd.encode('ascii'))
+                        elif cmd == 'u':
+                            try:
+                                _leftover = _handle_upload(
+                                    data, ser, ide_base, verify_tls)
+                                if _leftover:
+                                    # Bytes read during the ACK wait that are
+                                    # NOT the 0x06 ACK byte (e.g. trace packets
+                                    # emitted the moment the board starts
+                                    # executing the new image).  Prepend them
+                                    # back into the main receive buffer so the
+                                    # trace parser sees them on the next loop.
+                                    buf[0:0] = _leftover
+                            except Exception as _upload_exc:
+                                print(f'  [upload] ERROR: unexpected handler '
+                                      f'failure: {_upload_exc}', flush=True)
+                                try:
+                                    requests.post(
+                                        f'{ide_base}/hardware/wukong/upload-ack',
+                                        json={'ok': False,
+                                              'error': f'handler exception: {_upload_exc}'},
+                                        timeout=2, verify=verify_tls)
+                                except Exception:
+                                    pass
                 except Exception:
                     pass
 
@@ -455,6 +481,150 @@ def main():
         print('\nBridge stopped.')
     finally:
         ser.close()
+
+
+def _handle_upload(data, ser, ide_base, verify_tls):
+    """Decode a base64 boot-image payload and write it to the board over UART.
+
+    Protocol sent to the board (framing that the RTL upload FSM expects):
+        1. Magic byte 0x75 ('u') — upload start
+        2. 4-byte big-endian payload length in bytes
+        3. Raw boot-image bytes
+
+    After writing, posts the result to /hardware/wukong/upload-ack so the
+    IDE can poll for completion before issuing a step/run command.
+
+    Parameters
+    ----------
+    data : dict
+        Command payload from the server (must contain 'data' key with the
+        base64-encoded boot image).
+    ser : serial.Serial
+        Open serial port connected to the Wukong board.
+    ide_base : str
+        Base URL of the IDE server (e.g. 'https://...replit.dev').
+    verify_tls : bool
+        Whether to verify the TLS certificate on IDE requests.
+    """
+    # Bytes read from the serial port during the ACK wait that are NOT the 0x06
+    # ACK byte (e.g. trace packets the board emits as soon as it starts executing
+    # the freshly loaded image).  The caller must prepend these back into the
+    # main receive buffer so the trace parser can process them normally.
+    leftover = bytearray()
+
+    b64_payload = data.get('data', '')
+    if not b64_payload:
+        print('  [upload] ERROR: empty data payload', flush=True)
+        try:
+            requests.post(f'{ide_base}/hardware/wukong/upload-ack',
+                          json={'ok': False, 'error': 'empty payload'},
+                          timeout=2, verify=verify_tls)
+        except Exception:
+            pass
+        return leftover
+
+    try:
+        raw = base64.b64decode(b64_payload)
+    except Exception as exc:
+        print(f'  [upload] ERROR: base64 decode failed: {exc}', flush=True)
+        try:
+            requests.post(f'{ide_base}/hardware/wukong/upload-ack',
+                          json={'ok': False, 'error': f'base64 decode: {exc}'},
+                          timeout=2, verify=verify_tls)
+        except Exception:
+            pass
+        return leftover
+
+    # boot-image.bin stores each 32-bit word little-endian (struct.pack('<...I')).
+    # The RTL upload FSM assembles the first received byte as the MSByte of each
+    # DMEM word (big-endian on the wire).  Byte-swap every complete word so the
+    # board reconstructs the same word values the generator wrote.
+    n_words = len(raw) // 4
+    if n_words > 0:
+        raw = (struct.pack(f'>{n_words}I',
+                           *struct.unpack(f'<{n_words}I', raw[:n_words * 4]))
+               + raw[n_words * 4:])   # trailing partial word (if any) passed as-is
+
+    n_bytes = len(raw)
+
+    # Drain any stale bytes already in the UART RX buffer BEFORE sending the
+    # upload frame.  These are pre-upload trace events queued in the hardware
+    # FIFO (e.g. from a previous run before the 'u' command was issued).
+    # Draining now — before any bytes are sent — guarantees the drain window is
+    # clear of any byte we ourselves write.  After the frame is sent, the board
+    # is already halted (RTL sets step_mode=1 / step_halted=1 on 'u' reception)
+    # so no new trace bytes arrive during the upload or the subsequent ACK wait.
+    # This makes the board's 0x06 ACK (UPLOAD_ACK state) unambiguous: the only
+    # byte that can arrive between the end of the write and the ACK timeout is
+    # the RTL's completion signal.
+    _stale = ser.read(ser.in_waiting) if ser.in_waiting else b''
+    if _stale:
+        print(f'  [upload] drained {len(_stale)} stale RX byte(s) before upload '
+              f'frame', flush=True)
+        leftover.extend(_stale)
+
+    print(f'  [upload] writing {n_bytes} bytes to UART (LE→BE swapped)…', flush=True)
+    try:
+        # Frame: magic(1) + length(4 BE) + byte-swapped payload
+        # The RTL upload FSM (UPLOAD_LEN / UPLOAD_DATA / UPLOAD_ACK states in
+        # wukong_top.py) receives this frame, writes words to DMEM, then sends
+        # a single 0x06 ACK byte back via UART TX.
+        header = b'\x75' + struct.pack('>I', n_bytes)
+        ser.write(header + raw)
+        ser.flush()
+        print(f'  [upload] write complete ({n_bytes} bytes) — waiting for board ACK…',
+              flush=True)
+    except Exception as exc:
+        print(f'  [upload] ERROR: UART write failed: {exc}', flush=True)
+        try:
+            requests.post(f'{ide_base}/hardware/wukong/upload-ack',
+                          json={'ok': False, 'error': f'UART write: {exc}'},
+                          timeout=2, verify=verify_tls)
+        except Exception:
+            pass
+        return leftover
+
+    # Wait for the single unambiguous 0x06 ACK byte.
+    # The CM is halted (RTL guarantees step_mode=1 from 'u' reception), so the
+    # only byte that can arrive after draining + sending the frame is the board's
+    # 0x06 ACK.  Any unexpected bytes are preserved in leftover as a safety net.
+    _ACK_TIMEOUT_S = max(10.0, n_bytes * 0.0002)   # ≥10 s, 0.2 ms/byte headroom
+    ack_deadline = time.time() + _ACK_TIMEOUT_S
+    ack_found = False
+    while time.time() < ack_deadline:
+        avail = ser.in_waiting
+        chunk = ser.read(avail if avail > 0 else 1)
+        for idx, b in enumerate(chunk):
+            if b == 0x06:
+                ack_found = True
+                # Bytes after the ACK in the same read are also preserved.
+                leftover.extend(chunk[idx + 1:])
+                break
+            leftover.append(b)
+        if ack_found:
+            break
+        time.sleep(0.005)
+
+    if ack_found:
+        print('  [upload] board ACK received — upload successful', flush=True)
+        try:
+            requests.post(f'{ide_base}/hardware/wukong/upload-ack',
+                          json={'ok': True},
+                          timeout=2, verify=verify_tls)
+        except Exception as exc:
+            print(f'  [upload] WARNING: could not POST upload-ack: {exc}', flush=True)
+    else:
+        errmsg = f'board ACK timeout after {_ACK_TIMEOUT_S:.0f} s'
+        print(f'  [upload] ERROR: {errmsg}', flush=True)
+        try:
+            requests.post(f'{ide_base}/hardware/wukong/upload-ack',
+                          json={'ok': False, 'error': errmsg},
+                          timeout=2, verify=verify_tls)
+        except Exception as exc:
+            print(f'  [upload] WARNING: could not POST upload-ack (timeout): {exc}',
+                  flush=True)
+
+    return leftover
 
 
 if __name__ == '__main__':
