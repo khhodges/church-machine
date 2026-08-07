@@ -28,16 +28,12 @@
 
 const { test, expect } = require('@playwright/test');
 
-// abstraction must match the live NS slot 6 label ('SelfTest') so that
-// _findSrcLump(6, 'SelfTest') resolves to this stub.  has_source must be
-// true so the Source button renders (renderNamespaceTable gates on it).
 const STUB_LUMP = {
     token:       'ab1e86af',
-    abstraction: 'SelfTest',
+    abstraction: 'WordString',
     ns_slot:     6,
     lump_size:   64,
     lump_version: 1,
-    has_source:  true,
 };
 
 async function openNamespaceView(page) {

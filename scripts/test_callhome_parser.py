@@ -43,6 +43,7 @@ from callhome_bridge import (
     parse_trace,
     parse_fault_event,
     parse_hung,
+    _GREETING_MARKER,
 )
 
 # ---------------------------------------------------------------------------
@@ -74,10 +75,10 @@ class TestGreetingParser:
         assert len(greetings) >= 1, "No GREETING line found in transcript"
 
     def test_exact_greeting_string(self):
-        assert is_greeting("CHURCH Ti60 SoC+CM v2.0")
+        assert is_greeting("CM:WUKONG")
 
     def test_greeting_future_version(self):
-        assert is_greeting("CHURCH Ti60 SoC+CM v3.1")
+        assert is_greeting("WUKONG\r\n")
 
     def test_non_greeting_lines_rejected(self):
         assert not is_greeting("NIA=0x00000042")
@@ -87,7 +88,39 @@ class TestGreetingParser:
         assert not is_greeting("CHURCH MACHINE v1")
 
     def test_greeting_case_sensitive(self):
-        assert not is_greeting("church ti60 SoC+CM v2.0")
+        assert not is_greeting("wukong")
+
+    # ------------------------------------------------------------------
+    # Auto-detect byte-stream coverage
+    # ------------------------------------------------------------------
+
+    def test_rtl_banner_byte_stream_triggers_detection(self):
+        """RTL boot FSM banner b"WUKONG\r\n" must match _GREETING_MARKER."""
+        buf = b"WUKONG\r\n"
+        assert _GREETING_MARKER in buf
+
+    def test_firmware_banner_byte_stream_triggers_detection(self):
+        """Sapphire SoC firmware banner b"CM:WUKONG\r\n" must match _GREETING_MARKER."""
+        buf = b"CM:WUKONG\r\n"
+        assert _GREETING_MARKER in buf
+
+    def test_both_banners_in_combined_buffer_trigger_detection(self):
+        """When both banners arrive in the same serial read, detection still fires."""
+        buf = b"WUKONG\r\nUID=c0ffee0100000001\r\nCM:WUKONG\r\n"
+        assert _GREETING_MARKER in buf
+
+    def test_unrelated_device_output_does_not_trigger_detection(self):
+        """Noise from another USB-serial device must not match _GREETING_MARKER."""
+        buf = b"AT OK\r\nCOMMAND READY\r\n"
+        assert _GREETING_MARKER not in buf
+
+    def test_rtl_banner_is_greeting_str(self):
+        """is_greeting() accepts the decoded RTL banner string."""
+        assert is_greeting("WUKONG")
+
+    def test_firmware_banner_is_greeting_str(self):
+        """is_greeting() accepts the decoded firmware banner string."""
+        assert is_greeting("CM:WUKONG")
 
 
 # ===========================================================================

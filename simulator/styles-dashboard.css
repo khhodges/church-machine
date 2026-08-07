@@ -55,62 +55,6 @@
     white-space: nowrap;
 }
 
-/* ── Wukong hardware activity strip ──────────────────────────────────────── */
-/* Hidden until the first trace packet arrives (_wukongUpdateActivityStrip
-   adds the 'active' class).  Sits inside .hw-led-bar after the hint. */
-#wk-activity-strip {
-    display: none;
-    align-items: center;
-    gap: 0.5rem;
-    border-left: 1px solid #1e2d3e;
-    padding-left: 0.65rem;
-    margin-left: 0.5rem;
-    flex-shrink: 0;
-}
-#wk-activity-strip.active {
-    display: flex;
-}
-.wk-act-item {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1px;
-}
-.wk-act-label {
-    font-size: 0.49rem;
-    color: #3a4a5a;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-weight: 700;
-    line-height: 1;
-    white-space: nowrap;
-}
-.wk-act-val {
-    font-size: 0.61rem;
-    color: #5a7a8a;
-    line-height: 1.3;
-    white-space: nowrap;
-}
-.wk-act-val.wk-act-lit {
-    color: #7ab0c8;
-}
-.wk-act-mono {
-    font-family: 'Courier New', monospace;
-    font-size: 0.58rem;
-}
-#wk-last-instr {
-    max-width: 16ch;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.wk-act-sep {
-    width: 1px;
-    height: 22px;
-    background: #1e2d3e;
-    flex-shrink: 0;
-    align-self: center;
-}
-
 @keyframes hw-led-hb {
     0%   { background: #111820; box-shadow: none; border-color: #3a1a1a; }
     40%  { background: #8b2500; box-shadow: 0 0 5px 2px rgba(160,50,0,0.55); border-color: #bb3300; }

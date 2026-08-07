@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-callhome_bridge.py — Ti60F225 SoC call-home bridge
-====================================================
+callhome_bridge.py — Wukong A7 call-home bridge
+================================================
 
-Reads the Ti60 Sapphire SoC UART and forwards every CALLHOME, TRACE,
-FAULT_EVENT, and HUNG packet to the Church Machine IDE server so the device
-appears in the Devices view and fault data is persisted server-side.
+Reads the Wukong A7 (Artix-7) Sapphire SoC UART and forwards every CALLHOME,
+TRACE, FAULT_EVENT, and HUNG packet to the Church Machine IDE server so the
+device appears in the Devices view and fault data is persisted server-side.
 
 Features
 --------
 * --auto   Scans /dev/ttyUSB0–7 (Linux/ChromeOS), sends a probe byte, and
            selects the first port that replies with the SoC greeting string
-           ("CHURCH Ti60") within 1 second.  Prints the chosen port so the
+           ("WUKONG") within 1 second.  Prints the chosen port so the
            operator can confirm the selection.
 * --port   Override auto-detection with a specific device path.
 * --ide    IDE server base URL for forwarding packets.
@@ -29,7 +29,7 @@ CI test suites.
 
 Usage
 -----
-    # Show which port the Ti60 is on (no forwarding)
+    # Show which port the Wukong A7 is on (no forwarding)
     python3 scripts/callhome_bridge.py --auto
 
     # Probe and print the selected port, then exit
@@ -104,10 +104,11 @@ def is_greeting(line):
     """
     Return True if *line* contains the SoC boot greeting.
 
-    The firmware emits: "CHURCH Ti60 SoC+CM v2.0"
-    We match on the prefix so future firmware version bumps still pass.
+    The RTL boot FSM emits: "WUKONG\r\n" (before boot_start).
+    The Sapphire SoC firmware emits: "CM:WUKONG\r\n" (in the blink loop).
+    Matching on the substring "WUKONG" covers both.
     """
-    return "CHURCH Ti60" in line
+    return "WUKONG" in line
 
 
 # ---------------------------------------------------------------------------
@@ -256,7 +257,7 @@ def parse_hung(line):
 # ---------------------------------------------------------------------------
 
 _GREETING_PROBE_TIMEOUT = 1.0   # seconds to wait per port for the greeting
-_GREETING_MARKER        = b"CHURCH Ti60"
+_GREETING_MARKER        = b"WUKONG"
 
 
 def auto_detect_port(serial_mod, baud, verbose=False):
@@ -268,7 +269,7 @@ def auto_detect_port(serial_mod, baud, verbose=False):
     The probe newline is harmless — the SoC firmware ignores unexpected input
     and continues emitting its telemetry stream regardless.
 
-    Only the port whose received bytes contain "CHURCH Ti60" is returned; a
+    Only the port whose received bytes contain "WUKONG" is returned; a
     port that is busy or emits unrecognised data (e.g. another USB-serial
     device) is skipped.
     """
@@ -327,7 +328,7 @@ def auto_detect_port(serial_mod, baud, verbose=False):
             greeting_line = ""
             for raw_line in buf.split(b"\n"):
                 decoded = raw_line.rstrip(b"\r").decode("utf-8", errors="replace")
-                if "CHURCH Ti60" in decoded:
+                if "WUKONG" in decoded:
                     greeting_line = decoded
                     break
             print(f"  [auto]   {port}: greeting received — selected", file=sys.stderr)
@@ -507,7 +508,7 @@ if __name__ == "__main__":
         port = auto_detect_port(_serial_mod, _BAUD, verbose=_VERBOSE)
         if port is None:
             print(
-                "\nERROR: auto-detect found no Ti60 on any ttyUSB port.\n"
+                "\nERROR: auto-detect found no Wukong A7 on any ttyUSB port.\n"
                 "  • Check: ls /dev/ttyUSB*\n"
                 "  • Check: lsmod | grep ftdi\n"
                 "  • Most common cause: BRAM zero-initialised — "

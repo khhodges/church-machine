@@ -1,4 +1,4 @@
-# Ti60 SoC UART canned transcript — used by test_callhome_parser.py dry-run tests.
+# Wukong A7 SoC UART canned transcript — used by test_callhome_parser.py dry-run tests.
 #
 # Each non-blank, non-comment line is fed to the parser exactly as the firmware
 # would emit it over the SoC UART.  Lines are grouped by protocol line type so
@@ -6,7 +6,7 @@
 #
 # Protocol line types covered
 # ---------------------------
-#   GREETING     — SoC boot banner; contains "CHURCH Ti60"
+#   GREETING     — SoC boot banner; contains "WUKONG"
 #   NIA          — NIA=0x... live program-counter sample
 #   CALLHOME     — CALLHOME:{...} JSON heartbeat (with and without ns_manifest)
 #   TRACE        — TRACE:[...] JSON NIA-sample array (10-Hz sampler)
@@ -23,7 +23,7 @@
 # ---------------------------------------------------------------------------
 # GREETING
 # ---------------------------------------------------------------------------
-CHURCH Ti60 SoC+CM v2.0
+CM:WUKONG
 UID=c0ffee0100000001
 Waiting for CM boot_complete...
 

@@ -514,18 +514,20 @@ console.log('\n--- T008: NULL GT no pet name → immediate NULL_CAP fault ---');
         console.log('SKIP T008: boot did not complete');
     } else {
         setupCR6(sim);
-        // Use slot 11 — outside BOOT_NAMED_SLOTS ([0..10]), so petNameMemory
-        // does NOT contain it and a NULL GT there must hard-fault with NULL_CAP
-        // rather than lazy-suspend.  (Slots 0-10 are the 11 hardware boot-catalog
-        // entries; all are pre-seeded into petNameMemory at boot and would take
-        // the LAZY_RESOLVE branch instead of hard-faulting.)
-        // Extend clistCount to 12 so the slot-11 access is in-bounds.
-        sim.cr[6].word2 = sim.packNSWord1(0, 0, 0, 0, 12);  // clistCount = 12
-        sim.memory[511] = 0;  // slot 11 → NULL GT (500 + 11)
-        // Leave programCapabilities empty → no pet name for slot 11.
+        // Use slot 7 — the one genuine gap in the 8-slot hardware boot catalog
+        // (slots 0-6 are Boot.NS/Boot.Thread/UART_DEV/LED_DEV/BTN_DEV/TIMER_DEV/
+        // SelfTest, all pre-seeded into petNameMemory at boot; slot 7 is the
+        // "[programmable]" catalog entry and is NOT in petNameMemory).
+        // Slot 4 (BTN_DEV) is pre-seeded as named post-migration, so it now
+        // takes the LAZY_RESOLVE branch instead of hard-faulting — only slot 7
+        // reliably reaches the NULL_CAP path this test exercises.
+        // Extend clistCount to 8 so the slot-7 access is in-bounds.
+        sim.cr[6].word2 = sim.packNSWord1(0, 0, 0, 0, 8);  // clistCount = 8
+        sim.memory[507] = 0;  // slot 7 → NULL GT (500 + 7)
+        // Leave programCapabilities empty → no pet name for slot 7.
         sim.programCapabilities = null;
 
-        const instr = sim.encodeInstruction(0, 0xE, 1, 6, 11);  // ecRow = 11
+        const instr = sim.encodeInstruction(0, 0xE, 1, 6, 7);  // ecRow = 7
         const cr14  = sim.cr[14];
         sim.memory[cr14.word1 + 1] = instr >>> 0;
         sim.pc     = 0;

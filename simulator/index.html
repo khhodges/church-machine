@@ -300,58 +300,7 @@
         </header>
         <div id="capPopover" class="toolbar-cap-popover" style="display:none;" aria-live="polite"></div>
         <div id="flagsPopover" class="toolbar-flags-popover" style="display:none;" aria-live="polite"></div>
-        <!-- ── Wukong hardware status bar — inside fixed-toolbar so z-index is shared ── -->
-        <div id="hw-led-bar-global">
-            <div id="hwLedBar" class="hw-led-bar hw-led-bar-left">
-                <span class="hw-led-label" id="hwLedBoardLabel">Wukong A7</span>
-                <div class="hw-led-item">
-                    <div class="hw-led hw-led-green" id="hw-led0"></div>
-                    <span class="hw-led-name">G21<br><span class="hw-led-role">Boot/User</span></span>
-                </div>
-                <div class="hw-led-item">
-                    <div class="hw-led hw-led-red" id="hw-led1"></div>
-                    <span class="hw-led-name">G20<br><span class="hw-led-role">Fault/HB</span></span>
-                </div>
-                <span class="hw-led-hint">← DWRITE LED[0]</span>
-                <div id="wk-activity-strip">
-                    <div class="wk-act-item">
-                        <span class="wk-act-label">Last packet</span>
-                        <span class="wk-act-val" id="wk-last-time">—</span>
-                    </div>
-                    <div class="wk-act-sep"></div>
-                    <div class="wk-act-item">
-                        <span class="wk-act-label">NIA</span>
-                        <span class="wk-act-val wk-act-mono" id="wk-last-nia">—</span>
-                    </div>
-                    <div class="wk-act-sep"></div>
-                    <div class="wk-act-item">
-                        <span class="wk-act-label">Instruction</span>
-                        <span class="wk-act-val wk-act-mono" id="wk-last-instr" title="">—</span>
-                    </div>
-                    <div class="wk-act-sep"></div>
-                    <div class="wk-act-item">
-                        <span class="wk-act-label">Steps</span>
-                        <span class="wk-act-val" id="wk-step-count">0</span>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
-    <script>
-    /* Keep --toolbar-h in sync with the actual rendered height of .fixed-toolbar
-       so .view { top: var(--toolbar-h) } always clears the bar exactly. */
-    (function() {
-        var tb = document.querySelector('.fixed-toolbar');
-        if (!tb) return;
-        function sync() {
-            document.documentElement.style.setProperty('--toolbar-h', tb.offsetHeight + 'px');
-        }
-        sync();
-        if (window.ResizeObserver) {
-            new ResizeObserver(sync).observe(tb);
-        }
-    })();
-    </script>
 
     <div id="home" class="view">
         <div class="home-hero">
@@ -445,6 +394,18 @@
 
     <div id="dashboard" class="view">
         <div class="flags-led-row">
+            <div id="hwLedBar" class="hw-led-bar hw-led-bar-left">
+                <span class="hw-led-label" id="hwLedBoardLabel">Wukong A7</span>
+                <div class="hw-led-item">
+                    <div class="hw-led hw-led-green" id="hw-led0"></div>
+                    <span class="hw-led-name">G21<br><span class="hw-led-role">Boot/User</span></span>
+                </div>
+                <div class="hw-led-item">
+                    <div class="hw-led hw-led-red" id="hw-led1"></div>
+                    <span class="hw-led-name">G20<br><span class="hw-led-role">Fault/HB</span></span>
+                </div>
+                <span class="hw-led-hint">← DWRITE LED[0]</span>
+            </div>
             <div id="flagsDisplay" class="flags-bar"></div>
         </div>
         <div class="dash-tabs">
