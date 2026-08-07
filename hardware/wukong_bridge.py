@@ -279,17 +279,24 @@ def main():
                         help='Skip TLS certificate verification')
     args = parser.parse_args()
 
-    verify_tls = not args.insecure
-    if args.insecure:
+    ide_base   = args.ide.rstrip('/')
+
+    # For https:// IDE URLs the common case is a self-signed / lab certificate
+    # (e.g. lab.cloomc.org), which floods the terminal with one urllib3
+    # InsecureRequestWarning per HTTP request and drowns out the HW trace.
+    # Default to skipping verification for https and suppress the per-request
+    # warnings, printing a single one-line notice at startup instead.
+    verify_tls = not (args.insecure or ide_base.startswith('https://'))
+    if not verify_tls:
         try:
             import urllib3
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         except Exception:
             pass
 
-    ide_base   = args.ide.rstrip('/')
-
     print(f'Wukong bridge: {args.port} @ {args.baud} baud → {ide_base}')
+    if not verify_tls:
+        print('SSL verification disabled — add a cert to enable')
 
     # Compute the expected N_INIT from the current boot_rom.py tables once at
     # startup.  Used to validate the N_INIT byte that the board sends after the
