@@ -109,11 +109,7 @@ Each packet is **12 bytes**, big-endian, starting with magic byte `0xAA`:
 | `TRACE_EV_CALL_PUSH`  | 0x08  | CALL        | Caller frame stack push (payload = 0) |
 | `TRACE_EV_RETURN_POP` | 0x09  | RETURN      | Caller frame stack pop (payload = 0) |
 | `TRACE_EV_RETURN_CR6` | 0x0A  | RETURN      | CR6 ← restored from frame (payload = E-GT word0) |
-| `TRACE_EV_RETURN_CR14`| 0x0B  | RETURN      | CR14 ← restored from frame (payload ≈ callee CR14 word0) |
-
-Note: For `TRACE_EV_RETURN_CR14`, the payload is the *current* CR14 at retire
-time (the callee's code cap).  The exact restored value is written by the
-post-retire `cload` and is therefore not available at the retire-valid pulse.
+| `TRACE_EV_RETURN_CR14`| 0x0B  | RETURN      | CR14 ← restored from frame (payload = caller CR14 word0) |
 
 ---
 

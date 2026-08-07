@@ -638,6 +638,9 @@ class ChurchWukongXC7A100T(Elaboratable):
         # tq_ptr:  index of the event currently being sent.
         # tq_bidx: byte index within the 12-byte packet for the current event.
         # tq_nia / tq_flags / tq_fault: shared across all events for one retire.
+        # tq_return_cr14_pending: set for cross-domain RETURN; causes TraceUnit
+        #   to enter WAIT_RETURN_CR14 after sending POP+CR6 and await the actual
+        #   restored CR14 from cload before emitting the RETURN_CR14 packet.
         tq_type  = [Signal(8,  name=f"tq_type{i}")  for i in range(3)]
         tq_data  = [Signal(32, name=f"tq_data{i}")  for i in range(3)]
         tq_len   = Signal(2,  name="tq_len")
@@ -646,6 +649,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         tq_nia   = Signal(32, name="tq_nia")
         tq_flags = Signal(8,  name="tq_flags")   # bits[3:0]=NZCV; bits[7:4]=0
         tq_fault = Signal(8,  name="tq_fault")   # {bp_hit[7], fault_valid[6], 0[5], fault_code[4:0]}
+        tq_return_cr14_pending = Signal(name="tq_return_cr14_pending")
 
         # Current event's type and payload (combinatorial mux of tq_ptr)
         _cur_ev_type = Signal(8,  name="cur_ev_type")
@@ -733,15 +737,29 @@ class ChurchWukongXC7A100T(Elaboratable):
                                 tq_data[2].eq(0),
                             ]
                         with m.Case(ChurchOpcode.RETURN):  # 0b0011
-                            m.d.sync += [
-                                tq_len.eq(3),
-                                tq_type[0].eq(_TRACE_EV_RETURN_POP),
-                                tq_data[0].eq(0),
-                                tq_type[1].eq(_TRACE_EV_RETURN_CR6),
-                                tq_data[1].eq(core.retire_trace_cr6_gt),
-                                tq_type[2].eq(_TRACE_EV_RETURN_CR14),
-                                tq_data[2].eq(core.retire_trace_cr14_gt),
-                            ]
+                            # Cross-domain RETURN: defer RETURN_CR14 packet until
+                            # cload writes the actual restored caller code cap.
+                            # Lambda-fast RETURN: CR14 is unchanged; emit immediately.
+                            with m.If(core.retire_trace_return_is_cross_domain):
+                                m.d.sync += [
+                                    tq_len.eq(2),
+                                    tq_type[0].eq(_TRACE_EV_RETURN_POP),
+                                    tq_data[0].eq(0),
+                                    tq_type[1].eq(_TRACE_EV_RETURN_CR6),
+                                    tq_data[1].eq(core.retire_trace_cr6_gt),
+                                    tq_return_cr14_pending.eq(1),
+                                ]
+                            with m.Else():
+                                m.d.sync += [
+                                    tq_len.eq(3),
+                                    tq_type[0].eq(_TRACE_EV_RETURN_POP),
+                                    tq_data[0].eq(0),
+                                    tq_type[1].eq(_TRACE_EV_RETURN_CR6),
+                                    tq_data[1].eq(core.retire_trace_cr6_gt),
+                                    tq_type[2].eq(_TRACE_EV_RETURN_CR14),
+                                    tq_data[2].eq(core.retire_trace_cr14_gt),
+                                    tq_return_cr14_pending.eq(0),
+                                ]
                         with m.Default():
                             m.d.sync += [
                                 tq_len.eq(1),
@@ -775,13 +793,51 @@ class ChurchWukongXC7A100T(Elaboratable):
                         # Last byte of this event's packet
                         m.d.sync += tq_bidx.eq(0)
                         with m.If(tq_ptr == tq_len - 1):
-                            # All events for this retire sent → return to IDLE
-                            m.next = "IDLE"
+                            # All events for this retire sent
+                            with m.If(tq_return_cr14_pending):
+                                # Cross-domain RETURN: wait for cload to write
+                                # the actual restored caller CR14 before emitting
+                                # the RETURN_CR14 packet.
+                                m.next = "WAIT_RETURN_CR14"
+                            with m.Else():
+                                m.next = "IDLE"
                         with m.Else():
                             # More events remain → advance to next event
                             m.d.sync += tq_ptr.eq(tq_ptr + 1)
                     with m.Else():
                         m.d.sync += tq_bidx.eq(tq_bidx + 1)
+
+            with m.State("WAIT_RETURN_CR14"):
+                # Stall the CM while waiting for cload to write the restored caller
+                # CR14.  retire_trace_return_cr14_ready and _fault are sticky level
+                # registers in core.py: cload finishes in ~5-20 cycles, far before
+                # the ~20 000 cycles needed to drain the POP+CR6 UART bytes, so on
+                # entry here the flag is already set and the FSM exits in one cycle.
+                m.d.comb += [trace_tx_req.eq(0), trace_stall.eq(1)]
+                with m.If(core.retire_trace_return_cr14_ready):
+                    # cload wrote the caller's CR14 — emit the exact GT word0.
+                    m.d.sync += [
+                        tq_return_cr14_pending.eq(0),
+                        tq_len.eq(1),
+                        tq_ptr.eq(0),
+                        tq_bidx.eq(0),
+                        tq_type[0].eq(_TRACE_EV_RETURN_CR14),
+                        tq_data[0].eq(core.retire_trace_return_cr14_gt),
+                    ]
+                    m.next = "SEND"
+                with m.Elif(core.retire_trace_return_cr14_fault):
+                    # cload faulted (NS integrity check failure, etc.).
+                    # Emit RETURN_CR14 with payload 0; core will raise fault_valid
+                    # and the next retire packet carries the fault code.
+                    m.d.sync += [
+                        tq_return_cr14_pending.eq(0),
+                        tq_len.eq(1),
+                        tq_ptr.eq(0),
+                        tq_bidx.eq(0),
+                        tq_type[0].eq(_TRACE_EV_RETURN_CR14),
+                        tq_data[0].eq(0),
+                    ]
+                    m.next = "SEND"
 
         # ── Heartbeat (1 Hz blink on led[1] during boot) ──────────────────────
         hb_ctr   = Signal(range(self.clk_freq))

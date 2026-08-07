@@ -117,13 +117,36 @@ class ChurchCore(Elaboratable):
         #           cr6_gt  = new CR6  (committed to register file before retire)
         #           cr14_gt = new CR14 (committed to register file before retire)
         #   RETURN: cr6_gt  = E-GT from stack frame (u_return.cload_e_gt)
-        #           cr14_gt = current CR14 (approximate; cload updates post-retire)
+        #           cr14_gt = current CR14 (correct for lambda-fast RETURN where
+        #                     CR14 is unchanged; not used for cross-domain RETURN)
+        #           retire_trace_return_is_cross_domain: combinatorial, reads
+        #             cross_domain_ret at retire_valid time.  TraceUnit uses this
+        #             to choose between emitting CR14 immediately (lambda-fast) or
+        #             deferring until cload writes the actual restored value.
+        #           retire_trace_return_cr14_gt / _ready / _fault: deferred path
+        #             for cross-domain RETURN.  _ready and _fault are sticky level
+        #             registers cleared at the next RETURN start and set by cload.
         self.retire_trace_load_shadow_gt = Signal(32)
         self.retire_trace_load_new_gt    = Signal(32)
         self.retire_trace_cr5_gt         = Signal(32)
         self.retire_trace_cr6_gt         = Signal(32)
         self.retire_trace_cr12_gt        = Signal(32)
         self.retire_trace_cr14_gt        = Signal(32)
+
+        # Deferred RETURN CR14 — only meaningful after a cross-domain RETURN.
+        # retire_trace_return_is_cross_domain: combinatorial, valid at retire_valid.
+        # retire_trace_return_cr14_ready: sticky level register, set when cload
+        #   writes CR14 for a cross-domain RETURN; cleared when the next RETURN
+        #   starts.  Level (not a pulse) so TraceUnit can poll it after UART
+        #   serialization — cload typically completes before POP+CR6 bytes drain.
+        # retire_trace_return_cr14_fault: sticky level register, set when cload
+        #   faults during a cross-domain RETURN; cleared at next RETURN start.
+        # retire_trace_return_cr14_gt: register holding caller CR14 GT word0
+        #   (latched at the same sync edge that sets _ready).
+        self.retire_trace_return_is_cross_domain = Signal()
+        self.retire_trace_return_cr14_ready       = Signal()
+        self.retire_trace_return_cr14_fault       = Signal()
+        self.retire_trace_return_cr14_gt          = Signal(32)
 
         # GT fault telemetry — latched when fault_valid fires; held until FAULT_RST.
         # Exposed via APB3 registers +0x18..+0x24 for CALLHOME GT diagnostics.
@@ -883,6 +906,40 @@ class ChurchCore(Elaboratable):
                 code_lo_reg.eq(u_call.code_lo_out),
                 code_hi_reg.eq(u_call.code_hi_out),
             ]
+
+        # ── TraceUnit deferred RETURN_CR14 latch ──────────────────────────────
+        # retire_trace_return_is_cross_domain: combinatorial, reads cross_domain_ret
+        # at retire_valid time so the TraceUnit can choose the correct RETURN path.
+        m.d.comb += self.retire_trace_return_is_cross_domain.eq(cross_domain_ret)
+
+        # Sticky registers for deferred RETURN_CR14 trace packet.
+        # cload typically finishes ~5-20 cycles after RETURN retire, but UART
+        # serialization of 24 bytes (POP+CR6) takes ~20 000 cycles at 57600 baud,
+        # so a one-cycle pulse would be lost.  Instead _ready/_fault are latched
+        # and held until the TraceUnit's WAIT_RETURN_CR14 state observes them.
+        # Cleared when the next RETURN starts (ret_start_sig) to reset state for
+        # any new cross-domain RETURN transaction.
+        _cload_writes_cr14 = Signal()
+        m.d.comb += _cload_writes_cr14.eq(
+            u_cload.cr_wr_en & (u_cload.cr_wr_addr == CR_CLOOMC)
+        )
+        with m.If(ret_start_sig):
+            # New RETURN starting — reset both flags for the new transaction.
+            m.d.sync += [
+                self.retire_trace_return_cr14_ready.eq(0),
+                self.retire_trace_return_cr14_fault.eq(0),
+            ]
+        with m.Elif(_cload_writes_cr14):
+            # cload WRITE_CR14 state: latch caller GT and assert ready level.
+            m.d.sync += [
+                self.retire_trace_return_cr14_gt.eq(
+                    View(CAP_REG_LAYOUT, u_cload.cr_wr_data).word0_gt
+                ),
+                self.retire_trace_return_cr14_ready.eq(1),
+            ]
+        with m.Elif(u_cload.cload_fault):
+            # cload faulted (NS integrity check failure, etc.) — set fault level.
+            m.d.sync += self.retire_trace_return_cr14_fault.eq(1)
 
         m.d.comb += [
             self.imem_addr.eq(nia_reg),
@@ -2392,8 +2449,11 @@ class ChurchCore(Elaboratable):
         # All combinatorial, valid at retire_valid time for their instruction class.
         # For RETURN: retire_trace_cr6_gt carries the E-GT from the stack frame
         #   (u_return.cload_e_gt), not the current register-file CR6 value.
-        #   retire_trace_cr14_gt carries the current CR14 (approximate; cload
-        #   updates CR14 after retire, so the restored value is not available here).
+        #   retire_trace_cr14_gt carries the current CR14 — accurate for
+        #   lambda-fast RETURN (CR14 is not changed in that path).  Cross-domain
+        #   RETURN uses the deferred retire_trace_return_cr14_gt / _ready / _fault
+        #   sticky registers (set when cload writes/faults CR14); retire_trace_cr14_gt
+        #   is not used for that case.
         m.d.comb += [
             self.retire_trace_load_shadow_gt.eq(_trace_load_shadow_gt),
             self.retire_trace_load_new_gt.eq(
