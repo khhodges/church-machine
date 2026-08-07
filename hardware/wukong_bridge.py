@@ -89,8 +89,24 @@ _EV_NAMES = {
     TRACE_EV_RETURN_CR14: 'RETURN.CR14',
 }
 
-BOOT_SENTINEL  = 0xBB   # first byte of the 2-byte boot sentinel sequence
-SENTINEL_LEN   = 2      # 0xBB  N_INIT&0xFF
+# ── Boot sentinel constants ───────────────────────────────────────────────────
+# Old (stale) bitstreams emit a 2-byte sentinel:  0xBB  N_INIT&0xFF
+# New bitstreams emit a 3-byte sentinel:           0xBC  N_INIT&0xFF  TU_VERSION
+#
+# TU_VERSION encodes TraceUnit FSM capability:
+#   0x02 = ELOADCALL and XLOADLAMBDA emit 3-packet CALL sequence
+#          (CALL_CR6 + CALL_CR14 + CALL_PUSH) — current standard.
+#
+# If the bridge sees 0xBB it knows the TraceUnit is old: ELOADCALL and
+# XLOADLAMBDA will emit a single RESULT packet instead of the 3-packet CALL
+# sequence, so CR6/CR14 state shown in the IDE will be silently wrong.
+BOOT_SENTINEL_V1  = 0xBB   # old/stale 2-byte sentinel magic
+BOOT_SENTINEL_V2  = 0xBC   # current 3-byte sentinel magic
+SENTINEL_V1_LEN   = 2      # 0xBB  N_INIT&0xFF
+SENTINEL_V2_LEN   = 3      # 0xBC  N_INIT&0xFF  TU_VERSION
+
+# Minimum TU_VERSION required to guarantee correct ELOADCALL/XLOADLAMBDA trace.
+TU_VERSION_CALL_3PKT = 0x02  # must match _TU_VERSION_CALL_3PKT in wukong_top.py
 
 
 def _compute_expected_n_init():
@@ -196,7 +212,8 @@ def main():
     print(f'Wukong bridge: {args.port} @ {args.baud} baud → {ide_base}')
 
     # Compute the expected N_INIT from the current boot_rom.py tables once at
-    # startup.  Used to validate the N_INIT byte that the board sends after 0xBB.
+    # startup.  Used to validate the N_INIT byte that the board sends after the
+    # sentinel magic byte (0xBB for old/stale bitstreams, 0xBC for current ones).
     expected_n_init = _compute_expected_n_init()
     if expected_n_init is None:
         print('WARNING: boot_rom not importable — N_INIT sentinel byte will not be validated',
@@ -255,10 +272,10 @@ def main():
                           f'  flags={flag_str}{fault_str}{bp_str}')
                     i += TRACE_LEN
 
-                elif b == BOOT_SENTINEL:
-                    # Two-byte boot sentinel: 0xBB  N_INIT&0xFF
+                elif b == BOOT_SENTINEL_V1:
+                    # Old/stale 2-byte boot sentinel: 0xBB  N_INIT&0xFF
                     # Wait until both bytes are buffered.
-                    if len(buf) - i < SENTINEL_LEN:
+                    if len(buf) - i < SENTINEL_V1_LEN:
                         break
                     board_n_init_byte = buf[i + 1]
                     if expected_n_init is not None:
@@ -280,7 +297,67 @@ def main():
                     else:
                         print(f'BOOT: board ready — N_INIT byte=0x{board_n_init_byte:02X} '
                               f'(validation skipped: boot_rom not importable)')
-                    i += SENTINEL_LEN
+                    # Stale bitstream warning: old sentinel (0xBB) means the
+                    # TraceUnit FSM predates the 3-packet CALL sequence for
+                    # ELOADCALL/XLOADLAMBDA.  Those instructions emit a single
+                    # TRACE_EV_RESULT instead of CALL_CR6+CALL_CR14+CALL_PUSH,
+                    # so the IDE will show wrong CR6/CR14 state silently.
+                    print('BITSTREAM WARNING: old sentinel (0xBB) — stale TraceUnit FSM detected.',
+                          file=sys.stderr)
+                    print('  ELOADCALL and XLOADLAMBDA emit a single RESULT packet instead of',
+                          file=sys.stderr)
+                    print('  the 3-packet CALL sequence (CALL_CR6 + CALL_CR14 + CALL_PUSH).',
+                          file=sys.stderr)
+                    print('  CR6 and CR14 state shown in the IDE will be wrong after any',
+                          file=sys.stderr)
+                    print('  ELOADCALL or XLOADLAMBDA instruction executes.',
+                          file=sys.stderr)
+                    print('  Rebuild and reflash the bitstream to get the current TraceUnit.',
+                          file=sys.stderr)
+                    i += SENTINEL_V1_LEN
+
+                elif b == BOOT_SENTINEL_V2:
+                    # Current 3-byte boot sentinel: 0xBC  N_INIT&0xFF  TU_VERSION
+                    # Wait until all three bytes are buffered.
+                    if len(buf) - i < SENTINEL_V2_LEN:
+                        break
+                    board_n_init_byte = buf[i + 1]
+                    tu_version        = buf[i + 2]
+                    if expected_n_init is not None:
+                        expected_byte = expected_n_init & 0xFF
+                        if board_n_init_byte == expected_byte:
+                            print(f'BOOT: board ready — N_INIT={expected_n_init} '
+                                  f'(0x{expected_byte:02X}) matches source  ✓  '
+                                  f'TU_VERSION=0x{tu_version:02X}')
+                        else:
+                            print(f'BOOT WARNING: N_INIT mismatch — '
+                                  f'board sent 0x{board_n_init_byte:02X} '
+                                  f'but source expects 0x{expected_byte:02X} '
+                                  f'(N_INIT={expected_n_init})  '
+                                  f'TU_VERSION=0x{tu_version:02X}',
+                                  file=sys.stderr)
+                            print('  The bitstream was built with a different '
+                                  'WUKONG_DEMO_NAMESPACE / WUKONG_DEMO_CLIST.',
+                                  file=sys.stderr)
+                            print('  Run: python3 hardware/check_dmem_count.py --check',
+                                  file=sys.stderr)
+                    else:
+                        print(f'BOOT: board ready — N_INIT byte=0x{board_n_init_byte:02X} '
+                              f'(validation skipped: boot_rom not importable)  '
+                              f'TU_VERSION=0x{tu_version:02X}')
+                    # Warn if the TraceUnit capability version is below the
+                    # minimum required for correct ELOADCALL/XLOADLAMBDA tracing.
+                    if tu_version < TU_VERSION_CALL_3PKT:
+                        print(f'BITSTREAM WARNING: TU_VERSION=0x{tu_version:02X} is below '
+                              f'required 0x{TU_VERSION_CALL_3PKT:02X}.',
+                              file=sys.stderr)
+                        print('  ELOADCALL and XLOADLAMBDA may not emit the 3-packet CALL',
+                              file=sys.stderr)
+                        print('  sequence. CR6/CR14 state in the IDE may be wrong.',
+                              file=sys.stderr)
+                        print('  Rebuild and reflash the bitstream to get the current TraceUnit.',
+                              file=sys.stderr)
+                    i += SENTINEL_V2_LEN
 
                 else:
                     ch = buf[i]

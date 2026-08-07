@@ -3,7 +3,10 @@
 
 Runs three acceptance checks without needing the full IDE bridge:
 
-  (a) Waits up to SENTINEL_TIMEOUT seconds for the 0xBB boot sentinel byte.
+  (a) Waits up to SENTINEL_TIMEOUT seconds for the boot sentinel byte (0xBB or
+      0xBC).  0xBC is the current format; 0xBB indicates a stale bitstream whose
+      TraceUnit FSM emits a single RESULT packet for ELOADCALL/XLOADLAMBDA
+      instead of the correct 3-packet CALL sequence (CALL_CR6+CALL_CR14+CALL_PUSH).
   (c) Sends 'r' (run-free), then reads TRACE_TIMEOUT seconds of UART output
       and confirms at least one non-fault 0xAA trace packet arrived.
 
@@ -31,8 +34,11 @@ except ImportError:
     sys.exit(1)
 
 TRACE_MAGIC      = 0xAA
-TRACE_LEN        = 12   # 12-byte per-event packet: magic+NIA+ev_type+payload+flags+fault
-SENTINEL         = 0xBB
+# 12-byte per-event packet: magic(1)+NIA(4)+ev_type(1)+payload(4)+flags(1)+fault(1)
+# Must match TRACE_LEN in wukong_bridge.py and the TraceUnit in wukong_top.py.
+TRACE_LEN        = 12
+SENTINEL_V1      = 0xBB   # old/stale 2-byte sentinel (stale TraceUnit FSM)
+SENTINEL_V2      = 0xBC   # current 3-byte sentinel
 DEFAULT_PORT     = "/dev/ttyUSB0"
 DEFAULT_BAUD     = 57600
 
@@ -49,33 +55,41 @@ def _fault_name(code: int) -> str:
 def _parse_trace_packet(pkt: bytes) -> dict:
     """Decode a 12-byte 0xAA trace packet.
 
-    Packet layout (12 bytes, big-endian):
-        [0]     0xAA      magic
-        [1..4]  NIA       uint32
-        [5]     ev_type   TRACE_EV_* constant (0x00-0x0B)
-        [6..9]  payload   GT word0 (uint32); 0 for push/pop events
-        [10]    flags     bits[3:0]=NZCV
-        [11]    fault     bits[4:0]=fault_code  bit[6]=fault_valid  bit[7]=bp_hit
+    Packet layout (big-endian):
+      [0]     magic     0xAA
+      [1..4]  nia       retiring instruction NIA (uint32)
+      [5]     ev_type   TRACE_EV_* constant
+      [6..9]  payload   GT word0 (uint32); 0 for push/pop events
+      [10]    flags     bits[3:0]=NZCV; bits[7:4]=0
+      [11]    fault     bits[4:0]=fault_code; bit[6]=fault_valid; bit[7]=bp_hit
 
-    Returns a dict with keys: nia, ev_type, payload_gt, fault_valid, bp_hit, fault_code.
+    Returns a dict with keys: nia, ev_type, payload_gt, flags,
+    fault_valid, bp_hit, fault_code.
     """
-    nia        = struct.unpack(">I", pkt[1:5])[0]
-    ev_type    = pkt[5]
-    payload_gt = struct.unpack(">I", pkt[6:10])[0]
-    raw11      = pkt[11]
+    nia         = struct.unpack(">I", pkt[1:5])[0]
+    ev_type     = pkt[5]
+    payload_gt  = struct.unpack(">I", pkt[6:10])[0]
+    flags       = pkt[10]
+    raw11       = pkt[11]
     fault_valid = bool(raw11 & 0x40)
     bp_hit      = bool(raw11 & 0x80)
     fault_code  = raw11 & 0x1F
-    return dict(nia=nia, ev_type=ev_type, payload_gt=payload_gt,
+    return dict(nia=nia, ev_type=ev_type, payload_gt=payload_gt, flags=flags,
                 fault_valid=fault_valid, bp_hit=bp_hit, fault_code=fault_code)
 
 
 def check_sentinel(ser: "serial.Serial", timeout: float) -> bool:
-    """(a) Wait up to *timeout* seconds for the 0xBB sentinel byte.
+    """(a) Wait up to *timeout* seconds for a boot sentinel byte (0xBB or 0xBC).
 
-    Returns True on success, prints a diagnostic and returns False on failure.
+    0xBC is the current format; 0xBB means the bitstream is stale — the
+    TraceUnit FSM emits RESULT instead of the 3-packet CALL sequence for
+    ELOADCALL/XLOADLAMBDA, so CR6/CR14 state in the IDE will be wrong.
+
+    Returns True on success (either format), prints a diagnostic and returns
+    False if no sentinel is received within the timeout.
     """
-    print(f"[a] Waiting up to {timeout} s for 0xBB sentinel …", flush=True)
+    print(f"[a] Waiting up to {timeout} s for boot sentinel (0xBC current / "
+          f"0xBB stale) …", flush=True)
     deadline = time.monotonic() + timeout
     buf = bytearray()
 
@@ -83,14 +97,27 @@ def check_sentinel(ser: "serial.Serial", timeout: float) -> bool:
         chunk = ser.read(128)
         if chunk:
             buf.extend(chunk)
-            if SENTINEL in buf:
-                idx = buf.index(SENTINEL)
-                elapsed = timeout - (deadline - time.monotonic())
-                print(f"[a] PASS — 0xBB received after {elapsed:.2f} s "
-                      f"(buffer offset {idx})")
-                return True
+            for magic, label in ((SENTINEL_V2, 'current'), (SENTINEL_V1, 'stale')):
+                if magic in buf:
+                    idx = buf.index(magic)
+                    elapsed = timeout - (deadline - time.monotonic())
+                    if magic == SENTINEL_V2:
+                        print(f"[a] PASS — 0x{magic:02X} ({label}) sentinel received "
+                              f"after {elapsed:.2f} s (buffer offset {idx})")
+                    else:
+                        print(f"[a] PASS — 0x{magic:02X} ({label}) sentinel received "
+                              f"after {elapsed:.2f} s (buffer offset {idx})")
+                        print("[a] BITSTREAM WARNING: old sentinel (0xBB) — stale "
+                              "TraceUnit FSM.", file=sys.stderr)
+                        print("     ELOADCALL/XLOADLAMBDA emit RESULT not the 3-packet "
+                              "CALL sequence.", file=sys.stderr)
+                        print("     CR6/CR14 state in the IDE will be wrong after any "
+                              "such instruction.", file=sys.stderr)
+                        print("     Rebuild and reflash the bitstream to resolve this.",
+                              file=sys.stderr)
+                    return True
 
-    print(f"[a] FAIL — 0xBB NOT received within {timeout} s.", file=sys.stderr)
+    print(f"[a] FAIL — no boot sentinel received within {timeout} s.", file=sys.stderr)
     print("     Check: UART wiring (TX→F3, RX→E3, GND), baud=57600, "
           "DMEM hw_init logic in wukong_top.py.", file=sys.stderr)
     return False
@@ -136,7 +163,7 @@ def check_trace(ser: "serial.Serial", timeout: float) -> bool:
                         print(f"[c] PASS — first non-fault trace packet received "
                               f"after {elapsed:.2f} s  "
                               f"NIA=0x{info['nia']:08X}  "
-                              f"instr=0x{info['instr']:08X}")
+                              f"ev_type=0x{info['ev_type']:02X}")
                 i += TRACE_LEN
             else:
                 i += 1
@@ -170,7 +197,7 @@ def main() -> int:
                         help=f"Baud rate (default: {DEFAULT_BAUD})")
     parser.add_argument("--sentinel-timeout", type=float, default=3.0,
                         metavar="S",
-                        help="Seconds to wait for 0xBB sentinel (default: 3)")
+                        help="Seconds to wait for boot sentinel (default: 3)")
     parser.add_argument("--trace-timeout", type=float, default=3.0,
                         metavar="S",
                         help="Seconds to collect trace packets after 'r' (default: 3)")

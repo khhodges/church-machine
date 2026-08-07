@@ -46,6 +46,43 @@ Total distinct packet types: **16** across 6 instruction classes.
 
 ---
 
+## Boot sentinel
+
+Before the first trace packet the board sends a boot sentinel over the same
+UART so the bridge can detect stale bitstreams immediately.
+
+### Current format (3 bytes)
+
+| Byte | Value | Meaning |
+|------|-------|---------|
+| 0 | `0xBC` | Sentinel magic — new-format (3 bytes) |
+| 1 | `N_INIT & 0xFF` | Non-zero DMEM word count baked in at synthesis time |
+| 2 | `TU_VERSION` | TraceUnit FSM capability version |
+
+`TU_VERSION` constants:
+
+| Value | Meaning |
+|-------|---------|
+| `0x02` | TraceUnit emits 3-packet CALL sequence (`CALL_CR6`+`CALL_CR14`+`CALL_PUSH`) for ELOADCALL and XLOADLAMBDA — **current minimum required** |
+
+### Old format (stale bitstreams, 2 bytes)
+
+Bitstreams built before the 3-packet ELOADCALL/XLOADLAMBDA TraceUnit FSM was
+introduced emit a 2-byte sentinel with magic `0xBB`:
+
+| Byte | Value | Meaning |
+|------|-------|---------|
+| 0 | `0xBB` | Sentinel magic — old/stale 2-byte format |
+| 1 | `N_INIT & 0xFF` | Non-zero DMEM word count |
+
+When the bridge receives `0xBB` it prints a **BITSTREAM WARNING**: those
+bitstreams emit a single `TRACE_EV_RESULT` (0x00) for ELOADCALL and
+XLOADLAMBDA instead of the 3-packet CALL sequence, so the IDE will display
+wrong CR6/CR14 state after any such instruction executes.  Rebuild and
+reflash the bitstream to resolve this.
+
+---
+
 ## Boot sequence
 
 The 3-instruction boot ROM is the complete boot contract:

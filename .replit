@@ -169,6 +169,10 @@ args = "load-through-l-perm-cr6-tests"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
+args = "return-cr14-trace-tests"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
 args = "bare-space-ns-fallback-tests"
 
 [[workflows.workflow.tasks]]
@@ -601,6 +605,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node tests/simulator/sim_load_through_l_perm_cr6.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "return-cr14-trace-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_return_cr14_trace.js"
 
 [workflows.workflow.metadata]
 outputType = "console"

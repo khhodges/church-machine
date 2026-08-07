@@ -274,20 +274,30 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         # ── Boot-triggered / sentinel signals (declared early for arbitrator) ──
         # boot_triggered is driven by the boot FSM below; sentinel_sent latches
-        # after both sentinel bytes have been accepted by the UART TX.
+        # after all sentinel bytes have been accepted by the UART TX.
         #
-        # Two-byte boot sentinel: 0xBB  N_INIT&0xFF
-        #   0xBB        — magic: board has booted and DMEM init is complete
+        # Three-byte boot sentinel: 0xBC  N_INIT&0xFF  TU_VERSION
+        #   0xBC        — magic: new-format sentinel (old bitstreams emit 0xBB 2-byte sentinel)
         #   N_INIT&0xFF — count of non-zero DMEM words written by hw_init sequencer
+        #   TU_VERSION  — TraceUnit FSM capability version (see _TU_VERSION_* below)
+        #
+        # TU_VERSION constants (must match wukong_bridge.py TU_VERSION_* constants):
+        #   0x02 = TraceUnit emits 3-packet CALL sequence (CALL_CR6/CALL_CR14/CALL_PUSH)
+        #          for ELOADCALL and XLOADLAMBDA — current FSM capability level.
+        #
+        # Old bitstreams (pre-v2 TraceUnit) emit 0xBB N_INIT (2 bytes only).
+        # The bridge detects 0xBB and warns the user that ELOADCALL/XLOADLAMBDA
+        # will silently show wrong CR6/CR14 state (only RESULT is emitted).
         #
         # The N_INIT byte is baked in at synthesis time from hw_init_pairs.
         # The bridge (wukong_bridge.py) reads this byte and compares it against
         # the count computed from the current boot_rom.py tables.  A mismatch
         # means the bitstream was built with a different WUKONG_DEMO_NAMESPACE /
         # WUKONG_DEMO_CLIST than the one currently in source — stale bitstream.
+        _TU_VERSION_CALL_3PKT = 0x02  # TraceUnit emits CALL_CR6/CR14/PUSH for ELOADCALL+XLOADLAMBDA
         boot_triggered  = Signal()
         sentinel_sent   = Signal()
-        sentinel_phase  = Signal()  # 0 = 0xBB not yet sent, 1 = N_INIT byte pending
+        sentinel_phase  = Signal(2)  # 0=0xBC pending, 1=N_INIT pending, 2=TU_VERSION pending
 
         # ── Hardware boot banner (declared early; driven by boot FSM below) ─────
         # Sends "WUKONG\r\n" via UART TX during Phase 2.5 — after hw_init writes
@@ -360,7 +370,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         # Priority (highest to lowest):
         #   1. CM MMIO reg-5 write       — cm_tx_start
         #   2. HW boot banner            — "WUKONG\r\n", sent before boot_start
-        #   3. Boot sentinel (2 bytes)   — 0xBB then N_INIT&0xFF, once at boot
+        #   3. Boot sentinel (3 bytes)   — 0xBC then N_INIT&0xFF then TU_VERSION, once at boot
         #   4. TraceUnit packets         — fill remaining idle TX cycles
         #
         # cm_tx_start is the raw CM write signal; used by the TraceUnit to avoid
@@ -387,25 +397,28 @@ class ChurchWukongXC7A100T(Elaboratable):
             with m.Else():
                 m.d.sync += banner_idx.eq(banner_idx + 1)
 
-        # sentinel_req: active until both sentinel bytes are accepted.
-        # sentinel_phase=0 → send 0xBB; sentinel_phase=1 → send N_INIT & 0xFF.
-        # After the second byte is accepted, sentinel_sent latches and req drops.
+        # sentinel_req: active until all three sentinel bytes are accepted.
+        # sentinel_phase=0 → send 0xBC; =1 → send N_INIT&0xFF; =2 → send TU_VERSION.
+        # After the third byte is accepted, sentinel_sent latches and req drops.
         sentinel_req = Signal()
         m.d.comb += sentinel_req.eq(boot_triggered & ~sentinel_sent)
         with m.If(sentinel_req & ~uart_tx.busy & ~cm_tx_start & ~banner_req):
-            with m.If(~sentinel_phase):
-                m.d.sync += sentinel_phase.eq(1)   # 0xBB accepted → queue N_INIT byte
+            with m.If(sentinel_phase == 0):
+                m.d.sync += sentinel_phase.eq(1)   # 0xBC accepted → queue N_INIT byte
+            with m.Elif(sentinel_phase == 1):
+                m.d.sync += sentinel_phase.eq(2)   # N_INIT byte accepted → queue TU_VERSION
             with m.Else():
-                m.d.sync += sentinel_sent.eq(1)    # N_INIT byte accepted → done
+                m.d.sync += sentinel_sent.eq(1)    # TU_VERSION byte accepted → done
 
         trace_tx_ack = Signal()  # TraceUnit byte accepted (one-cycle ack)
         m.d.comb += [
             uart_tx.data.eq(
-                Mux(cm_tx_start,                          core.dmem_wr_data[0:8],
-                Mux(banner_req,                            banner_byte,
-                Mux(sentinel_req & ~sentinel_phase,       C(0xBB, 8),
-                Mux(sentinel_req &  sentinel_phase,       C(N_INIT & 0xFF, 8),
-                                                          trace_tx_byte))))),
+                Mux(cm_tx_start,                              core.dmem_wr_data[0:8],
+                Mux(banner_req,                                banner_byte,
+                Mux(sentinel_req & (sentinel_phase == 0),    C(0xBC, 8),
+                Mux(sentinel_req & (sentinel_phase == 1),    C(N_INIT & 0xFF, 8),
+                Mux(sentinel_req & (sentinel_phase == 2),    C(_TU_VERSION_CALL_3PKT, 8),
+                                                              trace_tx_byte)))))),
             uart_tx.start.eq(
                 cm_tx_start |
                 (banner_req    & ~uart_tx.busy & ~cm_tx_start) |
@@ -778,6 +791,8 @@ class ChurchWukongXC7A100T(Elaboratable):
                 # we are still sending events 0 and 1 (trace_stall holds the CM).
                 # Patch tq_data[2] so RETURN_CR14 carries the correct caller value,
                 # not the callee's CR14 that was latched at retire_valid time.
+                # If cload faults the valid pulse never fires; the fault is reported
+                # via fault_valid on the next retire (normal fault path).
                 with m.If(core.retire_trace_return_cr14_valid):
                     m.d.sync += tq_data[2].eq(core.retire_trace_return_cr14_gt)
 
@@ -818,7 +833,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         #
         # Phase 3 (1 cycle): boot_start pulsed; boot_triggered latched.
         #   The LED mux switches to CM-controlled outputs.
-        #   The UART TX arbitrator sends sentinel byte 0xBB (first free TX slot).
+        #   The UART TX arbitrator sends sentinel bytes 0xBC N_INIT TU_VERSION (first free TX slots).
         boot_delay  = Signal(4, init=0)
         hw_init_ctr = Signal(range(N_INIT + 1), init=0)
         # hw_init_done declared earlier (near boot_triggered) for UART arbitrator use
