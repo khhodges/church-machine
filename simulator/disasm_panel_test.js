@@ -418,6 +418,112 @@ function parseFragment(html) {
         'spotlightHtml=' + JSON.stringify(result.spotlightHtml));
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DH tests: _wukongRefreshDisasmHwCursor class toggling
+//
+//   DH-1  Calling _wukongRefreshDisasmHwCursor with _wukongLastHwNIA set to
+//          an address applies .nia-disasm-hw-current to the matching row and
+//          leaves non-matching rows without it.
+//   DH-2  Calling _wukongRefreshDisasmHwCursor with a different address
+//          removes .nia-disasm-hw-current from the previously-highlighted row
+//          and adds it to the new one.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Source extraction ─────────────────────────────────────────────────────────
+
+function extractRefreshHwCursor(srcPath) {
+    const src = fs.readFileSync(path.resolve(__dirname, srcPath), 'utf8');
+    const marker = 'function _wukongRefreshDisasmHwCursor()';
+    const startIdx = src.indexOf(marker);
+    if (startIdx === -1) throw new Error('_wukongRefreshDisasmHwCursor not found in ' + srcPath);
+    let depth = 0, end = -1;
+    for (let i = startIdx; i < src.length; i++) {
+        if (src[i] === '{') depth++;
+        else if (src[i] === '}') { if (--depth === 0) { end = i; break; } }
+    }
+    if (end === -1) throw new Error('Could not find end of _wukongRefreshDisasmHwCursor');
+    return src.slice(startIdx, end + 1);
+}
+
+const HW_CURSOR_SRC = extractRefreshHwCursor('app-run.js');
+
+// Build a DOM fixture with .nia-disasm-row elements carrying data-addr attributes,
+// then run _wukongRefreshDisasmHwCursor in a sandbox that owns _wukongLastHwNIA.
+function makeHwCursorSandbox(addrs, hwNia) {
+    const dom = new JSDOM('<!DOCTYPE html><body></body>');
+    const document = dom.window.document;
+
+    const rows = addrs.map(function(addr) {
+        const row = document.createElement('div');
+        row.className = 'nia-disasm-row';
+        row.dataset.addr = String(addr);
+        document.body.appendChild(row);
+        return row;
+    });
+
+    const sandbox = {
+        document:           document,
+        _wukongLastHwNIA:   hwNia,
+    };
+    const ctx = vm.createContext(new Proxy(sandbox, {
+        get(target, prop, receiver) {
+            if (prop in target) return Reflect.get(target, prop, receiver);
+            if (typeof prop === 'string' && prop in globalThis) return globalThis[prop];
+            return undefined;
+        },
+        has() { return true; },
+    }));
+    vm.runInContext(HW_CURSOR_SRC, ctx, { filename: 'app-run.js' });
+
+    return { ctx, rows };
+}
+
+// Helper: run the cursor function and return the result.
+function runHwCursor(ctx) {
+    vm.runInContext('_wukongRefreshDisasmHwCursor();', ctx, { filename: 'app-run.js' });
+}
+
+// ── DH-1: hw-current applied to the matching row only ────────────────────────
+{
+    const addrs = [100, 101, 102];
+    const { ctx, rows } = makeHwCursorSandbox(addrs, 101);
+
+    runHwCursor(ctx);
+
+    assert('DH-1: matching row (addr 101) gains .nia-disasm-hw-current',
+        rows[1].classList.contains('nia-disasm-hw-current'),
+        'classList=' + rows[1].className);
+    assert('DH-1: non-matching row (addr 100) does not get .nia-disasm-hw-current',
+        !rows[0].classList.contains('nia-disasm-hw-current'),
+        'classList=' + rows[0].className);
+    assert('DH-1: non-matching row (addr 102) does not get .nia-disasm-hw-current',
+        !rows[2].classList.contains('nia-disasm-hw-current'),
+        'classList=' + rows[2].className);
+}
+
+// ── DH-2: hw-current moves when the NIA changes ──────────────────────────────
+{
+    const addrs = [200, 201];
+    const { ctx, rows } = makeHwCursorSandbox(addrs, 200);
+
+    // First call — row 0 highlighted.
+    runHwCursor(ctx);
+    assert('DH-2: row 0 highlighted before NIA change',
+        rows[0].classList.contains('nia-disasm-hw-current'),
+        'classList=' + rows[0].className);
+
+    // Move the NIA to addr 201 and re-run.
+    ctx._wukongLastHwNIA = 201;
+    runHwCursor(ctx);
+
+    assert('DH-2: row 0 loses .nia-disasm-hw-current after NIA moves',
+        !rows[0].classList.contains('nia-disasm-hw-current'),
+        'classList=' + rows[0].className);
+    assert('DH-2: row 1 gains .nia-disasm-hw-current after NIA moves',
+        rows[1].classList.contains('nia-disasm-hw-current'),
+        'classList=' + rows[1].className);
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);
