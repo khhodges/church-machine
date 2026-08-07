@@ -7,8 +7,8 @@ description: SSH key setup for 165.227.190.84 droplet — how to connect from Re
 
 Auth: publickey only. The current authorized key on the droplet is:
 - Comment: `replit-agent@church-machine`
-- Fingerprint: `SHA256:+dGM2ID4s4MSVIrr8d6ZPfVPSrSFuB31tm0KrnIn420`
-- Public key: `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHn9fctYGX7jLXz90vzP7pZDuRhNLm9GFRBYUNVQkqls replit-agent@church-machine`
+- Fingerprint: `SHA256:VfKNv+5S2PuSHMmcPa9XgQnx1KuB+E21vdlSvlfbnrU`
+- Public key: `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO+cHlp9exdM1JSwK4F0b8380375q2LMt8Bq1mMdNovX replit-agent@church-machine`
 
 ## Setup in a new Replit session
 
@@ -45,13 +45,18 @@ ssh -i ~/.ssh/replit_droplet -o StrictHostKeyChecking=no root@165.227.190.84 ech
 
 ## If DropletPrivateKey secret is missing / key is rejected
 
-Generate a new key, add the public key to the droplet via DigitalOcean web console:
+Generate a new key, add the public key to the droplet's authorized_keys:
 ```bash
 ssh-keygen -t ed25519 -f ~/.ssh/replit_droplet -N "" -C "replit-agent@church-machine"
 cat ~/.ssh/replit_droplet.pub
-# User: paste into droplet's ~/.ssh/authorized_keys via DO console
+# Paste into droplet's ~/.ssh/authorized_keys via DO console:
+#   echo "<pubkey>" >> ~/.ssh/authorized_keys
 ```
 Then store the private key (full PEM, multiline) as `DropletPrivateKey` Replit secret.
+
+**Trap:** `ReplitDropletKey` and `id25519kas` and `KenCB2SSH` in Replit secrets are NOT
+the private key — they are a malformed stub, a fingerprint, and a public key respectively.
+Only `DropletPrivateKey` holds the actual private key.
 
 ## Full build workflow (Replit → droplet → Replit)
 
@@ -66,9 +71,10 @@ scp -i ~/.ssh/replit_droplet -o StrictHostKeyChecking=no \
   hardware/wukong_xc7a100t.tcl \
   root@165.227.190.84:~/wukong_build/
 
-# 3. Build on droplet in tmux (~25-30 min)
+# 3. Build on droplet in tmux (~20-25 min)
 ssh -i ~/.ssh/replit_droplet -o StrictHostKeyChecking=no root@165.227.190.84 \
   "cd ~/wukong_build && rm -rf vivado_wukong && \
+   tmux kill-session -t vivado_cm 2>/dev/null; \
    tmux new-session -d -s vivado_cm \
    'source /opt/Xilinx/2026.1/Vivado/settings64.sh && \
     vivado -mode batch -source wukong_xc7a100t.tcl > vivado_cm.log 2>&1; \
@@ -76,7 +82,7 @@ ssh -i ~/.ssh/replit_droplet -o StrictHostKeyChecking=no root@165.227.190.84 \
 
 # 4. Poll (run repeatedly until done)
 ssh -i ~/.ssh/replit_droplet -o StrictHostKeyChecking=no root@165.227.190.84 \
-  "grep -E 'EXIT_|SPI flash image ready|Bitstream ready|route_design completed|place_design completed' \
+  "grep -E 'EXIT_|route_design completed|place_design completed|write_bitstream|WNS' \
    ~/wukong_build/vivado_cm.log 2>/dev/null | tail -5; \
    tmux list-sessions | grep vivado_cm || echo SESSION_DONE"
 
@@ -86,8 +92,19 @@ scp -i ~/.ssh/replit_droplet -o StrictHostKeyChecking=no \
   root@165.227.190.84:~/wukong_build/church_wukong_xc7a100t.mcs \
   build/
 
-# Expected: EXIT_0, WNS ≥ 0 ns, .bit ~3.7 MB, .mcs ~10.5 MB
+# Expected: EXIT_0, WNS ≥ 0 ns, .bit ~3.7 MB, .mcs ~11 MB
 ```
+
+## Typical build timings (4-vCPU droplet, Vivado 2026.1)
+
+| Phase | Elapsed |
+|---|---|
+| synth_design | ~13 min |
+| opt_design | ~1 min |
+| place_design | ~5 min |
+| route_design | ~2 min |
+| write_bitstream | ~1 min |
+| **Total** | **~22 min** |
 
 ## Known build pitfalls (all fixed in current TCL/XDC)
 
