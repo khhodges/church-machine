@@ -28,6 +28,7 @@
     "sentinel-warning-tests",
     "check-wukong-hw-init",
     "wukong-cr-update-tests",
-    "wukong-trace-cr-server-tests"
+    "wukong-trace-cr-server-tests",
+    "wukong-status-readonly-tests"
   ]
 }

@@ -10033,7 +10033,7 @@ def wukong_command_post():
 
     elif cmd == 'u':
         b64 = data.get('data', '')
-        if not b64:
+        if not isinstance(b64, str) or not b64:
             return jsonify({'ok': False, 'error': 'missing data field'}), 400
         entry['data'] = b64
         # Atomic check-and-set: claim the in-flight slot under the lock so that
@@ -10097,7 +10097,11 @@ def wukong_status_get():
     with _wukong_command_lock:
         pending   = dict(_wukong_pending_cmd) if _wukong_pending_cmd else None
     if pending and 'data' in pending:
-        pending = {'cmd': pending.get('cmd'), 'data_bytes': len(pending['data'])}
+        # Type-safe payload summary: never embed the payload, and never raise
+        # (a TypeError here would turn the read-only status poll into a 500).
+        _d = pending['data']
+        pending = {'cmd': pending.get('cmd'),
+                   'data_bytes': len(_d) if isinstance(_d, (str, bytes)) else 0}
     bridge_age = (now - _wukong_last_bridge_poll) if _wukong_last_bridge_poll else None
     trace_age  = (now - _wukong_last_trace_post)  if _wukong_last_trace_post  else None
     return jsonify({

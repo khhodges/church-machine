@@ -241,6 +241,9 @@ register_suite "version-telemetry-tests" \
 register_suite "compile-api-tests" \
     'python3 -m pytest tests/server/test_compile_api.py -v'
 
+register_suite "wukong-status-readonly-tests" \
+    'python3 -m pytest tests/server/test_wukong_status_readonly.py -v'
+
 register_suite "hardware-sim" \
     'python -m hardware.test_mwin_seal && python -m hardware.test_outform_mode2 && python -m hardware.test_shift_ops && python -m hardware.test_irq_dispatch'
 
