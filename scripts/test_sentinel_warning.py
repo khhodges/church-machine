@@ -526,7 +526,56 @@ class TestCheckTraceSplitPacket:
         # Should not raise AttributeError or any other exception.
         ser.write(b"r")
 
+class TestCheckTraceFailure:
+    """check_trace() must return False (not raise) when only fault packets arrive.
 
+    The failure path inside check_trace() (lines after the good_packets > 0
+    guard) emits diagnostic text to stderr and returns False.  A refactor that
+    accidentally inverted the good_packets check could let a CM-faulting board
+    pass the smoke test; these tests pin that contract.
+    """
+
+    def _run_check_trace_with_stderr(self, chunks, timeout: float = 0.05):
+        """Run check_trace() and return (result, stdout_text, stderr_text).
+
+        Uses a very short timeout so the all-faults case finishes quickly.
+        """
+        ser = _ChunkedMockSerial(chunks)
+        captured_stdout = io.StringIO()
+        captured_stderr = io.StringIO()
+        old_stdout, old_stderr = sys.stdout, sys.stderr
+        sys.stdout, sys.stderr = captured_stdout, captured_stderr
+        try:
+            result = smoke.check_trace(ser, timeout=timeout)
+        finally:
+            sys.stdout, sys.stderr = old_stdout, old_stderr
+        return result, captured_stdout.getvalue(), captured_stderr.getvalue()
+
+    def test_only_fault_packets_returns_false(self):
+        """Returns False when only fault packets arrive (no good packets)."""
+        chunks = [_FAULT_TRACE_PKT, _FAULT_TRACE_PKT]
+        result, _, _ = self._run_check_trace_with_stderr(chunks)
+        assert result is False, (
+            'check_trace must return False when only fault trace packets arrive; '
+            'a CM-faulting board must not pass the smoke test'
+        )
+
+    def test_only_fault_packets_emits_fail_on_stderr(self):
+        """Emits a FAIL diagnostic to stderr when only fault packets arrive."""
+        chunks = [_FAULT_TRACE_PKT]
+        _, _, stderr = self._run_check_trace_with_stderr(chunks)
+        assert 'FAIL' in stderr, (
+            f'Expected "FAIL" in stderr when only fault packets arrive; '
+            f'got: {stderr!r}'
+        )
+
+    def test_only_fault_packets_mentions_fault_count(self):
+        """stderr diagnostic mentions the number of fault packets seen."""
+        chunks = [_FAULT_TRACE_PKT, _FAULT_TRACE_PKT]
+        _, _, stderr = self._run_check_trace_with_stderr(chunks)
+        assert 'fault packet' in stderr, (
+            f'Expected fault-packet count mention in stderr; got: {stderr!r}'
+        )
 class TestNoSentinel:
     """When no sentinel arrives within the timeout, check_sentinel returns False."""
 

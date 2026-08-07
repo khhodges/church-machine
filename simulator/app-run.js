@@ -1246,10 +1246,10 @@ function _showStopBtn(show) {
 }
 
 document.addEventListener('mousedown', function(e) {
-    const wrap = document.getElementById('breakWrap');
-        const pop = document.getElementById('breakPopover');
+    const wrap = document.getElementById('runWrap');
+    const pop = document.getElementById('runPopover');
     if (wrap && pop && pop.style.display !== 'none' && !wrap.contains(e.target)) {
-        pop.style.display = 'none';
+        hideRunPopover();
     }
 });
 
