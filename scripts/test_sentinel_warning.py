@@ -526,6 +526,87 @@ class TestCheckTraceSplitPacket:
         # Should not raise AttributeError or any other exception.
         ser.write(b"r")
 
+class TestCheckTraceMagicScan:
+    """check_trace() must skip non-0xAA bytes via the ``else: i += 1`` branch.
+
+    A refactor that replaced the byte-by-byte scan with a fixed-offset read
+    would silently miss packets interleaved with other UART output.  These
+    tests guard that branch directly.
+    """
+
+    def _run_check_trace(self, chunks, timeout: float = 2.0):
+        """Run check_trace() with a _ChunkedMockSerial and return (result, stdout)."""
+        ser = _ChunkedMockSerial(chunks)
+        captured_stdout = io.StringIO()
+        captured_stderr = io.StringIO()
+        old_stdout, old_stderr = sys.stdout, sys.stderr
+        sys.stdout, sys.stderr = captured_stdout, captured_stderr
+        try:
+            result = smoke.check_trace(ser, timeout=timeout)
+        finally:
+            sys.stdout, sys.stderr = old_stdout, old_stderr
+        return result, captured_stdout.getvalue()
+
+    def test_packet_preceded_by_non_magic_bytes_returns_true(self):
+        """check_trace() must skip non-0xAA prefix bytes and still find the packet.
+
+        Simulates UART text (no 0xAA bytes) appearing before a trace packet, which
+        exercises the ``else: i += 1`` branch for every non-magic byte.
+        """
+        # Several bytes that are definitely not 0xAA — simulating interleaved text.
+        prefix = bytes([0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x0D, 0x0A])  # "Hello\r\n"
+        payload = prefix + _GOOD_TRACE_PKT
+        result, _ = self._run_check_trace([payload])
+        assert result is True, (
+            'check_trace must return True when a valid packet is preceded by '
+            'non-0xAA bytes that must be skipped one at a time'
+        )
+
+    def test_packet_preceded_by_non_magic_bytes_reports_pass(self):
+        """PASS is printed to stdout after skipping non-magic prefix bytes."""
+        prefix = bytes([0x01, 0x02, 0x03, 0x04, 0x05])
+        payload = prefix + _GOOD_TRACE_PKT
+        _, stdout = self._run_check_trace([payload])
+        assert 'PASS' in stdout, (
+            f'Expected "PASS" in stdout after skipping non-magic bytes; '
+            f'got: {stdout!r}'
+        )
+
+    def test_many_non_magic_bytes_before_packet_returns_true(self):
+        """Scan still succeeds with a long run of non-0xAA bytes before the packet."""
+        prefix = bytes(b % 0xFF for b in range(200) if b != 0xAA)[:100]
+        # Ensure no accidental 0xAA snuck in.
+        assert 0xAA not in prefix
+        payload = prefix + _GOOD_TRACE_PKT
+        result, _ = self._run_check_trace([payload])
+        assert result is True, (
+            'check_trace must skip 100 non-magic bytes and still parse the packet'
+        )
+
+    def test_only_non_magic_bytes_returns_false(self):
+        """check_trace() must return False when no 0xAA byte ever appears.
+
+        A buffer of only non-0xAA bytes should exhaust the timeout without finding
+        a packet, causing check_trace() to return False.
+        """
+        # 200 bytes, none of which is 0xAA.
+        no_magic = bytes(b for b in range(256) if b != 0xAA)[:200]
+        assert 0xAA not in no_magic
+        result, _ = self._run_check_trace([no_magic], timeout=0.05)
+        assert result is False, (
+            'check_trace must return False when no 0xAA magic byte is present '
+            'anywhere in the buffer (timeout expected)'
+        )
+
+    def test_only_non_magic_bytes_no_spurious_pass(self):
+        """No PASS message appears when the buffer contains no trace packets."""
+        no_magic = bytes(b for b in range(256) if b != 0xAA)[:50]
+        _, stdout = self._run_check_trace([no_magic], timeout=0.05)
+        assert 'PASS' not in stdout, (
+            f'Unexpected "PASS" when no 0xAA bytes were present; '
+            f'got: {stdout!r}'
+        )
+
 class TestCheckTraceFailure:
     """check_trace() must return False (not raise) when only fault packets arrive.
 
