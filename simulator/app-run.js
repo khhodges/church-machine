@@ -14465,7 +14465,89 @@ function _wukongUpdateBtn() {
 
     // Show/hide call-depth badge.
     _wukongUpdateCallDepthBadge();
+
+    // ⚡ Wukong toolbar status button (visible on every view).
+    _wukongUpdateToolbarBtn(connected);
 }
+
+// Update the always-visible "⚡ Wukong" button in the top navigation bar.
+// Dim/grey when disconnected; green with a live NIA ticker when connected.
+function _wukongUpdateToolbarBtn(connected) {
+    const tb = document.getElementById('toolbarWukongBtn');
+    if (!tb) return;
+    if (connected) {
+        const liveNia = (_wukongHwNia !== null) ? _wukongHwNia : _wukongLastHwNIA;
+        const niaTxt = (liveNia !== null)
+            ? ' \u00B7 NIA 0x' + (liveNia >>> 0).toString(16).toUpperCase().padStart(4, '0')
+            : '';
+        tb.textContent = '\u26A1 Wukong' + niaTxt;
+        tb.style.opacity = '1';
+        tb.style.color = '#44dd88';
+        tb.style.borderColor = 'rgba(68,221,136,0.5)';
+        tb.setAttribute('data-tooltip', 'Wukong board connected \u2014 click to show the HW Trace panel');
+    } else {
+        tb.textContent = '\u26A1 Wukong';
+        tb.style.opacity = '0.45';
+        tb.style.color = '';
+        tb.style.borderColor = '';
+        tb.setAttribute('data-tooltip', 'Wukong board \u2014 not connected \u00B7 click for bridge setup instructions');
+    }
+}
+
+// Click handler for the toolbar Wukong button.
+// Connected → reveal, expand, and flash the HW Trace panel.
+// Disconnected → small popover explaining how the bridge works.
+function wukongConnBtnClick() {
+    const connected = _wukongIsConnected();
+    if (connected) {
+        const panel = document.getElementById('wukong-hw-log');
+        if (panel) {
+            panel.style.display = 'flex';
+            // Expand if collapsed (body hidden).
+            const body = document.getElementById('wukong-hw-log-body');
+            if (body && body.style.display === 'none') {
+                const hdr = document.getElementById('wukong-hw-log-hdr');
+                if (hdr) hdr.click();
+            }
+            panel.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            // Flash highlight so the user can find it.
+            const prevShadow = panel.style.boxShadow;
+            panel.style.transition = 'box-shadow 0.3s';
+            panel.style.boxShadow = '0 0 0 3px #44dd88, -2px -2px 12px rgba(0,0,0,0.5)';
+            setTimeout(function() { panel.style.boxShadow = prevShadow; }, 1600);
+        }
+        return;
+    }
+    // Disconnected → explain the bridge in a small popover.
+    let pop = document.getElementById('wukongConnPopover');
+    if (pop) { pop.remove(); return; }
+    pop = document.createElement('div');
+    pop.id = 'wukongConnPopover';
+    pop.style.cssText = 'position:fixed;top:52px;right:12px;z-index:10000;width:320px;background:#12122a;border:1px solid #3a3a5c;border-radius:8px;padding:14px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.6);font-size:0.82rem;color:#ccccee;line-height:1.55;';
+    pop.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+            '<span style="color:#f0c040;font-weight:bold;">\u26A1 Wukong Board</span>' +
+            '<button style="background:none;border:none;color:#8888cc;cursor:pointer;font-size:14px;" onclick="document.getElementById(\'wukongConnPopover\').remove()">\u2715</button>' +
+        '</div>' +
+        '<div style="color:#dd6644;font-weight:bold;margin-bottom:8px;">\u2717 Not connected</div>' +
+        '<div>Connect a QMTECH Wukong board by running the <b>bridge script</b> on the machine the board is plugged into. ' +
+        'The bridge reads the board\u2019s UART trace stream and forwards it to this IDE.</div>' +
+        '<div style="margin-top:8px;color:#8888cc;">Once trace packets arrive, this button turns <span style="color:#44dd88;">green</span> with a live NIA ticker, ' +
+        'and the <b>\u26A1 HW Trace</b> panel appears at the bottom-right corner of the browser.</div>';
+    document.body.appendChild(pop);
+    // Dismiss on outside click.
+    setTimeout(function() {
+        function outside(e) {
+            const p = document.getElementById('wukongConnPopover');
+            if (p && !p.contains(e.target) && e.target.id !== 'toolbarWukongBtn') {
+                p.remove();
+                document.removeEventListener('click', outside);
+            }
+        }
+        document.addEventListener('click', outside);
+    }, 0);
+}
+window.wukongConnBtnClick = wukongConnBtnClick;
 
 function _wukongUpdateCallDepthBadge() {
     const badge = document.getElementById('wukongCallDepthBadge');
@@ -14795,6 +14877,8 @@ function _wukongAppendTrace(data) {
     // Update the NIA ticker in the panel header.
     var niaTicker = document.getElementById('wukong-hw-log-nia');
     if (niaTicker) niaTicker.textContent = 'NIA ' + nia + (data.fault_valid ? ' ⚡' : ' ✓');
+    // Keep the toolbar Wukong button's NIA ticker live too.
+    if (typeof _wukongUpdateToolbarBtn === 'function') _wukongUpdateToolbarBtn(true);
 
     _appendToLog(hwLogBody, line, _WUKONG_HW_LOG_MAX);
     _appendToLog(con, line, 0);
