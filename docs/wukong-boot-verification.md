@@ -242,15 +242,100 @@ message with triage hints when either criterion is not met.
 
 ---
 
+## Step 4 — Fault-halt verification (Aug-7 bitstream and later)
+
+This step verifies the new `fault_halt` RTL change: any retired instruction with
+`fault_valid=True` automatically enters step-mode and halts the CM, exactly like
+a breakpoint hit.  This lets the IDE single-step through the fault without the CM
+silently retrying.
+
+**RTL location:** `hardware/wukong_top.py` lines 527–532:
+
+```python
+fault_halt = Signal()
+m.d.comb += fault_halt.eq(core.retire_valid & core.retire_fault_valid)
+
+with m.If(bp_hit | fault_halt):
+    m.d.sync += [step_mode.eq(1), step_halted.eq(1)]
+```
+
+### Procedure
+
+1. Start the bridge in the normal way (CM will be free-running):
+
+   ```bash
+   python3 hardware/wukong_bridge.py \
+       --port=/dev/ttyUSB0 \
+       --ide=https://<your-replit-url> \
+       --insecure
+   ```
+
+2. In the IDE, load a LUMP that performs a **NULL_CAP CALL** — the simplest
+   deliberate fault.  Example one-liner assembly:
+
+   ```
+   CALL CR0, CR0[0]    ; CR0 is NULL → NULL_CAP fault (fault_code=5)
+   ```
+
+   Any NULL-cap access (LOAD, SAVE, or CALL through a zero GT) works equally.
+
+3. Send **`'r'`** (run-free) from the IDE, then **`'h'`** immediately after to
+   let the CM reach the fault before the bridge can halt it, or just let it run
+   until the fault trace packet appears.
+
+4. **Expected observations:**
+
+   | Signal | Expected |
+   |--------|----------|
+   | Bridge console | Trace packet with `fault_valid=True`, `fault_code=NULL_CAP (5)`, `bp_hit=False` |
+   | Bridge console | `step_halted` state — subsequent `'s'` (step) commands do nothing until `'r'` |
+   | D2 (G20) | **ON** (LED active-LOW: FPGA drives LOW = lit) because `fault_latched` is now 1 |
+   | D1 (G21) | Stops blinking — CM is halted |
+
+5. Confirm the bridge console line contains `FAULT=` with a non-zero code:
+
+   ```
+   NIA=0x00000002  RESULT  FAULT=NULL_CAP(5)  bp_hit=False
+   ```
+
+6. **Recovery:** Send `'r'` to exit step-mode.  D1 resumes blinking.
+   D2 stays ON until the board is power-cycled or reset (`fault_latched` is a
+   sticky latch; it only clears on GSR).
+
+### Pass / Fail criteria
+
+| # | Check | Pass | Fail |
+|---|-------|------|------|
+| d1 | Trace packet has `fault_valid=True` | Yes | Bridge shows no fault packets |
+| d2 | CM halts (no further trace packets without `'s'`) | Yes | CM keeps running after fault |
+| d3 | D2 (G20) lights ON after fault | Yes | D2 stays OFF |
+| d4 | `'s'` (step) unblocks one retire, re-halts | Yes | No response to step command |
+
+> **If d1 passes but d2 fails** (CM does not halt): the `fault_halt` signal is
+> not reaching `step_mode` / `step_halted`.  Check that `bp_hit | fault_halt` is
+> wired into the sync update at lines 530–532 of `wukong_top.py`.
+
+> **If d2 passes but d3 fails** (D2 stays OFF): `fault_latched` is not connected
+> to the LED mux.  Check the `led[1]` drive in the boot-phase / run-phase mux at
+> the bottom of `wukong_top.py`.
+
+---
+
 ## Recording your result
 
-Once all three checks pass, note the outcome here (or in CHANGELOG.md):
+Once all four checks pass, note the outcome here (or in CHANGELOG.md):
 
 ```
 Date: ___________
+Bitstream: church_wukong_xc7a100t.bit  (Aug-7 build, WNS=5.19 ns)
 Bitstream SHA256: (sha256sum church_wukong_xc7a100t.bit)
-(a) 0xBB received:   YES / NO
-(b) D2 goes OFF:     YES / NO
-(c) D1 blinks ~1Hz:  YES / NO
+(a) 0xBC sentinel received:         YES / NO
+(b) D2 goes OFF (no fault):         YES / NO
+(c) D1 blinks ~1 Hz after 'r':      YES / NO
+(d) Fault-halt: NULL_CAP → halt:    YES / NO
+    d1 FAULT= trace packet:         YES / NO
+    d2 CM halts after fault:        YES / NO
+    d3 D2 ON after fault:           YES / NO
+    d4 's' steps one retire:        YES / NO
 Notes:
 ```
