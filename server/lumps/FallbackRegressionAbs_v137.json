@@ -1,16 +1,16 @@
 {
-  "token": "00000600",
-  "abstraction": "SelfTest",
-  "filename": "SelfTest_v76.lump",
-  "sidecar_file": "SelfTest_v76.json",
-  "ns_slot": 6,
+  "token": "fa110003",
+  "abstraction": "FallbackRegressionAbs",
+  "filename": "FallbackRegressionAbs_v137.lump",
+  "sidecar_file": "FallbackRegressionAbs_v137.json",
+  "ns_slot": null,
   "lump_size": 64,
   "typ": 0,
   "content_type": "code",
-  "cw": 17,
-  "cc": 8,
+  "cw": 1,
+  "cc": 0,
   "profile": "IoT",
-  "language": "unknown",
+  "language": "assembly",
   "author": "",
   "version": "",
   "release_notes": "",
@@ -29,13 +29,13 @@
   "deployment": {
     "target_board": "ti60-f225",
     "profile": "IoT",
-    "built_at": "2026-08-07T08:29:53.883070Z",
+    "built_at": "2026-08-07T08:30:18.263021Z",
     "builder": "CLOOMC++ IDE v1.0"
   },
   "grants": [
     "E"
   ],
   "source": "",
-  "lump_version": 76,
-  "compiled_at": 1786091393.8830812
+  "lump_version": 137,
+  "compiled_at": 1786091418.2630327
 }

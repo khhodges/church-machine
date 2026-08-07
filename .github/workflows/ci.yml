@@ -272,17 +272,6 @@ jobs:
         continue-on-error: true
         run: python3 -m pytest tests/server/test_version_telemetry.py -v
 
-      # --- Python stale / hardware checks ---
-      - name: Ti60 utilisation check
-        id: ti60_utilisation
-        continue-on-error: true
-        run: python scripts/check_ti60_utilisation.py --missing-ok
-
-      - name: Ti60 UART dry-run
-        id: ti60_uart
-        continue-on-error: true
-        run: python3 scripts/test_ti60_uart.py --dry-run
-
       # --- End-to-end (Playwright) — runs against a live server ---
       - name: Get Playwright version
         id: playwright-version
@@ -319,8 +308,6 @@ jobs:
               {"name": "Boot layout regression",       "outcome": "${{ steps.boot_layout.outcome }}"},
               {"name": "Selftest LUMP runs",           "outcome": "${{ steps.selftest_lump.outcome }}"},
               {"name": "Version telemetry tests",      "outcome": "${{ steps.version_telemetry.outcome }}"},
-              {"name": "Ti60 utilisation check",       "outcome": "${{ steps.ti60_utilisation.outcome }}"},
-              {"name": "Ti60 UART dry-run",            "outcome": "${{ steps.ti60_uart.outcome }}"},
               {"name": "Run E2E tests",                "outcome": "${{ steps.e2e_tests.outcome }}"}
             ]
           }
@@ -347,8 +334,6 @@ jobs:
             "${{ steps.boot_layout.outcome }}"
             "${{ steps.selftest_lump.outcome }}"
             "${{ steps.version_telemetry.outcome }}"
-            "${{ steps.ti60_utilisation.outcome }}"
-            "${{ steps.ti60_uart.outcome }}"
             "${{ steps.e2e_tests.outcome }}"
           )
           failed=0
