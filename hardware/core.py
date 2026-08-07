@@ -113,7 +113,8 @@ class ChurchCore(Elaboratable):
         #           load_new_gt    = new GT being written by the mload bus
         #   CHANGE: cr12_gt = new CR12 (committed to register file before retire)
         #           cr5_gt  = new CR5  (committed to register file before retire)
-        #   CALL:   cr6_gt  = new CR6  (committed to register file before retire)
+        #   CALL/ELOADCALL/XLOADLAMBDA:
+        #           cr6_gt  = new CR6  (committed to register file before retire)
         #           cr14_gt = new CR14 (committed to register file before retire)
         #   RETURN: cr6_gt  = E-GT from stack frame (u_return.cload_e_gt)
         #           cr14_gt = current CR14 (approximate; cload updates post-retire)

@@ -596,6 +596,8 @@ class ChurchWukongXC7A100T(Elaboratable):
         #   LOAD           LOAD_SHADOW (old CR_dst GT) + LOAD_NEW (new GT)
         #   CHANGE         CHANGE_PUSH + CHANGE_CR12  + CHANGE_CR5
         #   CALL           CALL_CR6   + CALL_CR14    + CALL_PUSH
+        #   ELOADCALL      CALL_CR6   + CALL_CR14    + CALL_PUSH
+        #   XLOADLAMBDA    CALL_CR6   + CALL_CR14    + CALL_PUSH
         #   RETURN         RETURN_POP + RETURN_CR6   + RETURN_CR14
         #   all others     RESULT (single packet, payload=0)
         #
@@ -697,6 +699,30 @@ class ChurchWukongXC7A100T(Elaboratable):
                                 tq_data[2].eq(core.retire_trace_cr5_gt),
                             ]
                         with m.Case(ChurchOpcode.CALL):    # 0b0010
+                            m.d.sync += [
+                                tq_len.eq(3),
+                                tq_type[0].eq(_TRACE_EV_CALL_CR6),
+                                tq_data[0].eq(core.retire_trace_cr6_gt),
+                                tq_type[1].eq(_TRACE_EV_CALL_CR14),
+                                tq_data[1].eq(core.retire_trace_cr14_gt),
+                                tq_type[2].eq(_TRACE_EV_CALL_PUSH),
+                                tq_data[2].eq(0),
+                            ]
+                        with m.Case(ChurchOpcode.ELOADCALL):    # 0b1000
+                            # ELOADCALL modifies CR6 and CR14 identically to CALL
+                            # (fused LOAD+TPERM(E)+CALL); emit the same 3-event sequence.
+                            m.d.sync += [
+                                tq_len.eq(3),
+                                tq_type[0].eq(_TRACE_EV_CALL_CR6),
+                                tq_data[0].eq(core.retire_trace_cr6_gt),
+                                tq_type[1].eq(_TRACE_EV_CALL_CR14),
+                                tq_data[1].eq(core.retire_trace_cr14_gt),
+                                tq_type[2].eq(_TRACE_EV_CALL_PUSH),
+                                tq_data[2].eq(0),
+                            ]
+                        with m.Case(ChurchOpcode.XLOADLAMBDA):  # 0b1001
+                            # XLOADLAMBDA modifies CR6 and CR14 identically to CALL
+                            # (fused LOAD+TPERM(X)+LAMBDA); emit the same 3-event sequence.
                             m.d.sync += [
                                 tq_len.eq(3),
                                 tq_type[0].eq(_TRACE_EV_CALL_CR6),
