@@ -174,10 +174,14 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         # ── Boot ROM (instruction fetch — read-only BRAM tile) ─────────────────
         boot_rom = m.submodules.boot_rom = BootRom(_WUKONG_ROM)
-        m.d.comb += [
-            boot_rom.addr.eq(core.imem_addr[2:12]),
-            core.imem_data.eq(boot_rom.data),
-        ]
+        m.d.comb += boot_rom.addr.eq(core.imem_addr[2:12])
+        # imem source mux: NIA 0x0-0xB fetches BOOT_PROGRAM from the 3-word ROM;
+        # everything else fetches from DMEM via a dedicated read port (below),
+        # so the WukongCallHome LUMP body at word 448 — and any IDE-uploaded
+        # code — actually executes.  Both sources have 1-cycle latency, so the
+        # select is registered to stay aligned with the data.
+        imem_from_dmem = Signal()
+        m.d.sync += imem_from_dmem.eq(core.imem_addr >= 0xC)
 
         # ── Data memory (BRAM, 16 384 × 32-bit = 64 KB) ───────────────────────
         # init= is used for simulation accuracy only.  On real FPGA hardware the
@@ -229,6 +233,19 @@ class ChurchWukongXC7A100T(Elaboratable):
         _wch_header = (0x1F << 27) | (1 << 23) | (_wch_cw << 10)  # n_minus_6=1
         for _i, _v in enumerate([_wch_header] + list(WUKONG_NUC_PROGRAM)):
             dmem_init[0x1C0 + _i] = _v
+
+        # Thread.caps[0] = WukongCallHome E-GT — the standalone boot entry.
+        # Thread base = NS slot 1 word0_location = 0 (Thread lump aliases DMEM
+        # base by design), so caps[0] = word THREAD_CAPS_OFFSET (244).
+        # BOOT_PROGRAM[2] = CALL CR0,CR0[0] resolves THIS word (not clist[0]).
+        # Without it the factory image faults cleanly at boot and loops forever
+        # — the bug behind the v6 endless LOAD@0 trace on real hardware.
+        dmem_init[244] = 0x4A000007     # caps[0] = WukongCallHome E-GT (NS slot 7)
+
+        # Thread.caps[12] = S-perm Boot.Thread GT: RESTORE_CALL[12] loads
+        # CR12 from DMEM[256]; a null there faults FETCH_THREAD_HDR post-boot.
+        # (Same two words hardware/test_boot_rom_no_false_halt.py bakes in.)
+        dmem_init[256] = make_gt(GT_TYPE_INFORM, PERM_MASK_S, 1, 0)
         # Words 0x1EA..0x23F remain zero (padding to 128-word alloc boundary).
 
         hw_init_pairs = [(addr, val)
@@ -243,6 +260,15 @@ class ChurchWukongXC7A100T(Elaboratable):
             shape=unsigned(32), depth=16384, init=dmem_init)
         dmem_rd = dmem.read_port(domain="sync")
         dmem_wr = dmem.write_port()
+
+        # Dedicated instruction-fetch read port (BRAM port; Vivado duplicates
+        # the BRAM to satisfy 3 ports — both copies share the write port, so
+        # IDE uploads stay coherent with executed code).
+        imem_rd = dmem.read_port(domain="sync")
+        m.d.comb += [
+            imem_rd.addr.eq(core.imem_addr[2:16]),
+            core.imem_data.eq(Mux(imem_from_dmem, imem_rd.data, boot_rom.data)),
+        ]
 
         # ── Memory address mux ─────────────────────────────────────────────────
         mem_addr = Signal(14)

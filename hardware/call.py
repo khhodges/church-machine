@@ -11,6 +11,9 @@ from .stack_frame import stack_slot_addr
 class ChurchCall(Elaboratable):
     def __init__(self):
         self.call_start = Signal()
+        self.boot_window = Signal()  # 1 during BOOT_PROGRAM microcode (first 3 retires)
+        self.dbg_src_gt = Signal(32)     # debug tap: latched src CR word0_gt
+        self.dbg_fsm_state = Signal(8)   # debug tap: CALL FSM state index
         self.cr_src = Signal(4)
         self.index = Signal(16)
         self.call_imm = Signal(15)  # method index from CALL imm15; 0 = single entry (NIA=lump_base+4)
@@ -225,9 +228,17 @@ class ChurchCall(Elaboratable):
             self.mload_cr_src.eq(mload_src),
             self.mload_cr_dst.eq(mload_dst),
             self.mload_index.eq(mload_index),
-            self.mload_direct.eq(0),
+            # Boot-window: BOOT_PROGRAM[2] = CALL CR0 calls THROUGH CR0's own
+            # E-GT (restored from Thread.caps[0] by CHANGE) — there is no
+            # caller c-list to index (Phase 1), and the boot lump carries no
+            # embedded c-list either (Phase 2 would misread the lump header as
+            # a GT).  Resolve the src GT directly in both phases; SET_M_WRITE
+            # then forces X=1 on CR14 so instruction fetch passes PERM_X.
+            # Post-boot CALLs keep the normal c-list-indexed fetch.
+            self.mload_direct.eq(self.boot_window),
             self.mload_m_elevated.eq(1),
-            self.mload_direct_gt.eq(0),
+            self.mload_direct_gt.eq(
+                Mux(self.boot_window, src_view.word0_gt.as_value(), 0)),
         ]
 
         m.d.comb += [
@@ -695,6 +706,8 @@ class ChurchCall(Elaboratable):
 
         m.d.comb += [
             self.call_busy.eq(~fsm.ongoing("IDLE")),
+            self.dbg_src_gt.eq(src_view.word0_gt.as_value()),
+            self.dbg_fsm_state.eq(fsm.state),
             self.call_complete.eq(fsm.ongoing("COMPLETE") | fsm.ongoing("M_FETCH_DONE")),
             self.call_normal_complete.eq(fsm.ongoing("COMPLETE")),
             self.call_fault.eq(fault_latched),

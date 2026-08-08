@@ -99,7 +99,17 @@ class ChurchChange(Elaboratable):
         mload_fault_latched = Signal()
 
         effective_mask = Signal(16)
-        m.d.comb += effective_mask.eq(mask_latched & ~RESERVED_MASK)
+        # Boot-window (M-elevated) restore mask: CR0 + CR12 only.
+        # The decoder permanently scrubs call_mask to 0 (imm15 now carries a
+        # method index, not a mask), which silently turned RESTORE_CALL into a
+        # universal no-op — but BOOT_PROGRAM[2] = CALL CR0 depends on CHANGE
+        # restoring CR0 from Thread.caps[0] (DMEM word 244) and CR12 from
+        # caps[12] (word 256).  Restore exactly those two during boot.
+        BOOT_RESTORE_MASK = (1 << 0) | (1 << 12)
+        m.d.comb += effective_mask.eq(
+            Mux(self.m_elevated,
+                C(BOOT_RESTORE_MASK, 16),
+                mask_latched & ~RESERVED_MASK))
 
         skip_current_cr = Signal()
         m.d.comb += skip_current_cr.eq((cr_index > 14) | ~effective_mask.bit_select(cr_index, 1))

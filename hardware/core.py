@@ -221,6 +221,8 @@ class ChurchCore(Elaboratable):
         # Simulation-only observability; tied to 0 at the synthesis boundary.
         # CR12 must hold an Inform GT (slot_id=1) after boot.
         # CR8 must remain NULL (0x00000000) after boot — it is never written by the FSM.
+        self.dbg_call_src_gt = Signal(32)   # debug tap: CALL unit latched src GT
+        self.dbg_call_state = Signal(8)     # debug tap: CALL FSM state
         self.dbg_cr12_gt = Signal(32)   # CR12 thread-stack GT word0 — INFORM(slot=1) after boot
         self.dbg_cr8_gt  = Signal(32)   # CR8 GT word0 — must remain NULL (0) after boot
 
@@ -1098,6 +1100,9 @@ class ChurchCore(Elaboratable):
 
         m.d.comb += [
             u_call.call_start.eq(call_start_sig),
+            u_call.boot_window.eq(boot_microcode_active),
+            self.dbg_call_src_gt.eq(u_call.dbg_src_gt),
+            self.dbg_call_state.eq(u_call.dbg_fsm_state),
             u_call.cr_src.eq(cr_src),
             u_call.index.eq(0),               # CALL uses call_imm for method-table dispatch; c-list index always 0
             u_call.call_imm.eq(u_decoder.call_imm),
