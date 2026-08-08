@@ -10022,6 +10022,32 @@ def wukong_events_get():
         if 14 in _wukong_latest_cr_gts:
             resp['cr14_gt'] = _wukong_latest_cr_gts[14]
     return jsonify(resp)
+@app.route('/hardware/wukong/console', methods=['POST'])
+def wukong_console_post():
+    """Bridge posts a line of raw UART ASCII output (banner text etc.).
+
+    Merged into the same ordered event queue as trace packets so the /fpga
+    page's live event log shows ALL board output in arrival order.
+    Body JSON: {'text': str, 'ts': float}
+    """
+    global _wukong_event_seq
+    data = request.get_json(silent=True) or {}
+    text = str(data.get('text', ''))[:400]
+    if not text.strip():
+        return jsonify({'ok': True})
+    entry = {
+        'console': text,
+        'ts':      float(data.get('ts', 0.0)),
+    }
+    with _wukong_trace_lock:
+        _wukong_event_seq += 1
+        entry['seq'] = _wukong_event_seq
+        _wukong_event_queue.append(entry)
+        if len(_wukong_event_queue) > _WUKONG_EVENT_QUEUE_MAXLEN:
+            del _wukong_event_queue[:-_WUKONG_EVENT_QUEUE_MAXLEN]
+    return jsonify({'ok': True})
+
+
 @app.route('/hardware/wukong/command', methods=['POST'])
 def wukong_command_post():
     """IDE enqueues a command for the bridge to forward to the board.

@@ -342,6 +342,27 @@ def main():
     buf       = bytearray()
     last_poll = 0.0
 
+    # ── UART ASCII console forwarding ────────────────────────────────────
+    # Printable UART bytes (banner text etc.) are line-buffered and POSTed
+    # to the IDE so the /fpga page's live event log shows ALL board output,
+    # not just decoded trace packets.
+    _console_line  = []     # chars of the line currently being assembled
+    _console_last  = [0.0]  # time of last char appended (for idle flush)
+
+    def _console_flush(base, vtls):
+        if not _console_line:
+            return
+        text = ''.join(_console_line)
+        _console_line.clear()
+        if not text.strip():
+            return
+        try:
+            requests.post(f'{base}/hardware/wukong/console',
+                          json={'text': text, 'ts': time.time()},
+                          timeout=1, verify=vtls)
+        except Exception as exc:
+            print(f'  [console POST error] {exc}')
+
     def _reopen_serial():
         """Close and reopen the serial port; return the new Serial object.
 
@@ -507,11 +528,24 @@ def main():
                 else:
                     ch = buf[i]
                     print(chr(ch) if 32 <= ch < 128 else '.', end='', flush=True)
+                    # Accumulate printable UART bytes into a line buffer so the
+                    # IDE's /fpga page can show the raw ASCII output too.
+                    if ch in (0x0A, 0x0D):
+                        _console_flush(ide_base, verify_tls)
+                    elif 32 <= ch < 128:
+                        _console_line.append(chr(ch))
+                        _console_last[0] = time.time()
+                        if len(_console_line) >= 200:   # runaway line safety
+                            _console_flush(ide_base, verify_tls)
                     i += 1
 
             del buf[:i]
 
             now = time.time()
+            # Idle flush: a partial line with no newline (e.g. a banner that
+            # ends without \n) is forwarded after 0.5 s of UART silence.
+            if _console_line and now - _console_last[0] >= 0.5:
+                _console_flush(ide_base, verify_tls)
             if now - last_poll >= 0.05:
                 last_poll = now
                 try:

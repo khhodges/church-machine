@@ -221,6 +221,10 @@
 
   function renderEvent(e) {
     var t = e.ts ? new Date(e.ts * 1000).toLocaleTimeString() : '--:--:--';
+    if (e.console !== undefined) {
+      addLine('[' + t + '] #' + e.seq + '  UART: ' + e.console, 'ev-uart');
+      return;
+    }
     var evName = EV_NAMES[e.ev_type] !== undefined ? EV_NAMES[e.ev_type]
                : ('EV_0x' + (e.ev_type || 0).toString(16).toUpperCase());
     var line = '[' + t + '] #' + e.seq + '  NIA=' + hex(e.nia) + '  ' + evName;
