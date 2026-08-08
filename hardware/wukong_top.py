@@ -57,7 +57,7 @@ from .uart_rx import UartRx
 # Increment this by 1 every time a new bitstream is synthesised and flashed.
 # The bridge reports it to the IDE so the FPGA status page can confirm exactly
 # which build is running — no need to reprogram just to check.
-WUKONG_BUILD_VERSION = 2   # ← bump this before each new synthesis run
+WUKONG_BUILD_VERSION = 4   # ← bump this before each new synthesis run
 
 # ── Wukong ROM: 3-instruction BOOT_PROGRAM ────────────────────────────────────
 # Architecture doc:             docs/wukong-boot.md
@@ -440,8 +440,17 @@ class ChurchWukongXC7A100T(Elaboratable):
                     m.d.comb += banner_byte.eq(C(b, 8))
             with m.Default():
                 m.d.comb += banner_byte.eq(0)
+        # tx_free: UART TX can accept a new byte THIS cycle.  ~busy alone is
+        # NOT sufficient: UartTx has a one-cycle DONE state (busy=0, done=1)
+        # during which `start` is ignored — a requester that advances its
+        # byte counter on `~busy` double-increments across that cycle and
+        # silently skips every other byte (bug: sentinel came out as
+        # 0xBC TU_VERSION instead of 0xBC N_INIT TU_VERSION BUILD_VERSION).
+        tx_free = Signal()
+        m.d.comb += tx_free.eq(~uart_tx.busy & ~uart_tx.done)
+
         # Advance banner on each accepted byte (start pulse fired = accepted)
-        with m.If(banner_req & ~uart_tx.busy & ~cm_tx_start):
+        with m.If(banner_req & tx_free & ~cm_tx_start):
             with m.If(banner_idx == _N_BANNER - 1):
                 m.d.sync += [banner_done.eq(1), banner_idx.eq(0)]
             with m.Else():
@@ -454,7 +463,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         # 'f' command clears sentinel_sent so the full 4-byte sequence re-fires.
         sentinel_req = Signal()
         m.d.comb += sentinel_req.eq(boot_triggered & ~sentinel_sent)
-        with m.If(sentinel_req & ~uart_tx.busy & ~cm_tx_start & ~banner_req):
+        with m.If(sentinel_req & tx_free & ~cm_tx_start & ~banner_req):
             with m.If(sentinel_phase == 0):
                 m.d.sync += sentinel_phase.eq(1)   # 0xBC accepted → queue N_INIT byte
             with m.Elif(sentinel_phase == 1):
@@ -477,12 +486,12 @@ class ChurchWukongXC7A100T(Elaboratable):
                                                               trace_tx_byte))))))))  ,
             uart_tx.start.eq(
                 cm_tx_start |
-                (banner_req      & ~uart_tx.busy & ~cm_tx_start) |
-                (sentinel_req    & ~uart_tx.busy & ~cm_tx_start & ~banner_req) |
-                (upload_ack_req  & ~uart_tx.busy & ~cm_tx_start & ~sentinel_req & ~banner_req) |
-                (trace_tx_req    & ~uart_tx.busy & ~cm_tx_start & ~sentinel_req & ~banner_req & ~upload_ack_req)),
+                (banner_req      & tx_free & ~cm_tx_start) |
+                (sentinel_req    & tx_free & ~cm_tx_start & ~banner_req) |
+                (upload_ack_req  & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req) |
+                (trace_tx_req    & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req & ~upload_ack_req)),
             trace_tx_ack.eq(
-                trace_tx_req & ~uart_tx.busy & ~cm_tx_start & ~sentinel_req & ~banner_req & ~upload_ack_req),
+                trace_tx_req & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req & ~upload_ack_req),
         ]
 
         is_mmio_read = Signal()
@@ -796,7 +805,11 @@ class ChurchWukongXC7A100T(Elaboratable):
                 # Transition to IDLE on the same cycle the start pulse fires
                 # (the byte is already latched into the UART TX shift register).
                 m.d.comb += upload_ack_req.eq(1)
-                with m.If(~uart_tx.busy & ~cm_tx_start & ~sentinel_req & ~banner_req):
+                # Must mirror the arbitrator's accepted-start condition exactly
+                # (tx_free, not bare ~busy): during UartTx's one-cycle DONE
+                # state busy=0 but start is ignored — leaving on ~busy alone
+                # would drop the 0x06 ACK byte.
+                with m.If(tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req):
                     m.next = "IDLE"
 
         # ── TraceUnit FSM ──────────────────────────────────────────────────────
