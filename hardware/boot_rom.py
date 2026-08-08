@@ -637,7 +637,7 @@ WUKONG_DEMO_NAMESPACE[WUKONG_CALLHOME_NS_SLOT * 4 + 2] = integrity32(_wch_loc_by
 #   idx 10 — Constants R-GT cleared: NS slot 9 absent in Wukong 8-slot NS
 # ---------------------------------------------------------------------------
 WUKONG_DEMO_CLIST = list(DEMO_CLIST)
-WUKONG_DEMO_CLIST[0]  = 0x4A000006  # SelfTest E-GT (NS slot 6) — boots standalone without IDE upload
+WUKONG_DEMO_CLIST[0]  = 0x4A000007  # WukongCallHome E-GT (NS slot 7) — has actual code in DMEM; loops forever (no RETURN to caller)
 WUKONG_DEMO_CLIST[9]  = 0           # SlideRule E-GT cleared: NS slot 8 absent in Wukong 8-slot NS
 WUKONG_DEMO_CLIST[10] = 0           # Constants R-GT cleared: NS slot 9 absent in Wukong 8-slot NS
 

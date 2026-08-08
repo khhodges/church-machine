@@ -26232,7 +26232,7 @@ module church_wukong_xc7a100t(rst_n, uart_rx_pin, led0, led1, uart_tx_pin, dbg_b
     dmem[253] = 32'd0;
     dmem[254] = 32'd0;
     dmem[255] = 32'd0;
-    dmem[256] = 32'd1241513990;
+    dmem[256] = 32'd1241513991;
     dmem[257] = 32'd0;
     dmem[258] = 32'd0;
     dmem[259] = 32'd1241513990;
@@ -42401,7 +42401,7 @@ module church_wukong_xc7a100t(rst_n, uart_rx_pin, led0, led1, uart_tx_pin, dbg_b
     init_rom[26] = 46'h001d0000007f;
     init_rom[27] = 46'h001edea1deef;
     init_rom[28] = 46'h001f48000000;
-    init_rom[29] = 46'h01004a000006;
+    init_rom[29] = 46'h01004a000007;
     init_rom[30] = 46'h01034a000006;
     init_rom[31] = 46'h0105b2000003;
     init_rom[32] = 46'h0106b2000002;
