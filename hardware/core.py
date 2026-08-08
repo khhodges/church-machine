@@ -147,6 +147,12 @@ class ChurchCore(Elaboratable):
         self.free_run_start = Signal()   # pulse high for 1 cycle to jump to free_run_nia
         self.free_run_nia   = Signal(32) # target byte address when free_run_start fires
 
+        # External reboot request: pulse high for 1 cycle to force the same
+        # FAULT_RST path a post-boot fault takes — clear_all wipes registers,
+        # the boot ladder re-runs (LOAD_NS→INIT_THRD→INIT_CLIST→LOAD_NUC),
+        # and execution restarts at NIA=0.  REBOOT and FAULT both zero the NIA.
+        self.reboot_req     = Signal()
+
         self.nia = Signal(32)
         self.flags = Signal(COND_FLAGS_LAYOUT)
 
@@ -818,7 +824,8 @@ class ChurchCore(Elaboratable):
             ),
         ]
 
-        with m.If(u_return.reboot_request | (self.fault_valid & self.boot_complete)):
+        with m.If(u_return.reboot_request | self.reboot_req |
+                  (self.fault_valid & self.boot_complete)):
             m.d.sync += [boot_state_reg.eq(BootState.FAULT_RST), nia_reg.eq(0)]
         with m.Elif(clear_all):
             m.d.sync += nia_reg.eq(0)

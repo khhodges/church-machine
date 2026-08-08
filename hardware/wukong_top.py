@@ -57,7 +57,7 @@ from .uart_rx import UartRx
 # Increment this by 1 every time a new bitstream is synthesised and flashed.
 # The bridge reports it to the IDE so the FPGA status page can confirm exactly
 # which build is running — no need to reprogram just to check.
-WUKONG_BUILD_VERSION = 5   # ← bump this before each new synthesis run
+WUKONG_BUILD_VERSION = 6   # ← bump this before each new synthesis run
 
 # ── Wukong ROM: 3-instruction BOOT_PROGRAM ────────────────────────────────────
 # Architecture doc:             docs/wukong-boot.md
@@ -568,7 +568,9 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         # ── Core control signals ───────────────────────────────────────────────
         fault_latched = Signal()
-        m.d.sync += fault_latched.eq(fault_latched | core.fault_valid)
+        cm_reboot     = Signal()   # 1-cycle pulse from 'f' — full CM reboot (FAULT_RST, NIA=0)
+        m.d.sync += fault_latched.eq(~cm_reboot & (fault_latched | core.fault_valid))
+        m.d.comb += core.reboot_req.eq(cm_reboot)
 
         # step_mode=1 (default when IDE-connected): CM halts after each retired
         #   instruction and waits for an 's' command before executing the next one.
@@ -664,13 +666,20 @@ class ChurchWukongXC7A100T(Elaboratable):
                         with m.Case(0x62):  # 'b'
                             m.d.sync += bp_recv_cnt.eq(0)
                             m.next = "BP_RECV"
-                        with m.Case(0x66):  # 'f' — force sentinel retransmit
-                            # Clear sentinel_sent so sentinel_req goes high again
-                            # (sentinel_req = boot_triggered & ~sentinel_sent).
-                            # The UART TX arbitrator will send 0xBC N_INIT TU_VERSION
-                            # on the next free TX slot, letting the bridge re-detect
-                            # the running bitstream identity without reprogramming.
-                            m.d.sync += [sentinel_sent.eq(0), sentinel_phase.eq(0)]
+                        with m.Case(0x66):  # 'f' — full CM reboot + sentinel retransmit
+                            # REBOOT and FAULT both zero the NIA: pulse reboot_req
+                            # so the core takes the same FAULT_RST path a post-boot
+                            # fault takes (clear_all → boot ladder → NIA=0), then
+                            # BOOT_PROGRAM re-executes (LOAD/CHANGE/CALL trace
+                            # events re-fire).  DMEM is NOT reloaded, so uploaded
+                            # lump changes take effect on the reboot.
+                            # Also re-arm the sentinel and clear the fault latch +
+                            # step state so the CM free-runs after the reboot.
+                            m.d.comb += cm_reboot.eq(1)
+                            m.d.sync += [
+                                sentinel_sent.eq(0), sentinel_phase.eq(0),
+                                step_mode.eq(0), step_halted.eq(0),
+                            ]
                         with m.Case(0x75):  # 'u' — upload
                             # Halt the CM immediately; it stays halted until
                             # UPLOAD_ACK sends the 0x06 completion byte and the
