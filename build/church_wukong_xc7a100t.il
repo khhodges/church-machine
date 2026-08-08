@@ -1373,7 +1373,7 @@ module \top
     parameter \WIDTH 8
     connect \S $16 [0]
     connect \A $17 [7:0]
-    connect \B 8'00000001
+    connect \B 8'00000010
     connect \Y $18
   end
 
@@ -3933,6 +3933,27 @@ module \top
             assign $178 [1:0] 2'11
           case
         end
+    end
+    switch \cmd_parser_state [2:0]
+      case 3'000
+        switch \valid [0]
+          case 1'1
+            switch \data$101 [7:0]
+              case 8'01110011
+              case 8'01110010
+              case 8'01101000
+              case 8'01100010
+              case 8'01100110
+                assign $178 [1:0] 2'00
+              case 8'01110101
+            end
+        end
+      case 3'001
+      case 3'011
+      case 3'010
+      case 3'100
+      case 3'101
+      case 3'110
     end
   end
 

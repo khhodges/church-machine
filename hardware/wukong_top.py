@@ -57,7 +57,7 @@ from .uart_rx import UartRx
 # Increment this by 1 every time a new bitstream is synthesised and flashed.
 # The bridge reports it to the IDE so the FPGA status page can confirm exactly
 # which build is running — no need to reprogram just to check.
-WUKONG_BUILD_VERSION = 1   # ← bump this before each new synthesis run
+WUKONG_BUILD_VERSION = 2   # ← bump this before each new synthesis run
 
 # ── Wukong ROM: 3-instruction BOOT_PROGRAM ────────────────────────────────────
 # Architecture doc:             docs/wukong-boot.md
@@ -661,7 +661,7 @@ class ChurchWukongXC7A100T(Elaboratable):
                             # The UART TX arbitrator will send 0xBC N_INIT TU_VERSION
                             # on the next free TX slot, letting the bridge re-detect
                             # the running bitstream identity without reprogramming.
-                            m.d.sync += sentinel_sent.eq(0)
+                            m.d.sync += [sentinel_sent.eq(0), sentinel_phase.eq(0)]
                         with m.Case(0x75):  # 'u' — upload
                             # Halt the CM immediately; it stays halted until
                             # UPLOAD_ACK sends the 0x06 completion byte and the
