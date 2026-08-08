@@ -177,7 +177,9 @@ def add_cache_control(response):
 
 @app.route("/dl/wukong-bridge")
 def download_wukong_bridge():
-    p = os.path.join(os.path.dirname(__file__), "wukong_bridge.py")
+    # Serve the canonical bridge from hardware/ — server/wukong_bridge.py was a
+    # stale duplicate that caused users to download an outdated bridge.
+    p = os.path.join(os.path.dirname(__file__), "..", "hardware", "wukong_bridge.py")
     return send_file(os.path.abspath(p), as_attachment=True,
                      download_name="wukong_bridge.py",
                      mimetype="text/plain")
