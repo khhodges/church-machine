@@ -89,6 +89,7 @@ class ChurchNSGate(Elaboratable):
         gt_view        = View(GT_LAYOUT, gt_latched)
         fault_type_reg = Signal(5)
 
+        rd_armed = Signal()  # stale-valid guard for FETCH_LOC (see below)
         raw_base_reg = Signal(32)
         raw_w2_reg   = Signal(32)
         raw_w3_reg   = Signal(32)
@@ -122,6 +123,7 @@ class ChurchNSGate(Elaboratable):
                         raw_w2_reg.eq(0),
                         raw_w3_reg.eq(0),
                         fault_type_reg.eq(FaultType.NONE),
+                        rd_armed.eq(0),
                     ]
                     if self.enable_seal_check:
                         m.d.sync += raw_integrity_reg.eq(0)
@@ -132,8 +134,15 @@ class ChurchNSGate(Elaboratable):
                     self.mem_addr.eq(ns_entry_addr),
                     self.mem_rd_en.eq(1),
                 ]
-                with m.If(self.mem_rd_valid):
-                    m.d.sync += raw_base_reg.eq(self.mem_rd_data)
+                # rd_armed: dmem_rd_valid is a shared 1-cycle-delayed rd_en; a
+                # read pulsed by another bus master the cycle before FETCH_LOC
+                # is entered leaves a stale valid (with that master's data) on
+                # our first cycle.  Accepting it shifts ALL four entry-word
+                # reads by one word — and RESET_GBIT then writes the shifted
+                # (wrong) w1 back to entry+4, corrupting the NS table.
+                m.d.sync += rd_armed.eq(1)
+                with m.If(self.mem_rd_valid & rd_armed):
+                    m.d.sync += [raw_base_reg.eq(self.mem_rd_data), rd_armed.eq(0)]
                     m.next = "FETCH_W1"
 
             with m.State("FETCH_W1"):
@@ -141,8 +150,11 @@ class ChurchNSGate(Elaboratable):
                     self.mem_addr.eq(ns_entry_addr + 4),
                     self.mem_rd_en.eq(1),
                 ]
-                with m.If(self.mem_rd_valid):
-                    m.d.sync += raw_w2_reg.eq(self.mem_rd_data)
+                # Same stale-valid guard: the PREVIOUS state's final read
+                # leaves valid=1 (with its data) on this state's first cycle.
+                m.d.sync += rd_armed.eq(1)
+                with m.If(self.mem_rd_valid & rd_armed):
+                    m.d.sync += [raw_w2_reg.eq(self.mem_rd_data), rd_armed.eq(0)]
                     if self.enable_seal_check:
                         m.next = "FETCH_W2"
                     else:
@@ -154,8 +166,10 @@ class ChurchNSGate(Elaboratable):
                         self.mem_addr.eq(ns_entry_addr + 8),
                         self.mem_rd_en.eq(1),
                     ]
-                    with m.If(self.mem_rd_valid):
-                        m.d.sync += raw_integrity_reg.eq(self.mem_rd_data)
+                    m.d.sync += rd_armed.eq(1)
+                    with m.If(self.mem_rd_valid & rd_armed):
+                        m.d.sync += [raw_integrity_reg.eq(self.mem_rd_data),
+                                     rd_armed.eq(0)]
                         m.next = "CHECK_INTEGRITY"
 
                 with m.State("CHECK_INTEGRITY"):
@@ -182,8 +196,9 @@ class ChurchNSGate(Elaboratable):
                     self.mem_addr.eq(ns_entry_addr + 12),
                     self.mem_rd_en.eq(1),
                 ]
-                with m.If(self.mem_rd_valid):
-                    m.d.sync += raw_w3_reg.eq(self.mem_rd_data)
+                m.d.sync += rd_armed.eq(1)
+                with m.If(self.mem_rd_valid & rd_armed):
+                    m.d.sync += [raw_w3_reg.eq(self.mem_rd_data), rd_armed.eq(0)]
                     m.next = "DONE"
 
             with m.State("DONE"):

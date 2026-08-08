@@ -126,6 +126,7 @@ class ChurchMLoad(Elaboratable):
         m.d.comb += ns_index_in_bounds.eq(result_gt.slot_id < ns_ns_w2.limit_offset[:16])
 
         ns_w1_saved = Signal(32)
+        rd_armed = Signal()  # stale-valid guard for FETCH_GT (see below)
 
         # Latched outform context (set in FETCH_GT when typ == GT_TYPE_OUTFORM)
         outform_clist_addr_reg = Signal(32)
@@ -170,6 +171,7 @@ class ChurchMLoad(Elaboratable):
                         m_elevated_reg.eq(self.sub_m_elevated),
                         result_cap.eq(0),
                         fault_type_reg.eq(FaultType.NONE),
+                        rd_armed.eq(0),
                     ]
                     m.next = "FETCH_SRC"
 
@@ -214,7 +216,14 @@ class ChurchMLoad(Elaboratable):
                     local_mem_addr.eq(clist_gt_addr),
                     local_mem_rd_en.eq(1),
                 ]
-                with m.If(self.mem_rd_valid):
+                # rd_armed: dmem_rd_valid is a shared 1-cycle-delayed rd_en; a
+                # read pulsed by another bus master the cycle before FETCH_GT
+                # is entered leaves a stale valid (with that master's data) on
+                # our first cycle.  Wait one cycle so valid/data belong to the
+                # read issued above (mload wins the bus mux while rd_en high).
+                m.d.sync += rd_armed.eq(1)
+                with m.If(self.mem_rd_valid & rd_armed):
+                    m.d.sync += rd_armed.eq(0)
                     m.d.sync += result_view.word0_gt.eq(self.mem_rd_data)
                     with m.If(self.mem_rd_data[25:27] == GT_TYPE_ABSTRACT):
                         # Stub: Abstract GT in a c-list slot has no NS entry or lump.

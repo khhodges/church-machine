@@ -67,6 +67,13 @@ class ChurchChange(Elaboratable):
         self.m_flag_restore_en  = Signal()
         self.m_flag_restore_val = Signal()
 
+        # 1 during BOOT_PROGRAM microcode (same signal the core feeds u_call).
+        # During the boot window LOAD_THREAD resolves the Thread NS slot via
+        # mLoad's direct-GT path instead of fetching a GT from the namespace
+        # c-list: NS slot 0 word1 is the namespace LIMIT word, and a GT's
+        # slot_id occupies the same bits[15:0], so one word cannot serve both.
+        self.boot_window = Signal()
+
     def elaborate(self, platform):
         m = Module()
 
@@ -151,16 +158,34 @@ class ChurchChange(Elaboratable):
         mload_src = Signal(4)
         mload_dst = Signal(4)
         mload_index = Signal(16)
+        mload_direct = Signal()
+        boot_window_lat = Signal()
+
+        # Boot-window direct Thread GT: Inform-type, S-perm, slot_id = CHANGE
+        # index operand (BOOT_PROGRAM[1] = CHANGE CR12, CR15[1] → NS slot 1).
+        boot_thread_gt = Signal(32)
+        boot_gt_view = View(GT_LAYOUT, boot_thread_gt)
+        m.d.comb += [
+            boot_gt_view.slot_id.eq(index_latched),
+            boot_gt_view.gt_type.eq(GT_TYPE_INFORM),
+            boot_gt_view.dom.eq(1),
+            boot_gt_view.perm.eq(PERM_MASK_S >> 1),
+        ]
 
         m.d.comb += [
             u_mload.sub_start.eq(mload_start_reg),
             u_mload.sub_cr_src.eq(mload_src),
             u_mload.sub_cr_dst.eq(mload_dst),
             u_mload.sub_index.eq(mload_index),
-            u_mload.sub_direct.eq(0),
-            u_mload.sub_direct_gt.eq(0),
+            u_mload.sub_direct.eq(mload_direct),
+            u_mload.sub_direct_gt.eq(Mux(mload_direct, boot_thread_gt, 0)),
             u_mload.sub_m_elevated.eq(1),
             u_mload.cr_rd_data.eq(self.cr_rd_data),
+            # Forward the internal mload's register-read address by default so
+            # its FETCH_SRC reads the real source cap (e.g. CR8 during
+            # RESTORE_CALL).  FSM states that need their own reads override
+            # this with later comb assignments.
+            self.cr_rd_addr.eq(u_mload.cr_rd_addr),
             u_mload.cr15_namespace.eq(self.cr15_namespace),
             u_mload.mem_rd_data.eq(self.mem_rd_data),
             u_mload.mem_rd_valid.eq(self.mem_rd_valid),
@@ -216,6 +241,14 @@ class ChurchChange(Elaboratable):
             self.thread_hdr_out.eq(thread_hdr_reg),
         ]
 
+        # Default: mload_start_reg self-clears every cycle; the FSM states that
+        # need the internal mload (LOAD_THREAD / RESTORE_CALL / CR12_CR13_LOAD)
+        # re-assert it (their m.d.sync assignment overrides this default).
+        # Without this, mload_start_reg stayed 1 after CHANGE completed and the
+        # internal mload restarted forever, hogging the DMEM bus mux (u_change
+        # has priority over u_call) and starving the boot CALL's FETCH_LUMP.
+        m.d.sync += mload_start_reg.eq(0)
+
         with m.FSM(name="change") as fsm:
             with m.State("IDLE"):
                 m.d.sync += [fault_latched.eq(0), fault_type_latched.eq(FaultType.NONE)]
@@ -228,6 +261,7 @@ class ChurchChange(Elaboratable):
                         cr_dst_latched.eq(self.cr_dst),
                         cr_index.eq(0),
                         save_index.eq(0),
+                        boot_window_lat.eq(self.boot_window),
                     ]
                     m.d.comb += self.cr_rd_addr.eq(7)
                     m.next = "READ_CR7"
@@ -291,7 +325,12 @@ class ChurchChange(Elaboratable):
                     mload_dst.eq(cr_dst_latched),
                     mload_index.eq(index_latched),
                 ]
-                m.d.sync += mload_start_reg.eq(1)
+                # One-shot: drop start as soon as this pass's mload completes,
+                # otherwise the still-high start restarts the mload with stale
+                # latched operands the moment it returns to IDLE.
+                m.d.sync += mload_start_reg.eq(
+                    ~(u_mload.sub_done | u_mload.sub_fault
+                      | mload_done_latched | mload_fault_latched))
                 m.d.sync += [mload_done_latched.eq(0), mload_fault_latched.eq(0)]
                 with m.If(u_mload.sub_done):
                     m.d.sync += mload_done_latched.eq(1)
@@ -340,8 +379,17 @@ class ChurchChange(Elaboratable):
                     mload_src.eq(cr_src_latched),
                     mload_dst.eq(8),
                     mload_index.eq(index_latched),
+                    # Boot window: resolve NS slot <index> directly (see
+                    # boot_window comment in __init__) — skips the c-list
+                    # GT fetch that would misread the namespace limit word.
+                    mload_direct.eq(boot_window_lat),
                 ]
-                m.d.sync += mload_start_reg.eq(1)
+                # One-shot: drop start as soon as this pass's mload completes,
+                # otherwise the still-high start restarts the mload with stale
+                # latched operands the moment it returns to IDLE.
+                m.d.sync += mload_start_reg.eq(
+                    ~(u_mload.sub_done | u_mload.sub_fault
+                      | mload_done_latched | mload_fault_latched))
                 m.d.sync += [mload_done_latched.eq(0), mload_fault_latched.eq(0)]
                 with m.If(u_mload.sub_done):
                     m.d.sync += mload_done_latched.eq(1)
@@ -371,7 +419,12 @@ class ChurchChange(Elaboratable):
                         m.next = "RESTORE_M_FLAG_RD"
                 with m.Else():
                     m.d.sync += [mload_done_latched.eq(0), mload_fault_latched.eq(0)]
-                    m.d.sync += mload_start_reg.eq(1)
+                    # One-shot: drop start as soon as this pass's mload completes,
+                    # otherwise the still-high start restarts the mload with stale
+                    # latched operands the moment it returns to IDLE.
+                    m.d.sync += mload_start_reg.eq(
+                        ~(u_mload.sub_done | u_mload.sub_fault
+                          | mload_done_latched | mload_fault_latched))
                     with m.If(u_mload.sub_done):
                         m.d.sync += mload_done_latched.eq(1)
                     with m.If(u_mload.sub_fault):

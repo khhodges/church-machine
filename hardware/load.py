@@ -30,10 +30,19 @@ class ChurchLoad(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
+        # Latch operands at load_start.  The core retires a LOAD on its issue
+        # cycle and the decoder immediately moves to the next instruction, so
+        # if the shared mload grants this unit's request late (e.g. right
+        # after a CALL releases the bus), comb-wired operands would belong to
+        # the WRONG instruction (observed: LOAD CR3 executed with dst=CR4).
+        cr_src_lat = Signal(4)
+        cr_dst_lat = Signal(4)
+        index_lat  = Signal(16)
+
         m.d.comb += [
-            self.mload_cr_src.eq(self.cr_src),
-            self.mload_cr_dst.eq(self.cr_dst),
-            self.mload_index.eq(self.index),
+            self.mload_cr_src.eq(cr_src_lat),
+            self.mload_cr_dst.eq(cr_dst_lat),
+            self.mload_index.eq(index_lat),
             self.mload_direct.eq(0),
             self.mload_direct_gt.eq(0),
             self.mload_m_elevated.eq(0),
@@ -42,6 +51,11 @@ class ChurchLoad(Elaboratable):
         with m.FSM(name="load_wrapper") as fsm:
             with m.State("IDLE"):
                 with m.If(self.load_start):
+                    m.d.sync += [
+                        cr_src_lat.eq(self.cr_src),
+                        cr_dst_lat.eq(self.cr_dst),
+                        index_lat.eq(self.index),
+                    ]
                     m.next = "START_SUB"
             with m.State("START_SUB"):
                 m.d.comb += self.mload_start.eq(1)

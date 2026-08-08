@@ -1,5 +1,5 @@
 """hardware/wukong_top.py — QMTECH Wukong XC7A100T minimal Church Machine top-level
-======================================================================================
+## ==================================================================================
 
 Minimal top-level for the QMTECH Wukong Board V3 (Artix-7 XC7A100T-2FGG676C).
 LED blink only — no Ethernet, no UART bridge.
@@ -48,7 +48,12 @@ from amaranth.lib.memory import Memory as LibMemory
 from .hw_types import *
 from .core import ChurchCore
 from .boot_rom import (BootRom, BOOT_PROGRAM, WUKONG_NUC_PROGRAM,
-                       WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST)
+                       WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST,
+                       WUKONG_WCH_CLIST, WUKONG_WCH_CLIST_WORD,
+                       WUKONG_THREAD_BASE_WORD, WUKONG_THREAD_HEADER,
+                       WUKONG_THREAD_STO_WORD, WUKONG_THREAD_STO_INIT,
+                       WUKONG_THREAD_CAPS0_WORD, WUKONG_THREAD_CAPS12_WORD,
+                       wukong_wch_header)
 from .uart_tx import UartTx
 from .uart_rx import UartRx
 
@@ -57,7 +62,7 @@ from .uart_rx import UartRx
 # Increment this by 1 every time a new bitstream is synthesised and flashed.
 # The bridge reports it to the IDE so the FPGA status page can confirm exactly
 # which build is running — no need to reprogram just to check.
-WUKONG_BUILD_VERSION = 6   # ← bump this before each new synthesis run
+WUKONG_BUILD_VERSION = 7   # ← bump this before each new synthesis run
 
 # ── Wukong ROM: 3-instruction BOOT_PROGRAM ────────────────────────────────────
 # Architecture doc:             docs/wukong-boot.md
@@ -228,24 +233,28 @@ class ChurchWukongXC7A100T(Elaboratable):
             dmem_init.append(0)
 
         # WukongCallHome LUMP body at DMEM byte 0x0700 = word 0x1C0 = 448.
-        # cc=0 → no c-list tail; LUMP uses CR6 (boot c-list at byte 0x400) directly.
-        _wch_cw     = len(WUKONG_NUC_PROGRAM)           # 73 — auto-tracks changes
-        _wch_header = (0x1F << 27) | (1 << 23) | (_wch_cw << 10)  # n_minus_6=1
-        for _i, _v in enumerate([_wch_header] + list(WUKONG_NUC_PROGRAM)):
+        # cc=7 → c-list tail at lump words 121-127 ([5]=LED, [6]=UART); the
+        # hardware CALL derives CR6 from the called lump's own header, so a
+        # cc=0 lump gets a NULL CR6 and its first LOAD faults NULL_CAP.
+        _wch_cw = len(WUKONG_NUC_PROGRAM)               # 73 — auto-tracks changes
+        for _i, _v in enumerate([wukong_wch_header(_wch_cw)] + list(WUKONG_NUC_PROGRAM)):
             dmem_init[0x1C0 + _i] = _v
+        for _i, _v in enumerate(WUKONG_WCH_CLIST):
+            dmem_init[WUKONG_WCH_CLIST_WORD + _i] = _v
 
-        # Thread.caps[0] = WukongCallHome E-GT — the standalone boot entry.
-        # Thread base = NS slot 1 word0_location = 0 (Thread lump aliases DMEM
-        # base by design), so caps[0] = word THREAD_CAPS_OFFSET (244).
-        # BOOT_PROGRAM[2] = CALL CR0,CR0[0] resolves THIS word (not clist[0]).
-        # Without it the factory image faults cleanly at boot and loops forever
-        # — the bug behind the v6 endless LOAD@0 trace on real hardware.
-        dmem_init[244] = 0x4A000007     # caps[0] = WukongCallHome E-GT (NS slot 7)
-
-        # Thread.caps[12] = S-perm Boot.Thread GT: RESTORE_CALL[12] loads
-        # CR12 from DMEM[256]; a null there faults FETCH_THREAD_HDR post-boot.
-        # (Same two words hardware/test_boot_rom_no_false_halt.py bakes in.)
-        dmem_init[256] = make_gt(GT_TYPE_INFORM, PERM_MASK_S, 1, 0)
+        # Boot.Thread lump at byte 0x900 (word 576) — see boot_rom.py for the
+        # relocation rationale (a base-0 Thread lump collides with the NS
+        # table: Heap[0]/STO is NS slot 4 word1).
+        #   header  : valid lump header (size=256, sw=32, cc=12)
+        #   STO     : 243 (sp_max) so the boot CALL's stack push succeeds
+        #   caps[0] : WukongCallHome E-GT (NS slot 7) — the ⚡ boot entry.
+        #             BOOT_PROGRAM[2] = CALL CR0,CR0[0] resolves THIS word.
+        #   caps[12]: S-perm Boot.Thread GT so RESTORE_CALL[12] gives CR12 a
+        #             non-null cap (FETCH_THREAD_HDR faults otherwise).
+        dmem_init[WUKONG_THREAD_BASE_WORD]   = WUKONG_THREAD_HEADER
+        dmem_init[WUKONG_THREAD_STO_WORD]    = WUKONG_THREAD_STO_INIT
+        dmem_init[WUKONG_THREAD_CAPS0_WORD]  = 0x4A000007  # WukongCallHome E-GT
+        dmem_init[WUKONG_THREAD_CAPS12_WORD] = make_gt(GT_TYPE_INFORM, PERM_MASK_S, 1, 0)
         # Words 0x1EA..0x23F remain zero (padding to 128-word alloc boundary).
 
         hw_init_pairs = [(addr, val)
@@ -639,10 +648,18 @@ class ChurchWukongXC7A100T(Elaboratable):
         with m.Elif(~step_mode):
             m.d.sync += step_halted.eq(0)
 
+        # Fetch-settle bubble: DMEM BRAM is sync-read; the cycle after
+        # imem_addr changes the read port still presents the OLD word.  Mask
+        # imem_valid for that cycle or the core retires a stale decode right
+        # after every NIA jump (stream slides one slot after the boot CALL).
+        imem_addr_prev = Signal(32, init=0xFFFFFFFF)
+        m.d.sync += imem_addr_prev.eq(core.imem_addr)
+        imem_settled = Signal()
+        m.d.comb += imem_settled.eq(imem_addr_prev == core.imem_addr)
         m.d.comb += [
             # trace_stall is OR-ed in so the TraceUnit can drain all event
             # packets for one instruction before the next retire fires.
-            core.imem_valid.eq(~step_halted & ~trace_stall),
+            core.imem_valid.eq(~step_halted & ~trace_stall & imem_settled),
             core.halt_req.eq(step_halted | trace_stall),
             core.free_run_start.eq(0),
             core.free_run_nia.eq(0),

@@ -89,3 +89,4 @@
 - [Wukong sentinel build version](wukong-sentinel-build-version.md) — 4-byte sentinel (0xBC N_INIT TU VER BUILD_VER); 'f' cmd re-arms; WUKONG_BUILD_VERSION in wukong_top.py; bump before each synthesis
 - [UartTx DONE-gap double-increment](uart-tx-done-gap-double-increment.md) — TX requesters gating on ~busy alone skip every other byte; must use ~busy & ~done (sentinel looked dead on hardware)
 - [Wukong sentinel_phase reset on 'f'](wukong-sentinel-phase-reset-bug.md) — 'f' must reset BOTH sentinel_sent AND sentinel_phase to 0; sentinel_phase alone causes single-byte re-fire (ignored by bridge)
+- [Wukong boot CALL/LOAD/retire fixes](wukong-boot-callhome-fixes.md) — sync-BRAM fetch-settle bubble, issue-cycle busy gaps, operand latching, busy-gated decoder faults, boot_retire_count reset on FAULT_RST

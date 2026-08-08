@@ -221,13 +221,20 @@ class ChurchCore(Elaboratable):
         # Simulation-only observability; tied to 0 at the synthesis boundary.
         # CR12 must hold an Inform GT (slot_id=1) after boot.
         # CR8 must remain NULL (0x00000000) after boot — it is never written by the FSM.
-        self.dbg_call_src_gt = Signal(32)   # debug tap: CALL unit latched src GT
-        self.dbg_call_state = Signal(8)     # debug tap: CALL FSM state
         self.dbg_cr12_gt = Signal(32)   # CR12 thread-stack GT word0 — INFORM(slot=1) after boot
         self.dbg_cr8_gt  = Signal(32)   # CR8 GT word0 — must remain NULL (0) after boot
 
     def elaborate(self, platform):
         m = Module()
+
+        # clear_all: asserted during BootState.FAULT_RST (driven combinatorially
+        # below, after boot_state_reg is declared).  Declared first so it can be
+        # used as a ResetInserter key for the stateful execution units: every
+        # execution-unit FSM and its latches are wiped on FAULT_RST, so a pass-2
+        # boot after a fault (or an external 'f' reboot) never inherits stale
+        # in-flight state from an interrupted unit.
+        clear_all = Signal()
+        _rst = ResetInserter({"sync": clear_all})
 
         u_regs = ChurchRegisters()
         u_decoder = ChurchDecoder(iot_profile=self.iot_profile)
@@ -241,13 +248,13 @@ class ChurchCore(Elaboratable):
         m.submodules.u_registers = u_regs
         m.submodules.u_decoder = u_decoder
         m.submodules.u_perm_check = u_perm
-        m.submodules.u_call = u_call
-        m.submodules.u_return = u_return
-        m.submodules.u_tperm = u_tperm
-        m.submodules.u_save = u_save
-        m.submodules.u_load = u_load
+        m.submodules.u_call = _rst(u_call)
+        m.submodules.u_return = _rst(u_return)
+        m.submodules.u_tperm = _rst(u_tperm)
+        m.submodules.u_save = _rst(u_save)
+        m.submodules.u_load = _rst(u_load)
         u_shared_mload = ChurchMLoad()
-        m.submodules.u_shared_mload = u_shared_mload
+        m.submodules.u_shared_mload = _rst(u_shared_mload)
         u_dread = ChurchDRead()
         u_dwrite = ChurchDWrite()
         u_cload = ChurchCLoad()
@@ -272,22 +279,24 @@ class ChurchCore(Elaboratable):
             # (IO_PORT_PET_NAME_WR) lets the assembler/firmware annotate
             # additional named slots at run time.
             u_pet_name_mem = PetNameMemory(init_named=list(DEMO_CLIST_NAMED_SLOTS))
-            m.submodules.u_gc_unit = u_gc
-            m.submodules.u_lambda = u_lambda
-            m.submodules.u_change = u_change
-            m.submodules.u_switch = u_switch
-            m.submodules.u_eloadcall = u_eloadcall
-            m.submodules.u_xloadlambda = u_xloadlambda
-            m.submodules.u_irq_dispatch = u_irq_dispatch
+            m.submodules.u_gc_unit = _rst(u_gc)
+            m.submodules.u_lambda = _rst(u_lambda)
+            m.submodules.u_change = _rst(u_change)
+            m.submodules.u_switch = _rst(u_switch)
+            m.submodules.u_eloadcall = _rst(u_eloadcall)
+            m.submodules.u_xloadlambda = _rst(u_xloadlambda)
+            m.submodules.u_irq_dispatch = _rst(u_irq_dispatch)
+            # PetNameMemory is intentionally NOT reset-wrapped: its contents are
+            # persistent annotations that must survive FAULT_RST reboots.
             m.submodules.u_pet_name_mem = u_pet_name_mem
 
-        m.submodules.u_dread = u_dread
-        m.submodules.u_dwrite = u_dwrite
-        m.submodules.u_cload = u_cload
-        m.submodules.u_outform = u_outform
+        m.submodules.u_dread = _rst(u_dread)
+        m.submodules.u_dwrite = _rst(u_dwrite)
+        m.submodules.u_cload = _rst(u_cload)
+        m.submodules.u_outform = _rst(u_outform)
 
         u_outform_fsm = ChurchOutformFSM()
-        m.submodules.u_outform_fsm = u_outform_fsm
+        m.submodules.u_outform_fsm = _rst(u_outform_fsm)
 
         nia_reg = Signal(32)
 
@@ -309,7 +318,6 @@ class ChurchCore(Elaboratable):
         lambda_pc_reg = Signal(32)
 
         boot_state_reg = Signal(3, init=BootState.IDLE)
-        clear_all = Signal()
 
         m.d.comb += [
             self.boot_state.eq(boot_state_reg),
@@ -403,9 +411,10 @@ class ChurchCore(Elaboratable):
         mint_ns_wr_data        = Signal(32)  # Mint NS write data
         mint_clist_wr_data_d   = Signal(32)  # clist write data (cc copy or E-GT)
 
+        load_busy_shadow = Signal()  # see load_start_sig below
         busy_expr = (
             u_tperm.tperm_busy | u_call.call_busy |
-            u_return.busy | u_save.save_busy | u_load.load_busy |
+            u_return.busy | u_save.save_busy | u_load.load_busy | load_busy_shadow |
             u_dread.busy | u_dwrite.busy |
             iadd_busy_reg | isub_busy_reg | branch_busy_reg |
             shl_busy_reg | shr_busy_reg | bfext_busy_reg | bfins_busy_reg | mcmp_busy_reg |
@@ -854,9 +863,13 @@ class ChurchCore(Elaboratable):
             m.d.sync += nia_reg.eq(nia_reg + Cat(C(0, 2), branch_sx32))
         with m.Elif(
             self.boot_complete & u_decoder.instr_valid & ~any_unit_busy
+            & ~call_start_sig
             & ~fetch_bounds_fault & ~u_outform_fsm.intercept_start
         ):
             # Advance PC for all instructions (including not-taken branches).
+            # ~call_start_sig: a CALL must NOT advance the PC on its issue
+            # cycle — its NIA comes from u_call.nia_set at completion, and an
+            # early +4 makes the nia_set retire show the wrong retire_nia.
             # ~fetch_bounds_fault ensures nia never advances on a BOUNDS-fault cycle.
             # ~u_outform_fsm.intercept_start holds the PC at the CALL instruction
             # when a Mode 2 Outform intercept fires; the CALL is replayed once the
@@ -1039,7 +1052,12 @@ class ChurchCore(Elaboratable):
         #
         # boot_retire_count tracks how many instructions have retired since boot_complete.
         # boot_microcode_active is True for the first 3 retires (LOAD, CHANGE, CALL).
-        with m.If(self.boot_complete & self.retire_valid & (boot_retire_count < 3)):
+        # clear_all (FAULT_RST) must rewind the boot-microcode window: on a
+        # re-boot pass the first 3 instructions run again and need the same
+        # M-elevation, or pass 2 faults VERSION at the very first boot LOAD.
+        with m.If(clear_all):
+            m.d.sync += boot_retire_count.eq(0)
+        with m.Elif(self.boot_complete & self.retire_valid & (boot_retire_count < 3)):
             m.d.sync += boot_retire_count.eq(boot_retire_count + 1)
         m.d.comb += boot_microcode_active.eq(
             self.boot_complete & (boot_retire_count < 3)
@@ -1101,8 +1119,6 @@ class ChurchCore(Elaboratable):
         m.d.comb += [
             u_call.call_start.eq(call_start_sig),
             u_call.boot_window.eq(boot_microcode_active),
-            self.dbg_call_src_gt.eq(u_call.dbg_src_gt),
-            self.dbg_call_state.eq(u_call.dbg_fsm_state),
             u_call.cr_src.eq(cr_src),
             u_call.index.eq(0),               # CALL uses call_imm for method-table dispatch; c-list index always 0
             u_call.call_imm.eq(u_decoder.call_imm),
@@ -1465,6 +1481,12 @@ class ChurchCore(Elaboratable):
         m.d.comb += load_start_sig.eq(
             cond_exec_enable & is_church_op & (church_op == ChurchOpcode.LOAD) & ~any_unit_busy
         )
+        # One-cycle busy shadow: u_load.load_busy rises a cycle after
+        # load_start (IDLE→START_SUB is a sync transition), leaving a gap in
+        # which the NEXT instruction can issue and retire while the LOAD is
+        # still pending (observed: back-to-back LOADs — the second was
+        # swallowed and never executed).  busy_expr ORs this in.
+        m.d.sync += load_busy_shadow.eq(load_start_sig)
         m.d.comb += [
             u_load.load_start.eq(load_start_sig),
             u_load.cr_src.eq(cr_src),
@@ -1509,6 +1531,7 @@ class ChurchCore(Elaboratable):
                 # M-flag save/restore (Task #432): pass current M-flag in; get restore
                 # enable/val out (wired below alongside other u_regs controls).
                 u_change.cr15_m_flag_in.eq(u_regs.cr15_m_flag),
+                u_change.boot_window.eq(boot_microcode_active),
             ]
 
             switch_start_sig = Signal()
@@ -1578,6 +1601,33 @@ class ChurchCore(Elaboratable):
             irq_dispatch_reason = Signal(2)
             irq_dispatch_slot   = Signal(16)
 
+            # ── IRQ arm gate ─────────────────────────────────────────────────
+            # Design rule: IRQ dispatch is DISABLED at boot and stays off until
+            # the first abstraction exits — i.e. after a good CALL, a good
+            # method body, and a good first RETURN.  This prevents dispatch
+            # from firing mid-boot (Scheduler.IRQ does not exist yet →
+            # IRQ_NULL_BASE would kill the boot CALL) and protects IDE
+            # single-stepping from being hijacked by dispatch during bring-up.
+            #
+            # irq_armed_reg:       set on the first clean RETURN after a clean
+            #                      CALL; cleared on FAULT_RST (clear_all).
+            # first_call_done_reg: set on the first clean CALL completion
+            #                      (COMPLETE state, no fault); cleared on
+            #                      FAULT_RST.  A fault at any point before the
+            #                      first RETURN keeps dispatch disabled for the
+            #                      re-boot pass (clear_all wipes both bits).
+            irq_armed_reg       = Signal()
+            first_call_done_reg = Signal()
+            with m.If(clear_all):
+                m.d.sync += [irq_armed_reg.eq(0), first_call_done_reg.eq(0)]
+            with m.Elif(~first_call_done_reg &
+                        u_call.call_normal_complete & ~u_call.call_fault):
+                m.d.sync += first_call_done_reg.eq(1)
+            with m.Elif(first_call_done_reg & ~irq_armed_reg &
+                        u_return.complete & ~u_return.fault_valid &
+                        ~u_return.reboot_request):
+                m.d.sync += irq_armed_reg.eq(1)
+
             # Priority: TIMER > LAZY_LOAD > LAZY_RESOLVE.
             # All three are mutually exclusive in practice (one per instruction
             # boundary), but the priority chain makes it deterministic.
@@ -1596,6 +1646,7 @@ class ChurchCore(Elaboratable):
                 irq_dispatch_start.eq(
                     (self.timer_alarm | u_call.lazy_load_irq |
                      u_eloadcall.lazy_resolve_irq | u_xloadlambda.lazy_resolve_irq)
+                    & irq_armed_reg
                     & ~u_irq_dispatch.busy
                 ),
                 u_irq_dispatch.start.eq(irq_dispatch_start),
@@ -2306,9 +2357,14 @@ class ChurchCore(Elaboratable):
         )
         with m.If(fetch_bounds_fault):
             m.d.comb += [self.fault.eq(FaultType.BOUNDS), self.fault_valid.eq(1)]
-        with m.Elif(u_decoder.fault_valid):
+        # Decoder/perm faults are combinational functions of the currently
+        # fetched word.  While a multi-cycle unit owns the shared DMEM bus the
+        # fetch data can be transient garbage (observed on Wukong: mload
+        # traffic decoded as INVALID_OP, spuriously fault-retiring the next
+        # instruction).  Gate them on ~any_unit_busy like retire_norm.
+        with m.Elif(u_decoder.fault_valid & ~any_unit_busy):
             m.d.comb += [self.fault.eq(u_decoder.fault), self.fault_valid.eq(1)]
-        with m.Elif(u_perm.fault_valid):
+        with m.Elif(u_perm.fault_valid & ~any_unit_busy):
             m.d.comb += [self.fault.eq(u_perm.fault_type), self.fault_valid.eq(1)]
         if not self.iot_profile:
             with m.Elif(u_lambda.lambda_fault):
@@ -2418,8 +2474,13 @@ class ChurchCore(Elaboratable):
         # not used internally here — included on ChurchCore for clean API only.
         _ = self.halt_req  # referenced to prevent "unused port" warnings
 
+        # CALL retires via u_call.nia_set, not retire_norm — but call_busy
+        # rises one cycle after call_start (IDLE transition is sync), so
+        # without excluding the issue cycle the CALL retires TWICE (issue +
+        # nia_set), inserting a phantom retire and advancing NIA early.
         retire_norm = (
             u_decoder.instr_valid & ~any_unit_busy &
+            ~call_start_sig &
             ~fetch_bounds_fault & ~u_outform_fsm.intercept_start
         )
         retire_conds_base = (
@@ -2520,18 +2581,31 @@ class ChurchCore(Elaboratable):
                 ),
             ]
 
+        # Grant-qualified handshake feedback.  The shared mload's busy/done/
+        # fault outputs are broadcast; each master must only see them while it
+        # actually owns the bus (mux priority: call > return > load).  Without
+        # this, a LOAD issued while the boot CALL's mload is still running sees
+        # the CALL's busy as its WAIT_ACK acknowledgment and the CALL's done as
+        # its own completion — the LOAD "retires" instantly without executing
+        # and every subsequent LOAD runs one instruction-slot late.
+        return_grant = Signal()
+        load_grant   = Signal()
         m.d.comb += [
-            u_call.mload_done.eq(u_shared_mload.sub_done),
-            u_call.mload_fault.eq(u_shared_mload.sub_fault),
+            return_grant.eq(~u_call.call_busy & u_return.busy),
+            load_grant.eq(~u_call.call_busy & ~u_return.busy & u_load.load_busy),
+        ]
+        m.d.comb += [
+            u_call.mload_done.eq(u_shared_mload.sub_done & u_call.call_busy),
+            u_call.mload_fault.eq(u_shared_mload.sub_fault & u_call.call_busy),
             u_call.mload_fault_type.eq(u_shared_mload.sub_fault_type),
 
-            u_return.mload_done.eq(u_shared_mload.sub_done),
-            u_return.mload_fault.eq(u_shared_mload.sub_fault),
+            u_return.mload_done.eq(u_shared_mload.sub_done & return_grant),
+            u_return.mload_fault.eq(u_shared_mload.sub_fault & return_grant),
             u_return.mload_fault_type.eq(u_shared_mload.sub_fault_type),
 
-            u_load.mload_busy.eq(u_shared_mload.sub_busy),
-            u_load.mload_done.eq(u_shared_mload.sub_done),
-            u_load.mload_fault.eq(u_shared_mload.sub_fault),
+            u_load.mload_busy.eq(u_shared_mload.sub_busy & load_grant),
+            u_load.mload_done.eq(u_shared_mload.sub_done & load_grant),
+            u_load.mload_fault.eq(u_shared_mload.sub_fault & load_grant),
             u_load.mload_fault_type.eq(u_shared_mload.sub_fault_type),
         ]
 

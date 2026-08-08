@@ -233,7 +233,13 @@ def test_wukong_boot_triggered():
     So led[1] 0→1 transition within the expected window confirms the FSM latched.
     """
     from .wukong_top import ChurchWukongXC7A100T
-    from .boot_rom import WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST, WUKONG_NUC_PROGRAM
+    from .boot_rom import (WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST,
+                           WUKONG_NUC_PROGRAM, WUKONG_WCH_CLIST,
+                           WUKONG_WCH_CLIST_WORD, WUKONG_THREAD_BASE_WORD,
+                           WUKONG_THREAD_HEADER, WUKONG_THREAD_STO_WORD,
+                           WUKONG_THREAD_STO_INIT, WUKONG_THREAD_CAPS0_WORD,
+                           WUKONG_THREAD_CAPS12_WORD, wukong_wch_header)
+    from .hw_types import make_gt, GT_TYPE_INFORM, PERM_MASK_S
 
     # sim_mode=True: skips port-driven comb clock so sim.add_clock() can drive
     # ClockSignal("sync") directly (no DriverConflict with self.clk port).
@@ -251,9 +257,14 @@ def test_wukong_boot_triggered():
     while len(dmem_init) < 16384:
         dmem_init.append(0)
     _wch_cw = len(WUKONG_NUC_PROGRAM)
-    _wch_header = (0x1F << 27) | (1 << 23) | (_wch_cw << 10)
-    for _i, _v in enumerate([_wch_header] + list(WUKONG_NUC_PROGRAM)):
+    for _i, _v in enumerate([wukong_wch_header(_wch_cw)] + list(WUKONG_NUC_PROGRAM)):
         dmem_init[0x1C0 + _i] = _v
+    for _i, _v in enumerate(WUKONG_WCH_CLIST):
+        dmem_init[WUKONG_WCH_CLIST_WORD + _i] = _v
+    dmem_init[WUKONG_THREAD_BASE_WORD]   = WUKONG_THREAD_HEADER
+    dmem_init[WUKONG_THREAD_STO_WORD]    = WUKONG_THREAD_STO_INIT
+    dmem_init[WUKONG_THREAD_CAPS0_WORD]  = 0x4A000007
+    dmem_init[WUKONG_THREAD_CAPS12_WORD] = make_gt(GT_TYPE_INFORM, PERM_MASK_S, 1, 0)
     hw_init_pairs = [(addr, val) for addr, val in enumerate(dmem_init) if val != 0]
     N_INIT = len(hw_init_pairs)
 

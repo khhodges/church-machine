@@ -274,6 +274,10 @@ def test_mload_wait_outform_fault_type():
         await ctx.tick()
         # After tick: FSM = FETCH_GT.
 
+        # ── FETCH_GT: rd_armed stale-valid guard costs one arming cycle ──
+        await ctx.tick()
+        # After tick: still FETCH_GT (rd_armed just set).
+
         # ── FETCH_GT: mem_rd_valid=1, mem_rd_data[23:24]=OUTFORM → branch ─
         await ctx.tick()
         # After tick: FSM = TRIGGER_OUTFORM; outform regs latched.

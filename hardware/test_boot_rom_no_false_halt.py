@@ -32,6 +32,10 @@ from .core import ChurchCore
 from .boot_rom import (
     BootRom, BOOT_PROGRAM,
     WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST, WUKONG_NUC_PROGRAM,
+    WUKONG_THREAD_BASE_WORD, WUKONG_THREAD_HEADER,
+    WUKONG_THREAD_STO_WORD, WUKONG_THREAD_STO_INIT,
+    WUKONG_THREAD_CAPS0_WORD, WUKONG_THREAD_CAPS12_WORD,
+    WUKONG_WCH_CLIST, WUKONG_WCH_CLIST_WORD, wukong_wch_header,
 )
 from .hw_types import GT_TYPE_INFORM, PERM_MASK_E, PERM_MASK_S, make_gt
 
@@ -72,27 +76,21 @@ def _build_dmem_init():
     while len(dmem) < 16384:
         dmem.append(0)
 
-    # WukongCallHome LUMP body at byte 0x0700 = word 0x1C0 = 448.
-    _cw     = len(WUKONG_NUC_PROGRAM)
-    _header = (0x1F << 27) | (1 << 23) | (_cw << 10)   # n_minus_6=1
-    for _i, _v in enumerate([_header] + list(WUKONG_NUC_PROGRAM)):
+    # WukongCallHome LUMP body at byte 0x0700 = word 0x1C0 = 448 (cc=7 c-list
+    # tail at words 569-575 — mirrors wukong_top.py).
+    _cw = len(WUKONG_NUC_PROGRAM)
+    for _i, _v in enumerate([wukong_wch_header(_cw)] + list(WUKONG_NUC_PROGRAM)):
         dmem[0x1C0 + _i] = _v
+    for _i, _v in enumerate(WUKONG_WCH_CLIST):
+        dmem[WUKONG_WCH_CLIST_WORD + _i] = _v
 
-    # Thread.caps[0] = E-GT for WukongCallHome so CALL CR0,CR0 succeeds.
-    # thread_base = NS slot 1 word0_location = 0x00 (byte 0).
-    # Thread.caps[0] byte address = 0x00 + 244 * 4 = 0x3D0; word = 244.
-    dmem[244] = E_GT_WUKONG_CALLHOME
-
-    # Thread.caps[12] = S-perm GT for Boot.Thread (NS slot 1) so that after
-    # RESTORE_CALL[cr_index=12] loads it into CR12, the FETCH_THREAD_HDR state
-    # in change.py sees a non-null CR12 and doesn't fault with NULL_CAP.
-    #
-    # RESTORE_CALL[12] reads CR8[THREAD_CAPS_OFFSET+12] = DMEM[256].
-    # DEMO_CLIST starts at word 256; DEMO_CLIST[0] = null GT (freed mem-mgr slot).
-    # We override word 256 with an Inform S-GT for Boot.Thread (slot 1).
-    # The S-perm bit is needed so post-boot CHANGE CR12 authority checks pass;
-    # in the boot microcode window all perm checks are bypassed by M-elevation.
-    dmem[256] = make_gt(GT_TYPE_INFORM, PERM_MASK_S, slot_id=1, gt_seq=0)
+    # Boot.Thread lump at byte 0x900 (word 576) — mirrors wukong_top.py.
+    # See boot_rom.py for the relocation rationale (base-0 Thread lump
+    # collides with the NS table: Heap[0]/STO is NS slot 4 word1).
+    dmem[WUKONG_THREAD_BASE_WORD]   = WUKONG_THREAD_HEADER
+    dmem[WUKONG_THREAD_STO_WORD]    = WUKONG_THREAD_STO_INIT
+    dmem[WUKONG_THREAD_CAPS0_WORD]  = E_GT_WUKONG_CALLHOME
+    dmem[WUKONG_THREAD_CAPS12_WORD] = make_gt(GT_TYPE_INFORM, PERM_MASK_S, slot_id=1, gt_seq=0)
 
     return dmem
 
@@ -136,16 +134,27 @@ class BootRomHarness(Elaboratable):
 
         # ── Boot ROM (instruction fetch) ───────────────────────────────────────
         boot_rom = m.submodules.boot_rom = BootRom(_WUKONG_ROM)
-        m.d.comb += [
-            boot_rom.addr.eq(core.imem_addr[2:12]),
-            core.imem_data.eq(boot_rom.data),
-        ]
+        m.d.comb += boot_rom.addr.eq(core.imem_addr[2:12])
+        # imem source mux (mirrors wukong_top.py): NIA 0x0-0xB fetches
+        # BOOT_PROGRAM from ROM; everything else fetches from DMEM via a
+        # dedicated read port, so the WukongCallHome LUMP body at word 448
+        # actually executes.  Both sources have 1-cycle latency, so the select
+        # is registered to stay aligned with the data.
+        imem_from_dmem = Signal()
+        m.d.sync += imem_from_dmem.eq(core.imem_addr >= 0xC)
 
         # ── Data memory (LibMemory, pre-initialised for simulation) ───────────
         dmem = m.submodules.dmem = LibMemory(
             shape=unsigned(32), depth=16384, init=self._dmem_init)
         dmem_rd = dmem.read_port(domain="sync")
         dmem_wr = dmem.write_port()
+
+        # Dedicated instruction-fetch read port (mirrors wukong_top.py)
+        imem_rd = dmem.read_port(domain="sync")
+        m.d.comb += [
+            imem_rd.addr.eq(core.imem_addr[2:16]),
+            core.imem_data.eq(Mux(imem_from_dmem, imem_rd.data, boot_rom.data)),
+        ]
 
         # ── Memory address mux (identical to ChurchWukongXC7A100T) ────────────
         mem_addr = Signal(14)
@@ -189,9 +198,18 @@ class BootRomHarness(Elaboratable):
         ]
 
         # ── CM control: free-run (no step_mode, no TraceUnit stall) ──────────
+        # Fetch-settle bubble: the DMEM/IMEM BRAM is sync-read, so the cycle
+        # after imem_addr changes the read data is still the OLD word.  Without
+        # this mask the core retires a stale decode right after every NIA jump
+        # (observed: instruction stream slid one slot after the boot CALL).
+        imem_addr_prev = Signal(32, init=0xFFFFFFFF)
+        m.d.sync += imem_addr_prev.eq(core.imem_addr)
+        imem_settled = Signal()
+        m.d.comb += imem_settled.eq(imem_addr_prev == core.imem_addr)
         m.d.comb += [
-            # Instruction fetch is valid as soon as boot is complete.
-            core.imem_valid.eq(core.boot_complete),
+            # Instruction fetch is valid as soon as boot is complete AND the
+            # BRAM read data corresponds to the current fetch address.
+            core.imem_valid.eq(core.boot_complete & imem_settled),
             core.halt_req.eq(0),
             core.free_run_start.eq(0),
             core.free_run_nia.eq(0),
@@ -378,6 +396,151 @@ def test_boot_rom_no_false_halt():
     print("PASS")
 
 
+# ── Shared retire-collection helper for Tests 4/5 ─────────────────────────────
+
+_WCH_ENTRY_NIA = 0x704                      # WukongCallHome entry: lump base 0x700 + 4
+_WCH_CODE_LO   = 0x704
+_WCH_CODE_HI   = 0x704 + 73 * 4             # exclusive end of WCH code (cw=73)
+
+
+async def _collect_retires(ctx, dut, count, max_wait=400):
+    """Collect `count` retire pulses as (nia, fault_valid) tuples.
+
+    Returns (retires, timed_out_at).  Assumes boot_complete is already high
+    (or will rise within max_wait cycles of the first retire wait).
+    """
+    retires = []
+    for idx in range(count):
+        if not ctx.get(dut.core.retire_valid):
+            for _ in range(max_wait):
+                await ctx.tick()
+                if ctx.get(dut.core.retire_valid):
+                    break
+            else:
+                return retires, idx
+        retires.append((
+            ctx.get(dut.core.retire_nia),
+            bool(ctx.get(dut.core.retire_fault_valid)),
+        ))
+        await ctx.tick()
+    return retires, None
+
+
+async def _wait_boot_complete(ctx, dut, max_cycles=40):
+    for _ in range(max_cycles):
+        if ctx.get(dut.boot_complete):
+            return True
+        await ctx.tick()
+    return bool(ctx.get(dut.boot_complete))
+
+
+def _assert_boot_and_wch(retires, n_wch, label=""):
+    """Assert the boot triple + n_wch clean retires inside the WCH code range."""
+    expected_boot = [0x0, 0x4, 0x8]
+    assert len(retires) >= 3 + n_wch, (
+        f"{label}: only {len(retires)} retires collected: "
+        f"{[(hex(n), fv) for n, fv in retires]}"
+    )
+    for i, exp in enumerate(expected_boot):
+        nia, fv = retires[i]
+        assert nia == exp and not fv, (
+            f"{label}: boot retire[{i}] NIA=0x{nia:08X} fault={fv}, "
+            f"expected 0x{exp:08X} clean"
+        )
+    nia3, fv3 = retires[3]
+    assert nia3 == _WCH_ENTRY_NIA, (
+        f"{label}: retire[3] NIA=0x{nia3:08X}, expected WukongCallHome entry "
+        f"0x{_WCH_ENTRY_NIA:08X} — boot CALL did not jump into the LUMP"
+    )
+    for i, (nia, fv) in enumerate(retires[3:3 + n_wch], start=3):
+        assert not fv, (
+            f"{label}: retire[{i}] at NIA=0x{nia:08X} faulted — "
+            f"WukongCallHome loop is not clean"
+        )
+        assert _WCH_CODE_LO <= nia < _WCH_CODE_HI, (
+            f"{label}: retire[{i}] NIA=0x{nia:08X} escaped the WukongCallHome "
+            f"code range [0x{_WCH_CODE_LO:X}, 0x{_WCH_CODE_HI:X})"
+        )
+
+
+# ── Test 4: boot CALL enters WukongCallHome and runs 30+ retires clean ────────
+
+def test_boot_call_enters_wukong_callhome():
+    """Factory image: ROM boot → CALL jumps to NIA=0x704 → 30+ clean retires."""
+    print("\n=== Test 4: boot CALL enters WukongCallHome (30+ retires) ===")
+
+    dut = BootRomHarness(_DMEM_INIT)
+    results = {}
+
+    async def testbench(ctx):
+        results["boot_ok"] = await _wait_boot_complete(ctx, dut)
+        if not results["boot_ok"]:
+            return
+        results["retires"], results["timeout_at"] = \
+            await _collect_retires(ctx, dut, 3 + 32)
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(testbench)
+    with sim.write_vcd("/dev/null"):
+        sim.run()
+
+    assert results.get("boot_ok"), "boot_complete never rose"
+    assert results.get("timeout_at") is None, (
+        f"Timed out waiting for retire {results['timeout_at']}; "
+        f"got {[(hex(n), fv) for n, fv in results['retires']]}"
+    )
+    _assert_boot_and_wch(results["retires"], 32, label="pass1")
+    print(f"  boot triple + 32 WukongCallHome retires all clean; "
+          f"entry NIA=0x{results['retires'][3][0]:X} ✓")
+    print("PASS")
+
+
+# ── Test 5: repeated 'f' reboots stay clean (FAULT_RST wipes unit state) ──────
+
+def test_repeated_reboots_stay_clean():
+    """Pulse reboot_req mid-run twice; each pass must re-boot cleanly into WCH."""
+    print("\n=== Test 5: repeated reboots (reboot_req → FAULT_RST) stay clean ===")
+
+    dut = BootRomHarness(_DMEM_INIT)
+    results = {"passes": []}
+
+    async def testbench(ctx):
+        for pass_idx in range(3):
+            ok = await _wait_boot_complete(ctx, dut)
+            if not ok:
+                results["boot_fail"] = pass_idx
+                return
+            retires, timeout_at = await _collect_retires(ctx, dut, 3 + 10)
+            results["passes"].append((retires, timeout_at))
+            if pass_idx < 2:
+                # Reboot mid-run — deliberately NOT aligned to instruction
+                # boundaries, so in-flight unit state must be wiped by FAULT_RST.
+                ctx.set(dut.core.reboot_req, 1)
+                await ctx.tick()
+                ctx.set(dut.core.reboot_req, 0)
+                await ctx.tick()
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(testbench)
+    with sim.write_vcd("/dev/null"):
+        sim.run()
+
+    assert "boot_fail" not in results, (
+        f"boot_complete never re-rose on pass {results['boot_fail']}"
+    )
+    assert len(results["passes"]) == 3, f"only {len(results['passes'])} passes ran"
+    for i, (retires, timeout_at) in enumerate(results["passes"]):
+        assert timeout_at is None, (
+            f"pass {i}: timed out at retire {timeout_at}; "
+            f"got {[(hex(n), fv) for n, fv in retires]}"
+        )
+        _assert_boot_and_wch(retires, 10, label=f"pass{i}")
+        print(f"  pass {i}: boot triple + 10 WCH retires clean ✓")
+    print("PASS")
+
+
 # ── Test 3: fault detection mechanism works ───────────────────────────────────
 
 def test_fault_halt_mechanism():
@@ -417,6 +580,8 @@ if __name__ == "__main__":
         test_boot_rom_instruction_encoding,
         test_boot_rom_no_false_halt,
         test_fault_halt_mechanism,
+        test_boot_call_enters_wukong_callhome,
+        test_repeated_reboots_stay_clean,
     ):
         try:
             fn()

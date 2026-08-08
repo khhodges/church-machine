@@ -12,8 +12,6 @@ class ChurchCall(Elaboratable):
     def __init__(self):
         self.call_start = Signal()
         self.boot_window = Signal()  # 1 during BOOT_PROGRAM microcode (first 3 retires)
-        self.dbg_src_gt = Signal(32)     # debug tap: latched src CR word0_gt
-        self.dbg_fsm_state = Signal(8)   # debug tap: CALL FSM state index
         self.cr_src = Signal(4)
         self.index = Signal(16)
         self.call_imm = Signal(15)  # method index from CALL imm15; 0 = single entry (NIA=lump_base+4)
@@ -212,6 +210,23 @@ class ChurchCall(Elaboratable):
         src_gt = View(GT_LAYOUT, src_view.word0_gt)
         src_has_e_perm = perm_bit(src_view.word0_gt, PERM_E)
 
+        # boot_window is only asserted by the core during the 3-retire
+        # BOOT_PROGRAM microcode window — but the window closes at the CALL's
+        # *decode* retire (the 3rd boot retire), before the CALL FSM's mLoad
+        # phases actually run.  Latch it at call_start so the direct-GT
+        # resolution below stays active for the whole boot CALL.
+        boot_window_lat = Signal()
+
+        # rd_armed: stale-valid guard for the FSM's direct memory-read states.
+        # The core's dmem_rd_valid is a shared 1-cycle-delayed dmem_rd_en, so
+        # a read pulsed by ANOTHER bus master on the cycle before a CALL read
+        # state is entered leaves mem_rd_valid=1 (with that master's data) on
+        # the read state's first cycle.  Each read state must therefore wait
+        # one cycle (arming) before trusting mem_rd_valid — from cycle 2 the
+        # valid/data pair belongs to the CALL unit's own request (CALL wins
+        # the bus mux while mem_rd_en is high).
+        rd_armed = Signal()
+
         mload_src = Signal(4)
         mload_dst = Signal(4)
         mload_index = Signal(16)
@@ -235,10 +250,10 @@ class ChurchCall(Elaboratable):
             # a GT).  Resolve the src GT directly in both phases; SET_M_WRITE
             # then forces X=1 on CR14 so instruction fetch passes PERM_X.
             # Post-boot CALLs keep the normal c-list-indexed fetch.
-            self.mload_direct.eq(self.boot_window),
+            self.mload_direct.eq(boot_window_lat),
             self.mload_m_elevated.eq(1),
             self.mload_direct_gt.eq(
-                Mux(self.boot_window, src_view.word0_gt.as_value(), 0)),
+                Mux(boot_window_lat, src_view.word0_gt.as_value(), 0)),
         ]
 
         m.d.comb += [
@@ -389,9 +404,11 @@ class ChurchCall(Elaboratable):
                 m.d.sync += [phase.eq(0), fault_latched.eq(0), fault_type_latched.eq(FaultType.NONE)]
                 m.d.sync += [sub_done_latched.eq(0), sub_fault_latched.eq(0)]
                 m.d.sync += [use_method_table.eq(0), method_entry_reg.eq(0)]
+                m.d.sync += rd_armed.eq(0)
                 with m.If(self.call_start):
                     m.d.sync += mask_latched.eq(self.mask)
                     m.d.sync += call_imm_latched.eq(self.call_imm)
+                    m.d.sync += boot_window_lat.eq(self.boot_window)
                     m.next = "CHECK_SRC"
 
             with m.State("CHECK_SRC"):
@@ -482,7 +499,9 @@ class ChurchCall(Elaboratable):
                     self.mem_rd_addr.eq(ns_base_from_cr14),  # lump word 0 = lump header
                     self.mem_rd_en.eq(1),
                 ]
-                with m.If(self.mem_rd_valid):
+                m.d.sync += rd_armed.eq(1)
+                with m.If(self.mem_rd_valid & rd_armed):
+                    m.d.sync += rd_armed.eq(0)
                     _hdr = View(LUMP_HEADER_LAYOUT, self.mem_rd_data)
                     m.d.sync += lump_reg.eq(self.mem_rd_data)
                     m.d.sync += [
@@ -509,7 +528,9 @@ class ChurchCall(Elaboratable):
                     self.mem_rd_addr.eq(ns_base_from_cr14 + (call_imm_latched.as_unsigned() << 2)),
                     self.mem_rd_en.eq(1),
                 ]
-                with m.If(self.mem_rd_valid):
+                m.d.sync += rd_armed.eq(1)
+                with m.If(self.mem_rd_valid & rd_armed):
+                    m.d.sync += rd_armed.eq(0)
                     m.d.sync += method_entry_reg.eq(self.mem_rd_data)
                     with m.If(self.mem_rd_data == 0):
                         # Table entry = 0 → private method or out-of-range index → FAULT.
@@ -582,8 +603,9 @@ class ChurchCall(Elaboratable):
                     self.mem_rd_addr.eq(cr5_heap_view.word1_location),
                     self.mem_rd_en.eq(1),
                 ]
-                with m.If(self.mem_rd_valid):
-                    m.d.sync += sp_latched.eq(self.mem_rd_data)
+                m.d.sync += rd_armed.eq(1)
+                with m.If(self.mem_rd_valid & rd_armed):
+                    m.d.sync += [sp_latched.eq(self.mem_rd_data), rd_armed.eq(0)]
                     m.next = "STACK_CHECK"
 
             with m.State("STACK_CHECK"):
@@ -706,8 +728,6 @@ class ChurchCall(Elaboratable):
 
         m.d.comb += [
             self.call_busy.eq(~fsm.ongoing("IDLE")),
-            self.dbg_src_gt.eq(src_view.word0_gt.as_value()),
-            self.dbg_fsm_state.eq(fsm.state),
             self.call_complete.eq(fsm.ongoing("COMPLETE") | fsm.ongoing("M_FETCH_DONE")),
             self.call_normal_complete.eq(fsm.ongoing("COMPLETE")),
             self.call_fault.eq(fault_latched),

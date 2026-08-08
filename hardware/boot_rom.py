@@ -603,8 +603,14 @@ DEMO_CLIST_NAMED_SLOTS = frozenset({0, 1, 2, 3, 5, 6, 7, 8, 9, 10})
 # ---------------------------------------------------------------------------
 WUKONG_DEMO_NAMESPACE = list(DEMO_NAMESPACE)
 _wukong_ns0_loc  = 0                        # NS table at DMEM byte 0
-_wukong_ns0_auth = DEMO_NAMESPACE[1]        # word1_authority unchanged (limit=63)
+# Word 1 is NS slot 0's word1 = the namespace LIMIT word (CR15.w2 after the
+# boot LOAD).  It must stay a plain limit (0x3F = 64 c-list entries): a GT's
+# slot_id occupies the same bits[15:0], so it cannot double as the Thread GT.
+# BOOT_PROGRAM[1] = CHANGE CR12, CR15[1] instead resolves NS slot 1 via the
+# boot-window direct-GT path in hardware/change.py (mirrors the CALL fix).
+_wukong_ns0_auth = 0x0000003F               # limit word — 64 NS/c-list entries
 WUKONG_DEMO_NAMESPACE[0] = _wukong_ns0_loc
+WUKONG_DEMO_NAMESPACE[1] = _wukong_ns0_auth
 WUKONG_DEMO_NAMESPACE[2] = integrity32(_wukong_ns0_loc, _wukong_ns0_auth)
 
 # Fix slot 7 (WukongCallHome) alloc from 64 → 128 words.
@@ -616,6 +622,35 @@ _wch_word1_new = 0x0000007F               # lim17 = 127  →  alloc = 128 words
 _wch_loc_byte  = WUKONG_CALLHOME_NS_SLOT * 0x100   # 0x700 (unchanged)
 WUKONG_DEMO_NAMESPACE[WUKONG_CALLHOME_NS_SLOT * 4 + 1] = _wch_word1_new
 WUKONG_DEMO_NAMESPACE[WUKONG_CALLHOME_NS_SLOT * 4 + 2] = integrity32(_wch_loc_byte, _wch_word1_new)
+
+# ---------------------------------------------------------------------------
+# Wukong Boot.Thread lump relocation — slot 1 loc 0x000 → 0x900
+#
+# With the NS table at DMEM byte 0, a Thread lump that also aliases byte 0
+# collides with the table: Heap[0] (thread word 17, the STO stack pointer
+# CALL reads and writes) is NS slot 4's word1.  The boot CALL then reads
+# STO=0 → STACK_OVERFLOW, and any CALL/RETURN would corrupt slot 4.
+# Relocate the Thread lump to byte 0x900 (word 576) — free space between the
+# WukongCallHome alloc (words 448-575) end and nothing else.
+#   header  word 576      : magic, size=256 words, sw(cw)=32, typ=2, cc=12
+#   STO     word 576+17   : 243 (= sp_max = 256 − 12 − 1)
+#   caps[0] word 576+244  : boot-entry E-GT (⚡ WukongCallHome)
+#   caps[12]word 576+256  : S-perm Boot.Thread GT (slot 1) for CR12
+# Slot 1 word1 limit widened to 0xFF (256-word alloc); seal recomputed.
+# ---------------------------------------------------------------------------
+WUKONG_THREAD_BASE_WORD = 576                # byte 0x900
+WUKONG_THREAD_HEADER = (
+    (0x1F << 27) | (2 << 23) | (32 << 10) | (2 << 8) | 12
+)  # n_minus_6=2 (256 words), sw=32, typ=2, cc=12 — mirrors boot_image.py
+WUKONG_THREAD_STO_WORD  = WUKONG_THREAD_BASE_WORD + 17    # Heap[0] = STO
+WUKONG_THREAD_STO_INIT  = 243                             # sp_max
+WUKONG_THREAD_CAPS0_WORD  = WUKONG_THREAD_BASE_WORD + 244  # Thread.caps[0]
+WUKONG_THREAD_CAPS12_WORD = WUKONG_THREAD_BASE_WORD + 256  # Thread.caps[12]
+_wukong_thr_loc  = WUKONG_THREAD_BASE_WORD * 4   # 0x900
+_wukong_thr_w1   = 0x000000FF                    # lim17 = 255 → 256-word alloc
+WUKONG_DEMO_NAMESPACE[1 * 4 + 0] = _wukong_thr_loc
+WUKONG_DEMO_NAMESPACE[1 * 4 + 1] = _wukong_thr_w1
+WUKONG_DEMO_NAMESPACE[1 * 4 + 2] = integrity32(_wukong_thr_loc, _wukong_thr_w1)
 
 
 # ---------------------------------------------------------------------------
@@ -640,6 +675,31 @@ WUKONG_DEMO_CLIST = list(DEMO_CLIST)
 WUKONG_DEMO_CLIST[0]  = 0x4A000007  # WukongCallHome E-GT (NS slot 7) — has actual code in DMEM; loops forever (no RETURN to caller)
 WUKONG_DEMO_CLIST[9]  = 0           # SlideRule E-GT cleared: NS slot 8 absent in Wukong 8-slot NS
 WUKONG_DEMO_CLIST[10] = 0           # Constants R-GT cleared: NS slot 9 absent in Wukong 8-slot NS
+
+# ---------------------------------------------------------------------------
+# WukongCallHome LUMP c-list tail — cc=7, entries at the lump's last 7 words.
+#
+# The hardware CALL derives CR6 from the CALLED lump's own header: cc=0 makes
+# SET_CR6_BASE write a NULL GT into CR6, and WCH's first instruction
+# (LOAD CR3, CR6[5]) then faults NULL_CAP.  Give the lump a real c-list:
+# base = lump_base + (alloc − cc)·4 = 0x700 + 120·4 = 0x8E0 (words 568-575).
+# Entries mirror the boot c-list slots WCH uses: [5]=LED_DEV, [6]=UART_DEV.
+# cc=8 (not 7): CR6.limit = cc−1 and mLoad's bounds check is strict '<', so
+# the highest usable index is cc−2; index 6 (UART) needs cc≥8.
+# ---------------------------------------------------------------------------
+WUKONG_WCH_BASE_WORD  = 448          # byte 0x700
+WUKONG_WCH_ALLOC      = 128          # words (lim17=127 patched above)
+WUKONG_WCH_CC         = 8
+WUKONG_WCH_CLIST_WORD = WUKONG_WCH_BASE_WORD + WUKONG_WCH_ALLOC - WUKONG_WCH_CC  # 569
+WUKONG_WCH_CLIST = [0, 0, 0, 0, 0,
+                    WUKONG_DEMO_CLIST[5],   # LED_DEV Inform GT
+                    WUKONG_DEMO_CLIST[6],   # UART_DEV Inform GT
+                    0]
+
+
+def wukong_wch_header(cw):
+    """WCH lump header: magic, n_minus_6=1 (128 words), cw code words, cc=8."""
+    return (0x1F << 27) | (1 << 23) | (cw << 10) | WUKONG_WCH_CC
 
 
 # ---------------------------------------------------------------------------
