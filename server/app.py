@@ -3948,6 +3948,12 @@ os.makedirs(BITSTREAM_DIR, exist_ok=True)
 
 BITSTREAM_FILES = {
     "ti60-f225": "church_ti60_f225.hex",
+    "wukong-xc7a100t": "church_wukong_xc7a100t.bit",
+}
+
+# Boards whose bitstream lives outside BITSTREAM_DIR (e.g. committed build artifacts).
+BITSTREAM_DIRS = {
+    "wukong-xc7a100t": os.path.join(BASE_DIR, "build"),
 }
 
 @app.route("/admin/bitstreams")
@@ -4069,7 +4075,8 @@ def bitstream_delete(board):
     expected = BITSTREAM_FILES.get(board)
     if not expected:
         return jsonify({"error": f"Unknown board: {board}"}), 404
-    path = os.path.join(BITSTREAM_DIR, expected)
+    bdir = BITSTREAM_DIRS.get(board, BITSTREAM_DIR)
+    path = os.path.join(bdir, expected)
     if os.path.isfile(path):
         os.remove(path)
         logging.info("Bitstream deleted: %s", expected)
@@ -4095,7 +4102,8 @@ def bitstream_upload():
     f = request.files.get("file")
     if not f:
         return jsonify({"error": "No file uploaded"}), 400
-    dest = os.path.join(BITSTREAM_DIR, expected)
+    bdir = BITSTREAM_DIRS.get(board, BITSTREAM_DIR)
+    dest = os.path.join(bdir, expected)
     f.save(dest)
     size = os.path.getsize(dest)
     logging.info("Bitstream uploaded: %s (%d bytes)", expected, size)
@@ -4115,7 +4123,8 @@ def bitstream_download(board):
     expected = BITSTREAM_FILES.get(board)
     if not expected:
         return jsonify({"error": f"Unknown board: {board}"}), 404
-    path = os.path.join(BITSTREAM_DIR, expected)
+    bdir = BITSTREAM_DIRS.get(board, BITSTREAM_DIR)
+    path = os.path.join(bdir, expected)
     if not os.path.isfile(path):
         return jsonify({"error": f"No bitstream available for {board} yet. Build and upload one first."}), 404
     return send_file(path, as_attachment=True, download_name=expected)
@@ -4126,7 +4135,8 @@ def bitstream_list():
     """List available official bitstreams."""
     result = []
     for board, fname in BITSTREAM_FILES.items():
-        path = os.path.join(BITSTREAM_DIR, fname)
+        bdir = BITSTREAM_DIRS.get(board, BITSTREAM_DIR)
+        path = os.path.join(bdir, fname)
         exists = os.path.isfile(path)
         result.append({
             "board": board,
