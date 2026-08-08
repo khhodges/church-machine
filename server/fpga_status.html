@@ -76,6 +76,8 @@
     <h2>Boot / Firmware</h2>
     <div class="row"><span class="k">Boot sentinel</span><span class="v" id="bootSentinel">not seen this session</span></div>
     <div class="row"><span class="k">TraceUnit version</span><span class="v" id="tuVersion">—</span></div>
+    <div class="row"><span class="k">Board build version</span><span class="v" id="boardBuildVersion">—</span></div>
+    <div class="row"><span class="k">IDE version</span><span class="v" id="ideVersion">—</span></div>
     <div class="row"><span class="k">Upload in flight</span><span class="v" id="uploadState">no</span></div>
     <div class="row"><span class="k">Pending command</span><span class="v" id="pendingCmd">none</span></div>
   </div>
@@ -98,6 +100,8 @@
   <button id="btnBp" title="Arm a breakpoint at this NIA ('b' + NIA)">Set BP</button>
   <span class="sep"></span>
   <button id="btnUpload" title="Send the current boot image to the board over UART ('u')">Upload boot image ⚡</button>
+  <span class="sep"></span>
+  <button id="btnReboot" title="Force the board to retransmit its boot sentinel ('f') — confirms which bitstream is running">↺ Reboot</button>
 </div>
 
 <div class="loghdr">
@@ -194,9 +198,10 @@
     ctlFetch('/hardware/wukong/command', body, label,
              function (d) { return d.ok; }, 'queued for bridge');
   }
-  document.getElementById('btnStep').onclick = function () { sendCmd({ cmd: 's' }, 'STEP'); };
-  document.getElementById('btnRun').onclick  = function () { sendCmd({ cmd: 'r' }, 'RUN'); };
-  document.getElementById('btnHalt').onclick = function () { sendCmd({ cmd: 'h' }, 'HALT'); };
+  document.getElementById('btnStep').onclick   = function () { sendCmd({ cmd: 's' }, 'STEP'); };
+  document.getElementById('btnRun').onclick    = function () { sendCmd({ cmd: 'r' }, 'RUN'); };
+  document.getElementById('btnHalt').onclick   = function () { sendCmd({ cmd: 'h' }, 'HALT'); };
+  document.getElementById('btnReboot').onclick = function () { sendCmd({ cmd: 'f' }, 'FORCE SENTINEL'); };
   document.getElementById('btnBp').onclick = function () {
     var raw = document.getElementById('bpNia').value.trim();
     if (!raw) { note('Set BP: enter an NIA first (hex, e.g. 0x200)'); return; }
@@ -267,7 +272,11 @@
           bi.stale_tu ? 'seen — STALE bitstream' : 'seen — current bitstream';
         document.getElementById('bootSentinel').className = bi.stale_tu ? 'v fault' : 'v good';
         document.getElementById('tuVersion').textContent = bi.tu_version;
+        if (bi.build_version != null)
+          document.getElementById('boardBuildVersion').textContent = 'v' + bi.build_version;
       }
+      if (s.ide_version)
+        document.getElementById('ideVersion').textContent = s.ide_version;
       document.getElementById('uploadState').textContent = s.upload_in_flight ? 'YES' : 'no';
       document.getElementById('pendingCmd').textContent =
         s.pending_command ? JSON.stringify(s.pending_command) : 'none';

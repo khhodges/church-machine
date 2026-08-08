@@ -10015,7 +10015,7 @@ def wukong_command_post():
     global _wukong_pending_cmd, _upload_in_flight
     data = request.get_json(silent=True) or {}
     cmd = str(data.get('cmd', '')).strip()
-    if cmd not in ('s', 'r', 'h', 'b', 'u'):
+    if cmd not in ('s', 'r', 'h', 'b', 'u', 'f'):
         return jsonify({'ok': False, 'error': 'unknown cmd'}), 400
 
     entry = {'cmd': cmd}
@@ -10118,6 +10118,7 @@ def wukong_status_get():
         'boot_info':          boot_info,
         'upload_in_flight':   upl,
         'pending_command':    pending,
+        'ide_version':        BUILD_VERSION,
     })
 
 
@@ -10270,9 +10271,11 @@ def wukong_boot_info_post():
     """
     global _wukong_boot_info
     data = request.get_json(silent=True) or {}
+    bv = data.get('build_version')
     entry = {
-        'stale_tu':  bool(data.get('stale_tu', False)),
-        'tu_version': int(data.get('tu_version', 0)),
+        'stale_tu':     bool(data.get('stale_tu', False)),
+        'tu_version':   int(data.get('tu_version', 0)),
+        'build_version': int(bv) if bv is not None else None,
     }
     with _wukong_boot_info_lock:
         _wukong_boot_info = entry

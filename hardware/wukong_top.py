@@ -52,6 +52,12 @@ from .boot_rom import (BootRom, BOOT_PROGRAM, WUKONG_NUC_PROGRAM,
 from .uart_tx import UartTx
 from .uart_rx import UartRx
 
+# ── Bitstream build version ────────────────────────────────────────────────────
+# Baked into the 4th byte of the boot sentinel (0xBC N_INIT TU_VERSION BUILD_VERSION).
+# Increment this by 1 every time a new bitstream is synthesised and flashed.
+# The bridge reports it to the IDE so the FPGA status page can confirm exactly
+# which build is running — no need to reprogram just to check.
+WUKONG_BUILD_VERSION = 1   # ← bump this before each new synthesis run
 
 # ── Wukong ROM: 3-instruction BOOT_PROGRAM ────────────────────────────────────
 # Architecture doc:             docs/wukong-boot.md
@@ -311,10 +317,14 @@ class ChurchWukongXC7A100T(Elaboratable):
         # boot_triggered is driven by the boot FSM below; sentinel_sent latches
         # after all sentinel bytes have been accepted by the UART TX.
         #
-        # Three-byte boot sentinel: 0xBC  N_INIT&0xFF  TU_VERSION
-        #   0xBC        — magic: new-format sentinel (old bitstreams emit 0xBB 2-byte sentinel)
-        #   N_INIT&0xFF — count of non-zero DMEM words written by hw_init sequencer
-        #   TU_VERSION  — TraceUnit FSM capability version (see _TU_VERSION_* below)
+        # Four-byte boot sentinel: 0xBC  N_INIT&0xFF  TU_VERSION  BUILD_VERSION
+        #   0xBC          — magic: new-format sentinel (old bitstreams emit 0xBB 2-byte sentinel)
+        #   N_INIT&0xFF   — count of non-zero DMEM words written by hw_init sequencer
+        #   TU_VERSION    — TraceUnit FSM capability version (see _TU_VERSION_* below)
+        #   BUILD_VERSION — monotonically increasing build identifier baked in at
+        #                   synthesis time; lets the IDE/bridge confirm exactly which
+        #                   bitstream is running without reprogramming.  Increment
+        #                   WUKONG_BUILD_VERSION in wukong_top.py for every new build.
         #
         # TU_VERSION constants (must match wukong_bridge.py TU_VERSION_* constants):
         #   0x02 = TraceUnit emits 3-packet CALL sequence (CALL_CR6/CALL_CR14/CALL_PUSH)
@@ -330,9 +340,10 @@ class ChurchWukongXC7A100T(Elaboratable):
         # means the bitstream was built with a different WUKONG_DEMO_NAMESPACE /
         # WUKONG_DEMO_CLIST than the one currently in source — stale bitstream.
         _TU_VERSION_CALL_3PKT = 0x02  # TraceUnit emits CALL_CR6/CR14/PUSH for ELOADCALL+XLOADLAMBDA
+        _BUILD_VERSION = WUKONG_BUILD_VERSION  # baked into sentinel byte 4; increment per build
         boot_triggered  = Signal()
         sentinel_sent   = Signal()
-        sentinel_phase  = Signal(2)  # 0=0xBC pending, 1=N_INIT pending, 2=TU_VERSION pending
+        sentinel_phase  = Signal(2)  # 0=0xBC, 1=N_INIT, 2=TU_VERSION, 3=BUILD_VERSION
 
         # ── Hardware boot banner (declared early; driven by boot FSM below) ─────
         # Sends "WUKONG\r\n" via UART TX during Phase 2.5 — after hw_init writes
@@ -436,9 +447,11 @@ class ChurchWukongXC7A100T(Elaboratable):
             with m.Else():
                 m.d.sync += banner_idx.eq(banner_idx + 1)
 
-        # sentinel_req: active until all three sentinel bytes are accepted.
-        # sentinel_phase=0 → send 0xBC; =1 → send N_INIT&0xFF; =2 → send TU_VERSION.
-        # After the third byte is accepted, sentinel_sent latches and req drops.
+        # sentinel_req: active until all four sentinel bytes are accepted.
+        # sentinel_phase=0 → send 0xBC; =1 → send N_INIT&0xFF;
+        #               =2 → send TU_VERSION; =3 → send BUILD_VERSION.
+        # After the fourth byte is accepted, sentinel_sent latches and req drops.
+        # 'f' command clears sentinel_sent so the full 4-byte sequence re-fires.
         sentinel_req = Signal()
         m.d.comb += sentinel_req.eq(boot_triggered & ~sentinel_sent)
         with m.If(sentinel_req & ~uart_tx.busy & ~cm_tx_start & ~banner_req):
@@ -446,8 +459,10 @@ class ChurchWukongXC7A100T(Elaboratable):
                 m.d.sync += sentinel_phase.eq(1)   # 0xBC accepted → queue N_INIT byte
             with m.Elif(sentinel_phase == 1):
                 m.d.sync += sentinel_phase.eq(2)   # N_INIT byte accepted → queue TU_VERSION
+            with m.Elif(sentinel_phase == 2):
+                m.d.sync += sentinel_phase.eq(3)   # TU_VERSION accepted → queue BUILD_VERSION
             with m.Else():
-                m.d.sync += sentinel_sent.eq(1)    # TU_VERSION byte accepted → done
+                m.d.sync += sentinel_sent.eq(1)    # BUILD_VERSION byte accepted → done
 
         trace_tx_ack = Signal()  # TraceUnit byte accepted (one-cycle ack)
         m.d.comb += [
@@ -457,8 +472,9 @@ class ChurchWukongXC7A100T(Elaboratable):
                 Mux(sentinel_req & (sentinel_phase == 0),    C(0xBC, 8),
                 Mux(sentinel_req & (sentinel_phase == 1),    C(N_INIT & 0xFF, 8),
                 Mux(sentinel_req & (sentinel_phase == 2),    C(_TU_VERSION_CALL_3PKT, 8),
+                Mux(sentinel_req & (sentinel_phase == 3),    C(_BUILD_VERSION & 0xFF, 8),
                 Mux(upload_ack_req,                          C(0x06, 8),
-                                                              trace_tx_byte))))))),
+                                                              trace_tx_byte))))))))  ,
             uart_tx.start.eq(
                 cm_tx_start |
                 (banner_req      & ~uart_tx.busy & ~cm_tx_start) |
@@ -602,6 +618,10 @@ class ChurchWukongXC7A100T(Elaboratable):
         #   'r' (0x72) — run:        clear step_mode; CM runs freely
         #   'h' (0x68) — halt:       assert step_mode + step_halted immediately
         #   'b' (0x62) — breakpoint: read 4 big-endian NIA bytes, then arm/disarm
+        #   'f' (0x66) — force sentinel: re-arm sentinel_sent=0 so the 3-byte
+        #                boot sentinel (0xBC N_INIT TU_VERSION) is retransmitted.
+        #                Lets the bridge re-detect the running bitstream identity
+        #                without reprogramming the FPGA.
         #   'u' (0x75) — upload:     receive 4-byte big-endian byte-count header,
         #                            then N raw bytes (big-endian 32-bit words).
         #                            Halts CM, writes words to DMEM starting at word 0,
@@ -635,6 +655,13 @@ class ChurchWukongXC7A100T(Elaboratable):
                         with m.Case(0x62):  # 'b'
                             m.d.sync += bp_recv_cnt.eq(0)
                             m.next = "BP_RECV"
+                        with m.Case(0x66):  # 'f' — force sentinel retransmit
+                            # Clear sentinel_sent so sentinel_req goes high again
+                            # (sentinel_req = boot_triggered & ~sentinel_sent).
+                            # The UART TX arbitrator will send 0xBC N_INIT TU_VERSION
+                            # on the next free TX slot, letting the bridge re-detect
+                            # the running bitstream identity without reprogramming.
+                            m.d.sync += sentinel_sent.eq(0)
                         with m.Case(0x75):  # 'u' — upload
                             # Halt the CM immediately; it stays halted until
                             # UPLOAD_ACK sends the 0x06 completion byte and the

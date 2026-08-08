@@ -105,7 +105,7 @@ _EV_NAMES = {
 BOOT_SENTINEL_V1  = 0xBB   # old/stale 2-byte sentinel magic
 BOOT_SENTINEL_V2  = 0xBC   # current 3-byte sentinel magic
 SENTINEL_V1_LEN   = 2      # 0xBB  N_INIT&0xFF
-SENTINEL_V2_LEN   = 3      # 0xBC  N_INIT&0xFF  TU_VERSION
+SENTINEL_V2_LEN   = 4      # 0xBC  N_INIT&0xFF  TU_VERSION  BUILD_VERSION
 
 # Minimum TU_VERSION required to guarantee correct ELOADCALL/XLOADLAMBDA trace.
 TU_VERSION_CALL_3PKT = 0x02  # must match _TU_VERSION_CALL_3PKT in wukong_top.py
@@ -164,16 +164,18 @@ def parse_boot_sentinel(buf, i=0):
             'stale':        True,
         }
     elif b == BOOT_SENTINEL_V2:
-        # Current 3-byte sentinel: 0xBC  N_INIT&0xFF  TU_VERSION
+        # Current 4-byte sentinel: 0xBC  N_INIT&0xFF  TU_VERSION  BUILD_VERSION
         if len(buf) - i < SENTINEL_V2_LEN:
             return False
-        tu_version = buf[i + 2]
+        tu_version    = buf[i + 2]
+        build_version = buf[i + 3]
         return {
-            'magic':        b,
-            'n_init_byte':  buf[i + 1],
-            'tu_version':   tu_version,
-            'length':       SENTINEL_V2_LEN,
-            'stale':        tu_version < TU_VERSION_CALL_3PKT,
+            'magic':         b,
+            'n_init_byte':   buf[i + 1],
+            'tu_version':    tu_version,
+            'build_version': build_version,
+            'length':        SENTINEL_V2_LEN,
+            'stale':         tu_version < TU_VERSION_CALL_3PKT,
         }
     return None
 
@@ -318,9 +320,32 @@ def main():
     buf       = bytearray()
     last_poll = 0.0
 
+    def _reopen_serial():
+        """Close and reopen the serial port; return the new Serial object."""
+        try:
+            ser.close()
+        except Exception:
+            pass
+        for attempt in range(10):
+            try:
+                s = serial.Serial(args.port, args.baud, timeout=0.05)
+                print(f'[bridge] serial port reopened ({args.port})', flush=True)
+                return s
+            except serial.SerialException as exc:
+                print(f'[bridge] reopen attempt {attempt+1}/10 failed: {exc}', flush=True)
+                time.sleep(1)
+        print(f'[bridge] ERROR: could not reopen {args.port} after 10 attempts', file=sys.stderr)
+        return ser  # return old object; read loop will keep failing gracefully
+
     try:
         while True:
-            chunk = ser.read(128)
+            try:
+                chunk = ser.read(128)
+            except (serial.SerialException, OSError) as exc:
+                print(f'[bridge] serial read error: {exc} — reopening port', flush=True)
+                ser = _reopen_serial()
+                buf.clear()
+                continue
             if chunk:
                 buf.extend(chunk)
 
@@ -368,20 +393,23 @@ def main():
                         break
 
                     board_n_init_byte = sentinel['n_init_byte']
-                    tu_version        = sentinel['tu_version']  # None for V1
+                    tu_version        = sentinel['tu_version']   # None for V1
+                    build_version     = sentinel.get('build_version')  # None for V1
                     tu_str            = (f'  TU_VERSION=0x{tu_version:02X}'
                                          if tu_version is not None else '')
+                    bv_str            = (f'  BUILD=v{build_version}'
+                                         if build_version is not None else '')
 
                     if expected_n_init is not None:
                         expected_byte = expected_n_init & 0xFF
                         if board_n_init_byte == expected_byte:
                             print(f'BOOT: board ready — N_INIT={expected_n_init} '
-                                  f'(0x{expected_byte:02X}) matches source  ✓{tu_str}')
+                                  f'(0x{expected_byte:02X}) matches source  ✓{tu_str}{bv_str}')
                         else:
                             print(f'BOOT WARNING: N_INIT mismatch — '
                                   f'board sent 0x{board_n_init_byte:02X} '
                                   f'but source expects 0x{expected_byte:02X} '
-                                  f'(N_INIT={expected_n_init}){tu_str}',
+                                  f'(N_INIT={expected_n_init}){tu_str}{bv_str}',
                                   file=sys.stderr)
                             print('  The bitstream was built with a different '
                                   'WUKONG_DEMO_NAMESPACE / WUKONG_DEMO_CLIST.',
@@ -390,7 +418,7 @@ def main():
                                   file=sys.stderr)
                     else:
                         print(f'BOOT: board ready — N_INIT byte=0x{board_n_init_byte:02X} '
-                              f'(validation skipped: boot_rom not importable){tu_str}')
+                              f'(validation skipped: boot_rom not importable){tu_str}{bv_str}')
 
                     # Send 'h' immediately so the board enters step mode as soon
                     # as the bridge attaches.  This means any fault that fires
@@ -427,7 +455,8 @@ def main():
                         try:
                             requests.post(
                                 f'{ide_base}/hardware/wukong/boot-info',
-                                json={'stale_tu': True, 'tu_version': post_tu},
+                                json={'stale_tu': True, 'tu_version': post_tu,
+                                      'build_version': build_version},
                                 timeout=1, verify=verify_tls)
                         except Exception as exc:
                             print(f'  [boot-info POST error] {exc}')
@@ -436,7 +465,8 @@ def main():
                         try:
                             requests.post(
                                 f'{ide_base}/hardware/wukong/boot-info',
-                                json={'stale_tu': False, 'tu_version': tu_version},
+                                json={'stale_tu': False, 'tu_version': tu_version,
+                                      'build_version': build_version},
                                 timeout=1, verify=verify_tls)
                         except Exception as exc:
                             print(f'  [boot-info POST error] {exc}')
@@ -463,6 +493,14 @@ def main():
                         if cmd == 'b':
                             nia_val = int(data.get('nia', 0xFFFFFFFF))
                             ser.write(b'b' + struct.pack('>I', nia_val))
+                        elif cmd == 'f':
+                            # Reopen the serial port first — JTAG programming
+                            # silently kills the FTDI connection, so the port
+                            # may be dead.  Reopening restores it, then 'f'
+                            # tells the FPGA to re-fire its boot sentinel.
+                            ser = _reopen_serial()
+                            buf.clear()
+                            ser.write(b'f')
                         elif cmd in ('s', 'r', 'h'):
                             ser.write(cmd.encode('ascii'))
                         elif cmd == 'u':

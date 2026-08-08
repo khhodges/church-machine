@@ -86,3 +86,4 @@
 - [B:07 Thread.caps[0] authority rule](b07-thread-caps0-authority.md) — B:07 reads CR0 from memory[threadBase+THREAD_CAPS_OFFSET]; B:05 writes it unconditionally (not if-zero); threadLoc=0 is valid (Thread lump at word 0) — typeof guard required, not falsy guard
 - [Mint gate for NS slot registration](mint-gate-ns-registration.md) — only Mint.RegisterOutform→Navana.ADD→writeNSEntry may add NS slots; _seedIrqLazyManifest handles post-allocation state; no direct writeNSEntry outside this chain
 - [Wukong droplet SSH key](wukong-droplet-ssh.md) — how to SSH to 165.227.190.84 from Replit; key setup, build workflow, regeneration if rejected
+- [Wukong sentinel build version](wukong-sentinel-build-version.md) — 4-byte sentinel (0xBC N_INIT TU VER BUILD_VER); 'f' cmd re-arms; WUKONG_BUILD_VERSION in wukong_top.py; bump before each synthesis
