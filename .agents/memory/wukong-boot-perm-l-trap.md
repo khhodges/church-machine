@@ -126,3 +126,36 @@ Vivado synthesis succeeded (EXIT_0, 0 errors, bitstream ~3.8 MB).
   removing it re-introduces the SEAL fault in the NS gate.
 - After any hardware change: run pysim first, then `python3 -m hardware.gen_rtlil`
   and synthesise on the droplet.
+
+## CLIST[0] null-GT fault on standalone boot (discovered Aug 2026)
+
+BOOT_PROGRAM[2] = `CALL CR0, CR0[0]` reads WUKONG_DEMO_CLIST[0] from DMEM word 256.
+The synthesis-time value is 0x00000000 (NULL GT) — the IDE is supposed to upload a boot
+image that patches it to a valid E-GT before the CM runs.
+
+Without that upload the CM faults at NIA=8 (the CALL), halts, LED0 solid, no blink, no UART.
+
+**Fix (runtime, no rebuild):** POST a 'u' upload of 257 DMEM words where word 256 =
+WUKONG_DEMO_CLIST[7] (0x92000004, WukongCallHome E-GT), then send 'r'. The halted CM
+retries the CALL at NIA=8, succeeds, and enters WukongCallHome.
+
+**Fix (permanent):** Option B — restore WUKONG_NUC_PROGRAM at ROM[0] so standalone boot
+needs no IDE upload (matches the working Jul-25 bitstream).
+
+## SelfTest body is zeros in Wukong DMEM — use WukongCallHome as boot entry (Aug 2026)
+
+WUKONG_DEMO_CLIST[0] must be 0x4A000007 (WukongCallHome E-GT, NS slot 7), NOT
+0x4A000006 (SelfTest E-GT, NS slot 6).
+
+**Why:** SelfTest's lump body in Wukong DMEM (at byte 0x0600 = word 384) is all zeros —
+no code there. Only WukongCallHome has actual instructions in dmem_init (at byte 0x0700 =
+word 448, the WUKONG_NUC_PROGRAM LED-blink + UART banner loop). SelfTest was designed to
+be IDE-uploaded at runtime; it has no synthesised-in body on Wukong.
+
+Calling SelfTest (slot 6) makes the CM execute zeros → fault → permanent halt → requires
+board reset (drops USB). WukongCallHome loops forever, never RETURNs to caller — safe.
+
+**Boot trace timing trap:** The 100-byte boot burst (sentinel + LOAD/CHANGE/CALL traces)
+fires in ~17 ms at 57600 baud. CH340 USB drops during JTAG programming for several
+seconds. Bridge always misses boot-time traces. 'f' only resends the 4-byte sentinel,
+not the boot trace. Catching boot traces requires the FPGA to buffer and re-send them.
