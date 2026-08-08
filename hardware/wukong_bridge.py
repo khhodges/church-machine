@@ -408,6 +408,9 @@ def main():
                 if b == TRACE_MAGIC:
                     if len(buf) - i < TRACE_LEN:
                         break
+                    # Flush any pending ASCII first so console text and trace
+                    # packets appear in the IDE event log in arrival order.
+                    _console_flush(ide_base, verify_tls)
                     pkt = buf[i:i + TRACE_LEN]
                     decoded = decode_trace_packet(pkt)
                     decoded['ts'] = time.time()
@@ -437,6 +440,8 @@ def main():
                     i += TRACE_LEN
 
                 elif b in (BOOT_SENTINEL_V1, BOOT_SENTINEL_V2):
+                    # Flush pending ASCII first (arrival-order preservation).
+                    _console_flush(ide_base, verify_tls)
                     # Delegate to the shared sentinel parser so the bridge and
                     # the smoke test always interpret the byte stream identically.
                     sentinel = parse_boot_sentinel(buf, i)

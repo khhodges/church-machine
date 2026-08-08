@@ -257,7 +257,7 @@
         setState('boardState', 'ok', 'tracing');
       else if (lt.fault_valid)
         setState('boardState', 'warn', 'halted on fault');
-      else if (s.server_seq > 0)
+      else if (s.last_trace_age !== null && s.last_trace_age !== undefined)
         setState('boardState', 'warn', 'idle / halted');
       else
         setState('boardState', 'bad', 'no trace yet');
