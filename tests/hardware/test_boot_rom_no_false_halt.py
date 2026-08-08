@@ -110,7 +110,7 @@ def _make_trace_packet(nia: int, ev_type: int, payload_gt: int = 0,
 
 def _make_clean_boot_stream(n_init_byte: int = 5) -> bytes:
     """Return a synthetic byte stream for a clean boot: sentinel + 8 fault-free packets."""
-    sentinel = bytes([BOOT_SENTINEL_V2, n_init_byte & 0xFF, TU_VERSION_CALL_3PKT])
+    sentinel = bytes([BOOT_SENTINEL_V2, n_init_byte & 0xFF, TU_VERSION_CALL_3PKT, 0x01])
     packets = b"".join(
         _make_trace_packet(nia, ev_type, fault_valid=False)
         for nia, ev_type in BOOT_PACKET_SPEC
