@@ -184,11 +184,26 @@ def download_wukong_bridge():
                      download_name="wukong_bridge.py",
                      mimetype="text/plain")
 
+def _wukong_build_version():
+    """Read WUKONG_BUILD_VERSION from hardware/wukong_top.py (best-effort)."""
+    try:
+        top = os.path.join(os.path.dirname(__file__), "..", "hardware", "wukong_top.py")
+        with open(os.path.abspath(top)) as f:
+            for line in f:
+                m = re.match(r"\s*WUKONG_BUILD_VERSION\s*=\s*(\d+)", line)
+                if m:
+                    return int(m.group(1))
+    except Exception:
+        pass
+    return None
+
 @app.route("/dl/wukong-bit")
 def download_wukong_bit():
     p = os.path.join(os.path.dirname(__file__), "..", "build", "church_wukong_xc7a100t.bit")
+    ver = _wukong_build_version()
+    name = ("church_wukong_xc7a100t_v%d.bit" % ver) if ver else "church_wukong_xc7a100t.bit"
     return send_file(os.path.abspath(p), as_attachment=True,
-                     download_name="church_wukong_xc7a100t.bit",
+                     download_name=name,
                      mimetype="application/octet-stream")
 
 @app.route("/dl/wukong-bscan")
