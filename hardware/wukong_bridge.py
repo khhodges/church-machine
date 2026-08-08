@@ -3,7 +3,7 @@
 
 Usage
 -----
-    python3 hardware/wukong_bridge.py --port=/dev/ttyUSB0 --ide=https://<your-replit-url>
+    python3 hardware/wukong_bridge.py --ide=https://<your-replit-url>
     python3 hardware/wukong_bridge.py --port=/dev/ttyUSB0 --ide=http://localhost:5000 --insecure
 
 What it does
@@ -274,7 +274,7 @@ def main():
         sys.exit(1)
 
     parser = argparse.ArgumentParser(description='Wukong UART ↔ IDE bridge')
-    parser.add_argument('--port', default='/dev/ttyUSB0', help='Serial port')
+    parser.add_argument('--port', default='auto', help='Serial port (default: auto-detect /dev/ttyUSB*)')
     parser.add_argument('--baud', type=int, default=57600, help='Baud rate')
     parser.add_argument('--ide', default='http://localhost:5000', help='IDE base URL')
     parser.add_argument('--insecure', action='store_true',
@@ -296,7 +296,29 @@ def main():
         except Exception:
             pass
 
-    print(f'Wukong bridge: {args.port} @ {args.baud} baud → {ide_base}')
+    # ── Port auto-detection ────────────────────────────────────────────────────
+    def _find_usb_serial(preferred=None):
+        """Return the first available /dev/ttyUSB* path, trying preferred first."""
+        import glob
+        candidates = sorted(glob.glob('/dev/ttyUSB*'))
+        if preferred and preferred in candidates:
+            return preferred
+        if candidates:
+            return candidates[0]
+        return preferred or '/dev/ttyUSB0'
+
+    port = args.port
+    if port == 'auto':
+        port = _find_usb_serial()
+        print(f'Wukong bridge: auto-detected {port} @ {args.baud} baud → {ide_base}')
+    else:
+        import os as _os
+        if not _os.path.exists(port):
+            alt = _find_usb_serial()
+            if alt != port:
+                print(f'[bridge] {port} not found — trying {alt} instead')
+                port = alt
+        print(f'Wukong bridge: {port} @ {args.baud} baud → {ide_base}')
     if not verify_tls:
         print('SSL verification disabled — add a cert to enable')
 
@@ -312,29 +334,38 @@ def main():
               f'(0x{expected_n_init & 0xFF:02X}) from board')
 
     try:
-        ser = serial.Serial(args.port, args.baud, timeout=0.05)
+        ser = serial.Serial(port, args.baud, timeout=0.05)
     except serial.SerialException as e:
-        print(f'ERROR opening {args.port}: {e}', file=sys.stderr)
+        print(f'ERROR opening {port}: {e}', file=sys.stderr)
         sys.exit(1)
 
     buf       = bytearray()
     last_poll = 0.0
 
     def _reopen_serial():
-        """Close and reopen the serial port; return the new Serial object."""
+        """Close and reopen the serial port; return the new Serial object.
+
+        After a USB reconnect the device may be renumbered (e.g. ttyUSB0→ttyUSB1).
+        We scan /dev/ttyUSB* on each attempt so the renumbered port is found.
+        """
+        nonlocal port
         try:
             ser.close()
         except Exception:
             pass
-        for attempt in range(10):
+        for attempt in range(15):
+            found = _find_usb_serial(port)
             try:
-                s = serial.Serial(args.port, args.baud, timeout=0.05)
-                print(f'[bridge] serial port reopened ({args.port})', flush=True)
+                s = serial.Serial(found, args.baud, timeout=0.05)
+                if found != port:
+                    print(f'[bridge] USB renumbered: {port} → {found}', flush=True)
+                    port = found
+                print(f'[bridge] serial port reopened ({port})', flush=True)
                 return s
             except serial.SerialException as exc:
-                print(f'[bridge] reopen attempt {attempt+1}/10 failed: {exc}', flush=True)
+                print(f'[bridge] reopen attempt {attempt+1}/15 failed ({found}): {exc}', flush=True)
                 time.sleep(1)
-        print(f'[bridge] ERROR: could not reopen {args.port} after 10 attempts', file=sys.stderr)
+        print(f'[bridge] ERROR: could not reopen serial port after 15 attempts', file=sys.stderr)
         return ser  # return old object; read loop will keep failing gracefully
 
     try:
