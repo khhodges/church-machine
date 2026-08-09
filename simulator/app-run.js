@@ -11049,6 +11049,7 @@ function switchBuilderViewTab(tab) {
     const lumpResident  = document.getElementById('lumpResidentPanel');
     const ti60Connect   = document.getElementById('ti60ConnectPanel');
     const versionsPanel = document.getElementById('versionsPanel');
+    const testingPanel  = document.getElementById('testingPanel');
     if (cyberspace)   cyberspace.style.display   = (tab === 'cyberspace')     ? '' : 'none';
     if (details)      details.style.display      = (tab === 'buildlog')       ? '' : 'none';
     if (lumpThread)   lumpThread.style.display   = (tab === 'lump-thread')    ? '' : 'none';
@@ -11056,6 +11057,12 @@ function switchBuilderViewTab(tab) {
     if (lumpResident) lumpResident.style.display = (tab === 'lump-resident')  ? '' : 'none';
     if (ti60Connect)  ti60Connect.style.display  = (tab === 'ti60-connect')   ? '' : 'none';
     if (versionsPanel) versionsPanel.style.display = (tab === 'versions')     ? '' : 'none';
+    if (testingPanel)  testingPanel.style.display  = (tab === 'testing')      ? '' : 'none';
+    // Lazily set iframe src on first open so polling only starts when the tab is used
+    if (tab === 'testing') {
+        const iframe = document.getElementById('testingIframe');
+        if (iframe && !iframe.dataset.loaded) { iframe.src = '/fpga'; iframe.dataset.loaded = '1'; }
+    }
     if ((tab === 'lump-thread' || tab === 'lump-ns') && typeof initLumpEditor === 'function') initLumpEditor();
     if (tab === 'lump-resident' && typeof initResidentPanel === 'function') initResidentPanel();
     if (tab === 'ti60-connect' && typeof Ti60Connect !== 'undefined') Ti60Connect.onTabOpen();

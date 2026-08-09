@@ -1055,11 +1055,15 @@
             <button class="builder-view-tab" id="builderViewTab-lump-resident" onclick="switchBuilderViewTab('lump-resident')" style="display:none;">&#x1F3E0; Resident</button>
             <button class="builder-view-tab active" id="builderViewTab-ti60-connect" onclick="switchBuilderViewTab('ti60-connect')">&#x1F50C; Connect</button>
             <button class="builder-view-tab" id="builderViewTab-versions" onclick="switchBuilderViewTab('versions')">&#x1F9ED; Versions</button>
+            <button class="builder-view-tab" id="builderViewTab-testing" onclick="switchBuilderViewTab('testing')" title="FPGA status page — bridge/board/boot state, board controls, and live event log">&#x1F9EA; Testing</button>
         </div>
         <div id="builderView"></div>
         <div id="lumpThreadPanel"   style="display:none;" class="lump-editor-wrap"></div>
         <div id="lumpNSPanel"       style="display:none;" class="lump-editor-wrap"></div>
         <div id="lumpResidentPanel" style="display:none;" class="lump-editor-wrap"></div>
+        <div id="testingPanel" style="display:none; width:100%; height:calc(100vh - 160px);">
+            <iframe id="testingIframe" style="width:100%; height:100%; border:none;" title="FPGA Status — Testing"></iframe>
+        </div>
         <div id="versionsPanel" style="display:none;" class="ti60-connect-panel">
             <div class="versions-header">
                 <h2>&#x1F9ED; Versions</h2>
