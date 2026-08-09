@@ -8,14 +8,14 @@ The test does NOT instantiate the full ChurchWukongXC7A100T (which needs BRAM
 init and UART arbitration); instead it exercises only the switch decode logic
 inside the TraceUnit FSM by checking that the tq_len / tq_type registers are
 loaded with the CALL 3-event values when the retiring instruction word encodes
-ELOADCALL or XLOADLAMBDA in bits[30:27].
+ELOADCALL or XLOADLAMBDA in bits[31:27].
 
 Approach
 --------
 We simulate the opcode-switch decode in Python using the same bit-field
 extraction used by the Amaranth FSM:
 
-    opcode_field = retire_instr[27:31]   # 4-bit Church opcode
+    opcode_field = retire_instr[27:32]   # full 5-bit opcode
 
 Then we verify that the switch body for ELOADCALL (0b1000) and XLOADLAMBDA
 (0b1001) maps to tq_len=3 and tq_type[0]=CALL_CR6, tq_type[1]=CALL_CR14,
@@ -74,9 +74,9 @@ def _trace_unit_decode(retire_instr: int) -> dict:
     """Python model of the TraceUnit FSM opcode switch.
 
     Returns a dict with keys: tq_len, tq_type (list of 3 ints).
-    Mirrors the m.Switch(core.retire_instr[27:31]) block in wukong_top.py.
+    Mirrors the m.Switch(core.retire_instr[27:32]) block in wukong_top.py.
     """
-    opcode = (retire_instr >> 27) & 0xF   # bits[30:27], 4-bit field
+    opcode = (retire_instr >> 27) & 0x1F  # bits[31:27], full 5-bit field
 
     CALL_EVENTS = dict(
         tq_len=3,
@@ -102,7 +102,7 @@ def _trace_unit_decode(retire_instr: int) -> dict:
 def _encode_instr(opcode: int, cond: int = 14) -> int:
     """Encode a minimal instruction word with the given 5-bit opcode."""
     # Format: opcode[5] | cond[4] | dst[4] | src[4] | imm[15]
-    # Bits[31:27]=opcode, bits[26:23]=cond (for Church ops only bits[30:27] matter)
+    # Bits[31:27]=opcode, bits[26:23]=cond.
     return ((opcode & 0x1F) << 27) | ((cond & 0xF) << 23)
 
 
@@ -318,6 +318,12 @@ class TestReturnCr14Trace:
         assert result["tq_type"][0] != _TRACE_EV_RESULT, (
             "RETURN must NOT emit a RESULT packet — it fell through to Default"
         )
+
+    def test_dread_emits_one_result_not_load_sequence(self):
+        """DREAD (opcode 16) must not alias Church LOAD (opcode 0)."""
+        instr = _encode_instr(16)  # Turing DREAD
+        result = _trace_unit_decode(instr)
+        assert result == {"tq_len": 1, "tq_type": [_TRACE_EV_RESULT, 0, 0]}
 
     # ── core.py: retire_trace_return_cr14_valid / _gt signals exist ───────────
 

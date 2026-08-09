@@ -956,8 +956,12 @@ class ChurchWukongXC7A100T(Elaboratable):
                         tq_bidx.eq(0),
                     ]
 
-                    # Decode opcode bits[30:27] to determine the event sequence
-                    with m.Switch(core.retire_instr[27:31]):
+                    # Decode the full 5-bit opcode bits[31:27] to determine
+                    # the event sequence.  Using only bits[30:27] aliases
+                    # Turing opcodes onto Church opcodes: DREAD (16/10000b)
+                    # becomes LOAD (0/0000b), which incorrectly emits the
+                    # two LOAD packets for one DREAD retire.
+                    with m.Switch(core.retire_instr[27:32]):
                         with m.Case(ChurchOpcode.LOAD):    # 0b0000
                             m.d.sync += [
                                 tq_len.eq(2),

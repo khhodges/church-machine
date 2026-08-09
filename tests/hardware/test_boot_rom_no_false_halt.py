@@ -163,8 +163,8 @@ class TestBootRomPacketCount:
             )
 
     def test_boot_program_opcodes(self):
-        """BOOT_PROGRAM[0]=LOAD, [1]=CHANGE, [2]=CALL — opcode field bits[30:27]."""
-        ops = [(BOOT_PROGRAM[i] >> 27) & 0xF for i in range(3)]
+        """BOOT_PROGRAM[0]=LOAD, [1]=CHANGE, [2]=CALL — full opcode bits[31:27]."""
+        ops = [(BOOT_PROGRAM[i] >> 27) & 0x1F for i in range(3)]
         assert ops[0] == int(ChurchOpcode.LOAD),   f"BOOT_PROGRAM[0] opcode should be LOAD, got {ops[0]}"
         assert ops[1] == int(ChurchOpcode.CHANGE), f"BOOT_PROGRAM[1] opcode should be CHANGE, got {ops[1]}"
         assert ops[2] == int(ChurchOpcode.CALL),   f"BOOT_PROGRAM[2] opcode should be CALL, got {ops[2]}"

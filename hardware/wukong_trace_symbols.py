@@ -120,14 +120,25 @@ def trace_metadata(nia):
             "source_map": "reference-bitstream",
         }
 
-    end = WUKONG_CALLHOME_BASE + len(WUKONG_CALLHOME_WORDS) * 4
+    # The LUMP header occupies word 0 at 0x700.  WUKONG_NUC_PROGRAM word 0
+    # starts at 0x704, so keep the displayed LUMP offset (including the
+    # header) but disassemble the executable word one position later.
+    end = WUKONG_CALLHOME_BASE + (len(WUKONG_CALLHOME_WORDS) + 1) * 4
     if WUKONG_CALLHOME_BASE <= nia < end and nia % 4 == 0:
         offset = (nia - WUKONG_CALLHOME_BASE) // 4
+        if offset == 0:
+            return {
+                "pet_name": WUKONG_CALLHOME_PET_NAME,
+                "offset": 0,
+                "nia_label": f"{WUKONG_CALLHOME_PET_NAME}.0",
+                "disasm": "LUMP_HEADER",
+                "source_map": "reference-bitstream",
+            }
         return {
             "pet_name": WUKONG_CALLHOME_PET_NAME,
             "offset": offset,
             "nia_label": f"{WUKONG_CALLHOME_PET_NAME}.{offset}",
-            "disasm": _disassemble_word(WUKONG_CALLHOME_WORDS[offset]),
+            "disasm": _disassemble_word(WUKONG_CALLHOME_WORDS[offset - 1]),
             "source_map": "reference-bitstream",
         }
     return None

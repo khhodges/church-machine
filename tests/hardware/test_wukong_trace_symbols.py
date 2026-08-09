@@ -14,7 +14,13 @@ def test_wukong_callhome_metadata_uses_word_offset():
     item = trace_metadata(0x000007FC)
     assert item["nia_label"] == "WukongCallHome.63"
     assert item["offset"] == 63
-    assert item["disasm"] == "ISUB DR3, DR3, DR1"
+    assert item["disasm"] == "BRANCHNE -1"
+
+
+def test_wukong_dread_at_71c_is_not_mislabeled_as_isub():
+    item = trace_metadata(0x0000071C)
+    assert item["nia_label"] == "WukongCallHome.7"
+    assert item["disasm"] == "DREAD DR6, CR4, #0, DR1"
 
 
 def test_unknown_address_is_not_guessed():

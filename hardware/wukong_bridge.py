@@ -298,13 +298,22 @@ def _trace_location(nia):
             'disasm': _standalone_disassemble(_STANDALONE_BOOT_WORDS[offset]),
             'source_map': 'reference-bitstream',
         }
-    if 0x700 <= nia < 0x700 + len(_STANDALONE_WUKONG_WORDS) * 4 and nia % 4 == 0:
+    # 0x700 is the LUMP header; executable word 0 starts at 0x704.
+    if 0x700 <= nia < 0x700 + (len(_STANDALONE_WUKONG_WORDS) + 1) * 4 and nia % 4 == 0:
         offset = (nia - 0x700) // 4
+        if offset == 0:
+            return {
+                'pet_name': 'WukongCallHome',
+                'offset': 0,
+                'nia_label': 'WukongCallHome.0',
+                'disasm': 'LUMP_HEADER',
+                'source_map': 'reference-bitstream',
+            }
         return {
             'pet_name': 'WukongCallHome',
             'offset': offset,
             'nia_label': f'WukongCallHome.{offset}',
-            'disasm': _standalone_disassemble(_STANDALONE_WUKONG_WORDS[offset]),
+            'disasm': _standalone_disassemble(_STANDALONE_WUKONG_WORDS[offset - 1]),
             'source_map': 'reference-bitstream',
         }
     return None

@@ -6,7 +6,7 @@ module \top
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:268"
   memory width 32 size 16384 \dmem
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1113"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1117"
   memory width 46 size 116 \init_rom
 
   attribute \src "/home/runner/workspace/hardware/wukong_top.py:173"
@@ -463,11 +463,11 @@ module \top
   attribute \init 7'0000000
   wire width 7 \init_rom_rd__addr
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1103"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1107"
   attribute \init 7'0000000
   wire width 7 \hw_init_ctr
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1102"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1106"
   attribute \init 4'0000
   wire width 4 \boot_delay
 
@@ -477,7 +477,7 @@ module \top
   attribute \src "/home/runner/workspace/hardware/core.py:76"
   wire width 1 \boot_start
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1079"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1083"
   attribute \init 1'0
   wire width 1 \hb_blink
 
@@ -551,7 +551,7 @@ module \top
   attribute \src "/home/runner/workspace/hardware/core.py:137"
   wire width 32 \retire_trace_return_cr14_gt
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1078"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1082"
   attribute \init 26'00000000000000000000000000
   wire width 26 \hb_ctr
 
@@ -2178,7 +2178,7 @@ module \top
     connect \Y $76
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1121"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1125"
   cell $not $320
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -2187,7 +2187,7 @@ module \top
     connect \Y $77
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1123"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1127"
   cell $lt $321
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -2199,7 +2199,7 @@ module \top
     connect \Y $78
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1127"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1131"
   cell $not $322
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -2208,7 +2208,7 @@ module \top
     connect \Y $79
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1143"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1147"
   cell $not $323
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -2217,7 +2217,7 @@ module \top
     connect \Y $80
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1158"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1162"
   cell $not $324
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -2226,7 +2226,7 @@ module \top
     connect \Y $81
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1166"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1170"
   cell $not $325
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -2235,7 +2235,7 @@ module \top
     connect \Y $82
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1169"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1173"
   cell $not $326
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -3012,7 +3012,7 @@ module \top
     connect \Y $150
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1065"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1069"
   cell $eq $394
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -3024,7 +3024,7 @@ module \top
     connect \Y $151
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1068"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1072"
   cell $sub $395
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -3036,7 +3036,7 @@ module \top
     connect \Y $152
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1068"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1072"
   cell $eq $396
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -3048,7 +3048,7 @@ module \top
     connect \Y $153
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1073"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1077"
   cell $add $397
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -3060,7 +3060,7 @@ module \top
     connect \Y $154
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1075"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1079"
   cell $add $398
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -3072,7 +3072,7 @@ module \top
     connect \Y $155
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1080"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1084"
   cell $add $399
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -3084,7 +3084,7 @@ module \top
     connect \Y $156
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1081"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1085"
   cell $eq $400
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -3096,7 +3096,7 @@ module \top
     connect \Y $157
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1082"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1086"
   cell $not $401
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -3105,7 +3105,7 @@ module \top
     connect \Y $158
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1121"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1125"
   cell $not $402
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -3114,7 +3114,7 @@ module \top
     connect \Y $159
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1123"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1127"
   cell $lt $403
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -3126,7 +3126,7 @@ module \top
     connect \Y $160
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1127"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1131"
   cell $not $404
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -3135,7 +3135,7 @@ module \top
     connect \Y $161
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1143"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1147"
   cell $not $405
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -3144,7 +3144,7 @@ module \top
     connect \Y $162
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1124"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1128"
   cell $add $406
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -3156,7 +3156,7 @@ module \top
     connect \Y $163
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1128"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1132"
   cell $add $407
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -3168,7 +3168,7 @@ module \top
     connect \Y $164
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1136"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1140"
   cell $eq $408
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -3249,7 +3249,7 @@ module \top
     connect \CLK \clk [0]
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1113"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1117"
   cell $meminit_v2 $413
     parameter \MEMID "\\init_rom"
     parameter \ABITS 0
@@ -5368,18 +5368,18 @@ module \top
       case 1'0
         switch \retire_valid [0]
           case 1'1
-            switch \imem_data [30:27]
-              case 4'0000
+            switch \imem_data [31:27]
+              case 5'00000
                 assign $212 [1:0] 2'10
-              case 4'0100
+              case 5'00100
                 assign $212 [1:0] 2'11
-              case 4'0010
+              case 5'00010
                 assign $212 [1:0] 2'11
-              case 4'1000
+              case 5'01000
                 assign $212 [1:0] 2'11
-              case 4'1001
+              case 5'01001
                 assign $212 [1:0] 2'11
-              case 4'0011
+              case 5'00011
                 assign $212 [1:0] 2'11
               case
                 assign $212 [1:0] 2'01
@@ -5405,18 +5405,18 @@ module \top
       case 1'0
         switch \retire_valid [0]
           case 1'1
-            switch \imem_data [30:27]
-              case 4'0000
+            switch \imem_data [31:27]
+              case 5'00000
                 assign $213 [7:0] 8'00000001
-              case 4'0100
+              case 5'00100
                 assign $213 [7:0] 8'00000011
-              case 4'0010
+              case 5'00010
                 assign $213 [7:0] 8'00000110
-              case 4'1000
+              case 5'01000
                 assign $213 [7:0] 8'00000110
-              case 4'1001
+              case 5'01001
                 assign $213 [7:0] 8'00000110
-              case 4'0011
+              case 5'00011
                 assign $213 [7:0] 8'00001001
               case
                 assign $213 [7:0] 8'00000000
@@ -5442,18 +5442,18 @@ module \top
       case 1'0
         switch \retire_valid [0]
           case 1'1
-            switch \imem_data [30:27]
-              case 4'0000
+            switch \imem_data [31:27]
+              case 5'00000
                 assign $214 [31:0] \retire_trace_load_shadow_gt [31:0]
-              case 4'0100
+              case 5'00100
                 assign $214 [31:0] 32'00000000000000000000000000000000
-              case 4'0010
+              case 5'00010
                 assign $214 [31:0] \retire_trace_cr6_gt [31:0]
-              case 4'1000
+              case 5'01000
                 assign $214 [31:0] \retire_trace_cr6_gt [31:0]
-              case 4'1001
+              case 5'01001
                 assign $214 [31:0] \retire_trace_cr6_gt [31:0]
-              case 4'0011
+              case 5'00011
                 assign $214 [31:0] 32'00000000000000000000000000000000
               case
                 assign $214 [31:0] 32'00000000000000000000000000000000
@@ -5479,18 +5479,18 @@ module \top
       case 1'0
         switch \retire_valid [0]
           case 1'1
-            switch \imem_data [30:27]
-              case 4'0000
+            switch \imem_data [31:27]
+              case 5'00000
                 assign $215 [7:0] 8'00000010
-              case 4'0100
+              case 5'00100
                 assign $215 [7:0] 8'00000100
-              case 4'0010
+              case 5'00010
                 assign $215 [7:0] 8'00000111
-              case 4'1000
+              case 5'01000
                 assign $215 [7:0] 8'00000111
-              case 4'1001
+              case 5'01001
                 assign $215 [7:0] 8'00000111
-              case 4'0011
+              case 5'00011
                 assign $215 [7:0] 8'00001010
               case
             end
@@ -5515,18 +5515,18 @@ module \top
       case 1'0
         switch \retire_valid [0]
           case 1'1
-            switch \imem_data [30:27]
-              case 4'0000
+            switch \imem_data [31:27]
+              case 5'00000
                 assign $216 [31:0] \retire_trace_load_new_gt [31:0]
-              case 4'0100
+              case 5'00100
                 assign $216 [31:0] \retire_trace_cr12_gt [31:0]
-              case 4'0010
+              case 5'00010
                 assign $216 [31:0] \retire_trace_cr14_gt [31:0]
-              case 4'1000
+              case 5'01000
                 assign $216 [31:0] \retire_trace_cr14_gt [31:0]
-              case 4'1001
+              case 5'01001
                 assign $216 [31:0] \retire_trace_cr14_gt [31:0]
-              case 4'0011
+              case 5'00011
                 assign $216 [31:0] \retire_trace_cr6_gt [31:0]
               case
             end
@@ -5551,17 +5551,17 @@ module \top
       case 1'0
         switch \retire_valid [0]
           case 1'1
-            switch \imem_data [30:27]
-              case 4'0000
-              case 4'0100
+            switch \imem_data [31:27]
+              case 5'00000
+              case 5'00100
                 assign $217 [7:0] 8'00000101
-              case 4'0010
+              case 5'00010
                 assign $217 [7:0] 8'00001000
-              case 4'1000
+              case 5'01000
                 assign $217 [7:0] 8'00001000
-              case 4'1001
+              case 5'01001
                 assign $217 [7:0] 8'00001000
-              case 4'0011
+              case 5'00011
                 assign $217 [7:0] 8'00001011
               case
             end
@@ -5586,17 +5586,17 @@ module \top
       case 1'0
         switch \retire_valid [0]
           case 1'1
-            switch \imem_data [30:27]
-              case 4'0000
-              case 4'0100
+            switch \imem_data [31:27]
+              case 5'00000
+              case 5'00100
                 assign $218 [31:0] \retire_trace_cr5_gt [31:0]
-              case 4'0010
+              case 5'00010
                 assign $218 [31:0] 32'00000000000000000000000000000000
-              case 4'1000
+              case 5'01000
                 assign $218 [31:0] 32'00000000000000000000000000000000
-              case 4'1001
+              case 5'01001
                 assign $218 [31:0] 32'00000000000000000000000000000000
-              case 4'0011
+              case 5'00011
                 assign $218 [31:0] \retire_trace_cr14_gt [31:0]
               case
             end
@@ -5652,7 +5652,7 @@ module \top
     connect \Q \trace_unit_state
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1078"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1082"
   process $555
     assign $220 [25:0] $156 [25:0]
     switch $157 [0]
@@ -5661,7 +5661,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1078"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1082"
   cell $dff $556
     parameter \WIDTH 26
     parameter \CLK_POLARITY 1
@@ -5670,7 +5670,7 @@ module \top
     connect \Q \hb_ctr
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1079"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1083"
   process $557
     assign $221 [0] \hb_blink [0]
     switch $157 [0]
@@ -5679,7 +5679,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1079"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1083"
   cell $dff $558
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -5688,7 +5688,7 @@ module \top
     connect \Q \hb_blink
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1102"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1106"
   process $559
     assign $222 [3:0] \boot_delay [3:0]
     switch $159 [0]
@@ -5704,7 +5704,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1102"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1106"
   cell $dff $560
     parameter \WIDTH 4
     parameter \CLK_POLARITY 1
@@ -5713,7 +5713,7 @@ module \top
     connect \Q \boot_delay
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1103"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1107"
   process $561
     assign $223 [6:0] \init_rom_rd__addr [6:0]
     switch $159 [0]
@@ -5729,7 +5729,7 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1103"
+  attribute \src "/home/runner/workspace/hardware/wukong_top.py:1107"
   cell $dff $562
     parameter \WIDTH 7
     parameter \CLK_POLARITY 1
