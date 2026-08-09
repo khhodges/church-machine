@@ -11119,18 +11119,24 @@ const VersionsView = {
         const btn = document.getElementById('versionsRefreshBtn');
         if (btn && manual) btn.disabled = true;
         try {
-            const [statusRes, ghRes, diffRes] = await Promise.allSettled([
+            const [statusRes, ghRes, diffRes, bsRes, prodRes] = await Promise.allSettled([
                 fetch('/hardware/wukong/status').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
                 fetch('/api/github/activity').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
                 fetch('/api/versions/github-diff').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
+                fetch('/api/bitstream-status').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
+                fetch('/api/versions/production').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
             ]);
             const status = statusRes.status === 'fulfilled' ? statusRes.value : null;
             const gh     = ghRes.status === 'fulfilled' ? ghRes.value : null;
             const diff   = diffRes.status === 'fulfilled' && !diffRes.value.error ? diffRes.value : null;
+            const bs     = bsRes.status === 'fulfilled' ? bsRes.value : null;
+            const prod   = prodRes.status === 'fulfilled' ? prodRes.value : null;
             this._lastDiff = diff;
             this._renderIde(status, gh, diff);
             this._renderGithub(status, gh);
             this._renderFpga(status);
+            this._renderBitstream(bs, status);
+            this._renderProd(prod);
             const lc = document.getElementById('versionsLastChecked');
             if (lc) lc.textContent = 'Checked ' + new Date().toLocaleTimeString();
         } finally {
@@ -11231,11 +11237,64 @@ const VersionsView = {
         } else {
             badge = this._badge('warn', 'Different commit than the IDE');
         }
+        const repoLine = gh.repo
+            ? `<div class="versions-note"><a href="https://github.com/${this._esc(gh.repo)}" target="_blank" rel="noopener">${this._esc(gh.repo)}</a></div>`
+            : '';
         el.innerHTML =
+            repoLine +
             `<div class="versions-value"><a href="${this._esc(c.url)}" target="_blank" rel="noopener"><code>${this._esc(c.sha)}</code></a></div>` +
             badge +
             `<div class="versions-note">${this._esc(c.message)}<br>` +
             `${this._esc(c.author)} &middot; ${this._esc(this._age(c.date) || c.date)}</div>`;
+    },
+
+    _renderBitstream(bs, status) {
+        const el = document.getElementById('versionsBitstreamBody');
+        if (!el) return;
+        if (!bs || !bs.ok) {
+            el.innerHTML = this._badge('unknown', 'Unavailable') +
+                '<div class="versions-note">Could not read the bitstream metadata.</div>';
+            return;
+        }
+        if (!bs.present) {
+            el.innerHTML = this._badge('warn', 'No bitstream built') +
+                '<div class="versions-note">No pre-built Ti60 hex found in bitstreams/.</div>';
+            return;
+        }
+        const fw = bs.firmware_version != null ? String(bs.firmware_version) : '?';
+        const letter = bs.build_letter ? ` (build ${this._esc(bs.build_letter)})` : '';
+        const expected = status ? status.expected_build_version : null;
+        let badge = '';
+        if (expected != null && /^\d+$/.test(fw)) {
+            badge = Number(fw) === Number(expected)
+                ? this._badge('ok', 'Matches repo expectation')
+                : this._badge('warn', `Repo expects v${this._esc(expected)}`);
+        }
+        el.innerHTML =
+            `<div class="versions-value">firmware v${this._esc(fw)}${letter}</div>` +
+            badge +
+            (bs.git_sha ? `<div class="versions-note">Built from <code>${this._esc(String(bs.git_sha).slice(0, 7))}</code>` +
+                (bs.git_message ? ` &middot; ${this._esc(bs.git_message)}` : '') + '</div>' : '') +
+            (bs.built_at ? `<div class="versions-note">Built ${this._esc(this._age(bs.built_at) || bs.built_at)}</div>` : '');
+    },
+
+    _renderProd(prod) {
+        const el = document.getElementById('versionsProdBody');
+        if (!el) return;
+        if (!prod || prod.error || prod.version == null) {
+            el.innerHTML = this._badge('unknown', 'Unreachable') +
+                `<div class="versions-note">${this._esc((prod && prod.error) || 'Could not reach production.')}</div>` +
+                (prod && prod.url ? `<div class="versions-note"><a href="${this._esc(prod.url)}" target="_blank" rel="noopener">${this._esc(prod.url)}</a></div>` : '');
+            return;
+        }
+        const badge = prod.in_sync
+            ? this._badge('ok', 'Same version as this IDE')
+            : this._badge('warn', 'Different version than this IDE');
+        el.innerHTML =
+            `<div class="versions-value"><code>${this._esc(prod.version)}</code></div>` +
+            badge +
+            `<div class="versions-note"><a href="${this._esc(prod.url)}" target="_blank" rel="noopener">${this._esc(prod.url)}</a>` +
+            (prod.local_version ? ` &middot; this IDE: <code>${this._esc(prod.local_version)}</code>` : '') + '</div>';
     },
 
     _renderFpga(status) {

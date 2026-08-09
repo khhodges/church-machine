@@ -3170,7 +3170,7 @@ def download_callhome_bridge():
     return resp
 
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "") or os.environ.get("GITHUB_PAT", "")
-GITHUB_LIBRARY_REPO = os.environ.get("GITHUB_LIBRARY_REPO", "khhodges/cloomc-project")
+GITHUB_LIBRARY_REPO = os.environ.get("GITHUB_LIBRARY_REPO", "khhodges/church-machine")
 GITHUB_FOUNDATION_REPO = "khhodges/cloomc-foundation"
 
 def github_api(method, path, json_data=None, repo=None):
@@ -3284,7 +3284,7 @@ def github_activity():
         return jsonify({"commits": [], "error": "No repo configured"})
     data, err = github_api_public("/commits?per_page=10", repo)
     if err or not isinstance(data, list):
-        return jsonify({"commits": [], "error": err or "No data"})
+        return jsonify({"commits": [], "repo": repo, "error": err or "No data"})
     commits = []
     for c in data[:10]:
         commit_info = c.get("commit", {})
@@ -3298,7 +3298,45 @@ def github_activity():
             "date": author_info.get("date", ""),
             "url": c.get("html_url", ""),
         })
-    return jsonify({"commits": commits})
+    return jsonify({"commits": commits, "repo": repo})
+
+# ---------------------------------------------------------------------------
+# /api/versions/production — version of the deployed production server
+# (lab.cloomc.org).  Fetches its /api/boot-id and caches briefly so the
+# Versions tab's 15 s auto-refresh doesn't hammer production.
+_versions_prod_cache = {"ts": 0.0, "payload": None}
+_VERSIONS_PROD_TTL = 60  # seconds
+PRODUCTION_BASE_URL = os.environ.get("PRODUCTION_BASE_URL", "https://lab.cloomc.org")
+
+
+@app.route("/api/versions/production")
+def versions_production():
+    import time as _prod_time
+    now = _prod_time.time()
+    if _versions_prod_cache["payload"] is not None and now - _versions_prod_cache["ts"] < _VERSIONS_PROD_TTL:
+        return jsonify(_versions_prod_cache["payload"])
+    payload = {"url": PRODUCTION_BASE_URL}
+    try:
+        r = http_requests.get(f"{PRODUCTION_BASE_URL}/api/boot-id", timeout=8)
+        if r.status_code == 200:
+            data = r.json()
+            if isinstance(data, dict) and data.get("version"):
+                payload["version"] = data.get("version")
+                payload["boot_id"] = data.get("bootId")
+                payload["local_version"] = BUILD_VERSION
+                payload["in_sync"] = (data.get("version") == BUILD_VERSION)
+                # Only cache validated successful responses; errors are never
+                # cached so the next UI refresh retries immediately.
+                _versions_prod_cache["ts"] = now
+                _versions_prod_cache["payload"] = payload
+            else:
+                payload["error"] = "Malformed response from production"
+        else:
+            payload["error"] = f"HTTP {r.status_code}"
+    except Exception as e:
+        payload["error"] = str(e)
+    return jsonify(payload)
+
 
 # ---------------------------------------------------------------------------
 # /api/versions/github-diff — file-level comparison between the local git HEAD
