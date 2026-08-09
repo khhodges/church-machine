@@ -76,6 +76,15 @@ def _disassemble_word(word):
         return f"??? 0x{word:08x}"
     suffix = "" if cond == 14 else _COND_NAMES[cond]
     mnemonic += suffix
+    if opcode == 10:
+        # RESOLVE: direction in imm[14], gated in imm[13], sel in imm[7:0]
+        direction = (imm >> 14) & 1
+        gated     = (imm >> 13) & 1
+        sel       = imm & 0xFF
+        dir_str   = "BIND" if direction == 0 else "FORM"
+        src_reg   = f"CR{src}" if direction == 0 else f"DR{src}"
+        gated_str = ",GATED" if gated else ""
+        return f"{mnemonic} CR{dst}, {src_reg}, #0x{sel:02X} [{dir_str}{gated_str}]"
     if opcode in (0, 1, 2, 4, 5, 8, 9):
         return f"{mnemonic} CR{dst}, CR{src}[0x{imm:04X}]"
     if opcode in (16, 17):
