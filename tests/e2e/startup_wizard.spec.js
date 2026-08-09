@@ -50,7 +50,7 @@ const { test, expect } = require('@playwright/test');
  */
 async function loadFreshWizard(page) {
     await page.goto('/simulator/');
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     // Clear any wizard localStorage left by a prior test, and suppress the
     // "What's New" modal so it cannot block clicks during Group 9 (demo tour).
     await page.evaluate(() => {
@@ -60,8 +60,32 @@ async function loadFreshWizard(page) {
         localStorage.setItem('church_whatsnew_dismissed_perm', '1');
     });
     await page.reload();
-    await page.waitForLoadState('networkidle');
+    await waitForAppReady(page);
     await openWizard(page);
+}
+
+/**
+ * Wait for a concrete readiness signal instead of 'networkidle'.
+ *
+ * The simulator page runs a background polling loop (Ti60 status/watchers)
+ * that keeps network activity alive indefinitely, so
+ * page.waitForLoadState('networkidle') never fires and deterministically
+ * times out (this silently broke Group 7 on page load).
+ *
+ * What we actually need is: the deferred scripts have executed —
+ * StartupWizard exists (app-startup-wizard.js ran, so init() has been
+ * scheduled/run via DOMContentLoaded) and the shell navigation globals
+ * (switchView / switchBuilderViewTab) are defined.
+ */
+async function waitForAppReady(page) {
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForFunction(
+        () =>
+            typeof StartupWizard === 'object' && StartupWizard !== null &&
+            typeof switchView === 'function' &&
+            typeof switchBuilderViewTab === 'function',
+        { timeout: 10000 }
+    );
 }
 
 /**
@@ -232,7 +256,7 @@ test.describe('Group 5 — localStorage persistence', () => {
 
         // Reload WITHOUT clearing localStorage.
         await page.reload();
-        await page.waitForLoadState('networkidle');
+        await waitForAppReady(page);
         // init() runs via defer+DOMContentLoaded, calls _load() (reads '2'),
         // then _renderProgress() which sets swBody2.style.display='block'.
         // Navigate to Builder > Connect and open the wizard; check step 2.
