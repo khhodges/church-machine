@@ -45,3 +45,10 @@ __pycache__/
 /church_ti60_f225.v.pre_direct
 /cm_dmem_bram.v
 *.db-journal
+
+# Loose build artifacts — never commit these
+*.bit
+*.zip
+/church_ti60_f225.hex
+bitstreams_that_worked.zip
+wukong.bit
