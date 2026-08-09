@@ -201,6 +201,61 @@ def _wukong_build_version():
         pass
     return None
 
+def _wukong_build_dir():
+    """Directory holding the pre-built Wukong bitstream (patchable in tests)."""
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "build"))
+
+def _bitstream_sidecar_path(bit_path):
+    """Path of the JSON metadata sidecar next to a .bit file."""
+    return bit_path + ".meta.json"
+
+def _write_bitstream_sidecar(bit_path, version=None, source_commit=None):
+    """Write a metadata sidecar describing the actual .bit file on disk.
+
+    Records the declared build version (may be None if unknown), the md5 of
+    the file contents (so staleness/tampering is detectable), a built_at
+    timestamp, and the source commit when known.
+    """
+    import hashlib, datetime as _dt
+    md5 = hashlib.md5()
+    with open(bit_path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            md5.update(chunk)
+    meta = {
+        "version": version,
+        "md5": md5.hexdigest(),
+        "built_at": _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "source_commit": source_commit,
+        "size_bytes": os.path.getsize(bit_path),
+    }
+    with open(_bitstream_sidecar_path(bit_path), "w") as f:
+        json.dump(meta, f, indent=2)
+    return meta
+
+def _read_bitstream_meta(bit_path):
+    """Return trustworthy sidecar metadata for bit_path, or None.
+
+    Returns None when the sidecar is missing, unparseable, or its recorded
+    md5 no longer matches the file on disk (i.e. the .bit was replaced
+    without updating the sidecar — metadata cannot be trusted).
+    """
+    import hashlib
+    sc = _bitstream_sidecar_path(bit_path)
+    try:
+        with open(sc) as f:
+            meta = json.load(f)
+        if not isinstance(meta, dict) or not meta.get("md5"):
+            return None
+        md5 = hashlib.md5()
+        with open(bit_path, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                md5.update(chunk)
+        if md5.hexdigest() != meta["md5"]:
+            return None
+        return meta
+    except Exception:
+        return None
+
 def _wukong_min_tu_version():
     """Read _TU_VERSION_CALL_3PKT from hardware/wukong_top.py (best-effort)."""
     try:
@@ -216,8 +271,12 @@ def _wukong_min_tu_version():
 
 @app.route("/dl/wukong-bit")
 def download_wukong_bit():
-    p = os.path.join(os.path.dirname(__file__), "..", "build", "church_wukong_xc7a100t.bit")
-    ver = _wukong_build_version()
+    p = os.path.join(_wukong_build_dir(), "church_wukong_xc7a100t.bit")
+    # Only advertise a version verified against the actual file's sidecar
+    # metadata — never the current source version (the .bit on disk may be
+    # older than the source right after a code push).
+    meta = _read_bitstream_meta(p)
+    ver = meta.get("version") if meta else None
     name = ("church_wukong_xc7a100t_v%d.bit" % ver) if ver else "church_wukong_xc7a100t.bit"
     return send_file(os.path.abspath(p), as_attachment=True,
                      download_name=name,
@@ -271,29 +330,80 @@ def upload_wukong_bit():
     f = request.files["file"]
     if not f.filename:
         return jsonify({"ok": False, "error": "Empty filename"}), 400
-    build_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "build"))
+    build_dir = _wukong_build_dir()
     os.makedirs(build_dir, exist_ok=True)
     bit_path = os.path.join(build_dir, "church_wukong_xc7a100t.bit")
-    f.save(bit_path)
+    # Validate all request metadata BEFORE touching the canonical bitstream,
+    # so a rejected upload can never replace or corrupt the served artifact.
+    ver_raw = request.form.get("version", "") or request.args.get("version", "")
+    version = None
+    if ver_raw:
+        try:
+            version = int(ver_raw)
+        except ValueError:
+            return jsonify({"ok": False, "error": "version must be an integer"}), 400
+    source_commit = request.form.get("commit", "") or request.args.get("commit", "") or None
+    # Save to a temp file first, write its sidecar, then atomically move both
+    # into place — a failed upload leaves the previous .bit + sidecar intact.
+    tmp_path = bit_path + ".uploading"
+    f.save(tmp_path)
+    try:
+        meta = _write_bitstream_sidecar(tmp_path, version=version, source_commit=source_commit)
+        os.replace(_bitstream_sidecar_path(tmp_path), _bitstream_sidecar_path(bit_path))
+        os.replace(tmp_path, bit_path)
+    except Exception:
+        for leftover in (tmp_path, _bitstream_sidecar_path(tmp_path)):
+            try:
+                os.remove(leftover)
+            except OSError:
+                pass
+        raise
     size = os.path.getsize(bit_path)
-    app.logger.info("Wukong bit uploaded: %d bytes", size)
-    return jsonify({"ok": True, "size_bytes": size})
+    app.logger.info("Wukong bit uploaded: %d bytes (version=%s md5=%s)",
+                    size, version, meta["md5"])
+    return jsonify({"ok": True, "size_bytes": size, "version": version, "md5": meta["md5"]})
 
 
 @app.route("/api/bitstream-status")
 def api_bitstream_status():
     """Return metadata about the pre-built Wukong bitstream for the IDE panel."""
-    build_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "build"))
+    build_dir = _wukong_build_dir()
     bit_path = os.path.join(build_dir, "church_wukong_xc7a100t.bit")
     present = os.path.isfile(bit_path)
+    source_version = _wukong_build_version()
     meta = {}
+    bit_version = None
+    version_known = False
+    mismatch = False
+    mismatch_message = None
     if present:
         stat = os.stat(bit_path)
         import datetime as _dt
+        sidecar = _read_bitstream_meta(bit_path)
+        if sidecar:
+            bit_version = sidecar.get("version")
+            version_known = bit_version is not None
+            built_at = sidecar.get("built_at")
+            git_sha = sidecar.get("source_commit")
+        else:
+            built_at = _dt.datetime.utcfromtimestamp(stat.st_mtime).strftime("%Y-%m-%dT%H:%M:%SZ")
+            git_sha = None
+        if source_version is not None:
+            if not version_known:
+                mismatch = True
+                mismatch_message = ("Source is at v%d but the downloadable bitstream's "
+                                    "version is unknown — rebuild/upload needed."
+                                    % source_version)
+            elif bit_version != source_version:
+                mismatch = True
+                mismatch_message = ("Source is at v%d but the downloadable bitstream is "
+                                    "v%d — rebuild/upload needed."
+                                    % (source_version, bit_version))
         meta = {
-            "built_at": _dt.datetime.utcfromtimestamp(stat.st_mtime).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "firmware_version": _wukong_build_version(),
+            "built_at": built_at,
+            "firmware_version": bit_version,
             "size_bytes": stat.st_size,
+            "git_sha": git_sha,
         }
     return jsonify({
         "ok": True,
@@ -301,6 +411,10 @@ def api_bitstream_status():
         "built_at": meta.get("built_at"),
         "build_letter": meta.get("build_letter"),
         "firmware_version": meta.get("firmware_version"),
+        "version_known": version_known,
+        "source_version": source_version,
+        "version_mismatch": mismatch,
+        "mismatch_message": mismatch_message,
         "size_bytes": meta.get("size_bytes"),
         "git_sha": meta.get("git_sha"),
         "git_date": meta.get("git_date"),
@@ -2413,13 +2527,20 @@ def release_r12_index():
     if(d.present){
       var sz = d.size_bytes ? (d.size_bytes/1048576).toFixed(1)+' MB' : '';
       var dt = d.built_at ? d.built_at.replace('T',' ').replace('Z',' UTC') : '';
-      var fw = d.firmware_version || '';
+      var fw = d.version_known ? ('v' + d.firmware_version) : 'version unknown';
+      var warn = '';
+      if(d.version_mismatch && d.mismatch_message){
+        warn = '<div style="background:#1a1408;border:1px solid #854d0e;border-radius:8px;padding:10px 14px;margin-top:8px;font-size:.78rem;color:#fbbf24">'
+          +'<span style="font-weight:700">&#x26A0;&#xFE0F; Version mismatch:</span> '
+          +String(d.mismatch_message).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+          +'</div>';
+      }
       card.innerHTML = '<div style="background:#071a0e;border:1px solid #166534;border-radius:8px;padding:14px 16px;display:flex;align-items:center;gap:14px;margin-bottom:0">'
         +'<span style="font-size:1.5rem">✅</span>'
         +'<div style="flex:1"><div style="color:#4ade80;font-weight:700;font-size:.9rem">Pre-built bitstream available</div>'
-        +'<div style="font-size:.75rem;color:#64748b;margin-top:2px">'+sz+(fw?' &middot; fw '+fw:'')+(dt?' &middot; built '+dt:'')+'</div></div>'
+        +'<div style="font-size:.75rem;color:#64748b;margin-top:2px">'+sz+' &middot; '+fw+(dt?' &middot; built '+dt:'')+'</div></div>'
         +'<a href="/dl/wukong-bit" style="padding:.4rem 1rem;background:#166534;border-radius:5px;color:#4ade80;text-decoration:none;font-size:.82rem;font-weight:700;white-space:nowrap">&#x2B07; Download .bit</a>'
-        +'</div>';
+        +'</div>' + warn;
     } else {
       card.innerHTML = '<div style="background:#1a0e0e;border:1px solid #4a1212;border-radius:8px;padding:12px 16px;font-size:.8rem;color:#9ca3af">'
         +'<span style="color:#f87171;font-weight:700">Bitstream not yet built.</span> '

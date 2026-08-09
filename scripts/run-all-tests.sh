@@ -259,6 +259,9 @@ register_suite "wukong-status-readonly-tests" \
 register_suite "pipeline-health-status-tests" \
     'python3 -m pytest tests/server/test_pipeline_health_status_fields.py -v'
 
+register_suite "bitstream-version-labeling-tests" \
+    'python3 -m pytest tests/server/test_bitstream_version_labeling.py -v'
+
 register_suite "pipeline-health-stages-tests" \
     'node simulator/test_pipeline_health_stages.js'
 

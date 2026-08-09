@@ -73,6 +73,7 @@ const DEFAULT_SCRIPT_ONLY_SUITES = [
     'check-wukong-hw-init',
     'wukong-cr-update-tests',
     'wukong-trace-cr-server-tests',
+    'bitstream-version-labeling-tests',
 ];
 
 const configPath = path.join(__dirname, 'test-workflow-config.json');
