@@ -150,7 +150,7 @@ def reset_boot_config():
     import json
     _MINIMAL_JSON = {
         "schemaVersion": 1,
-        "targetBoard": "ti60-f225",
+        "targetBoard": "wukong-xc7a100t",
         "step1": {
             "totalNamespaceWords": 16384,
             "namespaceLumpWords":     64,

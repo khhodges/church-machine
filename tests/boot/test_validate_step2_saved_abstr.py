@@ -54,7 +54,7 @@ def _call_validate(tmp_path, step2):
     }
     with patch('server.app.LUMPS_DIR', str(tmp_path)), \
          patch('server.app._load_lump_catalog', return_value=_FAKE_CATALOG):
-        return _validate_step2(step2, step1, "ti60-f225")
+        return _validate_step2(step2, step1, "wukong-xc7a100t")
 
 
 def test_validate_step2_rejects_lump_in_128w_abstr_region(tmp_path):

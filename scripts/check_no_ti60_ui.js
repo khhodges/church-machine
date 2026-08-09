@@ -10,10 +10,9 @@
 //
 // Internal identifiers are ALLOWED and stripped before matching:
 //   - ids/classes/keys/vars where "ti60" is attached to other identifier
-//     chars: ti60-connect, toolbarTi60ConnectBtn, sw_step_ti60, ti60-f225,
-//     isTi60, Ti60Connect, /dl/ti60-hex, BUILD_MD_TI60, ...
+//     chars: ti60-connect, toolbarTi60ConnectBtn, sw_step_ti60, ti60-f225, ...
 //   - exact protocol/data literals (UART banner match, board_type values)
-//   - comments in server/app.py and the script-facing BUILD_MD_TI60 doc
+//   - comments in server/app.py
 //
 // Anything else containing "Ti60", "Efinix" or "Efinity" fails the check.
 
@@ -35,32 +34,13 @@ const ATTACHED_RE = /(?:[A-Za-z0-9_$#.\/-]+[tT][iI]60[A-Za-z0-9_$-]*)|(?:[tT][iI
 const FILE_ALLOW = {
     'server/app.py': [
         /^\s*#/,                      // python comments
-        /is_ti60/,                    // internal flag docs
-        /"label": "Efinix Ti60 F225"/,        // HARDWARE_PROFILES metadata (never rendered)
-        /"notes": "Efinix Titanium Ti60 F225/, // HARDWARE_PROFILES metadata (never rendered)
-        /Efinix Ti60 F225 \(legacy\)/,        // token-gated admin upload page label
-        /app\.logger\./,                       // server-side log lines, never sent to the browser
-        /commit_msg = f"chore: update Ti60/,  // git commit message for script pushes
-        /^\s*"ti60":\s/,                       // board-code dict key
+        /^\s*"ti60":\s/,              // call-home board-code dict key (protocol data)
     ],
 };
 
-// In server/app.py, skip the script-facing BUILD_MD_TI60 document block.
-function stripBuildMdBlock(lines) {
-    const out = [];
-    let inBlock = false;
-    for (const line of lines) {
-        if (!inBlock && /^BUILD_MD_TI60 = """/.test(line)) { inBlock = true; out.push(''); continue; }
-        if (inBlock) { if (/"""\s*$/.test(line)) inBlock = false; out.push(''); continue; }
-        out.push(line);
-    }
-    return out;
-}
-
 function scanFile(rel) {
     const abs = path.join(ROOT, rel);
-    let lines = fs.readFileSync(abs, 'utf8').split('\n');
-    if (rel === 'server/app.py') lines = stripBuildMdBlock(lines);
+    const lines = fs.readFileSync(abs, 'utf8').split('\n');
     const allow = FILE_ALLOW[rel] || [];
     const failures = [];
     lines.forEach((line, i) => {
@@ -87,8 +67,8 @@ function listTargets() {
     return targets;
 }
 
-// Retired Ti60-era artifact names that must not appear in browser-served copy.
-// (server/app.py keeps script-facing legacy endpoints; only UI files are checked.)
+// Retired Ti60-era artifact names that must not appear in browser-served copy
+// or in server/app.py (the script-facing legacy endpoints were removed, #2509).
 const RETIRED_ARTIFACTS = /church_soc_cm\.(hex|xml)|church_ti60_f225|setup_ti60_peri\.py|ti60_f225_project|efinixinc\.com|\/dl\/ti60|titanium_ti60/;
 
 function scanRetiredArtifacts(rel) {
@@ -135,7 +115,7 @@ let failures = [];
 failures = failures.concat(scanReleaseManifest());
 for (const rel of listTargets()) {
     failures = failures.concat(scanFile(rel));
-    if (rel !== 'server/app.py') failures = failures.concat(scanRetiredArtifacts(rel));
+    failures = failures.concat(scanRetiredArtifacts(rel));
 }
 for (const req of REQUIRED_WUKONG_STRINGS) {
     const abs = path.join(ROOT, req.file);

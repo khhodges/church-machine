@@ -101,7 +101,7 @@ def patch_catalog_and_lumps_dir(tmp_path):
 
 _NS_TABLE_RESERVE = 0x400  # 1024 words (64 NS entries × 4 words)
 
-TI60_BOARD = "ti60-f225"
+TI60_BOARD = "wukong-xc7a100t"  # default board (Ti60 retired, Task #2509)
 TI60_RAM = HARDWARE_PROFILES[TI60_BOARD]["totalRamWords"]
 TI60_TOTAL_NS = TI60_RAM + _NS_TABLE_RESERVE + 512
 

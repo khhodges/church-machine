@@ -240,15 +240,6 @@ def download_wukong_verilog():
                      download_name="church_wukong_xc7a100t.v",
                      mimetype="text/plain")
 
-@app.route("/dl/ti60v")
-def download_ti60v():
-    v_path = os.path.join(os.path.dirname(__file__), "..", "build", "church_ti60_f225.v")
-    return send_file(os.path.abspath(v_path),
-                     as_attachment=True,
-                     download_name="church_ti60_f225.v",
-                     mimetype="text/plain")
-
-
 @app.route("/dl/patch-sapphire")
 def download_patch_sapphire():
     p = os.path.join(os.path.dirname(__file__), "..", "scripts", "patch_sapphire_init.py")
@@ -256,143 +247,6 @@ def download_patch_sapphire():
                      as_attachment=True,
                      download_name="patch_sapphire_init.py",
                      mimetype="text/plain")
-
-_GITHUB_CM_REPO = "khhodges/church-machine"
-_GITHUB_HEX_PATH = "bitstreams/church_ti60_f225.hex"
-_GITHUB_RAW_HEX_URL = f"https://raw.githubusercontent.com/{_GITHUB_CM_REPO}/main/{_GITHUB_HEX_PATH}"
-_DL_TIMEOUT = (5, 30)  # (connect_seconds, read_seconds) for GitHub hex fetch
-
-@app.route("/dl/ti60-hex")
-def download_ti60_hex():
-    """Serve the legacy hex file as a download (Content-Disposition: attachment).
-    Serves the local bitstreams/ copy when present; otherwise fetches from GitHub
-    server-side and streams the bytes back so Chrome/Firefox/Safari always save
-    the file instead of rendering it in the browser tab."""
-    import requests as _requests
-    from flask import send_file as _send_file, stream_with_context as _swc, Response as _Response
-    hex_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "bitstreams", "church_ti60_f225.hex"))
-    if os.path.isfile(hex_path):
-        return _send_file(hex_path, as_attachment=True, download_name="church_soc_cm.hex",
-                          mimetype="application/octet-stream")
-    try:
-        gh = _requests.get(_GITHUB_RAW_HEX_URL, stream=True, timeout=_DL_TIMEOUT)
-        gh.raise_for_status()
-        headers = {
-            "Content-Type": "application/octet-stream",
-            "Content-Disposition": 'attachment; filename="church_soc_cm.hex"',
-        }
-        return _Response(_swc(gh.iter_content(chunk_size=8192)), status=200, headers=headers)
-    except Exception:
-        resp = make_response(
-            "Pre-built bitstream not available yet.\n"
-            "Build the Wukong bitstream with Vivado (source wukong_xc7a100t.tcl) and upload it.",
-            404
-        )
-        resp.headers["Content-Type"] = "text/plain"
-        return resp
-
-def _push_bitstream_to_github(meta):
-    """Background thread: git-commit the updated bitstreams/ files and push to GitHub."""
-    import threading as _threading
-    import subprocess as _sp
-    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    fw_ver  = meta.get("firmware_version", "?")
-    git_sha = meta.get("git_sha", "?")
-    commit_msg = f"chore: update Ti60 bitstream v{fw_ver} (droplet {git_sha})"
-
-    def _run():
-        try:
-            env = {**os.environ}
-            git = ["git", "-C", repo_root]
-            _sp.run(git + ["-c", "user.name=Church Machine IDE",
-                           "-c", "user.email=ide@cloomc.org",
-                           "add", "bitstreams/church_ti60_f225.hex",
-                                  "bitstreams/church_ti60_f225.json"],
-                    check=True, capture_output=True, env=env)
-            result = _sp.run(git + ["-c", "user.name=Church Machine IDE",
-                                    "-c", "user.email=ide@cloomc.org",
-                                    "commit", "-m", commit_msg],
-                             capture_output=True, env=env)
-            if result.returncode not in (0, 1):
-                app.logger.warning("Ti60 bitstream git commit failed: %s", result.stderr.decode())
-                return
-            if b"nothing to commit" in result.stdout + result.stderr:
-                app.logger.info("Ti60 bitstream push skipped — no changes vs HEAD")
-                return
-            sync_script = os.path.join(repo_root, "scripts", "sync-to-github.sh")
-            _sp.run(["bash", sync_script], check=False, env=env,
-                    cwd=repo_root, capture_output=False)
-            app.logger.info("Ti60 bitstream pushed to GitHub: %s", commit_msg)
-        except Exception as exc:
-            app.logger.warning("Ti60 bitstream GitHub push failed: %s", exc)
-
-    _threading.Thread(target=_run, daemon=True).start()
-
-
-@app.route("/upload/ti60-hex", methods=["POST"])
-def upload_ti60_hex():
-    """Accept a legacy hex bitstream upload, save it to bitstreams/,
-    then push it to GitHub so /dl/ti60-hex can redirect there.
-
-    Usage from the droplet:
-      curl -X POST <ide-url>/upload/ti60-hex -F "file=@outflow/church_soc_cm.hex" \\
-           -F firmware_version=2.4 -F git_sha=abc1234
-    """
-    import datetime as _dt
-    if "file" not in request.files:
-        return jsonify({"ok": False, "error": "No file field in request"}), 400
-    f = request.files["file"]
-    if not f.filename:
-        return jsonify({"ok": False, "error": "Empty filename"}), 400
-    bitstreams_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "bitstreams"))
-    os.makedirs(bitstreams_dir, exist_ok=True)
-    hex_path = os.path.join(bitstreams_dir, "church_ti60_f225.hex")
-    f.save(hex_path)
-    size = os.path.getsize(hex_path)
-    built_at = _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-    json_path = os.path.join(bitstreams_dir, "church_ti60_f225.json")
-    try:
-        with open(json_path) as _jf:
-            meta = json.load(_jf)
-    except Exception:
-        meta = {}
-    meta["built_at"] = built_at
-    meta["size_bytes"] = size
-    for field in ("git_sha", "git_date", "git_message", "firmware_version"):
-        val = request.form.get(field, "").strip()
-        if val:
-            meta[field] = val
-    with open(json_path, "w") as _jf:
-        json.dump(meta, _jf, indent=2)
-    app.logger.info("Ti60 hex uploaded: %d bytes at %s sha=%s — pushing to GitHub",
-                    size, built_at, meta.get("git_sha", "?"))
-    _push_bitstream_to_github(meta)
-    return jsonify({"ok": True, "size_bytes": size, "built_at": built_at,
-                    "git_sha": meta.get("git_sha"), "git_date": meta.get("git_date"),
-                    "git_message": meta.get("git_message"),
-                    "firmware_version": meta.get("firmware_version"),
-                    "github_hex_url": _GITHUB_RAW_HEX_URL})
-
-@app.route("/upload/ti60-bit", methods=["POST"])
-def upload_ti60_bit():
-    """Accept a legacy raw bitstream upload and save it to bitstreams/.
-
-    Usage from Chromebook:
-      curl -X POST <ide-url>/upload/ti60-bit -F "file=@outflow/church_soc.bit"
-    """
-    if "file" not in request.files:
-        return jsonify({"ok": False, "error": "No file field in request"}), 400
-    f = request.files["file"]
-    if not f.filename:
-        return jsonify({"ok": False, "error": "Empty filename"}), 400
-    bitstreams_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "bitstreams"))
-    os.makedirs(bitstreams_dir, exist_ok=True)
-    bit_path = os.path.join(bitstreams_dir, "church_ti60_f225.bit")
-    f.save(bit_path)
-    size = os.path.getsize(bit_path)
-    app.logger.info("Ti60 bit uploaded: %d bytes", size)
-    return jsonify({"ok": True, "size_bytes": size})
-
 
 @app.route("/upload/wukong-bit", methods=["POST"])
 def upload_wukong_bit():
@@ -467,110 +321,6 @@ def download_build_soc_cm_md():
     return resp
 
 
-@app.route("/dl/flash")
-def download_flash_bootstrap():
-    """Serve a bootstrap shell script that clones / updates the repo then runs flash_and_monitor.sh.
-
-    Usage (works even if the repo is not cloned yet):
-      curl -sL https://lab.cloomc.org/dl/flash | bash
-    """
-    script = r"""#!/bin/bash
-# Church Machine — Flash & Monitor bootstrap
-# Clones the repo if needed, updates it if present, then flashes the Ti60.
-#
-# First-time usage (repo not cloned):
-#   curl -sL https://lab.cloomc.org/dl/flash | bash
-#
-# Subsequent usage (shortcut once repo exists):
-#   bash ~/church-machine/hardware/soc_combined/flash_and_monitor.sh
-
-set -euo pipefail
-
-REPO="https://github.com/khhodges/church-machine.git"
-DIR="$HOME/church-machine"
-SCRIPT="$DIR/hardware/soc_combined/flash_and_monitor.sh"
-
-if [ ! -d "$DIR/.git" ]; then
-    echo "==> Cloning church-machine repo into $DIR ..."
-    git clone "$REPO" "$DIR"
-else
-    echo "==> Updating repo ..."
-    cd "$DIR"
-    git fetch origin
-    git reset --hard origin/main
-    echo "    Repo at: $(git log -1 --oneline)"
-fi
-
-echo ""
-exec bash "$SCRIPT" "$@"
-"""
-    resp = make_response(script, 200)
-    resp.headers["Content-Type"] = "text/plain; charset=utf-8"
-    resp.headers["Content-Disposition"] = 'inline; filename="flash_bootstrap.sh"'
-    return resp
-
-
-@app.route("/dl/ti60zip")
-def download_ti60zip():
-    import zipfile, io, re as _re
-    BASE = os.path.dirname(__file__)
-    HW   = os.path.abspath(os.path.join(BASE, "..", "hardware"))
-    DOCS = os.path.abspath(os.path.join(BASE, "..", "docs"))
-    SOC  = os.path.join(HW, "soc_combined")
-    BITS = os.path.abspath(os.path.join(BASE, "..", "bitstreams"))
-    _SKIP = {"outflow", "work_syn", "work_pnr", "work_dbg", "good-builds", "__pycache__"}
-    _BANNED = _re.compile(
-        r'[ \t]*<efx:param name="(?:'
-        r'infer_clk_enable|infer_set_reset|calc_mcw|split_input_buf|'
-        r'no_fanout_override|get_names_method|logic_opting|pack_lut_into_ram|'
-        r'cpe_ins_register|use_cpe_for_const_0|use_cpe_for_const_1|fanout_limit'
-        r')"[^>]*/>\n?'
-    )
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        if os.path.isdir(SOC):
-            for root, dirs, files in os.walk(SOC):
-                dirs[:] = [d for d in dirs if d not in _SKIP]
-                for fn in files:
-                    if fn.endswith(".pyc"):
-                        continue
-                    full = os.path.join(root, fn)
-                    arc  = os.path.relpath(full, SOC)
-                    if arc == "church_soc_cm.xml":
-                        with open(full, "r") as xf:
-                            xml = xf.read()
-                        zf.writestr(arc, _BANNED.sub("", xml))
-                    elif arc == "Makefile":
-                        with open(full, "r") as mf:
-                            mk = mf.read()
-                        mk = mk.replace("SCRIPTS_DIR := ../../scripts", "SCRIPTS_DIR := scripts")
-                        zf.writestr(arc, mk)
-                    else:
-                        zf.write(full, arc)
-        patch = os.path.join(BASE, "..", "scripts", "patch_sapphire_init.py")
-        if os.path.exists(patch):
-            zf.write(os.path.abspath(patch), "scripts/patch_sapphire_init.py")
-        hex_src = os.path.join(BITS, "church_ti60_f225.hex")
-        bit_src = os.path.join(BITS, "church_ti60_f225.bit")
-        if os.path.exists(hex_src):
-            zf.write(hex_src, "outflow/church_soc_cm.hex")
-        if os.path.exists(bit_src):
-            zf.write(bit_src, "outflow/church_soc_cm.bit")
-        zf.writestr("BUILD.md", BUILD_MD_TI60)
-        for pdf, arc in [
-            ("introducing-cloomc.pdf",  "docs/Introducing CLOOMC.pdf"),
-            ("hardware-ti60-f225.pdf",  "docs/Ti60 Hardware Guide.pdf"),
-            ("cloomc-foundation.pdf",   "docs/Architecture Reference.pdf"),
-            ("instruction-set.pdf",     "docs/Instruction Set Reference.pdf"),
-        ]:
-            src_path = os.path.join(DOCS, pdf)
-            if os.path.exists(src_path):
-                zf.write(src_path, arc)
-    buf.seek(0)
-    return send_file(buf, as_attachment=True,
-                     download_name="church-ti60-package.zip",
-                     mimetype="application/zip")
-
 @app.route("/dl/wukong-zip")
 def download_wukong_zip():
     """Download the QMTECH Wukong XC7A100T build package.
@@ -620,14 +370,6 @@ def download_wukong_zip():
                      mimetype="application/zip")
 
 
-@app.route("/dl/ti60peri")
-def download_ti60peri():
-    peri_path = os.path.join(os.path.dirname(__file__), "..", "hardware", "ti60_f225.peri.xml")
-    return send_file(os.path.abspath(peri_path),
-                     as_attachment=True,
-                     download_name="church_ti60_f225.peri.xml",
-                     mimetype="text/xml")
-
 @app.route("/api/releases")
 def api_releases():
     import hashlib as _hashlib
@@ -641,7 +383,6 @@ def api_releases():
     release = next((r for r in manifest.get("releases", []) if r["version"] == latest_ver), None)
     _verilog_by_board = {
         "wukong-xc7a100t": "church_wukong_xc7a100t.v",
-        "ti60-f225": "church_ti60_f225.v",
     }
     _vfile = _verilog_by_board.get((release or {}).get("board"), "church_wukong_xc7a100t.v")
     verilog_path = os.path.join(os.path.dirname(__file__), "..", "build", _vfile)
@@ -975,18 +716,31 @@ BOOT_CONFIG_SCHEMA_VERSION = 1
 # surfaces what the chosen target board offers. `addressRange` is the byte
 # range of the namespace memory window the chosen board exposes.
 HARDWARE_PROFILES = {
-    "ti60-f225": {
-        "label": "Efinix Ti60 F225",
+    "wukong-xc7a100t": {
+        "label": "QMTECH Wukong Artix-7 (XC7A100T)",
         "totalRamWords": 65536,
         "addressBits": 18,
         "addressRange": "0x0000_0000 – 0x0003_FFFF (256 KB byte-addressable)",
-        "notes": "Efinix Titanium Ti60 F225 — ~256 KB embedded RAM available for namespace",
+        "notes": "QMTECH Wukong XC7A100T — 256 KB block-RAM namespace window",
     },
 }
 
+# Saved configs from the retired Efinix Ti60 era carry targetBoard
+# "ti60-f225". The Wukong exposes the identical namespace window, so
+# loaders transparently migrate the board id instead of rejecting the file.
+_LEGACY_BOARD_ALIASES = {"ti60-f225": "wukong-xc7a100t"}
+
+def _migrate_legacy_board(cfg):
+    """Rewrite retired board ids in a loaded boot-config dict (in place)."""
+    if isinstance(cfg, dict):
+        tb = cfg.get("targetBoard")
+        if tb in _LEGACY_BOARD_ALIASES:
+            cfg["targetBoard"] = _LEGACY_BOARD_ALIASES[tb]
+    return cfg
+
 DEFAULT_BOOT_CONFIG = {
     "schemaVersion": BOOT_CONFIG_SCHEMA_VERSION,
-    "targetBoard": "ti60-f225",
+    "targetBoard": "wukong-xc7a100t",
     "step1": {
         "totalNamespaceWords": 16384,
         "namespaceLumpWords": 64,
@@ -1291,6 +1045,7 @@ def boot_config_get():
                 cfg = json.load(f)
         except Exception as e:
             return jsonify({"error": f"Failed to read boot-config.json: {e}"}), 500
+        _migrate_legacy_board(cfg)
         s1 = cfg.get("step1") if isinstance(cfg, dict) else None
         if (not isinstance(cfg, dict)
             or _validate_step1(cfg.get("targetBoard"), s1 or {}) is not None):
@@ -1450,6 +1205,7 @@ def _read_saved_boot_config():
             cfg = json.load(f)
     except Exception as e:
         return None, f"Failed to read boot-config.json: {e}"
+    _migrate_legacy_board(cfg)
     err = _validate_step1(cfg.get("targetBoard"), cfg.get("step1") or {})
     if err:
         return None, f"Saved config fails Step 1 validation: {err}"
@@ -3082,22 +2838,9 @@ def docs_read(filename):
 BUILD_DIR = os.path.join(BASE_DIR, "build")
 
 _ALLOWED_BUILD_FILES = {
-    "church_ti60_f225.v":  "text/plain",
-    "church_ti60_f225.il": "text/plain",
+    "church_wukong_xc7a100t.v":  "text/plain",
+    "church_wukong_xc7a100t.il": "text/plain",
 }
-
-@app.route("/download/ti60_pol.py")
-def download_ti60_pol():
-    filepath = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'ti60_pol.py')
-    filepath = os.path.normpath(filepath)
-    if not os.path.isfile(filepath):
-        return make_response("Not found", 404)
-    with open(filepath, 'r') as f:
-        data = f.read()
-    resp = make_response(data, 200)
-    resp.headers['Content-Type'] = 'text/plain'
-    resp.headers['Content-Disposition'] = 'attachment; filename="ti60_pol.py"'
-    return resp
 
 @app.route("/download/<filename>")
 def download_build_file(filename):
@@ -3706,252 +3449,53 @@ to the Wukong board's 14-pin JTAG header.
 """
 
 
-BUILD_MD_TI60 = """# Church Machine — Efinix Ti60 F225  SoC+CM Build Package
-
-## What's Inside
-
-This package contains the **Sapphire RISC-V SoC + Church Machine (ECO-001B)**
-combined source for the Efinix Ti60F225 development board.
-Everything needed to rebuild from source is included — no extra downloads required.
-
-### Files
-- `church_soc_cm.xml`         — Efinity project — **open this in Efinity IDE**
-- `sapphire.v`                — Efinix Sapphire SoC IP (RISC-V SoC RTL)
-- `sapphire_define.vh`        — Efinix Sapphire SoC defines
-- `church_ti60_f225.v`        — Church Machine RTL (ECO-001B, Amaranth/Yosys)
-- `top.v`                     — Top-level SoC+CM wrapper
-- `apb3_cm_bridge.v`          — APB3 register bridge (Sapphire SoC ↔ Church Machine)
-- `church_soc_cm.sdc`         — Timing constraints
-- `church_soc_cm.peri.xml`    — Periphery I/O pin assignments
-- `firmware/`                 — Sapphire RISC-V firmware (main.c, crt0.S, Makefile)
-- `run_efx_map.sh`            — Synthesis (strips EFX-0002 banned params, calls efx_map)
-- `run_efx_pnr.sh`            — Place & Route
-- `run_efx_pgm.sh`            — Bitstream generation
-- `Makefile`                  — `make bitstream` runs all 6 steps in order
-- `BUILD_SOC_CM.md`           — Authoritative step-by-step build guide
-- `local_bridge.py`           — Serial bridge to connect the board to the IDE
-- `bridge.sh`                 — Auto-detects port and launches local_bridge.py
-- `outflow/church_soc_cm.hex` — **Pre-built bitstream** (flash immediately, no toolchain)
-
-## Case 1 — Flash the pre-built bitstream (no toolchain needed)
-
-The official SoC+CM bitstream is at `outflow/church_soc_cm.hex`.
-
-```bash
-sudo ~/oss-cad-suite/bin/openFPGALoader \\\\
-  -b titanium_ti60_f225_jtag \\\\
-  -f outflow/church_soc_cm.hex
-```
-
-Or via Efinity IDE: **Tool → Programmer** → JTAG → load `outflow/church_soc_cm.hex` → Program.
-
-On boot the board sends two serial streams:
-- **ttyUSB2** (57600 baud): `CHURCH Ti60 SoC+CM v2.0\\r\\n`  ← Sapphire SoC greeting + call-home
-- **ttyUSB3** (115200 baud): NIA trace + CALLHOME JSON packets ← Church Machine
-
-Connect to the IDE:
-```bash
-./bridge.sh --ide=http://localhost:5000
-```
-
----
-
-## Case 2 — Synthesise from Efinity IDE (RISC-V toolchain required)
-
-`sapphire.v` in this package has placeholder BRAM initialisation (all zeros) so
-that Efinity IDE can open the project immediately.  To produce a bitstream with
-real firmware you must patch `sapphire.v` first — one terminal command:
-
-```bash
-bash prep_ide_synthesis.sh
-```
-
-This compiles the RISC-V firmware (`~/efinity/efinity-riscv-ide-2025.2/`) and
-embeds the resulting bytes into `sapphire.v`.  After it finishes, click
-**Run Synthesis** in Efinity IDE as normal.
-
-> If you see **no USB2 messages** after flashing, your bitstream was built
-> without running `prep_ide_synthesis.sh` first — the Sapphire RISC-V core
-> is executing zero firmware.  Re-run `prep_ide_synthesis.sh`, re-synthesise,
-> and reflash.  Or just use Case 1 (pre-built hex already has real firmware).
-
----
-
-## Case 3 — Full command-line rebuild (Efinity 2026.1 + RISC-V toolchain)
-
-```bash
-make bitstream
-```
-
-Runs all 6 steps automatically (firmware → BRAM patch → synth → PnR → hex).
-Output: `outflow/church_soc_cm.hex` and `outflow/church_soc_cm.bit`
-
-Full step-by-step guide and troubleshooting: **`BUILD_SOC_CM.md`**
-
-### Flash
-
-```bash
-sudo ~/oss-cad-suite/bin/openFPGALoader \\\\
-  -b titanium_ti60_f225_jtag \\\\
-  -f outflow/church_soc_cm.hex
-```
-
----
-
-## Resource Usage
-
-- ~24%% of Ti60F225 logic (SoC + Church Machine core + APB3 bridge)
-- `win_mem` (16 KB) and `dmem` (64 KB) map to EBR block RAM
-
-## LED Pinout (Ti60 F225 Dev Board, active-high)
-
-| LED | Ball | Signal           |
-|-----|------|------------------|
-| 0   | K14  | Boot in progress |
-| 1   | J15  | Running          |
-| 2   | H10  | Fault            |
-
-## UART Pinout
-
-| Port    | Baud   | Content                                 |
-|---------|--------|-----------------------------------------|
-| ttyUSB2 | 57600  | Sapphire SoC greeting + CALLHOME JSON   |
-| ttyUSB3 | 115200 | Church Machine NIA trace / fault events |
-"""
-
-
 def _fpga_paths(board):
-    """Return (is_ti60, paths_dict, zip_name, build_md, gen_args, synth_cmd_tpl).
+    """Return (paths_dict, zip_name, build_md, gen_args, synth_cmd_tpl).
 
-    is_ti60=True   → Efinix Ti60 F225 (Efinity toolchain)
-    is_ti60=False  → QMTECH Wukong XC7A100T (Vivado toolchain)
+    The QMTECH Wukong XC7A100T (Vivado toolchain) is the only supported
+    board — the legacy F225 board flow was retired (Tasks #2506/#2509).
+    Unknown board ids fall through to the Wukong paths.
     """
     build_dir = os.path.join(BASE_DIR, "build")
     hw_dir = os.path.join(BASE_DIR, "hardware")
 
-    if board == "wukong-xc7a100t":
-        paths = {
-            "rtlil":   os.path.join(build_dir, "church_wukong_xc7a100t.il"),
-            "verilog": os.path.join(build_dir, "church_wukong_xc7a100t.v"),
-            "xdc":     os.path.join(hw_dir,    "wukong_xc7a100t.xdc"),
-            "tcl":     os.path.join(hw_dir,    "wukong_xc7a100t.tcl"),
-        }
-        zip_name = "church-wukong-package.zip"
-        build_md = BUILD_MD_WUKONG
-        gen_args = ["python3", "-m", "hardware.gen_rtlil", "build", "--wukong"]
-        # gen_rtlil already runs Yosys internally to produce the .v file.
-        # A second Yosys pass here is redundant and fails/times out on the
-        # 2.6 MB RTLIL.  Set to None so the build route skips it.
-        synth_cmd_tpl = None
-        return False, paths, zip_name, build_md, gen_args, synth_cmd_tpl
-
-    # Default: Ti60 F225
     paths = {
-        "rtlil":   os.path.join(build_dir, "church_ti60_f225.il"),
-        "verilog": os.path.join(build_dir, "church_ti60_f225.v"),
-        "isf":     os.path.join(hw_dir,    "ti60_f225.isf"),
-        "project": os.path.join(hw_dir,    "ti60_f225_project.xml"),
-        "peri":    os.path.join(hw_dir,    "ti60_f225.peri.xml"),
-        "sdc":     os.path.join(hw_dir,    "ti60_f225.sdc"),
-        "setup":   os.path.join(hw_dir,    "setup_ti60_peri.py"),
+        "rtlil":   os.path.join(build_dir, "church_wukong_xc7a100t.il"),
+        "verilog": os.path.join(build_dir, "church_wukong_xc7a100t.v"),
+        "xdc":     os.path.join(hw_dir,    "wukong_xc7a100t.xdc"),
+        "tcl":     os.path.join(hw_dir,    "wukong_xc7a100t.tcl"),
     }
-    zip_name = "church-ti60-package.zip"
-    build_md = BUILD_MD_TI60
-    gen_args = ["python3", "-m", "hardware.gen_rtlil", "build", "--ti60"]
-    synth_cmd_tpl = (
-        "read_rtlil {rtlil}; "
-        "hierarchy -top top; "
-        "proc; flatten; "
-        "opt -mux_undef -undriven; opt; opt_reduce; opt_clean; opt -fast; "
-        "techmap; clean; "
-        "write_verilog -noattr {verilog}"
-    )
-    return True, paths, zip_name, build_md, gen_args, synth_cmd_tpl
+    zip_name = "church-wukong-package.zip"
+    build_md = BUILD_MD_WUKONG
+    gen_args = ["python3", "-m", "hardware.gen_rtlil", "build", "--wukong"]
+    # gen_rtlil already runs Yosys internally to produce the .v file.
+    # A second Yosys pass here is redundant and fails/times out on the
+    # 2.6 MB RTLIL.  Set to None so the build route skips it.
+    synth_cmd_tpl = None
+    return paths, zip_name, build_md, gen_args, synth_cmd_tpl
 
 
-def _make_fpga_zip(board, is_ti60, paths, zip_name, build_md):
+def _make_fpga_zip(board, paths, zip_name, build_md):
     """Zip up FPGA artifacts and return (BytesIO, zip_name, warnings)."""
-    hw_dir = os.path.join(BASE_DIR, "hardware")
     buf = io.BytesIO()
     warnings = []
-    if is_ti60:
-        _SKIP_DIRS = {
-            'outflow', 'work_syn', 'work_pnr', 'work_dbg',
-            'good-builds', '__pycache__',
-        }
-        _BANNED_EFX = re.compile(
-            r'[ \t]*<efx:param name="(?:'
-            r'infer_clk_enable|infer_set_reset|calc_mcw|split_input_buf|'
-            r'no_fanout_override|get_names_method|logic_opting|pack_lut_into_ram|'
-            r'cpe_ins_register|use_cpe_for_const_0|use_cpe_for_const_1|fanout_limit'
-            r')"[^>]*/>' '\n?'
-        )
-        soc_combined = os.path.join(hw_dir, "soc_combined")
-        docs_dir = os.path.join(BASE_DIR, "docs")
-        _doc_pdfs = [
-            ("introducing-cloomc.pdf",  "docs/Introducing CLOOMC.pdf"),
-            ("hardware-ti60-f225.pdf",  "docs/Ti60 Hardware Guide.pdf"),
-            ("cloomc-foundation.pdf",   "docs/Architecture Reference.pdf"),
-            ("instruction-set.pdf",     "docs/Instruction Set Reference.pdf"),
-        ]
-        with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-            if os.path.isdir(soc_combined):
-                for root, dirs, files in os.walk(soc_combined):
-                    dirs[:] = [d for d in dirs if d not in _SKIP_DIRS]
-                    for fn in files:
-                        if fn.endswith('.pyc'):
-                            continue
-                        full = os.path.join(root, fn)
-                        arc  = os.path.relpath(full, soc_combined)
-                        if arc == 'church_soc_cm.xml':
-                            with open(full, 'r') as xf:
-                                xml_content = xf.read()
-                            xml_content = _BANNED_EFX.sub('', xml_content)
-                            zf.writestr(arc, xml_content)
-                        elif arc == 'Makefile':
-                            with open(full, 'r') as mf:
-                                mk = mf.read()
-                            mk = mk.replace(
-                                'SCRIPTS_DIR := ../../scripts',
-                                'SCRIPTS_DIR := scripts'
-                            )
-                            zf.writestr(arc, mk)
-                        else:
-                            zf.write(full, arc)
-            patch_script = os.path.join(BASE_DIR, "scripts", "patch_sapphire_init.py")
-            if os.path.isfile(patch_script):
-                zf.write(patch_script, "scripts/patch_sapphire_init.py")
-            bitstreams_dir = os.path.join(BASE_DIR, "bitstreams")
-            hex_src = os.path.join(bitstreams_dir, "church_ti60_f225.hex")
-            bit_src = os.path.join(bitstreams_dir, "church_ti60_f225.bit")
-            if os.path.isfile(hex_src):
-                zf.write(hex_src, "outflow/church_soc_cm.hex")
-            if os.path.isfile(bit_src):
-                zf.write(bit_src, "outflow/church_soc_cm.bit")
-            zf.writestr("BUILD.md", build_md)
-            for src_name, arc_name in _doc_pdfs:
-                src_path = os.path.join(docs_dir, src_name)
-                if os.path.isfile(src_path):
-                    zf.write(src_path, arc_name)
-    else:
-        # Wukong Artix-7 — Vivado flow; no soc_combined directory needed
-        build_dir = os.path.join(BASE_DIR, "build")
-        server_dir = os.path.join(BASE_DIR, "server")
-        with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-            for key in ('verilog', 'rtlil'):
-                p = paths.get(key)
-                if p and os.path.isfile(p):
-                    zf.write(p, os.path.basename(p))
-                elif p:
-                    warnings.append(f"{os.path.basename(p)} not found — run Build first")
-            for key in ('xdc', 'tcl'):
-                p = paths.get(key)
-                if p and os.path.isfile(p):
-                    zf.write(p, os.path.basename(p))
-            bridge = os.path.join(server_dir, "local_bridge.py")
-            if os.path.isfile(bridge):
-                zf.write(bridge, "local_bridge.py")
-            zf.writestr("BUILD.md", build_md)
+    # Wukong Artix-7 — Vivado flow
+    server_dir = os.path.join(BASE_DIR, "server")
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for key in ('verilog', 'rtlil'):
+            p = paths.get(key)
+            if p and os.path.isfile(p):
+                zf.write(p, os.path.basename(p))
+            elif p:
+                warnings.append(f"{os.path.basename(p)} not found — run Build first")
+        for key in ('xdc', 'tcl'):
+            p = paths.get(key)
+            if p and os.path.isfile(p):
+                zf.write(p, os.path.basename(p))
+        bridge = os.path.join(server_dir, "local_bridge.py")
+        if os.path.isfile(bridge):
+            zf.write(bridge, "local_bridge.py")
+        zf.writestr("BUILD.md", build_md)
     return buf, zip_name, warnings
 
 
@@ -3959,8 +3503,8 @@ def _make_fpga_zip(board, is_ti60, paths, zip_name, build_md):
 def build_fpga():
     """Run Amaranth elaboration + Yosys synthesis. Save artifacts to build/. Return JSON status."""
     build_dir = os.path.join(BASE_DIR, "build")
-    board = request.args.get("board", "ti60-f225").strip().lower()
-    is_ti60, paths, zip_name, build_md, gen_args, synth_cmd_tpl = _fpga_paths(board)
+    board = request.args.get("board", "wukong-xc7a100t").strip().lower()
+    paths, zip_name, build_md, gen_args, synth_cmd_tpl = _fpga_paths(board)
 
     try:
         os.makedirs(build_dir, exist_ok=True)
@@ -3979,8 +3523,8 @@ def build_fpga():
 
         synth_warning = None
         if synth_cmd_tpl is not None:
-            # Run a second Yosys synthesis pass (Ti60 path — gen_rtlil does not
-            # produce a .v for Ti60, so Yosys is needed here).
+            # Run a second Yosys synthesis pass when the board flow needs one
+            # (no current board does — gen_rtlil emits the .v directly).
             fmt_args = {k: v for k, v in paths.items()}
             synth_cmd = synth_cmd_tpl.format(**fmt_args)
             logging.info("FPGA build: running Yosys synthesis...")
@@ -4022,22 +3566,17 @@ def build_fpga():
 def download_fpga_zip():
     """Download the ZIP of the last successfully built FPGA artifacts (no rebuild)."""
     build_dir = os.path.join(BASE_DIR, "build")
-    board = request.args.get("board", "ti60-f225").strip().lower()
-    is_ti60, paths, zip_name, build_md, _, _ = _fpga_paths(board)
+    board = request.args.get("board", "wukong-xc7a100t").strip().lower()
+    paths, zip_name, build_md, _, _ = _fpga_paths(board)
 
-    if is_ti60:
-        soc_dir = os.path.join(BASE_DIR, "hardware", "soc_combined")
-        if not os.path.isdir(soc_dir):
-            return jsonify({"error": "SoC combined source directory not found."}), 404
-    else:
-        v_path = paths.get("verilog", "")
-        if not os.path.isfile(v_path):
-            return jsonify({
-                "error": f"No build found for {board}. Click Build first to generate the Verilog."
-            }), 404
+    v_path = paths.get("verilog", "")
+    if not os.path.isfile(v_path):
+        return jsonify({
+            "error": f"No build found for {board}. Click Build first to generate the Verilog."
+        }), 404
 
     try:
-        buf, zip_name, zip_warnings = _make_fpga_zip(board, is_ti60, paths, zip_name, build_md)
+        buf, zip_name, zip_warnings = _make_fpga_zip(board, paths, zip_name, build_md)
         zip_data = buf.getvalue()
         resp = make_response(zip_data)
         resp.headers['Content-Type'] = 'application/zip'
@@ -4056,8 +3595,8 @@ def download_fpga_zip():
 @app.route("/api/download/fpga-verilog")
 def download_fpga_verilog():
     """Download just the Verilog file for the selected board (no zip)."""
-    board = request.args.get("board", "ti60-f225").strip().lower()
-    is_ti60, paths, _, _, _, _ = _fpga_paths(board)
+    board = request.args.get("board", "wukong-xc7a100t").strip().lower()
+    paths, _, _, _, _ = _fpga_paths(board)
     verilog_path = paths["verilog"]
     if not os.path.isfile(verilog_path):
         return jsonify({"error": "No build found for this board. Run Build first."}), 404
@@ -4069,8 +3608,8 @@ def download_fpga_verilog():
 @app.route("/api/download/fpga-sdc")
 def download_fpga_sdc():
     """Download just the SDC constraints file for the selected board."""
-    board = request.args.get("board", "ti60-f225").strip().lower()
-    _, paths, _, _, _, _ = _fpga_paths(board)
+    board = request.args.get("board", "wukong-xc7a100t").strip().lower()
+    paths, _, _, _, _ = _fpga_paths(board)
     sdc_path = paths.get("sdc")
     if not sdc_path or not os.path.isfile(sdc_path):
         return jsonify({"error": "No SDC found for this board."}), 404
@@ -4082,8 +3621,8 @@ def download_fpga_sdc():
 @app.route("/api/download/fpga-peri")
 def download_fpga_peri():
     """Download just the peri.xml periphery config for the selected board."""
-    board = request.args.get("board", "ti60-f225").strip().lower()
-    _, paths, _, _, _, _ = _fpga_paths(board)
+    board = request.args.get("board", "wukong-xc7a100t").strip().lower()
+    paths, _, _, _, _ = _fpga_paths(board)
     peri_path = paths.get("peri")
     if not peri_path or not os.path.isfile(peri_path):
         return jsonify({"error": "No peri.xml found for this board."}), 404
@@ -4096,7 +3635,7 @@ def download_fpga_peri():
 def download_fpga_package():
     """Legacy: build + download in one shot (kept for backwards compatibility)."""
     build_dir = os.path.join(BASE_DIR, "build")
-    board = request.args.get("board", "ti60-f225").strip().lower()
+    board = request.args.get("board", "wukong-xc7a100t").strip().lower()
     build_resp = build_fpga()
     if isinstance(build_resp, tuple):
         resp_obj, status = build_resp
@@ -4112,7 +3651,6 @@ BITSTREAM_DIR = os.path.join(BASE_DIR, "bitstreams")
 os.makedirs(BITSTREAM_DIR, exist_ok=True)
 
 BITSTREAM_FILES = {
-    "ti60-f225": "church_ti60_f225.hex",
     "wukong-xc7a100t": "church_wukong_xc7a100t.bit",
 }
 
@@ -4146,7 +3684,7 @@ def admin_bitstreams_page():
                 os.path.getmtime(path)).strftime("%Y-%m-%d %H:%M UTC")
         status_colour = "#66bb6a" if exists else "#ef5350"
         status_text   = f"✓ {size_str}" if exists else "✗ missing"
-        board_label = {"ti60-f225": "Efinix Ti60 F225 (legacy)", "wukong-xc7a100t": "QMTECH Wukong Artix-7"}.get(board, board)
+        board_label = {"wukong-xc7a100t": "QMTECH Wukong Artix-7"}.get(board, board)
         delete_td = (
             "<td><a href='/api/bitstream/delete/" + board + "?token=" + token + "'"
             " onclick=\"return confirm('Delete " + fname + "?')\""
@@ -4260,7 +3798,7 @@ def bitstream_upload():
     from daily_report import check_report_auth as _check_auth
     if not _check_auth(request):
         return jsonify({"error": "Unauthorized — supply token via Authorization header or ?token="}), 401
-    board = request.form.get("board", "ti60-f225").strip().lower()
+    board = request.form.get("board", "wukong-xc7a100t").strip().lower()
     expected = BITSTREAM_FILES.get(board)
     if not expected:
         return jsonify({"error": f"Unknown board: {board}"}), 400
@@ -5362,7 +4900,7 @@ def save_lump():
             "source_hash":       metadata.get("source_hash", "")
         },
         "deployment": {
-            "target_board": metadata.get("target_board", "ti60-f225"),
+            "target_board": metadata.get("target_board", "wukong-xc7a100t"),
             "profile":      metadata.get("profile", "IoT"),
             "built_at":     _dt.datetime.utcnow().isoformat() + "Z",
             "builder":      "CLOOMC++ IDE v1.0"
@@ -6907,7 +6445,7 @@ def import_lump():
         "capabilities": [],
         "pet_names":    {"DR": {}, "CR": {}},
         "mtbf":         {"consecutive_clean": 0, "total_runs": 0, "status": "unknown", "source_hash": ""},
-        "deployment":   {"target_board": "ti60-f225", "profile": "IoT",
+        "deployment":   {"target_board": "wukong-xc7a100t", "profile": "IoT",
                          "built_at": _dt.datetime.utcnow().isoformat() + "Z",
                          "builder": "IDE Import"},
         "grants":       ["E"],
@@ -7014,7 +6552,7 @@ def upload_lump_file():
         "capabilities": [],
         "pet_names":    {"DR": {}, "CR": {}},
         "mtbf":         {"consecutive_clean": 0, "total_runs": 0, "status": "unknown", "source_hash": ""},
-        "deployment":   {"target_board": "ti60-f225", "profile": "IoT",
+        "deployment":   {"target_board": "wukong-xc7a100t", "profile": "IoT",
                          "built_at": _dt.datetime.utcnow().isoformat() + "Z",
                          "builder": "IDE LUMP Upload"},
         "grants":       ["E"],
@@ -7248,7 +6786,7 @@ def build_namespace():
         "pet_names": {"DR": {}, "CR": {}},
         "mtbf": {"consecutive_clean": 0, "total_runs": 0, "status": "unknown", "source_hash": ""},
         "deployment": {
-            "target_board": "ti60-f225",
+            "target_board": "wukong-xc7a100t",
             "profile": "IoT",
             "built_at": _dt.datetime.utcnow().isoformat() + "Z",
             "builder": "CLOOMC++ IDE v1.0"
@@ -9908,22 +9446,6 @@ def api_generate_method_available():
     if has_key:
         resp["token"] = _GENERATE_SESSION_TOKEN
     return jsonify(resp)
-
-
-@app.route("/internal/download-verilog")
-def internal_download_verilog():
-    """Temporary endpoint — serve the generated legacy Verilog so the Chromebook can wget it."""
-    import glob as _glob
-    candidates = [
-        os.path.join(os.path.dirname(__file__), "..", "church_ti60_f225.v"),
-        os.path.join(os.path.dirname(__file__), "..", "build", "church_ti60_f225.v"),
-    ]
-    for path in candidates:
-        path = os.path.normpath(path)
-        if os.path.isfile(path):
-            return send_file(path, as_attachment=True, download_name="church_ti60_f225.v",
-                             mimetype="text/plain")
-    return jsonify({"error": "church_ti60_f225.v not found — run gen_verilog first"}), 404
 
 
 # ---------------------------------------------------------------------------
