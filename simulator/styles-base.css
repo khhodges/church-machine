@@ -1466,3 +1466,61 @@ details[open] .ti60-advanced-summary::before { transform: rotate(90deg); }
 }
 .sw-what-next li { margin-bottom: 0.25rem; }
 .sw-what-next a { color: var(--church-gold,#daa520); text-decoration: underline; }
+
+/* ── Builder ▸ Versions tab ─────────────────────────────────────── */
+.versions-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.versions-header h2 {
+    font-size: 1.1rem;
+    color: var(--church-gold);
+    margin: 0;
+}
+.versions-refresh-btn {
+    background: #2a2a35;
+    color: #ddd;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 0.25rem 0.7rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+.versions-refresh-btn:hover { background: #34343f; }
+.versions-refresh-btn:disabled { opacity: 0.5; cursor: default; }
+.versions-last-checked { font-size: 0.75rem; color: #888; }
+.versions-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+}
+.versions-card {
+    background: #1d1d26;
+    border: 1px solid #33333f;
+    border-radius: 8px;
+    padding: 0.9rem 1rem;
+}
+.versions-card-title {
+    font-size: 0.85rem;
+    color: var(--church-gold);
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+.versions-value { font-size: 1.05rem; margin-bottom: 0.4rem; color: #eee; }
+.versions-value code { background: #2a2a35; padding: 0.1rem 0.35rem; border-radius: 3px; }
+.versions-value a { color: #8ab4f8; text-decoration: none; }
+.versions-value a:hover { text-decoration: underline; }
+.versions-note { font-size: 0.78rem; color: #999; margin-top: 0.45rem; line-height: 1.4; }
+.versions-badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+}
+.versions-badge-ok      { background: #16391f; color: #7fd894; border: 1px solid #2c6b3c; }
+.versions-badge-warn    { background: #3d3416; color: #e8c96a; border: 1px solid #7a672c; }
+.versions-badge-bad     { background: #3d1a1a; color: #e88a8a; border: 1px solid #7a3535; }
+.versions-badge-unknown { background: #2a2a35; color: #aaa;    border: 1px solid #4a4a58; }

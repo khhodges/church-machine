@@ -11047,16 +11047,190 @@ function switchBuilderViewTab(tab) {
     const lumpNS      = document.getElementById('lumpNSPanel');
     const lumpResident  = document.getElementById('lumpResidentPanel');
     const ti60Connect   = document.getElementById('ti60ConnectPanel');
+    const versionsPanel = document.getElementById('versionsPanel');
     if (cyberspace)   cyberspace.style.display   = (tab === 'cyberspace')     ? '' : 'none';
     if (details)      details.style.display      = (tab === 'buildlog')       ? '' : 'none';
     if (lumpThread)   lumpThread.style.display   = (tab === 'lump-thread')    ? '' : 'none';
     if (lumpNS)       lumpNS.style.display       = (tab === 'lump-ns')        ? '' : 'none';
     if (lumpResident) lumpResident.style.display = (tab === 'lump-resident')  ? '' : 'none';
     if (ti60Connect)  ti60Connect.style.display  = (tab === 'ti60-connect')   ? '' : 'none';
+    if (versionsPanel) versionsPanel.style.display = (tab === 'versions')     ? '' : 'none';
     if ((tab === 'lump-thread' || tab === 'lump-ns') && typeof initLumpEditor === 'function') initLumpEditor();
     if (tab === 'lump-resident' && typeof initResidentPanel === 'function') initResidentPanel();
     if (tab === 'ti60-connect' && typeof Ti60Connect !== 'undefined') Ti60Connect.onTabOpen();
+    if (typeof VersionsView !== 'undefined') {
+        if (tab === 'versions') VersionsView.onTabOpen(); else VersionsView.onTabClose();
+    }
 }
+
+// ── Versions view (Builder ▸ Versions tab) ────────────────────────────────
+// Three cards: IDE (running server), GitHub (latest remote commit), and the
+// attached FPGA (sentinel-reported tu_version/build_version).  Data comes
+// from /hardware/wukong/status and /api/github/activity, fetched in parallel.
+const VersionsView = {
+    _timer: null,
+    _inFlight: false,
+    AUTO_REFRESH_MS: 15000,
+
+    onTabOpen() {
+        this.refresh(false);
+        if (!this._timer) {
+            this._timer = setInterval(() => {
+                if (document.hidden) return;
+                const panel = document.getElementById('versionsPanel');
+                if (!panel || panel.style.display === 'none') return;
+                this.refresh(false);
+            }, this.AUTO_REFRESH_MS);
+        }
+    },
+
+    onTabClose() {
+        if (this._timer) { clearInterval(this._timer); this._timer = null; }
+    },
+
+    _esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+            '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    },
+
+    _badge(kind, label) {
+        // kind: ok | warn | bad | unknown
+        return `<span class="versions-badge versions-badge-${kind}">${this._esc(label)}</span>`;
+    },
+
+    _age(ts) {
+        if (!ts) return '';
+        const s = Math.max(0, Math.round((Date.now() - new Date(ts).getTime()) / 1000));
+        if (s < 60) return s + 's ago';
+        if (s < 3600) return Math.round(s / 60) + 'm ago';
+        if (s < 86400) return Math.round(s / 3600) + 'h ago';
+        return Math.round(s / 86400) + 'd ago';
+    },
+
+    _isGitSha(v) {
+        // git short hashes are 7+ hex chars; REPL_DEPLOY_ID fallback is a
+        // UUID prefix (may contain '-' or be non-hex) — treat those as unknown.
+        return typeof v === 'string' && /^[0-9a-f]{7,12}$/.test(v);
+    },
+
+    async refresh(manual) {
+        if (this._inFlight) return;
+        this._inFlight = true;
+        const btn = document.getElementById('versionsRefreshBtn');
+        if (btn && manual) btn.disabled = true;
+        try {
+            const [statusRes, ghRes] = await Promise.allSettled([
+                fetch('/hardware/wukong/status').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
+                fetch('/api/github/activity').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
+            ]);
+            const status = statusRes.status === 'fulfilled' ? statusRes.value : null;
+            const gh     = ghRes.status === 'fulfilled' ? ghRes.value : null;
+            this._renderIde(status, gh);
+            this._renderGithub(status, gh);
+            this._renderFpga(status);
+            const lc = document.getElementById('versionsLastChecked');
+            if (lc) lc.textContent = 'Checked ' + new Date().toLocaleTimeString();
+        } finally {
+            this._inFlight = false;
+            if (btn) btn.disabled = false;
+        }
+    },
+
+    _renderIde(status, gh) {
+        const el = document.getElementById('versionsIdeBody');
+        if (!el) return;
+        if (!status) {
+            el.innerHTML = this._badge('unknown', 'Unavailable') +
+                '<div class="versions-note">Could not reach the server status endpoint.</div>';
+            return;
+        }
+        const v = status.ide_version || 'unknown';
+        let badge;
+        const latest = gh && gh.commits && gh.commits.length ? gh.commits[0] : null;
+        if (!this._isGitSha(v)) {
+            badge = this._badge('unknown', 'Unknown vs GitHub');
+        } else if (!latest || !latest.sha) {
+            badge = this._badge('unknown', 'GitHub unavailable');
+        } else if (v.startsWith(latest.sha) || latest.sha.startsWith(v)) {
+            badge = this._badge('ok', 'In sync with GitHub');
+        } else {
+            badge = this._badge('warn', 'Differs from GitHub HEAD');
+        }
+        el.innerHTML =
+            `<div class="versions-value"><code>${this._esc(v)}</code></div>` + badge +
+            (this._isGitSha(v) ? '' :
+             '<div class="versions-note">Server is running without git (deploy ID shown) — comparison against GitHub is not possible.</div>');
+    },
+
+    _renderGithub(status, gh) {
+        const el = document.getElementById('versionsGithubBody');
+        if (!el) return;
+        if (!gh || gh.error || !gh.commits || !gh.commits.length) {
+            el.innerHTML = this._badge('unknown', 'Unavailable') +
+                `<div class="versions-note">${this._esc((gh && gh.error) || 'GitHub API unreachable.')}</div>`;
+            return;
+        }
+        const c = gh.commits[0];
+        const ide = status ? status.ide_version : null;
+        let badge;
+        if (!this._isGitSha(ide)) {
+            badge = this._badge('unknown', 'IDE version unknown');
+        } else if (ide.startsWith(c.sha) || c.sha.startsWith(ide)) {
+            badge = this._badge('ok', 'IDE up to date');
+        } else {
+            badge = this._badge('warn', 'IDE behind GitHub');
+        }
+        el.innerHTML =
+            `<div class="versions-value"><a href="${this._esc(c.url)}" target="_blank" rel="noopener"><code>${this._esc(c.sha)}</code></a></div>` +
+            badge +
+            `<div class="versions-note">${this._esc(c.message)}<br>` +
+            `${this._esc(c.author)} &middot; ${this._esc(this._age(c.date) || c.date)}</div>`;
+    },
+
+    _renderFpga(status) {
+        const el = document.getElementById('versionsFpgaBody');
+        if (!el) return;
+        if (!status) {
+            el.innerHTML = this._badge('unknown', 'Unavailable') +
+                '<div class="versions-note">Could not reach the server status endpoint.</div>';
+            return;
+        }
+        const expected = status.expected_build_version;
+        const expLine = (expected != null)
+            ? `<div class="versions-note">Repo expects build v${this._esc(expected)}` +
+              (status.min_tu_version != null ? ` &middot; min TU 0x${Number(status.min_tu_version).toString(16).padStart(2, '0').toUpperCase()}` : '') +
+              '</div>'
+            : '';
+        if (!status.bridge_connected) {
+            el.innerHTML = this._badge('bad', 'Board not connected') +
+                '<div class="versions-note">Bridge is offline (no poll in the last 3 s). Start the Wukong bridge on the host machine.</div>' + expLine;
+            return;
+        }
+        const bi = status.boot_info || {};
+        if (bi.tu_version == null) {
+            el.innerHTML = this._badge('warn', 'No sentinel yet') +
+                '<div class="versions-note">Bridge is online but no boot sentinel has been received this session. Send \u2018f\u2019 (Reboot) to re-arm the sentinel.</div>' + expLine;
+            return;
+        }
+        const bv = bi.build_version;
+        let badge;
+        if (expected == null || bv == null) {
+            badge = this._badge('unknown', 'Expected version unknown');
+        } else if (bv === expected && !bi.stale_tu) {
+            badge = this._badge('ok', 'Up to date');
+        } else {
+            badge = this._badge('warn', 'Stale bitstream');
+        }
+        const tuHex = '0x' + Number(bi.tu_version).toString(16).padStart(2, '0').toUpperCase();
+        el.innerHTML =
+            `<div class="versions-value">build v${this._esc(bv != null ? bv : '?')} &middot; TU ${this._esc(tuHex)}</div>` +
+            badge +
+            (bi.stale_tu ? '<div class="versions-note">TraceUnit predates the 3-packet CALL sequence \u2014 reflash the bitstream.</div>' : '') +
+            (bi.received_ts ? `<div class="versions-note">Sentinel received ${this._esc(this._age(bi.received_ts * 1000))}</div>` : '') +
+            expLine;
+    },
+};
+window.VersionsView = VersionsView;
 
 function _setBuildStatus(state, label, board) {
     const dot = document.getElementById('buildStatusDot');

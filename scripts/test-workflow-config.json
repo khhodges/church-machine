@@ -1,6 +1,6 @@
 {
-  "_comment": "Workflows listed here are infrastructure (app servers, orchestrators, design previews, etc.) — not test suites. The sync guard in check-run-all-tests-sync.js reads this file to decide which workflows to skip when diffing against run-all-tests.sh. Add a new entry here whenever you introduce a non-test workflow; do NOT edit the JS file.",
-  "_missing_file_behaviour": "If this file is deleted or renamed, check-run-all-tests-sync.js falls back to its built-in DEFAULT_INFRASTRUCTURE_WORKFLOWS constant and prints a WARNING — the sync check still runs rather than aborting. Restore this file (keeping the same infrastructureWorkflows entries) to suppress the warning. Also update DEFAULT_INFRASTRUCTURE_WORKFLOWS in the JS file if the two lists diverge.",
+  "_comment": "Workflows listed here are infrastructure (app servers, orchestrators, design previews, etc.) \u2014 not test suites. The sync guard in check-run-all-tests-sync.js reads this file to decide which workflows to skip when diffing against run-all-tests.sh. Add a new entry here whenever you introduce a non-test workflow; do NOT edit the JS file.",
+  "_missing_file_behaviour": "If this file is deleted or renamed, check-run-all-tests-sync.js falls back to its built-in DEFAULT_INFRASTRUCTURE_WORKFLOWS constant and prints a WARNING \u2014 the sync check still runs rather than aborting. Restore this file (keeping the same infrastructureWorkflows entries) to suppress the warning. Also update DEFAULT_INFRASTRUCTURE_WORKFLOWS in the JS file if the two lists diverge.",
   "infrastructureWorkflows": [
     "Project",
     "Church Machine IDE",
@@ -30,6 +30,7 @@
     "check-wukong-hw-init",
     "wukong-cr-update-tests",
     "wukong-trace-cr-server-tests",
-    "wukong-status-readonly-tests"
+    "wukong-status-readonly-tests",
+    "versions-view-tests"
   ]
 }

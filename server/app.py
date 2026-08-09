@@ -197,6 +197,19 @@ def _wukong_build_version():
         pass
     return None
 
+def _wukong_min_tu_version():
+    """Read _TU_VERSION_CALL_3PKT from hardware/wukong_top.py (best-effort)."""
+    try:
+        top = os.path.join(os.path.dirname(__file__), "..", "hardware", "wukong_top.py")
+        with open(os.path.abspath(top)) as f:
+            for line in f:
+                m = re.match(r"\s*_TU_VERSION_CALL_3PKT\s*=\s*(0[xX][0-9a-fA-F]+|\d+)", line)
+                if m:
+                    return int(m.group(1), 0)
+    except Exception:
+        pass
+    return None
+
 @app.route("/dl/wukong-bit")
 def download_wukong_bit():
     p = os.path.join(os.path.dirname(__file__), "..", "build", "church_wukong_xc7a100t.bit")
@@ -10216,6 +10229,10 @@ def wukong_status_get():
         'pending_command':    pending,
         'command_delivery':   delivery,
         'ide_version':        BUILD_VERSION,
+        # Repo-side expectations so the Versions view can compare against the
+        # sentinel-reported build_version / tu_version without extra requests.
+        'expected_build_version': _wukong_build_version(),
+        'min_tu_version':         _wukong_min_tu_version(),
     })
 
 

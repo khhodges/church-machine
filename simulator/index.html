@@ -1055,11 +1055,33 @@
             <button class="builder-view-tab" id="builderViewTab-lump-ns" onclick="switchBuilderViewTab('lump-ns')" style="display:none;">&#x1F9E9; Namespace</button>
             <button class="builder-view-tab" id="builderViewTab-lump-resident" onclick="switchBuilderViewTab('lump-resident')" style="display:none;">&#x1F3E0; Resident</button>
             <button class="builder-view-tab active" id="builderViewTab-ti60-connect" onclick="switchBuilderViewTab('ti60-connect')">&#x1F50C; Connect</button>
+            <button class="builder-view-tab" id="builderViewTab-versions" onclick="switchBuilderViewTab('versions')">&#x1F9ED; Versions</button>
         </div>
         <div id="builderView"></div>
         <div id="lumpThreadPanel"   style="display:none;" class="lump-editor-wrap"></div>
         <div id="lumpNSPanel"       style="display:none;" class="lump-editor-wrap"></div>
         <div id="lumpResidentPanel" style="display:none;" class="lump-editor-wrap"></div>
+        <div id="versionsPanel" style="display:none;" class="ti60-connect-panel">
+            <div class="versions-header">
+                <h2>&#x1F9ED; Versions</h2>
+                <button id="versionsRefreshBtn" class="versions-refresh-btn" onclick="if(typeof VersionsView!=='undefined')VersionsView.refresh(true)">&#x21BB; Refresh</button>
+                <span id="versionsLastChecked" class="versions-last-checked"></span>
+            </div>
+            <div class="versions-cards">
+                <div class="versions-card" id="versionsCardIde">
+                    <div class="versions-card-title">&#x1F5A5; IDE (running server)</div>
+                    <div class="versions-card-body" id="versionsIdeBody">Loading&hellip;</div>
+                </div>
+                <div class="versions-card" id="versionsCardGithub">
+                    <div class="versions-card-title">&#x1F419; GitHub (latest commit)</div>
+                    <div class="versions-card-body" id="versionsGithubBody">Loading&hellip;</div>
+                </div>
+                <div class="versions-card" id="versionsCardFpga">
+                    <div class="versions-card-title">&#x2B21; Attached FPGA</div>
+                    <div class="versions-card-body" id="versionsFpgaBody">Loading&hellip;</div>
+                </div>
+            </div>
+        </div>
         <div id="ti60ConnectPanel" style="display:none;" class="ti60-connect-panel">
 
             <!-- ── Download & Flash card ──────────────────────────────── -->
