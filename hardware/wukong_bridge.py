@@ -49,8 +49,7 @@ import time
 try:
     import serial
 except ImportError:
-    print("ERROR: pyserial not installed.  Run: pip install pyserial", file=sys.stderr)
-    sys.exit(1)
+    serial = None  # unit tests import this module without pyserial; main() checks
 
 try:
     import requests
@@ -214,13 +213,25 @@ def _flags_str(flags_byte):
     return ''.join(n for i, n in enumerate(names) if flags_byte & (1 << i)) or '-'
 
 
+# Fault-code table — must match hardware.hw_types.FaultType exactly.
+# (The bridge is distributed as a single standalone file via /dl/wukong-bridge,
+# so it cannot import hw_types at runtime on the Chromebook.)
+_FAULT_NAMES = {
+    0x00: 'NONE',          0x01: 'PERM_R',        0x02: 'PERM_W',
+    0x03: 'PERM_X',        0x04: 'PERM_L',        0x05: 'PERM_S',
+    0x06: 'PERM_E',        0x07: 'NULL_CAP',      0x08: 'BOUNDS',
+    0x09: 'VERSION',       0x0A: 'SEAL',          0x0B: 'INVALID_OP',
+    0x0C: 'TPERM_RSV',     0x0D: 'DOMAIN_PURITY', 0x0E: 'BIND',
+    0x0F: 'F_BIT',         0x10: 'STACK_OVERFLOW', 0x11: 'ABSENT_OUTFORM',
+    0x12: 'STACK_CORRUPT', 0x13: 'STACK_UNDERFLOW', 0x14: 'IRQ_NULL_BASE',
+    0x15: 'OUTFORM_CRC',   0x16: 'OUTFORM_ALLOC', 0x17: 'OUTFORM_MINT',
+    0x18: 'OUTFORM_HDR',   0x19: 'OUTFORM_TIMEOUT',
+}
+MAX_FAULT_CODE = max(_FAULT_NAMES)   # 0x19 — highest defined FaultType
+
+
 def _fault_name(code):
-    _names = {
-        0: 'NONE', 1: 'PERM_R', 2: 'PERM_W', 3: 'PERM_E', 4: 'PERM_L',
-        5: 'NULL_CAP', 6: 'BOUNDS', 7: 'SEAL', 8: 'INVALID_OP',
-        9: 'STACK_UNDERFLOW', 10: 'STACK_OVERFLOW',
-    }
-    return _names.get(code, f'FAULT_{code}')
+    return _FAULT_NAMES.get(code, f'FAULT_{code}')
 
 
 def decode_trace_packet(pkt):
@@ -268,7 +279,74 @@ def decode_trace_packet(pkt):
     }
 
 
+# ── Trace frame validation / resync ───────────────────────────────────────────
+# The 0xAA magic byte can also appear inside packet payloads (NIA bytes, GT
+# bytes).  If the parser loses byte alignment — mid-stream attach, a dropped
+# byte on reconnect, or UART noise — it can lock onto a payload 0xAA and emit
+# byte-shifted garbage events (e.g. NIA=0x000000AA with GT = a shifted copy of
+# the real NIA).  validate_trace_frame() applies plausibility checks so such
+# misaligned candidates are rejected and the scanner advances one byte instead.
+
+DMEM_BYTES      = 16384 * 4         # 64 KB DMEM — NIA must be below this
+_VALID_EV_TYPES = frozenset(_EV_NAMES)
+
+
+def validate_trace_frame(pkt):
+    """Return True when *pkt* (12 bytes starting 0xAA) is a plausible frame.
+
+    Checks (all must hold):
+      • correct length and magic byte
+      • NIA word-aligned and within DMEM range (< 64 KB)
+      • ev_type is one of the known TRACE_EV_* constants
+      • flags byte upper nibble zero (bits[7:4] are always 0 on hardware)
+      • fault byte reserved bit[5] zero, fault_code ≤ MAX_FAULT_CODE (0x19,
+        highest hw_types.FaultType — keep _FAULT_NAMES in sync with FaultType)
+    """
+    if len(pkt) != TRACE_LEN or pkt[0] != TRACE_MAGIC:
+        return False
+    nia = struct.unpack('>I', bytes(pkt[1:5]))[0]
+    if nia & 0x3 or nia >= DMEM_BYTES:
+        return False
+    if pkt[5] not in _VALID_EV_TYPES:
+        return False
+    if pkt[10] & 0xF0:
+        return False
+    raw11 = pkt[11]
+    if raw11 & 0x20:                       # reserved bit — always 0 on hardware
+        return False
+    if (raw11 & 0x1F) > MAX_FAULT_CODE:
+        return False
+    return True
+
+
+def try_parse_trace_frame(buf, i=0):
+    """Attempt to parse a validated trace frame at position *i* of *buf*.
+
+    Returns
+    -------
+    None
+        ``buf[i]`` is not 0xAA, or the candidate frame failed validation.
+        The caller should advance ``i`` by one byte and rescan.
+    False
+        ``buf[i]`` is 0xAA but fewer than 12 bytes are buffered.  The caller
+        should wait for more data without advancing ``i``.
+    dict
+        Decoded frame (see decode_trace_packet) — caller consumes TRACE_LEN.
+    """
+    if i >= len(buf) or buf[i] != TRACE_MAGIC:
+        return None
+    if len(buf) - i < TRACE_LEN:
+        return False
+    pkt = bytes(buf[i:i + TRACE_LEN])
+    if not validate_trace_frame(pkt):
+        return None
+    return decode_trace_packet(pkt)
+
+
 def main():
+    if serial is None:
+        print("ERROR: pyserial not installed.  Run: pip install pyserial", file=sys.stderr)
+        sys.exit(1)
     if requests is None:
         print("ERROR: requests not installed.  Run: pip install requests", file=sys.stderr)
         sys.exit(1)
@@ -339,8 +417,9 @@ def main():
         print(f'ERROR opening {port}: {e}', file=sys.stderr)
         sys.exit(1)
 
-    buf       = bytearray()
-    last_poll = 0.0
+    buf          = bytearray()
+    last_poll    = 0.0
+    resync_skips = 0   # bogus-0xAA candidates skipped by frame validation
 
     # ── UART ASCII console forwarding ────────────────────────────────────
     # Printable UART bytes (banner text etc.) are line-buffered and POSTed
@@ -406,13 +485,24 @@ def main():
                 b = buf[i]
 
                 if b == TRACE_MAGIC:
-                    if len(buf) - i < TRACE_LEN:
+                    decoded = try_parse_trace_frame(buf, i)
+                    if decoded is False:
+                        # Magic byte seen but frame not fully buffered yet.
                         break
+                    if decoded is None:
+                        # Candidate frame failed plausibility checks — the 0xAA
+                        # is a payload byte from a misaligned stream (mid-stream
+                        # attach, dropped byte, or noise).  Advance one byte and
+                        # rescan instead of emitting a garbage event.
+                        resync_skips += 1
+                        if resync_skips <= 3 or resync_skips % 100 == 0:
+                            print(f'[bridge] trace resync: skipped bogus 0xAA '
+                                  f'candidate ({resync_skips} total)', flush=True)
+                        i += 1
+                        continue
                     # Flush any pending ASCII first so console text and trace
                     # packets appear in the IDE event log in arrival order.
                     _console_flush(ide_base, verify_tls)
-                    pkt = buf[i:i + TRACE_LEN]
-                    decoded = decode_trace_packet(pkt)
                     decoded['ts'] = time.time()
 
                     try:

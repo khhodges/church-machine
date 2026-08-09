@@ -119,9 +119,17 @@
     0x06:'CALL CR6', 0x07:'CALL CR14', 0x08:'CALL push',
     0x09:'RETURN pop', 0x0A:'RETURN CR6', 0x0B:'RETURN CR14'
   };
+  // FAULT_NAMES — must match hardware.hw_types.FaultType exactly
+  // (guarded by tests/hardware/test_wukong_bridge_parser.py).
   var FAULT_NAMES = {
-    1:'PERM', 2:'RANGE', 3:'TYPE', 4:'SEAL', 5:'NULLGT',
-    6:'DEPTH', 7:'ALIGN', 8:'OPCODE', 9:'INTEGRITY'
+    0x00:'NONE', 0x01:'PERM_R', 0x02:'PERM_W', 0x03:'PERM_X',
+    0x04:'PERM_L', 0x05:'PERM_S', 0x06:'PERM_E', 0x07:'NULL_CAP',
+    0x08:'BOUNDS', 0x09:'VERSION', 0x0A:'SEAL', 0x0B:'INVALID_OP',
+    0x0C:'TPERM_RSV', 0x0D:'DOMAIN_PURITY', 0x0E:'BIND', 0x0F:'F_BIT',
+    0x10:'STACK_OVERFLOW', 0x11:'ABSENT_OUTFORM', 0x12:'STACK_CORRUPT',
+    0x13:'STACK_UNDERFLOW', 0x14:'IRQ_NULL_BASE', 0x15:'OUTFORM_CRC',
+    0x16:'OUTFORM_ALLOC', 0x17:'OUTFORM_MINT', 0x18:'OUTFORM_HDR',
+    0x19:'OUTFORM_TIMEOUT'
   };
   var cursor = 0;
   var logEl = document.getElementById('log');
@@ -278,6 +286,13 @@
         document.getElementById('tuVersion').textContent = bi.tu_version;
         if (bi.build_version != null)
           document.getElementById('boardBuildVersion').textContent = 'v' + bi.build_version;
+      } else if (s.bridge_connected) {
+        // Bridge attached mid-stream: the board booted before the bridge was
+        // listening, so no sentinel was captured this session.  Tell the user
+        // how to get one instead of leaving a bare "not seen".
+        var bsEl = document.getElementById('bootSentinel');
+        bsEl.textContent = "not seen — click ↺ Reboot (sends 'f') to reboot the board and re-arm the sentinel";
+        bsEl.className = 'v dim';
       }
       if (s.ide_version)
         document.getElementById('ideVersion').textContent = s.ide_version;

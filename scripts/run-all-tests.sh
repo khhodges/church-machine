@@ -123,6 +123,9 @@ register_suite "check-api-reference-stale" \
 register_suite "lump-consistency" \
     'python -m pytest tests/lump/test_lump_consistency.py -v'
 
+register_suite "wukong-bridge-parser-tests" \
+    'python -m pytest tests/hardware/test_wukong_bridge_parser.py -v'
+
 register_suite "sha32-vectors" \
     'python -m pytest scripts/test_sha32_vectors.py -v'
 
