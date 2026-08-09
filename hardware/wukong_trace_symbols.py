@@ -87,8 +87,10 @@ def _disassemble_word(word):
     if opcode in (20,):
         return f"{mnemonic} DR{dst}, DR{src}"
     if opcode in (21, 22):
-        operand = f"#{imm & 0x3FFF}" if imm & 0x4000 else f"DR{imm & 0xF}"
-        return f"{mnemonic} DR{dst}, DR{src}, {operand}"
+        # IADD/ISUB always encode a 15-bit signed immediate — there is no
+        # register-operand mode for these opcodes (unlike DREAD/DWRITE).
+        simm = (imm | 0xFFFF8000) - 0x100000000 if imm & 0x4000 else imm
+        return f"{mnemonic} DR{dst}, DR{src}, #{simm}"
     if opcode == 23:
         offset = imm | 0xFFFF8000 if imm & 0x4000 else imm
         if offset & 0x80000000:
