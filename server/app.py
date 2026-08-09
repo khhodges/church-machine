@@ -10075,6 +10075,192 @@ _wukong_total_bridge_polls = 0   # every GET  /hardware/wukong/command
 _wukong_cmd_delivery = None
 _wukong_cmd_id       = 0     # monotonic; incremented under _wukong_command_lock
 
+# ── Wukong relay state ────────────────────────────────────────────────────────
+# When relay is active, a background thread polls a remote server (default:
+# https://lab.cloomc.org) for new events and merges them into the local queue,
+# so the IDE's normal polling sees live hardware state without a direct bridge.
+_wukong_relay_lock    = _wk_threading.Lock()
+_wukong_relay_enabled = False
+_wukong_relay_url     = 'https://lab.cloomc.org'
+_wukong_relay_thread  = None   # daemon thread; None when stopped
+_wukong_relay_last_rx = 0.0    # last time ≥1 event arrived from source
+_wukong_relay_last_ok = 0.0    # last time the source events poll returned HTTP 200
+_wukong_relay_cursor  = 0      # remote seq of last event injected into local queue
+_wukong_relay_generation = 0  # incremented each enable; stale worker exits when mismatch
+
+# Allowlist of hostnames the relay may contact.  Override via env var
+# WUKONG_RELAY_ALLOWED_HOSTS (comma-separated) for self-hosted deployments.
+_RELAY_ALLOWED_HOSTS = frozenset(
+    h.strip().lower()
+    for h in os.environ.get('WUKONG_RELAY_ALLOWED_HOSTS', 'lab.cloomc.org').split(',')
+    if h.strip()
+)
+
+
+def _validate_relay_source_url(url):
+    """Return (sanitised_url, error_str). error_str is None on success."""
+    try:
+        from urllib.parse import urlparse as _up
+        p = _up(url)
+        if p.scheme != 'https':
+            return None, 'source_url must use https://'
+        host = (p.hostname or '').lower()
+        if host not in _RELAY_ALLOWED_HOSTS:
+            return None, ('source_url host %r is not in the allowed list (%s)'
+                          % (host, ', '.join(sorted(_RELAY_ALLOWED_HOSTS))))
+        return url.rstrip('/'), None
+    except Exception as exc:
+        return None, str(exc)
+
+
+def _wukong_relay_worker(my_gen):
+    """Poll the remote server's event queue and merge into the local queue."""
+    global _wukong_relay_enabled, _wukong_relay_last_rx, _wukong_relay_last_ok, \
+           _wukong_relay_cursor, _wukong_event_seq, _wukong_call_depth, \
+           _wukong_latest_trace, _wukong_latest_cr_gts, \
+           _wukong_last_trace_post, _wukong_total_trace_posts, \
+           _wukong_boot_info
+    local_cursor = 0
+    with _wukong_relay_lock:
+        local_cursor = _wukong_relay_cursor
+        src = _wukong_relay_url.rstrip('/')
+    while True:
+        with _wukong_relay_lock:
+            if not _wukong_relay_enabled or _wukong_relay_generation != my_gen:
+                break
+            src = _wukong_relay_url.rstrip('/')
+        try:
+            r = http_requests.get(
+                src + '/hardware/wukong/events',
+                params={'after': local_cursor},
+                timeout=(3, 6),
+                allow_redirects=False,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                events = data.get('events', [])
+                if events:
+                    # Atomically validate generation+enabled AND inject events.
+                    # We hold relay_lock through the entire check-and-write path,
+                    # acquiring trace_lock inside (consistent relay→trace order) so
+                    # no disable or source-change request can slip between the guard
+                    # and the queue mutation — giving true atomic lifecycle safety.
+                    with _wukong_relay_lock:
+                        if _wukong_relay_generation == my_gen and _wukong_relay_enabled:
+                            _wukong_relay_last_ok = _wk_time.time()
+                            _wukong_relay_last_rx = _wukong_relay_last_ok
+                            now = _wukong_relay_last_rx
+                            with _wukong_trace_lock:
+                                for ev in events:
+                                    ev_type = int(ev.get('ev_type', 0) or 0)
+                                    if ev_type == 0x08:    # CALL_PUSH
+                                        _wukong_call_depth += 1
+                                    elif ev_type == 0x09:  # CALL_POP
+                                        if _wukong_call_depth > 0:
+                                            _wukong_call_depth -= 1
+                                    ev_copy = dict(ev)
+                                    ev_copy['call_depth'] = _wukong_call_depth
+                                    ev_copy['relayed']    = True
+                                    if not ev_copy.get('ts'):
+                                        ev_copy['ts'] = now
+                                    _wukong_event_seq += 1
+                                    ev_copy['seq'] = _wukong_event_seq
+                                    _wukong_event_queue.append(ev_copy)
+                                    if len(_wukong_event_queue) > _WUKONG_EVENT_QUEUE_MAXLEN:
+                                        del _wukong_event_queue[:-_WUKONG_EVENT_QUEUE_MAXLEN]
+                                    _wukong_latest_trace = ev_copy
+                                    if ev_type == 0x06:
+                                        _wukong_latest_cr_gts[6]  = int(ev.get('payload_gt', 0) or 0)
+                                    elif ev_type == 0x07:
+                                        _wukong_latest_cr_gts[14] = int(ev.get('payload_gt', 0) or 0)
+                                    remote_seq = ev.get('seq', 0) or 0
+                                    if remote_seq > local_cursor:
+                                        local_cursor = remote_seq
+                            # Cursor and telemetry stay under relay_lock.
+                            _wukong_last_trace_post    = now
+                            _wukong_total_trace_posts += len(events)
+                            _wukong_relay_cursor       = local_cursor
+                        # else: stale generation or relay disabled — discard silently.
+                else:
+                    # No events but HTTP 200: still update last_ok under gen guard.
+                    with _wukong_relay_lock:
+                        if _wukong_relay_generation == my_gen and _wukong_relay_enabled:
+                            _wukong_relay_last_ok = _wk_time.time()
+                # Relay boot-info so the IDE stale-bitstream banner works.
+                # Guard with generation so a stale worker cannot pollute new session.
+                try:
+                    bi_r = http_requests.get(src + '/hardware/wukong/boot-info',
+                                             timeout=(2, 4), allow_redirects=False)
+                    if bi_r.status_code == 200:
+                        bi_data = bi_r.json()
+                        if bi_data:
+                            with _wukong_relay_lock:
+                                if _wukong_relay_generation == my_gen and _wukong_relay_enabled:
+                                    with _wukong_boot_info_lock:
+                                        _wukong_boot_info.update(bi_data)
+                except Exception:
+                    pass
+        except Exception as exc:
+            app.logger.debug('Wukong relay poll error: %s', exc)
+        _wk_time.sleep(1.5)
+
+
+@app.route('/hardware/wukong/relay', methods=['POST'])
+def wukong_relay_post():
+    """Enable or disable the production-to-dev event relay.
+
+    Accepts JSON: { "enabled": bool, "source_url": str }
+    source_url must be https:// and the hostname must be in _RELAY_ALLOWED_HOSTS
+    (default: lab.cloomc.org; override via WUKONG_RELAY_ALLOWED_HOSTS env var).
+
+    When enabled, a background thread polls <source_url>/hardware/wukong/events
+    every 1.5 s and merges new events into the local queue so the IDE's normal
+    polling continues to work without a direct Wukong bridge.
+
+    Response: { "ok": true, "enabled": bool, "source_url": str }
+    """
+    global _wukong_relay_enabled, _wukong_relay_url, _wukong_relay_thread, \
+           _wukong_relay_cursor, _wukong_relay_last_rx, _wukong_relay_last_ok, \
+           _wukong_relay_generation
+    data = request.get_json(silent=True) or {}
+    enabled = bool(data.get('enabled', False))
+    raw_url = str(data.get('source_url', '') or '').strip() or 'https://lab.cloomc.org'
+
+    validated_url, err = _validate_relay_source_url(raw_url)
+    if err:
+        return jsonify({'ok': False, 'error': err}), 400
+
+    with _wukong_relay_lock:
+        was_enabled = _wukong_relay_enabled
+        url_changed = (validated_url != _wukong_relay_url)
+        _wukong_relay_url     = validated_url
+        _wukong_relay_enabled = enabled
+        # Spawn a fresh worker whenever:
+        #  • relay is being turned on (was disabled), OR
+        #  • relay is already running but the source URL has changed.
+        # In both cases bump the generation so any in-flight or sleeping
+        # worker from the previous session self-exits and its results are
+        # discarded before they can reach the local event queue.
+        needs_new_worker = enabled and (not was_enabled or url_changed)
+        if needs_new_worker:
+            _wukong_relay_generation += 1
+            current_gen = _wukong_relay_generation
+            _wukong_relay_cursor  = 0
+            _wukong_relay_last_rx = 0.0
+            _wukong_relay_last_ok = 0.0
+
+    if needs_new_worker:
+        t = _wk_threading.Thread(target=_wukong_relay_worker,
+                                  args=(current_gen,),
+                                  daemon=True, name='wukong-relay')
+        t.start()
+        _wukong_relay_thread = t
+        app.logger.info('Wukong relay started → %s', validated_url)
+    elif not enabled:
+        app.logger.info('Wukong relay stopped')
+
+    return jsonify({'ok': True, 'enabled': enabled, 'source_url': validated_url})
+
 
 @app.route('/hardware/wukong/trace', methods=['POST'])
 def wukong_trace_post():
@@ -10381,6 +10567,11 @@ def wukong_status_get():
         # sentinel-reported build_version / tu_version without extra requests.
         'expected_build_version': _wukong_build_version(),
         'min_tu_version':         _wukong_min_tu_version(),
+        # Relay state — active when a dev IDE is mirroring from a remote server.
+        'relay_enabled':    _wukong_relay_enabled,
+        'relay_source_url': _wukong_relay_url,
+        'relay_last_ok':    (now - _wukong_relay_last_ok) if _wukong_relay_last_ok else None,
+        'relay_last_rx':    (now - _wukong_relay_last_rx) if _wukong_relay_last_rx else None,
     })
 
 

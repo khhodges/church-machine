@@ -57,9 +57,14 @@
 <h1>Wukong FPGA — Server Status</h1>
 <div class="sub">This page shows exactly what the server knows. It polls once per second and never interferes with the IDE.</div>
 
-<div id="healthStrip" style="margin-bottom:14px;background:#111827;border:1px solid #1f2b3e;border-radius:8px;padding:10px 14px;">
+<div id="healthStrip" style="margin-bottom:8px;background:#111827;border:1px solid #1f2b3e;border-radius:8px;padding:10px 14px;">
   <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#5a6b82;margin-bottom:8px;">Pipeline Health</div>
   <div id="healthStages" style="display:flex;flex-wrap:wrap;gap:8px 20px;"></div>
+</div>
+
+<div id="relayBanner" style="display:none;margin-bottom:14px;background:#0e1c34;border:1px solid #1e3060;border-radius:8px;padding:8px 14px;align-items:center;gap:10px;font-size:12px;color:#60a5fa;">
+  <span id="relayBannerDot" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#ef4444;flex-shrink:0;box-shadow:0 0 5px #ef4444;"></span>
+  <span>Showing events relayed from <b id="relayBannerSrc">lab.cloomc.org</b> — <span id="relayBannerStatus">not yet connected</span></span>
 </div>
 
 <div class="grid">
@@ -524,6 +529,34 @@
         bsEl.textContent = "not seen — click ↺ Reboot (sends 'f') to reboot the board and re-arm the sentinel";
         bsEl.className = 'v dim';
       }
+      // Relay banner
+      var relayBanner = document.getElementById('relayBanner');
+      if (relayBanner) {
+        if (s.relay_enabled) {
+          relayBanner.style.display = 'flex';
+          var relayDot    = document.getElementById('relayBannerDot');
+          var relaySrc    = document.getElementById('relayBannerSrc');
+          var relayStatus = document.getElementById('relayBannerStatus');
+          if (relaySrc) relaySrc.textContent = s.relay_source_url || 'lab.cloomc.org';
+          var rxAge = s.relay_last_rx;
+          var okAge = s.relay_last_ok;
+          var dot, statusText;
+          if (rxAge !== null && rxAge !== undefined && rxAge < 10) {
+            dot = '#22c55e'; statusText = 'receiving';
+          } else if (okAge !== null && okAge !== undefined && okAge < 10) {
+            dot = '#f59e0b'; statusText = 'connected \u2014 board idle';
+          } else if (okAge !== null && okAge !== undefined) {
+            dot = '#f59e0b'; statusText = 'stale \u2014 ' + Math.round(okAge) + 's ago';
+          } else {
+            dot = '#ef4444'; statusText = 'not yet connected';
+          }
+          if (relayDot) { relayDot.style.background = dot; relayDot.style.boxShadow = '0 0 5px ' + dot; }
+          if (relayStatus) relayStatus.textContent = statusText;
+        } else {
+          relayBanner.style.display = 'none';
+        }
+      }
+
       if (s.ide_version)
         document.getElementById('ideVersion').textContent = s.ide_version;
       document.getElementById('uploadState').textContent = s.upload_in_flight ? 'YES' : 'no';

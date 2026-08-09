@@ -14504,6 +14504,12 @@ let _wukongHwNia        = null;    // retiring NIA of last HW trace packet
 
 let _wukongLastEventSeq = 0;       // cursor into the server-side ordered event queue
 const _hwBreakpoints = new Set();
+
+// ── Relay state (mirror from production) ──────────────────────────────────────
+let _wukongRelayEnabled   = false;
+let _wukongRelaySourceUrl = 'https://lab.cloomc.org';
+let _wukongRelayLastOk    = null;  // age in seconds since last successful source poll
+let _wukongRelayLastRx    = null;  // age in seconds since last event received from source
 window._hwBreakpoints = _hwBreakpoints;
 
 function _wukongIsConnected() {
@@ -14710,15 +14716,109 @@ async function _wukongRefreshHealthStrip() {
         var r = await fetch('/hardware/wukong/status');
         if (!r.ok) return;
         var s = await r.json();
+        // Capture relay state from the server so the banner stays in sync.
+        if (s.relay_enabled !== undefined) {
+            _wukongRelayEnabled   = !!s.relay_enabled;
+            _wukongRelaySourceUrl = s.relay_source_url || _wukongRelaySourceUrl;
+            _wukongRelayLastOk    = (s.relay_last_ok !== undefined && s.relay_last_ok !== null)
+                ? s.relay_last_ok : null;
+            _wukongRelayLastRx    = (s.relay_last_rx !== undefined && s.relay_last_rx !== null)
+                ? s.relay_last_rx : null;
+        }
         var strip = document.getElementById('wukong-health-strip');
         if (!strip) return;
         var stages = _wukongClassifyPipelineStages(s, _wukongLastEventSeq, _wukongLastTraceTs || null);
         strip.innerHTML = _wukongHealthStripHtml(stages);
+        _wukongUpdateRelayBanner();
     } catch(e) {}
 }
 
 // Poll status for the health strip every 3 s (independent of the 500 ms event drain).
 setInterval(_wukongRefreshHealthStrip, 3000);
+
+/**
+ * Create, update, or remove the relay banner inside the HW log panel.
+ * Shows "Mirroring from <source>" with a green/amber/red health dot.
+ */
+function _wukongUpdateRelayBanner() {
+    const panel = document.getElementById('wukong-hw-log');
+    if (!panel) return;
+    let banner = document.getElementById('wukong-relay-banner');
+    if (_wukongRelayEnabled) {
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'wukong-relay-banner';
+            banner.style.cssText =
+                'background:#0e1c34;color:#60a5fa;font-size:10px;padding:3px 8px;' +
+                'flex-shrink:0;border-bottom:1px solid #1e2e4e;display:flex;' +
+                'align-items:center;gap:6px;';
+            // Insert after health strip (before log body).
+            const healthStrip = document.getElementById('wukong-health-strip');
+            if (healthStrip && healthStrip.nextSibling) {
+                panel.insertBefore(banner, healthStrip.nextSibling);
+            } else {
+                panel.appendChild(banner);
+            }
+        }
+        // Determine health colour.
+        var dot, label;
+        if (_wukongRelayLastRx !== null && _wukongRelayLastRx < 10) {
+            dot = '#22c55e'; label = 'receiving';
+        } else if (_wukongRelayLastOk !== null && _wukongRelayLastOk < 10) {
+            dot = '#f59e0b'; label = 'connected — board idle';
+        } else if (_wukongRelayLastOk !== null) {
+            dot = '#f59e0b'; label = 'stale — ' + Math.round(_wukongRelayLastOk) + 's ago';
+        } else {
+            dot = '#ef4444'; label = 'not connected yet';
+        }
+        var src = _wukongRelaySourceUrl || 'lab.cloomc.org';
+        // Build banner content via DOM so the (user-supplied) source URL is never
+        // interpolated into HTML markup (avoids stored-XSS).
+        banner.innerHTML = '';
+        var dotEl = document.createElement('span');
+        dotEl.style.cssText = 'display:inline-block;width:7px;height:7px;border-radius:50%;' +
+            'background:' + dot + ';flex-shrink:0;box-shadow:0 0 4px ' + dot + ';';
+        banner.appendChild(dotEl);
+        var textEl = document.createElement('span');
+        textEl.appendChild(document.createTextNode('Mirroring from '));
+        var bEl = document.createElement('b');
+        bEl.textContent = src;
+        textEl.appendChild(bEl);
+        textEl.appendChild(document.createTextNode(' \u2014 ' + label));
+        banner.appendChild(textEl);
+    } else if (banner) {
+        banner.remove();
+    }
+}
+
+/**
+ * Enable or disable the production-relay.
+ * @param {boolean} enabled
+ * @param {string=} sourceUrl  optional; defaults to _wukongRelaySourceUrl
+ */
+async function _wukongSetRelay(enabled, sourceUrl) {
+    const url = (sourceUrl || _wukongRelaySourceUrl || 'https://lab.cloomc.org').trim();
+    try {
+        const r = await fetch('/hardware/wukong/relay', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ enabled, source_url: url }),
+        });
+        if (r.ok) {
+            const d = await r.json();
+            _wukongRelayEnabled   = !!d.enabled;
+            _wukongRelaySourceUrl = d.source_url || url;
+            _wukongUpdateRelayBanner();
+            return { ok: true };
+        } else {
+            const d = await r.json().catch(function() { return {}; });
+            return { ok: false, error: (d && d.error) || ('Server error ' + r.status) };
+        }
+    } catch(e) {
+        return { ok: false, error: String(e) };
+    }
+}
+window._wukongSetRelay = _wukongSetRelay;
 
 // Move the hardware-step cursor (nia-hw-cursor class) to the given word address.
 // Removes the class from any previously highlighted row so only one row carries
@@ -14918,8 +15018,54 @@ function wukongConnBtnClick() {
         '<div>Connect a QMTECH Wukong board by running the <b>bridge script</b> on the machine the board is plugged into. ' +
         'The bridge reads the board\u2019s UART trace stream and forwards it to this IDE.</div>' +
         '<div style="margin-top:8px;color:#8888cc;">Once trace packets arrive, this button turns <span style="color:#44dd88;">green</span> with a live NIA ticker, ' +
-        'and the <b>\u26A1 HW Trace</b> panel appears at the bottom-right corner of the browser.</div>';
+        'and the <b>\u26A1 HW Trace</b> panel appears at the bottom-right corner of the browser.</div>' +
+        '<hr style="border:none;border-top:1px solid #2a2a44;margin:10px 0;">' +
+        '<div style="font-size:11px;color:#a0a8cc;margin-bottom:6px;font-weight:bold;">\uD83D\uDD04 Mirror from production</div>' +
+        '<div style="font-size:11px;color:#8888cc;margin-bottom:8px;">No hardware nearby? Mirror live events from <b>lab.cloomc.org</b> so the FPGA panel shows real board activity.</div>' +
+        '<div style="display:flex;flex-direction:column;gap:6px;">' +
+          '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">' +
+            '<input type="checkbox" id="wukongRelayToggle" style="width:14px;height:14px;cursor:pointer;" ' + (_wukongRelayEnabled ? 'checked' : '') + '>' +
+            '<span style="font-size:11px;color:#c0c8e8;">Enable mirror</span>' +
+          '</label>' +
+          '<div style="display:flex;align-items:center;gap:6px;">' +
+            '<span style="font-size:11px;color:#8888cc;flex-shrink:0;">Source:</span>' +
+            '<input id="wukongRelayUrlInput" type="text" ' +
+              'style="flex:1;background:#0d1120;color:#e0e8f8;border:1px solid #3a3a5c;border-radius:4px;padding:3px 6px;font:inherit;font-size:11px;" ' +
+              'placeholder="https://lab.cloomc.org">' +
+          '</div>' +
+          '<div id="wukongRelayPopoverStatus" style="font-size:10px;color:#8888cc;padding-left:2px;">' +
+            (_wukongRelayEnabled ? '\u23F3 relay active \u2014 waiting for first events\u2026' : '') +
+          '</div>' +
+        '</div>';
     document.body.appendChild(pop);
+    // Wire relay toggle
+    (function() {
+        var toggle = document.getElementById('wukongRelayToggle');
+        var urlInput = document.getElementById('wukongRelayUrlInput');
+        var statusEl = document.getElementById('wukongRelayPopoverStatus');
+        if (!toggle) return;
+        // Set the source URL via DOM property (not via innerHTML) to avoid XSS.
+        if (urlInput) urlInput.value = _wukongRelaySourceUrl || 'https://lab.cloomc.org';
+        toggle.addEventListener('change', async function() {
+            var enabled = toggle.checked;
+            var url = (urlInput && urlInput.value.trim()) || 'https://lab.cloomc.org';
+            if (statusEl) statusEl.textContent = enabled ? '\u23F3 starting\u2026' : 'Stopping\u2026';
+            var result = await _wukongSetRelay(enabled, url);
+            if (statusEl) {
+                if (result && !result.ok) {
+                    // Show the server's rejection reason and revert the checkbox.
+                    statusEl.style.color = '#f87171';
+                    statusEl.textContent = '\u26A0 ' + (result.error || 'Failed to change relay state.');
+                    toggle.checked = !enabled;
+                } else {
+                    statusEl.style.color = '';
+                    statusEl.textContent = enabled
+                        ? '\u23F3 relay active \u2014 waiting for first events\u2026'
+                        : 'Mirror disabled.';
+                }
+            }
+        });
+    })();
     // Async-load health status and render it into the popover.
     (async function() {
         try {

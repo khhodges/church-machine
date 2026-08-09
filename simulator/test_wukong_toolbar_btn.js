@@ -84,6 +84,18 @@ function makeEnv(opts) {
         _wukongIsConnected: function() { return sandbox._wukongConnected; },
         _wukongHwNia: null,
         _wukongLastHwNIA: null,
+        // Relay state vars — declared before the extracted block in app-run.js;
+        // must be present in the sandbox so wukongConnBtnClick can reference them.
+        _wukongRelayEnabled:   false,
+        _wukongRelaySourceUrl: 'https://lab.cloomc.org',
+        _wukongRelayLastOk:    null,
+        _wukongRelayLastRx:    null,
+        // Relay helpers called from the (async) toggle event-listener;
+        // not fired synchronously by these tests but must be resolvable.
+        _wukongSetRelay:        async function() {},
+        _wukongUpdateRelayBanner: function() {},
+        // fetch stub for the async health-status block inside the popover.
+        fetch: async function() { return { ok: false, json: async function() { return {}; } }; },
     };
     vm.createContext(sandbox);
     vm.runInContext(TOOLBAR_SRC, sandbox, { filename: 'app-run.extract.js' });
