@@ -10053,6 +10053,11 @@ _wukong_call_depth     = 0
 import time as _wk_time
 _wukong_last_bridge_poll = 0.0
 _wukong_last_trace_post  = 0.0
+# Cumulative counters for pipeline-health diagnostics.  These only go up
+# (never reset on server restart within a process) so the health strip can
+# distinguish "never seen" (== 0) from "stale / timed out" (> 0).
+_wukong_total_trace_posts  = 0   # every POST /hardware/wukong/trace
+_wukong_total_bridge_polls = 0   # every GET  /hardware/wukong/command
 # Command delivery lifecycle record for the most recent command.  Lets the
 # /fpga page distinguish "still queued" / "bridge consumed it" / "written to
 # the board's UART" instead of fire-and-forget.  Protected by
@@ -10090,8 +10095,9 @@ def wukong_trace_post():
         ts          — float timestamp
     """
     global _wukong_latest_trace, _wukong_latest_cr_gts, _wukong_event_seq, \
-           _wukong_call_depth, _wukong_last_trace_post
-    _wukong_last_trace_post = _wk_time.time()
+           _wukong_call_depth, _wukong_last_trace_post, _wukong_total_trace_posts
+    _wukong_last_trace_post    = _wk_time.time()
+    _wukong_total_trace_posts += 1
     data = request.get_json(silent=True) or {}
     ev_type    = int(data.get('ev_type', 0))
     payload_gt = int(data.get('payload_gt', 0))
@@ -10305,8 +10311,9 @@ def wukong_command_get():
     Returns {'cmd': ..., 'nia': ...} if a command is pending, else {}.
     The command is consumed (set to None) on each successful GET.
     """
-    global _wukong_pending_cmd, _wukong_last_bridge_poll
-    _wukong_last_bridge_poll = _wk_time.time()
+    global _wukong_pending_cmd, _wukong_last_bridge_poll, _wukong_total_bridge_polls
+    _wukong_last_bridge_poll    = _wk_time.time()
+    _wukong_total_bridge_polls += 1
     with _wukong_command_lock:
         entry = _wukong_pending_cmd
         _wukong_pending_cmd = None
@@ -10348,6 +10355,13 @@ def wukong_status_get():
     bridge_age = (now - _wukong_last_bridge_poll) if _wukong_last_bridge_poll else None
     trace_age  = (now - _wukong_last_trace_post)  if _wukong_last_trace_post  else None
     return jsonify({
+        # Pipeline-health counters (never reset within a process session).
+        # total_trace_posts == 0  → server has never seen a trace packet this session.
+        # total_bridge_polls == 0 → server has never seen a bridge command-poll.
+        # These let the health strip distinguish "never seen" from "stale / timed out"
+        # without requiring the UI to remember pre-existing ages across page loads.
+        'total_trace_posts':  _wukong_total_trace_posts,
+        'total_bridge_polls': _wukong_total_bridge_polls,
         'server_time':        now,
         'bridge_connected':   bridge_age is not None and bridge_age < 3.0,
         'bridge_poll_age':    bridge_age,

@@ -31,6 +31,8 @@
     "wukong-cr-update-tests",
     "wukong-trace-cr-server-tests",
     "wukong-status-readonly-tests",
-    "versions-view-tests"
+    "versions-view-tests",
+    "pipeline-health-status-tests",
+    "pipeline-health-stages-tests"
   ]
 }

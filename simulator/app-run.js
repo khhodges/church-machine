@@ -14545,6 +14545,7 @@ function _wukongIsConnected() {
             '<button id="wukong-hw-log-clear" title="Clear trace log" style="background:none;border:none;color:#8888cc;cursor:pointer;font-size:11px;padding:0 4px;line-height:1;" onclick="event.stopPropagation();var b=document.getElementById(\'wukong-hw-log-body\');if(b)b.innerHTML=\'\';">✕ clear</button>' +
             '<button id="wukong-hw-log-collapse" title="Minimise" style="background:none;border:none;color:#8888cc;cursor:pointer;font-size:14px;padding:0 4px;line-height:1;">▼</button>' +
         '</div>' +
+        '<div id="wukong-health-strip" style="flex-shrink:0;padding:3px 8px 3px;background:#0e0e22;border-bottom:1px solid #2a2a44;font-size:10px;line-height:1.6;"></div>' +
         '<div id="wukong-hw-log-body" style="flex:1;overflow-y:auto;padding:4px 8px;color:#ccccee;line-height:1.5;"></div>';
     document.body.appendChild(panel);
 
@@ -14562,6 +14563,162 @@ function _wukongIsConnected() {
         });
     }
 })();
+
+// ── Pipeline health strip ──────────────────────────────────────────────────────
+// Classifies the four stages of the hardware pipeline (Bridge → Board trace →
+// Boot info → IDE event feed) into green/amber/red with plain-language detail.
+// Called every 3 s from a dedicated setInterval; also called on popover open.
+
+function _wukongAgeStr(a) {
+    if (a === null || a === undefined) return 'never';
+    if (a < 2)   return a.toFixed(1) + 's ago';
+    if (a < 120) return Math.round(a) + 's ago';
+    if (a < 7200) return Math.round(a / 60) + 'min ago';
+    return Math.round(a / 3600) + 'h ago';
+}
+
+/**
+ * Classify each pipeline stage from a /hardware/wukong/status payload plus
+ * optional IDE-side cursors.
+ *
+ * @param {Object} s            - Status JSON from the server.
+ * @param {number} ideSeq       - IDE's _wukongLastEventSeq (pass -1 when unknown).
+ * @param {number|null} ideLastTs - IDE's _wukongLastTraceTs (unix seconds, or null).
+ * @returns {Array<{name,state,detail}>}  4 stages; state is 'green'|'amber'|'red'.
+ */
+function _wukongClassifyPipelineStages(s, ideSeq, ideLastTs) {
+    var stages = [];
+    var bridgeAge  = (s && s.bridge_poll_age  !== undefined) ? s.bridge_poll_age  : null;
+    var traceAge   = (s && s.last_trace_age   !== undefined) ? s.last_trace_age   : null;
+    var totalPolls = (s && s.total_bridge_polls != null)     ? s.total_bridge_polls : 0;
+    var totalPosts = (s && s.total_trace_posts  != null)     ? s.total_trace_posts  : 0;
+    var serverSeq  = (s && s.server_seq        != null)     ? s.server_seq         : 0;
+    var bi         = (s && s.boot_info) || {};
+
+    // ── Stage 1: Bridge ───────────────────────────────────────────────────────
+    var bridge;
+    if (bridgeAge !== null && bridgeAge < 3) {
+        bridge = { state: 'green', detail: 'Polling \u2014 last ' + _wukongAgeStr(bridgeAge) };
+    } else if (bridgeAge !== null && bridgeAge < 30) {
+        bridge = { state: 'amber', detail: 'Last poll ' + _wukongAgeStr(bridgeAge) + ' \u2014 bridge may be stalling' };
+    } else if (totalPolls === 0) {
+        bridge = { state: 'red',
+            detail: 'No bridge polling ever received \u2014 is the bridge script running and pointed at this server? ' +
+                    '(check https://lab.cloomc.org vs the dev URL)' };
+    } else {
+        bridge = { state: 'red',
+            detail: 'Bridge stopped ' + _wukongAgeStr(bridgeAge) + ' \u2014 bridge script may have crashed or lost network' };
+    }
+    stages.push({ name: 'Bridge', state: bridge.state, detail: bridge.detail });
+
+    // ── Stage 2: Board trace ─────────────────────────────────────────────────
+    var trace;
+    if (traceAge !== null && traceAge < 3) {
+        trace = { state: 'green', detail: 'Trace packets flowing \u2014 last ' + _wukongAgeStr(traceAge) };
+    } else if (traceAge !== null && traceAge < 30) {
+        trace = { state: 'amber', detail: 'Last trace ' + _wukongAgeStr(traceAge) + ' \u2014 board may be halted' };
+    } else if (totalPosts === 0) {
+        if (totalPolls > 0) {
+            trace = { state: 'red',
+                detail: 'Bridge is polling but no trace packets ever received \u2014 ' +
+                        'board may not be running, or bridge may be on the wrong serial port' };
+        } else {
+            trace = { state: 'red',
+                detail: 'No trace packets ever received \u2014 is the board powered and the FPGA bitstream loaded?' };
+        }
+    } else {
+        trace = { state: 'red',
+            detail: 'No trace in ' + _wukongAgeStr(traceAge) + ' \u2014 board halted or UART disconnected' };
+    }
+    stages.push({ name: 'Board trace', state: trace.state, detail: trace.detail });
+
+    // ── Stage 3: Boot info ───────────────────────────────────────────────────
+    var boot;
+    if (bi.tu_version !== undefined && Object.keys(bi).length) {
+        if (bi.stale_tu) {
+            boot = { state: 'amber',
+                detail: 'Sentinel seen \u2014 bitstream is STALE (TU v' + bi.tu_version + ') \u2014 reflash the board' };
+        } else {
+            boot = { state: 'green',
+                detail: 'Sentinel seen \u2014 TU v' + bi.tu_version +
+                        (bi.build_version != null ? ', build v' + bi.build_version : '') };
+        }
+    } else {
+        boot = { state: 'red',
+            detail: 'Boot sentinel not seen \u2014 board may not have booted yet, or the bridge attached after boot. ' +
+                    "Click \u21BA Reboot (sends 'f') to re-arm." };
+    }
+    stages.push({ name: 'Boot info', state: boot.state, detail: boot.detail });
+
+    // ── Stage 4: IDE event feed ──────────────────────────────────────────────
+    var ide;
+    if (typeof ideSeq === 'number' && ideSeq >= 0) {
+        // Called from the IDE where we have a local cursor.
+        if (ideSeq > 0) {
+            var nowSec = Date.now() / 1000;
+            if (ideLastTs && (nowSec - ideLastTs) < 10) {
+                ide = { state: 'green',
+                    detail: ideSeq + ' events received \u2014 last ' + _wukongAgeStr(nowSec - ideLastTs) };
+            } else if (ideLastTs) {
+                ide = { state: 'amber',
+                    detail: ideSeq + ' events received, but last ' + _wukongAgeStr(nowSec - ideLastTs) + ' ago' };
+            } else {
+                ide = { state: 'green', detail: ideSeq + ' events received' };
+            }
+        } else if (serverSeq > 0) {
+            ide = { state: 'amber',
+                detail: 'Server has ' + serverSeq + ' events but IDE event feed is at 0 \u2014 page may need a refresh' };
+        } else {
+            ide = { state: 'red', detail: 'No events received yet \u2014 waiting for trace packets to arrive' };
+        }
+    } else {
+        // Called from the /fpga page where we do not track a local cursor.
+        if (serverSeq > 0) {
+            ide = { state: 'green', detail: serverSeq + ' total events on server queue' };
+        } else {
+            ide = { state: 'red', detail: 'No events on server yet \u2014 awaiting first trace packet' };
+        }
+    }
+    stages.push({ name: 'IDE events', state: ide.state, detail: ide.detail });
+
+    return stages;
+}
+
+/** Build HTML for the compact pipeline health strip (used in both panel and popover). */
+function _wukongHealthStripHtml(stages) {
+    var DOT = { green: '#22c55e', amber: '#f59e0b', red: '#ef4444' };
+    var html = '<div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:flex-start;">';
+    stages.forEach(function(st) {
+        var color = DOT[st.state] || '#888';
+        html +=
+            '<span style="display:inline-flex;flex-direction:column;gap:1px;">' +
+                '<span style="display:flex;align-items:center;gap:4px;">' +
+                    '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + color + ';flex-shrink:0;box-shadow:0 0 4px ' + color + ';"></span>' +
+                    '<span style="color:#b0b8cc;font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;">' + st.name + '</span>' +
+                '</span>' +
+                (st.state !== 'green' ?
+                    '<span style="color:#9098b0;font-size:9px;padding-left:11px;max-width:220px;white-space:normal;line-height:1.4;">' + st.detail + '</span>' : '') +
+            '</span>';
+    });
+    html += '</div>';
+    return html;
+}
+
+/** Fetch status and render the health strip inside #wukong-health-strip. */
+async function _wukongRefreshHealthStrip() {
+    try {
+        var r = await fetch('/hardware/wukong/status');
+        if (!r.ok) return;
+        var s = await r.json();
+        var strip = document.getElementById('wukong-health-strip');
+        if (!strip) return;
+        var stages = _wukongClassifyPipelineStages(s, _wukongLastEventSeq, _wukongLastTraceTs || null);
+        strip.innerHTML = _wukongHealthStripHtml(stages);
+    } catch(e) {}
+}
+
+// Poll status for the health strip every 3 s (independent of the 500 ms event drain).
+setInterval(_wukongRefreshHealthStrip, 3000);
 
 // Move the hardware-step cursor (nia-hw-cursor class) to the given word address.
 // Removes the class from any previously highlighted row so only one row carries
@@ -14743,23 +14900,38 @@ function wukongConnBtnClick() {
         }
         return;
     }
-    // Disconnected → explain the bridge in a small popover.
+    // Disconnected → explain the bridge in a small popover, with a live health strip.
     let pop = document.getElementById('wukongConnPopover');
     if (pop) { pop.remove(); return; }
     pop = document.createElement('div');
     pop.id = 'wukongConnPopover';
-    pop.style.cssText = 'position:fixed;top:52px;right:12px;z-index:10000;width:320px;background:#12122a;border:1px solid #3a3a5c;border-radius:8px;padding:14px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.6);font-size:0.82rem;color:#ccccee;line-height:1.55;';
+    pop.style.cssText = 'position:fixed;top:52px;right:12px;z-index:10000;width:360px;background:#12122a;border:1px solid #3a3a5c;border-radius:8px;padding:14px 16px;box-shadow:0 8px 24px rgba(0,0,0,0.6);font-size:0.82rem;color:#ccccee;line-height:1.55;';
     pop.innerHTML =
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
             '<span style="color:#f0c040;font-weight:bold;">\u26A1 Wukong Board</span>' +
             '<button style="background:none;border:none;color:#8888cc;cursor:pointer;font-size:14px;" onclick="document.getElementById(\'wukongConnPopover\').remove()">\u2715</button>' +
         '</div>' +
         '<div style="color:#dd6644;font-weight:bold;margin-bottom:8px;">\u2717 Not connected</div>' +
+        '<div id="wukongConnPopoverHealth" style="margin-bottom:10px;padding:6px 8px;background:#0d1120;border-radius:5px;font-size:10px;">' +
+            '<span style="color:#5a6b82;">Loading pipeline status\u2026</span>' +
+        '</div>' +
         '<div>Connect a QMTECH Wukong board by running the <b>bridge script</b> on the machine the board is plugged into. ' +
         'The bridge reads the board\u2019s UART trace stream and forwards it to this IDE.</div>' +
         '<div style="margin-top:8px;color:#8888cc;">Once trace packets arrive, this button turns <span style="color:#44dd88;">green</span> with a live NIA ticker, ' +
         'and the <b>\u26A1 HW Trace</b> panel appears at the bottom-right corner of the browser.</div>';
     document.body.appendChild(pop);
+    // Async-load health status and render it into the popover.
+    (async function() {
+        try {
+            var r = await fetch('/hardware/wukong/status');
+            var s = r.ok ? await r.json() : null;
+            var healthEl = document.getElementById('wukongConnPopoverHealth');
+            if (!healthEl) return;
+            if (!s) { healthEl.innerHTML = '<span style="color:#dd6644;">Could not reach server.</span>'; return; }
+            var stages = _wukongClassifyPipelineStages(s, _wukongLastEventSeq, _wukongLastTraceTs || null);
+            healthEl.innerHTML = _wukongHealthStripHtml(stages);
+        } catch(e) {}
+    })();
     // Dismiss on outside click.
     setTimeout(function() {
         function outside(e) {

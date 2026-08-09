@@ -57,6 +57,11 @@
 <h1>Wukong FPGA — Server Status</h1>
 <div class="sub">This page shows exactly what the server knows. It polls once per second and never interferes with the IDE.</div>
 
+<div id="healthStrip" style="margin-bottom:14px;background:#111827;border:1px solid #1f2b3e;border-radius:8px;padding:10px 14px;">
+  <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#5a6b82;margin-bottom:8px;">Pipeline Health</div>
+  <div id="healthStages" style="display:flex;flex-wrap:wrap;gap:8px 20px;"></div>
+</div>
+
 <div class="grid">
   <div class="card">
     <h2>Bridge</h2>
@@ -114,6 +119,137 @@
 <script>
 (function () {
   'use strict';
+  // ── Pipeline health strip ──────────────────────────────────────────────────
+  function ageStr(a) {
+    if (a === null || a === undefined) return 'never';
+    if (a < 2) return a.toFixed(1) + 's ago';
+    if (a < 120) return Math.round(a) + 's ago';
+    if (a < 7200) return Math.round(a / 60) + 'min ago';
+    return Math.round(a / 3600) + 'h ago';
+  }
+
+  function classifyPipelineStages(s) {
+    var stages = [];
+    var bridgeAge  = (s.bridge_poll_age  !== undefined) ? s.bridge_poll_age  : null;
+    var traceAge   = (s.last_trace_age   !== undefined) ? s.last_trace_age   : null;
+    var totalPolls = s.total_bridge_polls || 0;
+    var totalPosts = s.total_trace_posts  || 0;
+    var serverSeq  = s.server_seq || 0;
+    var bi         = s.boot_info || {};
+
+    // Stage 1: Bridge
+    var bridge;
+    if (bridgeAge !== null && bridgeAge < 3) {
+      bridge = { state: 'green', detail: 'Polling — last ' + ageStr(bridgeAge) };
+    } else if (bridgeAge !== null && bridgeAge < 30) {
+      bridge = { state: 'amber', detail: 'Last poll ' + ageStr(bridgeAge) + ' — bridge may be stalling' };
+    } else if (totalPolls === 0) {
+      bridge = { state: 'red', detail: 'No bridge polling ever received — is the bridge script running and pointed at this server? (check https://lab.cloomc.org vs the dev URL)' };
+    } else {
+      bridge = { state: 'red', detail: 'Bridge stopped ' + ageStr(bridgeAge) + ' — bridge script may have crashed or lost network' };
+    }
+    stages.push({ name: 'Bridge', state: bridge.state, detail: bridge.detail });
+
+    // Stage 2: Board trace
+    var trace;
+    if (traceAge !== null && traceAge < 3) {
+      trace = { state: 'green', detail: 'Trace packets flowing — last ' + ageStr(traceAge) };
+    } else if (traceAge !== null && traceAge < 30) {
+      trace = { state: 'amber', detail: 'Last trace ' + ageStr(traceAge) + ' — board may be halted' };
+    } else if (totalPosts === 0) {
+      if (totalPolls > 0) {
+        trace = { state: 'red', detail: 'Bridge is polling but no trace packets ever received — board may not be running, or bridge may be on the wrong serial port' };
+      } else {
+        trace = { state: 'red', detail: 'No trace packets ever received — is the board powered and the FPGA bitstream loaded?' };
+      }
+    } else {
+      trace = { state: 'red', detail: 'No trace in ' + ageStr(traceAge) + ' — board halted or UART disconnected' };
+    }
+    stages.push({ name: 'Board trace', state: trace.state, detail: trace.detail });
+
+    // Stage 3: Boot info
+    var boot;
+    if (bi.tu_version !== undefined && Object.keys(bi).length) {
+      if (bi.stale_tu) {
+        boot = { state: 'amber', detail: 'Sentinel seen — bitstream is STALE (TU v' + bi.tu_version + ') — reflash the board' };
+      } else {
+        boot = { state: 'green', detail: 'Sentinel seen — TU v' + bi.tu_version + (bi.build_version != null ? ', build v' + bi.build_version : '') };
+      }
+    } else {
+      boot = { state: 'red', detail: "Boot sentinel not seen — board may not have booted yet, or bridge attached after boot. Click ↺ Reboot (sends 'f') to re-arm." };
+    }
+    stages.push({ name: 'Boot info', state: boot.state, detail: boot.detail });
+
+    // Stage 4: Event feed (server side — /fpga page has no IDE cursor)
+    var ide;
+    if (serverSeq > 0) {
+      ide = { state: 'green', detail: serverSeq + ' total events' };
+    } else {
+      ide = { state: 'red', detail: 'No events on server yet — awaiting first trace packet' };
+    }
+    stages.push({ name: 'Event feed', state: ide.state, detail: ide.detail });
+
+    return stages;
+  }
+
+  var DOT_COLOR = { green: '#22c55e', amber: '#f59e0b', red: '#ef4444' };
+  function renderHealthStrip(s) {
+    var stages = classifyPipelineStages(s);
+    var stagesEl = document.getElementById('healthStages');
+    if (!stagesEl) return;
+    stagesEl.innerHTML = '';
+    stages.forEach(function(st) {
+      var col = DOT_COLOR[st.state] || '#888';
+      var wrap = document.createElement('span');
+      wrap.style.cssText = 'display:inline-flex;flex-direction:column;gap:2px;min-width:140px;';
+      var lbl = document.createElement('span');
+      lbl.style.cssText = 'display:flex;align-items:center;gap:5px;';
+      lbl.innerHTML =
+        '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + col + ';box-shadow:0 0 5px ' + col + ';flex-shrink:0;"></span>' +
+        '<span style="color:#c8d6e5;font-size:12px;">' + st.name + '</span>';
+      wrap.appendChild(lbl);
+      if (st.state !== 'green') {
+        var det = document.createElement('span');
+        det.style.cssText = 'color:#7a8ba3;font-size:11px;padding-left:14px;line-height:1.45;';
+        det.textContent = st.detail;
+        wrap.appendChild(det);
+      }
+      stagesEl.appendChild(wrap);
+    });
+  }
+
+  // Also explain an empty live-event log instead of leaving it blank.
+  function maybeExplainEmptyLog(s) {
+    var logEl = document.getElementById('log');
+    var existing = document.getElementById('log-empty-explain');
+    if (!logEl) return;
+    var isEmpty = logEl.childNodes.length === 0 ||
+        (logEl.childNodes.length === 1 && logEl.firstChild.id === 'log-empty-explain');
+    if (!isEmpty) {
+      if (existing) existing.remove();
+      return;
+    }
+    var traceAge = (s.last_trace_age !== undefined) ? s.last_trace_age : null;
+    var totalPosts = s.total_trace_posts || 0;
+    var serverSeq  = s.server_seq || 0;
+    var msg = '';
+    if (serverSeq > 0 && logEl.childNodes.length === 0) {
+      msg = serverSeq + ' events are on the server but none have been displayed yet — scroll up or wait for the next poll.';
+    } else if (totalPosts === 0) {
+      msg = 'No trace packets have arrived at the server yet. Check the Pipeline Health strip above.';
+    } else if (traceAge !== null && traceAge > 10) {
+      msg = 'No new events in ' + ageStr(traceAge) + '. Board may be halted — use the Run ▶ or Step button above.';
+    }
+    if (!msg) { if (existing) existing.remove(); return; }
+    if (!existing) {
+      existing = document.createElement('div');
+      existing.id = 'log-empty-explain';
+      existing.style.cssText = 'color:#5a6b82;font-style:italic;padding:6px 0;';
+      logEl.appendChild(existing);
+    }
+    existing.textContent = msg;
+  }
+
   var EV_NAMES = {
     0x00:'RESULT', 0x01:'LOAD shadow GT', 0x02:'LOAD new GT',
     0x03:'CHANGE push', 0x04:'CHANGE CR12', 0x05:'CHANGE CR5',
@@ -416,6 +552,10 @@
         cursor = 0;
       }
       lastServerSeq = s.server_seq;
+
+      // Render pipeline health strip and explain empty log.
+      renderHealthStrip(s);
+      maybeExplainEmptyLog(s);
     }).catch(function () {
       setState('bridgeState', 'bad', 'server unreachable');
     });

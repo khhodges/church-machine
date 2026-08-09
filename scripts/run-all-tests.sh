@@ -250,6 +250,12 @@ register_suite "compile-api-tests" \
 register_suite "wukong-status-readonly-tests" \
     'python3 -m pytest tests/server/test_wukong_status_readonly.py -v'
 
+register_suite "pipeline-health-status-tests" \
+    'python3 -m pytest tests/server/test_pipeline_health_status_fields.py -v'
+
+register_suite "pipeline-health-stages-tests" \
+    'node simulator/test_pipeline_health_stages.js'
+
 register_suite "versions-view-tests" \
     'python3 -m pytest tests/server/test_versions_view_fields.py -v'
 
