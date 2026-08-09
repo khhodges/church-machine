@@ -15290,6 +15290,8 @@ async function _wukongDrainEvents() {
             _rcon.appendChild(_cl);
             _rcon.scrollTop = _rcon.scrollHeight;
         }
+        // Refresh the machine-status chip immediately on connect.
+        if (typeof updateFlagsDisplay === 'function') updateFlagsDisplay();
     }
 
     for (const ev of events) {
@@ -15297,6 +15299,9 @@ async function _wukongDrainEvents() {
     }
     // data carries cr6_gt / cr14_gt at top level (same shape as trace GET).
     _wukongApplyCRUpdate(data);
+    // Refresh the machine-status chip after processing drained events so it
+    // shows HW RUNNING / HW FAULTED without waiting for a fault transition.
+    if (typeof updateFlagsDisplay === 'function') updateFlagsDisplay();
     return true;
 }
 
@@ -15327,6 +15332,17 @@ let _wukongLastFaultData = null;
 // Set to true when the user clicks × on the fault panel; cleared when the
 // fault condition ends (clean packet or board reset).
 let _wukongFaultDismissed = false;
+// Tracks the fault_valid flag of the previous trace event so we can detect
+// false→true transitions and avoid repeated modal popups on a sustained fault.
+let _wukongPrevFaultValid = false;
+// Reflects the current hardware fault state for the machine-status chip.
+// Set true on fault arrival; false when fault clears or the feed goes stale.
+let _wukongHwFaulted = false;
+// Expose live getters to app-memory.js (same page context) for the status chip.
+window._wukongGetHwFaulted   = function() { return _wukongHwFaulted; };
+window._wukongGetHwConnected = function() {
+    return (typeof _wukongIsConnected === 'function') && _wukongIsConnected();
+};
 
 function _wukongShowStaleBanner() {
     if (_wukongStaleBannerDismissed) return;
@@ -15383,6 +15399,11 @@ setInterval(async function _wukongPoll() {
             _dcon.scrollTop = _dcon.scrollHeight;
         }
         _wukongUpdateBtn();
+        // Clear hardware fault state so the status chip reverts to simulator
+        // state and the next reconnect starts with a clean slate.
+        _wukongHwFaulted      = false;
+        _wukongPrevFaultValid = false;
+        if (typeof updateFlagsDisplay === 'function') updateFlagsDisplay();
     }
     // Also poll boot-info to show/hide the stale-bitstream banner.
     try {
@@ -15397,11 +15418,57 @@ setInterval(async function _wukongPoll() {
     } catch(e) {}
 }, 500);
 
-const _WUKONG_FAULT_NAMES = [
-    'NONE','PERM_R','PERM_W','PERM_E','PERM_L',
-    'NULL_CAP','BOUNDS','SEAL','INVALID_OP',
-    'STACK_UNDERFLOW','STACK_OVERFLOW'
-];
+// Fault-code table — must stay in sync with hardware.hw_types.FaultType and
+// hardware/wukong_bridge.py _FAULT_NAMES (which is the canonical JS-side source).
+// Codes 0x00–0x19 are all defined; unknown codes fall back to 'FAULT_<n>'.
+const _WUKONG_FAULT_NAMES = {
+    0x00: 'NONE',           0x01: 'PERM_R',        0x02: 'PERM_W',
+    0x03: 'PERM_X',         0x04: 'PERM_L',        0x05: 'PERM_S',
+    0x06: 'PERM_E',         0x07: 'NULL_CAP',      0x08: 'BOUNDS',
+    0x09: 'VERSION',        0x0A: 'SEAL',           0x0B: 'INVALID_OP',
+    0x0C: 'TPERM_RSV',      0x0D: 'DOMAIN_PURITY', 0x0E: 'BIND',
+    0x0F: 'F_BIT',          0x10: 'STACK_OVERFLOW', 0x11: 'ABSENT_OUTFORM',
+    0x12: 'STACK_CORRUPT',  0x13: 'STACK_UNDERFLOW', 0x14: 'IRQ_NULL_BASE',
+    0x15: 'OUTFORM_CRC',    0x16: 'OUTFORM_ALLOC', 0x17: 'OUTFORM_MINT',
+    0x18: 'OUTFORM_HDR',    0x19: 'OUTFORM_TIMEOUT',
+};
+
+// Build a fault-object compatible with showFaultModal() from a raw hardware
+// trace event.  Fields the hardware cannot supply are set to explicit sentinels
+// ("n/a from hardware") so the modal can display them gracefully rather than
+// showing blank or wrong values.
+function _wukongBuildHwFaultObj(data) {
+    const faultCode = data.fault_code || 0;
+    const faultName = _WUKONG_FAULT_NAMES[faultCode] || ('FAULT_' + faultCode);
+    const niaInt    = (data.nia || 0) >>> 0;
+    const flags     = data.flags || 0;
+    const evType    = data.ev_type || 0;
+    // Snapshot current CR values from the live simulator so the modal can show
+    // whatever CR state the hardware last reported via CALL_CR6 / CALL_CR14.
+    const crSnap = [];
+    if (typeof sim !== 'undefined' && sim && sim.cr) {
+        for (let i = 0; i < 16; i++) {
+            crSnap[i] = sim.cr[i] ? Object.assign({}, sim.cr[i]) : null;
+        }
+    }
+    return {
+        type:             faultName,
+        message:          faultName + ' at NIA 0x' +
+                          niaInt.toString(16).toUpperCase().padStart(8, '0') +
+                          (data.nia_label ? ' (' + data.nia_label + ')' : ''),
+        physicalPC:       niaInt,
+        pc:               niaInt,
+        faultStep:        null,
+        instrHistory:     [],      // not available from hardware
+        crSnapshot:       crSnap,
+        drSnapshot:       [],      // not available from hardware
+        flagsSnapshot:    { N: !!(flags & 8), Z: !!(flags & 4), C: !!(flags & 2), V: !!(flags & 1) },
+        faultLabel:       data.nia_label || null,
+        faultCode:        faultCode,
+        faultingMnemonic: _WUKONG_EV_INSTR_NAME[evType] || null,
+        _origin:          'hardware',
+    };
+}
 
 function _wukongFlagsStr(flags) {
     let s = '';
@@ -15462,6 +15529,30 @@ function _wukongAppendTrace(data) {
     // also trigger a stale-banner or NIA-rebuild when the panel is open.
     _wukongSyncFaultDisasmPanel(!!data.fault_valid, niaInt);
 
+    // ── Hardware fault transition detection ───────────────────────────────────
+    // Open the rich fault modal only on a false→true transition (new fault).
+    // Sustained faults (fault_valid still set on the next polled packet) must
+    // NOT re-open the modal — the user may have dismissed it.
+    // Fault clear (true→false transition) hides the inline panel and resets
+    // the dismissed flag so the next fault can pop the modal again.
+    if (data.fault_valid && !_wukongPrevFaultValid) {
+        _wukongHwFaulted = true;
+        const _hwFaultObj = _wukongBuildHwFaultObj(data);
+        if (typeof showFaultModal === 'function') {
+            try { showFaultModal(_hwFaultObj); } catch(e) {
+                setTimeout(function() {
+                    try { showFaultModal(_hwFaultObj); } catch(e2) {}
+                }, 0);
+            }
+        }
+        if (typeof updateFlagsDisplay === 'function') updateFlagsDisplay();
+    } else if (!data.fault_valid && _wukongPrevFaultValid) {
+        _wukongHideFaultPanel();
+        _wukongHwFaulted = false;
+        if (typeof updateFlagsDisplay === 'function') updateFlagsDisplay();
+    }
+    _wukongPrevFaultValid = !!data.fault_valid;
+
     // ── ev_type 0x08 CALL_PUSH / 0x09 RETURN_POP — depth only ───────────────
     // Helper: append a child node to a container, pruning old entries if needed,
     // then scroll to bottom.  Works for both editorConsole and hwLogBody.
@@ -15481,11 +15572,17 @@ function _wukongAppendTrace(data) {
             _wukongCallDepth++;
         }
         _wukongUpdateCallDepthBadge();
+        // Fault on CALL_PUSH: show inline panel (modal already opened by
+        // the transition block above for the false→true case).
+        if (data.fault_valid) _wukongShowFaultPanel(data);
         const line = document.createElement('div');
-        line.className = 'wukong-trace-line wukong-trace-call';
+        line.className = 'wukong-trace-line wukong-trace-call' +
+                         (data.fault_valid ? ' wukong-trace-fault' : '');
         line.appendChild(document.createTextNode(
             '\nHW: ' + _wukongTraceLocationText(data) +
-            '  CALL push (depth ' + _wukongCallDepth + ')'));
+            '  CALL push (depth ' + _wukongCallDepth + ')' +
+            (data.fault_valid ? '  \u26A1 ' +
+                (_WUKONG_FAULT_NAMES[data.fault_code] || 'FAULT_' + data.fault_code) : '')));
         _appendToLog(hwLogBody, line, _WUKONG_HW_LOG_MAX);
         _appendToLog(con, line, 0);
         return;
@@ -15498,11 +15595,16 @@ function _wukongAppendTrace(data) {
             if (_wukongCallDepth > 0) _wukongCallDepth--;
         }
         _wukongUpdateCallDepthBadge();
+        // Fault on RETURN_POP: show inline panel (modal already opened above).
+        if (data.fault_valid) _wukongShowFaultPanel(data);
         const line = document.createElement('div');
-        line.className = 'wukong-trace-line wukong-trace-return';
+        line.className = 'wukong-trace-line wukong-trace-return' +
+                         (data.fault_valid ? ' wukong-trace-fault' : '');
         line.appendChild(document.createTextNode(
             '\nHW: ' + _wukongTraceLocationText(data) +
-            '  RETURN (depth ' + _wukongCallDepth + ')'));
+            '  RETURN (depth ' + _wukongCallDepth + ')' +
+            (data.fault_valid ? '  \u26A1 ' +
+                (_WUKONG_FAULT_NAMES[data.fault_code] || 'FAULT_' + data.fault_code) : '')));
         _appendToLog(hwLogBody, line, _WUKONG_HW_LOG_MAX);
         _appendToLog(con, line, 0);
         return;

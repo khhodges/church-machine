@@ -1657,13 +1657,24 @@ function updateFlagsDisplay() {
     _initFlagsHover();
     const f = sim.flags;
     const bootLabel   = !sim.bootComplete ? `BOOT ${sim.bootStep}/4` : '';
-    const statusLabel = sim.halted ? 'HALTED' : (sim.bootComplete ? 'READY' : 'RESET');
+    // ── Hardware-driven status overrides simulator state while board is live ───
+    // _wukongGetHwConnected / _wukongGetHwFaulted are getter functions exposed
+    // by app-run.js via window so they always read the latest live values.
+    const _hwConnected = (typeof window._wukongGetHwConnected === 'function')
+                       && window._wukongGetHwConnected();
+    const _hwFaulted   = _hwConnected
+                       && (typeof window._wukongGetHwFaulted === 'function')
+                       && window._wukongGetHwFaulted();
+    const statusLabel = _hwConnected
+        ? (_hwFaulted ? 'HW FAULTED' : 'HW RUNNING')
+        : (sim.halted ? 'HALTED' : (sim.bootComplete ? 'READY' : 'RESET'));
+    const statusHalted = _hwFaulted || sim.halted;
     const cap = sim.lastCapability;
 
     // ── Compact status chip in the flags-led-row ──────────────────────────
     container.innerHTML =
         (bootLabel ? `<span class="flag-info flag-boot">${bootLabel}</span>` : '') +
-        `<span class="flag-info flag-status${sim.halted ? ' flag-status-halted' : ''}">${statusLabel}</span>`;
+        `<span class="flag-info flag-status${statusHalted ? ' flag-status-halted' : ''}">${statusLabel}</span>`;
 
     // ── Flags popover (anchored below step button, shown on hover) ─────────
     const flagsPop = document.getElementById('flagsPopover');
