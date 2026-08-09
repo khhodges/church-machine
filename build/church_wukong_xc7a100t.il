@@ -1439,7 +1439,7 @@ module \top
     parameter \WIDTH 8
     connect \S $18 [0]
     connect \A $19 [7:0]
-    connect \B 8'00000111
+    connect \B 8'00001000
     connect \Y $20
   end
 
