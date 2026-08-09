@@ -56,6 +56,12 @@ try:
 except ImportError:
     requests = None  # IDE notifications silently skipped; bridge main() will exit if None
 
+try:
+    from wukong_trace_symbols import trace_metadata as _trace_metadata
+except ImportError:
+    # The bridge is also distributed as a standalone single-file download.
+    _trace_metadata = None
+
 
 TRACE_MAGIC    = 0xAA
 TRACE_LEN      = 12   # 12-byte per-event packet: magic(1)+NIA(4)+ev_type(1)+payload(4)+flags(1)+fault(1)
@@ -211,6 +217,97 @@ def _flags_str(flags_byte):
     """Return a human-readable flag string like 'NZ' from the flags byte."""
     names = ['V', 'C', 'Z', 'N']  # bits 0..3
     return ''.join(n for i, n in enumerate(names) if flags_byte & (1 << i)) or '-'
+
+
+_STANDALONE_WUKONG_WORDS = (
+    0x071B0005, 0x07230006, 0xAF080001, 0x8F098000,
+    0xAF280043, 0x8F2A0000, 0x87320001, 0xB73B0001,
+    0xB8007FFE, 0xAF28004D, 0x8F2A0000, 0x87320001,
+    0xB73B0001, 0xB8007FFE, 0xAF28003A, 0x8F2A0000,
+    0x87320001, 0xB73B0001, 0xB8007FFE, 0xAF280057,
+    0x8F2A0000, 0x87320001, 0xB73B0001, 0xB8007FFE,
+    0xAF280055, 0x8F2A0000, 0x87320001, 0xB73B0001,
+    0xB8007FFE, 0xAF28004B, 0x8F2A0000, 0x87320001,
+    0xB73B0001, 0xB8007FFE, 0xAF28004F, 0x8F2A0000,
+    0x87320001, 0xB73B0001, 0xB8007FFE, 0xAF28004E,
+    0x8F2A0000, 0x87320001, 0xB73B0001, 0xB8007FFE,
+    0xAF280047, 0x8F2A0000, 0x87320001, 0xB73B0001,
+    0xB8007FFE, 0xAF28000D, 0x8F2A0000, 0x87320001,
+    0xB73B0001, 0xB8007FFE, 0xAF28000A, 0x8F2A0000,
+    0x87320001, 0xB73B0001, 0xB8007FFE, 0xAF18017C,
+    0xAF103FFF, 0xB7110001, 0xB8807FFF, 0xB7198001,
+    0xB8807FFC, 0x8F018000, 0xAF18017C, 0xAF103FFF,
+    0xB7110001, 0xB8807FFF, 0xB7198001, 0xB8807FFC,
+    0xBF007FBB,
+)
+_STANDALONE_BOOT_WORDS = (0x077F8000, 0x27678001, 0x17000000)
+_STANDALONE_CONDS = ('EQ', 'NE', 'CS', 'CC', 'MI', 'PL', 'VS', 'VC',
+                     'HI', 'LS', 'GE', 'LT', 'GT', 'LE', '', 'NV')
+_STANDALONE_OPS = {
+    0: 'LOAD', 1: 'SAVE', 2: 'CALL', 3: 'RETURN', 4: 'CHANGE',
+    5: 'SWITCH', 6: 'TPERM', 7: 'LAMBDA', 8: 'ELOADCALL',
+    9: 'XLOADLAMBDA', 16: 'DREAD', 17: 'DWRITE', 18: 'BFEXT',
+    19: 'BFINS', 20: 'MCMP', 21: 'IADD', 22: 'ISUB',
+    23: 'BRANCH', 24: 'SHL', 25: 'SHR',
+}
+
+
+def _standalone_disassemble(word):
+    word &= 0xFFFFFFFF
+    opcode = (word >> 27) & 0x1F
+    cond = (word >> 23) & 0xF
+    dst = (word >> 19) & 0xF
+    src = (word >> 15) & 0xF
+    imm = word & 0x7FFF
+    op = _STANDALONE_OPS.get(opcode)
+    if op is None:
+        return f'??? 0x{word:08x}'
+    op += '' if cond == 14 else _STANDALONE_CONDS[cond]
+    if opcode in (0, 1, 2, 4, 5, 8, 9):
+        return f'{op} CR{dst}, CR{src}[0x{imm:04X}]'
+    if opcode in (16, 17):
+        if imm & 0x4000:
+            return f'{op} DR{dst}, CR{src}, #{imm & 0x3FFF}'
+        return f'{op} DR{dst}, CR{src}, #{(imm >> 4) & 0x3FF}, DR{imm & 0xF}'
+    if opcode in (18, 19):
+        return f'{op} DR{dst}, DR{src}, #{(imm >> 5) & 0x1F}, #{imm & 0x1F}'
+    if opcode == 20:
+        return f'{op} DR{dst}, DR{src}'
+    if opcode in (21, 22):
+        operand = f'#{imm & 0x3FFF}' if imm & 0x4000 else f'DR{imm & 0xF}'
+        return f'{op} DR{dst}, DR{src}, {operand}'
+    if opcode == 23:
+        offset = imm | 0xFFFF8000 if imm & 0x4000 else imm
+        if offset & 0x80000000:
+            offset -= 0x100000000
+        return f'{op} {offset:+d}'
+    return f'{op} DR{dst}, DR{src}, {imm & 0x1F}'
+
+
+def _trace_location(nia):
+    """Resolve the reference-bitstream pet-name/offset and disassembly."""
+    if _trace_metadata is not None:
+        return _trace_metadata(nia)
+    nia = int(nia) & 0xFFFFFFFF
+    if nia in (0, 4, 8):
+        offset = nia // 4
+        return {
+            'pet_name': 'Boot',
+            'offset': offset,
+            'nia_label': f'Boot.{offset}',
+            'disasm': _standalone_disassemble(_STANDALONE_BOOT_WORDS[offset]),
+            'source_map': 'reference-bitstream',
+        }
+    if 0x700 <= nia < 0x700 + len(_STANDALONE_WUKONG_WORDS) * 4 and nia % 4 == 0:
+        offset = (nia - 0x700) // 4
+        return {
+            'pet_name': 'WukongCallHome',
+            'offset': offset,
+            'nia_label': f'WukongCallHome.{offset}',
+            'disasm': _standalone_disassemble(_STANDALONE_WUKONG_WORDS[offset]),
+            'source_map': 'reference-bitstream',
+        }
+    return None
 
 
 # Fault-code table — must match hardware.hw_types.FaultType exactly.
@@ -560,6 +657,9 @@ def main():
                     # packets appear in the IDE event log in arrival order.
                     _console_flush(ide_base, verify_tls)
                     decoded['ts'] = time.time()
+                    location = _trace_location(decoded['nia'])
+                    if location:
+                        decoded.update(location)
 
                     try:
                         requests.post(
@@ -581,7 +681,14 @@ def main():
                     else:
                         fault_str = ''
                     bp_str = '  [BP HIT]' if decoded['bp_hit'] else ''
-                    print(f'[{ts_str}] HW: NIA=0x{nia:08X}  {ev_name}{gt_str}'
+                    location = _trace_location(nia)
+                    if location:
+                        where = f"{location['nia_label']} (NIA=0x{nia:08X})"
+                        instruction = f"  {location['disasm']}"
+                    else:
+                        where = f"NIA=0x{nia:08X}"
+                        instruction = "  <instruction unavailable>"
+                    print(f'[{ts_str}] HW: {where}{instruction}  {ev_name}{gt_str}'
                           f'  flags={flag_str}{fault_str}{bp_str}')
                     i += TRACE_LEN
 

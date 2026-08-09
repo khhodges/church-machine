@@ -15306,6 +15306,20 @@ const _WUKONG_EV_INSTR_NAME = {
     0x06: 'CALL',   0x07: 'CALL',   0x08: 'CALL',
     0x09: 'RETURN', 0x0A: 'RETURN', 0x0B: 'RETURN'
 };
+
+function _wukongTraceLocationText(data) {
+    const niaInt = (data && data.nia !== undefined)
+        ? (data.nia >>> 0) : 0;
+    const nia = '0x' + niaInt.toString(16).padStart(8, '0').toUpperCase();
+    const label = data && data.nia_label;
+    const disasm = data && data.disasm;
+    if (label) {
+        return label + ' (NIA=' + nia + ') ' +
+            (disasm || '<instruction unavailable>');
+    }
+    return 'NIA=' + nia + ' <instruction unavailable>';
+}
+
 let _wukongStaleBannerDismissed = false;
 // Last hardware fault data (null when no active fault).
 // Populated by _wukongShowFaultPanel; cleared by _wukongHideFaultPanel.
@@ -15470,7 +15484,8 @@ function _wukongAppendTrace(data) {
         const line = document.createElement('div');
         line.className = 'wukong-trace-line wukong-trace-call';
         line.appendChild(document.createTextNode(
-            '\nHW: CALL push (depth ' + _wukongCallDepth + ')'));
+            '\nHW: ' + _wukongTraceLocationText(data) +
+            '  CALL push (depth ' + _wukongCallDepth + ')'));
         _appendToLog(hwLogBody, line, _WUKONG_HW_LOG_MAX);
         _appendToLog(con, line, 0);
         return;
@@ -15486,7 +15501,8 @@ function _wukongAppendTrace(data) {
         const line = document.createElement('div');
         line.className = 'wukong-trace-line wukong-trace-return';
         line.appendChild(document.createTextNode(
-            '\nHW: RETURN (depth ' + _wukongCallDepth + ')'));
+            '\nHW: ' + _wukongTraceLocationText(data) +
+            '  RETURN (depth ' + _wukongCallDepth + ')'));
         _appendToLog(hwLogBody, line, _WUKONG_HW_LOG_MAX);
         _appendToLog(con, line, 0);
         return;
@@ -15510,7 +15526,8 @@ function _wukongAppendTrace(data) {
     const line = document.createElement('div');
     line.className = 'wukong-trace-line' + (data.fault_valid ? ' wukong-trace-fault' : '');
     line.appendChild(document.createTextNode(
-        '\nHW: NIA=' + nia + '  flags=' + flags + '  ' + stateStr));
+        '\nHW: ' + _wukongTraceLocationText(data) +
+        '  flags=' + flags + '  ' + stateStr));
     if (data.bp_hit) {
         const bpBtn = document.createElement('button');
         bpBtn.className = 'wukong-bp-hit-link';

@@ -56,6 +56,10 @@ try:
     import wukong_udp as _wukong_udp
 except ImportError:
     _wukong_udp = None
+try:
+    from hardware.wukong_trace_symbols import trace_metadata as _wukong_trace_metadata
+except ImportError:
+    _wukong_trace_metadata = lambda _nia: None
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -9838,6 +9842,17 @@ def wukong_trace_post():
         'bp_hit':      bool(data.get('bp_hit', False)),
         'ts':          float(data.get('ts', 0.0)),
     }
+    # The packet format intentionally remains backward-compatible.  Prefer
+    # metadata supplied by a newer bridge, but derive it server-side as well
+    # for old bridges that only POST the original packet fields.
+    location = {
+        key: data[key]
+        for key in ('pet_name', 'offset', 'nia_label', 'disasm', 'source_map')
+        if key in data
+    }
+    if not location:
+        location = _wukong_trace_metadata(entry['nia']) or {}
+    entry.update(location)
     with _wukong_trace_lock:
         # Update authoritative call depth BEFORE assigning seq so that
         # entry['call_depth'] reflects the state AFTER this event is applied.

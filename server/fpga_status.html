@@ -78,6 +78,8 @@
     <h2>Board</h2>
     <div class="row"><span class="k">Activity</span><span class="v big" id="boardState"><span class="dot bad"></span>—</span></div>
     <div class="row"><span class="k">Last NIA</span><span class="v" id="lastNia">—</span></div>
+    <div class="row"><span class="k">Last location</span><span class="v" id="lastLocation">—</span></div>
+    <div class="row"><span class="k">Last instruction</span><span class="v" id="lastInstruction">—</span></div>
     <div class="row"><span class="k">Flags (NZCV)</span><span class="v" id="lastFlags">—</span></div>
     <div class="row"><span class="k">Fault</span><span class="v" id="lastFault">—</span></div>
     <div class="row"><span class="k">Call depth</span><span class="v" id="callDepth">—</span></div>
@@ -470,7 +472,12 @@
     }
     var evName = EV_NAMES[e.ev_type] !== undefined ? EV_NAMES[e.ev_type]
                : ('EV_0x' + (e.ev_type || 0).toString(16).toUpperCase());
-    var line = '[' + t + '] #' + e.seq + '  NIA=' + hex(e.nia) + '  ' + evName;
+    var location = e.nia_label
+      ? e.nia_label + ' (NIA=' + hex(e.nia) + ')'
+      : 'NIA=' + hex(e.nia);
+    var line = '[' + t + '] #' + e.seq + '  ' + location;
+    if (e.disasm) line += '  ' + e.disasm;
+    line += '  ' + evName;
     if (e.payload_gt) line += '  GT=' + hex(e.payload_gt);
     line += '  flags=' + flags(e.flags || 0);
     if (e.call_depth !== undefined) line += '  depth=' + e.call_depth;
@@ -505,6 +512,8 @@
       else
         setState('boardState', 'bad', 'no trace yet');
       document.getElementById('lastNia').textContent = lt.nia !== undefined ? hex(lt.nia) : '—';
+      document.getElementById('lastLocation').textContent = lt.nia_label || 'unknown';
+      document.getElementById('lastInstruction').textContent = lt.disasm || 'unavailable';
       document.getElementById('lastFlags').textContent = lt.flags !== undefined ? flags(lt.flags) : '—';
       var fEl = document.getElementById('lastFault');
       if (lt.fault_valid) {
