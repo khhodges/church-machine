@@ -36,6 +36,19 @@ sys.path.insert(0, ROOT)
 
 import server.app as _app_module
 from server.app import app
+from server.boot_image import generate_boot_image, NS_ENTRY_WORDS, create_gt
+
+LUMPS_DIR = os.path.join(ROOT, 'server', 'lumps')
+
+
+def _valid_image(entry_slot=None):
+    """A real, valid boot image — the send-to-hardware residency/caps gate
+    now rejects malformed placeholder blobs, so tests must use the genuine
+    generator output."""
+    cfg = {"step1": {"totalNamespaceWords": 16384,
+                     "namespaceLumpWords": 1024,
+                     "threadLumpWords": 256}}
+    return generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=entry_slot)
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -56,6 +69,9 @@ def _reset_wukong_globals():
         _app_module._wukong_upload_ack = {}
     with _app_module._upload_in_flight_lock:
         _app_module._upload_in_flight = False
+    with _app_module._wukong_hw_entry_lock:
+        _app_module._wukong_hw_entry_slot = None
+        _app_module._wukong_pending_entry_slot = None
     yield
     with _app_module._wukong_command_lock:
         _app_module._wukong_pending_cmd = None
@@ -63,19 +79,23 @@ def _reset_wukong_globals():
         _app_module._wukong_upload_ack = {}
     with _app_module._upload_in_flight_lock:
         _app_module._upload_in_flight = False
+    with _app_module._wukong_hw_entry_lock:
+        _app_module._wukong_hw_entry_slot = None
+        _app_module._wukong_pending_entry_slot = None
 
 
 @pytest.fixture
 def boot_bin_path(tmp_path, monkeypatch):
-    """Temporarily replace server/lumps/boot-image.bin with a tiny test image."""
+    """Temporarily replace server/lumps/boot-image.bin with a valid test image.
+
+    Must be a REAL generated image: send-to-hardware now runs a residency /
+    caps[0] gate (read_boot_entry_info) and rejects malformed blobs with 400.
+    """
     lumps_dir = os.path.join(ROOT, 'server', 'lumps')
     os.makedirs(lumps_dir, exist_ok=True)
     bin_path = os.path.join(lumps_dir, 'boot-image.bin')
 
-    # A minimal well-formed boot image: 16 words (64 bytes), all zeros except
-    # the first word which carries a non-zero format tag.  Exact contents don't
-    # matter here — we just need a readable file with len > 0 and len % 4 == 0.
-    payload = struct.pack('>16I', 0xDEADBEEF, *([0] * 15))
+    payload = _valid_image()
 
     existed_before = os.path.exists(bin_path)
     old_data = open(bin_path, 'rb').read() if existed_before else None
@@ -265,9 +285,12 @@ def test_server_queues_raw_le_file_bytes():
     unchanged.  The bridge is responsible for the LE→BE word swap before UART
     transmission.  This test confirms the server side of that contract."""
     import base64, struct
-    # Construct a LE file with known word values
-    words = [0xDEADBEEF, 0xCAFEBABE, 0x00000001, 0x12345678]
-    le_bytes = struct.pack(f'<{len(words)}I', *words)
+    # A real generated image (LE words on disk) — the upload gate rejects
+    # arbitrary placeholder bytes, so the contract is checked with genuine
+    # generator output.
+    le_bytes = _valid_image()
+    n_all = len(le_bytes) // 4
+    words = list(struct.unpack(f'<{n_all}I', le_bytes))
 
     lumps_dir = os.path.join(ROOT, 'server', 'lumps')
     os.makedirs(lumps_dir, exist_ok=True)
@@ -565,3 +588,153 @@ def test_direct_u_cmd_sets_in_flight_flag(client):
         assert _app_module._upload_in_flight, (
             "_upload_in_flight not set after direct 'u' command — "
             "execution commands would be accepted while bridge is transmitting")
+
+
+# ── Boot-entry gate + hardware entry-slot tracking ────────────────────────────
+
+def _install_boot_bin(payload):
+    """Write payload to server/lumps/boot-image.bin; returns (path, old_data)."""
+    lumps_dir = os.path.join(ROOT, 'server', 'lumps')
+    os.makedirs(lumps_dir, exist_ok=True)
+    bin_path = os.path.join(lumps_dir, 'boot-image.bin')
+    old_data = open(bin_path, 'rb').read() if os.path.exists(bin_path) else None
+    with open(bin_path, 'wb') as fh:
+        fh.write(payload)
+    return bin_path, old_data
+
+
+def _restore_boot_bin(bin_path, old_data):
+    if old_data is not None:
+        with open(bin_path, 'wb') as fh:
+            fh.write(old_data)
+    elif os.path.exists(bin_path):
+        os.remove(bin_path)
+
+
+def test_send_to_hardware_rejects_non_resident_entry(client):
+    """An image whose entry lump body is not resident (entry slot 2 = MMIO
+    UART_DEV, no code) is rejected with 400 before reaching the bridge."""
+    payload = _valid_image(entry_slot=2)   # simulator-legal, hardware-fatal
+    p, old = _install_boot_bin(payload)
+    try:
+        resp = client.post('/api/boot-image/send-to-hardware',
+                           content_type='application/json', data='{}')
+        assert resp.status_code == 400, (
+            f"Expected 400 for non-resident entry image, got {resp.status_code}")
+        body = json.loads(resp.data)
+        assert 'not resident' in body.get('error', '')
+        # Nothing queued, in-flight rolled back, no pending entry slot.
+        with _app_module._wukong_command_lock:
+            assert _app_module._wukong_pending_cmd is None
+        with _app_module._upload_in_flight_lock:
+            assert not _app_module._upload_in_flight
+        with _app_module._wukong_hw_entry_lock:
+            assert _app_module._wukong_pending_entry_slot is None
+    finally:
+        _restore_boot_bin(p, old)
+
+
+def test_send_to_hardware_rejects_mismatched_caps0(client):
+    """An image whose Thread.caps[0] GT points at a different slot than the
+    stored entry slot would silently boot the wrong lump — rejected 400."""
+    payload = bytearray(_valid_image(entry_slot=7))
+    n = len(payload) // 4
+    words = list(struct.unpack(f'<{n}I', payload))
+    thread_loc = words[n - 2 * NS_ENTRY_WORDS]           # NS slot 1 word0
+    caps0_idx = thread_loc + 244
+    wrong_gt = create_gt(0, 6, {"E": 1}, 1)              # slot 6, not 7
+    struct.pack_into('<I', payload, caps0_idx * 4, wrong_gt)
+    p, old = _install_boot_bin(bytes(payload))
+    try:
+        resp = client.post('/api/boot-image/send-to-hardware',
+                           content_type='application/json', data='{}')
+        assert resp.status_code == 400, (
+            f"Expected 400 for mismatched Thread.caps[0], got {resp.status_code}")
+        assert 'Thread.caps[0]' in json.loads(resp.data).get('error', '')
+        with _app_module._upload_in_flight_lock:
+            assert not _app_module._upload_in_flight
+    finally:
+        _restore_boot_bin(p, old)
+
+
+def test_hw_entry_slot_committed_only_after_ok_ack(client):
+    """hw_entry_slot stays at the power-on default (7) until the bridge ACKs
+    the upload ok, then reflects the uploaded image's entry slot."""
+    payload = _valid_image(entry_slot=6)
+    p, old = _install_boot_bin(payload)
+    try:
+        # Before any upload: power-on default.
+        st = json.loads(client.get('/hardware/wukong/status').data)
+        assert st['hw_entry_slot'] == 7
+        assert st['hw_entry_source'] == 'power-on'
+
+        resp = client.post('/api/boot-image/send-to-hardware',
+                           content_type='application/json', data='{}')
+        assert resp.status_code == 200
+        assert json.loads(resp.data).get('entry_slot') == 6
+
+        # Pending slot recorded BEFORE the command became observable.
+        with _app_module._wukong_hw_entry_lock:
+            assert _app_module._wukong_pending_entry_slot == 6
+
+        # Queued but not ACKed: still power-on.
+        st = json.loads(client.get('/hardware/wukong/status').data)
+        assert st['hw_entry_slot'] == 7
+
+        # Bridge ACKs ok → committed.
+        client.post('/hardware/wukong/upload-ack',
+                    content_type='application/json',
+                    data=json.dumps({'ok': True}))
+        st = json.loads(client.get('/hardware/wukong/status').data)
+        assert st['hw_entry_slot'] == 6
+        assert st['hw_entry_source'] == 'upload'
+        with _app_module._wukong_hw_entry_lock:
+            assert _app_module._wukong_pending_entry_slot is None
+    finally:
+        _restore_boot_bin(p, old)
+
+
+def test_hw_entry_slot_not_committed_on_failed_ack(client):
+    """A failed upload ACK must NOT change the reported hardware entry slot."""
+    payload = _valid_image(entry_slot=6)
+    p, old = _install_boot_bin(payload)
+    try:
+        resp = client.post('/api/boot-image/send-to-hardware',
+                           content_type='application/json', data='{}')
+        assert resp.status_code == 200
+
+        client.post('/hardware/wukong/upload-ack',
+                    content_type='application/json',
+                    data=json.dumps({'ok': False, 'error': 'board ACK timeout'}))
+
+        st = json.loads(client.get('/hardware/wukong/status').data)
+        assert st['hw_entry_slot'] == 7, (
+            "failed upload must leave the power-on entry slot in place")
+        assert st['hw_entry_source'] == 'power-on'
+        with _app_module._wukong_hw_entry_lock:
+            assert _app_module._wukong_pending_entry_slot is None, (
+                "pending entry slot must be cleared by any ACK")
+    finally:
+        _restore_boot_bin(p, old)
+
+
+def test_fast_bridge_ack_before_send_returns_still_commits(client):
+    """Ordering regression guard: the pending entry slot is recorded before
+    the 'u' command is observable, so an ACK arriving immediately after the
+    bridge consumes the command commits the correct slot."""
+    payload = _valid_image(entry_slot=6)
+    p, old = _install_boot_bin(payload)
+    try:
+        resp = client.post('/api/boot-image/send-to-hardware',
+                           content_type='application/json', data='{}')
+        assert resp.status_code == 200
+        # Simulate the fast bridge: consume command, ACK immediately.
+        client.get('/hardware/wukong/command')
+        client.post('/hardware/wukong/upload-ack',
+                    content_type='application/json',
+                    data=json.dumps({'ok': True}))
+        st = json.loads(client.get('/hardware/wukong/status').data)
+        assert st['hw_entry_slot'] == 6
+        assert st['hw_entry_source'] == 'upload'
+    finally:
+        _restore_boot_bin(p, old)

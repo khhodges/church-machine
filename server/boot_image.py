@@ -413,6 +413,84 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
             )
 
 
+def read_boot_entry_info(image_bytes):
+    """Parse a generated boot image and report its boot-entry state.
+
+    Returns a dict:
+        entry_slot   — NS slot stored at mem[ns_table_base - 2] (low byte)
+        entry_loc    — word0_location of that slot's NS entry (word index)
+        resident     — True when the entry lump body is resident (valid lump
+                       header with cw > 0 at entry_loc)
+        reason       — human-readable explanation when resident is False
+        thread_caps0 — the Thread.caps[0] word (thread_loc + 244)
+        expected_gt  — the E-GT expected for entry_slot
+        caps0_ok     — thread_caps0 == expected_gt
+
+    Raises ValueError when the image lacks the BOOT_IMAGE_FORMAT_TAG (stale
+    or corrupt image).  Used by the send-to-hardware gate so a boot image
+    whose entry lump is not resident is rejected before it reaches the board.
+    """
+    n_words = len(image_bytes) // 4
+    words = struct.unpack(f"<{n_words}I", image_bytes[: n_words * 4])
+
+    tag_idx = -1
+    scan_limit = min(8192, n_words)
+    for _i in range(1, scan_limit + 1):
+        _pos = n_words - _i
+        if words[_pos] == BOOT_IMAGE_FORMAT_TAG:
+            tag_idx = _pos
+            break
+    if tag_idx < 1:
+        raise ValueError(
+            "read_boot_entry_info: BOOT_IMAGE_FORMAT_TAG not found; "
+            "the boot image is stale or corrupt and must be regenerated"
+        )
+
+    entry_slot = words[tag_idx - 1] & 0xFF
+
+    def _ns_word0(slot):
+        base = n_words - (slot + 1) * NS_ENTRY_WORDS
+        if base < 0 or base >= n_words:
+            return None
+        return words[base]
+
+    entry_loc = _ns_word0(entry_slot)
+
+    resident = False
+    reason = None
+    if entry_loc is None:
+        reason = f"NS slot {entry_slot} entry is outside the image"
+    elif not (0 <= entry_loc < n_words):
+        reason = (f"NS slot {entry_slot} location 0x{entry_loc:08X} is outside "
+                  f"the image (MMIO or unallocated)")
+    else:
+        hdr   = words[entry_loc]
+        magic = (hdr >> 27) & 0x1F
+        cw    = (hdr >> 10) & 0x1FFF
+        if magic != 0x1F:
+            reason = (f"NS slot {entry_slot} location 0x{entry_loc * 4:08X} does "
+                      f"not hold a lump header (word=0x{hdr:08X})")
+        elif cw == 0:
+            reason = (f"NS slot {entry_slot} lump is a CODE_NOT_RESIDENT stub "
+                      f"(cw=0) — body not resident")
+        else:
+            resident = True
+
+    thread_loc   = _ns_word0(1) or 0
+    thread_caps0 = words[thread_loc + 244] if 0 <= thread_loc + 244 < n_words else 0
+    expected_gt  = create_gt(0, entry_slot, {"E": 1}, 1)
+
+    return {
+        "entry_slot":   entry_slot,
+        "entry_loc":    entry_loc,
+        "resident":     resident,
+        "reason":       reason,
+        "thread_caps0": thread_caps0,
+        "expected_gt":  expected_gt,
+        "caps0_ok":     thread_caps0 == expected_gt,
+    }
+
+
 # ----- main generator --------------------------------------------------------
 
 def _ns_n_minus_6(lump_words):
@@ -670,7 +748,8 @@ def _load_boot_resident_entries(manifest_path):
     return out
 
 
-def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
+def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
+                        require_entry_resident=False):
     """Produce the binary boot image bytes for the given config dict.
 
     `cfg` must already be Step-1 valid (target board + step1 fields).
@@ -680,6 +759,13 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     `boot_entry_slot` – NS slot the boot ROM will jump to (default: BOOT_ABSTR_NS_SLOT=6).
     The layout always places the SelfTest lump at BOOT_ABSTR_NS_SLOT; this parameter
     records which slot the hardware / simulator should treat as the boot entry point.
+
+    `require_entry_resident` – when True (hardware-targeted images, e.g. Wukong
+    bridge uploads), the selected boot-entry lump's code body MUST be resident
+    in the image; a lazy stub or missing body raises ValueError instead of
+    producing an image that faults on the board's first fetch.  When False
+    (simulator images), a non-resident entry is permitted because the simulator
+    can lazy-fetch the body at runtime.
     """
     if boot_entry_slot is None:
         boot_entry_slot = BOOT_ABSTR_NS_SLOT
@@ -1122,6 +1208,40 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         n = min(len(body), size_cap, total - phys)
         for i in range(n):
             mem[phys + i] = body[i] & 0xFFFFFFFF
+
+    # ----- Boot-entry residency validation --------------------------------
+    # Hardware-targeted images (require_entry_resident=True) must carry the
+    # selected entry lump's code body: the FPGA has no lazy-fetch path, so a
+    # cw=0 stub (or a missing/MMIO location) would fault on the first fetch
+    # after the boot ROM's CALL CR0.  Fail loudly here instead.
+    if require_entry_resident:
+        _e_slot = boot_entry_slot
+        _e_loc  = locations.get(_e_slot)
+        _e_err  = None
+        if _e_loc is None:
+            _e_err = f"NS slot {_e_slot} has no allocated location in this image"
+        elif _e_slot in _MMIO_SLOT_SPECS:
+            _e_err = f"NS slot {_e_slot} is an MMIO device slot (not executable)"
+        elif not (0 <= _e_loc < total):
+            _e_err = (f"NS slot {_e_slot} location 0x{_e_loc:08X} is outside "
+                      f"the image ({total} words)")
+        else:
+            _e_hdr   = mem[_e_loc]
+            _e_magic = (_e_hdr >> 27) & 0x1F
+            _e_cw    = (_e_hdr >> 10) & 0x1FFF
+            if _e_magic != 0x1F:
+                _e_err = (f"NS slot {_e_slot} location 0x{_e_loc * 4:08X} does not "
+                          f"hold a lump header (word=0x{_e_hdr:08X})")
+            elif _e_cw == 0:
+                _e_err = (f"NS slot {_e_slot} lump at 0x{_e_loc * 4:08X} is a "
+                          f"CODE_NOT_RESIDENT stub (cw=0)")
+        if _e_err:
+            raise ValueError(
+                f"Boot-entry lump body not resident for hardware image: {_e_err}.\n"
+                f"The board cannot lazy-fetch code — save the entry lump as "
+                f"boot-resident (manifest boot_resident=true) or pick a resident "
+                f"entry slot before uploading."
+            )
 
     # ----- Pack ----------------------------------------------------------
     image = struct.pack(f"<{total}I", *mem)

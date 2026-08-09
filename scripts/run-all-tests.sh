@@ -247,6 +247,9 @@ register_suite "boot-image-serve-endpoints" \
 register_suite "boot-layout-regression" \
     'python -m pytest tests/boot/test_boot_layout_no_null_slot2.py -v'
 
+register_suite "boot-entry-hw-image-tests" \
+    'python -m pytest tests/boot/test_boot_entry_hardware_image.py -v'
+
 register_suite "version-telemetry-tests" \
     'python3 -m pytest tests/server/test_version_telemetry.py -v'
 
@@ -323,7 +326,7 @@ register_suite "test-check-ila-probe-names" \
 
 declare -A ALL_GROUPS
 
-ALL_GROUPS["boot"]="boot-image-matches-sim boot-image-loads-and-boots boot-image-upload-endpoint boot-image-serve-endpoints boot-layout-regression"
+ALL_GROUPS["boot"]="boot-image-matches-sim boot-image-loads-and-boots boot-image-upload-endpoint boot-image-serve-endpoints boot-layout-regression boot-entry-hw-image-tests"
 
 ALL_GROUPS["lump"]="lump-consistency lump-binary-tests lump-roundtrip editor-roundtrip-tests lump-gt-display-tests update-lump-tests"
 

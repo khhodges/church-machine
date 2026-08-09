@@ -35,6 +35,7 @@
     "pipeline-health-status-tests",
     "pipeline-health-stages-tests",
     "check-no-ti60-ui",
-    "bitstream-version-labeling-tests"
+    "bitstream-version-labeling-tests",
+    "boot-entry-hw-image-tests"
   ]
 }

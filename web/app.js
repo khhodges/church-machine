@@ -1055,7 +1055,16 @@ function updateNamespaceDisplay() {
     // Use live simulator data when available
     const _sim = (typeof simulator !== 'undefined' && simulator) ? simulator : null;
     const simRunning = _sim && _sim.nsCount > 0;
-    const bootEntry  = simRunning ? (_sim.bootEntrySlot != null ? _sim.bootEntrySlot : 6) : 6;
+    // Boot-entry truthfulness: when a Wukong board is connected via the
+    // bridge, show the HARDWARE's actual entry slot (power-on default is
+    // slot 7 = WukongCallHome, baked into the bitstream DMEM; a boot-image
+    // upload changes it).  Only fall back to the simulator's selection
+    // (slot-6 default) when no board is connected.
+    const _hw = (typeof window !== 'undefined') ? window._wukongHwStatus : null;
+    const hwConnected = !!(_hw && _hw.bridge_connected);
+    const bootEntry = hwConnected
+        ? (_hw.hw_entry_slot != null ? _hw.hw_entry_slot : 7)
+        : (simRunning ? (_sim.bootEntrySlot != null ? _sim.bootEntrySlot : 6) : 6);
 
     const _he = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -1076,6 +1085,11 @@ function updateNamespaceDisplay() {
     html += '<div style="font-size:0.7rem;color:#7a8a9a;padding:5px 10px 4px;border-bottom:1px solid rgba(255,255,255,0.07);">' +
             'NS_ENTRY_LAYOUT: 4 words per entry (128 bits) \u2014 11-slot hardware boot namespace' +
             (simRunning ? ' \u2014 <span style="color:#4ec9b0;">live</span>' : ' \u2014 <span style="color:#666;">static (boot to see live data)</span>') +
+            (hwConnected
+                ? ' \u2014 <span style="color:#fbbf24;">\u26a1 hardware boot entry: slot ' + bootEntry +
+                  (_hw.hw_entry_source === 'upload' ? ' (from uploaded boot image)' : ' (power-on default)') +
+                  '</span>'
+                : '') +
             '</div>';
 
     html += '<table style="width:100%;border-collapse:collapse;font-size:0.78rem;">';
@@ -16923,8 +16937,30 @@ document.addEventListener('DOMContentLoaded', () => {
     loadLandingContent();
     checkRv32TunnelNotifications();
     setInterval(checkRv32TunnelNotifications, 2000);
+    _pollWukongHwStatus();
+    setInterval(_pollWukongHwStatus, 5000);
     loadHwInstrReference();
 });
+
+// ── Wukong hardware status poll ─────────────────────────────────────────────
+// Keeps window._wukongHwStatus fresh so updateNamespaceDisplay() can show the
+// hardware's ACTUAL boot-entry slot (power-on default slot 7, or the slot from
+// the last ACKed boot-image upload) whenever a board is bridge-connected.
+async function _pollWukongHwStatus() {
+    try {
+        const r = await fetch('/hardware/wukong/status');
+        if (!r.ok) return;
+        const data = await r.json();
+        const prev = window._wukongHwStatus;
+        window._wukongHwStatus = data;
+        const changed = !prev ||
+            prev.bridge_connected !== data.bridge_connected ||
+            prev.hw_entry_slot !== data.hw_entry_slot;
+        if (changed && typeof updateNamespaceDisplay === 'function') {
+            updateNamespaceDisplay();
+        }
+    } catch (e) { /* server offline — keep last known status */ }
+}
 
 async function loadHwInstrReference() {
     const el = document.getElementById('hwInstrContent');

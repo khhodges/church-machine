@@ -1351,8 +1351,13 @@ def boot_image_generate():
             entry_slot = max(0, min(255, int(entry_slot)))
         except (TypeError, ValueError):
             entry_slot = None
+    # Hardware-targeted generation (Wukong bridge upload): the entry lump's
+    # code body must be resident — the FPGA has no lazy-fetch path.
+    for_hardware = bool(body.get("forHardware", False))
     try:
-        blob = _boot_image_gen.generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=entry_slot)
+        blob = _boot_image_gen.generate_boot_image(
+            cfg, LUMPS_DIR, boot_entry_slot=entry_slot,
+            require_entry_resident=for_hardware)
     except Exception as e:
         return jsonify({"ok": False, "error": f"Generator failed: {e}"}), 500
     try:
@@ -10235,6 +10240,14 @@ def wukong_status_get():
         'cr6_gt':             cr_gts.get(6),
         'cr14_gt':            cr_gts.get(14),
         'boot_info':          boot_info,
+        # What the hardware will actually run at boot: power-on bitstream
+        # default (slot 7, WukongCallHome) until a boot-image upload is
+        # ACKed, then the uploaded image's entry slot.
+        'hw_entry_slot':      (_wukong_hw_entry_slot
+                               if _wukong_hw_entry_slot is not None
+                               else WUKONG_POWERON_ENTRY_SLOT),
+        'hw_entry_source':    ('upload' if _wukong_hw_entry_slot is not None
+                               else 'power-on'),
         'upload_in_flight':   upl,
         'pending_command':    pending,
         'command_delivery':   delivery,
@@ -10286,6 +10299,17 @@ _wukong_upload_ack        = {}   # {} = no upload attempted yet; {ok, error?}
 # silently corrupting the boot image.  Cleared when the bridge POSTs upload-ack.
 _upload_in_flight         = False
 _upload_in_flight_lock    = _wk_threading.Lock()
+
+# ── Hardware boot-entry tracking ─────────────────────────────────────────────
+# The Wukong bitstream's power-on DMEM boots WukongCallHome (NS slot 7).
+# After a successful boot-image upload the board runs whatever entry slot
+# that image carries.  The IDE dashboard reads hw_entry_slot from
+# GET /hardware/wukong/status so it shows what the hardware will ACTUALLY
+# run, distinct from the simulator's slot-6 default.
+WUKONG_POWERON_ENTRY_SLOT   = 7
+_wukong_hw_entry_lock       = _wk_threading.Lock()
+_wukong_hw_entry_slot       = None   # None = power-on default (no upload yet)
+_wukong_pending_entry_slot  = None   # entry slot of the upload in flight
 
 
 @app.route('/hardware/wukong/command-ack', methods=['POST'])
@@ -10340,6 +10364,13 @@ def wukong_upload_ack_post():
     }
     with _wukong_upload_ack_lock:
         _wukong_upload_ack = entry
+    # A confirmed upload changes what the board will run on its next boot:
+    # commit the uploaded image's entry slot as the hardware boot entry.
+    global _wukong_hw_entry_slot, _wukong_pending_entry_slot
+    with _wukong_hw_entry_lock:
+        if entry['ok'] and _wukong_pending_entry_slot is not None:
+            _wukong_hw_entry_slot = _wukong_pending_entry_slot
+        _wukong_pending_entry_slot = None
     # Clear the in-flight flag so execution commands are accepted again.
     with _upload_in_flight_lock:
         _upload_in_flight = False
@@ -10403,7 +10434,37 @@ def boot_image_send_to_hardware():
         except OSError as _exc:
             return jsonify({'error': f'could not read boot-image.bin: {_exc}'}), 500
 
+        # Residency gate: reject an image whose entry lump body is not
+        # resident BEFORE it reaches the board — the FPGA cannot lazy-fetch
+        # code and would fault on the first fetch after CALL CR0.
+        try:
+            _entry_info = _boot_image_gen.read_boot_entry_info(_raw)
+        except ValueError as _exc:
+            return jsonify({'error': f'boot image rejected: {_exc}'}), 400
+        if not _entry_info['resident']:
+            return jsonify({'error':
+                            'boot image rejected — entry lump body not resident: '
+                            + (_entry_info['reason'] or 'unknown')
+                            + ' (regenerate with a boot-resident entry lump)'}), 400
+        if not _entry_info['caps0_ok']:
+            return jsonify({'error':
+                            'boot image rejected — Thread.caps[0] GT '
+                            f"(0x{_entry_info['thread_caps0']:08X}) does not match "
+                            f"the stored entry slot {_entry_info['entry_slot']} "
+                            f"(expected 0x{_entry_info['expected_gt']:08X}); the "
+                            'board would boot a different slot than reported. '
+                            'Regenerate the boot image.'}), 400
+
         _encoded = _b64.b64encode(_raw).decode('ascii')
+
+        # Record which entry slot this upload carries BEFORE the command
+        # becomes observable to the bridge: a fast bridge could otherwise
+        # consume the command and POST the ACK before the pending slot is
+        # set, leaving the ACK unable to commit it (and the value stale).
+        # Rolled back in the finally block on any enqueue failure.
+        global _wukong_pending_entry_slot
+        with _wukong_hw_entry_lock:
+            _wukong_pending_entry_slot = _entry_info['entry_slot']
 
         # Clear any stale ACK from a previous upload BEFORE making the new
         # upload command observable to the bridge.  Clearing after would create
@@ -10429,9 +10490,12 @@ def boot_image_send_to_hardware():
             }
 
         _rollback = False   # committed — in-flight flag stays set
-        return jsonify({'queued': True, 'size': len(_raw)})
+        return jsonify({'queued': True, 'size': len(_raw),
+                        'entry_slot': _entry_info['entry_slot']})
     finally:
         if _rollback:
+            with _wukong_hw_entry_lock:
+                _wukong_pending_entry_slot = None
             with _upload_in_flight_lock:
                 _upload_in_flight = False
 

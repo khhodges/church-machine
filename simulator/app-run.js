@@ -15720,12 +15720,18 @@ async function _wukongLoadToHardware() {
     }
 
     try {
-        // Step 1: generate boot image.
-        _loadLog('Generating boot image\u2026');
+        // Step 1: generate a hardware-targeted boot image carrying the IDE's
+        // selected boot-entry slot.  forHardware:true makes the generator
+        // fail loudly if the entry lump's body is not resident (the board
+        // cannot lazy-fetch code).
+        let entrySel = (typeof sim !== 'undefined' && sim && sim.bootEntrySlot != null)
+            ? sim.bootEntrySlot
+            : ((typeof bootEntrySlot !== 'undefined' && bootEntrySlot != null) ? bootEntrySlot : 6);
+        _loadLog('Generating boot image (\u26A1 entry slot ' + entrySel + ')\u2026');
         const genResp = await fetch('/api/boot-image/generate', {
             method : 'POST',
             headers: {'Content-Type': 'application/json'},
-            body   : JSON.stringify({})
+            body   : JSON.stringify({entrySlot: entrySel, forHardware: true})
         });
         if (!genResp.ok) {
             const err = await genResp.json().catch(function() { return {}; });
@@ -15786,7 +15792,8 @@ async function _wukongLoadToHardware() {
             return;
         }
 
-        _loadLog('Upload complete \u2014 starting board\u2026');
+        _loadLog('Upload complete \u2014 hardware boot entry is now slot ' +
+                 entrySel + ' \u2014 starting board\u2026');
 
         // Step 4: send run command so the board starts executing the new image.
         _wukongHWRunning = true;
