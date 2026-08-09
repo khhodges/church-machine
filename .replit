@@ -720,3 +720,14 @@ BUILD_SIGNING_KEY = "2026411604PMkjhh0590"
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 300000
+
+[[workflows.workflow]]
+name = "wukong-command-delivery-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python -m pytest tests/server/test_wukong_command_delivery.py tests/hardware/test_wukong_bridge_command_ack.py -v"
+
+[workflows.workflow.metadata]
+outputType = "console"

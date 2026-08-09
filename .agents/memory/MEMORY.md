@@ -93,3 +93,4 @@
 - [Wukong IRQ arm gate](wukong-irq-arm-gate.md) — irq_armed_reg+first_call_done_reg cleared on FAULT_RST; dispatch disabled until first CALL→method→RETURN completes
 - [Wukong boot CALL direct-GT resolution](wukong-boot-call-resolution.md) — decoder call_mask=0 always; boot window uses BOOT_RESTORE_MASK (CR0+CR12); CALL bypasses c-list via mload_direct+boot_window_lat
 - [UART magic-byte frame resync](uart-frame-resync.md) — 0xAA-framed streams slip on mid-stream attach/dropped bytes; validate candidate frames (aligned NIA, known ev, sane flags) and advance 1 byte on failure
+- [Single-slot command ack correlation](single-slot-cmd-ack-correlation.md) — correlate queue/consume/ack/confirm stages by monotonic id, never by command letter; no time-window heuristics

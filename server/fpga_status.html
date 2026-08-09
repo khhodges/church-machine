@@ -80,6 +80,7 @@
     <div class="row"><span class="k">IDE version</span><span class="v" id="ideVersion">—</span></div>
     <div class="row"><span class="k">Upload in flight</span><span class="v" id="uploadState">no</span></div>
     <div class="row"><span class="k">Pending command</span><span class="v" id="pendingCmd">none</span></div>
+    <div class="row"><span class="k">Last cmd delivery</span><span class="v" id="cmdDelivery">—</span></div>
   </div>
   <div class="card">
     <h2>Server</h2>
@@ -171,7 +172,7 @@
   // other in the server's one-slot pending-command queue, and prevents a
   // command racing an upload for that slot.
   var ctlBusy = false;
-  var CTL_IDS = ['btnStep', 'btnRun', 'btnHalt', 'btnBp', 'btnUpload'];
+  var CTL_IDS = ['btnStep', 'btnRun', 'btnHalt', 'btnBp', 'btnUpload', 'btnReboot'];
   function setCtlBusy(b) {
     ctlBusy = b;
     CTL_IDS.forEach(function (id) { document.getElementById(id).disabled = b; });
@@ -209,7 +210,100 @@
   document.getElementById('btnStep').onclick   = function () { sendCmd({ cmd: 's' }, 'STEP'); };
   document.getElementById('btnRun').onclick    = function () { sendCmd({ cmd: 'r' }, 'RUN'); };
   document.getElementById('btnHalt').onclick   = function () { sendCmd({ cmd: 'h' }, 'HALT'); };
-  document.getElementById('btnReboot').onclick = function () { sendCmd({ cmd: 'f' }, 'FORCE SENTINEL'); };
+  // ── Reboot ('f') delivery watcher ─────────────────────────────────────
+  // After queueing 'f', poll /status every 500 ms and report each stage:
+  // queued → consumed by bridge → written to UART → boot sentinel seen.
+  var rebootWatch = null;   // {t0, timer, phase, warned}
+  function stopRebootWatch() {
+    if (rebootWatch && rebootWatch.timer) clearInterval(rebootWatch.timer);
+    rebootWatch = null;
+  }
+  function rebootTick() {
+    fetch('/hardware/wukong/status').then(function (r) { return r.json(); }).then(function (s) {
+      if (!rebootWatch) return;
+      var w = rebootWatch;
+      var elapsed = (Date.now() - w.t0) / 1000;
+      var d = s.command_delivery;
+      var mine = d && d.id === w.id;
+
+      if (w.phase === 'delivered') {
+        // Waiting for the sentinel — the true end-to-end proof of reboot.
+        // Only a sentinel received AFTER our command's successful serial
+        // write counts; a pre-existing sentinel can never falsely confirm.
+        var bi = s.boot_info || {};
+        if (bi.received_ts && w.writeTs && bi.received_ts > w.writeTs) {
+          note('REBOOT confirmed — boot sentinel seen' +
+               (bi.build_version != null ? ' (board build v' + bi.build_version + ')' : ''));
+          stopRebootWatch();
+        } else if (elapsed > 15) {
+          note('REBOOT: written to UART but no boot sentinel seen after 15s — check board power/UART wiring');
+          stopRebootWatch();
+        }
+        return;
+      }
+
+      if (mine && d.write_ts) {
+        if (d.write_ok) {
+          note('REBOOT delivered to board (serial write OK) — waiting for boot sentinel…');
+          w.phase = 'delivered';
+          w.writeTs = d.write_ts;
+        } else {
+          note('REBOOT FAILED: bridge consumed the command but the serial write failed — ' +
+               (d.write_error || 'unknown error'));
+          stopRebootWatch();
+        }
+        return;
+      }
+      if (mine && d.consumed_ts) {
+        if (w.phase !== 'consumed') {
+          note('REBOOT: bridge consumed the command — waiting for serial-write confirmation…');
+          w.phase = 'consumed';
+        }
+        if (elapsed > 8) {
+          note('REBOOT: no serial-write confirmation after 8s — bridge may be running an old version (git pull + make on the Chromebook)');
+          stopRebootWatch();
+        }
+        return;
+      }
+      // Still queued (or delivery record gone).
+      if (elapsed > 3 && !w.warned) {
+        w.warned = true;
+        if (!s.bridge_connected)
+          note("REBOOT: no bridge polling — command still queued on the server (start the bridge on the Chromebook)");
+        else
+          note('REBOOT: not consumed after 3s despite a polling bridge — still waiting…');
+      }
+      if (elapsed > 30) {
+        note('REBOOT: gave up waiting after 30s — command ' +
+             (s.pending_command && s.pending_command.cmd === 'f' ? 'still queued' : 'no longer pending'));
+        stopRebootWatch();
+      }
+    }).catch(function () {});
+  }
+  document.getElementById('btnReboot').onclick = function () {
+    if (ctlBusy) return;
+    stopRebootWatch();
+    setCtlBusy(true);
+    fetch('/hardware/wukong/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cmd: 'f' })
+    }).then(function (r) {
+      return r.text().then(function (t) {
+        var d = null;
+        try { d = JSON.parse(t); } catch (e) {}
+        if (r.ok && d && d.ok) {
+          note("REBOOT ('f') queued — watching delivery…" +
+               (d.overwrote ? "  (overwrote pending '" + d.overwrote + "' command)" : ''));
+          rebootWatch = { t0: Date.now(), id: d.id, writeTs: null,
+                          timer: setInterval(rebootTick, 500), phase: 'queued', warned: false };
+        } else {
+          note('REBOOT FAILED: ' + describeFailure(r.status, d, t));
+        }
+      });
+    }).catch(function (e) { note('REBOOT FAILED: ' + e); })
+      .finally(function () { setCtlBusy(false); });
+  };
   document.getElementById('btnBp').onclick = function () {
     var raw = document.getElementById('bpNia').value.trim();
     if (!raw) { note('Set BP: enter an NIA first (hex, e.g. 0x200)'); return; }
@@ -299,6 +393,19 @@
       document.getElementById('uploadState').textContent = s.upload_in_flight ? 'YES' : 'no';
       document.getElementById('pendingCmd').textContent =
         s.pending_command ? JSON.stringify(s.pending_command) : 'none';
+      var cd = s.command_delivery, cdEl = document.getElementById('cmdDelivery');
+      if (!cd) { cdEl.textContent = '—'; cdEl.className = 'v'; }
+      else if (cd.write_ts) {
+        cdEl.textContent = "'" + cd.cmd + "' " +
+          (cd.write_ok ? 'written to UART' : 'WRITE FAILED: ' + (cd.write_error || '?'));
+        cdEl.className = cd.write_ok ? 'v good' : 'v fault';
+      } else if (cd.consumed_ts) {
+        cdEl.textContent = "'" + cd.cmd + "' consumed by bridge (no write ack yet)";
+        cdEl.className = 'v';
+      } else {
+        cdEl.textContent = "'" + cd.cmd + "' queued (not consumed)";
+        cdEl.className = 'v dim';
+      }
       document.getElementById('serverSeq').textContent = s.server_seq;
       document.getElementById('queueLen').textContent = s.queue_len;
       document.getElementById('cr6gt').textContent  = s.cr6_gt  != null ? hex(s.cr6_gt)  : '—';

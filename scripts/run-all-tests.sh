@@ -126,6 +126,9 @@ register_suite "lump-consistency" \
 register_suite "wukong-bridge-parser-tests" \
     'python -m pytest tests/hardware/test_wukong_bridge_parser.py -v'
 
+register_suite "wukong-command-delivery-tests" \
+    'python -m pytest tests/server/test_wukong_command_delivery.py tests/hardware/test_wukong_bridge_command_ack.py -v'
+
 register_suite "sha32-vectors" \
     'python -m pytest scripts/test_sha32_vectors.py -v'
 

@@ -46,7 +46,9 @@ def _reset_wukong_state():
         _app_module._wukong_event_seq      = 0
         _app_module._wukong_call_depth     = 0
     with _app_module._wukong_command_lock:
-        _app_module._wukong_pending_cmd = None
+        _app_module._wukong_pending_cmd  = None
+        _app_module._wukong_cmd_delivery = None
+        _app_module._wukong_cmd_id       = 0
     with _app_module._wukong_upload_ack_lock:
         _app_module._wukong_upload_ack = {}
     with _app_module._upload_in_flight_lock:
@@ -98,7 +100,7 @@ class TestStatusDoesNotConsume:
 
         for _ in range(10):
             data = _status(client)
-            assert data['pending_command'] == {'cmd': 's'}, (
+            assert data['pending_command'] == {'cmd': 's', 'id': 1}, (
                 'status poll consumed or altered the pending command'
             )
 

@@ -343,6 +343,62 @@ def try_parse_trace_frame(buf, i=0):
     return decode_trace_packet(pkt)
 
 
+def post_command_ack(ide_base, verify_tls, cmd, ok, error='', cmd_id=None):
+    """Report the serial-write result for a dequeued command to the server.
+
+    Delivery of the ack is best-effort; a failure to POST never interrupts
+    the bridge loop.
+    """
+    try:
+        requests.post(f'{ide_base}/hardware/wukong/command-ack',
+                      json={'cmd': cmd, 'ok': ok, 'error': error,
+                            'id': cmd_id},
+                      timeout=1, verify=verify_tls)
+    except Exception as exc:
+        print(f'  [command-ack POST error] {exc}', flush=True)
+
+
+def execute_board_command(cmd, data, ser, reopen_serial, buf,
+                          ide_base, verify_tls):
+    """Write a dequeued command ('s','r','h','b','f') to the board's UART.
+
+    Reports success/failure back to the server via POST
+    /hardware/wukong/command-ack so a consumed-but-unwritten command is
+    never lost silently.  Returns the (possibly reopened) Serial object.
+
+    The server-assigned command id (data['id']) is echoed in the ack so the
+    server can attribute the write result to exactly this command, even if
+    another command with the same letter has been queued since.
+    """
+    cmd_id = data.get('id')
+    try:
+        if cmd == 'b':
+            nia_val = int(data.get('nia', 0xFFFFFFFF))
+            ser.write(b'b' + struct.pack('>I', nia_val))
+        elif cmd == 'f':
+            # Reopen the serial port first — JTAG programming silently kills
+            # the FTDI connection, so the port may be dead.  Reopening
+            # restores it, then 'f' tells the FPGA to re-fire its boot
+            # sentinel (FAULT_RST, top priority in hardware).
+            ser = reopen_serial()
+            buf.clear()
+            ser.write(b'f')
+        elif cmd in ('s', 'r', 'h'):
+            ser.write(cmd.encode('ascii'))
+        else:
+            post_command_ack(ide_base, verify_tls, cmd, False,
+                             f'bridge does not understand command {cmd!r}',
+                             cmd_id=cmd_id)
+            return ser
+        post_command_ack(ide_base, verify_tls, cmd, True, cmd_id=cmd_id)
+    except Exception as exc:
+        print(f'  [command] serial write FAILED for {cmd!r}: {exc}',
+              flush=True)
+        post_command_ack(ide_base, verify_tls, cmd, False,
+                         f'serial write failed: {exc}', cmd_id=cmd_id)
+    return ser
+
+
 def main():
     if serial is None:
         print("ERROR: pyserial not installed.  Run: pip install pyserial", file=sys.stderr)
@@ -650,19 +706,10 @@ def main():
                     if r.status_code == 200:
                         data = r.json() or {}
                         cmd = data.get('cmd')
-                        if cmd == 'b':
-                            nia_val = int(data.get('nia', 0xFFFFFFFF))
-                            ser.write(b'b' + struct.pack('>I', nia_val))
-                        elif cmd == 'f':
-                            # Reopen the serial port first — JTAG programming
-                            # silently kills the FTDI connection, so the port
-                            # may be dead.  Reopening restores it, then 'f'
-                            # tells the FPGA to re-fire its boot sentinel.
-                            ser = _reopen_serial()
-                            buf.clear()
-                            ser.write(b'f')
-                        elif cmd in ('s', 'r', 'h'):
-                            ser.write(cmd.encode('ascii'))
+                        if cmd in ('s', 'r', 'h', 'b', 'f'):
+                            ser = execute_board_command(
+                                cmd, data, ser, _reopen_serial, buf,
+                                ide_base, verify_tls)
                         elif cmd == 'u':
                             try:
                                 _leftover = _handle_upload(

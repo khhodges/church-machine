@@ -9906,6 +9906,22 @@ _wukong_call_depth     = 0
 import time as _wk_time
 _wukong_last_bridge_poll = 0.0
 _wukong_last_trace_post  = 0.0
+# Command delivery lifecycle record for the most recent command.  Lets the
+# /fpga page distinguish "still queued" / "bridge consumed it" / "written to
+# the board's UART" instead of fire-and-forget.  Protected by
+# _wukong_command_lock.  Fields:
+#   cmd         — the command char ('s','r','h','b','u','f')
+#   queued_ts   — when the IDE POSTed it
+#   consumed_ts — when the bridge GET dequeued it (None until then)
+#   write_ok    — True/False once the bridge reports the serial-write result
+#                 via POST /hardware/wukong/command-ack (None until then)
+#   write_error — error string when write_ok is False
+#   write_ts    — when the bridge reported the write result
+#   id          — server-generated monotonic command ID; the bridge receives
+#                 it on dequeue and must echo it in command-ack so a late or
+#                 duplicate ack can never be attributed to the wrong command
+_wukong_cmd_delivery = None
+_wukong_cmd_id       = 0     # monotonic; incremented under _wukong_command_lock
 
 
 @app.route('/hardware/wukong/trace', methods=['POST'])
@@ -10062,10 +10078,17 @@ def wukong_console_post():
 def wukong_command_post():
     """IDE enqueues a command for the bridge to forward to the board.
 
-    Body JSON: {'cmd': 's'|'r'|'h'|'b'|'u', 'nia': <int>, 'data': '<base64>'}
-    Only one command is queued at a time; a new POST overwrites any pending one.
+    Body JSON: {'cmd': 's'|'r'|'h'|'b'|'u'|'f', 'nia': <int>, 'data': '<base64>'}
+
+    Only one command is queued at a time.  Overwrite policy (documented):
+    a new POST overwrites any still-pending command, and the response
+    surfaces the overwrite as {'ok': True, 'overwrote': '<prev cmd>'} so
+    the caller can warn the user.  We surface rather than 409-reject so a
+    Reboot ('f') can always displace a stale queued command when no bridge
+    is polling.
     """
-    global _wukong_pending_cmd, _upload_in_flight
+    global _wukong_pending_cmd, _upload_in_flight, _wukong_cmd_delivery, \
+        _wukong_cmd_id
     data = request.get_json(silent=True) or {}
     cmd = str(data.get('cmd', '')).strip()
     if cmd not in ('s', 'r', 'h', 'b', 'u', 'f'):
@@ -10107,9 +10130,25 @@ def wukong_command_post():
                 return jsonify({'ok': False,
                                 'error': 'upload in progress — retry after upload-ack'}), 409
 
+    now = _wk_time.time()
     with _wukong_command_lock:
+        prev = _wukong_pending_cmd
+        _wukong_cmd_id += 1
+        entry['id'] = _wukong_cmd_id
         _wukong_pending_cmd = entry
-    return jsonify({'ok': True})
+        _wukong_cmd_delivery = {
+            'id':          _wukong_cmd_id,
+            'cmd':         cmd,
+            'queued_ts':   now,
+            'consumed_ts': None,
+            'write_ok':    None,
+            'write_error': '',
+            'write_ts':    None,
+        }
+    resp = {'ok': True, 'id': entry['id']}
+    if prev:
+        resp['overwrote'] = prev.get('cmd')
+    return jsonify(resp)
 
 
 @app.route('/hardware/wukong/command', methods=['GET'])
@@ -10124,6 +10163,9 @@ def wukong_command_get():
     with _wukong_command_lock:
         entry = _wukong_pending_cmd
         _wukong_pending_cmd = None
+        if entry and _wukong_cmd_delivery \
+                and _wukong_cmd_delivery.get('id') == entry.get('id'):
+            _wukong_cmd_delivery['consumed_ts'] = _wukong_last_bridge_poll
     if entry:
         return jsonify(entry)
     return jsonify({})
@@ -10149,6 +10191,7 @@ def wukong_status_get():
         upl       = _upload_in_flight
     with _wukong_command_lock:
         pending   = dict(_wukong_pending_cmd) if _wukong_pending_cmd else None
+        delivery  = dict(_wukong_cmd_delivery) if _wukong_cmd_delivery else None
     if pending and 'data' in pending:
         # Type-safe payload summary: never embed the payload, and never raise
         # (a TypeError here would turn the read-only status poll into a 500).
@@ -10171,6 +10214,7 @@ def wukong_status_get():
         'boot_info':          boot_info,
         'upload_in_flight':   upl,
         'pending_command':    pending,
+        'command_delivery':   delivery,
         'ide_version':        BUILD_VERSION,
     })
 
@@ -10210,6 +10254,42 @@ _wukong_upload_ack        = {}   # {} = no upload attempted yet; {ok, error?}
 # silently corrupting the boot image.  Cleared when the bridge POSTs upload-ack.
 _upload_in_flight         = False
 _upload_in_flight_lock    = _wk_threading.Lock()
+
+
+@app.route('/hardware/wukong/command-ack', methods=['POST'])
+def wukong_command_ack_post():
+    """Bridge reports the serial-write result for a dequeued command.
+
+    Body JSON:
+        id    — the command ID received on dequeue (GET /hardware/wukong/command)
+        cmd   — the command char it attempted to write ('s','r','h','b','f')
+        ok    — true when the UART write succeeded
+        error — human-readable failure string when ok=false
+
+    Updates the delivery record only when BOTH the id and cmd match the
+    current record AND that command has already been consumed — a late ack
+    for a superseded command (even one with the same letter) or an ack that
+    arrives before consumption can never corrupt the lifecycle.
+    """
+    global _wukong_cmd_delivery
+    data = request.get_json(silent=True) or {}
+    cmd  = str(data.get('cmd', '')).strip()
+    ok   = bool(data.get('ok', False))
+    err  = str(data.get('error', ''))[:400] if not ok else ''
+    try:
+        ack_id = int(data.get('id'))
+    except (TypeError, ValueError):
+        ack_id = None
+    with _wukong_command_lock:
+        if _wukong_cmd_delivery \
+                and ack_id is not None \
+                and _wukong_cmd_delivery.get('id') == ack_id \
+                and _wukong_cmd_delivery.get('cmd') == cmd \
+                and _wukong_cmd_delivery.get('consumed_ts') is not None:
+            _wukong_cmd_delivery['write_ok']    = ok
+            _wukong_cmd_delivery['write_error'] = err
+            _wukong_cmd_delivery['write_ts']    = _wk_time.time()
+    return jsonify({'ok': True})
 
 
 @app.route('/hardware/wukong/upload-ack', methods=['POST'])
@@ -10301,8 +10381,20 @@ def boot_image_send_to_hardware():
         with _wukong_upload_ack_lock:
             _wukong_upload_ack = {}
 
+        global _wukong_cmd_delivery, _wukong_cmd_id
         with _wukong_command_lock:
-            _wukong_pending_cmd = {'cmd': 'u', 'data': _encoded}
+            _wukong_cmd_id += 1
+            _wukong_pending_cmd = {'cmd': 'u', 'data': _encoded,
+                                   'id': _wukong_cmd_id}
+            _wukong_cmd_delivery = {
+                'id':          _wukong_cmd_id,
+                'cmd':         'u',
+                'queued_ts':   _wk_time.time(),
+                'consumed_ts': None,
+                'write_ok':    None,
+                'write_error': '',
+                'write_ts':    None,
+            }
 
         _rollback = False   # committed — in-flight flag stays set
         return jsonify({'queued': True, 'size': len(_raw)})
@@ -10329,6 +10421,9 @@ def wukong_boot_info_post():
         'stale_tu':     bool(data.get('stale_tu', False)),
         'tu_version':   int(data.get('tu_version', 0)),
         'build_version': int(bv) if bv is not None else None,
+        # Server-side receive timestamp: lets the /fpga page confirm a FRESH
+        # sentinel arrived after a Reboot ('f') — true end-to-end proof.
+        'received_ts':   _wk_time.time(),
     }
     with _wukong_boot_info_lock:
         _wukong_boot_info = entry
