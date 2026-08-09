@@ -45,7 +45,7 @@ test.describe('Builder ▸ Versions tab', () => {
         await openVersionsTab(page);
         const status = await page.evaluate(() =>
             fetch('/hardware/wukong/status').then(r => r.json()));
-        await expect(page.locator('#versionsIdeBody code'))
+        await expect(page.locator('#versionsIdeBody .versions-value code'))
             .toHaveText(status.ide_version, { timeout: 15000 });
     });
 

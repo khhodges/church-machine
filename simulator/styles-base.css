@@ -1524,3 +1524,9 @@ details[open] .ti60-advanced-summary::before { transform: rotate(90deg); }
 .versions-badge-warn    { background: #3d3416; color: #e8c96a; border: 1px solid #7a672c; }
 .versions-badge-bad     { background: #3d1a1a; color: #e88a8a; border: 1px solid #7a3535; }
 .versions-badge-unknown { background: #2a2a35; color: #aaa;    border: 1px solid #4a4a58; }
+
+/* Versions tab — file-level GitHub diff detail */
+.versions-diff { margin-top: 6px; }
+.versions-diff summary { cursor: pointer; color: #d9b44a; font-size: 0.85em; }
+.versions-diff-file { font-size: 0.78em; color: #9fb0c8; padding-left: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.versions-diff .versions-note b { color: #c7d3e6; }

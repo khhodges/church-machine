@@ -3169,7 +3169,7 @@ def download_callhome_bridge():
     resp.headers["Content-Disposition"] = 'attachment; filename="callhome_bridge.py"'
     return resp
 
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "") or os.environ.get("GITHUB_PAT", "")
 GITHUB_LIBRARY_REPO = os.environ.get("GITHUB_LIBRARY_REPO", "khhodges/cloomc-project")
 GITHUB_FOUNDATION_REPO = "khhodges/cloomc-foundation"
 
@@ -3299,6 +3299,140 @@ def github_activity():
             "url": c.get("html_url", ""),
         })
     return jsonify({"commits": commits})
+
+# ---------------------------------------------------------------------------
+# /api/versions/github-diff — file-level comparison between the local git HEAD
+# (what the running IDE was built from) and GitHub HEAD. Local history often
+# diverges from GitHub (task merges are local), so GitHub's compare API cannot
+# be used; instead we compare blob SHAs of the two trees, which git computes
+# identically on both sides.
+_versions_diff_cache = {"key": None, "ts": 0.0, "payload": None}
+_VERSIONS_DIFF_TTL = 300  # seconds
+
+_VERSIONS_AREA_LABELS = {
+    "hardware": "FPGA hardware & bridge",
+    "server": "IDE server",
+    "simulator": "IDE frontend / simulator",
+    "tests": "tests",
+    "scripts": "build & check scripts",
+    "docs": "documentation",
+    "build": "build artifacts (bitstreams)",
+    "bitstreams": "build artifacts (bitstreams)",
+    "e2e": "end-to-end tests",
+}
+
+# Non-functional paths excluded from the diff report (session artifacts,
+# agent memory, upload scratch) — they never affect how the IDE or FPGA behave.
+_VERSIONS_IGNORE_PREFIXES = ("attached_assets/", ".agents/", ".local/", ".cache/")
+
+def _versions_ignored(path):
+    return path.startswith(_VERSIONS_IGNORE_PREFIXES)
+
+def _versions_area(path):
+    top = path.split("/", 1)[0] if "/" in path else "(repo root)"
+    return _VERSIONS_AREA_LABELS.get(top, top)
+
+def _local_git_tree():
+    """Return ({path: blob_sha}, head_sha) for the local checkout."""
+    head = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=BASE_DIR, text=True, timeout=10).strip()
+    out = subprocess.check_output(
+        ["git", "ls-tree", "-r", "HEAD"], cwd=BASE_DIR, text=True, timeout=30)
+    tree = {}
+    for line in out.splitlines():
+        # format: <mode> <type> <sha>\t<path>
+        try:
+            meta, path = line.split("\t", 1)
+            mode, otype, sha = meta.split()
+        except ValueError:
+            continue
+        if otype == "blob":
+            tree[path] = sha
+    return tree, head
+
+_versions_diff_lock = threading.Lock()
+
+@app.route("/api/versions/github-diff")
+def versions_github_diff():
+    # Deliberately no ?repo= parameter: this endpoint uses the server's GitHub
+    # token, so allowing arbitrary repos would turn it into a metadata proxy.
+    repo = GITHUB_LIBRARY_REPO
+    if not repo:
+        return jsonify({"error": "No repo configured"}), 200
+    import time as _diff_time
+    now = _diff_time.time()
+
+    # Time-based cache check FIRST — before any git subprocess or GitHub call —
+    # so the 15 s auto-refresh doesn't burn workers or API quota.
+    if (_versions_diff_cache["payload"] is not None
+            and now - _versions_diff_cache["ts"] < _VERSIONS_DIFF_TTL):
+        return jsonify(_versions_diff_cache["payload"])
+
+    # Single-flight: if another request is already recomputing, serve the stale
+    # payload (or a pending marker) instead of piling up subprocesses.
+    if not _versions_diff_lock.acquire(blocking=False):
+        if _versions_diff_cache["payload"] is not None:
+            return jsonify(_versions_diff_cache["payload"])
+        return jsonify({"error": "Comparison in progress — retry shortly"}), 200
+    try:
+        try:
+            local_tree, local_head = _local_git_tree()
+        except Exception as e:
+            return jsonify({"error": f"Local git unavailable: {e}"}), 200
+
+        commits, err = github_api_public("/commits?per_page=1", repo)
+        if err or not isinstance(commits, list) or not commits:
+            return jsonify({"error": err or "GitHub unreachable"}), 200
+        gh_head = commits[0].get("sha", "")
+        if not gh_head:
+            return jsonify({"error": "GitHub HEAD sha missing"}), 200
+
+        gh_tree_data, err = github_api_public(
+            f"/git/trees/{gh_head}?recursive=1", repo)
+        if err or not isinstance(gh_tree_data, dict):
+            return jsonify({"error": err or "GitHub tree unavailable"}), 200
+        if gh_tree_data.get("truncated"):
+            # An incomplete remote tree would misreport missing entries as
+            # local-only — refuse to compute a verdict rather than lie.
+            payload = {"local_head": local_head[:7], "github_head": gh_head[:7],
+                       "error": "GitHub tree truncated — comparison indeterminate"}
+            _versions_diff_cache.update(key=None, ts=now, payload=payload)
+            return jsonify(payload)
+        gh_tree = {e["path"]: e["sha"]
+                   for e in gh_tree_data.get("tree", [])
+                   if e.get("type") == "blob"}
+
+        changed = sorted(p for p, s in local_tree.items()
+                         if p in gh_tree and gh_tree[p] != s
+                         and not _versions_ignored(p))
+        local_only = sorted(p for p in local_tree
+                            if p not in gh_tree and not _versions_ignored(p))
+        github_only = sorted(p for p in gh_tree
+                             if p not in local_tree and not _versions_ignored(p))
+
+        def _group(paths):
+            areas = {}
+            for p in paths:
+                areas[_versions_area(p)] = areas.get(_versions_area(p), 0) + 1
+            return dict(sorted(areas.items(), key=lambda kv: -kv[1]))
+
+        LIMIT = 200
+        payload = {
+            "local_head": local_head[:7],
+            "github_head": gh_head[:7],
+            "in_sync": not (changed or local_only or github_only),
+            "changed": changed[:LIMIT],
+            "local_only": local_only[:LIMIT],
+            "github_only": github_only[:LIMIT],
+            "counts": {"changed": len(changed), "local_only": len(local_only),
+                       "github_only": len(github_only)},
+            "areas": _group(changed + local_only + github_only),
+        }
+        _versions_diff_cache.update(key=(local_head, gh_head, repo),
+                                    ts=now, payload=payload)
+        return jsonify(payload)
+    finally:
+        _versions_diff_lock.release()
 
 @app.route("/api/github/contributors")
 def github_contributors():

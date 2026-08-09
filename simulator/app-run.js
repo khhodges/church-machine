@@ -11119,13 +11119,16 @@ const VersionsView = {
         const btn = document.getElementById('versionsRefreshBtn');
         if (btn && manual) btn.disabled = true;
         try {
-            const [statusRes, ghRes] = await Promise.allSettled([
+            const [statusRes, ghRes, diffRes] = await Promise.allSettled([
                 fetch('/hardware/wukong/status').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
                 fetch('/api/github/activity').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
+                fetch('/api/versions/github-diff').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
             ]);
             const status = statusRes.status === 'fulfilled' ? statusRes.value : null;
             const gh     = ghRes.status === 'fulfilled' ? ghRes.value : null;
-            this._renderIde(status, gh);
+            const diff   = diffRes.status === 'fulfilled' && !diffRes.value.error ? diffRes.value : null;
+            this._lastDiff = diff;
+            this._renderIde(status, gh, diff);
             this._renderGithub(status, gh);
             this._renderFpga(status);
             const lc = document.getElementById('versionsLastChecked');
@@ -11136,7 +11139,32 @@ const VersionsView = {
         }
     },
 
-    _renderIde(status, gh) {
+    // Render a human explanation of WHAT differs between the local checkout
+    // and GitHub HEAD, grouped by functional area, with expandable file lists.
+    _renderDiffDetail(diff) {
+        if (!diff) return '';
+        if (diff.in_sync) return '';
+        const c = diff.counts || {};
+        const total = (c.changed || 0) + (c.local_only || 0) + (c.github_only || 0);
+        if (!total) return '';
+        const areas = Object.entries(diff.areas || {})
+            .map(([a, n]) => `${this._esc(a)} (${n})`).join(', ');
+        const list = (title, paths, mark) => {
+            if (!paths || !paths.length) return '';
+            const items = paths.map(p =>
+                `<div class="versions-diff-file"><code>${mark} ${this._esc(p)}</code></div>`).join('');
+            return `<div class="versions-note"><b>${this._esc(title)}</b></div>` + items;
+        };
+        return '<div class="versions-note">Functional differences: ' + this._esc(areas) + '</div>' +
+            `<details class="versions-diff"><summary>${total} file${total === 1 ? '' : 's'} differ — show list</summary>` +
+            list('Changed (content differs)', diff.changed, '\u270E') +
+            list('Only in this IDE (not pushed to GitHub)', diff.local_only, '+') +
+            list('Only on GitHub (not in this IDE)', diff.github_only, '\u2212') +
+            (diff.truncated_github_tree ? '<div class="versions-note">GitHub file list was truncated; counts may be incomplete.</div>' : '') +
+            '</details>';
+    },
+
+    _renderIde(status, gh, diff) {
         const el = document.getElementById('versionsIdeBody');
         if (!el) return;
         if (!status) {
@@ -11145,19 +11173,33 @@ const VersionsView = {
             return;
         }
         const v = status.ide_version || 'unknown';
-        let badge;
+        let badge, note = '';
         const latest = gh && gh.commits && gh.commits.length ? gh.commits[0] : null;
         if (!this._isGitSha(v)) {
             badge = this._badge('unknown', 'Unknown vs GitHub');
+        } else if (diff && diff.in_sync) {
+            badge = this._badge('ok', 'In sync with GitHub');
         } else if (!latest || !latest.sha) {
             badge = this._badge('unknown', 'GitHub unavailable');
         } else if (v.startsWith(latest.sha) || latest.sha.startsWith(v)) {
             badge = this._badge('ok', 'In sync with GitHub');
+        } else if (diff) {
+            // Direction is only unambiguous when no shared files changed and
+            // the difference is entirely one-sided.
+            const ch = (diff.counts && diff.counts.changed) || 0;
+            const lo = (diff.counts && diff.counts.local_only) || 0;
+            const go = (diff.counts && diff.counts.github_only) || 0;
+            const label = !ch && lo && !go ? 'Ahead of GitHub (not pushed)'
+                        : !ch && go && !lo ? 'Behind GitHub'
+                        : 'Out of sync with GitHub';
+            badge = this._badge('warn', label);
+            note = this._renderDiffDetail(diff);
         } else {
-            badge = this._badge('warn', 'Differs from GitHub HEAD');
+            badge = this._badge('warn', 'Different commit than GitHub HEAD');
+            note = '<div class="versions-note">File-level comparison unavailable.</div>';
         }
         el.innerHTML =
-            `<div class="versions-value"><code>${this._esc(v)}</code></div>` + badge +
+            `<div class="versions-value"><code>${this._esc(v)}</code></div>` + badge + note +
             (this._isGitSha(v) ? '' :
              '<div class="versions-note">Server is running without git (deploy ID shown) — comparison against GitHub is not possible.</div>');
     },
@@ -11172,13 +11214,22 @@ const VersionsView = {
         }
         const c = gh.commits[0];
         const ide = status ? status.ide_version : null;
+        const diff = this._lastDiff;
         let badge;
         if (!this._isGitSha(ide)) {
             badge = this._badge('unknown', 'IDE version unknown');
-        } else if (ide.startsWith(c.sha) || c.sha.startsWith(ide)) {
-            badge = this._badge('ok', 'IDE up to date');
+        } else if ((diff && diff.in_sync) || ide.startsWith(c.sha) || c.sha.startsWith(ide)) {
+            badge = this._badge('ok', 'Matches the running IDE');
+        } else if (diff) {
+            const ch2 = (diff.counts && diff.counts.changed) || 0;
+            const lo = (diff.counts && diff.counts.local_only) || 0;
+            const go = (diff.counts && diff.counts.github_only) || 0;
+            badge = this._badge('warn',
+                !ch2 && lo && !go ? 'Missing latest IDE changes'
+                : !ch2 && go && !lo ? 'Has changes the IDE lacks'
+                : 'Out of sync with the IDE');
         } else {
-            badge = this._badge('warn', 'IDE behind GitHub');
+            badge = this._badge('warn', 'Different commit than the IDE');
         }
         el.innerHTML =
             `<div class="versions-value"><a href="${this._esc(c.url)}" target="_blank" rel="noopener"><code>${this._esc(c.sha)}</code></a></div>` +
