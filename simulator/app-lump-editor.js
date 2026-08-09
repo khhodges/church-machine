@@ -1055,13 +1055,68 @@
         '</div>';
     }
 
+    // ── design reference sections (Thread / Namespace design pages) ──────────
+
+    var _designCache = { thread: null, ns: null };
+    var _designRetryTimer = null;
+
+    function renderDesignHero(kind) {
+        var title = (kind === 'thread') ? 'Thread Lump \u2014 Design Page' : 'Namespace Lump \u2014 Design Page';
+        var blurb = (kind === 'thread')
+            ? 'The Thread Lump holds a running computation\u2019s full context \u2014 header, data registers, heap, LIFO stack, and the CR0\u2013CR11 capability zone \u2014 in one hardware-protected lump.'
+            : 'The Namespace Lump (NS Slot\u202f0) describes the machine\u2019s entire physical address space and the 4-word-per-entry NS Table that maps every slot.';
+        return '<div class="le-design-hero">' +
+            '<div class="le-design-hero-title">' + esc(title) + '</div>' +
+            '<div class="le-design-hero-board">QMTECH Wukong \u00b7 Artix-7 XC7A100T</div>' +
+            '<p class="le-design-hero-blurb">' + esc(blurb) + '</p>' +
+        '</div>';
+    }
+
+    function renderDesignSection(kind) {
+        if (_designCache[kind]) return _designCache[kind];
+        var Cls = (kind === 'thread')
+            ? (typeof ThreadTutorial    !== 'undefined' ? ThreadTutorial    : null)
+            : (typeof NamespaceTutorial !== 'undefined' ? NamespaceTutorial : null);
+        if (!Cls) {
+            // tutorial scripts load async — retry once they arrive
+            if (!_designRetryTimer) {
+                _designRetryTimer = setTimeout(function () {
+                    _designRetryTimer = null;
+                    render();
+                }, 400);
+            }
+            return '<div class="le-design-ref le-design-loading"><p class="le-panel-desc">Loading design reference\u2026</p></div>';
+        }
+        var steps;
+        try { steps = new Cls().steps || []; } catch (e) { steps = []; }
+        var html = '<div class="le-design-ref">' +
+            '<div class="le-design-ref-caption">Design reference \u2014 click a section to expand</div>' +
+            steps.map(function (s, i) {
+                return '<details class="le-design-step"' + (i === 0 ? ' open' : '') + '>' +
+                    '<summary class="le-design-step-title">' + s.title + '</summary>' +
+                    '<div class="sr-step-content le-design-step-body">' + s.content + '</div>' +
+                '</details>';
+            }).join('') +
+        '</div>';
+        _designCache[kind] = html;
+        return html;
+    }
+
     // ── top-level render ──────────────────────────────────────────────────────
 
     function render() {
         var tEl = document.getElementById('lumpThreadPanel');
         var nEl = document.getElementById('lumpNSPanel');
-        if (tEl) tEl.innerHTML = renderThreadPanel();
-        if (nEl) nEl.innerHTML = renderNSPanel();
+        if (tEl) tEl.innerHTML =
+            renderDesignHero('thread') +
+            renderDesignSection('thread') +
+            '<div class="le-design-editor-caption">Interactive build settings</div>' +
+            renderThreadPanel();
+        if (nEl) nEl.innerHTML =
+            renderDesignHero('ns') +
+            renderDesignSection('ns') +
+            '<div class="le-design-editor-caption">Interactive build settings</div>' +
+            renderNSPanel();
     }
 
     // ── public handlers ───────────────────────────────────────────────────────

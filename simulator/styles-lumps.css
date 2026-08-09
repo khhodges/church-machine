@@ -6134,3 +6134,75 @@ pre:hover .code-copy-btn {
     background: rgba(232, 184, 75, 0.12);
     border-color: rgba(232, 184, 75, 0.28);
 }
+
+/* ── Builder design pages (Thread Lump / Namespace Lump) ─────────────────── */
+
+.le-design-hero {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--church-gold);
+    border-radius: 8px;
+    padding: 0.9rem 1.1rem;
+    margin-bottom: 0.75rem;
+}
+
+.le-design-hero-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--church-gold);
+}
+
+.le-design-hero-board {
+    font-size: 0.72rem;
+    font-family: monospace;
+    color: var(--text-secondary);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
+.le-design-hero-blurb {
+    font-size: 0.82rem;
+    color: var(--text-primary);
+    margin: 0.5rem 0 0 0;
+    line-height: 1.5;
+}
+
+.le-design-ref {
+    margin-bottom: 0.75rem;
+}
+
+.le-design-ref-caption,
+.le-design-editor-caption {
+    font-size: 0.68rem;
+    font-family: monospace;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0.4rem 0;
+}
+
+.le-design-step {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 4px;
+}
+
+.le-design-step > summary.le-design-step-title {
+    cursor: pointer;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--church-gold);
+    list-style: revert;
+}
+
+.le-design-step[open] > summary.le-design-step-title {
+    border-bottom: 1px solid var(--border);
+}
+
+.le-design-step-body {
+    padding: 0.75rem;
+    line-height: 1.6;
+}
