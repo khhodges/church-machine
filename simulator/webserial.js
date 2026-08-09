@@ -242,7 +242,7 @@ const TangSerial = (function() {
             if (msg.includes('Failed to open') || msg.includes('Access denied') || msg.includes('busy')) {
                 throw new Error(
                     `Could not open port — it is held by another app.\n\n` +
-                    `Fix: close Efinity IDE's serial terminal (or any other serial monitor), ` +
+                    `Fix: close any other serial monitor that may hold the port, ` +
                     `wait 5 seconds, then try again.`
                 );
             }
@@ -643,7 +643,7 @@ const TangSerial = (function() {
         } else if (rxLen > 0) {
             status(`READ_BRAM: partial — got ${rxLen}/${expected} bytes (${words.length} complete words)`);
         } else {
-            status(`READ_BRAM: timeout — got 0/${expected} bytes. The FPGA did not respond to 0xBEAD. Check: (1) is the bitstream built with READ_BRAM? (2) is this the Ti60 F225 (not Tang Nano)?`);
+            status(`READ_BRAM: timeout — got 0/${expected} bytes. The FPGA did not respond to 0xBEAD. Check: (1) is the bitstream built with READ_BRAM? (2) is this the Wukong Artix-7 (not Tang Nano)?`);
         }
         return { success: ok, words: words, rxBytes: rxBuf, rxLen: rxLen };
     }

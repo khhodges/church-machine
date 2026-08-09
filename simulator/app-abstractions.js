@@ -435,7 +435,7 @@ function renderAbstractions() {
         const isBootEntry = abs.index === bootEntrySlot;
         const absProfile = _getAbstractionProfile(abs);
         const profileBadgeClass = absProfile === 'Full' ? 'profile-badge-full' : absProfile === 'XC7A100T' ? 'profile-badge-xc7a100t' : 'profile-badge-iot';
-        const profileTitle = absProfile === 'Full' ? 'Ti60 F225 only' : absProfile === 'XC7A100T' ? 'QMTECH Wukong XC7A100T only' : 'runs on both boards';
+        const profileTitle = absProfile === 'Full' ? 'Full profile only (Wukong Artix-7)' : absProfile === 'XC7A100T' ? 'QMTECH Wukong XC7A100T only' : 'runs on both boards';
 
         html += `<div class="abs-item${isActive ? ' active' : ''}" onclick="showAbstractionDetail(${abs.index})" ondblclick="event.stopPropagation();_goToLumpByAbstractionName(abstractionRegistry.getAbstraction(${abs.index}).name)" title="Double-click to jump to this abstraction\u2019s LUMP in the Repository">`;
         html += `<div class="abs-item-row1">`;

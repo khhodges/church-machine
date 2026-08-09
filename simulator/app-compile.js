@@ -1552,7 +1552,7 @@ function compileAndBuild() {
             mtbf_status:     mtbfStatus,
             source_hash:     _simRunHash || _currentEditorHash(),
             source:          source,
-            target_board:   'ti60-f225',
+            target_board:   'wukong-xc7a100t',
             grants:         ['E']
         }
     };
@@ -1606,7 +1606,7 @@ function compileAndBuild() {
     }
 
     listing += `\n  Deployment:\n`;
-    listing += `    Target Board: Efinix Ti60 F225\n`;
+    listing += `    Target Board: QMTECH Wukong XC7A100T (Artix-7)\n`;
     listing += `    Profile:      ${profile}\n`;
     listing += `    MTBF Status:  ${mtbfStatus.toUpperCase()}${mtbfClean >= 5 ? ' (deployment-ready)' : mtbfTotal === 0 ? ' (unknown — needs testing)' : ' (needs more clean runs)'}\n`;
 

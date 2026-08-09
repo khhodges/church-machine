@@ -1048,7 +1048,7 @@ async function injectCRCodeToFPGA(logEl) {
             const opcode = (patchWords[i] >>> 27) & 0x1F;
             if (FULL_ONLY_OPCODES.includes(opcode)) {
                 const opName = FULL_ONLY_OPCODE_NAMES[opcode] || `opcode ${opcode}`;
-                log(`ERROR: Assembled code contains Full-only instruction ${opName} at word ${i}. This cannot run on the Tang Nano 20K (IoT profile). Switch to Ti60 F225 or remove Full-only instructions (LAMBDA, CHANGE, SWITCH, ELOADCALL, XLOADLAMBDA).`);
+                log(`ERROR: Assembled code contains Full-only instruction ${opName} at word ${i}. This cannot run on the Tang Nano 20K (IoT profile). Switch to the Wukong Artix-7 or remove Full-only instructions (LAMBDA, CHANGE, SWITCH, ELOADCALL, XLOADLAMBDA).`);
                 return false;
             }
         }
@@ -1523,7 +1523,7 @@ function exportPatchFile() {
             const opcode = (patchWords[i] >>> 27) & 0x1F;
             if (FULL_ONLY_OPCODES.includes(opcode)) {
                 const opName = FULL_ONLY_OPCODE_NAMES[opcode] || `opcode ${opcode}`;
-                log(`ERROR: Assembled code contains Full-only instruction ${opName} at word ${i}. Cannot export for Tang Nano 20K (IoT profile). Switch to Ti60 F225 or remove Full-only instructions.`);
+                log(`ERROR: Assembled code contains Full-only instruction ${opName} at word ${i}. Cannot export for Tang Nano 20K (IoT profile). Switch to the Wukong Artix-7 or remove Full-only instructions.`);
                 return;
             }
         }
@@ -1643,7 +1643,7 @@ function exportPatchFile() {
  * file for command-line FPGA flashing via tools/patch_fpga.py.
  *
  * The .lump file stores 32-bit words big-endian (per the lump specification).
- * The UART PATCH_LUMP protocol on the Ti60 F225 expects words little-endian.
+ * The UART PATCH_LUMP protocol on the FPGA expects words little-endian.
  * This function performs the byte-swap on each word during frame construction.
  *
  * User supplies:
@@ -1795,7 +1795,7 @@ function _processLumpFileForPatch(fileName, buf) {
     log('To flash to FPGA, run:');
     log(`  python3 tools/patch_fpga.py /dev/ttyUSB1 ${outName}`);
     log('');
-    log('Hardware verification checklist (Efinix Ti60 F225):');
+    log('Hardware verification checklist (QMTECH Wukong Artix-7):');
     log(`  1. Flash: python3 tools/patch_fpga.py /dev/ttyUSB1 ${outName}`);
     log('  2. Expected UART echo after flash: "ACK <N> words written"');
     log('  3. Verify lump header in BRAM with READ_BRAM (0xBEAD) at the target address');

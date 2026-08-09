@@ -557,7 +557,7 @@ class AbstractionRegistry {
         // Default boot coordinator for the Wukong FPGA board.
         // Sequence: SelfTest.Run → Tunnel.Register (CALL HOME) → RETURN to IDE if
         // online (ACK=1), or spin offline.  DR1=SelfTest result sent as boot_reason.
-        // Wukong NS convention: slots 0-6 = hardware caps (shared with Ti60);
+        // Wukong NS convention: slots 0-6 = hardware caps;
         //   slot 7 = WukongCallHome (board-specific default boot entry, ⚡ target).
         this.createAbstraction(53, 'WukongCallHome', 1,
             ['Main'],

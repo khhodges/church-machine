@@ -1701,7 +1701,7 @@ function loadDeviceList() {
                         '<span class="dev-newcomer-icon">🎉</span>' +
                         '<span class="dev-newcomer-text">' +
                             '<strong>First boot!</strong> ' +
-                            'Your ' + _escHtml(dev.board_name || 'Ti60') + ' is online. ' +
+                            'Your ' + _escHtml(dev.board_name || 'Wukong') + ' is online. ' +
                             '<span class="dev-newcomer-abstr">First Abstraction: Hello World ✓</span>' +
                         '</span>' +
                         '<a href="/starter" class="dev-newcomer-btn" target="_blank">✏️ Write First Program →</a>';
@@ -3672,7 +3672,7 @@ function _showDeviceToast(evt) {
     if (!container) return;
 
     var isNew = !!evt.is_new;
-    var name  = evt.board_name || 'Ti60 F225';
+    var name  = evt.board_name || 'Wukong Artix-7';
 
     // Respect notification preferences
     var prefs = getNotifPrefs();

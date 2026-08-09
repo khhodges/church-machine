@@ -12,7 +12,7 @@ if (typeof module !== 'undefined' && typeof AbstractGTManager === 'undefined') {
 //
 // This is the heart of the browser-based Church Machine IDE.  It implements a
 // cycle-accurate (at the instruction level) simulation of the Church Machine
-// CPU — a capability-based computer architecture targeting the Efinix Ti60
+// CPU — a capability-based computer architecture targeting the QMTECH Wukong
 // F225 FPGA.
 //
 // PRIMARY CLASS

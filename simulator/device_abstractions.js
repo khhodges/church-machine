@@ -3,7 +3,7 @@
 // =============================================================================
 //
 // Implements DeviceAbstractions: the class that simulates the memory-mapped
-// I/O devices present on the Efinix Ti60 F225 FPGA board.  Device registers
+// I/O devices present on the QMTECH Wukong Artix-7 FPGA board.  Device registers
 // live in the I/O segment (0xFE00–0xFEFF) of the word-addressed memory space.
 //
 // PRIMARY CLASS

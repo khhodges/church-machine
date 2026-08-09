@@ -33,6 +33,7 @@
     "wukong-status-readonly-tests",
     "versions-view-tests",
     "pipeline-health-status-tests",
-    "pipeline-health-stages-tests"
+    "pipeline-health-stages-tests",
+    "check-no-ti60-ui"
   ]
 }

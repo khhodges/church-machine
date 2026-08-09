@@ -341,7 +341,7 @@ window.Ti60Connect = (function () {
                 _setStep('register', 'pass', 'Device registered in IDE (uid=' + pkt.uid + ')' + bootNum);
                 if (typeof window._r1SetStep === 'function') window._r1SetStep(2);
                 _setStep('release', 'active');
-                await _reportLaunchTest('passing', 'Ti60 CALLHOME confirmed');
+                await _reportLaunchTest('passing', 'Wukong CALLHOME confirmed');
                 const confirmed = await _confirmLaunchTest();
                 if (confirmed) {
                     _setStep('release', 'pass', 'TEST-09 confirmed passing in IDE ✅');

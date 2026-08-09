@@ -846,7 +846,7 @@ function showAbstractionDetail(index, methodName) {
         html += '</tbody></table>';
         html += '<div class="abs-note-text" style="margin-top:8px;">';
         html += 'This abstraction is present <strong>only</strong> in the 3-LUMP XC7A100T ROM image. ';
-        html += 'Tang Nano 20K and Ti60 F225 boots use UART (Tunnel abstraction) as the lazy-load channel instead. ';
+        html += 'Tang Nano 20K and Wukong Artix-7 boots use UART (Tunnel abstraction) as the lazy-load channel instead. ';
         html += '</div>';
         html += `<div style="margin-top:8px;"><a href="#" class="abs-doc-link" onclick="event.preventDefault();openDocAnchor('hardware-wukong-xc7a100t.md','#ethernet-abstraction-ns-slot-51')">View hardware documentation \u2192</a></div>`;
         html += '</div>';
@@ -1555,7 +1555,7 @@ const METHOD_REGISTER_CONVENTIONS = {
         'Send':    { index: 0, input: 'CR1 = data GT (R-perm Inform), DR1 = byte length', output: 'DR0 = 0 (queued) | \u22120x01 (TX busy) | \u22120x02 (link down)', dispatch: 'CALL Ethernet.Send',    note: 'Fire-and-forget raw frame send. Caller holds an E-only GT on Ethernet; the device GT is internal to the abstraction\u2019s c-list.' },
         'Receive': { index: 1, input: 'DR1 = timeout steps (0 = wait forever)',           output: 'CR0 = data GT (R-perm Inform), DR0 = byte length (0 = timeout)', dispatch: 'CALL Ethernet.Receive', note: 'Block until a frame arrives or timeout expires. Returned GT covers exactly byteLen bytes; caller must mSave before returning.' },
         'Connect': { index: 2, input: 'DR1 = IPv4 address (packed 32-bit), DR2 = port',   output: 'DR0 = 0 (link up) | \u22120x10 (PHY fault) | \u22120x11 (timeout)',  dispatch: 'CALL Ethernet.Connect', note: 'Configure the remote endpoint; arms the PHY and waits for link. Only needed when acting as a client; server mode calls Receive immediately.' },
-        'Status':  { index: 3, input: 'none',                                              output: 'DR0 = 0 (down) | 1 (up) | 2 (busy)',                             dispatch: 'CALL Ethernet.Status',  note: 'Non-blocking status poll. Returns link state without blocking. XC7A100T only \u2014 not present on Tang Nano 20K or Ti60 F225.' },
+        'Status':  { index: 3, input: 'none',                                              output: 'DR0 = 0 (down) | 1 (up) | 2 (busy)',                             dispatch: 'CALL Ethernet.Status',  note: 'Non-blocking status poll. Returns link state without blocking. XC7A100T only \u2014 not present on Tang Nano 20K.' },
     },
     'Tunnel': {
         'Register': { index: 0, input: 'DR1=boot_reason, DR2=last_fault, DR3=fault_NIA', output: 'DR0 = 1 (IDE ACK) | \u22640 (offline)', dispatch: 'CALL Tunnel.Register', note: 'Send 23-byte call-home packet to IDE and await ACK. Replaces hardwired B:02\u00bd boot step.' },
@@ -1664,7 +1664,7 @@ function getMethodPurposes(abs) {
             'Send':    'Ethernet.Send(dataGT, byteLen) — transmit a raw Ethernet frame. CR1 = R-perm Inform GT covering the frame buffer; DR1 = byte length. Fire-and-forget; DR0 \u2190 0 queued | \u22120x01 TX busy | \u22120x02 link down. XC7A100T only.',
             'Receive': 'Ethernet.Receive(timeout) — block until a frame arrives. DR1 = timeout in steps (0 = wait forever). CR0 \u2190 R-perm Inform GT covering exactly byteLen bytes of the received frame; DR0 \u2190 byte length (0 = timeout). Caller must copy data before returning.',
             'Connect': 'Ethernet.Connect(ipv4, port) — configure remote endpoint and arm the PHY. DR1 = packed IPv4 (big-endian 32-bit); DR2 = port number. DR0 \u2190 0 link up | \u22120x10 PHY fault | \u22120x11 timeout. Only required for client-mode connections.',
-            'Status':  'Ethernet.Status() — non-blocking link state poll. No inputs. DR0 \u2190 0 (down) | 1 (up) | 2 (busy). Use before Send to avoid TX errors. XC7A100T only \u2014 absent on Tang Nano 20K and Ti60 F225.',
+            'Status':  'Ethernet.Status() — non-blocking link state poll. No inputs. DR0 \u2190 0 (down) | 1 (up) | 2 (busy). Use before Send to avoid TX errors. XC7A100T only \u2014 absent on Tang Nano 20K.',
         },
         'Tunnel': {
             'Register': 'Tunnel.Register(boot_reason, last_fault, fault_NIA) — send the 23-byte call-home identification packet [0xCE11 · board · FW · HMAC(4B) · UID(8B) · reason · fault · NIA(4B)] and await ACK. Replaces the hardwired B:02\u00BD boot step. DR0 \u2190 1 (IDE connected) | 0 (offline).',
@@ -1680,8 +1680,8 @@ function getMethodPurposes(abs) {
         'Debugger': { 'Step': 'Debugger.Step() — fetch-decode-execute one instruction', 'Run': 'Debugger.Run() — execute until halt/breakpoint/fault', 'Breakpoint': 'Debugger.Breakpoint(address) — set/clear breakpoint', 'Inspect': 'Debugger.Inspect(address) — read and decode memory/NS entry' },
         'Deployer': (function() {
             const b = getSelectedBoard();
-            const chip = b === 'ti60-f225' ? 'Efinix Ti60F225' : 'Gowin GW2AR-18';
-            const brd  = b === 'ti60-f225' ? 'Ti60 F225' : 'Tang Nano';
+            const chip = b === 'wukong-xc7a100t' ? 'Xilinx XC7A100T' : 'Gowin GW2AR-18';
+            const brd  = b === 'wukong-xc7a100t' ? 'Wukong Artix-7' : 'Tang Nano';
             return { 'Build': `Deployer.Build(binary_GT) — package for ${chip}`, 'Upload': `Deployer.Upload() — send via UART to ${brd} (S perm)`, 'Verify': 'Deployer.Verify() — readback + checksum via UART (L perm)', 'Boot': 'Deployer.Boot() — send boot command, FPGA begins execution' };
         })(),
         'Browser': { 'Navigate': 'Browser.Navigate(site_GT) — LOAD content via L perm (no URLs)', 'Back': 'Browser.Back() — pop previous site GT from history', 'Bookmark': 'Browser.Bookmark(site_GT) — SAVE GT to bookmark c-list', 'Search': 'Browser.Search(scope_GT) — search within GT scope only' },
@@ -3205,12 +3205,12 @@ CALL   CR1              ; Debugger.Inspect:
         },
         'Deployer': (function() {
             const b = getSelectedBoard();
-            const isTi60 = b === 'ti60-f225';
-            const chip     = isTi60 ? 'Efinix Ti60F225' : 'Gowin GW2AR-18';
-            const brdName  = isTi60 ? 'Ti60 F225' : 'Tang Nano 20K';
-            const uartNote = isTi60 ? ';   3. UART via FTDI FT232H USB bridge (50MHz clock)' : ';   3. UART TX on pin 69 -> BL616 USB bridge';
-            const clkNote  = isTi60 ? ';   5. 50MHz clock begins instruction execution' : ';   5. 27MHz clock begins instruction execution';
-            const bootLine = isTi60 ? `;   2. ${brdName} begins executing from boot vector` : `;   2. ${brdName} begins executing from boot vector`;
+            const isWukong = b === 'wukong-xc7a100t';
+            const chip     = isWukong ? 'Xilinx XC7A100T' : 'Gowin GW2AR-18';
+            const brdName  = isWukong ? 'Wukong Artix-7' : 'Tang Nano 20K';
+            const uartNote = isWukong ? ';   3. UART via CP2102 USB bridge (100MHz clock)' : ';   3. UART TX on pin 69 -> BL616 USB bridge';
+            const clkNote  = isWukong ? ';   5. 100MHz clock begins instruction execution' : ';   5. 27MHz clock begins instruction execution';
+            const bootLine = `;   2. ${brdName} begins executing from boot vector`;
             return {
                 'Build': `; Deployer.Build — compile binary for ${brdName}\nLOAD   CR1, Deployer      ; Load Deployer E-GT\nLOAD   CR2, CR6, #0      ; Binary GT (DATA object)\n\nCALL   CR1              ; Deployer.Build:\n;   1. DREAD binary from CR2's location\n;   2. Add boot vector and NS table initialization\n;   3. Package for FPGA: ${chip} bitstream\n;   4. Memory.Allocate for deployment image\n;   5. Mint.Encode GT for image\n; CR2 <- deployment image GT`,
                 'Upload': `; Deployer.Upload — send to ${brdName} via UART\nLOAD   CR1, Deployer      ; Load Deployer E-GT\n\nCALL   CR1              ; Deployer.Upload:\n;   1. LOAD UART GT from c-list (NS[11] = UART)\n;   2. For each word in deployment image:\n;      SAVE word to UART (S perm on UART GT)\n${uartNote}\n;   4. Wait for ACK after each block`,

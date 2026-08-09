@@ -66,7 +66,7 @@ function checkUploadProfile(upload, boardType) {
     if (profile === 'Full' && boardType === 'tang-nano-20k-iot') {
         return {
             allowed: false,
-            message: `Abstraction "${upload.abstraction || upload.name || 'unknown'}" is tagged "${profile}" (uses Full-only opcodes: LAMBDA, CHANGE, SWITCH, ELOADCALL, or XLOADLAMBDA). It cannot run on the Tang Nano 20K (IoT profile). Use the Ti60 F225 instead.`
+            message: `Abstraction "${upload.abstraction || upload.name || 'unknown'}" is tagged "${profile}" (uses Full-only opcodes: LAMBDA, CHANGE, SWITCH, ELOADCALL, or XLOADLAMBDA). It cannot run on the Tang Nano 20K (IoT profile). Use the Wukong Artix-7 instead.`
         };
     }
     return { allowed: true };

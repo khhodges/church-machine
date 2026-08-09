@@ -291,7 +291,7 @@ function updateCRDetail() {
     if (showEditButton) {
         html += '<div class="crd-menu-divider"></div>';
         html += '<div class="crd-menu-section-label">FPGA</div>';
-        html += `<button class="crd-menu-item crd-menu-item-fpga" onclick="patchFPGA();toggleCRDetailMenu()" title="Patch FPGA \u2014 Runs Patch Simulator first, then uploads the updated lump to the Ti60 F225 over WebSerial (UART). Requires an active hardware connection.">&#x21A9; Patch FPGA</button>`;
+        html += `<button class="crd-menu-item crd-menu-item-fpga" onclick="patchFPGA();toggleCRDetailMenu()" title="Patch FPGA \u2014 Runs Patch Simulator first, then uploads the updated lump to the FPGA board over WebSerial (UART). Requires an active hardware connection.">&#x21A9; Patch FPGA</button>`;
         html += `<button class="crd-menu-item crd-menu-item-fpga" onclick="exportPatchFile();toggleCRDetailMenu()" title="Export Patch \u2014 Assembles the code and downloads a .patch file with UART frames, CRC, and RUN sentinel. Flash with: python3 patch_fpga.py /dev/ttyUSB1 file.patch">&#x2B73; Export Patch</button>`;
         html += `<button class="crd-menu-item crd-menu-item-fpga" onclick="exportLumpAsPatch();toggleCRDetailMenu()" title="Lump\u2192Patch \u2014 Pick a pre-built .lump binary, validate its header, and wrap it into a .patch UART frame file for FPGA flashing.">&#x2B73; Lump\u2192Patch</button>`;
     }
@@ -924,7 +924,7 @@ function updateCRDetail() {
                 html += `<tr><td class="cr-idx">+${ledIdx}</td><td>LED${ledIdx}</td><td class="cr-gt">0x${val.toString(16).toUpperCase().padStart(8,'0')}</td><td style="color:${pinColor};font-weight:${rBit?'bold':'normal'}">${pinLabel}</td></tr>`;
             }
             html += '</tbody></table>';
-            html += '<div style="color:var(--text-secondary);font-size:0.72rem;padding-bottom:0.3rem;">bit[0]=R drives pin \u00b7 bit[1]=G \u00b7 bit[2]=B (Ti60: only R connected)</div>';
+            html += '<div style="color:var(--text-secondary);font-size:0.72rem;padding-bottom:0.3rem;">bit[0]=R drives pin \u00b7 bit[1]=G \u00b7 bit[2]=B (Wukong: only R connected)</div>';
         }
 
         if (wordCount > 0 && nsIdx !== 12) {

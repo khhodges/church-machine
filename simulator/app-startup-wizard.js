@@ -117,7 +117,7 @@ const StartupWizard = (function () {
         fetch('/api/bitstream/list')
             .then(function (r) { return r.json(); })
             .then(function (d) {
-                const entry = d.bitstreams && d.bitstreams.find(function (b) { return b.board === 'ti60-f225'; });
+                const entry = d.bitstreams && d.bitstreams.find(function (b) { return b.board === 'wukong-xc7a100t' || b.board === 'ti60-f225'; });
                 statuses.forEach(function (s) {
                     if (!s) return;
                     if (entry && entry.available) {
@@ -317,7 +317,7 @@ const StartupWizard = (function () {
             const dlBtn = _el('swDownloadBtn');
             if (dlBtn && d.release.verilog_download) {
                 dlBtn.href = d.release.verilog_download;
-                dlBtn.setAttribute('download', 'church_ti60_f225.v');
+                dlBtn.setAttribute('download', 'church_wukong_xc7a100t.v');
             }
             const zipBtn = _el('swZipBtn');
             if (zipBtn && d.release.zip_download) {
@@ -347,7 +347,7 @@ const StartupWizard = (function () {
         const trouble = _el('swTrouble' + idx);
         if (trouble) trouble.classList.remove('sw-visible');
 
-        // Reset the underlying Ti60 step elements so the polling watcher does not
+        // Reset the underlying connect-step elements so the polling watcher does not
         // immediately re-fail from a stale ti60-step-fail class.
         if (idx === 3) {
             const uartEl = _el('ti60Step-uart');
@@ -374,7 +374,7 @@ const StartupWizard = (function () {
         _watchTi60Steps();
     }
 
-    // ── Watch the existing Ti60 steps to auto-advance wizard ─────────────────
+    // ── Watch the existing connect steps to auto-advance wizard ──────────────
 
     function _watchTi60Steps() {
         if (_pollTimer) clearInterval(_pollTimer);

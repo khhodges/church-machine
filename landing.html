@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Church Machine — Capability-Based Secure Computing Platform</title>
-    <meta name="description" content="The Church Machine is an educational platform for capability-based secure computing. Build and simulate Golden Token security on Tang Nano 20K, Efinix Ti60 F225, and Artix-7 FPGAs using a browser-based IDE.">
+    <meta name="description" content="The Church Machine is an educational platform for capability-based secure computing. Build and simulate Golden Token security on the QMTECH Wukong Artix-7 FPGA using a browser-based IDE.">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="/">
     <meta property="og:title" content="Church Machine — Capability-Based Secure Computing Platform">
@@ -223,13 +223,13 @@
         <!-- Builder — Orange -->
         <div class="card" style="background: linear-gradient(135deg, #2e1e0e 0%, #1a1208 100%); border-color: #fb923c;" onclick="window.location='/simulator/#builder?tab=ti60-connect'">
             <h2>Builder</h2>
-            <div class="tag" style="color: #fb923c;">Ti60 F225 &middot; WebSerial &middot; One-Click Flash</div>
+            <div class="tag" style="color: #fb923c;">Wukong Artix-7 &middot; Serial Bridge &middot; One-Click Flash</div>
             <p>
-                The only way to get code onto silicon. Flash the pre-built bitstream to your Ti60 F225 and connect via WebSerial. The IDE verifies the full program&nbsp;&rarr;&nbsp;test&nbsp;&rarr;&nbsp;release loop automatically.
+                The only way to get code onto silicon. Flash the pre-built bitstream to your Wukong Artix-7 and connect via the serial bridge. The IDE verifies the full program&nbsp;&rarr;&nbsp;test&nbsp;&rarr;&nbsp;release loop automatically.
             </p>
             <div class="features">
-                <a class="feature" href="/simulator/#builder?tab=ti60-connect" style="background:rgba(251,146,60,0.2);color:#fdba74;border-color:rgba(251,146,60,0.6);font-weight:600;" onclick="event.stopPropagation()">Connect Ti60 &rarr;</a>
-                <a class="feature" href="/api/bitstream/download/ti60-f225" style="background:rgba(251,146,60,0.1);color:#fb923c;border-color:rgba(251,146,60,0.3);" onclick="event.stopPropagation()">Ti60 Bitstream</a>
+                <a class="feature" href="/simulator/#builder?tab=ti60-connect" style="background:rgba(251,146,60,0.2);color:#fdba74;border-color:rgba(251,146,60,0.6);font-weight:600;" onclick="event.stopPropagation()">Connect Wukong &rarr;</a>
+                <a class="feature" href="/dl/wukong-bit" style="background:rgba(251,146,60,0.1);color:#fb923c;border-color:rgba(251,146,60,0.3);" onclick="event.stopPropagation()">Wukong Bitstream</a>
                 <a class="feature" href="/simulator/#builder" style="background:rgba(251,146,60,0.1);color:#fb923c;border-color:rgba(251,146,60,0.3);" onclick="event.stopPropagation()">Build Log</a>
             </div>
             <a class="arrow" href="/simulator/#builder?tab=ti60-connect" style="color:#fb923c;" onclick="event.stopPropagation()">Open Builder &rarr;</a>
@@ -270,7 +270,7 @@
             <h2>Dashboard</h2>
             <div class="tag" style="color: #f59e0b;">Call-Home &middot; MTBF &middot; Fault Log</div>
             <p>
-                Live telemetry from the Ti60. Fault records decoded by instruction address, per-slot MTBF scores, and capability register state after every step. Tells you if the board is alive.
+                Live telemetry from the Wukong. Fault records decoded by instruction address, per-slot MTBF scores, and capability register state after every step. Tells you if the board is alive.
             </p>
             <div class="features">
                 <a class="feature" href="/simulator/#dashboard" style="background:rgba(245,158,11,0.2);color:#fbbf24;border-color:rgba(245,158,11,0.5);font-weight:600;" onclick="event.stopPropagation()">Open Dashboard &rarr;</a>

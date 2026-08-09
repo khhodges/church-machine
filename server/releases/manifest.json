@@ -1,12 +1,31 @@
 {
-  "latest": "1.2.0",
+  "latest": "2.0.0",
   "releases": [
+    {
+      "version": "2.0.0",
+      "date": "2026-08-09",
+      "board": "wukong-xc7a100t",
+      "description": "Hardware target migrated to the QMTECH Wukong Artix-7 (XC7A100T); legacy board support retired from the IDE.",
+      "boot_rom_words": [
+        "0x077F8000",
+        "0x27678001",
+        "0x17000000"
+      ],
+      "verilog_sha256": "d0b984825b689af07c9f0e39413e1d606f7d19e5f1f417c93bc86017bd277ff4",
+      "verilog_download": "/dl/wukong-verilog",
+      "zip_download": "/dl/wukong-zip",
+      "notes": "Download the Verilog netlist and build with Vivado (source wukong_xc7a100t.tcl). The bitstream lands at church_wukong_xc7a100t.bit; a pre-built .bit is available from the Connect tab."
+    },
     {
       "version": "1.2.0",
       "date": "2026-05-28",
       "board": "ti60-f225",
       "description": "Boot ROM corrected — LOAD AL,CR15,CR15[0] → CHANGE AL,CR12,CR15,#1 → CALL AL,CR0 (cr_src=15 on CHANGE, was 12). Builder ZIP downloads fixed for all 3 boards.",
-      "boot_rom_words": ["0x077F8000", "0x27678001", "0x17000000"],
+      "boot_rom_words": [
+        "0x077F8000",
+        "0x27678001",
+        "0x17000000"
+      ],
       "verilog_sha256": "2f01c40334c89bbfa434f68d81fe458578d46ac2c50db2ec62e56575a32a70a0",
       "verilog_download": "/dl/ti60v",
       "zip_download": "/dl/ti60zip",

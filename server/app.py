@@ -264,7 +264,7 @@ _DL_TIMEOUT = (5, 30)  # (connect_seconds, read_seconds) for GitHub hex fetch
 
 @app.route("/dl/ti60-hex")
 def download_ti60_hex():
-    """Serve the Ti60 hex file as a download (Content-Disposition: attachment).
+    """Serve the legacy hex file as a download (Content-Disposition: attachment).
     Serves the local bitstreams/ copy when present; otherwise fetches from GitHub
     server-side and streams the bytes back so Chrome/Firefox/Safari always save
     the file instead of rendering it in the browser tab."""
@@ -285,7 +285,7 @@ def download_ti60_hex():
     except Exception:
         resp = make_response(
             "Pre-built bitstream not available yet.\n"
-            "Run: make bitstream  (requires Efinity — see hardware/soc_combined/BUILD_SOC_CM.md)",
+            "Build the Wukong bitstream with Vivado (source wukong_xc7a100t.tcl) and upload it.",
             404
         )
         resp.headers["Content-Type"] = "text/plain"
@@ -331,7 +331,7 @@ def _push_bitstream_to_github(meta):
 
 @app.route("/upload/ti60-hex", methods=["POST"])
 def upload_ti60_hex():
-    """Accept a new Ti60 F225 hex bitstream upload, save it to bitstreams/,
+    """Accept a legacy hex bitstream upload, save it to bitstreams/,
     then push it to GitHub so /dl/ti60-hex can redirect there.
 
     Usage from the droplet:
@@ -375,7 +375,7 @@ def upload_ti60_hex():
 
 @app.route("/upload/ti60-bit", methods=["POST"])
 def upload_ti60_bit():
-    """Accept a new Ti60 F225 raw bitstream upload and save it to bitstreams/.
+    """Accept a legacy raw bitstream upload and save it to bitstreams/.
 
     Usage from Chromebook:
       curl -X POST <ide-url>/upload/ti60-bit -F "file=@outflow/church_soc.bit"
@@ -424,24 +424,19 @@ def upload_wukong_bit():
 
 @app.route("/api/bitstream-status")
 def api_bitstream_status():
-    """Return metadata about the pre-built Ti60 hex file for the IDE panel."""
-    bitstreams_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "bitstreams"))
-    hex_path = os.path.join(bitstreams_dir, "church_ti60_f225.hex")
-    json_path = os.path.join(bitstreams_dir, "church_ti60_f225.json")
-    present = os.path.isfile(hex_path)
+    """Return metadata about the pre-built Wukong bitstream for the IDE panel."""
+    build_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "build"))
+    bit_path = os.path.join(build_dir, "church_wukong_xc7a100t.bit")
+    present = os.path.isfile(bit_path)
     meta = {}
     if present:
-        try:
-            with open(json_path) as _f:
-                meta = json.load(_f)
-        except Exception:
-            stat = os.stat(hex_path)
-            import datetime as _dt
-            meta = {
-                "built_at": _dt.datetime.utcfromtimestamp(stat.st_mtime).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "firmware_version": "unknown",
-                "size_bytes": stat.st_size,
-            }
+        stat = os.stat(bit_path)
+        import datetime as _dt
+        meta = {
+            "built_at": _dt.datetime.utcfromtimestamp(stat.st_mtime).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "firmware_version": _wukong_build_version(),
+            "size_bytes": stat.st_size,
+        }
     return jsonify({
         "ok": True,
         "present": present,
@@ -637,7 +632,6 @@ def download_ti60peri():
 def api_releases():
     import hashlib as _hashlib
     manifest_path = os.path.join(os.path.dirname(__file__), "releases", "manifest.json")
-    verilog_path  = os.path.join(os.path.dirname(__file__), "..", "build", "church_ti60_f225.v")
     try:
         with open(manifest_path) as _f:
             manifest = json.load(_f)
@@ -645,6 +639,12 @@ def api_releases():
         return jsonify({"ok": False, "error": str(_e)}), 500
     latest_ver = manifest.get("latest")
     release = next((r for r in manifest.get("releases", []) if r["version"] == latest_ver), None)
+    _verilog_by_board = {
+        "wukong-xc7a100t": "church_wukong_xc7a100t.v",
+        "ti60-f225": "church_ti60_f225.v",
+    }
+    _vfile = _verilog_by_board.get((release or {}).get("board"), "church_wukong_xc7a100t.v")
+    verilog_path = os.path.join(os.path.dirname(__file__), "..", "build", _vfile)
     stale = False
     if release and os.path.exists(verilog_path):
         try:
@@ -660,7 +660,7 @@ def api_releases_publish():
     import hashlib as _hashlib, datetime as _dt
     data = request.get_json(silent=True) or {}
     manifest_path = os.path.join(os.path.dirname(__file__), "releases", "manifest.json")
-    verilog_path  = os.path.join(os.path.dirname(__file__), "..", "build", "church_ti60_f225.v")
+    verilog_path  = os.path.join(os.path.dirname(__file__), "..", "build", "church_wukong_xc7a100t.v")
     if not os.path.exists(verilog_path):
         return jsonify({"ok": False, "error": "Verilog file not found"}), 404
     with open(verilog_path, "rb") as _f:
@@ -674,12 +674,12 @@ def api_releases_publish():
     new_entry = {
         "version":         version,
         "date":            _dt.date.today().isoformat(),
-        "board":           "ti60-f225",
+        "board":           "wukong-xc7a100t",
         "description":     data.get("description", ""),
         "boot_rom_words":  data.get("boot_rom_words", []),
         "verilog_sha256":  sha,
-        "verilog_download": "/dl/ti60v",
-        "zip_download":     "/dl/ti60zip",
+        "verilog_download": "/dl/wukong-verilog",
+        "zip_download":     "/dl/wukong-zip",
         "notes":           data.get("notes", ""),
     }
     manifest["releases"] = [r for r in manifest.get("releases", []) if r["version"] != version]
@@ -2353,7 +2353,7 @@ def start_here():
         when to patch, retire, or promote a LUMP.
       </p>
       <ul class="checklist">
-        <li>Connect a Ti60 F225 board via WebSerial</li>
+        <li>Connect a Wukong Artix-7 board (serial bridge + call-home)</li>
         <li>The board sends call-home telemetry to the IDE on every fault event</li>
         <li>Open the <strong>Dashboard</strong> to see live MTBF scores per named abstraction</li>
         <li>A dropping MTBF score flags an abstraction for review before it causes a production outage</li>
@@ -2370,7 +2370,7 @@ def start_here():
       </a>
       <a class="link-card" href="/simulator/#builder?tab=ti60-connect">
         <div class="lc-title">Connect Hardware &rarr;</div>
-        <div class="lc-desc">One-click proof-of-life for the Ti60 F225 via WebSerial to start receiving telemetry.</div>
+        <div class="lc-desc">One-click proof-of-life for the Wukong Artix-7 to start receiving telemetry.</div>
       </a>
       <div class="quiz" id="quiz-6">
         <div class="quiz-label">Quick Check</div>
@@ -2570,7 +2570,7 @@ def release_r12_index():
 <html lang="en"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Church Machine — Ti60 F225 Download</title>
+<title>Church Machine — Wukong Artix-7 Download</title>
 <style>
   *{box-sizing:border-box}
   body{font-family:system-ui,sans-serif;background:#0a0e17;color:#c8d6e5;padding:24px 20px;max-width:720px;margin:0 auto}
@@ -2631,18 +2631,18 @@ def release_r12_index():
   .back a:hover{color:#a78bfa}
 </style></head><body>
 
-<h1>&#x2B21; Church Machine — Ti60 F225</h1>
-<div class="tag">Efinix Ti60 F225 &middot; JTAG &middot; Everything in one ZIP &nbsp;&middot;&nbsp;
-  <a href="https://www.digikey.com/en/products/detail/efinix-inc./TI60F225C-DK/15672425"
+<h1>&#x2B21; Church Machine — QMTECH Wukong Artix-7</h1>
+<div class="tag">QMTECH Wukong XC7A100T &middot; JTAG &middot; Everything in one ZIP &nbsp;&middot;&nbsp;
+  <a href="https://www.aliexpress.com/w/wholesale-qmtech-wukong.html"
      target="_blank" rel="noopener"
-     style="color:#4ade80;text-decoration:none;">&#x1F6D2; Buy the Ti60 F225 Dev Kit on Digi-Key</a>
+     style="color:#4ade80;text-decoration:none;">&#x1F6D2; Buy the QMTECH Wukong board</a>
 </div>
 
 <div class="hero">
   <div class="hero-title">Complete build package &amp; pre-built bitstream</div>
-  <div class="hero-sub">One download. Extract, then <code>make flash</code> — board running in under a minute.</div>
-  <a class="dl-btn" href="/dl/ti60zip"><span class="dl-btn-icon">&#x2B07;</span>Download church_ti60_f225_project.zip</a>
-  <div class="hero-meta">Includes Verilog source &middot; Efinity project &middot; pre-built .hex &middot; Makefile &middot; PDFs</div>
+  <div class="hero-sub">One download. Extract, then build with Vivado — or flash the pre-built bitstream below.</div>
+  <a class="dl-btn" href="/dl/wukong-zip"><span class="dl-btn-icon">&#x2B07;</span>Download church-wukong-package.zip</a>
+  <div class="hero-meta">Includes Verilog netlist &middot; XDC pin constraints &middot; Vivado build script</div>
 </div>
 
 <div id="r12BitstreamCard" style="margin-bottom:1.6rem"></div>
@@ -2658,13 +2658,13 @@ def release_r12_index():
         +'<span style="font-size:1.5rem">✅</span>'
         +'<div style="flex:1"><div style="color:#4ade80;font-weight:700;font-size:.9rem">Pre-built bitstream available</div>'
         +'<div style="font-size:.75rem;color:#64748b;margin-top:2px">'+sz+(fw?' &middot; fw '+fw:'')+(dt?' &middot; built '+dt:'')+'</div></div>'
-        +'<a href="/dl/ti60-hex" style="padding:.4rem 1rem;background:#166534;border-radius:5px;color:#4ade80;text-decoration:none;font-size:.82rem;font-weight:700;white-space:nowrap">&#x2B07; Download .hex</a>'
+        +'<a href="/dl/wukong-bit" style="padding:.4rem 1rem;background:#166534;border-radius:5px;color:#4ade80;text-decoration:none;font-size:.82rem;font-weight:700;white-space:nowrap">&#x2B07; Download .bit</a>'
         +'</div>';
     } else {
       card.innerHTML = '<div style="background:#1a0e0e;border:1px solid #4a1212;border-radius:8px;padding:12px 16px;font-size:.8rem;color:#9ca3af">'
         +'<span style="color:#f87171;font-weight:700">Bitstream not yet built.</span> '
-        +'Run <code style="background:#0a0e17;padding:.1rem .3rem;border-radius:3px;color:#c4b5fd">make bitstream</code> from the repo root (requires Efinity). '
-        +'See <a href="/dl/build-soc-cm-md" style="color:#a78bfa">BUILD_SOC_CM.md</a> for instructions.'
+        +'Build it with Vivado: <code style="background:#0a0e17;padding:.1rem .3rem;border-radius:3px;color:#c4b5fd">source wukong_xc7a100t.tcl</code> from the extracted package, '
+        +'then upload the resulting .bit to the IDE.'
         +'</div>';
     }
   }).catch(function(){});
@@ -2672,15 +2672,11 @@ def release_r12_index():
 </script>
 <div class="box-title">&#x1F4E6; What&rsquo;s inside the ZIP</div>
 <div class="contents-grid">
-  <div class="highlight"><span class="file">outflow/church_ti60_f225.hex</span><span class="note"> — pre-built bitstream ✓</span></div>
-  <div><span class="file">church_ti60_f225.xml</span><span class="note"> — Efinity project</span></div>
-  <div><span class="file">church_ti60_f225.v</span><span class="note"> — Verilog source</span></div>
-  <div><span class="file">church_ti60_f225.sdc</span><span class="note"> — timing constraints</span></div>
-  <div><span class="file">church_ti60_f225.peri.xml</span><span class="note"> — periphery I/O</span></div>
-  <div><span class="file">setup_ti60_peri.py</span><span class="note"> — DesignAPI PLL script</span></div>
-  <div><span class="file">Makefile</span><span class="note"> — peri / efinity / flash / clean</span></div>
+  <div class="highlight"><span class="file">church_wukong_xc7a100t.v</span><span class="note"> — Verilog netlist ✓</span></div>
+  <div><span class="file">church_wukong_xc7a100t.il</span><span class="note"> — Amaranth RTLIL source</span></div>
+  <div><span class="file">wukong_xc7a100t.xdc</span><span class="note"> — Vivado pin constraints</span></div>
+  <div><span class="file">wukong_xc7a100t.tcl</span><span class="note"> — Vivado batch build script</span></div>
   <div><span class="file">BUILD.md</span><span class="note"> — full instructions</span></div>
-  <div><span class="file">docs/</span><span class="note"> — PDF documentation bundle</span></div>
 </div>
 
 <div class="box-title">&#x26A1; Flash the pre-built bitstream</div>
@@ -2696,10 +2692,9 @@ def release_r12_index():
     <div class="step-num">2</div>
     <div class="step-body">
       <strong>Flash the board</strong>
-      <pre>make flash</pre>
-      <p>Uses <code>~/oss-cad-suite/bin/openFPGALoader</code> with the included <code>outflow/church_ti60_f225.hex</code>.<br>
-      No Efinity IDE or synthesis needed.</p>
-      <p class="alt">Or via Efinity: <strong>Tool → Programmer</strong> → Efinix USB2.0 Device → JTAG → load <code>outflow/church_ti60_f225.hex</code> → Program.</p>
+      <pre>openFPGALoader church_wukong_xc7a100t.bit</pre>
+      <p>Download the pre-built <code>.bit</code> from the card above (when available).</p>
+      <p class="alt">Or via Vivado: <strong>Hardware Manager</strong> → Open target → Auto Connect → Program Device → select the <code>.bit</code>.</p>
     </div>
   </div>
   <div class="step">
@@ -2713,7 +2708,7 @@ def release_r12_index():
     <div class="step-num">4</div>
     <div class="step-body">
       <strong>Connect to the IDE</strong>
-      <p>Open the <a href="/simulator" style="color:#a78bfa">Church Machine IDE</a> → click <strong>&#x1F50C; Connect Ti60</strong> → pick your board from the list. The IDE uploads the boot image automatically and the Church Machine starts running.</p>
+      <p>Open the <a href="/simulator" style="color:#a78bfa">Church Machine IDE</a> → click <strong>&#x1F50C; Connect Wukong</strong> → pick your board from the list. The IDE uploads the boot image automatically and the Church Machine starts running.</p>
     </div>
   </div>
 </div>
@@ -2721,36 +2716,21 @@ def release_r12_index():
 <hr class="step-divider">
 
 <details>
-  <summary>&#x1F527; Rebuild the bitstream from source (Efinity toolchain required)</summary>
+  <summary>&#x1F527; Rebuild the bitstream from source (AMD Vivado required)</summary>
   <div class="steps" style="margin-top:1rem">
     <div class="step">
       <div class="step-num">1</div>
       <div class="step-body">
-        <strong>Generate the periphery XML</strong>
-        <pre>make peri</pre>
-        <p>Runs <code>setup_ti60_peri.py</code> via Efinity&rsquo;s Python. You should see <em>SUCCESS — church_ti60_f225.peri.xml written</em>.</p>
+        <strong>Run the Vivado build script</strong>
+        <pre>vivado -mode batch -source wukong_xc7a100t.tcl</pre>
+        <p>Creates the project, runs synthesis + implementation (~30 min), and writes <code>church_wukong_xc7a100t.bit</code>.</p>
       </div>
     </div>
     <div class="step">
       <div class="step-num">2</div>
       <div class="step-body">
-        <strong>Open Efinity IDE</strong>
-        <pre>make efinity</pre>
-        <p>Then <strong>File → Open Project → <code>church_ti60_f225.xml</code></strong></p>
-      </div>
-    </div>
-    <div class="step">
-      <div class="step-num">3</div>
-      <div class="step-body">
-        <strong>Synthesise &amp; generate bitstream</strong>
-        <p>Run <strong>Synthesis → Place &amp; Route → Generate Bitstream</strong> (~30 min). Efinity writes <code>outflow/church_ti60_f225.hex</code> when done.</p>
-      </div>
-    </div>
-    <div class="step">
-      <div class="step-num">4</div>
-      <div class="step-body">
         <strong>Flash</strong>
-        <pre>make flash</pre>
+        <pre>openFPGALoader church_wukong_xc7a100t.bit</pre>
       </div>
     </div>
   </div>
@@ -3141,7 +3121,7 @@ def download_build_file(filename):
 def download_local_bridge():
     """Serve the WebSerial HTTP bridge (server/local_bridge.py) for download.
     This bridge speaks the binary CALLHOME protocol and acts as a local HTTP
-    proxy so Chrome's WebSerial API can reach the Ti60 over USB.
+    proxy so Chrome's WebSerial API can reach the board over USB.
     For the ASCII CALLHOME bridge (Penguin / headless use) see /callhome_bridge.py.
     """
     bridge_path = os.path.join(os.path.dirname(__file__), "local_bridge.py")
@@ -3157,7 +3137,7 @@ def download_local_bridge():
 @app.route("/callhome_bridge.py")
 @app.route("/download/callhome_bridge.py")
 def download_callhome_bridge():
-    """Serve the ASCII CALLHOME bridge for Ti60 SoC (hardware/soc_combined/callhome_bridge.py)."""
+    """Serve the ASCII CALLHOME bridge (hardware/soc_combined/callhome_bridge.py)."""
     bridge_path = os.path.join(os.path.dirname(__file__), "..", "hardware", "soc_combined", "callhome_bridge.py")
     bridge_path = os.path.normpath(bridge_path)
     if not os.path.isfile(bridge_path):
@@ -4166,7 +4146,7 @@ def admin_bitstreams_page():
                 os.path.getmtime(path)).strftime("%Y-%m-%d %H:%M UTC")
         status_colour = "#66bb6a" if exists else "#ef5350"
         status_text   = f"✓ {size_str}" if exists else "✗ missing"
-        board_label = {"ti60-f225": "Efinix Ti60 F225"}.get(board, board)
+        board_label = {"ti60-f225": "Efinix Ti60 F225 (legacy)", "wukong-xc7a100t": "QMTECH Wukong Artix-7"}.get(board, board)
         delete_td = (
             "<td><a href='/api/bitstream/delete/" + board + "?token=" + token + "'"
             " onclick=\"return confirm('Delete " + fname + "?')\""
@@ -9775,7 +9755,7 @@ def mum_greet():
     from the Tunnel and resolves to Mum's GT.
 
     The Observer IDE bridge calls this endpoint after it receives a GTKN packet
-    from the Ti60/simulator and verifies the GT.  This handler runs Greet() and
+    from the board/simulator and verifies the GT.  This handler runs Greet() and
     returns the greeting response word back to the bridge, which writes it to
     the Tunnel RX path.
 
@@ -9932,7 +9912,7 @@ def api_generate_method_available():
 
 @app.route("/internal/download-verilog")
 def internal_download_verilog():
-    """Temporary endpoint — serve the generated Ti60 Verilog so the Chromebook can wget it."""
+    """Temporary endpoint — serve the generated legacy Verilog so the Chromebook can wget it."""
     import glob as _glob
     candidates = [
         os.path.join(os.path.dirname(__file__), "..", "church_ti60_f225.v"),

@@ -71,7 +71,7 @@
     // Board RAM limits:
     //   Tang Nano 9K          2,048 w  → no preset fits → fallback to min (shows warning)
     //   Tang Nano 20K / IoT  16,384 w  → only n=0 (16 K) shown
-    //   Efinix Ti60 F225     65,536 w  → n=0–2 (16 K–64 K) shown
+    //   (legacy ti60-f225)   65,536 w  → n=0–2 (16 K–64 K) shown
     //   Wukong XC7A100T     131,072 w  → n=0–3 (16 K–128 K) shown
     function getValidNSPresets(boardRam) {
         var fits = NS_PRESETS.filter(function (p) {
@@ -761,12 +761,12 @@
 
     var BOARD_PROFILES = {
         'tang-nano-20k-iot': { label: 'Tang Nano 20K',      totalRamWords: 16384,  singleThread: true  },
-        'ti60-f225':         { label: 'Ti60 F225',           totalRamWords: 65536,  singleThread: false },
         'wukong-xc7a100t':   { label: 'Wukong XC7A100T',    totalRamWords: 131072, singleThread: false }
     };
 
     function getBoardProfile() {
         var board = (typeof localStorage !== 'undefined' && localStorage.getItem('fpga_board_target')) || 'wukong-xc7a100t';
+        if (board === 'ti60-f225') board = 'wukong-xc7a100t';   // legacy stored value
         return BOARD_PROFILES[board] || BOARD_PROFILES['wukong-xc7a100t'];
     }
 

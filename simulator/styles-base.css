@@ -1513,6 +1513,26 @@ details[open] .ti60-advanced-summary::before { transform: rotate(90deg); }
 .versions-value a { color: #8ab4f8; text-decoration: none; }
 .versions-value a:hover { text-decoration: underline; }
 .versions-note { font-size: 0.78rem; color: #999; margin-top: 0.45rem; line-height: 1.4; }
+.versions-advice-btn {
+    background: #3d3416; color: #e8c96a; border: 1px solid #7a672c; border-radius: 5px;
+    padding: 0.25rem 0.7rem; font-size: 0.8rem; cursor: pointer; margin-left: 0.5rem;
+}
+.versions-advice-btn:hover { background: #4a4020; }
+.versions-advice-btn.versions-advice-ok { background: #16391f; color: #7fd894; border-color: #2c6b3c; }
+.versions-advice-popup {
+    position: relative; background: #1c2333; border: 1px solid #7a672c; border-radius: 8px;
+    padding: 0.8rem 1rem; margin: 0.6rem 0 0.8rem; max-width: 720px; font-size: 0.82rem;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.45);
+}
+.versions-advice-head { display: flex; justify-content: space-between; align-items: center; color: #e8c96a; margin-bottom: 0.4rem; }
+.versions-advice-close { background: none; border: none; color: #999; cursor: pointer; font-size: 0.9rem; }
+.versions-advice-close:hover { color: #fff; }
+.versions-advice-item { margin: 0.45rem 0; padding-left: 0.2rem; line-height: 1.45; }
+.versions-advice-item .vai-title { font-weight: 600; }
+.versions-advice-item.vai-bad  .vai-title { color: #e88a8a; }
+.versions-advice-item.vai-warn .vai-title { color: #e8c96a; }
+.versions-advice-item .vai-fix { color: #9fb4d8; display: block; margin-top: 0.1rem; }
+.versions-advice-allok { color: #7fd894; }
 .versions-badge {
     display: inline-block;
     font-size: 0.72rem;

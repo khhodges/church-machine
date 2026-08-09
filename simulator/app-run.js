@@ -1884,7 +1884,7 @@ function runSim() {
 
 // ── S-IDE v1 "Try demo program" one-click path ───────────────────────────────
 // Loads the led_control example, assembles it, and immediately runs it so
-// users can complete Step 3 without a real Ti60.  Called by the
+// users can complete Step 3 without a real board.  Called by the
 // "Try demo program →" button on the Step 3 card.
 window._r1TryDemoProgram = function() {
     if (typeof switchView === 'function') switchView('editor');
@@ -2028,8 +2028,9 @@ async function fpgaConnectToggle() {
     const _board = getSelectedBoard();
     const _boardHints = {
         'ti60-f225':          { chip: 'FTDI FT2232H',  look: 'look for "Dual RS232-HS" or "USB Serial Port"',      driver: 'install the FTDI VCP driver from ftdichip.com' },
+        'wukong-xc7a100t':    { chip: 'CP2102 / FTDI', look: 'look for "CP210x" or "USB Serial Port"',             driver: 'install the CP210x or FTDI VCP driver' },
     };
-    const _h = _boardHints[_board] || _boardHints['ti60-f225'];
+    const _h = _boardHints[_board] || _boardHints['wukong-xc7a100t'];
     const _label = getBoardLabel(_board);
     const _ready = window.confirm(
         'Connecting to ' + _label + '\n' +
@@ -2181,7 +2182,7 @@ function _showBridgeModal() {
 setInterval(updateFPGAStatusBtn, 2000);
 
 // ── BRAM readback ─────────────────────────────────────────────────────────────
-// Sends 0xBEAD to the Ti60 F225 debug FSM and dumps the returned words to the
+// Sends 0xBEAD to the board's debug FSM and dumps the returned words to the
 // editor console as a hex table.  Useful to verify PATCH_LUMP actually wrote the
 // correct words after a patch.
 function fpgaReadBRAM() {
@@ -2246,7 +2247,7 @@ function fpgaReadBRAM() {
             const result = await TangSerial.readBRAM(baseAddr, count, (msg) => _fpgaLog(msg));
             if (result.words.length === 0) {
                 _showFpgaToast('Read BRAM', 'No data received \u2014 is the bitstream built with READ_BRAM?', 'err', 8000);
-                _fpgaLog('Read BRAM: no data received \u2014 is the Ti60 F225 bitstream built with READ_BRAM support?');
+                _fpgaLog('Read BRAM: no data received \u2014 is the Wukong bitstream built with READ_BRAM support?');
                 return;
             }
             const PER_LINE = 8;
@@ -4071,7 +4072,7 @@ capabilities {
 ; HOW TO WATCH THIS IN THE SIMULATOR:
 ; 1. Boot the machine (click Boot, or Step x6).
 ; 2. Assemble this code, then click Run (or Step repeatedly).
-; 3. Switch to Ti60 255 IDE — watch the LED strip animate
+; 3. Switch to the Church Machine IDE — watch the LED strip animate
 ;    through 6 phases. All pass → all 6 LEDs blink 3×.
 ;    Any failure → LED2 (red FAULT) latches ON permanently.
 ;
@@ -7486,7 +7487,7 @@ done:
 HALT`,
         'led_control': `; ============================================================
 ; Abstraction:  LED Flash
-; Description:  LED control — Section 1: LED blink (Ti60 F225 nucleus) / Section 2: Turing DR Test (full ISA exercise)
+; Description:  LED control — Section 1: LED blink (Wukong nucleus) / Section 2: Turing DR Test (full ISA exercise)
 ; Author:       Church Machine Educational Platform
 ; Version:      1.2
 ; Created:      2026-05-09
@@ -7496,20 +7497,20 @@ HALT`,
 ; Capabilities required by this lump:
 capabilities { LED0 RW }
 ; Methods:
-;   1. blink — toggle LED0 at 1 Hz using nested delay loops (Ti60 F225 nucleus program)
+;   1. blink — toggle LED0 at 1 Hz using nested delay loops (Wukong nucleus program)
 ; ============================================================
 ; ============================================
-; LED Blink — Ti60 F225 Hardware Nucleus Code
+; LED Blink — Wukong Hardware Nucleus Code
 ; ============================================
 ;
 ; This is the exact binary burned into the
-; Ti60 F225 FPGA. It produces the 1 Hz LED
+; Wukong Artix-7 FPGA. It produces the 1 Hz LED
 ; blink you can see on the board right now.
 ;
 ; HOW TO WATCH THIS IN THE SIMULATOR:
 ; 1. Boot the machine (click Boot, or Step x6).
 ; 2. Assemble this code, then click Step.
-; 3. Switch to Ti60 255 IDE — watch the Ti60 F225
+; 3. Switch to the Church Machine IDE — watch the
 ;    LED strip: LED0 (green) toggles with each
 ;    DWRITE, exactly as on the physical board.
 ;
@@ -7691,7 +7692,7 @@ capabilities { LED0 RW }
 ; HOW TO WATCH THIS IN THE SIMULATOR:
 ;   1. Boot the machine (click Boot, or Step × 6).
 ;   2. Assemble this code, then click Step or Run.
-;   3. Switch to Ti60 255 IDE — watch LED0 (green) toggle:
+;   3. Switch to the Church Machine IDE — watch LED0 (green) toggle:
 ;      short = dit, long = dah, silence = gap.
 ;   4. To read the live pattern on a physical FPGA board, update
 ;      the delay counts to the FPGA values above, re-assemble,
@@ -10894,7 +10895,7 @@ function getStudentSettings() {
         language: 'english',
         nationality: 'us',
         ageTier: '13-17',
-        fpgaBoard: 'ti60-f225',
+        fpgaBoard: 'wukong-xc7a100t',
         selectedSubjects: []
     };
 }
@@ -11003,11 +11004,12 @@ function nativeShare() {
 }
 
 function getSelectedBoard() {
-    return localStorage.getItem('fpga_board_target') || 'ti60-f225';
+    var b = localStorage.getItem('fpga_board_target') || 'wukong-xc7a100t';
+    if (b === 'ti60-f225') b = 'wukong-xc7a100t';   // legacy stored value — Wukong is the only target
+    return b;
 }
 
 function getBoardShortLabel(board) {
-    if (board === 'ti60-f225') return 'Ti60 F225';
     if (board === 'wukong-xc7a100t') return 'Wukong XC7A100T';
     return 'Tang Nano 20K';
 }
@@ -11022,7 +11024,7 @@ function setSelectedBoard(board) {
     if (lbl) lbl.textContent = getBoardShortLabel(board);
     const ti60Btn = document.getElementById('toolbarTi60ConnectBtn');
     if (ti60Btn) {
-        const _boardShort = {'ti60-f225': 'Ti60', 'wukong-xc7a100t': 'Wukong'};
+        const _boardShort = {'wukong-xc7a100t': 'Wukong'};
         ti60Btn.innerHTML = '&#x1F50C; ' + (_boardShort[board] || 'Board');
         ti60Btn.classList.add('ti60-connect-active');
     }
@@ -11031,7 +11033,6 @@ function setSelectedBoard(board) {
 }
 
 function getBoardLabel(board) {
-    if (board === 'ti60-f225') return 'Efinix Ti60 F225';
     if (board === 'wukong-xc7a100t') return 'QMTECH Wukong (Artix-7)';
     return 'Sipeed Tang Nano 20K';
 }
@@ -11137,12 +11138,101 @@ const VersionsView = {
             this._renderFpga(status);
             this._renderBitstream(bs, status);
             this._renderProd(prod);
+            this._renderAdvice(status, gh, diff, bs, prod);
             const lc = document.getElementById('versionsLastChecked');
             if (lc) lc.textContent = 'Checked ' + new Date().toLocaleTimeString();
         } finally {
             this._inFlight = false;
             if (btn) btn.disabled = false;
         }
+    },
+
+    toggleAdvice(force) {
+        const pop = document.getElementById('versionsAdvicePopup');
+        if (!pop) return;
+        const show = force !== undefined ? force : pop.style.display === 'none';
+        pop.style.display = show ? '' : 'none';
+    },
+
+    // Cross-check every Versions data source and produce plain-language advice
+    // for any mismatch or problem (shown in the "Health" popup).
+    _collectAdvice(status, gh, diff, bs, prod) {
+        const issues = [];
+        const add = (sev, title, fix) => issues.push({ sev, title, fix });
+
+        // IDE ↔ GitHub
+        if (diff && diff.in_sync === false) {
+            const c = diff.counts || {};
+            const n = (c.changed || 0) + (c.local_only || 0) + (c.github_only || 0);
+            add('warn', `IDE and GitHub differ (${n} file${n === 1 ? '' : 's'})`,
+                'The running IDE is not the same code as the latest GitHub commit. Push local changes (or pull the latest commit) so the two stay in sync; expand the diff list on the IDE card to see what differs.');
+        }
+
+        // Attached FPGA / bridge
+        if (status && !status.bridge_connected) {
+            add('bad', 'FPGA board not connected',
+                'The Wukong bridge is offline. Start the bridge on the host machine (Connect tab \u2192 bridge instructions), then press Refresh. Firmware checks below cannot run until the board reports in.');
+        } else if (status && status.boot_info && status.boot_info.tu_version == null) {
+            add('warn', 'No boot sentinel received yet',
+                'The bridge is online but the board has not announced its firmware. Send \u2018f\u2019 (Reboot) from the Connect tab to re-arm the sentinel.');
+        } else if (status && status.boot_info && status.expected_build_version != null &&
+                   status.boot_info.build_version != null &&
+                   status.boot_info.build_version !== status.expected_build_version) {
+            add('warn', `Board firmware v${status.boot_info.build_version} \u2260 repo expectation v${status.expected_build_version}`,
+                'The bitstream running on the board is out of date. Download the current .bit from the Connect tab and reflash the board.');
+        }
+
+        // Bitstream metadata
+        if (bs && bs.ok && bs.present) {
+            const fwRaw = bs.firmware_version != null ? String(bs.firmware_version) : '';
+            const fw = fwRaw.replace(/^v+/i, '');
+            const expected = status ? status.expected_build_version : null;
+            if (fw && !/^\d+$/.test(fw)) {
+                add('warn', `Bitstream version looks malformed (\u201C${fwRaw}\u201D)`,
+                    'The stored bitstream metadata has a non-numeric firmware version, so it cannot be compared with the repo expectation. Re-upload the bitstream from a current build so the metadata is regenerated.');
+            } else if (expected != null && fw && Number(fw) !== Number(expected)) {
+                add('warn', `Stored bitstream is v${fw} but the repo expects v${expected}`,
+                    'The pre-built bitstream on the server is older than the current code expects. Rebuild with Vivado (or upload the latest build) so downloads from the Connect tab match the repo.');
+            }
+            if (bs.built_at) {
+                const ageDays = (Date.now() - Date.parse(bs.built_at)) / 86400000;
+                if (isFinite(ageDays) && ageDays > 30) {
+                    add('warn', `Bitstream build is ${Math.round(ageDays)} days old`,
+                        'The stored bitstream predates recent commits. If hardware behaviour matters, rebuild and re-upload it so the .bit matches the current repo.');
+                }
+            }
+        } else if (bs && bs.ok && !bs.present) {
+            add('warn', 'No pre-built bitstream on the server',
+                'Users cannot download a .bit from the Connect tab until one is uploaded from a Vivado build.');
+        }
+
+        // Production
+        if (prod && !prod.error && prod.version != null && prod.in_sync === false) {
+            add('warn', 'Production runs a different version than this IDE',
+                'lab.cloomc.org is serving a different commit. Deploy the current version (or expect behaviour differences between this IDE and production).');
+        }
+
+        return issues;
+    },
+
+    _renderAdvice(status, gh, diff, bs, prod) {
+        const btn = document.getElementById('versionsAdviceBtn');
+        const body = document.getElementById('versionsAdviceBody');
+        if (!btn || !body) return;
+        const issues = this._collectAdvice(status, gh, diff, bs, prod);
+        btn.style.display = '';
+        if (!issues.length) {
+            btn.textContent = '\u2713 Healthy';
+            btn.classList.add('versions-advice-ok');
+            body.innerHTML = '<div class="versions-advice-allok">No configuration mismatches detected \u2014 IDE, GitHub, bitstream, board, and production all look consistent.</div>';
+            return;
+        }
+        btn.classList.remove('versions-advice-ok');
+        btn.textContent = `\u26A0 Health (${issues.length})`;
+        body.innerHTML = issues.map(i =>
+            `<div class="versions-advice-item vai-${i.sev}">` +
+            `<span class="vai-title">${this._esc(i.title)}</span>` +
+            `<span class="vai-fix">${this._esc(i.fix)}</span></div>`).join('');
     },
 
     // Render a human explanation of WHAT differs between the local checkout
@@ -11258,10 +11348,10 @@ const VersionsView = {
         }
         if (!bs.present) {
             el.innerHTML = this._badge('warn', 'No bitstream built') +
-                '<div class="versions-note">No pre-built Ti60 hex found in bitstreams/.</div>';
+                '<div class="versions-note">No pre-built Wukong bitstream found yet \u2014 upload one from a Vivado build.</div>';
             return;
         }
-        const fw = bs.firmware_version != null ? String(bs.firmware_version) : '?';
+        const fw = bs.firmware_version != null ? String(bs.firmware_version).replace(/^v+/i, '') : '?';
         const letter = bs.build_letter ? ` (build ${this._esc(bs.build_letter)})` : '';
         const expected = status ? status.expected_build_version : null;
         let badge = '';
@@ -11407,14 +11497,12 @@ function _renderBuildNextSteps(isTi60, board) {
     const el = document.getElementById('buildNextSteps');
     if (!el) return;
     var steps;
-    if (isTi60) {
+    if (board === 'wukong-xc7a100t') {
         steps = [
             'Extract the zip — all files land in one folder',
-            'Run setup_ti60_peri.py with Efinity\'s Python to add the PLL (see BUILD.md)',
-            'In the SDC file: switch from Phase A (25 MHz) to Phase B (50 MHz) per the comments',
-            'File → Open Project → ti60_f225_project.xml',
-            'Run Synthesis → P&R → Generate Bitstream',
-            'Tool → Programmer → Program (JTAG / USB)',
+            'Run: vivado -mode batch -source wukong_xc7a100t.tcl (creates project + builds the bitstream)',
+            'Program church_wukong_xc7a100t.bit via Vivado Hardware Manager (or openFPGALoader)',
+            'Start the serial bridge (bridge.sh) and use Connect Wukong in the IDE',
         ];
     } else {
         steps = [];
@@ -11440,7 +11528,7 @@ function initHardwareBuildPanel() {
     const ti60Btn = document.getElementById('toolbarTi60ConnectBtn');
     if (ti60Btn) {
         const _board = getSelectedBoard();
-        const _boardShort = {'ti60-f225': 'Ti60', 'tang-nano-20k-iot': 'Tang 20K', 'wukong-xc7a100t': 'Wukong'};
+        const _boardShort = {'tang-nano-20k-iot': 'Tang 20K', 'wukong-xc7a100t': 'Wukong'};
         ti60Btn.innerHTML = '&#x1F50C; ' + (_boardShort[_board] || 'Board');
         ti60Btn.classList.add('ti60-connect-active');
     }
@@ -11454,7 +11542,7 @@ function updateHardwarePanelLabel() {
     const BASE_BUILD_TIP = 'Build \u2014 Run Amaranth elaboration + Yosys synthesis and save RTL artifacts to server';
     if (!info) return;
     if (board === 'ti60-f225') {
-        info.textContent = 'Output: church_ti60_f225.v + church_ti60_f225.edif + ti60_f225.isf  \u2014  open in Efinity IDE (Titanium project)';
+        info.textContent = 'Output: church_wukong_xc7a100t.v + wukong_xc7a100t.xdc  \u2014  build with Vivado';
         if (buildBtn) buildBtn.dataset.tooltip = BASE_BUILD_TIP;
     } else if (board === 'wukong-xc7a100t') {
         info.textContent = '';
@@ -11593,7 +11681,7 @@ function showReleaseHistory() {
             'Tunnel status badges in Devices view: green "Tunnel online", muted-red "Tunnel offline", and neutral "Checking…" — auto-refresh every 12 s without a full page reload',
             'Board online/offline status and "last seen" time also auto-refresh live in the Devices view between polls',
             'UART bridge reader fixed: one-byte hold-back in the CALLHOME_MAGIC scanner eliminated; final byte of any UART response is no longer silently held back until the next read cycle',
-            'GTKN replay test suite: pty loopback harness verifies the full serial framing path (tag big-endian on the wire, count, payload); golden 12-byte fixture captured from Ti60 hardware',
+            'GTKN replay test suite: pty loopback harness verifies the full serial framing path (tag big-endian on the wire, count, payload); golden 12-byte fixture captured from FPGA hardware',
             'LUMP detail panel: new Tokens tab (inserted after Content) showing POLA — Principle of Least Authority section with ⚡ Apply POLA button, and the full MyGoldenTokens capability-chip viewer; Content tab now shows code/data only',
             'Gate test infrastructure: 3 pre-existing failures fixed (far_cap_fault, outform_load_lazy, outform_eloadcall_lazy); shared bootSim/setupCR6 helpers extracted; XLOADLAMBDA harness fixed; Python pytest wrappers added for all JS-only gate harnesses; gate suite grows to 52 tests',
             'Boot stability: Navana.Init skips NS entries for failed code allocations; boot succeeds even when both AllocCode calls return OOM',
@@ -11603,9 +11691,9 @@ function showReleaseHistory() {
         { date: '2026-04-16 UTC', title: 'One-Click Build LUMP', changes: ['Build LUMP button: one-click compile-to-binary for any CLOOMC++ abstraction in any language mode', 'Produces spec-compliant .lump binary: header (magic 0x1F + n-6 + cw + typ + cc), code region, c-list, big-endian uint32', 'Console shows full lump layout: header hex, methods with offsets, capability list, freespace, file size', 'Available in toolbar (green button) and Editor Actions dropdown; auto-disabled in Assembly mode'] },
         { date: '2026-04-16 UTC', title: 'English String Abstraction', changes: ['EN: String example — 14 of 15 planned methods for packed 4-char-per-word string operations written in plain English (ReplaceChar deferred: requires bitwise AND/OR masking not yet in English translator)', 'Pack4/Unpack, IsLetter/IsDigit/IsUpper/IsLower/IsSpace, ToUpper/ToLower, CharToDigit/DigitToChar, ReverseWord, CompareWords, CountLetters', 'Byte extraction via shift-and-subtract (no bfext needed) — pure English front-end, zero hardware dependencies', 'New EN: String tab in CLOOMC++ IDE with category-organized source and ASCII reference header'] },
         { date: '2026-04-15 UTC', title: 'Patent Portfolio & Figure Audit', changes: ['Browsable /patents/ page: 8 PDFs with color-coded badges (FULL/BASE/CIP/COVER), 45 HTML figures with category filters and live search', 'Figure audit complete: 14 dark-background figures converted to white, 5 missing figures created (HP-35 opcode chart, Ada Lovelace model, 3 Lambda Recursion CIP figures), 4 new I/O Addressing figures', 'Consolidated patent document (2,818 lines): cover letter + Part I base patent + Addendum A (CLOOMC++) + Addendum B (Abstract GT I/O) + Addendum C (Lambda Recursion)', 'Lambda Recursion CIP finalized: 7 patent claims — CR6 self-invocation, idempotent re-entry, O(1) trifecta, two-RETURN exit, three loop styles, English NL compilation, pet-name constants', 'All patent PDFs regenerated with fpdf2: Unicode support, letter-size pages, multi-line table cells, page numbering', 'Server routes added: /patents/, /patents/files/, /figures/ for browsing patent portfolio'] },
-        { date: '2026-04-12 UTC', title: 'SlideRule Abstraction, LED MMIO & Doc Review', changes: ['SlideRule abstraction complete (NS slot 16): 22 methods in CLOOMC++ source — 13 core (Add, Sub, Mul, Div, Mod, Sqrt, Pow, Sin, Cos, Tan, ASin, ACos, ATan2) + 9 extended (Sinh, Cosh, Exp, Log, Log2, Log10, ToDegrees, ToRadians, Bernoulli)', 'CLOOMC++ compiler bugs fixed: multi-word method bodies, semicolon handling, capability block parsing', '4 lumps build cleanly: Constants, LED, SlideRule, SlideRuleHS (token=00001000, cw=2602, methods=22)', 'LED abstraction (NS slot 12): FPGA MMIO bindings for Efinix Ti60 F225 (NS slot 12)', 'Navana.Init boot sequence: ordered capability grants, slot pre-population on boot ROM start', 'IntegerOps (Clamp+Abs) and PackedString (Pack4+Unpack+IsLetter+ToUpper) JS examples in IDE tabs', 'CR5 instance-data convention clarified: CR5 is a thread register installed by CHANGE from Zone ④ bounds; not saved/restored by CALL/RETURN', 'Branding cleanup: CTMM_64 → ChurchMachine_64, RV32_CAP → IoT_32 throughout docs', 'Doc review (9 fixes): GT type table, register count, GT width, patent dates, network-transparency status, TSB line count (329 → ~300), Results row in prologue property table'] },
+        { date: '2026-04-12 UTC', title: 'SlideRule Abstraction, LED MMIO & Doc Review', changes: ['SlideRule abstraction complete (NS slot 16): 22 methods in CLOOMC++ source — 13 core (Add, Sub, Mul, Div, Mod, Sqrt, Pow, Sin, Cos, Tan, ASin, ACos, ATan2) + 9 extended (Sinh, Cosh, Exp, Log, Log2, Log10, ToDegrees, ToRadians, Bernoulli)', 'CLOOMC++ compiler bugs fixed: multi-word method bodies, semicolon handling, capability block parsing', '4 lumps build cleanly: Constants, LED, SlideRule, SlideRuleHS (token=00001000, cw=2602, methods=22)', 'LED abstraction (NS slot 12): FPGA MMIO bindings (NS slot 12)', 'Navana.Init boot sequence: ordered capability grants, slot pre-population on boot ROM start', 'IntegerOps (Clamp+Abs) and PackedString (Pack4+Unpack+IsLetter+ToUpper) JS examples in IDE tabs', 'CR5 instance-data convention clarified: CR5 is a thread register installed by CHANGE from Zone ④ bounds; not saved/restored by CALL/RETURN', 'Branding cleanup: CTMM_64 → ChurchMachine_64, RV32_CAP → IoT_32 throughout docs', 'Doc review (9 fixes): GT type table, register count, GT width, patent dates, network-transparency status, TSB line count (329 → ~300), Results row in prologue property table'] },
         { date: '2026-04-11 19:30 UTC', title: 'Cryptographic Build Signatures', changes: ['HMAC-SHA256 build signatures replace single-byte build tag', 'Server-side signature verification with constant-time comparison', '23-byte call-home packet with 4-byte HMAC, boot_reason, last_fault, fault_nia fields', 'Official/Custom Build badges (green/amber) in Devices view', 'MTBF gate: maxSteps runs count as failed; editor input clears history', 'Quick-start docs improved with toolbar icon reference and DigiKey link'] },
-        { date: '2026-03-29 22:15 UTC', title: 'Consistency & Hardware Updates', changes: ['Consistency audits completed', 'Simulator GT type mapping fixed (Inform/Outform/Abstract)', 'Hardware deployment plan for Efinix Ti60 F225 created', 'Settings button order corrected', 'Lump size specification unified (64-word minimum)'] },
+        { date: '2026-03-29 22:15 UTC', title: 'Consistency & Hardware Updates', changes: ['Consistency audits completed', 'Simulator GT type mapping fixed (Inform/Outform/Abstract)', 'Hardware deployment plan for the FPGA board created', 'Settings button order corrected', 'Lump size specification unified (64-word minimum)'] },
         { date: '2026-03-24 00:00 UTC', title: 'Locator & Docs', changes: ['Locator rename completed', 'Namespace docs refreshed', 'CLOOMC++ tutorials updated'] }
     ];
     let html = '<div style="max-height:60vh;overflow-y:auto;font-size:0.85rem;">';
@@ -11980,7 +12068,7 @@ const WHATS_NEW_FEATURES = [
         html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x1F4E6; Download FPGA Package &mdash; what you see is what you get</div>` +
             `<p style="font-size:0.9rem;line-height:1.65;margin-bottom:0.75rem;">` +
             `The build log printed after a ZIP download now exactly matches what is inside the file &mdash; for all three boards. ` +
-            `Ti60 F225 no longer lists a phantom <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">.edif</code> that was never generated; ` +
+            `The FPGA package no longer lists a phantom <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">.edif</code> that was never generated; ` +
             `Wukong and Tang Nano now list <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">local_bridge.py</code> which was silently included; ` +
             `Tang Nano marks <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">.v</code> and <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">.json</code> as conditional.</p>` +
             `<p style="font-size:0.88rem;color:#aaa;line-height:1.5;margin:0;">` +
@@ -12068,7 +12156,7 @@ const WHATS_NEW_FEATURES = [
             `A 60-second heartbeat keeps the board marked as online.</p>` +
             `<p style="font-size:0.88rem;color:#bbb;line-height:1.6;margin-bottom:0.5rem;">` +
             `Board type byte in the packet: <code>0x01</code> = Tang Nano 20K &nbsp;·&nbsp; ` +
-            `<code>0x03</code> = Ti60 F225 &nbsp;·&nbsp; ` +
+            `<code>0x03</code> = legacy board code &nbsp;·&nbsp; ` +
             `<code>0x06</code> = Wukong XC7A100T</p>` +
             `<p style="font-size:0.88rem;color:#aaa;line-height:1.5;margin:0;">` +
             `No manual registration needed &mdash; plug in, flash, run bridge, done.</p>`
@@ -12765,27 +12853,7 @@ async function downloadFPGAPackage() {
             _setBuildStatus('warn', `Downloaded with warnings — ${boardLabel}`, boardLabel);
         }
         _buildLogAppend('\nPackage contents:\n');
-        if (isTi60) {
-            _buildLogAppend('  ti60_f225_project.xml     — Efinity project file (open this in Efinity IDE)\n');
-            _buildLogAppend('  church_ti60_f225.v        — Synthesisable Verilog\n');
-            _buildLogAppend('  church_ti60_f225.sdc      — Timing constraints\n');
-            _buildLogAppend('  church_ti60_f225.peri.xml — Periphery I/O configuration\n');
-            _buildLogAppend('  setup_ti60_peri.py        — DesignAPI script to add PLL (run once)\n');
-            _buildLogAppend('  ti60_f225.isf             — Pin constraints (Efinity IDE)\n');
-            _buildLogAppend('  BUILD.md                  — Instructions\n');
-            _buildLogAppend('\n' +
-                '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
-                '  NEXT STEPS — Ti60 F225\n' +
-                '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
-                '  1. Unzip the downloaded file\n' +
-                '  2. Open the project in Efinity IDE\n' +
-                '  3. Run synthesis + place-and-route in Efinity\n' +
-                '  4. Flash via Efinity Programmer (JTAG)\n' +
-                '  5. Watch LEDs — walking pattern confirms boot OK\n' +
-                '\n' +
-                '  See BUILD.md inside the zip for full details.\n' +
-                '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-        } else if (board === 'wukong-xc7a100t') {
+        if (board === 'wukong-xc7a100t') {
             _buildLogAppend('  church_wukong_xc7a100t.il  — Amaranth RTLIL (authoritative)\n');
             _buildLogAppend('  church_wukong_xc7a100t.v   — Synthesisable Verilog (Yosys from RTLIL)\n');
             _buildLogAppend('  wukong_xc7a100t.xdc        — Vivado XDC pin constraints\n');
@@ -13000,29 +13068,6 @@ async function uploadToTang() {
         return;
     }
 
-    // Ti60 note: the firmware has no UART RX upload handler.
-    // The namespace is baked into the bitstream at synthesis time.
-    // UART TX (H14) sends the startup banner; the board is programmed via Efinity JTAG.
-    if (isTi60Board) {
-        con.textContent =
-            'Ti60 F225 — UART namespace upload is not yet supported in firmware.\n\n' +
-            'The namespace is baked into the bitstream at build time.\n' +
-            'Use Efinity IDE to program the board via JTAG after building the package.\n\n' +
-            'HOW TO CONFIRM YOUR BOARD IS RUNNING:\n' +
-            '  LEDs after JTAG flash + power-on:\n' +
-            '    Boot in progress  →  LED0 on (steady)\n' +
-            '    Boot complete     →  LED0→1→2→3→off walking pattern (0.5 s each)\n' +
-            '    CPU in free-run   →  LED1 has 1 Hz heartbeat blink\n' +
-            '    Fault             →  LED2 stays on\n\n' +
-            '  UART TX (pin H14, 115200 8N1) sends  CHURCH Ti60 v1.0  on startup.\n' +
-            '  (Requires an external USB-UART adapter — the Ti60 FT4232H is JTAG-only.)\n\n' +
-            'WORKFLOW:\n' +
-            '  1. Build FPGA Package  →  downloads the Efinity project zip\n' +
-            '  2. Open zip in Efinity IDE  →  synthesise + place-and-route\n' +
-            '  3. Programme via Efinity Programmer (JTAG)\n' +
-            '  4. Watch LEDs — walking pattern confirms successful boot\n';
-        return;
-    }
 
     // ── Pre-flash simulation gate ─────────────────────────────────────────────
     // Run the Turing DR Test in a headless simulator before touching hardware.
@@ -13065,7 +13110,7 @@ async function uploadToTang() {
         if (fullNames.length > 0) {
             con.textContent += `ERROR: ${fullNames.length} abstraction(s) tagged "Full" cannot run on the Tang Nano 20K (IoT profile): ${fullNames.join(', ')}\n\n`;
             con.textContent += 'Full-only opcodes (LAMBDA, CHANGE, SWITCH, ELOADCALL, XLOADLAMBDA) are not available on the Tang Nano 20K.\n';
-            con.textContent += 'Switch to Ti60 F225 or remove Full-only instructions from these abstractions.\n';
+            con.textContent += 'Switch to the Wukong Artix-7 or remove Full-only instructions from these abstractions.\n';
             return;
         }
     }
@@ -13109,7 +13154,7 @@ async function uploadToTang() {
                     return;
                 }
                 con.textContent += e.message + '\n\n';
-                con.textContent += `Check that the ${boardLabel} is connected via USB and no other app (e.g. Efinity IDE serial terminal) has the port open, then try again.\n`;
+                con.textContent += `Check that the ${boardLabel} is connected via USB and no other app (e.g. another serial monitor) has the port open, then try again.\n`;
                 return;
             }
         }
@@ -13246,7 +13291,7 @@ async function testUART() {
                 'Could not open port: ' + e.message + '\n\n' +
                 'Check:\n' +
                 '  • FPGA is plugged in via USB\n' +
-                '  • Efinity IDE serial terminal (or any serial monitor) is closed\n' +
+                '  • Any other serial monitor on this port is closed\n' +
                 '  • Wait 5 s then try again\n'
             );
             _setBuildStatus('error', 'Port open failed', boardLabel);

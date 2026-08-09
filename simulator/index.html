@@ -182,7 +182,7 @@
                             <!-- Hardware -->
                             <div class="ham-subhead">Hardware</div>
                             <div class="ham-group">
-                                <button class="ham-item" id="hamItem-ti60-connect" onclick="switchView('builder');switchBuilderViewTab('ti60-connect');closeHamburger()">&#x1F50C; Connect Ti60</button>
+                                <button class="ham-item" id="hamItem-ti60-connect" onclick="switchView('builder');switchBuilderViewTab('ti60-connect');closeHamburger()">&#x1F50C; Connect Wukong</button>
                                 <button class="ham-item" id="hamItem-builder" onclick="switchView('builder');closeHamburger()" style="display:none;">Builder<kbd class="ham-kbd">C+B</kbd></button>
                                 <button class="ham-item" id="fpgaConnBtn" onclick="fpgaConnectToggle()" style="display:none;">FPGA</button>
                                 <button class="ham-item" id="fpgaBridgeBtn" onclick="fpgaBridgeConnect()" style="display:none;">Bridge</button>
@@ -271,7 +271,7 @@
                 </div>
                 <div id="toolbarGroupConfig" class="toolbar-group">
                     <div class="toolbar-group-divider"></div>
-                    <button class="btn btn-view btn-ti60-connect" id="toolbarTi60ConnectBtn" onclick="switchView('builder');switchBuilderViewTab('ti60-connect')" data-tooltip="Active board — click to open the build &amp; connect panel">&#x1F50C; Ti60</button>
+                    <button class="btn btn-view btn-ti60-connect" id="toolbarTi60ConnectBtn" onclick="switchView('builder');switchBuilderViewTab('ti60-connect')" data-tooltip="Active board — click to open the build &amp; connect panel">&#x1F50C; Wukong</button>
                     <button class="btn btn-view btn-share-icon" onclick="openShareLink()" data-tooltip="Share — Copy link to open on another device">&#x1F517;</button>
                 </div>
                 <div id="toolbarGroupInfo" class="toolbar-group">
@@ -308,7 +308,7 @@
     <div id="home" class="view">
         <div class="home-hero">
             <div class="home-hero-title">Church Machine IDE</div>
-            <div class="home-hero-sub">Capability-secured computing on the Ti60 FPGA — write, simulate, and deploy CLOOMC programs.</div>
+            <div class="home-hero-sub">Capability-secured computing on the QMTECH Wukong Artix-7 FPGA — write, simulate, and deploy CLOOMC programs.</div>
         </div>
 
         <!-- Core functions -->
@@ -316,10 +316,10 @@
             <div class="home-section-title">Core Functions</div>
         </div>
         <div class="home-core-grid">
-            <div class="home-tile" onclick="switchView('builder');switchBuilderViewTab('ti60-connect')" data-tooltip="Hardware — Flash, connect, and verify your Ti60 F225 board">
+            <div class="home-tile" onclick="switchView('builder');switchBuilderViewTab('ti60-connect')" data-tooltip="Hardware — Flash, connect, and verify your Wukong Artix-7 board">
                 <div class="home-tile-icon">🔌</div>
                 <div class="home-tile-name">Hardware</div>
-                <div class="home-tile-desc">Flash &amp; connect your Ti60 F225 board</div>
+                <div class="home-tile-desc">Flash &amp; connect your Wukong Artix-7 board</div>
             </div>
             <div class="home-tile" onclick="switchView('namespace')" data-tooltip="Namespace — Browse and inspect all capability entries">
                 <div class="home-tile-icon">🗂️</div>
@@ -524,7 +524,7 @@
                         <button class="example-tab" onclick="loadExample('capability_test')" data-example="capability_test" data-tooltip="Capability Test — Self-test of LOAD, TPERM, CALL, SWITCH and Turing ISA">Capability Test</button>
                         <button class="example-tab" onclick="loadExample('system_patterns')" data-example="system_patterns" data-tooltip="System Patterns — Load/Save, conditional execution, GC test as three sections">System Patterns</button>
                         <button class="example-tab" onclick="loadExample('compute_demo')" data-example="compute_demo" data-tooltip="Compute Demo — Bernoulli sum identity and Turing ISA exercise as two sections">Compute Demo</button>
-                        <button class="example-tab" onclick="loadExample('led_control')" data-example="led_control" data-abstraction="LED Flash" style="color:#4ade80;" data-tooltip="LED Flash — The exact nucleus LED blink program on the Ti60 F225 FPGA">LED Flash ✦</button>
+                        <button class="example-tab" onclick="loadExample('led_control')" data-example="led_control" data-abstraction="LED Flash" style="color:#4ade80;" data-tooltip="LED Flash — The exact nucleus LED blink program on the Wukong Artix-7 FPGA">LED Flash ✦</button>
                         <button class="example-tab" onclick="loadExample('led_dr_test')" data-example="led_dr_test" style="color:#4ade80;" data-tooltip="LED DR Test ✦ — 6-phase ISA visual test across all DR0–DR15 using LED0–LED5; all pass → all 6 LEDs blink 3×">LED DR Test ✦</button>
                         <button class="example-tab" onclick="loadExample('salvation')" data-example="salvation" data-abstraction="Salvation" style="color:#4ade80;" data-tooltip="Salvation — Demonstrate safe abstraction and capability protection">Salvation</button>
                         <button class="example-tab" onclick="loadExample('constants_dot')" data-example="constants_dot" style="color:#f0c674;" data-tooltip="Constants Dot ★ — Recommended style: CALL AbstrName.Method and ELOADCALL CRd, AbstrName, Method shown end-to-end">Constants Dot ★</button>
@@ -989,8 +989,8 @@
                 <div class="r1-step-card" id="r1StepCard1">
                     <div class="r1-step-num">1</div>
                     <div class="r1-step-body">
-                        <div class="r1-step-title">Flash Your Ti60</div>
-                        <div class="r1-step-desc">Download the pre-built bitstream and program it onto your Ti60 F225 FPGA board. The board will boot the Church Machine kernel automatically.</div>
+                        <div class="r1-step-title">Flash Your Wukong</div>
+                        <div class="r1-step-desc">Download the pre-built bitstream and program it onto your QMTECH Wukong Artix-7 FPGA board. The board will boot the Church Machine kernel automatically.</div>
                         <div id="r1StepBadge1" class="r1-step-badge r1-step-badge-waiting">Waiting</div>
                     </div>
                     <div class="r1-step-action">
@@ -1002,7 +1002,7 @@
                     <div class="r1-step-num">2</div>
                     <div class="r1-step-body">
                         <div class="r1-step-title">Connect &amp; Verify</div>
-                        <div class="r1-step-desc">Plug in your Ti60 over USB and verify it calls home. The board will appear in your Devices list once registered.</div>
+                        <div class="r1-step-desc">Plug in your Wukong over USB and verify it calls home. The board will appear in your Devices list once registered.</div>
                         <div id="r1StepBadge2" class="r1-step-badge r1-step-badge-waiting">Waiting</div>
                     </div>
                     <div class="r1-step-action">
@@ -1032,8 +1032,7 @@
                 <span class="hardware-build-title">&#x2B21;</span>
                 <label class="hardware-build-label" for="hardwareBoardSel">Target</label>
                 <select id="hardwareBoardSel" class="lang-selector" onchange="setSelectedBoard(this.value); updateHardwarePanelLabel()" title="Target FPGA board">
-                    <option value="ti60-f225" selected>Efinix Ti60 F225</option>
-                    <option value="wukong-xc7a100t">QMTECH Wukong (Artix-7)</option>
+                    <option value="wukong-xc7a100t" selected>QMTECH Wukong (Artix-7)</option>
                 </select>
                 <div class="hw-actions-menu" id="hwActionsMenu">
                     <button class="hw-actions-toggle" onclick="toggleHwActions(event)" data-tooltip="Hardware actions — Build, Download, Deploy, Test UART">&#x2630; Actions &#x25BE;</button>
@@ -1065,7 +1064,15 @@
             <div class="versions-header">
                 <h2>&#x1F9ED; Versions</h2>
                 <button id="versionsRefreshBtn" class="versions-refresh-btn" onclick="if(typeof VersionsView!=='undefined')VersionsView.refresh(true)">&#x21BB; Refresh</button>
+                <button id="versionsAdviceBtn" class="versions-advice-btn" style="display:none;" onclick="if(typeof VersionsView!=='undefined')VersionsView.toggleAdvice()">&#x26A0; Health</button>
                 <span id="versionsLastChecked" class="versions-last-checked"></span>
+            </div>
+            <div id="versionsAdvicePopup" class="versions-advice-popup" style="display:none;">
+                <div class="versions-advice-head">
+                    <b>Configuration health</b>
+                    <button class="versions-advice-close" onclick="if(typeof VersionsView!=='undefined')VersionsView.toggleAdvice(false)">&#x2715;</button>
+                </div>
+                <div id="versionsAdviceBody"></div>
             </div>
             <div class="versions-cards">
                 <div class="versions-card" id="versionsCardIde">
@@ -1081,7 +1088,7 @@
                     <div class="versions-card-body" id="versionsFpgaBody">Loading&hellip;</div>
                 </div>
                 <div class="versions-card" id="versionsCardBitstream">
-                    <div class="versions-card-title">&#x1F4BE; Bitstream (Ti60 build)</div>
+                    <div class="versions-card-title">&#x1F4BE; Bitstream (Wukong build)</div>
                     <div class="versions-card-body" id="versionsBitstreamBody">Loading&hellip;</div>
                 </div>
                 <div class="versions-card" id="versionsCardProd">
@@ -1105,7 +1112,7 @@
                         <div id="ti60WatchStatus" style="display:none;margin-top:5px;font-size:0.8rem;"></div>
                     </div>
                     <div class="ti60-dl-flash-btns">
-                        <a id="ti60DlHexBtn" class="ti60-dl-flash-btn ti60-dl-flash-btn-dl" href="/dl/ti60-hex" download="church_soc_cm.hex">&#x2B07; Download .hex</a>
+                        <a id="ti60DlHexBtn" class="ti60-dl-flash-btn ti60-dl-flash-btn-dl" href="/dl/wukong-bit" download="church_wukong_xc7a100t.bit">&#x2B07; Download .bit</a>
                         <button class="ti60-dl-flash-btn ti60-dl-flash-btn-flash" onclick="switchBuilderViewTab('ti60-connect');StartupWizard.jumpToFlash();" title="Opens the Flash step in the Startup Wizard">&#x26A1; Flash via Wizard</button>
                         <button id="ti60WatchBtn" class="ti60-dl-flash-btn" style="display:none;background:#1a1a2e;border:1px solid #4a5568;color:#f0c674;" title="Poll every 30 s — lights up green when the next build letter appears">&#x1F514; Watch for next</button>
                     </div>
@@ -1114,10 +1121,10 @@
                     <span class="ti60-dl-flash-badge ti60-dl-flash-badge-grey">&#x23F3;</span>
                     <div class="ti60-dl-flash-info">
                         <div class="ti60-dl-flash-title" style="color:var(--text-secondary,#9ca3af)">Bitstream not yet built</div>
-                        <div class="ti60-dl-flash-meta" style="color:#4a5568">Run <code style="background:#0a0e17;padding:.1rem .3rem;border-radius:3px;color:#c4b5fd;font-size:.78rem">make bitstream</code> from the repo root (Efinity required) — see <a href="/dl/build-soc-cm-md" style="color:#a78bfa">BUILD_SOC_CM.md</a>.</div>
+                        <div class="ti60-dl-flash-meta" style="color:#4a5568">Run the Vivado build (<code style="background:#0a0e17;padding:.1rem .3rem;border-radius:3px;color:#c4b5fd;font-size:.78rem">source wukong_xc7a100t.tcl</code>) on a machine with Vivado, then upload the .bit to the IDE.</div>
                     </div>
                     <div class="ti60-dl-flash-btns">
-                        <button class="ti60-dl-flash-btn" disabled style="opacity:.4;cursor:not-allowed;">&#x2B07; Download .hex</button>
+                        <button class="ti60-dl-flash-btn" disabled style="opacity:.4;cursor:not-allowed;">&#x2B07; Download .bit</button>
                         <button class="ti60-dl-flash-btn" disabled style="opacity:.4;cursor:not-allowed;" title="No bitstream available">&#x26A1; Flash via Wizard</button>
                     </div>
                 </div>
@@ -1286,7 +1293,7 @@
                     <!-- ── Step 0: Get Bitstream ── -->
                     <div class="sw-body-step" id="swBody0">
                         <div class="sw-step-heading">📦 Download the Project <span class="sw-time-badge">~1 min</span></div>
-                        <p class="sw-step-desc">Download the full Church Machine project for your board. The ZIP already contains a <strong>pre-built bitstream</strong> (<code>outflow/church_soc_cm.hex</code>) — ready to flash, no synthesis needed. The Efinity project is also inside if you ever want to rebuild from source.</p>
+                        <p class="sw-step-desc">Download the full Church Machine project for your board. The ZIP contains the Verilog netlist, pin constraints, and the Vivado build script. If a pre-built bitstream is available you can download it directly from the card above — no synthesis needed.</p>
                         <div class="sw-led-guide">
                             <span class="sw-led-label">LEDs right now:</span>
                             <span class="sw-led sw-led-off" title="LED0">0</span>
@@ -1297,17 +1304,17 @@
                         </div>
                         <div style="display:flex;flex-direction:column;gap:0.6rem;margin-bottom:0.6rem;">
                             <div>
-                                <a id="swZipBtn" class="sw-btn sw-btn-primary" href="/dl/ti60zip">📦 Full project (.zip)</a>
-                                <p style="margin:0.2rem 0 0 0.1rem;font-size:0.78rem;color:var(--text-secondary,#9ca3af);">Everything in one download: the <strong>pre-built bitstream</strong> (<code>outflow/church_soc_cm.hex</code>), a <code>Makefile</code> with <code>make flash</code>, plus the full Efinity project for rebuilding.</p>
+                                <a id="swZipBtn" class="sw-btn sw-btn-primary" href="/dl/wukong-zip">📦 Full project (.zip)</a>
+                                <p style="margin:0.2rem 0 0 0.1rem;font-size:0.78rem;color:var(--text-secondary,#9ca3af);">Everything in one download: <code>church_wukong_xc7a100t.v</code>, the <code>wukong_xc7a100t.xdc</code> pin constraints, and the <code>wukong_xc7a100t.tcl</code> Vivado build script.</p>
                             </div>
                         </div>
-                        <div class="sw-release-note" id="swReleaseNote">The ready-to-flash programming file is already inside the ZIP at <code>outflow/church_soc_cm.hex</code> — go straight to the next step. (Rebuilding from source is optional and takes ~30 min.)</div>
+                        <div class="sw-release-note" id="swReleaseNote">The ready-to-flash <code>church_wukong_xc7a100t.bit</code> is downloaded separately from the card in the Connect tab — the ZIP holds the source, constraints, and Vivado build script. (Rebuilding from source is optional and takes ~30 min.)</div>
                         <div class="sw-trouble-panel" id="swTrouble0">
                             <div class="sw-trouble-title">⚠ Common problems — Get Bitstream</div>
                             <ul class="sw-trouble-list">
                                 <li><strong>Download link not loading</strong> — hard-refresh the page (Ctrl+Shift+R / Cmd+Shift+R).</li>
                                 <li><strong>No network access</strong> — copy the direct GitHub URL shown in the release badge and open it in a new tab.</li>
-                                <li><strong>Wrong board selected</strong> — verify you chose the <strong>Ti60 F225 / F225C</strong> variant.</li>
+                                <li><strong>Wrong board selected</strong> — verify you have the <strong>QMTECH Wukong XC7A100T (Artix-7)</strong> board.</li>
                             </ul>
                         </div>
                         <div class="sw-footer-row">
@@ -1341,8 +1348,8 @@
                         <div id="swFlashPrepack" style="display:none;">
                             <div class="sw-step-heading">⚡ Step 2 — Flash the Pre-built Bitstream <span class="sw-time-badge">~3 min</span></div>
 
-                            <p class="sw-step-desc sw-os-win">The pre-built bitstream is <strong>already inside the ZIP</strong> at <code>outflow/church_soc_cm.hex</code> — no separate download. Just unzip and load it in Efinity Programmer.</p>
-                            <p class="sw-step-desc sw-os-linux" style="display:none;">The pre-built bitstream is <strong>already inside the ZIP</strong> at <code>outflow/church_soc_cm.hex</code> — no separate download. Just unzip and run <code>make flash</code>.</p>
+                            <p class="sw-step-desc sw-os-win">Download the pre-built bitstream (<code>church_wukong_xc7a100t.bit</code>) from the card above, then program it with Vivado Hardware Manager.</p>
+                            <p class="sw-step-desc sw-os-linux" style="display:none;">Download the pre-built bitstream (<code>church_wukong_xc7a100t.bit</code>) from the card above, then program it with openFPGALoader.</p>
                             <div class="sw-prepack-dl-row">
                                 <span id="swBitstreamStatus" class="sw-bitstream-status sw-bitstream-checking">checking…</span>
                             </div>
@@ -1350,27 +1357,23 @@
                             <!-- Windows / Mac steps -->
                             <div class="sw-os-win">
                                 <ol class="sw-list">
-                                    <li>Unzip the project you downloaded in Step 1 into a working folder</li>
-                                    <li>Launch <strong>Efinity Programmer</strong>:<br>
-                                        Open Efinity IDE, then go to <strong>Tool → Programmer</strong><br>
-                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">(or run standalone: <code>C:\Efinity\2026.1\bin\programmer.exe</code>)</span></li>
-                                    <li>Cable dropdown: select <strong>Efinix USB2.0 Device</strong></li>
-                                    <li>Mode: <strong>JTAG</strong> &nbsp;·&nbsp; Operation: <strong>Active Serial Programming</strong><br>
-                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">(Active Serial writes to SPI flash — the board keeps it after power-off)</span></li>
-                                    <li>Click <strong>Open Bit File</strong> → select the bundled <code>outflow/church_soc_cm.hex</code> from the unzipped folder</li>
-                                    <li>Click <strong>Start</strong> and wait for <em>"Programming Done"</em> (~30 s)</li>
+                                    <li>Download <code>church_wukong_xc7a100t.bit</code> using the card at the top of this tab</li>
+                                    <li>Launch <strong>Vivado</strong> and open <strong>Hardware Manager</strong> (Flow → Open Hardware Manager)</li>
+                                    <li>Click <strong>Open target → Auto Connect</strong> — the Wukong appears as <code>xc7a100t</code></li>
+                                    <li>Right-click the device → <strong>Program Device</strong> → select the downloaded <code>.bit</code> file</li>
+                                    <li>Click <strong>Program</strong> and wait for it to finish (~10 s)</li>
                                 </ol>
                             </div>
 
                             <!-- Linux / Chromebook steps — one make flash command -->
                             <div class="sw-os-linux" style="display:none;">
                                 <ol class="sw-list">
-                                    <li>Unzip the project and open a terminal in that folder</li>
+                                    <li>Download <code>church_wukong_xc7a100t.bit</code> using the card at the top of this tab</li>
                                     <li>Activate OSS CAD Suite:<br><code>source ~/oss-cad-suite/environment</code></li>
                                     <li>Confirm the JTAG cable is visible:<br><code>ls /dev/ttyUSB*</code> — expect <code>/dev/ttyUSB0</code></li>
-                                    <li>Flash the bundled bitstream:<br><code>make flash</code><br>
-                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">Runs <code>openFPGALoader</code> on the included <code>outflow/church_soc_cm.hex</code> — nothing else to download.</span></li>
-                                    <li>Wait for <strong>"Programming done"</strong> — about 30 seconds</li>
+                                    <li>Flash the downloaded bitstream:<br><code>openFPGALoader church_wukong_xc7a100t.bit</code><br>
+                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">openFPGALoader auto-detects the Artix-7 JTAG cable.</span></li>
+                                    <li>Wait for <strong>"Programming done"</strong> — a few seconds</li>
                                 </ol>
                             </div>
 
@@ -1387,7 +1390,7 @@
                         <!-- Scratch path — user builds from ZIP then flashes -->
                         <div id="swFlashScratch">
                             <div class="sw-step-heading">⚡ Step 2 — Build &amp; Program the Board <span class="sw-time-badge">~35 min</span></div>
-                            <p class="sw-step-desc">Build the bitstream from the downloaded ZIP using Efinity IDE, then flash it to your board. The board stores it permanently — it keeps it even after you unplug it.</p>
+                            <p class="sw-step-desc">Build the bitstream from the downloaded ZIP using AMD Vivado, then flash it to your board.</p>
 
                             <!-- ── Part A: Build the bitstream ── -->
                             <div style="margin:0.8rem 0 0.4rem;font-weight:600;color:var(--text-secondary,#9ca3af);font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em;">Part A — Build the bitstream (~30 min)</div>
@@ -1395,41 +1398,24 @@
                             <!-- Windows / Mac build steps -->
                             <div class="sw-os-win">
                                 <ol class="sw-list">
-                                    <li><strong>Download and install Efinity 2026.1</strong> from <a href="https://www.efinixinc.com/support/efinity.php" target="_blank" rel="noopener">efinixinc.com/support/efinity.php</a> — required before any of the steps below.</li>
+                                    <li><strong>Download and install AMD Vivado</strong> (free ML Standard edition) from <a href="https://www.xilinx.com/support/download.html" target="_blank" rel="noopener">xilinx.com/support/download.html</a> — required before any of the steps below.</li>
                                     <li>Unzip the downloaded project into a working folder.</li>
-                                    <li>Open the <strong>Efinity Terminal</strong> (Start menu → Efinity 2026.1 → Efinity Terminal) — this shell pre-sets Efinity's Python path. Then <code>cd</code> into the folder and run <code>setup_ti60_peri.py</code>. The script is inside the ZIP; do not type it as a bare system command:<br>
-<pre style="margin:0.3rem 0 0.2rem;">cd C:\path\to\church_ti60_f225_project
-python setup_ti60_peri.py</pre>
-                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">You should see <em>"SUCCESS — church_ti60_f225.peri.xml written"</em></span></li>
-                                    <li><strong>Enable SoC / UART</strong> &mdash; open <code>church_ti60_f225.sdc</code> in any text editor and switch from Phase A to Phase B by following the comments inside the file:<br>
-                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">Phase A = 25 MHz (safe default). Phase B = 50 MHz with SoC/UART enabled. The comments tell you exactly which lines to swap.</span></li>
-                                    <li>Launch <strong>Efinity IDE</strong> from the Start menu (Windows) or Applications (Mac)</li>
-                                    <li><strong>File → Open Project</strong> → select <code>church_soc_cm.xml</code></li>
-                                    <li>Run <strong>Synthesis → Place &amp; Route → Generate Bitstream</strong><br>
-                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">Takes ~30 min. When done, <code>outflow/church_soc_cm.hex</code> is the programming file.</span></li>
+                                    <li>Open the <strong>Vivado Tcl Console</strong> (Start menu → Vivado → Vivado Tcl Shell), <code>cd</code> into the folder, and source the build script:<br>
+<pre style="margin:0.3rem 0 0.2rem;">cd C:/path/to/church-wukong-package
+source wukong_xc7a100t.tcl</pre>
+                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">The script creates the project, runs synthesis + implementation, and writes <code>church_wukong_xc7a100t.bit</code></span></li>
                                 </ol>
                             </div>
 
                             <!-- Linux / Chromebook build steps -->
                             <div class="sw-os-linux" style="display:none;">
                                 <ol class="sw-list">
-                                    <li><strong>Download and install Efinity 2026.1</strong> from <a href="https://www.efinixinc.com/support/efinity.php" target="_blank" rel="noopener">efinixinc.com/support/efinity.php</a> — required before any of the steps below.</li>
+                                    <li><strong>Download and install AMD Vivado</strong> (free ML Standard edition) from <a href="https://www.xilinx.com/support/download.html" target="_blank" rel="noopener">xilinx.com/support/download.html</a> — required before any of the steps below.</li>
                                     <li>Unzip the downloaded project into a working folder.</li>
-                                    <li>If you have an OSS CAD Suite or any other venv active, deactivate it first — then <code>cd</code> into the extracted folder and run <code>setup_ti60_peri.py</code> using <strong>Efinity's own Python</strong>. The script is inside the ZIP; it is not a system command, do not type it bare:<br>
-<pre style="margin:0.3rem 0 0.2rem;">deactivate   # skip if no venv is active
-cd ~/path/to/church_ti60_f225_project
-PYTHONPATH=$HOME/efinity/2026.1/lib:$HOME/efinity/2026.1/pt/bin \
-EFXPT_HOME=$HOME/efinity/2026.1/pt \
-  $HOME/efinity/2026.1/bin/python3.11 setup_ti60_peri.py</pre>
-                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">You should see <em>"SUCCESS — church_ti60_f225.peri.xml written"</em></span></li>
-                                    <li><strong>Enable SoC / UART</strong> &mdash; open <code>church_ti60_f225.sdc</code> and switch Phase A → Phase B per the comments (Phase B = 50 MHz with SoC/UART):<br>
-<pre style="margin:0.3rem 0 0.2rem;">nano church_ti60_f225.sdc</pre>
-                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">Comment out the Phase A line and uncomment Phase B exactly as the comments direct.</span></li>
-                                    <li>Launch Efinity IDE:<br>
-<pre style="margin:0.3rem 0 0.2rem;">QT_QPA_PLATFORM=xcb LIBGL_ALWAYS_SOFTWARE=1 ~/efinity/2026.1/bin/efinity &amp;</pre></li>
-                                    <li><strong>File → Open Project</strong> → select <code>church_soc_cm.xml</code></li>
-                                    <li>Run <strong>Synthesis → Place &amp; Route → Generate Bitstream</strong><br>
-                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">Takes ~30 min. When done, <code>outflow/church_soc_cm.hex</code> is the programming file.</span></li>
+                                    <li><code>cd</code> into the extracted folder and source the build script in Vivado batch mode:<br>
+<pre style="margin:0.3rem 0 0.2rem;">cd ~/path/to/church-wukong-package
+vivado -mode batch -source wukong_xc7a100t.tcl</pre>
+                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">The script creates the project, runs synthesis + implementation (~30 min), and writes <code>church_wukong_xc7a100t.bit</code></span></li>
                                 </ol>
                             </div>
 
@@ -1445,12 +1431,10 @@ EFXPT_HOME=$HOME/efinity/2026.1/pt \
 
                             <div class="sw-os-win">
                                 <ol class="sw-list">
-                                    <li>In Efinity IDE: go to <strong>Tool → Programmer</strong></li>
-                                    <li>Cable dropdown: select <strong>Efinix USB2.0 Device</strong></li>
-                                    <li>Mode: <strong>JTAG</strong> &nbsp;·&nbsp; Operation: <strong>Active Serial Programming</strong><br>
-                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">(Active Serial writes to SPI flash — the board keeps it after power-off)</span></li>
-                                    <li>Click <strong>Open Bit File</strong> → navigate to <code>outflow/church_soc_cm.hex</code></li>
-                                    <li>Click <strong>Start</strong> and wait for <em>"Programming Done"</em> (~30 s)</li>
+                                    <li>In Vivado: open <strong>Hardware Manager</strong> → <strong>Open target → Auto Connect</strong></li>
+                                    <li>Right-click the <code>xc7a100t</code> device → <strong>Program Device</strong></li>
+                                    <li>Select <code>church_wukong_xc7a100t.bit</code> from your build folder</li>
+                                    <li>Click <strong>Program</strong> and wait for it to finish (~10 s)</li>
                                 </ol>
                             </div>
                             <div class="sw-os-linux" style="display:none;">
@@ -1458,9 +1442,8 @@ EFXPT_HOME=$HOME/efinity/2026.1/pt \
                                     <li><strong>Get OSS CAD Suite</strong> if you don't have it — download the latest Linux x64 <code>.tgz</code> from <a href="https://github.com/YosysHQ/oss-cad-suite-build/releases" target="_blank" rel="noopener">github.com/YosysHQ/oss-cad-suite-build/releases</a> and extract it to your home folder so that <code>~/oss-cad-suite/environment</code> exists.</li>
                                     <li>Activate OSS CAD Suite in your terminal:<br><code>source ~/oss-cad-suite/environment</code></li>
                                     <li>Confirm the JTAG cable is visible:<br><code>ls /dev/ttyUSB*</code> — expect <code>/dev/ttyUSB0</code></li>
-                                    <li>Flash the built bitstream to the board:<br><code>make flash</code><br>
-                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">(equivalent to <code>openFPGALoader -b titanium_ti60_f225 outflow/church_soc_cm.hex</code>)</span></li>
-                                    <li>Wait for <strong>"Programming done"</strong> — about 30 seconds</li>
+                                    <li>Flash the built bitstream to the board:<br><code>openFPGALoader church_wukong_xc7a100t.bit</code></li>
+                                    <li>Wait for <strong>"Programming done"</strong> — a few seconds</li>
                                 </ol>
                             </div>
                         </div>
@@ -1469,8 +1452,8 @@ EFXPT_HOME=$HOME/efinity/2026.1/pt \
                         <div class="sw-trouble-panel" id="swTrouble1">
                             <div class="sw-trouble-title">⚠ Common problems — Flash</div>
                             <ul class="sw-trouble-list">
-                                <li><strong>Efinity Programmer can't find the board</strong> — check the JTAG cable is fully seated, try a different USB port, confirm 12 V power is connected.</li>
-                                <li><strong>"Unknown device" error</strong> — install or reinstall the Efinix FT4232H JTAG driver from the Efinity installer.</li>
+                                <li><strong>Vivado Hardware Manager can't find the board</strong> — check the JTAG cable is fully seated, try a different USB port, confirm board power is connected.</li>
+                                <li><strong>"Unknown device" error</strong> — install or reinstall the FTDI/Digilent JTAG cable drivers.</li>
                                 <li><strong>Bit file rejected / wrong device</strong> — re-download the bit file and verify its SHA against the release notes; do not use a bit file built for a different board variant.</li>
                                 <li><strong>openFPGALoader: "No device detected"</strong> (Linux/Chromebook) — check the USB cable is a data cable, try <code>openFPGALoader --detect</code>, and confirm the cable is fully seated.</li>
                                 <li><strong>"Permission denied" on /dev/ttyUSB*</strong> (Linux/Chromebook) — run <code>sudo usermod -aG dialout $USER</code> then log out and back in (or <code>sudo chmod 666 /dev/ttyUSB*</code> for a quick fix).</li>
@@ -1694,15 +1677,15 @@ EFXPT_HOME=$HOME/efinity/2026.1/pt \
                         <div class="sw-tour-complete-body">
                             <p class="sw-tour-complete-intro">You've walked through all 6 setup steps. Here's a quick summary of what the real flow involves:</p>
                             <ol class="sw-tour-summary">
-                                <li><strong>Download the Project</strong> — Grab the one ZIP, which already contains a pre-built bitstream (<code>outflow/church_soc_cm.hex</code>) plus a <code>Makefile</code> — no synthesis needed.</li>
-                                <li><strong>Flash</strong> — Unzip, then run <code>make flash</code> (or load the bundled hex in Efinity Programmer over JTAG) onto the Ti60 F225 board.</li>
+                                <li><strong>Download the Project</strong> — Grab the ZIP (Verilog netlist + XDC + Vivado build script), then download the pre-built <code>church_wukong_xc7a100t.bit</code> from the Connect tab — no synthesis needed.</li>
+                                <li><strong>Flash</strong> — Program <code>church_wukong_xc7a100t.bit</code> onto the Wukong board with Vivado Hardware Manager (or openFPGALoader).</li>
                                 <li><strong>Power Cycle</strong> — Unplug and replug the board; the LED pattern confirms the Church Machine core is healthy and waiting.</li>
                                 <li><strong>Connect</strong> — Click "Connect" in the IDE; the board's CALLHOME greeting is automatically detected and the wizard advances.</li>
                                 <li><strong>Upload</strong> — The IDE sends the boot image over UART (~1 second); each frame is CRC-checked and ACK'd by the FPGA.</li>
                                 <li><strong>Running</strong> — Your capability-secured abstraction is live on real FPGA hardware, LEDs cycling as the demo sequencer runs.</li>
                             </ol>
                             <div class="sw-tour-buy-row">
-                                <a class="sw-tour-link" href="https://www.efinixinc.com/products-trion-t60.html" target="_blank" rel="noopener noreferrer">🛒 Order a Ti60 F225 board →</a>
+                                <a class="sw-tour-link" href="https://www.aliexpress.com/w/wholesale-qmtech-wukong.html" target="_blank" rel="noopener noreferrer">🛒 Order a QMTECH Wukong Artix-7 board →</a>
                             </div>
                         </div>
                         <div class="sw-footer-row">
@@ -1713,9 +1696,9 @@ EFXPT_HOME=$HOME/efinity/2026.1/pt \
                 </div><!-- /swWizardBody -->
             </div><!-- /sw-panel -->
 
-            <!-- Ti60 Proof-of-Life — click to expand -->
+            <!-- Board Proof-of-Life — click to expand -->
             <div class="ti60-pol-toggle-row" onclick="(function(){var b=document.getElementById('ti60PolBody');var c=document.getElementById('ti60PolChev');var open=b.style.display!=='none';b.style.display=open?'none':'';c.textContent=open?'▸':'▾';})()">
-                <h2 class="ti60-pol-h2">Ti60 Proof-of-Life <span class="ti60-pol-hint-icon">&#x1F4CC;</span></h2>
+                <h2 class="ti60-pol-h2">Wukong Proof-of-Life <span class="ti60-pol-hint-icon">&#x1F4CC;</span></h2>
                 <span id="ti60PolChev" class="ti60-pol-chev">▸</span>
             </div>
             <div id="ti60PolBody" style="display:none;">
@@ -1726,8 +1709,8 @@ EFXPT_HOME=$HOME/efinity/2026.1/pt \
                             <div class="ti60-help-section">
                                 <div class="ti60-help-section-title">&#x2139;&#xFE0F; What to expect from the firmware</div>
                                 <p>When the board boots correctly it sends two lines over UART:</p>
-                                <pre class="ti60-help-pre">CHURCH Ti60 SoC+CM v1.0 ready
-CALLHOME:{"board":"ti60-f225","uid":"AABBCCDD","nia":0,"boot_ok":1,"fault":0,"fault_code":0}</pre>
+                                <pre class="ti60-help-pre">CM:WUKONG
+CALLHOME:{"board":"wukong-xc7a100t","uid":"AABBCCDD","nia":0,"boot_ok":1,"fault":0,"fault_code":0}</pre>
                                 <p><strong>Step 1 — Connect</strong> passes when the greeting line arrives. If nothing appears: wrong port, wrong baud, or board not booted — power-cycle and retry.</p>
                                 <p><strong>Step 2 — Call Home</strong> passes when <code>boot_ok = 1</code>. If 0: firmware fault on boot — check <code>fault_code</code> in the log.</p>
                                 <p><strong>Step 3 — Register</strong> passes when the IDE server stores the device UID. If it fails: server may be unreachable.</p>
@@ -2030,7 +2013,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <div id="docs" class="view">
         <div class="docs-tab-bar" id="docsTabBar">
             <button class="docs-tab-btn" id="docsTab-isa" onclick="switchDocsTab('isa')" data-tooltip="ISA Reference — Full Church Machine instruction set, opcodes, and capability encoding">&#x1F4D6; ISA Reference</button>
-            <button class="docs-tab-btn" id="docsTab-hardware" onclick="switchDocsTab('hardware')" data-tooltip="Hardware Guide — Ti60 F225 setup, USB ports, APB3 registers, and LED assignments">&#x1F527; Hardware Guide</button>
+            <button class="docs-tab-btn" id="docsTab-hardware" onclick="switchDocsTab('hardware')" data-tooltip="Hardware Guide — Wukong Artix-7 setup, USB ports, APB3 registers, and LED assignments">&#x1F527; Hardware Guide</button>
             <button class="docs-tab-btn" id="docsTab-cloomc" onclick="switchDocsTab('cloomc')" data-tooltip="CLOOMC++ Guide — CLOOMC ISA, capability model, PP250 heritage, and boot architecture">&#x1F4DC; CLOOMC++ Guide</button>
             <button class="docs-tab-btn" id="docsTab-api" onclick="switchDocsTab('api')" data-tooltip="API Reference — REST endpoints, WebSerial protocol, and server API">&#x1F50C; API Reference</button>
         </div>
@@ -2409,7 +2392,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
                     <div class="settings-section-title">Release Update</div>
                     <button class="btn btn-sm" onclick="showReleaseHistory()" data-tooltip="View all releases — See the complete release history and changelog">History</button>
                 </div>
-                <div class="settings-release-note" id="settingsReleaseNote">Two boards supported: Efinix Ti60 F225 (Efinity flow) and QMTECH Wukong XC7A100T Artix-7 (Vivado flow). Tang Nano 20K not supported.</div>
+                <div class="settings-release-note" id="settingsReleaseNote">Supported board: QMTECH Wukong XC7A100T Artix-7 (Vivado flow). Tang Nano 20K not supported.</div>
                 <div class="settings-release-meta">Published: <span id="settingsReleasePublishedAt"></span></div>
             </div>
             <div class="settings-page-grid">
@@ -2479,12 +2462,12 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
                         <div class="settings-section-title">Hardware Target</div>
                         <label class="settings-label">FPGA Board
                             <select id="settingFPGABoard" class="modal-input">
-                                <option value="ti60-f225" selected>Efinix Ti60 F225 (Titanium, 50 MHz)</option>
+                                <option value="wukong-xc7a100t" selected>QMTECH Wukong XC7A100T (Artix-7)</option>
                             </select>
                         </label>
                         <div style="color:#888;font-size:0.78rem;margin-top:0.3rem;">
                             Selects the synthesis target for Download FPGA Package and Deploy to FPGA.
-                            Ti60 F225 uses Yosys synth_efinix + Efinity IDE for P&amp;R.
+                            The Wukong XC7A100T uses Yosys + Vivado for P&amp;R.
                         </div>
                     </div>
                 </div>
