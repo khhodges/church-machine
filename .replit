@@ -679,6 +679,24 @@ args = "node tests/simulator/sim_return_fetch_lump.js"
 [workflows.workflow.metadata]
 outputType = "console"
 
+[deployment]
+deploymentTarget = "autoscale"
+run = ["gunicorn", "--bind", "0.0.0.0:23636", "--workers", "1", "--threads", "8", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "server.app:app"]
+build = ["pip", "install", "-r", "requirements.txt"]
+
+[nix]
+channel = "stable-25_05"
+packages = ["cargo", "fontconfig", "freetype", "ghostscript", "gitFull", "glib", "harfbuzz", "icestorm", "lcms2", "libiconv", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "nextpnr", "openjpeg", "openssl", "pango", "pkg-config", "rustc", "symbiyosys", "tcl", "tk", "yices", "yosys", "zlib"]
+
+[userenv]
+
+[userenv.shared]
+BUILD_SIGNING_KEY = "2026411604PMkjhh0590"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 300000
+
 [[ports]]
 localPort = 5000
 externalPort = 5000
@@ -702,24 +720,6 @@ externalPort = 3002
 [[ports]]
 localPort = 23638
 externalPort = 3000
-
-[deployment]
-deploymentTarget = "autoscale"
-run = ["gunicorn", "--bind", "0.0.0.0:23636", "--workers", "1", "--threads", "8", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "server.app:app"]
-build = ["pip", "install", "-r", "requirements.txt"]
-
-[nix]
-channel = "stable-25_05"
-packages = ["cargo", "fontconfig", "freetype", "ghostscript", "gitFull", "glib", "harfbuzz", "icestorm", "lcms2", "libiconv", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "nextpnr", "openjpeg", "openssl", "pango", "pkg-config", "rustc", "symbiyosys", "tcl", "tk", "yices", "yosys", "zlib"]
-
-[userenv]
-
-[userenv.shared]
-BUILD_SIGNING_KEY = "2026411604PMkjhh0590"
-
-[postMerge]
-path = "scripts/post-merge.sh"
-timeoutMs = 300000
 
 [[workflows.workflow]]
 name = "wukong-command-delivery-tests"
