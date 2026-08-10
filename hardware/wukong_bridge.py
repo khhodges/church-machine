@@ -558,10 +558,12 @@ class StreamSync:
     def __init__(self, out=None):
         self.locked = False
         self.discarded = 0          # unaligned bytes dropped while unlocked
+        self._ascii_run = []        # consecutive plausible bytes seen unlocked
         self._out = out if out is not None else print
 
     def lock(self, source='trace frame'):
         """Mark the stream aligned (a validated frame/sentinel was decoded)."""
+        self._ascii_run = []
         if self.locked:
             return
         self.locked = True
@@ -572,6 +574,7 @@ class StreamSync:
 
     def unlock(self, reason='byte slip'):
         """Drop the lock; subsequent non-magic bytes are dropped quietly."""
+        self._ascii_run = []
         if not self.locked:
             return
         self.locked = False
@@ -579,8 +582,43 @@ class StreamSync:
                   f'reacquiring quietly')
 
     def drop_byte(self):
-        """Count one unaligned byte discarded while unlocked."""
+        """Count one unaligned byte discarded while unlocked.
+
+        Also resets the ASCII re-lock run: this is called for failed 0xAA
+        candidates and invalid sentinels, both strong signs the surrounding
+        bytes are shifted packet payload, not genuine console text.
+        """
         self.discarded += 1
+        self._ascii_run = []
+
+    def note_unlocked_byte(self, b):
+        """Feed one non-magic byte seen while *unlocked*; maybe re-lock.
+
+        Genuine firmware output can legitimately contain a non-ASCII byte
+        (e.g. UTF-8 box-drawing characters in a banner).  That byte trips
+        the implausible-console-byte slip heuristic and drops the lock; on
+        an idle board no trace frame or boot sentinel may arrive for a long
+        time, so without this path the console would stay muted forever.
+
+        A sustained run of CONSOLE_RELOCK_RUN consecutive plausible ASCII
+        bytes is extremely unlikely in shifted packet payload (NIA high
+        bytes are 0x00, GT words are byte-sparse), so it re-acquires the
+        lock.  Returns the list of buffered run bytes to emit as console
+        output when the lock is re-acquired, else an empty list.
+        """
+        if is_console_plausible(b):
+            self._ascii_run.append(b)
+            if len(self._ascii_run) >= CONSOLE_RELOCK_RUN:
+                run = self._ascii_run
+                self._ascii_run = []
+                self.lock('sustained ASCII run')
+                return run
+        else:
+            # Implausible byte breaks the run; count it plus the (now
+            # discarded) partial run.
+            self.discarded += len(self._ascii_run) + 1
+            self._ascii_run = []
+        return []
 
 def is_console_plausible(b):
     """Return True when byte *b* is plausible genuine ASCII console output.
@@ -593,6 +631,13 @@ def is_console_plausible(b):
     implausible byte suppresses the shifted-byte console leak entirely.
     """
     return 32 <= b < 127 or b in (0x09, 0x0A, 0x0D)
+
+
+# Consecutive plausible ASCII bytes required to re-acquire the frame lock
+# while unlocked (see StreamSync.note_unlocked_byte).  Shifted trace-packet
+# payload never sustains a run this long (NIA high bytes are always 0x00),
+# but a genuine text banner reaches it within a dozen characters.
+CONSOLE_RELOCK_RUN = 8
 def post_command_ack(ide_base, verify_tls, cmd, ok, error='', cmd_id=None):
     """Report the serial-write result for a dequeued command to the server.
 
@@ -1001,8 +1046,21 @@ def main():
                     if not sync.locked:
                         # Unaligned stream (mid-run attach or byte slip):
                         # count and drop instead of spraying payload bytes
-                        # as console text.
-                        sync.drop_byte()
+                        # as console text.  A sustained run of plausible
+                        # ASCII re-acquires the lock (genuine banner text
+                        # after a UTF-8 byte tripped the slip heuristic);
+                        # the buffered run is then emitted so the banner
+                        # is not clipped.
+                        for rb in sync.note_unlocked_byte(ch):
+                            print(chr(rb) if 32 <= rb < 128 else '.',
+                                  end='', flush=True)
+                            if rb in (0x0A, 0x0D):
+                                _console_flush(ide_base, verify_tls)
+                            elif 32 <= rb < 128:
+                                _console_line.append(chr(rb))
+                                _console_last[0] = time.time()
+                                if len(_console_line) >= 200:
+                                    _console_flush(ide_base, verify_tls)
                         i += 1
                         continue
                     if not is_console_plausible(ch):

@@ -84,7 +84,9 @@ def run_sync_loop(data):
             i += s['length']
         else:
             if not sync.locked:
-                sync.drop_byte()
+                for rb in sync.note_unlocked_byte(b):
+                    if 32 <= rb < 128:
+                        console.append(chr(rb))
                 i += 1
                 continue
             if not wb.is_console_plausible(b):
@@ -204,6 +206,57 @@ def test_double_byte_slip_recovers():
     assert len(events) >= len(STREAM_FRAMES) - 5, \
         f'double slip: only {len(events)} events recovered'
     assert events[-1] == wb.decode_trace_packet(STREAM_FRAMES[-1])
+
+
+def test_utf8_byte_in_banner_does_not_mute_forever():
+    """A non-ASCII byte inside genuine console output (e.g. a UTF-8 /
+    box-drawing banner character) drops the lock, but a sustained run of
+    plausible ASCII afterwards must re-acquire it — even with no trace
+    frame or boot sentinel — so genuine text output resumes."""
+    # Locked via a real trace frame, then a banner with a UTF-8 byte inside.
+    banner = b'Church Machine \xe2\x94\x80 boot OK, more text follows here'
+    events, console, sync, messages = run_sync_loop(STREAM_FRAMES[0] + banner)
+    assert sync.locked, 'stream must end re-locked after ASCII run'
+    assert any('sustained ASCII run' in m for m in messages), \
+        f're-lock must come from the ASCII-run heuristic: {messages}'
+    text = ''.join(console)
+    # Text before the UTF-8 byte is forwarded (lock was held).
+    assert text.startswith('Church Machine '), f'pre-slip text lost: {text!r}'
+    # Text after re-lock resumes — including the buffered run bytes.
+    assert text.endswith('more text follows here'), \
+        f'post-UTF8 output stayed muted: {text!r}'
+    assert_all_events_genuine(events)
+
+
+def test_relock_run_not_triggered_by_shifted_packet_bytes():
+    """Shifted trace-packet payload must NOT sustain a plausible-ASCII run
+    long enough to re-lock: dropping a frame's magic byte still yields
+    console == [] (the existing slip guarantees hold)."""
+    for drop in range(0, len(STREAM), wb.TRACE_LEN):  # drop each magic byte
+        mutated = STREAM[:drop] + STREAM[drop + 1:]
+        events, console, sync, _ = run_sync_loop(mutated)
+        assert console == [], \
+            f'magic drop at {drop}: shifted bytes leaked via relock: {console!r}'
+        assert_all_events_genuine(events)
+
+
+def test_relock_threshold_requires_sustained_run():
+    """Fewer than CONSOLE_RELOCK_RUN consecutive plausible bytes must not
+    re-lock; an implausible byte resets the run."""
+    sync = wb.StreamSync(out=lambda m: None)
+    sync.lock('trace frame')
+    sync.unlock('test')
+    short = b'abc\x00def\x00ghi\x00'   # runs of 3, never reaching threshold
+    for b in short:
+        assert sync.note_unlocked_byte(b) == []
+    assert not sync.locked
+    # Now a sustained run re-locks and returns the buffered run.
+    run = b'x' * wb.CONSOLE_RELOCK_RUN
+    out = []
+    for b in run:
+        out += sync.note_unlocked_byte(b)
+    assert sync.locked
+    assert bytes(out) == run
 
 
 if __name__ == '__main__':
