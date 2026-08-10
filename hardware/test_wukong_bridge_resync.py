@@ -87,6 +87,11 @@ def run_sync_loop(data):
                 sync.drop_byte()
                 i += 1
                 continue
+            if not wb.is_console_plausible(b):
+                sync.unlock('implausible console byte — probable slip')
+                sync.drop_byte()
+                i += 1
+                continue
             if 32 <= b < 128:
                 console.append(chr(b))
             i += 1
@@ -143,13 +148,12 @@ def test_byte_slip_mid_packet_every_position():
                 assert events[-1] == last, \
                     f'drop at {drop}: final frame not recovered: {events[-1]}'
 
-        # 4. shifted-byte console leakage is bounded.  When the dropped byte
-        #    is a frame's 0xAA magic itself, the locked bridge cannot tell
-        #    the first few shifted printable bytes from genuine ASCII output
-        #    until a failed 0xAA candidate drops the lock — but the leak must
-        #    stay under one frame's worth, never a sustained spray.
-        assert len(console) < wb.TRACE_LEN, \
-            f'drop at {drop}: sustained console spray: {console!r}'
+        # 4. zero console leakage.  Even when the dropped byte is a frame's
+        #    0xAA magic itself, the implausible-byte slip heuristic drops
+        #    the lock on the first shifted NIA byte (always 0x00), so no
+        #    shifted bytes ever reach the console.
+        assert console == [], \
+            f'drop at {drop}: shifted bytes leaked to console: {console!r}'
 
 
 def test_byte_slip_drops_lock_and_relocks():

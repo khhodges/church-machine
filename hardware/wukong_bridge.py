@@ -582,7 +582,17 @@ class StreamSync:
         """Count one unaligned byte discarded while unlocked."""
         self.discarded += 1
 
+def is_console_plausible(b):
+    """Return True when byte *b* is plausible genuine ASCII console output.
 
+    Printable ASCII (0x20..0x7E) plus tab/CR/LF.  Anything else arriving
+    while the stream is *locked* is a strong slip signal: if a packet's
+    0xAA magic byte itself is dropped by a UART overrun, the shifted bytes
+    that follow start with the NIA high bytes (always 0x00 — NIA < 64 KB),
+    so gating on this predicate and dropping the lock on the first
+    implausible byte suppresses the shifted-byte console leak entirely.
+    """
+    return 32 <= b < 127 or b in (0x09, 0x0A, 0x0D)
 def post_command_ack(ide_base, verify_tls, cmd, ok, error='', cmd_id=None):
     """Report the serial-write result for a dequeued command to the server.
 
@@ -992,6 +1002,17 @@ def main():
                         # Unaligned stream (mid-run attach or byte slip):
                         # count and drop instead of spraying payload bytes
                         # as console text.
+                        sync.drop_byte()
+                        i += 1
+                        continue
+                    if not is_console_plausible(ch):
+                        # Locked, but this byte cannot be genuine ASCII console
+                        # output.  A dropped 0xAA magic byte (UART overrun)
+                        # leaves the stream shifted with the lock still held;
+                        # the shifted bytes start with NIA high bytes (0x00),
+                        # so treat the first implausible byte as a slip: drop
+                        # the lock and discard quietly until resync.
+                        sync.unlock('implausible console byte — probable slip')
                         sync.drop_byte()
                         i += 1
                         continue
