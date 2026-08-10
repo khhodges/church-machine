@@ -346,9 +346,95 @@
       .catch(function (e) { note(label + ' FAILED: ' + e); })
       .finally(function () { setCtlBusy(false); });
   }
+  // ── Generic command delivery watcher ──────────────────────────────────
+  // After queueing any command, poll /status every 500 ms and report each
+  // stage: queued → consumed by bridge → written to UART (or a concrete
+  // failure).  "Queued for bridge" alone is NOT delivery.
+  var cmdWatch = null;   // {t0, id, label, timer, phase, warned}
+  function stopCmdWatch() {
+    if (cmdWatch && cmdWatch.timer) clearInterval(cmdWatch.timer);
+    cmdWatch = null;
+    // Controls stay locked from queue until terminal ACK/timeout so a second
+    // command can never replace the single delivery record mid-watch.
+    setCtlBusy(false);
+  }
+  function cmdWatchTick() {
+    fetch('/hardware/wukong/status').then(function (r) { return r.json(); }).then(function (s) {
+      if (!cmdWatch) return;
+      var w = cmdWatch;
+      var elapsed = (Date.now() - w.t0) / 1000;
+      var d = s.command_delivery;
+      if (!d || d.id !== w.id) {
+        if (w.phase === 'consumed') {
+          // Bridge already dequeued our command; another client's command
+          // replaced the record before the write ACK. The bridge writes
+          // within one poll cycle of consuming — report as likely delivered.
+          note(w.label + ': consumed by bridge, but the delivery record was replaced before write confirmation — assuming delivered');
+        } else {
+          note(w.label + ': superseded by a newer command before delivery');
+        }
+        stopCmdWatch(); return;
+      }
+      if (d.write_ts) {
+        if (d.write_ok) note(w.label + ' delivered to board (serial write OK)');
+        else note(w.label + ' FAILED: bridge consumed the command but the serial write failed — ' +
+                  (d.write_error || 'unknown error'));
+        stopCmdWatch(); return;
+      }
+      if (d.consumed_ts) {
+        if (w.phase !== 'consumed') {
+          w.phase = 'consumed';
+          note(w.label + ': consumed by bridge — waiting for serial-write confirmation…');
+        }
+        if (elapsed > 8) {
+          note(w.label + ': no serial-write confirmation after 8s — bridge may be running an old version (git pull + make on the Chromebook)');
+          stopCmdWatch();
+        }
+        return;
+      }
+      if (elapsed > 3 && !w.warned) {
+        w.warned = true;
+        if (!s.bridge_connected)
+          note(w.label + ': no bridge polling — command still queued on the server (start the bridge on the Chromebook)');
+        else
+          note(w.label + ': not consumed after 3s despite a polling bridge — still waiting…');
+      }
+      if (elapsed > 30) {
+        note(w.label + ': gave up waiting after 30s — command ' +
+             (s.pending_command && s.pending_command.id === w.id ? 'still queued' : 'no longer pending'));
+        stopCmdWatch();
+      }
+    }).catch(function () {});
+  }
+  function startCmdWatch(id, label) {
+    stopCmdWatch();
+    cmdWatch = { t0: Date.now(), id: id, label: label, phase: 'queued', warned: false,
+                 timer: setInterval(cmdWatchTick, 500) };
+  }
   function sendCmd(body, label) {
-    ctlFetch('/hardware/wukong/command', body, label,
-             function (d) { return d.ok; }, 'queued for bridge');
+    if (ctlBusy) return;
+    setCtlBusy(true);
+    fetch('/hardware/wukong/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(function (r) {
+      return r.text().then(function (t) {
+        var d = null;
+        try { d = JSON.parse(t); } catch (e) {}
+        if (r.ok && d && d.ok) {
+          note(label + ' queued — watching delivery…' +
+               (d.overwrote ? "  WARNING: replaced pending '" + d.overwrote +
+                              "' command (it was never delivered)" : ''));
+          // Keep controls locked until the watcher reaches a terminal state
+          // (stopCmdWatch releases the lock) — see race note above.
+          startCmdWatch(d.id, label);
+        } else {
+          note(label + ' FAILED: ' + describeFailure(r.status, d, t));
+          setCtlBusy(false);
+        }
+      });
+    }).catch(function (e) { note(label + ' FAILED: ' + e); setCtlBusy(false); });
   }
   document.getElementById('btnStep').onclick   = function () { sendCmd({ cmd: 's' }, 'STEP'); };
   document.getElementById('btnRun').onclick    = function () { sendCmd({ cmd: 'r' }, 'RUN'); };

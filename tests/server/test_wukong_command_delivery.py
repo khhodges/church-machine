@@ -217,6 +217,56 @@ class TestOverwriteBehavior:
         assert 'overwrote' not in r.get_json()
 
 
+class TestBreakpointNiaParsing:
+    """A malformed NIA must be a hard 400 — never coerced to 0xFFFFFFFF,
+    which the RTL interprets as 'clear breakpoint' (a parse error would
+    otherwise silently DISARM breakpoints)."""
+
+    def _pending_nia(self):
+        with _app_module._wukong_command_lock:
+            return (_app_module._wukong_pending_cmd or {}).get('nia')
+
+    def test_int_nia_accepted(self, client):
+        r = _post_cmd(client, 'b', nia=16)
+        assert r.status_code == 200 and r.get_json()['ok']
+        assert self._pending_nia() == 16
+
+    def test_hex_string_nia_accepted(self, client):
+        r = _post_cmd(client, 'b', nia='0x00000010')
+        assert r.status_code == 200 and r.get_json()['ok']
+        assert self._pending_nia() == 0x10
+
+    def test_bare_hex_string_nia_accepted(self, client):
+        r = _post_cmd(client, 'b', nia='DEAD0010')
+        assert r.status_code == 200 and r.get_json()['ok']
+        assert self._pending_nia() == 0xDEAD0010
+
+    def test_decimal_string_nia_accepted(self, client):
+        r = _post_cmd(client, 'b', nia='512')
+        assert r.status_code == 200 and r.get_json()['ok']
+        assert self._pending_nia() == 512
+
+    def test_clear_sentinel_accepted(self, client):
+        r = _post_cmd(client, 'b', nia=0xFFFFFFFF)
+        assert r.status_code == 200 and r.get_json()['ok']
+        assert self._pending_nia() == 0xFFFFFFFF
+
+    def test_garbage_nia_rejected_not_coerced(self, client):
+        r = _post_cmd(client, 'b', nia='not-an-address')
+        assert r.status_code == 400
+        assert self._pending_nia() is None      # nothing queued
+
+    def test_out_of_range_nia_rejected(self, client):
+        r = _post_cmd(client, 'b', nia=2**32)
+        assert r.status_code == 400
+        assert self._pending_nia() is None
+
+    def test_none_nia_rejected(self, client):
+        r = _post_cmd(client, 'b', nia=None)
+        assert r.status_code == 400
+        assert self._pending_nia() is None
+
+
 class TestBootInfoReceivedTs:
     def test_boot_info_stamped_with_received_ts(self, client):
         """The sentinel-confirmation flow needs a server-side receive

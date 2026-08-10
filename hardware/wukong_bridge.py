@@ -711,7 +711,26 @@ def execute_board_command(cmd, data, ser, reopen_serial, buf,
     cmd_id = data.get('id')
     try:
         if cmd == 'b':
-            nia_val = int(data.get('nia', 0xFFFFFFFF))
+            # Server normalizes nia to an int, but be defensive: accept
+            # decimal/hex strings too, and NEVER coerce a parse failure to
+            # 0xFFFFFFFF (that would silently CLEAR breakpoints in RTL).
+            raw_nia = data.get('nia', 0xFFFFFFFF)
+            try:
+                nia_val = raw_nia if isinstance(raw_nia, int) \
+                    else int(str(raw_nia).strip(), 0)
+            except ValueError:
+                try:
+                    nia_val = int(str(raw_nia).strip(), 16)
+                except ValueError:
+                    post_command_ack(ide_base, verify_tls, cmd, False,
+                                     f'unparseable breakpoint nia {raw_nia!r}',
+                                     cmd_id=cmd_id)
+                    return ser
+            if not (0 <= nia_val <= 0xFFFFFFFF):
+                post_command_ack(ide_base, verify_tls, cmd, False,
+                                 f'breakpoint nia out of range: {nia_val}',
+                                 cmd_id=cmd_id)
+                return ser
             ser.write(b'b' + struct.pack('>I', nia_val))
         elif cmd == 'f':
             # Reopen the serial port first — JTAG programming silently kills

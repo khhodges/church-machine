@@ -94,6 +94,7 @@
 - [Wukong boot CALL direct-GT resolution](wukong-boot-call-resolution.md) — decoder call_mask=0 always; boot window uses BOOT_RESTORE_MASK (CR0+CR12); CALL bypasses c-list via mload_direct+boot_window_lat
 - [UART magic-byte frame resync](uart-frame-resync.md) — 0xAA-framed streams slip on mid-stream attach/dropped bytes; validate candidate frames (aligned NIA, known ev, sane flags) and advance 1 byte on failure
 - [networkidle never fires on /simulator/](networkidle-never-fires-simulator.md) — background polling keeps network busy; e2e tests must wait for concrete readiness globals, not 'networkidle'
+- [Single delivery record needs client command lock](single-slot-delivery-watch-lock.md) — hold busy until watcher terminal; record replaced after consumed = likely delivered, not superseded
 - [Single-slot command ack correlation](single-slot-cmd-ack-correlation.md) — correlate queue/consume/ack/confirm stages by monotonic id, never by command letter; no time-window heuristics
 - [Wukong trace disassembly](wukong-trace-disassembly.md) — current packets carry NIA but no instruction word; exact labels/mnemonics require a matching source map or a versioned packet extension
 - [Wukong dev/production event relay](wukong-dev-production-relay.md) — local simulator previews need the production relay when the physical bridge is attached to lab.cloomc.org

@@ -10224,10 +10224,30 @@ def wukong_command_post():
     entry = {'cmd': cmd}
 
     if cmd == 'b':
-        try:
-            entry['nia'] = int(data.get('nia', 0xFFFFFFFF)) & 0xFFFFFFFF
-        except (TypeError, ValueError):
-            entry['nia'] = 0xFFFFFFFF
+        # Accept int, decimal string, '0x…' hex string, or bare hex string.
+        # A malformed NIA is a hard 400 — it must NEVER be silently coerced
+        # to 0xFFFFFFFF, because the RTL interprets 0xFFFFFFFF as "clear
+        # breakpoint" (a parse error would otherwise DISARM breakpoints).
+        raw_nia = data.get('nia', 0xFFFFFFFF)
+        nia_val = None
+        if isinstance(raw_nia, bool):
+            pass                       # bool is an int subclass — reject
+        elif isinstance(raw_nia, int):
+            nia_val = raw_nia
+        elif isinstance(raw_nia, str):
+            s = raw_nia.strip()
+            try:
+                nia_val = int(s, 0)    # handles decimal and 0x-prefixed hex
+            except ValueError:
+                try:
+                    nia_val = int(s, 16)   # bare hex like 'DEAD0010'
+                except ValueError:
+                    nia_val = None
+        if nia_val is None or not (0 <= nia_val <= 0xFFFFFFFF):
+            return jsonify({'ok': False,
+                            'error': 'invalid nia %r — use a decimal or hex '
+                                     '(0x…) address' % (raw_nia,)}), 400
+        entry['nia'] = nia_val & 0xFFFFFFFF
         # Reject board execution commands while an upload is in-flight.
         with _upload_in_flight_lock:
             if _upload_in_flight:

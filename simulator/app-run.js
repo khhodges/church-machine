@@ -1516,7 +1516,17 @@ function _autoLoadDefaultProgram() {
         return;
     }
     _defaultProgramLoaded = true;
-    loadExample('capability_test');
+    // Only load the default example into an EMPTY editor.  The editor may
+    // already hold user source (restored from localStorage, a user tab, or
+    // pasted while boot was still animating / after a failed compile that
+    // never set _defaultProgramLoaded).  Overwriting it here silently
+    // destroyed the user's program on boot completion.
+    const _dfltEd = document.getElementById('asmEditor');
+    const _edHasContent = !!(_dfltEd && _dfltEd.value && _dfltEd.value.trim());
+    const _userTabActive = (typeof activeUserTabId !== 'undefined') && !!activeUserTabId;
+    if (!_edHasContent && !_userTabActive) {
+        loadExample('capability_test');
+    }
     // Do NOT auto-assemble here. assembleAndLoad() → sim.loadProgram() would
     // overwrite Boot.Abstr word[0] with the capability_test first instruction,
     // masking the boot image's correct value in Code View on every boot.
@@ -14984,19 +14994,20 @@ async function _wukongSetHwBreakpoint(nia) {
     const addr = nia >>> 0;
     const armed = _hwBreakpoints.has(addr);
     const sendNia = armed ? 0xFFFFFFFF : addr;
-    try {
-        await fetch('/hardware/wukong/command', {
-            method : 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body   : JSON.stringify({cmd: 'b', nia: sendNia})
-        });
-        if (armed) {
-            _hwBreakpoints.delete(addr);
-        } else {
-            _hwBreakpoints.add(addr);
-        }
-        _wukongRefreshHwbpGutters();
-    } catch(e) {}
+    const label = (armed ? 'CLEAR BP' : 'SET BP') +
+                  ' @ 0x' + addr.toString(16).toUpperCase().padStart(8, '0');
+    // Only update local breakpoint state after the bridge confirms the
+    // serial write — the old code updated it even when the command died.
+    const d = await _wukongPostCmd('b', {nia: sendNia}, label);
+    if (!d) return;
+    const ok = await _wukongWatchDelivery(d.id, label, 10000);
+    if (!ok) return;
+    if (armed) {
+        _hwBreakpoints.delete(addr);
+    } else {
+        _hwBreakpoints.add(addr);
+    }
+    _wukongRefreshHwbpGutters();
 }
 window._wukongSetHwBreakpoint = _wukongSetHwBreakpoint;
 
@@ -15746,14 +15757,124 @@ function _wukongAppendTrace(data) {
     _appendToLog(con, line, 0);
 }
 
+// ── Board-command helpers (shared by Step / Run / Halt / BP / Load) ─────────
+// Every board command must surface its true outcome: HTTP failure, queue
+// overwrite, bridge-absent, or serial-write failure — never silent success.
+function _wukongCmdLog(msg) {
+    const con = document.getElementById('editorConsole');
+    if (!con) return;
+    const line = document.createElement('div');
+    line.className = 'wukong-trace-line';
+    line.appendChild(document.createTextNode('\n\u26A1 ' + msg));
+    con.appendChild(line);
+    con.scrollTop = con.scrollHeight;
+}
+
+// One board command in flight at a time (per IDE tab).  The server keeps a
+// single delivery record, so posting command B while command A's delivery is
+// still being watched would replace A's record and make A's watcher report a
+// false "superseded" even though A was already consumed and written.
+let _wukongCmdBusy = false;
+
+// POST a command; returns the response object {ok, id, overwrote?} on queue
+// success, or null after logging the failure.
+async function _wukongPostCmd(cmd, extra, label) {
+    label = label || ("'" + cmd + "'");
+    if (_wukongCmdBusy) {
+        _wukongCmdLog(label + ': another board command is still awaiting ' +
+                      'delivery confirmation \u2014 try again in a moment');
+        return null;
+    }
+    const body = Object.assign({cmd: cmd}, extra || {});
+    let resp, d = null;
+    try {
+        resp = await fetch('/hardware/wukong/command', {
+            method : 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body   : JSON.stringify(body)
+        });
+        try { d = await resp.json(); } catch(e) {}
+    } catch(e) {
+        _wukongCmdLog(label + ' FAILED: ' + (e && e.message ? e.message : e));
+        return null;
+    }
+    if (!resp.ok || !d || !d.ok) {
+        _wukongCmdLog(label + ' FAILED: ' +
+            (d && d.error ? d.error : ('HTTP ' + resp.status)));
+        return null;
+    }
+    if (d.overwrote) {
+        _wukongCmdLog(label + " WARNING: replaced pending '" + d.overwrote +
+                      "' command \u2014 that command was never delivered to the board");
+    }
+    _wukongCmdBusy = true;   // released by _wukongWatchDelivery
+    return d;
+}
+
+// Watch the server's delivery record until the bridge confirms the serial
+// write (or the wait times out / the command is superseded).  Returns true
+// only on a confirmed UART write.
+async function _wukongWatchDelivery(id, label, timeoutMs) {
+    try {
+        return await _wukongWatchDeliveryInner(id, label, timeoutMs);
+    } finally {
+        _wukongCmdBusy = false;
+    }
+}
+async function _wukongWatchDeliveryInner(id, label, timeoutMs) {
+    const deadline = Date.now() + (timeoutMs || 10000);
+    let warnedQueued = false;
+    let sawConsumed = false;
+    while (Date.now() < deadline) {
+        await new Promise(function(res) { setTimeout(res, 400); });
+        try {
+            const s = await (await fetch('/hardware/wukong/status')).json();
+            const d = s.command_delivery;
+            if (!d || d.id !== id) {
+                if (sawConsumed) {
+                    // The bridge already dequeued our command; a later command
+                    // (from another client) replaced the delivery record before
+                    // we saw the write ACK.  The bridge writes within one poll
+                    // cycle of consuming, so treat as delivered — but say so.
+                    _wukongCmdLog(label + ': consumed by bridge, but the delivery ' +
+                                  'record was replaced before write confirmation \u2014 ' +
+                                  'assuming delivered');
+                    return true;
+                }
+                _wukongCmdLog(label + ': superseded by a newer command before delivery');
+                return false;
+            }
+            if (d.consumed_ts) sawConsumed = true;
+            if (d.write_ts) {
+                if (d.write_ok) return true;
+                _wukongCmdLog(label + ' FAILED: bridge serial write failed \u2014 ' +
+                              (d.write_error || 'unknown error'));
+                return false;
+            }
+            if (!d.consumed_ts && !warnedQueued &&
+                    (Date.now() - deadline + (timeoutMs || 10000)) > 3000) {
+                warnedQueued = true;
+                if (!s.bridge_connected) {
+                    _wukongCmdLog(label + ': no bridge polling \u2014 command still ' +
+                                  'queued on the server (is the bridge running?)');
+                }
+            }
+        } catch(e) {}
+    }
+    _wukongCmdLog(label + ': no delivery confirmation after ' +
+                  Math.round((timeoutMs || 10000) / 1000) + 's');
+    return false;
+}
+
 async function _wukongStep() {
     try {
         const beforeSeq = _wukongLastEventSeq;
-        await fetch('/hardware/wukong/command', {
-            method : 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body   : JSON.stringify({cmd: 's'})
-        });
+        const d = await _wukongPostCmd('s', null, 'STEP');
+        if (!d) return;
+        // First require a confirmed serial write — a bridge write failure or
+        // an absent bridge must surface here, not vanish into a 500 ms wait.
+        const delivered = await _wukongWatchDelivery(d.id, 'STEP', 10000);
+        if (!delivered) return;
         // Wait up to 500 ms for at least one new event beyond beforeSeq.
         const deadline = Date.now() + 500;
         while (Date.now() < deadline) {
@@ -15770,15 +15891,18 @@ async function _wukongStep() {
 }
 
 async function hwRunToggle() {
-    _wukongHWRunning = !_wukongHWRunning;
+    const wantRunning = !_wukongHWRunning;
+    const label = wantRunning ? 'RUN' : 'HALT';
+    // Optimistically flip for responsive UI, but REVERT on any failure —
+    // the old code left the button lying about the board's state.
+    _wukongHWRunning = wantRunning;
     _wukongUpdateBtn();
-    try {
-        await fetch('/hardware/wukong/command', {
-            method : 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body   : JSON.stringify({cmd: _wukongHWRunning ? 'r' : 'h'})
-        });
-    } catch(e) {}
+    const d = await _wukongPostCmd(wantRunning ? 'r' : 'h', null, label);
+    const ok = d ? await _wukongWatchDelivery(d.id, label, 10000) : false;
+    if (!ok) {
+        _wukongHWRunning = !wantRunning;
+        _wukongUpdateBtn();
+    }
 }
 
 async function _wukongLoadToHardware() {
@@ -15884,11 +16008,14 @@ async function _wukongLoadToHardware() {
         // Step 4: send run command so the board starts executing the new image.
         _wukongHWRunning = true;
         _wukongUpdateBtn();
-        await fetch('/hardware/wukong/command', {
-            method : 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body   : JSON.stringify({cmd: 'r'})
-        });
+        const runD = await _wukongPostCmd('r', null, 'RUN (post-upload)');
+        const runOk = runD ? await _wukongWatchDelivery(runD.id, 'RUN (post-upload)', 10000) : false;
+        if (!runOk) {
+            _wukongHWRunning = false;
+            _wukongUpdateBtn();
+            _loadLog('Upload OK but the RUN command was not confirmed \u2014 press \u25B6 to start the board.');
+            return _loadDone(false);
+        }
 
         _loadLog('Board running \u2014 waiting for trace\u2026');
         return _loadDone(true);

@@ -41,9 +41,12 @@ const ABS_SRC = extractBlock(
     'window._pushBootEntryToHardware = _pushBootEntryToHardware;',
     true);
 
+// Include the shared board-command helpers (_wukongCmdBusy, _wukongPostCmd,
+// _wukongWatchDelivery, _wukongCmdLog) that _wukongLoadToHardware's step-4
+// RUN verification depends on.
 const LOAD_SRC = extractBlock(
     'app-run.js',
-    'async function _wukongLoadToHardware() {',
+    '// ── Board-command helpers',
     '\nfunction _preSeedConventionsFromLumps',
     false);
 
@@ -61,6 +64,7 @@ function makeEnv(opts) {
     const document = window.document;
 
     const fetchCalls = [];
+    let lastCmdId = 0;
     const fetchImpl = async function(url, init) {
         fetchCalls.push({
             url : url,
@@ -78,7 +82,16 @@ function makeEnv(opts) {
             return { ok: true, json: async () => ({ ok: true }) };
         }
         if (url === '/hardware/wukong/command') {
-            return { ok: true, json: async () => ({ ok: true }) };
+            lastCmdId += 1;
+            return { ok: true, json: async () => ({ ok: true, id: lastCmdId }) };
+        }
+        if (url === '/hardware/wukong/status') {
+            // Model the bridge confirming the serial write for the last command.
+            const id = lastCmdId;
+            return { ok: true, json: async () => ({
+                bridge_connected: true,
+                command_delivery: { id: id, consumed_ts: 1, write_ts: 2, write_ok: true },
+            }) };
         }
         throw new Error('unexpected fetch: ' + url);
     };
