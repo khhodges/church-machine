@@ -223,6 +223,9 @@ register_suite "wukong-cr-update-tests" \
 register_suite "wukong-hw-fault-tests" \
     'node simulator/test_wukong_hw_fault.js'
 
+register_suite "wukong-console-warning-tests" \
+    'node simulator/test_wukong_console_warning.js'
+
 register_suite "wukong-trace-cr-server-tests" \
     'python3 -m pytest tests/server/test_wukong_trace_cr_update.py -v'
 

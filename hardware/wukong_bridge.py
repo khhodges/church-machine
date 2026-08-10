@@ -915,6 +915,20 @@ def main():
                                   file=sys.stderr)
                             print('  Run: python3 hardware/check_dmem_count.py --check',
                                   file=sys.stderr)
+                            # Notify the IDE so the mismatch is visible in the
+                            # console event log, not just the bridge's stderr.
+                            try:
+                                requests.post(
+                                    f'{ide_base}/hardware/wukong/console',
+                                    json={'text': ('⚠ Board bitstream may be stale — '
+                                                   'N_INIT mismatch (board sent '
+                                                   f'0x{board_n_init_byte:02X}, expected '
+                                                   f'0x{expected_byte:02X}). Reflash the '
+                                                   'bitstream.'),
+                                          'ts': time.time()},
+                                    timeout=1, verify=verify_tls)
+                            except Exception as exc:
+                                print(f'  [console POST error] {exc}')
                     else:
                         print(f'BOOT: board ready — N_INIT byte=0x{board_n_init_byte:02X} '
                               f'(validation skipped: boot_rom not importable){tu_str}{bv_str}')

@@ -15540,6 +15540,29 @@ function _wukongAppendTrace(data) {
     // If neither target exists yet (panel not injected, page still loading) bail.
     if (!hwLogBody && !con) return;
 
+    // ── Console events from the bridge ────────────────────────────────────────
+    // /hardware/wukong/console entries are {console: text, ts, seq} — raw UART
+    // ASCII lines and bridge-generated warnings (e.g. "Board bitstream may be
+    // stale — N_INIT mismatch").  They carry no trace fields, so render them as
+    // plain text lines and return before any trace-specific handling.
+    if (typeof data.console === 'string') {
+        const text   = data.console;
+        const isWarn = /N_INIT mismatch|stale|WARNING|\u26A0/i.test(text);
+        const line   = document.createElement('div');
+        line.className = 'wukong-trace-line' +
+            (isWarn ? ' wukong-trace-gap wukong-console-warn' : ' wukong-console-line');
+        line.appendChild(document.createTextNode('\nHW: ' + text));
+        for (const target of [con, hwLogBody]) {
+            if (!target) continue;
+            target.appendChild(line.cloneNode(true));
+            if (target.childElementCount > 500) {
+                target.removeChild(target.firstElementChild);
+            }
+            target.scrollTop = target.scrollHeight;
+        }
+        return;
+    }
+
     const evType = data.ev_type || 0;
     const niaInt = data.nia >>> 0;
 
