@@ -439,7 +439,7 @@ function renderAbstractions() {
 
         html += `<div class="abs-item${isActive ? ' active' : ''}" onclick="showAbstractionDetail(${abs.index})" ondblclick="event.stopPropagation();_goToLumpByAbstractionName(abstractionRegistry.getAbstraction(${abs.index}).name)" title="Double-click to jump to this abstraction\u2019s LUMP in the Repository">`;
         html += `<div class="abs-item-row1">`;
-        html += `<span class="abs-item-idx abs-boot-entry-btn${isBootEntry ? ' boot-entry-active' : ''}" onclick="event.stopPropagation();setBootEntrySlot(${abs.index})" title="${isBootEntry ? 'Current boot entry' : 'Set as boot entry'}">${isBootEntry ? '\u26a1' : abs.index}</span>`;
+        html += `<span class="abs-item-idx abs-boot-entry-btn${isBootEntry ? ' boot-entry-active' : ''}" onclick="event.stopPropagation();setBootEntrySlot(${abs.index},event)" title="${isBootEntry ? 'Current boot entry \u2014 \u2318/Ctrl+click to push to FPGA' : 'Set as boot entry \u2014 \u2318/Ctrl+click to also push to FPGA'}">${isBootEntry ? '\u26a1' : abs.index}</span>`;
         html += `<span class="abs-item-name">${abs.name}</span>`;
         html += `<span class="abs-profile-badge ${profileBadgeClass}" title="${absProfile} profile \u2014 ${profileTitle}">${absProfile}</span>`;
         if (compiledAt) html += `<span class="abs-item-date" title="Compiled ${compiledAt}">${compiledAt}</span>`;
@@ -493,7 +493,11 @@ function renderAbstractions() {
     }
 }
 
-function setBootEntrySlot(idx) {
+function setBootEntrySlot(idx, ev) {
+    // Task #2532: Cmd+click (⌘ on Mac, Ctrl elsewhere) on the lightning bolt
+    // additionally pushes the newly-selected boot entry to the Wukong board.
+    const _isCmdClick = !!(ev && (ev.metaKey || ev.ctrlKey));
+    const _anchorEl   = (ev && ev.target) || null;
     idx = Math.max(0, Math.min(255, Math.trunc(Number(idx)) || 0));
     bootEntrySlot = idx;
     localStorage.setItem('bootEntrySlot', String(idx));
@@ -523,7 +527,85 @@ function setBootEntrySlot(idx) {
     renderAbstractions();
     if (currentView === 'namespace') updateNamespace();
     if (typeof window.lumpEditorRenderResidentPanel === 'function') window.lumpEditorRenderResidentPanel();
+
+    // Task #2532: Cmd+click → push the new boot entry to the connected board.
+    // A plain click never touches hardware; with no board connected the
+    // Cmd+click degrades to a normal click plus a "No board connected" badge.
+    if (_isCmdClick) {
+        const _connected = (typeof _wukongIsConnected === 'function') && _wukongIsConnected();
+        if (!_connected) {
+            _showBootPushBadge(_anchorEl, 'No board connected', 'warn', 2500);
+        } else if (typeof _wukongLoadToHardware === 'function') {
+            _pushBootEntryToHardware(idx, _anchorEl);
+        }
+    }
 }
+
+// ── Task #2532: Cmd+click boot-entry hardware push ───────────────────────────
+
+// Transient status badge floated next to the clicked lightning bolt (or the
+// top-right corner when the anchor element is gone). Returns the element;
+// ms=0 keeps it until .remove() is called.
+function _showBootPushBadge(anchorEl, text, kind, ms) {
+    try {
+        const badge = document.createElement('div');
+        badge.className = 'boot-push-badge boot-push-badge-' + (kind || 'info');
+        badge.textContent = text;
+        const color = kind === 'ok' ? '#44dd88' : kind === 'err' ? '#ef4444'
+            : kind === 'warn' ? '#f59e0b' : '#e8e8e8';
+        badge.style.cssText =
+            'position:fixed;z-index:10000;padding:3px 8px;border-radius:4px;' +
+            'font-size:11px;font-weight:600;pointer-events:none;' +
+            'background:rgba(20,24,32,0.95);border:1px solid ' + color + ';' +
+            'color:' + color + ';box-shadow:0 2px 8px rgba(0,0,0,0.5);';
+        let placed = false;
+        if (anchorEl && typeof anchorEl.getBoundingClientRect === 'function' &&
+                document.contains(anchorEl)) {
+            const r = anchorEl.getBoundingClientRect();
+            if (r.width || r.height) {
+                badge.style.left = Math.round(r.right + 8) + 'px';
+                badge.style.top  = Math.round(r.top - 2) + 'px';
+                placed = true;
+            }
+        }
+        if (!placed) {
+            badge.style.right = '16px';
+            badge.style.top   = '56px';
+        }
+        document.body.appendChild(badge);
+        if (ms > 0) setTimeout(function() { badge.remove(); }, ms);
+        return badge;
+    } catch (e) { return null; }
+}
+
+let _bootPushInFlight = false;
+
+// Regenerate the boot image for the just-selected entry slot and push it to
+// the FPGA via the SAME flow as the toolbar "⚡ Load" button
+// (_wukongLoadToHardware: generate → send-to-hardware → poll upload-ack →
+// {cmd:'r'}). setBootEntrySlot already updated sim.bootEntrySlot, which is
+// exactly what _wukongLoadToHardware forwards as entrySlot to
+// /api/boot-image/generate — no duplication of the upload flow here.
+async function _pushBootEntryToHardware(idx, anchorEl) {
+    if (_bootPushInFlight) {
+        _showBootPushBadge(anchorEl, 'Upload already in progress\u2026', 'warn', 2000);
+        return;
+    }
+    _bootPushInFlight = true;
+    const pending = _showBootPushBadge(anchorEl, '\u23F3 Uploading\u2026', 'info', 0);
+    let ok = false;
+    try {
+        ok = (await _wukongLoadToHardware()) === true;
+    } catch (e) {
+        ok = false;
+    }
+    _bootPushInFlight = false;
+    if (pending && pending.remove) pending.remove();
+    _showBootPushBadge(anchorEl,
+        ok ? '\u2713 Sent to board (slot ' + idx + ')' : '\u2717 Upload failed \u2014 see console',
+        ok ? 'ok' : 'err', 3000);
+}
+window._pushBootEntryToHardware = _pushBootEntryToHardware;
 
 function _syncBootEntryFromSim() {
     if (!sim) return;

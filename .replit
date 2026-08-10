@@ -306,6 +306,17 @@ args = "node simulator/test_wukong_toolbar_btn.js"
 outputType = "console"
 
 [[workflows.workflow]]
+name = "cmd-click-boot-push-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_cmd_click_boot_push.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
 name = "wukong-hw-fault-tests"
 author = "agent"
 

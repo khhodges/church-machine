@@ -190,6 +190,9 @@ register_suite "disasm-panel-tests" \
 register_suite "wukong-toolbar-btn-tests" \
     'node simulator/test_wukong_toolbar_btn.js'
 
+register_suite "cmd-click-boot-push-tests" \
+    'node simulator/test_cmd_click_boot_push.js'
+
 register_suite "rci-threading-tests" \
     'node simulator/test_rci_threading.js'
 

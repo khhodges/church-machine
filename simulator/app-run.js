@@ -15783,6 +15783,7 @@ async function _wukongLoadToHardware() {
         if (!ok && _wukongHWRunning) {
             // Keep HW run state as-is; just restore the button.
         }
+        return ok;   // Task #2532: callers (Cmd+click boot push) need pass/fail
     }
 
     try {
@@ -15802,8 +15803,7 @@ async function _wukongLoadToHardware() {
         if (!genResp.ok) {
             const err = await genResp.json().catch(function() { return {}; });
             _loadLog('ERROR: generate failed \u2014 ' + (err.error || genResp.status));
-            _loadDone(false);
-            return;
+            return _loadDone(false);
         }
 
         // Step 2: enqueue upload command for the bridge.
@@ -15821,8 +15821,7 @@ async function _wukongLoadToHardware() {
                 _loadLog('Upload already in progress \u2014 waiting for bridge\u2026');
             } else {
                 _loadLog('ERROR: queue failed \u2014 ' + (err.error || sendResp.status));
-                _loadDone(false);
-                return;
+                return _loadDone(false);
             }
         }
         const sendData = await sendResp.json().catch(function() { return {}; });
@@ -15843,8 +15842,7 @@ async function _wukongLoadToHardware() {
                         } else {
                             _loadLog('ERROR: bridge upload failed \u2014 ' +
                                 (ackData.error || 'unknown error'));
-                            _loadDone(false);
-                            return;
+                            return _loadDone(false);
                         }
                         break;
                     }
@@ -15854,8 +15852,7 @@ async function _wukongLoadToHardware() {
 
         if (!ackOk) {
             _loadLog('ERROR: upload timed out \u2014 is the bridge running?');
-            _loadDone(false);
-            return;
+            return _loadDone(false);
         }
 
         _loadLog('Upload complete \u2014 hardware boot entry is now slot ' +
@@ -15871,11 +15868,11 @@ async function _wukongLoadToHardware() {
         });
 
         _loadLog('Board running \u2014 waiting for trace\u2026');
-        _loadDone(true);
+        return _loadDone(true);
 
     } catch(e) {
         _loadLog('ERROR: ' + (e && e.message ? e.message : String(e)));
-        _loadDone(false);
+        return _loadDone(false);
     }
 }
 function _preSeedConventionsFromLumps(lumps) {
