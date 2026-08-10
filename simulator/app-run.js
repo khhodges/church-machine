@@ -15312,6 +15312,48 @@ const _WUKONG_EV_INSTR_NAME = {
     0x09: 'RETURN', 0x0A: 'RETURN', 0x0B: 'RETURN'
 };
 
+// Descriptive event labels for the hardware trace panel — one per ev_type code.
+const _WUKONG_EV_TRACE_NAMES = {
+    0x00: 'RESULT',
+    0x01: 'LOAD shadow GT',
+    0x02: 'LOAD new GT',
+    0x03: 'CHANGE push',
+    0x04: 'CHANGE CR12',
+    0x05: 'CHANGE CR5',
+    0x06: 'CALL CR6',
+    0x07: 'CALL CR14',
+    0x0A: 'RETURN CR6',
+    0x0B: 'RETURN CR14',
+};
+
+// ── GT word → human-readable label ──────────────────────────────────────────
+// GT bit layout (hw_types.py):
+//   bits[6:0]   = slot_id
+//   bits[26:25] = gt_type  (00=NULL 01=Inform 10=Outform 11=Abstract)
+//   bit[27]     = dom      (0=Turing 1=Church)
+//   bits[30:28] = perm[2:0]
+//     Turing: bit0=R  bit1=W  bit2=X
+//     Church: bit0=L  bit1=S  bit2=E
+const _WUKONG_GT_SLOT_NAMES = {0: 'Thread', 1: 'Boot.NS', 7: 'WukongCallHome'};
+
+function _decodeGtLabel(gtWord) {
+    if (!gtWord) return null;
+    const gtType = (gtWord >>> 25) & 0x3;
+    const dom    = (gtWord >>> 27) & 0x1;
+    const perm   = (gtWord >>> 28) & 0x7;
+    const slot   = gtWord & 0x7F;
+    if (gtType === 0) return 'NULL GT';
+    const typePfx  = gtType === 2 ? 'Outform ' : (gtType === 3 ? 'Abstract ' : '');
+    const slotName = Object.prototype.hasOwnProperty.call(_WUKONG_GT_SLOT_NAMES, slot)
+        ? _WUKONG_GT_SLOT_NAMES[slot] : ('slot ' + slot);
+    const domStr   = dom ? 'Church' : 'Turing';
+    const permParts = dom
+        ? [(perm & 1) ? 'L' : '', (perm & 2) ? 'S' : '', (perm & 4) ? 'E' : '']
+        : [(perm & 1) ? 'R' : '', (perm & 2) ? 'W' : '', (perm & 4) ? 'X' : ''];
+    const permStr = permParts.filter(Boolean).join('+') || 'no';
+    return typePfx + slotName + ', ' + domStr + ' ' + permStr + '-perm';
+}
+
 function _wukongTraceLocationText(data) {
     const niaInt = (data && data.nia !== undefined)
         ? (data.nia >>> 0) : 0;
@@ -15624,11 +15666,26 @@ function _wukongAppendTrace(data) {
         // Clear any previous fault panel when execution resumes cleanly.
         _wukongHideFaultPanel();
     }
+    // ── Event-type name and GT annotation ────────────────────────────────────
+    const evTraceName = _WUKONG_EV_TRACE_NAMES[evType] || '';
+    const rawGt = (data.payload_gt || 0) >>> 0;
+    let gtAnnotation = '';
+    if (rawGt) {
+        const gtHex = '0x' + rawGt.toString(16).padStart(8, '0').toUpperCase();
+        // Prefer label shipped by bridge; fall back to client-side decode.
+        const gtLabel = (data.gt_label && data.gt_label.trim())
+            ? data.gt_label
+            : _decodeGtLabel(rawGt);
+        gtAnnotation = '  GT=' + gtHex + (gtLabel ? ' (' + gtLabel + ')' : '');
+    }
+
     // Fault lines get a distinct class so they stand out visually.
     const line = document.createElement('div');
     line.className = 'wukong-trace-line' + (data.fault_valid ? ' wukong-trace-fault' : '');
     line.appendChild(document.createTextNode(
         '\nHW: ' + _wukongTraceLocationText(data) +
+        (evTraceName ? '  ' + evTraceName : '') +
+        gtAnnotation +
         '  flags=' + flags + '  ' + stateStr));
     if (data.bp_hit) {
         const bpBtn = document.createElement('button');

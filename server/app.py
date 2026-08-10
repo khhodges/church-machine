@@ -9961,6 +9961,7 @@ def wukong_trace_post():
         'nia':         int(data.get('nia', 0)),
         'ev_type':     ev_type,
         'payload_gt':  payload_gt,
+        'gt_label':    str(data.get('gt_label', '') or ''),
         'instr':       int(data.get('instr', 0)),
         'flags':       int(data.get('flags', 0)),
         'fault_code':  int(data.get('fault_code', 0)),

@@ -340,6 +340,50 @@ def _fault_name(code):
     return _FAULT_NAMES.get(code, f'FAULT_{code}')
 
 
+# ── GT word decoder ───────────────────────────────────────────────────────────
+# GT bit layout (hw_types.py):
+#   bits[6:0]   = slot_id
+#   bits[26:25] = gt_type  (00=NULL  01=Inform  10=Outform  11=Abstract)
+#   bit[27]     = dom      (0=Turing  1=Church)
+#   bits[30:28] = perm[2:0]
+#     Turing (dom=0): bit0=R  bit1=W  bit2=X
+#     Church (dom=1): bit0=L  bit1=S  bit2=E
+_GT_SLOT_NAMES = {0: 'Thread', 1: 'Boot.NS', 7: 'WukongCallHome'}
+_GT_TYPE_SUFFIX = {2: 'Outform ', 3: 'Abstract '}
+
+
+def _decode_gt_label(gt_word):
+    """Return a short human-readable annotation for a GT word, or None.
+
+    Examples:
+        0x42000007 -> 'WukongCallHome, Turing X-perm'
+        0x1A000007 -> 'WukongCallHome, Church L-perm'
+        0x02000001 -> 'Boot.NS, Turing no-perm'
+        0          -> None  (push/pop events carry no GT payload)
+    """
+    if not gt_word:
+        return None
+    gt_type = (gt_word >> 25) & 0x3
+    dom     = (gt_word >> 27) & 0x1
+    perm    = (gt_word >> 28) & 0x7
+    slot    = gt_word & 0x7F
+    if gt_type == 0:
+        return 'NULL GT'
+    type_pfx = _GT_TYPE_SUFFIX.get(gt_type, '')
+    slot_str = _GT_SLOT_NAMES.get(slot, f'slot {slot}')
+    dom_str  = 'Church' if dom else 'Turing'
+    if dom:   # Church: L S E
+        parts = (['L'] if perm & 1 else []) + \
+                (['S'] if perm & 2 else []) + \
+                (['E'] if perm & 4 else [])
+    else:     # Turing: R W X
+        parts = (['R'] if perm & 1 else []) + \
+                (['W'] if perm & 2 else []) + \
+                (['X'] if perm & 4 else [])
+    perm_str = ('+'.join(parts) + '-perm') if parts else 'no-perm'
+    return f'{type_pfx}{slot_str}, {dom_str} {perm_str}'
+
+
 def decode_trace_packet(pkt):
     """Decode a single 12-byte trace packet into a dict.
 
@@ -669,6 +713,8 @@ def main():
                     location = _trace_location(decoded['nia'])
                     if location:
                         decoded.update(location)
+                    decoded['gt_label'] = \
+                        _decode_gt_label(decoded.get('payload_gt', 0)) or ''
 
                     try:
                         requests.post(
@@ -684,7 +730,10 @@ def main():
                     flag_str   = _flags_str(flags_byte)
                     ts_str     = time.strftime('%H:%M:%S', time.localtime())
                     ev_name    = _EV_NAMES.get(ev_type, f'EV_0x{ev_type:02X}')
-                    gt_str     = f'  GT=0x{payload_gt:08X}' if payload_gt else ''
+                    _gt_label  = _decode_gt_label(payload_gt)
+                    gt_str     = (f'  GT=0x{payload_gt:08X}' +
+                                  (f' ({_gt_label})' if _gt_label else '')) \
+                                 if payload_gt else ''
                     if decoded['fault_valid']:
                         fault_str = f'  FAULT={_fault_name(decoded["fault_code"])}'
                     else:
