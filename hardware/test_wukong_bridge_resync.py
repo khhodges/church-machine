@@ -90,6 +90,16 @@ def run_sync_loop(data):
                 i += 1
                 continue
             if not wb.is_console_plausible(b):
+                # Mirror main(): valid multi-byte UTF-8 is decoded and
+                # forwarded; only truly implausible bytes trigger the slip.
+                u = wb.try_parse_utf8_sequence(buf, i)
+                if u is False:
+                    break
+                if u is not None:
+                    n_bytes, text = u
+                    console.append(text)
+                    i += n_bytes
+                    continue
                 sync.unlock('implausible console byte — probable slip')
                 sync.drop_byte()
                 i += 1
@@ -208,24 +218,65 @@ def test_double_byte_slip_recovers():
     assert events[-1] == wb.decode_trace_packet(STREAM_FRAMES[-1])
 
 
-def test_utf8_byte_in_banner_does_not_mute_forever():
-    """A non-ASCII byte inside genuine console output (e.g. a UTF-8 /
-    box-drawing banner character) drops the lock, but a sustained run of
-    plausible ASCII afterwards must re-acquire it — even with no trace
-    frame or boot sentinel — so genuine text output resumes."""
-    # Locked via a real trace frame, then a banner with a UTF-8 byte inside.
+def test_utf8_banner_decoded_while_locked():
+    """A valid multi-byte UTF-8 sequence inside genuine console output must
+    be decoded and forwarded — the lock is never dropped and no characters
+    are clipped."""
     banner = b'Church Machine \xe2\x94\x80 boot OK, more text follows here'
     events, console, sync, messages = run_sync_loop(STREAM_FRAMES[0] + banner)
-    assert sync.locked, 'stream must end re-locked after ASCII run'
-    assert any('sustained ASCII run' in m for m in messages), \
-        f're-lock must come from the ASCII-run heuristic: {messages}'
+    assert sync.locked, 'lock must be retained across a UTF-8 sequence'
+    assert not any('frame sync lost' in m for m in messages), \
+        f'UTF-8 byte must not trip the slip heuristic: {messages}'
     text = ''.join(console)
-    # Text before the UTF-8 byte is forwarded (lock was held).
-    assert text.startswith('Church Machine '), f'pre-slip text lost: {text!r}'
-    # Text after re-lock resumes — including the buffered run bytes.
-    assert text.endswith('more text follows here'), \
-        f'post-UTF8 output stayed muted: {text!r}'
+    assert text == 'Church Machine \u2500 boot OK, more text follows here', \
+        f'UTF-8 banner not forwarded intact: {text!r}'
     assert_all_events_genuine(events)
+
+
+def test_utf8_multibyte_variants_decoded():
+    """2-, 3- and 4-byte UTF-8 sequences are all forwarded while locked."""
+    banner = 'deg\u00b0 box\u2500 emoji\U0001f600 end'.encode('utf-8')
+    events, console, sync, _ = run_sync_loop(STREAM_FRAMES[0] + banner)
+    assert sync.locked
+    assert ''.join(console) == 'deg\u00b0 box\u2500 emoji\U0001f600 end'
+    assert_all_events_genuine(events)
+
+
+def test_utf8_split_across_reads_waits():
+    """An incomplete UTF-8 sequence at the buffer tail must wait for more
+    data (like a partial trace frame), not slip or emit garbage."""
+    banner = 'box \u2500 done'.encode('utf-8')
+    # Cut the stream mid-sequence (after the 0xE2 lead byte).
+    cut = STREAM_FRAMES[0] + banner[:5]   # 'box ' + first byte of \u2500
+    events, console, sync, _ = run_sync_loop(cut)
+    assert sync.locked
+    assert ''.join(console) == 'box ', f'partial sequence mishandled: {console!r}'
+
+
+def test_implausible_bytes_still_slip():
+    """Truly implausible bytes (0x00, stray continuation bytes, out-of-range
+    leads) must still trigger the slip heuristic while locked."""
+    for bad in (b'\x00', b'\x80', b'\xf8', b'\xc2A'):  # NUL, continuation,
+        # invalid lead, lead followed by non-continuation
+        events, console, sync, messages = run_sync_loop(
+            STREAM_FRAMES[0] + b'ok' + bad)
+        assert not sync.locked, f'{bad!r} must drop the lock'
+        assert any('frame sync lost' in m for m in messages)
+        assert ''.join(console) == 'ok'
+        assert_all_events_genuine(events)
+
+
+def test_utf8_after_relock_run_still_muted_until_relock():
+    """While *unlocked*, a UTF-8 byte still resets the ASCII re-lock run
+    (unlocked bytes are untrusted); a sustained plausible ASCII run afterwards
+    re-acquires the lock as before."""
+    events, console, sync, messages = run_sync_loop(
+        STREAM_FRAMES[0] + b'ok\x00' + b'plain ascii text resumes here')
+    assert sync.locked, 'stream must end re-locked after ASCII run'
+    assert any('sustained ASCII run' in m for m in messages)
+    text = ''.join(console)
+    assert text.startswith('ok')
+    assert text.endswith('resumes here')
 
 
 def test_relock_run_not_triggered_by_shifted_packet_bytes():

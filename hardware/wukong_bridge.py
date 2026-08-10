@@ -638,6 +638,49 @@ def is_console_plausible(b):
 # payload never sustains a run this long (NIA high bytes are always 0x00),
 # but a genuine text banner reaches it within a dozen characters.
 CONSOLE_RELOCK_RUN = 8
+
+
+def try_parse_utf8_sequence(buf, i):
+    """Attempt to parse a valid multi-byte UTF-8 sequence at position *i*.
+
+    Firmware banners legitimately contain multi-byte UTF-8 (box-drawing
+    characters etc.).  While the stream is locked, such bytes should be
+    decoded and forwarded as console output rather than treated as a byte
+    slip.  Truly implausible bytes (0x00, stray continuation bytes, shifted
+    packet payload) are not valid UTF-8 lead sequences and still trigger the
+    slip heuristic.
+
+    Returns
+    -------
+    None
+        ``buf[i]`` is not a valid UTF-8 lead byte, or the bytes that follow
+        do not form a valid UTF-8 sequence.  Caller should treat it as an
+        implausible (slip) byte.
+    False
+        ``buf[i]`` is a valid lead byte but the buffer does not yet hold the
+        full sequence.  Caller should wait for more data without advancing.
+    (length, text)
+        A valid sequence of *length* bytes decoding to *text* (str).
+    """
+    b0 = buf[i]
+    if 0xC2 <= b0 <= 0xDF:
+        n = 2
+    elif 0xE0 <= b0 <= 0xEF:
+        n = 3
+    elif 0xF0 <= b0 <= 0xF4:
+        n = 4
+    else:
+        return None
+    if len(buf) - i < n:
+        return False
+    seq = bytes(buf[i:i + n])
+    try:
+        text = seq.decode('utf-8')
+    except UnicodeDecodeError:
+        return None
+    return (n, text)
+
+
 def post_command_ack(ide_base, verify_tls, cmd, ok, error='', cmd_id=None):
     """Report the serial-write result for a dequeued command to the server.
 
@@ -1064,12 +1107,29 @@ def main():
                         i += 1
                         continue
                     if not is_console_plausible(ch):
-                        # Locked, but this byte cannot be genuine ASCII console
-                        # output.  A dropped 0xAA magic byte (UART overrun)
-                        # leaves the stream shifted with the lock still held;
-                        # the shifted bytes start with NIA high bytes (0x00),
-                        # so treat the first implausible byte as a slip: drop
-                        # the lock and discard quietly until resync.
+                        # Could be a genuine multi-byte UTF-8 sequence in
+                        # firmware output (box-drawing banner characters).
+                        u = try_parse_utf8_sequence(buf, i)
+                        if u is False:
+                            # Valid lead byte, sequence incomplete — wait for
+                            # more data before deciding.
+                            break
+                        if u is not None:
+                            n_bytes, text = u
+                            print(text, end='', flush=True)
+                            _console_line.append(text)
+                            _console_last[0] = time.time()
+                            if len(_console_line) >= 200:
+                                _console_flush(ide_base, verify_tls)
+                            i += n_bytes
+                            continue
+                        # Locked, but this byte cannot be genuine console
+                        # output (not ASCII, not valid UTF-8).  A dropped 0xAA
+                        # magic byte (UART overrun) leaves the stream shifted
+                        # with the lock still held; the shifted bytes start
+                        # with NIA high bytes (0x00), so treat the first
+                        # implausible byte as a slip: drop the lock and
+                        # discard quietly until resync.
                         sync.unlock('implausible console byte — probable slip')
                         sync.drop_byte()
                         i += 1
