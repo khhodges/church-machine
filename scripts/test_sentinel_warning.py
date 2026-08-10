@@ -158,6 +158,7 @@ _N_INIT_BYTE  = 0x2A
 _TU_VERSION   = 0x02   # TU_VERSION_CALL_3PKT — current TraceUnit capability
 _TU_CURRENT   = bridge.TU_VERSION_CALL_3PKT        # 0x02 — current
 _TU_OLD       = bridge.TU_VERSION_CALL_3PKT - 1    # 0x01 — below minimum
+_BUILD_VER    = 0x07   # arbitrary BUILD_VERSION byte (4th byte of V2 sentinel)
 
 
 class TestStaleSentinel:
@@ -214,7 +215,7 @@ class TestStaleSentinel:
 class TestCurrentSentinel:
     """0xBC (current TraceUnit) must succeed silently — no BITSTREAM WARNING."""
 
-    _PAYLOAD = bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, _TU_VERSION])
+    _PAYLOAD = bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, _TU_VERSION, _BUILD_VER])
 
     def test_returns_true(self):
         result, _ = _run_check_sentinel(self._PAYLOAD)
@@ -231,7 +232,7 @@ class TestCurrentSentinel:
     def test_current_sentinel_preceded_by_ascii_garbage(self):
         """Current sentinel is detected even when prefixed by ASCII output."""
         garbage = b'Boot OK\r\n'
-        payload = garbage + bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, _TU_VERSION])
+        payload = garbage + bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, _TU_VERSION, _BUILD_VER])
         result, stderr = _run_check_sentinel(payload)
         assert result is True
         assert 'BITSTREAM WARNING' not in stderr
@@ -240,7 +241,7 @@ class TestCurrentSentinel:
 class TestLowTuVersion:
     """0xBC + TU_VERSION < 0x02 must trigger a BITSTREAM WARNING on stderr."""
 
-    _PAYLOAD_LOW = bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, 0x01])   # below minimum
+    _PAYLOAD_LOW = bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, 0x01, _BUILD_VER])   # below minimum
 
     def test_returns_true_on_low_tu_version(self):
         result, _ = _run_check_sentinel(self._PAYLOAD_LOW)
@@ -280,7 +281,7 @@ class TestLowTuVersion:
 
     def test_tu_version_zero_emits_warning(self):
         """TU_VERSION=0x00 (the absolute minimum) must also trigger a warning."""
-        payload = bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, 0x00])
+        payload = bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, 0x00, _BUILD_VER])
         _, stderr = _run_check_sentinel(payload)
         assert 'BITSTREAM WARNING' in stderr, (
             f'Expected BITSTREAM WARNING for TU_VERSION=0x00; got: {stderr!r}'
@@ -288,7 +289,7 @@ class TestLowTuVersion:
 
     def test_tu_version_at_minimum_no_warning(self):
         """TU_VERSION == TU_VERSION_CALL_3PKT (0x02) must NOT trigger a warning."""
-        payload = bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, 0x02])
+        payload = bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, 0x02, _BUILD_VER])
         _, stderr = _run_check_sentinel(payload)
         assert 'BITSTREAM WARNING' not in stderr, (
             f'Unexpected BITSTREAM WARNING for TU_VERSION=0x02; got: {stderr!r}'
@@ -296,7 +297,7 @@ class TestLowTuVersion:
 
     def test_tu_version_above_minimum_no_warning(self):
         """TU_VERSION > TU_VERSION_CALL_3PKT must NOT trigger a warning."""
-        payload = bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, 0x03])
+        payload = bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, 0x03, _BUILD_VER])
         _, stderr = _run_check_sentinel(payload)
         assert 'BITSTREAM WARNING' not in stderr, (
             f'Unexpected BITSTREAM WARNING for TU_VERSION=0x03; got: {stderr!r}'
@@ -305,7 +306,7 @@ class TestLowTuVersion:
     def test_low_tu_version_preceded_by_ascii_garbage(self):
         """Warning is emitted even when sentinel is prefixed by ASCII output."""
         garbage = b'Starting up\r\n'
-        payload = garbage + bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, 0x01])
+        payload = garbage + bytes([smoke.SENTINEL_V2, _N_INIT_BYTE, 0x01, _BUILD_VER])
         result, stderr = _run_check_sentinel(payload)
         assert result is True
         assert 'BITSTREAM WARNING' in stderr
@@ -316,10 +317,10 @@ class TestPartialBufferV2Sentinel:
 
     The partial-buffer guard inside check_sentinel() reads:
 
-        if len(buf) - idx < 3:
+        if len(buf) - idx < SENTINEL_V2_LEN:
             continue
 
-    These tests verify that when only the first 2 bytes of the 3-byte V2
+    These tests verify that when only the first 2 bytes of the 4-byte V2
     sentinel arrive on the first read(), check_sentinel() waits and correctly
     processes the TU_VERSION byte once it arrives on the second read().  A
     refactor that accidentally removes the ``continue`` would either index out
@@ -342,8 +343,8 @@ class TestPartialBufferV2Sentinel:
     def test_split_low_tu_version_returns_true(self):
         """Returns True when TU_VERSION=0x01 arrives one read after the magic+N_INIT."""
         chunks = [
-            bytes([smoke.SENTINEL_V2, _N_INIT_BYTE]),  # first read: magic + N_INIT only
-            bytes([0x01]),                              # second read: TU_VERSION
+            bytes([smoke.SENTINEL_V2, _N_INIT_BYTE]),       # first read: magic + N_INIT only
+            bytes([0x01, _BUILD_VER]),                      # second read: TU_VERSION + BUILD_VERSION
         ]
         result, _ = self._run_chunked(chunks)
         assert result is True, \
@@ -353,7 +354,7 @@ class TestPartialBufferV2Sentinel:
         """BITSTREAM WARNING is emitted when TU_VERSION=0x01 arrives in the second chunk."""
         chunks = [
             bytes([smoke.SENTINEL_V2, _N_INIT_BYTE]),
-            bytes([0x01]),
+            bytes([0x01, _BUILD_VER]),
         ]
         _, stderr = self._run_chunked(chunks)
         assert 'BITSTREAM WARNING' in stderr, (
@@ -365,7 +366,7 @@ class TestPartialBufferV2Sentinel:
         """The split-delivery warning must name TU_VERSION as the cause."""
         chunks = [
             bytes([smoke.SENTINEL_V2, _N_INIT_BYTE]),
-            bytes([0x01]),
+            bytes([0x01, _BUILD_VER]),
         ]
         _, stderr = self._run_chunked(chunks)
         assert 'TU_VERSION' in stderr or 'tu_version' in stderr.lower(), (
@@ -376,7 +377,7 @@ class TestPartialBufferV2Sentinel:
         """No BITSTREAM WARNING when TU_VERSION=0x02 arrives in the second chunk."""
         chunks = [
             bytes([smoke.SENTINEL_V2, _N_INIT_BYTE]),
-            bytes([0x02]),
+            bytes([0x02, _BUILD_VER]),
         ]
         _, stderr = self._run_chunked(chunks)
         assert 'BITSTREAM WARNING' not in stderr, (
@@ -388,7 +389,7 @@ class TestPartialBufferV2Sentinel:
         """Returns True when TU_VERSION>=0x02 arrives in the second chunk."""
         chunks = [
             bytes([smoke.SENTINEL_V2, _N_INIT_BYTE]),
-            bytes([0x02]),
+            bytes([0x02, _BUILD_VER]),
         ]
         result, _ = self._run_chunked(chunks)
         assert result is True, \
@@ -398,7 +399,7 @@ class TestPartialBufferV2Sentinel:
         """Split sentinel still detected when first chunk has leading ASCII garbage."""
         chunks = [
             b'Boot output\r\n' + bytes([smoke.SENTINEL_V2, _N_INIT_BYTE]),
-            bytes([0x01]),
+            bytes([0x01, _BUILD_VER]),
         ]
         result, stderr = self._run_chunked(chunks)
         assert result is True
@@ -413,6 +414,7 @@ class TestPartialBufferV2Sentinel:
             bytes([smoke.SENTINEL_V2]),  # magic only
             bytes([_N_INIT_BYTE]),       # N_INIT
             bytes([0x01]),               # TU_VERSION
+            bytes([_BUILD_VER]),         # BUILD_VERSION
         ]
         result, stderr = self._run_chunked(chunks)
         assert result is True
@@ -1001,10 +1003,10 @@ class TestConstantAlignment:
         assert bridge.SENTINEL_V1_LEN == 2, \
             f'Expected SENTINEL_V1_LEN==2, got {bridge.SENTINEL_V1_LEN}'
 
-    def test_current_sentinel_length_is_3(self):
-        """Current sentinel is 3 bytes: magic + N_INIT + TU_VERSION."""
-        assert bridge.SENTINEL_V2_LEN == 3, \
-            f'Expected SENTINEL_V2_LEN==3, got {bridge.SENTINEL_V2_LEN}'
+    def test_current_sentinel_length_is_4(self):
+        """Current sentinel is 4 bytes: magic + N_INIT + TU_VERSION + BUILD_VERSION."""
+        assert bridge.SENTINEL_V2_LEN == 4, \
+            f'Expected SENTINEL_V2_LEN==4, got {bridge.SENTINEL_V2_LEN}'
 
     def test_tu_version_call_3pkt_is_0x02(self):
         """Minimum TU_VERSION for correct ELOADCALL/XLOADLAMBDA tracing is 0x02."""
@@ -1180,7 +1182,7 @@ class TestParseBootSentinelV2Stale:
 
     def _buf(self):
         return bytearray(
-            [bridge.BOOT_SENTINEL_V2, _N_INIT_BYTE, _TU_OLD]
+            [bridge.BOOT_SENTINEL_V2, _N_INIT_BYTE, _TU_OLD, _BUILD_VER]
         )
 
     def test_stale_is_true_for_old_tu_version(self):
@@ -1201,7 +1203,7 @@ class TestParseBootSentinelV2Current:
 
     def _buf(self, prefix=b''):
         return bytearray(
-            prefix + bytes([bridge.BOOT_SENTINEL_V2, _N_INIT_BYTE, _TU_CURRENT])
+            prefix + bytes([bridge.BOOT_SENTINEL_V2, _N_INIT_BYTE, _TU_CURRENT, _BUILD_VER])
         )
 
     def test_returns_dict(self):
@@ -1235,6 +1237,13 @@ class TestParseBootSentinelV2Current:
         result = bridge.parse_boot_sentinel(buf)
         assert result is False, \
             f'Expected False for truncated V2, got {result!r}'
+
+    def test_returns_false_when_build_version_missing(self):
+        """Three bytes present (magic + N_INIT + TU_VERSION) but BUILD_VERSION missing."""
+        buf = bytearray([bridge.BOOT_SENTINEL_V2, _N_INIT_BYTE, _TU_CURRENT])
+        result = bridge.parse_boot_sentinel(buf)
+        assert result is False, \
+            f'Expected False for V2 missing BUILD_VERSION byte, got {result!r}'
 
     def test_with_nonzero_offset(self):
         buf = self._buf(prefix=b'\x00\x01\x02')
