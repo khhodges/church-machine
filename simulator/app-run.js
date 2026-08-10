@@ -15326,6 +15326,11 @@ const _WUKONG_EV_TRACE_NAMES = {
     0x0B: 'RETURN CR14',
 };
 
+// ev_types whose packet payload IS the GT (even 0x00000000 = NULL GT is informative).
+// Events not in this set (RESULT=0x00, CHANGE_PUSH=0x03, CALL_PUSH=0x08,
+// RETURN_POP=0x09) have hardware-forced payload=0 with no GT meaning.
+const _WUKONG_EV_HAS_GT_PAYLOAD = new Set([0x01, 0x02, 0x04, 0x05, 0x06, 0x07, 0x0A, 0x0B]);
+
 // ── GT word → human-readable label ──────────────────────────────────────────
 // GT bit layout (hw_types.py):
 //   bits[6:0]   = slot_id
@@ -15337,7 +15342,9 @@ const _WUKONG_EV_TRACE_NAMES = {
 const _WUKONG_GT_SLOT_NAMES = {0: 'Thread', 1: 'Boot.NS', 7: 'WukongCallHome'};
 
 function _decodeGtLabel(gtWord) {
-    if (!gtWord) return null;
+    // 0x00000000 IS a valid null-GT — return 'NULL GT', not null.
+    // Callers must gate on _WUKONG_EV_HAS_GT_PAYLOAD before calling.
+    if (gtWord === null || gtWord === undefined) return null;
     const gtType = (gtWord >>> 25) & 0x3;
     const dom    = (gtWord >>> 27) & 0x1;
     const perm   = (gtWord >>> 28) & 0x7;
@@ -15668,9 +15675,11 @@ function _wukongAppendTrace(data) {
     }
     // ── Event-type name and GT annotation ────────────────────────────────────
     const evTraceName = _WUKONG_EV_TRACE_NAMES[evType] || '';
-    const rawGt = (data.payload_gt || 0) >>> 0;
     let gtAnnotation = '';
-    if (rawGt) {
+    if (_WUKONG_EV_HAS_GT_PAYLOAD.has(evType)) {
+        // payload_gt is the actual GT value for this event — show it even when
+        // 0x00000000 (that IS a null GT, which is informative for LOAD events).
+        const rawGt = (data.payload_gt >>> 0);
         const gtHex = '0x' + rawGt.toString(16).padStart(8, '0').toUpperCase();
         // Prefer label shipped by bridge; fall back to client-side decode.
         const gtLabel = (data.gt_label && data.gt_label.trim())

@@ -351,17 +351,32 @@ def _fault_name(code):
 _GT_SLOT_NAMES = {0: 'Thread', 1: 'Boot.NS', 7: 'WukongCallHome'}
 _GT_TYPE_SUFFIX = {2: 'Outform ', 3: 'Abstract '}
 
+# ev_types whose packet payload IS the GT (even 0 = null-GT is informative).
+# Events NOT in this set (RESULT=0x00, CHANGE_PUSH=0x03, CALL_PUSH=0x08,
+# RETURN_POP=0x09) always have hardware-forced payload=0 with no GT meaning.
+_EV_HAS_GT_PAYLOAD = frozenset({
+    0x01, 0x02,        # LOAD_SHADOW, LOAD_NEW
+    0x04, 0x05,        # CHANGE_CR12, CHANGE_CR5
+    0x06, 0x07,        # CALL_CR6, CALL_CR14
+    0x0A, 0x0B,        # RETURN_CR6, RETURN_CR14
+})
+
 
 def _decode_gt_label(gt_word):
-    """Return a short human-readable annotation for a GT word, or None.
+    """Return a short human-readable annotation for a GT word.
+
+    Returns None only when gt_word is None/undefined.
+    0x00000000 returns 'NULL GT' — it is a valid null-GT value, not absence of
+    a GT payload (call sites must gate on _EV_HAS_GT_PAYLOAD to decide whether
+    to call this at all).
 
     Examples:
         0x42000007 -> 'WukongCallHome, Turing X-perm'
         0x1A000007 -> 'WukongCallHome, Church L-perm'
         0x02000001 -> 'Boot.NS, Turing no-perm'
-        0          -> None  (push/pop events carry no GT payload)
+        0x00000000 -> 'NULL GT'
     """
-    if not gt_word:
+    if gt_word is None:
         return None
     gt_type = (gt_word >> 25) & 0x3
     dom     = (gt_word >> 27) & 0x1
@@ -713,8 +728,10 @@ def main():
                     location = _trace_location(decoded['nia'])
                     if location:
                         decoded.update(location)
-                    decoded['gt_label'] = \
+                    decoded['gt_label'] = (
                         _decode_gt_label(decoded.get('payload_gt', 0)) or ''
+                        if decoded.get('ev_type') in _EV_HAS_GT_PAYLOAD else ''
+                    )
 
                     try:
                         requests.post(
@@ -730,10 +747,12 @@ def main():
                     flag_str   = _flags_str(flags_byte)
                     ts_str     = time.strftime('%H:%M:%S', time.localtime())
                     ev_name    = _EV_NAMES.get(ev_type, f'EV_0x{ev_type:02X}')
-                    _gt_label  = _decode_gt_label(payload_gt)
-                    gt_str     = (f'  GT=0x{payload_gt:08X}' +
-                                  (f' ({_gt_label})' if _gt_label else '')) \
-                                 if payload_gt else ''
+                    if ev_type in _EV_HAS_GT_PAYLOAD:
+                        _gt_label = _decode_gt_label(payload_gt)
+                        gt_str    = (f'  GT=0x{payload_gt:08X}' +
+                                     (f' ({_gt_label})' if _gt_label else ''))
+                    else:
+                        gt_str = ''
                     if decoded['fault_valid']:
                         fault_str = f'  FAULT={_fault_name(decoded["fault_code"])}'
                     else:

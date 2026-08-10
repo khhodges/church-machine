@@ -57,9 +57,51 @@ try:
 except ImportError:
     _wukong_udp = None
 try:
-    from hardware.wukong_trace_symbols import trace_metadata as _wukong_trace_metadata
+    from hardware.wukong_trace_symbols import (
+        trace_metadata    as _wukong_trace_metadata_static,
+        _disassemble_word as _wts_disasm,
+    )
 except ImportError:
-    _wukong_trace_metadata = lambda _nia: None
+    _wukong_trace_metadata_static = lambda _nia: None
+    _wts_disasm = lambda _w: '<unknown>'
+
+# ── Dynamic NIA map ──────────────────────────────────────────────────────────
+# Populated by _wukong_update_active_lump_nia() whenever a boot image is sent
+# to hardware.  Stores {base_byte, end_byte, name, lump_words} for the active
+# entry lump so every trace event gets a "LumpName.N" label instead of a raw
+# hex NIA.  WukongCallHome is already covered by _wukong_trace_metadata_static;
+# for user-compiled lumps this map is the only source of labels.
+_wukong_active_lump_info = {}
+
+def _wukong_resolve_nia(nia):
+    """Resolve a trace NIA: check the dynamic active-lump table first, then
+    fall back to the static WCH + Boot-ROM table from wukong_trace_symbols."""
+    info = _wukong_active_lump_info
+    if (info and
+            info.get('base_byte', -1) <= nia < info.get('end_byte', 0) and
+            nia % 4 == 0):
+        offset = (nia - info['base_byte']) // 4
+        name   = info.get('name', 'Lump')
+        word   = info.get('lump_words', {}).get(offset)
+        if offset == 0:
+            disasm = 'LUMP_HEADER'
+        elif word is not None:
+            try:
+                disasm = _wts_disasm(word)
+            except Exception:
+                disasm = f'0x{word:08X}'
+        else:
+            disasm = '<unknown>'
+        return {
+            'pet_name':   name,
+            'offset':     offset,
+            'nia_label':  f'{name}.{offset}',
+            'disasm':     disasm,
+            'source_map': 'uploaded',
+        }
+    return _wukong_trace_metadata_static(nia)
+
+_wukong_trace_metadata = _wukong_resolve_nia
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -4286,6 +4328,70 @@ def _derive_ns_state_names():
     except Exception:
         pass
     return [_out[k] for k in sorted(_out)]
+
+
+def _wukong_lump_name_for_slot(slot):
+    """Return the abstraction name for NS *slot* from ns-state.json or manifest."""
+    try:
+        with open(NS_STATE_PATH) as _fh:
+            _ns = json.load(_fh)
+        for _e in _ns.get('abstractions', []):
+            if isinstance(_e, dict) and _e.get('slot') == slot:
+                _n = _e.get('name')
+                if _n:
+                    return _n
+    except Exception:
+        pass
+    try:
+        _mf = os.path.join(LUMPS_DIR, 'manifest.json')
+        with open(_mf) as _fh:
+            _entries = json.load(_fh)
+        for _e in (_entries if isinstance(_entries, list) else []):
+            if _e.get('ns_slot') == slot:
+                _n = _e.get('abstraction')
+                if _n:
+                    return _n
+    except Exception:
+        pass
+    return f'Slot{slot}'
+
+
+def _wukong_update_active_lump_nia(image_bytes, entry_info):
+    """Populate _wukong_active_lump_info so trace events resolve to pet-name labels.
+
+    Called immediately after the boot image is validated and enqueued for the
+    bridge.  Reads the LUMP header at the entry slot's location, derives the
+    NIA byte range, stores the instruction words for disasm, and looks up the
+    abstraction name from ns-state.json / manifest.json.
+    """
+    global _wukong_active_lump_info
+    import struct as _st_nia
+    entry_slot = entry_info.get('entry_slot')
+    entry_loc  = entry_info.get('entry_loc')   # word index of LUMP header in image
+    if entry_loc is None or not entry_info.get('resident'):
+        _wukong_active_lump_info = {}
+        return
+    n_words = len(image_bytes) // 4
+    words    = _st_nia.unpack(f'<{n_words}I', image_bytes[:n_words * 4])
+    hdr      = words[entry_loc]
+    n_m6     = (hdr >> 23) & 0xF          # lump size exponent (2^(n_m6+6) words total)
+    lump_size = 2 ** (n_m6 + 6)
+    base_byte = entry_loc * 4             # byte-addressed NIA of LUMP header word
+    end_byte  = base_byte + lump_size * 4
+    lump_words = {
+        _i: words[entry_loc + _i]
+        for _i in range(lump_size)
+        if entry_loc + _i < n_words
+    }
+    name = _wukong_lump_name_for_slot(entry_slot)
+    _wukong_active_lump_info = {
+        'base_byte':  base_byte,
+        'end_byte':   end_byte,
+        'name':       name,
+        'lump_words': lump_words,
+    }
+    print(f'[wukong-nia] active lump: {name!r}  '
+          f'NIA=0x{base_byte:04X}–0x{end_byte:04X}  slot={entry_slot}', flush=True)
 
 
 def _read_boot_entry_name_from_image():
@@ -10457,6 +10563,10 @@ def boot_image_send_to_hardware():
                             'Regenerate the boot image.'}), 400
 
         _encoded = _b64.b64encode(_raw).decode('ascii')
+
+        # Register NIA label map so trace events for the uploaded lump resolve
+        # to "LumpName.N" labels instead of raw hex NIAs.
+        _wukong_update_active_lump_nia(_raw, _entry_info)
 
         # Record which entry slot this upload carries BEFORE the command
         # becomes observable to the bridge: a fast bridge could otherwise
