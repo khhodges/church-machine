@@ -65,6 +65,9 @@ export default defineConfig({
     },
     proxy: {
       "/api": "http://localhost:5000",
+      "/fpga": "http://localhost:5000",
+      "/hardware": "http://localhost:5000",
+      "/simulator": "http://localhost:5000",
       "/report": "http://localhost:5000",
       "/internal": "http://localhost:5000",
       "/upload": "http://localhost:5000",
