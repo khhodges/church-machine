@@ -508,6 +508,81 @@ def try_parse_trace_frame(buf, i=0):
     return decode_trace_packet(pkt)
 
 
+def validate_boot_sentinel(sentinel, expected_n_init=None):
+    """Plausibility check used to *acquire* frame sync from a boot sentinel.
+
+    ``parse_boot_sentinel`` accepts any 0xBB/0xBC byte plus the following
+    byte(s) — that is fine once the stream is aligned, but while the bridge
+    is still hunting for frame sync (mid-run attach, byte slip), a sentinel
+    magic byte inside unaligned trace-packet payload would falsely acquire
+    the lock and re-open the console-garbage spray this gate exists to stop.
+
+    Rules (all must hold for the sentinel to be trusted for lock
+    acquisition; locked-state sentinel handling is unaffected):
+      • when *expected_n_init* is known, the N_INIT byte must match it
+      • V2 sentinels must carry a sane TU_VERSION (0x01..0x0F)
+      • V1 sentinels with no N_INIT reference are rejected — two arbitrary
+        bytes are too weak a signature to trust from an unaligned stream
+    """
+    if expected_n_init is not None:
+        if sentinel['n_init_byte'] != (expected_n_init & 0xFF):
+            return False
+    if sentinel['magic'] == BOOT_SENTINEL_V2:
+        tu = sentinel.get('tu_version')
+        if tu is None or not (0x01 <= tu <= 0x0F):
+            return False
+    elif expected_n_init is None:
+        return False
+    return True
+
+
+class StreamSync:
+    """Attach-time / mid-run frame-sync state for the bridge main loop.
+
+    When the bridge attaches to a board that is already streaming trace
+    packets, the first bytes read land at an arbitrary offset inside a
+    packet.  Misaligned payload bytes are mostly printable ASCII, so without
+    this gate they get echoed to the terminal and forwarded to the IDE
+    console as garbage (``5!%!)!...`` spray).
+
+    The stream is *unlocked* until the first fully-validated trace frame or
+    boot sentinel is decoded.  While unlocked, non-magic bytes are counted
+    and dropped instead of echoed/forwarded.  A failed 0xAA candidate frame
+    (payload byte mistaken for magic — mid-session byte slip) drops the lock
+    again so resync happens quietly.  Serial reopen also drops the lock.
+
+    NOTE: no handshake byte is ever sent to acquire sync — in particular
+    never 'f' (0x66), which performs a full CM reboot on the board.
+    """
+
+    def __init__(self, out=None):
+        self.locked = False
+        self.discarded = 0          # unaligned bytes dropped while unlocked
+        self._out = out if out is not None else print
+
+    def lock(self, source='trace frame'):
+        """Mark the stream aligned (a validated frame/sentinel was decoded)."""
+        if self.locked:
+            return
+        self.locked = True
+        n = self.discarded
+        self.discarded = 0
+        self._out(f'[bridge] frame sync acquired ({source}) — '
+                  f'discarded {n} unaligned byte(s)')
+
+    def unlock(self, reason='byte slip'):
+        """Drop the lock; subsequent non-magic bytes are dropped quietly."""
+        if not self.locked:
+            return
+        self.locked = False
+        self._out(f'[bridge] frame sync lost ({reason}) — '
+                  f'reacquiring quietly')
+
+    def drop_byte(self):
+        """Count one unaligned byte discarded while unlocked."""
+        self.discarded += 1
+
+
 def post_command_ack(ide_base, verify_tls, cmd, ok, error='', cmd_id=None):
     """Report the serial-write result for a dequeued command to the server.
 
@@ -638,6 +713,17 @@ def main():
         print(f'ERROR opening {port}: {e}', file=sys.stderr)
         sys.exit(1)
 
+    # Attach flush: discard OS-buffered partial stream so we don't start
+    # decoding in the middle of a packet the board sent before we attached.
+    try:
+        ser.reset_input_buffer()
+    except Exception:
+        pass
+    print('[bridge] acquiring frame sync — unaligned bytes will be '
+          'discarded until the first valid trace frame or boot sentinel',
+          flush=True)
+    sync = StreamSync(out=lambda msg: print(msg, flush=True))
+
     buf          = bytearray()
     last_poll    = 0.0
     resync_skips = 0   # bogus-0xAA candidates skipped by frame validation
@@ -682,6 +768,16 @@ def main():
                     print(f'[bridge] USB renumbered: {port} → {found}', flush=True)
                     port = found
                 print(f'[bridge] serial port reopened ({port})', flush=True)
+                # Attach flush + quiet resync: drop the frame lock and any
+                # partial buffer so we re-acquire alignment without spraying
+                # misaligned payload bytes as console text.
+                try:
+                    s.reset_input_buffer()
+                except Exception:
+                    pass
+                sync.unlock('serial reopen')
+                del buf[:]
+                print('[bridge] acquiring frame sync after reopen', flush=True)
                 return s
             except serial.SerialException as exc:
                 print(f'[bridge] reopen attempt {attempt+1}/15 failed ({found}): {exc}', flush=True)
@@ -719,8 +815,15 @@ def main():
                         if resync_skips <= 3 or resync_skips % 100 == 0:
                             print(f'[bridge] trace resync: skipped bogus 0xAA '
                                   f'candidate ({resync_skips} total)', flush=True)
+                        # A payload 0xAA mistaken for magic means we may have
+                        # slipped alignment mid-session — drop the lock so the
+                        # following bytes are discarded quietly instead of
+                        # sprayed as console text.
+                        sync.unlock('bogus 0xAA candidate')
+                        sync.drop_byte()
                         i += 1
                         continue
+                    sync.lock('trace frame')
                     # Flush any pending ASCII first so console text and trace
                     # packets appear in the IDE event log in arrival order.
                     _console_flush(ide_base, verify_tls)
@@ -778,6 +881,15 @@ def main():
                     if sentinel is False:
                         # Magic byte seen but not enough bytes buffered yet.
                         break
+                    if not sync.locked:
+                        # Unaligned stream: only trust the sentinel to acquire
+                        # the lock when its fields validate — sentinel magic
+                        # bytes also appear inside trace-packet payloads.
+                        if not validate_boot_sentinel(sentinel, expected_n_init):
+                            sync.drop_byte()
+                            i += 1
+                            continue
+                        sync.lock('boot sentinel')
 
                     board_n_init_byte = sentinel['n_init_byte']
                     tu_version        = sentinel['tu_version']   # None for V1
@@ -862,6 +974,13 @@ def main():
 
                 else:
                     ch = buf[i]
+                    if not sync.locked:
+                        # Unaligned stream (mid-run attach or byte slip):
+                        # count and drop instead of spraying payload bytes
+                        # as console text.
+                        sync.drop_byte()
+                        i += 1
+                        continue
                     print(chr(ch) if 32 <= ch < 128 else '.', end='', flush=True)
                     # Accumulate printable UART bytes into a line buffer so the
                     # IDE's /fpga page can show the raw ASCII output too.

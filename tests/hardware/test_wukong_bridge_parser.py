@@ -191,6 +191,168 @@ def test_fpga_status_fault_names_match_hw_types():
         f'wrong={[k for k in set(ui_table) & set(expected) if ui_table[k] != expected[k]]}')
 
 
+# ── StreamSync attach / resync gating ────────────────────────────────────────
+# Mirrors the bridge main-loop wiring: unlocked → non-magic bytes dropped;
+# validated frame or sentinel → lock; failed 0xAA candidate → unlock again.
+
+def run_sync_loop(data, expected_n_init=None):
+    """Drive StreamSync + try_parse_trace_frame the way main() does.
+
+    Returns (events, console_chars, sync, messages)."""
+    messages = []
+    sync = wb.StreamSync(out=messages.append)
+    buf = bytearray(data)
+    events, console = [], []
+    i = 0
+    while i < len(buf):
+        b = buf[i]
+        if b == wb.TRACE_MAGIC:
+            r = wb.try_parse_trace_frame(buf, i)
+            if r is False:
+                break
+            if r is None:
+                sync.unlock('bogus 0xAA candidate')
+                sync.drop_byte()
+                i += 1
+                continue
+            sync.lock('trace frame')
+            events.append(r)
+            i += wb.TRACE_LEN
+        elif b in (wb.BOOT_SENTINEL_V1, wb.BOOT_SENTINEL_V2):
+            s = wb.parse_boot_sentinel(buf, i)
+            if s is False:
+                break
+            if not sync.locked:
+                if not wb.validate_boot_sentinel(s, expected_n_init):
+                    sync.drop_byte()
+                    i += 1
+                    continue
+                sync.lock('boot sentinel')
+            i += s['length']
+        else:
+            if not sync.locked:
+                sync.drop_byte()
+                i += 1
+                continue
+            if 32 <= b < 128:
+                console.append(chr(b))
+            i += 1
+    return events, console, sync, messages
+
+
+def test_streamsync_midstream_attach_no_console_spray():
+    """Attach inside a packet: lock on first aligned frame, drop the skipped
+    bytes, forward nothing to the console, and report the discarded count."""
+    k = 5  # start mid-way through the first frame
+    events, console, sync, messages = run_sync_loop(STREAM[k:])
+    assert sync.locked
+    assert console == [], f'skipped bytes leaked to console: {console!r}'
+    assert_all_events_genuine(events)
+    assert len(events) >= len(STREAM_FRAMES) - 2
+    acquired = [m for m in messages if 'frame sync acquired' in m]
+    assert acquired and 'discarded' in acquired[0]
+
+
+def test_streamsync_lock_drop_and_relock():
+    """A failed 0xAA candidate drops the lock; garbage after it is dropped
+    quietly; the next valid frame re-locks."""
+    good1 = build_frame(0x7F8, wb.TRACE_EV_RESULT)
+    # bogus 0xAA candidate: unaligned NIA → validation fails
+    bogus = bytes([0xAA]) + b'ABCDEFGHIJK'   # 12 bytes of printable garbage
+    good2 = build_frame(0x800, wb.TRACE_EV_CALL_CR6, 0x4A000006)
+    events, console, sync, messages = run_sync_loop(good1 + bogus + good2)
+    assert [e['nia'] for e in events] == [0x7F8, 0x800]
+    assert console == [], f'garbage bytes leaked to console: {console!r}'
+    assert sync.locked
+    assert any('frame sync lost' in m for m in messages)
+    # two acquisitions: initial lock + re-lock after the slip
+    assert sum('frame sync acquired' in m for m in messages) == 2
+
+
+def test_streamsync_locked_ascii_forwarding_unchanged():
+    """Once locked, genuine ASCII console output still passes through."""
+    frame = build_frame(0x7F8, wb.TRACE_EV_RESULT)
+    events, console, sync, _ = run_sync_loop(frame + b'Hello')
+    assert len(events) == 1
+    assert ''.join(console) == 'Hello'
+
+
+def test_streamsync_sentinel_locks():
+    """A validated boot sentinel also acquires the lock (board just booted)."""
+    sentinel = bytes([wb.BOOT_SENTINEL_V2, 0x08, 0x02, 0x07])
+    events, console, sync, messages = run_sync_loop(
+        b'\x35\x21' + sentinel + b'OK', expected_n_init=0x08)
+    assert sync.locked
+    assert ''.join(console) == 'OK'
+    assert console == list('OK')
+    acquired = [m for m in messages if 'frame sync acquired' in m]
+    assert acquired and 'boot sentinel' in acquired[0]
+    assert 'discarded 2 unaligned byte(s)' in acquired[0]
+
+
+def test_streamsync_no_false_lock_on_payload_sentinel_magic():
+    """Sentinel magic (0xBB/0xBC) inside unaligned payload with plausible
+    following bytes must NOT acquire the lock or leak console bytes."""
+    # V2 magic followed by wrong N_INIT + plausible TU/build bytes
+    bogus_v2 = bytes([wb.BOOT_SENTINEL_V2, 0x55, 0x02, 0x07])
+    # V1 magic followed by wrong N_INIT byte
+    bogus_v1 = bytes([wb.BOOT_SENTINEL_V1, 0x99])
+    garbage = b'5!%!)!' + bogus_v2 + b'."!!' + bogus_v1 + b'Hello'
+    events, console, sync, messages = run_sync_loop(garbage, expected_n_init=0x08)
+    assert not sync.locked
+    assert console == [], f'unaligned bytes leaked to console: {console!r}'
+    assert events == []
+    # A later genuine trace frame still locks and recovers.
+    frame = build_frame(0x7F8, wb.TRACE_EV_RESULT)
+    events, console, sync, _ = run_sync_loop(garbage + frame + b'OK',
+                                             expected_n_init=0x08)
+    assert sync.locked and len(events) == 1
+    assert ''.join(console) == 'OK'
+
+
+def test_streamsync_v1_sentinel_untrusted_without_reference():
+    """With no N_INIT reference (boot_rom unimportable), a bare V1 sentinel
+    (2 arbitrary bytes) is too weak to acquire the lock."""
+    v1 = bytes([wb.BOOT_SENTINEL_V1, 0x08])
+    events, console, sync, _ = run_sync_loop(b'\x41' + v1 + b'text',
+                                             expected_n_init=None)
+    assert not sync.locked
+    assert console == []
+
+
+def test_validate_boot_sentinel_rules():
+    v2 = wb.parse_boot_sentinel(bytes([wb.BOOT_SENTINEL_V2, 0x08, 0x02, 0x07]))
+    v1 = wb.parse_boot_sentinel(bytes([wb.BOOT_SENTINEL_V1, 0x08]))
+    # matching N_INIT
+    assert wb.validate_boot_sentinel(v2, 0x08)
+    assert wb.validate_boot_sentinel(v1, 0x08)
+    # mismatched N_INIT
+    assert not wb.validate_boot_sentinel(v2, 0x09)
+    assert not wb.validate_boot_sentinel(v1, 0x09)
+    # V2 with implausible TU_VERSION
+    bad_tu = wb.parse_boot_sentinel(bytes([wb.BOOT_SENTINEL_V2, 0x08, 0x00, 0x07]))
+    assert not wb.validate_boot_sentinel(bad_tu, 0x08)
+    big_tu = wb.parse_boot_sentinel(bytes([wb.BOOT_SENTINEL_V2, 0x08, 0x55, 0x07]))
+    assert not wb.validate_boot_sentinel(big_tu, 0x08)
+    # no reference: V2 with sane TU is accepted, V1 is not
+    assert wb.validate_boot_sentinel(v2, None)
+    assert not wb.validate_boot_sentinel(v1, None)
+
+
+def test_streamsync_unlock_before_lock_is_noop():
+    """unlock() before any lock must not print or go negative."""
+    messages = []
+    sync = wb.StreamSync(out=messages.append)
+    sync.unlock('x')
+    assert not sync.locked and messages == []
+    sync.drop_byte()
+    sync.lock('trace frame')
+    assert 'discarded 1 unaligned byte(s)' in messages[0]
+    # second lock is a no-op
+    sync.lock('trace frame')
+    assert len(messages) == 1
+
+
 def test_incomplete_frame_waits():
     """A truncated frame at the buffer tail returns False (wait for bytes)."""
     frame = build_frame(0x7F8, wb.TRACE_EV_RESULT)
