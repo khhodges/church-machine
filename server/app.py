@@ -10232,9 +10232,21 @@ def wukong_code_get():
     The active uploaded entry lump is authoritative when one has been sent to
     the board.  Before an upload, expose the fixed WukongCallHome reference
     listing so the FPGA workspace is still useful for the board's power-on
-    program.  Every row contains the byte-addressed NIA used by trace packets.
+    program.  When ``trace_nia`` is supplied, the live trace identity is
+    authoritative: a WukongCallHome trace must not be relabeled with an
+    overlapping uploaded lump such as SelfTest.  Every row contains the
+    byte-addressed NIA used by trace packets.
     """
     info = dict(_wukong_active_lump_info)
+    trace_nia = request.args.get('trace_nia')
+    trace_location = None
+    if trace_nia is not None:
+        try:
+            trace_location = _wukong_trace_metadata(int(trace_nia, 0))
+        except (TypeError, ValueError):
+            trace_location = None
+    trace_pet_name = (trace_location or {}).get('pet_name')
+    force_reference = trace_pet_name == 'WukongCallHome'
     rows = []
     source_map = 'uploaded'
 
@@ -10260,7 +10272,7 @@ def wukong_code_get():
     except Exception:
         pass
 
-    if info and info.get('lump_words'):
+    if not force_reference and info and info.get('lump_words'):
         base_byte = int(info.get('base_byte', 0))
         name = str(info.get('name') or 'Lump')
         for offset, word in sorted(info['lump_words'].items()):
@@ -10284,8 +10296,11 @@ def wukong_code_get():
             source_map = 'unavailable'
     return jsonify({
         'ok': True,
-        'name': str(info.get('name') if info else 'WukongCallHome'),
+        'name': ('WukongCallHome' if force_reference
+                 else str(info.get('name') if info else 'WukongCallHome')),
         'source_map': source_map,
+        'trace_authoritative': bool(trace_location),
+        'trace_pet_name': trace_pet_name,
         'rows': rows,
     })
 

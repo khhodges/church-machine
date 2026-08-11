@@ -53,3 +53,20 @@ def test_uploaded_listing_uses_active_lump_map(client):
     assert rows[0x200]['disasm'] == 'LUMP_HEADER'
     assert rows[0x204]['word'] == 0xB8007FFE
     assert rows[0x204]['nia_label'] == 'Demo.1'
+
+
+def test_trace_wukongcallhome_wins_over_overlapping_uploaded_selftest(client):
+    """A live WCH NIA must not be displayed as the cached SelfTest lump."""
+    app_module._wukong_active_lump_info = {
+        'base_byte': 0x700,
+        'name': 'SelfTest',
+        'lump_words': {0: 0x12345678, 1: 0xB8007FFE},
+    }
+
+    data = client.get('/hardware/wukong/code?trace_nia=0x704').get_json()
+
+    assert data['source_map'] == 'reference-bitstream'
+    assert data['trace_authoritative'] is True
+    assert data['trace_pet_name'] == 'WukongCallHome'
+    rows = {row['nia']: row for row in data['rows']}
+    assert rows[0x704]['nia_label'] == 'WukongCallHome.1'

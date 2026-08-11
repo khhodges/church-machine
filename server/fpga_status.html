@@ -369,6 +369,9 @@
   var workspaceOpen = false;
   var workspaceEventEl = document.getElementById('workspaceEvents');
   var codeListingEl = document.getElementById('codeListing');
+  var codeListingSource = null;
+  var codeListingTracePet = null;
+  var lastTraceNia = null;
 
   function hex(v) { return '0x' + (v >>> 0).toString(16).toUpperCase().padStart(8, '0'); }
   function flags(f) {
@@ -784,13 +787,18 @@
     if (selectedNia !== null) selectNia(selectedNia);
   }
   function loadCodeListing() {
-    fetch('/hardware/wukong/code')
+    var url = '/hardware/wukong/code';
+    if (lastTraceNia !== null) url += '?trace_nia=' + encodeURIComponent(hex(lastTraceNia));
+    fetch(url)
       .then(function (r) { return r.json(); })
       .then(function (d) {
         renderCodeListing(d);
+        codeListingSource = d.source_map || null;
+        codeListingTracePet = d.trace_pet_name || null;
         var source = d.source_map === 'uploaded' ? 'uploaded active lump' :
           (d.source_map === 'reference-bitstream' ? 'reference WukongCallHome' : 'no code map');
-        document.getElementById('codeSource').textContent = source;
+        document.getElementById('codeSource').textContent =
+          d.trace_authoritative ? source + ' · trace authoritative' : source;
       })
       .catch(function () {
         document.getElementById('codeSource').textContent = 'code map unavailable';
@@ -800,6 +808,16 @@
   function openWorkspace() {
     workspaceOpen = true;
     document.getElementById('workspaceBackdrop').classList.add('open');
+    // The event log may have been populated before the workspace was opened.
+    // Seed the code-map selector from the newest trace event so an uploaded
+    // SelfTest map cannot win merely because the modal was opened late.
+    for (var i = workspaceEvents.length - 1; i >= 0; i--) {
+      var prior = workspaceEvents[i];
+      if (prior && prior.nia !== undefined) {
+        lastTraceNia = Number(prior.nia) >>> 0;
+        break;
+      }
+    }
     loadCodeListing();
     workspaceEventEl.innerHTML = '';
     workspaceEvents.forEach(renderWorkspaceEvent);
@@ -849,6 +867,12 @@
     addLine(line, cls);
     appendWorkspaceEvent(e);
     if (e.nia !== undefined) {
+      lastTraceNia = Number(e.nia) >>> 0;
+      if (workspaceOpen &&
+          e.pet_name !== codeListingTracePet &&
+          (e.pet_name === 'WukongCallHome' || codeListingTracePet === 'WukongCallHome')) {
+        loadCodeListing();
+      }
       setCurrentNia(e.nia);
       if (e.bp_hit || selectedNia === null) selectNia(e.nia);
     }
