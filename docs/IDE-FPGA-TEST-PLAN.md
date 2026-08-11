@@ -105,6 +105,7 @@ node simulator/test_pipeline_health_stages.js
 node simulator/test_builder_testing_tab.js
 
 python3 -m pytest \
+  tests/hardware/test_wukong_halt_uart.py \
   tests/server/test_wukong_command_delivery.py \
   tests/server/test_wukong_status_readonly.py \
   tests/server/test_wukong_trace_call_depth.py \
@@ -126,8 +127,17 @@ Current baseline observed during creation of this plan:
 | Builder Testing tab | 11 passed |
 | Focused server/hardware pytest group | 106 passed |
 | Console warning tests | Passed |
+| Full-top UART Run/Pause/Step/Reboot regression | 3 passed |
 
 These results are a baseline, not a substitute for the L4 run.
+
+The full-top regression drives the production `ChurchWukongXC7A100T` UART
+receiver. It verifies that `s` pauses a free-running board at an instruction
+boundary, advances exactly one instruction while paused, and pauses the board
+again after `r` resumes it. It also verifies that legacy `h` remains accepted,
+and that `f` re-enters the boot sequence at `0x00000000`, `0x00000004`,
+`0x00000008`, then starts `WukongCallHome` at `0x00000704` rather than reusing
+a prior loop NIA.
 
 ### 4.1 Setup failure captured from an external checkout
 
@@ -190,10 +200,10 @@ actually completed may retain their observed pass counts.
 
 | ID | Function | Automated evidence | L4 procedure | Pass criteria |
 |---|---|---|---|---|
-| W-10 | Step HW | Bridge ACK/parser tests; no complete L4 test | Halt board, click Step HW once | Exactly one `s` reaches UART; at least one new trace event appears; NIA advances |
-| W-11 | HW Run | Command delivery and boot-push tests | Click HW Run | `r` is confirmed written; button changes to Halt state; trace activity resumes |
-| W-12 | HW Halt | Command delivery tests | Click HW Halt while running | `h` is confirmed written; trace activity stops; button returns to Run state |
-| W-13 | Run/Halt failure recovery | L1/mock coverage | Stop bridge during command delivery | Error is visible and the button reverts to the truthful state |
+| W-10 | Step HW | Full-top UART regression; bridge delivery tests | With board paused, click Step HW once | Exactly one `s` reaches UART; one new trace event appears; NIA advances; board remains paused |
+| W-11 | HW Run/Pause toggle | Full-top UART regression; command delivery and boot-push tests | Click HW Run, then click HW Pause | `r` resumes free-run; the same control changes to Pause; `s` pauses at the next instruction boundary and the control returns to Run |
+| W-12 | Legacy Halt compatibility | Full-top UART regression; legacy bridge tests | Use an older bridge that sends `h` | `h` is accepted as a compatibility command; no separate Halt button is required |
+| W-13 | Run/Pause failure recovery | L1/mock coverage | Stop bridge during a Run/Pause command delivery | Error is visible and the toggle reverts to the truthful local state |
 | W-14 | Hardware breakpoint set | Command encoding/ACK tests; UI coverage partial | Open disassembly, click gutter at a valid NIA | `b` plus big-endian NIA is written; gutter marks breakpoint |
 | W-15 | Hardware breakpoint hit | Protocol coverage partial; no complete L4 test | Run program through breakpoint | Board halts at requested NIA; trace/fault UI identifies breakpoint hit |
 | W-16 | Hardware breakpoint clear | Command encoding/ACK tests; UI coverage partial | Click armed breakpoint gutter again | `0xFFFFFFFF` clear command is written; marker disappears |
@@ -242,9 +252,9 @@ FPGA status URL.
 
 | ID | Control | Required verification |
 |---|---|---|
-| S-01 | Step | One command, one serial write, delivery status, and trace response |
-| S-02 | Run | Free-run command, write confirmation, active trace |
-| S-03 | Halt | Halt command, write confirmation, trace stops |
+| S-01 | Step | From paused state, one `s` command, one serial write, delivery status, one trace response, and a paused final state |
+| S-02 | Run/Pause toggle | `r` starts free-run; the same control sends `s` to pause at the next instruction boundary; labels and delivery status stay truthful |
+| S-03 | Legacy `h` compatibility | Optional protocol check only; `h` is accepted for older bridges and is not a separate UI control |
 | S-04 | Set BP | Valid hex NIA accepted and sent in correct byte order |
 | S-05 | Set BP invalid input | Invalid/empty/out-of-range value rejected without queueing |
 | S-06 | Upload boot image | Current image is queued, bridge ACK appears, upload state clears |
@@ -255,7 +265,9 @@ FPGA status URL.
 | S-11 | Status polling | Repeated status refreshes do not consume commands, uploads, events, or boot information |
 
 Server-side evidence already exists for most of S-01–S-11. The L4 pass still
-requires observing the real board response for S-01, S-02, S-03, S-06, and S-07.
+requires observing the real board response for S-01, S-02, S-06, and S-07.
+The bridge ACK is only transport evidence; it does not by itself prove that the
+FPGA received or applied the command.
 
 ## 8. End-to-end execution order
 
@@ -287,6 +299,37 @@ attaching the required evidence.
 | W-30–W-35 |  |  |  |
 | B-01–B-10 |  |  |  |
 | S-01–S-11 |  |  |  |
+
+### 9.1 Recorded hardware run — 2026-08-11
+
+This run used the published IDE at `https://haskell-main-1.replit.app`, a
+restarted Chromebook bridge, the Wukong onboard USB-UART, build **8**, and
+TraceUnit version **2**. The bridge was live: trace packets were continuously
+posted and command polling was active.
+
+| Test | Result | Evidence | Interpretation |
+|---|---|---|---|
+| S-07 Reboot | **PASS** | Command `f`, ID **15**, was consumed and written successfully at `2026-08-11 14:47:23 UTC`. The boot sentinel record refreshed from the previous timestamp to `2026-08-11 14:47:23 UTC`, still reporting build 8 / TU 2. | The physical FPGA responded to the force-sentinel command. |
+| Legacy Halt `h` | **FAIL (legacy path; superseded by toggle model)** | Command `h`, ID **16**, was consumed and written successfully at `2026-08-11 14:47:30 UTC`. Trace sequence advanced from **4547** before the test to **4552** two seconds later and **4568** six seconds later. | The bridge/server path worked, but that older physical bitstream did not stop. The current user-facing control uses `s` for a clean Run → Pause transition. |
+
+The corresponding source/full-top RTL checks pass locally: the production UART
+`s` frame pauses and steps as specified, the legacy `h` frame still latches
+`(step_mode, step_halted) = (1, 1)`, and the production UART `f` frame produces
+the post-reboot NIA sequence
+`0x00000000 → 0x00000004 → 0x00000008 → 0x00000704`. This does not replace
+the physical run because the checked-in build-8 metadata identifies source
+commit `42696d06`; a current-source bitstream must be programmed before using
+the local regression as board evidence.
+
+The run therefore proves:
+
+- trace receive from the FPGA to the bridge/server;
+- command queueing, bridge polling, serial writes, and delivery acknowledgments;
+- physical Reboot/force-sentinel behavior.
+
+It does **not** prove physical Run/Pause/Step control, breakpoints, or the
+complete L4 execution-controls group. Do not promote those cases to `PASS`
+based on the command ACK alone.
 
 ## 10. Failure classification
 

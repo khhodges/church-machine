@@ -1699,6 +1699,11 @@ function updateFlagsDisplay() {
 function updateInfoDisplay() {
     const container = document.getElementById('machineInfo');
     if (!container) return;
+    const hwSnapshot = sim && sim.hardwareSnapshot;
+    const hwHex = (value) => '0x' + (value >>> 0).toString(16).toUpperCase().padStart(8, '0');
+    const hardwareContextHtml = hwSnapshot
+        ? `<div class="info-item"><span class="info-label">Hardware Snapshot</span><span class="info-value">STOP ${hwSnapshot.reason} · NIA ${hwHex(hwSnapshot.nia)} · STO ${hwHex(hwSnapshot.sto)} · Thread base ${hwHex(hwSnapshot.thread_base)} · live M=${hwSnapshot.m_flag ? 1 : 0}<br><span style="color:var(--text-secondary);">Suspended context — stored CR12 GT ${hwHex(hwSnapshot.stored_cr12_gt)} · packed PC ${hwHex(hwSnapshot.stored_packed_pc)} · saved M word ${hwHex(hwSnapshot.stored_mflag)}</span></span></div>`
+        : '';
     container.innerHTML = `
         <div class="info-item"><span class="info-label">Architecture</span><span class="info-value">Church Machine (Church + Turing domains)</span></div>
         <div class="info-item"><span class="info-label">Church Opcodes</span><span class="info-value">10 (LOAD, SAVE, CALL, RETURN, CHANGE, SWITCH, TPERM, LAMBDA, ELOADCALL, XLOADLAMBDA)</span></div>
@@ -1710,6 +1715,7 @@ function updateInfoDisplay() {
         <div class="info-item"><span class="info-label">Security Gates</span><span class="info-value">mLoad (R\u2192DREAD, W\u2192DWRITE, X\u2192LAMBDA, L\u2192LOAD, S\u2192SAVE, E\u2192CALL) + mSave (Version, Seal, Bounds, B-bit, F-bit)</span></div>
         <div class="info-item"><span class="info-label">Security Blocks</span><span class="info-value">Each abstraction is a security block with MTBF \u2014 Turing hidden inside Church-callable entries, CALL in, RETURN out, atomic</span></div>
         <div class="info-item"><span class="info-label">Abstraction Layers</span><span class="info-value">9 layers, ${abstractionRegistry ? abstractionRegistry.count() : 46} abstractions (Boot, System, Hardware, Math, Lambda Calculus, Social, IDE, Internet, GC)</span></div>
+        ${hardwareContextHtml}
         ${(() => {
             const status = (sim && sim.callHomeStatus) || null;
             if (status === null) {

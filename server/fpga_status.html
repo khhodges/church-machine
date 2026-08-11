@@ -33,6 +33,7 @@
   #log .ev-load   { color:#34d399; }
   #log .ev-fault  { color:#f87171; }
   #log .ev-note   { color:#f59e0b; }
+  #log .ev-uart   { color:#94a3b8; }
   .loghdr { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
   .loghdr h2 { font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#5a6b82; }
   button { background:#1f2b3e; color:#c8d6e5; border:1px solid #2d3f5a;
@@ -51,6 +52,57 @@
   .ctlbar input { background:#0d1320; color:#e8f0fe; border:1px solid #2d3f5a;
                   border-radius:5px; padding:3px 8px; font:inherit; width:110px; }
   .ctlbar .sep { width:1px; height:22px; background:#1f2b3e; margin:0 4px; }
+  .workspace-backdrop { display:none; position:fixed; inset:0; z-index:20;
+                        background:rgba(3,7,18,.82); padding:4vh 4vw; }
+  .workspace-backdrop.open { display:block; }
+  .workspace { height:92vh; max-width:1500px; margin:0 auto; display:flex;
+               flex-direction:column; background:#0f1726; border:1px solid #30415e;
+               border-radius:10px; box-shadow:0 24px 90px #000; overflow:hidden; }
+  .workspace-head { display:flex; align-items:center; justify-content:space-between;
+                    gap:16px; padding:14px 18px; border-bottom:1px solid #25344c;
+                    background:#131e31; }
+  .workspace-head h2 { color:#e8f0fe; font-size:14px; }
+  .workspace-head .hint { color:#7a8ba3; font-size:11px; margin-top:4px; }
+  .workspace-head .right { display:flex; align-items:center; gap:10px; }
+  #codeSource { color:#fbbf24; font-size:11px; }
+  .workspace-body { min-height:0; flex:1; display:grid;
+                    grid-template-columns:minmax(320px,.82fr) minmax(500px,1.6fr); }
+  .workspace-pane { min-width:0; min-height:0; display:flex; flex-direction:column; }
+  .workspace-pane + .workspace-pane { border-left:1px solid #25344c; }
+  .pane-head { display:flex; justify-content:space-between; align-items:center;
+               padding:10px 14px; color:#7a8ba3; font-size:11px;
+               text-transform:uppercase; letter-spacing:1px; background:#111a2a; }
+  .pane-head span:last-child { text-transform:none; letter-spacing:0; color:#5a6b82; }
+  .workspace-scroll { min-height:0; flex:1; overflow:auto; padding:8px; }
+  #workspaceEvents, #codeListing { display:flex; flex-direction:column; gap:3px; }
+  .workspace-event { border:1px solid transparent; border-radius:5px; padding:7px 8px;
+                     cursor:pointer; font-size:11px; line-height:1.45; color:#aebed2; }
+  .workspace-event:hover { background:#17253b; border-color:#2d466b; }
+  .workspace-event.selected { background:#16345b; border-color:#3b82f6; color:#eff6ff; }
+  .workspace-event .top { display:flex; justify-content:space-between; gap:8px; color:#60a5fa; }
+  .workspace-event .detail { color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .workspace-event.fault { border-left:3px solid #ef4444; }
+  .code-row { display:grid; grid-template-columns:26px 92px 62px minmax(0,1fr) 34px;
+              align-items:center; gap:8px; min-height:31px; padding:3px 6px;
+              border:1px solid transparent; border-radius:5px; cursor:pointer;
+              font-size:12px; }
+  .code-row:hover { background:#17253b; border-color:#2d466b; }
+  .code-row.current { background:#183a45; border-color:#22c55e; box-shadow:inset 3px 0 #22c55e; }
+  .code-row.selected { background:#16345b; border-color:#3b82f6; }
+  .code-row.current.selected { background:#194b50; border-color:#67e8f9; }
+  .code-row .marker { color:#22c55e; text-align:center; font-size:14px; }
+  .code-row .addr, .code-row .offset { color:#7a8ba3; }
+  .code-row .word { color:#64748b; }
+  .code-row .asm { color:#e8f0fe; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .code-row .bp { padding:2px 6px; font-size:10px; color:#fca5a5; }
+  .code-row .bp.armed { color:#fff; background:#7f1d1d; border-color:#ef4444; }
+  .empty-pane { color:#5a6b82; padding:18px 12px; line-height:1.6; }
+  @media (max-width: 900px) {
+    .workspace-backdrop { padding:0; }
+    .workspace { height:100vh; border-radius:0; }
+    .workspace-body { grid-template-columns:1fr; grid-template-rows:42% 58%; }
+    .workspace-pane + .workspace-pane { border-left:0; border-top:1px solid #25344c; }
+  }
 </style>
 </head>
 <body>
@@ -106,8 +158,7 @@
 <div class="ctlbar">
   <span class="lbl">Board controls</span>
   <button id="btnStep" title="Execute one instruction ('s')">Step</button>
-  <button id="btnRun"  class="primary" title="Free-run ('r')">Run ▶</button>
-  <button id="btnHalt" class="danger" title="Halt / enter step mode ('h')">Halt ■</button>
+  <button id="btnRun"  class="primary" title="Start the board ('r')">Run ▶</button>
   <span class="sep"></span>
   <input id="bpNia" placeholder="BP NIA (hex)" spellcheck="false">
   <button id="btnBp" title="Arm a breakpoint at this NIA ('b' + NIA)">Set BP</button>
@@ -115,6 +166,8 @@
   <button id="btnUpload" title="Send the current boot image to the board over UART ('u')">Upload boot image ⚡</button>
   <span class="sep"></span>
   <button id="btnReboot" title="Force the board to retransmit its boot sentinel ('f') — confirms which bitstream is running">↺ Reboot</button>
+  <span class="sep"></span>
+  <button id="btnWorkspace" class="primary" title="Open the live code and event workspace">Open execution workspace ↗</button>
 </div>
 
 <div class="loghdr">
@@ -122,6 +175,36 @@
   <button id="clearBtn">Clear</button>
 </div>
 <div id="log"></div>
+
+<div id="workspaceBackdrop" class="workspace-backdrop" role="dialog" aria-modal="true"
+     aria-labelledby="workspaceTitle">
+  <section class="workspace">
+    <header class="workspace-head">
+      <div>
+        <h2 id="workspaceTitle">Execution workspace</h2>
+        <div class="hint">Select an event to follow its retired NIA. Use BP on any code row to arm that address.</div>
+      </div>
+      <div class="right">
+        <span id="codeSource">Loading code listing…</span>
+        <button id="closeWorkspace" title="Close execution workspace">Close</button>
+      </div>
+    </header>
+    <div class="workspace-body">
+      <section class="workspace-pane">
+        <div class="pane-head"><span>Live events</span><span id="workspaceEventCount">0 events</span></div>
+        <div id="workspaceEvents" class="workspace-scroll">
+          <div class="empty-pane">Waiting for trace events. The ordered server queue will appear here without replacing intermediate packets.</div>
+        </div>
+      </section>
+      <section class="workspace-pane">
+        <div class="pane-head"><span>Code listing</span><span id="workspaceSelection">No instruction selected</span></div>
+        <div id="codeListing" class="workspace-scroll">
+          <div class="empty-pane">Loading the hardware NIA map…</div>
+        </div>
+      </section>
+    </div>
+  </section>
+</div>
 
 <script>
 (function () {
@@ -278,6 +361,14 @@
   var cursor = 0;
   var logEl = document.getElementById('log');
   var lastServerSeq = null;
+  var codeRows = [];
+  var codeByNia = {};
+  var workspaceEvents = [];
+  var selectedNia = null;
+  var currentNia = null;
+  var workspaceOpen = false;
+  var workspaceEventEl = document.getElementById('workspaceEvents');
+  var codeListingEl = document.getElementById('codeListing');
 
   function hex(v) { return '0x' + (v >>> 0).toString(16).toUpperCase().padStart(8, '0'); }
   function flags(f) {
@@ -315,7 +406,18 @@
   // other in the server's one-slot pending-command queue, and prevents a
   // command racing an upload for that slot.
   var ctlBusy = false;
-  var CTL_IDS = ['btnStep', 'btnRun', 'btnHalt', 'btnBp', 'btnUpload', 'btnReboot'];
+  var boardRunning = false;
+  var CTL_IDS = ['btnStep', 'btnRun', 'btnBp', 'btnUpload', 'btnReboot', 'btnWorkspace'];
+  function updateRunButton() {
+    var btn = document.getElementById('btnRun');
+    if (!btn) return;
+    btn.textContent = boardRunning ? 'Pause ❚❚' : 'Run ▶';
+    btn.title = boardRunning
+      ? "Pause at the next instruction boundary ('s')"
+      : "Free-run ('r')";
+    btn.classList.toggle('primary', !boardRunning);
+    btn.classList.toggle('danger', boardRunning);
+  }
   function setCtlBusy(b) {
     ctlBusy = b;
     CTL_IDS.forEach(function (id) { document.getElementById(id).disabled = b; });
@@ -351,12 +453,16 @@
   // stage: queued → consumed by bridge → written to UART (or a concrete
   // failure).  "Queued for bridge" alone is NOT delivery.
   var cmdWatch = null;   // {t0, id, label, timer, phase, warned}
-  function stopCmdWatch() {
+  function stopCmdWatch(result) {
     if (cmdWatch && cmdWatch.timer) clearInterval(cmdWatch.timer);
+    var finished = cmdWatch;
     cmdWatch = null;
     // Controls stay locked from queue until terminal ACK/timeout so a second
     // command can never replace the single delivery record mid-watch.
     setCtlBusy(false);
+    if (finished && typeof finished.onResult === 'function') {
+      finished.onResult(result !== false);
+    }
   }
   function cmdWatchTick() {
     fetch('/hardware/wukong/status').then(function (r) { return r.json(); }).then(function (s) {
@@ -373,13 +479,16 @@
         } else {
           note(w.label + ': superseded by a newer command before delivery');
         }
-        stopCmdWatch(); return;
+        stopCmdWatch(false); return;
       }
       if (d.write_ts) {
-        if (d.write_ok) note(w.label + ' delivered to board (serial write OK)');
-        else note(w.label + ' FAILED: bridge consumed the command but the serial write failed — ' +
+        if (d.write_ok) {
+          note(w.label + ' delivered to board (serial write OK)');
+        } else {
+          note(w.label + ' FAILED: bridge consumed the command but the serial write failed — ' +
                   (d.write_error || 'unknown error'));
-        stopCmdWatch(); return;
+        }
+        stopCmdWatch(!!d.write_ok); return;
       }
       if (d.consumed_ts) {
         if (w.phase !== 'consumed') {
@@ -388,7 +497,7 @@
         }
         if (elapsed > 8) {
           note(w.label + ': no serial-write confirmation after 8s — bridge may be running an old version (git pull + make on the Chromebook)');
-          stopCmdWatch();
+          stopCmdWatch(false);
         }
         return;
       }
@@ -402,16 +511,17 @@
       if (elapsed > 30) {
         note(w.label + ': gave up waiting after 30s — command ' +
              (s.pending_command && s.pending_command.id === w.id ? 'still queued' : 'no longer pending'));
-        stopCmdWatch();
+        stopCmdWatch(false);
       }
     }).catch(function () {});
   }
-  function startCmdWatch(id, label) {
+  function startCmdWatch(id, label, onResult) {
     stopCmdWatch();
     cmdWatch = { t0: Date.now(), id: id, label: label, phase: 'queued', warned: false,
+                 onResult: onResult,
                  timer: setInterval(cmdWatchTick, 500) };
   }
-  function sendCmd(body, label) {
+  function sendCmd(body, label, onResult) {
     if (ctlBusy) return;
     setCtlBusy(true);
     fetch('/hardware/wukong/command', {
@@ -428,17 +538,31 @@
                               "' command (it was never delivered)" : ''));
           // Keep controls locked until the watcher reaches a terminal state
           // (stopCmdWatch releases the lock) — see race note above.
-          startCmdWatch(d.id, label);
+          startCmdWatch(d.id, label, onResult);
         } else {
           note(label + ' FAILED: ' + describeFailure(r.status, d, t));
           setCtlBusy(false);
+          if (typeof onResult === 'function') onResult(false);
         }
       });
-    }).catch(function (e) { note(label + ' FAILED: ' + e); setCtlBusy(false); });
+    }).catch(function (e) {
+      note(label + ' FAILED: ' + e);
+      setCtlBusy(false);
+      if (typeof onResult === 'function') onResult(false);
+    });
   }
   document.getElementById('btnStep').onclick   = function () { sendCmd({ cmd: 's' }, 'STEP'); };
-  document.getElementById('btnRun').onclick    = function () { sendCmd({ cmd: 'r' }, 'RUN'); };
-  document.getElementById('btnHalt').onclick   = function () { sendCmd({ cmd: 'h' }, 'HALT'); };
+  document.getElementById('btnRun').onclick    = function () {
+    var wantRunning = !boardRunning;
+    sendCmd({ cmd: wantRunning ? 'r' : 's' }, wantRunning ? 'RUN' : 'PAUSE',
+      function (ok) {
+        if (ok) {
+          boardRunning = wantRunning;
+          updateRunButton();
+        }
+      });
+  };
+  updateRunButton();
   // ── Reboot ('f') delivery watcher ─────────────────────────────────────
   // After queueing 'f', poll /status every 500 ms and report each stage:
   // queued → consumed by bridge → written to UART → boot sentinel seen.
@@ -550,6 +674,152 @@
              'queued — bridge will stream it to the board over UART');
   };
 
+  function eventName(e) {
+    return EV_NAMES[e.ev_type] !== undefined ? EV_NAMES[e.ev_type]
+      : ('EV_0x' + (e.ev_type || 0).toString(16).toUpperCase());
+  }
+  function eventSummary(e) {
+    if (e.console !== undefined) return 'UART: ' + e.console;
+    var name = e.nia_label || ('NIA=' + hex(e.nia));
+    var asm = e.disasm ? ' · ' + e.disasm : '';
+    var ev = eventName(e);
+    var suffix = e.bp_hit ? ' · BREAKPOINT' : '';
+    if (e.fault_valid) suffix += ' · FAULT ' +
+      (FAULT_NAMES[e.fault_code] || ('0x' + (e.fault_code || 0).toString(16)));
+    return name + asm + ' · ' + ev + suffix;
+  }
+  function selectNia(nia, source) {
+    if (nia === undefined || nia === null || isNaN(Number(nia))) return;
+    selectedNia = Number(nia) >>> 0;
+    Object.keys(codeByNia).forEach(function (key) {
+      var row = codeByNia[key];
+      row.classList.toggle('selected', Number(key) === selectedNia);
+      if (Number(key) === selectedNia && source === 'event') {
+        row.scrollIntoView({ block: 'center' });
+      }
+    });
+    var label = codeRows.find(function (r) { return r.nia === selectedNia; });
+    document.getElementById('workspaceSelection').textContent =
+      label ? label.nia_label + ' · ' + label.disasm : 'NIA ' + hex(selectedNia) + ' (not in listing)';
+  }
+  function setCurrentNia(nia) {
+    if (nia === undefined || nia === null || isNaN(Number(nia))) return;
+    currentNia = Number(nia) >>> 0;
+    Object.keys(codeByNia).forEach(function (key) {
+      codeByNia[key].classList.toggle('current', Number(key) === currentNia);
+    });
+  }
+  function renderWorkspaceEvent(e) {
+    if (!workspaceEventEl) return;
+    var empty = workspaceEventEl.querySelector('.empty-pane');
+    if (empty) empty.remove();
+    var row = document.createElement('div');
+    row.className = 'workspace-event' + (e.fault_valid ? ' fault' : '');
+    row.dataset.nia = e.nia !== undefined ? String(e.nia >>> 0) : '';
+    var time = e.ts ? new Date(e.ts * 1000).toLocaleTimeString() : '--:--:--';
+    var seq = e.seq !== undefined ? '#' + e.seq : '';
+    row.innerHTML = '<div class="top"><span>' + time + '  ' + seq +
+      '</span><span>' + (e.console !== undefined ? 'UART' : eventName(e)) + '</span></div>';
+    var detail = document.createElement('div');
+    detail.className = 'detail';
+    detail.textContent = eventSummary(e);
+    row.appendChild(detail);
+    row.onclick = function () {
+      selectNia(e.nia, 'event');
+      Array.prototype.forEach.call(workspaceEventEl.children, function (child) {
+        child.classList.toggle('selected', child === row);
+      });
+    };
+    workspaceEventEl.appendChild(row);
+    while (workspaceEventEl.children.length > 500)
+      workspaceEventEl.removeChild(workspaceEventEl.firstElementChild);
+    document.getElementById('workspaceEventCount').textContent =
+      workspaceEvents.length + ' event' + (workspaceEvents.length === 1 ? '' : 's');
+  }
+  function appendWorkspaceEvent(e) {
+    workspaceEvents.push(e);
+    while (workspaceEvents.length > 500) workspaceEvents.shift();
+    if (workspaceOpen) renderWorkspaceEvent(e);
+  }
+  function renderCodeListing(data) {
+    codeRows = data.rows || [];
+    codeByNia = {};
+    codeListingEl.innerHTML = '';
+    if (!codeRows.length) {
+      codeListingEl.innerHTML = '<div class="empty-pane">No matching code map is available yet. Upload a boot image to associate executable words with hardware NIAs.</div>';
+      return;
+    }
+    codeRows.forEach(function (item) {
+      var row = document.createElement('div');
+      row.className = 'code-row';
+      row.dataset.nia = String(item.nia >>> 0);
+      var marker = document.createElement('span');
+      marker.className = 'marker';
+      marker.textContent = '›';
+      var addr = document.createElement('span');
+      addr.className = 'addr';
+      addr.textContent = hex(item.nia);
+      var offset = document.createElement('span');
+      offset.className = 'offset';
+      offset.textContent = item.nia_label || (item.offset + '');
+      var asm = document.createElement('span');
+      asm.className = 'asm';
+      asm.textContent = item.disasm || ('0x' + (item.word >>> 0).toString(16).toUpperCase());
+      var bp = document.createElement('button');
+      bp.className = 'bp';
+      bp.textContent = 'BP';
+      bp.title = 'Arm breakpoint at ' + hex(item.nia);
+      bp.onclick = function (ev) {
+        ev.stopPropagation();
+        sendCmd({ cmd: 'b', nia: item.nia }, 'SET BP @ ' + hex(item.nia));
+        selectNia(item.nia);
+      };
+      row.appendChild(marker); row.appendChild(addr); row.appendChild(offset);
+      row.appendChild(asm); row.appendChild(bp);
+      row.onclick = function () { selectNia(item.nia); };
+      codeListingEl.appendChild(row);
+      codeByNia[item.nia >>> 0] = row;
+    });
+    if (currentNia !== null) setCurrentNia(currentNia);
+    if (selectedNia !== null) selectNia(selectedNia);
+  }
+  function loadCodeListing() {
+    fetch('/hardware/wukong/code')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        renderCodeListing(d);
+        var source = d.source_map === 'uploaded' ? 'uploaded active lump' :
+          (d.source_map === 'reference-bitstream' ? 'reference WukongCallHome' : 'no code map');
+        document.getElementById('codeSource').textContent = source;
+      })
+      .catch(function () {
+        document.getElementById('codeSource').textContent = 'code map unavailable';
+        codeListingEl.innerHTML = '<div class="empty-pane">Could not load the hardware code map.</div>';
+      });
+  }
+  function openWorkspace() {
+    workspaceOpen = true;
+    document.getElementById('workspaceBackdrop').classList.add('open');
+    loadCodeListing();
+    workspaceEventEl.innerHTML = '';
+    workspaceEvents.forEach(renderWorkspaceEvent);
+    if (!workspaceEvents.length)
+      workspaceEventEl.innerHTML = '<div class="empty-pane">Waiting for trace events. The ordered server queue will appear here without replacing intermediate packets.</div>';
+    document.getElementById('closeWorkspace').focus();
+  }
+  function closeWorkspace() {
+    workspaceOpen = false;
+    document.getElementById('workspaceBackdrop').classList.remove('open');
+  }
+  document.getElementById('btnWorkspace').onclick = openWorkspace;
+  document.getElementById('closeWorkspace').onclick = closeWorkspace;
+  document.getElementById('workspaceBackdrop').onclick = function (e) {
+    if (e.target === this) closeWorkspace();
+  };
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && workspaceOpen) closeWorkspace();
+  });
+
   function renderEvent(e) {
     var t = e.ts ? new Date(e.ts * 1000).toLocaleTimeString() : '--:--:--';
     if (e.console !== undefined) {
@@ -577,6 +847,11 @@
     }
     if (e.bp_hit) line += '  [BP HIT]';
     addLine(line, cls);
+    appendWorkspaceEvent(e);
+    if (e.nia !== undefined) {
+      setCurrentNia(e.nia);
+      if (e.bp_hit || selectedNia === null) selectNia(e.nia);
+    }
   }
 
   function pollStatus() {

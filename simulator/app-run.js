@@ -15040,6 +15040,9 @@ function _wukongUpdateBtn() {
     if (!btn) return;
     btn.style.display = (connected || _wukongHWRunning) ? '' : 'none';
     btn.textContent   = _wukongHWRunning ? '\u23F8 HW' : '\u25B6 HW';
+    btn.dataset.tooltip = _wukongHWRunning
+        ? 'HW Pause \u2014 Pause at the next instruction boundary'
+        : 'HW Run \u2014 Free-run the Wukong board';
     btn.classList.toggle('btn-warning', _wukongHWRunning);
     btn.classList.toggle('btn-secondary', !_wukongHWRunning);
 
@@ -15238,6 +15241,28 @@ function _wukongApplyCRUpdate(data) {
     }
 }
 
+function _wukongApplySnapshot(data) {
+    if (!sim || !data || data.snapshot !== true ||
+        typeof sim.applyHardwareSnapshot !== 'function') return false;
+    const result = sim.applyHardwareSnapshot(data);
+    if (!result || !result.ok) return false;
+    // StateChange normally refreshes these, but these calls also cover pages
+    // whose register panels are mounted outside the simulator shell.
+    if (typeof updateCRDisplay === 'function') updateCRDisplay();
+    if (typeof updateDRDisplay === 'function') updateDRDisplay();
+    if (typeof updateFlagsDisplay === 'function') updateFlagsDisplay();
+    if (typeof updateInfoDisplay === 'function') updateInfoDisplay();
+    if (typeof _wukongSetHwCursor === 'function') {
+        _wukongLastHwNIA = data.nia >>> 0;
+        _wukongSetHwCursor(_wukongLastHwNIA);
+    }
+    // The snapshot has no memory payload; re-render the currently selected
+    // view so thread/memory panels reflect the atomically committed registers
+    // without pretending that hardware memory was read.
+    if (typeof renderMemoryView === 'function') renderMemoryView();
+    return true;
+}
+
 // Drain all trace events with seq > _wukongLastEventSeq from the server queue.
 // Updates _wukongLastEventSeq, _wukongLastTraceTs, and _wukongCallDepth; appends
 // a console line for every event (including 0x08 CALL_PUSH and 0x09 CALL_POP).
@@ -15306,7 +15331,11 @@ async function _wukongDrainEvents() {
     }
 
     for (const ev of events) {
-        _wukongAppendTrace(ev);
+        if (ev && ev.snapshot) {
+            _wukongApplySnapshot(ev);
+        } else {
+            _wukongAppendTrace(ev);
+        }
     }
     // data carries cr6_gt / cr14_gt at top level (same shape as trace GET).
     _wukongApplyCRUpdate(data);
@@ -15892,12 +15921,14 @@ async function _wukongStep() {
 
 async function hwRunToggle() {
     const wantRunning = !_wukongHWRunning;
-    const label = wantRunning ? 'RUN' : 'HALT';
+    const label = wantRunning ? 'RUN' : 'PAUSE';
     // Optimistically flip for responsive UI, but REVERT on any failure —
     // the old code left the button lying about the board's state.
     _wukongHWRunning = wantRunning;
     _wukongUpdateBtn();
-    const d = await _wukongPostCmd(wantRunning ? 'r' : 'h', null, label);
+    // 's' is the universal pause control: unlike legacy 'h', it requests a
+    // clean instruction-boundary pause even when the board is free-running.
+    const d = await _wukongPostCmd(wantRunning ? 'r' : 's', null, label);
     const ok = d ? await _wukongWatchDelivery(d.id, label, 10000) : false;
     if (!ok) {
         _wukongHWRunning = !wantRunning;

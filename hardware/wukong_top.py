@@ -62,7 +62,7 @@ from .uart_rx import UartRx
 # Increment this by 1 every time a new bitstream is synthesised and flashed.
 # The bridge reports it to the IDE so the FPGA status page can confirm exactly
 # which build is running — no need to reprogram just to check.
-WUKONG_BUILD_VERSION = 8   # ← bump this before each new synthesis run
+WUKONG_BUILD_VERSION = 9   # ← bump this before each new synthesis run
 
 # ── Wukong ROM: 3-instruction BOOT_PROGRAM ────────────────────────────────────
 # Architecture doc:             docs/wukong-boot.md
@@ -268,6 +268,10 @@ class ChurchWukongXC7A100T(Elaboratable):
         dmem = m.submodules.dmem = LibMemory(
             shape=unsigned(32), depth=16384, init=dmem_init)
         dmem_rd = dmem.read_port(domain="sync")
+        # Independent synchronous read port for the stop-state snapshot.
+        # The snapshot is emitted only while the CM is halted, so this port
+        # cannot race an architectural write.
+        snapshot_mem_rd = dmem.read_port(domain="sync")
         dmem_wr = dmem.write_port()
 
         # Dedicated instruction-fetch read port (BRAM port; Vivado duplicates
@@ -314,6 +318,9 @@ class ChurchWukongXC7A100T(Elaboratable):
         # CM MMIO reg-5 writes always win over trace bytes.
         trace_tx_req  = Signal()   # TraceUnit wants to send a byte
         trace_tx_byte = Signal(8)  # byte from TraceUnit
+        snapshot_tx_req = Signal()
+        snapshot_tx_byte = Signal(8)
+        snapshot_tx_ack = Signal()
         # trace_stall: asserted by TraceUnit while events are pending.
         # OR-ed into halt_req/imem_valid so the CM cannot retire the next
         # instruction until the TraceUnit drains all queued event packets.
@@ -518,15 +525,21 @@ class ChurchWukongXC7A100T(Elaboratable):
                 Mux(sentinel_req & (sentinel_phase == 2),    C(_TU_VERSION_CALL_3PKT, 8),
                 Mux(sentinel_req & (sentinel_phase == 3),    C(_BUILD_VERSION & 0xFF, 8),
                 Mux(upload_ack_req,                          C(0x06, 8),
-                                                              trace_tx_byte))))))))  ,
+                Mux(snapshot_tx_req,                         snapshot_tx_byte,
+                                                              trace_tx_byte)))))))))  ,
             uart_tx.start.eq(
                 cm_tx_start |
                 (banner_req      & tx_free & ~cm_tx_start) |
                 (sentinel_req    & tx_free & ~cm_tx_start & ~banner_req) |
                 (upload_ack_req  & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req) |
-                (trace_tx_req    & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req & ~upload_ack_req)),
+                (snapshot_tx_req & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req & ~upload_ack_req) |
+                (trace_tx_req    & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req & ~upload_ack_req & ~snapshot_tx_req)),
             trace_tx_ack.eq(
-                trace_tx_req & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req & ~upload_ack_req),
+                trace_tx_req & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req &
+                ~upload_ack_req & ~snapshot_tx_req),
+            snapshot_tx_ack.eq(
+                snapshot_tx_req & tx_free & ~cm_tx_start & ~sentinel_req &
+                ~banner_req & ~upload_ack_req),
         ]
 
         is_mmio_read = Signal()
@@ -609,12 +622,20 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         # step_mode=1 (default when IDE-connected): CM halts after each retired
         #   instruction and waits for an 's' command before executing the next one.
-        # step_mode=0: CM executes freely; 'h' or a breakpoint hit re-enters step mode.
+        # step_mode=0: CM executes freely; an 's' command requests a clean pause
+        #   at the next instruction boundary.  'h' remains a legacy immediate
+        #   halt command for older bridge versions.
         # Wukong standalone: init=0 so the CM free-runs without requiring a bridge
         # to send 'r' first.  The bridge can still send 'h' to enter step mode.
         step_mode   = self.step_mode   # 0 = free-run (standalone-safe); see __init__
         step_halted = self.step_halted # 1 = CM currently held between instructions
         step_grant  = Signal()          # 1-cycle pulse: step command received
+        step_pause_pending = Signal()   # latched: 's' requested from free-run
+        # Complete read-only architectural state is emitted after a stop.
+        # This uses a separate frame from the compact 0xAA trace packets.
+        snapshot_pending = Signal()
+        snapshot_reason = Signal(2)  # 0=step/pause, 1=breakpoint, 2=fault, 3=explicit
+        snapshot_seq = Signal(16)
 
         # ── Breakpoints: 4 NIA slots ──────────────────────────────────────────
         bp_nia   = [Signal(32, init=0xFFFFFFFF, name=f"bp_nia{i}") for i in range(4)]
@@ -636,6 +657,13 @@ class ChurchWukongXC7A100T(Elaboratable):
         # the fault handler without the CM silently retrying and continuing.
         fault_halt = Signal()
         m.d.comb += fault_halt.eq(core.retire_valid & core.retire_fault_valid)
+        stop_retire = Signal()
+        m.d.comb += stop_retire.eq(
+            core.retire_valid & (
+                bp_hit | fault_halt |
+                ((step_mode | step_pause_pending) & ~step_grant)
+            )
+        )
 
         # Breakpoint hit or fault → force step_mode + halt; takes highest priority.
         with m.If(bp_hit | fault_halt):
@@ -643,10 +671,16 @@ class ChurchWukongXC7A100T(Elaboratable):
         with m.Elif(step_grant & step_mode):
             # step_grant clears halt for one retire (re-set on next retire_valid)
             m.d.sync += step_halted.eq(0)
-        with m.Elif(core.retire_valid & step_mode & ~step_grant):
+        with m.Elif(core.retire_valid & (step_mode | step_pause_pending) & ~step_grant):
             m.d.sync += step_halted.eq(1)
+            m.d.sync += step_pause_pending.eq(0)
         with m.Elif(~step_mode):
             m.d.sync += step_halted.eq(0)
+        with m.If(stop_retire):
+            m.d.sync += [
+                snapshot_pending.eq(1),
+                snapshot_reason.eq(Mux(bp_hit, 1, Mux(fault_halt, 2, 0))),
+            ]
 
         # Fetch-settle bubble: DMEM BRAM is sync-read; the cycle after
         # imem_addr changes the read port still presents the OLD word.  Mask
@@ -668,9 +702,10 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         # ── Command parser FSM ─────────────────────────────────────────────────
         # Reads one-byte commands from the UART RX FIFO:
-        #   's' (0x73) — step:       release CM for one retire (step_mode stays on)
+        #   's' (0x73) — step/pause: from halt, release CM for one retire; from
+        #                free-run, enter step mode and halt at the next retire.
         #   'r' (0x72) — run:        clear step_mode; CM runs freely
-        #   'h' (0x68) — halt:       assert step_mode + step_halted immediately
+        #   'h' (0x68) — legacy halt: assert step_mode + step_halted immediately
         #   'b' (0x62) — breakpoint: read 4 big-endian NIA bytes, then arm/disarm
         #   'f' (0x66) — force sentinel: re-arm sentinel_sent=0 so the 3-byte
         #                boot sentinel (0xBC N_INIT TU_VERSION) is retransmitted.
@@ -699,13 +734,31 @@ class ChurchWukongXC7A100T(Elaboratable):
                 with m.If(uart_rx.valid):
                     with m.Switch(uart_rx.data):
                         with m.Case(0x73):  # 's'
-                            # Only grant a step if in step mode AND currently halted.
-                            # The combinatorial step_grant feeds the step_halted updater above.
-                            m.d.comb += step_grant.eq(step_mode & step_halted)
+                            # 's' is the universal pause/step control.  From
+                            # free-run it enters step mode and latches a pending
+                            # pause until the next retirement.  From an
+                            # already halted state it grants exactly one retire.
+                            m.d.comb += [
+                                step_grant.eq(step_mode & step_halted),
+                            ]
+                            m.d.sync += [
+                                step_mode.eq(1),
+                                step_pause_pending.eq(~step_mode),
+                            ]
                         with m.Case(0x72):  # 'r'
-                            m.d.sync += [step_mode.eq(0), step_halted.eq(0)]
+                            m.d.sync += [
+                                step_mode.eq(0),
+                                step_halted.eq(0),
+                                step_pause_pending.eq(0),
+                            ]
                         with m.Case(0x68):  # 'h'
-                            m.d.sync += [step_mode.eq(1), step_halted.eq(1)]
+                            m.d.sync += [
+                                step_mode.eq(1),
+                                step_halted.eq(1),
+                                step_pause_pending.eq(0),
+                                snapshot_pending.eq(1),
+                                snapshot_reason.eq(3),
+                            ]
                         with m.Case(0x62):  # 'b'
                             m.d.sync += bp_recv_cnt.eq(0)
                             m.next = "BP_RECV"
@@ -732,6 +785,11 @@ class ChurchWukongXC7A100T(Elaboratable):
                                 up_len_cnt.eq(0),
                             ]
                             m.next = "UPLOAD_LEN"
+                        with m.Case(0x71):  # 'q' — explicit snapshot request
+                            m.d.sync += [
+                                snapshot_pending.eq(1),
+                                snapshot_reason.eq(3),
+                            ]
 
             with m.State("BP_RECV"):
                 with m.If(uart_rx.valid):
@@ -1077,6 +1135,168 @@ class ChurchWukongXC7A100T(Elaboratable):
                             m.d.sync += tq_ptr.eq(tq_ptr + 1)
                     with m.Else():
                         m.d.sync += tq_bidx.eq(tq_bidx + 1)
+
+        # ── Architectural snapshot FSM ───────────────────────────────────────
+        #
+        # Frame format (all multi-byte values big-endian):
+        #   AC 01 len_hi len_lo seq_hi seq_lo payload[284] crc_hi crc_lo
+        #
+        # Payload:
+        #   reason, flags(NZCV in bits 3:0), M, reserved,
+        #   live NIA, live STO, live thread base, stored Thread CR12 GT,
+        #   stored packed PC, stored M flag word,
+        #   CR0..CR15 × [word0, word1, word2],
+        #   DR0..DR15.
+        #
+        # The frame is emitted only while execution is stopped.  The four
+        # synchronous DMEM reads capture the suspended thread object before
+        # the frame starts, so the host never has to infer state from traces.
+        _SNAP_MAGIC       = 0xAC
+        _SNAP_VERSION     = 1
+        _SNAP_PAYLOAD_LEN = 284
+        _SNAP_DATA_LEN    = 6 + _SNAP_PAYLOAD_LEN
+        _SNAP_FRAME_LEN   = _SNAP_DATA_LEN + 2
+        snap_bidx = Signal(range(_SNAP_FRAME_LEN))
+        snap_crc  = Signal(16, init=0xFFFF)
+        snap_thread_cr12_gt = Signal(32)
+        snap_sto = Signal(32)
+        snap_thread_packed_pc = Signal(32)
+        snap_thread_mflag = Signal(32)
+        snap_mem_addr = Signal(14)
+        snap_payload_idx = Signal(9)
+
+        # CRC-16-CCITT over the header and payload (not the two CRC bytes).
+        def _crc16_byte(crc, byte):
+            value = crc
+            for shift in range(8):
+                top = value[15] ^ byte[7 - shift]
+                value = (value << 1) & 0xFFFF
+                value = Mux(top, value ^ 0x1021, value)
+            return value
+
+        # The host validates the header and payload together.  Seed the
+        # streaming CRC with the six header bytes for the frame sequence that
+        # is about to be committed.
+        snap_seq_next = Signal(16)
+        m.d.comb += snap_seq_next.eq(snapshot_seq + 1)
+        snap_header_crc = C(0xFFFF, 16)
+        for header_byte in (
+            C(_SNAP_MAGIC, 8), C(_SNAP_VERSION, 8),
+            C(_SNAP_PAYLOAD_LEN >> 8, 8),
+            C(_SNAP_PAYLOAD_LEN & 0xFF, 8),
+            snap_seq_next[8:16], snap_seq_next[0:8],
+        ):
+            snap_header_crc = _crc16_byte(snap_header_crc, header_byte)
+
+        def _be_bytes(word):
+            return [word[24:32], word[16:24], word[8:16], word[0:8]]
+
+        snap_flags = Cat(
+            core.flags.V, core.flags.C, core.flags.Z, core.flags.N, C(0, 4))
+        snap_words = [
+            core.nia, snap_sto,
+            core.debug_cr_words[12][1],
+            snap_thread_cr12_gt,
+            snap_thread_packed_pc,
+            snap_thread_mflag,
+        ]
+        snap_payload_bytes = [
+            Cat(snapshot_reason, C(0, 6)),
+            snap_flags,
+            Cat(core.debug_m_flag, C(0, 7)),
+            C(0, 8),
+        ]
+        for word in snap_words:
+            snap_payload_bytes += _be_bytes(word)
+        for cr_idx in range(16):
+            for word_idx in range(3):
+                snap_payload_bytes += _be_bytes(
+                    core.debug_cr_words[cr_idx][word_idx])
+        for dr_idx in range(16):
+            snap_payload_bytes += _be_bytes(core.debug_dr_words[dr_idx])
+        snap_payload_array = Array(snap_payload_bytes)
+
+        m.d.comb += [
+            snap_mem_addr.eq(0),
+            snapshot_mem_rd.addr.eq(snap_mem_addr),
+            snap_payload_idx.eq(snap_bidx - 6),
+            snapshot_tx_req.eq(0),
+            snapshot_tx_byte.eq(0),
+        ]
+        with m.FSM(name="snapshot_unit"):
+            with m.State("IDLE"):
+                with m.If(snapshot_pending & ~trace_stall):
+                    m.d.sync += [
+                        snapshot_pending.eq(0),
+                        snapshot_seq.eq(snap_seq_next),
+                        snap_bidx.eq(0),
+                        snap_crc.eq(snap_header_crc),
+                    ]
+                    m.next = "READ_THREAD_CR12"
+
+            # DMEM is synchronous: each READ state presents an address and
+            # its WAIT state latches the returned word.
+            with m.State("READ_THREAD_CR12"):
+                m.d.comb += snap_mem_addr.eq(
+                    (core.debug_cr_words[12][1] >> 2) + 256)
+                m.next = "WAIT_THREAD_CR12"
+            with m.State("WAIT_THREAD_CR12"):
+                m.d.sync += snap_thread_cr12_gt.eq(snapshot_mem_rd.data)
+                m.next = "READ_STO"
+            with m.State("READ_STO"):
+                m.d.comb += snap_mem_addr.eq(
+                    (core.debug_cr_words[5][1] >> 2))
+                m.next = "WAIT_STO"
+            with m.State("WAIT_STO"):
+                m.d.sync += snap_sto.eq(snapshot_mem_rd.data)
+                m.next = "READ_PACKED_PC"
+            with m.State("READ_PACKED_PC"):
+                m.d.comb += snap_mem_addr.eq(
+                    (core.debug_cr_words[12][1] >> 2) + 17)
+                m.next = "WAIT_PACKED_PC"
+            with m.State("WAIT_PACKED_PC"):
+                m.d.sync += snap_thread_packed_pc.eq(snapshot_mem_rd.data)
+                m.next = "READ_THREAD_M"
+            with m.State("READ_THREAD_M"):
+                m.d.comb += snap_mem_addr.eq(
+                    (core.debug_cr_words[12][1] >> 2) + 18)
+                m.next = "WAIT_THREAD_M"
+            with m.State("WAIT_THREAD_M"):
+                m.d.sync += snap_thread_mflag.eq(snapshot_mem_rd.data)
+                m.next = "SEND"
+
+            with m.State("SEND"):
+                m.d.comb += snapshot_tx_req.eq(1)
+                with m.Switch(snap_bidx):
+                    with m.Case(0):
+                        m.d.comb += snapshot_tx_byte.eq(_SNAP_MAGIC)
+                    with m.Case(1):
+                        m.d.comb += snapshot_tx_byte.eq(_SNAP_VERSION)
+                    with m.Case(2):
+                        m.d.comb += snapshot_tx_byte.eq(_SNAP_PAYLOAD_LEN >> 8)
+                    with m.Case(3):
+                        m.d.comb += snapshot_tx_byte.eq(_SNAP_PAYLOAD_LEN & 0xFF)
+                    with m.Case(4):
+                        m.d.comb += snapshot_tx_byte.eq(snapshot_seq[8:16])
+                    with m.Case(5):
+                        m.d.comb += snapshot_tx_byte.eq(snapshot_seq[0:8])
+                    with m.Default():
+                        with m.If(snap_bidx < _SNAP_DATA_LEN):
+                            m.d.comb += snapshot_tx_byte.eq(
+                                snap_payload_array[snap_payload_idx])
+                        with m.Elif(snap_bidx == _SNAP_DATA_LEN):
+                            m.d.comb += snapshot_tx_byte.eq(snap_crc[8:16])
+                        with m.Else():
+                            m.d.comb += snapshot_tx_byte.eq(snap_crc[0:8])
+
+                with m.If(snapshot_tx_ack):
+                    crc_next = _crc16_byte(snap_crc, snapshot_tx_byte)
+                    with m.If((snap_bidx >= 6) & (snap_bidx < _SNAP_DATA_LEN)):
+                        m.d.sync += snap_crc.eq(crc_next)
+                    with m.If(snap_bidx == _SNAP_FRAME_LEN - 1):
+                        m.next = "IDLE"
+                    with m.Else():
+                        m.d.sync += snap_bidx.eq(snap_bidx + 1)
 
         # ── Heartbeat (1 Hz blink on led[1] during boot) ──────────────────────
         hb_ctr   = Signal(range(self.clk_freq))

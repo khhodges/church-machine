@@ -66,6 +66,15 @@ except ImportError:
 TRACE_MAGIC    = 0xAA
 TRACE_LEN      = 12   # 12-byte per-event packet: magic(1)+NIA(4)+ev_type(1)+payload(4)+flags(1)+fault(1)
 
+# Complete architectural stop-state snapshot.  This is deliberately a
+# different magic byte from TRACE_MAGIC so old bridges/IDEs can continue to
+# consume the compact event stream.
+SNAPSHOT_MAGIC   = 0xAC
+SNAPSHOT_VERSION = 1
+SNAPSHOT_HEADER_LEN = 6       # magic, version, payload length, sequence
+SNAPSHOT_CRC_LEN = 2
+SNAPSHOT_PAYLOAD_LEN = 284
+
 # ── Event type constants ──────────────────────────────────────────────────────
 # Must match _TRACE_EV_* in wukong_top.py and docs/debug-packet-protocol.md.
 TRACE_EV_RESULT      = 0x00  # Single-packet result (DR→DR, SAVE, Function, etc.)
@@ -444,6 +453,95 @@ def decode_trace_packet(pkt):
     }
 
 
+def _crc16_ccitt(data, crc=0xFFFF):
+    """CRC-16-CCITT used by the complete architectural snapshot frame."""
+    for byte in data:
+        crc ^= (byte & 0xFF) << 8
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x1021) & 0xFFFF if crc & 0x8000 else (crc << 1) & 0xFFFF
+    return crc
+
+
+def decode_snapshot_frame(frame):
+    """Decode and integrity-check one complete architectural snapshot frame.
+
+    Wire format:
+      AC version payload_len_hi payload_len_lo seq_hi seq_lo
+      payload[284] crc_hi crc_lo
+
+    Payload is:
+      reason, flags, m_flag, reserved,
+      live nia/sto/thread_base/stored_cr12_gt/packed_pc/stored_mflag,
+      CR0..CR15 × 3 words, DR0..DR15.
+    """
+    if len(frame) < SNAPSHOT_HEADER_LEN + SNAPSHOT_CRC_LEN:
+        raise ValueError('snapshot frame is truncated')
+    if frame[0] != SNAPSHOT_MAGIC:
+        raise ValueError('snapshot frame has bad magic')
+    if frame[1] != SNAPSHOT_VERSION:
+        raise ValueError(f'unsupported snapshot version {frame[1]}')
+    payload_len = struct.unpack('>H', bytes(frame[2:4]))[0]
+    expected_len = SNAPSHOT_HEADER_LEN + payload_len + SNAPSHOT_CRC_LEN
+    if payload_len != SNAPSHOT_PAYLOAD_LEN or len(frame) != expected_len:
+        raise ValueError(f'snapshot length mismatch: payload={payload_len}, frame={len(frame)}')
+    received_crc = struct.unpack('>H', bytes(frame[-2:]))[0]
+    calculated_crc = _crc16_ccitt(bytes(frame[:-2]))
+    if received_crc != calculated_crc:
+        raise ValueError(
+            f'snapshot CRC mismatch: got 0x{received_crc:04X}, '
+            f'expected 0x{calculated_crc:04X}')
+
+    payload = bytes(frame[SNAPSHOT_HEADER_LEN:-2])
+    reason, flags, m_flag, _reserved = payload[:4]
+    words = [
+        struct.unpack('>I', payload[offset:offset + 4])[0]
+        for offset in range(4, 28, 4)
+    ]
+    cr_start = 28
+    cr_words = [
+        list(struct.unpack('>III', payload[cr_start + i * 12:cr_start + (i + 1) * 12]))
+        for i in range(16)
+    ]
+    dr_start = cr_start + 16 * 12
+    dr_words = list(struct.unpack('>16I', payload[dr_start:dr_start + 64]))
+    return {
+        'snapshot': True,
+        'version': frame[1],
+        'payload_len': payload_len,
+        'seq': struct.unpack('>H', bytes(frame[4:6]))[0],
+        'reason': reason,
+        'flags': flags & 0x0F,
+        'm_flag': bool(m_flag & 1),
+        'nia': words[0],
+        'sto': words[1],
+        'thread_base': words[2],
+        'stored_cr12_gt': words[3],
+        'stored_packed_pc': words[4],
+        'stored_mflag': words[5],
+        'cr': cr_words,
+        'dr': dr_words,
+        'crc16': received_crc,
+    }
+
+
+def try_parse_snapshot_frame(buf, i=0):
+    """Return decoded snapshot, False for incomplete, None for invalid."""
+    if i >= len(buf) or buf[i] != SNAPSHOT_MAGIC:
+        return None
+    if len(buf) - i < SNAPSHOT_HEADER_LEN:
+        return False
+    payload_len = struct.unpack('>H', bytes(buf[i + 2:i + 4]))[0]
+    total_len = SNAPSHOT_HEADER_LEN + payload_len + SNAPSHOT_CRC_LEN
+    if payload_len != SNAPSHOT_PAYLOAD_LEN:
+        return None
+    if len(buf) - i < total_len:
+        return False
+    try:
+        return decode_snapshot_frame(bytes(buf[i:i + total_len]))
+    except ValueError:
+        return None
+
+
 # ── Trace frame validation / resync ───────────────────────────────────────────
 # The 0xAA magic byte can also appear inside packet payloads (NIA bytes, GT
 # bytes).  If the parser loses byte alignment — mid-stream attach, a dropped
@@ -698,7 +796,7 @@ def post_command_ack(ide_base, verify_tls, cmd, ok, error='', cmd_id=None):
 
 def execute_board_command(cmd, data, ser, reopen_serial, buf,
                           ide_base, verify_tls):
-    """Write a dequeued command ('s','r','h','b','f') to the board's UART.
+    """Write a dequeued command ('s','r','h','q','b','f') to the board's UART.
 
     Reports success/failure back to the server via POST
     /hardware/wukong/command-ack so a consumed-but-unwritten command is
@@ -740,7 +838,7 @@ def execute_board_command(cmd, data, ser, reopen_serial, buf,
             ser = reopen_serial()
             buf.clear()
             ser.write(b'f')
-        elif cmd in ('s', 'r', 'h'):
+        elif cmd in ('s', 'r', 'h', 'q'):
             ser.write(cmd.encode('ascii'))
         else:
             post_command_ack(ide_base, verify_tls, cmd, False,
@@ -917,6 +1015,27 @@ def main():
             i = 0
             while i < len(buf):
                 b = buf[i]
+
+                if b == SNAPSHOT_MAGIC:
+                    decoded = try_parse_snapshot_frame(buf, i)
+                    if decoded is False:
+                        break
+                    if decoded is None:
+                        sync.unlock('invalid snapshot frame')
+                        sync.drop_byte()
+                        i += 1
+                        continue
+                    sync.lock('snapshot frame')
+                    _console_flush(ide_base, verify_tls)
+                    decoded['ts'] = time.time()
+                    try:
+                        requests.post(
+                            f'{ide_base}/hardware/wukong/snapshot',
+                            json=decoded, timeout=1, verify=verify_tls)
+                    except Exception as exc:
+                        print(f'  [snapshot POST error] {exc}', flush=True)
+                    i += SNAPSHOT_HEADER_LEN + decoded['payload_len'] + SNAPSHOT_CRC_LEN
+                    continue
 
                 if b == TRACE_MAGIC:
                     decoded = try_parse_trace_frame(buf, i)
@@ -1181,7 +1300,7 @@ def main():
                     if r.status_code == 200:
                         data = r.json() or {}
                         cmd = data.get('cmd')
-                        if cmd in ('s', 'r', 'h', 'b', 'f'):
+                        if cmd in ('s', 'r', 'h', 'q', 'b', 'f'):
                             ser = execute_board_command(
                                 cmd, data, ser, _reopen_serial, buf,
                                 ide_base, verify_tls)

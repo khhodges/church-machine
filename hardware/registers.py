@@ -40,6 +40,17 @@ class ChurchRegisters(Elaboratable):
         self.cr14_code = Signal(CAP_REG_LAYOUT)
         self.cr15_namespace = Signal(CAP_REG_LAYOUT)
 
+        # Full architectural readback ports for the Wukong snapshot channel.
+        # These are combinatorial and read-only; they do not add a second write
+        # path or alter the normal register-file arbitration.
+        self.debug_cr_words = [
+            [Signal(32, name=f"debug_cr{i}_word{w}") for w in range(3)]
+            for i in range(NUM_CAP_REGS)
+        ]
+        self.debug_dr_words = [
+            Signal(32, name=f"debug_dr{i}") for i in range(NUM_DATA_REGS)
+        ]
+
         # Trace read port: second combinatorial word0_gt read used by the TraceUnit
         # (via core.py) to capture the old CR_dst GT at LOAD start time.
         self.trace_rd_addr = Signal(4)
@@ -205,5 +216,17 @@ class ChurchRegisters(Elaboratable):
             self.dr_rd_data2.eq(Mux(self.dr_rd_addr2 == 0, 0, data_regs[self.dr_rd_addr2])),
             self.flags.eq(flags_reg),
         ]
+
+        for i in range(NUM_CAP_REGS):
+            cr_view = View(CAP_REG_LAYOUT, cap_regs[i])
+            m.d.comb += [
+                self.debug_cr_words[i][0].eq(cr_view.word0_gt),
+                self.debug_cr_words[i][1].eq(cr_view.word1_location),
+                self.debug_cr_words[i][2].eq(cr_view.word2_w2),
+            ]
+        for i in range(NUM_DATA_REGS):
+            m.d.comb += self.debug_dr_words[i].eq(
+                Mux(i == 0, 0, data_regs[i])
+            )
 
         return m

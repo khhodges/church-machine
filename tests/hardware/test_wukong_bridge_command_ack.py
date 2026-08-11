@@ -74,6 +74,13 @@ class TestWriteSuccess:
         assert acks[0]['json'] == {'cmd': 's', 'ok': True, 'error': '',
                                    'id': 42}
 
+    def test_snapshot_command_writes_q_and_posts_ok_ack(self, acks):
+        ser = FakeSerial()
+        _run('q', ser)
+        assert ser.written == [b'q']
+        assert acks[-1]['json'] == {'cmd': 'q', 'ok': True, 'error': '',
+                                    'id': 42}
+
     def test_breakpoint_command_writes_nia(self, acks):
         ser = FakeSerial()
         _run('b', ser, data={'nia': 0x200})

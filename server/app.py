@@ -9806,6 +9806,7 @@ import threading as _wk_threading
 _wukong_trace_lock    = _wk_threading.Lock()
 _wukong_command_lock  = _wk_threading.Lock()
 _wukong_latest_trace  = {}         # {nia, ev_type, payload_gt, flags, fault_code, fault_valid, bp_hit, ts}
+_wukong_latest_snapshot = {}
 # Latest GT word0 seen for each CALL-type event, keyed by CR index (6 or 14).
 # Maintained separately from _wukong_latest_trace so that a subsequent CALL_PUSH
 # packet (ev_type=0x08) cannot overwrite a CR6/CR14 update before the IDE polls.
@@ -10112,6 +10113,53 @@ def wukong_trace_post():
     return jsonify({'ok': True})
 
 
+@app.route('/hardware/wukong/snapshot', methods=['POST'])
+def wukong_snapshot_post():
+    """Bridge posts one complete, CRC-validated architectural stop snapshot.
+
+    The bridge has already checked the wire CRC.  The server still validates
+    the JSON shape before placing it in the same ordered queue as trace
+    events, so the browser can apply snapshots atomically and in arrival
+    order.
+    """
+    global _wukong_latest_snapshot, _wukong_event_seq, \
+        _wukong_last_trace_post, _wukong_total_trace_posts
+    data = request.get_json(silent=True) or {}
+    try:
+        cr = data.get('cr')
+        dr = data.get('dr')
+        if not data.get('snapshot') or int(data.get('version')) != 1:
+            raise ValueError('unsupported snapshot')
+        if not isinstance(cr, list) or len(cr) != 16 or \
+                any(not isinstance(row, list) or len(row) != 3 for row in cr):
+            raise ValueError('snapshot must contain CR0..CR15 × 3 words')
+        if not isinstance(dr, list) or len(dr) != 16:
+            raise ValueError('snapshot must contain DR0..DR15')
+        numeric = ('seq', 'reason', 'flags', 'nia', 'sto', 'thread_base',
+                   'stored_cr12_gt', 'stored_packed_pc', 'stored_mflag')
+        entry = {key: int(data[key]) for key in numeric}
+        entry['cr'] = [[int(word) & 0xFFFFFFFF for word in row] for row in cr]
+        entry['dr'] = [int(word) & 0xFFFFFFFF for word in dr]
+        entry['snapshot'] = True
+        entry['version'] = 1
+        entry['m_flag'] = bool(data.get('m_flag', False))
+        entry['crc16'] = int(data.get('crc16', 0)) & 0xFFFF
+        entry['ts'] = float(data.get('ts', 0.0))
+    except (KeyError, TypeError, ValueError, OverflowError) as exc:
+        return jsonify({'ok': False, 'error': f'invalid snapshot: {exc}'}), 400
+
+    _wukong_last_trace_post = _wk_time.time()
+    _wukong_total_trace_posts += 1
+    with _wukong_trace_lock:
+        _wukong_event_seq += 1
+        entry['seq'] = _wukong_event_seq
+        _wukong_event_queue.append(entry)
+        if len(_wukong_event_queue) > _WUKONG_EVENT_QUEUE_MAXLEN:
+            del _wukong_event_queue[:-_WUKONG_EVENT_QUEUE_MAXLEN]
+        _wukong_latest_snapshot = dict(entry)
+    return jsonify({'ok': True, 'seq': entry['seq']})
+
+
 @app.route('/hardware/wukong/trace', methods=['GET'])
 def wukong_trace_get():
     """IDE reads the latest trace packet (or {} if no packet yet).
@@ -10175,6 +10223,73 @@ def wukong_events_get():
         if 14 in _wukong_latest_cr_gts:
             resp['cr14_gt'] = _wukong_latest_cr_gts[14]
     return jsonify(resp)
+
+
+@app.route('/hardware/wukong/code', methods=['GET'])
+def wukong_code_get():
+    """Return the code listing that matches the server's active trace map.
+
+    The active uploaded entry lump is authoritative when one has been sent to
+    the board.  Before an upload, expose the fixed WukongCallHome reference
+    listing so the FPGA workspace is still useful for the board's power-on
+    program.  Every row contains the byte-addressed NIA used by trace packets.
+    """
+    info = dict(_wukong_active_lump_info)
+    rows = []
+    source_map = 'uploaded'
+
+    def add_row(offset, nia, word, label, disasm):
+        """Append one row unless another source already owns this NIA."""
+        if any(existing['nia'] == nia for existing in rows):
+            return
+        rows.append({
+            'offset': int(offset),
+            'nia': int(nia) & 0xFFFFFFFF,
+            'word': None if word is None else int(word) & 0xFFFFFFFF,
+            'nia_label': label,
+            'disasm': disasm,
+        })
+
+    # Boot is always part of the hardware execution path and is also emitted
+    # by the trace symbol resolver for NIAs 0x00000000/04/08.
+    try:
+        from hardware.wukong_trace_symbols import _BOOT_WORDS as _boot_words
+        for offset, word in enumerate(_boot_words):
+            add_row(offset, offset * 4, word, f'Boot.{offset}',
+                    _wts_disasm(word))
+    except Exception:
+        pass
+
+    if info and info.get('lump_words'):
+        base_byte = int(info.get('base_byte', 0))
+        name = str(info.get('name') or 'Lump')
+        for offset, word in sorted(info['lump_words'].items()):
+            offset = int(offset)
+            word = int(word) & 0xFFFFFFFF
+            add_row(offset, base_byte + offset * 4, word, f'{name}.{offset}',
+                    'LUMP_HEADER' if offset == 0 else _wts_disasm(word))
+    else:
+        try:
+            from hardware.wukong_trace_symbols import (
+                WUKONG_CALLHOME_BASE as _wch_base,
+                WUKONG_CALLHOME_WORDS as _wch_words,
+            )
+            source_map = 'reference-bitstream'
+            add_row(0, int(_wch_base), None, 'WukongCallHome.0', 'LUMP_HEADER')
+            for offset, word in enumerate(_wch_words, 1):
+                word = int(word) & 0xFFFFFFFF
+                add_row(offset, int(_wch_base) + offset * 4, word,
+                        f'WukongCallHome.{offset}', _wts_disasm(word))
+        except Exception:
+            source_map = 'unavailable'
+    return jsonify({
+        'ok': True,
+        'name': str(info.get('name') if info else 'WukongCallHome'),
+        'source_map': source_map,
+        'rows': rows,
+    })
+
+
 @app.route('/hardware/wukong/console', methods=['POST'])
 def wukong_console_post():
     """Bridge posts a line of raw UART ASCII output (banner text etc.).
@@ -10205,7 +10320,7 @@ def wukong_console_post():
 def wukong_command_post():
     """IDE enqueues a command for the bridge to forward to the board.
 
-    Body JSON: {'cmd': 's'|'r'|'h'|'b'|'u'|'f', 'nia': <int>, 'data': '<base64>'}
+    Body JSON: {'cmd': 's'|'r'|'h'|'q'|'b'|'u'|'f', 'nia': <int>, 'data': '<base64>'}
 
     Only one command is queued at a time.  Overwrite policy (documented):
     a new POST overwrites any still-pending command, and the response
@@ -10218,7 +10333,7 @@ def wukong_command_post():
         _wukong_cmd_id
     data = request.get_json(silent=True) or {}
     cmd = str(data.get('cmd', '')).strip()
-    if cmd not in ('s', 'r', 'h', 'b', 'u', 'f'):
+    if cmd not in ('s', 'r', 'h', 'q', 'b', 'u', 'f'):
         return jsonify({'ok': False, 'error': 'unknown cmd'}), 400
 
     entry = {'cmd': cmd}

@@ -830,6 +830,10 @@ class ChurchSimulator {
         this._instrHistory = [];
         this._currentInstrLabel = null;
         this.faultViolationData = null;   // populated by B:00 FAULT_RST from last faultLog entry
+        // Last complete state received from physical Wukong.  This is kept
+        // separately from simulator breakpoint state and includes the raw
+        // suspended-thread context fields that do not belong to live CR12.
+        this.hardwareSnapshot = null;
 
         // Boot Image Designer Step 1 (Task #214): namespace memory window size
         // is programmer-chosen via the Boot Image Designer (totalNamespaceWords).
@@ -7369,6 +7373,70 @@ class ChurchSimulator {
             namespaceTable: this.namespaceTable,
             petNameMemory: Array.from(this.petNameMemory),
         };
+    }
+
+    /**
+     * Atomically apply a validated physical-Wukong snapshot for display.
+     *
+     * This deliberately does not call step(), run(), boot(), or mutate any
+     * simulator breakpoint collection.  The suspended-thread fields remain
+     * under hardwareSnapshot because they are not the live simulator CR12.
+     */
+    applyHardwareSnapshot(snapshot) {
+        if (!snapshot || snapshot.snapshot !== true ||
+            snapshot.version !== 1 ||
+            !Array.isArray(snapshot.cr) || snapshot.cr.length !== 16 ||
+            !Array.isArray(snapshot.dr) || snapshot.dr.length !== 16) {
+            return { ok: false, error: 'incomplete hardware snapshot' };
+        }
+        if (snapshot.cr.some(row => !Array.isArray(row) || row.length !== 3) ||
+            snapshot.cr.some(row => row.some(v => !Number.isInteger(v))) ||
+            snapshot.dr.some(v => !Number.isInteger(v))) {
+            return { ok: false, error: 'malformed hardware snapshot words' };
+        }
+
+        const cr = snapshot.cr.map((row, i) => ({
+            word0: row[0] >>> 0,
+            word1: row[1] >>> 0,
+            word2: row[2] >>> 0,
+            // Hardware CAP_REG_LAYOUT has three words; clear the simulator
+            // compatibility-only fourth word instead of retaining stale data.
+            word3: 0,
+            m: i === 15 && snapshot.m_flag ? 1 : 0,
+        }));
+        const dr = snapshot.dr.map(v => v >>> 0);
+        const flagsWord = snapshot.flags >>> 0;
+        const flags = {
+            N: !!(flagsWord & 8),
+            Z: !!(flagsWord & 4),
+            C: !!(flagsWord & 2),
+            V: !!(flagsWord & 1),
+        };
+        const next = {
+            ...snapshot,
+            cr,
+            dr,
+            flags,
+            nia: snapshot.nia >>> 0,
+            sto: snapshot.sto >>> 0,
+            thread_base: snapshot.thread_base >>> 0,
+            stored_cr12_gt: snapshot.stored_cr12_gt >>> 0,
+            stored_packed_pc: snapshot.stored_packed_pc >>> 0,
+            stored_mflag: snapshot.stored_mflag >>> 0,
+        };
+
+        // Commit only after every field has been checked and transformed.
+        this.cr = cr;
+        this.dr = dr;
+        this.flags = flags;
+        // NIA is the hardware's physical instruction address.  Keep it in
+        // physicalPC for the hardware cursor; do not replace the simulator's
+        // logical PC, which would alter a subsequent simulator run.
+        this.physicalPC = next.nia;
+        this.sto = next.sto;
+        this.hardwareSnapshot = next;
+        this.emit('stateChange', this.getState());
+        return { ok: true };
     }
 
     getFormattedCR(idx) {

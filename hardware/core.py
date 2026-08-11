@@ -156,6 +156,18 @@ class ChurchCore(Elaboratable):
         self.nia = Signal(32)
         self.flags = Signal(COND_FLAGS_LAYOUT)
 
+        # Read-only architectural snapshot buses.  Wukong uses these to emit
+        # a complete state frame when execution is suspended; trace packets
+        # intentionally remain small and event-oriented.
+        self.debug_cr_words = [
+            [Signal(32, name=f"debug_cr{i}_word{w}") for w in range(3)]
+            for i in range(16)
+        ]
+        self.debug_dr_words = [
+            Signal(32, name=f"debug_dr{i}") for i in range(16)
+        ]
+        self.debug_m_flag = Signal()
+
         self.outform_tx_valid = Signal()
         self.outform_tx_data  = Signal(8)
         self.outform_tx_ack   = Signal()   # from tang_nano: UART accepted the byte
@@ -935,6 +947,12 @@ class ChurchCore(Elaboratable):
             self.nia.eq(nia_reg),
             self.flags.eq(u_regs.flags),
         ]
+        for i in range(16):
+            for w in range(3):
+                m.d.comb += self.debug_cr_words[i][w].eq(
+                    u_regs.debug_cr_words[i][w])
+            m.d.comb += self.debug_dr_words[i].eq(u_regs.debug_dr_words[i])
+        m.d.comb += self.debug_m_flag.eq(u_regs.cr15_m_flag)
 
         boot_wr_en = [Signal(name=f"boot_cap{i}_wr_en") for i in range(16)]
         boot_wr_gt = [Signal(GT_LAYOUT, name=f"boot_cap{i}_wr_gt") for i in range(16)]

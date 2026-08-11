@@ -193,6 +193,34 @@ entire handler to see exactly what the CM does in response to each fault.
 
 ---
 
+## Architectural stop snapshot
+
+When the board enters a stopped state because of pause, single-step,
+breakpoint, fault, or an explicit `q` request, the RTL may emit a complete
+read-only snapshot after the trace stream. Snapshot frames are independent of
+the 12-byte trace packets and are identified by magic byte `0xAC`.
+
+The frame is big-endian:
+
+```
+AC version payload_len_hi payload_len_lo seq_hi seq_lo payload[284] crc_hi crc_lo
+```
+
+The CRC is CRC-16-CCITT, seeded with `0xFFFF`, over the six-byte header and
+the complete payload. The payload contains the stop reason, NZCV and M-bit,
+live NIA/STO/thread base, stored suspended-thread CR12 GT/packed PC/M word,
+CR0–CR15 (three words each), and DR0–DR15. The bridge rejects truncated,
+wrong-length, unsupported-version, and CRC-invalid frames before posting them
+to `/hardware/wukong/snapshot`.
+
+The server places validated snapshots in the same ordered event queue as trace
+events. The browser applies one only after the complete object is validated:
+it updates displayed CR/DR/flags/STO and the physical hardware cursor without
+calling simulator execution or changing simulator breakpoints. Stored
+suspended-thread fields remain separate from live CR12.
+
+---
+
 ## IDE slave mode
 
 When `/dev/ttyUSB*` is present and the Wukong bridge is active:
