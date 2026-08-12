@@ -1158,6 +1158,14 @@
                     var lg = Math.log2(tw);
                     if (Number.isInteger(lg) && lg >= 14 && lg <= 29) state.ns.n_minus_6 = lg - 14;
                     state.ns.slots = snapNSCap(_nsDrill.committed.maxEntries || NS_CAP_MIN);
+                    // Seed thread geometry from the committed Thread.1 block too,
+                    // so the memory-truth checks open clean on a valid image.
+                    var ct = _nsDrill.committed.thread;
+                    if (ct) {
+                        var tlg = Math.log2(ct.size || 0);
+                        if (Number.isInteger(tlg) && tlg >= MIN_EXP && tlg <= MAX_EXP) state.thread.lumpPow2 = tlg;
+                        if (typeof ct.count === 'number' && ct.count >= 1 && ct.count <= 9) state.thread.count = ct.count;
+                    }
                     saveState();
                 }
                 render();

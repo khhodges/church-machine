@@ -145,6 +145,69 @@ test.describe('Builder design pages — Thread Lump & Namespace Lump', () => {
             .toContainText('beyond the approved capacity');
     });
 
+    test('committed snapshot carries the V20 contract blocks (nsHeader + thread)', async ({ page }) => {
+        const nsState = await (await page.request.get('/api/boot-image/ns-state')).json();
+        test.skip(!nsState.committed, 'no committed boot image available');
+        const c = nsState.committed;
+
+        // Synthesized architectural NS header: slot count split (cw<<8)|cc, typ=01.
+        expect(c.nsHeader).toBeTruthy();
+        expect(c.nsHeader.typ).toBe(1);
+        expect(((c.nsHeader.cw << 8) | c.nsHeader.cc)).toBe(c.maxEntries);
+        expect(c.nsHeader.word >>> 0).toBe(
+            (((0x1F << 27) | (c.nsHeader.n_minus_6 << 23) | (c.nsHeader.cw << 10) |
+              (1 << 8) | c.nsHeader.cc) >>> 0));
+
+        // Word 0 is the Thread.1 header, and the thread block agrees with it.
+        expect(c.header).toBeTruthy();
+        expect(c.header.kind).toBe('thread');
+        expect(c.header.typ).toBe(2);
+        expect(c.thread).toBeTruthy();
+        expect(c.thread.size).toBe(Math.pow(2, c.header.n_minus_6 + 6));
+        expect(c.thread.capsOffset).toBe(244);
+        expect(c.thread.count).toBeGreaterThanOrEqual(1);
+        // CR0 must be a live E-GT targeting the committed boot-entry slot.
+        expect(c.thread.cr0Word).not.toBe(0);
+        expect(c.thread.cr0Word & 0xFFFF).toBe(c.thread.bootSlot);
+    });
+
+    test('drill-down flags NS-header, thread-count, and CR0 contradictions', async ({ page }) => {
+        const nsState = await (await page.request.get('/api/boot-image/ns-state')).json();
+        test.skip(!nsState.committed, 'no committed boot image available');
+
+        await openBuilder(page);
+        await page.locator('#builderViewTab-lump-ns').click();
+        const panel = page.locator('#lumpNSPanel');
+        await expect(panel).toBeVisible();
+
+        // Serve a corrupted committed snapshot: wrong NS header word, wrong
+        // thread count, and a CR0 GT that disagrees with the boot sentinel.
+        await page.evaluate((committed) => {
+            const bad = JSON.parse(JSON.stringify(committed));
+            bad.nsHeader.word = (bad.nsHeader.word ^ 0x100) >>> 0;   // flip typ bit
+            bad.thread.count = 9;
+            bad.thread.cr0Word = (bad.thread.cr0Word & ~0xFFFF) | ((bad.thread.bootSlot + 1) & 0xFFFF);
+            const orig = window.fetch;
+            window.fetch = (u, o) => {
+                if (String(u).includes('/api/boot-image/ns-state')) {
+                    return Promise.resolve({ json: () => Promise.resolve({
+                        abstractions: [], committed: bad }) });
+                }
+                return orig(u, o);
+            };
+        }, nsState.committed);
+
+        await page.evaluate(() => window.lumpEditorToggleNSDrill());
+        await page.evaluate(() => window.lumpEditorNSDrillRefresh());
+
+        const banner = panel.locator('.le-nsd-banner-fault');
+        await expect(banner).toBeVisible({ timeout: 8000 });
+        const text = await banner.innerText();
+        expect(text).toMatch(/NS header encodes as/);
+        expect(text).toMatch(/9 threads/);
+        expect(text).toMatch(/CR0 targets NS slot/);
+    });
+
     test('other Builder tabs still work after visiting a design page', async ({ page }) => {
         await openBuilder(page);
 
