@@ -1356,6 +1356,48 @@
                     ' slots (' + (committed.maxEntries * 4).toLocaleString() + ' words); the approved capacity is ' +
                     slots.toLocaleString() + ' slots (' + (slots * 4).toLocaleString() + ' words) \u2014 cw/cc mismatch');
             }
+            // NS header encoding truth: the server synthesizes the architectural
+            // V20 namespace header from the committed geometry; it must equal
+            // the header this designer page displays (packHdr slot-count split).
+            if (committed.nsHeader && typeof committed.nsHeader.word === 'number') {
+                var expNsHdr = packHdr(n, (slots >> 8) & 0x1FFF, slots & 0xFF, 1) >>> 0;
+                if ((committed.nsHeader.word >>> 0) !== expNsHdr) {
+                    shapeFaults.push('committed NS header encodes as ' + hex8(committed.nsHeader.word >>> 0) +
+                        '; the approved design encodes ' + hex8(expNsHdr) +
+                        ' (n\u22126=' + n + ', slots=' + slots + ', typ=01)');
+                }
+            }
+            // Thread memory-truth: header at word 0, size, count, CR0 boot-entry GT.
+            if (committed.thread) {
+                var _thr = committed.thread;
+                var _apprSize = Math.pow(2, clamp(state.thread.lumpPow2, MIN_EXP, MAX_EXP));
+                var _board2   = (typeof localStorage !== 'undefined' && localStorage.getItem('fpga_board_target')) || 'wukong-xc7a100t';
+                var _prof2    = BOARD_PROFILES[_board2] || BOARD_PROFILES['wukong-xc7a100t'];
+                var _apprCnt  = _prof2.singleThread ? 1 : clamp(state.thread.count, 1, 9);
+                if (_thr.size !== _apprSize) {
+                    shapeFaults.push('committed Thread lump is ' + _thr.size.toLocaleString() +
+                        ' words; the approved Thread size is ' + _apprSize.toLocaleString() + ' words');
+                }
+                if (typeof _thr.count === 'number' && _thr.count !== _apprCnt) {
+                    shapeFaults.push('committed image carries ' + _thr.count + ' thread' + (_thr.count === 1 ? '' : 's') +
+                        '; the approved design specifies ' + _apprCnt);
+                }
+                if (!_thr.cr0Word) {
+                    shapeFaults.push('Thread CR0 boot-entry capability at +' + (_thr.capsOffset || 244) + ' is a Null GT \u2014 boot cannot dispatch');
+                } else {
+                    var _cr0 = _decodeGTWord(_thr.cr0Word >>> 0);
+                    var _apprBoot = parseInt(localStorage.getItem('bootEntrySlot'), 10);
+                    if (typeof _thr.bootSlot === 'number' && _cr0.slot !== _thr.bootSlot) {
+                        shapeFaults.push('Thread CR0 targets NS slot ' + _cr0.slot +
+                            ' but the committed boot-entry sentinel says slot ' + _thr.bootSlot);
+                    } else if (!isNaN(_apprBoot) && _cr0.slot !== _apprBoot) {
+                        shapeFaults.push('Thread CR0 targets NS slot ' + _cr0.slot +
+                            '; the selected boot entry is slot ' + _apprBoot);
+                    }
+                }
+            } else if (committed.header && committed.header.kind === 'thread' && committed.header.typ !== 2) {
+                shapeFaults.push('word 0 header typ=' + committed.header.typ + ' \u2014 expected a Thread header (typ=10)');
+            }
         }
         var rowsHtml = '';
         // Out-of-contract committed slots first — impossible to miss.

@@ -686,6 +686,22 @@ def parse_ns_table_raw(image_bytes):
             "typ":       (hdr >> 8) & 0x3,
             "cc":        hdr & 0xFF,
         }
+    # Thread.1 memory-truth block: raw header word, the CR0 boot-entry GT at
+    # the fixed +244 capability zone, the boot-entry sentinel, and the
+    # committed thread count (sentinel at ns_table_base-4; 0 ⇒ legacy 1).
+    thread_block = None
+    if header is not None and header["kind"] == "thread":
+        _t_size = 1 << (header["n_minus_6"] + 6)
+        _t_cnt  = mem[tag_idx - 3] & 0xFF if tag_idx >= 3 else 0
+        thread_block = {
+            "headerWord": hdr,
+            "size":       _t_size,
+            "cr0Word":    mem[244] if n_words > 244 else 0,
+            "capsOffset": 244,
+            "count":      _t_cnt if _t_cnt >= 1 else 1,
+            "bootSlot":   (mem[tag_idx - 1] & 0xFF) if tag_idx >= 1 else None,
+        }
+
     _ns_n = max(0, total.bit_length() - 15)  # total = 2^(n_minus_6+14)
     _ns_cw = (max_entries >> 8) & 0x1FFF
     _ns_cc = max_entries & 0xFF
@@ -715,6 +731,7 @@ def parse_ns_table_raw(image_bytes):
         "nsTableBase": ns_table_base,
         "header":      header,      # decoded mem[0] — Thread.1 lump header
         "nsHeader":    ns_header,   # synthesized architectural NS header (V20)
+        "thread":      thread_block,  # Thread.1 memory-truth block (may be None)
         "entries":     entries,
     }
 
@@ -1269,6 +1286,13 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         # Update NS entry: rewrite with corrected lim17 and cc via the gated helper.
         write_ns_entry(mem, total, NS_ENTRY_WORDS, _cslot, _loc, _lim17,
                        0, 0, 1, 0, _cc, 0)
+
+    # Thread-count sentinel (Task #2563): stored at NS_TABLE_BASE - 4 so the
+    # designer's memory-truth drill-down can verify the committed thread count.
+    # Only written when > 1 so single-thread images stay byte-identical to
+    # pre-#2562 images (the word was previously always zero; 0 ⇒ 1 thread).
+    if _thread_count > 1:
+        mem[ns_table_base - 4] = _thread_count & 0xFF
 
     # Boot-entry slot: stored at NS_TABLE_BASE - 2 so that loadBootImage()
     # can restore the user's selected boot entry when loading the image.
