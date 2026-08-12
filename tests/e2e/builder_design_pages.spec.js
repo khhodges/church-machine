@@ -185,6 +185,7 @@ test.describe('Builder design pages — Thread Lump & Namespace Lump', () => {
         await page.evaluate((committed) => {
             const bad = JSON.parse(JSON.stringify(committed));
             bad.nsHeader.word = (bad.nsHeader.word ^ 0x100) >>> 0;   // flip typ bit
+            bad.header.typ = 1;                                      // word-0 header no longer a Thread header
             bad.thread.count = 9;
             bad.thread.cr0Word = (bad.thread.cr0Word & ~0xFFFF) | ((bad.thread.bootSlot + 1) & 0xFFFF);
             const orig = window.fetch;
@@ -204,6 +205,7 @@ test.describe('Builder design pages — Thread Lump & Namespace Lump', () => {
         await expect(banner).toBeVisible({ timeout: 8000 });
         const text = await banner.innerText();
         expect(text).toMatch(/NS header encodes as/);
+        expect(text).toMatch(/expected a Thread header/);
         expect(text).toMatch(/9 threads/);
         expect(text).toMatch(/CR0 targets NS slot/);
     });

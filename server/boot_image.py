@@ -1142,6 +1142,11 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # chooses a different entry point; the simulator's "if empty" guard is a no-op
     # when loading a boot image that already carries this word.
     thread_loc = locations[1]
+    if thread_size < 256:
+        raise ValueError(
+            f"generate_boot_image: threadLumpWords ({thread_size}) is smaller "
+            f"than the fixed Thread capability zone offset (+244); each thread "
+            f"body must be at least 256 words to contain its own CR0")
     mem[thread_loc] = pack_lump_header(_ns_n_minus_6(thread_size), 32, 12, 2)
     mem[thread_loc + 244] = create_gt(0, boot_entry_slot, {"E": 1}, 1)
 

@@ -1375,6 +1375,11 @@
                         ' (n\u22126=' + n + ', slots=' + slots + ', typ=01)');
                 }
             }
+            // Word-0 header type truth: must be a Thread header (typ=10)
+            // regardless of whether the server produced a thread block.
+            if (committed.header && committed.header.typ !== 2) {
+                shapeFaults.push('word 0 header typ=' + committed.header.typ + ' \u2014 expected a Thread header (typ=10)');
+            }
             // Thread memory-truth: header at word 0, size, count, CR0 boot-entry GT.
             if (committed.thread) {
                 var _thr = committed.thread;

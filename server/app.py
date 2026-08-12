@@ -1153,10 +1153,19 @@ def _validate_step3(step3, step1, step2):
     # contains. Step 3 reserves additional empty entries on top of that
     # baseline, so the cap is BASE_NAMED_NS_COUNT + n <= MAX_NS_ENTRIES.
     end = BASE_NAMED_NS_COUNT + n
-    if end > MAX_NS_ENTRIES:
+    # Validate against the *configured* capacity (step1.nsSlotsMax, legacy
+    # default 256) so save-time and generation-time contracts agree — the
+    # generator rejects overflow of the configured table, not the 1024 cap.
+    _cap = MAX_NS_ENTRIES
+    try:
+        _cap = int((step1 or {}).get("nsSlotsMax") or _boot_image_gen.DEFAULT_NS_SLOTS_MAX)
+    except Exception:
+        pass
+    _cap = min(_cap, MAX_NS_ENTRIES)
+    if end > _cap:
         return (f"step3.emptySlotCount ({n}) plus the {BASE_NAMED_NS_COUNT} "
                 f"named NS slots written at boot would need {end} entries "
-                f"but the NS table only holds {MAX_NS_ENTRIES}")
+                f"but the configured NS table only holds {_cap}")
     return None
 
 def _is_pow2(n):
@@ -1205,6 +1214,11 @@ def _validate_step1(target_board, step1):
     if _raw_thread_count is not None:
         if not isinstance(_raw_thread_count, int) or not (1 <= _raw_thread_count <= 9):
             return "step1.threadCount must be an integer between 1 and 9 when provided"
+    # The Thread capability zone sits at a fixed +244 offset, so any thread
+    # body smaller than 256 words cannot contain its own CR0 boot-entry GT.
+    if step1["threadLumpWords"] < 256:
+        return ("step1.threadLumpWords must be at least 256: the Thread "
+                "capability zone lives at fixed offset +244 inside the lump")
     # The simulator reserves the top NS_TABLE_RESERVE words of the namespace
     # window for the namespace table itself.  Reserve size is now dynamic:
     # nextPow2(nsSlotsMax × 4).
