@@ -105,5 +105,6 @@
 - [Wukong server symbol import](wukong-server-symbol-import.md) — direct server workflow needs the repository root on sys.path or known pet-name listings fall back to `<unknown>`
 - [mLoad inclusive c-list bounds](mload-inclusive-c-list-bounds.md) — limit_offset stores count−1, so valid index checks must use inclusive `<=`
 - [Wukong RTL generation initializer bottleneck](wukong-rtl-generation-init-bottleneck.md) — fixed 64 KiB DMEM is not proof of a BRAM issue; Amaranth conversion can stall before Yosys/Vivado
+- [Amaranth shape() memoization](amaranth-shape-memoization.md) — Operator/SwitchValue.shape() uncached in 0.5.8; monkey-patch both before convert() for O(n) instead of O(n²)
 - [ns-state snapshot vs raw binary](ns-state-snapshot-vs-raw.md) — ns-state.json fields can be stale vs boot-image.bin; use the endpoint `committed` raw-words block for hex display and fault checks
 - [V20 designer boot-image contract](v20-designer-contract.md) — thread caps at fixed +244 forces threadLumpWords>=256; base-4 threadCount sentinel; parse nsHeader/thread blocks; DEFAULT_NS_SLOTS_MAX=256 fallback; E2E stale-5050/unsafe-port trap

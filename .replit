@@ -41,10 +41,6 @@ args = "pet-name-memory-tests"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "pet-name-mem-tests"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "port-collision-test"
 
 [[workflows.workflow.tasks]]
@@ -261,17 +257,6 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node simulator/test_pet_name_memory.js"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
-name = "pet-name-mem-tests"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node simulator/test_pet_name_mem.js"
 
 [workflows.workflow.metadata]
 outputType = "console"
@@ -741,14 +726,6 @@ externalPort = 5000
 [[ports]]
 localPort = 5050
 externalPort = 3001
-
-[[ports]]
-localPort = 5061
-externalPort = 4200
-
-[[ports]]
-localPort = 5077
-externalPort = 5173
 
 [[ports]]
 localPort = 8080

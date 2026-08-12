@@ -342,7 +342,43 @@ def generate_rtlil_wukong(output_dir="build"):
         + [top.dbg_boot_complete, top.dbg_fault_valid, top.dbg_nia, top.dbg_fault]
     )
 
+    import gc
+    import time
+
+    # ── Shape-memoisation patch ───────────────────────────────────────────────
+    # Amaranth 0.5.x has no caching on Operator.shape() or Switch.shape().
+    # Each call re-traverses the full operand subtree.  With 26+ decoder cases
+    # each containing nested arithmetic, this is O(n²) or worse.
+    # Shapes are immutable once constructed, so caching is always correct.
+    # SwitchValue (not Switch/Statement) is the Value-type switch with shape()
+    from amaranth.hdl._ast import Operator   as _AmaranthOperator
+    from amaranth.hdl._ast import SwitchValue as _AmaranthSwitchValue
+
+    _orig_op_shape = _AmaranthOperator.shape
+    def _cached_op_shape(self):
+        try:
+            return self._shape_cache
+        except AttributeError:
+            self._shape_cache = _orig_op_shape(self)
+            return self._shape_cache
+    _AmaranthOperator.shape = _cached_op_shape
+
+    _orig_sv_shape = _AmaranthSwitchValue.shape
+    def _cached_sv_shape(self):
+        try:
+            return self._shape_cache
+        except AttributeError:
+            self._shape_cache = _orig_sv_shape(self)
+            return self._shape_cache
+    _AmaranthSwitchValue.shape = _cached_sv_shape
+    # ─────────────────────────────────────────────────────────────────────────
+
+    print(f"  [gen_rtlil] Starting convert() at {time.strftime('%H:%M:%S')} — shape cache + gc disabled")
+    sys.stdout.flush()
+    gc.disable()
+    t0 = time.time()
     rtlil_text = convert(top, ports=ports)
+    print(f"  [gen_rtlil] convert() done in {time.time()-t0:.1f}s")
 
     il_path = os.path.join(output_dir, "church_wukong_xc7a100t.il")
     with open(il_path, "w") as f:
