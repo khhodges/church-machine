@@ -46,15 +46,25 @@
     }
 
     // V20 architecture profile:
-    //   * 64 namespace slots, 16 bytes per entry
+    //   * power-of-two namespace slot capacity: 64 (default/min) … 1024 (max)
+    //   * 16 bytes (4 words) per entry
     //   * slot 0 is the highest-address entry; slots descend toward the base
-    //   * the ISA top-of-memory layout is 0x1FC00..0x1FFFF (byte addresses)
-    //     when the namespace window is 32K words / 128 KiB
+    //   * the NS Table occupies the top of the selected total-memory window
     // Keep the total-memory selector available for board experiments, but
     // constrain the architectural slot capacity so the page cannot save a
     // configuration that contradicts the V20 namespace contract.
-    var V20_NS_SLOTS          = 64;
+    var NS_CAP_OPTIONS        = [64, 128, 256, 512, 1024];
+    var NS_CAP_MIN            = 64;
+    var NS_CAP_MAX            = 1024;
     var V20_NS_ENTRY_BYTES    = 16;
+
+    // Snap any saved/legacy slot count to the nearest valid power-of-two
+    // capacity (rounding up), clamped to [64, 1024].
+    function snapNSCap(v) {
+        v = parseInt(v, 10);
+        if (!Number.isFinite(v) || v <= NS_CAP_MIN) return NS_CAP_MIN;
+        return Math.min(nextPow2(v), NS_CAP_MAX);
+    }
     var V20_NS_TOTAL_N        = 1;   // 2^(1+14) = 32K words = 128 KiB
     var V20_THREAD_LUMP_POW2  = 9;   // 512 words
     var V20_THREAD_CAPS_OFFSET = 244;
@@ -118,7 +128,7 @@
         // Step 1: compute effective max count from saved lump size and board budget,
         // then clamp count and record a warning if it was reduced.
         var savedLumpSize = Math.pow(2, clamp(state.thread.lumpPow2, MIN_EXP, MAX_EXP));
-        var maxCount = profile.singleThread ? 1 : Math.min(10, Math.max(1, Math.floor(budget / savedLumpSize)));
+        var maxCount = profile.singleThread ? 1 : Math.min(9, Math.max(1, Math.floor(budget / savedLumpSize)));
         if (state.thread.count > maxCount) {
             var savedCount = state.thread.count;
             state.thread.count = maxCount;
@@ -152,8 +162,8 @@
             var savedN = state.ns.n_minus_6;
             state.ns.n_minus_6 = maxN;
             var serverMaxCl = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 1024;
-            var newMaxSl = Math.min(Math.pow(2, maxN + 14) / 64, serverMaxCl, V20_NS_SLOTS);
-            if (state.ns.slots > newMaxSl) state.ns.slots = newMaxSl;
+            var newMaxSl = Math.min(Math.pow(2, maxN + 14) / 64, serverMaxCl, NS_CAP_MAX);
+            if (state.ns.slots > newMaxSl) state.ns.slots = snapNSCap(Math.min(state.ns.slots, newMaxSl));
             _nsSizeClampedInfo = { savedN: savedN, clampedN: maxN, boardLabel: profile.label };
             saveState();
         } else {
@@ -167,12 +177,16 @@
     // state.thread.stackFrames: number of stack frames (each frame = 2 words)
     var state = {
         thread: { lumpPow2: V20_THREAD_LUMP_POW2, stackFrames: 16, count: 1 },
-        ns: { n_minus_6: V20_NS_TOTAL_N, slots: V20_NS_SLOTS }
+        ns: { n_minus_6: V20_NS_TOTAL_N, slots: NS_CAP_MIN }
     };
+
+    var _hadSavedState = false;   // true when a previously saved design exists in localStorage
 
     function loadState() {
         try {
-            var s = JSON.parse(localStorage.getItem('lump_editor_state') || '{}');
+            var raw = localStorage.getItem('lump_editor_state');
+            _hadSavedState = !!raw;
+            var s = JSON.parse(raw || '{}');
             if (s.thread) {
                 if (s.thread.lumpPow2 !== undefined) {
                     state.thread.lumpPow2 = clamp(s.thread.lumpPow2, 6, 13);
@@ -180,11 +194,13 @@
                 if (s.thread.stackFrames !== undefined) {
                     state.thread.stackFrames = clamp(s.thread.stackFrames, 10, 255);
                 }
-                state.thread.count = (s.thread.count !== undefined) ? clamp(s.thread.count, 1, 10) : 1;
+                state.thread.count = (s.thread.count !== undefined) ? clamp(s.thread.count, 1, 9) : 1;
             }
             if (s.ns) {
                 state.ns.n_minus_6 = (s.ns.n_minus_6 !== undefined) ? s.ns.n_minus_6 : V20_NS_TOTAL_N;
-                state.ns.slots = Math.min(s.ns.slots || V20_NS_SLOTS, V20_NS_SLOTS);
+                // Migrate legacy non-power-of-two slot counts (old 1–64 slider)
+                // to the nearest valid power-of-two capacity (min 64).
+                state.ns.slots = snapNSCap(s.ns.slots || NS_CAP_MIN);
             }
             // Migrate the old page defaults, but preserve deliberate user
             // choices.  This keeps an existing browser profile from silently
@@ -192,7 +208,7 @@
             if (state.thread.lumpPow2 === 8 && state.ns.n_minus_6 === 3) {
                 state.thread.lumpPow2 = V20_THREAD_LUMP_POW2;
                 state.ns.n_minus_6 = V20_NS_TOTAL_N;
-                state.ns.slots = V20_NS_SLOTS;
+                state.ns.slots = NS_CAP_MIN;
             }
             // Restore the board-switch clamp warning if it is still applicable.
             // It is applicable when the current n_minus_6 still matches what the
@@ -271,8 +287,8 @@
         var totalNamespaceWords = Math.pow(2, n + 14);
         var threadLumpWords     = Math.pow(2, clamp(state.thread.lumpPow2, MIN_EXP, MAX_EXP));
         var serverMax           = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 1024;
-        var maxSl               = Math.min(totalNamespaceWords / 64, serverMax, V20_NS_SLOTS);
-        var nsSlotsMax          = Math.round(clamp(state.ns.slots, 1, maxSl));
+        var maxSl               = Math.min(totalNamespaceWords / 64, serverMax, NS_CAP_MAX);
+        var nsSlotsMax          = Math.min(snapNSCap(state.ns.slots), maxSl);
         return {
             targetBoard: board,
             step1: {
@@ -807,7 +823,7 @@
         var budget       = Math.floor(profile.totalRamWords / 2);
 
         // Count is bounded by singleThread rule; compute preliminary max
-        var count        = clamp(state.thread.count, 1, profile.singleThread ? 1 : 10);
+        var count        = clamp(state.thread.count, 1, profile.singleThread ? 1 : 9);
 
         // Max lump size = floor(budget / count), capped at 8192 words
         var maxLumpWords = Math.max(64, Math.floor(budget / count));
@@ -833,7 +849,7 @@
         var wordHex = hex8(word);
 
         // Thread count max recalculated with actual lump size
-        var maxCount    = profile.singleThread ? 1 : Math.min(10, Math.max(1, Math.floor(budget / lumpSize)));
+        var maxCount    = profile.singleThread ? 1 : Math.min(9, Math.max(1, Math.floor(budget / lumpSize)));
         count           = clamp(count, 1, maxCount);
         var totalMem    = lumpSize * count;
         var overBudget  = totalMem > budget;
@@ -992,20 +1008,23 @@
         }
         var total      = Math.pow(2, n + 14);
         var serverMax  = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 1024;
-        var maxSl      = Math.min(total / 64, serverMax, V20_NS_SLOTS);
-        var slots      = clamp(state.ns.slots, 1, maxSl);
-        var NS_TABLE_COMPUTED = Math.max(16, Math.round(slots) * 4);
+        var maxSl      = Math.min(total / 64, serverMax, NS_CAP_MAX);
+        var capOptions = NS_CAP_OPTIONS.filter(function (c) { return c <= maxSl; });
+        if (!capOptions.length) capOptions = [NS_CAP_MIN];
+        var slots      = snapNSCap(state.ns.slots);
+        if (slots > capOptions[capOptions.length - 1]) slots = capOptions[capOptions.length - 1];
+        var NS_TABLE_COMPUTED = slots * 4;
         var threadLump   = Math.pow(2, clamp(state.thread.lumpPow2, MIN_EXP, MAX_EXP));
-        var maxCount     = profile.singleThread ? 1 : Math.min(10, Math.max(1, Math.floor(budget / threadLump)));
+        var maxCount     = profile.singleThread ? 1 : Math.min(9, Math.max(1, Math.floor(budget / threadLump)));
         var threadCount  = clamp(state.thread.count, 1, maxCount);
-        // Boot overhead = Boot.NS lump (64 w) + Boot.Thread lump (threadLump w).
+        // Boot overhead = Boot.NS lump (64 w) + one resident Thread lump per thread.
         // Null slot 2 has been removed — no 64-word gap between Thread and Boot.Abstr.
         var namespaceLumpWords = 64;
-        var bootOverhead = namespaceLumpWords + threadLump;
+        var bootOverhead = namespaceLumpWords + threadLump * threadCount;
         var pool    = total - bootOverhead - NS_TABLE_COMPUTED;
         var nsTableBaseByte = total * 4 - NS_TABLE_COMPUTED * 4;
         var nsTableEndByte  = total * 4 - 1;
-        var slot0Byte       = nsTableBaseByte + (Math.round(slots) - 1) * V20_NS_ENTRY_BYTES;
+        var slot0Byte       = nsTableBaseByte + (slots - 1) * V20_NS_ENTRY_BYTES;
         var lastSlotByte    = nsTableBaseByte;
         var cw      = (slots >>> 8) & 0x1FFF;
         var cc      =  slots & 0xFF;
@@ -1021,23 +1040,31 @@
             : esc(profile.label + '  (' + boardRam.toLocaleString() + ' words total)');
 
         var allZones = [
-            { label: 'Boot.NS + Boot.Thread', words: bootOverhead,           cls: 'le-zone-hdr' },
-            { label: 'Pool',                  words: Math.max(pool, 0),       cls: 'le-zone-free' },
-            { label: 'NS Table',              words: NS_TABLE_COMPUTED,       cls: 'le-zone-heap', onclick: "switchView('namespace')" }
+            { label: 'Boot.NS', words: namespaceLumpWords, cls: 'le-zone-hdr' }
         ];
+        for (var _ti = 1; _ti <= threadCount; _ti++) {
+            allZones.push({ label: 'Thread.' + _ti, words: threadLump, cls: 'le-zone-stack' });
+        }
+        allZones.push(
+            { label: 'Pool',     words: Math.max(pool, 0), cls: 'le-zone-free' },
+            { label: 'NS Table', words: NS_TABLE_COMPUTED, cls: 'le-zone-heap', onclick: 'lumpEditorToggleNSDrill()' }
+        );
 
-        var nsTableDesc = esc(NS_TABLE_COMPUTED.toLocaleString() + ' words (' + Math.round(slots) + ' slots × 4)');
+        var threadZoneDesc = threadCount === 1
+            ? 'Thread.1 (' + threadLump.toLocaleString() + ' w)'
+            : threadCount + ' \u00d7 ' + threadLump.toLocaleString() + ' w (Thread.1\u2026Thread.' + threadCount + ')';
+        var nsTableDesc = esc(NS_TABLE_COMPUTED.toLocaleString() + ' words (' + slots + ' slots × 4)');
         var grid = renderGrid([
             ['Target board',   boardInfo, 'le-val-gold'],
             ['Total words',    esc(total.toLocaleString() + '  (2^' + (n + 14) + ')'), noFit ? '' : 'le-val-gold'],
             ['n_minus_6',     esc(String(n)), ''],
             ['typ field',     '01  (Namespace, reserved)', ''],
-            ['Max slots',      esc(maxSl.toLocaleString() + (total / 64 > serverMax ? '  (server limit)' : '  (V20 cap / total \u00f7 64)')), ''],
+            ['Slot capacity',  esc(slots.toLocaleString() + '  (power of two; up to ' + Math.min(maxSl, NS_CAP_MAX).toLocaleString() + ' for this memory size)'), ''],
             ['NS table',       nsTableDesc, ''],
             ['Placement',      'Top of memory \u00b7 inverted physical order', 'le-val-gold'],
-            ['Slot order',     esc('Slot 0 @ 0x' + slot0Byte.toString(16).toUpperCase() + ' \u2192 Slot ' + (Math.round(slots) - 1) + ' @ 0x' + lastSlotByte.toString(16).toUpperCase()), ''],
+            ['Slot order',     esc('Slot 0 @ 0x' + slot0Byte.toString(16).toUpperCase() + ' \u2192 Slot ' + (slots - 1) + ' @ 0x' + lastSlotByte.toString(16).toUpperCase() + '  (descending)'), ''],
             ['ISA table range', esc('0x' + nsTableBaseByte.toString(16).toUpperCase() + '\u20130x' + nsTableEndByte.toString(16).toUpperCase() + ' (' + V20_NS_ENTRY_BYTES + ' bytes/slot)'), ''],
-            ['Boot overhead',  esc(bootOverhead.toLocaleString() + ' words (Boot.NS 64 + Boot.Thread ' + threadLump.toLocaleString() + ')'), ''],
+            ['Boot overhead',  esc(bootOverhead.toLocaleString() + ' words (Boot.NS 64 + ' + threadZoneDesc + ')'), ''],
             ['Pool available', pool >= 0 ? esc(pool.toLocaleString() + ' words') : '<span class="le-overflow">overflow</span>', ''],
             ['cw field',       esc(String(cw) + '  (slots >> 8)'), ''],
             ['cc field',       esc(String(cc) + '  (slots & 0xFF)'), ''],
@@ -1056,9 +1083,15 @@
                 '</div>' +
             '</div>';
 
+        var capOpts = capOptions.map(function (c) {
+            return '<option value="' + c + '"' + (c === slots ? ' selected' : '') + '>' +
+                c.toLocaleString() + ' slots  (' + (c * 4).toLocaleString() + ' table words)' +
+                (c === NS_CAP_MIN ? '  \u2014 default' : '') + '</option>';
+        }).join('');
+
         return '<div class="le-panel">' +
             clampBanner +
-            '<p class="le-panel-desc">V20 uses a 64-entry, 16-byte namespace table at the top of memory. Slot 0 is the highest-address entry and each following slot descends by 16 bytes. The slot count is encoded across <code>cw</code> and <code>cc</code> as <code>(cw&lt;&lt;8)|cc</code>.</p>' +
+            '<p class="le-panel-desc">V20 uses a power-of-two namespace table (64\u20131024 entries, 16 bytes each) at the top of memory. Slot 0 is the highest-address entry and each following slot descends by 16 bytes. The slot count is encoded across <code>cw</code> and <code>cc</code> as <code>(cw&lt;&lt;8)|cc</code>. Click the NS Table zone in the memory layout below to drill into its physical slot layout.</p>' +
             '<div class="le-field-row">' +
                 '<label class="le-label">Total namespace memory</label>' +
                 '<div class="le-input-group le-input-group-wide">' +
@@ -1066,16 +1099,16 @@
                 '</div>' +
             '</div>' +
             '<div class="le-field-row">' +
-                '<label class="le-label">NS slot capacity<span class="le-range-hint"> 1 – ' + maxSl.toLocaleString() + ' (V20 max 64)</span></label>' +
-                '<div class="le-input-group">' +
-                    '<input type="range"  class="le-slider" id="le-ns-slots-sl"  min="1" max="' + maxSl + '" value="' + slots + '" oninput="lumpEditorNSSlots(this.value)">' +
-                    '<input type="number" class="le-number" id="le-ns-slots-num" min="1" max="' + maxSl + '" value="' + slots + '" oninput="lumpEditorNSSlots(this.value)">' +
+                '<label class="le-label">NS slot capacity<span class="le-range-hint"> power of two \u00b7 64 (default) \u2013 ' + Math.min(maxSl, NS_CAP_MAX).toLocaleString() + '</span></label>' +
+                '<div class="le-input-group le-input-group-wide">' +
+                    '<select class="le-select" id="le-ns-slots-sel" onchange="lumpEditorNSSlots(this.value)">' + capOpts + '</select>' +
                 '</div>' +
             '</div>' +
             threadStepper +
             '<div class="le-bar-label-row"><span>Memory layout</span><span class="le-bar-label-count">' + esc(total.toLocaleString() + ' words') + '</span></div>' +
             renderBar(allZones) +
             renderMagBar(allZones) +
+            renderNSDrilldown(n, slots, total) +
             '<div class="le-divider"></div>' +
             grid +
             '<div class="le-save-row">' +
@@ -1089,6 +1122,300 @@
         '</div>';
     }
 
+    // ── NS Table drill-down (committed-state inspection + fault flagging) ────
+
+    var _nsDrill = {
+        open:     false,
+        expanded: {},      // slot index → true
+        entries:  [],      // committed rich NS rows from /api/boot-image/ns-state
+        committed: null,   // authoritative raw view {totalWords, maxEntries, header, entries:[{slot,w0..w3}]}
+        seeded:   false,   // approved settings seeded from committed geometry (first load, no saved design)
+        loaded:   false,
+        loading:  false,
+        errorMsg: ''
+    };
+
+    function _nsStateLoad(force) {
+        if (_nsDrill.loading) return;
+        if (_nsDrill.loaded && !force) return;
+        _nsDrill.loading = true;
+        fetch('/api/boot-image/ns-state')
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                _nsDrill.loading  = false;
+                _nsDrill.loaded   = true;
+                _nsDrill.errorMsg = (data && data.error) ? String(data.error) : '';
+                _nsDrill.entries  = (data && Array.isArray(data.abstractions)) ? data.abstractions : [];
+                _nsDrill.committed = (data && data.committed) ? data.committed : null;
+                // First-run seeding: when the programmer has never saved a
+                // design locally, adopt the committed image's geometry as the
+                // approved starting point so a valid committed image opens clean.
+                if (!_nsDrill.seeded && !_hadSavedState && _nsDrill.committed) {
+                    _nsDrill.seeded = true;
+                    var tw = _nsDrill.committed.totalWords;
+                    var lg = Math.log2(tw);
+                    if (Number.isInteger(lg) && lg >= 14 && lg <= 29) state.ns.n_minus_6 = lg - 14;
+                    state.ns.slots = snapNSCap(_nsDrill.committed.maxEntries || NS_CAP_MIN);
+                    saveState();
+                }
+                render();
+            })
+            .catch(function (err) {
+                _nsDrill.loading  = false;
+                _nsDrill.loaded   = true;
+                _nsDrill.errorMsg = 'Failed to load committed NS state: ' + err;
+                _nsDrill.entries  = [];
+                render();
+            });
+    }
+
+    function _parseHexField(v) {
+        if (typeof v === 'number') return v >>> 0;
+        if (typeof v === 'string') {
+            var p = parseInt(v, 16);
+            return isNaN(p) ? null : (p >>> 0);
+        }
+        return null;
+    }
+
+    var MMIO_BASE_WORD = 0x40000000;   // device-register windows live outside RAM by design
+
+    // Compare one committed NS row against the approved interactive design.
+    // Returns an array of fault strings (empty = clean).
+    function _nsSlotFaults(e, slots, totalWords) {
+        var faults = [];
+        if (e.slot >= slots) {
+            faults.push('occupied slot ' + e.slot + ' is beyond the approved capacity of ' + slots + ' slots');
+        }
+        // Prefer the authoritative raw committed words over snapshot fields.
+        var raw   = _nsRawEntry(e.slot);
+        var loc   = raw ? (raw.w0 >>> 0) : _parseHexField(e.location);
+        var limit = raw ? (_decodeNSWord1(raw.w1 >>> 0).limit) : _parseHexField(e.limit);
+        if (loc !== null && loc < MMIO_BASE_WORD) {
+            var end = loc + (limit !== null ? limit : 0);
+            if (loc >= totalWords || end >= totalWords) {
+                faults.push('location 0x' + loc.toString(16).toUpperCase() +
+                    (limit !== null ? ' + limit 0x' + limit.toString(16).toUpperCase() : '') +
+                    ' falls outside the approved ' + totalWords.toLocaleString() + '-word memory');
+            }
+        }
+        return faults;
+    }
+
+    var GT_TYPE_NAMES = ['Null', 'Inform', 'Outform', 'Abstract'];
+
+    // Decode word1 per the v2.0 NS layout (matches simulator.js parseNSWord1
+    // and boot_image.py pack_ns_word1): b@31, g@29, gtType@[27:26], clistCount@[25:17], limit17@[16:0].
+    function _decodeNSWord1(w1) {
+        return {
+            b:          (w1 >>> 31) & 1,
+            g:          (w1 >>> 29) & 1,
+            gtType:     (w1 >>> 26) & 3,
+            clistCount: (w1 >>> 17) & 0x1FF,
+            limit:      w1 & 0x1FFFF
+        };
+    }
+
+    // Decode a v2.0 GT word (boot_image.py create_gt / simulator.js createGT):
+    // perm3@[30:28], dom@27, gtType@[26:25], gt_seq@[24:16], slot@[15:0].
+    function _decodeGTWord(w) {
+        return {
+            perm3:  (w >>> 28) & 7,
+            dom:    (w >>> 27) & 1,
+            gtType: (w >>> 25) & 3,
+            seq:    (w >>> 16) & 0x1FF,
+            slot:   w & 0xFFFF
+        };
+    }
+
+    function _permStr(p3) {
+        return ((p3 & 4) ? 'R' : '\u00b7') + ((p3 & 2) ? 'W' : '\u00b7') + ((p3 & 1) ? 'X' : '\u00b7');
+    }
+
+    // Committed raw 4-word entry for a slot, or null when absent.
+    function _nsRawEntry(slot) {
+        var c = _nsDrill.committed;
+        if (!c || !Array.isArray(c.entries)) return null;
+        for (var i = 0; i < c.entries.length; i++) {
+            if (c.entries[i].slot === slot) return c.entries[i];
+        }
+        return null;
+    }
+
+    function _nsSlotDetail(e, isMMIO) {
+        var raw = _nsRawEntry(e.slot);
+        var rows;
+        if (raw) {
+            var d1 = _decodeNSWord1(raw.w1 >>> 0);
+            var gt = _decodeGTWord(raw.w3 >>> 0);
+            rows = [
+                ['+0', 'word0 \u2014 location', hex8(raw.w0 >>> 0),
+                 (isMMIO ? 'MMIO device-register window' : 'Lump base (word address)')],
+                ['+1', 'word1 \u2014 authority', hex8(raw.w1 >>> 0),
+                 'type=' + (GT_TYPE_NAMES[d1.gtType] || d1.gtType) + ' \u00b7 limit=' + d1.limit.toLocaleString() +
+                 ' (' + (d1.limit + 1).toLocaleString() + ' words) \u00b7 clistCount=' + d1.clistCount +
+                 ' \u00b7 b=' + d1.b + ' \u00b7 g=' + d1.g],
+                ['+2', 'word2 \u2014 integrity', hex8(raw.w2 >>> 0),
+                 'gt_seq=' + (((raw.w2 >>> 25) & 0x7F)) + ' \u00b7 CRC-16 seal=0x' + (raw.w2 & 0xFFFF).toString(16).toUpperCase()],
+                ['+3', 'word3 \u2014 abstract GT', hex8(raw.w3 >>> 0),
+                 raw.w3 === 0 ? 'Null GT (no per-slot Abstract GT committed)' :
+                 (GT_TYPE_NAMES[gt.gtType] || gt.gtType) + ' GT \u00b7 perm=' + _permStr(gt.perm3) +
+                 (gt.dom ? '+D' : '') + ' \u00b7 seq=' + gt.seq + ' \u00b7 slot=' + gt.slot]
+            ];
+        } else {
+            // No raw words available (older server / missing boot image):
+            // show the snapshot's decoded fields only, without fabricated hex.
+            rows = [
+                ['+0', 'word0 \u2014 location', '\u2014', 'snapshot: ' + esc(String(e.location)) + (isMMIO ? ' (MMIO)' : '')],
+                ['+1', 'word1 \u2014 authority', '\u2014', 'snapshot: type=' + esc(String(e.type)) + ' \u00b7 limit=' + esc(String(e.limit)) + ' \u00b7 g=' + (e.g || 0)],
+                ['+2', 'word2 \u2014 integrity', '\u2014', 'snapshot: gt_seq=' + (e.seq || 0) + ' \u00b7 seal=' + esc(String(e.seal))],
+                ['+3', 'word3 \u2014 abstract GT', '\u2014', 'raw words unavailable (boot image not readable)']
+            ];
+        }
+        return '<table class="le-nsd-words"><thead><tr>' +
+            '<th>Off</th><th>Word</th><th>Hex (committed)</th><th>Decoded</th>' +
+            '</tr></thead><tbody>' +
+            rows.map(function (r) {
+                return '<tr><td class="le-nsd-mono">' + r[0] + '</td><td>' + r[1] +
+                    '</td><td class="le-nsd-mono">' + r[2] + '</td><td>' + r[3] + '</td></tr>';
+            }).join('') +
+            '</tbody></table>';
+    }
+
+    function _nsDrillRow(idx, addrByte, e, faults) {
+        var addr = '0x' + addrByte.toString(16).toUpperCase();
+        if (!e) {
+            return '<div class="le-nsd-row le-nsd-empty">' +
+                '<span class="le-nsd-slot">Slot ' + idx + '</span>' +
+                '<span class="le-nsd-addr le-nsd-mono">' + addr + '</span>' +
+                '<span class="le-nsd-name le-nsd-dim">\u2014 empty \u2014</span>' +
+                '</div>';
+        }
+        var raw     = _nsRawEntry(e.slot);
+        var loc     = raw ? (raw.w0 >>> 0) : _parseHexField(e.location);
+        var lim     = raw ? _decodeNSWord1(raw.w1 >>> 0).limit : _parseHexField(e.limit);
+        var isMMIO  = loc !== null && loc >= MMIO_BASE_WORD;
+        var faulted = faults.length > 0;
+        var expanded = !!_nsDrill.expanded[idx];
+        var badges = '';
+        if (e.boot)  badges += '<span class="le-nsd-badge le-nsd-badge-boot">boot</span>';
+        if (isMMIO)  badges += '<span class="le-nsd-badge le-nsd-badge-mmio">MMIO</span>';
+        if (faulted) badges += '<span class="le-nsd-badge le-nsd-badge-fault">\u26A0 FAULT</span>';
+        var html =
+            '<div class="le-nsd-row le-nsd-pop' + (faulted ? ' le-nsd-fault' : '') + (expanded ? ' le-nsd-open' : '') + '"' +
+                ' onclick="lumpEditorNSDrillSlot(' + idx + ')" title="Click to ' + (expanded ? 'collapse' : 'inspect the 4-word entry') + '">' +
+                '<span class="le-nsd-slot">Slot ' + idx + '</span>' +
+                '<span class="le-nsd-addr le-nsd-mono">' + addr + '</span>' +
+                '<span class="le-nsd-name">' + esc(e.name || '?') + '</span>' +
+                '<span class="le-nsd-meta le-nsd-mono">' + esc(String(e.type || '?')) +
+                ' \u00b7 loc ' + (loc !== null ? '0x' + loc.toString(16).toUpperCase().padStart(8, '0') : esc(String(e.location))) +
+                ' \u00b7 lim ' + (lim !== null ? '0x' + lim.toString(16).toUpperCase() : esc(String(e.limit))) + '</span>' +
+                badges +
+                '<span class="le-nsd-caret">' + (expanded ? '\u25BE' : '\u25B8') + '</span>' +
+            '</div>';
+        if (faulted) {
+            html += '<div class="le-nsd-fault-detail">' + faults.map(function (f) {
+                return '\u26A0 ' + esc(f);
+            }).join('<br>') + '</div>';
+        }
+        if (expanded) {
+            html += '<div class="le-nsd-detail">' + _nsSlotDetail(e, isMMIO) + '</div>';
+        }
+        return html;
+    }
+
+    function renderNSDrilldown(n, slots, total) {
+        if (!_nsDrill.open) {
+            return '<div class="le-nsd-toggle-row">' +
+                '<button class="le-nsd-toggle-btn" onclick="lumpEditorToggleNSDrill()">' +
+                '\u25B8 NS Table drill-down \u2014 physical slot layout &amp; committed-state check</button></div>';
+        }
+        var nsTableBaseByte = total * 4 - slots * V20_NS_ENTRY_BYTES;
+        var bySlot = {};
+        var beyond = [];
+        var faultCount = 0;
+        var shapeFaults = [];
+        for (var i = 0; i < _nsDrill.entries.length; i++) {
+            var e = _nsDrill.entries[i];
+            if (!e || typeof e.slot !== 'number') continue;
+            if (e.slot < slots) bySlot[e.slot] = e; else beyond.push(e);
+        }
+        // Table-shape check against the authoritative committed geometry
+        // (raw boot-image.bin header + NS-table extent) — not heuristics on
+        // individual slot limits.
+        var committed = _nsDrill.committed;
+        if (committed) {
+            if (committed.totalWords !== total) {
+                shapeFaults.push('committed image is ' + committed.totalWords.toLocaleString() +
+                    ' words; the approved Total-memory setting is ' + total.toLocaleString() + ' words');
+            }
+            if (committed.maxEntries !== slots) {
+                shapeFaults.push('committed NS table reserves ' + committed.maxEntries.toLocaleString() +
+                    ' slots (' + (committed.maxEntries * 4).toLocaleString() + ' words); the approved capacity is ' +
+                    slots.toLocaleString() + ' slots (' + (slots * 4).toLocaleString() + ' words) \u2014 cw/cc mismatch');
+            }
+        }
+        var rowsHtml = '';
+        // Out-of-contract committed slots first — impossible to miss.
+        for (var b = 0; b < beyond.length; b++) {
+            var be = beyond[b];
+            var bf = _nsSlotFaults(be, slots, total);
+            faultCount += bf.length ? 1 : 0;
+            rowsHtml += _nsDrillRow(be.slot, total * 4 - (be.slot + 1) * V20_NS_ENTRY_BYTES, be, bf);
+        }
+        for (var s = 0; s < slots; s++) {
+            var addrByte = nsTableBaseByte + (slots - 1 - s) * V20_NS_ENTRY_BYTES;
+            var ent = bySlot[s] || null;
+            var flts = ent ? _nsSlotFaults(ent, slots, total) : [];
+            if (ent && flts.length) faultCount++;
+            rowsHtml += _nsDrillRow(s, addrByte, ent, flts);
+        }
+        var totalFaults = faultCount + shapeFaults.length;
+        var banner;
+        if (_nsDrill.loading || !_nsDrill.loaded) {
+            banner = '<div class="le-nsd-banner le-nsd-banner-info">Loading committed NS state\u2026</div>';
+        } else if (_nsDrill.errorMsg) {
+            banner = '<div class="le-nsd-banner le-nsd-banner-fault">\u26A0 ' + esc(_nsDrill.errorMsg) + '</div>';
+        } else if (totalFaults > 0) {
+            banner = '<div class="le-nsd-banner le-nsd-banner-fault">\u26A0 ' + totalFaults +
+                ' fault' + (totalFaults === 1 ? '' : 's') + ' \u2014 committed namespace data contradicts the approved design' +
+                (shapeFaults.length ? '<br>' + shapeFaults.map(esc).join('<br>') : '') + '</div>';
+        } else {
+            banner = '<div class="le-nsd-banner le-nsd-banner-ok">\u2714 Committed NS state is consistent with the approved design (' +
+                Object.keys(bySlot).length + ' occupied / ' + slots + ' slots)</div>';
+        }
+        return '<div class="le-nsd-panel">' +
+            '<div class="le-nsd-toggle-row">' +
+                '<button class="le-nsd-toggle-btn" onclick="lumpEditorToggleNSDrill()">' +
+                '\u25BE NS Table drill-down \u2014 physical slot layout &amp; committed-state check</button>' +
+                '<button class="le-nsd-refresh-btn" onclick="lumpEditorNSDrillRefresh()" title="Re-fetch the committed NS state snapshot">\u21BB refresh</button>' +
+            '</div>' +
+            '<div class="le-nsd-caption">One 4-word (16-byte) entry per slot \u00b7 descending from slot 0 @ 0x' +
+                (nsTableBaseByte + (slots - 1) * V20_NS_ENTRY_BYTES).toString(16).toUpperCase() +
+                ' to slot ' + (slots - 1) + ' @ 0x' + nsTableBaseByte.toString(16).toUpperCase() +
+                ' \u00b7 tracks the interactive Total-memory / capacity settings \u00b7 read-only</div>' +
+            banner +
+            '<div class="le-nsd-list">' + rowsHtml + '</div>' +
+        '</div>';
+    }
+
+    window.lumpEditorToggleNSDrill = function () {
+        _nsDrill.open = !_nsDrill.open;
+        if (_nsDrill.open) _nsStateLoad(true);
+        render();
+    };
+
+    window.lumpEditorNSDrillRefresh = function () {
+        _nsDrill.loaded = false;
+        _nsStateLoad(true);
+        render();
+    };
+
+    window.lumpEditorNSDrillSlot = function (idx) {
+        _nsDrill.expanded[idx] = !_nsDrill.expanded[idx];
+        render();
+    };
+
     // ── design reference sections (Thread / Namespace design pages) ──────────
 
     var _designCache = { thread: null, ns: null };
@@ -1098,7 +1425,7 @@
         var title = (kind === 'thread') ? 'Thread Lump \u2014 Design Page' : 'Namespace Lump \u2014 Design Page';
         var blurb = (kind === 'thread')
             ? 'The V20 Thread Lump holds a running computation\u2019s full context in a 512-word allocation. Its fixed capability zone begins at offset +244 and restores CR0\u2013CR14; CR0 carries the WukongCallHome boot entry.'
-            : 'The V20 Namespace Lump (NS Slot\u202f0) describes the physical address space with 64 sixteen-byte entries at the top of memory. Slot 0 is highest and slot 63 is lowest.';
+            : 'The V20 Namespace Lump (NS Slot\u202f0) describes the physical address space with a power-of-two number of sixteen-byte entries (64\u20131024, chosen interactively) at the top of memory. Slot 0 is the highest-address entry; slots descend by 16 bytes toward the table base.';
         return '<div class="le-design-hero">' +
             '<div class="le-design-hero-title">' + esc(title) + '</div>' +
             '<div class="le-design-hero-board">QMTECH Wukong \u00b7 Artix-7 XC7A100T</div>' +
@@ -1158,7 +1485,7 @@
     window.lumpEditorThreadLumpSize = function (exp) {
         var profile  = getBoardProfile();
         var budget   = Math.floor(profile.totalRamWords / 2);
-        var count    = clamp(state.thread.count, 1, profile.singleThread ? 1 : 10);
+        var count    = clamp(state.thread.count, 1, profile.singleThread ? 1 : 9);
         var maxWords = Math.min(Math.floor(budget / count), 8192);
         var maxExp   = Math.max(MIN_EXP, Math.min(MAX_EXP, Math.floor(Math.log2(maxWords))));
         state.thread.lumpPow2 = clamp(exp, MIN_EXP, maxExp);
@@ -1166,7 +1493,7 @@
 
         // Patch count slider max in-place so it reacts before the full re-render
         var lumpSize = Math.pow(2, state.thread.lumpPow2);
-        var maxCount = profile.singleThread ? 1 : Math.min(10, Math.max(1, Math.floor(budget / lumpSize)));
+        var maxCount = profile.singleThread ? 1 : Math.min(9, Math.max(1, Math.floor(budget / lumpSize)));
         state.thread.count = clamp(state.thread.count, 1, maxCount);
         var sl  = document.getElementById('le-t-count-sl');
         var num = document.getElementById('le-t-count-num');
@@ -1178,7 +1505,7 @@
     };
 
     window.lumpEditorThreadCount = function (v) {
-        state.thread.count = clamp(v, 1, 10);
+        state.thread.count = clamp(v, 1, 9);
         _threadCountClampedInfo = null;
         saveState();
         var sl  = document.getElementById('le-t-count-sl');
@@ -1201,8 +1528,8 @@
     window.lumpEditorNSSize = function (v) {
         state.ns.n_minus_6 = clamp(v, 0, 15);
         var serverMaxNS = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 1024;
-        var maxSl = Math.min(Math.pow(2, state.ns.n_minus_6 + 14) / 64, serverMaxNS, V20_NS_SLOTS);
-        if (state.ns.slots > maxSl) state.ns.slots = maxSl;
+        var maxSl = Math.min(Math.pow(2, state.ns.n_minus_6 + 14) / 64, serverMaxNS, NS_CAP_MAX);
+        if (state.ns.slots > maxSl) state.ns.slots = snapNSCap(Math.min(state.ns.slots, maxSl));
         _nsSizeClampedInfo = null;
         saveState();
         render();
@@ -1226,13 +1553,9 @@
 
     window.lumpEditorNSSlots = function (v) {
         var serverMaxSlots = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 1024;
-        var maxSl = Math.min(Math.pow(2, state.ns.n_minus_6 + 14) / 64, serverMaxSlots, V20_NS_SLOTS);
-        state.ns.slots = clamp(v, 1, maxSl);
+        var maxSl = Math.min(Math.pow(2, state.ns.n_minus_6 + 14) / 64, serverMaxSlots, NS_CAP_MAX);
+        state.ns.slots = snapNSCap(Math.min(snapNSCap(v), maxSl));
         saveState();
-        var sl  = document.getElementById('le-ns-slots-sl');
-        var num = document.getElementById('le-ns-slots-num');
-        if (sl  && sl  !== document.activeElement) sl.value  = state.ns.slots;
-        if (num && num !== document.activeElement) num.value = state.ns.slots;
         render();
     };
 
@@ -1282,6 +1605,7 @@
 
     window.initLumpEditor = function () {
         loadState();
+        _nsStateLoad(true);   // refresh committed NS data whenever the design page opens
         render();
     };
 

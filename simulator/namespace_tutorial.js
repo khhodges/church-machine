@@ -27,13 +27,11 @@ class NamespaceTutorial {
         const fields = [
             { bits: '[31:27]', name: 'magic',  val: '0x1F', note: 'Trap-on-execute guard',                                  w: 5,  bg: '#2a2a2a', border: '#555',    text: '#888'    },
             { bits: '[26:23]', name: 'n\u22126', val: '1',     note: 'lumpSize = 2^(val+6) = 32K words / 128 KiB V20 address space', w: 4,  bg: '#3a2000', border: '#c86000', text: '#f09040' },
-            { bits: '[22:10]', name: 'cw',     val: '256',   note: 'NS Table word count; 64 entries \u00d7 4 words at the top of memory', w: 13, bg: '#002a40', border: '#2080c0', text: '#60b8f0' },
+            { bits: '[22:10]', name: 'cw',     val: '256',   note: 'NS Table word count; slots \u00d7 4 words at the top of memory (this example: 64 slots)', w: 13, bg: '#002a40', border: '#2080c0', text: '#60b8f0' },
             { bits: '[9:8]',   name: 'typ',    val: '10',    note: 'clist-only \u2014 Namespace data lump (same as Thread)',   w: 2,  bg: '#2a2a2a', border: '#555',    text: '#888'    },
-            { bits: '[7:0]',   name: 'cc',     val: '64',    note: '64 namespace slots; slot 0 is highest and slots descend by 16 bytes', w: 8,  bg: '#1a1000', border: '#b07820', text: '#f0c050' },
+            { bits: '[7:0]',   name: 'cc',     val: '64',    note: 'namespace slot capacity (power of two, 64\u20131024; this example: 64); slot 0 is highest and slots descend by 16 bytes', w: 8,  bg: '#1a1000', border: '#b07820', text: '#f0c050' },
         ];
         let bar = '<div style="display:flex;width:100%;border-radius:3px;overflow:hidden;margin-bottom:2px;">';
-        fields[4].val = '64';
-        fields[4].note = '64 namespace slots; slot 0 is highest and slots descend by 16 bytes';
         for (const f of fields) {
             bar += `<div style="flex:${f.w};background:${f.bg};border:1px solid ${f.border};padding:2px 3px;text-align:center;overflow:hidden;min-width:0;" title="${f.bits} ${f.name}=${f.val} \u2014 ${f.note}">`;
             bar += `<span style="color:${f.text};font-size:0.62rem;font-weight:700;font-family:monospace;white-space:nowrap;">${f.name}</span><br>`;
@@ -135,7 +133,7 @@ ${this._memMap(null)}
 <tr><td><strong>\u2460 Bootstrap</strong></td><td><code>0x0000</code> \u2191</td><td>IDE-set</td><td>NS root (Slot\u202f0) \u00b7 Boot Thread (Slot\u202f1) \u2014 First Abstraction loaded from Thread.CR0 (set via \u26a1 in NS table)</td></tr>
 <tr><td><strong>\u2461 Resident Lumps</strong></td><td>${hex(this.BOOTSTRAP_WORDS)} \u2191</td><td>IDE-set</td><td>Always-loaded abstractions \u2014 never evicted</td></tr>
 <tr><td><strong>\u2462 Freespace</strong></td><td>${hex(this.BOOTSTRAP_WORDS + this.RESIDENT_WORDS)} \u2195</td><td>IDE-set</td><td>Cache for lazy-loaded lumps \u2014 dynamic, grows from both ends</td></tr>
-<tr><td><strong>\u2463 NS Table</strong></td><td>0xFFFF \u2191</td><td>cw words</td><td>4-word metadata entry per slot \u2014 slot\u202f0 at 0xFFFF\u22123, each new slot steps up toward freespace; base = 2^cc\u2212cw</td></tr>
+<tr><td><strong>\u2463 NS Table</strong></td><td>0xFFFF \u2191</td><td>cw words</td><td>4-word metadata entry per slot \u2014 slot\u202f0 is the highest-address entry; each following slot descends by 16 bytes toward the table base = 2^cc\u2212cw</td></tr>
 </table></div>`
             },
             {
@@ -147,9 +145,9 @@ ${this._memMap(null)}
 <tr><th>Field</th><th>Bits</th><th>Width</th><th>NS Slot\u202f0 value</th><th>Meaning</th></tr>
 <tr><td><code style="color:#888">magic</code></td><td>[31:27]</td><td>5&nbsp;b</td><td><code>0x1F</code></td><td>Trap-on-execute guard \u2014 executing word&nbsp;0 always faults</td></tr>
 <tr><td><code style="color:#f09040">n\u22126</code></td><td>[26:23]</td><td>4&nbsp;b</td><td><code>1</code></td><td><code>lumpSize = 2^(n\u22126+6)</code> = 32K words / 128 KiB V20 physical space</td></tr>
-<tr><td><code style="color:#60b8f0">cw</code></td><td>[22:10]</td><td>13&nbsp;b</td><td><code>256</code></td><td><strong>NS Table word count</strong>: 64 entries \u00d7 4 words, at the top of memory</td></tr>
+<tr><td><code style="color:#60b8f0">cw</code></td><td>[22:10]</td><td>13&nbsp;b</td><td><code>256</code></td><td><strong>NS Table word count</strong>: slots \u00d7 4 words at the top of memory (this example: 64 slots \u00d7 4 = 256)</td></tr>
 <tr><td><code style="color:#888">typ</code></td><td>[9:8]</td><td>2&nbsp;b</td><td><code>10</code></td><td>clist-only \u2014 same type code as Thread; marks NS as a data lump, not a callable</td></tr>
-<tr><td><code style="color:#f0c050">cc</code></td><td>[7:0]</td><td>8&nbsp;b</td><td><code>64</code></td><td><strong>Namespace slot capacity</strong>: 64 entries; slot 0 is highest and slots descend by 16 bytes</td></tr>
+<tr><td><code style="color:#f0c050">cc</code></td><td>[7:0]</td><td>8&nbsp;b</td><td><code>64</code></td><td><strong>Namespace slot capacity</strong>: power of two (64\u20131024; this example: 64); slot 0 is highest and slots descend by 16 bytes</td></tr>
 </table>
 <div class="sr-key-concept"><div class="sr-concept-title">Address Space Layout \u2014 Four Zones</div>
 <p>The namespace divides physical memory into four IDE-set zones. Lump zones grow <strong>upward \u2191</strong> from <code>0x0000</code>; the V20 NS Table occupies the top-of-memory byte range <code>0x1FC00\u20130x1FFFF</code> and its logical slots descend from the highest address.</p>
@@ -206,7 +204,7 @@ ${this._memMap(null)}
                 title: '\u2461 NS Table \u2014 One Entry per Slot',
                 type: 'nstable',
                 content: `${this._memMap('nstable')}
-<p>The NS Table occupies the top of physical memory from ${NS} to ${END}. It holds one <strong>4-word entry</strong> for every namespace slot. Entry\u202f<em>i</em> starts at address <code>${NS}\u202f+\u202fi\u202f\u00d7\u202f${this.NS_ENTRY_WORDS}</code>.</p>
+<p>The NS Table occupies the top of physical memory from ${NS} to ${END}. It holds one <strong>4-word entry</strong> for every namespace slot, in descending order: slot\u202f0 is the highest-address entry and entry\u202f<em>i</em> starts at word address <code>${hex(this.TOTAL_WORDS)}\u202f\u2212\u202f(i+1)\u202f\u00d7\u202f${this.NS_ENTRY_WORDS}</code>.</p>
 <table class="sr-table"><tr><th>Offset within entry</th><th>Name</th><th>Contents</th></tr>
 <tr><td>+0</td><td>word0</td><td>Lump base address (<code>word0_location</code>)</td></tr>
 <tr><td>+1</td><td>word1</td><td>Packed metadata: limit, clistCount, flags (see next slide)</td></tr>
@@ -215,7 +213,7 @@ ${this._memMap(null)}
 </table>
 <p>The hardware reads these four words on every <strong>mLoad</strong>, every <strong>CALL</strong>, and every <strong>RETURN</strong>. The seal in word2 is re-verified on each use to detect stale or forged capabilities. Word3 is reserved and ignored by current hardware.</p>
 <div class="sr-key-concept"><div class="sr-concept-title">NS Table Capacity</div>
-<p>Up to <strong>256 entries</strong> fit in the ${hex(this.NS_TABLE_BASE)}\u202f\u2013\u202f${END} region (${this.TOTAL_WORDS - this.NS_TABLE_BASE} words \u00f7 ${this.NS_ENTRY_WORDS} words/entry). The first <em>N</em> entries (where <em>N</em> = Slot\u202f0 <code>clistCount</code>) are live. Entries above <em>N</em> are unallocated. GC may compact and reduce <em>N</em>.</p></div>`
+<p>Slot capacity is a <strong>power of two chosen at design time</strong> \u2014 64 (default/minimum), 128, 256, 512, or 1024 entries. This worked example uses 64 entries: the ${hex(this.NS_TABLE_BASE)}\u202f\u2013\u202f${END} region holds ${this.TOTAL_WORDS - this.NS_TABLE_BASE} words \u00f7 ${this.NS_ENTRY_WORDS} words/entry = ${(this.TOTAL_WORDS - this.NS_TABLE_BASE) / this.NS_ENTRY_WORDS} entries. The first <em>N</em> entries (where <em>N</em> = Slot\u202f0 <code>clistCount</code>) are live. Entries above <em>N</em> are unallocated. GC may compact and reduce <em>N</em>.</p></div>`
             },
             {
                 title: 'NS Entry word1 \u2014 Packed Metadata',

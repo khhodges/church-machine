@@ -105,3 +105,4 @@
 - [Wukong server symbol import](wukong-server-symbol-import.md) — direct server workflow needs the repository root on sys.path or known pet-name listings fall back to `<unknown>`
 - [mLoad inclusive c-list bounds](mload-inclusive-c-list-bounds.md) — limit_offset stores count−1, so valid index checks must use inclusive `<=`
 - [Wukong RTL generation initializer bottleneck](wukong-rtl-generation-init-bottleneck.md) — fixed 64 KiB DMEM is not proof of a BRAM issue; Amaranth conversion can stall before Yosys/Vivado
+- [ns-state snapshot vs raw binary](ns-state-snapshot-vs-raw.md) — ns-state.json fields can be stale vs boot-image.bin; use the endpoint `committed` raw-words block for hex display and fault checks

@@ -1857,6 +1857,17 @@ def boot_image_ns_state():
     try:
         with open(NS_STATE_PATH) as _fh:
             _state = json.load(_fh)
+        # Attach the authoritative raw NS-table view (raw words + header
+        # geometry straight from boot-image.bin) for the Namespace Design
+        # Page drill-down.  Best-effort: absence just omits the block.
+        try:
+            if os.path.isfile(BOOT_IMAGE_PATH):
+                with open(BOOT_IMAGE_PATH, "rb") as _bf:
+                    _raw = _boot_image_gen.parse_ns_table_raw(_bf.read())
+                if _raw is not None:
+                    _state["committed"] = _raw
+        except Exception:
+            pass
         resp = jsonify(_state)
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         resp.headers["Pragma"] = "no-cache"

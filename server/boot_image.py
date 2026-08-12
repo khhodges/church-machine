@@ -636,6 +636,69 @@ def parse_ns_table(image_bytes):
             "clist_count": (w1 >> 17) & 0x1FF,
         })
     return entries
+def parse_ns_table_raw(image_bytes):
+    """Authoritative raw view of the committed NS table for the design page.
+
+    Returns None when the image is unrecognisable, otherwise:
+      { "totalWords": int, "maxEntries": int, "nsTableBase": int,
+        "header": {"n_minus_6": int, "cw": int, "cc": int, "typ": int} | None,
+        "entries": [ {"slot": int, "w0": int, "w1": int, "w2": int, "w3": int}, ... ] }
+
+    entries contains every occupied slot's four raw words exactly as stored
+    in boot-image.bin (little-endian words); header decodes the NS lump
+    header word at word 0 when it carries the 0x1F magic.
+    """
+    n_words = len(image_bytes) // 4
+    if n_words < 16:
+        return None
+    mem = list(struct.unpack(f"<{n_words}I", image_bytes[: n_words * 4]))
+
+    tag_idx = -1
+    scan_limit = min(8192, n_words)
+    for _i in range(1, scan_limit + 1):
+        _pos = n_words - _i
+        if mem[_pos] == BOOT_IMAGE_FORMAT_TAG:
+            tag_idx = _pos
+            break
+    if tag_idx < 0:
+        return None
+
+    ns_table_base    = tag_idx + 1
+    total            = n_words
+    ns_table_reserve = total - ns_table_base
+    if ns_table_reserve < NS_ENTRY_WORDS or ns_table_reserve % NS_ENTRY_WORDS != 0:
+        return None
+    max_entries = ns_table_reserve // NS_ENTRY_WORDS
+
+    header = None
+    hdr = mem[0]
+    if (hdr >> 27) & 0x1F == 0x1F:
+        header = {
+            "n_minus_6": (hdr >> 23) & 0xF,
+            "cw":        (hdr >> 10) & 0x1FFF,
+            "typ":       (hdr >> 8) & 0x3,
+            "cc":        hdr & 0xFF,
+        }
+
+    entries = []
+    for slot in range(max_entries):
+        base = total - (slot + 1) * NS_ENTRY_WORDS
+        if base < 0 or base + 3 >= total:
+            break
+        w0, w1, w2, w3 = mem[base], mem[base + 1], mem[base + 2], mem[base + 3]
+        if w0 == 0 and w1 == 0:
+            continue
+        entries.append({"slot": slot, "w0": w0, "w1": w1, "w2": w2, "w3": w3})
+
+    return {
+        "totalWords":  total,
+        "maxEntries":  max_entries,
+        "nsTableBase": ns_table_base,
+        "header":      header,
+        "entries":     entries,
+    }
+
+
 def _load_ns_state_token_map(lumps_dir):
     """ns-state.json → slot→token map used by the boot image generator.
 

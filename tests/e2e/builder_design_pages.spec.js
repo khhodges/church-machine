@@ -86,6 +86,65 @@ test.describe('Builder design pages — Thread Lump & Namespace Lump', () => {
         await expect(panel.locator('#le-ns-size-sel')).toBeVisible();
     });
 
+    test('NS Table drill-down: valid committed image is clean, words match server, out-of-contract slot faults', async ({ page }) => {
+        // Fetch the authoritative committed snapshot first.
+        const nsState = await (await page.request.get('/api/boot-image/ns-state')).json();
+
+        await openBuilder(page);
+        await page.locator('#builderViewTab-lump-ns').click();
+        const panel = page.locator('#lumpNSPanel');
+        await expect(panel).toBeVisible();
+
+        // Open the drill-down (fresh localStorage → design seeds from committed geometry).
+        await page.evaluate(() => window.lumpEditorToggleNSDrill());
+        await expect(panel.locator('.le-nsd-panel')).toBeVisible({ timeout: 8000 });
+        await expect(panel.locator('.le-nsd-banner')).toBeVisible({ timeout: 8000 });
+
+        if (nsState.committed) {
+            // 1. A valid committed image against the seeded default design is CLEAN.
+            await expect(panel.locator('.le-nsd-banner-ok')).toBeVisible({ timeout: 8000 });
+            expect(await panel.locator('.le-nsd-fault').count()).toBe(0);
+
+            // 2. Row count equals committed capacity; slot 0 sits at the top byte address.
+            const cap = nsState.committed.maxEntries;
+            expect(await panel.locator('.le-nsd-row').count()).toBe(cap);
+            const slot0Addr = (nsState.committed.totalWords * 4 - 16)
+                .toString(16).toUpperCase();
+            await expect(panel.locator('.le-nsd-row').first()).toContainText('0x' + slot0Addr);
+
+            // 3. Expanded 4-word view shows the exact raw words from the boot image.
+            const raw0 = nsState.committed.entries.find(e => e.slot === 0);
+            if (raw0) {
+                await panel.locator('.le-nsd-pop').first().click();
+                const detail = await panel.locator('.le-nsd-detail').innerText();
+                const hex8 = v => '0x' + (v >>> 0).toString(16).toUpperCase().padStart(8, '0');
+                expect(detail).toContain(hex8(raw0.w0));
+                expect(detail).toContain(hex8(raw0.w1));
+                expect(detail).toContain(hex8(raw0.w2));
+                expect(detail).toContain(hex8(raw0.w3));
+            }
+        }
+
+        // 4. An out-of-contract committed slot is flagged as a fault.
+        await page.evaluate(() => {
+            const orig = window.fetch;
+            window.fetch = (u, o) => {
+                if (String(u).includes('/api/boot-image/ns-state')) {
+                    return Promise.resolve({ json: () => Promise.resolve({ abstractions: [
+                        { name: 'Rogue', slot: 2000, location: '0x00100000', type: 'Inform',
+                          f: 0, g: 0, limit: '0x0003F', seq: 0, seal: '0x0000' }
+                    ] }) });
+                }
+                return orig(u, o);
+            };
+            window.lumpEditorNSDrillRefresh();
+        });
+        await expect(panel.locator('.le-nsd-banner-fault')).toBeVisible({ timeout: 8000 });
+        await expect(panel.locator('.le-nsd-fault').first()).toContainText('Rogue');
+        await expect(panel.locator('.le-nsd-fault-detail').first())
+            .toContainText('beyond the approved capacity');
+    });
+
     test('other Builder tabs still work after visiting a design page', async ({ page }) => {
         await openBuilder(page);
 
