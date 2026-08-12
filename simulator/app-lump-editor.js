@@ -289,13 +289,15 @@
         var serverMax           = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 1024;
         var maxSl               = Math.min(totalNamespaceWords / 64, serverMax, NS_CAP_MAX);
         var nsSlotsMax          = Math.min(snapNSCap(state.ns.slots), maxSl);
+        var threadCount         = profile.singleThread ? 1 : clamp(state.thread.count, 1, 9);
         return {
             targetBoard: board,
             step1: {
                 totalNamespaceWords: totalNamespaceWords,
                 namespaceLumpWords:  64,
                 threadLumpWords:     threadLumpWords,
-                nsSlotsMax:          nsSlotsMax
+                nsSlotsMax:          nsSlotsMax,
+                threadCount:         threadCount
             }
         };
     }

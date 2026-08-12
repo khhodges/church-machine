@@ -29,8 +29,8 @@ Layout (all words 32-bit little-endian):
     [resident lump bodies at programmer
      -chosen physAddr]
     [NS_TABLE_BASE .. +NS_TABLE_RESERVE)     Namespace table
-       (256 entries × 4 words; named slots followed by Step-3 reserved
-        empties; remainder zero)
+       (step1.nsSlotsMax entries × 4 words, default 256; named slots followed
+        by Step-3 reserved empties; remainder zero)
 
 NS slots 2–5 are MMIO device-register windows (UART, LED, BTN, TIMER).
 They carry NS entries pointing at physical hardware addresses but have no
@@ -48,8 +48,9 @@ except ImportError:
 
 NS_ENTRY_WORDS   = 4            # words per NS entry (stride-4, 16 bytes per slot)
 NS_BUS_WORDS     = 4            # hardware ns_rd_data/ns_wr_data bus width in 32-bit words
-MAX_NS_ENTRIES   = 256          # A7 v1.2: 256 slots — GT bits[15:0] could hold more but 256 is the hardware cap
-NS_TABLE_RESERVE = MAX_NS_ENTRIES * NS_ENTRY_WORDS  # 1024 words = 256 entries × 4
+MAX_NS_ENTRIES   = 1024         # V20 cap: 64–1024 slots, power of two (matches app.py MAX_NS_ENTRIES and the designer selector)
+DEFAULT_NS_SLOTS_MAX = 256      # legacy default when step1.nsSlotsMax is absent (A7 v1.2 images)
+NS_TABLE_RESERVE = DEFAULT_NS_SLOTS_MAX * NS_ENTRY_WORDS  # 1024 words = 256 entries × 4 (legacy default reserve)
 SLOT_SIZE        = 0x40         # 64 words
 
 
@@ -670,15 +671,33 @@ def parse_ns_table_raw(image_bytes):
         return None
     max_entries = ns_table_reserve // NS_ENTRY_WORDS
 
+    # mem[0] is the Thread.1 lump header (Thread lives at word 0), NOT a
+    # namespace header — the NS table region is a raw table with no header
+    # word in RAM.  Decode mem[0] as the thread header, and synthesize the
+    # architectural V20 namespace header (slot count split across cw/cc as
+    # (cw<<8)|cc, typ=01 data) from the committed geometry.
     header = None
     hdr = mem[0]
     if (hdr >> 27) & 0x1F == 0x1F:
         header = {
+            "kind":      "thread",   # header at word 0 belongs to Thread.1
             "n_minus_6": (hdr >> 23) & 0xF,
             "cw":        (hdr >> 10) & 0x1FFF,
             "typ":       (hdr >> 8) & 0x3,
             "cc":        hdr & 0xFF,
         }
+    _ns_n = max(0, total.bit_length() - 15)  # total = 2^(n_minus_6+14)
+    _ns_cw = (max_entries >> 8) & 0x1FFF
+    _ns_cc = max_entries & 0xFF
+    ns_header = {
+        "slots":     max_entries,
+        "n_minus_6": _ns_n,
+        "cw":        _ns_cw,
+        "typ":       1,          # 01 = data lump (Namespace)
+        "cc":        _ns_cc,
+        "word":      ((0x1F << 27) | (_ns_n << 23) | (_ns_cw << 10)
+                      | (1 << 8) | _ns_cc) & 0xFFFFFFFF,
+    }
 
     entries = []
     for slot in range(max_entries):
@@ -694,7 +713,8 @@ def parse_ns_table_raw(image_bytes):
         "totalWords":  total,
         "maxEntries":  max_entries,
         "nsTableBase": ns_table_base,
-        "header":      header,
+        "header":      header,      # decoded mem[0] — Thread.1 lump header
+        "nsHeader":    ns_header,   # synthesized architectural NS header (V20)
         "entries":     entries,
     }
 
@@ -838,8 +858,22 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     thread_size = int(step1["threadLumpWords"])
 
     # Dynamic NS table reserve (Task #1244): size follows configured slot capacity.
-    # nsSlotsMax defaults to MAX_NS_ENTRIES when absent.
-    _ns_slots_max = int(step1.get("nsSlotsMax") or MAX_NS_ENTRIES)
+    # nsSlotsMax defaults to DEFAULT_NS_SLOTS_MAX (256) when absent — legacy images.
+    _ns_slots_max = int(step1.get("nsSlotsMax") or DEFAULT_NS_SLOTS_MAX)
+    if _ns_slots_max > MAX_NS_ENTRIES:
+        raise ValueError(
+            f"generate_boot_image: nsSlotsMax={_ns_slots_max} exceeds the "
+            f"V20 maximum of {MAX_NS_ENTRIES} slots.")
+
+    # V20 thread count (Task #2562): Thread.1..Thread.n resident stack objects.
+    # Thread.1 is the NS-slot-1 Boot.Thread; threads 2..n are additional resident
+    # bodies placed after the catalog allocations (no NS entries — the designer's
+    # Thread.2..Thread.n pet names are presentational; only Thread.1 is hardwired).
+    try:
+        _thread_count = int(step1.get("threadCount") or 1)
+    except (TypeError, ValueError):
+        _thread_count = 1
+    _thread_count = max(1, min(9, _thread_count))
     NS_TABLE_RESERVE = ns_table_reserve_words(_ns_slots_max)   # local, shadows module constant
 
     if "abstractionLumpWords" in step1:
@@ -1062,10 +1096,11 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             empty_count = max(0, int(cfg["step3"].get("emptySlotCount") or 0))
         except (TypeError, ValueError):
             empty_count = 0
-    if ns_count + empty_count > MAX_NS_ENTRIES:
+    if ns_count + empty_count > _ns_slots_max:
         raise ValueError(
             f"Step 3 emptySlotCount={empty_count} would push NS table to "
-            f"{ns_count + empty_count} entries; max {MAX_NS_ENTRIES}."
+            f"{ns_count + empty_count} entries; configured capacity is "
+            f"{_ns_slots_max} (step1.nsSlotsMax)."
         )
     if _ns_slots_max < ns_count:
         raise ValueError(
@@ -1092,6 +1127,32 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     thread_loc = locations[1]
     mem[thread_loc] = pack_lump_header(_ns_n_minus_6(thread_size), 32, 12, 2)
     mem[thread_loc + 244] = create_gt(0, boot_entry_slot, {"E": 1}, 1)
+
+    # ----- V20 additional threads (Thread.2 .. Thread.n) -----------------
+    # Each extra thread is a resident stack object identical in shape to
+    # Thread.1: same header encoding and a CR0 boot-entry E-GT at the fixed
+    # +244 capability zone (CR1.. remain null GTs / zero).  They are placed
+    # contiguously after the catalog allocations and carry no NS entries —
+    # only Thread.1 (NS slot 1) is hardwired into the boot namespace.
+    extra_thread_locs = []
+    if _thread_count > 1:
+        _t_cursor = running_offset
+        for _tn in range(2, _thread_count + 1):
+            _t_end = _t_cursor + thread_size
+            # Must stay clear of the stored-nsCount / boot-entry / format-tag
+            # sentinel words at ns_table_base-3 .. ns_table_base-1.
+            if _t_end > ns_table_base - 3:
+                raise ValueError(
+                    f"generate_boot_image: Thread.{_tn} ({thread_size} words at "
+                    f"0x{_t_cursor:X}) does not fit below the NS table "
+                    f"(base 0x{ns_table_base:X}); reduce threadCount, "
+                    f"threadLumpWords, or nsSlotsMax, or increase "
+                    f"totalNamespaceWords.")
+            mem[_t_cursor] = pack_lump_header(_ns_n_minus_6(thread_size), 32, 12, 2)
+            mem[_t_cursor + 244] = create_gt(0, boot_entry_slot, {"E": 1}, 1)
+            extra_thread_locs.append(_t_cursor)
+            _t_cursor = _t_end
+        running_offset = _t_cursor
 
     # Memory-manager GT at c-list[0]: R|W capability over NS slot 0 (full namespace).
     mem_mgr_gt = create_gt(0, 0, {"R":1, "W":1}, 1)

@@ -27,9 +27,9 @@ class NamespaceTutorial {
         const fields = [
             { bits: '[31:27]', name: 'magic',  val: '0x1F', note: 'Trap-on-execute guard',                                  w: 5,  bg: '#2a2a2a', border: '#555',    text: '#888'    },
             { bits: '[26:23]', name: 'n\u22126', val: '1',     note: 'lumpSize = 2^(val+6) = 32K words / 128 KiB V20 address space', w: 4,  bg: '#3a2000', border: '#c86000', text: '#f09040' },
-            { bits: '[22:10]', name: 'cw',     val: '256',   note: 'NS Table word count; slots \u00d7 4 words at the top of memory (this example: 64 slots)', w: 13, bg: '#002a40', border: '#2080c0', text: '#60b8f0' },
-            { bits: '[9:8]',   name: 'typ',    val: '10',    note: 'clist-only \u2014 Namespace data lump (same as Thread)',   w: 2,  bg: '#2a2a2a', border: '#555',    text: '#888'    },
-            { bits: '[7:0]',   name: 'cc',     val: '64',    note: 'namespace slot capacity (power of two, 64\u20131024; this example: 64); slot 0 is highest and slots descend by 16 bytes', w: 8,  bg: '#1a1000', border: '#b07820', text: '#f0c050' },
+            { bits: '[22:10]', name: 'cw',     val: '0',     note: 'high bits of slot capacity: cw = slots >> 8 (this example: 64 slots \u2192 cw=0)', w: 13, bg: '#002a40', border: '#2080c0', text: '#60b8f0' },
+            { bits: '[9:8]',   name: 'typ',    val: '01',    note: 'data lump \u2014 Namespace root is data, not a callable',   w: 2,  bg: '#2a2a2a', border: '#555',    text: '#888'    },
+            { bits: '[7:0]',   name: 'cc',     val: '64',    note: 'low byte of slot capacity: cc = slots & 0xFF; capacity = (cw<<8)|cc (power of two, 64\u20131024; this example: 64); slot 0 is highest and slots descend by 16 bytes', w: 8,  bg: '#1a1000', border: '#b07820', text: '#f0c050' },
         ];
         let bar = '<div style="display:flex;width:100%;border-radius:3px;overflow:hidden;margin-bottom:2px;">';
         for (const f of fields) {
@@ -47,7 +47,7 @@ class NamespaceTutorial {
         }
         meta += '</div>';
         return `<div style="background:#111;border:1px solid #333;border-radius:4px;padding:6px 8px 4px 8px;margin-bottom:8px;">`
-             + `<div style="font-size:0.62rem;color:#555;font-family:monospace;margin-bottom:4px;">Header[0] \u2014 Namespace Lump \u00b7 Slot\u202f0 (typ=10) \u00b7 32 bits</div>`
+             + `<div style="font-size:0.62rem;color:#555;font-family:monospace;margin-bottom:4px;">Header[0] \u2014 Namespace Lump \u00b7 Slot\u202f0 (typ=01) \u00b7 32 bits</div>`
              + bar + meta + `</div>`;
     }
 
@@ -140,14 +140,14 @@ ${this._memMap(null)}
                 title: 'Header[0] \u2014 Namespace Lump Bit Fields',
                 type: 'header',
                 content: `${this._headerRef()}
-<p>Word 0 of every lump is a <strong>32-bit header word</strong>. For the Namespace root (Slot\u202f0) the five fields are <em>repurposed</em> just as they are for Thread lumps. The two key fields are <code style="color:#f0c050">cc</code> (physical address space size as a power of two) and <code style="color:#60b8f0">cw</code> (NS Table word count). Hover any field box above to read its bit range and note.</p>
+<p>Word 0 of every lump is a <strong>32-bit header word</strong>. For the Namespace root (Slot\u202f0) the five fields are <em>repurposed</em> just as they are for Thread lumps. The two key fields are <code style="color:#f0c050">cc</code> (low byte of the slot capacity) and <code style="color:#60b8f0">cw</code> (high bits of the slot capacity; capacity = <code>(cw&lt;&lt;8)|cc</code>). Hover any field box above to read its bit range and note.</p>
 <table class="sr-table">
 <tr><th>Field</th><th>Bits</th><th>Width</th><th>NS Slot\u202f0 value</th><th>Meaning</th></tr>
 <tr><td><code style="color:#888">magic</code></td><td>[31:27]</td><td>5&nbsp;b</td><td><code>0x1F</code></td><td>Trap-on-execute guard \u2014 executing word&nbsp;0 always faults</td></tr>
 <tr><td><code style="color:#f09040">n\u22126</code></td><td>[26:23]</td><td>4&nbsp;b</td><td><code>1</code></td><td><code>lumpSize = 2^(n\u22126+6)</code> = 32K words / 128 KiB V20 physical space</td></tr>
-<tr><td><code style="color:#60b8f0">cw</code></td><td>[22:10]</td><td>13&nbsp;b</td><td><code>256</code></td><td><strong>NS Table word count</strong>: slots \u00d7 4 words at the top of memory (this example: 64 slots \u00d7 4 = 256)</td></tr>
-<tr><td><code style="color:#888">typ</code></td><td>[9:8]</td><td>2&nbsp;b</td><td><code>10</code></td><td>clist-only \u2014 same type code as Thread; marks NS as a data lump, not a callable</td></tr>
-<tr><td><code style="color:#f0c050">cc</code></td><td>[7:0]</td><td>8&nbsp;b</td><td><code>64</code></td><td><strong>Namespace slot capacity</strong>: power of two (64\u20131024; this example: 64); slot 0 is highest and slots descend by 16 bytes</td></tr>
+<tr><td><code style="color:#60b8f0">cw</code></td><td>[22:10]</td><td>13&nbsp;b</td><td><code>256</code></td><td><strong>High bits of slot capacity</strong>: cw = slots &gt;&gt; 8 (this example: 64 slots \u2192 cw = 0)</td></tr>
+<tr><td><code style="color:#888">typ</code></td><td>[9:8]</td><td>2&nbsp;b</td><td><code>01</code></td><td>data lump \u2014 the Namespace root is data, not a callable</td></tr>
+<tr><td><code style="color:#f0c050">cc</code></td><td>[7:0]</td><td>8&nbsp;b</td><td><code>64</code></td><td><strong>Low byte of slot capacity</strong>: cc = slots &amp; 0xFF; capacity = (cw&lt;&lt;8)|cc, power of two (64\u20131024; this example: 64); slot 0 is highest and slots descend by 16 bytes</td></tr>
 </table>
 <div class="sr-key-concept"><div class="sr-concept-title">Address Space Layout \u2014 Four Zones</div>
 <p>The namespace divides physical memory into four IDE-set zones. Lump zones grow <strong>upward \u2191</strong> from <code>0x0000</code>; the V20 NS Table occupies the top-of-memory byte range <code>0x1FC00\u20130x1FFFF</code> and its logical slots descend from the highest address.</p>
@@ -159,14 +159,14 @@ ${this._memMap(null)}
 </table>
 <p>The V20 NS Table begins at byte address <code>0x1FC00</code> (word address <code>0x7F00</code>) and ends at <code>0x1FFFF</code>. Each entry is 16 bytes: slot 0 begins at <code>0x1FFC0</code>, while slot 63 begins at <code>0x1FC00</code>.</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">Encoding Formula</div>
-<p><code>(0x1F &lt;&lt; 27) | (n_minus_6 &lt;&lt; 23) | (cw &lt;&lt; 10) | (0b10 &lt;&lt; 8) | cc</code></p>
-<p>Example \u2014 65536-word namespace (cc=16, cw=1024 NS Table words, n\u22126=10):</p>
-<p><code style="color:#f0c050;font-size:1rem;">0xFD10_0210</code>&nbsp;&nbsp;(magic=0x1F, n\u22126=10, cw=1024, typ=10, cc=16)</p></div>
+<p><code>(0x1F &lt;&lt; 27) | (n_minus_6 &lt;&lt; 23) | (cw &lt;&lt; 10) | (0b01 &lt;&lt; 8) | cc</code></p>
+<p>Example \u2014 65536-word namespace with 1024 slots (cw=4, cc=0, n\u22126=10):</p>
+<p><code style="color:#f0c050;font-size:1rem;">0xFD00_1100</code>&nbsp;&nbsp;(magic=0x1F, n\u22126=10, cw=4, typ=01, cc=0 \u2192 capacity (4&lt;&lt;8)|0 = 1024 slots)</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">Three Lump Types \u2014 Same Header, Different Field Semantics</div>
 <p>All three lump types share the same 32-bit header format. The hardware uses <code>typ</code> to decide which interpretation applies:</p>
-<table class="sr-table" style="margin-top:6px;"><tr><th>Field</th><th>Programmed (typ=00)</th><th>Thread (typ=10)</th><th>Namespace (typ=10)</th></tr>
-<tr><td><code>cw</code></td><td>Code word count</td><td>Stack words (sw)</td><td>NS Table word count</td></tr>
-<tr><td><code>cc</code></td><td>C-list GT count</td><td>Heap size (max N words)</td><td>Physical space = 2^cc words</td></tr>
+<table class="sr-table" style="margin-top:6px;"><tr><th>Field</th><th>Programmed (typ=00)</th><th>Thread (typ=10)</th><th>Namespace (typ=01)</th></tr>
+<tr><td><code>cw</code></td><td>Code word count</td><td>Stack words (sw)</td><td>Slot capacity high bits (slots &gt;&gt; 8)</td></tr>
+<tr><td><code>cc</code></td><td>C-list GT count</td><td>Heap size (max N words)</td><td>Slot capacity low byte (slots &amp; 0xFF)</td></tr>
 </table></div>`,
             },
             {

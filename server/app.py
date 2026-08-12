@@ -1047,7 +1047,7 @@ def _validate_step2(step2, step1, target_board):
     if not isinstance(lumps, list):
         return "step2.lumps must be a list"
     catalog = {e["nsSlot"]: e for e in _load_lump_catalog()}
-    _ns_slots_max_v2 = int(step1.get("nsSlotsMax") or MAX_NS_ENTRIES)
+    _ns_slots_max_v2 = int(step1.get("nsSlotsMax") or _boot_image_gen.DEFAULT_NS_SLOTS_MAX)
     NS_TABLE_RESERVE = _boot_image_gen.ns_table_reserve_words(_ns_slots_max_v2)
     total = step1["totalNamespaceWords"]
     # Determine actual Boot.Abstr size from the saved SelfTest lump (looked up via
@@ -1080,7 +1080,7 @@ def _validate_step2(step2, step1, target_board):
         except OSError:
             pass
     foundation_end = (step1["namespaceLumpWords"] +
-                      step1["threadLumpWords"] +
+                      step1["threadLumpWords"] * int(step1.get("threadCount") or 1) +
                       _abstr_size_for_validation)       # Boot.Abstr: saved lump size or 64w default
     # NS slots 2–5 are MMIO (no RAM body) — they do not contribute to foundation_end.
     usable_end = total - NS_TABLE_RESERVE
@@ -1185,7 +1185,7 @@ def _validate_step1(target_board, step1):
     # Boot.Abstr actual size is always BOOT_ABSTR_DEFAULT_SIZE (64) or the saved
     # lump size — abstractionLumpWords is ignored for the foundation_sum check.
     foundation_sum = (step1["namespaceLumpWords"] +
-                      step1["threadLumpWords"] +
+                      step1["threadLumpWords"] * int(step1.get("threadCount") or 1) +
                       BOOT_ABSTR_DEFAULT_SIZE)        # Boot.Abstr (slot 6) — always 64w minimum
     # NS slots 2–5 are MMIO (no RAM body) — they do not contribute to foundation_sum.
     if foundation_sum > total:
@@ -1199,10 +1199,16 @@ def _validate_step1(target_board, step1):
         if _raw_ns_slots_max > MAX_NS_ENTRIES:
             return (f"step1.nsSlotsMax ({_raw_ns_slots_max}) exceeds the maximum "
                     f"supported NS slot count ({MAX_NS_ENTRIES})")
+    # Optional threadCount (Task #2562): V20 Thread.1..Thread.n resident stack
+    # objects. Each thread costs threadLumpWords of resident RAM.
+    _raw_thread_count = step1.get("threadCount")
+    if _raw_thread_count is not None:
+        if not isinstance(_raw_thread_count, int) or not (1 <= _raw_thread_count <= 9):
+            return "step1.threadCount must be an integer between 1 and 9 when provided"
     # The simulator reserves the top NS_TABLE_RESERVE words of the namespace
     # window for the namespace table itself.  Reserve size is now dynamic:
     # nextPow2(nsSlotsMax × 4).
-    _ns_slots_max_v1 = int(_raw_ns_slots_max or MAX_NS_ENTRIES)
+    _ns_slots_max_v1 = int(_raw_ns_slots_max or _boot_image_gen.DEFAULT_NS_SLOTS_MAX)
     NS_TABLE_RESERVE = _boot_image_gen.ns_table_reserve_words(_ns_slots_max_v1)
     usable = total - NS_TABLE_RESERVE
     if foundation_sum > usable:
@@ -1286,6 +1292,9 @@ def boot_config_post():
     # (1024-word reserve), preserving backward compatibility with old configs.
     if step1.get("nsSlotsMax") is not None:
         cfg["step1"]["nsSlotsMax"] = int(step1["nsSlotsMax"])
+    # Persist threadCount when provided (Task #2562 — V20 Thread.1..Thread.n).
+    if step1.get("threadCount") is not None:
+        cfg["step1"]["threadCount"] = int(step1["threadCount"])
     if step2 is not None:
         norm = []
         for e in (step2.get("lumps") or []):
@@ -1675,7 +1684,7 @@ def namespace_lump_json():
             return jsonify({"error": f"Failed to generate boot image: {_e}"}), 500
 
     words          = list(_st.unpack(f"<{total}I", img_bytes[:total * 4]))
-    _ns_slots_max_mf = int(step1.get("nsSlotsMax") or _boot_image_gen.MAX_NS_ENTRIES)
+    _ns_slots_max_mf = int(step1.get("nsSlotsMax") or _boot_image_gen.DEFAULT_NS_SLOTS_MAX)
     ns_table_base  = total - _boot_image_gen.ns_table_reserve_words(_ns_slots_max_mf)
     ns_entry_words = _boot_image_gen.NS_ENTRY_WORDS
     catalog        = _boot_image_gen.DEFAULT_ABSTRACTION_CATALOG
@@ -4294,7 +4303,7 @@ def _derive_ns_state_entries():
             _mem2 = list(_struct.unpack(f"<{_n2}I", _raw[:_n2 * 4]))
             _cfg2, _ = _read_saved_boot_config()
             _step1b  = (_cfg2 or {}).get("step1", {})
-            _nsmax2  = int(_step1b.get("nsSlotsMax") or _boot_image_gen.MAX_NS_ENTRIES)
+            _nsmax2  = int(_step1b.get("nsSlotsMax") or _boot_image_gen.DEFAULT_NS_SLOTS_MAX)
             _nsres2  = _boot_image_gen.ns_table_reserve_words(_nsmax2)
             _nsbase2 = _n2 - _nsres2
             _sidx2   = _nsbase2 - 2
@@ -4525,7 +4534,7 @@ def _load_boot_abstr_lump():
         # Read the boot config to get the correct nsSlotsMax — same pattern as _load_boot_ns_lump().
         _cfg_ab, _err_ab = _read_saved_boot_config()
         _step1_ab = (_cfg_ab or {}).get("step1", {})
-        _ns_slots_max_ab = int(_step1_ab.get("nsSlotsMax") or _boot_image_gen.MAX_NS_ENTRIES)
+        _ns_slots_max_ab = int(_step1_ab.get("nsSlotsMax") or _boot_image_gen.DEFAULT_NS_SLOTS_MAX)
         _ns_table_reserve_ab = _boot_image_gen.ns_table_reserve_words(_ns_slots_max_ab)
         ns_table_base = n_words - _ns_table_reserve_ab
         NS_ENTRY_WORDS = 4
@@ -4681,7 +4690,7 @@ def _load_boot_ns_lump():
         # the NS table even when the config is unavailable.
         _cfg_ns, _err_ns = _read_saved_boot_config()
         _step1_ns = (_cfg_ns or {}).get("step1", {})
-        _ns_slots_max = int(_step1_ns.get("nsSlotsMax") or _boot_image_gen.MAX_NS_ENTRIES)
+        _ns_slots_max = int(_step1_ns.get("nsSlotsMax") or _boot_image_gen.DEFAULT_NS_SLOTS_MAX)
         _ns_table_reserve = _boot_image_gen.ns_table_reserve_words(_ns_slots_max)
         ns_table_base = n_words - _ns_table_reserve
 
