@@ -1865,15 +1865,15 @@
   {
     "token": "87c45cc2",
     "abstraction": "Abstraction:  WukongCallHome",
-    "filename": "Abstraction_WukongCallHome_v2.lump",
-    "sidecar_file": "Abstraction_WukongCallHome_v2.json",
+    "filename": "Abstraction_WukongCallHome_v3.lump",
+    "sidecar_file": "Abstraction_WukongCallHome_v3.json",
     "lump_size": 128,
     "cw": 73,
     "cc": 2,
     "author": "",
-    "version": "2026.08.10",
-    "lump_version": 2,
-    "compiled_at": 1786371316.402255,
+    "version": "2026.08.12",
+    "lump_version": 3,
+    "compiled_at": 1786530937.0319977,
     "methods": [
       {
         "name": "run",

@@ -153,6 +153,23 @@ def test_fault_table_matches_hw_types():
     assert wb.MAX_FAULT_CODE == max(expected)
 
 
+def test_serial_port_selection_supports_windows_com_ports(monkeypatch):
+    """Auto-detection must not assume Linux /dev/ttyUSB* paths."""
+    monkeypatch.setattr(wb, '_available_serial_ports',
+                        lambda: ['COM12', 'COM3'])
+
+    assert wb._find_serial_port() == 'COM12'
+    assert wb._find_serial_port('COM3') == 'COM3'
+    # A disconnected preferred port falls back to a currently visible one.
+    assert wb._find_serial_port('COM7') == 'COM12'
+
+
+def test_serial_port_selection_preserves_explicit_port_without_enumeration(monkeypatch):
+    """An explicit port remains usable with minimal pyserial installations."""
+    monkeypatch.setattr(wb, '_available_serial_ports', lambda: [])
+    assert wb._find_serial_port('COM9') == 'COM9'
+
+
 def test_high_fault_code_frames_emit_and_do_not_stall():
     """Valid high-numbered fault frames (e.g. OUTFORM_TIMEOUT=0x19) must be
     emitted, and a following frame must still parse — no resync stall."""

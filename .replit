@@ -183,6 +183,10 @@ args = "bare-space-ns-fallback-tests"
 task = "workflow.run"
 args = "return-cr14-trace-tests"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "wukong-command-delivery-tests"
+
 [[workflows.workflow]]
 name = "Church Machine IDE"
 author = "agent"
@@ -758,9 +762,9 @@ externalPort = 3000
 name = "wukong-command-delivery-tests"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python -m pytest tests/server/test_wukong_command_delivery.py tests/hardware/test_wukong_bridge_command_ack.py -v"
-
-[workflows.workflow.metadata]
-outputType = "console"

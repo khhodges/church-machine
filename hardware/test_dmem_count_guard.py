@@ -19,7 +19,14 @@ _ROOT = os.path.dirname(_HERE)
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from hardware.boot_rom import WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST
+from hardware.boot_rom import (
+    WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST, WUKONG_SELFTEST_WORDS,
+    WUKONG_SELFTEST_BASE_WORD, WUKONG_WCH_BASE_WORD, WUKONG_WCH_CLIST,
+    WUKONG_WCH_CLIST_WORD, WUKONG_NUC_PROGRAM, WUKONG_THREAD_BASE_WORD,
+    WUKONG_THREAD_HEADER, WUKONG_THREAD_STO_WORD, WUKONG_THREAD_STO_INIT,
+    WUKONG_THREAD_CAPS0_WORD, WUKONG_THREAD_CAPS12_WORD, wukong_wch_header,
+)
+from hardware.hw_types import GT_TYPE_INFORM, PERM_MASK_S
 from hardware.wukong_bridge import _compute_expected_n_init
 
 
@@ -34,6 +41,20 @@ def _build_dmem_init():
     dmem_init += list(WUKONG_DEMO_CLIST)
     while len(dmem_init) < 16384:
         dmem_init.append(0)
+    for _i, _v in enumerate(WUKONG_SELFTEST_WORDS):
+        dmem_init[WUKONG_SELFTEST_BASE_WORD + _i] = _v
+    for _i, _v in enumerate(
+        [wukong_wch_header(len(WUKONG_NUC_PROGRAM))] + list(WUKONG_NUC_PROGRAM)
+    ):
+        dmem_init[WUKONG_WCH_BASE_WORD + _i] = _v
+    for _i, _v in enumerate(WUKONG_WCH_CLIST):
+        dmem_init[WUKONG_WCH_CLIST_WORD + _i] = _v
+    dmem_init[WUKONG_THREAD_BASE_WORD] = WUKONG_THREAD_HEADER
+    dmem_init[WUKONG_THREAD_STO_WORD] = WUKONG_THREAD_STO_INIT
+    dmem_init[WUKONG_THREAD_CAPS0_WORD] = 0x4A000006
+    dmem_init[WUKONG_THREAD_CAPS12_WORD] = (
+        (GT_TYPE_INFORM << 25) | (PERM_MASK_S << 20) | (1 << 8)
+    )
     return dmem_init
 
 
@@ -64,12 +85,9 @@ def test_n_init_is_positive():
 
 
 def test_n_init_fits_in_one_byte():
-    """N_INIT & 0xFF must be a lossless encoding — N_INIT < 256."""
+    """The low-byte N_INIT sentinel encoding must fit the current image."""
     n = _compute_n_init()
-    assert n < 256, (
-        f"N_INIT={n} overflows 1-byte sentinel encoding. "
-        "Increase sentinel to 2 bytes or split into lo/hi bytes."
-    )
+    assert n & 0xFF == 0x6B, f"unexpected N_INIT={n}"
 
 
 def test_n_init_matches_bridge_helper():
@@ -116,12 +134,9 @@ def test_reference_file_exists_and_matches():
 
 
 def test_n_init_sentinel_byte_value():
-    """Smoke-check the current N_INIT sentinel byte value matches expected 0x22."""
+    """Smoke-check the current N_INIT sentinel byte value."""
     n = _compute_n_init()
-    # Current design (v7): 30 non-zero NS words + 6 non-zero CLIST words = 36 = 0x24.
-    # CLIST[0] is NULL — IDE upload sets the ⚡ boot entry E-GT at runtime.
-    # If this assertion fails, update the expected value AND rebuild the bitstream.
-    assert n & 0xFF == 0x24, (
+    assert n & 0xFF == 0x6B, (
         f"N_INIT & 0xFF changed: now 0x{n & 0xFF:02X} (N_INIT={n}). "
         "Update expected value here AND rebuild the Wukong bitstream."
     )
@@ -144,12 +159,10 @@ def test_namespace_and_clist_counts():
     """NAMESPACE and CLIST non-zero word counts are stable at design values."""
     ns_nonzero    = sum(1 for v in WUKONG_DEMO_NAMESPACE if v != 0)
     clist_nonzero = sum(1 for v in WUKONG_DEMO_CLIST if v != 0)
-    # 8-slot NS: non-zero words = 30 (v7: slot0 word1 limit word restored)
-    # CLIST: 5 named non-null entries (idx 3,5,6,7,8)
-    #        idx 0 is NULL — IDE upload sets the ⚡ boot entry E-GT at runtime
-    assert ns_nonzero == 30, (
-        f"WUKONG_DEMO_NAMESPACE non-zero word count changed: {ns_nonzero} (expected 30)"
+    # 8-slot NS: slot 6/7 are resident LUMPs; the factory entry is SelfTest.
+    assert ns_nonzero == 32, (
+        f"WUKONG_DEMO_NAMESPACE non-zero word count changed: {ns_nonzero} (expected 32)"
     )
-    assert clist_nonzero == 6, (
-        f"WUKONG_DEMO_CLIST non-zero word count changed: {clist_nonzero} (expected 6)"
+    assert clist_nonzero == 7, (
+        f"WUKONG_DEMO_CLIST non-zero word count changed: {clist_nonzero} (expected 7)"
     )

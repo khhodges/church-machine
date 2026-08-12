@@ -1,15 +1,18 @@
 """Source-backed symbols for the Wukong hardware trace stream.
 
 The current TraceUnit packet contains the retiring NIA, but not the fetched
-instruction word.  This module therefore describes the fixed WukongCallHome
-program baked into the reference bitstream.  It is deliberately dependency
-free so the server and the standalone bridge can use the same lookup.
+instruction word.  This module therefore describes the two resident programs
+baked into the reference bitstream: factory SelfTest and selectable
+WukongCallHome.  It is deliberately dependency free so the server and the
+standalone bridge can use the same lookup.
 
 For uploaded or stale bitstreams, callers must treat a missing or mismatched
 symbol as unresolved rather than presenting this table as authoritative.
 """
 
-WUKONG_CALLHOME_BASE = 0x0700
+WUKONG_SELFTEST_BASE = 0x0600
+WUKONG_SELFTEST_PET_NAME = "SelfTest"
+WUKONG_CALLHOME_BASE = 0x1200
 WUKONG_CALLHOME_PET_NAME = "WukongCallHome"
 
 # This fallback is intentionally encoded data, not a second mnemonic table.
@@ -39,12 +42,20 @@ _WUKONG_CALLHOME_FALLBACK_WORDS = (
 )
 
 try:
-    from .boot_rom import WUKONG_NUC_PROGRAM as _CANONICAL_WUKONG_WORDS
+    from .boot_rom import (
+        WUKONG_NUC_PROGRAM as _CANONICAL_WUKONG_WORDS,
+        WUKONG_SELFTEST_WORDS as _CANONICAL_SELFTEST_WORDS,
+        wukong_wch_header as _canonical_wch_header,
+    )
 except (ImportError, ModuleNotFoundError):
     _CANONICAL_WUKONG_WORDS = _WUKONG_CALLHOME_FALLBACK_WORDS
+    _CANONICAL_SELFTEST_WORDS = ()
+    _canonical_wch_header = lambda _cw: 0xF8812408
 
 WUKONG_CALLHOME_WORDS = tuple(int(word) & 0xFFFFFFFF
                               for word in _CANONICAL_WUKONG_WORDS)
+WUKONG_SELFTEST_WORDS = tuple(int(word) & 0xFFFFFFFF
+                              for word in _CANONICAL_SELFTEST_WORDS)
 assert len(WUKONG_CALLHOME_WORDS) == 73
 if _CANONICAL_WUKONG_WORDS is not _WUKONG_CALLHOME_FALLBACK_WORDS:
     assert WUKONG_CALLHOME_WORDS == _WUKONG_CALLHOME_FALLBACK_WORDS, (
@@ -54,6 +65,10 @@ if _CANONICAL_WUKONG_WORDS is not _WUKONG_CALLHOME_FALLBACK_WORDS:
 _COND_NAMES = ("EQ", "NE", "CS", "CC", "MI", "PL", "VS", "VC",
                "HI", "LS", "GE", "LT", "GT", "LE", "", "NV")
 _BOOT_WORDS = (0x077F8000, 0x27678001, 0x17000000)
+_BOOT_DISASSEMBLY = (
+    "LOAD NAMESPACE CD15",
+    "LOAD THREAD+HEAP CR12+, CR5",
+)
 _OP_NAMES = {
     0: "LOAD", 1: "SAVE", 2: "CALL", 3: "RETURN", 4: "CHANGE",
     5: "SWITCH", 6: "TPERM", 7: "LAMBDA", 8: "ELOADCALL",
@@ -109,6 +124,34 @@ def _disassemble_word(word):
         return f"{mnemonic} DR{dst}, DR{src}, {imm & 0x1F}"
     return mnemonic
 
+
+def boot_disassembly(offset, entry_pet_name=WUKONG_SELFTEST_PET_NAME):
+    """Return the Wukong-specific semantic text for a boot instruction."""
+    if offset == 0 or offset == 1:
+        return _BOOT_DISASSEMBLY[offset]
+    if offset == 2:
+        return f"CALL CR[0] {entry_pet_name}"
+    return None
+
+
+def _resident_lump_metadata(nia, base, pet_name, words):
+    """Resolve a resident LUMP whose word zero is its header."""
+    end = base + len(words) * 4
+    if not (base <= nia < end and nia % 4 == 0):
+        return None
+    offset = (nia - base) // 4
+    return {
+        "pet_name": pet_name,
+        "offset": offset,
+        "nia_label": f"{pet_name}.{offset}",
+        "disasm": (
+            "LUMP_HEADER" if offset == 0
+            else _disassemble_word(words[offset])
+        ),
+        "source_map": "reference-bitstream",
+    }
+
+
 def trace_metadata(nia):
     """Return source metadata for *nia*, or ``None`` when it is not known.
 
@@ -127,29 +170,24 @@ def trace_metadata(nia):
             "pet_name": "Boot",
             "offset": offset,
             "nia_label": f"Boot.{offset}",
-            "disasm": _disassemble_word(_BOOT_WORDS[offset]),
+            "disasm": boot_disassembly(offset),
             "source_map": "reference-bitstream",
         }
 
-    # The LUMP header occupies word 0 at 0x700.  WUKONG_NUC_PROGRAM word 0
-    # starts at 0x704, so keep the displayed LUMP offset (including the
-    # header) but disassemble the executable word one position later.
-    end = WUKONG_CALLHOME_BASE + (len(WUKONG_CALLHOME_WORDS) + 1) * 4
-    if WUKONG_CALLHOME_BASE <= nia < end and nia % 4 == 0:
-        offset = (nia - WUKONG_CALLHOME_BASE) // 4
-        if offset == 0:
-            return {
-                "pet_name": WUKONG_CALLHOME_PET_NAME,
-                "offset": 0,
-                "nia_label": f"{WUKONG_CALLHOME_PET_NAME}.0",
-                "disasm": "LUMP_HEADER",
-                "source_map": "reference-bitstream",
-            }
-        return {
-            "pet_name": WUKONG_CALLHOME_PET_NAME,
-            "offset": offset,
-            "nia_label": f"{WUKONG_CALLHOME_PET_NAME}.{offset}",
-            "disasm": _disassemble_word(WUKONG_CALLHOME_WORDS[offset - 1]),
-            "source_map": "reference-bitstream",
-        }
+    location = _resident_lump_metadata(
+        nia, WUKONG_SELFTEST_BASE, WUKONG_SELFTEST_PET_NAME,
+        WUKONG_SELFTEST_WORDS,
+    )
+    if location is not None:
+        return location
+
+    # WukongCallHome's generated header is not part of NUC_PROGRAM.
+    wch_words = (
+        int(_canonical_wch_header(len(WUKONG_CALLHOME_WORDS))) & 0xFFFFFFFF,
+    ) + WUKONG_CALLHOME_WORDS
+    location = _resident_lump_metadata(
+        nia, WUKONG_CALLHOME_BASE, WUKONG_CALLHOME_PET_NAME, wch_words
+    )
+    if location is not None:
+        return location
     return None

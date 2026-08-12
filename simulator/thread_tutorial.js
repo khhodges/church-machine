@@ -40,7 +40,7 @@ class ThreadTutorial {
             { id: 'heap',  label: '\u2463 Heap \u2193',       sub: 'Size = cc words \u00b7 cc field in Header[0] \u00b7 IDE-set', bg: '#002a10', border: '#20a040', text: '#60d080' },
             { id: 'free',  label: '\u2462 Freespace',         sub: 'Dynamic gap \u00b7 shrinks as stack/heap grow', bg: '#181818', border: '#404040', text: '#888'    },
             { id: 'stack', label: '\u2461 LIFO Stack \u2191', sub: 'Size = sw words \u00b7 sw field in Header[0] \u00b7 SW-defined by IDE', bg: '#002a40', border: '#2080c0', text: '#60b8f0' },
-            { id: 'cap',   label: '\u2460 Capabilities',     sub: 'GT for CR0\u2013CR11  (12 words, architecture-fixed)',            bg: '#3a2c00', border: '#c8a020', text: '#f0d060' },
+            { id: 'cap',   label: '\u2460 Capabilities',     sub: 'GT for CR0\u2013CR14  (15 words at fixed offset +244)',            bg: '#3a2c00', border: '#c8a020', text: '#f0d060' },
         ];
         const heights = { dr: 64, heap: 72, free: 56, stack: 96, cap: 72 };
         const addrLabels = {
@@ -78,10 +78,10 @@ class ThreadTutorial {
                 title: 'What Is a Thread Abstraction?',
                 type: 'intro',
                 content: `<p>A <strong>Thread Abstraction</strong> is the Church Machine\u2019s representation of a running computation. Like all abstractions it lives inside a <em>lump</em> (a contiguous block of namespace words), but its internal structure is different from a Programmed Abstraction: it carries both a protected capability set <em>and</em> a live execution context.</p>
-<p>At boot (B:02) the machine loads the thread stack GT into <strong>CR12</strong> from NS Slot 1 (zero perms, Inform-type). CR12 holds the privileged thread stack capability; its NS entry encodes the lump base and total size that the hardware uses to derive stack bounds (<code>lumpSize = 2^(n-6+6)</code>). The thread header at word 0 carries two IDE-set fields: <code>sw</code> (stack words, stored in the <code>cw</code> position for typ=10 lumps) and <code>cc</code> (heapWords \u2014 IDE-set max heap words; the caps zone is architecture-fixed at 12 words for CR0\u2013CR11). The stack region expands downward from <code>sp_max = lumpSize \u2212 12 \u2212 1</code>; its current position is tracked by the <strong>cursor register</strong> \u2014 a 32-bit hardware-only word packing both the next instruction offset (NIA) and the stack top offset (STO, initially = sp_max).</p>
+<p>At boot (B:02) the machine loads the thread stack GT into <strong>CR12</strong> from NS Slot 1. CR12 holds the privileged thread stack capability; its NS entry encodes the lump base and total size that the hardware uses to derive stack bounds. In V20 the Thread allocation is 512 words, and the fixed capability zone begins at offset <code>+244</code>: CR0\u2013CR14 are restored from words <code>+244\u2026+258</code>. CR0 is the WukongCallHome boot entry. The stack cursor stops before that fixed zone, so <code>sp_max = 243</code>; its current position is tracked by the <strong>cursor register</strong>.</p>
 ${this._memMap(null)}
 <div class="sr-key-concept"><div class="sr-concept-title">Five Regions, One Lump</div>
-<p>Reading top-to-bottom (word 0 \u2192 base): <strong>Header \u2192 \u2464 Data Registers \u2192 \u2463 Heap \u2192 \u2462 Freespace \u2192 \u2461 Stack \u2192 \u2460 Capabilities</strong>. Every region lives inside the same protected lump; the hardware enforces bounds on every access. The Capabilities zone at the tail (<code>lumpSize\u221212</code> \u2026 <code>lumpSize\u22121</code>, exactly 12 words, architecture-fixed) is the c-list, eliminating any overlap.</p></div>
+<p>Reading top-to-bottom (word 0 \u2192 base): <strong>Header \u2192 \u2464 Data Registers \u2192 working/heap region \u2192 \u2461 Stack \u2192 \u2460 Capabilities</strong>. Every region lives inside the same protected lump; the hardware enforces bounds on every access. In V20 the capability zone is fixed at <code>+244\u2026+258</code> (15 words, CR0\u2013CR14), leaving the rest of the 512-word allocation available for the thread\u2019s working storage without overlapping WukongCallHome.</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">Object Garbage Collection</div>
 <p>Zone \u2463 (Heap) is <strong>not individually scanned</strong> by the hardware GC. The G-bit mark-and-sweep operates at the <em>Thread object</em> level: when the system GC marks the Thread GT as reachable, the <strong>entire lump</strong> \u2014 all five zones \u2014 is considered live and left untouched. If the Thread GT becomes unreachable, the whole lump is reclaimed at once. All heap memory management within Zone \u2463 \u2014 allocation, compaction, and freeing \u2014 is a <strong>software concern</strong> left to the thread\u2019s own code.</p></div>`
             },
@@ -96,20 +96,20 @@ ${this._memMap(null)}
 <tr><td><code style="color:#f09040">n\u22126</code></td><td>[26:23]</td><td>4&nbsp;b</td><td>IDE</td><td><code>lumpSize = 2^(val+6)</code>; e.g. val=2 \u2192 2^8 = 256 words</td></tr>
 <tr><td><code style="color:#60b8f0">sw</code></td><td>[22:10]</td><td>13&nbsp;b</td><td>IDE</td><td><strong>Stack words</strong> \u2014 <code>cw</code> field reinterpreted for typ=10; max CALL frames&nbsp;= sw\u00f72</td></tr>
 <tr><td><code style="color:#888">typ</code></td><td>[9:8]</td><td>2&nbsp;b</td><td><code>10</code></td><td>clist-only \u2014 identifies this lump as a Thread (no executable code)</td></tr>
-<tr><td><code style="color:#60d080">cc</code></td><td>[7:0]</td><td>8&nbsp;b</td><td>IDE</td><td><strong>Heap size</strong> \u2014 IDE sets the heap zone size limit; cc = max N heap words (e.g. cc=64 \u2192 Zone \u2463 holds up to 64 words); caps zone always 12 words (architecture-fixed)</td></tr>
+<tr><td><code style="color:#60d080">cc</code></td><td>[7:0]</td><td>8&nbsp;b</td><td>IDE</td><td><strong>Heap size</strong> \u2014 IDE sets the heap zone size limit; the V20 capability zone is independently fixed at 15 words beginning at offset +244</td></tr>
 </table>
 <div class="sr-key-concept"><div class="sr-concept-title">Encoding Formula</div>
 <p><code>(0x1F &lt;&lt; 27) | (n_minus_6 &lt;&lt; 23) | (sw &lt;&lt; 10) | (0b10 &lt;&lt; 8) | heapWords</code></p>
-<p>Example \u2014 256-word thread, sw=32 stack words, heapWords=64:</p>
+<p>Example \u2014 512-word V20 thread, sw=32 stack words, heapWords=64:</p>
 <p><code style="color:#60d080;font-size:1rem;">0xF900_8240</code>&nbsp;&nbsp;(magic=0x1F, n\u22126=2, sw=32, typ=10, cc=64)</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">Why Reinterpret <code>cw</code> and <code>cc</code>?</div>
-<p>A Thread carries <em>no executable code</em>, so the 13-bit <code>cw</code> (code-word count) field is otherwise wasted. The hardware and Mint reinterpret it as <code>sw</code> (stack words) when <code>typ=10</code>. Likewise, the 8-bit <code>cc</code> (c-list count) is repurposed as <code>heapWords</code> because the Thread caps zone is <strong>always exactly 12 words</strong> (CR0\u2013CR11, architecture-fixed) \u2014 it never needs to be stored. Both repurposings are lossless: no information is discarded, only reused.</p></div>`,
+<p>A Thread carries <em>no executable code</em>, so the 13-bit <code>cw</code> (code-word count) field is otherwise wasted. The hardware and Mint reinterpret it as <code>sw</code> (stack words) when <code>typ=10</code>. The V20 capability zone is a fixed architectural region at <code>+244</code>, so the <code>cc</code> field remains available for the IDE-defined heap limit.</p></div>`,
             },
             {
-                title: '\u2460 Capabilities \u2014 GT Zone for CR0\u2013CR11',
+                title: '\u2460 Capabilities \u2014 GT Zone for CR0\u2013CR14',
                 type: 'capabilities',
                 content: `${this._memMap('cap')}
-<p>The tail <strong>12 words</strong> of the thread lump (words <code>lumpSize\u221212</code> \u2026 <code>lumpSize\u22121</code>) are the <strong>GT zone</strong>: one 32-bit Golden Token word for each of CR0\u2013CR11. The count 12 is architecture-fixed (CR0\u2013CR11 always exists); only the start address varies with <code>lumpSize</code>. Only <em>two</em> of these are hardware-defined; the remaining ten are general-purpose \u2014 exactly as DR0\u2013DR15 are general-purpose data registers.</p>
+<p>V20 reserves <strong>15 words</strong> at offsets <code>+244\u2026+258</code> as the <strong>GT zone</strong>: one 32-bit Golden Token word for each of CR0\u2013CR14. CR0 is the WukongCallHome boot entry; CR12 is the thread-stack capability; CR14 is the per-thread code register. The zone location is fixed by the architecture rather than recomputed from the allocation tail.</p>
 <table class="sr-table"><tr><th>Offset (lumpSize\u221212+N)</th><th>CR</th><th>Role</th><th>Controlled by</th></tr>
 <tr><td>lumpSize\u221212+0</td><td>CR0</td><td>General-purpose</td><td>Programmer</td></tr>
 <tr><td>lumpSize\u221212+1</td><td>CR1</td><td>CALL/RETURN ABI \u00b7 argument GT in; return GT out</td><td><strong>Architecture</strong></td></tr>

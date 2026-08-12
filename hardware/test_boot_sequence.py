@@ -234,7 +234,9 @@ def test_wukong_boot_triggered():
     """
     from .wukong_top import ChurchWukongXC7A100T
     from .boot_rom import (WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST,
-                           WUKONG_NUC_PROGRAM, WUKONG_WCH_CLIST,
+                           WUKONG_NUC_PROGRAM, WUKONG_SELFTEST_WORDS,
+                           WUKONG_SELFTEST_BASE_WORD, WUKONG_WCH_BASE_WORD,
+                           WUKONG_WCH_CLIST,
                            WUKONG_WCH_CLIST_WORD, WUKONG_THREAD_BASE_WORD,
                            WUKONG_THREAD_HEADER, WUKONG_THREAD_STO_WORD,
                            WUKONG_THREAD_STO_INIT, WUKONG_THREAD_CAPS0_WORD,
@@ -247,23 +249,27 @@ def test_wukong_boot_triggered():
     results = {}
 
     # Mirror the hw_init_pairs computation from elaborate() to get N_INIT.
-    # Must include the WukongCallHome LUMP body at offset 0x1C0 (word 448) —
-    # elaborate() writes [_wch_header] + list(WUKONG_NUC_PROGRAM) there, adding
-    # ~74 non-zero DMEM words that the old formula omitted.
+    # Mirror the complete factory DMEM image: SelfTest, Thread, and the
+    # selectable WukongCallHome LUMP.
     dmem_init = list(WUKONG_DEMO_NAMESPACE)
     while len(dmem_init) < 256:
         dmem_init.append(0)
     dmem_init += list(WUKONG_DEMO_CLIST)
     while len(dmem_init) < 16384:
         dmem_init.append(0)
+    for _i, _v in enumerate(WUKONG_SELFTEST_WORDS):
+        dmem_init[WUKONG_SELFTEST_BASE_WORD + _i] = _v
+    # WukongCallHome LUMP body at offset 0x1200 (word 1152) —
+    # elaborate() writes [_wch_header] + list(WUKONG_NUC_PROGRAM) there, adding
+    # ~74 non-zero DMEM words that the old formula omitted.
     _wch_cw = len(WUKONG_NUC_PROGRAM)
     for _i, _v in enumerate([wukong_wch_header(_wch_cw)] + list(WUKONG_NUC_PROGRAM)):
-        dmem_init[0x1C0 + _i] = _v
+        dmem_init[WUKONG_WCH_BASE_WORD + _i] = _v
     for _i, _v in enumerate(WUKONG_WCH_CLIST):
         dmem_init[WUKONG_WCH_CLIST_WORD + _i] = _v
     dmem_init[WUKONG_THREAD_BASE_WORD]   = WUKONG_THREAD_HEADER
     dmem_init[WUKONG_THREAD_STO_WORD]    = WUKONG_THREAD_STO_INIT
-    dmem_init[WUKONG_THREAD_CAPS0_WORD]  = 0x4A000007
+    dmem_init[WUKONG_THREAD_CAPS0_WORD]  = 0x4A000006
     dmem_init[WUKONG_THREAD_CAPS12_WORD] = make_gt(GT_TYPE_INFORM, PERM_MASK_S, 1, 0)
     hw_init_pairs = [(addr, val) for addr, val in enumerate(dmem_init) if val != 0]
     N_INIT = len(hw_init_pairs)

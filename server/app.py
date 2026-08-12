@@ -46,6 +46,13 @@ _COMPILE_API_TOKEN = os.environ.get('COMPILE_API_TOKEN', '')
 _SERVER_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SERVER_DIR not in sys.path:
     sys.path.insert(0, _SERVER_DIR)
+# `python server/app.py` puts only server/ on sys.path.  The Wukong symbol
+# module lives under the repository root, so make that importable before the
+# optional symbol import below.  Without this, the running workflow silently
+# installs the "<unknown>" decoder fallback while direct test imports work.
+_REPO_DIR = os.path.dirname(_SERVER_DIR)
+if _REPO_DIR not in sys.path:
+    sys.path.insert(0, _REPO_DIR)
 
 import boot_image as _boot_image_gen
 try:
@@ -65,17 +72,39 @@ except ImportError:
     _wukong_trace_metadata_static = lambda _nia: None
     _wts_disasm = lambda _w: '<unknown>'
 
+
+def _wukong_disassemble_word(word, pet_name=None):
+    """Return a deterministic display string for a known hardware word.
+
+    A pet-name-backed listing must never render the generic ``<unknown>``
+    placeholder.  The normal path uses the source-backed decoder; the
+    word-literal fallback keeps the row useful if a downloaded/standalone
+    server cannot load that optional decoder.
+    """
+    try:
+        disasm = _wts_disasm(int(word) & 0xFFFFFFFF)
+    except Exception:
+        disasm = None
+    if isinstance(disasm, str) and disasm.strip() and \
+            disasm.strip().lower() not in ('<unknown>', 'unknown'):
+        return disasm
+    word_text = f'0x{int(word) & 0xFFFFFFFF:08X}'
+    return f'WORD {word_text}' if pet_name else word_text
+
+
 # ── Dynamic NIA map ──────────────────────────────────────────────────────────
 # Populated by _wukong_update_active_lump_nia() whenever a boot image is sent
 # to hardware.  Stores {base_byte, end_byte, name, lump_words} for the active
 # entry lump so every trace event gets a "LumpName.N" label instead of a raw
-# hex NIA.  WukongCallHome is already covered by _wukong_trace_metadata_static;
+# hex NIA.  Resident Wukong programs are covered by
+# _wukong_trace_metadata_static;
 # for user-compiled lumps this map is the only source of labels.
 _wukong_active_lump_info = {}
 
 def _wukong_resolve_nia(nia):
     """Resolve a trace NIA: check the dynamic active-lump table first, then
-    fall back to the static WCH + Boot-ROM table from wukong_trace_symbols."""
+    fall back to the static resident-program + Boot-ROM table from
+    wukong_trace_symbols."""
     info = _wukong_active_lump_info
     if (info and
             info.get('base_byte', -1) <= nia < info.get('end_byte', 0) and
@@ -86,12 +115,9 @@ def _wukong_resolve_nia(nia):
         if offset == 0:
             disasm = 'LUMP_HEADER'
         elif word is not None:
-            try:
-                disasm = _wts_disasm(word)
-            except Exception:
-                disasm = f'0x{word:08X}'
+            disasm = _wukong_disassemble_word(word, name)
         else:
-            disasm = '<unknown>'
+            disasm = f'WORD 0x{offset:08X}'
         return {
             'pet_name':   name,
             'offset':     offset,
@@ -7898,7 +7924,7 @@ def device_callhome_log():
                 11:'INVALID_OP',12:'TPERM_RSV',13:'DOMAIN_PURITY',14:'BIND',
                 15:'F_BIT',16:'STACK_OVERFLOW',17:'ABSENT_OUTFORM',
                 18:'STACK_CORRUPT',19:'STACK_UNDERFLOW',
-                21:'OUTFORM_CRC',22:'OUTFORM_ALLOC',23:'OUTFORM_MINT',24:'OUTFORM_HDR',
+                21:'OUTFORM_CRC',22:'OUTFORM_ALLOC',23:'OUTFORM_MINT',24:'OUTFORM_HDR',25:'OUTFORM_TIMEOUT',
             }
             entries = [{
                 "ts":          r.ts,
@@ -10265,10 +10291,17 @@ def wukong_code_get():
     # Boot is always part of the hardware execution path and is also emitted
     # by the trace symbol resolver for NIAs 0x00000000/04/08.
     try:
-        from hardware.wukong_trace_symbols import _BOOT_WORDS as _boot_words
+        from hardware.wukong_trace_symbols import (
+            _BOOT_WORDS as _boot_words,
+            boot_disassembly as _wts_boot_disassembly,
+        )
+        boot_entry_name = (
+            'WukongCallHome' if force_reference
+            else str(info.get('name') if info else 'SelfTest')
+        )
         for offset, word in enumerate(_boot_words):
             add_row(offset, offset * 4, word, f'Boot.{offset}',
-                    _wts_disasm(word))
+                    _wts_boot_disassembly(offset, boot_entry_name))
     except Exception:
         pass
 
@@ -10279,19 +10312,31 @@ def wukong_code_get():
             offset = int(offset)
             word = int(word) & 0xFFFFFFFF
             add_row(offset, base_byte + offset * 4, word, f'{name}.{offset}',
-                    'LUMP_HEADER' if offset == 0 else _wts_disasm(word))
+                    'LUMP_HEADER' if offset == 0
+                    else _wukong_disassemble_word(word, name))
     else:
         try:
             from hardware.wukong_trace_symbols import (
+                WUKONG_SELFTEST_BASE as _selftest_base,
+                WUKONG_SELFTEST_WORDS as _selftest_words,
                 WUKONG_CALLHOME_BASE as _wch_base,
                 WUKONG_CALLHOME_WORDS as _wch_words,
+                _canonical_wch_header as _wch_header,
             )
             source_map = 'reference-bitstream'
-            add_row(0, int(_wch_base), None, 'WukongCallHome.0', 'LUMP_HEADER')
+            for offset, word in enumerate(_selftest_words):
+                word = int(word) & 0xFFFFFFFF
+                add_row(offset, int(_selftest_base) + offset * 4, word,
+                        f'SelfTest.{offset}',
+                        'LUMP_HEADER' if offset == 0
+                        else _wukong_disassemble_word(word, 'SelfTest'))
+            add_row(0, int(_wch_base), int(_wch_header(len(_wch_words))),
+                    'WukongCallHome.0', 'LUMP_HEADER')
             for offset, word in enumerate(_wch_words, 1):
                 word = int(word) & 0xFFFFFFFF
                 add_row(offset, int(_wch_base) + offset * 4, word,
-                        f'WukongCallHome.{offset}', _wts_disasm(word))
+                        f'WukongCallHome.{offset}',
+                        _wukong_disassemble_word(word, 'WukongCallHome'))
         except Exception:
             source_map = 'unavailable'
     return jsonify({
@@ -10459,6 +10504,7 @@ def wukong_status_get():
     now = _wk_time.time()
     with _wukong_trace_lock:
         latest    = dict(_wukong_latest_trace)
+        snapshot  = dict(_wukong_latest_snapshot)
         seq       = _wukong_event_seq
         qlen      = len(_wukong_event_queue)
         depth     = _wukong_call_depth
@@ -10494,6 +10540,9 @@ def wukong_status_get():
         'queue_len':          qlen,
         'call_depth':         depth,
         'latest_trace':       latest,
+        # Latest validated architectural stop snapshot.  This is read-only
+        # status data for dashboards; it does not mutate simulator state.
+        'latest_snapshot':    snapshot,
         'cr6_gt':             cr_gts.get(6),
         'cr14_gt':            cr_gts.get(14),
         'boot_info':          boot_info,

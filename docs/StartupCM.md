@@ -58,18 +58,15 @@ bitstream. It includes:
   `thread[+244]` (the boot entry E-GT)
 - **Boot.Abstr lump** — NS slot 6 (LED flash abstraction)
 - **DEMO_CLIST** — the c-list for the boot abstraction context (DMEM words 256–319)
-- **Thread.caps[0]** — `DMEM word 244` (`threadBase=0 + THREAD_CAPS_OFFSET=244`); the
-  boot-entry E-GT slot used by `CALL CR0`; **NULL (zero) in the factory image**
+- **Thread.caps[0]** — `DMEM word 1140` (`threadBase=896 + THREAD_CAPS_OFFSET=244`);
+  the boot-entry E-GT slot used by `CALL CR0`; `0x4A000006` (SelfTest) in the
+  factory image
 
-> **Important — NULL boot entry:** `Thread.caps[0]` (DMEM word 244) is zero in the
-> factory bitstream. On standalone power-on, `CALL CR0` at ROM[2] raises `NULL_CAP`
-> and the CM halts cleanly. This is intentional — the board is in a defined, safe state.
->
-> To configure a static boot entry: write a non-zero E-GT at DMEM word 244 in
-> `hardware/wukong_top.py`'s `dmem_init` construction (the zeros region, between
-> the 32-word NS table and the c-list). Rebuild the bitstream and reflash.
-> Alternatively, upload a freshly built bitstream to the IDE via `/upload/wukong-bit`
-> so it is served to the droplet via `/dl/wukong-bit`.
+> **Factory entry:** `Thread.caps[0]` contains the SelfTest E-GT
+> `0x4A000006`. The boot ROM's CALL reaches SelfTest at NIA `0x604`.
+> To configure another static entry, replace that E-GT in the boot image/build
+> configuration and rebuild the bitstream. Alternatively, upload a freshly built
+> bitstream to the IDE via `/upload/wukong-bit`.
 
 Source: `hardware/wukong_top.py` → `WUKONG_DEMO_NAMESPACE`, `WUKONG_DEMO_CLIST`
 
@@ -158,10 +155,10 @@ New bitstreams (current):   0xBC  N_INIT  TU_VERSION
 Old bitstreams (stale):     0xBB  N_INIT
 ```
 
-On **standalone power-on** (factory bitstream, `Thread.caps[0]` = NULL), the CM
-executes ROM[2] `CALL CR0`, raises `NULL_CAP`, and halts. This is the expected safe
-state. To configure a boot entry, write a non-zero E-GT at DMEM word 244 in
-`hardware/wukong_top.py`'s `dmem_init` and rebuild/reflash the bitstream.
+On **standalone power-on** (factory bitstream, `Thread.caps[0]` =
+`0x4A000006` at DMEM word 1140), the CM executes ROM[2] `CALL CR0` and enters
+SelfTest at NIA `0x604`. To configure another boot entry, replace that E-GT in
+the boot image/build configuration and rebuild/reflash the bitstream.
 
 - `N_INIT` — count of non-zero DMEM words written by the init sequencer (low byte).
   The bridge computes a partial expected count from `WUKONG_DEMO_NAMESPACE` and
@@ -197,6 +194,18 @@ python3 hardware/wukong_bridge.py --port=/dev/ttyUSB0 --ide=https://<your-replit
 # Use --insecure for a local HTTP server:
 python3 hardware/wukong_bridge.py --port=/dev/ttyUSB0 --ide=http://localhost:5000 --insecure
 ```
+
+On Windows 11, the same bridge runs natively with a `COM` port:
+
+```powershell
+py .\wukong_bridge.py --port=COM3 --ide=https://<your-replit-url>
+# Or let pyserial choose the first visible serial adapter:
+py .\wukong_bridge.py --port=auto --ide=https://<your-replit-url>
+```
+
+Install the Windows dependencies with `py -m pip install pyserial requests`.
+See [`docs/bridge-setup-windows.md`](bridge-setup-windows.md) for the complete
+Device Manager and troubleshooting steps.
 
 ### What the bridge does
 
@@ -237,17 +246,17 @@ Multi-event instructions emit multiple consecutive packets with the same NIA:
 
 **Two scenarios — choose based on your bitstream:**
 
-**Scenario A — Factory bitstream (Thread.caps[0] = NULL at DMEM word 244):**
+**Scenario A — Factory bitstream (Thread.caps[0] = SelfTest at DMEM word 1140):**
 ```
 1.  Flash church_wukong_xc7a100t.bit (factory build)
 2.  Power cycle the Wukong A7 board
 3.  Board sends boot sentinel:  0xBC N_INIT TU_VERSION
 4.  CM executes ROM[0]  LOAD CR15, CR15[0]
 5.  CM executes ROM[1]  CHANGE CR12, CR15, #1
-6.  CM executes ROM[2]  CALL CR0     ← NULL_CAP fault (Thread.caps[0]=NULL); CM halts
+6.  CM executes ROM[2]  CALL CR0     ← enters SelfTest at NIA 0x604
 7.  Start bridge:  python3 hardware/wukong_bridge.py --port=/dev/ttyUSB0 --ide=https://...
-8.  Bridge receives boot sentinel + fault trace packet; IDE shows NULL_CAP halt
-    (To proceed: rebuild with Thread.caps[0] set to a valid boot E-GT — see Phase A)
+8.  Bridge receives the boot trace and SelfTest events; IDE shows the factory
+     SelfTest execution state
 ```
 
 **Scenario B — Configured bitstream (Thread.caps[0] set to a valid boot E-GT):**

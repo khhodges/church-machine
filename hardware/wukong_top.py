@@ -49,6 +49,8 @@ from .hw_types import *
 from .core import ChurchCore
 from .boot_rom import (BootRom, BOOT_PROGRAM, WUKONG_NUC_PROGRAM,
                        WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST,
+                       WUKONG_SELFTEST_WORDS, WUKONG_SELFTEST_BASE_WORD,
+                       WUKONG_CALLHOME_BASE_WORD,
                        WUKONG_WCH_CLIST, WUKONG_WCH_CLIST_WORD,
                        WUKONG_THREAD_BASE_WORD, WUKONG_THREAD_HEADER,
                        WUKONG_THREAD_STO_WORD, WUKONG_THREAD_STO_INIT,
@@ -62,23 +64,22 @@ from .uart_rx import UartRx
 # Increment this by 1 every time a new bitstream is synthesised and flashed.
 # The bridge reports it to the IDE so the FPGA status page can confirm exactly
 # which build is running — no need to reprogram just to check.
-WUKONG_BUILD_VERSION = 9   # ← bump this before each new synthesis run
+WUKONG_BUILD_VERSION = 10  # ← bump this before each new synthesis run
 
 # ── Wukong ROM: 3-instruction BOOT_PROGRAM ────────────────────────────────────
 # Architecture doc:             docs/wukong-boot.md
 # BOOT_PROGRAM (3 words) — minimal boot microcode that calls into DMEM:
 #   [0] LOAD CR15, CR15[0]  → load NS root into CR15  (M-elevated during boot)
 #   [1] CHANGE              → load Thread lump; CR6 ← boot c-list at byte 0x400
-#   [2] CALL CR0, CR0[0]    → Thread.caps[0] = IDE-configured ⚡ boot entry E-GT
-#                              (set by the IDE boot-image upload; WUKONG_DEMO_CLIST[0]
-#                               is zeroed in boot_rom.py so standalone power-on
-#                               without an IDE upload faults cleanly instead of
-#                               silently entering WukongCallHome)
+#   [2] CALL CR0, CR0[0]    → Thread.caps[0] = factory SelfTest E-GT
+#                              (0x4A000006), matching the simulator lightning bolt.
+#                              An IDE boot-image upload may replace it with the
+#                              user's selected entry.
 # [3..1023] = 0
 #
 # WukongCallHome remains in the namespace at slot 7 as a selectable abstraction
 # but is no longer the hardwired default CALL target.
-# The WukongCallHome LUMP body is placed in dmem_init below at byte 0x0700.
+# The WukongCallHome LUMP body is placed in dmem_init below at byte 0x1200.
 _WUKONG_ROM = list(BOOT_PROGRAM[:3]) + [0] * (1024 - 3)
 
 # ── Synthesis-time LUMP overflow guard ────────────────────────────────────────
@@ -182,7 +183,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         m.d.comb += boot_rom.addr.eq(core.imem_addr[2:12])
         # imem source mux: NIA 0x0-0xB fetches BOOT_PROGRAM from the 3-word ROM;
         # everything else fetches from DMEM via a dedicated read port (below),
-        # so the WukongCallHome LUMP body at word 448 — and any IDE-uploaded
+        # so the WukongCallHome LUMP body at word 1152 — and any IDE-uploaded
         # code — actually executes.  Both sources have 1-cycle latency, so the
         # select is registered to stay aligned with the data.
         imem_from_dmem = Signal()
@@ -198,8 +199,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         #   CR6.word1_location  = 0x400  (c-list at byte 0x400 = word 256)
         #
         # BOOT_PROGRAM[2] = CALL CR0,CR0[0] → Thread.caps[0] (WUKONG_DEMO_CLIST[0])
-        # WUKONG_DEMO_CLIST[0] is NULL (zero) in the factory image; the IDE boot-image
-        # upload overwrites it with the E-GT for the ⚡ configured boot abstraction.
+        # WUKONG_DEMO_CLIST[0] and Thread.caps[0] carry the factory SelfTest E-GT.
         #
         # WukongCallHome LUMP (cc=0): uses CR6 to reach the boot c-list directly.
         #   WUKONG_NUC_PROGRAM[0] = LOAD CR3, CR6[5]  → LED_DEV (clist[5])
@@ -215,12 +215,11 @@ class ChurchWukongXC7A100T(Elaboratable):
         #                   [0]=NULL (IDE upload sets this to ⚡ boot entry E-GT)
         #                   [5]=LED_DEV, [6]=UART_DEV, [7]=BTN_DEV, [8]=TIMER_DEV
         #                   [9]=0, [10]=0  (SlideRule/Constants absent in 8-slot NS)
-        #   words 320-447 : zeros
-        #   words 448-521 : WukongCallHome LUMP body
-        #                   [448] header (magic=0x1F, n_minus_6=1, cw=73, cc=0)
-        #                   [449..521] WUKONG_NUC_PROGRAM[0..72]
-        #   words 522-575 : zeros (padding to end of 128-word alloc at word 575)
-        #   words 576+    : zeros
+        #   words 320-383 : zeros
+        #   words 384-895 : canonical SelfTest LUMP (512 words)
+        #   words 896-1151: Boot.Thread LUMP (256-word allocation)
+        #   words 1152-1279: WukongCallHome LUMP (128-word allocation)
+        #   words 1280+   : zeros
         #
         # The LUMP body is derived from WUKONG_NUC_PROGRAM at module-load time, so
         # any future change to WUKONG_NUC_PROGRAM propagates automatically.
@@ -232,30 +231,34 @@ class ChurchWukongXC7A100T(Elaboratable):
         while len(dmem_init) < 16384:
             dmem_init.append(0)
 
-        # WukongCallHome LUMP body at DMEM byte 0x0700 = word 0x1C0 = 448.
-        # cc=7 → c-list tail at lump words 121-127 ([5]=LED, [6]=UART); the
+        # Canonical SelfTest LUMP at DMEM byte 0x0600 = word 384.
+        for _i, _v in enumerate(WUKONG_SELFTEST_WORDS):
+            dmem_init[WUKONG_SELFTEST_BASE_WORD + _i] = _v
+
+        # WukongCallHome LUMP body at DMEM byte 0x1200 = word 1152.
+        # cc=8 → c-list tail at lump words 120-127 ([5]=LED, [6]=UART); the
         # hardware CALL derives CR6 from the called lump's own header, so a
-        # cc=0 lump gets a NULL CR6 and its first LOAD faults NULL_CAP.
+        # malformed c-list would make its first LOAD fault NULL_CAP.
         _wch_cw = len(WUKONG_NUC_PROGRAM)               # 73 — auto-tracks changes
         for _i, _v in enumerate([wukong_wch_header(_wch_cw)] + list(WUKONG_NUC_PROGRAM)):
-            dmem_init[0x1C0 + _i] = _v
+            dmem_init[WUKONG_CALLHOME_BASE_WORD + _i] = _v
         for _i, _v in enumerate(WUKONG_WCH_CLIST):
             dmem_init[WUKONG_WCH_CLIST_WORD + _i] = _v
 
-        # Boot.Thread lump at byte 0x900 (word 576) — see boot_rom.py for the
+        # Boot.Thread lump at byte 0xE00 (word 896) — see boot_rom.py for the
         # relocation rationale (a base-0 Thread lump collides with the NS
         # table: Heap[0]/STO is NS slot 4 word1).
         #   header  : valid lump header (size=256, sw=32, cc=12)
         #   STO     : 243 (sp_max) so the boot CALL's stack push succeeds
-        #   caps[0] : WukongCallHome E-GT (NS slot 7) — the ⚡ boot entry.
+        #   caps[0] : SelfTest E-GT (NS slot 6) — the ⚡ boot entry.
         #             BOOT_PROGRAM[2] = CALL CR0,CR0[0] resolves THIS word.
         #   caps[12]: S-perm Boot.Thread GT so RESTORE_CALL[12] gives CR12 a
         #             non-null cap (FETCH_THREAD_HDR faults otherwise).
         dmem_init[WUKONG_THREAD_BASE_WORD]   = WUKONG_THREAD_HEADER
         dmem_init[WUKONG_THREAD_STO_WORD]    = WUKONG_THREAD_STO_INIT
-        dmem_init[WUKONG_THREAD_CAPS0_WORD]  = 0x4A000007  # WukongCallHome E-GT
+        dmem_init[WUKONG_THREAD_CAPS0_WORD]  = 0x4A000006  # SelfTest E-GT
         dmem_init[WUKONG_THREAD_CAPS12_WORD] = make_gt(GT_TYPE_INFORM, PERM_MASK_S, 1, 0)
-        # Words 0x1EA..0x23F remain zero (padding to 128-word alloc boundary).
+        # Words 0x47A..0x47F remain zero (padding to 128-word init boundary).
 
         hw_init_pairs = [(addr, val)
                          for addr, val in enumerate(dmem_init) if val != 0]
@@ -265,8 +268,13 @@ class ChurchWukongXC7A100T(Elaboratable):
         # below also uses N_INIT for Signal(range(N_INIT+1)) and the done-latch.
         N_INIT = len(hw_init_pairs)
 
+        # The hardware init sequencer below writes every non-zero word before
+        # boot_start, so synthesis does not need to elaborate the complete
+        # 16K-word Python initializer. Keep it for sim_mode accuracy, where
+        # tests inspect memory immediately after elaboration.
         dmem = m.submodules.dmem = LibMemory(
-            shape=unsigned(32), depth=16384, init=dmem_init)
+            shape=unsigned(32), depth=16384,
+            init=dmem_init if self.sim_mode else [])
         dmem_rd = dmem.read_port(domain="sync")
         # Independent synchronous read port for the stop-state snapshot.
         # The snapshot is emitted only while the CM is halted, so this port

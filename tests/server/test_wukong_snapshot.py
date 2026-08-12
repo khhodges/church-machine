@@ -87,3 +87,15 @@ def test_snapshot_is_ordered_with_trace_events(client):
     assert [event['seq'] for event in events] == [1, 2, 3]
     assert events[1]['stored_cr12_gt'] == 0xA1
     assert events[1]['dr'][15] == 0x10F
+
+
+def test_latest_snapshot_is_exposed_by_read_only_status(client):
+    payload = _snapshot()
+    assert client.post('/hardware/wukong/snapshot',
+                       data=json.dumps(payload),
+                       content_type='application/json').status_code == 200
+
+    status = client.get('/hardware/wukong/status').get_json()
+    assert status['latest_snapshot']['snapshot'] is True
+    assert status['latest_snapshot']['nia'] == 0x1234
+    assert status['latest_snapshot']['stored_cr12_gt'] == 0xA1

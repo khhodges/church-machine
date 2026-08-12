@@ -1556,6 +1556,10 @@ function loadDeviceList() {
                 return;
             }
             _devLastSeenMap = {};
+            Object.keys(_devHardwarePollers).forEach(function(pid) { _stopDeviceHardwarePolling(pid); });
+            Object.keys(_devHardwareState).forEach(function(pid) {
+                _devHardwareState[pid].busy = false;
+            });
             grid.innerHTML = '';
             const _bootReasonNames = {0: 'Cold', 1: 'Warm', 2: 'Fault'};
             const _faultNames = {
@@ -1563,7 +1567,7 @@ function loadDeviceList() {
                 6:'PERM_E',7:'NULL_CAP',8:'BOUNDS',9:'VERSION',10:'SEAL',
                 11:'INVALID_OP',12:'TPERM_RSV',13:'DOMAIN_PURITY',14:'BIND',
                 15:'F_BIT',16:'STACK_OVERFLOW',17:'ABSENT_OUTFORM',
-                18:'STACK_CORRUPT',19:'STACK_UNDERFLOW',
+                18:'STACK_CORRUPT',19:'STACK_UNDERFLOW',25:'OUTFORM_TIMEOUT',
                 21:'OUTFORM_CRC',22:'OUTFORM_ALLOC',23:'OUTFORM_MINT',24:'OUTFORM_HDR'
             };
             data.devices.forEach(dev => {
@@ -1650,6 +1654,31 @@ function loadDeviceList() {
                             '<canvas class="dev-nia-sparkline" id="devNiaSparkline_' + dev.id + '" height="48"></canvas>' +
                             '<div class="dev-nia-tooltip" id="devNiaTooltip_' + dev.id + '" style="display:none;"></div>' +
                         '</div>' +
+                    '</div>' +
+                    '<div class="dev-live-section dev-hw-section" id="devHwSection_' + dev.id + '">' +
+                        '<div class="dev-live-section-hdr dev-hw-section-hdr">' +
+                            '<span>FPGA execution</span><span class="dev-hw-live-state" id="devHwState_' + dev.id + '">Checking\u2026</span>' +
+                        '</div>' +
+                        '<div class="dev-hw-toolbar">' +
+                            '<button class="dev-hw-btn dev-hw-run" id="devHwRun_' + dev.id + '" type="button">Run \u25B6</button>' +
+                            '<button class="dev-hw-btn" id="devHwStep_' + dev.id + '" type="button">Step</button>' +
+                            '<button class="dev-hw-btn dev-hw-halt" id="devHwHalt_' + dev.id + '" type="button">Pause</button>' +
+                            '<label class="dev-hw-breakpoint"><span>FPGA BP</span><input id="devHwBp_' + dev.id + '" placeholder="NIA hex" spellcheck="false"><button id="devHwBpBtn_' + dev.id + '" type="button">Set</button></label>' +
+                            '<a class="dev-hw-workspace-link" href="/fpga" target="_blank" rel="noopener">Full workspace \u2197</a>' +
+                        '</div>' +
+                        '<div class="dev-hw-summary" id="devHwSummary_' + dev.id + '">' +
+                            '<div><span>Present</span><strong id="devHwPresent_' + dev.id + '">\u2014</strong></div>' +
+                            '<div><span>Last</span><strong id="devHwLast_' + dev.id + '">\u2014</strong></div>' +
+                            '<div><span>Next</span><strong id="devHwNext_' + dev.id + '">\u2014</strong></div>' +
+                            '<div><span>Depth</span><strong id="devHwDepth_' + dev.id + '">\u2014</strong></div>' +
+                            '<div><span>Delivery</span><strong id="devHwDelivery_' + dev.id + '">\u2014</strong></div>' +
+                        '</div>' +
+                        '<div class="dev-hw-grid">' +
+                            '<div><div class="dev-hw-subhead">Semantic code</div><div class="dev-hw-code" id="devHwCode_' + dev.id + '"><span class="dev-live-empty">Waiting for hardware trace\u2026</span></div></div>' +
+                            '<div><div class="dev-hw-subhead">Snapshot / suspended thread</div><div class="dev-hw-snapshot" id="devHwSnapshot_' + dev.id + '"><span class="dev-live-empty">No validated stop snapshot yet.</span></div></div>' +
+                        '</div>' +
+                        '<div class="dev-hw-pipeline" id="devHwPipeline_' + dev.id + '">Pipeline: waiting for bridge status\u2026</div>' +
+                        '<div class="dev-hw-message" id="devHwMessage_' + dev.id + '" role="status"></div>' +
                     '</div>';
 
                 (function(cnv, ttId) {
@@ -1686,10 +1715,12 @@ function loadDeviceList() {
                     document.querySelectorAll('.dev-detail').forEach(function(d) { d.style.display = 'none'; });
                     document.querySelectorAll('.dev-row').forEach(function(r) { r.classList.remove('dev-row-open'); });
                     Object.keys(_devLivePollers).forEach(function(pid) { _stopDeviceLivePolling(pid); });
+                    Object.keys(_devHardwarePollers).forEach(function(pid) { _stopDeviceHardwarePolling(pid); });
                     if (!isOpen) {
                         detail.style.display = 'block';
                         row.classList.add('dev-row-open');
                         _startDeviceLivePolling(dev.device_uid, dev.id, dev.fw_major || 1);
+                        _startDeviceHardwarePolling(dev.id, isOnline);
                     }
                 });
 
@@ -1746,6 +1777,8 @@ var _deviceTunnelTimer = null;
 var _deviceRelTimeTimer = null;
 var _devLastSeenMap = {};
 var _devLivePollers = {};
+var _devHardwarePollers = {};
+var _devHardwareState = {};
 
 function startDeviceTunnelPolling() {
     stopDeviceTunnelPolling();
@@ -1825,6 +1858,254 @@ function _startDeviceLivePolling(uid, devId, fwMajor) {
     var faultTimer = setInterval(fetchFaults, 3000);
     var traceTimer = setInterval(function() { setTimeout(fetchTraces, 1500); }, 3000);
     _devLivePollers[devId] = [faultTimer, traceTimer];
+}
+
+// === FPGA execution summary (shared Wukong server state, per-card UI) ===
+// The Devices page is intentionally a read-only mirror of the hardware
+// workspace.  It never advances the simulator PC or applies hardware CR/DR
+// values to `sim`; commands go through the same one-slot bridge queue as /fpga.
+function _devHardwareHex(value) {
+    if (value === null || value === undefined || value === '') return '\u2014';
+    var n = Number(value);
+    if (!isFinite(n)) return '\u2014';
+    return '0x' + (n >>> 0).toString(16).toUpperCase().padStart(8, '0');
+}
+
+function _devHardwareShortLabel(row) {
+    if (!row) return '\u2014';
+    return (row.nia_label || row.disasm || _devHardwareHex(row.nia)).toString();
+}
+
+function _devHardwareSetMessage(devId, text, kind) {
+    var el = document.getElementById('devHwMessage_' + devId);
+    if (!el) return;
+    el.textContent = text || '';
+    el.className = 'dev-hw-message' + (kind ? ' ' + kind : '');
+}
+
+function _devHardwareControls(devId, busy) {
+    ['devHwRun_', 'devHwStep_', 'devHwHalt_', 'devHwBpBtn_'].forEach(function(prefix) {
+        var el = document.getElementById(prefix + devId);
+        if (el) el.disabled = !!busy;
+    });
+}
+
+function _devHardwareRenderCode(devId, rows, presentNia, breakpoints) {
+    var el = document.getElementById('devHwCode_' + devId);
+    if (!el) return;
+    rows = Array.isArray(rows) ? rows : [];
+    if (!rows.length) {
+        el.innerHTML = '<span class="dev-live-empty">No semantic code map available yet.</span>';
+        return;
+    }
+    var presentIndex = rows.findIndex(function(row) {
+        return presentNia !== null && presentNia !== undefined &&
+            (Number(row.nia) >>> 0) === (Number(presentNia) >>> 0);
+    });
+    var html = '';
+    rows.slice(0, 80).forEach(function(row, index) {
+        var nia = Number(row.nia) >>> 0;
+        var state = index === presentIndex ? ' present' :
+            (presentIndex >= 0 && index === presentIndex - 1 ? ' last' :
+             (presentIndex >= 0 && index === presentIndex + 1 ? ' next' : ''));
+        var bp = breakpoints && breakpoints.has(nia);
+        html += '<div class="dev-hw-code-row' + state + '">' +
+            '<span class="dev-hw-code-marker">' + (bp ? '\u25CF' : '') + '</span>' +
+            '<span class="dev-hw-code-offset">+' + _escHtml(String(row.offset === undefined ? '?' : row.offset)) + '</span>' +
+            '<span class="dev-hw-code-asm">' + _escHtml(row.disasm || _devHardwareHex(row.word)) + '</span>' +
+            '<button type="button" class="dev-hw-row-bp" data-nia="' + nia + '" title="Arm FPGA breakpoint at this NIA">BP</button>' +
+            '</div>';
+    });
+    if (rows.length > 80) {
+        html += '<div class="dev-live-empty">+' + (rows.length - 80) + ' more instructions in the full workspace.</div>';
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('.dev-hw-row-bp').forEach(function(btn) {
+        btn.addEventListener('click', function(event) {
+            event.stopPropagation();
+            _devHardwareSendCommand(devId, 'b', 'SET BP @ ' + _devHardwareHex(btn.dataset.nia),
+                {nia: Number(btn.dataset.nia) >>> 0});
+        });
+    });
+}
+
+function _devHardwareRenderSnapshot(devId, snapshot) {
+    var el = document.getElementById('devHwSnapshot_' + devId);
+    if (!el) return;
+    if (!snapshot || !snapshot.snapshot) {
+        el.innerHTML = '<span class="dev-live-empty">No validated stop snapshot yet.</span>';
+        return;
+    }
+    var cr = Array.isArray(snapshot.cr) ? snapshot.cr : [];
+    var dr = Array.isArray(snapshot.dr) ? snapshot.dr : [];
+    var reason = ({1: 'pause', 2: 'step', 3: 'fault', 4: 'breakpoint'})[snapshot.reason] ||
+        ('reason ' + (snapshot.reason === undefined ? '?' : snapshot.reason));
+    el.innerHTML =
+        '<div class="dev-hw-snapshot-grid">' +
+            '<span>Stop</span><strong>' + _escHtml(reason) + '</strong>' +
+            '<span>NIA</span><strong>' + _devHardwareHex(snapshot.nia) + '</strong>' +
+            '<span>Thread base</span><strong>' + _devHardwareHex(snapshot.thread_base) + '</strong>' +
+            '<span>Stored CR12 GT</span><strong>' + _devHardwareHex(snapshot.stored_cr12_gt) + '</strong>' +
+            '<span>Stored packed PC</span><strong>' + _devHardwareHex(snapshot.stored_packed_pc) + '</strong>' +
+            '<span>M flag</span><strong>' + (snapshot.m_flag ? 'set' : 'clear') + '</strong>' +
+        '</div>' +
+        '<div class="dev-hw-snapshot-note">' +
+            (cr.length === 16 ? 'CR0\u2013CR15 captured (3 words each)' : 'CR register capture unavailable') +
+            ' \u00B7 ' + (dr.length === 16 ? 'DR0\u2013DR15 captured' : 'DR register capture unavailable') +
+        '</div>';
+}
+
+function _devHardwareRenderStatus(devId, status, codeData) {
+    var state = _devHardwareState[devId] || (_devHardwareState[devId] = {
+        breakpoints: new Set(), busy: false, code: []
+    });
+    var trace = (status && status.latest_trace) || {};
+    var presentNia = trace.nia === undefined ? null : Number(trace.nia) >>> 0;
+    var rows = (codeData && Array.isArray(codeData.rows)) ? codeData.rows : state.code;
+    state.code = rows;
+    var fresh = status && status.last_trace_age !== null && status.last_trace_age !== undefined &&
+        status.last_trace_age < 3;
+    var faulted = !!trace.fault_valid;
+    var stateEl = document.getElementById('devHwState_' + devId);
+    if (stateEl) {
+        stateEl.textContent = faulted ? 'Faulted' : (fresh ? 'Running' : (trace.nia !== undefined ? 'Paused / idle' : 'Waiting'));
+        stateEl.className = 'dev-hw-live-state ' + (faulted ? 'fault' : (fresh ? 'running' : 'idle'));
+    }
+    var presentRow = rows.find(function(row) {
+        return presentNia !== null && (Number(row.nia) >>> 0) === presentNia;
+    });
+    var presentIndex = presentRow ? rows.indexOf(presentRow) : -1;
+    var lastRow = presentIndex > 0 ? rows[presentIndex - 1] : null;
+    var nextRow = presentIndex >= 0 ? rows[presentIndex + 1] : null;
+    var values = {
+        Present: presentRow || trace,
+        Last: lastRow,
+        Next: nextRow
+    };
+    ['Present', 'Last', 'Next'].forEach(function(label) {
+        var node = document.getElementById('devHw' + label + '_' + devId);
+        if (node) node.textContent = _devHardwareShortLabel(values[label]);
+    });
+    var depth = document.getElementById('devHwDepth_' + devId);
+    if (depth) depth.textContent = status && status.call_depth !== undefined ? status.call_depth : '\u2014';
+    var delivery = status && status.command_delivery;
+    var deliveryEl = document.getElementById('devHwDelivery_' + devId);
+    if (deliveryEl) {
+        deliveryEl.textContent = delivery
+            ? (delivery.write_ts ? (delivery.write_ok ? 'written: ' + delivery.cmd : 'write failed') :
+               (delivery.consumed_ts ? 'bridge consumed: ' + delivery.cmd : 'queued: ' + delivery.cmd))
+            : 'none';
+    }
+    _devHardwareRenderCode(devId, rows, presentNia, state.breakpoints);
+    _devHardwareRenderSnapshot(devId, status && status.latest_snapshot);
+    var pipeline = document.getElementById('devHwPipeline_' + devId);
+    if (pipeline) {
+        var bridge = status && status.bridge_connected ? 'bridge online' : 'bridge offline';
+        var traceAge = status && status.last_trace_age !== null && status.last_trace_age !== undefined
+            ? Math.round(status.last_trace_age) + 's trace age' : 'no trace yet';
+        pipeline.textContent = 'Pipeline: ' + bridge + ' \u00B7 ' + traceAge +
+            ' \u00B7 queue ' + ((status && status.queue_len) || 0) +
+            ' \u00B7 server seq ' + ((status && status.server_seq) || 0);
+    }
+}
+
+function _devHardwareFetch(devId) {
+    var state = _devHardwareState[devId];
+    if (!state || state.busy) return;
+    fetch('/hardware/wukong/status')
+        .then(function(response) { return response.json(); })
+        .then(function(status) {
+            var traceNia = status.latest_trace && status.latest_trace.nia;
+            var url = '/hardware/wukong/code' + (traceNia === undefined ? '' :
+                '?trace_nia=' + encodeURIComponent('0x' + (Number(traceNia) >>> 0).toString(16)));
+            return fetch(url).then(function(response) { return response.json(); })
+                .then(function(codeData) { _devHardwareRenderStatus(devId, status, codeData); });
+        })
+        .catch(function() {
+            _devHardwareSetMessage(devId, 'FPGA status unavailable', 'error');
+        });
+}
+
+function _devHardwareSendCommand(devId, cmd, label, extra) {
+    var state = _devHardwareState[devId] || (_devHardwareState[devId] = {breakpoints: new Set(), code: []});
+    if (state.busy) return;
+    state.busy = true;
+    _devHardwareControls(devId, true);
+    _devHardwareSetMessage(devId, label + '\u2026', '');
+    fetch('/hardware/wukong/command', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(Object.assign({cmd: cmd}, extra || {}))
+    }).then(function(response) {
+        return response.json().then(function(data) { return {ok: response.ok, data: data}; });
+    }).then(function(result) {
+        if (!result.ok || !result.data || !result.data.ok) {
+            throw new Error(result.data && result.data.error || 'command rejected');
+        }
+        var id = result.data.id;
+        var deadline = Date.now() + 10000;
+        function waitForDelivery() {
+            return fetch('/hardware/wukong/status').then(function(response) { return response.json(); }).then(function(status) {
+                var delivery = status.command_delivery;
+                if (delivery && delivery.id === id && delivery.write_ts) {
+                    if (!delivery.write_ok) throw new Error(delivery.write_error || 'bridge serial write failed');
+                    if (cmd === 'b') state.breakpoints.add(Number(extra.nia) >>> 0);
+                    _devHardwareSetMessage(devId, label + ' delivered', 'success');
+                    _devHardwareFetch(devId);
+                    return;
+                }
+                if (Date.now() >= deadline) throw new Error('no bridge delivery confirmation');
+                return new Promise(function(resolve) { setTimeout(resolve, 350); }).then(waitForDelivery);
+            });
+        }
+        return waitForDelivery();
+    }).catch(function(error) {
+        _devHardwareSetMessage(devId, label + ' failed: ' + error.message, 'error');
+    }).finally(function() {
+        state.busy = false;
+        _devHardwareControls(devId, false);
+    });
+}
+
+function _startDeviceHardwarePolling(devId, isOnline) {
+    _stopDeviceHardwarePolling(devId);
+    var state = _devHardwareState[devId] || (_devHardwareState[devId] = {breakpoints: new Set(), code: [], busy: false});
+    var run = document.getElementById('devHwRun_' + devId);
+    var step = document.getElementById('devHwStep_' + devId);
+    var halt = document.getElementById('devHwHalt_' + devId);
+    var bpInput = document.getElementById('devHwBp_' + devId);
+    var bpButton = document.getElementById('devHwBpBtn_' + devId);
+    [run, step, halt, bpButton].forEach(function(button) {
+        if (button) button.disabled = !isOnline;
+    });
+    if (run && !run.dataset.bound) {
+        run.dataset.bound = '1';
+        run.addEventListener('click', function() {
+            var status = document.getElementById('devHwState_' + devId);
+            var wantsRun = !status || status.textContent !== 'Running';
+            _devHardwareSendCommand(devId, wantsRun ? 'r' : 's', wantsRun ? 'RUN' : 'PAUSE');
+        });
+        step.addEventListener('click', function() { _devHardwareSendCommand(devId, 's', 'STEP'); });
+        halt.addEventListener('click', function() { _devHardwareSendCommand(devId, 'h', 'HALT'); });
+        bpButton.addEventListener('click', function() {
+            var raw = bpInput && bpInput.value.trim();
+            if (!raw || !/^(0x)?[0-9a-fA-F]{1,8}$/.test(raw)) {
+                _devHardwareSetMessage(devId, 'Enter a valid hex NIA, e.g. 0x200', 'error');
+                return;
+            }
+            var nia = parseInt(raw.replace(/^0x/i, ''), 16) >>> 0;
+            _devHardwareSendCommand(devId, 'b', 'SET BP @ ' + _devHardwareHex(nia), {nia: nia});
+        });
+    }
+    _devHardwareFetch(devId);
+    _devHardwarePollers[devId] = setInterval(function() { _devHardwareFetch(devId); }, 1800);
+}
+
+function _stopDeviceHardwarePolling(devId) {
+    if (_devHardwarePollers[devId]) {
+        clearInterval(_devHardwarePollers[devId]);
+        delete _devHardwarePollers[devId];
+    }
 }
 
 function _stopDeviceLivePolling(devId) {
@@ -1993,7 +2274,7 @@ var _faultTypeNames = {
     11:'INVALID_OP',12:'TPERM_RSV',13:'DOMAIN_PURITY',14:'BIND',
     15:'F_BIT',16:'STACK_OVERFLOW',17:'ABSENT_OUTFORM',
     18:'STACK_CORRUPT',19:'STACK_UNDERFLOW',
-    21:'OUTFORM_CRC',22:'OUTFORM_ALLOC',23:'OUTFORM_MINT',24:'OUTFORM_HDR'
+    21:'OUTFORM_CRC',22:'OUTFORM_ALLOC',23:'OUTFORM_MINT',24:'OUTFORM_HDR',25:'OUTFORM_TIMEOUT'
 };
 
 function showDeviceFaultLog(deviceUid) {

@@ -5,6 +5,7 @@ Usage
 -----
     python3 hardware/wukong_bridge.py --ide=https://<your-replit-url>
     python3 hardware/wukong_bridge.py --port=/dev/ttyUSB0 --ide=http://localhost:5000 --insecure
+    py hardware/wukong_bridge.py --port=COM3 --ide=https://<your-replit-url>
 
 What it does
 ------------
@@ -209,8 +210,16 @@ def _compute_expected_n_init():
         _root = os.path.dirname(_here)   # project root
         if _root not in sys.path:
             sys.path.insert(0, _root)
-        from hardware.boot_rom import WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST
-    except ImportError:
+        from hardware.boot_rom import (
+            WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST, WUKONG_SELFTEST_WORDS,
+            WUKONG_SELFTEST_BASE_WORD, WUKONG_WCH_BASE_WORD, WUKONG_WCH_CLIST,
+            WUKONG_WCH_CLIST_WORD, WUKONG_NUC_PROGRAM, WUKONG_THREAD_BASE_WORD,
+            WUKONG_THREAD_HEADER, WUKONG_THREAD_STO_WORD, WUKONG_THREAD_STO_INIT,
+            WUKONG_THREAD_CAPS0_WORD, WUKONG_THREAD_CAPS12_WORD,
+            wukong_wch_header,
+        )
+        from hardware.hw_types import GT_TYPE_INFORM, PERM_MASK_S, make_gt
+    except (ImportError, OSError, struct.error):
         return None
 
     dmem_init = list(WUKONG_DEMO_NAMESPACE)
@@ -219,6 +228,20 @@ def _compute_expected_n_init():
     dmem_init += list(WUKONG_DEMO_CLIST)
     while len(dmem_init) < 16384:
         dmem_init.append(0)
+    for _i, _v in enumerate(WUKONG_SELFTEST_WORDS):
+        dmem_init[WUKONG_SELFTEST_BASE_WORD + _i] = _v
+    for _i, _v in enumerate(
+        [wukong_wch_header(len(WUKONG_NUC_PROGRAM))] + list(WUKONG_NUC_PROGRAM)
+    ):
+        dmem_init[WUKONG_WCH_BASE_WORD + _i] = _v
+    for _i, _v in enumerate(WUKONG_WCH_CLIST):
+        dmem_init[WUKONG_WCH_CLIST_WORD + _i] = _v
+    dmem_init[WUKONG_THREAD_BASE_WORD] = WUKONG_THREAD_HEADER
+    dmem_init[WUKONG_THREAD_STO_WORD] = WUKONG_THREAD_STO_INIT
+    dmem_init[WUKONG_THREAD_CAPS0_WORD] = 0x4A000006
+    dmem_init[WUKONG_THREAD_CAPS12_WORD] = make_gt(
+        GT_TYPE_INFORM, PERM_MASK_S, 1, 0
+    )
     return sum(1 for v in dmem_init if v != 0)
 
 
@@ -250,6 +273,10 @@ _STANDALONE_WUKONG_WORDS = (
     0xBF007FBB,
 )
 _STANDALONE_BOOT_WORDS = (0x077F8000, 0x27678001, 0x17000000)
+_STANDALONE_BOOT_DISASSEMBLY = (
+    'LOAD NAMESPACE CD15',
+    'LOAD THREAD+HEAP CR12+, CR5',
+)
 _STANDALONE_CONDS = ('EQ', 'NE', 'CS', 'CC', 'MI', 'PL', 'VS', 'VC',
                      'HI', 'LS', 'GE', 'LT', 'GT', 'LE', '', 'NV')
 _STANDALONE_OPS = {
@@ -293,6 +320,14 @@ def _standalone_disassemble(word):
     return f'{op} DR{dst}, DR{src}, {imm & 0x1F}'
 
 
+def _standalone_boot_disassemble(offset, entry_pet_name='SelfTest'):
+    if offset == 0 or offset == 1:
+        return _STANDALONE_BOOT_DISASSEMBLY[offset]
+    if offset == 2:
+        return f'CALL CR[0] {entry_pet_name}'
+    return None
+
+
 def _trace_location(nia):
     """Resolve the reference-bitstream pet-name/offset and disassembly."""
     if _trace_metadata is not None:
@@ -304,17 +339,28 @@ def _trace_location(nia):
             'pet_name': 'Boot',
             'offset': offset,
             'nia_label': f'Boot.{offset}',
-            'disasm': _standalone_disassemble(_STANDALONE_BOOT_WORDS[offset]),
+            'disasm': _standalone_boot_disassemble(offset),
             'source_map': 'reference-bitstream',
         }
-    # 0x700 is the LUMP header; executable word 0 starts at 0x704.
-    if 0x700 <= nia < 0x700 + (len(_STANDALONE_WUKONG_WORDS) + 1) * 4 and nia % 4 == 0:
-        offset = (nia - 0x700) // 4
+    # Factory SelfTest is the resident default; WukongCallHome is the
+    # selectable resident program at 0x1200.
+    if 0x600 <= nia < 0x600 + 512 * 4 and nia % 4 == 0:
+        offset = (nia - 0x600) // 4
+        return {
+            'pet_name': 'SelfTest',
+            'offset': offset,
+            'nia_label': f'SelfTest.{offset}',
+            'disasm': ('LUMP_HEADER' if offset == 0
+                       else 'SelfTest resident instruction'),
+            'source_map': 'reference-bitstream',
+        }
+    if 0x1200 <= nia < 0x1200 + (len(_STANDALONE_WUKONG_WORDS) + 1) * 4 and nia % 4 == 0:
+        offset = (nia - 0x1200) // 4
         if offset == 0:
             return {
                 'pet_name': 'WukongCallHome',
                 'offset': 0,
-                'nia_label': 'WukongCallHome.0',
+            'nia_label': 'WukongCallHome.0',
                 'disasm': 'LUMP_HEADER',
                 'source_map': 'reference-bitstream',
             }
@@ -854,6 +900,45 @@ def execute_board_command(cmd, data, ser, reopen_serial, buf,
     return ser
 
 
+def _available_serial_ports():
+    """Return serial device names visible to pyserial on this host.
+
+    ``/dev/ttyUSB*`` is not available on Windows, where the same USB-UART
+    adapter is exposed as ``COM3``, ``COM4``, etc.  pyserial already provides
+    the portable enumeration API, so the bridge should use it on both
+    platforms instead of assuming a POSIX device path.
+    """
+    try:
+        from serial.tools import list_ports
+        return sorted(
+            {str(info.device) for info in list_ports.comports()
+             if getattr(info, 'device', None)},
+            key=lambda device: device.lower(),
+        )
+    except Exception:
+        # Keep explicit --port operation usable even if enumeration is not
+        # available in a minimal pyserial installation.
+        return []
+
+
+def _find_serial_port(preferred=None):
+    """Return *preferred* when present, otherwise the first visible port.
+
+    The fallback is only used to produce a useful SerialException when no
+    device is connected.  On Windows, COM3 is a conventional error hint; it
+    is not claimed to exist and is never opened in preference to an
+    enumerated port.
+    """
+    candidates = _available_serial_ports()
+    if preferred and preferred in candidates:
+        return preferred
+    if candidates:
+        return candidates[0]
+    if preferred:
+        return preferred
+    return 'COM3' if os.name == 'nt' else '/dev/ttyUSB0'
+
+
 def main():
     if serial is None:
         print("ERROR: pyserial not installed.  Run: pip install pyserial", file=sys.stderr)
@@ -863,7 +948,9 @@ def main():
         sys.exit(1)
 
     parser = argparse.ArgumentParser(description='Wukong UART ↔ IDE bridge')
-    parser.add_argument('--port', default='auto', help='Serial port (default: auto-detect /dev/ttyUSB*)')
+    parser.add_argument('--port', default='auto',
+                        help='Serial port (default: auto-detect; COMx on Windows, '
+                             '/dev/ttyUSB* on Linux)')
     parser.add_argument('--baud', type=int, default=57600, help='Baud rate')
     parser.add_argument('--ide', default='http://localhost:5000', help='IDE base URL')
     parser.add_argument('--insecure', action='store_true',
@@ -886,24 +973,16 @@ def main():
             pass
 
     # ── Port auto-detection ────────────────────────────────────────────────────
-    def _find_usb_serial(preferred=None):
-        """Return the first available /dev/ttyUSB* path, trying preferred first."""
-        import glob
-        candidates = sorted(glob.glob('/dev/ttyUSB*'))
-        if preferred and preferred in candidates:
-            return preferred
-        if candidates:
-            return candidates[0]
-        return preferred or '/dev/ttyUSB0'
-
     port = args.port
     if port == 'auto':
-        port = _find_usb_serial()
+        port = _find_serial_port()
         print(f'Wukong bridge: auto-detected {port} @ {args.baud} baud → {ide_base}')
     else:
-        import os as _os
-        if not _os.path.exists(port):
-            alt = _find_usb_serial()
+        # os.path.exists('COM3') is not a reliable Windows serial-port
+        # availability check. Ask pyserial instead, while still honoring an
+        # explicitly supplied port when enumeration is unavailable.
+        if port not in _available_serial_ports():
+            alt = _find_serial_port()
             if alt != port:
                 print(f'[bridge] {port} not found — trying {alt} instead')
                 port = alt
@@ -976,7 +1055,7 @@ def main():
         except Exception:
             pass
         for attempt in range(15):
-            found = _find_usb_serial(port)
+            found = _find_serial_port(port)
             try:
                 s = serial.Serial(found, args.baud, timeout=0.05)
                 if found != port:

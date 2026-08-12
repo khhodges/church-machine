@@ -4,15 +4,11 @@
 Checks three properties that the structural auto-derivation in wukong_top.py
 cannot catch because they live in separate modules:
 
-  1. WUKONG_DEMO_CLIST[0] is NULL (zero).
-     BOOT_PROGRAM[2] = CALL CR0,CR0[0] uses this entry at factory reset.
-     The IDE boot-image upload overwrites it with the E-GT for the user's
-     chosen ⚡ boot abstraction; the factory NULL causes a clean fault if
-     the board is powered on without an IDE upload.
-     A non-zero value here means WukongCallHome (or another hardwired LUMP)
-     is silently stealing every power-on CALL.
+  1. WUKONG_DEMO_CLIST[0] is the factory SelfTest E-GT (0x4A000006),
+     matching the simulator's default lightning-bolt entry.
 
-  2. WUKONG_DEMO_NAMESPACE slot 7 alloc ≥ header + WUKONG_NUC_PROGRAM words.
+  2. WUKONG_DEMO_NAMESPACE slot 6 contains the full SelfTest allocation and
+     slot 7 alloc ≥ header + WUKONG_NUC_PROGRAM words.
      If the alloc is too small the CM fires a range fault the moment it tries
      to execute past the lim17 boundary.
 
@@ -36,29 +32,40 @@ from hardware.boot_rom import (
     WUKONG_DEMO_NAMESPACE,
     WUKONG_NUC_PROGRAM,
     WUKONG_CALLHOME_NS_SLOT,
+    SELFTEST_NS_SLOT,
+    WUKONG_SELFTEST_BASE_BYTE,
+    WUKONG_SELFTEST_ALLOC,
+    WUKONG_CALLHOME_BASE_BYTE,
+    WUKONG_THREAD_BASE_WORD,
     BOOT_PROGRAM,
 )
 from hardware.wukong_top import _WUKONG_ROM   # noqa: F401  (triggers the assert too)
 
 FAILURES = []
 
-# ── Check 1: WUKONG_DEMO_CLIST[0] is NULL (zero) ──────────────────────────────
-# The IDE boot-image upload sets Thread.caps[0] to the ⚡ configured E-GT.
-# The factory image must leave it zero so standalone power-on faults cleanly
-# instead of silently entering a hardwired default LUMP.
+# ── Check 1: factory boot entry is SelfTest ───────────────────────────────────
 actual = WUKONG_DEMO_CLIST[0]
-if actual == 0:
-    print("OK: WUKONG_DEMO_CLIST[0] = 0x00000000  (NULL — IDE upload sets ⚡ boot entry)")
+if actual == 0x4A000006:
+    print("OK: WUKONG_DEMO_CLIST[0] = 0x4A000006  (factory SelfTest ⚡ entry)")
 else:
     msg = (
-        f"FAIL: WUKONG_DEMO_CLIST[0] = 0x{actual:08X}, expected NULL (0x00000000).\n"
-        "       A non-zero value hardwires a CALL target; the IDE-configured ⚡\n"
-        "       boot entry is bypassed.  Set WUKONG_DEMO_CLIST[0] = 0 in boot_rom.py."
+        f"FAIL: WUKONG_DEMO_CLIST[0] = 0x{actual:08X}, expected SelfTest E-GT "
+        "(0x4A000006)."
     )
     print(msg)
     FAILURES.append(msg)
 
-# ── Check 2: NS slot 7 alloc ≥ LUMP body size ──────────────────────────────────
+# ── Check 2: resident LUMP allocations and non-overlap ────────────────────────
+slot6_base = SELFTEST_NS_SLOT * 4
+slot6_word1 = WUKONG_DEMO_NAMESPACE[slot6_base + 1]
+slot6_alloc = (slot6_word1 & 0x1FFFF) + 1
+if slot6_alloc >= WUKONG_SELFTEST_ALLOC and WUKONG_SELFTEST_BASE_BYTE == 0x600:
+    print(f"OK: WUKONG_DEMO_NAMESPACE slot 6 alloc={slot6_alloc} at 0x600")
+else:
+    msg = f"FAIL: slot 6 alloc/location invalid: alloc={slot6_alloc}, base=0x{WUKONG_SELFTEST_BASE_BYTE:X}"
+    print(msg)
+    FAILURES.append(msg)
+
 slot7_base  = WUKONG_CALLHOME_NS_SLOT * 4          # index into WUKONG_DEMO_NAMESPACE
 slot7_word1 = WUKONG_DEMO_NAMESPACE[slot7_base + 1]
 lim17       = slot7_word1 & 0x1FFFF                # bits[16:0]
@@ -77,6 +84,15 @@ else:
     )
     print(msg)
     FAILURES.append(msg)
+
+if not (WUKONG_SELFTEST_BASE_BYTE + WUKONG_SELFTEST_ALLOC * 4
+        <= WUKONG_THREAD_BASE_WORD * 4
+        < WUKONG_CALLHOME_BASE_BYTE):
+    msg = "FAIL: SelfTest, Thread, and WukongCallHome DMEM regions overlap"
+    print(msg)
+    FAILURES.append(msg)
+else:
+    print("OK: SelfTest, Thread, and WukongCallHome DMEM regions do not overlap")
 
 # ── Check 3: _WUKONG_ROM[2] is BOOT_PROGRAM's CALL word ───────────────────────
 expected_call = BOOT_PROGRAM[2]   # 0x17000000

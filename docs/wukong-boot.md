@@ -1,24 +1,30 @@
-# Wukong Board Boot Program (WukongCallHome LUMP)
+# Wukong Board Boot Programs
+
+For the agreed verification and redesign workflow—banner/IDE receipt checks,
+standard-instruction editing, LUMP sizing, and DMEM placement review—see
+[`docs/wukong-callhome-redesign-plan.md`](wukong-callhome-redesign-plan.md).
 
 ## Overview
 
-This document explains `WUKONG_NUC_PROGRAM` — the WukongCallHome abstraction body
-that lives in DMEM as a LUMP at NS slot 7. It is **not** in the boot ROM; the boot
-ROM contains only the 3-instruction `BOOT_PROGRAM` (see `docs/StartupCM.md`).
+This document explains the two resident programs in the Wukong DMEM image:
+factory `SelfTest` at NS slot 6 and the selectable `WukongCallHome` abstraction
+at NS slot 7. Neither is in the boot ROM; the boot ROM contains only the
+3-instruction `BOOT_PROGRAM` (see `docs/StartupCM.md`).
 
-The WukongCallHome LUMP is useful for diagnostics and standalone operation: it loops
-forever without ever executing a `CALL`, so it is safe on a board with an empty c-list.
+`SelfTest` is the factory boot target, matching the simulator lightning-bolt
+default. `WukongCallHome` remains available for an explicit boot-entry selection
+and runs the LED/UART diagnostic loop.
 
 ---
 
 ## Boot ROM vs DMEM LUMP
 
-| | Boot ROM | WukongCallHome LUMP |
+| | Boot ROM | SelfTest LUMP | WukongCallHome LUMP |
 |---|---|---|
-| Location | ROM BRAM (`_WUKONG_ROM` in `wukong_top.py`) | DMEM NS slot 7 (embedded in bitstream via `WUKONG_DEMO_NAMESPACE`) |
-| Size | 3 instructions (`BOOT_PROGRAM`) | 73 instructions (`WUKONG_NUC_PROGRAM`) |
-| Executed by default | Always (ROM[0..2] on every power-on) | Only if the IDE or boot config selects NS slot 7 as the boot entry |
-| Standalone safe | Faults `NULL_CAP` at ROM[2] — `Thread.caps[0]` (DMEM word 244) = NULL | Yes — never executes `CALL`; loops unconditionally |
+| Location | ROM BRAM (`_WUKONG_ROM` in `wukong_top.py`) | DMEM byte `0x600`, NS slot 6 | DMEM byte `0x1200`, NS slot 7 |
+| Size | 3 instructions (`BOOT_PROGRAM`) | 512-word canonical image | 73 instructions (`WUKONG_NUC_PROGRAM`) |
+| Executed by default | Always (ROM[0..2] on every power-on) | Yes — `Thread.caps[0]` contains `0x4A000006` | Only if the IDE or boot config selects NS slot 7 |
+| Standalone safe | — | Runs the canonical self-test | Yes — loops without calling into an application c-list |
 
 **The 3-instruction boot ROM (`BOOT_PROGRAM`) always runs first:**
 ```
@@ -27,23 +33,27 @@ ROM[1]  CHANGE CR12, CR15, #1  ; switch to Boot.Thread
 ROM[2]  CALL   CR0             ; enter boot entry via Thread.caps[0]
 ```
 
-On factory power-on, `Thread.caps[0]` is NULL and ROM[2] raises `NULL_CAP`.
-The board halts cleanly. This is the expected safe state.
+On factory power-on, `Thread.caps[0]` contains the SelfTest E-GT
+`0x4A000006`; ROM[2] enters SelfTest at NIA `0x604`.
 
-To enter WukongCallHome on power-on, write a WukongCallHome E-GT (NS slot 7) into
-DMEM word 244 (`Thread.caps[0]`) in `hardware/wukong_top.py`'s `dmem_init` and
-rebuild/reflash the bitstream.
+To enter WukongCallHome on power-on, replace the factory entry with its NS-slot-7
+E-GT in the boot image/build configuration and rebuild/reflash the bitstream.
 
 ---
 
-## The NULL_CAP Standalone Problem (historical context)
+## Factory image layout
 
-In the current design, `Thread.caps[0]` (DMEM word 244) is zero in the factory
-bitstream, so standalone power-on always reaches `NULL_CAP` safely:
-1. DMEM word 244 = 0 (NULL) in the factory image
-2. `CALL CR0` with a NULL GT raises `NULL_CAP` and halts
-3. WukongCallHome (NS slot 7) is available as an opt-in boot abstraction — configure
-   DMEM word 244 in `hardware/wukong_top.py` to point to it and rebuild
+The resident regions are deliberately separated:
+
+| Region | DMEM byte range | Purpose |
+|---|---:|---|
+| SelfTest | `0x600–0xDFF` | Canonical 512-word factory image |
+| Boot.Thread | `0xE00–0x11FF` | 256-word thread allocation |
+| WukongCallHome | `0x1200–0x13FF` | 128-word selectable diagnostic allocation |
+
+`Thread.caps[0]` is at DMEM word `1140` (`0xE00 + 244`), not word 244:
+the relocated thread prevents the namespace table and resident LUMPs from
+overlapping.
 
 ---
 

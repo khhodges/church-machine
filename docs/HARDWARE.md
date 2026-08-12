@@ -69,8 +69,11 @@ Word 2  CALL   CR0              ; enter boot entry via Thread.caps[0]
 
 Source: `hardware/boot_rom.py` → `BOOT_PROGRAM`
 
-**Standalone power-on behavior (no prior boot image configured):**
-`Thread.caps[0]` (DMEM word 244, at `threadBase=0 + THREAD_CAPS_OFFSET=244`) is `0` (NULL) in the factory bitstream. `CALL CR0` at ROM[2] raises `NULL_CAP` and the CM halts. This is intentional — the board is in a defined, safe state. To configure a static boot entry, write a non-zero E-GT at DMEM word 244 in `hardware/wukong_top.py`'s `dmem_init`, rebuild, and reflash.
+**Standalone power-on behavior (factory image):**
+`Thread.caps[0]` is at DMEM word 1140 (`threadBase=896 + THREAD_CAPS_OFFSET=244`)
+and contains the SelfTest E-GT `0x4A000006`. `CALL CR0` at ROM[2] enters the
+factory SelfTest at NIA `0x604`. To configure another static boot entry, replace
+that E-GT in the boot image/build configuration, rebuild, and reflash.
 
 **WukongCallHome fallback:** The `WUKONG_NUC_PROGRAM` 73-instruction loop (LED blink + UART text) lives in DMEM as the WukongCallHome LUMP (NS slot 7), not in the boot ROM. See `hardware/boot_rom.py` and `docs/wukong-boot.md` for details.
 
@@ -105,6 +108,7 @@ If the board sent the boot sentinel before the bridge started, power-cycle the b
 > ```
 
 For ChromeOS-specific setup (Crostini port forwarding), see `docs/bridge-setup-chromeos.md`.
+For Windows 11 setup, see `docs/bridge-setup-windows.md`.
 
 ---
 

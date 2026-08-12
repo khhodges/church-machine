@@ -114,7 +114,10 @@ class ChurchMLoad(Elaboratable):
 
         bounds_ok = Signal()
         ns_w2 = View(WORD2_LAYOUT, src_view.word2_w2)
-        m.d.comb += bounds_ok.eq(index_reg < ns_w2.limit_offset[:16])
+        # word2.limit_offset is inclusive (cc - 1), so c-list index 0 must
+        # remain valid for a one-entry c-list (cc=1).  The previous strict
+        # '<' comparison rejected the canonical SelfTest lump's only entry.
+        m.d.comb += bounds_ok.eq(index_reg <= ns_w2.limit_offset[:16])
 
         clist_gt_addr = Signal(32)
         m.d.comb += clist_gt_addr.eq(src_view.word1_location + (index_reg << 2))
@@ -123,7 +126,9 @@ class ChurchMLoad(Elaboratable):
         ns_ns_w2 = View(WORD2_LAYOUT, ns_view_for_bounds.word2_w2)
 
         ns_index_in_bounds = Signal()
-        m.d.comb += ns_index_in_bounds.eq(result_gt.slot_id < ns_ns_w2.limit_offset[:16])
+        m.d.comb += ns_index_in_bounds.eq(
+            result_gt.slot_id <= ns_ns_w2.limit_offset[:16]
+        )
 
         ns_w1_saved = Signal(32)
         rd_armed = Signal()  # stale-valid guard for FETCH_GT (see below)

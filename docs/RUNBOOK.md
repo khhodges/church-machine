@@ -118,13 +118,12 @@ Sentinel bytes: 0xBC 0xXX 0x02
 
 (where `0xXX` is the N_INIT byte — depends on DMEM content)
 
-**Note on standalone behavior (factory bitstream):** In the factory image `Thread.caps[0]`
-(DMEM word 244, `threadBase + THREAD_CAPS_OFFSET`) is `0` (NULL). After the sentinel,
-the CM executes all 3 boot ROM instructions, reaches `CALL CR0` at word 2, raises
-`NULL_CAP`, and halts permanently. The boot sentinel and the fault trace packet will
-arrive on the bridge, but there is no way to resume: the boot ROM has already executed.
-**To get past this state, rebuild the bitstream with a non-NULL E-GT at DMEM word 244
-and reflash** — see `docs/StartupCM.md` Phase A for build instructions.
+**Note on standalone behavior (factory bitstream):** In the factory image
+`Thread.caps[0]` (`0x4A000006`) is at DMEM word 1140
+(`threadBase=896 + THREAD_CAPS_OFFSET`). After the sentinel, the CM executes all
+3 boot ROM instructions, reaches `CALL CR0` at word 2, and enters SelfTest at
+NIA `0x604`. To choose another entry, replace the E-GT in the boot
+image/build configuration and reflash — see `docs/StartupCM.md` Phase A.
 
 ### Failure modes
 
@@ -212,7 +211,7 @@ The bridge is working if it **does not** return immediately. A prompt that retur
 ```
 Step 1 → NIA=0x00000000  LOAD   CR15, CR15[0]    (LOAD.shadow + LOAD.new packets)
 Step 2 → NIA=0x00000004  CHANGE CR12, CR15, #1   (CHANGE.push + CHANGE.CR12 + CHANGE.CR5)
-Step 3 → NIA=0x00000008  CALL   CR0              (NULL_CAP fault — factory Thread.caps[0]=NULL)
+Step 3 → NIA=0x00000008  CALL   CR0              (enters factory SelfTest at NIA=0x604)
 ```
 
 Each step takes < 100 ms round-trip (bridge latency + UART byte time at 57,600 baud).
@@ -241,7 +240,7 @@ Discoveries made during real hardware sessions that are easy to miss:
 | **`step_mode` init must be 0 in standalone builds** | The CM halts immediately after boot when `step_mode` initialises to `1`. Standalone FPGA builds need `step_mode = 0`. |
 | **`write_bitstream` DRC trap** | Using `launch_runs -to_step write_bitstream` spawns a fresh Vivado session and drops XDC severity overrides (DRC NSTD-1/UCIO-1 errors). The provided TCL script (`hardware/wukong_xc7a100t.tcl`) handles this correctly. |
 | **gen_rtlil output must be copied to hardware/** | `python3 -m hardware.gen_rtlil --wukong` writes to `build/church_wukong_xc7a100t.v`; the TCL script expects it in `hardware/`. Run `cp build/church_wukong_xc7a100t.v hardware/` before running Vivado. |
-| **Factory image boots to NULL_CAP** | `Thread.caps[0]` (DMEM word 244) is NULL in the factory bitstream. The CM faults cleanly at ROM word 2. This is expected — the board is in a safe state. |
+| **Factory image enters SelfTest** | `Thread.caps[0]` (DMEM word 1140 in the relocated Thread lump) contains the SelfTest E-GT `0x4A000006`; ROM word 2 enters SelfTest at NIA `0x604`. |
 
 ---
 

@@ -45,6 +45,23 @@
             .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
+    // V20 architecture profile:
+    //   * 64 namespace slots, 16 bytes per entry
+    //   * slot 0 is the highest-address entry; slots descend toward the base
+    //   * the ISA top-of-memory layout is 0x1FC00..0x1FFFF (byte addresses)
+    //     when the namespace window is 32K words / 128 KiB
+    // Keep the total-memory selector available for board experiments, but
+    // constrain the architectural slot capacity so the page cannot save a
+    // configuration that contradicts the V20 namespace contract.
+    var V20_NS_SLOTS          = 64;
+    var V20_NS_ENTRY_BYTES    = 16;
+    var V20_NS_TOTAL_N        = 1;   // 2^(1+14) = 32K words = 128 KiB
+    var V20_THREAD_LUMP_POW2  = 9;   // 512 words
+    var V20_THREAD_CAPS_OFFSET = 244;
+    var V20_THREAD_CAP_WORDS  = 15;  // CR0..CR14; CR15 is Namespace
+    var V20_WCH_BASE_BYTE     = 0x1600;
+    var V20_WCH_END_BYTE      = 0x17FF;
+
     // NS size presets (n_minus_6 value → totalNamespaceWords = 2^(n+14))
     var NS_PRESETS = [
         { label: '16 K words  (min, n=0)',          n: 0  },
@@ -135,7 +152,7 @@
             var savedN = state.ns.n_minus_6;
             state.ns.n_minus_6 = maxN;
             var serverMaxCl = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 1024;
-            var newMaxSl = Math.min(Math.pow(2, maxN + 14) / 64, serverMaxCl);
+            var newMaxSl = Math.min(Math.pow(2, maxN + 14) / 64, serverMaxCl, V20_NS_SLOTS);
             if (state.ns.slots > newMaxSl) state.ns.slots = newMaxSl;
             _nsSizeClampedInfo = { savedN: savedN, clampedN: maxN, boardLabel: profile.label };
             saveState();
@@ -149,8 +166,8 @@
     // state.thread.lumpPow2: exponent for lump size (e.g. 8 = 256 words)
     // state.thread.stackFrames: number of stack frames (each frame = 2 words)
     var state = {
-        thread: { lumpPow2: 8, stackFrames: 16, count: 1 },
-        ns: { n_minus_6: 3, slots: 256 }
+        thread: { lumpPow2: V20_THREAD_LUMP_POW2, stackFrames: 16, count: 1 },
+        ns: { n_minus_6: V20_NS_TOTAL_N, slots: V20_NS_SLOTS }
     };
 
     function loadState() {
@@ -166,8 +183,16 @@
                 state.thread.count = (s.thread.count !== undefined) ? clamp(s.thread.count, 1, 10) : 1;
             }
             if (s.ns) {
-                state.ns.n_minus_6 = (s.ns.n_minus_6 !== undefined) ? s.ns.n_minus_6 : 3;
-                state.ns.slots = Math.min(s.ns.slots || 256, 1024);
+                state.ns.n_minus_6 = (s.ns.n_minus_6 !== undefined) ? s.ns.n_minus_6 : V20_NS_TOTAL_N;
+                state.ns.slots = Math.min(s.ns.slots || V20_NS_SLOTS, V20_NS_SLOTS);
+            }
+            // Migrate the old page defaults, but preserve deliberate user
+            // choices.  This keeps an existing browser profile from silently
+            // reopening with the pre-V20 256-word/256-slot contract.
+            if (state.thread.lumpPow2 === 8 && state.ns.n_minus_6 === 3) {
+                state.thread.lumpPow2 = V20_THREAD_LUMP_POW2;
+                state.ns.n_minus_6 = V20_NS_TOTAL_N;
+                state.ns.slots = V20_NS_SLOTS;
             }
             // Restore the board-switch clamp warning if it is still applicable.
             // It is applicable when the current n_minus_6 still matches what the
@@ -246,7 +271,7 @@
         var totalNamespaceWords = Math.pow(2, n + 14);
         var threadLumpWords     = Math.pow(2, clamp(state.thread.lumpPow2, MIN_EXP, MAX_EXP));
         var serverMax           = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 1024;
-        var maxSl               = Math.min(totalNamespaceWords / 64, serverMax);
+        var maxSl               = Math.min(totalNamespaceWords / 64, serverMax, V20_NS_SLOTS);
         var nsSlotsMax          = Math.round(clamp(state.ns.slots, 1, maxSl));
         return {
             targetBoard: board,
@@ -755,7 +780,7 @@
     // ── Thread panel ──────────────────────────────────────────────────────────
 
     var DR_WORDS  = 16;   // DR0–DR15, static
-    var CAP_WORDS = 12;   // CR0–CR11 GT home slots, static
+    var CAP_WORDS = V20_THREAD_CAP_WORDS; // CR0–CR14 GT home slots; CR15 is Namespace
     var MIN_EXP   = 6;    // 64 words minimum lump
     var MAX_EXP   = 13;   // 8192 words cap
 
@@ -850,7 +875,9 @@
             ['Data Regs',      esc(DR_WORDS + ' words  (DR0–DR15, static)'), ''],
             ['Heap (cw)',      heapDisplay, overCapacity ? '' : ''],
             ['Stack (cc)',     esc(stackFrames + ' frames  (' + stackWords + ' words)'), ''],
-            ['Cap Regs',       esc(CAP_WORDS + ' words  (CR0–CR11 GT slots, static)'), ''],
+            ['Cap Regs',       esc(CAP_WORDS + ' words  (CR0–CR14 GT slots, static)'), ''],
+            ['Capability offset', esc('+' + V20_THREAD_CAPS_OFFSET + ' … +' + (V20_THREAD_CAPS_OFFSET + CAP_WORDS - 1) + '  (fixed; CR0 = WukongCallHome boot entry)'), 'le-val-gold'],
+            ['WukongCallHome', esc('0x' + V20_WCH_BASE_BYTE.toString(16).toUpperCase() + '–0x' + V20_WCH_END_BYTE.toString(16).toUpperCase() + '  (after full Thread allocation)'), 'le-val-gold'],
             ['Header word',    '<span id="le-thread-hex" class="le-hex">' + esc(wordHex) + '</span>' + copyBtn('le-thread-hex'), 'le-val-mono']
         ]);
 
@@ -900,15 +927,15 @@
             threadCountClampBanner +
             threadClampBanner +
             overCapWarning +
-            '<p class="le-panel-desc">Choose lump size first (power of two, bounded by board thread budget). Set stack frames. Heap is derived automatically — no wasted freespace.</p>' +
+             '<p class="le-panel-desc">V20 reserves a 512-word Thread object with its capability zone at offset +244. CR0\u2013CR14 are restored from the Thread; CR0 carries the WukongCallHome boot entry. Choose lump size and stack frames; heap is derived automatically.</p>' +
             '<div class="le-field-row">' +
                 '<label class="le-label">Lump size<span class="le-range-hint"> 2^' + MIN_EXP + '\u2013' + maxLumpPow2 + ', max ' + fmtWords(Math.pow(2, maxLumpPow2)) + ' w</span></label>' +
                 '<div class="le-input-group le-input-group-wide">' +
                     '<select class="le-select" id="le-t-lump-sel" onchange="lumpEditorThreadLumpSize(this.value)">' + lumpOpts + '</select>' +
                 '</div>' +
             '</div>' +
-            '<div class="le-thread-sync-note">' +
-                '<span class="le-thread-sync-badge">Boot.Thread lump\u00a0= ' + esc(fmtWords(lumpSize)) + '\u00a0words\u00a0(2^' + lumpPow2 + ')\u00a0\u2014 reflected\u00a0in\u00a0Resident\u00a0Lumps\u00a0SIZE\u00a0column</span>' +
+                '<div class="le-thread-sync-note">' +
+                '<span class="le-thread-sync-badge">V20 Thread\u00a0= ' + esc(fmtWords(lumpSize)) + '\u00a0words\u00a0(2^' + lumpPow2 + ')\u00a0\u00b7 caps @ +244\u00a0\u00b7 CR0\u2013CR14\u00a0\u2014 reflected\u00a0in\u00a0Resident\u00a0Lumps\u00a0SIZE\u00a0column</span>' +
             '</div>' +
             '<div class="le-field-row">' +
                 '<label class="le-label">Thread count<span class="le-range-hint">' + esc(countHint) + '</span></label>' +
@@ -965,7 +992,7 @@
         }
         var total      = Math.pow(2, n + 14);
         var serverMax  = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 1024;
-        var maxSl      = Math.min(total / 64, serverMax);
+        var maxSl      = Math.min(total / 64, serverMax, V20_NS_SLOTS);
         var slots      = clamp(state.ns.slots, 1, maxSl);
         var NS_TABLE_COMPUTED = Math.max(16, Math.round(slots) * 4);
         var threadLump   = Math.pow(2, clamp(state.thread.lumpPow2, MIN_EXP, MAX_EXP));
@@ -976,6 +1003,10 @@
         var namespaceLumpWords = 64;
         var bootOverhead = namespaceLumpWords + threadLump;
         var pool    = total - bootOverhead - NS_TABLE_COMPUTED;
+        var nsTableBaseByte = total * 4 - NS_TABLE_COMPUTED * 4;
+        var nsTableEndByte  = total * 4 - 1;
+        var slot0Byte       = nsTableBaseByte + (Math.round(slots) - 1) * V20_NS_ENTRY_BYTES;
+        var lastSlotByte    = nsTableBaseByte;
         var cw      = (slots >>> 8) & 0x1FFF;
         var cc      =  slots & 0xFF;
         var word    = packHdr(n, cw, cc, 1);
@@ -1001,8 +1032,11 @@
             ['Total words',    esc(total.toLocaleString() + '  (2^' + (n + 14) + ')'), noFit ? '' : 'le-val-gold'],
             ['n_minus_6',     esc(String(n)), ''],
             ['typ field',     '01  (Namespace, reserved)', ''],
-            ['Max slots',      esc(maxSl.toLocaleString() + (total / 64 > serverMax ? '  (server limit)' : '  (total \u00f7 64)')), ''],
+            ['Max slots',      esc(maxSl.toLocaleString() + (total / 64 > serverMax ? '  (server limit)' : '  (V20 cap / total \u00f7 64)')), ''],
             ['NS table',       nsTableDesc, ''],
+            ['Placement',      'Top of memory \u00b7 inverted physical order', 'le-val-gold'],
+            ['Slot order',     esc('Slot 0 @ 0x' + slot0Byte.toString(16).toUpperCase() + ' \u2192 Slot ' + (Math.round(slots) - 1) + ' @ 0x' + lastSlotByte.toString(16).toUpperCase()), ''],
+            ['ISA table range', esc('0x' + nsTableBaseByte.toString(16).toUpperCase() + '\u20130x' + nsTableEndByte.toString(16).toUpperCase() + ' (' + V20_NS_ENTRY_BYTES + ' bytes/slot)'), ''],
             ['Boot overhead',  esc(bootOverhead.toLocaleString() + ' words (Boot.NS 64 + Boot.Thread ' + threadLump.toLocaleString() + ')'), ''],
             ['Pool available', pool >= 0 ? esc(pool.toLocaleString() + ' words') : '<span class="le-overflow">overflow</span>', ''],
             ['cw field',       esc(String(cw) + '  (slots >> 8)'), ''],
@@ -1024,7 +1058,7 @@
 
         return '<div class="le-panel">' +
             clampBanner +
-            '<p class="le-panel-desc">Choose total namespace memory and slot capacity. Slot count is encoded across cw and cc as <code>(cw&lt;&lt;8)|cc</code>.</p>' +
+            '<p class="le-panel-desc">V20 uses a 64-entry, 16-byte namespace table at the top of memory. Slot 0 is the highest-address entry and each following slot descends by 16 bytes. The slot count is encoded across <code>cw</code> and <code>cc</code> as <code>(cw&lt;&lt;8)|cc</code>.</p>' +
             '<div class="le-field-row">' +
                 '<label class="le-label">Total namespace memory</label>' +
                 '<div class="le-input-group le-input-group-wide">' +
@@ -1032,7 +1066,7 @@
                 '</div>' +
             '</div>' +
             '<div class="le-field-row">' +
-                '<label class="le-label">NS slot capacity<span class="le-range-hint"> 1 – ' + maxSl.toLocaleString() + '</span></label>' +
+                '<label class="le-label">NS slot capacity<span class="le-range-hint"> 1 – ' + maxSl.toLocaleString() + ' (V20 max 64)</span></label>' +
                 '<div class="le-input-group">' +
                     '<input type="range"  class="le-slider" id="le-ns-slots-sl"  min="1" max="' + maxSl + '" value="' + slots + '" oninput="lumpEditorNSSlots(this.value)">' +
                     '<input type="number" class="le-number" id="le-ns-slots-num" min="1" max="' + maxSl + '" value="' + slots + '" oninput="lumpEditorNSSlots(this.value)">' +
@@ -1063,8 +1097,8 @@
     function renderDesignHero(kind) {
         var title = (kind === 'thread') ? 'Thread Lump \u2014 Design Page' : 'Namespace Lump \u2014 Design Page';
         var blurb = (kind === 'thread')
-            ? 'The Thread Lump holds a running computation\u2019s full context \u2014 header, data registers, heap, LIFO stack, and the CR0\u2013CR11 capability zone \u2014 in one hardware-protected lump.'
-            : 'The Namespace Lump (NS Slot\u202f0) describes the machine\u2019s entire physical address space and the 4-word-per-entry NS Table that maps every slot.';
+            ? 'The V20 Thread Lump holds a running computation\u2019s full context in a 512-word allocation. Its fixed capability zone begins at offset +244 and restores CR0\u2013CR14; CR0 carries the WukongCallHome boot entry.'
+            : 'The V20 Namespace Lump (NS Slot\u202f0) describes the physical address space with 64 sixteen-byte entries at the top of memory. Slot 0 is highest and slot 63 is lowest.';
         return '<div class="le-design-hero">' +
             '<div class="le-design-hero-title">' + esc(title) + '</div>' +
             '<div class="le-design-hero-board">QMTECH Wukong \u00b7 Artix-7 XC7A100T</div>' +
@@ -1167,7 +1201,7 @@
     window.lumpEditorNSSize = function (v) {
         state.ns.n_minus_6 = clamp(v, 0, 15);
         var serverMaxNS = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 1024;
-        var maxSl = Math.min(Math.pow(2, state.ns.n_minus_6 + 14) / 64, serverMaxNS);
+        var maxSl = Math.min(Math.pow(2, state.ns.n_minus_6 + 14) / 64, serverMaxNS, V20_NS_SLOTS);
         if (state.ns.slots > maxSl) state.ns.slots = maxSl;
         _nsSizeClampedInfo = null;
         saveState();
@@ -1192,7 +1226,7 @@
 
     window.lumpEditorNSSlots = function (v) {
         var serverMaxSlots = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 1024;
-        var maxSl = Math.min(Math.pow(2, state.ns.n_minus_6 + 14) / 64, serverMaxSlots);
+        var maxSl = Math.min(Math.pow(2, state.ns.n_minus_6 + 14) / 64, serverMaxSlots, V20_NS_SLOTS);
         state.ns.slots = clamp(v, 1, maxSl);
         saveState();
         var sl  = document.getElementById('le-ns-slots-sl');

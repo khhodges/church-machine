@@ -10,10 +10,10 @@ Boot sequence (from docs/debug-packet-protocol.md §"Boot sequence"):
     [1] CHANGE CR12, CR15, #1  NIA=0x04  →  retire_fault_valid must be False
     [2] CALL   CR0,  CR0       NIA=0x08  →  retire_fault_valid must be False
 
-The DMEM is pre-initialised with WUKONG_DEMO_NAMESPACE + WUKONG_DEMO_CLIST +
-the WukongCallHome LUMP body, and Thread.caps[0] (DMEM word 244) is set to a
-valid E-GT for WukongCallHome (NS slot 7) so BOOT_PROGRAM[2] = CALL CR0, CR0
-completes without a NULL_CAP fault.
+The DMEM is pre-initialised with the factory SelfTest LUMP, the selectable
+WukongCallHome LUMP, and the relocated Thread lump. Thread.caps[0] carries
+the SelfTest E-GT (NS slot 6), so BOOT_PROGRAM[2] enters the default lightning
+entry without a NULL_CAP fault.
 
 The BootRomHarness exposes self.core (ChurchCore instance) as a public attribute
 so the testbench can read core.retire_valid, core.retire_nia, and
@@ -32,6 +32,7 @@ from .core import ChurchCore
 from .boot_rom import (
     BootRom, BOOT_PROGRAM,
     WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST, WUKONG_NUC_PROGRAM,
+    WUKONG_SELFTEST_WORDS, WUKONG_SELFTEST_BASE_WORD, WUKONG_WCH_BASE_WORD,
     WUKONG_THREAD_BASE_WORD, WUKONG_THREAD_HEADER,
     WUKONG_THREAD_STO_WORD, WUKONG_THREAD_STO_INIT,
     WUKONG_THREAD_CAPS0_WORD, WUKONG_THREAD_CAPS12_WORD,
@@ -46,22 +47,13 @@ from .hw_types import GT_TYPE_INFORM, PERM_MASK_E, PERM_MASK_S, make_gt
 #   words   0-31  : WUKONG_DEMO_NAMESPACE  (8 NS slots × 4 words, direct layout)
 #   words  32-255 : zeros
 #   words 256-319 : WUKONG_DEMO_CLIST      (64 c-list entries)
-#   words 320-447 : zeros
-#   words 448-521 : WukongCallHome LUMP body
-#                   [448] header + [449..521] WUKONG_NUC_PROGRAM
-#   words 522+    : zeros
+#   words 320-383 : zeros
+#   words 384-895 : canonical SelfTest LUMP
+#   words 896-1151: relocated Boot.Thread LUMP
+#   words 1152-1279: WukongCallHome LUMP body
 #
-# Simulation-only patch: DMEM word 244 (byte 0x3D0) = Thread.caps[0].
-#
-#   Thread base:  NS slot 1 word0_location = 0x00 (byte 0).
-#   Thread.caps[0] offset: THREAD_CAPS_OFFSET = 244 words.
-#   Address: byte 0x00 + 244 × 4 = byte 0x3D0 = word 244.
-#
-#   The IDE normally writes this via setBootEntrySlot().  Here we patch it to
-#   an E-GT for WukongCallHome (NS slot 7) so BOOT_PROGRAM[2]=CALL does not
-#   fault with NULL_CAP.
-#
-E_GT_WUKONG_CALLHOME = make_gt(gt_type=GT_TYPE_INFORM, perms=PERM_MASK_E, slot_id=7)
+# The factory image uses SelfTest as the default CALL target.
+E_GT_SELFTEST = make_gt(gt_type=GT_TYPE_INFORM, perms=PERM_MASK_E, slot_id=6)
 # Inform E-GT (not Abstract): mload can load Inform GTs from c-list slots.
 # Abstract GTs in c-list slots trigger INVALID_OP in mload FETCH_GT (Task #432 stub).
 # The IDE writes an Inform E-GT for the chosen abstraction into Thread.caps[0]
@@ -76,20 +68,22 @@ def _build_dmem_init():
     while len(dmem) < 16384:
         dmem.append(0)
 
-    # WukongCallHome LUMP body at byte 0x0700 = word 0x1C0 = 448 (cc=7 c-list
-    # tail at words 569-575 — mirrors wukong_top.py).
+    for _i, _v in enumerate(WUKONG_SELFTEST_WORDS):
+        dmem[WUKONG_SELFTEST_BASE_WORD + _i] = _v
+
+    # WukongCallHome LUMP body at byte 0x1200 = word 1152.
     _cw = len(WUKONG_NUC_PROGRAM)
     for _i, _v in enumerate([wukong_wch_header(_cw)] + list(WUKONG_NUC_PROGRAM)):
-        dmem[0x1C0 + _i] = _v
+        dmem[WUKONG_WCH_BASE_WORD + _i] = _v
     for _i, _v in enumerate(WUKONG_WCH_CLIST):
         dmem[WUKONG_WCH_CLIST_WORD + _i] = _v
 
-    # Boot.Thread lump at byte 0x900 (word 576) — mirrors wukong_top.py.
+    # Boot.Thread lump at byte 0xE00 (word 896) — mirrors wukong_top.py.
     # See boot_rom.py for the relocation rationale (base-0 Thread lump
     # collides with the NS table: Heap[0]/STO is NS slot 4 word1).
     dmem[WUKONG_THREAD_BASE_WORD]   = WUKONG_THREAD_HEADER
     dmem[WUKONG_THREAD_STO_WORD]    = WUKONG_THREAD_STO_INIT
-    dmem[WUKONG_THREAD_CAPS0_WORD]  = E_GT_WUKONG_CALLHOME
+    dmem[WUKONG_THREAD_CAPS0_WORD]  = E_GT_SELFTEST
     dmem[WUKONG_THREAD_CAPS12_WORD] = make_gt(GT_TYPE_INFORM, PERM_MASK_S, slot_id=1, gt_seq=0)
 
     return dmem
@@ -398,9 +392,9 @@ def test_boot_rom_no_false_halt():
 
 # ── Shared retire-collection helper for Tests 4/5 ─────────────────────────────
 
-_WCH_ENTRY_NIA = 0x704                      # WukongCallHome entry: lump base 0x700 + 4
-_WCH_CODE_LO   = 0x704
-_WCH_CODE_HI   = 0x704 + 73 * 4             # exclusive end of WCH code (cw=73)
+_SELFTEST_ENTRY_NIA = 0x604
+_SELFTEST_CODE_LO   = 0x604
+_SELFTEST_CODE_HI   = 0x600 + 512 * 4
 
 
 async def _collect_retires(ctx, dut, count, max_wait=400):
@@ -434,10 +428,10 @@ async def _wait_boot_complete(ctx, dut, max_cycles=40):
     return bool(ctx.get(dut.boot_complete))
 
 
-def _assert_boot_and_wch(retires, n_wch, label=""):
-    """Assert the boot triple + n_wch clean retires inside the WCH code range."""
+def _assert_boot_and_selftest(retires, n_selftest, label=""):
+    """Assert the boot triple + factory SelfTest retires."""
     expected_boot = [0x0, 0x4, 0x8]
-    assert len(retires) >= 3 + n_wch, (
+    assert len(retires) >= 3 + n_selftest, (
         f"{label}: only {len(retires)} retires collected: "
         f"{[(hex(n), fv) for n, fv in retires]}"
     )
@@ -448,26 +442,27 @@ def _assert_boot_and_wch(retires, n_wch, label=""):
             f"expected 0x{exp:08X} clean"
         )
     nia3, fv3 = retires[3]
-    assert nia3 == _WCH_ENTRY_NIA, (
-        f"{label}: retire[3] NIA=0x{nia3:08X}, expected WukongCallHome entry "
-        f"0x{_WCH_ENTRY_NIA:08X} — boot CALL did not jump into the LUMP"
+    assert nia3 == _SELFTEST_ENTRY_NIA, (
+        f"{label}: retire[3] NIA=0x{nia3:08X}, expected SelfTest entry "
+        f"0x{_SELFTEST_ENTRY_NIA:08X} — boot CALL did not jump into SelfTest"
     )
-    for i, (nia, fv) in enumerate(retires[3:3 + n_wch], start=3):
+    for i, (nia, fv) in enumerate(retires[3:3 + n_selftest], start=3):
         assert not fv, (
             f"{label}: retire[{i}] at NIA=0x{nia:08X} faulted — "
-            f"WukongCallHome loop is not clean"
+            f"SelfTest execution is not clean; factory entry must run without "
+            f"an immediate capability fault"
         )
-        assert _WCH_CODE_LO <= nia < _WCH_CODE_HI, (
-            f"{label}: retire[{i}] NIA=0x{nia:08X} escaped the WukongCallHome "
-            f"code range [0x{_WCH_CODE_LO:X}, 0x{_WCH_CODE_HI:X})"
+        assert _SELFTEST_CODE_LO <= nia < _SELFTEST_CODE_HI, (
+            f"{label}: retire[{i}] NIA=0x{nia:08X} escaped the SelfTest "
+            f"code range [0x{_SELFTEST_CODE_LO:X}, 0x{_SELFTEST_CODE_HI:X})"
         )
 
 
-# ── Test 4: boot CALL enters WukongCallHome and runs 30+ retires clean ────────
+# ── Test 4: boot CALL enters SelfTest and runs clean ─────────────────────────
 
-def test_boot_call_enters_wukong_callhome():
-    """Factory image: ROM boot → CALL jumps to NIA=0x704 → 30+ clean retires."""
-    print("\n=== Test 4: boot CALL enters WukongCallHome (30+ retires) ===")
+def test_boot_call_enters_selftest():
+    """Factory image: ROM boot → CALL jumps to NIA=0x604."""
+    print("\n=== Test 4: boot CALL enters SelfTest ===")
 
     dut = BootRomHarness(_DMEM_INIT)
     results = {}
@@ -490,8 +485,8 @@ def test_boot_call_enters_wukong_callhome():
         f"Timed out waiting for retire {results['timeout_at']}; "
         f"got {[(hex(n), fv) for n, fv in results['retires']]}"
     )
-    _assert_boot_and_wch(results["retires"], 32, label="pass1")
-    print(f"  boot triple + 32 WukongCallHome retires all clean; "
+    _assert_boot_and_selftest(results["retires"], 32, label="pass1")
+    print(f"  boot triple + 32 SelfTest retires all clean; "
           f"entry NIA=0x{results['retires'][3][0]:X} ✓")
     print("PASS")
 
@@ -499,7 +494,7 @@ def test_boot_call_enters_wukong_callhome():
 # ── Test 5: repeated 'f' reboots stay clean (FAULT_RST wipes unit state) ──────
 
 def test_repeated_reboots_stay_clean():
-    """Pulse reboot_req mid-run twice; each pass must re-boot cleanly into WCH."""
+    """Pulse reboot_req mid-run twice; each pass must re-boot cleanly into SelfTest."""
     print("\n=== Test 5: repeated reboots (reboot_req → FAULT_RST) stay clean ===")
 
     dut = BootRomHarness(_DMEM_INIT)
@@ -536,8 +531,8 @@ def test_repeated_reboots_stay_clean():
             f"pass {i}: timed out at retire {timeout_at}; "
             f"got {[(hex(n), fv) for n, fv in retires]}"
         )
-        _assert_boot_and_wch(retires, 10, label=f"pass{i}")
-        print(f"  pass {i}: boot triple + 10 WCH retires clean ✓")
+        _assert_boot_and_selftest(retires, 10, label=f"pass{i}")
+        print(f"  pass {i}: boot triple + 10 SelfTest retires clean ✓")
     print("PASS")
 
 

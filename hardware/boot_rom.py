@@ -1,4 +1,6 @@
 from amaranth import *
+import struct
+from pathlib import Path
 
 from .hw_types import *
 from .integrity32 import integrity32
@@ -508,8 +510,8 @@ NS_SLOT_COUNT = 8   # minimal boot namespace: slots 0-7
 #   Slot 3: LED_DEV        — MMIO 0x40000000, RW, limit=4 (5 words)
 #   Slot 4: BTN_DEV        — MMIO 0x40000028, R,  limit=0 (1 word)
 #   Slot 5: TIMER_DEV      — MMIO 0x4000002C, RW, limit=4 (5 words)
-#   Slot 6: SelfTest       — LUMP (base=0x0600, limit=63), E-perm; default ⚡ boot entry
-#   Slot 7: WukongCallHome — LUMP (base=0x0700, limit=63), E-perm; Wukong ⚡ boot entry
+#   Slot 6: SelfTest       — LUMP (base=0x0600, limit=511), E-perm; default ⚡ boot entry
+#   Slot 7: WukongCallHome — LUMP (base=0x1200, limit=127), E-perm; selectable diagnostic entry
 # ---------------------------------------------------------------------------
 DEMO_NAMESPACE = []
 for _i in range(NS_SLOT_COUNT):
@@ -613,32 +615,65 @@ WUKONG_DEMO_NAMESPACE[0] = _wukong_ns0_loc
 WUKONG_DEMO_NAMESPACE[1] = _wukong_ns0_auth
 WUKONG_DEMO_NAMESPACE[2] = integrity32(_wukong_ns0_loc, _wukong_ns0_auth)
 
-# Fix slot 7 (WukongCallHome) alloc from 64 → 128 words.
+# The canonical SelfTest LUMP is the 512-word image used by the simulator and
+# boot-image generator. It must be present in factory DMEM because the
+# lightning-bolt default is a real executable entry.
+# Slot 6 occupies byte range 0x600..0xDFF.
+WUKONG_SELFTEST_BASE_BYTE = 0x0600
+WUKONG_SELFTEST_BASE_WORD = WUKONG_SELFTEST_BASE_BYTE // 4
+WUKONG_SELFTEST_ALLOC = 512
+_selftest_word1 = WUKONG_SELFTEST_ALLOC - 1
+WUKONG_DEMO_NAMESPACE[SELFTEST_NS_SLOT * 4 + 0] = WUKONG_SELFTEST_BASE_BYTE
+WUKONG_DEMO_NAMESPACE[SELFTEST_NS_SLOT * 4 + 1] = _selftest_word1
+WUKONG_DEMO_NAMESPACE[SELFTEST_NS_SLOT * 4 + 2] = integrity32(
+    WUKONG_SELFTEST_BASE_BYTE, _selftest_word1
+)
+
+# Canonical 512-word SelfTest image (server/lumps/00000600.lump), stored
+# big-endian on disk.  The Wukong synthesis runs from this repository, so use
+# the canonical binary directly instead of maintaining a second copied image.
+_selftest_path = Path(__file__).resolve().parents[1] / "server" / "lumps" / "00000600.lump"
+try:
+    _selftest_raw = _selftest_path.read_bytes()
+except OSError as exc:
+    raise RuntimeError(
+        f"Wukong factory image requires canonical SelfTest lump: {_selftest_path}"
+    ) from exc
+WUKONG_SELFTEST_WORDS = tuple(struct.unpack(">512I", _selftest_raw))
+assert WUKONG_SELFTEST_WORDS[0] == 0xF987D801
+assert WUKONG_SELFTEST_WORDS[-1] == 0x4A000006
+
+# Fix slot 7 (WukongCallHome) alloc from 64 → 128 words and move it after
+# the relocated Thread lump. The old 0x700 location overlapped SelfTest,
+# and the old 0x900 location overlaps the 256-word Thread.
 # DEMO_NAMESPACE was built with alloc=64 (lim17=63=0x3F) for all abstraction slots.
 # The WukongCallHome LUMP body is header + WUKONG_NUC_PROGRAM (73 words) = 74 words,
 # padded to 128 (next power of 2 ≥ 74).  Patch word1 (lim17=127) and recompute the
 # integrity seal so the CM's NS range-check passes during LUMP execution.
 _wch_word1_new = 0x0000007F               # lim17 = 127  →  alloc = 128 words
-_wch_loc_byte  = WUKONG_CALLHOME_NS_SLOT * 0x100   # 0x700 (unchanged)
+WUKONG_CALLHOME_BASE_BYTE = 0x1200
+WUKONG_CALLHOME_BASE_WORD = WUKONG_CALLHOME_BASE_BYTE // 4
+_wch_loc_byte  = WUKONG_CALLHOME_BASE_BYTE
+WUKONG_DEMO_NAMESPACE[WUKONG_CALLHOME_NS_SLOT * 4 + 0] = _wch_loc_byte
 WUKONG_DEMO_NAMESPACE[WUKONG_CALLHOME_NS_SLOT * 4 + 1] = _wch_word1_new
 WUKONG_DEMO_NAMESPACE[WUKONG_CALLHOME_NS_SLOT * 4 + 2] = integrity32(_wch_loc_byte, _wch_word1_new)
 
 # ---------------------------------------------------------------------------
-# Wukong Boot.Thread lump relocation — slot 1 loc 0x000 → 0x900
+# Wukong Boot.Thread lump relocation — slot 1 loc 0x000 → 0xE00
 #
 # With the NS table at DMEM byte 0, a Thread lump that also aliases byte 0
 # collides with the table: Heap[0] (thread word 17, the STO stack pointer
 # CALL reads and writes) is NS slot 4's word1.  The boot CALL then reads
 # STO=0 → STACK_OVERFLOW, and any CALL/RETURN would corrupt slot 4.
-# Relocate the Thread lump to byte 0x900 (word 576) — free space between the
-# WukongCallHome alloc (words 448-575) end and nothing else.
-#   header  word 576      : magic, size=256 words, sw(cw)=32, typ=2, cc=12
-#   STO     word 576+17   : 243 (= sp_max = 256 − 12 − 1)
-#   caps[0] word 576+244  : boot-entry E-GT (⚡ WukongCallHome)
-#   caps[12]word 576+256  : S-perm Boot.Thread GT (slot 1) for CR12
+# Relocate the Thread lump to byte 0xE00 (word 896) — after the full SelfTest
+# image (words 384-895) and before WukongCallHome (words 1152-1279).
+#   header  word 896      : magic, size=256 words, sw(cw)=32, typ=2, cc=12
+#   STO     word 896+17   : 243 (= sp_max = 256 − 12 − 1)
+#   caps[0] word 896+244  : boot-entry E-GT (⚡ SelfTest)
+#   caps[12]word 896+256  : S-perm Boot.Thread GT (slot 1) for CR12
 # Slot 1 word1 limit widened to 0xFF (256-word alloc); seal recomputed.
 # ---------------------------------------------------------------------------
-WUKONG_THREAD_BASE_WORD = 576                # byte 0x900
+WUKONG_THREAD_BASE_WORD = 896                # byte 0xE00
 WUKONG_THREAD_HEADER = (
     (0x1F << 27) | (2 << 23) | (32 << 10) | (2 << 8) | 12
 )  # n_minus_6=2 (256 words), sw=32, typ=2, cc=12 — mirrors boot_image.py
@@ -646,7 +681,7 @@ WUKONG_THREAD_STO_WORD  = WUKONG_THREAD_BASE_WORD + 17    # Heap[0] = STO
 WUKONG_THREAD_STO_INIT  = 243                             # sp_max
 WUKONG_THREAD_CAPS0_WORD  = WUKONG_THREAD_BASE_WORD + 244  # Thread.caps[0]
 WUKONG_THREAD_CAPS12_WORD = WUKONG_THREAD_BASE_WORD + 256  # Thread.caps[12]
-_wukong_thr_loc  = WUKONG_THREAD_BASE_WORD * 4   # 0x900
+_wukong_thr_loc  = WUKONG_THREAD_BASE_WORD * 4   # 0xE00
 _wukong_thr_w1   = 0x000000FF                    # lim17 = 255 → 256-word alloc
 WUKONG_DEMO_NAMESPACE[1 * 4 + 0] = _wukong_thr_loc
 WUKONG_DEMO_NAMESPACE[1 * 4 + 1] = _wukong_thr_w1
@@ -658,39 +693,35 @@ WUKONG_DEMO_NAMESPACE[1 * 4 + 2] = integrity32(_wukong_thr_loc, _wukong_thr_w1)
 #
 # Derived from DEMO_CLIST with three overrides:
 #
-#   idx  0 — NULL (zero): BOOT_PROGRAM[2] = CALL CR0, CR0[0] uses this entry.
-#             The boot FSM initialises CR6 → byte 0x400 (this c-list) before
-#             BOOT_PROGRAM runs.  clist[0] is intentionally zeroed here so
-#             that the IDE-uploaded boot image's Thread.caps[0] — which holds
-#             the E-GT for the ⚡ configured boot abstraction — is the actual
-#             CALL target.  Without an IDE upload the CALL will fault cleanly
-#             rather than silently jumping into a hardwired default program.
-#             WukongCallHome remains in the namespace as a selectable
-#             abstraction (slot 7) but is no longer the default CALL target.
+#   idx  0 — SelfTest E-GT: the factory CALL target and the same abstraction
+#             selected by the simulator's default lightning bolt. An IDE
+#             boot-image upload may overwrite Thread.caps[0] with another
+#             selected entry, but a cold standalone board must not silently
+#             enter WukongCallHome.
 #
 #   idx  9 — SlideRule E-GT cleared: NS slot 8 absent in Wukong 8-slot NS
 #   idx 10 — Constants R-GT cleared: NS slot 9 absent in Wukong 8-slot NS
 # ---------------------------------------------------------------------------
 WUKONG_DEMO_CLIST = list(DEMO_CLIST)
-WUKONG_DEMO_CLIST[0]  = 0x4A000007  # WukongCallHome E-GT (NS slot 7) — has actual code in DMEM; loops forever (no RETURN to caller)
+WUKONG_DEMO_CLIST[0]  = make_gt(GT_TYPE_INFORM, PERM_MASK_E, SELFTEST_NS_SLOT, 0)
 WUKONG_DEMO_CLIST[9]  = 0           # SlideRule E-GT cleared: NS slot 8 absent in Wukong 8-slot NS
 WUKONG_DEMO_CLIST[10] = 0           # Constants R-GT cleared: NS slot 9 absent in Wukong 8-slot NS
 
 # ---------------------------------------------------------------------------
-# WukongCallHome LUMP c-list tail — cc=7, entries at the lump's last 7 words.
+# WukongCallHome LUMP c-list tail — cc=8, entries at the lump's last 8 words.
 #
 # The hardware CALL derives CR6 from the CALLED lump's own header: cc=0 makes
 # SET_CR6_BASE write a NULL GT into CR6, and WCH's first instruction
 # (LOAD CR3, CR6[5]) then faults NULL_CAP.  Give the lump a real c-list:
-# base = lump_base + (alloc − cc)·4 = 0x700 + 120·4 = 0x8E0 (words 568-575).
+# base = lump_base + (alloc − cc)·4 = 0x1200 + 120·4 = 0x13E0 (words 1272-1279).
 # Entries mirror the boot c-list slots WCH uses: [5]=LED_DEV, [6]=UART_DEV.
 # cc=8 (not 7): CR6.limit = cc−1 and mLoad's bounds check is strict '<', so
 # the highest usable index is cc−2; index 6 (UART) needs cc≥8.
 # ---------------------------------------------------------------------------
-WUKONG_WCH_BASE_WORD  = 448          # byte 0x700
+WUKONG_WCH_BASE_WORD  = WUKONG_CALLHOME_BASE_WORD  # byte 0x1200
 WUKONG_WCH_ALLOC      = 128          # words (lim17=127 patched above)
 WUKONG_WCH_CC         = 8
-WUKONG_WCH_CLIST_WORD = WUKONG_WCH_BASE_WORD + WUKONG_WCH_ALLOC - WUKONG_WCH_CC  # 569
+WUKONG_WCH_CLIST_WORD = WUKONG_WCH_BASE_WORD + WUKONG_WCH_ALLOC - WUKONG_WCH_CC  # 1272
 WUKONG_WCH_CLIST = [0, 0, 0, 0, 0,
                     WUKONG_DEMO_CLIST[5],   # LED_DEV Inform GT
                     WUKONG_DEMO_CLIST[6],   # UART_DEV Inform GT

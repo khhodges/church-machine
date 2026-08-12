@@ -6298,6 +6298,187 @@ mark.abs-search-highlight {
     padding-top: 0.5rem;
 }
 
+/* Compact hardware execution console in the Devices page.  The server-side
+   /fpga page remains the full event/workspace view; this card is the quick
+   per-board operational surface. */
+.dev-hw-section {
+    background: rgba(8, 12, 24, 0.35);
+    border-radius: 5px;
+    padding: 0.55rem 0.65rem 0.65rem;
+}
+.dev-hw-section-hdr {
+    justify-content: space-between;
+}
+.dev-hw-live-state {
+    border-radius: 10px;
+    padding: 1px 7px;
+    font-size: 0.6rem;
+    letter-spacing: 0.04em;
+    text-transform: none;
+    color: #aaa;
+    background: rgba(255,255,255,0.06);
+}
+.dev-hw-live-state.running { color: #75e39a; background: rgba(60,180,100,0.16); }
+.dev-hw-live-state.idle { color: #f0c76b; background: rgba(212,160,23,0.12); }
+.dev-hw-live-state.fault { color: #ff8c8c; background: rgba(220,60,60,0.18); }
+.dev-hw-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0.15rem 0 0.55rem;
+}
+.dev-hw-btn,
+.dev-hw-breakpoint button {
+    border: 1px solid #4a4a5d;
+    border-radius: 4px;
+    background: #24243a;
+    color: #d8d8e5;
+    padding: 3px 8px;
+    cursor: pointer;
+    font-size: 0.7rem;
+}
+.dev-hw-btn:hover,
+.dev-hw-breakpoint button:hover { border-color: var(--church-gold, #daa520); color: #fff; }
+.dev-hw-btn:disabled,
+.dev-hw-breakpoint button:disabled { opacity: 0.4; cursor: not-allowed; }
+.dev-hw-run { color: #86efac; border-color: #376744; }
+.dev-hw-halt { color: #fbbf24; }
+.dev-hw-breakpoint {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: 0.2rem;
+    color: #888;
+    font-size: 0.65rem;
+}
+.dev-hw-breakpoint input {
+    width: 74px;
+    border: 1px solid #45455a;
+    border-radius: 4px;
+    background: #141425;
+    color: #ddd;
+    padding: 3px 5px;
+    font: 0.68rem monospace;
+}
+.dev-hw-breakpoint input:focus { outline: none; border-color: var(--church-gold, #daa520); }
+.dev-hw-workspace-link {
+    margin-left: auto;
+    color: #8db7ff;
+    font-size: 0.68rem;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.dev-hw-workspace-link:hover { color: #c2d8ff; text-decoration: underline; }
+.dev-hw-summary {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.35rem;
+    margin-bottom: 0.55rem;
+}
+.dev-hw-summary > div {
+    min-width: 0;
+    padding: 0.28rem 0.35rem;
+    background: rgba(255,255,255,0.035);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 3px;
+}
+.dev-hw-summary span,
+.dev-hw-subhead {
+    display: block;
+    color: #777;
+    font-size: 0.58rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.dev-hw-summary strong {
+    display: block;
+    margin-top: 0.15rem;
+    overflow: hidden;
+    color: #ddd;
+    font: 0.68rem monospace;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dev-hw-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr);
+    gap: 0.55rem;
+}
+.dev-hw-subhead { margin-bottom: 0.25rem; }
+.dev-hw-code,
+.dev-hw-snapshot {
+    max-height: 190px;
+    overflow: auto;
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 3px;
+    background: rgba(0,0,0,0.18);
+}
+.dev-hw-code-row {
+    display: grid;
+    grid-template-columns: 14px 32px minmax(0,1fr) 25px;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 22px;
+    padding: 1px 4px;
+    border-left: 2px solid transparent;
+    font: 0.66rem monospace;
+}
+.dev-hw-code-row:hover { background: rgba(80,120,190,0.15); }
+.dev-hw-code-row.last { background: rgba(40,105,205,0.2); border-left-color: #3b82f6; }
+.dev-hw-code-row.present { background: rgba(40,160,115,0.22); border-left-color: #22c55e; }
+.dev-hw-code-row.next { background: rgba(180,145,20,0.18); border-left-color: #facc15; }
+.dev-hw-code-marker { color: #ef7777; font-size: 0.62rem; }
+.dev-hw-code-offset { color: #888; }
+.dev-hw-code-asm {
+    overflow: hidden;
+    color: #d5d9e4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dev-hw-code-row.present .dev-hw-code-asm { color: #b7f7d0; }
+.dev-hw-row-bp {
+    border: 0;
+    border-radius: 3px;
+    background: transparent;
+    color: #777;
+    cursor: pointer;
+    font: 0.58rem monospace;
+}
+.dev-hw-row-bp:hover { color: #fca5a5; background: rgba(180,40,40,0.22); }
+.dev-hw-snapshot { padding: 0.4rem; }
+.dev-hw-snapshot-grid {
+    display: grid;
+    grid-template-columns: auto minmax(0,1fr);
+    gap: 0.25rem 0.55rem;
+    font-size: 0.65rem;
+}
+.dev-hw-snapshot-grid span { color: #777; }
+.dev-hw-snapshot-grid strong { color: #d8d8e5; font: 0.65rem monospace; }
+.dev-hw-snapshot-note {
+    margin-top: 0.5rem;
+    color: #777;
+    font-size: 0.6rem;
+}
+.dev-hw-pipeline {
+    margin-top: 0.45rem;
+    color: #888;
+    font: 0.62rem monospace;
+}
+.dev-hw-message {
+    min-height: 1rem;
+    margin-top: 0.2rem;
+    color: #aaa;
+    font-size: 0.65rem;
+}
+.dev-hw-message.success { color: #76df9b; }
+.dev-hw-message.error { color: #ff8d8d; }
+@media (max-width: 650px) {
+    .dev-hw-summary { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .dev-hw-grid { grid-template-columns: 1fr; }
+    .dev-hw-workspace-link { margin-left: 0; }
+}
+
 .dev-live-section-hdr {
     font-size: 0.7rem;
     font-weight: 700;

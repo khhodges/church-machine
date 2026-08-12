@@ -1,7 +1,7 @@
 class NamespaceTutorial {
     constructor() {
         this.currentStep = -1;
-        this.TOTAL_WORDS    = 65536;
+        this.TOTAL_WORDS    = 32768;
         this.SLOT_SIZE      = 64;   // 64 words per slot — hardware minimum (Task #1205)
         this.NS_ENTRY_WORDS = 4;
         // Zone 1 — Bootstrap: NS root (slot 0) + boot thread (slot 1)
@@ -12,9 +12,12 @@ class NamespaceTutorial {
         // Zone 2 — Resident: always-loaded IDE abstractions (IDE-set count)
         this.RESIDENT_SLOTS  = 10;
         this.RESIDENT_WORDS  = this.RESIDENT_SLOTS  * this.SLOT_SIZE;   // 640
-        // Zone 4 — NS Table: sits at the top, grows downward
-        this.NS_TABLE_BASE   = 0xFC00;
-        this.NS_CW           = this.TOTAL_WORDS - this.NS_TABLE_BASE;   // 1024 = 256 entries × 4 words
+        // Zone 4 — V20 NS Table: 64 entries at the architectural top of
+        // memory. Simulator addresses are words; ISA addresses are bytes.
+        this.NS_TABLE_BASE   = 0x7F00;  // byte address 0x1FC00
+        this.NS_CW           = this.TOTAL_WORDS - this.NS_TABLE_BASE;   // 256 = 64 × 4 words
+        this.NS_TABLE_BASE_BYTE = 0x1FC00;
+        this.NS_ENTRY_BYTES  = 16;
         this.steps = this._buildSteps();
     }
 
@@ -23,12 +26,14 @@ class NamespaceTutorial {
     _headerRef() {
         const fields = [
             { bits: '[31:27]', name: 'magic',  val: '0x1F', note: 'Trap-on-execute guard',                                  w: 5,  bg: '#2a2a2a', border: '#555',    text: '#888'    },
-            { bits: '[26:23]', name: 'n\u22126', val: 'HW',    note: 'lumpSize = 2^(val+6) = full physical address space (n\u22126=10 for 65536 words)', w: 4,  bg: '#3a2000', border: '#c86000', text: '#f09040' },
-            { bits: '[22:10]', name: 'cw',     val: 'HW',    note: 'NS Table word count; NS Table base = 2^cc \u2212 cw (e.g. cw=1024 \u2192 256 entries \u00d7 4 words)', w: 13, bg: '#002a40', border: '#2080c0', text: '#60b8f0' },
+            { bits: '[26:23]', name: 'n\u22126', val: '1',     note: 'lumpSize = 2^(val+6) = 32K words / 128 KiB V20 address space', w: 4,  bg: '#3a2000', border: '#c86000', text: '#f09040' },
+            { bits: '[22:10]', name: 'cw',     val: '256',   note: 'NS Table word count; 64 entries \u00d7 4 words at the top of memory', w: 13, bg: '#002a40', border: '#2080c0', text: '#60b8f0' },
             { bits: '[9:8]',   name: 'typ',    val: '10',    note: 'clist-only \u2014 Namespace data lump (same as Thread)',   w: 2,  bg: '#2a2a2a', border: '#555',    text: '#888'    },
-            { bits: '[7:0]',   name: 'cc',     val: 'HW',    note: 'Physical address space = 2^cc words (e.g. cc=16 \u2192 65\u202f536 total words); NS Table starts at 2^cc and grows \u2193', w: 8,  bg: '#1a1000', border: '#b07820', text: '#f0c050' },
+            { bits: '[7:0]',   name: 'cc',     val: '64',    note: '64 namespace slots; slot 0 is highest and slots descend by 16 bytes', w: 8,  bg: '#1a1000', border: '#b07820', text: '#f0c050' },
         ];
         let bar = '<div style="display:flex;width:100%;border-radius:3px;overflow:hidden;margin-bottom:2px;">';
+        fields[4].val = '64';
+        fields[4].note = '64 namespace slots; slot 0 is highest and slots descend by 16 bytes';
         for (const f of fields) {
             bar += `<div style="flex:${f.w};background:${f.bg};border:1px solid ${f.border};padding:2px 3px;text-align:center;overflow:hidden;min-width:0;" title="${f.bits} ${f.name}=${f.val} \u2014 ${f.note}">`;
             bar += `<span style="color:${f.text};font-size:0.62rem;font-weight:700;font-family:monospace;white-space:nowrap;">${f.name}</span><br>`;
@@ -141,20 +146,20 @@ ${this._memMap(null)}
 <table class="sr-table">
 <tr><th>Field</th><th>Bits</th><th>Width</th><th>NS Slot\u202f0 value</th><th>Meaning</th></tr>
 <tr><td><code style="color:#888">magic</code></td><td>[31:27]</td><td>5&nbsp;b</td><td><code>0x1F</code></td><td>Trap-on-execute guard \u2014 executing word&nbsp;0 always faults</td></tr>
-<tr><td><code style="color:#f09040">n\u22126</code></td><td>[26:23]</td><td>4&nbsp;b</td><td>HW</td><td><code>lumpSize = 2^(n\u22126+6)</code> = full physical address space; for 65536-word NS: n\u22126=10</td></tr>
-<tr><td><code style="color:#60b8f0">cw</code></td><td>[22:10]</td><td>13&nbsp;b</td><td>HW</td><td><strong>NS Table word count</strong> (repurposed from code word count); NS Table base = 2^cc \u2212 cw \u2193; e.g. cw=1024 = 256 entries \u00d7 4 words/entry</td></tr>
+<tr><td><code style="color:#f09040">n\u22126</code></td><td>[26:23]</td><td>4&nbsp;b</td><td><code>1</code></td><td><code>lumpSize = 2^(n\u22126+6)</code> = 32K words / 128 KiB V20 physical space</td></tr>
+<tr><td><code style="color:#60b8f0">cw</code></td><td>[22:10]</td><td>13&nbsp;b</td><td><code>256</code></td><td><strong>NS Table word count</strong>: 64 entries \u00d7 4 words, at the top of memory</td></tr>
 <tr><td><code style="color:#888">typ</code></td><td>[9:8]</td><td>2&nbsp;b</td><td><code>10</code></td><td>clist-only \u2014 same type code as Thread; marks NS as a data lump, not a callable</td></tr>
-<tr><td><code style="color:#f0c050">cc</code></td><td>[7:0]</td><td>8&nbsp;b</td><td>HW</td><td><strong>Physical address space = 2^cc words</strong> (repurposed from c-list count); e.g. cc=16 \u2192 2^16 = 65\u202f536 total words; NS Table starts at 2^cc and grows \u2193</td></tr>
+<tr><td><code style="color:#f0c050">cc</code></td><td>[7:0]</td><td>8&nbsp;b</td><td><code>64</code></td><td><strong>Namespace slot capacity</strong>: 64 entries; slot 0 is highest and slots descend by 16 bytes</td></tr>
 </table>
 <div class="sr-key-concept"><div class="sr-concept-title">Address Space Layout \u2014 Four Zones</div>
-<p>The namespace divides physical memory into four IDE-set zones. Lump zones grow <strong>upward \u2191</strong> from <code>0x0000</code>; the NS Table grows <strong>downward \u2193</strong> from <code>2^cc</code>.</p>
+<p>The namespace divides physical memory into four IDE-set zones. Lump zones grow <strong>upward \u2191</strong> from <code>0x0000</code>; the V20 NS Table occupies the top-of-memory byte range <code>0x1FC00\u20130x1FFFF</code> and its logical slots descend from the highest address.</p>
 <table class="sr-table" style="margin:6px 0;"><tr><th>Zone</th><th>Base</th><th>Top</th><th>Size</th></tr>
 <tr><td>\u2460 Bootstrap</td><td><code>0x0000</code></td><td>2^cc\u2212cw\u2212resident\u2212free\u22121</td><td>IDE-set (boot slots)</td></tr>
 <tr><td>\u2461 Resident Lumps</td><td>Bootstrap end + 1</td><td>Resident end</td><td>IDE-set (always-loaded)</td></tr>
 <tr><td>\u2462 Freespace</td><td>Resident end + 1</td><td>2^cc\u2212cw\u22121</td><td>IDE-set (lazy-load cache)</td></tr>
 <tr><td>\u2463 NS Table</td><td><code>2^cc \u2212 cw</code></td><td><code>2^cc \u2212 1</code></td><td>cw words (IDE-set)</td></tr>
 </table>
-<p>The NS Table base: since the Table ends at <code>2^cc \u2212 1</code> and occupies <code>cw</code> words, its base = <code>(2^cc \u2212 1 + 1) \u2212 cw = 2^cc \u2212 cw</code>. Example: cc=16, cw=1024 \u2192 base = 65\u202f536 \u2212 1024 = <strong>0xFC00</strong>.</p></div>
+<p>The V20 NS Table begins at byte address <code>0x1FC00</code> (word address <code>0x7F00</code>) and ends at <code>0x1FFFF</code>. Each entry is 16 bytes: slot 0 begins at <code>0x1FFC0</code>, while slot 63 begins at <code>0x1FC00</code>.</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">Encoding Formula</div>
 <p><code>(0x1F &lt;&lt; 27) | (n_minus_6 &lt;&lt; 23) | (cw &lt;&lt; 10) | (0b10 &lt;&lt; 8) | cc</code></p>
 <p>Example \u2014 65536-word namespace (cc=16, cw=1024 NS Table words, n\u22126=10):</p>

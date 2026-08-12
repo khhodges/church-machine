@@ -24,6 +24,14 @@ WUKONG_BUILD_VERSION = 1   # ← bump this before each new synthesis run
 
 **How to apply:** increment `WUKONG_BUILD_VERSION` before every `python3 -m hardware.gen_rtlil` + droplet build cycle.
 
+## Artifact labels are not build identity
+
+The sentinel is authoritative. A remote `.bit` filename, plan document, or operator label such as “V9” does not prove the image was built from the corresponding source or memory layout. If the board announces `BUILD=v8`, treat it as the V8 image until a newly programmed SRAM image announces otherwise.
+
+**Why:** the source can advance its layout and `WUKONG_BUILD_VERSION` while the synthesized remote artifact remains stale; in particular, the legacy WCH placement at `0x0700` is distinguishable from the relocated source placement at `0x1200`.
+
+**How to apply:** require a pre-program manifest tying sentinel build number, source commit, WCH base, `N_INIT`, and bitstream hash together; reject any artifact whose post-program sentinel does not match that manifest.
+
 ## 'f' command — force sentinel retransmit
 
 - FPGA receives `0x66` ('f') over UART RX → clears `sentinel_sent` → `sentinel_req` goes high → all 4 sentinel bytes re-sent

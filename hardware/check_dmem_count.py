@@ -61,7 +61,15 @@ if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
 try:
-    from hardware.boot_rom import WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST
+    from hardware.boot_rom import (
+        WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST, WUKONG_SELFTEST_WORDS,
+        WUKONG_SELFTEST_BASE_WORD, WUKONG_WCH_BASE_WORD, WUKONG_WCH_CLIST,
+        WUKONG_WCH_CLIST_WORD, WUKONG_NUC_PROGRAM, WUKONG_THREAD_BASE_WORD,
+        WUKONG_THREAD_HEADER, WUKONG_THREAD_STO_WORD, WUKONG_THREAD_STO_INIT,
+        WUKONG_THREAD_CAPS0_WORD, WUKONG_THREAD_CAPS12_WORD,
+        wukong_wch_header,
+    )
+    from hardware.hw_types import GT_TYPE_INFORM, PERM_MASK_S, make_gt
 except ImportError as exc:
     print(f"ERROR: cannot import hardware.boot_rom: {exc}", file=sys.stderr)
     sys.exit(2)
@@ -166,6 +174,21 @@ def _compute_dmem_init():
     dmem_init += list(WUKONG_DEMO_CLIST)
     while len(dmem_init) < 16384:
         dmem_init.append(0)
+
+    for _i, _v in enumerate(WUKONG_SELFTEST_WORDS):
+        dmem_init[WUKONG_SELFTEST_BASE_WORD + _i] = _v
+    for _i, _v in enumerate(
+        [wukong_wch_header(len(WUKONG_NUC_PROGRAM))] + list(WUKONG_NUC_PROGRAM)
+    ):
+        dmem_init[WUKONG_WCH_BASE_WORD + _i] = _v
+    for _i, _v in enumerate(WUKONG_WCH_CLIST):
+        dmem_init[WUKONG_WCH_CLIST_WORD + _i] = _v
+    dmem_init[WUKONG_THREAD_BASE_WORD] = WUKONG_THREAD_HEADER
+    dmem_init[WUKONG_THREAD_STO_WORD] = WUKONG_THREAD_STO_INIT
+    dmem_init[WUKONG_THREAD_CAPS0_WORD] = 0x4A000006
+    dmem_init[WUKONG_THREAD_CAPS12_WORD] = make_gt(
+        GT_TYPE_INFORM, PERM_MASK_S, 1, 0
+    )
 
     hw_init_pairs = [(addr, val) for addr, val in enumerate(dmem_init) if val != 0]
     n_init = len(hw_init_pairs)
