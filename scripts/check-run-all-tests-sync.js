@@ -54,6 +54,7 @@ const DEFAULT_INFRASTRUCTURE_WORKFLOWS = [
  * the scriptOnlySuites array in test-workflow-config.json.
  */
 const DEFAULT_SCRIPT_ONLY_SUITES = [
+    'wukong-bridge-parser-tests',
     'sha32-vectors',
     'check-sha32-collisions',
     'compile-api-tests',
@@ -73,7 +74,13 @@ const DEFAULT_SCRIPT_ONLY_SUITES = [
     'check-wukong-hw-init',
     'wukong-cr-update-tests',
     'wukong-trace-cr-server-tests',
+    'wukong-status-readonly-tests',
+    'versions-view-tests',
+    'pipeline-health-status-tests',
+    'pipeline-health-stages-tests',
+    'check-no-ti60-ui',
     'bitstream-version-labeling-tests',
+    'boot-entry-hw-image-tests',
 ];
 
 const configPath = path.join(__dirname, 'test-workflow-config.json');
