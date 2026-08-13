@@ -298,6 +298,9 @@ register_suite "playwright-port-wiring" \
 register_suite "pet-name-memory-tests" \
     'node simulator/test_pet_name_memory.js'
 
+register_suite "settings-petname-roundtrip-tests" \
+    'node simulator/test_settings_petname_roundtrip.js'
+
 register_suite "wukong-protocol-tests" \
     'python -m pytest scripts/test_wukong_protocol.py -v'
 
