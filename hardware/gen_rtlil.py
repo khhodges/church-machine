@@ -371,6 +371,21 @@ def generate_rtlil_wukong(output_dir="build"):
             self._shape_cache = _orig_sv_shape(self)
             return self._shape_cache
     _AmaranthSwitchValue.shape = _cached_sv_shape
+
+    # ── _check_rhs memoisation patch ─────────────────────────────────────────
+    # _check_rhs (hdl/_dsl.py) recursively walks every RHS expression to
+    # validate signal scoping.  Also uncached in 0.5.8 — same O(n²) pattern.
+    # Cache by object identity; safe because gc is disabled above.
+    import amaranth.hdl._dsl as _amaranth_dsl
+    _orig_check_rhs = _amaranth_dsl._check_rhs
+    _checked_rhs_ids: set = set()
+    def _cached_check_rhs(value):
+        vid = id(value)
+        if vid in _checked_rhs_ids:
+            return
+        _checked_rhs_ids.add(vid)
+        _orig_check_rhs(value)
+    _amaranth_dsl._check_rhs = _cached_check_rhs
     # ─────────────────────────────────────────────────────────────────────────
 
     print(f"  [gen_rtlil] Starting convert() at {time.strftime('%H:%M:%S')} — shape cache + gc disabled")
