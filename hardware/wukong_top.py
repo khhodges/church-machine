@@ -47,7 +47,7 @@ from amaranth.lib.memory import Memory as LibMemory
 
 from .hw_types import *
 from .core import ChurchCore
-from .boot_rom import (BootRom, BOOT_PROGRAM, WUKONG_NUC_PROGRAM,
+from .boot_rom import (BootRom, BOOT_PROGRAM, WUKONG_NUC_PROGRAM, encode_turing,
                        WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST,
                        WUKONG_SELFTEST_WORDS, WUKONG_SELFTEST_BASE_WORD,
                        WUKONG_CALLHOME_BASE_WORD,
@@ -64,7 +64,7 @@ from .uart_rx import UartRx
 # Increment this by 1 every time a new bitstream is synthesised and flashed.
 # The bridge reports it to the IDE so the FPGA status page can confirm exactly
 # which build is running — no need to reprogram just to check.
-WUKONG_BUILD_VERSION = 11  # ← bump this before each new synthesis run
+WUKONG_BUILD_VERSION = 12  # ← bump this before each new synthesis run
 
 # ── Wukong ROM: 3-instruction BOOT_PROGRAM ────────────────────────────────────
 # Architecture doc:             docs/wukong-boot.md
@@ -75,12 +75,18 @@ WUKONG_BUILD_VERSION = 11  # ← bump this before each new synthesis run
 #                              (0x4A000006), matching the simulator lightning bolt.
 #                              An IDE boot-image upload may replace it with the
 #                              user's selected entry.
-# [3..1023] = 0
+# [3] BRANCH -1  → infinite loop guard: if SelfTest ever returns, spin here
+#                   safely until an IRQ fires to load a user program.
+#                   Without this, word 3 is 0x00000000 (a zero-encoded instruction)
+#                   which causes an immediate fault, wiping all CRs and looping
+#                   the entire boot sequence with NULL GTs — the fault LED lights.
+# [4..1023] = 0
 #
 # WukongCallHome remains in the namespace at slot 7 as a selectable abstraction
 # but is no longer the hardwired default CALL target.
 # The WukongCallHome LUMP body is placed in dmem_init below at byte 0x1200.
-_WUKONG_ROM = list(BOOT_PROGRAM[:3]) + [0] * (1024 - 3)
+_BRANCH_MINUS_1 = encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=(-1) & 0x7FFF)
+_WUKONG_ROM = list(BOOT_PROGRAM[:3]) + [_BRANCH_MINUS_1] + [0] * (1024 - 4)
 
 # ── Synthesis-time LUMP overflow guard ────────────────────────────────────────
 # WukongCallHome LUMP alloc = 128 words (n_minus_6=1 → 2^7).
