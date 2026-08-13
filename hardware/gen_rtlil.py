@@ -386,6 +386,70 @@ def generate_rtlil_wukong(output_dir="build"):
         _checked_rhs_ids.add(vid)
         _orig_check_rhs(value)
     _amaranth_dsl._check_rhs = _cached_check_rhs
+
+    # ── DomainCollector.on_value memoisation patch ────────────────────────────
+    # DomainCollector traverses the full value-AST looking for ClockSignal /
+    # ResetSignal nodes.  All mutations are set.add() — idempotent.  Visiting
+    # the same node twice adds nothing new, but with a large decoder the same
+    # sub-expression appears thousands of times.  Skip revisits by tracking
+    # object ids (safe while gc is disabled).
+    from amaranth.hdl._xfrm import DomainCollector as _DomainCollector
+    _orig_dc_on_value = _DomainCollector.on_value
+    def _memoised_dc_on_value(self, value):
+        if not hasattr(self, '_visited_ids'):
+            self._visited_ids = set()
+        vid = id(value)
+        if vid in self._visited_ids:
+            return
+        self._visited_ids.add(vid)
+        return _orig_dc_on_value(self, value)
+    _DomainCollector.on_value = _memoised_dc_on_value
+
+    # ── ValueTransformer.on_value memoisation patch ───────────────────────────
+    # ValueTransformer recursively rebuilds expression trees (Operator, Slice,
+    # SwitchValue, …).  DomainLowerer and similar passes use it over every
+    # statement in the design.  With a 26-way decoder the same sub-expression
+    # (e.g. the SwitchValue condition) appears in thousands of assignments,
+    # so on_value is called O(N²) times.
+    #
+    # For a given transformer instance, the result for any input node is
+    # deterministic (the domain→signal map is fixed per fragment, and plain
+    # Signal/Const/Operator nodes transform purely).  Cache by input id() per
+    # instance; safe because gc is disabled so ids are stable.
+    from amaranth.hdl._xfrm import ValueTransformer as _ValueTransformer
+    _orig_vt_on_value = _ValueTransformer.on_value
+    def _cached_vt_on_value(self, value):
+        try:
+            cache = self.__vt_cache
+        except AttributeError:
+            cache = self.__vt_cache = {}
+        vid = id(value)
+        if vid in cache:
+            return cache[vid]
+        result = _orig_vt_on_value(self, value)
+        cache[vid] = result
+        return result
+    _ValueTransformer.on_value = _cached_vt_on_value
+
+    # ── Design._collect_used_signals_value memoisation patch ─────────────────
+    # _collect_used_signals_value (hdl/_ir.py, class Design) recursively walks
+    # the AST to mark which Signals are used.  _use_signal() is a set-add —
+    # idempotent.  Visiting the same value node a second time for the same
+    # fragment adds nothing.  Cache by (id(fragment), id(value)) per Design
+    # instance; safe with gc disabled.
+    import amaranth.hdl._ir as _amaranth_ir
+    _orig_cusv = _amaranth_ir.Design._collect_used_signals_value
+    def _memoised_cusv(self, fragment, value):
+        try:
+            seen = self.__cusv_seen
+        except AttributeError:
+            seen = self.__cusv_seen = set()
+        key = (id(fragment), id(value))
+        if key in seen:
+            return
+        seen.add(key)
+        _orig_cusv(self, fragment, value)
+    _amaranth_ir.Design._collect_used_signals_value = _memoised_cusv
     # ─────────────────────────────────────────────────────────────────────────
 
     print(f"  [gen_rtlil] Starting convert() at {time.strftime('%H:%M:%S')} — shape cache + gc disabled")
