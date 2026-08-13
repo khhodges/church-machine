@@ -1,14 +1,14 @@
 {
   "token": "fa110003",
   "abstraction": "FallbackRegressionAbs",
-  "filename": "FallbackRegressionAbs_v136.lump",
-  "sidecar_file": "FallbackRegressionAbs_v136.json",
+  "filename": "FallbackRegressionAbs_v154.lump",
+  "sidecar_file": "FallbackRegressionAbs_v154.json",
   "ns_slot": null,
   "lump_size": 64,
   "typ": 0,
   "content_type": "code",
-  "cw": 0,
-  "cc": 1,
+  "cw": 1,
+  "cc": 0,
   "profile": "IoT",
   "language": "assembly",
   "author": "",
@@ -27,15 +27,20 @@
     "source_hash": ""
   },
   "deployment": {
-    "target_board": "ti60-f225",
+    "target_board": "wukong-xc7a100t",
     "profile": "IoT",
-    "built_at": "2026-07-25T22:48:29.314982Z",
+    "built_at": "2026-08-13T22:29:50.718815Z",
     "builder": "CLOOMC++ IDE v1.0"
   },
   "grants": [
     "E"
   ],
   "source": "",
-  "lump_version": 136,
-  "compiled_at": 1785019709.3149946
+  "binary_hash": "00a86f684d41c18c5d16b8a2c9c04152169758994c8d44c6a200ea699c9253a0",
+  "petname": "",
+  "issue_number": 1,
+  "identity_string": "FallbackRegressionAbs#1",
+  "identity_hash": "8e4df3345ccf07f520919210a8795f7ec25977c11fc7958bf836dd1b3287bf8c",
+  "lump_version": 154,
+  "compiled_at": 1786660190.7188263
 }

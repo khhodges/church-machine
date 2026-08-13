@@ -5021,6 +5021,66 @@ def save_lump():
                     "cc":                 _sl_cc,
                 }), 422
 
+    # ── Pre-flight: identity computation + seal verification ──────────────────
+    # Pure computation — no filesystem reads or writes — so a corrupt lump
+    # header that makes c-list[0] unwritable returns 422 BEFORE any existing
+    # archive or sidecar is touched by Phase 4.
+    import hashlib as _hl_id
+    if _petname:
+        _identity_string = f"{_petname}.{abs_name}#{_issue_number}"
+    else:
+        _identity_string = f"{abs_name}#{_issue_number}"
+    _identity_hash = _hl_id.sha256(_identity_string.encode('utf-8')).hexdigest()
+
+    # Self Inform GT: bits[31:25] = 0b0000_101 (dom=1, gt_type=Inform, perm=0),
+    # bits[24:0] = low 25 bits of sha256(identity_string).
+    _id_hash_int = int(_identity_hash[:8], 16)
+    _self_gt     = (0x0A000000 | (_id_hash_int & 0x1FFFFFF)) & 0xFFFFFFFF
+
+    # Build the word array, bump cc=0→1 if needed, then inject the self-GT.
+    _sl_words = [int(w) & 0xFFFFFFFF for w in words]
+    _sl_hdr   = _sl_words[0]
+    _sl_cc2   = _sl_hdr & 0xFF
+    _sl_lsz   = 1 << (((_sl_hdr >> 23) & 0xF) + 6)
+
+    if _sl_cc2 == 0:
+        # No c-list yet — open one slot in the padding zone and bump cc to 1.
+        _sl_words[0] = (_sl_hdr & 0xFFFFFF00) | 0x01
+        _sl_cc2 = 1
+
+    _clist_row0_idx = _sl_lsz - _sl_cc2
+    if 0 < _clist_row0_idx < len(_sl_words):
+        _sl_words[_clist_row0_idx] = _self_gt
+
+    # Verify the injection landed before touching any file on disk.
+    # Two failure modes: index out of range (lump_size/cc mismatch) or future
+    # code accidentally overwrites the slot.  Either way: reject, don't save.
+    _actual_seal = (
+        _sl_words[_clist_row0_idx]
+        if 0 < _clist_row0_idx < len(_sl_words)
+        else 0
+    )
+    if _actual_seal != _self_gt:
+        return jsonify({
+            "error": (
+                f"Identity seal mismatch: expected self-GT {_self_gt:#010x} "
+                f"but c-list[0] contains {_actual_seal:#010x}. "
+                f"identity_string used: {_identity_string!r}. "
+                f"The LUMP has not been saved. "
+                f"Re-compile and ensure cc >= 1 and lump_size is consistent."
+            ),
+            "identity_seal_mismatch": True,
+            "expected_self_gt":       _self_gt,
+            "actual_clist0":          _actual_seal,
+            "identity_string":        _identity_string,
+        }), 422
+
+    # Pre-pack and hash the verified binary now; Phase 5 only writes it.
+    import hashlib as _hl_save
+    lump_bytes   = _struct.pack(f'>{len(_sl_words)}I', *_sl_words)
+    _binary_hash = _hl_save.sha256(lump_bytes).hexdigest()
+    # ── End pre-flight ────────────────────────────────────────────────────────
+
     lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
     os.makedirs(lumps_dir, exist_ok=True)
 
@@ -5158,49 +5218,15 @@ def save_lump():
                 except OSError as _e:
                     logging.warning('[lumps] Could not prune sidecar %s: %s', _old_json, _e)
 
-    # ── Identity: dot pet name + issue number ────────────────────────────────
-    # Identity string = "petname.Abstraction#n" (or "Abstraction#n" when no
-    # petname is set yet).  The identity_hash covers ONLY the identity string,
-    # not the binary bytes, so the two seals are independent:
-    #   identity_hash — who authored this, which issue (public, secretless)
-    #   binary_hash   — content fingerprint (what the bits are)
-    import hashlib as _hl_id
-    if _petname:
-        _identity_string = f"{_petname}.{abs_name}#{_issue_number}"
-    else:
-        _identity_string = f"{abs_name}#{_issue_number}"
-    _identity_hash = _hl_id.sha256(_identity_string.encode('utf-8')).hexdigest()
-
-    # Self Inform GT: v2.0 layout bits[31:25] = 0b0000_101 (dom=1, gt_type=01=Inform,
-    # perm=0), bits[24:0] = low 25 bits of identity_hash.
-    # Placed at c-list row 0 so the binary carries its own identity fingerprint.
-    _id_hash_int = int(_identity_hash[:8], 16)
-    _self_gt     = (0x0A000000 | (_id_hash_int & 0x1FFFFFF)) & 0xFFFFFFFF
-
-    # ── Phase 5: Inject self GT into c-list row 0, then write binary ──────────
-    _sl_words = [int(w) & 0xFFFFFFFF for w in words]
-    _sl_hdr   = _sl_words[0]
-    _sl_cc2   = _sl_hdr & 0xFF
-    _sl_lsz   = 1 << (((_sl_hdr >> 23) & 0xF) + 6)
-
-    if _sl_cc2 == 0:
-        # No c-list yet — open one slot in the padding zone and bump cc to 1
-        _sl_words[0] = (_sl_hdr & 0xFFFFFF00) | 0x01
-        _sl_cc2 = 1
-
-    _clist_row0_idx = _sl_lsz - _sl_cc2
-    if 0 < _clist_row0_idx < len(_sl_words):
-        _sl_words[_clist_row0_idx] = _self_gt
-
-    lump_bytes = _struct.pack(f'>{len(_sl_words)}I', *_sl_words)
+    # ── Phase 5: Write pre-verified binary ────────────────────────────────────
+    # lump_bytes, _binary_hash, _identity_string, _identity_hash, and _self_gt
+    # were all computed and seal-verified in the pre-flight block above, before
+    # any filesystem mutation took place.
     with open(lump_path, 'wb') as fh:
         fh.write(lump_bytes)
 
     LAZY_LUMPS[token8] = lump_bytes
     LAZY_LUMPS[token8.lstrip('0') or '0'] = lump_bytes
-
-    import hashlib as _hl_save
-    _binary_hash = _hl_save.sha256(lump_bytes).hexdigest()
 
     # ── Phase 6: Build and write sidecar JSON ─────────────────────────────────
     sidecar = {
