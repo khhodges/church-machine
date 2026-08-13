@@ -1622,6 +1622,16 @@ function compileAndBuild() {
     listing += `  Profile:   ${profile}\n`;
     listing += `  MTBF:      ${mtbfClean}/${mtbfTotal} clean runs (${mtbfStatus})\n`;
 
+    // Identity line: show the full dot pet name stamped into this LUMP.
+    // When no petname is set, remind the programmer how to set one.
+    if (_savePetname) {
+        const _identStr = `${_savePetname}.${absName}#${_saveIssueNumber}`;
+        listing += `  Identity:  ${_identStr}\n`;
+    } else {
+        listing += `  Identity:  ${absName}#${_saveIssueNumber}  ` +
+                   `\u26a0 No petname — open IDE Settings to set one\n`;
+    }
+
     if (Object.keys(drPetNames).length > 0 || Object.keys(crPetNames).length > 0) {
         listing += `\n  Pet Names:\n`;
         for (const [reg, name] of Object.entries(drPetNames)) {

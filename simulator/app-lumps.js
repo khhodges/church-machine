@@ -3203,9 +3203,12 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
             `<span class="lump-proof-chip" title="LUMP token \u2014 local runtime key, links binary to ${e(_nsSlotDisplay || 'the namespace table')}. Identity lives in the dot pet name, not this token.">` +
                 `<span class="lump-proof-label">Token</span>0x${e(token)}` +
             `</span>` +
-            `<span class="lump-proof-chip" title="${e(_idChipTitle)}">` +
-                `<span class="lump-proof-label">Identity</span>${e(_dotPetName)}` +
-                (_idHashSide ? `&ensp;<span style="opacity:.55;font-size:.85em">${e(_idHashSide.slice(0,8))}\u2026</span>` : '') +
+            `<span class="lump-proof-chip${_idPetname ? '' : ' lump-proof-chip-warn'}" title="${e(_idChipTitle)}">` +
+                `<span class="lump-proof-label">Identity</span>` +
+                (_idPetname
+                    ? `${e(_dotPetName)}` +
+                      (_idHashSide ? `&ensp;<span style="opacity:.55;font-size:.85em">${e(_idHashSide.slice(0,8))}\u2026</span>` : '')
+                    : `${e(_dotPetName)}&ensp;<a class="lump-proof-set-petname" href="#" onclick="event.preventDefault();openSettings();document.getElementById('settingPetname')&&document.getElementById('settingPetname').focus()" title="Open IDE Settings to set your petname">Set petname \u2192</a>`) +
             `</span>` +
             (_nsSlotDisplay ? `<span class="lump-proof-chip" title="Namespace slot \u2014 transient local resolution of the dot pet name on this machine">` +
                 `<span class="lump-proof-label">Slot</span>${e(_nsSlotDisplay)}` +

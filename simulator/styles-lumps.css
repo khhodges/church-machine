@@ -1441,6 +1441,24 @@
     border-color: rgba(255, 255, 255, 0.08);
     color: var(--text-secondary, #8888aa);
 }
+/* Identity chip: no petname set — amber tint to draw attention */
+.lump-proof-chip-warn {
+    background: rgba(255, 200, 60, 0.08);
+    border-color: rgba(255, 200, 60, 0.28);
+    color: #d4a520;
+}
+/* Inline link inside the identity chip to open Settings */
+.lump-proof-set-petname {
+    color: #c8a040;
+    font-size: 0.65rem;
+    font-family: inherit;
+    text-decoration: underline dotted;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.lump-proof-set-petname:hover {
+    color: #f0c060;
+}
 
 /* ── C-List viewer ──────────────────────────────────────── */
 .lump-clist-section {

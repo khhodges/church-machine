@@ -2474,6 +2474,17 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
                             The Wukong XC7A100T uses Yosys + Vivado for P&amp;R.
                         </div>
                     </div>
+                    <div class="settings-section" id="settingsIdentitySection">
+                        <div class="settings-section-title">Identity</div>
+                        <div style="color:#888;font-size:0.78rem;margin-bottom:0.6rem;">Your dot pet name is stamped into every compiled LUMP as the identity seal — <code>petname.Abstraction#n</code> is globally unique.</div>
+                        <label class="settings-label">Dot Pet Name
+                            <input type="text" id="settingPetname" class="modal-input" placeholder="e.g. ken or org.dep.proj" maxlength="128" autocomplete="off" spellcheck="false">
+                        </label>
+                        <label class="settings-label">Default Issue Number
+                            <input type="number" id="settingIssueNumber" class="modal-input" placeholder="1" min="1" max="9999" value="1">
+                        </label>
+                        <div id="settingPetnamePreview" style="color:#6b7280;font-size:0.78rem;margin-top:0.3rem;font-family:monospace;min-height:1.2em;"></div>
+                    </div>
                 </div>
                 <div class="settings-page-col">
                     <div class="settings-section">

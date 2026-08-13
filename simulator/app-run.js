@@ -11594,6 +11594,17 @@ function openSettings() {
     if (osCb) osCb.checked = !!settings.openSource;
     const boardSel = document.getElementById('settingFPGABoard');
     if (boardSel) boardSel.value = getSelectedBoard();
+    const petnameEl = document.getElementById('settingPetname');
+    if (petnameEl) {
+        petnameEl.value = (() => { try { return localStorage.getItem('church_petname') || ''; } catch(_e) { return ''; } })();
+        petnameEl.oninput = _updatePetnamePreview;
+    }
+    const issueEl = document.getElementById('settingIssueNumber');
+    if (issueEl) {
+        issueEl.value = (() => { try { return parseInt(localStorage.getItem('church_issue_number') || '1') || 1; } catch(_e) { return 1; } })();
+        issueEl.oninput = _updatePetnamePreview;
+    }
+    _updatePetnamePreview();
     const notifPrefs = getNotifPrefs();
     const nb = document.getElementById('notifBoardNew');       if (nb) nb.checked = notifPrefs.boardNew;
     const nr = document.getElementById('notifBoardReconnect'); if (nr) nr.checked = notifPrefs.boardReconnect;
@@ -11650,6 +11661,20 @@ function dismissAllPopupsPerm() {
     localStorage.setItem('churchMachine_toolGuide_abacus_perm', '1');
     localStorage.setItem('churchMachine_toolGuide_sliderule', '1');
     localStorage.setItem('churchMachine_toolGuide_sliderule_perm', '1');
+}
+
+function _updatePetnamePreview() {
+    const previewEl = document.getElementById('settingPetnamePreview');
+    if (!previewEl) return;
+    const pn = (document.getElementById('settingPetname')?.value || '').trim();
+    const iss = parseInt(document.getElementById('settingIssueNumber')?.value || '1') || 1;
+    if (pn) {
+        previewEl.textContent = `Seal: ${pn}.Abstraction#${iss}`;
+        previewEl.style.color = '#22c55e';
+    } else {
+        previewEl.textContent = 'No petname set — LUMPs will carry Abstraction#n only';
+        previewEl.style.color = '#6b7280';
+    }
 }
 
 function closeSettings() {
@@ -11760,6 +11785,20 @@ function saveSettings() {
         }
     };
     localStorage.setItem('church_student_settings', JSON.stringify(settings));
+
+    // Save petname + issue number independently in their own localStorage keys
+    // so they can be read by the compiler without loading the full settings blob.
+    const _pnEl = document.getElementById('settingPetname');
+    const _inEl = document.getElementById('settingIssueNumber');
+    if (_pnEl !== null) {
+        const _pnVal = _pnEl.value.trim();
+        if (_pnVal) localStorage.setItem('church_petname', _pnVal);
+        else localStorage.removeItem('church_petname');
+    }
+    if (_inEl !== null) {
+        const _inVal = parseInt(_inEl.value) || 1;
+        localStorage.setItem('church_issue_number', String(_inVal));
+    }
 
     const boardSel = document.getElementById('settingFPGABoard');
     if (boardSel) setSelectedBoard(boardSel.value);
