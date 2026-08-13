@@ -1578,6 +1578,12 @@ function compileAndBuild() {
     }
 
     const lumpWordsArray = Array.from(lumpWords);
+    // Petname: programmer's globally-unique dot identity (e.g. "ken" or "org.dep.proj").
+    // Issue number: which specific issuance of this abstraction this is.
+    // Together: petname.Abstraction#n is the globally meaningful identity of this LUMP.
+    const _savePetname     = (() => { try { return localStorage.getItem('church_petname') || ''; } catch (_e) { return ''; } })();
+    const _saveIssueNumber = (() => { try { return parseInt(localStorage.getItem('church_issue_number') || '1') || 1; } catch (_e) { return 1; } })();
+
     const savePayload = {
         binary: lumpWordsArray,
         metadata: {
@@ -1598,7 +1604,9 @@ function compileAndBuild() {
             source_hash:     _simRunHash || _currentEditorHash(),
             source:          source,
             target_board:   'wukong-xc7a100t',
-            grants:         ['E']
+            grants:         ['E'],
+            petname:        _savePetname,
+            issue_number:   _saveIssueNumber,
         }
     };
 

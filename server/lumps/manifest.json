@@ -1733,18 +1733,40 @@
     ]
   },
   {
+    "token": "87c45cc2",
+    "abstraction": "Abstraction:  WukongCallHome",
+    "filename": "Abstraction_WukongCallHome_v3.lump",
+    "sidecar_file": "Abstraction_WukongCallHome_v3.json",
+    "lump_size": 128,
+    "cw": 73,
+    "cc": 2,
+    "author": "",
+    "version": "2026.08.12",
+    "lump_version": 3,
+    "compiled_at": 1786530937.0319977,
+    "methods": [
+      {
+        "name": "run",
+        "offset": 0,
+        "length": 73
+      }
+    ],
+    "grants": [
+      "E"
+    ]
+  },
+  {
     "token": "00001000",
     "abstraction": "SlideRule",
-    "filename": "SlideRule_v1.lump",
-    "sidecar_file": "SlideRule_v1.json",
-    "ns_slot": 16,
+    "filename": "SlideRule_v2.lump",
+    "sidecar_file": "SlideRule_v2.json",
     "lump_size": 4096,
     "cw": 2602,
     "cc": 1,
     "author": "",
-    "version": "2026.08.04",
-    "lump_version": 1,
-    "compiled_at": 1785849687.4299583,
+    "version": "2026.08.13",
+    "lump_version": 2,
+    "compiled_at": 1786659063.1567092,
     "methods": [
       {
         "name": "Multiply",
@@ -1860,29 +1882,9 @@
     "grants": [
       "E"
     ],
-    "variant_group": "sliderule"
-  },
-  {
-    "token": "87c45cc2",
-    "abstraction": "Abstraction:  WukongCallHome",
-    "filename": "Abstraction_WukongCallHome_v3.lump",
-    "sidecar_file": "Abstraction_WukongCallHome_v3.json",
-    "lump_size": 128,
-    "cw": 73,
-    "cc": 2,
-    "author": "",
-    "version": "2026.08.12",
-    "lump_version": 3,
-    "compiled_at": 1786530937.0319977,
-    "methods": [
-      {
-        "name": "run",
-        "offset": 0,
-        "length": 73
-      }
-    ],
-    "grants": [
-      "E"
-    ]
+    "binary_hash": "6a449f41a0048c54e2a7b31d078068300832febb88c03c4beb228b1afbff48a3",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "a3514490fec3fce8fe06f9ee6a3b83bd94b1b686c4ecac855951344504989b91"
   }
 ]

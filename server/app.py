@@ -4965,9 +4965,11 @@ def save_lump():
     _ct_default_map = {0: 'code', 1: 'data', 2: 'thread', 3: 'outform'}
     content_type = metadata.get("content_type") or _ct_default_map.get(hdr_typ, 'binary')
 
-    abs_name   = metadata.get("abstraction", "Unnamed")
-    ns_slot    = metadata.get("ns_slot", None)
-    token_hint = metadata.get("token", None)
+    abs_name     = metadata.get("abstraction", "Unnamed")
+    ns_slot      = metadata.get("ns_slot", None)
+    token_hint   = metadata.get("token", None)
+    _petname     = str(metadata.get("petname", "")).strip()
+    _issue_number = int(metadata.get("issue_number", 1) or 1)
 
     import re as _re
     if token_hint:
@@ -5156,9 +5158,41 @@ def save_lump():
                 except OSError as _e:
                     logging.warning('[lumps] Could not prune sidecar %s: %s', _old_json, _e)
 
-    # ── Phase 5: Write new lump binary ────────────────────────────────────────
-    lump_bytes = _struct.pack(f'>{len(words)}I',
-                              *[int(w) & 0xFFFFFFFF for w in words])
+    # ── Identity: dot pet name + issue number ────────────────────────────────
+    # Identity string = "petname.Abstraction#n" (or "Abstraction#n" when no
+    # petname is set yet).  The identity_hash covers ONLY the identity string,
+    # not the binary bytes, so the two seals are independent:
+    #   identity_hash — who authored this, which issue (public, secretless)
+    #   binary_hash   — content fingerprint (what the bits are)
+    import hashlib as _hl_id
+    if _petname:
+        _identity_string = f"{_petname}.{abs_name}#{_issue_number}"
+    else:
+        _identity_string = f"{abs_name}#{_issue_number}"
+    _identity_hash = _hl_id.sha256(_identity_string.encode('utf-8')).hexdigest()
+
+    # Self Inform GT: v2.0 layout bits[31:25] = 0b0000_101 (dom=1, gt_type=01=Inform,
+    # perm=0), bits[24:0] = low 25 bits of identity_hash.
+    # Placed at c-list row 0 so the binary carries its own identity fingerprint.
+    _id_hash_int = int(_identity_hash[:8], 16)
+    _self_gt     = (0x0A000000 | (_id_hash_int & 0x1FFFFFF)) & 0xFFFFFFFF
+
+    # ── Phase 5: Inject self GT into c-list row 0, then write binary ──────────
+    _sl_words = [int(w) & 0xFFFFFFFF for w in words]
+    _sl_hdr   = _sl_words[0]
+    _sl_cc2   = _sl_hdr & 0xFF
+    _sl_lsz   = 1 << (((_sl_hdr >> 23) & 0xF) + 6)
+
+    if _sl_cc2 == 0:
+        # No c-list yet — open one slot in the padding zone and bump cc to 1
+        _sl_words[0] = (_sl_hdr & 0xFFFFFF00) | 0x01
+        _sl_cc2 = 1
+
+    _clist_row0_idx = _sl_lsz - _sl_cc2
+    if 0 < _clist_row0_idx < len(_sl_words):
+        _sl_words[_clist_row0_idx] = _self_gt
+
+    lump_bytes = _struct.pack(f'>{len(_sl_words)}I', *_sl_words)
     with open(lump_path, 'wb') as fh:
         fh.write(lump_bytes)
 
@@ -5206,6 +5240,10 @@ def save_lump():
         "grants": metadata.get("grants", ["E"]),
         "source":        metadata.get("source", ""),
         "binary_hash":   _binary_hash,
+        "petname":         _petname,
+        "issue_number":    _issue_number,
+        "identity_string": _identity_string,
+        "identity_hash":   _identity_hash,
     }
 
     import time as _time_save
@@ -5244,6 +5282,9 @@ def save_lump():
         "methods":       sidecar["methods"],
         "grants":        sidecar["grants"],
         "binary_hash":   _binary_hash,
+        "petname":       _petname,
+        "issue_number":  _issue_number,
+        "identity_hash": _identity_hash,
     }
     manifest.append(new_entry)
 
@@ -5276,14 +5317,18 @@ def save_lump():
             logging.warning('[lumps] boot-image.bin regeneration failed: %s', _bie)
 
     resp: dict = {
-        "ok":           True,
-        "token":        token8,
-        "lump":         lump_filename,
-        "lump_path":    f'server/lumps/{lump_filename}',
-        "sidecar":      sidecar_filename,
-        "size_bytes":   len(lump_bytes),
-        "lump_version": next_lump_version,
+        "ok":             True,
+        "token":          token8,
+        "lump":           lump_filename,
+        "lump_path":      f'server/lumps/{lump_filename}',
+        "sidecar":        sidecar_filename,
+        "size_bytes":     len(lump_bytes),
+        "lump_version":   next_lump_version,
         "boot_image_refreshed": boot_refreshed,
+        "identity_hash":  _identity_hash,
+        "identity_string": _identity_string,
+        "petname":        _petname,
+        "issue_number":   _issue_number,
     }
     if boot_refresh_note:
         resp["boot_image_note"] = boot_refresh_note
@@ -5735,7 +5780,32 @@ def get_lump_words(token_hex):
         except Exception:
             pass
 
-    return jsonify({"token": key8, "words": words, "count": num_words, "binary_hash": _bh_live})
+    # Return identity fields from sidecar alongside hash; backfill legacy lumps.
+    _petname_ret    = ''
+    _issue_ret      = 1
+    _id_str_ret     = ''
+    _id_hash_ret    = ''
+    if os.path.isfile(_sc_path_bh):
+        try:
+            with open(_sc_path_bh) as _scf_id:
+                _sc_id = json.load(_scf_id)
+            _petname_ret = _sc_id.get('petname', '')
+            _issue_ret   = _sc_id.get('issue_number', 1)
+            _id_str_ret  = _sc_id.get('identity_string', '')
+            _id_hash_ret = _sc_id.get('identity_hash', '')
+        except Exception:
+            pass
+
+    return jsonify({
+        "token":           key8,
+        "words":           words,
+        "count":           num_words,
+        "binary_hash":     _bh_live,
+        "petname":         _petname_ret,
+        "issue_number":    _issue_ret,
+        "identity_string": _id_str_ret,
+        "identity_hash":   _id_hash_ret,
+    })
 
 
 @app.route("/api/lumps/<token>/history")

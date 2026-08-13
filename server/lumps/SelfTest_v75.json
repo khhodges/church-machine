@@ -39,5 +39,8 @@
   "lump_version": 75,
   "compiled_at": 1784384244.1230512,
   "boot_resident": true,
-  "binary_hash": "14fc14beaf2d8e99edb46f231cd5923d76afcf19cc604a566929dd97e8fdc0a4"
+  "binary_hash": "14fc14beaf2d8e99edb46f231cd5923d76afcf19cc604a566929dd97e8fdc0a4",
+  "identity_string": "SelfTest#1",
+  "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25",
+  "issue_number": 1
 }

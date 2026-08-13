@@ -2644,7 +2644,13 @@ async function _loadLumpContent(token, lump) {
         const typ = lump.typ;
         const dataWords = words.slice(1);
         if (ct === 'code' || typ === 0 || lump.cw > 0) {
-            _renderLumpCodeContent(bodyEl, lump, words, token, data.binary_hash || '');
+            const _identData = {
+                petname:         data.petname         || lump.petname         || '',
+                issue_number:    data.issue_number     || lump.issue_number     || 1,
+                identity_string: data.identity_string  || lump.identity_string  || '',
+                identity_hash:   data.identity_hash    || lump.identity_hash    || '',
+            };
+            _renderLumpCodeContent(bodyEl, lump, words, token, data.binary_hash || '', _identData);
         } else if (ct === 'text') {
             const text = _pack4Decode(dataWords);
             bodyEl.innerHTML = '';
@@ -2783,7 +2789,8 @@ function _colorizeComment(text) {
     return out;
 }
 
-function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash) {
+function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identityData) {
+    identityData = identityData || {};
     const e = _escHtml;
     const methods   = lump.methods  || [];
     // Prefer binary-header values — they are the authoritative source and will
@@ -3137,10 +3144,23 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash) {
         if (!_hasRealCode && _hasReturn) _stubMethods.add(_smStart);
     }
 
-    // ── Proof bar: token identity + name + binary hash verification ──────────
-    // Shows the programmer the exact token that links this binary to the NS
-    // table, the manifest-recorded name, and a hash check proving the binary
-    // on disk matches the hash captured at compile time.
+    // ── Proof bar: identity + content verification ────────────────────────────
+    // Two independent seals, matching the design:
+    //   identity_hash — sha256(petname.Abstraction#n) — who made it, which issue
+    //   binary_hash   — sha256(binary bytes)          — content fingerprint
+    // The full dot pet name (petname.Abstraction#issue) is the globally meaningful
+    // identity; the local token and NS slot are transient runtime resolution.
+    const _idPetname  = identityData.petname         || lump.petname         || '';
+    const _idIssue    = identityData.issue_number     || lump.issue_number     || 1;
+    const _idStr      = identityData.identity_string  || lump.identity_string  || '';
+    const _idHashSide = (identityData.identity_hash   || lump.identity_hash    || '').toLowerCase();
+
+    // Full dot pet name for display: "petname.Abstraction#n" or "Abstraction#n"
+    const _dotPetName = _idStr || (_idPetname
+        ? `${_idPetname}.${abstName}#${_idIssue}`
+        : `${abstName}#${_idIssue}`);
+
+    // Content hash check (binary_hash): did the bytes on disk change since compile?
     const _serverHash   = (binaryHash        || '').toLowerCase();
     const _manifestHash = (lump.binary_hash  || '').toLowerCase();
     let _hashStatus, _hashIcon, _hashDisplay, _hashTitle;
@@ -3149,12 +3169,12 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash) {
             _hashStatus  = 'ok';
             _hashIcon    = '\u2713';  // ✓
             _hashDisplay = _serverHash.slice(0, 12) + '\u2026';
-            _hashTitle   = 'Binary verified \u2014 content on disk matches the hash recorded at compile time';
+            _hashTitle   = 'Content verified \u2014 binary on disk matches the hash recorded at compile time';
         } else {
             _hashStatus  = 'bad';
             _hashIcon    = '\u2717';  // ✗
             _hashDisplay = _serverHash.slice(0, 12) + '\u2026';
-            _hashTitle   = 'Hash mismatch \u2014 binary on disk ('
+            _hashTitle   = 'Content mismatch \u2014 binary on disk ('
                          + _serverHash.slice(0, 8) + '\u2026) differs from the compiled record ('
                          + _manifestHash.slice(0, 8) + '\u2026). Binary may have been replaced after compilation.';
         }
@@ -3162,28 +3182,36 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash) {
         _hashStatus  = 'none';
         _hashIcon    = '\u2014';  // —
         _hashDisplay = _serverHash.slice(0, 12) + '\u2026';
-        _hashTitle   = 'No compile-time hash recorded for this lump \u2014 recompile to establish a verification baseline';
+        _hashTitle   = 'No compile-time hash recorded \u2014 recompile to establish a verification baseline';
     } else {
         _hashStatus  = 'none';
         _hashIcon    = '\u2014';
         _hashDisplay = 'not available';
         _hashTitle   = 'Binary hash not available';
     }
+
+    // Identity hash chip: shows the dot pet name and the identity seal status
+    const _idChipTitle = _idHashSide
+        ? `Identity seal: sha256("${_idStr || _dotPetName}") \u2014 ` +
+          `proves this is the genuine ${_dotPetName}, independent of content`
+        : `Dot pet name \u2014 set a petname in IDE settings to seal with sha256(petname.Abstraction#n)`;
+
     const _nsSlotDisplay = (lump.ns_slot !== null && lump.ns_slot !== undefined)
         ? `NS[${lump.ns_slot}]` : '';
     const _proofBar =
         `<div class="lump-proof-bar">` +
-            `<span class="lump-proof-chip" title="LUMP identity token \u2014 this key links the binary to ${e(_nsSlotDisplay || 'the namespace table')}">` +
+            `<span class="lump-proof-chip" title="LUMP token \u2014 local runtime key, links binary to ${e(_nsSlotDisplay || 'the namespace table')}. Identity lives in the dot pet name, not this token.">` +
                 `<span class="lump-proof-label">Token</span>0x${e(token)}` +
             `</span>` +
-            `<span class="lump-proof-chip" title="Abstraction name from manifest sidecar \u2014 the binary itself carries no name field">` +
-                `<span class="lump-proof-label">Name</span>${e(abstName)}` +
+            `<span class="lump-proof-chip" title="${e(_idChipTitle)}">` +
+                `<span class="lump-proof-label">Identity</span>${e(_dotPetName)}` +
+                (_idHashSide ? `&ensp;<span style="opacity:.55;font-size:.85em">${e(_idHashSide.slice(0,8))}\u2026</span>` : '') +
             `</span>` +
-            (_nsSlotDisplay ? `<span class="lump-proof-chip" title="Namespace slot this LUMP occupies">` +
+            (_nsSlotDisplay ? `<span class="lump-proof-chip" title="Namespace slot \u2014 transient local resolution of the dot pet name on this machine">` +
                 `<span class="lump-proof-label">Slot</span>${e(_nsSlotDisplay)}` +
             `</span>` : '') +
             `<span class="lump-proof-chip lump-proof-hash-${e(_hashStatus)}" title="${e(_hashTitle)}">` +
-                `<span class="lump-proof-label">Hash</span>${e(_hashDisplay)}&thinsp;${e(_hashIcon)}` +
+                `<span class="lump-proof-label">Content</span>${e(_hashDisplay)}&thinsp;${e(_hashIcon)}` +
             `</span>` +
         `</div>`;
 
