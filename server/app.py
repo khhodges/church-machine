@@ -5165,6 +5165,8 @@ def save_lump():
     LAZY_LUMPS[token8] = lump_bytes
     LAZY_LUMPS[token8.lstrip('0') or '0'] = lump_bytes
 
+    import hashlib as _hl_save
+    _binary_hash = _hl_save.sha256(lump_bytes).hexdigest()
 
     # ── Phase 6: Build and write sidecar JSON ─────────────────────────────────
     sidecar = {
@@ -5202,7 +5204,8 @@ def save_lump():
             "builder":      "CLOOMC++ IDE v1.0"
         },
         "grants": metadata.get("grants", ["E"]),
-        "source": metadata.get("source", ""),
+        "source":        metadata.get("source", ""),
+        "binary_hash":   _binary_hash,
     }
 
     import time as _time_save
@@ -5240,6 +5243,7 @@ def save_lump():
         "compiled_at":   _compiled_at,
         "methods":       sidecar["methods"],
         "grants":        sidecar["grants"],
+        "binary_hash":   _binary_hash,
     }
     manifest.append(new_entry)
 
@@ -5700,7 +5704,38 @@ def get_lump_words(token_hex):
             return jsonify({"error": f"Unknown lump 0x{key8}"}), 404
     num_words = len(data) // 4
     words = list(_struct.unpack(f'>{num_words}I', data[:num_words * 4]))
-    return jsonify({"token": key8, "words": words, "count": num_words})
+
+    # Compute a fresh SHA-256 of the binary bytes so the caller can verify
+    # the served content matches the hash recorded at compile time.
+    import hashlib as _hl_words
+    _bh_live = _hl_words.sha256(data[:num_words * 4]).hexdigest()
+
+    # Backfill sidecar with binary_hash if it was compiled before this field existed.
+    _lumps_dir_bh = os.path.join(os.path.dirname(__file__), 'lumps')
+    _sc_fn_bh = f'{key8}.json'
+    _mf_bh_path = os.path.join(_lumps_dir_bh, 'manifest.json')
+    if os.path.isfile(_mf_bh_path):
+        try:
+            with open(_mf_bh_path) as _mf_bh:
+                for _me_bh in json.load(_mf_bh):
+                    if _me_bh.get('token') == key8:
+                        _sc_fn_bh = _me_bh.get('sidecar_file', _sc_fn_bh)
+                        break
+        except Exception:
+            pass
+    _sc_path_bh = os.path.join(_lumps_dir_bh, _sc_fn_bh)
+    if os.path.isfile(_sc_path_bh):
+        try:
+            with open(_sc_path_bh) as _scf_bh:
+                _sc_bh = json.load(_scf_bh)
+            if not _sc_bh.get('binary_hash'):
+                _sc_bh['binary_hash'] = _bh_live
+                with open(_sc_path_bh, 'w') as _scwf_bh:
+                    json.dump(_sc_bh, _scwf_bh, indent=2)
+        except Exception:
+            pass
+
+    return jsonify({"token": key8, "words": words, "count": num_words, "binary_hash": _bh_live})
 
 
 @app.route("/api/lumps/<token>/history")

@@ -1391,6 +1391,57 @@
     display: block;
     font-size: 0.63rem;
 }
+/* ── Content-tab proof bar: token + name + binary hash ─────────────────── */
+.lump-proof-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.6rem 0.35rem;
+    margin-bottom: 0.5rem;
+    background: rgba(80, 120, 200, 0.07);
+    border: 1px solid rgba(100, 160, 255, 0.15);
+    border-radius: 5px;
+}
+.lump-proof-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.68rem;
+    font-family: 'Courier New', monospace;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: var(--text-primary, #e0e0f0);
+    white-space: nowrap;
+    cursor: default;
+}
+.lump-proof-label {
+    font-size: 0.58rem;
+    font-family: inherit;
+    color: var(--text-secondary, #8888aa);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-right: 1px;
+}
+/* Hash status variants */
+.lump-proof-hash-ok {
+    background: rgba(80, 200, 120, 0.10);
+    border-color: rgba(80, 200, 120, 0.30);
+    color: #6ddd90;
+}
+.lump-proof-hash-bad {
+    background: rgba(220, 80, 80, 0.12);
+    border-color: rgba(220, 80, 80, 0.35);
+    color: #f08080;
+}
+.lump-proof-hash-none {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary, #8888aa);
+}
+
 /* ── C-List viewer ──────────────────────────────────────── */
 .lump-clist-section {
     margin-top: 0.8rem;

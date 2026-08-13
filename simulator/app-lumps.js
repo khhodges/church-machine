@@ -2644,7 +2644,7 @@ async function _loadLumpContent(token, lump) {
         const typ = lump.typ;
         const dataWords = words.slice(1);
         if (ct === 'code' || typ === 0 || lump.cw > 0) {
-            _renderLumpCodeContent(bodyEl, lump, words, token);
+            _renderLumpCodeContent(bodyEl, lump, words, token, data.binary_hash || '');
         } else if (ct === 'text') {
             const text = _pack4Decode(dataWords);
             bodyEl.innerHTML = '';
@@ -2783,7 +2783,7 @@ function _colorizeComment(text) {
     return out;
 }
 
-function _renderLumpCodeContent(bodyEl, lump, words, token) {
+function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash) {
     const e = _escHtml;
     const methods   = lump.methods  || [];
     // Prefer binary-header values — they are the authoritative source and will
@@ -3137,7 +3137,58 @@ function _renderLumpCodeContent(bodyEl, lump, words, token) {
         if (!_hasRealCode && _hasReturn) _stubMethods.add(_smStart);
     }
 
+    // ── Proof bar: token identity + name + binary hash verification ──────────
+    // Shows the programmer the exact token that links this binary to the NS
+    // table, the manifest-recorded name, and a hash check proving the binary
+    // on disk matches the hash captured at compile time.
+    const _serverHash   = (binaryHash        || '').toLowerCase();
+    const _manifestHash = (lump.binary_hash  || '').toLowerCase();
+    let _hashStatus, _hashIcon, _hashDisplay, _hashTitle;
+    if (_serverHash && _manifestHash) {
+        if (_serverHash === _manifestHash) {
+            _hashStatus  = 'ok';
+            _hashIcon    = '\u2713';  // ✓
+            _hashDisplay = _serverHash.slice(0, 12) + '\u2026';
+            _hashTitle   = 'Binary verified \u2014 content on disk matches the hash recorded at compile time';
+        } else {
+            _hashStatus  = 'bad';
+            _hashIcon    = '\u2717';  // ✗
+            _hashDisplay = _serverHash.slice(0, 12) + '\u2026';
+            _hashTitle   = 'Hash mismatch \u2014 binary on disk ('
+                         + _serverHash.slice(0, 8) + '\u2026) differs from the compiled record ('
+                         + _manifestHash.slice(0, 8) + '\u2026). Binary may have been replaced after compilation.';
+        }
+    } else if (_serverHash) {
+        _hashStatus  = 'none';
+        _hashIcon    = '\u2014';  // —
+        _hashDisplay = _serverHash.slice(0, 12) + '\u2026';
+        _hashTitle   = 'No compile-time hash recorded for this lump \u2014 recompile to establish a verification baseline';
+    } else {
+        _hashStatus  = 'none';
+        _hashIcon    = '\u2014';
+        _hashDisplay = 'not available';
+        _hashTitle   = 'Binary hash not available';
+    }
+    const _nsSlotDisplay = (lump.ns_slot !== null && lump.ns_slot !== undefined)
+        ? `NS[${lump.ns_slot}]` : '';
+    const _proofBar =
+        `<div class="lump-proof-bar">` +
+            `<span class="lump-proof-chip" title="LUMP identity token \u2014 this key links the binary to ${e(_nsSlotDisplay || 'the namespace table')}">` +
+                `<span class="lump-proof-label">Token</span>0x${e(token)}` +
+            `</span>` +
+            `<span class="lump-proof-chip" title="Abstraction name from manifest sidecar \u2014 the binary itself carries no name field">` +
+                `<span class="lump-proof-label">Name</span>${e(abstName)}` +
+            `</span>` +
+            (_nsSlotDisplay ? `<span class="lump-proof-chip" title="Namespace slot this LUMP occupies">` +
+                `<span class="lump-proof-label">Slot</span>${e(_nsSlotDisplay)}` +
+            `</span>` : '') +
+            `<span class="lump-proof-chip lump-proof-hash-${e(_hashStatus)}" title="${e(_hashTitle)}">` +
+                `<span class="lump-proof-label">Hash</span>${e(_hashDisplay)}&thinsp;${e(_hashIcon)}` +
+            `</span>` +
+        `</div>`;
+
     let html = '<div class="lump-content-code">';
+    html += _proofBar;
     html += '<div class="lump-methods-section">';
     html += '<div class="lump-methods-title" data-token="' + e(token) + '">' + e(abstName) + '</div>';
     if (effEnd <= 1) {
