@@ -117,6 +117,31 @@ class CLOOMCCompiler {
         } else if (result.errors.length === 0) {
             result.profile = 'IoT';
         }
+
+        // ── main-method static RETURN check ──────────────────────────────────
+        // A method declared 'main' is a non-returning entry point. Scan its
+        // compiled words for RETURN (Church opcode 3, bits[31:27] === 3) and
+        // reject the compilation if any are found.  Implicit RETURNs are already
+        // suppressed by the compiler, so any hit here is from the user's source.
+        if (result.errors.length === 0) {
+            for (const _mm of result.methods) {
+                if (!_mm.isMain || !Array.isArray(_mm.code)) continue;
+                const _retWords = [];
+                for (let _wi = 0; _wi < _mm.code.length; _wi++) {
+                    if (((_mm.code[_wi] >>> 27) & 0x1F) === 3) _retWords.push(_wi + 1);
+                }
+                if (_retWords.length > 0) {
+                    result.errors.push({
+                        line: null,
+                        message: `[MAIN] main method "${_mm.name}" must not contain RETURN ` +
+                            `(found at word${_retWords.length !== 1 ? 's' : ''} ${_retWords.join(', ')}). ` +
+                            `A main method has no caller to return to \u2014 use an infinite ` +
+                            `loop or CALL another abstraction instead.`
+                    });
+                }
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────
         return result;
     }
 
@@ -178,7 +203,7 @@ class CLOOMCCompiler {
             if (result.errors.length > 0) {
                 errors.push(...result.errors);
             } else {
-                methods.push({ name: method.name, code: result.code, params: method.params || [], visibility: method.visibility || 'public', crossMethodRefs: result.crossMethodRefs, ...(method.sourceLines && { sourceLines: method.sourceLines }) });
+                methods.push({ name: method.name, code: result.code, params: method.params || [], visibility: method.visibility || 'public', crossMethodRefs: result.crossMethodRefs, ...(method.isMain && { isMain: true }), ...(method.sourceLines && { sourceLines: method.sourceLines }) });
                 manifest.push({ name: method.name, mapping: result.manifest });
             }
         }
@@ -835,8 +860,10 @@ class CLOOMCCompiler {
         if (resultReg !== this.DR_ARGS_START) {
             code.push(this.encode(this.opcodes.IADD, 14, this.DR_ARGS_START, resultReg, 0));
         }
-        manifest.push({ src: method.startLine, addr: code.length, desc: 'RETURN (implicit)' });
-        code.push(this.encode(this.opcodes.RETURN, 14, 0, 0, 0));
+        if (!method.isMain) {
+            manifest.push({ src: method.startLine, addr: code.length, desc: 'RETURN (implicit)' });
+            code.push(this.encode(this.opcodes.RETURN, 14, 0, 0, 0));
+        }
 
         return { code, errors, warnings, manifest };
     }
@@ -1075,13 +1102,20 @@ class CLOOMCCompiler {
             const visMatch = line.match(/^(public|private)\s+/);
             const visibility = visMatch ? visMatch[1] : 'public';
             const explicitVisibility = !!visMatch;
-            const cleanLine = visMatch ? line.slice(visMatch[0].length) : line;
+            let cleanLine = visMatch ? line.slice(visMatch[0].length) : line;
+            // 'main' method-type qualifier: [public|private] main method Name(params) { ... }
+            // or shorthand: main Name(params) { ... }
+            // A main method is a non-returning entry point; the compiler rejects
+            // any RETURN instruction found in its body (explicit or compiler-injected).
+            const _mainQualMatch = cleanLine.match(/^main\s+(?=method\b|\w)/);
+            const _isMain = !!_mainQualMatch;
+            if (_mainQualMatch) cleanLine = cleanLine.slice(_mainQualMatch[0].length);
 
             // method Name = aliasOf Target;  (explicit alias, no code body)
             const aliasMatch = cleanLine.match(/^method\s+(\w+)\s*(?:\([^)]*\))?\s*=\s*aliasOf\s+(\w+)\s*;/);
             if (aliasMatch) {
                 _commentBlockStart = -1;
-                result.methods.push({ name: aliasMatch[1], aliasOf: aliasMatch[2], params: [], body: [], startLine: i, visibility, explicitVisibility });
+                result.methods.push({ name: aliasMatch[1], aliasOf: aliasMatch[2], params: [], body: [], startLine: i, visibility, explicitVisibility, isMain: _isMain });
                 i++;
                 continue;
             }
@@ -1103,7 +1137,7 @@ class CLOOMCCompiler {
                     }
                     i++;
                 }
-                const _rawIsaMethod = { name: rawIsaMatch[1], rawIsa: rawWords, params: [], body: [], startLine: _rawIsaSrcStart, visibility, explicitVisibility };
+                const _rawIsaMethod = { name: rawIsaMatch[1], rawIsa: rawWords, params: [], body: [], startLine: _rawIsaSrcStart, visibility, explicitVisibility, isMain: _isMain };
                 _rawIsaMethod.sourceLines = lines.slice(_rawIsaSrcStart, i).join('\n');
                 result.methods.push(_rawIsaMethod);
                 continue;
@@ -1114,7 +1148,7 @@ class CLOOMCCompiler {
             if (methodMatch) {
                 const _srcStart = _commentBlockStart >= 0 ? _commentBlockStart : i;
                 _commentBlockStart = -1;
-                const method = { name: methodMatch[1], params: [], body: [], startLine: i, visibility, explicitVisibility };
+                const method = { name: methodMatch[1], params: [], body: [], startLine: i, visibility, explicitVisibility, isMain: _isMain };
                 if (methodMatch[2] && methodMatch[2].trim()) {
                     method.params = methodMatch[2].split(',').map(p => p.trim()).filter(Boolean);
                 }
@@ -1173,7 +1207,7 @@ class CLOOMCCompiler {
             if (keywordlessMatch) {
                 const _srcStart = _commentBlockStart >= 0 ? _commentBlockStart : i;
                 _commentBlockStart = -1;
-                const method = { name: keywordlessMatch[1], params: [], body: [], startLine: i, visibility, explicitVisibility };
+                const method = { name: keywordlessMatch[1], params: [], body: [], startLine: i, visibility, explicitVisibility, isMain: _isMain };
                 if (keywordlessMatch[2] && keywordlessMatch[2].trim()) {
                     method.params = keywordlessMatch[2].split(',').map(p => p.trim()).filter(Boolean);
                 }
@@ -1305,7 +1339,9 @@ class CLOOMCCompiler {
 
         if (errors.length === 0) {
             const lastOpcode = code.length > 0 ? (code[code.length - 1] >>> 27) : -1;
-            if (lastOpcode !== this.opcodes.RETURN) {
+            // main methods are non-returning entry points — never append implicit RETURN.
+            // The static scan in compile() will reject any explicit RETURN in the body.
+            if (!method.isMain && lastOpcode !== this.opcodes.RETURN) {
                 manifest.push({ src: method.startLine, addr: code.length, desc: 'RETURN (implicit)' });
                 code.push(this.encode(this.opcodes.RETURN, 14, 0, 0, 0));
             }

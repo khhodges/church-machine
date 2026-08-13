@@ -9845,10 +9845,10 @@ Add a method called Run
     const compileLines = fs.readFileSync(
         path.join(__dirname, 'app-compile.js'), 'utf8').split('\n');
     // Line ranges (1-indexed) must be kept in sync with app-compile.js:
-    //   resolvedCaps capability-name → nsIndex resolution: lines 1355–1395
-    //   lumpWords allocation + c-list Golden Token write: lines 1396–1425
-    const resolveSrc = compileLines.slice(1354, 1395).join('\n');
-    const clistSrc    = compileLines.slice(1395, 1426).join('\n');
+    //   resolvedCaps capability-name → nsIndex resolution: lines 1400–1440
+    //   lumpWords allocation + c-list Golden Token write: lines 1441–1470
+    const resolveSrc = compileLines.slice(1399, 1440).join('\n');
+    const clistSrc    = compileLines.slice(1440, 1470).join('\n');
 
     assert('CAP-GT-SRC1: extracted resolvedCaps block from app-compile.js',
         resolveSrc.includes('const resolvedCaps = caps.map('),
