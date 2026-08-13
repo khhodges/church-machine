@@ -11596,8 +11596,27 @@ function openSettings() {
     if (boardSel) boardSel.value = getSelectedBoard();
     const petnameEl = document.getElementById('settingPetname');
     if (petnameEl) {
-        petnameEl.value = (() => { try { return localStorage.getItem('church_petname') || ''; } catch(_e) { return ''; } })();
+        const _storedPetname = (() => { try { return localStorage.getItem('church_petname') || ''; } catch(_e) { return ''; } })();
+        petnameEl.value = _storedPetname;
         petnameEl.oninput = _updatePetnamePreview;
+        // Remove any leftover banner from a previous open, then re-evaluate.
+        const _oldWarn = document.getElementById('settingPetnameStoredWarn');
+        if (_oldWarn) _oldWarn.remove();
+        if (_storedPetname && !/^[a-z0-9._-]+$/i.test(_storedPetname)) {
+            const _sanitised = _storedPetname.replace(/[^a-z0-9._-]/gi, '');
+            // Correct the field so the user immediately sees the cleaned value.
+            petnameEl.value = _sanitised;
+            const _warnDiv = document.createElement('div');
+            _warnDiv.id = 'settingPetnameStoredWarn';
+            _warnDiv.style.cssText = 'background:#7c2d12;color:#fef2f2;border:1px solid #ef4444;border-radius:4px;padding:0.45rem 0.65rem;font-size:0.78rem;margin-top:0.5rem;line-height:1.45;';
+            const _correctedTo = _sanitised
+                ? `corrected to <strong style="font-family:monospace">${_sanitised.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</strong>`
+                : 'cleared (no valid characters remained)';
+            _warnDiv.innerHTML = `\u26a0\ufe0f Your stored petname contained invalid characters and has been ${_correctedTo}. Click <strong>Save Settings</strong> to keep this correction.`;
+            const _previewEl = document.getElementById('settingPetnamePreview');
+            if (_previewEl) _previewEl.insertAdjacentElement('afterend', _warnDiv);
+            else { const _sec = petnameEl.closest('.settings-section'); if (_sec) _sec.appendChild(_warnDiv); }
+        }
     }
     const issueEl = document.getElementById('settingIssueNumber');
     if (issueEl) {
