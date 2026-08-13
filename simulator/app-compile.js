@@ -1581,7 +1581,7 @@ function compileAndBuild() {
     // Petname: programmer's globally-unique dot identity (e.g. "ken" or "org.dep.proj").
     // Issue number: which specific issuance of this abstraction this is.
     // Together: petname.Abstraction#n is the globally meaningful identity of this LUMP.
-    const _savePetname     = (() => { try { return localStorage.getItem('church_petname') || ''; } catch (_e) { return ''; } })();
+    const _savePetname     = (() => { try { return (localStorage.getItem('church_petname') || '').replace(/[^a-z0-9._-]/gi, ''); } catch (_e) { return ''; } })();
     const _saveIssueNumber = (() => { try { return parseInt(localStorage.getItem('church_issue_number') || '1') || 1; } catch (_e) { return 1; } })();
 
     const savePayload = {

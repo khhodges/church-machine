@@ -11666,14 +11666,25 @@ function dismissAllPopupsPerm() {
 function _updatePetnamePreview() {
     const previewEl = document.getElementById('settingPetnamePreview');
     if (!previewEl) return;
-    const pn = (document.getElementById('settingPetname')?.value || '').trim();
+    const rawPn = (document.getElementById('settingPetname')?.value || '');
+    const pn = rawPn.trim();
     const iss = parseInt(document.getElementById('settingIssueNumber')?.value || '1') || 1;
+    const saveBtn = document.getElementById('settingsSaveBtn');
     if (pn) {
-        previewEl.textContent = `Seal: ${pn}.Abstraction#${iss}`;
-        previewEl.style.color = '#22c55e';
+        const isValid = /^[a-z0-9._-]+$/i.test(pn);
+        if (!isValid) {
+            previewEl.textContent = 'Invalid characters — only letters, digits, dots (.), underscores (_), and hyphens (-) are allowed';
+            previewEl.style.color = '#ef4444';
+            if (saveBtn) saveBtn.disabled = true;
+        } else {
+            previewEl.textContent = `Seal: ${pn}.Abstraction#${iss}`;
+            previewEl.style.color = '#22c55e';
+            if (saveBtn) saveBtn.disabled = false;
+        }
     } else {
         previewEl.textContent = 'No petname set — LUMPs will carry Abstraction#n only';
         previewEl.style.color = '#6b7280';
+        if (saveBtn) saveBtn.disabled = false;
     }
 }
 
@@ -11767,6 +11778,15 @@ function showReleaseHistory() {
 }
 
 function saveSettings() {
+    // Refuse to save when the petname contains invalid characters.
+    const _pnGuardEl = document.getElementById('settingPetname');
+    if (_pnGuardEl) {
+        const _pnGuardVal = _pnGuardEl.value.trim();
+        if (_pnGuardVal && !/^[a-z0-9._-]+$/i.test(_pnGuardVal)) {
+            _updatePetnamePreview(); // ensure error state is visible
+            return;
+        }
+    }
     const settings = {
         name: document.getElementById('settingName').value.trim(),
         familyMembers: collectFamilyMembers(),
