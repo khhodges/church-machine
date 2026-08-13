@@ -41,6 +41,7 @@ The manifest entry's optional 'filename' / 'sidecar_file' fields point to the
 actual files on disk.  When absent, the legacy <token>.*  naming is assumed.
 """
 
+import hashlib
 import json
 import os
 import re as _re
@@ -554,6 +555,7 @@ SELFTEST_LUMP_CASES = [
 # cc=1 lumps: single SelfTest E-GT at slot 0 (POLA redesign — no Boot.Nucs needed)
 SELFTEST_LUMP_CASES_CC1 = [
     ("4c7380cb", "PostFlashSelftest"),
+    ("00000600", "SelfTest"),
 ]
 
 
@@ -1436,6 +1438,194 @@ class TestR20_BootCatalogAbstractGTRoundTrip:
         assert v1_decoded["gt_type"] != 3 or v1_decoded["R"] != 1 or v1_decoded["W"] != 0, (
             f"v1 stale literal 0x{v1_stale:08X} incorrectly passes v2.0 decode — "
             "sentinel check is no longer distinguishing v1 from v2."
+        )
+
+
+def _self_gt_expected(identity_string: str) -> int:
+    """Compute the expected self Inform GT word for a given identity_string.
+
+    Formula (from server/app.py):
+        hash32  = first 32 bits of sha256(identity_string.encode('utf-8'))
+        hash25  = hash32 & 0x1FFFFFF          (low 25 bits)
+        self_gt = 0x0A000000 | hash25
+
+    0x0A000000 encodes:  perm3=0, dom=1 (Church), gt_type=1 (Inform), R=0, W=0.
+    The 25-bit hash occupies bits[24:0] — slot_id / sequence fields — making
+    this GT a secretless, public identity token with no capability permissions.
+    """
+    h = hashlib.sha256(identity_string.encode("utf-8")).hexdigest()
+    hash32  = int(h[:8], 16)
+    hash25  = hash32 & 0x1FFFFFF
+    return (0x0A000000 | hash25) & 0xFFFFFFFF
+
+
+def _self_gt_targets():
+    """Return a sorted list of (token, identity_string) pairs for every production
+    lump whose sidecar declares an identity_string.
+
+    cc == 0 lumps are included: the test body asserts cc >= 1 so that an
+    identity-bearing lump with an empty c-list is a hard failure, not a
+    silent skip.  Lumps listed in KNOWN_SELF_GT_EXCEPTIONS are excluded from
+    the parametrize set for the hash/dom/type checks but are still collected
+    here so the stale-exception guard sees the complete target population.
+    """
+    targets = []
+    for token in LUMP_TOKENS:
+        sc = _load_sidecar(token)
+        if not sc:
+            continue
+        id_str = sc.get("identity_string", "")
+        if not id_str:
+            continue
+        if not _lump_exists(token):
+            continue
+        h = _read_header(token)
+        if h is None:
+            continue
+        targets.append((token, id_str))
+    return targets
+
+
+# Tokens whose c-list[0] is deliberately NOT a self-identity GT.
+# Add a token here ONLY when it has a structured reason — and reference the
+# test class that does verify its c-list[0] instead.
+#
+# To add a new exception:
+#   1. Provide a one-sentence reason.
+#   2. Name the existing test that already verifies c-list[0] for this lump.
+#   3. Do NOT add entries to suppress a genuine hash mismatch — fix the binary.
+KNOWN_SELF_GT_EXCEPTIONS: dict = {
+    # SelfTest (token 00000600, cc=1) uses its sole c-list slot for the
+    # SelfTest E-GT (0x4A000006) needed to call itself in the boot sequence.
+    # That slot is already verified by TestR13b_NewSelftestClistGT.
+    "00000600": (
+        "Boot-resident selftest lump; cc=1 slot is the SelfTest E-GT "
+        "(NS slot 6, Church domain, E permission) — verified by "
+        "TestR13b_NewSelftestClistGT.  No room for a self-identity GT "
+        "at c-list[0] without displacing the required capability."
+    ),
+}
+
+_SELF_GT_ALL_TARGETS = _self_gt_targets()
+_SELF_GT_TARGETS = [
+    (tok, id_str)
+    for tok, id_str in _SELF_GT_ALL_TARGETS
+    if tok not in KNOWN_SELF_GT_EXCEPTIONS
+]
+
+
+class TestR22_SelfGTCorrect:
+    """R22: Every production LUMP that carries an identity_string in its sidecar
+    must have c-list row 0 == 0x0A000000 | sha256(identity_string)[:25 bits].
+
+    Background
+    ----------
+    When a LUMP is issued (compiled and saved to the namespace), app.py bakes a
+    self Inform GT into c-list[0]:
+
+        hash32  = first 32 bits of sha256(identity_string.encode('utf-8'))
+        hash25  = hash32 & 0x1FFFFFF
+        self_gt = 0x0A000000 | hash25
+
+    The 0x0A000000 prefix encodes dom=1 (Church), gt_type=Inform, perm3=0
+    (no capability permissions).  The low 25 bits are a public, secretless
+    digest of who authored the LUMP and which issue number it carries.
+
+    This test is the CI gate that catches:
+      • A silent binary replacement that resets c-list[0] to a stale value.
+      • A sidecar identity_string that drifted from the one used at compile time.
+      • Any future patch that accidentally zeros or corrupts c-list[0].
+
+    Lumps whose c-list[0] is deliberately used for a different purpose (e.g. a
+    required capability GT) are listed in KNOWN_SELF_GT_EXCEPTIONS with a reason
+    and a pointer to the test that does verify that slot.
+    """
+
+    @pytest.mark.parametrize(
+        "token,identity_string",
+        _SELF_GT_TARGETS,
+        ids=[t[0] for t in _SELF_GT_TARGETS],
+    )
+    def test_clist0_matches_identity_hash(self, token, identity_string):
+        h = _read_header(token)
+        assert h["cc"] >= 1, (
+            f"{token}: sidecar declares identity_string={identity_string!r} but "
+            f"the binary has cc=0 (no c-list entries).\n"
+            "  An identity-bearing LUMP must have at least one c-list slot so\n"
+            "  that the self Inform GT can be stored at c-list[0].\n"
+            "  Fix: recompile the LUMP so that cc >= 1."
+        )
+        expected = _self_gt_expected(identity_string)
+        actual   = _read_clist_word(token, 0)
+        assert actual == expected, (
+            f"{token}: c-list[0] = {actual:#010x} but expected self Inform GT "
+            f"{expected:#010x} for identity_string={identity_string!r}.\n"
+            "  The 25-bit identity seal in c-list[0] must equal the low 25 bits\n"
+            "  of sha256(identity_string.encode('utf-8')).\n"
+            "  Possible causes:\n"
+            "    • The binary was replaced without regenerating the self-GT.\n"
+            "    • The sidecar identity_string drifted from the value used at\n"
+            "      compile time.\n"
+            "    • A patch accidentally overwrote c-list[0].\n"
+            "  Fix: recompile the LUMP with the correct identity_string, or\n"
+            f"  patch c-list[0] to {expected:#010x} (word at offset\n"
+            f"  {(h['lump_sz'] - h['cc']) * 4:#x} bytes from file start)."
+        )
+
+    @pytest.mark.parametrize(
+        "token,identity_string",
+        _SELF_GT_TARGETS,
+        ids=[t[0] for t in _SELF_GT_TARGETS],
+    )
+    def test_clist0_is_church_domain(self, token, identity_string):
+        h = _read_header(token)
+        assert h["cc"] >= 1, (
+            f"{token}: identity_string present but cc=0; see test_clist0_matches_identity_hash."
+        )
+        word = _read_clist_word(token, 0)
+        gt   = _decode_gt(word)
+        assert gt["dom"] == 1, (
+            f"{token}: c-list[0] = {word:#010x} has dom={gt['dom']} "
+            f"({gt['dom_name']}), expected dom=1 (Church).\n"
+            "  The self Inform GT must have bit[27]=1 (Church domain).\n"
+            "  0x0A000000 prefix guarantees this; a different top byte means\n"
+            "  c-list[0] was overwritten or the binary is corrupt."
+        )
+
+    @pytest.mark.parametrize(
+        "token,identity_string",
+        _SELF_GT_TARGETS,
+        ids=[t[0] for t in _SELF_GT_TARGETS],
+    )
+    def test_clist0_is_inform_type(self, token, identity_string):
+        h = _read_header(token)
+        assert h["cc"] >= 1, (
+            f"{token}: identity_string present but cc=0; see test_clist0_matches_identity_hash."
+        )
+        word = _read_clist_word(token, 0)
+        gt   = _decode_gt(word)
+        assert gt["type"] == 1, (
+            f"{token}: c-list[0] = {word:#010x} decodes as gt_type={gt['type']} "
+            f"({gt['type_name']}), expected Inform (1).\n"
+            "  The self Inform GT must have bits[26:25]=0b01.\n"
+            "  0x0A000000 prefix guarantees this; a different encoding means\n"
+            "  c-list[0] was overwritten or the binary is corrupt."
+        )
+
+    def test_exception_allowlist_is_not_stale(self):
+        """Every token in KNOWN_SELF_GT_EXCEPTIONS must still appear in the full
+        set of self-GT targets (i.e. still have identity_string + cc >= 1).
+        A token removed from the lump set or whose sidecar lost identity_string
+        would silently leave a dead allowlist entry; remove it instead.
+        """
+        current_tokens = {tok for tok, _ in _SELF_GT_ALL_TARGETS}
+        stale = set(KNOWN_SELF_GT_EXCEPTIONS) - current_tokens
+        assert not stale, (
+            "KNOWN_SELF_GT_EXCEPTIONS entries no longer match any lump with\n"
+            "identity_string + cc >= 1:\n  " +
+            "\n  ".join(sorted(stale)) +
+            "\n  Remove stale entries from KNOWN_SELF_GT_EXCEPTIONS in\n"
+            "  tests/lump/test_lump_consistency.py."
         )
 
 
