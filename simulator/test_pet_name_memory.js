@@ -27,6 +27,7 @@
 //   T027 — _updatePetnamePreview: valid petname → Save enabled, preview green + seal text
 //   T028 — _updatePetnamePreview: empty petname → Save enabled, preview grey "No petname set"
 //   T029 — _updatePetnamePreview: invalid → corrected to valid → Save re-enables
+//   T032 — _updatePetnamePreview: non-numeric / whitespace-only issue number → falls back to 1, no NaN in seal
 
 const ChurchSimulator  = require('./simulator.js');
 const ChurchAssembler  = require('./assembler.js');
@@ -568,6 +569,39 @@ console.log('\n--- T026–T029: _updatePetnamePreview petname validation (real s
             d.previewEl.style.color === '#22c55e');
         check('T031c: padded valid petname → preview shows trimmed seal text',
             d.previewEl.textContent === 'Seal: ken.Abstraction#2');
+    }
+
+    // T032 — whitespace-only or non-numeric issue number → parseInt() returns NaN;
+    //         the production guard `|| 1` must silently fall back to 1 so the seal
+    //         reads "ken.Abstraction#1" rather than the broken "ken.Abstraction#NaN".
+    //         Both a whitespace-only value ('   ') and a purely alphabetic value
+    //         ('abc') are exercised.  saveBtn starts disabled to prove the valid
+    //         branch actively enables it.
+    {
+        // 32a: whitespace-only issue number ('   ') → fallback to 1
+        const d = makeDOMContext('ken', '   ', true);
+        d.invoke();
+        check('T032a: whitespace-only issue number → saveBtn.disabled === false',
+            d.saveBtn.disabled === false);
+        check('T032b: whitespace-only issue number → preview color is #22c55e',
+            d.previewEl.style.color === '#22c55e');
+        check('T032c: whitespace-only issue number → seal uses #1, not #NaN',
+            d.previewEl.textContent === 'Seal: ken.Abstraction#1');
+        check('T032d: whitespace-only issue number → seal text contains no "NaN"',
+            !d.previewEl.textContent.includes('NaN'));
+    }
+    {
+        // 32b: non-numeric issue number ('abc') → fallback to 1
+        const d2 = makeDOMContext('ken', 'abc', true);
+        d2.invoke();
+        check('T032e: non-numeric issue number → saveBtn.disabled === false',
+            d2.saveBtn.disabled === false);
+        check('T032f: non-numeric issue number → preview color is #22c55e',
+            d2.previewEl.style.color === '#22c55e');
+        check('T032g: non-numeric issue number → seal uses #1, not #NaN',
+            d2.previewEl.textContent === 'Seal: ken.Abstraction#1');
+        check('T032h: non-numeric issue number → seal text contains no "NaN"',
+            !d2.previewEl.textContent.includes('NaN'));
     }
 }
 
