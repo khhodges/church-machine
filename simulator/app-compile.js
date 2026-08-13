@@ -1337,6 +1337,51 @@ function compileAndBuild() {
         }
     }
 
+    // ── Boot-entry RETURN check ────────────────────────────────────────────
+    // If this abstraction is the currently-selected boot entry, any RETURN
+    // instruction is a semantic error: there is no caller frame at hardware
+    // boot. The machine will fall through to a zero word, fault, wipe all
+    // CRs to NULL GT, and loop with a dead namespace — fault LED ON.
+    (function _checkBootEntryReturn() {
+        const _bootSlot = (typeof sim !== 'undefined' && sim && typeof sim.bootEntrySlot !== 'undefined')
+            ? sim.bootEntrySlot : -1;
+        if (_bootSlot < 0) return;
+        // Check whether this abstraction IS the boot entry (name match in registry).
+        let _isBootEntry = false;
+        if (sim && sim.abstractionRegistry) {
+            const _allAbs = sim.abstractionRegistry.abstractions || {};
+            for (const _j of Object.keys(_allAbs)) {
+                const _a = _allAbs[_j];
+                if (_a && Number(_a.index) === _bootSlot &&
+                    _a.name && _a.name.toUpperCase() === absName.toUpperCase()) {
+                    _isBootEntry = true;
+                    break;
+                }
+            }
+        }
+        if (!_isBootEntry) return;
+        // Scan assembled words for RETURN (Church opcode 3, bits[31:27] === 3).
+        const _returnHits = [];
+        for (let _wi = 0; _wi < allCode.length; _wi++) {
+            if (((allCode[_wi] >>> 27) & 0x1F) === 3) {
+                _returnHits.push({ word: _wi + 1, line: allLineNums[_wi] });
+            }
+        }
+        if (_returnHits.length === 0) return;
+        const _locs = _returnHits.map(h => h.line != null ? `line ${h.line}` : `word ${h.word}`).join(', ');
+        const _warn = {
+            line: _returnHits[0].line,
+            message: `[BOOT-RETURN] "${absName}" is the boot entry (slot ${_bootSlot}) ` +
+                `and contains ${_returnHits.length} RETURN instruction` +
+                `${_returnHits.length !== 1 ? 's' : ''} (${_locs}). ` +
+                `At hardware boot there is no caller — RETURN will fault and wipe all ` +
+                `registers (fault LED ON). Replace with an infinite loop or a CALL to ` +
+                `another abstraction.`
+        };
+        if (typeof _showAsmWarnings === 'function') _showAsmWarnings([_warn]);
+    })();
+    // ─────────────────────────────────────────────────────────────────────────
+
     const codeRegion = [...allCode];
     const cw = codeRegion.length;
 
