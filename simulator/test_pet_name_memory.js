@@ -541,6 +541,34 @@ console.log('\n--- T026–T029: _updatePetnamePreview petname validation (real s
         check('T029d: after correcting to valid → preview shows correct seal',
             d.previewEl.textContent === 'Seal: goodname.Abstraction#1');
     }
+
+    // T030 — whitespace-only petname ("   ") → trim() collapses it to empty →
+    //         Save enabled, preview grey "No petname set" (not "Invalid characters").
+    //         saveBtn starts disabled to prove the empty branch actively enables it.
+    {
+        const d = makeDOMContext('   ', 1, true);
+        d.invoke();
+        check('T030a: whitespace-only petname → saveBtn.disabled === false',
+            d.saveBtn.disabled === false);
+        check('T030b: whitespace-only petname → preview color is #6b7280',
+            d.previewEl.style.color === '#6b7280');
+        check('T030c: whitespace-only petname → preview starts with "No petname set"',
+            d.previewEl.textContent.startsWith('No petname set'));
+    }
+
+    // T031 — leading/trailing whitespace around a valid name (" ken ") →
+    //         trim() produces "ken" → Save enabled, preview green with correct seal.
+    //         saveBtn starts disabled to prove the valid branch actively enables it.
+    {
+        const d = makeDOMContext(' ken ', 2, true);
+        d.invoke();
+        check('T031a: padded valid petname → saveBtn.disabled === false',
+            d.saveBtn.disabled === false);
+        check('T031b: padded valid petname → preview color is #22c55e',
+            d.previewEl.style.color === '#22c55e');
+        check('T031c: padded valid petname → preview shows trimmed seal text',
+            d.previewEl.textContent === 'Seal: ken.Abstraction#2');
+    }
 }
 
 // ── T030: Source-level regression — canonical petname rule not duplicated ───────
