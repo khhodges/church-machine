@@ -401,6 +401,17 @@ HALT
 // production regex, preview text, colour constants, or save-button logic will
 // immediately break these assertions — no manual sync required.
 //
+// CANONICAL VALIDATION RULE: the allowed character set is defined once in
+// _isPetnameValid() in simulator/app-run.js, just above _updatePetnamePreview().
+// _updatePetnamePreview and saveSettings both call _isPetnameValid — they do NOT
+// contain their own inline regex.  If you change the allowed characters, change
+// _isPetnameValid only; everything else (preview, save guard, openSettings sanitiser,
+// and these tests) will follow automatically because they all run from the same source.
+//
+// WARNING: if the regex is ever duplicated outside _isPetnameValid, these tests
+// will still pass (they drive _updatePetnamePreview directly) while the duplicated
+// copy silently diverges — UI accepts characters the guard rejects, or vice versa.
+//
 // Only the four DOM elements the function actually calls getElementById() on are
 // mocked: settingPetname, settingIssueNumber, settingPetnamePreview, settingsSaveBtn.
 console.log('\n--- T026–T029: _updatePetnamePreview petname validation (real source) ---');
@@ -409,21 +420,39 @@ console.log('\n--- T026–T029: _updatePetnamePreview petname validation (real s
     const fs   = require('fs');
     const path = require('path');
 
-    // ── Extract _updatePetnamePreview from the production source ─────────────
-    // Brace-counting ensures we capture the complete function body even if it
-    // contains nested braces, without relying on a fragile line-number offset.
+    // ── Extract _isPetnameValid and _updatePetnamePreview from production source ─
+    // _isPetnameValid is the single source-of-truth for the petname regex (see
+    // app-run.js, just above _updatePetnamePreview).  Both functions are injected
+    // into the vm context so that any change to the canonical helper is immediately
+    // reflected here without any manual sync.
+    // Brace-counting ensures we capture complete function bodies even when they
+    // contain nested braces, without relying on fragile line-number offsets.
     const appRunSrc = fs.readFileSync(
         path.join(__dirname, 'app-run.js'), 'utf8'
     );
-    const startMarker = 'function _updatePetnamePreview() {';
-    const startIdx = appRunSrc.indexOf(startMarker);
-    if (startIdx === -1) throw new Error('_updatePetnamePreview not found in app-run.js');
-    let depth = 0, endIdx = startIdx;
-    for (let i = startIdx; i < appRunSrc.length; i++) {
-        if (appRunSrc[i] === '{') depth++;
-        else if (appRunSrc[i] === '}') { depth--; if (depth === 0) { endIdx = i; break; } }
+    function extractFn(src, marker) {
+        const idx = src.indexOf(marker);
+        if (idx === -1) throw new Error(marker + ' not found in app-run.js');
+        let depth = 0, end = idx;
+        for (let i = idx; i < src.length; i++) {
+            if (src[i] === '{') depth++;
+            else if (src[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+        }
+        return src.slice(idx, end + 1);
     }
-    const fnSource = appRunSrc.slice(startIdx, endIdx + 1);
+    // Also extract _PETNAME_CHAR_CLASS — _isPetnameValid references it as a closure
+    // variable, so the vm context must include it too.
+    const charClassMarker = 'const _PETNAME_CHAR_CLASS = ';
+    const charClassIdx = appRunSrc.indexOf(charClassMarker);
+    if (charClassIdx === -1) throw new Error('_PETNAME_CHAR_CLASS not found in app-run.js');
+    const charClassEnd = appRunSrc.indexOf('\n', charClassIdx);
+    const charClassSource = appRunSrc.slice(charClassIdx, charClassEnd + 1);
+
+    const validatorSource   = extractFn(appRunSrc, 'function _isPetnameValid(');
+    const sanitiserSource   = extractFn(appRunSrc, 'function _sanitisePetname(');
+    const fnSource          = extractFn(appRunSrc, 'function _updatePetnamePreview() {');
+    // Combined preamble: canonical constant + both helpers + the function under test.
+    const vmPreamble = charClassSource + '\n' + validatorSource + '\n' + sanitiserSource + '\n';
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     // makeDOMContext builds one persistent mock DOM that survives across multiple
@@ -444,8 +473,13 @@ console.log('\n--- T026–T029: _updatePetnamePreview petname validation (real s
         const ctx = vm.createContext({
             document: { getElementById: (id) => elements[id] || null }
         });
-        // Expose the ctx script once so callers can mutate petnameEl.value between calls.
-        function invoke() { vm.runInContext(fnSource + '\n_updatePetnamePreview();', ctx); }
+        // Run the preamble (constant + helpers + function body) ONCE on the context so
+        // that `const _PETNAME_CHAR_CLASS` and the function definitions are declared
+        // exactly once.  Subsequent invoke() calls only re-run the call site, avoiding
+        // the "already been declared" error that arises when T029 invokes twice on the
+        // same context.
+        vm.runInContext(vmPreamble + fnSource, ctx);
+        function invoke() { vm.runInContext('_updatePetnamePreview();', ctx); }
         return { previewEl, saveBtn, petnameEl, invoke };
     }
 
@@ -506,6 +540,99 @@ console.log('\n--- T026–T029: _updatePetnamePreview petname validation (real s
             d.previewEl.style.color === '#22c55e');
         check('T029d: after correcting to valid → preview shows correct seal',
             d.previewEl.textContent === 'Seal: goodname.Abstraction#1');
+    }
+}
+
+// ── T030: Source-level regression — canonical petname rule not duplicated ───────
+//
+// This test reads simulator/app-run.js and asserts the structural contract:
+//
+//   1. The character-class literal 'a-z0-9._-' appears only inside the two
+//      canonical helpers (_isPetnameValid / _sanitisePetname).  Any inline copy
+//      of the regex elsewhere means a future character-set change can silently
+//      diverge; this test catches that the moment it happens.
+//
+//   2. _updatePetnamePreview and saveSettings call _isPetnameValid() — they do
+//      NOT contain their own inline regex.
+//
+//   3. The _sanitisePetname helper is present and is used by the openSettings
+//      stored-value correction path (not an inline replace pattern).
+//
+// If this test fails after a regex change, the fix is to update _PETNAME_CHAR_CLASS
+// in app-run.js only — not to adjust the expected string in this test.
+console.log('\n--- T030: Source-level regression — petname rule not duplicated ---');
+{
+    const fs   = require('fs');
+    const path = require('path');
+    const src  = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
+
+    // Helper: extract a function body by name (brace-counting).
+    function extractFnBody(source, marker) {
+        const idx = source.indexOf(marker);
+        if (idx === -1) return null;
+        let depth = 0, end = idx;
+        for (let i = idx; i < source.length; i++) {
+            if (source[i] === '{') depth++;
+            else if (source[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+        }
+        return source.slice(idx, end + 1);
+    }
+
+    // The canonical character-class literal.  If _PETNAME_CHAR_CLASS changes,
+    // update this string to match — and only here.
+    const CHAR_CLASS = 'a-z0-9._-';
+
+    const validatorBody   = extractFnBody(src, 'function _isPetnameValid(');
+    const sanitiserBody   = extractFnBody(src, 'function _sanitisePetname(');
+    const previewBody     = extractFnBody(src, 'function _updatePetnamePreview() {');
+    const saveBody        = extractFnBody(src, 'function saveSettings() {');
+
+    check('T030a: _isPetnameValid helper exists in app-run.js',       validatorBody !== null);
+    check('T030b: _sanitisePetname helper exists in app-run.js',      sanitiserBody !== null);
+    check('T030c: _updatePetnamePreview body exists in app-run.js',   previewBody   !== null);
+    check('T030d: saveSettings body exists in app-run.js',            saveBody      !== null);
+
+    if (validatorBody && sanitiserBody && previewBody && saveBody) {
+        // Strip the two canonical helpers (and the const declaration that defines
+        // _PETNAME_CHAR_CLASS) from the source, then verify no functional inline
+        // regex copies of the character class remain elsewhere.  We check for the
+        // regex literal forms — /^[a-z0-9._-]+$/  and  /[^a-z0-9._-]/ — that an
+        // inline copy would use.  The bare string in the const declaration and in
+        // documentation comments is benign and intentionally excluded from this check.
+        const constLinePattern = new RegExp('const _PETNAME_CHAR_CLASS = [^\\n]+\\n');
+        const withoutCanonical = src
+            .replace(constLinePattern, '')
+            .replace(validatorBody, '')
+            .replace(sanitiserBody, '');
+        const INLINE_VALIDATOR_RE  = /\/\^?\[a-z0-9\._-\]/.source; // /^[a-z0-9._-] literal
+        const INLINE_SANITISER_RE  = /\/\[\^a-z0-9\._-\]/.source; // /[^a-z0-9._-] literal
+        const hasInlineCopy = withoutCanonical.includes('/^[' + CHAR_CLASS + ']+$/')
+                           || withoutCanonical.includes('/[^' + CHAR_CLASS + ']/');
+        check('T030e: no functional inline regex copies of the character class outside canonical helpers',
+            !hasInlineCopy);
+
+        // The preview and save functions must call _isPetnameValid, not inline regex.
+        check('T030f: _updatePetnamePreview calls _isPetnameValid()',
+            previewBody.includes('_isPetnameValid('));
+        check('T030g: saveSettings calls _isPetnameValid()',
+            saveBody.includes('_isPetnameValid('));
+
+        // The preview and save functions must NOT contain the raw character class.
+        check('T030h: _updatePetnamePreview contains no inline character-class copy',
+            !previewBody.includes(CHAR_CLASS));
+        check('T030i: saveSettings contains no inline character-class copy',
+            !saveBody.includes(CHAR_CLASS));
+
+        // _sanitisePetname must be used by the openSettings stored-value correction
+        // path (not an inline replace pattern with the raw character class).
+        // We verify by checking _sanitisePetname is referenced in the source outside
+        // its own definition, and that the openSettings region contains _sanitisePetname
+        // rather than the raw inverse class.
+        const openSettingsBody = extractFnBody(src, 'function openSettings(');
+        check('T030j: openSettings uses _sanitisePetname() not an inline replace pattern',
+            openSettingsBody !== null &&
+            openSettingsBody.includes('_sanitisePetname(') &&
+            !openSettingsBody.includes(CHAR_CLASS));
     }
 }
 

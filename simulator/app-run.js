@@ -11602,8 +11602,8 @@ function openSettings() {
         // Remove any leftover banner from a previous open, then re-evaluate.
         const _oldWarn = document.getElementById('settingPetnameStoredWarn');
         if (_oldWarn) _oldWarn.remove();
-        if (_storedPetname && !/^[a-z0-9._-]+$/i.test(_storedPetname)) {
-            const _sanitised = _storedPetname.replace(/[^a-z0-9._-]/gi, '');
+        if (_storedPetname && !_isPetnameValid(_storedPetname)) {
+            const _sanitised = _sanitisePetname(_storedPetname);
             // Correct the field so the user immediately sees the cleaned value.
             petnameEl.value = _sanitised;
             const _warnDiv = document.createElement('div');
@@ -11682,6 +11682,27 @@ function dismissAllPopupsPerm() {
     localStorage.setItem('churchMachine_toolGuide_sliderule_perm', '1');
 }
 
+// ── Petname validation — single source of truth ──────────────────────────────
+// _PETNAME_CHAR_CLASS is the ONE place where the allowed character set is defined.
+// Both helpers below derive their pattern from it, so a character-set change only
+// ever needs to be made here.
+//
+// Rules for callers:
+//   • Use _isPetnameValid(pn)  to check whether a petname is acceptable.
+//   • Use _sanitisePetname(pn) to strip disallowed characters from a stored value.
+//   • Do NOT copy the character-class pattern inline in any other function.
+//
+// The test suite (test_pet_name_memory.js T026–T030) loads both helpers from this
+// file verbatim via Node vm, and includes a source-scan assertion (T030) that fails
+// if the character pattern literal appears outside these two helpers.
+const _PETNAME_CHAR_CLASS = 'a-z0-9._-';
+function _isPetnameValid(pn) {
+    return new RegExp('^[' + _PETNAME_CHAR_CLASS + ']+$', 'i').test(pn);
+}
+function _sanitisePetname(pn) {
+    return pn.replace(new RegExp('[^' + _PETNAME_CHAR_CLASS + ']', 'gi'), '');
+}
+
 function _updatePetnamePreview() {
     const previewEl = document.getElementById('settingPetnamePreview');
     if (!previewEl) return;
@@ -11690,7 +11711,7 @@ function _updatePetnamePreview() {
     const iss = parseInt(document.getElementById('settingIssueNumber')?.value || '1') || 1;
     const saveBtn = document.getElementById('settingsSaveBtn');
     if (pn) {
-        const isValid = /^[a-z0-9._-]+$/i.test(pn);
+        const isValid = _isPetnameValid(pn);
         if (!isValid) {
             previewEl.textContent = 'Invalid characters — only letters, digits, dots (.), underscores (_), and hyphens (-) are allowed';
             previewEl.style.color = '#ef4444';
@@ -11801,7 +11822,7 @@ function saveSettings() {
     const _pnGuardEl = document.getElementById('settingPetname');
     if (_pnGuardEl) {
         const _pnGuardVal = _pnGuardEl.value.trim();
-        if (_pnGuardVal && !/^[a-z0-9._-]+$/i.test(_pnGuardVal)) {
+        if (_pnGuardVal && !_isPetnameValid(_pnGuardVal)) {
             _updatePetnamePreview(); // ensure error state is visible
             return;
         }
