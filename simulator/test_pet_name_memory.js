@@ -23,6 +23,10 @@
 //   T018 — getState().petNameMemory reflects additions from markNamedSlots()
 //   T019 — getState().petNameMemory reflects additions from DWRITE intercept
 //   T020 — Full round-trip: assemble → namedSlots → markNamedSlots → getState
+//   T026 — _updatePetnamePreview: invalid petname → Save disabled, preview red
+//   T027 — _updatePetnamePreview: valid petname → Save enabled, preview green + seal text
+//   T028 — _updatePetnamePreview: empty petname → Save enabled, preview grey "No petname set"
+//   T029 — _updatePetnamePreview: invalid → corrected to valid → Save re-enables
 
 const ChurchSimulator  = require('./simulator.js');
 const ChurchAssembler  = require('./assembler.js');
@@ -388,6 +392,121 @@ HALT
     check('T025a: resetNamedSlots() does not throw', !threw);
     check('T025b: isNamedSlot() works normally after reset', sim.isNamedSlot(0));
     check('T025c: isNamedSlot(7) true after reset (WukongCallHome boot default)', sim.isNamedSlot(7));
+}
+
+// ── T026–T029: _updatePetnamePreview validation via real production source ──────
+//
+// These tests load the REAL _updatePetnamePreview function from simulator/app-run.js
+// using Node's `vm` module and a minimal mocked `document`. Any change to the
+// production regex, preview text, colour constants, or save-button logic will
+// immediately break these assertions — no manual sync required.
+//
+// Only the four DOM elements the function actually calls getElementById() on are
+// mocked: settingPetname, settingIssueNumber, settingPetnamePreview, settingsSaveBtn.
+console.log('\n--- T026–T029: _updatePetnamePreview petname validation (real source) ---');
+{
+    const vm   = require('vm');
+    const fs   = require('fs');
+    const path = require('path');
+
+    // ── Extract _updatePetnamePreview from the production source ─────────────
+    // Brace-counting ensures we capture the complete function body even if it
+    // contains nested braces, without relying on a fragile line-number offset.
+    const appRunSrc = fs.readFileSync(
+        path.join(__dirname, 'app-run.js'), 'utf8'
+    );
+    const startMarker = 'function _updatePetnamePreview() {';
+    const startIdx = appRunSrc.indexOf(startMarker);
+    if (startIdx === -1) throw new Error('_updatePetnamePreview not found in app-run.js');
+    let depth = 0, endIdx = startIdx;
+    for (let i = startIdx; i < appRunSrc.length; i++) {
+        if (appRunSrc[i] === '{') depth++;
+        else if (appRunSrc[i] === '}') { depth--; if (depth === 0) { endIdx = i; break; } }
+    }
+    const fnSource = appRunSrc.slice(startIdx, endIdx + 1);
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    // makeDOMContext builds one persistent mock DOM that survives across multiple
+    // invocations of runInDOM — essential for testing state transitions (T029).
+    // saveBtnDisabled lets callers pre-set the button state before the first call
+    // so tests can prove the production branch actively changes it (T027, T028).
+    function makeDOMContext(petnameVal, issueVal, saveBtnDisabled) {
+        const previewEl = { textContent: '', style: { color: '' } };
+        const saveBtn   = { disabled: saveBtnDisabled !== undefined ? saveBtnDisabled : false };
+        const petnameEl = { value: String(petnameVal) };
+        const issueEl   = { value: String(issueVal !== undefined ? issueVal : 1) };
+        const elements  = {
+            settingPetname:        petnameEl,
+            settingIssueNumber:    issueEl,
+            settingPetnamePreview: previewEl,
+            settingsSaveBtn:       saveBtn
+        };
+        const ctx = vm.createContext({
+            document: { getElementById: (id) => elements[id] || null }
+        });
+        // Expose the ctx script once so callers can mutate petnameEl.value between calls.
+        function invoke() { vm.runInContext(fnSource + '\n_updatePetnamePreview();', ctx); }
+        return { previewEl, saveBtn, petnameEl, invoke };
+    }
+
+    // T026 — invalid petname (contains @) → Save disabled, preview red
+    // saveBtn starts enabled to prove the function actively disables it.
+    {
+        const d = makeDOMContext('ken@work', 1, false);
+        d.invoke();
+        check('T026a: invalid petname → saveBtn.disabled === true',
+            d.saveBtn.disabled === true);
+        check('T026b: invalid petname → preview color is #ef4444',
+            d.previewEl.style.color === '#ef4444');
+        check('T026c: invalid petname → preview text starts with "Invalid characters"',
+            d.previewEl.textContent.startsWith('Invalid characters'));
+    }
+
+    // T027 — valid petname ("ken") → Save enabled, preview green with correct seal text.
+    // saveBtn starts disabled to prove the function actively enables it.
+    {
+        const d = makeDOMContext('ken', 3, true);
+        d.invoke();
+        check('T027a: valid petname → saveBtn.disabled === false',
+            d.saveBtn.disabled === false);
+        check('T027b: valid petname → preview color is #22c55e',
+            d.previewEl.style.color === '#22c55e');
+        check('T027c: valid petname → preview shows correct seal text',
+            d.previewEl.textContent === 'Seal: ken.Abstraction#3');
+    }
+
+    // T028 — empty petname → Save enabled, preview grey "No petname set".
+    // saveBtn starts disabled to prove the empty branch actively enables it.
+    {
+        const d = makeDOMContext('', 1, true);
+        d.invoke();
+        check('T028a: empty petname → saveBtn.disabled === false',
+            d.saveBtn.disabled === false);
+        check('T028b: empty petname → preview color is #6b7280',
+            d.previewEl.style.color === '#6b7280');
+        check('T028c: empty petname → preview starts with "No petname set"',
+            d.previewEl.textContent.startsWith('No petname set'));
+    }
+
+    // T029 — type invalid, then correct to valid → Save re-enables on same DOM.
+    // A single persistent DOM is reused so the same saveBtn object transitions
+    // from disabled=false → true (invalid) → false (corrected), proving the
+    // production re-enable branch is reached and not masked by a fresh default.
+    {
+        const d = makeDOMContext('bad!name', 1, false);
+        d.invoke();
+        check('T029a: after invalid input → saveBtn.disabled === true',
+            d.saveBtn.disabled === true);
+        // Simulate the user correcting the input (same DOM, same button object).
+        d.petnameEl.value = 'goodname';
+        d.invoke();
+        check('T029b: after correcting to valid → saveBtn.disabled === false',
+            d.saveBtn.disabled === false);
+        check('T029c: after correcting to valid → preview color is #22c55e',
+            d.previewEl.style.color === '#22c55e');
+        check('T029d: after correcting to valid → preview shows correct seal',
+            d.previewEl.textContent === 'Seal: goodname.Abstraction#1');
+    }
 }
 
 // ── Final summary ──────────────────────────────────────────────────────────────
