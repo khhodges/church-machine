@@ -11708,7 +11708,7 @@ function _updatePetnamePreview() {
     if (!previewEl) return;
     const rawPn = (document.getElementById('settingPetname')?.value || '');
     const pn = rawPn.trim();
-    const iss = parseInt(document.getElementById('settingIssueNumber')?.value || '1') || 1;
+    const iss = Math.max(1, parseInt(document.getElementById('settingIssueNumber')?.value || '1') || 1);
     const saveBtn = document.getElementById('settingsSaveBtn');
     if (pn) {
         const isValid = _isPetnameValid(pn);

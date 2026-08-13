@@ -28,6 +28,7 @@
 //   T028 — _updatePetnamePreview: empty petname → Save enabled, preview grey "No petname set"
 //   T029 — _updatePetnamePreview: invalid → corrected to valid → Save re-enables
 //   T032 — _updatePetnamePreview: non-numeric / whitespace-only issue number → falls back to 1, no NaN in seal
+//   T033 — _updatePetnamePreview: negative or zero issue number → clamped to 1, seal shows #1 not #-5 or #0
 
 const ChurchSimulator  = require('./simulator.js');
 const ChurchAssembler  = require('./assembler.js');
@@ -602,6 +603,37 @@ console.log('\n--- T026–T029: _updatePetnamePreview petname validation (real s
             d2.previewEl.textContent === 'Seal: ken.Abstraction#1');
         check('T032h: non-numeric issue number → seal text contains no "NaN"',
             !d2.previewEl.textContent.includes('NaN'));
+    }
+
+    // T033 — negative or zero issue number → clamped to 1 via Math.max(1, …)
+    //         A user typing "-5" or "0" must never produce "ken.Abstraction#-5"
+    //         or "ken.Abstraction#0"; the seal must always show #1.
+    //         saveBtn starts disabled to prove the valid branch actively enables it.
+    {
+        // T033a: negative issue number ('-5') → clamped to 1
+        const d = makeDOMContext('ken', '-5', true);
+        d.invoke();
+        check('T033a: negative issue number → saveBtn.disabled === false',
+            d.saveBtn.disabled === false);
+        check('T033b: negative issue number → preview color is #22c55e',
+            d.previewEl.style.color === '#22c55e');
+        check('T033c: negative issue number → seal uses #1, not #-5',
+            d.previewEl.textContent === 'Seal: ken.Abstraction#1');
+        check('T033d: negative issue number → seal text contains no "-5"',
+            !d.previewEl.textContent.includes('-5'));
+    }
+    {
+        // T033e: zero issue number ('0') → clamped to 1
+        const d = makeDOMContext('ken', '0', true);
+        d.invoke();
+        check('T033e: zero issue number → saveBtn.disabled === false',
+            d.saveBtn.disabled === false);
+        check('T033f: zero issue number → preview color is #22c55e',
+            d.previewEl.style.color === '#22c55e');
+        check('T033g: zero issue number → seal uses #1, not #0',
+            d.previewEl.textContent === 'Seal: ken.Abstraction#1');
+        check('T033h: zero issue number → seal text ends with "#1" not "#0"',
+            d.previewEl.textContent.endsWith('#1'));
     }
 }
 
