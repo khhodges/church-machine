@@ -10096,6 +10096,161 @@ Add a method called Run
     }
 }
 
+// ── Boot-entry RETURN warning: [BOOT-RETURN] ─────────────────────────────────
+//
+// _checkBootEntryReturn() in app-compile.js fires a [BOOT-RETURN] warning when:
+//   - the abstraction being compiled IS the current boot entry (NS slot + name)
+//   - the assembled code contains at least one RETURN word (opcode 3)
+//
+// At hardware boot there is no caller frame, so RETURN faults and wipes all
+// registers (fault LED ON). The IDE must warn the programmer before they flash.
+//
+// The IIFE closes over: sim, absName, allCode, allLineNums, _showAsmWarnings
+// (all available in the compileAndBuild scope just before codeRegion is built).
+{
+    const fs   = require('fs');
+    const path = require('path');
+    const compileLines = fs.readFileSync(
+        path.join(__dirname, 'app-compile.js'), 'utf8').split('\n');
+    // Lines 1345–1382 (1-indexed) contain the _checkBootEntryReturn() IIFE.
+    // Update both slice indices if the IIFE is moved inside app-compile.js.
+    const berSrc = compileLines.slice(1344, 1382).join('\n');
+
+    assert('BER-SRC1: extracted _checkBootEntryReturn IIFE from app-compile.js',
+        berSrc.includes('(function _checkBootEntryReturn()') &&
+        berSrc.includes('[BOOT-RETURN]'),
+        'Line range 1345–1382 no longer contains the IIFE — update the slice');
+
+    // Helper: run the IIFE in a controlled context; returns what _showAsmWarnings
+    // received, or null if it was never called.
+    function runBerCheck({ bootSlot, absName, registryAbstractions, allCode, allLineNums }) {
+        let captured = null;
+        const sim = {
+            bootEntrySlot: bootSlot,
+            abstractionRegistry: registryAbstractions != null
+                ? { abstractions: registryAbstractions }
+                : null
+        };
+        const _showAsmWarnings = (warns) => { captured = warns; };
+        const fn = new Function(
+            'sim', 'absName', 'allCode', 'allLineNums', '_showAsmWarnings',
+            '"use strict";\n' + berSrc
+        );
+        fn(sim, absName, allCode || [], allLineNums || [], _showAsmWarnings);
+        return captured;
+    }
+
+    // Church opcode 3 (RETURN) lives in bits[31:27].
+    const RETURN_WORD = (3 << 27) >>> 0;   // 0x06000000
+    const BRANCH_WORD = (23 << 27) >>> 0;  // 0xB8000000  (not RETURN)
+
+    // BER-1: SelfTest is the boot entry and its code contains RETURN → warning fires
+    const _ber1reg = { 6: { index: 6, name: 'SelfTest' } };
+    const ber1 = runBerCheck({
+        bootSlot: 6, absName: 'SelfTest',
+        registryAbstractions: _ber1reg,
+        allCode: [BRANCH_WORD, RETURN_WORD],
+        allLineNums: [1, 2]
+    });
+    assert('BER-1: RETURN in boot-entry abstraction fires a warning',
+        Array.isArray(ber1) && ber1.length === 1,
+        `captured=${JSON.stringify(ber1)}`);
+    assert('BER-1: warning message contains [BOOT-RETURN]',
+        (ber1 && ber1[0] && ber1[0].message || '').includes('[BOOT-RETURN]'),
+        ber1 && ber1[0]?.message?.slice(0, 70));
+    assert('BER-1: warning message names the abstraction',
+        (ber1 && ber1[0]?.message || '').includes('SelfTest'),
+        '');
+    assert('BER-1: warning message cites the boot slot',
+        (ber1 && ber1[0]?.message || '').includes('6'),
+        '');
+
+    // BER-2: boot entry, but code has NO RETURN → no warning
+    const ber2 = runBerCheck({
+        bootSlot: 6, absName: 'SelfTest',
+        registryAbstractions: _ber1reg,
+        allCode: [BRANCH_WORD, BRANCH_WORD],
+        allLineNums: [1, 2]
+    });
+    assert('BER-2: no RETURN in boot-entry abstraction → no warning',
+        ber2 === null,
+        `captured=${JSON.stringify(ber2)}`);
+
+    // BER-3: RETURN present, but abstraction name does NOT match boot entry → no warning
+    const ber3 = runBerCheck({
+        bootSlot: 6, absName: 'MyOtherAbstraction',
+        registryAbstractions: _ber1reg,   // slot 6 = SelfTest, not MyOtherAbstraction
+        allCode: [RETURN_WORD],
+        allLineNums: [1]
+    });
+    assert('BER-3: RETURN in non-boot-entry abstraction → no warning',
+        ber3 === null,
+        `captured=${JSON.stringify(ber3)}`);
+
+    // BER-4: bootEntrySlot = -1 (no boot entry configured) → no warning
+    const ber4 = runBerCheck({
+        bootSlot: -1, absName: 'SelfTest',
+        registryAbstractions: null,
+        allCode: [RETURN_WORD],
+        allLineNums: [1]
+    });
+    assert('BER-4: bootEntrySlot=-1 → no warning even with RETURN',
+        ber4 === null,
+        `captured=${JSON.stringify(ber4)}`);
+
+    // BER-5: multiple RETURN words → single warning with plural wording + both locations
+    const ber5 = runBerCheck({
+        bootSlot: 6, absName: 'SelfTest',
+        registryAbstractions: _ber1reg,
+        allCode: [RETURN_WORD, BRANCH_WORD, RETURN_WORD],
+        allLineNums: [1, 2, 3]
+    });
+    assert('BER-5: multiple RETURNs → exactly one warning object',
+        Array.isArray(ber5) && ber5.length === 1,
+        `captured=${JSON.stringify(ber5)}`);
+    assert('BER-5: warning uses plural "instructions"',
+        (ber5 && ber5[0]?.message || '').includes('instructions'),
+        ber5 && ber5[0]?.message?.slice(0, 90));
+    assert('BER-5: warning cites source line 1 and line 3',
+        (ber5 && ber5[0]?.message || '').includes('line 1') &&
+        (ber5 && ber5[0]?.message || '').includes('line 3'),
+        ber5 && ber5[0]?.message?.slice(0, 120));
+
+    // BER-6: name comparison is case-insensitive
+    const ber6 = runBerCheck({
+        bootSlot: 6, absName: 'SELFTEST',
+        registryAbstractions: { 6: { index: 6, name: 'selftest' } },
+        allCode: [RETURN_WORD],
+        allLineNums: [null]
+    });
+    assert('BER-6: name match is case-insensitive → warning still fires',
+        Array.isArray(ber6) && ber6.length === 1,
+        `captured=${JSON.stringify(ber6)}`);
+
+    // BER-7: null source-line info → warning falls back to "word N" notation
+    const ber7 = runBerCheck({
+        bootSlot: 6, absName: 'SelfTest',
+        registryAbstractions: _ber1reg,
+        allCode: [RETURN_WORD],
+        allLineNums: [null]
+    });
+    assert('BER-7: null line-number → location reported as "word 1"',
+        (ber7 && ber7[0]?.message || '').includes('word 1'),
+        ber7 && ber7[0]?.message?.slice(0, 90));
+
+    // BER-8: warning advises replacing RETURN with a loop or CALL
+    const ber8 = runBerCheck({
+        bootSlot: 6, absName: 'SelfTest',
+        registryAbstractions: _ber1reg,
+        allCode: [RETURN_WORD],
+        allLineNums: [5]
+    });
+    assert('BER-8: warning message advises infinite loop or CALL alternative',
+        (ber8 && ber8[0]?.message || '').includes('infinite loop') ||
+        (ber8 && ber8[0]?.message || '').includes('CALL'),
+        ber8 && ber8[0]?.message?.slice(0, 120));
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);
