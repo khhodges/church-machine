@@ -416,6 +416,19 @@ _EV_HAS_GT_PAYLOAD = frozenset({
     0x0A, 0x0B,        # RETURN_CR6, RETURN_CR14
 })
 
+# ev_types whose payload carries the new GT value for a *known* CR register.
+# Used to maintain the rolling CR GT cache for hardware fault snapshots.
+# LOAD_NEW (0x02) is excluded because the destination CR is not encoded in the
+# ev_type — it would require instruction decoding to identify the target CR.
+_EV_TO_CR = {
+    TRACE_EV_CHANGE_CR5:  5,
+    TRACE_EV_CALL_CR6:    6,
+    TRACE_EV_CHANGE_CR12: 12,
+    TRACE_EV_CALL_CR14:   14,
+    TRACE_EV_RETURN_CR6:  6,
+    TRACE_EV_RETURN_CR14: 14,
+}
+
 
 def _decode_gt_label(gt_word):
     """Return a short human-readable annotation for a GT word.
@@ -1021,6 +1034,12 @@ def main():
     buf          = bytearray()
     last_poll    = 0.0
     resync_skips = 0   # bogus-0xAA candidates skipped by frame validation
+    # Rolling cache of the most-recently-seen GT word0 for each CR register,
+    # keyed by CR index.  Updated on every ev_type that unambiguously carries a
+    # known CR's new GT value (CALL_CR6, CALL_CR14, RETURN_CR6, RETURN_CR14,
+    # CHANGE_CR12, CHANGE_CR5).  Included in fault snapshot POSTs so the IDE's
+    # Last Fault panel shows at least the call-path CRs rather than all-zero rows.
+    _cr_gt_cache = {}   # {cr_index: gt_word0}
 
     # ── UART ASCII console forwarding ────────────────────────────────────
     # Printable UART bytes (banner text etc.) are line-buffered and POSTed
@@ -1171,13 +1190,27 @@ def main():
                                      (f' ({_gt_label})' if _gt_label else ''))
                     else:
                         gt_str = ''
+
+                    # Update rolling CR GT cache from packets that unambiguously
+                    # carry a known CR's new GT value.  Done after the trace POST
+                    # so the packet is already delivered before we mutate state,
+                    # but before the fault check so a fault in the same packet
+                    # captures the register update that caused it.
+                    _cr_idx = _EV_TO_CR.get(ev_type)
+                    if _cr_idx is not None:
+                        _cr_gt_cache[_cr_idx] = payload_gt
+
                     if decoded['fault_valid']:
                         fault_str = f'  FAULT={_fault_name(decoded["fault_code"])}'
                         # Post a fault snapshot to the IDE so the Last Fault panel
                         # appears even when the hardware resets before the user polls.
-                        # The bridge has no full CR/DR state from trace packets alone,
-                        # so we post what is available: fault code, NIA, and source.
+                        # Include cached GT word0 values for all CRs seen so far in
+                        # this session (word1/word2 are not carried by trace packets
+                        # and are zeroed).  The IDE panel shows these as partial
+                        # register state rather than all-zero rows.
                         try:
+                            _cr_rows = [[_cr_gt_cache.get(i, 0), 0, 0]
+                                        for i in range(16)]
                             _fault_snap = {
                                 'fault_code':    decoded['fault_code'],
                                 'fault_message': _fault_name(decoded['fault_code']),
@@ -1189,6 +1222,7 @@ def main():
                                 'abstraction_label': str(decoded.get('gt_label', '') or ''),
                                 'abstraction_slot': None,
                                 'source':        'hardware',
+                                'cr':            _cr_rows,
                             }
                             _fault_snap.update({k: decoded[k] for k in
                                 ('pet_name', 'nia_label') if k in decoded})
