@@ -4908,17 +4908,34 @@ async function openLumpInEditor(token) {
         window._editorLumpDirtyToken       = null;
         window._editorLumpDirtyListener    = null;
         if (window.LumpRegistry) window.LumpRegistry.evictMemory(window.LumpRegistry.getCurrent());
-        // Remove banners and the button itself
+        // Remove banners and both lump-edit toolbar buttons
         var _db = document.getElementById('_lumpDraftBanner');
         if (_db) _db.remove();
+        var _slb = document.getElementById('btnToolbarSaveLump');
+        if (_slb) _slb.remove();
         _discardBtn.remove();
         if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
         if (typeof switchView === 'function') switchView('lumps');
     });
-    // Insert the Discard button into the toolbar, after the inline Compile button
+
+    // ── Inject / refresh Save Lump toolbar button ─────────────────────────
+    var _existingSaveBtn = document.getElementById('btnToolbarSaveLump');
+    if (_existingSaveBtn) _existingSaveBtn.remove();
+    var _saveLumpBtn = document.createElement('button');
+    _saveLumpBtn.id = 'btnToolbarSaveLump';
+    _saveLumpBtn.className = 'btn btn-sm lump-editor-save-btn';
+    _saveLumpBtn.setAttribute('data-tooltip', 'Save Lump — Compile first, then save the assembled LUMP to a namespace slot');
+    _saveLumpBtn.textContent = 'Save Lump';
+    _saveLumpBtn.disabled = true;
+    _saveLumpBtn.addEventListener('click', function() {
+        if (typeof showSaveToNamespace === 'function') showSaveToNamespace();
+    });
+
+    // Insert Discard then Save Lump into the toolbar, after the inline Compile button
     var _compileInlineBtn = document.getElementById('btnToolbarCompile');
     if (_compileInlineBtn && _compileInlineBtn.parentNode) {
         _compileInlineBtn.parentNode.insertBefore(_discardBtn, _compileInlineBtn.nextSibling);
+        _compileInlineBtn.parentNode.insertBefore(_saveLumpBtn, _discardBtn.nextSibling);
     }
 
     // Expose this lump's token so the C-List viewer can show its baked-in

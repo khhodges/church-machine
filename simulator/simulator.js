@@ -1040,6 +1040,26 @@ class ChurchSimulator {
         this._returnToBoot();
     }
 
+    /**
+     * _tier3Recovery(faultInfo)
+     *
+     * Double-fault escalation path: called when a fault fires while the
+     * machine is already in a faulted/recovery state, making a normal
+     * fault() halt inappropriate.  Instead of halting, immediately trigger
+     * a fault-recovery reboot (reason=2) so the boot sequence restarts
+     * cleanly without the machine staying permanently halted.
+     *
+     * Contract (enforced by sim_selftest_reboot_midrun.js):
+     *   • bootComplete === false after return  (set by _returnToBoot inside _fastBoot)
+     *   • halted       === false after return  (set by _returnToBoot inside _fastBoot)
+     *   • No entry added to faultLog           (caller may already have logged the fault)
+     *
+     * faultInfo — { type, message } — informational only; not persisted here.
+     */
+    _tier3Recovery(faultInfo) {
+        this._fastBoot(2);
+    }
+
     packNSWord1(limit17, bFlag, gBit, gtType, clistCount) {
         return (
             ((bFlag & 1) << 31) |

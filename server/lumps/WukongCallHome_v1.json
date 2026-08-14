@@ -45,5 +45,6 @@
       "length": 3,
       "description": "Run SelfTest, register result with Tunnel, return to IDE."
     }
-  ]
+  ],
+  "binary_hash": "bdd84cdd1a907ef6b9b1af9c962b2016c0293912dc5eaa04f3dac248e3216038"
 }

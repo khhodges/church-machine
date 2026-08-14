@@ -11,7 +11,7 @@
   "cc": 1,
   "profile": "IoT",
   "language": "assembly",
-  "description": "Post-Flash Exhaustive Self-Test — 81 hardware correctness tests (DR independence, ALU, shifts, branches, BFEXT/BFINS, TPERM, CHANGE, LOAD). DR0=0 on full pass, DR0=N on first failure.",
+  "description": "Post-Flash Exhaustive Self-Test \u2014 81 hardware correctness tests (DR independence, ALU, shifts, branches, BFEXT/BFINS, TPERM, CHANGE, LOAD). DR0=0 on full pass, DR0=N on first failure.",
   "capabilities": [
     {
       "name": "SelfTest",
@@ -20,7 +20,7 @@
       ],
       "gt": "0x4A000006",
       "ns_slot": 6,
-      "note": "SelfTest E-GT — loaded into CR1 for TPERM and EXACT cross-checks (POLA minimum)"
+      "note": "SelfTest E-GT \u2014 loaded into CR1 for TPERM and EXACT cross-checks (POLA minimum)"
     }
   ],
   "grants": [
@@ -28,5 +28,6 @@
   ],
   "author": "Church Machine",
   "version": "1.1",
-  "lump_version": 0
+  "lump_version": 0,
+  "binary_hash": "14fc14beaf2d8e99edb46f231cd5923d76afcf19cc604a566929dd97e8fdc0a4"
 }

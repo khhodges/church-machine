@@ -660,6 +660,10 @@ function onLangChange(restoring) {
     const btnSaveNS = document.getElementById('btnSaveNS');
     const _hasMemLump = !!(window.LumpRegistry?.resolve(window.LumpRegistry?.getCurrent())?.sources?.memory);
     if (btnSaveNS) btnSaveNS.disabled = (lang !== 'assembly' || !_hasMemLump);
+    // btnToolbarSaveLump is intentionally NOT enabled here — it requires a fresh
+    // compile (lastAssembledWords non-empty) to avoid the "assemble first" guard
+    // in showSaveToNamespace().  It is enabled only by the explicit compile-success
+    // paths in app-run.js.
     const btnExportLump = document.getElementById('btnExportLump');
     if (btnExportLump) btnExportLump.disabled = (lang !== 'assembly' || !_hasMemLump);
 

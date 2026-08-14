@@ -404,6 +404,8 @@ function assembleAndLoad() {
         showNextSteps('assembled');
         const saveBtn = document.getElementById('btnSaveNS');
         if (saveBtn) saveBtn.disabled = false;
+        const _toolbarSaveBtn0 = document.getElementById('btnToolbarSaveLump');
+        if (_toolbarSaveBtn0) _toolbarSaveBtn0.disabled = false;
         const _expBtn0 = document.getElementById('btnExportLump');
         if (_expBtn0) _expBtn0.disabled = false;
         updateDashboard();
@@ -433,6 +435,8 @@ function assembleAndLoad() {
         if (window.LumpRegistry) window.LumpRegistry.evictMemory(window.LumpRegistry.getCurrent());
         const _errSaveBtn = document.getElementById('btnSaveNS');
         if (_errSaveBtn) _errSaveBtn.disabled = true;
+        const _errToolbarSaveBtn = document.getElementById('btnToolbarSaveLump');
+        if (_errToolbarSaveBtn) _errToolbarSaveBtn.disabled = true;
         const _errExpBtn = document.getElementById('btnExportLump');
         if (_errExpBtn) _errExpBtn.disabled = true;
         switchCodeTab('console');
@@ -511,6 +515,8 @@ function assembleAndLoad() {
 
     const saveBtn = document.getElementById('btnSaveNS');
     if (saveBtn) saveBtn.disabled = false;
+    const _toolbarSaveBtn = document.getElementById('btnToolbarSaveLump');
+    if (_toolbarSaveBtn) _toolbarSaveBtn.disabled = false;
     const _expBtn = document.getElementById('btnExportLump');
     if (_expBtn) _expBtn.disabled = false;
 
@@ -10529,7 +10535,11 @@ function confirmCreateNamespace() {
 
 function showSaveToNamespace() {
     if (!lastAssembledWords || lastAssembledWords.length === 0) {
-        alert('Assemble code first before saving to namespace.');
+        // Nothing assembled yet — trigger a compile so the user ends up in
+        // the right state.  After compile succeeds the Save-to-NS button
+        // (both toolbar and ham-menu) will be re-enabled; the user can then
+        // click Save Lump / Save to NS again without an interrupting alert.
+        if (typeof smartCompile === 'function') smartCompile();
         return;
     }
     const slotSel = document.getElementById('saveNSSlot');
