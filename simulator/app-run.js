@@ -10534,11 +10534,15 @@ function confirmCreateNamespace() {
 }
 
 function showSaveToNamespace() {
-    if (!lastAssembledWords || lastAssembledWords.length === 0) {
-        // Nothing assembled yet — trigger a compile so the user ends up in
-        // the right state.  After compile succeeds the Save-to-NS button
-        // (both toolbar and ham-menu) will be re-enabled; the user can then
-        // click Save Lump / Save to NS again without an interrupting alert.
+    // Use LumpRegistry as the authoritative source — the compile path
+    // (app-run.js ~L464) registers words there, NOT into lastAssembledWords.
+    // lastAssembledWords is only written by app-absdetail.js and is always
+    // null after a normal editor compile, so it must not be used as a gate.
+    const _guardMem = window.LumpRegistry
+        ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())?.sources?.memory
+        : null;
+    if (!_guardMem || !(_guardMem.words && _guardMem.words.length)) {
+        // Nothing compiled yet — trigger compile; buttons re-enable on success.
         if (typeof smartCompile === 'function') smartCompile();
         return;
     }
