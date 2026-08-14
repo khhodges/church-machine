@@ -7196,9 +7196,13 @@ tL81:
 ; ═══════════════════════════════════════════════════════════════════════════════
 done:
     ISUB DR0, DR0, DR0      ; DR0 = 0 (all tests passed)
+    TPERM CR0, FRAME        ; is there a real caller frame? (called via ELOADCALL, not boot)
+    BRANCHEQ ec_return      ; yes — RETURN with DR0 result to ELOADCALL caller
     TPERM CR0, E            ; is Thread.caps[0] a valid E-GT?
     BRANCHEQ launch         ; yes — dispatch to programmer's first abstraction
     BRANCH AL, start        ; no — loop and re-run all 81 tests
+ec_return:
+    RETURN                  ; return DR0 (0=all pass, N=first fail) to ELOADCALL caller
 launch:
     CALL CR0                ; enter programmer's first abstraction`,
         'gt_v1_1_test': `; GT Encoding v1.1 Hardware Self-Test

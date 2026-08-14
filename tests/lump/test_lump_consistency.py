@@ -554,7 +554,7 @@ SELFTEST_LUMP_CASES = [
 
 # cc=1 lumps: single SelfTest E-GT at slot 0 (POLA redesign — no Boot.Nucs needed)
 SELFTEST_LUMP_CASES_CC1 = [
-    ("4c7380cb", "PostFlashSelftest"),
+    ("25dd1fb5", "PostFlashSelftest"),
     ("00000600", "SelfTest"),
 ]
 
@@ -829,7 +829,12 @@ class TestR16_AbstractionNameMatchesRegistry:
         collision that happens to reuse the same string. Remove stale
         entries instead of leaving them in place.
         """
-        current_abstraction_names = {t[2] for t in ABSTRACTION_CHECK_TARGETS}
+        # Include all manifest entries (not just static-slot ones) so that
+        # dynamic/NULL-slot lumps like PostFlashSelftest (ns_slot=null) are
+        # counted — _abstraction_check_targets() deliberately excludes them
+        # from the registry-match check, but they are still real, living lumps.
+        all_manifest_names = {e.get("abstraction") for e in MANIFEST if e.get("abstraction")}
+        current_abstraction_names = {t[2] for t in ABSTRACTION_CHECK_TARGETS} | all_manifest_names
         assert allowlisted_name in current_abstraction_names, (
             f"KNOWN_NON_REGISTRY_ABSTRACTIONS entry {allowlisted_name!r} no longer "
             "matches any current manifest/sidecar `abstraction` field.\n"
