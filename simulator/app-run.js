@@ -12797,8 +12797,9 @@ function confirmSaveToNamespace() {
 
     // Compute and store the token for the just-saved lump so "Open Lump"
     // navigates by token after a Save to NS (Step 2 of token-first navigation).
+    let _svTok = null;
     if (typeof window._computeLumpToken === 'function') {
-        const _svTok = window._computeLumpToken(_svWords, _caps);
+        _svTok = window._computeLumpToken(_svWords, _caps);
         if (window.LumpRegistry) {
             const _svLabel = (sim.nsLabels && sim.nsLabels[idx]) ? sim.nsLabels[idx] : label;
             window.LumpRegistry.registerMemory(_svTok, _svLabel, _svWords, _caps);
@@ -12813,6 +12814,14 @@ function confirmSaveToNamespace() {
         con.scrollTop = con.scrollHeight;
     }
     updateDashboard();
+
+    // Show a toast with an "Open Lump" shortcut so the user can immediately
+    // inspect the saved lump without navigating away manually.
+    const _toastBody = `NS[${idx}] "${label}" — ${_svWords.length} word${_svWords.length === 1 ? '' : 's'}`;
+    const _toastAction = _svTok && typeof showLumpDetail === 'function'
+        ? { label: '📂 Open Lump', onClick: function() { showLumpDetail(_svTok); } }
+        : null;
+    _showFpgaToast('Lump Saved', _toastBody, 'ok', 9000, _toastAction);
 }
 
 
