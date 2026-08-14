@@ -2243,3 +2243,152 @@
     background: rgba(20, 30, 50, 0.8);
 }
 
+/* ── Last Fault Panel ────────────────────────────────────────────────────── */
+/* Persistent collapsible panel shown after a fault-triggered ReBoot.
+   Survives the reboot animation; dismissed by user click or next manual reset. */
+
+.last-fault-panel {
+    background: rgba(60, 15, 15, 0.92);
+    border: 1px solid rgba(220, 60, 60, 0.45);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.82rem;
+    color: #d8c0c0;
+    overflow: hidden;
+}
+
+.last-fault-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 10px;
+    background: rgba(180, 30, 30, 0.28);
+    border-bottom: 1px solid rgba(220, 60, 60, 0.3);
+    font-weight: 700;
+    color: #e87070;
+    letter-spacing: 0.04em;
+    font-size: 0.8rem;
+}
+
+.last-fault-panel-dismiss {
+    background: transparent;
+    border: 1px solid rgba(220, 100, 100, 0.4);
+    border-radius: 4px;
+    color: #c08080;
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    font-family: inherit;
+}
+
+.last-fault-panel-dismiss:hover {
+    background: rgba(200, 60, 60, 0.25);
+    color: #f09090;
+    border-color: rgba(220, 80, 80, 0.7);
+}
+
+.last-fault-panel-body {
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.lf-row {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    line-height: 1.6;
+}
+
+.lf-label {
+    min-width: 100px;
+    color: #a09090;
+    font-size: 0.78rem;
+    flex-shrink: 0;
+}
+
+.lf-value {
+    color: #e0d0d0;
+    word-break: break-all;
+}
+
+.lf-fault-type {
+    color: #f08080;
+    font-weight: 600;
+}
+
+.lf-nia {
+    color: #80c0e0;
+    font-weight: 600;
+}
+
+.lf-dim {
+    color: #907070;
+    font-size: 0.76rem;
+}
+
+.lf-section {
+    margin-top: 6px;
+    border: 1px solid rgba(180, 60, 60, 0.25);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.lf-section > summary {
+    padding: 4px 8px;
+    cursor: pointer;
+    color: #c0a0a0;
+    font-size: 0.78rem;
+    background: rgba(80, 20, 20, 0.4);
+    user-select: none;
+}
+
+.lf-section > summary:hover {
+    color: #e0c0c0;
+}
+
+.lf-cr-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.76rem;
+    margin: 4px 0 2px 0;
+}
+
+.lf-cr-table th {
+    color: #907080;
+    text-align: left;
+    padding: 2px 6px;
+    border-bottom: 1px solid rgba(180, 60, 60, 0.2);
+    font-weight: 600;
+}
+
+.lf-cr-table td {
+    padding: 2px 6px;
+    font-family: var(--font-mono, monospace);
+    color: #d0b8b8;
+    border-bottom: 1px solid rgba(100, 40, 40, 0.15);
+}
+
+.lf-cr-null td {
+    color: #604040;
+}
+
+.lf-dr-list {
+    padding: 6px 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.lf-dr-entry {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.76rem;
+    color: #d0b8b8;
+    background: rgba(80, 20, 20, 0.3);
+    border-radius: 3px;
+    padding: 1px 5px;
+}
+

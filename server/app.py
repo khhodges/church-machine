@@ -10230,6 +10230,95 @@ def wukong_relay_post():
     return jsonify({'ok': True, 'enabled': enabled, 'source_url': validated_url})
 
 
+# ── Fault snapshot (simulator + hardware path) ───────────────────────────────
+# Holds the most recent fault snapshot for the session.  Written by:
+#   • POST /api/fault-snapshot  — simulator (before _returnToBoot) or bridge
+#   • POST /hardware/wukong/snapshot with is_fault_snapshot=true (bridge alias)
+# Read by GET; cleared by DELETE or overwritten by the next POST.
+_fault_snapshot = None
+_fault_snapshot_lock = _wk_threading.Lock()
+
+
+@app.route('/api/fault-snapshot', methods=['POST'])
+def fault_snapshot_post():
+    """Receive a fault snapshot from the simulator or hardware bridge.
+
+    Accepted fields (all optional except the required snapshot shape):
+        fault_code    (int)   — structured fault code (e.g. BOUNDS=0x03)
+        fault_message (str)   — human-readable fault description
+        nia           (int)   — faulting instruction address
+        pc            (int)   — simulator logical PC at fault
+        cr            (list)  — 16 × [word0, word1, word2] capability registers
+        dr            (list)  — 16 data register values
+        flags         (int)   — NZCV flag byte
+        call_depth    (int)   — call stack depth at fault
+        led_bits      (int)   — LED register at fault
+        abstraction_label (str) — NS label of the faulting abstraction
+        abstraction_slot  (int) — NS slot index of the faulting abstraction
+        source        (str)   — 'simulator' | 'hardware'
+        ts            (float) — Unix timestamp
+    """
+    global _fault_snapshot
+    data = request.get_json(silent=True) or {}
+    import time as _ft_time
+    entry = {
+        'fault_code':        int(data.get('fault_code', 0)),
+        'fault_message':     str(data.get('fault_message', '') or ''),
+        'nia':               int(data.get('nia', 0)),
+        'pc':                int(data.get('pc', 0)),
+        'flags':             int(data.get('flags', 0)),
+        'call_depth':        int(data.get('call_depth', 0)),
+        'led_bits':          int(data.get('led_bits', 0)),
+        'abstraction_label': str(data.get('abstraction_label', '') or ''),
+        'abstraction_slot':  (int(data['abstraction_slot'])
+                              if data.get('abstraction_slot') is not None else None),
+        'source':            str(data.get('source', 'simulator')),
+        'ts':                float(data.get('ts', _ft_time.time())),
+    }
+    # CR registers: accept either 16×[w0,w1,w2] list or absence (store null rows).
+    raw_cr = data.get('cr')
+    if isinstance(raw_cr, list) and len(raw_cr) == 16:
+        try:
+            entry['cr'] = [[int(w) & 0xFFFFFFFF for w in (row if len(row) >= 3 else row + [0]*(3-len(row)))]
+                           for row in raw_cr]
+        except (TypeError, ValueError):
+            entry['cr'] = None
+    else:
+        entry['cr'] = None
+    # DR registers: accept 16-element list.
+    raw_dr = data.get('dr')
+    if isinstance(raw_dr, list) and len(raw_dr) == 16:
+        try:
+            entry['dr'] = [int(v) & 0xFFFFFFFF for v in raw_dr]
+        except (TypeError, ValueError):
+            entry['dr'] = None
+    else:
+        entry['dr'] = None
+
+    with _fault_snapshot_lock:
+        _fault_snapshot = entry
+    return jsonify({'ok': True})
+
+
+@app.route('/api/fault-snapshot', methods=['GET'])
+def fault_snapshot_get():
+    """Return the most recent fault snapshot, or 404 if none recorded."""
+    with _fault_snapshot_lock:
+        snap = _fault_snapshot
+    if snap is None:
+        return jsonify({'ok': False, 'error': 'no fault snapshot'}), 404
+    return jsonify(snap)
+
+
+@app.route('/api/fault-snapshot', methods=['DELETE'])
+def fault_snapshot_delete():
+    """Clear the stored fault snapshot (user dismissed the panel)."""
+    global _fault_snapshot
+    with _fault_snapshot_lock:
+        _fault_snapshot = None
+    return jsonify({'ok': True})
+
+
 @app.route('/hardware/wukong/trace', methods=['POST'])
 def wukong_trace_post():
     """Bridge posts a decoded 12-byte trace packet here.

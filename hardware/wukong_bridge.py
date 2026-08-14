@@ -1173,6 +1173,30 @@ def main():
                         gt_str = ''
                     if decoded['fault_valid']:
                         fault_str = f'  FAULT={_fault_name(decoded["fault_code"])}'
+                        # Post a fault snapshot to the IDE so the Last Fault panel
+                        # appears even when the hardware resets before the user polls.
+                        # The bridge has no full CR/DR state from trace packets alone,
+                        # so we post what is available: fault code, NIA, and source.
+                        try:
+                            _fault_snap = {
+                                'fault_code':    decoded['fault_code'],
+                                'fault_message': _fault_name(decoded['fault_code']),
+                                'nia':           decoded['nia'],
+                                'pc':            decoded['nia'],
+                                'flags':         decoded.get('flags', 0),
+                                'call_depth':    0,
+                                'led_bits':      0,
+                                'abstraction_label': str(decoded.get('gt_label', '') or ''),
+                                'abstraction_slot': None,
+                                'source':        'hardware',
+                            }
+                            _fault_snap.update({k: decoded[k] for k in
+                                ('pet_name', 'nia_label') if k in decoded})
+                            requests.post(
+                                f'{ide_base}/api/fault-snapshot',
+                                json=_fault_snap, timeout=1, verify=verify_tls)
+                        except Exception as _fse:
+                            print(f'  [fault-snapshot POST error] {_fse}')
                     else:
                         fault_str = ''
                     bp_str = '  [BP HIT]' if decoded['bp_hit'] else ''

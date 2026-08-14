@@ -861,6 +861,11 @@ function init() {
     sim.on('stateChange', () => { updateDashboard(); updateLedStrip(); updateToolbarIdeBadge(); if (currentView === 'gt-view') renderGTView(); });
     sim.on('step', _traceRecordStep);
     sim.on('reset', clearTrace);
+    // Register the Last Fault panel listener here — sim is null during
+    // app-run.js evaluation, so the listener must be wired after init().
+    if (typeof _onSimFaultSnapshot === 'function') {
+        sim.on('faultSnapshot', _onSimFaultSnapshot);
+    }
     // Task #217: every reset rebuilds memory[] from scratch via
     // _initNamespaceTable. If a programmer-generated boot image is
     // available, overlay it now so the simulator runs from the

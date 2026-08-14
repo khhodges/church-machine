@@ -1922,6 +1922,95 @@ console.log('\n--- T019: STUB_METHOD fault (all-RETURN stub LUMP) ---');
         sim.halted === true);
 }
 
+// ── T012: Fault snapshot capture before _returnToBoot() ──────────────────────
+//
+// Verifies that _fastBoot(2) emits a 'faultSnapshot' event BEFORE calling
+// _returnToBoot(), and that the emitted snapshot contains the right fields
+// derived from the most recent faultLog entry.
+//
+// Test strategy (no HTTP server needed):
+//   1. Trigger a BOUNDS fault so faultLog has one entry with full state.
+//   2. Register a one-shot 'faultSnapshot' listener on sim before calling
+//      _fastBoot(2), capturing the emitted snapshot synchronously.
+//   3. Assert all required snapshot fields are present and match faultLog.
+//   4. Call _returnToBoot() manually (as _fastBoot already did) and verify
+//      the captured snapshot was NOT mutated (state was captured before clear).
+//
+// The test does NOT make HTTP requests because the server is not running in
+// unit-test mode.  The POST logic is exercised by the browser-context app-run.js
+// listener registered on the same 'faultSnapshot' event.
+console.log('\n--- T012: faultSnapshot event emitted before _returnToBoot() ---');
+{
+    const { sim: t12sim } = makeTestSim();
+
+    // Set up minimal state so the snapshot has non-trivial values.
+    t12sim.pc         = 0x00001234;
+    t12sim.physicalPC = 0x00001234;
+    t12sim.ledBits    = 0b101010;
+    t12sim.callStack  = [{ sz: 2, returnPC: 10, savedSTO: 243, frameWord: 0 }];
+
+    // Give CR14 a non-null word0 so faultingAbstractionSlot is resolved.
+    t12sim.cr[14] = { word0: (1 << 25) | 7, word1: 0x00010000, word2: 0, word3: 0, m: 0 };
+    t12sim.nsLabels[7] = 'TestAbstraction';
+
+    // DR3 = known value so the drSnapshot check passes.
+    t12sim.dr[3] = 0xDEADBEEF >>> 0;
+
+    // Inject a BOUNDS fault — this populates faultLog with a full entry.
+    t12sim.fault('BOUNDS', 'Test bounds fault for snapshot (T012)');
+
+    check('T012a: faultLog has one entry after fault()', t12sim.faultLog.length === 1);
+    check('T012b: faultCode is BOUNDS code',
+        t12sim.faultLog[0].faultCode === ChurchSimulator.FAULT_CODES.BOUNDS);
+
+    // Capture the 'faultSnapshot' event emitted by _fastBoot(2).
+    let t12snap = null;
+    t12sim.on('faultSnapshot', function(snap) { t12snap = snap; });
+
+    // _fastBoot(2) emits the snapshot synchronously before _returnToBoot().
+    t12sim._fastBoot(2);
+
+    check('T012c: faultSnapshot event was emitted', t12snap !== null);
+
+    // Required fields
+    check('T012d: snap.source === "simulator"', t12snap && t12snap.source === 'simulator');
+    check('T012e: snap.fault_code matches BOUNDS',
+        t12snap && t12snap.fault_code === ChurchSimulator.FAULT_CODES.BOUNDS);
+    check('T012f: snap.fault_message matches fault() message',
+        t12snap && t12snap.fault_message === 'Test bounds fault for snapshot (T012)');
+    check('T012g: snap.nia matches PC at fault time',
+        t12snap && snap_nia_ok(t12snap));
+    check('T012h: snap.cr is a 16-element array',
+        t12snap && Array.isArray(t12snap.cr) && t12snap.cr.length === 16);
+    check('T012i: at least one CR row has a non-zero word0 (CR14 was set)',
+        t12snap && t12snap.cr.some(function(row) { return row && row[0] !== 0; }));
+    check('T012j: snap.dr is a 16-element array',
+        t12snap && Array.isArray(t12snap.dr) && t12snap.dr.length === 16);
+    check('T012k: snap.dr[3] === 0xDEADBEEF (captured before clear)',
+        t12snap && (t12snap.dr[3] >>> 0) === (0xDEADBEEF >>> 0));
+    check('T012l: snap.call_depth === 1 (one frame on stack at fault)',
+        t12snap && t12snap.call_depth === 1);
+    check('T012m: snap.led_bits === 0b101010',
+        t12snap && t12snap.led_bits === 0b101010);
+    check('T012n: snap.abstraction_label is a string',
+        t12snap && typeof t12snap.abstraction_label === 'string');
+    check('T012o: snap.ts is a positive number (Unix timestamp)',
+        t12snap && typeof t12snap.ts === 'number' && t12snap.ts > 0);
+
+    // After _fastBoot, _returnToBoot() has run — simulator state is cleared.
+    check('T012p: pc reset to 0 after _fastBoot (state cleared)',
+        t12sim.pc === 0);
+    check('T012q: callStack cleared after _fastBoot',
+        t12sim.callStack.length === 0);
+    check('T012r: captured snapshot is unchanged (snapshot predates state clear)',
+        t12snap && (t12snap.dr[3] >>> 0) === (0xDEADBEEF >>> 0));
+
+    function snap_nia_ok(snap) {
+        // nia should equal the PC that was set at fault time (0x1234).
+        return snap.nia === 0x00001234 || snap.pc === 0x00001234;
+    }
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

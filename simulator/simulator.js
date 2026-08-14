@@ -997,6 +997,46 @@ class ChurchSimulator {
             result: 'pass',
             stepCtx: 'PP250_FAST_BOOT',
         });
+
+        // ── Fault snapshot capture (before state is wiped) ──────────────────
+        // Build snapshot from the most recent faultLog entry so the IDE can
+        // display a persistent "Last Fault" panel across the reboot boundary.
+        // State is captured synchronously here; the POST is async/fire-and-forget.
+        if (reason === 2 && this.faultLog && this.faultLog.length > 0) {
+            const _last = this.faultLog[this.faultLog.length - 1];
+            const _snap = {
+                fault_code:        _last.faultCode != null ? _last.faultCode : 0,
+                fault_message:     _last.message   || '',
+                nia:               _last.pc         != null ? _last.pc : 0,
+                pc:                _last.pc         != null ? _last.pc : 0,
+                flags:             (_last.flagsSnapshot
+                    ? (((_last.flagsSnapshot.N ? 8 : 0) |
+                        (_last.flagsSnapshot.Z ? 4 : 0) |
+                        (_last.flagsSnapshot.C ? 2 : 0) |
+                        (_last.flagsSnapshot.V ? 1 : 0)) >>> 0) : 0),
+                call_depth:        this.callStack ? this.callStack.length : 0,
+                led_bits:          this.ledBits || 0,
+                abstraction_label: _last.faultingAbstractionLabel || '',
+                abstraction_slot:  _last.faultingAbstractionSlot  != null
+                    ? _last.faultingAbstractionSlot : null,
+                source:            'simulator',
+                ts:                Date.now() / 1000,
+            };
+            // CRs: emit as [[word0,word1,word2], ...] matching the hardware snapshot schema.
+            if (_last.crSnapshot && _last.crSnapshot.length === 16) {
+                _snap.cr = _last.crSnapshot.map(function(c) {
+                    return c ? [(c.word0 >>> 0), (c.word1 >>> 0), (c.word2 >>> 0)] : [0, 0, 0];
+                });
+            }
+            // DRs: flat array of 16 ints.
+            if (_last.drSnapshot && _last.drSnapshot.length === 16) {
+                _snap.dr = _last.drSnapshot.map(function(v) { return v >>> 0; });
+            }
+            // Emit event so app-run.js can POST to the server.  This fires
+            // synchronously before _returnToBoot() clears any further state.
+            this.emit('faultSnapshot', _snap);
+        }
+
         this._returnToBoot();
     }
 

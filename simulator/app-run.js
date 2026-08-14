@@ -1596,6 +1596,11 @@ function slowBoot() {
                     // Skips slots where isNSEntryValid() is true so boot-image
                     // catalog entries always take precedence over saved labels.
                     if (typeof loadNamespaceState === 'function') loadNamespaceState();
+                    // Show last-fault panel if a fault snapshot was recorded
+                    // before this reboot (survives the reboot animation).
+                    if (typeof _fetchAndShowLastFaultPanel === 'function') {
+                        _fetchAndShowLastFaultPanel();
+                    }
                 }
                 updateDashboard();
                 if (!sim.halted) {
@@ -3199,6 +3204,42 @@ function faultModalReboot() {
     faultModalDismiss();
     _lastFault = null;
     faultAlertOff();
+    // Capture and post a fault snapshot BEFORE clearing faultLog and resetting,
+    // so the Last Fault panel can show full CR/DR state across the reboot.
+    // This covers the common user-triggered reboot path (Reboot button in the
+    // fault modal); the tier-3 escalation path is handled by _fastBoot(2) in
+    // simulator.js via the 'faultSnapshot' event.
+    if (typeof _onSimFaultSnapshot === 'function' &&
+            sim && sim.faultLog && sim.faultLog.length > 0) {
+        const _lfe = sim.faultLog[sim.faultLog.length - 1];
+        const _snap = {
+            fault_code:        _lfe.faultCode != null ? _lfe.faultCode : 0,
+            fault_message:     _lfe.message   || '',
+            nia:               _lfe.pc         != null ? _lfe.pc : 0,
+            pc:                _lfe.pc         != null ? _lfe.pc : 0,
+            flags:             (_lfe.flagsSnapshot
+                ? (((_lfe.flagsSnapshot.N ? 8 : 0) |
+                    (_lfe.flagsSnapshot.Z ? 4 : 0) |
+                    (_lfe.flagsSnapshot.C ? 2 : 0) |
+                    (_lfe.flagsSnapshot.V ? 1 : 0)) >>> 0) : 0),
+            call_depth:        sim.callStack ? sim.callStack.length : 0,
+            led_bits:          sim.ledBits || 0,
+            abstraction_label: _lfe.faultingAbstractionLabel || '',
+            abstraction_slot:  _lfe.faultingAbstractionSlot  != null
+                ? _lfe.faultingAbstractionSlot : null,
+            source:            'simulator',
+            ts:                Date.now() / 1000,
+        };
+        if (_lfe.crSnapshot && _lfe.crSnapshot.length === 16) {
+            _snap.cr = _lfe.crSnapshot.map(function(c) {
+                return c ? [(c.word0 >>> 0), (c.word1 >>> 0), (c.word2 >>> 0)] : [0, 0, 0];
+            });
+        }
+        if (_lfe.drSnapshot && _lfe.drSnapshot.length === 16) {
+            _snap.dr = _lfe.drSnapshot.map(function(v) { return v >>> 0; });
+        }
+        _onSimFaultSnapshot(_snap);
+    }
     if (sim && sim.faultLog) sim.faultLog = [];
     try { localStorage.removeItem(_FAULT_LOG_LS_KEY); } catch(e) {}
     if (pipelineViz) pipelineViz.setNIA(null);
@@ -3569,6 +3610,8 @@ function resetSim() {
     if (!window._startupDefaultView) switchView('dashboard');
     _lastFault = null;
     faultAlertOff();
+    // Manual reset — clear last-fault panel and server snapshot.
+    if (typeof _hideLastFaultPanel === 'function') _hideLastFaultPanel(true);
     if (sim && sim.faultLog) sim.faultLog = [];
     try { localStorage.removeItem(_FAULT_LOG_LS_KEY); } catch(e) {}
     if (pipelineViz) pipelineViz.setNIA(null);
@@ -15757,6 +15800,35 @@ function _wukongAppendTrace(data) {
             }
         }
         if (typeof updateFlagsDisplay === 'function') updateFlagsDisplay();
+        // ── Show Last Fault panel immediately in the open IDE ─────────────
+        // Build the snapshot directly from the trace event so the panel
+        // appears without an extra server round-trip.  The bridge also POSTs
+        // to /api/fault-snapshot for reload/cross-client persistence, but
+        // the panel in the current session is driven from local event data.
+        if (typeof _showLastFaultPanel === 'function') {
+            const _hwFaultSnap = {
+                fault_code:        data.fault_code || 0,
+                fault_message:     _WUKONG_FAULT_NAMES[data.fault_code] ||
+                                   ('FAULT_' + (data.fault_code || 0)),
+                nia:               (data.nia >>> 0),
+                pc:                (data.nia >>> 0),
+                flags:             data.flags || 0,
+                call_depth:        data.call_depth || 0,
+                led_bits:          0,
+                abstraction_label: String(data.gt_label || data.nia_label || ''),
+                abstraction_slot:  null,
+                source:            'hardware',
+                ts:                data.ts || (Date.now() / 1000),
+            };
+            _lastFaultSnapshotDismissed = false;
+            _showLastFaultPanel(_hwFaultSnap);
+            // POST to server for page-reload / cross-client persistence.
+            fetch('/api/fault-snapshot', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(_hwFaultSnap),
+            }).catch(function() {});
+        }
     } else if (!data.fault_valid && _wukongPrevFaultValid) {
         _wukongHideFaultPanel();
         _wukongHwFaulted = false;
@@ -16578,3 +16650,184 @@ function _wukongSyncFaultDisasmPanel(faultValid, niaInt) {
         if (disasmBody) disasmBody.style.opacity = '0.4';
     }
 }
+
+// ── Last Fault Panel ─────────────────────────────────────────────────────────
+// Displays a persistent, collapsible "Last Fault" panel in the IDE after any
+// fault-triggered ReBoot (simulator or hardware).  The panel survives the
+// reboot and the subsequent boot animation.  It is auto-dismissed on the
+// NEXT fault or a manual page reset — not on reboot.
+
+let _lastFaultSnapshotData  = null;   // Most-recent snapshot received
+let _lastFaultSnapshotDismissed = false; // True after user clicks Dismiss
+
+/**
+ * Build the CR/DR table HTML from a fault snapshot object.
+ */
+function _buildLastFaultPanelHTML(snap) {
+    var html = '';
+    var faultCode = snap.fault_code || 0;
+    var faultMsg  = snap.fault_message || '';
+    var nia       = (snap.nia >>> 0);
+    var niaStr    = '0x' + nia.toString(16).toUpperCase().padStart(8, '0');
+    var absLabel  = snap.abstraction_label || '';
+    var absSlot   = snap.abstraction_slot != null ? snap.abstraction_slot : null;
+    var callDepth = snap.call_depth || 0;
+    var ledBits   = (snap.led_bits >>> 0);
+    var source    = snap.source || 'simulator';
+
+    // Fault reason line
+    html += '<div class="lf-row">' +
+        '<span class="lf-label">Fault</span>' +
+        '<span class="lf-value lf-fault-type">' + _escHtml(faultMsg || ('Code 0x' + faultCode.toString(16))) + '</span>' +
+        '</div>';
+    html += '<div class="lf-row">' +
+        '<span class="lf-label">NIA</span>' +
+        '<span class="lf-value lf-nia">' + _escHtml(niaStr) + '</span>' +
+        '</div>';
+    if (absLabel) {
+        html += '<div class="lf-row">' +
+            '<span class="lf-label">Abstraction</span>' +
+            '<span class="lf-value">' + _escHtml(absLabel) +
+            (absSlot !== null ? ' <span class="lf-dim">(NS[' + absSlot + '])</span>' : '') +
+            '</span></div>';
+    }
+    html += '<div class="lf-row">' +
+        '<span class="lf-label">Call depth</span>' +
+        '<span class="lf-value">' + callDepth + '</span>' +
+        '</div>';
+    html += '<div class="lf-row">' +
+        '<span class="lf-label">LEDs</span>' +
+        '<span class="lf-value lf-dim">0b' + ledBits.toString(2).padStart(6, '0') + '</span>' +
+        '</div>';
+    html += '<div class="lf-row">' +
+        '<span class="lf-label">Source</span>' +
+        '<span class="lf-value lf-dim">' + _escHtml(source) + '</span>' +
+        '</div>';
+
+    // CR table (collapsible)
+    if (Array.isArray(snap.cr) && snap.cr.length === 16) {
+        html += '<details class="lf-section"><summary>Capability Registers (CR0–CR15)</summary>';
+        html += '<table class="lf-cr-table"><thead><tr><th>Reg</th><th>Word0</th><th>Word1</th><th>Word2</th></tr></thead><tbody>';
+        for (var i = 0; i < 16; i++) {
+            var row = snap.cr[i] || [0, 0, 0];
+            var w0 = (row[0] >>> 0), w1 = (row[1] >>> 0), w2 = (row[2] >>> 0);
+            var isNull = w0 === 0 && w1 === 0 && w2 === 0;
+            html += '<tr class="' + (isNull ? 'lf-cr-null' : '') + '">' +
+                '<td>CR' + i + '</td>' +
+                '<td>' + (isNull ? '—' : '0x' + w0.toString(16).toUpperCase().padStart(8, '0')) + '</td>' +
+                '<td>' + (isNull ? '' : '0x' + w1.toString(16).toUpperCase().padStart(8, '0')) + '</td>' +
+                '<td>' + (isNull ? '' : '0x' + w2.toString(16).toUpperCase().padStart(8, '0')) + '</td>' +
+                '</tr>';
+        }
+        html += '</tbody></table></details>';
+    }
+
+    // DR list (collapsible)
+    if (Array.isArray(snap.dr) && snap.dr.length === 16) {
+        html += '<details class="lf-section"><summary>Data Registers (DR0–DR15)</summary>';
+        html += '<div class="lf-dr-list">';
+        for (var j = 0; j < 16; j++) {
+            var dv = (snap.dr[j] >>> 0);
+            html += '<span class="lf-dr-entry"><span class="lf-dim">DR' + j + '</span> ' +
+                (dv === 0 ? '<span class="lf-dim">0</span>' : '0x' + dv.toString(16).toUpperCase().padStart(8, '0')) +
+                '</span>';
+        }
+        html += '</div></details>';
+    }
+
+    return html;
+}
+
+/**
+ * Remove the "Last Fault" panel from the DOM and optionally clear state.
+ */
+function _hideLastFaultPanel(clearState) {
+    var panel = document.getElementById('last-fault-panel');
+    if (panel) panel.remove();
+    if (clearState) {
+        _lastFaultSnapshotData = null;
+        _lastFaultSnapshotDismissed = false;
+        // Best-effort DELETE to clear server-side snapshot.
+        try {
+            fetch('/api/fault-snapshot', { method: 'DELETE' }).catch(function() {});
+        } catch(e) {}
+    }
+}
+
+/**
+ * Render the "Last Fault" panel above the editor console using snap data.
+ */
+function _showLastFaultPanel(snap) {
+    if (_lastFaultSnapshotDismissed) return;
+    var con = document.getElementById('editorConsole');
+    if (!con || !con.parentNode) return;
+
+    _lastFaultSnapshotData = snap;
+
+    // Remove any previous instance before re-rendering.
+    var prev = document.getElementById('last-fault-panel');
+    if (prev) prev.remove();
+
+    var panel = document.createElement('div');
+    panel.id = 'last-fault-panel';
+    panel.className = 'last-fault-panel';
+
+    var header = document.createElement('div');
+    header.className = 'last-fault-panel-header';
+    header.innerHTML = '<span>\u26A0 Last Fault</span>';
+
+    var dismiss = document.createElement('button');
+    dismiss.textContent = 'Dismiss';
+    dismiss.className = 'last-fault-panel-dismiss';
+    dismiss.title = 'Dismiss this fault snapshot';
+    dismiss.addEventListener('click', function() {
+        _lastFaultSnapshotDismissed = true;
+        _hideLastFaultPanel(true);
+    });
+    header.appendChild(dismiss);
+
+    var body = document.createElement('div');
+    body.className = 'last-fault-panel-body';
+    body.innerHTML = _buildLastFaultPanelHTML(snap);
+
+    panel.appendChild(header);
+    panel.appendChild(body);
+    con.parentNode.insertBefore(panel, con);
+}
+
+/**
+ * Fetch /api/fault-snapshot and show the panel if a snapshot exists.
+ * Called after each boot completion so the panel survives reboots.
+ */
+function _fetchAndShowLastFaultPanel() {
+    if (_lastFaultSnapshotDismissed) return;
+    fetch('/api/fault-snapshot')
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(snap) {
+            if (snap && snap.fault_message !== undefined) {
+                _showLastFaultPanel(snap);
+            }
+        })
+        .catch(function() {});
+}
+
+/**
+ * Handle a faultSnapshot event emitted by the simulator before _returnToBoot().
+ * Posts the snapshot to the server and shows the panel immediately.
+ */
+function _onSimFaultSnapshot(snap) {
+    // Reset dismiss state so the panel always appears after a new fault.
+    _lastFaultSnapshotDismissed = false;
+    // Show immediately (before the reboot animation clears the console).
+    _showLastFaultPanel(snap);
+    // POST to server so the panel survives page reloads and hardware clients.
+    fetch('/api/fault-snapshot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(snap),
+    }).catch(function() {});
+}
+
+// NOTE: The 'faultSnapshot' listener is registered on sim inside app-shell.js
+// init() (after sim = new ChurchSimulator()), because sim is null when
+// app-run.js is first evaluated.  See app-shell.js: sim.on('faultSnapshot', ...).
