@@ -16739,6 +16739,34 @@ function _buildLastFaultPanelHTML(snap) {
 }
 
 /**
+ * Show or hide the toolbar fault-panel badge depending on whether a fault
+ * snapshot exists and the editor view is not currently active.
+ * Safe to call at any time; no-ops when the badge element is absent.
+ */
+function _updateFaultToolbarBadge() {
+    var badge = document.getElementById('faultPanelBadge');
+    if (!badge) return;
+    var hasFault = _lastFaultSnapshotData && !_lastFaultSnapshotDismissed;
+    // Show the badge only when there is a fault AND the editor is not the
+    // active view (the full panel is already visible there).
+    var onEditor = (typeof currentView !== 'undefined' && currentView === 'editor');
+    badge.style.display = (hasFault && !onEditor) ? '' : 'none';
+}
+
+/**
+ * Toolbar fault-panel badge click handler.
+ * Switches to the editor view and scrolls the last-fault panel into view.
+ */
+function _faultBadgeClick() {
+    if (typeof switchView === 'function') switchView('editor');
+    // Scroll after a short delay so the view transition has completed.
+    setTimeout(function() {
+        var panel = document.getElementById('last-fault-panel');
+        if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 80);
+}
+
+/**
  * Remove the "Last Fault" panel from the DOM and optionally clear state.
  */
 function _hideLastFaultPanel(clearState) {
@@ -16752,6 +16780,7 @@ function _hideLastFaultPanel(clearState) {
             fetch('/api/fault-snapshot', { method: 'DELETE' }).catch(function() {});
         } catch(e) {}
     }
+    _updateFaultToolbarBadge();
 }
 
 /**
@@ -16793,6 +16822,7 @@ function _showLastFaultPanel(snap) {
     panel.appendChild(header);
     panel.appendChild(body);
     con.parentNode.insertBefore(panel, con);
+    _updateFaultToolbarBadge();
 }
 
 /**

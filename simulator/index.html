@@ -59,7 +59,7 @@
     <link rel="stylesheet" href="styles-dashboard.css?v=20260708b">
     <link rel="stylesheet" href="styles-lumps.css?v=20260812a">
     <link rel="stylesheet" href="styles-gatelog.css?v=20260513a">
-    <link rel="stylesheet" href="styles-fault.css?v=20260527a">
+    <link rel="stylesheet" href="styles-fault.css?v=20260814a">
     <link rel="stylesheet" href="styles-tools.css?v=20260619b">
     <style>
         .app-loading {
@@ -228,6 +228,7 @@
                     <div class="toolbar-group-divider"></div>
                     <div class="sim-exec-btns">
                         <button class="btn btn-warning sim-icon-btn fault-idle" id="toolFaultBtn" onclick="faultRecall()" data-tooltip="Fault — Click to recall the fault report">&#x26A1;</button>
+                        <button class="btn sim-icon-btn fault-panel-badge" id="faultPanelBadge" onclick="_faultBadgeClick()" style="display:none;" data-tooltip="Last Fault — A fault was recorded · click to view it in the editor">&#x26A0; Fault</button>
                         <button class="btn btn-success sim-icon-btn" id="toolStepBtn" onclick="stepSim()" data-tooltip="Step — Execute one instruction">&#x1F463;</button>
                         <button class="btn btn-secondary sim-icon-btn" id="toolHWRunBtn" onclick="hwRunToggle()" style="display:none;font-size:11px;padding:2px 6px;" data-tooltip="HW Run/Pause — Toggle Wukong board free-run or instruction-boundary pause">&#x25B6; HW</button>
                         <span id="wukongCallDepthBadge" class="wukong-call-depth-badge" style="display:none;" title="HW call-stack depth: 0">&#x21C6; 0</span>

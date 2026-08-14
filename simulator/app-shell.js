@@ -1604,6 +1604,7 @@ function switchView(viewId) {
     }
     if (viewId !== currentView) previousView = currentView;
     currentView = viewId;
+    if (typeof _updateFaultToolbarBadge === 'function') _updateFaultToolbarBadge();
     window.location.hash = viewId;
     try { localStorage.setItem('church_lastView', viewId); } catch(e) {}
     const backBtn = document.getElementById('backBtn');
