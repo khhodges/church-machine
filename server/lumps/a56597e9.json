@@ -1,12 +1,12 @@
 {
-  "token": "25dd1fb5",
+  "token": "a56597e9",
   "abstraction": "PostFlashSelftest",
   "ns_slot": null,
   "ns_slot_policy": "dynamic",
   "lump_size": 512,
   "typ": 0,
   "content_type": "code",
-  "cw": 505,
+  "cw": 499,
   "cc": 1,
   "profile": "IoT",
   "language": "assembly",
@@ -28,5 +28,5 @@
   "author": "Church Machine",
   "version": "1.1",
   "lump_version": 0,
-  "binary_hash": "4a851b2dd316e3e2951ff33749e9004fd038a407d0e47905ce67677a4e4391ce"
+  "binary_hash": "42ac06c131162f05591572399095ee7b59245668fd3e3e63357ff252c7e440e7"
 }

@@ -371,18 +371,18 @@ console.log('\n--- LLB-08: NS[3].word2 seal consistent with EXTENDED_BASE and cw
         `stored=0x${storedWord2.toString(16)} expected=0x${expected.toString(16)}`);
 }
 
-// ── LLB-RBA: Real PostFlashSelftest binary (25dd1fb5.lump, Boot.Abstr slot) ──
-// Fixture: server/lumps/25dd1fb5.lump — canonical abstraction name "PostFlashSelftest"
-// per sidecar JSON (server/lumps/25dd1fb5.json), token 25dd1fb5, cw=505, cc=1,
+// ── LLB-RBA: Real PostFlashSelftest binary (a56597e9.lump, Boot.Abstr slot) ──
+// Fixture: server/lumps/a56597e9.lump — canonical abstraction name "PostFlashSelftest"
+// per sidecar JSON (server/lumps/a56597e9.json), token a56597e9, cw=499, cc=1,
 // lumpSize=512 (2048-byte file).  This is the Boot.Abstr lump (NS slot 6) that
 // the simulator loads into the boot entry slot at startup.
 // Reads the file as big-endian uint32 words — the same format served by the
-// Flask /api/lump/25dd1fb5/words endpoint.
-console.log('\n--- LLB-RBA: Real PostFlashSelftest binary (25dd1fb5.lump, Boot.Abstr slot) ---');
+// Flask /api/lump/a56597e9/words endpoint.
+console.log('\n--- LLB-RBA: Real PostFlashSelftest binary (a56597e9.lump, Boot.Abstr slot) ---');
 {
-    const lumpPath = path.join(__dirname, '..', 'server', 'lumps', '25dd1fb5.lump');
+    const lumpPath = path.join(__dirname, '..', 'server', 'lumps', 'a56597e9.lump');
     const lumpExists = fs.existsSync(lumpPath);
-    check('LLB-RBA-0: 25dd1fb5.lump fixture file exists on disk', lumpExists,
+    check('LLB-RBA-0: a56597e9.lump fixture file exists on disk', lumpExists,
         lumpPath);
 
     if (lumpExists) {
@@ -393,14 +393,14 @@ console.log('\n--- LLB-RBA: Real PostFlashSelftest binary (25dd1fb5.lump, Boot.A
             rawWords.length === 512,
             `got ${rawWords.length}`);
 
-        // Parse the header word — must decode as cw=505, cc=1, lumpSize=512
+        // Parse the header word — must decode as cw=499, cc=1, lumpSize=512
         const sim = new ChurchSimulator();
         const hdr0 = sim.parseLumpHeader(rawWords[0] >>> 0);
         check('LLB-RBA-2: fixture header magic = 0x1F (valid LUMP)',
             hdr0.valid,
             `magic=0x${hdr0.magic.toString(16)} word[0]=0x${(rawWords[0]>>>0).toString(16)}`);
-        check('LLB-RBA-3: fixture header cw = 505 (PostFlashSelftest)',
-            hdr0.cw === 505,
+        check('LLB-RBA-3: fixture header cw = 499 (PostFlashSelftest)',
+            hdr0.cw === 499,
             `got cw=${hdr0.cw}`);
         check('LLB-RBA-4: fixture header cc = 1 (PostFlashSelftest)',
             hdr0.cc === 1,
@@ -421,8 +421,8 @@ console.log('\n--- LLB-RBA: Real PostFlashSelftest binary (25dd1fb5.lump, Boot.A
             `got 0x${sim2.memory[nsBase+0].toString(16)}`);
 
         const p = sim2.parseNSWord1(sim2.memory[nsBase + 1]);
-        check('LLB-RBA-8: NS[bootEntrySlot].word1 limit = 505 (cw from real fixture)',
-            p.limit === 505,
+        check('LLB-RBA-8: NS[bootEntrySlot].word1 limit = 499 (cw from real fixture)',
+            p.limit === 499,
             `got limit=${p.limit}`);
         check('LLB-RBA-9: NS[bootEntrySlot].word1 clistCount = 1 (cc from real fixture)',
             p.clistCount === 1,
@@ -432,14 +432,14 @@ console.log('\n--- LLB-RBA: Real PostFlashSelftest binary (25dd1fb5.lump, Boot.A
             `got 0x${sim2.cr[14].word1.toString(16)}`);
 
         // LLB-RBA-11: Sidecar JSON metadata — prevents future token/name drift.
-        const sidecarPath = path.join(__dirname, '..', 'server', 'lumps', '25dd1fb5.json');
+        const sidecarPath = path.join(__dirname, '..', 'server', 'lumps', 'a56597e9.json');
         if (fs.existsSync(sidecarPath)) {
             const sidecar = JSON.parse(fs.readFileSync(sidecarPath, 'utf8'));
-            check('LLB-RBA-11: sidecar token = 25dd1fb5 (canonical token for PostFlashSelftest)',
-                sidecar.token === '25dd1fb5',
+            check('LLB-RBA-11: sidecar token = a56597e9 (canonical token for PostFlashSelftest)',
+                sidecar.token === 'a56597e9',
                 `got token=${sidecar.token}`);
         } else {
-            console.log('SKIP LLB-RBA-11 (sidecar 25dd1fb5.json not found)');
+            console.log('SKIP LLB-RBA-11 (sidecar a56597e9.json not found)');
         }
     }
 }

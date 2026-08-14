@@ -554,7 +554,7 @@ SELFTEST_LUMP_CASES = [
 
 # cc=1 lumps: single SelfTest E-GT at slot 0 (POLA redesign — no Boot.Nucs needed)
 SELFTEST_LUMP_CASES_CC1 = [
-    ("25dd1fb5", "PostFlashSelftest"),
+    ("a56597e9", "PostFlashSelftest"),
     ("00000600", "SelfTest"),
 ]
 

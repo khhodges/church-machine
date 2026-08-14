@@ -774,16 +774,17 @@ tL81:
     RETURN
 
 ; ═══════════════════════════════════════════════════════════════════════════════
-; All 81 tests passed — enter recovery loop
+; All 81 tests passed — loop continuously
 ; ═══════════════════════════════════════════════════════════════════════════════
+; NOTE: RETURN is intentionally absent here.  The boot CALL from boot_rom.py
+; pushes a frame with returnPC = byte 0x00C (the word after the boot CALL
+; instruction), which lies outside every valid lump.  Any RETURN at this
+; depth would fault RANGE and restart the boot, creating an infinite reboot
+; loop.  ELOADCALL also does not push its own frame (it replaces the current
+; lump in-place), so the only frame visible here is the boot CALL frame.
+; Until ELOADCALL is fixed to push a proper frame (a hardware change),
+; the correct behaviour is to loop — the hardware stays alive and the bridge
+; can observe the stable test trace.
 done:
-    ISUB DR0, DR0, DR0      ; DR0 = 0 (all tests passed)
-    TPERM CR0, FRAME        ; is there a real caller frame? (called via ELOADCALL, not boot)
-    BRANCHEQ ec_return      ; yes — RETURN with DR0 result to ELOADCALL caller
-    TPERM CR0, E            ; is Thread.caps[0] a valid E-GT?
-    BRANCHEQ launch         ; yes — dispatch to programmer's first abstraction
-    BRANCH AL, start        ; no — loop and re-run all 81 tests
-ec_return:
-    RETURN                  ; return DR0 (0=all pass, N=first fail) to ELOADCALL caller
-launch:
-    CALL CR0                ; enter programmer's first abstraction
+    ISUB DR0, DR0, DR0      ; DR0 = 0 (all 81 tests passed)
+    BRANCH AL, start        ; loop — re-run tests continuously

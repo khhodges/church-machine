@@ -1872,13 +1872,13 @@
         "identity_hash": "a3514490fec3fce8fe06f9ee6a3b83bd94b1b686c4ecac855951344504989b91"
     },
     {
-        "token": "25dd1fb5",
+        "token": "a56597e9",
         "abstraction": "PostFlashSelftest",
         "ns_slot": null,
         "ns_slot_policy": "dynamic",
         "variant_group": null,
         "lump_size": 512,
-        "cw": 505,
+        "cw": 499,
         "cc": 1,
         "grants": [
             "E"
