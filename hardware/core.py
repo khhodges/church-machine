@@ -1582,6 +1582,12 @@ class ChurchCore(Elaboratable):
                 u_eloadcall.cr15_namespace.eq(u_regs.cr15_namespace),
                 u_eloadcall.mem_rd_data.eq(self.dmem_rd_data),
                 u_eloadcall.mem_rd_valid.eq(self.dmem_rd_valid),
+                # Call-stack frame push: heap cap, thread-lump base, thread header
+                # (LUMP_HEADER_LAYOUT for sp_max/sp_min bounds), and CR12 for null check.
+                u_eloadcall.cr5_heap.eq(u_regs.cr5_heap),
+                u_eloadcall.thread_base.eq(View(CAP_REG_LAYOUT, u_regs.cr12_thread).word1_location),
+                u_eloadcall.thread_hdr.eq(u_change.thread_hdr_out if not self.iot_profile else 0),
+                u_eloadcall.cr12_thread.eq(u_regs.cr12_thread),
             ]
 
             xloadlambda_start_sig = Signal()
@@ -2657,6 +2663,22 @@ class ChurchCore(Elaboratable):
                 m.d.comb += [
                     self.dmem_addr.eq(u_change.mem_wr_addr),
                     self.dmem_wr_data.eq(u_change.mem_wr_data),
+                    self.dmem_wr_en.eq(1),
+                ]
+            with m.Elif(u_eloadcall.mem_rd_en):
+                # ELOADCALL PUSH_ARM / PUSH_READ_STO: read Heap[0] (STO) before
+                # pushing the call-stack frame.  Mutually exclusive with
+                # u_shared_mload (call/return/load) and u_change.
+                m.d.comb += [
+                    self.dmem_addr.eq(u_eloadcall.mem_addr),
+                    self.dmem_rd_en.eq(1),
+                ]
+            with m.Elif(u_eloadcall.mem_wr_en):
+                # ELOADCALL PUSH_EGT / PUSH_FRAME / PUSH_STO: write three
+                # frame-push words.  Also mutually exclusive with all others.
+                m.d.comb += [
+                    self.dmem_addr.eq(u_eloadcall.mem_wr_addr),
+                    self.dmem_wr_data.eq(u_eloadcall.mem_wr_data),
                     self.dmem_wr_en.eq(1),
                 ]
         with m.Elif(u_call.mem_rd_en):

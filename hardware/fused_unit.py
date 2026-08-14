@@ -2,10 +2,11 @@ from amaranth import *
 from amaranth.lib.data import View
 
 from .hw_types import *
-from .layouts import GT_LAYOUT, CAP_REG_LAYOUT
+from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, LUMP_HEADER_LAYOUT
 from .mload import ChurchMLoad
 from .perm_check import perm_bit
 from .mload_seq import mload_wait_body
+from .stack_frame import stack_slot_addr
 
 
 class ChurchELoadCall(Elaboratable):
@@ -20,7 +21,7 @@ class ChurchELoadCall(Elaboratable):
         self.busy = Signal()
         self.complete = Signal()
         self.fault = Signal()
-        self.fault_type = Signal(4)
+        self.fault_type = Signal(5)   # 5 bits: FaultType.STACK_OVERFLOW=0x10 requires 5 bits
 
         self.cr_rd_addr = Signal(4)
         self.cr_rd_data = Signal(CAP_REG_LAYOUT)
@@ -42,6 +43,30 @@ class ChurchELoadCall(Elaboratable):
         self.nia_value = Signal(32)
         self.dr_clear_mask = Signal(16)
         self.cr_clear_mask = Signal(16)
+
+        # Call-stack frame push (ELOADCALL fix): ELOADCALL now pushes a frame
+        # identical to a CALL frame so that RETURN inside an ELOADCALL-entered
+        # lump can unwind cleanly instead of faulting (NIA→0 → RANGE fault).
+        #
+        # Frame word layout (matches call.py / stack_frame.py):
+        #   bit[31]    = SZ = 1  (CALL/ELOADCALL frame tag)
+        #   bits[30:16] = sentinel_return_pc = 3  (BRANCH -1 at boot ROM word 3)
+        #   bits[15:0]  = prev_STO (current STO before decrement)
+        #
+        # Core wires these from u_regs.cr5_heap, u_regs.cr12_thread, CR12.word1_location,
+        # and u_change.thread_hdr_out (per-thread LUMP_HEADER_LAYOUT word).
+        self.cr5_heap    = Signal(CAP_REG_LAYOUT)   # heap cap (word1_location = Heap[0] addr)
+        self.thread_base = Signal(32)               # CR12 thread lump byte base
+        self.thread_hdr  = Signal(32)               # LUMP_HEADER_LAYOUT word (n_minus_6, cw, cc)
+        self.cr12_thread = Signal(CAP_REG_LAYOUT)   # CR12 thread cap (for null check)
+
+        # Direct DMEM writes for the three frame-push words:
+        #   (1) callee E-GT  at thread_base + (STO-1)*4
+        #   (2) frame word   at thread_base + STO*4
+        #   (3) new STO      at Heap[0] = CR5.word1_location
+        self.mem_wr_addr = Signal(32)
+        self.mem_wr_data = Signal(32)
+        self.mem_wr_en   = Signal()
 
         # Lazy-resolve IRQ outputs (Task #1523): pulsed when CHECK_E detects
         # a NULL GT in the loaded c-list slot.  Core uses these to trigger
@@ -70,7 +95,7 @@ class ChurchELoadCall(Elaboratable):
         mask_latched = Signal(16)
         call_imm_latched = Signal(15)
         fault_latched = Signal()
-        fault_type_latched = Signal(4)
+        fault_type_latched = Signal(5)   # 5 bits: matches self.fault_type width
         sub_start = Signal()
         sub_start_reg = Signal()
         sub_done_latched = Signal()
@@ -85,6 +110,62 @@ class ChurchELoadCall(Elaboratable):
 
         local_cr_rd_en = Signal()
         local_cr_rd_addr = Signal(4)
+
+        # ── Call-stack frame push ──────────────────────────────────────────────
+        # Sentinel return PC = 3 (word offset → NIA = 0x0C = boot ROM BRANCH -1).
+        _SENTINEL_RETURN_PC = 3
+
+        # callee_egt_latched: latched in CALL_P1_DONE by reading CR6.word0_gt.
+        #   This is the phase-1 result cap GT (the capability actually committed
+        #   into the callee’s c-list slot), matching what ChurchCall saves.
+        callee_egt_latched = Signal(32)
+
+        # Stack bounds from thread_hdr (LUMP_HEADER_LAYOUT), mirrors call.py.
+        #   sp_max = lump_sz − 12 − 1   (max valid STO before the frame push)
+        #   sp_min = lump_sz − 10 − cw  (stack floor — code zone boundary)
+        thread_hdr_view = View(LUMP_HEADER_LAYOUT, self.thread_hdr)
+        thr_lump_sz     = Signal(15)
+        sp_max          = Signal(15)
+        sp_min          = Signal(15)
+        sp_min_base     = Signal(15)
+
+        # CR5 / CR12 validity (mirrors ChurchCall.CHECK_CR5_CR12).
+        cr5_view  = View(CAP_REG_LAYOUT, self.cr5_heap)
+        cr5_gt    = View(GT_LAYOUT, cr5_view.word0_gt)
+        cr5_null  = Signal()
+        cr5_has_r = Signal()
+
+        cr12_view = View(CAP_REG_LAYOUT, self.cr12_thread)
+        cr12_gt   = View(GT_LAYOUT, cr12_view.word0_gt)
+        cr12_null = Signal()
+
+        m.d.comb += [
+            thr_lump_sz.eq(Const(1, 15) << (thread_hdr_view.n_minus_6 + 6)),
+            sp_max.eq(thr_lump_sz - 12 - 1),
+            sp_min_base.eq(thr_lump_sz - 10),
+            sp_min.eq(sp_min_base - thread_hdr_view.cw),
+            cr5_null.eq(cr5_gt.gt_type == GT_TYPE_NULL),
+            cr5_has_r.eq(~cr5_gt.dom & cr5_gt.perm[PERM_R]),
+            cr12_null.eq(cr12_gt.gt_type == GT_TYPE_NULL),
+        ]
+
+        sto_latched   = Signal(32)   # STO word index read from Heap[0]
+        sto_reading   = Signal()     # asserted to drive the Heap[0] read
+        sto_rd_armed  = Signal()     # one-cycle guard before trusting mem_rd_valid
+        sto_read_addr = Signal(32)   # byte address of Heap[0] = CR5.word1_location
+        frame_word    = Signal(32)   # SZ=1 | sentinel_return_pc | prev_STO
+
+        local_mem_wr_en   = Signal()
+        local_mem_wr_addr = Signal(32)
+        local_mem_wr_data = Signal(32)
+
+        m.d.comb += [
+            sto_read_addr.eq(cr5_view.word1_location[:32]),
+            # frame_word: bit31=SZ=1, bits[30:16]=sentinel_pc, bits[15:0]=prev_STO
+            frame_word.eq(Cat(sto_latched[:16],
+                              Const(_SENTINEL_RETURN_PC, 15),
+                              Const(1, 1))),
+        ]
 
         loaded_view = View(CAP_REG_LAYOUT, loaded_cap)
         loaded_gt = View(GT_LAYOUT, loaded_view.word0_gt)
@@ -138,12 +219,21 @@ class ChurchELoadCall(Elaboratable):
             self.cr_wr_addr.eq(u_mload.cr_wr_addr),
             self.cr_wr_data.eq(u_mload.cr_wr_data),
             self.cr_wr_en.eq(u_mload.cr_wr_en),
-            # Mux: method-entry fetch overrides mload's memory bus after CALL_P2 completes.
-            self.mem_addr.eq(Mux(method_entry_reading, method_entry_addr_sig, u_mload.mem_addr)),
-            self.mem_rd_en.eq(method_entry_reading | u_mload.mem_rd_en),
+            # Mux (priority: method-entry > STO read > mload's normal bus).
+            # sto_reading: PUSH_ARM/PUSH_READ_STO states assert this to read Heap[0].
+            self.mem_addr.eq(
+                Mux(method_entry_reading, method_entry_addr_sig,
+                Mux(sto_reading,          sto_read_addr,
+                                          u_mload.mem_addr))
+            ),
+            self.mem_rd_en.eq(method_entry_reading | sto_reading | u_mload.mem_rd_en),
             self.thread_wr_en.eq(u_mload.thread_wr_en),
             self.thread_wr_idx.eq(u_mload.thread_wr_idx),
             self.thread_wr_data.eq(u_mload.thread_wr_data),
+            # Frame-push write port (driven by PUSH_EGT/PUSH_FRAME/PUSH_STO states).
+            self.mem_wr_addr.eq(local_mem_wr_addr),
+            self.mem_wr_data.eq(local_mem_wr_data),
+            self.mem_wr_en.eq(local_mem_wr_en),
         ]
 
         m.d.comb += self.cr_rd_addr.eq(
@@ -257,6 +347,14 @@ class ChurchELoadCall(Elaboratable):
                 )
 
             with m.State("CALL_P1_DONE"):
+                # Latch the phase-1 callee E-GT from CR6 before phase 2 runs.
+                # CR6 (CR_CLIST) has just been written by CALL_P1’s mLoad; its
+                # word0_gt is the capability actually selected for the callee’s
+                # c-list slot 0, matching what ChurchCall saves in PHASE1_DONE.
+                m.d.comb += [local_cr_rd_en.eq(1), local_cr_rd_addr.eq(CR_CLIST)]
+                m.d.sync += callee_egt_latched.eq(
+                    View(CAP_REG_LAYOUT, self.cr_rd_data).word0_gt.as_value()
+                )
                 m.d.sync += [
                     phase.eq(2), sub_done_latched.eq(0), sub_fault_latched.eq(0),
                 ]
@@ -285,11 +383,13 @@ class ChurchELoadCall(Elaboratable):
 
             with m.State("DISPATCH"):
                 # cr14_latched is now valid; ns_base is derived from it combinatorially.
+                # Method-entry validation happens first; frame push follows only on success.
                 with m.If(call_imm_latched == 0):
-                    # Fast-path: NIA = ns_base + 4 (lump word 1 = first body word).
-                    m.next = "COMPLETE"
+                    # Fast-path (imm=0): NIA = ns_base + 4.  Dispatch is unconditionally
+                    # valid — proceed to pre-push CR5/CR12 validation.
+                    m.next = "PUSH_CR5_CR12"
                 with m.Else():
-                    # Indexed dispatch: assert method-entry memory read this cycle.
+                    # Indexed dispatch: validate method-entry before touching the stack.
                     m.d.comb += [
                         method_entry_reading.eq(1),
                         method_entry_addr_sig.eq(ns_base + (call_imm_latched.as_unsigned() << 2)),
@@ -304,15 +404,118 @@ class ChurchELoadCall(Elaboratable):
                 ]
                 with m.If(self.mem_rd_valid):
                     with m.If(self.mem_rd_data == 0):
-                        # Entry 0 = private/absent: fault.
+                        # Entry 0 = private/absent: fault WITHOUT touching the stack.
                         m.d.sync += [
                             fault_latched.eq(1),
                             fault_type_latched.eq(FaultType.PERM_E),
                         ]
                         m.next = "FAULT"
                     with m.Else():
+                        # Dispatch validated — proceed to pre-push CR5/CR12 validation.
                         m.d.sync += method_entry_reg.eq(self.mem_rd_data)
-                        m.next = "COMPLETE"
+                        m.next = "PUSH_CR5_CR12"
+
+            # ── Call-stack frame push ──────────────────────────────────────
+            # Six states mirror what CALL does (hardware/call.py).  They execute
+            # ONLY after successful dispatch validation (DISPATCH or
+            # FETCH_METHOD_ENTRY) so a failed instruction never corrupts the stack.
+            #
+            #   PUSH_CR5_CR12  — validate CR5 (non-null, has R-perm) and CR12 (non-null)
+            #   PUSH_ARM       — arm the Heap[0] read (assert sto_reading for 1 cycle)
+            #   PUSH_READ_STO  — wait for STO read valid; latch into sto_latched
+            #   PUSH_BOUNDS    — full stack-zone bounds check using thread_hdr:
+            #                      STO > sp_max → STACK_CORRUPT (pointer out of zone)
+            #                      STO < sp_min → STACK_OVERFLOW (zone exhausted)
+            #   PUSH_EGT       — write callee E-GT (phase-1 CR6 GT) at (STO-1)
+            #   PUSH_FRAME     — write frame word  at thread_base+STO*4
+            #   PUSH_STO       — write new STO (STO-2) back to Heap[0]
+            # After PUSH_STO the FSM proceeds to COMPLETE.
+
+            with m.State("PUSH_CR5_CR12"):
+                # Mirror ChurchCall.CHECK_CR5_CR12: validate CR5 is a live heap cap
+                # with R-permission, and CR12 is a live thread cap.  Any failure here
+                # is caught BEFORE touching the stack, so the frame is never half-written.
+                with m.If(cr5_null):
+                    m.d.sync += [
+                        fault_latched.eq(1),
+                        fault_type_latched.eq(FaultType.NULL_CAP),
+                    ]
+                    m.next = "FAULT"
+                with m.Elif(~cr5_has_r):
+                    m.d.sync += [
+                        fault_latched.eq(1),
+                        fault_type_latched.eq(FaultType.PERM_R),
+                    ]
+                    m.next = "FAULT"
+                with m.Elif(cr12_null):
+                    m.d.sync += [
+                        fault_latched.eq(1),
+                        fault_type_latched.eq(FaultType.NULL_CAP),
+                    ]
+                    m.next = "FAULT"
+                with m.Else():
+                    m.next = "PUSH_ARM"
+
+            with m.State("PUSH_ARM"):
+                m.d.comb += sto_reading.eq(1)
+                m.d.sync += sto_rd_armed.eq(1)
+                m.next = "PUSH_READ_STO"
+
+            with m.State("PUSH_READ_STO"):
+                m.d.comb += sto_reading.eq(1)
+                with m.If(sto_rd_armed & self.mem_rd_valid):
+                    m.d.sync += [sto_latched.eq(self.mem_rd_data), sto_rd_armed.eq(0)]
+                    m.next = "PUSH_BOUNDS"
+
+            with m.State("PUSH_BOUNDS"):
+                # Full bounds check using thread_hdr-derived sp_max / sp_min,
+                # matching ChurchCall.STACK_CHECK exactly.
+                # STO > sp_max: pointer above the stack zone → STACK_CORRUPT.
+                # STO < sp_min: stack zone exhausted (floor reached) → STACK_OVERFLOW.
+                with m.If(sto_latched > sp_max):
+                    m.d.sync += [
+                        fault_latched.eq(1),
+                        fault_type_latched.eq(FaultType.STACK_CORRUPT),
+                    ]
+                    m.next = "FAULT"
+                with m.Elif(sto_latched < sp_min):
+                    m.d.sync += [
+                        fault_latched.eq(1),
+                        fault_type_latched.eq(FaultType.STACK_OVERFLOW),
+                    ]
+                    m.next = "FAULT"
+                with m.Else():
+                    m.next = "PUSH_EGT"
+
+            with m.State("PUSH_EGT"):
+                # Write callee E-GT to stack slot STO-1.
+                # callee_egt_latched was captured from CR6.word0_gt in CALL_P1_DONE
+                # (phase-1 result), matching what ChurchCall writes in STACK_WRITE_EGT.
+                m.d.comb += [
+                    local_mem_wr_en.eq(1),
+                    local_mem_wr_addr.eq(stack_slot_addr(self.thread_base, sto_latched, -1)),
+                    local_mem_wr_data.eq(callee_egt_latched),
+                ]
+                m.next = "PUSH_FRAME"
+
+            with m.State("PUSH_FRAME"):
+                # Write frame word (SZ=1 | sentinel_return_pc | prev_STO) to stack slot STO.
+                m.d.comb += [
+                    local_mem_wr_en.eq(1),
+                    local_mem_wr_addr.eq(stack_slot_addr(self.thread_base, sto_latched, 0)),
+                    local_mem_wr_data.eq(frame_word),
+                ]
+                m.next = "PUSH_STO"
+
+            with m.State("PUSH_STO"):
+                # Write new STO = STO-2 to Heap[0] = CR5.word1_location.
+                # Full 32-bit write matches ChurchCall.STACK_WRITE_SP.
+                m.d.comb += [
+                    local_mem_wr_en.eq(1),
+                    local_mem_wr_addr.eq(sto_read_addr),
+                    local_mem_wr_data.eq(sto_latched - 2),
+                ]
+                m.next = "COMPLETE"
 
             with m.State("COMPLETE"):
                 m.next = "IDLE"
