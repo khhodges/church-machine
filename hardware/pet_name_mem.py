@@ -79,7 +79,7 @@ class PetNameMemory(Elaboratable):
         m = Module()
 
         bits = Array(
-            Signal(1, reset=(1 if i in self._init_named else 0), name=f"pn_{i}")
+            Signal(1, init=(1 if i in self._init_named else 0), name=f"pn_{i}")
             for i in range(PET_NAME_MEM_DEPTH)
         )
 
