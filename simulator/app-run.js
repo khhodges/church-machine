@@ -982,7 +982,10 @@ function _injectClistNow() {
     // through to the nsLabels lookup and resolves via its NS entry.
     const _devSlotMap = {
         LED0: 3, LED1: 3, LED2: 3, LED3: 3, LED4: 3, LED5: 3,
-        UART: 2, UART_TX: 2, UART_RX: 2, BTN: 4, Timer: 5, Display: 2,
+        LED_DEV: 3,
+        UART: 2, UART_TX: 2, UART_RX: 2, UART_DEV: 2, Display: 2,
+        BTN: 4, BTN_DEV: 4,
+        Timer: 5, TIMER_DEV: 5,
     };
 
     // Boot.Abstr's NS slot is dynamic (sim.bootEntrySlot, default 6 = SelfTest
@@ -1047,12 +1050,22 @@ function _injectClistNow() {
                 }
             }
             if (nsIdx >= 0) {
-                const perms = {R:0, W:0, X:0, L:0, S:0, E:1};
+                // Start with no permissions and apply only what the capability
+                // block declared.  Do NOT default to E:1 here — doing so produces
+                // domain-impure GTs (e.g. RWE) when the cap has Turing rights like
+                // ["R","W"], causing createGT() to throw.  Fall back to E:1 only
+                // when the declared rights set is completely empty.
+                const perms = {R:0, W:0, X:0, L:0, S:0, E:0};
                 for (const r of rights) {
                     if      (r === 'R') perms.R = 1;
                     else if (r === 'W') perms.W = 1;
                     else if (r === 'X') perms.X = 1;
+                    else if (r === 'L') perms.L = 1;
+                    else if (r === 'S') perms.S = 1;
                     else if (r === 'E') perms.E = 1;
+                }
+                if (!perms.R && !perms.W && !perms.X && !perms.L && !perms.S && !perms.E) {
+                    perms.E = 1;  // no rights declared → safe Church entry default
                 }
                 sim.memory[clistBase + i] =
                     sim.createGT(0, nsIdx, perms, 1) >>> 0;
@@ -1572,6 +1585,7 @@ function instantBoot() {
 
 function slowBoot() {
     if (bootAnimating || sim.bootComplete || sim.halted) return;
+    const _savedBootEntrySlow = sim.bootEntrySlot;  // restored in catch on boot error
     bootAnimating = true;
     if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(0)); pipelineViz.render(); }  // prime NIA to B:00 before first step
     switchView('pipeline');  // show pipeline so boot-step overview is immediately visible
