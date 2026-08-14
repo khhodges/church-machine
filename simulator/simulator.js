@@ -5642,39 +5642,39 @@ class ChurchSimulator {
         }
 
         const clistEntry = tpermCheck.entry;
-        const clistLoc = clistEntry.word0_location;
-        const cr14Read = this.mLoad(slotGT, 'E', undefined, clistLoc);
-        if (!cr14Read.ok) {
-            this.fault(cr14Read.fault, `ELOADCALL CR14 clist[0]: ${cr14Read.message}`);
+        // Read the callee lump header to derive clistStart — same approach as CALL
+        // (lines ~4386-4424).  The old code read memory[word0_location] as if it
+        // were clist[0], but word0_location IS the lump base, so it read the header
+        // word, which is never a type-1 GT.  This caused cr14Check to always be null
+        // → spurious NO_CODE fault even when SelfTest (or any LUMP) has resident code.
+        const base_ec = clistEntry.word0_location;
+        const lumpHdrCheck = this.mLoad(slotGT, 'E', undefined, base_ec);
+        if (!lumpHdrCheck.ok) {
+            this.fault(lumpHdrCheck.fault, `ELOADCALL CR${d.crDst} lump-hdr: ${lumpHdrCheck.message}`);
             return null;
         }
-        const cr14GT = this.memory[clistLoc];
-        let cr14Check = null;
-        if (cr14GT !== 0) {
-            const cr14Parsed = this.parseGT(cr14GT);
-            if (cr14Parsed.type === 1) {
-                const cr14Entry = this.readNSEntry(cr14Parsed.index);
-                if (cr14Entry) {
-                    const chk = this.mLoad(cr14GT, 'X', undefined);
-                    if (chk.ok) cr14Check = chk;
-                }
-            }
+        const hdrWord_ec = this.memory[base_ec] >>> 0;
+        const hdr_ec    = this.parseLumpHeader(hdrWord_ec);
+        if (!hdr_ec.valid || hdr_ec.cc === 0) {
+            this.fault('NO_CODE', `ELOADCALL CR${d.crDst}: target abstraction has no code capability (invalid or headerless lump)`);
+            return null;
         }
+        const clistStart_ec = hdr_ec.lumpSize - hdr_ec.cc;
 
         const savedSTO_ec = this.sto;
         const ecThreadBase = this.cr[12] && this.cr[12].word1;
         if (ecThreadBase) {
-            const hdrRead_ec = this._threadRead(ecThreadBase, `ELOADCALL CR${d.crDst} thread-hdr`);
-            if (!hdrRead_ec.ok) return null;
-            const hdr_ec = this.parseLumpHeader(hdrRead_ec.value);
-            const lumpSize_ec = hdr_ec.valid ? hdr_ec.lumpSize : 256;
-            const sw_ec = (hdr_ec.valid && hdr_ec.typ === 2) ? hdr_ec.cw : 0;
-            const sp_max_ec = lumpSize_ec - 12 - 1;
-            const sp_min_ec = sp_max_ec - sw_ec + 1;
-            const newSTO_ec = (savedSTO_ec - 2) & 0xFFF;
-            if (newSTO_ec < sp_min_ec) {
+            const hdrRead_th = this._threadRead(ecThreadBase, `ELOADCALL CR${d.crDst} thread-hdr`);
+            if (!hdrRead_th.ok) return null;
+            const hdr_th     = this.parseLumpHeader(hdrRead_th.value);
+            const lumpSize_th = hdr_th.valid ? hdr_th.lumpSize : 256;
+            const sw_th       = (hdr_th.valid && hdr_th.typ === 2) ? hdr_th.cw : 0;
+            const sp_max_th   = lumpSize_th - 12 - 1;
+            const sp_min_th   = sp_max_th - sw_th + 1;
+            const newSTO_ec   = (savedSTO_ec - 2) & 0xFFF;
+            if (newSTO_ec < sp_min_th) {
                 this.flags.V = true;
-                this.output += `[STACK WARNING] ELOADCALL CR${d.crDst}: STO=${newSTO_ec} below sw limit sp_min=${sp_min_ec} (sw=${sw_ec}) — V flag set\n`;
+                this.output += `[STACK WARNING] ELOADCALL CR${d.crDst}: STO=${newSTO_ec} below sw limit sp_min=${sp_min_th} (sw=${sw_th}) — V flag set\n`;
             }
         }
         const frameWord_ec = this._packFrameWord(this.pc + 1, 1, savedSTO_ec);
@@ -5690,37 +5690,48 @@ class ChurchSimulator {
         });
         this.sto = (savedSTO_ec - 2) & 0xFFF;
 
-        // Now write the loaded GT and set up CR6/CR14 for the callee context.
+        // Write the loaded GT into the destination CR.
         if (!this._writeCR(d.crDst, slotGT, entry)) return null;
-        if (cr14Check) {
-            this._writeCR(6, slotGT, clistEntry);
-            this._writeCR(14, cr14GT, cr14Check.entry);
-            this.cr[6].m = 1;   // M set explicitly — CR14 does NOT need M=1; XR grants from CALL microcode are sufficient
-        }
+
+        // CR14 (code, RX, M=1) — synthesised directly from index/seq, matching CALL
+        // microcode (call.py: cr14_gt has R+X, m=1).  Never read from clist[0]: that
+        // word is the lump header at base_ec, not a GT.
+        const cr14NewGT = this.createGT(slotParsed.gt_seq, targetIdx, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);
+        this.cr[14] = {
+            word0: cr14NewGT,
+            word1: base_ec >>> 0,
+            word2: clistEntry.word1_limit >>> 0,
+            word3: clistEntry.word2_seals,
+            m: 1,
+        };
+
+        // CR6 (c-list, L-only, M=1) — matching CALL microcode (call.py: cr6_adj_gt.perm=0b001).
+        const cr6NewGT = this.createGT(slotParsed.gt_seq, targetIdx, {R:0,W:0,X:0,L:1,S:0,E:0}, slotParsed.type);
+        this.cr[6] = {
+            word0: cr6NewGT,
+            word1: (base_ec + clistStart_ec) >>> 0,
+            word2: clistEntry.word1_limit >>> 0,
+            word3: clistEntry.word2_seals,
+            m: 1,
+        };
 
         const label = this.nsLabels[targetIdx] || 'abstraction';
         const ecIdxSuffix = ecMethodIdx > 0 ? `, #${ecMethodIdx}` : '';
         const desc = `ELOADCALL CR${d.crDst}, [CR${d.crSrc} + ${ecRow}]${ecIdxSuffix} -> ${label} (LOAD+TPERM+CALL)`;
         this.output += desc + '\n';
         const prevPC_ec = this.pc;
-        if (cr14Check) {
-            // Hardware method-table dispatch: method index from imm15[14:8] (ecMethodIdx).
-            // ecMethodIdx=0: fast path — NIA = word 1 (pc=0).
-            // ecMethodIdx=k>0: read table entry at lump word k; pc = entry - 1.
-            // Entry value 0 = private method → FAULT.
-            if (ecMethodIdx === 0) {
-                this.pc = 0;
-            } else {
-                const ecMethodEntry = (this.memory[this.cr[14].word1 + ecMethodIdx] || 0) >>> 0;
-                if (ecMethodEntry === 0) {
-                    this.fault('PRIVATE_METHOD', `ELOADCALL CR${d.crDst}: method index ${ecMethodIdx} is private or unmapped (table entry = 0)`);
-                    return null;
-                }
-                this.pc = ecMethodEntry - 1;
-            }
+        // Hardware method-table dispatch: method index from imm15[14:8] (ecMethodIdx).
+        // ecMethodIdx=0: fast path — NIA = lump_base + 1 (pc=0).
+        // ecMethodIdx=k>0: read table entry at lump word k; 0 = private → FAULT.
+        if (ecMethodIdx === 0) {
+            this.pc = 0;
         } else {
-            this.fault('NO_CODE', `ELOADCALL CR${d.crDst}: target abstraction has no code capability`);
-            return null;
+            const ecMethodEntry = (this.memory[this.cr[14].word1 + ecMethodIdx] || 0) >>> 0;
+            if (ecMethodEntry === 0) {
+                this.fault('PRIVATE_METHOD', `ELOADCALL CR${d.crDst}: method index ${ecMethodIdx} is private or unmapped (table entry = 0)`);
+                return null;
+            }
+            this.pc = ecMethodEntry - 1;
         }
         this._emitTrace(this.physicalPC, TRACE_EV_CALL_CR6,  this.cr[6].word0  >>> 0);
         this._emitTrace(this.physicalPC, TRACE_EV_CALL_CR14, this.cr[14].word0 >>> 0);
