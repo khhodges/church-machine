@@ -640,7 +640,7 @@ except OSError as exc:
         f"Wukong factory image requires canonical SelfTest lump: {_selftest_path}"
     ) from exc
 WUKONG_SELFTEST_WORDS = tuple(struct.unpack(">512I", _selftest_raw))
-assert WUKONG_SELFTEST_WORDS[0] == 0xF987D801
+assert WUKONG_SELFTEST_WORDS[0] == 0xF987E401  # cw=505 (was 0xF987D801 cw=502 — updated with TPERM FRAME fix)
 assert WUKONG_SELFTEST_WORDS[-1] == 0x4A000006
 
 # Fix slot 7 (WukongCallHome) alloc from 64 → 128 words and move it after
