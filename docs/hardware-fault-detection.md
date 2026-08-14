@@ -186,6 +186,13 @@ fault. This covers stored GTs, which R1 does not.
 Cost: BRAM parity bits, which are present in the primitive whether used or
 not, plus the ECC logic the primitive already contains.
 
+> **Design rationale — why per-word BRAM ECC replaces an aggregate c-list CRC:**
+> See `gt-parity-integrity.md`. An aggregate CRC over the whole c-list is
+> incompatible with the machine's own dynamics (binding at load time, SAVE at
+> runtime both legitimately change c-list bytes). BRAM SECDED covers each word
+> individually, which is both stronger and structurally compatible with binding.
+> This is the *immediate next hardware hardening target*.
+
 ### R3 — Address parity
 
 Lowest priority. The shift-based addressing introduced with stride 4 removes

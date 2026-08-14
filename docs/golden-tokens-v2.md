@@ -528,6 +528,16 @@ ECC requirements. On the current FPGA the unforgeability guarantee holds
 **against software adversaries only** — a limitation the 74-series PP250,
 with address and data parity on every word, did not have.
 
+### 6.4 Why there is no aggregate CRC over the c-list
+
+There is no CRC over all c-list GTs as a group. See `gt-parity-integrity.md`
+for the full reasoning; the short version is that binding (at load time) and
+SAVE (at runtime) legitimately change c-list bytes, so any aggregate check
+would fault on normal operation. Per-word parity/ECC — intrinsic to each GT
+word — is the replacement: it checks exactly what integrity32 does not
+(whether each token is what the program was given / stored), and it never
+needs updating when a row is rebound.
+
 ---
 
 ## 7. Summary of corrections
