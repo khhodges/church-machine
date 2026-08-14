@@ -78,5 +78,6 @@
     "status": "unknown"
   },
   "lump_version": 13,
-  "compiled_at": 1781626299.266924
+  "compiled_at": 1781626299.266924,
+  "binary_hash": "2401e2d849f21e8cd37c187081bce54139d48a3ad0563f6f2406bca0e06311f3"
 }

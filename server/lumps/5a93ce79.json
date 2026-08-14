@@ -24,7 +24,7 @@
       "slot": 0,
       "name": "SlideRule.Multiply",
       "target_ns": 16,
-      "note": "SlideRule E-GT (NS[16]) — provides floating-point Multiply, Divide, and Sqrt for the Bernoulli series computation",
+      "note": "SlideRule E-GT (NS[16]) \u2014 provides floating-point Multiply, Divide, and Sqrt for the Bernoulli series computation",
       "gt": "0x48800010"
     }
   ],
@@ -50,5 +50,6 @@
     "E"
   ],
   "lump_version": 2,
-  "compiled_at": 1779196707.4638784
+  "compiled_at": 1779196707.4638784,
+  "binary_hash": "1ade69d75de8daad59d5163517f1693929a8b11b1eadccab5fb1e538def775ee"
 }

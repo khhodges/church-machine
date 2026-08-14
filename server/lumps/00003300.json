@@ -14,15 +14,15 @@
       "length": 3,
       "description": "Arm the transmitter after pre-loading frame bytes into ETH_TX_DATA (offset 6). DR1 = dataGT (reserved for future DMA path, ignored in MMIO model); DR2 = byte count. Returns DR1 = byteLen.",
       "inputs": [
-        "DR1: dataGT — reserved for future DMA path; ignored in MMIO model",
-        "DR2: byteLen — byte count of frame pre-loaded in TX FIFO (1–1518)"
+        "DR1: dataGT \u2014 reserved for future DMA path; ignored in MMIO model",
+        "DR2: byteLen \u2014 byte count of frame pre-loaded in TX FIFO (1\u20131518)"
       ],
       "outputs": [
         "DR1: byteLen (bytes committed to transmit)"
       ],
       "comments": [
-        "LOAD CR7, CR6, #0   — EthernetDevice GT from c-list slot 0 → CR7",
-        "DWRITE DR2, CR7, #2 — byteLen → ETH_TX_LEN (commits queued bytes, starts TX)",
+        "LOAD CR7, CR6, #0   \u2014 EthernetDevice GT from c-list slot 0 \u2192 CR7",
+        "DWRITE DR2, CR7, #2 \u2014 byteLen \u2192 ETH_TX_LEN (commits queued bytes, starts TX)",
         "RETURN"
       ]
     },
@@ -36,8 +36,8 @@
         "DR1: 0 = no frame waiting; N = byte count of pending frame (drain via ETH_RX_DATA reads)"
       ],
       "comments": [
-        "LOAD CR7, CR6, #0  — EthernetDevice GT from c-list slot 0 → CR7",
-        "DREAD DR1, CR7, #3 — ETH_RX_LEN → DR1 (0 = no frame, N = byte count)",
+        "LOAD CR7, CR6, #0  \u2014 EthernetDevice GT from c-list slot 0 \u2192 CR7",
+        "DREAD DR1, CR7, #3 \u2014 ETH_RX_LEN \u2192 DR1 (0 = no frame, N = byte count)",
         "RETURN"
       ]
     },
@@ -48,15 +48,15 @@
       "description": "Register a UDP session endpoint. DR1 = packed IPv4 address (network byte order); DR2 = port number. Returns DR1 = 0 on success, -1 on fault.",
       "inputs": [
         "DR1: packed IPv4 address in network byte order (e.g. 0xC0A80001 = 192.168.0.1)",
-        "DR2: UDP port number (1–65535)"
+        "DR2: UDP port number (1\u201365535)"
       ],
       "outputs": [
         "DR1: 0 on success, -1 on fault"
       ],
       "comments": [
-        "LOAD CR7, CR6, #0   — EthernetDevice GT from c-list slot 0 → CR7",
-        "DWRITE DR1, CR7, #4 — ipv4 → ETH_IP_ADDR",
-        "DWRITE DR2, CR7, #5 — port → ETH_PORT",
+        "LOAD CR7, CR6, #0   \u2014 EthernetDevice GT from c-list slot 0 \u2192 CR7",
+        "DWRITE DR1, CR7, #4 \u2014 ipv4 \u2192 ETH_IP_ADDR",
+        "DWRITE DR2, CR7, #5 \u2014 port \u2192 ETH_PORT",
         "RETURN"
       ]
     },
@@ -70,8 +70,8 @@
         "DR1: 0 = link down, 1 = link up, 2 = negotiating"
       ],
       "comments": [
-        "LOAD CR7, CR6, #0  — EthernetDevice GT from c-list slot 0 → CR7",
-        "DREAD DR1, CR7, #1 — ETH_STATUS direct 3-state value → DR1",
+        "LOAD CR7, CR6, #0  \u2014 EthernetDevice GT from c-list slot 0 \u2192 CR7",
+        "DREAD DR1, CR7, #1 \u2014 ETH_STATUS direct 3-state value \u2192 DR1",
         "RETURN"
       ]
     }
@@ -85,5 +85,6 @@
       "7": "EthernetDevice"
     }
   },
-  "source": "// Ethernet abstraction — token 00003300\n// Provides raw Ethernet frame send/receive for the QMTECH Wukong XC7A100T.\n//\n// Identity: token 00003300.  NS slot assignment is determined at load time by\n// the Locator/loader and is not a stable identity.  Callers identify this\n// abstraction by its token, never by slot number.\n//\n// This abstraction is the Application LUMP in the minimal three-LUMP ROM image\n// (Namespace + Thread + Ethernet) for the XC7A100T board.  Once running, the\n// startup thread calls Status/Connect to bring up the link, then the Locator\n// can fetch all remaining abstractions from the IDE/Mum Tunnel on demand over\n// Ethernet, replacing UART as the lazy-load transport.\n//\n// MMIO model — caller responsibility:\n//   TX path: write frame bytes sequentially to ETH_TX_DATA (offset 6), then\n//            call Send(byteLen) to arm the transmitter.  The dataGT parameter\n//            is reserved for the future DMA path and is not consumed here.\n//   RX path: call Receive() to poll.  DR1 = 0 if no frame is waiting;\n//            DR1 = N (byte count) if a frame is ready.  Drain the frame with\n//            N sequential DREAD CR7,#7 reads from ETH_RX_DATA.\n//\n// Hardware: RGMII PHY interface (RTL8211E) on QMTECH Wukong XC7A100T.\n//   MMIO base 0x40001000 (EthernetDevice GT, device_class=ETH):\n//     offset 0  ETH_CTRL    — bit[0]=reset, bit[1]=enable\n//     offset 1  ETH_STATUS  — 0=link down, 1=link up, 2=negotiating\n//     offset 2  ETH_TX_LEN  — write byte length to trigger TX\n//     offset 3  ETH_RX_LEN  — byte count of pending frame (0 = no frame)\n//     offset 4  ETH_IP_ADDR — packed IPv4 address (network byte order)\n//     offset 5  ETH_PORT    — UDP port number\n//     offset 6  ETH_TX_DATA — TX FIFO (write bytes here before Send)\n//     offset 7  ETH_RX_DATA — RX FIFO (drain bytes here after Receive returns N)\n//\n// C-list:\n//   CR6[0] (slot 0, target token 00003300) = EthernetDevice capability (hardware MMIO GT)\n//\n// Permissions granted to callers: E (enter/call only).\n\nabstraction Ethernet {\n    capabilities {\n        EthernetDevice\n    }\n\n    // Send(byteLen) — arm the transmitter after pre-loading the TX FIFO.\n    //\n    // The caller must write all frame bytes to ETH_TX_DATA (offset 6) via\n    // sequential DWRITE calls before invoking Send().  Writing byteLen to\n    // ETH_TX_LEN (offset 2) commits the queued bytes and starts the TX.\n    //\n    // DR1 (dataGT) is accepted for ABI compatibility with the future DMA\n    // path but is not used in the MMIO model.\n    //\n    // Compiled instructions (3 words):\n    //   LOAD  CR7, CR6, #0      ; EthernetDevice GT → CR7\n    //   DWRITE DR2, CR7, #2     ; byteLen → ETH_TX_LEN (triggers TX)\n    //   RETURN\n    //\n    // Inputs:  DR1 = dataGT  (future DMA path; ignored in MMIO model)\n    //          DR2 = byteLen (byte count of frame pre-loaded in TX FIFO)\n    // Outputs: DR1 = byteLen (bytes committed to transmit)\n    method Send(dataGT, byteLen) {\n        eth = load(CR6, 0)\n        write(eth, 2, byteLen)\n        return(byteLen)\n    }\n\n    // Receive() — poll for a pending frame (non-blocking).\n    //\n    // Reads ETH_RX_LEN (offset 3) into DR1.  A non-zero value means a frame\n    // is waiting; drain it with DR1 sequential DREAD CR7,#7 reads from\n    // ETH_RX_DATA before calling Receive() again.\n    //\n    // Compiled instructions (3 words):\n    //   LOAD  CR7, CR6, #0      ; EthernetDevice GT → CR7\n    //   DREAD DR1, CR7, #3      ; ETH_RX_LEN → DR1 (0 = no frame, N = byte count)\n    //   RETURN\n    //\n    // Inputs:  (none)\n    // Outputs: DR1 = 0 if no frame waiting; N = byte count of pending frame\n    method Receive() {\n        eth = load(CR6, 0)\n        bytecount = read(eth, 3)\n        return(bytecount)\n    }\n\n    // Connect(ipv4, port) — register a UDP session endpoint.\n    //\n    // Compiled instructions (4 words):\n    //   LOAD  CR7, CR6, #0      ; EthernetDevice GT → CR7\n    //   DWRITE DR1, CR7, #4     ; ipv4 → ETH_IP_ADDR\n    //   DWRITE DR2, CR7, #5     ; port → ETH_PORT\n    //   RETURN\n    //\n    // Inputs:  DR1 = packed IPv4 address in network byte order\n    //                (e.g. 0xC0A80001 = 192.168.0.1)\n    //          DR2 = UDP port number (1–65535)\n    // Outputs: DR1 = 0 on success, -1 on fault\n    method Connect(ipv4, port) {\n        eth = load(CR6, 0)\n        write(eth, 4, ipv4)\n        write(eth, 5, port)\n        return(0)\n    }\n\n    // Status() — query hardware link state.\n    //\n    // Reads ETH_STATUS (offset 1) and returns it directly.  The hardware\n    // encodes state as a direct value (not a bit-field):\n    //   0 = link down (cable disconnected or no signal)\n    //   1 = link up   (ready to send and receive)\n    //   2 = negotiating (auto-negotiation in progress)\n    //\n    // Compiled instructions (3 words):\n    //   LOAD  CR7, CR6, #0      ; EthernetDevice GT → CR7\n    //   DREAD DR1, CR7, #1      ; ETH_STATUS → DR1\n    //   RETURN\n    //\n    // Inputs:  (none)\n    // Outputs: DR1 = 0 (link down) | 1 (link up) | 2 (negotiating)\n    method Status() {\n        eth = load(CR6, 0)\n        s = read(eth, 1)\n        return(s)\n    }\n}\n"
+  "source": "// Ethernet abstraction \u2014 token 00003300\n// Provides raw Ethernet frame send/receive for the QMTECH Wukong XC7A100T.\n//\n// Identity: token 00003300.  NS slot assignment is determined at load time by\n// the Locator/loader and is not a stable identity.  Callers identify this\n// abstraction by its token, never by slot number.\n//\n// This abstraction is the Application LUMP in the minimal three-LUMP ROM image\n// (Namespace + Thread + Ethernet) for the XC7A100T board.  Once running, the\n// startup thread calls Status/Connect to bring up the link, then the Locator\n// can fetch all remaining abstractions from the IDE/Mum Tunnel on demand over\n// Ethernet, replacing UART as the lazy-load transport.\n//\n// MMIO model \u2014 caller responsibility:\n//   TX path: write frame bytes sequentially to ETH_TX_DATA (offset 6), then\n//            call Send(byteLen) to arm the transmitter.  The dataGT parameter\n//            is reserved for the future DMA path and is not consumed here.\n//   RX path: call Receive() to poll.  DR1 = 0 if no frame is waiting;\n//            DR1 = N (byte count) if a frame is ready.  Drain the frame with\n//            N sequential DREAD CR7,#7 reads from ETH_RX_DATA.\n//\n// Hardware: RGMII PHY interface (RTL8211E) on QMTECH Wukong XC7A100T.\n//   MMIO base 0x40001000 (EthernetDevice GT, device_class=ETH):\n//     offset 0  ETH_CTRL    \u2014 bit[0]=reset, bit[1]=enable\n//     offset 1  ETH_STATUS  \u2014 0=link down, 1=link up, 2=negotiating\n//     offset 2  ETH_TX_LEN  \u2014 write byte length to trigger TX\n//     offset 3  ETH_RX_LEN  \u2014 byte count of pending frame (0 = no frame)\n//     offset 4  ETH_IP_ADDR \u2014 packed IPv4 address (network byte order)\n//     offset 5  ETH_PORT    \u2014 UDP port number\n//     offset 6  ETH_TX_DATA \u2014 TX FIFO (write bytes here before Send)\n//     offset 7  ETH_RX_DATA \u2014 RX FIFO (drain bytes here after Receive returns N)\n//\n// C-list:\n//   CR6[0] (slot 0, target token 00003300) = EthernetDevice capability (hardware MMIO GT)\n//\n// Permissions granted to callers: E (enter/call only).\n\nabstraction Ethernet {\n    capabilities {\n        EthernetDevice\n    }\n\n    // Send(byteLen) \u2014 arm the transmitter after pre-loading the TX FIFO.\n    //\n    // The caller must write all frame bytes to ETH_TX_DATA (offset 6) via\n    // sequential DWRITE calls before invoking Send().  Writing byteLen to\n    // ETH_TX_LEN (offset 2) commits the queued bytes and starts the TX.\n    //\n    // DR1 (dataGT) is accepted for ABI compatibility with the future DMA\n    // path but is not used in the MMIO model.\n    //\n    // Compiled instructions (3 words):\n    //   LOAD  CR7, CR6, #0      ; EthernetDevice GT \u2192 CR7\n    //   DWRITE DR2, CR7, #2     ; byteLen \u2192 ETH_TX_LEN (triggers TX)\n    //   RETURN\n    //\n    // Inputs:  DR1 = dataGT  (future DMA path; ignored in MMIO model)\n    //          DR2 = byteLen (byte count of frame pre-loaded in TX FIFO)\n    // Outputs: DR1 = byteLen (bytes committed to transmit)\n    method Send(dataGT, byteLen) {\n        eth = load(CR6, 0)\n        write(eth, 2, byteLen)\n        return(byteLen)\n    }\n\n    // Receive() \u2014 poll for a pending frame (non-blocking).\n    //\n    // Reads ETH_RX_LEN (offset 3) into DR1.  A non-zero value means a frame\n    // is waiting; drain it with DR1 sequential DREAD CR7,#7 reads from\n    // ETH_RX_DATA before calling Receive() again.\n    //\n    // Compiled instructions (3 words):\n    //   LOAD  CR7, CR6, #0      ; EthernetDevice GT \u2192 CR7\n    //   DREAD DR1, CR7, #3      ; ETH_RX_LEN \u2192 DR1 (0 = no frame, N = byte count)\n    //   RETURN\n    //\n    // Inputs:  (none)\n    // Outputs: DR1 = 0 if no frame waiting; N = byte count of pending frame\n    method Receive() {\n        eth = load(CR6, 0)\n        bytecount = read(eth, 3)\n        return(bytecount)\n    }\n\n    // Connect(ipv4, port) \u2014 register a UDP session endpoint.\n    //\n    // Compiled instructions (4 words):\n    //   LOAD  CR7, CR6, #0      ; EthernetDevice GT \u2192 CR7\n    //   DWRITE DR1, CR7, #4     ; ipv4 \u2192 ETH_IP_ADDR\n    //   DWRITE DR2, CR7, #5     ; port \u2192 ETH_PORT\n    //   RETURN\n    //\n    // Inputs:  DR1 = packed IPv4 address in network byte order\n    //                (e.g. 0xC0A80001 = 192.168.0.1)\n    //          DR2 = UDP port number (1\u201365535)\n    // Outputs: DR1 = 0 on success, -1 on fault\n    method Connect(ipv4, port) {\n        eth = load(CR6, 0)\n        write(eth, 4, ipv4)\n        write(eth, 5, port)\n        return(0)\n    }\n\n    // Status() \u2014 query hardware link state.\n    //\n    // Reads ETH_STATUS (offset 1) and returns it directly.  The hardware\n    // encodes state as a direct value (not a bit-field):\n    //   0 = link down (cable disconnected or no signal)\n    //   1 = link up   (ready to send and receive)\n    //   2 = negotiating (auto-negotiation in progress)\n    //\n    // Compiled instructions (3 words):\n    //   LOAD  CR7, CR6, #0      ; EthernetDevice GT \u2192 CR7\n    //   DREAD DR1, CR7, #1      ; ETH_STATUS \u2192 DR1\n    //   RETURN\n    //\n    // Inputs:  (none)\n    // Outputs: DR1 = 0 (link down) | 1 (link up) | 2 (negotiating)\n    method Status() {\n        eth = load(CR6, 0)\n        s = read(eth, 1)\n        return(s)\n    }\n}\n",
+  "binary_hash": "a0f1e83804a613773d356c3743840f598f082d8da97e82e8524e44b3a50413db"
 }

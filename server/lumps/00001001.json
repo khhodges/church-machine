@@ -17,7 +17,7 @@
     {
       "slot": 0,
       "name": "SlideRule (Haskell).SelfDataR",
-      "note": "self-data read-only cap — grants read access to the embedded constant tables baked into the Haskell-style SlideRule lump body"
+      "note": "self-data read-only cap \u2014 grants read access to the embedded constant tables baked into the Haskell-style SlideRule lump body"
     }
   ],
   "pet_names": {
@@ -25,5 +25,6 @@
     "CR": {
       "0": "SlideRule (Haskell).SelfDataR"
     }
-  }
+  },
+  "binary_hash": "62237f701bf8a6dfc758741c7cf05baa21baa73d6d46ae82ed9c949b6d217ad5"
 }

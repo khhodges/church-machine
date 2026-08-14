@@ -41,5 +41,6 @@
   "grants": [
     "E"
   ],
-  "lump_version": 1
+  "lump_version": 1,
+  "binary_hash": "9467635a9b627617657fa2fa215b8085569050e33c96f791988faa12c070f4e0"
 }

@@ -281,5 +281,6 @@
   ],
   "author": "Final Author",
   "version": "3.1.0",
-  "lump_version": 0
+  "lump_version": 0,
+  "binary_hash": "a096df1ce67baa7c34cecee247b42ffeb633493b1bf1d7011f5d5597ed538a78"
 }

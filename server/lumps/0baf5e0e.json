@@ -24,7 +24,7 @@
       "slot": 0,
       "name": "SlideRule.Multiply",
       "target_ns": 16,
-      "note": "SlideRule E-GT (NS[16]) — provides floating-point arithmetic for the buggy Ada Note G computation (off-by-one in initial conditions)",
+      "note": "SlideRule E-GT (NS[16]) \u2014 provides floating-point arithmetic for the buggy Ada Note G computation (off-by-one in initial conditions)",
       "gt": "0x48800010"
     }
   ],
@@ -50,5 +50,6 @@
     "E"
   ],
   "lump_version": 2,
-  "compiled_at": 1779196700.2854762
+  "compiled_at": 1779196700.2854762,
+  "binary_hash": "03c40525fc4857d0c5cf9f1dc5b0755ac889301ef9452bb6a8d635452bc2684a"
 }
