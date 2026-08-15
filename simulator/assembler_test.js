@@ -8937,6 +8937,47 @@ Add a method called Run
         capErrs.map(e => e.message).join('; '));
 }
 
+// ── Source-extraction helpers (pattern-based, immune to line-number drift) ────
+// These helpers locate code by its known first-line signature so tests never
+// break just because surrounding code grew or shrank.
+
+// _srcExtractBalanced: extract a complete JS block starting at the first line
+// matching `startSig` (search from `fromIdx`). Counts `{`/`}` to find the
+// balanced close. Returns { src, endIdx }.
+function _srcExtractBalanced(lines, startSig, label, fromIdx) {
+    const si = lines.findIndex((l, i) => i >= (fromIdx || 0) && l.includes(startSig));
+    if (si < 0) {
+        process.stderr.write('[assembler_test] PATTERN NOT FOUND: "' + startSig + '" — ' + label + '\n');
+        return { src: '', endIdx: fromIdx || 0 };
+    }
+    let depth = 0;
+    for (let i = si; i < lines.length; i++) {
+        for (const ch of lines[i]) {
+            if (ch === '{') depth++;
+            else if (ch === '}') { if (--depth === 0) return { src: lines.slice(si, i + 1).join('\n'), endIdx: i }; }
+        }
+    }
+    return { src: lines.slice(si).join('\n'), endIdx: lines.length - 1 };
+}
+
+// _srcExtract: extract from the line matching `startSig` through the line
+// matching `endSig` (inclusive) plus `endOffset` additional lines.
+// `fromIdx` restricts the search start. Emits diagnostics to stderr on failure.
+function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
+    const si = lines.findIndex((l, i) => i >= (fromIdx || 0) && l.includes(startSig));
+    if (si < 0) {
+        process.stderr.write('[assembler_test] PATTERN NOT FOUND: "' + startSig + '" — ' + label + '\n');
+        return { src: '', endIdx: fromIdx || 0 };
+    }
+    const ei = lines.findIndex((l, i) => i >= si && l.includes(endSig));
+    if (ei < 0) {
+        process.stderr.write('[assembler_test] END PATTERN NOT FOUND: "' + endSig + '" — ' + label + '\n');
+        return { src: lines.slice(si).join('\n'), endIdx: lines.length - 1 };
+    }
+    const lastIdx = ei + (endOffset || 0);
+    return { src: lines.slice(si, lastIdx + 1).join('\n'), endIdx: lastIdx };
+}
+
 // ── ABS-H: Abstractions panel search-highlight regression (task-1379) ────────
 // Tests for _absHighlightText / _absHighlightNodes as called by renderAbstractions().
 //
@@ -8945,13 +8986,6 @@ Add a method called Run
 // minimum globals renderAbstractions() needs.  If someone removes the
 // _absHighlightText() calls from renderAbstractions(), or renames the element
 // classes, these tests will fail immediately.
-//
-// Line ranges (1-indexed) extracted below must be kept in sync with source:
-//   app-compile.js      _absHighlightNodes  lines 110–133
-//   app-compile.js      _absHighlightText   lines 138–149
-//   app-abstractions.js renderAbstractions  lines 388–494 (incl. module-level
-//                                            `let _absSearchQuery` at line 388,
-//                                            which renderAbstractions() reads/writes)
 {
     const { JSDOM } = require('jsdom');
     const fs   = require('fs');
@@ -8962,10 +8996,25 @@ Add a method called Run
     const absLines = fs.readFileSync(
         path.join(__dirname, 'app-abstractions.js'), 'utf8').split('\n');
 
-    // Extract real function source text (slice uses 0-based indices).
-    const highlightNodesSrc = compileLines.slice(109, 133).join('\n');
-    const highlightTextSrc  = compileLines.slice(137, 149).join('\n');
-    const renderAbsSrc      = absLines.slice(387, 494).join('\n');
+    // Pattern-based extraction — immune to line-number drift.
+    const { src: highlightNodesSrc } = _srcExtractBalanced(
+        compileLines, 'function _absHighlightNodes(node, re)',
+        '_absHighlightNodes in app-compile.js');
+    const { src: highlightTextSrc } = _srcExtractBalanced(
+        compileLines, 'function _absHighlightText(el, q)',
+        '_absHighlightText in app-compile.js');
+    // renderAbstractions section includes the module-level `let _absSearchQuery`
+    // declaration (which renderAbstractions() reads/writes) followed by the
+    // function itself.  Extract from that `let` declaration through the closing
+    // `}` of renderAbstractions().
+    const { endIdx: _renderAbsFnEnd } = _srcExtractBalanced(
+        absLines, 'function renderAbstractions()',
+        'renderAbstractions in app-abstractions.js');
+    const _renderAbsStart = absLines.findIndex(l => l.includes("let _absSearchQuery = ''"));
+    const renderAbsSrc = (_renderAbsStart >= 0 && _renderAbsFnEnd > _renderAbsStart)
+        ? absLines.slice(_renderAbsStart, _renderAbsFnEnd + 1).join('\n') : '';
+    if (!renderAbsSrc) process.stderr.write(
+        '[assembler_test] EXTRACTION FAILED: renderAbstractions section in app-abstractions.js\n');
 
     // Verify extraction found the right functions — fail fast rather than giving
     // misleading results if line numbers drift after a refactor.
@@ -9844,19 +9893,40 @@ Add a method called Run
 
     const compileLines = fs.readFileSync(
         path.join(__dirname, 'app-compile.js'), 'utf8').split('\n');
-    // Line ranges (1-indexed) must be kept in sync with app-compile.js:
-    //   resolvedCaps capability-name → nsIndex resolution: lines 1400–1440
-    //   lumpWords allocation + c-list Golden Token write: lines 1441–1470
-    const resolveSrc = compileLines.slice(1399, 1440).join('\n');
-    const clistSrc    = compileLines.slice(1440, 1470).join('\n');
+    // Pattern-based extraction — locates each block by its known first-line
+    // signature so the test survives future edits to the surrounding code.
+    //
+    // resolveSrc: the `const resolvedCaps = caps.map(...)` declaration.
+    //   Start: `const resolvedCaps = caps.map(`
+    //   End:   the return statement inside the map callback, +1 to include
+    //          the closing `});` on the next line.
+    const { src: resolveSrc, endIdx: _resolveEnd } = _srcExtract(
+        compileLines,
+        'const resolvedCaps = caps.map(',
+        'return { name: capName, rights: capRights, nsIndex: target, grants: capGrants };',
+        1,
+        'resolvedCaps block in app-compile.js');
+    //
+    // clistSrc: the `const lumpWords` allocation + c-list GT write for-loop.
+    //   Start: `const lumpWords = new Uint32Array(lumpSize)` (search AFTER
+    //          resolveSrc so the second occurrence at line ~1870 is not matched).
+    //   End:   the null-GT else-branch write, +2 to include the two closing
+    //          `}` lines that close the else-block and the for-loop.
+    const { src: clistSrc } = _srcExtract(
+        compileLines,
+        'const lumpWords = new Uint32Array(lumpSize)',
+        'lumpWords[clistStart + i] = 0x00000000;',
+        2,
+        'lumpWords/c-list block in app-compile.js',
+        _resolveEnd + 1);
 
     assert('CAP-GT-SRC1: extracted resolvedCaps block from app-compile.js',
         resolveSrc.includes('const resolvedCaps = caps.map('),
-        'Line range 1357-1376 no longer contains the resolvedCaps block — update the slice');
+        'Pattern "const resolvedCaps = caps.map(" not found in app-compile.js — check _srcExtract');
     assert('CAP-GT-SRC2: extracted c-list write block from app-compile.js',
         clistSrc.includes('const lumpWords = new Uint32Array(lumpSize);') &&
         clistSrc.includes('const clistStart = lumpSize - cc;') && clistSrc.includes('lumpWords[clistStart + i]'),
-        'Line range 1378-1397 no longer contains the lumpWords/c-list write block — update the slice');
+        'Pattern "const lumpWords = new Uint32Array(lumpSize)" not found after resolvedCaps — check _srcExtract');
 
     // Real production registry shape: object keyed by numeric index.
     const registry = new AbstractionRegistry();
@@ -10112,14 +10182,19 @@ Add a method called Run
     const path = require('path');
     const compileLines = fs.readFileSync(
         path.join(__dirname, 'app-compile.js'), 'utf8').split('\n');
-    // Lines 1345–1382 (1-indexed) contain the _checkBootEntryReturn() IIFE.
-    // Update both slice indices if the IIFE is moved inside app-compile.js.
-    const berSrc = compileLines.slice(1344, 1382).join('\n');
+    // Pattern-based extraction — locates the IIFE by its known first-line
+    // signature and its closing `})();` so the test survives future edits.
+    const { src: berSrc } = _srcExtract(
+        compileLines,
+        '(function _checkBootEntryReturn()',
+        '})();',
+        0,
+        '_checkBootEntryReturn IIFE in app-compile.js');
 
     assert('BER-SRC1: extracted _checkBootEntryReturn IIFE from app-compile.js',
         berSrc.includes('(function _checkBootEntryReturn()') &&
         berSrc.includes('[BOOT-RETURN]'),
-        'Line range 1345–1382 no longer contains the IIFE — update the slice');
+        'Pattern "(function _checkBootEntryReturn()" not found in app-compile.js — check _srcExtract');
 
     // Helper: run the IIFE in a controlled context; returns what _showAsmWarnings
     // received, or null if it was never called.
