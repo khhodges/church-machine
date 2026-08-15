@@ -5348,6 +5348,11 @@ def save_lump():
         _sl_words[0] = (_sl_hdr & 0xFFFFFF00) | 0x01
         _sl_cc2 = 1
 
+    # Pad to the logical lump size so the c-list area is always reachable,
+    # even when the client sends a compact binary (only non-zero words).
+    if len(_sl_words) < _sl_lsz:
+        _sl_words.extend([0] * (_sl_lsz - len(_sl_words)))
+
     _clist_row0_idx = _sl_lsz - _sl_cc2
     if 0 < _clist_row0_idx < len(_sl_words):
         _sl_words[_clist_row0_idx] = _self_gt

@@ -12997,17 +12997,31 @@ function confirmSaveToNamespace() {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify(_svPayload),
-        }).then(function(r) { return r.json(); }).then(function(resp) {
-            if (resp && resp.ok) {
-                if (window.LumpRegistry) {
-                    window.LumpRegistry.setCurrent(resp.token);
-                    window.LumpRegistry.setPending(resp.token);
+        }).then(function(r) {
+            return r.json().then(function(resp) {
+                if (!r.ok) {
+                    // Surface the server's rejection reason so the user can act on it.
+                    var _errMsg = (resp && resp.error) ? resp.error : ('HTTP ' + r.status);
+                    console.error('[confirmSaveToNamespace] server rejected save:', _errMsg, resp);
+                    if (typeof _showFpgaToast === 'function') {
+                        _showFpgaToast('LUMP Repository Save Failed', _errMsg, 'error', 10000);
+                    }
+                } else if (resp && resp.ok && resp.token) {
+                    // Use the server-returned token — it reflects the final binary
+                    // (server injects the self-GT into c-list[0] before hashing).
+                    if (window.LumpRegistry) {
+                        window.LumpRegistry.setCurrent(resp.token);
+                        window.LumpRegistry.setPending(resp.token);
+                    }
                 }
+                // Always refresh the LUMP browser so the user sees the current state.
+                if (typeof renderLumps === 'function') renderLumps();
+            });
+        }).catch(function(err) {
+            console.error('[confirmSaveToNamespace] network error during save:', err);
+            if (typeof _showFpgaToast === 'function') {
+                _showFpgaToast('LUMP Repository Save Failed', 'Network error — check your connection.', 'error', 8000);
             }
-            // Always refresh the LUMP browser — even on error the list may have
-            // changed if a concurrent save completed.
-            if (typeof renderLumps === 'function') renderLumps();
-        }).catch(function() {
             if (typeof renderLumps === 'function') renderLumps();
         });
     }
