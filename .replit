@@ -141,6 +141,10 @@ args = "openin-links-tests"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
+args = "open-lump-freshness-tests"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
 args = "lump-warning-tests"
 
 [[workflows.workflow.tasks]]
@@ -592,6 +596,17 @@ args = "node simulator/test_openin_links.js"
 outputType = "console"
 
 [[workflows.workflow]]
+name = "open-lump-freshness-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_open_lump_freshness.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
 name = "lump-warning-tests"
 author = "agent"
 
@@ -686,17 +701,6 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node simulator/test_bare_space_ns_fallback.js"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
-name = "return-cr14-trace-tests"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node simulator/test_return_cr14_trace.js"
 
 [workflows.workflow.metadata]
 outputType = "console"
