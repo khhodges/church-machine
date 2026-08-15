@@ -25,6 +25,10 @@ R17  Every example-tab button in simulator/index.html whose tooltip label or dis
 R18  Every top-level key of the knownPurposes dict in simulator/app-absdetail.js must
      name a currently-live entry in the abstraction registry (catches stale or
      wrongly-cased method-doc keys after an abstraction rename).
+R20  Every manifest entry with a `dot_name` field must have a canonical-format
+     `filename` ({Dot.Name}.{n}.{8hex}.lump), and recomputing sha256(dot_name_utf8
+     + lump_bytes)[:8] must equal the Number segment in that filename (catches
+     file renames or binary replacements that were not paired with a migration run).
 
 Failure messages are written to be self-diagnosing: they state what was found,
 what was expected, and which file to correct.
@@ -1656,4 +1660,260 @@ class TestR19_NoProductionStubLumps:
             f"{name} (token {token}): all {cw} code word(s) are RETURN instructions "
             "— this is a stub LUMP.  Implement the methods or mark status='wip' "
             "if still in development."
+        )
+
+
+# ── R20: canonical filename Number must match recomputed hash ─────────────────
+# Scope: ALL manifest entries that carry a dot_name field.
+# Having dot_name means the entry is under the canonical naming regime, so:
+#   1. filename must be set
+#   2. filename must match the canonical pattern
+#   3. the canonical file must exist on disk
+#   4. recomputed sha256(dot_name_utf8 + lump_bytes)[:8] must equal the Number
+#
+# Tests use pytest.fail (not pytest.skip) for missing/malformed data so future
+# regressions in migration coverage are hard failures, not silent omissions.
+
+_CANONICAL_FN_RE = _re.compile(r'^.+\.(\d+)\.([0-9a-f]{8})\.lump$', _re.IGNORECASE)
+
+# Parametrize on every entry that has dot_name (regardless of filename state).
+_R20_TOKENS = [
+    _me.get("token", "").lower()
+    for _me in MANIFEST
+    if _me.get("dot_name")
+]
+_R20_BY_TOKEN: dict = {
+    _me.get("token", "").lower(): _me
+    for _me in MANIFEST
+    if _me.get("dot_name")
+}
+
+
+class TestR20_CanonicalFilenameIntegrity:
+    """R20: Every manifest entry with a dot_name must have a canonical filename
+    whose Number matches sha256(dot_name_utf8 + lump_bytes)[:8].
+
+    dot_name present → entry is under canonical naming regime → all four
+    sub-rules are REQUIRED (not optional/skippable):
+      a. filename field is set
+      b. filename is in Dot.Name.n.XXXXXXXX.lump format
+      c. canonical file exists on disk
+      d. recomputed Number equals the filename's Number segment
+
+    A mismatch or missing file means migration did not complete correctly.
+    Fix by re-running: python3 scripts/migrate_lump_names.py
+    """
+
+    @pytest.mark.parametrize("token", _R20_TOKENS)
+    def test_canonical_filename_is_set_and_formatted(self, token):
+        """(a + b) filename is present and in canonical format."""
+        me = _R20_BY_TOKEN[token]
+        dot_name = me.get("dot_name", "")
+        filename = me.get("filename", "")
+        assert filename, (
+            f"token {token} (dot_name={dot_name!r}) has no filename in manifest.json.\n"
+            "A dot_name entry MUST have a canonical filename.\n"
+            "Fix: run scripts/migrate_lump_names.py"
+        )
+        assert _CANONICAL_FN_RE.match(filename), (
+            f"token {token} (dot_name={dot_name!r}): filename {filename!r} is not in\n"
+            "canonical Dot.Name.n.XXXXXXXX.lump format.\n"
+            "Fix: run scripts/migrate_lump_names.py"
+        )
+
+    @pytest.mark.parametrize("token", _R20_TOKENS)
+    def test_canonical_file_exists_on_disk(self, token):
+        """(c) The canonical file referenced by filename must exist on disk."""
+        me = _R20_BY_TOKEN[token]
+        dot_name = me.get("dot_name", "")
+        filename = me.get("filename", "")
+        if not filename or not _CANONICAL_FN_RE.match(filename):
+            pytest.fail(
+                f"token {token}: cannot check disk presence — filename {filename!r} "
+                "is absent or non-canonical (see test_canonical_filename_is_set_and_formatted)."
+            )
+        lump_path = os.path.join(LUMPS_DIR, filename)
+        assert os.path.isfile(lump_path), (
+            f"token {token} (dot_name={dot_name!r}): canonical file {filename!r} is "
+            "not on disk.\n"
+            "Fix: run scripts/migrate_lump_names.py"
+        )
+
+    @pytest.mark.parametrize("token", _R20_TOKENS)
+    def test_filename_number_matches_content(self, token):
+        """(d) Recomputed sha256(dot_name_utf8 + lump_bytes)[:8] must equal filename Number."""
+        me = _R20_BY_TOKEN[token]
+        dot_name = me.get("dot_name", "")
+        filename  = me.get("filename", "")
+        if not filename or not _CANONICAL_FN_RE.match(filename):
+            pytest.fail(
+                f"token {token}: cannot validate hash — filename {filename!r} is "
+                "absent or non-canonical (see test_canonical_filename_is_set_and_formatted)."
+            )
+        lump_path = os.path.join(LUMPS_DIR, filename)
+        if not os.path.isfile(lump_path):
+            pytest.fail(
+                f"token {token}: canonical file {filename!r} missing on disk "
+                "(see test_canonical_file_exists_on_disk)."
+            )
+        with open(lump_path, "rb") as _f:
+            raw = _f.read()
+        n_words = len(raw) // 4
+        lump_bytes = raw[: n_words * 4]
+
+        _m = _CANONICAL_FN_RE.match(filename)
+        expected_number = _m.group(2).lower()
+
+        h = hashlib.sha256()
+        h.update(dot_name.encode("utf-8"))
+        h.update(lump_bytes)
+        actual_number = h.hexdigest()[:8]
+
+        assert actual_number == expected_number, (
+            f"Filename integrity failure for {filename} (token {token}):\n"
+            f"  dot_name        : {dot_name!r}\n"
+            f"  expected Number : {expected_number}  (from filename)\n"
+            f"  actual Number   : {actual_number}  (sha256({dot_name!r} + {len(lump_bytes)}b)[:8])\n"
+            "The file was renamed without updating its content or its content was\n"
+            "replaced without renaming.  Fix by re-running:\n"
+            "  python3 scripts/migrate_lump_names.py"
+        )
+
+    def test_validation_helper_detects_tampered_hash(self, tmp_path):
+        """The server's check_lump_canonical_integrity helper must return an
+        error string (not True or None) when content or metadata is wrong.
+
+        Imports the real function from server/lump_integrity.py — not a
+        duplicate — so defects in the actual implementation are caught here.
+        Covers: good content, tampered bytes, wrong Number in filename, wrong
+        name segment, wrong issue_n, missing filename field, and legacy entry
+        (no dot_name → returns None).
+        """
+        import sys, json as _json, hashlib as _hl, struct as _st
+
+        # Make server/lump_integrity importable without triggering Flask startup
+        _server_dir = os.path.normpath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "server")
+        )
+        if _server_dir not in sys.path:
+            sys.path.insert(0, _server_dir)
+        from lump_integrity import check_lump_canonical_integrity as _check
+
+        # Build a minimal synthetic lump dir + manifest
+        dot_name = "TestAbstraction"
+        issue_n  = 1
+        lump_words = [0xF8000401, 0x1F000000] + [0] * 62  # 64-word lump
+        lump_bytes = _st.pack(">64I", *lump_words)
+        number = _hl.sha256(dot_name.encode("utf-8") + lump_bytes).hexdigest()[:8]
+        canonical_fname = f"{dot_name}.{issue_n}.{number}.lump"
+
+        (tmp_path / canonical_fname).write_bytes(lump_bytes)
+
+        def _write_manifest(entries):
+            (tmp_path / "manifest.json").write_text(_json.dumps(entries))
+
+        _write_manifest([{
+            "token": "deadcafe", "dot_name": dot_name,
+            "issue_n": issue_n, "filename": canonical_fname,
+        }])
+
+        # --- Good bytes → True
+        result = _check(str(tmp_path), "deadcafe", lump_bytes)
+        assert result is True, f"Expected True for valid content, got {result!r}"
+
+        # --- Tampered bytes → error string
+        tampered = bytearray(lump_bytes)
+        tampered[8] ^= 0xFF
+        result = _check(str(tmp_path), "deadcafe", bytes(tampered))
+        assert isinstance(result, str), (
+            f"Expected an error string for tampered content, got {result!r}"
+        )
+
+        # --- Wrong Number in filename → error string
+        wrong_number_fname = f"{dot_name}.{issue_n}.00000000.lump"
+        (tmp_path / wrong_number_fname).write_bytes(lump_bytes)
+        _write_manifest([{
+            "token": "deadcafe", "dot_name": dot_name,
+            "issue_n": issue_n, "filename": wrong_number_fname,
+        }])
+        result = _check(str(tmp_path), "deadcafe", lump_bytes)
+        assert isinstance(result, str), (
+            f"Expected error for mismatched Number in filename, got {result!r}"
+        )
+
+        # --- Wrong name segment in filename → error string
+        wrong_name_fname = f"WrongName.{issue_n}.{number}.lump"
+        (tmp_path / wrong_name_fname).write_bytes(lump_bytes)
+        _write_manifest([{
+            "token": "deadcafe", "dot_name": dot_name,
+            "issue_n": issue_n, "filename": wrong_name_fname,
+        }])
+        result = _check(str(tmp_path), "deadcafe", lump_bytes)
+        assert isinstance(result, str), (
+            f"Expected error for mismatched name segment in filename, got {result!r}"
+        )
+
+        # --- Wrong issue_n in filename → error string
+        wrong_issue_fname = f"{dot_name}.99.{number}.lump"
+        (tmp_path / wrong_issue_fname).write_bytes(lump_bytes)
+        _write_manifest([{
+            "token": "deadcafe", "dot_name": dot_name,
+            "issue_n": issue_n, "filename": wrong_issue_fname,
+        }])
+        result = _check(str(tmp_path), "deadcafe", lump_bytes)
+        assert isinstance(result, str), (
+            f"Expected error for mismatched issue_n in filename, got {result!r}"
+        )
+
+        # --- No filename field → error string
+        _write_manifest([{"token": "deadcafe", "dot_name": dot_name, "issue_n": issue_n}])
+        result = _check(str(tmp_path), "deadcafe", lump_bytes)
+        assert isinstance(result, str), (
+            f"Expected error when filename is absent, got {result!r}"
+        )
+
+        # --- Missing issue_n field → error string (required for every dot_name entry)
+        _write_manifest([{
+            "token": "deadcafe", "dot_name": dot_name, "filename": canonical_fname,
+        }])
+        result = _check(str(tmp_path), "deadcafe", lump_bytes)
+        assert isinstance(result, str), (
+            f"Expected error when issue_n is absent from a dot_name entry, got {result!r}"
+        )
+
+        # --- issue_n = 0 (non-positive) → error string
+        zero_issue_fname = f"{dot_name}.0.{number}.lump"
+        (tmp_path / zero_issue_fname).write_bytes(lump_bytes)
+        _write_manifest([{
+            "token": "deadcafe", "dot_name": dot_name,
+            "issue_n": 0, "filename": zero_issue_fname,
+        }])
+        result = _check(str(tmp_path), "deadcafe", lump_bytes)
+        assert isinstance(result, str), (
+            f"Expected error for issue_n=0 (non-positive), got {result!r}"
+        )
+
+        # --- issue_n is a non-numeric string → error string
+        _write_manifest([{
+            "token": "deadcafe", "dot_name": dot_name,
+            "issue_n": "NaN", "filename": canonical_fname,
+        }])
+        result = _check(str(tmp_path), "deadcafe", lump_bytes)
+        assert isinstance(result, str), (
+            f"Expected error for non-numeric issue_n='NaN', got {result!r}"
+        )
+
+        # --- Legacy entry (no dot_name) → None (no validation)
+        _write_manifest([{"token": "deadcafe"}])
+        result = _check(str(tmp_path), "deadcafe", lump_bytes)
+        assert result is None, (
+            f"Expected None for legacy entry with no dot_name, got {result!r}"
+        )
+
+        # --- Token not in manifest → None (not applicable)
+        _write_manifest([{"token": "othertok", "dot_name": dot_name,
+                          "issue_n": issue_n, "filename": canonical_fname}])
+        result = _check(str(tmp_path), "deadcafe", lump_bytes)
+        assert result is None, (
+            f"Expected None for token not in manifest, got {result!r}"
         )

@@ -20,7 +20,10 @@ function showLumpDetail(token) {
 
     const isNamespace = lump.lump_type === 'namespace' || lump.typ === 1;
     const _lumpTitleLabel = _lumpContentTypeLabel(lump);
-    titleEl.textContent = (lump.abstraction || 'Unknown Lump') +
+    // Prefer the canonical dot-name (e.g. "Scheduler.IRQ") over the raw
+    // abstraction field when the manifest supplies it.
+    const _lumpDisplayName = lump.dot_name || lump.abstraction || 'Unknown Lump';
+    titleEl.textContent = _lumpDisplayName +
         (isNamespace ? ' — Namespace LUMP' : ` — ${_lumpTitleLabel}`);
 
     // ── Symmetric Open-in link: LUMP → Abstraction Catalog ──────────────────
@@ -43,7 +46,22 @@ function showLumpDetail(token) {
     const _isCodeLump = !isNamespace && (lump.content_type === 'code' || lump.language === 'assembly' || lump.language === 'cloomc');
     let _headerStrip = `<div class="lump-header-strip">`;
     _headerStrip += _lumpTypeBadge(lump);
+    // Issue number badge (#n) — present on all post-migration canonical lumps.
+    // Shows the ownership generation: #1 = sole author, #2+ = after transfer.
+    {
+        const _issueN = lump.issue_n != null ? parseInt(lump.issue_n) : null;
+        if (_issueN != null)
+            _headerStrip += `<span class="lump-hs-chip lump-issue-badge" title="Issue #${_issueN}\u2014ownership generation; \u00231 = sole original author"><span class="lump-hs-label">#</span>${_issueN}</span>`;
+    }
     _headerStrip += `<span class="lump-hs-chip"><span class="lump-hs-label">Token</span>0x${_e(lump.token || '')}</span>`;
+    // Number chip — 8-hex content-identity digest from the canonical filename.
+    // Derived as sha256(dot_name_utf8 + lump_bytes)[:8]; stable across identical
+    // rebuilds; changes whenever the binary changes.
+    if (lump.filename) {
+        const _numMatch = lump.filename.match(/\.([0-9a-f]{8})\.lump$/i);
+        if (_numMatch)
+            _headerStrip += `<span class="lump-hs-chip lump-number-chip" title="Content identity Number \u2014 sha256(dot_name + binary)[:8]; changes when the binary changes"><span class="lump-hs-label">N\u00ba</span>${_numMatch[1]}</span>`;
+    }
     if (lump.ns_slot !== null && lump.ns_slot !== undefined) {
         const _liveSlot = _lumpLiveNsSlot(token);
         const _manifestSlot = parseInt(lump.ns_slot);

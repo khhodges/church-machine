@@ -4160,6 +4160,16 @@ def _extract_clist_from_words(words, base=0):
         return []
 
 
+# _check_lump_canonical_integrity is the server-facing alias for the
+# importable helper defined in lump_integrity.py.  Using the module keeps the
+# logic in one place and lets tests import the real implementation directly.
+try:
+    from lump_integrity import check_lump_canonical_integrity as _check_lump_canonical_integrity
+except ImportError:
+    # Fallback: try with server package prefix (when imported as a sub-module)
+    from server.lump_integrity import check_lump_canonical_integrity as _check_lump_canonical_integrity
+
+
 def _extract_clist_from_lump_file(lump_path):
     """Read a .lump binary (big-endian 32-bit words, no CRC prefix) and decode its C-List."""
     try:
@@ -4876,6 +4886,15 @@ def get_lump(token_hex):
                           ' (GitHub not configured — Mum Tunnel Library unavailable)'
             return jsonify({"error": f"Unknown lump token 0x{key8}{github_hint}"}), 404
 
+    # ── Canonical integrity check — fail-closed for canonical manifest entries ──
+    # Entries with a dot_name MUST pass hash validation before bytes are served.
+    # Returns None (legacy / library / unknown — serve freely), True (OK),
+    # or an error string (→ 409, no skip path).
+    _gl_lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    _gl_integrity = _check_lump_canonical_integrity(_gl_lumps_dir, key8, data)
+    if isinstance(_gl_integrity, str):
+        return jsonify({"error": _gl_integrity}), 409
+
     import hashlib as _hashlib_lump
     payload = _lump_with_crc(data)
     lump_sha256 = _hashlib_lump.sha256(data).hexdigest()
@@ -5163,8 +5182,16 @@ def save_lump():
         ]
         next_lump_version = (max(existing_versions_for_abs) + 1) if existing_versions_for_abs else 1
 
-    lump_filename    = f'{safe_name}_v{next_lump_version}.lump'
-    sidecar_filename = f'{safe_name}_v{next_lump_version}.json'
+    # ── Canonical filename derivation ─────────────────────────────────────────
+    # All new saves use Dot.Name.issue_n.Number.lump format.
+    # Number = sha256(dot_name_utf8 + lump_bytes)[:8]; includes dot_name so
+    # identical code compiled under different names produces different Numbers.
+    from lump_integrity import to_dot_name as _to_dot_name, compute_number as _compute_number
+    _dot_name_save = _to_dot_name(abs_name)
+    _issue_n_save  = int((_existing_entry or {}).get('issue_n', 1) or 1)
+    _number_save   = _compute_number(_dot_name_save, lump_bytes)
+    lump_filename    = f'{_dot_name_save}.{_issue_n_save}.{_number_save}.lump'
+    sidecar_filename = f'{_dot_name_save}.{_issue_n_save}.{_number_save}.json'
     lump_path        = os.path.join(lumps_dir, lump_filename)
     sidecar_path     = os.path.join(lumps_dir, sidecar_filename)
 
@@ -5228,6 +5255,22 @@ def save_lump():
     LAZY_LUMPS[token8] = lump_bytes
     LAZY_LUMPS[token8.lstrip('0') or '0'] = lump_bytes
 
+    # ── Backward-compat symlink ───────────────────────────────────────────────
+    # If a previous canonical file existed under a different Number (because the
+    # binary changed), replace it with a symlink to the new canonical name so
+    # any cached URL for the old Number still resolves during the transition.
+    if (_exist_filename and _exist_filename != lump_filename):
+        _old_compat = os.path.join(lumps_dir, _exist_filename)
+        if os.path.isfile(_old_compat) and not os.path.islink(_old_compat):
+            try:
+                os.remove(_old_compat)
+                os.symlink(lump_filename, _old_compat)
+                print(f'[lumps] Backward-compat symlink: {_exist_filename} → {lump_filename}',
+                      flush=True)
+            except OSError as _e:
+                logging.warning('[lumps] Backward-compat symlink %s→%s failed: %s',
+                                _exist_filename, lump_filename, _e)
+
     # ── Phase 6: Build and write sidecar JSON ─────────────────────────────────
     sidecar = {
         "token":         token8,
@@ -5270,6 +5313,8 @@ def save_lump():
         "issue_number":    _issue_number,
         "identity_string": _identity_string,
         "identity_hash":   _identity_hash,
+        "dot_name":        _dot_name_save,
+        "issue_n":         _issue_n_save,
     }
 
     import time as _time_save
@@ -5311,6 +5356,8 @@ def save_lump():
         "petname":       _petname,
         "issue_number":  _issue_number,
         "identity_hash": _identity_hash,
+        "dot_name":      _dot_name_save,
+        "issue_n":       _issue_n_save,
     }
     manifest.append(new_entry)
 
@@ -5647,6 +5694,13 @@ def list_lumps():
                     sidecar = json.load(fh)
                 lean = {k: v for k, v in sidecar.items() if k != 'source'}
                 lean['has_source'] = bool(sidecar.get('source', '').strip())
+                # Overwrite canonical identity fields from the manifest — the
+                # manifest is the authority for dot_name / issue_n / filename
+                # after migration; sidecar copies of these fields may be stale.
+                for _mkey in ('dot_name', 'issue_n', 'filename'):
+                    _mv = entry.get(_mkey)
+                    if _mv is not None:
+                        lean[_mkey] = _mv
                 result.append(lean)
                 continue
             except Exception:
@@ -5774,12 +5828,23 @@ def get_lump_words(token_hex):
         else:
             return jsonify({"error": f"Unknown lump 0x{key8}"}), 404
     num_words = len(data) // 4
-    words = list(_struct.unpack(f'>{num_words}I', data[:num_words * 4]))
+    lump_raw  = data[:num_words * 4]
+    words = list(_struct.unpack(f'>{num_words}I', lump_raw))
+
+    # ── Filename integrity check (fail-closed for canonical entries) ─────────
+    # Entries with a dot_name in the manifest MUST pass canonical hash
+    # validation before their bytes are served.  _check_lump_canonical_integrity
+    # returns None (legacy/unknown — serve freely), True (validated OK), or a
+    # string (error message — caller returns 409, no skip path).
+    import hashlib as _hl_words
+    _lh_lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    _integrity_result = _check_lump_canonical_integrity(_lh_lumps_dir, key8, lump_raw)
+    if isinstance(_integrity_result, str):
+        return jsonify({"error": _integrity_result}), 409
 
     # Compute a fresh SHA-256 of the binary bytes so the caller can verify
     # the served content matches the hash recorded at compile time.
-    import hashlib as _hl_words
-    _bh_live = _hl_words.sha256(data[:num_words * 4]).hexdigest()
+    _bh_live = _hl_words.sha256(lump_raw).hexdigest()
 
     # Backfill sidecar with binary_hash if it was compiled before this field existed.
     _lumps_dir_bh = os.path.join(os.path.dirname(__file__), 'lumps')

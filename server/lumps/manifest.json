@@ -157,7 +157,10 @@
         "self_data_r": true,
         "author": "Test",
         "version": "1.0",
-        "lump_version": 0
+        "lump_version": 0,
+        "dot_name": "Constants",
+        "issue_n": 1,
+        "filename": "Constants.1.67a04067.lump"
     },
     {
         "token": "00001001",
@@ -300,7 +303,10 @@
         "grants": [
             "E"
         ],
-        "lump_version": 0
+        "lump_version": 0,
+        "dot_name": "SlideRule.Haskell",
+        "issue_n": 1,
+        "filename": "SlideRule.Haskell.1.3542a2db.lump"
     },
     {
         "token": "ab1e86af",
@@ -758,7 +764,10 @@
         ],
         "author": "Final Author",
         "version": "3.0.0",
-        "lump_version": 0
+        "lump_version": 0,
+        "dot_name": "WordString",
+        "issue_n": 1,
+        "filename": "WordString.1.a1682b26.lump"
     },
     {
         "token": "00001f00",
@@ -937,7 +946,10 @@
                 "description": "MP3 compressed audio"
             }
         },
-        "lump_version": 0
+        "lump_version": 0,
+        "dot_name": "Tunnel",
+        "issue_n": 1,
+        "filename": "Tunnel.1.8770bf03.lump"
     },
     {
         "token": "00002000",
@@ -1017,7 +1029,10 @@
         ],
         "domain": "Church",
         "domain_perms": "L+S+E",
-        "lump_version": 0
+        "lump_version": 0,
+        "dot_name": "Keystone",
+        "issue_n": 1,
+        "filename": "Keystone.1.86b853a1.lump"
     },
     {
         "token": "00003300",
@@ -1080,10 +1095,12 @@
             "E"
         ],
         "lump_version": 0,
-        "filename": "00003300.lump",
+        "filename": "Ethernet.1.b169bba4.lump",
         "sidecar_file": "00003300.json",
         "language": "ISA",
-        "status": "released"
+        "status": "released",
+        "dot_name": "Ethernet",
+        "issue_n": 1
     },
     {
         "token": "cb8739cf",
@@ -1106,7 +1123,10 @@
         ],
         "grants": [
             "E"
-        ]
+        ],
+        "dot_name": "GT.Encoding.v1.1.Hardware.Self-Test",
+        "issue_n": 1,
+        "filename": "GT.Encoding.v1.1.Hardware.Self-Test.1.254f3542.lump"
     },
     {
         "token": "ab3de4fd",
@@ -1129,7 +1149,10 @@
         ],
         "grants": [
             "E"
-        ]
+        ],
+        "dot_name": "Salvation",
+        "issue_n": 1,
+        "filename": "Salvation.1.6be43a9d.lump"
     },
     {
         "token": "0baf5e0e",
@@ -1152,7 +1175,10 @@
         "grants": [
             "E"
         ],
-        "source": "simulator/examples/ada_note_g_published_bug.cloomc"
+        "source": "simulator/examples/ada_note_g_published_bug.cloomc",
+        "dot_name": "NoteG",
+        "issue_n": 1,
+        "filename": "NoteG.1.0a129ffa.lump"
     },
     {
         "token": "5a93ce79",
@@ -1174,7 +1200,10 @@
         ],
         "grants": [
             "E"
-        ]
+        ],
+        "dot_name": "BernoulliNumbers",
+        "issue_n": 1,
+        "filename": "BernoulliNumbers.1.656dd0e4.lump"
     },
     {
         "token": "50ce4c64",
@@ -1261,7 +1290,10 @@
         ],
         "grants": [
             "E"
-        ]
+        ],
+        "dot_name": "StringOps",
+        "issue_n": 1,
+        "filename": "StringOps.1.05b56245.lump"
     },
     {
         "token": "d9454529",
@@ -1293,7 +1325,10 @@
         ],
         "grants": [
             "E"
-        ]
+        ],
+        "dot_name": "EnglishLoops",
+        "issue_n": 1,
+        "filename": "EnglishLoops.1.19366291.lump"
     },
     {
         "token": "19d3e599",
@@ -1331,7 +1366,10 @@
         ],
         "grants": [
             "E"
-        ]
+        ],
+        "dot_name": "IntegerOps",
+        "issue_n": 1,
+        "filename": "IntegerOps.1.54c9a1e9.lump"
     },
     {
         "token": "50789581",
@@ -1353,12 +1391,15 @@
         ],
         "grants": [
             "E"
-        ]
+        ],
+        "dot_name": "Keystone",
+        "issue_n": 1,
+        "filename": "Keystone.1.258fd841.lump"
     },
     {
         "token": "95a651e7",
         "abstraction": "NoteG",
-        "filename": "NoteG_v6.lump",
+        "filename": "NoteG.1.04a720f8.lump",
         "sidecar_file": "NoteG_v6.json",
         "ns_slot": null,
         "lump_size": 64,
@@ -1377,12 +1418,14 @@
         ],
         "grants": [
             "E"
-        ]
+        ],
+        "dot_name": "NoteG",
+        "issue_n": 1
     },
     {
         "token": "97cc8047",
         "abstraction": "Human_Hand",
-        "filename": "Human_Hand_v13.lump",
+        "filename": "Human.Hand.1.e88911d6.lump",
         "sidecar_file": "Human_Hand_v13.json",
         "ns_slot": null,
         "lump_size": 64,
@@ -1434,7 +1477,9 @@
                 "length": 1,
                 "description": "close the thumb and finger to touch each other in a flat pinch"
             }
-        ]
+        ],
+        "dot_name": "Human.Hand",
+        "issue_n": 1
     },
     {
         "token": "b3076308",
@@ -1517,12 +1562,15 @@
             }
         ],
         "description": "Event-to-handler routing table. Maps event Golden Tokens to handler capabilities.",
-        "source": "simulator/cloomc/EventRouter.cloomc"
+        "source": "simulator/cloomc/EventRouter.cloomc",
+        "dot_name": "EventRouter",
+        "issue_n": 1,
+        "filename": "EventRouter.1.032ca4ee.lump"
     },
     {
         "token": "8e37e416",
         "abstraction": "Tunnel",
-        "filename": "Tunnel_37words_cc_1_25free_v2.lump",
+        "filename": "Tunnel.1.8a90193e.lump",
         "sidecar_file": "Tunnel_37words_cc_1_25free_v2.json",
         "ns_slot": null,
         "lump_size": 64,
@@ -1537,12 +1585,14 @@
                 "offset": 0,
                 "length": 1
             }
-        ]
+        ],
+        "dot_name": "Tunnel",
+        "issue_n": 1
     },
     {
         "token": "c3963aed",
         "abstraction": "Memory",
-        "filename": "Memory_v1.lump",
+        "filename": "Memory.1.3359e86e.lump",
         "sidecar_file": "Memory_v1.json",
         "ns_slot": null,
         "lump_size": 64,
@@ -1571,7 +1621,9 @@
         ],
         "grants": [
             "E"
-        ]
+        ],
+        "dot_name": "Memory",
+        "issue_n": 1
     },
     {
         "token": "00000600",
@@ -1591,7 +1643,11 @@
         "lump_version": 75,
         "status": "released",
         "description": "SelfTest (a.k.a. Boot.Abstr) \u2014 the lump executed by the hardware ROM during boot phases B:01-B:07.",
-        "source": "simulator/examples/post_flash_selftest.cloomc"
+        "source": "simulator/examples/post_flash_selftest.cloomc",
+        "dot_name": "SelfTest",
+        "issue_n": 1,
+        "filename": "SelfTest.1.8a12c082.lump",
+        "sidecar_file": "SelfTest.1.8a12c082.json"
     },
     {
         "token": "00000800",
@@ -1609,12 +1665,15 @@
         "author": "Church Machine Platform",
         "version": "2026.07.23",
         "lump_version": 1,
-        "description": "Scheduler.IRQ \u2014 Tier 2 fault-escalation interrupt handler. Lazy-loaded on first Tier 2 fault (v1.2 \u00a74 TSB compliance: not baked into boot code)."
+        "description": "Scheduler.IRQ \u2014 Tier 2 fault-escalation interrupt handler. Lazy-loaded on first Tier 2 fault (v1.2 \u00a74 TSB compliance: not baked into boot code).",
+        "dot_name": "Scheduler.IRQ",
+        "issue_n": 1,
+        "filename": "Scheduler.IRQ.1.439e0ddd.lump"
     },
     {
         "token": "00130000",
         "abstraction": "Loader",
-        "filename": "Loader_v1.lump",
+        "filename": "Loader.1.19ba3a9d.lump",
         "sidecar_file": "Loader_v1.json",
         "ns_slot": null,
         "lump_size": 64,
@@ -1630,12 +1689,14 @@
                 "length": 1,
                 "description": "Main function"
             }
-        ]
+        ],
+        "dot_name": "Loader",
+        "issue_n": 1
     },
     {
         "token": "00000300",
         "abstraction": "LEDFlash",
-        "filename": "LEDFlash_v3.lump",
+        "filename": "LEDFlash.1.55f1a32f.lump",
         "sidecar_file": "LEDFlash_v3.json",
         "ns_slot": null,
         "lump_size": 64,
@@ -1651,12 +1712,14 @@
                 "length": 1,
                 "description": "Toggle LED0 at ~1 Hz using nested delay loops"
             }
-        ]
+        ],
+        "dot_name": "LEDFlash",
+        "issue_n": 1
     },
     {
         "token": "e186c4ec",
         "abstraction": "WukongCallHome",
-        "filename": "WukongCallHome_v1.lump",
+        "filename": "WukongCallHome.1.2f3d7d46.lump",
         "sidecar_file": "WukongCallHome_v1.json",
         "ns_slot": 7,
         "ns_slot_policy": "static",
@@ -1673,7 +1736,9 @@
         "version": "1.0",
         "lump_version": 1,
         "description": "Wukong board software boot coordinator \u2014 runs SelfTest, calls Tunnel.Register, returns to IDE.",
-        "source": "simulator/examples/wukong_callhome_coordinator.cloomc"
+        "source": "simulator/examples/wukong_callhome_coordinator.cloomc",
+        "dot_name": "WukongCallHome",
+        "issue_n": 1
     },
     {
         "token": "c7425d6c",
@@ -1688,12 +1753,15 @@
         "grants": [
             "E"
         ],
-        "lump_version": 1
+        "lump_version": 1,
+        "dot_name": "CapTest",
+        "issue_n": 1,
+        "filename": "CapTest.1.46f73b24.lump"
     },
     {
         "token": "d78f751b",
         "abstraction": "Abstraction:  MorseCmOk",
-        "filename": "Abstraction_MorseCmOk_v4.lump",
+        "filename": "MorseCmOk.1.eb20fe01.lump",
         "sidecar_file": "Abstraction_MorseCmOk_v4.json",
         "ns_slot": null,
         "lump_size": 512,
@@ -1712,12 +1780,14 @@
         ],
         "grants": [
             "E"
-        ]
+        ],
+        "dot_name": "MorseCmOk",
+        "issue_n": 1
     },
     {
         "token": "87c45cc2",
         "abstraction": "Abstraction:  WukongCallHome",
-        "filename": "Abstraction_WukongCallHome_v3.lump",
+        "filename": "WukongCallHome.1.0342a02d.lump",
         "sidecar_file": "Abstraction_WukongCallHome_v3.json",
         "lump_size": 128,
         "cw": 73,
@@ -1735,12 +1805,14 @@
         ],
         "grants": [
             "E"
-        ]
+        ],
+        "dot_name": "WukongCallHome",
+        "issue_n": 1
     },
     {
         "token": "00001000",
         "abstraction": "SlideRule",
-        "filename": "SlideRule_v2.lump",
+        "filename": "SlideRule.1.d960f531.lump",
         "sidecar_file": "SlideRule_v2.json",
         "lump_size": 4096,
         "cw": 2602,
@@ -1867,7 +1939,9 @@
         "binary_hash": "6a449f41a0048c54e2a7b31d078068300832febb88c03c4beb228b1afbff48a3",
         "petname": "",
         "issue_number": 1,
-        "identity_hash": "a3514490fec3fce8fe06f9ee6a3b83bd94b1b686c4ecac855951344504989b91"
+        "identity_hash": "a3514490fec3fce8fe06f9ee6a3b83bd94b1b686c4ecac855951344504989b91",
+        "dot_name": "SlideRule",
+        "issue_n": 1
     },
     {
         "token": "a56597e9",
@@ -1881,6 +1955,9 @@
         "grants": [
             "E"
         ],
-        "lump_version": 0
+        "lump_version": 0,
+        "dot_name": "PostFlashSelftest",
+        "issue_n": 1,
+        "filename": "PostFlashSelftest.1.e0cf060e.lump"
     }
 ]
