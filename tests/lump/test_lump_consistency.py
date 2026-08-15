@@ -556,9 +556,11 @@ SELFTEST_LUMP_CASES = [
     ("cb8739cf", "GT Encoding v1.1 Hardware Self-Test"),
 ]
 
-# cc=1 lumps: single SelfTest E-GT at slot 0 (POLA redesign — no Boot.Nucs needed)
+# cc>=1 lumps: SelfTest E-GT at slot 0 (POLA redesign — no Boot.Nucs needed)
+# PostFlashSelftest: CRC-32 token for the PostFlashSelftest binary (rebuilt alongside source)
+# SelfTest: token 00000600, now cc=2 (slot 0 = SelfTest E-GT; slot 1 = Next.GT for continuation)
 SELFTEST_LUMP_CASES_CC1 = [
-    ("a56597e9", "PostFlashSelftest"),
+    ("059dc47f", "PostFlashSelftest"),
     ("00000600", "SelfTest"),
 ]
 
@@ -1504,15 +1506,11 @@ def _self_gt_targets():
 #   2. Name the existing test that already verifies c-list[0] for this lump.
 #   3. Do NOT add entries to suppress a genuine hash mismatch — fix the binary.
 KNOWN_SELF_GT_EXCEPTIONS: dict = {
-    # SelfTest (token 00000600, cc=1) uses its sole c-list slot for the
-    # SelfTest E-GT (0x4A000006) needed to call itself in the boot sequence.
-    # That slot is already verified by TestR13b_NewSelftestClistGT.
-    "00000600": (
-        "Boot-resident selftest lump; cc=1 slot is the SelfTest E-GT "
-        "(NS slot 6, Church domain, E permission) — verified by "
-        "TestR13b_NewSelftestClistGT.  No room for a self-identity GT "
-        "at c-list[0] without displacing the required capability."
-    ),
+    # SelfTest (token 00000600) sidecar carries no identity_string — its c-list
+    # is entirely occupied by executable GTs (SelfTest E-GT at slot 0, Next.GT
+    # at slot 1) that are verified by TestR13b_NewSelftestClistGT.  No entry here
+    # since _self_gt_targets() only collects lumps whose sidecar declares
+    # identity_string — SelfTest does not, so it never reaches TestR22.
 }
 
 _SELF_GT_ALL_TARGETS = _self_gt_targets()

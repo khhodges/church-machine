@@ -65,23 +65,25 @@ console.log(`Assembled ${words.length} instruction words.`);
 
 // ── C-List definition ─────────────────────────────────────────────────────────
 //
-// cc = 1  — POLA minimum (one E-GT for LOAD + TPERM + EXACT cross-checks).
+// cc = 2.
 // X-permission is NOT stored in a c-list (constructed dynamically by CALL into CR14,
-// a privileged register blocked from TPERM by the assembler).  The c-list holds
-// exactly one slot: E-GT for NS slot 6 (SelfTest).  At SelfTest entry:
-//   CR0  = E-GT for SelfTest  (Church domain, E-perm; from thread[+244])
-//   CR1  = E-GT for SelfTest  (loaded via LOAD CR1, SelfTest from c-list[0])
-// CR0 and CR1 are bit-identical (same GT word 0x4A000006) — EXACT cross-checks pass.
-// Sections I-L use CR0 and CR1 — no CR14 in TPERM (CR14 is privileged).
+// a privileged register blocked from TPERM by the assembler).
+//
+//   slot 0  SelfTest  E  NS slot 6  — E-GT for LOAD+TPERM tests and EXACT cross-comparison.
+//           At SelfTest entry:
+//             CR0  = E-GT for SelfTest  (Church domain, E-perm; from thread[+244])
+//             CR1  = E-GT for SelfTest  (loaded via LOAD CR1, SelfTest from c-list[0])
+//           CR0 and CR1 are bit-identical (0x4A000006) — EXACT cross-checks pass.
+//           boot_image.py overrides slot 0 with the memory-manager GT (R|W to NS[0]).
+//
+//   slot 1  Next  E  NS slot 6  — Next.GT: continuation called at done: when all tests pass.
+//           Default: SelfTest E-GT (self-loop via ELOADCALL).
+//           boot_image.py overrides with the E-GT for nextAfterSelfTestSlot (IDE-configured).
 //
 const CLIST = [
-    { gt: 0x4A000006 }, // 0  SelfTest  E  NS slot 6  (POLA: minimum — one E-GT for LOAD+TPERM tests)
+    { gt: 0x4A000006 }, // 0  SelfTest  E  NS slot 6  — E-GT for TPERM/EXACT tests
+    { gt: 0x4A000006 }, // 1  Next      E  NS slot 6  — Next.GT (default: SelfTest self-loop)
 ];
-// cc = 1: one E-GT pointing to NS slot 6.  Loaded into CR1 at start so that:
-//   a) TPERM CR1, E tests the LOAD instruction as well as TPERM
-//   b) TPERM CR0, EXACT, CR1 confirms two independently-sourced E-GTs are bit-identical
-// X-permission is NOT stored in a c-list (constructed dynamically by CALL → CR14,
-// which is a privileged register off-limits to TPERM).  No X entries here.
 
 // ── Pack LUMP binary ─────────────────────────────────────────────────────────
 //
@@ -199,13 +201,14 @@ fs.writeFileSync(sidecarPath, JSON.stringify(sidecar, null, 2) + '\n');
 console.log(`Written: ${sidecarPath}`);
 
 // ── Print c-list note ─────────────────────────────────────────────────────────
-console.log('\nC-List GT slot assignments (cc=1, tail-packed):');
+console.log(`\nC-List GT slot assignments (cc=${CLIST.length}, tail-packed):`);
 const slotNames = [
-    'SelfTest  E  NS-slot 6  — POLA minimum; loaded into CR1 for TPERM/EXACT tests',
+    'SelfTest  E  NS-slot 6  — E-GT for TPERM/EXACT tests; boot_image.py overrides to mem-mgr GT',
+    'Next      E  NS-slot 6  — Next.GT (default=SelfTest self-loop); boot_image.py overrides per config',
 ];
 for (let i = 0; i < CLIST.length; i++) {
     const gt = '0x' + CLIST[i].gt.toString(16).padStart(8, '0');
-    console.log(`  slot ${i}  ${gt}  ${slotNames[i]}`);
+    console.log(`  slot ${i}  ${gt}  ${slotNames[i] || '(unnamed)'}`);
 }
 
 // ── Suggest manifest entry ───────────────────────────────────────────────────

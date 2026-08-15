@@ -383,6 +383,94 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
     assert hdr_cc == cc, f"lump header cc={hdr_cc} != {cc}"
 
 
+@pytest.mark.parametrize("next_slot,expected_clist1_slot", [
+    (None, 6),   # default: SelfTest self-loop (Next.GT → slot 6)
+    (7,    7),   # configured: WukongCallHome (slot 7)
+    (8,    8),   # configured: arbitrary user-chosen slot
+    (300, 300),  # extended-namespace slot (> DEFAULT_NS_SLOTS_MAX=256); validates 16-bit slot_id encoding
+])
+def test_boot_image_next_gt_is_serialized(tmp_path, next_slot, expected_clist1_slot):
+    """generate_boot_image() bakes the configured Next.GT into c-list[1] of the resident SelfTest lump.
+
+    This guards the serialisation path added for nextAfterSelfTestSlot: the
+    stored .lump binary retains catalog-loop defaults at its c-list tail, so
+    generate_boot_image() must patch clist_gts[1] into mem[] after copying the
+    resident lump.  Without that patch, changing nextAfterSelfTestSlot would
+    update boot-config.json and the simulator's virtual clistGTs[1] but would
+    never reach the boot-image binary uploaded to hardware.
+
+    Uses the production SelfTest lump (cc=2, 512 words) so the patch path taken
+    by generate_boot_image() is identical to what runs on hardware.
+    """
+    from server.boot_image import (
+        generate_boot_image, NS_TABLE_RESERVE, NS_ENTRY_WORDS,
+        BOOT_ABSTR_NS_SLOT, create_gt,
+    )
+
+    # ── Use the production SelfTest binary (cc=2, 512 words) ──────────────────
+    #    find_lump_file_by_abstraction() prefers the "filename" field in the
+    #    manifest entry; we copy the canonical file into tmp_path and point the
+    #    manifest at it so the generator loads the real binary.
+    CANONICAL_FILENAME = "SelfTest.1.b562e522.lump"
+    real_lump_src = os.path.join(LUMPS_DIR, CANONICAL_FILENAME)
+    (tmp_path / CANONICAL_FILENAME).write_bytes(
+        open(real_lump_src, "rb").read()
+    )
+
+    # Parse lump header to get CC and LUMP_SIZE from the actual binary.
+    with open(real_lump_src, "rb") as _f:
+        _hdr = struct.unpack_from(">I", _f.read(4))[0]
+    CC        = _hdr & 0xFF                            # must be 2
+    LUMP_SIZE = 1 << (((_hdr >> 23) & 0xF) + 6)       # must be 512
+    assert CC == 2,   f"SelfTest lump cc={CC} but expected 2; rebuild with build_selftest_lump.js"
+    assert LUMP_SIZE == 512, f"SelfTest lump_size={LUMP_SIZE} but expected 512"
+
+    SAVED_TOKEN = f"{BOOT_ABSTR_NS_SLOT << 8:08x}"
+    (tmp_path / "manifest.json").write_text(json.dumps([{
+        "token":           SAVED_TOKEN,
+        "abstraction":     "SelfTest",
+        "ns_slot":         BOOT_ABSTR_NS_SLOT,
+        "ns_slot_policy":  "static",
+        "boot_resident":   True,
+        "lump_size":       LUMP_SIZE,
+        "cc":              CC,
+        "filename":        CANONICAL_FILENAME,
+    }]))
+
+    cfg = {
+        "step1": {
+            "totalNamespaceWords": 16384,
+            "namespaceLumpWords":     64,
+            "threadLumpWords":       256,
+        },
+    }
+    if next_slot is not None:
+        cfg["nextAfterSelfTestSlot"] = next_slot
+
+    img   = generate_boot_image(cfg, str(tmp_path))
+    total = 16384
+    words = list(struct.unpack(f"<{total}I", img))
+
+    # Locate Boot.Abstr lump in the image.
+    ns_base  = total - (BOOT_ABSTR_NS_SLOT + 1) * NS_ENTRY_WORDS
+    boot_loc = words[ns_base]
+
+    # c-list starts at boot_loc + LUMP_SIZE - CC; index 1 is the Next.GT.
+    clist_base = boot_loc + LUMP_SIZE - CC
+    clist_1    = words[clist_base + 1]
+
+    # Expected: Inform E-GT targeting expected_clist1_slot, constructed the
+    # same way boot_image.py does it (avoids hardcoding the bit pattern).
+    expected_gt = create_gt(0, expected_clist1_slot, {"E": 1}, 1) & 0xFFFFFFFF
+
+    assert clist_1 == expected_gt, (
+        f"c-list[1] in boot image = 0x{clist_1:08X} (slot {clist_1 & 0xFFFF}); "
+        f"expected Next.GT = 0x{expected_gt:08X} (slot {expected_clist1_slot}). "
+        f"nextAfterSelfTestSlot={next_slot!r}. "
+        f"Boot.Abstr at word 0x{boot_loc:X}, c-list base at word 0x{clist_base:X}."
+    )
+
+
 if __name__ == "__main__":
     failures = 0
     for p in CONFIGS:

@@ -1180,6 +1180,15 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     mem_mgr_gt = create_gt(0, 0, {"R":1, "W":1}, 1)
     clist_gts[0] = mem_mgr_gt
 
+    # Next.GT at c-list[1]: SelfTest calls through it at done: (CALL AL, CR1, CR1).
+    # Default: self-loop — E-GT targeting BOOT_ABSTR_NS_SLOT (SelfTest, slot 6).
+    # Configured: the slot designated by the "→ Next" secondary ⚡ in the IDE
+    # (persisted in boot-config.json as nextAfterSelfTestSlot).
+    _next_after_slot = cfg.get('nextAfterSelfTestSlot')
+    if not isinstance(_next_after_slot, int) or _next_after_slot < 0:
+        _next_after_slot = BOOT_ABSTR_NS_SLOT
+    clist_gts[1] = create_gt(0, _next_after_slot, {"E": 1}, 1)
+
     # ── DEMO_CLIST finalisation ─────────────────────────────────────────────────
     # The c-list GT words are managed virtually in clist_gts[].  They are NOT
     # written into the NS TABLE region — the NS TABLE is a flat table of NS
@@ -1245,6 +1254,19 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         # Derive cc from the saved lump header (already validated above).
         _saved_cc      = abstr_words[0] & 0xFF
         entry_cr_limit = actual_abstr_size - _saved_cc - 1
+
+        # Patch the two virtually-managed c-list entries (idx 0: memory-manager GT,
+        # idx 1: Next.GT) into the resident lump copy.  The stored .lump binary has
+        # catalog-loop defaults baked into its c-list tail; overriding here ensures
+        # the IDE-configured values are baked into the boot-image.bin regardless of
+        # what was compiled into the .lump file.  cc=0 lumps have no c-list and skip
+        # this block safely.
+        if _saved_cc > 0 and len(clist_gts) > 0:
+            _clist_base_m = boot_entry_loc + actual_abstr_size - _saved_cc
+            if 0 < _clist_base_m < total:
+                mem[_clist_base_m] = clist_gts[0] & 0xFFFFFFFF       # idx 0: memory-manager GT
+                if _saved_cc > 1 and len(clist_gts) > 1:
+                    mem[_clist_base_m + 1] = clist_gts[1] & 0xFFFFFFFF  # idx 1: Next.GT
         write_ns_entry(mem, total, NS_ENTRY_WORDS, BOOT_ABSTR_NS_SLOT,
                        boot_entry_loc, entry_cr_limit, 0, 0, 1, 0, _saved_cc,
                        _abstr_abstract_gt)

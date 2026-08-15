@@ -1668,6 +1668,25 @@ class ChurchSimulator {
 
         // Memory-manager GT at c-list[0]: R|W Inform capability over NS slot 0 (full namespace).
         clistGTs[0] = this.createGT(0, BOOT_NS_SLOT_HEADER, {R:1, W:1}, 1);
+
+        // Next.GT at c-list[1]: SelfTest calls through it at done: (CALL AL, CR1, CR1)
+        // when all tests pass.  Default: self-loop — E-GT for SelfTest's own NS slot.
+        // Configured: nextAfterSelfTestSlot from window.bootConfig (the "→ Next" secondary ⚡).
+        // Mirrors boot_image.py clist_gts[1] override and hardware/boot_rom.py make_demo_clist().
+        {
+            const _nextSlot = (() => {
+                try {
+                    const cfg = (typeof window !== 'undefined') && window.bootConfig;
+                    const n = cfg && typeof cfg.nextAfterSelfTestSlot === 'number'
+                            ? cfg.nextAfterSelfTestSlot : -1;
+                    if (n >= 0) return n;
+                } catch (_) { /* no window in test harness */ }
+                // Default: SelfTest self-loop — canonical boot-abstraction NS slot.
+                return this._slotByPetName('SelfTest', 6);
+            })();
+            clistGTs[1] = this.createGT(0, _nextSlot, {E: 1}, 1);
+        }
+
         const DEMO_CLIST_SIZE   = 11;   // slots 0–10 (minimal 11-slot namespace)
 
         // ── DEMO_CLIST finalisation ──────────────────────────────────────────────

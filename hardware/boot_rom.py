@@ -537,13 +537,14 @@ for _i in range(NS_SLOT_COUNT):
 
 
 # ---------------------------------------------------------------------------
-# DEMO_CLIST — initial C-List for the boot abstraction (SelfTest, Slot 6)
+# make_demo_clist — factory for the boot abstraction c-list (SelfTest, Slot 6)
 #
-# Aligned with simulator boot c-list (simulator.js _initBootState).
+# Aligned with simulator boot c-list (simulator.js _initNamespaceTable).
 # Minimal 11-entry layout matching the 8-slot namespace.
 #
 #   idx  0: make_gt(Inform, R|X, slot_id=6, gt_seq=0)         — boot-internal: SelfTest code/constants R|X
-#   idx  1: make_gt(NULL,   0,   0,         0)                 — freed (Salvation/NUC_PROGRAM removed)
+#   idx  1: make_gt(Inform, E,   next_slot, gt_seq=0)         — Next.GT: SelfTest calls here at done:
+#            Default next_slot = SELFTEST_NS_SLOT: ELOADCALL self-loop; configured: chosen abstraction.
 #   idx  2: make_gt(NULL,   0,   0,         0)                 — boot-internal: filled by SAVE epilogue (Thread GT)
 #   idx  3: make_gt(Inform, E,   slot_id=6, gt_seq=0)         — boot-internal: SelfTest E-GT (return channel)
 #   idx  4: make_gt(NULL,   0,   0,         0)                 — freed
@@ -559,19 +560,31 @@ for _i in range(NS_SLOT_COUNT):
 #
 # b_flag=1 marks each IO device GT as IDE-bound to a physical peripheral.
 # ---------------------------------------------------------------------------
-DEMO_CLIST = [
-    make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_X, SELFTEST_NS_SLOT, 0),   # idx 0: SelfTest R|X
-    make_gt(GT_TYPE_NULL, 0, 0, 0),                                              # idx 1: freed (Salvation removed)
-    make_gt(GT_TYPE_NULL, 0, 0, 0),                                              # idx 2: Thread GT (SAVE epilogue)
-    make_gt(GT_TYPE_INFORM, PERM_MASK_E, SELFTEST_NS_SLOT, 0),                  # idx 3: SelfTest E-GT return channel
-    make_gt(GT_TYPE_NULL, 0, 0, 0),                                              # idx 4: freed
-    make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, MMIO_LED_SLOT,   0, b_flag=1),  # idx 5:  LED_DEV  → NS 3
-    make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, MMIO_UART_SLOT,  0, b_flag=1),  # idx 6:  UART_DEV → NS 2
-    make_gt(GT_TYPE_INFORM, PERM_MASK_R,                MMIO_BTN_SLOT,   0, b_flag=1),  # idx 7:  BTN_DEV  → NS 4
-    make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, MMIO_TIMER_SLOT, 0, b_flag=1),  # idx 8:  TIMER_DEV→ NS 5
-    make_gt(GT_TYPE_INFORM, PERM_MASK_E, SLIDERULE_SLOT, 0),                    # idx 9:  SlideRule E-GT → NS 8
-    make_gt(GT_TYPE_INFORM, PERM_MASK_R, CONSTANTS_SLOT, 0),                    # idx 10: Constants R-GT → NS 9
-]
+def make_demo_clist(next_slot=None):
+    """Build the 11-entry boot c-list for the boot abstraction (SelfTest, Slot 6).
+
+    idx 1 = Next.GT: SelfTest's ``done:`` label calls through c-list[1] with
+    ``CALL AL, CR1, CR1`` when all tests pass.  Default (next_slot=None,
+    i.e. SELFTEST_NS_SLOT): self-loop back into SelfTest via ELOADCALL.
+    Configured: the abstraction chosen by the "→ Next" secondary ⚡ in the IDE.
+    """
+    if next_slot is None:
+        next_slot = SELFTEST_NS_SLOT
+    return [
+        make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_X, SELFTEST_NS_SLOT, 0),   # idx 0: SelfTest R|X
+        make_gt(GT_TYPE_INFORM, PERM_MASK_E, next_slot, 0),                          # idx 1: Next.GT — SelfTest chains here at done:
+        make_gt(GT_TYPE_NULL, 0, 0, 0),                                              # idx 2: Thread GT (SAVE epilogue)
+        make_gt(GT_TYPE_INFORM, PERM_MASK_E, SELFTEST_NS_SLOT, 0),                  # idx 3: SelfTest E-GT return channel
+        make_gt(GT_TYPE_NULL, 0, 0, 0),                                              # idx 4: freed
+        make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, MMIO_LED_SLOT,   0, b_flag=1),  # idx 5:  LED_DEV  → NS 3
+        make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, MMIO_UART_SLOT,  0, b_flag=1),  # idx 6:  UART_DEV → NS 2
+        make_gt(GT_TYPE_INFORM, PERM_MASK_R,                MMIO_BTN_SLOT,   0, b_flag=1),  # idx 7:  BTN_DEV  → NS 4
+        make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, MMIO_TIMER_SLOT, 0, b_flag=1),  # idx 8:  TIMER_DEV→ NS 5
+        make_gt(GT_TYPE_INFORM, PERM_MASK_E, SLIDERULE_SLOT, 0),                    # idx 9:  SlideRule E-GT → NS 8
+        make_gt(GT_TYPE_INFORM, PERM_MASK_R, CONSTANTS_SLOT, 0),                    # idx 10: Constants R-GT → NS 9
+    ]
+
+DEMO_CLIST = make_demo_clist()   # default: SelfTest self-loop at idx 1
 
 while len(DEMO_CLIST) < 64:
     DEMO_CLIST.append(0)
@@ -702,7 +715,7 @@ WUKONG_DEMO_NAMESPACE[1 * 4 + 2] = integrity32(_wukong_thr_loc, _wukong_thr_w1)
 #   idx  9 — SlideRule E-GT cleared: NS slot 8 absent in Wukong 8-slot NS
 #   idx 10 — Constants R-GT cleared: NS slot 9 absent in Wukong 8-slot NS
 # ---------------------------------------------------------------------------
-WUKONG_DEMO_CLIST = list(DEMO_CLIST)
+WUKONG_DEMO_CLIST = make_demo_clist()   # idx 1 = Next.GT (SelfTest self-loop by default)
 WUKONG_DEMO_CLIST[0]  = make_gt(GT_TYPE_INFORM, PERM_MASK_E, SELFTEST_NS_SLOT, 0)
 WUKONG_DEMO_CLIST[9]  = 0           # SlideRule E-GT cleared: NS slot 8 absent in Wukong 8-slot NS
 WUKONG_DEMO_CLIST[10] = 0           # Constants R-GT cleared: NS slot 9 absent in Wukong 8-slot NS

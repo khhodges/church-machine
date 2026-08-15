@@ -1497,6 +1497,11 @@ def boot_config_post():
                 _existing = json.load(_f)
             if isinstance(_existing.get("slotLabels"), dict):
                 cfg["slotLabels"] = _existing["slotLabels"]
+            # Preserve nextAfterSelfTestSlot — written by the "→ Next" secondary ⚡
+            # in the abstractions panel; must not be wiped by a Boot Image Designer save.
+            _n = _existing.get("nextAfterSelfTestSlot")
+            if isinstance(_n, int) and _n >= 0:
+                cfg["nextAfterSelfTestSlot"] = _n
         except Exception:
             pass
     try:
@@ -1505,6 +1510,42 @@ def boot_config_post():
     except Exception as e:
         return jsonify({"ok": False, "error": f"Failed to write boot-config.json: {e}"}), 500
     return jsonify({"ok": True, "config": cfg})
+
+
+@app.route("/api/boot-config/next-after-selftest", methods=["POST"])
+def boot_config_next_after_selftest():
+    """Write nextAfterSelfTestSlot to boot-config.json.
+
+    Called by the "→ Next" secondary ⚡ button in the abstractions panel.
+    Persisting the slot here means generate_boot_image() bakes the correct
+    Next.GT (E-GT targeting that slot) into DEMO_CLIST idx 1 automatically.
+
+    body: {"nextAfterSelfTestSlot": <int ≥ 0> | null}
+    null (or absent)  → remove the field → SelfTest self-loops back to itself.
+    """
+    data = request.get_json(silent=True) or {}
+    slot = data.get("nextAfterSelfTestSlot")
+    cfg = {}
+    if os.path.isfile(BOOT_CONFIG_PATH):
+        try:
+            with open(BOOT_CONFIG_PATH) as _f:
+                cfg = json.load(_f) or {}
+        except Exception:
+            pass
+    if slot is None:
+        cfg.pop("nextAfterSelfTestSlot", None)
+    elif isinstance(slot, int) and 0 <= slot < MAX_NS_ENTRIES:
+        cfg["nextAfterSelfTestSlot"] = slot
+    else:
+        return jsonify({"ok": False, "error":
+                        f"nextAfterSelfTestSlot must be a non-negative integer "
+                        f"< {MAX_NS_ENTRIES} (V20 maximum) or null"}), 400
+    try:
+        with open(BOOT_CONFIG_PATH, "w") as _f:
+            json.dump(cfg, _f, indent=2)
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to write boot-config.json: {e}"}), 500
+    return jsonify({"ok": True})
 
 
 @app.route("/api/boot-config/slot-label", methods=["POST"])
@@ -2056,6 +2097,19 @@ def boot_image_ns_state():
                     _state["committed"] = _raw
         except Exception:
             pass
+        # Attach nextGtSlot so the Build Approval view can render the
+        # SelfTest→Next connector (labelled arrow or self-loop).
+        # None means "default self-loop" (SelfTest calls back into itself).
+        try:
+            if os.path.isfile(BOOT_CONFIG_PATH):
+                with open(BOOT_CONFIG_PATH) as _bc_fh:
+                    _bc = json.load(_bc_fh)
+                _n = _bc.get("nextAfterSelfTestSlot")
+                _state["nextGtSlot"] = _n if (isinstance(_n, int) and _n >= 0) else None
+            else:
+                _state["nextGtSlot"] = None
+        except Exception:
+            _state["nextGtSlot"] = None
         resp = jsonify(_state)
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         resp.headers["Pragma"] = "no-cache"
