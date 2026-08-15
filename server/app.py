@@ -389,17 +389,22 @@ def upload_wukong_bit():
            -F "file=@church_wukong_xc7a100t.bit"
     """
     token = os.environ.get("REPORT_TOKEN", "")
+    if not token:
+        # Fail closed: a write endpoint with no token configured is not safe to expose.
+        return jsonify({"ok": False, "error": "REPORT_TOKEN is not configured on this server"}), 503
     auth = request.headers.get("Authorization", "")
     q_token = request.args.get("token", "")
-    if token and auth != f"Bearer {token}" and q_token != token:
+    if auth != f"Bearer {token}" and q_token != token:
+        _record_build_event(board="wukong-xc7a100t", status="failed", notes="auth_rejected")
         return jsonify({"ok": False, "error": "Unauthorized"}), 401
     if "file" not in request.files:
+        _record_build_event(board="wukong-xc7a100t", status="failed", notes="missing_file")
         return jsonify({"ok": False, "error": "No file field in request"}), 400
     f = request.files["file"]
     if not f.filename:
+        _record_build_event(board="wukong-xc7a100t", status="failed", notes="empty_filename")
         return jsonify({"ok": False, "error": "Empty filename"}), 400
     build_dir = _wukong_build_dir()
-    os.makedirs(build_dir, exist_ok=True)
     bit_path = os.path.join(build_dir, "church_wukong_xc7a100t.bit")
     # Validate all request metadata BEFORE touching the canonical bitstream,
     # so a rejected upload can never replace or corrupt the served artifact.
@@ -409,26 +414,50 @@ def upload_wukong_bit():
         try:
             version = int(ver_raw)
         except ValueError:
+            _record_build_event(board="wukong-xc7a100t", status="failed", notes="invalid_version")
             return jsonify({"ok": False, "error": "version must be an integer"}), 400
     source_commit = request.form.get("commit", "") or request.args.get("commit", "") or None
+    _approver = request.form.get("approver", "") or request.args.get("approver", "")
+
+    # ── filesystem flow — entirely wrapped so every failure is recorded ──────
     # Save to a temp file first, write its sidecar, then atomically move both
     # into place — a failed upload leaves the previous .bit + sidecar intact.
     tmp_path = bit_path + ".uploading"
-    f.save(tmp_path)
     try:
+        os.makedirs(build_dir, exist_ok=True)
+        f.save(tmp_path)
         meta = _write_bitstream_sidecar(tmp_path, version=version, source_commit=source_commit)
         os.replace(_bitstream_sidecar_path(tmp_path), _bitstream_sidecar_path(bit_path))
         os.replace(tmp_path, bit_path)
-    except Exception:
+        size = os.path.getsize(bit_path)
+    except Exception as _fs_exc:
         for leftover in (tmp_path, _bitstream_sidecar_path(tmp_path)):
             try:
                 os.remove(leftover)
             except OSError:
                 pass
-        raise
-    size = os.path.getsize(bit_path)
+        # Record failure with a safe fixed code — never str(exception)
+        _record_build_event(board="wukong-xc7a100t", status="failed",
+                            notes="save_error", approver=_approver)
+        app.logger.exception("Wukong bit upload filesystem error")
+        return jsonify({"ok": False, "error": "Upload write failed"}), 500
+    # ── end filesystem flow ──────────────────────────────────────────────────
+
     app.logger.info("Wukong bit uploaded: %d bytes (version=%s md5=%s)",
                     size, version, meta["md5"])
+
+    # Record this upload as a build event so it appears in Build History.
+    # Version is always set to the record's primary-key id (atomic, unique).
+    # Caller-supplied version is NOT used for BuildRecord allocation.
+    _record_build_event(
+        board="wukong-xc7a100t",
+        status="succeeded",
+        notes="upload",
+        bit_path=bit_path,
+        bit_hash=meta["md5"],
+        approver=_approver,
+    )
+
     return jsonify({"ok": True, "size_bytes": size, "version": version, "md5": meta["md5"]})
 
 
@@ -488,6 +517,142 @@ def api_bitstream_status():
         "git_date": meta.get("git_date"),
         "git_message": meta.get("git_message"),
     })
+
+
+
+def _record_build_event(board, status, notes="", bit_path="", bit_hash="", mcs_path="", approver=""):
+    """Write a BuildRecord directly from server-side code.
+
+    Called by build_fpga() and upload_wukong_bit() — no client auth required.
+    The display version is set equal to the auto-incremented primary key so the
+    allocation is inherently atomic and unique (no MAX+1 race).
+    Errors are logged but never propagate (callers must not be disrupted by a
+    history-write failure).
+    """
+    import datetime as _dt
+    try:
+        br = BuildRecord(
+            version=0,   # placeholder; overwritten with id after flush
+            timestamp=_dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            board=str(board or "")[:64],
+            status=str(status or "unknown")[:16],
+            approver=str(approver or "")[:128],
+            git_commit=_git_short_hash()[:64],
+            bit_path=str(bit_path or "")[:512],
+            bit_hash=str(bit_hash or "")[:64],
+            mcs_path=str(mcs_path or "")[:512],
+            notes=str(notes or ""),
+        )
+        db.session.add(br)
+        db.session.flush()   # assigns br.id within the current transaction
+        br.version = br.id   # version = id: unique, monotone, no race
+        db.session.commit()
+        logging.info("build_history: recorded v%d board=%s status=%s", br.version, board, status)
+        return br.id
+    except Exception as _e:
+        logging.warning("build_history: could not record event: %s", _e)
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return None
+
+
+@app.route("/api/builds", methods=["GET"])
+def api_builds_list():
+    """Return build records, newest first.
+
+    Public fields (no auth required): id, version, timestamp, board, status,
+    approver, git_commit, bit_hash, notes, test_results summary.
+
+    Server file paths (bit_path, mcs_path) and raw NS snapshots are omitted
+    from the public response — they are not needed by the IDE UI and would
+    expose internal filesystem layout.
+    """
+    try:
+        records = BuildRecord.query.order_by(BuildRecord.id.desc()).all()
+        out = []
+        for r in records:
+            tr = None
+            if r.test_results:
+                try:
+                    tr = json.loads(r.test_results)
+                except Exception:
+                    pass
+            out.append({
+                "id":           r.id,
+                "version":      r.version,
+                "timestamp":    r.timestamp,
+                "board":        r.board,
+                "status":       r.status,
+                "approver":     r.approver,
+                "git_commit":   r.git_commit,
+                "test_results": tr,
+                "bit_hash":     r.bit_hash,   # integrity check only — no server path
+                # notes omitted: may contain internal error codes stored server-side
+            })
+        return jsonify({"ok": True, "builds": out})
+    except Exception as e:
+        logging.exception("api_builds_list failed")
+        return jsonify({"ok": False, "error": "could not load build history"}), 500
+
+
+@app.route("/api/builds", methods=["POST"])
+def api_builds_create():
+    """Create a build record from an external caller (droplet, CI, Vivado script).
+
+    Always requires Authorization: Bearer <REPORT_TOKEN> or ?token=<REPORT_TOKEN>.
+    Browser-triggered FPGA builds are recorded server-side inside build_fpga()
+    — they do not call this endpoint.
+
+    Body (JSON):
+        board        — board identifier string
+        status       — 'succeeded' | 'failed' | 'partial'
+        approver     — who triggered the build (optional)
+        git_commit   — git short hash (optional; auto-detected if omitted)
+        ns_snapshot  — JS object snapshot of NS table (optional)
+        test_results — JS object {workflow_name: 'pass'|'fail'|'unknown'} (optional)
+        bit_hash     — md5 hex of .bit file (optional)
+        notes        — free text (optional)
+        version      — integer version override (optional; auto-incremented if omitted)
+    """
+    _token = os.environ.get("REPORT_TOKEN", "")
+    if not _token:
+        return jsonify({"ok": False, "error": "REPORT_TOKEN is not configured on this server"}), 503
+    _auth = request.headers.get("Authorization", "")
+    _qtok = request.args.get("token", "")
+    if _auth != f"Bearer {_token}" and _qtok != _token:
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+    import datetime as _dt
+    data = request.get_json(silent=True) or {}
+    # Version is always set equal to the record's primary key after flush —
+    # no caller-supplied override, no MAX+1 race.
+    ns_snap = data.get("ns_snapshot")
+    test_res = data.get("test_results")
+    try:
+        br = BuildRecord(
+            version=0,   # placeholder; overwritten with id after flush
+            timestamp=_dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            board=str(data.get("board", ""))[:64],
+            status=str(data.get("status", "unknown"))[:16],
+            approver=str(data.get("approver", ""))[:128],
+            git_commit=str(data.get("git_commit", "") or _git_short_hash())[:64],
+            ns_snapshot=json.dumps(ns_snap) if ns_snap is not None else None,
+            test_results=json.dumps(test_res) if test_res is not None else None,
+            # External callers supply a hash only — paths are internal to the server.
+            bit_hash=str(data.get("bit_hash", ""))[:64],
+            notes=str(data.get("notes", "")),
+        )
+        db.session.add(br)
+        db.session.flush()   # assigns br.id within the current transaction
+        br.version = br.id   # version = id: unique, monotone, no race
+        db.session.commit()
+        return jsonify({"ok": True, "id": br.id, "version": br.version})
+    except Exception as e:
+        logging.exception("api_builds_create failed")
+        db.session.rollback()
+        return jsonify({"ok": False, "error": "database error"}), 500
 
 
 @app.route("/dl/build-soc-cm-md")
@@ -3744,6 +3909,9 @@ def build_fpga():
         logging.info("FPGA build: generating RTLIL from Amaranth (board=%s)...", board)
         gen_result = subprocess.run(gen_args, cwd=BASE_DIR, capture_output=True, text=True, timeout=180)
         if gen_result.returncode != 0:
+            _record_build_event(board=board, status="failed",
+                                notes="Amaranth RTLIL generation failed",
+                                approver=request.args.get("approver", ""))
             return jsonify({
                 "error": "Amaranth RTLIL generation failed",
                 "stderr": gen_result.stderr[-2000:] if gen_result.stderr else "",
@@ -3751,6 +3919,9 @@ def build_fpga():
             }), 500
 
         if not os.path.isfile(paths["rtlil"]):
+            _record_build_event(board=board, status="failed",
+                                notes="RTLIL file not generated",
+                                approver=request.args.get("approver", ""))
             return jsonify({"error": "RTLIL file not generated", "stderr": ""}), 500
 
         synth_warning = None
@@ -3769,7 +3940,8 @@ def build_fpga():
                 synth_warning = "Yosys synthesis timed out (RTLIL still available)"
                 logging.warning("Yosys synthesis timed out")
             except Exception as synth_exc:
-                synth_warning = f"Yosys synthesis error: {synth_exc} (RTLIL still available)"
+                # Do NOT interpolate synth_exc — it can contain filesystem paths.
+                synth_warning = "Yosys synthesis error (RTLIL still available)"
                 logging.warning("Yosys synthesis exception: %s", synth_exc)
         else:
             # gen_rtlil already produced the .v — no second Yosys pass needed.
@@ -3782,15 +3954,45 @@ def build_fpga():
         files = [os.path.basename(p) for p in paths.values() if os.path.isfile(p)]
         file_paths = [p for p in paths.values() if os.path.isfile(p)]
         logging.info("FPGA build: complete, files=%s, warning=%s", files, synth_warning)
+
+        # --- server-side build history recording ---
+        _bit  = paths.get("bit",  "")
+        _mcs  = paths.get("mcs",  "")
+        _bit_h = ""
+        if _bit and os.path.isfile(_bit):
+            try:
+                import hashlib as _hl
+                _md5 = _hl.md5()
+                with open(_bit, "rb") as _bf:
+                    for _chunk in iter(lambda: _bf.read(1 << 20), b""):
+                        _md5.update(_chunk)
+                _bit_h = _md5.hexdigest()
+            except Exception:
+                pass
+        _bld_status = "partial" if synth_warning else "succeeded"
+        _record_build_event(
+            board=board,
+            status=_bld_status,
+            notes=synth_warning or "",
+            bit_path=_bit if _bit and os.path.isfile(_bit) else "",
+            bit_hash=_bit_h,
+            mcs_path=_mcs if _mcs and os.path.isfile(_mcs) else "",
+            approver=request.args.get("approver", ""),
+        )
+        # ------------------------------------------
+
         result = {"ok": True, "board": board, "files": files, "file_paths": file_paths}
         if synth_warning:
             result["warning"] = synth_warning
         return jsonify(result)
 
     except subprocess.TimeoutExpired:
+        _record_build_event(board=board, status="failed", notes="timeout")
         return jsonify({"error": "Build timed out (300s limit)", "stderr": ""}), 500
     except Exception as e:
         logging.exception("FPGA build failed")
+        # Store only a generic error code — never str(e), which may include paths.
+        _record_build_event(board=board, status="failed", notes="internal_error")
         return jsonify({"error": str(e), "stderr": ""}), 500
 
 
@@ -9288,6 +9490,7 @@ NiaTrace = None
 LaunchTest = None
 CallhomeLog = None
 UartLog = None
+BuildRecord = None
 
 LAUNCH_TESTS_SEED = [
     ("TEST-01", "Boot.NS",
@@ -9335,7 +9538,7 @@ with app.app_context():
     import sys
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from server.models import register_models, BOARD_TYPES, PROFILE_NAMES
-    Project, TutorialProgress, Device, FaultEvent, NiaTrace, LaunchTest, CallhomeLog, UartLog = register_models(db)
+    Project, TutorialProgress, Device, FaultEvent, NiaTrace, LaunchTest, CallhomeLog, UartLog, BuildRecord = register_models(db)
     db.create_all()
 
     from sqlalchemy import inspect as _sa_inspect, text as _sa_text

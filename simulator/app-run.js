@@ -11151,6 +11151,7 @@ function switchBuilderViewTab(tab) {
     if ((tab === 'lump-thread' || tab === 'lump-ns') && typeof initLumpEditor === 'function') initLumpEditor();
     if (tab === 'lump-resident' && typeof initResidentPanel === 'function') initResidentPanel();
     if (tab === 'ti60-connect' && typeof Ti60Connect !== 'undefined') Ti60Connect.onTabOpen();
+    if (tab === 'buildlog') _loadBuildHistory();
     if (typeof VersionsView !== 'undefined') {
         if (tab === 'versions') VersionsView.onTabOpen(); else VersionsView.onTabClose();
     }
@@ -11602,6 +11603,127 @@ function _renderBuildNextSteps(isTi60, board) {
     el.innerHTML = steps.map((s, i) =>
         `<div class="build-step-row"><span class="build-step-num">${i + 1}</span><span>${s}</span></div>`
     ).join('');
+}
+
+// ── Build History ─────────────────────────────────────────────────────────────
+function _escHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+}
+
+function toggleBuildHistory() {
+    const body = document.getElementById('buildHistoryBody');
+    const ch   = document.getElementById('buildHistoryChevron');
+    if (!body) return;
+    const collapsed = body.classList.toggle('collapsed');
+    if (ch) ch.innerHTML = collapsed ? '&#9658;' : '&#9660;';
+    if (!collapsed) _loadBuildHistory();
+}
+
+async function _loadBuildHistory() {
+    const el = document.getElementById('buildHistoryTable');
+    if (!el) return;
+    try {
+        const resp = await fetch('/api/builds');
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+        _renderBuildHistory(data.builds || []);
+    } catch (e) {
+        if (el) el.innerHTML = '<div class="build-file-empty">Could not load history: ' + e.message + '</div>';
+    }
+}
+
+function _renderBuildHistory(builds) {
+    const el = document.getElementById('buildHistoryTable');
+    if (!el) return;
+    if (!builds || !builds.length) {
+        el.textContent = '';
+        const empty = document.createElement('div');
+        empty.className = 'build-file-empty';
+        empty.textContent = 'No builds recorded yet.';
+        el.appendChild(empty);
+        return;
+    }
+    const statusIcon = {succeeded: '✅', failed: '❌', partial: '⚠️', unknown: '❓'};
+
+    // Build the table using DOM APIs so no API value is ever interpolated into innerHTML.
+    const table = document.createElement('table');
+    table.className = 'build-history-tbl';
+
+    // Header
+    const thead = table.createTHead();
+    const hrow = thead.insertRow();
+    ['Version', 'Date (UTC)', 'Board', 'Status', 'Tests', '.bit hash', 'Commit'].forEach(h => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        hrow.appendChild(th);
+    });
+
+    // Rows
+    const tbody = table.createTBody();
+    builds.forEach(b => {
+        const tr = tbody.insertRow();
+        tr.className = 'build-history-row';
+
+        // Version
+        const tdVer = tr.insertCell(); tdVer.className = 'bh-ver';
+        tdVer.textContent = b.version != null ? 'v' + b.version : '—';
+
+        // Timestamp
+        const tdTs = tr.insertCell(); tdTs.className = 'bh-ts';
+        tdTs.textContent = b.timestamp
+            ? b.timestamp.replace('T', ' ').replace('Z', ' UTC') : '—';
+
+        // Board
+        const tdBoard = tr.insertCell(); tdBoard.className = 'bh-board';
+        tdBoard.textContent = b.board || '—';
+
+        // Status
+        const tdStatus = tr.insertCell(); tdStatus.className = 'bh-status';
+        const icon = statusIcon[b.status] || '❓';
+        tdStatus.textContent = icon + ' ' + (b.status || '—');
+
+        // Test summary
+        const tdTests = tr.insertCell(); tdTests.className = 'bh-tests';
+        if (b.test_results && typeof b.test_results === 'object') {
+            const vals = Object.values(b.test_results);
+            const pass = vals.filter(v => v === 'pass').length;
+            const fail = vals.filter(v => v === 'fail').length;
+            const total = vals.length;
+            tdTests.textContent = total
+                ? pass + '/' + total + ' ✅' + (fail ? ' ' + fail + ' ❌' : '')
+                : '—';
+        } else {
+            tdTests.textContent = '—';
+        }
+
+        // .bit hash
+        const tdBit = tr.insertCell(); tdBit.className = 'bh-bit';
+        if (b.bit_hash) {
+            const code = document.createElement('code');
+            code.title = 'md5: ' + b.bit_hash;
+            code.textContent = b.bit_hash.slice(0, 8) + '…';
+            tdBit.appendChild(code);
+        } else {
+            tdBit.textContent = '—';
+        }
+
+        // Commit
+        const tdCommit = tr.insertCell(); tdCommit.className = 'bh-commit';
+        const commitCode = document.createElement('code');
+        commitCode.textContent = b.git_commit ? b.git_commit.slice(0, 8) : '—';
+        tdCommit.appendChild(commitCode);
+    });
+
+    el.textContent = '';
+    el.appendChild(table);
+}
+
+function _refreshBuildHistoryIfOpen() {
+    /** Reload build history when the panel is already expanded. */
+    const body = document.getElementById('buildHistoryBody');
+    if (body && !body.classList.contains('collapsed')) _loadBuildHistory();
 }
 
 function toggleBuildNextSteps() {
@@ -12979,6 +13101,8 @@ async function buildFPGAOnly() {
             const msg = data.error || `Server returned ${resp.status}`;
             _buildLogAppend('\nFailed: ' + msg + (data.stderr ? '\n\n--- stderr ---\n' + data.stderr : '') + '\n');
             _setBuildStatus('error', 'Build failed — see log', boardLabel);
+            // Recording happens server-side inside /api/build/fpga for all outcomes.
+            _refreshBuildHistoryIfOpen();
             return;
         }
         const doneTs = new Date().toLocaleTimeString();
@@ -12994,9 +13118,12 @@ async function buildFPGAOnly() {
         _renderBuildFiles(data.files || [], isTi60, board);
         _renderBuildNextSteps(isTi60, board);
         if (dlBtn) dlBtn.disabled = false;
+        // Recording happens server-side; just refresh the history panel.
+        _refreshBuildHistoryIfOpen();
     } catch (e) {
         _buildLogAppend('\nError: ' + e.message + '\n');
         _setBuildStatus('error', 'Build error — see log', boardLabel);
+        _refreshBuildHistoryIfOpen();
     } finally {
         if (hwBtn) { hwBtn.disabled = false; hwBtn.textContent = 'Build'; }
     }

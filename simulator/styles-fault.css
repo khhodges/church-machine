@@ -1537,6 +1537,92 @@
     display: none;
 }
 
+/* ── Build History section ───────────────────────────────────────────────── */
+.build-history-section {
+    border-top: 1px solid var(--border-color, rgba(255,255,255,0.08));
+    margin-top: 0.75rem;
+    padding-top: 0.5rem;
+}
+
+.build-history-title {
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    margin-bottom: 0;
+}
+
+.build-history-body {
+    overflow-x: auto;
+    margin-top: 0.4rem;
+}
+
+.build-history-body.collapsed {
+    display: none;
+}
+
+.build-history-tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.74rem;
+    font-family: var(--mono, monospace);
+    color: var(--text-primary);
+}
+
+.build-history-tbl thead th {
+    text-align: left;
+    padding: 4px 8px;
+    color: var(--text-secondary);
+    font-family: var(--sans, sans-serif);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.1));
+    white-space: nowrap;
+}
+
+.build-history-tbl tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.build-history-tbl tbody tr:hover {
+    background: rgba(255,255,255,0.03);
+}
+
+.build-history-tbl td {
+    padding: 5px 8px;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.build-history-row .bh-ver {
+    font-weight: 600;
+    color: var(--church-gold, #DAA520);
+}
+
+.build-history-row .bh-ts {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+.build-history-row .bh-status {
+    font-size: 0.72rem;
+}
+
+.build-history-row .bh-tests {
+    font-size: 0.72rem;
+}
+
+.build-history-row .bh-commit code,
+.build-history-row .bh-bit code {
+    font-size: 0.68rem;
+    background: rgba(255,255,255,0.06);
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+
 .build-step-row {
     display: flex;
     gap: 0.5rem;

@@ -137,4 +137,24 @@ def register_models(db):
         uid = Column(String(16), default="")
         line = Column(Text, default="")
 
-    return Project, TutorialProgress, Device, FaultEvent, NiaTrace, LaunchTest, CallhomeLog, UartLog
+    class BuildRecord(db.Model):
+        __tablename__ = "build_records"
+
+        id           = Column(Integer, primary_key=True)
+        # Human-facing build version (auto-incremented integer, e.g. 14, 15, …)
+        version      = Column(Integer, nullable=False, default=0)
+        timestamp    = Column(String(32), nullable=False, default="")   # UTC ISO-8601
+        board        = Column(String(64), default="")                   # board identifier
+        status       = Column(String(16), default="unknown")            # succeeded/failed/partial
+        approver     = Column(String(128), default="")                  # who triggered the build
+        git_commit   = Column(String(64), default="")                   # short git hash
+        # JSON blobs
+        ns_snapshot  = Column(Text, default=None)    # NS table state at build time
+        test_results = Column(Text, default=None)    # {workflow: pass/fail/unknown}
+        # Bitstream file references (paths on server/droplet + integrity hashes)
+        bit_path     = Column(String(512), default="")
+        bit_hash     = Column(String(64), default="")    # md5 hex
+        mcs_path     = Column(String(512), default="")
+        notes        = Column(Text, default="")
+
+    return Project, TutorialProgress, Device, FaultEvent, NiaTrace, LaunchTest, CallhomeLog, UartLog, BuildRecord
