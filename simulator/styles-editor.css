@@ -1,3 +1,106 @@
+/* ── Editor Find / Find & Replace bar ───────────────────────────────────── */
+.editor-find-bar {
+    background: #1a2333;
+    border-bottom: 1px solid #2d3a4e;
+    padding: 4px 8px;
+    flex-direction: column;
+    gap: 3px;
+    flex-shrink: 0;
+    /* displayed as flex when open; hidden by default via style="display:none" */
+}
+.editor-find-row,
+.editor-replace-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: nowrap;
+}
+.editor-find-input {
+    background: #0f1923;
+    border: 1px solid #3a4a5c;
+    border-radius: 3px;
+    color: #d8e6f0;
+    font-size: 0.8rem;
+    padding: 3px 7px;
+    flex: 1;
+    min-width: 100px;
+    max-width: 300px;
+    outline: none;
+    font-family: inherit;
+}
+.editor-find-input:focus {
+    border-color: #5b8dde;
+    box-shadow: 0 0 0 1px #5b8dde40;
+}
+.editor-find-input.editor-find-no-match {
+    border-color: #8b2020;
+    background: #1e0c0c;
+    color: #f87171;
+}
+.editor-find-count {
+    font-size: 0.72rem;
+    color: #7a9aae;
+    min-width: 58px;
+    text-align: right;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.editor-find-nav-btn {
+    background: #1e2d3e;
+    border: 1px solid #3a4a5c;
+    border-radius: 3px;
+    color: #aac4d8;
+    cursor: pointer;
+    font-size: 0.6rem;
+    padding: 3px 7px;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: background 0.1s;
+}
+.editor-find-nav-btn:hover  { background: #28405a; }
+.editor-find-nav-btn:disabled { opacity: 0.3; cursor: default; }
+.editor-find-toggle-label {
+    font-size: 0.72rem;
+    color: #7a9aae;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    user-select: none;
+    padding: 2px 5px;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.editor-find-toggle-label:hover { border-color: #3a4a5c; background: #1e2d3e; }
+.editor-find-toggle-label input[type=checkbox] { margin: 0; cursor: pointer; }
+.editor-find-close-btn {
+    background: none;
+    border: none;
+    color: #7a9aae;
+    cursor: pointer;
+    font-size: 0.95rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: auto;
+    flex-shrink: 0;
+    line-height: 1;
+}
+.editor-find-close-btn:hover { color: #e0e8f0; background: #28405a; }
+.editor-find-action-btn {
+    background: #1e2d3e;
+    border: 1px solid #3a4a5c;
+    border-radius: 3px;
+    color: #aac4d8;
+    cursor: pointer;
+    font-size: 0.75rem;
+    padding: 3px 9px;
+    flex-shrink: 0;
+    transition: background 0.1s;
+}
+.editor-find-action-btn:hover { background: #28405a; }
+
 /* ── Compile-failed status banner ────────────────────────────────────────── */
 .compile-failed-banner {
     display: none;

@@ -475,6 +475,10 @@
                                 <button class="ham-item" onclick="saveSourceFile();closeEditorActions()" data-tooltip="Save — Write editor source back to its open file (C+Shift+F)">Save</button>
                                 <button class="ham-item" onclick="saveSourceFileAs();closeEditorActions()" data-tooltip="Save As — Choose a new path to save this source">Save As&hellip;</button>
                                 <div class="ham-divider"></div>
+                                <div class="ham-group-title">Search</div>
+                                <button class="ham-item" onclick="_editorFindOpen(false);closeEditorActions()" data-tooltip="Find — Search for text in the editor (Ctrl+F)">Find&hellip;</button>
+                                <button class="ham-item" onclick="_editorFindOpen(true);closeEditorActions()" data-tooltip="Find &amp; Replace — Search and replace text in the editor (Ctrl+H)">Find &amp; Replace&hellip;</button>
+                                <div class="ham-divider"></div>
                                 <div class="ham-group-title">Build</div>
                                 <button class="ham-item" onclick="smartCompile();closeEditorActions()" data-tooltip="Compile — Compile with auto-detected or selected source language">Compile</button>
                                 <button class="ham-item" onclick="compileDraft();closeEditorActions()" style="color:#C89B3C;" data-tooltip="Draft — Show compilation draft: methods, capabilities, and lump layout">Draft</button>
@@ -499,6 +503,8 @@
                                 <div class="ham-item" style="pointer-events:none;display:flex;justify-content:space-between;gap:0.5rem;">Save Program<kbd class="ham-kbd">C+S</kbd></div>
                                 <div class="ham-item" style="pointer-events:none;display:flex;justify-content:space-between;gap:0.5rem;">Save File<kbd class="ham-kbd">C+Shift+F</kbd></div>
                                 <div class="ham-item" style="pointer-events:none;display:flex;justify-content:space-between;gap:0.5rem;">C-List picker<kbd class="ham-kbd">C+Shift+C</kbd></div>
+                                <div class="ham-item" style="pointer-events:none;display:flex;justify-content:space-between;gap:0.5rem;">Find<kbd class="ham-kbd">C+F</kbd></div>
+                                <div class="ham-item" style="pointer-events:none;display:flex;justify-content:space-between;gap:0.5rem;">Find &amp; Replace<kbd class="ham-kbd">C+H</kbd></div>
                             </div>
                         </div>
                         <select id="langSelector" class="lang-selector" onchange="onLangChange()" title="Source language">
@@ -618,6 +624,23 @@
                 <div id="compileFailedBanner" class="compile-failed-banner" role="alert" aria-live="assertive" style="display:none;">
                     <span class="compile-failed-banner-icon">&#x2716;</span>
                     <span id="compileFailedBannerText">COMPILE FAILED</span>
+                </div>
+                <!-- Find / Find & Replace bar — opened by hamburger menu or Ctrl+F / Ctrl+H -->
+                <div id="editorFindBar" class="editor-find-bar" style="display:none;" role="search" aria-label="Find in editor">
+                    <div class="editor-find-row">
+                        <input type="text" id="editorFindInput" class="editor-find-input" placeholder="Find&hellip;" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off">
+                        <span id="editorFindCount" class="editor-find-count"></span>
+                        <button class="editor-find-nav-btn" id="editorFindPrev" title="Previous match (Shift+Enter)" disabled>&#x25B2;</button>
+                        <button class="editor-find-nav-btn" id="editorFindNext" title="Next match (Enter)" disabled>&#x25BC;</button>
+                        <label class="editor-find-toggle-label" title="Match case"><input type="checkbox" id="editorFindCase"> Aa</label>
+                        <label class="editor-find-toggle-label" title="Whole word"><input type="checkbox" id="editorFindWord"> W</label>
+                        <button class="editor-find-close-btn" id="editorFindClose" title="Close (Escape)">&#x2715;</button>
+                    </div>
+                    <div class="editor-replace-row" id="editorReplaceRow" style="display:none;">
+                        <input type="text" id="editorReplaceInput" class="editor-find-input" placeholder="Replace with&hellip;" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off">
+                        <button class="editor-find-action-btn" id="editorReplaceOne">Replace</button>
+                        <button class="editor-find-action-btn" id="editorReplaceAll">Replace All</button>
+                    </div>
                 </div>
                 <div class="code-editor-wrap">
                     <div class="line-numbers" id="lineNumbers"></div>
@@ -2773,6 +2796,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
          via window._cloomcLangExampleGroups); both must precede app-source-library. -->
     <script src="app-compile.js?v=20260814b"></script>
     <script src="app-lump-editor.js?v=20260812b"></script>
+    <script src="app-editor-find.js?v=20260815a"></script>
     <script src="app-run.js?v=20260814e"></script>
     <script src="app-source-library.js?v=20260720h"></script>
     <script src="app-invoke.js?v=20260521a"></script>

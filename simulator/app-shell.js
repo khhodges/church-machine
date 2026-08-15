@@ -1103,6 +1103,24 @@ function init() {
                 e.preventDefault();
                 if (activeUserTabId) saveActiveUserTab();
             }
+            // Ctrl+F — Find; Ctrl+H — Find & Replace (scoped to this editor)
+            if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+                if (e.key === 'f' || e.key === 'F') {
+                    e.preventDefault();
+                    if (typeof _editorFindOpen === 'function') _editorFindOpen(false);
+                } else if (e.key === 'h' || e.key === 'H') {
+                    e.preventDefault();
+                    if (typeof _editorFindOpen === 'function') _editorFindOpen(true);
+                }
+            }
+            // Escape — close find bar if open, with focus returning to editor
+            if (e.key === 'Escape') {
+                var _fb = document.getElementById('editorFindBar');
+                if (_fb && _fb.style.display !== 'none') {
+                    e.stopPropagation();
+                    if (typeof _editorFindClose === 'function') _editorFindClose();
+                }
+            }
         });
     }
     window.addEventListener('resize', function() { syncLineScroll(); _debouncedErrorRecalc(); });
