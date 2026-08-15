@@ -6048,6 +6048,22 @@ def get_lump_detail(token):
     except Exception as exc:
         return jsonify({"error": f"Could not read sidecar: {exc}"}), 500
 
+    # If the 'source' field is a file-path reference (no newlines, ends in .cloomc)
+    # rather than actual source text, resolve it to the file's content so the
+    # editor can populate itself correctly.  The sidecar on disk is left unchanged.
+    _src_raw = sidecar.get('source', '')
+    if _src_raw and '\n' not in _src_raw and _src_raw.strip().endswith('.cloomc'):
+        _repo_root = os.path.normpath(os.path.join(os.path.dirname(__file__), '..'))
+        _src_abs = os.path.normpath(os.path.join(_repo_root, _src_raw.strip()))
+        if os.path.isfile(_src_abs):
+            try:
+                with open(_src_abs, 'r', encoding='utf-8', errors='replace') as _sfh:
+                    sidecar = dict(sidecar)
+                    sidecar['source'] = _sfh.read()
+                    sidecar['source_path'] = _src_raw.strip()
+            except OSError:
+                pass  # serve the path string as fallback; client will show disasm instead
+
     return jsonify(sidecar)
 
 
