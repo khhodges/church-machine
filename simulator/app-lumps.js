@@ -5364,13 +5364,36 @@ window.showFormatLump = function() {
                         _capStatus = 'pending';
                     }
                 }
-                // Enrich with abstractionRegistry index → full name like SelfTest#6
-                var _capAbsObj = (typeof abstractionRegistry !== 'undefined' && abstractionRegistry
-                    && _capName && typeof abstractionRegistry.getByName === 'function')
-                    ? abstractionRegistry.getByName(_capName) : null;
-                var _capFullName = (_capAbsObj && typeof _capAbsObj.index !== 'undefined')
-                    ? (_capName + '#' + _capAbsObj.index)
-                    : _capName;
+                // Enrich with a slot/index suffix so "SelfTest" → "SelfTest#6".
+                // Three-stage lookup:
+                //   1. abstractionRegistry (catalog abstractions)
+                //   2. sim.nsLabels reverse-scan (NS-boot entries)
+                //   3. _lumpsCache ns_slot field
+                var _capSlotNum = null;
+                if (_capName) {
+                    // Stage 1 — catalog registry
+                    if (_capSlotNum === null && typeof abstractionRegistry !== 'undefined'
+                            && abstractionRegistry && typeof abstractionRegistry.getByName === 'function') {
+                        var _capReg = abstractionRegistry.getByName(_capName);
+                        if (_capReg && typeof _capReg.index !== 'undefined') _capSlotNum = _capReg.index;
+                    }
+                    // Stage 2 — sim NS label map (reverse-scan)
+                    if (_capSlotNum === null && typeof sim !== 'undefined' && sim && sim.nsLabels) {
+                        var _capNameLC = _capName.toLowerCase();
+                        for (var _nsi = 0; _nsi < (sim.nsCount || 64); _nsi++) {
+                            var _lbl = sim.nsLabels[_nsi];
+                            if (_lbl && _lbl.toLowerCase() === _capNameLC) { _capSlotNum = _nsi; break; }
+                        }
+                    }
+                    // Stage 3 — lump cache ns_slot
+                    if (_capSlotNum === null && typeof _lumpsCache !== 'undefined' && _lumpsCache) {
+                        var _capLump = _lumpsCache.find(function(l) {
+                            return l.abstraction && l.abstraction.toLowerCase() === _capName.toLowerCase();
+                        });
+                        if (_capLump && typeof _capLump.ns_slot !== 'undefined') _capSlotNum = _capLump.ns_slot;
+                    }
+                }
+                var _capFullName = (_capSlotNum !== null) ? (_capName + '#' + _capSlotNum) : _capName;
 
                 if (_capStatus === 'pending') {
                     _capsHtml += '<div class="fmt-caps-row">' +
