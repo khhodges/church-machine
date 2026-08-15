@@ -5874,4 +5874,3 @@ function _gtLiveDisplayName(slot, capMeta, petName, nsLabel) {
 /* ---- GT_DECODE_UNIT_TEST_EXPORT_END ---- */
 
 if (typeof window !== 'undefined') window.showLumpDetail = showLumpDetail;
-

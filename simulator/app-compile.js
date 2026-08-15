@@ -1107,6 +1107,15 @@ function _wipMethodChecked(methodName, checked) {
     }
 }
 
+// Returns a short human-readable LUMP summary for compile log lines.
+// Format: "SelfTest v2 NS\u00a06 512w · 15 Aug 2026 14:30"
+function _lumpSummaryLabel(absName, ver, nsSlot, cw) {
+    const _now = new Date();
+    const _dateStr = _now.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const _nsPart = (nsSlot !== null && nsSlot !== undefined) ? ` NS\u00a0${nsSlot}` : '';
+    return `${absName} v${ver}${_nsPart} ${cw}w \u00b7 ${_dateStr}`;
+}
+
 function _doWipVersionSave() {
     if (!_pendingWipSave) return;
     const { savePayload, listing, con, binaryBuf, sizeBytes, absName, _autoVer } = _pendingWipSave;
@@ -1129,7 +1138,7 @@ function _doWipVersionSave() {
             document.body.appendChild(_a); _a.click();
             document.body.removeChild(_a);
             URL.revokeObjectURL(_dlU);
-            appendOutput(`Saved to library: lumps/${resp.lump} \u2014 token 0x${resp.token} \u00b7 v${_autoVer}`, 'info');
+            appendOutput(`Saved to library: lumps/${resp.lump} \u2014 token 0x${resp.token} \u00b7 v${_autoVer} \u2014 ${_lumpSummaryLabel(absName, resp.lump_version != null ? resp.lump_version : _autoVer, savePayload.metadata.ns_slot, savePayload.metadata.cw)}`, 'info');
             if (_compileDraftToken && typeof _draftLsDel === 'function') { _draftLsDel(_compileDraftToken); _compileDraftToken = null; }
             if (window.LumpRegistry) { window.LumpRegistry.setCurrent(resp.token); window.LumpRegistry.setPending(resp.token); }
             if (typeof switchView === 'function') switchView('lumps');
@@ -1255,7 +1264,7 @@ function _confirmLumpRelease() {
             document.body.appendChild(a); a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(dlUrl);
-            appendOutput(`Saved to library: lumps/${resp.lump} \u2014 token 0x${resp.token} \u00b7 v${ver}`, 'info');
+            appendOutput(`Saved to library: lumps/${resp.lump} \u2014 token 0x${resp.token} \u00b7 v${ver} \u2014 ${_lumpSummaryLabel(data.absName, resp.lump_version != null ? resp.lump_version : ver, data.savePayload.metadata.ns_slot, data.savePayload.metadata.cw)}`, 'info');
             if (_compileDraftToken && typeof _draftLsDel === 'function') { _draftLsDel(_compileDraftToken); _compileDraftToken = null; }
             if (window.LumpRegistry) { window.LumpRegistry.setCurrent(resp.token); window.LumpRegistry.setPending(resp.token); }
             if (typeof switchView === 'function') switchView('lumps');
@@ -1728,7 +1737,7 @@ function compileAndBuild() {
             }
             _renderWipMethodGate(con, methodMeta, listing);
             trackAction('build_lump', { name: absName, lang: result.language, size: lumpSize });
-            appendOutput('Built LUMP: "' + absName + '" [' + langLabel + '] \u2014 ' + cw + ' words, cc=' + cc + ', ' + sizeBytes + ' bytes \u00b7 v' + _autoVer + ' \u2014 test all methods to unlock version save', 'info');
+            appendOutput('Built LUMP: "' + absName + '" [' + langLabel + '] \u2014 ' + cw + ' words, cc=' + cc + ', ' + sizeBytes + ' bytes \u00b7 v' + _autoVer + ' \u2014 test all methods to unlock version save \u2014 ' + _lumpSummaryLabel(absName, _autoVer, resolvedNsSlot, cw), 'info');
             showNextSteps('compiled');
         };
         fetch('/api/lumps/save', {
@@ -1757,7 +1766,7 @@ function compileAndBuild() {
             document.body.appendChild(_a); _a.click();
             document.body.removeChild(_a);
             URL.revokeObjectURL(_dlUrl);
-            appendOutput(`Saved to library: lumps/${resp.lump} \u2014 token 0x${resp.token} \u00b7 v${_autoVer}`, 'info');
+            appendOutput(`Saved to library: lumps/${resp.lump} \u2014 token 0x${resp.token} \u00b7 v${_autoVer} \u2014 ${_lumpSummaryLabel(absName, resp.lump_version != null ? resp.lump_version : _autoVer, resolvedNsSlot, cw)}`, 'info');
             if (_compileDraftToken && typeof _draftLsDel === 'function') { _draftLsDel(_compileDraftToken); _compileDraftToken = null; }
             if (window.LumpRegistry) { window.LumpRegistry.setCurrent(resp.token); window.LumpRegistry.setPending(resp.token); }
             if (typeof switchView === 'function') switchView('lumps');
@@ -1783,7 +1792,7 @@ function compileAndBuild() {
     });
 
     trackAction('build_lump', { name: absName, lang: result.language, size: lumpSize });
-    appendOutput(`Built LUMP: "${absName}" [${langLabel}] \u2014 ${cw} words, cc=${cc}, ${sizeBytes} bytes \u00b7 v${_autoVer}`, 'info');
+    appendOutput(`Built LUMP: "${absName}" [${langLabel}] \u2014 ${cw} words, cc=${cc}, ${sizeBytes} bytes \u00b7 v${_autoVer} \u2014 ${_lumpSummaryLabel(absName, _autoVer, resolvedNsSlot, cw)}`, 'info');
     showNextSteps('compiled');
 }
 

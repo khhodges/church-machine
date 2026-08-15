@@ -1008,6 +1008,7 @@ function _updateLumpViewingLabel(token) {
     const _meta = [_metaParts, _datePart].filter(Boolean).join('\u2002\u00b7\u2002');
     const _esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     el.innerHTML =
+        `<span class="lump-viewing-prefix">Viewing: </span>` +
         `<span class="lump-viewing-main">${_esc(name)}${badge ? ' <span class="lump-viewing-badge">' + _esc(badge) + '</span>' : ''}</span>` +
         (_meta ? `<span class="lump-viewing-meta">${_esc(_meta)}</span>` : '');
     el.style.display = 'block';
