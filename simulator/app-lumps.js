@@ -4457,6 +4457,40 @@ function _scrollToLumpMethod(tk, methodName, _attempt) {
 async function openLumpInEditor(token) {
     var lump = window.LumpRegistry ? (window.LumpRegistry.resolve(token)?.sources?.server || null) : null;
 
+    // ── Fresh-compilation redirect (dot.name.hash protocol) ───────────────
+    // Each compilation produces a unique hash token.  If the Edit button
+    // carries a SAVED token (old hash) but the user has since compiled a
+    // newer version, that newer compilation has a DIFFERENT token in
+    // LumpRegistry.  Detect this by comparing memory.registeredAt against
+    // the saved entry's fetchedAt for the same abstraction name, and
+    // silently redirect to the fresher token so "Open Lump" always shows
+    // the most recent work, not the last-saved binary.
+    if (window.LumpRegistry) {
+        var _savedEntry = window.LumpRegistry.resolve(token);
+        var _absName = (_savedEntry?.sources?.server?.abstraction)
+                    || (_savedEntry?.abstraction)
+                    || null;
+        var _savedFetchedAt = _savedEntry?.sources?.server?.fetchedAt || 0;
+        if (_absName) {
+            var _fresherEntry = null;
+            var _fresherAt = _savedFetchedAt; // must be strictly newer
+            window.LumpRegistry.list().forEach(function(e) {
+                if (e.token === token) return; // same entry — skip
+                if (e.abstraction !== _absName) return;
+                if (!e.sources || !e.sources.memory) return;
+                if (e.sources.memory.registeredAt > _fresherAt) {
+                    _fresherAt = e.sources.memory.registeredAt;
+                    _fresherEntry = e;
+                }
+            });
+            if (_fresherEntry) {
+                token = _fresherEntry.token;
+                // Re-resolve with the new token; lump descriptor built below.
+                lump = _fresherEntry.sources?.server || null;
+            }
+        }
+    }
+
     // ── In-memory assembled lump fallback ─────────────────────────────────
     // When the token is not in the server cache (e.g. just assembled, not yet
     // saved), check the registry's memory source.  If it matches, build a
