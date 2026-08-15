@@ -5438,13 +5438,14 @@ def save_lump():
 
     # ── Phase 1: Read manifest to find current entry + file paths ─────────────
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
-    manifest = []
-    if os.path.isfile(manifest_path):
-        try:
-            with open(manifest_path, 'r') as fh:
-                manifest = json.load(fh)
-        except Exception:
-            manifest = []
+    try:
+        manifest = _read_manifest_safe(manifest_path)
+    except ValueError as _mf_err:
+        return jsonify({"error": (
+            "manifest.json is corrupt and cannot be read safely. "
+            "The save has been aborted to prevent overwriting previously-saved LUMPs. "
+            f"Details: {_mf_err}"
+        )}), 500
 
     _existing_entry = next((e for e in manifest if e.get('token') == token8), None)
     _exist_filename = (_existing_entry or {}).get('filename', f'{token8}.lump')
@@ -5701,13 +5702,14 @@ def save_lump():
 
     with _lumps_manifest_lock:
         # Fresh read under lock — picks up any entry written by a concurrent save.
-        _locked_manifest = []
-        if os.path.isfile(manifest_path):
-            try:
-                with open(manifest_path, 'r') as _lmfh:
-                    _locked_manifest = json.load(_lmfh)
-            except Exception:
-                _locked_manifest = []
+        try:
+            _locked_manifest = _read_manifest_safe(manifest_path)
+        except ValueError as _mf_lock_err:
+            return jsonify({"error": (
+                "manifest.json is corrupt and cannot be read safely. "
+                "The save has been aborted to prevent overwriting previously-saved LUMPs. "
+                f"Details: {_mf_lock_err}"
+            )}), 500
 
         _locked_manifest = [e for e in _locked_manifest if e.get('token') != token8]
 
@@ -5814,13 +5816,14 @@ def save_lump_wip():
     lumps_dir     = os.path.join(os.path.dirname(__file__), 'lumps')
     os.makedirs(lumps_dir, exist_ok=True)
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
-    manifest = []
-    if os.path.isfile(manifest_path):
-        try:
-            with open(manifest_path) as fh:
-                manifest = json.load(fh)
-        except Exception:
-            manifest = []
+    try:
+        manifest = _read_manifest_safe(manifest_path)
+    except ValueError as _mf_wip_err:
+        return jsonify({"error": (
+            "manifest.json is corrupt and cannot be read safely. "
+            "The save has been aborted to prevent overwriting previously-saved LUMPs. "
+            f"Details: {_mf_wip_err}"
+        )}), 500
 
     existing_entry = next((e for e in manifest if e.get('token') == token8), None)
 
@@ -6860,21 +6863,22 @@ def patch_lump_meta(token):
                 _BOOT_ABSTR_META[field] = sidecar[field]
 
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
-    if os.path.isfile(manifest_path):
-        try:
-            with open(manifest_path, 'r') as fh:
-                manifest = json.load(fh)
-            changed = False
-            for entry in manifest:
-                if entry.get('token') == key8:
-                    for field in ("author", "version"):
-                        if field in payload:
-                            entry[field] = sidecar[field]
-                    changed = True
-            if changed:
-                _atomic_write_json(manifest_path, manifest)
-        except Exception:
-            pass
+    try:
+        manifest = _read_manifest_safe(manifest_path)
+        changed = False
+        for entry in manifest:
+            if entry.get('token') == key8:
+                for field in ("author", "version"):
+                    if field in payload:
+                        entry[field] = sidecar[field]
+                changed = True
+        if changed:
+            _atomic_write_json(manifest_path, manifest)
+    except ValueError as _mf_meta_err:
+        return jsonify({"error": (
+            "manifest.json is corrupt and cannot be read safely. "
+            f"Details: {_mf_meta_err}"
+        )}), 500
 
     print(f'[lumps/meta PATCH] {key8} author={sidecar.get("author","")} version={sidecar.get("version","")}', flush=True)
     return jsonify({"ok": True, "token": key8})
@@ -7223,13 +7227,13 @@ def resize_lump(token_hex):
 
     # Update manifest entry if present.
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
-    manifest = []
-    if os.path.isfile(manifest_path):
-        try:
-            with open(manifest_path, 'r') as fh:
-                manifest = json.load(fh)
-        except Exception:
-            pass
+    try:
+        manifest = _read_manifest_safe(manifest_path)
+    except ValueError as _mf_rsz_err:
+        return jsonify({"error": (
+            "manifest.json is corrupt and cannot be read safely. "
+            f"Details: {_mf_rsz_err}"
+        )}), 500
     for entry in manifest:
         if entry.get('token') == key8:
             entry['lump_size'] = new_size
@@ -7322,13 +7326,14 @@ def import_lump():
         json.dump(sidecar, fh, indent=2)
 
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
-    manifest = []
-    if os.path.isfile(manifest_path):
-        try:
-            with open(manifest_path, 'r') as mfh:
-                manifest = json.load(mfh)
-        except Exception:
-            manifest = []
+    try:
+        manifest = _read_manifest_safe(manifest_path)
+    except ValueError as _mf_imp_err:
+        return jsonify({"error": (
+            "manifest.json is corrupt and cannot be read safely. "
+            "The import has been aborted to prevent overwriting previously-saved LUMPs. "
+            f"Details: {_mf_imp_err}"
+        )}), 500
     manifest = [e for e in manifest if e.get('token') != token8]
     manifest.append({"token": token8, "abstraction": name, "ns_slot": None,
                       "lump_size": lump_size, "cw": cw, "cc": 0,
@@ -7425,13 +7430,14 @@ def upload_lump_file():
         json.dump(sidecar, fh, indent=2)
 
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
-    manifest = []
-    if os.path.isfile(manifest_path):
-        try:
-            with open(manifest_path, 'r') as mfh:
-                manifest = json.load(mfh)
-        except Exception:
-            manifest = []
+    try:
+        manifest = _read_manifest_safe(manifest_path)
+    except ValueError as _mf_upl_err:
+        return jsonify({"error": (
+            "manifest.json is corrupt and cannot be read safely. "
+            "The upload has been aborted to prevent overwriting previously-saved LUMPs. "
+            f"Details: {_mf_upl_err}"
+        )}), 500
     manifest = [e for e in manifest if e.get('token') != token8]
     manifest.append({"token": token8, "abstraction": name, "ns_slot": None,
                       "lump_size": lump_size, "cw": cw, "cc": cc,
@@ -7675,13 +7681,14 @@ def build_namespace():
         json.dump(sidecar, fh, indent=2)
 
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
-    manifest = []
-    if os.path.isfile(manifest_path):
-        try:
-            with open(manifest_path, 'r') as fh2:
-                manifest = json.load(fh2)
-        except Exception:
-            manifest = []
+    try:
+        manifest = _read_manifest_safe(manifest_path)
+    except ValueError as _mf_ns_err:
+        return jsonify({"error": (
+            "manifest.json is corrupt and cannot be read safely. "
+            "The namespace build has been aborted to prevent overwriting previously-saved LUMPs. "
+            f"Details: {_mf_ns_err}"
+        )}), 500
     manifest = [e for e in manifest if e.get('token') != token8]
     manifest.append({
         "token": token8,
@@ -7726,17 +7733,18 @@ def delete_lump(token):
 
     manifest_removed = False
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
-    if os.path.isfile(manifest_path):
-        try:
-            with open(manifest_path, 'r') as fh:
-                manifest = json.load(fh)
-            before = len(manifest)
-            manifest = [e for e in manifest if e.get('token') != token8]
-            if len(manifest) < before:
-                manifest_removed = True
-            _atomic_write_json(manifest_path, manifest)
-        except Exception:
-            pass
+    try:
+        manifest = _read_manifest_safe(manifest_path)
+        before = len(manifest)
+        manifest = [e for e in manifest if e.get('token') != token8]
+        if len(manifest) < before:
+            manifest_removed = True
+        _atomic_write_json(manifest_path, manifest)
+    except ValueError as _mf_del_err:
+        return jsonify({"error": (
+            "manifest.json is corrupt and cannot be read safely. "
+            f"Details: {_mf_del_err}"
+        )}), 500
 
     if not deleted and not manifest_removed:
         return jsonify({"error": f"No lump found for token 0x{token8}"}), 404
@@ -12453,3 +12461,30 @@ if __name__ == "__main__":
     _port = int(os.environ.get("E2E_PORT", 5000))
     logging.info("Starting Church Machine server on port %d", _port)
     _bind_with_retry(_port)
+
+def _read_manifest_safe(manifest_path):
+    """Read and parse the LUMP manifest at *manifest_path*.
+
+    Returns an empty list when the file does not exist yet (a fresh install has
+    no saved lumps — that is not an error).
+
+    Raises ``ValueError`` with a descriptive message when the file *exists* but
+    cannot be parsed as valid JSON.  Callers that perform a read-modify-write
+    cycle MUST propagate this exception rather than silently falling back to
+    ``[]``; overwriting a corrupt manifest with a single-entry list would
+    permanently discard every previously-saved LUMP.
+    """
+    if not os.path.isfile(manifest_path):
+        return []
+    try:
+        with open(manifest_path, 'r') as _fh:
+            return json.load(_fh)
+    except (json.JSONDecodeError, ValueError) as _exc:
+        raise ValueError(
+            f"manifest.json exists at {manifest_path!r} but is not valid JSON "
+            f"(possibly truncated by a previous crash): {_exc}"
+        ) from _exc
+    except OSError as _exc:
+        raise ValueError(
+            f"manifest.json at {manifest_path!r} could not be read: {_exc}"
+        ) from _exc
