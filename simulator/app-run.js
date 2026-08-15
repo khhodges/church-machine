@@ -11133,16 +11133,18 @@ function switchBuilderViewTab(tab) {
     const lumpNS      = document.getElementById('lumpNSPanel');
     const lumpResident  = document.getElementById('lumpResidentPanel');
     const ti60Connect   = document.getElementById('ti60ConnectPanel');
-    const versionsPanel = document.getElementById('versionsPanel');
-    const testingPanel  = document.getElementById('testingPanel');
-    if (cyberspace)   cyberspace.style.display   = (tab === 'cyberspace')     ? '' : 'none';
-    if (details)      details.style.display      = (tab === 'buildlog')       ? '' : 'none';
-    if (lumpThread)   lumpThread.style.display   = (tab === 'lump-thread')    ? '' : 'none';
-    if (lumpNS)       lumpNS.style.display       = (tab === 'lump-ns')        ? '' : 'none';
-    if (lumpResident) lumpResident.style.display = (tab === 'lump-resident')  ? '' : 'none';
-    if (ti60Connect)  ti60Connect.style.display  = (tab === 'ti60-connect')   ? '' : 'none';
-    if (versionsPanel) versionsPanel.style.display = (tab === 'versions')     ? '' : 'none';
-    if (testingPanel)  testingPanel.style.display  = (tab === 'testing')      ? '' : 'none';
+    const versionsPanel      = document.getElementById('versionsPanel');
+    const testingPanel       = document.getElementById('testingPanel');
+    const buildApprovalPanel = document.getElementById('buildApprovalPanel');
+    if (cyberspace)        cyberspace.style.display        = (tab === 'cyberspace')   ? '' : 'none';
+    if (details)           details.style.display           = (tab === 'buildlog')     ? '' : 'none';
+    if (lumpThread)        lumpThread.style.display        = (tab === 'lump-thread')  ? '' : 'none';
+    if (lumpNS)            lumpNS.style.display            = (tab === 'lump-ns')      ? '' : 'none';
+    if (lumpResident)      lumpResident.style.display      = (tab === 'lump-resident')? '' : 'none';
+    if (ti60Connect)       ti60Connect.style.display       = (tab === 'ti60-connect') ? '' : 'none';
+    if (versionsPanel)     versionsPanel.style.display     = (tab === 'versions')     ? '' : 'none';
+    if (testingPanel)      testingPanel.style.display      = (tab === 'testing')      ? '' : 'none';
+    if (buildApprovalPanel) buildApprovalPanel.style.display = (tab === 'build')      ? '' : 'none';
     // Lazily set iframe src on first open so polling only starts when the tab is used
     if (tab === 'testing') {
         const iframe = document.getElementById('testingIframe');
@@ -11154,6 +11156,9 @@ function switchBuilderViewTab(tab) {
     if (tab === 'buildlog') _loadBuildHistory();
     if (typeof VersionsView !== 'undefined') {
         if (tab === 'versions') VersionsView.onTabOpen(); else VersionsView.onTabClose();
+    }
+    if (typeof BuildApprovalView !== 'undefined') {
+        if (tab === 'build') BuildApprovalView.onTabOpen(); else BuildApprovalView.onTabClose();
     }
 }
 

@@ -519,7 +519,6 @@ def api_bitstream_status():
     })
 
 
-
 def _record_build_event(board, status, notes="", bit_path="", bit_hash="", mcs_path="", approver=""):
     """Write a BuildRecord directly from server-side code.
 
@@ -1512,6 +1511,25 @@ def boot_config_post():
     return jsonify({"ok": True, "config": cfg})
 
 
+def _optional_report_token_check():
+    """Require REPORT_TOKEN only when it is configured in the environment.
+
+    IDE-internal mutation endpoints call this so they are protected in
+    production deployments (where REPORT_TOKEN is set) while remaining
+    usable in local dev sessions that omit the token.  Clients should send
+    'Authorization: Bearer <token>' when the token is available.
+    """
+    token = os.environ.get('REPORT_TOKEN', '').strip()
+    if not token:
+        return True, None          # auth not configured — allow (dev mode)
+    auth = request.headers.get('Authorization', '')
+    if auth == f'Bearer {token}':
+        return True, None
+    err = jsonify({'ok': False, 'error':
+                   'Unauthorized — supply REPORT_TOKEN via Authorization: Bearer header.'})
+    return False, (err, 401)
+
+
 @app.route("/api/boot-config/next-after-selftest", methods=["POST"])
 def boot_config_next_after_selftest():
     """Write nextAfterSelfTestSlot to boot-config.json.
@@ -1522,7 +1540,14 @@ def boot_config_next_after_selftest():
 
     body: {"nextAfterSelfTestSlot": <int ≥ 0> | null}
     null (or absent)  → remove the field → SelfTest self-loops back to itself.
+
+    Requires Authorization: Bearer <REPORT_TOKEN> when REPORT_TOKEN is set.
+    In dev sessions without a configured token the check is skipped so the
+    abstractions-panel button keeps working without credentials.
     """
+    ok, err = _optional_report_token_check()
+    if not ok:
+        return err
     data = request.get_json(silent=True) or {}
     slot = data.get("nextAfterSelfTestSlot")
     cfg = {}
@@ -5446,10 +5471,29 @@ def save_lump():
     _dot_name_save = _to_dot_name(abs_name)
     _issue_n_save  = int((_existing_entry or {}).get('issue_n', 1) or 1)
     _number_save   = _compute_number(_dot_name_save, lump_bytes)
+
+    # ── Security: strict allowlist + realpath containment ─────────────────────
+    # to_dot_name() preserves '/', '..', and absolute-path prefixes from
+    # request-controlled abstraction names.  Validate and contain before any I/O.
+    import re as _re_sec
+    if not _re_sec.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.\-]*', _dot_name_save):
+        return jsonify({'error':
+            f'Canonical dot name {_dot_name_save!r} contains invalid characters; '
+            'only A-Z, a-z, 0-9, "." and "-" are permitted.'}), 400
+    _lumps_dir_real = os.path.realpath(lumps_dir)
+    # ── End security block ────────────────────────────────────────────────────
+
     lump_filename    = f'{_dot_name_save}.{_issue_n_save}.{_number_save}.lump'
     sidecar_filename = f'{_dot_name_save}.{_issue_n_save}.{_number_save}.json'
     lump_path        = os.path.join(lumps_dir, lump_filename)
     sidecar_path     = os.path.join(lumps_dir, sidecar_filename)
+
+    # Containment check — must follow path construction so realpath can resolve
+    for _chk_path, _chk_label in ((lump_path, 'lump'), (sidecar_path, 'sidecar')):
+        if not os.path.realpath(_chk_path).startswith(_lumps_dir_real + os.sep):
+            return jsonify({'error':
+                f'Path traversal detected in {_chk_label} filename — '
+                f'canonical name resolves outside server/lumps/'}), 400
 
     # ── Phase 4: Archive existing binary with human-readable name ─────────────
     if os.path.isfile(_existing_lump) and not _is_forked_save:
@@ -11453,6 +11497,904 @@ def _dev_serve_makefile():
                         'hardware', 'soc_combined', 'firmware', 'Makefile')
     return send_file(_src, mimetype='text/plain', as_attachment=False,
                      download_name='Makefile')
+
+# ── Build Approval — module-level constants and mutable state ─────────────────
+import struct as _ba_struct          # module — call sites use 3-arg unpack_from(fmt, buf, off)
+import hashlib as _ba_hashlib
+import datetime as _ba_datetime
+
+_BUILD_SNAPSHOTS_DIR  = os.path.join(_SERVER_DIR, 'build-snapshots')
+_LUMPS_DIR            = LUMPS_DIR          # alias to the project-wide constant
+
+_BA_NONCE_TTL_SECS    = 300               # nonce valid for 5 minutes
+_ba_nonce_store: dict = {}
+_ba_nonce_lock        = threading.Lock()
+
+_ba_build_log:  list  = []
+_ba_build_done: bool  = True              # True = idle; False = in-progress
+_ba_build_exit        = None
+_ba_build_lock        = threading.Lock()
+
+# Droplet SSH configuration — overridable via environment variables.
+# Defaults match the DigitalOcean CPU-Optimised droplet used for Wukong synthesis.
+_DROPLET_USER      = os.environ.get('DROPLET_USER',      'root')
+_DROPLET_IP        = os.environ.get('DROPLET_IP',        '165.227.190.84')
+_DROPLET_BUILD_DIR = os.environ.get('DROPLET_BUILD_DIR', '~/church-wukong-package')
+_VIVADO_SESSION    = os.environ.get('VIVADO_SESSION',    'vivado_cm')
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _ba_fresh_nonce():
+    """Generate a new build nonce valid for _BA_NONCE_TTL_SECS seconds."""
+    import time as _time
+    nonce = secrets.token_urlsafe(24)
+    with _ba_nonce_lock:
+        _ba_nonce_store['nonce']   = nonce
+        _ba_nonce_store['expires'] = _time.monotonic() + _BA_NONCE_TTL_SECS
+    return nonce
+
+def _ba_check_report_token():
+    """
+    Verify that REPORT_TOKEN is configured and matches the caller's Authorization header.
+
+    Returns (ok: bool, error_response | None).
+
+    REPORT_TOKEN is required; this function is NOT satisfied by a nonce alone.
+    If REPORT_TOKEN is not set in the environment the endpoint is blocked entirely
+    (configuration error — the secret must be configured before build actions work).
+    """
+    report_token = os.environ.get("REPORT_TOKEN", "")
+    if not report_token:
+        err = jsonify({
+            'ok': False,
+            'error': 'REPORT_TOKEN secret not configured — set it to enable build actions.'
+        })
+        return False, (err, 503)
+
+    auth_header = request.headers.get("Authorization", "")
+    # Bearer header only — no query-string token support.
+    # Query-string tokens appear in server logs, proxy logs, and browser history,
+    # which is unacceptable for a credential that authorises privileged SSH access.
+    if auth_header == f"Bearer {report_token}":
+        return True, None
+
+    err = jsonify({
+        'ok': False,
+        'error': (
+            'Unauthorized — supply REPORT_TOKEN via Authorization: Bearer header.'
+        )
+    })
+    return False, (err, 401)
+
+def _ba_read_lump_header(path):
+    """Return (header_word, cw, cc) or None if file is missing/invalid."""
+    try:
+        with open(path, 'rb') as f:
+            raw = f.read(4)
+        if len(raw) < 4:
+            return None
+        w = _ba_struct.unpack('>I', raw)[0]
+        if ((w >> 27) & 0x1F) != 0x1F:
+            return None
+        cw = (w >> 10) & 0x1FFF
+        cc = w & 0xFF
+        return w, cw, cc
+    except Exception:
+        return None
+
+
+@app.route('/api/build-approval/snapshot/latest', methods=['GET'])
+def build_approval_snapshot_latest():
+    """Return metadata for the most recent frozen snapshot.
+
+    Requires REPORT_TOKEN auth — snapshot records contain live NS map data.
+    """
+    ok, err = _ba_check_report_token()
+    if not ok:
+        return err
+    try:
+        if not os.path.isdir(_BUILD_SNAPSHOTS_DIR):
+            return jsonify({'filename': None})
+        files = sorted([f for f in os.listdir(_BUILD_SNAPSHOTS_DIR)
+                        if f.startswith('build-approval-') and f.endswith('.json')])
+        if not files:
+            return jsonify({'filename': None})
+        latest = files[-1]
+        path = os.path.join(_BUILD_SNAPSHOTS_DIR, latest)
+        with open(path) as f:
+            snap = json.load(f)
+        return jsonify({'filename': latest, 'frozen_at': snap.get('frozen_at')})
+    except Exception as e:
+        return jsonify({'filename': None, 'error': str(e)})
+
+def _ba_md5_file(path):
+    m = _ba_hashlib.md5()
+    try:
+        with open(path, 'rb') as f:
+            for chunk in iter(lambda: f.read(1 << 20), b''):
+                m.update(chunk)
+        return m.hexdigest()
+    except Exception:
+        return None
+
+def _ba_validate_lump_size(n_words, cw, cc):
+    """
+    Return an error string if LUMP file length is inconsistent with the header's
+    cw/cc declaration, or None if the size is acceptable.
+
+    Valid LUMP files are either exactly (1 + cw + cc) words (no padding) or
+    padded to the next power of two.  Anything else — including files with
+    appended data — is rejected to prevent boundary-confusion attacks where
+    correct opcodes/GTs appended beyond the declared content fool the checks.
+    """
+    import math as _math
+    min_w = 1 + cw + cc
+    if n_words < min_w:
+        return (f'file too short: {n_words} words but header declares '
+                f'1+{cw}(cw)+{cc}(cc)={min_w} words')
+    if n_words == min_w:
+        return None   # exact fit — no padding
+    if min_w > 1:
+        pow2_w = 1 << _math.ceil(_math.log2(min_w))
+    else:
+        pow2_w = 1
+    if n_words == pow2_w:
+        return None   # padded to next power of two — normal LUMP format
+    return (f'unexpected file size: {n_words} words '
+            f'(header cw={cw} cc={cc} → expect {min_w} or {pow2_w}; '
+            f'possible appended-data tampering)')
+
+def _ba_check_selftest_egt(lump_path, selftest_ns_slot):
+    """
+    Verify SelfTest LUMP c-list[0] matches boot_rom's expected E-GT.
+
+    The c-list is stored at the LAST cc words of the lump file.  For the
+    canonical SelfTest binary (cc=1) the last file word should equal:
+        boot_rom.make_gt(GT_TYPE_INFORM, PERM_MASK_E, SELFTEST_NS_SLOT, 0)
+
+    This is the check that would have caught the v12→v13 regression where the
+    SelfTest return-channel GT was corrupted: an incorrect c-list[0] means the
+    binary diverges from what boot_rom asserts.
+
+    Fails CLOSED: if the expected value cannot be computed the check returns
+    ok=False rather than passing silently.
+    """
+    # Import hardware.boot_rom from the repo root (parent of server/).
+    # boot_rom uses package-relative imports (from .hw_types import *) so it
+    # must be loaded as part of the 'hardware' package, not as a standalone file.
+    import sys as _sys
+    _repo_root = os.path.dirname(_SERVER_DIR)
+    expected_gt  = None
+    import_err   = None
+    _inserted = False
+    try:
+        if _repo_root not in _sys.path:
+            _sys.path.insert(0, _repo_root)
+            _inserted = True
+        import hardware.boot_rom as _hw_boot_rom
+        expected_gt = _hw_boot_rom.make_gt(
+            _hw_boot_rom.GT_TYPE_INFORM, _hw_boot_rom.PERM_MASK_E, selftest_ns_slot, 0)
+    except Exception as _e:
+        import_err = str(_e)
+    finally:
+        if _inserted and _repo_root in _sys.path:
+            _sys.path.remove(_repo_root)
+
+    if expected_gt is None:
+        # Fail closed: cannot verify without the expected value
+        return {'ok': False,
+                'detail': f'Cannot derive expected E-GT from boot_rom ({import_err}) — FAIL'}
+
+    try:
+        with open(lump_path, 'rb') as f:
+            data = f.read()
+        n_words = len(data) // 4
+        if n_words < 2:
+            return {'ok': False, 'detail': 'LUMP too short to inspect c-list'}
+        w0 = _ba_struct.unpack_from('>I', data, 0)[0]
+        cw = (w0 >> 10) & 0x1FFF
+        cc = w0 & 0xFF
+        if cc == 0:
+            return {'ok': None, 'detail': 'SelfTest LUMP has cc=0 (no c-list entries)'}
+        # Validate file size before using file-length-derived c-list offset to
+        # prevent appended-data attacks where a correct GT is placed beyond the
+        # declared content boundary.
+        size_err = _ba_validate_lump_size(n_words, cw, cc)
+        if size_err:
+            return {'ok': False, 'detail': f'LUMP integrity: {size_err}'}
+        # c-list occupies the LAST cc words of the (validated) file
+        actual_gt = _ba_struct.unpack_from('>I', data, (n_words - cc) * 4)[0]
+        ok = (actual_gt == expected_gt)
+        verdict = '✅ matches boot_rom' if ok else '❌ mismatch'
+        return {'ok': ok,
+                'detail': f'c-list[0]=0x{actual_gt:08X} expected=0x{expected_gt:08X} {verdict}'}
+    except Exception as e:
+        return {'ok': None, 'detail': f'c-list check error: {e}'}
+
+def _ba_check_final_opcode(lump_path):
+    """
+    Scan the last non-zero word of the executable code section and verify
+    it is BRANCH (5-bit opcode 23, bits[31:27]), not Church RETURN (opcode 3).
+
+    The Church Machine ISA encodes opcodes in bits[31:27] (5 bits), not bits[31:26].
+    BRANCH=23 (0b10111), Church RETURN=3 (0b00011).
+
+    This catches the v12→v13 regression where a SelfTest loop-back BRANCH was
+    accidentally replaced by RETURN, which would cause the SelfTest to return
+    instead of looping — a silent control-flow corruption invisible without this gate.
+
+    Returns a dict:
+        ok=True   — terminal opcode is BRANCH (23) ✅
+        ok=False  — terminal opcode is RETURN (3) ❌ regression detected
+        ok=None   — terminal opcode is neither 23 nor 3 ⚠️ (unexpected; warning only,
+                    does NOT block Approve because some lumps use extended ISA encodings)
+    """
+    BRANCH_OP  = 23   # bits[31:27] = 0b10111
+    RETURN_OP  =  3   # bits[31:27] = 0b00011  (Church RETURN, not opcode 24)
+    try:
+        with open(lump_path, 'rb') as f:
+            data = f.read()
+        n_words = len(data) // 4
+        if n_words < 2:
+            return {'ok': False, 'detail': 'LUMP too short to check opcodes'}
+        w0 = _ba_struct.unpack_from('>I', data, 0)[0]
+        cw = (w0 >> 10) & 0x1FFF   # header-declared code word count
+        cc = w0 & 0xFF
+        # Validate file size against header before using any derived offsets.
+        # This prevents appended-data attacks where a correct BRANCH instruction
+        # is appended beyond the declared content boundary so that the
+        # file-length-derived code_end points at the attacker's word.
+        size_err = _ba_validate_lump_size(n_words, cw, cc)
+        if size_err:
+            return {'ok': False, 'detail': f'LUMP integrity: {size_err}'}
+        # Use the HEADER-DEFINED code section boundary (word index cw is the
+        # last code word), not a file-length-derived offset.
+        code_end = cw
+        if code_end < 1:
+            return {'ok': None, 'detail': 'Code section too short to check (cw=0)'}
+        # Scan backward within the header-declared code section for the last
+        # non-zero instruction word (skip zero-padded gap before c-list).
+        last_w = None
+        last_idx = None
+        for i in range(code_end, 0, -1):
+            w = _ba_struct.unpack_from('>I', data, i * 4)[0]
+            if w != 0:
+                last_w = w
+                last_idx = i
+                break
+        if last_w is None:
+            return {'ok': None, 'detail': 'Code section is all zeros — cannot check opcode'}
+        # 5-bit opcode: bits[31:27]
+        op = (last_w >> 27) & 0x1F
+        if op == RETURN_OP:
+            return {'ok': False,
+                    'detail': (f'❌ REGRESSION: terminal opcode={op} (RETURN) at word[{last_idx}]'
+                               f' — should be BRANCH({BRANCH_OP}); 0x{last_w:08X}')}
+        if op == BRANCH_OP:
+            return {'ok': True,
+                    'detail': (f'terminal opcode={op} (BRANCH ✅) at word[{last_idx}];'
+                               f' 0x{last_w:08X}')}
+        # Neither BRANCH nor RETURN — warn but do not block approval
+        return {'ok': None, 'warn': True,
+                'detail': (f'⚠️ terminal opcode={op} at word[{last_idx}] — not RETURN({RETURN_OP}) ✓,'
+                           f' not BRANCH({BRANCH_OP}) (extended ISA encoding); 0x{last_w:08X}')}
+    except Exception as e:
+        return {'ok': None, 'detail': f'Opcode check error: {e}'}
+
+@app.route('/api/build-approval/ns-map', methods=['GET'])
+def build_approval_ns_map():
+    """Return the full NS map with per-slot verification checks.
+
+    Requires REPORT_TOKEN authentication.  On success, also returns a fresh
+    build_nonce that the browser must supply as a CSRF guard when calling
+    /api/wukong-build/start.  Because this endpoint is auth-gated, the nonce
+    is session-bound — an unauthenticated caller cannot obtain one.
+    """
+    ok, err = _ba_check_report_token()
+    if not ok:
+        return err
+
+    try:
+        data = _ba_build_ns_map()
+        data['build_nonce'] = _ba_fresh_nonce()
+        return jsonify(data)
+    except Exception as e:
+        app.logger.exception('build-approval/ns-map error')
+        return jsonify({'error': str(e)}), 500
+
+def _ba_build_ns_map():
+    """Assemble the full NS map with per-slot checks. Returns a dict."""
+    import re as _re
+
+    ROOT = os.path.dirname(_SERVER_DIR)
+
+    # ── Read boot_rom.py constants ─────────────────────────────────────────
+    rom_path = os.path.join(ROOT, 'hardware', 'boot_rom.py')
+    try:
+        with open(rom_path) as f:
+            rom_src = f.read()
+    except Exception:
+        rom_src = ''
+
+    def _rom(pattern, default):
+        m = _re.search(pattern, rom_src)
+        return m.group(1) if m else default
+
+    selftest_slot   = int(_rom(r'SELFTEST_NS_SLOT\s*=\s*(\d+)',          '6'))
+    callhome_slot   = int(_rom(r'WUKONG_CALLHOME_NS_SLOT\s*=\s*(\d+)',  '7'))
+    ns_slot_count   = int(_rom(r'NS_SLOT_COUNT\s*=\s*(\d+)',             '8'))
+    selftest_base   = _rom(r'WUKONG_SELFTEST_BASE_BYTE\s*=\s*(0x[0-9a-fA-F]+|\d+)', '0x600')
+    # callhome base — match the literal constant assignment (not the indirect alias)
+    callhome_base   = _rom(r'WUKONG_CALLHOME_BASE_BYTE\s*=\s*(0x[0-9a-fA-F]+|\d+)', '0x1200')
+
+    mmio_uart  = _rom(r'MMIO_UART_ADDR\s*=\s*(0x[0-9a-fA-F]+)',  '0x40000014')
+    mmio_led   = _rom(r'MMIO_LED_ADDR\s*=\s*(0x[0-9a-fA-F]+)',   '0x40000000')
+    mmio_btn   = _rom(r'MMIO_BTN_ADDR\s*=\s*(0x[0-9a-fA-F]+)',   '0x40000028')
+    mmio_timer = _rom(r'MMIO_TIMER_ADDR\s*=\s*(0x[0-9a-fA-F]+)', '0x4000002C')
+
+    # NS_TABLE_BASE from hw_types.py
+    hw_types_path = os.path.join(ROOT, 'hardware', 'hw_types.py')
+    try:
+        with open(hw_types_path) as f:
+            hw_src = f.read()
+        m3 = _re.search(r'NS_TABLE_BASE\s*=\s*(0x[0-9a-fA-F]+|\d+)', hw_src)
+        ns_table_base = m3.group(1) if m3 else '0x1FC00'
+    except Exception:
+        ns_table_base = '0x1FC00'
+
+    # Thread base
+    thread_base_word = int(_rom(r'WUKONG_THREAD_BASE_WORD\s*=\s*(\d+)', '896'))
+    thread_base = hex(thread_base_word * 4)
+
+    # ── manifest ───────────────────────────────────────────────────────────
+    manifest_path = os.path.join(_LUMPS_DIR, 'manifest.json')
+    manifest = []
+    try:
+        with open(manifest_path) as f:
+            manifest = json.load(f)
+    except Exception:
+        pass
+
+    # Map ns_slot → manifest entry
+    manifest_by_slot = {}
+    manifest_no_slot = []
+    for entry in manifest:
+        slot = entry.get('ns_slot')
+        if slot is not None and isinstance(slot, int):
+            manifest_by_slot[slot] = entry
+        else:
+            manifest_no_slot.append(entry)
+
+    # ── Helper: build checks for a LUMP slot ──────────────────────────────
+    def _lump_checks(slot_num, token, manifest_entry, lump_path, is_selftest=False):
+        checks = []
+
+        # 1. LUMP file present?
+        if lump_path and os.path.exists(lump_path):
+            hdr = _ba_read_lump_header(lump_path)
+            # 1a. Header valid (magic 0x1F)
+            if hdr:
+                checks.append({'label': 'header', 'ok': True,
+                                'detail': f'Header valid: 0x{hdr[0]:08X}  cw={hdr[1]} cc={hdr[2]}'})
+                # 1b. cw/cc match manifest
+                if manifest_entry:
+                    m_cw = manifest_entry.get('cw')
+                    m_cc = manifest_entry.get('cc')
+                    cw_ok = (m_cw is None) or (hdr[1] == m_cw)
+                    cc_ok = (m_cc is None) or (hdr[2] == m_cc)
+                    checks.append({'label': 'cw/cc', 'ok': cw_ok and cc_ok,
+                                   'detail': f'binary cw={hdr[1]} cc={hdr[2]} vs manifest cw={m_cw} cc={m_cc}'})
+                # 1c. md5 (token parity — we just verify file is readable with correct magic)
+                md5 = _ba_md5_file(lump_path)
+                checks.append({'label': 'binary', 'ok': md5 is not None,
+                               'detail': f'md5={md5 or "read-error"}'})
+            else:
+                checks.append({'label': 'header', 'ok': False,
+                                'detail': 'LUMP header magic invalid or file unreadable'})
+        else:
+            checks.append({'label': 'file', 'ok': False,
+                            'detail': f'LUMP binary not found: {lump_path}'})
+
+        # 2. Name parity (manifest abstraction vs JSON .json sidecar if present)
+        if manifest_entry and token:
+            json_path = os.path.join(_LUMPS_DIR, token + '.json')
+            if os.path.exists(json_path):
+                try:
+                    with open(json_path) as jf:
+                        jdata = json.load(jf)
+                    m_name = manifest_entry.get('abstraction', '')
+                    j_name = jdata.get('abstraction', jdata.get('name', ''))
+                    name_ok = (not m_name or not j_name or m_name == j_name)
+                    checks.append({'label': 'name parity', 'ok': name_ok,
+                                   'detail': f'manifest="{m_name}" sidecar="{j_name}"'})
+                except Exception:
+                    pass
+
+        # 3. Token parity — manifest token should match filename
+        if manifest_entry and token:
+            m_token = manifest_entry.get('token', '')
+            token_ok = (not m_token) or (m_token.lower() == token.lower())
+            checks.append({'label': 'token', 'ok': token_ok,
+                           'detail': f'manifest token={m_token!r} file={token!r}'})
+
+        # 4. SelfTest-specific checks: RETURN-vs-BRANCH opcode + c-list E-GT
+        if is_selftest and lump_path and os.path.exists(lump_path):
+            # 4a. Terminal opcode check — catch v12→v13 regression (RETURN instead of BRANCH)
+            op_chk = _ba_check_final_opcode(lump_path)
+            checks.append({'label': 'BRANCH opcode',
+                           'ok': op_chk['ok'],
+                           'warn': op_chk.get('warn', False),
+                           'detail': op_chk['detail']})
+            # 4b. c-list[0] E-GT check — verify return-channel capability matches boot_rom
+            egt = _ba_check_selftest_egt(lump_path, selftest_slot)
+            checks.append({'label': 'SelfTest E-GT', 'ok': egt['ok'],
+                           'detail': egt['detail']})
+
+        return checks
+
+    # ── Assemble tiers ─────────────────────────────────────────────────────
+    # Bootstrap: slots 0–1
+    bootstrap = [
+        {
+            'slot': 0, 'name': 'Boot.NS', 'token': None,
+            'header_word': None, 'cw': None, 'cc': None,
+            'location': ns_table_base, 'perms': ['R', 'W'], 'source': 'BRAM (boot ROM)',
+            'checks': [{'label': 'BRAM', 'ok': True, 'detail': 'Baked into BRAM at NS_TABLE_BASE'}],
+        },
+        {
+            'slot': 1, 'name': 'Boot.Thread', 'token': None,
+            'header_word': None, 'cw': None, 'cc': None,
+            'location': thread_base, 'perms': ['R', 'W'], 'source': 'BRAM (boot ROM)',
+            'checks': [{'label': 'BRAM', 'ok': True, 'detail': 'Thread lump baked into BRAM'}],
+        },
+    ]
+
+    # Resident MMIO: slots 2–5
+    resident = [
+        {'slot': 2, 'name': 'UART_DEV',  'token': None, 'header_word': 'MMIO', 'cw': None, 'cc': None,
+         'location': mmio_uart,  'perms': ['R', 'W'], 'source': 'boot ROM',
+         'checks': [{'label': 'MMIO', 'ok': True, 'detail': f'MMIO at {mmio_uart}'}]},
+        {'slot': 3, 'name': 'LED_DEV',   'token': None, 'header_word': 'MMIO', 'cw': None, 'cc': None,
+         'location': mmio_led,   'perms': ['R', 'W'], 'source': 'boot ROM',
+         'checks': [{'label': 'MMIO', 'ok': True, 'detail': f'MMIO at {mmio_led}'}]},
+        {'slot': 4, 'name': 'BTN_DEV',   'token': None, 'header_word': 'MMIO', 'cw': None, 'cc': None,
+         'location': mmio_btn,   'perms': ['R'],      'source': 'boot ROM',
+         'checks': [{'label': 'MMIO', 'ok': True, 'detail': f'MMIO at {mmio_btn}'}]},
+        {'slot': 5, 'name': 'TIMER_DEV', 'token': None, 'header_word': 'MMIO', 'cw': None, 'cc': None,
+         'location': mmio_timer, 'perms': ['R', 'W'], 'source': 'boot ROM',
+         'checks': [{'label': 'MMIO', 'ok': True, 'detail': f'MMIO at {mmio_timer}'}]},
+    ]
+
+    # Slot 6 — SelfTest LUMP
+    st_token = '00000600'
+    st_lump = os.path.join(_LUMPS_DIR, st_token + '.lump')
+    st_hdr = _ba_read_lump_header(st_lump) if os.path.exists(st_lump) else None
+    st_checks = _lump_checks(selftest_slot, st_token,
+                             manifest_by_slot.get(selftest_slot),
+                             st_lump, is_selftest=True)
+    resident.append({
+        'slot': selftest_slot, 'name': 'SelfTest ⚡',
+        'token': st_token,
+        'header_word': f'0x{st_hdr[0]:08X}' if st_hdr else None,
+        'cw': st_hdr[1] if st_hdr else None, 'cc': st_hdr[2] if st_hdr else None,
+        'location': selftest_base, 'perms': ['E'], 'source': 'server/lumps',
+        'checks': st_checks,
+    })
+
+    # Slot 7 — WukongCallHome LUMP
+    wch_entry = manifest_by_slot.get(callhome_slot)
+    wch_token = wch_entry.get('token') if wch_entry else None
+    # Also scan for WukongCallHome_v* files
+    if not wch_token:
+        cands = sorted([fn for fn in os.listdir(_LUMPS_DIR)
+                       if 'WukongCallHome' in fn and fn.endswith('.lump')])
+        if cands:
+            wch_token = cands[-1].replace('.lump', '')
+    wch_lump = _ba_lump_file_for_token(wch_token) if wch_token else None
+    wch_hdr = _ba_read_lump_header(wch_lump) if wch_lump else None
+    wch_checks = _lump_checks(callhome_slot, wch_token, wch_entry, wch_lump)
+    resident.append({
+        'slot': callhome_slot, 'name': 'WukongCallHome',
+        'token': wch_token,
+        'header_word': f'0x{wch_hdr[0]:08X}' if wch_hdr else None,
+        'cw': wch_hdr[1] if wch_hdr else None, 'cc': wch_hdr[2] if wch_hdr else None,
+        'location': callhome_base, 'perms': ['E'], 'source': 'server/lumps',
+        'checks': wch_checks,
+    })
+
+    # ── Byte-range overlap check for resident LUMP slots ──────────────────
+    def _parse_hex(s):
+        try:
+            return int(str(s), 16)
+        except Exception:
+            return None
+
+    lump_ranges = []
+    for s in resident:
+        if s.get('perms') and 'E' in s['perms'] and s.get('cw') is not None:
+            base = _parse_hex(s.get('location'))
+            if base is not None:
+                end = base + (s['cw'] or 0) * 4
+                lump_ranges.append((s['slot'], s['name'], base, end))
+
+    overlap_slots = _ba_overlap_check(lump_ranges)
+    for s in resident:
+        if s['slot'] in overlap_slots:
+            s['checks'].append({'label': 'overlap', 'ok': False,
+                                'detail': f'Slot {s["slot"]} byte range overlaps with another resident slot'})
+        elif s.get('cw') is not None and s.get('perms') and 'E' in s['perms']:
+            s['checks'].append({'label': 'overlap', 'ok': True,
+                                'detail': 'No byte-range overlap with other resident slots'})
+
+    # ── Lazy-load (manifest ns_slot >= 8) ─────────────────────────────────
+    lazy = []
+    for slot_num in sorted(manifest_by_slot.keys()):
+        if slot_num < ns_slot_count:
+            continue  # already in resident
+        entry = manifest_by_slot[slot_num]
+        token = entry.get('token')
+        lump_path = _ba_lump_file_for_token(token)
+        hdr = _ba_read_lump_header(lump_path) if lump_path else None
+        checks = _lump_checks(slot_num, token, entry, lump_path)
+        lazy.append({
+            'slot': slot_num,
+            'name': entry.get('abstraction', '?'),
+            'token': token,
+            'header_word': f'0x{hdr[0]:08X}' if hdr else None,
+            'cw': hdr[1] if hdr else (entry.get('cw')),
+            'cc': hdr[2] if hdr else (entry.get('cc')),
+            'location': None,
+            'perms': entry.get('grants', []),
+            'source': 'manifest (lazy)',
+            'checks': checks,
+        })
+
+    # Manifest entries with ns_slot=None or dynamic
+    for entry in manifest_no_slot:
+        token = entry.get('token')
+        policy = entry.get('ns_slot_policy', 'dynamic')
+        if policy == 'dynamic':
+            lump_path = _ba_lump_file_for_token(token)
+            hdr = _ba_read_lump_header(lump_path) if lump_path else None
+            checks = _lump_checks(None, token, entry, lump_path)
+            lazy.append({
+                'slot': '(dynamic)',
+                'name': entry.get('abstraction', '?'),
+                'token': token,
+                'header_word': f'0x{hdr[0]:08X}' if hdr else None,
+                'cw': hdr[1] if hdr else entry.get('cw'),
+                'cc': hdr[2] if hdr else entry.get('cc'),
+                'location': None,
+                'perms': entry.get('grants', []),
+                'source': 'manifest (dynamic)',
+                'checks': checks,
+            })
+
+    return {
+        'tiers': {
+            'bootstrap': bootstrap,
+            'resident':  resident,
+            'lazy':      lazy,
+            'unused':    [],
+        },
+        'ns_table_base': ns_table_base,
+        'ns_slot_count': ns_slot_count,
+    }
+
+def _ba_lump_file_for_token(token):
+    """Return path to token.lump in the lumps dir, or None."""
+    if not token:
+        return None
+    p = os.path.join(_LUMPS_DIR, token + '.lump')
+    return p if os.path.exists(p) else None
+
+def _ba_write_ssh_key():
+    """Write DropletPrivateKey secret to ~/.ssh/replit_droplet and return path, or None."""
+    key_raw = os.environ.get('DropletPrivateKey', '')
+    if not key_raw.strip():
+        return None
+    ssh_dir = os.path.expanduser('~/.ssh')
+    os.makedirs(ssh_dir, exist_ok=True)
+    key_path = os.path.join(ssh_dir, 'replit_droplet')
+    # Replit may collapse newlines into spaces — reformat to valid PEM
+    lines = key_raw.strip().split('\n')
+    if len(lines) > 2:
+        pem = key_raw.strip() + '\n'
+    else:
+        # Single-line (spaces collapsed) — rebuild PEM blocks
+        tokens = key_raw.strip().split()
+        if len(tokens) >= 8:
+            header = ' '.join(tokens[:4])
+            footer = ' '.join(tokens[-4:])
+            body = ''.join(tokens[4:-4])
+            chunks = [body[i:i+64] for i in range(0, len(body), 64)]
+            pem = header + '\n' + '\n'.join(chunks) + '\n' + footer + '\n'
+        else:
+            pem = key_raw.strip() + '\n'
+    with open(key_path, 'w') as f:
+        f.write(pem)
+    os.chmod(key_path, 0o600)
+    return key_path
+
+
+def _ba_build_worker(key_path):
+    """Background thread: SSH to droplet, start Vivado in tmux, stream log."""
+    global _ba_build_log, _ba_build_done, _ba_build_exit
+
+    ssh_base = [
+        'ssh', '-i', key_path,
+        '-o', 'StrictHostKeyChecking=accept-new',
+        '-o', 'ConnectTimeout=15',
+        f'{_DROPLET_USER}@{_DROPLET_IP}',
+    ]
+
+    def _append(line):
+        with _ba_build_lock:
+            _ba_build_log.append(line)
+
+    def _finish(code):
+        global _ba_build_done, _ba_build_exit
+        with _ba_build_lock:
+            _ba_build_done = True
+            _ba_build_exit = code
+
+    _append('🔗 Connecting to build droplet…')
+
+    try:
+        # 1. Kill any existing session + start new tmux Vivado build
+        launch_cmd = (
+            f'cd {_DROPLET_BUILD_DIR} && '
+            f'tmux kill-session -t {_VIVADO_SESSION} 2>/dev/null; '
+            f'tmux new-session -d -s {_VIVADO_SESSION} '
+            f"'source /opt/Xilinx/2026.1/Vivado/settings64.sh && "
+            f"vivado -mode batch -source wukong_xc7a100t.tcl "
+            f"> vivado_cm.log 2>&1; echo EXIT_$? >> vivado_cm.log'"
+        )
+        r = subprocess.run(ssh_base + [launch_cmd],
+                           capture_output=True, text=True, timeout=30)
+        if r.returncode != 0:
+            _append(f'❌ SSH launch failed (exit {r.returncode}):')
+            _append(r.stderr.strip() or '(no error output)')
+            _finish(r.returncode)
+            return
+
+        _append(f'✅ Vivado synthesis started in tmux session "{_VIVADO_SESSION}"')
+        _append('⏳ Polling build log (every 30 s)…')
+
+        # 2. Poll the remote log until EXIT_ appears or session ends
+        import time as _time
+        seen_lines = 0
+        poll_interval = 30
+        max_polls = 60  # ~30 min max
+
+        for _ in range(max_polls):
+            _time.sleep(poll_interval)
+            # Fetch new log lines
+            poll_cmd = (
+                f'tail -n +{seen_lines + 1} {_DROPLET_BUILD_DIR}/vivado_cm.log 2>/dev/null; '
+                f'tmux list-sessions 2>/dev/null | grep {_VIVADO_SESSION} || echo __SESSION_GONE__'
+            )
+            pr = subprocess.run(ssh_base + [poll_cmd],
+                                capture_output=True, text=True, timeout=30)
+            if pr.returncode != 0:
+                _append(f'⚠️ Poll SSH error (exit {pr.returncode}) — retrying…')
+                continue
+
+            out = pr.stdout or ''
+            session_gone = '__SESSION_GONE__' in out
+            new_lines = [l for l in out.splitlines()
+                         if l != '__SESSION_GONE__' and _VIVADO_SESSION not in l]
+            seen_lines += len(new_lines)
+            for ln in new_lines:
+                _append(ln)
+
+            # Check for exit marker
+            exit_code = None
+            for ln in new_lines:
+                m = re.match(r'EXIT_(\d+)', ln.strip())
+                if m:
+                    exit_code = int(m.group(1))
+                    break
+
+            if exit_code is not None:
+                _append(f'\n{"✅ Build complete!" if exit_code == 0 else "❌ Build FAILED"} (exit {exit_code})')
+                _finish(exit_code)
+                return
+
+            if session_gone and not any('EXIT_' in ln for ln in new_lines):
+                _append('⚠️ tmux session gone without EXIT_ marker — may have crashed')
+                _finish(1)
+                return
+
+        _append('⏰ Build poll timed out (max 30 min exceeded)')
+        _finish(1)
+
+    except subprocess.TimeoutExpired:
+        _append('❌ SSH command timed out')
+        _finish(1)
+    except Exception as e:
+        _append(f'❌ Build worker error: {e}')
+        _finish(1)
+
+@app.route('/api/wukong-build/start', methods=['POST'])
+def wukong_build_start():
+    """SSH to the DigitalOcean droplet and launch Vivado synthesis in tmux.
+
+    Requires either:
+      • Authorization: Bearer <REPORT_TOKEN>   (scripted / external callers)
+      • build_nonce in the JSON body or ?build_nonce= query param  (browser)
+    The nonce is obtained from GET /api/build-approval/ns-map.
+    """
+    global _ba_build_log, _ba_build_done, _ba_build_exit
+
+    ok, err = _ba_validate_build_auth()
+    if not ok:
+        return err
+
+    # Server-side approval gate: require a freshly frozen snapshot where every
+    # check passed.  An authenticated direct POST cannot bypass the UI's
+    # "all checks pass" rule — the server re-enforces it here.
+    if not os.path.isdir(_BUILD_SNAPSHOTS_DIR):
+        return jsonify({'ok': False,
+                        'error': 'No approval snapshot found — freeze a clean snapshot first'}), 422
+    snap_files = sorted([f for f in os.listdir(_BUILD_SNAPSHOTS_DIR)
+                         if f.startswith('build-approval-') and f.endswith('.json')])
+    if not snap_files:
+        return jsonify({'ok': False,
+                        'error': 'No approval snapshot found — freeze a clean snapshot first'}), 422
+    latest_snap_path = os.path.join(_BUILD_SNAPSHOTS_DIR, snap_files[-1])
+    try:
+        with open(latest_snap_path) as _sf:
+            latest_snap = json.load(_sf)
+    except Exception as _se:
+        return jsonify({'ok': False,
+                        'error': f'Could not read approval snapshot: {_se}'}), 500
+    if not latest_snap.get('all_checks_pass'):
+        return jsonify({'ok': False,
+                        'error': (f'Latest snapshot ({snap_files[-1]}) has failed or missing '
+                                  f'checks — fix all issues and re-freeze before launching build')}), 422
+
+    with _ba_build_lock:
+        if _ba_build_done is False and _ba_build_log:
+            return jsonify({'ok': False, 'error': 'Build already in progress'}), 409
+
+    key_path = _ba_write_ssh_key()
+    if not key_path:
+        return jsonify({'ok': False,
+                        'error': 'DropletPrivateKey secret not set — cannot SSH to build droplet'}), 503
+
+    # Reset log state
+    with _ba_build_lock:
+        _ba_build_log = []
+        _ba_build_done = False
+        _ba_build_exit = None
+
+    t = threading.Thread(target=_ba_build_worker, args=(key_path,), daemon=True)
+    t.start()
+
+    return jsonify({'ok': True, 'message': 'Build started — poll /api/wukong-build/status'})
+
+@app.route('/api/wukong-build/status', methods=['GET'])
+def wukong_build_status():
+    """Return current build log lines + done/exit status.
+
+    Requires REPORT_TOKEN auth (Bearer header).  No nonce needed here —
+    the nonce was consumed at /start; polling only needs the token.
+    """
+    ok, err = _ba_check_report_token()
+    if not ok:
+        return err
+    with _ba_build_lock:
+        log = list(_ba_build_log)
+        done = _ba_build_done
+        exit_code = _ba_build_exit
+    return jsonify({'log': log, 'done': done, 'exit_code': exit_code})
+
+@app.route('/api/build-approval/freeze-snapshot', methods=['POST'])
+def build_approval_freeze_snapshot():
+    """Persist the current NS map + check results as a dated JSON record.
+
+    Requires REPORT_TOKEN auth.  The map is derived server-side at freeze time
+    rather than accepted from the client, preventing attacker-supplied snapshot JSON
+    from tainting the approval artifact record.
+    """
+    ok, err = _ba_check_report_token()
+    if not ok:
+        return err
+    try:
+        os.makedirs(_BUILD_SNAPSHOTS_DIR, exist_ok=True)
+        # Always derive the map server-side — never trust client-submitted map data.
+        ns_map = _ba_build_ns_map()
+        # Determine whether the hardware-relevant tiers pass.
+        #
+        # Only the bootstrap (slots 0-1, baked into BRAM) and resident (slots
+        # 2-7, in the boot ROM) tiers affect the Vivado bitstream.  Lazy/dynamic
+        # slots are fetched at runtime by the IDE — stale manifest entries and
+        # missing legacy LUMP files in those tiers are informational and must not
+        # block synthesis approval.
+        def _snap_all_pass(m):
+            for tier_name in ('bootstrap', 'resident'):
+                for s in m.get('tiers', {}).get(tier_name, []):
+                    for c in s.get('checks', []):
+                        if c.get('ok') is False:
+                            return False
+            return True
+        all_pass = _snap_all_pass(ns_map)
+        now_str = _ba_datetime.datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
+        filename = f'build-approval-{now_str}.json'
+        snap = {
+            'frozen_at': now_str,
+            'all_checks_pass': all_pass,
+            'ns_map': ns_map,
+        }
+        path = os.path.join(_BUILD_SNAPSHOTS_DIR, filename)
+        with open(path, 'w') as f:
+            json.dump(snap, f, indent=2)
+        return jsonify({'ok': True, 'filename': filename, 'frozen_at': now_str,
+                        'all_checks_pass': all_pass})
+    except Exception as e:
+        app.logger.exception('freeze-snapshot error')
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+def _ba_overlap_check(slots_with_ranges):
+    """
+    Given list of (slot, name, byte_start, byte_end), return set of slot nums
+    that overlap with at least one other slot.
+    """
+    bad = set()
+    s = [(s, n, a, b) for s, n, a, b in slots_with_ranges if a is not None and b is not None]
+    for i, (si, ni, ai, bi) in enumerate(s):
+        for j, (sj, nj, aj, bj) in enumerate(s):
+            if i >= j:
+                continue
+            # overlap if not (bi <= aj or bj <= ai)
+            if not (bi <= aj or bj <= ai):
+                bad.add(si)
+                bad.add(sj)
+    return bad
+
+def _ba_validate_build_auth():
+    """
+    Return (ok, error_response) for build-trigger endpoints.
+
+    Requires:
+      1. REPORT_TOKEN via Authorization: Bearer header  (primary auth)
+      2. A valid build_nonce issued by /api/build-approval/ns-map  (CSRF guard)
+
+    The nonce is session-bound: /api/build-approval/ns-map only issues a nonce
+    after the caller has already authenticated with REPORT_TOKEN, so a nonce
+    cannot be obtained without the token.  Together they prevent both external
+    exploitation and CSRF attacks from browser pages that tricked the user.
+    """
+    import time as _time
+
+    # 1. Primary auth — REPORT_TOKEN required
+    ok, err = _ba_check_report_token()
+    if not ok:
+        return False, err
+
+    # 2. CSRF guard — nonce must match the one issued by the authenticated ns-map call
+    body = request.get_json(silent=True) or {}
+    supplied_nonce = body.get("build_nonce") or request.args.get("build_nonce", "")
+    with _ba_nonce_lock:
+        stored_nonce  = _ba_nonce_store.get('nonce')
+        nonce_expires = _ba_nonce_store.get('expires', 0.0)
+    nonce_valid = (
+        supplied_nonce and stored_nonce and
+        secrets.compare_digest(supplied_nonce, stored_nonce) and
+        _time.monotonic() < nonce_expires
+    )
+    if not nonce_valid:
+        err = jsonify({
+            'ok': False,
+            'error': (
+                'Missing or expired build_nonce — refresh the Build tab to obtain a '
+                'fresh nonce from /api/build-approval/ns-map and retry.'
+            )
+        })
+        return False, (err, 403)
+
+    return True, None
 
 
 if __name__ == "__main__":

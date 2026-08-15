@@ -573,9 +573,14 @@ function setNextAfterSelfTestSlot(idx) {
 
     // Persist to server boot-config so generate_boot_image() bakes the correct
     // Next.GT into DEMO_CLIST idx 1 on the next "Generate Boot Image" / upload.
+    // Send auth header when REPORT_TOKEN is available (production deployments).
+    const _nextHeaders = { 'Content-Type': 'application/json' };
+    if (typeof _authHeaders === 'function') {
+        Object.assign(_nextHeaders, _authHeaders());
+    }
     fetch('/api/boot-config/next-after-selftest', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: _nextHeaders,
         body:    JSON.stringify({ nextAfterSelfTestSlot: newSlot >= 0 ? newSlot : null }),
     }).catch(() => {});
 }

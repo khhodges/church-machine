@@ -146,6 +146,58 @@
         .r1-step-btn-secondary { background:transparent; color:#C89B3C; border:1px solid #C89B3C; font-weight:600; }
         .r1-step-btn-secondary:hover { background:#1a1408; color:#daa520; border-color:#daa520; }
         @media (max-width:600px) { .r1-step-card { flex-direction:column; } .r1-step-action { width:100%; align-items:stretch; } .r1-step-btn { width:100%; text-align:center; } }
+        /* ── Build Approval panel ────────────────────────────────────── */
+        .ba-panel { padding:0; overflow-y:auto; max-height:calc(100vh - 120px); }
+        .ba-panel > .ba-header, .ba-panel > .ba-toolbar, .ba-panel > .ba-map-body, .ba-panel > .ba-build-log-wrap { padding-left:1.4rem; padding-right:1.4rem; }
+        .ba-panel > .ba-header { padding-top:1rem; }
+        .ba-token-row { display:flex; align-items:center; gap:0.6rem; padding:0.45rem 1.4rem; background:#0a0e17; border-bottom:1px solid #1c1f35; }
+        .ba-token-row label { font-size:0.78rem; color:#7ec8e3; white-space:nowrap; user-select:none; }
+        .ba-token-input { flex:1; max-width:380px; background:#13162a; border:1px solid #2a2d4a; border-radius:4px; color:#e0e6f0; font-size:0.78rem; padding:3px 8px; font-family:monospace; }
+        .ba-token-input:focus { outline:none; border-color:#7ec8e3; }
+        .ba-token-status { font-size:0.73rem; color:#4ade80; }
+        .ba-header { display:flex; align-items:center; gap:0.8rem; margin-bottom:0.8rem; }
+        .ba-header h2 { margin:0; font-family:Georgia,serif; font-size:1.25rem; color:#daa520; }
+        .ba-refresh-btn { background:#1a1a2e; color:#c8c8e0; border:1px solid #3a3a5a; border-radius:5px; padding:0.3rem 0.75rem; font-size:0.82rem; cursor:pointer; }
+        .ba-refresh-btn:hover { background:#2a2a4a; }
+        .ba-last-checked { font-size:0.75rem; color:#55557a; margin-left:auto; }
+        .ba-toolbar { display:flex; align-items:center; gap:0.7rem; margin-bottom:1rem; flex-wrap:wrap; }
+        .ba-freeze-btn { background:#1a2a3a; color:#7ec8e3; border:1px solid #3a5a7a; border-radius:5px; padding:0.35rem 0.9rem; font-size:0.83rem; cursor:pointer; font-weight:600; }
+        .ba-freeze-btn:hover:not(:disabled) { background:#2a3a4a; }
+        .ba-freeze-btn:disabled { opacity:0.45; cursor:not-allowed; }
+        .ba-approve-btn { background:#1a3a1a; color:#3fb950; border:1px solid #3a7a3a; border-radius:5px; padding:0.35rem 0.9rem; font-size:0.83rem; cursor:pointer; font-weight:700; }
+        .ba-approve-btn:hover:not(:disabled) { background:#2a4a2a; }
+        .ba-approve-btn:disabled { opacity:0.45; cursor:not-allowed; }
+        .ba-snapshot-status { font-size:0.78rem; color:#888; font-style:italic; }
+        .ba-tier-header { font-size:0.8rem; font-weight:700; color:#7ec8e3; text-transform:uppercase; letter-spacing:0.07em; padding:0.6rem 0 0.3rem; margin-top:0.4rem; border-top:1px solid #2a2a4a; }
+        .ba-tier-header:first-child { border-top:none; margin-top:0; }
+        .ba-table { width:100%; border-collapse:collapse; font-size:0.78rem; margin-bottom:0.6rem; }
+        .ba-table th { text-align:left; color:#55557a; font-weight:600; padding:0.25rem 0.5rem; border-bottom:1px solid #2a2a4a; white-space:nowrap; }
+        .ba-table td { padding:0.22rem 0.5rem; border-bottom:1px solid #1a1a2e; vertical-align:middle; }
+        .ba-table tr:last-child td { border-bottom:none; }
+        .ba-row-ok { background:rgba(63,185,80,0.04); }
+        .ba-row-warn { background:rgba(218,165,32,0.07); }
+        .ba-row-bad { background:rgba(220,50,50,0.08); }
+        .ba-slot { color:#daa520; font-weight:700; width:2.5rem; }
+        .ba-name { color:#e0e0f0; font-weight:600; }
+        .ba-token code, .ba-hdr code, .ba-loc code { font-size:0.72rem; color:#c4b5fd; background:#0a0e17; padding:1px 4px; border-radius:3px; }
+        .ba-num { text-align:center; color:#c8c8e0; }
+        .ba-perms { color:#7ec8e3; font-size:0.72rem; }
+        .ba-src { color:#888; font-size:0.72rem; }
+        .ba-checks { white-space:nowrap; }
+        .ba-badge { display:inline-block; font-size:0.7rem; padding:1px 5px; border-radius:3px; margin:1px; cursor:default; }
+        .ba-badge-ok      { background:#1a3a1a; color:#3fb950; }
+        .ba-badge-warn    { background:#2a2000; color:#daa520; }
+        .ba-badge-bad     { background:#3a1a1a; color:#f87171; }
+        .ba-badge-unknown { background:#1a1a2e; color:#55557a; }
+        .ba-loading, .ba-empty { color:#55557a; font-style:italic; padding:1rem; font-size:0.85rem; }
+        .ba-error { color:#f87171; padding:1rem; font-size:0.85rem; }
+        .ba-build-log-wrap { margin-top:1.2rem; border:1px solid #2a2a4a; border-radius:6px; overflow:hidden; }
+        .ba-build-log-header { display:flex; align-items:center; justify-content:space-between; padding:0.4rem 0.8rem; background:#12121f; font-size:0.8rem; color:#888; border-bottom:1px solid #2a2a4a; }
+        .ba-build-log { background:#08080f; color:#c8c8e0; font-family:'Courier New',monospace; font-size:0.73rem; padding:0.7rem 0.9rem; margin:0; max-height:320px; overflow-y:auto; white-space:pre-wrap; word-break:break-all; }
+        .ba-build-status { font-size:0.78rem; font-weight:600; }
+        .ba-build-running { color:#daa520; }
+        .ba-build-ok      { color:#3fb950; }
+        .ba-build-bad     { color:#f87171; }
     </style>
 </head>
 <body>
@@ -1080,6 +1132,7 @@
             <button class="builder-view-tab" id="builderViewTab-lump-resident" onclick="switchBuilderViewTab('lump-resident')" style="display:none;">&#x1F3E0; Resident</button>
             <button class="builder-view-tab active" id="builderViewTab-ti60-connect" onclick="switchBuilderViewTab('ti60-connect')">&#x1F50C; Connect</button>
             <button class="builder-view-tab" id="builderViewTab-versions" onclick="switchBuilderViewTab('versions')">&#x1F9ED; Versions</button>
+            <button class="builder-view-tab" id="builderViewTab-build" onclick="switchBuilderViewTab('build')" title="Build Approval — NS map verification and Vivado synthesis launch">&#x1F528; Build</button>
             <button class="builder-view-tab" id="builderViewTab-testing" onclick="switchBuilderViewTab('testing')" title="FPGA status page — bridge/board/boot state, board controls, and live event log">&#x1F9EA; Testing</button>
         </div>
         <div id="builderView"></div>
@@ -1088,6 +1141,36 @@
         <div id="lumpResidentPanel" style="display:none;" class="lump-editor-wrap"></div>
         <div id="testingPanel" style="display:none; width:100%; height:calc(100vh - 160px);">
             <iframe id="testingIframe" style="width:100%; height:100%; border:none;" title="FPGA Status — Testing"></iframe>
+        </div>
+        <div id="buildApprovalPanel" style="display:none;" class="ti60-connect-panel ba-panel">
+            <div class="ba-token-row">
+                <label for="baBuildTokenInput">&#x1F511; Build token</label>
+                <input id="baBuildTokenInput" type="password" class="ba-token-input"
+                       placeholder="Paste REPORT_TOKEN to unlock build actions&hellip;"
+                       autocomplete="off"
+                       oninput="if(typeof BuildApprovalView!=='undefined')BuildApprovalView._onTokenInput(this.value)">
+                <span id="baTokenStatus" class="ba-token-status"></span>
+            </div>
+            <div class="ba-header">
+                <h2>&#x1F528; Build Approval</h2>
+                <button id="baRefreshBtn" class="ba-refresh-btn" onclick="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.refresh(true)">&#x21BB; Refresh</button>
+                <span id="baLastChecked" class="ba-last-checked"></span>
+            </div>
+            <div class="ba-toolbar">
+                <button id="baFreezeBtn" class="ba-freeze-btn" disabled onclick="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.freezeSnapshot()">&#x2744;&#xFE0F; Freeze Snapshot</button>
+                <button id="baApproveBtn" class="ba-approve-btn" disabled onclick="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.startBuild()">&#x2705; Approve &amp; Build</button>
+                <span id="baSnapshotStatus" class="ba-snapshot-status"></span>
+            </div>
+            <div id="baMapBody" class="ba-map-body">
+                <div class="ba-loading">Select the &#x1F528; Build tab to load NS map&hellip;</div>
+            </div>
+            <div id="baBuildLogWrap" class="ba-build-log-wrap" style="display:none;">
+                <div class="ba-build-log-header">
+                    <span>&#x1F6E0;&#xFE0F; Vivado build log</span>
+                    <span id="baBuildStatus" class="ba-build-status"></span>
+                </div>
+                <pre id="baBuildLog" class="ba-build-log"></pre>
+            </div>
         </div>
         <div id="versionsPanel" style="display:none;" class="ti60-connect-panel">
             <div class="versions-header">
@@ -2798,7 +2881,8 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="app-compile.js?v=20260814b"></script>
     <script src="app-lump-editor.js?v=20260812b"></script>
     <script src="app-editor-find.js?v=20260815a"></script>
-    <script src="app-run.js?v=20260814e"></script>
+    <script src="app-run.js?v=20260815a"></script>
+    <script src="app-build-approval.js?v=20260815a"></script>
     <script src="app-source-library.js?v=20260720h"></script>
     <script src="app-invoke.js?v=20260521a"></script>
     <script src="app-misc.js?v=20260803a"></script>

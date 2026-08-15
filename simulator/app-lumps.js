@@ -4817,7 +4817,14 @@ async function openLumpInEditor(token) {
                         // meaningful compiled source — that hides the real disasm.
                         var _isStubSource = _dj.source.indexOf('; TODO: write your code here') !== -1
                                          || _dj.source.indexOf('; TODO: write your code') !== -1;
-                        if (!_isStubSource) {
+                        // Guard: server stores path-references for lumps whose source
+                        // lives in simulator/examples/*.cloomc.  The detail endpoint
+                        // resolves these to file content, but if the file is missing
+                        // (e.g. a different deployment) the raw path string leaks
+                        // through.  Never put a bare .cloomc path into the editor.
+                        var _isUnresolvedPath = _dj.source.indexOf('\n') === -1
+                                             && /\.cloomc\s*$/.test(_dj.source.trim());
+                        if (!_isStubSource && !_isUnresolvedPath) {
                             _compiledDisasm = _dj.source;
                             _sourceRestored = true;
                         }
