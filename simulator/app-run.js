@@ -12984,8 +12984,29 @@ function confirmSaveToNamespace() {
                       && _svEntry.sources.server.language)
                     || (typeof sim !== 'undefined' && sim._lastCompiledLanguage)
                     || '';
+
+        // LumpRegistry stores raw code words (no lump header, no c-list).
+        // The server requires a spec-compliant binary: header word (magic 0x1F
+        // in bits[31:27]) + code region + padding + c-list.  Build it here
+        // the same way compileAndBuild does (app-compile.js ~line 1454).
+        var _svCC = _caps.length;
+        var _svCW = _svWords.length;
+        var _svLumpSize = 64;
+        while (_svLumpSize < 1 + _svCW + _svCC) _svLumpSize = _svLumpSize << 1;
+        var _svNm6 = 0;
+        while ((64 << _svNm6) < _svLumpSize) _svNm6++;
+        var _svHdr = (((0x1F & 0x1F) << 27) |
+                      ((_svNm6 & 0x0F)  << 23) |
+                      ((_svCW  & 0x1FFF) << 10) |
+                      ((0 & 0x03) << 8) |
+                      (_svCC & 0xFF)) >>> 0;
+        var _svBinary = new Array(_svLumpSize).fill(0);
+        _svBinary[0] = _svHdr;
+        for (var _svI = 0; _svI < _svCW; _svI++) _svBinary[1 + _svI] = (_svWords[_svI] >>> 0);
+        // c-list slots left as zeros — server injects the self-GT into slot 0.
+
         var _svPayload = {
-            binary: _svWords,
+            binary: _svBinary,
             metadata: {
                 abstraction:  _svAbsName,
                 content_type: 'code',
