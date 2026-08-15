@@ -34,6 +34,28 @@ _lumps_manifest_lock = threading.Lock()
 # the race window deterministic.  None in production (no overhead).
 _lumps_manifest_pre_write_hook: "threading.Callable | None" = None
 
+
+def _atomic_write_json(path: str, data) -> None:
+    """Write *data* as JSON to *path* atomically.
+
+    Serialises to a sibling temp file first, then calls os.replace() so the
+    destination is either the old content or the new content — never a
+    partially-written intermediate state.  Any I/O error during the write
+    leaves the original file untouched; the temp file is cleaned up.
+    """
+    dir_ = os.path.dirname(os.path.abspath(path))
+    fd, tmp_path = tempfile.mkstemp(dir=dir_, suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w') as fh:
+            json.dump(data, fh, indent=2)
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
 def _push_device_event(payload: dict):
     """Broadcast a JSON event to all open SSE connections."""
     msg = "data: " + json.dumps(payload) + "\n\n"
@@ -5699,8 +5721,7 @@ def save_lump():
 
         _locked_manifest.append(new_entry)
 
-        with open(manifest_path, 'w') as fh:
-            json.dump(_locked_manifest, fh, indent=2)
+        _atomic_write_json(manifest_path, _locked_manifest)
 
     print(f'[lumps] Saved {lump_filename} ({len(lump_bytes)} bytes) + {sidecar_filename}', flush=True)
 
@@ -5917,8 +5938,7 @@ def save_lump_wip():
     }
     manifest = [e for e in manifest if e.get('token') != token8]
     manifest.append(new_entry)
-    with open(manifest_path, 'w') as fh:
-        json.dump(manifest, fh, indent=2)
+    _atomic_write_json(manifest_path, manifest)
 
     # Cache binary in LAZY_LUMPS so it can be served immediately
     try:
@@ -6852,8 +6872,7 @@ def patch_lump_meta(token):
                             entry[field] = sidecar[field]
                     changed = True
             if changed:
-                with open(manifest_path, 'w') as fh:
-                    json.dump(manifest, fh, indent=2)
+                _atomic_write_json(manifest_path, manifest)
         except Exception:
             pass
 
@@ -7215,8 +7234,7 @@ def resize_lump(token_hex):
         if entry.get('token') == key8:
             entry['lump_size'] = new_size
             break
-    with open(manifest_path, 'w') as fh:
-        json.dump(manifest, fh, indent=2)
+    _atomic_write_json(manifest_path, manifest)
 
     print(f'[lump/resize] {key8}: {old_size}w → {new_size}w (cw={cw}, cc={cc}, saved {old_size - new_size}w)', flush=True)
     return jsonify({"ok": True, "already_minimal": False,
@@ -7315,8 +7333,7 @@ def import_lump():
     manifest.append({"token": token8, "abstraction": name, "ns_slot": None,
                       "lump_size": lump_size, "cw": cw, "cc": 0,
                       "methods": [], "grants": ["E"]})
-    with open(manifest_path, 'w') as mfh:
-        json.dump(manifest, mfh, indent=2)
+    _atomic_write_json(manifest_path, manifest)
 
     print(f'[lumps/import] {token8} content_type={content_type} {len(lump_bytes)}B', flush=True)
     return jsonify({"ok": True, "token": token8})
@@ -7419,8 +7436,7 @@ def upload_lump_file():
     manifest.append({"token": token8, "abstraction": name, "ns_slot": None,
                       "lump_size": lump_size, "cw": cw, "cc": cc,
                       "methods": [], "grants": ["E"]})
-    with open(manifest_path, 'w') as mfh:
-        json.dump(manifest, mfh, indent=2)
+    _atomic_write_json(manifest_path, manifest)
 
     print(f'[lumps/upload-lump] {token8} typ={typ} ({lump_type}) n={n} cw={cw} cc={cc} {len(lump_bytes)}B', flush=True)
     return jsonify({"ok": True, "token": token8})
@@ -7678,8 +7694,7 @@ def build_namespace():
         "methods": [],
         "grants": [],
     })
-    with open(manifest_path, 'w') as fh2:
-        json.dump(manifest, fh2, indent=2)
+    _atomic_write_json(manifest_path, manifest)
 
     print(f'[namespace] Built {safe_name}.namespace.zip ({len(app_bin)} bytes, {len(entries)} entries)', flush=True)
     return resp
@@ -7719,8 +7734,7 @@ def delete_lump(token):
             manifest = [e for e in manifest if e.get('token') != token8]
             if len(manifest) < before:
                 manifest_removed = True
-            with open(manifest_path, 'w') as fh:
-                json.dump(manifest, fh, indent=2)
+            _atomic_write_json(manifest_path, manifest)
         except Exception:
             pass
 
