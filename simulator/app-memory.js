@@ -2744,12 +2744,33 @@ function updateNamespace() {
         {
             const _srcLump = _findSrcLump(i, e.label);
             const _srcToken = _srcLump ? _srcLump.token : null;
+            // Show Source for Inform (gtType 1) and Outform (gtType 2) only.
+            // Hide for Null (0), Abstract (3), Thread slots, and hardware I/O caps.
+            // has_source is intentionally NOT checked — lumps saved before source persistence
+            // was active (e.g. SelfTest, Tunnel) have has_source:false but real CLOOMC source.
+            //
+            // Hardware exclusion covers three name spaces:
+            //   • NS entry labels used in the boot catalog  (LED_DEV, UART_DEV, …)
+            //   • HW_NAMESPACE labels (LED, UART, Button, Timer, Display at slots 11-15)
+            //   • User-facing cap names from _isHardwareCapName (LED0-5, UART, BTN, …)
+            //   • Namespace-root entry (Boot.NS)
+            const _hwCapRe = /^(LED[0-5]?|LED_DEV|UART(_TX|_RX|_DEV)?|BTN|BTN_DEV|Button|SlideRule|Timer|TIMER_DEV|Display|Boot\.NS|Boot\.Nucs|Boot\.Abstr)$/i;
+            const _hideSource = (e.gtType !== 1 && e.gtType !== 2) ||
+                                THREAD_NS_SLOTS.has(i) ||
+                                _hwCapRe.test(e.label || '');
             if (codeNotResident) {
                 html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span></td>`;
             } else {
-                const _srcBtn = (_srcToken && _srcLump && _srcLump.has_source)
-                    ? `<button class="btn btn-xs" onclick="event.stopPropagation();_openLumpSource('${_srcToken}')" style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);" title="Open source in Repository view">Source</button>`
-                    : '';
+                let _srcBtn = '';
+                if (!_hideSource) {
+                    // Prefer the cached token; fall back to the NS slot index so
+                    // _openLumpSource can do a safe label lookup without needing to
+                    // embed a label string inside an HTML attribute (injection-safe).
+                    const _onclickTarget = _srcToken
+                        ? `'${_srcToken}'`
+                        : `null,${i}`;
+                    _srcBtn = `<button class="btn btn-xs" onclick="event.stopPropagation();_openLumpSource(${_onclickTarget})" style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);" title="Open source in Repository view">Source</button>`;
+                }
                 html += `<td class="ns-entry-actions">${_srcBtn}</td>`;
             }
         }
@@ -4106,13 +4127,51 @@ function _showNSTypeDescModal(slotIdx, nsEntry) {
 
 window.memoryViewAddr = 0;
 
-function _openLumpSource(token) {
+function _openLumpSource(token, nsSlotFallback) {
     // Pass a pending-token and pending-tab to renderLumps() via window properties.
     // renderLumps() reads these after all auto-select logic runs, so the user's
     // explicit slot click always wins over the live CR14 auto-select.
-    window._pendingLumpToken = token;
-    window._pendingLumpTab = 'clooms';
-    if (typeof switchView === 'function') switchView('lumps');
+
+    if (token) {
+        // Fast path: token already known — navigate immediately.
+        window._pendingLumpToken = token;
+        window._pendingLumpTab = 'clooms';
+        if (typeof switchView === 'function') switchView('lumps');
+        return;
+    }
+
+    if (typeof nsSlotFallback !== 'number') {
+        // No useful hint — just open the Lumps view at whatever is currently selected.
+        window._pendingLumpTab = 'clooms';
+        if (typeof switchView === 'function') switchView('lumps');
+        return;
+    }
+
+    // Fallback path: no cached token for this slot yet.
+    // Resolve the label from the live NS entry, warm the registry if needed, then navigate.
+    // nsSlotFallback is a number (the NS slot index), safe to embed directly in HTML onclick.
+    (async function() {
+        let absLabel = null;
+        if (typeof sim !== 'undefined' && sim && typeof sim.readNSEntry === 'function') {
+            const _nsEntry = sim.readNSEntry(nsSlotFallback);
+            absLabel = _nsEntry ? _nsEntry.label : null;
+        }
+        let resolvedToken = null;
+        if (absLabel && window.LumpRegistry) {
+            // Warm the server list so the lookup reflects the current server state,
+            // even on first click before any renderLumps() call has completed.
+            if (!window.LumpRegistry.isServerListFetched()) {
+                try { await window.LumpRegistry.warmServerList(); } catch (_e) {}
+            }
+            const _byLabel = window.LumpRegistry.getServerList().find(function(l) {
+                return l.abstraction === absLabel;
+            });
+            if (_byLabel) resolvedToken = _byLabel.token;
+        }
+        if (resolvedToken) window._pendingLumpToken = resolvedToken;
+        window._pendingLumpTab = 'clooms';
+        if (typeof switchView === 'function') switchView('lumps');
+    }());
 }
 
 function jumpToMemory(addr) {

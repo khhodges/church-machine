@@ -1262,8 +1262,35 @@ async function _populateLumpSourceTab(lump, targetId) {
         return;
     }
 
+    // Helper: "No source stored yet" — shown when the server has no source file for
+    // this abstraction but it is a software lump that could have source in future.
+    const _showNoSourceYet = () => {
+        const displayName = absName || lump.token || 'This lump';
+        el.innerHTML = `<div class="lump-source-no-source-yet">
+            <div class="lump-source-no-source-yet-icon">&#128196;</div>
+            <div class="lump-source-no-source-yet-title">No source stored yet</div>
+            <div class="lump-source-no-source-yet-desc">
+                No CLOOMC++ source has been saved for <strong>${e(displayName)}</strong> yet.<br><br>
+                Compile and save this abstraction to attach source.
+            </div>
+        </div>`;
+    };
+
     try {
         const resp = await fetch(`/api/lump-source/${encodeURIComponent(absName)}`);
+
+        // Check status BEFORE content-type: 5xx responses are typically HTML, not JSON.
+        // 404 → server found no source file at all; show friendly notice.
+        // Other non-2xx → surface as an explicit HTTP error (not binary-only).
+        if (resp.status === 404) {
+            _showNoSourceYet();
+            return;
+        }
+        if (!resp.ok) {
+            el.innerHTML = `<div class="lump-source-status err">Error loading source (HTTP ${resp.status}).</div>`;
+            return;
+        }
+
         const ct = resp.headers.get('content-type') || '';
         if (!ct.includes('application/json')) {
             _showBinaryOnly('has no functional CLOOMC++ source on file. The Binary tab shows the compiled form.');
@@ -1271,7 +1298,7 @@ async function _populateLumpSourceTab(lump, targetId) {
         }
         const data = await resp.json();
 
-        if (resp.ok && !data.binary_only && data.source) {
+        if (!data.binary_only && data.source) {
             const src = data.source;
             if (_isRawISASource(src)) {
                 _showBinaryOnly('was compiled from RAW ISA or low-level assembly and has no CLOOMC++ pet-name source. The Binary tab shows the compiled form.');
