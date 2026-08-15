@@ -5040,7 +5040,8 @@ async function openLumpInEditor(token) {
         var _hasCompiledWords = !!(_regMem && _regMem.memory && _regMem.memory.words
                                    && _regMem.memory.words.length > 0);
         if (_hasCompiledWords) {
-            if (typeof showSaveToNamespace === 'function') showSaveToNamespace();
+            if (typeof showFormatLump === 'function') showFormatLump();
+            else if (typeof showSaveToNamespace === 'function') showSaveToNamespace();
         } else if (!_inMemoryLump && token) {
             // No compiled words — save the existing server binary as a new dated version.
             _saveLumpDirectVersion(token, lump, _saveLumpBtn);
@@ -5147,8 +5148,9 @@ window._saveLumpDirectVersion = _saveLumpDirectVersion;
 
 // ── editorSaveLump — unified handler for the hamburger "Save Lump" item ──────
 // Always accessible regardless of editor state.  Priority order:
-//   1. Fresh compiled words in LumpRegistry → showSaveToNamespace() (lets the
-//      user choose slot / permissions for the newly-assembled binary).
+//   1. Fresh compiled words in LumpRegistry → showFormatLump() (Step 1 of 2:
+//      shows header, capabilities, version history, and audit before the
+//      slot/permissions dialog).
 //   2. A server-persisted LUMP is open (set by openLumpInEditor) → save a new
 //      dated version of that LUMP without requiring a recompile.
 //   3. Nothing compiled and no open LUMP → trigger a compile so the user ends
@@ -5160,7 +5162,7 @@ window.editorSaveLump = function() {
     var _hasCompiledWords = !!(_regMem && _regMem.memory && _regMem.memory.words
                                && _regMem.memory.words.length > 0);
     if (_hasCompiledWords) {
-        if (typeof showSaveToNamespace === 'function') showSaveToNamespace();
+        if (typeof showFormatLump === 'function') showFormatLump();
     } else if (window._editorOpenLumpToken && window._editorOpenLumpMeta) {
         _saveLumpDirectVersion(window._editorOpenLumpToken,
                                window._editorOpenLumpMeta, null);
@@ -5168,6 +5170,247 @@ window.editorSaveLump = function() {
         // No compiled words and no open LUMP — trigger compile first.
         if (typeof smartCompile === 'function') smartCompile();
     }
+};
+
+// ── HTML escape helper for format-lump panel ──────────────────────────────────
+function _fmtEscape(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ── _closeFormatLumpDialog ────────────────────────────────────────────────────
+function _closeFormatLumpDialog() {
+    var d = document.getElementById('formatLumpDialog');
+    if (d) d.style.display = 'none';
+    // Clear pending binary so a cancelled Step 1 can never contaminate Step 2.
+    window._pendingLumpData = null;
+}
+window._closeFormatLumpDialog = _closeFormatLumpDialog;
+
+// ── _renderFormatLumpVersionHistory ──────────────────────────────────────────
+// Populates #fmtVersionHistory by querying LumpRegistry for lumps whose
+// `abstraction` field matches absName.  Newest version first.
+function _renderFormatLumpVersionHistory(absName) {
+    var _histEl = document.getElementById('fmtVersionHistory');
+    if (!_histEl) return;
+
+    function _doRender(list) {
+        var _matches = list.filter(function(l) { return l.abstraction === absName; });
+        _matches.sort(function(a, b) {
+            var av = a.lump_version != null ? parseInt(a.lump_version) : 0;
+            var bv = b.lump_version != null ? parseInt(b.lump_version) : 0;
+            return bv - av;
+        });
+        if (_matches.length === 0) {
+            _histEl.innerHTML = '<div class="fmt-version-empty">No previous versions saved</div>';
+            return;
+        }
+        var _html = '';
+        for (var _mi = 0; _mi < _matches.length; _mi++) {
+            var _m = _matches[_mi];
+            var _ver = _m.lump_version != null ? 'v' + parseInt(_m.lump_version) : 'v?';
+            // Use the first 8 hex chars of the token as the displayed binary hash
+            var _hash = (_m.token || '').replace(/[^a-f0-9]/gi, '');
+            var _hashDisplay = _hash.substring(0, 8) || '????????';
+            var _sizeStr = _m.lump_size != null ? (parseInt(_m.lump_size) + 'w') : '';
+            var _dateStr = '';
+            if (_m.compiled_at && typeof _lumpTsStr === 'function') {
+                _dateStr = _lumpTsStr(_m.compiled_at, { month: 'short', day: 'numeric', year: 'numeric' }) || '';
+            }
+            var _meta = [_sizeStr, _dateStr].filter(Boolean).join(' \u00b7 ');
+            _html += '<div class="fmt-version-row">' +
+                '<span class="fmt-ver-badge">' + _fmtEscape(_ver) + '</span>' +
+                '<span class="fmt-ver-name" title="' + _fmtEscape(_m.abstraction || '') + '">' +
+                    _fmtEscape(_m.abstraction || absName) +
+                '</span>' +
+                '<span class="fmt-ver-hash" title="Binary hash token (first 8 hex digits)">' +
+                    _fmtEscape(_hashDisplay) +
+                '</span>' +
+                (_meta ? '<span class="fmt-ver-meta">' + _fmtEscape(_meta) + '</span>' : '') +
+                '</div>';
+        }
+        _histEl.innerHTML = _html;
+    }
+
+    if (!window.LumpRegistry) {
+        _histEl.innerHTML = '<div class="fmt-version-empty">No previous versions saved</div>';
+        return;
+    }
+    if (window.LumpRegistry.isServerListFetched()) {
+        _doRender(window.LumpRegistry.getServerList());
+    } else {
+        _histEl.innerHTML = '<div class="fmt-version-empty" style="color:#555;font-style:italic;">Loading\u2026</div>';
+        window.LumpRegistry.warmServerList().then(function(list) {
+            _doRender(list);
+        }).catch(function() {
+            _histEl.innerHTML = '<div class="fmt-version-empty">No previous versions saved</div>';
+        });
+    }
+}
+
+// ── showFormatLump — Step 1 of the two-step Save Lump flow ───────────────────
+// Builds the spec-compliant binary, runs the lump audit, queries version
+// history, then opens #formatLumpDialog.  Stores the binary on
+// window._pendingLumpData for reuse in Step 2 (confirmSaveToNamespace).
+window.showFormatLump = function() {
+    var _regEntry = window.LumpRegistry
+        ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())
+        : null;
+    var _regMem = _regEntry ? _regEntry.sources : null;
+    var _hasCompiledWords = !!(_regMem && _regMem.memory && _regMem.memory.words
+                               && _regMem.memory.words.length > 0);
+    if (!_hasCompiledWords) {
+        if (typeof smartCompile === 'function') smartCompile();
+        return;
+    }
+
+    var _svWords = _regMem.memory.words;
+    var _caps    = (_regMem.memory.capabilities || []).slice();
+    var _absName = (_regEntry && _regEntry.abstraction) || '';
+
+    // ── Build the spec-compliant binary ──────────────────────────────────────
+    // header word (magic 0x1F in bits[31:27]) + code region + padding + c-list.
+    var _svCC = _caps.length;
+    var _svCW = _svWords.length;
+    var _svLumpSize = 64;
+    while (_svLumpSize < 1 + _svCW + _svCC) _svLumpSize = _svLumpSize << 1;
+    var _svNm6 = 0;
+    while ((64 << _svNm6) < _svLumpSize) _svNm6++;
+    var _svHdr = (((0x1F & 0x1F) << 27) |
+                  ((_svNm6 & 0x0F)  << 23) |
+                  ((_svCW  & 0x1FFF) << 10) |
+                  ((0 & 0x03) << 8) |
+                  (_svCC & 0xFF)) >>> 0;
+    var _svBinary = new Array(_svLumpSize).fill(0);
+    _svBinary[0] = _svHdr;
+    for (var _i = 0; _i < _svCW; _i++) _svBinary[1 + _i] = (_svWords[_i] >>> 0);
+    // c-list slots left as zeros — server injects the self-GT into slot 0.
+
+    // Store for Step 2 so confirmSaveToNamespace() does not rebuild.
+    // registeredAt is captured now so Step 2 can verify nothing was recompiled
+    // between Format Lump and Save to Namespace.
+    var _svRegisteredAt = (_regMem && _regMem.memory) ? (_regMem.memory.registeredAt || 0) : 0;
+    window._pendingLumpData = {
+        binary:       _svBinary,
+        words:        _svWords.slice(),
+        caps:         _caps,
+        registeredAt: _svRegisteredAt
+    };
+
+    // ── Decode header for the summary row ────────────────────────────────────
+    var _cw = (_svHdr >>> 10) & 0x1FFF;
+    var _cc = _svHdr & 0xFF;
+
+    // Header chips
+    var _chipsEl = document.getElementById('fmtHeaderChips');
+    if (_chipsEl) {
+        _chipsEl.innerHTML =
+            '<span class="fmt-chip fmt-chip-ok"><span class="fmt-chip-label">magic</span>0x1F \u2713</span>' +
+            '<span class="fmt-chip"><span class="fmt-chip-label">size</span>' + _svLumpSize + ' words</span>' +
+            '<span class="fmt-chip"><span class="fmt-chip-label">cw</span>' + _cw + '</span>' +
+            '<span class="fmt-chip"><span class="fmt-chip-label">cc</span>' + _cc + '</span>';
+    }
+
+    // ── Capabilities table ────────────────────────────────────────────────────
+    var _capsEl = document.getElementById('fmtCapsTable');
+    if (_capsEl) {
+        if (_cc === 0) {
+            _capsEl.innerHTML = '<div class="fmt-caps-empty">No capability slots \u2014 ambient boot c-list used at runtime</div>';
+        } else {
+            var _capsHtml = '';
+            var _clistBase = _svLumpSize - _cc;
+            for (var _ci = 0; _ci < _cc; _ci++) {
+                var _cap = _caps[_ci];
+                var _capName = (_cap && _cap.name) ? _cap.name
+                             : (typeof _cap === 'string' && _cap ? _cap : null);
+                var _capStatus = 'named';
+                // Check for pending GT sentinel in the binary c-list area
+                if (!_capName && _clistBase >= 0 && (_clistBase + _ci) < _svBinary.length) {
+                    var _clWord = _svBinary[_clistBase + _ci] >>> 0;
+                    if ((_clWord >>> 16) === 0xFEED) {
+                        var _pendIdx  = _clWord & 0xFFFF;
+                        var _pendName = (typeof ChurchSimulator !== 'undefined' &&
+                                         ChurchSimulator.PENDING_GT_NAMES &&
+                                         ChurchSimulator.PENDING_GT_NAMES[_pendIdx])
+                                        ? ChurchSimulator.PENDING_GT_NAMES[_pendIdx]
+                                        : ('pending#' + _pendIdx);
+                        _capName   = _pendName;
+                        _capStatus = 'pending';
+                    }
+                }
+                if (_capStatus === 'pending') {
+                    _capsHtml += '<div class="fmt-caps-row">' +
+                        '<span class="fmt-caps-slot">[' + _ci + ']</span>' +
+                        '<span class="fmt-caps-name fmt-caps-pending">\u29d6 ' + _fmtEscape(_capName) + ' (pending)</span>' +
+                        '<span class="fmt-caps-status">unresolved</span>' +
+                        '</div>';
+                } else if (_capName) {
+                    _capsHtml += '<div class="fmt-caps-row">' +
+                        '<span class="fmt-caps-slot">[' + _ci + ']</span>' +
+                        '<span class="fmt-caps-name">' + _fmtEscape(_capName) + '</span>' +
+                        '<span class="fmt-caps-status">named</span>' +
+                        '</div>';
+                } else {
+                    _capsHtml += '<div class="fmt-caps-row">' +
+                        '<span class="fmt-caps-slot">[' + _ci + ']</span>' +
+                        '<span class="fmt-caps-name" style="color:#6b7280;font-style:italic;">(unnamed)</span>' +
+                        '<span class="fmt-caps-status">\u2014</span>' +
+                        '</div>';
+                }
+            }
+            _capsEl.innerHTML = _capsHtml;
+        }
+    }
+
+    // ── Run audit ─────────────────────────────────────────────────────────────
+    var _manifest = { cw: _cw, cc: _cc, lump_size: _svLumpSize, capabilities: _caps };
+    var _auditResults = (typeof lumpAudit === 'function') ? lumpAudit(_svBinary, _manifest) : [];
+    var _hasErrors   = (typeof lumpAuditHasErrors   === 'function') ? lumpAuditHasErrors(_auditResults)   : false;
+    var _hasWarnings = (typeof lumpAuditHasWarnings === 'function') ? lumpAuditHasWarnings(_auditResults) : false;
+
+    var _auditEl = document.getElementById('fmtAuditResults');
+    if (_auditEl) {
+        _auditEl.innerHTML = '';
+        if (typeof lumpAuditRenderPanel === 'function') {
+            lumpAuditRenderPanel(_auditEl, _auditResults, {
+                collapsible: true,
+                startOpen:   _hasErrors || _hasWarnings,
+            });
+        }
+    }
+
+    // ── Proceed button state ──────────────────────────────────────────────────
+    var _proceedBtn  = document.getElementById('fmtProceedBtn');
+    var _proceedNote = document.getElementById('fmtProceedNote');
+    if (_proceedBtn) {
+        if (_hasErrors) {
+            _proceedBtn.disabled = true;
+            if (_proceedNote) {
+                _proceedNote.style.display = '';
+                _proceedNote.style.color   = '#e07070';
+                _proceedNote.textContent   = '\u2717 Fix errors above before saving';
+            }
+        } else if (_hasWarnings) {
+            _proceedBtn.disabled = false;
+            var _warnCount = _auditResults.filter(function(r) { return r.severity === 'warn'; }).length;
+            if (_proceedNote) {
+                _proceedNote.style.display = '';
+                _proceedNote.style.color   = '#e0a055';
+                _proceedNote.textContent   = '\u26a0 ' + _warnCount + ' warning' +
+                    (_warnCount !== 1 ? 's' : '') + ' \u2014 review before saving';
+            }
+        } else {
+            _proceedBtn.disabled = false;
+            if (_proceedNote) { _proceedNote.style.display = 'none'; _proceedNote.textContent = ''; }
+        }
+    }
+
+    // ── Version history (may be async) ───────────────────────────────────────
+    _renderFormatLumpVersionHistory(_absName);
+
+    // ── Show dialog ───────────────────────────────────────────────────────────
+    var _dlg = document.getElementById('formatLumpDialog');
+    if (_dlg) { _dlg.style.display = ''; _dlg.scrollTop = 0; }
 };
 
 // ── GT Slot Picker ────────────────────────────────────────────────────────────
@@ -5670,6 +5913,8 @@ async function runSelftestLump() {
         if (window.LumpRegistry) {
             window.LumpRegistry.registerMemory(SELFTEST_TOKEN, SELFTEST_NAME, words.slice(), []);
             window.LumpRegistry.setCurrent(SELFTEST_TOKEN);
+            // A registry change invalidates any pending Format Lump binary.
+            window._pendingLumpData = null;
         }
         if (typeof _defaultProgramLoaded !== 'undefined') window._defaultProgramLoaded = true;
         if (typeof _injectClistNow === 'function') {

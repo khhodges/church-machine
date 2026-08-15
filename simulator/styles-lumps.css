@@ -6413,3 +6413,154 @@ pre:hover .code-copy-btn {
 }
 
 .le-nsd-words th { color: #778; font-weight: 600; font-size: 0.68rem; }
+
+/* ── Format Lump dialog (Step 1 of 2) ─────────────────────────────────────── */
+.fmt-lump-dialog {
+    max-width: 540px;
+    width: 94vw;
+}
+.fmt-step-badge {
+    font-size: 0.65rem;
+    font-weight: 600;
+    background: rgba(200,155,60,0.18);
+    color: var(--church-gold);
+    border: 1px solid rgba(200,155,60,0.35);
+    border-radius: 3px;
+    padding: 1px 6px;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+}
+.fmt-section-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #6b7280;
+    margin: 0.85rem 0 0.3rem;
+    border-left: 2px solid rgba(200,155,60,0.35);
+    padding-left: 0.4rem;
+}
+.fmt-header-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0.2rem 0;
+}
+.fmt-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(100,160,255,0.2);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.73rem;
+    color: #b0c4de;
+}
+.fmt-chip-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    opacity: 0.5;
+    margin-right: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.fmt-chip-ok {
+    border-color: rgba(100,210,120,0.4);
+    color: #8bd4a8;
+}
+.fmt-version-list {
+    font-size: 0.72rem;
+    min-height: 1.5rem;
+}
+.fmt-version-empty {
+    color: #6b7280;
+    font-style: italic;
+    padding: 0.3rem 0;
+    font-size: 0.72rem;
+}
+.fmt-version-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    padding: 0.22rem 0.3rem;
+    border-bottom: 1px solid rgba(100,160,255,0.06);
+    flex-wrap: wrap;
+}
+.fmt-version-row:last-child { border-bottom: none; }
+.fmt-ver-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    background: rgba(96,165,250,0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(96,165,250,0.3);
+    border-radius: 3px;
+    padding: 1px 5px;
+    flex-shrink: 0;
+}
+.fmt-ver-name {
+    flex: 1;
+    min-width: 0;
+    color: #c8a84b;
+    font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.fmt-ver-hash {
+    font-family: 'Courier New', monospace;
+    font-size: 0.69rem;
+    color: #6b7280;
+    flex-shrink: 0;
+}
+.fmt-ver-meta {
+    font-size: 0.66rem;
+    color: #555;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+.fmt-caps-wrap {
+    font-size: 0.72rem;
+    min-height: 1rem;
+}
+.fmt-caps-empty {
+    color: #6b7280;
+    font-style: italic;
+    padding: 0.3rem 0;
+    font-size: 0.72rem;
+}
+.fmt-caps-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    padding: 0.22rem 0.3rem;
+    border-bottom: 1px solid rgba(100,160,255,0.06);
+}
+.fmt-caps-row:last-child { border-bottom: none; }
+.fmt-caps-slot {
+    font-family: 'Courier New', monospace;
+    font-size: 0.68rem;
+    color: #6b7280;
+    flex-shrink: 0;
+    min-width: 2rem;
+}
+.fmt-caps-name {
+    flex: 1;
+    min-width: 0;
+    color: #e0e0e0;
+}
+.fmt-caps-pending {
+    color: #c8a84b;
+    font-style: italic;
+}
+.fmt-caps-status {
+    font-size: 0.66rem;
+    color: #6b7280;
+    flex-shrink: 0;
+}
+#fmtProceedBtn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}

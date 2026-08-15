@@ -238,6 +238,8 @@ function assembleAndLoad() {
             if (window.LumpRegistry) {
                 window.LumpRegistry.registerMemory(_cluTok, sim.programName, _cluWords, _cluCaps);
                 window.LumpRegistry.setCurrent(_cluTok);
+                // A new compile invalidates any pending Format Lump binary.
+                window._pendingLumpData = null;
             }
         }
         const manifestByMethod = {};
@@ -466,6 +468,8 @@ function assembleAndLoad() {
         if (window.LumpRegistry) {
             window.LumpRegistry.registerMemory(_asmTok, sim.programName, _rawWords, _rawCaps);
             window.LumpRegistry.setCurrent(_asmTok);
+            // A new compile invalidates any pending Format Lump binary.
+            window._pendingLumpData = null;
         }
     }
 
@@ -10570,6 +10574,21 @@ function showSaveToNamespace() {
         if (typeof smartCompile === 'function') smartCompile();
         return;
     }
+    // Close the Format Lump dialog (Step 1) if it is still open.
+    const _fmtDlg = document.getElementById('formatLumpDialog');
+    if (_fmtDlg) _fmtDlg.style.display = 'none';
+    // Update dialog title to indicate Step 2 of 2 only when reached via Format Lump
+    // (i.e. _pendingLumpData is set).  Direct callers (hamburger "Save to NS")
+    // should not show the step badge.
+    const _nsTitleSpan = document.querySelector('#saveNSDialog .modal-title > span:first-child');
+    if (_nsTitleSpan) {
+        if (window._pendingLumpData) {
+            _nsTitleSpan.innerHTML = 'Save to Namespace' +
+                ' <span class="fmt-step-badge">Step 2 of 2</span>';
+        } else {
+            _nsTitleSpan.textContent = 'Save to Namespace';
+        }
+    }
     const slotSel = document.getElementById('saveNSSlot');
     slotSel.innerHTML = '';
     const newOpt = document.createElement('option');
@@ -10631,6 +10650,9 @@ function onSlotChange() {
 
 function closeSaveDialog() {
     document.getElementById('saveNSDialog').style.display = 'none';
+    // Clear any pending Format Lump binary so it cannot be accidentally reused
+    // by a future Save to Namespace invocation opened independently.
+    window._pendingLumpData = null;
 }
 
 function getNextStepTip(lang) {
@@ -12935,6 +12957,67 @@ function confirmSaveToNamespace() {
         : null;
     const _svWords = _svRegMem ? (_svRegMem.words || []) : [];
     const _caps    = _svRegMem ? (_svRegMem.capabilities || []).slice() : [];
+
+    // ── Decide binary BEFORE any registerMemory call ─────────────────────────
+    // registerMemory() stamps a fresh Date.now() into the registry entry.
+    // If the binary decision happened after that call, the registeredAt
+    // comparison would always see the freshly-stamped value and never match
+    // the value captured in _pendingLumpData by showFormatLump().
+    // We therefore resolve the abstraction name, language, and binary right
+    // here, against the pre-save registry state.
+    var _svBinary;
+    var _svAbsName;
+    var _svLang;
+    if (_svWords.length > 0) {
+        var _svEntryPre = window.LumpRegistry
+            ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())
+            : null;
+        _svAbsName = (_svEntryPre && _svEntryPre.abstraction) || label;
+        _svLang = (_svEntryPre && _svEntryPre.sources && _svEntryPre.sources.server
+                   && _svEntryPre.sources.server.language)
+                 || (typeof sim !== 'undefined' && sim._lastCompiledLanguage)
+                 || '';
+
+        // Re-use the binary built in Step 1 (showFormatLump) when the registry
+        // has not changed since the Format panel was shown.  _pendingLumpData
+        // carries the registeredAt timestamp captured at that moment; comparing
+        // it against the current entry's timestamp tells us whether a new
+        // compile has happened in the interim.
+        var _snapshotPending = window._pendingLumpData || null;
+        window._pendingLumpData = null; // consumed; prevent any later reuse
+        var _pendingCanReuse = (function() {
+            if (!_snapshotPending || !_snapshotPending.binary) return false;
+            var _curAt = (_svRegMem && _svRegMem.registeredAt) ? _svRegMem.registeredAt : 0;
+            if (_curAt !== _snapshotPending.registeredAt) {
+                console.warn('[SaveLump] pending binary is stale (registeredAt mismatch); rebuilding.');
+                return false;
+            }
+            return true;
+        })();
+        if (_pendingCanReuse) {
+            _svBinary = _snapshotPending.binary;
+        } else {
+            // Fallback: build from scratch (direct Save-to-NS, or a recompile
+            // invalidated the pending binary between Format Lump and Proceed).
+            var _svCC = _caps.length;
+            var _svCW = _svWords.length;
+            var _svLumpSize = 64;
+            while (_svLumpSize < 1 + _svCW + _svCC) _svLumpSize = _svLumpSize << 1;
+            var _svNm6 = 0;
+            while ((64 << _svNm6) < _svLumpSize) _svNm6++;
+            var _svHdr = (((0x1F & 0x1F) << 27) |
+                          ((_svNm6 & 0x0F)  << 23) |
+                          ((_svCW  & 0x1FFF) << 10) |
+                          ((0 & 0x03) << 8) |
+                          (_svCC & 0xFF)) >>> 0;
+            _svBinary = new Array(_svLumpSize).fill(0);
+            _svBinary[0] = _svHdr;
+            for (var _svI = 0; _svI < _svCW; _svI++) _svBinary[1 + _svI] = (_svWords[_svI] >>> 0);
+            // c-list slots left as zeros — server injects the self-GT into slot 0.
+        }
+    }
+
+    // ── Persist to simulator namespace ────────────────────────────────────────
     let idx;
     if (slotSel.value === 'new') {
         idx = sim.saveToNamespace(label, _svWords, perms, gtType, _caps);
@@ -12975,36 +13058,7 @@ function confirmSaveToNamespace() {
 
     // ── Persist to the server LUMP repository so the LUMP browser reflects the
     // newly compiled lump immediately, without requiring a manual refresh.
-    if (_svWords.length > 0) {
-        var _svEntry = window.LumpRegistry
-            ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())
-            : null;
-        var _svAbsName = (_svEntry && _svEntry.abstraction) || label;
-        var _svLang = (_svEntry && _svEntry.sources && _svEntry.sources.server
-                      && _svEntry.sources.server.language)
-                    || (typeof sim !== 'undefined' && sim._lastCompiledLanguage)
-                    || '';
-
-        // LumpRegistry stores raw code words (no lump header, no c-list).
-        // The server requires a spec-compliant binary: header word (magic 0x1F
-        // in bits[31:27]) + code region + padding + c-list.  Build it here
-        // the same way compileAndBuild does (app-compile.js ~line 1454).
-        var _svCC = _caps.length;
-        var _svCW = _svWords.length;
-        var _svLumpSize = 64;
-        while (_svLumpSize < 1 + _svCW + _svCC) _svLumpSize = _svLumpSize << 1;
-        var _svNm6 = 0;
-        while ((64 << _svNm6) < _svLumpSize) _svNm6++;
-        var _svHdr = (((0x1F & 0x1F) << 27) |
-                      ((_svNm6 & 0x0F)  << 23) |
-                      ((_svCW  & 0x1FFF) << 10) |
-                      ((0 & 0x03) << 8) |
-                      (_svCC & 0xFF)) >>> 0;
-        var _svBinary = new Array(_svLumpSize).fill(0);
-        _svBinary[0] = _svHdr;
-        for (var _svI = 0; _svI < _svCW; _svI++) _svBinary[1 + _svI] = (_svWords[_svI] >>> 0);
-        // c-list slots left as zeros — server injects the self-GT into slot 0.
-
+    if (_svWords.length > 0 && _svBinary) {
         var _svPayload = {
             binary: _svBinary,
             metadata: {

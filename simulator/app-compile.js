@@ -1986,6 +1986,8 @@ function loadCLOOMCIntoSim() {
         if (window.LumpRegistry) {
             window.LumpRegistry.registerMemory(_cmpTok, sim.programName, words.slice(), _asmCaps);
             window.LumpRegistry.setCurrent(_cmpTok);
+            // A new compile invalidates any pending Format Lump binary.
+            window._pendingLumpData = null;
         }
     }
 

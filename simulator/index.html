@@ -57,7 +57,7 @@
     <link rel="stylesheet" href="styles-toolbar.css?v=20260710a">
     <link rel="stylesheet" href="styles-editor.css?v=20260710a">
     <link rel="stylesheet" href="styles-dashboard.css?v=20260708b">
-    <link rel="stylesheet" href="styles-lumps.css?v=20260814a">
+    <link rel="stylesheet" href="styles-lumps.css?v=20260815b">
     <link rel="stylesheet" href="styles-gatelog.css?v=20260513a">
     <link rel="stylesheet" href="styles-fault.css?v=20260814a">
     <link rel="stylesheet" href="styles-tools.css?v=20260619b">
@@ -2732,6 +2732,29 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
         </div>
     </div>
 
+    <!-- ── Format Lump dialog (Step 1 of 2) ────────────────────────────── -->
+    <div id="formatLumpDialog" class="modal-overlay" style="display:none;" onclick="if(event.target===this)_closeFormatLumpDialog()">
+        <div class="modal-dialog fmt-lump-dialog">
+            <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;">
+                <span>Format Lump <span class="fmt-step-badge">Step 1 of 2</span></span>
+                <button onclick="_closeFormatLumpDialog()" style="background:none;border:none;color:#9ca3af;font-size:1.2rem;cursor:pointer;line-height:1;padding:0;" data-tooltip="Close">&times;</button>
+            </div>
+            <div class="fmt-section-label">Header</div>
+            <div id="fmtHeaderChips" class="fmt-header-chips"></div>
+            <div class="fmt-section-label">Version History</div>
+            <div id="fmtVersionHistory" class="fmt-version-list"></div>
+            <div class="fmt-section-label" id="fmtCapsLabel">Capabilities</div>
+            <div id="fmtCapsTable" class="fmt-caps-wrap"></div>
+            <div class="fmt-section-label">Audit</div>
+            <div id="fmtAuditResults"></div>
+            <div class="modal-buttons" style="margin-top:1.2rem;">
+                <button class="btn btn-primary" id="fmtProceedBtn" onclick="showSaveToNamespace()" data-tooltip="Proceed to Save — Open the slot and pet name dialog (Step 2 of 2)">Proceed to Save &#x2192;</button>
+                <button class="btn btn-warning" onclick="_closeFormatLumpDialog()" data-tooltip="Cancel — Close without saving">Cancel</button>
+            </div>
+            <div id="fmtProceedNote" style="display:none;font-size:0.72rem;color:#e0a055;margin-top:0.4rem;text-align:right;"></div>
+        </div>
+    </div>
+
     <!-- ── Open File dialog ─────────────────────────────────────────────── -->
     <div id="openFileDialog" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeOpenFileDialog()">
         <div class="modal-dialog" style="max-width:520px;width:92vw;max-height:80vh;display:flex;flex-direction:column;gap:0;">
@@ -2875,15 +2898,15 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="app-abstractions.js?v=20260803a"></script>
     <script src="lump-audit.js?v=20260724c"></script>
     <script src="rci-show-errs.js?v=20260519a"></script>
-    <script src="app-lumps.js?v=20260815b"></script>
+    <script src="app-lumps.js?v=20260815c"></script>
     <script src="app-absdetail.js?v=20260729b"></script>
     <!-- Load order matters: app-compile must precede app-run (exports LANG_EXAMPLE_GROUPS
          via window._cloomcLangExampleGroups); both must precede app-source-library. -->
-    <script src="app-compile.js?v=20260814b"></script>
+    <script src="app-compile.js?v=20260815a"></script>
     <script src="app-lump-editor.js?v=20260812b"></script>
     <script src="app-editor-find.js?v=20260815a"></script>
     <script src="lump_save_handler.js?v=20260815a"></script>
-    <script src="app-run.js?v=20260815a"></script>
+    <script src="app-run.js?v=20260815b"></script>
     <script src="app-build-approval.js?v=20260815a"></script>
     <script src="app-source-library.js?v=20260720h"></script>
     <script src="app-invoke.js?v=20260521a"></script>
