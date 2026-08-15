@@ -4925,6 +4925,8 @@ async function openLumpInEditor(token) {
         }
         window._editorLumpDirtyToken       = null;
         window._editorLumpDirtyListener    = null;
+        window._editorOpenLumpToken        = null;
+        window._editorOpenLumpMeta         = null;
         if (window.LumpRegistry) window.LumpRegistry.evictMemory(window.LumpRegistry.getCurrent());
         // Remove banners and both lump-edit toolbar buttons
         var _db = document.getElementById('_lumpDraftBanner');
@@ -4982,6 +4984,11 @@ async function openLumpInEditor(token) {
     // clears this to null (app-compile.js line ~1158) so mid-edit state is
     // never stale.
     if (window.LumpRegistry) window.LumpRegistry.setCurrent(token);
+    // Store open-lump context for editorSaveLump() (hamburger "Save Lump").
+    // Cleared by the discard handler and preserved across recompiles so the
+    // button always knows which LUMP it is working with.
+    window._editorOpenLumpToken = token   || null;
+    window._editorOpenLumpMeta  = lump    || null;
     // Opening a saved LUMP is a distinct context from a catalog-method edit —
     // clear any stale abstraction/method context so the jump links reflect
     // this LUMP, not a previously-edited method.
@@ -5059,6 +5066,31 @@ async function _saveLumpDirectVersion(token, lump, btn) {
     }
 }
 window._saveLumpDirectVersion = _saveLumpDirectVersion;
+
+// ── editorSaveLump — unified handler for the hamburger "Save Lump" item ──────
+// Always accessible regardless of editor state.  Priority order:
+//   1. Fresh compiled words in LumpRegistry → showSaveToNamespace() (lets the
+//      user choose slot / permissions for the newly-assembled binary).
+//   2. A server-persisted LUMP is open (set by openLumpInEditor) → save a new
+//      dated version of that LUMP without requiring a recompile.
+//   3. Nothing compiled and no open LUMP → trigger a compile so the user ends
+//      up in state 1 on the next click.
+window.editorSaveLump = function() {
+    var _regMem = window.LumpRegistry
+        ? (window.LumpRegistry.resolve(window.LumpRegistry.getCurrent()) || {}).sources
+        : null;
+    var _hasCompiledWords = !!(_regMem && _regMem.memory && _regMem.memory.words
+                               && _regMem.memory.words.length > 0);
+    if (_hasCompiledWords) {
+        if (typeof showSaveToNamespace === 'function') showSaveToNamespace();
+    } else if (window._editorOpenLumpToken && window._editorOpenLumpMeta) {
+        _saveLumpDirectVersion(window._editorOpenLumpToken,
+                               window._editorOpenLumpMeta, null);
+    } else {
+        // No compiled words and no open LUMP — trigger compile first.
+        if (typeof smartCompile === 'function') smartCompile();
+    }
+};
 
 // ── GT Slot Picker ────────────────────────────────────────────────────────────
 // Opened when the user clicks an empty c-list chip in the LUMP content view.
