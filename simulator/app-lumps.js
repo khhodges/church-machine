@@ -59,8 +59,10 @@ function showLumpDetail(token) {
     // rebuilds; changes whenever the binary changes.
     if (lump.filename) {
         const _numMatch = lump.filename.match(/\.([0-9a-f]{8})\.lump$/i);
-        if (_numMatch)
-            _headerStrip += `<span class="lump-hs-chip lump-number-chip" title="Content identity Number \u2014 sha256(dot_name + binary)[:8]; changes when the binary changes"><span class="lump-hs-label">N\u00ba</span>${_numMatch[1]}</span>`;
+        if (_numMatch) {
+            const _fnTitle = `${_e(lump.filename)}\u2002\u2014\u2002sha256(dot_name\u202f+\u202fbinary)[:8]; changes when the binary changes`;
+            _headerStrip += `<span class="lump-hs-chip lump-number-chip" title="${_fnTitle}"><span class="lump-hs-label">N\u00ba</span>${_numMatch[1]}</span>`;
+        }
     }
     if (lump.ns_slot !== null && lump.ns_slot !== undefined) {
         const _liveSlot = _lumpLiveNsSlot(token);
@@ -252,6 +254,21 @@ function showLumpDetail(token) {
         html += '<div class="lump-detail-section">';
         html += '<table class="lump-detail-table"><tbody>';
         html += `<tr><td>Token</td><td>0x${e(lump.token)}</td></tr>`;
+        // Filename row — shows the dot.name.version.hash.lump canonical filename
+        // with a human-readable summary beside it so it's easy to identify.
+        if (lump.filename) {
+            const _verPart  = lump.lump_version != null ? 'v' + lump.lump_version : (lump.version ? 'v' + lump.version : '');
+            const _isFloatOv = (lump.ns_slot === null || lump.ns_slot === undefined);
+            const _nsPart   = !_isFloatOv ? 'NS\u00a0' + lump.ns_slot : '';
+            const _sizePart = lump.cw != null ? lump.cw + 'w' : (lump.lump_size ? lump.lump_size + 'w' : '');
+            const _dateStr  = typeof _lumpTsStr === 'function' && lump.compiled_at ? _lumpTsStr(lump.compiled_at) : '';
+            const _metaParts = [lump.abstraction, _verPart, _nsPart, _sizePart].filter(Boolean).join('\u2002');
+            const _metaLine  = [_metaParts, _dateStr].filter(Boolean).join('\u2002\u00b7\u2002');
+            html += `<tr><td>Filename</td><td>` +
+                `<code class="lump-filename-code">${e(lump.filename)}</code>` +
+                (_metaLine ? `<br><span class="lump-filename-meta">${e(_metaLine)}</span>` : '') +
+                `</td></tr>`;
+        }
         if (lump.ns_slot !== null && lump.ns_slot !== undefined) {
             const _liveSlotOv = _lumpLiveNsSlot(token);
             const _manifestSlotOv = parseInt(lump.ns_slot) || 0;
@@ -4969,55 +4986,18 @@ async function openLumpInEditor(token) {
         window._editorOpenLumpToken        = null;
         window._editorOpenLumpMeta         = null;
         if (window.LumpRegistry) window.LumpRegistry.evictMemory(window.LumpRegistry.getCurrent());
-        // Remove banners and both lump-edit toolbar buttons
+        // Remove banners and the discard toolbar button
         var _db = document.getElementById('_lumpDraftBanner');
         if (_db) _db.remove();
-        var _slb = document.getElementById('btnToolbarSaveLump');
-        if (_slb) _slb.remove();
         _discardBtn.remove();
         if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
         if (typeof switchView === 'function') switchView('lumps');
     });
 
-    // ── Inject / refresh Save Lump toolbar button ─────────────────────────
-    var _existingSaveBtn = document.getElementById('btnToolbarSaveLump');
-    if (_existingSaveBtn) _existingSaveBtn.remove();
-    var _saveLumpBtn = document.createElement('button');
-    _saveLumpBtn.id = 'btnToolbarSaveLump';
-    _saveLumpBtn.className = 'btn btn-sm lump-editor-save-btn';
-    _saveLumpBtn.setAttribute('data-tooltip',
-        _inMemoryLump
-            ? 'Save Lump — Compile first to assemble the binary, then save to a namespace slot'
-            : 'Save Lump — Save a new dated version of this LUMP to the repository (no recompile needed)');
-    _saveLumpBtn.textContent = 'Save Lump';
-    // Server-persisted lumps: always enabled — we can re-save the existing binary
-    // without a recompile.  In-memory lumps (not yet on server) still require
-    // a compile first, so they start disabled (the compile-success path enables them).
-    _saveLumpBtn.disabled = !!_inMemoryLump;
-    _saveLumpBtn.addEventListener('click', function() {
-        // If the user has compiled fresh words use the standard namespace-save
-        // dialog so they can also choose a slot/permissions.
-        var _regMem = window.LumpRegistry
-            ? (window.LumpRegistry.resolve(window.LumpRegistry.getCurrent()) || {}).sources
-            : null;
-        var _hasCompiledWords = !!(_regMem && _regMem.memory && _regMem.memory.words
-                                   && _regMem.memory.words.length > 0);
-        if (_hasCompiledWords) {
-            if (typeof showSaveToNamespace === 'function') showSaveToNamespace();
-        } else if (!_inMemoryLump && token) {
-            // No compiled words — save the existing server binary as a new dated version.
-            _saveLumpDirectVersion(token, lump, _saveLumpBtn);
-        } else {
-            // In-memory lump with no compiled words — trigger compile.
-            if (typeof smartCompile === 'function') smartCompile();
-        }
-    });
-
-    // Insert Discard then Save Lump into the toolbar, after the inline Compile button
+    // Insert Discard into the toolbar, after the inline Compile button
     var _compileInlineBtn = document.getElementById('btnToolbarCompile');
     if (_compileInlineBtn && _compileInlineBtn.parentNode) {
         _compileInlineBtn.parentNode.insertBefore(_discardBtn, _compileInlineBtn.nextSibling);
-        _compileInlineBtn.parentNode.insertBefore(_saveLumpBtn, _discardBtn.nextSibling);
     }
 
     // Expose this lump's token so the C-List viewer can show its baked-in

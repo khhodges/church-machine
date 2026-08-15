@@ -359,19 +359,70 @@ function lumpAudit(words, manifest, lineNums) {
 
     // ── RPN — Pet Name Coverage ───────────────────────────────────────────────
     // Verify every c-list slot accessed by a Church instruction (LOAD/SAVE/
-    // ELOADCALL/XLOADLAMBDA via CR6) has a pet name declared in the manifest.
-    // Name sources: manifest.pet_names.CR (slot-index string → name) and/or
-    // manifest.capabilities[] (array index = slot, .name = capability name).
+    // ELOADCALL/XLOADLAMBDA via CR6) has a resolvable pet name.
+    // Name sources (tried in priority order, all always scanned):
+    //   1. manifest.pet_names.CR   — slot-index string → name
+    //   2. manifest.capabilities[] — array index = slot; .name or bare string
+    //   3. Pending GT sentinels    — bits[31:16]=0xFEED in the binary c-list;
+    //                                name carried inside the sentinel word itself
+    // The "Capability names not checked" warning is only emitted when NO source
+    // yields any name at all.  Previously it fired whenever the manifest lacked
+    // both pet_names.CR and capabilities[], which caused false positives when the
+    // assembler had already baked pet names into the binary as pending sentinels.
     // Skipped when cc=0 (no c-list) or when binary size/bounds failed.
     if (actualWords === lumpSize && contentWords <= lumpSize && cw >= 1 && cc > 0 &&
             manifest && typeof manifest === 'object') {
-        const _rpnHasPetCR = manifest.pet_names &&
-                             typeof manifest.pet_names.CR === 'object' &&
-                             manifest.pet_names.CR !== null;
-        const _rpnHasCaps  = Array.isArray(manifest.capabilities) &&
-                             manifest.capabilities.length > 0;
 
-        if (!_rpnHasPetCR && !_rpnHasCaps) {
+        // ── Step 1: build slot → best name map from all available sources ─────
+        const _rpnSlotName = {};
+
+        // Source 1: manifest.pet_names.CR
+        if (manifest.pet_names &&
+                typeof manifest.pet_names.CR === 'object' &&
+                manifest.pet_names.CR !== null) {
+            for (const [k, v] of Object.entries(manifest.pet_names.CR)) {
+                const s = parseInt(k, 10);
+                if (!isNaN(s) && s >= 0 && s < cc) _rpnSlotName[s] = String(v);
+            }
+        }
+
+        // Source 2: manifest.capabilities[] — supports both {name:…} objects and
+        // bare strings (assembler output format may vary).
+        if (Array.isArray(manifest.capabilities)) {
+            for (let i = 0; i < manifest.capabilities.length && i < cc; i++) {
+                if (_rpnSlotName[i]) continue;          // already named by source 1
+                const cap = manifest.capabilities[i];
+                if (cap && cap.name)               _rpnSlotName[i] = String(cap.name);
+                else if (typeof cap === 'string' && cap) _rpnSlotName[i] = cap;
+            }
+        }
+
+        // Source 3: pending GT sentinels in the binary's c-list area.
+        // A pending sentinel (bits[31:16] = 0xFEED) carries the pet name index
+        // internally.  This covers lumps whose assembler baked in pending GTs but
+        // whose repository record predates capability-name storage.
+        if (actualWords >= lumpSize && lumpSize > cc) {
+            const _rpnClistBase = lumpSize - cc;
+            for (let _si = 0; _si < cc; _si++) {
+                if (_rpnSlotName[_si]) continue;        // already named
+                const _rpnGT = (words[_rpnClistBase + _si] >>> 0);
+                if ((_rpnGT >>> 16) === 0xFEED) {
+                    const _rpnPendIdx  = _rpnGT & 0xFFFF;
+                    const _rpnPendName = (typeof ChurchSimulator !== 'undefined' &&
+                        ChurchSimulator.PENDING_GT_NAMES &&
+                        ChurchSimulator.PENDING_GT_NAMES[_rpnPendIdx])
+                        ? ChurchSimulator.PENDING_GT_NAMES[_rpnPendIdx]
+                        : ('pending#' + _rpnPendIdx);
+                    _rpnSlotName[_si] = '\u29d6 ' + _rpnPendName + ' (pending)';
+                }
+            }
+        }
+
+        // ── Step 2: decide what to report ─────────────────────────────────────
+        const _rpnAnyNamed = Object.keys(_rpnSlotName).length > 0;
+
+        if (!_rpnAnyNamed) {
+            // Nothing resolved names from any source.
             results.push({
                 ruleId: 'RPN',
                 severity: 'warn',
@@ -379,39 +430,6 @@ function lumpAudit(words, manifest, lineNums) {
                 detail: `${cc} capability slot${cc !== 1 ? 's' : ''} allocated but the repository record has no capability names. Add capability names to the record to enable this check.`,
             });
         } else {
-            // Build slot → best name map from manifest sources.
-            const _rpnSlotName = {};
-            if (_rpnHasPetCR) {
-                for (const [k, v] of Object.entries(manifest.pet_names.CR)) {
-                    const s = parseInt(k, 10);
-                    if (!isNaN(s) && s >= 0 && s < cc) _rpnSlotName[s] = String(v);
-                }
-            }
-            if (_rpnHasCaps) {
-                for (let i = 0; i < manifest.capabilities.length && i < cc; i++) {
-                    const cap = manifest.capabilities[i];
-                    if (!_rpnSlotName[i] && cap && cap.name) _rpnSlotName[i] = String(cap.name);
-                }
-            }
-            // Also recognise pending GT sentinels embedded in the binary's c-list area.
-            // A pending sentinel (bits[31:16] = 0xFEED) carries the pet name internally;
-            // treat it as named so it is not flagged as an unexplained null.
-            if (actualWords >= lumpSize && lumpSize > cc) {
-                const _rpnClistBase = lumpSize - cc;
-                for (let _si = 0; _si < cc; _si++) {
-                    const _rpnGT = (words[_rpnClistBase + _si] >>> 0);
-                    if ((_rpnGT >>> 16) === 0xFEED && !_rpnSlotName[_si]) {
-                        const _rpnPendIdx = _rpnGT & 0xFFFF;
-                        const _rpnPendName = (typeof ChurchSimulator !== 'undefined' &&
-                            ChurchSimulator.PENDING_GT_NAMES &&
-                            ChurchSimulator.PENDING_GT_NAMES[_rpnPendIdx])
-                            ? ChurchSimulator.PENDING_GT_NAMES[_rpnPendIdx]
-                            : ('pending#' + _rpnPendIdx);
-                        _rpnSlotName[_si] = '\u29d6 ' + _rpnPendName + ' (pending)';
-                    }
-                }
-            }
-
             // Scan Church instructions for unnamed-slot references.
             const _rpnChurchOps = new Set([0, 1, 8, 9]);
             const _rpnUnnamedReferenced = new Set();

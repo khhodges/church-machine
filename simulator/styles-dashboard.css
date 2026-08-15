@@ -5098,15 +5098,33 @@ mark.abs-search-highlight {
 .lump-viewing-label {
     display: none;
     font-size: 0.72rem;
-    color: var(--accent-color, #c89b3c);
     background: var(--bg-secondary, #1a1a2e);
     border: 1px solid var(--border-color, #3a3a5c);
     border-radius: 4px;
     padding: 0.25rem 0.55rem;
     margin-bottom: 0.5rem;
+    overflow: hidden;
+}
+.lump-viewing-main {
+    display: block;
+    color: var(--accent-color, #c89b3c);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+.lump-viewing-badge {
+    font-size: 0.65rem;
+    color: var(--text-secondary, #888);
+    margin-left: 0.3em;
+}
+.lump-viewing-meta {
+    display: block;
+    font-size: 0.67rem;
+    color: var(--text-secondary, #7a8a9a);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 0.1rem;
 }
 
 .lumps-detail-panel {
@@ -5299,6 +5317,22 @@ mark.abs-search-highlight {
     border-radius: 3px;
     font-size: 0.68rem;
     font-family: 'Courier New', monospace;
+}
+
+/* Filename row in the overview table */
+.lump-filename-code {
+    background: rgba(100, 160, 255, 0.1);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    font-size: 0.67rem;
+    font-family: 'Courier New', monospace;
+    word-break: break-all;
+}
+.lump-filename-meta {
+    font-size: 0.66rem;
+    color: var(--text-secondary, #7a8a9a);
+    margin-top: 0.15rem;
+    display: block;
 }
 
 .lump-detail-actions {

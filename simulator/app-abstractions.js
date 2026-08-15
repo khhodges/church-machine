@@ -982,7 +982,7 @@ window.lumpPickerChanged = function(token) {
 function _updateLumpViewingLabel(token) {
     const el = document.getElementById('lumpViewingLabel');
     if (!el) return;
-    if (!token || !window.LumpRegistry) { el.style.display = 'none'; el.textContent = ''; return; }
+    if (!token || !window.LumpRegistry) { el.style.display = 'none'; el.innerHTML = ''; return; }
     const lump = window.LumpRegistry.resolve(token)?.sources?.server
               || window.LumpRegistry.getServerList().find(l => l.token === token)
               || null;
@@ -999,7 +999,17 @@ function _updateLumpViewingLabel(token) {
                   : isFloat && lt !== 'boot'          ? '[SAVED]'
                   : '';
     const name = lump.abstraction || 'Unknown';
-    el.textContent = 'Viewing: ' + name + (badge ? ' ' + badge : '');
+    // Build a compact meta line: "v1  NS 6  512w  · 15 Aug 2026 14:30"
+    const _verPart  = lump.lump_version != null ? 'v' + lump.lump_version : (lump.version ? 'v' + lump.version : '');
+    const _nsPart   = !isFloat ? 'NS\u00a0' + lump.ns_slot : '';
+    const _sizePart = lump.cw != null ? lump.cw + 'w' : (lump.lump_size ? lump.lump_size + 'w' : '');
+    const _datePart = _lumpDateStr(lump);
+    const _metaParts = [_verPart, _nsPart, _sizePart].filter(Boolean).join('\u2002');
+    const _meta = [_metaParts, _datePart].filter(Boolean).join('\u2002\u00b7\u2002');
+    const _esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    el.innerHTML =
+        `<span class="lump-viewing-main">${_esc(name)}${badge ? ' <span class="lump-viewing-badge">' + _esc(badge) + '</span>' : ''}</span>` +
+        (_meta ? `<span class="lump-viewing-meta">${_esc(_meta)}</span>` : '');
     el.style.display = 'block';
 }
 

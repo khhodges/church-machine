@@ -12971,6 +12971,46 @@ function confirmSaveToNamespace() {
         ? { label: '📂 Open Lump', onClick: function() { showLumpDetail(_svTok); } }
         : null;
     _showFpgaToast('Lump Saved', _toastBody, 'ok', 9000, _toastAction);
+
+    // ── Persist to the server LUMP repository so the LUMP browser reflects the
+    // newly compiled lump immediately, without requiring a manual refresh.
+    if (_svWords.length > 0) {
+        var _svEntry = window.LumpRegistry
+            ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())
+            : null;
+        var _svAbsName = (_svEntry && _svEntry.abstraction) || label;
+        var _svLang = (_svEntry && _svEntry.sources && _svEntry.sources.server
+                      && _svEntry.sources.server.language)
+                    || (typeof sim !== 'undefined' && sim._lastCompiledLanguage)
+                    || '';
+        var _svPayload = {
+            binary: _svWords,
+            metadata: {
+                abstraction:  _svAbsName,
+                content_type: 'code',
+                language:     _svLang,
+                ns_slot:      idx,
+                capabilities: _caps,
+            }
+        };
+        fetch('/api/lumps/save', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(_svPayload),
+        }).then(function(r) { return r.json(); }).then(function(resp) {
+            if (resp && resp.ok) {
+                if (window.LumpRegistry) {
+                    window.LumpRegistry.setCurrent(resp.token);
+                    window.LumpRegistry.setPending(resp.token);
+                }
+            }
+            // Always refresh the LUMP browser — even on error the list may have
+            // changed if a concurrent save completed.
+            if (typeof renderLumps === 'function') renderLumps();
+        }).catch(function() {
+            if (typeof renderLumps === 'function') renderLumps();
+        });
+    }
 }
 
 
