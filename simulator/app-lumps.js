@@ -4942,11 +4942,32 @@ async function openLumpInEditor(token) {
     var _saveLumpBtn = document.createElement('button');
     _saveLumpBtn.id = 'btnToolbarSaveLump';
     _saveLumpBtn.className = 'btn btn-sm lump-editor-save-btn';
-    _saveLumpBtn.setAttribute('data-tooltip', 'Save Lump — Compile first, then save the assembled LUMP to a namespace slot');
+    _saveLumpBtn.setAttribute('data-tooltip',
+        _inMemoryLump
+            ? 'Save Lump — Compile first to assemble the binary, then save to a namespace slot'
+            : 'Save Lump — Save a new dated version of this LUMP to the repository (no recompile needed)');
     _saveLumpBtn.textContent = 'Save Lump';
-    _saveLumpBtn.disabled = true;
+    // Server-persisted lumps: always enabled — we can re-save the existing binary
+    // without a recompile.  In-memory lumps (not yet on server) still require
+    // a compile first, so they start disabled (the compile-success path enables them).
+    _saveLumpBtn.disabled = !!_inMemoryLump;
     _saveLumpBtn.addEventListener('click', function() {
-        if (typeof showSaveToNamespace === 'function') showSaveToNamespace();
+        // If the user has compiled fresh words use the standard namespace-save
+        // dialog so they can also choose a slot/permissions.
+        var _regMem = window.LumpRegistry
+            ? (window.LumpRegistry.resolve(window.LumpRegistry.getCurrent()) || {}).sources
+            : null;
+        var _hasCompiledWords = !!(_regMem && _regMem.memory && _regMem.memory.words
+                                   && _regMem.memory.words.length > 0);
+        if (_hasCompiledWords) {
+            if (typeof showSaveToNamespace === 'function') showSaveToNamespace();
+        } else if (!_inMemoryLump && token) {
+            // No compiled words — save the existing server binary as a new dated version.
+            _saveLumpDirectVersion(token, lump, _saveLumpBtn);
+        } else {
+            // In-memory lump with no compiled words — trigger compile.
+            if (typeof smartCompile === 'function') smartCompile();
+        }
     });
 
     // Insert Discard then Save Lump into the toolbar, after the inline Compile button
@@ -4968,6 +4989,76 @@ async function openLumpInEditor(token) {
     if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
     if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
 }
+
+// ── Save an already-persisted LUMP as a new dated version ────────────────────
+// Called by the "Save Lump" toolbar button when the editor was opened from a
+// server-saved LUMP and no fresh compiled words are in LumpRegistry.
+// Fetches the binary from /api/lump/<token>/words and POSTs it to
+// /api/lumps/save so the server generates a new versioned filename and sidecar
+// following the standard Dot.Name.issue_n.Number.lump rules.
+// ─────────────────────────────────────────────────────────────────────────────
+async function _saveLumpDirectVersion(token, lump, btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
+    var opName = 'Save Lump \u2014 ' + (lump.abstraction || token);
+    try {
+        // 1. Fetch authoritative binary from server
+        var _wr = await fetch('/api/lump/' + token + '/words', { cache: 'no-store' });
+        if (!_wr.ok) throw new Error('Could not fetch lump binary (HTTP ' + _wr.status + ')');
+        var _wj = await _wr.json();
+        var _words = _wj && Array.isArray(_wj.words) ? _wj.words : null;
+        if (!_words || _words.length < 2) throw new Error('Server returned empty or invalid binary');
+
+        // 2. Build metadata from the existing sidecar fields so the server can
+        //    preserve the abstraction name, issue_n, language, etc.
+        var _meta = {
+            abstraction:   lump.abstraction  || 'Unnamed',
+            token:         token,
+            content_type:  lump.content_type || 'code',
+            language:      lump.language     || '',
+            author:        lump.author       || '',
+            version:       lump.version      || '',
+            status:        lump.status       || '',
+            description:   lump.description  || '',
+            dot_name:      lump.dot_name     || '',
+            issue_n:       lump.issue_n      || 1,
+            boot_resident: lump.boot_resident || false,
+        };
+        if (lump.ns_slot !== null && lump.ns_slot !== undefined) {
+            _meta.ns_slot = lump.ns_slot;
+        }
+        if (lump.ns_slot_policy) _meta.ns_slot_policy = lump.ns_slot_policy;
+        if (Array.isArray(lump.capabilities)) _meta.capabilities = lump.capabilities;
+        if (Array.isArray(lump.grants))       _meta.grants       = lump.grants;
+
+        // 3. POST to the standard save endpoint
+        var _sr = await fetch('/api/lumps/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ binary: _words, metadata: _meta }),
+        });
+        var _sj = await _sr.json();
+        if (!_sr.ok) throw new Error(_sj.error || 'Server error (' + _sr.status + ')');
+
+        // 4. Report success
+        var _lines = ['\u2713 Saved \u2014 token: ' + _sj.token];
+        if (_sj.lump_version !== undefined) _lines.push('lump_version: ' + _sj.lump_version);
+        if (_sj.lump_path)  _lines.push(_sj.lump_path);
+        if (_sj.boot_image_refreshed) {
+            _lines.push('\u2713 boot-image.bin refreshed \u2014 change persists on reboot');
+        } else if (_sj.boot_image_note) {
+            _lines.push('\u26A0 ' + _sj.boot_image_note);
+        }
+        if (typeof showPatchModal === 'function') showPatchModal(true, opName, _lines.join('\n'));
+        if (typeof renderLumps   === 'function') renderLumps();
+    } catch (err) {
+        if (typeof showPatchModal === 'function') {
+            showPatchModal(false, opName, '\u2717 ' + err.message);
+        }
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Save Lump'; }
+    }
+}
+window._saveLumpDirectVersion = _saveLumpDirectVersion;
 
 // ── GT Slot Picker ────────────────────────────────────────────────────────────
 // Opened when the user clicks an empty c-list chip in the LUMP content view.
