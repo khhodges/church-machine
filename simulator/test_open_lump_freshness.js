@@ -62,7 +62,7 @@ function extractRedirectBlock() {
 
     // The `if (window.LumpRegistry) {` line follows within a few lines.
     let ifLineIdx = -1;
-    for (let i = markerIdx; i < Math.min(markerIdx + 25, lines.length); i++) {
+    for (let i = markerIdx; i < Math.min(markerIdx + 40, lines.length); i++) {
         if (/^\s*if\s*\(window\.LumpRegistry\)/.test(lines[i])) {
             ifLineIdx = i;
             break;
@@ -70,7 +70,8 @@ function extractRedirectBlock() {
     }
     if (ifLineIdx === -1)
         throw new Error(
-            'app-lumps.js: `if (window.LumpRegistry)` not found after redirect comment.');
+            'app-lumps.js: `if (window.LumpRegistry)` not found after redirect comment ' +
+            '(searched ' + 40 + ' lines — if the comment block grew, increase the window).');
 
     // Scan brace depth to find the closing `}` of the if block.
     let depth = 0;
@@ -145,7 +146,8 @@ function buildRedirectFn(sandbox) {
 // (extractRedirectBlock() above already throws if it's missing; reaching here
 //  means the block was found and the core variable was present.)
 check('T6 redirect block exists in production source (app-lumps.js)',
-      REDIRECT_FN_SRC.includes('_fresherEntry'));
+      REDIRECT_FN_SRC.includes('_fresherEntry') &&
+      REDIRECT_FN_SRC.includes('_sessionEpoch'));
 
 // ── T1 — newer in-memory compilation redirects to the new token ──────────────
 {
@@ -155,6 +157,10 @@ check('T6 redirect block exists in production source (app-lumps.js)',
     const OLD_TOKEN = 'aabb1100';
     const NEW_TOKEN = 'ccdd2200';
     const ABS_NAME  = 'Foo.Bar';
+
+    // Pin SESSION_EPOCH=0 so all timestamps qualify as current-session; this
+    // test verifies the newer-timestamp redirect logic, not the epoch guard.
+    LR.SESSION_EPOCH = 0;
 
     // Register the old token via server (simulates a saved LUMP).
     LR.registerFromServer([{ token: OLD_TOKEN, abstraction: ABS_NAME }]);
@@ -214,6 +220,10 @@ check('T6 redirect block exists in production source (app-lumps.js)',
     const BEST_TOKEN = 'eeff3300';
     const ABS_NAME   = 'Foo.Bar';
 
+    // Pin SESSION_EPOCH=0 so all timestamps qualify; this test verifies
+    // the "pick the newest" logic, not the epoch guard.
+    LR.SESSION_EPOCH = 0;
+
     LR.registerFromServer([{ token: OLD_TOKEN, abstraction: ABS_NAME }]);
     LR.resolve(OLD_TOKEN).sources.server.fetchedAt = 1000;
 
@@ -268,6 +278,63 @@ check('T6 redirect block exists in production source (app-lumps.js)',
     const redirected = buildRedirectFn(sb)(SAVED_TOKEN, sb);
     check('T7 no redirect in post-reload state (fetchedAt=0, no memory entry)',
           redirected === SAVED_TOKEN, redirected);
+}
+
+// ── T8 — session-epoch guard: pre-session in-memory entry must NOT redirect ───
+// Scenario: the user opens a fresh page.  The server list hasn't loaded yet so
+// savedFetchedAt=0.  A phantom in-memory entry exists whose registeredAt is
+// BEFORE SESSION_EPOCH (e.g. left over from a hypothetical earlier run or a
+// clock anomaly).  Without the epoch guard that entry would win (it beats 0)
+// and redirect away from the real saved binary.  With the guard it is rejected.
+{
+    const sb = makeSandbox();
+    const LR = sb.window.LumpRegistry;
+
+    const SAVED_TOKEN = 'aabb1100';
+    const MEM_TOKEN   = 'ccdd2200';
+    const ABS_NAME    = 'Foo.Bar';
+
+    // Pin SESSION_EPOCH to a known value so the test is deterministic.
+    const EPOCH = 5000;
+    LR.SESSION_EPOCH = EPOCH;
+
+    // Server entry present but not yet fetched (fetchedAt = 0).
+    LR.registerFromServer([{ token: SAVED_TOKEN, abstraction: ABS_NAME }]);
+    LR.resolve(SAVED_TOKEN).sources.server.fetchedAt = 0;
+
+    // In-memory entry registered BEFORE the session epoch — pre-session.
+    LR.registerMemory(MEM_TOKEN, ABS_NAME, [0x00000001], []);
+    LR.resolve(MEM_TOKEN).sources.memory.registeredAt = EPOCH - 1;  // just before epoch
+
+    const redirected = buildRedirectFn(sb)(SAVED_TOKEN, sb);
+    check('T8a no redirect when in-memory entry is older than SESSION_EPOCH (even if > savedFetchedAt=0)',
+          redirected === SAVED_TOKEN, redirected);
+}
+
+// ── T8b — session-epoch guard allows valid current-session compilation ─────────
+// A real compile in the same session (registeredAt >= SESSION_EPOCH) and newer
+// than the saved binary should still redirect as expected.
+{
+    const sb = makeSandbox();
+    const LR = sb.window.LumpRegistry;
+
+    const SAVED_TOKEN = 'aabb1100';
+    const NEW_TOKEN   = 'ccdd2200';
+    const ABS_NAME    = 'Foo.Bar';
+
+    const EPOCH = 5000;
+    LR.SESSION_EPOCH = EPOCH;
+
+    LR.registerFromServer([{ token: SAVED_TOKEN, abstraction: ABS_NAME }]);
+    LR.resolve(SAVED_TOKEN).sources.server.fetchedAt = 1000;
+
+    // In-memory entry registered AT the epoch (>= SESSION_EPOCH) and newer than saved.
+    LR.registerMemory(NEW_TOKEN, ABS_NAME, [0x00000001, 0x00000002], []);
+    LR.resolve(NEW_TOKEN).sources.memory.registeredAt = EPOCH;  // exactly at epoch
+
+    const redirected = buildRedirectFn(sb)(SAVED_TOKEN, sb);
+    check('T8b redirect when in-memory entry is at or after SESSION_EPOCH and newer than saved',
+          redirected === NEW_TOKEN, redirected);
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────

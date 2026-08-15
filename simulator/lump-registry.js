@@ -37,6 +37,15 @@
     var _serverListFetched = false; // true after first registerFromServer() call
     var _serverListFetchPromise = null; // in-flight warmServerList() promise (shared)
 
+    // Session epoch — set once when this module is first loaded (page load /
+    // initial script evaluation).  Any in-memory registeredAt that is >= this
+    // value was produced during the current browser session.  The redirect block
+    // in openLumpInEditor() uses this as a floor so it never redirects to an
+    // in-memory entry that was registered before the current session started
+    // (e.g. a phantom entry where savedFetchedAt is 0 but the server binary is
+    // actually the most recent known-good artefact).
+    var _SESSION_EPOCH = Date.now();
+
     // Restore last-viewed token from localStorage on startup
     try {
         var _saved = localStorage.getItem('lumpRegistryCurrent');
@@ -109,6 +118,13 @@
         // (even for an empty list). Lets updateNamespace() skip its prefetch
         // when renderLumps() or another path has already fetched the server list.
         isServerListFetched: function () { return _serverListFetched; },
+
+        // Timestamp (ms since epoch) captured once when lump-registry.js was
+        // first evaluated (i.e. page load).  openLumpInEditor()'s redirect
+        // block uses this as a floor: only in-memory entries whose
+        // registeredAt >= SESSION_EPOCH were compiled in the current session
+        // and are therefore candidates for the "fresh-compile redirect".
+        SESSION_EPOCH: _SESSION_EPOCH,
 
         // Warm the server list with at most one in-flight network request.
         // All concurrent callers share the same Promise — no duplicate fetches.

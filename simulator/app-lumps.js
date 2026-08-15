@@ -4491,12 +4491,21 @@ async function openLumpInEditor(token) {
     // is intentionally correct: we cannot know whether a reload-lost
     // compilation was newer than the saved binary, so we fall back safely
     // to the last saved version rather than risk opening a stale artefact.
+    //
+    // Session-epoch guard: only redirect to an in-memory entry that was
+    // registered at or after LumpRegistry.SESSION_EPOCH (the timestamp
+    // captured when lump-registry.js was first evaluated, i.e. page load).
+    // This prevents a redirect when savedFetchedAt happens to be 0 (server
+    // list not yet fetched) but the server binary is actually the most
+    // recent known-good artefact — without the guard any new compilation
+    // (registeredAt > 0) would beat fetchedAt=0 and incorrectly win.
     if (window.LumpRegistry) {
         var _savedEntry = window.LumpRegistry.resolve(token);
         var _absName = (_savedEntry?.sources?.server?.abstraction)
                     || (_savedEntry?.abstraction)
                     || null;
         var _savedFetchedAt = _savedEntry?.sources?.server?.fetchedAt || 0;
+        var _sessionEpoch = window.LumpRegistry.SESSION_EPOCH || 0;
         if (_absName) {
             var _fresherEntry = null;
             var _fresherAt = _savedFetchedAt; // must be strictly newer
@@ -4504,6 +4513,8 @@ async function openLumpInEditor(token) {
                 if (e.token === token) return; // same entry — skip
                 if (e.abstraction !== _absName) return;
                 if (!e.sources || !e.sources.memory) return;
+                // Only consider in-memory entries compiled in this session.
+                if (e.sources.memory.registeredAt < _sessionEpoch) return;
                 if (e.sources.memory.registeredAt > _fresherAt) {
                     _fresherAt = e.sources.memory.registeredAt;
                     _fresherEntry = e;
