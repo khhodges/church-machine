@@ -119,7 +119,16 @@
         if (!ed || _matches.length === 0) return;
         _matchIdx = ((idx % _matches.length) + _matches.length) % _matches.length;
         var m = _matches[_matchIdx];
-        ed.focus();
+        // Only pull focus into the editor when the user explicitly navigated
+        // (Next / Prev / Enter).  When called from _update() the find input
+        // still has focus — stealing it here causes the one-character-per-click
+        // bug where every keystroke refocuses the editor and the user has to
+        // click the input again to type the next character.
+        var _active = document.activeElement;
+        var _inp    = _el('editorFindInput');
+        var _rInp   = _el('editorReplaceInput');
+        var _findHasFocus = (_active && (_active === _inp || _active === _rInp));
+        if (!_findHasFocus) ed.focus();
         ed.setSelectionRange(m.start, m.end);
         _scrollTo(ed, m.start);
         _setCount((_matchIdx + 1) + ' / ' + _matches.length);
