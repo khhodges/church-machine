@@ -10590,10 +10590,10 @@ function showSaveToNamespace() {
     document.getElementById('saveNSType').value = '0';
     document.getElementById('permR').checked = false;
     document.getElementById('permW').checked = false;
-    document.getElementById('permX').checked = true;
+    document.getElementById('permX').checked = false;
     document.getElementById('permL').checked = false;
     document.getElementById('permS').checked = false;
-    document.getElementById('permE').checked = false;
+    document.getElementById('permE').checked = true;
     const info = document.getElementById('saveNSInfo');
     const _csWords = window.LumpRegistry?.resolve(window.LumpRegistry?.getCurrent())?.sources?.memory?.words;
     const _csLen = _csWords ? _csWords.length : 0;
@@ -10605,16 +10605,16 @@ function showSaveToNamespace() {
 function onSlotChange() {
     const slotSel = document.getElementById('saveNSSlot');
     const labelInput = document.getElementById('saveNSLabel');
+    // Always reset to E-only regardless of slot — the user is saving a freshly
+    // compiled binary; the old GT's permissions are not relevant to the new save.
+    const _permDefaults = { R: false, W: false, X: false, L: false, S: false, E: true };
+    Object.entries(_permDefaults).forEach(function([k, v]) {
+        document.getElementById('perm' + k).checked = v;
+    });
     if (slotSel.value === 'new') {
         labelInput.value = '';
         labelInput.disabled = false;
         document.getElementById('saveNSType').value = '0';
-        document.getElementById('permR').checked = false;
-        document.getElementById('permW').checked = false;
-        document.getElementById('permX').checked = true;
-        document.getElementById('permL').checked = false;
-        document.getElementById('permS').checked = false;
-        document.getElementById('permE').checked = false;
     } else {
         const idx = parseInt(slotSel.value);
         const entry = sim.readNSEntry(idx);
@@ -10622,14 +10622,9 @@ function onSlotChange() {
             labelInput.value = entry.label;
             labelInput.disabled = false;
             document.getElementById('saveNSType').value = String(entry.gtType || 0);
-            const gt = sim.memory[entry.word0_location];
-            const p = sim.parseGT(gt).permissions;
-            document.getElementById('permR').checked = !!p.R;
-            document.getElementById('permW').checked = !!p.W;
-            document.getElementById('permX').checked = !!p.X;
-            document.getElementById('permL').checked = !!p.L;
-            document.getElementById('permS').checked = !!p.S;
-            document.getElementById('permE').checked = !!p.E;
+            // Permissions deliberately NOT copied from the existing GT — the
+            // user is overwriting that slot with new compiled code, so the
+            // default should be E-only, same as a fresh slot.
         }
     }
 }
