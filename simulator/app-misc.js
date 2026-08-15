@@ -728,6 +728,13 @@ function _openLastCompiledLump() {
             return;
         }
         if (_hasMem) {
+            // If this token was just saved to the namespace, go straight to
+            // the repository — the save flow already pushed it to the server.
+            if (_tok === window._lastSavedNsToken) {
+                if (typeof switchView    === 'function') switchView('lumps');
+                if (typeof showLumpDetail === 'function') showLumpDetail(_tok);
+                return;
+            }
             // Memory-only (freshly compiled, not yet saved): open in editor
             // so the fresh binary is visible rather than the old saved version.
             if (typeof openLumpInEditor === 'function') {

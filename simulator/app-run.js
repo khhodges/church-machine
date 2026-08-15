@@ -13038,6 +13038,9 @@ function confirmSaveToNamespace() {
             window.LumpRegistry.registerMemory(_svTok, _svLabel, _svWords, _caps);
             window.LumpRegistry.setCurrent(_svTok);
         }
+        // Mark as freshly saved so _openLastCompiledLump() goes to the
+        // repository rather than reopening the editor.
+        window._lastSavedNsToken = _svTok;
     }
 
     const con = document.getElementById('editorConsole');

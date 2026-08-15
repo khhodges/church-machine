@@ -1626,30 +1626,6 @@
     "issue_n": 1
   },
   {
-    "token": "00000600",
-    "abstraction": "SelfTest",
-    "ns_slot": 6,
-    "ns_slot_policy": "static",
-    "boot_resident": true,
-    "lump_size": 512,
-    "cw": 499,
-    "cc": 2,
-    "grants": [
-      "E"
-    ],
-    "language": "ISA",
-    "author": "Church Machine",
-    "version": "1.2",
-    "lump_version": 76,
-    "status": "released",
-    "description": "SelfTest (a.k.a. Boot.Abstr) \u2014 the lump executed by the hardware ROM during boot phases B:01-B:07.",
-    "source": "simulator/examples/post_flash_selftest.cloomc",
-    "dot_name": "SelfTest",
-    "issue_n": 1,
-    "filename": "SelfTest.1.b562e522.lump",
-    "sidecar_file": "SelfTest.1.b562e522.json"
-  },
-  {
     "token": "00000800",
     "abstraction": "Scheduler.IRQ",
     "ns_slot": null,
@@ -1956,5 +1932,28 @@
       "E"
     ],
     "lump_version": 0
+  },
+  {
+    "token": "00000600",
+    "abstraction": "start",
+    "filename": "start.1.5efed30b.lump",
+    "sidecar_file": "start.1.5efed30b.json",
+    "lump_size": 512,
+    "cw": 0,
+    "cc": 0,
+    "author": "",
+    "version": "",
+    "lump_version": 77,
+    "compiled_at": 1786828713.0003908,
+    "methods": [],
+    "grants": [
+      "E"
+    ],
+    "binary_hash": "20965f6732d95cc935d9a4b562c4f4882e502f60516df720ec136aa9eef28fa4",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "5e23e11e8f8e601474f2cb936f9e8f829959445c61c0d32873856c60f5a8fc80",
+    "dot_name": "start",
+    "issue_n": 1
   }
 ]

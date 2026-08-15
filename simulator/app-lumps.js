@@ -5303,14 +5303,21 @@ window.showFormatLump = function() {
         registeredAt: _svRegisteredAt
     };
 
-    // ── Reference name: dot name + binary hash ───────────────────────────────
+    // ── Reference name: petname.AbstractionName#issueNumber · binaryHash ────────
     var _refEl = document.getElementById('fmtRefName');
     if (_refEl) {
         var _fmtTok = (typeof window._computeLumpToken === 'function')
             ? window._computeLumpToken(_svWords, _caps) : '';
-        var _fmtDisplayName = _absName || '(unnamed)';
+        var _fmtPetname = '';
+        var _fmtIssue = 1;
+        try { _fmtPetname = localStorage.getItem('church_petname') || ''; } catch(_e) {}
+        try { _fmtIssue = parseInt(localStorage.getItem('church_issue_number') || '1') || 1; } catch(_e) {}
+        var _fmtBaseName = _absName || '(unnamed)';
+        var _fmtDotName  = _fmtPetname
+            ? (_fmtPetname + '.' + _fmtBaseName + '#' + _fmtIssue)
+            : (_fmtBaseName + '#' + _fmtIssue);
         _refEl.innerHTML =
-            '<span class="fmt-ref-doname">' + _fmtEscape(_fmtDisplayName) + '</span>' +
+            '<span class="fmt-ref-doname">' + _fmtEscape(_fmtDotName) + '</span>' +
             (_fmtTok
                 ? '<span class="fmt-ref-hash">\u00b7\u00a0' + _fmtEscape(_fmtTok) + '</span>'
                 : '');
@@ -5357,16 +5364,24 @@ window.showFormatLump = function() {
                         _capStatus = 'pending';
                     }
                 }
+                // Enrich with abstractionRegistry index → full name like SelfTest#6
+                var _capAbsObj = (typeof abstractionRegistry !== 'undefined' && abstractionRegistry
+                    && _capName && typeof abstractionRegistry.getByName === 'function')
+                    ? abstractionRegistry.getByName(_capName) : null;
+                var _capFullName = (_capAbsObj && typeof _capAbsObj.index !== 'undefined')
+                    ? (_capName + '#' + _capAbsObj.index)
+                    : _capName;
+
                 if (_capStatus === 'pending') {
                     _capsHtml += '<div class="fmt-caps-row">' +
                         '<span class="fmt-caps-slot">[' + _ci + ']</span>' +
-                        '<span class="fmt-caps-name fmt-caps-pending">\u29d6 ' + _fmtEscape(_capName) + ' (pending)</span>' +
+                        '<span class="fmt-caps-name fmt-caps-pending">\u29d6 ' + _fmtEscape(_capFullName || _capName) + ' (pending)</span>' +
                         '<span class="fmt-caps-status">unresolved</span>' +
                         '</div>';
                 } else if (_capName) {
                     _capsHtml += '<div class="fmt-caps-row">' +
                         '<span class="fmt-caps-slot">[' + _ci + ']</span>' +
-                        '<span class="fmt-caps-name">' + _fmtEscape(_capName) + '</span>' +
+                        '<span class="fmt-caps-name">' + _fmtEscape(_capFullName) + '</span>' +
                         '<span class="fmt-caps-status">named</span>' +
                         '</div>';
                 } else {

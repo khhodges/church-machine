@@ -1,0 +1,26 @@
+{
+  "token": "00000600",
+  "abstraction": "SelfTest",
+  "ns_slot": 6,
+  "ns_slot_policy": "static",
+  "boot_resident": true,
+  "lump_size": 512,
+  "cw": 499,
+  "cc": 2,
+  "grants": [
+    "E"
+  ],
+  "language": "ISA",
+  "author": "Church Machine",
+  "version": "1.2",
+  "lump_version": 76,
+  "status": "released",
+  "description": "SelfTest (a.k.a. Boot.Abstr) \u2014 the lump executed by the hardware ROM during boot phases B:01-B:07.",
+  "source": "simulator/examples/post_flash_selftest.cloomc",
+  "dot_name": "SelfTest",
+  "issue_n": 1,
+  "filename": "SelfTest.1.b562e522.lump",
+  "sidecar_file": "SelfTest.1.b562e522.json",
+  "binary_hash": "837496f1ceef18a6588491918e294946659222a8c24c187b6f702980e0e1d619",
+  "archived_version": 76
+}
