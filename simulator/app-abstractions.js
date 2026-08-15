@@ -1006,10 +1006,23 @@ function _updateLumpViewingLabel(token) {
     const _metaParts = [_verPart, _nsPart, _sizePart].filter(Boolean).join('\u2002');
     const _meta = [_metaParts, _datePart].filter(Boolean).join('\u2002\u00b7\u2002');
     const _esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    // Dot-name identity: petname.Abstraction#issue · hash8
+    const _petname  = (typeof localStorage !== 'undefined' && localStorage.getItem('church_petname')) || '';
+    const _issueN   = lump.issue_n != null ? parseInt(lump.issue_n) : null;
+    const _hashPart = (() => {
+        if (lump.filename) { const m = lump.filename.match(/\.([0-9a-f]{8})\.lump$/i); if (m) return m[1]; }
+        return '';
+    })();
+    const _dotBase  = _petname ? `${_petname}.${name}` : name;
+    const _identStr = _issueN != null
+        ? (_hashPart ? `${_dotBase}#${_issueN} · ${_hashPart}` : `${_dotBase}#${_issueN}`)
+        : (_hashPart ? `${_dotBase} · ${_hashPart}` : '');
+
     el.innerHTML =
         `<span class="lump-viewing-prefix">Viewing: </span>` +
         `<span class="lump-viewing-main">${_esc(name)}${badge ? ' <span class="lump-viewing-badge">' + _esc(badge) + '</span>' : ''}</span>` +
-        (_meta ? `<span class="lump-viewing-meta">${_esc(_meta)}</span>` : '');
+        (_meta    ? `<span class="lump-viewing-meta">${_esc(_meta)}</span>` : '') +
+        (_identStr ? `<span class="lump-viewing-ident" title="dot-name identity: ${_esc(_identStr)}">${_esc(_identStr)}</span>` : '');
     el.style.display = 'block';
 }
 

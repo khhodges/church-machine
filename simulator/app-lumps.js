@@ -139,10 +139,8 @@ function showLumpDetail(token) {
     }
     _tabBar += `<button class="lump-tab${isNamespace ? ' lump-tab-active' : ''}" onclick="_switchLumpTab('${_tk}','overview')">Overview</button>`;
     if (!isNamespace) {
-        _tabBar += `<button class="lump-tab${lump.has_source ? '' : ' lump-tab-dim'}" onclick="_switchLumpTab('${_tk}','source')" title="${lump.has_source ? 'Compiled Source \u2014 the CLOOMC source that was compiled to produce this binary' : 'No compiled source stored \u2014 LUMP predates source persistence'}">Compiled Source</button>`;
-        _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','content')">Content</button>`;
+        _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','source')" title="Source \u2014 compiled CLOOMC source and decoded binary content">Source</button>`;
         _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','tokens')">Tokens</button>`;
-        _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','versions')">Versions</button>`;
         _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','history')">History</button>`;
     }
     const _hasDna = !isNamespace && (lump.clist_entries || []).length > 0;
@@ -387,15 +385,11 @@ function showLumpDetail(token) {
         };
         let _srcHtml = `<div class="lump-tab-panel" id="lumpTabSource_${_tk}"><div class="lump-source-panel">`;
         _srcHtml += `<div id="lumpStoredSourceBody_${_tk}" class="lump-stored-src-placeholder"><div class="lump-stored-src-loading">Loading\u2026</div></div>`;
+        _srcHtml += `<div class="lump-source-content-divider"></div>`;
+        _srcHtml += `<div id="lumpContentBody_${_tk}" class="lump-hex-loading">Loading\u2026</div>`;
         _srcHtml += `</div></div>`;
-        html += _srcHtml;
-
-        html += `<div class="lump-tab-panel" id="lumpTabContent_${_tk}">` +
-                `<div id="lumpContentBody_${_tk}" class="lump-hex-loading">Loading\u2026</div></div>`;
         html += `<div class="lump-tab-panel" id="lumpTabTokens_${_tk}">` +
                 `<div id="lumpTokensBody_${_tk}" class="lump-hex-loading">Loading\u2026</div></div>`;
-        html += `<div class="lump-tab-panel" id="lumpTabVersions_${_tk}">` +
-                `<div id="lumpVersionsBody_${_tk}" class="lump-hex-loading">Loading\u2026</div></div>`;
         html += `<div class="lump-tab-panel" id="lumpTabHistory_${_tk}">` +
                 `<div id="lumpHistoryBody_${_tk}" class="lump-hex-loading">Loading\u2026</div></div>`;
         if (_hasDna) {
@@ -441,12 +435,12 @@ function showLumpDetail(token) {
         }
     }
 
-    _lumpActiveTab[_tk] = isNamespace ? 'overview' : 'content';
+    _lumpActiveTab[_tk] = isNamespace ? 'overview' : 'source';
     const nsdgWrap = contentEl.querySelector('.ns-dep-graph-wrap[id]');
     if (nsdgWrap) _initNsDepGraphPanZoom(nsdgWrap.id);
-    // For non-namespace lumps the default tab is 'content'; honour any prior/editor tab on top of that
-    const _defaultTab = isNamespace ? 'overview' : 'content';
-    const restoreTab = (_lumpEditorOpen[_tk] && !isNamespace) ? 'content' : (_prevTab && _prevTab !== 'overview' ? _prevTab : _defaultTab);
+    // For non-namespace lumps the default tab is 'source'; honour any prior/editor tab on top of that
+    const _defaultTab = isNamespace ? 'overview' : 'source';
+    const restoreTab = (_lumpEditorOpen[_tk] && !isNamespace) ? 'source' : (_prevTab && _prevTab !== 'overview' ? _prevTab : _defaultTab);
     _switchLumpTab(_tk, restoreTab);
 
     // Passive malformed-binary check — shows amber chip in header without requiring Edit click.
@@ -867,10 +861,10 @@ function _populateLumpLogicCatalog() {
         const _isGold = _lumpVer > 0;
         const _badgeClass = _isGold ? 'lump-ver-badge lump-ver-badge-gold' : 'lump-ver-badge lump-ver-badge-grey';
         const _clickHandler = _lumpTk
-            ? `event.stopPropagation();showLumpDetail('${_lumpTk}');_switchLumpTab('${_lumpTk}','versions')`
+            ? `event.stopPropagation();showLumpDetail('${_lumpTk}');_switchLumpTab('${_lumpTk}','history')`
             : 'event.stopPropagation()';
         const _badgeCursor = _lumpTk ? '' : ' style="cursor:default"';
-        const _badgeTitle = _lumpTk ? 'LUMP version \u2014 click to open Versions tab' : 'LUMP version \u2014 not yet compiled';
+        const _badgeTitle = _lumpTk ? 'LUMP version \u2014 click to open History tab' : 'LUMP version \u2014 not yet compiled';
         const _verBadgeHtml = `<span class="${_badgeClass}" onclick="${_clickHandler}"${_badgeCursor} title="${_badgeTitle}">v${_lumpVer}</span>`;
 
         html += `<div class="abs-item" onclick="showAbstractionDetail(${abs.index})" ondblclick="event.stopPropagation();_goToLumpByAbstractionName(abstractionRegistry.getAbstraction(${abs.index}).name)" title="Double-click to jump to this abstraction\u2019s LUMP in the Repository">`;
@@ -1352,7 +1346,7 @@ async function _populateLumpSourceTab(lump, targetId) {
                 if (_banner) {
                     const _prevVer = lump.lump_version - 1;
                     _banner.style.display = '';
-                    _banner.textContent = `Editing v${lump.lump_version} \u2014 v${_prevVer} compiled binary preserved in Versions tab`;
+                    _banner.textContent = `Editing v${lump.lump_version} \u2014 v${_prevVer} compiled binary preserved in History tab`;
                 }
                 const _tk = (lump.token || '').replace(/[^a-z0-9]/gi, '');
                 const _dot0 = document.getElementById(`lumpTabForkDot_${_tk}`);
@@ -1377,7 +1371,7 @@ async function _populateLumpSourceTab(lump, targetId) {
                             const _newVer = _fd.new_version;
                             const _prevVer = _fd.prev_version;
                             _banner.style.display = '';
-                            _banner.textContent = `Editing v${_newVer} \u2014 v${_prevVer} compiled binary preserved in Versions tab`;
+                            _banner.textContent = `Editing v${_newVer} \u2014 v${_prevVer} compiled binary preserved in History tab`;
                             const _tk = (lump.token || '').replace(/[^a-z0-9]/gi, '');
                             const _dot1 = document.getElementById(`lumpTabForkDot_${_tk}`);
                             if (_dot1) _dot1.style.display = '';
@@ -1393,7 +1387,7 @@ async function _populateLumpSourceTab(lump, targetId) {
                                 _lumpsCache[_lumpIdx].forked = true;
                                 _lumpsCache[_lumpIdx].lump_version = _newVer;
                             }
-                            delete _lumpVersionsLoaded[_tk];
+                            delete _lumpTimelineLoaded[_tk];
                         } catch (_err) {
                             // Network/server failure — reset so the next keystroke retries.
                             _forked = false;
@@ -1635,8 +1629,7 @@ function _lumpTypeBadge(lump) {
     return '';
 }
 
-const _lumpVersionsLoaded = {};
-const _lumpHistoryLoaded  = {};
+const _lumpTimelineLoaded = {};
 
 function _switchLumpTab(tk, tab) {
     _lumpActiveTab[tk] = tab;
@@ -1645,9 +1638,7 @@ function _switchLumpTab(tk, tab) {
         clooms: `lumpTabClooms_${tk}`,
         overview: `lumpTabOverview_${tk}`,
         source: `lumpTabSource_${tk}`,
-        content: `lumpTabContent_${tk}`,
         tokens: `lumpTabTokens_${tk}`,
-        versions: `lumpTabVersions_${tk}`,
         history: `lumpTabHistory_${tk}`,
         dna: `lumpTabDna_${tk}`,
         hexdump: `lumpTabHexdump_${tk}`,
@@ -1660,7 +1651,7 @@ function _switchLumpTab(tk, tab) {
     if (bar) {
         const btns = bar.querySelectorAll('.lump-tab');
         btns.forEach(btn => {
-            const labelMap = { api: 'API', clooms: 'CLOOMC', overview: 'Overview', source: 'Compiled Source', content: 'Content', tokens: 'Tokens', versions: 'Versions', history: 'History', dna: 'DNA', hexdump: 'Hex Dump' };
+            const labelMap = { api: 'API', clooms: 'CLOOMC', overview: 'Overview', source: 'Source', tokens: 'Tokens', history: 'History', dna: 'DNA', hexdump: 'Hex Dump' };
             btn.classList.toggle('lump-tab-active', btn.textContent.trim() === labelMap[tab]);
         });
     }
@@ -1672,10 +1663,6 @@ function _switchLumpTab(tk, tab) {
     if (tab === 'clooms' && lump) {
         _populateLumpSourceTab(lump, `lumpTabClooms_${tk}`);
     }
-    if (tab === 'content' && !_lumpContentLoaded[tk] && lump) {
-        _lumpContentLoaded[tk] = true;
-        _loadLumpContent(token, lump);
-    }
     if (tab === 'tokens' && !_lumpTokensLoaded[tk] && lump) {
         _lumpTokensLoaded[tk] = true;
         _loadLumpTokens(token, lump);
@@ -1684,16 +1671,16 @@ function _switchLumpTab(tk, tab) {
         _lumpHexLoaded[tk] = true;
         _fetchAndShowLumpBinary(token, lump);
     }
-    if (tab === 'versions' && !_lumpVersionsLoaded[tk] && lump) {
-        _lumpVersionsLoaded[tk] = true;
-        _fetchAndShowLumpVersions(token, lump);
-    }
-    if (tab === 'history' && !_lumpHistoryLoaded[tk] && lump) {
-        _lumpHistoryLoaded[tk] = true;
-        _fetchAndShowLumpHistory(token, lump);
+    if (tab === 'history' && !_lumpTimelineLoaded[tk] && lump) {
+        _lumpTimelineLoaded[tk] = true;
+        _fetchAndShowLumpTimeline(token, lump);
     }
     if (tab === 'source' && lump) {
         _fetchAndShowLumpSavedSource(token, lump, tk);
+        if (!_lumpContentLoaded[tk]) {
+            _lumpContentLoaded[tk] = true;
+            _loadLumpContent(token, lump);
+        }
     }
 }
 
@@ -1948,88 +1935,159 @@ async function _fetchAndShowLumpSavedSource(token, lump, tk) {
     }
 }
 
-async function _fetchAndShowLumpVersions(token, lump) {
+// _fetchAndShowLumpTimeline — unified History + Telemetry view.
+// Fetches both /api/lumps/{token}/history (binary archive) and
+// /api/lump/version-telemetry/{abstraction} (fleet call-home data) in parallel,
+// joins on version number, and renders a single table.
+async function _fetchAndShowLumpTimeline(token, lump) {
     const tk = (token || '').replace(/[^a-z0-9]/gi, '');
-    const bodyEl = document.getElementById(`lumpVersionsBody_${tk}`);
+    const bodyEl = document.getElementById(`lumpHistoryBody_${tk}`);
     if (!bodyEl) return;
     const e = _escHtml;
     const absName = lump.abstraction || '';
-    if (!absName) {
-        bodyEl.innerHTML = '<div class="lump-detail-section"><em>No abstraction name — cannot load version telemetry.</em></div>';
-        return;
-    }
-    try {
-        bodyEl.innerHTML = '<div class="lump-hex-loading">Loading version telemetry\u2026</div>';
-        const resp = await fetch(`/api/lump/version-telemetry/${encodeURIComponent(absName)}`);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
-        const versions = data.versions || [];
 
-        const STABLE_ICONS = { stable: '\u2705', amber: '\u26a0\ufe0f', red: '\u274c' };
+    const fmtTs = ts => {
+        if (!ts) return '\u2014';
+        const d = typeof ts === 'number' ? new Date(ts * 1000) : new Date(ts);
+        if (isNaN(d.getTime())) return '\u2014';
+        const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
+        return `${d.getDate()} ${mo} ${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    };
+
+    try {
+        bodyEl.innerHTML = '<div class="lump-hex-loading">Loading\u2026</div>';
+
+        const fetches = [fetch(`/api/lumps/${token}/history`)];
+        if (absName) fetches.push(fetch(`/api/lump/version-telemetry/${encodeURIComponent(absName)}`));
+        const [histResp, telResp] = await Promise.all(fetches);
+
+        const histData = histResp.ok ? await histResp.json() : {};
+        const telData  = (telResp  && telResp.ok)  ? await telResp.json()  : {};
+
+        const history    = histData.history  || [];
+        const telRows    = telData.versions  || [];
+        const hasTel     = telRows.length > 0;
+
+        // Build a telemetry map keyed by version number
+        const telByVer = {};
+        for (const tv of telRows) telByVer[tv.lump_version] = tv;
+
+        // Find the highest-version telemetry entry (upgrade target)
+        const latestTel = hasTel
+            ? telRows.reduce((a, b) => b.lump_version > a.lump_version ? b : a, telRows[0])
+            : null;
+
+        // Merge: history drives the list; telemetry-only rows (old fleet versions
+        // no longer in the local archive) are appended.
+        const versionMap = new Map();
+        for (const h of history) versionMap.set(h.version, { ver: h.version, hist: h, tel: telByVer[h.version] || null });
+        for (const tv of telRows) {
+            if (!versionMap.has(tv.lump_version))
+                versionMap.set(tv.lump_version, { ver: tv.lump_version, hist: null, tel: tv });
+        }
+        const rows = Array.from(versionMap.values()).sort((a, b) => b.ver - a.ver);
+
+        const STABLE_ICONS  = { stable: '\u2705', amber: '\u26a0\ufe0f', red: '\u274c' };
         const STABLE_LABELS = { stable: 'Stable', amber: 'Tier-3 reboots', red: 'Unrecovered halts' };
         const STABLE_COLORS = { stable: 'var(--mtbf-green, #22c55e)', amber: '#f59e0b', red: '#ef4444' };
 
-        let html = `<div class="lump-detail-section">`;
-        html += `<div class="lump-section-title">Version Telemetry \u2014 ${e(absName)}</div>`;
-        html += `<div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.5rem;">`;
-        html += `Per-version fault rates from FPGA call-home telemetry. Green = all faults recover at tier\u00a01/2. Amber = tier\u00a03 reboots. Red = unrecovered halts.`;
-        html += `</div>`;
+        let html = '<div class="lump-detail-section">';
+        html += '<div class="lump-section-title">Version History</div>';
+        html += '<div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.5rem;">';
+        html += 'Binary archive and fleet call-home telemetry. Click a row to preview the hex diff against the current version.';
+        if (hasTel) html += ' Fault rates and device counts from FPGA hardware.';
+        html += '</div>';
 
-        if (versions.length === 0) {
-            html += `<div style="color:var(--text-secondary);font-style:italic;padding:0.5rem 0;">No version data recorded yet. Fault telemetry appears here once devices report via call-home.</div>`;
+        if (rows.length === 0) {
+            html += '<div style="color:var(--text-secondary);font-style:italic;padding:0.5rem 0;">No archived versions yet. Each time you save a LUMP, the previous binary is automatically archived here.</div>';
         } else {
-            const latestVersion = versions.reduce((a, b) => (b.lump_version > a.lump_version ? b : a), versions[0]);
-            const latestToken = latestVersion ? latestVersion.lump_token : token;
-            const latestVer = latestVersion ? latestVersion.lump_version : 0;
-            html += `<table class="lump-detail-table"><thead><tr>`;
-            html += `<th>Ver</th><th>Token</th><th>Faults/1k steps</th><th>Recovery</th><th>MTBF (steps)</th><th>Devices</th><th>Status</th><th></th>`;
-            html += `</tr></thead><tbody>`;
-            for (const v of versions) {
-                const isCurrent = (v.lump_token === token);
-                const rate1k = v.fault_rate_per_1000 != null ? v.fault_rate_per_1000 : (v.fault_rate > 0 ? v.fault_rate * 1000 : 0);
-                const faultPer1k = rate1k > 0 ? `${rate1k.toFixed(4)}/1k` : '0';
-                const mtbfStr = v.mtbf != null ? v.mtbf.toLocaleString() : '\u2014';
-                const status = v.stable_status || 'stable';
-                const statusIcon = STABLE_ICONS[status] || '';
-                const statusLabel = STABLE_LABELS[status] || status;
-                const statusColor = STABLE_COLORS[status] || '#9ca3af';
-                const tier1pct = v.total_faults > 0 ? Math.round(v.tier1_count / v.total_faults * 100) : 0;
-                const tier2pct = v.total_faults > 0 ? Math.round(v.tier2_count / v.total_faults * 100) : 0;
-                const tier3pct = v.total_faults > 0 ? Math.round(v.tier3_count / v.total_faults * 100) : 0;
-                const recoveryStr = v.total_faults > 0
-                    ? `T1:${tier1pct}% T2:${tier2pct}% T3:${tier3pct}%`
-                    : '\u2014';
-                const rowStyle = isCurrent ? ' style="background:var(--bg-selected,rgba(99,102,241,0.08));"' : '';
-                html += `<tr${rowStyle}>`;
-                const compiledStr = v.compiled_at
-                    ? (_lumpTsStr(v.compiled_at) || (v.lump_version === 0 ? 'system' : '\u2014'))
-                    : (v.lump_version === 0 ? 'system' : '\u2014');
-                html += `<td><strong>v${v.lump_version}</strong>${isCurrent ? ' <span style="font-size:0.65rem;color:#818cf8;">(this)</span>' : ''}<br><span style="font-size:0.65rem;color:var(--text-secondary)">${e(compiledStr)}</span></td>`;
-                html += `<td style="font-family:monospace;font-size:0.75rem;">0x${e(v.lump_token)}</td>`;
-                html += `<td>${e(faultPer1k)}</td>`;
-                html += `<td style="font-size:0.75rem;">${e(recoveryStr)}</td>`;
-                html += `<td>${mtbfStr}</td>`;
-                html += `<td>${v.device_count}</td>`;
-                html += `<td><span style="color:${statusColor};font-size:0.8rem;" title="${e(statusLabel)}">${statusIcon} ${e(statusLabel)}</span></td>`;
-                html += `<td>`;
-                if (!isCurrent && v.device_count > 0 && latestVer > v.lump_version) {
-                    html += `<button class="btn" style="font-size:0.7rem;padding:2px 8px;" `
-                           + `onclick="_promptUpgradeLump('${e(absName)}','${e(v.lump_token)}',${v.lump_version},'${e(latestToken)}',${latestVer})" `
-                           + `title="Record upgrade of all devices on v${v.lump_version} to v${latestVer}">Upgrade\u2026</button>`;
+            html += `<table class="lump-detail-table" id="lumpHistoryTable_${tk}"><thead><tr>`;
+            html += '<th>Ver</th><th>Compiled</th><th>CW</th><th>CC</th><th>Size</th>';
+            if (hasTel) html += '<th>Devices</th><th>Faults/1k</th><th>Health</th>';
+            html += '<th colspan="2"></th>';
+            if (hasTel) html += '<th></th>';
+            html += '</tr></thead><tbody>';
+
+            for (const { ver, hist, tel } of rows) {
+                // "current" = the token this detail panel is showing
+                const isCurrent = tel ? (tel.lump_token === token)
+                                      : (lump.lump_version != null && ver === lump.lump_version);
+                const compiledTs = hist ? hist.compiled_at : (tel ? tel.compiled_at : null);
+                const compiledStr = fmtTs(compiledTs) || (ver === 0 ? 'system' : '\u2014');
+                const cwStr   = hist && hist.cw       != null ? hist.cw              : '\u2014';
+                const ccStr   = hist && hist.cc       != null ? hist.cc              : '\u2014';
+                const szStr   = hist && hist.lump_size != null ? `${hist.lump_size}w` : '\u2014';
+
+                let _rowAttrs = '';
+                if (isCurrent) {
+                    _rowAttrs = ' style="background:var(--bg-selected,rgba(99,102,241,0.08));"';
+                } else if (hist) {
+                    _rowAttrs = ` style="cursor:pointer;" onclick="_lumpHistorySelectRow(this,'${e(token)}',${ver},${hist.cw||0},${hist.cc||0},${hist.lump_size||0},'${tk}')"`;
                 }
-                html += `</td>`;
-                html += `</tr>`;
+                html += `<tr class="lump-history-row" data-version="${ver}"${_rowAttrs}>`;
+
+                // Ver column (version number + current badge only; compiled date is in its own column)
+                html += `<td><strong>v${ver}</strong>${isCurrent ? ' <span style="font-size:0.65rem;color:#818cf8;">(this)</span>' : ''}</td>`;
+
+                // Binary columns
+                html += `<td style="font-size:0.75rem;">${e(compiledStr)}</td>`;
+                html += `<td>${e(String(cwStr))}</td>`;
+                html += `<td>${e(String(ccStr))}</td>`;
+                html += `<td>${e(szStr)}</td>`;
+
+                // Telemetry columns (only rendered when hasTel)
+                if (hasTel) {
+                    if (tel) {
+                        const rate1k = tel.fault_rate_per_1000 != null ? tel.fault_rate_per_1000
+                                     : (tel.fault_rate > 0 ? tel.fault_rate * 1000 : 0);
+                        const faultStr = rate1k > 0 ? `${rate1k.toFixed(4)}/1k` : '0';
+                        const status   = tel.stable_status || 'stable';
+                        const statusIcon  = STABLE_ICONS[status]  || '';
+                        const statusLabel = STABLE_LABELS[status] || status;
+                        const statusColor = STABLE_COLORS[status] || '#9ca3af';
+                        html += `<td>${tel.device_count}</td>`;
+                        html += `<td>${e(faultStr)}</td>`;
+                        html += `<td><span style="color:${statusColor};font-size:0.8rem;" title="${e(statusLabel)}">${statusIcon} ${e(statusLabel)}</span></td>`;
+                    } else {
+                        html += '<td>\u2014</td><td>\u2014</td><td>\u2014</td>';
+                    }
+                }
+
+                // Preview + Restore (only for archived binaries)
+                if (hist) {
+                    html += `<td><button class="btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_lumpHistoryPreview('${e(token)}',${ver},${hist.cw||0},${hist.cc||0},${hist.lump_size||0},'${tk}')" title="Preview hex diff of v${ver}">Preview</button></td>`;
+                    html += `<td><button class="btn lump-history-restore-btn" id="lumpHistoryRestoreBtn_${tk}_${ver}" style="font-size:0.7rem;padding:2px 8px;" disabled onclick="event.stopPropagation();_restoreLumpFromHistory('${e(token)}',${ver})" title="Preview this version first, then restore">Restore</button></td>`;
+                } else {
+                    html += '<td></td><td></td>';
+                }
+
+                // Upgrade (only for non-current telemetry rows that have live devices and a newer version exists)
+                if (hasTel) {
+                    const canUpgrade = tel && !isCurrent && tel.device_count > 0 && latestTel && latestTel.lump_version > ver;
+                    if (canUpgrade) {
+                        html += `<td><button class="btn" style="font-size:0.7rem;padding:2px 8px;" `
+                            + `onclick="event.stopPropagation();_promptUpgradeLump('${e(absName)}','${e(tel.lump_token)}',${ver},'${e(latestTel.lump_token)}',${latestTel.lump_version})" `
+                            + `title="Record upgrade of all devices on v${ver} to v${latestTel.lump_version}">Upgrade\u2026</button></td>`;
+                    } else {
+                        html += '<td></td>';
+                    }
+                }
+
+                html += '</tr>';
             }
-            html += `</tbody></table>`;
-            html += `<div style="font-size:0.72rem;color:var(--text-secondary);margin-top:0.5rem;">`;
-            html += `\u2139\ufe0f Upgrade action records the new LUMP version in the device registry. No forced push — devices upgrade voluntarily via the Navana upload path.`;
-            html += `</div>`;
+            html += '</tbody></table>';
+            if (hasTel) {
+                html += '<div style="font-size:0.72rem;color:var(--text-secondary);margin-top:0.5rem;">';
+                html += '\u2139\ufe0f Upgrade records the new version in the device registry. No forced push \u2014 devices upgrade voluntarily via the Navana upload path.';
+                html += '</div>';
+            }
         }
-        html += `</div>`;
+        html += '</div>';
+        html += `<div id="lumpHistoryHexPreview_${tk}" style="margin-top:0.5rem;"></div>`;
         bodyEl.innerHTML = html;
         bodyEl.className = '';
     } catch (err) {
-        bodyEl.innerHTML = `<div class="lump-detail-section" style="color:#ef4444;">Failed to load version telemetry: ${e(err.message)}</div>`;
+        bodyEl.innerHTML = `<div class="lump-detail-section" style="color:#ef4444;">Failed to load history: ${e(err.message)}</div>`;
     }
 }
 
@@ -2064,9 +2122,9 @@ async function _promptUpgradeLump(absName, fromToken, fromVersion, toToken, toVe
             const n = data.updated_count || 0;
             alert(`Bulk upgrade recorded: ${n} device(s) on ${absName} v${fromVersion} → v${toVersion}.`);
             const tk = (toToken || '').replace(/[^a-z0-9]/gi, '');
-            delete _lumpVersionsLoaded[tk];
+            delete _lumpTimelineLoaded[tk];
             const lump = _lumpsCache.find(l => l.token === toToken || l.abstraction === absName);
-            if (lump) _fetchAndShowLumpVersions(toToken, lump);
+            if (lump) _fetchAndShowLumpTimeline(toToken, lump);
         } else {
             alert('Bulk upgrade failed: ' + (data.error || 'unknown error'));
         }
@@ -2075,61 +2133,6 @@ async function _promptUpgradeLump(absName, fromToken, fromVersion, toToken, toVe
     }
 }
 
-async function _fetchAndShowLumpHistory(token, lump) {
-    const tk = (token || '').replace(/[^a-z0-9]/gi, '');
-    const bodyEl = document.getElementById(`lumpHistoryBody_${tk}`);
-    if (!bodyEl) return;
-    const e = _escHtml;
-
-    const fmtDate = ts => {
-        if (!ts) return '\u2014';
-        const d = new Date(ts * 1000);
-        const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
-        return `${d.getDate()} ${mo} ${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-    };
-
-    try {
-        bodyEl.innerHTML = '<div class="lump-hex-loading">Loading history\u2026</div>';
-        const resp = await fetch(`/api/lumps/${token}/history`);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
-        const history = data.history || [];
-
-        let html = '<div class="lump-detail-section">';
-        html += '<div class="lump-section-title">Binary Version Archive</div>';
-        html += '<div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.5rem;">Every saved version of this LUMP is kept on disk. Click a row to preview the binary. Use Restore to make that version current.</div>';
-
-        if (history.length === 0) {
-            html += '<div style="color:var(--text-secondary);font-style:italic;padding:0.5rem 0;">No archived versions yet. Each time you save a LUMP, the previous binary is automatically archived here.</div>';
-        } else {
-            html += '<table class="lump-detail-table" id="lumpHistoryTable_' + tk + '"><thead><tr>';
-            html += '<th>Version</th><th>Compiled</th><th>CW</th><th>CC</th><th>Size</th><th></th><th></th>';
-            html += '</tr></thead><tbody>';
-            for (const v of history) {
-                const compiledStr = fmtDate(v.compiled_at);
-                const cwStr  = v.cw  != null ? v.cw  : '\u2014';
-                const ccStr  = v.cc  != null ? v.cc  : '\u2014';
-                const szStr  = v.lump_size != null ? `${v.lump_size}w` : '\u2014';
-                html += `<tr class="lump-history-row" data-version="${v.version}" style="cursor:pointer;" onclick="_lumpHistorySelectRow(this,'${e(token)}',${v.version},${v.cw || 0},${v.cc || 0},${v.lump_size || 0},'${tk}')">`;
-                html += `<td><strong>v${v.version}</strong></td>`;
-                html += `<td style="font-size:0.75rem;">${e(compiledStr)}</td>`;
-                html += `<td>${e(String(cwStr))}</td>`;
-                html += `<td>${e(String(ccStr))}</td>`;
-                html += `<td>${e(szStr)}</td>`;
-                html += `<td><button class="btn" style="font-size:0.7rem;padding:2px 8px;" onclick="event.stopPropagation();_lumpHistoryPreview('${e(token)}',${v.version},${v.cw || 0},${v.cc || 0},${v.lump_size || 0},'${tk}')" title="Preview hex dump of v${v.version}">Preview</button></td>`;
-                html += `<td><button class="btn lump-history-restore-btn" id="lumpHistoryRestoreBtn_${tk}_${v.version}" style="font-size:0.7rem;padding:2px 8px;" disabled onclick="event.stopPropagation();_restoreLumpFromHistory('${e(token)}',${v.version})" title="Preview this version first, then restore">Restore</button></td>`;
-                html += `</tr>`;
-            }
-            html += '</tbody></table>';
-        }
-        html += '</div>';
-        html += '<div id="lumpHistoryHexPreview_' + tk + '" style="margin-top:0.5rem;"></div>';
-        bodyEl.innerHTML = html;
-        bodyEl.className = '';
-    } catch (err) {
-        bodyEl.innerHTML = `<div class="lump-detail-section" style="color:#ef4444;">Failed to load history: ${e(err.message)}</div>`;
-    }
-}
 
 function _lumpHistorySelectRow(rowEl, token, version, cw, cc, lumpSize, tk) {
     const table = document.getElementById(`lumpHistoryTable_${tk}`);
@@ -2290,7 +2293,7 @@ async function _restoreLumpFromHistory(token, version) {
         }
 
         const tk = token.replace(/[^a-z0-9]/gi, '');
-        delete _lumpHistoryLoaded[tk];
+        delete _lumpTimelineLoaded[tk];
         if (typeof refreshLumps === 'function') refreshLumps();
     } catch (err) {
         alert(`Restore failed: ${err.message}`);
@@ -4340,7 +4343,7 @@ async function _absOpenInEditorByName(name, methodName) {
 // _scrollToLumpMethod) or 'hexdump' (raw byte range — see
 // _scrollToLumpHexMethod). Read once in renderLumps() then left as-is;
 // only _goToLumpByAbstractionName ever sets it.
-let _pendingLumpMethodTarget = 'content';
+let _pendingLumpMethodTarget = 'source';
 
 async function _goToLumpByAbstractionName(name, methodName, targetTab) {
     if (!name) return;
@@ -4350,7 +4353,7 @@ async function _goToLumpByAbstractionName(name, methodName, targetTab) {
     // Browser method-level jump symmetry. See _scrollToLumpMethod().
     // `targetTab === 'hexdump'` instead lands on the Hex Dump tab's byte
     // range for that method — see _scrollToLumpHexMethod().
-    _pendingLumpMethodTarget = (targetTab === 'hexdump') ? 'hexdump' : 'content';
+    _pendingLumpMethodTarget = (targetTab === 'hexdump') ? 'hexdump' : 'source';
     // Warm cache: check immediately without a network round-trip.
     if (window.LumpRegistry && window.LumpRegistry.getServerList().length > 0) {
         const existing = window.LumpRegistry.getServerList().find(l => l.abstraction === name);
@@ -4442,7 +4445,7 @@ function _lumpVersionLabel(lump) {
 function _switchToLumpVersionAndScroll(token, methodName) {
     if (!token) return;
     if (window.LumpRegistry) window.LumpRegistry.setPending(token);
-    window._pendingLumpTab = 'content';
+    window._pendingLumpTab = 'source';
     _pendingLumpMethodName = methodName || null;
     if (typeof renderLumps === 'function') renderLumps();
 }
@@ -5672,7 +5675,7 @@ async function _gtPickCommit(lumpToken, slotIndex) {
         if (selLump) {
             const tk = (selLump.token || '').replace(/[^a-z0-9]/gi, '');
             _lumpContentLoaded[tk] = false;   // force fresh fetch
-            _switchLumpTab(tk, 'content');
+            _switchLumpTab(tk, 'source');
         }
     } catch (err) {
         if (btn) { btn.disabled = false; btn.textContent = 'Assign GT'; }
