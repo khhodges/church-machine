@@ -186,6 +186,8 @@
     flex-direction: column;
     grid-template-columns: unset;
     min-width: 200px;
+    max-height: calc(100vh - 60px);
+    overflow-y: auto;
 }
 
 .ham-group {
