@@ -18,6 +18,13 @@ manifest lock is acquired (Phase 7).  Placing the barrier here guarantees that
 both threads have completed their Phase-1 manifest read before either is
 allowed to enter Phase 7 — the exact window that the old implementation
 (no lock, stale in-memory manifest) loses data.
+
+Filesystem isolation
+--------------------
+All tests use the ``isolated_lumps`` fixture, which monkeypatches
+``_app_module.__file__`` so the server's lumps directory resolves to a fresh
+``tmp_path/lumps`` directory.  The production ``server/lumps/`` directory and
+its ``manifest.json`` are never touched.
 """
 
 import json
@@ -32,8 +39,6 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 import server.app as _app_module
-
-LUMPS_DIR = os.path.join(os.path.dirname(_app_module.__file__), "lumps")
 
 # ── Lump construction helpers ─────────────────────────────────────────────────
 
@@ -70,27 +75,24 @@ def _meta(token, abstraction):
     }
 
 
-# ── Cleanup helper ────────────────────────────────────────────────────────────
+# ── Fixtures ──────────────────────────────────────────────────────────────────
 
-def _cleanup_token(token, abstraction):
-    """Remove all on-disk artefacts for a token so each test run is isolated."""
-    manifest_path = os.path.join(LUMPS_DIR, "manifest.json")
-    dot_pfx = abstraction.replace(".", "").replace(" ", "")
-    for fn in list(os.listdir(LUMPS_DIR)):
-        if fn.startswith(token) or fn.startswith(abstraction) or fn.startswith(dot_pfx):
-            try:
-                os.remove(os.path.join(LUMPS_DIR, fn))
-            except OSError:
-                pass
-    try:
-        man = json.load(open(manifest_path))
-        json.dump(
-            [e for e in man if e.get("token") != token],
-            open(manifest_path, "w"),
-            indent=2,
-        )
-    except Exception:
-        pass
+@pytest.fixture()
+def isolated_lumps(tmp_path, monkeypatch):
+    """Redirect the server's lumps directory to a fresh temp directory.
+
+    save_lump() builds lumps_dir via:
+        os.path.join(os.path.dirname(__file__), 'lumps')
+    where __file__ is server/app.py.  Monkeypatching _app_module.__file__ to
+    a path inside tmp_path makes os.path.dirname(__file__) return tmp_path,
+    so lumps_dir = tmp_path/lumps — fully isolated from the live server/lumps/.
+    """
+    fake_app_py = tmp_path / "app.py"
+    monkeypatch.setattr(_app_module, "__file__", str(fake_app_py))
+    lumps_dir = tmp_path / "lumps"
+    lumps_dir.mkdir()
+    (lumps_dir / "manifest.json").write_text("[]")
+    return lumps_dir
 
 
 # ── Tests ──────────────────────────────────────────────────────────────────────
@@ -104,16 +106,12 @@ class TestConcurrentLumpSave:
     ABS_B   = "ConcurrentSaveB"
 
     def setup_method(self):
-        _cleanup_token(self.TOKEN_A, self.ABS_A)
-        _cleanup_token(self.TOKEN_B, self.ABS_B)
         # Always clear the hook before each test.
         _app_module._lumps_manifest_pre_write_hook = None
 
     def teardown_method(self):
         # Restore hook to None so other tests are unaffected.
         _app_module._lumps_manifest_pre_write_hook = None
-        _cleanup_token(self.TOKEN_A, self.ABS_A)
-        _cleanup_token(self.TOKEN_B, self.ABS_B)
 
     def _run_concurrent_saves_with_hook(self):
         """
@@ -167,7 +165,7 @@ class TestConcurrentLumpSave:
 
         return results, errors
 
-    def test_both_tokens_in_list_after_concurrent_saves(self):
+    def test_both_tokens_in_list_after_concurrent_saves(self, isolated_lumps):
         """Both tokens must appear in /api/lumps/list after simultaneous saves."""
         results, errors = self._run_concurrent_saves_with_hook()
 
@@ -199,17 +197,17 @@ class TestConcurrentLumpSave:
             f"manifest race not serialised. Tokens present: {sorted(tokens_in_list)}"
         )
 
-    def test_manifest_on_disk_contains_both_tokens(self):
-        """manifest.json on disk must contain both entries after concurrent saves."""
+    def test_manifest_on_disk_contains_both_tokens(self, isolated_lumps):
+        """manifest.json in the isolated temp dir must contain both entries."""
         results, errors = self._run_concurrent_saves_with_hook()
 
         assert not errors, f"Save threads raised exceptions: {errors}"
         assert results.get(self.TOKEN_A) == 200
         assert results.get(self.TOKEN_B) == 200
 
-        manifest_path = os.path.join(LUMPS_DIR, "manifest.json")
-        assert os.path.isfile(manifest_path), "manifest.json not found on disk"
-        tokens_on_disk = {e.get("token") for e in json.load(open(manifest_path))}
+        manifest_path = isolated_lumps / "manifest.json"
+        assert manifest_path.is_file(), "manifest.json not found in isolated lumps dir"
+        tokens_on_disk = {e.get("token") for e in json.loads(manifest_path.read_text())}
 
         assert self.TOKEN_A in tokens_on_disk, (
             f"Token A missing from manifest.json on disk. "

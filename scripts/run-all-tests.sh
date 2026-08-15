@@ -151,6 +151,12 @@ register_suite "lambda-exec-tests" \
 register_suite "lump-binary-tests" \
     'node simulator/test_load_lump_binary.js'
 
+register_suite "lump-save-endpoint-tests" \
+    'python -m pytest tests/server/test_lump_save_endpoint.py -v'
+
+register_suite "lump-save-error-surface-tests" \
+    'node simulator/test_lump_save_error_surface.js'
+
 register_suite "lump-roundtrip" \
     'node simulator/test_lump_roundtrip.js'
 

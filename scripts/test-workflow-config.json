@@ -36,6 +36,8 @@
     "pipeline-health-stages-tests",
     "check-no-ti60-ui",
     "bitstream-version-labeling-tests",
-    "boot-entry-hw-image-tests"
+    "boot-entry-hw-image-tests",
+    "lump-save-endpoint-tests",
+    "lump-save-error-surface-tests"
   ]
 }

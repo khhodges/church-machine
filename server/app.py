@@ -12457,11 +12457,6 @@ def _ba_validate_build_auth():
     return True, None
 
 
-if __name__ == "__main__":
-    _port = int(os.environ.get("E2E_PORT", 5000))
-    logging.info("Starting Church Machine server on port %d", _port)
-    _bind_with_retry(_port)
-
 def _read_manifest_safe(manifest_path):
     """Read and parse the LUMP manifest at *manifest_path*.
 
@@ -12488,3 +12483,9 @@ def _read_manifest_safe(manifest_path):
         raise ValueError(
             f"manifest.json at {manifest_path!r} could not be read: {_exc}"
         ) from _exc
+
+
+if __name__ == "__main__":
+    _port = int(os.environ.get("E2E_PORT", 5000))
+    logging.info("Starting Church Machine server on port %d", _port)
+    _bind_with_retry(_port)

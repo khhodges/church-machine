@@ -81,6 +81,8 @@ const DEFAULT_SCRIPT_ONLY_SUITES = [
     'check-no-ti60-ui',
     'bitstream-version-labeling-tests',
     'boot-entry-hw-image-tests',
+    'lump-save-endpoint-tests',
+    'lump-save-error-surface-tests',
 ];
 
 const configPath = path.join(__dirname, 'test-workflow-config.json');
