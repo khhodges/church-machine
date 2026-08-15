@@ -4482,6 +4482,15 @@ async function openLumpInEditor(token) {
     // the saved entry's fetchedAt for the same abstraction name, and
     // silently redirect to the fresher token so "Open Lump" always shows
     // the most recent work, not the last-saved binary.
+    //
+    // Post-reload safety: both sources.server.fetchedAt and
+    // sources.memory.registeredAt are in-memory timestamps that reset to 0
+    // on every page reload.  After a reload there will be no memory entry
+    // for the abstraction (_fresherEntry stays null), so the redirect is
+    // simply skipped and the saved (server) token is opened as-is.  This
+    // is intentionally correct: we cannot know whether a reload-lost
+    // compilation was newer than the saved binary, so we fall back safely
+    // to the last saved version rather than risk opening a stale artefact.
     if (window.LumpRegistry) {
         var _savedEntry = window.LumpRegistry.resolve(token);
         var _absName = (_savedEntry?.sources?.server?.abstraction)

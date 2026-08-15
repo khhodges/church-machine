@@ -62,7 +62,7 @@ function extractRedirectBlock() {
 
     // The `if (window.LumpRegistry) {` line follows within a few lines.
     let ifLineIdx = -1;
-    for (let i = markerIdx; i < Math.min(markerIdx + 10, lines.length); i++) {
+    for (let i = markerIdx; i < Math.min(markerIdx + 25, lines.length); i++) {
         if (/^\s*if\s*\(window\.LumpRegistry\)/.test(lines[i])) {
             ifLineIdx = i;
             break;
@@ -245,6 +245,29 @@ check('T6 redirect block exists in production source (app-lumps.js)',
     const redirected = buildRedirectFn(sb)(OLD_TOKEN, sb);
     check('T5 no redirect when in-memory entry has a different abstraction name',
           redirected === OLD_TOKEN, redirected);
+}
+
+// ── T7 — post-reload state: fetchedAt=0, no memory entry → no redirect ───────
+// After a page reload both in-memory timestamps reset to zero and any
+// previously-compiled (unsaved) entries are gone.  The redirect block must
+// NOT redirect in this state — it should silently open the saved token,
+// which is the last known-good binary.  This test pins that behaviour so
+// future changes to the timestamp logic cannot accidentally break it.
+{
+    const sb = makeSandbox();
+    const LR = sb.window.LumpRegistry;
+
+    const SAVED_TOKEN = 'aabb1100';
+
+    // Server entry present — but fetchedAt is 0 (reset after page reload).
+    LR.registerFromServer([{ token: SAVED_TOKEN, abstraction: 'Foo.Bar' }]);
+    LR.resolve(SAVED_TOKEN).sources.server.fetchedAt = 0;
+
+    // No in-memory entry at all (cleared by reload).
+
+    const redirected = buildRedirectFn(sb)(SAVED_TOKEN, sb);
+    check('T7 no redirect in post-reload state (fetchedAt=0, no memory entry)',
+          redirected === SAVED_TOKEN, redirected);
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────
