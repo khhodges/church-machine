@@ -481,6 +481,7 @@
                                 <div class="ham-divider"></div>
                                 <div class="ham-group-title">Build</div>
                                 <button class="ham-item" onclick="smartCompile();closeEditorActions()" data-tooltip="Compile — Compile with auto-detected or selected source language">Compile</button>
+                                <button class="ham-item" id="btnHamSaveLump" onclick="editorSaveLump();closeEditorActions()" style="color:#7dd3a8;" data-tooltip="Save Lump — Save a new dated version of the current LUMP; or compile-then-save if no LUMP is open">Save Lump</button>
                                 <button class="ham-item" onclick="compileDraft();closeEditorActions()" style="color:#C89B3C;" data-tooltip="Draft — Show compilation draft: methods, capabilities, and lump layout">Draft</button>
                                 <button class="ham-item" onclick="showCreateNamespace();closeEditorActions()" data-tooltip="Create Namespace — Reserve a namespace slot for your abstraction">Create Namespace</button>
                                 <button class="ham-item" onclick="compileAndCreateAbstraction();closeEditorActions()" data-tooltip="Create Abstraction — Compile and create via Navana.Abstraction.Add">Create Abstraction</button>
@@ -489,7 +490,6 @@
                                 <button class="ham-item" onclick="showEditorCListPopup(event);closeEditorActions()" style="color:#7dd3fc;" data-tooltip="C-List — Browse capability names and insert into editor (Ctrl+Shift+C)">C-List</button>
                                 <div class="ham-divider"></div>
                                 <div class="ham-group-title">Install</div>
-                                <button class="ham-item" id="btnHamSaveLump" onclick="editorSaveLump();closeEditorActions()" style="color:#7dd3a8;" data-tooltip="Save Lump — Save a new dated version of the current LUMP; or compile-then-save if no LUMP is open">Save Lump</button>
                                 <button class="ham-item" onclick="saveUploadJSON();closeEditorActions()" data-tooltip="Save Abstraction — Compile and save the abstraction definition file">Save Abstraction</button>
                                 <button class="ham-item" id="btnSaveUserTab" disabled onclick="saveActiveUserTab();closeEditorActions()" data-tooltip="Save Program — Save the current user program (C+S)">Save Program</button>
                                 <button class="ham-item" id="btnSaveNS" disabled onclick="showSaveToNamespace();closeEditorActions()" data-tooltip="Save to NS — Save the assembled program as a namespace entry">Save to NS</button>
