@@ -20,6 +20,20 @@ import requests as http_requests
 _sse_clients     = []
 _sse_clients_lock = threading.Lock()
 
+# ── LUMP manifest write lock ───────────────────────────────────────────────────
+# Guards the read/update/write cycle in save_lump() so concurrent saves never
+# clobber each other's manifest entry.  The lump binary and sidecar files are
+# written outside this lock (they are per-token and idempotent); only the
+# shared manifest.json update is serialised.
+_lumps_manifest_lock = threading.Lock()
+
+# Test hook — set to a callable to be invoked inside save_lump() after all
+# per-token file writes (Phase 5/6) complete but BEFORE the manifest lock is
+# acquired (Phase 7).  This lets tests synchronise threads so both have
+# finished their Phase-1 manifest read before either enters Phase 7, making
+# the race window deterministic.  None in production (no overhead).
+_lumps_manifest_pre_write_hook: "threading.Callable | None" = None
+
 def _push_device_event(payload: dict):
     """Broadcast a JSON event to all open SSE connections."""
     msg = "data: " + json.dumps(payload) + "\n\n"
@@ -5630,17 +5644,9 @@ def save_lump():
     with open(sidecar_path, 'w') as fh:
         json.dump(sidecar, fh, indent=2)
 
-    # ── Phase 7: Update manifest ───────────────────────────────────────────────
-    manifest = [e for e in manifest if e.get('token') != token8]
-
-    vg_key = f"compiled_{abs_name.lower().replace(' ', '_')}"
-    if ns_slot is not None:
-        for prev_entry in manifest:
-            if (prev_entry.get("abstraction") == abs_name
-                    and prev_entry.get("ns_slot") == ns_slot
-                    and not prev_entry.get("variant_group")):
-                prev_entry["variant_group"] = vg_key
-
+    # ── Phase 7: Update manifest (serialised) ─────────────────────────────────
+    # Re-read manifest.json inside the lock so any concurrent save that wrote
+    # between Phase 1 and now is not silently discarded.
     new_entry = {
         "token":         token8,
         "abstraction":   abs_name,
@@ -5664,10 +5670,37 @@ def save_lump():
         "dot_name":      _dot_name_save,
         "issue_n":       _issue_n_save,
     }
-    manifest.append(new_entry)
 
-    with open(manifest_path, 'w') as fh:
-        json.dump(manifest, fh, indent=2)
+    # Test hook: fires after all per-token I/O (Phase 5/6) but before the lock.
+    # In production this is always None.  Tests set it to synchronise threads
+    # so both have read the manifest (Phase 1) before either enters Phase 7.
+    if _lumps_manifest_pre_write_hook is not None:
+        _lumps_manifest_pre_write_hook()  # noqa: not-callable — callable at runtime
+
+    with _lumps_manifest_lock:
+        # Fresh read under lock — picks up any entry written by a concurrent save.
+        _locked_manifest = []
+        if os.path.isfile(manifest_path):
+            try:
+                with open(manifest_path, 'r') as _lmfh:
+                    _locked_manifest = json.load(_lmfh)
+            except Exception:
+                _locked_manifest = []
+
+        _locked_manifest = [e for e in _locked_manifest if e.get('token') != token8]
+
+        vg_key = f"compiled_{abs_name.lower().replace(' ', '_')}"
+        if ns_slot is not None:
+            for prev_entry in _locked_manifest:
+                if (prev_entry.get("abstraction") == abs_name
+                        and prev_entry.get("ns_slot") == ns_slot
+                        and not prev_entry.get("variant_group")):
+                    prev_entry["variant_group"] = vg_key
+
+        _locked_manifest.append(new_entry)
+
+        with open(manifest_path, 'w') as fh:
+            json.dump(_locked_manifest, fh, indent=2)
 
     print(f'[lumps] Saved {lump_filename} ({len(lump_bytes)} bytes) + {sidecar_filename}', flush=True)
 
