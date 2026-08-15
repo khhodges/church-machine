@@ -1851,6 +1851,12 @@ if (typeof window !== 'undefined') window._fetchLumpDetailCached = _fetchLumpDet
 //              to a matching layout). Counts non-comment, non-capabilities
 //              lines in the decompiled/source text so a click never no-ops.
 async function _lumpAuditJump(token, sourceLine, wordIndex) {
+    // When jumping to the current editor (no token), close the Format Lump dialog
+    // first so the editor is visible after the view switch.
+    if (!token) {
+        const _fmtDlg = document.getElementById('formatLumpDialog');
+        if (_fmtDlg) _fmtDlg.style.display = 'none';
+    }
     if (token && typeof openLumpInEditor === 'function') {
         try { await openLumpInEditor(token); } catch (_e) {}
     } else if (typeof switchView === 'function' && document.getElementById('asmEditor')) {
@@ -5297,6 +5303,19 @@ window.showFormatLump = function() {
         registeredAt: _svRegisteredAt
     };
 
+    // ── Reference name: dot name + binary hash ───────────────────────────────
+    var _refEl = document.getElementById('fmtRefName');
+    if (_refEl) {
+        var _fmtTok = (typeof window._computeLumpToken === 'function')
+            ? window._computeLumpToken(_svWords, _caps) : '';
+        var _fmtDisplayName = _absName || '(unnamed)';
+        _refEl.innerHTML =
+            '<span class="fmt-ref-doname">' + _fmtEscape(_fmtDisplayName) + '</span>' +
+            (_fmtTok
+                ? '<span class="fmt-ref-hash">\u00b7\u00a0' + _fmtEscape(_fmtTok) + '</span>'
+                : '');
+    }
+
     // ── Decode header for the summary row ────────────────────────────────────
     var _cw = (_svHdr >>> 10) & 0x1FFF;
     var _cc = _svHdr & 0xFF;
@@ -5364,7 +5383,10 @@ window.showFormatLump = function() {
 
     // ── Run audit ─────────────────────────────────────────────────────────────
     var _manifest = { cw: _cw, cc: _cc, lump_size: _svLumpSize, capabilities: _caps };
-    var _auditResults = (typeof lumpAudit === 'function') ? lumpAudit(_svBinary, _manifest) : [];
+    // skipRnc: true — the binary c-list is all-zeros by design; GTs are injected
+    // by the server at deployment time, so RNC NULL-GT warnings are always false
+    // positives here.  Named slots are shown in the Capabilities panel above.
+    var _auditResults = (typeof lumpAudit === 'function') ? lumpAudit(_svBinary, _manifest, null, { skipRnc: true }) : [];
     var _hasErrors   = (typeof lumpAuditHasErrors   === 'function') ? lumpAuditHasErrors(_auditResults)   : false;
     var _hasWarnings = (typeof lumpAuditHasWarnings === 'function') ? lumpAuditHasWarnings(_auditResults) : false;
 

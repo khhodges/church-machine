@@ -18,7 +18,7 @@
  *   RSM — no stub methods (bare RETURN with no real code body — compiler error)
  */
 
-function lumpAudit(words, manifest, lineNums) {
+function lumpAudit(words, manifest, lineNums, opts) {
     const results = [];
 
     if (!words || words.length === 0) {
@@ -327,7 +327,20 @@ function lumpAudit(words, manifest, lineNums) {
         }
 
         // ── RNC — NULL GT in c-list (warning) ────────────────────────────────
-        if (_rncViolations.length === 0) {
+        // skipRnc is set when auditing a freshly compiled binary whose c-list is
+        // intentionally all-zeros (GTs are injected at deployment time by the server).
+        // In that context the warning is always a false positive — the Capabilities
+        // panel above already shows the named slots from the manifest.
+        if (opts && opts.skipRnc) {
+            if (cc > 0) {
+                results.push({
+                    ruleId: 'RNC',
+                    severity: 'pass',
+                    message: 'C-list slots not checked \u2014 GTs populated at deployment \u2713',
+                    detail: 'In a freshly compiled binary the c-list area is 0x00000000; the server injects capability GTs when the lump is saved to the namespace. Named slots are listed in the Capabilities panel above.',
+                });
+            }
+        } else if (_rncViolations.length === 0) {
             if (cc > 0) {
                 results.push({
                     ruleId: 'RNC',

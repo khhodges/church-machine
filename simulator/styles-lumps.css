@@ -6430,6 +6430,27 @@ pre:hover .code-copy-btn {
     margin-left: 0.5rem;
     vertical-align: middle;
 }
+.fmt-ref-name {
+    display: flex;
+    align-items: baseline;
+    gap: 0.55rem;
+    padding: 0.45rem 0 0.1rem;
+    flex-wrap: wrap;
+}
+.fmt-ref-doname {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    letter-spacing: 0.01em;
+    word-break: break-all;
+}
+.fmt-ref-hash {
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    color: #6b7280;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
 .fmt-section-label {
     font-size: 0.68rem;
     font-weight: 700;
