@@ -402,7 +402,7 @@ let nextAfterSelfTestSlot = (() => {
         return Number.isFinite(n) && n >= 0 ? n : -1;
     } catch (e) { return -1; }
 })();
-window.nextAfterSelfTestSlot = nextAfterSelfTestSlot;
+if (typeof window !== 'undefined') window.nextAfterSelfTestSlot = nextAfterSelfTestSlot;
 
 function renderAbstractions() {
     if (!abstractionRegistry) return;

@@ -371,18 +371,19 @@ console.log('\n--- LLB-08: NS[3].word2 seal consistent with EXTENDED_BASE and cw
         `stored=0x${storedWord2.toString(16)} expected=0x${expected.toString(16)}`);
 }
 
-// ── LLB-RBA: Real PostFlashSelftest binary (a56597e9.lump, Boot.Abstr slot) ──
-// Fixture: server/lumps/a56597e9.lump — canonical abstraction name "PostFlashSelftest"
-// per sidecar JSON (server/lumps/a56597e9.json), token a56597e9, cw=499, cc=1,
+// ── LLB-RBA: Real PostFlashSelftest binary (059dc47f.lump, Boot.Abstr slot) ──
+// Fixture: server/lumps/059dc47f.lump — canonical abstraction name "PostFlashSelftest"
+// per sidecar JSON (server/lumps/059dc47f.json), token 059dc47f, cw=499, cc=2,
 // lumpSize=512 (2048-byte file).  This is the Boot.Abstr lump (NS slot 6) that
 // the simulator loads into the boot entry slot at startup.
+// cc changed from 1→2 when Next.GT was wired into SelfTest c-list[1].
 // Reads the file as big-endian uint32 words — the same format served by the
-// Flask /api/lump/a56597e9/words endpoint.
-console.log('\n--- LLB-RBA: Real PostFlashSelftest binary (a56597e9.lump, Boot.Abstr slot) ---');
+// Flask /api/lump/059dc47f/words endpoint.
+console.log('\n--- LLB-RBA: Real PostFlashSelftest binary (059dc47f.lump, Boot.Abstr slot) ---');
 {
-    const lumpPath = path.join(__dirname, '..', 'server', 'lumps', 'a56597e9.lump');
+    const lumpPath = path.join(__dirname, '..', 'server', 'lumps', '059dc47f.lump');
     const lumpExists = fs.existsSync(lumpPath);
-    check('LLB-RBA-0: a56597e9.lump fixture file exists on disk', lumpExists,
+    check('LLB-RBA-0: 059dc47f.lump fixture file exists on disk', lumpExists,
         lumpPath);
 
     if (lumpExists) {
@@ -402,8 +403,8 @@ console.log('\n--- LLB-RBA: Real PostFlashSelftest binary (a56597e9.lump, Boot.A
         check('LLB-RBA-3: fixture header cw = 499 (PostFlashSelftest)',
             hdr0.cw === 499,
             `got cw=${hdr0.cw}`);
-        check('LLB-RBA-4: fixture header cc = 1 (PostFlashSelftest)',
-            hdr0.cc === 1,
+        check('LLB-RBA-4: fixture header cc = 2 (PostFlashSelftest — Next.GT in slot 1)',
+            hdr0.cc === 2,
             `got cc=${hdr0.cc}`);
         check('LLB-RBA-5: fixture header lumpSize = 512',
             hdr0.lumpSize === 512,
@@ -424,19 +425,19 @@ console.log('\n--- LLB-RBA: Real PostFlashSelftest binary (a56597e9.lump, Boot.A
         check('LLB-RBA-8: NS[bootEntrySlot].word1 limit = 499 (cw from real fixture)',
             p.limit === 499,
             `got limit=${p.limit}`);
-        check('LLB-RBA-9: NS[bootEntrySlot].word1 clistCount = 1 (cc from real fixture)',
-            p.clistCount === 1,
+        check('LLB-RBA-9: NS[bootEntrySlot].word1 clistCount = 2 (cc from real fixture — Next.GT in slot 1)',
+            p.clistCount === 2,
             `got clistCount=${p.clistCount}`);
         check('LLB-RBA-10: CR14.word1 = EXTENDED_BASE after real load',
             sim2.cr[14].word1 === EXTENDED_BASE,
             `got 0x${sim2.cr[14].word1.toString(16)}`);
 
         // LLB-RBA-11: Sidecar JSON metadata — prevents future token/name drift.
-        const sidecarPath = path.join(__dirname, '..', 'server', 'lumps', 'a56597e9.json');
+        const sidecarPath = path.join(__dirname, '..', 'server', 'lumps', '059dc47f.json');
         if (fs.existsSync(sidecarPath)) {
             const sidecar = JSON.parse(fs.readFileSync(sidecarPath, 'utf8'));
-            check('LLB-RBA-11: sidecar token = a56597e9 (canonical token for PostFlashSelftest)',
-                sidecar.token === 'a56597e9',
+            check('LLB-RBA-11: sidecar token = 059dc47f (canonical token for PostFlashSelftest)',
+                sidecar.token === '059dc47f',
                 `got token=${sidecar.token}`);
         } else {
             console.log('SKIP LLB-RBA-11 (sidecar a56597e9.json not found)');
