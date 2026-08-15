@@ -3646,6 +3646,24 @@ a.next-step-link:hover {
     color: #e0e0e0;
 }
 
+.patch-toast-action {
+    background: rgba(125,211,168,0.12);
+    border: 1px solid rgba(125,211,168,0.4);
+    border-radius: 4px;
+    color: #7dd3a8;
+    font-size: 0.75rem;
+    cursor: pointer;
+    padding: 0.15rem 0.55rem;
+    line-height: 1.4;
+    margin-left: auto;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.patch-toast-action:hover {
+    background: rgba(125,211,168,0.22);
+    color: #a7edca;
+}
+
 .patch-toast-close {
     background: none;
     border: none;

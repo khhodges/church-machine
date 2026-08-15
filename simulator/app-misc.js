@@ -706,12 +706,37 @@ function showNextSteps(context) {
 }
 
 // Opens the LUMP Repository view, selecting the most recently compiled/saved
-// lump when one is known (via LumpRegistry.getCurrent()).  Does NOT use
-// setPending — that path triggers an openLumpInEditor redirect for
-// memory-only (assembled but not yet saved) lumps.  getCurrent() is already
-// consumed directly by renderLumps() as _selTok, so saved lumps are
-// auto-selected without a pending token race.
+// lump when one is known (via LumpRegistry.getCurrent()).
+//   • Server-backed token → switch to the LUMP browser and call showLumpDetail
+//     so the correct entry is selected immediately (not whatever was last open).
+//   • Memory-only token (compiled but not yet saved) → open directly in the
+//     editor via openLumpInEditor so the fresh binary is shown, not an older
+//     saved version with the same abstraction name.
+//   • No token → just switch to the LUMP browser.
 function _openLastCompiledLump() {
+    var _tok = window.LumpRegistry ? window.LumpRegistry.getCurrent() : null;
+    if (_tok && window.LumpRegistry) {
+        var _entry = window.LumpRegistry.resolve(_tok);
+        var _hasServer = !!((_entry || {}).sources && _entry.sources.server);
+        var _hasMem    = !!((_entry || {}).sources && _entry.sources.memory
+                            && _entry.sources.memory.words
+                            && _entry.sources.memory.words.length > 0);
+        if (_hasServer) {
+            // Saved lump: navigate browser and highlight it.
+            if (typeof switchView === 'function') switchView('lumps');
+            if (typeof showLumpDetail === 'function') showLumpDetail(_tok);
+            return;
+        }
+        if (_hasMem) {
+            // Memory-only (freshly compiled, not yet saved): open in editor
+            // so the fresh binary is visible rather than the old saved version.
+            if (typeof openLumpInEditor === 'function') {
+                openLumpInEditor(_tok);
+                return;
+            }
+        }
+    }
+    // Fallback: no known current token — just open the browser.
     if (typeof switchView === 'function') switchView('lumps');
 }
 

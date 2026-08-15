@@ -1819,10 +1819,22 @@ function showPatchModal(ok, opName, logText) {
     const lines = (logText || '').split('\n').filter(l => l.trim());
     const lastLine = lines[lines.length - 1] || (ok ? 'Done.' : 'Operation failed.');
 
+    // Capture the saved token at modal-build time so the "Show Lump" button
+    // always points at the correct entry even if getCurrent() changes later.
+    const _savedTok = ok && window.LumpRegistry ? window.LumpRegistry.getCurrent() : null;
+    const _showLumpBtn = _savedTok
+        ? `<button class="patch-toast-action" onclick="
+                document.getElementById('patchToastOverlay').remove();
+                if(typeof switchView==='function')switchView('lumps');
+                if(typeof showLumpDetail==='function')showLumpDetail('${_savedTok}');
+           ">&#128218; Show Lump</button>`
+        : '';
+
     toast.innerHTML = `
         <div class="patch-toast-header">
             <span class="patch-toast-icon">${ok ? '&#x2713;' : '&#x2717;'}</span>
             <span class="patch-toast-title">${opName} &mdash; ${ok ? 'Success' : 'Failed'}</span>
+            ${_showLumpBtn}
             <button class="patch-toast-close" onclick="document.getElementById('patchToastOverlay').remove()">&#x2715;</button>
         </div>
         <div class="patch-toast-summary">${lastLine}</div>
