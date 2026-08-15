@@ -34,17 +34,15 @@
 ;   Slot 0: E-GT at c-list[0] enables LOAD + TPERM tests and EXACT cross-comparison.
 ;   Slot 1: Next.GT at c-list[1] — the continuation called at done: when all 81 tests
 ;           pass.  boot_image.py overrides this word at image-generation time; the
-;           stored value is the default (SelfTest self-loop, 0x4A000006) which is used
-;           when the binary is loaded directly without going through the generator.
-;           The IDE "→ Next" secondary ⚡ button configures a different continuation;
-;           boot_image.py bakes the E-GT for that abstraction into c-list[1].
+;           stored default (0x4A000006) is the SelfTest self-loop, used when the
+;           binary is loaded directly without going through the boot image generator.
 ;   At SelfTest entry the hardware guarantees:
 ;     CR0  = E-GT for SelfTest  (Church domain, E-perm; from thread[+244])
 ;     CR1  = E-GT for SelfTest  (loaded via: LOAD CR1, SelfTest from c-list[0])
 ;   CR0 and CR1 hold the same GT word (0x4A000006) — TPERM EXACT cross-check passes.
 capabilities {
     SelfTest     E          ; slot 0 — E-GT for TPERM/EXACT tests
-    Next         E          ; slot 1 — Next.GT (continuation at done:; default=SelfTest self-loop)
+    Next         E          ; slot 1 — Next.GT (default=SelfTest self-loop; boot_image.py overrides)
 }
 ;
 ; Fail-fast pattern (every instruction on its own line, ; is comment):
@@ -782,7 +780,6 @@ tL81:
 
 ; ═══════════════════════════════════════════════════════════════════════════════
 ; All 81 tests passed — call through Next.GT (c-list[1]) to continue
-; ═══════════════════════════════════════════════════════════════════════════════
 ; NOTE: RETURN is intentionally absent here.  The boot CALL from boot_rom.py
 ; pushes a frame with returnPC = byte 0x00C (the word after the boot CALL
 ; instruction), which lies outside every valid lump.  Any RETURN at this
@@ -792,6 +789,7 @@ tL81:
 ; is the boot CALL frame — ELOADCALL is safe here without a RETURN.
 ; Default (boot_image.py bakes SelfTest E-GT into c-list[1]): self-loop.
 ; Configured (IDE "→ Next" secondary ⚡): transitions to the chosen abstraction.
+; ═══════════════════════════════════════════════════════════════════════════════
 done:
     ISUB DR0, DR0, DR0      ; DR0 = 0 (all 81 tests passed)
     ELOADCALL CR1, Next     ; load Next.GT from c-list[1] and ELOADCALL to it (replaces lump in-place)

@@ -6446,16 +6446,21 @@ HALT`,
 ;   DR3       expected-value comparison scratch
 ;   DR4-DR15  register-independence pattern storage (Section A only)
 ;
-; C-list: cc = 1 — POLA minimum.
+; C-list: cc = 2.
 ;   X-permission is NOT a stored Golden Token — it is constructed dynamically by CALL
 ;   from the lump header into CR14 (a privileged register, off-limits for TPERM).
-;   One E-GT at c-list slot 0 enables LOAD + TPERM tests and EXACT cross-comparison.
+;   Slot 0: E-GT at c-list[0] enables LOAD + TPERM tests and EXACT cross-comparison.
+;   Slot 1: Next.GT at c-list[1] — the continuation called at done: when all 81 tests
+;           pass.  boot_image.py overrides this word at image-generation time; the
+;           stored default (0x4A000006) is the SelfTest self-loop, used when the
+;           binary is loaded directly without going through the boot image generator.
 ;   At SelfTest entry the hardware guarantees:
 ;     CR0  = E-GT for SelfTest  (Church domain, E-perm; from thread[+244])
 ;     CR1  = E-GT for SelfTest  (loaded via: LOAD CR1, SelfTest from c-list[0])
 ;   CR0 and CR1 hold the same GT word (0x4A000006) — TPERM EXACT cross-check passes.
 capabilities {
-    SelfTest     E
+    SelfTest     E          ; slot 0 — E-GT for TPERM/EXACT tests
+    Next         E          ; slot 1 — Next.GT (default=SelfTest self-loop; boot_image.py overrides)
 }
 ;
 ; Fail-fast pattern (every instruction on its own line, ; is comment):
@@ -7192,19 +7197,20 @@ tL81:
     RETURN
 
 ; ═══════════════════════════════════════════════════════════════════════════════
-; All 81 tests passed — enter recovery loop
+; All 81 tests passed — call through Next.GT (c-list[1]) to continue
+; NOTE: RETURN is intentionally absent here.  The boot CALL from boot_rom.py
+; pushes a frame with returnPC = byte 0x00C (the word after the boot CALL
+; instruction), which lies outside every valid lump.  Any RETURN at this
+; depth would fault RANGE and restart the boot, creating an infinite reboot
+; loop.  ELOADCALL (CALL with cr_dst == cr_src) does not push its own frame
+; (it replaces the current lump in-place), so the only frame visible here
+; is the boot CALL frame — ELOADCALL is safe here without a RETURN.
+; Default (boot_image.py bakes SelfTest E-GT into c-list[1]): self-loop.
+; Configured (IDE "→ Next" secondary ⚡): transitions to the chosen abstraction.
 ; ═══════════════════════════════════════════════════════════════════════════════
 done:
-    ISUB DR0, DR0, DR0      ; DR0 = 0 (all tests passed)
-    TPERM CR0, FRAME        ; is there a real caller frame? (called via ELOADCALL, not boot)
-    BRANCHEQ ec_return      ; yes — RETURN with DR0 result to ELOADCALL caller
-    TPERM CR0, E            ; is Thread.caps[0] a valid E-GT?
-    BRANCHEQ launch         ; yes — dispatch to programmer's first abstraction
-    BRANCH AL, start        ; no — loop and re-run all 81 tests
-ec_return:
-    RETURN                  ; return DR0 (0=all pass, N=first fail) to ELOADCALL caller
-launch:
-    CALL CR0                ; enter programmer's first abstraction`,
+    ISUB DR0, DR0, DR0      ; DR0 = 0 (all 81 tests passed)
+    ELOADCALL CR1, Next     ; load Next.GT from c-list[1] and ELOADCALL to it (replaces lump in-place)`,
         'gt_v1_1_test': `; GT Encoding v1.1 Hardware Self-Test
 ; =====================================
 ; A CLOOMC program that exercises the live mLoad capability pipeline to

@@ -376,9 +376,15 @@ console.log('\n--- LLB-08: NS[3].word2 seal consistent with EXTENDED_BASE and cw
 // per sidecar JSON (server/lumps/059dc47f.json), token 059dc47f, cw=499, cc=2,
 // lumpSize=512 (2048-byte file).  This is the Boot.Abstr lump (NS slot 6) that
 // the simulator loads into the boot entry slot at startup.
-// cc changed from 1→2 when Next.GT was wired into SelfTest c-list[1].
+// c-list: slot 0 = SelfTest E-GT; slot 1 = Next.GT (default=self-loop;
+//         boot_image.py overrides at image-generation time).
+// Completion: ELOADCALL CR1, Next — dispatches through c-list[1], not Thread.caps[0].
 // Reads the file as big-endian uint32 words — the same format served by the
 // Flask /api/lump/059dc47f/words endpoint.
+// To regenerate after editing the source:
+//   node scripts/build_selftest_lump.js
+//   Then update the token here and in tests/lump/test_lump_consistency.py
+//   and commit the new .lump + .json + manifest.json.
 console.log('\n--- LLB-RBA: Real PostFlashSelftest binary (059dc47f.lump, Boot.Abstr slot) ---');
 {
     const lumpPath = path.join(__dirname, '..', 'server', 'lumps', '059dc47f.lump');
@@ -394,7 +400,7 @@ console.log('\n--- LLB-RBA: Real PostFlashSelftest binary (059dc47f.lump, Boot.A
             rawWords.length === 512,
             `got ${rawWords.length}`);
 
-        // Parse the header word — must decode as cw=499, cc=1, lumpSize=512
+        // Parse the header word — must decode as cw=499, cc=2, lumpSize=512
         const sim = new ChurchSimulator();
         const hdr0 = sim.parseLumpHeader(rawWords[0] >>> 0);
         check('LLB-RBA-2: fixture header magic = 0x1F (valid LUMP)',
@@ -440,7 +446,7 @@ console.log('\n--- LLB-RBA: Real PostFlashSelftest binary (059dc47f.lump, Boot.A
                 sidecar.token === '059dc47f',
                 `got token=${sidecar.token}`);
         } else {
-            console.log('SKIP LLB-RBA-11 (sidecar a56597e9.json not found)');
+            console.log('SKIP LLB-RBA-11 (sidecar 059dc47f.json not found)');
         }
     }
 }

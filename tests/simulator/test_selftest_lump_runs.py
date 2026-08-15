@@ -120,7 +120,15 @@ def test_selftest_lump_loads_and_boots():
 
 
 def test_selftest_lump_runs_to_completion():
-    """Selftest terminates via RETURN (not halt or fault), indicating normal exit."""
+    """Selftest terminates normally via RETURN or ELOADCALL, not a mid-test fault or loop.
+
+    Two valid completion paths:
+      RETURN    — legacy completion: selftest ended with RETURN on an empty stack
+                  (STACK_UNDERFLOW), indicating all tests ran to their end labels.
+      ELOADCALL — current completion: selftest ended with ELOADCALL CR1, Next;
+                  the harness patches c-list[1] with a null sentinel so the
+                  ELOADCALL faults cleanly instead of self-looping indefinitely.
+    """
     if not _node_available():
         import pytest
         pytest.skip('Node.js not available')
@@ -128,8 +136,9 @@ def test_selftest_lump_runs_to_completion():
     report, returncode, stderr = _run()
 
     terminated_by = report.get('terminatedBy')
-    assert terminated_by == 'RETURN', (
-        f'Selftest did not terminate via RETURN — got terminatedBy={terminated_by!r}. '
+    assert terminated_by in ('RETURN', 'ELOADCALL'), (
+        f'Selftest did not terminate normally — got terminatedBy={terminated_by!r}. '
+        f'Expected "RETURN" (legacy) or "ELOADCALL" (current completion path). '
         f'failMessage: {report.get("failMessage")}. '
         f'steps={report.get("steps")}. '
         f'First unexpected fault: '

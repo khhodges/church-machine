@@ -148,15 +148,36 @@ if (!loaded) {
     process.exit(1);
 }
 
-// ── Intercept fault() to capture DR0 at the moment of the first fault ────────
-// The selftest ends with RETURN; since loadLumpBinary() cleared the call stack
-// there is no sentinel frame, so RETURN triggers fault('STACK_UNDERFLOW').
-// fault() then sets halted=true.  We read DR0 here — before any recovery path
-// can clear it — because DR0 was set by the selftest before RETURN was called.
+// ── Patch c-list[1] with a null sentinel ─────────────────────────────────────
+// The selftest completion path is ELOADCALL CR1, Next, which reads c-list[1]
+// and calls through that GT.  The default c-list[1] is the SelfTest self-loop
+// (0x4A000006); left unpatched the ELOADCALL would restart the selftest and
+// the sim would loop until MAX_STEPS with no fault to intercept.
 //
-// We also watch for any unexpected earlier fault (not STACK_UNDERFLOW) which
-// would indicate a real error (e.g. LOAD validation failure) rather than
-// normal completion.
+// Patching c-list[1] with 0x00000000 (null GT) ensures the ELOADCALL faults
+// immediately after all 81 tests pass, giving us a clean DR0 capture point.
+// This fault is NOT a STACK_UNDERFLOW, so the termination classifier below
+// treats it as 'ELOADCALL' rather than 'RETURN'.
+//
+// The c-list[1] word address is: EXTENDED_BASE + (lumpSize - cc) + 1.
+{
+    const EXTENDED_BASE = 0x0400;
+    const hdr = sim.parseLumpHeader(lumpWords[0] >>> 0);
+    if (hdr && hdr.valid && hdr.cc >= 2) {
+        const clist1Addr = EXTENDED_BASE + (hdr.lumpSize - hdr.cc) + 1;
+        sim.memory[clist1Addr] = 0x00000000; // null GT — ELOADCALL will fault
+    }
+}
+
+// ── Intercept fault() to capture DR0 at the moment of the first fault ────────
+// Two completion paths:
+//   RETURN path   — selftest ends with RETURN; empty stack → STACK_UNDERFLOW.
+//   ELOADCALL path — selftest ends with ELOADCALL CR1, Next; c-list[1] patched
+//                    to null above → fault (not STACK_UNDERFLOW) with DR0=0.
+//
+// We also watch for any unexpected earlier fault (e.g. LOAD validation failure)
+// which would indicate a real error rather than normal completion.
+// DR0 is captured before any recovery handler can clear it.
 let capturedDR0      = null;
 let capturedFaultType = null;
 let capturedFaultMsg  = null;
@@ -211,8 +232,17 @@ function drToSection(n) {
 // ── Determine termination reason and pass/fail ────────────────────────────────
 let terminatedBy;
 if (capturedDR0 !== null) {
-    // A fault was intercepted — classify by type
-    terminatedBy = (capturedFaultType === 'STACK_UNDERFLOW') ? 'RETURN' : 'UNEXPECTED_FAULT';
+    // A fault was intercepted — classify by type and DR0 value:
+    //   STACK_UNDERFLOW  → old RETURN-path completion
+    //   any other fault, DR0=0 → ELOADCALL-path completion (null-sentinel fired)
+    //   any other fault, DR0≠0 → a real failure mid-test
+    if (capturedFaultType === 'STACK_UNDERFLOW') {
+        terminatedBy = 'RETURN';
+    } else if (capturedDR0 === 0) {
+        terminatedBy = 'ELOADCALL';
+    } else {
+        terminatedBy = 'UNEXPECTED_FAULT';
+    }
 } else if (steps >= MAX_STEPS) {
     // Loop hit step limit without any fault — probably an infinite loop
     capturedDR0  = sim.dr[0] >>> 0;
@@ -223,12 +253,13 @@ if (capturedDR0 !== null) {
     terminatedBy = 'HALT';
 }
 
-const pass = (capturedDR0 === 0) && (terminatedBy === 'RETURN');
+// Both RETURN (old binary) and ELOADCALL (current binary) are valid completions.
+const pass = (capturedDR0 === 0) && (terminatedBy === 'RETURN' || terminatedBy === 'ELOADCALL');
 
 let failSection = null;
 let failMessage = null;
 if (!pass) {
-    if (terminatedBy === 'RETURN') {
+    if (terminatedBy === 'RETURN' || terminatedBy === 'ELOADCALL') {
         // Normal termination but DR0 != 0: a specific test failed
         failSection = drToSection(capturedDR0);
         const sectionLabel = failSection || `test ${capturedDR0}`;

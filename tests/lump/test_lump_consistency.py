@@ -558,7 +558,13 @@ SELFTEST_LUMP_CASES = [
 
 # cc>=1 lumps: SelfTest E-GT at slot 0 (POLA redesign — no Boot.Nucs needed)
 # PostFlashSelftest: CRC-32 token for the PostFlashSelftest binary (rebuilt alongside source)
-# SelfTest: token 00000600, now cc=2 (slot 0 = SelfTest E-GT; slot 1 = Next.GT for continuation)
+#   Current token: 059dc47f  cw=499  cc=2
+#     slot 0 = SelfTest E-GT (NS slot 6, Church domain, E perm)
+#     slot 1 = Next.GT     (default = SelfTest self-loop; boot_image.py overrides)
+# SelfTest: token 00000600, cc=2 (slot 0 = SelfTest E-GT; slot 1 = Next.GT for continuation)
+# To regenerate PostFlashSelftest after editing the source:
+#   node scripts/build_selftest_lump.js
+#   Then update the token on the line below and commit .lump + .json + manifest.json.
 SELFTEST_LUMP_CASES_CC1 = [
     ("059dc47f", "PostFlashSelftest"),
     ("00000600", "SelfTest"),
@@ -670,11 +676,12 @@ class TestR13_SelftestClistGTs:
 
 
 class TestR13b_NewSelftestClistGT:
-    """R13b: POLA-redesigned selftest lumps (cc=1) carry the expected SelfTest E-GT
+    """R13b: POLA-redesigned selftest lumps (cc>=1) carry the expected SelfTest E-GT
     at c-list slot 0 — Church domain, E permission, NS slot 6.
 
     These lumps dropped Boot.Nucs (no privileged CR14 needed) in favour of a
-    minimal single-capability design: one E-GT pointing at the SelfTest NS slot.
+    minimal design: slot 0 is an E-GT pointing at the SelfTest NS slot.
+    PostFlashSelftest is cc=2; slot 1 carries Next.GT (default = SelfTest self-loop).
     """
 
     @pytest.mark.parametrize("token,label", SELFTEST_LUMP_CASES_CC1)

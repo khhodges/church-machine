@@ -748,7 +748,6 @@ function _applyBootEntryToSim() {
 }
 
 
-
 let _pendingLumpAbstractionName = null;
 let _pendingLumpMethodName = null;
 let _nsdgTooltipData = {};
@@ -1693,4 +1692,3 @@ function _buildDnaGraph(lump, allLumps) {
     const wrapId = `dna-wrap-${rootToken}`;
     return { svg, wrapId, nullCount };
 }
-
