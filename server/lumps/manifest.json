@@ -1955,5 +1955,28 @@
     "identity_hash": "5e23e11e8f8e601474f2cb936f9e8f829959445c61c0d32873856c60f5a8fc80",
     "dot_name": "start",
     "issue_n": 1
+  },
+  {
+    "token": "2ab3c12f",
+    "abstraction": "CapTest",
+    "filename": "CapTest.1.9cc3e6da.lump",
+    "sidecar_file": "CapTest.1.9cc3e6da.json",
+    "lump_size": 64,
+    "cw": 23,
+    "cc": 5,
+    "author": "",
+    "version": "",
+    "lump_version": 1,
+    "compiled_at": 1786877654.9100282,
+    "methods": [],
+    "grants": [
+      "E"
+    ],
+    "binary_hash": "e21caf6b7198de41c668e6b90ed5b20a5c53f7c33e160d80b2383c18856ef1c9",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "86dd5da65dbf4a1a9e43671221b67f77bed2edcba428f5efa6f361e84ec2f91a",
+    "dot_name": "CapTest",
+    "issue_n": 1
   }
 ]

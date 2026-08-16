@@ -1,0 +1,48 @@
+{
+  "token": "2ab3c12f",
+  "abstraction": "CapTest",
+  "filename": "CapTest.1.9cc3e6da.lump",
+  "sidecar_file": "CapTest.1.9cc3e6da.json",
+  "ns_slot": null,
+  "lump_size": 64,
+  "typ": 0,
+  "content_type": "code",
+  "cw": 23,
+  "cc": 5,
+  "profile": "IoT",
+  "language": "unknown",
+  "author": "",
+  "version": "",
+  "release_notes": "",
+  "methods": [],
+  "capabilities": [],
+  "pet_names": {
+    "DR": {},
+    "CR": {}
+  },
+  "mtbf": {
+    "consecutive_clean": 0,
+    "total_runs": 0,
+    "status": "unknown",
+    "source_hash": ""
+  },
+  "deployment": {
+    "target_board": "wukong-xc7a100t",
+    "profile": "IoT",
+    "built_at": "2026-08-16T10:54:14.910009Z",
+    "builder": "CLOOMC++ IDE v1.0"
+  },
+  "grants": [
+    "E"
+  ],
+  "source": "",
+  "binary_hash": "e21caf6b7198de41c668e6b90ed5b20a5c53f7c33e160d80b2383c18856ef1c9",
+  "petname": "",
+  "issue_number": 1,
+  "identity_string": "CapTest#1",
+  "identity_hash": "86dd5da65dbf4a1a9e43671221b67f77bed2edcba428f5efa6f361e84ec2f91a",
+  "dot_name": "CapTest",
+  "issue_n": 1,
+  "lump_version": 1,
+  "compiled_at": 1786877654.9100282
+}
