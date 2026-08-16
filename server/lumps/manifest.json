@@ -1978,5 +1978,28 @@
     "identity_hash": "86dd5da65dbf4a1a9e43671221b67f77bed2edcba428f5efa6f361e84ec2f91a",
     "dot_name": "CapTest",
     "issue_n": 1
+  },
+  {
+    "token": "00000a00",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.1.4d3d4d17.lump",
+    "sidecar_file": "CapabilityTest.1.4d3d4d17.json",
+    "lump_size": 64,
+    "cw": 0,
+    "cc": 0,
+    "author": "",
+    "version": "",
+    "lump_version": 1,
+    "compiled_at": 1786878239.562543,
+    "methods": [],
+    "grants": [
+      "E"
+    ],
+    "binary_hash": "84bd0e5ca579c420eeca3ccc6a5bd3abd56862b689633f5e5e25f486a34adf44",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
+    "dot_name": "CapabilityTest",
+    "issue_n": 1
   }
 ]

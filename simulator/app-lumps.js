@@ -3064,11 +3064,14 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
             case 7: {  // LAMBDA CRd
                 return `${condStr}create lambda closure → CR${crDst}`;
             }
-            case 8: {  // ELOADCALL CRd, CRs[imm]
+            case 8: {  // ELOADCALL CRd, CRs[imm15]  imm15 = (methodIdx<<5)|row
+                const _elcRow  = imm & 0x1F;   // bits[4:0] = c-list row (0–31)
+                const _elcMeth = imm >>> 5;    // bits[11:5] = method index (0=fast-path)
+                const _methTag = _elcMeth > 0 ? ` method #${_elcMeth}` : '';
                 if (crSrc === 6 && cc > 0) {
-                    return `${condStr}fused load + call "${_slotLabel(imm)}" → CR${crDst}`;
+                    return `${condStr}fused load + call "${_slotLabel(_elcRow)}"${_methTag} → CR${crDst}`;
                 }
-                return `${condStr}fused load + call ${crName(crSrc)}[${imm}] → CR${crDst}`;
+                return `${condStr}fused load + call ${crName(crSrc)}[${_elcRow}]${_methTag} → CR${crDst}`;
             }
             case 9: {  // XLOADLAMBDA CRd, CRs[imm]
                 if (crSrc === 6 && cc > 0) {
@@ -3381,7 +3384,10 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
                 const nm = _nsOrClistName(crAlias[crDst]);
                 if (nm) ann = `<span class="lump-sym-ann">\u2192 ${e(nm)}</span>`;
             } else if ((op === 8 || op === 9) && crSrc === 6 && cc > 0) {
-                const nm = _nsOrClistName(imm);
+                // ELOADCALL (op=8): imm15 = (methodIdx<<5)|row — slot is bits[4:0] only.
+                // XLOADLAMBDA (op=9): imm15 is the full slot index.
+                const _annSlot = op === 8 ? (imm & 0x1F) : imm;
+                const nm = _nsOrClistName(_annSlot);
                 if (nm) ann = `<span class="lump-sym-ann">\u21D2 ${e(nm)}</span>`;
             }
 
