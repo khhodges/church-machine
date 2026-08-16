@@ -411,7 +411,7 @@ def test_boot_image_next_gt_is_serialized(tmp_path, next_slot, expected_clist1_s
     #    find_lump_file_by_abstraction() prefers the "filename" field in the
     #    manifest entry; we copy the canonical file into tmp_path and point the
     #    manifest at it so the generator loads the real binary.
-    CANONICAL_FILENAME = "SelfTest.1.b562e522.lump"
+    CANONICAL_FILENAME = "SelfTest.1.30542a6d.lump"
     real_lump_src = os.path.join(LUMPS_DIR, CANONICAL_FILENAME)
     (tmp_path / CANONICAL_FILENAME).write_bytes(
         open(real_lump_src, "rb").read()

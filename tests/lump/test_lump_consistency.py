@@ -784,6 +784,10 @@ KNOWN_NON_REGISTRY_ABSTRACTIONS = {
                            "NS slot 6 by the boot image builder. Not a user-facing "
                            "abstraction — accessed only via the Builder tab (Run Self-Test) "
                            "and loadLumpBinary(), never via the Abstractions view/registry.",
+    "SlideRule.Haskell":   "Haskell-frontend language variant of SlideRule (NS slot 16). "
+                           "Browsable via the LUMP repository only — the registry registers "
+                           "the base 'SlideRule' abstraction; this dot-name variant is "
+                           "deliberately distinct and predates per-language registry entries.",
 }
 
 
