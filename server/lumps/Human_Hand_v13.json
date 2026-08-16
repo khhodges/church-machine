@@ -1,6 +1,6 @@
 {
   "token": "97cc8047",
-  "abstraction": "Human_Hand",
+  "abstraction": "Human.Hand",
   "filename": "Human_Hand_v13.lump",
   "sidecar_file": "Human_Hand_v13.json",
   "ns_slot": null,

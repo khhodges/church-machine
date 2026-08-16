@@ -3475,7 +3475,7 @@ class ChurchSimulator {
         }
         const _schedulerSlot = (this.irqState.irqLumpSlot != null)
             ? this.irqState.irqLumpSlot
-            : this._slotByPetName('Scheduler', 11);
+            : this._slotByPetName('Scheduler.IRQ', 11);
         // IRQ thread slot: dynamic offset from the LUMP slot.
         // Kept for context-switch logging (not a hard dependency).
         const _irqThreadSlot = (this.irqState.irqLumpSlot != null)
