@@ -5340,10 +5340,10 @@ def save_lump():
             _sl_ww  = int(words[_sl_wi]) & 0xFFFFFFFF
             _sl_op  = (_sl_ww >> 27) & 0x1F
             _sl_crs = (_sl_ww >> 15) & 0xF
-            _sl_slt = _sl_ww & 0x1F   # row lives in bits[4:0]; for ELOADCALL/XLOADLAMBDA
-                                       # imm15=(methodIdx<<5)|row — using 0x7FFF would fold
-                                       # the method-index bits into the slot, producing
-                                       # false-positive "slot 32" errors when methodIdx=1.
+            # ELOADCALL (op=8) imm15 is split: bits[4:0]=c-list row, bits[11:5]=methodIdx.
+            # LOAD/SAVE/XLOADLAMBDA (ops 0,1,9) use the full 15-bit imm15 as slot index.
+            # Must match lump-audit.js RCI line: op===8 ? (ww & 0x1F) : (ww & 0x7FFF)
+            _sl_slt = _sl_ww & 0x1F if _sl_op == 8 else _sl_ww & 0x7FFF
             if _sl_op in _CLIST_SAVE_OPS and _sl_crs == 6 and _sl_slt >= _sl_cc:
                 return jsonify({
                     "error": (

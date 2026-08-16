@@ -5451,10 +5451,13 @@ window.showFormatLump = function() {
 
     // ── Run audit ─────────────────────────────────────────────────────────────
     var _manifest = { cw: _cw, cc: _cc, lump_size: _svLumpSize, capabilities: _caps };
-    // skipRnc: true — the binary c-list is all-zeros by design; GTs are injected
-    // by the server at deployment time, so RNC NULL-GT warnings are always false
-    // positives here.  Named slots are shown in the Capabilities panel above.
-    var _auditResults = (typeof lumpAudit === 'function') ? lumpAudit(_svBinary, _manifest, null, { skipRnc: true }) : [];
+    // Run the full audit including RNC.  NULL-GT warnings (severity:'warn') are
+    // expected for freshly compiled lumps — the runtime fills slots at load time —
+    // but suppressing them with skipRnc gave a misleading ✓ pass.  Showing them
+    // here lets the user see exactly what Step 1 found before they approve.
+    // RCI (c-list slot bounds) is the authoritative check; the server repeats it
+    // only as defence-in-depth.  If RCI passes here, the server must agree.
+    var _auditResults = (typeof lumpAudit === 'function') ? lumpAudit(_svBinary, _manifest, null, {}) : [];
     var _hasErrors   = (typeof lumpAuditHasErrors   === 'function') ? lumpAuditHasErrors(_auditResults)   : false;
     var _hasWarnings = (typeof lumpAuditHasWarnings === 'function') ? lumpAuditHasWarnings(_auditResults) : false;
 
