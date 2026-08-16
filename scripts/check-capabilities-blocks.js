@@ -35,8 +35,9 @@
 
 'use strict';
 
-const fs   = require('fs');
-const path = require('path');
+const fs             = require('fs');
+const path           = require('path');
+const { spawnSync }  = require('child_process');
 
 if (process.argv.includes('--help')) {
     console.log(fs.readFileSync(__filename, 'utf8').split('\n')
@@ -294,9 +295,22 @@ if (violations > 0) {
     console.log(`check-capabilities-blocks: all ${files.length} file(s) pass.`);
 }
 
+// ── sidecar source guard ──────────────────────────────────────────────────────
+// Ensure every sidecar whose abstraction has a canonical .cloomc source file
+// carries a non-empty "source" field (catches silent blanking on recompile).
+const sidecarResult = spawnSync(
+    'node',
+    [path.join(ROOT, 'scripts', 'check-sidecar-source.js')],
+    { encoding: 'utf8', cwd: ROOT }
+);
+if (sidecarResult.stdout) process.stdout.write(sidecarResult.stdout);
+if (sidecarResult.stderr) process.stderr.write(sidecarResult.stderr);
+if (sidecarResult.status !== 0) {
+    process.exit(sidecarResult.status || 1);
+}
+
 // ── audit_clist guard ─────────────────────────────────────────────────────────
 // Ensure every empty c-list slot in every lump binary has a registered name.
-const { spawnSync } = require('child_process');
 const auditResult = spawnSync(
     'python',
     [path.join(ROOT, 'scripts', 'audit_clist.py'), '--check'],
