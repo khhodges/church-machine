@@ -6089,7 +6089,7 @@ def list_lumps():
         if _tk in ('00000600', '00000000'):
             _e['binary_valid'] = True
         elif _tk:
-            _lp = os.path.join(lumps_dir, f'{_tk}.lump')
+            _lp = os.path.join(lumps_dir, _e.get('filename') or f'{_tk}.lump')
             _e['binary_valid'] = False
             if os.path.isfile(_lp):
                 try:
@@ -6114,7 +6114,7 @@ def list_lumps():
         _cc = int(_e.get('cc', 0) or 0)
         if _cc == 0:
             continue
-        _lp = os.path.join(lumps_dir, f'{_tk}.lump')
+        _lp = os.path.join(lumps_dir, _e.get('filename') or f'{_tk}.lump')
         if os.path.isfile(_lp):
             _e['clist_entries'] = _extract_clist_from_lump_file(_lp)
 

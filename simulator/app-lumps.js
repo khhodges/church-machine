@@ -1295,7 +1295,17 @@ async function _populateLumpSourceTab(lump, targetId) {
         if (!data.binary_only && data.source) {
             const src = data.source;
             if (_isRawISASource(src)) {
-                _showBinaryOnly('was compiled from RAW ISA or low-level assembly and has no CLOOMC++ pet-name source. The Binary tab shows the compiled form.');
+                // Source exists but is raw ISA / Church Machine Assembly — show it
+                // read-only with an Assembly badge rather than hiding it entirely.
+                el.innerHTML =
+                    `<div class="lump-source-toolbar">` +
+                    `<span class="lump-source-lang-badge">Assembly</span>` +
+                    `<span style="font-size:0.7rem;color:var(--text-secondary);margin-left:auto;padding:0 0.5rem;">` +
+                    `Read-only \u2014 raw ISA; to add high-level source create ` +
+                    `<code>${e(absName)}.cloomc</code> in <code>simulator/cloomc/</code>` +
+                    `</span></div>` +
+                    `<pre class="lump-stored-src-pre lump-stored-src-pre-full" style="margin:0;border-top:1px solid var(--border-color,#333)">` +
+                    `${_highlightCLOOMCSource(src, 'assembly')}</pre>`;
                 return;
             }
             const _previewOpen = (localStorage.getItem('lumpSourcePreviewOpen') !== '0');
