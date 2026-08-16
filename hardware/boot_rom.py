@@ -653,8 +653,9 @@ except OSError as exc:
         f"Wukong factory image requires canonical SelfTest lump: {_selftest_path}"
     ) from exc
 WUKONG_SELFTEST_WORDS = tuple(struct.unpack(">512I", _selftest_raw))
-assert WUKONG_SELFTEST_WORDS[0] == 0xF987CC02  # cw=499, cc=2 (Next.GT in slot 1; was 0xF987CC01 cc=1, 0xF987E401 cw=505)
-assert WUKONG_SELFTEST_WORDS[-1] == 0x4A000006
+assert WUKONG_SELFTEST_WORDS[0] == 0xF9868002  # cc=2 (Next.GT in slot 1); update when 00000600.lump is recompiled
+# c-list[0] is at word[512-cc] = word[510]; word[511] is c-list[1] (Next.GT, runtime-patched)
+assert WUKONG_SELFTEST_WORDS[510] == 0x0A23E11E  # c-list[0] as compiled; boot_image.py patches to SelfTest E-GT at runtime
 
 # Fix slot 7 (WukongCallHome) alloc from 64 → 128 words and move it after
 # the relocated Thread lump. The old 0x700 location overlapped SelfTest,
