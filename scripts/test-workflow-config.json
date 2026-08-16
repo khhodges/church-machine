@@ -38,6 +38,7 @@
     "bitstream-version-labeling-tests",
     "boot-entry-hw-image-tests",
     "lump-save-endpoint-tests",
-    "lump-save-error-surface-tests"
+    "lump-save-error-surface-tests",
+    "constants-lump-tests"
   ]
 }
