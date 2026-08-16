@@ -14,7 +14,9 @@ R7   sidecar fields agree with manifest where both exist.
 R8   No duplicate ns_slot values unless all claimants share the same non-null variant_group.
 R9   RETIRED — ns_slot=null is implicitly dynamic; ns_slot_policy is optional/informational only.
 R10  Every manifest entry with lump_size declared has a .lump file on disk.
-R11  Every manifest entry with lump_size declared has a sidecar .json on disk.
+R11  Every manifest entry with an explicit sidecar_file field has that file on
+     disk.  Entries with lump_size but no sidecar_file emit a pytest warning so
+     the gap stays visible without blocking CI.
 R14  Every archive binary has a matching sidecar .json (both old <token>-vN and new <Name>_vN).
 R16  A statically-slotted, system-baseline lump's `abstraction` field must name a
      currently-live entry in simulator/abstractions.js (catches abstraction-name
@@ -51,6 +53,8 @@ import os
 import re as _re
 import struct
 import subprocess
+
+import warnings
 
 import pytest
 
@@ -491,9 +495,14 @@ class TestR12_LedPetName:
 
 
 class TestR11_SidecarFilesExist:
-    """R11: Every manifest entry with an explicit sidecar_file field has that file on disk."""
+    """R11: Every manifest entry with an explicit sidecar_file field has that file on disk.
+
+    A second (warn-only) check flags entries that declare lump_size but omit
+    sidecar_file entirely, so the gap remains visible in CI without blocking it.
+    """
 
     def test_sidecar_files_present(self):
+        """Hard fail: declared sidecar_file must exist on disk."""
         missing = []
         for e in MANIFEST_ENTRIES_WITH_SIZE:
             # Only check entries that explicitly declare a sidecar_file.
@@ -509,6 +518,28 @@ class TestR11_SidecarFilesExist:
         assert not missing, (
             "Manifest entries missing sidecar .json:\n  " + "\n  ".join(missing)
         )
+
+    def test_sidecar_file_field_present(self):
+        """Warn (not fail) when a manifest entry with lump_size has no sidecar_file field.
+
+        This makes the gap visible in CI output without blocking merges for
+        entries that legitimately have no sidecar yet.  Add a sidecar and wire
+        up sidecar_file in manifest.json to silence the warning.
+        """
+        no_sidecar = []
+        for e in MANIFEST_ENTRIES_WITH_SIZE:
+            if not e.get("sidecar_file"):
+                no_sidecar.append(
+                    f"{e['token']} ({e.get('abstraction', '?')}) — "
+                    f"lump_size={e['lump_size']} but no sidecar_file in manifest"
+                )
+        if no_sidecar:
+            warnings.warn(
+                "Manifest entries with lump_size but no sidecar_file field "
+                f"({len(no_sidecar)} entries):\n  " + "\n  ".join(no_sidecar),
+                UserWarning,
+                stacklevel=2,
+            )
 
 
 def _read_clist_word(token: str, slot_index: int) -> int:
