@@ -1,8 +1,8 @@
 {
-  "token": "00000a00",
+  "token": "archive-v1",
   "abstraction": "CapabilityTest",
-  "filename": "CapabilityTest.1.4d3d4d17.lump",
-  "sidecar_file": "CapabilityTest.1.4d3d4d17.json",
+  "filename": "CapabilityTest_v1.lump",
+  "sidecar_file": "CapabilityTest_v1.json",
   "ns_slot": 10,
   "lump_size": 64,
   "typ": 0,
@@ -81,5 +81,6 @@
   "compiled_at": 1786878239.562543,
   "ns_slot_policy": "static",
   "boot_resident": true,
-  "archived_version": 1
+  "archived_version": 1,
+  "archive_note": "Assembly front-packed binary (v1, hash 4d3d4d17). C-list lazy stubs at words[1..5]; instructions at words[6..26]. Canonical token 00000a00 now points to CapabilityTest.2.c7a66d01.lump (tail-packed with real hardware GTs)."
 }

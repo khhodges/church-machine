@@ -1662,7 +1662,7 @@ def _load_server_managed_tokens() -> frozenset:
             return frozenset(t.lower() for t in json.load(_f).get('tokens', []))
     except Exception as _e:
         print(f'[lumps] WARNING: could not load server_managed_tokens.json: {_e}', flush=True)
-        return frozenset({'00000600', '00000003'})
+        return frozenset({'00000600'})
 
 SERVER_MANAGED_TOKENS: frozenset = _load_server_managed_tokens()
 
