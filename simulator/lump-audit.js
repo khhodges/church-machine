@@ -40,12 +40,18 @@ function lumpAudit(words, manifest, lineNums, opts) {
     const cc       =  word0         & 0xFF;
     const lumpSize = 1 << (nMinus6 + 6);
 
+    // Human-readable name for each typ value (bits[9:8] of word 0).
+    const _typNames = { 0: 'lump', 1: 'data', 2: 'clist-only', 3: 'Outform' };
+    const _typName  = _typNames[typ] || 'unknown';
+    const _typBits  = typ.toString(2).padStart(2, '0');
+
     if (magic === 0x1F) {
         results.push({
             ruleId: 'R1',
             severity: 'pass',
-            message: 'Format recognised \u2014 valid Church Machine file header \u2713',
-            detail: `Header identifier 0x${magic.toString(16).toUpperCase()} matches the Church Machine format \u2713`,
+            message: `Format recognised \u2014 type: ${_typName} (${_typBits}) \u2713`,
+            detail: `Header identifier 0x${magic.toString(16).toUpperCase()} matches the Church Machine format. ` +
+                `Object type: ${_typName} (typ=${_typBits}); cw=${cw}, cc=${cc}, lumpSize=${lumpSize} \u2713`,
         });
     } else {
         results.push({
@@ -309,7 +315,17 @@ function lumpAudit(words, manifest, lineNums, opts) {
     const _rgtBaseIdx   = lumpSize - _rgtSlotCount;
     // Also skip RGT for data LUMPs (typ=01): body is programmer payload, not a c-list.
     const _rgtRun = !_rgtIsNamespace && typ !== 1 && actualWords === lumpSize && contentWords <= lumpSize && _rgtSlotCount > 0;
-    if (_rgtRun) {
+    if (_rgtIsNamespace) {
+        // Namespace LUMPs (typ=10, cw=0) carry the NS Table in the body, not a GT c-list.
+        // Scanning the NS Table words as GT Word 0 values would produce meaningless or
+        // false-positive errors — RGT does not apply.
+        results.push({
+            ruleId: 'RGT',
+            severity: 'pass',
+            message: 'GT format check not applicable \u2014 clist-only (typ=10) LUMP has no GT c-list \u2713',
+            detail: 'Namespace LUMPs (typ=10, cw=0) store an NS Table in the body rather than a GT c-list at the tail. RGT is skipped.',
+        });
+    } else if (_rgtRun) {
         const _rgtViolations = [];
 
         for (let si = 0; si < _rgtSlotCount; si++) {
