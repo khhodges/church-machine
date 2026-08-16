@@ -5340,7 +5340,10 @@ def save_lump():
             _sl_ww  = int(words[_sl_wi]) & 0xFFFFFFFF
             _sl_op  = (_sl_ww >> 27) & 0x1F
             _sl_crs = (_sl_ww >> 15) & 0xF
-            _sl_slt = _sl_ww & 0x7FFF
+            _sl_slt = _sl_ww & 0x1F   # row lives in bits[4:0]; for ELOADCALL/XLOADLAMBDA
+                                       # imm15=(methodIdx<<5)|row — using 0x7FFF would fold
+                                       # the method-index bits into the slot, producing
+                                       # false-positive "slot 32" errors when methodIdx=1.
             if _sl_op in _CLIST_SAVE_OPS and _sl_crs == 6 and _sl_slt >= _sl_cc:
                 return jsonify({
                     "error": (
