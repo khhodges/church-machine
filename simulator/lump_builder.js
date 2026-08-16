@@ -20,7 +20,7 @@
  *   [31:27] = 0x1F  (LUMP type tag)
  *   [26:23] = nMinus6   (log2(lumpSize) - 6)
  *   [22:10] = cw        (code-word count, 13 bits; includes dispatch table)
- *   [9:8]   = 00        (gt_type = Inform)
+ *   [9:8]   = 00        (object type: 00 = lump/abstraction; see CM_LUMP_SPECIFICATION.md §Header typ field)
  *   [7:0]   = cc        (c-list count)
  *
  * Dispatch table:

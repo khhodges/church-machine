@@ -76,16 +76,18 @@ On every `CALL`, the hardware derives two root Capability Registers from the lum
 
 ## 3. Object Types (`typ`)
 
-There are exactly **three** valid LUMP types (per `docs/cloomc-foundation.md`). `typ=11` is undefined — Outform is a **GT type and NS slot state**, not a LUMP binary type (see §4 and §8).
+There are exactly **four** valid LUMP object types, selected by `typ` (bits 9:8 of the header word). The canonical names below come from `docs/CM_LUMP_SPECIFICATION.md` §Header.
 
-| `typ` | Name          | Description |
-|:------|:--------------|:------------|
-| `00`  | Abstraction   | Executable CLOOMC code body — instructions, freespace, and a GT C-List tail. |
-| `01`  | Namespace     | Namespace configuration object. Encodes `totalNamespaceWords` (the board's physical memory envelope). *(Reserved — not user-authored.)* |
-| `10`  | Thread        | Execution context: PC, register file, call stack. Encodes stack/heap sizing. |
-| `11`  | *(undefined)* | Not a valid LUMP type. Do not use. |
+| `typ` | Canonical name  | Description |
+|:------|:----------------|:------------|
+| `00`  | lump            | Standard executable lump — a CLOOMC code body with an optional GT C-List tail. *(Also called "Abstraction" in user-facing IDE text.)* |
+| `01`  | data            | Raw data region with no code section and no C-List. `cw = 0`, `cc = 0`. Hardware refuses `CALL`; access via R-GT or RW-GT only. |
+| `10`  | clist-only      | Lump with no executable code section. Both Thread lumps and Namespace lumps carry `typ = 10`. For **Thread** lumps: the `cw` field is **reinterpreted as `sw`** (stack words; Mint requires `sw > 0`, `cc > 0`, and `17 + sw + cc ≤ lumpSize − 12`) and `cc` encodes `heapWords`. For **Namespace** lumps: `cw = 0` and `cc` encodes the Locator-entry count. |
+| `11`  | Outform         | Registered-but-absent lump. Fires an Absent event on `LOAD`; the Locator inflates and promotes the slot to Live (`typ = 01`). |
 
-The `content_type` sidecar field further sub-classifies `typ=00` Abstraction lumps into `"text"`, `"markdown"`, `"image"`, `"grayscale"`, etc. The `lump_type` sidecar field carries the semantic label (e.g. `"application_namespace"` for Namespace lumps).
+> **Note on `typ=10` sub-types:** Thread lumps reinterpret `cw` as `sw` (stack words) **and** `cc` as `heapWords`; Namespace lumps use `cw = 0` and `cc` as the Locator-entry count. Neither is callable via `CALL`. See `docs/Lump-Architecture.md` and `docs/CM_LUMP_SPECIFICATION.md` Appendix A for the full Thread layout and Mint validation rules.
+
+The `content_type` sidecar field further sub-classifies `typ=00` lumps into `"text"`, `"markdown"`, `"image"`, `"grayscale"`, etc. The `lump_type` sidecar field carries the semantic label (e.g. `"application_namespace"` for Namespace lumps).
 
 ---
 

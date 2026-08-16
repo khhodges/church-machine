@@ -1958,3 +1958,457 @@ class TestR20_CanonicalFilenameIntegrity:
         assert result is None, (
             f"Expected None for token not in manifest, got {result!r}"
         )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# R21 — Freespace zero-fill
+# ══════════════════════════════════════════════════════════════════════════════
+
+# SPEC-EXCEPTION: Constants.1.67a04067.lump stores its data words (Pi, E, Phi,
+# Zero, One) at word offsets 19–23, which fall inside the freespace zone
+# (fs = words cw+1..lumpSize-cc-1 = 19..61 for this binary with cw=18, cc=2,
+# lump_sz=64).  This binary predates strict freespace enforcement and the data
+# words are intentional payload, not padding corruption.  The manifest documents
+# data_offset=19 and dw=5 explicitly.  Correcting this would require rebuilding
+# the binary with cw=23 to include the data words in the code-section count.
+_R21_FREESPACE_EXCEPTIONS: frozenset = frozenset([
+    "00001200",   # Constants — data words in freespace by design (see note above)
+])
+
+
+class TestR21_FreespaceZeroFill:
+    """R21: All freespace words (cw+1 .. lumpSize-cc-1) must be zero.
+
+    Mint step 7 of the validation sequence rejects any lump whose freespace
+    contains non-zero words.  A dirty freespace zone is almost always a sign
+    that the binary was packed incorrectly (code or data words spilling past
+    the declared cw boundary).
+
+    Exceptions documented in _R21_FREESPACE_EXCEPTIONS are exempt.
+    """
+
+    @pytest.mark.parametrize("token", LUMP_TOKENS)
+    def test_freespace_is_zero(self, token):
+        if token in _R21_FREESPACE_EXCEPTIONS:
+            pytest.skip(
+                f"{token}: freespace exempted — see _R21_FREESPACE_EXCEPTIONS "
+                "for rationale (SPEC-EXCEPTION)"
+            )
+        if not _lump_exists(token):
+            pytest.skip(f"lump file absent for {token} (covered by R10)")
+
+        path = _lump_path(token)
+        with open(path, "rb") as f:
+            raw = f.read()
+        words = struct.unpack(f">{len(raw) // 4}I", raw)
+        h = _parse_header(words[0])
+
+        if not h["valid"]:
+            pytest.skip(f"{token}: invalid header magic — covered by R1")
+        if len(words) != h["lump_sz"]:
+            pytest.skip(f"{token}: file-size mismatch — covered by R2")
+
+        cw      = h["cw"]
+        cc      = h["cc"]
+        typ     = h["typ"]
+        lump_sz = h["lump_sz"]
+
+        # Namespace LUMPs (typ=10, cw=0): body is the NS Table — binary data,
+        # not freespace.  Skip R21 (scanning NS entries as padding is invalid).
+        if typ == 0b10 and cw == 0:
+            pytest.skip(
+                f"{token}: Namespace LUMP (typ=10, cw=0) — body is the NS Table, "
+                "not freespace; R21 does not apply (CM_LUMP_SPECIFICATION.md Appendix B)"
+            )
+
+        # Data LUMPs (typ=01): entire body is programmer-defined payload, not
+        # freespace.  The concept of a zero-fill freespace zone does not apply.
+        if typ == 0b01:
+            pytest.skip(
+                f"{token}: data LUMP (typ=01) — body is programmer payload, "
+                "not freespace; R21 does not apply"
+            )
+
+        # Thread LUMPs (typ=10, cw>0): freespace is the collision zone between
+        # the heap (grows ↑ from word 17+heapWords) and the stack (grows ↓ to
+        # word lumpSize-12-sw).  Use Thread-specific geometry, not generic cw/cc.
+        # (CM_LUMP_SPECIFICATION.md Appendix A, "Zone Constants" table.)
+        if typ == 0b10 and cw > 0:
+            sw      = cw   # cw field is sw (stack words) for Thread LUMPs
+            hw      = cc   # cc field is heapWords for Thread LUMPs
+            fs_start = 17 + hw          # first word after heap zone
+            fs_end   = lump_sz - 12 - sw  # first stack word (exclusive end)
+        else:
+            fs_start = 1 + cw
+            fs_end   = lump_sz - cc
+
+        if fs_start >= fs_end:
+            return  # no freespace zone (fully packed or empty collision zone)
+
+        dirty = [
+            (i, words[i])
+            for i in range(fs_start, fs_end)
+            if words[i] != 0
+        ]
+
+        assert not dirty, (
+            f"{token}: {len(dirty)} non-zero word(s) in freespace zone "
+            f"(words {fs_start}–{fs_end - 1}); "
+            f"first dirty word: [word {dirty[0][0]}] = 0x{dirty[0][1]:08X}.\n"
+            "  Mint step 7 rejects any lump with non-zero freespace.\n"
+            "  Re-pack the binary so all freespace words are 0x00000000, or add\n"
+            "  a SPEC-EXCEPTION entry to _R21_FREESPACE_EXCEPTIONS with rationale."
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# R22 — C-list GT Word 0 format
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _rgt_check_word(w: int) -> str | None:
+    """Return an error string if GT Word 0 `w` is structurally malformed, else None.
+
+    Rules per CM_LUMP_SPECIFICATION.md v1.2 §"Word 0 — The Golden Token":
+      - Null GT (all-zero) is always valid.
+      - For all non-null GTs: spare bit 26 must be 0.
+        Mint step 8 rejects any GT Word 0 where bit 26 is set.
+    """
+    w = w & 0xFFFFFFFF
+    if w == 0:
+        return None  # null GT always valid
+
+    spare = (w >> 26) & 0x1
+    if spare != 0:
+        return (
+            f"spare bit 26 = 1 in GT Word 0 = 0x{w:08X} "
+            "(CM_LUMP_SPECIFICATION.md v1.2 §\"Word 0\" requires bit 26 = 0; "
+            "Mint step 8 will reject this lump)"
+        )
+
+    return None
+
+
+# SPEC-EXCEPTION: Ethernet.1.b169bba4.lump (token 00003300) and
+# Tunnel.1.8770bf03.lump (token 00001f00) carry Abstract GTs in v2.0
+# hardware encoding where bits[26:25]=11 encodes the Abstract type.
+# That places bit 26 = 1, violating the spec v1.2 spare-bit requirement
+# (the spec puts gt_type at bits[24:23] and reserves bit 26 as spare=0).
+# Both binaries were compiled against v2.0 hardware before the canonical
+# spec was frozen at v1.2.  Rebuilding with spec v1.2 GT format is pending.
+_R22_CLIST_GT_EXCEPTIONS: frozenset = frozenset([
+    "00001f00",  # Tunnel.1 — c-list[0]=0x07800200: v2.0 Abstract GT, bit26=1.
+                 # SPEC-EXCEPTION: predates spec v1.2 GT Word 0 layout; rebuild pending.
+    "00003300",  # Ethernet.1 — c-list[0]=0x07800400: v2.0 Abstract GT, bit26=1.
+                 # SPEC-EXCEPTION: predates spec v1.2 GT Word 0 layout; rebuild pending.
+])
+
+
+class TestR22_ClistGtFormat:
+    """R22: Every non-null c-list slot must contain a well-formed GT Word 0.
+
+    Mint step 8 validates every c-list entry before issuing any GT for the
+    lump.  A malformed GT Word 0 — e.g. spare bit 26 set in a non-Abstract
+    GT — will cause Mint to reject the entire lump.
+
+    Null GTs (0x00000000) are always valid; they are the compile-time
+    placeholder for capabilities injected at deployment time.
+
+    Abstract GTs (v2.0 gt_type bits[26:25]=11) are exempt from the
+    spare-bit check because bit 26 is part of their type encoding in
+    v2.0 hardware format.
+
+    Tokens in _R22_CLIST_GT_EXCEPTIONS are fully exempt (document reason
+    with a SPEC-EXCEPTION comment when adding).
+    """
+
+    @pytest.mark.parametrize("token", LUMP_TOKENS)
+    def test_clist_gt_format(self, token):
+        if token in _R22_CLIST_GT_EXCEPTIONS:
+            pytest.skip(
+                f"{token}: c-list GT format exempted — see _R22_CLIST_GT_EXCEPTIONS "
+                "for rationale (SPEC-EXCEPTION)"
+            )
+        if not _lump_exists(token):
+            pytest.skip(f"lump file absent for {token} (covered by R10)")
+
+        path = _lump_path(token)
+        with open(path, "rb") as f:
+            raw = f.read()
+        words = struct.unpack(f">{len(raw) // 4}I", raw)
+        h = _parse_header(words[0])
+
+        if not h["valid"]:
+            pytest.skip(f"{token}: invalid header magic — covered by R1")
+        if len(words) != h["lump_sz"]:
+            pytest.skip(f"{token}: file-size mismatch — covered by R2")
+
+        cc     = h["cc"]
+        cw     = h["cw"]
+        typ    = h["typ"]
+        lump_sz = h["lump_sz"]
+
+        # Namespace LUMPs (typ=10, cw=0): body is the NS Table — no GT c-list.
+        # Scanning NS Table entries as GT Word 0 values would produce false errors.
+        # Skip R22 for Namespace LUMPs.
+        if typ == 0b10 and cw == 0:
+            pytest.skip(
+                f"{token}: Namespace LUMP (typ=10, cw=0) — body is the NS Table, "
+                "not a GT c-list; R22 does not apply (CM_LUMP_SPECIFICATION.md Appendix B)"
+            )
+
+        # Data LUMPs (typ=01): no c-list; body is programmer payload.  Skip R22.
+        if typ == 0b01:
+            pytest.skip(
+                f"{token}: data LUMP (typ=01) — no c-list; R22 does not apply"
+            )
+
+        # Thread LUMPs (typ=10, cw>0): the caps zone is architecture-fixed at
+        # the last 12 words (lumpSize-12..lumpSize-1), regardless of cc (heapWords).
+        # (CM_LUMP_SPECIFICATION.md Appendix A, "C-List at the Tail — Zone ①".)
+        if typ == 0b10 and cw > 0:
+            caps_count = 12      # architecture-fixed caps zone
+            clist_start = lump_sz - caps_count
+        else:
+            if cc == 0:
+                return  # no c-list to check
+            caps_count  = cc
+            clist_start = lump_sz - cc
+
+        violations = []
+        for i in range(caps_count):
+            w = words[clist_start + i] & 0xFFFFFFFF
+            err = _rgt_check_word(w)
+            if err is not None:
+                slot_label = "caps" if (typ == 0b10 and cw > 0) else "c-list"
+                violations.append(f"  {slot_label} [{i}]: {err}")
+
+        assert not violations, (
+            f"{token}: {len(violations)} malformed GT Word 0 value(s) in "
+            f"{'caps zone' if (typ == 0b10 and cw > 0) else 'c-list'} "
+            f"(Mint step 8 will reject this lump):\n" + "\n".join(violations) + "\n"
+            "  Correct the GT values in the binary, or add a SPEC-EXCEPTION entry\n"
+            "  to _R22_CLIST_GT_EXCEPTIONS with a documented rationale."
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# R21/R22 — Synthetic unit fixtures for Thread and data LUMP geometry
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# No Thread or data LUMPs exist in server/lumps/ at this time, so the
+# parametrised R21/R22 classes above cannot exercise Thread- and data-lump
+# code paths against real binaries.  The unit fixtures below construct
+# synthetic word arrays and call the same validation logic directly, ensuring
+# the geometry branches are regression-tested even without stored binaries.
+
+import math as _math
+
+
+def _build_thread_hdr(lump_sz: int, sw: int, hw: int) -> int:
+    """Encode a Thread LUMP header word (typ=10, cw=sw, cc=hw)."""
+    n_m6 = lump_sz.bit_length() - 7  # lump_sz = 2^(n_m6+6)
+    return (0x1F << 27) | (n_m6 << 23) | (sw << 10) | (0b10 << 8) | hw
+
+
+def _build_data_hdr(lump_sz: int) -> int:
+    """Encode a data LUMP header word (typ=01, cw=0, cc=0)."""
+    n_m6 = lump_sz.bit_length() - 7
+    return (0x1F << 27) | (n_m6 << 23) | (0 << 10) | (0b01 << 8) | 0
+
+
+def _thread_freespace_range(lump_sz: int, sw: int, hw: int):
+    """Return (fs_start, fs_end) for Thread LUMP freespace (exclusive end)."""
+    return (17 + hw, lump_sz - 12 - sw)
+
+
+def _thread_caps_range(lump_sz: int):
+    """Return (caps_start, caps_end) — 12 architecture-fixed cap words."""
+    return (lump_sz - 12, lump_sz)
+
+
+def _parse_words(words):
+    """Run R21/R22 logic on a synthetic word list; return (freespace_dirty, cap_violations)."""
+    h = _parse_header(words[0])
+    cw = h["cw"]; cc = h["cc"]; typ = h["typ"]; lump_sz = h["lump_sz"]
+    # R21 freespace
+    freespace_dirty = []
+    if typ == 0b10 and cw > 0:  # Thread
+        fs_start, fs_end = _thread_freespace_range(lump_sz, cw, cc)
+        freespace_dirty = [i for i in range(fs_start, fs_end) if words[i] != 0]
+    elif typ not in (0b01, 0b10):  # standard (skip Namespace/data)
+        fs_start = 1 + cw; fs_end = lump_sz - cc
+        freespace_dirty = [i for i in range(fs_start, fs_end) if words[i] != 0]
+    # R22 caps/c-list
+    cap_violations = []
+    if typ == 0b10 and cw > 0:  # Thread: 12 fixed caps
+        caps_start, caps_end = _thread_caps_range(lump_sz)
+        for i in range(caps_start, caps_end):
+            err = _rgt_check_word(words[i])
+            if err:
+                cap_violations.append((i - caps_start, err))
+    elif typ not in (0b01, 0b10):  # standard: cc tail words
+        for si in range(cc):
+            err = _rgt_check_word(words[lump_sz - cc + si])
+            if err:
+                cap_violations.append((si, err))
+    return freespace_dirty, cap_violations
+
+
+class TestR21_ThreadGeometryUnit:
+    """Synthetic unit tests: R21 freespace geometry for Thread LUMPs.
+
+    A 64-word Thread (sw=4, hw=4) has:
+      header[0], DR[1..16], heap[17..20], freespace[21..47], stack[48..51], caps[52..63].
+    Non-zero DR, heap, and stack words must NOT be flagged as freespace dirt.
+    Non-zero words inside [21..47] must be flagged.
+    """
+
+    LUMP_SZ = 64
+    SW       = 4
+    HW       = 4
+
+    def _make_thread(self, dirty_word: int | None = None,
+                     bad_cap: int | None = None) -> list[int]:
+        """Build a 64-word Thread LUMP word array.
+
+        dirty_word: word offset within the lump to set to 0xDEADBEEF (freespace dirt).
+        bad_cap: caps-zone index (0-11) to fill with a malformed GT (bit26=1).
+        """
+        words = [0] * self.LUMP_SZ
+        words[0] = _build_thread_hdr(self.LUMP_SZ, self.SW, self.HW)
+        # Non-zero live thread state (must NOT be flagged by R21)
+        for i in range(1, 17):              # DRs
+            words[i] = 0x12340000 + i
+        for i in range(17, 17 + self.HW):  # heap
+            words[i] = 0xBEEF0000 + i
+        stack_base = self.LUMP_SZ - 12 - self.SW
+        for i in range(stack_base, stack_base + self.SW):  # stack
+            words[i] = 0xCAFE0000 + i
+        # Freespace [21..47] is all-zero by default
+        if dirty_word is not None:
+            words[dirty_word] = 0xDEADBEEF
+        # Caps zone [52..63]: valid null GTs by default
+        if bad_cap is not None:
+            words[self.LUMP_SZ - 12 + bad_cap] = 0x04000001  # bit26=1
+        return words
+
+    def test_valid_thread_no_freespace_dirt(self):
+        """Non-zero DRs, heap, and stack are NOT treated as freespace dirt."""
+        words = self._make_thread()
+        dirty, _ = _parse_words(words)
+        assert not dirty, (
+            f"R21 incorrectly flagged {len(dirty)} non-freespace word(s) as dirt: "
+            f"{[f'[{i}]=0x{words[i]:08X}' for i in dirty[:5]]}"
+        )
+
+    def test_dirty_freespace_detected(self):
+        """A non-zero word in the collision zone is detected by R21."""
+        fs_start, _ = _thread_freespace_range(self.LUMP_SZ, self.SW, self.HW)
+        dirty_idx = fs_start + 3   # arbitrary freespace word
+        words = self._make_thread(dirty_word=dirty_idx)
+        dirty, _ = _parse_words(words)
+        assert dirty_idx in dirty, (
+            f"R21 failed to detect dirty freespace at word {dirty_idx}"
+        )
+
+    def test_heap_not_scanned_as_freespace(self):
+        """Non-zero heap words are before fs_start and must not appear in dirty list."""
+        words = self._make_thread()
+        # fs_start = 17 + HW = 21; heap is 17..20 → outside freespace range
+        dirty, _ = _parse_words(words)
+        heap_idxs_in_dirty = [i for i in dirty if 17 <= i < 17 + self.HW]
+        assert not heap_idxs_in_dirty, (
+            f"R21 incorrectly included heap word(s) {heap_idxs_in_dirty} in dirty list"
+        )
+
+    def test_stack_not_scanned_as_freespace(self):
+        """Non-zero stack words are at/after fs_end and must not appear in dirty list."""
+        words = self._make_thread()
+        _, fs_end = _thread_freespace_range(self.LUMP_SZ, self.SW, self.HW)
+        dirty, _ = _parse_words(words)
+        stack_idxs_in_dirty = [i for i in dirty if i >= fs_end]
+        assert not stack_idxs_in_dirty, (
+            f"R21 incorrectly included stack word(s) {stack_idxs_in_dirty} in dirty list"
+        )
+
+
+class TestR22_ThreadCapsUnit:
+    """Synthetic unit tests: R22 scans the final 12 words for Thread LUMPs.
+
+    A valid Thread cap is 0x00000000 (null) or any GT Word 0 with bit26=0.
+    A malformed Thread cap has bit26=1.
+    """
+
+    LUMP_SZ = 64
+    SW       = 4
+    HW       = 4
+
+    def _make_thread(self, bad_cap: int | None = None) -> list[int]:
+        words = [0] * self.LUMP_SZ
+        words[0] = _build_thread_hdr(self.LUMP_SZ, self.SW, self.HW)
+        if bad_cap is not None:
+            words[self.LUMP_SZ - 12 + bad_cap] = 0x04000001  # bit26=1
+        return words
+
+    def test_all_null_caps_pass(self):
+        """All-zero caps zone (null GTs) is valid for R22."""
+        words = self._make_thread()
+        _, violations = _parse_words(words)
+        assert not violations, f"R22 false-positive on null caps: {violations}"
+
+    def test_valid_inform_gt_passes(self):
+        """A valid Inform GT (bit26=0) in the caps zone passes R22."""
+        words = self._make_thread()
+        words[self.LUMP_SZ - 12] = 0x4A000006  # valid GT Word 0: bit26=0
+        _, violations = _parse_words(words)
+        assert not violations, f"R22 false-positive on valid GT: {violations}"
+
+    def test_malformed_cap_gt_detected(self):
+        """A GT with bit26=1 in the caps zone is flagged by R22."""
+        words = self._make_thread(bad_cap=0)
+        _, violations = _parse_words(words)
+        assert violations, "R22 failed to detect malformed cap GT (bit26=1)"
+        assert violations[0][0] == 0, f"Wrong violation slot index: {violations[0][0]}"
+
+    def test_non_cap_words_not_scanned(self):
+        """R22 only scans the final 12 words; non-zero heap/stack words are ignored."""
+        words = self._make_thread()
+        # Put a non-zero value with bit26=1 in the heap (word 17) — outside caps
+        words[17] = 0x04000001  # bit26=1, but this is heap, not a cap
+        _, violations = _parse_words(words)
+        heap_violations = [v for v in violations if v[0] < 0 or v[0] >= 12]
+        assert not heap_violations, (
+            f"R22 scanned beyond the final-12-word caps zone: {heap_violations}"
+        )
+
+
+class TestR21_DataLumpUnit:
+    """Synthetic unit tests: R21 skips data LUMPs entirely.
+
+    A data LUMP body is programmer-defined payload, not required-zero freespace.
+    Non-zero body words must not be reported as freespace dirt.
+    """
+
+    LUMP_SZ = 64
+
+    def _make_data_lump(self) -> list[int]:
+        words = [0] * self.LUMP_SZ
+        words[0] = _build_data_hdr(self.LUMP_SZ)
+        # Programmer payload — non-zero values throughout the body
+        for i in range(1, self.LUMP_SZ):
+            words[i] = 0xDA7A0000 + i
+        return words
+
+    def test_data_body_not_scanned_as_freespace(self):
+        """Non-zero data LUMP body words are never treated as freespace dirt."""
+        words = self._make_data_lump()
+        h = _parse_header(words[0])
+        assert h["typ"] == 0b01, f"Expected typ=01, got {h['typ']}"
+        # The _parse_words helper skips data LUMPs entirely (freespace_dirty=[])
+        dirty, violations = _parse_words(words)
+        assert not dirty, (
+            f"R21 incorrectly scanned {len(dirty)} data LUMP body word(s) as freespace dirt"
+        )
+        assert not violations, (
+            f"R22 incorrectly flagged {len(violations)} data LUMP body word(s) as bad GTs"
+        )

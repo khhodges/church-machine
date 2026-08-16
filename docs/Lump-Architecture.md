@@ -128,18 +128,26 @@ programmer-defined binary data.
 
 ---
 
-### `typ = 10` — Thread Lump  ·  Namespace Lump
+### `typ = 10` — C-List-Only Lump
 
-Both Thread Lumps and Namespace Lumps carry `typ = 10`. Neither is
-callable as code. The `cw` field is always `0` for both. They are
-distinguished from each other by context and usage — not by an additional
-tag bit. Within a given system there is exactly one Namespace Lump (Boot.NS
-at Slot 0) and one or more Thread Lumps; the Scheduler knows which is which
-by the NS slot it references.
+`typ = 10` is the **clist-only** class. Neither Thread Lumps nor Namespace
+Lumps are callable as code. They are distinguished from each other by
+context and usage — not by an additional tag bit. Within a given system
+there is exactly one Namespace Lump (Boot.NS at Slot 0) and one or more
+Thread Lumps; the Scheduler knows which is which by the NS slot it references.
+
+For **Thread lumps**, the `cw` header field is **reinterpreted as `sw`**
+(stack words). Mint requires `sw > 0`, `cc > 0` (heapWords), and
+`17 + sw + cc ≤ lumpSize − 12` — the five zones must all fit within the lump.
+For **Namespace lumps**, `cw = 0` and `cc` encodes the Locator-entry count.
+
+> **Canonical name:** The Church Machine LUMP Specification (v1.2) labels
+> `typ = 10` as **"clist-only"**. The sub-types (Thread and Namespace) are
+> architectural roles, not separate `typ` values.
 
 ---
 
-#### `typ = 10, cw = 0` — Thread Lump
+#### `typ = 10` — Thread Lump  (`cw` reinterpreted as `sw`; `cc` = heap words)
 
 A live execution context. A Thread Lump holds the full hardware state of
 one thread: context registers, LIFO stack, heap, and data registers. It is
@@ -156,7 +164,7 @@ architecture-fixed, not recorded in `cc`.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Word 0          Header (typ=10, cw=0)                  │  Zone: Header
+│  Word 0          Header (typ=10, sw=N>0, cc=heapWords)  │  Zone: Header
 ├─────────────────────────────────────────────────────────┤
 │  Words 1..16     Data Registers DR0–DR15                │  Zone ⑤
 ├─────────────────────────────────────────────────────────┤
@@ -178,7 +186,8 @@ architecture-fixed, not recorded in `cc`.
   **RW-GT** for the Thread itself.
 - Distributed as `*.thread.zip`.
 
-**Example header:**  `0xF900_020C`  (n=8, cw=0, heapWords=12)
+**Example header:**  `0xF900_8240`  (n-6=2 → 256-word lump, sw=32, heapWords=64)
+— see `docs/CM_LUMP_SPECIFICATION.md` Appendix A for encoding formula.
 
 ---
 

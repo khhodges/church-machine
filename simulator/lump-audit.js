@@ -36,6 +36,7 @@ function lumpAudit(words, manifest, lineNums, opts) {
     const magic    = (word0 >>> 27) & 0x1F;
     const nMinus6  = (word0 >>> 23) & 0xF;
     const cw       = (word0 >>> 10) & 0x1FFF;
+    const typ      = (word0 >>>  8) & 0x3;   // LUMP object type: 00=lump, 01=data, 10=clist-only, 11=Outform
     const cc       =  word0         & 0xFF;
     const lumpSize = 1 << (nMinus6 + 6);
 
@@ -72,7 +73,79 @@ function lumpAudit(words, manifest, lineNums, opts) {
         });
     }
 
-    if (cw >= 1) {
+    // RB1: Structure check — depends on typ.
+    //
+    // typ=00/11 (executable / Outform): cw must be >= 1.
+    // typ=01 (data): cw and cc must both be 0; no code section or c-list.
+    // typ=10, cw=0 (Namespace): Namespace LUMP — body is the NS Table (binary
+    //   data, not code).  cc is the Locator-entry count.  No GT c-list at tail.
+    //   (See CM_LUMP_SPECIFICATION.md Appendix B.)
+    // typ=10, cw>0 (Thread): `cw` is reinterpreted as `sw` (stack words) and
+    //   `cc` as `heapWords` (Appendix A).  Mint requires sw > 0, cc > 0, and
+    //   header(1) + DR(16) + heapWords + sw + caps(12) ≤ lumpSize.
+    if (typ === 1 /* data */) {
+        // Spec requires both cw and cc to be zero for typ=01 data lumps.
+        if (cw !== 0 || cc !== 0) {
+            results.push({
+                ruleId: 'RB1',
+                severity: 'error',
+                message: `Data lump (typ=01): cw=${cw}, cc=${cc} \u2014 both must be 0. Mint step 3 will reject this lump.`,
+                detail: `Data lumps (typ=01) must have cw=0 and cc=0 (no code section, no c-list). ` +
+                    `Found cw=${cw}, cc=${cc}. This is a malformed header.`,
+            });
+        } else {
+            results.push({
+                ruleId: 'RB1',
+                severity: 'pass',
+                message: 'Data lump (typ=01) \u2014 cw=0, cc=0 \u2713',
+                detail: 'This is a data lump (typ=01). cw=0 and cc=0 — no executable code section or c-list.',
+            });
+        }
+    } else if (typ === 2 && cw === 0) {
+        // Namespace LUMP (typ=10, cw=0): body is the NS Table — no code or GT c-list.
+        // cc = number of Locator entries; any value (including 0) is structurally valid here.
+        results.push({
+            ruleId: 'RB1',
+            severity: 'pass',
+            message: `Namespace LUMP (typ=10, cw=0) \u2014 NS Table locator entries: ${cc} \u2713`,
+            detail: 'Namespace LUMP (typ=10, cw=0): body is the NS Table (binary data). ' +
+                `cc (Locator-entry count) = ${cc}. No code section or GT c-list. ` +
+                'See CM_LUMP_SPECIFICATION.md Appendix B.',
+        });
+    } else if (typ === 2 /* Thread: cw>0 */) {
+        // Thread LUMP (typ=10, cw>0): cw = sw (stack words), cc = heapWords.
+        const sw = cw;            // cw field reinterpreted as stack words
+        const hw = cc;            // cc field reinterpreted as heap words
+        const CAPS_ZONE  = 12;   // architecture-fixed (CR0..CR11)
+        const DR_ZONE    = 16;   // data registers DR0..DR15
+        const HDR        = 1;    // header word
+        const minFit = HDR + DR_ZONE + hw + sw + CAPS_ZONE;  // 29 + hw + sw
+        if (hw === 0) {
+            results.push({
+                ruleId: 'RB1',
+                severity: 'error',
+                message: 'Thread lump: heapWords = 0 \u2014 Mint requires cc > 0.',
+                detail: 'Thread lump (typ=10, cw>0) header has heapWords (cc field) = 0. ' +
+                    'Mint validates cc > 0; a Thread with no heap zone is malformed.',
+            });
+        } else if (minFit > lumpSize) {
+            results.push({
+                ruleId: 'RB1',
+                severity: 'error',
+                message: `Thread lump: zones don\u2019t fit \u2014 header+DR+heap+stack+caps = ${minFit} > lumpSize (${lumpSize}).`,
+                detail: `Thread lump (typ=10) geometry invalid: header(1) + DR(16) + heap(${hw}) + stack(${sw}) + caps(12) = ${minFit} words, ` +
+                    `but lumpSize = ${lumpSize}. Mint requires 17 + sw + cc \u2264 lumpSize \u2212 12.`,
+            });
+        } else {
+            results.push({
+                ruleId: 'RB1',
+                severity: 'pass',
+                message: `Thread lump: sw=${sw}, heapWords=${hw} \u2014 geometry valid \u2713`,
+                detail: `Thread lump (typ=10): header(1) + DR(16) + heap(${hw}) + stack(${sw}) + caps(12) = ${minFit} words, ` +
+                    `fits within ${lumpSize}-word lump \u2713`,
+            });
+        }
+    } else if (cw >= 1) {
         results.push({
             ruleId: 'RB1',
             severity: 'pass',
@@ -106,16 +179,45 @@ function lumpAudit(words, manifest, lineNums, opts) {
     }
 
     if (actualWords === lumpSize && contentWords <= lumpSize) {
-        const fsStart = 1 + cw;
-        const fsEnd   = lumpSize - cc;
+        // RFS: Freespace zero-fill check.
+        //
+        // Namespace lumps (typ=10, cw=0): the body IS the NS Table — binary
+        // data, not freespace. Applying the generic freespace scan to an NS
+        // body would falsely flag valid NS Table entries as dirty.  Skip RFS.
+        //
+        // Thread lumps (typ=10, cw>0): freespace is the collision zone
+        // between heap (grows ↑ from word 17+heapWords) and stack
+        // (grows ↓ from word lumpSize-12-sw).
+        //
+        // Standard lumps (typ=00/01/11): freespace = words cw+1 .. lumpSize-cc-1.
+        const _isThread    = (typ === 2 && cw > 0);
+        const _isNamespace = (typ === 2 && cw === 0);
+        const _isData      = (typ === 1);
+
+        if (_isNamespace || _isData) {
+            // Namespace body is the NS Table — data, not freespace.  Skip RFS.
+            // Data LUMP body is programmer-defined payload — also not freespace.
+            // (No RFS result is emitted for either; the concept does not apply.)
+        } else {
+        let fsStart, fsEnd;
+        if (_isThread) {
+            const hw = cc;   // cc reinterpreted as heap words
+            fsStart = 17 + hw;              // first word after heap zone
+            fsEnd   = lumpSize - 12 - cw;  // first stack word (exclusive)
+        } else {
+            fsStart = 1 + cw;
+            fsEnd   = lumpSize - cc;
+        }
         const fsCount = Math.max(0, fsEnd - fsStart);
 
         if (fsCount === 0) {
             results.push({
                 ruleId: 'RFS',
                 severity: 'pass',
-                message: 'No padding \u2014 lump is fully packed \u2713',
-                detail: 'No padding zone \u2014 lump is fully packed \u2713',
+                message: 'No freespace \u2014 lump is fully packed \u2713',
+                detail: typ === 2
+                    ? 'Thread lump freespace zone is empty (heap and stack are adjacent) \u2713'
+                    : 'No padding zone \u2014 lump is fully packed \u2713',
             });
         } else {
             let dirtyWords = 0;
@@ -134,25 +236,113 @@ function lumpAudit(words, manifest, lineNums, opts) {
                 results.push({
                     ruleId: 'RFS',
                     severity: 'pass',
-                    message: 'Padding is zeroed \u2713',
-                    detail: `${fsCount} padding word${fsCount !== 1 ? 's' : ''} are all zero \u2713`,
+                    message: 'Freespace is zeroed \u2713',
+                    detail: `${fsCount} freespace word${fsCount !== 1 ? 's' : ''} (words ${fsStart}\u2013${fsEnd - 1}) are all zero \u2713`,
                 });
             } else {
                 results.push({
                     ruleId: 'RFS',
-                    severity: 'warn',
-                    message: `Non-zero padding \u2014 ${dirtyWords} unexpected word${dirtyWords !== 1 ? 's' : ''} found in the padding area.`,
-                    detail: `${dirtyWords} non-zero word${dirtyWords !== 1 ? 's' : ''} in the padding area (first at position ${firstDirtyIdx}: 0x${firstDirtyVal.toString(16).toUpperCase().padStart(8, '0')}).`,
+                    severity: 'error',
+                    message: `Non-zero freespace \u2014 ${dirtyWords} unexpected word${dirtyWords !== 1 ? 's' : ''} found in the freespace zone. Mint step 7 will reject this lump.`,
+                    detail: `${dirtyWords} non-zero word${dirtyWords !== 1 ? 's' : ''} in the freespace zone (words ${fsStart}\u2013${fsEnd - 1}); first dirty word at position ${firstDirtyIdx}: 0x${firstDirtyVal.toString(16).toUpperCase().padStart(8, '0')}. All freespace words must be zero before Mint can load this lump.`,
                 });
             }
         }
+        }  // end of if (!_isNamespace) else block
     } else {
         results.push({
             ruleId: 'RFS',
             severity: 'warn',
-            message: 'Padding check skipped \u2014 fix size/bounds errors above first.',
-            detail: 'Cannot check padding until the file size and layout errors above are resolved.',
+            message: 'Freespace check skipped \u2014 fix size/bounds errors above first.',
+            detail: 'Cannot check freespace until the file size and layout errors above are resolved.',
         });
+    }
+
+    // ── RGT — C-List GT Word 0 Format Check ──────────────────────────────────
+    // Mint step 8 requires every c-list slot to be a well-formed GT Word 0.
+    // Null GTs (all-zero) are always valid — they are the compile-time placeholder
+    // for capabilities that the server injects at deployment time.
+    //
+    // GT Word 0 layout (CM_LUMP_SPECIFICATION.md §"Word 0 — The Golden Token"):
+    //   [31]    B      (Bind flag)
+    //   [30:28] perm3  (permissions: Turing {X,W,R} or Church {E,S,L} per dom)
+    //   [27]    dom    (0=Turing, 1=Church)
+    //   [26]    spare  (must be 0 — except in v2.0 Abstract GTs where bits[26:25]
+    //                  encode gt_type=11; see note below)
+    //   [25]    f_flag
+    //   [24:23] typ    (GT class: 00=NULL, 01=Inform, 10=Outform, 11=Abstract)
+    //   [22:16] gt_seq (revocation sequence number)
+    //   [15:0]  object_id
+    //
+    // ── RGT — C-List GT Word 0 Format Check ──────────────────────────────────
+    // GT Word 0 layout per CM_LUMP_SPECIFICATION.md v1.2 §"Word 0 — The Golden Token":
+    //   [31]    B      Bind flag
+    //   [30:28] perm3  Permissions (Turing {X,W,R} or Church {E,S,L} per dom)
+    //   [27]    dom    Domain: 0=Turing, 1=Church
+    //   [26]    spare  MUST be 0 (Mint step 8 rejects any non-zero value here)
+    //   [25]    f_flag
+    //   [24:23] typ    GT class: 00=NULL, 01=Inform, 10=Outform, 11=Abstract
+    //   [22:16] gt_seq Revocation sequence number
+    //   [15:0]  object_id
+    //
+    // Null GTs (all-zero) are always valid — they are the compile-time placeholder
+    // for capabilities injected at deployment time.
+    //
+    // For Thread lumps (typ=10): the caps zone is architecture-fixed at 12 words
+    // at lumpSize-12..lumpSize-1 (CR0..CR11), regardless of the cc (heapWords) field.
+    // For standard lumps: the c-list is at lumpSize-cc..lumpSize-1.
+    //
+    // Namespace LUMPs (typ=10, cw=0): body is the NS Table — no GT c-list at tail.
+    // Applying RGT to NS Table entries would scan binary NS data as GT Word 0s
+    // and produce meaningless or false-positive errors.  Skip RGT for Namespace.
+    //
+    // Thread LUMPs (typ=10, cw>0): caps zone is architecture-fixed at 12 words
+    // at lumpSize-12..lumpSize-1, regardless of cc (heapWords).
+    //
+    // Standard lumps (typ=00/01/11): c-list is at lumpSize-cc..lumpSize-1.
+    //
+    // Skipped when binary size or bounds checks have already failed.
+    // For standard lumps: also skipped when cc=0.  Namespace lumps: always skipped.
+    const _rgtIsThread    = (typ === 2 && cw > 0);
+    const _rgtIsNamespace = (typ === 2 && cw === 0);
+    const _rgtSlotCount = _rgtIsThread ? 12 : cc;
+    const _rgtBaseIdx   = lumpSize - _rgtSlotCount;
+    // Also skip RGT for data LUMPs (typ=01): body is programmer payload, not a c-list.
+    const _rgtRun = !_rgtIsNamespace && typ !== 1 && actualWords === lumpSize && contentWords <= lumpSize && _rgtSlotCount > 0;
+    if (_rgtRun) {
+        const _rgtViolations = [];
+
+        for (let si = 0; si < _rgtSlotCount; si++) {
+            const gw = (words[_rgtBaseIdx + si] >>> 0);
+            if (gw === 0) continue;  // NULL GT (all-zero) — always valid
+
+            // Spec v1.2: bit 26 is the spare field and must be 0.
+            const _spare = (gw >>> 26) & 0x1;
+            if (_spare !== 0) {
+                _rgtViolations.push(
+                    `${_rgtIsThread ? 'Caps' : 'C-list'} slot [${si}] = 0x${gw.toString(16).toUpperCase().padStart(8, '0')}: ` +
+                    `spare bit 26 = 1 (must be 0 per CM_LUMP_SPECIFICATION.md v1.2 §"Word 0"). ` +
+                    `Mint step 8 will reject this lump.`
+                );
+            }
+        }
+
+        const slotLabel = _rgtIsThread ? 'cap' : 'c-list slot';
+        if (_rgtViolations.length === 0) {
+            results.push({
+                ruleId: 'RGT',
+                severity: 'pass',
+                message: `GT format valid \u2014 all ${_rgtSlotCount} ${slotLabel}${_rgtSlotCount !== 1 ? 's' : ''} are well-formed \u2713`,
+                detail: `All ${_rgtSlotCount} ${slotLabel}${_rgtSlotCount !== 1 ? 's' : ''} are either null (0x00000000) or structurally valid GT Word 0 values \u2713`,
+            });
+        } else {
+            results.push({
+                ruleId: 'RGT',
+                severity: 'error',
+                message: `Malformed GT \u2014 ${_rgtViolations.length} ${slotLabel}${_rgtViolations.length !== 1 ? 's' : ''} would be rejected by Mint.`,
+                detail: _rgtViolations.join(' '),
+            });
+        }
     }
 
     if (manifest && typeof manifest === 'object') {
@@ -219,8 +409,11 @@ function lumpAudit(words, manifest, lineNums, opts) {
     //   per-LUMP slot-bounds check is possible or meaningful — slots are exempt.
     //   BRANCH (opcode 23, v2.0 ISA): sign-extended 15-bit offset must land in [0, cw-1].
     //   Note: opcode 17 = DWRITE (device write) — not BRANCH — in v2.0.
+    //
+    // Skipped for Thread lumps (typ=10): words 1..sw are DR values (data registers),
+    // not executable code; applying Church instruction checks to them is meaningless.
     // Skipped when binary size or bounds checks have already failed.
-    if (actualWords === lumpSize && contentWords <= lumpSize && cw >= 1) {
+    if (actualWords === lumpSize && contentWords <= lumpSize && cw >= 1 && typ !== 2 && typ !== 1) {
         const _rciChurchOps = new Set([0, 1, 8, 9]);
         const _rciOpName    = { 0: 'LOAD', 1: 'SAVE', 8: 'ELOADCALL', 9: 'XLOADLAMBDA' };
         const _rciBranchOp  = 23;  // v2.0 ISA: BRANCH is opcode 23 (opcode 17 = DWRITE)
@@ -361,7 +554,7 @@ function lumpAudit(words, manifest, lineNums, opts) {
                 violations: _rncViolations,
             });
         }
-    } else {
+    } else if (typ !== 2 && typ !== 1 /* Thread/data lumps silently skip RCI; only warn for other failures */) {
         results.push({
             ruleId: 'RCI',
             severity: 'warn',
@@ -382,9 +575,10 @@ function lumpAudit(words, manifest, lineNums, opts) {
     // yields any name at all.  Previously it fired whenever the manifest lacked
     // both pet_names.CR and capabilities[], which caused false positives when the
     // assembler had already baked pet names into the binary as pending sentinels.
+    // Skipped for Thread lumps (typ=10): cc=heapWords, not a c-list slot count.
     // Skipped when cc=0 (no c-list) or when binary size/bounds failed.
     if (actualWords === lumpSize && contentWords <= lumpSize && cw >= 1 && cc > 0 &&
-            manifest && typeof manifest === 'object') {
+            typ !== 2 && typ !== 1 && manifest && typeof manifest === 'object') {
 
         // ── Step 1: build slot → best name map from all available sources ─────
         const _rpnSlotName = {};
@@ -498,7 +692,10 @@ function lumpAudit(words, manifest, lineNums, opts) {
     // Two detection modes:
     //   1. Manifest-guided  — uses manifest.methods[].offset to delineate ranges
     //   2. Binary-only      — scans for consecutive RETURNs (only zeros between)
-    if (actualWords === lumpSize && contentWords <= lumpSize && cw >= 1) {
+    // Skipped for Thread lumps (typ=10): words 1..sw are DR state, not executable code;
+    // scanning them for RETURN opcodes would produce false stub-method warnings.
+    // Skipped for data lumps (typ=01): body is programmer payload, not instructions.
+    if (actualWords === lumpSize && contentWords <= lumpSize && cw >= 1 && typ !== 2 && typ !== 1) {
         const _RETURN_OP = 3;
         const _rsmStubs = [];  // { name?, wordIndex }
 
