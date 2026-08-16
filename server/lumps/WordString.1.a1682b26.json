@@ -1,0 +1,17 @@
+{
+  "token": "ab1e86af",
+  "abstraction": "WordString",
+  "dot_name": "WordString",
+  "issue_n": 1,
+  "ns_slot": null,
+  "ns_slot_policy": "dynamic",
+  "lump_size": 512,
+  "status": "released",
+  "language": "CLOOMC",
+  "author": "Church Machine",
+  "cw": 294,
+  "cc": 0,
+  "source_file": "simulator/cloomc/WordString.cloomc",
+  "filename": "WordString.1.a1682b26.lump",
+  "sidecar_file": "WordString.1.a1682b26.json"
+}

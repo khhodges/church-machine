@@ -1,0 +1,16 @@
+{
+  "token": "5a93ce79",
+  "abstraction": "BernoulliNumbers",
+  "dot_name": "BernoulliNumbers",
+  "issue_n": 1,
+  "ns_slot": null,
+  "ns_slot_policy": "dynamic",
+  "lump_size": 64,
+  "status": "released",
+  "language": "ISA",
+  "author": "Church Machine",
+  "cw": 15,
+  "cc": 1,
+  "filename": "BernoulliNumbers.1.656dd0e4.lump",
+  "sidecar_file": "BernoulliNumbers.1.656dd0e4.json"
+}

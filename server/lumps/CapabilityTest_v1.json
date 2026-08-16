@@ -80,5 +80,6 @@
   "lump_version": 1,
   "compiled_at": 1786878239.562543,
   "ns_slot_policy": "static",
-  "boot_resident": true
+  "boot_resident": true,
+  "archived_version": 1
 }

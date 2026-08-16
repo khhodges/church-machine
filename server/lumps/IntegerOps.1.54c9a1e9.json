@@ -1,0 +1,16 @@
+{
+  "token": "19d3e599",
+  "abstraction": "IntegerOps",
+  "dot_name": "IntegerOps",
+  "issue_n": 1,
+  "ns_slot": null,
+  "ns_slot_policy": "dynamic",
+  "lump_size": 64,
+  "status": "released",
+  "language": "ISA",
+  "author": "Church Machine",
+  "cw": 20,
+  "cc": 0,
+  "filename": "IntegerOps.1.54c9a1e9.lump",
+  "sidecar_file": "IntegerOps.1.54c9a1e9.json"
+}

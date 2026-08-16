@@ -6992,9 +6992,9 @@ def patch_lump_clist_slot(token_hex, slot_index):
     key8 = (raw[:8] if len(raw) >= 8 else raw).zfill(8)
 
     lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
-    lump_path = os.path.join(lumps_dir, f'{key8}.lump')
-    if not os.path.isfile(lump_path):
-        return jsonify({"error": f"No standalone .lump file for token {key8}"}), 404
+    lump_path = _resolve_lump_path(key8, lumps_dir)
+    if not lump_path:
+        return jsonify({"error": f"No .lump file for token {key8}"}), 404
 
     payload = request.get_json(force=True, silent=True) or {}
     gt_word = payload.get("gt_word")
@@ -7063,13 +7063,13 @@ def resize_lump(token_hex):
     raw   = token_hex.lower()
     key8  = (raw[:8] if len(raw) >= 8 else raw).zfill(8)
     lumps_dir    = os.path.join(os.path.dirname(__file__), 'lumps')
-    lump_path    = os.path.join(lumps_dir, f'{key8}.lump')
-    sidecar_path = os.path.join(lumps_dir, f'{key8}.json')
+    lump_path    = _resolve_lump_path(key8, lumps_dir)
+    sidecar_path = _resolve_sidecar_path(key8, lumps_dir)
 
     # Special branch: boot lump embedded in boot-image.bin (token 00000600).
     # There is no standalone .lump file for this token; resize it in-place inside
     # the binary, update NS slot 6, then write the file back.
-    if not os.path.isfile(lump_path) and key8 == '00000600' and _BOOT_ABSTR_META:
+    if not lump_path and key8 == '00000600' and _BOOT_ABSTR_META:
         boot_path = os.path.join(os.path.dirname(__file__), 'lumps', 'boot-image.bin')
         if not os.path.isfile(boot_path):
             return jsonify({"error": "boot-image.bin not found"}), 400
@@ -7556,9 +7556,9 @@ def build_namespace():
             if not lump_token:
                 return jsonify({"error": f"Slot {slot}: Bundled entry requires a lump token"}), 400
 
-            lump_path = os.path.join(lumps_dir, f'{lump_token}.lump')
-            if not os.path.isfile(lump_path):
-                return jsonify({"error": f"Slot {slot}: Lump file {lump_token}.lump not found"}), 400
+            lump_path = _resolve_lump_path(lump_token, lumps_dir)
+            if not lump_path:
+                return jsonify({"error": f"Slot {slot}: No .lump file found for token {lump_token}"}), 400
 
             with open(lump_path, 'rb') as fh:
                 lump_binary = fh.read()
@@ -7720,16 +7720,16 @@ def delete_lump(token):
     token8 = raw.zfill(8)
     lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
 
-    lump_path = os.path.join(lumps_dir, f'{token8}.lump')
-    sidecar_path = os.path.join(lumps_dir, f'{token8}.json')
+    lump_path    = _resolve_lump_path(token8, lumps_dir)
+    sidecar_path = _resolve_sidecar_path(token8, lumps_dir)
     deleted = []
 
-    if os.path.isfile(lump_path):
+    if lump_path and os.path.isfile(lump_path):
         os.remove(lump_path)
-        deleted.append(f'{token8}.lump')
-    if os.path.isfile(sidecar_path):
+        deleted.append(os.path.basename(lump_path))
+    if sidecar_path and os.path.isfile(sidecar_path):
         os.remove(sidecar_path)
-        deleted.append(f'{token8}.json')
+        deleted.append(os.path.basename(sidecar_path))
 
     LAZY_LUMPS.pop(token8, None)
     LAZY_LUMPS.pop(token8.lstrip('0') or '0', None)
@@ -10016,7 +10016,7 @@ with app.app_context():
             """
             import struct as _struct
             fname = "{:08x}.lump".format(token)
-            fpath = os.path.join(LUMPS_DIR, fname)
+            fpath = _resolve_lump_path(fname[:-5], LUMPS_DIR) or os.path.join(LUMPS_DIR, fname)
             try:
                 with open(fpath, "rb") as _fh:
                     raw = _fh.read()
@@ -12144,12 +12144,71 @@ def _ba_build_ns_map():
         'ns_slot_count': ns_slot_count,
     }
 
-def _ba_lump_file_for_token(token):
-    """Return path to token.lump in the lumps dir, or None."""
-    if not token:
+def _resolve_lump_path(token8, lumps_dir=None):
+    """Return the filesystem path to a token's .lump file, or None.
+
+    Checks the token-named file first (fast path for token-native lumps and
+    symlinks), then falls back to the manifest 'filename' field for lumps that
+    were migrated to canonical ``DotName.N.hash.lump`` names.
+    """
+    if not token8:
         return None
-    p = os.path.join(_LUMPS_DIR, token + '.lump')
-    return p if os.path.exists(p) else None
+    if lumps_dir is None:
+        lumps_dir = _LUMPS_DIR
+    token_path = os.path.join(lumps_dir, token8 + '.lump')
+    if os.path.isfile(token_path):
+        return token_path
+    # Fall back to manifest canonical filename
+    manifest_path = os.path.join(lumps_dir, 'manifest.json')
+    try:
+        manifest = _read_manifest_safe(manifest_path)
+        for entry in manifest:
+            if entry.get('token') == token8:
+                fn = entry.get('filename', '')
+                if fn:
+                    p = os.path.join(lumps_dir, fn)
+                    if os.path.isfile(p):
+                        return p
+    except Exception:
+        pass
+    return None
+
+
+def _resolve_sidecar_path(token8, lumps_dir=None):
+    """Return the filesystem path to a token's .json sidecar, or None.
+
+    Checks the token-named file first, then falls back to the manifest
+    'sidecar_file' field for canonically-renamed lumps.
+    """
+    if not token8:
+        return None
+    if lumps_dir is None:
+        lumps_dir = _LUMPS_DIR
+    token_path = os.path.join(lumps_dir, token8 + '.json')
+    if os.path.isfile(token_path):
+        return token_path
+    manifest_path = os.path.join(lumps_dir, 'manifest.json')
+    try:
+        manifest = _read_manifest_safe(manifest_path)
+        for entry in manifest:
+            if entry.get('token') == token8:
+                sf = entry.get('sidecar_file', '')
+                if sf:
+                    p = os.path.join(lumps_dir, sf)
+                    if os.path.isfile(p):
+                        return p
+    except Exception:
+        pass
+    return None
+
+
+def _ba_lump_file_for_token(token):
+    """Return path to token's .lump in the lumps dir, or None.
+
+    Uses _resolve_lump_path so canonical-named lumps (DotName.N.hash.lump)
+    are found even when no token-named file or symlink exists.
+    """
+    return _resolve_lump_path(token, _LUMPS_DIR)
 
 def _ba_write_ssh_key():
     """Write DropletPrivateKey secret to ~/.ssh/replit_droplet and return path, or None."""

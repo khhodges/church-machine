@@ -1,0 +1,16 @@
+{
+  "token": "d9454529",
+  "abstraction": "EnglishLoops",
+  "dot_name": "EnglishLoops",
+  "issue_n": 1,
+  "ns_slot": null,
+  "ns_slot_policy": "dynamic",
+  "lump_size": 64,
+  "status": "released",
+  "language": "ISA",
+  "author": "Church Machine",
+  "cw": 35,
+  "cc": 0,
+  "filename": "EnglishLoops.1.19366291.lump",
+  "sidecar_file": "EnglishLoops.1.19366291.json"
+}

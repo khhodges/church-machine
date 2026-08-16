@@ -1,7 +1,6 @@
 {
   "_comment": "Tokens managed entirely by the server at runtime. These are excluded from the /api/lumps browser listing and are exempt from the R3 manifest-presence check in test_lump_consistency.py. Edit this file (one place only) when a new server-managed token is added.",
   "tokens": [
-    "00000600",
-    "00000003"
+    "00000600"
   ]
 }

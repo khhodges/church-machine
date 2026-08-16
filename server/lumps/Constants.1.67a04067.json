@@ -1,0 +1,16 @@
+{
+  "token": "00001200",
+  "abstraction": "Constants",
+  "dot_name": "Constants",
+  "issue_n": 1,
+  "ns_slot": 9,
+  "ns_slot_policy": "dynamic",
+  "lump_size": 64,
+  "status": "released",
+  "language": "ISA",
+  "author": "Church Machine",
+  "cw": 18,
+  "cc": 2,
+  "filename": "Constants.1.67a04067.lump",
+  "sidecar_file": "Constants.1.67a04067.json"
+}

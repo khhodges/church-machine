@@ -1,0 +1,17 @@
+{
+  "token": "00000800",
+  "abstraction": "Scheduler.IRQ",
+  "dot_name": "Scheduler.IRQ",
+  "issue_n": 1,
+  "ns_slot": null,
+  "ns_slot_policy": "dynamic",
+  "lump_size": 64,
+  "status": "released",
+  "language": "CLOOMC",
+  "author": "Church Machine",
+  "cw": 1,
+  "cc": 0,
+  "source_file": "simulator/examples/scheduler_irq.cloomc",
+  "filename": "Scheduler.IRQ.1.439e0ddd.lump",
+  "sidecar_file": "Scheduler.IRQ.1.439e0ddd.json"
+}

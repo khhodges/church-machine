@@ -1,0 +1,17 @@
+{
+  "token": "00001f00",
+  "abstraction": "Tunnel",
+  "dot_name": "Tunnel",
+  "issue_n": 1,
+  "ns_slot": 22,
+  "ns_slot_policy": "dynamic",
+  "lump_size": 64,
+  "status": "released",
+  "language": "CLOOMC",
+  "author": "Church Machine",
+  "cw": 37,
+  "cc": 1,
+  "source_file": "simulator/cloomc/Tunnel.cloomc",
+  "filename": "Tunnel.1.8770bf03.lump",
+  "sidecar_file": "Tunnel.1.8770bf03.json"
+}

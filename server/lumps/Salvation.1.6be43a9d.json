@@ -1,0 +1,17 @@
+{
+  "token": "ab3de4fd",
+  "abstraction": "Salvation",
+  "dot_name": "Salvation",
+  "issue_n": 1,
+  "ns_slot": null,
+  "ns_slot_policy": "dynamic",
+  "lump_size": 256,
+  "status": "released",
+  "language": "CLOOMC",
+  "author": "Church Machine",
+  "cw": 141,
+  "cc": 0,
+  "source_file": "simulator/examples/salvation.cloomc",
+  "filename": "Salvation.1.6be43a9d.lump",
+  "sidecar_file": "Salvation.1.6be43a9d.json"
+}

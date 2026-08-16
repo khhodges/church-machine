@@ -1,0 +1,16 @@
+{
+  "token": "50ce4c64",
+  "abstraction": "StringOps",
+  "dot_name": "StringOps",
+  "issue_n": 1,
+  "ns_slot": null,
+  "ns_slot_policy": "dynamic",
+  "lump_size": 512,
+  "status": "released",
+  "language": "ISA",
+  "author": "Church Machine",
+  "cw": 315,
+  "cc": 0,
+  "filename": "StringOps.1.05b56245.lump",
+  "sidecar_file": "StringOps.1.05b56245.json"
+}
