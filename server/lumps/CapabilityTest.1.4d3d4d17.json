@@ -7,8 +7,8 @@
   "lump_size": 64,
   "typ": 0,
   "content_type": "code",
-  "cw": 0,
-  "cc": 0,
+  "cw": 21,
+  "cc": 5,
   "profile": "IoT",
   "language": "",
   "author": "",
@@ -78,5 +78,7 @@
   "dot_name": "CapabilityTest",
   "issue_n": 1,
   "lump_version": 1,
-  "compiled_at": 1786878239.562543
+  "compiled_at": 1786878239.562543,
+  "ns_slot_policy": "static",
+  "boot_resident": true
 }

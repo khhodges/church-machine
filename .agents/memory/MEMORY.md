@@ -1,3 +1,4 @@
+- [Boot-image regen SelfTest manifest gap](boot-image-regen-selftest-manifest-gap.md) — generate_boot_image needs manifest abstraction=="SelfTest"@slot6; entry is "start"/null, so full regen fails; patch surgically
 - [Dot pet name identity architecture](dot-pet-name-identity.md) — petname.Abstraction#n is global identity; two seals (identity_hash + binary_hash); self Inform GT at c-list row 0
 - [ns-state.json rich NS-entry format](ns-state-dot-name-format.md) — one rich object per occupied slot (name, slot, location, type, f, g, limit, seq, seal, boot?); no flat-name list or top-level boot_entry
 - [gen_cm_dmem_direct.py double-definition trap](gen-cm-dmem-double-definition.md) — appends cm_dmem_bram to church_ti60_f225.v AND writes cm_dmem_bram.v; delete the .v and strip XML entry before MAP

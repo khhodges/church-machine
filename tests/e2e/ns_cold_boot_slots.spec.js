@@ -23,7 +23,7 @@
 //   7  WukongCallHome  (E-perm LUMP)
 //   8  Tunnel          (bitstreamOnly — FPGA writes at power-on; sim leaves null)
 //   9  Ethernet        (E-perm hardware cap)
-//  10  CapTest         (E-perm LUMP)
+//  10  CapabilityTest         (E-perm LUMP)
 //
 // ─── Suites ───────────────────────────────────────────────────────────────
 //
@@ -71,7 +71,7 @@ const COLD_BOOT_EXPECTED_LABELS = {
     6:  'SelfTest',
     7:  'WukongCallHome',
     9:  'Ethernet',
-    10: 'CapTest',
+    10: 'CapabilityTest',
 };
 
 // Minimal CLOOMC++ abstraction that compiles successfully.

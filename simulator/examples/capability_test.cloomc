@@ -7,11 +7,11 @@
 ; Created:      2026-08-03
 ; Language:     Assembly
 ; ============================================================
-; Single source of truth for the CapTest abstraction (NS slot 10).
-; The lump is built from this file by scripts/build_captest_lump.js,
+; Single source of truth for the CapabilityTest abstraction (NS slot 10).
+; The lump is built from this file by scripts/build_capability_test_lump.js,
 ; which supplies hardware GT words for each declared capability.
 ;
-; C-list layout (CapTest's own 5-entry c-list, injected at load):
+; C-list layout (CapabilityTest's own 5-entry c-list, injected at load):
 ;   [0] SelfTest   E    (NS  6)  0x4A000006 -- entry-callable abstraction
 ;   [1] LED_DEV    RW   (NS  3)  0x32000003 -- hardware LED register file
 ;   [2] UART_DEV   RW   (NS  2)  0x32000002 -- hardware UART TX/STATUS/RX

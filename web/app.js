@@ -1048,7 +1048,7 @@ function updateNamespaceDisplay() {
           loc: null,         desc: 'CALL HOME / IDE bridge — NS entry written by FPGA bitstream at power-on, not boot software' },
         { slot: 9, label: 'Ethernet',       perms: 'E',  tier: 'boot',
           loc: 0x000001C0, desc: 'Network I/O hardware capability (E-perm)' },
-        { slot: 10, label: 'CapTest',       perms: 'E',  tier: 'boot',
+        { slot: 10, label: 'CapabilityTest',       perms: 'E',  tier: 'boot',
           loc: 0x00000200, desc: 'Capability validation LUMP — task #2274 (E-perm)' },
     ];
 

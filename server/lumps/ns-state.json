@@ -112,7 +112,7 @@
       "seal": "0x0598"
     },
     {
-      "name": "CapTest",
+      "name": "CapabilityTest",
       "slot": 10,
       "location": "0x000003C0",
       "type": "Inform",

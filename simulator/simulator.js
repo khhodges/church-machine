@@ -480,7 +480,7 @@ class ChurchSimulator {
 
         // Integrity check: the minimum complete boot namespace has 11 slots
         // (indices 0-10: Boot.NS, Boot.Thread, UART_DEV, LED_DEV, BTN_DEV,
-        // TIMER_DEV, SelfTest, WukongCallHome, Tunnel, Ethernet, CapTest).
+        // TIMER_DEV, SelfTest, WukongCallHome, Tunnel, Ethernet, CapabilityTest).
         // Warn loudly in the console log when the binary is smaller than this.
         const _BOOT_SLOT_MIN = 11;
         if (count < _BOOT_SLOT_MIN) {
@@ -1432,7 +1432,7 @@ class ChurchSimulator {
         //         Set ⚡ to slot 7 to test the full Wukong call-home path in the IDE.
         //   8     Tunnel         — CALL HOME / IDE bridge (hardware E-perm cap)
         //   9     Ethernet       — network I/O hardware cap (E-perm)
-        //  10     CapTest        — capability validation LUMP (E-perm, task #2274)
+        //  10     CapabilityTest        — capability validation LUMP (E-perm, task #2274)
         // No slot above 1 has special hardware significance — the ⚡ lightning
         // bolt sets Thread.CR0 to whichever slot the programmer chooses.
         // This catalog NEVER derives from abstractionRegistry — the registry is
@@ -1448,7 +1448,7 @@ class ChurchSimulator {
             { label: 'WukongCallHome', perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 7  Wukong coordinator LUMP
             { label: 'Tunnel',         perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 8  CALL HOME / IDE bridge
             { label: 'Ethernet',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 9  network I/O hardware cap
-            { label: 'CapTest',        perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 10 capability validation LUMP
+            { label: 'CapabilityTest',        perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },  // 10 capability validation LUMP
         ];
     }
 

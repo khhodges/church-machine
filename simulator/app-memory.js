@@ -41,6 +41,11 @@ function _setNsDirty(dirty) {
 // Secondary: name match covers unsaved in-memory additions (the slot is already
 //            visible in the NS table, so membership is implied by its presence there).
 // Returns the matching lump cache entry, or null.
+// Hardware-capability name matcher used by the NS table render loop to decide
+// whether a row's Source button should be hidden.  Module-level constant so it
+// is compiled once, not once per row per render.
+const _hwCapRe = /^(LED[0-5]?|LED_DEV|UART(_TX|_RX|_DEV)?|BTN|BTN_DEV|Button|SlideRule|Timer|TIMER_DEV|Display|Boot\.NS|Boot\.Nucs|Boot\.Abstr)$/i;
+
 function _findSrcLump(slotIdx, slotLabel) {
     if (typeof _lumpsCache === 'undefined' || !Array.isArray(_lumpsCache)) return null;
     if (!slotLabel) return null;
@@ -2754,7 +2759,6 @@ function updateNamespace() {
             //   • HW_NAMESPACE labels (LED, UART, Button, Timer, Display at slots 11-15)
             //   • User-facing cap names from _isHardwareCapName (LED0-5, UART, BTN, …)
             //   • Namespace-root entry (Boot.NS)
-            const _hwCapRe = /^(LED[0-5]?|LED_DEV|UART(_TX|_RX|_DEV)?|BTN|BTN_DEV|Button|SlideRule|Timer|TIMER_DEV|Display|Boot\.NS|Boot\.Nucs|Boot\.Abstr)$/i;
             const _hideSource = (e.gtType !== 1 && e.gtType !== 2) ||
                                 THREAD_NS_SLOTS.has(i) ||
                                 _hwCapRe.test(e.label || '');
@@ -3466,7 +3470,12 @@ window._nsTableSave = async function(btn) {
                 slot:     _si,
                 location: _hex8(_loc),
                 type:     _GT_TYPE_NAMES[_pW1.gtType] || 'Inform',
-                f:        0,
+                // F bit: taken truthfully from parseNSWord1(word1) — never hardcoded.
+                // In v2.0 the far-lump F flag is retired and parseNSWord1 returns f:0
+                // by design (bit[30] is the GC liveness mark); routing through the
+                // parser means the saved value tracks the ISA definition, so if F is
+                // ever reintroduced the save path stays truthful automatically.
+                f:        _pW1.f,
                 g:        _pW1.g,
                 limit:    _hex5(_lim),
                 seq:      _seq,

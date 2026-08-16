@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// scripts/build_captest_lump.js
+// scripts/build_capability_test_lump.js
 //
 // Assembles simulator/examples/capability_test.cloomc using the production
 // ChurchAssembler (simulator/assembler.js), packs the result into a valid LUMP
@@ -31,7 +31,7 @@
 //   TIMER_DEV slot 5 → (3<<28)|(0<<27)|(1<<25)|5 = 0x32000005
 //
 // Usage:
-//   node scripts/build_captest_lump.js
+//   node scripts/build_capability_test_lump.js
 
 'use strict';
 
@@ -173,9 +173,9 @@ function crc32(buf) {
 const token = crc32(bytes).toString(16).toLowerCase().padStart(8, '0');
 console.log(`Token (CRC-32 of binary): ${token}`);
 
-// ── Remove old CapTest lump files ────────────────────────────────────────────
+// ── Remove old CapabilityTest lump files ────────────────────────────────────────────
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
-const existingIdx = manifest.findIndex(e => e.abstraction === 'CapTest');
+const existingIdx = manifest.findIndex(e => e.abstraction === 'CapabilityTest');
 if (existingIdx !== -1) {
     const oldToken = manifest[existingIdx].token;
     if (oldToken && oldToken !== token) {
@@ -184,7 +184,7 @@ if (existingIdx !== -1) {
         if (fs.existsSync(oldLump))    { fs.unlinkSync(oldLump);    console.log(`Removed old: ${oldLump}`); }
         if (fs.existsSync(oldSidecar)) { fs.unlinkSync(oldSidecar); console.log(`Removed old: ${oldSidecar}`); }
     }
-    console.log('\nExisting CapTest entry found — replacing it.');
+    console.log('\nExisting CapabilityTest entry found — replacing it.');
     manifest.splice(existingIdx, 1);
 }
 
@@ -206,7 +206,7 @@ const capabilitiesJson = CLIST.map(c => ({
 
 const sidecar = {
     token,
-    abstraction:     'CapTest',
+    abstraction:     'CapabilityTest',
     filename:        `${token}.lump`,
     sidecar_file:    `${token}.json`,
     ns_slot:         10,
@@ -243,7 +243,7 @@ for (let i = 0; i < CLIST.length; i++) {
 // ── Update manifest.json ──────────────────────────────────────────────────────
 const manifestEntry = {
     token,
-    abstraction:     'CapTest',
+    abstraction:     'CapabilityTest',
     ns_slot:         10,
     ns_slot_policy:  'static',
     boot_resident:   true,

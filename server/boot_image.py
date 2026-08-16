@@ -80,7 +80,9 @@ except ImportError:
 
 # Mandatory NS slots — every valid boot image must have a non-zero entry here.
 # Minimal boot trio: NS root (0), Thread (1), SelfTest/boot-entry (6).
-_MANDATORY_NS_SLOTS = (0, 1, 2, 3, 4, 5, BOOT_ABSTR_NS_SLOT)  # slots 0, 1 (foundational), 2-5 (MMIO devices), 6 (Boot.Abstr)
+CAPABILITY_TEST_NS_SLOT = 10  # CapabilityTest capability-validation LUMP
+
+_MANDATORY_NS_SLOTS = (0, 1, 2, 3, 4, 5, BOOT_ABSTR_NS_SLOT, CAPABILITY_TEST_NS_SLOT)  # 0,1 foundational; 2-5 MMIO; 6 Boot.Abstr; 10 CapabilityTest
 
 # Format-version tag written to mem[NS_TABLE_BASE - 1] so loadBootImage()
 # can reject stale binaries.
@@ -192,7 +194,7 @@ DEFAULT_ABSTRACTION_CATALOG = [
     ("WukongCallHome", {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 7  Wukong coordinator LUMP
      ("Tunnel",         {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 8  CALL HOME / IDE bridge
     ("Ethernet",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 9  network I/O hardware cap
-    ("CapTest",        {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 10 capability validation LUMP
+    ("CapabilityTest",        {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # 10 capability validation LUMP
 ]
 assert len(DEFAULT_ABSTRACTION_CATALOG) == 11, "catalog drift vs simulator.js"
 
@@ -412,6 +414,19 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
                 f"(word0=0x{word0:08x}, word1=0x{word1:08x}); "
                 "the boot image is invalid and would cause a BOOT fault at runtime"
             )
+
+    # Slot 10 (CapabilityTest) must carry an Inform GT (gt_type=1) in W1.
+    # A gtType of 0 (NULL) hides the CODE/Source button in the IDE and marks
+    # the entry invalid; catch a stale/zeroed slot 10 W1 with a clear error.
+    _ct_base = n_words - (CAPABILITY_TEST_NS_SLOT + 1) * NS_ENTRY_WORDS
+    _ct_w1 = words[_ct_base + 1]
+    _ct_gt_type = (_ct_w1 >> 26) & 0x3
+    if _ct_gt_type != 1:
+        raise ValueError(
+            f"validate_boot_image: NS slot {CAPABILITY_TEST_NS_SLOT} (CapabilityTest) "
+            f"W1 gtType is {_ct_gt_type}, expected 1 (Inform) "
+            f"(word1=0x{_ct_w1:08x}); the boot image is stale — regenerate it"
+        )
 
 
 def read_boot_entry_info(image_bytes):
@@ -1353,7 +1368,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             mem[_phys + _wi] = _body[_wi] & 0xFFFFFFFF
         # Update NS entry word1 (lim17 + cc) and word2 (seal) to match the
         # actual lump.  The catalog loop wrote cc=0 for non-MMIO non-SelfTest
-        # slots; boot-resident lumps may have cc > 0 (e.g. CapTest has cc=5).
+        # slots; boot-resident lumps may have cc > 0 (e.g. CapabilityTest has cc=5).
         # Preserve word3 (abstract_gt) from the catalog loop.
         _hdr      = _body[0] if _body else 0
         _body_cc  = _hdr & 0xFF

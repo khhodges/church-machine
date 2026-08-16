@@ -4634,7 +4634,7 @@ def _derive_ns_state_entries():
             0: "Boot.NS", 1: "Boot.Thread",
             2: "UART_DEV", 3: "LED_DEV", 4: "BTN_DEV", 5: "TIMER_DEV",
             6: "SelfTest", 7: "WukongCallHome",
-            8: "Tunnel", 9: "Ethernet", 10: "CapTest",
+            8: "Tunnel", 9: "Ethernet", 10: "CapabilityTest",
         }
 
         # Read boot-entry slot from binary sentinel (NS_TABLE_BASE - 2).
