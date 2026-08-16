@@ -593,3 +593,108 @@ class TestEloadcallFalsePositiveFix:
             f"ELOADCALL with crSrc≠6 must not trigger c-list bounds check. "
             f"Got {resp.status_code}: {resp.get_data(as_text=True)}"
         )
+
+
+# ---------------------------------------------------------------------------
+# T5 — LOAD/SAVE/ELOADCALL/XLOADLAMBDA with crSrc ≠ 6 must never return 422
+# ---------------------------------------------------------------------------
+#
+# The c-list bounds guard fires ONLY when crSrc == 6 (the c-list register CR6).
+# For any other source register the immediate field is an address offset or an
+# unrelated operand — not a c-list slot — and must never be mis-interpreted as
+# one, regardless of how large the encoded value is.
+#
+# Parametrised matrix:
+#   opcode  × crSrc (0, 1, 7, 14, 15)  × imm value ≥ cc=5
+#
+# Token convention: 7c505<opcode_hex><cr_hex><seq> (all 8 hex chars)
+
+def _raw_instr_word(opcode: int, cr_src: int, imm15: int) -> int:
+    """Build a raw instruction word for any opcode with the given crSrc and imm15."""
+    return ((opcode & 0x1F) << 27) | ((cr_src & 0xF) << 15) | (imm15 & 0x7FFF)
+
+
+import itertools as _itertools
+
+# Each tuple: (label_suffix, opcode, cr_src, imm15)
+# imm15 values chosen to be ≥ cc=5 for all opcodes, exercising large immediate paths.
+_NON_CR6_CASES = [
+    # LOAD (op=0), various crSrc, various large immediates
+    ("load_cr0_imm5",   0,  0,   5),
+    ("load_cr0_imm32",  0,  0,  32),
+    ("load_cr0_imm255", 0,  0, 255),
+    ("load_cr1_imm5",   0,  1,   5),
+    ("load_cr7_imm63",  0,  7,  63),
+    ("load_cr14_imm5",  0, 14,   5),
+    ("load_cr15_imm16383", 0, 15, 0x3FFF),
+    # SAVE (op=1), various crSrc, various large immediates
+    ("save_cr0_imm5",   1,  0,   5),
+    ("save_cr0_imm32",  1,  0,  32),
+    ("save_cr0_imm255", 1,  0, 255),
+    ("save_cr1_imm5",   1,  1,   5),
+    ("save_cr7_imm63",  1,  7,  63),
+    ("save_cr14_imm5",  1, 14,   5),
+    ("save_cr15_imm16383", 1, 15, 0x3FFF),
+    # ELOADCALL (op=8) — imm15 = (method_idx << 5) | row; crSrc ≠ 6
+    # Large method_idx produces imm15 >> cc even though row is valid.
+    ("eloadcall_cr0_m1r5",   8,  0, (1  << 5) | 5),
+    ("eloadcall_cr0_m7r5",   8,  0, (7  << 5) | 5),
+    ("eloadcall_cr1_m7r0",   8,  1, (7  << 5) | 0),
+    ("eloadcall_cr7_m127r0", 8,  7, (127 << 5) | 0),
+    ("eloadcall_cr14_m1r5",  8, 14, (1  << 5) | 5),
+    ("eloadcall_cr15_m3r4",  8, 15, (3  << 5) | 4),
+    # XLOADLAMBDA (op=9) — imm15 is direct slot; crSrc ≠ 6
+    ("xloadlambda_cr0_slot5",     9,  0,   5),
+    ("xloadlambda_cr0_slot32",    9,  0,  32),
+    ("xloadlambda_cr1_slot255",   9,  1, 255),
+    ("xloadlambda_cr7_slot5",     9,  7,   5),
+    ("xloadlambda_cr14_slot63",   9, 14,  63),
+    ("xloadlambda_cr15_slot16383",9, 15, 0x3FFF),
+]
+
+
+class TestNonCr6NeverRejected:
+    """LOAD/SAVE/ELOADCALL/XLOADLAMBDA with crSrc ≠ 6 must NEVER return 422.
+
+    The c-list bounds guard in save_lump() checks (crSrc == 6) before testing
+    the slot index.  When the instruction reads from any register other than
+    CR6, the immediate field is not a c-list slot and must never be
+    mis-interpreted as one — even when the encoded value is ≥ cc.
+
+    This class is the parametrised complement to TestEloadcallFalsePositiveFix:
+    that class verified the opcode-specific mask logic for crSrc=6; this class
+    verifies the crSrc≠6 gate for all four opcodes across many operand values.
+    """
+
+    # c-list size chosen to make every imm15 value in _NON_CR6_CASES ≥ cc,
+    # so if the guard ever fires on crSrc≠6 the test will catch it.
+    CC = 5
+
+    def _binary(self, instr_word: int) -> list:
+        return [_hdr(cw=1, cc=self.CC), instr_word]
+
+    @pytest.mark.parametrize("label,opcode,cr_src,imm15", _NON_CR6_CASES)
+    def test_non_cr6_not_rejected(self, label, opcode, cr_src, imm15,
+                                  client, isolated_lumps):
+        """Instruction with crSrc≠6 must return 200 regardless of imm15 size.
+
+        Guard condition: crSrc == 6.  For crSrc ∈ {0,1,7,14,15} the guard
+        must be skipped entirely; no 422 should be returned.
+        """
+        assert cr_src != 6, "Fixture error: this test is only for crSrc ≠ 6"
+        word = _raw_instr_word(opcode, cr_src, imm15)
+        # Use a deterministic token derived from the case parameters.
+        token = f"7c5{opcode:01x}{cr_src:01x}{abs(imm15) & 0xFFFFF:05x}"[:8].ljust(8, "0")
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": self._binary(word), "metadata": _meta(token)},
+        )
+        assert resp.status_code == 200, (
+            f"[{label}] op={opcode} crSrc={cr_src} imm15={imm15:#x} (≥cc={self.CC}) "
+            f"must NOT be rejected — crSrc≠6 so it is not a c-list reference. "
+            f"Got {resp.status_code}: {resp.get_data(as_text=True)}"
+        )
+        assert resp.get_json().get("ok") is True, (
+            f"[{label}] op={opcode} crSrc={cr_src} imm15={imm15:#x}: "
+            f"expected ok=True in response, got: {resp.get_json()}"
+        )
