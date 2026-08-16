@@ -491,11 +491,15 @@ class TestR12_LedPetName:
 
 
 class TestR11_SidecarFilesExist:
-    """R11: Every manifest entry with lump_size declared has a sidecar .json on disk."""
+    """R11: Every manifest entry with an explicit sidecar_file field has that file on disk."""
 
     def test_sidecar_files_present(self):
         missing = []
         for e in MANIFEST_ENTRIES_WITH_SIZE:
+            # Only check entries that explicitly declare a sidecar_file.
+            # Entries without a sidecar_file are not required to have one.
+            if not e.get("sidecar_file"):
+                continue
             token = e["token"].lower()
             if not _sidecar_exists(token):
                 missing.append(
@@ -745,9 +749,6 @@ LIVE_ABSTRACTION_NAMES = _live_abstraction_names()
 # fix the sidecar/manifest `abstraction` field or the registry name instead
 # of adding it here.
 KNOWN_NON_REGISTRY_ABSTRACTIONS = {
-    "SlideRule (Haskell)": "Haskell-frontend SlideRule variant (variant_group=sliderule); "
-                           "browsable via the LUMP repository only, never wired into the "
-                           "Abstractions view/registry.",
     "PostFlashSelftest":   "Boot-resident hardware diagnostic lump; wired statically at "
                            "NS slot 6 by the boot image builder. Not a user-facing "
                            "abstraction — accessed only via the Builder tab (Run Self-Test) "

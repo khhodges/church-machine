@@ -1135,7 +1135,7 @@
     ],
     "lump_version": 0,
     "filename": "Ethernet.1.b169bba4.lump",
-    "sidecar_file": "00003300.json",
+    "sidecar_file": "Ethernet.1.b169bba4.json",
     "language": "ISA",
     "status": "released",
     "dot_name": "Ethernet",
@@ -1388,7 +1388,7 @@
     "token": "95a651e7",
     "abstraction": "NoteG",
     "filename": "NoteG.1.04a720f8.lump",
-    "sidecar_file": "NoteG_v6.json",
+    "sidecar_file": "NoteG.1.04a720f8.json",
     "ns_slot": null,
     "lump_size": 64,
     "cw": 38,
@@ -1414,7 +1414,7 @@
     "token": "97cc8047",
     "abstraction": "Human.Hand",
     "filename": "Human.Hand.1.e88911d6.lump",
-    "sidecar_file": "Human_Hand_v13.json",
+    "sidecar_file": "Human.Hand.1.e88911d6.json",
     "ns_slot": null,
     "lump_size": 64,
     "cw": 7,
@@ -1559,7 +1559,7 @@
     "token": "c3963aed",
     "abstraction": "Memory",
     "filename": "Memory.1.3359e86e.lump",
-    "sidecar_file": "Memory_v1.json",
+    "sidecar_file": "Memory.1.3359e86e.json",
     "ns_slot": null,
     "lump_size": 64,
     "cw": 19,
@@ -1616,7 +1616,7 @@
     "token": "00130000",
     "abstraction": "Loader",
     "filename": "Loader.1.19ba3a9d.lump",
-    "sidecar_file": "Loader_v1.json",
+    "sidecar_file": "Loader.1.19ba3a9d.json",
     "ns_slot": null,
     "lump_size": 64,
     "cw": 1,
@@ -1639,7 +1639,7 @@
     "token": "00000300",
     "abstraction": "LEDFlash",
     "filename": "LEDFlash.1.55f1a32f.lump",
-    "sidecar_file": "LEDFlash_v3.json",
+    "sidecar_file": "LEDFlash.1.55f1a32f.json",
     "ns_slot": null,
     "lump_size": 64,
     "cw": 1,
@@ -1662,7 +1662,7 @@
     "token": "e186c4ec",
     "abstraction": "WukongCallHome",
     "filename": "WukongCallHome.1.2f3d7d46.lump",
-    "sidecar_file": "WukongCallHome_v1.json",
+    "sidecar_file": "WukongCallHome.1.2f3d7d46.json",
     "ns_slot": 7,
     "ns_slot_policy": "static",
     "boot_resident": true,
@@ -1686,7 +1686,7 @@
     "token": "d78f751b",
     "abstraction": "MorseCmOk",
     "filename": "MorseCmOk.1.eb20fe01.lump",
-    "sidecar_file": "Abstraction_MorseCmOk_v4.json",
+    "sidecar_file": "MorseCmOk.1.eb20fe01.json",
     "ns_slot": null,
     "lump_size": 512,
     "cw": 363,
@@ -1712,7 +1712,7 @@
     "token": "00001000",
     "abstraction": "SlideRule",
     "filename": "SlideRule.1.d960f531.lump",
-    "sidecar_file": "SlideRule_v2.json",
+    "sidecar_file": "SlideRule.1.d960f531.json",
     "lump_size": 4096,
     "cw": 2602,
     "cc": 1,
@@ -1843,20 +1843,6 @@
     "issue_n": 1
   },
   {
-    "token": "059dc47f",
-    "abstraction": "PostFlashSelftest",
-    "ns_slot": null,
-    "ns_slot_policy": "dynamic",
-    "variant_group": null,
-    "lump_size": 512,
-    "cw": 499,
-    "cc": 2,
-    "grants": [
-      "E"
-    ],
-    "lump_version": 0
-  },
-  {
     "token": "00000a00",
     "abstraction": "CapabilityTest",
     "filename": "CapabilityTest.1.4d3d4d17.lump",
@@ -1878,5 +1864,19 @@
     "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
     "dot_name": "CapabilityTest",
     "issue_n": 1
+  },
+  {
+    "token": "059dc47f",
+    "abstraction": "PostFlashSelftest",
+    "ns_slot": null,
+    "ns_slot_policy": "dynamic",
+    "variant_group": null,
+    "lump_size": 512,
+    "cw": 499,
+    "cc": 2,
+    "grants": [
+      "E"
+    ],
+    "lump_version": 0
   }
 ]
