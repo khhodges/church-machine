@@ -1955,28 +1955,5 @@
     "identity_hash": "5e23e11e8f8e601474f2cb936f9e8f829959445c61c0d32873856c60f5a8fc80",
     "dot_name": "start",
     "issue_n": 1
-  },
-  {
-    "token": "00000a00",
-    "abstraction": "CapabilityTest",
-    "filename": "CapabilityTest.1.1b20fba6.lump",
-    "sidecar_file": "CapabilityTest.1.1b20fba6.json",
-    "lump_size": 64,
-    "cw": 0,
-    "cc": 0,
-    "author": "",
-    "version": "",
-    "lump_version": 1,
-    "compiled_at": 1786841167.101907,
-    "methods": [],
-    "grants": [
-      "E"
-    ],
-    "binary_hash": "b24ada8251d0e6ad6a686250f0c125c041b85410d01abcb1e13878947c36cb6b",
-    "petname": "",
-    "issue_number": 1,
-    "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
-    "dot_name": "CapabilityTest",
-    "issue_n": 1
   }
 ]

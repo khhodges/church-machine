@@ -374,3 +374,222 @@ class TestErrorResponseShape:
         assert data.get("token") and isinstance(data["token"], str), (
             f"Successful save must return a non-empty string 'token'; got: {data}"
         )
+
+
+# ---------------------------------------------------------------------------
+# T4 — ELOADCALL / XLOADLAMBDA with methodIdx ≥ 1 must NOT be false-rejected
+# ---------------------------------------------------------------------------
+#
+# Live compiler/assembler encoding (simulator/assembler.js, cloomc_compiler.js):
+#   ELOADCALL (op=8): imm15 = (method_index << 5) | row  — 5-bit row, 7-bit method
+#   XLOADLAMBDA (op=9): imm15 = direct c-list slot (assembler.js case 9: `imm = slot`)
+#   LOAD/SAVE (ops 0,1): imm15 = c-list slot (5-bit, 0–31)
+#
+# The old server bug used (word & 0x7FFF) for all four opcodes, folding the
+# method-index bits into the slot for ELOADCALL.  For example, method_index=1,
+# row=0 gives imm15 = 32; old mask: slot=32 ≥ cc=5 → false 422.
+# The fix: ELOADCALL uses & 0x1F (row in bits[4:0]); XLOADLAMBDA uses & 0x7FFF.
+
+def _eloadcall_word(cr_src: int, method_idx: int, row: int) -> int:
+    """Build an ELOADCALL instruction word (opcode=8).
+
+    Live compiler/assembler encoding (cloomc_compiler.js):
+      bits[31:27] = opcode = 8
+      bits[18:15] = crSrc  (4-bit field)
+      imm15[11:5] = method_index (7-bit, 1-based)
+      imm15[4:0]  = c-list row   (5-bit, 0–31)
+      → imm15 = (method_index << 5) | (row & 0x1F)
+    """
+    imm15 = ((method_idx & 0x7F) << 5) | (row & 0x1F)
+    return ((8 << 27) | (cr_src << 15) | imm15) & 0xFFFFFFFF
+
+
+def _xloadlambda_word(cr_src: int, slot: int) -> int:
+    """Build an XLOADLAMBDA instruction word (opcode=9).
+
+    XLOADLAMBDA is only emitted by raw assembly (never by the CLOOMC compiler).
+    The assembler encodes it with imm15 = direct c-list slot (assembler.js case 9).
+      bits[31:27] = opcode = 9
+      bits[18:15] = crSrc  (4-bit field)
+      bits[14:0]  = slot   (direct 15-bit value; server extracts via & 0x7FFF)
+    """
+    return ((9 << 27) | (cr_src << 15) | (slot & 0x7FFF)) & 0xFFFFFFFF
+
+
+class TestEloadcallFalsePositiveFix:
+    """ELOADCALL with method_index ≥ 1 must not produce a false 422.
+
+    The server extracts the c-list row using opcode-specific masks:
+      ELOADCALL (op=8):   slot = word & 0x1F    (row in imm15[4:0])
+      XLOADLAMBDA (op=9): slot = word & 0x7FFF  (direct slot)
+    With method_index=1 and row=0, imm15 = 32; old 0x7FFF mask: slot=32 ≥ cc=5
+    → false 422.  Correct 0x1F mask: slot = 0 < cc=5 → 200 ✓
+    """
+
+    CC = 5  # enough c-list entries that row=0..4 are all valid
+
+    def _binary(self, instr_word: int) -> list:
+        """Header (typ=0, cw=1, cc=CC) + the given instruction word."""
+        return [_hdr(cw=1, cc=self.CC), instr_word]
+
+    # ── ELOADCALL: false-positive regression (the original bug) ───────────────
+
+    def test_eloadcall_method1_row0_returns_200(self, client, isolated_lumps):
+        """ELOADCALL crSrc=6, method_index=1, row=0, cc=5 — must return 200.
+
+        imm15 = (1 << 5) | 0 = 32.
+        Old mask (0x7FFF): slot = 32 ≥ cc=5 → false 422.
+        Correct mask (0x1F): row  = 0   < cc=5 → 200 ✓
+        """
+        word = _eloadcall_word(cr_src=6, method_idx=1, row=0)
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": self._binary(word), "metadata": _meta("7c504001")},
+        )
+        assert resp.status_code == 200, (
+            f"ELOADCALL method_index=1, row=0 should not be rejected as "
+            f"c-list out-of-bounds. Got {resp.status_code}: "
+            f"{resp.get_data(as_text=True)}"
+        )
+        assert resp.get_json().get("ok") is True
+
+    def test_eloadcall_method7_row0_returns_200(self, client, isolated_lumps):
+        """ELOADCALL crSrc=6, method_index=7, row=0, cc=5 — must return 200.
+
+        imm15 = (7 << 5) | 0 = 224.
+        Old mask: slot = 224 (false reject).  Correct 0x1F mask: slot = 0 ✓
+        """
+        word = _eloadcall_word(cr_src=6, method_idx=7, row=0)
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": self._binary(word), "metadata": _meta("7c504002")},
+        )
+        assert resp.status_code == 200, (
+            f"ELOADCALL method_index=7, row=0 wrongly rejected. "
+            f"Got {resp.status_code}: {resp.get_data(as_text=True)}"
+        )
+
+    def test_eloadcall_method1_row4_returns_200(self, client, isolated_lumps):
+        """ELOADCALL crSrc=6, method_index=1, row=4, cc=5 — row=4 < cc=5, valid.
+
+        imm15 = (1 << 5) | 4 = 36.  Correct mask: slot = 36 & 0x1F = 4 < cc=5 ✓
+        """
+        word = _eloadcall_word(cr_src=6, method_idx=1, row=4)
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": self._binary(word), "metadata": _meta("7c504003")},
+        )
+        assert resp.status_code == 200, (
+            f"ELOADCALL method_index=1, row=4 (< cc=5) should be accepted. "
+            f"Got {resp.status_code}: {resp.get_data(as_text=True)}"
+        )
+
+    def test_eloadcall_method127_row0_returns_200(self, client, isolated_lumps):
+        """ELOADCALL crSrc=6, method_index=127 (max), row=0, cc=5 — must return 200.
+
+        imm15 = (127 << 5) | 0 = 4064; old 0x7FFF mask: slot=4064 ≥ cc=5 → false 422.
+        Fixed 0x1F mask: slot = 4064 & 0x1F = 0 < cc=5 ✓
+        """
+        word = _eloadcall_word(cr_src=6, method_idx=127, row=0)
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": self._binary(word), "metadata": _meta("7c504003b")},
+        )
+        assert resp.status_code == 200, (
+            f"ELOADCALL method_index=127 (max), row=0 should not be rejected. "
+            f"Got {resp.status_code}: {resp.get_data(as_text=True)}"
+        )
+
+    # ── ELOADCALL: genuine OOB detection ─────────────────────────────────────
+
+    def test_eloadcall_row_oob_returns_422(self, client, isolated_lumps):
+        """ELOADCALL crSrc=6, method_index=0, row=5, cc=5 — row=5 ≥ cc=5, genuinely OOB.
+
+        imm15 = (0 << 5) | 5 = 5; slot = 5 & 0x1F = 5 ≥ cc=5 → 422 ✓
+        """
+        word = _eloadcall_word(cr_src=6, method_idx=0, row=5)
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": self._binary(word), "metadata": _meta("7c504004")},
+        )
+        assert resp.status_code == 422, (
+            f"ELOADCALL row=5 >= cc=5 must be rejected. "
+            f"Got {resp.status_code}: {resp.get_data(as_text=True)}"
+        )
+        data = resp.get_json()
+        assert data.get("clist_inconsistent") is True, (
+            f"OOB ELOADCALL must set clist_inconsistent=True; got: {data}"
+        )
+        assert data.get("bad_slot") == 5, (
+            f"bad_slot must be 5 (the row); got: {data}"
+        )
+
+    def test_eloadcall_method1_row_oob_returns_422(self, client, isolated_lumps):
+        """ELOADCALL crSrc=6, method_index=1, row=5, cc=5 — nonzero method + OOB row.
+
+        imm15 = (1 << 5) | 5 = 37; slot = 37 & 0x1F = 5 ≥ cc=5 → 422 ✓
+        Verifies that method bits do not hide a genuine OOB row.
+        """
+        word = _eloadcall_word(cr_src=6, method_idx=1, row=5)
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": self._binary(word), "metadata": _meta("7c504004b")},
+        )
+        assert resp.status_code == 422, (
+            f"ELOADCALL method_index=1, row=5 >= cc=5 must be rejected. "
+            f"Got {resp.status_code}: {resp.get_data(as_text=True)}"
+        )
+        data = resp.get_json()
+        assert data.get("clist_inconsistent") is True
+        assert data.get("bad_slot") == 5, (
+            f"bad_slot must be 5 (bits[4:0] of imm15); got: {data}"
+        )
+
+    # ── XLOADLAMBDA tests ─────────────────────────────────────────────────────
+    # XLOADLAMBDA is only emitted by raw assembly (never by the CLOOMC compiler).
+    # Its imm15 encodes the c-list slot directly; the server extracts via & 0x7FFF.
+
+    def test_xloadlambda_slot0_returns_200(self, client, isolated_lumps):
+        """XLOADLAMBDA crSrc=6, slot=0, cc=5 — slot=0 < cc=5, valid."""
+        word = _xloadlambda_word(cr_src=6, slot=0)
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": self._binary(word), "metadata": _meta("7c504005")},
+        )
+        assert resp.status_code == 200, (
+            f"XLOADLAMBDA slot=0 should be accepted. "
+            f"Got {resp.status_code}: {resp.get_data(as_text=True)}"
+        )
+        assert resp.get_json().get("ok") is True
+
+    def test_xloadlambda_slot_oob_returns_422(self, client, isolated_lumps):
+        """XLOADLAMBDA crSrc=6, slot=5, cc=5 — slot=5 ≥ cc=5, genuinely OOB."""
+        word = _xloadlambda_word(cr_src=6, slot=5)
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": self._binary(word), "metadata": _meta("7c504006")},
+        )
+        assert resp.status_code == 422, (
+            f"XLOADLAMBDA slot=5 >= cc=5 must be rejected. "
+            f"Got {resp.status_code}: {resp.get_data(as_text=True)}"
+        )
+        data = resp.get_json()
+        assert data.get("clist_inconsistent") is True
+
+    # ── Cross-check: non-CR6 ELOADCALL is not checked ─────────────────────────
+
+    def test_eloadcall_non_cr6_ignored(self, client, isolated_lumps):
+        """ELOADCALL targeting CR0 (not the c-list register) must not be flagged.
+
+        The bounds check applies only when crSrc == 6 (the c-list register).
+        method_index=1, row=5 (row ≥ cc=5) but crSrc=0 — not a c-list ref.
+        """
+        word = _eloadcall_word(cr_src=0, method_idx=1, row=5)
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": self._binary(word), "metadata": _meta("7c504007")},
+        )
+        assert resp.status_code == 200, (
+            f"ELOADCALL with crSrc≠6 must not trigger c-list bounds check. "
+            f"Got {resp.status_code}: {resp.get_data(as_text=True)}"
+        )
