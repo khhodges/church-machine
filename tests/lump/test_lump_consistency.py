@@ -1964,16 +1964,7 @@ class TestR20_CanonicalFilenameIntegrity:
 # R21 — Freespace zero-fill
 # ══════════════════════════════════════════════════════════════════════════════
 
-# SPEC-EXCEPTION: Constants.1.67a04067.lump stores its data words (Pi, E, Phi,
-# Zero, One) at word offsets 19–23, which fall inside the freespace zone
-# (fs = words cw+1..lumpSize-cc-1 = 19..61 for this binary with cw=18, cc=2,
-# lump_sz=64).  This binary predates strict freespace enforcement and the data
-# words are intentional payload, not padding corruption.  The manifest documents
-# data_offset=19 and dw=5 explicitly.  Correcting this would require rebuilding
-# the binary with cw=23 to include the data words in the code-section count.
-_R21_FREESPACE_EXCEPTIONS: frozenset = frozenset([
-    "00001200",   # Constants — data words in freespace by design (see note above)
-])
+_R21_FREESPACE_EXCEPTIONS: frozenset = frozenset([])
 
 
 class TestR21_FreespaceZeroFill:

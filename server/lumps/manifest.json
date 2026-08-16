@@ -43,7 +43,7 @@
         "abstraction": "Constants",
         "ns_slot": 9,
         "lump_size": 64,
-        "cw": 18,
+        "cw": 23,
         "dw": 5,
         "cc": 2,
         "methods": [
@@ -199,8 +199,8 @@
         "lump_version": 0,
         "dot_name": "Constants",
         "issue_n": 1,
-        "filename": "Constants.1.67a04067.lump",
-        "sidecar_file": "Constants.1.67a04067.json"
+        "filename": "Constants.1.a7920fad.lump",
+        "sidecar_file": "Constants.1.a7920fad.json"
     },
     {
         "token": "00001001",
