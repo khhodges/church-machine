@@ -524,6 +524,135 @@ function runHwCursor(ctx) {
         'classList=' + rows[1].className);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ELC tests: ELOADCALL slot decoding in _autoComment and annotation builder
+//
+// The ELOADCALL imm15 field is split:
+//   bits[4:0]  = c-list row (the slot index passed to the capability register)
+//   bits[11:5] = method index (1-based; 0 = fast-path)
+// The c-list SLOT used is therefore `imm & 0x1F`, NOT the raw imm15.
+// `ELOADCALL CR0, CR6, 0, 1` assembles as imm15=32 (0x0020).
+// A regression that uses raw imm15 as the slot would report c-list[32];
+// the correct implementation reports c-list[0].
+//
+//   ELC-1  _autoComment for ELOADCALL CR0,CR6,0,1 (imm15=32) → slot 0, not 32
+//   ELC-2  _autoComment for ELOADCALL CR0,CR6,1,2 (imm15=65) → slot 1, not 65
+//   ELC-3  Source of annotation builder confirms it uses (imm & 0x1F) for op===8
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Extractor: pull _autoComment out of app-lumps.js ─────────────────────────
+// _autoComment is a const arrow-function defined inside _renderLumpCodeContent.
+// It closes over `cc` and `clistSlotName` — we supply those as sandbox globals.
+
+function extractAutoComment(srcPath) {
+    const src = fs.readFileSync(path.resolve(__dirname, srcPath), 'utf8');
+    const marker = 'const _autoComment = (w, op, crDst, crSrc, imm, cond, crAlias) => {';
+    const startIdx = src.indexOf(marker);
+    if (startIdx === -1) throw new Error('_autoComment marker not found in ' + srcPath);
+    // Walk forward matching braces to find the closing `};`
+    let depth = 0;
+    let end   = -1;
+    for (let i = startIdx; i < src.length; i++) {
+        if (src[i] === '{') depth++;
+        else if (src[i] === '}') {
+            if (--depth === 0) { end = i; break; }
+        }
+    }
+    if (end === -1) throw new Error('Could not find end of _autoComment');
+    // Include the trailing `;` if present
+    const tail = src[end + 1] === ';' ? ';' : '';
+    return src.slice(startIdx, end + 1) + tail;
+}
+
+const AUTO_COMMENT_SRC = extractAutoComment('app-lumps.js');
+
+// Run _autoComment in an isolated sandbox with controlled outer-scope variables.
+// cc         — capability count (>0 triggers the crSrc===6 branch)
+// slotNames  — object mapping slot index → display name (empty = fallback labels)
+function runAutoComment(cc, slotNames, word) {
+    const clistSlotName = slotNames || {};
+    const sandbox = {
+        cc,
+        clistSlotName,
+        _autoComment: undefined,
+    };
+    const ctx = vm.createContext(new Proxy(sandbox, {
+        get(target, prop, receiver) {
+            if (prop in target) return Reflect.get(target, prop, receiver);
+            if (typeof prop === 'string' && prop in globalThis) return globalThis[prop];
+            return undefined;
+        },
+        has() { return true; },
+    }));
+    vm.runInContext(AUTO_COMMENT_SRC, ctx, { filename: 'app-lumps.js' });
+
+    const w      = word >>> 0;
+    const op     = (w >>> 27) & 0x1F;
+    const cond   = (w >>> 23) & 0xF;
+    const crDst  = (w >>> 19) & 0xF;
+    const crSrc  = (w >>> 15) & 0xF;
+    const imm    = w & 0x7FFF;
+    return vm.runInContext(
+        `_autoComment(${w}, ${op}, ${crDst}, ${crSrc}, ${imm}, ${cond}, {})`,
+        ctx,
+        { filename: 'app-lumps.js' }
+    );
+}
+
+// ── ELC-1: ELOADCALL CR0, CR6, 0, 1  (row=0, method=1, imm15=32) ─────────────
+// Word encoding: op=8, cond=14, crDst=0, crSrc=6, imm15=32
+//   (8<<27)|(14<<23)|(0<<19)|(6<<15)|32 = 0x47030020
+{
+    const ELOADCALL_WORD = 0x47030020;
+    const comment = runAutoComment(2, {}, ELOADCALL_WORD);
+
+    assert('ELC-1: comment mentions c-list[0], not c-list[32]',
+        comment.includes('c-list[0]') && !comment.includes('c-list[32]'),
+        'comment=' + JSON.stringify(comment));
+
+    assert('ELC-1: comment mentions method #1',
+        comment.includes('method #1'),
+        'comment=' + JSON.stringify(comment));
+}
+
+// ── ELC-2: ELOADCALL CR0, CR6, 1, 2  (row=1, method=2, imm15=65) ─────────────
+// Word encoding: op=8, cond=14, crDst=0, crSrc=6, imm15=(2<<5)|1=65=0x41
+//   (8<<27)|(14<<23)|(0<<19)|(6<<15)|65 = 0x47030041
+{
+    const ELOADCALL_WORD2 = 0x47030041;
+    const comment2 = runAutoComment(3, {}, ELOADCALL_WORD2);
+
+    assert('ELC-2: comment mentions c-list[1], not c-list[65]',
+        comment2.includes('c-list[1]') && !comment2.includes('c-list[65]'),
+        'comment=' + JSON.stringify(comment2));
+
+    assert('ELC-2: comment mentions method #2',
+        comment2.includes('method #2'),
+        'comment=' + JSON.stringify(comment2));
+}
+
+// ── ELC-3: annotation-builder source uses (imm & 0x1F) for op===8 ────────────
+// This is a structural guard: if someone naively reverts the fix back to `imm`
+// for op===8, this test will catch it at the source level.
+{
+    const src = fs.readFileSync(path.resolve(__dirname, 'app-lumps.js'), 'utf8');
+
+    // The annotation builder must contain the corrected split formula for op===8.
+    // Look for the exact expression that was fixed:
+    //   const _annSlot = op === 8 ? (imm & 0x1F) : imm;
+    const annPattern = /const\s+_annSlot\s*=\s*op\s*===\s*8\s*\?\s*\(\s*imm\s*&\s*0x1F\s*\)\s*:\s*imm/;
+    assert('ELC-3: annotation builder uses (imm & 0x1F) for ELOADCALL slot',
+        annPattern.test(src),
+        'pattern not found — regression in annotation builder');
+
+    // The _autoComment case 8 must use (imm & 0x1F) (or a variable derived from it)
+    // rather than bare `imm` as the slot. The canonical marker is `_elcRow  = imm & 0x1F`.
+    const autoCommentPattern = /const\s+_elcRow\s*=\s*imm\s*&\s*0x1F/;
+    assert('ELC-3: _autoComment uses imm & 0x1F for ELOADCALL row',
+        autoCommentPattern.test(src),
+        'pattern not found — regression in _autoComment');
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);
