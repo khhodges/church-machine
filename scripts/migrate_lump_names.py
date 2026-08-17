@@ -36,6 +36,7 @@ import json
 import os
 import re
 import struct
+import subprocess
 import sys
 import shutil
 
@@ -155,6 +156,60 @@ def _read_lump_header(path: str) -> dict | None:
     return dict(magic=magic, cw=cw, cc=cc, lump_sz=lump_sz, valid=(magic == 0x1F))
 
 
+def _git_tracked_filenames(lumps_dir: str) -> set:
+    """Return the set of .lump basenames currently tracked by git in *lumps_dir*.
+
+    Returns an empty set when git is unavailable or the directory is not inside
+    a git repository.
+    """
+    try:
+        repo_root = os.path.normpath(os.path.join(lumps_dir, '..', '..'))
+        result = subprocess.run(
+            ['git', 'ls-files', 'server/lumps/'],
+            capture_output=True, text=True, check=True,
+            cwd=repo_root,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return set()
+    names: set = set()
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if line.endswith('.lump'):
+            names.add(os.path.basename(line))
+    return names
+
+
+def _build_known_filenames(manifest: list) -> set:
+    """Return the lowercased set of all filenames the manifest currently owns."""
+    known: set = set()
+    for entry in manifest:
+        token = entry.get('token', '').lower()
+        if token:
+            known.add(f'{token}.lump')
+        fn = entry.get('filename', '')
+        if fn:
+            known.add(fn.lower())
+    return known
+
+
+def _make_is_archive(known_filenames: set):
+    """Return an ``is_archive(basename)`` predicate closed over *known_filenames*."""
+    _ARCHIVE_RE_LEGACY = re.compile(r'^[0-9a-f]{8}-v\d+\.lump$')
+    _ARCHIVE_RE_NEW    = re.compile(r'^.+_v\d+\.lump$')
+    current_stems = {n[:-5] for n in known_filenames}
+
+    def is_archive(basename: str) -> bool:
+        bl = basename.lower()
+        if _ARCHIVE_RE_LEGACY.match(bl):
+            return True
+        if _ARCHIVE_RE_NEW.match(bl):
+            stem = bl[:-5]
+            return stem not in current_stems
+        return False
+
+    return is_archive
+
+
 def orphan_cleanup(lumps_dir: str, dry_run: bool = False, force: bool = False):
     """Scan *lumps_dir* for .lump files not referenced by manifest.json and offer
     to delete them.
@@ -166,8 +221,9 @@ def orphan_cleanup(lumps_dir: str, dry_run: bool = False, force: bool = False):
     Naming rules:
     - A file is *known* if its basename (or stem) matches any manifest entry's
       ``filename`` field or ``<token>.lump`` legacy name.
-    - Archive files (<token>-vN.lump and <Name>_vN.lump) are skipped silently —
-      they are intentional historical copies.
+    - Archive files (<token>-vN.lump and <Name>_vN.lump) are skipped — they are
+      intentional historical copies.  Git-tracked archives with valid headers are
+      noted at the end as a reminder to review them with ``--archive-cleanup``.
 
     Returns a list of deleted filenames (empty in dry-run or when nothing found).
     """
@@ -179,39 +235,20 @@ def orphan_cleanup(lumps_dir: str, dry_run: bool = False, force: bool = False):
     with open(manifest_path) as f:
         manifest = json.load(f)
 
-    # Build the set of all filenames the manifest owns.
-    known_filenames: set = set()
-    for entry in manifest:
-        token = entry.get('token', '').lower()
-        if token:
-            known_filenames.add(f'{token}.lump')
-        fn = entry.get('filename', '')
-        if fn:
-            known_filenames.add(fn.lower())
-
-    _ARCHIVE_RE_LEGACY = re.compile(r'^[0-9a-f]{8}-v\d+\.lump$')
-    _ARCHIVE_RE_NEW    = re.compile(r'^.+_v\d+\.lump$')
-
-    def is_archive(basename: str) -> bool:
-        bl = basename.lower()
-        if _ARCHIVE_RE_LEGACY.match(bl):
-            return True
-        # New-style archive only when the stem is not a manifest current filename.
-        if _ARCHIVE_RE_NEW.match(bl):
-            stem = bl[:-5]
-            return stem not in {n[:-5] for n in known_filenames}
-        return False
+    known_filenames = _build_known_filenames(manifest)
+    is_archive = _make_is_archive(known_filenames)
 
     all_lumps = sorted(fn for fn in os.listdir(lumps_dir) if fn.endswith('.lump'))
     candidates = [fn for fn in all_lumps
                   if fn.lower() not in known_filenames and not is_archive(fn)]
+    skipped_archives = [fn for fn in all_lumps
+                        if fn.lower() not in known_filenames and is_archive(fn)]
 
     if not candidates:
         print('orphan-cleanup: no orphan .lump files found.')
-        return []
-
-    print(f'{"DRY RUN — " if dry_run else ""}orphan-cleanup: {len(candidates)} candidate(s) in {lumps_dir}')
-    print()
+    else:
+        print(f'{"DRY RUN — " if dry_run else ""}orphan-cleanup: {len(candidates)} candidate(s) in {lumps_dir}')
+        print()
 
     blocked = []   # valid-header files blocked without --force
     deleted = []
@@ -254,19 +291,157 @@ def orphan_cleanup(lumps_dir: str, dry_run: bool = False, force: bool = False):
         else:
             deleted.append(basename)   # in dry-run we still report what *would* be deleted
 
-    print()
-    if blocked:
-        print(
-            f'BLOCKED {len(blocked)} valid-header file(s) — re-add to manifest.json or '
-            'use --force:\n  ' + '\n  '.join(blocked)
-        )
-    if dry_run:
-        print(f'Dry run — {len(deleted)} file(s) would be deleted, {len(blocked)} blocked.')
-    else:
-        print(f'Deleted {len(deleted)} file(s), {len(blocked)} blocked.')
+    if candidates:
+        print()
+        if blocked:
+            print(
+                f'BLOCKED {len(blocked)} valid-header file(s) — re-add to manifest.json or '
+                'use --force:\n  ' + '\n  '.join(blocked)
+            )
+        if dry_run:
+            print(f'Dry run — {len(deleted)} file(s) would be deleted, {len(blocked)} blocked.')
+        else:
+            print(f'Deleted {len(deleted)} file(s), {len(blocked)} blocked.')
+
+    # Warn about git-tracked archive files with valid headers that were skipped.
+    # These archives were once current binaries; they deserve review before any
+    # sweep removes them.  Use --archive-cleanup to manage them explicitly.
+    if skipped_archives:
+        git_tracked = _git_tracked_filenames(lumps_dir)
+        warned_archives = []
+        for basename in skipped_archives:
+            if basename not in git_tracked:
+                continue
+            path = os.path.join(lumps_dir, basename)
+            hdr = _read_lump_header(path)
+            if hdr and hdr['valid']:
+                warned_archives.append((basename, hdr))
+        if warned_archives:
+            print()
+            print(
+                f'NOTE: {len(warned_archives)} git-tracked archive .lump file(s) with valid\n'
+                f'      headers were skipped by orphan-cleanup (archives are exempt from\n'
+                f'      the manifest-coverage check, but they were once current binaries).\n'
+                f'      Review them with:  python3 scripts/migrate_lump_names.py --archive-cleanup'
+            )
+            for basename, hdr in warned_archives:
+                print(
+                    f'      {basename}  '
+                    f'(magic=0x1F, cw={hdr["cw"]}, cc={hdr["cc"]}, lump_sz={hdr["lump_sz"]})'
+                )
 
     if blocked and not force:
         sys.exit(2)  # non-zero so CI catches the blocked-deletion condition
+
+    return deleted
+
+
+def archive_cleanup(lumps_dir: str, dry_run: bool = False, force: bool = False):
+    """Scan *lumps_dir* for archive .lump files and guard against silent deletion
+    of valid-header binaries.
+
+    Archive files (<token>-vN.lump and <Name>_vN.lump) are intentional historical
+    copies exempt from the manifest-coverage check.  However, a valid-header archive
+    that was git-tracked (i.e. committed) was once a current binary; deleting it
+    without review discards history that may be needed for rollback or audit.
+
+    Without ``--force``:
+      - Archives with a valid LUMP header (magic=0x1F) are BLOCKED regardless of
+        whether they are git-tracked.  Git-tracked ones are labelled prominently.
+      - Archives with invalid/unreadable headers are deleted (or would-be in dry-run).
+
+    With ``--force``:
+      - All archives are deleted.  Valid-header ones (especially git-tracked ones)
+        produce a prominent WARNING log line so the action is traceable.
+
+    Returns a list of deleted filenames (empty in dry-run or when nothing found).
+    """
+    manifest_path = os.path.join(lumps_dir, 'manifest.json')
+    if not os.path.isfile(manifest_path):
+        print(f'ERROR: manifest.json not found at {manifest_path}', file=sys.stderr)
+        sys.exit(1)
+
+    with open(manifest_path) as f:
+        manifest = json.load(f)
+
+    known_filenames = _build_known_filenames(manifest)
+    is_archive = _make_is_archive(known_filenames)
+
+    # Collect git-tracked filenames for labelling (best-effort; empty set if no git).
+    git_tracked = _git_tracked_filenames(lumps_dir)
+
+    all_lumps = sorted(fn for fn in os.listdir(lumps_dir) if fn.endswith('.lump'))
+    archives = [fn for fn in all_lumps if is_archive(fn)]
+
+    if not archives:
+        print('archive-cleanup: no archive .lump files found.')
+        return []
+
+    print(f'{"DRY RUN — " if dry_run else ""}archive-cleanup: {len(archives)} archive(s) in {lumps_dir}')
+    print()
+
+    blocked = []
+    deleted = []
+
+    for basename in archives:
+        path = os.path.join(lumps_dir, basename)
+        hdr = _read_lump_header(path)
+        git_label = '  [git-tracked]' if basename in git_tracked else ''
+
+        if hdr and hdr['valid']:
+            if not force:
+                git_note = (
+                    '\n           This file is git-tracked — it was once a current binary\n'
+                    '           and is preserved in commit history.'
+                    if basename in git_tracked
+                    else ''
+                )
+                print(
+                    f'  BLOCKED  {basename}{git_label}\n'
+                    f'           Header valid: magic=0x1F, cw={hdr["cw"]}, cc={hdr["cc"]}, '
+                    f'lump_sz={hdr["lump_sz"]}{git_note}\n'
+                    f'           This archive carries a valid LUMP header.  Supply --force\n'
+                    f'           only after confirming this version is genuinely obsolete\n'
+                    f'           and git history (or another backup) preserves it.'
+                )
+                blocked.append(basename)
+                continue
+            else:
+                git_warn = (
+                    '\n           WARNING: this file is git-tracked — ensure the commit\n'
+                    '           history preserves it before deletion.'
+                    if basename in git_tracked
+                    else ''
+                )
+                print(
+                    f'  FORCE-DELETE  {basename}{git_label}\n'
+                    f'           Header valid: magic=0x1F, cw={hdr["cw"]}, cc={hdr["cc"]}, '
+                    f'lump_sz={hdr["lump_sz"]}\n'
+                    f'           WARNING: deleting a valid LUMP archive binary.{git_warn}'
+                )
+        else:
+            reason = 'invalid/unreadable header' if hdr else 'unreadable'
+            print(f'  DELETE  {basename}  ({reason}){git_label}')
+
+        if not dry_run:
+            os.remove(path)
+            deleted.append(basename)
+        else:
+            deleted.append(basename)
+
+    print()
+    if blocked:
+        print(
+            f'BLOCKED {len(blocked)} valid-header archive(s) — confirm obsolete and '
+            'use --force:\n  ' + '\n  '.join(blocked)
+        )
+    if dry_run:
+        print(f'Dry run — {len(deleted)} archive(s) would be deleted, {len(blocked)} blocked.')
+    else:
+        print(f'Deleted {len(deleted)} archive(s), {len(blocked)} blocked.')
+
+    if blocked and not force:
+        sys.exit(2)
 
     return deleted
 
@@ -378,13 +553,23 @@ def main():
         ),
     )
     parser.add_argument(
+        '--archive-cleanup', action='store_true',
+        help=(
+            'Scan server/lumps/ for archive .lump files (<token>-vN.lump, '
+            '<Name>_vN.lump) and guard against silently deleting valid-header '
+            'binaries.  Archives with a valid LUMP header (magic=0x1F) are '
+            'BLOCKED unless --force is also supplied.  Git-tracked archives '
+            '(recently demoted from "current" status) are labelled prominently '
+            'so reviewers can confirm they are intentionally obsolete.'
+        ),
+    )
+    parser.add_argument(
         '--force', action='store_true',
         help=(
-            'Allow --orphan-cleanup to delete .lump files that carry a valid '
-            'LUMP header even when they are absent from manifest.json.  '
-            'Use only after confirming the binary is genuinely obsolete and '
-            'the manifest entry was intentionally removed.  Has no effect '
-            'without --orphan-cleanup.'
+            'Allow --orphan-cleanup or --archive-cleanup to delete .lump files '
+            'that carry a valid LUMP header.  Use only after confirming the '
+            'binary is genuinely obsolete.  Has no effect without one of those '
+            'cleanup modes.'
         ),
     )
     args = parser.parse_args()
@@ -399,6 +584,8 @@ def main():
 
     if args.orphan_cleanup:
         orphan_cleanup(lumps_dir, dry_run=args.dry_run, force=args.force)
+    elif args.archive_cleanup:
+        archive_cleanup(lumps_dir, dry_run=args.dry_run, force=args.force)
     else:
         migrate(lumps_dir, dry_run=args.dry_run)
 

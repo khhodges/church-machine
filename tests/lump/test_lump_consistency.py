@@ -44,6 +44,11 @@ R24b Every .json file in server/lumps/ (sidecar and manifest) that is a symbolic
      link must resolve to a real regular file (broken/dangling symlinks are an
      immediate hard failure). Symlinks that resolve outside the lumps directory
      are flagged as a pytest warning.
+R25b Every git-tracked archive .lump file (<token>-vN.lump, <Name>_vN.lump) with
+     a valid LUMP header emits a pytest warning. Archives are exempt from the
+     manifest-coverage requirement (R25), but a committed archive that was once
+     a current binary deserves review before any cleanup sweep removes it.
+     (Warning only — does not block CI.)
 
 Failure messages are written to be self-diagnosing: they state what was found,
 what was expected, and which file to correct.
@@ -2830,6 +2835,89 @@ class TestR25_GitTrackedLumpsInManifest:
             "    obsolete (use `--force` on the orphan-cleanup tool to confirm).\n"
             "Do NOT silently delete or rename them without updating manifest.json."
         )
+
+
+class TestR25b_GitTrackedArchiveLumpsWarning:
+    """R25b: Git-tracked archive .lump files with valid headers emit a pytest warning.
+
+    Archives (<token>-vN.lump and <Name>_vN.lump) are intentional historical
+    copies, exempt from the manifest-coverage requirement enforced by R25.
+    However, a git-tracked archive that carries a valid LUMP header was once
+    a "current" binary; a logged warning keeps it visible to reviewers and
+    reminds operators to use ``--archive-cleanup`` before any sweep removes it.
+
+    An archive that is NOT currently tracked by git (never committed, or already
+    removed from the index) is silently ignored — only committed archives that
+    could still be deleted by a naive cleanup sweep are surfaced here.
+
+    This is a WARNING (not a hard failure) because archives are intentionally
+    exempt from the manifest.  The goal is visibility, not a CI block.
+    """
+
+    @staticmethod
+    def _git_tracked_lump_filenames() -> list:
+        """Return basenames of all .lump files currently tracked by git in server/lumps/."""
+        try:
+            result = subprocess.run(
+                ["git", "ls-files", "server/lumps/"],
+                capture_output=True, text=True, check=True,
+                cwd=os.path.normpath(os.path.join(LUMPS_DIR, "..", "..")),
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return []
+        names = []
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if line.endswith(".lump"):
+                names.append(os.path.basename(line))
+        return sorted(names)
+
+    def test_git_tracked_archive_lumps_warn(self):
+        """Git-tracked archive .lump files with valid headers emit a pytest warning.
+
+        This does not block CI — it surfaces archives that were once current
+        binaries so reviewers can confirm they are intentionally obsolete before
+        any cleanup sweep removes them.
+        """
+        tracked = set(self._git_tracked_lump_filenames())
+        if not tracked:
+            pytest.skip("No git-tracked .lump files found (not inside a git repo?)")
+
+        for basename in sorted(tracked):
+            stem = basename[:-5]  # strip .lump
+            if not _is_archive_stem(stem):
+                continue  # non-archives are handled by R25
+
+            path = os.path.join(LUMPS_DIR, basename)
+            if not os.path.isfile(path):
+                continue  # dangling — R24 catches it
+
+            try:
+                with open(path, "rb") as fh:
+                    raw = fh.read(4)
+                if len(raw) < 4:
+                    continue
+                import struct as _struct
+                word = _struct.unpack(">I", raw)[0]
+                magic = (word >> 27) & 0x1F
+                cw    = (word >> 10) & 0x1FFF
+                cc    =  word        & 0xFF
+            except OSError:
+                continue
+
+            if magic != 0x1F:
+                continue  # invalid header — safe to ignore
+
+            warnings.warn(
+                f"R25b: git-tracked archive {basename!r} carries a valid LUMP header "
+                f"(magic=0x1F, cw={cw}, cc={cc}) and is absent from manifest.json.\n"
+                "  This archive was once a current binary.  Confirm it is intentionally\n"
+                "  demoted before any cleanup sweep removes it.\n"
+                "  To review all such archives:  "
+                "python3 scripts/migrate_lump_names.py --archive-cleanup [--dry-run]",
+                UserWarning,
+                stacklevel=2,
+            )
 
 
 class TestR24b_NoBrokenJsonSymlinks:
