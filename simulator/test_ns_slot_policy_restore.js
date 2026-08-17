@@ -82,6 +82,22 @@ function extractTopLevelFn(sourceFile, fnName) {
 const populateAddMetaSrc = extractTopLevelFn('app-memory.js', '_nsPopulateAddMeta');
 const confirmFnSrc       = extractTopLevelFn('app-memory.js', '_nsTableAddConfirm');
 
+// ── Extract shared helper definitions from the unit-test export marker ────────
+//
+// _nsPopulateAddMeta and _nsTableAddConfirm now call _nsSlotPolicyResolve and
+// _nsSlotPersistRecord (defined inside the NS_SLOT_PERSIST_UNIT_TEST_EXPORT
+// marker block).  VM sandboxes that load the production functions must also
+// load the helpers or they get ReferenceError at the call sites.
+const _appMemorySrc = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');
+const _MSTART = 'NS_SLOT_PERSIST_UNIT_TEST_EXPORT_START';
+const _MEND   = 'NS_SLOT_PERSIST_UNIT_TEST_EXPORT_END';
+const _msi = _appMemorySrc.indexOf('/* ---- ' + _MSTART);
+const _mei = _appMemorySrc.indexOf(_MEND + ' ---- */');
+if (_msi === -1 || _mei === -1) {
+    throw new Error('NS_SLOT_PERSIST_UNIT_TEST_EXPORT markers not found in app-memory.js');
+}
+const helpersSrc = _appMemorySrc.slice(_msi, _mei + _MEND.length + ' ---- */'.length);
+
 // ── Simulator factory ─────────────────────────────────────────────────────────
 
 function makeTestSim() {
@@ -164,6 +180,8 @@ function makeCacheHitSandbox(sim, detailSidecar) {
     };
 
     const ctx = vm.createContext(sandbox);
+    // Inject shared helpers first — _nsPopulateAddMeta calls them.
+    vm.runInContext(helpersSrc,         ctx, { filename: 'app-memory.js[helpers]'  });
     vm.runInContext(populateAddMetaSrc, ctx, { filename: 'app-memory.js' });
     return { ctx, container, sandbox };
 }
@@ -381,6 +399,8 @@ console.log('\n--- T105: full install → remove → re-add (fetch path) ---');
     };
 
     const ctx = vm.createContext(sandbox);
+    // Inject shared helpers first — both production functions call them.
+    vm.runInContext(helpersSrc,          ctx, { filename: 'app-memory.js[helpers]'  });
     vm.runInContext(confirmFnSrc,        ctx, { filename: 'app-memory.js[confirm]'  });
     vm.runInContext(populateAddMetaSrc,  ctx, { filename: 'app-memory.js[populate]' });
 

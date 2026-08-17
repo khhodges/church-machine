@@ -2841,6 +2841,39 @@ window._nsAddCurrentDetailSidecar = null;  // full sidecar from /api/lumps/<toke
 // Keys are LUMP token strings; values are { ns_slot_policy, ns_slot }.
 window._nsPersistedSlotMeta = window._nsPersistedSlotMeta || {};
 
+/* ---- NS_SLOT_PERSIST_UNIT_TEST_EXPORT_START ---- */
+// Pure helpers extracted for unit testing.  These mirror the inline logic in
+// _nsPopulateAddMeta (cache overlay) and _nsTableAddConfirm (persist-on-install)
+// without any DOM or fetch dependency.
+//
+// _nsSlotPolicyResolve: given a sidecar, a token, and the persistent cache,
+//   return the { nsSlotVal, policy } pair that the ADD modal should display.
+//   Mirrors the overlay block at the top of _nsPopulateAddMeta.
+function _nsSlotPolicyResolve(detailSidecar, token, nsPersistedSlotMeta) {
+    const _persistedSlotMeta = nsPersistedSlotMeta && nsPersistedSlotMeta[token];
+    if (_persistedSlotMeta) {
+        if (_persistedSlotMeta.ns_slot_policy !== undefined) {
+            detailSidecar = Object.assign({}, detailSidecar, { ns_slot_policy: _persistedSlotMeta.ns_slot_policy });
+        }
+        if (_persistedSlotMeta.ns_slot !== undefined) {
+            detailSidecar = Object.assign({}, detailSidecar, { ns_slot: _persistedSlotMeta.ns_slot });
+        }
+    }
+    const rawSlot   = detailSidecar.ns_slot;
+    const nsSlotVal = (rawSlot !== null && rawSlot !== undefined) ? String(rawSlot) : '';
+    const policy    = detailSidecar.ns_slot_policy || (nsSlotVal !== '' ? 'static' : 'dynamic');
+    return { nsSlotVal, policy };
+}
+// _nsSlotPersistRecord: given the user's chosen policy and the allocated slot,
+//   return { patchedPolicy, patchedSlot } — the values written to both the PATCH
+//   body and to window._nsPersistedSlotMeta[token] in _nsTableAddConfirm.
+function _nsSlotPersistRecord(slotPolicy, slot) {
+    const patchedPolicy = slotPolicy;
+    const patchedSlot   = slotPolicy === 'dynamic' ? null : slot;
+    return { patchedPolicy, patchedSlot };
+}
+/* ---- NS_SLOT_PERSIST_UNIT_TEST_EXPORT_END ---- */
+
 function _nsTableAdd() {
     if (!sim) return;
     const _existing = document.getElementById('_nsAddModalOverlay');
@@ -2996,26 +3029,18 @@ async function _nsPopulateAddMeta(token) {
         }
     }
 
-    // ── Overlay persistent slot-policy choices from previous installs ─────────
-    // window._nsPersistedSlotMeta is keyed by token and is NOT cleared by
-    // _nsTableAdd(), so it carries the programmer's last-chosen policy and slot
-    // across modal lifecycle resets and before the async PATCH reaches the server.
-    const _persistedSlotMeta = window._nsPersistedSlotMeta && window._nsPersistedSlotMeta[token];
-    if (_persistedSlotMeta) {
-        if (_persistedSlotMeta.ns_slot_policy !== undefined) {
-            detailSidecar = Object.assign({}, detailSidecar, { ns_slot_policy: _persistedSlotMeta.ns_slot_policy });
-        }
-        if (_persistedSlotMeta.ns_slot !== undefined) {
-            detailSidecar = Object.assign({}, detailSidecar, { ns_slot: _persistedSlotMeta.ns_slot });
-        }
-    }
+    // ── Overlay persistent slot-policy choices + compute editable-field defaults ─
+    // _nsSlotPolicyResolve() applies the in-memory cache (window._nsPersistedSlotMeta)
+    // on top of the server-fetched sidecar, then derives { nsSlotVal, policy }.
+    // window._nsPersistedSlotMeta is NOT cleared by _nsTableAdd(), so it carries the
+    // programmer's last-chosen policy and slot across modal lifecycles and before the
+    // async PATCH reaches the server.  The shared helper is unit-tested in
+    // test_ns_slot_modal_persist.js so drift between test and production is impossible.
+    const { nsSlotVal, policy } = _nsSlotPolicyResolve(
+        detailSidecar, token, window._nsPersistedSlotMeta);
 
     // ── Editable-field defaults from detailSidecar ────────────────────────────
     const bootResident  = !!(detailSidecar.boot_resident);
-    const rawSlot       = detailSidecar.ns_slot;
-    const nsSlotVal     = (rawSlot !== null && rawSlot !== undefined) ? String(rawSlot) : '';
-    const policy        = detailSidecar.ns_slot_policy ||
-                          (nsSlotVal !== '' ? 'static' : 'dynamic');
     const contentType   = detailSidecar.content_type || 'code';
     const typField      = typeof detailSidecar.typ === 'number' ? detailSidecar.typ : 0;
     const gtTypeDefault = (contentType === 'outform' || typField === 2) ? 2 : 1;
@@ -3232,8 +3257,10 @@ function _nsTableAddConfirm() {
 
         // Persist the programmer's slot-policy choice (and the concrete slot assigned)
         // back to the sidecar so re-add and boot_image.py use the correct policy.
-        const _patchedPolicy = slotPolicy;
-        const _patchedSlot   = slotPolicy === 'dynamic' ? null : slot;
+        // _nsSlotPersistRecord() is shared with the unit test (test_ns_slot_modal_persist.js)
+        // so drift between test and production is impossible.
+        const { patchedPolicy: _patchedPolicy, patchedSlot: _patchedSlot } =
+            _nsSlotPersistRecord(slotPolicy, slot);
         fetch('/api/lump/' + token + '/meta', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
