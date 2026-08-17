@@ -41,6 +41,35 @@ git commit --no-verify
 Only use this if you are certain the violation is intentional (e.g. a test
 fixture that is itself testing the error path).
 
+## Renaming a .lump file
+
+When you rename a `.lump` file in `server/lumps/`, you **must** also update
+`server/lumps/manifest.json` in the same commit.  The pre-commit hook enforces
+this automatically:
+
+1. If you stage a renamed `.lump` that still carries a valid LUMP header, the
+   hook checks whether `manifest.json` (staged version) has a matching `filename`
+   or `token` entry.
+2. If no matching entry is found, the commit is blocked with a message listing
+   the offending file(s).
+
+**Fix:** update the `filename` field (or add a new entry) in `manifest.json`,
+re-stage the manifest, and commit again.
+
+**Run the check manually at any time:**
+
+```bash
+python3 scripts/check_staged_lumps.py
+```
+
+Note: `check_staged_lumps.py` inspects the git *index* (staged files), so it
+must be run from inside the repository.  To audit already-committed lumps use
+the R25 pytest rule instead:
+
+```bash
+python -m pytest tests/lump/test_lump_consistency.py -v -k R25
+```
+
 ## Other local checks
 
 | Command | What it checks |
@@ -48,4 +77,5 @@ fixture that is itself testing the error path).
 | `npm test` | Assembler tests + capabilities scan |
 | `npm run check:selftest-lump` | Selftest LUMP freshness |
 | `node scripts/sync-canonical-examples.js --check` | Inline examples match `simulator/examples/` |
-| `python -m pytest tests/lump/test_lump_consistency.py -v` | LUMP metadata consistency (11 rules) |
+| `python -m pytest tests/lump/test_lump_consistency.py -v` | LUMP metadata consistency (R1–R25) |
+| `python3 scripts/check_staged_lumps.py` | Staged .lump renames reflected in manifest.json |

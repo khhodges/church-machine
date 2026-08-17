@@ -11,24 +11,36 @@
 #   cp scripts/hooks/pre-commit .git/hooks/pre-commit
 #   chmod +x .git/hooks/pre-commit
 
-STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep '\.cloomc$')
+STAGED_CLOOMC=$(git diff --cached --name-only --diff-filter=ACM | grep '\.cloomc$')
+STAGED_LUMP=$(git diff --cached --name-only --diff-filter=AR | grep '\.lump$')
 
-if [ -z "$STAGED" ]; then
-    exit 0
+# ── Capabilities check (staged .cloomc files) ────────────────────────────────
+if [ -n "$STAGED_CLOOMC" ]; then
+    echo "check-capabilities: scanning staged .cloomc files..."
+    node scripts/check-capabilities-blocks.js --glob '**/*.cloomc'
+    STATUS=$?
+    if [ $STATUS -ne 0 ]; then
+        echo ""
+        echo "Commit blocked: one or more .cloomc files are missing a capabilities block."
+        echo "Add the missing block(s) and re-stage the file(s), or run:"
+        echo "  npm run check:capabilities"
+        echo "to see the full report."
+        exit 1
+    fi
 fi
 
-echo "check-capabilities: scanning staged .cloomc files..."
-
-node scripts/check-capabilities-blocks.js --glob '**/*.cloomc'
-STATUS=$?
-
-if [ $STATUS -ne 0 ]; then
-    echo ""
-    echo "Commit blocked: one or more .cloomc files are missing a capabilities block."
-    echo "Add the missing block(s) and re-stage the file(s), or run:"
-    echo "  npm run check:capabilities"
-    echo "to see the full report."
-    exit 1
+# ── Staged-lump manifest check (staged .lump additions / renames) ─────────────
+if [ -n "$STAGED_LUMP" ]; then
+    echo "check-staged-lumps: verifying staged .lump files appear in manifest.json..."
+    python3 scripts/check_staged_lumps.py
+    STATUS=$?
+    if [ $STATUS -eq 1 ]; then
+        echo ""
+        echo "Commit blocked: staged .lump file(s) are missing from manifest.json."
+        echo "Update server/lumps/manifest.json and re-stage it, then commit again."
+        exit 1
+    fi
+    # Exit code 2 means infrastructure warning — don't block the commit.
 fi
 
 exit 0
