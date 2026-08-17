@@ -5646,7 +5646,7 @@ def save_lump():
         "filename":      lump_filename,
         "sidecar_file":  sidecar_filename,
         "ns_slot":       ns_slot,
-        "lump_size":     len(words),
+        "lump_size":     len(_sl_words),
         "typ":           hdr_typ,
         "content_type":  content_type,
         "cw":            metadata.get("cw", 0),
@@ -5703,7 +5703,7 @@ def save_lump():
         "sidecar_file":  sidecar_filename,
         # ns_slot intentionally omitted from new entries — ns-state.json is now
         # the authoritative slot→token map; existing entries left as-is.
-        "lump_size":     len(words),
+        "lump_size":     len(_sl_words),  # padded size (matches on-disk file)
         "cw":            sidecar["cw"],
         "cc":            sidecar["cc"],
         "author":        sidecar.get("author", ""),

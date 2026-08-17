@@ -698,3 +698,190 @@ class TestNonCr6NeverRejected:
             f"[{label}] op={opcode} crSrc={cr_src} imm15={imm15:#x}: "
             f"expected ok=True in response, got: {resp.get_json()}"
         )
+
+
+# ---------------------------------------------------------------------------
+# T6 — Manifest lump_size matches the actual on-disk binary size
+# ---------------------------------------------------------------------------
+#
+# save_lump() pads the client's compact binary to the logical LUMP size
+# (1 << (n_m6 + 6) words) before writing the .lump file.  The manifest and
+# sidecar must record the *padded* word count so that:
+#   manifest_lump_size * 4 == os.path.getsize(lump_file)
+#
+# A previous bug recorded len(input_words) instead of len(padded_words),
+# producing a manifest entry whose lump_size (e.g. 2) disagreed with the
+# actual file (e.g. 256 bytes = 64 words).  Boot-image layout checks and
+# the hex-tab viewer both rely on manifest lump_size to determine the real
+# range of valid addresses; a stale compact size causes false truncation
+# warnings for every user-compiled lump.
+#
+# Also checked: /api/lump/<token> response length == lump_size * 4 + 4.
+# The +4 accounts for the CRC-32 prefix word prepended by _lump_with_crc().
+
+class TestManifestLumpSizeMatchesDiskFile:
+    """Manifest lump_size must equal the actual on-disk file size / 4.
+
+    Tests cover:
+      • compact binary (input shorter than logical lump_size) — the common
+        case where the bug manifested
+      • full padded binary (input exactly lump_size words) — a sanity check
+        that the padded-size recording is idempotent for already-padded input
+    """
+
+    # ── helpers ───────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _logical_lump_size(hdr_word: int) -> int:
+        """Decode the logical LUMP size from a header word (1 << (n_m6+6))."""
+        n_m6 = (hdr_word >> 23) & 0xF
+        return 1 << (n_m6 + 6)
+
+    @staticmethod
+    def _lump_file_for(isolated_lumps, token: str, save_resp_json: dict):
+        """Resolve the saved .lump path from the save response."""
+        lump_filename = save_resp_json.get("lump", "")
+        assert lump_filename, f"save response missing 'lump' field: {save_resp_json}"
+        p = isolated_lumps / lump_filename
+        assert p.is_file(), f".lump file not found at {p}"
+        return p
+
+    @staticmethod
+    def _manifest_lump_size(isolated_lumps, token: str) -> int:
+        """Read lump_size for *token* from manifest.json."""
+        manifest_path = isolated_lumps / "manifest.json"
+        with open(manifest_path) as f:
+            manifest = json.load(f)
+        entries = [e for e in manifest if e.get("token") == token]
+        assert entries, f"Token {token!r} not found in manifest"
+        return entries[-1]["lump_size"]
+
+    # ── T6a — compact binary: padded file, manifest records padded size ───────
+
+    TOKEN_COMPACT = "7c506001"
+
+    def test_compact_binary_manifest_size_equals_file_size(self, client, isolated_lumps):
+        """Compact input (2 words) → manifest lump_size == actual file size / 4."""
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": _compact_valid_words(), "metadata": _meta(self.TOKEN_COMPACT)},
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        data = resp.get_json()
+
+        lump_path = self._lump_file_for(isolated_lumps, self.TOKEN_COMPACT, data)
+        file_size_bytes = lump_path.stat().st_size
+        manifest_lump_size = self._manifest_lump_size(isolated_lumps, self.TOKEN_COMPACT)
+
+        assert file_size_bytes == manifest_lump_size * 4, (
+            f"Compact binary: file is {file_size_bytes} bytes "
+            f"({file_size_bytes // 4} words) but manifest records "
+            f"lump_size={manifest_lump_size}. "
+            f"save_lump() must record the padded word count, not len(input_words)."
+        )
+
+    def test_compact_binary_manifest_size_equals_logical_header_size(self, client, isolated_lumps):
+        """Manifest lump_size must equal 1 << (n_m6+6) decoded from the header."""
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": _compact_valid_words(), "metadata": _meta(self.TOKEN_COMPACT)},
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        data = resp.get_json()
+
+        lump_path = self._lump_file_for(isolated_lumps, self.TOKEN_COMPACT, data)
+        raw = lump_path.read_bytes()
+        hdr = struct.unpack(">I", raw[:4])[0]
+        logical_size = self._logical_lump_size(hdr)
+        manifest_lump_size = self._manifest_lump_size(isolated_lumps, self.TOKEN_COMPACT)
+
+        assert manifest_lump_size == logical_size, (
+            f"manifest lump_size={manifest_lump_size} does not match "
+            f"logical LUMP size decoded from header ({logical_size} words, n_m6="
+            f"{(hdr >> 23) & 0xF})."
+        )
+
+    def test_compact_binary_save_response_size_bytes_matches_file(self, client, isolated_lumps):
+        """The save response's size_bytes must match the actual on-disk file size."""
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": _compact_valid_words(), "metadata": _meta(self.TOKEN_COMPACT)},
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        data = resp.get_json()
+
+        lump_path = self._lump_file_for(isolated_lumps, self.TOKEN_COMPACT, data)
+        file_size_bytes = lump_path.stat().st_size
+        resp_size_bytes = data.get("size_bytes")
+
+        assert resp_size_bytes == file_size_bytes, (
+            f"save response size_bytes={resp_size_bytes} != "
+            f"actual file size {file_size_bytes}"
+        )
+
+    # ── T6b — get_lump response length: lump_size * 4 + 4 (CRC prefix) ───────
+
+    TOKEN_GETLUMP = "7c506002"
+
+    def test_get_lump_response_length_equals_lump_size_times_4_plus_crc(
+            self, client, isolated_lumps):
+        """/api/lump/<token> must return exactly lump_size*4+4 bytes.
+
+        The +4 accounts for the big-endian CRC-32 prefix word prepended by
+        _lump_with_crc().  lump_size is read from the manifest (the padded
+        word count) so this test also exercises the manifest-size fix.
+        """
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": _compact_valid_words(), "metadata": _meta(self.TOKEN_GETLUMP)},
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+
+        manifest_lump_size = self._manifest_lump_size(isolated_lumps, self.TOKEN_GETLUMP)
+        expected_len = manifest_lump_size * 4 + 4   # lump bytes + CRC prefix word
+
+        get_resp = client.get(f"/api/lump/{self.TOKEN_GETLUMP}")
+        assert get_resp.status_code == 200, (
+            f"/api/lump/{self.TOKEN_GETLUMP} returned {get_resp.status_code}: "
+            f"{get_resp.get_data(as_text=True)}"
+        )
+        actual_len = len(get_resp.data)
+        assert actual_len == expected_len, (
+            f"/api/lump/{self.TOKEN_GETLUMP} response is {actual_len} bytes but "
+            f"expected {expected_len} (manifest lump_size={manifest_lump_size} "
+            f"× 4 + 4 CRC prefix)."
+        )
+
+    # ── T6c — full padded binary: no net change, sizes trivially agree ────────
+
+    TOKEN_FULL = "7c506003"
+
+    def test_full_binary_manifest_size_equals_file_size(self, client, isolated_lumps):
+        """Full padded binary (64 words, n_m6=0) must also pass the invariant.
+
+        When the client sends a binary that is already exactly lump_size words,
+        no padding is applied and the invariant must trivially hold.
+        """
+        hdr = _hdr(cw=1, cc=1)
+        logical_size = 1 << (_N_M6 + 6)   # 64 for n_m6=0
+        full_binary = [hdr] + [0] * (logical_size - 1)   # 64 words total
+
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": full_binary, "metadata": _meta(self.TOKEN_FULL)},
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        data = resp.get_json()
+
+        lump_path = self._lump_file_for(isolated_lumps, self.TOKEN_FULL, data)
+        file_size_bytes = lump_path.stat().st_size
+        manifest_lump_size = self._manifest_lump_size(isolated_lumps, self.TOKEN_FULL)
+
+        assert file_size_bytes == manifest_lump_size * 4, (
+            f"Full binary: file is {file_size_bytes} bytes but manifest records "
+            f"lump_size={manifest_lump_size} (expected {file_size_bytes // 4})."
+        )
+        assert manifest_lump_size == logical_size, (
+            f"Full binary: manifest lump_size={manifest_lump_size} "
+            f"!= logical size {logical_size}."
+        )
