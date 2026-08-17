@@ -41,34 +41,49 @@ git commit --no-verify
 Only use this if you are certain the violation is intentional (e.g. a test
 fixture that is itself testing the error path).
 
-## Renaming a .lump file
+## Adding, renaming, or deleting a .lump file
 
-When you rename a `.lump` file in `server/lumps/`, you **must** also update
+Any change to a `.lump` file in `server/lumps/` must be reflected in
 `server/lumps/manifest.json` in the same commit.  The pre-commit hook enforces
-this automatically:
+this automatically for three kinds of change:
 
-1. If you stage a renamed `.lump` that still carries a valid LUMP header, the
-   hook checks whether `manifest.json` (staged version) has a matching `filename`
+### Adding or renaming a .lump file
+
+1. If you stage an added or renamed `.lump` that carries a valid LUMP header,
+   the hook checks whether the staged `manifest.json` has a matching `filename`
    or `token` entry.
 2. If no matching entry is found, the commit is blocked with a message listing
    the offending file(s).
 
 **Fix:** update the `filename` field (or add a new entry) in `manifest.json`,
-re-stage the manifest, and commit again.
+re-stage the manifest, and commit again.  To audit already-committed lumps:
 
-**Run the check manually at any time:**
+```bash
+python -m pytest tests/lump/test_lump_consistency.py -v -k R25
+```
+
+### Deleting a .lump file
+
+1. If you stage a deleted `.lump` that had a valid LUMP header in HEAD, the
+   hook checks whether the staged `manifest.json` still references it.
+2. If the manifest entry was not also removed (or updated), the commit is
+   blocked with a message listing the offending file(s).
+
+**Fix:** remove (or update) the matching entry in `manifest.json`, re-stage the
+manifest, and commit again.  To audit already-committed deletions:
+
+```bash
+python -m pytest tests/lump/test_lump_consistency.py -v -k R10
+```
+
+### Running the check manually
 
 ```bash
 python3 scripts/check_staged_lumps.py
 ```
 
 Note: `check_staged_lumps.py` inspects the git *index* (staged files), so it
-must be run from inside the repository.  To audit already-committed lumps use
-the R25 pytest rule instead:
-
-```bash
-python -m pytest tests/lump/test_lump_consistency.py -v -k R25
-```
+must be run from inside the repository.
 
 ## Other local checks
 

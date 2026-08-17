@@ -12,7 +12,7 @@
 #   chmod +x .git/hooks/pre-commit
 
 STAGED_CLOOMC=$(git diff --cached --name-only --diff-filter=ACM | grep '\.cloomc$')
-STAGED_LUMP=$(git diff --cached --name-only --diff-filter=AR | grep '\.lump$')
+STAGED_LUMP=$(git diff --cached --name-only --diff-filter=ARD | grep '\.lump$')
 
 # ── Capabilities check (staged .cloomc files) ────────────────────────────────
 if [ -n "$STAGED_CLOOMC" ]; then
