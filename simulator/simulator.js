@@ -6883,6 +6883,16 @@ class ChurchSimulator {
 
         const lumpSize = hdr.lumpSize;
 
+        // Truncation guard: the buffer must supply at least as many words as the
+        // header declares.  A shorter buffer means the file was cut short — code
+        // words or c-list entries are missing and the LUMP would silently run with
+        // zeroed-out words in their place.  Reject early so the caller gets a
+        // clear error rather than corrupted execution.
+        if (words.length < lumpSize) {
+            this.output += `[loadLumpBinary] ERROR: buffer has ${words.length} word(s) but header declares lumpSize=${lumpSize} — truncated LUMP rejected.\n`;
+            return false;
+        }
+
         if (EXTENDED_BASE + lumpSize > this.NS_TABLE_BASE) {
             this.output += `[loadLumpBinary] ERROR: LUMP (${lumpSize} words) would overflow memory at 0x${EXTENDED_BASE.toString(16)}.\n`;
             return false;

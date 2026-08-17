@@ -1039,6 +1039,68 @@ console.log('\n--- LLB-18: n_minus_6=10 (out of range) — loadLumpBinary return
         `got 0x${sim.memory[nsBase+2].toString(16)} expected 0x${sentinelW2.toString(16)}`);
 }
 
+// ── LLB-19: Truncated buffer — loadLumpBinary returns false ───────────────────
+// The header declares lumpSize=64 (n_minus_6=0) but the buffer is only 32 words.
+// loadLumpBinary must reject the buffer and leave NS slot unchanged.
+console.log('\n--- LLB-19: Truncated buffer (header says 64 words, buffer has 32) ---');
+{
+    const N_MINUS_6 = 0;   // lumpSize = 2^(0+6) = 64
+    const CW        = 10;
+    const CC        = 2;
+    const LUMP_SIZE = 1 << (N_MINUS_6 + 6);  // 64
+    const BUF_SIZE  = LUMP_SIZE / 2;          // 32 — deliberately short
+
+    const sim = new ChurchSimulator();
+    sim.bootComplete = true;
+
+    const GT_SEQ    = 3;
+    const INIT_BASE = 0x80;
+    const INIT_CW   = 64;
+    const nsBase = sim._nsSlotBase(sim.bootEntrySlot);
+
+    const sentinelW0 = INIT_BASE >>> 0;
+    const sentinelW1 = sim.packNSWord1(INIT_CW, 0, 0, 0, 0);
+    const sentinelW2 = sim.makeVersionSeals(GT_SEQ, INIT_BASE, INIT_CW);
+    sim.memory[nsBase + 0] = sentinelW0;
+    sim.memory[nsBase + 1] = sentinelW1;
+    sim.memory[nsBase + 2] = sentinelW2;
+
+    sim.cr[14] = {
+        word0: sim.createGT(GT_SEQ, sim.bootEntrySlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1),
+        word1: INIT_BASE,
+        word2: sentinelW1,
+        word3: sentinelW2,
+        m: 0,
+    };
+    sim.cr[12] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
+
+    // Build a valid header (declares 64-word lump) but only supply 32 words.
+    const hdrWord = makeHdr(CW, CC, N_MINUS_6);
+    const truncatedWords = new Array(BUF_SIZE).fill(0);
+    truncatedWords[0] = hdrWord;
+
+    const ok = sim.loadLumpBinary(truncatedWords);
+
+    check('LLB-19a: loadLumpBinary returns false for truncated buffer', ok === false,
+        `loadLumpBinary returned ${ok}`);
+
+    // NS slot must be left completely untouched.
+    check('LLB-19b: NS slot word0 unchanged after truncated-buffer rejection',
+        sim.memory[nsBase + 0] === sentinelW0,
+        `got 0x${sim.memory[nsBase+0].toString(16)} expected 0x${sentinelW0.toString(16)}`);
+    check('LLB-19c: NS slot word1 unchanged after truncated-buffer rejection',
+        sim.memory[nsBase + 1] === sentinelW1,
+        `got 0x${sim.memory[nsBase+1].toString(16)} expected 0x${sentinelW1.toString(16)}`);
+    check('LLB-19d: NS slot word2 unchanged after truncated-buffer rejection',
+        sim.memory[nsBase + 2] === sentinelW2,
+        `got 0x${sim.memory[nsBase+2].toString(16)} expected 0x${sentinelW2.toString(16)}`);
+
+    // The error must be recorded in sim.output.
+    check('LLB-19e: sim.output contains truncation error message',
+        sim.output.includes('truncated LUMP rejected'),
+        `output: "${sim.output.slice(0, 200)}"`);
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log('\n══════════════════════════════════════');
 console.log(`Results: ${pass} passed, ${fail} failed`);
