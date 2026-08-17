@@ -33,7 +33,7 @@ function extractDisMnemBlock() {
     if (condStart === -1) throw new Error('CONDS array not found');
     const condEnd = html.indexOf('];\n', condStart) + 3;
 
-    const fnMarker = 'function _disMnem(w32)';
+    const fnMarker = 'function _disMnem(w32, clistNames)';
     const fnStart  = html.indexOf(fnMarker, condEnd);
     if (fnStart === -1) throw new Error('_disMnem function not found');
     let depth = 0, fnEnd = -1;
@@ -53,8 +53,9 @@ const DISMNEM_BLOCK = extractDisMnemBlock();
 // Build a _disMnem function bound to a given mock clistNames map.
 function makeDisMnem(mockClistNames) {
     // eslint-disable-next-line no-new-func
-    const factory = new Function('clistNames', `${DISMNEM_BLOCK}\nreturn _disMnem;`);
-    return factory(mockClistNames);
+    const factory = new Function(`${DISMNEM_BLOCK}\nreturn _disMnem;`);
+    const fn = factory();
+    return (w32) => fn(w32, mockClistNames);
 }
 
 // ── Instruction word encoding ────────────────────────────────────────────────

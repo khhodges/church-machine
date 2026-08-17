@@ -1431,7 +1431,7 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
       const CONDS = ['EQ','NE','CS','CC','MI','PL','VS','VC','HI','LS','GE','LT','GT','LE','','NV'];
 
       // ── Mnemonic string ───────────────────────────────────────────────────────
-      function _disMnem(w32) {
+      function _disMnem(w32, clistNames) {
         w32 = w32 >>> 0;
         const op=(w32>>>27)&0x1F, cond=(w32>>>23)&0xF, dst=(w32>>>19)&0xF;
         const src=(w32>>>15)&0xF, imm=w32&0x7FFF;
@@ -1595,7 +1595,7 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
           } else if(wi>=1&&wi<=cw_){
             // Code region
             const mLabel=methodStarts[wi]?`.method ${methodStarts[wi]}\n`:'';
-            const mn=_disMnem(val), cmt=_mkCmt(val,crAlias,clistNames);
+            const mn=_disMnem(val,clistNames), cmt=_mkCmt(val,crAlias,clistNames);
             tip+=`\n${mLabel}${mn}\n; ${cmt}`;
             codeWords.push(val);
             filled++;
@@ -1737,7 +1737,7 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
           if(!mnemHtml){
             const opName=OPNAMES[op]||'';
             const condStr=cond===14?'':CONDS[cond];
-            const full=_esc(_disMnem(w32));
+            const full=_esc(_disMnem(w32,clistNames));
             const pfxLen=opName.length+(condStr?condStr.length+1:0);
             mnemHtml=`<span class="da-op">${_esc(opName)}</span>`+
               (condStr?`<span class="da-cond"> ${_esc(condStr)}</span>`:'')+
