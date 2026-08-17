@@ -1257,9 +1257,9 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
         const val = words[wi];
         const cls = 'hex-cell hex-' + sec.replace('-','-');
         const hexStr = val !== null ? val.toString(16).toUpperCase().padStart(8,'0') : '· · · ·';
-        const tipVal = val !== null ? `0x${val.toString(16).toUpperCase().padStart(8,'0')}` : '(not embedded)';
+        const tipVal = val !== null ? `0x${val.toString(16).toUpperCase().padStart(8,'0')}` : '(loading…)';
         const tip = (annots[wi] ? annots[wi] + '  |  ' : '') + tipVal;
-        cells += `<td class="${cls}" title="${tip.replace(/"/g,'&quot;')}">${hexStr}</td>`;
+        cells += `<td id="hexW${wi}" class="${cls}" title="${tip.replace(/"/g,'&quot;')}">${hexStr}</td>`;
       }
       const showRegion = (firstSec !== prevSec);
       prevSec = firstSec;
@@ -1356,7 +1356,7 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
           <span class="hex-leg-item"><span class="hex-leg-swatch" style="background:#f7f7f7;border-color:#ccc;"></span> Freespace (all 0)</span>
           <span class="hex-leg-item"><span class="hex-leg-swatch" style="background:#fff8e8;border-color:#d8b870;"></span> C-list (null GT)</span>
           <span class="hex-leg-item"><span class="hex-leg-swatch" style="background:#ffe8b0;border-color:#c8900a;"></span> C-list (live GT)</span>
-          <span style="color:#888;font-size:0.68rem;margin-left:auto;">· · · · = not embedded (binary only)</span>
+          <span id="_hexBinaryNote" style="color:#888;font-size:0.68rem;margin-left:auto;">⏳ Loading binary…</span>
         </div>
         <div class="hex-wrap">
           <table class="hex-table">
@@ -1376,6 +1376,32 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
         </div>
         <div class="disasm-listing" id="_disasmListing">${esc(da)}</div>
       </div>`;
+
+    // ── Async: fetch the real binary and fill in code words ───────────────────
+    (async function _fetchHexBinary(token, codeStart, codeEnd) {
+      const note = document.getElementById('_hexBinaryNote');
+      try {
+        const res = await fetch('/api/lump/' + token);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const buf = await res.arrayBuffer();
+        const view = new DataView(buf);
+        const wordCount = Math.floor(buf.byteLength / 4);
+        let filled = 0;
+        for (let w = codeStart; w <= codeEnd && w < wordCount; w++) {
+          const val = view.getUint32(w * 4, false); // big-endian
+          const cell = document.getElementById('hexW' + w);
+          if (!cell) continue;
+          const hexStr = val.toString(16).toUpperCase().padStart(8, '0');
+          cell.textContent = hexStr;
+          const oldTitle = cell.title;
+          cell.title = oldTitle.replace('(loading…)', '0x' + hexStr);
+          filled++;
+        }
+        if (note) note.textContent = filled + ' code word' + (filled !== 1 ? 's' : '') + ' loaded from binary';
+      } catch (e) {
+        if (note) note.textContent = '⚠ Binary unavailable — ' + e.message;
+      }
+    })(lump.token, 1, lump.cw);
 
   } else if (tab === 'spec') {
     body.innerHTML = `
