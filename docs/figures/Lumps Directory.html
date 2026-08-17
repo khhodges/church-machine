@@ -144,8 +144,25 @@ body { font-family: system-ui, sans-serif; margin: 0; background: #f2f3f7; color
 .hex-leg-swatch { width: 1em; height: 1em; border: 1px solid #ccc; border-radius: 2px; }
 .disasm-btn { background: #1e2d52; color: #a8c8f8; border: 1px solid #3a5a8a; border-radius: 4px; padding: 0.32rem 0.8rem; font-size: 0.77rem; cursor: pointer; font-weight: 600; }
 .disasm-btn:hover { background: #2a3d6a; }
-.disasm-listing { font-family: 'Courier New', Courier, monospace; font-size: 0.7rem; background: #0d1b2a; color: #c8d8f0; padding: 0.9rem 1rem; border-radius: 5px; overflow: auto; max-height: 560px; line-height: 1.75; white-space: pre; margin-top: 0.75rem; display: none; }
+.disasm-listing { font-family: 'Courier New', Courier, monospace; font-size: 0.7rem; background: #0d1b2a; color: #c8d8f0; padding: 0.9rem 1rem; border-radius: 5px; overflow: auto; max-height: 560px; line-height: 1.6; margin-top: 0.75rem; display: none; }
 .disasm-listing.visible { display: block; }
+.da-row   { display: flex; align-items: center; gap: 0.5rem; min-height: 20px; padding: 0 0.1rem; }
+.da-row:hover { background: #1a2a40; }
+.da-addr  { color: #5a7a9a; min-width: 5.2em; flex-shrink: 0; font-size: 0.65rem; }
+.da-hex   { color: #4a6a5a; min-width: 6.6em; flex-shrink: 0; font-size: 0.65rem; }
+.da-brsvg { display: inline-flex; align-items: center; flex-shrink: 0; }
+.da-mnem  { min-width: 22em; flex-shrink: 0; }
+.da-cmt   { color: #5a8a6a; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.da-op    { color: #a8d8f8; font-weight: 700; }
+.da-cond  { color: #f7b731; font-size: 0.65rem; vertical-align: super; }
+.da-lbl   { color: #f7b731; font-weight: 700; }
+.da-ops   { color: #c8d8f0; }
+.da-hdr   { color: #3a5a7a; white-space: pre; }
+.da-sep   { color: #2a3a5a; white-space: pre; margin-top: 0.5rem; }
+.da-method-hdr { color: #a8c8f8; font-weight: 700; margin-top: 0.6rem; padding: 0.2rem 0; }
+.da-docstring  { color: #5a8a6a; font-style: italic; padding-left: 1rem; }
+.da-label { color: #f7b731; padding: 0.1rem 0; }
+.br-svg   { display: block; overflow: visible; }
 
 /* ── Docs ── */
 .doc-stat { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
@@ -1378,6 +1395,7 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
           <span class="hex-leg-item"><span class="hex-leg-swatch" style="background:#ffe8b0;border-color:#c8900a;"></span> C-list (live GT)</span>
           <span id="_hexBinaryNote" style="color:#888;font-size:0.68rem;margin-left:auto;">⏳ Loading binary…</span>
         </div>
+        <div id="_hexSizeWarn" style="display:none;background:#4a1a1a;color:#ffa0a0;font-size:0.72rem;padding:0.3rem 0.7rem;border-radius:3px;margin-bottom:0.4rem;"></div>
         <div class="hex-wrap">
           <table class="hex-table">
             <thead><tr>
@@ -1397,93 +1415,254 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
         <div class="disasm-listing" id="_disasmListing">${esc(da)}</div>
       </div>`;
 
-    // ── Async: fetch the real binary, fill code words, decode each as assembler ─
-    (async function _fetchHexBinary(token, codeStart, codeEnd, methodStarts) {
-      // ── Mini-disassembler (v2.0 ISA) ───────────────────────────────────────
-      const _OPNAMES = {
-        0:'LOAD', 1:'SAVE', 2:'CALL', 3:'RETURN', 4:'CHANGE', 5:'SWITCH',
-        6:'TPERM', 7:'LAMBDA', 8:'ELOADCALL', 9:'XLOADLAMBDA',
-        16:'DREAD', 17:'DWRITE', 18:'BFEXT', 19:'BFINS', 20:'MCMP',
-        21:'IADD', 22:'ISUB', 23:'BRANCH', 24:'SHL', 25:'SHR',
-      };
-      const _OPDESC = {
-        0:'load GT from c-list[imm] via CR_src → CR_dst',
-        1:'save CR_src into c-list[imm] via CR_dst',
-        2:'call method #imm on abstraction in CR_dst (CR_src=ctx)',
-        3:'return to caller (restore CR14, pop frame)',
-        4:'CHANGE thread context: switch to NS in CR_dst',
-        5:'SWITCH namespace to CR_dst (privileged)',
-        6:'transfer permission from CR_src to CR_dst',
-        7:'load word at lump[imm] via CR_src into CR_dst',
-        8:'load + call in one step (ELOADCALL)',
-        9:'load lambda extension (XLOADLAMBDA)',
-        16:'read from address [CR_src + imm] into DR_dst',
-        17:'write DR_dst to address [CR_src + imm]',
-        18:'bit-field extract from DR_src',
-        19:'bit-field insert into DR_dst',
-        20:'masked compare DR_dst vs DR_src',
-        21:'integer add DR_dst ← DR_src + imm',
-        22:'integer subtract DR_dst ← DR_src − imm',
-        23:'conditional PC-relative branch',
-        24:'shift left DR_dst ← DR_src << imm',
-        25:'shift right DR_dst ← DR_src >> imm',
-      };
-      const _CONDS = ['EQ','NE','CS','CC','MI','PL','VS','VC','HI','LS','GE','LT','GT','LE','AL','NV'];
-      function _disasm(w32) {
+    // ── Async: fetch binary → fill hex grid + build live disassembly ─────────
+    (async function _fetchHexBinary(token, codeStart, codeEnd, methodStarts, lumpData) {
+
+      // ── ISA tables ───────────────────────────────────────────────────────────
+      const OPNAMES = {0:'LOAD',1:'SAVE',2:'CALL',3:'RETURN',4:'CHANGE',5:'SWITCH',
+        6:'TPERM',7:'LAMBDA',8:'ELOADCALL',9:'XLOADLAMBDA',
+        16:'DREAD',17:'DWRITE',18:'BFEXT',19:'BFINS',20:'MCMP',
+        21:'IADD',22:'ISUB',23:'BRANCH',24:'SHL',25:'SHR'};
+      const CONDS = ['EQ','NE','CS','CC','MI','PL','VS','VC','HI','LS','GE','LT','GT','LE','','NV'];
+
+      // ── Mnemonic string ───────────────────────────────────────────────────────
+      function _disMnem(w32) {
         w32 = w32 >>> 0;
-        const op   = (w32 >>> 27) & 0x1F;
-        const cond = (w32 >>> 23) & 0xF;
-        const dst  = (w32 >>> 19) & 0xF;
-        const src  = (w32 >>> 15) & 0xF;
-        const imm  = w32 & 0x7FFF;
-        if (op === 0x1F) return { line: '.header  (trap sentinel)', desc: 'not executable — lump magic word' };
-        if (op === 0x1E) return { line: `.word  0x${w32.toString(16).toUpperCase().padStart(8,'0')}`, desc: 'inline data constant' };
-        const mnemo = _OPNAMES[op] || `???[${op}]`;
-        const condTag = cond === 14 ? '' : _CONDS[cond]; // omit AL
-        const isTuring = op >= 16 && op <= 25;
-        const R = isTuring ? 'DR' : 'CR';
-        let ops;
-        if (op === 3) {                         // RETURN — no operands
-          ops = '';
-        } else if (op === 23) {                 // BRANCH — signed offset only
-          const sImm = (imm & 0x4000) ? (imm - 0x8000) : imm;
-          ops = `  #${sImm >= 0 ? '+' : ''}${sImm}`;
-        } else if (op === 2 || op === 8) {      // CALL / ELOADCALL — method index in imm
-          ops = `  ${R}${dst}, ${R}${src}, method=#${imm}`;
-        } else if (op === 0 || op === 1 || op === 7) { // LOAD / SAVE / LAMBDA — slot in imm
-          ops = `  ${R}${dst}, ${R}${src}, slot=#${imm}`;
-        } else {
-          ops = `  ${R}${dst}, ${R}${src}, #${imm}`;
-        }
-        const line = condTag ? `${mnemo} ${condTag}${ops}` : `${mnemo}${ops}`;
-        const desc = _OPDESC[op] || '';
-        return { line, desc };
+        const op=(w32>>>27)&0x1F, cond=(w32>>>23)&0xF, dst=(w32>>>19)&0xF;
+        const src=(w32>>>15)&0xF, imm=w32&0x7FFF;
+        if (op===0x1F) return '.header';
+        if (op===0x1E) return `.word  0x${w32.toString(16).toUpperCase().padStart(8,'0')}`;
+        const mn=OPNAMES[op]||`???[${op}]`, cs=cond===14?'':CONDS[cond];
+        const R=op>=16&&op<=25?'DR':'CR';
+        let ops='';
+        if (op===3) ops='';
+        else if (op===23){const s=(imm&0x4000)?(imm-0x8000):imm;ops=`  #${s>=0?'+':''}${s}`;}
+        else if (op===2||op===8) ops=`  ${R}${dst}, ${R}${src}, method=#${imm}`;
+        else if (op===0||op===1||op===7) ops=`  ${R}${dst}, ${R}${src}, slot=#${imm}`;
+        else ops=`  ${R}${dst}, ${R}${src}, #${imm}`;
+        return cs?`${mn} ${cs}${ops}`:`${mn}${ops}`;
       }
-      // ── Fetch & fill ───────────────────────────────────────────────────────
-      const note = document.getElementById('_hexBinaryNote');
+
+      // ── Semantic comment (ported from app-lumps.js _autoComment) ─────────────
+      function _mkCmt(w32, crAlias, clistNames) {
+        w32=w32>>>0; if(w32===0) return 'end of method / padding';
+        const op=(w32>>>27)&0x1F, cond=(w32>>>23)&0xF, dst=(w32>>>19)&0xF;
+        const src=(w32>>>15)&0xF, imm=w32&0x7FFF;
+        const cs=cond===14?'':('if '+CONDS[cond]+' ');
+        const nm=i=>clistNames[i]||null, sl=i=>clistNames[i]||`c-list[${i}]`;
+        const crN=n=>{if(crAlias[n]!==undefined){const l=nm(crAlias[n]);if(l)return `"${l}"`;}return `CR${n}`;};
+        switch(op){
+          case 0: return src===6?`${cs}CR${dst} ← "${sl(imm)}"` :`${cs}CR${dst} ← GT via ${crN(src)}[${imm}]`;
+          case 1: return `${cs}store CR${src} → GT space of ${crN(dst)}[${imm}]`;
+          case 2: return `${cs}invoke ${crN(dst)}`;
+          case 3: {const m=imm&0xFFF;return m?`scrub 0b${m.toString(2).padStart(12,'0')} then return`:'return to caller';}
+          case 4: return src===6?`${cs}hot-swap CR${dst} ← "${sl(imm)}"` :`${cs}update CR${dst} via ${crN(src)}[${imm}]`;
+          case 5: return `${cs}SWITCH CR${src} ↔ CR${imm&0x7}`;
+          case 6: {const ps=['CLEAR','R','RW','X','RX','RWX','L','S','E','LS'];return `${cs}attenuate CR${dst} → ${ps[imm&0xF]||'RSV'}${(imm>>>4)&1?'+B':''}`;}
+          case 7: return `${cs}create lambda closure → CR${dst}`;
+          case 8: {const r=imm&0x1F,m=imm>>>5;return `${cs}fused load+call "${sl(r)}"${m?` method #${m}`:''}→ CR${dst}`;}
+          case 9: return `${cs}fused load+lambda "${sl(imm)}" → CR${dst}`;
+          case 16:{const l=crAlias[src]!==undefined&&nm(crAlias[src]);return l?`${cs}DR${dst} ← "${l}"` :`${cs}DR${dst} ← data[${crN(src)}+${imm}]`;}
+          case 17:{const l=crAlias[src]!==undefined&&nm(crAlias[src]);return l?`${cs}"${l}" ← DR${dst}` :`${cs}data[${crN(src)}+${imm}] ← DR${dst}`;}
+          case 18:{const p=(imm>>>5)&0x1F,w=imm&0x1F;return `${cs}DR${dst}=bits[${p}:${p+w-1}] of DR${src}`;}
+          case 19:{const p=(imm>>>5)&0x1F,w=imm&0x1F;return `${cs}insert ${w}b from DR${src} at pos ${p} into DR${dst}`;}
+          case 20: return `${cs}compare DR${dst} vs DR${src} → flags`;
+          case 21:{const r=(imm&0x4000)?`#${imm&0x3FFF}`:`DR${imm&0xF}`;return `${cs}DR${dst} = DR${src} + ${r}`;}
+          case 22:{const r=(imm&0x4000)?`#${imm&0x3FFF}`:`DR${imm&0xF}`;return `${cs}DR${dst} = DR${src} − ${r}`;}
+          case 23:{const s=(imm&0x4000)?(imm|0xFFFF8000):imm;return `${cs}branch → PC${s>=0?'+':''}${s}`;}
+          case 24: return `${cs}DR${dst} = DR${src} << ${imm&0x1F}`;
+          case 25:{const a=(imm>>>5)&1;return `${cs}DR${dst} = DR${src} >> ${imm&0x1F} (${a?'arith':'logical'})`;}
+          default: return 'unknown opcode';
+        }
+      }
+
+      // ── Branch arrow SVG (ported from app-cr-detail.js _computeBranchArrows) ─
+      const _brColors=['#e94560','#4ecdc4','#f7b731','#a55eea','#26de81','#fd9644','#45aaf2','#fc5c65'];
+      function _computeBranchArrows(words) {
+        const n=words.length, branches=[];
+        for(let i=0;i<n;i++){
+          const w=words[i]>>>0; if(w===0)continue;
+          if(((w>>>27)&0x1F)===23){
+            const imm=w&0x7FFF, soff=(imm&0x4000)?(imm|0xFFFF8000):imm, tgt=i+soff;
+            if(tgt>=0&&tgt<n&&tgt!==i){const top=Math.min(i,tgt),bot=Math.max(i,tgt);branches.push({src:i,tgt,top,bot,span:bot-top});}
+          }
+        }
+        if(!branches.length) return {html:new Array(n).fill(''),hasBranches:false};
+        branches.sort((a,b)=>a.span-b.span);
+        for(let i=0;i<branches.length;i++){
+          const b=branches[i];
+          for(let lane=0;lane<8;lane++){
+            let ok=true;
+            for(let j=0;j<i;j++){if(branches[j].lane!==lane)continue;if(branches[j].top<=b.bot&&branches[j].bot>=b.top){ok=false;break;}}
+            if(ok){b.lane=lane;break;}
+          }
+          if(b.lane===undefined)b.lane=0;
+          b.color=_brColors[i%_brColors.length];
+        }
+        const maxLane=Math.max(...branches.map(b=>b.lane))+1;
+        const laneW=7,tickW=5,svgW=maxLane*laneW+tickW+2,h=18,mid=h/2;
+        const result=[];
+        for(let row=0;row<n;row++){
+          let lines='';
+          for(const b of branches){
+            if(row<b.top||row>b.bot)continue;
+            const x=svgW-tickW-(b.lane*laneW)-2,col=b.color;
+            if(row===b.top){
+              lines+=`<line x1="${x}" y1="${mid}" x2="${x}" y2="${h}" stroke="${col}" stroke-width="1.5"/>`;
+              lines+=`<line x1="${x}" y1="${mid}" x2="${svgW}" y2="${mid}" stroke="${col}" stroke-width="1.5"/>`;
+              if(row===b.tgt)lines+=`<polygon points="${svgW},${mid} ${svgW-4},${mid-3} ${svgW-4},${mid+3}" fill="${col}"/>`;
+            } else if(row===b.bot){
+              lines+=`<line x1="${x}" y1="0" x2="${x}" y2="${mid}" stroke="${col}" stroke-width="1.5"/>`;
+              lines+=`<line x1="${x}" y1="${mid}" x2="${svgW}" y2="${mid}" stroke="${col}" stroke-width="1.5"/>`;
+              if(row===b.tgt)lines+=`<polygon points="${svgW},${mid} ${svgW-4},${mid-3} ${svgW-4},${mid+3}" fill="${col}"/>`;
+            } else {
+              lines+=`<line x1="${x}" y1="0" x2="${x}" y2="${h}" stroke="${col}" stroke-width="1.5"/>`;
+            }
+          }
+          result.push(lines?`<svg class="br-svg" width="${svgW}" height="${h}">${lines}</svg>`:'');
+        }
+        return {html:result,hasBranches:true,svgW};
+      }
+
+      const _esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+      // ── Fetch ────────────────────────────────────────────────────────────────
+      const note=document.getElementById('_hexBinaryNote');
       try {
-        const res = await fetch('/api/lump/' + token);
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const buf = await res.arrayBuffer();
-        const view = new DataView(buf);
-        const wordCount = Math.floor(buf.byteLength / 4);
-        let filled = 0;
-        for (let w = codeStart; w <= codeEnd && w < wordCount; w++) {
-          const val = view.getUint32(w * 4, false); // big-endian
-          const cell = document.getElementById('hexW' + w);
-          if (!cell) continue;
-          const hexStr = val.toString(16).toUpperCase().padStart(8, '0');
-          cell.textContent = hexStr;
-          const { line: daLine, desc: daDesc } = _disasm(val);
-          const methodLabel = methodStarts[w] ? `.method ${methodStarts[w]}\n` : '';
-          cell.title = `W${String(w).padStart(4,'0')}  0x${hexStr}\n${methodLabel}${daLine}${daDesc ? '\n; ' + daDesc : ''}`;
-          filled++;
+        const res=await fetch('/api/lump/'+token);
+        if(!res.ok) throw new Error('HTTP '+res.status);
+        const buf=await res.arrayBuffer();
+        const view=new DataView(buf);
+        const wordCount=Math.floor(buf.byteLength/4);
+
+        // Size mismatch warning
+        if(wordCount!==lumpData.lump_size){
+          const warn=document.getElementById('_hexSizeWarn');
+          if(warn){warn.style.display='';warn.textContent=`⚠ Binary is ${wordCount} words but header claims ${lumpData.lump_size} — file may be truncated`;}
         }
-        if (note) note.textContent = filled + ' code word' + (filled !== 1 ? 's' : '') + ' loaded';
-      } catch (e) {
-        if (note) note.textContent = '⚠ Binary unavailable — ' + e.message;
+
+        // Build c-list name map
+        const clistNames={};
+        (lumpData.capabilities||[]).forEach((cap,i)=>{if(cap&&cap.name)clistNames[i]=cap.name;});
+
+        // Method objects map: 1-based word index → method obj
+        const methodObjs={};
+        (lumpData.methods||[]).forEach(m=>{methodObjs[1+(m.offset||0)]=m;});
+
+        // Collect code words and fill hex grid
+        const codeWords=[];
+        let filled=0;
+        const crAlias={};
+        for(let wi=codeStart;wi<=codeEnd&&wi<wordCount;wi++){
+          const val=view.getUint32(wi*4,false)>>>0;
+          codeWords.push(val);
+          const cell=document.getElementById('hexW'+wi);
+          if(cell){
+            const h8=val.toString(16).toUpperCase().padStart(8,'0');
+            cell.textContent=h8;
+            const mLabel=methodStarts[wi]?`.method ${methodStarts[wi]}\n`:'';
+            const mn=_disMnem(val), cmt=_mkCmt(val,crAlias,clistNames);
+            cell.title=`W${String(wi).padStart(4,'0')}  0x${h8}\n${mLabel}${mn}\n; ${cmt}`;
+            filled++;
+          }
+          // Maintain CR alias for tooltip context
+          const op=(val>>>27)&0x1F,dst=(val>>>19)&0xF,src=(val>>>15)&0xF,imm=val&0x7FFF;
+          if((op===0||op===4)&&src===6&&lumpData.cc>0) crAlias[dst]=imm;
+          if(op===3||val===0){for(const k of Object.keys(crAlias))delete crAlias[k];}
+        }
+        if(note) note.textContent=filled+' code word'+(filled!==1?'s':'')+' loaded';
+
+        // ── Build live disassembly listing ────────────────────────────────────
+        const listing=document.getElementById('_disasmListing');
+        if(!listing||codeWords.length===0) return;
+
+        const brArrows=_computeBranchArrows(codeWords);
+        const svgW=brArrows.svgW||14;
+        const emptySvg=brArrows.hasBranches?`<svg class="br-svg" width="${svgW}" height="18"></svg>`:'';
+
+        // Branch label map
+        const brTargetSet=new Set();
+        codeWords.forEach((cw,ci)=>{
+          if(((cw>>>27)&0x1F)!==23) return;
+          const imm=cw&0x7FFF, soff=(imm&0x4000)?(imm|0xFFFF8000):imm, tgt=ci+soff;
+          if(tgt>=0&&tgt<codeWords.length) brTargetSet.add(tgt);
+        });
+        const brLabelMap=new Map();
+        Array.from(brTargetSet).sort((a,b)=>a-b).forEach((idx,n)=>brLabelMap.set(idx,`L${n}`));
+
+        // Render
+        const cc=lumpData.cc, cw=lumpData.cw, lumpSize=lumpData.lump_size;
+        let html='';
+        html+=`<div class="da-hdr">; ${'═'.repeat(60)}</div>`;
+        html+=`<div class="da-hdr">; ${_esc(lumpData.id||token)}  —  disassembly  (${lumpSize} words · ${lumpSize*4} bytes)</div>`;
+        html+=`<div class="da-hdr">; cw=${cw}  cc=${cc}  freespace=${lumpSize-1-cw-cc}  typ=${lumpData.typ||0}</div>`;
+        html+=`<div class="da-hdr">; ${'═'.repeat(60)}</div>`;
+
+        const crA={};
+        codeWords.forEach((w32,ci)=>{
+          const wi=ci+1;
+          const op=(w32>>>27)&0x1F, cond=(w32>>>23)&0xF;
+          const dst=(w32>>>19)&0xF, src=(w32>>>15)&0xF, imm=w32&0x7FFF;
+          const hex=w32.toString(16).toUpperCase().padStart(8,'0');
+
+          // CR alias tracking for semantic comments
+          if((op===0||op===4)&&src===6&&cc>0) crA[dst]=imm;
+          if(op===3||w32===0){for(const k of Object.keys(crA))delete crA[k];}
+
+          // Method boundary
+          if(methodStarts[wi]){
+            const mo=methodObjs[wi]||null;
+            const si=(lumpData.methods||[]).findIndex(m=>(1+(m.offset||0))===wi)+1;
+            html+=`<div class="da-sep">; ${'─'.repeat(60)}</div>`;
+            html+=`<div class="da-method-hdr">◆ ${_esc(methodStarts[wi])}  (selector ${si||'?'})  W${String(wi).padStart(4,'0')}</div>`;
+            if(mo&&mo.description) html+=`<div class="da-docstring">; ${_esc(mo.description.slice(0,100))}${mo.description.length>100?'…':''}</div>`;
+            if(mo&&mo.inputs&&mo.inputs.length)  html+=`<div class="da-docstring">; in:  ${_esc(mo.inputs.join(' | '))}</div>`;
+            if(mo&&mo.outputs&&mo.outputs.length) html+=`<div class="da-docstring">; out: ${_esc(mo.outputs.join(' | '))}</div>`;
+          }
+
+          // Branch target label row
+          if(brLabelMap.has(ci)) html+=`<div class="da-label">${brLabelMap.get(ci)}:</div>`;
+
+          // Mnemonic HTML with coloring
+          let mnemHtml, cmt=_mkCmt(w32,crA,clistNames);
+          if(op===23){
+            const soff=(imm&0x4000)?(imm|0xFFFF8000):imm, tgt=ci+soff;
+            const lbl=brLabelMap.get(tgt);
+            if(lbl){
+              const condStr=cond===14?'':CONDS[cond];
+              mnemHtml=`<span class="da-op">BRANCH</span>${condStr?`<span class="da-cond"> ${condStr}</span>`:''}&#x00A0;&#x00A0;<span class="da-lbl">${lbl}</span>`;
+              cmt=`branch → ${lbl}${cond!==14?' [if '+CONDS[cond]+']':''}`;
+            }
+          }
+          if(!mnemHtml){
+            const opName=OPNAMES[op]||'';
+            const condStr=cond===14?'':CONDS[cond];
+            const full=_esc(_disMnem(w32));
+            const pfxLen=opName.length+(condStr?condStr.length+1:0);
+            mnemHtml=`<span class="da-op">${_esc(opName)}</span>`+
+              (condStr?`<span class="da-cond"> ${_esc(condStr)}</span>`:'')+
+              `<span class="da-ops">${full.slice(pfxLen)}</span>`;
+          }
+
+          const brSvg=brArrows.hasBranches
+            ?(brArrows.html[ci]?`<span class="da-brsvg">${brArrows.html[ci]}</span>`:`<span class="da-brsvg">${emptySvg}</span>`):'';
+
+          html+=`<div class="da-row">`+
+            `<span class="da-addr">W${String(wi).padStart(4,'0')}</span>`+
+            brSvg+
+            `<span class="da-hex">${hex}</span>`+
+            `<span class="da-mnem">${mnemHtml}</span>`+
+            `<span class="da-cmt">; ${_esc(cmt)}</span>`+
+            `</div>`;
+        });
+
+        listing.innerHTML=html;
+        listing.dataset.loaded='1';
+
+      } catch(e) {
+        if(note) note.textContent='⚠ Binary unavailable — '+e.message;
       }
-    })(lump.token, 1, lump.cw, methodStarts);
+    })(lump.token, 1, lump.cw, methodStarts, lump);
 
   } else if (tab === 'spec') {
     body.innerHTML = `
