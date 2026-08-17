@@ -27,6 +27,7 @@ Coverage
         successful PATCH (sidecar + manifest agree on the committed values)
   T17 — sidecar write failure: _atomic_write_json failing on the sidecar write
         returns 5xx and leaves the original sidecar file intact (no partial write)
+  T18 — values survive a simulated server restart (importlib.reload clears memory)
 """
 
 import json
@@ -257,6 +258,16 @@ class TestNsSlotValidation:
 
 class TestNsSlotPolicyRoundTrip:
 
+    def test_t12_round_trip_via_detail(self, client, saved_token):
+        """T12 — Values written by PATCH survive a subsequent GET /api/lumps/<token>/detail.
+
+        This is the critical invariant for re-add: the ADD modal reads from
+        /api/lumps/<token>/detail; if PATCH does not persist to the sidecar
+        the values will be lost after a restart and the modal will not
+        pre-select the correct policy and slot.
+        """
+        # Write known values
+        patch_resp = _patch(client, saved_token, {"ns_slot_policy": "static", "ns_slot": 9})
     def test_t12_round_trip_via_detail(self, client, saved_token):
         """T12 — Values written by PATCH survive a subsequent GET /api/lumps/<token>/detail.
 
@@ -580,4 +591,124 @@ class TestNsSlotPolicyRoundTrip:
         assert _write_call_count[0] == 1, (
             f"Expected exactly 1 _atomic_write_json call (sidecar only), "
             f"got {_write_call_count[0]}"
+        )
+
+    def test_t18_round_trip_survives_restart(self, isolated_lumps, saved_token):
+        """T18 — Values written by PATCH survive a simulated server restart.
+
+        Bug it guards against: PATCH stores values only in a module-level
+        in-memory dict.  T12 cannot catch this because PATCH and GET share the
+        same process memory.  Here we use importlib.reload() to reinitialise
+        every module-level global before issuing the GET, exactly as a fresh
+        process would see only what was written to disk.
+
+        Flow:
+          1. PATCH via a test client (represents the old server process).
+          2. importlib.reload(_app_module) — clears all module-level state.
+          3. Re-apply the __file__ isolation so the reloaded app resolves
+             lumps/ inside the same temp directory the PATCH wrote to.
+          4. GET /api/lumps/<token>/detail via a new client on the reloaded app.
+          5. Assert ns_slot_policy and ns_slot match the PATCHed values.
+
+        If PATCH only stored values in memory (step 2 would wipe them) the
+        reloaded app would serve the seed values (ns_slot=None, no policy).
+        """
+        import importlib
+
+        # Remember the temp root before any reload can change __file__.
+        fake_app_py = isolated_lumps.parent / "app.py"
+
+        # ── Phase 1: PATCH (old process) ─────────────────────────────────────
+        _app_module.app.config["TESTING"] = True
+        with _app_module.app.test_client() as client_a:
+            patch_resp = _patch(client_a, saved_token, {
+                "ns_slot_policy": "static",
+                "ns_slot": 7,
+            })
+            assert patch_resp.status_code == 200, patch_resp.data
+            assert patch_resp.get_json().get("ok"), patch_resp.data
+
+        # ── Phase 2: Simulate process restart ────────────────────────────────
+        # reload() re-executes every top-level statement in server/app.py,
+        # reinitialising all module-level caches, globals, and Flask app state
+        # the way a fresh OS process would.  The temp files on disk are intact.
+        importlib.reload(_app_module)
+        # reload() reset __file__ to the real server/app.py path.  Point it
+        # back at the temp tree so the reloaded app finds the same lumps/.
+        _app_module.__file__ = str(fake_app_py)
+
+        # ── Phase 3: GET (new process) ────────────────────────────────────────
+        _app_module.app.config["TESTING"] = True
+        with _app_module.app.test_client() as client_b:
+            detail_resp = client_b.get(f"/api/lumps/{saved_token}/detail")
+            assert detail_resp.status_code == 200, detail_resp.data
+            detail = detail_resp.get_json()
+
+        assert detail.get("ns_slot_policy") == "static", (
+            f"After simulated restart ns_slot_policy={detail.get('ns_slot_policy')!r}; "
+            "PATCH did not persist ns_slot_policy to disk"
+        )
+        assert detail.get("ns_slot") == 7, (
+            f"After simulated restart ns_slot={detail.get('ns_slot')!r}; "
+            "PATCH did not persist ns_slot to disk"
+        )
+
+    def test_t17_round_trip_survives_restart(self, isolated_lumps, saved_token):
+        """T17 — Values written by PATCH survive a simulated server restart.
+
+        Bug it guards against: PATCH stores values only in a module-level
+        in-memory dict.  T12 cannot catch this because PATCH and GET share the
+        same process memory.  Here we use importlib.reload() to reinitialise
+        every module-level global before issuing the GET, exactly as a fresh
+        process would see only what was written to disk.
+
+        Flow:
+          1. PATCH via a test client (represents the old server process).
+          2. importlib.reload(_app_module) — clears all module-level state.
+          3. Re-apply the __file__ isolation so the reloaded app resolves
+             lumps/ inside the same temp directory the PATCH wrote to.
+          4. GET /api/lumps/<token>/detail via a new client on the reloaded app.
+          5. Assert ns_slot_policy and ns_slot match the PATCHed values.
+
+        If PATCH only stored values in memory (step 2 would wipe them) the
+        reloaded app would serve the seed values (ns_slot=None, no policy).
+        """
+        import importlib
+
+        # Remember the temp root before any reload can change __file__.
+        fake_app_py = isolated_lumps.parent / "app.py"
+
+        # ── Phase 1: PATCH (old process) ─────────────────────────────────────
+        _app_module.app.config["TESTING"] = True
+        with _app_module.app.test_client() as client_a:
+            patch_resp = _patch(client_a, saved_token, {
+                "ns_slot_policy": "static",
+                "ns_slot": 7,
+            })
+            assert patch_resp.status_code == 200, patch_resp.data
+            assert patch_resp.get_json().get("ok"), patch_resp.data
+
+        # ── Phase 2: Simulate process restart ────────────────────────────────
+        # reload() re-executes every top-level statement in server/app.py,
+        # reinitialising all module-level caches, globals, and Flask app state
+        # the way a fresh OS process would.  The temp files on disk are intact.
+        importlib.reload(_app_module)
+        # reload() reset __file__ to the real server/app.py path.  Point it
+        # back at the temp tree so the reloaded app finds the same lumps/.
+        _app_module.__file__ = str(fake_app_py)
+
+        # ── Phase 3: GET (new process) ────────────────────────────────────────
+        _app_module.app.config["TESTING"] = True
+        with _app_module.app.test_client() as client_b:
+            detail_resp = client_b.get(f"/api/lumps/{saved_token}/detail")
+            assert detail_resp.status_code == 200, detail_resp.data
+            detail = detail_resp.get_json()
+
+        assert detail.get("ns_slot_policy") == "static", (
+            f"After simulated restart ns_slot_policy={detail.get('ns_slot_policy')!r}; "
+            "PATCH did not persist ns_slot_policy to disk"
+        )
+        assert detail.get("ns_slot") == 7, (
+            f"After simulated restart ns_slot={detail.get('ns_slot')!r}; "
+            "PATCH did not persist ns_slot to disk"
         )
