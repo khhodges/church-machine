@@ -187,6 +187,14 @@ args = "return-cr14-trace-tests"
 task = "workflow.run"
 args = "wukong-command-delivery-tests"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "ns-slot-modal-persist-tests"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "hex-tab-fill-path-tests"
+
 [[workflows.workflow]]
 name = "Church Machine IDE"
 author = "agent"
@@ -768,6 +776,28 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node tests/simulator/sim_return_fetch_lump.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "ns-slot-modal-persist-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_ns_slot_modal_persist.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "hex-tab-fill-path-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_hex_tab_fill_path.js"
 
 [workflows.workflow.metadata]
 outputType = "console"
