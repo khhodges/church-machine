@@ -22,6 +22,16 @@ Coverage
        When /api/lumps/save returns 422, the JSON body must contain an
        "error" string so _lumpSaveHandleResponse() in lump_save_handler.js
        can surface it in a toast.
+
+  T7 — cw=0 guard for large lumps:
+       POST a binary whose header reports cw=0 but lump_size > 64.  The
+       server must return HTTP 422 with cw_zero_with_content=true and must
+       NOT write any file — regardless of what cw the client metadata claims.
+
+  T8 — cw/cc in manifest come from binary header, not client metadata:
+       POST a binary with cw=5, cc=3 in the header but cw=0, cc=0 in the
+       client-supplied metadata object.  The saved manifest entry must store
+       cw=5, cc=3 (from the binary header), never cw=0, cc=0.
 """
 
 import json
@@ -884,4 +894,193 @@ class TestManifestLumpSizeMatchesDiskFile:
         assert manifest_lump_size == logical_size, (
             f"Full binary: manifest lump_size={manifest_lump_size} "
             f"!= logical size {logical_size}."
+        )
+
+
+# ---------------------------------------------------------------------------
+# T7 — cw=0 guard for large lumps returns 422 with cw_zero_with_content
+# ---------------------------------------------------------------------------
+
+class TestCwZeroWithContentRejection:
+    """A binary with lump_size > 64 and cw=0 in the header must be rejected.
+
+    This guards against the bug where a client POSTs a real binary (more than
+    64 words) but the header word was not updated after compilation, leaving
+    cw=0.  The server must not silently write cw=0 to the manifest.
+    """
+
+    TOKEN = "7c507001"
+
+    @staticmethod
+    def _large_cw0_binary(n_m6: int = 1) -> list:
+        """Return a binary whose header has cw=0, cc=1, lump_size=128 (n_m6=1).
+
+        lump_size = 1 << (n_m6 + 6) = 128 words > 64 → guard must fire.
+        cc=1 so the identity seal injection does not short-circuit; cw=0 is
+        the bad value that the guard must catch.
+        """
+        hdr = _hdr(cw=0, cc=1, n_m6=n_m6)
+        # Send more than 64 words so lump_size > 64 is unambiguous.
+        lump_sz = 1 << (n_m6 + 6)
+        return [hdr] + [0] * (lump_sz - 1)
+
+    def test_cw0_large_returns_422(self, client, isolated_lumps):
+        """cw=0 with lump_size=128 must return HTTP 422."""
+        resp = client.post(
+            "/api/lumps/save",
+            json={
+                "binary":   self._large_cw0_binary(),
+                "metadata": _meta(self.TOKEN),
+            },
+        )
+        assert resp.status_code == 422, (
+            f"Expected 422 for cw=0 with lump_size>64, "
+            f"got {resp.status_code}. Body: {resp.get_data(as_text=True)}"
+        )
+
+    def test_cw0_large_body_has_flag(self, client, isolated_lumps):
+        """422 body must contain cw_zero_with_content=true."""
+        resp = client.post(
+            "/api/lumps/save",
+            json={
+                "binary":   self._large_cw0_binary(),
+                "metadata": _meta(self.TOKEN),
+            },
+        )
+        assert resp.status_code == 422
+        data = resp.get_json()
+        assert data.get("cw_zero_with_content") is True, (
+            f"Expected cw_zero_with_content=true in 422 body, got: {data}"
+        )
+
+    def test_cw0_large_body_has_error_string(self, client, isolated_lumps):
+        """422 body must contain a non-empty 'error' string for client surfacing."""
+        resp = client.post(
+            "/api/lumps/save",
+            json={
+                "binary":   self._large_cw0_binary(),
+                "metadata": _meta(self.TOKEN),
+            },
+        )
+        assert resp.status_code == 422
+        data = resp.get_json()
+        assert isinstance(data.get("error"), str) and data["error"], (
+            f"Expected non-empty 'error' string in 422 body, got: {data}"
+        )
+
+    def test_cw0_large_no_file_written(self, client, isolated_lumps):
+        """Rejected save must not write any .lump file to disk."""
+        resp = client.post(
+            "/api/lumps/save",
+            json={
+                "binary":   self._large_cw0_binary(),
+                "metadata": _meta(self.TOKEN),
+            },
+        )
+        assert resp.status_code == 422
+        lump_files = list(isolated_lumps.glob("*.lump"))
+        assert not lump_files, (
+            f"No .lump file should exist after a rejected save, "
+            f"but found: {[f.name for f in lump_files]}"
+        )
+
+    def test_cw0_exact_64_words_allowed(self, client, isolated_lumps):
+        """A binary with cw=0, lump_size=64 (≤ 64) must NOT be rejected by the guard.
+
+        lump_size == 64 is the minimum non-trivial lump (n_m6=0).  The guard
+        only fires for lump_size > 64; a 64-word lump with cw=0 is a valid
+        data/thread lump and must be accepted.
+        """
+        hdr = _hdr(cw=0, cc=1, n_m6=0)   # lump_size = 64, cw = 0
+        binary = [hdr] + [0] * 63         # full 64-word binary
+        token = "7c507002"
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": binary, "metadata": _meta(token)},
+        )
+        # Accept 200 (saved) or 422 for other reasons (e.g. identity seal).
+        # The key assertion is that it is NOT the cw_zero_with_content error.
+        if resp.status_code == 422:
+            data = resp.get_json()
+            assert not data.get("cw_zero_with_content"), (
+                "cw_zero_with_content guard must not fire for lump_size == 64. "
+                f"Got: {data}"
+            )
+
+
+# ---------------------------------------------------------------------------
+# T8 — manifest cw/cc derived from binary header, not client metadata
+# ---------------------------------------------------------------------------
+
+class TestManifestCwCcFromBinaryHeader:
+    """The manifest entry must store cw/cc read from the binary, not from metadata.
+
+    Regression guard for the bug where a client POSTs a binary with cw=21, cc=5
+    in the header but supplies cw=0, cc=0 in the metadata JSON.  The server was
+    writing cw=0, cc=0 to the manifest, making the consistency suite fail.
+    """
+
+    TOKEN = "7c508001"
+
+    # Binary header values — what the server must persist.
+    _BINARY_CW = 5
+    _BINARY_CC = 3
+
+    @classmethod
+    def _binary_with_real_cw_cc(cls) -> list:
+        """Return a compact binary with cw=5, cc=3 in the header."""
+        return [_hdr(cw=cls._BINARY_CW, cc=cls._BINARY_CC)] + [0]
+
+    @classmethod
+    def _misleading_meta(cls, token: str) -> dict:
+        """Metadata whose cw and cc are intentionally wrong (zero)."""
+        m = _meta(token)
+        m["cw"] = 0   # wrong — must be ignored by the server
+        m["cc"] = 0   # wrong — must be ignored by the server
+        return m
+
+    def _get_manifest_entry(self, isolated_lumps, token: str) -> dict:
+        manifest_path = isolated_lumps / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        entry = next((e for e in manifest if e.get("token") == token), None)
+        assert entry is not None, (
+            f"Token {token!r} not found in manifest after save. "
+            f"Manifest contents: {manifest}"
+        )
+        return entry
+
+    def test_manifest_cw_from_binary_not_metadata(self, client, isolated_lumps):
+        """Manifest entry cw must equal the binary header's cw, not metadata cw."""
+        resp = client.post(
+            "/api/lumps/save",
+            json={
+                "binary":   self._binary_with_real_cw_cc(),
+                "metadata": self._misleading_meta(self.TOKEN),
+            },
+        )
+        assert resp.status_code == 200, (
+            f"Expected 200, got {resp.status_code}: {resp.get_data(as_text=True)}"
+        )
+        entry = self._get_manifest_entry(isolated_lumps, resp.get_json()["token"])
+        assert entry["cw"] == self._BINARY_CW, (
+            f"manifest entry cw={entry['cw']} but binary header has cw={self._BINARY_CW}. "
+            f"The server must derive cw from the binary, not from the client metadata."
+        )
+
+    def test_manifest_cc_from_binary_not_metadata(self, client, isolated_lumps):
+        """Manifest entry cc must equal the binary header's cc, not metadata cc."""
+        resp = client.post(
+            "/api/lumps/save",
+            json={
+                "binary":   self._binary_with_real_cw_cc(),
+                "metadata": self._misleading_meta(self.TOKEN),
+            },
+        )
+        assert resp.status_code == 200, (
+            f"Expected 200, got {resp.status_code}: {resp.get_data(as_text=True)}"
+        )
+        entry = self._get_manifest_entry(isolated_lumps, resp.get_json()["token"])
+        assert entry["cc"] == self._BINARY_CC, (
+            f"manifest entry cc={entry['cc']} but binary header has cc={self._BINARY_CC}. "
+            f"The server must derive cc from the binary, not from the client metadata."
         )

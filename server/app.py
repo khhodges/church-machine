@@ -5446,6 +5446,34 @@ def save_lump():
     import hashlib as _hl_save
     lump_bytes   = _struct.pack(f'>{len(_sl_words)}I', *_sl_words)
     _binary_hash = _hl_save.sha256(lump_bytes).hexdigest()
+
+    # ── Read authoritative cw/cc from the (post-modification) binary header ───
+    # The client-supplied metadata.cw / metadata.cc are UNTRUSTED: they reflect
+    # whatever the JavaScript assembled in memory and may be stale or zero even
+    # when the binary has real instructions.  The binary header word is the only
+    # ground truth — read cw and cc from it now, after all header mutations
+    # (cc bump from 0→1) have been applied.
+    _hdr_final   = _sl_words[0]
+    _binary_cw   = (_hdr_final >> 10) & 0x1FFF   # bits[22:10]
+    _binary_cc   = _hdr_final & 0xFF              # bits[7:0]  (_sl_cc2 already tracks this)
+
+    # Guard: a lump with more than 64 words has real content; cw==0 in that
+    # situation means the header is corrupt / the client sent wrong metadata.
+    # Reject cleanly now rather than silently storing a bad manifest entry.
+    if len(_sl_words) > 64 and _binary_cw == 0:
+        return jsonify({
+            "error": (
+                f"Manifest write rejected: lump has {len(_sl_words)} words "
+                f"of binary content but the header reports cw=0. "
+                f"The compiled binary has real instructions but the code-word "
+                f"count in the LUMP header is zero — the header is inconsistent "
+                f"with the binary. Re-compile or correct the lump header before saving."
+            ),
+            "cw_zero_with_content": True,
+            "lump_size":            len(_sl_words),
+            "binary_cw":            _binary_cw,
+            "binary_cc":            _binary_cc,
+        }), 422
     # ── End pre-flight ────────────────────────────────────────────────────────
 
     lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
@@ -5649,8 +5677,11 @@ def save_lump():
         "lump_size":     len(_sl_words),
         "typ":           hdr_typ,
         "content_type":  content_type,
-        "cw":            metadata.get("cw", 0),
-        "cc":            metadata.get("cc", 0),
+        # Use values read directly from the verified binary header — never the
+        # client-supplied metadata, which can be stale or zero even when the
+        # binary has real instructions.
+        "cw":            _binary_cw,
+        "cc":            _binary_cc,
         "profile":       metadata.get("profile", "IoT"),
         "language":      metadata.get("language", "unknown"),
         "author":        metadata.get("author", ""),
