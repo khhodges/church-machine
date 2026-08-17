@@ -31,6 +31,11 @@ R20  Every manifest entry with a `dot_name` field must have a canonical-format
      `filename` ({Dot.Name}.{n}.{8hex}.lump), and recomputing sha256(dot_name_utf8
      + lump_bytes)[:8] must equal the Number segment in that filename (catches
      file renames or binary replacements that were not paired with a migration run).
+R21  Every manifest entry with a `cw` or `cc` field whose .lump file is present
+     on disk must have those fields agree with the decoded binary header.
+     Skipped (not failed) when the .lump file is absent (WIP / not-yet-compiled
+     entries).  This catches cw=0-style corruption for ALL manifest entries,
+     including those that do not declare lump_size (which R5 skips).
 R24  Every .lump file in server/lumps/ that is a symbolic link must resolve to a
      real regular file (broken/dangling symlinks are an immediate hard failure).
      Symlinks that resolve to a target outside the lumps directory are flagged as
@@ -299,6 +304,10 @@ def _archive_lump_stems():
 LUMP_TOKENS             = _lump_tokens()
 JSON_TOKENS             = _json_tokens()
 MANIFEST_ENTRIES_WITH_SIZE = [e for e in MANIFEST if e.get("lump_size")]
+MANIFEST_ENTRIES_WITH_CW_OR_CC = [
+    e for e in MANIFEST
+    if e.get("cw") is not None or e.get("cc") is not None
+]
 ARCHIVE_LUMP_STEMS      = _archive_lump_stems()
 
 
@@ -2646,6 +2655,58 @@ class TestR24_NobrokenSymlinks:
                 UserWarning,
                 stacklevel=2,
             )
+
+class TestR21_ManifestCwCcMatchBinaryAllEntries:
+    """R21: Every manifest entry with a declared cw or cc field whose .lump file
+    is present on disk must have those values match the decoded binary header.
+
+    R5 only runs for entries that declare lump_size.  This rule closes the gap
+    by checking *all* manifest entries — including those that omit lump_size —
+    so that a cw=0 (or any other corrupt value) in the manifest is caught even
+    when lump_size was never added to that entry.
+
+    The check is skipped (not failed) when the .lump file is absent on disk so
+    that WIP / not-yet-compiled entries do not break CI.
+    """
+
+    @pytest.mark.parametrize(
+        "entry", MANIFEST_ENTRIES_WITH_CW_OR_CC, ids=lambda e: e["token"]
+    )
+    def test_manifest_cw_matches_binary(self, entry):
+        """manifest.cw must equal the cw decoded from the binary header word."""
+        if entry.get("cw") is None:
+            return  # entry only declares cc — nothing to check here
+        token = entry["token"].lower()
+        if not _lump_exists(token):
+            pytest.skip(f"lump file absent for {token} (WIP entry — skipped by R21)")
+        h = _read_header(token)
+        assert entry["cw"] == h["cw"], (
+            f"{token}: manifest.cw = {entry['cw']} but binary header cw = {h['cw']}.\n"
+            "  The manifest entry's cw field does not match what is encoded in the\n"
+            "  .lump binary header word (bits[22:10]).  This mismatch is often caused\n"
+            "  by a manual edit to manifest.json that set cw=0 (or another wrong\n"
+            "  value) without recompiling the binary, or by a binary replacement\n"
+            "  that was not paired with a manifest update.\n"
+            "  Update manifest.json to match the compiled binary, then bump CHANGELOG."
+        )
+
+    @pytest.mark.parametrize(
+        "entry", MANIFEST_ENTRIES_WITH_CW_OR_CC, ids=lambda e: e["token"]
+    )
+    def test_manifest_cc_matches_binary(self, entry):
+        """manifest.cc must equal the cc decoded from the binary header word."""
+        if entry.get("cc") is None:
+            return  # entry only declares cw — nothing to check here
+        token = entry["token"].lower()
+        if not _lump_exists(token):
+            pytest.skip(f"lump file absent for {token} (WIP entry — skipped by R21)")
+        h = _read_header(token)
+        assert entry["cc"] == h["cc"], (
+            f"{token}: manifest.cc = {entry['cc']} but binary header cc = {h['cc']}.\n"
+            "  The manifest entry's cc field does not match what is encoded in the\n"
+            "  .lump binary header word (bits[7:0]).  Update manifest.json to match\n"
+            "  the compiled binary, then bump CHANGELOG."
+        )
 
 
 class TestR24b_NoBrokenJsonSymlinks:
