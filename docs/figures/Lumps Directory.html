@@ -27,7 +27,7 @@
     /* ── Iframe lump viewer ── */
     #lump-viewer-frame {
       width: 100%;
-      height: 540px;
+      min-height: 540px;
       border: 1px solid #ccc;
       border-radius: 4px;
       background: #fff;
@@ -82,94 +82,278 @@
   <meta charset="UTF-8">
   <title>Document Review Table</title>
   <style>
-    body { font-family: system-ui, sans-serif; margin: 2rem; background: #f5f5f7; }
-    h1 { margin-bottom: 1rem; }
-    table { border-collapse: collapse; width: 100%; background: #fff; }
-    th, td { border: 1px solid #ccc; padding: 0.5rem 0.75rem; text-align: left; }
-    th { background: #eee; }
+    body { font-family: system-ui, sans-serif; margin: 0; background: #f5f5f7; }
+    .table-wrap { padding: 1.5rem 1.5rem 0; }
+    h1 { margin: 0 0 1rem; font-size: 1.4rem; }
+    table { border-collapse: collapse; width: 100%; background: #fff; font-size: 0.9rem; }
+    th, td { border: 1px solid #ccc; padding: 0.45rem 0.65rem; text-align: left; }
+    th { background: #e8e8ee; font-size: 0.85rem; }
+    td:nth-child(2) { font-family: monospace; font-size: 0.82rem; white-space: nowrap; }
     a.review-link { color: #0066cc; text-decoration: none; font-weight: 600; }
     a.review-link:hover { text-decoration: underline; }
-    #review-panel { margin-top: 1.5rem; padding: 1rem; background: #fff; border: 1px solid #ccc; }
-    #review-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; }
-    #review-body { white-space: pre-wrap; }
+    tr.group-hdr td { background: #2a3a5a; color: #c8d6f0; font-weight: 700;
+      font-size: 0.78rem; letter-spacing: 0.05em; text-transform: uppercase;
+      padding: 0.3rem 0.65rem; border-color: #1a2a4a; }
+    tr.wip td { color: #888; font-style: italic; }
+    #review-panel {
+      position: sticky; bottom: 0; left: 0; right: 0;
+      background: #fff; border-top: 2px solid #0066cc;
+      padding: 0.75rem 1.5rem; font-size: 0.88rem;
+      box-shadow: 0 -3px 10px rgba(0,0,0,0.12);
+      display: none;
+    }
+    #review-panel.visible { display: block; }
+    #review-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.4rem; }
+    #review-title { font-size: 1rem; font-weight: 700; color: #003399; }
+    #review-close { cursor: pointer; color: #999; font-size: 1.1rem; margin-left: auto; }
+    #review-close:hover { color: #333; }
+    .review-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 0.75rem; }
+    .review-key { font-weight: 600; color: #555; white-space: nowrap; }
+    .review-val { color: #222; }
+    .review-methods { font-family: monospace; font-size: 0.85rem; }
+    .review-badge { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 3px;
+      font-size: 0.75rem; font-weight: 600; margin-right: 0.25rem; }
+    .badge-released { background: #d4f5d4; color: #1a6b1a; }
+    .badge-wip { background: #fff3cd; color: #7a5700; }
+    .badge-archive { background: #e8e0f0; color: #5a2a7a; }
   </style>
 </head>
 <body>
+  <div class="table-wrap">
   <h1>Document Review</h1>
   <table>
     <thead>
       <tr><th>Lump</th><th>Genotype</th><th>Origin</th><th>Methods</th><th>Review</th></tr>
     </thead>
     <tbody>
+
+      <tr class="group-hdr"><td colspan="5">Boot ROM</td></tr>
       <tr>
-        <td>SlideRule</td><td>0xE18DEB39</td><td>ide Namespace</td><td>Multiply, Abs, Max, Min</td>
-        <td><a href="#" class="review-link" data-name="SlideRule" data-genotype="0xE18DEB39" data-origin="ide Namespace" data-methods="Multiply, Abs, Max, Min">Review</a></td>
+        <td>SelfTest</td><td>0x30542A6D</td><td>Boot ROM</td><td>SelfTest, Next</td>
+        <td><a href="#" class="review-link" data-name="SelfTest" data-genotype="0x30542A6D" data-origin="Boot ROM" data-methods="SelfTest, Next" data-lang="ISA" data-status="released" data-ns="6" data-desc="SelfTest (a.k.a. Boot.Abstr) — the lump executed by the hardware ROM during boot phases B:01–B:07.">Review</a></td>
       </tr>
       <tr>
-        <td>DijkstraFlag</td><td>0x44CE2AAE</td><td>ide Namespace</td><td>Init, Send, Recv</td>
-        <td><a href="#" class="review-link" data-name="DijkstraFlag" data-genotype="0x44CE2AAE" data-origin="ide Namespace" data-methods="Init, Send, Recv">Review</a></td>
+        <td>WukongCallHome</td><td>0x2F3D7D46</td><td>Boot ROM</td><td>Main</td>
+        <td><a href="#" class="review-link" data-name="WukongCallHome" data-genotype="0x2F3D7D46" data-origin="Boot ROM" data-methods="Main" data-lang="assembly" data-status="released" data-ns="7" data-desc="Wukong board boot coordinator — runs SelfTest, calls Tunnel.Register, returns to IDE.">Review</a></td>
+      </tr>
+      <tr>
+        <td>PostFlashSelftest</td><td>0x059DC47F</td><td>Boot ROM</td><td>SelfTest, Next</td>
+        <td><a href="#" class="review-link" data-name="PostFlashSelftest" data-genotype="0x059DC47F" data-origin="Boot ROM" data-methods="SelfTest, Next" data-lang="assembly" data-status="released" data-ns="" data-desc="Post-flash self-test stub. Verifies hardware boot path with SelfTest E-GT and Next continuation slot.">Review</a></td>
+      </tr>
+      <tr>
+        <td>Salvation</td><td>0x6BE43A9D</td><td>Boot ROM</td><td>main</td>
+        <td><a href="#" class="review-link" data-name="Salvation" data-genotype="0x6BE43A9D" data-origin="Boot ROM" data-methods="main" data-lang="assembly" data-status="released" data-ns="" data-desc="Boot entry-point demo — LOADs and CALLs the four core boot abstractions (Salvation, Navana, Mint, Memory) in sequence.">Review</a></td>
+      </tr>
+
+      <tr class="group-hdr"><td colspan="5">System</td></tr>
+      <tr>
+        <td>Memory</td><td>0x3359E86E</td><td>System</td><td>Allocate, Free, Resize</td>
+        <td><a href="#" class="review-link" data-name="Memory" data-genotype="0x3359E86E" data-origin="System" data-methods="Allocate, Free, Resize" data-lang="ISA" data-status="released" data-ns="" data-desc="RAM zone guardian. Allocates and releases bounded memory regions under capability control.">Review</a></td>
+      </tr>
+      <tr>
+        <td>EventRouter</td><td>0x032CA4EE</td><td>System</td><td>Add, Remove, Resolve, List, Methods</td>
+        <td><a href="#" class="review-link" data-name="EventRouter" data-genotype="0x032CA4EE" data-origin="System" data-methods="Add, Remove, Resolve, List, Methods" data-lang="CLOOMC" data-status="released" data-ns="43" data-desc="Event-to-handler routing table. Maps event Golden Tokens to handler capabilities. Up to 10 registered pairs.">Review</a></td>
+      </tr>
+      <tr>
+        <td>Keystone</td><td>0x86B853A1</td><td>System</td><td>Connect, Hello</td>
+        <td><a href="#" class="review-link" data-name="Keystone" data-genotype="0x86B853A1" data-origin="System" data-methods="Connect, Hello" data-lang="CLOOMC" data-status="released" data-ns="" data-desc="Network key-exchange abstraction. Establishes a shared Mum identity word and confirms connectivity.">Review</a></td>
+      </tr>
+      <tr class="wip">
+        <td>Loader</td><td>0x19BA3A9D</td><td>System</td><td>run</td>
+        <td><a href="#" class="review-link" data-name="Loader" data-genotype="0x19BA3A9D" data-origin="System" data-methods="run" data-lang="ISA" data-status="wip" data-ns="" data-desc="Lump fetch-and-load stub. Requests a lump binary from the IDE by NS slot token over UART TX.">Review</a></td>
+      </tr>
+      <tr>
+        <td>Scheduler.IRQ</td><td>0x439E0DDD</td><td>System</td><td>IRQ (escalation)</td>
+        <td><a href="#" class="review-link" data-name="Scheduler.IRQ" data-genotype="0x439E0DDD" data-origin="System" data-methods="IRQ (escalation handler)" data-lang="assembly" data-status="released" data-ns="" data-desc="Tier-2 fault-escalation interrupt handler. Lazy-loaded on first scheduler fault; dispatches to the active thread&apos;s IRQ slot.">Review</a></td>
+      </tr>
+
+      <tr class="group-hdr"><td colspan="5">Networking</td></tr>
+      <tr>
+        <td>Tunnel</td><td>0x8770BF03</td><td>ide Namespace</td><td>Register, Send, Receive, Fault, Fetch, Call</td>
+        <td><a href="#" class="review-link" data-name="Tunnel" data-genotype="0x8770BF03" data-origin="ide Namespace" data-methods="Register, Send, Receive, Fault, Fetch, Call" data-lang="CLOOMC" data-status="released" data-ns="8" data-desc="Mum Tunnel messaging abstraction. Provides capability-secured inter-machine send/receive, fault reporting, and remote lump fetch.">Review</a></td>
+      </tr>
+      <tr>
+        <td>Ethernet</td><td>0xB169BBA4</td><td>ide Namespace</td><td>Send, Receive, Connect, Status</td>
+        <td><a href="#" class="review-link" data-name="Ethernet" data-genotype="0xB169BBA4" data-origin="ide Namespace" data-methods="Send, Receive, Connect, Status" data-lang="CLOOMC" data-status="released" data-ns="9" data-desc="Ethernet hardware driver abstraction. Manages IPv4 connections and raw frame transmission on the Ti60 NIC.">Review</a></td>
+      </tr>
+
+      <tr class="group-hdr"><td colspan="5">Math / Science</td></tr>
+      <tr>
+        <td>Constants</td><td>0xE494696F</td><td>ide Namespace</td><td>Pi, E, Phi, Zero, One, Add, Get</td>
+        <td><a href="#" class="review-link" data-name="Constants" data-genotype="0xE494696F" data-origin="ide Namespace" data-methods="Pi, E, Phi, Zero, One, Add, Get" data-lang="ISA" data-status="released" data-ns="9" data-desc="Mathematical constants library. Returns IEEE-754 values for Pi, e, Phi etc., plus a 14-slot user pool (Add/Get).">Review</a></td>
+      </tr>
+      <tr>
+        <td>SlideRule</td><td>0xD960F531</td><td>ide Namespace</td><td>Multiply, Divide, Sqrt, Mod, Sin, Cos, Tan, Asin, Acos, Atan, ToDegrees, ToRadians, Bernoulli, Abs, Pow, Min, Max, GCD, Factorial, Log2, Atan2, Signum</td>
+        <td><a href="#" class="review-link" data-name="SlideRule" data-genotype="0xD960F531" data-origin="ide Namespace" data-methods="Multiply, Divide, Sqrt, Mod, Sin, Cos, Tan, Asin, Acos, Atan, ToDegrees, ToRadians, Bernoulli, Abs, Pow, Min, Max, GCD, Factorial, Log2, Atan2, Signum" data-lang="CLOOMC" data-status="released" data-ns="" data-desc="Full-precision fixed-point mathematics library. 22 methods covering trigonometry, algebra, and number theory.">Review</a></td>
+      </tr>
+      <tr>
+        <td>SlideRule.Haskell</td><td>0x3542A2DB</td><td>IDE demo</td><td>Add, Sub, Mul, Sqrt, Pow2, Abs, Signum, Max, Min</td>
+        <td><a href="#" class="review-link" data-name="SlideRule.Haskell" data-genotype="0x3542A2DB" data-origin="IDE demo" data-methods="Add, Sub, Mul, Sqrt, Pow2, Abs, Signum, Max, Min" data-lang="Haskell" data-status="released" data-ns="" data-desc="Haskell-syntax SlideRule variant. Functional math library compiled from CLOOMC Haskell dialect.">Review</a></td>
+      </tr>
+      <tr>
+        <td>BernoulliNumbers</td><td>0x656DD0E4</td><td>IDE demo</td><td>compute</td>
+        <td><a href="#" class="review-link" data-name="BernoulliNumbers" data-genotype="0x656DD0E4" data-origin="IDE demo" data-methods="compute" data-lang="ISA" data-status="released" data-ns="" data-desc="Bernoulli number sequence generator. Computes B(n) for use in Taylor-series trigonometric expansions.">Review</a></td>
+      </tr>
+      <tr>
+        <td>IntegerOps</td><td>0x54C9A1E9</td><td>IDE demo</td><td>Greet, Increment, Add, Double</td>
+        <td><a href="#" class="review-link" data-name="IntegerOps" data-genotype="0x54C9A1E9" data-origin="IDE demo" data-methods="Greet, Increment, Add, Double" data-lang="English / ISA" data-status="released" data-ns="" data-desc="Integer arithmetic demo compiled from English natural-language source. Shows the English-CLOOMC front-end.">Review</a></td>
+      </tr>
+      <tr>
+        <td>NoteG</td><td>0x04A720F8</td><td>IDE demo</td><td>compute</td>
+        <td><a href="#" class="review-link" data-name="NoteG" data-genotype="0x04A720F8" data-origin="IDE demo" data-methods="compute" data-lang="Symbolic" data-status="released" data-ns="" data-desc="Ada NoteG musical demo. Symbolic-math pipeline that computes the frequency of musical note G using rational arithmetic.">Review</a></td>
+      </tr>
+
+      <tr class="group-hdr"><td colspan="5">Data / String</td></tr>
+      <tr>
+        <td>WordString</td><td>0xA1682B26</td><td>ide Namespace</td><td>GetWordCount, GetCharCount, GetByteCount, GetCharByte, IsUppercase, IsLowercase, IsDigit, IsAlpha, ToUpper, ToLower</td>
+        <td><a href="#" class="review-link" data-name="WordString" data-genotype="0xA1682B26" data-origin="ide Namespace" data-methods="GetWordCount, GetCharCount, GetByteCount, GetCharByte, IsUppercase, IsLowercase, IsDigit, IsAlpha, ToUpper, ToLower" data-lang="ISA" data-status="released" data-ns="" data-desc="Packed-word character string library. Raw ISA implementation of character classification and access on 32-bit word-packed strings.">Review</a></td>
+      </tr>
+      <tr>
+        <td>StringOps</td><td>0x05B56245</td><td>ide Namespace</td><td>Pack4, Unpack, IsLetter, IsDigit, IsUpper, IsLower, IsSpace, ToUpper, ToLower, ReverseWord, CompareWords</td>
+        <td><a href="#" class="review-link" data-name="StringOps" data-genotype="0x05B56245" data-origin="ide Namespace" data-methods="Pack4, Unpack, IsLetter, IsDigit, IsUpper, IsLower, IsSpace, ToUpper, ToLower, ReverseWord, CompareWords" data-lang="ISA" data-status="released" data-ns="" data-desc="Word-level string packing and character classification library. Packs 4 chars per 32-bit word; full char-class and case conversion.">Review</a></td>
+      </tr>
+      <tr>
+        <td>EnglishLoops</td><td>0x19366291</td><td>IDE demo</td><td>WhileSum, RecurseSum, LambdaSum</td>
+        <td><a href="#" class="review-link" data-name="EnglishLoops" data-genotype="0x19366291" data-origin="IDE demo" data-methods="WhileSum, RecurseSum, LambdaSum" data-lang="English / ISA" data-status="released" data-ns="" data-desc="Loop-construct demo compiled from English natural-language. Shows three equivalent sum implementations: while-loop, recursive, and lambda-tail.">Review</a></td>
+      </tr>
+
+      <tr class="group-hdr"><td colspan="5">Hardware</td></tr>
+      <tr class="wip">
+        <td>LEDFlash</td><td>0x55F1A32F</td><td>Hardware</td><td>blink</td>
+        <td><a href="#" class="review-link" data-name="LEDFlash" data-genotype="0x55F1A32F" data-origin="Hardware" data-methods="blink" data-lang="ISA" data-status="wip" data-ns="" data-desc="LED blink demo. Toggles LED0 at ~1 Hz using nested busy-wait delay loops on the Ti60 board.">Review</a></td>
+      </tr>
+      <tr>
+        <td>MorseCmOk</td><td>0xEB20FE01</td><td>Hardware</td><td>run</td>
+        <td><a href="#" class="review-link" data-name="MorseCmOk" data-genotype="0xEB20FE01" data-origin="Hardware" data-methods="run" data-lang="assembly" data-status="released" data-ns="" data-desc="Morse-code CM OK signal. Flashes the Ti60 LED pattern for &apos;CQ DE CM&apos; to signal a healthy boot.">Review</a></td>
+      </tr>
+
+      <tr class="group-hdr"><td colspan="5">Security Test</td></tr>
+      <tr>
+        <td>CapabilityTest</td><td>0x1B20FBA6</td><td>Security test</td><td>(device capability verification)</td>
+        <td><a href="#" class="review-link" data-name="CapabilityTest" data-genotype="0x1B20FBA6" data-origin="Security test" data-methods="(device capability verification)" data-lang="ISA" data-status="released" data-ns="10" data-desc="Hardware capability test v1. Verifies SelfTest, LED_DEV, UART_DEV, BTN_DEV, and TIMER_DEV GT permissions in sequence.">Review</a></td>
+      </tr>
+      <tr>
+        <td>CapabilityTest.2</td><td>0xC7A66D01</td><td>Security test</td><td>(hardware GT verification)</td>
+        <td><a href="#" class="review-link" data-name="CapabilityTest.2" data-genotype="0xC7A66D01" data-origin="Security test" data-methods="(hardware GT verification)" data-lang="assembly" data-status="released" data-ns="" data-desc="Hardware capability test v2. Full TPERM audit of all five hardware device GTs with extended fault coverage.">Review</a></td>
+      </tr>
+      <tr>
+        <td>GT.Encoding.Self-Test</td><td>0x254F3542</td><td>Security test</td><td>(GT encoding audit)</td>
+        <td><a href="#" class="review-link" data-name="GT.Encoding.Self-Test" data-genotype="0x254F3542" data-origin="Security test" data-methods="(GT encoding audit)" data-lang="ISA" data-status="released" data-ns="" data-desc="GT encoding v1 hardware self-test. Audits that the CM hardware correctly interprets Golden Token permission bits for all 10 permission types.">Review</a></td>
+      </tr>
+
+      <tr class="group-hdr"><td colspan="5">Research Demo</td></tr>
+      <tr>
+        <td>Human.Hand</td><td>0xE88911D6</td><td>Research demo</td><td>Status, Close_Fist, Open_Hand, Grip, Point, Count, Pinch</td>
+        <td><a href="#" class="review-link" data-name="Human.Hand" data-genotype="0xE88911D6" data-origin="Research demo" data-methods="Status, Close_Fist, Open_Hand, Grip, Point, Count, Pinch" data-lang="ISA" data-status="released" data-ns="" data-desc="Prosthetic hand gesture abstraction. Maps CM capability calls to seven physical finger-motor commands.">Review</a></td>
+      </tr>
+
+      <tr class="group-hdr"><td colspan="5">IDE Namespace (compiled on demand)</td></tr>
+      <tr>
+        <td>DijkstraFlag</td><td>0x44CE2AAE</td><td>ide Namespace</td><td>RunSequence, Produce, Consume, Peek</td>
+        <td><a href="#" class="review-link" data-name="DijkstraFlag" data-genotype="0x44CE2AAE" data-origin="ide Namespace" data-methods="RunSequence, Produce, Consume, Peek" data-lang="CLOOMC" data-status="released" data-ns="" data-desc="Dijkstra mutual-exclusion flag. Classic producer/consumer semaphore implemented as a capability-secured CLOOMC abstraction.">Review</a></td>
       </tr>
       <tr>
         <td>Store</td><td>0x69FC2839</td><td>ide Namespace</td><td>Hash</td>
-        <td><a href="#" class="review-link" data-name="Store" data-genotype="0x69FC2839" data-origin="ide Namespace" data-methods="Hash">Review</a></td>
+        <td><a href="#" class="review-link" data-name="Store" data-genotype="0x69FC2839" data-origin="ide Namespace" data-methods="Hash" data-lang="CLOOMC" data-status="released" data-ns="" data-desc="Key-value store abstraction. Single Hash method maps a capability key to a stored word value.">Review</a></td>
       </tr>
       <tr>
         <td>Counter</td><td>0xB62C83A1</td><td>ide Namespace</td><td>Inc, Dec, IsZero</td>
-        <td><a href="#" class="review-link" data-name="Counter" data-genotype="0xB62C83A1" data-origin="ide Namespace" data-methods="Inc, Dec, IsZero">Review</a></td>
+        <td><a href="#" class="review-link" data-name="Counter" data-genotype="0xB62C83A1" data-origin="ide Namespace" data-methods="Inc, Dec, IsZero" data-lang="CLOOMC" data-status="released" data-ns="" data-desc="Integer counter abstraction. Maintains a private count behind E-permission. Inc/Dec are atomic; IsZero returns a capability-secured boolean.">Review</a></td>
       </tr>
       <tr>
         <td>Adder</td><td>0x7BA260A5</td><td>IDE demo</td><td>Add, Double</td>
-        <td><a href="#" class="review-link" data-name="Adder" data-genotype="0x7BA260A5" data-origin="IDE demo" data-methods="Add, Double">Review</a></td>
+        <td><a href="#" class="review-link" data-name="Adder" data-genotype="0x7BA260A5" data-origin="IDE demo" data-methods="Add, Double" data-lang="CLOOMC" data-status="released" data-ns="" data-desc="Simple arithmetic demo. Add(a,b) and Double(x) — introductory example for CALL / RETURN flow.">Review</a></td>
       </tr>
       <tr>
         <td>Calc</td><td>0xB691F404</td><td>IDE demo</td><td>Multiply, Square</td>
-        <td><a href="#" class="review-link" data-name="Calc" data-genotype="0xB691F404" data-origin="IDE demo" data-methods="Multiply, Square">Review</a></td>
+        <td><a href="#" class="review-link" data-name="Calc" data-genotype="0xB691F404" data-origin="IDE demo" data-methods="Multiply, Square" data-lang="CLOOMC" data-status="released" data-ns="" data-desc="Multiplication demo. Multiply(a,b) and Square(x) — companion to Adder for demonstrating multiple method abstractions.">Review</a></td>
       </tr>
+
+      <tr class="group-hdr"><td colspan="5">Two-Enemies Security Proof</td></tr>
       <tr>
         <td>Alice</td><td>0x3FCBF37C</td><td>two-enemies proof</td><td>Stash, Reveal</td>
-        <td><a href="#" class="review-link" data-name="Alice" data-genotype="0x3FCBF37C" data-origin="two-enemies proof" data-methods="Stash, Reveal">Review</a></td>
+        <td><a href="#" class="review-link" data-name="Alice" data-genotype="0x3FCBF37C" data-origin="two-enemies proof" data-methods="Stash, Reveal" data-lang="CLOOMC" data-status="released" data-ns="" data-desc="Alice principal in the two-enemies security proof. Stash stores a secret behind an E-permission capability; Reveal returns it only to the original caller.">Review</a></td>
       </tr>
       <tr>
         <td>Mallory</td><td>0xB2AB7AF0</td><td>two-enemies proof</td><td>Steal, Probe</td>
-        <td><a href="#" class="review-link" data-name="Mallory" data-genotype="0xB2AB7AF0" data-origin="two-enemies proof" data-methods="Steal, Probe">Review</a></td>
+        <td><a href="#" class="review-link" data-name="Mallory" data-genotype="0xB2AB7AF0" data-origin="two-enemies proof" data-methods="Steal, Probe" data-lang="CLOOMC" data-status="released" data-ns="" data-desc="Mallory adversary in the two-enemies security proof. Attempts to Steal and Probe Alice&apos;s capability — both calls must fault with PERM_DENIED to pass the proof.">Review</a></td>
       </tr>
+
     </tbody>
   </table>
+  </div><!-- /.table-wrap -->
 
   <div id="review-panel">
-    <div id="review-title">Select a document to review.</div>
-    <div id="review-body"></div>
+    <div id="review-header">
+      <div id="review-title">Select a lump to review.</div>
+      <span id="review-status"></span>
+      <span id="review-close" title="Close">&#x2715;</span>
+    </div>
+    <div class="review-grid" id="review-grid"></div>
   </div>
 
   <script>
-    function buildReviewText(data) {
-      return (
-        "Name: " + data.name + "\n" +
-        "Genotype: " + data.genotype + "\n" +
-        "Origin: " + data.origin + "\n" +
-        "Methods: " + data.methods + "\n\n" +
-        "Review Notes:\n" +
-        "- This is a placeholder review.\n" +
-        "- You can replace this text with real analysis,\n" +
-        "  security notes, or documentation links."
-      );
+    function escHtml(s) {
+      return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+    function buildGrid(d) {
+      var rows = [
+        ["Name",    escHtml(d.name)],
+        ["Genotype",escHtml(d.genotype)],
+        ["Origin",  escHtml(d.origin)],
+        ["Language",escHtml(d.lang || "—")],
+        ["NS Slot", d.ns ? escHtml(d.ns) : "—"],
+        ["Methods", "<span class=\"review-methods\">" + escHtml(d.methods) + "</span>"],
+        ["Description", escHtml(d.desc || "—")]
+      ];
+      return rows.map(function(r){
+        return "<div class=\"review-key\">" + r[0] + ":</div><div class=\"review-val\">" + r[1] + "</div>";
+      }).join("");
+    }
+    function statusBadge(s) {
+      var cls = s === "released" ? "badge-released" : s === "wip" ? "badge-wip" : "badge-archive";
+      return "<span class=\"review-badge " + cls + "\">" + escHtml(s || "—") + "</span>";
     }
     document.querySelectorAll(".review-link").forEach(function(link) {
       link.addEventListener("click", function(e) {
         e.preventDefault();
-        var data = {
-          name: this.dataset.name,
+        var d = {
+          name:     this.dataset.name,
           genotype: this.dataset.genotype,
-          origin: this.dataset.origin,
-          methods: this.dataset.methods
+          origin:   this.dataset.origin,
+          methods:  this.dataset.methods,
+          lang:     this.dataset.lang,
+          status:   this.dataset.status,
+          ns:       this.dataset.ns,
+          desc:     this.dataset.desc
         };
-        document.getElementById("review-title").textContent = "Reviewing: " + data.name;
-        document.getElementById("review-body").textContent = buildReviewText(data);
+        document.getElementById("review-title").textContent = d.name;
+        document.getElementById("review-status").innerHTML = statusBadge(d.status);
+        document.getElementById("review-grid").innerHTML = buildGrid(d);
+        var panel = document.getElementById("review-panel");
+        panel.classList.add("visible");
+        document.querySelectorAll(".review-link").forEach(function(l){ l.style.fontWeight="600"; });
+        this.style.fontWeight = "900";
       });
+    });
+    document.getElementById("review-close").addEventListener("click", function() {
+      document.getElementById("review-panel").classList.remove("visible");
+      document.querySelectorAll(".review-link").forEach(function(l){ l.style.fontWeight="600"; });
     });
   </script>
 </body>
 </html>'></iframe>
+
+  <script>
+    // Auto-size iframe to its content height after load
+    var fr = document.getElementById("lump-viewer-frame");
+    fr.addEventListener("load", function() {
+      try {
+        var h = fr.contentDocument.body.scrollHeight;
+        fr.style.height = (h + 20) + "px";
+      } catch(e) {}
+    });
+  </script>
 
   <!-- ═══════════════════════════════════════════
        Lump Size Rule
