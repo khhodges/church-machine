@@ -1450,6 +1450,8 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
       function _mkCmt(w32, crAlias, clistNames) {
         w32=w32>>>0; if(w32===0) return 'end of method / padding';
         const op=(w32>>>27)&0x1F, cond=(w32>>>23)&0xF, dst=(w32>>>19)&0xF;
+        if(op===0x1F) return 'lump magic word — header sentinel (not executable)';
+        if(op>=26)    return 'reserved opcode';
         const src=(w32>>>15)&0xF, imm=w32&0x7FFF;
         const cs=cond===14?'':('if '+CONDS[cond]+' ');
         const nm=i=>clistNames[i]||null, sl=i=>clistNames[i]||`c-list[${i}]`;
