@@ -3152,6 +3152,15 @@ def six_laws_index():
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return resp
 
+@app.route("/six-laws/view")
+def six_laws_view():
+    """Serve the Six Laws PDF inline so the browser displays it directly."""
+    pdf_path = os.path.join(SIX_LAWS_DIR, "six-laws-review.pdf")
+    resp = make_response(send_file(pdf_path, mimetype="application/pdf"))
+    resp.headers["Content-Disposition"] = 'inline; filename="six-laws-review.pdf"'
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
+
 @app.route("/six-laws/files/<path:filename>")
 def six_laws_file(filename):
     resp = make_response(send_from_directory(SIX_LAWS_DIR, filename))
