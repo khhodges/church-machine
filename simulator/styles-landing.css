@@ -154,6 +154,33 @@
     line-height: 1.4;
 }
 
+/* Quick-access chips inside home cards */
+.home-chip {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 500;
+    padding: 0.18rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid rgba(218,165,32,0.35);
+    background: rgba(218,165,32,0.08);
+    color: #d4a017;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.14s, border-color 0.14s;
+    white-space: nowrap;
+}
+.home-chip:hover {
+    background: rgba(218,165,32,0.18);
+    border-color: rgba(218,165,32,0.65);
+    color: #f0c040;
+}
+.home-chip-row {
+    margin-top: 0.55rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+
 /* Docs section — slightly different colour */
 .home-doc-card {
     background: rgba(30,58,138,0.12);

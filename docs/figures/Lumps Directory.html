@@ -1397,8 +1397,10 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
           <span class="hex-leg-item"><span class="hex-leg-swatch" style="background:#fff8e8;border-color:#d8b870;"></span> C-list (null GT)</span>
           <span class="hex-leg-item"><span class="hex-leg-swatch" style="background:#ffe8b0;border-color:#c8900a;"></span> C-list (live GT)</span>
           <span id="_hexBinaryNote" style="color:#888;font-size:0.68rem;margin-left:auto;">⏳ Loading binary…</span>
+          <span id="_hexHashCheck" style="font-size:0.68rem;margin-left:0.9rem;"></span>
         </div>
         <div id="_hexSizeWarn" style="display:none;background:#4a1a1a;color:#ffa0a0;font-size:0.72rem;padding:0.3rem 0.7rem;border-radius:3px;margin-bottom:0.4rem;"></div>
+        <div id="_hexHashBanner" style="display:none;font-size:0.72rem;padding:0.3rem 0.7rem;border-radius:3px;margin-bottom:0.4rem;font-family:monospace;white-space:pre-wrap;"></div>
         <div class="hex-wrap">
           <table class="hex-table">
             <thead><tr>
@@ -1546,6 +1548,7 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
       try {
         const res=await fetch('/api/lump/'+token);
         if(!res.ok) throw new Error('HTTP '+res.status);
+        const serverHashHeader=res.headers.get('X-Lump-Hash'); // sha256:<hex> of raw lump bytes
         const buf=await res.arrayBuffer();
         const view=new DataView(buf);
         const wordCount=Math.floor(buf.byteLength/4);
@@ -1608,6 +1611,66 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
           if(cell) cell.title=tip;
         }
         if(note) note.textContent=filled+' code word'+(filled!==1?'s':'')+' loaded';
+
+        // ── Hash crosscheck: sha256(dot_name_utf8 + lump_bytes)[:8] must equal token ─
+        // The "Number" in the filename IS sha256(dot_name + binary)[:8].
+        // This proves the dot.name is cryptographically bound to the binary content.
+        (async()=>{
+          const hashEl=document.getElementById('_hexHashCheck');
+          const bannerEl=document.getElementById('_hexHashBanner');
+          if(!hashEl) return;
+          try {
+            const rawBytes=buf.slice(4);               // strip CRC-32 prefix word
+            const dotName=lumpData.dot_name||'';
+            const enc=new TextEncoder();
+            const dnBytes=enc.encode(dotName);
+
+            // Two digests in parallel: binary-only and name+binary (identity)
+            const combined=new Uint8Array(dnBytes.length+rawBytes.byteLength);
+            combined.set(dnBytes,0);
+            combined.set(new Uint8Array(rawBytes),dnBytes.length);
+            const [binBuf,idBuf]=await Promise.all([
+              crypto.subtle.digest('SHA-256',rawBytes),
+              crypto.subtle.digest('SHA-256',combined.buffer)
+            ]);
+            const toHex=b=>Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
+            const computedBin=toHex(binBuf);           // sha256(binary)
+            const computedNum=toHex(idBuf).slice(0,8); // sha256(dot_name+binary)[:8] = Number
+
+            // Server header: "sha256:<full-hex>"
+            const srvHex=serverHashHeader?serverHashHeader.replace(/^sha256:/i,'').trim():null;
+            // Manifest binary_hash (full sha256 of raw bytes, no name)
+            const mfxHex=lumpData.binary_hash||null;
+            // Expected Number = first 8 hex chars of the token (token IS the Number)
+            const expectedNum=(token||'').toLowerCase().replace(/^0x/,'').slice(0,8);
+
+            const binOk=(!srvHex||computedBin===srvHex)&&(!mfxHex||computedBin===mfxHex);
+            const nameOk=!dotName||!expectedNum||computedNum===expectedNum;
+
+            if(binOk&&nameOk){
+              hashEl.style.color='#3a8a5a';
+              hashEl.textContent=dotName
+                ?`✓ sha256("${dotName}" + binary)[:8] = ${computedNum} — name bound to content`
+                :`✓ Binary hash verified`;
+              hashEl.title=`Computed sha256(binary): ${computedBin}\nComputed sha256("${dotName}"+binary)[:8]: ${computedNum}\nToken Number: ${expectedNum}\nX-Lump-Hash: ${srvHex||'(none)'}\nManifest binary_hash: ${mfxHex||'(none)'}`;
+            } else {
+              hashEl.style.cssText='color:#c84040;font-weight:600;font-size:0.68rem;';
+              const parts=[];
+              if(!binOk) parts.push('binary hash mismatch (file corrupt or swapped)');
+              if(!nameOk) parts.push(`identity mismatch: sha256("${dotName}"+binary)[:8]=${computedNum} ≠ token ${expectedNum} — dot.name not bound to this binary`);
+              hashEl.textContent=`✗ Hash FAILED`;
+              if(bannerEl){
+                bannerEl.style.display='';
+                bannerEl.style.background='#4a1a1a';
+                bannerEl.style.color='#ffa0a0';
+                bannerEl.textContent=`Hash crosscheck FAILED:\n${parts.join('\n')}\n\nComputed sha256(binary):              ${computedBin}\nComputed sha256("${dotName}"+binary)[:8]: ${computedNum}\nExpected token Number:                  ${expectedNum}`;
+              }
+            }
+          } catch(e){
+            hashEl.style.color='#888';
+            hashEl.textContent='(hash check unavailable)';
+          }
+        })();
 
         // ── Build live disassembly listing ────────────────────────────────────
         const listing=document.getElementById('_disasmListing');

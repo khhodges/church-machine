@@ -410,16 +410,28 @@
                 <div class="home-card-icon">📘</div>
                 <div class="home-card-name">Tutorials</div>
                 <div class="home-card-desc">Step-by-step CLOOMC guides</div>
+                <div class="home-chip-row">
+                    <a class="home-chip" onclick="event.stopPropagation();switchView('start')">Get Started</a>
+                    <a class="home-chip" onclick="event.stopPropagation();switchView('repl')">Math REPL</a>
+                </div>
             </div>
-            <div class="home-card" onclick="switchView('repl')" data-tooltip="Math REPL — Evaluate expressions with Church Machine trace">
-                <div class="home-card-icon">🧮</div>
-                <div class="home-card-name">Math REPL</div>
-                <div class="home-card-desc">Evaluate symbolic math with trace</div>
+            <div class="home-card" onclick="switchView('abstractions')" data-tooltip="Abstractions — Browse, inspect, and deploy LUMPs">
+                <div class="home-card-icon">🧩</div>
+                <div class="home-card-name">Abstractions</div>
+                <div class="home-card-desc">Browse and deploy capability modules</div>
+                <div class="home-chip-row">
+                    <a class="home-chip" onclick="event.stopPropagation();switchView('lumps')">LUMP Browser</a>
+                    <a class="home-chip" onclick="event.stopPropagation();switchView('namespace')">Namespace</a>
+                </div>
             </div>
-            <div class="home-card" onclick="switchView('start')" data-tooltip="Get Started — Three-step onboarding: Flash · Connect · Write">
-                <div class="home-card-icon">🚦</div>
-                <div class="home-card-name">Get Started</div>
-                <div class="home-card-desc">Flash · Connect · Write your first program</div>
+            <div class="home-card" onclick="switchView('dashboard')" data-tooltip="Dashboard — Live telemetry, MTBF, and fault log">
+                <div class="home-card-icon">📊</div>
+                <div class="home-card-name">Dashboard</div>
+                <div class="home-card-desc">Live MTBF, call-home, and fault records</div>
+                <div class="home-chip-row">
+                    <a class="home-chip" onclick="event.stopPropagation();switchView('devices');switchDevicesTab('devices')">Devices</a>
+                    <a class="home-chip" onclick="event.stopPropagation();switchView('pipeline')">Pipeline</a>
+                </div>
             </div>
         </div>
 
@@ -432,11 +444,20 @@
                 <div class="home-card-icon">📖</div>
                 <div class="home-card-name">ISA Reference</div>
                 <div class="home-card-desc">Full instruction set reference</div>
+                <div class="home-chip-row">
+                    <a class="home-chip" onclick="event.stopPropagation();switchView('reference');switchRefTab('isa')">ISA</a>
+                    <a class="home-chip" onclick="event.stopPropagation();switchView('reference');switchRefTab('hardware')">Architecture</a>
+                </div>
             </div>
             <div class="home-card home-doc-card" onclick="switchView('docs')" data-tooltip="Docs — Hardware guide, CLOOMC++ guide, API reference">
                 <div class="home-card-icon">📚</div>
                 <div class="home-card-name">All Docs</div>
                 <div class="home-card-desc">Hardware, language, and API guides</div>
+                <div class="home-chip-row">
+                    <a class="home-chip" onclick="event.stopPropagation();" href="/six-laws/" target="_blank">Six Laws</a>
+                    <a class="home-chip" onclick="event.stopPropagation();" href="/six-laws-review.pdf" target="_blank">PDF</a>
+                    <a class="home-chip" onclick="event.stopPropagation();" href="/docs/figures/Lumps Directory.html" target="_blank">Lump Viewer</a>
+                </div>
             </div>
             <div class="home-card home-doc-card" onclick="switchView('hello-mum')" data-tooltip="Mum Tunnel — Share abstractions through the community library">
                 <div class="home-card-icon">🌐</div>
