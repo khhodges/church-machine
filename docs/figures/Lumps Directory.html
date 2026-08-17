@@ -1106,6 +1106,13 @@ function switchTab(lumpId, tabId) {
   selectLump(lumpId);
 }
 
+// ── Formal filename: dot.name.issue_n.genotype_lower.lump ─────
+function formalFilename(lump) {
+  const g = (lump.genotype || '').replace(/^0x/i, '').toLowerCase();
+  const v = lump.lump_version || parseInt(lump.version) || 1;
+  return g ? `${lump.id}.${v}.${g}.lump` : lump.id;
+}
+
 // ══════════════════════════════════════════════════════════════
 //  TAB CONTENT
 // ══════════════════════════════════════════════════════════════
@@ -1124,6 +1131,7 @@ function renderTabContent(lump, tab, { freespace, header, n, nMinus6, checks }) 
         <h3>Identity</h3>
         <div class="kv-grid">
           <div class="kv-key">Name</div>       <div class="kv-val">${lump.id}</div>
+          <div class="kv-key">Filename</div>   <div class="kv-val"><code>${formalFilename(lump)}</code></div>
           <div class="kv-key">Genotype</div>   <div class="kv-val"><code>${lump.genotype}</code></div>
           <div class="kv-key">Token</div>      <div class="kv-val"><code>${lump.token}</code></div>
           <div class="kv-key">Group</div>      <div class="kv-val">${lump.group}</div>
@@ -1314,7 +1322,7 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
     const hxHdr = '0x' + (header>>>0).toString(16).toUpperCase().padStart(8,'0');
     let da = '';
     da += `; ${'═'.repeat(66)}\n`;
-    da += `; ${lump.id}  —  structural disassembly\n`;
+    da += `; ${formalFilename(lump)}  —  structural disassembly\n`;
     da += `; lump_size=${lump.lump_size}  cw=${lump.cw}  cc=${lump.cc}  freespace=${freespace}  typ=${lump.typ||0}\n`;
     da += `; ${'═'.repeat(66)}\n\n`;
 
@@ -1394,7 +1402,7 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
 
     body.innerHTML = `
       <div class="card">
-        <h3>Hex Dump — ${lump.id}  (${lump.lump_size} words · ${lump.lump_size*4} bytes)</h3>
+        <h3>Hex Dump — ${formalFilename(lump)}  (${lump.lump_size} words · ${lump.lump_size*4} bytes)</h3>
         <div class="hex-legend">
           <span class="hex-leg-item"><span class="hex-leg-swatch" style="background:#edfced;border-color:#9acea2;"></span> Header</span>
           <span class="hex-leg-item"><span class="hex-leg-swatch" style="background:#eef1ff;border-color:#9aaaca;"></span> Code</span>
