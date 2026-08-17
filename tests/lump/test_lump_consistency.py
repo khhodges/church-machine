@@ -386,11 +386,25 @@ class TestR6_SidecarMatchesBinary:
             )
 
 
+def _resolve_ns_slot_policy(ns_slot, policy):
+    """Semantic normalization of ns_slot_policy per the retired-R9 rule.
+
+    For null slots: absent means 'dynamic' (R9 retired).
+    For fixed slots: absent means 'static' (Resident/Lazy-load convention).
+    """
+    if policy is not None:
+        return policy
+    if ns_slot is None:
+        return "dynamic"
+    return "static"
+
+
 class TestR7_SidecarMatchesManifest:
     """R7: sidecar fields agree with manifest where both are present.
 
-    Checked fields: cw, cc, lump_size, ns_slot, abstraction, lump_version.
-    lump_version is the integer LUMP version (0 = system baseline, 1+ = user-compiled).
+    Checked fields: cw, cc, lump_size, ns_slot, abstraction, lump_version,
+    and ns_slot_policy (with semantic normalization: absent = dynamic for null
+    slots, absent = static for fixed slots — R9 retired).
     """
 
     @pytest.mark.parametrize("entry", MANIFEST, ids=lambda e: e["token"])
@@ -407,6 +421,17 @@ class TestR7_SidecarMatchesManifest:
                     f"{token}: manifest.{field} = {m_val!r} but sidecar.{field} = {s_val!r}.\n"
                     "  The two must agree. Update whichever is stale, then bump CHANGELOG."
                 )
+        # ns_slot_policy: always compare resolved values so absent-vs-static (null slot) is caught
+        ns_slot = entry.get("ns_slot")
+        if entry.get("ns_slot_policy") is not None or sc.get("ns_slot_policy") is not None:
+            m_policy = _resolve_ns_slot_policy(ns_slot, entry.get("ns_slot_policy"))
+            s_policy = _resolve_ns_slot_policy(sc.get("ns_slot"), sc.get("ns_slot_policy"))
+            assert m_policy == s_policy, (
+                f"{token}: manifest.ns_slot_policy resolves to {m_policy!r} but "
+                f"sidecar.ns_slot_policy resolves to {s_policy!r}.\n"
+                "  Align the two (add explicit ns_slot_policy to whichever is absent), "
+                "then bump CHANGELOG."
+            )
 
 
 class TestR8_NoDuplicateNsSlots:
@@ -445,6 +470,42 @@ class TestR9_NullSlotPolicy:
 
     def test_null_slot_has_policy(self):
         pass
+
+
+class TestR7b_PolicySemanticNormalization:
+    """Regression tests for _resolve_ns_slot_policy semantic normalization (R9 retirement).
+
+    Ensures that absent-vs-static disagreement on null slots is caught, and that
+    absent-vs-dynamic on null slots passes (both resolve to 'dynamic').
+    """
+
+    def test_null_slot_absent_policy_resolves_to_dynamic(self):
+        """ns_slot=null + absent policy → 'dynamic' (R9 retired rule)."""
+        assert _resolve_ns_slot_policy(None, None) == "dynamic"
+
+    def test_null_slot_explicit_dynamic_policy(self):
+        """ns_slot=null + 'dynamic' policy → 'dynamic'."""
+        assert _resolve_ns_slot_policy(None, "dynamic") == "dynamic"
+
+    def test_null_slot_explicit_static_policy(self):
+        """ns_slot=null + 'static' policy → 'static' (NULL/token-only category)."""
+        assert _resolve_ns_slot_policy(None, "static") == "static"
+
+    def test_fixed_slot_absent_policy_resolves_to_static(self):
+        """ns_slot=integer + absent policy → 'static' (Resident/Lazy-load convention)."""
+        assert _resolve_ns_slot_policy(9, None) == "static"
+
+    def test_absent_vs_dynamic_null_slot_agrees(self):
+        """manifest='dynamic', sidecar=absent, null slot → resolved values agree (both dynamic)."""
+        m = _resolve_ns_slot_policy(None, "dynamic")
+        s = _resolve_ns_slot_policy(None, None)
+        assert m == s, f"Expected both to resolve to 'dynamic', got manifest={m!r} sidecar={s!r}"
+
+    def test_absent_vs_static_null_slot_disagrees(self):
+        """manifest='static', sidecar=absent, null slot → resolved values disagree (NULL vs dynamic)."""
+        m = _resolve_ns_slot_policy(None, "static")
+        s = _resolve_ns_slot_policy(None, None)
+        assert m != s, "Expected 'static' and absent null-slot to resolve differently, but they agreed"
 
 
 class TestR10_LumpFilesExist:

@@ -4,7 +4,7 @@
   "dot_name": "Tunnel",
   "issue_n": 1,
   "ns_slot": 22,
-  "ns_slot_policy": "dynamic",
+  "ns_slot_policy": "static",
   "lump_size": 64,
   "status": "released",
   "language": "CLOOMC",

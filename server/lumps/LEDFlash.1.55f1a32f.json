@@ -4,6 +4,7 @@
   "filename": "LEDFlash_v3.lump",
   "sidecar_file": "LEDFlash_v3.json",
   "ns_slot": null,
+  "ns_slot_policy": "dynamic",
   "lump_size": 64,
   "typ": 0,
   "content_type": "code",

@@ -2,6 +2,7 @@
   "token": "00003300",
   "abstraction": "Ethernet",
   "ns_slot": null,
+  "ns_slot_policy": "dynamic",
   "lump_size": 64,
   "cw": 13,
   "cc": 1,

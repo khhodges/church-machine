@@ -4,7 +4,7 @@
   "dot_name": "Constants",
   "issue_n": 1,
   "ns_slot": 9,
-  "ns_slot_policy": "dynamic",
+  "ns_slot_policy": "static",
   "lump_size": 64,
   "status": "released",
   "language": "ISA",

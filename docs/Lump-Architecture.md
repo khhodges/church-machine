@@ -303,25 +303,26 @@ on demand. NULL lumps never enter the Namespace table at all.
 |:---------|:----------|:----------------|:-----------------|:----------|
 | **Resident** | integer | `true` | `"static"` | Slot is part of the boot image. NS entry is `Live` at cold boot. |
 | **Lazy-load** | integer | `false` / absent | `"static"` | Slot is reserved but the lump body is absent from the boot image. Loaded into that specific slot on first demand via Loader/Tunnel. |
-| **Dynamic** | `null` | — | `"dynamic"` | No assigned slot. The runtime allocates the next free slot at first use. Slot number may differ between reboots; callers hold a GT, not a slot index. |
-| **NULL** | `null` | — | absent / `"static"` | Never enters the Namespace table. Fetched directly by token via Loader/Tunnel when needed. Correct for data, media, and library lumps that require no callable NS slot. |
+| **Dynamic** | `null` | — | `"dynamic"` or absent | No assigned slot. The runtime allocates the next free slot at first use. Slot number may differ between reboots; callers hold a GT, not a slot index. `ns_slot_policy` is optional — absent is treated as `"dynamic"`. |
+| **NULL** | `null` | — | `"static"` | Never enters the Namespace table. Fetched directly by token via Loader/Tunnel when needed. Correct for data, media, and library lumps that require no callable NS slot. Must use explicit `"static"` to opt into this category. |
 
 ### Variant Group
 
 If two manifest entries claim the same `ns_slot` they must share the same
 non-null `variant_group` string. The boot image installs exactly one at a time.
 
-Example: SlideRule (00001000) and SlideRule (Haskell) (00001001) both have
-`ns_slot: 16` and `variant_group: "sliderule"`.
+Example: two alternative implementations of the same abstraction both carry
+the same `ns_slot` integer and a matching `variant_group` string.
 
 | `ns_slot` | `ns_slot_policy` | Classification |
 |---|---|---|
 | integer | absent / `"static"` | Resident or Lazy-load — fixed assigned slot |
-| `null` | `"dynamic"` | Dynamic — allocated by Mint on first use |
-| `null` | absent | **Error** — caught by consistency gate R9 |
+| `null` | `"dynamic"` or absent | Dynamic — allocated by Mint on first use |
+| `null` | `"static"` | NULL — never enters the NS table; fetched by token |
 
 Enforcement: `tests/lump/test_lump_consistency.py` — R8 (variant_group),
-R9 (null-slot policy), run before every lump-related merge.
+run before every lump-related merge. **R9 is retired** — `ns_slot_policy` is
+optional when `ns_slot` is null; absent is treated as dynamic.
 
 ---
 

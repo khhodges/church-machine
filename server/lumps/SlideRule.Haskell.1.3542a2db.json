@@ -4,7 +4,7 @@
   "dot_name": "SlideRule.Haskell",
   "issue_n": 1,
   "ns_slot": 16,
-  "ns_slot_policy": "dynamic",
+  "ns_slot_policy": "static",
   "lump_size": 256,
   "status": "released",
   "language": "CLOOMC",
@@ -13,5 +13,6 @@
   "cc": 1,
   "source_file": "simulator/cloomc/sliderule_haskell.cloomc",
   "filename": "SlideRule.Haskell.1.3542a2db.lump",
-  "sidecar_file": "SlideRule.Haskell.1.3542a2db.json"
+  "sidecar_file": "SlideRule.Haskell.1.3542a2db.json",
+  "variant_group": null
 }

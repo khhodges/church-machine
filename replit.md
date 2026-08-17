@@ -119,17 +119,18 @@ never enter the Namespace table at all.
 |:---------|:----------|:----------------|:-----------------|
 | **Resident** | integer | `true` | `"static"` |
 | **Lazy-load** | integer | `false`/absent | `"static"` |
-| **Dynamic** | `null` | — | `"dynamic"` |
-| **NULL** | `null` | — | absent/`"static"` |
+| **Dynamic** | `null` | — | `"dynamic"` or absent |
+| **NULL** | `null` | — | `"static"` |
 
-A **Dynamic lump** sets `ns_slot: null` and `ns_slot_policy: "dynamic"`.
-The runtime allocates the next free slot at first use; the slot may change
-between reboots, but callers hold a GT (not a slot index) so it is invisible
-to them.
+A **Dynamic lump** has `ns_slot: null`. The runtime allocates the next free
+slot at first use; the slot may change between reboots, but callers hold a GT
+(not a slot index) so it is invisible to them. `ns_slot_policy: "dynamic"` is
+preferred for clarity but **absent is treated as dynamic** — R9 is retired.
 
 A **NULL lump** also has `ns_slot: null` but never enters the Namespace table.
-It is fetched directly by token via the Loader/Tunnel when needed — correct
-for data, media, and library lumps that require no callable NS slot.
+It is fetched directly by token via the Loader/Tunnel when needed — correct for
+data, media, and library lumps that require no callable NS slot. Must declare
+`ns_slot_policy: "static"` explicitly to opt into this category.
 
 Canonical example: WordString (ab1e86af).
 

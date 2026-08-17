@@ -4,6 +4,7 @@
   "filename": "Abstraction_MorseCmOk_v4.lump",
   "sidecar_file": "Abstraction_MorseCmOk_v4.json",
   "ns_slot": null,
+  "ns_slot_policy": "dynamic",
   "lump_size": 512,
   "typ": 0,
   "content_type": "code",

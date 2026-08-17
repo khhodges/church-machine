@@ -122,9 +122,11 @@ body { font-family: system-ui, sans-serif; margin: 0; background: #f2f3f7; color
 .doc-count-big { font-size: 2rem; font-weight: 700; color: #1a5cc8; }
 .doc-count-label { font-size: 0.8rem; color: #666; }
 .doc-list { list-style: none; margin: 0; padding: 0; }
-.doc-list li { padding: 0.35rem 0; border-bottom: 1px solid #eef; font-size: 0.82rem; color: #2244aa; display: flex; gap: 0.4rem; align-items: center; }
+.doc-list li { padding: 0.35rem 0; border-bottom: 1px solid #eef; font-size: 0.82rem; color: #444; display: flex; gap: 0.4rem; align-items: center; }
 .doc-list li:last-child { border: none; }
 .doc-icon { color: #888; font-size: 0.8rem; }
+.doc-link { color: #1a5cc8; text-decoration: none; }
+.doc-link:hover { text-decoration: underline; }
 
 /* ── NS state ── */
 .ns-state-live { color: #1a7a1a; font-weight: 600; }
@@ -308,7 +310,7 @@ const LUMPS = [
 },
 {
   id:"Keystone", genotype:"0x86B853A1", token:"00002000", group:"System",
-  ns_slot:23, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  ns_slot:23, ns_slot_policy:"static", boot_resident:false, variant_group:null,
   lump_size:64, cw:22, cc:2, typ:0,
   language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
   description:"Network key-exchange abstraction. Establishes a shared Mum identity word and confirms connectivity. Connect verifies the peer's 32-bit identity token (bits[31:28] must equal 1); on success it issues an Outform E-GT into c-list slot 1. Hello confirms the connection is live.",
@@ -370,7 +372,7 @@ const LUMPS = [
 // ── NETWORKING ────────────────────────────────────────────────
 {
   id:"Tunnel", genotype:"0x8770BF03", token:"00001f00", group:"Networking",
-  ns_slot:22, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  ns_slot:22, ns_slot_policy:"static", boot_resident:false, variant_group:null,
   lump_size:64, cw:37, cc:1, typ:0,
   language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
   description:"Mum Tunnel messaging abstraction. Provides capability-secured inter-machine send/receive, fault reporting, and remote lump fetch. The 'Hello Mum' primitive: CALL(CONNECT(me, mymother)). Six public methods covering registration, send, receive, fault, fetch (binary transfer), and tunnelled CALL.",
@@ -445,7 +447,7 @@ const LUMPS = [
 // ── MATH / SCIENCE ────────────────────────────────────────────
 {
   id:"Constants", genotype:"0xE494696F", token:"00001200", group:"Math / Science",
-  ns_slot:9, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  ns_slot:9, ns_slot_policy:"static", boot_resident:false, variant_group:null,
   lump_size:64, cw:23, cc:2, typ:0,
   language:"ISA", author:"Church Machine", version:"1.0", status:"released",
   description:"Mathematical constants library. Returns IEEE-754 fixed-point values for Pi (3.14159…), e (2.71828…), and Phi (1.61803…). Includes a 14-slot user pool (Add/Get) for application-defined constants. C-list holds two self-referential GTs for the pool storage region.",
@@ -467,10 +469,10 @@ const LUMPS = [
 },
 {
   id:"SlideRule", genotype:"0xD960F531", token:"00001000", group:"Math / Science",
-  ns_slot:16, ns_slot_policy:"dynamic", boot_resident:false, variant_group:"sliderule",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:4096, cw:2602, cc:1, typ:0,
   language:"CLOOMC (JS front-end)", author:"Church Machine", version:"2026.08.13", status:"released",
-  description:"Full-precision fixed-point mathematics library. 22 methods covering trigonometry, algebra, and number theory. The largest lump in the repository at 4096 words. C-list slot 0 holds the Constants E-GT. Variant partner: SlideRule.Haskell (same NS slot 16, variant_group sliderule).",
+  description:"Full-precision fixed-point mathematics library. 22 methods covering trigonometry, algebra, and number theory. The largest lump in the repository at 4096 words. C-list slot 0 holds the Constants E-GT. See also: SlideRule.Haskell (Haskell-syntax variant at NS slot 16).",
   ns_state:null,
   methods:[
     { name:"Multiply", offset:0, length:43, description:"Fixed-point multiply DR0 × DR1." },
@@ -504,10 +506,10 @@ const LUMPS = [
 },
 {
   id:"SlideRule.Haskell", genotype:"0x3542A2DB", token:"00001001", group:"Math / Science",
-  ns_slot:16, ns_slot_policy:"dynamic", boot_resident:false, variant_group:"sliderule",
+  ns_slot:16, ns_slot_policy:"static", boot_resident:false, variant_group:null,
   lump_size:256, cw:137, cc:1, typ:0,
   language:"CLOOMC Haskell", author:"Church Machine", version:"1.0", status:"released",
-  description:"Haskell-syntax SlideRule variant. Functional math library compiled from the CLOOMC Haskell dialect. Shares NS slot 16 with SlideRule (variant_group: sliderule) — exactly one is active per boot image. Nine methods covering essential arithmetic, using Haskell's curried style.",
+  description:"Haskell-syntax SlideRule variant. Functional math library compiled from the CLOOMC Haskell dialect. Occupies NS slot 16. Nine methods covering essential arithmetic, using Haskell's curried style.",
   ns_state:null,
   methods:[
     { name:"Add",    offset:0,   length:10, description:"Add DR0 + DR1." },
@@ -680,7 +682,7 @@ const LUMPS = [
 // ── SECURITY TEST ─────────────────────────────────────────────
 {
   id:"CapabilityTest", genotype:"0x1B20FBA6", token:"00000a00", group:"Security Test",
-  ns_slot:10, ns_slot_policy:"static", boot_resident:true, variant_group:null,
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:64, cw:0, cc:0, typ:0,
   language:"ISA", author:"Church Machine", version:"3", status:"released",
   description:"Hardware capability test v1. Verifies that the five boot-namespace hardware device GTs (SelfTest, LED_DEV, UART_DEV, BTN_DEV, TIMER_DEV) are present in the c-list, have the correct permission types (E vs R/W), and respond to LOAD without faulting. Compiled lump — cw=0 means the body is a stub; the real test is in the boot-image binary.",
@@ -937,9 +939,11 @@ function specChecks(lump) {
     cat = "Resident — NS slot is part of the boot image; Live at cold boot"; catCls="check-pass"; catIcon="✅";
   } else if (lump.ns_slot !== null && lump.ns_slot !== undefined && !lump.boot_resident) {
     cat = "Lazy-load — NS slot reserved but lump fetched on first demand"; catCls="check-warn"; catIcon="⚡";
-  } else if (lump.ns_slot === null && lump.ns_slot_policy === "dynamic") {
-    cat = "Dynamic — no assigned slot; Mint allocates next free slot at first use"; catCls="check-info"; catIcon="ℹ️";
-  } else if (lump.ns_slot === null && !lump.ns_slot_policy) {
+  } else if (lump.ns_slot === null && (lump.ns_slot_policy === "dynamic" || !lump.ns_slot_policy)) {
+    cat = "Dynamic — no assigned slot; Mint allocates next free slot at first use" +
+          (!lump.ns_slot_policy ? " (ns_slot_policy absent, implicitly dynamic)" : "");
+    catCls="check-info"; catIcon="ℹ️";
+  } else if (lump.ns_slot === null && lump.ns_slot_policy === "static") {
     cat = "NULL — never enters the NS table; fetched directly by token"; catCls="check-info"; catIcon="○";
   } else {
     cat = `ns_slot=${lump.ns_slot}, policy=${lump.ns_slot_policy||'absent'}`; catCls="check-info"; catIcon="ℹ️";
@@ -955,11 +959,11 @@ function specChecks(lump) {
       val:`slot ${lump.ns_slot} shared` });
   }
 
-  // R9: ns_slot=null without policy is an error
+  // R9: ns_slot=null without explicit policy — retired (informational warning only)
   if (lump.ns_slot === null && !lump.ns_slot_policy) {
-    checks.push({ rule:"R9", icon:"❌", cls:"check-fail",
-      desc:`ns_slot = null but ns_slot_policy is absent — Spec §NS Slot Assignment Rule 9: this combination is an error; must declare "dynamic" or "static"`,
-      val:"R9 FAIL" });
+    checks.push({ rule:"R9", icon:"⚠️", cls:"check-warn",
+      desc:`R9 (retired) — ns_slot_policy is optional; null slot is implicitly dynamic`,
+      val:"R9 (retired)" });
   }
 
   return { freespace, header, n, nMinus6, checks };
@@ -1053,8 +1057,8 @@ function renderTabContent(lump, tab, { freespace, header, n, nMinus6, checks }) 
     const cat = lump.ns_slot !== null && lump.ns_slot !== undefined
       ? (lump.boot_resident ? '<span class="ns-state-live">Resident (Live at boot)</span>'
                              : '<span class="ns-state-lazy">Lazy-load (reserved slot)</span>')
-      : (lump.ns_slot_policy === 'dynamic' ? '<span class="ns-state-dynamic">Dynamic (allocated at first use)</span>'
-                                            : '<span class="ns-state-null">NULL (no NS slot)</span>');
+      : (lump.ns_slot_policy === 'static' ? '<span class="ns-state-null">NULL (no NS slot)</span>'
+                                           : '<span class="ns-state-dynamic">Dynamic (allocated at first use)</span>');
     body.innerHTML = `
       <div class="card">
         <h3>Identity</h3>
@@ -1384,7 +1388,7 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
       <div class="doc-count-big">${lump.doc_count}</div>
       <div class="doc-count-label">documentation files reference<br><strong>${lump.id}</strong></div>
     </div>`;
-    const listHtml = refs.length ? `<ul class="doc-list">${refs.map(d=>`<li><span class="doc-icon">📄</span>${d}</li>`).join('')}</ul>` :
+    const listHtml = refs.length ? `<ul class="doc-list">${refs.map(d=>`<li><span class="doc-icon">📄</span><a class="doc-link" href="../${d}" target="_blank">${d}</a></li>`).join('')}</ul>` :
       `<p class="empty-note">No documentation cross-references recorded for this lump.</p>`;
     body.innerHTML = `<div class="card">
       <h3>Documentation Cross-References</h3>
@@ -1395,11 +1399,11 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
     <div class="card">
       <h3>Specification Cross-References — Spec §Cross-references</h3>
       <ul class="doc-list">
-        <li><span class="doc-icon">📄</span>CM_LUMP_SPECIFICATION.md — §Lump Memory Layout, §Mint Validation Sequence, §NS Slot Assignment</li>
-        <li><span class="doc-icon">📄</span>architecture.md — Overall Church Machine architecture</li>
-        <li><span class="doc-icon">📄</span>Lump-Architecture.md — Accessible overview of the Lump object model</li>
-        <li><span class="doc-icon">📄</span>golden-tokens.md — GT format, encoding, and capability rules</li>
-        <li><span class="doc-icon">📄</span>foundation-lump-design.md — Lump design rationale and layout rules</li>
+        <li><span class="doc-icon">📄</span><a class="doc-link" href="../CM_LUMP_SPECIFICATION.md" target="_blank">CM_LUMP_SPECIFICATION.md</a> — §Lump Memory Layout, §Mint Validation Sequence, §NS Slot Assignment</li>
+        <li><span class="doc-icon">📄</span><a class="doc-link" href="../architecture.md" target="_blank">architecture.md</a> — Overall Church Machine architecture</li>
+        <li><span class="doc-icon">📄</span><a class="doc-link" href="../Lump-Architecture.md" target="_blank">Lump-Architecture.md</a> — Accessible overview of the Lump object model</li>
+        <li><span class="doc-icon">📄</span><a class="doc-link" href="../golden-tokens.md" target="_blank">golden-tokens.md</a> — GT format, encoding, and capability rules</li>
+        <li><span class="doc-icon">📄</span><a class="doc-link" href="../foundation-lump-design.md" target="_blank">foundation-lump-design.md</a> — Lump design rationale and layout rules</li>
       </ul>
     </div>`;
   }

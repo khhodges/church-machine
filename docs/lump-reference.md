@@ -218,7 +218,7 @@ The `source` field is the only sidecar field intentionally excluded from the man
 | `abstraction` | `string` | ✓ | Human-readable name (e.g. `"Constants"`, `"SlideRule"`). |
 | `lump_version` | `integer` | ✓ | Monotonically incrementing compile counter. Bumped by `/api/lumps/save`. |
 | `ns_slot` | `integer\|null` | ✓ | Assigned Namespace slot for Resident and Lazy-load LUMPs, or `null` for Dynamic LUMPs (see §8). |
-| `ns_slot_policy` | `string` | — | `"static"` (assigned slot — Resident or Lazy-load) \| `"dynamic"` (top free slot on demand). Absent = `"static"`. |
+| `ns_slot_policy` | `string` | — | `"static"` (assigned slot — Resident or Lazy-load; or NULL token-only lump) \| `"dynamic"` (top free slot on demand). When `ns_slot` is null, absent = `"dynamic"` (R9 retired). |
 | `lump_size` | `integer` | ✓ | Total word count. Must equal `2^(n-6+6)` and match header. |
 | `cw` | `integer` | ✓ | Code word count. Must match header bits 22:10. |
 | `cc` | `integer` | ✓ | C-List row count. Must match header bits 7:0. |
@@ -339,8 +339,8 @@ Only **Resident** and **Lazy-load** LUMPs have an assigned slot in the Namespace
 |:---------|:----------|:----------------|:-----------------|:----------|
 | **Resident** | integer | `true` | `"static"` | Slot is part of the boot image. Present in the NS table from power-on. |
 | **Lazy-load** | integer | `false` / absent | `"static"` | Slot is reserved but the LUMP is not in the boot image. Loaded into that specific slot on first demand (via Loader/Tunnel). |
-| **Dynamic** | `null` | — | `"dynamic"` | No assigned slot. The runtime allocates the next free slot from the top of the NS table at the moment of first use. Slot number may differ between reboots; callers hold a GT, not a slot index. |
-| **NULL** | `null` | — | absent / `"static"` | Never enters the Namespace table. Fetched directly by token via the Loader/Tunnel when needed. No NS presence at any point. Correct for data, media, and library lumps that require no callable NS slot. |
+| **Dynamic** | `null` | — | `"dynamic"` or absent | No assigned slot. The runtime allocates the next free slot from the top of the NS table at the moment of first use. Slot number may differ between reboots; callers hold a GT, not a slot index. `ns_slot_policy` is optional — absent is treated as `"dynamic"` (R9 retired). |
+| **NULL** | `null` | — | `"static"` | Never enters the Namespace table. Fetched directly by token via the Loader/Tunnel when needed. No NS presence at any point. Correct for data, media, and library lumps that require no callable NS slot. Must use explicit `"static"` to opt into this category. |
 
 ---
 

@@ -56,16 +56,18 @@ NS table at all.
 |:---------|:----------|:----------------|:-----------------|:----------|
 | **Resident** | integer | `true` | `"static"` | Slot is part of the boot image. NS entry is `Live` at cold boot. |
 | **Lazy-load** | integer | `false` / absent | `"static"` | Slot is reserved but the lump is not in the boot image. Loaded into that specific slot on first demand via Loader/Tunnel. |
-| **Dynamic** | `null` | — | `"dynamic"` | No assigned slot. Runtime allocates the next free slot at first use. Slot number may differ between reboots; callers hold a GT, not an index. |
-| **NULL** | `null` | — | absent / `"static"` | Never enters the NS table. Fetched directly by token via Loader/Tunnel. Correct for data, media, and library lumps that require no callable NS slot. |
+| **Dynamic** | `null` | — | `"dynamic"` or absent | No assigned slot. Runtime allocates the next free slot at first use. Slot number may differ between reboots; callers hold a GT, not an index. `ns_slot_policy` is optional — absent is treated as `"dynamic"`. |
+| **NULL** | `null` | — | `"static"` | Never enters the NS table. Fetched directly by token via Loader/Tunnel. Correct for data, media, and library lumps that require no callable NS slot. Must use explicit `"static"` to distinguish from Dynamic. |
 
-Machine-readable rule (enforced by `tests/lump/test_lump_consistency.py` R9):
+Machine-readable classification (`tests/lump/test_lump_consistency.py`):
 
 | `ns_slot` | `ns_slot_policy` | Classification |
 |---|---|---|
 | integer | absent / `"static"` | Resident or Lazy-load — fixed assigned slot |
-| `null` | `"dynamic"` | Dynamic — allocated by Mint on first use |
-| `null` | absent | **Error** — caught by consistency gate R9 |
+| `null` | `"dynamic"` or absent | Dynamic — allocated by Mint on first use (`ns_slot_policy` is optional; absent = dynamic) |
+| `null` | `"static"` | NULL — never enters the NS table; fetched by token |
+
+> **R9 retired.** `ns_slot: null` with an absent `ns_slot_policy` is treated as Dynamic, not an error. Explicit `"dynamic"` is preferred for clarity; `"static"` is required to opt into the NULL (token-only) category.
 
 ### Variant Group
 
@@ -73,9 +75,9 @@ Two manifest entries may declare the same `ns_slot` if and only if they both
 carry the same non-null `variant_group` string. This declares alternative
 implementations of the same abstraction; the boot image installs exactly one.
 
-Example: SlideRule (00001000) and SlideRule (Haskell) (00001001) both declare
-`"ns_slot": 16` and `"variant_group": "sliderule"`. Exactly one is active per
-boot image. This constraint is enforced by consistency gate rule R8.
+Example: two alternative implementations of the same abstraction may share the
+same `ns_slot` by declaring matching `variant_group` values. The boot image
+installs exactly one. This constraint is enforced by consistency gate rule R8.
 
 Canonical examples: Boot.Abstr (NS[3], Resident), Loader (NS[19], Resident),
 Tunnel (NS[31], Resident), WordString (ab1e86af, NULL — no NS slot required).
