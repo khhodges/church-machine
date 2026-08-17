@@ -2834,6 +2834,13 @@ window._nsAddCurrentWords        = null;   // cached words[] from per-selection 
 window._nsAddCurrentToken        = null;   // token these cached words belong to
 window._nsAddCurrentDetailSidecar = null;  // full sidecar from /api/lumps/<token>/detail
 
+// Persistent token-keyed cache for ns_slot_policy / ns_slot choices made by the
+// programmer.  Unlike the per-modal state above, this is intentionally NOT cleared
+// by _nsTableAdd() so that re-opening the ADD modal pre-populates the fields with
+// the previous install's choices even before the async PATCH reaches the server.
+// Keys are LUMP token strings; values are { ns_slot_policy, ns_slot }.
+window._nsPersistedSlotMeta = window._nsPersistedSlotMeta || {};
+
 function _nsTableAdd() {
     if (!sim) return;
     const _existing = document.getElementById('_nsAddModalOverlay');
@@ -2986,6 +2993,20 @@ async function _nsPopulateAddMeta(token) {
             if (!nowSel2 || nowSel2.value !== token) return;
             container.innerHTML = `<div style="color:#f87171;font-size:0.78rem;padding:4px 0;">&#9888; Failed to load LUMP: ${String(fetchErr).replace(/</g,'&lt;')}</div>`;
             return;
+        }
+    }
+
+    // ── Overlay persistent slot-policy choices from previous installs ─────────
+    // window._nsPersistedSlotMeta is keyed by token and is NOT cleared by
+    // _nsTableAdd(), so it carries the programmer's last-chosen policy and slot
+    // across modal lifecycle resets and before the async PATCH reaches the server.
+    const _persistedSlotMeta = window._nsPersistedSlotMeta && window._nsPersistedSlotMeta[token];
+    if (_persistedSlotMeta) {
+        if (_persistedSlotMeta.ns_slot_policy !== undefined) {
+            detailSidecar = Object.assign({}, detailSidecar, { ns_slot_policy: _persistedSlotMeta.ns_slot_policy });
+        }
+        if (_persistedSlotMeta.ns_slot !== undefined) {
+            detailSidecar = Object.assign({}, detailSidecar, { ns_slot: _persistedSlotMeta.ns_slot });
         }
     }
 
@@ -3211,14 +3232,27 @@ function _nsTableAddConfirm() {
 
         // Persist the programmer's slot-policy choice (and the concrete slot assigned)
         // back to the sidecar so re-add and boot_image.py use the correct policy.
+        const _patchedPolicy = slotPolicy;
+        const _patchedSlot   = slotPolicy === 'dynamic' ? null : slot;
         fetch('/api/lump/' + token + '/meta', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                ns_slot_policy: slotPolicy,
-                ns_slot: slotPolicy === 'dynamic' ? null : slot
+                ns_slot_policy: _patchedPolicy,
+                ns_slot: _patchedSlot
             })
         }).catch(function(e) { console.warn('[NSADD] ns_slot_policy persist failed:', e); });
+        // Synchronously record the chosen policy and slot in the persistent token-keyed
+        // cache so that re-opening the ADD modal pre-populates the fields immediately —
+        // even before the async PATCH completes and before _nsTableAdd() clears the
+        // per-modal cache objects.  _nsPopulateAddMeta() overlays this cache after every
+        // detail fetch, giving both the cache-hit path and the fresh-fetch path access
+        // to the previously-selected values.
+        if (!window._nsPersistedSlotMeta) window._nsPersistedSlotMeta = {};
+        window._nsPersistedSlotMeta[token] = {
+            ns_slot_policy: _patchedPolicy,
+            ns_slot:        _patchedSlot
+        };
 
         // ── Populate c-list GTs in DMEM from sidecar capabilities ─────────────
         // c-list lives at lumpBase + (lumpSize - cc) per parseLumpHeader:
