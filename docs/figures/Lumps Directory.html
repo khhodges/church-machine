@@ -254,10 +254,10 @@ const LUMPS = [
     }
   ],
   capabilities:[
-    { slot:0, name:"Salvation", rights:["E"], gt:"", note:"NS slot 4" },
-    { slot:1, name:"Navana", rights:["E"], gt:"", note:"NS slot 5" },
-    { slot:2, name:"Mint", rights:["E"], gt:"", note:"NS slot 6" },
-    { slot:3, name:"Memory", rights:["E"], gt:"", note:"NS slot 7" }
+    { slot:0, name:"Salvation", rights:["E"], gt:"", note:"lazy-issued — slot assigned when Salvation abstraction is loaded by Namespace bitstream or Lazy Loader" },
+    { slot:1, name:"Navana", rights:["E"], gt:"", note:"lazy-issued — slot assigned when Navana abstraction is loaded by Namespace bitstream or Lazy Loader" },
+    { slot:2, name:"Mint", rights:["E"], gt:"", note:"lazy-issued — slot assigned when Mint abstraction is loaded by Namespace bitstream or Lazy Loader" },
+    { slot:3, name:"Memory", rights:["E"], gt:"", note:"lazy-issued — slot assigned when Memory abstraction is loaded by Namespace bitstream or Lazy Loader" }
   ],
   source:"; LOAD + TPERM + CALL pattern for each boot abstraction\ncapabilities { Salvation E, Navana E, Mint E, Memory E }\n\nLOAD  CR0, Salvation  ; CR0 = Salvation (E)\nTPERM CR0, E\nCALL  Salvation.main  ; selector 0xF\n\nLOAD  CR1, Navana\nTPERM CR1, E\nCALL  Navana.main     ; selector 8\n\nLOAD  CR2, Mint\nTPERM CR2, E\nCALL  Mint.main       ; selector 5\n\nLOAD  CR3, Memory\nTPERM CR3, E\nCALL  Memory.main     ; selector 6\n\nHALT",
   doc_count:16,
@@ -525,7 +525,7 @@ const LUMPS = [
     { name:"Min",    offset:107, length:10, description:"Minimum of DR0, DR1." }
   ],
   capabilities:[
-    { slot:0, name:"Constants", rights:["E"], gt:"", note:"Same NS slot 9 dependency as SlideRule" }
+    { slot:0, name:"Constants", rights:["E"], gt:"", note:"runtime-issued GT targeting the static Constants abstraction (same dependency as SlideRule; slot assigned at load time, not pre-allocated)" }
   ],
   source:null, doc_count:5, doc_refs:["lambda-arithmetic.md","dispatch-styles.md","note-g-comparison.md"]
 },
