@@ -86,7 +86,7 @@ function extractFillLoopBlock(html) {
     if (builderStart === -1) throw new Error('clistNames builder not found in HTML');
 
     // End marker: the line that writes to the note element after the loop
-    const noteMarker = "if(note) note.textContent=filled";
+    const noteMarker = "if(note) note.textContent=";
     const noteIdx    = html.indexOf(noteMarker, builderStart);
     if (noteIdx === -1) throw new Error('fill-loop end marker not found in HTML');
     const noteEnd = html.indexOf(';\n', noteIdx) + 2;
@@ -121,8 +121,9 @@ function runFillPath(helperBlock, fillBlock, lumpData, buf) {
 
     // methodStarts: no named method boundaries in our synthetic lump
     const methodStarts = {};
-    // note stub (the element that shows "N code words loaded")
-    const note = { set textContent(_v) {} };
+    // note stub (the element that shows "N of M words loaded · K code words")
+    const noteCapture = { value: '' };
+    const note = { set textContent(v) { noteCapture.value = v; } };
 
     // Build the combined source.
     // The fill loop uses `document`, `buf`, `view`, `lumpData`, `methodStarts`,
@@ -137,7 +138,7 @@ ${fillBlock}
         src
     );
     fn(domStub, buf, view, lumpData, methodStarts, note);
-    return tips;
+    return { tips, noteText: noteCapture.value };
 }
 
 // ── Synthetic binary builder ─────────────────────────────────────────────────
@@ -259,9 +260,9 @@ console.log('\n── FP-2  Structural: _disMnem(val,clistNames) call-site prese
 // ── FP-3  Integration: fill path runs without throwing ────────────────────────
 console.log('\n── FP-3  Integration: extracted fill path runs without throwing ──────────');
 {
-    let threw = false, tips;
+    let threw = false, tips, noteText;
     try {
-        tips = runFillPath(HELPER_BLOCK, FILL_BLOCK, WUKONG_CALLHOME, SYNTHETIC_BUF);
+        ({ tips, noteText } = runFillPath(HELPER_BLOCK, FILL_BLOCK, WUKONG_CALLHOME, SYNTHETIC_BUF));
     } catch (e) {
         threw = true;
         console.error('       exception:', e.message);
@@ -272,7 +273,7 @@ console.log('\n── FP-3  Integration: extracted fill path runs without throwi
 }
 
 // ── FP-4 / FP-5 / FP-6 / FP-7  Per-word tooltip assertions ──────────────────
-const TIPS_WITH_CAPS = runFillPath(HELPER_BLOCK, FILL_BLOCK, WUKONG_CALLHOME, SYNTHETIC_BUF);
+const { tips: TIPS_WITH_CAPS, noteText: NOTE_WITH_CAPS } = runFillPath(HELPER_BLOCK, FILL_BLOCK, WUKONG_CALLHOME, SYNTHETIC_BUF);
 
 console.log('\n── FP-4  Word 1 (ELOADCALL slot 0): tooltip contains → SelfTest ──────────');
 {
@@ -309,7 +310,7 @@ console.log('\n── FP-7  Word 0 (header sentinel): tooltip contains .header �
 // clistNames entry.  When capabilities is empty, those suffixes must be absent.
 console.log('\n── FP-8  Empty capabilities: no → AbstrName annotation in code words ─────');
 {
-    const noCaps = runFillPath(HELPER_BLOCK, FILL_BLOCK, WUKONG_NO_CAPS, SYNTHETIC_BUF);
+    const { tips: noCaps } = runFillPath(HELPER_BLOCK, FILL_BLOCK, WUKONG_NO_CAPS, SYNTHETIC_BUF);
     const tip1 = noCaps[1] || '';
     const tip2 = noCaps[2] || '';
     // The _disMnem annotation suffix always starts on the mnemonic line (first
@@ -322,6 +323,23 @@ console.log('\n── FP-8  Empty capabilities: no → AbstrName annotation in c
         mnemonicLine2, '→ Tunnel');
     // But words are still decoded (ELOADCALL mnemonic still present)
     checkContains('FP-8c', 'word 1 still decoded as ELOADCALL', tip1, 'ELOADCALL');
+}
+
+// ── FP-9  Note text: total words loaded + code word count ─────────────────────
+console.log('\n── FP-9  Note text shows total words and code word count ──────────────────');
+{
+    // WukongCallHome: lump_size=64, cw=3 → "64 of 64 words loaded · 3 code words"
+    checkContains('FP-9a', 'note contains "64 of 64 words loaded"',
+        NOTE_WITH_CAPS, '64 of 64 words loaded');
+    checkContains('FP-9b', 'note contains "3 code words"',
+        NOTE_WITH_CAPS, '3 code words');
+    // cw=0: "64 of 64 words loaded · 0 code words"
+    const ZERO_CW = { ...WUKONG_CALLHOME, cw: 0, cc: 0, capabilities: [], methods: [] };
+    const { noteText: noteZeroCw } = runFillPath(HELPER_BLOCK, FILL_BLOCK, ZERO_CW, SYNTHETIC_BUF);
+    checkContains('FP-9c', 'note for cw=0 contains "64 of 64 words loaded"',
+        noteZeroCw, '64 of 64 words loaded');
+    checkContains('FP-9d', 'note for cw=0 contains "0 code words"',
+        noteZeroCw, '0 code words');
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────

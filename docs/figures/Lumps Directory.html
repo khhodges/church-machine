@@ -1581,7 +1581,7 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
         const lumpSize=lumpData.lump_size, cc=lumpData.cc, cw_=lumpData.cw;
         const clistStart=cc>0?lumpSize-cc:lumpSize;
         const codeWords=[];
-        let filled=0;
+        let filled=0, totalFilled=0;
         const crAlias={};
 
         for(let wi=0;wi<lumpSize;wi++){
@@ -1592,7 +1592,7 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
 
           // Fill hex grid cell
           const cell=document.getElementById('hexW'+wi);
-          if(cell) cell.textContent=h8;
+          if(cell){ cell.textContent=h8; totalFilled++; }
 
           // Build per-cell tooltip
           let tip=`W${String(wi).padStart(4,'0')}  0x${h8}`;
@@ -1616,7 +1616,7 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
           }
           if(cell) cell.title=tip;
         }
-        if(note) note.textContent=filled+' code word'+(filled!==1?'s':'')+' loaded';
+        if(note) note.textContent=totalFilled+' of '+lumpSize+' word'+(lumpSize!==1?'s':'')+' loaded \u00b7 '+filled+' code word'+(filled!==1?'s':'');
 
         // ── Hash crosscheck: sha256(dot_name_utf8 + lump_bytes)[:8] must equal token ─
         // The "Number" in the filename IS sha256(dot_name + binary)[:8].
