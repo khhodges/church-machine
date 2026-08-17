@@ -1229,12 +1229,25 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
       const capName  = cap ? cap.name : `slot ${i}`;
       const capPerms = cap ? ((cap.rights||[]).join('+') || '—') : '—';
       if (cap && cap.gt) {
-        words[w]    = parseInt(cap.gt, 16) >>> 0;
+        const gt32 = parseInt(cap.gt, 16) >>> 0;
+        const gtTyp  = (gt32 >>> 25) & 0x3;
+        const gtSlot = gt32 & 0xFFFF;
+        const gtVer  = (gt32 >>> 16) & 0x1FF;
+        const gtTypName = ['NULL','Inform','Outform','Abstract'][gtTyp];
+        const gtPerms = [];
+        if ((gt32>>>31)&1) gtPerms.push('B');
+        if ((gt32>>>30)&1) gtPerms.push('E');
+        if ((gt32>>>29)&1) gtPerms.push('S');
+        if ((gt32>>>28)&1) gtPerms.push('L');
+        if ((gt32>>>27)&1) gtPerms.push('R');
+        words[w]    = gt32;
         sections[w] = 'clist-live';
-        annots[w]   = `c-list[${i}]  ${capName}  perms:${capPerms}  GT=${cap.gt}`;
+        annots[w]   = `c-list[${i}]  ${capName}`
+          + `\ntyp=${gtTyp} (${gtTypName})  perms=${gtPerms.join('')||'none'}  ns_slot=${gtSlot}  ver=${gtVer}`
+          + `\nraw=${cap.gt}`;
       } else {
         sections[w] = 'clist';
-        annots[w]   = `c-list[${i}]  ${capName}  perms:${capPerms}  (runtime-issued — zero at compile time)`;
+        annots[w]   = `c-list[${i}]  ${capName}  perms:${capPerms}\n(runtime-issued — NULL GT, zero at compile time)`;
       }
     }
 
