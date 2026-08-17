@@ -1326,18 +1326,21 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
     if (lump.cw === 0) {
       da += `; (no code — cw=0)\n\n`;
     } else if (lump.methods.length === 0) {
-      da += `W0001   --------    (${lump.cw} code words — no method table available)\n\n`;
+      da += `W0001   (loading binary…)    (${lump.cw} code words — no method table available)\n\n`;
     } else {
       let mPrev = 0;
       lump.methods.forEach((m, mi) => {
         const wS = 1 + (m.offset || 0);
         const wE = wS + (m.length || 1) - 1;
         const vis = m.visibility === 'private' ? ' [private]' : '';
-        da += `\nW${String(wS).padStart(4,'0')}   --------    .method ${m.name}${vis}  (selector ${mi+1})\n`;
+        da += `\nW${String(wS).padStart(4,'0')}   .method ${m.name}${vis}  (selector ${mi+1})\n`;
         da += `        words   W${String(wS).padStart(4,'0')}..W${String(wE).padStart(4,'0')}  length=${m.length||1}\n`;
         if (m.description) da += `        desc    ${m.description.slice(0,90)}${m.description.length>90?'…':''}\n`;
         if (m.inputs && m.inputs.length)  da += `        in      ${m.inputs.join('  |  ')}\n`;
         if (m.outputs && m.outputs.length) da += `        out     ${m.outputs.join('  |  ')}\n`;
+        for (let wi = wS; wi <= wE; wi++) {
+          da += `        W${String(wi).padStart(4,'0')}  (loading binary…)\n`;
+        }
         mPrev = wE;
       });
       da += `\n`;
