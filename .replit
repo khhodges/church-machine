@@ -420,6 +420,18 @@ args = "node simulator/test_load_lump_binary.js"
 outputType = "console"
 
 [[workflows.workflow]]
+name = "wukong-callhome-hw-lump-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_wukong_callhome_hw_lump.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+
+[[workflows.workflow]]
 name = "selftest-lump-runs"
 author = "agent"
 

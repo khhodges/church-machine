@@ -151,6 +151,9 @@ register_suite "lambda-exec-tests" \
 register_suite "lump-binary-tests" \
     'node simulator/test_load_lump_binary.js'
 
+register_suite "wukong-callhome-hw-lump-tests" \
+    'node simulator/test_wukong_callhome_hw_lump.js'
+
 register_suite "lump-binary-size-tests" \
     'node simulator/test_lump_binary_size.js'
 
@@ -364,7 +367,7 @@ declare -A ALL_GROUPS
 
 ALL_GROUPS["boot"]="boot-image-matches-sim boot-image-loads-and-boots boot-image-upload-endpoint boot-image-serve-endpoints boot-layout-regression boot-entry-hw-image-tests"
 
-ALL_GROUPS["lump"]="lump-consistency lump-binary-tests lump-roundtrip editor-roundtrip-tests lump-gt-display-tests update-lump-tests lump-meta-patch-validation-tests"
+ALL_GROUPS["lump"]="lump-consistency lump-binary-tests wukong-callhome-hw-lump-tests lump-roundtrip editor-roundtrip-tests lump-gt-display-tests update-lump-tests lump-meta-patch-validation-tests"
 
 ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests warning-panel-tests bare-space-ns-fallback-tests disasm-panel-tests lump-dir-disasm-tooltip-tests boot-entry-sync-tests ns-slot-dynamic-tests ns-slot-policy-restore-tests ns-slot-modal-persist-tests selftest-lump-runs pet-name-memory-tests lump-builder-dispatch-tests openin-links-tests open-lump-freshness-tests lump-warning-tests call-cr6-l-perm-tests return-cr6-l-perm-tests load-through-l-perm-cr6-tests return-cr14-trace-tests wukong-cr-update-tests wukong-hw-fault-tests wukong-trace-cr-server-tests return-fetch-lump-tests constants-lump-tests"
 
