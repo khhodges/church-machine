@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Document Review Table</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 2rem;
+      background: #f5f5f7;
+    }
+    h1 {
+      margin-bottom: 1rem;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      background: #fff;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+    }
+    th {
+      background: #eee;
+    }
+    a.review-link {
+      color: #0066cc;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    a.review-link:hover {
+      text-decoration: underline;
+    }
+    #review-panel {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: #fff;
+      border: 1px solid #ccc;
+    }
+    #review-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    #review-body {
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1>Document Review</h1>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Lump</th>
+        <th>Genotype</th>
+        <th>Origin</th>
+        <th>Methods</th>
+        <th>Review</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>SlideRule</td>
+        <td>0xE18DEB39</td>
+        <td>ide Namespace</td>
+        <td>Multiply, Abs, Max, Min</td>
+        <td><a href="#" class="review-link"
+               data-name="SlideRule"
+               data-genotype="0xE18DEB39"
+               data-origin="ide Namespace"
+               data-methods="Multiply, Abs, Max, Min">
+               Review
+            </a>
+        </td>
+      </tr>
+      <tr>
+        <td>DijkstraFlag</td>
+        <td>0x44CE2AAE</td>
+        <td>ide Namespace</td>
+        <td>Init, Send, Recv</td>
+        <td><a href="#" class="review-link"
+               data-name="DijkstraFlag"
+               data-genotype="0x44CE2AAE"
+               data-origin="ide Namespace"
+               data-methods="Init, Send, Recv">
+               Review
+            </a>
+        </td>
+      </tr>
+      <tr>
+        <td>Store</td>
+        <td>0x69FC2839</td>
+        <td>ide Namespace</td>
+        <td>Hash</td>
+        <td><a href="#" class="review-link"
+               data-name="Store"
+               data-genotype="0x69FC2839"
+               data-origin="ide Namespace"
+               data-methods="Hash">
+               Review
+            </a>
+        </td>
+      </tr>
+      <tr>
+        <td>Counter</td>
+        <td>0xB62C83A1</td>
+        <td>ide Namespace</td>
+        <td>Inc, Dec, IsZero</td>
+        <td><a href="#" class="review-link"
+               data-name="Counter"
+               data-genotype="0xB62C83A1"
+               data-origin="ide Namespace"
+               data-methods="Inc, Dec, IsZero">
+               Review
+            </a>
+        </td>
+      </tr>
+      <tr>
+        <td>Adder</td>
+        <td>0x7BA260A5</td>
+        <td>IDE demo</td>
+        <td>Add, Double</td>
+        <td><a href="#" class="review-link"
+               data-name="Adder"
+               data-genotype="0x7BA260A5"
+               data-origin="IDE demo"
+               data-methods="Add, Double">
+               Review
+            </a>
+        </td>
+      </tr>
+      <tr>
+        <td>Calc</td>
+        <td>0xB691F404</td>
+        <td>IDE demo</td>
+        <td>Multiply, Square</td>
+        <td><a href="#" class="review-link"
+               data-name="Calc"
+               data-genotype="0xB691F404"
+               data-origin="IDE demo"
+               data-methods="Multiply, Square">
+               Review
+            </a>
+        </td>
+      </tr>
+      <tr>
+        <td>Alice</td>
+        <td>0x3FCBF37C</td>
+        <td>two-enemies proof</td>
+        <td>Stash, Reveal</td>
+        <td><a href="#" class="review-link"
+               data-name="Alice"
+               data-genotype="0x3FCBF37C"
+               data-origin="two-enemies proof"
+               data-methods="Stash, Reveal">
+               Review
+            </a>
+        </td>
+      </tr>
+      <tr>
+        <td>Mallory</td>
+        <td>0xB2AB7AF0</td>
+        <td>two-enemies proof</td>
+        <td>Steal, Probe</td>
+        <td><a href="#" class="review-link"
+               data-name="Mallory"
+               data-genotype="0xB2AB7AF0"
+               data-origin="two-enemies proof"
+               data-methods="Steal, Probe">
+               Review
+            </a>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div id="review-panel">
+    <div id="review-title">Select a document to review.</div>
+    <div id="review-body"></div>
+  </div>
+
+  <script>
+    function buildReviewText(data) {
+      return (
+        "Name: " + data.name + "\n" +
+        "Genotype: " + data.genotype + "\n" +
+        "Origin: " + data.origin + "\n" +
+        "Methods: " + data.methods + "\n\n" +
+        "Review Notes:\n" +
+        "- This is a placeholder review.\n" +
+        "- You can replace this text with real analysis,\n" +
+        "  security notes, or documentation links."
+      );
+    }
+
+    document.querySelectorAll('.review-link').forEach(function(link) {
+      link.addEventListener('click', function (e) {
+        e.preventDefault();
+        const data = {
+          name: this.dataset.name,
+          genotype: this.dataset.genotype,
+          origin: this.dataset.origin,
+          methods: this.dataset.methods
+        };
+
+        document.getElementById('review-title').textContent =
+          "Reviewing: " + data.name;
+        document.getElementById('review-body').textContent =
+          buildReviewText(data);
+      });
+    });
+  </script>
+</body>
+</html>
