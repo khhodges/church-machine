@@ -133,6 +133,144 @@ def resolve_lump_path(lumps_dir: str, entry: dict) -> str | None:
     return None
 
 
+def _read_lump_header(path: str) -> dict | None:
+    """Read and parse the 4-byte LUMP header word.
+
+    Returns a dict with keys magic, cw, cc, lump_sz, valid; or None if the
+    file cannot be opened or is shorter than 4 bytes.
+    """
+    try:
+        with open(path, 'rb') as f:
+            raw = f.read(4)
+    except OSError:
+        return None
+    if len(raw) < 4:
+        return None
+    word = struct.unpack('>I', raw)[0]
+    magic  = (word >> 27) & 0x1F
+    n_m6   = (word >> 23) & 0xF
+    cw     = (word >> 10) & 0x1FFF
+    cc     =  word        & 0xFF
+    lump_sz = 1 << (n_m6 + 6)
+    return dict(magic=magic, cw=cw, cc=cc, lump_sz=lump_sz, valid=(magic == 0x1F))
+
+
+def orphan_cleanup(lumps_dir: str, dry_run: bool = False, force: bool = False):
+    """Scan *lumps_dir* for .lump files not referenced by manifest.json and offer
+    to delete them.
+
+    Safety guard: any file whose header has magic == 0x1F (a valid LUMP binary)
+    is refused without ``--force``.  With ``--force`` the deletion is performed
+    but logged prominently so the action is traceable.
+
+    Naming rules:
+    - A file is *known* if its basename (or stem) matches any manifest entry's
+      ``filename`` field or ``<token>.lump`` legacy name.
+    - Archive files (<token>-vN.lump and <Name>_vN.lump) are skipped silently —
+      they are intentional historical copies.
+
+    Returns a list of deleted filenames (empty in dry-run or when nothing found).
+    """
+    manifest_path = os.path.join(lumps_dir, 'manifest.json')
+    if not os.path.isfile(manifest_path):
+        print(f'ERROR: manifest.json not found at {manifest_path}', file=sys.stderr)
+        sys.exit(1)
+
+    with open(manifest_path) as f:
+        manifest = json.load(f)
+
+    # Build the set of all filenames the manifest owns.
+    known_filenames: set = set()
+    for entry in manifest:
+        token = entry.get('token', '').lower()
+        if token:
+            known_filenames.add(f'{token}.lump')
+        fn = entry.get('filename', '')
+        if fn:
+            known_filenames.add(fn.lower())
+
+    _ARCHIVE_RE_LEGACY = re.compile(r'^[0-9a-f]{8}-v\d+\.lump$')
+    _ARCHIVE_RE_NEW    = re.compile(r'^.+_v\d+\.lump$')
+
+    def is_archive(basename: str) -> bool:
+        bl = basename.lower()
+        if _ARCHIVE_RE_LEGACY.match(bl):
+            return True
+        # New-style archive only when the stem is not a manifest current filename.
+        if _ARCHIVE_RE_NEW.match(bl):
+            stem = bl[:-5]
+            return stem not in {n[:-5] for n in known_filenames}
+        return False
+
+    all_lumps = sorted(fn for fn in os.listdir(lumps_dir) if fn.endswith('.lump'))
+    candidates = [fn for fn in all_lumps
+                  if fn.lower() not in known_filenames and not is_archive(fn)]
+
+    if not candidates:
+        print('orphan-cleanup: no orphan .lump files found.')
+        return []
+
+    print(f'{"DRY RUN — " if dry_run else ""}orphan-cleanup: {len(candidates)} candidate(s) in {lumps_dir}')
+    print()
+
+    blocked = []   # valid-header files blocked without --force
+    deleted = []
+
+    for basename in candidates:
+        path = os.path.join(lumps_dir, basename)
+        hdr = _read_lump_header(path)
+
+        if hdr and hdr['valid']:
+            # Valid LUMP binary — refuse without --force.
+            if not force:
+                print(
+                    f'  BLOCKED  {basename}\n'
+                    f'           Header valid: magic=0x1F, cw={hdr["cw"]}, cc={hdr["cc"]}, '
+                    f'lump_sz={hdr["lump_sz"]}\n'
+                    f'           This file carries a valid LUMP header but is absent from\n'
+                    f'           manifest.json.  Re-add it to the manifest or run with\n'
+                    f'           --force to confirm deletion.\n'
+                    f'           Reason required: supply --force only after verifying this\n'
+                    f'           binary is genuinely obsolete and the manifest entry has\n'
+                    f'           been intentionally removed.'
+                )
+                blocked.append(basename)
+                continue
+            else:
+                print(
+                    f'  FORCE-DELETE  {basename}\n'
+                    f'           Header valid: magic=0x1F, cw={hdr["cw"]}, cc={hdr["cc"]}, '
+                    f'lump_sz={hdr["lump_sz"]}\n'
+                    f'           WARNING: deleting a valid LUMP binary that is absent from\n'
+                    f'           manifest.json.  Ensure git history preserves this file.'
+                )
+        else:
+            reason = 'invalid/unreadable header' if hdr else 'unreadable'
+            print(f'  DELETE  {basename}  ({reason})')
+
+        if not dry_run:
+            os.remove(path)
+            deleted.append(basename)
+        else:
+            deleted.append(basename)   # in dry-run we still report what *would* be deleted
+
+    print()
+    if blocked:
+        print(
+            f'BLOCKED {len(blocked)} valid-header file(s) — re-add to manifest.json or '
+            'use --force:\n  ' + '\n  '.join(blocked)
+        )
+    if dry_run:
+        print(f'Dry run — {len(deleted)} file(s) would be deleted, {len(blocked)} blocked.')
+    else:
+        print(f'Deleted {len(deleted)} file(s), {len(blocked)} blocked.')
+
+    if blocked and not force:
+        sys.exit(2)  # non-zero so CI catches the blocked-deletion condition
+
+    return deleted
+
+
 def migrate(lumps_dir: str, dry_run: bool = False):
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
     if not os.path.isfile(manifest_path):
@@ -227,9 +365,28 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--dry-run', action='store_true',
-                        help='Print the migration plan without making any changes')
+                        help='Print the plan without making any changes')
     parser.add_argument('--lumps-dir', default=None,
                         help='Path to server/lumps/ directory (default: auto-detect)')
+    parser.add_argument(
+        '--orphan-cleanup', action='store_true',
+        help=(
+            'Scan server/lumps/ for .lump files not referenced by manifest.json '
+            'and delete them.  Files with a valid LUMP header (magic=0x1F) are '
+            'BLOCKED unless --force is also supplied — this prevents silently '
+            'discarding valid binaries whose sidecar names changed.'
+        ),
+    )
+    parser.add_argument(
+        '--force', action='store_true',
+        help=(
+            'Allow --orphan-cleanup to delete .lump files that carry a valid '
+            'LUMP header even when they are absent from manifest.json.  '
+            'Use only after confirming the binary is genuinely obsolete and '
+            'the manifest entry was intentionally removed.  Has no effect '
+            'without --orphan-cleanup.'
+        ),
+    )
     args = parser.parse_args()
 
     if args.lumps_dir:
@@ -240,7 +397,10 @@ def main():
         lumps_dir = os.path.join(script_dir, '..', 'server', 'lumps')
         lumps_dir = os.path.abspath(lumps_dir)
 
-    migrate(lumps_dir, dry_run=args.dry_run)
+    if args.orphan_cleanup:
+        orphan_cleanup(lumps_dir, dry_run=args.dry_run, force=args.force)
+    else:
+        migrate(lumps_dir, dry_run=args.dry_run)
 
 
 if __name__ == '__main__':

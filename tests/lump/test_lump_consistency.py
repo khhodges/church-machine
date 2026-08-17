@@ -2709,6 +2709,129 @@ class TestR21_ManifestCwCcMatchBinaryAllEntries:
         )
 
 
+class TestR25_GitTrackedLumpsInManifest:
+    """R25: Every git-tracked .lump file with a valid header must appear in manifest.json.
+
+    This catches the exact failure mode where a cleanup sweep silently deletes a
+    valid LUMP binary because its sidecar used a legacy naming scheme and the file
+    had no matching entry under the new canonical filename.
+
+    A git-tracked .lump file that:
+      - has valid header magic (bits[31:27] == 0x1F), AND
+      - is not listed in manifest.json (by filename or token), AND
+      - is not a recognised archive (legacy <token>-vN or new <Name>_vN form)
+    is a hard failure — the binary existed in the repo and should have been preserved.
+
+    Files with invalid/corrupt headers are skipped (they were never valid LUMP
+    binaries and may be deleted freely).  Server-managed tokens are also exempt.
+    """
+
+    # Re-use the server-managed-tokens exempt set from R3.
+    _SERVER_MANAGED_TOKENS: frozenset = frozenset(
+        t.lower()
+        for t in json.load(
+            open(os.path.join(LUMPS_DIR, "server_managed_tokens.json"))
+        ).get("tokens", [])
+    )
+
+    @staticmethod
+    def _git_tracked_lump_filenames() -> list:
+        """Return basenames of all .lump files currently tracked by git in server/lumps/."""
+        try:
+            result = subprocess.run(
+                ["git", "ls-files", "server/lumps/"],
+                capture_output=True, text=True, check=True,
+                cwd=os.path.normpath(os.path.join(LUMPS_DIR, "..", "..")),
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return []
+        names = []
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if line.endswith(".lump"):
+                names.append(os.path.basename(line))
+        return sorted(names)
+
+    @staticmethod
+    def _build_manifest_filename_set() -> set:
+        """Build the complete set of filenames (and token stems) the manifest covers."""
+        known: set = set()
+        for entry in MANIFEST:
+            token = entry.get("token", "").lower()
+            if token:
+                known.add(token + ".lump")         # legacy <token>.lump
+            fn = entry.get("filename", "")
+            if fn:
+                known.add(fn.lower())
+        return known
+
+    def test_git_tracked_lumps_in_manifest(self):
+        """Every git-tracked .lump with a valid header must appear in manifest.json."""
+        tracked = self._git_tracked_lump_filenames()
+        if not tracked:
+            pytest.skip("No git-tracked .lump files found (not inside a git repo?)")
+
+        manifest_filenames = self._build_manifest_filename_set()
+
+        orphans = []
+        for basename in tracked:
+            bl = basename.lower()
+            stem = basename[:-5]           # strip .lump
+
+            # Already covered by manifest?
+            if bl in manifest_filenames:
+                continue
+
+            # Is it a recognised archive? (legacy <token>-vN or new <Name>_vN)
+            if _is_archive_stem(stem):
+                continue
+
+            # Is it a server-managed token?
+            if stem.lower() in self._SERVER_MANAGED_TOKENS:
+                continue
+
+            # Resolve the path and validate the binary header.
+            path = os.path.join(LUMPS_DIR, basename)
+            if not os.path.isfile(path):
+                continue                   # broken/dangling — R24 catches it
+
+            try:
+                with open(path, "rb") as fh:
+                    raw = fh.read(4)
+                if len(raw) < 4:
+                    continue               # too short to be a valid LUMP
+                import struct as _struct
+                word = _struct.unpack(">I", raw)[0]
+                magic = (word >> 27) & 0x1F
+                cw    = (word >> 10) & 0x1FFF
+                cc    =  word        & 0xFF
+            except OSError:
+                continue                   # unreadable — not a guard concern
+
+            if magic != 0x1F:
+                continue                   # invalid header — not a LUMP binary
+
+            # Valid header, not in manifest, not an archive, not server-managed.
+            orphans.append(
+                f"  {basename}  (magic=0x1F, cw={cw}, cc={cc}) — "
+                "git-tracked but absent from manifest.json"
+            )
+
+        assert not orphans, (
+            "Git-tracked .lump files with valid headers that are missing from "
+            "manifest.json:\n"
+            + "\n".join(orphans)
+            + "\n\n"
+            "These files were committed to the repository and carry a valid LUMP\n"
+            "header, so they should not have been removed from the manifest.\n"
+            "Either:\n"
+            "  • Add them back to manifest.json (with correct metadata), or\n"
+            "  • Delete them from git history with `git rm` if they are truly\n"
+            "    obsolete (use `--force` on the orphan-cleanup tool to confirm).\n"
+            "Do NOT silently delete or rename them without updating manifest.json."
+        )
+
+
 class TestR24b_NoBrokenJsonSymlinks:
     """R24b: Every .json symlink in server/lumps/ must resolve to a real regular file.
 
