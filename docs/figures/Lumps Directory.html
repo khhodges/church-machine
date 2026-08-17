@@ -1550,13 +1550,13 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
         const view=new DataView(buf);
         const wordCount=Math.floor(buf.byteLength/4);
 
-        // The server prepends a 4-byte CRC word; a complete response is lump_size+1 words.
-        // Compare actualLumpWords (wordCount-1) against declared lump_size to detect truncation.
+        // Response layout: [CRC-32 word (4 bytes)] [lump word 0] [lump word 1] … [lump word N-1]
+        // lump word wi lives at response byte offset (wi+1)*4  (skip the CRC prefix).
+        // wordCount includes the CRC word, so actual lump words = wordCount-1.
         const actualLumpWords=wordCount>0?wordCount-1:0;
         if(actualLumpWords!==lumpData.lump_size){
           const warn=document.getElementById('_hexSizeWarn');
-          if(warn){warn.style.display='';warn.textContent=`⚠ Binary is ${actualLumpWords} words but header claims ${lumpData.lump_size} — file may be truncated`;}
-
+          if(warn){warn.style.display='';warn.textContent=`⚠ Binary is ${actualLumpWords} words but manifest claims ${lumpData.lump_size} — file may be truncated or corrupt`;}
         }
 
         // Build c-list name map
@@ -1567,26 +1567,45 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
         const methodObjs={};
         (lumpData.methods||[]).forEach(m=>{methodObjs[1+(m.offset||0)]=m;});
 
-        // Collect code words and fill hex grid
+        // ── Exact hex dump: fill every cell from the raw binary ───────────────
+        // lump word wi → response offset (wi+1)*4 (first word after CRC).
+        const lumpSize=lumpData.lump_size, cc=lumpData.cc, cw_=lumpData.cw;
+        const clistStart=cc>0?lumpSize-cc:lumpSize;
         const codeWords=[];
         let filled=0;
         const crAlias={};
-        for(let wi=codeStart;wi<=codeEnd&&wi<wordCount;wi++){
-          const val=view.getUint32(wi*4,false)>>>0;
-          codeWords.push(val);
+
+        for(let wi=0;wi<lumpSize;wi++){
+          const byteOff=(wi+1)*4;
+          if(byteOff+4>buf.byteLength) break;          // binary shorter than expected
+          const val=view.getUint32(byteOff,false)>>>0;
+          const h8=val.toString(16).toUpperCase().padStart(8,'0');
+
+          // Fill hex grid cell
           const cell=document.getElementById('hexW'+wi);
-          if(cell){
-            const h8=val.toString(16).toUpperCase().padStart(8,'0');
-            cell.textContent=h8;
+          if(cell) cell.textContent=h8;
+
+          // Build per-cell tooltip
+          let tip=`W${String(wi).padStart(4,'0')}  0x${h8}`;
+          if(wi===0){
+            tip+='\n.header  (lump magic / sentinel word)';
+          } else if(wi>=1&&wi<=cw_){
+            // Code region
             const mLabel=methodStarts[wi]?`.method ${methodStarts[wi]}\n`:'';
             const mn=_disMnem(val), cmt=_mkCmt(val,crAlias,clistNames);
-            cell.title=`W${String(wi).padStart(4,'0')}  0x${h8}\n${mLabel}${mn}\n; ${cmt}`;
+            tip+=`\n${mLabel}${mn}\n; ${cmt}`;
+            codeWords.push(val);
             filled++;
+            // Track CR aliases for semantic comments
+            const op=(val>>>27)&0x1F,dst=(val>>>19)&0xF,src=(val>>>15)&0xF,imm=val&0x7FFF;
+            if((op===0||op===4)&&src===6&&cc>0) crAlias[dst]=imm;
+            if(op===3||val===0){for(const k of Object.keys(crAlias))delete crAlias[k];}
+          } else if(wi>=clistStart&&cc>0){
+            tip+=`\n.clist[${wi-clistStart}]  (c-list entry — raw binary word)`;
+          } else {
+            tip+='\n.freespace  (zero padding)';
           }
-          // Maintain CR alias for tooltip context
-          const op=(val>>>27)&0x1F,dst=(val>>>19)&0xF,src=(val>>>15)&0xF,imm=val&0x7FFF;
-          if((op===0||op===4)&&src===6&&lumpData.cc>0) crAlias[dst]=imm;
-          if(op===3||val===0){for(const k of Object.keys(crAlias))delete crAlias[k];}
+          if(cell) cell.title=tip;
         }
         if(note) note.textContent=filled+' code word'+(filled!==1?'s':'')+' loaded';
 
@@ -1608,8 +1627,8 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
         const brLabelMap=new Map();
         Array.from(brTargetSet).sort((a,b)=>a-b).forEach((idx,n)=>brLabelMap.set(idx,`L${n}`));
 
-        // Render
-        const cc=lumpData.cc, cw=lumpData.cw, lumpSize=lumpData.lump_size;
+        // Render  (cc, cw_, lumpSize already declared in fill loop above)
+        const cw=cw_;
         let html='';
         html+=`<div class="da-hdr">; ${'═'.repeat(60)}</div>`;
         html+=`<div class="da-hdr">; ${_esc(lumpData.id||token)}  —  disassembly  (${lumpSize} words · ${lumpSize*4} bytes)</div>`;
