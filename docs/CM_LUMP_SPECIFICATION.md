@@ -1,6 +1,6 @@
 # Church Machine — Lump Specification
 
-**v1.2 — 2026-06-20**
+**v1.2.1 — 2026-08-17**
 **CONFIDENTIAL**
 
 ## Overview
@@ -179,6 +179,135 @@ The PC and NIA counters operate in **word offsets** (one unit = one 32-bit word 
 - `CR14.limit_offset` = `lumpSize − cc − 2`
 - `CR6.base` = `NS_base + (lumpSize − cc) × 4`
 - `CR6.limit_offset` = `cc − 1`
+
+---
+
+## The Genotype Field — How It Is Computed
+
+The **genotype** is the content-address seal that gives a lump its
+self-verifying identity. It appears in the lump filename
+(`Name.issue.GENOTYPE.lump`) and in the IDE catalogue.
+
+### Current Form (Bootstrap Compiler, `cloomc.py`)
+
+```python
+# body layout: [header] + clist + method_words, zero-padded to power-of-two
+# genotype = content hash over c-list + code (NOT the header, NOT the pad)
+genome   = clist + method_words
+h        = hashlib.sha256(bytes(str(genome), "utf-8")).hexdigest()[:8]
+genotype = int(h, 16)
+```
+
+Step by step:
+
+| Step | Action |
+|------|--------|
+| 1 | **Input** — `clist + method_words`: the c-list rows followed by the code words. Header excluded; zero-padding excluded. |
+| 2 | **Serialise** — Python `str()` of that integer list (e.g. `"[2147483651, 2147483667, ...]"`), UTF-8 encoded. |
+| 3 | **Hash** — SHA-256 of those bytes. |
+| 4 | **Truncate** — first 8 hex characters of the digest. |
+| 5 | **Genotype** — that value as a 32-bit unsigned integer. |
+
+This produced every genotype in the current catalogue (e.g. `Alice = 0x3FCBF37C`).
+To re-verify a lump, recompute `sha256(str(clist + code_words))[:8]` and
+compare — a mismatch means tampering or corruption. This is exactly what
+`lump_json.py :: _reseal_from_parts` does; all catalogue lumps round-trip and
+verify, and a tampered word is rejected.
+
+### Limits of the Current Form
+
+The bootstrap genotype is deterministic, self-consistent, and sufficient for
+integrity and tamper-detection, but it is a **placeholder**, not the production
+seal, for four reasons:
+
+1. **Content-only, not identity-covering.** Two lumps with byte-identical
+   c-list and code produce the same genotype even if they are different
+   authors' work or different issue numbers. The design requires distinct
+   issues to differ.
+2. **`str()` is not a canonical encoding.** It depends on Python's
+   list-repr formatting (spaces, commas, integer rendering). A different
+   tool, language, or Python version could serialise differently and compute
+   a different hash for the same lump. A seal must have a
+   language-independent canonical byte encoding.
+3. **32 bits is narrow.** Adequate for content-addressing and accidental
+   collision detection; too narrow to lean on for adversarial forgery
+   resistance. Width is a deliberate choice to make, not a truncation to
+   inherit.
+4. **Source is not covered.** The lump carries its source (short-form
+   CLOOMC++ + long-form assembler) so it can be edited out of context; the
+   seal must bind that source to the code so they cannot drift independently.
+
+### Target Form (Per the Design)
+
+The genotype must seal **identity + capabilities + code + source** as one
+indivisible unit:
+
+```
+genotype = H_canonical( petname.Abstraction#n  ||  c-list  ||  code  ||  source )
+```
+
+| Component | Role | Covered today? |
+|-----------|------|:--------------:|
+| `petname.Abstraction#n` | Full identity: author pet name, abstraction name, issue number. Makes distinct issues/authors hash differently. | ✗ |
+| c-list | Capability rows (DNA / reachability). | ✓ |
+| code | Method words. | ✓ |
+| source | Carried source, so source and code cannot drift; editing → new genotype. | ✗ |
+| `H_canonical` | Fixed cryptographic hash over a canonical byte encoding (not `str()` of a list), so any conforming tool in any language computes the identical genotype for the identical lump. | ✗ |
+
+### Two Gates — Integrity and Ownership
+
+The genotype is the **integrity gate** — static, public, secretless:
+
+| What changed | Effect |
+|---|---|
+| Wrong issue number / different author | Different genotype → fails *(identity)* |
+| Corrupted code or c-list word | Different genotype → fails *(integrity)* |
+| Source edited without recompiling | Source no longer matches → fails *(source-consistency)* |
+
+The genotype is **not** the ownership gate. Ownership is the separate,
+dynamic, secret-based passkey acid test. Integrity (this hash) must be
+verifiable without authority; ownership must not be derivable from these
+static bits. The two gates stay independent by necessity.
+
+### What the Genotype Does NOT Cover
+
+| Excluded | Reason |
+|----------|--------|
+| Header (Word 0) | Holds derived layout (`cc`, `code_len`) recomputable from the sealed content, and placement-specific bookkeeping. Sealing it would make the seal depend on layout accidents. |
+| Zero-padding | Carries no information. |
+| Resolved GTs / bindings | Assigned by the locator at load and rebound at runtime (`SAVE`). They are placement, not identity. Their integrity is handled separately by per-GT parity/ECC — **not** by the genotype. The genotype never faults on binding because binding does not touch what the genotype covers. |
+
+### Migration Path (Bootstrap → Production)
+
+Each step is additive; each changes the genotype values — which is correct
+and expected: a lump sealed under the production scheme is a genuinely
+different (better-identified) artifact than the same lump under the bootstrap
+scheme. Under content-addressing, a better seal is simply a new identity.
+
+| Step | Change |
+|------|--------|
+| **Now** | `sha256(str(clist + code))[:8]`, 32-bit, content-only. Keep for the bootstrap; self-consistent and sufficient for the current single-author, no-transfer world. |
+| **Add identity** | Extend the hashed input to include the full `petname.Abstraction#n` string, so distinct issues/authors differ. First and most important upgrade — turns a content hash into an identity hash. |
+| **Add source** | Include the carried source in the hashed input, binding source to code (editing → new genotype). |
+| **Canonicalise** | Replace `str()`-of-list with a defined canonical byte encoding (fixed field order, fixed integer width, explicit lengths), so the genotype is tool- and language-independent. |
+| **Choose width** | Decide the genotype width deliberately (e.g. full 256-bit digest, or a documented truncation) based on the forgery-resistance required, rather than inheriting the 8-hex-char bootstrap truncation. |
+
+> **Development-status note (source inclusion):** The source included in the
+> seal may itself vary by development status — full commented source (active
+> development), uncommented source (release), or no source (locked
+> production). Each is different content, hence a different genotype — which
+> is consistent: a commented-source lump and its no-source production
+> counterpart are legitimately different artifacts with different identities.
+> If a three-tier source scheme is adopted, the genotype computation is
+> unchanged — it simply hashes whatever source tier the lump carries, and
+> different tiers yield different genotypes by construction.
+
+> **Status:** Spec note. Current form documented verbatim from `cloomc.py`
+> (`sha256(str(clist+code))[:8]`, 32-bit, content-only). Target form
+> specified (identity + c-list + code + source, canonical encoding, chosen
+> width) but **not yet implemented** — it is the "confirm the seal
+> construction in the compiler" open item. Per-GT parity (not the genotype)
+> covers transient bindings.
 
 ---
 
@@ -1556,6 +1685,8 @@ already owns.
 
 | Version | Date | Summary |
 |---|---|---|
+| v1.2.1 | 2026-08-17 | New section: **The Genotype Field — How It Is Computed** — documents the current bootstrap form (`sha256(str(clist+code))[:8]`, 32-bit), its four known limits, the target production form (`H_canonical(identity ‖ c-list ‖ code ‖ source)`), the two-gate model (integrity vs ownership), the excluded fields (header, padding, resolved GTs), and the four-step migration path (identity → source → canonical encoding → chosen width). |
+| v1.2 | 2026-06-20 | (prior release) |
 | v1.1 | 2026-05-03 | Floating-lump concept formalised (new section); `variant_group` and `ns_slot_policy` added to manifest schema; Boot.Abstr example table corrected (cw=17, cc=1, 64 words, `0xF800_4401`); automated consistency gate (`tests/lump/test_lump_consistency.py`, 11 rules). |
 | v1.0 | 2026-04-29 | Initial documented release. |
 

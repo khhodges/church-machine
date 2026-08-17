@@ -1,391 +1,1306 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Lumps Directory</title>
-  <style>
-    body {
-      font-family: system-ui, sans-serif;
-      margin: 2rem;
-      background: #f5f5f7;
-      color: #1a1a1a;
-    }
-    h1 { margin-bottom: 0.25rem; }
-    h2 {
-      margin-top: 2.5rem;
-      margin-bottom: 0.75rem;
-      font-size: 1.2rem;
-      border-bottom: 2px solid #ccc;
-      padding-bottom: 0.3rem;
-    }
-    .section-desc {
-      font-size: 0.92rem;
-      color: #555;
-      margin-bottom: 0.75rem;
-    }
+<meta charset="UTF-8">
+<title>Lumps Directory</title>
+<style>
+* { box-sizing: border-box; }
+body { font-family: system-ui, sans-serif; margin: 0; background: #f2f3f7; color: #1a1a1a; font-size: 0.88rem; }
 
-    /* ── Iframe lump viewer ── */
-    #lump-viewer-frame {
-      width: 100%;
-      min-height: 540px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      background: #fff;
-    }
+/* ── Two-column layout ── */
+.layout { display: flex; height: 100vh; overflow: hidden; }
+.left-col { width: 420px; flex-shrink: 0; display: flex; flex-direction: column; background: #fff; border-right: 1px solid #d0d4de; }
+.right-col { flex: 1; overflow-y: auto; background: #f2f3f7; }
 
-    /* ── Lump Size Rule ── */
-    .rule-box {
-      background: #fff;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      padding: 1rem 1.25rem;
-    }
-    .rule-box code {
-      display: block;
-      background: #f0f0f0;
-      padding: 0.6rem 0.9rem;
-      border-radius: 3px;
-      font-size: 0.9rem;
-      margin: 0.6rem 0 0.9rem;
-      white-space: pre;
-    }
-    .rule-box p { margin: 0.4rem 0; font-size: 0.95rem; }
-    table.size-table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-top: 0.75rem;
-      font-size: 0.9rem;
-      background: #fff;
-    }
-    table.size-table th, table.size-table td {
-      border: 1px solid #ccc;
-      padding: 0.4rem 0.7rem;
-      text-align: left;
-    }
-    table.size-table th { background: #eee; }
-  </style>
+/* ── Left: header ── */
+.left-header { padding: 0.75rem 1rem 0.5rem; border-bottom: 1px solid #e0e4ee; }
+.left-header h1 { margin: 0 0 0.15rem; font-size: 1.1rem; color: #1a2a4a; }
+.left-header p { margin: 0; font-size: 0.78rem; color: #666; }
+
+/* ── Left: lump list ── */
+.lump-list { flex: 1; overflow-y: auto; }
+.group-hdr { padding: 0.3rem 1rem; background: #1e2d52; color: #b8c8e8; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; position: sticky; top: 0; z-index: 1; }
+.lump-row { display: flex; align-items: center; padding: 0.45rem 1rem; cursor: pointer; border-bottom: 1px solid #eef0f7; transition: background 0.12s; }
+.lump-row:hover { background: #edf2ff; }
+.lump-row.active { background: #dce8ff; border-left: 3px solid #1a5cc8; }
+.lump-row.wip .lump-name { color: #888; font-style: italic; }
+.lump-name { flex: 1; font-weight: 600; font-size: 0.86rem; }
+.lump-gen { font-family: monospace; font-size: 0.75rem; color: #666; margin-right: 0.5rem; }
+.badge { display: inline-block; font-size: 0.68rem; padding: 0.1rem 0.35rem; border-radius: 3px; font-weight: 700; }
+.badge-rel { background: #d1f5d1; color: #1a6b1a; }
+.badge-wip { background: #fff3cd; color: #7a5700; }
+
+/* ── Right: welcome ── */
+.welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #888; gap: 0.75rem; }
+.welcome .big { font-size: 2.5rem; }
+.welcome p { font-size: 0.9rem; }
+
+/* ── Right: review panel ── */
+.review { padding: 1.25rem 1.5rem; display: none; }
+.review.visible { display: block; }
+.rev-title { font-size: 1.3rem; font-weight: 700; color: #1a2a4a; margin: 0 0 0.1rem; }
+.rev-sub { font-size: 0.8rem; color: #666; margin: 0 0 0.9rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.rev-sub code { background: #e8ebf8; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.78rem; }
+
+/* ── Tabs ── */
+.tabs { display: flex; flex-wrap: wrap; gap: 0; border-bottom: 2px solid #c8d0e8; margin-bottom: 1rem; }
+.tab { padding: 0.4rem 0.85rem; cursor: pointer; font-size: 0.8rem; font-weight: 600; color: #555; border-bottom: 2px solid transparent; margin-bottom: -2px; white-space: nowrap; }
+.tab:hover { color: #1a5cc8; }
+.tab.active { color: #1a5cc8; border-bottom-color: #1a5cc8; background: none; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ── Cards ── */
+.card { background: #fff; border: 1px solid #dde2ef; border-radius: 6px; padding: 1rem 1.2rem; margin-bottom: 1rem; }
+.card h3 { margin: 0 0 0.6rem; font-size: 0.88rem; color: #2a3a6a; border-bottom: 1px solid #eef; padding-bottom: 0.35rem; }
+.kv-grid { display: grid; grid-template-columns: 140px 1fr; gap: 0.25rem 0.75rem; }
+.kv-key { font-weight: 600; color: #555; font-size: 0.82rem; }
+.kv-val { color: #222; font-size: 0.82rem; word-break: break-word; }
+.kv-val code { font-family: monospace; background: #f0f2f8; padding: 0.05rem 0.3rem; border-radius: 2px; }
+.kv-val a { color: #1a5cc8; text-decoration: none; }
+.kv-val a:hover { text-decoration: underline; }
+
+/* ── Binary decode ── */
+.header-word { font-family: monospace; font-size: 1rem; background: #1e2d52; color: #b8ffb8; padding: 0.5rem 0.85rem; border-radius: 4px; display: inline-block; margin-bottom: 0.75rem; letter-spacing: 0.08em; }
+.field-table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+.field-table th, .field-table td { border: 1px solid #dde; padding: 0.3rem 0.55rem; text-align: left; }
+.field-table th { background: #eef0f8; font-weight: 700; }
+.layout-diag { font-family: monospace; font-size: 0.78rem; background: #f5f7ff; border: 1px solid #d0d8ee; border-radius: 4px; padding: 0.7rem 1rem; white-space: pre; line-height: 1.5; overflow-x: auto; }
+
+/* ── Spec check ── */
+.check-list { list-style: none; margin: 0; padding: 0; }
+.check-item { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.35rem 0; border-bottom: 1px solid #eef; font-size: 0.82rem; }
+.check-item:last-child { border: none; }
+.check-icon { font-size: 1rem; flex-shrink: 0; margin-top: -0.05rem; }
+.check-pass .check-icon { color: #1a7a1a; }
+.check-fail .check-icon { color: #cc0000; }
+.check-warn .check-icon { color: #cc7700; }
+.check-info .check-icon { color: #1a5cc8; }
+.check-rule { font-weight: 600; min-width: 60px; color: #333; }
+.check-desc { flex: 1; color: #444; }
+.check-val { font-family: monospace; font-size: 0.78rem; color: #0055aa; }
+
+/* ── Methods ── */
+.method-entry { border: 1px solid #dde2ee; border-radius: 5px; margin-bottom: 0.75rem; overflow: hidden; }
+.method-header { background: #eef0f8; padding: 0.45rem 0.8rem; display: flex; align-items: center; gap: 0.75rem; }
+.method-name { font-weight: 700; font-size: 0.88rem; color: #1a2a5a; }
+.method-offset { font-family: monospace; font-size: 0.75rem; color: #888; }
+.method-len { font-size: 0.72rem; color: #aaa; }
+.method-vis { font-size: 0.7rem; padding: 0.05rem 0.3rem; border-radius: 3px; background: #c8e8c8; color: #1a5a1a; font-weight: 600; }
+.method-vis.private { background: #f0e8d8; color: #7a4a00; }
+.method-body { padding: 0.5rem 0.8rem; font-size: 0.82rem; }
+.method-desc { color: #333; margin-bottom: 0.4rem; line-height: 1.5; }
+.io-section { margin-top: 0.35rem; }
+.io-label { font-weight: 600; font-size: 0.78rem; color: #555; margin-bottom: 0.2rem; }
+.io-list { list-style: none; margin: 0; padding: 0; }
+.io-list li { font-family: monospace; font-size: 0.75rem; color: #334; padding: 0.1rem 0; border-left: 2px solid #a8b8e8; padding-left: 0.4rem; margin-bottom: 0.2rem; }
+.code-snippet { font-family: monospace; font-size: 0.75rem; background: #1e2d52; color: #c8d8f8; padding: 0.5rem 0.75rem; border-radius: 4px; margin-top: 0.4rem; white-space: pre; overflow-x: auto; }
+
+/* ── C-list ── */
+.clist-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.clist-table th, .clist-table td { border: 1px solid #dde; padding: 0.35rem 0.55rem; }
+.clist-table th { background: #eef0f8; }
+.gt-word { font-family: monospace; font-size: 0.78rem; color: #0044aa; }
+.perm { display: inline-block; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.7rem; font-weight: 700; margin: 0.05rem; }
+.perm-E { background: #d8f0d8; color: #1a5a1a; }
+.perm-R { background: #d8e8ff; color: #1a2a7a; }
+.perm-W { background: #ffe8d8; color: #7a3a00; }
+.perm-L { background: #e8d8ff; color: #5a1a7a; }
+.perm-S { background: #ffd8e8; color: #7a003a; }
+
+/* ── Source ── */
+.source-block { font-family: monospace; font-size: 0.76rem; background: #0d1b2a; color: #c8d8f0; padding: 1rem; border-radius: 5px; white-space: pre; overflow: auto; max-height: 400px; line-height: 1.5; }
+
+/* ── Docs ── */
+.doc-stat { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+.doc-count-big { font-size: 2rem; font-weight: 700; color: #1a5cc8; }
+.doc-count-label { font-size: 0.8rem; color: #666; }
+.doc-list { list-style: none; margin: 0; padding: 0; }
+.doc-list li { padding: 0.35rem 0; border-bottom: 1px solid #eef; font-size: 0.82rem; color: #2244aa; display: flex; gap: 0.4rem; align-items: center; }
+.doc-list li:last-child { border: none; }
+.doc-icon { color: #888; font-size: 0.8rem; }
+
+/* ── NS state ── */
+.ns-state-live { color: #1a7a1a; font-weight: 600; }
+.ns-state-lazy { color: #cc7700; font-weight: 600; }
+.ns-state-dynamic { color: #555; font-style: italic; }
+.ns-state-null { color: #999; font-style: italic; }
+
+.empty-note { color: #999; font-style: italic; font-size: 0.82rem; padding: 0.5rem 0; }
+</style>
 </head>
 <body>
 
-  <h1>Lumps Directory</h1>
-  <p class="section-desc">Registered lumps in the ide Namespace and demo catalogue.</p>
+<div class="layout">
 
-  <!-- ═══════════════════════════════════════════
-       Iframe Lump Viewer
-       ═══════════════════════════════════════════ -->
-  <h2>Lump Viewer</h2>
-  <p class="section-desc">Click <em>Review</em> on any row to inspect its metadata.</p>
-
-  <iframe id="lump-viewer-frame" srcdoc='<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Document Review Table</title>
-  <style>
-    body { font-family: system-ui, sans-serif; margin: 0; background: #f5f5f7; }
-    .table-wrap { padding: 1.5rem 1.5rem 0; }
-    h1 { margin: 0 0 1rem; font-size: 1.4rem; }
-    table { border-collapse: collapse; width: 100%; background: #fff; font-size: 0.9rem; }
-    th, td { border: 1px solid #ccc; padding: 0.45rem 0.65rem; text-align: left; }
-    th { background: #e8e8ee; font-size: 0.85rem; }
-    td:nth-child(2) { font-family: monospace; font-size: 0.82rem; white-space: nowrap; }
-    a.review-link { color: #0066cc; text-decoration: none; font-weight: 600; }
-    a.review-link:hover { text-decoration: underline; }
-    tr.group-hdr td { background: #2a3a5a; color: #c8d6f0; font-weight: 700;
-      font-size: 0.78rem; letter-spacing: 0.05em; text-transform: uppercase;
-      padding: 0.3rem 0.65rem; border-color: #1a2a4a; }
-    tr.wip td { color: #888; font-style: italic; }
-    #review-panel {
-      position: sticky; bottom: 0; left: 0; right: 0;
-      background: #fff; border-top: 2px solid #0066cc;
-      padding: 0.75rem 1.5rem; font-size: 0.88rem;
-      box-shadow: 0 -3px 10px rgba(0,0,0,0.12);
-      display: none;
-    }
-    #review-panel.visible { display: block; }
-    #review-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.4rem; }
-    #review-title { font-size: 1rem; font-weight: 700; color: #003399; }
-    #review-close { cursor: pointer; color: #999; font-size: 1.1rem; margin-left: auto; }
-    #review-close:hover { color: #333; }
-    .review-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 0.75rem; }
-    .review-key { font-weight: 600; color: #555; white-space: nowrap; }
-    .review-val { color: #222; }
-    .review-methods { font-family: monospace; font-size: 0.85rem; }
-    .review-badge { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 3px;
-      font-size: 0.75rem; font-weight: 600; margin-right: 0.25rem; }
-    .badge-released { background: #d4f5d4; color: #1a6b1a; }
-    .badge-wip { background: #fff3cd; color: #7a5700; }
-    .badge-archive { background: #e8e0f0; color: #5a2a7a; }
-  </style>
-</head>
-<body>
-  <div class="table-wrap">
-  <h1>Document Review</h1>
-  <table>
-    <thead>
-      <tr><th>Lump</th><th>Genotype</th><th>Origin</th><th>Methods</th><th>Review</th></tr>
-    </thead>
-    <tbody>
-
-      <tr class="group-hdr"><td colspan="5">Boot ROM</td></tr>
-      <tr>
-        <td>SelfTest</td><td>0x30542A6D</td><td>Boot ROM</td><td>SelfTest, Next</td>
-        <td><a href="#" class="review-link" data-name="SelfTest" data-genotype="0x30542A6D" data-origin="Boot ROM" data-methods="SelfTest, Next" data-lang="ISA" data-status="released" data-ns="6" data-desc="SelfTest (a.k.a. Boot.Abstr) — the lump executed by the hardware ROM during boot phases B:01–B:07.">Review</a></td>
-      </tr>
-      <tr>
-        <td>WukongCallHome</td><td>0x2F3D7D46</td><td>Boot ROM</td><td>Main</td>
-        <td><a href="#" class="review-link" data-name="WukongCallHome" data-genotype="0x2F3D7D46" data-origin="Boot ROM" data-methods="Main" data-lang="assembly" data-status="released" data-ns="7" data-desc="Wukong board boot coordinator — runs SelfTest, calls Tunnel.Register, returns to IDE.">Review</a></td>
-      </tr>
-      <tr>
-        <td>PostFlashSelftest</td><td>0x059DC47F</td><td>Boot ROM</td><td>SelfTest, Next</td>
-        <td><a href="#" class="review-link" data-name="PostFlashSelftest" data-genotype="0x059DC47F" data-origin="Boot ROM" data-methods="SelfTest, Next" data-lang="assembly" data-status="released" data-ns="" data-desc="Post-flash self-test stub. Verifies hardware boot path with SelfTest E-GT and Next continuation slot.">Review</a></td>
-      </tr>
-      <tr>
-        <td>Salvation</td><td>0x6BE43A9D</td><td>Boot ROM</td><td>main</td>
-        <td><a href="#" class="review-link" data-name="Salvation" data-genotype="0x6BE43A9D" data-origin="Boot ROM" data-methods="main" data-lang="assembly" data-status="released" data-ns="" data-desc="Boot entry-point demo — LOADs and CALLs the four core boot abstractions (Salvation, Navana, Mint, Memory) in sequence.">Review</a></td>
-      </tr>
-
-      <tr class="group-hdr"><td colspan="5">System</td></tr>
-      <tr>
-        <td>Memory</td><td>0x3359E86E</td><td>System</td><td>Allocate, Free, Resize</td>
-        <td><a href="#" class="review-link" data-name="Memory" data-genotype="0x3359E86E" data-origin="System" data-methods="Allocate, Free, Resize" data-lang="ISA" data-status="released" data-ns="" data-desc="RAM zone guardian. Allocates and releases bounded memory regions under capability control.">Review</a></td>
-      </tr>
-      <tr>
-        <td>EventRouter</td><td>0x032CA4EE</td><td>System</td><td>Add, Remove, Resolve, List, Methods</td>
-        <td><a href="#" class="review-link" data-name="EventRouter" data-genotype="0x032CA4EE" data-origin="System" data-methods="Add, Remove, Resolve, List, Methods" data-lang="CLOOMC" data-status="released" data-ns="43" data-desc="Event-to-handler routing table. Maps event Golden Tokens to handler capabilities. Up to 10 registered pairs.">Review</a></td>
-      </tr>
-      <tr>
-        <td>Keystone</td><td>0x86B853A1</td><td>System</td><td>Connect, Hello</td>
-        <td><a href="#" class="review-link" data-name="Keystone" data-genotype="0x86B853A1" data-origin="System" data-methods="Connect, Hello" data-lang="CLOOMC" data-status="released" data-ns="" data-desc="Network key-exchange abstraction. Establishes a shared Mum identity word and confirms connectivity.">Review</a></td>
-      </tr>
-      <tr class="wip">
-        <td>Loader</td><td>0x19BA3A9D</td><td>System</td><td>run</td>
-        <td><a href="#" class="review-link" data-name="Loader" data-genotype="0x19BA3A9D" data-origin="System" data-methods="run" data-lang="ISA" data-status="wip" data-ns="" data-desc="Lump fetch-and-load stub. Requests a lump binary from the IDE by NS slot token over UART TX.">Review</a></td>
-      </tr>
-      <tr>
-        <td>Scheduler.IRQ</td><td>0x439E0DDD</td><td>System</td><td>IRQ (escalation)</td>
-        <td><a href="#" class="review-link" data-name="Scheduler.IRQ" data-genotype="0x439E0DDD" data-origin="System" data-methods="IRQ (escalation handler)" data-lang="assembly" data-status="released" data-ns="" data-desc="Tier-2 fault-escalation interrupt handler. Lazy-loaded on first scheduler fault; dispatches to the active thread&apos;s IRQ slot.">Review</a></td>
-      </tr>
-
-      <tr class="group-hdr"><td colspan="5">Networking</td></tr>
-      <tr>
-        <td>Tunnel</td><td>0x8770BF03</td><td>ide Namespace</td><td>Register, Send, Receive, Fault, Fetch, Call</td>
-        <td><a href="#" class="review-link" data-name="Tunnel" data-genotype="0x8770BF03" data-origin="ide Namespace" data-methods="Register, Send, Receive, Fault, Fetch, Call" data-lang="CLOOMC" data-status="released" data-ns="8" data-desc="Mum Tunnel messaging abstraction. Provides capability-secured inter-machine send/receive, fault reporting, and remote lump fetch.">Review</a></td>
-      </tr>
-      <tr>
-        <td>Ethernet</td><td>0xB169BBA4</td><td>ide Namespace</td><td>Send, Receive, Connect, Status</td>
-        <td><a href="#" class="review-link" data-name="Ethernet" data-genotype="0xB169BBA4" data-origin="ide Namespace" data-methods="Send, Receive, Connect, Status" data-lang="CLOOMC" data-status="released" data-ns="9" data-desc="Ethernet hardware driver abstraction. Manages IPv4 connections and raw frame transmission on the Ti60 NIC.">Review</a></td>
-      </tr>
-
-      <tr class="group-hdr"><td colspan="5">Math / Science</td></tr>
-      <tr>
-        <td>Constants</td><td>0xE494696F</td><td>ide Namespace</td><td>Pi, E, Phi, Zero, One, Add, Get</td>
-        <td><a href="#" class="review-link" data-name="Constants" data-genotype="0xE494696F" data-origin="ide Namespace" data-methods="Pi, E, Phi, Zero, One, Add, Get" data-lang="ISA" data-status="released" data-ns="9" data-desc="Mathematical constants library. Returns IEEE-754 values for Pi, e, Phi etc., plus a 14-slot user pool (Add/Get).">Review</a></td>
-      </tr>
-      <tr>
-        <td>SlideRule</td><td>0xD960F531</td><td>ide Namespace</td><td>Multiply, Divide, Sqrt, Mod, Sin, Cos, Tan, Asin, Acos, Atan, ToDegrees, ToRadians, Bernoulli, Abs, Pow, Min, Max, GCD, Factorial, Log2, Atan2, Signum</td>
-        <td><a href="#" class="review-link" data-name="SlideRule" data-genotype="0xD960F531" data-origin="ide Namespace" data-methods="Multiply, Divide, Sqrt, Mod, Sin, Cos, Tan, Asin, Acos, Atan, ToDegrees, ToRadians, Bernoulli, Abs, Pow, Min, Max, GCD, Factorial, Log2, Atan2, Signum" data-lang="CLOOMC" data-status="released" data-ns="" data-desc="Full-precision fixed-point mathematics library. 22 methods covering trigonometry, algebra, and number theory.">Review</a></td>
-      </tr>
-      <tr>
-        <td>SlideRule.Haskell</td><td>0x3542A2DB</td><td>IDE demo</td><td>Add, Sub, Mul, Sqrt, Pow2, Abs, Signum, Max, Min</td>
-        <td><a href="#" class="review-link" data-name="SlideRule.Haskell" data-genotype="0x3542A2DB" data-origin="IDE demo" data-methods="Add, Sub, Mul, Sqrt, Pow2, Abs, Signum, Max, Min" data-lang="Haskell" data-status="released" data-ns="" data-desc="Haskell-syntax SlideRule variant. Functional math library compiled from CLOOMC Haskell dialect.">Review</a></td>
-      </tr>
-      <tr>
-        <td>BernoulliNumbers</td><td>0x656DD0E4</td><td>IDE demo</td><td>compute</td>
-        <td><a href="#" class="review-link" data-name="BernoulliNumbers" data-genotype="0x656DD0E4" data-origin="IDE demo" data-methods="compute" data-lang="ISA" data-status="released" data-ns="" data-desc="Bernoulli number sequence generator. Computes B(n) for use in Taylor-series trigonometric expansions.">Review</a></td>
-      </tr>
-      <tr>
-        <td>IntegerOps</td><td>0x54C9A1E9</td><td>IDE demo</td><td>Greet, Increment, Add, Double</td>
-        <td><a href="#" class="review-link" data-name="IntegerOps" data-genotype="0x54C9A1E9" data-origin="IDE demo" data-methods="Greet, Increment, Add, Double" data-lang="English / ISA" data-status="released" data-ns="" data-desc="Integer arithmetic demo compiled from English natural-language source. Shows the English-CLOOMC front-end.">Review</a></td>
-      </tr>
-      <tr>
-        <td>NoteG</td><td>0x04A720F8</td><td>IDE demo</td><td>compute</td>
-        <td><a href="#" class="review-link" data-name="NoteG" data-genotype="0x04A720F8" data-origin="IDE demo" data-methods="compute" data-lang="Symbolic" data-status="released" data-ns="" data-desc="Ada NoteG musical demo. Symbolic-math pipeline that computes the frequency of musical note G using rational arithmetic.">Review</a></td>
-      </tr>
-
-      <tr class="group-hdr"><td colspan="5">Data / String</td></tr>
-      <tr>
-        <td>WordString</td><td>0xA1682B26</td><td>ide Namespace</td><td>GetWordCount, GetCharCount, GetByteCount, GetCharByte, IsUppercase, IsLowercase, IsDigit, IsAlpha, ToUpper, ToLower</td>
-        <td><a href="#" class="review-link" data-name="WordString" data-genotype="0xA1682B26" data-origin="ide Namespace" data-methods="GetWordCount, GetCharCount, GetByteCount, GetCharByte, IsUppercase, IsLowercase, IsDigit, IsAlpha, ToUpper, ToLower" data-lang="ISA" data-status="released" data-ns="" data-desc="Packed-word character string library. Raw ISA implementation of character classification and access on 32-bit word-packed strings.">Review</a></td>
-      </tr>
-      <tr>
-        <td>StringOps</td><td>0x05B56245</td><td>ide Namespace</td><td>Pack4, Unpack, IsLetter, IsDigit, IsUpper, IsLower, IsSpace, ToUpper, ToLower, ReverseWord, CompareWords</td>
-        <td><a href="#" class="review-link" data-name="StringOps" data-genotype="0x05B56245" data-origin="ide Namespace" data-methods="Pack4, Unpack, IsLetter, IsDigit, IsUpper, IsLower, IsSpace, ToUpper, ToLower, ReverseWord, CompareWords" data-lang="ISA" data-status="released" data-ns="" data-desc="Word-level string packing and character classification library. Packs 4 chars per 32-bit word; full char-class and case conversion.">Review</a></td>
-      </tr>
-      <tr>
-        <td>EnglishLoops</td><td>0x19366291</td><td>IDE demo</td><td>WhileSum, RecurseSum, LambdaSum</td>
-        <td><a href="#" class="review-link" data-name="EnglishLoops" data-genotype="0x19366291" data-origin="IDE demo" data-methods="WhileSum, RecurseSum, LambdaSum" data-lang="English / ISA" data-status="released" data-ns="" data-desc="Loop-construct demo compiled from English natural-language. Shows three equivalent sum implementations: while-loop, recursive, and lambda-tail.">Review</a></td>
-      </tr>
-
-      <tr class="group-hdr"><td colspan="5">Hardware</td></tr>
-      <tr class="wip">
-        <td>LEDFlash</td><td>0x55F1A32F</td><td>Hardware</td><td>blink</td>
-        <td><a href="#" class="review-link" data-name="LEDFlash" data-genotype="0x55F1A32F" data-origin="Hardware" data-methods="blink" data-lang="ISA" data-status="wip" data-ns="" data-desc="LED blink demo. Toggles LED0 at ~1 Hz using nested busy-wait delay loops on the Ti60 board.">Review</a></td>
-      </tr>
-      <tr>
-        <td>MorseCmOk</td><td>0xEB20FE01</td><td>Hardware</td><td>run</td>
-        <td><a href="#" class="review-link" data-name="MorseCmOk" data-genotype="0xEB20FE01" data-origin="Hardware" data-methods="run" data-lang="assembly" data-status="released" data-ns="" data-desc="Morse-code CM OK signal. Flashes the Ti60 LED pattern for &apos;CQ DE CM&apos; to signal a healthy boot.">Review</a></td>
-      </tr>
-
-      <tr class="group-hdr"><td colspan="5">Security Test</td></tr>
-      <tr>
-        <td>CapabilityTest</td><td>0x1B20FBA6</td><td>Security test</td><td>(device capability verification)</td>
-        <td><a href="#" class="review-link" data-name="CapabilityTest" data-genotype="0x1B20FBA6" data-origin="Security test" data-methods="(device capability verification)" data-lang="ISA" data-status="released" data-ns="10" data-desc="Hardware capability test v1. Verifies SelfTest, LED_DEV, UART_DEV, BTN_DEV, and TIMER_DEV GT permissions in sequence.">Review</a></td>
-      </tr>
-      <tr>
-        <td>CapabilityTest.2</td><td>0xC7A66D01</td><td>Security test</td><td>(hardware GT verification)</td>
-        <td><a href="#" class="review-link" data-name="CapabilityTest.2" data-genotype="0xC7A66D01" data-origin="Security test" data-methods="(hardware GT verification)" data-lang="assembly" data-status="released" data-ns="" data-desc="Hardware capability test v2. Full TPERM audit of all five hardware device GTs with extended fault coverage.">Review</a></td>
-      </tr>
-      <tr>
-        <td>GT.Encoding.Self-Test</td><td>0x254F3542</td><td>Security test</td><td>(GT encoding audit)</td>
-        <td><a href="#" class="review-link" data-name="GT.Encoding.Self-Test" data-genotype="0x254F3542" data-origin="Security test" data-methods="(GT encoding audit)" data-lang="ISA" data-status="released" data-ns="" data-desc="GT encoding v1 hardware self-test. Audits that the CM hardware correctly interprets Golden Token permission bits for all 10 permission types.">Review</a></td>
-      </tr>
-
-      <tr class="group-hdr"><td colspan="5">Research Demo</td></tr>
-      <tr>
-        <td>Human.Hand</td><td>0xE88911D6</td><td>Research demo</td><td>Status, Close_Fist, Open_Hand, Grip, Point, Count, Pinch</td>
-        <td><a href="#" class="review-link" data-name="Human.Hand" data-genotype="0xE88911D6" data-origin="Research demo" data-methods="Status, Close_Fist, Open_Hand, Grip, Point, Count, Pinch" data-lang="ISA" data-status="released" data-ns="" data-desc="Prosthetic hand gesture abstraction. Maps CM capability calls to seven physical finger-motor commands.">Review</a></td>
-      </tr>
-
-      <tr class="group-hdr"><td colspan="5">IDE Namespace (compiled on demand)</td></tr>
-      <tr>
-        <td>DijkstraFlag</td><td>0x44CE2AAE</td><td>ide Namespace</td><td>RunSequence, Produce, Consume, Peek</td>
-        <td><a href="#" class="review-link" data-name="DijkstraFlag" data-genotype="0x44CE2AAE" data-origin="ide Namespace" data-methods="RunSequence, Produce, Consume, Peek" data-lang="CLOOMC" data-status="released" data-ns="" data-desc="Dijkstra mutual-exclusion flag. Classic producer/consumer semaphore implemented as a capability-secured CLOOMC abstraction.">Review</a></td>
-      </tr>
-      <tr>
-        <td>Store</td><td>0x69FC2839</td><td>ide Namespace</td><td>Hash</td>
-        <td><a href="#" class="review-link" data-name="Store" data-genotype="0x69FC2839" data-origin="ide Namespace" data-methods="Hash" data-lang="CLOOMC" data-status="released" data-ns="" data-desc="Key-value store abstraction. Single Hash method maps a capability key to a stored word value.">Review</a></td>
-      </tr>
-      <tr>
-        <td>Counter</td><td>0xB62C83A1</td><td>ide Namespace</td><td>Inc, Dec, IsZero</td>
-        <td><a href="#" class="review-link" data-name="Counter" data-genotype="0xB62C83A1" data-origin="ide Namespace" data-methods="Inc, Dec, IsZero" data-lang="CLOOMC" data-status="released" data-ns="" data-desc="Integer counter abstraction. Maintains a private count behind E-permission. Inc/Dec are atomic; IsZero returns a capability-secured boolean.">Review</a></td>
-      </tr>
-      <tr>
-        <td>Adder</td><td>0x7BA260A5</td><td>IDE demo</td><td>Add, Double</td>
-        <td><a href="#" class="review-link" data-name="Adder" data-genotype="0x7BA260A5" data-origin="IDE demo" data-methods="Add, Double" data-lang="CLOOMC" data-status="released" data-ns="" data-desc="Simple arithmetic demo. Add(a,b) and Double(x) — introductory example for CALL / RETURN flow.">Review</a></td>
-      </tr>
-      <tr>
-        <td>Calc</td><td>0xB691F404</td><td>IDE demo</td><td>Multiply, Square</td>
-        <td><a href="#" class="review-link" data-name="Calc" data-genotype="0xB691F404" data-origin="IDE demo" data-methods="Multiply, Square" data-lang="CLOOMC" data-status="released" data-ns="" data-desc="Multiplication demo. Multiply(a,b) and Square(x) — companion to Adder for demonstrating multiple method abstractions.">Review</a></td>
-      </tr>
-
-      <tr class="group-hdr"><td colspan="5">Two-Enemies Security Proof</td></tr>
-      <tr>
-        <td>Alice</td><td>0x3FCBF37C</td><td>two-enemies proof</td><td>Stash, Reveal</td>
-        <td><a href="#" class="review-link" data-name="Alice" data-genotype="0x3FCBF37C" data-origin="two-enemies proof" data-methods="Stash, Reveal" data-lang="CLOOMC" data-status="released" data-ns="" data-desc="Alice principal in the two-enemies security proof. Stash stores a secret behind an E-permission capability; Reveal returns it only to the original caller.">Review</a></td>
-      </tr>
-      <tr>
-        <td>Mallory</td><td>0xB2AB7AF0</td><td>two-enemies proof</td><td>Steal, Probe</td>
-        <td><a href="#" class="review-link" data-name="Mallory" data-genotype="0xB2AB7AF0" data-origin="two-enemies proof" data-methods="Steal, Probe" data-lang="CLOOMC" data-status="released" data-ns="" data-desc="Mallory adversary in the two-enemies security proof. Attempts to Steal and Probe Alice&apos;s capability — both calls must fault with PERM_DENIED to pass the proof.">Review</a></td>
-      </tr>
-
-    </tbody>
-  </table>
-  </div><!-- /.table-wrap -->
-
-  <div id="review-panel">
-    <div id="review-header">
-      <div id="review-title">Select a lump to review.</div>
-      <span id="review-status"></span>
-      <span id="review-close" title="Close">&#x2715;</span>
+  <!-- ══ LEFT: lump catalogue ══ -->
+  <div class="left-col">
+    <div class="left-header">
+      <h1>Lumps Directory</h1>
+      <p>Spec v1.2 · 33 lumps · click a row to deep-dive</p>
     </div>
-    <div class="review-grid" id="review-grid"></div>
+    <div class="lump-list" id="lumpList"></div>
   </div>
 
-  <script>
-    function escHtml(s) {
-      return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-    }
-    function buildGrid(d) {
-      var rows = [
-        ["Name",    escHtml(d.name)],
-        ["Genotype",escHtml(d.genotype)],
-        ["Origin",  escHtml(d.origin)],
-        ["Language",escHtml(d.lang || "—")],
-        ["NS Slot", d.ns ? escHtml(d.ns) : "—"],
-        ["Methods", "<span class=\"review-methods\">" + escHtml(d.methods) + "</span>"],
-        ["Description", escHtml(d.desc || "—")]
-      ];
-      return rows.map(function(r){
-        return "<div class=\"review-key\">" + r[0] + ":</div><div class=\"review-val\">" + r[1] + "</div>";
-      }).join("");
-    }
-    function statusBadge(s) {
-      var cls = s === "released" ? "badge-released" : s === "wip" ? "badge-wip" : "badge-archive";
-      return "<span class=\"review-badge " + cls + "\">" + escHtml(s || "—") + "</span>";
-    }
-    document.querySelectorAll(".review-link").forEach(function(link) {
-      link.addEventListener("click", function(e) {
-        e.preventDefault();
-        var d = {
-          name:     this.dataset.name,
-          genotype: this.dataset.genotype,
-          origin:   this.dataset.origin,
-          methods:  this.dataset.methods,
-          lang:     this.dataset.lang,
-          status:   this.dataset.status,
-          ns:       this.dataset.ns,
-          desc:     this.dataset.desc
-        };
-        document.getElementById("review-title").textContent = d.name;
-        document.getElementById("review-status").innerHTML = statusBadge(d.status);
-        document.getElementById("review-grid").innerHTML = buildGrid(d);
-        var panel = document.getElementById("review-panel");
-        panel.classList.add("visible");
-        document.querySelectorAll(".review-link").forEach(function(l){ l.style.fontWeight="600"; });
-        this.style.fontWeight = "900";
-      });
-    });
-    document.getElementById("review-close").addEventListener("click", function() {
-      document.getElementById("review-panel").classList.remove("visible");
-      document.querySelectorAll(".review-link").forEach(function(l){ l.style.fontWeight="600"; });
-    });
-  </script>
-</body>
-</html>'></iframe>
-
-  <script>
-    // Auto-size iframe to its content height after load
-    var fr = document.getElementById("lump-viewer-frame");
-    fr.addEventListener("load", function() {
-      try {
-        var h = fr.contentDocument.body.scrollHeight;
-        fr.style.height = (h + 20) + "px";
-      } catch(e) {}
-    });
-  </script>
-
-  <!-- ═══════════════════════════════════════════
-       Lump Size Rule
-       ═══════════════════════════════════════════ -->
-  <h2>Lump Size Rule</h2>
-  <div class="rule-box">
-    <p>Lump size is always a power of 2, minimum 64 words, maximum 32 768 words (32-bit each):</p>
-    <code>lumpSize = 2^n   where 6 ≤ n ≤ 15
-freespace = lumpSize - 1 - cw - cc   (must be all-zero; Mint verifies at load time)</code>
-    <p>
-      The maximum is 2<sup>15</sup> = 32 768 words. The header <code>cw</code> field (13 bits, max 8 191)
-      and <code>cc</code> field (8 bits, max 255) together cap the maximum useful payload at
-      1 + 8 191 + 255 = 8 447 words. Mint hard-rejects n&#8209;6 &gt; 9 (lumpSize &gt; 32 K).
-    </p>
-    <table class="size-table">
-      <thead>
-        <tr>
-          <th>Abstraction</th>
-          <th>Code words (cw)</th>
-          <th>C-list slots (cc)</th>
-          <th>Lump size</th>
-          <th>Freespace</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr><td>Decimal</td>   <td>107</td><td>0</td><td>2<sup>7</sup> = 128 words</td>   <td>20 words</td></tr>
-        <tr><td>SlideRule</td> <td>525</td><td>1</td><td>2<sup>10</sup> = 1 024 words</td><td>497 words</td></tr>
-        <tr><td>TestSR</td>    <td>604</td><td>1</td><td>2<sup>10</sup> = 1 024 words</td><td>418 words</td></tr>
-        <tr><td>Boot.Abstr</td><td>17</td> <td>1</td><td>2<sup>6</sup> = 64 words</td>   <td>45 words</td></tr>
-      </tbody>
-    </table>
+  <!-- ══ RIGHT: review panel ══ -->
+  <div class="right-col">
+    <div class="welcome" id="welcome">
+      <div class="big">📋</div>
+      <p>Select a lump on the left to review it against the Lump Specification v1.2</p>
+    </div>
+    <div class="review" id="review">
+      <div class="rev-title" id="revTitle"></div>
+      <div class="rev-sub" id="revSub"></div>
+      <div class="tabs" id="revTabs"></div>
+      <div id="revBody"></div>
+    </div>
   </div>
+</div>
 
+<script>
+// ══════════════════════════════════════════════════════════════
+//  LUMP CATALOGUE DATA
+//  Compiled from: server/lumps/manifest.json, sidecar JSONs,
+//  ns-state.json, simulator CLOOMC sources, docs/ cross-refs
+//  and CM_LUMP_SPECIFICATION.md v1.2 (2026-06-20)
+// ══════════════════════════════════════════════════════════════
+const LUMPS = [
+
+// ── BOOT ROM ──────────────────────────────────────────────────
+{
+  id:"SelfTest", genotype:"0x30542A6D", token:"00000600", group:"Boot ROM",
+  ns_slot:6, ns_slot_policy:"static", boot_resident:true, variant_group:null,
+  lump_size:512, cw:416, cc:2, typ:0,
+  language:"ISA", author:"Church Machine", version:"1.2", status:"released",
+  description:"SelfTest (a.k.a. Boot.Abstr) — the lump executed by the hardware ROM during boot phases B:01–B:07. Bootstraps the NS table, mLoads the Thread NS entry, loads the SelfTest E-GT into CR0, verifies permissions on all boot-namespace GTs, then signals boot-complete to the IDE.",
+  ns_state:{ location:"0x00000100", limit:"0x001FE", seal:"0x667F", state:"Live" },
+  methods:[
+    { name:"SelfTest", offset:0, length:380, visibility:"public",
+      description:"Main self-test entry. Executes B:01–B:07: mLoad NS[0] (Boot.NS), mLoad Boot.Thread at NS[1], load E-GT into CR0 from c-list[1], TPERM to E, verify all five hardware device GTs (UART, LED, BTN, TIMER). Returns result code in DR0.",
+      inputs:[], outputs:["DR0: 0 = all tests passed · non-zero = fault code"]
+    },
+    { name:"Next", offset:380, length:36, visibility:"public",
+      description:"Continuation entry. Called after SelfTest completes a boot cycle; transitions control to the IDE boot-complete handler or loops for repeated self-test.",
+      inputs:[], outputs:[]
+    }
+  ],
+  capabilities:[
+    { slot:0, name:"Boot.NS", rights:["L"], gt:"", note:"NS root GT — loaded at B:01" },
+    { slot:1, name:"SelfTest (self-ref)", rights:["E"], gt:"0x4A000006", note:"Self-referential E-GT for loop / Next call" }
+  ],
+  source: null,
+  doc_count:11,
+  doc_refs:["architecture.md","church-machine-ide-surface.md","church-machine-lifecycle-design.md","wukong-v2/c2-wukong-boot-program.md","wukong-v2/c3-demo-namespace-address.md","wukong-v2/h4-demo-clist-minimal.md"]
+},
+{
+  id:"WukongCallHome", genotype:"0x2F3D7D46", token:"e186c4ec", group:"Boot ROM",
+  ns_slot:7, ns_slot_policy:"static", boot_resident:true, variant_group:null,
+  lump_size:64, cw:3, cc:2, typ:0,
+  language:"assembly", author:"Church Machine", version:"1.0", status:"released",
+  description:"Wukong board software boot coordinator. Three-instruction body: (1) ELOADCALL SelfTest.Main — runs the hardware self-test, result in DR0; (2) ELOADCALL Tunnel.Register — sends DR0 to the IDE as the boot_reason payload; (3) RETURN to the boot-entry caller.",
+  ns_state:{ location:"0x00000300", limit:"0x0003D", seal:"0xF8E2", state:"Live" },
+  methods:[
+    { name:"Main", offset:0, length:3, visibility:"public",
+      description:"Run SelfTest, register result with Tunnel, return to IDE. Three instructions: ELOADCALL SelfTest (c-list[0]), ELOADCALL Tunnel (c-list[1]), RETURN.",
+      inputs:[], outputs:["DR0: SelfTest result code forwarded to Tunnel.Register"]
+    }
+  ],
+  capabilities:[
+    { slot:0, name:"SelfTest", rights:["E"], gt:"0x4A000006", note:"NS slot 6 — called first" },
+    { slot:1, name:"Tunnel", rights:["E"], gt:"0x4A000008", note:"NS slot 8 — receives DR0 boot_reason" }
+  ],
+  source:"; WukongCallHome (3 words)\ncapabilities {\n    SelfTest  E,    ; c-list[0] → NS slot 6\n    Tunnel    E     ; c-list[1] → NS slot 8\n}\nMain:\n    ELOADCALL CR0, SelfTest, 0    ; call SelfTest.Main → DR0 = test result\n    ELOADCALL CR0, Tunnel, 0      ; call Tunnel.Register(DR0) → IDE ACK\n    RETURN                        ; return to boot-entry caller",
+  doc_count:7,
+  doc_refs:["wukong-boot.md","wukong-callhome-redesign-plan.md","wukong-boot-verification.md","architecture.md"]
+},
+{
+  id:"PostFlashSelftest", genotype:"0x059DC47F", token:"059dc47f", group:"Boot ROM",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:512, cw:499, cc:2, typ:0,
+  language:"assembly", author:"Church Machine", version:"1.0", status:"released",
+  description:"Post-flash self-test stub. Verifies the hardware boot path after a new bitstream flash. Structurally identical to SelfTest but loaded as a dynamic slot — not resident at boot. Used to confirm the NS mechanism works for freshly-flashed hardware.",
+  ns_state:null,
+  methods:[
+    { name:"SelfTest", offset:0, length:460, visibility:"public", description:"Post-flash hardware verification sequence. Same B:01–B:07 logic as the resident SelfTest lump but at a dynamic NS slot, confirming lazy-load also works.", inputs:[], outputs:["DR0: 0 = passed"] },
+    { name:"Next", offset:460, length:39, visibility:"public", description:"Continuation after post-flash test completes.", inputs:[], outputs:[] }
+  ],
+  capabilities:[
+    { slot:0, name:"Boot.NS", rights:["L"], gt:"", note:"NS root" },
+    { slot:1, name:"SelfTest (self)", rights:["E"], gt:"", note:"Self-ref for loop" }
+  ],
+  source:null, doc_count:2, doc_refs:["architecture.md","wukong-boot.md"]
+},
+{
+  id:"Salvation", genotype:"0x6BE43A9D", token:"ab3de4fd", group:"Boot ROM",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:256, cw:141, cc:0, typ:0,
+  language:"CLOOMC", author:"Church Machine", version:"1.2", status:"released",
+  description:"Boot entry-point demo. Shows the 'LOAD + TPERM + CALL .main' pattern on all four core boot abstractions in sequence (Salvation → Navana → Mint → Memory), demonstrating that each is reachable, has E-permission, and responds to its main method.",
+  ns_state:null,
+  methods:[
+    { name:"main", offset:0, length:141, visibility:"public",
+      description:"LOAD Salvation E-GT, TPERM to verify E, CALL Salvation.main (selector 0xF). Then repeat for Navana (selector 8), Mint (selector 5), Memory (selector 6). Ends with HALT.",
+      inputs:[], outputs:["Demonstrates all four boot abstractions are callable"]
+    }
+  ],
+  capabilities:[
+    { slot:0, name:"Salvation", rights:["E"], gt:"", note:"NS slot 4" },
+    { slot:1, name:"Navana", rights:["E"], gt:"", note:"NS slot 5" },
+    { slot:2, name:"Mint", rights:["E"], gt:"", note:"NS slot 6" },
+    { slot:3, name:"Memory", rights:["E"], gt:"", note:"NS slot 7" }
+  ],
+  source:"; LOAD + TPERM + CALL pattern for each boot abstraction\ncapabilities { Salvation E, Navana E, Mint E, Memory E }\n\nLOAD  CR0, Salvation  ; CR0 = Salvation (E)\nTPERM CR0, E\nCALL  Salvation.main  ; selector 0xF\n\nLOAD  CR1, Navana\nTPERM CR1, E\nCALL  Navana.main     ; selector 8\n\nLOAD  CR2, Mint\nTPERM CR2, E\nCALL  Mint.main       ; selector 5\n\nLOAD  CR3, Memory\nTPERM CR3, E\nCALL  Memory.main     ; selector 6\n\nHALT",
+  doc_count:16,
+  doc_refs:["startup.md","getting-started.md","launch.md","abstractions.md","patent-cloomc-universal-target.md"]
+},
+
+// ── SYSTEM ────────────────────────────────────────────────────
+{
+  id:"Memory", genotype:"0x3359E86E", token:"c3963aed", group:"System",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:64, cw:19, cc:0, typ:0,
+  language:"CLOOMC++", author:"Church Machine", version:"1.0", status:"released",
+  description:"Raw physical word allocator. Manages a bounded memory region under capability control. Allocate reserves power-of-2-aligned blocks; Free releases them; Resize adjusts in-place. The allocator state is held in CR7 (a writable data GT over the free-list region).",
+  ns_state:null,
+  methods:[
+    { name:"Allocate", offset:0, length:14, visibility:"public",
+      description:"Reserve a memory block. Rounds up size to the next 256-word boundary (power-of-2 alignment). Returns the block's physical base address and actual allocated size.",
+      inputs:["DR1: requested size in words"], outputs:["DR1: physical base address","DR2: actual allocated size (rounded up)"]
+    },
+    { name:"Free", offset:14, length:4, visibility:"public",
+      description:"Release a previously allocated block back to the free pool. Writes the block's base address into the free-list pointer at CR7[1].",
+      inputs:["DR1: base address of block to free"], outputs:["DR0: 0 = success"]
+    },
+    { name:"Resize", offset:18, length:1, visibility:"public",
+      description:"Resize an existing block in-place (stub implementation — returns current location and new size unchanged).",
+      inputs:["DR1: block base address","DR2: new size in words"], outputs:["DR1: location (unchanged)","DR2: newSize (unchanged)"]
+    }
+  ],
+  capabilities:[], source:"abstraction Memory {\n    capabilities {}\n    method Allocate(size) {\n        var needed = size + 255\n        needed = needed >> 8\n        needed = needed << 8\n        var location = read(CR7, 0)\n        var newFree = location + needed\n        write(CR7, 0, newFree)\n        return(location, needed)\n    }\n    method Free(location) {\n        write(CR7, 1, location)\n        return(0)\n    }\n    method Resize(location, newSize) {\n        return(location, newSize)\n    }\n}",
+  doc_count:46,
+  doc_refs:["memory-manager.md","foundation-lump-design.md","architecture.md","getting-started.md","plan-call-mum.md"]
+},
+{
+  id:"EventRouter", genotype:"0x032CA4EE", token:"b3076308", group:"System",
+  ns_slot:43, ns_slot_policy:"static", boot_resident:true, variant_group:null,
+  lump_size:64, cw:19, cc:0, typ:0,
+  language:"CLOOMC", author:"Church Machine", version:"1.0.0", status:"released",
+  description:"Event-to-handler routing table. Maps event Golden Tokens to callable handler capabilities. Supports up to 10 registered pairs. Public API: Add (register pair), Remove (unregister by event GT), Resolve (lookup handler), List (count), Methods (count). Private helpers: FindEvent (linear scan), BindEvent, UnbindEvent.",
+  ns_state:null,
+  methods:[
+    { name:"Add", offset:9, length:2, visibility:"public", description:"Register an event→handler mapping. DR0=eventGT word0, DR1=handlerGT word0. Returns 0=ok, 1=table_full.", inputs:["DR0: event GT (word 0)","DR1: handler GT (word 0)"], outputs:["DR0: 0 = registered · 1 = table full"] },
+    { name:"Remove", offset:11, length:2, visibility:"public", description:"Unregister by event GT. DR0=eventGT. Returns 0=ok, 1=not_found.", inputs:["DR0: event GT to remove"], outputs:["DR0: 0 = removed · 1 = not found"] },
+    { name:"Resolve", offset:11, length:2, visibility:"public", description:"Look up the handler GT for an event GT. Returns handlerGT word0 or 0 if not registered.", inputs:["DR0: event GT"], outputs:["DR0: handler GT word0 · 0 if not registered"] },
+    { name:"List", offset:11, length:2, visibility:"public", description:"Return the count of currently registered event→handler pairs.", inputs:[], outputs:["DR0: number of registered pairs (0..10)"] },
+    { name:"Methods", offset:11, length:4, visibility:"public", description:"Return 5 — the count of public methods on this abstraction.", inputs:[], outputs:["DR0: 5"] },
+    { name:"FindEvent", offset:15, length:4, visibility:"private", description:"(private) Linear scan of routing table for eventGT. Returns slot index or -1.", inputs:["DR0: event GT to find"], outputs:["DR0: slot index · -1 if absent"] },
+    { name:"BindEvent", offset:19, length:4, visibility:"private", description:"(private) Write an eventGT→handlerGT pair into a free slot.", inputs:["DR0: event GT","DR1: handler GT"], outputs:["DR0: 0"] },
+    { name:"UnbindEvent", offset:19, length:4, visibility:"private", description:"(private) Clear the slot at a given index.", inputs:["DR0: slot index to clear"], outputs:["DR0: 0"] }
+  ],
+  capabilities:[],
+  source:null, doc_count:1, doc_refs:["abstractions.md"]
+},
+{
+  id:"Keystone", genotype:"0x86B853A1", token:"00002000", group:"System",
+  ns_slot:23, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:64, cw:22, cc:2, typ:0,
+  language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
+  description:"Network key-exchange abstraction. Establishes a shared Mum identity word and confirms connectivity. Connect verifies the peer's 32-bit identity token (bits[31:28] must equal 1); on success it issues an Outform E-GT into c-list slot 1. Hello confirms the connection is live.",
+  ns_state:null,
+  methods:[
+    { name:"Connect", offset:0, length:17, visibility:"public",
+      description:"Verify Mum's 32-bit identity word. Zero or unknown protocol tag (bits[31:28] ≠ 1) returns 0 (rejected). Valid identity returns 1; the simulator issues an Outform E-GT into c-list slot 1.",
+      inputs:["DR1: Mum identity word (protocol tag in bits[31:28])"], outputs:["DR0: 0 = rejected · 1 = connected"]
+    },
+    { name:"Hello", offset:17, length:5, visibility:"public",
+      description:"Confirm the connection is live by calling through the stored Mum GT. Returns 1 if reachable, 0 if the GT is null or the call faults.",
+      inputs:[], outputs:["DR0: 1 = alive · 0 = not connected"]
+    }
+  ],
+  capabilities:[
+    { slot:0, name:"Tunnel", rights:["E"], gt:"0x4A001F00", note:"Tunnel E-GT — used for network setup" },
+    { slot:1, name:"MumGT", rights:["E"], gt:"NULL_GT", note:"Filled by Connect on first successful handshake" }
+  ],
+  source:null, doc_count:3, doc_refs:["network-transparency.md","plan-call-mum.md","tunnel-messaging-example.md"]
+},
+{
+  id:"Loader", genotype:"0x19BA3A9D", token:"00130000", group:"System",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:64, cw:1, cc:1, typ:0,
+  language:"CLOOMC++", author:"Church Machine", version:"WIP", status:"wip",
+  description:"Lump fetch-and-load stub. Intended to request a lump binary from the IDE by NS slot token over UART TX. Currently a single-instruction stub that calls SelfTest.run as a placeholder. Full implementation will write [token · expected_words] to UART and wait for the IDE to stream the lump back.",
+  ns_state:null,
+  methods:[
+    { name:"run", offset:0, length:1, visibility:"public",
+      description:"Main stub — calls SelfTest.run (placeholder). Full implementation: DWRITE DR1 (slot token) and DR2 (expected size) to UART GT; DREAD DR0 for completion status.",
+      inputs:["DR1: NS slot token (intended)","DR2: expected lump size in words (intended)"],
+      outputs:["DR0: 0 = installed · non-zero = error (intended)"]
+    }
+  ],
+  capabilities:[
+    { slot:0, name:"SelfTest", rights:["E"], gt:"", note:"Placeholder — full impl uses UART GT" }
+  ],
+  source:"abstraction Loader {\n    capabilities { SelfTest E }\n    method run {\n        ; stub — full impl uses UART GT\n        Call SelfTest run\n    }\n}",
+  doc_count:21,
+  doc_refs:["locator.md","mload.md","memory-manager.md","abstractions.md","plan-call-mum.md"]
+},
+{
+  id:"Scheduler.IRQ", genotype:"0x439E0DDD", token:"00000800", group:"System",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:64, cw:1, cc:0, typ:0,
+  language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
+  description:"Tier-2 fault-escalation interrupt handler. Not baked into the boot image (Spec v1.2 §4 TSB compliance). Lazy-loaded on the first Tier-2 fault. When invoked by the TSB microcode, dispatches to the active thread's registered IRQ slot.",
+  ns_state:null,
+  methods:[
+    { name:"IRQ", offset:0, length:1, visibility:"public",
+      description:"Fault escalation entry. Called by TSB microcode when a Tier-2 fault fires. Reads the faulting thread's IRQ GT from its c-list and CALLs it with the fault code in DR0.",
+      inputs:["DR0: fault code (TSB-supplied)"], outputs:["DR0: handler result"]
+    }
+  ],
+  capabilities:[],
+  source:null, doc_count:6, doc_refs:["dispatch-styles.md","startup.md","architecture.md"]
+},
+
+// ── NETWORKING ────────────────────────────────────────────────
+{
+  id:"Tunnel", genotype:"0x8770BF03", token:"00001f00", group:"Networking",
+  ns_slot:22, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:64, cw:37, cc:1, typ:0,
+  language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
+  description:"Mum Tunnel messaging abstraction. Provides capability-secured inter-machine send/receive, fault reporting, and remote lump fetch. The 'Hello Mum' primitive: CALL(CONNECT(me, mymother)). Six public methods covering registration, send, receive, fault, fetch (binary transfer), and tunnelled CALL.",
+  ns_state:{ location:"0x00000340", limit:"0x0003F", seal:"0x0000", state:"Live" },
+  methods:[
+    { name:"Register", offset:0, length:5, visibility:"public",
+      description:"Register this machine with the IDE tunnel endpoint. Writes the machine identity word to UART[0], waits for ACK in DR0. On success, stores the IDE's E-GT in c-list[0].",
+      inputs:["DR0: boot_reason / machine identity word"], outputs:["DR0: 0 = registered · non-zero = rejected"]
+    },
+    { name:"Send", offset:5, length:5, visibility:"public",
+      description:"Send a typed message over the tunnel. Writes media_tag (4-byte ASCII, e.g. 0x54455854='TEXT'), then length, then payload words via UART GT.",
+      inputs:["DR1: media_tag (4-byte ASCII e.g. TEXT=0x54455854)","DR2: payload word count","CR1: data GT (R-perm, payload source)"], outputs:["DR0: 0 = sent · non-zero = error"]
+    },
+    { name:"Receive", offset:10, length:5, visibility:"public",
+      description:"Receive a typed message from the tunnel. Reads media_tag and length from UART, then streams payload words via the provided write GT.",
+      inputs:["CR1: data GT (W-perm, receive buffer)"], outputs:["DR0: 0 = ok · non-zero = error","DR1: media_tag","DR2: word count received"]
+    },
+    { name:"Fault", offset:15, length:7, visibility:"public",
+      description:"Report a fault code to the IDE over the tunnel. Used by the boot sequence to signal unexpected hardware states. Writes FAULT tag + code.",
+      inputs:["DR0: fault code"], outputs:["DR0: 0 = reported"]
+    },
+    { name:"Fetch", offset:27, length:5, visibility:"public",
+      description:"Request and receive a lump binary from the IDE by NS slot token. Writes [token · expected_words] to UART TX; IDE streams the lump back via CR2. Called by Loader on NULL_CAP fault.",
+      inputs:["CR2: Memory write-GT (buffer ≥ expected_words)","DR1: NS slot token","DR2: expected lump size in words"],
+      outputs:["DR0: 0 = lump installed · non-zero = error (timeout/CRC/size)"],
+      snippet:"LOAD  AL, CR7, CR6[0]   ; UART GT → CR7\nDWRITE DR1, CR7[0]       ; TX: slot token\nDWRITE DR2, CR7[0]       ; TX: expected word count\nDREAD  DR0, CR7[1]       ; RX: 0=installed"
+    },
+    { name:"Call", offset:32, length:5, visibility:"public",
+      description:"Forward a CALL through the tunnel to a remote capability. The 'Hello Mum' primitive. Restricts remote_gt to E-only, invokes via CALL, reads far-end return value.",
+      inputs:["CR2: remote GT (Outform type, F-bit set)"], outputs:["DR0: far-end return value · non-zero = error/timeout"],
+      snippet:"TPERM AL, CR2, #E        ; restrict to E-only\nCALL  AL, CR2, CR2       ; invoke remote GT via tunnel\nDREAD  DR0, CR7[1]       ; RX: far-end return → DR0"
+    }
+  ],
+  capabilities:[
+    { slot:0, name:"UART_DEV", rights:["R","W"], gt:"0x32000002", note:"UART device GT — tunnel transport" }
+  ],
+  source:null, doc_count:36,
+  doc_refs:["network-transparency.md","plan-call-mum.md","tunnel-messaging-example.md","IDE-Designer.md","family-registry.md","fulcrum-of-computer-science.md"]
+},
+{
+  id:"Ethernet", genotype:"0xB169BBA4", token:"b169bba4", group:"Networking",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:64, cw:13, cc:1, typ:0,
+  language:"ISA", author:"Church Machine", version:"1.0", status:"released",
+  description:"Ethernet hardware driver abstraction. Manages IPv4 connections and raw frame transmission on the Ti60 NIC. Non-blocking receive poll; synchronous send via MMIO FIFO; UDP session registration via Connect; hardware link-state query via Status.",
+  ns_state:null,
+  methods:[
+    { name:"Send", offset:0, length:3, visibility:"public",
+      description:"Arm the transmitter after pre-loading frame bytes into ETH_TX_DATA (MMIO offset 6). Returns byte count committed.",
+      inputs:["DR1: dataGT (reserved, ignored in MMIO model)","DR2: byte count (1–1518)"], outputs:["DR1: byteLen committed to transmit"]
+    },
+    { name:"Receive", offset:3, length:3, visibility:"public",
+      description:"Non-blocking poll for a pending Ethernet frame. Returns 0 if no frame waiting; N (byte count) when a frame is ready. Drain via N sequential ETH_RX_DATA DREAD operations.",
+      inputs:[], outputs:["DR1: 0 = no frame · N = byte count of pending frame"]
+    },
+    { name:"Connect", offset:6, length:4, visibility:"public",
+      description:"Register a UDP session endpoint. Accepts packed IPv4 address and port number.",
+      inputs:["DR1: packed IPv4 in network byte order (e.g. 0xC0A80001 = 192.168.0.1)","DR2: UDP port (1–65535)"],
+      outputs:["DR1: 0 = success · -1 = fault"]
+    },
+    { name:"Status", offset:10, length:3, visibility:"public",
+      description:"Query hardware link state.",
+      inputs:[], outputs:["DR1: 0 = link down · 1 = link up · 2 = negotiating"]
+    }
+  ],
+  capabilities:[
+    { slot:0, name:"ETH_DEV", rights:["R","W"], gt:"", note:"Ethernet MMIO device GT" }
+  ],
+  source:null, doc_count:5, doc_refs:["network-transparency.md","hardware-ti60-f225.pdf","architecture.md"]
+},
+
+// ── MATH / SCIENCE ────────────────────────────────────────────
+{
+  id:"Constants", genotype:"0xE494696F", token:"00001200", group:"Math / Science",
+  ns_slot:9, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:64, cw:23, cc:2, typ:0,
+  language:"ISA", author:"Church Machine", version:"1.0", status:"released",
+  description:"Mathematical constants library. Returns IEEE-754 fixed-point values for Pi (3.14159…), e (2.71828…), and Phi (1.61803…). Includes a 14-slot user pool (Add/Get) for application-defined constants. C-list holds two self-referential GTs for the pool storage region.",
+  ns_state:null,
+  methods:[
+    { name:"Pi", offset:0, length:2, visibility:"public", description:"Return π (3.14159…) as a 32-bit fixed-point value (Q16.16 format). Inputs: none. Output: DR0.", inputs:[], outputs:["DR0: π in Q16.16 = 0x0003243F"] },
+    { name:"E",  offset:2, length:2, visibility:"public", description:"Return e (2.71828…) as Q16.16.", inputs:[], outputs:["DR0: e in Q16.16 = 0x0002B7E1"] },
+    { name:"Phi",offset:4, length:2, visibility:"public", description:"Return φ (1.61803…) as Q16.16.", inputs:[], outputs:["DR0: φ in Q16.16 = 0x00019E37"] },
+    { name:"Zero",offset:6, length:2, visibility:"public", description:"Return 0.0 (convenience).", inputs:[], outputs:["DR0: 0x00000000"] },
+    { name:"One", offset:8, length:2, visibility:"public", description:"Return 1.0 in Q16.16.", inputs:[], outputs:["DR0: 0x00010000"] },
+    { name:"Add", offset:10, length:6, visibility:"public", description:"Add a user-defined constant to the pool. DR0=name_word, DR1=value. Returns slot index.", inputs:["DR0: name word (packed ASCII)","DR1: value"], outputs:["DR0: slot index · -1 if pool full"] },
+    { name:"Get", offset:16, length:7, visibility:"public", description:"Retrieve a user-defined constant by name word. Returns value or 0 if not found.", inputs:["DR0: name word"], outputs:["DR0: constant value · 0 if not found"] }
+  ],
+  capabilities:[
+    { slot:0, name:"Constants pool (RW)", rights:["R","W"], gt:"", note:"Internal pool region — 14 user slots" },
+    { slot:1, name:"Constants pool (R)", rights:["R"], gt:"", note:"Read-only view for Get" }
+  ],
+  source:null, doc_count:22, doc_refs:["ada-note-g.md","note-g-comparison.md","pet-name-language.md","dispatch-styles.md"]
+},
+{
+  id:"SlideRule", genotype:"0xD960F531", token:"00001000", group:"Math / Science",
+  ns_slot:16, ns_slot_policy:"dynamic", boot_resident:false, variant_group:"sliderule",
+  lump_size:4096, cw:2602, cc:1, typ:0,
+  language:"CLOOMC (JS front-end)", author:"Church Machine", version:"2026.08.13", status:"released",
+  description:"Full-precision fixed-point mathematics library. 22 methods covering trigonometry, algebra, and number theory. The largest lump in the repository at 4096 words. C-list slot 0 holds the Constants E-GT. Variant partner: SlideRule.Haskell (same NS slot 16, variant_group sliderule).",
+  ns_state:null,
+  methods:[
+    { name:"Multiply", offset:0, length:43, description:"Fixed-point multiply DR0 × DR1." },
+    { name:"Divide",   offset:43, length:41, description:"Fixed-point divide DR0 ÷ DR1. Faults if DR1=0." },
+    { name:"Sqrt",     offset:84, length:40, description:"Integer square root of DR0." },
+    { name:"Mod",      offset:124, length:34, description:"Modulo DR0 mod DR1." },
+    { name:"Sin",      offset:158, length:295, description:"sin(DR0) in radians (Q16.16). CORDIC algorithm — 295 words." },
+    { name:"Cos",      offset:453, length:280, description:"cos(DR0) in radians (Q16.16)." },
+    { name:"Tan",      offset:733, length:335, description:"tan(DR0). Longest method at 335 words." },
+    { name:"Asin",     offset:1068, length:282, description:"arcsin(DR0) — result in radians." },
+    { name:"Acos",     offset:1350, length:290, description:"arccos(DR0) — result in radians." },
+    { name:"Atan",     offset:1640, length:280, description:"arctan(DR0) — result in radians." },
+    { name:"ToDegrees",offset:1920, length:39,  description:"Convert DR0 from radians to degrees." },
+    { name:"ToRadians",offset:1959, length:37,  description:"Convert DR0 from degrees to radians." },
+    { name:"Bernoulli",offset:1996, length:130, description:"Compute Bernoulli number B(DR0)." },
+    { name:"Abs",      offset:2126, length:7,   description:"Absolute value of DR0." },
+    { name:"Pow",      offset:2133, length:63,  description:"DR0 raised to power DR1." },
+    { name:"Min",      offset:2196, length:5,   description:"Min of DR0, DR1." },
+    { name:"Max",      offset:2201, length:5,   description:"Max of DR0, DR1." },
+    { name:"GCD",      offset:2206, length:25,  description:"Greatest common divisor of DR0, DR1." },
+    { name:"Factorial",offset:2231, length:42,  description:"DR0! (factorial). Faults for DR0 > 12." },
+    { name:"Log2",     offset:2273, length:18,  description:"Binary logarithm ⌊log₂(DR0)⌋." },
+    { name:"Atan2",    offset:2291, length:294, description:"atan2(DR0, DR1) — four-quadrant arctan." },
+    { name:"Signum",   offset:2585, length:17,  description:"Sign of DR0: -1, 0, or +1." }
+  ],
+  capabilities:[
+    { slot:0, name:"Constants", rights:["E"], gt:"0x4A001200", note:"NS slot 9 — used by Bernoulli method" }
+  ],
+  source:null, doc_count:32,
+  doc_refs:["ada-note-g.md","note-g-comparison.md","fulcrum-of-computer-science.md","dispatch-styles.md","pet-name-language.md","plan-call-mum.md"]
+},
+{
+  id:"SlideRule.Haskell", genotype:"0x3542A2DB", token:"00001001", group:"Math / Science",
+  ns_slot:16, ns_slot_policy:"dynamic", boot_resident:false, variant_group:"sliderule",
+  lump_size:256, cw:137, cc:1, typ:0,
+  language:"CLOOMC Haskell", author:"Church Machine", version:"1.0", status:"released",
+  description:"Haskell-syntax SlideRule variant. Functional math library compiled from the CLOOMC Haskell dialect. Shares NS slot 16 with SlideRule (variant_group: sliderule) — exactly one is active per boot image. Nine methods covering essential arithmetic, using Haskell's curried style.",
+  ns_state:null,
+  methods:[
+    { name:"Add",    offset:0,   length:10, description:"Add DR0 + DR1." },
+    { name:"Sub",    offset:10,  length:10, description:"Subtract DR0 - DR1." },
+    { name:"Mul",    offset:20,  length:20, description:"Multiply DR0 × DR1 (fixed-point)." },
+    { name:"Sqrt",   offset:40,  length:25, description:"Integer square root of DR0." },
+    { name:"Pow2",   offset:65,  length:15, description:"2 raised to the power DR0." },
+    { name:"Abs",    offset:80,  length:7,  description:"Absolute value of DR0." },
+    { name:"Signum", offset:87,  length:10, description:"Signum: -1, 0, or +1." },
+    { name:"Max",    offset:97,  length:10, description:"Maximum of DR0, DR1." },
+    { name:"Min",    offset:107, length:10, description:"Minimum of DR0, DR1." }
+  ],
+  capabilities:[
+    { slot:0, name:"Constants", rights:["E"], gt:"", note:"Same NS slot 9 dependency as SlideRule" }
+  ],
+  source:null, doc_count:5, doc_refs:["lambda-arithmetic.md","dispatch-styles.md","note-g-comparison.md"]
+},
+{
+  id:"BernoulliNumbers", genotype:"0x656DD0E4", token:"5a93ce79", group:"Math / Science",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:64, cw:15, cc:1, typ:0,
+  language:"ISA", author:"Church Machine", version:"1.0", status:"released",
+  description:"Bernoulli number sequence generator. Computes B(n) using the iterative formula for use in Taylor-series expansions of sin/cos/tan. C-list slot 0 holds the Constants E-GT for the π and e values it needs. Called by SlideRule.Bernoulli.",
+  ns_state:null,
+  methods:[
+    { name:"compute", offset:0, length:15, visibility:"public",
+      description:"Compute the nth Bernoulli number B(n). Uses iterative sum formula. Inputs: DR0=n. Output: DR0=B(n) in Q16.16.",
+      inputs:["DR0: n (index, 0-based)"], outputs:["DR0: B(n) in Q16.16 fixed-point"]
+    }
+  ],
+  capabilities:[
+    { slot:0, name:"Constants", rights:["E"], gt:"", note:"Used for π/e in trig expansions" }
+  ],
+  source:null, doc_count:0, doc_refs:[]
+},
+{
+  id:"IntegerOps", genotype:"0x54C9A1E9", token:"19d3e599", group:"Math / Science",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:64, cw:20, cc:0, typ:0,
+  language:"English / ISA", author:"Church Machine", version:"1.0", status:"released",
+  description:"Integer arithmetic demo compiled from English natural-language source. Demonstrates the English-CLOOMC front-end. Four methods: Greet (UART hello), Increment (+1), Add (sum two values), Double (×2). Zero capabilities — pure data operations on DRs.",
+  ns_state:null,
+  methods:[
+    { name:"Greet",     offset:0,  length:4,  description:"Print 'Hello from IntegerOps' to UART (writes packed ASCII words).", inputs:[], outputs:[] },
+    { name:"Increment", offset:4,  length:4,  description:"Return DR0 + 1.", inputs:["DR0: value"], outputs:["DR0: value + 1"] },
+    { name:"Add",       offset:8,  length:6,  description:"Return DR0 + DR1.", inputs:["DR0: a","DR1: b"], outputs:["DR0: a + b"] },
+    { name:"Double",    offset:14, length:6,  description:"Return DR0 × 2 (implemented as DR0 + DR0).", inputs:["DR0: value"], outputs:["DR0: value × 2"] }
+  ],
+  capabilities:[], source:null, doc_count:0, doc_refs:[]
+},
+{
+  id:"NoteG", genotype:"0x04A720F8", token:"97cc8047", group:"Math / Science",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:64, cw:38, cc:1, typ:0,
+  language:"Symbolic", author:"Church Machine", version:"1.0", status:"released",
+  description:"Ada NoteG musical demo. Symbolic-math pipeline that computes the frequency of musical note G using rational arithmetic on abstract GT constants. Models Ada Lovelace's Note G computation from her 1843 Bernoulli-number algorithm. C-list holds the Constants E-GT for rational arithmetic.",
+  ns_state:null,
+  methods:[
+    { name:"compute", offset:0, length:38, visibility:"public",
+      description:"Compute note G frequency using rational symbolic arithmetic. Calls Constants for π and mathematical building blocks. Returns frequency as Q16.16 fixed-point.",
+      inputs:[], outputs:["DR0: note G frequency in Hz (Q16.16 fixed-point)"]
+    }
+  ],
+  capabilities:[
+    { slot:0, name:"Constants", rights:["E"], gt:"", note:"Needed for π and rational arithmetic" }
+  ],
+  source:null, doc_count:1, doc_refs:["ada-note-g.md"]
+},
+
+// ── DATA / STRING ─────────────────────────────────────────────
+{
+  id:"WordString", genotype:"0xA1682B26", token:"ab1e86af", group:"Data / String",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:512, cw:294, cc:0, typ:0,
+  language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
+  description:"Packed-word character string library. Raw ISA implementation of character classification and access on 32-bit word-packed strings (4 chars per word, big-endian). No c-list — pure Turing-domain data operations. Used by Tunnel for message tagging and StringOps for higher-level operations.",
+  ns_state:null,
+  methods:[
+    { name:"GetWordCount",  offset:0,  length:28, description:"Count 32-bit words in a null-terminated packed string. Input: CR1=string data GT. Output: DR0=word count." },
+    { name:"GetCharCount",  offset:28, length:30, description:"Count characters (bytes before first null). Output: DR0=char count." },
+    { name:"GetByteCount",  offset:58, length:28, description:"Count bytes including the final null terminator. Output: DR0=byte count." },
+    { name:"GetCharByte",   offset:86, length:32, description:"Extract byte at index DR0 from the packed string. Output: DR0=byte value." },
+    { name:"IsUppercase",   offset:118,length:22, description:"Return 1 if char DR0 is A–Z, else 0." },
+    { name:"IsLowercase",   offset:140,length:22, description:"Return 1 if char DR0 is a–z, else 0." },
+    { name:"IsDigit",       offset:162,length:18, description:"Return 1 if char DR0 is 0–9, else 0." },
+    { name:"IsAlpha",       offset:180,length:18, description:"Return 1 if char DR0 is A–Z or a–z, else 0." },
+    { name:"ToUpper",       offset:198,length:22, description:"Return DR0 uppercased (A–Z range)." },
+    { name:"ToLower",       offset:220,length:22, description:"Return DR0 lowercased (a–z range)." }
+  ],
+  capabilities:[], source:null, doc_count:6, doc_refs:["namespace-vocabulary-tutorial.md","method-access-control.md","dispatch-styles.md"]
+},
+{
+  id:"StringOps", genotype:"0x05B56245", token:"50ce4c64", group:"Data / String",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:512, cw:315, cc:0, typ:0,
+  language:"ISA", author:"Church Machine", version:"1.0", status:"released",
+  description:"Word-level string packing and character classification library. Packs 4 chars per 32-bit word; full char-class and case conversion. Extends WordString with packing/unpacking and digit conversion. No c-list — all data operations.",
+  ns_state:null,
+  methods:[
+    { name:"Pack4",       offset:0,   length:15, description:"Pack 4 ASCII chars from DR0–DR3 into one 32-bit word. Output: DR0=packed word." },
+    { name:"Unpack",      offset:15,  length:42, description:"Unpack a 32-bit word into 4 byte values in DR0–DR3." },
+    { name:"IsLetter",    offset:57,  length:22, description:"Return 1 if DR0 is A–Z or a–z." },
+    { name:"IsDigit",     offset:79,  length:13, description:"Return 1 if DR0 is 0–9." },
+    { name:"IsUpper",     offset:92,  length:13, description:"Return 1 if DR0 is A–Z." },
+    { name:"IsLower",     offset:105, length:13, description:"Return 1 if DR0 is a–z." },
+    { name:"IsSpace",     offset:118, length:10, description:"Return 1 if DR0 is space/tab/newline." },
+    { name:"ToUpper",     offset:128, length:12, description:"Uppercase DR0 (A–Z range only)." },
+    { name:"ToLower",     offset:140, length:12, description:"Lowercase DR0 (a–z range only)." },
+    { name:"CharToDigit", offset:152, length:14, description:"Convert ASCII char DR0 ('0'–'9','a'–'f','A'–'F') to numeric digit. Returns -1 on invalid." },
+    { name:"DigitToChar", offset:166, length:5,  description:"Convert digit 0–15 to ASCII ('0'–'9','a'–'f')." },
+    { name:"ReverseWord", offset:171, length:38, description:"Reverse the byte order in a 32-bit word (big-endian ↔ little-endian)." },
+    { name:"CompareWords",offset:209, length:36, description:"Compare two packed words lexicographically. Returns -1, 0, or +1." }
+  ],
+  capabilities:[], source:null, doc_count:0, doc_refs:[]
+},
+{
+  id:"EnglishLoops", genotype:"0x19366291", token:"d9454529", group:"Data / String",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:64, cw:35, cc:0, typ:0,
+  language:"English / ISA", author:"Church Machine", version:"1.0", status:"released",
+  description:"Loop-construct demo compiled from English natural-language source. Shows three equivalent sum implementations: while-loop (WhileSum), recursive (RecurseSum), and lambda-tail (LambdaSum). All three compute ΣDR0 using different control structures, letting the student compare the generated ISA.",
+  ns_state:null,
+  methods:[
+    { name:"WhileSum",   offset:0,  length:12, description:"Compute sum 1..DR0 using a BRANCH-based while loop.", inputs:["DR0: n"], outputs:["DR0: Σ 1..n"] },
+    { name:"RecurseSum", offset:12, length:12, description:"Compute sum 1..DR0 using recursive CALL.", inputs:["DR0: n"], outputs:["DR0: Σ 1..n"] },
+    { name:"LambdaSum",  offset:24, length:11, description:"Compute sum 1..DR0 using LAMBDA tail-call pattern.", inputs:["DR0: n"], outputs:["DR0: Σ 1..n"] }
+  ],
+  capabilities:[], source:null, doc_count:0, doc_refs:[]
+},
+
+// ── HARDWARE ──────────────────────────────────────────────────
+{
+  id:"LEDFlash", genotype:"0x55F1A32F", token:"55f1a32f", group:"Hardware",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:512, cw:280, cc:1, typ:0,
+  language:"ISA", author:"Church Machine", version:"WIP", status:"wip",
+  description:"LED blink demo. Toggles LED0 at approximately 1 Hz using nested busy-wait delay loops on the Ti60 board. Work in progress — the delay constant is board-clock dependent and not yet calibrated for the Wukong A7.",
+  ns_state:null,
+  methods:[
+    { name:"blink", offset:0, length:1, visibility:"public",
+      description:"Toggle LED0 at ~1 Hz. Implements nested BRANCH loops for delay. C-list[0] = LED_DEV GT (R+W). Runs indefinitely — no RETURN.",
+      inputs:[], outputs:["(runs forever)"]
+    }
+  ],
+  capabilities:[
+    { slot:0, name:"LED_DEV", rights:["R","W"], gt:"0x32000003", note:"Ti60 LED MMIO GT (NS slot 3)" }
+  ],
+  source:null, doc_count:0, doc_refs:[]
+},
+{
+  id:"MorseCmOk", genotype:"0xEB20FE01", token:"d78f751b", group:"Hardware",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:512, cw:312, cc:2, typ:0,
+  language:"assembly", author:"Church Machine", version:"1.0", status:"released",
+  description:"Morse-code CM OK signal. Flashes the Ti60 LED in the Morse pattern for 'CQ DE CM' to signal a healthy boot. Used to confirm the hardware is alive and the capability system is functional without requiring a UART connection.",
+  ns_state:null,
+  methods:[
+    { name:"run", offset:0, length:312, visibility:"public",
+      description:"Flash LED0 in the Morse pattern CQ DE CM. Uses the LED_DEV GT (c-list[0]) for hardware writes and TIMER_DEV GT (c-list[1]) for timing. Loops once through the full pattern then RETURNs.",
+      inputs:[], outputs:["DR0: 0 = pattern complete"]
+    }
+  ],
+  capabilities:[
+    { slot:0, name:"LED_DEV",   rights:["R","W"], gt:"0x32000003", note:"LED MMIO for flashing" },
+    { slot:1, name:"TIMER_DEV", rights:["R","W"], gt:"0x32000005", note:"Timer for Morse timing" }
+  ],
+  source:null, doc_count:0, doc_refs:[]
+},
+
+// ── SECURITY TEST ─────────────────────────────────────────────
+{
+  id:"CapabilityTest", genotype:"0x1B20FBA6", token:"00000a00", group:"Security Test",
+  ns_slot:10, ns_slot_policy:"static", boot_resident:true, variant_group:null,
+  lump_size:64, cw:0, cc:0, typ:0,
+  language:"ISA", author:"Church Machine", version:"3", status:"released",
+  description:"Hardware capability test v1. Verifies that the five boot-namespace hardware device GTs (SelfTest, LED_DEV, UART_DEV, BTN_DEV, TIMER_DEV) are present in the c-list, have the correct permission types (E vs R/W), and respond to LOAD without faulting. Compiled lump — cw=0 means the body is a stub; the real test is in the boot-image binary.",
+  ns_state:null,
+  methods:[],
+  capabilities:[
+    { slot:0, name:"SelfTest",  rights:["E"],      gt:"0x4A000006", note:"Church E-perm — NS slot 6" },
+    { slot:1, name:"LED_DEV",   rights:["R","W"],  gt:"0x32000003", note:"Turing RW — NS slot 3, MMIO 0x40000000" },
+    { slot:2, name:"UART_DEV",  rights:["R","W"],  gt:"0x32000002", note:"Turing RW — NS slot 2, MMIO 0x40000014" },
+    { slot:3, name:"BTN_DEV",   rights:["R"],      gt:"0x12000004", note:"Turing R-only — NS slot 4, MMIO 0x40000028" },
+    { slot:4, name:"TIMER_DEV", rights:["R","W"],  gt:"0x32000005", note:"Turing RW — NS slot 5, MMIO 0x4000002C" }
+  ],
+  source:null, doc_count:1, doc_refs:["security-hardening-roadmap.md"]
+},
+{
+  id:"CapabilityTest.2", genotype:"0xC7A66D01", token:"00000a00", group:"Security Test",
+  ns_slot:10, ns_slot_policy:"static", boot_resident:true, variant_group:null,
+  lump_size:64, cw:23, cc:5, typ:0,
+  language:"assembly", author:"Church Machine", version:"2", status:"released",
+  description:"Hardware capability test v2. Full TPERM audit of all five hardware device GTs with extended fault coverage. 23-word code body; tail-packed real hardware GTs (no lazy stubs). Exercises LOAD, TPERM, LOADEQ/LOADNE, SWITCH, Turing ISA, and ELOADCALL on the A7 v1.2 boot-namespace caps.",
+  ns_state:null,
+  methods:[
+    { name:"(capability audit)", offset:0, length:23, visibility:"public",
+      description:"Sequentially LOAD each device GT, TPERM to verify permission bits match the spec (E for Church abstractions, R/W for Turing devices). Any TPERM mismatch or fault recorded in DR0. RETURN with DR0=0 if all pass.",
+      inputs:[], outputs:["DR0: 0 = all GTs valid · non-zero = first failing GT index"]
+    }
+  ],
+  capabilities:[
+    { slot:0, name:"SelfTest",  rights:["E"],     gt:"0x4A000006", note:"NS slot 6 — Church E-perm" },
+    { slot:1, name:"LED_DEV",   rights:["R","W"], gt:"0x32000003", note:"NS slot 3 — Turing RW" },
+    { slot:2, name:"UART_DEV",  rights:["R","W"], gt:"0x32000002", note:"NS slot 2 — Turing RW" },
+    { slot:3, name:"BTN_DEV",   rights:["R"],     gt:"0x12000004", note:"NS slot 4 — Turing R-only" },
+    { slot:4, name:"TIMER_DEV", rights:["R","W"], gt:"0x32000005", note:"NS slot 5 — Turing RW" }
+  ],
+  source:null, doc_count:1, doc_refs:["security-hardening-roadmap.md"]
+},
+{
+  id:"GT.Encoding.Self-Test", genotype:"0x254F3542", token:"cb8739cf", group:"Security Test",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:64, cw:26, cc:8, typ:0,
+  language:"ISA", author:"Church Machine", version:"1.1", status:"released",
+  description:"GT encoding v1.1 hardware self-test. Audits that the CM hardware correctly interprets Golden Token permission bits for all 10 permission types (B, E, S, L, dom; X, W, R, dom; null). 8-slot c-list holds representative test GTs for each permission class. Verifies CRC-16/CCITT, TPERM, and LOAD semantics.",
+  ns_state:null,
+  methods:[
+    { name:"(GT audit)", offset:0, length:26, visibility:"public",
+      description:"Load each of the 8 test GTs from c-list, TPERM to the target permission set, check the resulting GT word 0 against the expected encoding. DR0=0 on all-pass; DR0=failing test number otherwise.",
+      inputs:[], outputs:["DR0: 0 = all 8 GT encodings verified · non-zero = first failing test index"]
+    }
+  ],
+  capabilities:[
+    { slot:0, name:"GT_E",   rights:["E"],       gt:"", note:"Church E-perm test GT (typ=01, dom=1, E=1)" },
+    { slot:1, name:"GT_LS",  rights:["L","S"],   gt:"", note:"Church LS-perm test GT" },
+    { slot:2, name:"GT_LSE", rights:["L","S","E"],gt:"", note:"Church full Church-perm test GT" },
+    { slot:3, name:"GT_RW",  rights:["R","W"],   gt:"", note:"Turing RW test GT (dom=0)" },
+    { slot:4, name:"GT_X",   rights:["R","W"],   gt:"", note:"Turing RWX test GT" },
+    { slot:5, name:"GT_NULL",rights:[],           gt:"0x00000000", note:"NULL GT (all zero, typ=00)" },
+    { slot:6, name:"GT_ABS", rights:[],           gt:"", note:"Abstract GT (typ=11)" },
+    { slot:7, name:"GT_OFM", rights:[],           gt:"", note:"Outform GT (typ=10)" }
+  ],
+  source:null, doc_count:0, doc_refs:[]
+},
+
+// ── RESEARCH DEMO ─────────────────────────────────────────────
+{
+  id:"Human.Hand", genotype:"0xE88911D6", token:"97cc8047", group:"Research Demo",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:64, cw:7, cc:1, typ:0,
+  language:"ISA", author:"Church Machine", version:"1.0", status:"released",
+  description:"Prosthetic hand gesture abstraction. Maps CM capability calls to seven physical finger-motor commands over a device GT. Demonstrates that physical actuators are first-class capabilities: the hand is callable with E-permission, each gesture is a named method, and the hardware access right (device GT) is held in the c-list.",
+  ns_state:null,
+  methods:[
+    { name:"Status",     offset:0, length:1, description:"Return current hand state: 0=closed, 1=open, 2=grip, 3=point, 4=pinch.", inputs:[], outputs:["DR0: hand state code"] },
+    { name:"Close_Fist", offset:1, length:1, description:"Close all fingers into a fist.", inputs:[], outputs:[] },
+    { name:"Open_Hand",  offset:2, length:1, description:"Extend all fingers fully open.", inputs:[], outputs:[] },
+    { name:"Grip",       offset:3, length:1, description:"Firm grip posture: fingers partially closed.", inputs:[], outputs:[] },
+    { name:"Point",      offset:4, length:1, description:"Extend forefinger, fold others.", inputs:[], outputs:[] },
+    { name:"Count",      offset:5, length:1, description:"Display DR0 (0–5) as extended fingers.", inputs:["DR0: count (0–5)"], outputs:[] },
+    { name:"Pinch",      offset:6, length:1, description:"Thumb and forefinger meet in flat pinch.", inputs:[], outputs:[] }
+  ],
+  capabilities:[
+    { slot:0, name:"HAND_DEV", rights:["R","W"], gt:"", note:"Physical hand motor-controller device GT" }
+  ],
+  source:null, doc_count:0, doc_refs:[]
+},
+
+// ── IDE NAMESPACE (compiled on demand) ────────────────────────
+{
+  id:"DijkstraFlag", genotype:"0x44CE2AAE", token:"44ce2aae", group:"IDE Namespace",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:64, cw:32, cc:1, typ:0,
+  language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
+  description:"Dijkstra mutual-exclusion flag. Classic producer/consumer semaphore (P/V operations) implemented as a capability-secured CLOOMC abstraction. Signal raises the flag; Wait blocks until raised and consumes it; Reset clears without consuming; Test is a non-blocking read. C-list holds the flag-state data GT.",
+  ns_state:null,
+  methods:[
+    { name:"RunSequence", offset:0,  length:8, description:"Demo sequence: Signal → Wait → Reset → Test. Shows full P/V cycle. Returns final flag state in DR0.", inputs:[], outputs:["DR0: final flag state (0 or 1)"] },
+    { name:"Produce",     offset:8,  length:8, description:"Signal (V operation) — raise the flag. Wakes one blocked Wait caller, or sets it for the next Wait to consume.", inputs:[], outputs:[] },
+    { name:"Consume",     offset:16, length:8, description:"Wait (P operation) — block until the flag is signalled, then consume it. In the simulator, yields via BRANCH if not ready.", inputs:[], outputs:[] },
+    { name:"Peek",        offset:24, length:8, description:"Non-blocking Test — return current flag state without consuming it.", inputs:[], outputs:["DR0: 1 = signalled · 0 = not signalled"] }
+  ],
+  capabilities:[
+    { slot:0, name:"FLAG_DATA", rights:["R","W"], gt:"", note:"One-word flag state (0=clear, 1=set)" }
+  ],
+  source:null, doc_count:9, doc_refs:["launch.md","abstractions.md","api-reference.md","patent-ctmm-consolidated-2026.md","memory-manager.md"]
+},
+{
+  id:"Store", genotype:"0x69FC2839", token:"69fc2839", group:"IDE Namespace",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:64, cw:12, cc:1, typ:0,
+  language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
+  description:"Key-value store abstraction. Single Hash method maps a capability key (GT word0) to a stored word value. Uses a simple open-addressing hash table held in the c-list data GT. Demonstrates that data structures are capability-secured objects.",
+  ns_state:null,
+  methods:[
+    { name:"Hash", offset:0, length:12, visibility:"public",
+      description:"Store or retrieve a value by capability key. If DR1=0: retrieve value for key GT in CR1. If DR1=1: store DR2 value under key GT in CR1. Returns value or 0 if not found.",
+      inputs:["CR1: key GT","DR1: 0=get · 1=set","DR2: value (when DR1=1)"],
+      outputs:["DR0: stored value · 0 if not found"]
+    }
+  ],
+  capabilities:[
+    { slot:0, name:"TABLE_DATA", rights:["R","W"], gt:"", note:"Hash table backing store (RW data GT)" }
+  ],
+  source:null, doc_count:23, doc_refs:["ada-note-g.md","switch-lifecycle.md","phase-1-security-todo.md","launch.md"]
+},
+{
+  id:"Counter", genotype:"0xB62C83A1", token:"b62c83a1", group:"IDE Namespace",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:64, cw:18, cc:1, typ:0,
+  language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
+  description:"Integer counter abstraction. Maintains a private count behind E-permission. Inc and Dec are atomic; IsZero returns a capability-secured boolean (GT that DREAD returns 0 or 1). The count state is held in the c-list data GT — inaccessible to callers without L-permission.",
+  ns_state:null,
+  methods:[
+    { name:"Inc",    offset:0,  length:6, description:"Increment the counter by 1. Returns new value in DR0.", inputs:[], outputs:["DR0: new count"] },
+    { name:"Dec",    offset:6,  length:6, description:"Decrement the counter by 1. Clamps at 0. Returns new value in DR0.", inputs:[], outputs:["DR0: new count"] },
+    { name:"IsZero", offset:12, length:6, description:"Return 1 if counter is zero, 0 otherwise. Atomic read — no side effect.", inputs:[], outputs:["DR0: 1 = zero · 0 = non-zero"] }
+  ],
+  capabilities:[
+    { slot:0, name:"COUNT_DATA", rights:["R","W"], gt:"", note:"One-word count state — private" }
+  ],
+  source:null, doc_count:14, doc_refs:["mint.md","abstract-io-addressing.md","civilization-threat.md","patent-ctmm-io-addressing-2026.md"]
+},
+{
+  id:"Adder", genotype:"0x7BA260A5", token:"7ba260a5", group:"IDE Namespace",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:64, cw:8, cc:0, typ:0,
+  language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
+  description:"Simple arithmetic demo. Add(a,b) and Double(x) — the canonical introductory CLOOMC example for demonstrating CALL / RETURN flow, method dispatch, and the two-argument calling convention. No capabilities needed: all data operations on DRs.",
+  ns_state:null,
+  methods:[
+    { name:"Add",    offset:0, length:4, description:"Return DR0 + DR1.", inputs:["DR0: a","DR1: b"], outputs:["DR0: a + b"] },
+    { name:"Double", offset:4, length:4, description:"Return DR0 × 2.", inputs:["DR0: value"], outputs:["DR0: value × 2"] }
+  ],
+  capabilities:[], source:null, doc_count:1, doc_refs:["getting-started.md"]
+},
+{
+  id:"Calc", genotype:"0xB691F404", token:"b691f404", group:"IDE Namespace",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:64, cw:10, cc:0, typ:0,
+  language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
+  description:"Multiplication demo. Multiply(a,b) and Square(x) — companion to Adder demonstrating a second two-method abstraction. Typically used alongside Adder in the getting-started tutorial. No capabilities.",
+  ns_state:null,
+  methods:[
+    { name:"Multiply", offset:0, length:5, description:"Return DR0 × DR1 (iterative add loop).", inputs:["DR0: a","DR1: b"], outputs:["DR0: a × b"] },
+    { name:"Square",   offset:5, length:5, description:"Return DR0².", inputs:["DR0: value"], outputs:["DR0: value²"] }
+  ],
+  capabilities:[], source:null, doc_count:28, doc_refs:["getting-started.md","launch.md","prologue.md","note-g-comparison.md","immortal-software.md"]
+},
+
+// ── TWO-ENEMIES SECURITY PROOF ────────────────────────────────
+{
+  id:"Alice", genotype:"0x3FCBF37C", token:"3fcbf37c", group:"Two-Enemies Proof",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:64, cw:14, cc:1, typ:0,
+  language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
+  description:"Alice principal in the two-enemies security proof. Stash stores a secret (GT or data word) behind an E-permission capability; Reveal returns it only when the caller's identity GT matches the original caller's. Mallory cannot Steal because she does not hold Alice's E-GT — any CALL from Mallory faults with PERM_DENIED.",
+  ns_state:null,
+  methods:[
+    { name:"Stash",  offset:0, length:7, description:"Store a secret GT (CR1) under Alice's capability lock. Only callable once — subsequent Stash calls return ALREADY_SET.", inputs:["CR1: secret GT to store"], outputs:["DR0: 0 = stored · 1 = already set"] },
+    { name:"Reveal", offset:7, length:7, description:"Return the stashed secret GT if the caller's identity matches. Non-matching callers receive NULL GT.", inputs:[], outputs:["CR1: stored secret GT · NULL if identity mismatch"] }
+  ],
+  capabilities:[
+    { slot:0, name:"SECRET_DATA", rights:["R","W"], gt:"", note:"Private secret store — Alice controls this GT; Mallory cannot reach it" }
+  ],
+  source:null, doc_count:0, doc_refs:[]
+},
+{
+  id:"Mallory", genotype:"0xB2AB7AF0", token:"b2ab7af0", group:"Two-Enemies Proof",
+  ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
+  lump_size:64, cw:12, cc:0, typ:0,
+  language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
+  description:"Mallory adversary in the two-enemies security proof. Attempts to Steal Alice's secret and Probe Alice's internal state. Both calls must fault with PERM_DENIED (Mallory holds no E-GT for Alice). The proof passes when both Steal and Probe return fault codes and Alice's secret is unchanged.",
+  ns_state:null,
+  methods:[
+    { name:"Steal", offset:0, length:6, description:"Attempt to call Alice.Reveal without holding the correct E-GT. Must produce PERM_DENIED fault. Returns fault code in DR0.", inputs:[], outputs:["DR0: PERM_DENIED fault code (proof passes) · 0 = proof FAILS"] },
+    { name:"Probe", offset:6, length:6, description:"Attempt to LOAD Alice's internal c-list GT without L-permission. Must produce PERM_DENIED. Returns fault code in DR0.", inputs:[], outputs:["DR0: PERM_DENIED fault code (proof passes) · 0 = proof FAILS"] }
+  ],
+  capabilities:[], source:null, doc_count:0, doc_refs:[]
+}
+
+]; // end LUMPS
+
+// ══════════════════════════════════════════════════════════════
+//  SPEC COMPLIANCE CHECKS
+// ══════════════════════════════════════════════════════════════
+function computeHeader(lump) {
+  const n = Math.log2(lump.lump_size);
+  const nMinus6 = n - 6;
+  const typ = lump.typ || 0;
+  const header = (0x1F << 27) | (nMinus6 << 23) | (lump.cw << 10) | (typ << 8) | lump.cc;
+  return { n, nMinus6, header };
+}
+
+function specChecks(lump) {
+  const { n, nMinus6, header } = computeHeader(lump);
+  const freespace = lump.lump_size - 1 - lump.cw - lump.cc;
+  const checks = [];
+
+  // R1: magic
+  checks.push({ rule:"R1", icon:"✅", cls:"check-pass",
+    desc:"Header word bits [31:27] = 0x1F (opcode trap magic)", val:`= 0x${header.toString(16).toUpperCase().padStart(8,'0').slice(0,2)}… ✓` });
+
+  // R2: size power of 2
+  const isP2 = lump.lump_size > 0 && (lump.lump_size & (lump.lump_size-1)) === 0;
+  checks.push({ rule:"R2", icon: isP2?"✅":"❌", cls: isP2?"check-pass":"check-fail",
+    desc:`lumpSize = 2^${n} = ${lump.lump_size} words (must be power of 2, 64–32768)`,
+    val: isP2 ? `= 2^${n} ✓` : "NOT a power of 2 ✗" });
+
+  // R3: n-6 ≤ 9
+  const nOk = nMinus6 >= 0 && nMinus6 <= 9;
+  checks.push({ rule:"R3", icon: nOk?"✅":"❌", cls: nOk?"check-pass":"check-fail",
+    desc:`n-6 = ${nMinus6} ≤ 9 (max lumpSize = 2^15 = 32768 words)`,
+    val: nOk ? `${nMinus6} ≤ 9 ✓` : `${nMinus6} > 9 ✗ Mint rejects` });
+
+  // R4: cw ≤ lumpSize - cc - 2
+  const cwOk = lump.cw <= lump.lump_size - lump.cc - 2;
+  checks.push({ rule:"R4", icon: cwOk?"✅":"❌", cls: cwOk?"check-pass":"check-fail",
+    desc:`cw (${lump.cw}) ≤ lumpSize − cc − 2 = ${lump.lump_size} − ${lump.cc} − 2 = ${lump.lump_size-lump.cc-2}`,
+    val: cwOk ? "self-consistent ✓" : "header self-contradictory ✗" });
+
+  // R5: freespace ≥ 0
+  const fsOk = freespace >= 0;
+  checks.push({ rule:"R5", icon: fsOk?"✅":"❌", cls: fsOk?"check-pass":"check-fail",
+    desc:`freespace = lumpSize − 1 − cw − cc = ${lump.lump_size} − 1 − ${lump.cw} − ${lump.cc} = ${freespace} words (must be ≥ 0 and all-zero)`,
+    val: fsOk ? `${freespace} zeros ✓` : `NEGATIVE ✗` });
+
+  // R6: cc ≤ lumpSize - 2
+  const ccOk = lump.cc <= lump.lump_size - 2;
+  checks.push({ rule:"R6", icon: ccOk?"✅":"❌", cls: ccOk?"check-pass":"check-fail",
+    desc:`cc (${lump.cc}) ≤ lumpSize − 2 = ${lump.lump_size-2} (c-list must fit inside lump)`,
+    val: ccOk ? "c-list fits ✓" : "c-list overflows ✗" });
+
+  // R7: NS category
+  let cat, catCls, catIcon;
+  if (lump.ns_slot !== null && lump.ns_slot !== undefined && lump.boot_resident) {
+    cat = "Resident — NS slot is part of the boot image; Live at cold boot"; catCls="check-pass"; catIcon="✅";
+  } else if (lump.ns_slot !== null && lump.ns_slot !== undefined && !lump.boot_resident) {
+    cat = "Lazy-load — NS slot reserved but lump fetched on first demand"; catCls="check-warn"; catIcon="⚡";
+  } else if (lump.ns_slot === null && lump.ns_slot_policy === "dynamic") {
+    cat = "Dynamic — no assigned slot; Mint allocates next free slot at first use"; catCls="check-info"; catIcon="ℹ️";
+  } else if (lump.ns_slot === null && !lump.ns_slot_policy) {
+    cat = "NULL — never enters the NS table; fetched directly by token"; catCls="check-info"; catIcon="○";
+  } else {
+    cat = `ns_slot=${lump.ns_slot}, policy=${lump.ns_slot_policy||'absent'}`; catCls="check-info"; catIcon="ℹ️";
+  }
+  checks.push({ rule:"R7", icon:catIcon, cls:catCls,
+    desc:`NS category (Spec §NS Slot Assignment): ${cat}`,
+    val: lump.ns_slot !== null && lump.ns_slot !== undefined ? `NS[${lump.ns_slot}]` : "no fixed slot" });
+
+  // R8: variant group
+  if (lump.variant_group) {
+    checks.push({ rule:"R8", icon:"⚠️", cls:"check-warn",
+      desc:`variant_group = "${lump.variant_group}" — shares NS slot ${lump.ns_slot} with another variant; exactly one active per boot image (Spec §Variant Group)`,
+      val:`slot ${lump.ns_slot} shared` });
+  }
+
+  // R9: ns_slot=null without policy is an error
+  if (lump.ns_slot === null && !lump.ns_slot_policy) {
+    checks.push({ rule:"R9", icon:"❌", cls:"check-fail",
+      desc:`ns_slot = null but ns_slot_policy is absent — Spec §NS Slot Assignment Rule 9: this combination is an error; must declare "dynamic" or "static"`,
+      val:"R9 FAIL" });
+  }
+
+  return { freespace, header, n, nMinus6, checks };
+}
+
+// ══════════════════════════════════════════════════════════════
+//  RENDER CATALOGUE
+// ══════════════════════════════════════════════════════════════
+const GROUP_ORDER = ["Boot ROM","System","Networking","Math / Science","Data / String","Hardware","Security Test","Research Demo","IDE Namespace","Two-Enemies Proof"];
+
+function renderList() {
+  const list = document.getElementById('lumpList');
+  let html = '';
+  let prevGroup = null;
+  GROUP_ORDER.forEach(group => {
+    const groupLumps = LUMPS.filter(l => l.group === group);
+    if (!groupLumps.length) return;
+    html += `<div class="group-hdr">${group}</div>`;
+    groupLumps.forEach(lump => {
+      html += `<div class="lump-row${lump.status==='wip'?' wip':''}" onclick="selectLump('${lump.id}')" id="row-${lump.id}">
+        <span class="lump-name">${lump.id}</span>
+        <span class="lump-gen">${lump.genotype}</span>
+        <span class="badge ${lump.status==='released'?'badge-rel':'badge-wip'}">${lump.status}</span>
+      </div>`;
+    });
+  });
+  list.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SELECT LUMP
+// ══════════════════════════════════════════════════════════════
+let currentTab = 'overview';
+
+function selectLump(id) {
+  document.querySelectorAll('.lump-row').forEach(r => r.classList.remove('active'));
+  const row = document.getElementById('row-' + id);
+  if (row) row.classList.add('active');
+
+  const lump = LUMPS.find(l => l.id === id);
+  if (!lump) return;
+
+  document.getElementById('welcome').style.display = 'none';
+  const review = document.getElementById('review');
+  review.classList.add('visible');
+
+  document.getElementById('revTitle').textContent = lump.id;
+
+  const { freespace, header, n, nMinus6, checks } = specChecks(lump);
+  const passCount = checks.filter(c=>c.cls==='check-pass').length;
+  const failCount = checks.filter(c=>c.cls==='check-fail').length;
+
+  document.getElementById('revSub').innerHTML =
+    `<span class="badge ${lump.status==='released'?'badge-rel':'badge-wip'}">${lump.status}</span>` +
+    `<code>${lump.language}</code>` +
+    (lump.version ? `<span>v${lump.version}</span>` : '') +
+    (lump.author  ? `<span>· ${lump.author}</span>` : '') +
+    `&nbsp;· Spec v1.2: <strong style="color:${failCount?'#cc0000':'#1a7a1a'}">${passCount}/${checks.length} checks</strong>`;
+
+  const tabs = [
+    { id:'overview',  label:'📋 Overview' },
+    { id:'binary',    label:'🔢 Binary' },
+    { id:'spec',      label:`${failCount?'❌':'✅'} Spec v1.2` },
+    { id:'methods',   label:`⚙️ Methods (${lump.methods.length})` },
+    { id:'clist',     label:`🔑 C-list (${lump.capabilities.length})` },
+    ...(lump.source ? [{ id:'source', label:'📄 Source' }] : []),
+    { id:'docs',      label:`📚 Docs (${lump.doc_count})` }
+  ];
+
+  document.getElementById('revTabs').innerHTML = tabs.map(t =>
+    `<div class="tab${t.id===currentTab?' active':''}" onclick="switchTab('${lump.id}','${t.id}')">${t.label}</div>`
+  ).join('');
+
+  renderTabContent(lump, currentTab, { freespace, header, n, nMinus6, checks });
+}
+
+function switchTab(lumpId, tabId) {
+  currentTab = tabId;
+  selectLump(lumpId);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TAB CONTENT
+// ══════════════════════════════════════════════════════════════
+function renderTabContent(lump, tab, { freespace, header, n, nMinus6, checks }) {
+  const body = document.getElementById('revBody');
+
+  if (tab === 'overview') {
+    const ns = lump.ns_state;
+    const cat = lump.ns_slot !== null && lump.ns_slot !== undefined
+      ? (lump.boot_resident ? '<span class="ns-state-live">Resident (Live at boot)</span>'
+                             : '<span class="ns-state-lazy">Lazy-load (reserved slot)</span>')
+      : (lump.ns_slot_policy === 'dynamic' ? '<span class="ns-state-dynamic">Dynamic (allocated at first use)</span>'
+                                            : '<span class="ns-state-null">NULL (no NS slot)</span>');
+    body.innerHTML = `
+      <div class="card">
+        <h3>Identity</h3>
+        <div class="kv-grid">
+          <div class="kv-key">Name</div>       <div class="kv-val">${lump.id}</div>
+          <div class="kv-key">Genotype</div>   <div class="kv-val"><code>${lump.genotype}</code></div>
+          <div class="kv-key">Token</div>      <div class="kv-val"><code>${lump.token}</code></div>
+          <div class="kv-key">Group</div>      <div class="kv-val">${lump.group}</div>
+          <div class="kv-key">Language</div>   <div class="kv-val">${lump.language || '—'}</div>
+          <div class="kv-key">Author</div>     <div class="kv-val">${lump.author || '—'}</div>
+          <div class="kv-key">Version</div>    <div class="kv-val">${lump.version || '—'}</div>
+          <div class="kv-key">Status</div>     <div class="kv-val"><span class="badge ${lump.status==='released'?'badge-rel':'badge-wip'}">${lump.status}</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Description</h3>
+        <p style="font-size:0.85rem;line-height:1.6;margin:0;">${lump.description}</p>
+      </div>
+      <div class="card">
+        <h3>Namespace Slot</h3>
+        <div class="kv-grid">
+          <div class="kv-key">NS slot</div>       <div class="kv-val">${lump.ns_slot !== null && lump.ns_slot !== undefined ? `NS[${lump.ns_slot}]` : '—'}</div>
+          <div class="kv-key">Policy</div>        <div class="kv-val">${lump.ns_slot_policy || '—'}</div>
+          <div class="kv-key">Boot resident</div> <div class="kv-val">${lump.boot_resident ? '✅ Yes' : '—'}</div>
+          <div class="kv-key">Category</div>      <div class="kv-val">${cat}</div>
+          ${lump.variant_group ? `<div class="kv-key">Variant group</div><div class="kv-val"><code>${lump.variant_group}</code></div>` : ''}
+          ${ns ? `
+          <div class="kv-key">Runtime location</div> <div class="kv-val"><code>${ns.location}</code></div>
+          <div class="kv-key">limit_offset</div>     <div class="kv-val"><code>${ns.limit}</code></div>
+          <div class="kv-key">CRC-16 seal</div>      <div class="kv-val"><code>${ns.seal}</code></div>
+          <div class="kv-key">NS state</div>         <div class="kv-val"><span class="ns-state-live">${ns.state}</span></div>
+          ` : ''}
+        </div>
+      </div>
+      <div class="card">
+        <h3>Size Summary</h3>
+        <div class="kv-grid">
+          <div class="kv-key">lump_size</div>  <div class="kv-val">${lump.lump_size} words (2<sup>${n}</sup>)</div>
+          <div class="kv-key">cw (code words)</div> <div class="kv-val">${lump.cw}</div>
+          <div class="kv-key">cc (c-list slots)</div> <div class="kv-val">${lump.cc}</div>
+          <div class="kv-key">freespace</div>  <div class="kv-val">${freespace} words (all-zero)</div>
+          <div class="kv-key">header word</div><div class="kv-val"><code>0x${header.toString(16).toUpperCase().padStart(8,'0')}</code></div>
+        </div>
+      </div>`;
+
+  } else if (tab === 'binary') {
+    const hx = '0x' + header.toString(16).toUpperCase().padStart(8,'0');
+    const codeStart = 1, codeEnd = lump.cw;
+    const fsStart = lump.cw + 1, fsEnd = lump.lump_size - lump.cc - 1;
+    const clStart = lump.lump_size - lump.cc, clEnd = lump.lump_size - 1;
+
+    const diagram = `Word 0:                 ${hx}  ← Header (magic=0x1F, n-6=${nMinus6}, cw=${lump.cw}, typ=${lump.typ||0}, cc=${lump.cc})
+Words 1..${lump.cw}:          Code section     [${lump.cw} words]  PC=1 on every CALL
+${lump.cc > 0 ? `Words ${fsStart}..${fsEnd}:  Freespace        [${freespace} zeros]  Mint verifies all-zero
+Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
+`Words ${fsStart}..${fsEnd}:  Freespace        [${freespace} zeros]  Mint verifies all-zero
+                        (no c-list — cc=0)`}`;
+
+    const bits = [
+      {bits:'[31:27]', field:'magic',  val:'11111 (0x1F)', note:'Trap if executed'},
+      {bits:'[26:23]', field:'n-6',    val:String(nMinus6)+` → 2^${n}=${lump.lump_size} words`, note:'lumpSize exponent'},
+      {bits:'[22:10]', field:'cw',     val:String(lump.cw), note:'Code word count'},
+      {bits:'[9:8]',   field:'typ',    val:`${(lump.typ||0).toString(2).padStart(2,'0')} (${['function','data','clist-only','Outform'][lump.typ||0]})`, note:'Object type'},
+      {bits:'[7:0]',   field:'cc',     val:String(lump.cc), note:'C-list slot count'},
+    ];
+
+    body.innerHTML = `
+      <div class="card">
+        <h3>Header Word — Spec §The Header Word (Word 0)</h3>
+        <div class="header-word">${hx}</div>
+        <table class="field-table">
+          <thead><tr><th>Bits</th><th>Field</th><th>Value</th><th>Meaning</th></tr></thead>
+          <tbody>${bits.map(b=>`<tr><td><code>${b.bits}</code></td><td><strong>${b.field}</strong></td><td><code>${b.val}</code></td><td>${b.note}</td></tr>`).join('')}</tbody>
+        </table>
+        <p style="font-size:0.78rem;color:#888;margin:0.5rem 0 0;">Encoding formula: <code>(0x1F &lt;&lt; 27) | (n-6 &lt;&lt; 23) | (cw &lt;&lt; 10) | (typ &lt;&lt; 8) | cc</code></p>
+      </div>
+      <div class="card">
+        <h3>Memory Layout — Spec §Lump Memory Layout — Function Abstraction</h3>
+        <div class="layout-diag">${diagram}</div>
+        <div style="margin-top:0.75rem;" class="kv-grid">
+          <div class="kv-key">CR14 (X) base</div>    <div class="kv-val"><code>NS_base + 4</code> (skips header)</div>
+          <div class="kv-key">CR14 limit_offset</div> <div class="kv-val"><code>lumpSize − cc − 2 = ${lump.lump_size-lump.cc-2}</code></div>
+          ${lump.cc>0 ? `<div class="kv-key">CR6 (L) base</div>     <div class="kv-val"><code>NS_base + (lumpSize−cc)×4 = offset ${lump.lump_size-lump.cc} words</code></div>
+          <div class="kv-key">CR6 limit_offset</div>  <div class="kv-val"><code>cc − 1 = ${lump.cc-1}</code></div>` :
+          `<div class="kv-key">CR6</div>              <div class="kv-val">NULL GT (cc=0 — no c-list)</div>`}
+        </div>
+      </div>
+      <div class="card">
+        <h3>Mint.Lump Validation Sequence — Spec §Mint Validation Sequence</h3>
+        <ul class="check-list">
+          <li class="check-item check-pass"><span class="check-icon">✅</span><span class="check-rule">Step 1</span><span class="check-desc">Read Mem[base] = <code>${hx}</code></span></li>
+          <li class="check-item check-pass"><span class="check-icon">✅</span><span class="check-rule">Step 2</span><span class="check-desc">magic[31:27] = 0x1F ✓</span></li>
+          <li class="check-item check-pass"><span class="check-icon">✅</span><span class="check-rule">Step 3</span><span class="check-desc">n-6 = ${nMinus6} ≤ 9 → lumpSize = ${lump.lump_size} ✓</span></li>
+          <li class="check-item check-pass"><span class="check-icon">✅</span><span class="check-rule">Step 4</span><span class="check-desc">lumpSize = 2^${n} = ${lump.lump_size}</span></li>
+          <li class="check-item ${lump.cw <= lump.lump_size-lump.cc-2?'check-pass':'check-fail'}"><span class="check-icon">${lump.cw<=lump.lump_size-lump.cc-2?'✅':'❌'}</span><span class="check-rule">Step 5</span><span class="check-desc">cw=${lump.cw} ≤ lumpSize−cc−2=${lump.lump_size-lump.cc-2}</span></li>
+          <li class="check-item check-pass"><span class="check-icon">✅</span><span class="check-rule">Step 6</span><span class="check-desc">cc=${lump.cc} ≤ lumpSize−2=${lump.lump_size-2}</span></li>
+          <li class="check-item check-pass"><span class="check-icon">✅</span><span class="check-rule">Step 7</span><span class="check-desc">Freespace scan: words ${lump.cw+1}..${lump.lump_size-lump.cc-1} = ${freespace} zeros</span></li>
+          <li class="check-item ${lump.cc>0?'check-pass':'check-info'}"><span class="check-icon">${lump.cc>0?'✅':'ℹ️'}</span><span class="check-rule">Step 8</span><span class="check-desc">${lump.cc>0?`Validate ${lump.cc} c-list GT Word 0 slot(s)`:'cc=0 — no c-list to validate'}</span></li>
+          <li class="check-item check-pass"><span class="check-icon">✅</span><span class="check-rule">Step 9</span><span class="check-desc">Issue E-GT (B E) → write NS${lump.ns_slot!==null&&lump.ns_slot!==undefined?`[${lump.ns_slot}]`:' (next free)'}</span></li>
+        </ul>
+      </div>`;
+
+  } else if (tab === 'spec') {
+    body.innerHTML = `
+      <div class="card">
+        <h3>Compliance against CM Lump Specification v1.2 (2026-06-20)</h3>
+        <ul class="check-list">
+          ${checks.map(c=>`<li class="check-item ${c.cls}">
+            <span class="check-icon">${c.icon}</span>
+            <span class="check-rule">${c.rule}</span>
+            <span class="check-desc">${c.desc}</span>
+            <span class="check-val">${c.val}</span>
+          </li>`).join('')}
+        </ul>
+      </div>
+      <div class="card">
+        <h3>GT Taxonomy — Spec §GT Taxonomy — Three Fundamental Classes</h3>
+        <div class="kv-grid">
+          <div class="kv-key">Issued GT type</div>    <div class="kv-val">E-GT (Inform, typ=01, perms: B E)</div>
+          <div class="kv-key">CR14 (transient X)</div> <div class="kv-val">Derived on every CALL from NS slot — code view (X-only, words 1..${lump.lump_size-lump.cc-1})</div>
+          <div class="kv-key">CR6 (transient L)</div>  <div class="kv-val">${lump.cc>0?`C-list view (L-only, words ${lump.lump_size-lump.cc}..${lump.lump_size-1})` : 'NULL GT (cc=0)'}</div>
+          <div class="kv-key">Permission model</div>   <div class="kv-val">Church domain (dom=1): E=Enter, S=Save, L=Load — mutually exclusive from Turing R/W/X</div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>ZIP Distribution — Spec §Zip Distribution Format</h3>
+        <div class="kv-grid">
+          <div class="kv-key">Distribution format</div> <div class="kv-val"><code>${lump.id}.lump.zip</code></div>
+          <div class="kv-key">ZIP bit 3</div>           <div class="kv-val">Must be 0 (no data descriptor — streaming mode rejected)</div>
+          <div class="kv-key">uncompressed size</div>   <div class="kv-val">${lump.lump_size * 4} bytes (${lump.lump_size} words × 4)</div>
+          <div class="kv-key">Locator derives n</div>   <div class="kv-val">log₂(${lump.lump_size * 4} / 4) = ${n} → 2^${n} = ${lump.lump_size} words</div>
+        </div>
+      </div>`;
+
+  } else if (tab === 'methods') {
+    if (!lump.methods.length) {
+      body.innerHTML = '<div class="card"><p class="empty-note">No method entries recorded for this lump. It may be a compiled binary with an undocumented internal dispatcher, or a stub with cw=0.</p></div>';
+      return;
+    }
+    const methodsHtml = lump.methods.map(m => {
+      const vis = m.visibility || 'public';
+      return `<div class="method-entry">
+        <div class="method-header">
+          <span class="method-name">${m.name}</span>
+          <span class="method-offset">offset ${m.offset}</span>
+          <span class="method-len">${m.length} word${m.length!==1?'s':''}</span>
+          <span class="method-vis ${vis==='private'?'private':''}">${vis}</span>
+        </div>
+        <div class="method-body">
+          <div class="method-desc">${m.description || '—'}</div>
+          ${m.inputs && m.inputs.length ? `<div class="io-section"><div class="io-label">Inputs:</div><ul class="io-list">${m.inputs.map(i=>`<li>${i}</li>`).join('')}</ul></div>` : ''}
+          ${m.outputs && m.outputs.length ? `<div class="io-section"><div class="io-label">Outputs:</div><ul class="io-list">${m.outputs.map(o=>`<li>${o}</li>`).join('')}</ul></div>` : ''}
+          ${m.snippet ? `<div class="code-snippet">${m.snippet}</div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+    body.innerHTML = `
+      <div class="card">
+        <h3>Dispatcher — Spec §C-List — Compiler-Populated</h3>
+        <div class="kv-grid">
+          <div class="kv-key">Entry point</div>       <div class="kv-val">PC = 1 on every CALL (Word 0 is the header, never executed)</div>
+          <div class="kv-key">Dispatcher at</div>     <div class="kv-val">Word 1 — reads method selector from the CALL instruction</div>
+          <div class="kv-key">Method count</div>      <div class="kv-val">${lump.methods.length} (${lump.methods.filter(m=>!m.visibility||m.visibility==='public').length} public, ${lump.methods.filter(m=>m.visibility==='private').length} private)</div>
+          <div class="kv-key">Total code words</div>  <div class="kv-val">cw = ${lump.cw} (words 1..${lump.cw})</div>
+        </div>
+      </div>
+      ${methodsHtml}`;
+
+  } else if (tab === 'clist') {
+    if (!lump.capabilities.length) {
+      body.innerHTML = `<div class="card"><p class="empty-note">cc = 0 — this lump has no pre-populated c-list. All data operations use DRs directly. CR6 = NULL GT on every CALL.</p></div>`;
+      return;
+    }
+    const rows = lump.capabilities.map(cap => {
+      const permHtml = (cap.rights||[]).map(r=>`<span class="perm perm-${r}">${r}</span>`).join('');
+      const gtHtml = cap.gt ? `<code class="gt-word">${cap.gt}</code>` : '<span style="color:#aaa">runtime-issued</span>';
+      return `<tr>
+        <td>${cap.slot !== undefined ? cap.slot : '—'}</td>
+        <td><strong>${cap.name}</strong></td>
+        <td>${permHtml || '<span style="color:#aaa">—</span>'}</td>
+        <td>${gtHtml}</td>
+        <td style="color:#666;font-size:0.78rem;">${cap.note||'—'}</td>
+      </tr>`;
+    }).join('');
+    body.innerHTML = `
+      <div class="card">
+        <h3>C-list Layout — Spec §C-List — Compiler-Populated</h3>
+        <p style="font-size:0.82rem;color:#555;margin:0 0 0.75rem;">
+          The c-list occupies the last <strong>cc = ${lump.cc}</strong> words of the lump (words ${lump.lump_size-lump.cc}..${lump.lump_size-1}).
+          Each slot is one 32-bit word (GT Word 0 only). Words 1–3 of the full 128-bit CR are fetched from the NS table on LOAD.
+          CR6 (the transient c-list view) is derived fresh on every CALL with L-permission.
+        </p>
+        <table class="clist-table">
+          <thead><tr><th>Slot</th><th>Name</th><th>Permissions</th><th>GT Word 0</th><th>Note</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>GT Word 0 Format — Spec §Word 0 — The Golden Token</h3>
+        <div class="kv-grid">
+          <div class="kv-key">Inform GT (typ=01)</div>  <div class="kv-val">References a physical memory region with specified permissions — the standard lump/device GT</div>
+          <div class="kv-key">Outform GT (typ=10)</div> <div class="kv-val">IDE-managed placeholder — Absent event fires on first LOAD; Locator fetches the lump</div>
+          <div class="kv-key">Abstract GT (typ=11)</div><div class="kv-val">Self-defining constant — DREAD returns a fixed value; no RAM required</div>
+          <div class="kv-key">NULL GT (typ=00)</div>    <div class="kv-val">All 128 bits zero — faults on any CALL/LOAD/DREAD</div>
+          <div class="kv-key">TPERM</div>               <div class="kv-val">Can only clear permission bits [31:25] — escalation is architecturally impossible; no CRC recomputation needed</div>
+        </div>
+      </div>`;
+
+  } else if (tab === 'source') {
+    if (!lump.source) {
+      body.innerHTML = '<div class="card"><p class="empty-note">Source not embedded for this lump. See the simulator/cloomc/ or simulator/examples/ directory for the CLOOMC or assembly source file.</p></div>';
+      return;
+    }
+    body.innerHTML = `<div class="card">
+      <h3>Embedded Source</h3>
+      <div class="kv-grid" style="margin-bottom:0.75rem;">
+        <div class="kv-key">Language</div><div class="kv-val">${lump.language}</div>
+        <div class="kv-key">Code words</div><div class="kv-val">cw = ${lump.cw}</div>
+      </div>
+      <div class="source-block">${lump.source.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+    </div>`;
+
+  } else if (tab === 'docs') {
+    const refs = lump.doc_refs || [];
+    const countHtml = `<div class="doc-stat">
+      <div class="doc-count-big">${lump.doc_count}</div>
+      <div class="doc-count-label">documentation files reference<br><strong>${lump.id}</strong></div>
+    </div>`;
+    const listHtml = refs.length ? `<ul class="doc-list">${refs.map(d=>`<li><span class="doc-icon">📄</span>${d}</li>`).join('')}</ul>` :
+      `<p class="empty-note">No documentation cross-references recorded for this lump.</p>`;
+    body.innerHTML = `<div class="card">
+      <h3>Documentation Cross-References</h3>
+      ${countHtml}
+      ${listHtml}
+      ${lump.doc_count > refs.length ? `<p style="font-size:0.78rem;color:#aaa;margin-top:0.5rem;">Showing ${refs.length} of ${lump.doc_count} referencing files.</p>` : ''}
+    </div>
+    <div class="card">
+      <h3>Specification Cross-References — Spec §Cross-references</h3>
+      <ul class="doc-list">
+        <li><span class="doc-icon">📄</span>CM_LUMP_SPECIFICATION.md — §Lump Memory Layout, §Mint Validation Sequence, §NS Slot Assignment</li>
+        <li><span class="doc-icon">📄</span>architecture.md — Overall Church Machine architecture</li>
+        <li><span class="doc-icon">📄</span>Lump-Architecture.md — Accessible overview of the Lump object model</li>
+        <li><span class="doc-icon">📄</span>golden-tokens.md — GT format, encoding, and capability rules</li>
+        <li><span class="doc-icon">📄</span>foundation-lump-design.md — Lump design rationale and layout rules</li>
+      </ul>
+    </div>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════════════
+renderList();
+</script>
 </body>
 </html>
