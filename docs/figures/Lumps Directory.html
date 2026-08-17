@@ -1390,8 +1390,69 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
         <div class="disasm-listing" id="_disasmListing">${esc(da)}</div>
       </div>`;
 
-    // ── Async: fetch the real binary and fill in code words ───────────────────
-    (async function _fetchHexBinary(token, codeStart, codeEnd) {
+    // ── Async: fetch the real binary, fill code words, decode each as assembler ─
+    (async function _fetchHexBinary(token, codeStart, codeEnd, methodStarts) {
+      // ── Mini-disassembler (v2.0 ISA) ───────────────────────────────────────
+      const _OPNAMES = {
+        0:'LOAD', 1:'SAVE', 2:'CALL', 3:'RETURN', 4:'CHANGE', 5:'SWITCH',
+        6:'TPERM', 7:'LAMBDA', 8:'ELOADCALL', 9:'XLOADLAMBDA',
+        16:'DREAD', 17:'DWRITE', 18:'BFEXT', 19:'BFINS', 20:'MCMP',
+        21:'IADD', 22:'ISUB', 23:'BRANCH', 24:'SHL', 25:'SHR',
+      };
+      const _OPDESC = {
+        0:'load GT from c-list[imm] via CR_src → CR_dst',
+        1:'save CR_src into c-list[imm] via CR_dst',
+        2:'call method #imm on abstraction in CR_dst (CR_src=ctx)',
+        3:'return to caller (restore CR14, pop frame)',
+        4:'CHANGE thread context: switch to NS in CR_dst',
+        5:'SWITCH namespace to CR_dst (privileged)',
+        6:'transfer permission from CR_src to CR_dst',
+        7:'load word at lump[imm] via CR_src into CR_dst',
+        8:'load + call in one step (ELOADCALL)',
+        9:'load lambda extension (XLOADLAMBDA)',
+        16:'read from address [CR_src + imm] into DR_dst',
+        17:'write DR_dst to address [CR_src + imm]',
+        18:'bit-field extract from DR_src',
+        19:'bit-field insert into DR_dst',
+        20:'masked compare DR_dst vs DR_src',
+        21:'integer add DR_dst ← DR_src + imm',
+        22:'integer subtract DR_dst ← DR_src − imm',
+        23:'conditional PC-relative branch',
+        24:'shift left DR_dst ← DR_src << imm',
+        25:'shift right DR_dst ← DR_src >> imm',
+      };
+      const _CONDS = ['EQ','NE','CS','CC','MI','PL','VS','VC','HI','LS','GE','LT','GT','LE','AL','NV'];
+      function _disasm(w32) {
+        w32 = w32 >>> 0;
+        const op   = (w32 >>> 27) & 0x1F;
+        const cond = (w32 >>> 23) & 0xF;
+        const dst  = (w32 >>> 19) & 0xF;
+        const src  = (w32 >>> 15) & 0xF;
+        const imm  = w32 & 0x7FFF;
+        if (op === 0x1F) return { line: '.header  (trap sentinel)', desc: 'not executable — lump magic word' };
+        if (op === 0x1E) return { line: `.word  0x${w32.toString(16).toUpperCase().padStart(8,'0')}`, desc: 'inline data constant' };
+        const mnemo = _OPNAMES[op] || `???[${op}]`;
+        const condTag = cond === 14 ? '' : _CONDS[cond]; // omit AL
+        const isTuring = op >= 16 && op <= 25;
+        const R = isTuring ? 'DR' : 'CR';
+        let ops;
+        if (op === 3) {                         // RETURN — no operands
+          ops = '';
+        } else if (op === 23) {                 // BRANCH — signed offset only
+          const sImm = (imm & 0x4000) ? (imm - 0x8000) : imm;
+          ops = `  #${sImm >= 0 ? '+' : ''}${sImm}`;
+        } else if (op === 2 || op === 8) {      // CALL / ELOADCALL — method index in imm
+          ops = `  ${R}${dst}, ${R}${src}, method=#${imm}`;
+        } else if (op === 0 || op === 1 || op === 7) { // LOAD / SAVE / LAMBDA — slot in imm
+          ops = `  ${R}${dst}, ${R}${src}, slot=#${imm}`;
+        } else {
+          ops = `  ${R}${dst}, ${R}${src}, #${imm}`;
+        }
+        const line = condTag ? `${mnemo} ${condTag}${ops}` : `${mnemo}${ops}`;
+        const desc = _OPDESC[op] || '';
+        return { line, desc };
+      }
+      // ── Fetch & fill ───────────────────────────────────────────────────────
       const note = document.getElementById('_hexBinaryNote');
       try {
         const res = await fetch('/api/lump/' + token);
@@ -1406,15 +1467,16 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
           if (!cell) continue;
           const hexStr = val.toString(16).toUpperCase().padStart(8, '0');
           cell.textContent = hexStr;
-          const oldTitle = cell.title;
-          cell.title = oldTitle.replace('(loading…)', '0x' + hexStr);
+          const { line: daLine, desc: daDesc } = _disasm(val);
+          const methodLabel = methodStarts[w] ? `.method ${methodStarts[w]}\n` : '';
+          cell.title = `W${String(w).padStart(4,'0')}  0x${hexStr}\n${methodLabel}${daLine}${daDesc ? '\n; ' + daDesc : ''}`;
           filled++;
         }
-        if (note) note.textContent = filled + ' code word' + (filled !== 1 ? 's' : '') + ' loaded from binary';
+        if (note) note.textContent = filled + ' code word' + (filled !== 1 ? 's' : '') + ' loaded';
       } catch (e) {
         if (note) note.textContent = '⚠ Binary unavailable — ' + e.message;
       }
-    })(lump.token, 1, lump.cw);
+    })(lump.token, 1, lump.cw, methodStarts);
 
   } else if (tab === 'spec') {
     body.innerHTML = `
