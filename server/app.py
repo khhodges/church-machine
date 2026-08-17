@@ -3236,6 +3236,7 @@ BOOK_CHAPTERS = [
     ("Part IV: Runtime", [
         "CM_LUMP_SPECIFICATION.md",
         "abstractions.md",
+        {"type": "figure", "name": "Lumps Directory.html", "label": "Lump Viewer"},
         "garbage-collection.md",
         "locator.md",
         "family-registry.md",
@@ -3298,14 +3299,27 @@ def docs_list():
 
     chapters = []
     catalogued = set()
+    figures_dir = os.path.join(DOCS_DIR, "figures")
     for part_title, filenames in BOOK_CHAPTERS:
         entries = []
-        for fname in filenames:
-            if fname in all_files:
-                filepath = os.path.join(DOCS_DIR, fname)
+        for item in filenames:
+            if isinstance(item, dict):
+                # Inline figure entry within a chapter
+                fig_name = item["name"]
+                fig_path = os.path.join(figures_dir, fig_name)
+                if os.path.isfile(fig_path):
+                    size = os.path.getsize(fig_path)
+                    entries.append({
+                        "name": fig_name,
+                        "type": "figure",
+                        "label": item.get("label", fig_name.replace(".html", "")),
+                        "size": size,
+                    })
+            elif item in all_files:
+                filepath = os.path.join(DOCS_DIR, item)
                 size = os.path.getsize(filepath)
-                entries.append({"name": fname, "type": "doc", "size": size})
-                catalogued.add(fname)
+                entries.append({"name": item, "type": "doc", "size": size})
+                catalogued.add(item)
         if entries:
             chapters.append({"title": part_title, "docs": entries})
 
