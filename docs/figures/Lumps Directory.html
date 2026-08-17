@@ -116,6 +116,7 @@ body { font-family: system-ui, sans-serif; margin: 0; background: #f2f3f7; color
 .source-block { font-family: 'Courier New', Courier, monospace; font-size: 0.76rem; background: #0d1b2a; color: #c8d8f0; padding: 1rem; border-radius: 5px; white-space: pre; overflow: auto; max-height: 420px; line-height: 1.5; }
 .source-absent { background: #f5f7ff; border: 1px dashed #c8d0e8; border-radius: 4px; padding: 0.85rem 1rem; color: #888; font-style: italic; font-size: 0.82rem; line-height: 1.65; }
 .source-absent code { color: #1a5cc8; background: #eef0f8; padding: 0.1rem 0.3rem; border-radius: 2px; font-style: normal; font-family: monospace; }
+.source-absent a { color: #1a5cc8; font-style: normal; font-family: 'Courier New', Courier, monospace; font-size: 0.83rem; text-decoration: underline; display: inline-block; margin: 0.1rem 0; }
 
 /* ── Assembler listing ── */
 .asm-ok-bar   { background: #071f07; color: #5ae05a; font-family: 'Courier New', Courier, monospace; font-size: 0.73rem; padding: 0.5rem 0.9rem; border-radius: 4px; border-left: 4px solid #2a7a2a; margin-bottom: 0.75rem; }
@@ -1917,15 +1918,32 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
       </div>`;
 
   } else if (tab === 'source') {
-    if (!lump.source) {
-      const hints = [];
-      if (lump.language && lump.language !== '—') hints.push(`Language: <code>${lump.language}</code>`);
-      hints.push(`Look for <code>${lump.id.toLowerCase().replace(/[^a-z0-9]+/g,'_')}.cloomc</code> or <code>${lump.id.toLowerCase().replace(/[^a-z0-9]+/g,'_')}.asm</code> in <code>simulator/examples/</code> or <code>simulator/cloomc/</code>`);
+    // Distinguish: embedded code (contains newlines) vs file-path reference vs absent.
+    const isEmbedded = lump.source && lump.source.includes('\n');
+    const isFilePath = lump.source && !lump.source.includes('\n');
+
+    if (!isEmbedded) {
+      // Build clickable links — relative path from docs/figures/ to project root is ../../
+      const ROOT = '../../';
+      let linkHtml;
+      if (isFilePath) {
+        // lump.source is a repo-relative path like "simulator/examples/foo.cloomc"
+        linkHtml = `<a href="${ROOT}${lump.source}">${lump.source}</a>`;
+      } else {
+        // source is null — suggest canonical candidate filenames
+        const slug = lump.id.toLowerCase().replace(/[^a-z0-9]+/g,'_');
+        const candidates = [
+          `simulator/examples/${slug}.cloomc`,
+          `simulator/examples/${slug}.asm`,
+          `simulator/cloomc/${slug}.cloomc`,
+        ];
+        linkHtml = candidates.map(p => `<a href="${ROOT}${p}">${p}</a>`).join('<br>');
+      }
       body.innerHTML = `<div class="card">
         <h3>Source</h3>
         <div class="source-absent">
           <strong>Source not embedded for this lump.</strong><br><br>
-          ${hints.join('<br>')}
+          ${linkHtml}
         </div>
       </div>
       <div class="card">
@@ -1940,6 +1958,7 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
       </div>`;
       return;
     }
+    // Embedded source code — render in monospace block
     body.innerHTML = `<div class="card">
       <h3>Source — ${lump.language}</h3>
       <div class="kv-grid" style="margin-bottom:0.75rem;">
