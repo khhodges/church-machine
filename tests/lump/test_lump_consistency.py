@@ -35,6 +35,10 @@ R24  Every .lump file in server/lumps/ that is a symbolic link must resolve to a
      real regular file (broken/dangling symlinks are an immediate hard failure).
      Symlinks that resolve to a target outside the lumps directory are flagged as
      a pytest warning so the gap stays visible without blocking CI.
+R24b Every .json file in server/lumps/ (sidecar and manifest) that is a symbolic
+     link must resolve to a real regular file (broken/dangling symlinks are an
+     immediate hard failure). Symlinks that resolve outside the lumps directory
+     are flagged as a pytest warning.
 
 Failure messages are written to be self-diagnosing: they state what was found,
 what was expected, and which file to correct.
@@ -73,6 +77,64 @@ _INDEX_HTML     = os.path.join(_SIMULATOR_DIR, "index.html")
 _ABSDETAIL_JS   = os.path.join(_SIMULATOR_DIR, "app-absdetail.js")
 
 _DECORATOR_STRIP_RE = _re.compile(r"[\u2726\u2605\s]+$")
+
+
+# ── R24b preflight: check .json symlinks before any module-level loading ───────
+# This runs at collection time, before _load_manifest() is called, so that a
+# dangling manifest.json or sidecar symlink produces a self-diagnosing R24b
+# message rather than a raw FileNotFoundError from an unrelated rule.
+
+def _check_json_symlinks(lumps_dir: str) -> list:
+    """Return a list of (filename, target, resolved) for every dangling .json
+    symlink found in *lumps_dir*.  Non-symlinks and resolving symlinks are
+    not included.  Exported so regression tests can call it directly.
+    """
+    broken = []
+    try:
+        entries = sorted(os.listdir(lumps_dir))
+    except FileNotFoundError:
+        return broken
+    for fn in entries:
+        if not fn.endswith(".json"):
+            continue
+        path = os.path.join(lumps_dir, fn)
+        if not os.path.islink(path):
+            continue
+        target = os.readlink(path)
+        resolved = os.path.realpath(path)
+        if not os.path.isfile(resolved):
+            broken.append((fn, target, resolved))
+    return broken
+
+
+def _preflight_json_symlinks(lumps_dir: str = LUMPS_DIR) -> None:
+    """Abort pytest collection if any .json file in *lumps_dir* is a dangling
+    symlink.  Called immediately at module-import time so the guard fires
+    before _load_manifest() and all other module-level discovery/loading.
+    """
+    broken = _check_json_symlinks(lumps_dir)
+    if not broken:
+        return
+    lines = []
+    for fn, target, resolved in broken:
+        lines.append(
+            f"  {fn}: dangling symlink — points to {target!r} "
+            f"(resolved path: {resolved!r}).\n"
+            "    Either restore the missing target file or delete this symlink.\n"
+            "    Broken .json symlinks cause confusing FileNotFoundError failures\n"
+            "    in manifest loading and other lump-consistency rules instead of\n"
+            "    a clear R24b diagnostic."
+        )
+    pytest.exit(
+        "R24b preflight: broken .json symlink(s) in "
+        + lumps_dir
+        + ":\n"
+        + "\n".join(lines),
+        returncode=1,
+    )
+
+
+_preflight_json_symlinks()
 
 
 # ── Manifest + path helpers ────────────────────────────────────────────────────
@@ -2521,14 +2583,20 @@ class TestR23_BinaryHashIntegrity:
         )
 
 
-# ── R24: No broken symlinks in the lumps directory ─────────────────────────────
+# ── R24 / R24b: No broken symlinks in the lumps directory ──────────────────────
 
 def _all_lump_filenames():
     """Return sorted list of all .lump filenames (not stems) in LUMPS_DIR."""
     return sorted(fn for fn in os.listdir(LUMPS_DIR) if fn.endswith(".lump"))
 
 
+def _all_json_filenames():
+    """Return sorted list of all .json filenames in LUMPS_DIR (sidecars + manifest)."""
+    return sorted(fn for fn in os.listdir(LUMPS_DIR) if fn.endswith(".json"))
+
+
 _ALL_LUMP_FILENAMES = _all_lump_filenames()
+_ALL_JSON_FILENAMES = _all_json_filenames()
 
 
 class TestR24_NobrokenSymlinks:
@@ -2567,6 +2635,55 @@ class TestR24_NobrokenSymlinks:
         resolved = os.path.realpath(path)
         if not os.path.isfile(resolved):
             return  # dangling — already caught by test_no_dangling_symlinks
+        lumps_real = os.path.realpath(LUMPS_DIR)
+        if not resolved.startswith(lumps_real + os.sep) and resolved != lumps_real:
+            target = os.readlink(path)
+            warnings.warn(
+                f"{filename}: symlink target {target!r} resolves outside the lumps "
+                f"directory (resolved: {resolved!r}).\n"
+                "  Consider replacing it with a copy or a relative symlink inside "
+                "server/lumps/ to avoid accidental dependency on external paths.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+
+class TestR24b_NoBrokenJsonSymlinks:
+    """R24b: Every .json symlink in server/lumps/ must resolve to a real regular file.
+
+    Covers archive sidecar .json files and manifest.json.  A dangling symlink
+    in any of these files produces confusing FileNotFoundError failures in R14
+    and other rules rather than a clear diagnostic.
+
+    Additionally, symlinks whose target resolves outside the lumps directory are
+    flagged as a pytest warning so the gap stays visible without blocking CI.
+    """
+
+    @pytest.mark.parametrize("filename", _ALL_JSON_FILENAMES)
+    def test_no_dangling_json_symlinks(self, filename):
+        """Hard fail: a .json that is a symlink must resolve to a real file."""
+        path = os.path.join(LUMPS_DIR, filename)
+        if not os.path.islink(path):
+            return  # not a symlink — nothing to check here
+        target = os.readlink(path)
+        resolved = os.path.realpath(path)
+        assert os.path.isfile(resolved), (
+            f"{filename}: dangling symlink — points to {target!r} which does not exist "
+            f"(resolved path: {resolved!r}).\n"
+            "  Either restore the missing target file or delete this symlink.\n"
+            "  Broken .json symlinks cause confusing FileNotFoundError failures in R14 "
+            "and other lump-consistency rules instead of a clear diagnostic."
+        )
+
+    @pytest.mark.parametrize("filename", _ALL_JSON_FILENAMES)
+    def test_json_symlink_target_inside_lumps_dir(self, filename):
+        """Warn (not fail) when a resolving .json symlink points outside the lumps directory."""
+        path = os.path.join(LUMPS_DIR, filename)
+        if not os.path.islink(path):
+            return  # not a symlink
+        resolved = os.path.realpath(path)
+        if not os.path.isfile(resolved):
+            return  # dangling — already caught by test_no_dangling_json_symlinks
         lumps_real = os.path.realpath(LUMPS_DIR)
         if not resolved.startswith(lumps_real + os.sep) and resolved != lumps_real:
             target = os.readlink(path)
