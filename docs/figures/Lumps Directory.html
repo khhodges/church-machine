@@ -1440,10 +1440,20 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
         let ops='';
         if (op===3) ops='';
         else if (op===23){const s=(imm&0x4000)?(imm-0x8000):imm;ops=`  #${s>=0?'+':''}${s}`;}
-        else if (op===2||op===8) ops=`  ${R}${dst}, ${R}${src}, method=#${imm}`;
+        else if (op===2) ops=`  ${R}${dst}, ${R}${src}, method=#${imm}`;
+        else if (op===8){const eSlot=imm&0x1F,eMethod=imm>>>5;ops=`  ${R}${dst}, ${R}${src}, slot=#${eSlot}, method=#${eMethod}`;}
         else if (op===0||op===1||op===7) ops=`  ${R}${dst}, ${R}${src}, slot=#${imm}`;
         else ops=`  ${R}${dst}, ${R}${src}, #${imm}`;
-        return cs?`${mn} ${cs}${ops}`:`${mn}${ops}`;
+        let line=cs?`${mn} ${cs}${ops}`:`${mn}${ops}`;
+        // Annotate LOAD/SAVE/ELOADCALL with abstraction name when src is the local c-list (CR6)
+        if(src===6&&clistNames){
+          let capSlot=-1;
+          if(op===0) capSlot=imm;
+          else if(op===1) capSlot=imm;
+          else if(op===8) capSlot=imm&0x1F;
+          if(capSlot>=0&&clistNames[capSlot]) line+=`  \u2192 ${clistNames[capSlot]}`;
+        }
+        return line;
       }
 
       // ── Semantic comment (ported from app-lumps.js _autoComment) ─────────────

@@ -343,6 +343,28 @@ args = "node simulator/disasm_panel_test.js"
 outputType = "console"
 
 [[workflows.workflow]]
+name = "lump-dir-disasm-tooltip-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_lump_dir_disasm_tooltip.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "lump-binary-size-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_lump_binary_size.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
 name = "check-stale-cr7"
 author = "agent"
 
