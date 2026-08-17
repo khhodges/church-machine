@@ -1686,7 +1686,10 @@ console.log('\n--- T017: SCHEDULER_IRQ_CLIST authority check (Task #1530) ---');
         const { sim, registry, sysAbs } = makeTestSim();
         if (!sim.cr) sim.cr = new Array(16).fill(null);
         sim.cr[14] = { word0: 3, word1: 0, word2: 0, word3: 0 };
-        sim.irqState = { irqActive: false, timerArmed: false };
+        // Reset only the transient flags — preserve irqLumpSlot=8 set by makeTestSim()
+        // so that _schedulerSlot resolves to 8 and getAbstraction(8) finds the clist.
+        sim.irqState.irqActive = false;
+        sim.irqState.timerArmed = false;
 
         // Register a TIMER handler so IRQ returns ok=true
         sysAbs._schedulerState.threads[0].state = 'sleeping';
@@ -1704,7 +1707,9 @@ console.log('\n--- T017: SCHEDULER_IRQ_CLIST authority check (Task #1530) ---');
         const { sim, registry, sysAbs } = makeTestSim();
         if (!sim.cr) sim.cr = new Array(16).fill(null);
         sim.cr[14] = { word0: 3, word1: 0, word2: 0, word3: 0 };
-        sim.irqState = { irqActive: false, timerArmed: false };
+        // Preserve irqLumpSlot=8 from makeTestSim() so the scheduler slot resolves correctly.
+        sim.irqState.irqActive = false;
+        sim.irqState.timerArmed = false;
 
         // Tamper: set wrong target on CR12_PORT entry (not NS[19])
         const schedulerAbs = registry.abstractions[8];
@@ -1724,7 +1729,9 @@ console.log('\n--- T017: SCHEDULER_IRQ_CLIST authority check (Task #1530) ---');
         const { sim, registry, sysAbs } = makeTestSim();
         if (!sim.cr) sim.cr = new Array(16).fill(null);
         sim.cr[14] = { word0: 3, word1: 0, word2: 0, word3: 0 };
-        sim.irqState = { irqActive: false, timerArmed: false };
+        // Preserve irqLumpSlot=8 from makeTestSim() so the scheduler slot resolves correctly.
+        sim.irqState.irqActive = false;
+        sim.irqState.timerArmed = false;
 
         // Tamper: strip E-perm from CR13_PORT entry
         const schedulerAbs = registry.abstractions[8];

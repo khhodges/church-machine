@@ -439,18 +439,19 @@ console.log('\nTest 28: Valid Thread lump (sw=32, hw=64, non-zero DRs/stack/caps
     assert(!results.find(r => r.ruleId === 'RCI'), 'RCI not emitted for Thread lump');
 }
 
-// ─── Test 29: Namespace lump (typ=10, cw=0) — RB1 pass ──────────────────
-// cw=0 distinguishes Namespace from Thread.  Any cc value is structurally valid.
-console.log('\nTest 29: Namespace LUMP (cw=0, cc=4) — RB1 pass');
+// ─── Test 29: typ=10, cw=0 — RB1 error (over-capacity Thread / zero stack words) ──
+// Spec v1.2: Thread LUMP (typ=10) requires cw ≥ 1 (cw field = stack words).
+// cw=0 is produced when the editor clamps cw on over-capacity; Mint rejects it.
+console.log('\nTest 29: typ=10 cw=0 (zero stack words) — RB1 error');
 {
     const lumpSize = 64;
     const words = new Array(lumpSize).fill(0);
     words[0] = makeThreadHeader({ nMinus6: 0, sw: 0, hw: 4 });  // cw=0,cc=4,typ=10
     const results = lumpAudit(words, null);
-    assertRule(results, 'RB1', 'pass', 'RB1 pass: Namespace LUMP (cw=0, typ=10)');
-    assert(!lumpAuditHasErrors(results), 'no errors');
+    assertRule(results, 'RB1', 'error', 'RB1 error: typ=10 cw=0 (zero stack words)');
+    assert(lumpAuditHasErrors(results), 'has errors');
     // RCI/RPN should not fire for typ=10 lumps
-    assert(!results.find(r => r.ruleId === 'RCI'), 'RCI not emitted for Namespace');
+    assert(!results.find(r => r.ruleId === 'RCI'), 'RCI not emitted for typ=10');
 }
 
 // ─── Test 30: Thread with cc=0 (heapWords=0) — RB1 error ─────────────────

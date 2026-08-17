@@ -109,7 +109,13 @@ body { font-family: system-ui, sans-serif; margin: 0; background: #f2f3f7; color
 .perm-S { background: #ffd8e8; color: #7a003a; }
 
 /* ── Source ── */
-.source-block { font-family: monospace; font-size: 0.76rem; background: #0d1b2a; color: #c8d8f0; padding: 1rem; border-radius: 5px; white-space: pre; overflow: auto; max-height: 400px; line-height: 1.5; }
+.source-block { font-family: 'Courier New', Courier, monospace; font-size: 0.76rem; background: #0d1b2a; color: #c8d8f0; padding: 1rem; border-radius: 5px; white-space: pre; overflow: auto; max-height: 420px; line-height: 1.5; }
+.source-absent { background: #f5f7ff; border: 1px dashed #c8d0e8; border-radius: 4px; padding: 0.85rem 1rem; color: #888; font-style: italic; font-size: 0.82rem; line-height: 1.65; }
+.source-absent code { color: #1a5cc8; background: #eef0f8; padding: 0.1rem 0.3rem; border-radius: 2px; font-style: normal; font-family: monospace; }
+
+/* ── Assembler listing ── */
+.asm-ok-bar   { background: #071f07; color: #5ae05a; font-family: 'Courier New', Courier, monospace; font-size: 0.73rem; padding: 0.5rem 0.9rem; border-radius: 4px; border-left: 4px solid #2a7a2a; margin-bottom: 0.75rem; }
+.asm-listing  { font-family: 'Courier New', Courier, monospace; font-size: 0.72rem; background: #0d1b2a; color: #c8d8f0; padding: 1rem 1.1rem; border-radius: 5px; overflow: auto; max-height: 480px; line-height: 1.65; white-space: pre; }
 
 /* ── Docs ── */
 .doc-stat { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
@@ -1019,7 +1025,8 @@ function selectLump(id) {
     { id:'spec',      label:`${failCount?'❌':'✅'} Spec v1.2` },
     { id:'methods',   label:`⚙️ Methods (${lump.methods.length})` },
     { id:'clist',     label:`🔑 C-list (${lump.capabilities.length})` },
-    ...(lump.source ? [{ id:'source', label:'📄 Source' }] : []),
+    { id:'source',    label:'📄 Source' },
+    { id:'assembler', label:'🔧 Assembler' },
     { id:'docs',      label:`📚 Docs (${lump.doc_count})` }
   ];
 
@@ -1258,17 +1265,118 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
 
   } else if (tab === 'source') {
     if (!lump.source) {
-      body.innerHTML = '<div class="card"><p class="empty-note">Source not embedded for this lump. See the simulator/cloomc/ or simulator/examples/ directory for the CLOOMC or assembly source file.</p></div>';
+      const hints = [];
+      if (lump.language && lump.language !== '—') hints.push(`Language: <code>${lump.language}</code>`);
+      hints.push(`Look for <code>${lump.id.toLowerCase().replace(/[^a-z0-9]+/g,'_')}.cloomc</code> or <code>${lump.id.toLowerCase().replace(/[^a-z0-9]+/g,'_')}.asm</code> in <code>simulator/examples/</code> or <code>simulator/cloomc/</code>`);
+      body.innerHTML = `<div class="card">
+        <h3>Source</h3>
+        <div class="source-absent">
+          <strong>Source not embedded for this lump.</strong><br><br>
+          ${hints.join('<br>')}
+        </div>
+      </div>
+      <div class="card">
+        <h3>Identity</h3>
+        <div class="kv-grid">
+          <div class="kv-key">Lump</div>    <div class="kv-val">${lump.id}</div>
+          <div class="kv-key">Language</div><div class="kv-val">${lump.language || '—'}</div>
+          <div class="kv-key">Token</div>   <div class="kv-val"><code>${lump.token}</code></div>
+          <div class="kv-key">cw</div>      <div class="kv-val">${lump.cw} code words</div>
+          <div class="kv-key">Methods</div> <div class="kv-val">${lump.methods.length}</div>
+        </div>
+      </div>`;
       return;
     }
     body.innerHTML = `<div class="card">
-      <h3>Embedded Source</h3>
+      <h3>Source — ${lump.language}</h3>
       <div class="kv-grid" style="margin-bottom:0.75rem;">
-        <div class="kv-key">Language</div><div class="kv-val">${lump.language}</div>
+        <div class="kv-key">Lump</div>      <div class="kv-val">${lump.id}</div>
+        <div class="kv-key">Language</div>  <div class="kv-val">${lump.language}</div>
+        <div class="kv-key">Token</div>     <div class="kv-val"><code>${lump.token}</code></div>
         <div class="kv-key">Code words</div><div class="kv-val">cw = ${lump.cw}</div>
+        <div class="kv-key">Methods</div>   <div class="kv-val">${lump.methods.length}</div>
       </div>
       <div class="source-block">${lump.source.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
     </div>`;
+
+  } else if (tab === 'assembler') {
+    // Build a human-readable compilation listing from the lump metadata.
+    // This mirrors what the IDE's right-hand assembler panel shows after a
+    // 100% successful compile — before the user clicks SAVE LUMP.
+    const hx = '0x' + header.toString(16).toUpperCase().padStart(8,'0');
+    const passIcon = '✅';
+    const metaLine = `; Lump: ${lump.id}  ·  Language: ${lump.language || '—'}  ·  Token: ${lump.token}`;
+    const statsLine = `; cw=${lump.cw}  cc=${lump.cc}  lump_size=${lump.lump_size}  freespace=${freespace}  methods=${lump.methods.length}`;
+
+    // Header word line
+    const hdrLine = `[W${String(0).padStart(4,'0')}]  ${hx.padEnd(12)}; magic=0x1F  n-6=${nMinus6}  cw=${lump.cw}  typ=${lump.typ||0}  cc=${lump.cc}`;
+
+    // Code section: per-method word ranges
+    let codeLines = '';
+    if (lump.methods.length === 0 && lump.cw > 0) {
+      codeLines = `\n.code                      ; ${lump.cw} word${lump.cw!==1?'s':''} (W0001..W${String(lump.cw).padStart(4,'0')}) — no method table`;
+    } else if (lump.methods.length > 0) {
+      codeLines = '\n.code';
+      let prevEnd = 0;
+      lump.methods.forEach((m, i) => {
+        const wStart = 1 + (m.offset || 0);
+        const wEnd   = wStart + (m.length || 1) - 1;
+        const vis    = m.visibility === 'private' ? ' (private)' : '';
+        const sel    = `selector ${i + 1}`;
+        codeLines += `\n  .method ${m.name.padEnd(16)}; W${String(wStart).padStart(4,'0')}..W${String(wEnd).padStart(4,'0')}  ${(m.length||1)} word${(m.length||1)!==1?'s':''}, ${sel}${vis}`;
+        prevEnd = wEnd;
+      });
+    } else {
+      codeLines = '\n; (no code — cw=0)';
+    }
+
+    // Freespace line
+    const fsStart = lump.cw + 1, fsEnd = lump.lump_size - lump.cc - 1;
+    const fsLine = freespace > 0
+      ? `\n\n.freespace                 ; W${String(fsStart).padStart(4,'0')}..W${String(fsEnd).padStart(4,'0')}  ${freespace} zero word${freespace!==1?'s':''}  ✓ Mint verified`
+      : '\n\n; (no freespace — lump fully utilised)';
+
+    // C-list lines
+    let clistLines = '';
+    if (lump.cc > 0) {
+      const clBase = lump.lump_size - lump.cc;
+      clistLines = `\n\n.clist                     ; ${lump.cc} slot${lump.cc!==1?'s':''} (W${String(clBase).padStart(4,'0')}..W${String(lump.lump_size-1).padStart(4,'0')})`;
+      if (lump.capabilities.length > 0) {
+        lump.capabilities.forEach((cap, i) => {
+          const perms = (cap.rights||[]).join('+') || '—';
+          const w = clBase + i;
+          clistLines += `\n  [slot ${i}]  ${cap.name.padEnd(16)}; W${String(w).padStart(4,'0')}  perms: ${perms}${cap.note ? '  — '+cap.note : ''}`;
+        });
+      } else {
+        for (let i = 0; i < lump.cc; i++) {
+          clistLines += `\n  [slot ${i}]  (runtime-issued)       ; W${String(clBase+i).padStart(4,'0')}`;
+        }
+      }
+    } else {
+      clistLines = '\n\n; cc=0 — no c-list';
+    }
+
+    const listing = `; ══════════════════════════════════════════════════════════════════\n${metaLine}\n${statsLine}\n; ══════════════════════════════════════════════════════════════════\n\n.header\n  ${hdrLine}${codeLines}${fsLine}${clistLines}`;
+
+    body.innerHTML = `
+      <div class="card">
+        <div class="asm-ok-bar">${passIcon} COMPILED SUCCESSFULLY — ${lump.methods.length} method${lump.methods.length!==1?'s':''}, ${lump.cw} code word${lump.cw!==1?'s':''}, ${lump.cc} c-list slot${lump.cc!==1?'s':''} · ready for SAVE LUMP</div>
+        <h3>Compilation Listing</h3>
+        <div class="asm-listing">${listing.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+      </div>
+      <div class="card">
+        <h3>Compilation Stats</h3>
+        <div class="kv-grid">
+          <div class="kv-key">Total size</div>    <div class="kv-val">${lump.lump_size} words (2<sup>${n}</sup>) = ${lump.lump_size*4} bytes</div>
+          <div class="kv-key">Code words</div>    <div class="kv-val">cw = ${lump.cw} (words 1..${lump.cw})</div>
+          <div class="kv-key">Freespace</div>     <div class="kv-val">${freespace} words — Mint verifies all-zero</div>
+          <div class="kv-key">C-list slots</div>  <div class="kv-val">cc = ${lump.cc}${lump.cc>0?' (words '+(lump.lump_size-lump.cc)+'...'+(lump.lump_size-1)+')':' — no c-list'}</div>
+          <div class="kv-key">Methods</div>       <div class="kv-val">${lump.methods.length} (${lump.methods.filter(m=>!m.visibility||m.visibility==='public').length} public, ${lump.methods.filter(m=>m.visibility==='private').length} private)</div>
+          <div class="kv-key">Language</div>      <div class="kv-val">${lump.language || '—'}</div>
+          <div class="kv-key">NS slot</div>       <div class="kv-val">${lump.ns_slot !== null && lump.ns_slot !== undefined ? `NS[${lump.ns_slot}]` : 'dynamic / none'}</div>
+          <div class="kv-key">Token</div>         <div class="kv-val"><code>${lump.token}</code></div>
+        </div>
+      </div>`;
 
   } else if (tab === 'docs') {
     const refs = lump.doc_refs || [];

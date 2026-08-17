@@ -108,15 +108,18 @@ function lumpAudit(words, manifest, lineNums, opts) {
             });
         }
     } else if (typ === 2 && cw === 0) {
-        // Namespace LUMP (typ=10, cw=0): body is the NS Table — no code or GT c-list.
-        // cc = number of Locator entries; any value (including 0) is structurally valid here.
+        // typ=10, cw=0: Thread LUMP with zero stack words.
+        // This is produced when a Thread LUMP editor clamps cw to 0 because the
+        // lump is over-capacity (heap ≤ 0).  Mint rejects Thread LUMPs with sw=0.
+        // Spec: Thread LUMP (typ=10) requires cw ≥ 1 (cw field = stack words).
         results.push({
             ruleId: 'RB1',
-            severity: 'pass',
-            message: `Namespace LUMP (typ=10, cw=0) \u2014 NS Table locator entries: ${cc} \u2713`,
-            detail: 'Namespace LUMP (typ=10, cw=0): body is the NS Table (binary data). ' +
-                `cc (Locator-entry count) = ${cc}. No code section or GT c-list. ` +
-                'See CM_LUMP_SPECIFICATION.md Appendix B.',
+            severity: 'error',
+            message: `typ=10, cw=0 \u2014 zero stack words. Thread LUMP requires cw \u2265 1 (Mint step 5 will reject this lump).`,
+            detail: 'Thread LUMP (typ=10) with cw=0 means sw (stack words) = 0. ' +
+                'This is produced when the lump is over-capacity (heap \u2264 0) and the editor clamps cw to 0. ' +
+                'Mint rejects Thread LUMPs with sw=0. Reduce stack depth or increase lump size. ' +
+                'See CM_LUMP_SPECIFICATION.md Appendix A.',
         });
     } else if (typ === 2 /* Thread: cw>0 */) {
         // Thread LUMP (typ=10, cw>0): cw = sw (stack words), cc = heapWords.
