@@ -6864,6 +6864,25 @@ def patch_lump_meta(token):
             sidecar['pet_names']['CR'].pop(cr_slot, None)
         updated = True
 
+    if 'ns_slot_policy' in payload:
+        policy_val = payload['ns_slot_policy']
+        if policy_val not in ('static', 'dynamic'):
+            return jsonify({"error": "ns_slot_policy must be 'static' or 'dynamic'"}), 400
+        sidecar['ns_slot_policy'] = policy_val
+        updated = True
+
+    if 'ns_slot' in payload:
+        slot_val = payload['ns_slot']
+        if slot_val is None:
+            sidecar['ns_slot'] = None
+        else:
+            # Reject booleans: Python treats True/False as int subtypes, but the
+            # API contract requires a plain integer.
+            if isinstance(slot_val, bool) or not isinstance(slot_val, int) or slot_val < 0:
+                return jsonify({"error": "ns_slot must be a non-negative integer or null"}), 400
+            sidecar['ns_slot'] = slot_val
+        updated = True
+
     if not updated:
         return jsonify({"ok": True, "token": key8, "message": "No fields updated"}), 200
 
@@ -6885,7 +6904,7 @@ def patch_lump_meta(token):
         changed = False
         for entry in manifest:
             if entry.get('token') == key8:
-                for field in ("author", "version"):
+                for field in ("author", "version", "ns_slot_policy", "ns_slot"):
                     if field in payload:
                         entry[field] = sidecar[field]
                 changed = True
@@ -6897,7 +6916,7 @@ def patch_lump_meta(token):
             f"Details: {_mf_meta_err}"
         )}), 500
 
-    print(f'[lumps/meta PATCH] {key8} author={sidecar.get("author","")} version={sidecar.get("version","")}', flush=True)
+    print(f'[lumps/meta PATCH] {key8} author={sidecar.get("author","")} version={sidecar.get("version","")} ns_slot_policy={sidecar.get("ns_slot_policy","")} ns_slot={sidecar.get("ns_slot", "")}', flush=True)
     return jsonify({"ok": True, "token": key8})
 
 

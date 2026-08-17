@@ -3209,6 +3209,17 @@ function _nsTableAddConfirm() {
             body: JSON.stringify({ slot: slot, label: name })
         }).catch(function(e) { console.warn('[NSADD] slot-label persist failed:', e); });
 
+        // Persist the programmer's slot-policy choice (and the concrete slot assigned)
+        // back to the sidecar so re-add and boot_image.py use the correct policy.
+        fetch('/api/lump/' + token + '/meta', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ns_slot_policy: slotPolicy,
+                ns_slot: slotPolicy === 'dynamic' ? null : slot
+            })
+        }).catch(function(e) { console.warn('[NSADD] ns_slot_policy persist failed:', e); });
+
         // ── Populate c-list GTs in DMEM from sidecar capabilities ─────────────
         // c-list lives at lumpBase + (lumpSize - cc) per parseLumpHeader:
         // "c-list starts at lumpBase + (lumpSize - cc)" — call.py line 282.
