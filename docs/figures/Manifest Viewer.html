@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Manifest Viewer</title>
+<style>
+* { box-sizing: border-box; }
+body { font-family: system-ui, sans-serif; margin: 0; background: #f2f3f7; color: #1a1a1a; font-size: 0.88rem; }
+
+/* ── Two-column layout ── */
+.layout { display: flex; height: 100vh; overflow: hidden; }
+.left-col { width: 400px; flex-shrink: 0; display: flex; flex-direction: column; background: #fff; border-right: 1px solid #d0d4de; }
+.right-col { flex: 1; overflow-y: auto; background: #f2f3f7; }
+
+/* ── Left: header ── */
+.left-header { padding: 0.75rem 1rem 0.5rem; border-bottom: 1px solid #e0e4ee; }
+.left-header h1 { margin: 0 0 0.15rem; font-size: 1.1rem; color: #1a2a4a; }
+.left-header p { margin: 0; font-size: 0.78rem; color: #666; }
+
+/* ── Left: filters ── */
+.filter-bar { padding: 0.5rem 0.75rem; border-bottom: 1px solid #e0e4ee; display: flex; flex-direction: column; gap: 0.4rem; }
+.search-wrap { position: relative; }
+.search-wrap input {
+  width: 100%; padding: 0.35rem 0.5rem 0.35rem 1.8rem;
+  border: 1px solid #c8d0e8; border-radius: 4px;
+  font-size: 0.82rem; background: #f8f9ff; color: #1a1a1a;
+  outline: none;
+}
+.search-wrap input:focus { border-color: #1a5cc8; background: #fff; }
+.search-icon { position: absolute; left: 0.5rem; top: 50%; transform: translateY(-50%); color: #999; font-size: 0.9rem; pointer-events: none; }
+.filter-pills { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.pill { padding: 0.18rem 0.55rem; border-radius: 12px; font-size: 0.72rem; font-weight: 700; cursor: pointer; border: 1.5px solid transparent; transition: all 0.12s; user-select: none; }
+.pill.active { border-color: currentColor; }
+.pill-all    { background: #eef0f8; color: #3a4a7a; }
+.pill-static { background: #d4eaff; color: #0a3a7a; }
+.pill-dynamic{ background: #e8f8d4; color: #2a5a00; }
+.pill-none   { background: #f0eaff; color: #4a1a7a; }
+.pill-boot   { background: #fff3cd; color: #7a4a00; }
+.pill-wip    { background: #fde8e8; color: #7a1a00; }
+
+/* ── Left: entry list ── */
+.entry-list { flex: 1; overflow-y: auto; }
+.group-hdr { padding: 0.3rem 1rem; background: #1e2d52; color: #b8c8e8; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; position: sticky; top: 0; z-index: 1; }
+.entry-row { display: flex; align-items: center; padding: 0.4rem 1rem; cursor: pointer; border-bottom: 1px solid #eef0f7; transition: background 0.12s; gap: 0.4rem; }
+.entry-row:hover { background: #edf2ff; }
+.entry-row.active { background: #dce8ff; border-left: 3px solid #1a5cc8; padding-left: calc(1rem - 3px); }
+.entry-name { flex: 1; font-weight: 600; font-size: 0.84rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entry-token { font-family: monospace; font-size: 0.7rem; color: #888; flex-shrink: 0; }
+.badge { display: inline-block; font-size: 0.66rem; padding: 0.08rem 0.3rem; border-radius: 3px; font-weight: 700; flex-shrink: 0; }
+.badge-slot   { background: #dce8ff; color: #1a3a7a; }
+.badge-noport { background: #eee; color: #999; }
+.badge-rel    { background: #d1f5d1; color: #1a6b1a; }
+.badge-wip    { background: #fff3cd; color: #7a5700; }
+.badge-na     { background: #f0eaff; color: #6a2a8a; }
+.badge-lang   { background: #f0f2f8; color: #444; font-weight: 600; }
+.badge-boot   { background: #fff0b0; color: #7a5000; }
+.badge-invalid { background: #fde8e8; color: #9a0000; }
+
+/* ── Right: welcome ── */
+.welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #888; gap: 0.75rem; }
+.welcome .big { font-size: 2.5rem; }
+.welcome p { font-size: 0.9rem; margin: 0; }
+.welcome .sub { font-size: 0.78rem; color: #aaa; }
+
+/* ── Right: review panel ── */
+.review { padding: 1.25rem 1.5rem; display: none; }
+.review.visible { display: block; }
+.rev-filename { font-size: 0.72rem; font-family: 'Courier New', monospace; color: #7a8aaa; letter-spacing: 0.01em; margin: 0 0 0.15rem; user-select: all; }
+.rev-title { font-size: 1.3rem; font-weight: 700; color: #1a2a4a; margin: 0 0 0.1rem; }
+.rev-sub { font-size: 0.8rem; color: #666; margin: 0 0 0.9rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.rev-sub code { background: #e8ebf8; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.78rem; font-family: monospace; }
+
+/* ── Tabs ── */
+.tabs { display: flex; gap: 0; border-bottom: 2px solid #c8d0e8; margin-bottom: 1rem; }
+.tab { padding: 0.4rem 0.85rem; cursor: pointer; font-size: 0.8rem; font-weight: 600; color: #555; border-bottom: 2px solid transparent; margin-bottom: -2px; white-space: nowrap; }
+.tab:hover { color: #1a5cc8; }
+.tab.active { color: #1a5cc8; border-bottom-color: #1a5cc8; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ── Cards ── */
+.card { background: #fff; border: 1px solid #dde2ef; border-radius: 6px; padding: 1rem 1.2rem; margin-bottom: 1rem; }
+.card h3 { margin: 0 0 0.6rem; font-size: 0.88rem; color: #2a3a6a; border-bottom: 1px solid #eef; padding-bottom: 0.35rem; }
+.kv-grid { display: grid; grid-template-columns: 160px 1fr; gap: 0.25rem 0.75rem; }
+.kv-key { font-weight: 600; color: #555; font-size: 0.82rem; align-self: start; padding-top: 0.05rem; }
+.kv-val { color: #222; font-size: 0.82rem; word-break: break-word; }
+.kv-val code { font-family: monospace; background: #f0f2f8; padding: 0.05rem 0.3rem; border-radius: 2px; }
+.kv-val a { color: #1a5cc8; text-decoration: none; }
+.kv-val a:hover { text-decoration: underline; }
+.kv-null { color: #bbb; font-style: italic; }
+.desc-text { color: #444; line-height: 1.6; font-size: 0.83rem; margin: 0; }
+
+/* ── Methods ── */
+.method-entry { border: 1px solid #dde2ee; border-radius: 5px; margin-bottom: 0.6rem; overflow: hidden; }
+.method-header { background: #eef0f8; padding: 0.4rem 0.8rem; display: flex; align-items: center; gap: 0.6rem; }
+.method-name { font-weight: 700; font-size: 0.86rem; color: #1a2a5a; }
+.method-offset { font-family: monospace; font-size: 0.73rem; color: #888; }
+.method-len { font-size: 0.7rem; color: #aaa; }
+.method-body { padding: 0.45rem 0.8rem; font-size: 0.82rem; }
+.method-desc { color: #333; margin: 0 0 0.35rem; line-height: 1.5; }
+.io-section { margin-top: 0.25rem; }
+.io-label { font-weight: 600; font-size: 0.76rem; color: #555; margin-bottom: 0.15rem; }
+.io-list { list-style: none; margin: 0; padding: 0; }
+.io-list li { font-family: monospace; font-size: 0.74rem; color: #334; padding: 0.08rem 0; border-left: 2px solid #a8b8e8; padding-left: 0.4rem; margin-bottom: 0.15rem; }
+
+/* ── C-list ── */
+.clist-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.clist-table th, .clist-table td { border: 1px solid #dde; padding: 0.3rem 0.5rem; }
+.clist-table th { background: #eef0f8; font-weight: 700; }
+.perm { display: inline-block; padding: 0.04rem 0.28rem; border-radius: 3px; font-size: 0.7rem; font-weight: 700; margin: 0.03rem; }
+.perm-E { background: #d8f0d8; color: #1a5a1a; }
+.perm-R { background: #d8e8ff; color: #1a2a7a; }
+.perm-W { background: #ffe8d8; color: #7a3a00; }
+.perm-L { background: #e8d8ff; color: #5a1a7a; }
+.perm-S { background: #ffd8e8; color: #7a003a; }
+
+/* ── Source ── */
+.source-block { font-family: 'Courier New', Courier, monospace; font-size: 0.76rem; background: #0d1b2a; color: #c8d8f0; padding: 1rem; border-radius: 5px; white-space: pre; overflow: auto; max-height: 480px; line-height: 1.5; }
+.source-absent { background: #f5f7ff; border: 1px dashed #c8d0e8; border-radius: 4px; padding: 0.85rem 1rem; color: #888; font-style: italic; font-size: 0.82rem; line-height: 1.65; }
+.source-absent a { color: #1a5cc8; font-style: normal; font-family: 'Courier New', Courier, monospace; font-size: 0.83rem; text-decoration: underline; display: inline-block; margin-top: 0.3rem; }
+
+/* ── Binary / Hex ── */
+.hex-wrap { overflow-x: auto; overflow-y: auto; max-height: 440px; background: #fafbff; border: 1px solid #d8daee; border-radius: 4px; padding: 0.35rem 0.5rem; }
+.hex-table { border-collapse: collapse; font-family: 'Courier New', Courier, monospace; font-size: 0.7rem; width: 100%; }
+.hex-table tr:hover td { filter: brightness(0.92); }
+.hex-addr  { color: #888; padding: 0.12rem 0.6rem 0.12rem 0; white-space: nowrap; font-weight: 600; user-select: none; }
+.hex-cell  { padding: 0.1rem 0.25rem; text-align: center; white-space: nowrap; border: 1px solid #ebebf5; cursor: default; min-width: 5.8em; }
+.hex-cell:hover { outline: 2px solid #1a5cc8; position: relative; z-index: 1; }
+.hex-header    { color: #1a5a1a; background: #edfced; font-weight: 700; }
+.hex-code      { color: #1a2a5a; background: #eef1ff; }
+.hex-code-start{ color: #1a2a5a; background: #dce4ff; font-weight: 700; }
+.hex-freespace { color: #bbb; background: #f7f7f7; }
+.hex-clist     { color: #7a4a00; background: #fff8e8; }
+.hex-legend { display: flex; gap: 0.9rem; flex-wrap: wrap; margin-bottom: 0.55rem; font-size: 0.72rem; }
+.hex-leg-item { display: flex; align-items: center; gap: 0.3rem; }
+.hex-leg-swatch { width: 1em; height: 1em; border: 1px solid #ccc; border-radius: 2px; }
+.load-btn { background: #1e2d52; color: #a8c8f8; border: 1px solid #3a5a8a; border-radius: 4px; padding: 0.32rem 0.8rem; font-size: 0.77rem; cursor: pointer; font-weight: 600; margin-bottom: 0.75rem; display: inline-block; }
+.load-btn:hover { background: #2a3d6a; }
+.load-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* ── Loading / error states ── */
+.loading-msg { color: #888; font-style: italic; padding: 1rem; font-size: 0.84rem; }
+.error-msg   { color: #cc0000; background: #fde8e8; border: 1px solid #f0b0b0; border-radius: 4px; padding: 0.65rem 0.9rem; font-size: 0.82rem; margin: 0.5rem 0; }
+.empty-note  { color: #999; font-style: italic; font-size: 0.82rem; padding: 0.5rem 0; }
+
+/* ── Status colours ── */
+.stat-rel  { color: #1a6b1a; font-weight: 700; }
+.stat-wip  { color: #7a5700; font-weight: 700; }
+.stat-none { color: #999; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ══ LEFT: manifest entry list ══ -->
+  <div class="left-col">
+    <div class="left-header">
+      <h1>Manifest Viewer</h1>
+      <p id="headerSub">Loading manifest…</p>
+    </div>
+    <div class="filter-bar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchBox" placeholder="Search token, abstraction, dot_name…" autocomplete="off">
+      </div>
+      <div class="filter-pills" id="filterPills">
+        <span class="pill pill-all active" data-filter="all">All</span>
+        <span class="pill pill-static" data-filter="static">Static NS</span>
+        <span class="pill pill-dynamic" data-filter="dynamic">Dynamic</span>
+        <span class="pill pill-none" data-filter="none">No slot</span>
+        <span class="pill pill-boot" data-filter="boot">Boot resident</span>
+        <span class="pill pill-wip" data-filter="wip">WIP</span>
+      </div>
+    </div>
+    <div class="entry-list" id="entryList">
+      <div class="loading-msg">Fetching manifest…</div>
+    </div>
+  </div>
+
+  <!-- ══ RIGHT: review panel ══ -->
+  <div class="right-col">
+    <div class="welcome" id="welcome">
+      <div class="big">📦</div>
+      <p>Select an entry on the left to inspect it</p>
+      <div class="sub">Live view of server/lumps/manifest.json</div>
+    </div>
+    <div class="review" id="review">
+      <div class="rev-filename" id="revFilename"></div>
+      <div class="rev-title" id="revTitle"></div>
+      <div class="rev-sub" id="revSub"></div>
+      <div class="tabs" id="revTabs"></div>
+      <div id="revBody"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  Manifest Viewer — fetches /api/lumps/list live
+// ══════════════════════════════════════════════════════════════
+
+let ALL_ENTRIES = [];
+let activeFilter = 'all';
+let searchQuery  = '';
+let activeToken  = null;
+
+// ── Fetch manifest ────────────────────────────────────────────
+async function loadManifest() {
+  try {
+    const r = await fetch('/api/lumps/list');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    ALL_ENTRIES = await r.json();
+    document.getElementById('headerSub').textContent =
+      `${ALL_ENTRIES.length} entries · live from manifest.json`;
+    renderList();
+  } catch (e) {
+    document.getElementById('entryList').innerHTML =
+      `<div class="error-msg">Failed to load manifest: ${e.message}</div>`;
+    document.getElementById('headerSub').textContent = 'Load failed';
+  }
+}
+
+// ── Filter + search ───────────────────────────────────────────
+function matchesFilter(e) {
+  if (activeFilter === 'all')     return true;
+  if (activeFilter === 'static')  return e.ns_slot_policy === 'static';
+  if (activeFilter === 'dynamic') return e.ns_slot_policy === 'dynamic';
+  if (activeFilter === 'none')    return e.ns_slot_policy === 'none' || (!e.ns_slot_policy && e.ns_slot == null);
+  if (activeFilter === 'boot')    return !!e.boot_resident;
+  if (activeFilter === 'wip')     return e.status === 'wip';
+  return true;
+}
+
+function matchesSearch(e) {
+  if (!searchQuery) return true;
+  const q = searchQuery.toLowerCase();
+  return (
+    (e.token        || '').toLowerCase().includes(q) ||
+    (e.abstraction  || '').toLowerCase().includes(q) ||
+    (e.dot_name     || '').toLowerCase().includes(q) ||
+    (e.description  || '').toLowerCase().includes(q) ||
+    (e.language     || '').toLowerCase().includes(q)
+  );
+}
+
+function groupLabel(e) {
+  const policy = e.ns_slot_policy || 'none';
+  if (policy === 'static')  return 'Static NS Slots';
+  if (policy === 'dynamic') return 'Dynamic NS Slots';
+  return 'No NS Slot';
+}
+
+function groupOrder(label) {
+  if (label === 'Static NS Slots')  return 0;
+  if (label === 'Dynamic NS Slots') return 1;
+  return 2;
+}
+
+// ── Render left list ──────────────────────────────────────────
+function renderList() {
+  const filtered = ALL_ENTRIES.filter(e => matchesFilter(e) && matchesSearch(e));
+
+  // Group
+  const groups = {};
+  for (const e of filtered) {
+    const g = groupLabel(e);
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(e);
+  }
+  const sortedGroups = Object.keys(groups).sort((a, b) => groupOrder(a) - groupOrder(b));
+
+  const list = document.getElementById('entryList');
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="empty-note" style="padding:1rem">No entries match.</div>';
+    return;
+  }
+
+  let html = '';
+  for (const g of sortedGroups) {
+    html += `<div class="group-hdr">${escH(g)} <span style="opacity:0.6;font-weight:400">(${groups[g].length})</span></div>`;
+    for (const e of groups[g]) {
+      const isActive  = e.token === activeToken;
+      const slotBadge = e.ns_slot != null
+        ? `<span class="badge badge-slot">NS${e.ns_slot}</span>`
+        : `<span class="badge badge-noport">—</span>`;
+      const statBadge = e.status === 'released'
+        ? `<span class="badge badge-rel">REL</span>`
+        : e.status === 'wip'
+          ? `<span class="badge badge-wip">WIP</span>`
+          : `<span class="badge badge-na">?</span>`;
+      const bootBadge = e.boot_resident
+        ? `<span class="badge badge-boot">⚡</span>` : '';
+      const langBadge = e.language
+        ? `<span class="badge badge-lang">${escH(e.language)}</span>` : '';
+      const validBadge = e.binary_valid === false
+        ? `<span class="badge badge-invalid" title="Binary missing or invalid">!</span>` : '';
+      html += `<div class="entry-row${isActive?' active':''}" data-token="${escH(e.token||'')}">
+        <span class="entry-name" title="${escH(e.dot_name||e.abstraction||e.token||'')}">${escH(e.dot_name||e.abstraction||e.token||'—')}</span>
+        ${slotBadge}${bootBadge}${langBadge}${statBadge}${validBadge}
+        <span class="entry-token">${escH((e.token||'').slice(0,8))}</span>
+      </div>`;
+    }
+  }
+  list.innerHTML = html;
+
+  // Re-attach click handlers
+  list.querySelectorAll('.entry-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const tok = row.dataset.token;
+      const entry = ALL_ENTRIES.find(x => x.token === tok);
+      if (entry) selectEntry(entry);
+    });
+  });
+}
+
+// ── Select / render right panel ───────────────────────────────
+function selectEntry(e) {
+  activeToken = e.token;
+  renderList(); // refresh active state
+
+  document.getElementById('welcome').style.display  = 'none';
+  const review = document.getElementById('review');
+  review.classList.add('visible');
+
+  // Header
+  document.getElementById('revFilename').textContent = e.filename || `${e.token}.lump`;
+  document.getElementById('revTitle').textContent    = e.dot_name || e.abstraction || e.token || '—';
+
+  // Sub-line
+  const sub = document.getElementById('revSub');
+  const parts = [];
+  if (e.token)    parts.push(`<code>${escH(e.token)}</code>`);
+  if (e.language) parts.push(`<span>${escH(e.language)}</span>`);
+  if (e.version)  parts.push(`<span>v${escH(e.version)}</span>`);
+  if (e.status === 'released') parts.push(`<span class="stat-rel">● released</span>`);
+  else if (e.status === 'wip') parts.push(`<span class="stat-wip">⚠ wip</span>`);
+  if (e.boot_resident) parts.push(`<span class="badge badge-boot">⚡ boot resident</span>`);
+  sub.innerHTML = parts.join(' · ');
+
+  // Tabs
+  document.getElementById('revTabs').innerHTML = `
+    <div class="tab active" data-tab="overview">Overview</div>
+    <div class="tab" data-tab="methods">Methods${e.methods && e.methods.length ? ' ('+e.methods.length+')' : ''}</div>
+    <div class="tab" data-tab="caps">Capabilities${e.capabilities && e.capabilities.length ? ' ('+e.capabilities.length+')' : ''}</div>
+    <div class="tab" data-tab="binary">Binary</div>
+    <div class="tab" data-tab="source">Source</div>
+  `;
+  document.getElementById('revTabs').querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => switchTab(t.dataset.tab, e));
+  });
+
+  renderOverview(e);
+}
+
+function switchTab(name, e) {
+  document.querySelectorAll('#revTabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  const body = document.getElementById('revBody');
+  body.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+  let tc = body.querySelector(`.tab-content[data-tab="${name}"]`);
+  if (!tc) {
+    tc = document.createElement('div');
+    tc.className = 'tab-content';
+    tc.dataset.tab = name;
+    body.appendChild(tc);
+    if (name === 'overview')  tc.innerHTML = buildOverviewHTML(e);
+    else if (name === 'methods') tc.innerHTML = buildMethodsHTML(e);
+    else if (name === 'caps')    tc.innerHTML = buildCapsHTML(e);
+    else if (name === 'binary')  tc.innerHTML = buildBinaryPlaceholderHTML(e);
+    else if (name === 'source')  tc.innerHTML = buildSourceHTML(e);
+
+    if (name === 'binary') attachBinaryLoader(tc, e);
+    if (name === 'source') attachSourceLoader(tc, e);
+  }
+  tc.classList.add('active');
+}
+
+function renderOverview(e) {
+  const body = document.getElementById('revBody');
+  body.innerHTML = '';
+  const tc = document.createElement('div');
+  tc.className = 'tab-content active';
+  tc.dataset.tab = 'overview';
+  tc.innerHTML = buildOverviewHTML(e);
+  body.appendChild(tc);
+}
+
+// ── Overview tab ──────────────────────────────────────────────
+function buildOverviewHTML(e) {
+  const nv = (v, cls='kv-null') =>
+    v == null || v === '' ? `<span class="${cls}">—</span>` : escH(String(v));
+
+  const slotp = e.ns_slot_policy || '—';
+  const slotCls = { static:'stat-rel', dynamic:'stat-none', none:'stat-none' };
+
+  const grantsBadges = (e.grants || []).map(g =>
+    `<span class="perm perm-${escH(g)}">${escH(g)}</span>`).join(' ') || '<span class="kv-null">—</span>';
+
+  let descHtml = '<span class="kv-null">—</span>';
+  if (e.description) {
+    descHtml = `<p class="desc-text">${escH(e.description)}</p>`;
+  }
+
+  return `
+  <div class="card">
+    <h3>Identity</h3>
+    <div class="kv-grid">
+      <span class="kv-key">Token</span>        <span class="kv-val"><code>${nv(e.token)}</code></span>
+      <span class="kv-key">Abstraction</span>  <span class="kv-val">${nv(e.abstraction)}</span>
+      <span class="kv-key">Dot name</span>     <span class="kv-val">${nv(e.dot_name)}</span>
+      <span class="kv-key">Issue #</span>      <span class="kv-val">${nv(e.issue_n ?? e.issue_number)}</span>
+      <span class="kv-key">Version</span>      <span class="kv-val">${nv(e.version)}</span>
+      <span class="kv-key">Author</span>       <span class="kv-val">${nv(e.author)}</span>
+      <span class="kv-key">Status</span>       <span class="kv-val">${e.status === 'released' ? '<span class="stat-rel">released</span>' : e.status === 'wip' ? '<span class="stat-wip">wip</span>' : '<span class="stat-none">—</span>'}</span>
+      <span class="kv-key">Filename</span>     <span class="kv-val"><code>${nv(e.filename)}</code></span>
+      <span class="kv-key">Sidecar</span>      <span class="kv-val"><code>${nv(e.sidecar_file)}</code></span>
+      <span class="kv-key">Binary hash</span> <span class="kv-val" style="word-break:break-all"><code style="font-size:0.7rem">${nv(e.binary_hash)}</code></span>
+      ${e.identity_hash ? `<span class="kv-key">Identity hash</span><span class="kv-val" style="word-break:break-all"><code style="font-size:0.7rem">${escH(e.identity_hash)}</code></span>` : ''}
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Namespace</h3>
+    <div class="kv-grid">
+      <span class="kv-key">NS slot</span>        <span class="kv-val">${e.ns_slot != null ? `<span class="badge badge-slot">NS${e.ns_slot}</span>` : '<span class="kv-null">—</span>'}</span>
+      <span class="kv-key">NS slot policy</span> <span class="kv-val">${escH(slotp)}</span>
+      <span class="kv-key">Boot resident</span>  <span class="kv-val">${e.boot_resident ? '⚡ yes' : '<span class="kv-null">no</span>'}</span>
+      <span class="kv-key">Variant group</span> <span class="kv-val">${nv(e.variant_group)}</span>
+      <span class="kv-key">Domain</span>        <span class="kv-val">${nv(e.domain)}</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Binary layout</h3>
+    <div class="kv-grid">
+      <span class="kv-key">LUMP size (words)</span> <span class="kv-val">${nv(e.lump_size)}</span>
+      <span class="kv-key">Code words (cw)</span>   <span class="kv-val">${nv(e.cw)}</span>
+      <span class="kv-key">Data words (dw)</span>   <span class="kv-val">${nv(e.dw)}</span>
+      <span class="kv-key">C-list count (cc)</span> <span class="kv-val">${nv(e.cc)}</span>
+      <span class="kv-key">Lump type</span>         <span class="kv-val">${nv(e.lump_type)}</span>
+      <span class="kv-key">Language</span>          <span class="kv-val">${nv(e.language)}</span>
+      <span class="kv-key">LUMP version</span>      <span class="kv-val">${nv(e.lump_version)}</span>
+      <span class="kv-key">Grants</span>            <span class="kv-val">${grantsBadges}</span>
+      <span class="kv-key">Binary valid</span>      <span class="kv-val">${e.binary_valid === true ? '✅ yes' : e.binary_valid === false ? '❌ no' : '<span class="kv-null">?</span>'}</span>
+      ${e.data_offset != null ? `<span class="kv-key">Data offset</span><span class="kv-val">${e.data_offset}</span>` : ''}
+      ${e.self_data_r ? `<span class="kv-key">Self-data R</span><span class="kv-val">yes</span>` : ''}
+      ${e.compiled_at ? `<span class="kv-key">Compiled at</span><span class="kv-val">${escH(e.compiled_at)}</span>` : ''}
+    </div>
+  </div>
+
+  ${e.description ? `<div class="card"><h3>Description</h3>${descHtml}</div>` : ''}
+
+  ${e.source ? `<div class="card"><h3>Source file</h3><div class="kv-val"><a href="/${escH(e.source)}" target="_blank">${escH(e.source)}</a></div></div>` : ''}
+
+  ${e.media_tags && e.media_tags.length ? `<div class="card"><h3>Media tags</h3><div class="kv-val">${e.media_tags.map(t=>`<code>${escH(t)}</code>`).join(' ')}</div></div>` : ''}
+  `;
+}
+
+// ── Methods tab ───────────────────────────────────────────────
+function buildMethodsHTML(e) {
+  const methods = e.methods || [];
+  if (!methods.length) return '<div class="empty-note">No methods recorded in manifest.</div>';
+  let html = '';
+  for (const m of methods) {
+    html += `<div class="method-entry">
+      <div class="method-header">
+        <span class="method-name">${escH(m.name)}</span>
+        <span class="method-offset">@${m.offset ?? '?'}</span>
+        <span class="method-len">len=${m.length ?? '?'}</span>
+        ${m.aliasOf ? `<span class="badge badge-na">alias→${escH(m.aliasOf)}</span>` : ''}
+      </div>
+      <div class="method-body">
+        ${m.description ? `<div class="method-desc">${escH(m.description)}</div>` : ''}
+        ${buildIOSection('Inputs', m.inputs)}
+        ${buildIOSection('Outputs', m.outputs)}
+      </div>
+    </div>`;
+  }
+  return html;
+}
+
+function buildIOSection(label, items) {
+  if (!items || !items.length) return '';
+  return `<div class="io-section">
+    <div class="io-label">${label}</div>
+    <ul class="io-list">${items.map(i=>`<li>${escH(i)}</li>`).join('')}</ul>
+  </div>`;
+}
+
+// ── Capabilities tab ──────────────────────────────────────────
+function buildCapsHTML(e) {
+  // Two sources: manifest 'capabilities' array + live 'clist_entries'
+  const caps = e.capabilities || [];
+  const clist = e.clist_entries || [];
+
+  let html = '';
+
+  if (caps.length) {
+    html += `<div class="card"><h3>Declared capabilities (manifest)</h3>
+    <table class="clist-table">
+      <thead><tr><th>#</th><th>Name</th><th>Rights</th></tr></thead>
+      <tbody>`;
+    caps.forEach((c, i) => {
+      const rights = (c.rights || []).map(r => `<span class="perm perm-${escH(r)}">${escH(r)}</span>`).join(' ');
+      html += `<tr>
+        <td>${i}</td>
+        <td>${escH(c.name || '—')}</td>
+        <td>${rights || '<span class="kv-null">—</span>'}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  }
+
+  if (clist.length) {
+    html += `<div class="card"><h3>Live C-list (from binary)</h3>
+    <table class="clist-table">
+      <thead><tr><th>#</th><th>GT word 0</th><th>Perm bits</th></tr></thead>
+      <tbody>`;
+    clist.forEach((c, i) => {
+      html += `<tr>
+        <td>${i}</td>
+        <td style="font-family:monospace">${c.word0 != null ? '0x'+Number(c.word0).toString(16).toUpperCase().padStart(8,'0') : '—'}</td>
+        <td>${c.perm_bits != null ? c.perm_bits : '—'}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  }
+
+  if (!caps.length && !clist.length) {
+    html = '<div class="empty-note">No capabilities recorded.</div>';
+  }
+
+  return html;
+}
+
+// ── Binary tab ────────────────────────────────────────────────
+function buildBinaryPlaceholderHTML(e) {
+  return `<button class="load-btn" id="loadBinBtn">⬇ Fetch binary</button>
+  <div id="binContent"></div>`;
+}
+
+function attachBinaryLoader(tc, e) {
+  const btn = tc.querySelector('#loadBinBtn');
+  const out = tc.querySelector('#binContent');
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = '⏳ Loading…';
+    try {
+      // Use /words endpoint — returns clean JSON uint32 array, no CRC prefix
+      const r = await fetch(`/api/lump/${encodeURIComponent(e.token || '')}/words`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const json = await r.json();
+      if (json.error) throw new Error(json.error);
+      const words = json.words;
+      // Sanity-check: word 0 must be a valid LUMP header (bits [31:27] == 0x1F)
+      const w0 = words[0] >>> 0;
+      const magic = (w0 >>> 27) & 0x1F;
+      if (magic !== 0x1F) {
+        out.innerHTML = `<div class="error-msg">⚠ Word 0 (0x${w0.toString(16).toUpperCase().padStart(8,'0')}) does not have LUMP header magic (bits[31:27] should be 0x1F, got 0x${magic.toString(16).toUpperCase()}). Binary may be corrupt.</div>`;
+      } else {
+        out.innerHTML = buildHexDump(words, e);
+      }
+      btn.textContent = `✅ ${words.length} words (${words.length * 4} bytes) loaded`;
+    } catch (err) {
+      out.innerHTML = `<div class="error-msg">Failed to fetch binary: ${escH(err.message)}</div>`;
+      btn.disabled = false;
+      btn.textContent = '⬇ Fetch binary';
+    }
+  });
+}
+
+function buildHexDump(words, e) {
+  // words[] is a plain uint32 array from /api/lump/<token>/words — no CRC prefix,
+  // no byte-order ambiguity.  word[0] is always the LUMP header.
+  const cw      = parseInt(e.cw ?? 0) || 0;
+  const dw      = parseInt(e.dw ?? 0) || 0;
+  const cc      = parseInt(e.cc ?? 0) || 0;
+  // data_offset is the word index where the data section begins; fall back to cw+1
+  const dataOff = parseInt(e.data_offset ?? 0) || (cw > 0 ? cw + 1 : 0);
+
+  const wordsTotal  = words.length;
+  // C-list occupies the last cc words of the LUMP
+  const clistStart  = wordsTotal - cc;
+
+  function wordClass(idx) {
+    if (idx === 0)                               return 'hex-header';
+    if (cc > 0 && idx >= clistStart)             return 'hex-clist';
+    if (dw > 0 && idx >= dataOff && idx < dataOff + dw) return 'hex-freespace';
+    return idx === 1 ? 'hex-code-start' : 'hex-code';
+  }
+
+  // Legend
+  let leg = `<div class="hex-legend">
+    <div class="hex-leg-item"><div class="hex-leg-swatch hex-header"></div>Header (word 0)</div>
+    <div class="hex-leg-item"><div class="hex-leg-swatch hex-code-start"></div>Code start</div>
+    <div class="hex-leg-item"><div class="hex-leg-swatch hex-code"></div>Code</div>`;
+  if (dw > 0) leg += `<div class="hex-leg-item"><div class="hex-leg-swatch hex-freespace"></div>Data</div>`;
+  if (cc > 0) leg += `<div class="hex-leg-item"><div class="hex-leg-swatch hex-clist"></div>C-list (last ${cc})</div>`;
+  leg += '</div>';
+
+  // Table: one row per word
+  let rows = '';
+  for (let w = 0; w < wordsTotal; w++) {
+    const val = (words[w] >>> 0);
+    const hex = val.toString(16).toUpperCase().padStart(8, '0');
+    const cls = wordClass(w);
+    rows += `<tr>
+      <td class="hex-addr">${w.toString(16).toUpperCase().padStart(4,'0')}</td>
+      <td class="hex-cell ${cls}" title="word ${w} · 0x${hex}">${hex}</td>
+    </tr>`;
+  }
+
+  return `${leg}<div class="hex-wrap"><table class="hex-table">
+    <thead><tr><th class="hex-addr">word</th><th>value (big-endian uint32)</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+
+// ── Source tab ────────────────────────────────────────────────
+function buildSourceHTML(e) {
+  // If source is a path, render a clickable link + placeholder;
+  // we'll try to load the full text from detail endpoint
+  const srcPath = e.source || '';
+  if (!srcPath && !e.has_source) {
+    return '<div class="source-absent">No source path recorded in manifest for this entry.</div>';
+  }
+  return `<div id="srcLoading" class="loading-msg">Loading source…</div>
+    <div id="srcContent"></div>
+    ${srcPath ? `<div id="srcLink" style="margin-top:0.5rem;font-size:0.78rem;color:#888">Path: <a href="/${escH(srcPath)}" target="_blank">${escH(srcPath)}</a></div>` : ''}`;
+}
+
+function attachSourceLoader(tc, e) {
+  const loading = tc.querySelector('#srcLoading');
+  const content = tc.querySelector('#srcContent');
+  if (!loading || !content) return;
+
+  // Try to get source from detail endpoint
+  fetch(`/api/lumps/${encodeURIComponent(e.token)}/detail`)
+    .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+    .then(detail => {
+      const src = detail.source || '';
+      loading.style.display = 'none';
+      if (src && src.trim()) {
+        content.innerHTML = `<pre class="source-block">${escH(src)}</pre>`;
+      } else if (e.source) {
+        content.innerHTML = `<div class="source-absent">Source text not stored in sidecar.
+${e.source ? `<br><a href="/${escH(e.source)}" target="_blank">${escH(e.source)}</a>` : ''}</div>`;
+      } else {
+        content.innerHTML = '<div class="source-absent">No source stored for this entry.</div>';
+      }
+    })
+    .catch(err => {
+      loading.style.display = 'none';
+      if (e.source) {
+        content.innerHTML = `<div class="source-absent">Could not load source detail (${escH(err.message)}).
+<br><a href="/${escH(e.source)}" target="_blank">${escH(e.source)}</a></div>`;
+      } else {
+        content.innerHTML = `<div class="error-msg">Failed to load source: ${escH(err.message)}</div>`;
+      }
+    });
+}
+
+// ── Filter pill handler ───────────────────────────────────────
+document.getElementById('filterPills').addEventListener('click', e => {
+  const pill = e.target.closest('.pill');
+  if (!pill) return;
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  pill.classList.add('active');
+  activeFilter = pill.dataset.filter;
+  renderList();
+});
+
+// ── Search handler ────────────────────────────────────────────
+document.getElementById('searchBox').addEventListener('input', e => {
+  searchQuery = e.target.value.trim();
+  renderList();
+});
+
+// ── Helpers ───────────────────────────────────────────────────
+function escH(s) {
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+// ── Boot ──────────────────────────────────────────────────────
+loadManifest();
+</script>
+</body>
+</html>
