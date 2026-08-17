@@ -119,6 +119,33 @@ body { font-family: system-ui, sans-serif; margin: 0; background: #f2f3f7; color
 .asm-ok-bar   { background: #071f07; color: #5ae05a; font-family: 'Courier New', Courier, monospace; font-size: 0.73rem; padding: 0.5rem 0.9rem; border-radius: 4px; border-left: 4px solid #2a7a2a; margin-bottom: 0.75rem; }
 .asm-listing  { font-family: 'Courier New', Courier, monospace; font-size: 0.72rem; background: #0d1b2a; color: #c8d8f0; padding: 1rem 1.1rem; border-radius: 5px; overflow: auto; max-height: 480px; line-height: 1.65; white-space: pre; }
 
+/* ── Hex dump ── */
+.hex-wrap  { overflow-x: auto; overflow-y: auto; max-height: 440px; background: #fafbff; border: 1px solid #d8daee; border-radius: 4px; padding: 0.35rem 0.5rem; }
+.hex-table { border-collapse: collapse; font-family: 'Courier New', Courier, monospace; font-size: 0.7rem; width: 100%; }
+.hex-table tr:hover td { filter: brightness(0.92); }
+.hex-addr  { color: #888; padding: 0.12rem 0.6rem 0.12rem 0; white-space: nowrap; font-weight: 600; user-select: none; }
+.hex-cell  { padding: 0.1rem 0.25rem; text-align: center; white-space: nowrap; border: 1px solid #ebebf5; cursor: default; min-width: 5.8em; }
+.hex-cell:hover { outline: 2px solid #1a5cc8; position: relative; z-index: 1; }
+.hex-empty { color: #ccc !important; background: #f8f8fc !important; }
+.hex-header    { color: #1a5a1a; background: #edfced; font-weight: 700; }
+.hex-code      { color: #1a2a5a; background: #eef1ff; }
+.hex-code-start{ color: #1a2a5a; background: #dce4ff; font-weight: 700; }
+.hex-freespace { color: #bbb;    background: #f7f7f7; }
+.hex-clist     { color: #7a4a00; background: #fff8e8; }
+.hex-clist-live{ color: #6a3800; background: #ffe8b0; font-weight: 700; }
+.hex-region    { padding: 0.1rem 0 0.1rem 0.55rem; font-size: 0.62rem; font-weight: 700; white-space: nowrap; user-select: none; color: #bbb; }
+.hex-region-header    { color: #2a7a2a; }
+.hex-region-code      { color: #3a4a9a; }
+.hex-region-freespace { color: #aaa; }
+.hex-region-clist     { color: #8a5a10; }
+.hex-legend { display: flex; gap: 0.9rem; flex-wrap: wrap; margin-bottom: 0.55rem; font-size: 0.72rem; }
+.hex-leg-item { display: flex; align-items: center; gap: 0.3rem; }
+.hex-leg-swatch { width: 1em; height: 1em; border: 1px solid #ccc; border-radius: 2px; }
+.disasm-btn { background: #1e2d52; color: #a8c8f8; border: 1px solid #3a5a8a; border-radius: 4px; padding: 0.32rem 0.8rem; font-size: 0.77rem; cursor: pointer; font-weight: 600; }
+.disasm-btn:hover { background: #2a3d6a; }
+.disasm-listing { font-family: 'Courier New', Courier, monospace; font-size: 0.7rem; background: #0d1b2a; color: #c8d8f0; padding: 0.9rem 1rem; border-radius: 5px; overflow: auto; max-height: 560px; line-height: 1.75; white-space: pre; margin-top: 0.75rem; display: none; }
+.disasm-listing.visible { display: block; }
+
 /* ── Docs ── */
 .doc-stat { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
 .doc-count-big { font-size: 2rem; font-weight: 700; color: #1a5cc8; }
@@ -1028,6 +1055,7 @@ function selectLump(id) {
   const tabs = [
     { id:'overview',  label:'📋 Overview' },
     { id:'binary',    label:'🔢 Binary' },
+    { id:'hex',       label:'💾 Hex' },
     { id:'spec',      label:`${failCount?'❌':'✅'} Spec v1.2` },
     { id:'methods',   label:`⚙️ Methods (${lump.methods.length})` },
     { id:'clist',     label:`🔑 C-list (${lump.capabilities.length})` },
@@ -1161,6 +1189,192 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
           <li class="check-item ${lump.cc>0?'check-pass':'check-info'}"><span class="check-icon">${lump.cc>0?'✅':'ℹ️'}</span><span class="check-rule">Step 8</span><span class="check-desc">${lump.cc>0?`Validate ${lump.cc} c-list GT Word 0 slot(s)`:'cc=0 — no c-list to validate'}</span></li>
           <li class="check-item check-pass"><span class="check-icon">✅</span><span class="check-rule">Step 9</span><span class="check-desc">Issue E-GT (B E) → write NS${lump.ns_slot!==null&&lump.ns_slot!==undefined?`[${lump.ns_slot}]`:' (next free)'}</span></li>
         </ul>
+      </div>`;
+
+  } else if (tab === 'hex') {
+    // ── Build word-annotation maps ─────────────────────────────────────────────
+    // words[i]   = known 32-bit value (null = not embedded / binary only)
+    // sections[i]= 'header' | 'code' | 'code-start' | 'freespace' | 'clist' | 'clist-live'
+    // annots[i]  = hover tooltip string
+    const words   = new Array(lump.lump_size).fill(null);
+    const sections= new Array(lump.lump_size).fill('code');
+    const annots  = new Array(lump.lump_size).fill('');
+
+    // Word 0: header (always known)
+    words[0]    = header >>> 0;
+    sections[0] = 'header';
+    annots[0]   = `Header: magic=0x1F  n-6=${nMinus6}  cw=${lump.cw}  typ=${lump.typ||0}  cc=${lump.cc}`;
+
+    // Code section (words 1..cw) — actual instructions not embedded
+    const methodStarts = {};
+    for (const m of lump.methods) methodStarts[1 + (m.offset || 0)] = m.name;
+    for (let w = 1; w <= lump.cw; w++) {
+      sections[w] = methodStarts[w] ? 'code-start' : 'code';
+      annots[w]   = methodStarts[w] ? `.method ${methodStarts[w]}  (W${String(w).padStart(4,'0')})` : `code word  W${String(w).padStart(4,'0')}`;
+    }
+
+    // Freespace (words cw+1 .. lump_size-cc-1)
+    const fsS = lump.cw + 1, fsE = lump.lump_size - lump.cc - 1;
+    for (let w = fsS; w <= fsE; w++) {
+      words[w]    = 0;
+      sections[w] = 'freespace';
+      annots[w]   = `freespace  W${String(w).padStart(4,'0')}  (Mint verifies = 0x00000000)`;
+    }
+
+    // C-list (words lump_size-cc .. lump_size-1)
+    const clBase = lump.lump_size - lump.cc;
+    for (let i = 0; i < lump.cc; i++) {
+      const w   = clBase + i;
+      const cap = lump.capabilities[i] || null;
+      const capName  = cap ? cap.name : `slot ${i}`;
+      const capPerms = cap ? ((cap.rights||[]).join('+') || '—') : '—';
+      if (cap && cap.gt) {
+        words[w]    = parseInt(cap.gt, 16) >>> 0;
+        sections[w] = 'clist-live';
+        annots[w]   = `c-list[${i}]  ${capName}  perms:${capPerms}  GT=${cap.gt}`;
+      } else {
+        sections[w] = 'clist';
+        annots[w]   = `c-list[${i}]  ${capName}  perms:${capPerms}  (runtime-issued — zero at compile time)`;
+      }
+    }
+
+    // ── Render hex dump table ─────────────────────────────────────────────────
+    const COLS = 8;
+    let hexRows = '';
+    let prevSec = null;
+    for (let rStart = 0; rStart < lump.lump_size; rStart += COLS) {
+      const firstSec = sections[rStart] || 'code';
+      const regionCls = 'hex-region hex-region-' + firstSec.replace('-start','').replace('-live','');
+      const regionLabel = firstSec.startsWith('freespace') ? '.freespace'
+                        : firstSec.startsWith('header')    ? '.header'
+                        : firstSec.startsWith('clist')     ? '.clist'
+                        : '.code';
+      let cells = '';
+      for (let c = 0; c < COLS; c++) {
+        const wi = rStart + c;
+        if (wi >= lump.lump_size) { cells += '<td class="hex-cell hex-empty">——————</td>'; continue; }
+        const sec = sections[wi];
+        const val = words[wi];
+        const cls = 'hex-cell hex-' + sec.replace('-','-');
+        const hexStr = val !== null ? val.toString(16).toUpperCase().padStart(8,'0') : '· · · ·';
+        const tipVal = val !== null ? `0x${val.toString(16).toUpperCase().padStart(8,'0')}` : '(not embedded)';
+        const tip = (annots[wi] ? annots[wi] + '  |  ' : '') + tipVal;
+        cells += `<td class="${cls}" title="${tip.replace(/"/g,'&quot;')}">${hexStr}</td>`;
+      }
+      const showRegion = (firstSec !== prevSec);
+      prevSec = firstSec;
+      hexRows += `<tr><td class="hex-addr">W${String(rStart).padStart(4,'0')}</td>${cells}<td class="${regionCls}">${showRegion ? regionLabel : ''}</td></tr>`;
+    }
+
+    // ── Build disassembly listing text ────────────────────────────────────────
+    const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const hxHdr = '0x' + (header>>>0).toString(16).toUpperCase().padStart(8,'0');
+    let da = '';
+    da += `; ${'═'.repeat(66)}\n`;
+    da += `; ${lump.id}  —  structural disassembly\n`;
+    da += `; lump_size=${lump.lump_size}  cw=${lump.cw}  cc=${lump.cc}  freespace=${freespace}  typ=${lump.typ||0}\n`;
+    da += `; ${'═'.repeat(66)}\n\n`;
+
+    // Header
+    da += `; ${'─'.repeat(24)} .header ${'─'.repeat(33)}\n`;
+    da += `W0000   ${hxHdr}    .header\n`;
+    da += `        bits[31:27]  magic   = 0x1F  (0b11111)  trap sentinel — never executed as code\n`;
+    da += `        bits[26:23]  n-6     = ${String(nMinus6).padEnd(3)}   lump_size = 2^${n} = ${lump.lump_size} word${lump.lump_size!==1?'s':''} (${lump.lump_size*4} bytes)\n`;
+    da += `        bits[22:10]  cw      = ${String(lump.cw).padEnd(3)}   code section: W0001..W${String(lump.cw).padStart(4,'0')}\n`;
+    da += `        bits[9:8]    typ     = ${String(lump.typ||0).padEnd(3)}   ${['Function abstraction','Data abstraction','C-list only','Outform'][lump.typ||0]}\n`;
+    da += `        bits[7:0]    cc      = ${String(lump.cc).padEnd(3)}   c-list: ${lump.cc>0?`W${String(lump.lump_size-lump.cc).padStart(4,'0')}..W${String(lump.lump_size-1).padStart(4,'0')}`:'none (cc=0)'}\n\n`;
+
+    // Code section
+    da += `; ${'─'.repeat(24)} .code  [${lump.cw} word${lump.cw!==1?'s':''}] ${'─'.repeat(28)}\n`;
+    if (lump.cw === 0) {
+      da += `; (no code — cw=0)\n\n`;
+    } else if (lump.methods.length === 0) {
+      da += `W0001   --------    (${lump.cw} code words — no method table available)\n\n`;
+    } else {
+      let mPrev = 0;
+      lump.methods.forEach((m, mi) => {
+        const wS = 1 + (m.offset || 0);
+        const wE = wS + (m.length || 1) - 1;
+        const vis = m.visibility === 'private' ? ' [private]' : '';
+        da += `\nW${String(wS).padStart(4,'0')}   --------    .method ${m.name}${vis}  (selector ${mi+1})\n`;
+        da += `        words   W${String(wS).padStart(4,'0')}..W${String(wE).padStart(4,'0')}  length=${m.length||1}\n`;
+        if (m.description) da += `        desc    ${m.description.slice(0,90)}${m.description.length>90?'…':''}\n`;
+        if (m.inputs && m.inputs.length)  da += `        in      ${m.inputs.join('  |  ')}\n`;
+        if (m.outputs && m.outputs.length) da += `        out     ${m.outputs.join('  |  ')}\n`;
+        mPrev = wE;
+      });
+      da += `\n`;
+    }
+
+    // Freespace
+    da += `; ${'─'.repeat(24)} .freespace  [${freespace} word${freespace!==1?'s':''}] ${'─'.repeat(25)}\n`;
+    if (freespace === 0) {
+      da += `; (no freespace — lump fully utilised)\n\n`;
+    } else {
+      da += `W${String(fsS).padStart(4,'0')}   00000000    × ${freespace}  (all-zero, verified by Mint.Lump step 7)\n`;
+      da += `W${String(fsE).padStart(4,'0')}   00000000    (last freespace word)\n\n`;
+    }
+
+    // C-list
+    da += `; ${'─'.repeat(24)} .clist  [cc=${lump.cc}] ${'─'.repeat(33)}\n`;
+    if (lump.cc === 0) {
+      da += `; cc=0 — no c-list  CR6 = NULL GT on every CALL\n`;
+    } else {
+      for (let i = 0; i < lump.cc; i++) {
+        const w   = clBase + i;
+        const cap = lump.capabilities[i] || null;
+        const capName  = cap ? cap.name : `(unknown slot ${i})`;
+        const capPerms = cap ? ((cap.rights||[]).join('+') || '—') : '—';
+        const capGT    = (cap && cap.gt) ? cap.gt : null;
+        const capNote  = cap && cap.note ? `  — ${cap.note}` : '';
+        da += `\nW${String(w).padStart(4,'0')}   ${capGT ? capGT.replace('0x','').replace('0X','').toUpperCase().padStart(8,'0') : '00000000'}    c-list[${i}]  ${capName}  rights:${capPerms}${capNote}\n`;
+        if (capGT) {
+          const gt32 = parseInt(capGT,16) >>> 0;
+          const gtTyp  = (gt32 >>> 25) & 0x3;
+          const gtSlot = gt32 & 0xFFFF;
+          const gtTypName = ['NULL','Inform','Outform','Abstract'][gtTyp];
+          const gtPerms = [];
+          if ((gt32>>>31)&1) gtPerms.push('B');
+          if ((gt32>>>30)&1) gtPerms.push('E');
+          if ((gt32>>>29)&1) gtPerms.push('S');
+          if ((gt32>>>28)&1) gtPerms.push('L');
+          if ((gt32>>>27)&1) gtPerms.push('R');
+          da += `        decode  typ=${gtTyp} (${gtTypName})  perms=${gtPerms.join('')||'none'}  ns_slot=${gtSlot}  raw=${capGT}\n`;
+        } else {
+          da += `        decode  0x00000000 = NULL GT (runtime-issued; Mint or lazy-loader writes live GT at install time)\n`;
+        }
+      }
+    }
+
+    body.innerHTML = `
+      <div class="card">
+        <h3>Hex Dump — ${lump.id}  (${lump.lump_size} words · ${lump.lump_size*4} bytes)</h3>
+        <div class="hex-legend">
+          <span class="hex-leg-item"><span class="hex-leg-swatch" style="background:#edfced;border-color:#9acea2;"></span> Header</span>
+          <span class="hex-leg-item"><span class="hex-leg-swatch" style="background:#eef1ff;border-color:#9aaaca;"></span> Code</span>
+          <span class="hex-leg-item"><span class="hex-leg-swatch" style="background:#dce4ff;border-color:#7a8ad8;"></span> Method start</span>
+          <span class="hex-leg-item"><span class="hex-leg-swatch" style="background:#f7f7f7;border-color:#ccc;"></span> Freespace (all 0)</span>
+          <span class="hex-leg-item"><span class="hex-leg-swatch" style="background:#fff8e8;border-color:#d8b870;"></span> C-list (null GT)</span>
+          <span class="hex-leg-item"><span class="hex-leg-swatch" style="background:#ffe8b0;border-color:#c8900a;"></span> C-list (live GT)</span>
+          <span style="color:#888;font-size:0.68rem;margin-left:auto;">· · · · = not embedded (binary only)</span>
+        </div>
+        <div class="hex-wrap">
+          <table class="hex-table">
+            <thead><tr>
+              <th style="color:#888;font-size:0.65rem;padding:0.1rem 0.6rem 0.2rem 0;text-align:left;border-bottom:1px solid #dde;">Addr</th>
+              ${Array.from({length:8},(_,i)=>`<th style="color:#999;font-size:0.65rem;padding:0.1rem 0.25rem 0.2rem;text-align:center;border-bottom:1px solid #dde;">+${i}</th>`).join('')}
+              <th style="border-bottom:1px solid #dde;"></th>
+            </tr></thead>
+            <tbody>${hexRows}</tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0;">
+          <button class="disasm-btn" onclick="(function(btn){var el=document.getElementById('_disasmListing');if(!el)return;var vis=el.classList.toggle('visible');btn.textContent=vis?'▲ Collapse':'🔍 Disassemble';})(this)">🔍 Disassemble</button>
+          <span style="font-size:0.75rem;color:#888;">Per-word structural annotation — header fields, method boundaries, freespace scan, c-list GT decode</span>
+        </div>
+        <div class="disasm-listing" id="_disasmListing">${esc(da)}</div>
       </div>`;
 
   } else if (tab === 'spec') {
