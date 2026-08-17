@@ -25,6 +25,8 @@ Coverage
         sidecar and manifest retain their pre-PATCH values (rollback verified)
   T16 — concurrent PATCH: a failed PATCH does not clobber a previously-committed
         successful PATCH (sidecar + manifest agree on the committed values)
+  T17 — sidecar write failure: _atomic_write_json failing on the sidecar write
+        returns 5xx and leaves the original sidecar file intact (no partial write)
 """
 
 import json
@@ -502,4 +504,80 @@ class TestNsSlotPolicyRoundTrip:
             f"manifest/sidecar ns_slot_policy disagree: "
             f"manifest={final_entry.get('ns_slot_policy')!r} "
             f"sidecar={final_sidecar.get('ns_slot_policy')!r}"
+        )
+
+    def test_t17_sidecar_write_failure_leaves_original_intact(
+        self, client, saved_token, isolated_lumps, monkeypatch
+    ):
+        """T17 — Sidecar write atomicity: if _atomic_write_json fails while writing
+        the sidecar, the original sidecar file must be left completely intact.
+
+        This confirms that the sidecar write uses _atomic_write_json (not a bare
+        open()+json.dump()), so a disk-full or I/O error during the write cannot
+        produce a truncated or corrupt sidecar.  The original content must survive
+        unchanged and the server must return 5xx so the caller knows the PATCH
+        did not succeed.
+
+        Scenario: _atomic_write_json raises IOError on the first call (the sidecar
+        write).  The manifest write is never reached.
+
+        Verifies:
+          1. Server responds with 5xx (not 200).
+          2. The sidecar JSON file still contains the original ns_slot_policy and
+             ns_slot values (no partial or new content written).
+          3. manifest.json is also unchanged (write never reached).
+        """
+        sidecar_path  = isolated_lumps / f"{saved_token}.json"
+        manifest_path = isolated_lumps / "manifest.json"
+
+        # Capture the original file content verbatim so we can compare bytes.
+        original_sidecar_text  = sidecar_path.read_text()
+        original_manifest_text = manifest_path.read_text()
+        original_sidecar       = json.loads(original_sidecar_text)
+
+        # Inject a fault: fail on the very first _atomic_write_json call
+        # (the sidecar write).  The manifest write must never be reached.
+        _write_call_count = [0]
+        _real_atomic_write = _app_module._atomic_write_json
+
+        def _fail_on_sidecar_write(path, data):
+            _write_call_count[0] += 1
+            if _write_call_count[0] == 1:
+                # First call is the sidecar write — simulate a disk-full error.
+                raise IOError("Simulated disk full — sidecar write failed")
+            # Subsequent calls (which should not be reached) use the real impl.
+            _real_atomic_write(path, data)
+
+        monkeypatch.setattr(_app_module, "_atomic_write_json", _fail_on_sidecar_write)
+
+        # Issue the PATCH with values distinct from the originals.
+        resp = _patch(client, saved_token, {"ns_slot_policy": "static", "ns_slot": 3})
+
+        # 1. Server must NOT return success.
+        assert resp.status_code >= 500, (
+            f"Expected 5xx when sidecar write fails, got {resp.status_code}: {resp.data}"
+        )
+
+        # 2. Sidecar file must be identical to its pre-PATCH content.
+        post_sidecar = json.loads(sidecar_path.read_text())
+        assert post_sidecar.get("ns_slot_policy") == original_sidecar.get("ns_slot_policy"), (
+            f"sidecar ns_slot_policy changed despite write failure: "
+            f"{original_sidecar.get('ns_slot_policy')!r} → {post_sidecar.get('ns_slot_policy')!r}"
+        )
+        assert post_sidecar.get("ns_slot") == original_sidecar.get("ns_slot"), (
+            f"sidecar ns_slot changed despite write failure: "
+            f"{original_sidecar.get('ns_slot')!r} → {post_sidecar.get('ns_slot')!r}"
+        )
+
+        # 3. manifest.json must also be unchanged (the write was never reached).
+        assert manifest_path.read_text() == original_manifest_text, (
+            "manifest.json was modified even though the sidecar write failed before it"
+        )
+
+        # Confirm _atomic_write_json was only called once (for the sidecar) —
+        # a second call would mean the manifest write was attempted despite the
+        # sidecar failure, which would leave the two stores out of sync.
+        assert _write_call_count[0] == 1, (
+            f"Expected exactly 1 _atomic_write_json call (sidecar only), "
+            f"got {_write_call_count[0]}"
         )
