@@ -21,6 +21,27 @@ import sys
 
 LUMPS_DIR_IN_REPO = "server/lumps"
 
+# ---------------------------------------------------------------------------
+# Shared manifest filename-set logic
+# ---------------------------------------------------------------------------
+# Import the single source of truth so this guard and R25
+# (tests/lump/test_lump_consistency.py) can never drift apart.
+# We manipulate sys.path at import time because this file runs both as a
+# pre-commit hook (arbitrary CWD) and from within the test suite.
+_REPO_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
+_TESTS_LUMP_DIR = os.path.join(_REPO_ROOT, "tests", "lump")
+if _TESTS_LUMP_DIR not in sys.path:
+    sys.path.insert(0, _TESTS_LUMP_DIR)
+
+try:
+    from lump_manifest_utils import build_manifest_filename_set as _build_manifest_filename_set
+except ImportError as _e:  # pragma: no cover
+    raise ImportError(
+        "check_staged_lumps: could not import lump_manifest_utils from "
+        f"{_TESTS_LUMP_DIR!r}. "
+        "Ensure tests/lump/lump_manifest_utils.py exists in the repository."
+    ) from _e
+
 
 def _run(cmd, **kwargs):
     """Run a subprocess and return CompletedProcess, or None on failure."""
@@ -100,6 +121,11 @@ def _staged_manifest_filenames():
     """Return the set of filenames/token stems covered by the staged manifest.json.
 
     Falls back to the on-disk manifest if the file is not staged.
+
+    Delegates to ``lump_manifest_utils.build_manifest_filename_set`` for the
+    filename-matching logic so this function and R25
+    (``tests/lump/test_lump_consistency.TestR25_GitTrackedLumpsInManifest``)
+    share a single implementation and can never drift apart.
     """
     manifest_repo_path = f"{LUMPS_DIR_IN_REPO}/manifest.json"
 
@@ -120,15 +146,7 @@ def _staged_manifest_filenames():
         except (OSError, json.JSONDecodeError):
             entries = []
 
-    known = set()
-    for entry in entries:
-        token = entry.get("token", "").lower()
-        if token:
-            known.add(token + ".lump")
-        fn = entry.get("filename", "")
-        if fn:
-            known.add(fn.lower())
-    return known
+    return _build_manifest_filename_set(entries)
 
 
 def _load_server_managed_tokens():

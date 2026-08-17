@@ -76,6 +76,8 @@ import warnings
 
 import pytest
 
+from tests.lump.lump_manifest_utils import build_manifest_filename_set as _build_manifest_filename_set_util
+
 LUMPS_DIR = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "..", "server", "lumps")
 )
@@ -2759,16 +2761,13 @@ class TestR25_GitTrackedLumpsInManifest:
 
     @staticmethod
     def _build_manifest_filename_set() -> set:
-        """Build the complete set of filenames (and token stems) the manifest covers."""
-        known: set = set()
-        for entry in MANIFEST:
-            token = entry.get("token", "").lower()
-            if token:
-                known.add(token + ".lump")         # legacy <token>.lump
-            fn = entry.get("filename", "")
-            if fn:
-                known.add(fn.lower())
-        return known
+        """Build the complete set of filenames (and token stems) the manifest covers.
+
+        Delegates to ``lump_manifest_utils.build_manifest_filename_set`` so this
+        method and ``scripts/check_staged_lumps._staged_manifest_filenames`` share
+        a single implementation and can never drift apart.
+        """
+        return _build_manifest_filename_set_util(MANIFEST)
 
     def test_git_tracked_lumps_in_manifest(self):
         """Every git-tracked .lump with a valid header must appear in manifest.json."""
