@@ -73,7 +73,7 @@
   "version": "2.0",
   "lump_version": 2,
   "dot_name": "CapabilityTest",
-  "binary_hash": "c7a66d01",
+  "binary_hash": "1a6f7fef427b5069ee55dcda784bcc5b8a716c9ab3e5241ac6509c1d9dc95ae0",
   "release_notes": {
     "v1": "Assembler front-packed layout: c-list lazy stubs at words[1..5], instructions at words[6..26]. Binary hash 4d3d4d17. Archived as CapabilityTest_v1.lump. A broken v2 recompile (hash 1b20fba6) had empty source + missing HALT; that binary has been permanently deleted.",
     "v2": "Build-script tail-packed layout: instructions at words[1..23], real hardware GTs at words[59..63]. Binary hash c7a66d01. This is the canonical binary for token 00000a00."

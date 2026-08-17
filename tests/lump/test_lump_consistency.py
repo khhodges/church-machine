@@ -2464,3 +2464,54 @@ class TestR21_DataLumpUnit:
         assert not violations, (
             f"R22 incorrectly flagged {len(violations)} data LUMP body word(s) as bad GTs"
         )
+
+
+# ── R23: binary_hash integrity ─────────────────────────────────────────────────
+
+import hashlib as _hashlib
+
+_R23_MANIFEST_ENTRIES = [
+    e for e in MANIFEST
+    if len(e.get("binary_hash", "")) == 64
+]
+
+_R23_SIDECAR_TOKENS = [
+    tok for tok in JSON_TOKENS
+    if (lambda sc: sc is not None and len(sc.get("binary_hash", "")) == 64)(
+        _load_sidecar(tok)
+    )
+]
+
+
+class TestR23_BinaryHashIntegrity:
+    """R23: manifest/sidecar binary_hash (full SHA-256) must equal sha256 of the .lump file.
+
+    Only checked when binary_hash is exactly 64 hex characters.  8-character
+    filename-number entries are not the full SHA-256 contract and are skipped.
+    """
+
+    @pytest.mark.parametrize("entry", _R23_MANIFEST_ENTRIES, ids=lambda e: e["token"])
+    def test_manifest_binary_hash(self, entry):
+        token = entry["token"].lower()
+        if not _lump_exists(token):
+            pytest.skip(f"lump file absent for {token} (covered by R10)")
+        with open(_lump_path(token), "rb") as fh:
+            actual = _hashlib.sha256(fh.read()).hexdigest()
+        assert entry["binary_hash"] == actual, (
+            f"{token}: manifest.binary_hash = {entry['binary_hash']!r}\n"
+            f"  but sha256({_lump_path(token)}) = {actual!r}.\n"
+            "  Update manifest.json binary_hash to the value above, then bump CHANGELOG."
+        )
+
+    @pytest.mark.parametrize("token", _R23_SIDECAR_TOKENS)
+    def test_sidecar_binary_hash(self, token):
+        if not _lump_exists(token):
+            pytest.skip(f"lump file absent for {token}")
+        sc = _load_sidecar(token)
+        with open(_lump_path(token), "rb") as fh:
+            actual = _hashlib.sha256(fh.read()).hexdigest()
+        assert sc["binary_hash"] == actual, (
+            f"{token}: sidecar.binary_hash = {sc['binary_hash']!r}\n"
+            f"  but sha256({_lump_path(token)}) = {actual!r}.\n"
+            "  Update the sidecar binary_hash to the value above, then bump CHANGELOG."
+        )
