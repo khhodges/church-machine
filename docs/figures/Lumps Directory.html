@@ -101,6 +101,8 @@ body { font-family: system-ui, sans-serif; margin: 0; background: #f2f3f7; color
 .clist-table th, .clist-table td { border: 1px solid #dde; padding: 0.35rem 0.55rem; }
 .clist-table th { background: #eef0f8; }
 .gt-word { font-family: monospace; font-size: 0.78rem; color: #0044aa; }
+.gt-link { cursor: pointer; text-decoration: underline dotted #0044aa; }
+.gt-link:hover { color: #002288; background: #eaf0ff; border-radius: 2px; }
 .perm { display: inline-block; padding: 0.05rem 0.3rem; border-radius: 3px; font-size: 0.7rem; font-weight: 700; margin: 0.05rem; }
 .perm-E { background: #d8f0d8; color: #1a5a1a; }
 .perm-R { background: #d8e8ff; color: #1a2a7a; }
@@ -1234,7 +1236,16 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
     }
     const rows = lump.capabilities.map(cap => {
       const permHtml = (cap.rights||[]).map(r=>`<span class="perm perm-${r}">${r}</span>`).join('');
-      const gtHtml = cap.gt ? `<code class="gt-word">${cap.gt}</code>` : '<span style="color:#aaa">runtime-issued</span>';
+      let gtHtml;
+      if (!cap.gt) {
+        gtHtml = '<span style="color:#aaa">runtime-issued</span>';
+      } else {
+        const nsSlot = parseInt(cap.gt, 16) & 0xFFFF;
+        const target = LUMPS.find(l => l.ns_slot === nsSlot);
+        gtHtml = target
+          ? `<code class="gt-word gt-link" onclick="selectLump('${target.id}')" title="→ ${target.id} (NS[${nsSlot}])">${cap.gt}</code>`
+          : `<code class="gt-word">${cap.gt}</code>`;
+      }
       return `<tr>
         <td>${cap.slot !== undefined ? cap.slot : '—'}</td>
         <td><strong>${cap.name}</strong></td>
