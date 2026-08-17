@@ -8,6 +8,7 @@ import uuid
 import secrets
 import base64
 import mimetypes
+import warnings as _warnings_mod
 import zipfile
 import subprocess
 import tempfile
@@ -1712,10 +1713,17 @@ def boot_image_generate():
     # Hardware-targeted generation (Wukong bridge upload): the entry lump's
     # code body must be resident — the FPGA has no lazy-fetch path.
     for_hardware = bool(body.get("forHardware", False))
+    drift_warnings = []
     try:
-        blob = _boot_image_gen.generate_boot_image(
-            cfg, LUMPS_DIR, boot_entry_slot=entry_slot,
-            require_entry_resident=for_hardware)
+        with _warnings_mod.catch_warnings(record=True) as _caught:
+            _warnings_mod.simplefilter("always")
+            blob = _boot_image_gen.generate_boot_image(
+                cfg, LUMPS_DIR, boot_entry_slot=entry_slot,
+                require_entry_resident=for_hardware)
+        for _w in _caught:
+            if issubclass(_w.category, UserWarning):
+                drift_warnings.append(str(_w.message))
+                logging.warning("boot-image drift: %s", _w.message)
     except Exception as e:
         return jsonify({"ok": False, "error": f"Generator failed: {e}"}), 500
     try:
@@ -1731,6 +1739,7 @@ def boot_image_generate():
         "words": len(blob) // 4,
         "downloadUrl": "/api/boot-image/download",
         "binaryUrl": "/api/boot-image/binary",
+        "warnings": drift_warnings,
     })
 
 @app.route("/api/boot-image/download", methods=["GET"])

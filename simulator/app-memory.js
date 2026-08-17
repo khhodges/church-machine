@@ -2507,12 +2507,19 @@ function generateBootImage() {
             }
             const kib = (body.bytes / 1024).toFixed(1);
             if (result) {
-                result.innerHTML =
+                let html =
                     `Generated <strong>${body.bytes.toLocaleString()}</strong> bytes ` +
                     `(${body.words.toLocaleString()} words, ${kib}\u00a0KiB) \u2014 ` +
                     `<a href="${body.downloadUrl}" download="boot-image.bin" ` +
                     `style="color:#9bd;text-decoration:underline;">Download boot-image.bin</a>. ` +
                     `Reset the simulator to apply this image at boot.`;
+                const driftWarnings = Array.isArray(body.warnings) ? body.warnings : [];
+                if (driftWarnings.length > 0) {
+                    html += driftWarnings.map(w =>
+                        `<div style="margin-top:6px;padding:4px 8px;background:#3a2a00;border-left:3px solid #f90;color:#fc0;font-size:0.9em;">\u26A0\uFE0F ${w}</div>`
+                    ).join('');
+                }
+                result.innerHTML = html;
             }
             // Cache the freshly-generated binary so the next sim.reset()
             // immediately overlays it (no extra round-trip needed). The

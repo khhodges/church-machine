@@ -16440,6 +16440,9 @@ async function _wukongLoadToHardware() {
             _loadLog('ERROR: generate failed \u2014 ' + (err.error || genResp.status));
             return _loadDone(false);
         }
+        const genData = await genResp.json().catch(function() { return {}; });
+        const genWarnings = Array.isArray(genData && genData.warnings) ? genData.warnings : [];
+        genWarnings.forEach(function(w) { _loadLog('\u26A0\uFE0F ns_slot drift: ' + w); });
 
         // Step 2: enqueue upload command for the bridge.
         _loadLog('Queuing upload to bridge\u2026');
