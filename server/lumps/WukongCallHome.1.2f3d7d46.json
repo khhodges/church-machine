@@ -1,8 +1,8 @@
 {
   "token": "e186c4ec",
   "abstraction": "WukongCallHome",
-  "filename": "WukongCallHome_v1.lump",
-  "sidecar_file": "WukongCallHome_v1.json",
+  "filename": "WukongCallHome.1.2f3d7d46.lump",
+  "sidecar_file": "WukongCallHome.1.2f3d7d46.json",
   "ns_slot": 7,
   "ns_slot_policy": "static",
   "boot_resident": true,
