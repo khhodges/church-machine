@@ -12,14 +12,12 @@
   "content_type": "code",
   "cw": 73,
   "cc": 2,
-  "grants": [
-    "E"
-  ],
-  "language": "assembly",
+  "grants": ["E"],
+  "language": "ISA",
   "author": "Church Machine",
   "version": "1.0",
   "lump_version": 1,
-  "description": "Wukong board hardware ROM boot program \u2014 LED blink and UART callhome beacon. Transcribed from WUKONG_NUC_PROGRAM in hardware/boot_rom.py. INFINITE LOOP: no RETURN, no CALL. Runs safely on an unconfigured FPGA without IDE involvement.",
+  "description": "Wukong board hardware ROM boot program. 73-instruction infinite loop: LED0 on \u2192 transmit \"CM:WUKONG\\r\\n\" over UART (busy-poll per byte) \u2192 ~0.498 s on-delay \u2192 LED0 off \u2192 ~0.498 s off-delay \u2192 repeat. No RETURN, no CALL. Runs safely on an unconfigured FPGA with no IDE connected. Recovered from git (deleted in lump-directory cleanup). Full disassembly confirmed word-for-word against the recovered binary.",
   "source": "simulator/examples/wukong_callhome.cloomc",
   "dot_name": "WukongCallHome.hw",
   "issue_n": 1,
@@ -28,16 +26,13 @@
   "capabilities": [
     {
       "name": "LED0",
-      "rights": [
-        "R",
-        "W"
-      ]
+      "rights": ["R", "W"],
+      "note": "CR3 \u2014 DWRITE word 0 = {B,G,R}; bit 0 = R (physical LED pin). On: DWRITE DR1,CR3,0,DR0. Off: DWRITE DR0,CR3,0,DR0."
     },
     {
       "name": "UART_TX",
-      "rights": [
-        "W"
-      ]
+      "rights": ["W"],
+      "note": "CR4 \u2014 DWRITE word 0 = TX data byte; DREAD word 1 (offset=DR1=1) = STATUS, bit 0 = busy. Busy-poll: DREAD/ISUB/BRANCHEQ per byte."
     }
   ],
   "methods": [
@@ -45,14 +40,51 @@
       "name": "setup",
       "offset": 0,
       "length": 3,
-      "description": "Load LED0 and UART_TX capabilities; set DR1=1."
+      "description": "One-time capability loads and constant init. LOAD LED0\u2192CR3 (c-list[0]), LOAD UART_TX\u2192CR4 (c-list[1]), IADD DR1=1 (used as LED-on value and DREAD STATUS offset throughout).",
+      "inputs": [],
+      "outputs": ["CR3: LED0 GT", "CR4: UART_TX GT", "DR1: 1 (constant)"]
     },
     {
       "name": "loop_top",
       "offset": 3,
-      "length": 70,
-      "description": "LED-blink + UART banner infinite loop (no RETURN)."
+      "length": 56,
+      "description": "Infinite LED-on + UART banner phase. DWRITE DR1,CR3 (LED on). Then emits 11 bytes over UART with busy-poll per byte: 'C'(67) 'M'(77) ':'(58) 'W'(87) 'U'(85) 'K'(75) 'O'(79) 'N'(78) 'G'(71) CR(13) LF(10). Each byte: IADD DR5=#byte, DWRITE DR5,CR4, then poll: DREAD DR6,CR4,0,DR1 / ISUB DR7,DR6,#1 / BRANCHEQ poll_X.",
+      "inputs": ["CR3: LED0 GT (from setup)", "CR4: UART_TX GT (from setup)", "DR1: 1 (STATUS offset)"],
+      "outputs": []
+    },
+    {
+      "name": "on_delay",
+      "offset": 59,
+      "length": 6,
+      "description": "LED-on hold delay ~0.498 s at 50 MHz. Nested loop: outer=380, inner=16383. 380 \u00d7 16383 \u00d7 4 cycles = ~24.9M cycles. IADD DR3=#380 / outer_on: IADD DR2=#16383 / inner_on: ISUB DR2,DR2,#1 / BRANCHNE inner_on / ISUB DR3,DR3,#1 / BRANCHNE outer_on.",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "name": "led_off",
+      "offset": 65,
+      "length": 1,
+      "description": "DWRITE DR0,CR3,0,DR0 \u2014 sets LED0 word 0 to 0 (off). DR0 is the zero register (never written).",
+      "inputs": ["CR3: LED0 GT", "DR0: 0 (zero register)"],
+      "outputs": []
+    },
+    {
+      "name": "off_delay",
+      "offset": 66,
+      "length": 6,
+      "description": "LED-off hold delay ~0.498 s at 50 MHz. Identical nested-loop structure to on_delay: outer=380, inner=16383.",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "name": "loop_back",
+      "offset": 72,
+      "length": 1,
+      "description": "BRANCH AL [03] \u2014 unconditional branch back to loop_top (offset=-69). Closes the infinite loop.",
+      "inputs": [],
+      "outputs": []
     }
   ],
+  "clist_note": "W0126=0x32000003, W0127=0x32000002 are v1.x Inform GTs (old NS-slot-addressed format, pre-v2.0). Stale from original compile. In modern use the lazy-loader overwrites these with live Abstract GTs at install time.",
   "compiled_at": "2026-08-05T23:10:53Z"
 }
