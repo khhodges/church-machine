@@ -157,6 +157,9 @@ register_suite "constants-lump-tests" \
 register_suite "lump-save-endpoint-tests" \
     'python -m pytest tests/server/test_lump_save_endpoint.py -v'
 
+register_suite "lump-meta-patch-validation-tests" \
+    'python -m pytest tests/server/test_lump_meta_patch_validation.py -v'
+
 register_suite "lump-save-error-surface-tests" \
     'node simulator/test_lump_save_error_surface.js'
 
@@ -180,6 +183,9 @@ register_suite "boot-entry-sync-tests" \
 
 register_suite "ns-slot-dynamic-tests" \
     'node simulator/test_ns_slot_dynamic.js'
+
+register_suite "ns-slot-policy-restore-tests" \
+    'node simulator/test_ns_slot_policy_restore.js'
 
 register_suite "warning-panel-tests" \
     'node simulator/test_asm_warning_panel.js'
@@ -346,9 +352,9 @@ declare -A ALL_GROUPS
 
 ALL_GROUPS["boot"]="boot-image-matches-sim boot-image-loads-and-boots boot-image-upload-endpoint boot-image-serve-endpoints boot-layout-regression boot-entry-hw-image-tests"
 
-ALL_GROUPS["lump"]="lump-consistency lump-binary-tests lump-roundtrip editor-roundtrip-tests lump-gt-display-tests update-lump-tests"
+ALL_GROUPS["lump"]="lump-consistency lump-binary-tests lump-roundtrip editor-roundtrip-tests lump-gt-display-tests update-lump-tests lump-meta-patch-validation-tests"
 
-ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests warning-panel-tests bare-space-ns-fallback-tests disasm-panel-tests boot-entry-sync-tests ns-slot-dynamic-tests selftest-lump-runs pet-name-memory-tests lump-builder-dispatch-tests openin-links-tests open-lump-freshness-tests lump-warning-tests call-cr6-l-perm-tests return-cr6-l-perm-tests load-through-l-perm-cr6-tests return-cr14-trace-tests wukong-cr-update-tests wukong-hw-fault-tests wukong-trace-cr-server-tests return-fetch-lump-tests constants-lump-tests"
+ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests warning-panel-tests bare-space-ns-fallback-tests disasm-panel-tests boot-entry-sync-tests ns-slot-dynamic-tests ns-slot-policy-restore-tests selftest-lump-runs pet-name-memory-tests lump-builder-dispatch-tests openin-links-tests open-lump-freshness-tests lump-warning-tests call-cr6-l-perm-tests return-cr6-l-perm-tests load-through-l-perm-cr6-tests return-cr14-trace-tests wukong-cr-update-tests wukong-hw-fault-tests wukong-trace-cr-server-tests return-fetch-lump-tests constants-lump-tests"
 
 ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabilities-blocks check-no-ti60-ui check-api-reference-stale callhome-parser-tests check-slot-index-leak check-ila-probe-names test-check-ila-probe-names"
 

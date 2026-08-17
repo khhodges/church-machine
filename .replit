@@ -495,6 +495,28 @@ args = "node simulator/test_boot_entry_sync.js"
 
 [workflows.workflow.metadata]
 outputType = "console"
+[[workflows.workflow]]
+name = "ns-slot-policy-restore-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_ns_slot_policy_restore.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "lump-meta-patch-validation-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python -m pytest tests/server/test_lump_meta_patch_validation.py -v"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 
 [[workflows.workflow]]
 name = "boot-layout-regression"
