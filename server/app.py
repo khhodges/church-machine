@@ -6803,118 +6803,143 @@ def patch_lump_meta(token):
     lumps_dir    = os.path.join(os.path.dirname(__file__), 'lumps')
     sidecar_path = os.path.join(lumps_dir, f'{key8}.json')
 
-    # When no sidecar exists yet, bootstrap one so the PATCH can proceed and
-    # subsequent reads return persisted metadata.  Priority:
-    #   1. Boot.Abstr (token "00000600") — seed from in-memory _BOOT_ABSTR_META.
-    #   2. Any other lump — seed from the matching manifest.json entry, or a
-    #      minimal stub if it is in LAZY_LUMPS but not in the manifest.
-    if not os.path.isfile(sidecar_path):
-        seed = None
-        if key8 == '00000600' and _BOOT_ABSTR_META:
-            seed = dict(_BOOT_ABSTR_META)
-        else:
-            # Try the manifest first
-            manifest_path = os.path.join(lumps_dir, 'manifest.json')
-            if os.path.isfile(manifest_path):
-                try:
-                    with open(manifest_path, 'r') as _mf:
-                        _manifest = json.load(_mf)
-                    for _entry in _manifest:
-                        if (_entry.get('token', '') or '').lower().zfill(8) == key8:
-                            seed = dict(_entry)
-                            break
-                except Exception:
-                    pass
-            # Fall back to a minimal stub when the lump binary is known
-            if seed is None and (key8 in LAZY_LUMPS or
-                                 os.path.isfile(os.path.join(lumps_dir, f'{key8}.lump'))):
-                seed = {'token': key8, 'abstraction': key8}
-        if seed is None:
-            return jsonify({"error": "Lump sidecar not found"}), 404
-        try:
-            with open(sidecar_path, 'w') as _sf:
-                json.dump(seed, _sf, indent=2)
-        except Exception as _se:
-            return jsonify({"error": f"Could not create sidecar: {_se}"}), 500
-
     payload = request.get_json(force=True, silent=True) or {}
 
-    try:
-        with open(sidecar_path, 'r') as fh:
-            sidecar = json.load(fh)
-    except Exception as exc:
-        return jsonify({"error": f"Could not read sidecar: {exc}"}), 500
-
-    updated = False
-    for field in ("author", "version"):
-        if field in payload:
-            sidecar[field] = str(payload[field])
-            updated = True
-
-    if 'pet_name_cr_slot' in payload:
-        cr_slot = str(payload['pet_name_cr_slot'])
-        cr_value = (str(payload.get('pet_name_cr_value', '')) or '').strip()
-        if 'pet_names' not in sidecar or not isinstance(sidecar.get('pet_names'), dict):
-            sidecar['pet_names'] = {}
-        if 'CR' not in sidecar['pet_names'] or not isinstance(sidecar['pet_names'].get('CR'), dict):
-            sidecar['pet_names']['CR'] = {}
-        if cr_value:
-            sidecar['pet_names']['CR'][cr_slot] = cr_value
-        else:
-            sidecar['pet_names']['CR'].pop(cr_slot, None)
-        updated = True
-
+    # ── Phase 1: validate payload (pure, no I/O, no lock needed) ─────────────
+    # Validate ns_slot_policy before entering the lock so we can return 400
+    # without holding any shared resource.
     if 'ns_slot_policy' in payload:
-        policy_val = payload['ns_slot_policy']
-        if policy_val not in ('static', 'dynamic'):
+        if payload['ns_slot_policy'] not in ('static', 'dynamic'):
             return jsonify({"error": "ns_slot_policy must be 'static' or 'dynamic'"}), 400
-        sidecar['ns_slot_policy'] = policy_val
-        updated = True
 
     if 'ns_slot' in payload:
         slot_val = payload['ns_slot']
-        if slot_val is None:
-            sidecar['ns_slot'] = None
-        else:
+        if slot_val is not None:
             # Reject booleans: Python treats True/False as int subtypes, but the
             # API contract requires a plain integer.
             if isinstance(slot_val, bool) or not isinstance(slot_val, int) or slot_val < 0:
                 return jsonify({"error": "ns_slot must be a non-negative integer or null"}), 400
-            sidecar['ns_slot'] = slot_val
-        updated = True
 
-    if not updated:
+    _updatable = ("author", "version", "pet_name_cr_slot", "ns_slot_policy", "ns_slot")
+    if not any(f in payload for f in _updatable):
         return jsonify({"ok": True, "token": key8, "message": "No fields updated"}), 200
 
-    try:
-        with open(sidecar_path, 'w') as fh:
-            json.dump(sidecar, fh, indent=2)
-    except Exception as exc:
-        return jsonify({"error": f"Could not write sidecar: {exc}"}), 500
+    # ── Phase 2: serialised transaction under _lumps_manifest_lock ───────────
+    # The lock covers the entire sidecar-bootstrap → fresh-read → apply →
+    # sidecar-write → manifest-write → rollback sequence.  Holding it from
+    # the moment we read the sidecar prevents two concurrent PATCHes from
+    # both snapshotting an old version, then committing stale sidecars that
+    # overwrite each other's fields.
+    #
+    # Rollback strategy: if the manifest write fails, the sidecar is restored
+    # to the on-disk content we read at the start of the lock — the caller
+    # receives a 500 and can retry.  Rollback failure is logged and the 500 is
+    # still returned so the caller is never misled into thinking the write
+    # succeeded.
 
-    # Keep _BOOT_ABSTR_META in sync so /api/lumps/list returns the new values immediately.
+    manifest_path = os.path.join(lumps_dir, 'manifest.json')
+    with _lumps_manifest_lock:
+        # Bootstrap sidecar if missing (inside lock to prevent concurrent creation).
+        if not os.path.isfile(sidecar_path):
+            seed = None
+            if key8 == '00000600' and _BOOT_ABSTR_META:
+                seed = dict(_BOOT_ABSTR_META)
+            else:
+                if os.path.isfile(manifest_path):
+                    try:
+                        with open(manifest_path, 'r') as _mf:
+                            _manifest = json.load(_mf)
+                        for _entry in _manifest:
+                            if (_entry.get('token', '') or '').lower().zfill(8) == key8:
+                                seed = dict(_entry)
+                                break
+                    except Exception:
+                        pass
+                if seed is None and (key8 in LAZY_LUMPS or
+                                     os.path.isfile(os.path.join(lumps_dir, f'{key8}.lump'))):
+                    seed = {'token': key8, 'abstraction': key8}
+            if seed is None:
+                return jsonify({"error": "Lump sidecar not found"}), 404
+            try:
+                _atomic_write_json(sidecar_path, seed)
+            except Exception as _se:
+                return jsonify({"error": f"Could not create sidecar: {_se}"}), 500
+
+        # Fresh sidecar read inside the lock — picks up any commit by a
+        # concurrent PATCH that took the lock before us.
+        try:
+            with open(sidecar_path, 'r') as _sf:
+                _original_sidecar_json = _sf.read()
+            sidecar = json.loads(_original_sidecar_json)
+        except Exception as exc:
+            return jsonify({"error": f"Could not read sidecar: {exc}"}), 500
+
+        # Apply all validated changes to the freshly-read in-memory copy.
+        for field in ("author", "version"):
+            if field in payload:
+                sidecar[field] = str(payload[field])
+
+        if 'pet_name_cr_slot' in payload:
+            cr_slot = str(payload['pet_name_cr_slot'])
+            cr_value = (str(payload.get('pet_name_cr_value', '')) or '').strip()
+            if 'pet_names' not in sidecar or not isinstance(sidecar.get('pet_names'), dict):
+                sidecar['pet_names'] = {}
+            if 'CR' not in sidecar['pet_names'] or not isinstance(sidecar['pet_names'].get('CR'), dict):
+                sidecar['pet_names']['CR'] = {}
+            if cr_value:
+                sidecar['pet_names']['CR'][cr_slot] = cr_value
+            else:
+                sidecar['pet_names']['CR'].pop(cr_slot, None)
+
+        if 'ns_slot_policy' in payload:
+            sidecar['ns_slot_policy'] = payload['ns_slot_policy']  # already validated above
+
+        if 'ns_slot' in payload:
+            sidecar['ns_slot'] = payload['ns_slot']  # already validated above
+
+        # Write updated sidecar atomically.
+        try:
+            _atomic_write_json(sidecar_path, sidecar)
+        except Exception as exc:
+            return jsonify({"error": f"Could not write sidecar: {exc}"}), 500
+
+        # Write manifest — roll back sidecar on any failure so both stores
+        # stay consistent.
+        try:
+            manifest = _read_manifest_safe(manifest_path)
+            changed = False
+            for entry in manifest:
+                if entry.get('token') == key8:
+                    for field in ("author", "version", "ns_slot_policy", "ns_slot"):
+                        if field in payload:
+                            entry[field] = sidecar[field]
+                    changed = True
+            if changed:
+                _atomic_write_json(manifest_path, manifest)
+        except (ValueError, OSError) as _mf_err:
+            app.logger.error(
+                "patch_lump_meta: manifest write failed for %s (%s); rolling back sidecar",
+                key8, _mf_err,
+            )
+            try:
+                _orig = json.loads(_original_sidecar_json)
+                _atomic_write_json(sidecar_path, _orig)
+            except Exception as _rb_err:
+                app.logger.error(
+                    "patch_lump_meta: sidecar rollback also failed for %s: %s", key8, _rb_err
+                )
+            if isinstance(_mf_err, ValueError):
+                msg = f"manifest.json is corrupt and cannot be read safely. Details: {_mf_err}"
+            else:
+                msg = f"Could not commit update to manifest.json: {_mf_err}"
+            return jsonify({"error": msg}), 500
+
+    # Keep _BOOT_ABSTR_META in sync so /api/lumps/list returns the new values
+    # immediately.  Done outside the lock — in-memory update is non-critical.
     if key8 == '00000600':
         for field in ("author", "version"):
             if field in payload:
                 _BOOT_ABSTR_META[field] = sidecar[field]
-
-    manifest_path = os.path.join(lumps_dir, 'manifest.json')
-    try:
-        manifest = _read_manifest_safe(manifest_path)
-        changed = False
-        for entry in manifest:
-            if entry.get('token') == key8:
-                for field in ("author", "version", "ns_slot_policy", "ns_slot"):
-                    if field in payload:
-                        entry[field] = sidecar[field]
-                changed = True
-        if changed:
-            _atomic_write_json(manifest_path, manifest)
-    except ValueError as _mf_meta_err:
-        return jsonify({"error": (
-            "manifest.json is corrupt and cannot be read safely. "
-            f"Details: {_mf_meta_err}"
-        )}), 500
 
     print(f'[lumps/meta PATCH] {key8} author={sidecar.get("author","")} version={sidecar.get("version","")} ns_slot_policy={sidecar.get("ns_slot_policy","")} ns_slot={sidecar.get("ns_slot", "")}', flush=True)
     return jsonify({"ok": True, "token": key8})

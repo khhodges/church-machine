@@ -20,6 +20,11 @@ Coverage
   T11 — ns_slot negative integer is rejected (HTTP 400)
   T12 — round-trip: stored values survive a subsequent GET /api/lumps/<token>/detail
   T13 — both ns_slot_policy and ns_slot updated together in one PATCH
+  T14 — PATCH updates are written to manifest.json as well as the sidecar
+  T15 — partial write failure: manifest write fails → server returns 5xx and both
+        sidecar and manifest retain their pre-PATCH values (rollback verified)
+  T16 — concurrent PATCH: a failed PATCH does not clobber a previously-committed
+        successful PATCH (sidecar + manifest agree on the committed values)
 """
 
 import json
@@ -299,3 +304,202 @@ class TestNsSlotPolicyRoundTrip:
             f"manifest entry ns_slot_policy={entry.get('ns_slot_policy')!r}"
         assert entry.get("ns_slot") == 11, \
             f"manifest entry ns_slot={entry.get('ns_slot')!r}"
+
+    def test_t15_partial_write_failure_returns_error_and_leaves_both_stores_intact(
+        self, client, saved_token, isolated_lumps, monkeypatch
+    ):
+        """T15 — Partial write failure: manifest write fails → server returns 5xx
+        and BOTH the manifest and the sidecar retain their pre-PATCH values.
+
+        Scenario: _atomic_write_json raises an IOError when writing manifest.json
+        (the second of two writes in patch_lump_meta).  The server must:
+          a) Roll back the sidecar to its original content so the sidecar and
+             manifest stay in agreement.
+          b) Return a 5xx status so the caller knows the PATCH did not succeed.
+
+        Without rollback the server would return 500 while the sidecar held the
+        new ns_slot/ns_slot_policy values and the manifest held the old ones.
+        The GET /detail path (which reads the sidecar) would then show a
+        different slot than boot_image.py (which reads the manifest), causing
+        the wrong NS slot to be used at boot with no visible error.
+
+        This test verifies:
+          1. The server responds with a 5xx status (not 200/OK).
+          2. manifest.json still contains the original ns_slot_policy and
+             ns_slot values.
+          3. The sidecar JSON file also still contains the original values
+             (i.e. the rollback was applied successfully).
+        """
+        manifest_path = isolated_lumps / "manifest.json"
+        sidecar_path  = isolated_lumps / f"{saved_token}.json"
+
+        # Capture the original values from both stores before the PATCH.
+        original_manifest = json.loads(manifest_path.read_text())
+        original_entry = next(
+            (e for e in original_manifest if e.get("token") == saved_token), None
+        )
+        assert original_entry is not None, "Pre-condition: token must exist in manifest"
+        original_ns_slot_policy = original_entry.get("ns_slot_policy")
+        original_ns_slot        = original_entry.get("ns_slot")
+
+        original_sidecar = json.loads(sidecar_path.read_text())
+        original_sc_policy = original_sidecar.get("ns_slot_policy")
+        original_sc_slot   = original_sidecar.get("ns_slot")
+
+        # Inject a fault: _atomic_write_json succeeds for the sidecar write
+        # (1st call) and the rollback (3rd call), but raises IOError on the
+        # manifest write (2nd call).
+        _write_call_count = [0]
+        _real_atomic_write = _app_module._atomic_write_json
+
+        def _fail_on_manifest_write(path, data):
+            _write_call_count[0] += 1
+            if _write_call_count[0] == 2:
+                # Second call is the manifest write — simulate a disk error.
+                raise IOError("Simulated disk full — manifest write failed")
+            # All other calls (sidecar write, sidecar rollback) use the real impl.
+            _real_atomic_write(path, data)
+
+        monkeypatch.setattr(_app_module, "_atomic_write_json", _fail_on_manifest_write)
+
+        # Issue the PATCH with new values distinct from the originals.
+        resp = _patch(client, saved_token, {"ns_slot_policy": "static", "ns_slot": 7})
+
+        # 1. Server must NOT return success.
+        assert resp.status_code >= 500, (
+            f"Expected 5xx when manifest write fails, got {resp.status_code}: {resp.data}"
+        )
+
+        # 2. manifest.json must still hold the original values — no partial update.
+        post_manifest = json.loads(manifest_path.read_text())
+        post_entry = next(
+            (e for e in post_manifest if e.get("token") == saved_token), None
+        )
+        assert post_entry is not None, "Token disappeared from manifest after failed PATCH"
+        assert post_entry.get("ns_slot_policy") == original_ns_slot_policy, (
+            f"manifest ns_slot_policy changed despite write failure: "
+            f"{original_ns_slot_policy!r} → {post_entry.get('ns_slot_policy')!r}"
+        )
+        assert post_entry.get("ns_slot") == original_ns_slot, (
+            f"manifest ns_slot changed despite write failure: "
+            f"{original_ns_slot!r} → {post_entry.get('ns_slot')!r}"
+        )
+
+        # 3. The sidecar must have been rolled back — it must also hold the
+        #    original values so both stores remain in agreement.
+        post_sidecar = json.loads(sidecar_path.read_text())
+        assert post_sidecar.get("ns_slot_policy") == original_sc_policy, (
+            f"sidecar ns_slot_policy was NOT rolled back after manifest failure: "
+            f"{original_sc_policy!r} → {post_sidecar.get('ns_slot_policy')!r}"
+        )
+        assert post_sidecar.get("ns_slot") == original_sc_slot, (
+            f"sidecar ns_slot was NOT rolled back after manifest failure: "
+            f"{original_sc_slot!r} → {post_sidecar.get('ns_slot')!r}"
+        )
+
+    def test_t16_concurrent_disjoint_patches_both_committed(
+        self, isolated_lumps
+    ):
+        """T16 — Two concurrent PATCHes for disjoint fields on the same token
+        must both be committed; sidecar and manifest must agree on both updates.
+
+        Root cause being guarded: without holding _lumps_manifest_lock from the
+        moment the sidecar is read, two concurrent requests can both snapshot
+        the same stale sidecar, then each commit their own update while
+        overwriting the other's — only one field survives in the final state.
+
+        With the lock held across fresh-read → apply → write, requests are
+        serialised: the second to enter the lock reads the first's committed
+        sidecar and therefore carries both updates forward.
+
+        Scenario (concurrent):
+          Thread A  — PATCH ns_slot=5 / ns_slot_policy='static'
+          Thread B  — PATCH author='concurrent_author'
+        Both threads are released from a Barrier simultaneously so they race
+        for _lumps_manifest_lock.  After both join, the final sidecar and
+        manifest must contain all three field values.
+        """
+        import threading
+
+        # Seed a fresh token in the isolated lumps dir used by this test.
+        token = "cc000002"
+        sidecar_data = {
+            "token": token, "abstraction": "ConcurrentTest",
+            "ns_slot": None, "ns_slot_policy": None,
+            "author": "", "version": "", "cw": 1, "cc": 1,
+            "profile": "IoT", "language": "assembly",
+            "methods": [], "capabilities": [], "grants": ["E"],
+            "content_type": "code",
+        }
+        sidecar_file = f"{token}.json"
+        (isolated_lumps / sidecar_file).write_text(json.dumps(sidecar_data, indent=2))
+        manifest_seed = [{
+            "token": token, "abstraction": "ConcurrentTest",
+            "sidecar_file": sidecar_file, "filename": f"{token}.lump",
+        }]
+        (isolated_lumps / "manifest.json").write_text(json.dumps(manifest_seed))
+
+        results   = {}
+        errors    = {}
+        barrier   = threading.Barrier(2)
+
+        def _do_patch(label, payload_dict):
+            """Issue a PATCH inside a fresh test client; record status."""
+            try:
+                barrier.wait(timeout=10)   # synchronise both threads at the gate
+                with _app_module.app.test_client() as tc:
+                    resp = tc.patch(
+                        f"/api/lump/{token}/meta",
+                        data=json.dumps(payload_dict),
+                        content_type="application/json",
+                    )
+                    results[label] = resp.status_code
+            except Exception as exc:
+                errors[label] = exc
+
+        thread_a = threading.Thread(
+            target=_do_patch,
+            args=("a", {"ns_slot": 5, "ns_slot_policy": "static"}),
+        )
+        thread_b = threading.Thread(
+            target=_do_patch,
+            args=("b", {"author": "concurrent_author"}),
+        )
+
+        thread_a.start()
+        thread_b.start()
+        thread_a.join(timeout=15)
+        thread_b.join(timeout=15)
+
+        assert not errors, f"Thread exception(s): {errors}"
+        assert results.get("a") == 200, f"Thread A (ns_slot) returned {results.get('a')!r}"
+        assert results.get("b") == 200, f"Thread B (author) returned {results.get('b')!r}"
+
+        # ── Both updates must be present in the final sidecar and manifest ──
+        final_sidecar = json.loads((isolated_lumps / sidecar_file).read_text())
+        final_manifest = json.loads((isolated_lumps / "manifest.json").read_text())
+        final_entry = next(
+            (e for e in final_manifest if e.get("token") == token), None
+        )
+        assert final_entry is not None, "Token missing from manifest after concurrent PATCHes"
+
+        assert final_sidecar.get("ns_slot") == 5, (
+            f"sidecar ns_slot lost: {final_sidecar.get('ns_slot')!r}"
+        )
+        assert final_sidecar.get("ns_slot_policy") == "static", (
+            f"sidecar ns_slot_policy lost: {final_sidecar.get('ns_slot_policy')!r}"
+        )
+        assert final_sidecar.get("author") == "concurrent_author", (
+            f"sidecar author lost: {final_sidecar.get('author')!r}"
+        )
+
+        # Sidecar and manifest must agree on the ns_slot-family fields.
+        assert final_entry.get("ns_slot") == final_sidecar.get("ns_slot"), (
+            f"manifest/sidecar ns_slot disagree: "
+            f"manifest={final_entry.get('ns_slot')!r} sidecar={final_sidecar.get('ns_slot')!r}"
+        )
+        assert final_entry.get("ns_slot_policy") == final_sidecar.get("ns_slot_policy"), (
+            f"manifest/sidecar ns_slot_policy disagree: "
+            f"manifest={final_entry.get('ns_slot_policy')!r} "
+            f"sidecar={final_sidecar.get('ns_slot_policy')!r}"
+        )
