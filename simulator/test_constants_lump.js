@@ -37,7 +37,7 @@
 // Coverage:
 //   CONST-SETUP-1..11  File exists; header cw=23, cc=2; raw data word checks.
 //   CONST-01a/b        Pi()   — no fault; DREAD computes DR0 = 0x40490FDB.
-//   CONST-02a/b        E()    — no fault; DREAD computes DR0 = 0x406DF854.
+//   CONST-02a/b        E()    — no fault; DREAD computes DR0 = 0x402DF854.
 //   CONST-03a/b        Phi()  — no fault; DREAD computes DR0 = 0x3FCF1BBD.
 //   CONST-04a/b        Zero() — no fault; DREAD computes DR0 = 0x00000000.
 //   CONST-05a/b        One()  — no fault; DREAD computes DR0 = 0x3F800000.
@@ -62,7 +62,7 @@ function check(label, cond, detail) {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const LUMP_PATH = path.join(__dirname, '..', 'server', 'lumps', 'Constants.1.a7920fad.lump');
+const LUMP_PATH = path.join(__dirname, '..', 'server', 'lumps', 'Constants.1.e494696f.lump');
 
 // NS slot assignments for the test harness
 const CONSTANTS_NS_SLOT = 9;   // Constants abstraction (code + c-list)
@@ -79,7 +79,7 @@ const THREAD_LIMIT  = 512;     // covers caps zone (offset 244–255) and DR zon
 // not the manifest description (the manifest comment for E has a minor typo).
 const EXPECTED = {
     Pi:   0x40490FDB >>> 0,   // π ≈ 3.14159265
-    E:    0x406DF854 >>> 0,   // as baked in the binary (word[20])
+    E:    0x402DF854 >>> 0,   // e ≈ 2.71828183 (Euler's number)
     Phi:  0x3FCF1BBD >>> 0,   // φ ≈ 1.61803398
     Zero: 0x00000000 >>> 0,   // 0.0
     One:  0x3F800000 >>> 0,   // 1.0
@@ -305,7 +305,7 @@ function runMethod(rawWords, methodOffset, drPreset) {
 console.log('\n--- CONST-SETUP: Verify Constants lump binary ---');
 
 const lumpExists = fs.existsSync(LUMP_PATH);
-check('CONST-SETUP-1: Constants.1.a7920fad.lump exists', lumpExists, LUMP_PATH);
+check('CONST-SETUP-1: Constants.1.e494696f.lump exists', lumpExists, LUMP_PATH);
 
 let rawWords = null;
 if (lumpExists) {
@@ -336,7 +336,7 @@ if (lumpExists) {
     check('CONST-SETUP-7: word[19] = Pi   (0x40490FDB = π ≈ 3.14159265)',
         w19 === EXPECTED.Pi,
         `got 0x${w19.toString(16).padStart(8, '0')}`);
-    check('CONST-SETUP-8: word[20] = E    (0x406DF854, as baked in binary)',
+    check('CONST-SETUP-8: word[20] = E    (0x402DF854 = e ≈ 2.71828183)',
         w20 === EXPECTED.E,
         `got 0x${w20.toString(16).padStart(8, '0')}`);
     check('CONST-SETUP-9: word[21] = Phi  (0x3FCF1BBD = φ ≈ 1.61803398)',
