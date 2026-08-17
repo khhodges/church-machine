@@ -214,6 +214,9 @@ register_suite "disasm-panel-tests" \
 register_suite "lump-dir-disasm-tooltip-tests" \
     'node simulator/test_lump_dir_disasm_tooltip.js'
 
+register_suite "hex-tab-fill-path-tests" \
+    'node simulator/test_hex_tab_fill_path.js'
+
 register_suite "wukong-toolbar-btn-tests" \
     'node simulator/test_wukong_toolbar_btn.js'
 

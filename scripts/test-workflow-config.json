@@ -40,6 +40,7 @@
     "lump-save-endpoint-tests",
     "lump-save-error-surface-tests",
     "constants-lump-tests",
-    "ns-slot-modal-persist-tests"
+    "ns-slot-modal-persist-tests",
+    "hex-tab-fill-path-tests"
   ]
 }
