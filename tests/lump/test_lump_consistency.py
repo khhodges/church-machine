@@ -31,6 +31,10 @@ R20  Every manifest entry with a `dot_name` field must have a canonical-format
      `filename` ({Dot.Name}.{n}.{8hex}.lump), and recomputing sha256(dot_name_utf8
      + lump_bytes)[:8] must equal the Number segment in that filename (catches
      file renames or binary replacements that were not paired with a migration run).
+R24  Every .lump file in server/lumps/ that is a symbolic link must resolve to a
+     real regular file (broken/dangling symlinks are an immediate hard failure).
+     Symlinks that resolve to a target outside the lumps directory are flagged as
+     a pytest warning so the gap stays visible without blocking CI.
 
 Failure messages are written to be self-diagnosing: they state what was found,
 what was expected, and which file to correct.
@@ -2515,3 +2519,62 @@ class TestR23_BinaryHashIntegrity:
             f"  but sha256({_lump_path(token)}) = {actual!r}.\n"
             "  Update the sidecar binary_hash to the value above, then bump CHANGELOG."
         )
+
+
+# ── R24: No broken symlinks in the lumps directory ─────────────────────────────
+
+def _all_lump_filenames():
+    """Return sorted list of all .lump filenames (not stems) in LUMPS_DIR."""
+    return sorted(fn for fn in os.listdir(LUMPS_DIR) if fn.endswith(".lump"))
+
+
+_ALL_LUMP_FILENAMES = _all_lump_filenames()
+
+
+class TestR24_NobrokenSymlinks:
+    """R24: Every .lump symlink in server/lumps/ must resolve to a real regular file.
+
+    A dangling (broken) symlink produces confusing FileNotFoundError and false
+    "missing binary" failures in every other rule instead of a clear diagnostic.
+    This rule catches the problem at the earliest possible moment.
+
+    Additionally, symlinks whose target resolves outside the lumps directory are
+    flagged as a pytest warning so the gap stays visible without blocking CI.
+    """
+
+    @pytest.mark.parametrize("filename", _ALL_LUMP_FILENAMES)
+    def test_no_dangling_symlinks(self, filename):
+        """Hard fail: a .lump that is a symlink must resolve to a real file."""
+        path = os.path.join(LUMPS_DIR, filename)
+        if not os.path.islink(path):
+            return  # not a symlink — nothing to check here
+        target = os.readlink(path)
+        resolved = os.path.realpath(path)
+        assert os.path.isfile(resolved), (
+            f"{filename}: dangling symlink — points to {target!r} which does not exist "
+            f"(resolved path: {resolved!r}).\n"
+            "  Either restore the missing target file or delete this symlink.\n"
+            "  Broken symlinks cause confusing FileNotFoundError failures in every "
+            "other lump-consistency rule instead of a clear diagnostic."
+        )
+
+    @pytest.mark.parametrize("filename", _ALL_LUMP_FILENAMES)
+    def test_symlink_target_inside_lumps_dir(self, filename):
+        """Warn (not fail) when a resolving symlink points outside the lumps directory."""
+        path = os.path.join(LUMPS_DIR, filename)
+        if not os.path.islink(path):
+            return  # not a symlink
+        resolved = os.path.realpath(path)
+        if not os.path.isfile(resolved):
+            return  # dangling — already caught by test_no_dangling_symlinks
+        lumps_real = os.path.realpath(LUMPS_DIR)
+        if not resolved.startswith(lumps_real + os.sep) and resolved != lumps_real:
+            target = os.readlink(path)
+            warnings.warn(
+                f"{filename}: symlink target {target!r} resolves outside the lumps "
+                f"directory (resolved: {resolved!r}).\n"
+                "  Consider replacing it with a copy or a relative symlink inside "
+                "server/lumps/ to avoid accidental dependency on external paths.",
+                UserWarning,
+                stacklevel=2,
+            )
