@@ -151,6 +151,9 @@ register_suite "lambda-exec-tests" \
 register_suite "lump-binary-tests" \
     'node simulator/test_load_lump_binary.js'
 
+register_suite "lump-binary-size-tests" \
+    'node simulator/test_lump_binary_size.js'
+
 register_suite "constants-lump-tests" \
     'node simulator/test_constants_lump.js'
 

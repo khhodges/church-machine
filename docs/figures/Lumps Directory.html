@@ -1535,10 +1535,13 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
         const view=new DataView(buf);
         const wordCount=Math.floor(buf.byteLength/4);
 
-        // Size mismatch warning
-        if(wordCount!==lumpData.lump_size){
+        // The server prepends a 4-byte CRC word; a complete response is lump_size+1 words.
+        // Compare actualLumpWords (wordCount-1) against declared lump_size to detect truncation.
+        const actualLumpWords=wordCount>0?wordCount-1:0;
+        if(actualLumpWords!==lumpData.lump_size){
           const warn=document.getElementById('_hexSizeWarn');
-          if(warn){warn.style.display='';warn.textContent=`⚠ Binary is ${wordCount} words but header claims ${lumpData.lump_size} — file may be truncated`;}
+          if(warn){warn.style.display='';warn.textContent=`⚠ Binary is ${actualLumpWords} words but header claims ${lumpData.lump_size} — file may be truncated`;}
+
         }
 
         // Build c-list name map
