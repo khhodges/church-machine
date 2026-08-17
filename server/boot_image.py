@@ -41,6 +41,7 @@ Thread lump body at physAddr = threadLumpWords.
 import json
 import os
 import struct
+import warnings
 try:
     from boot_constants import DEMO_CLIST_SIZE, BOOT_ABSTR_DEFAULT_SIZE
 except ImportError:
@@ -908,6 +909,15 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     _thread_count = max(1, min(9, _thread_count))
     NS_TABLE_RESERVE = ns_table_reserve_words(_ns_slots_max)   # local, shadows module constant
 
+    # ── Preflight: warn when manifest and sidecar ns_slot disagree ───────────
+    # boot_image.py reads ns_slot exclusively from manifest.json.  If a partial
+    # PATCH left the two stores out of sync the operator would silently boot
+    # with the manifest value while the IDE shows the sidecar value.
+    # Emit one UserWarning per divergent entry so callers / test harnesses can
+    # capture or log them without any exception being raised.
+    for _drift_msg in check_ns_slot_drift(lumps_dir):
+        warnings.warn(_drift_msg, UserWarning, stacklevel=2)
+
     if "abstractionLumpWords" in step1:
         print("WARNING: abstractionLumpWords is deprecated and ignored; "
               "Boot.Abstr size is determined by the saved SelfTest lump "
@@ -1441,3 +1451,55 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     validate_boot_image(image, total)
 
     return image
+
+
+# ---------------------------------------------------------------------------
+# Manifest / sidecar drift detector
+# ---------------------------------------------------------------------------
+
+def check_ns_slot_drift(lumps_dir):
+    """Compare ns_slot in manifest.json against each entry's sidecar file.
+
+    boot_image.py reads ns_slot exclusively from manifest.json.  If the
+    manifest and the sidecar diverge (e.g. after a partial PATCH failure or
+    a hand-edit) the IDE would boot with the manifest value while the detail
+    view shows the sidecar value, silently hiding the discrepancy.
+
+    Returns a list of human-readable warning strings (one per divergent
+    entry); returns [] when every sidecar agrees with its manifest entry or
+    when the sidecar file cannot be read.  Does NOT raise — callers may log
+    or surface the warnings as they see fit.
+    """
+    warnings = []
+    mf_path = os.path.join(lumps_dir, "manifest.json")
+    try:
+        with open(mf_path) as _f:
+            entries = json.load(_f)
+    except Exception:
+        return warnings
+
+    for e in entries if isinstance(entries, list) else []:
+        if not isinstance(e, dict):
+            continue
+        sidecar_file = e.get("sidecar_file")
+        token = e.get("token", "<unknown>")
+        abstraction = e.get("abstraction", "<unknown>")
+        manifest_slot = e.get("ns_slot")
+        if not sidecar_file:
+            continue
+        sc_path = os.path.join(lumps_dir, sidecar_file)
+        try:
+            with open(sc_path) as _sf:
+                sc = json.load(_sf)
+        except Exception:
+            continue
+        if not isinstance(sc, dict):
+            continue
+        sidecar_slot = sc.get("ns_slot")
+        if manifest_slot != sidecar_slot:
+            warnings.append(
+                f"ns_slot mismatch for '{abstraction}' (token={token}): "
+                f"manifest={manifest_slot!r} but sidecar={sidecar_slot!r}. "
+                f"boot_image.py will use the manifest value ({manifest_slot!r})."
+            )
+    return warnings
