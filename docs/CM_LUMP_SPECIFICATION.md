@@ -1221,6 +1221,215 @@ reference that is defined by the object reference.
 
 ---
 
+## Distribution Formats
+
+The per-type distribution containers are:
+
+| Lump type | File extension | Contents |
+|-----------|---------------|----------|
+| Abstraction | `dot.name.issue.token.zip` | Single `dot.name.issue.token.lump` binary — header + code + freespace + c-list |
+| Thread | `*.thread.zip` | Single `.bin` file — header + five zones |
+| Namespace | `*.namespace.zip` | `manifest.json` + NS LUMP `.bin` + optional bundled deps |
+| Data | `*.data.zip` | Single `.bin` file — header + raw data |
+
+**The distribution unit for an abstraction lump is the binary alone:**
+`dot.name.issue.token.lump`.
+
+- **No sidecar is included** — the `.json` sidecar is local administrative
+  metadata and stays in the home region; it never crosses a distribution
+  boundary.
+- **No `.api.json` file is included** — the API definition is embedded in
+  the binary's freespace (see the Source Code Storage section, T7). The
+  binary is self-defining; a recipient needs no companion file to
+  understand the interface.
+- **The recipient region derives its own sidecar and manifest entry
+  mechanically from the received binary.** NS slot assignment remains the
+  recipient's own deployment configuration and is never read from the
+  binary (see Manifest Architecture).
+
+Any older file-set description listing sidecars, `.api.json` files, or other
+companion members inside a distribution zip is superseded by the binary-only
+rule above.
+
+### ZIP Container Convention
+
+All ZIP containers: bit 3 of the general-purpose flags must be `0`
+(uncompressed size present in the local file header). The Locator reads the
+uncompressed size before downloading the body and pre-allocates physical
+memory accordingly (see ZIP Pre-Allocation Sequence). ZIP files where bit 3
+is `1` are rejected.
+
+### Directory Layout Inside a Distribution Zip
+
+The zip is flat — no subdirectories. A single-lump distribution zip contains
+exactly one member, the binary, named identically to the zip minus the
+`.zip` extension:
+
+```
+dot.SlideRule.1.a3f9c2b1.zip
++-- dot.SlideRule.1.a3f9c2b1.lump
+```
+
+Thread and Namespace bundles keep their existing layouts (see Single Thread
+Upload and Namespace Bundle above); bundle-internal `*.bin` member names are
+an intentional legacy exception pending a bundle revision (see "Canonical
+Filename Form and File Set").
+
+---
+
+## Boot Image Design
+
+The boot image is the self-contained binary the IDE produces to initialise
+a Church Machine system. This section defines the design rules the boot
+image must obey.
+
+### IDE Role — Design-Time Only
+
+The IDE configures the boot image; **its role ends at boot**. Once the
+binary boot image is produced and the device boots, the IDE may disconnect
+at any time — network failure, programmer closing the browser, device
+powered off and back on, or the device deployed to a remote site that never
+sees the IDE again. Every Church Machine deployment must be designed so
+that after boot, the system is fully self-supporting and operates under its
+own authority.
+
+That means the following services are not IDE features — they are runtime
+system services that must be part of the boot image itself:
+
+- **Lazy loading** — fetching and resident-loading lumps on first CALL
+- **NS slot allocation** — claiming empty slots from the reserved pool
+- **Memory management** — allocating and reclaiming lump-sized regions
+- **Garbage collection** — sweeping unreachable NS entries and lumps
+- **Error recovery** — handling faults, thread crashes, and resource
+  exhaustion
+
+The IDE produces the image. The runtime owns the system from boot onwards.
+Every service the running system needs must be either resident in the boot
+image or reachable through the lazy-load mechanism the boot image installs.
+
+### Digital Object Lifecycle
+
+A lump is a **digital object**: it is born via Mint commissioning, lives in
+NS slots, and retires when all references to it are gone.
+
+Thread-internal variables — short-lived scalars, intermediate calculations,
+local arrays — use the thread's own heap. No NS machinery is needed and no
+GTs are minted.
+
+Digital objects are different. An image, a document, a piece of work output
+created by the running system has an independent existence and may outlive
+any single thread interaction. While a digital object is *online*, it
+requires:
+
+- An **NS slot** — so the namespace knows it exists
+- A **memory window** — the physical region it occupies (allocated by the
+  memory manager from the namespace's memory)
+- **GTs** in any c-list that needs to reference it
+
+All three are dynamic — minted when the object is created, evolving as the
+object changes, referenced from one or many threads simultaneously, and
+revoked when the object goes away.
+
+When a digital object is **exported** — packaged as a lump and moved
+offline (written to disk, sent over the network, archived) — it leaves the
+namespace entirely. Its NS slot, memory window, and outstanding GTs all
+become redundant and are eligible for garbage collection:
+
+1. Revoke the GTs (bump the NS entry's `gt_seq` so all stale references
+   fault)
+2. Release the memory window back to the memory manager for re-allocation
+3. Free the NS slot for reuse by the next dynamic object
+
+The garbage collector runs without IDE involvement.
+
+### C-list Rule at Boot Time
+
+**The c-list of a resident lump is fixed at boot time.** Dynamic extension
+of capability sets is the domain of runtime Mint operations, not the boot
+image. A c-list is strictly an array of 32-bit GT words — one GT per slot;
+no raw address, scalar, or data word may occupy a c-list slot (a null word
+`0x00000000` is a valid GT encoding meaning empty/invalid). The hardware
+and simulator refuse to load anything but a validated GT from a c-list
+slot.
+
+### NS Slot 0 Semantics
+
+**Slot 0 is the namespace's own NS entry — the root Namespace LUMP
+(Boot.NS); it is not a general-purpose slot.** Slot 0 of the Namespace
+table describes the total physical memory allocated
+to the namespace. It is a *descriptor*, not a GT container. The Namespace
+table never holds GTs — GTs live only in c-lists. Slot 0 tells you what
+physical memory exists and where; it does not grant the right to act on
+that memory.
+
+The right to act on the namespace's memory is held by the **memory
+manager**, which has in its own c-list a GT covering the full namespace
+memory region. It uses that GT to allocate lumps on demand.
+
+| Holds what | Where |
+|------------|-------|
+| Description of "this memory exists" | NS slot 0 in the Namespace table |
+| Authority to allocate from it | A GT in the memory manager's c-list |
+
+### Three-Step Boot Initialisation
+
+The IDE walks the programmer through three sequential steps when generating
+a boot image. The IDE provides hardware information (memory budget, address
+map for the chosen target board) so the programmer can make informed
+decisions; it never derives sizes automatically.
+
+**Step 1 — Namespace setup (foundational lumps, always present).** The
+programmer specifies the total namespace physical memory and the sizes of
+the three foundational lumps:
+
+- **Namespace Lump** — anchors the namespace; defines NS slot 0 and the
+  initial NS table layout.
+- **Thread Lump** — physical region for the initial thread (its registers,
+  stack, heap).
+- **Abstraction Lump** — physical region for the initial abstraction the
+  thread runs in (its code and c-list).
+
+All three lump sizes are programmer choices, informed by the target
+hardware profile shown by the IDE. The Namespace Lump is sized based on how
+many NS entries the design will need over its lifetime (resident + lazy +
+reserved empty slots, plus headroom for digital-object slots).
+
+**Step 2 — C-list injection (resident lumps, zero or many).** The
+programmer declares which additional lumps are baked into the boot image at
+fixed physical addresses — it is the programmer's call which abstractions
+need to be resident from the first clock cycle (e.g. memory manager, lazy
+loader, garbage collector, fault handler) versus which can be lazy-loaded.
+For each resident lump, the IDE places its body in the binary image at a
+fixed address inside the namespace memory region, with its c-list fixed at
+boot time (per the c-list rule above). Lumps not declared resident use the
+lazy-load mechanism: their NS entry exists in the namespace table (so GTs
+can be minted against them from the start), but the lump body is fetched
+into memory at first CALL.
+
+**Step 3 — Thread activation (empty NS slots, open-ended growth).** The
+programmer reserves a number of empty NS slots in the namespace table for
+lumps that do not exist at design time. The IDE cannot know what those
+lumps will contain — only how much headroom to leave. These slots are
+filled at runtime by the lazy loader when new lumps are created (a new
+abstraction installed, a new digital object minted, a remote lump cached
+locally). The boot image then activates the initial thread, and the running
+system operates under its own authority from that point on.
+
+**What the IDE produces** — a self-contained binary boot image whose byte
+layout is:
+
+- The NS table (foundational + resident + reserved empty slots)
+- The three foundational lump bodies at fixed addresses
+- All resident lump bodies at fixed addresses
+- The memory manager's c-list, including a GT covering the full namespace
+  memory region
+
+After the device boots from this image, the IDE plays no further role. The
+boot architecture rules above apply without exception; any divergence is a
+bug.
+
+---
+
 ## Security Properties
 
 ### Architectural (hardware-enforced, not bypassable)
