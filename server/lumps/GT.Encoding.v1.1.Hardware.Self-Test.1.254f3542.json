@@ -13,5 +13,6 @@
   "cc": 8,
   "filename": "GT.Encoding.v1.1.Hardware.Self-Test.1.254f3542.lump",
   "sidecar_file": "GT.Encoding.v1.1.Hardware.Self-Test.1.254f3542.json",
-  "group": "Security Test"
+  "group": "Security Test",
+  "binary_hash": "36eeb671d95b19d63b3f60f5c105d8595d8259b9e775518563fa3dfa10509e94"
 }
