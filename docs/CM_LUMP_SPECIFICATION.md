@@ -499,6 +499,184 @@ scheme. Under content-addressing, a better seal is simply a new identity.
 
 ---
 
+## The Sidecar — IDE-Local Administrative Metadata
+
+**The sidecar is optional administrative metadata local to an IDE region.** It is not part of
+the logical lump and is never transported across cyberspace boundaries.
+
+The logical lump is the binary alone (`dot.name.issue.token.lump`). It is self-defining:
+the API definition is embedded in its freespace (future-normative — see the freespace
+transition note in "Canonical Filename Form and File Set"; the current release still
+enforces all-zero freespace). A `.api.json` file may be extracted from the binary by
+tooling (compiler, IDE) as a convenience — it is a hidden implementation detail, not a
+named artifact and not part of the logical lump.
+
+The sidecar (`dot.name.issue.token.json`) is entirely separate from the binary. It is
+IDE-local, never distributed, and not required for the lump to function. It exists solely
+to serve the IDE's local discovery, cataloguing, and validation workflows. If a sidecar is
+lost, binary-derived fields can be recomputed from the binary. A lump binary is complete
+without a sidecar.
+
+### Sidecar Authorship Rule
+
+The sidecar is a **pure mechanical cache** — every field is derived from the binary
+(including the API/source content embedded in its freespace, once the Source Code Storage
+section, T7, is deployed) by tooling. There is exactly one write path: `POST /api/lumps/save`,
+which reads the binary and writes all fields. Sidecar files must never be edited by hand.
+
+There are no curatorial fields. The former `group` and `doc_refs` fields are **removed
+from this specification** — they added no value and introduced a drift risk. Any field
+not derivable from the binary does not belong in the sidecar.
+
+> **Transition note — authorship rule enforcement status.** The single-write-path rule is
+> *future-normative*, like the embedded-API freespace format it depends on (see the
+> freespace transition note in "Canonical Filename Form and File Set"). In the current
+> release:
+>
+> - `POST /api/lumps/save` populates most sidecar fields from the request's `metadata`
+>   object (supplied by the compiler/IDE at save time), not by re-deriving them from the
+>   binary — because the binary does not yet embed its API/source in freespace.
+> - Additional server write paths still exist and remain in service until this rule is
+>   enforced. Sidecar-creating: `POST /api/lumps/save-wip` (work-in-progress save),
+>   `POST /api/lumps/import` (base64 data-lump import), `POST /api/lumps/upload-lump`
+>   (raw binary upload; sidecar generated from the parsed header), and the namespace-build
+>   path (writes the Boot.NS sidecar with `namespace_meta`). Sidecar-mutating:
+>   `PATCH /api/lump/<token>/meta` (in-place field updates),
+>   `PATCH /api/lump/<token>/wip-source` (updates `source` and `last_edited_at`),
+>   `PUT /api/lump/<token>/content` (data-lump rewrites),
+>   `POST /api/lump/<token>/resize` (updates `lump_size` after freespace removal),
+>   `POST /api/lump/<token>/fork-version` (version promotion; also marks the live
+>   sidecar with a transient `forked: true` flag), and
+>   `POST /api/lump/<token>/mtbf` (mutates the `mtbf` telemetry object in place).
+>   Under the enforced rule, each of these either retires or reduces to a
+>   recompile-and-save flow through `POST /api/lumps/save` (telemetry and catalogue
+>   state moving to the IDE-local stores noted in the field tables below).
+> - Sidecars on disk may still carry `group` and `doc_refs`, and some readers still consume
+>   them; they are scheduled for removal from the writers, the readers, and the on-disk
+>   files as part of the T7 migration.
+>
+> When T7 lands and the binary is self-defining, the save path switches to deriving all
+> fields from the binary, the auxiliary write paths are retired or reduced to
+> recompile-and-save flows, and the rule above becomes enforced behaviour.
+
+### Sidecar JSON Fields
+
+The tables below list every sidecar field: its on-disk JSON key, type, and meaning
+(see also `docs/lump-reference.md` §6, and actual sidecars under `server/lumps/`).
+Under the target authorship rule all of these are binary-derived; the grouping notes
+which are decoded from the binary structure today versus recorded from save-time
+`metadata` pending the T7 migration.
+
+#### Identity and structure (decoded from the binary header and file naming)
+
+| Field | Type | Meaning |
+|:------|:-----|:--------|
+| `token` | string | 8-hex-digit token (32-bit lump identity; see The Token — Lump Identity). |
+| `abstraction` | string | Abstraction name (the `name` input to the token hash). |
+| `dot_name` | string | Canonical dot-form name component used in the filename. |
+| `issue_n` | integer | Publication issue number (the `issue` filename component; not part of the token hash). |
+| `lump_size` | integer | Total word count, `2^n`. Must equal the header `n-6` field. |
+| `cw` | integer | Code word count. Must match header bits 22:10. |
+| `cc` | integer | C-list slot count. Must match header bits 7:0. |
+| `typ` | integer | Header object type (bits 9:8): 0=lump, 1=data, 2=clist-only, 3=Outform. |
+| `dw` | integer | Data word count embedded inside the code section. |
+| `data_offset` | integer | Word index (from lump base) of the first data word. |
+| `data_word_names` | string[] | Human names for each data word, in order. |
+| `content_type` | string | Semantic sub-classification of `typ=0` lumps (`"code"`, `"text"`, `"markdown"`, `"image"`, `"grayscale"`, …). |
+| `lump_type` | string | Alternative semantic type label used by some import flows (e.g. `"application_namespace"`). |
+| `filename` | string | Name of the `.lump` binary file (canonical `dot.name.issue.token.lump` form). |
+| `sidecar_file` | string | Name of this sidecar file (canonical `dot.name.issue.token.json` form). |
+
+#### Integrity (computed over the binary)
+
+| Field | Type | Meaning |
+|:------|:-----|:--------|
+| `binary_hash` | string | SHA-256 hex digest computed over the binary at save time — the checksum used by staleness and consistency checks. |
+| `capBlockHash` | string | *Reserved (not yet emitted by the save path):* hash over the c-list block alone, for c-list drift detection. |
+
+#### Capability and namespace metadata (today: from save-time `metadata` and boot registration; target: decoded from the binary c-list)
+
+| Field | Type | Meaning |
+|:------|:-----|:--------|
+| `ns_slot` | integer\|null | Assigned NS slot (Resident / Lazy-load), or `null` (Dynamic / NULL). See NS Slot Assignment. |
+| `ns_slot_policy` | string | `"static"` or `"dynamic"` (absent with `ns_slot: null` = dynamic; R9 retired). |
+| `variant_group` | string | Declares alternative implementations sharing an `ns_slot` (rule R8). |
+| `boot_resident` | boolean | `true` if the lump is part of the boot image. |
+| `grants` | string[] | Top-level permissions this lump confers (usually `["E"]`). |
+| `self_data_r` | boolean | `true` if c-list row 0 is a self-referential read-only data capability. |
+| `capabilities` | object[] | C-list row descriptors: `row`, `name`, `grants`/`rights`, `gt`, `note`. |
+| `clist_note` | string | Free-text note on the c-list layout, extracted at compile time. |
+| `domain` | string | Security domain label (e.g. `"Church"`). |
+| `domain_perms` | string | Permission string granted within the domain (e.g. `"L+S+E"`). |
+| `media_tags` | object | Tag registry for data lumps: tag name → `{hex, description}` (e.g. `"TEXT": {"hex": "0x54455854", ...}`). |
+| `image_width` | integer | Pixel width of an imported image data lump (written by `POST /api/lumps/import`; decodable from the image payload). |
+| `image_height` | integer | Pixel height of an imported image data lump (written by `POST /api/lumps/import`; decodable from the image payload). |
+| `namespace_meta` | object | Boot.NS (Namespace lump) only: decoded NS-table view (`entries[]` of slot/label/state), derived from the namespace binary by the namespace-build path. |
+| `permBits` | string | *Reserved (not yet emitted by the save path):* canonical permission-bit summary of the lump's own GT. |
+| `gtWord0` | string | *Reserved (not yet emitted by the save path):* the lump's own GT Word 0 (c-list slot 0 self-GT), as hex. |
+
+#### API and source (today: recorded from save-time `metadata`; target: extracted from the embedded freespace content)
+
+| Field | Type | Meaning |
+|:------|:-----|:--------|
+| `methods` | object[] | Method descriptors: `name`, `offset`, `length`, `description`, `inputs`, `outputs`, `comments`, `pet_names`, `aliasOf`. |
+| `pet_names` | object | Register aliases: `{"DR": {...}, "CR": {...}}`. |
+| `language` | string | Source language: `"cloomc"`, `"assembly"`, `"haskell"`, `"lambda"`, `"ISA"`, `"unknown"`. |
+| `source` | string | Full source text as carried by the binary. Omitted from list projections. |
+| `sourceStorageTier` | integer (0, 1, or 2) | Written by API / compiler. Tier of freespace content derived from the binary header. `0` = API only, `1` = API + minimal source, `2` = API + full source. Absent = legacy binary awaiting recompilation. (Defined by the Source Code Storage section, T7; not emitted until T7 lands.) |
+
+#### Build and lifecycle metadata (recorded at save time; not binary-derived today)
+
+These fields are **not derivable from the binary in the current release** — they are
+recorded from save-time `metadata` or updated by the server. Their target disposition
+under the mechanical-cache rule is stated per field: fields whose content becomes part of
+the source carried in freespace (T7) become binary-derived; the remainder are IDE-local
+lifecycle/telemetry annotations that migrate **out of the sidecar** to a separate
+IDE-local store when the authorship rule is enforced.
+
+| Field | Type | Meaning | Target disposition |
+|:------|:-----|:--------|:-------------------|
+| `author` | string | Creator name recorded at compile time. | Embedded in the source tier (T7) → binary-derived. |
+| `version` | string | Human version string (e.g. `"2.0"`). | Embedded in the source tier (T7) → binary-derived. |
+| `release_notes` | string\|object | Change description per version. | Embedded in the source tier (T7) → binary-derived. |
+| `compiled_at` | float | Unix timestamp of compilation. | Embedded in the source tier (T7) → binary-derived. |
+| `lump_version` | integer | Monotonic compile counter, bumped by `POST /api/lumps/save`. | Migrates to the IDE-local catalogue store. |
+| `status` | string | Lifecycle status label (e.g. `"stable"`, `"released"`, `"wip"`). *Legacy/catalogue-curated: present on disk but not emitted by the current save path.* | Migrates to the IDE-local catalogue store. |
+| `description` | string | One-line description of the abstraction. *Legacy/catalogue-curated: present on disk but not emitted by the current save path.* | Embedded in the source tier (T7) → binary-derived. |
+| `source_file` | string | Repository path of the source file the binary was compiled from. *Legacy/catalogue-curated: present on disk but not emitted by the current save path.* | Superseded by embedded source (T7); dropped. |
+| `forked` | boolean | Transient marker written to the live sidecar by `POST /api/lump/<token>/fork-version`; cleared on the next save. | Migrates to the IDE-local catalogue store. |
+| `profile` | string | Target hardware profile (e.g. `"IoT"`, `"wukong-a7"`, `"example"`). | Embedded in the source tier (T7) → binary-derived. |
+| `last_edited_at` | float | Unix timestamp of the most recent save. | Migrates to the IDE-local catalogue store. |
+| `deployment` | object | Build environment metadata: `target_board`, `profile`, `built_at`, `builder`. | Migrates to the IDE-local catalogue store. |
+| `mtbf` | object | Mutable reliability telemetry: `status`, `consecutive_clean`, `total_runs`, `source_hash`. | Migrates to the IDE-local telemetry store (mutable data can never live in a mechanical cache). |
+
+#### Pet-name identity fields (written by the save path when a pet name is supplied)
+
+The dual-seal identity scheme records both an identity seal (over the pet-name identity
+string) and the content checksum (`binary_hash` above). These fields are emitted by
+`POST /api/lumps/save` and appear in canonical sidecars as well as archived snapshots.
+
+| Field | Type | Meaning |
+|:------|:-----|:--------|
+| `petname` | string | Global pet-name identity component (`petname.Abstraction#n`). |
+| `issue_number` | integer | Issue component of the identity string (alias of `issue_n` in this role). |
+| `identity_string` | string | The exact identity input string, `petname.Abstraction#issue` (or `Abstraction#issue` when no pet name is set). |
+| `identity_hash` | string | SHA-256 hex digest of `identity_string` — the identity seal. |
+
+#### Archive-only fields (present only in archived `*_vN` sidecars written by the fork-version path)
+
+| Field | Type | Meaning |
+|:------|:-----|:--------|
+| `archived_version` | integer | Version number of this archived snapshot. |
+| `archive_note` | string | Reason the version was archived. |
+
+> **Removed fields.** `group` and `doc_refs` are removed from the sidecar schema in this
+> specification. They were curatorial (not derivable from the binary) and introduced a
+> drift risk. Sidecars on disk still carrying them, and readers still consuming them, are
+> cleaned up as part of the T7 migration (see the authorship-rule transition note above).
+
+---
+
 ## Mint Validation Sequence
 
 `Mint.Lump(base, n)` receives a lump already inflated into physical memory.
