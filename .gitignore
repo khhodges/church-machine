@@ -52,3 +52,4 @@ __pycache__/
 /church_ti60_f225.hex
 bitstreams_that_worked.zip
 wukong.bit
+server/.lumps.write.lock
