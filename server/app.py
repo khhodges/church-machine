@@ -7111,7 +7111,7 @@ def patch_lump_meta(token):
             if isinstance(slot_val, bool) or not isinstance(slot_val, int) or slot_val < 0:
                 return jsonify({"error": "ns_slot must be a non-negative integer or null"}), 400
 
-    _updatable = ("author", "version", "pet_name_cr_slot", "ns_slot_policy", "ns_slot")
+    _updatable = ("author", "version", "pet_name_cr_slot", "ns_slot_policy", "ns_slot", "boot_resident")
     if not any(f in payload for f in _updatable):
         return jsonify({"ok": True, "token": key8, "message": "No fields updated"}), 200
 
@@ -7187,6 +7187,9 @@ def patch_lump_meta(token):
 
         if 'ns_slot' in payload:
             sidecar['ns_slot'] = payload['ns_slot']  # already validated above
+
+        if 'boot_resident' in payload:
+            sidecar['boot_resident'] = bool(payload['boot_resident'])
 
         # Write updated sidecar atomically.
         try:
