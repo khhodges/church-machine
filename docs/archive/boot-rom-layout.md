@@ -210,6 +210,6 @@ runtime can clear it on un-bind without recomputing the NS entry seal.
 ## See Also
 
 - [cloomc-foundation.md](cloomc-foundation.md) — **Authoritative architectural overview**: explains the heritage of this layout, the TSB principle, the old 6-region layout's problems, and the 3-LUMP model that supersedes it.
-- [Lump-Architecture.md](Lump-Architecture.md) — Lump object structure, Header Word encoding, and zone layout
+- [`CM_LUMP_SPECIFICATION.md`](../CM_LUMP_SPECIFICATION.md) — Lump object structure, Header Word encoding, and zone layout (formerly `Lump-Architecture.md`, now consolidated)
 ---
 *Confidential — Kenneth Hamer-Hodges — April 2026*
