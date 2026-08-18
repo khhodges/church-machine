@@ -13,5 +13,9 @@
   "cc": 0,
   "source_file": "simulator/cloomc/EventRouter.cloomc",
   "filename": "EventRouter.1.032ca4ee.lump",
-  "sidecar_file": "EventRouter.1.032ca4ee.json"
+  "sidecar_file": "EventRouter.1.032ca4ee.json",
+  "group": "System",
+  "doc_refs": [
+    "abstractions.md"
+  ]
 }

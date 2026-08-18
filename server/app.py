@@ -5009,8 +5009,9 @@ def _load_boot_abstr_lump():
                                 with open(_sc_mo_path) as _sc_mo_f:
                                     _sc_mo = json.load(_sc_mo_f)
                                 for _fld in ('author', 'version', 'pet_names', 'capabilities',
-                                             'description', 'methods'):
-                                    if _fld in _sc_mo and _sc_mo[_fld]:
+                                             'description', 'methods',
+                                             'group', 'doc_refs'):
+                                    if _fld in _sc_mo and _sc_mo[_fld] is not None:
                                         _BOOT_ABSTR_META[_fld] = _sc_mo[_fld]
                                 _BOOT_ABSTR_META['has_source'] = bool(
                                     (_sc_mo.get('source', '') or '').strip()

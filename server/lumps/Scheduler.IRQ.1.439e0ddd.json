@@ -13,5 +13,11 @@
   "cc": 0,
   "source_file": "simulator/examples/scheduler_irq.cloomc",
   "filename": "Scheduler.IRQ.1.439e0ddd.lump",
-  "sidecar_file": "Scheduler.IRQ.1.439e0ddd.json"
+  "sidecar_file": "Scheduler.IRQ.1.439e0ddd.json",
+  "group": "System",
+  "doc_refs": [
+    "dispatch-styles.md",
+    "startup.md",
+    "architecture.md"
+  ]
 }

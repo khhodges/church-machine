@@ -14,5 +14,14 @@
   "source_file": "simulator/cloomc/Tunnel.cloomc",
   "filename": "Tunnel.1.8770bf03.lump",
   "sidecar_file": "Tunnel.1.8770bf03.json",
-  "binary_hash": "25856150f7d363dc853d2986b5c42b2f16a30bf390eff09de50220bfca597708"
+  "binary_hash": "25856150f7d363dc853d2986b5c42b2f16a30bf390eff09de50220bfca597708",
+  "group": "Networking",
+  "doc_refs": [
+    "network-transparency.md",
+    "plan-call-mum.md",
+    "tunnel-messaging-example.md",
+    "IDE-Designer.md",
+    "family-registry.md",
+    "fulcrum-of-computer-science.md"
+  ]
 }

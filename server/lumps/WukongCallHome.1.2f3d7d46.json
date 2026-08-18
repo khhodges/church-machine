@@ -19,8 +19,8 @@
   "grants": [
     "E"
   ],
-  "source": "; ============================================================\n; Abstraction:  WukongCallHome\n; Description:  Wukong board software boot coordinator \u2014 simulator / IDE side.\n;               Runs SelfTest, then calls Tunnel.Register with the result\n;               so the IDE receives the board's boot_reason payload.\n;\n;               This is the LUMP executed by the Church Machine simulator\n;               when the \u26a1 boot entry is set to WukongCallHome (NS slot 7).\n;               It is distinct from wukong_callhome.cloomc, which is the\n;               exact hardware LED-blink ROM program burned into the Wukong\n;               FPGA (an infinite loop with no RETURN, no capability calls).\n;\n; Sequence:\n;   1. ELOADCALL SelfTest.Main  (c-list[0], NS slot 6)\n;      \u2192 executes the hardware self-test; result code arrives in DR0\n;   2. ELOADCALL Tunnel.Register (c-list[1], NS slot 8)\n;      \u2192 registers DR0 as the boot_reason with the IDE host\n;   3. RETURN to the boot-entry caller (IDE boot-complete handler)\n;\n; C-list layout (2 entries, injected by the lazy loader at runtime):\n;   c-list[0]  SelfTest   E  (NS slot 6)   E-GT: 0x4A000006\n;   c-list[1]  Tunnel     E  (NS slot 8)   E-GT: 0x4A000008\n;\n; Register usage:\n;   DR0  SelfTest result code (passed through to Tunnel.Register)\n;   All CRs are scratch; ELOADCALL manages CR internally.\n;\n; Slot:    NS slot 7  (WukongCallHome \u2014 Wukong board coordinator)\n; Token:   e186c4ec\n; Source:  simulator/examples/wukong_callhome_coordinator.cloomc\n; Author:  Church Machine\n; Version: 1.0\n; ============================================================\n\ncapabilities {\n    SelfTest  E,\n    Tunnel    E\n}\n\nMain:\n    ELOADCALL CR0, SelfTest, 0    ; [0] call SelfTest.Main \u2192 DR0 = test result\n    ELOADCALL CR0, Tunnel, 0      ; [1] call Tunnel.Register(DR0) \u2192 IDE ACK\n    RETURN                        ; [2] return to boot-entry caller\n",
-  "description": "Wukong board software boot coordinator \u2014 runs SelfTest, calls Tunnel.Register, returns to IDE.",
+  "source": "; ============================================================\n; Abstraction:  WukongCallHome\n; Description:  Wukong board software boot coordinator — simulator / IDE side.\n;               Runs SelfTest, then calls Tunnel.Register with the result\n;               so the IDE receives the board's boot_reason payload.\n;\n;               This is the LUMP executed by the Church Machine simulator\n;               when the ⚡ boot entry is set to WukongCallHome (NS slot 7).\n;               It is distinct from wukong_callhome.cloomc, which is the\n;               exact hardware LED-blink ROM program burned into the Wukong\n;               FPGA (an infinite loop with no RETURN, no capability calls).\n;\n; Sequence:\n;   1. ELOADCALL SelfTest.Main  (c-list[0], NS slot 6)\n;      → executes the hardware self-test; result code arrives in DR0\n;   2. ELOADCALL Tunnel.Register (c-list[1], NS slot 8)\n;      → registers DR0 as the boot_reason with the IDE host\n;   3. RETURN to the boot-entry caller (IDE boot-complete handler)\n;\n; C-list layout (2 entries, injected by the lazy loader at runtime):\n;   c-list[0]  SelfTest   E  (NS slot 6)   E-GT: 0x4A000006\n;   c-list[1]  Tunnel     E  (NS slot 8)   E-GT: 0x4A000008\n;\n; Register usage:\n;   DR0  SelfTest result code (passed through to Tunnel.Register)\n;   All CRs are scratch; ELOADCALL manages CR internally.\n;\n; Slot:    NS slot 7  (WukongCallHome — Wukong board coordinator)\n; Token:   e186c4ec\n; Source:  simulator/examples/wukong_callhome_coordinator.cloomc\n; Author:  Church Machine\n; Version: 1.0\n; ============================================================\n\ncapabilities {\n    SelfTest  E,\n    Tunnel    E\n}\n\nMain:\n    ELOADCALL CR0, SelfTest, 0    ; [0] call SelfTest.Main → DR0 = test result\n    ELOADCALL CR0, Tunnel, 0      ; [1] call Tunnel.Register(DR0) → IDE ACK\n    RETURN                        ; [2] return to boot-entry caller\n",
+  "description": "Wukong board software boot coordinator — runs SelfTest, calls Tunnel.Register, returns to IDE.",
   "lump_version": 1,
   "compiled_at": "2026-08-03T00:00:00Z",
   "status": "released",
@@ -46,5 +46,12 @@
       "description": "Run SelfTest, register result with Tunnel, return to IDE."
     }
   ],
-  "binary_hash": "bdd84cdd1a907ef6b9b1af9c962b2016c0293912dc5eaa04f3dac248e3216038"
+  "binary_hash": "bdd84cdd1a907ef6b9b1af9c962b2016c0293912dc5eaa04f3dac248e3216038",
+  "group": "Boot ROM",
+  "doc_refs": [
+    "wukong-boot.md",
+    "wukong-callhome-redesign-plan.md",
+    "wukong-boot-verification.md",
+    "architecture.md"
+  ]
 }

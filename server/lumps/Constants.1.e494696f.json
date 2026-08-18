@@ -12,5 +12,12 @@
   "cw": 23,
   "cc": 2,
   "filename": "Constants.1.e494696f.lump",
-  "sidecar_file": "Constants.1.e494696f.json"
+  "sidecar_file": "Constants.1.e494696f.json",
+  "group": "Math / Science",
+  "doc_refs": [
+    "ada-note-g.md",
+    "note-g-comparison.md",
+    "pet-name-language.md",
+    "dispatch-styles.md"
+  ]
 }

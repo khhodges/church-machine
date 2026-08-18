@@ -272,6 +272,11 @@ jobs:
         continue-on-error: true
         run: python3 -m pytest tests/server/test_version_telemetry.py -v
 
+      - name: Lump Viewer → sidecar sync check
+        id: lump_viewer_sync
+        continue-on-error: true
+        run: python scripts/sync_lump_viewer_to_sidecars.py --check
+
       # --- End-to-end (Playwright) — runs against a live server ---
       - name: Get Playwright version
         id: playwright-version
@@ -308,6 +313,7 @@ jobs:
               {"name": "Boot layout regression",       "outcome": "${{ steps.boot_layout.outcome }}"},
               {"name": "Selftest LUMP runs",           "outcome": "${{ steps.selftest_lump.outcome }}"},
               {"name": "Version telemetry tests",      "outcome": "${{ steps.version_telemetry.outcome }}"},
+              {"name": "Lump Viewer sync check",       "outcome": "${{ steps.lump_viewer_sync.outcome }}"},
               {"name": "Run E2E tests",                "outcome": "${{ steps.e2e_tests.outcome }}"}
             ]
           }
@@ -334,6 +340,7 @@ jobs:
             "${{ steps.boot_layout.outcome }}"
             "${{ steps.selftest_lump.outcome }}"
             "${{ steps.version_telemetry.outcome }}"
+            "${{ steps.lump_viewer_sync.outcome }}"
             "${{ steps.e2e_tests.outcome }}"
           )
           failed=0

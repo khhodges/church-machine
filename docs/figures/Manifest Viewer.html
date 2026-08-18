@@ -87,6 +87,9 @@ body { font-family: system-ui, sans-serif; margin: 0; background: #f2f3f7; color
 .kv-val code { font-family: monospace; background: #f0f2f8; padding: 0.05rem 0.3rem; border-radius: 2px; }
 .kv-val a { color: #1a5cc8; text-decoration: none; }
 .kv-val a:hover { text-decoration: underline; }
+.doc-ref-link { margin: 0.1rem 0.2rem 0.1rem 0; display: inline-block; }
+.doc-ref-link code { color: #1a5cc8; background: #e8f0ff; }
+.doc-ref-link:hover code { background: #d0e4ff; }
 .kv-null { color: #bbb; font-style: italic; }
 .desc-text { color: #444; line-height: 1.6; font-size: 0.83rem; margin: 0; }
 
@@ -451,6 +454,21 @@ function buildOverviewHTML(e) {
   ${e.description ? `<div class="card"><h3>Description</h3>${descHtml}</div>` : ''}
 
   ${e.source ? `<div class="card"><h3>Source file</h3><div class="kv-val"><a href="/${escH(e.source)}" target="_blank">${escH(e.source)}</a></div></div>` : ''}
+
+  ${(e.group || (e.doc_refs && e.doc_refs.length)) ? `
+  <div class="card">
+    <h3>Catalogue</h3>
+    <div class="kv-grid">
+      <span class="kv-key">Group</span>
+      <span class="kv-val">${e.group ? escH(e.group) : '<span class="kv-null">—</span>'}</span>
+      <span class="kv-key">Docs</span>
+      <span class="kv-val">${
+        e.doc_refs && e.doc_refs.length
+          ? e.doc_refs.map(d => `<a class="doc-ref-link" href="/docs/${escH(d)}" target="_blank" rel="noopener noreferrer"><code>${escH(d)}</code></a>`).join(' ')
+          : '<span class="kv-null">—</span>'
+      }</span>
+    </div>
+  </div>` : ''}
 
   ${e.media_tags && e.media_tags.length ? `<div class="card"><h3>Media tags</h3><div class="kv-val">${e.media_tags.map(t=>`<code>${escH(t)}</code>`).join(' ')}</div></div>` : ''}
   `;

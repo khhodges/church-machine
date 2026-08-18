@@ -13,5 +13,11 @@
   "cc": 2,
   "source_file": "simulator/cloomc/keystone.cloomc",
   "filename": "Keystone.1.86b853a1.lump",
-  "sidecar_file": "Keystone.1.86b853a1.json"
+  "sidecar_file": "Keystone.1.86b853a1.json",
+  "group": "System",
+  "doc_refs": [
+    "network-transparency.md",
+    "plan-call-mum.md",
+    "tunnel-messaging-example.md"
+  ]
 }

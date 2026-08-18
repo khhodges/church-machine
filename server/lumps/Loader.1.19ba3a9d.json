@@ -11,7 +11,7 @@
   "cw": 1,
   "cc": 1,
   "status": "wip",
-  "source": "; Loader abstraction\n; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\nabstraction Loader {\n    capabilities {\n    SelfTest E\n}\n\n    method run {\n        ; Main function\n        ; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n        \nCall SelfTest run\n\n        \n    }\n}",
+  "source": "; Loader abstraction\n; ─────────────────────────────────────────────────\n\nabstraction Loader {\n    capabilities {\n    SelfTest E\n}\n\n    method run {\n        ; Main function\n        ; ───────────────────────────────────\n        \nCall SelfTest run\n\n        \n    }\n}",
   "description": "",
   "methods": [
     {
@@ -45,5 +45,13 @@
   "lump_version": 1,
   "compiled_at": 1785333917.725582,
   "last_edited_at": 1785334019.971098,
-  "binary_hash": "2202a4436a80fcb9c78a5234063e84fa639709b2a7beca27688dc7c1b9ec89d6"
+  "binary_hash": "2202a4436a80fcb9c78a5234063e84fa639709b2a7beca27688dc7c1b9ec89d6",
+  "group": "System",
+  "doc_refs": [
+    "locator.md",
+    "mload.md",
+    "memory-manager.md",
+    "abstractions.md",
+    "plan-call-mum.md"
+  ]
 }

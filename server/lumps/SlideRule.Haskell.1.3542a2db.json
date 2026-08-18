@@ -14,5 +14,11 @@
   "source_file": "simulator/cloomc/sliderule_haskell.cloomc",
   "filename": "SlideRule.Haskell.1.3542a2db.lump",
   "sidecar_file": "SlideRule.Haskell.1.3542a2db.json",
-  "variant_group": null
+  "variant_group": null,
+  "group": "Math / Science",
+  "doc_refs": [
+    "lambda-arithmetic.md",
+    "dispatch-styles.md",
+    "note-g-comparison.md"
+  ]
 }
