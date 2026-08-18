@@ -4962,7 +4962,7 @@ async function openLumpInEditor(token) {
         // ── Check for a saved draft from a previous session ───────────────
         var _savedDraft = _draftLsGet(token);
         if (_savedDraft !== null) _savedDraft = _migrateBfextBfinsSyntax(_savedDraft);
-        var _hasDraft   = _savedDraft !== null && _savedDraft !== _compiledDisasm;
+        var _hasDraft   = _savedDraft !== null && _savedDraft.trim() !== '' && _savedDraft !== _compiledDisasm;
 
         if (_hasDraft) {
             // Restore draft content into editor
