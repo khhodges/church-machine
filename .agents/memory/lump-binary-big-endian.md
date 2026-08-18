@@ -20,3 +20,5 @@ file's raw bytes directly (rather than going through `scripts/update-lump.js` or
 in-browser compiler), use big-endian word reads/writes and verify with `lump-audit.js`'s
 `lumpAudit()` (or the R1 magic-byte check: `(word0 >>> 27) & 0x1F === 0x1F`) before trusting
 the result.
+
+See also: docs/CM_LUMP_SPECIFICATION.md — Developer Traps and Implementation Rules section.

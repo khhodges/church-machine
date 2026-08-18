@@ -25,3 +25,5 @@ documented exception set (e.g. `SlideRuleHS`, a pre-registry Haskell-variant
 lump) for legitimate historical mismatches — anything else that fails is
 real name drift, not a design gap. See `tests/lump/test_lump_consistency.py`
 R16 (`KNOWN_NON_REGISTRY_ABSTRACTIONS`) for the reference implementation.
+
+See also: docs/CM_LUMP_SPECIFICATION.md — Developer Traps and Implementation Rules section.

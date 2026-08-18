@@ -7,7 +7,7 @@
 
 **Status: DRAFT — design questions resolved; ready for implementation approval**
 **Author: design session 2026-04-29 / 2026-04-30**
-**Depends on: `docs/golden-tokens.md`, `docs/abstractions.md`, `docs/Lump-Architecture.md`**
+**Depends on: `docs/golden-tokens.md`, `docs/abstractions.md`, `docs/CM_LUMP_SPECIFICATION.md`**
 
 ---
 
@@ -140,7 +140,7 @@ user-visible E-GT is ever issued for PhysicalPool. Only `TuringMemory` and
 
 All lumps must be exactly 2ⁿ words, where 6 ≤ n ≤ 14 (64 words through 16 384 words).
 This matches the hardware `n-6` field in the lump header described in
-`docs/Lump-Architecture.md` and the ZIP-derivation rule in `docs/abstractions.md §ZIP → Header Word`.
+`docs/CM_LUMP_SPECIFICATION.md` and the ZIP-derivation rule in `docs/abstractions.md §ZIP → Header Word`.
 
 The thread lump sizes established in `simulator/app-memory.js` —
 `THREAD_FS = 256 words` (full stack), `THREAD_HS = 64 words` (half stack),

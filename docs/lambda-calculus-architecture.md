@@ -420,9 +420,9 @@ HALT
 ## Cross-references
 
 - [`architecture.md`](architecture.md) — Full Church Machine architecture including GT format, NS table, boot sequence, and mLoad pipeline
-- [`Lump-Architecture.md`](Lump-Architecture.md) — Lump header format, lump split mechanics, and the four lump types
+- [`CM_LUMP_SPECIFICATION.md`](CM_LUMP_SPECIFICATION.md) — Lump header format, lump split mechanics, and the four lump types
 - [`instruction-set.md`](instruction-set.md) — LOAD, CALL, RETURN, TPERM, LAMBDA, ELOADCALL encoding and semantics
-- [`foundation-lump-design.md`](foundation-lump-design.md) — Boot image design: Boot.NS, Boot.Thread, Salvation, Navana
+- [`CM_LUMP_SPECIFICATION.md`](CM_LUMP_SPECIFICATION.md) — Boot image design: Boot.NS, Boot.Thread, Salvation, Navana
 - [`golden-tokens.md`](golden-tokens.md) — GT format, permission bits, B-bit, revocation, and gt_type values
 
 ---

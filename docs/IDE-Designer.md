@@ -375,7 +375,7 @@ Five machine instructions. Every security property — confinement, monotonic re
 - [`pet-name-language.md`](pet-name-language.md) — complete language reference: operators, functions, LOAD syntax, register allocation
 - [`namespace-vocabulary-tutorial.md`](namespace-vocabulary-tutorial.md) — step-by-step walkthrough of all three vocabulary stages using the telecommunications example
 - [`method-access-control.md`](method-access-control.md) — how `public`/`private` qualifiers generate the dispatch table and the lump seal
-- [`Lump-Architecture.md`](Lump-Architecture.md) — thread lump zone layout (HS, SS, FS parameters); function lump structure
+- [`CM_LUMP_SPECIFICATION.md`](CM_LUMP_SPECIFICATION.md) — thread lump zone layout (HS, SS, FS parameters); function lump structure (Appendix A and the lump layout sections)
 - [`abstractions.md`](abstractions.md) — the full abstraction catalogue: every sealed lump in the namespace with its c-list and method table
 - [`golden-tokens.md`](golden-tokens.md) — GT format, permission bits, revocation counter
 - [`namespace-security.md`](namespace-security.md) — mLoad validation, confinement proof, and the GT chain invariant

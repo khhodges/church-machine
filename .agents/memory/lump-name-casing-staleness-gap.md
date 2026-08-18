@@ -28,3 +28,5 @@ it's very likely dead. Separately, grep for hardcoded lump tokens in UI code
 (e.g. `runSelftestLump()`-style shortcuts) — these can independently rot to a
 *third*, no-longer-existent token when the lump is rebuilt, since nothing
 enforces they stay in sync with manifest.json.
+
+See also: docs/CM_LUMP_SPECIFICATION.md — Developer Traps and Implementation Rules section.

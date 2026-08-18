@@ -529,7 +529,7 @@ The firmware's `pp250_fault_recovery()` function (in `hardware/soc_combined/firm
 
 ## See Also
 
-- [`foundation-lump-design.md`](foundation-lump-design.md) — Authoritative rules for foundation lump design, programmer-controlled boot image steps, and the IDE role
+- [`CM_LUMP_SPECIFICATION.md`](CM_LUMP_SPECIFICATION.md) — Authoritative rules for foundation lump design, programmer-controlled boot image steps, and the IDE role
 - [`boot-rom-layout.md`](boot-rom-layout.md) — Specific demo boot ROM layout (IMEM map, NUC_PROGRAM, DEMO_NAMESPACE, DEMO_CLIST)
 - [`ctmm-memory-map.md`](ctmm-memory-map.md) — Authoritative CM memory map with NS table, lump headers, and per-board profiles
 - [`locator.md`](locator.md) — Absent-lump fetch protocol; lazy load lifecycle

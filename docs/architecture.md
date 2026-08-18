@@ -825,11 +825,11 @@ telescope into the hardware, not a replacement for it.
 
 ## Cross-references
 
-- [Lump-Architecture.md](./Lump-Architecture.md) — Lump header format, lump split mechanics, and
+- [CM_LUMP_SPECIFICATION.md](./CM_LUMP_SPECIFICATION.md) — Lump header format, lump split mechanics, and
   power-of-2 allocation rules
 - [CM_LUMP_SPECIFICATION.md](./CM_LUMP_SPECIFICATION.md) — Full binary-level lump specification with
   encoding formulae, example words, and hardware flow diagrams
-- [foundation-lump-design.md](./foundation-lump-design.md) — Boot image design and three-lump
+- [CM_LUMP_SPECIFICATION.md](./CM_LUMP_SPECIFICATION.md) — Boot image design and three-lump
   foundation architecture (Salvation, Navana, Mint)
 - [golden-tokens.md](./golden-tokens.md) — Golden Token format, CRC coverage, permission
   model, and revocation protocol

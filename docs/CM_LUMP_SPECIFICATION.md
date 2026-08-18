@@ -610,7 +610,7 @@ not derivable from the binary does not belong in the sidecar.
 ### Sidecar JSON Fields
 
 The tables below list every sidecar field: its on-disk JSON key, type, and meaning
-(see also `docs/lump-reference.md` §6, and actual sidecars under `server/lumps/`).
+(actual sidecars live under `server/lumps/`).
 Under the target authorship rule all of these are binary-derived; the grouping notes
 which are decoded from the binary structure today versus recorded from save-time
 `metadata` pending the T7 migration.
@@ -1962,11 +1962,11 @@ advisory only.
 ## Developer Tooling
 
 The scripts below are the supported workflow for rebuilding and validating `.lump`
-binaries and keeping example sources in sync. (Source reference: `docs/lump-tooling.md`.)
+binaries and keeping example sources in sync.
 
 > **Token discovery.** Tokens are discovered via `server/lumps/manifest.json`;
 > do not maintain a separate token table in documentation. Where an older
-> document (including `docs/lump-tooling.md`) carries a static token/source
+> (now archived) document carries a static token/source
 > table, this specification supersedes it — such tables go stale and must
 > not be relied on.
 
@@ -2989,9 +2989,12 @@ already owns.
 ## Cross-references
 
 - [`architecture.md`](architecture.md) — Overall Church Machine architecture
-- [`Lump-Architecture.md`](Lump-Architecture.md) — Accessible overview of the Lump object model
-- [`foundation-lump-design.md`](foundation-lump-design.md) — Lump design rationale and layout rules
 - [`golden-tokens.md`](golden-tokens.md) — GT format, encoding, and capability rules
+
+> The former `Lump-Architecture.md`, `foundation-lump-design.md`, `lump-reference.md`, and
+> `lump-tooling.md` documents have been consolidated into this specification and archived
+> as redirect stubs (2026-08-18). Their content lives in the sections above (object model,
+> lump design, sidecar/manifest field reference, and Developer Tooling respectively).
 
 ---
 
@@ -3012,3 +3015,94 @@ already owns.
 See [`CHANGELOG.md`](../CHANGELOG.md) for full change details and formal change control rules.
 ---
 *Confidential — Kenneth Hamer-Hodges — April 2026*
+
+---
+
+# Developer Traps and Implementation Rules
+
+> **Scope:** This section is **simulator/IDE implementation guidance** — hard-won rules for the
+> tooling and UI code that manipulates lumps. It is **not** part of the binary format rules
+> above. Nothing here changes the on-disk lump encoding; it documents how implementation code
+> must handle it.
+
+## Trap: LUMP binary files are big-endian
+
+Raw `.lump` file words are stored **big-endian** (`readUInt32BE`/`writeUInt32BE` in Node).
+This is not obvious from the runtime `.js` code, which mostly works with in-memory
+`Uint32Array`/decoded words rather than raw file bytes. Any ad-hoc little-endian read or write
+silently corrupts the header and c-list — the header magic, `cw`/`cc` fields, and c-list GT
+words all decode as nonsense, while the file size and general shape still look plausible.
+
+**Rule:** any ad-hoc code that inspects or patches `.lump` bytes directly must use big-endian
+word reads/writes, and must verify the result with `lump-audit.js` (or at minimum the magic
+check `(word0 >>> 27) & 0x1F === 0x1F`) after any manual binary manipulation.
+
+## Trap: Abstraction-name drift check must exempt certain lumps
+
+The drift check that compares a lump's in-memory abstraction name against the registry
+(`simulator/abstractions.js`) must exempt:
+
+- **User-compiled lumps** (`lump_version >= 1`) — compiled in-session with arbitrary names;
+  the name is not necessarily (and is not meant to be) in the registry.
+- **Dynamic/NULL slot lumps** (`ns_slot` is `null`) — allocated/fetched by token, never wired
+  into the Abstractions view; there is no name to check by design.
+
+Applying the check to these categories produces false failures even though nothing is wrong.
+Scope the check to `lump_version` 0/absent AND non-null `ns_slot`, and keep one explicit,
+documented exception set for legitimate historical mismatches (see
+`tests/lump/test_lump_consistency.py` R16, `KNOWN_NON_REGISTRY_ABSTRACTIONS`).
+
+## Trap: IRQ lazy-load gate must verify the manifest entry exists
+
+The lazy-load body gate inside `_fireSchedulerIRQ()` must check that `lazyManifest[slot]`
+exists before proceeding. If no manifest entry exists for the slot, the gate must be skipped
+so the dispatcher falls through to the `abstractionRegistry` path.
+
+Test harnesses that pre-seed `irqLumpSlot` without a corresponding manifest entry bypass the
+gate and access `abstractionRegistry` directly — masking the bug in tests while it fails at
+runtime (an unguarded gate would call `lazyLoad(slot)` and crash on
+`lazyManifest[slot].loaded` being undefined).
+
+**Rule:** any future code that adds a lazy-load gate for a dynamic slot must include
+`&& this.lazyManifest[slot]` in the condition.
+
+## Trap: the "Viewing" label must be updated synchronously, never via deferred data loading
+
+`showLumpDetail()` is itself a synchronous function, but the detail panel's *data* arrives
+via nested asynchronous fetches (word arrays, source, etc.). The historical bug was wiring
+the "Viewing: <name>" label update to the completion of that deferred data loading — on page
+reload the label flickered or never appeared depending on fetch timing.
+
+The fix (still present in the current code) is two synchronous update points:
+`showLumpDetail()` calls `_updateLumpViewingLabel(token)` at its very start, and
+`renderLumps()` additionally calls `_updateLumpViewingLabel(_selTok)` directly after
+invoking `showLumpDetail`, covering the synchronous restore path (e.g. page reload with the
+registry already populated).
+
+**Rule:** label sync must never depend on completion of any deferred detail-data fetch. Keep
+both synchronous call sites; the call is idempotent — it returns early when the registry has
+no data yet.
+
+**Also — cross-script call convention:** functions defined in one script file that are
+called from another (such as `showLumpDetail`, called from `app-abstractions.js`) are
+explicitly exported via `window.showLumpDetail = showLumpDetail` and invoked as
+`window.showLumpDetail` behind a `typeof` guard at cross-script call sites. Follow this
+convention for any new cross-script function — it makes the dependency explicit and keeps
+call sites robust to script load order and future module/scoping changes.
+
+## Trap: Staleness guards are keyed by the exact abstraction-name string (case-sensitive)
+
+Per-lump staleness/build scripts find "the" lump by matching
+`manifest.entry.abstraction === '<ExactName>'`. A casing mismatch between the sidecar's
+`abstraction` field and the registry key hides an orphaned lump from all staleness checks
+permanently — it sits in `server/lumps/` and `manifest.json` forever, fully "consistent" by
+the consistency-gate rules, but semantically dead and loadable by anyone browsing lumps.
+(Every recompile mints a brand-new token; nothing deletes the previous one, and the build
+scripts only replace an entry whose name string matches exactly.)
+
+**Rule:** when adding or renaming a lump, verify that the sidecar/manifest `abstraction` field exactly
+matches the registry key — character for character. When a lump's disassembly or behaviour
+looks wrong or dated, suspect a stale duplicate before assuming the disassembler is broken:
+use the lump's `check_*_stale.js` script to find the actual canonical token, and grep the
+tree for the token you were viewing. Also grep UI code for hardcoded lump tokens — these can
+independently rot to a no-longer-existent token when the lump is rebuilt.

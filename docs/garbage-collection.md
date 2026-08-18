@@ -159,6 +159,6 @@ The G-bit reset happens on **every** namespace access because reachability deter
 
 ## See Also
 
-- [Lump-Architecture.md](Lump-Architecture.md) — Lump object structure, Header Word encoding, and zone layout
+- [CM_LUMP_SPECIFICATION.md](CM_LUMP_SPECIFICATION.md) — Lump object structure, Header Word encoding, and zone layout
 ---
 *Confidential — Kenneth Hamer-Hodges — April 2026*

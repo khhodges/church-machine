@@ -43,7 +43,7 @@ The programmer takes control at this point; the hardwired Boot ends and software
 ## See Also
 
 - [cloomc-foundation.md](cloomc-foundation.md) — **Authoritative architectural overview**: explains the heritage of this layout, the TSB principle, the old 6-region layout's problems, and the 3-LUMP model that supersedes it.
-- [Lump-Architecture.md](Lump-Architecture.md) — Lump object structure, Header Word encoding, and zone layout
+- [CM_LUMP_SPECIFICATION.md](CM_LUMP_SPECIFICATION.md) — Lump object structure, Header Word encoding, and zone layout
 
 ---
 *Confidential — Kenneth Hamer-Hodges — July 2026*

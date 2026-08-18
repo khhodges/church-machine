@@ -376,7 +376,7 @@ const LUMPS = [
   ],
   capabilities:[], source:"abstraction Memory {\n    capabilities {}\n    method Allocate(size) {\n        var needed = size + 255\n        needed = needed >> 8\n        needed = needed << 8\n        var location = read(CR7, 0)\n        var newFree = location + needed\n        write(CR7, 0, newFree)\n        return(location, needed)\n    }\n    method Free(location) {\n        write(CR7, 1, location)\n        return(0)\n    }\n    method Resize(location, newSize) {\n        return(location, newSize)\n    }\n}",
   doc_count:46,
-  doc_refs:["memory-manager.md","foundation-lump-design.md","architecture.md","getting-started.md","plan-call-mum.md"]
+  doc_refs:["memory-manager.md","CM_LUMP_SPECIFICATION.md","architecture.md","getting-started.md","plan-call-mum.md"]
 },
 {
   id:"EventRouter", genotype:"0x032CA4EE", token:"b3076308", group:"System",
@@ -2069,9 +2069,9 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
       <ul class="doc-list">
         <li><span class="doc-icon">📄</span><a class="doc-link" href="../CM_LUMP_SPECIFICATION.md" target="_blank">CM_LUMP_SPECIFICATION.md</a> — §Lump Memory Layout, §Mint Validation Sequence, §NS Slot Assignment</li>
         <li><span class="doc-icon">📄</span><a class="doc-link" href="../architecture.md" target="_blank">architecture.md</a> — Overall Church Machine architecture</li>
-        <li><span class="doc-icon">📄</span><a class="doc-link" href="../Lump-Architecture.md" target="_blank">Lump-Architecture.md</a> — Accessible overview of the Lump object model</li>
+        <li><span class="doc-icon">📄</span><a class="doc-link" href="../CM_LUMP_SPECIFICATION.md" target="_blank">CM_LUMP_SPECIFICATION.md</a> — Lump object model, binary encoding, and field specification</li>
         <li><span class="doc-icon">📄</span><a class="doc-link" href="../golden-tokens.md" target="_blank">golden-tokens.md</a> — GT format, encoding, and capability rules</li>
-        <li><span class="doc-icon">📄</span><a class="doc-link" href="../foundation-lump-design.md" target="_blank">foundation-lump-design.md</a> — Lump design rationale and layout rules</li>
+        <li><span class="doc-icon">📄</span><a class="doc-link" href="../CM_LUMP_SPECIFICATION.md" target="_blank">CM_LUMP_SPECIFICATION.md</a> — Lump design rationale and layout rules</li>
       </ul>
     </div>`;
   }

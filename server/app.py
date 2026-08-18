@@ -3289,8 +3289,6 @@ BOOK_CHAPTERS = [
         "pet-name-language.md",
         "namespace-vocabulary-tutorial.md",
         "method-access-control.md",
-        "foundation-lump-design.md",
-        "Lump-Architecture.md",
     ]),
     ("Part XI: Implementation Plans", [
         "memory-manager.md",
