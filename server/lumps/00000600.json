@@ -15,7 +15,7 @@
   "version": "1.2",
   "lump_version": 76,
   "status": "released",
-  "description": "SelfTest (a.k.a. Boot.Abstr) — the lump executed by the hardware ROM during boot phases B:01-B:07.",
+  "description": "SelfTest (a.k.a. Boot.Abstr) \u2014 the lump executed by the hardware ROM during boot phases B:01-B:07.",
   "source": "simulator/examples/post_flash_selftest.cloomc",
   "dot_name": "SelfTest",
   "issue_n": 1,

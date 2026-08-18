@@ -3,13 +3,13 @@
     {
       "name": "Boot.NS",
       "slot": 0,
-      "location": "0x00003C00",
+      "location": "0x00007F00",
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x003FF",
+      "limit": "0x000FF",
       "seq": 0,
-      "seal": "0x3DA8"
+      "seal": "0x9741"
     },
     {
       "name": "Boot.Thread",
@@ -18,9 +18,9 @@
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x000FF",
+      "limit": "0x001FF",
       "seq": 0,
-      "seal": "0xEF3E"
+      "seal": "0xDC0F"
     },
     {
       "name": "UART_DEV",
@@ -69,59 +69,81 @@
     {
       "name": "SelfTest",
       "slot": 6,
-      "location": "0x00000100",
+      "location": "0x00000200",
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x001FE",
+      "limit": "0x001FD",
       "seq": 0,
-      "seal": "0x667F",
-      "boot": true
+      "seal": "0xB8CE"
     },
     {
-      "name": "WukongCallHome",
+      "name": "WukongCallHome.hw",
       "slot": 7,
-      "location": "0x00000300",
+      "location": "0x00000400",
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x0003D",
+      "limit": "0x00049",
       "seq": 0,
-      "seal": "0xF8E2"
+      "seal": "0xA125"
     },
     {
       "name": "Tunnel",
       "slot": 8,
-      "location": "0x00000340",
+      "location": "0x00000440",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x0003F",
       "seq": 0,
-      "seal": "0xB63C"
+      "seal": "0xD1E8"
     },
     {
       "name": "Ethernet",
       "slot": 9,
-      "location": "0x00000380",
+      "location": "0x00000480",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x0003F",
       "seq": 0,
-      "seal": "0x0598"
+      "seal": "0x624C"
     },
     {
       "name": "CapabilityTest",
       "slot": 10,
-      "location": "0x000003C0",
+      "location": "0x000004C0",
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x0003A",
+      "limit": "0x0003F",
       "seq": 0,
-      "seal": "0x3BA1"
+      "seal": "0x0CD0",
+      "boot": true
+    },
+    {
+      "name": "SlideRule",
+      "slot": 45,
+      "location": "0x00002D00",
+      "type": "Null",
+      "f": 0,
+      "g": 0,
+      "limit": "0x04000",
+      "seq": 1,
+      "seal": "0xD5CC"
+    },
+    {
+      "name": "Constants",
+      "slot": 46,
+      "location": "0x00006D00",
+      "type": "Null",
+      "f": 0,
+      "g": 0,
+      "limit": "0x00100",
+      "seq": 1,
+      "seal": "0xFA59"
     }
   ],
-  "generated_at": 1785973925.0
+  "generated_at": 1787092483.9646783
 }
