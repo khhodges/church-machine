@@ -15,11 +15,5 @@
   "filename": "SlideRule.Haskell.1.3542a2db.lump",
   "sidecar_file": "SlideRule.Haskell.1.3542a2db.json",
   "variant_group": null,
-  "group": "Math / Science",
-  "doc_refs": [
-    "lambda-arithmetic.md",
-    "dispatch-styles.md",
-    "note-g-comparison.md"
-  ],
   "binary_hash": "62237f701bf8a6dfc758741c7cf05baa21baa73d6d46ae82ed9c949b6d217ad5"
 }

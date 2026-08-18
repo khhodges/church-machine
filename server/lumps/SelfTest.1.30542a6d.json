@@ -15,20 +15,11 @@
   "version": "1.2",
   "lump_version": 76,
   "status": "released",
-  "description": "SelfTest (a.k.a. Boot.Abstr) — the lump executed by the hardware ROM during boot phases B:01-B:07.",
+  "description": "SelfTest (a.k.a. Boot.Abstr) \u2014 the lump executed by the hardware ROM during boot phases B:01-B:07.",
   "source": "simulator/examples/post_flash_selftest.cloomc",
   "dot_name": "SelfTest",
   "issue_n": 1,
   "filename": "SelfTest.1.30542a6d.lump",
   "sidecar_file": "SelfTest.1.30542a6d.json",
-  "binary_hash": "40ae9a9efe1bb1fbbe2c6be234a7996fe3dcb2511e6a87916c6a75c1d0714dbd",
-  "group": "Boot ROM",
-  "doc_refs": [
-    "architecture.md",
-    "church-machine-ide-surface.md",
-    "church-machine-lifecycle-design.md",
-    "wukong-v2/c2-wukong-boot-program.md",
-    "wukong-v2/c3-demo-namespace-address.md",
-    "wukong-v2/h4-demo-clist-minimal.md"
-  ]
+  "binary_hash": "40ae9a9efe1bb1fbbe2c6be234a7996fe3dcb2511e6a87916c6a75c1d0714dbd"
 }

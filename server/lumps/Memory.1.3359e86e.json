@@ -52,16 +52,8 @@
   "grants": [
     "E"
   ],
-  "source": "// ============================================================\n// Abstraction:  Memory\n// Description:  Raw physical word allocator (NS slot 7)\n// Author:       Church Machine Educational Platform\n// Version:      1.0\n// Created:      2026-05-09\n// Language:     CLOOMC++\n// Dependencies: None\n// ============================================================\n// Methods:\n//   1. Allocate(size) — reserve size words; return (location, actual_size)\n//   2. Free(location) — release a previously allocated block\n//   3. Resize(location, newSize) — resize an existing block in-place\n// ============================================================\nabstraction Memory {\n    capabilities {\n    }\n    method Allocate(size) {\n        var needed = size + 255\n        needed = needed >> 8\n        needed = needed << 8\n        var location = read(CR7, 0)\n        var newFree = location + needed\n        write(CR7, 0, newFree)\n        return(location, needed)\n    }\n    method Free(location) {\n        write(CR7, 1, location)\n        return(0)\n    }\n    method Resize(location, newSize) {\n        return(location, newSize)\n    }\n}\n",
+  "source": "// ============================================================\n// Abstraction:  Memory\n// Description:  Raw physical word allocator (NS slot 7)\n// Author:       Church Machine Educational Platform\n// Version:      1.0\n// Created:      2026-05-09\n// Language:     CLOOMC++\n// Dependencies: None\n// ============================================================\n// Methods:\n//   1. Allocate(size) \u2014 reserve size words; return (location, actual_size)\n//   2. Free(location) \u2014 release a previously allocated block\n//   3. Resize(location, newSize) \u2014 resize an existing block in-place\n// ============================================================\nabstraction Memory {\n    capabilities {\n    }\n    method Allocate(size) {\n        var needed = size + 255\n        needed = needed >> 8\n        needed = needed << 8\n        var location = read(CR7, 0)\n        var newFree = location + needed\n        write(CR7, 0, newFree)\n        return(location, needed)\n    }\n    method Free(location) {\n        write(CR7, 1, location)\n        return(0)\n    }\n    method Resize(location, newSize) {\n        return(location, newSize)\n    }\n}\n",
   "lump_version": 1,
   "compiled_at": 1783630782.9145057,
-  "binary_hash": "1b5c6fbbe3775bf6839b602842ba006c9dcbf753eb28cc00db4c9fa6487c1227",
-  "group": "System",
-  "doc_refs": [
-    "memory-manager.md",
-    "foundation-lump-design.md",
-    "architecture.md",
-    "getting-started.md",
-    "plan-call-mum.md"
-  ]
+  "binary_hash": "1b5c6fbbe3775bf6839b602842ba006c9dcbf753eb28cc00db4c9fa6487c1227"
 }

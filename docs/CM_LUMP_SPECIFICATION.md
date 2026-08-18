@@ -2049,18 +2049,17 @@ Exception: the `led_dr_test` key is a variable reference in `app-run.js` (not a 
 literal), so the sync script cannot extract it; its source is verified separately by the
 assembler test suite.
 
-### `scripts/sync_lump_viewer_to_sidecars.py` — **obsolete; delete**
+### `scripts/sync_lump_viewer_to_sidecars.py` — **removed (V1.3)**
 
 This script copied `group` and `doc_refs` fields from the Lump Viewer HTML
 (`docs/figures/Lumps Directory.html`) into per-lump sidecar JSONs, treating the Viewer as
 an authoritative curatorial source. Both fields and the Lump Viewer approval role have
 been removed from this specification: under the specified model the binary is the single
-source of truth and the sidecar carries no curatorial fields. The script is therefore
-obsolete under this specification and should be deleted. Note the current repository
-state has not yet caught up with this policy — the script, its tests, and existing
-sidecar `group`/`doc_refs` fields still exist pending that cleanup. Do not use it as
-part of the lump workflow, and do not document it as a legitimate tool; removal of the
-script and the residual sidecar fields is planned follow-up work.
+source of truth and the sidecar carries no curatorial fields. The script and its tests
+have been deleted, the live catalogue's sidecars no longer carry `group`/`doc_refs`, and
+the server runs an idempotent startup migration that strips the two keys from any sidecar
+that reappears with them. CI enforces the invariant with a check that no live sidecar
+carries either key.
 
 ### `simulator/lump-audit.js` — audit engine
 

@@ -4883,6 +4883,48 @@ def _ensure_ns_state():
     except Exception as _exc:
         print(f"[ns-state] cold-start creation failed: {_exc}", flush=True)
 
+def _migrate_sidecars_drop_group_doc_refs():
+    """One-pass idempotent migration (Lump V1.3): remove the removed curatorial
+    fields 'group' and 'doc_refs' from every live sidecar JSON in server/lumps/.
+
+    V1.3 removed these fields from the sidecar schema — the binary is the sole
+    source of truth and the sidecar carries no curatorial fields.  Runs at
+    startup; a clean catalogue is a no-op.  In debug mode a leftover key after
+    migration is treated as an assertion failure.
+    """
+    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    if not os.path.isdir(lumps_dir):
+        return
+    cleaned = 0
+    for fn in sorted(os.listdir(lumps_dir)):
+        if not fn.endswith('.json') or fn == 'manifest.json':
+            continue
+        path = os.path.join(lumps_dir, fn)
+        try:
+            with open(path) as fh:
+                data = json.load(fh)
+        except Exception:
+            continue  # non-object / unreadable sidecars are out of scope here
+        if not isinstance(data, dict):
+            continue
+        if 'group' in data or 'doc_refs' in data:
+            data.pop('group', None)
+            data.pop('doc_refs', None)
+            _atomic_write_json(path, data)
+            cleaned += 1
+            print(f'[lumps-migrate] removed group/doc_refs from {fn}', flush=True)
+        if app.debug:
+            assert 'group' not in data and 'doc_refs' not in data, (
+                f'sidecar {fn} still carries group/doc_refs after V1.3 migration'
+            )
+    if cleaned:
+        print(f'[lumps-migrate] V1.3 sidecar cleanup: {cleaned} file(s) cleaned',
+              flush=True)
+
+
+_migrate_sidecars_drop_group_doc_refs()
+
+
 def _load_boot_abstr_lump():
     """Parse boot-image.bin, extract Boot.Abstr (NS slot 6) and cache in LAZY_LUMPS.
 
@@ -5007,8 +5049,7 @@ def _load_boot_abstr_lump():
                                 with open(_sc_mo_path) as _sc_mo_f:
                                     _sc_mo = json.load(_sc_mo_f)
                                 for _fld in ('author', 'version', 'pet_names', 'capabilities',
-                                             'description', 'methods',
-                                             'group', 'doc_refs'):
+                                             'description', 'methods'):
                                     if _fld in _sc_mo and _sc_mo[_fld] is not None:
                                         _BOOT_ABSTR_META[_fld] = _sc_mo[_fld]
                                 _BOOT_ABSTR_META['has_source'] = bool(

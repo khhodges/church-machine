@@ -226,7 +226,7 @@ const LUMPS = [
 
 // ── BOOT ROM ──────────────────────────────────────────────────
 {
-  id:"SelfTest", genotype:"0x30542A6D", token:"00000600", group:"Boot ROM",
+  id:"SelfTest", genotype:"0x30542A6D", token:"00000600", section:"Boot ROM",
   ns_slot:6, ns_slot_policy:"static", boot_resident:true, variant_group:null,
   lump_size:512, cw:416, cc:2, typ:0,
   language:"ISA", author:"Church Machine", version:"1.2", status:"released",
@@ -248,10 +248,10 @@ const LUMPS = [
   ],
   source: null,
   doc_count:11,
-  doc_refs:["architecture.md","church-machine-ide-surface.md","church-machine-lifecycle-design.md","wukong-v2/c2-wukong-boot-program.md","wukong-v2/c3-demo-namespace-address.md","wukong-v2/h4-demo-clist-minimal.md"]
+  docs:["architecture.md","church-machine-ide-surface.md","church-machine-lifecycle-design.md","wukong-v2/c2-wukong-boot-program.md","wukong-v2/c3-demo-namespace-address.md","wukong-v2/h4-demo-clist-minimal.md"]
 },
 {
-  id:"WukongCallHome", genotype:"0x2F3D7D46", token:"e186c4ec", group:"Boot ROM",
+  id:"WukongCallHome", genotype:"0x2F3D7D46", token:"e186c4ec", section:"Boot ROM",
   ns_slot:7, ns_slot_policy:"static", boot_resident:true, variant_group:null,
   lump_size:64, cw:3, cc:2, typ:0,
   language:"assembly", author:"Church Machine", version:"1.0", status:"released",
@@ -269,10 +269,10 @@ const LUMPS = [
   ],
   source:"; ============================================================\n; Abstraction:  WukongCallHome\n; Description:  Wukong board software boot coordinator \u2014 simulator / IDE side.\n;               Runs SelfTest, then calls Tunnel.Register with the result\n;               so the IDE receives the board's boot_reason payload.\n;\n;               This is the LUMP executed by the Church Machine simulator\n;               when the \u26a1 boot entry is set to WukongCallHome (NS slot 7).\n;               It is distinct from wukong_callhome.cloomc, which is the\n;               exact hardware LED-blink ROM program burned into the Wukong\n;               FPGA (an infinite loop with no RETURN, no capability calls).\n;\n; Sequence:\n;   1. ELOADCALL SelfTest.Main  (c-list[0], NS slot 6)\n;      \u2192 executes the hardware self-test; result code arrives in DR0\n;   2. ELOADCALL Tunnel.Register (c-list[1], NS slot 8)\n;      \u2192 registers DR0 as the boot_reason with the IDE host\n;   3. RETURN to the boot-entry caller (IDE boot-complete handler)\n;\n; C-list layout (2 entries, injected by the lazy loader at runtime):\n;   c-list[0]  SelfTest   E  (NS slot 6)   E-GT: 0x4A000006\n;   c-list[1]  Tunnel     E  (NS slot 8)   E-GT: 0x4A000008\n;\n; Register usage:\n;   DR0  SelfTest result code (passed through to Tunnel.Register)\n;   All CRs are scratch; ELOADCALL manages CR internally.\n;\n; Slot:    NS slot 7  (WukongCallHome \u2014 Wukong board coordinator)\n; Token:   e186c4ec\n; Source:  simulator/examples/wukong_callhome_coordinator.cloomc\n; Author:  Church Machine\n; Version: 1.0\n; ============================================================\n\ncapabilities {\n    SelfTest  E,\n    Tunnel    E\n}\n\nMain:\n    ELOADCALL CR0, SelfTest, 0    ; [0] call SelfTest.Main \u2192 DR0 = test result\n    ELOADCALL CR0, Tunnel, 0      ; [1] call Tunnel.Register(DR0) \u2192 IDE ACK\n    RETURN                        ; [2] return to boot-entry caller\n",
   doc_count:7,
-  doc_refs:["wukong-boot.md","wukong-callhome-redesign-plan.md","wukong-boot-verification.md","architecture.md"]
+  docs:["wukong-boot.md","wukong-callhome-redesign-plan.md","wukong-boot-verification.md","architecture.md"]
 },
 {
-  id:"WukongCallHome.hw", genotype:"0x1DCB7B09", token:"1dcb7b09", group:"Boot ROM",
+  id:"WukongCallHome.hw", genotype:"0x1DCB7B09", token:"1dcb7b09", section:"Boot ROM",
   ns_slot:null, ns_slot_policy:"none", boot_resident:false, variant_group:"WukongCallHome",
   lump_size:128, cw:73, cc:2, typ:0,
   language:"ISA", author:"Church Machine", version:"1.0", status:"released",
@@ -309,10 +309,10 @@ const LUMPS = [
   ],
   source:"simulator/examples/wukong_callhome.cloomc",
   doc_count:3,
-  doc_refs:["wukong-boot.md","wukong-callhome-redesign-plan.md","architecture.md"]
+  docs:["wukong-boot.md","wukong-callhome-redesign-plan.md","architecture.md"]
 },
 {
-  id:"PostFlashSelftest", genotype:"0x059DC47F", token:"059dc47f", group:"Boot ROM",
+  id:"PostFlashSelftest", genotype:"0x059DC47F", token:"059dc47f", section:"Boot ROM",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:512, cw:499, cc:2, typ:0,
   language:"assembly", author:"Church Machine", version:"1.0", status:"released",
@@ -326,10 +326,10 @@ const LUMPS = [
     { slot:0, name:"Boot.NS", rights:["L"], gt:"", note:"NS root" },
     { slot:1, name:"SelfTest (self)", rights:["E"], gt:"", note:"Self-ref for loop" }
   ],
-  source:null, doc_count:2, doc_refs:["architecture.md","wukong-boot.md"]
+  source:null, doc_count:2, docs:["architecture.md","wukong-boot.md"]
 },
 {
-  id:"Salvation", genotype:"0x6BE43A9D", token:"ab3de4fd", group:"Boot ROM",
+  id:"Salvation", genotype:"0x6BE43A9D", token:"ab3de4fd", section:"Boot ROM",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:256, cw:141, cc:0, typ:0,
   language:"CLOOMC", author:"Church Machine", version:"1.2", status:"released",
@@ -349,12 +349,12 @@ const LUMPS = [
   ],
   source:"; LOAD + TPERM + CALL pattern for each boot abstraction\ncapabilities { Salvation E, Navana E, Mint E, Memory E }\n\nLOAD  CR0, Salvation  ; CR0 = Salvation (E)\nTPERM CR0, E\nCALL  Salvation.main  ; selector 0xF\n\nLOAD  CR1, Navana\nTPERM CR1, E\nCALL  Navana.main     ; selector 8\n\nLOAD  CR2, Mint\nTPERM CR2, E\nCALL  Mint.main       ; selector 5\n\nLOAD  CR3, Memory\nTPERM CR3, E\nCALL  Memory.main     ; selector 6\n\nHALT",
   doc_count:16,
-  doc_refs:["startup.md","getting-started.md","launch.md","abstractions.md","patent-cloomc-universal-target.md"]
+  docs:["startup.md","getting-started.md","launch.md","abstractions.md","patent-cloomc-universal-target.md"]
 },
 
 // ── SYSTEM ────────────────────────────────────────────────────
 {
-  id:"Memory", genotype:"0x3359E86E", token:"c3963aed", group:"System",
+  id:"Memory", genotype:"0x3359E86E", token:"c3963aed", section:"System",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:64, cw:19, cc:0, typ:0,
   language:"CLOOMC++", author:"Church Machine", version:"1.0", status:"released",
@@ -376,10 +376,10 @@ const LUMPS = [
   ],
   capabilities:[], source:"abstraction Memory {\n    capabilities {}\n    method Allocate(size) {\n        var needed = size + 255\n        needed = needed >> 8\n        needed = needed << 8\n        var location = read(CR7, 0)\n        var newFree = location + needed\n        write(CR7, 0, newFree)\n        return(location, needed)\n    }\n    method Free(location) {\n        write(CR7, 1, location)\n        return(0)\n    }\n    method Resize(location, newSize) {\n        return(location, newSize)\n    }\n}",
   doc_count:46,
-  doc_refs:["memory-manager.md","CM_LUMP_SPECIFICATION.md","architecture.md","getting-started.md","plan-call-mum.md"]
+  docs:["memory-manager.md","CM_LUMP_SPECIFICATION.md","architecture.md","getting-started.md","plan-call-mum.md"]
 },
 {
-  id:"EventRouter", genotype:"0x032CA4EE", token:"b3076308", group:"System",
+  id:"EventRouter", genotype:"0x032CA4EE", token:"b3076308", section:"System",
   ns_slot:43, ns_slot_policy:"static", boot_resident:true, variant_group:null,
   lump_size:64, cw:19, cc:0, typ:0,
   language:"CLOOMC", author:"Church Machine", version:"1.0.0", status:"released",
@@ -396,10 +396,10 @@ const LUMPS = [
     { name:"UnbindEvent", offset:19, length:4, visibility:"private", description:"(private) Clear the slot at a given index.", inputs:["DR0: slot index to clear"], outputs:["DR0: 0"] }
   ],
   capabilities:[],
-  source:null, doc_count:1, doc_refs:["abstractions.md"]
+  source:null, doc_count:1, docs:["abstractions.md"]
 },
 {
-  id:"Keystone", genotype:"0x86B853A1", token:"00002000", group:"System",
+  id:"Keystone", genotype:"0x86B853A1", token:"00002000", section:"System",
   ns_slot:23, ns_slot_policy:"static", boot_resident:false, variant_group:null,
   lump_size:64, cw:22, cc:2, typ:0,
   language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
@@ -419,10 +419,10 @@ const LUMPS = [
     { slot:0, name:"Tunnel", rights:["E"], gt:"0x4A001F00", note:"Tunnel E-GT — used for network setup" },
     { slot:1, name:"MumGT", rights:["E"], gt:"NULL_GT", note:"Filled by Connect on first successful handshake" }
   ],
-  source:null, doc_count:3, doc_refs:["network-transparency.md","plan-call-mum.md","tunnel-messaging-example.md"]
+  source:null, doc_count:3, docs:["network-transparency.md","plan-call-mum.md","tunnel-messaging-example.md"]
 },
 {
-  id:"Loader", genotype:"0x19BA3A9D", token:"00130000", group:"System",
+  id:"Loader", genotype:"0x19BA3A9D", token:"00130000", section:"System",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:64, cw:1, cc:1, typ:0,
   language:"CLOOMC++", author:"Church Machine", version:"WIP", status:"wip",
@@ -440,10 +440,10 @@ const LUMPS = [
   ],
   source:"abstraction Loader {\n    capabilities { SelfTest E }\n    method run {\n        ; stub — full impl uses UART GT\n        Call SelfTest run\n    }\n}",
   doc_count:21,
-  doc_refs:["locator.md","mload.md","memory-manager.md","abstractions.md","plan-call-mum.md"]
+  docs:["locator.md","mload.md","memory-manager.md","abstractions.md","plan-call-mum.md"]
 },
 {
-  id:"Scheduler.IRQ", genotype:"0x439E0DDD", token:"00000800", group:"System",
+  id:"Scheduler.IRQ", genotype:"0x439E0DDD", token:"00000800", section:"System",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:64, cw:1, cc:0, typ:0,
   language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
@@ -456,12 +456,12 @@ const LUMPS = [
     }
   ],
   capabilities:[],
-  source:null, doc_count:6, doc_refs:["dispatch-styles.md","startup.md","architecture.md"]
+  source:null, doc_count:6, docs:["dispatch-styles.md","startup.md","architecture.md"]
 },
 
 // ── NETWORKING ────────────────────────────────────────────────
 {
-  id:"Tunnel", genotype:"0x8770BF03", token:"00001f00", group:"Networking",
+  id:"Tunnel", genotype:"0x8770BF03", token:"00001f00", section:"Networking",
   ns_slot:22, ns_slot_policy:"static", boot_resident:false, variant_group:null,
   lump_size:64, cw:37, cc:1, typ:0,
   language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
@@ -500,10 +500,10 @@ const LUMPS = [
     { slot:0, name:"UART_DEV", rights:["R","W"], gt:"0x32000002", note:"UART device GT — tunnel transport" }
   ],
   source:null, doc_count:36,
-  doc_refs:["network-transparency.md","plan-call-mum.md","tunnel-messaging-example.md","IDE-Designer.md","family-registry.md","fulcrum-of-computer-science.md"]
+  docs:["network-transparency.md","plan-call-mum.md","tunnel-messaging-example.md","IDE-Designer.md","family-registry.md","fulcrum-of-computer-science.md"]
 },
 {
-  id:"Ethernet", genotype:"0xB169BBA4", token:"b169bba4", group:"Networking",
+  id:"Ethernet", genotype:"0xB169BBA4", token:"b169bba4", section:"Networking",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:64, cw:13, cc:1, typ:0,
   language:"ISA", author:"Church Machine", version:"1.0", status:"released",
@@ -531,12 +531,12 @@ const LUMPS = [
   capabilities:[
     { slot:0, name:"ETH_DEV", rights:["R","W"], gt:"", note:"Ethernet MMIO device GT" }
   ],
-  source:null, doc_count:5, doc_refs:["network-transparency.md","hardware-ti60-f225.pdf","architecture.md"]
+  source:null, doc_count:5, docs:["network-transparency.md","hardware-ti60-f225.pdf","architecture.md"]
 },
 
 // ── MATH / SCIENCE ────────────────────────────────────────────
 {
-  id:"Constants", genotype:"0xE494696F", token:"00001200", group:"Math / Science",
+  id:"Constants", genotype:"0xE494696F", token:"00001200", section:"Math / Science",
   ns_slot:9, ns_slot_policy:"static", boot_resident:false, variant_group:null,
   lump_size:64, cw:23, cc:2, typ:0,
   language:"ISA", author:"Church Machine", version:"1.0", status:"released",
@@ -555,10 +555,10 @@ const LUMPS = [
     { slot:0, name:"Constants pool (RW)", rights:["R","W"], gt:"", note:"Internal pool region — 14 user slots" },
     { slot:1, name:"Constants pool (R)", rights:["R"], gt:"", note:"Read-only view for Get" }
   ],
-  source:null, doc_count:22, doc_refs:["ada-note-g.md","note-g-comparison.md","pet-name-language.md","dispatch-styles.md"]
+  source:null, doc_count:22, docs:["ada-note-g.md","note-g-comparison.md","pet-name-language.md","dispatch-styles.md"]
 },
 {
-  id:"SlideRule", genotype:"0xD960F531", token:"00001000", group:"Math / Science",
+  id:"SlideRule", genotype:"0xD960F531", token:"00001000", section:"Math / Science",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:4096, cw:2602, cc:1, typ:0,
   language:"CLOOMC (JS front-end)", author:"Church Machine", version:"2026.08.13", status:"released",
@@ -592,10 +592,10 @@ const LUMPS = [
     { slot:0, name:"Constants", rights:["E"], gt:"0x4A001200", note:"NS slot 9 — used by Bernoulli method" }
   ],
   source:null, doc_count:32,
-  doc_refs:["ada-note-g.md","note-g-comparison.md","fulcrum-of-computer-science.md","dispatch-styles.md","pet-name-language.md","plan-call-mum.md"]
+  docs:["ada-note-g.md","note-g-comparison.md","fulcrum-of-computer-science.md","dispatch-styles.md","pet-name-language.md","plan-call-mum.md"]
 },
 {
-  id:"SlideRule.Haskell", genotype:"0x3542A2DB", token:"00001001", group:"Math / Science",
+  id:"SlideRule.Haskell", genotype:"0x3542A2DB", token:"00001001", section:"Math / Science",
   ns_slot:16, ns_slot_policy:"static", boot_resident:false, variant_group:null,
   lump_size:256, cw:137, cc:1, typ:0,
   language:"CLOOMC Haskell", author:"Church Machine", version:"1.0", status:"released",
@@ -615,10 +615,10 @@ const LUMPS = [
   capabilities:[
     { slot:0, name:"Constants", rights:["E"], gt:"", note:"runtime-issued GT targeting the static Constants abstraction (same dependency as SlideRule; slot assigned at load time, not pre-allocated)" }
   ],
-  source:null, doc_count:5, doc_refs:["lambda-arithmetic.md","dispatch-styles.md","note-g-comparison.md"]
+  source:null, doc_count:5, docs:["lambda-arithmetic.md","dispatch-styles.md","note-g-comparison.md"]
 },
 {
-  id:"BernoulliNumbers", genotype:"0x656DD0E4", token:"5a93ce79", group:"Math / Science",
+  id:"BernoulliNumbers", genotype:"0x656DD0E4", token:"5a93ce79", section:"Math / Science",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:64, cw:15, cc:1, typ:0,
   language:"ISA", author:"Church Machine", version:"1.0", status:"released",
@@ -633,10 +633,10 @@ const LUMPS = [
   capabilities:[
     { slot:0, name:"Constants", rights:["E"], gt:"", note:"Used for π/e in trig expansions" }
   ],
-  source:null, doc_count:0, doc_refs:[]
+  source:null, doc_count:0, docs:[]
 },
 {
-  id:"IntegerOps", genotype:"0x54C9A1E9", token:"19d3e599", group:"Math / Science",
+  id:"IntegerOps", genotype:"0x54C9A1E9", token:"19d3e599", section:"Math / Science",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:64, cw:20, cc:0, typ:0,
   language:"English / ISA", author:"Church Machine", version:"1.0", status:"released",
@@ -648,10 +648,10 @@ const LUMPS = [
     { name:"Add",       offset:8,  length:6,  description:"Return DR0 + DR1.", inputs:["DR0: a","DR1: b"], outputs:["DR0: a + b"] },
     { name:"Double",    offset:14, length:6,  description:"Return DR0 × 2 (implemented as DR0 + DR0).", inputs:["DR0: value"], outputs:["DR0: value × 2"] }
   ],
-  capabilities:[], source:null, doc_count:0, doc_refs:[]
+  capabilities:[], source:null, doc_count:0, docs:[]
 },
 {
-  id:"NoteG", genotype:"0x04A720F8", token:"04a720f8", group:"Math / Science",
+  id:"NoteG", genotype:"0x04A720F8", token:"04a720f8", section:"Math / Science",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:64, cw:38, cc:1, typ:0,
   language:"Symbolic", author:"Church Machine", version:"1.0", status:"released",
@@ -666,12 +666,12 @@ const LUMPS = [
   capabilities:[
     { slot:0, name:"Constants", rights:["E"], gt:"", note:"Needed for π and rational arithmetic" }
   ],
-  source:null, doc_count:1, doc_refs:["ada-note-g.md"]
+  source:null, doc_count:1, docs:["ada-note-g.md"]
 },
 
 // ── DATA / STRING ─────────────────────────────────────────────
 {
-  id:"WordString", genotype:"0xA1682B26", token:"ab1e86af", group:"Data / String",
+  id:"WordString", genotype:"0xA1682B26", token:"ab1e86af", section:"Data / String",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:512, cw:294, cc:0, typ:0,
   language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
@@ -689,10 +689,10 @@ const LUMPS = [
     { name:"ToUpper",       offset:198,length:22, description:"Return DR0 uppercased (A–Z range)." },
     { name:"ToLower",       offset:220,length:22, description:"Return DR0 lowercased (a–z range)." }
   ],
-  capabilities:[], source:null, doc_count:6, doc_refs:["namespace-vocabulary-tutorial.md","method-access-control.md","dispatch-styles.md"]
+  capabilities:[], source:null, doc_count:6, docs:["namespace-vocabulary-tutorial.md","method-access-control.md","dispatch-styles.md"]
 },
 {
-  id:"StringOps", genotype:"0x05B56245", token:"50ce4c64", group:"Data / String",
+  id:"StringOps", genotype:"0x05B56245", token:"50ce4c64", section:"Data / String",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:512, cw:315, cc:0, typ:0,
   language:"ISA", author:"Church Machine", version:"1.0", status:"released",
@@ -713,10 +713,10 @@ const LUMPS = [
     { name:"ReverseWord", offset:171, length:38, description:"Reverse the byte order in a 32-bit word (big-endian ↔ little-endian)." },
     { name:"CompareWords",offset:209, length:36, description:"Compare two packed words lexicographically. Returns -1, 0, or +1." }
   ],
-  capabilities:[], source:null, doc_count:0, doc_refs:[]
+  capabilities:[], source:null, doc_count:0, docs:[]
 },
 {
-  id:"EnglishLoops", genotype:"0x19366291", token:"d9454529", group:"Data / String",
+  id:"EnglishLoops", genotype:"0x19366291", token:"d9454529", section:"Data / String",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:64, cw:35, cc:0, typ:0,
   language:"English / ISA", author:"Church Machine", version:"1.0", status:"released",
@@ -727,12 +727,12 @@ const LUMPS = [
     { name:"RecurseSum", offset:12, length:12, description:"Compute sum 1..DR0 using recursive CALL.", inputs:["DR0: n"], outputs:["DR0: Σ 1..n"] },
     { name:"LambdaSum",  offset:24, length:11, description:"Compute sum 1..DR0 using LAMBDA tail-call pattern.", inputs:["DR0: n"], outputs:["DR0: Σ 1..n"] }
   ],
-  capabilities:[], source:null, doc_count:0, doc_refs:[]
+  capabilities:[], source:null, doc_count:0, docs:[]
 },
 
 // ── HARDWARE ──────────────────────────────────────────────────
 {
-  id:"LEDFlash", genotype:"0x55F1A32F", token:"55f1a32f", group:"Hardware",
+  id:"LEDFlash", genotype:"0x55F1A32F", token:"55f1a32f", section:"Hardware",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:512, cw:280, cc:1, typ:0,
   language:"ISA", author:"Church Machine", version:"WIP", status:"wip",
@@ -747,10 +747,10 @@ const LUMPS = [
   capabilities:[
     { slot:0, name:"LED_DEV", rights:["R","W"], gt:"0x32000003", note:"Ti60 LED MMIO GT (NS slot 3)" }
   ],
-  source:null, doc_count:0, doc_refs:[]
+  source:null, doc_count:0, docs:[]
 },
 {
-  id:"MorseCmOk", genotype:"0xEB20FE01", token:"d78f751b", group:"Hardware",
+  id:"MorseCmOk", genotype:"0xEB20FE01", token:"d78f751b", section:"Hardware",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:512, cw:312, cc:2, typ:0,
   language:"assembly", author:"Church Machine", version:"1.0", status:"released",
@@ -766,12 +766,12 @@ const LUMPS = [
     { slot:0, name:"LED_DEV",   rights:["R","W"], gt:"0x32000003", note:"LED MMIO for flashing" },
     { slot:1, name:"TIMER_DEV", rights:["R","W"], gt:"0x32000005", note:"Timer for Morse timing" }
   ],
-  source:null, doc_count:0, doc_refs:[]
+  source:null, doc_count:0, docs:[]
 },
 
 // ── SECURITY TEST ─────────────────────────────────────────────
 {
-  id:"CapabilityTest.2", genotype:"0xC7A66D01", token:"00000a00", group:"Security Test",
+  id:"CapabilityTest.2", genotype:"0xC7A66D01", token:"00000a00", section:"Security Test",
   ns_slot:10, ns_slot_policy:"static", boot_resident:true, variant_group:null,
   lump_size:64, cw:23, cc:5, typ:0,
   language:"assembly", author:"Church Machine", version:"2", status:"released",
@@ -790,10 +790,10 @@ const LUMPS = [
     { slot:3, name:"BTN_DEV",   rights:["R"],     gt:"0x12000004", note:"NS slot 4 — Turing R-only" },
     { slot:4, name:"TIMER_DEV", rights:["R","W"], gt:"0x32000005", note:"NS slot 5 — Turing RW" }
   ],
-  source:null, doc_count:1, doc_refs:["security-hardening-roadmap.md"]
+  source:null, doc_count:1, docs:["security-hardening-roadmap.md"]
 },
 {
-  id:"GT.Encoding.v1.1.Hardware.Self-Test", genotype:"0x254F3542", token:"cb8739cf", group:"Security Test",
+  id:"GT.Encoding.v1.1.Hardware.Self-Test", genotype:"0x254F3542", token:"cb8739cf", section:"Security Test",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:64, cw:26, cc:8, typ:0,
   language:"ISA", author:"Church Machine", version:"1.1", status:"released",
@@ -815,12 +815,12 @@ const LUMPS = [
     { slot:6, name:"GT_ABS", rights:[],           gt:"", note:"Abstract GT (typ=11)" },
     { slot:7, name:"GT_OFM", rights:[],           gt:"", note:"Outform GT (typ=10)" }
   ],
-  source:null, doc_count:0, doc_refs:[]
+  source:null, doc_count:0, docs:[]
 },
 
 // ── RESEARCH DEMO ─────────────────────────────────────────────
 {
-  id:"Human.Hand", genotype:"0xE88911D6", token:"97cc8047", group:"Research Demo",
+  id:"Human.Hand", genotype:"0xE88911D6", token:"97cc8047", section:"Research Demo",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:64, cw:7, cc:1, typ:0,
   language:"ISA", author:"Church Machine", version:"1.0", status:"released",
@@ -838,12 +838,12 @@ const LUMPS = [
   capabilities:[
     { slot:0, name:"HAND_DEV", rights:["R","W"], gt:"", note:"Physical hand motor-controller device GT" }
   ],
-  source:null, doc_count:0, doc_refs:[]
+  source:null, doc_count:0, docs:[]
 },
 
 // ── IDE NAMESPACE (compiled on demand) ────────────────────────
 {
-  id:"DijkstraFlag", genotype:"0x44CE2AAE", token:"44ce2aae", group:"IDE Namespace",
+  id:"DijkstraFlag", genotype:"0x44CE2AAE", token:"44ce2aae", section:"IDE Namespace",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:64, cw:32, cc:1, typ:0,
   language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
@@ -858,10 +858,10 @@ const LUMPS = [
   capabilities:[
     { slot:0, name:"FLAG_DATA", rights:["R","W"], gt:"", note:"One-word flag state (0=clear, 1=set)" }
   ],
-  source:null, doc_count:9, doc_refs:["launch.md","abstractions.md","api-reference.md","patent-ctmm-consolidated-2026.md","memory-manager.md"]
+  source:null, doc_count:9, docs:["launch.md","abstractions.md","api-reference.md","patent-ctmm-consolidated-2026.md","memory-manager.md"]
 },
 {
-  id:"Store", genotype:"0x69FC2839", token:"69fc2839", group:"IDE Namespace",
+  id:"Store", genotype:"0x69FC2839", token:"69fc2839", section:"IDE Namespace",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:64, cw:12, cc:1, typ:0,
   language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
@@ -877,10 +877,10 @@ const LUMPS = [
   capabilities:[
     { slot:0, name:"TABLE_DATA", rights:["R","W"], gt:"", note:"Hash table backing store (RW data GT)" }
   ],
-  source:null, doc_count:23, doc_refs:["ada-note-g.md","switch-lifecycle.md","phase-1-security-todo.md","launch.md"]
+  source:null, doc_count:23, docs:["ada-note-g.md","switch-lifecycle.md","phase-1-security-todo.md","launch.md"]
 },
 {
-  id:"Counter", genotype:"0xB62C83A1", token:"b62c83a1", group:"IDE Namespace",
+  id:"Counter", genotype:"0xB62C83A1", token:"b62c83a1", section:"IDE Namespace",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:64, cw:18, cc:1, typ:0,
   language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
@@ -894,10 +894,10 @@ const LUMPS = [
   capabilities:[
     { slot:0, name:"COUNT_DATA", rights:["R","W"], gt:"", note:"One-word count state — private" }
   ],
-  source:null, doc_count:14, doc_refs:["mint.md","abstract-io-addressing.md","civilization-threat.md","patent-ctmm-io-addressing-2026.md"]
+  source:null, doc_count:14, docs:["mint.md","abstract-io-addressing.md","civilization-threat.md","patent-ctmm-io-addressing-2026.md"]
 },
 {
-  id:"Adder", genotype:"0x7BA260A5", token:"7ba260a5", group:"IDE Namespace",
+  id:"Adder", genotype:"0x7BA260A5", token:"7ba260a5", section:"IDE Namespace",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:64, cw:8, cc:0, typ:0,
   language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
@@ -907,10 +907,10 @@ const LUMPS = [
     { name:"Add",    offset:0, length:4, description:"Return DR0 + DR1.", inputs:["DR0: a","DR1: b"], outputs:["DR0: a + b"] },
     { name:"Double", offset:4, length:4, description:"Return DR0 × 2.", inputs:["DR0: value"], outputs:["DR0: value × 2"] }
   ],
-  capabilities:[], source:null, doc_count:1, doc_refs:["getting-started.md"]
+  capabilities:[], source:null, doc_count:1, docs:["getting-started.md"]
 },
 {
-  id:"Calc", genotype:"0xB691F404", token:"b691f404", group:"IDE Namespace",
+  id:"Calc", genotype:"0xB691F404", token:"b691f404", section:"IDE Namespace",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:64, cw:10, cc:0, typ:0,
   language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
@@ -920,12 +920,12 @@ const LUMPS = [
     { name:"Multiply", offset:0, length:5, description:"Return DR0 × DR1 (iterative add loop).", inputs:["DR0: a","DR1: b"], outputs:["DR0: a × b"] },
     { name:"Square",   offset:5, length:5, description:"Return DR0².", inputs:["DR0: value"], outputs:["DR0: value²"] }
   ],
-  capabilities:[], source:null, doc_count:28, doc_refs:["getting-started.md","launch.md","prologue.md","note-g-comparison.md","immortal-software.md"]
+  capabilities:[], source:null, doc_count:28, docs:["getting-started.md","launch.md","prologue.md","note-g-comparison.md","immortal-software.md"]
 },
 
 // ── TWO-ENEMIES SECURITY PROOF ────────────────────────────────
 {
-  id:"Alice", genotype:"0x3FCBF37C", token:"3fcbf37c", group:"Two-Enemies Proof",
+  id:"Alice", genotype:"0x3FCBF37C", token:"3fcbf37c", section:"Two-Enemies Proof",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:64, cw:14, cc:1, typ:0,
   language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
@@ -938,10 +938,10 @@ const LUMPS = [
   capabilities:[
     { slot:0, name:"SECRET_DATA", rights:["R","W"], gt:"", note:"Private secret store — Alice controls this GT; Mallory cannot reach it" }
   ],
-  source:null, doc_count:0, doc_refs:[]
+  source:null, doc_count:0, docs:[]
 },
 {
-  id:"Mallory", genotype:"0xB2AB7AF0", token:"b2ab7af0", group:"Two-Enemies Proof",
+  id:"Mallory", genotype:"0xB2AB7AF0", token:"b2ab7af0", section:"Two-Enemies Proof",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
   lump_size:64, cw:12, cc:0, typ:0,
   language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
@@ -951,7 +951,7 @@ const LUMPS = [
     { name:"Steal", offset:0, length:6, description:"Attempt to call Alice.Reveal without holding the correct E-GT. Must produce PERM_DENIED fault. Returns fault code in DR0.", inputs:[], outputs:["DR0: PERM_DENIED fault code (proof passes) · 0 = proof FAILS"] },
     { name:"Probe", offset:6, length:6, description:"Attempt to LOAD Alice's internal c-list GT without L-permission. Must produce PERM_DENIED. Returns fault code in DR0.", inputs:[], outputs:["DR0: PERM_DENIED fault code (proof passes) · 0 = proof FAILS"] }
   ],
-  capabilities:[], source:null, doc_count:0, doc_refs:[]
+  capabilities:[], source:null, doc_count:0, docs:[]
 }
 
 ]; // end LUMPS
@@ -1052,7 +1052,7 @@ function renderList() {
   let html = '';
   let prevGroup = null;
   GROUP_ORDER.forEach(group => {
-    const groupLumps = LUMPS.filter(l => l.group === group);
+    const groupLumps = LUMPS.filter(l => l.section === group);
     if (!groupLumps.length) return;
     html += `<div class="group-hdr">${group}</div>`;
     groupLumps.forEach(lump => {
@@ -1158,7 +1158,7 @@ function renderTabContent(lump, tab, { freespace, header, n, nMinus6, checks }) 
           <div class="kv-key">Filename</div>   <div class="kv-val"><code>${formalFilename(lump)}</code></div>
           <div class="kv-key">Genotype</div>   <div class="kv-val"><code>${lump.genotype}</code></div>
           <div class="kv-key">Token</div>      <div class="kv-val"><code>${lump.token}</code></div>
-          <div class="kv-key">Group</div>      <div class="kv-val">${lump.group}</div>
+          <div class="kv-key">Group</div>      <div class="kv-val">${lump.section}</div>
           <div class="kv-key">Language</div>   <div class="kv-val">${lump.language || '—'}</div>
           <div class="kv-key">Author</div>     <div class="kv-val">${lump.author || '—'}</div>
           <div class="kv-key">Version</div>    <div class="kv-val">${lump.version || '—'}</div>
@@ -2051,7 +2051,7 @@ Words ${clStart}..${clEnd}:  C-list           [${lump.cc} GT Word 0 slots]` :
       </div>`;
 
   } else if (tab === 'docs') {
-    const refs = lump.doc_refs || [];
+    const refs = lump.docs || [];
     const countHtml = `<div class="doc-stat">
       <div class="doc-count-big">${lump.doc_count}</div>
       <div class="doc-count-label">documentation files reference<br><strong>${lump.id}</strong></div>

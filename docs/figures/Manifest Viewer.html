@@ -455,20 +455,6 @@ function buildOverviewHTML(e) {
 
   ${e.source ? `<div class="card"><h3>Source file</h3><div class="kv-val"><a href="/${escH(e.source)}" target="_blank">${escH(e.source)}</a></div></div>` : ''}
 
-  ${(e.group || (e.doc_refs && e.doc_refs.length)) ? `
-  <div class="card">
-    <h3>Catalogue</h3>
-    <div class="kv-grid">
-      <span class="kv-key">Group</span>
-      <span class="kv-val">${e.group ? escH(e.group) : '<span class="kv-null">—</span>'}</span>
-      <span class="kv-key">Docs</span>
-      <span class="kv-val">${
-        e.doc_refs && e.doc_refs.length
-          ? e.doc_refs.map(d => `<a class="doc-ref-link" href="/docs/${escH(d)}" target="_blank" rel="noopener noreferrer"><code>${escH(d)}</code></a>`).join(' ')
-          : '<span class="kv-null">—</span>'
-      }</span>
-    </div>
-  </div>` : ''}
 
   ${e.media_tags && e.media_tags.length ? `<div class="card"><h3>Media tags</h3><div class="kv-val">${e.media_tags.map(t=>`<code>${escH(t)}</code>`).join(' ')}</div></div>` : ''}
   `;

@@ -114,3 +114,4 @@
 - [ELOADCALL frame-push full bounds](eloadcall-frame-push-bounds.md) — ELOADCALL needs thread_hdr+cr12_thread inputs; PUSH_CR5_CR12 before STO read; callee_egt from CALL_P1_DONE CR6 (phase-1), not phase-0 loaded_cap
 - [Sidecar spec vs implementation](sidecar-spec-vs-implementation.md) — mechanical-cache rule is future-normative; verify field/writer claims against server/app.py before spec edits
 - [T7 freespace self-definition format](t7-freespace-format.md) — embedded API JSON must never carry token/issue (circular hash / identity rule); Mint validates framing only
+- [Schema field removal must sweep all readers](schema-field-removal-sweep.md) — purge CI workflow steps + doc-figure HTML viewers too; add a CI invariant so the key stays gone

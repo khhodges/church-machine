@@ -55,9 +55,5 @@
   ],
   "lump_version": 6,
   "compiled_at": 1779886993.949057,
-  "binary_hash": "e50f5e02d071a6cb0de36d7b97a1bbca982f130ae98ba93d281f90c4a41d53e9",
-  "group": "Math / Science",
-  "doc_refs": [
-    "ada-note-g.md"
-  ]
+  "binary_hash": "e50f5e02d071a6cb0de36d7b97a1bbca982f130ae98ba93d281f90c4a41d53e9"
 }

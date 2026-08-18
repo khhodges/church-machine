@@ -19,7 +19,7 @@
   "author": "Church Machine",
   "version": "1.0",
   "lump_version": 1,
-  "description": "Wukong board hardware ROM boot program. 73-instruction infinite loop: LED0 on → transmit \"CM:WUKONG\\r\\n\" over UART (busy-poll per byte) → ~0.498 s on-delay → LED0 off → ~0.498 s off-delay → repeat. No RETURN, no CALL. Runs safely on an unconfigured FPGA with no IDE connected. Recovered from git (deleted in lump-directory cleanup). Full disassembly confirmed word-for-word against the recovered binary.",
+  "description": "Wukong board hardware ROM boot program. 73-instruction infinite loop: LED0 on \u2192 transmit \"CM:WUKONG\\r\\n\" over UART (busy-poll per byte) \u2192 ~0.498 s on-delay \u2192 LED0 off \u2192 ~0.498 s off-delay \u2192 repeat. No RETURN, no CALL. Runs safely on an unconfigured FPGA with no IDE connected. Recovered from git (deleted in lump-directory cleanup). Full disassembly confirmed word-for-word against the recovered binary.",
   "source": "simulator/examples/wukong_callhome.cloomc",
   "dot_name": "WukongCallHome.hw",
   "issue_n": 1,
@@ -32,14 +32,14 @@
         "R",
         "W"
       ],
-      "note": "CR3 — DWRITE word 0 = {B,G,R}; bit 0 = R (physical LED pin). On: DWRITE DR1,CR3,0,DR0. Off: DWRITE DR0,CR3,0,DR0."
+      "note": "CR3 \u2014 DWRITE word 0 = {B,G,R}; bit 0 = R (physical LED pin). On: DWRITE DR1,CR3,0,DR0. Off: DWRITE DR0,CR3,0,DR0."
     },
     {
       "name": "UART_TX",
       "rights": [
         "W"
       ],
-      "note": "CR4 — DWRITE word 0 = TX data byte; DREAD word 1 (offset=DR1=1) = STATUS, bit 0 = busy. Busy-poll: DREAD/ISUB/BRANCHEQ per byte."
+      "note": "CR4 \u2014 DWRITE word 0 = TX data byte; DREAD word 1 (offset=DR1=1) = STATUS, bit 0 = busy. Busy-poll: DREAD/ISUB/BRANCHEQ per byte."
     }
   ],
   "methods": [
@@ -47,7 +47,7 @@
       "name": "setup",
       "offset": 0,
       "length": 3,
-      "description": "One-time capability loads and constant init. LOAD LED0→CR3 (c-list[0]), LOAD UART_TX→CR4 (c-list[1]), IADD DR1=1 (used as LED-on value and DREAD STATUS offset throughout).",
+      "description": "One-time capability loads and constant init. LOAD LED0\u2192CR3 (c-list[0]), LOAD UART_TX\u2192CR4 (c-list[1]), IADD DR1=1 (used as LED-on value and DREAD STATUS offset throughout).",
       "inputs": [],
       "outputs": [
         "CR3: LED0 GT",
@@ -71,7 +71,7 @@
       "name": "on_delay",
       "offset": 59,
       "length": 6,
-      "description": "LED-on hold delay ~0.498 s at 50 MHz. Nested loop: outer=380, inner=16383. 380 × 16383 × 4 cycles = ~24.9M cycles. IADD DR3=#380 / outer_on: IADD DR2=#16383 / inner_on: ISUB DR2,DR2,#1 / BRANCHNE inner_on / ISUB DR3,DR3,#1 / BRANCHNE outer_on.",
+      "description": "LED-on hold delay ~0.498 s at 50 MHz. Nested loop: outer=380, inner=16383. 380 \u00d7 16383 \u00d7 4 cycles = ~24.9M cycles. IADD DR3=#380 / outer_on: IADD DR2=#16383 / inner_on: ISUB DR2,DR2,#1 / BRANCHNE inner_on / ISUB DR3,DR3,#1 / BRANCHNE outer_on.",
       "inputs": [],
       "outputs": []
     },
@@ -79,7 +79,7 @@
       "name": "led_off",
       "offset": 65,
       "length": 1,
-      "description": "DWRITE DR0,CR3,0,DR0 — sets LED0 word 0 to 0 (off). DR0 is the zero register (never written).",
+      "description": "DWRITE DR0,CR3,0,DR0 \u2014 sets LED0 word 0 to 0 (off). DR0 is the zero register (never written).",
       "inputs": [
         "CR3: LED0 GT",
         "DR0: 0 (zero register)"
@@ -98,17 +98,11 @@
       "name": "loop_back",
       "offset": 72,
       "length": 1,
-      "description": "BRANCH AL [03] — unconditional branch back to loop_top (offset=-69). Closes the infinite loop.",
+      "description": "BRANCH AL [03] \u2014 unconditional branch back to loop_top (offset=-69). Closes the infinite loop.",
       "inputs": [],
       "outputs": []
     }
   ],
   "clist_note": "W0126=0x32000003, W0127=0x32000002 are v1.x Inform GTs (old NS-slot-addressed format, pre-v2.0). Stale from original compile. In modern use the lazy-loader overwrites these with live Abstract GTs at install time.",
-  "compiled_at": "2026-08-05T23:10:53Z",
-  "group": "Boot ROM",
-  "doc_refs": [
-    "wukong-boot.md",
-    "wukong-callhome-redesign-plan.md",
-    "architecture.md"
-  ]
+  "compiled_at": "2026-08-05T23:10:53Z"
 }
