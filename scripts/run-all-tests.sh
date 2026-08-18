@@ -431,6 +431,19 @@ node scripts/check-run-all-tests-sync.js || {
 }
 
 # ---------------------------------------------------------------------------
+# Lumps-guard snapshot — record server/lumps/ state before any suite runs.
+# Verified after all suites complete; fails the run if any file was mutated
+# and not restored (prevents canonical SelfTest lump corruption).
+# ---------------------------------------------------------------------------
+_LUMPS_SNAP="$WORK_DIR/lumps_snap.json"
+if ! python3 scripts/check_lumps_dir_clean.py --snapshot "$_LUMPS_SNAP"; then
+    echo ""
+    echo "STOPPING: lumps-guard could not snapshot server/lumps/ (see error above)."
+    echo "Fix the I/O issue, then re-run."
+    exit 1
+fi
+
+# ---------------------------------------------------------------------------
 # Filter suites based on command-line arguments
 # ---------------------------------------------------------------------------
 SUITE_NAMES=()
@@ -675,6 +688,27 @@ if [ -n "$PROGRESS_PID" ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Lumps-guard verify — compare server/lumps/ against the pre-run snapshot.
+# Runs after every suite has finished so per-module restore fixtures have had
+# a chance to run their teardown.
+# ---------------------------------------------------------------------------
+if [ -f "$_LUMPS_SNAP" ]; then
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  POST-RUN: verifying server/lumps/ integrity"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    if python3 scripts/check_lumps_dir_clean.py --verify "$_LUMPS_SNAP"; then
+        echo "  ✔  lumps-guard PASSED"
+        _LUMPS_GUARD_FAILED=0
+    else
+        echo "  ✘  lumps-guard FAILED"
+        _LUMPS_GUARD_FAILED=1
+    fi
+else
+    _LUMPS_GUARD_FAILED=0
+fi
+
+# ---------------------------------------------------------------------------
 # Final summary
 # ---------------------------------------------------------------------------
 PASS=0
@@ -689,6 +723,11 @@ for name in "${SUITE_NAMES[@]}"; do
         FAILED_SUITES+=("$name")
     fi
 done
+
+if [ "$_LUMPS_GUARD_FAILED" -eq 1 ]; then
+    FAIL=$((FAIL + 1))
+    FAILED_SUITES+=("lumps-guard")
+fi
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
