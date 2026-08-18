@@ -7,6 +7,8 @@ tests without needing the actual PostFlashSelftest lump on disk.
 
 After the test session the file is removed if it was created by this fixture.
 """
+import contextlib
+import fcntl
 import math
 import os
 import struct
@@ -15,6 +17,32 @@ import pytest
 
 ROOT      = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
+
+
+# ── Cross-process write lock for the live server/lumps/ directory ────────────
+# The all-tests runner starts several pytest sessions in parallel.  Any test
+# (or fixture) that MUTATES the live server/lumps/ directory must hold this
+# exclusive lock for the full mutate-then-restore span, so that two
+# cooperating writers can never interleave snapshot/restore cycles.
+#
+# Guarantee and limits: this serializes only *cooperating* lock holders
+# (tests/fixtures that call lumps_write_lock()).  It cannot protect against
+# non-cooperating writers such as a live dev server process; do not run the
+# destructive suites while the IDE server is actively saving lumps.
+_LUMPS_LOCK_PATH = os.path.join(ROOT, "server", ".lumps.write.lock")
+
+
+@contextlib.contextmanager
+def lumps_write_lock():
+    """Exclusive cross-process lock for mutations of the live server/lumps/."""
+    fh = open(_LUMPS_LOCK_PATH, "a+")
+    try:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+        yield
+    finally:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+        fh.close()
+
 
 _BOOT_ABSTR_NS_SLOT = 6
 _LUMP_SIZE          = 64          # words — must match BOOT_ABSTR_DEFAULT_SIZE
