@@ -878,24 +878,32 @@ class Interpreter:
     # the interpreter has no import cycle and reads a Lump on its own terms.
     @staticmethod
     def _unpack_source(words, h):
-        import struct, zlib
-        desc_at = h["size_words"] - h["cc"] - 1
-        if desc_at <= h["cw"]:
+        # V1.3 self-defining freespace: 0xAB content frame at word cw+1
+        # (see CM_LUMP_SPECIFICATION.md §Freespace Content and Self-Definition).
+        import struct
+        fs_start = 1 + h["cw"]
+        fs_end = h["size_words"] - h["cc"]
+        if fs_start >= fs_end:
             return None
-        desc = words[desc_at]
-        fmt, length = (desc >> 24) & 0xFF, desc & 0xFFFFFF
-        if fmt == 2:
-            return "\x00omitted"
-        if fmt == 3:
-            return "\x00too-large"
-        if fmt != 1 or length == 0:
+        hdr = words[fs_start] & 0xFFFFFFFF
+        if (hdr >> 24) & 0xFF != 0xAB:
+            return None                       # legacy — all-zero freespace
+        flags = (hdr >> 16) & 0xFF
+        if not (flags & 0x01):
+            return None                       # Tier 0 — API only, no source
+        api_len = hdr & 0xFFFF
+        pos = fs_start + 1 + (api_len + 3) // 4
+        if pos >= fs_end:
             return None
-        nwords = (length + 3) // 4
-        raw = struct.pack(f">{nwords}I",
-                          *words[desc_at - nwords:desc_at])[:length]
+        src_len = words[pos] & 0xFFFFFFFF
+        src_nw = (src_len + 3) // 4
+        pos += 1
+        if src_len == 0 or pos + src_nw > fs_end:
+            return None
+        raw = struct.pack(f">{src_nw}I", *words[pos:pos + src_nw])[:src_len]
         try:
-            return zlib.decompress(raw, -15).decode("utf-8")
-        except Exception:
+            return raw.decode("utf-8")
+        except UnicodeDecodeError:
             return None
 
     @staticmethod

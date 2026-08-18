@@ -1,9 +1,15 @@
 ---
-name: SelfTest lump c-list[0] stomp via /api/lumps/save tests
-description: Why the canonical SelfTest binary's word 510 (0x4A000006 E-GT) keeps getting corrupted and how to repair it
+name: Destructive test isolation for canonical lump binaries
+description: Why suites that hit /api/lumps/save must never run against the real server/lumps/ dir
 ---
-The canonical SelfTest lump (token 00000600, 512 words) must have word[510] = 0x4A000006 (c-list[0] SelfTest E-GT); hardware/boot_rom.py asserts this at import time, so corruption blocks the whole IDE server.
+Test suites that exercise save/upload endpoints must run against an
+isolated lumps directory, never `server/lumps/`.
 
-**Why:** Running the full tests/boot/ suite against the real server/lumps/ dir is destructive: test_boot_abstr_cw_cc.py POSTs /api/lumps/save for ns_slot=6 and, if the suite fails midway, leaves a stub SelfTest.<n>.<hash>.lump, re-pointed symlinks, and even truncates SelfTest_v76.lump. That is how the d4f13015/0x0ba2785e drift happened.
+**Why:** the canonical SelfTest binary is asserted at server import time,
+so any test that writes through the real save path and fails midway can
+corrupt it and block the whole IDE server from starting.
 
-**How to apply:** Repair = restore the 512-word binary with word510=0x4A000006 (SelfTest_v76.lump in git is a good copy; content hashes to 30542a6d), name it SelfTest.1.<sha256("SelfTest"+bytes)[:8]>.lump, keep 00000600.lump as a symlink to it, and align manifest.json (filename, sidecar_file, ns_slot=6, ns_slot_policy=static, lump_version, binary_hash). Never run the full tests/boot/ suite as a validation step; run the targeted boot-image test files instead.
+**How to apply:** use the monkeypatched-`__file__` isolated-lumps fixture
+pattern (see tests/server/ suites) for anything touching save/upload/resize;
+never run the full destructive boot suite as a validation step — run
+targeted test files instead.

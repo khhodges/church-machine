@@ -1919,6 +1919,12 @@ async function _fetchAndShowLumpSavedSource(token, lump, tk) {
     const e = _escHtml;
     try {
         const data = await _fetchLumpDetailCached(token);
+        // V1.3 self-defining binaries carry a sourceStorageTier (0/1/2);
+        // undefined means a legacy binary (all-zero freespace, sidecar only).
+        const _tier = (typeof data.sourceStorageTier === 'number') ? data.sourceStorageTier : null;
+        const _tierBadge = _tier !== null
+            ? `<span class="lump-stored-src-tier-badge" title="V1.3 self-defining freespace">Tier ${_tier} \u2014 ${_tier >= 1 ? 'source embedded in binary' : 'API embedded in binary'}</span>`
+            : '';
         if (data.source && data.source.trim().length > 0) {
             const _lang = e(data.language || lump.language || 'cloomc');
             const _compiledAt = data.compiled_at
@@ -1933,11 +1939,21 @@ async function _fetchAndShowLumpSavedSource(token, lump, tk) {
                 `<div class="lump-stored-src-section">` +
                 `<div class="lump-stored-src-meta-bar lump-stored-src-meta">` +
                 `<span class="lump-stored-src-lang-badge">${_lang}</span>` +
+                _tierBadge +
                 (_compiledAt ? `<span class="lump-stored-src-ts">compiled ${_compiledAt}</span>` : '') +
                 `</div>` +
                 `<pre class="lump-stored-src-pre lump-stored-src-pre-full">${_highlightCLOOMCSource(data.source, data.language || lump.language)}</pre>` +
                 `</div>`;
+        } else if (_tier !== null) {
+            // Tier 0: the binary is self-defining (API embedded) but the
+            // source itself is withheld.
+            el.innerHTML =
+                `<div class="lump-stored-src-section">` +
+                `<div class="lump-stored-src-meta-bar lump-stored-src-meta">${_tierBadge}</div>` +
+                `<div class="lump-stored-src-empty">Source not embedded (Tier 0 \u2014 API only) and no sidecar source.</div>` +
+                `</div>`;
         } else {
+            // Legacy binary (all-zero freespace) AND no sidecar source.
             el.innerHTML = `<div class="lump-stored-src-empty">No stored source — this LUMP predates source persistence.</div>`;
         }
     } catch (_) {

@@ -115,5 +115,6 @@
 - [Sidecar spec vs implementation](sidecar-spec-vs-implementation.md) — mechanical-cache rule is future-normative; verify field/writer claims against server/app.py before spec edits
 - [Freespace validation zone per typ](freespace-validation-zone-per-typ.md) — freespace scans must branch on lump typ: Thread uses the collision zone, Namespace skips; generic cw/cc bounds reject valid Threads
 - [T7 freespace self-definition format](t7-freespace-format.md) — embedded API JSON must never carry token/issue (circular hash / identity rule); Mint validates framing only
+- [Lump V1.3 self-defining freespace](lump-v13-self-definition.md) — 0xAB frame at word cw+1 (API JSON + optional source); JS/Python emitters must stay in lockstep; compile cache key must include tier
 - [Schema field removal must sweep all readers](schema-field-removal-sweep.md) — purge CI workflow steps + doc-figure HTML viewers too; add a CI invariant so the key stays gone
 - [SelfTest word510 E-GT stomp](selftest-lump-word510-stomp.md) — boot_rom asserts word[510]=0x4A000006; full tests/boot run is destructive to server/lumps and caused the drift

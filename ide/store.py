@@ -38,18 +38,40 @@ import hashlib
 import json
 import re
 import struct
-import zlib
 import time
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Iterator
 
-from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import (
-    Ed25519PrivateKey,
-    Ed25519PublicKey,
-)
+# Provenance (Identity / Seal) needs the cryptography package; the pure
+# binary-format helpers (parse_header, embed_content, extract_content, …) do
+# not.  Import lazily-optional so format tooling works in environments where
+# the native cryptography bindings are unavailable.
+try:
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+        Ed25519PrivateKey,
+        Ed25519PublicKey,
+    )
+    _HAVE_CRYPTO = True
+    _CRYPTO_IMPORT_ERROR = None
+except Exception as _crypto_exc:  # pragma: no cover — env without working cffi backend
+    InvalidSignature = Exception          # type: ignore
+    serialization = None                  # type: ignore
+    Ed25519PrivateKey = Ed25519PublicKey = None  # type: ignore
+    _HAVE_CRYPTO = False
+    _CRYPTO_IMPORT_ERROR = _crypto_exc
+
+
+def _require_crypto():
+    """Fail loudly (not with a confusing NoneType error) if the cryptography
+    package could not be imported.  Format helpers (header packing, freespace
+    frames) stay usable without it; identity/provenance operations do not."""
+    if not _HAVE_CRYPTO:
+        raise RuntimeError(
+            "cryptography is unavailable in this environment — identity and "
+            f"provenance operations cannot run: {_CRYPTO_IMPORT_ERROR!r}")
 
 # Lump header constraints — bit positions confirmed against
 # simulator/simulator.js parseLumpHeader()/packLumpHeader() (lines 912-958).
@@ -64,63 +86,45 @@ TYP_CODE, TYP_DATA, TYP_THREAD, TYP_OUTFORM = 0, 1, 2, 3
 TYP_NAMES = {TYP_CODE: "code", TYP_DATA: "data",
              TYP_THREAD: "thread", TYP_OUTFORM: "outform"}
 
-# ── embedded source ─────────────────────────────────────────────────────────
+# ── self-defining freespace (V1.3) ──────────────────────────────────────────
 #
-# A Lump may carry the source that produced it, compressed, in its freespace.
-# The header already says nothing outside the Lump describes the Lump; this
-# extends that from what a Lump *is* to what it *means*. Source and binary
-# cannot drift when they are the same bytes under the same hash and the same
-# seal.
+# Every typ=lump binary is self-defining (CM_LUMP_SPECIFICATION.md,
+# §Freespace Content and Self-Definition).  The freespace between the code
+# and the c-list carries an 0xAB-tagged content frame:
 #
-# Layout — the block sits immediately below the c-list and grows downward, so
-# freespace stays contiguous between the code and the source:
+#     word cw+1         content header:
+#                         [31:24] magic 0xAB
+#                         [23:16] flags: bit0=has_source, bit1=source_has_comments
+#                         [15:0]  api_byte_length
+#     words cw+2 …      API definition JSON (UTF-8, big-endian, zero-padded)
+#     if has_source:    one word source_byte_length, then source bytes
+#                       (UTF-8, big-endian, zero-padded to word boundary)
+#     remainder         all zero — mandatory (Mint validation step 7)
 #
-#     word 0            header
-#     words 1..cw       code
-#                       ← freespace (zeros)
-#                       ← source payload
-#     size-cc-1         descriptor
-#     last cc words     c-list
+# Legacy binaries (all-zero freespace, word cw+1 magic != 0xAB) carry no
+# self-definition and are a transitional state resolved by recompilation.
 #
-# Descriptor word:  [31:24] format   [23:0] byte length
-#
-# A reader checks one word. Zero means no source and nothing more to do —
-# cheap enough that Mint can ignore it entirely.
-#
-SRC_NONE      = 0   # no source embedded
-SRC_DEFLATE   = 1   # raw DEFLATE, level 9, wbits=-15
-SRC_OMITTED   = 2   # deliberately withheld (e.g. proprietary)
-SRC_TOO_LARGE = 3   # did not fit; the compiler warned
+# The embedded API JSON MUST NOT contain `token` or `issue` — the token is a
+# hash over bytes that include this frame (circular fixed point), and issue
+# is publication metadata that never enters the hashed bytes.
+CONTENT_MAGIC = 0xAB
 
-SRC_FORMATS = {SRC_NONE: "none", SRC_DEFLATE: "deflate",
-               SRC_OMITTED: "omitted", SRC_TOO_LARGE: "too-large"}
+# Tier → flags byte.  Tier 2 (full source + comments) is the default: every
+# compile with no explicit tier produces a Tier 2 binary.  Tier 0/1 exist for
+# future use and testing.
+TIER_FLAGS = {0: 0x00, 1: 0x01, 2: 0x03}
+FLAGS_TIER = {v: k for k, v in TIER_FLAGS.items()}
+DEFAULT_TIER = 2
 
-# Source-carriage modes — three individuals of one genotype.
-#
-#   FULL  embed the source verbatim, comments and all. The Lump grows as
-#         needed to carry it. For development and for the documented original
-#         that stays home in the store. A NEW organism.
-#
-#   DNA   embed only the genotype-bearing lines: the capabilities block and the
-#         instructions, with comments and blank lines stripped. Small enough to
-#         usually fit the original size, still enough for the authority view and
-#         a readable disassembly. For a MATURE organism that roams light.
-#
-#   NONE  embed nothing (SRC_OMITTED). Smallest and opaque. For proprietary
-#         code or when the source lives elsewhere. Traced home by genotype.
-#
-# All three share one genotype hash — identical code, identical authority —
-# so a NONE Lump on silicon can always be traced back to its FULL sibling.
+TIER_NAMES = {0: "api-only", 1: "source", 2: "source+comments"}
+
+# Legacy source-carriage mode names, kept as aliases so existing callers keep
+# working: FULL → Tier 2, DNA → Tier 1 (comments stripped), NONE → Tier 0.
 SRC_MODE_FULL = "full"
 SRC_MODE_DNA  = "dna"
 SRC_MODE_NONE = "none"
 SRC_MODES = (SRC_MODE_FULL, SRC_MODE_DNA, SRC_MODE_NONE)
-
-# Level is pinned by the specification, not chosen at runtime. If compression
-# varied, identical source would yield different bytes and different hashes,
-# and the identity model would break.
-SRC_LEVEL = 9
-SRC_WBITS = -15
+MODE_TIER = {SRC_MODE_FULL: 2, SRC_MODE_DNA: 1, SRC_MODE_NONE: 0}
 
 
 DOTNAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$")
@@ -251,31 +255,97 @@ def parse_header(words: list[int]) -> dict:
             "typ_name": TYP_NAMES[typ], "cc": cc}
 
 
-def compress_source(text: str) -> bytes:
-    """Compress source for embedding. Level and window are pinned by spec —
-    if these varied, identical source would produce different bytes and
-    different hashes."""
-    return _raw_deflate(text.encode("utf-8"))
-
-
-def _raw_deflate(data: bytes) -> bytes:
-    c = zlib.compressobj(SRC_LEVEL, zlib.DEFLATED, SRC_WBITS)
-    return c.compress(data) + c.flush()
-
-
-def _raw_inflate(data: bytes) -> bytes:
-    return zlib.decompress(data, SRC_WBITS)
-
-
 def source_capacity(words: list[int]) -> int:
-    """Bytes available for an embedded source block, descriptor included.
+    """Bytes available for embedded content beyond the content-header word.
 
     Everything between the end of the code and the start of the c-list, less
-    the one descriptor word.
+    the one 0xAB content-header word.
     """
     h = parse_header(words)
     free = h["size_words"] - (1 + h["cw"]) - h["cc"]
     return max(0, (free - 1) * 4)
+
+
+def _pack_be_words(data: bytes) -> list[int]:
+    """UTF-8 bytes → big-endian packed words, zero-padded to word boundary."""
+    padded = data + b"\x00" * (-len(data) % 4)
+    return list(struct.unpack(f">{len(padded) // 4}I", padded)) if padded else []
+
+
+def build_api_definition(name: str, methods: list | None = None,
+                         words: list[int] | None = None) -> dict:
+    """Build the embeddable API definition JSON from compile-time facts.
+
+    `methods` entries may be dicts (compiler method table: name/petName,
+    params, visibility, optional branchOffset / in / out) or bare strings.
+    When `words` is supplied and a method lacks an explicit branchOffset,
+    it is read from the dispatch-table entry at words[1 + index].  Table
+    entries are raw lump-word offsets (buildLump semantics: bodyOffset + 1;
+    0 = private), matching the JS emitter in simulator/lump_builder.js —
+    the two emitters must produce identical API frames.  Private methods
+    are omitted (the API describes the public interface only).
+
+    Parameters map to DR1.. (DR_ARGS_START=1, matching the CLOOMC compiler);
+    public methods report a single `result` out variable in DR1.  Reserved
+    registers (DR0, CR5, CR6, CR12–CR15) are never assigned.
+
+    The payload never contains `token` or `issue` (identity is external —
+    embedding the token would be a circular fixed point).
+    """
+    out_methods = []
+    for i, m in enumerate(methods or []):
+        if isinstance(m, str):
+            m = {"name": m}
+        if m.get("visibility") == "private":
+            continue
+        pet = m.get("petName") or m.get("name") or f"method{i + 1}"
+        branch = m.get("branchOffset")
+        if branch is None and words is not None and 1 + i < len(words):
+            branch = words[1 + i] & 0x7FFF
+        if branch is None:
+            branch = 0
+        if "in" in m:
+            ins = list(m["in"])
+        else:
+            ins = [{"name": p, "reg": f"DR{pi + 1}"}
+                   for pi, p in enumerate(m.get("params") or [])]
+        if "out" in m:
+            outs = list(m["out"])
+        else:
+            outs = [{"name": "result", "reg": "DR1"}]
+        out_methods.append({"petName": pet, "branchOffset": int(branch),
+                            "in": ins, "out": outs})
+    return {"name": name or "", "methods": out_methods}
+
+
+def _api_bytes(api) -> bytes:
+    """Serialise an API definition, rejecting identity fields."""
+    if api is None:
+        api = {"name": "", "methods": []}
+    if isinstance(api, (bytes, bytearray)):
+        raw = bytes(api)
+        parsed = json.loads(raw.decode("utf-8"))
+    else:
+        parsed = api
+        raw = None
+    if not isinstance(parsed, dict):
+        raise LumpError("API definition must be a JSON object")
+    for forbidden in ("token", "issue"):
+        if forbidden in parsed:
+            raise LumpError(
+                f"API payload must not contain '{forbidden}' — identity "
+                "fields live outside the binary (circular-hash rule)")
+    if raw is None:
+        # ensure_ascii=False: JSON.stringify emits UTF-8 characters
+        # directly — Python must match or byte-for-byte parity breaks on
+        # any non-ASCII API name/parameter.
+        raw = json.dumps(parsed, separators=(",", ":"),
+                         ensure_ascii=False).encode("utf-8")
+    if not raw:
+        raise LumpError("API definition serialised to zero bytes")
+    if len(raw) > 0xFFFF:
+        raise LumpError(f"API definition too large: {len(raw)} bytes > 65535")
+    return raw
 
 
 def _rebuild_header(old_header: int, new_n: int) -> int:
@@ -312,6 +382,21 @@ def grow_lump(words: list[int], new_n: int) -> list[int]:
     return out
 
 
+def strip_comments(text: str) -> str:
+    """Canonical Tier 1 transformation — MUST match stripComments() in
+    simulator/lump_builder.js byte-for-byte, or the two emitters produce
+    different Tier 1 binaries for the same source: every line has any
+    trailing `;`/`//` comment removed (inline included), lines that are
+    then blank are dropped, lines joined with '\\n', no trailing newline."""
+    out = []
+    for raw in text.split("\n"):
+        line = re.sub(r";.*$", "", raw)
+        line = re.sub(r"//.*$", "", line)
+        if line.strip():
+            out.append(line)
+    return "\n".join(out)
+
+
 def strip_to_dna(text: str) -> str:
     """Reduce source to its genotype-bearing lines: the capabilities block and
     the instructions, with comment-only lines and blank lines removed.
@@ -338,135 +423,188 @@ def strip_to_dna(text: str) -> str:
     return "\n".join(out) + ("\n" if out else "")
 
 
-def embed_source(words: list[int], text: str, mode: str = SRC_MODE_FULL,
-                 grow: bool = True) -> tuple[list[int], str]:
-    """Embed source according to a carriage mode. Returns (words, message).
+def embed_source(words: list[int], text: str, mode: str | None = None,
+                 grow: bool = True, tier: int | None = None,
+                 api: dict | bytes | None = None) -> tuple[list[int], str]:
+    """Embed the V1.3 self-definition frame. Returns (words, message).
 
-    FULL carries the source verbatim (growing the Lump as needed). DNA carries
-    the stripped genotype form. NONE carries nothing, marking the slot OMITTED
-    so a reader knows the source was withheld, not merely absent. All three
-    leave the code and c-list — and therefore the genotype hash — untouched.
+    Tier selects what freespace carries beyond the mandatory API definition:
+    Tier 2 (default) embeds full source with comments, Tier 1 embeds source
+    with comment-only lines stripped, Tier 0 embeds the API alone.  Legacy
+    mode names are accepted: full→2, dna→1, none→0.
     """
-    if mode not in SRC_MODES:
-        raise LumpError(f"unknown source mode '{mode}' — one of {SRC_MODES}")
+    if tier is None:
+        if mode is not None:
+            if mode not in MODE_TIER:
+                raise LumpError(
+                    f"unknown source mode '{mode}' — one of {SRC_MODES}")
+            tier = MODE_TIER[mode]
+        else:
+            tier = DEFAULT_TIER
+    if tier not in TIER_FLAGS:
+        raise LumpError(f"unknown tier {tier} — one of 0, 1, 2")
 
-    if mode == SRC_MODE_NONE:
-        out = list(words)
-        h = parse_header(words)
-        desc_at = h["size_words"] - h["cc"] - 1
-        if desc_at > h["cw"]:
-            out[desc_at] = (SRC_OMITTED << 24)
-        return out, "source omitted (NONE) — traced home by genotype"
-
-    if mode == SRC_MODE_DNA:
-        dna = strip_to_dna(text)
-        out, msg = pack_source(words, dna, grow=grow)
-        saved = len(text) - len(dna)
-        return out, f"DNA: {msg} (stripped {saved} bytes of prose)"
-
-    return pack_source(words, text, grow=grow)   # FULL
+    src: str | None = None
+    if tier >= 1:
+        # Tier 1 stripping happens inside embed_content (canonical).
+        src = text
+        if not (strip_comments(text) if tier == 1 else text):
+            raise LumpError(f"tier {tier} requires non-empty source")
+    return embed_content(words, api, source=src, tier=tier, grow=grow)
 
 
-def pack_source(words: list[int], text: str,
-                grow: bool = True) -> tuple[list[int], str]:
-    """Embed source, growing the Lump to the next size that fits if needed.
+def pack_source(words: list[int], text: str, grow: bool = True,
+                api: dict | bytes | None = None) -> tuple[list[int], str]:
+    """Embed full source at the default tier (2). Kept for existing callers."""
+    return embed_content(words, api, source=text, tier=DEFAULT_TIER, grow=grow)
 
-    A Lump's size is 2**n words, n in [6, 15]. When the compressed source does
-    not fit the current freespace and `grow` is set, the Lump is enlarged one
-    power of two at a time until it fits or n reaches its ceiling. Growing
-    changes the header, therefore the bytes, therefore the identity hash — a
-    larger Lump is a different object — so this runs before the seal, never
-    after.
 
-    If the source will not fit even at the maximum size, the Lump is returned
-    unchanged with SRC_TOO_LARGE recorded. That is the end of the road for a
-    Lump this size: the Church Machine cannot carry this source inside this
-    object, and the caller must split the abstraction or use a DNA block.
+def embed_content(words: list[int], api: dict | bytes | None = None,
+                  source: str | None = None, tier: int = DEFAULT_TIER,
+                  grow: bool = True) -> tuple[list[int], str]:
+    """Write the 0xAB content frame into freespace, growing the Lump if needed.
+
+    Layout (spec §Freespace Content and Self-Definition):
+      word cw+1   = 0xAB<<24 | flags<<16 | api_byte_length
+      words cw+2… = API JSON bytes (UTF-8, big-endian, zero-padded)
+      tier ≥ 1    : next word = source_byte_length, then source bytes
+      remainder   = all zero (mandatory)
+
+    Growing changes the header, therefore the bytes, therefore the identity
+    hash — so this runs before the seal, never after.
     """
+    if tier not in TIER_FLAGS:
+        raise LumpError(f"unknown tier {tier} — one of 0, 1, 2")
+    if tier >= 1 and not source:
+        raise LumpError(f"tier {tier} requires non-empty source")
+
     h = parse_header(words)
-    blob = _raw_deflate(text.encode("utf-8"))
+    api_raw = _api_bytes(api)
+    api_words = _pack_be_words(api_raw)
+    src_words: list[int] = []
+    src_len = 0
+    if tier >= 1:
+        # Tier 1 strips comments here (canonical transformation), exactly
+        # like embedSelfDefinition() in simulator/lump_builder.js.
+        src_raw = (strip_comments(source) if tier == 1 else source).encode("utf-8")
+        src_len = len(src_raw)
+        src_words = _pack_be_words(src_raw)
 
-    # Find the smallest n whose freespace holds the blob.
-    def capacity_at(n: int) -> int:
-        return max(0, ((1 << n) - (1 + h["cw"]) - h["cc"] - 1) * 4)
+    need = 1 + len(api_words) + ((1 + len(src_words)) if tier >= 1 else 0)
+
+    def free_at(n: int) -> int:
+        return (1 << n) - 1 - h["cw"] - h["cc"]
 
     target_n = h["n"]
-    while blob and len(blob) > capacity_at(target_n) and target_n < N_MAX:
+    while need > free_at(target_n) and target_n < N_MAX:
         target_n += 1
+    if need > free_at(target_n):
+        raise LumpError(
+            f"content frame ({need} words) does not fit the biggest Lump "
+            f"(n={N_MAX}, {free_at(N_MAX)} free words) — split the "
+            f"abstraction or lower the tier")
 
     grew = ""
     if target_n > h["n"]:
         if not grow:
-            spare = capacity_at(target_n) - len(blob)
             return words, (
-                f"source not embedded: {len(blob)} bytes compressed, "
-                f"{capacity_at(h['n'])} available\n"
-                f"  → next size up ({1 << target_n} words) would fit "
-                f"with {spare} bytes spare (pass grow=True to auto-resize)"
-            )
+                f"content not embedded: needs {need} words, "
+                f"{free_at(h['n'])} free (pass grow=True to auto-resize)")
+        old_size = h["size_words"]
         words = grow_lump(words, target_n)
         h = parse_header(words)
-        grew = f"grew {1 << (h['n'] - (target_n - h['n']))}→{h['size_words']} words, "
-
-    capacity = source_capacity(words)
-    if len(blob) > capacity:
-        # Ran out of sizes. Mark the slot so a reader knows the source existed
-        # and was refused, not merely absent.
-        out = list(words)
-        desc_at = h["size_words"] - h["cc"] - 1
-        if desc_at > h["cw"]:
-            out[desc_at] = (SRC_TOO_LARGE << 24)
-        return out, (
-            f"source NOT embedded — too large for the biggest Lump: "
-            f"{len(blob)} bytes compressed, {capacity} available at the "
-            f"maximum n={N_MAX} ({1 << N_MAX} words).\n"
-            f"  This is the end of the road for a Lump this size. Split the "
-            f"abstraction, omit the source, or use a compact DNA block."
-        )
+        grew = f"grew {old_size}→{h['size_words']} words, "
 
     out = list(words)
-    padded = blob + b"\x00" * (-len(blob) % 4)
-    payload = list(struct.unpack(f">{len(padded) // 4}I", padded))
+    # Zero the whole freespace first — the zero remainder is mandatory.
+    fs_start = 1 + h["cw"]
+    fs_end = h["size_words"] - h["cc"]
+    for i in range(fs_start, fs_end):
+        out[i] = 0
 
-    desc_at = h["size_words"] - h["cc"] - 1
-    out[desc_at] = (SRC_DEFLATE << 24) | (len(blob) & 0xFFFFFF)
-    out[desc_at - len(payload):desc_at] = payload
+    flags = TIER_FLAGS[tier]
+    out[fs_start] = ((CONTENT_MAGIC << 24) | (flags << 16)
+                     | (len(api_raw) & 0xFFFF))
+    pos = fs_start + 1
+    out[pos:pos + len(api_words)] = api_words
+    pos += len(api_words)
+    if tier >= 1:
+        out[pos] = src_len & 0xFFFFFFFF
+        pos += 1
+        out[pos:pos + len(src_words)] = src_words
+        pos += len(src_words)
 
-    return out, (f"source embedded: {grew}{len(text)} bytes "
-                 f"→ {len(blob)} compressed")
+    tail = (f", source {src_len} bytes" if tier >= 1 else "")
+    return out, (f"self-definition embedded: {grew}tier {tier}, "
+                 f"API {len(api_raw)} bytes{tail}")
+
+
+def extract_content(words: list[int]) -> dict | None:
+    """Read the 0xAB content frame. Returns None for a legacy binary.
+
+    Result: {tier, flags, api (dict), api_bytes, source (str|None)}.
+    Raises SourceError on a malformed frame (bad flags, out-of-bounds
+    lengths, undecodable payload).
+    """
+    h = parse_header(words)
+    fs_start = 1 + h["cw"]
+    fs_end = h["size_words"] - h["cc"]
+    if fs_start >= fs_end:
+        return None
+    hdr = words[fs_start] & 0xFFFFFFFF
+    if (hdr >> 24) & 0xFF != CONTENT_MAGIC:
+        return None    # legacy — all-zero freespace
+
+    flags = (hdr >> 16) & 0xFF
+    if flags not in FLAGS_TIER:
+        raise SourceError(f"illegal content flags 0x{flags:02X}")
+    tier = FLAGS_TIER[flags]
+    api_len = hdr & 0xFFFF
+    if api_len == 0:
+        raise SourceError("content header declares zero-length API")
+    api_nw = (api_len + 3) // 4
+    pos = fs_start + 1
+    if pos + api_nw > fs_end:
+        raise SourceError("API region overruns freespace")
+    api_raw = struct.pack(f">{api_nw}I", *words[pos:pos + api_nw])[:api_len]
+    try:
+        api = json.loads(api_raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as e:
+        raise SourceError(f"API JSON will not decode: {e}") from e
+    pos += api_nw
+
+    source = None
+    if flags & 0x01:
+        if pos >= fs_end:
+            raise SourceError("source length word overruns freespace")
+        src_len = words[pos] & 0xFFFFFFFF
+        if src_len == 0:
+            raise SourceError("has_source set but source length is zero")
+        src_nw = (src_len + 3) // 4
+        pos += 1
+        if pos + src_nw > fs_end:
+            raise SourceError("source region overruns freespace")
+        raw = struct.pack(f">{src_nw}I", *words[pos:pos + src_nw])[:src_len]
+        try:
+            source = raw.decode("utf-8")
+        except UnicodeDecodeError as e:
+            raise SourceError(f"source will not decode as UTF-8: {e}") from e
+
+    return {"tier": tier, "flags": flags, "api": api,
+            "api_bytes": api_raw, "source": source}
 
 
 def unpack_source(words: list[int]) -> tuple[str | None, str]:
-    """Read an embedded source block. Returns (source, format_name).
+    """Read the embedded source. Returns (source, tier_name).
 
-    One word tells a reader whether to look further, so this costs nothing on
-    Lumps that carry no source.
+    tier_name is one of 'none' (legacy binary), 'api-only' (Tier 0),
+    'source' (Tier 1), 'source+comments' (Tier 2).
     """
-    h = parse_header(words)
-    desc_at = h["size_words"] - h["cc"] - 1
-    if desc_at <= h["cw"]:
+    content = extract_content(words)
+    if content is None:
         return None, "none"
+    return content["source"], TIER_NAMES[content["tier"]]
 
-    desc = words[desc_at]
-    fmt, length = (desc >> 24) & 0xFF, desc & 0xFFFFFF
-
-    if fmt == SRC_NONE:
-        return None, "none"
-    if fmt in (SRC_OMITTED, SRC_TOO_LARGE):
-        return None, SRC_FORMATS[fmt]
-    if fmt != SRC_DEFLATE:
-        raise SourceError(f"unknown source format {fmt}")
-
-    n_words = (length + 3) // 4
-    start = desc_at - n_words
-    if start <= h["cw"]:
-        raise SourceError("source block overruns the code region")
-
-    raw = struct.pack(f">{n_words}I", *words[start:desc_at])[:length]
-    try:
-        return _raw_inflate(raw).decode("utf-8"), "deflate"
-    except (zlib.error, UnicodeDecodeError) as e:
-        raise SourceError(f"source block will not decompress: {e}") from e
 
 
 
@@ -496,15 +634,18 @@ class Identity:
     """An IDE's signing identity. One keypair per IDE instance."""
 
     def __init__(self, name: str, private_key: Ed25519PrivateKey):
+        _require_crypto()
         self.name = name
         self._sk = private_key
 
     @classmethod
     def generate(cls, name: str) -> "Identity":
+        _require_crypto()
         return cls(name, Ed25519PrivateKey.generate())
 
     @classmethod
     def load(cls, path: Path) -> "Identity":
+        _require_crypto()
         data = json.loads(Path(path).read_text())
         sk = serialization.load_pem_private_key(
             data["private_key"].encode(), password=None
@@ -548,6 +689,7 @@ def verify_seal(seal: Seal, expect_key: str | None = None) -> bool:
     embedded key signed the hash. That is not trust. Trust means checking
     against a key you chose in advance, which is why the parameter exists.
     """
+    _require_crypto()
     if expect_key is not None and seal.public_key != expect_key:
         return False
     try:

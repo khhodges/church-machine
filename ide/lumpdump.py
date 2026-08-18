@@ -155,26 +155,33 @@ def load_words(binary):
 
 
 def unpack_source(words, cw, cc, size):
-    """Returns the decompressed source, or a marker string for non-deflate
-    states: '\x00omitted' (NONE mode), '\x00too-large', or None if truly
-    absent. The marker prefix lets the caller tell 'withheld' from 'missing'."""
-    desc_at = size - cc - 1
-    if desc_at <= cw:
+    """Returns the embedded source from the V1.3 0xAB content frame,
+    '\x00api-only' for a Tier 0 binary (API present, source withheld), or
+    None for a legacy binary with all-zero freespace. The marker prefix lets
+    the caller tell 'withheld' from 'missing'."""
+    fs_start = 1 + cw
+    fs_end = size - cc
+    if fs_start >= fs_end:
         return None
-    desc = words[desc_at]
-    fmt, length = (desc >> 24) & 0xFF, desc & 0xFFFFFF
-    if fmt == 2:
-        return "\x00omitted"
-    if fmt == 3:
-        return "\x00too-large"
-    if fmt != 1 or length == 0:
+    hdr = words[fs_start] & 0xFFFFFFFF
+    if (hdr >> 24) & 0xFF != 0xAB:
+        return None                        # legacy — all-zero freespace
+    flags = (hdr >> 16) & 0xFF
+    if not (flags & 0x01):
+        return "\x00api-only"
+    api_len = hdr & 0xFFFF
+    pos = fs_start + 1 + (api_len + 3) // 4
+    if pos >= fs_end:
         return None
-    import zlib
-    nwords = (length + 3) // 4
-    raw = struct.pack(f">{nwords}I", *words[desc_at-nwords:desc_at])[:length]
+    src_len = words[pos] & 0xFFFFFFFF
+    src_nw = (src_len + 3) // 4
+    pos += 1
+    if src_len == 0 or pos + src_nw > fs_end:
+        return None
+    raw = struct.pack(f">{src_nw}I", *words[pos:pos + src_nw])[:src_len]
     try:
-        return zlib.decompress(raw, -15).decode("utf-8")
-    except Exception:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
         return None
 
 

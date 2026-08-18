@@ -165,7 +165,18 @@ class CompileClient:
         # arrives readable as well as runnable.
         if embed_source:
             try:
-                words, result.source_note = pack_source(words, source)
+                from store import build_api_definition, extract_content
+                # Reuse an already-embedded frame's API (authoritative:
+                # real dispatch offsets, public methods only) rather than
+                # rebuilding it from the response metadata.
+                existing = extract_content(words)
+                if existing is not None and existing["tier"] == 2:
+                    result.source_note = "self-definition already embedded (tier 2)"
+                else:
+                    api = existing["api_bytes"] if existing else build_api_definition(
+                        abstraction_name or body.get("abstractionName") or "",
+                        body.get("methods") or [], words=words)
+                    words, result.source_note = pack_source(words, source, api=api)
                 result.words = words
             except LumpError as e:
                 result.source_note = f"source not embedded: {e}"

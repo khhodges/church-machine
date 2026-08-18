@@ -154,7 +154,31 @@ class NodeCompiler:
                           words=words)
 
         try:
-            words, r.source_note = _embed(words, source, mode=source_mode)
+            from store import (build_api_definition, extract_content,
+                               MODE_TIER)
+            # The worker binary may already carry the V1.3 frame (the JS
+            # emitter runs inside compile_worker.js).  Its embedded API is
+            # authoritative — it has the real dispatch offsets and public
+            # methods only — so never rebuild it; reuse it, and only
+            # re-embed when the caller asked for a different tier.
+            existing = extract_content(words)
+            if existing is not None:
+                if existing["tier"] == MODE_TIER.get(source_mode):
+                    r.source_note = (f"self-definition already embedded "
+                                     f"(tier {existing['tier']})")
+                else:
+                    # Pass the exact embedded API bytes, not a reserialised
+                    # dict — guarantees the worker's API frame is preserved
+                    # byte-for-byte across a tier change.
+                    words, r.source_note = _embed(words, source,
+                                                  mode=source_mode,
+                                                  api=existing["api_bytes"])
+            else:
+                api = build_api_definition(body.get("abstractionName") or "",
+                                           body.get("methods") or [],
+                                           words=words)
+                words, r.source_note = _embed(words, source,
+                                              mode=source_mode, api=api)
             r.words = words
         except LumpError as e:
             r.source_note = f"source not embedded: {e}"

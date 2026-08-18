@@ -39,6 +39,7 @@
     "boot-entry-hw-image-tests",
     "lump-save-endpoint-tests",
     "lump-save-error-surface-tests",
-    "constants-lump-tests"
+    "constants-lump-tests",
+    "lump-v13-freespace-tests"
   ]
 }

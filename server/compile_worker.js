@@ -110,7 +110,8 @@ if (isMainThread) {
     // Set up global shim before loading the compiler
     global.ChurchAssembler = require(path.join(SIM_DIR, 'assembler.js'));
     const CLOOMCCompiler   = require(path.join(SIM_DIR, 'cloomc_compiler.js'));
-    const { buildLump }    = require(path.join(SIM_DIR, 'lump_builder.js'));
+    const { buildLump, embedSelfDefinition, buildApiDefinition } =
+        require(path.join(SIM_DIR, 'lump_builder.js'));
 
     const source   = (payload.source   || '').toString();
     const language = (payload.language || 'auto').toString().toLowerCase();
@@ -175,7 +176,19 @@ if (isMainThread) {
         return;
     }
 
-    const words = lumpResult.words;
+    let words = lumpResult.words;
+
+    // ── V1.3 self-definition: embed API JSON (+ source) in freespace ────────
+    // Tier 2 (full source + comments) is the default; callers may pass
+    // tier=0/1 explicitly. On failure, fall back to a legacy (all-zero
+    // freespace) binary with a warning rather than failing the compile.
+    const tier = Number.isInteger(payload.tier) ? payload.tier : 2;
+    try {
+        const api = buildApiDefinition(compileResult, words);
+        words = embedSelfDefinition(words, api, source, tier);
+    } catch (err) {
+        warnings.push({ message: `self-definition not embedded: ${err.message}` });
+    }
 
     // Encode as big-endian binary (Church Machine native byte order)
     const buf = Buffer.allocUnsafe(words.length * 4);

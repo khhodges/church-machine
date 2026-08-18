@@ -5770,6 +5770,14 @@ def save_lump():
     sidecar["lump_version"] = next_lump_version
     sidecar["compiled_at"]  = _compiled_at
 
+    # V1.3: derive sourceStorageTier from the binary's freespace content
+    # header (word cw+1), read back from the bytes just written.  Absent =
+    # legacy (all-zero freespace, not self-defining).
+    _fs_save = _lump_freespace_content(
+        list(_struct.unpack(f'>{len(lump_bytes) // 4}I', lump_bytes)))
+    if _fs_save is not None:
+        sidecar["sourceStorageTier"] = _fs_save["tier"]
+
     with open(sidecar_path, 'w') as fh:
         json.dump(sidecar, fh, indent=2)
 
@@ -6275,6 +6283,26 @@ def get_lump_detail(token):
             except OSError:
                 pass  # serve the path string as fallback; client will show disasm instead
 
+    # V1.3 self-defining binaries: extract the source from freespace when the
+    # binary carries Tier 1/2 content, and report sourceStorageTier.  The
+    # sidecar 'source' field remains the fallback for legacy binaries.
+    _bin_fn = entry.get('filename') or f'{token8}.lump'
+    _bin_path = os.path.join(lumps_dir, _bin_fn)
+    if os.path.isfile(_bin_path):
+        try:
+            with open(_bin_path, 'rb') as _bfh:
+                _braw = _bfh.read()
+            _bn = len(_braw) // 4
+            _bwords = list(_struct.unpack(f'>{_bn}I', _braw[:_bn * 4]))
+            _fs_det = _lump_freespace_content(_bwords)
+            if _fs_det is not None:
+                sidecar = dict(sidecar)
+                sidecar['sourceStorageTier'] = _fs_det['tier']
+                if _fs_det['source']:
+                    sidecar['source'] = _fs_det['source']
+        except Exception:
+            pass  # malformed frame — serve sidecar fields unchanged
+
     return jsonify(sidecar)
 
 
@@ -6667,6 +6695,37 @@ def get_lump_source(name):
         with open(path, 'r', encoding='utf-8', errors='replace') as fh:
             return fh.read()
 
+    # 0. V1.3 self-defining binary — the embedded Tier 1/2 source is the
+    # authoritative source and MUST precede all external/sidecar fallbacks:
+    # a same-name .cloomc file on disk may be stale or a different program.
+    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    if os.path.isdir(lumps_dir):
+        for fname in os.listdir(lumps_dir):
+            if not fname.endswith('.json') or fname == 'manifest.json':
+                continue
+            try:
+                with open(os.path.join(lumps_dir, fname), 'r') as fh:
+                    sc = json.load(fh)
+            except Exception:
+                continue
+            if sc.get('abstraction', '').lower() != name.lower():
+                continue
+            bin_path = os.path.join(lumps_dir, fname[:-len('.json')] + '.lump')
+            if not os.path.isfile(bin_path):
+                continue
+            try:
+                with open(bin_path, 'rb') as fh:
+                    braw = fh.read()
+                bn = len(braw) // 4
+                fs = _lump_freespace_content(
+                    list(_struct.unpack(f'>{bn}I', braw[:bn * 4])))
+            except Exception:
+                continue
+            if fs and fs.get('source'):
+                return jsonify({"name": name, "source": fs['source'],
+                                "source_path": f"embedded (Tier {fs['tier']})",
+                                "binary_only": False})
+
     # 1. simulator/cloomc/ — exact then case-insensitive scan
     cloomc_dir = os.path.join(_root, 'simulator', 'cloomc')
     candidate = os.path.join(cloomc_dir, f'{name}.cloomc')
@@ -6729,6 +6788,25 @@ def get_lump_source(name):
             if os.path.isfile(abs_sf):
                 return jsonify({"name": name, "source": _read_source(abs_sf),
                                 "source_path": sf,
+                                "binary_only": False})
+
+    # 4. Sidecar 'source' text — last fallback before binary_only, which is
+    # only returned when the freespace is all-zero (legacy) AND no sidecar
+    # or external source exists.
+    if os.path.isdir(lumps_dir):
+        for fname in os.listdir(lumps_dir):
+            if not fname.endswith('.json') or fname == 'manifest.json':
+                continue
+            try:
+                with open(os.path.join(lumps_dir, fname), 'r') as fh:
+                    sc = json.load(fh)
+            except Exception:
+                continue
+            if sc.get('abstraction', '').lower() != name.lower():
+                continue
+            if sc.get('source') and '\n' in sc.get('source', ''):
+                return jsonify({"name": name, "source": sc['source'],
+                                "source_path": "sidecar",
                                 "binary_only": False})
 
     return jsonify({
@@ -7186,6 +7264,66 @@ def patch_lump_clist_slot(token_hex, slot_index):
     return jsonify({"ok": True, "token": key8, "slot": slot_index, "gt_word": gt_word})
 
 
+def _lump_freespace_content(words):
+    """Parse the V1.3 0xAB self-definition frame from a lump word array.
+
+    Spec: CM_LUMP_SPECIFICATION.md §Freespace Content and Self-Definition.
+    Word cw+1 = 0xAB | flags | api_byte_length; then API JSON bytes; if
+    flags.has_source a source_byte_length word and source bytes follow.
+
+    Returns None for a legacy binary (no 0xAB magic at word cw+1 — all-zero
+    freespace) or a non-code lump; otherwise a dict:
+      {tier, flags, api_len, content_words, source}
+    content_words counts the freespace words the frame occupies starting at
+    word cw+1 (header + API + optional length word + source).
+    """
+    if not words:
+        return None
+    hdr0 = words[0] & 0xFFFFFFFF
+    if (hdr0 >> 27) & 0x1F != 0x1F:
+        return None
+    size = 1 << (((hdr0 >> 23) & 0xF) + 6)
+    cw   = (hdr0 >> 10) & 0x1FFF
+    typ  = (hdr0 >> 8) & 0x3
+    cc   = hdr0 & 0xFF
+    if typ != 0:
+        return None
+    fs_start = 1 + cw
+    fs_end   = size - cc
+    if fs_start >= fs_end or fs_start >= len(words):
+        return None
+    h = words[fs_start] & 0xFFFFFFFF
+    if (h >> 24) & 0xFF != 0xAB:
+        return None
+    flags = (h >> 16) & 0xFF
+    tier  = {0x00: 0, 0x01: 1, 0x03: 2}.get(flags)
+    if tier is None:
+        return None
+    api_len = h & 0xFFFF
+    if api_len == 0:
+        return None
+    api_nw  = (api_len + 3) // 4
+    content = 1 + api_nw
+    source  = None
+    if flags & 0x01:
+        pos = fs_start + 1 + api_nw
+        if pos >= fs_end or pos >= len(words):
+            return None
+        src_len = words[pos] & 0xFFFFFFFF
+        src_nw  = (src_len + 3) // 4
+        if src_len == 0 or pos + 1 + src_nw > fs_end:
+            return None
+        raw = _struct.pack(f'>{src_nw}I',
+                           *[w & 0xFFFFFFFF for w in words[pos + 1:pos + 1 + src_nw]])[:src_len]
+        try:
+            source = raw.decode('utf-8')
+        except UnicodeDecodeError:
+            return None
+        content += 1 + src_nw
+    return {"tier": tier, "flags": flags, "api_len": api_len,
+            "content_words": content, "source": source}
+
+
 @app.route("/api/lump/<token_hex>/resize", methods=["POST"])
 def resize_lump(token_hex):
     """Repack a LUMP to its minimum power-of-2 size by removing freespace.
@@ -7252,8 +7390,15 @@ def resize_lump(token_hex):
         if word0_location + old_size > n_words:
             return jsonify({"error": "Boot lump region extends beyond boot-image.bin"}), 400
 
-        # Compute minimum size (same formula as standalone path)
-        min_content = 1 + cw + cc
+        # V1.3: a self-defining lump's 0xAB content frame (word cw+1 …) must
+        # survive the repack — it is declared content, not reclaimable zeros.
+        _lump_words_bi = mem_bi[word0_location:word0_location + old_size]
+        _fs_bi = _lump_freespace_content(_lump_words_bi)
+        _content_nw_bi = _fs_bi["content_words"] if _fs_bi else 0
+
+        # Compute minimum size (same formula as standalone path, plus the
+        # content frame when present)
+        min_content = 1 + cw + _content_nw_bi + cc
         new_n = max(6, _math.ceil(_math.log2(max(min_content, 2))))
         new_n = min(new_n, 14)
         new_size = 1 << new_n
@@ -7262,18 +7407,21 @@ def resize_lump(token_hex):
             return jsonify({"ok": True, "already_minimal": True,
                             "lump_size": old_size, "cw": cw, "cc": cc})
 
-        # Capture code and c-list from the current lump region
+        # Capture code, content frame and c-list from the current lump region
         code_words  = mem_bi[word0_location + 1 : word0_location + 1 + cw]
+        frame_words = (mem_bi[word0_location + 1 + cw :
+                              word0_location + 1 + cw + _content_nw_bi]
+                       if _content_nw_bi else [])
         clist_words = (mem_bi[word0_location + old_size - cc : word0_location + old_size]
                        if cc > 0 else [])
 
-        # Repack lump in-place: header | code | freespace zeros | c-list
-        freespace = new_size - 1 - cw - cc
+        # Repack lump in-place: header | code | content frame | zeros | c-list
+        freespace = new_size - 1 - cw - _content_nw_bi - cc
         mem_bi[word0_location] = _pack_lump_header(new_n - 6, cw, cc, typ)
-        for i, w in enumerate(code_words):
+        for i, w in enumerate(code_words + frame_words):
             mem_bi[word0_location + 1 + i] = int(w) & 0xFFFFFFFF
         for i in range(freespace):
-            mem_bi[word0_location + 1 + cw + i] = 0
+            mem_bi[word0_location + 1 + cw + _content_nw_bi + i] = 0
         for i, w in enumerate(clist_words):
             mem_bi[word0_location + new_size - cc + i] = int(w) & 0xFFFFFFFF
         # Zero the freed tail of the old lump region
@@ -7335,8 +7483,14 @@ def resize_lump(token_hex):
     if old_size != num_words:
         return jsonify({"error": f"Header size mismatch: header says {old_size}w, file has {num_words}w"}), 400
 
-    # Minimum lump size: header + code + c-list, rounded up to next power of 2, min 64.
-    min_content = 1 + cw + cc
+    # V1.3: preserve the 0xAB self-definition frame (word cw+1 …) — declared
+    # content is never zeroed, and the minimum size must accommodate it.
+    _fs_rs = _lump_freespace_content(words)
+    _content_nw = _fs_rs["content_words"] if _fs_rs else 0
+
+    # Minimum lump size: header + code + content frame + c-list, rounded up
+    # to next power of 2, min 64.
+    min_content = 1 + cw + _content_nw + cc
     new_n = max(6, _math.ceil(_math.log2(max(min_content, 2))))
     new_n = min(new_n, 14)
     new_size = 1 << new_n
@@ -7345,12 +7499,14 @@ def resize_lump(token_hex):
         return jsonify({"ok": True, "already_minimal": True,
                         "lump_size": old_size, "cw": cw, "cc": cc})
 
-    # Re-pack: new header | code words | freespace zeros | c-list words.
+    # Re-pack: new header | code | content frame | freespace zeros | c-list.
     code_words  = words[1:1 + cw]
+    frame_words = words[1 + cw:1 + cw + _content_nw] if _content_nw else []
     clist_words = words[old_size - cc:old_size] if cc > 0 else []
-    freespace   = new_size - 1 - cw - cc
+    freespace   = new_size - 1 - cw - _content_nw - cc
     new_words   = [_pack_lump_header(new_n - 6, cw, cc, typ)]
     new_words  += code_words
+    new_words  += frame_words
     new_words  += [0] * freespace
     new_words  += clist_words
 
@@ -7575,6 +7731,13 @@ def upload_lump_file():
                          "builder": "IDE LUMP Upload"},
         "grants":       ["E"],
     }
+    # V1.3: derive sourceStorageTier from the uploaded binary's freespace
+    # content header; absent = legacy (all-zero freespace).
+    _fs_upl = _lump_freespace_content(
+        list(_struct.unpack(f'>{lump_size}I', lump_bytes)))
+    if _fs_upl is not None:
+        sidecar["sourceStorageTier"] = _fs_upl["tier"]
+
     sidecar_path = os.path.join(lumps_dir, f'{token8}.json')
     with open(sidecar_path, 'w') as fh:
         json.dump(sidecar, fh, indent=2)

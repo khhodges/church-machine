@@ -306,7 +306,7 @@ def test_source_roundtrips_through_freespace(store, ide):
     assert "embedded" in msg
     h, _ = store.put(words, ide)
     got, fmt = store.source(h)
-    assert got == src and fmt == "deflate"
+    assert got == src and fmt == "source+comments"
 
 
 def test_source_is_covered_by_the_hash(store, ide):
@@ -361,19 +361,14 @@ def test_growth_preserves_code_and_clist_bytes():
 
 
 def test_source_too_large_even_for_biggest_lump():
-    """The hard stop: incompressible source bigger than n=15 can hold is
-    refused, the slot marked too-large, and the Lump left valid. End of the
-    road for a Lump this size."""
-    import os
+    """The hard stop: source bigger than n=15 can hold is refused loudly —
+    the caller must split the abstraction or lower the tier."""
+    import os, pytest
+    from store import LumpError
     words = make_lump(n=6, cw=5, cc=2)
-    huge = os.urandom(200000).decode("latin-1")     # truly incompressible
-    out, msg = pack_source(words, huge)
-    h = parse_header(out)
-    assert h["n"] == N_MAX, "must cap at the maximum size"
-    assert "too large" in msg.lower()
-    back, fmt = unpack_source(out)
-    assert back is None and fmt == "too-large"
-    assert h["cw"] == 5 and h["cc"] == 2, "Lump still structurally valid"
+    huge = os.urandom(200000).decode("latin-1")
+    with pytest.raises(LumpError, match="does not fit"):
+        pack_source(words, huge)
 
 
 def test_grow_false_keeps_old_best_effort():
@@ -384,7 +379,7 @@ def test_grow_false_keeps_old_best_effort():
     bulky = base64.b64encode(os.urandom(400)).decode()
     out, msg = pack_source(words, bulky, grow=False)
     assert parse_header(out)["n"] == 6, "must not grow"
-    assert "not embedded" in msg and "next size up" in msg
+    assert "not embedded" in msg and "grow=True" in msg
 
 
 def test_capacity_accounts_for_code_and_clist():
@@ -424,11 +419,12 @@ def test_dna_strips_prose_keeps_capabilities():
 
 
 def test_none_omits_source_marked():
-    from store import embed_source, unpack_source, SRC_OMITTED
+    """Mode 'none' → Tier 0: API definition embedded, source withheld."""
+    from store import embed_source, unpack_source
     out, msg = embed_source(make_lump(n=6, cw=19, cc=2), "anything", mode="none")
     back, fmt = unpack_source(out)
-    assert back is None and fmt == "omitted"
-    assert "omitted" in msg.lower()
+    assert back is None and fmt == "api-only"
+    assert "tier 0" in msg.lower()
 
 
 def test_different_clist_breaks_genotype():

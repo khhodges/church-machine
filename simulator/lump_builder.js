@@ -155,6 +155,125 @@ function buildLump(result, opts) {
     return { words, header, cw, cc, lumpSize, clistStart };
 }
 
+// ── V1.3 self-defining freespace ─────────────────────────────────────────────
+// Every typ=lump binary carries an 0xAB-tagged content frame in freespace
+// (CM_LUMP_SPECIFICATION.md §Freespace Content and Self-Definition):
+//   word cw+1   = 0xAB<<24 | flags<<16 | api_byte_length
+//   words cw+2… = API definition JSON (UTF-8, big-endian packed, zero-padded)
+//   tier ≥ 1    : one word source_byte_length, then source bytes (same packing)
+//   remainder   = all zero (mandatory)
+// flags: 0x00 = API only (Tier 0), 0x01 = API + source w/o comments (Tier 1),
+//        0x03 = API + full source (Tier 2, the default).
+
+const CONTENT_MAGIC = 0xAB;
+const TIER_FLAGS = { 0: 0x00, 1: 0x01, 2: 0x03 };
+const N_MAX = 15;
+
+/** Strip comment-only lines and trailing comments for Tier 1 embedding. */
+function stripComments(src) {
+    return src.split('\n')
+        .map(l => l.replace(/;.*$/, '').replace(/\/\/.*$/, ''))
+        .filter(l => l.trim().length > 0)
+        .join('\n');
+}
+
+/**
+ * Build the embeddable API definition from a compile result + built words.
+ * Never includes `token` or `issue` — identity lives outside the binary
+ * (embedding the token would be a circular fixed point).
+ */
+function buildApiDefinition(result, words) {
+    const methods = result.methods || [];
+    const api = { name: result.abstractionName || '', methods: [] };
+    methods.forEach((m, i) => {
+        if (m.visibility === 'private') return;
+        const branchOffset = words && (1 + i) < words.length ? (words[1 + i] & 0x7FFF) : 0;
+        api.methods.push({
+            petName: m.name,
+            branchOffset,
+            in: (m.params || []).map((p, pi) => ({ name: p, reg: `DR${pi + 1}` })),
+            out: [{ name: 'result', reg: 'DR1' }],
+        });
+    });
+    return api;
+}
+
+/** UTF-8 string → array of big-endian packed words (zero-padded). */
+function packBEWords(str) {
+    const bytes = Buffer.from(str, 'utf-8');
+    const out = [];
+    for (let i = 0; i < bytes.length; i += 4) {
+        out.push((((bytes[i] || 0) << 24) | ((bytes[i + 1] || 0) << 16) |
+                  ((bytes[i + 2] || 0) << 8) | (bytes[i + 3] || 0)) >>> 0);
+    }
+    return { words: out, byteLength: bytes.length };
+}
+
+/**
+ * Embed the 0xAB content frame into a built lump's freespace, growing the
+ * lump (next power of 2, c-list moved to the new end) when the frame does
+ * not fit. Returns the (possibly new) words array. Throws if the frame will
+ * not fit even at the maximum size (n=15).
+ *
+ * @param {number[]} words  built lump words (words[0] = header)
+ * @param {object}   api    API definition object (buildApiDefinition output)
+ * @param {string}   source full source text
+ * @param {number}   tier   0 | 1 | 2 (default 2 — full source + comments)
+ */
+function embedSelfDefinition(words, api, source, tier) {
+    if (tier === undefined || tier === null) tier = 2;
+    if (!(tier in TIER_FLAGS)) throw new Error(`unknown tier ${tier} — one of 0, 1, 2`);
+    if (tier >= 1 && (!source || !source.length)) {
+        throw new Error(`tier ${tier} requires non-empty source`);
+    }
+    if (api && ('token' in api || 'issue' in api)) {
+        throw new Error("API payload must not contain 'token' or 'issue'");
+    }
+
+    const header = words[0] >>> 0;
+    let nMinus6  = (header >>> 23) & 0x0F;
+    const cw     = (header >>> 10) & 0x1FFF;
+    const cc     = header & 0xFF;
+    const typ    = (header >>> 8) & 0x03;
+
+    const apiPacked = packBEWords(JSON.stringify(api || { name: '', methods: [] }));
+    if (apiPacked.byteLength === 0 || apiPacked.byteLength > 0xFFFF) {
+        throw new Error(`API definition size out of range: ${apiPacked.byteLength} bytes`);
+    }
+    let srcPacked = { words: [], byteLength: 0 };
+    if (tier >= 1) {
+        srcPacked = packBEWords(tier === 1 ? stripComments(source) : source);
+    }
+    const need = 1 + apiPacked.words.length +
+                 (tier >= 1 ? 1 + srcPacked.words.length : 0);
+
+    let n = nMinus6 + 6;
+    while (((1 << n) - 1 - cw - cc) < need && n < N_MAX) n++;
+    if (((1 << n) - 1 - cw - cc) < need) {
+        throw new Error(`content frame (${need} words) does not fit the biggest lump`);
+    }
+
+    const lumpSize = 1 << n;
+    const out = new Array(lumpSize).fill(0);
+    out[0] = (((0x1F) << 27) | (((n - 6) & 0x0F) << 23) |
+              ((cw & 0x1FFF) << 10) | ((typ & 0x03) << 8) | (cc & 0xFF)) >>> 0;
+    for (let i = 0; i < cw; i++) out[1 + i] = words[1 + i] >>> 0;
+    const oldSize = words.length;
+    for (let i = 0; i < cc; i++) {
+        out[lumpSize - cc + i] = words[oldSize - cc + i] >>> 0;
+    }
+
+    let pos = 1 + cw;
+    out[pos++] = ((CONTENT_MAGIC << 24) | (TIER_FLAGS[tier] << 16) |
+                  (apiPacked.byteLength & 0xFFFF)) >>> 0;
+    for (const w of apiPacked.words) out[pos++] = w;
+    if (tier >= 1) {
+        out[pos++] = srcPacked.byteLength >>> 0;
+        for (const w of srcPacked.words) out[pos++] = w;
+    }
+    return out;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { buildLump };
+    module.exports = { buildLump, embedSelfDefinition, buildApiDefinition, stripComments };
 }
