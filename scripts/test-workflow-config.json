@@ -40,6 +40,7 @@
     "lump-save-endpoint-tests",
     "lump-save-error-surface-tests",
     "constants-lump-tests",
-    "lump-v13-freespace-tests"
+    "lump-v13-freespace-tests",
+    "check-lumps-guard"
   ]
 }

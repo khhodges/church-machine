@@ -85,6 +85,7 @@ const DEFAULT_SCRIPT_ONLY_SUITES = [
     'lump-save-error-surface-tests',
     'constants-lump-tests',
     'lump-v13-freespace-tests',
+    'check-lumps-guard',
 ];
 
 const configPath = path.join(__dirname, 'test-workflow-config.json');
