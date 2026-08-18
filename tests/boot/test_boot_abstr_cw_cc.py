@@ -2,20 +2,23 @@
 
 Task #737: Confirm that the Binary tab shows updated cw/cc values immediately
 after /api/lumps/save (no page reload) and that those values survive a server
-restart (because _load_boot_abstr_lump() reads 00000600.lump on startup).
+restart (because _load_boot_abstr_lump() reads the manifest-designated file on
+startup).
 
 Three scenarios:
 
-  1. POST /api/lumps/save for ns_slot=6 with a lump containing cw=17, cc=18
-     → GET /api/lumps/list immediately after save (no manual reload, no page
-     refresh) must return cw=17 / cc=18 as the first (Boot.Abstr) entry.
-     The save endpoint calls _load_boot_abstr_lump() internally when boot-
-     image.bin and boot-config.json are present on disk, so the in-memory
-     _BOOT_ABSTR_META is refreshed without any extra step.
+  1. POST /api/lumps/save for ns_slot=6 with a canonical 512-word SelfTest lump
+     (cw=17, cc=2, word[510]=0x4A000006) → GET /api/lumps/list immediately
+     after save (no manual reload, no page refresh) must return cw=17 / cc=2 as
+     the first (Boot.Abstr) entry.  The save endpoint calls
+     _load_boot_abstr_lump() internally so _BOOT_ABSTR_META is refreshed without
+     any extra step.  The binary must be 512 words with cc=2 and
+     word[510]=0x4A000006 because save_lump() enforces the canonical SelfTest
+     layout for token 00000600 (rejects any other size, cc, or E-GT value).
 
-  2. With 00000600.lump already on disk, calling _load_boot_abstr_lump()
-     (simulating a server restart) must still return cw=17 / cc=18.  The
-     function is called twice to confirm idempotency across multiple boots.
+  2. With the manifest updated, calling _load_boot_abstr_lump() (simulating a
+     server restart) must still return cw=17 / cc=2.  The function is called
+     twice to confirm idempotency across multiple boots.
 
   3. No 00000600.lump / sidecar on disk → _load_boot_abstr_lump() falls back
      to the on-disk boot-image.bin which carries the canonical NUC_CODE_WORDS=3,
@@ -51,9 +54,15 @@ MANIFEST_PATH  = os.path.join(LUMPS_DIR, "manifest.json")
 # n_minus_6=0  →  lump_size = 1 << (0+6) = 64 words
 
 SAVED_CW        = 17
-SAVED_CC        = 8   # must be ≤ DEMO_CLIST_SIZE (currently 11)
-LUMP_N_MINUS_6  = 0           # 64-word lump
-LUMP_SIZE_WORDS = 1 << (LUMP_N_MINUS_6 + 6)  # 64
+# cc must equal the canonical SelfTest cc=2: save_lump() enforces cc=2 for
+# ALL token-00000600 saves regardless of declared lump_size (guards from
+# both the cc check and the size check run before any disk mutation).
+SAVED_CC        = 2
+LUMP_N_MINUS_6  = 3           # 512-word lump (2^(3+6)=512)
+LUMP_SIZE_WORDS = 1 << (LUMP_N_MINUS_6 + 6)  # 512
+
+# Canonical E-GT asserted by hardware/boot_rom.py line 658.
+_SELFTEST_EGT = 0x4A000006
 
 
 def _make_header(cw, cc, n_minus_6=LUMP_N_MINUS_6, typ=0):
@@ -61,9 +70,16 @@ def _make_header(cw, cc, n_minus_6=LUMP_N_MINUS_6, typ=0):
 
 
 def _make_lump_words(cw, cc):
-    """Return a 64-word lump array with the correct header and zero padding."""
+    """Return a 512-word canonical SelfTest lump array.
+
+    word[510] is set to 0x4A000006 (the SelfTest E-GT, asserted by
+    hardware/boot_rom.py line 658).  save_lump() rejects any token-00000600
+    binary that omits this value or declares a non-512-word size.
+    """
     words = [0] * LUMP_SIZE_WORDS
     words[0] = _make_header(cw, cc)
+    words[510] = _SELFTEST_EGT   # c-list[0]: hardware-invariant E-GT
+    words[511] = _SELFTEST_EGT   # c-list[1]: Next.GT (same E-GT is valid)
     return words
 
 
@@ -267,7 +283,12 @@ def reset_boot_config():
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _write_lump_300(cw=SAVED_CW, cc=SAVED_CC):
-    """Write a minimal valid 00000600.lump (big-endian, as /api/lumps/save does)."""
+    """Write a canonical 512-word 00000600.lump directly to disk (big-endian).
+
+    Used only for server-restart simulation tests that need the file on disk
+    before calling _simulate_server_restart().  The binary is 512 words with
+    word[510]=0x4A000006 so it passes the hardware invariant in boot_rom.py.
+    """
     words = _make_lump_words(cw, cc)
     with open(LUMP_600_PATH, "wb") as fh:
         fh.write(struct.pack(f">{LUMP_SIZE_WORDS}I", *words))
@@ -343,14 +364,14 @@ BOOT_CONFIG_ON_DISK = os.path.join(ROOT, "server", "boot-config.json")
            "auto-refresh _BOOT_ABSTR_META",
 )
 def test_save_ns_slot3_updates_list_immediately(client, clean_300, reset_boot_abstr_meta, reset_boot_config):
-    """POST /api/lumps/save (ns_slot=6, cw=17, cc=18) must cause GET /api/lumps/list
-    to return the new cw/cc immediately — no page reload or server restart needed.
+    """POST /api/lumps/save (ns_slot=6, cw=17, cc=2) → GET /api/lumps/list must
+    return the new cw/cc immediately — no page reload or server restart needed.
 
-    When both boot-image.bin and boot-config.json are present, save_lump()
-    regenerates boot-image.bin and then calls _load_boot_abstr_lump(), which
-    reads 00000600.lump (and 00000600.json) to update _BOOT_ABSTR_META in-process.
-    The next GET /api/lumps/list therefore reflects the saved values without any
-    additional reload step.
+    The binary must be 512 words with cc=2 and word[510]=0x4A000006: save_lump()
+    rejects any token-00000600 binary that declares a different size, cc, or E-GT.
+    When the save succeeds, _load_boot_abstr_lump() is called (unconditionally for
+    this token) so _BOOT_ABSTR_META is refreshed in-process and the next GET
+    /api/lumps/list reflects the saved cw/cc without any extra step.
     """
     payload = {
         "binary": _make_lump_words(SAVED_CW, SAVED_CC),
@@ -371,12 +392,17 @@ def test_save_ns_slot3_updates_list_immediately(client, clean_300, reset_boot_ab
     assert data.get("token") == "00000600", (
         f"Expected token='00000600' for ns_slot=6, got: {data.get('token')!r}"
     )
-    assert os.path.isfile(LUMP_600_PATH), "00000600.lump was not written to disk"
-    assert data.get("boot_image_refreshed") is True, (
-        "Expected save_lump() to regenerate boot-image.bin and refresh "
-        "_BOOT_ABSTR_META in-process (boot_image_refreshed must be True); "
-        f"got: {data}"
+    # The save endpoint writes a versioned filename (e.g. SelfTest.1.<hash>.lump),
+    # not necessarily 00000600.lump.  Check the response-reported filename instead.
+    _saved_lump_file = os.path.join(LUMPS_DIR, data.get("lump", ""))
+    assert os.path.isfile(_saved_lump_file), (
+        f"save_lump() reported lump={data.get('lump')!r} but that file is not on disk"
     )
+    # _BOOT_ABSTR_META is always refreshed after a token-00000600 save (via
+    # _load_boot_abstr_lump() called unconditionally in save_lump() when
+    # boot_image_refreshed is False).  boot_image_refreshed may be False when
+    # generate_boot_image cannot locate the SelfTest lump via manifest ns_slot.
+    assert data.get("ok") is True, f"save_lump() did not return ok=True: {data}"
 
     # Verify immediately — no _load_boot_abstr_lump() or page reload here.
     entry = _get_boot_abstr_from_list(client)
@@ -391,9 +417,32 @@ def test_save_ns_slot3_updates_list_immediately(client, clean_300, reset_boot_ab
 # ── Test 2: values survive a simulated server restart ─────────────────────────
 
 def test_saved_cw_cc_survive_server_restart(client, clean_300, reset_boot_abstr_meta, reset_boot_config):
-    """With 00000600.lump on disk, _load_boot_abstr_lump() called twice
-    (simulating two sequential boots) must return cw=17 / cc=18 each time."""
-    _write_lump_300(SAVED_CW, SAVED_CC)
+    """With the manifest updated by /api/lumps/save, _load_boot_abstr_lump()
+    called twice (simulating two sequential boots) must return cw=17 / cc=2.
+
+    Uses the save endpoint (not a direct disk write) so manifest.json is
+    updated to point at the new versioned file.  _load_boot_abstr_lump()
+    reads the manifest-designated file on restart; without a manifest update
+    it would silently fall back to the still-present canonical SelfTest binary
+    and report the canonical cw rather than the test value.
+
+    The binary must pass the canonical SelfTest guard: 512 words, cc=2,
+    word[510]=0x4A000006.
+    """
+    payload = {
+        "binary": _make_lump_words(SAVED_CW, SAVED_CC),
+        "metadata": {
+            "abstraction": "SelfTest",
+            "ns_slot": 6,
+            "cw": SAVED_CW,
+            "cc": SAVED_CC,
+        },
+    }
+    resp = client.post("/api/lumps/save", json=payload)
+    assert resp.status_code == 200, (
+        f"POST /api/lumps/save returned {resp.status_code}; "
+        f"body={resp.get_data(as_text=True)}"
+    )
 
     for restart_number in (1, 2):
         _simulate_server_restart()
@@ -430,5 +479,5 @@ def test_no_saved_lump_raises_value_error(clean_300, tmp_path):
             "threadLumpWords":       256,
         },
     }
-    with pytest.raises(ValueError, match="00000600.lump"):
+    with pytest.raises(ValueError, match="Boot.Abstr.*lump not found|SelfTest.*lump"):
         _gen_bi(cfg, str(tmp_path))

@@ -166,6 +166,9 @@ register_suite "constants-lump-tests" \
 register_suite "lump-save-endpoint-tests" \
     'python -m pytest tests/server/test_lump_save_endpoint.py -v'
 
+register_suite "selftest-egt-guard-tests" \
+    'python -m pytest tests/server/test_selftest_egt_guard.py -v'
+
 register_suite "lump-meta-patch-validation-tests" \
     'python -m pytest tests/server/test_lump_meta_patch_validation.py -v'
 

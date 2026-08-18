@@ -5432,6 +5432,21 @@ def save_lump():
                     "cc":                 _sl_cc,
                 }), 422
 
+    # ── SelfTest canonical E-GT guard (token 00000600) ───────────────────────
+    # Token 00000600 is the canonical SelfTest lump whose c-list[0] must equal
+    # 0x4A000006 — the SelfTest E-GT (Church domain, E permission, NS slot 6).
+    # This value is asserted at module-load time by hardware/boot_rom.py, so a
+    # corrupt save is only discovered on the next server restart (when the whole
+    # IDE fails to launch).  Flag it early here before any file is touched.
+    #
+    # NOTE: The self-GT identity-seal injection below does NOT apply to this
+    # token because c-list[0] is the hardware-specified E-GT, not a petname
+    # identity seal.  The two concepts are distinct; mixing them corrupts the
+    # boot binary.
+    _SELFTEST_CANONICAL_TOKEN  = '00000600'
+    _SELFTEST_EXPECTED_EGT     = 0x4A000006  # Inform E-GT, NS slot 6, Church domain
+    _is_selftest_canonical = (token8 == _SELFTEST_CANONICAL_TOKEN)
+
     # ── Pre-flight: identity computation + seal verification ──────────────────
     # Pure computation — no filesystem reads or writes — so a corrupt lump
     # header that makes c-list[0] unwritable returns 422 BEFORE any existing
@@ -5448,14 +5463,106 @@ def save_lump():
     _id_hash_int = int(_identity_hash[:8], 16)
     _self_gt     = (0x0A000000 | (_id_hash_int & 0x1FFFFFF)) & 0xFFFFFFFF
 
-    # Build the word array, bump cc=0→1 if needed, then inject the self-GT.
+    # Build the word array. The canonical SelfTest guard below runs BEFORE the
+    # cc=0→1 auto-rewrite so the rewrite cannot be used as a bypass.
     _sl_words = [int(w) & 0xFFFFFFFF for w in words]
     _sl_hdr   = _sl_words[0]
     _sl_cc2   = _sl_hdr & 0xFF
     _sl_lsz   = 1 << (((_sl_hdr >> 23) & 0xF) + 6)
 
+    # ── SelfTest canonical layout guard (ALL token 00000600 saves) ───────────
+    # Runs BEFORE the cc=0→1 auto-rewrite so the rewrite cannot be used to
+    # bypass the cc check.  The canonical SelfTest binary is invariant:
+    #
+    #   lump_size = 512 words   (n_minus_6 = 3, asserted by boot_rom.py:656)
+    #   cc        = 2           (asserted by boot_rom.py:656)
+    #   word[510] = 0x4A000006  (c-list[0] E-GT, asserted by boot_rom.py:658)
+    #
+    # ALL saves of token 00000600 are subject to this guard — including those
+    # that declare a non-512-word lump_size in the header.  A non-512-word save
+    # with this token silently bypasses both the self-GT injection and all
+    # layout checks, then updates the manifest/canonical-compatibility chain,
+    # so the IDE server cannot boot on next restart.
+    # word[510] is checked at the fixed hardware-asserted index (not via
+    # lump_size−cc) so the check is immune to a wrong cc pointing the cursor
+    # elsewhere.
+    if _is_selftest_canonical:
+        # ── Step 1: exact array-length check (BEFORE header decode or padding) ──
+        # The submitted word array must contain exactly 512 entries.  Checking
+        # the raw array length catches oversized payloads (e.g. 513 words) that
+        # carry a valid 512-word header but extra trailing words: those words
+        # would be serialized to disk and produce a >2048-byte file that
+        # hardware/boot_rom.py's `struct.unpack(">512I", raw)` rejects on the
+        # next server start, breaking IDE boot.
+        if len(_sl_words) != 512:
+            return jsonify({
+                "error": (
+                    f"SelfTest size guard: token 00000600 requires exactly 512 "
+                    f"entries in the submitted word array ({512 * 4} bytes on disk); "
+                    f"got {len(_sl_words)} entries. "
+                    f"Re-compile from the canonical SelfTest source."
+                ),
+                "selftest_size_mismatch": True,
+                "expected_lump_size":     512,
+                "actual_lump_size":       len(_sl_words),
+            }), 422
+        # ── Step 2: header-declared lump_size ────────────────────────────────────
+        # The header must also declare 512 words (n_minus_6=3).  A 512-entry
+        # array with a 64-word header (n_minus_6=0) would write 512 words to disk
+        # but claim to be a 64-word lump — incoherent and rejected.
+        if _sl_lsz != 512:
+            return jsonify({
+                "error": (
+                    f"SelfTest layout guard: token 00000600 must declare "
+                    f"lump_size=512 in the header (n_minus_6=3, asserted by "
+                    f"hardware/boot_rom.py line 656); header declares {_sl_lsz} words. "
+                    f"Re-compile from the canonical SelfTest source."
+                ),
+                "selftest_size_mismatch": True,
+                "expected_lump_size":     512,
+                "actual_lump_size":       _sl_lsz,
+            }), 422
+        # ── Step 3: cc must equal the canonical value ─────────────────────────
+        _SELFTEST_CANONICAL_CC = 2
+        if _sl_cc2 != _SELFTEST_CANONICAL_CC:
+            return jsonify({
+                "error": (
+                    f"SelfTest layout guard: canonical SelfTest lump (token 00000600) "
+                    f"must have cc={_SELFTEST_CANONICAL_CC} in the header "
+                    f"(asserted by hardware/boot_rom.py line 656); "
+                    f"incoming binary has cc={_sl_cc2}. "
+                    f"Submitting cc=0 to trigger the auto-rewrite is not permitted "
+                    f"for this token. "
+                    f"Re-compile from the canonical SelfTest source."
+                ),
+                "selftest_cc_mismatch": True,
+                "expected_cc":          _SELFTEST_CANONICAL_CC,
+                "actual_cc":            _sl_cc2,
+            }), 422
+        # ── Step 4: word[510] must be the hardware-asserted E-GT ─────────────
+        # Array length is exactly 512 (verified in Step 1), so word[510] is safe
+        # to access directly without padding or bounds checks.
+        _st_w510 = _sl_words[510]
+        if _st_w510 != _SELFTEST_EXPECTED_EGT:
+            return jsonify({
+                "error": (
+                    f"SelfTest E-GT guard: canonical SelfTest lump (token 00000600) "
+                    f"must have word[510] = 0x{_SELFTEST_EXPECTED_EGT:08X} "
+                    f"(SelfTest E-GT — Inform, Church domain, E permission, NS slot 6; "
+                    f"asserted by hardware/boot_rom.py line 658). "
+                    f"Incoming binary has 0x{_st_w510:08X} at word[510]. "
+                    f"Re-compile from the canonical SelfTest source to restore it."
+                ),
+                "selftest_egt_mismatch": True,
+                "expected_egt":          _SELFTEST_EXPECTED_EGT,
+                "actual_word_510":       _st_w510,
+                "word_index":            510,
+            }), 422
+
     if _sl_cc2 == 0:
         # No c-list yet — open one slot in the padding zone and bump cc to 1.
+        # Never reached for the canonical 512-word SelfTest lump: cc=2 is
+        # enforced by the guard above before this point.
         _sl_words[0] = (_sl_hdr & 0xFFFFFF00) | 0x01
         _sl_cc2 = 1
 
@@ -5465,31 +5572,36 @@ def save_lump():
         _sl_words.extend([0] * (_sl_lsz - len(_sl_words)))
 
     _clist_row0_idx = _sl_lsz - _sl_cc2
-    if 0 < _clist_row0_idx < len(_sl_words):
-        _sl_words[_clist_row0_idx] = _self_gt
 
-    # Verify the injection landed before touching any file on disk.
-    # Two failure modes: index out of range (lump_size/cc mismatch) or future
-    # code accidentally overwrites the slot.  Either way: reject, don't save.
-    _actual_seal = (
-        _sl_words[_clist_row0_idx]
-        if 0 < _clist_row0_idx < len(_sl_words)
-        else 0
-    )
-    if _actual_seal != _self_gt:
-        return jsonify({
-            "error": (
-                f"Identity seal mismatch: expected self-GT {_self_gt:#010x} "
-                f"but c-list[0] contains {_actual_seal:#010x}. "
-                f"identity_string used: {_identity_string!r}. "
-                f"The LUMP has not been saved. "
-                f"Re-compile and ensure cc >= 1 and lump_size is consistent."
-            ),
-            "identity_seal_mismatch": True,
-            "expected_self_gt":       _self_gt,
-            "actual_clist0":          _actual_seal,
-            "identity_string":        _identity_string,
-        }), 422
+    # Inject the self-GT identity seal at c-list[0].
+    # Skipped for token 00000600: its c-list[0] is the hardware-asserted SelfTest
+    # E-GT (validated above) and must not be overwritten with the petname seal.
+    if not _is_selftest_canonical:
+        if 0 < _clist_row0_idx < len(_sl_words):
+            _sl_words[_clist_row0_idx] = _self_gt
+
+        # Verify the injection landed before touching any file on disk.
+        # Two failure modes: index out of range (lump_size/cc mismatch) or future
+        # code accidentally overwrites the slot.  Either way: reject, don't save.
+        _actual_seal = (
+            _sl_words[_clist_row0_idx]
+            if 0 < _clist_row0_idx < len(_sl_words)
+            else 0
+        )
+        if _actual_seal != _self_gt:
+            return jsonify({
+                "error": (
+                    f"Identity seal mismatch: expected self-GT {_self_gt:#010x} "
+                    f"but c-list[0] contains {_actual_seal:#010x}. "
+                    f"identity_string used: {_identity_string!r}. "
+                    f"The LUMP has not been saved. "
+                    f"Re-compile and ensure cc >= 1 and lump_size is consistent."
+                ),
+                "identity_seal_mismatch": True,
+                "expected_self_gt":       _self_gt,
+                "actual_clist0":          _actual_seal,
+                "identity_string":        _identity_string,
+            }), 422
 
     # Pre-pack and hash the verified binary now; Phase 5 only writes it.
     import hashlib as _hl_save
@@ -5863,6 +5975,18 @@ def save_lump():
         except Exception as _bie:
             boot_refresh_note = str(_bie)
             logging.warning('[lumps] boot-image.bin regeneration failed: %s', _bie)
+
+    # ── SelfTest metadata always refreshed on token 00000600 save ────────────
+    # generate_boot_image() locates the SelfTest lump via ns_slot in the
+    # manifest, but new manifest entries intentionally omit ns_slot (ns-state.json
+    # is authoritative for that mapping).  When regeneration fails or is skipped,
+    # _load_boot_abstr_lump() is NOT called above, so _BOOT_ABSTR_META stays
+    # stale and GET /api/lumps/list returns the old cw/cc.
+    # Calling it unconditionally here (reads the manifest-designated lump file
+    # directly, no boot-image needed) ensures the list reflects the new binary
+    # immediately after every SelfTest save, regardless of boot-image outcome.
+    if token8 == '00000600' and not boot_refreshed:
+        _load_boot_abstr_lump()
 
     resp: dict = {
         "ok":             True,
