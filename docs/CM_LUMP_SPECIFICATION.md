@@ -1,6 +1,6 @@
 # Church Machine — Lump Specification
 
-**v1.2.1 — 2026-08-17**
+**v1.3 — 2026-08-18**
 **CONFIDENTIAL**
 
 ## Overview
@@ -36,7 +36,7 @@ and `cc` field (8 bits, max 255) together cap the maximum useful payload at
 
 | Abstraction | Code words (cw) | C-list slots (cc) | Lump size         | Freespace  |
 |-------------|-----------------|-------------------|-------------------|------------|
-| Decimal     | 107             | 0                 | 2^7 = 128 words   | 20 words   |
+| Decimal     | 107             | 0 *(legacy — cc≥1 planned for typ=lump; see C-list Slot 0 rule)* | 2^7 = 128 words   | 20 words   |
 | SlideRule   | 525             | 1                 | 2^10 = 1 024 words | 497 words |
 | TestSR      | 604             | 1                 | 2^10 = 1 024 words | 418 words |
 | Boot.Abstr  | 17              | 1                 | 2^6 = 64 words    | 45 words   |
@@ -148,7 +148,10 @@ corrupting state.
 Encoding formula: `(0x1F << 27) | ((n-6) << 23) | (cw << 10) | (typ << 8) | cc`
 
 ```
-Decimal    (n=7,  cw=107, cc=0, typ=00):  0xF881_AC00
+Decimal    (n=7,  cw=107, cc=0, typ=00):  0xF881_AC00   ← legacy example; cc=0 will be
+                                                          invalid for typ=lump once the
+                                                          C-list Slot 0 rule is enforced
+                                                          (planned; not in this release)
 SlideRule  (n=10, cw=525, cc=1, typ=00):  0xFA08_3401
 Boot.Abstr (n=6,  cw=17,  cc=1,  typ=00): 0xF800_4401
 ```
@@ -184,20 +187,196 @@ The PC and NIA counters operate in **word offsets** (one unit = one 32-bit word 
 
 ---
 
-## The Genotype Field — How It Is Computed
+## The Token — Lump Identity
 
-The **genotype** is the content-address seal that gives a lump its
-self-verifying identity. It appears in the lump filename
-(`Name.issue.GENOTYPE.lump`) and in the IDE catalogue.
+Terminology in this specification is precise:
+
+- **Genotype** — the full 2^n-word binary form of a lump: header + code +
+  freespace + c-list, zero-padded to the next power-of-two word boundary.
+  "Genotype" always means this binary form, never an identifier or hash.
+- **Token** — the 32-bit identifier derived from the genotype, defined below.
+
+### Canonical Definition
+
+> **Token** — a 32-bit value computed as:
+>
+>     token = hash( name || genotype_binary )
+>
+> where:
+> - `name` is the abstraction name string (UTF-8, no null terminator)
+> - `||` denotes concatenation
+> - `genotype_binary` is the full lump binary padded to the next power-of-two word boundary
+>   (i.e. all 2^n words of the genotype, including zero-padding)
+>
+> The token is the runtime identity of the lump. It appears in GTs, c-list entries, and NS table
+> entries. It is also the content fingerprint: two lumps with the same token are guaranteed to have
+> the same name and the same binary content.
+
+**Token vs. runtime GT fields — representation note.** The statement that the token "appears
+in GTs, c-list entries, and NS table entries" describes the *identity model*, not a claim that
+the 32-bit token value is stored verbatim in those structures today. In the current runtime
+encoding, a GT Word 0 carries a 16-bit `object_id` that indexes the **NS slot** for the lump;
+the NS entry, in turn, is the runtime's binding of that slot to the lump the token identifies
+(and Outform entries carry a content-hash prefix for the absent lump). The token is today the
+catalogue/filename/content identity; carrying the token itself inside GT or NS words (or
+widening `object_id`) is a **future-normative** representation decision, part of the same
+migration path as the production hash width. Any runtime check phrased in terms of the token
+(such as the planned slot-0 self-GT validation) is therefore expressed against the NS-slot
+mapping in the current encoding: slot 0 must hold a GT whose `object_id` resolves, via the NS
+table, to this lump — i.e. to the lump this token names.
+
+**Normative algorithm.** `hash` is **SHA-256**. The input is the exact byte sequence formed by:
+
+1. the abstraction `name` as UTF-8 bytes (no null terminator, no length prefix), followed by
+2. the full 2^n-word genotype binary, each 32-bit word serialised **big-endian**
+   (the on-disk `.lump` byte order), words in ascending address order, including
+   header word 0 and all zero-padding.
+
+The token is the **first 8 hexadecimal characters** of the lowercase hex digest, interpreted
+as a 32-bit unsigned integer. In filenames it is rendered as exactly those 8 lowercase hex
+digits (zero-padded). Any conforming tool in any language computes the identical token from
+the identical (name, binary) pair.
+
+**Collision note.** The guarantee above is the identity contract the system relies on, delivered
+probabilistically: the token is a 32-bit truncation of the SHA-256 digest, so a collision —
+two different (name, binary) pairs producing the same token — is possible in principle, though
+astronomically unlikely within a single region's catalogue. As with the forbidden CRC value in
+NS entries, collisions are handled at mint time: if Mint detects that a newly computed token
+collides with a different lump already in the catalogue, it rejects the publication and the
+publisher must perturb the binary (e.g. a freespace-layout change via recompilation) to obtain
+a distinct token. Only the truncated 32-bit value is retained and validated by the current
+filename-integrity path; retaining and verifying the full digest where adversarial forgery
+resistance is required is a planned upgrade, covered under "Choose width" in the Migration
+Path below.
+
+Including the name in the hash input binds identity to both content *and* name: transplanting a
+binary to a different abstraction name produces a different token.
+
+The **issue number** is explicitly *not* part of the hash input. The same binary published under
+a new issue number retains the same token. The issue number tracks publication history; the token
+tracks what the lump is.
+
+### Name and Token are Independent
+
+> **The name is the logical identity** — it names the abstraction, the idea. It remains stable
+> across versions, hardware targets, and cyberspace regions as long as the same concept is
+> being described.
+>
+> **The token is the physical instantiation** — it changes whenever the binary changes, for any
+> reason. Two lumps with the same name but different tokens are different instantiations of the
+> same abstraction.
+>
+> They are independent axes:
+>
+> | Change | New name? | New token? | New issue? |
+> |--------|-----------|-----------|------------|
+> | Bug fix or new feature (same abstraction) | No | Yes | Yes (e.g. `.2.`) |
+> | Port to new hardware target (same source, different binary) | No | Yes | No (same issue, different variant) |
+> | Import from another cyberspace region (same source, compiled locally) | No | Yes | No |
+> | Create a genuinely new abstraction | Yes | Yes | Starts at 1 |
+>
+> When another region imports an abstraction, they compile the source locally and derive their
+> own token from their own binary. The name is what makes the abstraction recognisably the same
+> across regions; the token is how each region's runtime refers to its local copy.
+>
+> **A new name is required only when the logical meaning changes enough that the abstraction
+> is no longer the same concept.** That is a human judgment. The hash does not make this
+> decision — it only records it.
+
+### Canonical Filename Form and File Set
+
+Every lump is named on disk using the canonical form:
+
+```
+dot.name.issue.token.lump        ← the logical lump (self-defining binary)
+dot.name.issue.token.json        ← sidecar (optional local administrative metadata)
+dot.name.issue.token.zip         ← distribution zip (if present)
+```
+
+Where:
+- `dot` — namespace prefix identifying this as a Church Machine lump
+- `name` — abstraction name (matches the name used in the token hash)
+- `issue` — publication revision number, starting at 1; not part of the token hash
+- `token` — 8 hex digits (the 32-bit token value computed above)
+
+**The logical lump is the binary alone.** It is self-defining: its API definition is embedded
+in the freespace (see the Source Code Storage section — *forthcoming; specified in a separate
+spec update (T7)*). The sidecar is optional local administrative metadata and is never
+transported across cyberspace boundaries.
+
+> **Transition note — freespace invariant.** The current release enforces the all-zero
+> freespace invariant (Mint validation step 7, and the layout/example sections): freespace
+> today carries no content, and the API definition is delivered via the sidecar/tooling.
+> When the Source Code Storage section lands, it will define a delimited region within
+> freespace for the embedded API/source, and Mint's freespace scan will be updated to
+> verify that region's framing while requiring the remainder to stay zero. Until then,
+> the all-zero rule stands and the embedded-API description in this section is normative
+> intent, not yet the deployed binary format.
+
+A separate `.api.json` file may be extracted from the binary by tooling (compiler, IDE) as
+a convenience — it is a hidden implementation detail, not a named part of the logical lump.
+
+Flat names such as `00000600.lump` are legacy aliases only; they must not appear in new tooling
+or documentation.
+
+**Scope and legacy exceptions.** The canonical form governs the on-disk lump file set (the
+`.lump` binary, its optional sidecar, and its distribution zip). The following forms elsewhere
+in this specification are *intentional legacy or out-of-scope exceptions*, retained until their
+own protocol sections are revised:
+- `*.bin` members inside `namespace.zip` bundles and the `manifest.json` `file` fields — the
+  bundle-internal naming predates the canonical form; a bundle revision will migrate members
+  to `dot.name.issue.token.lump`.
+- The lazy-load / Home Base fetch URLs (`{label}@sha256:{hash}.lump.zip`) — the network
+  protocol addresses lumps by label + full content hash, which is a transport addressing
+  scheme, not an on-disk filename; it is unchanged by this policy.
+- `*.thread.zip` and `*.namespace.zip` — Thread and Namespace lumps are not function
+  abstractions and keep their existing distribution names.
+
+#### API Definition Embedded in Freespace
+
+The API definition is stored inside the binary's freespace (see the Source Code Storage
+section — forthcoming, T7 — for the full freespace layout). This makes the binary self-defining: a recipient
+region has everything needed to understand the interface without any companion file.
+
+The embedded API definition specifies every method's:
+- pet name (the CLOOMC++ identifier callers use)
+- branch offset (compiled-in numeric entry point)
+- IN and OUT variables, each with an exact register assignment
+
+**Register conventions** (also to be documented in the forthcoming Source Code Storage section):
+
+Each variable specifies the exact register it occupies:
+- **`CRn`** — capability register; Church domain; holds a Golden Token
+- **`DRn`** — data register; Turing domain; holds an ordinary value
+
+**Reserved registers** — must not be assigned to any parameter:
+- `DR0` — hardwired zero on Artix-7
+- `CR5` — thread heap
+- `CR6` — abstraction c-list
+- `CR12` — thread object
+- `CR13` — IRQ thread
+- `CR14` — executing code (R/W)
+- `CR15` — namespace
+
+Valid parameter registers: `DR1`+, `CR0`–`CR4`, `CR7`–`CR11`.
+
+**Success/fail convention:** before executing RETURN, the callee writes non-null to output
+registers on success, or null (`DR`=zero, `CR`=null GT) on failure. The caller tests output
+registers directly — null means fail, non-null means success. Conditional instructions branch
+on this directly; no separate flag is needed.
 
 ### Current Form (Bootstrap Compiler, `cloomc.py`)
 
+The bootstrap compiler does not yet implement the canonical definition above.
+Its interim token computation is documented here verbatim; the migration path
+follows.
+
 ```python
 # body layout: [header] + clist + method_words, zero-padded to power-of-two
-# genotype = content hash over c-list + code (NOT the header, NOT the pad)
+# token = interim content hash (interim scheme) over c-list + code (NOT the header, NOT the pad)
 genome   = clist + method_words
 h        = hashlib.sha256(bytes(str(genome), "utf-8")).hexdigest()[:8]
-genotype = int(h, 16)
+token    = int(h, 16)
 ```
 
 Step by step:
@@ -208,9 +387,9 @@ Step by step:
 | 2 | **Serialise** — Python `str()` of that integer list (e.g. `"[2147483651, 2147483667, ...]"`), UTF-8 encoded. |
 | 3 | **Hash** — SHA-256 of those bytes. |
 | 4 | **Truncate** — first 8 hex characters of the digest. |
-| 5 | **Genotype** — that value as a 32-bit unsigned integer. |
+| 5 | **Token** — that value as a 32-bit unsigned integer. |
 
-This produced every genotype in the current catalogue (e.g. `Alice = 0x3FCBF37C`).
+This produced every token in the current catalogue (e.g. `Alice = 0x3FCBF37C`).
 To re-verify a lump, recompute `sha256(str(clist + code_words))[:8]` and
 compare — a mismatch means tampering or corruption. This is exactly what
 `lump_json.py :: _reseal_from_parts` does; all catalogue lumps round-trip and
@@ -218,14 +397,14 @@ verify, and a tampered word is rejected.
 
 ### Limits of the Current Form
 
-The bootstrap genotype is deterministic, self-consistent, and sufficient for
+The bootstrap token is deterministic, self-consistent, and sufficient for
 integrity and tamper-detection, but it is a **placeholder**, not the production
 seal, for four reasons:
 
 1. **Content-only, not identity-covering.** Two lumps with byte-identical
-   c-list and code produce the same genotype even if they are different
-   authors' work or different issue numbers. The design requires distinct
-   issues to differ.
+   c-list and code produce the same token even if they carry different
+   abstraction names. The canonical definition requires the name in the
+   hash input.
 2. **`str()` is not a canonical encoding.** It depends on Python's
    list-repr formatting (spaces, commas, integer rendering). A different
    tool, language, or Python version could serialise differently and compute
@@ -241,47 +420,54 @@ seal, for four reasons:
 
 ### Target Form (Per the Design)
 
-The genotype must seal **identity + capabilities + code + source** as one
-indivisible unit:
+The target form is the canonical definition given above:
 
 ```
-genotype = H_canonical( petname.Abstraction#n  ||  c-list  ||  code  ||  source )
+token = hash( name || genotype_binary )
 ```
+
+The name binds identity to content; the genotype binary covers the full
+2^n-word form. Per the canonical definition, the **issue number is excluded**
+from the hash input — it tracks publication history, not identity.
 
 | Component | Role | Covered today? |
 |-----------|------|:--------------:|
-| `petname.Abstraction#n` | Full identity: author pet name, abstraction name, issue number. Makes distinct issues/authors hash differently. | ✗ |
+| `name` | Abstraction name string. Binds identity to the name; transplanting a binary to a different name yields a different token. | ✗ |
 | c-list | Capability rows (DNA / reachability). | ✓ |
 | code | Method words. | ✓ |
-| source | Carried source, so source and code cannot drift; editing → new genotype. | ✗ |
-| `H_canonical` | Fixed cryptographic hash over a canonical byte encoding (not `str()` of a list), so any conforming tool in any language computes the identical genotype for the identical lump. | ✗ |
+| source | Carried source, so source and code cannot drift; editing → new token. | ✗ |
+| `H_canonical` | Fixed cryptographic hash over a canonical byte encoding (not `str()` of a list), so any conforming tool in any language computes the identical token for the identical lump. | ✗ |
 
 ### Two Gates — Integrity and Ownership
 
-The genotype is the **integrity gate** — static, public, secretless:
+The token is the **integrity gate** — static, public, secretless:
 
 | What changed | Effect |
 |---|---|
-| Wrong issue number / different author | Different genotype → fails *(identity)* |
-| Corrupted code or c-list word | Different genotype → fails *(integrity)* |
+| Different name (transplanted binary) | Different token → fails *(identity)* |
+| Corrupted code or c-list word | Different token → fails *(integrity)* |
 | Source edited without recompiling | Source no longer matches → fails *(source-consistency)* |
 
-The genotype is **not** the ownership gate. Ownership is the separate,
+The token is **not** the ownership gate. Ownership is the separate,
 dynamic, secret-based passkey acid test. Integrity (this hash) must be
 verifiable without authority; ownership must not be derivable from these
 static bits. The two gates stay independent by necessity.
 
-### What the Genotype Does NOT Cover
+### What the Bootstrap Token Does NOT Cover
 
-| Excluded | Reason |
+The exclusions below apply to the **bootstrap (interim) form only**. Under the
+canonical definition the hash covers the full genotype binary — header,
+zero-padding, and all.
+
+| Excluded (bootstrap form) | Reason |
 |----------|--------|
 | Header (Word 0) | Holds derived layout (`cc`, `code_len`) recomputable from the sealed content, and placement-specific bookkeeping. Sealing it would make the seal depend on layout accidents. |
 | Zero-padding | Carries no information. |
-| Resolved GTs / bindings | Assigned by the locator at load and rebound at runtime (`SAVE`). They are placement, not identity. Their integrity is handled separately by per-GT parity/ECC — **not** by the genotype. The genotype never faults on binding because binding does not touch what the genotype covers. |
+| Resolved GTs / bindings | Assigned by the locator at load and rebound at runtime (`SAVE`). They are placement, not identity. Their integrity is handled separately by per-GT parity/ECC — **not** by the token. The token never faults on binding because binding does not touch what the token covers. |
 
 ### Migration Path (Bootstrap → Production)
 
-Each step is additive; each changes the genotype values — which is correct
+Each step is additive; each changes the token values — which is correct
 and expected: a lump sealed under the production scheme is a genuinely
 different (better-identified) artifact than the same lump under the bootstrap
 scheme. Under content-addressing, a better seal is simply a new identity.
@@ -289,26 +475,26 @@ scheme. Under content-addressing, a better seal is simply a new identity.
 | Step | Change |
 |------|--------|
 | **Now** | `sha256(str(clist + code))[:8]`, 32-bit, content-only. Keep for the bootstrap; self-consistent and sufficient for the current single-author, no-transfer world. |
-| **Add identity** | Extend the hashed input to include the full `petname.Abstraction#n` string, so distinct issues/authors differ. First and most important upgrade — turns a content hash into an identity hash. |
-| **Add source** | Include the carried source in the hashed input, binding source to code (editing → new genotype). |
-| **Canonicalise** | Replace `str()`-of-list with a defined canonical byte encoding (fixed field order, fixed integer width, explicit lengths), so the genotype is tool- and language-independent. |
-| **Choose width** | Decide the genotype width deliberately (e.g. full 256-bit digest, or a documented truncation) based on the forgery-resistance required, rather than inheriting the 8-hex-char bootstrap truncation. |
+| **Add identity** | Extend the hashed input to include the abstraction `name` string, per the canonical definition (issue number excluded). First and most important upgrade — turns a content hash into an identity hash. |
+| **Add source** | Include the carried source in the hashed input, binding source to code (editing → new token). |
+| **Canonicalise** | Replace `str()`-of-list with a defined canonical byte encoding (fixed field order, fixed integer width, explicit lengths), so the token is tool- and language-independent. |
+| **Choose width** | Decide the token width deliberately (e.g. full 256-bit digest, or a documented truncation) based on the forgery-resistance required, rather than inheriting the 8-hex-char bootstrap truncation. |
 
 > **Development-status note (source inclusion):** The source included in the
 > seal may itself vary by development status — full commented source (active
 > development), uncommented source (release), or no source (locked
-> production). Each is different content, hence a different genotype — which
+> production). Each is different content, hence a different token — which
 > is consistent: a commented-source lump and its no-source production
 > counterpart are legitimately different artifacts with different identities.
-> If a three-tier source scheme is adopted, the genotype computation is
+> If a three-tier source scheme is adopted, the token computation is
 > unchanged — it simply hashes whatever source tier the lump carries, and
-> different tiers yield different genotypes by construction.
+> different tiers yield different tokens by construction.
 
 > **Status:** Spec note. Current form documented verbatim from `cloomc.py`
 > (`sha256(str(clist+code))[:8]`, 32-bit, content-only). Target form
 > specified (identity + c-list + code + source, canonical encoding, chosen
 > width) but **not yet implemented** — it is the "confirm the seal
-> construction in the compiler" open item. Per-GT parity (not the genotype)
+> construction in the compiler" open item. Per-GT parity (not the token)
 > covers transient bindings.
 
 ---
@@ -325,6 +511,12 @@ Step 3  n-6[26:23] <= 9   — reject if n-6 > 9 (lump would exceed 32 K words).
 Step 4  lumpSize = 2^(n-6+6).
 Step 5  cw[22:10] <= lumpSize - cc - 2  — reject if header is self-contradictory.
 Step 6  cc[7:0]   <= lumpSize - 2       — reject if c-list overflows lump.
+Step 6b (planned — NOT enforced in this release) typ==00 (lump) requires cc >= 1,
+          AND c-list slot 0 must hold the lump's own GT: a well-formed E-GT
+          Word 0 whose object_id equals the NS slot Mint is issuing for this
+          lump (see "C-list Slot 0 — The Lump's Own GT"). Today the save path
+          upgrades cc=0 to cc=1 instead of rejecting, and slot-0 value
+          validation is not performed; legacy cc=0 binaries are still accepted.
 Step 7  Scan words cw+1 .. lumpSize-cc-1: reject if any word is non-zero.
           Freespace must be all-zero — this is enforced, not assumed.
 Step 8  Validate c-list slots (each must be a well-formed GT Word 0).
@@ -606,18 +798,49 @@ an Outform Event only if the download remains absent.
 
 `cc` is the slot count. The c-list occupies the last `cc` words of the lump.
 
+### C-list Slot 0 — The Lump's Own GT
+
+> **C-list slot 0 is always the GT for the lump itself.** This GT is valid for both:
+> - **Inform** — a caller passes a GT to this lump; the lump can refer to its own GT in
+>   slot 0 to identify itself in the exchange
+> - **Outform** — the lump passes its own GT (slot 0) to another abstraction, granting
+>   that abstraction the ability to call back
+>
+> For `typ=lump`, `cc >= 1` is therefore always required. A lump with `cc = 0` has no
+> self-GT and cannot participate in inform or outform exchanges. **Planned enforcement:**
+> Mint will reject `typ=lump` binaries with `cc = 0` once the transition below completes.
+
+> **Transition note — enforcement status.** The `cc >= 1` rule is *future-normative*:
+> rejection is **not deployed anywhere in this release**. The current save path *upgrades*
+> `cc = 0` lumps to `cc = 1` (inserting the self-GT slot) rather than rejecting them, and
+> legacy `cc = 0` paths are still exercised by existing simulator/boot coverage. The Mint
+> validation sequence gains the rejection step (see planned step 6b there) once those
+> legacy paths are retired; until then, upgrade-on-save is the accepted behaviour and a
+> `cc = 0` binary is still accepted. Full enforcement additionally requires validating
+> the *value* of slot 0 — that it holds the lump's own GT (`object_id` matching the NS
+> slot Mint is issuing for this lump) — not merely that `cc >= 1`.
+
 ---
 
 ## Zip Distribution Format
 
-Lump binaries are distributed as zip files.
+Lump binaries are distributed as zip files. File names for single-lump
+distribution follow the canonical `dot.name.issue.token.*` form (see
+"Canonical Filename Form and File Set", including its list of intentional
+legacy exceptions — bundle-internal `*.bin` members and hash-addressed fetch
+URLs below are among them). Flat names such as `00000600.lump` are legacy
+aliases only and must not appear in new tooling or documentation.
 
 ### Single Lump Upload
 
 ```
-SlideRule.lump.zip
-+-- SlideRule.bin    ← raw lump binary: header + code + freespace + c-list
+dot.SlideRule.1.a3f9c2b1.zip
++-- dot.SlideRule.1.a3f9c2b1.lump   ← the logical lump (self-defining binary):
+                                       header + code + freespace + c-list
 ```
+
+The logical lump is the binary alone; the optional `.json` sidecar is local
+administrative metadata and is never included in the distribution zip.
 
 ### Single Thread Upload
 
@@ -704,7 +927,13 @@ reference that is defined by the object reference.
 
 ## Concrete Lump Examples
 
-### Decimal (n=7, cw=107, cc=0)
+### Decimal (n=7, cw=107, cc=0) — legacy example
+
+> **Note:** this example predates the C-list Slot 0 rule. Under that (future-normative)
+> rule every lump must carry its own GT in c-list slot 0, so `cc = 0` will not be valid
+> for `typ=lump` once Mint enforcement lands (planned step 6b — not enforced in this
+> release; the current save path upgrades `cc = 0` to `cc = 1` instead). The example is
+> retained for its header-encoding arithmetic only.
 
 ```
 Header:  0xF881_AC00
@@ -1624,7 +1853,7 @@ Boot.NS (Slot 0) is a special case of the Namespace LUMP:
 | limit_offset | Entire RAM − 1 | 2^n − 1 (sub-range) |
 | typ | 10 (clist-only — no init microcode) | 10 always |
 | cw | 0 | 0 always |
-| N (NS Table entries) | All 46 boot slots | App-specific count |
+| N (NS Table entries) | Current entries are listed in `server/lumps/manifest.json`. | App-specific count |
 | NS Table location | `NS_TABLE_BASE = 0xFD00` (hardware fixed) | Declared in manifest or header field |
 | Locators (cc) | 3 (Mint, Scheduler, Locator — header field only, no GT slots) | App-chosen count (header field only) |
 | Issued by | Hardware at power-on (pre-written) | Mint.Lump() at install time |
@@ -1664,7 +1893,7 @@ already owns.
 | **GC interaction** | G bit in NS slot Word 3 | G bits in all live CRs in Zone ① | Live & Dead slots |
 | **lumpSize** | 2^n compiler-chosen (64–16 384 words) | IDE defined 2^n < 1024 | 2^n IDE-chosen; Boot.NS = 2^14 = 16 384 words |
 | **Freespace verified by Mint** | Yes — words cw+1..lumpSize-cc-1 all-zero | Zone ③ only (words 45..175); Zone ① skipped | Scan CRC per slot |
-| **Distribution format** | `*.lump.zip` | `*.thread.zip` | `*.namespace.zip` |
+| **Distribution format** | `dot.name.issue.token.zip` | `*.thread.zip` | `*.namespace.zip` |
 | **Simulator NS slot** | Most slots (Salvation=4, Mint=6, …) | Slots 1 and 45 | Slot 0 (Boot.NS) |
 | **CALL target** | Yes | No | No |
 
@@ -1687,6 +1916,7 @@ already owns.
 
 | Version | Date | Summary |
 |---|---|---|
+| v1.3 | 2026-08-18 | Naming consistency (T1): canonical **Token** definition (`hash(name ‖ genotype_binary)`; issue number excluded); "genotype" reserved for the 2^n-word binary form only; canonical `dot.name.issue.token.*` filename form and logical file set documented (binary is self-defining; API definition embedded in freespace, register conventions, success/fail convention); "Name and Token are Independent" subsection; C-list Slot 0 self-GT rule (`cc ≥ 1` required for `typ=lump`; Decimal cc=0 examples annotated as legacy); hardcoded NS entry count replaced with a `server/lumps/manifest.json` reference. |
 | v1.2.1 | 2026-08-17 | New section: **The Genotype Field — How It Is Computed** — documents the current bootstrap form (`sha256(str(clist+code))[:8]`, 32-bit), its four known limits, the target production form (`H_canonical(identity ‖ c-list ‖ code ‖ source)`), the two-gate model (integrity vs ownership), the excluded fields (header, padding, resolved GTs), and the four-step migration path (identity → source → canonical encoding → chosen width). |
 | v1.2 | 2026-06-20 | (prior release) |
 | v1.1 | 2026-05-03 | Floating-lump concept formalised (new section); `variant_group` and `ns_slot_policy` added to manifest schema; Boot.Abstr example table corrected (cw=17, cc=1, 64 words, `0xF800_4401`); automated consistency gate (`tests/lump/test_lump_consistency.py`, 11 rules). |
