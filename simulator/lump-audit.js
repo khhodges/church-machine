@@ -459,6 +459,13 @@ function lumpAudit(words, manifest, lineNums, opts) {
             const gw = (words[_rgtBaseIdx + si] >>> 0);
             if (gw === 0) continue;  // NULL GT (all-zero) — always valid
 
+            // 0xFEED pending GT sentinels are valid pre-deployment placeholders.
+            // bits[31:16] = 0xFEED identifies a named capability whose real GT
+            // will be injected by the loader at deployment time.  They are
+            // intentionally distinct from valid GT Word 0 values and must not
+            // be flagged as malformed — the runtime resolves them from the NS.
+            if ((gw >>> 16) === 0xFEED) continue;
+
             // Spec v1.2: bit 26 is the spare field and must be 0.
             const _spare = (gw >>> 26) & 0x1;
             if (_spare !== 0) {
