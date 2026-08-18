@@ -57,6 +57,21 @@ HTML_PATH     = os.path.join(ROOT, "docs", "figures", "Lumps Directory.html")
 LUMPS_DIR     = os.path.join(ROOT, "server", "lumps")
 MANIFEST_PATH = os.path.join(LUMPS_DIR, "manifest.json")
 
+# ── Ghost allowlist ────────────────────────────────────────────────────────────
+# Lump Viewer entries that have no matching .lump on disk are "ghost" entries.
+# In --check mode any ghost whose id is NOT in this set is a CI failure, so new
+# accidental ghosts are caught immediately.  To legitimise a new ghost, add its
+# id here AND update this comment.
+GHOST_ALLOWLIST: frozenset = frozenset({
+    "Adder",        # placeholder — no .lump built yet
+    "Alice",        # placeholder — no .lump built yet
+    "Calc",         # placeholder — no .lump built yet
+    "Counter",      # placeholder — no .lump built yet
+    "DijkstraFlag", # placeholder — no .lump built yet
+    "Mallory",      # placeholder — no .lump built yet
+    "Store",        # placeholder — no .lump built yet
+})
+
 # ── Parse LUMPS[] from HTML ────────────────────────────────────────────────────
 
 def _extract_lumps_js(html_path: str) -> str:
@@ -234,12 +249,12 @@ def plan_work(lumps: list, manifest: list, lumps_dir: str):
             lump_id, lump_token, by_name, by_token
         )
         if mf_entry is None:
-            ghosts.append(f"{lump_id} (no manifest entry, token={lump_token})")
+            ghosts.append((lump_id, f"{lump_id} (no manifest entry, token={lump_token})"))
             continue
 
         # Is the .lump file on disk?
         if _lump_path_for_entry(mf_entry, lumps_dir) is None:
-            ghosts.append(f"{lump_id} (no .lump file on disk)")
+            ghosts.append((lump_id, f"{lump_id} (no .lump file on disk)"))
             continue
 
         mf_token = (mf_entry.get("token") or "").lower()
@@ -420,9 +435,18 @@ def main(
                     f"has no corresponding Lump Viewer entry."
                 )
 
-    # ── Report ghost entries (informational, not fatal) ────────
+    # ── Report ghost entries; enforce allowlist in --check mode ───
     if ghosts:
         _print_ghosts(ghosts)
+    if args.check:
+        for ghost_id, desc in ghosts:
+            if ghost_id not in GHOST_ALLOWLIST:
+                check_errors.append(
+                    f"UNEXPECTED GHOST — '{ghost_id}' appears in Lump Viewer "
+                    f"but has no .lump on disk and is not in GHOST_ALLOWLIST.  "
+                    f"Either build the lump or add '{ghost_id}' to GHOST_ALLOWLIST "
+                    f"in scripts/sync_lump_viewer_to_sidecars.py."
+                )
 
     # ── Final result ───────────────────────────────────────────
     if check_errors:
@@ -445,8 +469,8 @@ def main(
 def _print_ghosts(ghosts: list) -> None:
     print(f"\n[INFO] Ghost entries ({len(ghosts)}) — "
           f"in Lump Viewer but no .lump on disk (not fatal):")
-    for g in ghosts:
-        print(f"         • {g}")
+    for _lump_id, desc in ghosts:
+        print(f"         • {desc}")
 
 
 if __name__ == "__main__":
