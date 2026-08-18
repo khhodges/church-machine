@@ -1311,6 +1311,231 @@ Note: clistStart = lumpSize - cc = 64 - 1 = 63
 
 ---
 
+## IDE Views
+
+Every lump-related view in the IDE is a **dynamic tool** — it reads binary data at runtime
+and renders a live view. None are resident documents; none can drift from the truth. The
+binary is the source; the view is always derived. No view is an editorial gate; all views
+are read-only windows onto binary-derived data.
+
+### LUMP Detail Panel
+
+Reached via the **Lumps tab** in the full IDE. Selecting any LUMP from the sidebar opens the
+detail view, which is split into eight sub-tabs plus a header strip, all reading
+binary-derived data.
+
+#### Header Strip
+
+Always visible. Shows:
+
+| Element | Description |
+|:--------|:------------|
+| Token | 8-hex token, copyable. |
+| NS Slot | Assigned slot number (Resident or Lazy-load), or `—` for Dynamic LUMPs. |
+| Version | `lump_version` integer. |
+| Size | `lump_size` in words. |
+| CW / CC | Code word count / C-List count. |
+| **Edit** button | Opens the source editor preloaded with this LUMP's source. |
+| **Audit** button | Runs all lump-audit rules against the binary (see Lump Audit Rules). |
+| **Run** button | Loads the binary into the simulator and boots. |
+| **Shrink** button | Calls `/api/lump/<token>/resize` to remove freespace. |
+
+#### Sub-Tab: Overview
+
+Shows identity and authorship metadata — pet names (DR/CR register aliases) and NS table
+slot/state/hash.
+
+**For code LUMPs:**
+- Author, version, compiled date
+- Token, size, cw, cc, language, grants
+- **Pet Names** — table of DR and CR register aliases
+- **MTBF Reliability** — status badge, consecutive-clean count, total runs
+- **Deployment** — target board, profile, builder, build timestamp
+
+**For the Namespace LUMP (Boot.NS, slot 0, `typ=1`):**
+- SVG dependency graph of the namespace hierarchy
+- NS Table: slot index, label, state, and hash/file for each resident abstraction
+
+#### Sub-Tab: API
+
+The call contract for this abstraction.
+
+- **Methods table**: index, name, offset (word), length (words), description
+- **Caller Grants**: what permissions a caller must have to enter this LUMP
+- **C-List / Capabilities table**: row index, name, grants, note for every C-List row
+
+#### Sub-Tab: Content
+
+Renders the LUMP's logical content (binary content breakdown) based on `content_type` / `typ`:
+
+| Content Type | Rendering |
+|:-------------|:----------|
+| `code` | Disassembled instructions with semantic comments, branch-target arrows, method-boundary markers, and stub-method warnings (amber) for bare-`RETURN` methods. |
+| `text` / `markdown` | Plain text editor or formatted Markdown render. |
+| `image` / `grayscale` | Reconstructed image canvas + "Replace file" utility. |
+| `thread` | Thread state: PC, call depth, all 16 Data Registers. |
+
+#### Sub-Tab: Tokens *(MyGoldenTokens)*
+
+C-List viewer and POLA editor.
+
+- **GT chips**: one chip per C-List row, showing the raw GT word, permissions, object_id, and pet name.
+- **POLA tools**: strip excess permissions from individual rows (Principle of Least Authority).
+- **Push Names**: writes this LUMP's pet names into the running simulator's namespace so the Memory and GT views use them.
+
+#### Sub-Tab: Source
+
+Displays the original CLOOMC++ / Assembly source that produced this binary — extracted from
+freespace if Tier 1 or 2 (fetched from `/api/lumps/<token>/detail`). Shows a `binary_only`
+notice if no source was saved.
+
+#### Sub-Tab: Versions *(Version Telemetry)*
+
+Per-version fault telemetry from FPGA call-home data.
+
+- Table of every archived version with: version number, fault count, Tier-1/2/3 recovery breakdown, MTBF estimate.
+- **Bulk upgrade** button: pushes the current version to all registered devices still on an older version.
+
+#### Sub-Tab: History *(Binary Version Archive)*
+
+Archived `.lump` binaries stored as `<token>-v<N>.lump`.
+
+- Lists every archived version with timestamp and word count.
+- **Preview**: fetches the old binary and renders its hex dump.
+- **Restore**: promotes the archived version to the active binary (writes it back as `<token>.lump` and updates the sidecar).
+
+#### Sub-Tab: Hex Dump
+
+Raw binary view of the `.lump` file, with inline header decode.
+
+- One 32-bit word per row, colour-coded by region:
+  - **Header** (word 0): gold
+  - **Code** (words 1–cw): blue/white
+  - **Freespace**: dim grey
+  - **C-List** (tail cc words): amber
+- ASCII sidecar alongside each word.
+- Header decode panel: expands `magic`, `n-6`, `cw`, `typ`, `cc` inline.
+
+### DNA Viewer (`app-gt-view.js`)
+
+The top-level design surface of the IDE. Displays every Golden Token of any type across all
+configured namespaces. Each GT is identified by its `dot.name.token` ID. Four GT types appear
+in the DNA Viewer:
+
+- **Abstract** — the conceptual identity of an abstraction: its pet name and interface
+  contract, independent of any binary or NS slot; the idea itself
+- **Outform** — the GT an abstraction presents to the outside world; makes it callable
+  from a configured NS slot; the face an abstraction shows to callers
+- **Inform** — the binary lump in memory being executed; the physical compiled form:
+  header, code, freespace, c-list
+- **NULL** — a c-list row that is currently empty; the slot is always useable. Filled at
+  runtime either by the Lazy Load protocol or by code calling a system abstraction that
+  returns a GT. The returned GT must have `B=1` (binding bit set) for code to save it into
+  the slot. NULL GTs are visible in the DNA Viewer so the programmer can see which c-list
+  slots are unresolved at design time
+
+Clicking any GT reveals the full details of that node. The DNA Viewer is the primary
+navigation surface: the programmer starts here and navigates outward to any lump or
+namespace node. All other views are subordinate; the DNA Viewer is not subordinate to
+any other panel.
+
+### Manifest Viewer
+
+Fetches `/api/lumps/list`; shows the mechanically derived manifest index as a flat list of
+available lumps.
+
+### Other IDE Panels that Show LUMP Data
+
+| Panel | Location | What it shows |
+|:------|:---------|:--------------|
+| **Memory View** | `app-memory.js` | Physical address space map — shows where each LUMP is loaded as a coloured block with its token and size. |
+| **CR Detail** | `app-cr-detail.js` | Deep inspection of a specific Capability Register: resolves the underlying LUMP token, base, limit, and permissions. |
+| **Namespace tab** | Main IDE sidebar | Shows all NS slots with their resident LUMP token, state (loaded/absent/outform), and size. |
+| **Lesson 5 form** | `/start` (starter IDE) | "Start from an existing abstraction" picker: populates `absName`, `absDesc`, and method rows from a selected LUMP's sidecar data via `/api/lumps/list`. |
+
+All views are read-only tools derived from binary truth. No view is an editorial gate.
+
+---
+
+## API Endpoints
+
+All lump-related HTTP endpoints are served by the Flask backend (`server/app.py`).
+
+### Read / Retrieve
+
+| Method | Path | Description |
+|:-------|:-----|:------------|
+| `GET` | `/api/lumps/list` | JSON array of all lumps (sidecar minus `source`). Includes `binary_valid` flag. |
+| `GET` | `/api/lumps/<token>/detail` | Full sidecar JSON including `source`. |
+| `GET` | `/api/lump/<token_hex>` | Raw binary (`application/octet-stream`). Falls back to Mum Tunnel Library on GitHub. `X-Lump-Source` header indicates origin. |
+| `GET` | `/api/lump/<token_hex>/words` | `{token, words: uint32[], count}` — word array as JSON. |
+| `GET` | `/api/lump-source/<name>` | `{name, source}` for the named abstraction. Returns `{binary_only: true}` if no source exists. |
+| `GET` | `/api/lumps/bundle.zip` | ZIP of all `.lump` binaries + `manifest.json`. |
+| `GET` | `/api/lumps/<token>/history` | `{history: [{version, filename, compiled_at, lump_size}]}`. |
+
+### Create / Save
+
+| Method | Path | Description |
+|:-------|:-----|:------------|
+| `POST` | `/api/lumps/save` | Save a compiled LUMP. Body: `{binary: uint32[], metadata: {...}}`. Runs c-list bounds check. Returns `{token, lump_path, sidecar_path}`. |
+| `POST` | `/api/lumps/import` | Pack a base64 file into a data LUMP. Body: `{name, content_type, data_b64, width?, height?}`. |
+| `POST` | `/api/lumps/upload-lump` | Import a raw `.lump` binary. Body: `{name, data_b64}`. Parses header to generate sidecar. |
+
+### Update / Modify
+
+| Method | Path | Description |
+|:-------|:-----|:------------|
+| `PUT` | `/api/lump/<token>/content` | Overwrite the content of a data/text LUMP in-place. Body: `{text?} \| {data_b64?}`. Returns `{cw, lump_size}`. |
+| `PATCH` | `/api/lump/<token>/meta` | Update sidecar fields (`author`, `version`, `pet_names`, etc.). |
+| `PATCH` | `/api/lump/<token_hex>/clist/<row>` | Write one GT word into a specific C-List row. Body: `{gt_word: uint32}`. |
+| `POST` | `/api/lump/<token_hex>/resize` | Repack to minimum power-of-2, removing freespace. Returns `{old_size, new_size, saved_words}`. |
+| `POST` | `/api/lump/<token>/fork-version` | Archive current binary as `-vN`, promote new compile as primary. |
+
+### Delete
+
+| Method | Path | Description |
+|:-------|:-----|:------------|
+| `DELETE` | `/api/lumps/<token>` | Remove binary, sidecar, and manifest entry. Returns list of deleted files. |
+
+### Telemetry
+
+| Method | Path | Description |
+|:-------|:-----|:------------|
+| `GET` | `/api/lump/version-telemetry/<name>` | Per-version fault statistics for the named abstraction. Used by the Versions sub-tab. |
+
+---
+
+## Lump Audit Rules
+
+The audit system (`simulator/lump-audit.js`) runs structural consistency checks on LUMP
+binaries. Invoked from the **Audit** button in the IDE detail-panel header strip, and from
+the `lump-consistency` CI workflow.
+
+The auditor operates in two modes:
+
+- **Manifest-guided**: sidecar metadata is available; all rules apply.
+- **Binary-only**: no sidecar; only binary-derivable rules apply (R0, R1, R2, RB1, RB2, RFS, RCI, RNC).
+
+| Rule ID | Name | What it checks | Failure means |
+|:--------|:-----|:---------------|:--------------|
+| **R0** | Empty Binary | Word array must not be empty. | No binary content to audit — the file is empty or unreadable. |
+| **R1** | Header Magic | Bits 31:27 of word 0 must equal `0x1F`. | Word 0 is not a valid LUMP header; the file is not a lump or is corrupted/evicted. |
+| **R2** | Word Count | Actual word count must equal `2^(n-6+6)` as encoded in the header exponent field. | The binary is truncated or padded inconsistently with its declared size. |
+| **RB1** | Code Word Count | `cw >= 1` — at least one code word must exist. | The lump declares no code section; nothing can execute at PC = 1. |
+| **RB2** | Layout Bounds | `1 + cw + cc <= lump_size` — header + code + c-list must fit. | Declared regions overflow the lump; header fields are inconsistent. |
+| **RFS** | Freespace Zone | All words in the padding region (between code and c-list) must be zero. | Freespace contains non-zero words — corruption or an out-of-bounds write; Mint would reject the lump at load time. |
+| **RMC** | Manifest Coherence | If a sidecar is provided, its `cw`, `cc`, and `lump_size` must exactly match the binary header. | The sidecar has drifted from the binary; the binary header is ground truth. |
+| **RCI** | Instruction Range | `LOAD`/`SAVE`/`ELOADCALL`/`XLOADLAMBDA` must reference rows `0 … cc-1`. `BRANCH` targets must land within the code section. | Code references a c-list row or branch target outside the lump's declared bounds — a fault at runtime. |
+| **RNC** | NULL GT Check | Warns if code accesses a C-List row that holds a NULL (all-zero) Golden Token. | The row is expected to be filled at runtime (Lazy Load or a system abstraction returning a `B=1` GT); if it is not, the access faults. |
+| **RPN** | Pet Name Coverage | Every C-List row referenced by code must have a corresponding pet name in the sidecar. | The sidecar's documentation of the c-list is incomplete. |
+| **RSM** | Stub Method | Detects methods whose entire body is a single bare `RETURN` with no implementation. Flagged as amber warnings in the Content sub-tab. | A declared method has no real body — likely unfinished code. |
+
+Failures at R0–RFS are hard errors; RMC–RPN are reported as warnings that block merge
+(enforced by `tests/lump/test_lump_consistency.py` — 11 rules, R1–R11 in that file). RSM is
+advisory only.
+
+---
+
 ---
 
 # Appendix A — Thread as a Lump
