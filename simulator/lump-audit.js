@@ -13,10 +13,106 @@
  *   R2  — word count of the binary matches the size encoded in the header exponent
  *   RB1 — cw >= 1 (at least one code word)
  *   RB2 — 1 + cw + cc <= lump_size (bounds)
- *   RFS — all words in the freespace zone are zero
+ *   RFS — for typ=lump, freespace must either begin with a valid 0xAB content
+ *         header whose framing passes Mint validation step 7 (flags, bounds,
+ *         zero pad bytes, zero remainder) or be entirely zero (legacy binary);
+ *         for all other typ values, all freespace words must be zero
  *   RMC — if a manifest is supplied, its cw / cc / lump_size agree with the binary header
  *   RSM — no stub methods (bare RETURN with no real code body — compiler error)
  */
+
+// ── Freespace 0xAB content-frame validator (Mint validation step 7) ────────
+// Validates the V1.3 self-definition content frame in a typ=lump freespace
+// zone (CM_LUMP_SPECIFICATION.md §Freespace Content and Self-Definition,
+// §Mint Validation Sequence step 7).  Caller has already confirmed
+// words[fsStart] bits [31:24] === 0xAB.
+//
+//   words   — full lump word array
+//   fsStart — index of word cw+1 (first freespace word)
+//   fsEnd   — index of the first c-list word (exclusive freespace bound)
+//
+// Returns { ok: true, tier, contentWords } on success, or
+//         { ok: false, code, detail } where code is one of:
+//   FS_BAD_FLAGS     — flags byte not 0x00 / 0x01 / 0x03           (step 7a)
+//   FS_API_LEN       — api_byte_length is zero                     (step 7b)
+//   FS_API_OVERFLOW  — API region overflows freespace              (step 7b)
+//   FS_SRC_LEN       — source_byte_length is zero                  (step 7c)
+//   FS_SRC_OVERFLOW  — source region overflows freespace           (step 7c)
+//   FS_PAD_NONZERO   — non-zero pad byte in a padded region        (step 7d)
+//   FS_TAIL_NONZERO  — non-zero word after the last content word   (step 7d)
+function lumpAuditValidateContentFrame(words, fsStart, fsEnd) {
+    const fsWords = fsEnd - fsStart;
+    const hdr     = words[fsStart] >>> 0;
+    const flags   = (hdr >>> 16) & 0xFF;
+    const apiLen  = hdr & 0xFFFF;
+
+    // 7a — flags must be 0x00 (Tier 0), 0x01 (Tier 1) or 0x03 (Tier 2).
+    if (flags !== 0x00 && flags !== 0x01 && flags !== 0x03) {
+        return { ok: false, code: 'FS_BAD_FLAGS',
+                 detail: `content header flags 0x${flags.toString(16).padStart(2, '0').toUpperCase()} — only 0x00, 0x01 or 0x03 are valid (Mint step 7a)` };
+    }
+    // 7b — api_byte_length non-zero, API region within freespace.
+    if (apiLen === 0) {
+        return { ok: false, code: 'FS_API_LEN',
+                 detail: 'api_byte_length is zero — the embedded API definition must be non-empty (Mint step 7b)' };
+    }
+    const apiWords = Math.ceil(apiLen / 4);
+    if (1 + apiWords > fsWords) {
+        return { ok: false, code: 'FS_API_OVERFLOW',
+                 detail: `api_byte_length ${apiLen} needs ${apiWords} word(s) but only ${fsWords - 1} freespace word(s) follow the content header (Mint step 7b)` };
+    }
+    // 7d (pad bytes, API region) — trailing pad bytes inside the last padded
+    // word must be zero.  Bytes are packed big-endian: byte 0 is bits [31:24].
+    const apiRem = apiLen % 4;
+    if (apiRem !== 0) {
+        const padMask = (Math.pow(2, 8 * (4 - apiRem)) - 1) >>> 0;
+        const lastApiWord = words[fsStart + apiWords] >>> 0;
+        if ((lastApiWord & padMask) !== 0) {
+            return { ok: false, code: 'FS_PAD_NONZERO',
+                     detail: `non-zero pad byte(s) in the last API word (word ${fsStart + apiWords}: 0x${lastApiWord.toString(16).toUpperCase().padStart(8, '0')}) — padding must be zero (Mint step 7d)` };
+        }
+    }
+
+    let cursor = fsStart + 1 + apiWords;   // first word after the padded API region
+    if ((flags & 0x01) !== 0) {
+        // 7c — has_source: source_byte_length word, then padded source region.
+        if (cursor >= fsEnd) {
+            return { ok: false, code: 'FS_SRC_OVERFLOW',
+                     detail: 'flags.has_source is set but no room remains for the source_byte_length word (Mint step 7c)' };
+        }
+        const srcLen = words[cursor] >>> 0;
+        if (srcLen === 0) {
+            return { ok: false, code: 'FS_SRC_LEN',
+                     detail: 'source_byte_length is zero but flags.has_source is set (Mint step 7c)' };
+        }
+        const srcWords = Math.ceil(srcLen / 4);
+        if (cursor + 1 + srcWords > fsEnd) {
+            return { ok: false, code: 'FS_SRC_OVERFLOW',
+                     detail: `source_byte_length ${srcLen} needs ${srcWords} word(s) but the source region overflows freespace (Mint step 7c)` };
+        }
+        const srcRem = srcLen % 4;
+        if (srcRem !== 0) {
+            const padMask = (Math.pow(2, 8 * (4 - srcRem)) - 1) >>> 0;
+            const lastSrcWord = words[cursor + srcWords] >>> 0;
+            if ((lastSrcWord & padMask) !== 0) {
+                return { ok: false, code: 'FS_PAD_NONZERO',
+                         detail: `non-zero pad byte(s) in the last source word (word ${cursor + srcWords}: 0x${lastSrcWord.toString(16).toUpperCase().padStart(8, '0')}) — padding must be zero (Mint step 7d)` };
+            }
+        }
+        cursor = cursor + 1 + srcWords;
+    }
+
+    // 7d — every freespace word after the last content word must be zero.
+    for (let i = cursor; i < fsEnd; i++) {
+        if ((words[i] >>> 0) !== 0) {
+            return { ok: false, code: 'FS_TAIL_NONZERO',
+                     detail: `non-zero word after the declared content region (word ${i}: 0x${(words[i] >>> 0).toString(16).toUpperCase().padStart(8, '0')}) — the freespace remainder must be zero (Mint step 7d)` };
+        }
+    }
+
+    const tier = (flags === 0x03) ? 2 : (flags === 0x01) ? 1 : 0;
+    return { ok: true, tier, contentWords: cursor - fsStart };
+}
 
 function lumpAudit(words, manifest, lineNums, opts) {
     const results = [];
@@ -199,14 +295,15 @@ function lumpAudit(words, manifest, lineNums, opts) {
         // (grows ↓ from word lumpSize-12-sw).
         //
         // Standard lumps (typ=00/01/11): freespace = words cw+1 .. lumpSize-cc-1.
+        // Data lumps (typ=01): payload lives in words 1..cw; the zone after it
+        // is freespace and must be all-zero (Mint step 7 — the 0xAB content
+        // frame is only valid for typ=lump).
         const _isThread    = (typ === 2 && cw > 0);
         const _isNamespace = (typ === 2 && cw === 0);
-        const _isData      = (typ === 1);
 
-        if (_isNamespace || _isData) {
+        if (_isNamespace) {
             // Namespace body is the NS Table — data, not freespace.  Skip RFS.
-            // Data LUMP body is programmer-defined payload — also not freespace.
-            // (No RFS result is emitted for either; the concept does not apply.)
+            // (No RFS result is emitted; the concept does not apply.)
         } else {
         let fsStart, fsEnd;
         if (_isThread) {
@@ -229,6 +326,32 @@ function lumpAudit(words, manifest, lineNums, opts) {
                     : 'No padding zone \u2014 lump is fully packed \u2713',
             });
         } else {
+            // V1.3 two-path rule (Mint validation step 7):
+            //   • typ=lump AND word[fsStart] bits [31:24] === 0xAB → validate the
+            //     self-definition content frame (flags, bounds, pad bytes, zero
+            //     remainder) per §Freespace Content and Self-Definition.
+            //   • otherwise (legacy binary, Thread collision zone, or any other
+            //     typ) → every freespace word must be zero.
+            const _fsWord0 = words[fsStart] >>> 0;
+            const _hasContentFrame = (typ === 0 && !_isThread && ((_fsWord0 >>> 24) === 0xAB));
+            if (_hasContentFrame) {
+                const _frame = lumpAuditValidateContentFrame(words, fsStart, fsEnd);
+                if (_frame.ok) {
+                    results.push({
+                        ruleId: 'RFS',
+                        severity: 'pass',
+                        message: `Freespace carries a valid 0xAB self-definition content frame (Tier ${_frame.tier}) \u2713`,
+                        detail: `Content frame occupies ${_frame.contentWords} of ${fsCount} freespace word${fsCount !== 1 ? 's' : ''} (words ${fsStart}\u2013${fsEnd - 1}); framing, bounds, pad bytes and zero remainder all pass Mint validation step 7 \u2713`,
+                    });
+                } else {
+                    results.push({
+                        ruleId: 'RFS',
+                        severity: 'error',
+                        message: `Malformed content header \u2014 the 0xAB freespace frame fails Mint validation step 7 (${_frame.code}). Mint will reject this lump.`,
+                        detail: `Malformed 0xAB content frame in the freespace zone (words ${fsStart}\u2013${fsEnd - 1}): ${_frame.detail}.`,
+                    });
+                }
+            } else {
             let dirtyWords = 0;
             let firstDirtyIdx = -1;
             let firstDirtyVal = 0;
@@ -245,16 +368,17 @@ function lumpAudit(words, manifest, lineNums, opts) {
                 results.push({
                     ruleId: 'RFS',
                     severity: 'pass',
-                    message: 'Freespace is zeroed \u2713',
+                    message: 'Freespace is zeroed (legacy binary \u2014 tolerated) \u2713',
                     detail: `${fsCount} freespace word${fsCount !== 1 ? 's' : ''} (words ${fsStart}\u2013${fsEnd - 1}) are all zero \u2713`,
                 });
             } else {
                 results.push({
                     ruleId: 'RFS',
                     severity: 'error',
-                    message: `Non-zero freespace \u2014 ${dirtyWords} unexpected word${dirtyWords !== 1 ? 's' : ''} found in the freespace zone. Mint step 7 will reject this lump.`,
-                    detail: `${dirtyWords} non-zero word${dirtyWords !== 1 ? 's' : ''} in the freespace zone (words ${fsStart}\u2013${fsEnd - 1}); first dirty word at position ${firstDirtyIdx}: 0x${firstDirtyVal.toString(16).toUpperCase().padStart(8, '0')}. All freespace words must be zero before Mint can load this lump.`,
+                    message: `Unexpected non-zero words in legacy freespace \u2014 ${dirtyWords} word${dirtyWords !== 1 ? 's' : ''} found without a 0xAB content header. Mint step 7 will reject this lump.`,
+                    detail: `${dirtyWords} non-zero word${dirtyWords !== 1 ? 's' : ''} in the freespace zone (words ${fsStart}\u2013${fsEnd - 1}); first dirty word at position ${firstDirtyIdx}: 0x${firstDirtyVal.toString(16).toUpperCase().padStart(8, '0')}. Without a valid 0xAB content header at word ${fsStart}, all freespace words must be zero (legacy rule) before Mint can load this lump.`,
                 });
+            }
             }
         }
         }  // end of if (!_isNamespace) else block

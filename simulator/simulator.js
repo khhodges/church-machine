@@ -1150,6 +1150,116 @@ class ChurchSimulator {
         return { magic, n_minus_6, lumpSize, cw, typ, cc, valid: magic === 0x1F };
     }
 
+    // ── Mint validation step 7 — freespace validation ─────────────────────────
+    // CM_LUMP_SPECIFICATION.md §Mint Validation Sequence step 7 and
+    // §Freespace Content and Self-Definition (V1.3).
+    //
+    // For typ=lump (typ===0): inspect word cw+1.
+    //   • bits [31:24] === 0xAB → validate the self-definition content frame:
+    //       7a  flags (bits [23:16]) must be 0x00 / 0x01 / 0x03
+    //       7b  api_byte_length (bits [15:0]) non-zero; API region within freespace
+    //       7c  if flags.has_source: source_byte_length non-zero; source region
+    //           within freespace
+    //       7d  pad bytes inside the last word of each padded region zero;
+    //           every freespace word after the last content word zero
+    //   • otherwise → ALL freespace words must be zero (legacy binary, tolerated).
+    // For typ=data / clist-only / Outform: all freespace words must be zero.
+    //
+    // words — full lump word array (word 0 = header); hdr — parseLumpHeader(words[0]).
+    // Returns { ok: true, tier?, legacy? } or { ok: false, code, detail } with
+    // distinct codes: FS_LEGACY_NONZERO, FS_BAD_FLAGS, FS_API_LEN,
+    // FS_API_OVERFLOW, FS_SRC_LEN, FS_SRC_OVERFLOW, FS_PAD_NONZERO, FS_TAIL_NONZERO.
+    // Thread lumps (typ=10, cw>0) use the collision-zone bounds — the heap
+    // (grows ↑ from word 17+heapWords) and stack (grows ↓) hold live state, so
+    // only the gap between them is freespace (same zone as lump-audit.js RFS).
+    // Namespace lumps (typ=10, cw=0): body IS the NS Table — no freespace scan.
+    mintStep7Freespace(words, hdr) {
+        const _isThread    = (hdr.typ === 2 && hdr.cw > 0);
+        const _isNamespace = (hdr.typ === 2 && hdr.cw === 0);
+        if (_isNamespace) return { ok: true, legacy: true };  // NS Table body — freespace concept does not apply
+        let fsStart, fsEnd;
+        if (_isThread) {
+            // Thread header reinterprets cc as heapWords and cw as stack words.
+            fsStart = 17 + hdr.cc;                 // first word after heap zone
+            fsEnd   = hdr.lumpSize - 12 - hdr.cw;  // first stack word (exclusive)
+        } else {
+            fsStart = 1 + hdr.cw;
+            fsEnd   = hdr.lumpSize - hdr.cc;
+        }
+        if (fsEnd <= fsStart) return { ok: true, legacy: true };  // fully packed — nothing to validate
+
+        const _legacyScan = () => {
+            for (let i = fsStart; i < fsEnd; i++) {
+                if ((words[i] >>> 0) !== 0) {
+                    return { ok: false, code: 'FS_LEGACY_NONZERO',
+                             detail: `unexpected non-zero word in legacy freespace at word ${i} (0x${(words[i] >>> 0).toString(16).toUpperCase().padStart(8, '0')}) — without a 0xAB content header all freespace words must be zero` };
+                }
+            }
+            return { ok: true, legacy: true };
+        };
+
+        const w0 = words[fsStart] >>> 0;
+        if (hdr.typ !== 0 || (w0 >>> 24) !== 0xAB) return _legacyScan();
+
+        // 0xAB content frame — validate framing, bounds, pad bytes, remainder.
+        const fsWords = fsEnd - fsStart;
+        const flags   = (w0 >>> 16) & 0xFF;
+        const apiLen  = w0 & 0xFFFF;
+        if (flags !== 0x00 && flags !== 0x01 && flags !== 0x03) {
+            return { ok: false, code: 'FS_BAD_FLAGS',
+                     detail: `content header flags 0x${flags.toString(16).padStart(2, '0').toUpperCase()} — only 0x00, 0x01 or 0x03 are valid (step 7a)` };
+        }
+        if (apiLen === 0) {
+            return { ok: false, code: 'FS_API_LEN', detail: 'api_byte_length is zero (step 7b)' };
+        }
+        const apiWords = Math.ceil(apiLen / 4);
+        if (1 + apiWords > fsWords) {
+            return { ok: false, code: 'FS_API_OVERFLOW',
+                     detail: `api_byte_length ${apiLen} overflows freespace (${apiWords} word(s) needed, ${fsWords - 1} available; step 7b)` };
+        }
+        const _padCheck = (lastWordIdx, byteLen) => {
+            const rem = byteLen % 4;
+            if (rem === 0) return null;
+            // Bytes are packed big-endian: pad bytes are the low (4 − rem) bytes.
+            const padMask = (Math.pow(2, 8 * (4 - rem)) - 1) >>> 0;
+            if (((words[lastWordIdx] >>> 0) & padMask) !== 0) {
+                return { ok: false, code: 'FS_PAD_NONZERO',
+                         detail: `non-zero pad byte(s) in word ${lastWordIdx} (0x${(words[lastWordIdx] >>> 0).toString(16).toUpperCase().padStart(8, '0')}; step 7d)` };
+            }
+            return null;
+        };
+        let padErr = _padCheck(fsStart + apiWords, apiLen);
+        if (padErr) return padErr;
+
+        let cursor = fsStart + 1 + apiWords;
+        if ((flags & 0x01) !== 0) {
+            if (cursor >= fsEnd) {
+                return { ok: false, code: 'FS_SRC_OVERFLOW',
+                         detail: 'flags.has_source set but no room for the source_byte_length word (step 7c)' };
+            }
+            const srcLen = words[cursor] >>> 0;
+            if (srcLen === 0) {
+                return { ok: false, code: 'FS_SRC_LEN', detail: 'source_byte_length is zero but flags.has_source is set (step 7c)' };
+            }
+            const srcWords = Math.ceil(srcLen / 4);
+            if (cursor + 1 + srcWords > fsEnd) {
+                return { ok: false, code: 'FS_SRC_OVERFLOW',
+                         detail: `source_byte_length ${srcLen} overflows freespace (step 7c)` };
+            }
+            padErr = _padCheck(cursor + srcWords, srcLen);
+            if (padErr) return padErr;
+            cursor = cursor + 1 + srcWords;
+        }
+
+        for (let i = cursor; i < fsEnd; i++) {
+            if ((words[i] >>> 0) !== 0) {
+                return { ok: false, code: 'FS_TAIL_NONZERO',
+                         detail: `non-zero word after the declared content region at word ${i} (0x${(words[i] >>> 0).toString(16).toUpperCase().padStart(8, '0')}; step 7d)` };
+            }
+        }
+        return { ok: true, tier: (flags === 0x03) ? 2 : (flags === 0x01) ? 1 : 0 };
+    }
+
     // Returns true when every non-zero word in the code region (words[1..cw])
     // has opcode 3 (RETURN) AND at least one such word exists.  Predicate:
     //   "every non-zero code word is a RETURN"
@@ -6898,6 +7008,13 @@ class ChurchSimulator {
             return false;
         }
 
+        // Mint validation step 7 — freespace validation (V1.3).
+        const _fsCheck = this.mintStep7Freespace(words, hdr);
+        if (!_fsCheck.ok) {
+            this.output += `[loadLumpBinary] ERROR: freespace validation failed (${_fsCheck.code}) — ${_fsCheck.detail}. LUMP rejected (Mint step 7).\n`;
+            return false;
+        }
+
         for (let i = 0; i < lumpSize; i++) {
             this.memory[EXTENDED_BASE + i] = (i < words.length ? words[i] : 0) >>> 0;
         }
@@ -7379,6 +7496,15 @@ class ChurchSimulator {
             this.awaitingLump = null;
             this.fault('LUMP_LAYOUT', `receiveLump: cw=${cw_check}+cc=${cc_check} >= lumpSize=${lumpSize} (layout overflow)`);
             return { ok: false, message: 'lump layout overflow' };
+        }
+
+        // Mint validation step 7 — freespace validation (V1.3).  Distinct fault
+        // identifiers per reject path (LUMP_FS_<code>) so tests can tell them apart.
+        const _fsCheck = this.mintStep7Freespace(lumpPayload, hdr);
+        if (!_fsCheck.ok) {
+            this.awaitingLump = null;
+            this.fault('LUMP_' + _fsCheck.code, `receiveLump: freespace validation failed for Slot ${nsIndex} — ${_fsCheck.detail} (Mint step 7)`);
+            return { ok: false, message: 'freespace validation failed (' + _fsCheck.code + ')' };
         }
 
         // Find the next aligned free slot (above all resident NS lumps).

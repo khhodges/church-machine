@@ -530,23 +530,32 @@ console.log('\nTest 36: Data lump (typ=01) with cw=0, cc=0 — RB1 pass');
     assert(!lumpAuditHasErrors(results), 'no errors');
 }
 
-// ─── Test 37: Data lump (typ=01) with non-zero body — no RFS error ───────
-// Data LUMP body is programmer-defined payload, not freespace.
-// Non-zero body words must NOT trigger RFS error in JS audit.
-console.log('\nTest 37: Data lump (typ=01) with non-zero body — RFS skipped (no error)');
+// ─── Test 37: Data lump (typ=01) — payload within cw passes, dirty freespace errors ───
+// V1.3 (Mint step 7): data-lump payload lives in words 1..cw; the zone after
+// it (cw+1..lumpSize-cc-1) is freespace and must be all-zero. The 0xAB content
+// frame is only valid for typ=lump, so data lumps always use the all-zero rule.
+console.log('\nTest 37: Data lump (typ=01) — RFS all-zero rule applies to freespace after cw');
 {
     const lumpSize = 64;
-    const words = new Array(lumpSize).fill(0);
-    words[0] = buildHeader({ nMinus6: 0, cw: 0, typ: 1, cc: 0 });
-    // Non-zero data payload at several body offsets
-    words[1]  = 0xDEADBEEF;
-    words[15] = 0xCAFEBABE;
-    words[30] = 0x12345678;
-    const results = lumpAudit(words, null);
-    // RFS must NOT emit an error for data LUMP payload
-    const rfs = results.find(r => r.ruleId === 'RFS');
-    assert(!rfs || rfs.severity !== 'error', 'RFS does not error on data LUMP payload');
-    assert(!lumpAuditHasErrors(results), 'no errors overall');
+    // (a) Payload contained within cw — RFS passes.
+    const okWords = new Array(lumpSize).fill(0);
+    okWords[0] = buildHeader({ nMinus6: 0, cw: 30, typ: 1, cc: 0 });
+    okWords[1]  = 0xDEADBEEF;
+    okWords[15] = 0xCAFEBABE;
+    okWords[30] = 0x12345678;
+    const okResults = lumpAudit(okWords, null);
+    const okRfs = okResults.find(r => r.ruleId === 'RFS');
+    assert(okRfs && okRfs.severity === 'pass', 'RFS pass: data payload within cw, freespace zeroed');
+
+    // (b) Non-zero word beyond cw (in freespace) — RFS errors (Mint parity).
+    const badWords = new Array(lumpSize).fill(0);
+    badWords[0] = buildHeader({ nMinus6: 0, cw: 10, typ: 1, cc: 0 });
+    badWords[1]  = 0xDEADBEEF;
+    badWords[30] = 0x12345678;   // beyond cw=10 → freespace → must be zero
+    const badResults = lumpAudit(badWords, null);
+    assertRule(badResults, 'RFS', 'error', 'RFS error: data lump with non-zero freespace after cw');
+    const badRfs = badResults.find(r => r.ruleId === 'RFS');
+    assert(badRfs.message.includes('legacy freespace'), 'data-lump rejection uses the legacy all-zero message');
 }
 
 // ─── Test 38: Thread with RETURN-shaped DR values — no RSM result ────────
@@ -622,6 +631,121 @@ console.log('\nTest 27: RGT error (spare bit 26 = 1, violates spec v1.2)');
     assert(rgt.detail.includes('bit 26'), 'detail mentions bit 26');
     assert(rgt.detail.includes('0x04000001'.toUpperCase()) ||
            rgt.detail.includes('04000001'), 'detail includes the offending GT word');
+}
+
+// ─── V1.3 freespace content-frame tests (Mint step 7 / RFS two-path) ──────
+// Frame builder: lumpSize=64, cw=2, cc=1 → freespace words 3..62 (fsStart=3).
+function makeFrameLump({ flags = 0x00, apiLen = 10, apiPad = 0, srcLen = 0, srcPad = 0 } = {}) {
+    const words = makeWellFormed({ cw: 2, cc: 1, nMinus6: 0 });
+    const fsStart = 3;
+    words[fsStart] = ((0xAB << 24) | ((flags & 0xFF) << 16) | (apiLen & 0xFFFF)) >>> 0;
+    const apiWords = Math.ceil(apiLen / 4);
+    for (let i = 0; i < apiWords; i++) words[fsStart + 1 + i] = 0x41414141;  // "AAAA"
+    // Zero the pad bytes in the last API word (big-endian packing).
+    const apiRem = apiLen % 4;
+    if (apiRem !== 0) {
+        const padMask = (Math.pow(2, 8 * (4 - apiRem)) - 1) >>> 0;
+        words[fsStart + apiWords] = ((0x41414141 & ~padMask) | apiPad) >>> 0;
+    }
+    let cursor = fsStart + 1 + apiWords;
+    if ((flags & 0x01) !== 0 && srcLen > 0) {
+        words[cursor] = srcLen >>> 0;
+        const srcWords = Math.ceil(srcLen / 4);
+        for (let i = 0; i < srcWords; i++) words[cursor + 1 + i] = 0x42424242;  // "BBBB"
+        const srcRem = srcLen % 4;
+        if (srcRem !== 0) {
+            const padMask = (Math.pow(2, 8 * (4 - srcRem)) - 1) >>> 0;
+            words[cursor + srcWords] = ((0x42424242 & ~padMask) | srcPad) >>> 0;
+        }
+        cursor = cursor + 1 + srcWords;
+    }
+    return { words, cursor };
+}
+
+console.log('\nTest 40: Valid Tier 0 content frame (0xAB, flags=0x00) — RFS pass');
+{
+    const { words } = makeFrameLump({ flags: 0x00, apiLen: 10 });
+    const results = lumpAudit(words, null);
+    assertRule(results, 'RFS', 'pass', 'RFS pass: Tier 0 frame');
+    const rfs = results.find(r => r.ruleId === 'RFS');
+    assert(rfs.message.includes('Tier 0'), 'message identifies Tier 0');
+    assert(!lumpAuditHasErrors(results), 'no errors');
+}
+
+console.log('\nTest 41: Valid Tier 1 content frame (flags=0x01, source present) — RFS pass');
+{
+    const { words } = makeFrameLump({ flags: 0x01, apiLen: 12, srcLen: 7 });
+    const results = lumpAudit(words, null);
+    assertRule(results, 'RFS', 'pass', 'RFS pass: Tier 1 frame');
+    const rfs = results.find(r => r.ruleId === 'RFS');
+    assert(rfs.message.includes('Tier 1'), 'message identifies Tier 1');
+}
+
+console.log('\nTest 42: Valid Tier 2 content frame (flags=0x03) — RFS pass');
+{
+    const { words } = makeFrameLump({ flags: 0x03, apiLen: 9, srcLen: 16 });
+    const results = lumpAudit(words, null);
+    assertRule(results, 'RFS', 'pass', 'RFS pass: Tier 2 frame');
+    const rfs = results.find(r => r.ruleId === 'RFS');
+    assert(rfs.message.includes('Tier 2'), 'message identifies Tier 2');
+}
+
+console.log('\nTest 43: All-zero freespace (legacy) — RFS pass');
+{
+    const words = makeWellFormed({ cw: 2, cc: 1, nMinus6: 0 });
+    const results = lumpAudit(words, null);
+    assertRule(results, 'RFS', 'pass', 'RFS pass: legacy all-zero freespace');
+}
+
+console.log('\nTest 44: 0xAB frame with invalid flags=0x02 — RFS error (malformed header)');
+{
+    const { words } = makeFrameLump({ flags: 0x02, apiLen: 10 });
+    const results = lumpAudit(words, null);
+    assertRule(results, 'RFS', 'error', 'RFS error: flags=0x02');
+    const rfs = results.find(r => r.ruleId === 'RFS');
+    assert(rfs.message.includes('Malformed content header'), 'message says malformed content header');
+    assert(rfs.message.includes('FS_BAD_FLAGS'), 'message carries FS_BAD_FLAGS code');
+}
+
+console.log('\nTest 45: 0xAB frame with overflowing api_byte_length — RFS error');
+{
+    const words = makeWellFormed({ cw: 2, cc: 1, nMinus6: 0 });
+    words[3] = ((0xAB << 24) | (0x00 << 16) | 0xFFFF) >>> 0;  // 65535 bytes >> 59 free words
+    const results = lumpAudit(words, null);
+    assertRule(results, 'RFS', 'error', 'RFS error: api_byte_length overflow');
+    const rfs = results.find(r => r.ruleId === 'RFS');
+    assert(rfs.message.includes('Malformed content header'), 'message says malformed content header');
+    assert(rfs.message.includes('FS_API_OVERFLOW'), 'message carries FS_API_OVERFLOW code');
+}
+
+console.log('\nTest 46: Valid frame + non-zero word after content — RFS error');
+{
+    const { words, cursor } = makeFrameLump({ flags: 0x00, apiLen: 10 });
+    words[cursor + 2] = 0x12345678;  // dirty remainder word
+    const results = lumpAudit(words, null);
+    assertRule(results, 'RFS', 'error', 'RFS error: non-zero remainder after content');
+    const rfs = results.find(r => r.ruleId === 'RFS');
+    assert(rfs.message.includes('FS_TAIL_NONZERO'), 'message carries FS_TAIL_NONZERO code');
+}
+
+console.log('\nTest 47: Non-0xAB non-zero freespace word — RFS error (legacy rule)');
+{
+    const words = makeWellFormed({ cw: 2, cc: 1, nMinus6: 0 });
+    words[3] = 0xDEADBEEF;  // bits[31:24]=0xDE ≠ 0xAB → legacy rule applies
+    const results = lumpAudit(words, null);
+    assertRule(results, 'RFS', 'error', 'RFS error: legacy non-zero freespace');
+    const rfs = results.find(r => r.ruleId === 'RFS');
+    assert(rfs.message.includes('legacy freespace'), 'message says legacy freespace');
+    assert(!rfs.message.includes('Malformed content header'), 'legacy message distinct from malformed-header message');
+}
+
+console.log('\nTest 48: 0xAB frame with non-zero pad byte in last API word — RFS error');
+{
+    const { words } = makeFrameLump({ flags: 0x00, apiLen: 10, apiPad: 0x01 });  // 10 % 4 = 2 → 2 pad bytes
+    const results = lumpAudit(words, null);
+    assertRule(results, 'RFS', 'error', 'RFS error: non-zero pad byte');
+    const rfs = results.find(r => r.ruleId === 'RFS');
+    assert(rfs.message.includes('FS_PAD_NONZERO'), 'message carries FS_PAD_NONZERO code');
 }
 
 // ─── Summary ─────────────────────────────────────────────────────────────

@@ -1101,6 +1101,185 @@ console.log('\n--- LLB-19: Truncated buffer (header says 64 words, buffer has 32
         `output: "${sim.output.slice(0, 200)}"`);
 }
 
+// ── LLB-20: Mint step 7 — 0xAB freespace content frames (V1.3) ────────────────
+// loadLumpBinary must accept valid 0xAB content frames (Tier 0/1/2) and legacy
+// all-zero freespace, and reject malformed frames / dirty legacy freespace with
+// distinct codes.  receiveLump must apply the same rule with LUMP_FS_* faults.
+{
+    console.log('\nLLB-20: Mint step 7 freespace validation (loadLumpBinary + receiveLump)');
+    const CW = 2, CC = 1, FS_START = 3;   // 64-word lump: freespace = words 3..62
+
+    // Build a 64-word typ=lump array with a 0xAB content frame in freespace.
+    function makeFrameWords({ flags = 0x00, apiLen = 10, srcLen = 0 } = {}) {
+        const words = new Array(64).fill(0);
+        words[0] = makeHdr(CW, CC, 0);
+        words[1] = 0x01000000;
+        words[FS_START] = ((0xAB << 24) | ((flags & 0xFF) << 16) | (apiLen & 0xFFFF)) >>> 0;
+        const apiWords = Math.ceil(apiLen / 4);
+        for (let i = 0; i < apiWords; i++) words[FS_START + 1 + i] = 0x41414141;
+        const apiRem = apiLen % 4;
+        if (apiRem !== 0) {
+            const padMask = (Math.pow(2, 8 * (4 - apiRem)) - 1) >>> 0;
+            words[FS_START + apiWords] = (0x41414141 & ~padMask) >>> 0;
+        }
+        let cursor = FS_START + 1 + apiWords;
+        if ((flags & 0x01) !== 0 && srcLen > 0) {
+            words[cursor] = srcLen >>> 0;
+            const srcWords = Math.ceil(srcLen / 4);
+            for (let i = 0; i < srcWords; i++) words[cursor + 1 + i] = 0x42424242;
+            const srcRem = srcLen % 4;
+            if (srcRem !== 0) {
+                const padMask = (Math.pow(2, 8 * (4 - srcRem)) - 1) >>> 0;
+                words[cursor + srcWords] = (0x42424242 & ~padMask) >>> 0;
+            }
+            cursor = cursor + 1 + srcWords;
+        }
+        return { words, cursor };
+    }
+
+    function freshSim() {
+        const sim = new ChurchSimulator();
+        sim.bootComplete = true;
+        const nsBase = sim._nsSlotBase(sim.bootEntrySlot);
+        sim.memory[nsBase + 0] = 0x80;
+        sim.memory[nsBase + 1] = sim.packNSWord1(64, 0, 0, 0, 0);
+        sim.memory[nsBase + 2] = sim.makeVersionSeals(5, 0x80, 64);
+        sim.cr[14] = {
+            word0: sim.createGT(5, sim.bootEntrySlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1),
+            word1: 0x80, word2: sim.memory[nsBase + 1], word3: sim.memory[nsBase + 2], m: 0,
+        };
+        sim.cr[12] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
+        return sim;
+    }
+
+    // ── loadLumpBinary acceptance ────────────────────────────────────────────
+    check('LLB-20a: loadLumpBinary accepts Tier 0 frame (flags=0x00)',
+        freshSim().loadLumpBinary(makeFrameWords({ flags: 0x00, apiLen: 10 }).words) === true);
+    check('LLB-20b: loadLumpBinary accepts Tier 1 frame (flags=0x01 + source)',
+        freshSim().loadLumpBinary(makeFrameWords({ flags: 0x01, apiLen: 12, srcLen: 7 }).words) === true);
+    check('LLB-20c: loadLumpBinary accepts Tier 2 frame (flags=0x03 + source)',
+        freshSim().loadLumpBinary(makeFrameWords({ flags: 0x03, apiLen: 9, srcLen: 16 }).words) === true);
+
+    // ── loadLumpBinary rejection (distinct codes in output) ─────────────────
+    {
+        const sim = freshSim();
+        const ok = sim.loadLumpBinary(makeFrameWords({ flags: 0x02, apiLen: 10 }).words);
+        check('LLB-20d: loadLumpBinary rejects flags=0x02 (FS_BAD_FLAGS)',
+            ok === false && sim.output.includes('FS_BAD_FLAGS'), sim.output.slice(-200));
+    }
+    {
+        const sim = freshSim();
+        const words = new Array(64).fill(0);
+        words[0] = makeHdr(CW, CC, 0);
+        words[1] = 0x01000000;
+        words[FS_START] = ((0xAB << 24) | 0xFFFF) >>> 0;   // api_byte_length overflows
+        const ok = sim.loadLumpBinary(words);
+        check('LLB-20e: loadLumpBinary rejects api_byte_length overflow (FS_API_OVERFLOW)',
+            ok === false && sim.output.includes('FS_API_OVERFLOW'), sim.output.slice(-200));
+    }
+    {
+        const sim = freshSim();
+        const { words, cursor } = makeFrameWords({ flags: 0x00, apiLen: 10 });
+        words[cursor + 1] = 0x12345678;   // dirty remainder after content
+        const ok = sim.loadLumpBinary(words);
+        check('LLB-20f: loadLumpBinary rejects non-zero remainder (FS_TAIL_NONZERO)',
+            ok === false && sim.output.includes('FS_TAIL_NONZERO'), sim.output.slice(-200));
+    }
+    {
+        const sim = freshSim();
+        const words = new Array(64).fill(0);
+        words[0] = makeHdr(CW, CC, 0);
+        words[1] = 0x01000000;
+        words[FS_START] = 0xDEADBEEF;     // non-0xAB non-zero → legacy rule
+        const ok = sim.loadLumpBinary(words);
+        check('LLB-20g: loadLumpBinary rejects dirty legacy freespace (FS_LEGACY_NONZERO)',
+            ok === false && sim.output.includes('FS_LEGACY_NONZERO'), sim.output.slice(-200));
+    }
+    // ── Mint parity: non-lump typ never accepts a 0xAB frame ────────────────
+    {
+        const sim = freshSim();
+        const hdr = sim.parseLumpHeader(((0x1F << 27) | (0 << 23) | (2 << 10) | (1 << 8) | 0) >>> 0); // typ=data
+        const words = new Array(64).fill(0);
+        words[0] = ((0x1F << 27) | (0 << 23) | (2 << 10) | (1 << 8) | 0) >>> 0;
+        words[FS_START] = ((0xAB << 24) | (0x00 << 16) | 10) >>> 0;   // frame-shaped word
+        for (let i = 0; i < 3; i++) words[FS_START + 1 + i] = 0x41414100;
+        const res = sim.mintStep7Freespace(words, hdr);
+        check('LLB-20h: mintStep7Freespace rejects 0xAB frame in typ=data lump (FS_LEGACY_NONZERO)',
+            res.ok === false && res.code === 'FS_LEGACY_NONZERO', JSON.stringify(res));
+    }
+
+    // ── Thread lumps (typ=10, cw>0): collision-zone bounds, not generic ─────
+    // 256-word Thread: heapWords(cc)=8, stackWords(cw)=4 → collision zone is
+    // words 25..239 (17+8 .. 256-12-4-1).  Live DR/heap/stack/caps state is
+    // non-zero and must NOT be scanned as freespace.
+    function makeThreadWords({ dirtyCollisionZone = false } = {}) {
+        const lumpSize = 256;
+        const heapWords = 8, stackWords = 4;
+        const words = new Array(lumpSize).fill(0);
+        words[0] = makeHdr(stackWords, heapWords, 2, 2);   // typ=2 (clist-only/Thread), cw=stack, cc=heap
+        for (let i = 1; i <= 16; i++) words[i] = 0x11110000 + i;             // DR0..DR15 live values
+        for (let i = 17; i < 17 + heapWords; i++) words[i] = 0x22220000 + i; // heap state
+        for (let i = lumpSize - 12 - stackWords; i < lumpSize - 12; i++) words[i] = 0x33330000 + i; // stack
+        for (let i = lumpSize - 12; i < lumpSize; i++) words[i] = 0x4A000006; // caps zone GTs
+        if (dirtyCollisionZone) words[100] = 0xBADC0DE1;   // inside collision zone
+        return words;
+    }
+    {
+        const sim = freshSim();
+        const hdr = sim.parseLumpHeader(makeHdr(4, 8, 2, 2));
+        const okRes = sim.mintStep7Freespace(makeThreadWords(), hdr);
+        check('LLB-20l: mintStep7Freespace accepts Thread with live heap/stack/caps and zero collision zone',
+            okRes.ok === true, JSON.stringify(okRes));
+        const badRes = sim.mintStep7Freespace(makeThreadWords({ dirtyCollisionZone: true }), hdr);
+        check('LLB-20m: mintStep7Freespace rejects Thread with non-zero collision-zone word (FS_LEGACY_NONZERO)',
+            badRes.ok === false && badRes.code === 'FS_LEGACY_NONZERO', JSON.stringify(badRes));
+    }
+    {
+        // loadLumpBinary end-to-end with the valid Thread binary — must not be
+        // rejected by the step-7 gate (the collision zone is the only freespace).
+        const sim = freshSim();
+        const ok = sim.loadLumpBinary(makeThreadWords());
+        check('LLB-20n: loadLumpBinary accepts a valid Thread lump with live state',
+            ok === true, sim.output.slice(-200));
+    }
+
+    // ── receiveLump: same rule, distinct LUMP_FS_* faults ────────────────────
+    function receive(payloadWords) {
+        const sim = new ChurchSimulator();
+        sim.bootComplete = true;
+        sim.awaitingLump = { nsIndex: 20, retryPC: 7 };
+        const crc = sim._crc32Words(payloadWords);
+        return { sim, res: sim.receiveLump([crc, ...payloadWords]) };
+    }
+    {
+        const { res } = receive(makeFrameWords({ flags: 0x00, apiLen: 10 }).words);
+        check('LLB-20i: receiveLump accepts a valid Tier 0 frame', res.ok === true, JSON.stringify(res));
+    }
+    {
+        const { res } = receive(makeThreadWords());
+        check('LLB-20o: receiveLump accepts a valid Thread lump with live state (collision zone zero)',
+            res.ok === true, JSON.stringify(res));
+    }
+    {
+        const { sim, res } = receive(makeFrameWords({ flags: 0x02, apiLen: 10 }).words);
+        check('LLB-20j: receiveLump rejects flags=0x02 with LUMP_FS_BAD_FLAGS fault',
+            res.ok === false && res.message.includes('FS_BAD_FLAGS')
+            && sim.faultLog.some(f => (f.type || f.code) === 'LUMP_FS_BAD_FLAGS'),
+            JSON.stringify(res));
+    }
+    {
+        const words = new Array(64).fill(0);
+        words[0] = makeHdr(CW, CC, 0);
+        words[1] = 0x01000000;
+        words[FS_START] = 0xDEADBEEF;
+        const { sim, res } = receive(words);
+        check('LLB-20k: receiveLump rejects dirty legacy freespace with LUMP_FS_LEGACY_NONZERO fault',
+            res.ok === false && res.message.includes('FS_LEGACY_NONZERO')
+            && sim.faultLog.some(f => (f.type || f.code) === 'LUMP_FS_LEGACY_NONZERO'),
+            JSON.stringify(res));
+    }
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log('\n══════════════════════════════════════');
 console.log(`Results: ${pass} passed, ${fail} failed`);
