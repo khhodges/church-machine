@@ -1654,7 +1654,7 @@
     "ns_slot": 7,
     "ns_slot_policy": "static",
     "boot_resident": true,
-    "variant_group": null,
+    "variant_group": "compiled_wukongcallhome",
     "lump_size": 64,
     "cw": 3,
     "cc": 2,
@@ -1920,5 +1920,28 @@
     "issue_n": 1,
     "ns_slot": 6,
     "ns_slot_policy": "static"
+  },
+  {
+    "token": "00000700",
+    "abstraction": "WukongCallHome",
+    "filename": "WukongCallHome.1.78f1c4e0.lump",
+    "sidecar_file": "WukongCallHome.1.78f1c4e0.json",
+    "lump_size": 128,
+    "cw": 73,
+    "cc": 2,
+    "author": "",
+    "version": "",
+    "lump_version": 1,
+    "compiled_at": 1787095393.9806204,
+    "methods": [],
+    "grants": [
+      "E"
+    ],
+    "binary_hash": "386399a134b7405b7915958d9333a1320fbd1af6c710f1f13c30baa70cc56725",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "b2c8f3d7d7e755f24ac3ab22726514cfaa9a604d037ab661891c198a0f5d8b90",
+    "dot_name": "WukongCallHome",
+    "issue_n": 1
   }
 ]

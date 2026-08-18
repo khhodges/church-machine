@@ -5177,15 +5177,12 @@ async function _saveLumpDirectVersion(token, lump, btn) {
 }
 window._saveLumpDirectVersion = _saveLumpDirectVersion;
 
-// ── editorSaveLump — unified handler for the hamburger "Save Lump" item ──────
-// Always accessible regardless of editor state.  Priority order:
-//   1. Fresh compiled words in LumpRegistry → showFormatLump() (Step 1 of 2:
-//      shows header, capabilities, version history, and audit before the
-//      slot/permissions dialog).
-//   2. A server-persisted LUMP is open (set by openLumpInEditor) → save a new
-//      dated version of that LUMP without requiring a recompile.
-//   3. Nothing compiled and no open LUMP → trigger a compile so the user ends
-//      up in state 1 on the next click.
+// ── editorSaveLump — unified handler for the static "Save Lump" toolbar button ──
+// Always builds a brand-new LUMP from the compiler output following the v1.3
+// spec.  Prior server binaries with the same name are never reused.
+//   • Compiled words in LumpRegistry → showFormatLump() (build + audit + save).
+//   • No compiled words → trigger smartCompile() so the user ends up in the
+//     first state on the next click.
 window.editorSaveLump = function() {
     var _regMem = window.LumpRegistry
         ? (window.LumpRegistry.resolve(window.LumpRegistry.getCurrent()) || {}).sources
@@ -5194,11 +5191,8 @@ window.editorSaveLump = function() {
                                && _regMem.memory.words.length > 0);
     if (_hasCompiledWords) {
         if (typeof showFormatLump === 'function') showFormatLump();
-    } else if (window._editorOpenLumpToken && window._editorOpenLumpMeta) {
-        _saveLumpDirectVersion(window._editorOpenLumpToken,
-                               window._editorOpenLumpMeta, null);
     } else {
-        // No compiled words and no open LUMP — trigger compile first.
+        // Nothing compiled yet — trigger compile so the user gets fresh words.
         if (typeof smartCompile === 'function') smartCompile();
     }
 };
@@ -5316,6 +5310,102 @@ window.showFormatLump = function() {
     _svBinary[0] = _svHdr;
     for (var _i = 0; _i < _svCW; _i++) _svBinary[1 + _i] = (_svWords[_i] >>> 0);
     // c-list slots left as zeros — server injects the self-GT into slot 0.
+
+    // ── Embed V1.3 0xAB self-definition content frame ────────────────────────
+    // The frame lives at word cw+1 (first freespace word).  Build API JSON
+    // (never include token/issue — circular hash rule) and embed the current
+    // editor source so the binary is self-defining (Tier 2).
+    // Spec: lump-audit.js lumpAuditValidateContentFrame(), CM_LUMP_SPECIFICATION §Freespace.
+    (function _embedV13Frame() {
+        // UTF-8 encode a string to a byte array (big-endian word-packed later).
+        function _utf8Bytes(s) {
+            if (typeof TextEncoder !== 'undefined') {
+                return Array.from(new TextEncoder().encode(String(s)));
+            }
+            var out = [];
+            for (var _ci = 0; _ci < s.length; _ci++) {
+                var _ch = s.charCodeAt(_ci);
+                if (_ch < 0x80)       { out.push(_ch); }
+                else if (_ch < 0x800) { out.push(0xC0 | (_ch >> 6)); out.push(0x80 | (_ch & 0x3F)); }
+                else                  { out.push(0xE0 | (_ch >> 12)); out.push(0x80 | ((_ch >> 6) & 0x3F)); out.push(0x80 | (_ch & 0x3F)); }
+            }
+            return out;
+        }
+        // Pack a byte array big-endian into a word array (last word zero-padded).
+        function _packBE(bytes) {
+            var nw = Math.ceil(bytes.length / 4);
+            var ws = new Array(nw).fill(0);
+            for (var _bi = 0; _bi < bytes.length; _bi++) {
+                ws[_bi >> 2] = (ws[_bi >> 2] | (bytes[_bi] << (24 - (_bi & 3) * 8))) >>> 0;
+            }
+            return ws;
+        }
+
+        // Build API JSON — name + language + cap names only (no token/issue).
+        var _capNames = _caps.map(function(c) {
+            return (c && c.name) ? c.name : (typeof c === 'string' && c ? c : null);
+        }).filter(Boolean);
+        var _apiObj = { name: _absName || '', language:
+            (typeof sim !== 'undefined' && sim && sim._lastCompiledLanguage) || 'assembly' };
+        if (_capNames.length > 0) _apiObj.caps = _capNames;
+        var _apiBytes = _utf8Bytes(JSON.stringify(_apiObj));
+        var _apiWds   = _packBE(_apiBytes);
+
+        // Source text — editor content (Tier 2); fall back to Tier 0 if empty.
+        var _srcEl    = document.getElementById('asmEditor');
+        var _srcText  = _srcEl ? (_srcEl.value || '').trim() : '';
+        var _srcBytes = _srcText ? _utf8Bytes(_srcText) : null;
+        var _srcWds   = _srcBytes ? _packBE(_srcBytes) : null;
+
+        // Frame size: 1 header + apiWords [+ 1 srcLen + srcWords]
+        var _fsStart = 1 + _svCW;
+        var _fsEnd0  = _svLumpSize - _svCC;          // initial freespace end
+
+        var _flags, _frameWds;
+        var _t2Size = 1 + _apiWds.length + (_srcWds ? 1 + _srcWds.length : 0);
+        var _t0Size = 1 + _apiWds.length;
+
+        // Grow the lump binary if the frame doesn't fit at the current size.
+        function _grow(neededFsWords) {
+            while ((_svLumpSize - _svCC - _fsStart) < neededFsWords) {
+                _svLumpSize = _svLumpSize << 1;
+            }
+            // Rebuild with new size.
+            _svBinary.length = 0;
+            for (var _gi = 0; _gi < _svLumpSize; _gi++) _svBinary.push(0);
+            _svBinary[0] = _svHdr; // will be updated below after nm6 recalc
+            for (var _wi = 0; _wi < _svCW; _wi++) _svBinary[1 + _wi] = (_svWords[_wi] >>> 0);
+        }
+
+        if (_srcWds && _t2Size <= (_fsEnd0 - _fsStart)) {
+            _flags = 0x03; _frameWds = [null].concat(_apiWds, [_srcBytes.length >>> 0], _srcWds);
+        } else if (_srcWds) {
+            _grow(_t2Size);
+            _flags = 0x03; _frameWds = [null].concat(_apiWds, [_srcBytes.length >>> 0], _srcWds);
+        } else if (_t0Size <= (_fsEnd0 - _fsStart)) {
+            _flags = 0x00; _frameWds = [null].concat(_apiWds);
+        } else {
+            _grow(_t0Size);
+            _flags = 0x00; _frameWds = [null].concat(_apiWds);
+        }
+
+        // Recompute header if lump size changed (nm6 encodes log₂(lumpSize/64)).
+        _svNm6 = 0;
+        while ((64 << _svNm6) < _svLumpSize) _svNm6++;
+        _svHdr = (((0x1F & 0x1F) << 27) |
+                  ((_svNm6 & 0x0F)  << 23) |
+                  ((_svCW  & 0x1FFF) << 10) |
+                  ((0 & 0x03) << 8) |
+                  (_svCC & 0xFF)) >>> 0;
+        _svBinary[0] = _svHdr;
+
+        // Write frame header then data words into freespace.
+        _frameWds[0] = ((0xAB << 24) | (_flags << 16) | (_apiBytes.length & 0xFFFF)) >>> 0;
+        for (var _fi = 0; _fi < _frameWds.length; _fi++) {
+            _svBinary[_fsStart + _fi] = _frameWds[_fi] >>> 0;
+        }
+    })();
+    // ─────────────────────────────────────────────────────────────────────────
 
     // Store for Step 2 so confirmSaveToNamespace() does not rebuild.
     // registeredAt is captured now so Step 2 can verify nothing was recompiled
