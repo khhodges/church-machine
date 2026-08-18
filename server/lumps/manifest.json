@@ -1,44 +1,5 @@
 [
   {
-    "token": "00000600",
-    "abstraction": "SelfTest",
-    "ns_slot": 6,
-    "ns_slot_policy": "static",
-    "boot_resident": true,
-    "lump_size": 512,
-    "cw": 416,
-    "cc": 2,
-    "grants": [
-      "E"
-    ],
-    "language": "ISA",
-    "author": "Church Machine",
-    "version": "1.2",
-    "lump_version": 76,
-    "status": "released",
-    "description": "SelfTest (a.k.a. Boot.Abstr) \u2014 the lump executed by the hardware ROM during boot phases B:01-B:07.",
-    "source": "simulator/examples/post_flash_selftest.cloomc",
-    "dot_name": "SelfTest",
-    "issue_n": 1,
-    "filename": "SelfTest.1.30542a6d.lump",
-    "sidecar_file": "SelfTest.1.30542a6d.json",
-    "binary_hash": "40ae9a9efe1bb1fbbe2c6be234a7996fe3dcb2511e6a87916c6a75c1d0714dbd",
-    "capabilities": [
-      {
-        "name": "SelfTest",
-        "rights": [
-          "E"
-        ]
-      },
-      {
-        "name": "Next",
-        "rights": [
-          "E"
-        ]
-      }
-    ]
-  },
-  {
     "token": "00001200",
     "abstraction": "Constants",
     "ns_slot": 9,
@@ -1934,6 +1895,29 @@
     "issue_number": 1,
     "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
     "dot_name": "CapabilityTest",
+    "issue_n": 1
+  },
+  {
+    "token": "00000600",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.1.d4f13015.lump",
+    "sidecar_file": "SelfTest.1.d4f13015.json",
+    "lump_size": 512,
+    "cw": 416,
+    "cc": 2,
+    "author": "Church Machine",
+    "version": "1.2",
+    "lump_version": 77,
+    "compiled_at": 1787051349.9427254,
+    "methods": [],
+    "grants": [
+      "E"
+    ],
+    "binary_hash": "16bc7ef5b8d0262cac35b38cf970dfe6c3b6ad5c301d1eaeeda6b031ffa81c7b",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25",
+    "dot_name": "SelfTest",
     "issue_n": 1
   }
 ]
