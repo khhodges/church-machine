@@ -1508,8 +1508,8 @@ All lump-related HTTP endpoints are served by the Flask backend (`server/app.py`
 ## Lump Audit Rules
 
 The audit system (`simulator/lump-audit.js`) runs structural consistency checks on LUMP
-binaries. Invoked from the **Audit** button in the IDE detail-panel header strip, and from
-the `lump-consistency` CI workflow.
+binaries. Invoked from the **Audit** button in the IDE detail-panel header strip and by
+its direct test consumers.
 
 The auditor operates in two modes:
 
@@ -1533,6 +1533,120 @@ The auditor operates in two modes:
 Failures at R0–RFS are hard errors; RMC–RPN are reported as warnings that block merge
 (enforced by `tests/lump/test_lump_consistency.py` — 11 rules, R1–R11 in that file). RSM is
 advisory only.
+
+---
+
+## Developer Tooling
+
+The scripts below are the supported workflow for rebuilding and validating `.lump`
+binaries and keeping example sources in sync. (Source reference: `docs/lump-tooling.md`.)
+
+> **Token discovery.** Tokens are discovered via `server/lumps/manifest.json`;
+> do not maintain a separate token table in documentation. Where an older
+> document (including `docs/lump-tooling.md`) carries a static token/source
+> table, this specification supersedes it — such tables go stale and must
+> not be relied on.
+
+### `scripts/update-lump.js` — one-command LUMP rebuild
+
+Changing a lump requires assembling the `.cloomc` source, writing the binary, updating the
+sidecar JSON, and patching `manifest.json` — all in one commit, or the consistency gate
+rejects the merge. `update-lump.js` wraps the entire sequence into a single command.
+
+**Invocation:**
+
+```bash
+node scripts/update-lump.js --token <hex>           # rebuild lump
+node scripts/update-lump.js --token <hex> --check   # drift check (no writes)
+make update-lump TOKEN=<hex>                        # Makefile shorthand
+```
+
+**Inputs read:**
+
+1. The manifest entry for `<token>` in `server/lumps/manifest.json`.
+2. The `.cloomc` source, discovered in this order:
+   1. the manifest entry's `"source"` field (explicit path relative to repo root)
+   2. `simulator/examples/<token>.cloomc`
+   3. `simulator/examples/<normalised-abstraction>.cloomc`
+   4. `server/lumps/<token>.cloomc`
+3. The existing `.lump` binary — its c-list GT words (the `cc` tail entries) are extracted
+   and preserved unchanged in the rebuilt binary; only the code words change. On a first
+   build with no existing binary, the c-list is initialised to all zeros.
+
+**Scope of assembly.** The script assembles with `ChurchAssembler` — it handles
+assembler-level `.cloomc` sources only. Sources written in higher-level CLOOMC++
+constructs require the CLOOMC compiler and are not rebuildable by this script even if a
+manifest `"source"` field points at them; assembly fails with an error and nothing is
+written. Lumps with no discoverable `.cloomc` source (binary-only data lumps,
+hardware-compiled binaries) are likewise out of scope; adding a `"source"` field to the
+manifest entry enables rebuild only when that source is assembler-level.
+
+**Outputs written (on success):**
+
+- the rebuilt `.lump` binary (header + new code words + zero pad + preserved c-list)
+- the sidecar JSON — `cw` / `cc` / `lump_size` fields only; all other fields preserved
+- the matching `manifest.json` entry — same three fields
+
+On success it prints `Updated <token>: cw=N cc=N lump_size=N` and exits 0. Any failure
+detected before the write phase (missing token, undiscoverable source, assembly error,
+oversized code) exits non-zero with a clear message and writes nothing. The writes
+themselves are sequential (binary, then sidecar, then manifest), not transactional; if a
+write fails partway, re-run the script — a rebuild is idempotent — or run `--check` plus
+the consistency gate to confirm the three files agree.
+
+**Flags:** `--token <hex>` (required) selects the lump. `--check` assembles the source and
+compares the result against the current binary on disk without writing anything — exit 0
+if identical, exit 1 with a `DRIFT` message if different; designed for CI / pre-commit
+drift detection.
+
+After rebuilding, run the consistency gate to confirm the output is gate-clean:
+`python -m pytest tests/lump/test_lump_consistency.py -v` (or
+`./scripts/run-all-tests.sh --group lump`).
+
+### `scripts/sync-canonical-examples.js` — canonical example sync
+
+The inline assembly examples embedded in `simulator/app-run.js` must stay identical to the
+canonical source files in `simulator/examples/*.cloomc`. Run the sync script whenever an
+inline example string in `app-run.js` is edited.
+
+**Invocation:**
+
+```bash
+node scripts/sync-canonical-examples.js           # repair drift (writes files)
+node scripts/sync-canonical-examples.js --check   # CI guard (no writes)
+```
+
+**Inputs:** every inline example string in `simulator/app-run.js`.
+
+**Outputs:** overwrites any `simulator/examples/<key>.cloomc` file that differs from its
+inline counterpart; exits 0 on success. In `--check` mode it writes nothing and exits
+non-zero listing drifted files if any canonical file is out of date.
+
+Exception: the `led_dr_test` key is a variable reference in `app-run.js` (not a backtick
+literal), so the sync script cannot extract it; its source is verified separately by the
+assembler test suite.
+
+### `scripts/sync_lump_viewer_to_sidecars.py` — **obsolete; delete**
+
+This script copied `group` and `doc_refs` fields from the Lump Viewer HTML
+(`docs/figures/Lumps Directory.html`) into per-lump sidecar JSONs, treating the Viewer as
+an authoritative curatorial source. Both fields and the Lump Viewer approval role have
+been removed from this specification: under the specified model the binary is the single
+source of truth and the sidecar carries no curatorial fields. The script is therefore
+obsolete under this specification and should be deleted. Note the current repository
+state has not yet caught up with this policy — the script, its tests, and existing
+sidecar `group`/`doc_refs` fields still exist pending that cleanup. Do not use it as
+part of the lump workflow, and do not document it as a legitimate tool; removal of the
+script and the residual sidecar fields is planned follow-up work.
+
+### `simulator/lump-audit.js` — audit engine
+
+The audit rules engine. It is a library, not a standalone CLI: it is invoked from the
+**Audit** button in the IDE detail-panel header strip and loaded as a module by its
+direct test consumers. (The separate `lump-consistency` CI gate,
+`tests/lump/test_lump_consistency.py`, implements its own independent checks and does
+not invoke this engine.) The full rule list (R0–RSM, both manifest-guided and
+binary-only modes) lives in the **Lump Audit Rules** section above.
 
 ---
 
