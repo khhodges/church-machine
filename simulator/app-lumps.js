@@ -5078,52 +5078,15 @@ async function openLumpInEditor(token) {
         var _db = document.getElementById('_lumpDraftBanner');
         if (_db) _db.remove();
         _discardBtn.remove();
-        var _sbtn = document.getElementById('btnToolbarSaveLump');
-        if (_sbtn) _sbtn.remove();
         if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
         if (typeof switchView === 'function') switchView('lumps');
     });
 
-    // ── Inject / refresh Save Lump toolbar button ─────────────────────────
-    var _existingSaveBtn = document.getElementById('btnToolbarSaveLump');
-    if (_existingSaveBtn) _existingSaveBtn.remove();
-    var _saveLumpBtn = document.createElement('button');
-    _saveLumpBtn.id = 'btnToolbarSaveLump';
-    _saveLumpBtn.className = 'btn btn-sm lump-editor-save-btn';
-    _saveLumpBtn.setAttribute('data-tooltip',
-        _inMemoryLump
-            ? 'Save Lump — Compile first to assemble the binary, then save to a namespace slot'
-            : 'Save Lump — Save a new dated version of this LUMP to the repository (no recompile needed)');
-    _saveLumpBtn.textContent = 'Save Lump';
-    // Server-persisted lumps: always enabled — we can re-save the existing binary
-    // without a recompile.  In-memory lumps (not yet on server) still require
-    // a compile first, so they start disabled (the compile-success path enables them).
-    _saveLumpBtn.disabled = !!_inMemoryLump;
-    _saveLumpBtn.addEventListener('click', function() {
-        // If the user has compiled fresh words use the standard namespace-save
-        // dialog so they can also choose a slot/permissions.
-        var _regMem = window.LumpRegistry
-            ? (window.LumpRegistry.resolve(window.LumpRegistry.getCurrent()) || {}).sources
-            : null;
-        var _hasCompiledWords = !!(_regMem && _regMem.memory && _regMem.memory.words
-                                   && _regMem.memory.words.length > 0);
-        if (_hasCompiledWords) {
-            if (typeof showFormatLump === 'function') showFormatLump();
-            else if (typeof showSaveToNamespace === 'function') showSaveToNamespace();
-        } else if (!_inMemoryLump && token) {
-            // No compiled words — save the existing server binary as a new dated version.
-            _saveLumpDirectVersion(token, lump, _saveLumpBtn);
-        } else {
-            // In-memory lump with no compiled words — trigger compile.
-            if (typeof smartCompile === 'function') smartCompile();
-        }
-    });
-
-    // Insert Discard then Save Lump into the toolbar, after the inline Compile button
+    // Insert Discard into the toolbar, after the inline Compile button.
+    // Save Lump is a static button (btnToolbarSaveLumpPerm) — no injection needed.
     var _compileInlineBtn = document.getElementById('btnToolbarCompile');
     if (_compileInlineBtn && _compileInlineBtn.parentNode) {
         _compileInlineBtn.parentNode.insertBefore(_discardBtn, _compileInlineBtn.nextSibling);
-        _compileInlineBtn.parentNode.insertBefore(_saveLumpBtn, _discardBtn.nextSibling);
     }
 
     // Expose this lump's token so the C-List viewer can show its baked-in
