@@ -5407,6 +5407,25 @@ window.showFormatLump = function() {
     })();
     // ─────────────────────────────────────────────────────────────────────────
 
+    // ── Populate c-list tail with pending GT sentinels ────────────────────────
+    // After the frame IIFE (which may have grown _svLumpSize), write each named
+    // capability into its binary c-list slot as a 0xFEED pending GT sentinel so
+    // the runtime can resolve the pet name to a real GT when the lump is loaded.
+    // Unnamed slots stay zero — the runtime will fault loudly if they're needed.
+    if (typeof ChurchSimulator !== 'undefined' &&
+            typeof ChurchSimulator.makePendingGT === 'function' && _svCC > 0) {
+        var _clBase = _svLumpSize - _svCC;
+        for (var _cli = 0; _cli < _svCC; _cli++) {
+            var _clCap  = _caps[_cli];
+            var _clName = (_clCap && _clCap.name) ? _clCap.name
+                        : (typeof _clCap === 'string' && _clCap ? _clCap : null);
+            if (_clName) {
+                _svBinary[_clBase + _cli] = ChurchSimulator.makePendingGT(_clName);
+            }
+        }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     // Store for Step 2 so confirmSaveToNamespace() does not rebuild.
     // registeredAt is captured now so Step 2 can verify nothing was recompiled
     // between Format Lump and Save to Namespace.
