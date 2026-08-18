@@ -3886,7 +3886,10 @@ function _showNSLumpModal(slotIdx, nsEntry) {
         const srcLump = (typeof _findSrcLump === 'function') ? _findSrcLump(slotIdx, nsEntry.label) : null;
         if (srcLump && srcLump.token) {
             const _slTok = srcLump.token;
-            _modalToken = _slTok; _modalMode = 'resident';
+            _modalToken = _slTok;
+            _modalMode = (srcLump.ns_slot_policy === 'static' && srcLump.boot_resident) ? 'resident'
+                       : (srcLump.ns_slot_policy === 'static')                        ? 'lazy'
+                       :                                                                 'dynamic';
             tokenHtml = `<div style="margin-bottom:12px;">
                 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
                     <span style="color:#888;font-size:0.78rem;">Token:</span>
@@ -3913,7 +3916,10 @@ function _showNSLumpModal(slotIdx, nsEntry) {
         const _lazyEntry = (typeof _findSrcLump === 'function') ? _findSrcLump(slotIdx, nsEntry.label) : null;
         if (_lazyEntry && _lazyEntry.token) {
             _lazyFetchToken = _lazyEntry.token;
-            _modalToken = _lazyFetchToken; _modalMode = 'lazy';
+            _modalToken = _lazyFetchToken;
+            _modalMode = (_lazyEntry.ns_slot_policy === 'static' && _lazyEntry.boot_resident) ? 'resident'
+                       : (_lazyEntry.ns_slot_policy === 'static')                             ? 'lazy'
+                       :                                                                        'dynamic';
             tokenHtml = `<div style="margin-bottom:12px;">
                 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
                     <span style="color:#888;font-size:0.78rem;">Token:</span>
