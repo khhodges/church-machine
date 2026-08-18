@@ -32,6 +32,66 @@ MANIFEST_PATH = os.path.join(LUMPS_DIR, "manifest.json")
 _CANONICAL_RE = re.compile(r'^(.+)\.(\d+)\.([0-9a-f]{8})\.lump$', re.IGNORECASE)
 
 
+# ── Module-scoped snapshot/restore ───────────────────────────────────────────
+
+@pytest.fixture(scope="module", autouse=True)
+def lumps_dir_snapshot(tmp_path_factory):
+    """Full snapshot/restore of server/lumps/ around this destructive module.
+
+    Tests here POST /api/lumps/save and directly modify manifest.json in the
+    real server/lumps/ directory.  Per-test cleanup fixtures handle the
+    nominal case, but a mid-suite failure could leave stale files or a corrupt
+    manifest.  This module-scoped autouse fixture holds the cross-process
+    lumps_write_lock for the entire snapshot → tests → restore span and
+    guarantees full restoration even on unexpected failures.
+    """
+    from tests.boot.conftest import lumps_write_lock
+    import shutil as _shutil
+
+    with lumps_write_lock():
+        snap_dir = str(tmp_path_factory.mktemp("lumps_snapshot"))
+        entries = {}
+        for name in os.listdir(LUMPS_DIR):
+            p = os.path.join(LUMPS_DIR, name)
+            if os.path.islink(p):
+                entries[name] = ("link", os.readlink(p))
+            elif os.path.isfile(p):
+                dst = os.path.join(snap_dir, name)
+                _shutil.copy2(p, dst)
+                entries[name] = ("file", dst)
+
+        yield
+
+        # 1. Remove anything created during the module.
+        for name in os.listdir(LUMPS_DIR):
+            if name not in entries:
+                p = os.path.join(LUMPS_DIR, name)
+                if os.path.islink(p) or os.path.isfile(p):
+                    os.remove(p)
+
+        # 2. Restore originals (content, symlink targets, deleted files).
+        for name, (kind, val) in entries.items():
+            p = os.path.join(LUMPS_DIR, name)
+            if kind == "link":
+                current = os.readlink(p) if os.path.islink(p) else None
+                if current != val:
+                    if os.path.islink(p) or os.path.exists(p):
+                        os.remove(p)
+                    os.symlink(val, p)
+            else:
+                with open(val, "rb") as fh:
+                    original = fh.read()
+                if os.path.islink(p):
+                    os.remove(p)
+                needs_write = True
+                if os.path.isfile(p):
+                    with open(p, "rb") as fh:
+                        needs_write = fh.read() != original
+                if needs_write:
+                    with open(p, "wb") as fh:
+                        fh.write(original)
+
+
 def _load_manifest():
     with open(MANIFEST_PATH) as fh:
         return json.load(fh)

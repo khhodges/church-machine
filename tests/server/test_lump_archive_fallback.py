@@ -24,6 +24,67 @@ import server.app as _app_module
 
 LUMPS_DIR = os.path.join(os.path.dirname(_app_module.__file__), "lumps")
 
+
+# ── Module-scoped snapshot/restore ───────────────────────────────────────────
+
+@pytest.fixture(scope="module", autouse=True)
+def lumps_dir_snapshot(tmp_path_factory):
+    """Full snapshot/restore of server/lumps/ around this destructive module.
+
+    Tests here POST /api/lumps/save and write archive lump files directly into
+    the real server/lumps/ directory.  Per-test try/finally blocks handle the
+    nominal case, but a mid-suite failure could leave stale archive files or a
+    corrupt manifest.json behind.  This module-scoped autouse fixture holds the
+    cross-process lumps_write_lock for the entire snapshot → tests → restore
+    span and guarantees full restoration even on unexpected failures.
+    """
+    from tests.boot.conftest import lumps_write_lock
+    import shutil as _shutil
+
+    with lumps_write_lock():
+        snap_dir = str(tmp_path_factory.mktemp("lumps_snapshot"))
+        entries = {}
+        for name in os.listdir(LUMPS_DIR):
+            p = os.path.join(LUMPS_DIR, name)
+            if os.path.islink(p):
+                entries[name] = ("link", os.readlink(p))
+            elif os.path.isfile(p):
+                dst = os.path.join(snap_dir, name)
+                _shutil.copy2(p, dst)
+                entries[name] = ("file", dst)
+
+        yield
+
+        # 1. Remove anything created during the module.
+        for name in os.listdir(LUMPS_DIR):
+            if name not in entries:
+                p = os.path.join(LUMPS_DIR, name)
+                if os.path.islink(p) or os.path.isfile(p):
+                    os.remove(p)
+
+        # 2. Restore originals (content, symlink targets, deleted files).
+        for name, (kind, val) in entries.items():
+            p = os.path.join(LUMPS_DIR, name)
+            if kind == "link":
+                current = os.readlink(p) if os.path.islink(p) else None
+                if current != val:
+                    if os.path.islink(p) or os.path.exists(p):
+                        os.remove(p)
+                    os.symlink(val, p)
+            else:
+                with open(val, "rb") as fh:
+                    original = fh.read()
+                if os.path.islink(p):
+                    os.remove(p)
+                needs_write = True
+                if os.path.isfile(p):
+                    with open(p, "rb") as fh:
+                        needs_write = fh.read() != original
+                if needs_write:
+                    with open(p, "wb") as fh:
+                        fh.write(original)
+
+
 _HEADER = (0x1F << 27) | 1
 _BINARY_A = [_HEADER] + [0xAAAAAAAA] + [0] * 62
 _BINARY_B = [_HEADER] + [0xBBBBBBBB] + [0] * 62
