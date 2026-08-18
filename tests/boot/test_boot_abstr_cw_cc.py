@@ -23,6 +23,7 @@ Three scenarios:
      cw=3 / cc=0 (no regression in the no-saved-lump code path).
 """
 import os
+import shutil
 import struct
 import sys
 
@@ -67,6 +68,86 @@ def _make_lump_words(cw, cc):
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+
+@pytest.fixture(scope="module", autouse=True)
+def lumps_dir_snapshot(tmp_path_factory):
+    """Full snapshot/restore of server/lumps/ around this destructive module.
+
+    Tests here POST /api/lumps/save for ns_slot=6.  Beyond the files the
+    per-test ``clean_300`` fixture tracks, save_lump() also writes a stub
+    SelfTest.<n>.<hash>.lump, re-points the SelfTest.1.<hash>.lump /
+    00000600.lump symlinks, rewrites manifest.json, and can truncate versioned
+    SelfTest_v*.lump files.  A midway suite failure used to leave the canonical
+    SelfTest binary corrupted (word[510] c-list[0] stomp), which broke
+    hardware/boot_rom.py's import-time assert and took down the IDE server.
+
+    This module-scoped autouse fixture snapshots EVERY top-level file and
+    symlink in server/lumps/ before any test runs, then in teardown (which
+    pytest runs even when tests fail or error):
+      - deletes any file/symlink created during the module,
+      - restores any file whose bytes changed or that was deleted,
+      - restores any symlink whose target changed or that was deleted.
+    The canonical SelfTest lump therefore cannot be mutated by a failing run.
+    Scoped to this module only (not the whole session) so it cannot race with
+    other boot-test pytest sessions the all-tests runner starts in parallel.
+    """
+    snap_dir = str(tmp_path_factory.mktemp("lumps_snapshot"))
+    entries = {}  # name -> ("link", target) | ("file", snapshot_path)
+    for name in os.listdir(LUMPS_DIR):
+        p = os.path.join(LUMPS_DIR, name)
+        if os.path.islink(p):
+            entries[name] = ("link", os.readlink(p))
+        elif os.path.isfile(p):
+            dst = os.path.join(snap_dir, name)
+            shutil.copy2(p, dst)
+            entries[name] = ("file", dst)
+
+    yield
+
+    # 1. Remove anything created during the module.
+    for name in os.listdir(LUMPS_DIR):
+        if name in entries:
+            continue
+        p = os.path.join(LUMPS_DIR, name)
+        if os.path.islink(p) or os.path.isfile(p):
+            os.remove(p)
+
+    # 2. Restore originals (content, symlink targets, deleted files).
+    for name, (kind, val) in entries.items():
+        p = os.path.join(LUMPS_DIR, name)
+        if kind == "link":
+            current = os.readlink(p) if os.path.islink(p) else None
+            if current != val:
+                if os.path.islink(p) or os.path.exists(p):
+                    os.remove(p)
+                os.symlink(val, p)
+        else:
+            with open(val, "rb") as fh:
+                original = fh.read()
+            if os.path.islink(p):
+                os.remove(p)
+            needs_write = True
+            if os.path.isfile(p):
+                with open(p, "rb") as fh:
+                    needs_write = fh.read() != original
+            if needs_write:
+                with open(p, "wb") as fh:
+                    fh.write(original)
+
+    # 3. Sanity guard: the canonical SelfTest binary must be intact
+    #    (word[510] == 0x4A000006, the c-list[0] SelfTest E-GT) whenever a
+    #    512-word 00000600.lump is present.  Fail loudly if restore missed it.
+    lump_600 = os.path.join(LUMPS_DIR, "00000600.lump")
+    if os.path.exists(lump_600):
+        with open(lump_600, "rb") as fh:
+            blob = fh.read()
+        if len(blob) == 512 * 4:
+            w510 = struct.unpack(">I", blob[510 * 4:511 * 4])[0]
+            assert w510 == 0x4A000006, (
+                f"lumps_dir_snapshot restore failed: canonical SelfTest lump "
+                f"word[510]={w510:#010x}, expected 0x4A000006"
+            )
+
 
 @pytest.fixture(scope="module")
 def client():
