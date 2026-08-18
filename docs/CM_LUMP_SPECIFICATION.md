@@ -27,7 +27,10 @@ Lump size is always a power of 2, minimum 64 words, maximum 32 768 words
 
 ```
 lumpSize = 2^n   where 6 ≤ n ≤ 15
-freespace = lumpSize - 1 - cw - cc   (must be all-zero; Mint verifies at load time)
+freespace = lumpSize - 1 - cw - cc   (verified by Mint at load time: for typ=lump it
+                                      carries the 0xAB-tagged self-definition content —
+                                      see Freespace Content and Self-Definition; legacy
+                                      binaries and all other typ values must be all-zero)
 ```
 
 The maximum is 2^15 = 32 768 words. The header `cw` field (13 bits, max 8 191)
@@ -40,6 +43,10 @@ and `cc` field (8 bits, max 255) together cap the maximum useful payload at
 | SlideRule   | 525             | 1                 | 2^10 = 1 024 words | 497 words |
 | TestSR      | 604             | 1                 | 2^10 = 1 024 words | 418 words |
 | Boot.Abstr  | 17              | 1                 | 2^6 = 64 words    | 45 words   |
+
+The example binaries above were compiled before the freespace content format and carry
+all-zero freespace — they are **legacy** binaries (not self-defining), awaiting
+recompilation into the `0xAB` content format (see Freespace Content and Self-Definition).
 
 ---
 
@@ -132,7 +139,9 @@ new GT, and the old version's GT is unchanged.
 │                 Dispatcher at PC = 1, then methods      │
 ├─────────────────────────────────────────────────────────┤  ← word cw + 1
 │  Words cw+1 … lumpSize-cc-1   Freespace                │
-│                 All zeros — verified by Mint at load    │
+│                 0xAB content header + embedded API/     │
+│                 source, remainder zero (legacy: all     │
+│                 zeros) — verified by Mint at load       │
 ├─────────────────────────────────────────────────────────┤  ← word lumpSize - cc
 │  Words lumpSize-cc … lumpSize-1   C-list               │
 │                 cc × 1-word GT slots (Word 0 only)      │
@@ -163,7 +172,7 @@ corrupting state.
 |-------|-------|---------|
 | magic | 31:27 | Always `11111` (0x1F). Traps if executed. |
 | n-6   | 26:23 | lumpSize = 2^(val+6). Valid range 0..9 → 64..32 768 words. Values 10..15 rejected by Mint. |
-| cw    | 22:10 | Code word count (0..8191). Words 1..cw are code; words cw+1..lumpSize-cc-1 must be zero. |
+| cw    | 22:10 | Code word count (0..8191). Words 1..cw are code; words cw+1..lumpSize-cc-1 are freespace (self-definition content for typ=lump, otherwise all-zero — see Freespace Content and Self-Definition). |
 | typ   | 9:8   | Object type: `00`=lump, `01`=data, `10`=clist-only, `11`=Outform. |
 | cc    | 7:0   | C-list slot count (0..255). |
 
@@ -217,7 +226,7 @@ The PC and NIA counters operate in **word offsets** (one unit = one 32-bit word 
 
 **Derived sizes**:
 - `lumpSize` (words) = `1 << (n_minus_6 + 6)` — always a power of two, 64..32768
-- `freespace` (words) = `lumpSize − 1 − cw − cc` — words between the last code word and the c-list; must be zero-filled
+- `freespace` (words) = `lumpSize − 1 − cw − cc` — words between the last code word and the c-list; carries the `0xAB`-tagged self-definition content for `typ=lump` (remainder zero-filled), all-zero otherwise (see Freespace Content and Self-Definition)
 - `CR14.base` = `NS_base + 4` (skips lump header word)
 - `CR14.limit_offset` = `lumpSize − cc − 2`
 - `CR6.base` = `NS_base + (lumpSize − cc) × 4`
@@ -338,18 +347,18 @@ Where:
 - `token` — 8 hex digits (the 32-bit token value computed above)
 
 **The logical lump is the binary alone.** It is self-defining: its API definition is embedded
-in the freespace (see the Source Code Storage section — *forthcoming; specified in a separate
-spec update (T7)*). The sidecar is optional local administrative metadata and is never
+in the freespace (see Freespace Content and Self-Definition). The sidecar is optional
+local administrative metadata and is never
 transported across cyberspace boundaries.
 
-> **Transition note — freespace invariant.** The current release enforces the all-zero
-> freespace invariant (Mint validation step 7, and the layout/example sections): freespace
-> today carries no content, and the API definition is delivered via the sidecar/tooling.
-> When the Source Code Storage section lands, it will define a delimited region within
-> freespace for the embedded API/source, and Mint's freespace scan will be updated to
-> verify that region's framing while requiring the remainder to stay zero. Until then,
-> the all-zero rule stands and the embedded-API description in this section is normative
-> intent, not yet the deployed binary format.
+> **Transition note — freespace invariant.** The freespace content format is now
+> specified (see Freespace Content and Self-Definition, and the revised Mint validation
+> step 7): a `0xAB`-tagged content header delimits the embedded API/source region, with
+> the remainder of freespace staying zero. Binaries compiled before this format have
+> all-zero freespace and are **legacy** — a transitional state resolved by recompilation,
+> not a permanent category. Tooling that has not yet adopted the format continues to
+> deliver the API definition via the sidecar until it is migrated; new tooling must never
+> produce legacy (all-zero-freespace) `typ=lump` binaries.
 
 A separate `.api.json` file may be extracted from the binary by tooling (compiler, IDE) as
 a convenience — it is a hidden implementation detail, not a named part of the logical lump.
@@ -372,8 +381,8 @@ own protocol sections are revised:
 
 #### API Definition Embedded in Freespace
 
-The API definition is stored inside the binary's freespace (see the Source Code Storage
-section — forthcoming, T7 — for the full freespace layout). This makes the binary self-defining: a recipient
+The API definition is stored inside the binary's freespace (see Freespace Content and
+Self-Definition for the full freespace layout). This makes the binary self-defining: a recipient
 region has everything needed to understand the interface without any companion file.
 
 The embedded API definition specifies every method's:
@@ -381,7 +390,7 @@ The embedded API definition specifies every method's:
 - branch offset (compiled-in numeric entry point)
 - IN and OUT variables, each with an exact register assignment
 
-**Register conventions** (also to be documented in the forthcoming Source Code Storage section):
+**Register conventions** (also documented in Freespace Content and Self-Definition):
 
 Each variable specifies the exact register it occupies:
 - **`CRn`** — capability register; Church domain; holds a Golden Token
@@ -543,9 +552,9 @@ scheme. Under content-addressing, a better seal is simply a new identity.
 the logical lump and is never transported across cyberspace boundaries.
 
 The logical lump is the binary alone (`dot.name.issue.token.lump`). It is self-defining:
-the API definition is embedded in its freespace (future-normative — see the freespace
-transition note in "Canonical Filename Form and File Set"; the current release still
-enforces all-zero freespace). A `.api.json` file may be extracted from the binary by
+the API definition is embedded in its freespace (see Freespace Content and
+Self-Definition; binaries predating the format are legacy, resolved by
+recompilation). A `.api.json` file may be extracted from the binary by
 tooling (compiler, IDE) as a convenience — it is a hidden implementation detail, not a
 named artifact and not part of the logical lump.
 
@@ -558,8 +567,8 @@ without a sidecar.
 ### Sidecar Authorship Rule
 
 The sidecar is a **pure mechanical cache** — every field is derived from the binary
-(including the API/source content embedded in its freespace, once the Source Code Storage
-section, T7, is deployed) by tooling. There is exactly one write path: `POST /api/lumps/save`,
+(including the API/source content embedded in its freespace per Freespace Content and
+Self-Definition, once tooling adopts it) by tooling. There is exactly one write path: `POST /api/lumps/save`,
 which reads the binary and writes all fields. Sidecar files must never be edited by hand.
 
 There are no curatorial fields. The former `group` and `doc_refs` fields are **removed
@@ -593,9 +602,10 @@ not derivable from the binary does not belong in the sidecar.
 >   them; they are scheduled for removal from the writers, the readers, and the on-disk
 >   files as part of the T7 migration.
 >
-> When T7 lands and the binary is self-defining, the save path switches to deriving all
-> fields from the binary, the auxiliary write paths are retired or reduced to
-> recompile-and-save flows, and the rule above becomes enforced behaviour.
+> The freespace content format is now specified (Freespace Content and Self-Definition);
+> once tooling adopts it and binaries are self-defining, the save path switches to
+> deriving all fields from the binary, the auxiliary write paths are retired or reduced
+> to recompile-and-save flows, and the rule above becomes enforced behaviour.
 
 ### Sidecar JSON Fields
 
@@ -661,7 +671,7 @@ which are decoded from the binary structure today versus recorded from save-time
 | `pet_names` | object | Register aliases: `{"DR": {...}, "CR": {...}}`. |
 | `language` | string | Source language: `"cloomc"`, `"assembly"`, `"haskell"`, `"lambda"`, `"ISA"`, `"unknown"`. |
 | `source` | string | Full source text as carried by the binary. Omitted from list projections. |
-| `sourceStorageTier` | integer (0, 1, or 2) | Written by API / compiler. Tier of freespace content derived from the binary header. `0` = API only, `1` = API + minimal source, `2` = API + full source. Absent = legacy binary awaiting recompilation. (Defined by the Source Code Storage section, T7; not emitted until T7 lands.) |
+| `sourceStorageTier` | integer (0, 1, or 2) | Written by API / compiler. Tier of the embedded freespace content. `0` = API only, `1` = API + minimal source, `2` = API + full source. Absent = legacy (all-zero freespace, not self-defining). See Freespace Content and Self-Definition. |
 
 #### Build and lifecycle metadata (recorded at save time; not binary-derived today)
 
@@ -724,7 +734,8 @@ from the binaries on disk — a performance cache, not a truth document.
 The manifest (`server/lumps/manifest.json`) is a mechanically-derived index of the lumps
 available in this IDE's local region of cyberspace. It is generated by scanning the lumps
 directory and reading each binary — the header word (Word 0) for the structural fields and,
-once T7 lands, the API/source content embedded in the binary's freespace. It is a cache —
+for self-defining binaries, the API/source content embedded in the binary's freespace
+(see Freespace Content and Self-Definition). It is a cache —
 if it is lost or stale, it is regenerated from the binaries.
 
 **Why it exists:**
@@ -747,14 +758,14 @@ store). The truth hierarchy is thus two-sourced: the binary is truth for everyth
 binary defines; the deployment configuration is truth for slot assignment. The manifest
 remains a cache of both — never the truth for either.
 
-> **Transition note — mechanical regeneration status.** Full regeneration from binaries
-> is *future-normative*, gated on T7 (Source Code Storage). In the current release,
-> freespace is required to be all-zero (Mint validation step 7), so API/source fields
-> cannot yet be read from the binary; the manifest is maintained incrementally by the
-> save/delete API from save-time `metadata` (see the sidecar authorship-rule transition
-> note). Only the structural header fields (`lump_size`, `cw`, `cc`, `typ`) are
-> binary-derivable today. When T7 lands, the binary becomes self-defining and the
-> regeneration rule above becomes enforced behaviour.
+> **Transition note — mechanical regeneration status.** The freespace content format is
+> now specified (Freespace Content and Self-Definition), but full regeneration from
+> binaries is gated on tooling adopting it. Binaries compiled before the format have
+> all-zero (legacy) freespace, so API/source fields cannot be read from them; the
+> manifest is maintained incrementally by the save/delete API from save-time `metadata`
+> (see the sidecar authorship-rule transition note). Only the structural header fields
+> (`lump_size`, `cw`, `cc`, `typ`) are derivable from legacy binaries. As recompilation
+> retires legacy binaries, the regeneration rule above becomes enforced behaviour.
 
 ### Why Tokens Do Not Cross Cyberspace Boundaries
 
@@ -774,11 +785,12 @@ Pet names are hardware-neutral, owner-neutral, and human-meaningful. They name t
 the token names the instantiation. Each region produces its own binary and its own token
 from the shared source.
 
-> **Transition note — source extraction status.** Extracting source "from lump freespace"
-> is future-normative pending T7: today freespace is all-zero and the source travels in
-> the sidecar's `source` field / the save-time `metadata`, so an export in the current
-> release takes the source from the sidecar. The exchange model itself (pet name + source
-> out, local compile + local token in) is unchanged by this transition.
+> **Transition note — source extraction status.** The freespace layout for embedded
+> source is now specified (Freespace Content and Self-Definition, Tier 1/2). For legacy
+> binaries (all-zero freespace) the source still travels in the sidecar's `source`
+> field / the save-time `metadata`, so an export of a legacy lump takes the source from
+> the sidecar until recompilation retires it. The exchange model itself (pet name +
+> source out, local compile + local token in) is unchanged by this transition.
 
 ---
 
@@ -814,9 +826,9 @@ is eliminated.
      and assigns any NS slot from its own deployment configuration.
 
 > **Transition note — publication workflow status.** Steps 1–4 describe the target
-> workflow and are *future-normative*, gated on T7 (Source Code Storage) and the sidecar
-> single-write-path rule (see the authorship-rule transition note). In the current
-> release the binary does not yet embed its API/source (freespace must be all-zero),
+> workflow and are *future-normative*, gated on tooling adopting the freespace content
+> format (Freespace Content and Self-Definition) and the sidecar single-write-path rule
+> (see the authorship-rule transition note). Until compilers emit self-defining binaries,
 > publication runs through `POST /api/lumps/save` with compiler-supplied `metadata`, and
 > the sidecar/manifest are written from that metadata rather than re-derived from the
 > binary. NS slot assignment remains deployment configuration in both the current and
@@ -842,16 +854,218 @@ Step 6b (planned — NOT enforced in this release) typ==00 (lump) requires cc >=
           lump (see "C-list Slot 0 — The Lump's Own GT"). Today the save path
           upgrades cc=0 to cc=1 instead of rejecting, and slot-0 value
           validation is not performed; legacy cc=0 binaries are still accepted.
-Step 7  Scan words cw+1 .. lumpSize-cc-1: reject if any word is non-zero.
-          Freespace must be all-zero — this is enforced, not assumed.
+Step 7  Freespace validation (Zone ③, words cw+1 .. lumpSize-cc-1):
+          For typ=lump only: inspect word cw+1. If bits [31:24] equal 0xAB,
+          treat this as a content header (see Freespace Content and
+          Self-Definition) and validate the full framing:
+            7a  flags (bits [23:16]) must be 0x00, 0x01, or 0x03 — reject
+                any other value.
+            7b  api_byte_length (bits [15:0]) must be non-zero, and the API
+                region (⌈api_byte_length/4⌉ words starting at word cw+2)
+                must fit entirely within freespace — reject on overflow.
+            7c  If flags.has_source: the word after the padded API region is
+                source_byte_length; it must be non-zero, and the source
+                region (⌈source_byte_length/4⌉ words following it) must fit
+                entirely within freespace — reject on overflow. If
+                flags.has_source is clear, no source-length word is present.
+            7d  Zero-padding bytes inside the last word of each padded
+                region must be zero, and every freespace word after the last
+                content word must be zero — scan and reject any non-zero
+                remainder. Arbitrary trailing data is never accepted.
+          Mint validates framing, bounds, and the zero remainder only. It
+          does not decode the payload: UTF-8 decoding, JSON parsing, and API
+          schema validation (see the API definition format and register
+          rules) are performed by tooling at extraction time, and a payload
+          that fails them is malformed even though Mint accepted the frame.
+          If bits [31:24] do not equal 0xAB, require ALL freespace words to
+          be zero (legacy rule — the lump is a legacy binary, tolerated only
+          until recompilation).
+          For typ=data, typ=clist-only, and typ=Outform: scan words
+          cw+1 .. lumpSize-cc-1 and reject if any word is non-zero — the
+          all-zero rule is unchanged.
 Step 8  Validate c-list slots (each must be a well-formed GT Word 0).
 Step 9  Issue E-GT, write NS slot.
 ```
 
 Steps 2–6 are pure arithmetic on the 32-bit header — no memory access beyond
-the header word. Step 7 is the freespace scan, protected by the cheap
-consistency gates in steps 3–6. A malformed or malicious header is caught
-before Mint touches the binary body.
+the header word. Step 7 is the freespace validation (content-header check for
+`typ=lump`, all-zero scan otherwise), protected by the cheap consistency gates
+in steps 3–6. A malformed or malicious header is caught before Mint touches
+the binary body.
+
+---
+
+## Freespace Content and Self-Definition
+
+Every `typ=lump` binary is self-defining. Its freespace carries an embedded API definition
+that describes the abstraction's interface: method pet names, branch offsets, and typed
+IN/OUT variables with register assignments. A recipient region can compile a CALL to this
+abstraction using only the binary — no companion file is required.
+
+(*Legacy exception:* binaries compiled before this format have all-zero freespace and are
+not yet self-defining. Legacy is a transitional state resolved by recompilation — see
+"Legacy lumps" below. The self-definition statement above is the normative rule for all
+newly compiled `typ=lump` binaries.)
+
+Source code may additionally be embedded in freespace to make the lump portable across
+cyberspace regions (enabling the recipient to recompile it locally). Three tiers govern
+what freespace contains.
+
+A lump's token identifies it within a local cyberspace region. Crossing a region boundary
+requires the source — because each region compiles its own binary and derives its own token
+(see Manifest Architecture and "Why Tokens Do Not Cross Cyberspace Boundaries"). The API
+definition enables callers to compile against the abstraction; the source enables the
+recipient region to recompile it.
+
+### The Three Storage Tiers
+
+**All three tiers embed the API definition.** The tiers describe only whether source code is
+*additionally* present. A Tier 0 lump is self-defining — it carries its full API definition
+in freespace. "Tier 0" means *API without source*, not *no freespace content*.
+
+The tier is chosen by the lump author at compile time:
+
+| Tier | Name | Freespace contents | Cross-region? | When to use |
+|------|------|--------------------|---------------|-------------|
+| 0 | **API only** | API definition only (no source) | ❌ Interface-only | Mature designs with MTBF approaching infinity — so thoroughly validated that every region that needs them already has them compiled locally |
+| 1 | **API + minimal source** | API definition + source with comments stripped | ✅ Portable | Production-grade designs; auditability without storage overhead |
+| 2 | **API + full source** | API definition + complete source including all comments | ✅ Fully portable | Active development; intent and rationale travel with the lump |
+
+**Tier 0 and MTBF → ∞:** a deliberate declaration of maturity, not a default for convenience.
+The lump has reached cyberspace infrastructure status — universally known, universally compiled,
+no longer needing to travel as source. Choosing Tier 0 for an immature design is an error.
+
+**Legacy lumps (all-zero freespace):** pre-existing binaries compiled before this spec have
+all-zero freespace and are not self-defining. **Legacy is a transitional state, not a permanent
+category.** The correct resolution is recompilation: recompiling a legacy lump against its
+source produces a new self-defining binary (Tier 0, 1, or 2) with a new token, retiring the
+legacy binary. Legacy lumps are tolerated only until recompilation is complete; they must not
+be created by new tooling.
+
+**Same abstraction, different tiers → different tokens:** a lump compiled at Tier 2 has a
+larger binary (more freespace) than the same code compiled at Tier 0. Different binary =
+different token. This is correct — the tier is baked into the identity.
+
+### Freespace Layout
+
+When freespace carries content, it is structured as follows:
+
+```
+Word 0:  Content header
+  [31:24]  magic = 0xAB  (identifies this word as a content header)
+  [23:16]  flags:  bit0 = has_source,  bit1 = source_has_comments
+  [15:0]   api_byte_length  (byte count of the embedded API JSON)
+
+Words 1 … ⌈api_byte_length/4⌉:
+         API definition JSON bytes (UTF-8, packed big-endian, zero-padded to word boundary)
+
+If flags.has_source (tier 1 or 2):
+  Next word:  source_byte_length  (32 bits, byte count of source)
+  Following:  source bytes (UTF-8, packed big-endian, zero-padded to word boundary)
+
+Remaining freespace words: all zero
+```
+
+The zero remainder is mandatory: every freespace word after the last content word, and
+every padding byte inside the last word of a padded region, must be zero. Mint enforces
+the framing, bounds, and zero remainder at load time (validation step 7); freespace
+outside the declared content regions can never carry data.
+
+Tier-to-flags mapping:
+
+- Tier 0: `flags = 0x00` (API only)
+- Tier 1: `flags = 0x01` (API + source, no comments)
+- Tier 2: `flags = 0x03` (API + source + comments)
+
+**Legacy lumps:** if `word[cw+1]` bits [31:24] ≠ `0xAB`, the lump is a legacy binary
+(all-zero freespace). Legacy is a transitional state — the correct resolution is
+recompilation, which produces a new self-defining binary and retires the legacy one.
+Legacy lumps are tolerated only until recompilation is complete; new tooling must never
+produce them.
+
+### API Definition JSON Format (Embedded)
+
+The API definition embedded in freespace is a UTF-8 JSON object:
+
+```json
+{
+  "name": "<abstraction name>",
+  "methods": [
+    {
+      "petName": "<method pet name>",
+      "branchOffset": <integer>,
+      "in":  [ { "name": "<var>", "reg": "CRn|DRn", "comment": "<optional>" } ],
+      "out": [ { "name": "<var>", "reg": "CRn|DRn", "comment": "<optional>" } ]
+    }
+  ]
+}
+```
+
+**Identity fields are external — never embedded.** The embedded payload MUST NOT contain
+`token` or `issue` fields:
+
+- The **token** is `hash(name || genotype_binary)` — a function of the complete genotype
+  *including this freespace content*. Embedding the token would require knowing the hash
+  of bytes that contain the hash (a circular fixed point). The token therefore lives only
+  outside the binary: in the canonical filename, the catalogue, and GT/NS bindings.
+- The **issue** number is explicitly excluded from token identity (see The Token — Lump
+  Identity): the same binary republished under a new issue keeps its token. Embedding the
+  issue would bake a publication revision into the hashed bytes and break that rule. The
+  issue lives only in the filename and catalogue.
+
+When tooling extracts the payload to a `.api.json` cache file, it MAY annotate the
+extracted JSON with `token` and `issue` taken from the binary's canonical filename —
+those annotations are extraction-time metadata, present in the cache file only, never in
+the binary.
+
+**Register rules:**
+
+- `reg` must be `CR` + non-negative integer, or `DR` + non-negative integer
+- Reserved (must not be used for parameters): `DR0`, `CR5`, `CR6`, `CR12`, `CR13`, `CR14`, `CR15`
+- Valid parameter registers: `DR1`+, `CR0`–`CR4`, `CR7`–`CR11`
+- `comment` is present for Tier 2 (source has comments), absent for Tier 0/1
+- Success/fail: callee writes non-null to `out` registers on success, null on failure —
+  no separate flag; caller branches on null vs non-null directly
+
+### Construction and Verification (Normative Tier 0 Example)
+
+This sequence proves the format is constructible without circularity — a compiler can
+emit a Tier 0 lump and any tool can independently verify its token:
+
+```
+Encode (compiler):
+  1. Compile the abstraction → code words 1..cw, c-list (cc slots).
+  2. Build the API JSON from compile-time facts only: name + methods
+     (petName, branchOffset, in/out register assignments). No token,
+     no issue — nothing in the payload depends on the final binary.
+  3. Serialise the JSON as UTF-8; api_byte_length = byte count.
+  4. Choose lumpSize = smallest 2^n (n ≥ 6) that fits
+     1 + cw + 1 + ⌈api_byte_length/4⌉ + cc words.
+  5. Assemble the genotype: header word (typ=00) · code · content header
+     (0xAB, flags=0x00, api_byte_length) · packed API bytes (big-endian,
+     zero-padded to word boundary) · zero remainder · c-list.
+  6. token = first 8 hex chars of SHA-256(name_utf8 || genotype_bytes),
+     each word serialised big-endian. Deterministic — computable only
+     after step 5, which is why the token is never inside the binary.
+  7. Write dot.name.issue.token.lump. Issue is assigned at publication;
+     changing it renames the file but never changes the bytes or token.
+
+Verify / extract (any tool):
+  1. Recompute SHA-256(name || binary) and compare to the filename token.
+  2. Read word cw+1, check magic 0xAB, validate framing (Mint step 7 rules).
+  3. Decode api_byte_length bytes from word cw+2 as UTF-8 JSON; validate
+     against the API schema above.
+```
+
+### Tooling Extraction Note
+
+To extract the API definition from a lump binary: read word cw+1, check magic `0xAB`,
+read `api_byte_length` bytes starting at word cw+2, and decode as UTF-8 JSON. The
+resulting JSON is the same structure that tooling may cache as a `.api.json` file
+(optionally annotated with `token` and `issue` from the filename, per the identity-fields
+rule above) — this file is a hidden implementation detail derived from the binary, not a
+separate artifact. It is not a named part of the logical lump and is not exported or
+imported separately.
 
 ---
 
@@ -1239,7 +1453,7 @@ The per-type distribution containers are:
   metadata and stays in the home region; it never crosses a distribution
   boundary.
 - **No `.api.json` file is included** — the API definition is embedded in
-  the binary's freespace (see the Source Code Storage section, T7). The
+  the binary's freespace (see Freespace Content and Self-Definition). The
   binary is self-defining; a recipient needs no companion file to
   understand the interface.
 - **The recipient region derives its own sidecar and manifest entry
@@ -1732,7 +1946,7 @@ The auditor operates in two modes:
 | **R2** | Word Count | Actual word count must equal `2^(n-6+6)` as encoded in the header exponent field. | The binary is truncated or padded inconsistently with its declared size. |
 | **RB1** | Code Word Count | `cw >= 1` — at least one code word must exist. | The lump declares no code section; nothing can execute at PC = 1. |
 | **RB2** | Layout Bounds | `1 + cw + cc <= lump_size` — header + code + c-list must fit. | Declared regions overflow the lump; header fields are inconsistent. |
-| **RFS** | Freespace Zone | All words in the padding region (between code and c-list) must be zero. | Freespace contains non-zero words — corruption or an out-of-bounds write; Mint would reject the lump at load time. |
+| **RFS** | Freespace Zone | For `typ=lump`, freespace must either begin with a valid `0xAB` content header whose framing passes Mint validation step 7 (bounds + zero remainder), or be entirely zero (legacy binary). For all other `typ` values, all freespace words must be zero. | Freespace fails both forms — a malformed content frame, non-zero trailing words after the declared content, or non-zero words in a legacy/non-lump binary; corruption or an out-of-bounds write; Mint would reject the lump at load time. |
 | **RMC** | Manifest Coherence | If a sidecar is provided, its `cw`, `cc`, and `lump_size` must exactly match the binary header. | The sidecar has drifted from the binary; the binary header is ground truth. |
 | **RCI** | Instruction Range | `LOAD`/`SAVE`/`ELOADCALL`/`XLOADLAMBDA` must reference rows `0 … cc-1`. `BRANCH` targets must land within the code section. | Code references a c-list row or branch target outside the lump's declared bounds — a fault at runtime. |
 | **RNC** | NULL GT Check | Warns if code accesses a C-List row that holds a NULL (all-zero) Golden Token. | The row is expected to be filled at runtime (Lazy Load or a system abstraction returning a `B=1` GT); if it is not, the access faults. |
@@ -2752,7 +2966,7 @@ already owns.
 | **Example header** | `0xF881_AC00` (Decimal, n=7 cw=107 cc=0) | `0xF900_8240` (n-6=2, sw=32, heapWords=cc=64) | Binary data |
 | **Entry point** | PC = 1 on every CALL | Never — not callable | Never — not callable |
 | **Words 1..cw** | [CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html) code (dispatcher + methods) | Absent — `cw = 0` | Boot / init microcode and SWITCH |
-| **Freespace zone** | Compile-time fixed · all-zero · immutable per release | Dynamic 131 words — Stack ↓ and Heap ↑ collide | Between init code and NS Table · all-zero |
+| **Freespace zone** | Compile-time fixed · `0xAB` content header + embedded API/source, zero remainder (legacy: all-zero) · immutable per release | Dynamic 131 words — Stack ↓ and Heap ↑ collide | Between init code and NS Table · all-zero |
 | **C-list zone** | Last `cc` words · list E-GTs · compiler-set | Last 12 words · CR0–CR11 + LIFO Stack | BINARY DATA |
 | **Unique body** | Code and C-List | 5 zones: Header · Caps · Stack · Free · Heap · DR | NS Table (N × 4-word entries: Inform GT + reserved) |
 | **Physical scope · 2^n frame size** | One lump region | One 256/512/1024-word thread frames | Entire application address space |
@@ -2765,7 +2979,7 @@ already owns.
 | **Issued GTs** | One E-GT (caller holds) | GT (Thread) | GT NS |
 | **GC interaction** | G bit in NS slot Word 3 | G bits in all live CRs in Zone ① | Live & Dead slots |
 | **lumpSize** | 2^n compiler-chosen (64–16 384 words) | IDE defined 2^n < 1024 | 2^n IDE-chosen; Boot.NS = 2^14 = 16 384 words |
-| **Freespace verified by Mint** | Yes — words cw+1..lumpSize-cc-1 all-zero | Zone ③ only (words 45..175); Zone ① skipped | Scan CRC per slot |
+| **Freespace verified by Mint** | Yes — words cw+1..lumpSize-cc-1: `0xAB` content-frame validation (bounds + zero remainder, step 7) or all-zero (legacy) | Zone ③ only (words 45..175); Zone ① skipped | Scan CRC per slot |
 | **Distribution format** | `dot.name.issue.token.zip` | `*.thread.zip` | `*.namespace.zip` |
 | **Simulator NS slot** | Most slots (Salvation=4, Mint=6, …) | Slots 1 and 45 | Slot 0 (Boot.NS) |
 | **CALL target** | Yes | No | No |

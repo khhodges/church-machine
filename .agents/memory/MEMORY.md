@@ -113,3 +113,4 @@
 - [V20 designer boot-image contract](v20-designer-contract.md) — thread caps at fixed +244 forces threadLumpWords>=256; base-4 threadCount sentinel; parse nsHeader/thread blocks; DEFAULT_NS_SLOTS_MAX=256 fallback; E2E stale-5050/unsafe-port trap
 - [ELOADCALL frame-push full bounds](eloadcall-frame-push-bounds.md) — ELOADCALL needs thread_hdr+cr12_thread inputs; PUSH_CR5_CR12 before STO read; callee_egt from CALL_P1_DONE CR6 (phase-1), not phase-0 loaded_cap
 - [Sidecar spec vs implementation](sidecar-spec-vs-implementation.md) — mechanical-cache rule is future-normative; verify field/writer claims against server/app.py before spec edits
+- [T7 freespace self-definition format](t7-freespace-format.md) — embedded API JSON must never carry token/issue (circular hash / identity rule); Mint validates framing only
