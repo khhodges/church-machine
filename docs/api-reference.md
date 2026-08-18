@@ -201,7 +201,7 @@ Device drivers accessed via Abstract GTs. L = read device, S = write device, E =
 
 ### Ethernet — NS[null] `E` *(XC7A100T only)*
 
-Raw Ethernet frame transport — XC7A100T lazy-load channel. Locator fetches all other abstractions through it. Identity: token 00003300 (slot is assigned at load time and is not a stable identifier).
+Raw Ethernet frame transport — XC7A100T lazy-load channel. Locator fetches all other abstractions through it. Identity: token b169bba4 (slot is assigned at load time and is not a stable identifier).
 
 | Method | Signature | Perms | Description |
 |--------|-----------|-------|-------------|

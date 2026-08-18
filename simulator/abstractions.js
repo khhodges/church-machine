@@ -530,17 +530,17 @@ class AbstractionRegistry {
             'Hardware interrupt entry point — wakes sleeping threads on ALARM fire and handles Tier 2 fault recovery (Task #1077)',
             { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 0 } });
 
-        // Ethernet — token 00003300 (XC7A100T-only)
-        // Identity: token 00003300.  This abstraction has no fixed NS slot — the
+        // Ethernet — token b169bba4 (XC7A100T-only)
+        // Identity: token b169bba4.  This abstraction has no fixed NS slot — the
         // Locator (locator_ethernet.cloomc) installs it via Mint.Install() during
         // boot, receiving an FCFS slot that may vary between reboots.  Callers MUST
-        // hold the GT (token 00003300), never a slot index.
+        // hold the GT (token b169bba4), never a slot index.
         // freedNSSlot: true — the catalog emits null for this entry so
         // _initNamespaceTable does not create a static physical NS entry at slot 51;
         // the simulator resolves it through the token registry instead.
         this.createAbstraction(51, 'Ethernet', 2,
             ['Send', 'Receive', 'Connect', 'Status'],
-            'Raw Ethernet frame transport — XC7A100T lazy-load channel. Send(dataGT, byteLen), Receive() \u2192 (dataGT, byteLen), Connect(ipv4, port), Status() \u2192 0=down/1=up/2=busy. FCFS NS slot assigned by Locator at boot; callers identify by token 00003300, not slot index.',
+            'Raw Ethernet frame transport — XC7A100T lazy-load channel. Send(dataGT, byteLen), Receive() \u2192 (dataGT, byteLen), Connect(ipv4, port), Status() \u2192 0=down/1=up/2=busy. FCFS NS slot assigned by Locator at boot; callers identify by token b169bba4, not slot index.',
             { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, profile: 'XC7A100T', freedNSSlot: true });
 
         // NS slot 52 — EventRouter

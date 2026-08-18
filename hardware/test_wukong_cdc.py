@@ -332,7 +332,7 @@ def test_callhome_payload_roundtrip():
     Verifies:
     - Payload starts with CALLHOME_MAGIC (0xCE110001)
     - parse_callhome_frame() accepts the payload and returns a valid dict
-    - token matches ETHERNET_TOKEN (0x00003300)
+    - token matches ETHERNET_TOKEN (0xb169bba4)
     - N=0 requests (no lump tokens in the minimal payload)
     """
     import struct

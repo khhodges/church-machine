@@ -10083,7 +10083,7 @@ with app.app_context():
 
     # ── Wukong Ethernet UDP listener ─────────────────────────────────────────
     # Listens on UDP port 5900 for Wukong XC7A100T callhome frames.
-    # Parses frames by token (0x00003300 = Ethernet abstraction Pet-Name GT),
+    # Parses frames by token (0xb169bba4 = Ethernet abstraction Pet-Name GT),
     # logs them to _callhome_log, and replies with lump-serve responses.
     _wukong_listener = None
     if _wukong_udp is not None:

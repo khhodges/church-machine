@@ -2222,7 +2222,7 @@ def _rgt_check_word(w: int) -> str | None:
     return None
 
 
-# SPEC-EXCEPTION: Ethernet.1.b169bba4.lump (token 00003300) and
+# SPEC-EXCEPTION: Ethernet.1.b169bba4.lump (token b169bba4) and
 # Tunnel.1.8770bf03.lump (token 00001f00) carry Abstract GTs in v2.0
 # hardware encoding where bits[26:25]=11 encodes the Abstract type.
 # That places bit 26 = 1, violating the spec v1.2 spare-bit requirement
@@ -2232,7 +2232,7 @@ def _rgt_check_word(w: int) -> str | None:
 _R22_CLIST_GT_EXCEPTIONS: frozenset = frozenset([
     "00001f00",  # Tunnel.1 — c-list[0]=0x07800200: v2.0 Abstract GT, bit26=1.
                  # SPEC-EXCEPTION: predates spec v1.2 GT Word 0 layout; rebuild pending.
-    "00003300",  # Ethernet.1 — c-list[0]=0x07800400: v2.0 Abstract GT, bit26=1.
+    "b169bba4",  # Ethernet.1 — c-list[0]=0x07800400: v2.0 Abstract GT, bit26=1.
                  # SPEC-EXCEPTION: predates spec v1.2 GT Word 0 layout; rebuild pending.
 ])
 

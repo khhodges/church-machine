@@ -33,7 +33,7 @@ from wukong_udp import (
 TEST_MAC      = b'\x02\xCE\x11\x00\x00\x01'
 TEST_VERSION  = 0x00010002
 TEST_UPTIME   = 42
-TEST_REQUESTS = [0x00003300, 0xABCD1234]
+TEST_REQUESTS = [0xb169bba4, 0xABCD1234]
 
 
 # ── Build / parse round-trips ─────────────────────────────────────────────────
@@ -79,11 +79,11 @@ def test_lump_serve_round_trip():
 
 def test_lump_serve_empty_words():
     """Lump-serve with W=0 words (not-found signal) round-trips correctly."""
-    response = build_lump_serve_response(0x00003300, [])
+    response = build_lump_serve_response(0xb169bba4, [])
     result   = parse_lump_serve_response(response)
     assert result is not None
     assert result['words'] == []
-    assert result['token'] == 0x00003300
+    assert result['token'] == 0xb169bba4
 
 
 # ── Token identity in frame bytes ─────────────────────────────────────────────
@@ -95,15 +95,15 @@ def test_callhome_magic_in_bytes():
 
 
 def test_callhome_carries_ethernet_token():
-    """Bytes 4-7 carry ETHERNET_TOKEN (0x00003300) — not a slot number."""
+    """Bytes 4-7 carry ETHERNET_TOKEN (0xb169bba4) — not a slot number."""
     raw   = build_callhome_frame(TEST_MAC)
     token = struct.unpack_from('>I', raw, 4)[0]
-    assert token == ETHERNET_TOKEN == 0x00003300
+    assert token == ETHERNET_TOKEN == 0xb169bba4
 
 
 def test_lumpserve_magic_in_bytes():
     """First 4 bytes of a lump-serve response are big-endian 0xCE110002."""
-    raw = build_lump_serve_response(0x00003300, [0xABCD])
+    raw = build_lump_serve_response(0xb169bba4, [0xABCD])
     assert struct.unpack_from('>I', raw, 0)[0] == LUMPSERVE_MAGIC
 
 
@@ -117,7 +117,7 @@ def test_lumpserve_carries_lump_token():
 
 def test_requests_use_tokens_not_slots():
     """Requested tokens in callhome frame are token values, not NS slot indices."""
-    token_a = 0x00003300
+    token_a = 0xb169bba4
     token_b = 0xABCD1234
     raw     = build_callhome_frame(TEST_MAC, requests=[token_a, token_b])
     result  = parse_callhome_frame(raw)
@@ -135,8 +135,8 @@ def test_callhome_minimum_length():
 def test_callhome_length_with_requests():
     """Each additional request adds 4 bytes to the callhome frame."""
     base = build_callhome_frame(TEST_MAC, requests=[])
-    with1 = build_callhome_frame(TEST_MAC, requests=[0x00003300])
-    with2 = build_callhome_frame(TEST_MAC, requests=[0x00003300, 0xABCD1234])
+    with1 = build_callhome_frame(TEST_MAC, requests=[0xb169bba4])
+    with2 = build_callhome_frame(TEST_MAC, requests=[0xb169bba4, 0xABCD1234])
     assert len(with1) == len(base) + 4
     assert len(with2) == len(base) + 8
 
@@ -164,7 +164,7 @@ def test_callhome_too_short():
 
 def test_callhome_truncated_requests():
     """Frame claiming N requests but truncated data → None."""
-    raw   = build_callhome_frame(TEST_MAC, requests=[0x00003300, 0xABCD1234])
+    raw   = build_callhome_frame(TEST_MAC, requests=[0xb169bba4, 0xABCD1234])
     trunc = raw[:-4]
     assert parse_callhome_frame(trunc) is None
 

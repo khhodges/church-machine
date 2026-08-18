@@ -1,7 +1,7 @@
-// Ethernet abstraction — token 00003300
+// Ethernet abstraction — token b169bba4
 // Provides raw Ethernet frame send/receive for the QMTECH Wukong XC7A100T.
 //
-// Identity: token 00003300.  NS slot assignment is determined at load time by
+// Identity: token b169bba4.  NS slot assignment is determined at load time by
 // the Locator/loader and is not a stable identity.  Callers identify this
 // abstraction by its token, never by slot number.
 //
@@ -31,7 +31,7 @@
 //     offset 7  ETH_RX_DATA — RX FIFO (drain bytes here after Receive returns N)
 //
 // C-list:
-//   CR6[0] (slot 0, target token 00003300) = EthernetDevice capability (hardware MMIO GT)
+//   CR6[0] (slot 0, target token b169bba4) = EthernetDevice capability (hardware MMIO GT)
 //
 // Permissions granted to callers: E (enter/call only).
 

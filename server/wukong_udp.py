@@ -8,7 +8,7 @@ Wire format (docs/HARDWARE.md § Wukong Ethernet Protocol):
 Callhome broadcast (board → IDE server, UDP port 5900):
   Offset  Bytes  Field
   0       4      Magic = 0xCE110001
-  4       4      Sender token = 0x00003300 (Ethernet abstraction Pet-Name GT)
+  4       4      Sender token = 0xb169bba4 (Ethernet abstraction Pet-Name GT)
   8       4      CM version word (u32, big-endian)
   12      6      Board MAC address (6 octets)
   18      2      Pad = 0x0000
@@ -38,7 +38,7 @@ LUMPSERVE_MAGIC  = 0xCE110002
 WUKONG_PORT      = 5900
 CALLHOME_MIN_LEN = 26    # minimum callhome frame length (N=0)
 
-ETHERNET_TOKEN   = 0x00003300   # Pet-Name GT of the Ethernet abstraction
+ETHERNET_TOKEN   = 0xb169bba4   # Pet-Name GT of the Ethernet abstraction
 
 
 # ── Frame constructors (used by tests and the board simulator) ────────────────

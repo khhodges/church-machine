@@ -17,7 +17,7 @@
 // Wire protocol: docs/HARDWARE.md § Wukong Ethernet Protocol
 //
 // C-list:
-//   CR6[0] (slot 0) = Ethernet GT  (token 00003300) — RGMII transport layer
+//   CR6[0] (slot 0) = Ethernet GT  (token b169bba4) — RGMII transport layer
 //   CR6[1] (slot 1) = Mint GT      — installs fetched LUMPs into the Namespace
 //   CR6[2] (slot 2) = NSWrite GT   — promotes Outform NS entries to Live
 //
@@ -45,9 +45,9 @@ abstraction Locator {
     // Boot() — entry point called by the startup thread (CR0 = Locator E-GT).
     //
     // Steps:
-    //   1. Load Ethernet GT from CR6 slot 0 (token 00003300).
+    //   1. Load Ethernet GT from CR6 slot 0 (token b169bba4).
     //   2. Poll Ethernet.Status() (method 3) until link is up (returns 1).
-    //   3. Send callhome broadcast frame (magic=0xCE110001, token=0x00003300)
+    //   3. Send callhome broadcast frame (magic=0xCE110001, token=0xb169bba4)
     //      via Ethernet.Send() (method 0).  The frame was pre-built into
     //      ETH_TX_DATA by the boot ROM; ETH_TX_LEN triggers TX.
     //   4. Enter receive loop via Ethernet.Receive() (method 1).
@@ -61,7 +61,7 @@ abstraction Locator {
     // Compiled pseudo-assembly (each instruction = one CM word):
     //
     //   ; --- Step 1: load Ethernet GT ---
-    //   LOAD   CR7, CR6, #0            ; Ethernet GT → CR7  (token 00003300)
+    //   LOAD   CR7, CR6, #0            ; Ethernet GT → CR7  (token b169bba4)
     //
     //   ; --- Step 2: poll for link-up ---
     //   link_poll:
@@ -121,7 +121,7 @@ abstraction Locator {
     // Inputs:  (none)
     // Outputs: (none) — side effect is a fully populated Namespace table
     method Boot() {
-        eth  = load(CR6, 0)   // Ethernet GT (token 00003300)
+        eth  = load(CR6, 0)   // Ethernet GT (token b169bba4)
         mint = load(CR6, 1)   // Mint GT
         nsw  = load(CR6, 2)   // NSWrite GT
 

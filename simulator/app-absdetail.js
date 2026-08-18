@@ -839,7 +839,7 @@ function showAbstractionDetail(index, methodName) {
         html += '<table class="abs-props-table"><tbody>';
         html += '<tr><td>Board</td><td>QMTECH Wukong Artix-7 XC7A100T</td></tr>';
         html += '<tr><td>NS Slot</td><td>51</td></tr>';
-        html += '<tr><td>Token</td><td><code>0x00003300</code></td></tr>';
+        html += '<tr><td>Token</td><td><code>0xb169bba4</code></td></tr>';
         html += '<tr><td>Permissions</td><td>[E] — callers hold E-only GT; device GT is internal</td></tr>';
         html += '<tr><td>Transport</td><td>Raw Ethernet frames (no TCP/IP stack)</td></tr>';
         html += '<tr><td>Role</td><td>Lazy-load channel — Locator fetches all other abstractions through it</td></tr>';

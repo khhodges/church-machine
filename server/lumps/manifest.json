@@ -1083,7 +1083,7 @@
     "sidecar_file": "Keystone.1.86b853a1.json"
   },
   {
-    "token": "00003300",
+    "token": "b169bba4",
     "abstraction": "Ethernet",
     "ns_slot": null,
     "ns_slot_policy": "dynamic",
@@ -1405,7 +1405,7 @@
     "sidecar_file": "IntegerOps.1.54c9a1e9.json"
   },
   {
-    "token": "95a651e7",
+    "token": "04a720f8",
     "abstraction": "NoteG",
     "filename": "NoteG.1.04a720f8.lump",
     "sidecar_file": "NoteG.1.04a720f8.json",
@@ -1662,7 +1662,7 @@
     "issue_n": 1
   },
   {
-    "token": "00000300",
+    "token": "55f1a32f",
     "abstraction": "LEDFlash",
     "filename": "LEDFlash.1.55f1a32f.lump",
     "sidecar_file": "LEDFlash.1.55f1a32f.json",
