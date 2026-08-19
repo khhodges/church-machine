@@ -1946,5 +1946,28 @@
     "identity_hash": "b2c8f3d7d7e755f24ac3ab22726514cfaa9a604d037ab661891c198a0f5d8b90",
     "dot_name": "WukongCallHome",
     "issue_n": 1
+  },
+  {
+    "token": "46738c7a",
+    "abstraction": "WukongCallHome",
+    "filename": "WukongCallHome.1.d74da592.lump",
+    "sidecar_file": "WukongCallHome.1.d74da592.json",
+    "lump_size": 1024,
+    "cw": 74,
+    "cc": 3,
+    "author": "",
+    "version": "",
+    "lump_version": 6,
+    "compiled_at": 1787141161.1948426,
+    "methods": [],
+    "grants": [
+      "E"
+    ],
+    "binary_hash": "86c7bb5ddb7a07a5bc48024670d197e487e237eeb9c9ccda9443a42d557d3357",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "b2c8f3d7d7e755f24ac3ab22726514cfaa9a604d037ab661891c198a0f5d8b90",
+    "dot_name": "WukongCallHome",
+    "issue_n": 1
   }
 ]
