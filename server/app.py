@@ -5469,6 +5469,16 @@ def save_lump():
     _sl_hdr   = _sl_words[0]
     _sl_cc2   = _sl_hdr & 0xFF
     _sl_lsz   = 1 << (((_sl_hdr >> 23) & 0xF) + 6)
+    _declared_caps_raw = metadata.get("capabilities", [])
+    if _declared_caps_raw is None:
+        _declared_caps_raw = []
+    if not isinstance(_declared_caps_raw, list):
+        return jsonify({
+            "error": "Capability validation failed: metadata.capabilities must be an array.",
+            "capability_validation_failed": True,
+        }), 422
+    _has_declared_caps = len(_declared_caps_raw) > 0
+    _validated_declared_caps = []
 
     # ── SelfTest canonical layout guard (ALL token 00000600 saves) ───────────
     # Runs BEFORE the cc=0→1 auto-rewrite so the rewrite cannot be used to
@@ -5559,7 +5569,7 @@ def save_lump():
                 "word_index":            510,
             }), 422
 
-    if _sl_cc2 == 0:
+    if _sl_cc2 == 0 and not _has_declared_caps:
         # No c-list yet — open one slot in the padding zone and bump cc to 1.
         # Never reached for the canonical 512-word SelfTest lump: cc=2 is
         # enforced by the guard above before this point.
@@ -5573,10 +5583,219 @@ def save_lump():
 
     _clist_row0_idx = _sl_lsz - _sl_cc2
 
+    # Older binaries can reserve several all-zero c-list rows before the
+    # server writes the legacy identity seal at row 0. Preserve that inert
+    # format, but reject any nonzero undeclared row: it would otherwise carry
+    # an unchecked Golden Token (including B-set or pending placeholders).
+    if not _has_declared_caps and _sl_cc2 > 1:
+        _undeclared_nonzero_rows = [
+            _row for _row in range(_sl_cc2)
+            if _sl_words[_clist_row0_idx + _row] != 0
+        ]
+        if _undeclared_nonzero_rows:
+            return jsonify({
+                "error": (
+                    "Capability validation failed: the LUMP header declares "
+                    f"cc={_sl_cc2}, but metadata declares no capabilities and "
+                    f"c-list row {_undeclared_nonzero_rows[0]} is nonzero. "
+                    "Declare one named capability for every non-empty c-list row "
+                    "before saving."
+                ),
+                "capability_validation_failed": True,
+                "declared_capability_count": 0,
+                "cc": _sl_cc2,
+                "clist_row": _undeclared_nonzero_rows[0],
+            }), 422
+
+    # ── Declared-capability C-list guard ─────────────────────────────────────
+    # A declared capability owns its c-list row. Never replace it with an
+    # identity seal and never persist NULL, pending, malformed, mis-targeted,
+    # or over/under-permissioned tokens. The browser performs the same checks,
+    # but this endpoint is the final trust boundary.
+    if _has_declared_caps:
+        if len(_declared_caps_raw) != _sl_cc2:
+            return jsonify({
+                "error": (
+                    f"Capability validation failed: metadata declares "
+                    f"{len(_declared_caps_raw)} capabilities but the LUMP header "
+                    f"declares cc={_sl_cc2}."
+                ),
+                "capability_validation_failed": True,
+                "declared_capability_count": len(_declared_caps_raw),
+                "cc": _sl_cc2,
+            }), 422
+        if _clist_row0_idx <= 0 or (_clist_row0_idx + _sl_cc2) > len(_sl_words):
+            return jsonify({
+                "error": (
+                    f"Capability validation failed: c-list range "
+                    f"[{_clist_row0_idx}, {_clist_row0_idx + _sl_cc2}) is outside "
+                    f"the {len(_sl_words)}-word LUMP."
+                ),
+                "capability_validation_failed": True,
+            }), 422
+
+        _right_order = ("R", "W", "X", "L", "S", "E")
+        for _cap_row, _cap_raw in enumerate(_declared_caps_raw):
+            if isinstance(_cap_raw, str):
+                _cap_name = _cap_raw.strip()
+                _cap_right_values = []
+                _cap_obj = {"name": _cap_name}
+                _cap_target_raw = None
+            elif isinstance(_cap_raw, dict):
+                _cap_name = str(_cap_raw.get("name", "")).strip()
+                _cap_right_values = _cap_raw.get("rights", [])
+                _cap_obj = dict(_cap_raw)
+                _cap_target_raw = _cap_raw.get("nsIndex", _cap_raw.get("target"))
+            else:
+                _cap_name = ""
+                _cap_right_values = []
+                _cap_obj = {}
+                _cap_target_raw = None
+
+            def _cap_reject(_detail, **_extra):
+                _body = {
+                    "error": (
+                        f'Capability validation failed for '
+                        f'"{_cap_name or f"c-list[{_cap_row}]"}": {_detail}'
+                    ),
+                    "capability_validation_failed": True,
+                    "capability": _cap_name,
+                    "clist_row": _cap_row,
+                }
+                _body.update(_extra)
+                return jsonify(_body), 422
+
+            if not _cap_name:
+                return _cap_reject("the declared capability has no name.")
+
+            if not isinstance(_cap_right_values, list):
+                return _cap_reject(
+                    "permissions must be an array of permission strings."
+                )
+            _cap_rights = []
+            for _cap_right_value in _cap_right_values:
+                if (not isinstance(_cap_right_value, str)
+                        or not _cap_right_value.strip()):
+                    return _cap_reject(
+                        "each permission must be a non-empty string."
+                    )
+                _cap_right_text = _cap_right_value.strip().upper()
+                _invalid_cap_rights = [
+                    _ch for _ch in _cap_right_text
+                    if _ch not in _right_order
+                ]
+                if _invalid_cap_rights:
+                    return _cap_reject(
+                        "permissions contain invalid character(s) "
+                        f'"{"".join(_invalid_cap_rights)}"; valid letters are '
+                        f'{" ".join(_right_order)}.'
+                    )
+                for _cap_right in _cap_right_text:
+                    if _cap_right not in _cap_rights:
+                        _cap_rights.append(_cap_right)
+            if not _cap_rights:
+                return _cap_reject("no permissions were declared.")
+
+            _cap_has_turing = any(_r in _cap_rights for _r in ("R", "W", "X"))
+            _cap_has_church = any(_r in _cap_rights for _r in ("L", "S", "E"))
+            if _cap_has_turing and _cap_has_church:
+                return _cap_reject(
+                    f"permissions {''.join(_cap_rights)} mix Turing and Church domains."
+                )
+            if sum(1 for _r in ("L", "S", "E") if _r in _cap_rights) > 1:
+                return _cap_reject(
+                    f"permissions {''.join(_cap_rights)} violate the single-Church-permission rule."
+                )
+
+            try:
+                if isinstance(_cap_target_raw, bool):
+                    raise ValueError()
+                _cap_target = int(_cap_target_raw)
+            except (TypeError, ValueError):
+                return _cap_reject(
+                    "the active namespace target is unresolved; metadata.nsIndex is required."
+                )
+            if _cap_target < 0 or _cap_target > 0xFFFF:
+                return _cap_reject(
+                    f"namespace target {_cap_target} is outside the 16-bit NS range."
+                )
+
+            _cap_word = _sl_words[_clist_row0_idx + _cap_row] & 0xFFFFFFFF
+            if (_cap_word >> 16) == 0xFEED:
+                return _cap_reject(
+                    f"c-list row {_cap_row} is still a pending placeholder "
+                    f"(0x{_cap_word:08X}); resolve {_cap_name} before saving.",
+                    actual_word=_cap_word,
+                )
+
+            _cap_b = (_cap_word >> 31) & 1
+            _cap_perm3 = (_cap_word >> 28) & 0x7
+            _cap_dom = (_cap_word >> 27) & 1
+            _cap_type = (_cap_word >> 25) & 0x3
+            _cap_index = _cap_word & 0xFFFF
+            if _cap_type == 0:
+                return _cap_reject(
+                    f"c-list row {_cap_row} contains a NULL Golden Token "
+                    f"(0x{_cap_word:08X}); resolve {_cap_name} before saving.",
+                    actual_word=_cap_word,
+                )
+            if _cap_type != 1:
+                return _cap_reject(
+                    f"c-list row {_cap_row} has Golden Token type {_cap_type}; "
+                    f"a declared c-list capability must be an Inform token.",
+                    actual_word=_cap_word,
+                )
+            if _cap_b:
+                return _cap_reject(
+                    "the Golden Token unexpectedly has its B flag set.",
+                    actual_word=_cap_word,
+                )
+            if _cap_dom == 1 and (
+                    ((_cap_perm3 >> 0) & 1)
+                    + ((_cap_perm3 >> 1) & 1)
+                    + ((_cap_perm3 >> 2) & 1)
+                    > 1):
+                return _cap_reject(
+                    "the Golden Token has multiple Church permissions.",
+                    actual_word=_cap_word,
+                )
+            if _cap_index != _cap_target:
+                return _cap_reject(
+                    f"c-list row {_cap_row} targets NS[{_cap_index}], but the "
+                    f"declared capability resolves to NS[{_cap_target}].",
+                    actual_word=_cap_word,
+                    expected_ns_index=_cap_target,
+                    actual_ns_index=_cap_index,
+                )
+
+            _expected_dom = 1 if _cap_has_church else 0
+            _expected_perm3 = (
+                ((1 if "E" in _cap_rights else 0) << 2)
+                | ((1 if "S" in _cap_rights else 0) << 1)
+                | (1 if "L" in _cap_rights else 0)
+            ) if _expected_dom else (
+                ((1 if "X" in _cap_rights else 0) << 2)
+                | ((1 if "W" in _cap_rights else 0) << 1)
+                | (1 if "R" in _cap_rights else 0)
+            )
+            if _cap_dom != _expected_dom or _cap_perm3 != _expected_perm3:
+                return _cap_reject(
+                    f"c-list row {_cap_row} permissions do not match declared "
+                    f"{''.join(_cap_rights)} rights.",
+                    actual_word=_cap_word,
+                )
+
+            _cap_obj["name"] = _cap_name
+            _cap_obj["rights"] = _cap_rights
+            _cap_obj["nsIndex"] = _cap_target
+            _validated_declared_caps.append(_cap_obj)
+
     # Inject the self-GT identity seal at c-list[0].
     # Skipped for token 00000600: its c-list[0] is the hardware-asserted SelfTest
     # E-GT (validated above) and must not be overwritten with the petname seal.
-    if not _is_selftest_canonical:
+    # Also skipped when c-list rows belong to declared capabilities; in that
+    # case identity_string + identity_hash are the canonical metadata seal.
+    if not _is_selftest_canonical and not _has_declared_caps:
         if 0 < _clist_row0_idx < len(_sl_words):
             _sl_words[_clist_row0_idx] = _self_gt
 
@@ -5849,7 +6068,11 @@ def save_lump():
         "version":       metadata.get("version", ""),
         "release_notes": metadata.get("release_notes", ""),
         "methods":       metadata.get("methods", []),
-        "capabilities":  metadata.get("capabilities", []),
+        "capabilities":  (
+            _validated_declared_caps
+            if _has_declared_caps
+            else metadata.get("capabilities", [])
+        ),
         "pet_names": {
             "DR": metadata.get("pet_names_dr", {}),
             "CR": metadata.get("pet_names_cr", {})
@@ -5873,6 +6096,11 @@ def save_lump():
         "issue_number":    _issue_number,
         "identity_string": _identity_string,
         "identity_hash":   _identity_hash,
+        "identity_seal_location": (
+            "sidecar"
+            if _has_declared_caps
+            else ("canonical-c-list" if _is_selftest_canonical else "c-list[0]")
+        ),
         "dot_name":        _dot_name_save,
         "issue_n":         _issue_n_save,
     }

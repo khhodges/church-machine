@@ -1905,27 +1905,33 @@ function _storeLumpManifest(nsIdx, baseLoc, methods, manifest, capabilities) {
 }
 
 function _resolveClistPetName(clistBase, imm, nsIdx) {
-    if (clistBase > 0 && sim && (clistBase + imm) < sim.memory.length) {
-        const gtWord = sim.memory[clistBase + imm] >>> 0;
-        if (gtWord !== 0) {
-            const parsed = sim.parseGT(gtWord);
-            if (parsed.type === 3) {
-                // Abstract GT: bits[15:0] is ab_data = (device_class<<8)|instance, not an NS slot.
-                try {
-                    const ab = sim.parseAbstractGT(gtWord);
-                    const DC = { 1: 'LED', 2: 'UART', 3: 'Button', 4: 'Timer', 5: 'Display' };
-                    if (ab.ab_type === 0) return `${DC[ab.device_class] || 'dc'+ab.device_class}${ab.device_data}`;
-                    return `M-Elev 0x${ab.ab_data.toString(16).toUpperCase()}`;
-                } catch(_e) {}
-            }
-            return (sim.nsLabels && sim.nsLabels[parsed.index]) || `NS[${parsed.index}]`;
-        }
-    }
     const stored = _lumpManifests[nsIdx];
     const caps = stored && stored._caps;
-    if (caps && imm > 0 && imm <= caps.length) {
-        return caps[imm - 1];
+    const declared = caps && imm >= 0 && imm < caps.length ? caps[imm] : null;
+    const declaredName = typeof declared === 'string'
+        ? declared
+        : (declared && declared.name ? declared.name : null);
+
+    if (clistBase > 0 && sim && (clistBase + imm) < sim.memory.length) {
+        const gtWord = sim.memory[clistBase + imm] >>> 0;
+        if (declaredName && typeof CapabilityTokens !== 'undefined') {
+            const resolved = CapabilityTokens.resolveCapability(declared, {
+                sim,
+                lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) ? _lumpsCache : [],
+            });
+            const checked = CapabilityTokens.validateToken(gtWord, resolved, { sim });
+            if (checked.ok) return declaredName;
+            return `Invalid ${declaredName} GT`;
+        }
+        if (gtWord !== 0) {
+            const parsed = sim.parseGT(gtWord);
+            if (parsed.type === 1 && !parsed.malformed) {
+                return (sim.nsLabels && sim.nsLabels[parsed.index]) || `NS[${parsed.index}]`;
+            }
+            return 'Invalid c-list GT';
+        }
     }
+    if (declaredName) return `Unresolved ${declaredName}`;
     return null;
 }
 

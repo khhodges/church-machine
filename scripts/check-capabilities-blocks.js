@@ -203,7 +203,7 @@ function parseCapabilities(src) {
 // Return the set of abstract names referenced by dot-notation operands in src.
 // Names that are boot-level qualified references (containing a dot in the LOAD
 // operand) are excluded; only plain identifiers are returned.
-function extractReferencedNames(src) {
+function extractReferencedNames(src, capabilities) {
     const names = new Set();
 
     for (const raw of src.split('\n')) {
@@ -213,7 +213,13 @@ function extractReferencedNames(src) {
         // CALL Name.method  — dot-notation dispatch
         const callDot = code.match(/^CALL\s+([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)/);
         if (callDot) {
-            names.add(callDot[1]);
+            const dottedName = `${callDot[1]}.${callDot[2]}`;
+            // A dot-named single-entry LUMP (for example
+            // WukongCallHome.hw) is itself the declared capability and uses
+            // selector 0. Otherwise this is normal Abstraction.method syntax.
+            names.add(capabilities && capabilities.has(dottedName)
+                ? dottedName
+                : callDot[1]);
             continue;
         }
 
@@ -248,13 +254,12 @@ for (const filepath of files) {
     const relpath = path.relative(ROOT, filepath);
     const src     = fs.readFileSync(filepath, 'utf8');
 
-    const referenced = extractReferencedNames(src);
+    const caps = parseCapabilities(src);
+    const referenced = extractReferencedNames(src, caps);
     if (referenced.size === 0) {
         console.log(`  ok   (no dot-notation)  ${relpath}`);
         continue;
     }
-
-    const caps = parseCapabilities(src);
 
     const missing = [];
     for (const name of referenced) {

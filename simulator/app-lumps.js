@@ -849,9 +849,10 @@ function _runSelectedLumpInSim(btn) {
     // classic "LED flash LUMP stays in place" bug.  Passing null forces
     // loadLumpBinary to target BOOT_ABSTR_NS_SLOT so the new code is reachable
     // via CR14 immediately.
-    // Pass capabilities so _loadLumpBinaryIntoSim can inject device GTs for any
-    // NULL c-list slots in binaries compiled before the pet-name registry was wired.
-    _loadLumpBinaryIntoSim(_selectedLumpToken, lump.abstraction || _selectedLumpToken, btn, null, lump.capabilities || []);
+    // The loader re-reads the canonical sidecar before execution. Passing this
+    // cache entry as undefined (rather than coercing it to []) makes a stale
+    // catalogue entry fail closed instead of bypassing declared-capability checks.
+    _loadLumpBinaryIntoSim(_selectedLumpToken, lump.abstraction || _selectedLumpToken, btn, null, lump.capabilities);
 }
 
 function _showLumpWorkspaceTabs() {
@@ -5523,24 +5524,33 @@ window.showFormatLump = async function() {
     })(); } catch (_frameErr) { /* frame embedding failed — binary is still valid without it */ }
     // ─────────────────────────────────────────────────────────────────────────
 
-    // ── Populate c-list tail with pending GT sentinels ────────────────────────
-    // Write each named capability into its binary c-list slot as a 0xFEED
-    // pending GT sentinel so the loader can resolve the pet name to a real GT
-    // when the lump is deployed to a namespace slot.  Unnamed slots stay zero.
-    // The RGT audit exempts 0xFEED sentinels from the spare-bit-26 check.
-    if (typeof ChurchSimulator !== 'undefined' &&
-            typeof ChurchSimulator.makePendingGT === 'function' && _svCC > 0) {
-        var _clBase = _svLumpSize - _svCC;
-        for (var _cli = 0; _cli < _svCC; _cli++) {
-            var _clCap  = _caps[_cli];
-            var _clName = (_clCap && _clCap.name) ? _clCap.name
-                        : (typeof _clCap === 'string' && _clCap ? _clCap : null);
-            if (_clName) {
-                _svBinary[_clBase + _cli] = ChurchSimulator.makePendingGT(_clName);
-            }
-        }
+    // Materialize every declared capability now. Pending/NULL placeholders are
+    // not persistable: they make the saved LUMP depend on a later injection
+    // pass and allow malformed words to reach Code view and runtime.
+    if (typeof CapabilityTokens === 'undefined') {
+        alert('Cannot format this LUMP: capability token validator is unavailable.');
+        return;
     }
-    // ─────────────────────────────────────────────────────────────────────────
+    var _clBase = _svLumpSize - _svCC;
+    var _capMaterialized = CapabilityTokens.materialize(_caps, _svBinary, _clBase, {
+        sim: (typeof sim !== 'undefined' ? sim : null),
+        lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) ? _lumpsCache : [],
+    });
+    if (!_capMaterialized.ok) {
+        var _capFailure = 'Cannot save this LUMP until its capabilities resolve:\n' +
+            _capMaterialized.errors.map(function(message) { return '\u2022 ' + message; }).join('\n');
+        if (typeof appendOutput === 'function') appendOutput(_capFailure, 'error');
+        alert(_capFailure);
+        return;
+    }
+    _caps = _capMaterialized.resolvedCaps.map(function(cap) {
+        return {
+            name: cap.name,
+            rights: cap.rights.slice(),
+            grants: cap.grants.slice(),
+            nsIndex: cap.nsIndex,
+        };
+    });
 
     // Store for Step 2 so confirmSaveToNamespace() does not rebuild.
     // registeredAt is captured now so Step 2 can verify nothing was recompiled
@@ -5550,6 +5560,7 @@ window.showFormatLump = async function() {
         binary:       _svBinary,
         words:        _svWords.slice(),
         caps:         _caps,
+        resolvedCaps: _capMaterialized.resolvedCaps,
         registeredAt: _svRegisteredAt
     };
 
@@ -5906,6 +5917,78 @@ async function _gtPickCommit(lumpToken, slotIndex) {
     }
 }
 
+// ── Saved-LUMP capability metadata guard ─────────────────────────────────────
+// Always obtain the canonical sidecar before running a saved binary. The list
+// endpoint intentionally returns a lean cache and the resident editor can load
+// a LUMP without a list entry, so callers must not be able to bypass validation
+// by omitting the optional `caps` argument.
+async function _loadSavedLumpCapabilities(token, suppliedCaps) {
+    const resp = await fetch(`/api/lumps/${token}/detail`, { cache: 'no-store' });
+    if (!resp.ok) {
+        throw new Error(`could not load declared capability metadata (server returned ${resp.status})`);
+    }
+    const detail = await resp.json();
+    if (!Array.isArray(detail.capabilities)) {
+        throw new Error('declared capability metadata is unavailable or malformed');
+    }
+    if (suppliedCaps !== undefined && suppliedCaps !== null) {
+        if (!Array.isArray(suppliedCaps) ||
+            JSON.stringify(suppliedCaps) !== JSON.stringify(detail.capabilities)) {
+            throw new Error('catalog capability metadata does not match the saved LUMP sidecar');
+        }
+    }
+    return {
+        capabilities: detail.capabilities,
+        identityHash: detail.identity_hash || null,
+        identitySealLocation: detail.identity_seal_location || null,
+    };
+}
+
+function _validateSavedLumpClist(rawWords, header, savedMetadata, simInstance) {
+    const savedCaps = savedMetadata.capabilities;
+    const legacySelfSeal = savedCaps.length === 0 && header.cc > 0 &&
+        savedMetadata.identitySealLocation !== 'sidecar' &&
+        typeof savedMetadata.identityHash === 'string' &&
+        /^[0-9a-f]{64}$/i.test(savedMetadata.identityHash);
+    if (savedCaps.length !== header.cc && !legacySelfSeal) {
+        throw new Error(
+            `declared capability count ${savedCaps.length} does not match c-list count ${header.cc}`
+        );
+    }
+    if (legacySelfSeal) {
+        const legacyExpectedSeal = (
+            0x0A000000 | (parseInt(savedMetadata.identityHash.slice(0, 8), 16) & 0x1FFFFFF)
+        ) >>> 0;
+        const legacyClistStart = header.lumpSize - header.cc;
+        const legacyActualSeal = rawWords[legacyClistStart] >>> 0;
+        const legacyReservedRowsAreZero = rawWords
+            .slice(legacyClistStart + 1, header.lumpSize)
+            .every(word => (word >>> 0) === 0);
+        if (legacyActualSeal !== legacyExpectedSeal || !legacyReservedRowsAreZero) {
+            throw new Error('legacy identity-seal c-list contains malformed undeclared rows');
+        }
+    }
+    if (savedCaps.length > 0) {
+        if (typeof CapabilityTokens === 'undefined') {
+            throw new Error('capability token validator is unavailable');
+        }
+        const runResolved = CapabilityTokens.resolveCapabilities(savedCaps, {
+            sim: simInstance,
+            lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) ? _lumpsCache : [],
+        });
+        const runValidation = CapabilityTokens.validateClist(
+            rawWords,
+            header.lumpSize - header.cc,
+            runResolved,
+            { sim: simInstance }
+        );
+        if (!runValidation.ok) {
+            throw new Error('capability validation failed: ' + runValidation.errors.join(' '));
+        }
+    }
+    return savedCaps;
+}
+
 // ── Load a saved LUMP binary into the simulator ───────────────────────────────
 // Fetches the full LUMP binary from /api/lump/<token>/words and loads it
 // atomically into the simulator via sim.loadLumpBinary().  The entire binary
@@ -5918,13 +6001,19 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
     if (!token) return;
     if (btn) { btn.disabled = true; btn.textContent = 'Loading\u2026'; }
     try {
-        const resp = await fetch(`/api/lump/${token}/words`);
+        const [resp, _savedMetadata] = await Promise.all([
+            fetch(`/api/lump/${token}/words`),
+            _loadSavedLumpCapabilities(token, caps),
+        ]);
         if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
         const data = await resp.json();
         const rawWords = data.words || [];
         if (!rawWords.length) throw new Error('Empty LUMP \u2014 no words returned');
 
         if (typeof sim === 'undefined' || !sim) throw new Error('Simulator not ready');
+        const _runHeader = sim.parseLumpHeader(rawWords[0] >>> 0);
+        if (!_runHeader || !_runHeader.valid) throw new Error('Malformed LUMP header');
+        const _savedCaps = _validateSavedLumpClist(rawWords, _runHeader, _savedMetadata, sim);
 
         const _BOOT_SLOT = sim._bootAbstrSlot;
         // _targetSlot: the NS slot the LUMP will occupy after loading.
@@ -5992,41 +6081,6 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
         // Calling _injectClistNow() here would overwrite the loaded c-list and mutate the
         // header's cc field, destroying the LUMP integrity that this function now preserves.
         //
-        // DEVICE GT INJECTION — covers binaries compiled before the pet-name registry was
-        // wired (NULL c-list slots for LED0, UART_TX, etc.).  For each capability with a
-        // NULL slot in sim.memory, resolve the GT via the universal pet-name registry
-        // (abstractionRegistry.abstractions[j].capabilities, populated from boot_uploads.js)
-        // and inject it.  Non-null slots are never overwritten.
-        if (Array.isArray(caps) && caps.length > 0 && sim.cr && sim.cr[6] && sim.cr[6].word1 != null) {
-            const _clistBase = sim.cr[6].word1 >>> 0;
-            const _allAbs = (sim.abstractionRegistry && sim.abstractionRegistry.abstractions) || {};
-            for (let _ci = 0; _ci < caps.length; _ci++) {
-                if ((sim.memory[_clistBase + _ci] >>> 0) !== 0) continue; // already filled
-                const _capName = (typeof caps[_ci] === 'string' ? caps[_ci] : (caps[_ci] && caps[_ci].name) || '').toUpperCase();
-                if (!_capName) continue;
-                // Search the capabilities arrays for a matching pet name
-                let _found = false;
-                for (const _jj of Object.keys(_allAbs)) {
-                    const _aa = _allAbs[_jj];
-                    if (!Array.isArray(_aa.capabilities)) continue;
-                    for (const _dc of _aa.capabilities) {
-                        if (_dc.name && _dc.name.toUpperCase() === _capName && _dc.target != null) {
-                            const _grants = Array.isArray(_dc.grants) ? _dc.grants : [];
-                            const _turing = _grants.some(g => g === 'R' || g === 'W' || g === 'X');
-                            const _perms = _turing
-                                ? { R: _grants.includes('R')?1:0, W: _grants.includes('W')?1:0, X: _grants.includes('X')?1:0, L:0, S:0, E:0 }
-                                : { R:0, W:0, X:0, L:0, S:0, E:1 };
-                            if (typeof sim.createGT === 'function') {
-                                sim.memory[_clistBase + _ci] = sim.createGT(0, _dc.target, _perms, 1) >>> 0;
-                            }
-                            _found = true;
-                            break;
-                        }
-                    }
-                    if (_found) break;
-                }
-            }
-        }
         if (sim.programName !== undefined) sim.programName = name || token;
 
         const hdr = rawWords.length ? sim.parseLumpHeader(rawWords[0] >>> 0) : null;

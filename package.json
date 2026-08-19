@@ -8,7 +8,7 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "node simulator/assembler_test.js && node scripts/check-capabilities-blocks.js --glob '**/*.cloomc'",
+    "test": "node simulator/assembler_test.js && node simulator/test_saved_lump_cap_guard.js && node scripts/check-capabilities-blocks.js --glob '**/*.cloomc'",
     "test:e2e": "npx playwright test",
     "check:capabilities": "node scripts/check-capabilities-blocks.js --glob '**/*.cloomc'",
     "check:selftest-lump": "node scripts/check_selftest_lump_stale.js",

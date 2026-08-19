@@ -3,11 +3,16 @@
 //
 // CI guard: verifies that simulator/examples/wukong_callhome.cloomc, when
 // assembled, produces instruction words that match hardware/boot_rom.py's
-// WUKONG_NUC_PROGRAM.
+// WUKONG_NUC_PROGRAM while allowing the software LUMP's explicit hardware
+// handoff after the shared ROM sequence.
 //
 // What is checked:
-//   • Total word count must be exactly 73.
-//   • Words [2..72] must be bit-for-bit identical.
+//   • The software LUMP must contain exactly 74 instructions; the immutable ROM
+//     remains exactly 73 words.
+//   • Words [2..71] must be bit-for-bit identical.
+//   • Word 72 must CALL WukongCallHome.hw through c-list row 2, selector 0.
+//   • Word 73 must be the adjusted loop fallback (BRANCH -70).
+//   • Declared capabilities must materialize to the canonical Wukong tokens.
 //
 // What is intentionally NOT compared:
 //   • Words [0..1] (LOAD instructions) — the LUMP uses c-list slots 0/1 for
@@ -35,6 +40,7 @@ const { execSync }  = require('child_process');
 const ROOT        = path.resolve(__dirname, '..');
 const ASSEMBLER   = path.join(ROOT, 'simulator', 'assembler.js');
 const SOURCE      = path.join(ROOT, 'simulator', 'examples', 'wukong_callhome.cloomc');
+const CAP_TOKENS  = path.join(ROOT, 'simulator', 'capability_tokens.js');
 
 // ── Load assembler ───────────────────────────────────────────────────────────
 global.localStorage = {
@@ -105,8 +111,8 @@ console.log(`WUKONG_NUC_PROGRAM has ${nucProgram.length} words.`);
 // ── Verify lengths ────────────────────────────────────────────────────────────
 let failed = false;
 
-if (assembled.length !== 73) {
-    console.error(`FAIL: wukong_callhome.cloomc assembled to ${assembled.length} words; expected 73.`);
+if (assembled.length !== 74) {
+    console.error(`FAIL: wukong_callhome.cloomc assembled to ${assembled.length} words; expected 74.`);
     failed = true;
 }
 if (nucProgram.length !== 73) {
@@ -144,11 +150,11 @@ function normWord(w) {
     return w;
 }
 
-// ── Check words 2-72 (instruction logic, must match after normalisation) ───────
-console.log('\nChecking words [2..72] (instruction logic, bit14-normalised)...');
+// ── Check shared words 2-71 (instruction logic) ───────────────────────────────
+console.log('\nChecking words [2..71] (shared ROM logic, bit14-normalised)...');
 let diverged = false;
 
-for (let i = 2; i < 73; i++) {
+for (let i = 2; i < 72; i++) {
     const a = normWord(assembled[i] >>> 0);
     const n = normWord(nucProgram[i] >>> 0);
     if (a !== n) {
@@ -163,7 +169,7 @@ for (let i = 2; i < 73; i++) {
 }
 
 // Report bit14 differences as info (not failures) so they're visible but don't break CI.
-for (let i = 2; i < 73; i++) {
+for (let i = 2; i < 72; i++) {
     const a = (assembled[i] >>> 0);
     const n = (nucProgram[i] >>> 0);
     const opc = (a >>> 27) & 0x1F;
@@ -178,7 +184,66 @@ for (let i = 2; i < 73; i++) {
 }
 
 if (!diverged) {
-    console.log('  OK: words [2..72] match exactly.');
+    console.log('  OK: words [2..71] match exactly.');
+}
+
+// The immutable ROM loops at word 72. The software LUMP instead hands off to
+// the recovered hardware LUMP, then keeps an adjusted loop as a safe fallback.
+const EXPECTED_HW_CALL = 0x47030002;
+const EXPECTED_SW_LOOP = 0xBF007FBA;
+const EXPECTED_ROM_LOOP = 0xBF007FBB;
+if ((assembled[72] >>> 0) !== EXPECTED_HW_CALL) {
+    console.error(`  DIVERGED word[72]: expected WukongCallHome.hw selector-0 CALL ` +
+                  `0x${EXPECTED_HW_CALL.toString(16)}, got 0x${(assembled[72] >>> 0).toString(16)}.`);
+    diverged = true;
+}
+if ((assembled[73] >>> 0) !== EXPECTED_SW_LOOP) {
+    console.error(`  DIVERGED word[73]: expected loop fallback 0x${EXPECTED_SW_LOOP.toString(16)}, ` +
+                  `got 0x${(assembled[73] >>> 0).toString(16)}.`);
+    diverged = true;
+}
+if ((nucProgram[72] >>> 0) !== EXPECTED_ROM_LOOP) {
+    console.error(`  DIVERGED immutable ROM word[72]: expected 0x${EXPECTED_ROM_LOOP.toString(16)}, ` +
+                  `got 0x${(nucProgram[72] >>> 0).toString(16)}.`);
+    diverged = true;
+}
+
+// Verify the declared capability order, exact rights, targets, and encoded GTs.
+const CapabilityTokens = require(CAP_TOKENS);
+const expectedCaps = [
+    { name: 'LED0', rights: ['R', 'W'], nsIndex: 3, token: 0x32000003 },
+    { name: 'UART_TX', rights: ['W'], nsIndex: 2, token: 0x22000002 },
+    { name: 'WukongCallHome.hw', rights: ['E'], nsIndex: 7, token: 0x4A000007 },
+];
+const declaredCaps = result.capabilities || [];
+if (JSON.stringify(declaredCaps) !== JSON.stringify(
+        expectedCaps.map(({name, rights}) => ({name, rights})))) {
+    console.error(`  DIVERGED capabilities: got ${JSON.stringify(declaredCaps)}.`);
+    diverged = true;
+} else {
+    const capWords = new Array(expectedCaps.length).fill(0);
+    const capSim = {
+        abstractionRegistry: {
+            abstractions: {
+                2: { capabilities: [{name: 'UART_TX', target: 2, grants: ['R', 'W']}] },
+                3: { capabilities: [{name: 'LED0', target: 3, grants: ['R', 'W']}] },
+            },
+        },
+        nsLabels: {7: 'WukongCallHome'},
+    };
+    const builtCaps = CapabilityTokens.materialize(
+        declaredCaps, capWords, 0, {
+            sim: capSim,
+            lumps: [{abstraction: 'WukongCallHome.hw', ns_slot: 7, grants: ['E']}],
+        });
+    const expectedWords = expectedCaps.map(cap => cap.token >>> 0);
+    if (!builtCaps.ok || JSON.stringify(capWords) !== JSON.stringify(expectedWords)) {
+        console.error(`  DIVERGED c-list tokens: ${builtCaps.errors.join('; ')} ` +
+                      `got ${capWords.map(w => `0x${(w >>> 0).toString(16)}`).join(', ')}.`);
+        diverged = true;
+    } else {
+        console.log('  OK: capability rows materialize to LED0/UART_TX/WukongCallHome.hw canonical GTs.');
+    }
 }
 
 // ── Check words 0-1 (LOAD instructions — slot index differs by design) ────────

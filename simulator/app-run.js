@@ -165,6 +165,74 @@ function _pushAsmLabelSnippets(source, labels, progName) {
     }
 }
 
+function _materializeRunCapabilities(capabilities, actionLabel) {
+    const caps = Array.isArray(capabilities) ? capabilities : [];
+    if (caps.length === 0) {
+        return { ok: true, errors: [], capabilities: [] };
+    }
+    if (typeof CapabilityTokens === 'undefined') {
+        return {
+            ok: false,
+            errors: [`${actionLabel}: capability validator is unavailable; compile again after reloading the IDE.`],
+            capabilities: [],
+        };
+    }
+
+    const tokenWords = new Array(caps.length).fill(0);
+    const materialized = CapabilityTokens.materialize(
+        caps, tokenWords, 0,
+        {
+            sim,
+            lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache))
+                ? _lumpsCache : [],
+        }
+    );
+    if (!materialized.ok) {
+        return {
+            ok: false,
+            errors: materialized.errors,
+            capabilities: [],
+        };
+    }
+    return {
+        ok: true,
+        errors: [],
+        capabilities: materialized.resolvedCaps.map((cap, index) => ({
+            name: cap.name,
+            rights: cap.rights.slice(),
+            grants: cap.grants.slice(),
+            nsIndex: cap.nsIndex,
+            token: tokenWords[index] >>> 0,
+        })),
+    };
+}
+
+function _blockCapabilityRun(errors, con) {
+    const messages = (errors || []).map(message => `[CAP-GT] ${message}`);
+    const text = `Capability validation failed — code not loaded:\n${messages.join('\n')}`;
+    _pendingSimLoad = false;
+    window._lastCLOOMCLump = null;
+    if (con) {
+        con.className = '';
+        con.textContent = text;
+    }
+    if (typeof appendOutput === 'function') appendOutput(text, 'error');
+    if (typeof _showAsmErrors === 'function') {
+        _showAsmErrors(
+            messages.map(message => ({ line: null, message })),
+            'Capability validation failed — code not loaded'
+        );
+    }
+    const saveBtn = document.getElementById('btnSaveNS');
+    if (saveBtn) saveBtn.disabled = true;
+    const toolbarSave = document.getElementById('btnToolbarSaveLump');
+    if (toolbarSave) toolbarSave.disabled = true;
+    const exportBtn = document.getElementById('btnExportLump');
+    if (exportBtn) exportBtn.disabled = true;
+    switchCodeTab('console');
+    showNextSteps('error');
+}
+
 function assembleAndLoad() {
     const editor = document.getElementById('asmEditor');
     if (!editor) return;
@@ -224,12 +292,18 @@ function assembleAndLoad() {
             for (const w of (m.code || [])) words.push(w);
         }
         const _cluWords = words.slice();
-        const _cluCaps  = (result.capabilities && result.capabilities.length > 0) ? result.capabilities.slice() : [];
+        const _cluCapsResult = _materializeRunCapabilities(
+            result.capabilities || [], 'Compile');
+        if (!_cluCapsResult.ok) {
+            _blockCapabilityRun(_cluCapsResult.errors, con);
+            return;
+        }
+        const _cluCaps = _cluCapsResult.capabilities;
         lastAssembledNamedSlots = (result.namedSlots && result.namedSlots.length > 0) ? result.namedSlots.slice() : null;
         lastMethodTableSize = methodTableSize;
         _defaultProgramLoaded = true;
         sim.programLabels = labels;
-        sim.programCapabilities = result.capabilities ? result.capabilities.slice() : [];
+        sim.programCapabilities = _cluCaps.slice();
         sim.programName = result.abstractionName || (methods.length > 0 ? methods[0].name : 'prog');
         window._assemblerSymbols = { labels, lumpName: sim.programName };
         _pendingSimLoad = true;
@@ -451,13 +525,18 @@ function assembleAndLoad() {
     if (typeof _showAsmWarnings === 'function') _showAsmWarnings(result.warnings || []);
 
     const _rawWords = result.words.slice();
-    const _rawCaps  = (result.capabilities && result.capabilities.length > 0)
-        ? result.capabilities.slice() : [];
+    const _rawCapsResult = _materializeRunCapabilities(
+        result.capabilities || [], 'Assembly');
+    if (!_rawCapsResult.ok) {
+        _blockCapabilityRun(_rawCapsResult.errors, con);
+        return;
+    }
+    const _rawCaps = _rawCapsResult.capabilities;
     lastAssembledNamedSlots = (result.namedSlots && result.namedSlots.length > 0)
         ? result.namedSlots.slice() : null;
     _defaultProgramLoaded = true;
     sim.programLabels = result.labels || {};
-    sim.programCapabilities = result.capabilities ? result.capabilities.slice() : [];
+    sim.programCapabilities = _rawCaps.slice();
     const entryLabel = Object.keys(result.labels || {}).find(k => (result.labels[k] === 0)) || null;
     const _srcAbstrName = (source.match(/;\s*Abstraction:\s*(.+)/i) || [])[1]?.trim() || null;
     sim.programName = _srcAbstrName || entryLabel || (sim.nsLabels && sim.nsLabels[sim.bootEntrySlot]) || 'SelfTest';
@@ -1021,6 +1100,33 @@ function _injectClistNow() {
             const rights  = typeof cap === 'string' ? [] : (cap.rights || []);
             if (!capName) { sim.memory[clistBase + i] = 0; continue; }
 
+            // Compile → Run records carry the exact materialized GT that passed
+            // pre-run validation. Use it verbatim: rebuilding from demoClistGTs
+            // would broaden UART_TX W to RW, while unresolved-name fallback
+            // would reintroduce 0xFEED placeholders after validation succeeded.
+            if (typeof cap === 'object' && cap !== null &&
+                    Object.prototype.hasOwnProperty.call(cap, 'token')) {
+                const _capCheck = (typeof CapabilityTokens !== 'undefined')
+                    ? CapabilityTokens.validateToken(cap.token, cap, { sim })
+                    : { ok: false, error: `${capName}: capability validator is unavailable` };
+                if (!_capCheck.ok) {
+                    const _capRunError = `[CAP-GT] Run blocked: ${_capCheck.error}`;
+                    sim.halted = true;
+                    sim.output += _capRunError + '\n';
+                    if (typeof appendOutput === 'function') {
+                        appendOutput(_capRunError, 'error');
+                    }
+                    const _capRunCon = document.getElementById('editorConsole');
+                    if (_capRunCon) {
+                        _capRunCon.className = '';
+                        _capRunCon.textContent = _capRunError;
+                    }
+                    return false;
+                }
+                sim.memory[clistBase + i] = cap.token >>> 0;
+                continue;
+            }
+
             // Boot-image fixed capability names — always resolvable to a real GT
             // regardless of which abstractions are installed in the Namespace Table.
             // Mirrors the assembler's own hardcoded fallback (_resolveNSName §3.5):
@@ -1135,6 +1241,7 @@ function _injectClistNow() {
     } else {
         console.log('[_injectClistNow] mem[244] unchanged=0x' + _icn_post244.toString(16) + ' BOOT_ABSTR_SLOT=' + BOOT_ABSTR_SLOT);
     }
+    return true;
 }
 
 function _applyPendingSimLoad() {
@@ -1238,7 +1345,10 @@ function _applyPendingSimLoad() {
         }
     }
 
-    _injectClistNow();
+    if (_injectClistNow() === false) {
+        _pendingSimLoad = false;
+        return;
+    }
     _pendingSimLoad = false;
 }
 
@@ -12959,7 +13069,7 @@ function confirmSaveToNamespace() {
         ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())?.sources?.memory
         : null;
     const _svWords = _svRegMem ? (_svRegMem.words || []) : [];
-    const _caps    = _svRegMem ? (_svRegMem.capabilities || []).slice() : [];
+    let _caps      = _svRegMem ? (_svRegMem.capabilities || []).slice() : [];
 
     // ── Decide binary BEFORE any registerMemory call ─────────────────────────
     // registerMemory() stamps a fresh Date.now() into the registry entry.
@@ -12999,6 +13109,9 @@ function confirmSaveToNamespace() {
         })();
         if (_pendingCanReuse) {
             _svBinary = _snapshotPending.binary;
+            if (Array.isArray(_snapshotPending.caps)) {
+                _caps = _snapshotPending.caps.slice();
+            }
         } else {
             // Fallback: build from scratch (direct Save-to-NS, or a recompile
             // invalidated the pending binary between Format Lump and Proceed).
@@ -13016,7 +13129,55 @@ function confirmSaveToNamespace() {
             _svBinary = new Array(_svLumpSize).fill(0);
             _svBinary[0] = _svHdr;
             for (var _svI = 0; _svI < _svCW; _svI++) _svBinary[1 + _svI] = (_svWords[_svI] >>> 0);
-            // c-list slots left as zeros — server injects the self-GT into slot 0.
+            if (typeof CapabilityTokens === 'undefined') {
+                alert('Save blocked: capability token validator is unavailable.');
+                return;
+            }
+            var _fallbackMaterialized = CapabilityTokens.materialize(
+                _caps,
+                _svBinary,
+                _svLumpSize - _svCC,
+                {
+                    sim,
+                    lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) ? _lumpsCache : [],
+                }
+            );
+            if (!_fallbackMaterialized.ok) {
+                alert('Save blocked: ' + _fallbackMaterialized.errors.join(' '));
+                return;
+            }
+            _caps = _fallbackMaterialized.resolvedCaps.map(function(cap) {
+                return {
+                    name: cap.name,
+                    rights: cap.rights.slice(),
+                    grants: cap.grants.slice(),
+                    nsIndex: cap.nsIndex,
+                };
+            });
+        }
+    }
+
+    // Validate the exact c-list bytes before either the live namespace or the
+    // server repository can observe them.
+    if (_svWords.length > 0 && _svBinary && _caps.length > 0) {
+        if (typeof CapabilityTokens === 'undefined') {
+            alert('Save blocked: capability token validator is unavailable.');
+            return;
+        }
+        var _preSaveHdr = sim.parseLumpHeader(_svBinary[0] >>> 0);
+        var _preSaveResolved = CapabilityTokens.resolveCapabilities(_caps, {
+            sim,
+            lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) ? _lumpsCache : [],
+        });
+        var _preSaveValidation = CapabilityTokens.validateClist(
+            _svBinary,
+            _preSaveHdr.lumpSize - _preSaveHdr.cc,
+            _preSaveResolved,
+            { sim }
+        );
+        if (!_preSaveValidation.ok) {
+            alert('Save blocked: ' + _preSaveValidation.errors.join(' '));
+            return;
         }
     }
 

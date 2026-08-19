@@ -10150,116 +10150,173 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
     }
 }
 
-// ── CAP-GT: NoteG/SlideRule NULL-GT-in-c-list regression ─────────────────────
-// Root cause (task: RNC "NULL GT in c-list" warning on NoteG reopen):
-//   1. sim.abstractionRegistry.abstractions is a plain object keyed by numeric
-//      index (see AbstractionRegistry.createAbstraction), NOT an array. Code
-//      that resolved a capability name to an NS index via
-//      `for (let j = 0; j < allAbs.length; j++)` always saw `.length ===
-//      undefined`, so the loop body never ran and every capability resolved
-//      to nsIndex = -1 — regardless of language front-end or capability name.
-//   2. Even once resolved, the c-list slot was written as the bare NS index
-//      (e.g. 16) rather than a full Golden Token word. parseGT() decodes the
-//      type field from bits [26:25]; a bare small integer always decodes as
-//      type=NULL, so the RNC audit's `word === 0` check would eventually be
-//      dodged but the capability would still be non-functional at runtime.
-// This test extracts the REAL capability-resolution and c-list-write code
-// from app-compile.js (compileAndBuild) and runs it against a real
-// ChurchSimulator + AbstractionRegistry (production shapes), proving:
-//   - the capability name resolves to the correct nsIndex (not -1)
-//   - the c-list slot holds a non-null, correctly-typed Golden Token GT
+// ── CAP-GT: declared capability materialization and Code-view labels ─────────
 {
     const fs   = require('fs');
     const path = require('path');
     const ChurchSimulator    = require('./simulator.js');
     const AbstractionRegistry = require('./abstractions.js');
-
-    const compileLines = fs.readFileSync(
-        path.join(__dirname, 'app-compile.js'), 'utf8').split('\n');
-    // Pattern-based extraction — locates each block by its known first-line
-    // signature so the test survives future edits to the surrounding code.
-    //
-    // resolveSrc: the `const resolvedCaps = caps.map(...)` declaration.
-    //   Start: `const resolvedCaps = caps.map(`
-    //   End:   the return statement inside the map callback, +1 to include
-    //          the closing `});` on the next line.
-    const { src: resolveSrc, endIdx: _resolveEnd } = _srcExtract(
-        compileLines,
-        'const resolvedCaps = caps.map(',
-        'return { name: capName, rights: capRights, nsIndex: target, grants: capGrants };',
-        1,
-        'resolvedCaps block in app-compile.js');
-    //
-    // clistSrc: the `const lumpWords` allocation + c-list GT write for-loop.
-    //   Start: `const lumpWords = new Uint32Array(lumpSize)` (search AFTER
-    //          resolveSrc so the second occurrence at line ~1870 is not matched).
-    //   End:   the null-GT else-branch write, +2 to include the two closing
-    //          `}` lines that close the else-block and the for-loop.
-    const { src: clistSrc } = _srcExtract(
-        compileLines,
-        'const lumpWords = new Uint32Array(lumpSize)',
-        'lumpWords[clistStart + i] = 0x00000000;',
-        2,
-        'lumpWords/c-list block in app-compile.js',
-        _resolveEnd + 1);
-
-    assert('CAP-GT-SRC1: extracted resolvedCaps block from app-compile.js',
-        resolveSrc.includes('const resolvedCaps = caps.map('),
-        'Pattern "const resolvedCaps = caps.map(" not found in app-compile.js — check _srcExtract');
-    assert('CAP-GT-SRC2: extracted c-list write block from app-compile.js',
-        clistSrc.includes('const lumpWords = new Uint32Array(lumpSize);') &&
-        clistSrc.includes('const clistStart = lumpSize - cc;') && clistSrc.includes('lumpWords[clistStart + i]'),
-        'Pattern "const lumpWords = new Uint32Array(lumpSize)" not found after resolvedCaps — check _srcExtract');
+    const CapabilityTokens = require('./capability_tokens.js');
 
     // Real production registry shape: object keyed by numeric index.
     const registry = new AbstractionRegistry();
-    registry.createAbstraction(16, 'SlideRule', 3, ['Multiply', 'Divide'], 'Analog slide rule');
+    registry.createAbstraction(2, 'UART', 3, [], 'UART devices');
+    registry.createAbstraction(3, 'LED', 3, [], 'LED devices');
+    registry.createAbstraction(53, 'WukongCallHome', 4, [], 'Wukong call-home');
+    registry.abstractions[2].capabilities = [
+        { name: 'UART_TX', target: 2, grants: ['R', 'W'] },
+    ];
+    registry.abstractions[3].capabilities = [
+        { name: 'LED0', target: 3, grants: ['R', 'W'] },
+    ];
 
     const sim = new ChurchSimulator();
     sim.initAbstractions(registry, {}, {});
+    sim.nsLabels[7] = 'WukongCallHome';
+    const lumps = [{ abstraction: 'WukongCallHome.hw', ns_slot: 7, grants: ['E'] }];
+    const caps = [
+        { name: 'LED0', rights: ['R', 'W'] },
+        { name: 'UART_TX', rights: ['W'] },
+        { name: 'WukongCallHome.hw', rights: ['E'] },
+    ];
+    const words = new Array(64).fill(0);
+    const clistStart = 61;
+    const built = CapabilityTokens.materialize(caps, words, clistStart, { sim, lumps });
 
-    const factory = new Function('sim', 'caps', 'cc', 'lumpSize', 'cw', 'codeRegion', 'header', `
-        "use strict";
-        ${resolveSrc}
-        ${clistSrc}
-        return { resolvedCaps, lumpWords, clistStart };
-    `);
+    assert('CAP-GT-1: Wukong capability set materializes without errors',
+        built.ok, built.errors.join('; '));
+    assert('CAP-GT-2: LED0 emits exact RW Inform GT for NS[3]',
+        (words[61] >>> 0) === 0x32000003,
+        `got 0x${(words[61] >>> 0).toString(16)}`);
+    assert('CAP-GT-3: UART_TX emits exact W-only Inform GT for NS[2]',
+        (words[62] >>> 0) === 0x22000002,
+        `got 0x${(words[62] >>> 0).toString(16)}`);
+    assert('CAP-GT-4: WukongCallHome.hw emits exact E Inform GT for NS[7]',
+        (words[63] >>> 0) === 0x4A000007,
+        `got 0x${(words[63] >>> 0).toString(16)}`);
 
-    const cc = 1, cw = 1, lumpSize = 8;
-    const { resolvedCaps, lumpWords, clistStart } = factory(
-        sim, [{ name: 'SlideRule', rights: ['E'] }], cc, lumpSize, cw, [0], 0);
+    const unknownWords = new Array(64).fill(0);
+    const unknown = CapabilityTokens.materialize(
+        [{ name: 'TotallyUnknownCapability', rights: ['E'] }],
+        unknownWords, 63, { sim, lumps });
+    assert('CAP-GT-5: unresolved capability fails closed instead of writing NULL',
+        !unknown.ok && /TotallyUnknownCapability/.test(unknown.errors.join(' ')),
+        unknown.errors.join('; '));
 
-    assert('CAP-GT-1: SlideRule capability resolves to nsIndex 16 (not -1)',
-        resolvedCaps[0].nsIndex === 16,
-        `got nsIndex=${resolvedCaps[0].nsIndex}`);
+    const badRights = CapabilityTokens.materialize(
+        [{ name: 'LED0', rights: ['RWZ'] }],
+        new Array(1).fill(0), 0, { sim, lumps });
+    assert('CAP-GT-5b: malformed permission text fails closed instead of dropping invalid letters',
+        !badRights.ok && /LED0/.test(badRights.errors.join(' ')) &&
+            /invalid permission/i.test(badRights.errors.join(' ')),
+        badRights.errors.join('; '));
 
-    const clistWord = lumpWords[clistStart] >>> 0;
-    assert('CAP-GT-2: c-list slot is NOT a NULL GT (0x00000000)',
-        clistWord !== 0,
-        `c-list slot = 0x${clistWord.toString(16)}`);
+    const pendingWords = words.slice();
+    pendingWords[62] = 0xFEED0001;
+    const pending = CapabilityTokens.validateClist(
+        pendingWords, clistStart, built.resolvedCaps, { sim });
+    assert('CAP-GT-6: pending placeholder is rejected with its capability name',
+        !pending.ok && /UART_TX/.test(pending.errors.join(' ')),
+        pending.errors.join('; '));
 
-    const parsed = sim.parseGT(clistWord);
-    assert('CAP-GT-3: c-list GT decodes to type=Inform (1)',
-        parsed.type === 1,
-        `got type=${parsed.type} (${parsed.typeName}), word=0x${clistWord.toString(16)}`);
-    assert('CAP-GT-4: c-list GT index points at NS[16] (SlideRule)',
-        parsed.index === 16,
-        `got index=${parsed.index}`);
-    assert('CAP-GT-5: c-list GT carries exactly E permission (C-Lists only have E permission)',
-        parsed.permissions.E === 1 && !parsed.permissions.R && !parsed.permissions.W &&
-        !parsed.permissions.X && !parsed.permissions.L && !parsed.permissions.S,
-        `got permissions=${JSON.stringify(parsed.permissions)}`);
+    const malformedWords = words.slice();
+    malformedWords[61] = 0x0AC8F3D7;
+    const malformed = CapabilityTokens.validateClist(
+        malformedWords, clistStart, built.resolvedCaps, { sim });
+    assert('CAP-GT-7: identity/malformed row is rejected with LED0 name',
+        !malformed.ok && /LED0/.test(malformed.errors.join(' ')),
+        malformed.errors.join('; '));
+    const bSetWords = words.slice();
+    bSetWords[61] = (bSetWords[61] | 0x80000000) >>> 0;
+    const bSet = CapabilityTokens.validateClist(
+        bSetWords, clistStart, built.resolvedCaps, { sim });
+    assert('CAP-GT-7b: B-set declared token is rejected with LED0 name',
+        !bSet.ok && /LED0/.test(bSet.errors.join(' ')) && /B=1/.test(bSet.errors.join(' ')),
+        bSet.errors.join('; '));
 
-    // An unresolvable capability name must still write a NULL GT (0x00000000),
-    // not throw or silently write garbage — confirms the -1 fallback path.
-    const { resolvedCaps: unresolvedCaps, lumpWords: unresolvedWords, clistStart: unresolvedStart } = factory(
-        sim, [{ name: 'TotallyUnknownCapability', rights: ['E'] }], cc, lumpSize, cw, [0], 0);
-    assert('CAP-GT-6: unknown capability name resolves to nsIndex -1',
-        unresolvedCaps[0].nsIndex === -1,
-        `got nsIndex=${unresolvedCaps[0].nsIndex}`);
-    assert('CAP-GT-7: unresolved capability still writes a NULL GT (0x00000000), not garbage',
-        (unresolvedWords[unresolvedStart] >>> 0) === 0,
-        `c-list slot = 0x${(unresolvedWords[unresolvedStart] >>> 0).toString(16)}`);
+    // Exercise the production Code-view resolver with its real function body.
+    const detailSrc = fs.readFileSync(path.join(__dirname, 'app-cr-detail.js'), 'utf8');
+    const detailStart = detailSrc.indexOf('function _resolveClistPetName(');
+    const detailEnd = detailSrc.indexOf('\nconst _brColors', detailStart);
+    assert('CAP-GT-SRC: Code-view resolver source located',
+        detailStart >= 0 && detailEnd > detailStart,
+        'Could not locate _resolveClistPetName in app-cr-detail.js');
+    const resolverFactory = new Function(
+        'sim', '_lumpManifests', 'CapabilityTokens', '_lumpsCache',
+        `${detailSrc.slice(detailStart, detailEnd)}
+         return _resolveClistPetName;`
+    );
+    const codeBase = 100;
+    sim.memory[codeBase] = words[61];
+    sim.memory[codeBase + 1] = words[62];
+    sim.memory[codeBase + 2] = words[63];
+    const manifests = { 7: { _caps: built.resolvedCaps } };
+    const resolvePetName = resolverFactory(sim, manifests, CapabilityTokens, lumps);
+    assert('CAP-GT-8: Code view labels c-list row 0 as LED0',
+        resolvePetName(codeBase, 0, 7) === 'LED0',
+        `got ${resolvePetName(codeBase, 0, 7)}`);
+    assert('CAP-GT-9: Code view labels c-list row 1 as UART_TX',
+        resolvePetName(codeBase, 1, 7) === 'UART_TX',
+        `got ${resolvePetName(codeBase, 1, 7)}`);
+    sim.memory[codeBase] = 0x0AC8F3D7;
+    const badLabel = resolvePetName(codeBase, 0, 7);
+    assert('CAP-GT-10: malformed LED0 row has safe diagnostic, never bogus NS/M-Elev label',
+        badLabel === 'Invalid LED0 GT' && !/NS\[62423\]|M-Elev/.test(badLabel),
+        `got ${badLabel}`);
+    sim.memory[codeBase] = (words[61] | 0x80000000) >>> 0;
+    const bSetLabel = resolvePetName(codeBase, 0, 7);
+    assert('CAP-GT-10b: Code view rejects B-set LED0 token safely',
+        bSetLabel === 'Invalid LED0 GT',
+        `got ${bSetLabel}`);
+
+    // Exercise the shared gate used by both raw Assembly and CLOOMC++ Run paths.
+    // It must discard any caller-supplied placeholder/malformed token and
+    // re-materialize the declared capability from the active namespace instead.
+    const runSrc = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
+    const runStart = runSrc.indexOf('function _materializeRunCapabilities(');
+    const runEnd = runSrc.indexOf('\nfunction _blockCapabilityRun(', runStart);
+    assert('CAP-GT-SRC2: raw-assembly run capability gate source located',
+        runStart >= 0 && runEnd > runStart,
+        'Could not locate _materializeRunCapabilities in app-run.js');
+    const runGateFactory = new Function(
+        'sim', 'CapabilityTokens', '_lumpsCache',
+        `${runSrc.slice(runStart, runEnd)}
+         return _materializeRunCapabilities;`
+    );
+    const materializeForRun = runGateFactory(sim, CapabilityTokens, lumps);
+    const rawRunCaps = caps.map((cap, index) => ({
+        ...cap,
+        // These are deliberately unsafe cached values. The raw Run gate must
+        // never trust them or allow them through to the live C-list.
+        token: index === 0 ? 0x0AC8F3D7 : (index === 1 ? 0xFEED0001 : 0),
+    }));
+    const rawRun = materializeForRun(rawRunCaps, 'Run');
+    assert('CAP-GT-11: raw-assembly Run gate re-materializes all Wukong capabilities',
+        rawRun.ok, rawRun.errors.join('; '));
+    assert('CAP-GT-12: raw-assembly Run gate replaces pending/malformed cached tokens',
+        rawRun.ok &&
+            rawRun.capabilities.map(cap => cap.token >>> 0).join(',') ===
+                [0x32000003, 0x22000002, 0x4A000007].join(','),
+        rawRun.ok
+            ? rawRun.capabilities.map(cap => `0x${(cap.token >>> 0).toString(16)}`).join(', ')
+            : rawRun.errors.join('; '));
+    const rawUnknown = materializeForRun(
+        [{ name: 'TotallyUnknownCapability', rights: ['E'] }], 'Run');
+    assert('CAP-GT-13: raw-assembly Run gate blocks unresolved named capability',
+        !rawUnknown.ok && /TotallyUnknownCapability/.test(rawUnknown.errors.join(' ')),
+        rawUnknown.errors.join('; '));
+    const rawWrongTarget = materializeForRun(
+        [{ name: 'LED0', rights: ['R', 'W'], nsIndex: 99 }], 'Run');
+    assert('CAP-GT-14: raw-assembly Run gate blocks wrong namespace target',
+        !rawWrongTarget.ok && /LED0/.test(rawWrongTarget.errors.join(' ')) &&
+            /NS\[99\]/.test(rawWrongTarget.errors.join(' ')),
+        rawWrongTarget.errors.join('; '));
+    const rawWrongPermission = materializeForRun(
+        [{ name: 'LED0', rights: ['E'] }], 'Run');
+    assert('CAP-GT-15: raw-assembly Run gate blocks wrong permission domain',
+        !rawWrongPermission.ok && /LED0/.test(rawWrongPermission.errors.join(' ')) &&
+            /requests E/.test(rawWrongPermission.errors.join(' ')),
+        rawWrongPermission.errors.join('; '));
 }
 
 // ── Bare-space method call sugar: AbsName MethodName ─────────────────────────

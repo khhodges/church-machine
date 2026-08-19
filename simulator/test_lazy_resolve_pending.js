@@ -16,6 +16,7 @@ const fs   = require('fs');
 const path = require('path');
 
 const ChurchSimulator = require('./simulator.js');
+const CapabilityTokens = require('./capability_tokens.js');
 
 // bootSim() from tests/gates/sim_helpers is fine; setupCR6 there uses the
 // wrong argument order for packNSWord1 in this codebase (7-arg call hits a
@@ -280,9 +281,11 @@ console.log('\n--- T004: _injectClistNow CASE B — integration test ---');
         const ctx4 = vm.createContext({
             sim: sim2,
             ChurchSimulator,
+            CapabilityTokens,
             lastAssembledCapabilities,
             lastAssembledNamedSlots: null,
             console,
+            document: { getElementById: () => null },
             window: { bootConfig: {} },
         });
         // Define and immediately call the function.
@@ -307,6 +310,42 @@ console.log('\n--- T004: _injectClistNow CASE B — integration test ---');
 
         check('T004h: CASE B sentinel preserves the pet name "FutureWidget"',
             ChurchSimulator.pendingGTName(written) === 'FutureWidget');
+
+        // Compile → Run uses the already-validated exact token instead of the
+        // legacy device-map fallback. In particular UART_TX W must stay W-only
+        // and must not be broadened to the demo c-list's RW device grant.
+        const sim3 = bootSim();
+        sim3.demoClistGTs = new Array(20).fill(0);
+        sim3.demoClistGTs[2] = 0x32000002; // broad RW device token
+        const ctx5 = vm.createContext({
+            sim: sim3,
+            ChurchSimulator,
+            CapabilityTokens,
+            lastAssembledCapabilities: [{
+                name: 'UART_TX',
+                rights: ['W'],
+                grants: ['R', 'W'],
+                nsIndex: 2,
+                token: 0x22000002,
+            }],
+            lastAssembledNamedSlots: null,
+            console,
+            document: { getElementById: () => null },
+            window: { bootConfig: {} },
+        });
+        const exactResult = vm.runInContext(
+            fnSrc + '\n_injectClistNow();', ctx5);
+        const exactNsBase = sim3._nsSlotBase(sim3.bootEntrySlot);
+        const exactLumpBase = sim3.memory[exactNsBase] >>> 0;
+        const exactLumpSize = sim3.parseLumpHeader(
+            sim3.memory[exactLumpBase] >>> 0).lumpSize;
+        const exactWritten = sim3.memory[
+            exactLumpBase + exactLumpSize - 1] >>> 0;
+        check('T004i: validated exact-token runtime injection succeeds',
+            exactResult === true);
+        check('T004j: UART_TX runtime token remains exact W-only 0x22000002',
+            exactWritten === 0x22000002,
+            `got 0x${exactWritten.toString(16).padStart(8, '0')}`);
     }
 }
 

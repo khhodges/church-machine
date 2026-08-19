@@ -1299,6 +1299,7 @@ function compileAndBuild() {
     if (typeof _invalidateLastSavedToken === 'function') _invalidateLastSavedToken();
     _runStopped = true;
     sim.running = false;
+    window._lastCLOOMCLump = null;
 
     const result = cloomcCompiler.compile(source, []);
 
@@ -1410,76 +1411,46 @@ function compileAndBuild() {
                    ((0 & 0x03) << 8) |
                    (cc & 0xFF);
 
-    const resolvedCaps = caps.map(cap => {
-        const capName = typeof cap === 'string' ? cap : (cap.name || '');
-        const capRights = typeof cap === 'string' ? [] : (cap.rights || []);
-        let target = -1;
-        let capGrants = [];
-        if (sim && sim.abstractionRegistry) {
-            // sim.abstractionRegistry.abstractions is a plain object keyed by
-            // numeric index (see AbstractionRegistry.createAbstraction), NOT
-            // an array — Object.keys() is required, .length/[j] would always
-            // resolve to undefined and silently produce a NULL GT (0x00000000)
-            // in the c-list for every capability. See NoteG/SlideRule bug.
-            const allAbs = sim.abstractionRegistry.abstractions || {};
-            // Search 1: match top-level abstraction name (e.g. 'SlideRule', 'Navana')
-            for (const j of Object.keys(allAbs)) {
-                if (allAbs[j] && allAbs[j].name && allAbs[j].name.toUpperCase() === capName.toUpperCase()) {
-                    target = Number(j);
-                    break;
-                }
-            }
-            // Search 2: match device pet name inside an abstraction's capabilities array.
-            // LED0–LED5, UART_TX, BTN, TIMER etc. are defined in boot_uploads.js and
-            // fed into abstractionRegistry.abstractions[j].capabilities by app-shell.js
-            // init.  This is the universal pet-name registry — never resolve by slot literal.
-            if (target < 0) {
-                outer:
-                for (const j2 of Object.keys(allAbs)) {
-                    const _a2 = allAbs[j2];
-                    if (!Array.isArray(_a2.capabilities)) continue;
-                    for (const _dc of _a2.capabilities) {
-                        if (_dc.name && _dc.name.toUpperCase() === capName.toUpperCase() && _dc.target != null) {
-                            target    = _dc.target;
-                            capGrants = Array.isArray(_dc.grants) ? _dc.grants : [];
-                            break outer;
-                        }
-                    }
-                }
-            }
-        }
-        return { name: capName, rights: capRights, nsIndex: target, grants: capGrants };
-    });
-
     const lumpWords = new Uint32Array(lumpSize);
     lumpWords[0] = header >>> 0;
     for (let i = 0; i < cw; i++) {
         lumpWords[1 + i] = (codeRegion[i] >>> 0);
     }
     const clistStart = lumpSize - cc;
-    for (let i = 0; i < cc; i++) {
-        // A c-list slot must hold a full Golden Token word (type + perm bits +
-        // index), not a bare NS index — see simulator.js parseGT/createGT.
-        // Per project convention ("C-Lists only have E permission"), every
-        // resolved capability GT is an Inform-type (type=1), E-permission-only
-        // token: gt_seq=0, dom=1, perm3=E(0b100) -> 0x4A000000 | index.
-        if (resolvedCaps[i].nsIndex >= 0) {
-            if (sim && typeof sim.createGT === 'function') {
-                // Use the grants from the capability definition to build the correct GT:
-                // R/W/X grants → Turing-domain Inform GT; E grant (or default) → Church E-perm GT.
-                const _cg = resolvedCaps[i].grants || [];
-                const _hasTuring = _cg.some(g => g === 'R' || g === 'W' || g === 'X');
-                const _perms = _hasTuring
-                    ? { R: _cg.includes('R') ? 1 : 0, W: _cg.includes('W') ? 1 : 0, X: _cg.includes('X') ? 1 : 0, L: 0, S: 0, E: 0 }
-                    : { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 };
-                lumpWords[clistStart + i] = sim.createGT(0, resolvedCaps[i].nsIndex, _perms, 1) >>> 0;
-            } else {
-                lumpWords[clistStart + i] = (0x4A000000 | (resolvedCaps[i].nsIndex & 0xFFFF)) >>> 0;
-            }
-        } else {
-            lumpWords[clistStart + i] = 0x00000000;
+    if (typeof CapabilityTokens === 'undefined') {
+        if (con) con.textContent = 'Build failed: capability token validator is unavailable; no binary was saved.';
+        if (typeof _showAsmErrors === 'function') {
+            _showAsmErrors([{ line: null, message: '[CAP-GT] Capability token validator is unavailable.' }],
+                'Capability error — code not applied');
         }
+        return;
     }
+    const _capTokenContext = {
+        sim,
+        lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) ? _lumpsCache : [],
+    };
+    const _capMaterialized = CapabilityTokens.materialize(
+        caps, lumpWords, clistStart, _capTokenContext);
+    const resolvedCaps = _capMaterialized.resolvedCaps;
+    if (!_capMaterialized.ok) {
+        const _capErrors = _capMaterialized.errors.map(message => ({ line: null, message: `[CAP-GT] ${message}` }));
+        const _capListing = [
+            `BUILD FAILED — "${absName}"`,
+            '',
+            'Every declared capability must resolve to a valid Golden Token before this LUMP can be saved or run.',
+            ..._capMaterialized.errors.map(message => `  ✗ ${message}`),
+        ].join('\n');
+        if (con) { con.textContent = _capListing; con.scrollTop = 0; }
+        if (typeof _showAsmErrors === 'function') {
+            _showAsmErrors(_capErrors, 'Capability error' + (_capErrors.length !== 1 ? 's' : '') + ' — code not applied');
+        }
+        return;
+    }
+    window._lastCLOOMCLump = {
+        words: Array.from(lumpWords),
+        clistStart,
+        resolvedCaps: resolvedCaps.map(cap => Object.assign({}, cap)),
+    };
 
     // ── Pre-save audit — run on assembled binary BEFORE download or server save ──
     // Build LUMP-level lineNums: index 0 = header (null), indices 1..cw = per-word source lines.
@@ -1496,7 +1467,7 @@ function compileAndBuild() {
         _auditResults = lumpAudit(Array.from(lumpWords), {
             cw, cc, lump_size: lumpSize,
             pet_names:    { CR: _auditPnCR },
-            capabilities: resolvedCaps.map(rc => ({ name: rc.name, rights: rc.rights, grants: rc.rights })),
+            capabilities: resolvedCaps.map(rc => ({ name: rc.name, rights: rc.rights, grants: rc.grants, nsIndex: rc.nsIndex })),
         }, _lumpLineNums);
         _auditErrors  = _auditResults.filter(r => r.severity === 'error');
         _auditWarns   = _auditResults.filter(r => r.severity === 'warn');
@@ -1608,7 +1579,7 @@ function compileAndBuild() {
             profile:        profile,
             language:       result.language || 'javascript',
             methods:        methodMeta,
-            capabilities:   resolvedCaps.map(rc => ({ name: rc.name, rights: rc.rights, grants: rc.rights, nsIndex: rc.nsIndex })),
+            capabilities:   resolvedCaps.map(rc => ({ name: rc.name, rights: rc.rights, grants: rc.grants, nsIndex: rc.nsIndex })),
             pet_names_dr:   drPetNames,
             pet_names_cr:   crPetNames,
             mtbf_clean_runs: mtbfClean,
@@ -1657,16 +1628,11 @@ function compileAndBuild() {
 
     if (cc > 0) {
         listing += `\n  Capabilities (C-List):\n`;
-        const unresolved = [];
         for (let i = 0; i < resolvedCaps.length; i++) {
             const rc = resolvedCaps[i];
-            const status = rc.nsIndex >= 0 ? `NS[${rc.nsIndex}]` : 'unresolved (null GT)';
+            const status = `NS[${rc.nsIndex}]`;
             const _rcRightsStr = rc.rights && rc.rights.length > 0 ? ` [${rc.rights.join('')}]` : '';
             listing += `    [${i}] ${rc.name}${_rcRightsStr} → ${status}\n`;
-            if (rc.nsIndex < 0) unresolved.push(rc.name);
-        }
-        if (unresolved.length > 0) {
-            listing += `    ⚠ ${unresolved.length} unresolved — boot the simulator to resolve, or deploy with null GTs\n`;
         }
     }
 
@@ -1879,9 +1845,24 @@ function auditLumpOnly() {
     const lumpWords = new Uint32Array(lumpSize);
     lumpWords[0] = header >>> 0;
     for (let i = 0; i < cw; i++) { lumpWords[1 + i] = (allCode[i] >>> 0); }
-    // C-list slots populated with zero (unresolved NS indices) — same layout as compileAndBuild.
     const _auditClistStart = lumpSize - cc;
-    for (let i = 0; i < cc; i++) { lumpWords[_auditClistStart + i] = 0; }
+    if (typeof CapabilityTokens === 'undefined') {
+        if (con) con.textContent = 'Audit failed: capability token validator is unavailable.';
+        return;
+    }
+    const _auditCapMaterialized = CapabilityTokens.materialize(caps, lumpWords, _auditClistStart, {
+        sim,
+        lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) ? _lumpsCache : [],
+    });
+    if (!_auditCapMaterialized.ok) {
+        const _messages = _auditCapMaterialized.errors.map(message => `[CAP-GT] ${message}`);
+        if (con) con.textContent = `AUDIT FAILED — "${absName}"\n\n${_messages.join('\n')}`;
+        if (typeof _showAsmErrors === 'function') {
+            _showAsmErrors(_messages.map(message => ({ line: null, message })),
+                'Audit LUMP — capability resolution failed');
+        }
+        return;
+    }
 
     const _aloPnCR = {};
     for (let _i = 0; _i < caps.length; _i++) {
@@ -1946,6 +1927,28 @@ function loadCLOOMCIntoSim() {
         appendOutput('Load into Sim: nothing compiled yet — run Compile first.', 'warn');
         return;
     }
+    const _compiledLump = window._lastCLOOMCLump;
+    if (!_compiledLump || typeof CapabilityTokens === 'undefined') {
+        appendOutput('Load into Sim blocked: compile again so every named capability can be validated.', 'error');
+        return;
+    }
+    const _preRunValidation = CapabilityTokens.validateClist(
+        _compiledLump.words,
+        _compiledLump.clistStart,
+        _compiledLump.resolvedCaps,
+        { sim }
+    );
+    if (!_preRunValidation.ok) {
+        const _message = 'Load into Sim blocked: ' + _preRunValidation.errors.join(' ');
+        appendOutput(_message, 'error');
+        const _runCon = document.getElementById('editorConsole');
+        if (_runCon) { _runCon.className = ''; _runCon.textContent = _message; }
+        if (typeof _showAsmErrors === 'function') {
+            _showAsmErrors(_preRunValidation.errors.map(message => ({ line: null, message: `[CAP-GT] ${message}` })),
+                'Capability validation failed — LUMP not run');
+        }
+        return;
+    }
 
     const methods = result.methods || [];
     const methodTableSize = methods.length;
@@ -1981,7 +1984,17 @@ function loadCLOOMCIntoSim() {
     // navigates by token (not by NS slot index) immediately after assembly,
     // even before a Save to NS or server-side persist has occurred.
     if (typeof window._computeLumpToken === 'function') {
-        const _asmCaps = (result.capabilities && result.capabilities.length > 0) ? result.capabilities.slice() : [];
+        // Register the same enriched capability records that were validated
+        // above, including each exact GT word. _injectClistNow consumes these
+        // tokens verbatim so Compile → Run cannot quietly broaden permissions
+        // or replace an unresolved name with a pending placeholder.
+        const _asmCaps = _compiledLump.resolvedCaps.map(cap => ({
+            name: cap.name,
+            rights: cap.rights.slice(),
+            grants: cap.grants.slice(),
+            nsIndex: cap.nsIndex,
+            token: cap.token >>> 0,
+        }));
         const _cmpTok = window._computeLumpToken(words, _asmCaps);
         if (window.LumpRegistry) {
             window.LumpRegistry.registerMemory(_cmpTok, sim.programName, words.slice(), _asmCaps);
@@ -2058,6 +2071,13 @@ function loadCLOOMCIntoSim() {
         _lumpManifests[sim.bootEntrySlot] = {
             _methods: _manifestMethods,
             methods:  _methodsDict,
+            _caps:     _compiledLump.resolvedCaps.map(cap => ({
+                name: cap.name,
+                rights: cap.rights.slice(),
+                grants: cap.grants.slice(),
+                nsIndex: cap.nsIndex,
+                token: cap.token >>> 0,
+            })),
             pet_names: { DR: _globalPetDR, CR: {} }
         };
     }

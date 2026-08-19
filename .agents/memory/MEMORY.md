@@ -121,3 +121,4 @@
 - [SelfTest word510 E-GT stomp](selftest-lump-word510-stomp.md) — boot_rom asserts word[510]=0x4A000006; full tests/boot run is destructive to server/lumps and caused the drift
 - [Case-insensitive metadata aliases](case-insensitive-metadata-aliases.md) — case-equivalent registry aliases must update atomically; diagnostics dedupe only within one source location
 - [Direct LUMP call selector](direct-lump-call-selector.md) — single-entry LUMPs whose first code word is executable must use selector 0, never method-table selector 1
+- [Declared C-list B-flag rule](declared-clist-b-flag-rule.md) — declared capability rows must use B=0; browser and server validators must reject B-set Inform tokens consistently

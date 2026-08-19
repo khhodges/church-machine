@@ -1028,8 +1028,10 @@ class TestManifestCwCcFromBinaryHeader:
 
     @classmethod
     def _binary_with_real_cw_cc(cls) -> list:
-        """Return a compact binary with cw=5, cc=3 in the header."""
-        return [_hdr(cw=cls._BINARY_CW, cc=cls._BINARY_CC)] + [0]
+        """Return a complete binary with cw=5, cc=3 and declared-cap rows."""
+        words = [_hdr(cw=cls._BINARY_CW, cc=cls._BINARY_CC)] + [0] * 63
+        words[-3:] = [0x32000003, 0x22000002, 0x4A000007]
+        return words
 
     @classmethod
     def _misleading_meta(cls, token: str) -> dict:
@@ -1037,6 +1039,11 @@ class TestManifestCwCcFromBinaryHeader:
         m = _meta(token)
         m["cw"] = 0   # wrong — must be ignored by the server
         m["cc"] = 0   # wrong — must be ignored by the server
+        m["capabilities"] = [
+            {"name": "LED0", "rights": ["R", "W"], "nsIndex": 3},
+            {"name": "UART_TX", "rights": ["W"], "nsIndex": 2},
+            {"name": "WukongCallHome.hw", "rights": ["E"], "nsIndex": 7},
+        ]
         return m
 
     def _get_manifest_entry(self, isolated_lumps, token: str) -> dict:
@@ -1084,3 +1091,128 @@ class TestManifestCwCcFromBinaryHeader:
             f"manifest entry cc={entry['cc']} but binary header has cc={self._BINARY_CC}. "
             f"The server must derive cc from the binary, not from the client metadata."
         )
+
+
+# ---------------------------------------------------------------------------
+# T9 — declared capability C-list validation and preservation
+# ---------------------------------------------------------------------------
+
+class TestDeclaredCapabilityClist:
+    """Declared capabilities own their c-list rows and must be valid Inform GTs."""
+
+    TOKEN = "7c509001"
+    CAPS = [
+        {"name": "LED0", "rights": ["R", "W"], "nsIndex": 3},
+        {"name": "UART_TX", "rights": ["W"], "nsIndex": 2},
+        {"name": "WukongCallHome.hw", "rights": ["E"], "nsIndex": 7},
+    ]
+    VALID_WORDS = [0x32000003, 0x22000002, 0x4A000007]
+
+    @classmethod
+    def _binary(cls, clist_words=None):
+        words = [_hdr(cw=2, cc=3), 0, 0] + [0] * (64 - 3)
+        words[61:64] = list(clist_words or cls.VALID_WORDS)
+        return words
+
+    @classmethod
+    def _metadata(cls, token=None):
+        meta = _meta(token or cls.TOKEN, "WukongCallHome")
+        meta["capabilities"] = [dict(cap) for cap in cls.CAPS]
+        meta["ns_slot"] = 7
+        return meta
+
+    def test_valid_declared_tokens_are_preserved(self, client, isolated_lumps):
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": self._binary(), "metadata": self._metadata()},
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        saved_path = isolated_lumps / resp.get_json()["lump"]
+        saved_words = struct.unpack(">64I", saved_path.read_bytes())
+        assert list(saved_words[61:64]) == self.VALID_WORDS
+
+        sidecar = json.loads(
+            (isolated_lumps / resp.get_json()["sidecar"]).read_text()
+        )
+        assert sidecar["identity_seal_location"] == "sidecar"
+        assert [cap["nsIndex"] for cap in sidecar["capabilities"]] == [3, 2, 7]
+
+    @pytest.mark.parametrize(
+        "row,word,name,reason",
+        [
+            (0, 0x00000000, "LED0", "NULL"),
+            (1, 0xFEED0001, "UART_TX", "pending"),
+            (2, 0x0AC8F3D7, "WukongCallHome.hw", "targets"),
+            (1, 0x32000002, "UART_TX", "permissions"),
+        ],
+    )
+    def test_invalid_declared_token_is_rejected(
+            self, client, isolated_lumps, row, word, name, reason):
+        words = list(self.VALID_WORDS)
+        words[row] = word
+        resp = client.post(
+            "/api/lumps/save",
+            json={
+                "binary": self._binary(words),
+                "metadata": self._metadata(f"7c5091{row:02x}"),
+            },
+        )
+        assert resp.status_code == 422, resp.get_data(as_text=True)
+        data = resp.get_json()
+        assert data.get("capability_validation_failed") is True
+        assert data.get("capability") == name
+        assert reason.lower() in data["error"].lower()
+        assert not list(isolated_lumps.glob("WukongCallHome*.lump"))
+
+    def test_unresolved_named_capability_is_rejected(
+            self, client, isolated_lumps):
+        metadata = self._metadata("7c5091ff")
+        metadata["capabilities"][2].pop("nsIndex")
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": self._binary(), "metadata": metadata},
+        )
+        assert resp.status_code == 422, resp.get_data(as_text=True)
+        data = resp.get_json()
+        assert data.get("capability") == "WukongCallHome.hw"
+        assert "unresolved" in data["error"].lower()
+
+    def test_empty_declaration_with_nonempty_clist_is_rejected(
+            self, client, isolated_lumps):
+        metadata = self._metadata("7c5091ee")
+        metadata["capabilities"] = []
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": self._binary([0x80000003, 0xFEED0001, 0x4A000007]), "metadata": metadata},
+        )
+        assert resp.status_code == 422, resp.get_data(as_text=True)
+        data = resp.get_json()
+        assert data.get("capability_validation_failed") is True
+        assert data.get("declared_capability_count") == 0
+        assert data.get("cc") == 3
+        assert "no capabilities" in data["error"].lower()
+        assert not list(isolated_lumps.glob("WukongCallHome*.lump"))
+
+    @pytest.mark.parametrize(
+        "rights",
+        [
+            ["RWZ"],
+            "RW",
+            [7],
+            [""],
+        ],
+    )
+    def test_malformed_permission_declaration_is_rejected(
+            self, client, isolated_lumps, rights):
+        metadata = self._metadata("7c5092ff")
+        metadata["capabilities"][0]["rights"] = rights
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": self._binary(), "metadata": metadata},
+        )
+        assert resp.status_code == 422, resp.get_data(as_text=True)
+        data = resp.get_json()
+        assert data.get("capability_validation_failed") is True
+        assert data.get("capability") == "LED0"
+        assert "permission" in data["error"].lower()
+        assert not list(isolated_lumps.glob("WukongCallHome*.lump"))

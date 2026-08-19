@@ -1674,6 +1674,11 @@ def _self_gt_targets():
         id_str = sc.get("identity_string", "")
         if not id_str:
             continue
+        # Declared capabilities own every c-list row. These LUMPs retain the
+        # same identity_string/hash seal in the sidecar instead of overwriting
+        # the first capability with an identity-shaped token.
+        if sc.get("identity_seal_location") == "sidecar":
+            continue
         if not _lump_exists(token):
             continue
         h = _read_header(token)
@@ -1820,6 +1825,26 @@ class TestR22_SelfGTCorrect:
             "\n  Remove stale entries from KNOWN_SELF_GT_EXCEPTIONS in\n"
             "  tests/lump/test_lump_consistency.py."
         )
+
+    def test_sidecar_identity_seals_match_identity_string(self):
+        """Capability-owning c-lists retain identity exclusively in metadata."""
+        checked = 0
+        for token in LUMP_TOKENS:
+            sc = _load_sidecar(token)
+            if not sc or sc.get("identity_seal_location") != "sidecar":
+                continue
+            identity_string = sc.get("identity_string", "")
+            assert identity_string, (
+                f"{token}: sidecar identity seal has no identity_string"
+            )
+            expected = hashlib.sha256(
+                identity_string.encode("utf-8")
+            ).hexdigest()
+            assert sc.get("identity_hash") == expected, (
+                f"{token}: sidecar identity_hash does not match identity_string"
+            )
+            checked += 1
+        assert checked >= 1, "No production sidecar identity seal was found"
 
 
 class TestR19_NoProductionStubLumps:

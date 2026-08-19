@@ -1,9 +1,10 @@
 {
   "token": "46738c7a",
   "abstraction": "WukongCallHome",
-  "filename": "WukongCallHome.1.d74da592.lump",
-  "sidecar_file": "WukongCallHome.1.d74da592.json",
+  "filename": "WukongCallHome.1.2fa83c3d.lump",
+  "sidecar_file": "WukongCallHome.1.2fa83c3d.json",
   "ns_slot": 7,
+  "ns_slot_policy": "static",
   "lump_size": 1024,
   "typ": 0,
   "content_type": "code",
@@ -17,20 +18,34 @@
   "methods": [],
   "capabilities": [
     {
+      "grants": [
+        "R",
+        "W"
+      ],
       "name": "LED0",
+      "nsIndex": 3,
       "rights": [
         "R",
         "W"
       ]
     },
     {
+      "grants": [
+        "R",
+        "W"
+      ],
       "name": "UART_TX",
+      "nsIndex": 2,
       "rights": [
         "W"
       ]
     },
     {
+      "grants": [
+        "E"
+      ],
       "name": "WukongCallHome.hw",
+      "nsIndex": 7,
       "rights": [
         "E"
       ]
@@ -49,21 +64,22 @@
   "deployment": {
     "target_board": "wukong-xc7a100t",
     "profile": "IoT",
-    "built_at": "2026-08-19T12:06:01.194820Z",
+    "built_at": "2026-08-19T12:36:37.708184Z",
     "builder": "CLOOMC++ IDE v1.0"
   },
   "grants": [
     "E"
   ],
   "source": "",
-  "binary_hash": "86c7bb5ddb7a07a5bc48024670d197e487e237eeb9c9ccda9443a42d557d3357",
+  "binary_hash": "f3e684ca009fb0a3d8ecb0e627421ef0cd45841f65ce987d800d37ffddd1d049",
   "petname": "",
   "issue_number": 1,
   "identity_string": "WukongCallHome#1",
   "identity_hash": "b2c8f3d7d7e755f24ac3ab22726514cfaa9a604d037ab661891c198a0f5d8b90",
+  "identity_seal_location": "sidecar",
   "dot_name": "WukongCallHome",
   "issue_n": 1,
-  "lump_version": 6,
-  "compiled_at": 1787141161.1948426,
+  "lump_version": 7,
+  "compiled_at": 1787142997.7081983,
   "sourceStorageTier": 2
 }
