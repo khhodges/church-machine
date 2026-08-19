@@ -46,10 +46,12 @@ function lumpAuditValidateContentFrame(words, fsStart, fsEnd) {
     const flags   = (hdr >>> 16) & 0xFF;
     const apiLen  = hdr & 0xFFFF;
 
-    // 7a — flags must be 0x00 (Tier 0), 0x01 (Tier 1) or 0x03 (Tier 2).
-    if (flags !== 0x00 && flags !== 0x01 && flags !== 0x03) {
+    // 7a — flags must be 0x00 (Tier 0), 0x01/0x03 (Tier 1/2 uncompressed), or
+    //      0x05/0x07 (Tier 1/2 deflate-raw compressed; bit 2 = compressed flag).
+    if (flags !== 0x00 && flags !== 0x01 && flags !== 0x03 &&
+        flags !== 0x05 && flags !== 0x07) {
         return { ok: false, code: 'FS_BAD_FLAGS',
-                 detail: `content header flags 0x${flags.toString(16).padStart(2, '0').toUpperCase()} — only 0x00, 0x01 or 0x03 are valid (Mint step 7a)` };
+                 detail: `content header flags 0x${flags.toString(16).padStart(2, '0').toUpperCase()} — valid values: 0x00, 0x01, 0x03, 0x05, 0x07 (Mint step 7a)` };
     }
     // 7b — api_byte_length non-zero, API region within freespace.
     if (apiLen === 0) {
@@ -110,7 +112,7 @@ function lumpAuditValidateContentFrame(words, fsStart, fsEnd) {
         }
     }
 
-    const tier = (flags === 0x03) ? 2 : (flags === 0x01) ? 1 : 0;
+    const tier = (flags === 0x03 || flags === 0x07) ? 2 : (flags === 0x01 || flags === 0x05) ? 1 : 0;
     return { ok: true, tier, contentWords: cursor - fsStart };
 }
 

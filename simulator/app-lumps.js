@@ -139,8 +139,6 @@ function showLumpDetail(token) {
     }
     _tabBar += `<button class="lump-tab${isNamespace ? ' lump-tab-active' : ''}" onclick="_switchLumpTab('${_tk}','overview')">Overview</button>`;
     if (!isNamespace) {
-        _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','source')" title="Source \u2014 compiled CLOOMC source and decoded binary content">Source</button>`;
-        _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','tokens')">Tokens</button>`;
         _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','history')">History</button>`;
     }
     const _hasDna = !isNamespace && (lump.clist_entries || []).length > 0;
@@ -383,13 +381,6 @@ function showLumpDetail(token) {
             const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
             return `${d.getDate()} ${mo} ${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
         };
-        let _srcHtml = `<div class="lump-tab-panel" id="lumpTabSource_${_tk}"><div class="lump-source-panel">`;
-        _srcHtml += `<div id="lumpStoredSourceBody_${_tk}" class="lump-stored-src-placeholder"><div class="lump-stored-src-loading">Loading\u2026</div></div>`;
-        _srcHtml += `<div class="lump-source-content-divider"></div>`;
-        _srcHtml += `<div id="lumpContentBody_${_tk}" class="lump-hex-loading">Loading\u2026</div>`;
-        _srcHtml += `</div></div>`;
-        html += `<div class="lump-tab-panel" id="lumpTabTokens_${_tk}">` +
-                `<div id="lumpTokensBody_${_tk}" class="lump-hex-loading">Loading\u2026</div></div>`;
         html += `<div class="lump-tab-panel" id="lumpTabHistory_${_tk}">` +
                 `<div id="lumpHistoryBody_${_tk}" class="lump-hex-loading">Loading\u2026</div></div>`;
         if (_hasDna) {
@@ -435,12 +426,12 @@ function showLumpDetail(token) {
         }
     }
 
-    _lumpActiveTab[_tk] = isNamespace ? 'overview' : 'source';
+    _lumpActiveTab[_tk] = isNamespace ? 'overview' : 'api';
     const nsdgWrap = contentEl.querySelector('.ns-dep-graph-wrap[id]');
     if (nsdgWrap) _initNsDepGraphPanZoom(nsdgWrap.id);
-    // For non-namespace lumps the default tab is 'source'; honour any prior/editor tab on top of that
-    const _defaultTab = isNamespace ? 'overview' : 'source';
-    const restoreTab = (_lumpEditorOpen[_tk] && !isNamespace) ? 'source' : (_prevTab && _prevTab !== 'overview' ? _prevTab : _defaultTab);
+    // For non-namespace lumps the default tab is 'api'.
+    const _defaultTab = isNamespace ? 'overview' : 'api';
+    const restoreTab = (_prevTab && _prevTab !== 'overview' && _prevTab !== 'source' && _prevTab !== 'tokens') ? _prevTab : _defaultTab;
     _switchLumpTab(_tk, restoreTab);
 
     // Passive malformed-binary check — shows amber chip in header without requiring Edit click.
@@ -1647,8 +1638,6 @@ function _switchLumpTab(tk, tab) {
         api: `lumpTabApi_${tk}`,
         clooms: `lumpTabClooms_${tk}`,
         overview: `lumpTabOverview_${tk}`,
-        source: `lumpTabSource_${tk}`,
-        tokens: `lumpTabTokens_${tk}`,
         history: `lumpTabHistory_${tk}`,
         dna: `lumpTabDna_${tk}`,
         hexdump: `lumpTabHexdump_${tk}`,
@@ -1661,7 +1650,7 @@ function _switchLumpTab(tk, tab) {
     if (bar) {
         const btns = bar.querySelectorAll('.lump-tab');
         btns.forEach(btn => {
-            const labelMap = { api: 'API', clooms: 'CLOOMC', overview: 'Overview', source: 'Source', tokens: 'Tokens', history: 'History', dna: 'DNA', hexdump: 'Hex Dump' };
+            const labelMap = { api: 'API', clooms: 'CLOOMC', overview: 'Overview', history: 'History', dna: 'DNA', hexdump: 'Hex Dump' };
             btn.classList.toggle('lump-tab-active', btn.textContent.trim() === labelMap[tab]);
         });
     }
@@ -1673,10 +1662,6 @@ function _switchLumpTab(tk, tab) {
     if (tab === 'clooms' && lump) {
         _populateLumpSourceTab(lump, `lumpTabClooms_${tk}`);
     }
-    if (tab === 'tokens' && !_lumpTokensLoaded[tk] && lump) {
-        _lumpTokensLoaded[tk] = true;
-        _loadLumpTokens(token, lump);
-    }
     if (tab === 'hexdump' && !_lumpHexLoaded[tk] && lump) {
         _lumpHexLoaded[tk] = true;
         _fetchAndShowLumpBinary(token, lump);
@@ -1684,13 +1669,6 @@ function _switchLumpTab(tk, tab) {
     if (tab === 'history' && !_lumpTimelineLoaded[tk] && lump) {
         _lumpTimelineLoaded[tk] = true;
         _fetchAndShowLumpTimeline(token, lump);
-    }
-    if (tab === 'source' && lump) {
-        _fetchAndShowLumpSavedSource(token, lump, tk);
-        if (!_lumpContentLoaded[tk]) {
-            _lumpContentLoaded[tk] = true;
-            _loadLumpContent(token, lump);
-        }
     }
 }
 
@@ -4477,7 +4455,7 @@ function _lumpVersionLabel(lump) {
 function _switchToLumpVersionAndScroll(token, methodName) {
     if (!token) return;
     if (window.LumpRegistry) window.LumpRegistry.setPending(token);
-    window._pendingLumpTab = 'source';
+    window._pendingLumpTab = 'api';
     _pendingLumpMethodName = methodName || null;
     if (typeof renderLumps === 'function') renderLumps();
 }
@@ -4701,6 +4679,55 @@ async function openLumpInEditor(token) {
                 if (_wj && Array.isArray(_wj.words)) serverWords = _wj.words;
             }
         } catch (_fe) {}
+    }
+
+    // ── Try to read embedded source from V1.3 0xAB content frame ─────────────
+    // When flags bit 2 (0x04) is set the source region is deflate-raw compressed;
+    // srcLen stores the compressed byte count so DecompressionStream knows when to stop.
+    var _binaryFrameSource = null;
+    if (serverWords && serverWords.length > 0) {
+        try {
+            var _bhdr  = serverWords[0] >>> 0;
+            var _bCw   = (_bhdr >>> 10) & 0x1FFF;
+            var _bCc   = _bhdr & 0xFF;
+            var _bNm6  = (_bhdr >>> 23) & 0x0F;
+            var _bSz   = 64 << _bNm6;
+            var _bFsS  = 1 + _bCw;
+            var _bFsE  = _bSz - _bCc;
+            if (_bFsS < _bFsE && _bFsS < serverWords.length &&
+                    (((serverWords[_bFsS] >>> 0) >>> 24) & 0xFF) === 0xAB) {
+                var _fHdr    = serverWords[_bFsS] >>> 0;
+                var _fFlags  = (_fHdr >>> 16) & 0xFF;
+                var _fApiLen = _fHdr & 0xFFFF;
+                var _fApiW   = Math.ceil(_fApiLen / 4);
+                var _fCursor = _bFsS + 1 + _fApiW;
+                if ((_fFlags & 0x01) !== 0 && _fCursor < _bFsE) {
+                    var _fSrcLen = serverWords[_fCursor] >>> 0;
+                    var _fSrcW   = Math.ceil(_fSrcLen / 4);
+                    if (_fSrcLen > 0 && _fCursor + 1 + _fSrcW <= _bFsE) {
+                        // Unpack big-endian words → byte array, then trim to srcLen.
+                        var _fBytes = [];
+                        for (var _fsi = 0; _fsi < _fSrcW; _fsi++) {
+                            var _fsw = serverWords[_fCursor + 1 + _fsi] >>> 0;
+                            _fBytes.push((_fsw >>> 24) & 0xFF, (_fsw >>> 16) & 0xFF,
+                                         (_fsw >>>  8) & 0xFF,  _fsw         & 0xFF);
+                        }
+                        _fBytes = _fBytes.slice(0, _fSrcLen);
+                        if ((_fFlags & 0x04) !== 0 && typeof DecompressionStream !== 'undefined') {
+                            // Compressed — inflate with native DecompressionStream.
+                            var _ds = new DecompressionStream('deflate-raw');
+                            var _dw = _ds.writable.getWriter();
+                            _dw.write(new Uint8Array(_fBytes));
+                            _dw.close();
+                            _fBytes = Array.from(new Uint8Array(
+                                await new Response(_ds.readable).arrayBuffer()));
+                        }
+                        var _decoded = new TextDecoder().decode(new Uint8Array(_fBytes));
+                        if (_decoded.trim().length > 0) _binaryFrameSource = _decoded;
+                    }
+                }
+            }
+        } catch (_bfe) { /* silently fall through to sidecar / disasm */ }
     }
 
     // ── Disassemble from server words (authoritative) ──────────────────────
@@ -4940,13 +4967,16 @@ async function openLumpInEditor(token) {
             else if (asmEd.parentNode) asmEd.parentNode.insertBefore(_mfBanner, asmEd);
         }
 
-        // ── Try to restore original source from sidecar detail endpoint ──────
-        // Only override _compiledDisasm when a non-empty, non-stub source is
-        // found; older LUMPs and stub WIP skeletons silently fall through so
-        // the real disassembly is shown instead of a TODO placeholder.
-        // Skip for in-memory lumps — the disasm IS the source.
+        // ── Restore original source: binary frame first, sidecar as fallback ──
+        // Binary-embedded source (from the 0xAB content frame) is the canonical
+        // form — it is exactly what was in the editor when the LUMP was saved.
+        // Fall back to the sidecar detail endpoint for older lumps that predate
+        // the V1.3 self-defining binary format.
         var _sourceRestored = false;
-        if (!_inMemoryLump) {
+        if (_binaryFrameSource) {
+            _compiledDisasm = _binaryFrameSource;
+            _sourceRestored = true;
+        } else if (!_inMemoryLump) {
             try {
                 var _dr = await fetch('/api/lumps/' + token + '/detail', { cache: 'no-store' });
                 if (_dr.ok) {
@@ -5277,7 +5307,7 @@ function _renderFormatLumpVersionHistory(absName) {
 // Builds the spec-compliant binary, runs the lump audit, queries version
 // history, then opens #formatLumpDialog.  Stores the binary on
 // window._pendingLumpData for reuse in Step 2 (confirmSaveToNamespace).
-window.showFormatLump = function() {
+window.showFormatLump = async function() {
     var _regEntry = window.LumpRegistry
         ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())
         : null;
@@ -5316,7 +5346,7 @@ window.showFormatLump = function() {
     // (never include token/issue — circular hash rule) and embed the current
     // editor source so the binary is self-defining (Tier 2).
     // Spec: lump-audit.js lumpAuditValidateContentFrame(), CM_LUMP_SPECIFICATION §Freespace.
-    (function _embedV13Frame() {
+    await (async function _embedV13Frame() {
         // UTF-8 encode a string to a byte array (big-endian word-packed later).
         function _utf8Bytes(s) {
             if (typeof TextEncoder !== 'undefined') {
@@ -5340,6 +5370,14 @@ window.showFormatLump = function() {
             }
             return ws;
         }
+        // Deflate-raw compress a byte array using the browser-native CompressionStream.
+        async function _deflateRaw(bytes) {
+            var cs = new CompressionStream('deflate-raw');
+            var wr = cs.writable.getWriter();
+            wr.write(new Uint8Array(bytes));
+            wr.close();
+            return Array.from(new Uint8Array(await new Response(cs.readable).arrayBuffer()));
+        }
 
         // Build API JSON — name + language + cap names only (no token/issue).
         var _capNames = _caps.map(function(c) {
@@ -5351,13 +5389,17 @@ window.showFormatLump = function() {
         var _apiBytes = _utf8Bytes(JSON.stringify(_apiObj));
         var _apiWds   = _packBE(_apiBytes);
 
-        // Source text — editor content (Tier 2); fall back to Tier 0 if empty.
+        // Source text — compress with deflate-raw (Tier 2 compressed, flags 0x07).
+        // srcLen in the frame stores the COMPRESSED byte count so the decompressor
+        // knows exactly how many bytes to feed to DecompressionStream.
+        // Falls back to Tier 0 (API JSON only) when the editor is empty.
         var _srcEl    = document.getElementById('asmEditor');
         var _srcText  = _srcEl ? (_srcEl.value || '').trim() : '';
-        var _srcBytes = _srcText ? _utf8Bytes(_srcText) : null;
+        var _srcRaw   = _srcText ? _utf8Bytes(_srcText) : null;
+        var _srcBytes = _srcRaw ? await _deflateRaw(_srcRaw) : null;  // compressed bytes
         var _srcWds   = _srcBytes ? _packBE(_srcBytes) : null;
 
-        // Frame size: 1 header + apiWords [+ 1 srcLen + srcWords]
+        // Frame size: 1 header + apiWords [+ 1 srcLen + compressed srcWords]
         var _fsStart = 1 + _svCW;
         var _fsEnd0  = _svLumpSize - _svCC;          // initial freespace end
 
@@ -5377,14 +5419,16 @@ window.showFormatLump = function() {
             for (var _wi = 0; _wi < _svCW; _wi++) _svBinary[1 + _wi] = (_svWords[_wi] >>> 0);
         }
 
-        // Prefer Tier 2 (API JSON + full source embedded).  Grow the lump to the
-        // smallest power-of-2 that fits.  Fall back to Tier 0 (API JSON only)
-        // only when there is no source text at all.
+        // Prefer Tier 2 compressed (flags 0x07 = has_source | compressed).
+        // srcLen stores the COMPRESSED byte count; the reader feeds exactly that
+        // many bytes to DecompressionStream('deflate-raw') to recover the source.
+        // Grow the lump to the smallest power-of-2 that fits.
+        // Fall back to Tier 0 (API JSON only) when there is no source text.
         if (_srcWds && _t2Size <= (_fsEnd0 - _fsStart)) {
-            _flags = 0x03; _frameWds = [null].concat(_apiWds, [_srcBytes.length >>> 0], _srcWds);
+            _flags = 0x07; _frameWds = [null].concat(_apiWds, [_srcBytes.length >>> 0], _srcWds);
         } else if (_srcWds) {
             _grow(_t2Size);
-            _flags = 0x03; _frameWds = [null].concat(_apiWds, [_srcBytes.length >>> 0], _srcWds);
+            _flags = 0x07; _frameWds = [null].concat(_apiWds, [_srcBytes.length >>> 0], _srcWds);
         } else if (_t0Size <= (_fsEnd0 - _fsStart)) {
             _flags = 0x00; _frameWds = [null].concat(_apiWds);
         } else {
@@ -5785,7 +5829,7 @@ async function _gtPickCommit(lumpToken, slotIndex) {
         if (selLump) {
             const tk = (selLump.token || '').replace(/[^a-z0-9]/gi, '');
             _lumpContentLoaded[tk] = false;   // force fresh fetch
-            _switchLumpTab(tk, 'source');
+            _switchLumpTab(tk, 'api');
         }
     } catch (err) {
         if (btn) { btn.disabled = false; btn.textContent = 'Assign GT'; }
