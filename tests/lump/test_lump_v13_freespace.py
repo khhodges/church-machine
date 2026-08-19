@@ -22,6 +22,7 @@ Coverage
         offsets, private methods omitted
   T11 — /api/lump-source/<name> serves the binary's embedded source even
         when a same-name stale .cloomc file exists on disk
+  T15 — Python build_lumps.py embeds source that server.app can recover
 """
 
 import base64
@@ -36,6 +37,8 @@ import pytest
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
+
+from tools.build_lumps import build_lump
 
 # server.app transitively imports hardware/boot_rom.py, which self-checks the
 # canonical SelfTest binary at import time.  If that unrelated startup check
@@ -372,6 +375,35 @@ def test_t13_identity_requires_crypto_explicitly():
     else:
         with pytest.raises(RuntimeError, match="cryptography is unavailable"):
             st.Identity.generate("test-ide")
+
+
+@needs_server
+def test_t15_python_build_lump_source_round_trips_through_server_parser():
+    """A Python-built compressed source frame must survive editor loading."""
+    source = (
+        "; Python-built source round-trip\n"
+        "abstraction PythonBuilderRoundTrip {\n"
+        "  Run() {\n"
+        "    return 42\n"
+        "  }\n"
+        "}\n"
+    )
+    payload = {
+        "abstraction": "PythonBuilderRoundTrip",
+        "token": "f00dcafe",
+        "methods": [{"name": "Run", "code": ["1f000000"]}],
+        "capabilities": [],
+        "source": source,
+    }
+
+    binary, _manifest_entry = build_lump(payload)
+    words = list(struct.unpack(f">{len(binary) // 4}I", binary))
+    result = _app_module._lump_freespace_content(words)
+
+    assert result is not None, "Python-built lump must contain a valid 0xAB frame"
+    assert result["tier"] == 2
+    assert result["flags"] == 0x07
+    assert result["source"] == source
 
 
 @needs_server
