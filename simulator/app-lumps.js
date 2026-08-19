@@ -18,13 +18,31 @@ function showLumpDetail(token) {
     const contentEl = document.getElementById('lumpsDetailContent');
     if (!titleEl || !contentEl) return;
 
+    const _tk = token.replace(/[^a-z0-9]/gi, '');
     const isNamespace = lump.lump_type === 'namespace' || lump.typ === 1;
     const _lumpTitleLabel = _lumpContentTypeLabel(lump);
     // Prefer the canonical dot-name (e.g. "Scheduler.IRQ") over the raw
     // abstraction field when the manifest supplies it.
     const _lumpDisplayName = lump.dot_name || lump.abstraction || 'Unknown Lump';
-    titleEl.textContent = _lumpDisplayName +
+    const _detailTitle = _lumpDisplayName +
         (isNamespace ? ' — Namespace LUMP' : ` — ${_lumpTitleLabel}`);
+    // The binary-derived values below replace these quick manifest estimates as
+    // soon as the words endpoint returns. Keeping the summary in the heading
+    // leaves the LUMP layout visible while inspecting any detail tab.
+    const _headingCw = parseInt(lump.cw) || 0;
+    const _headingCc = parseInt(lump.cc) || 0;
+    titleEl.innerHTML =
+        `<span class="lump-detail-title-text">${_escHtml(_detailTitle)}</span>` +
+        `<span class="lump-field-size-summary" id="lumpFieldSizes_${_tk}" ` +
+        `title="LUMP field sizes in 32-bit words. API includes its 0xAB frame header; Source includes its byte-length word.">` +
+        _renderLumpFieldSizeSummary({
+            code: _headingCw,
+            api: null,
+            source: null,
+            empty: null,
+            clist: _headingCc,
+        }) +
+        `</span>`;
 
     // ── Symmetric Open-in link: LUMP → Abstraction Catalog ──────────────────
     // Only offered when a cataloged abstraction of the same name actually
@@ -35,7 +53,6 @@ function showLumpDetail(token) {
         _lumpAbsMatch = abstractionRegistry.getByName(lump.abstraction);
     }
 
-    const _tk = token.replace(/[^a-z0-9]/gi, '');
     const _prevTab = _lumpActiveTab[_tk] || 'overview';
     delete _lumpContentLoaded[_tk];
     delete _lumpHexLoaded[_tk];
@@ -441,6 +458,68 @@ function showLumpDetail(token) {
     _hideLumpWorkspaceTabs();
 }
 
+// Returns the physical field sizes of a LUMP binary. The five reported fields
+// deliberately exclude the one-word LUMP header so Code + API + Source + Empty
+// + C-List always describe the binary payload after its header.
+function _getLumpFieldSizeLayout(words) {
+    if (!Array.isArray(words) || words.length === 0) return null;
+    const header = words[0] >>> 0;
+    const cw = (header >>> 10) & 0x1FFF;
+    const cc = header & 0xFF;
+    const nMinus6 = (header >>> 23) & 0x0F;
+    const lumpSize = 64 << nMinus6;
+    const freeStart = 1 + cw;
+    const freeEnd = lumpSize - cc;
+    if (freeStart > freeEnd || lumpSize > words.length) return null;
+
+    let api = 0;
+    let source = 0;
+    const frameHeader = words[freeStart] >>> 0;
+    if ((frameHeader >>> 24) === 0xAB) {
+        const flags = (frameHeader >>> 16) & 0xFF;
+        const apiBytes = frameHeader & 0xFFFF;
+        const apiPayloadWords = Math.ceil(apiBytes / 4);
+        const sourceLengthIndex = freeStart + 1 + apiPayloadWords;
+        api = Math.min(1 + apiPayloadWords, freeEnd - freeStart);
+
+        // Source-bearing V1.3 frames reserve one word for the byte length,
+        // followed by the packed (possibly compressed) source payload.
+        if ((flags & 0x01) !== 0 && sourceLengthIndex < freeEnd) {
+            const sourceBytes = words[sourceLengthIndex] >>> 0;
+            source = Math.min(1 + Math.ceil(sourceBytes / 4), freeEnd - freeStart - api);
+        }
+    }
+
+    return {
+        code: cw,
+        api,
+        source,
+        empty: Math.max(0, freeEnd - freeStart - api - source),
+        clist: cc,
+    };
+}
+
+function _renderLumpFieldSizeSummary(layout) {
+    const value = (n) => Number.isFinite(n) ? `${n}w` : '…';
+    const fields = [
+        ['Code', layout.code],
+        ['API', layout.api],
+        ['Source', layout.source],
+        ['Empty', layout.empty],
+        ['C-List', layout.clist],
+    ];
+    return fields.map(([label, words]) =>
+        `<span class="lump-field-size"><span class="lump-field-size-label">${label}</span>${value(words)}</span>`
+    ).join('');
+}
+
+function _updateLumpFieldSizeSummary(tk, words) {
+    const el = document.getElementById(`lumpFieldSizes_${tk}`);
+    const layout = _getLumpFieldSizeLayout(words);
+    if (!el || !layout) return;
+    el.innerHTML = _renderLumpFieldSizeSummary(layout);
+}
+
 // Fetch binary words, parse the lump header, and patch the CC badge / shrink button /
 // malformed chip in the already-rendered header strip.  Fires after contentEl.innerHTML
 // so the DOM elements already exist.  Also populates _lumpBinaryHdrCache[token] for
@@ -465,6 +544,7 @@ async function _patchCcFromBinary(token, lump, tk) {
             ? sim.parseLumpHeader(words[0] >>> 0) : null;
         if (!hdr || !hdr.valid) return;
         _lumpBinaryHdrCache[token] = { hdr, words };
+        _updateLumpFieldSizeSummary(tk, words);
 
         // ── Patch CC badge ───────────────────────────────────────────────────
         const ccBadge = document.getElementById(`lumpCcChip_${tk}`);

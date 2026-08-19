@@ -5035,6 +5035,56 @@ mark.abs-search-highlight {
     color: var(--text-muted, #8a7fb8);
     border-bottom: none;
     margin-bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.lump-detail-title-text {
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.lump-field-size-summary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.45rem;
+    margin-left: auto;
+    color: var(--text-secondary, #8892a4);
+    font-family: 'Courier New', monospace;
+    font-size: 0.62rem;
+    white-space: nowrap;
+}
+
+.lump-field-size {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.18rem;
+}
+
+.lump-field-size-label {
+    color: var(--text-muted, #8a7fb8);
+    font-size: 0.56rem;
+    font-family: inherit;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+@media (max-width: 760px) {
+    .lump-detail-subheading {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.2rem;
+    }
+
+    .lump-field-size-summary {
+        justify-content: flex-start;
+        margin-left: 0;
+        flex-wrap: wrap;
+        white-space: normal;
+    }
 }
 
 .lump-sort-bar {
