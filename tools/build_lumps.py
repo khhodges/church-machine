@@ -7,11 +7,14 @@ under library/.  For each file that has a "token" field and "methods" with
 it to server/lumps/<token8>.lump.
 
 Also writes server/lumps/manifest.json describing every lump that was built.
+The generated .lump files are committed catalog artifacts; rerun this script
+and commit its output whenever the builder format changes (including content
+frame changes), so the catalog stays reproducible and fresh.
 
 Lump binary format (big-endian uint32 words):
   word 0           : header — magic 0x1F[26:23]=n-6 [22:10]=cw [9:8]=typ [7:0]=cc
   word 1..cw       : code region (all methods concatenated in method-index order)
-  word cw+1..sz-cc-1 : zeros (free space)
+  word cw+1..sz-cc-1 : V1.3 0xAB content frame followed by zero free space
   word sz-cc..sz-1 : c-list GTs (null GTs = 0x00000000)
 
 Method dispatch:

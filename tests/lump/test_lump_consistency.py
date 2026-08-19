@@ -2108,17 +2108,78 @@ class TestR20_CanonicalFilenameIntegrity:
 # ══════════════════════════════════════════════════════════════════════════════
 
 _R21_FREESPACE_EXCEPTIONS: frozenset = frozenset([])
+_V13_CONTENT_FRAME_FLAGS: frozenset = frozenset({0x00, 0x01, 0x03, 0x05, 0x07})
+
+
+def _validate_v13_content_frame(words, fs_start: int, fs_end: int, token: str) -> int:
+    """Validate the V1.3 0xAB frame at *fs_start* and return its end word.
+
+    The caller has already established that the frame header is present.  The
+    returned index is the first trailing zero-fill word, or ``fs_end`` when the
+    frame consumes all remaining freespace.
+    """
+    frame_header = words[fs_start]
+    flags = (frame_header >> 16) & 0xFF
+    api_len = frame_header & 0xFFFF
+    assert flags in _V13_CONTENT_FRAME_FLAGS, (
+        f"{token}: V1.3 content frame at word {fs_start} has unsupported "
+        f"flags 0x{flags:02X}; expected one of "
+        f"{', '.join(f'0x{value:02X}' for value in sorted(_V13_CONTENT_FRAME_FLAGS))}."
+    )
+    assert api_len > 0, (
+        f"{token}: V1.3 content frame at word {fs_start} has an empty API "
+        "definition. Rebuild the LUMP with a non-empty API JSON object."
+    )
+
+    api_words = (api_len + 3) // 4
+    frame_end = fs_start + 1 + api_words
+    assert frame_end <= fs_end, (
+        f"{token}: V1.3 content frame API extends through word "
+        f"{frame_end - 1}, beyond freespace ending at word {fs_end - 1}."
+    )
+    api_remainder = api_len % 4
+    if api_remainder:
+        api_padding_mask = (1 << (8 * (4 - api_remainder))) - 1
+        assert words[frame_end - 1] & api_padding_mask == 0, (
+            f"{token}: V1.3 content frame API has non-zero padding bytes in "
+            f"word {frame_end - 1}."
+        )
+
+    if flags & 0x01:
+        assert frame_end < fs_end, (
+            f"{token}: V1.3 content frame declares source bytes but has "
+            "no source-length word in freespace."
+        )
+        source_len = words[frame_end]
+        assert source_len > 0, (
+            f"{token}: V1.3 content frame declares source bytes but its "
+            "source length is zero."
+        )
+        source_words = (source_len + 3) // 4
+        frame_end += 1 + source_words
+        assert frame_end <= fs_end, (
+            f"{token}: V1.3 content frame source extends through word "
+            f"{frame_end - 1}, beyond freespace ending at word {fs_end - 1}."
+        )
+        source_remainder = source_len % 4
+        if source_remainder:
+            source_padding_mask = (1 << (8 * (4 - source_remainder))) - 1
+            assert words[frame_end - 1] & source_padding_mask == 0, (
+                f"{token}: V1.3 content frame source has non-zero padding bytes "
+                f"in word {frame_end - 1}."
+            )
+
+    return frame_end
 
 
 class TestR21_FreespaceZeroFill:
-    """R21: All freespace words (cw+1 .. lumpSize-cc-1) must be zero.
+    """R21: Freespace is zero-filled outside a valid V1.3 content frame.
 
-    Mint step 7 of the validation sequence rejects any lump whose freespace
-    contains non-zero words.  A dirty freespace zone is almost always a sign
-    that the binary was packed incorrectly (code or data words spilling past
-    the declared cw boundary).
-
-    Exceptions documented in _R21_FREESPACE_EXCEPTIONS are exempt.
+    Pre-V1.3 LUMPs have an entirely zero-filled freespace zone.  V1.3 catalog
+    LUMPs may begin that zone with one bounded 0xAB self-definition frame
+    containing compact API JSON and optional source bytes.  The remainder must
+    remain zero-filled.  Exceptions documented in
+    _R21_FREESPACE_EXCEPTIONS are exempt.
     """
 
     @pytest.mark.parametrize("token", LUMP_TOKENS)
@@ -2173,26 +2234,85 @@ class TestR21_FreespaceZeroFill:
             fs_start = 17 + hw          # first word after heap zone
             fs_end   = lump_sz - 12 - sw  # first stack word (exclusive end)
         else:
-            fs_start = 1 + cw
+            # Executable data words follow code and are not freespace.  The
+            # header does not encode dw, so recover it from the manifest.
+            manifest_entry = next(
+                (entry for entry in MANIFEST
+                 if entry.get("token", "").lower() == token.lower()),
+                {},
+            )
+            dw = int(manifest_entry.get("dw", 0) or 0)
+            fs_start = 1 + cw + dw
             fs_end   = lump_sz - cc
 
         if fs_start >= fs_end:
             return  # no freespace zone (fully packed or empty collision zone)
 
+        frame_end = fs_start
+        frame_header = words[fs_start]
+        if (frame_header >> 24) & 0xFF == 0xAB:
+            frame_end = _validate_v13_content_frame(
+                words, fs_start, fs_end, token
+            )
+
         dirty = [
             (i, words[i])
-            for i in range(fs_start, fs_end)
+            for i in range(frame_end, fs_end)
             if words[i] != 0
         ]
 
         assert not dirty, (
-            f"{token}: {len(dirty)} non-zero word(s) in freespace zone "
+            f"{token}: {len(dirty)} non-zero word(s) after its V1.3 content frame "
+            "in freespace zone "
             f"(words {fs_start}–{fs_end - 1}); "
             f"first dirty word: [word {dirty[0][0]}] = 0x{dirty[0][1]:08X}.\n"
-            "  Mint step 7 rejects any lump with non-zero freespace.\n"
-            "  Re-pack the binary so all freespace words are 0x00000000, or add\n"
+            "  Mint step 7 permits only the bounded V1.3 0xAB content frame; "
+            "all remaining freespace must be 0x00000000.\n"
+            "  Re-pack the binary so the content frame is bounded and remaining "
+            "freespace is zero-filled, or add\n"
             "  a SPEC-EXCEPTION entry to _R21_FREESPACE_EXCEPTIONS with rationale."
         )
+
+
+def _r21_test_frame_words(flags: int, api: bytes = b'{}', source: bytes | None = None):
+    """Build a small valid V1.3 frame and its free-space boundary for unit tests."""
+    def _pack(data: bytes):
+        return [
+            int.from_bytes(data[pos:pos + 4].ljust(4, b'\0'), 'big')
+            for pos in range(0, len(data), 4)
+        ]
+
+    words = [((0xAB << 24) | (flags << 16) | len(api)), *_pack(api)]
+    if flags & 0x01:
+        assert source is not None
+        words.extend([len(source), *_pack(source)])
+    words.extend([0, 0])
+    return words, len(words)
+
+
+class TestR21V13ContentFrameValidation:
+    """Focused V1.3 framing regression checks for the consistency validator."""
+
+    def test_compressed_tier_one_frame_is_valid(self):
+        words, fs_end = _r21_test_frame_words(0x05, source=b'x')
+        assert _validate_v13_content_frame(words, 0, fs_end, "test") == fs_end - 2
+
+    def test_rejects_zero_source_length(self):
+        words, fs_end = _r21_test_frame_words(0x01, source=b'')
+        with pytest.raises(AssertionError, match="source length is zero"):
+            _validate_v13_content_frame(words, 0, fs_end, "test")
+
+    def test_rejects_nonzero_api_padding(self):
+        words, fs_end = _r21_test_frame_words(0x00)
+        words[1] |= 0x01
+        with pytest.raises(AssertionError, match="API has non-zero padding"):
+            _validate_v13_content_frame(words, 0, fs_end, "test")
+
+    def test_rejects_nonzero_source_padding(self):
+        words, fs_end = _r21_test_frame_words(0x01, source=b'x')
+        words[3] |= 0x01
+        with pytest.raises(AssertionError, match="source has non-zero padding"):
+            _validate_v13_content_frame(words, 0, fs_end, "test")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
