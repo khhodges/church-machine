@@ -34,7 +34,7 @@ if (typeof module !== 'undefined' && typeof AbstractGTManager === 'undefined') {
 //                         f_flag[31]: Far indicator — 0=local, 1=remote IDE node; also masked from integrity32
 //                         Both g_bit and f_flag are NS SLOT properties, not GT word fields. ★v2.0
 //     word2  integrity  — integrity32(word0, word1 with g_bit[30] and f_flag[31] cleared); 32-bit parallel check
-//     word3  abstract_gt — advisory Abstract GT annotation (M-bit gated; invisible to user-mode LOAD)
+//     word3  cache_token — issue-blind 32-bit lookup/cache value T; non-authoritative
 //
 // THREAD LUMP LAYOUT  (256 words, NS[1] "Boot.Thread")
 //   +0        Header word
@@ -287,7 +287,7 @@ class ChurchSimulator {
         // so we discover the reserve by finding the tag rather than using a
         // hardcoded offset. Scan limit: 8192 words covers up to 1024-slot NS tables
         // (4096 words) plus the 2 sentinel words and future headroom.
-        const BOOT_IMAGE_FORMAT_TAG = 0xB0072128;  // must match boot_image.py; bumped for A7 v1.2 layout inversion (Thread@0, NS@top)
+        const BOOT_IMAGE_FORMAT_TAG = 0xB0072862;  // must match boot_image.py; bumped for Task #2862 (W3=cache_token migration; W1||W2||W3 Outform token)
         let tagIdx = -1;
         const scanLimit = Math.min(8192, src.length);
         for (let _si = 1; _si <= scanLimit; _si++) {
@@ -446,12 +446,12 @@ class ChurchSimulator {
             };
             for (const [_slotStr, _spec] of Object.entries(_MMIO_REINIT)) {
                 const _slot  = Number(_slotStr);
-                const _nsB   = this._nsSlotBase(_slot);
-                const _w1    = this.memory[_nsB + 1];
-                const _pW1   = this.parseNSWord1(_w1);
-                if (_pW1.gtType !== 1) {
-                    this.memory[_nsB + 0] = _spec.addr >>> 0;
-                    this.memory[_nsB + 1] = this.packNSWord1(_spec.lim17, 0, 0, 1, 0);
+                // This is a display/catalog hint, never execution state or authority.
+                const _declared = (this._nsUiTypeHint && this._nsUiTypeHint[_slot]) || 0;
+                if (_declared !== 1) {
+                    // writeNSEntry recomputes W1 (authority) and W2 (integrity32).
+                    this.writeNSEntry(_slot, _spec.addr >>> 0, _spec.lim17, 0, 0, 1, 0, 0,
+                        this.memory[this._nsSlotBase(_slot) + 3] >>> 0);
                     this.output += `[BOOTIMG] NS[${_slot}] MMIO gtType upgraded NULL→Inform (stale binary).\n`;
                 }
             }
@@ -569,12 +569,10 @@ class ChurchSimulator {
                 // path fires in _execCall when a CALL arrives on this slot.
                 // Warm entries keep gtType=1 (Inform) so Mode 1 restore fires
                 // correctly on them — do not change warm entries here.
-                const coldNsBase = this._nsSlotBase(slot);
-                const coldW1 = this.memory[coldNsBase + 1];
-                const coldW1f = this.parseNSWord1(coldW1);
-                this.memory[coldNsBase + 1] = this.packNSWord1(
-                    coldW1f.limit, coldW1f.b, coldW1f.g,
-                    2 /* Outform */, coldW1f.clistCount);
+                // W1 is authority only. Record a display-only Outform hint and
+                // leave W1 untouched so W2 stays valid.
+                if (!this._nsUiTypeHint) this._nsUiTypeHint = {};
+                this._nsUiTypeHint[slot] = 2 /* display-only Outform hint */;
             }
         }
         if (warmCount + coldCount > 0) {
@@ -681,10 +679,10 @@ class ChurchSimulator {
         const nsBase = this._nsSlotBase(slotIndex);
         const nsW0Prev = this.memory[nsBase + 0];
         const nsW1     = this.memory[nsBase + 1];
-        const nsW2Prev = this.memory[nsBase + 2];
         if (nsW0Prev !== 0 || nsW1 !== 0) {
-            const gt_seq   = (nsW2Prev >>> 25) & 0x7F;
+            // Canonical NS ABI: gt_seq is W1[29:21], not W2 (W2 is integrity32).
             const parsedW1 = this.parseNSWord1(nsW1);
+            const gt_seq   = parsedW1.gtSeq;
             this.memory[nsBase + 0] = loc >>> 0;
             this.memory[nsBase + 2] = this.makeVersionSeals(gt_seq, loc, parsedW1.limit);
         }
@@ -694,14 +692,11 @@ class ChurchSimulator {
         // the lump is resident.  Subsequent GT derivations from this NS entry will
         // carry type=1 so the normal Inform CALL path fires without re-triggering Mode 2.
         {
-            const promNsBase = this._nsSlotBase(slotIndex);
-            const promW1 = this.memory[promNsBase + 1];
-            const promW1f = this.parseNSWord1(promW1);
-            if (promW1f.gtType === 2) {
-                this.memory[promNsBase + 1] = this.packNSWord1(
-                    promW1f.limit, promW1f.b, promW1f.g,
-                    1 /* Inform */, promW1f.clistCount);
-                this.output += `[LOADER] NS[${slotIndex}] Outform→Inform promotion in NS entry word1\n`;
+            // Update presentation metadata only; access GT controls state.
+            if (!this._nsUiTypeHint) this._nsUiTypeHint = {};
+            if (this._nsUiTypeHint[slotIndex] === 2) {
+                this._nsUiTypeHint[slotIndex] = 1 /* display-only Inform hint */;
+                this.output += `[LOADER] NS[${slotIndex}] display hint updated Outform→Inform\n`;
             }
         }
 
@@ -765,7 +760,21 @@ class ChurchSimulator {
         }
 
         entry.loaded = false;
-        this.output += `[LOADER] Evicted ${label} (slot ${slotIndex}) — entire lump zeroed, NS entry authority preserved\n`;
+
+        // Task #2862: when this slot carries a trusted network identity (i.e. it
+        // was resolved from a network Outform), eviction must restore the exact
+        // Outform W1-3 so the next CALL/LOAD re-fires the Mode-2 lazy path and
+        // re-resolution reproduces the same token.  The trusted identity is
+        // preserved (NOT cleared) — only slot clear/reset removes it.  Legacy
+        // slots with no registered identity keep the historical behaviour
+        // (NS entry authority preserved, lump body zeroed).
+        if (this.getSlotIdentity(slotIndex)) {
+            this._restoreOutformWords(slotIndex);
+            this._restoreOutformBindings(slotIndex);
+            this.output += `[LOADER] Evicted ${label} (slot ${slotIndex}) — resident body cleared, Outform W1-3 restored (identity preserved)\n`;
+        } else {
+            this.output += `[LOADER] Evicted ${label} (slot ${slotIndex}) — entire lump zeroed, NS entry authority preserved\n`;
+        }
 
         this.auditLog.push({
             gate: 'Loader.Evict',
@@ -803,6 +812,9 @@ class ChurchSimulator {
     }
 
     reset() {
+        // Presentation hints are rebuildable metadata, never lifecycle state.
+        this._nsUiTypeHint = {};
+        this._nsClistCount = {};
         this.cr = [];
         for (let i = 0; i < 16; i++) {
             this.cr[i] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
@@ -905,6 +917,27 @@ class ChurchSimulator {
         // Token→NS slot map: tracks which slot a compiled lump was last allocated to.
         // Cleared on reset so a page-reload starts fresh.
         this._tokenSlotMap = new Map();
+
+        // ── Trusted per-slot identity map (Task #2862) ────────────────────────
+        // Lives OUTSIDE the 4-word NS entry: it is trusted metadata the resolver
+        // (ADD path / sidecar / manifest) records BEFORE a lazy Outform is created,
+        // and that receiveLump() checks against the fetched lump before committing
+        // any resident state.  The 4-word NS entry alone can never select or
+        // authorize a fetched lump — the identity here is the discriminator.
+        //
+        //   slot → {
+        //     cacheToken    : 32-bit cache tag T (must equal the Outform W3 low 8 hex)
+        //     dotName       : dotted abstraction name (e.g. "Math.Add")
+        //     issueN        : issue / generation number; different issue = different identity
+        //     identityHash  : trusted hash over the logical identity (name+issue+…)
+        //     binaryHash    : trusted hash over the exact lump binary bytes
+        //     outformWords  : [W1, W2, W3] captured at Outform-create time (restored on evict)
+        //     gtSeq         : NS gt_seq at registration
+        //     generation    : monotonic generation counter to prevent slot reuse
+        //   }
+        // Cleared on reset so a page-reload starts fresh.
+        this._slotIdentity = new Map();
+        this._slotIdentityGen = 0;
 
         this._initNamespaceTable();
         this.output += '--- HARD RESET: all registers zeroed ---\n';
@@ -1060,41 +1093,29 @@ class ChurchSimulator {
         this._fastBoot(2);
     }
 
-    packNSWord1(limit17, bFlag, gBit, gtType, clistCount) {
+    packNSWord1(limitOffset, gtSeq, gBit, fFlag) {
+        // Canonical v2.0 NS W1 / CR W2 authority layout:
+        // limit[20:0] | gt_seq[29:21] | G[30] | F[31].
+        // State/type and c-list count are never encoded in an NS word.
         return (
-            ((bFlag & 1) << 31) |
-            // bit[30]: f_flag (far-lump) — REMOVED in v2.0 ISA; always 0 in packNSWord1.
-            //          In v1.x, f_flag lived in the GT word at bit[25]. In v2.0, it was
-            //          retired entirely: far-lumps are no longer a gate in the mLoad/mSave path.
-            //          parseNSWord1() returns f:0 for forward compatibility with any code that
-            //          still reads the field; callers should treat f===1 as unreachable in v2.0.
-            ((gBit & 1) << 29) |        // G-bit at bit[29] — matches server/boot_image.py pack_ns_word1 g→29.
-            // bit[28] reserved — NOT used for chainable; chainable lives in this.nsChainable[] side-table.
-            ((gtType & 3) << 26) |
-            (((clistCount || 0) & 0x1FF) << 17) |
-            (limit17 & 0x1FFFF)
+            ((fFlag & 1) << 31) |
+            ((gBit & 1) << 30) |
+            (((gtSeq || 0) & 0x1FF) << 21) |
+            (limitOffset & 0x1FFFFF)
         ) >>> 0;
     }
 
     parseNSWord1(word1) {
         return {
-            b: (word1 >>> 31) & 1,
-            // f: far-lump flag — REMOVED in v2.0; hardcoded 0 here because bit[30] is now
-            //    the hardware GC liveness mark (markLive/getGBit write/read bit[30] per
-            //    WORD2_LAYOUT).  Reading bit[30] as F would produce false F_BIT faults
-            //    whenever mLoad marks a slot live during boot.  Callers that check .f === 1
-            //    always see false and skip the far-lump restriction path. ★v2.0 fix
-            f: 0,
-            g: (word1 >>> 29) & 1,      // G-bit at bit[29] — matches packNSWord1 and boot_image.py.
-            // bit[28] reserved — chainable is NOT in Word 1; see this.nsChainable[] side-table.
-            gtType: (word1 >>> 26) & 3,
-            clistCount: (word1 >>> 17) & 0x1FF,
-            limit: word1 & 0x1FFFF,
+            f: (word1 >>> 31) & 1,
+            g: (word1 >>> 30) & 1,
+            gtSeq: (word1 >>> 21) & 0x1FF,
+            limit: word1 & 0x1FFFFF,
         };
     }
 
     packLimitWord(limit17, bFlag) {
-        return this.packNSWord1(limit17, bFlag, 0, 0, 0);
+        return this.packNSWord1(limit17, 0, 0, 0);
     }
 
     parseLimitWord(word1) {
@@ -1299,7 +1320,9 @@ class ChurchSimulator {
         return this.NS_TABLE_BASE + this.NS_TABLE_RESERVE - (idx + 1) * this.NS_ENTRY_WORDS;
     }
 
-    writeNSEntry(idx, location, limit17, bFlag, gBit, gtType, version, clistCount, abstract_gt) {
+    // Task #2862: the final parameter is the 32-bit CACHE TOKEN written to W3
+    // (word3_cache_token), NOT an Abstract GT.  Renamed abstract_gt -> cacheToken32.
+    writeNSEntry(idx, location, limit17, bFlag, gBit, gtType, version, clistCount, cacheToken32) {
         if (gtType === 3) {
             throw new Error(
                 `writeNSEntry(slot ${idx}): Abstract GTs (gtType=3) must never have NS entries. ` +
@@ -1308,10 +1331,15 @@ class ChurchSimulator {
             );
         }
         const base = this._nsSlotBase(idx);
+        if (!this._nsUiTypeHint) this._nsUiTypeHint = {};
+        if (!this._nsClistCount) this._nsClistCount = {};
+        this._nsUiTypeHint[idx] = gtType; // non-authoritative UI/catalog metadata
+        this._nsClistCount[idx] = clistCount || 0;
         this.memory[base + 0] = location >>> 0;
-        this.memory[base + 1] = this.packNSWord1(limit17, bFlag, gBit, gtType, clistCount || 0);
-        this.memory[base + 2] = this.makeVersionSeals(version || 0, location, limit17);
-        this.memory[base + 3] = (abstract_gt || 0) >>> 0;
+        this.memory[base + 1] = this.packNSWord1(limit17, version || 0, gBit, 0);
+        this.memory[base + 2] = this._integrity32(
+            this.memory[base + 0], this.memory[base + 1]);
+        this.memory[base + 3] = (cacheToken32 || 0) >>> 0;   // W3 = cache token (T)
         if (idx >= this.nsCount) this.nsCount = idx + 1;
     }
 
@@ -1412,14 +1440,26 @@ class ChurchSimulator {
         const w3 = this.memory[base + 3];
         if (w0 === 0 && w1 === 0) return null;
         const parsed = this.parseNSWord1(w1);
+        let clistCount = (this._nsClistCount && this._nsClistCount[idx]) || 0;
+        if (w0 < this.memory.length) {
+            const hdr = this.parseLumpHeader(this.memory[w0]);
+            if (hdr.valid) clistCount = hdr.cc;
+        }
         return {
             word0_location: w0,
             word1_limit: w1,
             word2_seals: w2,
-            word3_abstract_gt: w3,
+            // Task #2862: W3 is now the resident cache_token (Inform) / cache tag T
+            // (Outform).  word3_cache_token is canonical; word3_abstract_gt is kept
+            // as a DEPRECATED alias for tests/consumers not yet migrated.
+            word3_cache_token: w3,
+            word3_abstract_gt: w3,   // deprecated alias — same underlying W3 word
             gBit: parsed.g,
-            gtType: parsed.gtType,
-            clistCount: parsed.clistCount,
+            gtSeq: parsed.gtSeq,
+            // Compatibility metadata only; never decoded from W1 and never
+            // used as the authoritative runtime state discriminator.
+            gtType: (this._nsUiTypeHint && this._nsUiTypeHint[idx]) || 1,
+            clistCount,
             chainable: this.nsChainable[idx] || false,
             label: this.nsLabels[idx] || '',
         };
@@ -1429,6 +1469,36 @@ class ChurchSimulator {
         if (idx < 0 || idx >= this.MAX_NS_ENTRIES) return false;
         const base = this._nsSlotBase(idx);
         return (this.memory[base] !== 0 || this.memory[base + 1] !== 0);
+    }
+
+    // ── Canonical c-list-count helper (Task #2862 NS ABI migration) ───────────
+    // The c-list slot count is NEVER decoded from an NS/CR authority word (W1/
+    // CR.word2): the canonical v2.0 authority layout carries only
+    // limit[20:0] | gt_seq[29:21] | G[30] | F[31].  The count is a property of
+    // the RESIDENT LUMP, read from its header (LUMP_HEADER_LAYOUT.cc) at the
+    // lump base address.  This helper centralises that derivation so no caller
+    // has to re-derive it (and so the old W1-overloaded path is never reused).
+    //
+    // Resolution order:
+    //   1. If the CR holds a GT that indexes a valid NS entry, use the resident
+    //      lump header cc via readNSEntry (which already derives it from the
+    //      lump base).  This is the authoritative path.
+    //   2. Fall back to the writeNSEntry-declared side-table count, then 0.
+    _clistCountForCR(crIdx) {
+        const cr = this.cr && this.cr[crIdx];
+        if (!cr) return 0;
+        const gt = cr.word0 >>> 0;
+        if (gt === 0 || ChurchSimulator.isNullGT(gt)) return 0;
+        let idx;
+        try { idx = this.parseGT(gt).index; } catch (e) { return 0; }
+        // readNSEntry derives clistCount from the resident lump header at the
+        // NS entry's word0_location (the lump base), falling back to the
+        // writeNSEntry-declared side-table value.  This is the authoritative
+        // count — a CR c-list base (CR.word1) points at the c-list region, not
+        // the header, so it cannot be read directly.
+        const entry = this.readNSEntry(idx);
+        if (entry && typeof entry.clistCount === 'number') return entry.clistCount;
+        return 0;
     }
 
     // ── Interactive Pending-GT Resolution (Task #1448 + Task #1519) ────────────
@@ -1452,8 +1522,7 @@ class ChurchSimulator {
         if (!cr6 || (cr6.word0 >>> 0) === 0) return { ok: false, error: 'CR6 is null — no active c-list' };
 
         const clistBase = cr6.word1 >>> 0;
-        let clistCount = 0;
-        try { clistCount = this.parseNSWord1(cr6.word2).clistCount; } catch (e) { clistCount = 0; }
+        const clistCount = this._clistCountForCR(6);
 
         if (slotIdx < 0 || slotIdx >= clistCount) {
             return { ok: false, error: `Slot ${slotIdx} is out of range (c-list has ${clistCount} entries)` };
@@ -1676,14 +1745,13 @@ class ChurchSimulator {
             // clistCount is 0. The DEMO_CLIST is managed through this.demoClistGTs
             // and lazily installed into Boot.Abstr at runtime by _applyPendingSimLoad.
             const nsTableCount = 0;
-            // v2.0 GT layout: [31]=b_flag [30:28]=perm[2:0] [27]=dom ★[26:25]=gt_type ★[24:16]=gt_seq ...
-            const _ap   = a.perms || {};
-            const _dom  = (_ap.L || _ap.S || _ap.E) ? 1 : 0;
-            const _p3   = _dom === 0
-                ? (((_ap.X?1:0)<<2)|((_ap.W?1:0)<<1)|(_ap.R?1:0))
-                : (((_ap.E?1:0)<<2)|((_ap.S?1:0)<<1)|(_ap.L?1:0));
-            const abstractGtWord = ((_p3 << 28) | (_dom << 27)) >>> 0;
-            this.writeNSEntry(i, loc, lim17, 0, 0, 1, 0, nsTableCount, abstractGtWord);
+            // Task #2862: built-in boot NS entries no longer synthesize Abstract-GT
+            // permissions into W3.  W3 is now the resident cache_token slot only.
+            // A built-in entry has no registered trusted identity and no network
+            // cache token, so W3 = 0.  (Previously this packed perm/dom bits into a
+            // pseudo Abstract-GT word — removed with the W3=cache_token migration.)
+            const w3CacheToken = 0;
+            this.writeNSEntry(i, loc, lim17, 0, 0, 1, 0, nsTableCount, w3CacheToken);
             this.nsChainable[i] = a.chainable || false;
             this.nsLabels[i] = a.label;
             if (a.handler) {
@@ -1707,9 +1775,13 @@ class ChurchSimulator {
             const _e2Phys  = _e2.physAddr | 0;
             const _e2Size  = (_e2.lumpSize || this.SLOT_SIZE) | 0;
             const _e2Lim17 = (_e2Size - 1) & 0x1FFFF;
-            // Callable abstraction: Church domain (dom=1), E-perm (p3=4=0b100)
-            const _e2AbsGt = ((4 << 28) | (1 << 27)) >>> 0;
-            this.writeNSEntry(_e2Slot, _e2Phys, _e2Lim17, 0, 0, 1, 0, 0, _e2AbsGt);
+            // Task #2862: W3 = 0 for resident boot Inform entries.  W3 is the
+            // cache_token ONLY and no external trusted full identity exists for a
+            // built-in boot lump, so W3 must NOT synthesize an Abstract-GT
+            // permission word.  (Was 0x48000000 = Church-domain E-perm; removing
+            // it restores boot parity with the built-in catalog entries, which
+            // also carry W3=0.)
+            this.writeNSEntry(_e2Slot, _e2Phys, _e2Lim17, 0, 0, 1, 0, 0, 0);
             this.nsLabels[_e2Slot]    = `slot${_e2Slot}`;
             this.nsChainable[_e2Slot] = false;
         }
@@ -1831,8 +1903,13 @@ class ChurchSimulator {
         const entryNSBase      = this._nsSlotBase(this.bootEntrySlot);
         const entryCRLimit     = entryLumpSize - 1;
         const bootEntryLoc     = this.memory[this._nsSlotBase(this.bootEntrySlot)];
-        this.memory[entryNSBase + 1] = this.packNSWord1(entryCRLimit, 0, 0, 1, 0);
+        // W1 is authority only. The type hint below is presentation metadata.
+        this.memory[entryNSBase + 1] = this.packNSWord1(entryCRLimit, 0, 0, 0);
         this.memory[entryNSBase + 2] = this.makeVersionSeals(0, bootEntryLoc, entryCRLimit);
+        if (!this._nsUiTypeHint) this._nsUiTypeHint = {};
+        this._nsUiTypeHint[this.bootEntrySlot] = 1 /* display-only Inform hint */;
+        if (!this._nsClistCount) this._nsClistCount = {};
+        this._nsClistCount[this.bootEntrySlot] = 0;
 
         // Write a minimal Boot.Abstr lump header at the boot entry slot physical
         // address so NUC_CLIST (B:06) can read a valid magic word.  Without this,
@@ -1891,10 +1968,10 @@ class ChurchSimulator {
                 }
                 this.memory[loc + sz - cc + ci] = gt >>> 0;
             }
-            // Update NS entry word1 (lim17 + cc) and word2 (seal)
-            const nsBase    = this._nsSlotBase(cslot);
-            this.memory[nsBase + 1] = this.packNSWord1(lim17, 0, 0, 1, cc) >>> 0;
-            this.memory[nsBase + 2] = this.makeVersionSeals(0, loc, lim17) >>> 0;
+            // Update NS entry via writeNSEntry so W1 (authority) and W2
+            // (integrity32) stay consistent; state/type + cc go to side-tables.
+            this.writeNSEntry(cslot, loc, lim17, 0, 0, 1, 0, cc,
+                this.memory[this._nsSlotBase(cslot) + 3] >>> 0);
         }
 
         // Boot-entry slot: written at NS_TABLE_BASE - 2 (mirrors boot_image.py).
@@ -1905,7 +1982,7 @@ class ChurchSimulator {
         // stale binaries. Bumped to 0x563 (Task #568) — Boot.Abstr placement is now
         // dynamic (64w default or saved lump size); abstractionLumpWords deprecated.
         // Must match boot_image.py BOOT_IMAGE_FORMAT_TAG and loadBootImage().
-        const BOOT_IMAGE_FORMAT_TAG_INIT = 0xB0072128;  // bumped for A7 v1.2 layout inversion (Thread@0, NS@top)
+        const BOOT_IMAGE_FORMAT_TAG_INIT = 0xB0072862;  // bumped for Task #2862 (W3=cache_token migration; W1||W2||W3 Outform token)
         this.memory[this.NS_TABLE_BASE - 1] = BOOT_IMAGE_FORMAT_TAG_INIT >>> 0;
     }
 
@@ -2051,7 +2128,8 @@ class ChurchSimulator {
             // ════════════════════════════════════════════════════════════════════
             case 1: {
                 const _nsEntry0 = this.readNSEntry(BOOT_NS_SLOT_HEADER);
-                const _seq0 = _nsEntry0 ? ((_nsEntry0.word2_seals >>> 25) & 0x7F) : 0;
+                const _seq0 = _nsEntry0
+                    ? this.parseNSWord1(_nsEntry0.word1_limit).gtSeq : 0;
                 const gt15 = this.createGT(_seq0, BOOT_NS_SLOT_HEADER, {R:0,W:0,X:0,L:0,S:0,E:0}, 1); // zero-perm Inform GT for NS Slot 0 (the namespace table itself)
                 const check = this.mLoad(gt15, null, undefined);                   // mLoad with M-elevation; reads NS word0/word1 for Slot 0
                 if (!check.ok) {
@@ -2089,7 +2167,8 @@ class ChurchSimulator {
             // ════════════════════════════════════════════════════════════════════
             case 2: {
                 const _nsEntry1 = this.readNSEntry(BOOT_NS_SLOT_THREAD);
-                const _seq1 = _nsEntry1 ? ((_nsEntry1.word2_seals >>> 25) & 0x7F) : 0;
+                const _seq1 = _nsEntry1
+                    ? this.parseNSWord1(_nsEntry1.word1_limit).gtSeq : 0;
                 const gt12 = this.createGT(_seq1, BOOT_NS_SLOT_THREAD, {R:0,W:0,X:0,L:0,S:0,E:0}, 1); // zero-perm Inform GT for NS Slot 1 (thread lump)
                 const check12 = this.mLoad(gt12, null, undefined);                 // M-elevation mLoad; reads thread lump NS entry
                 if (!check12.ok) {
@@ -2134,7 +2213,7 @@ class ChurchSimulator {
                 const _threadCC12     = _threadHdr12.valid ? _threadHdr12.cc : 0;
                 const _heapStart12    = 1 + 16 + _threadCC12;                     // first word above header + DR zone + c-list
                 const _spMax12        = (_threadHdr12.valid ? _threadHdr12.lumpSize : 256) - 12 - 1;
-                const _seq1h = (_initThrdEntry.word2_seals >>> 25) & 0x7F;
+                const _seq1h = this.parseNSWord1(_initThrdEntry.word1_limit).gtSeq;
                 const gt5 = this.createGT(_seq1h, BOOT_NS_SLOT_THREAD, {R:1,W:1,X:0,L:0,S:0,E:0}, 1);  // RW Inform GT for the thread lump (Slot 1)
                 this._writeCR(5, gt5, _initThrdEntry);                             // CR5 ← heap RW token (base=thread lump, perms=RW)
                 // Boot ROM instruction [1]: CHANGE CR12, CR15[1] — 3 trace packets (hardware NIA=1)
@@ -2315,9 +2394,8 @@ class ChurchSimulator {
                     return false;
                 }
                 const entryNSEntry  = entryCheck.entry;                             // NS entry for boot entry abstraction
-                const entryNSParsed = this.parseNSWord1(entryNSEntry.word1_limit);
-                // F-bit check removed: f is hardcoded 0 in parseNSWord1 (v2.0 fix —
-                // bit[30] is the GC liveness mark, not the far-lump flag). ★v2.0
+                // F-bit check removed: bit[30] of W1 is the GC liveness mark (g_bit),
+                // not the far-lump flag; f_flag is bit[31] and masked from integrity32. ★v2.0
                 const bootEntrySlot = this.bootEntrySlot;
 
                 // ── Step 2: Read Boot.Abstr lump header (word 0) ──────────────────────
@@ -2719,15 +2797,18 @@ class ChurchSimulator {
     }
 
     makeVersionSeals(gt_seq, location, limit17) {
-        const seal = this.computeSeal(location, limit17);
-        return (((gt_seq & 0x7F) << 25) | (seal & 0xFFFF)) >>> 0;
+        // Deprecated method name retained for callers while the stored W2 ABI
+        // is now the canonical 32-bit integrity check, not version+CRC fields.
+        return this._integrity32(
+            location >>> 0,
+            this.packNSWord1(limit17, gt_seq, 0, 0)
+        );
     }
 
     validateMAC(entry) {
         if (!entry) return false;
-        const storedSeal = entry.word2_seals & 0xFFFF;
-        const lim = this.parseNSWord1(entry.word1_limit);
-        return storedSeal === this.computeSeal(entry.word0_location, lim.limit);
+        return (entry.word2_seals >>> 0) ===
+            this._integrity32(entry.word0_location, entry.word1_limit);
     }
 
     _validateClistSlotPerms(parsed, slotIdx) {
@@ -2769,12 +2850,12 @@ class ChurchSimulator {
         if (!entry) {
             return { ok: false, fault: 'BOUNDS', message: `namespace entry ${parsed.index} is null` };
         }
-        const nsGtSeq = (entry.word2_seals >>> 25) & 0x7F;
+        const nsGtSeq = this.parseNSWord1(entry.word1_limit).gtSeq;
         const versionMatch = parsed.gt_seq === nsGtSeq;
         const sealValid = this.validateMAC(entry);
 
         const bBit = parsed.permissions.B || 0;
-        const fBit = (entry.word1_limit >>> 30) & 1;
+        const fBit = (entry.word1_limit >>> 31) & 1;
 
         const permPass = requiredPerm === null || this.mElevation || !!parsed.permissions[requiredPerm];
 
@@ -2823,7 +2904,7 @@ class ChurchSimulator {
             return { ok: false, fault: 'VERSION', message: `gt_seq mismatch: GT seq ${parsed.gt_seq}, entry seq ${nsGtSeq}` };
         }
         if (!sealValid) {
-            return { ok: false, fault: 'SEAL', message: `CRC seal validation failed for entry ${parsed.index}` };
+                return { ok: false, fault: 'SEAL', message: `integrity32 validation failed for entry ${parsed.index}` };
         }
         if (requiredPerm !== null && !this.mElevation && !parsed.permissions[requiredPerm]) {
             return { ok: false, fault: 'PERMISSION', message: `lacks ${requiredPerm} permission` };
@@ -2844,11 +2925,12 @@ class ChurchSimulator {
             return { ok: false, fault: 'BOUNDS', message: `source entry ${parsed.index} is null` };
         }
 
-        const srcVersionMatch = parsed.gt_seq === ((srcEntry.word2_seals >>> 25) & 0x7F);
+        const srcVersionMatch = parsed.gt_seq ===
+            this.parseNSWord1(srcEntry.word1_limit).gtSeq;
         const srcSealValid = this.validateMAC(srcEntry);
 
         const bBit = parsed.permissions.B || 0;
-        const fBit = (srcEntry.word1_limit >>> 30) & 1;
+        const fBit = (srcEntry.word1_limit >>> 31) & 1;
 
         const bindPass = bBit === 1 || this.mElevation;
         let farPass = true;
@@ -2903,10 +2985,10 @@ class ChurchSimulator {
             sealValid: srcSealValid,
         };
         if (!srcVersionMatch) {
-            return { ok: false, fault: 'VERSION', message: `source gt_seq mismatch: GT seq ${parsed.gt_seq}, entry seq ${(srcEntry.word2_seals >>> 25) & 0x7F}` };
+            return { ok: false, fault: 'VERSION', message: `source gt_seq mismatch: GT seq ${parsed.gt_seq}, entry seq ${this.parseNSWord1(srcEntry.word1_limit).gtSeq}` };
         }
         if (!srcSealValid) {
-            return { ok: false, fault: 'SEAL', message: `source CRC seal validation failed for entry ${parsed.index}` };
+            return { ok: false, fault: 'SEAL', message: `source integrity32 validation failed for entry ${parsed.index}` };
         }
         if (!bindPass) {
             return { ok: false, fault: 'BIND', message: `GT has B=0 — not bindable to c-list` };
@@ -3081,11 +3163,13 @@ class ChurchSimulator {
             const label = this.nsLabels[i] || '(unnamed)';
             const loc = entry ? (entry.word0_location >>> 0) : 0;
             const w1parsed = entry ? this.parseNSWord1(entry.word1_limit) : null;
-            const typeName  = w1parsed ? (_GT_TYPE_NAMES[w1parsed.gtType] || '?') : '?';
+            // Type + c-list count are entry-level metadata (side-table / resident
+            // header derivation), never decoded from the W1 authority word.
+            const typeName  = entry ? (_GT_TYPE_NAMES[entry.gtType] || '?') : '?';
             const limit     = w1parsed ? w1parsed.limit : 0;
-            const clistCnt  = w1parsed ? w1parsed.clistCount : 0;
-            const w2base    = this._nsSlotBase(i) + 2;
-            const version   = (this.memory[w2base] >>> 25) & 0x7F;
+            const clistCnt  = entry ? (entry.clistCount || 0) : 0;
+            // Canonical NS ABI: gt_seq (version) is W1[29:21], not W2 (integrity32).
+            const version   = w1parsed ? w1parsed.gtSeq : 0;
             candidates.push({ index: i, label, loc });
             p3Lines.push(`NS[${i}]  "${label}"`);
             p3Lines.push(`  ${typeName}  ·  @0x${loc.toString(16).toUpperCase().padStart(4,'0')}  ·  ${limit} words  ·  ${clistCnt} caps  ·  v${version}`);
@@ -3115,13 +3199,13 @@ class ChurchSimulator {
                 log.push(`  SKIP NS[0] "Boot.NS" — namespace root is protected`);
                 continue;
             }
-            const base = this.NS_TABLE_BASE + c.index * this.NS_ENTRY_WORDS;
-            const w2 = this.memory[base + 2];
-            const oldVersion = (w2 >>> 25) & 0x7F;
+            // Canonical NS ABI: gt_seq lives in W1[29:21] (not W2). Read/bump the
+            // sequence from W1 and re-write the (now-empty) entry via writeNSEntry
+            // so W1 carries the bumped gt_seq and W2 stays a coherent integrity32.
+            const base = this._nsSlotBase(c.index);
+            const oldVersion = this.parseNSWord1(this.memory[base + 1] >>> 0).gtSeq & 0x7F;
             const newVersion = (oldVersion + 1) & 0x7F;
-            this.memory[base + 0] = 0;
-            this.memory[base + 1] = 0;
-            this.memory[base + 2] = (newVersion << 25) >>> 0;
+            this.writeNSEntry(c.index, 0, 0, 0, 0, 0, newVersion, 0, 0);
 
             let wordsCleared = 0;
             for (let w = 0; w < this.SLOT_SIZE; w++) {
@@ -3199,24 +3283,199 @@ class ChurchSimulator {
 
 
     // ── Absent-lump helpers (shared by LOAD, ELOADCALL, XLOADLAMBDA) ───────────
-    // _outformToken96: build the 96-bit IDE token from the three NS words of an
-    // Outform entry (word0_location || word1_limit || word2_seals), returned as
-    // 24 lowercase hex chars.  Matches the CTMM IDE token width (3 × 32 bits).
+    // _outformToken96: build the 96-bit IDE token from the Outform NS entry
+    // (Task #2862).  The token is serialized EXACTLY as W1||W2||W3 — the three
+    // *identity* words of the Outform entry (word1_limit || word2_seals ||
+    // word3), NOT W0||W1||W2.  word0_location holds no meaning for an unbacked
+    // Outform (there is no resident lump yet), so it is deliberately excluded.
+    //
+    // The 32-bit cache tag T lives in W3 and therefore appears as the FINAL
+    // 8 hex chars of the returned 24-char token.  T alone never selects or
+    // authorizes a fetch — it is only a cache key; the trusted per-slot
+    // identity map is the authority checked at commit time in receiveLump().
     _outformToken96(entry) {
-        const w0 = (entry.word0_location >>> 0).toString(16).padStart(8, '0');
-        const w1 = (entry.word1_limit    >>> 0).toString(16).padStart(8, '0');
-        const w2 = (entry.word2_seals    >>> 0).toString(16).padStart(8, '0');
-        return `${w0}${w1}${w2}`;   // 24-char hex = 96 bits
+        const w1 = (entry.word1_limit >>> 0).toString(16).padStart(8, '0');
+        const w2 = (entry.word2_seals >>> 0).toString(16).padStart(8, '0');
+        const w3 = (this._cacheTokenOf(entry) >>> 0).toString(16).padStart(8, '0');
+        return `${w1}${w2}${w3}`;   // 24-char hex = 96 bits = W1||W2||W3
     }
 
-    _absentLumpIntercept(entry, targetIdx, d, instrName) {
-        if (!entry || entry.gtType !== 2) return null;
-        // Use full 96-bit IDE token (3 × 32-bit NS words) for the fetch URL.
+    // Extract the 32-bit cache tag T from an entry (its W3).  Reads the canonical
+    // word3_cache_token getter; falls back to the deprecated word3_abstract_gt
+    // alias only for entry objects produced by older code paths.
+    _cacheTokenOf(entry) {
+        const w3 = (entry.word3_cache_token != null)
+            ? entry.word3_cache_token
+            : (entry.word3_abstract_gt || 0); // deprecated compatibility alias
+        return (w3 >>> 0);
+    }
+
+    // ── Trusted per-slot identity helpers (Task #2862) ────────────────────────
+    // _is64Hex: canonical hash format check (exactly 64 lowercase/uppercase hex
+    // chars = a full SHA-256 digest).  Hashes are NEVER parseInt'd/truncated to a
+    // uint32 — they are compared as canonical strings end-to-end.
+    _is64Hex(s) {
+        return typeof s === 'string' && /^[0-9a-fA-F]{64}$/.test(s);
+    }
+    _normHash(s) {
+        return (typeof s === 'string') ? s.toLowerCase() : null;
+    }
+
+    // registerSlotIdentity: the single, central entry point through which the
+    // resolver (ADD path, sidecar, manifest) records trusted identity for a slot
+    // BEFORE a lazy Outform is created.  All fields are stored outside the NS
+    // entry.  Same cache T with a different issue is a *different* identity — the
+    // caller must supply a distinct issueN so the two never collide.
+    //
+    // Task #2862 security corrections:
+    //   • identityHash / binaryHash are canonical 64-hex strings (SHA-256), never
+    //     truncated to uint32.
+    //   • A SECURE identity (opts.secure !== false, the default) REQUIRES a
+    //     positive integer issueN, a non-empty dotName, and 64-hex identityHash
+    //     and binaryHash.  Missing/invalid fields THROW (fail closed) — the
+    //     caller must not create an unverifiable secure Outform.
+    //   • Each registration bumps the monotonic generation; the awaiting snapshot
+    //     records this generation so a later re-register (slot reuse) invalidates
+    //     any in-flight promotion.
+    registerSlotIdentity(slot, meta, opts) {
+        if (!this._slotIdentity) this._slotIdentity = new Map();
+        meta = meta || {};
+        opts = opts || {};
+        const secure = (opts.secure !== false);   // secure by default
+
+        const dotName      = (meta.dotName != null) ? String(meta.dotName) : '';
+        const issueN       = (meta.issueN != null) ? parseInt(meta.issueN, 10) : NaN;
+        const identityHash = this._normHash(meta.identityHash);
+        const binaryHash   = this._normHash(meta.binaryHash);
+
+        if (secure) {
+            if (!(Number.isInteger(issueN) && issueN > 0)) {
+                throw new Error(`registerSlotIdentity(slot ${slot}): secure identity requires a positive integer issueN (got ${meta.issueN})`);
+            }
+            if (!dotName) {
+                throw new Error(`registerSlotIdentity(slot ${slot}): secure identity requires a non-empty dotName`);
+            }
+            if (!this._is64Hex(identityHash)) {
+                throw new Error(`registerSlotIdentity(slot ${slot}): secure identity requires a 64-hex identityHash`);
+            }
+            if (!this._is64Hex(binaryHash)) {
+                throw new Error(`registerSlotIdentity(slot ${slot}): secure identity requires a 64-hex binaryHash`);
+            }
+        }
+
+        const rec = {
+            secure,
+            cacheToken:   (meta.cacheToken >>> 0) || 0,
+            dotName,
+            issueN:       Number.isInteger(issueN) ? issueN : 0,
+            identityHash,   // canonical 64-hex string or null
+            binaryHash,     // canonical 64-hex string or null
+            outformWords: Array.isArray(meta.outformWords)
+                ? meta.outformWords.map(w => (w >>> 0))
+                : [0, 0, 0],
+            gtSeq:        (meta.gtSeq | 0) || 0,
+            // C-list rows promoted only after full verification.  Eviction uses
+            // these records to restore the exact Outform GT without clobbering
+            // a row that was independently changed meanwhile.
+            bindings:     [],
+            generation:   ++this._slotIdentityGen,
+        };
+        this._slotIdentity.set(slot, rec);
+        return rec;
+    }
+
+    getSlotIdentity(slot) {
+        return (this._slotIdentity && this._slotIdentity.get(slot)) || null;
+    }
+
+    // clearSlotIdentity: remove trusted identity so the slot cannot be re-used by
+    // a stale/replayed lump.  MUST be called from every slot clear/reset path.
+    clearSlotIdentity(slot) {
+        if (this._slotIdentity) this._slotIdentity.delete(slot);
+    }
+
+    // _restoreOutformWords: write the captured Outform identity words (W1,W2,W3)
+    // back into the NS entry EXACTLY as recorded, leaving W0 (location) 0 (no
+    // resident body).  Used on eviction and on every receiveLump() failure so
+    // that the exact W1-3 the resolver minted survive byte-for-byte and
+    // re-resolution reproduces the identical token.
+    //
+    // Task #2862 security correction: restore the recorded W1-W3 verbatim.  Do
+    // NOT re-pack / rewrite the W1 type bits — the recorded W1 is captured from a
+    // live Outform entry (gtType already = 2) and any re-derivation could alter
+    // limit/clistCount/reserved bits and break byte-for-byte identity.
+    _restoreOutformWords(slot) {
+        const id = this.getSlotIdentity(slot);
+        if (!id || !Array.isArray(id.outformWords)) return false;
+        const base = this._nsSlotBase(slot);
+        const [w1, w2, w3] = id.outformWords;
+        this.memory[base + 0] = 0;          // no resident body
+        this.memory[base + 1] = (w1 >>> 0); // exact recorded W1 (authority only)
+        this.memory[base + 2] = (w2 >>> 0); // exact recorded W2
+        this.memory[base + 3] = (w3 >>> 0); // exact recorded W3 (cache tag T)
+        // Restore display-only Outform metadata; the restored access GT controls state.
+        if (!this._nsUiTypeHint) this._nsUiTypeHint = {};
+        this._nsUiTypeHint[slot] = 2 /* display-only Outform hint */;
+        return true;
+    }
+
+    _restoreOutformBindings(slot) {
+        const id = this.getSlotIdentity(slot);
+        if (!id || !Array.isArray(id.bindings)) return;
+        for (const binding of id.bindings) {
+            if (!binding || !Number.isInteger(binding.addr)) continue;
+            if ((this.memory[binding.addr] >>> 0) === (binding.informGT >>> 0)) {
+                this.memory[binding.addr] = binding.outformGT >>> 0;
+            }
+        }
+        id.bindings = [];
+    }
+
+    // _commitResidentInform: the ONE atomic promotion helper.  Given a validated
+    // free base, lump size and header, it writes the resident lump body and the
+    // resident NS entry (W0..W3) together — nothing partial is ever left behind.
+    // Resident W3 is the 32-bit cache token ONLY (not an Abstract GT, not
+    // authority).  Callers must have verified identity/CRC/header BEFORE calling.
+    _commitResidentInform(slot, freeBase, lumpPayload, hdr, cacheToken32) {
+        const lumpSize = hdr.lumpSize;
+        const cc       = hdr.cc;
+        const limit17  = lumpSize - cc - 1;
+        // 1. Write the lump body.
+        for (let i = 0; i < Math.min(lumpPayload.length, lumpSize); i++) {
+            this.memory[freeBase + i] = (lumpPayload[i] >>> 0);
+        }
+        // 2. Write resident NS entry W0..W3 atomically via writeNSEntry so W1
+        //    (authority: limit/gt_seq/G/F) and W2 (integrity32) stay consistent.
+        //    State/type (Inform) and cc are recorded in side-tables, never W1.
+        //    W3 (word3_cache_token) carries the cache token ONLY.
+        this.writeNSEntry(slot, freeBase >>> 0, limit17, 0, 0, 1 /* Inform */, 0, cc, cacheToken32 >>> 0);
+    }
+
+    _absentLumpIntercept(entry, targetIdx, d, instrName, bindingAddr, accessGT) {
+        if (!entry) return null;
+        // Serialize the token as W1||W2||W3 (identity words) with cache tag T in W3.
         const token = this._outformToken96(entry);
+        const cacheToken = this._cacheTokenOf(entry);
         const label = this.nsLabels[targetIdx] || 'entry_' + targetIdx;
-        this.awaitingLump = { nsIndex: targetIdx, retryPC: this.pc, d, token };
-        this.output += `\u27F3 Fetching lump: Slot ${targetIdx} (${label}) [${instrName}] — token=0x${token}\n`;
-        return { absent: true, nsIndex: targetIdx, token, label };
+        // Snapshot the trusted identity generation at suspend time.  receiveLump()
+        // re-reads the live identity and rejects if the generation has advanced
+        // (slot cleared + re-registered) so a stale in-flight fetch can never
+        // promote against a newer identity.
+        const _idAtSuspend = this.getSlotIdentity(targetIdx);
+        this.awaitingLump = {
+            nsIndex: targetIdx, retryPC: this.pc, d, token,
+            cacheToken,
+            identityGeneration: _idAtSuspend ? _idAtSuspend.generation : null,
+            outformWords: [
+                entry.word1_limit >>> 0,
+                entry.word2_seals >>> 0,
+                this._cacheTokenOf(entry) >>> 0,   // canonical W3 cache token
+            ],
+            bindingAddr: Number.isInteger(bindingAddr) ? bindingAddr : null,
+            accessGT: accessGT == null ? null : (accessGT >>> 0),
+        };
+        this.output += `\u27F3 Fetching lump: Slot ${targetIdx} (${label}) [${instrName}] — token=0x${token} (T=0x${cacheToken.toString(16).padStart(8,'0')})\n`;
+        return { absent: true, nsIndex: targetIdx, token, cacheToken, label };
     }
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -3238,7 +3497,15 @@ class ChurchSimulator {
         this.cr[crIdx].word0 = gt32;
         this.cr[crIdx].word1 = entry.word0_location >>> 0;
         this.cr[crIdx].word2 = entry.word1_limit >>> 0;
-        this.cr[crIdx].word3 = this.mElevation ? ((entry.word3_abstract_gt || 0) >>> 0) : 0;
+        // Task #2862: CR word3 mirrors the NS entry's W3, which is now the
+        // resident cache_token (NOT an Abstract GT, NOT authority).  It stays
+        // M-bit gated: visible only when the Abstract Manager has elevated (M=1),
+        // 0 in ordinary user mode.  word3_cache_token is the canonical source;
+        // word3_abstract_gt remains only as a deprecated alias for the same word.
+        const _w3Cache = (entry.word3_cache_token != null)
+            ? entry.word3_cache_token
+            : (entry.word3_abstract_gt || 0); // deprecated compatibility alias
+        this.cr[crIdx].word3 = this.mElevation ? (_w3Cache >>> 0) : 0;
         this.cr[crIdx].m = this.mElevation ? 1 : 0;
         if (crIdx <= 11 && crIdx !== 6) {
             const threadBase = this.cr[12] && this.cr[12].word1;
@@ -3274,6 +3541,10 @@ class ChurchSimulator {
     // so the Abstract Manager can decode them as data.  Clearing M writes
     // DR11–DR15 back (completing the round-trip) and resets CRn.m = 0.
     // Only CR15 can hold M=1 (hardware enforces via single 4-input AND gate).
+    //
+    // Task #2862: DR15 mirrors CRn.word3, which is the resident cache_token
+    // (cache tag T) — NOT an Abstract GT and NOT any authority word.  The
+    // M-window round-trip therefore carries only the cache tag through DR15.
 
     _integrity32(w0, w1) {
         // ROL(w0, 7) XOR ROL(w1_masked, 13) XOR 0xDEADBEEF
@@ -3291,7 +3562,7 @@ class ChurchSimulator {
         this.dr[12] = cr.word1 >>> 0;
         this.dr[13] = cr.word2 >>> 0;
         this.dr[14] = this._integrity32(cr.word1, cr.word2);
-        this.dr[15] = cr.word3 >>> 0;
+        this.dr[15] = cr.word3 >>> 0;   // Task #2862: cache_token (cache tag T), not Abstract GT
     }
 
     _mwinWriteback() {
@@ -3968,7 +4239,7 @@ class ChurchSimulator {
         let clistSize;
         if (d.crSrc === 6) {
             clistLoc = this.cr[d.crSrc].word1;
-            clistSize = this.parseNSWord1(this.cr[6].word2).clistCount;
+            clistSize = this._clistCountForCR(6);
         } else {
             const lumpBase = this.cr[d.crSrc].word1;
             const hdrRead = this._capRead(d.crSrc, lumpBase, 'R', `LOAD CR${d.crSrc} lump-hdr`);
@@ -4103,7 +4374,7 @@ class ChurchSimulator {
 
         if (slotParsed.type === 3) {
             const info = this.parseAbstractGT(slotGT);
-            const fakeEntry = { word0_location: 0, word1_limit: 0, word3_abstract_gt: 0 };
+            const fakeEntry = { word0_location: 0, word1_limit: 0, word3_cache_token: 0 };
             if (!this._writeCR(d.crDst, slotGT, fakeEntry)) return null;
             const CLASS_NAMES = ['IO','M-Elev','','','',''];
             const DC_NAMES   = {
@@ -4146,6 +4417,18 @@ class ChurchSimulator {
         //       consistently receives an Inform GT on every LOAD.
         if (slotParsed.type === 2) {
             const manifest2 = this.lazyManifest[targetIdx];
+            // A trusted identity, a non-zero cache token, or absence of a
+            // legacy manifest always selects the secure network resolver.  The
+            // access GT is the sole state discriminator; opaque Outform W1-W3
+            // are never decoded to decide whether resolution is required.
+            if (this.getSlotIdentity(targetIdx) ||
+                    this._cacheTokenOf(entry) !== 0 ||
+                    !manifest2) {
+                return this._absentLumpIntercept(
+                    entry, targetIdx, d, 'LOAD',
+                    clistLoc + d.imm, slotGT
+                );
+            }
             if (manifest2 && !manifest2.loaded) {
                 this.output += `[LOADER] LOAD: CR${d.crDst} is Outform GT (NS[${targetIdx}]) — dispatching Loader (Mode 2)...\n`;
                 const loaded = this._dispatchLoaderLoad(targetIdx);
@@ -4157,8 +4440,9 @@ class ChurchSimulator {
             // Promote the GT from Outform→Inform regardless of whether the loader
             // just ran or the lump was already resident — the c-list slot is not
             // rewritten so any LOAD from it must canonicalise to Inform.
-            const nsW2 = this.memory[this.NS_TABLE_BASE + targetIdx * this.NS_ENTRY_WORDS + 2];
-            const gt_seq = (nsW2 >>> 25) & 0x7F;
+            // Canonical NS ABI: gt_seq is W1[29:21]; read it from the authority word.
+            const nsW1 = this.memory[this._nsSlotBase(targetIdx) + 1] >>> 0;
+            const gt_seq = this.parseNSWord1(nsW1).gtSeq;
             const informGT = this.createGT(gt_seq, targetIdx, slotParsed.permissions, 1);
             const freshEntry = this.readNSEntry(targetIdx);
             if (!this._writeCR(d.crDst, informGT, freshEntry)) return null;
@@ -4199,8 +4483,8 @@ class ChurchSimulator {
         }
 
         // ── Absent-lump intercept ─────────────────────────────────────────────
-        const absentLoad = this._absentLumpIntercept(entry, targetIdx, d, 'LOAD');
-        if (absentLoad) return absentLoad;
+        // Secure Outform accesses return from the branch above.  Inform state
+        // falls through without consulting W1/W3 as a state discriminator.
         // ─────────────────────────────────────────────────────────────────────
 
         if (!this.validateMAC(entry)) {
@@ -4267,7 +4551,7 @@ class ChurchSimulator {
         let clistSize;
         if (d.crSrc === 6) {
             clistLoc = this.cr[d.crSrc].word1;
-            clistSize = this.parseNSWord1(this.cr[6].word2).clistCount;
+            clistSize = this._clistCountForCR(6);
         } else {
             const lumpBase = this.cr[d.crSrc].word1;
             const hdrRead = this._capRead(d.crSrc, lumpBase, 'R', `SAVE CR${d.crSrc} lump-hdr`);
@@ -4335,8 +4619,9 @@ class ChurchSimulator {
             }
             // Promote the live CR from Outform→Inform: read fresh NS entry, rebuild GT with type=1.
             // Update word0 in-place so word2, word3, and m are preserved.
-            const nsW2 = this.memory[this.NS_TABLE_BASE + nsSlot * this.NS_ENTRY_WORDS + 2];
-            const gt_seq = (nsW2 >>> 25) & 0x7F;
+            // Canonical NS ABI: gt_seq is W1[29:21]; read it from the authority word.
+            const nsW1 = this.memory[this._nsSlotBase(nsSlot) + 1] >>> 0;
+            const gt_seq = this.parseNSWord1(nsW1).gtSeq;
             const informGT = this.createGT(gt_seq, nsSlot, srcParsed.permissions, 1);
             this.cr[d.crDst].word0 = informGT;
             sourceGT = informGT;
@@ -4359,7 +4644,7 @@ class ChurchSimulator {
         // Architecturally, a far-capability violation is detected at capability
         // decode time, before any side-effects of the CALL boundary are triggered.
         {
-            const preBase = this.NS_TABLE_BASE + srcParsed.index * this.NS_ENTRY_WORDS;
+            const preBase = this._nsSlotBase(srcParsed.index);
             const preW1   = this.memory[preBase + 1];
             if ((preW1 >>> 30) & 1) {
                 this.fault('F_BIT', `CALL: CR${d.crDst} has F-bit set (Far)`);
@@ -5133,7 +5418,7 @@ class ChurchSimulator {
             // created by the boot ROM in B:02 (INIT_THRD).  The gt_seq is taken from the
             // NS entry so mLoad's version check passes.
             const gtToWrite = (d.crDst === 12)
-                ? this.createGT((entry.word2_seals >>> 25) & 0x7F, targetIdx, {R:0,W:0,X:0,L:0,S:0,E:0}, 1)
+                ? this.createGT(this.parseNSWord1(entry.word1_limit).gtSeq, targetIdx, {R:0,W:0,X:0,L:0,S:0,E:0}, 1)
                 : gt;
             if (!this._writeCR(d.crDst, gtToWrite, entry)) return null;
 
@@ -5233,7 +5518,7 @@ class ChurchSimulator {
         //     Instead synthesise a valid R+X GT matching the B:07 NUC_CODE boot
         //     ROM pattern (line 1575: createGT with R+X, same gt_seq as the NS
         //     entry so mLoad's version check passes).
-        const fa_gt_seq = (entry.word2_seals >>> 25) & 0x7F;
+        const fa_gt_seq = this.parseNSWord1(entry.word1_limit).gtSeq;
         const codeGT = this.createGT(fa_gt_seq, targetIdx, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);
         if (!this._writeCR(d.crDst, codeGT, entry)) return null;
         // Restore CR0–CR11 from the incoming thread lump's caps zone (THREAD_CAPS_OFFSET).
@@ -5466,7 +5751,7 @@ class ChurchSimulator {
         // if location + limitOffset > 0xFFFFFFFF the true sum still fits in
         // float64, so we can compare it against NS_TABLE_BASE without wrapping.
         if (parsed.index < this.MAX_NS_ENTRIES) {
-            const nsEntryBase = this.NS_TABLE_BASE + parsed.index * this.NS_ENTRY_WORDS;
+            const nsEntryBase = this._nsSlotBase(parsed.index);
             const location    = (this.memory[nsEntryBase]     >>> 0);  // word0: base (words)
             const limitWord   = (this.memory[nsEntryBase + 1] >>> 0);  // word1: packed
             const limitOffset = this.parseNSWord1(limitWord).limit;    // bits[16:0]
@@ -5609,7 +5894,7 @@ class ChurchSimulator {
         let ecClistSize;
         if (d.crSrc === 6) {
             srcLoc = this.cr[d.crSrc].word1;
-            ecClistSize = this.parseNSWord1(this.cr[6].word2).clistCount;
+            ecClistSize = this._clistCountForCR(6);
         } else {
             const lumpBase = this.cr[d.crSrc].word1;
             const hdrRead = this._capRead(d.crSrc, lumpBase, 'R', `ELOADCALL CR${d.crSrc} lump-hdr`);
@@ -5735,6 +6020,14 @@ class ChurchSimulator {
         // slot GT is promoted to Inform before the combined LOAD+CALL continues.
         if (slotParsed.type === 2) {
             const manifest2 = this.lazyManifest[targetIdx];
+            if (this.getSlotIdentity(targetIdx) ||
+                    this._cacheTokenOf(entry) !== 0 ||
+                    !manifest2) {
+                return this._absentLumpIntercept(
+                    entry, targetIdx, d, 'ELOADCALL',
+                    srcLoc + ecRow, slotGT
+                );
+            }
             if (manifest2 && !manifest2.loaded) {
                 this.output += `[LOADER] ELOADCALL: c-list [CR${d.crSrc} + ${ecRow}] is Outform GT (NS[${targetIdx}]) — dispatching Loader (Mode 2)...\n`;
                 const loaded = this._dispatchLoaderLoad(targetIdx);
@@ -5745,8 +6038,9 @@ class ChurchSimulator {
             }
             // Promote the slot GT from Outform→Inform so the TPERM check and
             // subsequent CALL phase operate on a valid Inform GT.
-            const nsW2_promote = this.memory[this.NS_TABLE_BASE + targetIdx * this.NS_ENTRY_WORDS + 2];
-            const gt_seq_promote = (nsW2_promote >>> 25) & 0x7F;
+            // Canonical NS ABI: gt_seq is W1[29:21]; read it from the authority word.
+            const nsW1_promote = this.memory[this._nsSlotBase(targetIdx) + 1] >>> 0;
+            const gt_seq_promote = this.parseNSWord1(nsW1_promote).gtSeq;
             slotGT = this.createGT(gt_seq_promote, targetIdx, slotParsed.permissions, 1);
             slotParsed = this.parseGT(slotGT);
             // Re-read the NS entry so subsequent checks (_absentLumpIntercept,
@@ -5755,8 +6049,7 @@ class ChurchSimulator {
             this.output += `[LOADER] ELOADCALL: Outform→Inform promotion complete for NS[${targetIdx}], proceeding with LOAD+CALL\n`;
         }
         // ── Absent-lump intercept ─────────────────────────────────────────────
-        const absentEC = this._absentLumpIntercept(entry, targetIdx, d, 'ELOADCALL');
-        if (absentEC) return absentEC;
+        // Secure Outform accesses return from the branch above.
         // ─────────────────────────────────────────────────────────────────────
         if (!this.validateMAC(entry)) {
             this.fault('SEAL', `ELOADCALL: entry ${targetIdx} seal failed`);
@@ -5907,7 +6200,7 @@ class ChurchSimulator {
         let xlClistSize;
         if (d.crSrc === 6) {
             srcLoc = this.cr[d.crSrc].word1;
-            xlClistSize = this.parseNSWord1(this.cr[6].word2).clistCount;
+            xlClistSize = this._clistCountForCR(6);
         } else {
             const lumpBase = this.cr[d.crSrc].word1;
             const hdrRead = this._capRead(d.crSrc, lumpBase, 'R', `XLOADLAMBDA CR${d.crSrc} lump-hdr`);
@@ -5997,6 +6290,14 @@ class ChurchSimulator {
         // the slot GT is promoted to Inform before the LOAD+LAMBDA continues.
         if (slotParsed.type === 2) {
             const manifest2 = this.lazyManifest[targetIdx];
+            if (this.getSlotIdentity(targetIdx) ||
+                    this._cacheTokenOf(entry) !== 0 ||
+                    !manifest2) {
+                return this._absentLumpIntercept(
+                    entry, targetIdx, d, 'XLOADLAMBDA',
+                    srcLoc + d.imm, slotGT
+                );
+            }
             if (manifest2 && !manifest2.loaded) {
                 this.output += `[LOADER] XLOADLAMBDA: c-list [CR${d.crSrc} + ${d.imm}] is Outform GT (NS[${targetIdx}]) — dispatching Loader (Mode 2)...\n`;
                 const loaded = this._dispatchLoaderLoad(targetIdx);
@@ -6007,8 +6308,9 @@ class ChurchSimulator {
             }
             // Promote the slot GT from Outform→Inform so the TPERM check and
             // subsequent LAMBDA phase operate on a valid Inform GT.
-            const nsW2_promote = this.memory[this.NS_TABLE_BASE + targetIdx * this.NS_ENTRY_WORDS + 2];
-            const gt_seq_promote = (nsW2_promote >>> 25) & 0x7F;
+            // Canonical NS ABI: gt_seq is W1[29:21]; read it from the authority word.
+            const nsW1_promote = this.memory[this._nsSlotBase(targetIdx) + 1] >>> 0;
+            const gt_seq_promote = this.parseNSWord1(nsW1_promote).gtSeq;
             slotGT = this.createGT(gt_seq_promote, targetIdx, slotParsed.permissions, 1);
             slotParsed = this.parseGT(slotGT);
             // Re-read the NS entry so subsequent checks (_absentLumpIntercept,
@@ -6017,8 +6319,7 @@ class ChurchSimulator {
             this.output += `[LOADER] XLOADLAMBDA: Outform→Inform promotion complete for NS[${targetIdx}], proceeding with LOAD+LAMBDA\n`;
         }
         // ── Absent-lump intercept ─────────────────────────────────────────────
-        const absentXL = this._absentLumpIntercept(entry, targetIdx, d, 'XLOADLAMBDA');
-        if (absentXL) return absentXL;
+        // Secure Outform accesses return from the branch above.
         // ─────────────────────────────────────────────────────────────────────
         if (!this.validateMAC(entry)) {
             this.fault('SEAL', `XLOADLAMBDA: slot ${targetIdx} seal failed`);
@@ -6855,17 +7156,18 @@ class ChurchSimulator {
                             this.memory[newLumpBase + 1 + i] = words[i] >>> 0;
                         }
 
-                        // Update NS slot 3: point to new lump, limit17 = words.length, cc=0
+                        // Update NS slot 3: point to new lump, limit17 = words.length, cc=0.
+                        // Rewrite via writeNSEntry so W1 (authority) + W2 (integrity32)
+                        // stay consistent; state/type + cc live in side-tables, not W1.
                         const nsBase        = this._nsSlotBase(abstrSlot);
                         const oldW1         = this.memory[nsBase + 1] >>> 0;
-                        const oldW2         = this.memory[nsBase + 2] >>> 0;
                         const w1f           = this.parseNSWord1(oldW1);
-                        const existingGtSeq = (oldW2 >>> 25) & 0x7F;
-                        this.memory[nsBase + 0] = newLumpBase >>> 0;
-                        this.memory[nsBase + 1] = this.packNSWord1(
-                            words.length, w1f.b, w1f.g, w1f.gtType, 0
-                        );
-                        this.memory[nsBase + 2] = this.makeVersionSeals(existingGtSeq, newLumpBase, words.length);
+                        // Canonical NS ABI: gt_seq is W1[29:21], not W2 (integrity32).
+                        const existingGtSeq = w1f.gtSeq;
+                        const _declType     = (this._nsUiTypeHint && this._nsUiTypeHint[abstrSlot]) || 1;
+                        this.writeNSEntry(abstrSlot, newLumpBase >>> 0, words.length,
+                            0, w1f.g, _declType, existingGtSeq, 0,
+                            this.memory[nsBase + 3] >>> 0);
 
                         // Update CR14 (code-region capability) to new lump location + NS words
                         const cr14 = this.cr[14];
@@ -6933,14 +7235,18 @@ class ChurchSimulator {
                         this.memory[baseAddr] = ((hdrWord & ~(0x1FFF << 10)) | ((newCW & 0x1FFF) << 10)) >>> 0;
                     }
                     const oldW1        = this.memory[nsBase + 1] >>> 0;
-                    const oldW2        = this.memory[nsBase + 2] >>> 0;
                     const w1f          = this.parseNSWord1(oldW1);
                     const newLimit17   = newCW;
-                    // Always keep NS slot 3 word0 pointing at the actual lump base
-                    this.memory[nsBase + 0] = baseAddr >>> 0;
-                    this.memory[nsBase + 1] = this.packNSWord1(newLimit17, w1f.b, w1f.g, w1f.gtType, w1f.clistCount);
-                    const existingGtSeq    = (oldW2 >>> 25) & 0x7F;
-                    this.memory[nsBase + 2] = this.makeVersionSeals(existingGtSeq, baseAddr, newLimit17);
+                    // Canonical NS ABI: gt_seq is W1[29:21], not W2 (integrity32).
+                    const existingGtSeq = w1f.gtSeq;
+                    // Preserve declared type + cc (state/count are side-tables, not W1);
+                    // writeNSEntry recomputes W1 (authority) + W2 (integrity32).
+                    const _declType    = (this._nsUiTypeHint && this._nsUiTypeHint[abstrSlot]) || 1;
+                    const _declCC      = (this._nsClistCount && this._nsClistCount[abstrSlot]) || 0;
+                    // Always keep NS slot word0 pointing at the actual lump base
+                    this.writeNSEntry(abstrSlot, baseAddr >>> 0, newLimit17,
+                        0, w1f.g, _declType, existingGtSeq, _declCC,
+                        this.memory[nsBase + 3] >>> 0);
                     const cr14 = this.cr[14];
                     if (cr14) {
                         // word1 is the physical base — must match NS slot 3 word0
@@ -7028,13 +7334,17 @@ class ChurchSimulator {
 
         const nsBase       = this._nsSlotBase(abstrSlot);
         const oldW1        = this.memory[nsBase + 1] >>> 0;
-        const oldW2        = this.memory[nsBase + 2] >>> 0;
         const w1f          = this.parseNSWord1(oldW1);
-        const existingGtSeq = (oldW2 >>> 25) & 0x7F;
+        // Canonical NS ABI: gt_seq is W1[29:21], not W2 (integrity32).
+        const existingGtSeq = w1f.gtSeq;
 
-        this.memory[nsBase + 0] = EXTENDED_BASE >>> 0;
-        this.memory[nsBase + 1] = this.packNSWord1(hdr.cw, w1f.b, w1f.g, w1f.gtType, hdr.cc);
-        this.memory[nsBase + 2] = this.makeVersionSeals(existingGtSeq, EXTENDED_BASE, hdr.cw);
+        // c-list count comes from the resident lump header (hdr.cc), recorded in
+        // the side-table; state/type preserved from the prior entry (default Inform).
+        // writeNSEntry recomputes W1 (authority) + W2 (integrity32).
+        const _declType    = (this._nsUiTypeHint && this._nsUiTypeHint[abstrSlot]) || 1;
+        this.writeNSEntry(abstrSlot, EXTENDED_BASE >>> 0, hdr.cw,
+            0, w1f.g, _declType, existingGtSeq, hdr.cc,
+            this.memory[nsBase + 3] >>> 0);
 
         // Stub detection: tag the NS slot when every code word is a bare RETURN.
         // Uses the raw words[] array (not memory[]) so the scan is immune to any
@@ -7119,16 +7429,19 @@ class ChurchSimulator {
         this.nsCount = 0;
         this.nsClistMap = {};
 
-        // hwNamespace uses 4-word entries (loc, word1, word2, word3_reserved=0).
+        // Preserve all four canonical NS words verbatim. Import must not
+        // reconstruct authority/integrity or discard cache/restore metadata.
         const nsEntryCount = hwNamespace.length / 4;
         for (let i = 0; i < nsEntryCount; i++) {
             const loc  = hwNamespace[i * 4 + 0];
             const w1   = hwNamespace[i * 4 + 1];
-            const parsed1 = this.parseNSWord1(w1);
+            const w2   = hwNamespace[i * 4 + 2];
+            const w3   = hwNamespace[i * 4 + 3];
             const base = this._nsSlotBase(i);
             this.memory[base + 0] = loc >>> 0;
             this.memory[base + 1] = w1 >>> 0;
-            this.memory[base + 2] = this.makeVersionSeals(0, loc, parsed1.limit);
+            this.memory[base + 2] = w2 >>> 0;
+            this.memory[base + 3] = w3 >>> 0;
             if (hwLabels && hwLabels[i]) {
                 this.nsLabels[i] = hwLabels[i];
             } else {
@@ -7138,7 +7451,7 @@ class ChurchSimulator {
         }
 
         const abstrSlot = 2;
-        const abstrNSBase = this.NS_TABLE_BASE + abstrSlot * this.NS_ENTRY_WORDS;
+        const abstrNSBase = this._nsSlotBase(abstrSlot);
         const abstrLoc = this.memory[abstrNSBase] || (abstrSlot * this.SLOT_SIZE);
 
         // Write hardware program first (hwProgram[0] = lump header, hwProgram[1+] = code)
@@ -7167,14 +7480,14 @@ class ChurchSimulator {
         if (abstractions) {
             for (const abs of abstractions) {
                 if (abs.clist && abs.nsIndex !== undefined) {
-                    const absBase = this.NS_TABLE_BASE + abs.nsIndex * this.NS_ENTRY_WORDS;
+                    const absBase = this._nsSlotBase(abs.nsIndex);
                     const absLoc = this.memory[absBase];
                     for (let i = 0; i < abs.clist.length; i++) {
                         this.memory[absLoc + i] = abs.clist[i] >>> 0;
                     }
                 }
                 if (abs.code && abs.codeNsIndex !== undefined) {
-                    const codeBase = this.NS_TABLE_BASE + abs.codeNsIndex * this.NS_ENTRY_WORDS;
+                    const codeBase = this._nsSlotBase(abs.codeNsIndex);
                     const codeLoc = this.memory[codeBase];
                     for (let i = 0; i < abs.code.length; i++) {
                         this.memory[codeLoc + i] = abs.code[i] >>> 0;
@@ -7222,7 +7535,7 @@ class ChurchSimulator {
         if (abstractions) {
             for (const abs of abstractions) {
                 if (abs.code && abs.codeNsIndex !== undefined) {
-                    const codeBase = this.NS_TABLE_BASE + abs.codeNsIndex * this.NS_ENTRY_WORDS;
+                    const codeBase = this._nsSlotBase(abs.codeNsIndex);
                     const codeLoc = this.memory[codeBase];
                     const label = abs.label || `NS ${abs.nsIndex}`;
                     this.output += `\n--- ${label} Code (NS ${abs.codeNsIndex}, at 0x${codeLoc.toString(16).padStart(4,'0').toUpperCase()}) ---\n`;
@@ -7288,23 +7601,26 @@ class ChurchSimulator {
             const loc = nsWords[i * 4 + 0] >>> 0;
             const w1  = nsWords[i * 4 + 1] >>> 0;
             const w2  = nsWords[i * 4 + 2] >>> 0;
+            const w3  = nsWords[i * 4 + 3] >>> 0;
             const base = this._nsSlotBase(i);
             this.memory[base + 0] = loc;
             this.memory[base + 1] = w1;
             this.memory[base + 2] = w2;
-            // base + 3 (word3_reserved) stays zero
+            this.memory[base + 3] = w3;
             this.nsLabels[i] = `Slot ${i}`;
             this.nsCount = i + 1;
         }
 
         const abstrSlot = 2;
-        const abstrNSBase = this.NS_TABLE_BASE + abstrSlot * this.NS_ENTRY_WORDS;
+        const abstrNSBase = this._nsSlotBase(abstrSlot);
         const abstrLoc = this.memory[abstrNSBase] || (abstrSlot * this.SLOT_SIZE);
         const abstrW1 = this.memory[abstrNSBase + 1];
         const abstrParsed = this.parseNSWord1(abstrW1);
         const abstrAllocSize = abstrParsed.limit + 1;
         const clistCount = Math.min(clistWords.length, CLIST_WORDS);
-        const abstrClistCount = abstrParsed.clistCount || clistCount;
+        // c-list count is a resident-lump property (header cc), not a W1 field.
+        const _abstrHdr = this.parseLumpHeader(this.memory[abstrLoc] >>> 0);
+        const abstrClistCount = (_abstrHdr.valid ? _abstrHdr.cc : 0) || clistCount;
         const abstrClistStart = abstrAllocSize - abstrClistCount;
         const safeClistCopy = Math.min(clistCount, abstrClistCount);
 
@@ -7392,7 +7708,7 @@ class ChurchSimulator {
             nsWords[i * 4 + 0] = this.memory[base + 0] >>> 0;
             nsWords[i * 4 + 1] = this.memory[base + 1] >>> 0;
             nsWords[i * 4 + 2] = this.memory[base + 2] >>> 0;
-            nsWords[i * 4 + 3] = 0;  // word3_reserved
+            nsWords[i * 4 + 3] = this.memory[base + 3] >>> 0;
         }
 
         const clistWords = new Uint32Array(CLIST_WORDS);
@@ -7401,7 +7717,9 @@ class ChurchSimulator {
         const abstrW1 = this.memory[abstrNSBase + 1];
         const abstrParsed = this.parseNSWord1(abstrW1);
         const abstrAllocSize = abstrParsed.limit + 1;
-        const abstrClistCount = abstrParsed.clistCount || 0;
+        // c-list count is a resident-lump property (header cc), not a W1 field.
+        const _abstrHdrE = this.parseLumpHeader(this.memory[abstrLoc] >>> 0);
+        const abstrClistCount = (_abstrHdrE.valid ? _abstrHdrE.cc : 0) || 0;
         const abstrClistStart = abstrAllocSize - abstrClistCount;
         const clistBase = abstrLoc + abstrClistStart;
         for (let i = 0; i < Math.min(abstrClistCount, CLIST_WORDS); i++) {
@@ -7446,44 +7764,201 @@ class ChurchSimulator {
     }
 
     // ── Lazy-load lump installation ───────────────────────────────────────────
-    // Called by app.js after a successful GET /api/lump/<token_hex>.
+    // Called by app-run.js after a successful GET /api/lump/<token_hex>.
     // lumpWords: Uint32Array or plain Array of 32-bit words (big-endian native).
     //   word[0]     — CRC-32 preamble (computed by server over the lump payload bytes)
     //   word[1..]   — actual lump binary (header + code + c-list)
+    //
+    // resolverMeta (Task #2862): trusted metadata the resolver associates with the
+    // fetched response.  For a SECURE network Outform this is MANDATORY and is
+    // compared — together with the pre-registered per-slot identity — against the
+    // fetched lump BEFORE ANY resident memory / NS entry / c-list state is written:
+    //   {
+    //     cacheToken          : 32-bit cache tag T (from X-Lump-Cache-Token)
+    //     dotName             : dotted abstraction name (X-Lump-Dot-Name)
+    //     issueN              : positive integer issue (X-Lump-Issue-N)
+    //     identityHash        : canonical 64-hex SHA-256 (X-Lump-Identity-Hash)
+    //     binaryHash          : canonical 64-hex SHA-256 (X-Lump-Binary-Hash)
+    //     computedBinaryHash  : canonical 64-hex SHA-256 computed by app-run over
+    //                           the RAW lump payload bytes EXCLUDING the 4-byte CRC
+    //                           prefix (the bytes we are about to commit)
+    //   }
+    //
+    // Invariants (Task #2862):
+    //   • The GT gt_type (Outform=2) already gated us here; T alone never selects.
+    //   • FAIL CLOSED: a secure network Outform is rejected unless a trusted
+    //     per-slot identity is present, resolver metadata is present, every
+    //     required canonical field is present, and computedBinaryHash is present.
+    //   • Hashes are compared as canonical 64-hex strings, never truncated.
+    //   • computedBinaryHash must equal BOTH the trusted registered binaryHash
+    //     AND the resolver binaryHash.
+    //   • The awaiting generation must equal the live identity generation (a slot
+    //     that was cleared + re-registered invalidates any in-flight promotion).
+    //   • Every failure preserves the exact Outform W1-3 via _restoreOutformWords
+    //     and leaves awaiting state cleared but Outform identity intact for retry.
+    //   • Resident W0-W3 are committed atomically through _commitResidentInform.
     // Returns { ok, freeBase?, lumpSize?, message? }.
-    receiveLump(lumpWords) {
+    receiveLump(lumpWords, resolverMeta) {
         if (!this.awaitingLump) {
             return { ok: false, message: 'not awaiting a lump' };
         }
         const { nsIndex, retryPC } = this.awaitingLump;
+        const awaitingCacheToken = (this.awaitingLump.cacheToken >>> 0) || 0;
+        const awaitingGeneration = this.awaitingLump.identityGeneration;
+        const bindingAddr = this.awaitingLump.bindingAddr;
+        const accessGT = this.awaitingLump.accessGT;
+
+        // Reject helper: on ANY failure, restore the exact Outform W1-3 for this
+        // slot (identity untouched), clear only the awaiting state, and never
+        // leave partial resident state behind.  The trusted identity map is NOT
+        // cleared — re-resolution must be able to reproduce the same token.
+        const _reject = (faultType, faultMsg, returnMsg) => {
+            this._restoreOutformWords(nsIndex);
+            this.awaitingLump = null;
+            this.fault(faultType, faultMsg);
+            return { ok: false, message: returnMsg };
+        };
 
         // ── CRC-32 verification ───────────────────────────────────────────────
         // word[0] is the stored CRC-32 (prepended by the server).
         // The CRC is computed over the raw lump payload bytes (words[1..]).
         // Algorithm: CRC-32/ISO-HDLC — matches hardware outform_iot.py CHECK_CRC32.
         if (lumpWords.length < 2) {
-            this.awaitingLump = null;
-            this.fault('LUMP_SIZE', `receiveLump: response too short (${lumpWords.length} words) for Slot ${nsIndex}`);
-            return { ok: false, message: 'lump response too short' };
+            return _reject('LUMP_SIZE',
+                `receiveLump: response too short (${lumpWords.length} words) for Slot ${nsIndex}`,
+                'lump response too short');
         }
         const crcStored   = (lumpWords[0] >>> 0);
         const lumpPayload = Array.isArray(lumpWords) ? lumpWords.slice(1) : Array.from(lumpWords).slice(1);
         const crcComputed = this._crc32Words(lumpPayload);
         if (crcComputed !== crcStored) {
-            this.awaitingLump = null;
-            this.fault('OUTFORM_CRC',
+            return _reject('OUTFORM_CRC',
                 `receiveLump: CRC-32 mismatch for Slot ${nsIndex} — ` +
                 `stored=0x${crcStored.toString(16).padStart(8,'0')} ` +
-                `computed=0x${crcComputed.toString(16).padStart(8,'0')}`);
-            return { ok: false, message: 'CRC-32 mismatch' };
+                `computed=0x${crcComputed.toString(16).padStart(8,'0')}`,
+                'CRC-32 mismatch');
+        }
+
+        // ── Trusted identity verification (Task #2862, fail-closed) ────────────
+        // receiveLump is EXCLUSIVELY the network Outform promotion path — there is
+        // no legacy/back-compat commit here.  A trusted SECURE per-slot identity
+        // is therefore MANDATORY and UNCONDITIONAL: the 4-word NS entry alone can
+        // never authorize this write.  Reject before any commit if the identity
+        // is absent, was cleared mid-fetch, or is not explicitly secure.
+        const trustedId = this.getSlotIdentity(nsIndex);
+        if (!trustedId) {
+            return _reject('OUTFORM_IDENTITY',
+                `receiveLump: no trusted per-slot identity for Slot ${nsIndex} — ` +
+                `network Outform promotion refused (fail closed)`,
+                'no trusted identity');
+        }
+        if (trustedId.secure !== true) {
+            return _reject('OUTFORM_IDENTITY',
+                `receiveLump: Slot ${nsIndex} identity is not a secure identity — ` +
+                `network Outform promotion refused (fail closed)`,
+                'identity not secure');
+        }
+
+        {
+            // 0. Stale slot-reuse guard: the identity must be the SAME generation
+            //    that was live when this fetch was suspended.  A clear+re-register
+            //    (slot reuse) advances the generation and invalidates the fetch.
+            //    A NULL awaiting generation for a secure fetch is ALSO a failure —
+            //    clearing identity mid-fetch is never a bypass.
+            if (awaitingGeneration == null || trustedId.generation !== awaitingGeneration) {
+                return _reject('OUTFORM_IDENTITY',
+                    `receiveLump: stale/absent identity generation for Slot ${nsIndex} — ` +
+                    `awaiting=${awaitingGeneration} live=${trustedId.generation} ` +
+                    `(slot was cleared/re-registered mid-fetch, or fetch started without a secure identity)`,
+                    'stale identity generation');
+            }
+
+            // 1. Resolver metadata and all canonical fields are MANDATORY.
+            const rm = resolverMeta || null;
+            const missing = [];
+            if (!rm) missing.push('resolverMeta');
+            if (!rm || rm.cacheToken == null) missing.push('cacheToken');
+            if (!rm || rm.trust !== 'canonical') missing.push('trust=canonical');
+            if (!rm || rm.dotName == null || String(rm.dotName) === '') missing.push('dotName');
+            if (!rm || !(Number.isInteger(rm.issueN) && rm.issueN > 0)) missing.push('issueN');
+            if (!rm || !this._is64Hex(rm.identityHash)) missing.push('identityHash(64-hex)');
+            if (!rm || !this._is64Hex(rm.binaryHash))   missing.push('binaryHash(64-hex)');
+            if (!rm || !this._is64Hex(rm.computedBinaryHash)) missing.push('computedBinaryHash(64-hex)');
+            if (missing.length) {
+                return _reject('OUTFORM_IDENTITY',
+                    `receiveLump: secure Outform for Slot ${nsIndex} missing/untrusted resolver metadata: ${missing.join(', ')} (fail closed)`,
+                    'missing/untrusted resolver metadata');
+            }
+
+            if (!Number.isInteger(rm.cacheToken) ||
+                    rm.cacheToken < 0 || rm.cacheToken > 0xFFFFFFFF) {
+                return _reject('OUTFORM_IDENTITY',
+                    `receiveLump: resolver cache token is not an exact uint32 for Slot ${nsIndex}`,
+                    'invalid cache token');
+            }
+
+            // 2. Cache tag T: awaiting Outform W3 AND resolver T AND registered T.
+            if (awaitingCacheToken !== (trustedId.cacheToken >>> 0)) {
+                return _reject('OUTFORM_IDENTITY',
+                    `receiveLump: Outform W3 cache tag 0x${awaitingCacheToken.toString(16).padStart(8,'0')} ` +
+                    `does not match registered identity 0x${(trustedId.cacheToken>>>0).toString(16).padStart(8,'0')} for Slot ${nsIndex}`,
+                    'cache tag mismatch (W3)');
+            }
+            if ((rm.cacheToken >>> 0) !== (trustedId.cacheToken >>> 0)) {
+                return _reject('OUTFORM_IDENTITY',
+                    `receiveLump: cache tag T mismatch for Slot ${nsIndex} — ` +
+                    `resolver=0x${(rm.cacheToken>>>0).toString(16).padStart(8,'0')} ` +
+                    `registered=0x${(trustedId.cacheToken>>>0).toString(16).padStart(8,'0')}`,
+                    'cache tag mismatch');
+            }
+
+            // 3. dotName must match exactly.
+            if (String(rm.dotName) !== String(trustedId.dotName)) {
+                return _reject('OUTFORM_IDENTITY',
+                    `receiveLump: dotName mismatch for Slot ${nsIndex} — ` +
+                    `resolver="${rm.dotName}" registered="${trustedId.dotName}"`,
+                    'dotName mismatch');
+            }
+
+            // 4. Issue separation: same cache T with a different issue is a
+            //    DIFFERENT identity and must use a separate slot.
+            if (rm.issueN !== trustedId.issueN) {
+                return _reject('OUTFORM_IDENTITY',
+                    `receiveLump: issue mismatch for Slot ${nsIndex} — ` +
+                    `resolver=${rm.issueN} registered=${trustedId.issueN} ` +
+                    `(same cache T with a different issue must use a separate slot)`,
+                    'issue mismatch');
+            }
+
+            // 5. identityHash: canonical 64-hex string comparison (resolver vs registered).
+            if (this._normHash(rm.identityHash) !== this._normHash(trustedId.identityHash)) {
+                return _reject('OUTFORM_IDENTITY',
+                    `receiveLump: identityHash mismatch for Slot ${nsIndex}`,
+                    'identityHash mismatch');
+            }
+
+            // 6. binaryHash: the computed SHA-256 over the RAW payload bytes must
+            //    equal BOTH the trusted registered binaryHash AND the resolver
+            //    binaryHash — all as canonical 64-hex strings.
+            const computed = this._normHash(rm.computedBinaryHash);
+            if (computed !== this._normHash(trustedId.binaryHash)) {
+                return _reject('OUTFORM_IDENTITY',
+                    `receiveLump: binaryHash mismatch (computed vs registered) for Slot ${nsIndex}`,
+                    'binaryHash mismatch (registered)');
+            }
+            if (computed !== this._normHash(rm.binaryHash)) {
+                return _reject('OUTFORM_IDENTITY',
+                    `receiveLump: binaryHash mismatch (computed vs resolver) for Slot ${nsIndex}`,
+                    'binaryHash mismatch (resolver)');
+            }
         }
 
         // Validate magic byte in lump header word0 (first word of the actual lump).
         const hdrWord = (lumpPayload[0] >>> 0);
         if ((hdrWord >>> 27) !== 0x1F) {
-            this.awaitingLump = null;
-            this.fault('LUMP_MAGIC', `receiveLump: bad magic 0x${((hdrWord>>>27)&0x1F).toString(16)} in fetched lump for Slot ${nsIndex}`);
-            return { ok: false, message: 'invalid lump magic' };
+            return _reject('LUMP_MAGIC',
+                `receiveLump: bad magic 0x${((hdrWord>>>27)&0x1F).toString(16)} in fetched lump for Slot ${nsIndex}`,
+                'invalid lump magic');
         }
 
         const hdr = this.parseLumpHeader(hdrWord);
@@ -7492,51 +7967,80 @@ class ChurchSimulator {
         // Validate that the payload is consistent with the declared header size.
         // Truncated payloads (fewer words than declared) are rejected; extra words are ignored.
         if (lumpPayload.length < lumpSize) {
-            this.awaitingLump = null;
-            this.fault('LUMP_SIZE', `receiveLump: payload is ${lumpPayload.length} words, header declares ${lumpSize} (truncated)`);
-            return { ok: false, message: 'truncated lump payload' };
+            return _reject('LUMP_SIZE',
+                `receiveLump: payload is ${lumpPayload.length} words, header declares ${lumpSize} (truncated)`,
+                'truncated lump payload');
         }
         // cw (code words) and cc (c-list slots) must fit within the declared lump size.
         const cw_check = hdr.cw;
         const cc_check = hdr.cc;
         if (cw_check + cc_check >= lumpSize) {
-            this.awaitingLump = null;
-            this.fault('LUMP_LAYOUT', `receiveLump: cw=${cw_check}+cc=${cc_check} >= lumpSize=${lumpSize} (layout overflow)`);
-            return { ok: false, message: 'lump layout overflow' };
+            return _reject('LUMP_LAYOUT',
+                `receiveLump: cw=${cw_check}+cc=${cc_check} >= lumpSize=${lumpSize} (layout overflow)`,
+                'lump layout overflow');
         }
 
         // Mint validation step 7 — freespace validation (V1.3).  Distinct fault
         // identifiers per reject path (LUMP_FS_<code>) so tests can tell them apart.
         const _fsCheck = this.mintStep7Freespace(lumpPayload, hdr);
         if (!_fsCheck.ok) {
-            this.awaitingLump = null;
-            this.fault('LUMP_' + _fsCheck.code, `receiveLump: freespace validation failed for Slot ${nsIndex} — ${_fsCheck.detail} (Mint step 7)`);
-            return { ok: false, message: 'freespace validation failed (' + _fsCheck.code + ')' };
+            return _reject('LUMP_' + _fsCheck.code,
+                `receiveLump: freespace validation failed for Slot ${nsIndex} — ${_fsCheck.detail} (Mint step 7)`,
+                'freespace validation failed (' + _fsCheck.code + ')');
         }
 
         // Find the next aligned free slot (above all resident NS lumps).
         const freeBase = this._findFreeSlot(lumpSize);
         if (freeBase + lumpSize > this.NS_TABLE_BASE) {
-            this.awaitingLump = null;
-            this.fault('LUMP_OOM', `receiveLump: no free space for ${lumpSize}-word lump (high-water would hit NS table)`);
-            return { ok: false, message: 'out of lump space' };
+            return _reject('LUMP_OOM',
+                `receiveLump: no free space for ${lumpSize}-word lump (high-water would hit NS table)`,
+                'out of lump space');
         }
 
-        // Write lump words into memory.
-        for (let i = 0; i < Math.min(lumpPayload.length, lumpSize); i++) {
-            this.memory[freeBase + i] = (lumpPayload[i] >>> 0);
-        }
-
-        // Promote NS entry from Outform (gtType=2) → Inform (gtType=1).
+        // ── Atomic commit (Task #2862) ────────────────────────────────────────
+        // All identity/CRC/header/layout/freespace checks passed.  Commit the
+        // resident lump body AND resident NS entry W0-W3 together through the ONE
+        // promotion helper so nothing partial is ever observable.  Resident W3 is
+        // the 32-bit cache token ONLY (the awaiting Outform W3 / cache tag T).
         // GT type semantics: 0=NULL, 1=Inform, 2=Outform, 3=Abstract.
-        // limit17 = lumpSize - cc - 1  (valid code range 0..limit17 inclusive).
-        const cc      = hdr.cc;
-        const cw      = hdr.cw;
-        const limit17 = lumpSize - cc - 1;
-        this.writeNSEntry(nsIndex, freeBase, limit17, 0, 0, 0, 1 /*gtType=Inform*/, 0, cc);
+        const cacheToken32 = awaitingCacheToken;
+
+        // The exact c-list row that triggered the fetch is part of the
+        // transaction.  It must still contain the same Outform GT immediately
+        // before publication; otherwise the binding was revoked/replaced while
+        // the fetch was in flight and the whole promotion fails closed.
+        let informBinding = null;
+        if (bindingAddr != null || accessGT != null) {
+            if (!Number.isInteger(bindingAddr) || accessGT == null ||
+                    bindingAddr < 0 || bindingAddr >= this.memory.length) {
+                return _reject('OUTFORM_IDENTITY',
+                    `receiveLump: incomplete c-list binding snapshot for Slot ${nsIndex}`,
+                    'incomplete c-list binding snapshot');
+            }
+            const access = this.parseGT(accessGT >>> 0);
+            if (access.type !== 2 || access.index !== nsIndex ||
+                    (this.memory[bindingAddr] >>> 0) !== (accessGT >>> 0)) {
+                return _reject('OUTFORM_IDENTITY',
+                    `receiveLump: stale/replaced Outform c-list binding for Slot ${nsIndex}`,
+                    'stale c-list binding');
+            }
+            informBinding = this.createGT(
+                access.gt_seq, nsIndex, access.permissions, 1
+            ) >>> 0;
+        }
+
+        this._commitResidentInform(nsIndex, freeBase, lumpPayload, hdr, cacheToken32);
+        if (informBinding != null) {
+            this.memory[bindingAddr] = informBinding;
+            trustedId.bindings.push({
+                addr: bindingAddr,
+                outformGT: accessGT >>> 0,
+                informGT: informBinding,
+            });
+        }
 
         const label = this.nsLabels[nsIndex] || 'entry_' + nsIndex;
-        this.output += `\u2713 Installed: ${label} — ${lumpSize} words @ 0x${freeBase.toString(16)} [Slot ${nsIndex}]\n`;
+        this.output += `\u2713 Installed: ${label} — ${lumpSize} words @ 0x${freeBase.toString(16)} [Slot ${nsIndex}] (T=0x${cacheToken32.toString(16).padStart(8,'0')})\n`;
 
         // Restore PC to the retry instruction and clear the suspend state.
         this.pc = retryPC;
@@ -7547,7 +8051,7 @@ class ChurchSimulator {
 
     // Find the lowest aligned slot address above all resident NS lumps.
     // Skips slot 0 (Boot.NS — covers entire memory, not a physical lump),
-    // and Outform entries (gtType=2 — no physical backing yet).
+    // Entries with no resident location/header do not advance the watermark.
     // Uses the lump header's actual lumpSize rather than the NS limit17 field,
     // because limit17 encodes the code-region limit, not the full slot size.
     _findFreeSlot(lumpSize) {
@@ -7555,8 +8059,6 @@ class ChurchSimulator {
         for (let i = BOOT_NS_SLOT_THREAD; i < this.nsCount; i++) {   // skip BOOT_NS_SLOT_HEADER (namespace descriptor)
             const entry = this.readNSEntry(i);
             if (!entry) continue;
-            const entryW1 = this.parseNSWord1(entry.word1_limit);
-            if (entryW1.gtType === 2) continue;    // Outform: no physical backing
             const base = entry.word0_location >>> 0;
             if (base === 0 || base >= this.NS_TABLE_BASE) continue;  // sanity guard
             // Prefer reading the lump header for the true slot size.
@@ -7710,8 +8212,11 @@ class ChurchSimulator {
         const nsEntry = this.readNSEntry(parsed.index);
         const nsWord1 = nsEntry ? nsEntry.word1_limit : cr.word2;
         const lim = this.parseNSWord1(nsWord1);
-        const sealGtSeq = (cr.word3 >>> 25) & 0x7F;
-        const sealCRC = cr.word3 & 0xFFFF;
+        // Canonical NS ABI: gt_seq lives in W1[29:21] (authority word), and the
+        // NS integrity check is the full 32-bit integrity32 in W2 — NOT a version
+        // + legacy CRC16 integrity metadata (CR.word3 now exposes cache T).
+        const sealGtSeq = lim.gtSeq;
+        const sealCRC = nsEntry ? (nsEntry.word2_seals >>> 0) : 0;
         const permStr = (parsed.permissions.B ? 'B' : '-') +
                         (parsed.permissions.R ? 'R' : '-') +
                         (parsed.permissions.W ? 'W' : '-') +
@@ -7803,11 +8308,9 @@ class ChurchSimulator {
         const n_minus_6 = Math.max(0, Math.ceil(Math.log2(lumpSize)) - 6);
         // NS entry limit17 = index of last valid code/data word = lumpSize - cc - 1.
         const lim17 = Math.min(lumpSize - cc - 1, 0x1FFFF);
-        // Abstract GT word for NS entry word3: dom[27] | perm[30:28].
-        // getPermBits returns (perm3 << 1) | dom; shifting by 27 places
-        // dom at bit 27 and perm3 at bits [30:28] per the new GT layout.
-        const abstractGtWord = (this.getPermBits(perms) << 27) >>> 0;
-        this.writeNSEntry(idx, loc, lim17, 0, 0, 0, gtType, 0, cc || undefined, abstractGtWord);
+        // No trusted full identity is registered by this local save path, so it
+        // must not invent a resident cache token from the permission mask.
+        this.writeNSEntry(idx, loc, lim17, 0, 0, 0, gtType, 0, cc || undefined, 0);
         this.nsLabels[idx] = label;
         // Word 0: lump header (magic=0x1F, n_minus_6, cw=codeLen, cc, typ=0).
         // Previously a GT word was written here, which broke CALL dispatch and
@@ -7842,9 +8345,9 @@ class ChurchSimulator {
         for (let j = 0; j < lumpSize; j++) {
             if (loc + j < this.memory.length) this.memory[loc + j] = 0;
         }
-        // Abstract GT word for NS entry word3: dom[27] | perm[30:28] (same as above).
-        const abstractGtWord = (this.getPermBits(perms) << 27) >>> 0;
-        this.writeNSEntry(idx, loc, lim17, 0, 0, 0, gtType, 0, cc || undefined, abstractGtWord);
+        // No trusted full identity is registered by this local save path, so W3
+        // remains zero rather than carrying permission-derived data.
+        this.writeNSEntry(idx, loc, lim17, 0, 0, 0, gtType, 0, cc || undefined, 0);
         this.nsLabels[idx] = label;
         // Word 0: lump header (magic=0x1F, n_minus_6, cw=codeLen, cc, typ=0).
         // Previously a GT word was written here, which broke CALL dispatch and
@@ -7876,7 +8379,13 @@ class ChurchSimulator {
         const loc = entry.word0_location;
         const lim17 = Math.min(dataWords.length - 1, 0x1FFFF);
         const parsed = this.parseNSWord1(entry.word1_limit);
-        this.writeNSEntry(idx, loc, lim17, parsed.b, parsed.g, parsed.gtType, (entry.word2_seals >>> 25) & 0x7F, undefined, entry.word3_abstract_gt || 0);
+        // Type/state + cc are entry-level metadata (side-tables), never W1 fields;
+        // b_flag is a GT-word property, not an NS authority field → 0 here.
+        this.writeNSEntry(
+            idx, loc, lim17, 0, parsed.g, entry.gtType,
+            this.parseNSWord1(entry.word1_limit).gtSeq, entry.clistCount || 0,
+            entry.word3_cache_token || 0
+        );
         for (let i = 0; i < dataWords.length; i++) {
             this.memory[loc + i] = dataWords[i] >>> 0;
         }
@@ -7912,6 +8421,7 @@ ChurchSimulator.FAULT_CODES = {
     PERM: null, BOOT: null, MATH_ERROR: null, DOMAIN_ERROR: null,
     HANDLER: null, PERMISSION: null, TYPE: null, THREAD: null,
     LUMP_MAGIC: null, LUMP_SIZE: null, LUMP_LAYOUT: null, LUMP_OOM: null,
+    OUTFORM_IDENTITY: null,   // Task #2862: trusted per-slot identity mismatch (software-only)
     NO_CODE: null, PRIVATE_METHOD: null, CODE_NOT_RESIDENT: null, PRIV_REG: null,
     LAZY_RESOLVE_PENDING: null, STUB_METHOD: null,
 };

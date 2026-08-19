@@ -287,7 +287,8 @@ Each namespace entry is **4 words (16 bytes)**, stride = `slot_id × 16` from th
 - **Word 0** (base): 32-bit lump base byte address
 - **Word 1** (WORD2_LAYOUT): `spare[31:29] | g_bit[28] | gt_seq[27:21] | limit_offset[20:0]`
 - **Word 2** (integrity32 check): 32-bit parallel check over Word 0 and Word 1 (g_bit masked)
-- **Word 3** (abstract_gt): Abstract Golden Token for capability delegation
+- **Word 3** (`cache_token32`): issue-blind 32-bit lookup/cache value `T`;
+  non-authoritative and not covered by `integrity32`
 
 The NS table supports up to 65,536 entries (16-bit `slot_id`).
 
@@ -601,7 +602,10 @@ Outform GTs (type=10) with F-bit=1 represent remote resources:
 
 Navana (NS[5]) is the sole namespace entry writer. All NS table modifications go through Navana:
 
-- **Navana.Add**: Find free NS slot, write 4-word entry (base, g_bit+gt_seq+limit_offset, integrity32, abstract_gt), return `slot_id` + `gt_seq`
+- **Navana.Add**: Find free NS slot, write the 4-word resident entry
+  (location, authority, integrity32, cache token `T`), return `slot_id` +
+  `gt_seq`. `T` is accepted only with the trusted full identity held outside
+  the entry.
 - **Navana.Remove**: Revoke GT (increment `gt_seq` in NS Entry Word 1), free NS slot
 - **Navana.Abstraction.Add**: Process compiled abstraction, allocate power-of-2 lump, write lump header (`cc`, `n_minus_6`), write code + c-list GTs, create NS entry, forge E-GT
 - **Navana.Abstraction.Update**: Re-carve lump or migrate to larger allocation

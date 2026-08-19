@@ -101,7 +101,10 @@ class ChurchCall(Elaboratable):
         self.mgt_ns_location  = Signal(32)   # NS entry word0_location
         self.mgt_ns_authority = Signal(32)   # NS entry word1_authority
         self.mgt_ns_integrity = Signal(32)   # NS entry word2_integrity
-        self.mgt_ns_seals     = Signal(32)   # NS entry word3_abstract_gt (advisory seals)
+        # NS entry word3 — resident Inform cache token (cache_token32).
+        # Non-authoritative / diagnostic only (Task #2862): never gates or
+        # authorises the M-window writeback.  Formerly named mgt_ns_seals.
+        self.mgt_cache_token32 = Signal(32)
 
         # Lazy-load IRQ outputs (Task #1523): pulsed when FETCH_LUMP detects cw=0
         # (CODE_NOT_RESIDENT).  No stack frame has been pushed at this point in
@@ -172,7 +175,8 @@ class ChurchCall(Elaboratable):
         ns_loc_lat   = Signal(32)
         ns_auth_lat  = Signal(32)
         ns_int_lat   = Signal(32)
-        ns_seal_lat  = Signal(32)
+        # Resident Inform W3 latch — non-authoritative cache token (diagnostic).
+        cache_token32_lat = Signal(32)
 
         # CALL frame word (spec §"Zone ② — LIFO Stack"):
         #   bit[31]    = SZ = 1  (CALL frame tag)
@@ -668,8 +672,9 @@ class ChurchCall(Elaboratable):
 
             # ── M-GT dispatch states ──────────────────────────────────────────
             # Entered from CHECK_PERM when src GT has gt_type == GT_TYPE_ABSTRACT.
-            # Reads all 4 NS entry words (location, authority, integrity, seals)
-            # via the direct memory bus; mgt_set_trigger pulses for one cycle at
+            # Reads all 4 NS entry words (location, authority, integrity, and the
+            # resident Inform W3 cache token) via the direct memory bus;
+            # mgt_set_trigger pulses for one cycle at
             # M_FETCH_DONE to populate DR11-DR15 in hardware/registers.py.
             # No lump is loaded, no stack frame is pushed, nia_set is NOT asserted.
 
@@ -704,13 +709,15 @@ class ChurchCall(Elaboratable):
                     m.next = "M_FETCH_NS3"
 
             with m.State("M_FETCH_NS3"):
-                # Fetch NS entry word3_abstract_gt (advisory seals annotation)
+                # Fetch NS entry word3 — resident Inform cache token (cache_token32).
+                # Non-authoritative / diagnostic only (Task #2862): latched for
+                # visibility in DR15 but never used to gate/authorise writeback.
                 m.d.comb += [
                     self.mem_rd_addr.eq(mgt_ns_entry_base + 12),
                     self.mem_rd_en.eq(1),
                 ]
                 with m.If(self.mem_rd_valid):
-                    m.d.sync += ns_seal_lat.eq(self.mem_rd_data)
+                    m.d.sync += cache_token32_lat.eq(self.mem_rd_data)
                     m.next = "M_FETCH_DONE"
 
             with m.State("M_FETCH_DONE"):
@@ -739,7 +746,7 @@ class ChurchCall(Elaboratable):
             self.mgt_ns_location.eq(ns_loc_lat),
             self.mgt_ns_authority.eq(ns_auth_lat),
             self.mgt_ns_integrity.eq(ns_int_lat),
-            self.mgt_ns_seals.eq(ns_seal_lat),
+            self.mgt_cache_token32.eq(cache_token32_lat),
             self.lazy_load_irq.eq(fsm.ongoing("LAZY_LOAD_ABORT")),
             self.lazy_load_ns_slot.eq(View(GT_LAYOUT, callee_egt_latched).slot_id),
         ]

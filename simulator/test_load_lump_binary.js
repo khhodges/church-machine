@@ -68,9 +68,48 @@
 //            and _instrHistory contains rawWords[1] after step(), proving the
 //            fetch phase reached the right address with the right word.
 
-const fs   = require('fs');
-const path = require('path');
+const fs     = require('fs');
+const path   = require('path');
+const crypto = require('crypto');
 const ChurchSimulator = require('./simulator.js');
+
+// Task #2862: receiveLump is the secure network Outform promotion path, so it
+// now requires a trusted secure per-slot identity + matching resolver metadata.
+// This helper registers that identity (matching the payload) and returns the
+// resolver metadata so freespace-validation tests can exercise the same code.
+function _sha256Words(words) {
+    const buf = Buffer.alloc(words.length * 4);
+    for (let i = 0; i < words.length; i++) buf.writeUInt32BE(words[i] >>> 0, i * 4);
+    return crypto.createHash('sha256').update(buf).digest('hex');
+}
+function _primeSecureReceive(sim, nsIndex, payloadWords, retryPC) {
+    const T = 0x2862ABCD;
+    const w1 = sim.packNSWord1(4, 0, 0, 2 /*Outform*/, 2) >>> 0;
+    const w2 = 0x00000456;
+    const binHash = _sha256Words(payloadWords);
+    const idHash  = crypto.createHash('sha256').update('LLB.Fixture#1').digest('hex');
+    sim.registerSlotIdentity(nsIndex, {
+        cacheToken: T, dotName: 'LLB.Fixture', issueN: 1,
+        identityHash: idHash, binaryHash: binHash,
+        outformWords: [w1, w2, T >>> 0],
+    }, { secure: true });
+    const base = sim._nsSlotBase(nsIndex);
+    sim.memory[base + 0] = 0; sim.memory[base + 1] = w1;
+    sim.memory[base + 2] = w2; sim.memory[base + 3] = T >>> 0;
+    if (nsIndex >= sim.nsCount) sim.nsCount = nsIndex + 1;
+    sim.awaitingLump = {
+        nsIndex, retryPC: (retryPC != null ? retryPC : 7), d: {},
+        token: sim._outformToken96(sim.readNSEntry(nsIndex)),
+        cacheToken: T >>> 0,
+        identityGeneration: sim.getSlotIdentity(nsIndex).generation,
+        outformWords: [w1, w2, T >>> 0],
+    };
+    return {
+        trust: 'canonical',
+        cacheToken: T, dotName: 'LLB.Fixture', issueN: 1,
+        identityHash: idHash, binaryHash: binHash, computedBinaryHash: binHash,
+    };
+}
 
 let pass = 0;
 let fail = 0;
@@ -203,15 +242,16 @@ console.log('\n--- LLB-01: NS slot 3 word0/word1 and CR14 wired correctly ---');
         nsW0 === EXTENDED_BASE,
         `got 0x${nsW0.toString(16)}`);
 
-    // NS slot 3 word1: limit field must encode cw=10, clistCount must encode cc=2
+    // NS slot 3 W1 (authority) encodes the limit; the c-list count is a
+    // resident-lump property (header cc), derived by readNSEntry — never W1.
     const nsW1 = sim.memory[nsBase + 1];
     const parsed1 = sim.parseNSWord1(nsW1);
     check('LLB-01c: NS[3].word1 limit = cw (10)',
         parsed1.limit === 10,
         `got limit=${parsed1.limit}`);
-    check('LLB-01d: NS[3].word1 clistCount = cc (2)',
-        parsed1.clistCount === 2,
-        `got clistCount=${parsed1.clistCount}`);
+    check('LLB-01d: NS[3] clistCount = cc (2) — from resident lump header',
+        sim.readNSEntry(sim.bootEntrySlot).clistCount === 2,
+        `got clistCount=${sim.readNSEntry(sim.bootEntrySlot).clistCount}`);
 
     // CR14 must mirror NS slot 3 word1/word2, and word1 must be EXTENDED_BASE
     const cr14 = sim.cr[14];
@@ -236,7 +276,7 @@ console.log('\n--- LLB-02: step() fetches first code word without fault ---');
     const { sim, nsBase, GT_SEQ } = setupAndLoad({ cw: 4, cc: 1, codeWord: SENTINEL });
 
     // Rebuild CR14.word0 with the gt_seq that loadLumpBinary preserved in NS[3].word2
-    const gtSeqAfter = (sim.memory[nsBase + 2] >>> 25) & 0x7F;
+    const gtSeqAfter = sim.parseNSWord1(sim.memory[nsBase + 1]).gtSeq;
     sim.cr[14] = {
         word0: sim.createGT(gtSeqAfter, sim.bootEntrySlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1),
         word1: sim.cr[14].word1,
@@ -287,9 +327,9 @@ console.log('\n--- LLB-03: Synthetic NS slot 3 cw=17 cc=1 round-trip (LED flash 
     check('LLB-03b: NS[3].word1 limit = 17 (cw matching LED flash / NS slot 3)',
         parsed.limit === 17,
         `got limit=${parsed.limit}`);
-    check('LLB-03c: NS[3].word1 clistCount = 1 (cc matching LED flash / NS slot 3)',
-        parsed.clistCount === 1,
-        `got clistCount=${parsed.clistCount}`);
+    check('LLB-03c: NS[3] clistCount = 1 (cc from resident header, LED flash params)',
+        sim.readNSEntry(sim.bootEntrySlot).clistCount === 1,
+        `got clistCount=${sim.readNSEntry(sim.bootEntrySlot).clistCount}`);
 
     // Verify the LUMP header in memory at EXTENDED_BASE decodes identically
     const hdrInMem  = sim.memory[EXTENDED_BASE] >>> 0;
@@ -312,10 +352,9 @@ console.log('\n--- LLB-04: cc=0 leaves CR6 zeroed ---');
 
     check('LLB-04a: loadLumpBinary returns true', ok === true);
 
-    const parsed = sim.parseNSWord1(sim.memory[nsBase + 1]);
-    check('LLB-04b: NS[3].word1 clistCount = 0',
-        parsed.clistCount === 0,
-        `got clistCount=${parsed.clistCount}`);
+    check('LLB-04b: NS[3] clistCount = 0 (from resident lump header)',
+        sim.readNSEntry(sim.bootEntrySlot).clistCount === 0,
+        `got clistCount=${sim.readNSEntry(sim.bootEntrySlot).clistCount}`);
 
     const cr6 = sim.cr[6];
     const cr6IsZero = cr6 &&
@@ -363,7 +402,7 @@ console.log('\n--- LLB-08: NS[3].word2 seal consistent with EXTENDED_BASE and cw
     const { sim, nsBase, GT_SEQ } = setupAndLoad({ cw: CW, cc: 1 });
 
     const storedWord2  = sim.memory[nsBase + 2];
-    const gtSeqStored  = (storedWord2 >>> 25) & 0x7F;
+    const gtSeqStored  = sim.parseNSWord1(sim.memory[nsBase + 1]).gtSeq;
     // Recompute seal from scratch: should match storedWord2
     const expected     = sim.makeVersionSeals(gtSeqStored, EXTENDED_BASE, CW);
     check('LLB-08: NS[3].word2 seal matches makeVersionSeals(gt_seq, 0x0400, cw)',
@@ -431,9 +470,9 @@ console.log('\n--- LLB-RBA: Real PostFlashSelftest binary (059dc47f.lump, Boot.A
         check('LLB-RBA-8: NS[bootEntrySlot].word1 limit = 499 (cw from real fixture)',
             p.limit === 499,
             `got limit=${p.limit}`);
-        check('LLB-RBA-9: NS[bootEntrySlot].word1 clistCount = 2 (cc from real fixture — Next.GT in slot 1)',
-            p.clistCount === 2,
-            `got clistCount=${p.clistCount}`);
+        check('LLB-RBA-9: NS[bootEntrySlot] clistCount = 2 (cc from resident header — Next.GT in slot 1)',
+            sim2.readNSEntry(sim2.bootEntrySlot).clistCount === 2,
+            `got clistCount=${sim2.readNSEntry(sim2.bootEntrySlot).clistCount}`);
         check('LLB-RBA-10: CR14.word1 = EXTENDED_BASE after real load',
             sim2.cr[14].word1 === EXTENDED_BASE,
             `got 0x${sim2.cr[14].word1.toString(16)}`);
@@ -498,8 +537,8 @@ console.log('\n--- LLB-APP: Mimic _loadLumpBinaryIntoSim app path with real fixt
             p.limit === wordCount,
             `ns limit=${p.limit} wordCount=${wordCount}`);
         check('LLB-APP-7: NS[3] clistCount agrees with header-row cc (1)',
-            p.clistCount === (hdr ? hdr.cc : -1),
-            `ns clistCount=${p.clistCount}`);
+            sim.readNSEntry(sim.bootEntrySlot).clistCount === (hdr ? hdr.cc : -1),
+            `ns clistCount=${sim.readNSEntry(sim.bootEntrySlot).clistCount}`);
     } else {
         console.log('SKIP LLB-APP-* (fixture file not found)');
     }
@@ -525,7 +564,7 @@ console.log('\n--- LLB-STP: step() on real LED flash (NS slot 3, token 00000300)
         sim.loadLumpBinary(rawWords);
 
         // Rebuild CR14.word0 with an RX GT matching the preserved gt_seq
-        const gtSeqAfter = (sim.memory[nsBase + 2] >>> 25) & 0x7F;
+        const gtSeqAfter = sim.parseNSWord1(sim.memory[nsBase + 1]).gtSeq;
         sim.cr[14] = {
             word0: sim.createGT(gtSeqAfter, sim.bootEntrySlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1),
             word1: sim.cr[14].word1,
@@ -592,8 +631,8 @@ console.log('\n--- LLB-09: Large LUMP (n_minus_6=2, 256 words, cc=4) ---');
     const nsW1   = sim.memory[nsBase + 1];
     const parsed = sim.parseNSWord1(nsW1);
     check('LLB-09c: NS[3].word1 clistCount = 4',
-        parsed.clistCount === CC,
-        `got clistCount=${parsed.clistCount}`);
+        sim.readNSEntry(sim.bootEntrySlot).clistCount === CC,
+        `got clistCount=${sim.readNSEntry(sim.bootEntrySlot).clistCount}`);
     check('LLB-09d: NS[3].word1 limit = cw (20)',
         parsed.limit === CW,
         `got limit=${parsed.limit}`);
@@ -642,8 +681,8 @@ console.log('\n--- LLB-10: Large LUMP (n_minus_6=1, 128 words, cc=3) ---');
     const nsW1   = sim.memory[nsBase + 1];
     const parsed = sim.parseNSWord1(nsW1);
     check('LLB-10c: NS[3].word1 clistCount = 3',
-        parsed.clistCount === CC,
-        `got clistCount=${parsed.clistCount}`);
+        sim.readNSEntry(sim.bootEntrySlot).clistCount === CC,
+        `got clistCount=${sim.readNSEntry(sim.bootEntrySlot).clistCount}`);
     check('LLB-10d: NS[3].word1 limit = cw (15)',
         parsed.limit === CW,
         `got limit=${parsed.limit}`);
@@ -692,8 +731,8 @@ console.log('\n--- LLB-11: Large LUMP (n_minus_6=3, 512 words, cc=5) ---');
     const nsW1   = sim.memory[nsBase + 1];
     const parsed = sim.parseNSWord1(nsW1);
     check('LLB-11c: NS[3].word1 clistCount = 5',
-        parsed.clistCount === CC,
-        `got clistCount=${parsed.clistCount}`);
+        sim.readNSEntry(sim.bootEntrySlot).clistCount === CC,
+        `got clistCount=${sim.readNSEntry(sim.bootEntrySlot).clistCount}`);
     check('LLB-11d: NS[3].word1 limit = cw (25)',
         parsed.limit === CW,
         `got limit=${parsed.limit}`);
@@ -740,8 +779,8 @@ console.log('\n--- LLB-12: Large LUMP (n_minus_6=4, 1024 words, cc=6) ---');
     const nsW1   = sim.memory[nsBase + 1];
     const parsed = sim.parseNSWord1(nsW1);
     check('LLB-12c: NS[3].word1 clistCount = 6',
-        parsed.clistCount === CC,
-        `got clistCount=${parsed.clistCount}`);
+        sim.readNSEntry(sim.bootEntrySlot).clistCount === CC,
+        `got clistCount=${sim.readNSEntry(sim.bootEntrySlot).clistCount}`);
     check('LLB-12d: NS[3].word1 limit = cw (30)',
         parsed.limit === CW,
         `got limit=${parsed.limit}`);
@@ -785,8 +824,8 @@ console.log('\n--- LLB-13: Large LUMP (n_minus_6=5, 2048 words, cc=7) ---');
     const nsW1   = sim.memory[nsBase + 1];
     const parsed = sim.parseNSWord1(nsW1);
     check('LLB-13c: NS[3].word1 clistCount = 7',
-        parsed.clistCount === CC,
-        `got clistCount=${parsed.clistCount}`);
+        sim.readNSEntry(sim.bootEntrySlot).clistCount === CC,
+        `got clistCount=${sim.readNSEntry(sim.bootEntrySlot).clistCount}`);
     check('LLB-13d: NS[3].word1 limit = cw (35)',
         parsed.limit === CW,
         `got limit=${parsed.limit}`);
@@ -830,8 +869,8 @@ console.log('\n--- LLB-14: Large LUMP (n_minus_6=6, 4096 words, cc=8) ---');
     const nsW1   = sim.memory[nsBase + 1];
     const parsed = sim.parseNSWord1(nsW1);
     check('LLB-14c: NS[3].word1 clistCount = 8',
-        parsed.clistCount === CC,
-        `got clistCount=${parsed.clistCount}`);
+        sim.readNSEntry(sim.bootEntrySlot).clistCount === CC,
+        `got clistCount=${sim.readNSEntry(sim.bootEntrySlot).clistCount}`);
     check('LLB-14d: NS[3].word1 limit = cw (40)',
         parsed.limit === CW,
         `got limit=${parsed.limit}`);
@@ -875,8 +914,8 @@ console.log('\n--- LLB-15: Large LUMP (n_minus_6=7, 8192 words, cc=9) ---');
     const nsW1   = sim.memory[nsBase + 1];
     const parsed = sim.parseNSWord1(nsW1);
     check('LLB-15c: NS[3].word1 clistCount = 9',
-        parsed.clistCount === CC,
-        `got clistCount=${parsed.clistCount}`);
+        sim.readNSEntry(sim.bootEntrySlot).clistCount === CC,
+        `got clistCount=${sim.readNSEntry(sim.bootEntrySlot).clistCount}`);
     check('LLB-15d: NS[3].word1 limit = cw (45)',
         parsed.limit === CW,
         `got limit=${parsed.limit}`);
@@ -920,8 +959,8 @@ console.log('\n--- LLB-16: Large LUMP (n_minus_6=8, 16384 words, cc=10) ---');
     const nsW1   = sim.memory[nsBase + 1];
     const parsed = sim.parseNSWord1(nsW1);
     check('LLB-16c: NS[3].word1 clistCount = 10',
-        parsed.clistCount === CC,
-        `got clistCount=${parsed.clistCount}`);
+        sim.readNSEntry(sim.bootEntrySlot).clistCount === CC,
+        `got clistCount=${sim.readNSEntry(sim.bootEntrySlot).clistCount}`);
     check('LLB-16d: NS[3].word1 limit = cw (50)',
         parsed.limit === CW,
         `got limit=${parsed.limit}`);
@@ -965,8 +1004,8 @@ console.log('\n--- LLB-17: Large LUMP (n_minus_6=9, 32768 words, cc=11) ---');
     const nsW1   = sim.memory[nsBase + 1];
     const parsed = sim.parseNSWord1(nsW1);
     check('LLB-17c: NS[3].word1 clistCount = 11',
-        parsed.clistCount === CC,
-        `got clistCount=${parsed.clistCount}`);
+        sim.readNSEntry(sim.bootEntrySlot).clistCount === CC,
+        `got clistCount=${sim.readNSEntry(sim.bootEntrySlot).clistCount}`);
     check('LLB-17d: NS[3].word1 limit = cw (55)',
         parsed.limit === CW,
         `got limit=${parsed.limit}`);
@@ -1247,9 +1286,9 @@ console.log('\n--- LLB-19: Truncated buffer (header says 64 words, buffer has 32
     function receive(payloadWords) {
         const sim = new ChurchSimulator();
         sim.bootComplete = true;
-        sim.awaitingLump = { nsIndex: 20, retryPC: 7 };
+        const meta = _primeSecureReceive(sim, 20, payloadWords, 7);
         const crc = sim._crc32Words(payloadWords);
-        return { sim, res: sim.receiveLump([crc, ...payloadWords]) };
+        return { sim, res: sim.receiveLump([crc, ...payloadWords], meta) };
     }
     {
         const { res } = receive(makeFrameWords({ flags: 0x00, apiLen: 10 }).words);

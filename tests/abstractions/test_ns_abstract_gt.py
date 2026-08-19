@@ -1,22 +1,29 @@
 """
-Tests for NS slot word3 Abstract GT tag (Task #322).
+Tests for NS slot Word 3 cache token (cache_token32) (Task #322 / #2862).
+
+NS Word 3 is a 32-bit issue-blind content cache/index token T — non-authoritative
+and diagnostic only.  The test value is an ARBITRARY cache token, NOT a permission
+GT: the gate merely fetches and mirrors it (M-bit gated); it never gates or
+authorises anything.
 
 Verifies:
-  1. ChurchNSGate fetches NS entry W3 (abstract_gt) and latches it in raw_w3.
-  2. ChurchMLoad forwards raw_w3 on ns_abstract_gt ONLY when m_elevated=1
-     (M-bit gated); ns_abstract_gt is 0 when m_elevated=0.
+  1. ChurchNSGate fetches NS entry W3 and latches it as cache_token32
+     (resident Inform W3, non-authoritative — Task #2862).
+  2. ChurchMLoad forwards cache_token32 on ns_cache_token32 ONLY when m_elevated=1
+     (M-bit gated); ns_cache_token32 is 0 when m_elevated=0.
 
 test_ns_gate_fetches_w3
   Drives ChurchNSGate directly with enable_seal_check=False, supplies a
-  fake memory that returns a known W3 value, and checks raw_w3 after DONE.
+  fake memory that returns a known W3 value, and checks ns_cache_token32
+  (cache_token32) after DONE.
 
-test_mload_abstract_gt_m_elevated
-  Full mLoad transaction with m_elevated=1; verifies ns_abstract_gt carries
+test_mload_cache_token_m_elevated
+  Full mLoad transaction with m_elevated=1; verifies ns_cache_token32 carries
   the W3 value after COMPLETE.
 
-test_mload_abstract_gt_user_mode
+test_mload_cache_token_user_mode
   Full mLoad transaction with m_elevated=0 (L-perm present so no fault);
-  verifies ns_abstract_gt is always 0.
+  verifies ns_cache_token32 is always 0.
 """
 
 import sys
@@ -33,12 +40,10 @@ from hardware.mload import ChurchMLoad
 from hardware.hw_types import (
     GT_TYPE_INFORM, GT_TYPE_NULL,
     PERM_MASK_R, PERM_MASK_W, PERM_MASK_L, PERM_MASK_E,
-    FaultType,
+    FaultType, gt_encode_perm,
 )
 from hardware.layouts import GT_LAYOUT, CAP_REG_LAYOUT, WORD2_LAYOUT
 from hardware.integrity32 import integrity32
-from hardware.boot_rom import _abstract_gt_word
-
 MAX_TICKS = 200
 
 SLOT_ID     = 6
@@ -49,24 +54,32 @@ INDEX       = 0
 
 GT_SEQ      = 0
 LIMIT_WORDS = 63
-W1_AUTH     = ((GT_SEQ & 0x7F) << 21) | (LIMIT_WORDS & 0x1FFFFF)
+W1_AUTH     = ((GT_SEQ & 0x1FF) << 21) | (LIMIT_WORDS & 0x1FFFFF)  # gt_seq 9b ★v2.0
 W2_INTEG    = integrity32(LUMP_BASE, W1_AUTH)
-ABSTRACT_GT = _abstract_gt_word(PERM_MASK_E)
+# NS Word 3 = an ARBITRARY, issue-blind content cache token T (cache_token32).
+# It is NOT a permission GT and is non-authoritative (Task #2862): the value is
+# opaque to the gate, which merely fetches and mirrors it (M-bit gated).
+CACHE_TOKEN = 0xC0FFEE42
 
 
 def _build_gt(slot_id, gt_type=GT_TYPE_INFORM, perms=0, gt_seq=0, b_flag=0):
+    # GT Word 0 v2.0 layout:
+    #   slot_id[15:0], gt_seq[24:16] (9b), gt_type[26:25], dom[27],
+    #   perm[30:28] (perm3), b_flag[31].
+    dom, perm3 = gt_encode_perm(perms)
     w  = (slot_id & 0xFFFF)
-    w |= (gt_seq  & 0x7F) << 16
-    w |= (gt_type & 0x03) << 23
-    w |= (perms   & 0x3F) << 25
-    w |= (b_flag  & 0x01) << 31
+    w |= (gt_seq  & 0x1FF) << 16
+    w |= (gt_type & 0x03)  << 25
+    w |= (dom     & 0x01)  << 27
+    w |= (perm3   & 0x07)  << 28
+    w |= (b_flag  & 0x01)  << 31
     return w
 
 
 def _build_cap(location=0, perms=0, slot_id=0, gt_type=GT_TYPE_INFORM,
                limit=LIMIT_WORDS, gt_seq=0):
     gt  = _build_gt(slot_id, gt_type=gt_type, perms=perms, gt_seq=gt_seq)
-    w2  = ((gt_seq & 0x7F) << 21) | (limit & 0x1FFFFF)
+    w2  = ((gt_seq & 0x1FF) << 21) | (limit & 0x1FFFFF)  # gt_seq 9b at [29:21] ★v2.0
     return gt | (location << 32) | (w2 << 64)
 
 
@@ -77,7 +90,7 @@ def _make_mem(with_w3=True):
     mem[ns_slot_base + 0]  = LUMP_BASE
     mem[ns_slot_base + 4]  = W1_AUTH
     mem[ns_slot_base + 8]  = W2_INTEG
-    mem[ns_slot_base + 12] = ABSTRACT_GT if with_w3 else 0
+    mem[ns_slot_base + 12] = CACHE_TOKEN if with_w3 else 0
     clist_addr = CLIST_BASE + INDEX * 4
     mem[clist_addr] = _build_gt(SLOT_ID, GT_TYPE_INFORM, perms=PERM_MASK_E)
     return mem
@@ -86,7 +99,7 @@ def _make_mem(with_w3=True):
 # ─── test_ns_gate_fetches_w3 ─────────────────────────────────────────────────
 
 def test_ns_gate_fetches_w3():
-    """ChurchNSGate latches NS W3 into raw_w3 after the gate completes."""
+    """ChurchNSGate latches NS W3 into cache_token32 after the gate completes."""
     dut = ChurchNSGate(enable_seal_check=False)
 
     ns_cap = _build_cap(location=NS_BASE, perms=PERM_MASK_L | PERM_MASK_R | PERM_MASK_W,
@@ -119,7 +132,7 @@ def test_ns_gate_fetches_w3():
                 ctx.set(dut.mem_rd_valid, 0)
                 ctx.set(dut.mem_rd_data, 0)
             if ctx.get(dut.ns_gate_done):
-                result["ns_abstract_gt"] = ctx.get(dut.ns_abstract_gt)
+                result["ns_cache_token32"] = ctx.get(dut.ns_cache_token32)
                 break
 
     sim = Simulator(dut)
@@ -128,16 +141,16 @@ def test_ns_gate_fetches_w3():
     with sim.write_vcd("/dev/null"):
         sim.run()
 
-    assert "ns_abstract_gt" in result, "ns_gate never reached DONE within MAX_TICKS"
-    assert result["ns_abstract_gt"] == ABSTRACT_GT, (
-        f"ns_abstract_gt=0x{result['ns_abstract_gt']:08X}  expected ABSTRACT_GT=0x{ABSTRACT_GT:08X}"
+    assert "ns_cache_token32" in result, "ns_gate never reached DONE within MAX_TICKS"
+    assert result["ns_cache_token32"] == CACHE_TOKEN, (
+        f"ns_cache_token32=0x{result['ns_cache_token32']:08X}  expected CACHE_TOKEN=0x{CACHE_TOKEN:08X}"
     )
 
 
 # ─── helpers shared by mLoad tests ───────────────────────────────────────────
 
 def _run_mload(m_elevated, max_ticks=MAX_TICKS):
-    """Drive one mLoad transaction and return ns_abstract_gt at COMPLETE."""
+    """Drive one mLoad transaction and return ns_cache_token32 at COMPLETE."""
     dut = ChurchMLoad(enable_seal_check=False)
 
     src_perms = PERM_MASK_L | PERM_MASK_R | PERM_MASK_W
@@ -179,7 +192,7 @@ def _run_mload(m_elevated, max_ticks=MAX_TICKS):
                 ctx.set(dut.mem_rd_valid, 0)
                 ctx.set(dut.mem_rd_data, 0)
             if ctx.get(dut.sub_done):
-                result["ns_abstract_gt"] = ctx.get(dut.ns_abstract_gt)
+                result["ns_cache_token32"] = ctx.get(dut.ns_cache_token32)
                 break
             if ctx.get(dut.sub_fault):
                 result["fault"] = ctx.get(dut.sub_fault_type)
@@ -194,23 +207,23 @@ def _run_mload(m_elevated, max_ticks=MAX_TICKS):
     return result
 
 
-def test_mload_abstract_gt_m_elevated():
-    """With m_elevated=1 ns_abstract_gt carries NS W3 at COMPLETE."""
+def test_mload_cache_token_m_elevated():
+    """With m_elevated=1 ns_cache_token32 carries NS W3 at COMPLETE."""
     result = _run_mload(m_elevated=True)
     assert "fault" not in result, f"unexpected fault 0x{result.get('fault', 0):02X}"
-    assert "ns_abstract_gt" in result, "mLoad never reached COMPLETE"
-    assert result["ns_abstract_gt"] == ABSTRACT_GT, (
-        f"ns_abstract_gt=0x{result['ns_abstract_gt']:08X}  "
-        f"expected 0x{ABSTRACT_GT:08X} (m_elevated=1)"
+    assert "ns_cache_token32" in result, "mLoad never reached COMPLETE"
+    assert result["ns_cache_token32"] == CACHE_TOKEN, (
+        f"ns_cache_token32=0x{result['ns_cache_token32']:08X}  "
+        f"expected 0x{CACHE_TOKEN:08X} (m_elevated=1)"
     )
 
 
-def test_mload_abstract_gt_user_mode():
-    """With m_elevated=0 ns_abstract_gt is always 0 (user-mode invisible)."""
+def test_mload_cache_token_user_mode():
+    """With m_elevated=0 ns_cache_token32 is always 0 (user-mode invisible)."""
     result = _run_mload(m_elevated=False)
     assert "fault" not in result, f"unexpected fault 0x{result.get('fault', 0):02X}"
-    assert "ns_abstract_gt" in result, "mLoad never reached COMPLETE"
-    assert result["ns_abstract_gt"] == 0, (
-        f"ns_abstract_gt=0x{result['ns_abstract_gt']:08X}  "
+    assert "ns_cache_token32" in result, "mLoad never reached COMPLETE"
+    assert result["ns_cache_token32"] == 0, (
+        f"ns_cache_token32=0x{result['ns_cache_token32']:08X}  "
         f"expected 0x00000000 (user-mode: M-bit gate must block W3)"
     )

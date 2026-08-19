@@ -32,16 +32,28 @@ function bootSim() {
 }
 
 // Wire CR6 to a 1-slot scratch c-list at address 500.
-// Uses the correct 5-arg packNSWord1(limit17, bFlag, gBit, gtType, clistCount).
+//
+// Canonical NS ABI: c-list count is NOT encoded in W1 (authority word).  It is
+// derived from the resident lump header at the NS entry's word0_location, with a
+// fallback to the writeNSEntry-declared side-table count when the header is not
+// a valid lump.  So we install a dedicated scratch NS descriptor slot whose
+// word0_location points at an empty (invalid-header) region — this forces
+// _clistCountForCR(6) to use the explicit side-table count (1) we declared.
+const CR6_DESC_SLOT = 40;      // scratch NS descriptor for CR6's c-list (not a boot slot)
+const CR6_DESC_LOC  = 0x0700;  // empty region: parseLumpHeader() here is invalid
 function setupCR6(sim) {
-    const slotIdx = sim.bootEntrySlot;
-    const nsBase  = sim.NS_TABLE_BASE + slotIdx * sim.NS_ENTRY_WORDS;
-    const gt_seq  = (sim.memory[nsBase + 2] >>> 25) & 0x7F;
-    const eGT     = sim.createGT(gt_seq, slotIdx, { E: 1 }, 1);
+    sim.memory[CR6_DESC_LOC] = 0;   // ensure header at the descriptor location is invalid
+    // writeNSEntry(idx, location, limit17, bFlag, gBit, gtType, version, clistCount, cacheToken)
+    // clistCount=1 is recorded in the _nsClistCount side-table and surfaced by
+    // readNSEntry() (header fallback), which _clistCountForCR(6) consults.
+    sim.writeNSEntry(CR6_DESC_SLOT, CR6_DESC_LOC, 0, 0, 0, 1 /*Inform*/, 0, 1 /*clistCount*/, 0);
+    const nsBase  = sim._nsSlotBase(CR6_DESC_SLOT);
+    const gt_seq  = sim.parseNSWord1(sim.memory[nsBase + 1] >>> 0).gtSeq;
+    const eGT     = sim.createGT(gt_seq, CR6_DESC_SLOT, { E: 1 }, 1);
     sim.cr[6] = {
         word0: eGT,
-        word1: 500,
-        word2: sim.packNSWord1(0, 0, 0, 0, 1),   // clistCount = 1
+        word1: 500,                              // scratch c-list base (1 entry)
+        word2: sim.memory[nsBase + 1] >>> 0,     // mirror the descriptor's W1 (authority)
         word3: 0,
         m:     0,
     };
@@ -560,7 +572,10 @@ console.log('\n--- T008: NULL GT no pet name → immediate NULL_CAP fault ---');
         // outside BOOT_NAMED_SLOTS reliably reaches the NULL_CAP path this
         // test exercises.
         // Extend clistCount to 12 so the slot-11 access is in-bounds.
-        sim.cr[6].word2 = sim.packNSWord1(0, 0, 0, 0, 12);  // clistCount = 12
+        // c-list count is entry-level metadata (side-table), not a W1 field:
+        // re-declare the CR6 descriptor slot with clistCount=12 so
+        // _clistCountForCR(6) reports 12 via readNSEntry() fallback.
+        sim.writeNSEntry(CR6_DESC_SLOT, CR6_DESC_LOC, 0, 0, 0, 1, 0, 12, 0);
         sim.memory[511] = 0;  // slot 11 → NULL GT (500 + 11)
         // Leave programCapabilities empty → no pet name for slot 11.
         sim.programCapabilities = null;

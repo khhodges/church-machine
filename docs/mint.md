@@ -26,24 +26,19 @@ This document is self-standing. A reader who understands the GT bit layout in `d
 A GT is a single 32-bit word. The hardware checks specific bits on every instruction that names a GT as an operand. The full layout, reproduced from `docs/memory-manager.md §2`, is:
 
 ```
-Bit  31   30   29   28   27   26   25   24─23   22────16   15────────0
-     ┌────┬────┬────┬────┬────┬────┬────┬──────┬──────────┬───────────┐
-     │ B  │ E  │ S  │ L  │ X  │ W  │ R  │ type │  gt_seq  │  slot_id  │
-     └────┴────┴────┴────┴────┴────┴────┴──────┴──────────┴───────────┘
-      [31]  [30] [29] [28] [27] [26] [25] [24:23]  [22:16]    [15:0]
+Bit  31   30────28   27   26─25   24────16   15────────0
+     ┌────┬──────────┬────┬───────┬──────────┬───────────┐
+     │ B  │  perm3   │dom │ type  │  gt_seq  │ object_id │
+     └────┴──────────┴────┴───────┴──────────┴───────────┘
 ```
 
 | Field | Bits | Width | Meaning |
 |---|---|---|---|
-| `slot_id` | [15:0] | 16 | Index into the Namespace table |
-| `gt_seq` | [22:16] | 7 | Revocation freshness counter; must match NS Entry Word 2 |
-| `type` | [24:23] | 2 | `00`=NULL `01`=Inform `10`=Outform `11`=Abstract |
-| `R` | [25] | 1 | Read (Turing domain) |
-| `W` | [26] | 1 | Write (Turing domain) |
-| `X` | [27] | 1 | Execute (Turing domain) |
-| `L` | [28] | 1 | Load capability (Church domain) |
-| `S` | [29] | 1 | Save capability (Church domain) |
-| `E` | [30] | 1 | Enter — call permission (Church domain) |
+| `object_id` | [15:0] | 16 | Namespace slot, or Abstract inline value |
+| `gt_seq` | [24:16] | 9 | Revocation freshness counter; matches NS W1[29:21] |
+| `type` | [26:25] | 2 | `00`=NULL `01`=Inform `10`=Outform `11`=Abstract |
+| `dom` | [27] | 1 | 0=Turing (`R/W/X`), 1=Church (`L/S/E`) |
+| `perm3` | [30:28] | 3 | Domain-relative permission bits |
 | `B` | [31] | 1 | Bind — GT may be propagated to another c-list |
 
 Mint is the only code path that writes a GT word with a valid `gt_seq`. All other code receives GTs from Mint; it cannot construct a fresh one.
@@ -55,7 +50,7 @@ Mint is the only code path that writes a GT word with a valid `gt_seq`. All othe
 Mint exposes one primary operation:
 
 ```
-Encode(base, exp, permsBits, bindable, far) → GT
+Encode(base, exp, type, dom, perm3, bindable) → GT
 ```
 
 **Implementation note:** the current simulator stub names this method `Create` (in
@@ -68,27 +63,27 @@ same operation; future versions of the implementation are expected to adopt the 
 | Parameter | Type | Maps to GT field |
 |---|---|---|
 | `base` | 16-bit unsigned | `slot_id` [15:0] |
-| `exp` | 7-bit unsigned | `gt_seq` [22:16] |
-| `permsBits` | 6-bit mask (R,W,X,L,S,E) | bits [30:25] |
+| `exp` | 9-bit unsigned | `gt_seq` [24:16] |
+| `type` | 2-bit discriminator | `gt_type` [26:25] |
+| `dom`, `perm3` | domain bit + 3-bit permissions | bits [30:27] |
 | `bindable` | boolean | `B` bit [31] |
-| `far` | boolean | `F` flag in NS Entry Word 1 (lump metadata, not in GT word itself) |
 
 **`base`** is the Namespace slot index that identifies the entity this GT refers to. The hardware uses `slot_id` to look up the entity's physical base address and limit in the Namespace table. Mint receives this index from the Namespace (Navana) after the entity's lump has been registered; it does not choose or guess the slot number.
 
-**`exp`** is the current value of `gt_seq` for the target slot, read from NS Entry Word 2 at the moment of issuance. Embedding `exp` into the GT word at issuance time is what makes revocation possible: if the Namespace increments `gt_seq` later, every outstanding GT for that slot fails the hardware's freshness check and is immediately invalid. The counter is 7 bits (0–127); it wraps modulo 128 on overflow.
+**`exp`** is the current 9-bit `gt_seq`, read from NS Entry Word 1 for an
+issued Namespace capability. Abstract values use zero. Issue remains part of
+the external issued identity even though code-cache `T` is issue-blind.
 
-**`permsBits`** is a 6-bit mask covering the six capability bits R, W, X, L, S, E in that order from LSB. Mint writes these bits directly into GT[30:25]. The hardware checks exactly these bits on every instruction that uses the GT; Mint's encoding is the only opportunity to set them.
+**`dom` and `perm3`** encode one permission domain at a time: `dom=0` maps
+`perm3` to R/W/X; `dom=1` maps it to L/S/E.
 
 **`bindable`** controls the B bit [31] independently of the six capability bits. Setting B permits the holder to copy this GT into another c-list via `mSave`. Clearing B confines the GT to the c-list it was placed in at issuance. Mint sets B as a separate parameter because the decision of whether a token may propagate is a policy choice made by the AM, not a consequence of any capability combination.
 
-**`far`** does not appear in the GT word itself. It is a hint written into NS Entry Word 1 that tells the lump loader this entity's backing store may not be resident in local memory and should be fetched from a remote host on first access. Outform GTs always carry `far=1` implicitly. Inform GTs default to `far=0` unless the caller specifies otherwise.
-
 ### The `type` field
 
-The 2-bit `type` field at GT[24:23] is not a separate parameter to `Encode`. It is a fixed
-property of the Namespace slot established when the entity's lump was registered via
-`Navana.Add`. Mint reads the type from the NS entry associated with `base` at the time it
-performs the NS lookup for `exp`. The valid non-NULL types are:
+The 2-bit `type` field at GT[26:25] is explicitly supplied by the authorized
+issuance path. It is never decoded from
+an NS word. The valid non-NULL types are:
 
 | Value | Name | Meaning |
 |---|---|---|
@@ -103,11 +98,8 @@ Mint rejects `type = 00` (NULL). See §9 for Abstract GT specifics.
 Mint returns the fully assembled 32-bit GT word:
 
 ```
-GT = (bindable << 31)
-   | (permsBits << 25)        ; bits [30:25]: E S L X W R
-   | (type << 23)             ; bits [24:23]: read from NS entry at 'base'
-   | (exp << 16)              ; bits [22:16]: gt_seq freshness counter
-   | (base & 0xFFFF)          ; bits [15:0]:  slot_id
+GT = (bindable << 31) | (perm3 << 28) | (dom << 27)
+   | (type << 25) | ((exp & 0x1FF) << 16) | (base & 0xFFFF)
 ```
 
 The word is ready for the hardware to check on the first instruction that names it as an operand.
@@ -120,18 +112,16 @@ Steps 1–3 are caller responsibilities; steps 4–8 are Mint's.
 ```
 1.  size    ← nextPow2(requestedSize)          ; caller: quantise to 2ⁿ words (§8)
 2.  loc     ← Memory.Allocate(size)            ; caller: obtain backing lump
-3.  (base, exp, type) ← Navana.Add(loc, size, gtType, far)
+3.  (base, exp) ← Navana.Add(loc, size)
                                                ; caller: register in Namespace;
                                                ;   base = assigned slot_id
                                                ;   exp  = initial gt_seq (= 0)
-                                               ;   type = gtType passed to Navana
+4.  type, dom, perm3 ← authorised issuance decision
 
-4.  assert ¬(Turing(permsBits) ∧ Church(permsBits))  ; DOMAIN_PURITY check
-5.  assert ¬(E(permsBits) ∧ (L(permsBits) ∨ S(permsBits)))  ; E_ISOLATION check
-6.  assert type ≠ NULL                        ; non-NULL type check
-7.  if bindable: permsBits.B ← 1              ; fold B into perm word
-8.  GT ← (B(permsBits) << 31) | (permsBits[E:R] << 25) | (type << 23)
-              | (exp << 16) | (base & 0xFFFF)
+5.  assert type ≠ NULL
+6.  assert perm3 is valid for dom
+7.  GT ← (bindable << 31) | (perm3 << 28) | (dom << 27)
+              | (type << 25) | ((exp & 0x1FF) << 16) | (base & 0xFFFF)
     return GT
 ```
 
@@ -187,7 +177,8 @@ Mint refuses to issue a GT with `type = 00` (NULL). The NULL GT is the zero word
 
 ### 5.1 What it is
 
-Every Namespace entry carries a 7-bit `gt_seq` field in NS Entry Word 2, at bits [31:25] of that word. When Mint issues a GT for a given slot, it copies the slot's current `gt_seq` value into GT[22:16]. On every subsequent use of that GT, the hardware extracts `gt_seq` from the GT word, performs a Namespace lookup, and compares the value to the live `gt_seq` in the NS entry. If they differ, the instruction raises a version fault immediately. The GT is dead.
+Every resident Namespace entry carries a 9-bit `gt_seq` in W1[29:21].
+Mint copies it into GT[24:16]. Hardware compares those fields on use.
 
 ### 5.2 Where it comes from
 
@@ -201,11 +192,13 @@ Mint exposes a second operation for the system:
 Revoke(nsIndex) → newSeq
 ```
 
-Revoke reads NS Entry Word 2 for the given slot, extracts `gt_seq`, increments it modulo 128, and writes it back. It does nothing else. There is no broadcast, no notification, no scan of outstanding GTs.
+Revoke reads NS W1, increments `gt_seq` modulo 512, rewrites W1, and regenerates
+W2 `integrity32`. It never uses W3 cache `T` as revocation authority.
 
 The effect is immediate and total: every GT that was ever issued for this slot carries the old `gt_seq` value. Every use of any of those GTs will now fail the hardware freshness check. The hardware enforces the revocation; no software sweep is needed. The slot remains valid in the Namespace; a new GT can be issued at any time by calling Encode with the new `gt_seq` value.
 
-**The counter wraps.** After 127 Revoke calls on a single slot, `gt_seq` returns to 0. If any GT from 128 revocations ago is still held by a program, it will spuriously pass the freshness check. The system must ensure that such long-lived GTs are not held in practice. The 7-bit width is a deliberate hardware constraint; Mint has no mechanism to prevent wrap-around beyond the counter itself.
+**The counter wraps.** After 511 increments, `gt_seq` returns to 0; lifecycle
+policy must prevent ancient issued GTs from surviving that full generation.
 
 ---
 
@@ -236,7 +229,7 @@ Mint implements the `issue` step. The AM has already verified the cryptographic 
                    │                Abstraction Manager                   │
                    │                                                       │
  cryptographic ──► │  verify → authorise ──► Mint.Encode(base, exp,     │ ──► GT (local session handle)
- identity string   │                          permsBits, bindable, far)  │
+ identity string   │                          type,dom,perm3,bindable)  │
                    └─────────────────────────────────────────────────────┘
                                               ▲
                                       Mint enforces:
@@ -255,16 +248,41 @@ Mint knows nothing about the cryptographic identity string. It knows nothing abo
 Mint does not allocate Namespace slots directly. The sequence for issuing a GT to a new entity is:
 
 1. **Memory.Allocate(size)** — a backing lump is obtained from the physical pool. Size must be 2ⁿ words (6 ≤ n ≤ 14) per the quantisation rules in `docs/memory-manager.md §3.1`.
-2. **Navana.Add(location, limit, gtType, …)** — the lump is registered in the Namespace. Navana assigns a `slot_id` and initialises `gt_seq = 0`. It returns `(nsIndex, version)`.
-3. **Mint.Encode(base=nsIndex, exp=version, permsBits, bindable, far)** — the GT word is assembled. The `far` hint is written into NS Entry Word 1 by the caller before or after this step.
+2. **Navana.Add(location, limit, …)** — the lump is registered in the Namespace. Navana assigns `object_id` and initialises W1 `gt_seq = 0`.
+3. **Mint.Encode(base=nsIndex, exp=version, type, dom, perm3, bindable)** — the GT word is assembled from the authorized decision.
 
 Mint is step 3. It has no side-effects on the Namespace or on memory. It reads `gt_seq` (supplied by the caller as `exp`) and writes nothing. The only state change Mint makes in the wider system is through `Mint.Revoke`, which writes a new `gt_seq` value back to one NS entry word.
+
+> **NS Word 3 content token (`T`) and promotion.** A resident (Inform) NS entry
+> is four words: Word 0 = `location`, Word 1 = `authority`, Word 2 =
+> `integrity32`, Word 3 = a 32-bit **issue-blind content token `T`**
+> (`T = hash(name ‖ genotype_binary)`, issue excluded). `T` is a name-free
+> cache/index only — it is **never** authenticity (`integrity32` detects local
+> corruption but is not cryptographic identity proof), revocation (that is
+> `gt_seq`), or ownership (which uses full issued identity and authorization),
+> and it authorizes nothing. Issue is excluded from the code-content token `T`
+> but is **mandatory for value/ownership**, where it lives outside `T` in the
+> full `dot.name.issue.token` name. When `Mint.Lump` promotes an Outform entry
+> to Live, it commits the NS slot (and any dependent c-list binding) **only after
+> verifying the fetched bytes hash to `T` and the full trusted identity
+> matches**; on failure the Outform restore token (Words 1–3, `T` in Word 3) is
+> preserved exactly. See `docs/locator.md` and
+> `docs/CM_LUMP_SPECIFICATION.md § "Namespace Table — Entry Format"`.
 
 ---
 
 ## 9. Abstract GT Note
 
-When `type = 11` (Abstract), the GT word carries its value directly rather than through a Namespace lookup. The `slot_id` field is reused as `ab_data` and the `type` subfields carry an `ab_type` discriminant as described in `docs/memory-manager.md §2.2`. Mint.Encode applies the same domain-purity and E-isolation checks to Abstract GTs, but the `far` parameter and the `gt_seq` freshness mechanism are not meaningful for the value-in-token Abstract type. The `exp` field should be set to 0 when encoding an Abstract GT.
+When `type = 11` (Abstract), the GT word carries its value directly rather than
+through a Namespace lookup. `object_id` is reused as inline data. `gt_seq` is
+not meaningful for this value-in-token type and must be zero.
+
+**An Abstract GT never owns an NS entry.** Because its value lives in the GT word
+itself, no NS slot is allocated or consumed for an Abstract GT, and no NS entry
+Word 3 annotation is written on its behalf. The deprecated per-abstraction
+annotation once imagined for an NS Word 3 (the retired `abstract_gt` alias)
+migrates to **access/catalogue metadata**, outside the NS entry — see
+`docs/golden-tokens.md § "Word 3 — content token cache/index (T)"`.
 
 ---
 
@@ -277,7 +295,6 @@ When `type = 11` (Abstract), the GT word carries its value directly rather than 
 | Where does `gt_seq` come from? | The Namespace entry, at the moment Navana.Add registers the lump. |
 | How does revocation work? | Mint.Revoke increments `gt_seq` in one NS entry. The hardware rejects all outstanding GTs for that slot. |
 | What does `bindable` control? | Whether the GT holder can propagate the token via `mSave` (B bit [31]). |
-| What does `far` control? | A hint in NS Entry Word 1 — not in the GT word — signalling the lump may not be locally resident. |
 | Does Mint allocate memory? | No. Memory.Allocate and Navana.Add precede Mint. Mint only encodes. |
 
 ---

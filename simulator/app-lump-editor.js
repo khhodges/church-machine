@@ -1257,7 +1257,6 @@
         var rows;
         if (raw) {
             var d1 = _decodeNSWord1(raw.w1 >>> 0);
-            var gt = _decodeGTWord(raw.w3 >>> 0);
             rows = [
                 ['+0', 'word0 \u2014 location', hex8(raw.w0 >>> 0),
                  (isMMIO ? 'MMIO device-register window' : 'Lump base (word address)')],
@@ -1267,10 +1266,9 @@
                  ' \u00b7 b=' + d1.b + ' \u00b7 g=' + d1.g],
                 ['+2', 'word2 \u2014 integrity', hex8(raw.w2 >>> 0),
                  'gt_seq=' + (((raw.w2 >>> 25) & 0x7F)) + ' \u00b7 CRC-16 seal=0x' + (raw.w2 & 0xFFFF).toString(16).toUpperCase()],
-                ['+3', 'word3 \u2014 abstract GT', hex8(raw.w3 >>> 0),
-                 raw.w3 === 0 ? 'Null GT (no per-slot Abstract GT committed)' :
-                 (GT_TYPE_NAMES[gt.gtType] || gt.gtType) + ' GT \u00b7 perm=' + _permStr(gt.perm3) +
-                 (gt.dom ? '+D' : '') + ' \u00b7 seq=' + gt.seq + ' \u00b7 slot=' + gt.slot]
+                ['+3', 'word3 \u2014 cache token T', hex8(raw.w3 >>> 0),
+                 raw.w3 === 0 ? 'No trusted cache binding recorded' :
+                 '32-bit lookup/cache value only \u00b7 never identity or authority']
             ];
         } else {
             // No raw words available (older server / missing boot image):
@@ -1279,7 +1277,7 @@
                 ['+0', 'word0 \u2014 location', '\u2014', 'snapshot: ' + esc(String(e.location)) + (isMMIO ? ' (MMIO)' : '')],
                 ['+1', 'word1 \u2014 authority', '\u2014', 'snapshot: type=' + esc(String(e.type)) + ' \u00b7 limit=' + esc(String(e.limit)) + ' \u00b7 g=' + (e.g || 0)],
                 ['+2', 'word2 \u2014 integrity', '\u2014', 'snapshot: gt_seq=' + (e.seq || 0) + ' \u00b7 seal=' + esc(String(e.seal))],
-                ['+3', 'word3 \u2014 abstract GT', '\u2014', 'raw words unavailable (boot image not readable)']
+                ['+3', 'word3 \u2014 cache token T', '\u2014', 'raw words unavailable (boot image not readable)']
             ];
         }
         return '<table class="le-nsd-words"><thead><tr>' +

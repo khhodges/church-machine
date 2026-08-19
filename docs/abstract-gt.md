@@ -237,10 +237,12 @@ and a **5-word shadow** (DR11–DR15 / XR11–XR15):
 | DR12 / XR12 | `m_xr12`    | `m_dr12`        | NS entry word0\_location |
 | DR13 / XR13 | `m_xr13`    | `m_dr13`        | NS entry word1\_authority |
 | DR14 / XR14 | `m_xr14`    | `m_dr14`        | integrity32(DR12, DR13) |
-| DR15 / XR15 | `m_xr15`    | `m_dr15`        | NS entry word3\_seals (version + seal) |
+| DR15 / XR15 | `m_xr15`    | `m_dr15`        | NS entry `word3_cache_token` (diagnostic `T`) |
 
 DR14 / XR14 holds a 32-bit integrity tag computed as `integrity32(location, authority)`.
-DR15 / XR15 holds the advisory seals word; writeback validates `GT.version == seals.version`.
+DR15 / XR15 exposes the advisory cache/index value `T` for diagnostics only.
+Writeback ignores DR15; validity comes from the GT sequence and the integrity
+check over the protected resident fields.
 
 ### M-flag lifecycle
 

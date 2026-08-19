@@ -1154,14 +1154,13 @@ permission bits describe what the holder may do with that region.
 
 ### Outform GT (typ = 10)
 
-A GT issued by the IDE as a dependency placeholder. The GT itself (Word 0
-only) is the IDE's key to identify the lump — no NS slot is required until
-the lump is resolved. When the lump is first LOAD-ed, an Absent event fires;
-the Locator fetches the zip, inflates it, determines the lump size and all
-metadata from the header word, and then allocates an NS slot and calls
-`Mint.Lump` to promote the slot to Live (typ = 01). The IDE may issue many
-Outform GTs for the same lump; they all resolve to the same Live slot when
-inflated.
+An IDE-issued dependency placeholder whose `slot_id` selects an allocated NS
+slot. That slot owns exact opaque restore data in W1–W3; W3 contains the
+32-bit cache/index `T`. A trusted full identity record outside the entry binds
+the slot and generation to canonical name, positive issue, full identity hash,
+full binary hash, `T`, and the saved W1–W3. First use fires resolution.
+Promotion to resident Inform occurs only after full verification; matching `T`
+alone never authorizes it.
 
 ### Abstract GT (typ = 11)
 
@@ -1173,17 +1172,15 @@ slot consumed.
 
 ---
 
-## Context Register (CR) — 128-bit Structure
+## Context Register (CR) — 96-bit Structure
 
-A CR is four 32-bit words stored in a hardware register file (CR0..CR15 per
-thread).
+A CR is three 32-bit words stored in a hardware register file (CR0..CR15 per
+thread). NS Word 3 is not part of the ordinary capability register.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  Word 3 [127:96]  CRC and GC  (spare[15] | G[1] | CRC[16]) │
-├──────────────────────────────────────────────────────────────┤
-│  Word 2 [95:64]   Limit and revocation                      │
-│                   (spare[4] | gt_seq[7] | limit_offset[21]) │
+│  Word 2 [95:64]   Authority snapshot                         │
+│                   (f[1] | g[1] | gt_seq[9] | limit[21])     │
 ├──────────────────────────────────────────────────────────────┤
 │  Word 1 [63:32]   Base address [32]                         │
 ├──────────────────────────────────────────────────────────────┤
@@ -1195,59 +1192,46 @@ thread).
 ### Word 0 — The Golden Token (per-holder credential)
 
 ```
-31  30 29 28 27 26 25 24  23 22      16 15            0
-+───┬──┬──┬──┬───┬──┬──┬──────┬──────────┬──────────────+
-│ B │p2│p1│p0│dom│ 0│ f│ typ  │  gt_seq  │  object_id   │
-│1b │  3b perm3  │  2b  │ 2b  │   [7]    │    [16]      │
-+───┴──┴──┴──┴───┴──┴──┴──────┴──────────┴──────────────+
+31 30    28 27 26   25 24       16 15            0
++───┬────────┬───┬────────┬───────────┬──────────────+
+│ B │ perm3  │dom│gt_type │ gt_seq[9] │   slot_id    │
++───┴────────┴───┴────────┴───────────┴──────────────+
 ```
 
 The permission field at bits [31:25] uses a **dom+perm3** encoding:
 
 | Field         | Bits  | Meaning |
 |---------------|-------|---------|
-| B             | 31    | Bind — TPERM-changeable, **excluded from CRC**. Must be 1 for SAVE. |
-| perm[2:0]     | 30:28 | 3-bit permission field (TPERM-changeable, **excluded from CRC**). Turing (dom=0): bit30=X, bit29=W, bit28=R. Church (dom=1): bit30=E, bit29=S, bit28=L. |
-| dom           | 27    | Domain select (TPERM-changeable, **excluded from CRC**): `0`=Turing {R,W,X}; `1`=Church {L,S,E}. |
-| spare         | 26    | Reserved; always `0`. |
-| f_flag        | 25    | Per-token flag (TPERM-changeable, excluded from CRC). |
-| typ           | 24:23 | GT class: 00=NULL, 01=Inform, 10=Outform, 11=Abstract — **CRC covered** |
-| gt_seq        | 22:16 | Revocation sequence number — **CRC covered** |
-| object_id     | 15:0  | Object index, unique per lump issuance — **CRC covered** |
+| B             | 31    | Bind — TPERM-changeable. Must be 1 for user-level SAVE. |
+| perm[2:0]     | 30:28 | Turing (dom=0): X/W/R. Church (dom=1): E/S/L. |
+| dom           | 27    | Domain select: `0`=Turing, `1`=Church. |
+| gt_type       | 26:25 | 00=NULL, 01=Inform, 10=Outform, 11=Abstract |
+| gt_seq        | 24:16 | 9-bit revocation sequence |
+| slot_id       | 15:0  | Namespace slot ID; Abstract reuses this as value data |
 
 TPERM clears any subset of bits [31:25] to produce a weaker GT. Permission
 escalation is architecturally impossible.
 
 ### Word 1 — Base Address
 
-Physical base address of the memory region. CRC covered.
+Physical base address copied from resident NS Word 0 after validation.
 
 ### Word 2 — Limit and Revocation
 
 ```
-95  92 91      85 84                          64
-+──────+──────────+────────────────────────────+
-│spare │  gt_seq  │       limit_offset [21]     │
-│ [4]  │   [7]    │                             │
-+──────+──────────+────────────────────────────+
+95 94 93       85 84                          64
++──┬──┬───────────┬────────────────────────────+
+│f │g │ gt_seq[9] │       limit_offset [21]     │
++──┴──┴───────────┴────────────────────────────+
 ```
 
 **Revocation:** Mint increments gt_seq in the Object NS slot. On LOAD,
 hardware checks Word 0 gt_seq against Word 2 gt_seq — a mismatch means the
 GT has been revoked and the LOAD faults and the GT is set to NULL.
 
-### Word 3 — CRC and GC
-
-```
-127         113 112 111                     96
-+─────────────┬───┬──────────────────────────+
-│  spare [15] │ G │        CRC [16]          │
-+─────────────┴───┴──────────────────────────+
-```
-
-CRC is CRC-16/CCITT (poly 0x1021) over Word 0[24:0] + Word 1[all] +
-Word 2[all]. Permission bits [31:25] are **excluded** — TPERM requires no
-CRC recomputation.
+NS `integrity32` is checked during resolution/LOAD but is not copied into the
+CR. NS W3 cache `T` is likewise absent from ordinary CRs. M-elevated hardware
+may expose W3 in DR15 for diagnostics only; DR15 never gates writeback.
 
 ---
 
@@ -1274,14 +1258,14 @@ in CR6 (a hardware requirement).
 
 ## The Object NS Slot
 
-Each lump occupies exactly one Object NS slot (three 32-bit words). Word 0
-(the Golden Token) is held privately by the owner — it is never stored in
-the NS slot.
+Each lump occupies exactly one Object NS slot (four 32-bit words). The access
+GT is held by its holder and is never stored in the NS slot.
 
 ```
-NS Word 1  base [32]               — physical byte address of lump word 0
-NS Word 2  spare[4] | gt_seq[7] | limit_offset[21]
-NS Word 3  spare[15] | G[1] | CRC[16]
+NS Word 0  location [32]           — physical address of lump word 0
+NS Word 1  f | g | gt_seq[9] | limit_offset[21]
+NS Word 2  integrity32             — corruption check over W0-W1
+NS Word 3  cache/index T [32]      — non-authoritative
 ```
 
 CALL fetches the **callee** lump header word directly from `Mem[CR14.word1_location]`
@@ -1654,9 +1638,9 @@ bug.
 | GT unforgeable | Only Mint issues GTs — raw bytes cannot be reinterpreted as capabilities |
 | Execute isolation | Transient CR14 grants X only — code is execute-only, DREAD cannot reach it |
 | C-list isolation | Transient CR6 grants E+M only — callers can load capabilities out but cannot SAVE into slots without B=1 |
-| Permission non-escalation | TPERM can only remove bits, never add; perms excluded from CRC enables pure-hardware TPERM |
+| Permission non-escalation | TPERM can only remove bits, never add |
 | Entry point integrity | PC always starts at 1 — the header word cannot be executed |
-| CRC check | Every LOAD validates CRC-16/CCITT over Word 0[24:0] + Word 1 + Word 2 |
+| NS integrity check | Every LOAD validates `integrity32` over resident NS W0–W1; this detects corruption but is not identity authentication |
 | SAVE gating | B=0 in Word 0 bit 31 causes SAVE to fault — PassKeys and session GTs cannot be copied |
 | GC correctness | Mark-and-sweep via G bit — cycles collected, no per-operation overhead (deterministic and real-time, no applition stalls) |
 
@@ -1693,10 +1677,11 @@ Layout (128 words):
   Words 108..127: freespace    [20 zeros]
   C-list:         (none)
 
-NS Slot (gt_seq=0x01, base=0x20000000):
-  Word 1:  0x20000000
-  Word 2:  0x0020007F  (gt_seq=0x01, limit_offset=127)
-  Word 3:  0x00004CEF  (E-GT CRC)
+NS Slot (gt_seq=0x01, location=0x20000000):
+  Word 0:  0x20000000
+  Word 1:  0x0020007F  (gt_seq=0x01, limit_offset=127)
+  Word 2:  integrity32(Word0, Word1)
+  Word 3:  cache/index T
 ```
 
 ### SlideRule (n=10, cw=525, cc=1)
@@ -1711,10 +1696,11 @@ Layout (1024 words):
   Words 526..1022: freespace    [497 zeros]
   Word 1023:       PI abstract GT (Word 0 only)  [c-list, cc=1]
 
-NS Slot (gt_seq=0x01, base=0x10000000):
-  Word 1:  0x10000000
-  Word 2:  0x002003FF  (gt_seq=0x01, limit_offset=1023)
-  Word 3:  0x000048F3  (E-GT CRC — illustrative)
+NS Slot (gt_seq=0x01, location=0x10000000):
+  Word 0:  0x10000000
+  Word 1:  0x002003FF  (gt_seq=0x01, limit_offset=1023)
+  Word 2:  integrity32(Word0, Word1)
+  Word 3:  cache/index T
 ```
 
 ### Boot.Abstr (n=6, cw=17, cc=1) — simulator boot-time abstraction lump
@@ -2637,49 +2623,69 @@ on the Wukong A7, the base is parameterised but fixed at synthesis time.
 
 ## Namespace Table — Entry Format
 
-The NS Table is a flat array of **N entries × 4 words** (word3 reserved/zero). N is the total
+The NS Table is a flat array of **N entries × 4 words**. N is the total
 number of object slots in the namespace. Only the object owner holds
 GT Word 0 (the per-holder credential) in their c-list — GT Word 0 is
 never stored in the NS Table.
 
-Each entry has one of three states: **Live**, **Outform**, or **NULL**.
+Each entry has one of three states: **Live** (resident Inform), **Outform**, or
+**NULL**. The **access GT's `gt_type` is the explicit discriminator** for the
+state; a **NULL** entry is never interpreted.
+
+> **Canonical NS Word 3 (content token cache `T`).** The NS entry is four words,
+> and that count is fixed. For a **resident Inform** entry the four words are
+> Word 0 = `location`, Word 1 = `authority`, Word 2 = `integrity32`, and **Word 3
+> = a 32-bit issue-blind content token `T`** — a name-free cache/index of the
+> resolved lump's content identity (`T = hash(name ‖ genotype_binary)`, issue
+> number excluded; see *The Token — Lump Identity*). For an **Outform** entry the
+> same four words carry the **exact opaque restore token** (serialized
+> `W1 ‖ W2 ‖ W3`, with `T` in Word 3); the entry owns those words verbatim so
+> eviction restores them exactly (see [`locator.md`](locator.md)).
+>
+> `T` is a **cache/index only**: it is never authenticity (`integrity32` detects
+> local corruption but is not cryptographic identity proof), never revocation
+> (that is `gt_seq`), and never ownership. Ownership uses full issued identity
+> and its separate policy path.
+>
+> W3 — and the hardware `word3` register / `DR15` mirror that reflects it — is
+> **diagnostic only and never a
+> writeback authority**; it authorizes and seals nothing. A stale `T` is simply
+> recomputed by hashing the resident lump. The full trusted identity
+> (`dot.name`, positive `issue`, identity hash, binary hash) lives **outside the
+> entry**, in access/catalogue metadata. An **Abstract GT never owns an NS
+> entry**; any annotation belongs to access/catalogue metadata outside the
+> four-word entry.
 
 ```
-Live entry   (lump resident in RAM):
-  Word 1:  base [32]                    physical base of lump binary
-  Word 2:  spare[4] | gt_seq[7] | limit_offset[21]
-  Word 3:  spare[15] | G[1] | CRC[16]   CRC-16/CCITT over GT Wrd0[24:0]+W1+W2
-
-Outform entry   (lump absent — lazy load pending):
-  Word 1:  content_id[32]               first 32 bits of SHA256 content hash
-  Word 2:  content_id[32]               next 32 bits of SHA256 content hash
-  Word 3:  spare[7] | loc_idx[8] | flags[8] | OUTFORM_MARKER[9]
-           loc_idx   → which Locator NS slot to call for this fetch
-           flags     → bit 0: required (fault if unreachable)
-                       bit 1: bundle (pre-bundled in install zip)
-                       bit 2: pinned (do not evict)
-           OUTFORM_MARKER = 0x1FF (9-bit sentinel, distinguishes from Live CRC)
-
-NULL entry   (no capability installed):
+NULL access GT (00):
+  Word 0:  0x00000000
   Word 1:  0x00000000
   Word 2:  0x00000000
   Word 3:  0x00000000
+  External trusted identity/cache record: cleared
+
+Outform access GT (10; lump absent):
+  Word 0:  locator/reserved data; non-authoritative
+  Word 1:  opaque restore token [95:64]
+  Word 2:  opaque restore token [63:32]
+  Word 3:  opaque restore token [31:0], including 32-bit cache/index T
+  External record: canonical dot_name, positive issue_n, identity_hash,
+                   binary_hash, T, gt_seq/generation, exact W1-W3 snapshot
+
+Resident Inform access GT (01):
+  Word 0:  location [32]
+  Word 1:  f_flag[1] | g_bit[1] | gt_seq[9] | limit_offset[21]
+  Word 2:  integrity32(Word0, Word1 with mutable flags masked)
+  Word 3:  issue-blind 32-bit cache/index T
+  External record: same trusted full issued identity retained
 ```
 
-### Distinguishing Live from Outform
+### Distinguishing NULL, Outform, and Resident Inform
 
-The hardware distinguishes the three states at LOAD time using the low 9
-bits of NS Word 3:
-
-| NS Word 3 [8:0] | Interpretation |
-|-----------------|----------------|
-| `000000000` | NULL — all zero, faults immediately |
-| `111111111` (0x1FF) | Outform — Absent event fired, Locator invoked |
-| anything else | Live — CRC-16 field; LOAD re-computes and checks |
-
-A valid CRC-16/CCITT value of exactly `0x1FF` is astronomically unlikely
-and forbidden by Mint (Mint re-generates the lump if this collision occurs).
-The hardware state machine therefore requires no extra tag bit.
+The hardware uses **only the access GT's `gt_type` bits [26:25]**. It never
+infers lifecycle state from W3, `T`, a CRC value, location, or an Outform
+marker. NULL faults before NS interpretation; Outform invokes resolution;
+Inform enters the normal integrity, sequence, permission, and range gates.
 
 ---
 
@@ -2700,38 +2706,33 @@ The hardware state machine therefore requires no extra tag bit.
 
 | Transition | Who | How |
 |------------|-----|-----|
-| NULL → Live | Mint.Lump() | Binary validated, E-GT issued, NS Words 1-3 written |
-| NULL → Outform | IDE install | Outform token written into NS Words 1-3 |
-| Outform → Live | Locator + Mint.Lump() | Binary fetched, inflated, validated, NS slot updated |
-| Live → Outform | Memory Manager (eviction) | Lump binary freed; Outform token restored from manifest |
-| Live → NULL | Mint.Revoke() | gt_seq incremented in NS Word 2, slot zeroed |
+| NULL → Live | Mint.Lump() | Binary and full trusted identity validated; resident W0–W3 staged; Inform GT published last |
+| NULL → Outform | IDE install | Trusted external identity registered first; exact Outform W1–W3 written; Outform GT published last |
+| Outform → Live | Locator + Mint.Lump() | Candidate selected by `T`; full identity and full binary hash independently verified before atomic resident promotion |
+| Live → Outform | Memory Manager (eviction) | Lump binary freed; exact saved W1–W3 restored from the trusted external record |
+| Live → NULL | Mint.Revoke() | `gt_seq` bumped in the authority path, slot zeroed, external identity/cache record cleared |
 | Outform → NULL | Mint.Revoke() | Slot zeroed; content hash discarded |
 
 ---
 
 ## Outform Token Detail
 
-The 96-bit Outform token (NS Words 1–3) encodes enough information for
-the Locator to perform a cold fetch without any additional state:
+The 96-bit Outform token is the exact opaque concatenation `W1 ‖ W2 ‖ W3`.
+The only standardized subfield is the 32-bit cache/index `T` in W3:
 
 ```
-NS Word 1  [31:0]   SHA256 content hash, bits [31:0]
-NS Word 2  [31:0]   SHA256 content hash, bits [63:32]
-NS Word 3  [31:9]   spare[7] | loc_idx[8] | dep_flags[8]
-           [8:0]    0x1FF — Outform marker (sentinel value)
+NS Word 1  [31:0]   opaque restore data
+NS Word 2  [31:0]   opaque restore data
+NS Word 3  [31:0]   issue-blind cache/index T
 ```
 
-The full SHA256 hash (256 bits) is too wide for 3 × 32-bit words.
-The first 64 bits (Words 1-2) are stored. The Locator fetches the lump by
-URL (resolved from a label→URL table it maintains), then verifies the full
-SHA256 against the downloaded bytes. The 64-bit prefix is sufficient for
-the Locator to select the correct cached copy if multiple versions exist
-locally.
-
-`loc_idx` is the NS slot index of the Locator abstraction to call. This
-allows different fetch policies (LAN cache, CDN, origin, peer-to-peer)
-for different subsets of the namespace, simply by pointing groups of
-Outform entries at different Locator NS slots.
+The 96 bits are **recovery data, not identity proof**. Before installation,
+the authorized Namespace/Mint path must already hold an external trusted
+record containing canonical `dot_name`, positive `issue_n`, full
+`identity_hash`, full `binary_hash`, `T`, `gt_seq`/slot generation, and the
+exact W1–W3 snapshot. The resolver may use `T` to find a candidate but must
+reject ambiguous collisions and compare every full field and the fetched
+bytes before promotion. Matching `T` alone never suffices.
 
 ---
 
@@ -2744,60 +2745,59 @@ Outform NS slot. The calling thread is never aware of the pause.
 ① Thread issues:  LOAD CR_d, CR6, #slot_idx
                   (or CALL CR_s  where CR_s.object_id → Outform NS slot)
 
-② Hardware reads NS[slot_idx] Words 1-3.
-   Detects Outform marker (Word 3 [8:0] == 0x1FF).
-   Hardware parks calling thread (CHANGE to Scheduler).
+② Hardware classifies the access GT by gt_type=Outform.
+   It passes NS[slot_idx] W1||W2||W3 verbatim to Locator; W3 contains T.
 
-③ Scheduler receives control.
-   Reads Outform token from NS[slot_idx].
-   Extracts loc_idx (NS Word 3 [24:17]) and content_id prefix (Words 1-2).
+③ Locator uses T only as a cache/index to find a candidate.
+   Ambiguous T mappings fail closed. The calling thread remains at the
+   retry instruction until resolution reaches a terminal result.
 
-④ Scheduler CALLs Locator[loc_idx].fetch(content_id_prefix).
+④ Locator loads the trusted external identity record for slot+generation:
+     canonical dot_name, positive issue_n, identity_hash, binary_hash,
+     cache T, gt_seq/generation, and exact Outform W1-W3.
 
-⑤ Locator resolves label → URL:
-     label = Locator's internal label-to-URL table
-     url   = cm://homebase.ide/{label}@sha256:{full_hash}
-
-⑥ Locator sends HTTP GET to Home Base IDE:
+⑤ Locator sends HTTP GET to Home Base IDE:
      GET /lump/{label}@sha256:{hash}.lump.zip  HTTP/1.1
      Authorization: Bearer <PassKey credential>
    Response: ZIP file with the lump binary.
 
-⑦ Locator verifies ZIP:
+⑥ Locator verifies ZIP:
    a. Signature = 0x04034B50 ✓
    b. Bit 3 of flags = 0 (no data descriptor) ✓
    c. uncompressed_size → derive n = log2(size / 4) ✓
    d. n in [6..14] ✓
 
-⑧ Locator calls Memory Manager (via RW-GT):
+⑦ Locator calls Memory Manager (via RW-GT):
    base = MemoryManager.alloc(n)   → returns physical base address
 
-⑨ Locator inflates ZIP payload into [base, base + 2^n × 4).
+⑧ Locator inflates ZIP payload into staging memory.
 
-⑩ Locator verifies SHA256 of inflated binary — reject + free if mismatch.
+⑨ Locator verifies the full SHA-256 binary hash and canonical issued identity.
+   It recomputes T only as a cache-consistency check. A T match alone is rejected.
 
-⑪ Locator calls Mint.Lump(base, n):
+⑩ Locator calls Mint.Lump(base, n):
    Mint validates header, scans freespace, validates c-list.
-   Mint writes Live NS slot:
-     NS[slot_idx].Word1 = base
-     NS[slot_idx].Word2 = spare | gt_seq | (lumpSize-1)
-     NS[slot_idx].Word3 = spare | G=0 | CRC-16(...)
-   Mint issues E-GT to Locator (Locator stores in its own c-list).
+   Authorized Namespace writer commits resident NS state:
+     NS[slot_idx].Word0 = location
+     NS[slot_idx].Word1 = authority (f,g,gt_seq,limit)
+     NS[slot_idx].Word2 = integrity32
+     NS[slot_idx].Word3 = T
+   The dependent Inform c-list GT is published last.
 
-⑫ Locator RETURNs to Scheduler.
+⑪ On any failure or interrupted promotion:
+   staging is discarded; exact Outform W1-W3 remain/restored; no Inform GT
+   is published; the full trusted identity record remains for retry.
 
-⑬ Scheduler un-parks calling thread (CHANGE back).
+⑫ Locator RETURNs.
 
-⑭ Thread retries LOAD / CALL.
+⑬ Thread retries LOAD / CALL.
    NS slot is now Live — LOAD reconstructs GT normally.
    Execution continues as if the lump had always been present.
 ```
 
-**Cost:** one CHANGE out (step ②) and one CHANGE back (step ⑬). The
-thread pays exactly two context switches for a cold fetch. All network
-I/O is absorbed inside the Locator's own CHANGE cycle (see Flag Pool in
-the main body). The calling thread sees no network latency — only a
-brief scheduler pause.
+The calling thread observes a retry boundary, never a partially resident
+entry. Transport latency and scheduling policy do not change the identity or
+atomic-promotion rules above.
 
 ---
 
@@ -2976,7 +2976,7 @@ already owns.
 | **Transient CR14** | Code view (X) words 1..cw | Loaded into CR12 | Code view (X) if typ=00 |
 | **Transient CR6** | C-list view (L) last `cc` words | Not derived | C-list view (L) last `cc` words |
 | **Issued GTs** | One E-GT (caller holds) | GT (Thread) | GT NS |
-| **GC interaction** | G bit in NS slot Word 3 | G bits in all live CRs in Zone ① | Live & Dead slots |
+| **GC interaction** | G bit in NS slot Word 1 authority | G bits in live CR authority snapshots in Zone ① | Live & Dead slots |
 | **lumpSize** | 2^n compiler-chosen (64–16 384 words) | IDE defined 2^n < 1024 | 2^n IDE-chosen; Boot.NS = 2^14 = 16 384 words |
 | **Freespace verified by Mint** | Yes — words cw+1..lumpSize-cc-1: `0xAB` content-frame validation (bounds + zero remainder, step 7) or all-zero (legacy) | Zone ③ only (words 45..175); Zone ① skipped | Scan CRC per slot |
 | **Distribution format** | `dot.name.issue.token.zip` | `*.thread.zip` | `*.namespace.zip` |

@@ -338,6 +338,15 @@ class FaultType(IntEnum):
     OUTFORM_MINT    = 0x17   # Outform download: Mint capability-minting step failed
     OUTFORM_HDR     = 0x18   # Outform download: header validation failed (bad length/alignment)
     OUTFORM_TIMEOUT = 0x19   # Outform download: server stopped sending bytes (watchdog expired)
+    OUTFORM_UNAUTH  = 0x1A   # Outform ingress fault-closed (Task #2862): unauthenticated
+                             #   direct network Outform promotion is refused before any
+                             #   allocation or NS/c-list publication.  CRC-32 / integrity32(T)
+                             #   are integrity codes, NOT authentication, and no trusted
+                             #   externally-authenticated Mint identity/hash input exists to
+                             #   authorise minting attacker-controlled network payload into a
+                             #   resident capability.  Re-enabling network promotion REQUIRES
+                             #   adding such an authenticated Mint input — see hardware/mload.py
+                             #   FETCH_GT and hardware/church_outform.py.
 
 
 class BootState(IntEnum):

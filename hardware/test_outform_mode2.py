@@ -1,18 +1,25 @@
-"""Unit + integration tests for ChurchOutformFSM — Mode 2 lazy load CALL intercept.
+"""Unit + integration tests for ChurchOutformFSM — Mode 2 CALL Outform ingress.
+
+── Fail-closed containment (Task #2862) ──
+The Mode 2 CALL intercept used to lazily download a non-resident lump over the
+network and promote the source CR's Outform GT to a resident Inform GT.  That
+promotion was authenticated only by a fused CRC-32 + integrity32(T), neither of
+which is authentication, and no trusted externally-authenticated Mint input
+exists.  The intercept is now fault-closed: it faults with OUTFORM_UNAUTH
+before any download / allocation / Mint / NS / c-list write and before any CR
+promotion.
 
 FSM unit tests (Tests 1–3) exercise ChurchOutformFSM in isolation:
-  IDLE → TRIGGER_OUTFORM → WAIT_OUTFORM → PROMOTE_WRITE → DONE
-  IDLE → TRIGGER_OUTFORM → WAIT_OUTFORM → FAULT → IDLE
-  IDLE quiescence (intercept_start=0)
+  Test 1: intercept_start → FAULT (OUTFORM_UNAUTH); NO outform_start_out, NO
+          cr_wr_en (CRC-valid attacker payload cannot even begin promotion).
+  Test 2: legacy fault-propagation path stays safe (still FAULT → IDLE).
+  Test 3: IDLE quiescence (intercept_start=0)
 
-ChurchCore integration test (Test 4) boots a full ChurchCore instance,
-writes an Outform GT into a source CR via the debug port, presents a CALL
-instruction, and verifies:
-  1. NIA is held at CALL_PC during the Mode 2 intercept.
-  2. outform_busy rises when the intercept fires.
-  3. After dbg_outform_done_inject, the FSM completes and outform_busy drops.
-  4. Decode retries the CALL with the promoted Inform GT — no second intercept,
-     meaning the callee dispatch path has been entered.
+ChurchCore integration test (Test 4) boots a full ChurchCore instance, writes
+an Outform GT into a source CR via the debug port, presents a CALL instruction,
+and verifies the ingress fault-closes: fault_valid fires with OUTFORM_UNAUTH,
+outform_busy (download engine) never rises, and the source CR is NOT promoted
+to Inform (no resident-state write).
 
 Run with:  python -m hardware.test_outform_mode2
 """
@@ -97,19 +104,25 @@ MINTED_WORD0 = _pack_word0_gt(
 
 
 # ---------------------------------------------------------------------------
-# Test 1: FSM success path — intercept → download → GT promotion
+# Test 1: FSM fail-closed — intercept faults BEFORE any download/promotion
+#
+# Regression for Task #2862: a CALL whose source CR holds an Outform GT (the
+# handle an attacker uses to name a CRC-valid network payload) must NOT start
+# the download engine and must NOT promote the source CR.  The intercept
+# fault-closes with OUTFORM_UNAUTH the cycle after intercept_start, with:
+#   - outform_start_out never asserted (no download → no alloc → no Mint →
+#     no NS/c-list write)
+#   - cr_wr_en never asserted (source CR never promoted to a resident Inform GT)
 # ---------------------------------------------------------------------------
 
-def test_mode2_success():
-    """ChurchOutformFSM should intercept the CALL, trigger outform, wait for
-    done, then write the promoted Inform GT to the source CR.
+def test_mode2_fail_closed():
+    """ChurchOutformFSM must fault-close a CALL Outform intercept.
 
-    State sequence:
-      IDLE  (intercept_start=1) → TRIGGER_OUTFORM
-      TRIGGER_OUTFORM           → WAIT_OUTFORM  (outform_start_out=1 for 1 cycle)
-      WAIT_OUTFORM (outform_done_in=1) → PROMOTE_WRITE
-      PROMOTE_WRITE             → DONE          (cr_wr_en=1, promoted GT written)
-      DONE                      → IDLE          (done=1)
+    State sequence (contained):
+      IDLE  (intercept_start=1) → FAULT   (fault_type = OUTFORM_UNAUTH)
+      FAULT                     → IDLE
+    Neither outform_start_out nor cr_wr_en is ever asserted, so a CRC-valid
+    attacker-controlled payload cannot be downloaded, minted, or promoted.
     """
     dut = ChurchOutformFSM()
     results = {}
@@ -129,39 +142,35 @@ def test_mode2_success():
         ctx.set(dut.src_cr,          SRC_CR_ADDR)
         ctx.set(dut.src_cr_data,     _OUTFORM_CAP_DICT)
         await ctx.tick()
-        # After tick: FSM = TRIGGER_OUTFORM; src context latched.
         ctx.set(dut.intercept_start, 0)
 
-        results["busy_trigger"] = ctx.get(dut.busy)
-        results["start_out"]    = ctx.get(dut.outform_start_out)
-        results["gt_raw_out"]   = ctx.get(dut.outform_gt_raw_out)
-        results["slot_id_out"]  = ctx.get(dut.outform_slot_id_out)
-
-        await ctx.tick()
-        # After tick: FSM = WAIT_OUTFORM.
-        results["busy_wait"] = ctx.get(dut.busy)
-
-        # ── WAIT_OUTFORM: assert outform_done_in ─────────────────────────────
+        # Attacker keeps feeding a "download complete" with a CRC-valid minted
+        # GT for several cycles — it must have NO effect (FSM already faulting).
         ctx.set(dut.outform_done_in, 1)
         ctx.set(dut.result_gt_in,    MINTED_WORD0)
-        await ctx.tick()
-        # After tick: FSM = PROMOTE_WRITE.
+
+        # Sample every cycle for a window covering the whole (would-be) promotion
+        # path; assert start_out and cr_wr_en NEVER fire.
+        start_out_seen = 0
+        cr_wr_en_seen  = 0
+        fault_seen     = 0
+        fault_type     = 0
+        for _ in range(8):
+            if ctx.get(dut.outform_start_out):
+                start_out_seen = 1
+            if ctx.get(dut.cr_wr_en):
+                cr_wr_en_seen = 1
+            if ctx.get(dut.fault):
+                fault_seen = 1
+                fault_type = ctx.get(dut.fault_type)
+            await ctx.tick()
+
         ctx.set(dut.outform_done_in, 0)
-
-        results["cr_wr_en"]   = ctx.get(dut.cr_wr_en)
-        results["cr_wr_addr"] = ctx.get(dut.cr_wr_addr)
-        results["busy_promo"] = ctx.get(dut.busy)
-        # Read promoted cap as raw integer via .as_value()
-        results["cr_wr_data_raw"] = ctx.get(dut.cr_wr_data.as_value())
-
-        await ctx.tick()
-        # After tick: FSM = DONE.
-        results["done_pulse"] = ctx.get(dut.done)
-        results["fault_none"] = ctx.get(dut.fault)
-
-        await ctx.tick()
-        # After tick: FSM = IDLE.
-        results["busy_after"] = ctx.get(dut.busy)
+        results["start_out_seen"] = start_out_seen
+        results["cr_wr_en_seen"]  = cr_wr_en_seen
+        results["fault_seen"]     = fault_seen
+        results["fault_type"]     = fault_type
+        results["busy_after"]     = ctx.get(dut.busy)
 
     sim = Simulator(dut)
     sim.add_clock(1e-6)
@@ -170,99 +179,53 @@ def test_mode2_success():
         sim.run()
 
     ok = True
-    print("=== Test 1: Mode 2 FSM success path ===")
+    print("=== Test 1: Mode 2 CALL Outform intercept fault-closed (Task #2862) ===")
 
-    # TRIGGER_OUTFORM: busy=1 + outform_start_out=1 + correct GT raw/slot
-    if not results["busy_trigger"]:
-        print("FAIL: busy not asserted in TRIGGER_OUTFORM")
+    if results["start_out_seen"]:
+        print("FAIL: outform_start_out asserted — download engine started (alloc/Mint reachable)!")
         ok = False
-    if not results["start_out"]:
-        print("FAIL: outform_start_out not asserted in TRIGGER_OUTFORM")
-        ok = False
-    if results["gt_raw_out"] != OUTFORM_WORD0:
-        print(f"FAIL: gt_raw_out={results['gt_raw_out']:#010x}, expected {OUTFORM_WORD0:#010x}")
-        ok = False
-    if results["slot_id_out"] != OUTFORM_SLOT_ID:
-        print(f"FAIL: slot_id_out={results['slot_id_out']}, expected {OUTFORM_SLOT_ID}")
-        ok = False
+    else:
+        print("  PASS: outform_start_out never asserted (no download / alloc / Mint / NS / c-list write)")
 
-    # WAIT_OUTFORM: busy=1
-    if not results["busy_wait"]:
-        print("FAIL: busy not asserted in WAIT_OUTFORM")
+    if results["cr_wr_en_seen"]:
+        print("FAIL: cr_wr_en asserted — source CR promoted to a resident Inform GT!")
         ok = False
+    else:
+        print("  PASS: cr_wr_en never asserted (source CR never promoted)")
 
-    # PROMOTE_WRITE: cr_wr_en=1, cr_wr_addr=src_cr, busy=1
-    if not results["cr_wr_en"]:
-        print("FAIL: cr_wr_en not asserted in PROMOTE_WRITE")
+    if not results["fault_seen"]:
+        print("FAIL: fault never asserted — ingress did not fault-close")
         ok = False
-    if results["cr_wr_addr"] != SRC_CR_ADDR:
-        print(f"FAIL: cr_wr_addr={results['cr_wr_addr']}, expected {SRC_CR_ADDR}")
+    if results["fault_type"] != int(FaultType.OUTFORM_UNAUTH):
+        print(f"FAIL: fault_type={results['fault_type']}, expected "
+              f"{int(FaultType.OUTFORM_UNAUTH)} (OUTFORM_UNAUTH)")
         ok = False
-    if not results["busy_promo"]:
-        print("FAIL: busy not asserted in PROMOTE_WRITE")
-        ok = False
+    else:
+        print("  PASS: fault_type = OUTFORM_UNAUTH")
 
-    # Verify promoted GT fields inside cr_wr_data
-    cr_wr_val = results["cr_wr_data_raw"]
-    prom_word0    = cr_wr_val & 0xFFFFFFFF
-    prom_gt_type  = (prom_word0 >> 25) & 0x3   # gt_type at [26:25] ★v2.0
-    prom_slot_id  = prom_word0 & 0xFFFF
-    prom_gt_seq   = (prom_word0 >> 16) & 0x1FF  # gt_seq 9b at [24:16] ★v2.0
-    # v2.0 GT layout: gt_seq[24:16], gt_type[26:25], dom[27], perm[30:28]
-    prom_dom      = (prom_word0 >> 27) & 0x1
-    prom_perm     = (prom_word0 >> 28) & 0x7
-    prom_b_flag   = (prom_word0 >> 31) & 0x1
-    prom_word1    = (cr_wr_val >> 32) & 0xFFFFFFFF
-    prom_word2    = (cr_wr_val >> 64) & 0xFFFFFFFF
-
-    if prom_gt_type != GT_TYPE_INFORM:
-        print(f"FAIL: promoted gt_type={prom_gt_type:#04b}, expected Inform ({GT_TYPE_INFORM:#04b})")
-        ok = False
-    if prom_slot_id != OUTFORM_SLOT_ID:
-        print(f"FAIL: promoted slot_id={prom_slot_id}, expected {OUTFORM_SLOT_ID}")
-        ok = False
-    if prom_gt_seq != MINTED_SEQ:
-        print(f"FAIL: promoted gt_seq={prom_gt_seq}, expected {MINTED_SEQ}")
-        ok = False
-    if prom_dom != 1 or prom_perm != OUTFORM_PERMS:
-        print(f"FAIL: promoted dom={prom_dom}, perm={prom_perm:#05b}, expected dom=1, perm={OUTFORM_PERMS:#05b}")
-        ok = False
-    if prom_b_flag != OUTFORM_B_FLAG:
-        print(f"FAIL: promoted b_flag={prom_b_flag}, expected {OUTFORM_B_FLAG}")
-        ok = False
-    if prom_word1 != OUTFORM_LOCATION:
-        print(f"FAIL: promoted word1_location={prom_word1:#010x}, expected {OUTFORM_LOCATION:#010x}")
-        ok = False
-    if prom_word2 != OUTFORM_W2:
-        print(f"FAIL: promoted word2_w2={prom_word2:#010x}, expected {OUTFORM_W2:#010x}")
-        ok = False
-
-    # DONE: done=1, fault=0
-    if not results["done_pulse"]:
-        print("FAIL: done not asserted in DONE state")
-        ok = False
-    if results["fault_none"]:
-        print("FAIL: fault spuriously asserted in DONE state")
-        ok = False
-
-    # IDLE: busy=0
     if results["busy_after"]:
-        print("FAIL: FSM still busy after DONE — machine wedged!")
+        print("FAIL: FSM still busy — machine wedged!")
         ok = False
 
     if ok:
         print("PASS")
-    assert ok, "Test 1 (Mode 2 success path) had failures — see output above"
+    assert ok, "Test 1 (Mode 2 fail-closed) had failures — see output above"
 
 
 # ---------------------------------------------------------------------------
-# Test 2: FSM fault path — outform fault during WAIT_OUTFORM
+# Test 2: FSM never reaches the (dead) download/promotion states
+#
+# Regression for Task #2862: even if the outform engine reports a completed,
+# CRC-valid download (outform_done_in) with a minted result GT, the FSM must
+# already be in its fault-closed path — it must NEVER assert done (which would
+# tell decode the CALL may retry against a promoted GT).
 # ---------------------------------------------------------------------------
 
-def test_mode2_fault():
-    """When outform_fault_in fires in WAIT_OUTFORM, the FSM should:
-    1. Transition to FAULT and assert fault=1 / fault_type = the given code.
-    2. Return to IDLE (busy=0) — no permanent wedge.
+def test_mode2_never_promotes():
+    """Injecting a CRC-valid download-complete must not drive the FSM to DONE.
+
+    The FSM fault-closes at IDLE, so the DONE pulse (which signals a successful
+    promotion + CALL-retry) must never fire regardless of the engine inputs.
     """
     dut = ChurchOutformFSM()
     results = {}
@@ -282,24 +245,24 @@ def test_mode2_fault():
         ctx.set(dut.src_cr_data,     _OUTFORM_CAP_DICT)
         await ctx.tick()
         ctx.set(dut.intercept_start, 0)
-        # FSM = TRIGGER_OUTFORM
 
-        await ctx.tick()
-        # FSM = WAIT_OUTFORM
+        # Simulate the download engine reporting success with a minted GT — the
+        # exact stimulus that used to drive promotion.  It must be inert now.
+        ctx.set(dut.outform_done_in, 1)
+        ctx.set(dut.result_gt_in,    MINTED_WORD0)
 
-        ctx.set(dut.outform_fault_in,      1)
-        ctx.set(dut.outform_fault_type_in, int(FaultType.OUTFORM_MINT))
-        await ctx.tick()
-        ctx.set(dut.outform_fault_in,      0)
-        ctx.set(dut.outform_fault_type_in, 0)
-        # FSM = FAULT
+        done_seen  = 0
+        fault_seen = 0
+        for _ in range(8):
+            if ctx.get(dut.done):
+                done_seen = 1
+            if ctx.get(dut.fault):
+                fault_seen = 1
+            await ctx.tick()
+        ctx.set(dut.outform_done_in, 0)
 
-        results["fault"]      = ctx.get(dut.fault)
-        results["fault_type"] = ctx.get(dut.fault_type)
-        results["done_none"]  = ctx.get(dut.done)
-
-        await ctx.tick()
-        # FSM = IDLE
+        results["done_seen"]  = done_seen
+        results["fault_seen"] = fault_seen
         results["busy_after"] = ctx.get(dut.busy)
 
     sim = Simulator(dut)
@@ -309,27 +272,23 @@ def test_mode2_fault():
         sim.run()
 
     ok = True
-    print("\n=== Test 2: Mode 2 FSM fault path ===")
+    print("\n=== Test 2: Mode 2 never promotes on CRC-valid download (Task #2862) ===")
 
-    if not results["fault"]:
-        print("FAIL: fault not asserted in FAULT state")
+    if results["done_seen"]:
+        print("FAIL: done pulse fired — FSM signalled a successful promotion!")
         ok = False
-    if results["fault_type"] != int(FaultType.OUTFORM_MINT):
-        print(
-            f"FAIL: fault_type={results['fault_type']}, "
-            f"expected {int(FaultType.OUTFORM_MINT)} (OUTFORM_MINT)"
-        )
-        ok = False
-    if results["done_none"]:
-        print("FAIL: done spuriously asserted in FAULT state")
+    else:
+        print("  PASS: done never fired (no successful promotion / CALL-retry)")
+    if not results["fault_seen"]:
+        print("FAIL: fault never fired — ingress did not fault-close")
         ok = False
     if results["busy_after"]:
-        print("FAIL: FSM still busy after FAULT — machine wedged!")
+        print("FAIL: FSM still busy — machine wedged!")
         ok = False
 
     if ok:
         print("PASS")
-    assert ok, "Test 2 (Mode 2 fault path) had failures — see output above"
+    assert ok, "Test 2 (Mode 2 never promotes) had failures — see output above"
 
 
 # ---------------------------------------------------------------------------
@@ -383,17 +342,19 @@ def test_mode2_no_intercept():
 # ---------------------------------------------------------------------------
 
 def test_mode2_core_integration():
-    """ChurchCore integration: CALL with Outform GT source triggers Mode 2 intercept.
+    """ChurchCore integration: a CALL with an Outform GT source fault-closes.
 
-    Boots a full ChurchCore (iot_profile=True), writes an Outform GT into CR1
-    via the debug port, feeds a CALL CR1→CR0 instruction, then injects a
-    simulated download-complete via dbg_outform_done_inject.
+    Regression for Task #2862.  Boots a full ChurchCore (iot_profile=True),
+    writes an Outform GT into CR1 via the debug port, feeds a CALL CR1→CR0
+    instruction, and (adversarially) injects a CRC-valid download-complete via
+    dbg_outform_done_inject with a minted Inform result GT.
 
     Assertions:
-      1. NIA is held at CALL_PC (0) during the intercept — not advanced to +4.
-      2. outform_busy=1 when the intercept fires.
-      3. outform_busy drops to 0 after done injection + GT promotion.
-      4. No second Mode 2 intercept fires after promotion (CR1 now Inform GT).
+      1. fault_valid fires with fault code OUTFORM_UNAUTH.
+      2. outform_busy (the download engine) NEVER rises — no network fetch /
+         allocation / Mint / NS / c-list write is ever started.
+      3. CR1 is NOT promoted to an Inform GT — it still reads as an Outform GT
+         (no resident capability-register state was written by the ingress).
     """
     from .core import ChurchCore
 
@@ -465,39 +426,42 @@ def test_mode2_core_integration():
         await ctx.tick()   # CR1 written at end of tick
         ctx.set(dut.dbg_cr_wr_en, 0)
 
-        # ── 3. Present CALL instruction → decode fires → intercept triggers ──
-        ctx.set(dut.imem_valid, 1)
-        ctx.set(dut.imem_data, CALL_INSTR)
-        await ctx.tick()
-        # After this tick: intercept_start fired, FSM→TRIGGER_OUTFORM.
-        # NIA advance was blocked by ~intercept_start, so nia_reg is still 0.
-        # outform_fsm_busy is combinatorial from the TRIGGER_OUTFORM state.
-        results["nia_held"]  = ctx.get(dut.nia)
-        results["busy_rise"] = ctx.get(dut.outform_fsm_busy)
-
-        # ── 4. TRIGGER_OUTFORM cycle — FSM→WAIT_OUTFORM; outform_mode2_active=1 ──
-        await ctx.tick()
-
-        # ── 5. Inject outform done — keep result_gt valid through PROMOTE_WRITE
-        # (result_gt_in is read combinatorially in PROMOTE_WRITE; hold the inject
-        # for 2 cycles: WAIT_OUTFORM + PROMOTE_WRITE)
+        # ── 3. Present CALL instruction → decode fires → ingress fault-closes ──
+        # The attacker also holds dbg_outform_done_inject high with a CRC-valid
+        # minted GT for the whole window, mimicking a completed network download.
         ctx.set(dut.dbg_outform_done_inject, 1)
         ctx.set(dut.dbg_outform_result_gt,   MINTED_WORD0)
-        await ctx.tick()   # WAIT_OUTFORM → PROMOTE_WRITE
-        await ctx.tick()   # PROMOTE_WRITE → DONE  (CR1 written with Inform GT)
-        ctx.set(dut.dbg_outform_done_inject, 0)
-        ctx.set(dut.dbg_outform_result_gt,   0)
-        await ctx.tick()   # DONE → IDLE (outform_fsm_busy drops to 0)
+        ctx.set(dut.imem_valid, 1)
+        ctx.set(dut.imem_data, CALL_INSTR)
 
-        results["busy_drop"] = ctx.get(dut.outform_fsm_busy)
-
-        # ── 6. CALL replayed with Inform GT — no second Mode 2 intercept ─────
-        # Run 4 more cycles; outform_fsm_busy must remain 0 (Inform GT does not
-        # trigger Mode 2 — callee dispatch path entered).
-        for _ in range(4):
+        # Sample every cycle: outform_busy (download engine) must never rise, and
+        # the OUTFORM_UNAUTH fault must be raised.
+        # CR1 must NEVER be observed holding an Inform GT — the ingress must
+        # never promote it.  (A post-fault reboot subsequently clears CR1 to a
+        # NULL GT, which is likewise not a promotion; the invariant we assert is
+        # "never Inform" across the entire window.)
+        busy_ever          = 0
+        fault_seen         = 0
+        fault_code         = 0
+        cr1_ever_inform    = 0
+        for _ in range(10):
+            if ctx.get(dut.outform_busy):
+                busy_ever = 1
+            if ctx.get(dut.fault_valid):
+                fault_seen = 1
+                fault_code = ctx.get(dut.fault)
+            cr1_gt_type = (ctx.get(dut.debug_cr_words[SRC_CR][0]) >> 25) & 0x3
+            if cr1_gt_type == GT_TYPE_INFORM:
+                cr1_ever_inform = 1
             await ctx.tick()
 
-        results["no_second_intercept"] = ctx.get(dut.outform_fsm_busy)
+        ctx.set(dut.dbg_outform_done_inject, 0)
+        ctx.set(dut.dbg_outform_result_gt,   0)
+
+        results["outform_busy_ever"] = busy_ever
+        results["fault_seen"]        = fault_seen
+        results["fault_code"]        = fault_code
+        results["cr1_ever_inform"]   = cr1_ever_inform
 
     sim = Simulator(dut)
     sim.add_clock(1e-6)
@@ -506,42 +470,37 @@ def test_mode2_core_integration():
         sim.run()
 
     ok = True
-    print("\n=== Test 4: ChurchCore integration — Mode 2 NIA hold + callee dispatch ===")
+    print("\n=== Test 4: ChurchCore integration — Mode 2 CALL ingress fault-closed (Task #2862) ===")
 
     if not results["boot_complete"]:
         print("FAIL: ChurchCore boot did not complete")
         ok = False
 
-    if results["nia_held"] != CALL_PC:
-        print(
-            f"FAIL: NIA advanced during Mode 2 intercept "
-            f"(got {results['nia_held']:#010x}, expected {CALL_PC:#010x})"
-        )
+    if results["outform_busy_ever"]:
+        print("FAIL: outform_busy rose — the network download engine was started!")
         ok = False
     else:
-        print(f"  PASS: NIA held at CALL_PC={CALL_PC:#010x} during intercept")
+        print("  PASS: outform_busy never rose (no network fetch / alloc / Mint / NS / c-list write)")
 
-    if not results["busy_rise"]:
-        print("FAIL: outform_fsm_busy did not rise when Mode 2 intercept fired")
+    if not results["fault_seen"]:
+        print("FAIL: no fault raised — CALL Outform ingress did not fault-close")
+        ok = False
+    elif results["fault_code"] != int(FaultType.OUTFORM_UNAUTH):
+        print(f"FAIL: fault code={results['fault_code']}, expected "
+              f"{int(FaultType.OUTFORM_UNAUTH)} (OUTFORM_UNAUTH)")
         ok = False
     else:
-        print("  PASS: outform_fsm_busy=1 when intercept fires (FSM in TRIGGER_OUTFORM)")
+        print("  PASS: fault raised with OUTFORM_UNAUTH")
 
-    if results["busy_drop"]:
-        print("FAIL: outform_fsm_busy still high after FSM completion + GT promotion")
+    if results["cr1_ever_inform"]:
+        print("FAIL: CR1 promoted to an Inform GT — resident CR state was written!")
         ok = False
     else:
-        print("  PASS: outform_fsm_busy=0 after done injection + GT promotion (FSM IDLE)")
-
-    if results["no_second_intercept"]:
-        print("FAIL: second Mode 2 intercept fired — CR1 not promoted to Inform?")
-        ok = False
-    else:
-        print("  PASS: no second intercept after promotion (Inform GT in CR1 — callee dispatch entered)")
+        print("  PASS: CR1 never became an Inform GT (never promoted — no resident state written)")
 
     if ok:
         print("PASS")
-    assert ok, "Test 4 (ChurchCore integration) had failures — see above"
+    assert ok, "Test 4 (ChurchCore integration fail-closed) had failures — see above"
 
 
 # ---------------------------------------------------------------------------
@@ -551,8 +510,8 @@ def test_mode2_core_integration():
 if __name__ == "__main__":
     failures = []
     for fn in (
-        test_mode2_success,
-        test_mode2_fault,
+        test_mode2_fail_closed,
+        test_mode2_never_promotes,
         test_mode2_no_intercept,
         test_mode2_core_integration,
     ):

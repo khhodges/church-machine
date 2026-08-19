@@ -1,9 +1,14 @@
-"""Negative test: injecting a corrupt outform lump causes a visible fault code
-and the outform FSM returns to IDLE so the machine is not permanently wedged.
+"""Negative tests for the Outform fault path.
 
-Tests the full fault chain:
-  ChurchOutformIoT → outform_fault / outform_fault_type
-  ChurchMLoad (WAIT_OUTFORM path) → sub_fault_type, FAULT → IDLE
+Test 1 / Test 3: injecting a corrupt / stalled outform lump into the download
+engine (ChurchOutformIoT) causes a visible fault code and the engine returns to
+IDLE so the machine is not permanently wedged.
+
+Test 2 (Task #2862): the ChurchMLoad Outform *ingress* is fault-closed.  A
+CRC-valid attacker-controlled Outform GT in a c-list can no longer start the
+network download engine (no alloc / Mint / NS / c-list write); FETCH_GT faults
+immediately with OUTFORM_UNAUTH.  This is the containment point shared by the
+LOAD, ELOADCALL, and XLOADLAMBDA ingress paths.
 
 Run with:  python -m hardware.test_outform_fault
 """
@@ -189,23 +194,30 @@ def test_outform_iot_crc_fault():
 
 
 # ---------------------------------------------------------------------------
-# Test 2: ChurchMLoad WAIT_OUTFORM → FAULT → IDLE with correct fault type
+# Test 2: ChurchMLoad Outform ingress is fault-closed (Task #2862)
 #
 # The FSM is driven step-by-step through:
 #   IDLE → FETCH_SRC → CHECK_L → CHECK_BOUNDS → FETCH_GT
-#          → TRIGGER_OUTFORM → WAIT_OUTFORM
-# then outform_fault_in is asserted with OUTFORM_MINT, and the test verifies:
-#   - sub_fault_type == OUTFORM_MINT
-#   - sub_fault fires for exactly one cycle
-#   - sub_busy falls to 0 (IDLE) within a bounded number of cycles
+# where FETCH_GT reads a CRC-valid attacker-controlled Outform GT out of the
+# c-list.  Previously this branched to TRIGGER_OUTFORM (starting the network
+# download → alloc → Mint → NS/c-list write → GT promotion).  It must now
+# fault-close: FETCH_GT → FAULT with fault code OUTFORM_UNAUTH, and:
+#   - sub_fault_type == OUTFORM_UNAUTH
+#   - outform_start_out is NEVER asserted (no download engine start → no alloc,
+#     Mint, NS write, or c-list write can occur)
+#   - sub_busy falls back to 0 (IDLE) — no permanent wedge
+#
+# This is the single containment point covering the LOAD, ELOADCALL, and
+# XLOADLAMBDA ingress paths, all of which walk a c-list through ChurchMLoad.
 # ---------------------------------------------------------------------------
 
-def test_mload_wait_outform_fault_type():
-    """Walk ChurchMLoad into WAIT_OUTFORM then inject an outform fault.
+def test_mload_outform_ingress_fail_closed():
+    """A CRC-valid Outform GT in a c-list must fault-close ChurchMLoad.
 
     Verifies that:
-    1. The specific fault code (OUTFORM_MINT) is propagated to sub_fault_type.
-    2. sub_fault fires during the FAULT state.
+    1. sub_fault_type == OUTFORM_UNAUTH (unauthenticated network promotion refused).
+    2. outform_start_out never fires — the download engine is never started, so
+       no allocation, Mint, NS write, or c-list write can ever be performed.
     3. The FSM returns to IDLE (sub_busy=0) — no permanent wedge.
     """
 
@@ -278,29 +290,29 @@ def test_mload_wait_outform_fault_type():
         await ctx.tick()
         # After tick: still FETCH_GT (rd_armed just set).
 
-        # ── FETCH_GT: mem_rd_valid=1, mem_rd_data[23:24]=OUTFORM → branch ─
-        await ctx.tick()
-        # After tick: FSM = TRIGGER_OUTFORM; outform regs latched.
-
-        # ── TRIGGER_OUTFORM: pure pass-through → WAIT_OUTFORM ─────────────
-        await ctx.tick()
-        # After tick: FSM = WAIT_OUTFORM.
-
-        # ── Assert outform fault BEFORE the next tick (WAIT_OUTFORM cycle) ─
-        ctx.set(dut.outform_fault_in,      1)
-        ctx.set(dut.outform_fault_type_in, int(FaultType.OUTFORM_MINT))
-        await ctx.tick()
-        # After tick: FSM = FAULT; fault_type_reg = OUTFORM_MINT (sync write).
+        # ── FETCH_GT: mem_rd_valid=1, mem_rd_data[26:25]=OUTFORM → fault-close ─
+        # The attacker also holds outform_done_in/outform_fault_in high through
+        # the whole window, as if a CRC-valid download had completed — these must
+        # be inert.  Sample every cycle: outform_start_out must NEVER fire.
+        ctx.set(dut.outform_done_in,       1)
         ctx.set(dut.outform_fault_in,      0)
         ctx.set(dut.outform_fault_type_in, 0)
 
-        # During the FAULT cycle sub_fault (combinatorial) = 1 and
-        # sub_fault_type = fault_type_reg = OUTFORM_MINT.
-        results["sub_fault"]      = ctx.get(dut.sub_fault)
-        results["sub_fault_type"] = ctx.get(dut.sub_fault_type)
+        start_out_seen = 0
+        fault_seen     = 0
+        fault_type     = 0
+        for _ in range(8):
+            if ctx.get(dut.outform_start_out):
+                start_out_seen = 1
+            if ctx.get(dut.sub_fault):
+                fault_seen = 1
+                fault_type = ctx.get(dut.sub_fault_type)
+            await ctx.tick()
+        ctx.set(dut.outform_done_in, 0)
 
-        await ctx.tick()
-        # After tick: FSM = IDLE; FAULT state unconditionally → IDLE.
+        results["start_out_seen"] = start_out_seen
+        results["sub_fault"]      = fault_seen
+        results["sub_fault_type"] = fault_type
         results["sub_busy_after"] = ctx.get(dut.sub_busy)
 
     sim = Simulator(dut)
@@ -311,19 +323,23 @@ def test_mload_wait_outform_fault_type():
         sim.run()
 
     ok = True
-    print("\n=== Test 2: mLoad WAIT_OUTFORM → FAULT path (specific fault type) ===")
-    print(f"  sub_fault      : {results.get('sub_fault')} (expected 1 during FAULT state)")
-    print(f"  sub_fault_type : {results.get('sub_fault_type')} "
-          f"(expected {int(FaultType.OUTFORM_MINT)} = OUTFORM_MINT)")
-    print(f"  sub_busy after : {results.get('sub_busy_after')} (expected 0 = IDLE)")
+    print("\n=== Test 2: mLoad Outform ingress fault-closed (Task #2862) ===")
+    print(f"  outform_start_out seen : {results.get('start_out_seen')} (expected 0 — never started)")
+    print(f"  sub_fault              : {results.get('sub_fault')} (expected 1 during FAULT state)")
+    print(f"  sub_fault_type         : {results.get('sub_fault_type')} "
+          f"(expected {int(FaultType.OUTFORM_UNAUTH)} = OUTFORM_UNAUTH)")
+    print(f"  sub_busy after         : {results.get('sub_busy_after')} (expected 0 = IDLE)")
 
-    if results.get("sub_fault") != 1:
-        print("FAIL: sub_fault was not asserted during the FAULT state.")
+    if results.get("start_out_seen"):
+        print("FAIL: outform_start_out fired — download engine started (alloc/Mint/NS/c-list reachable)!")
         ok = False
-    if results.get("sub_fault_type") != int(FaultType.OUTFORM_MINT):
+    if results.get("sub_fault") != 1:
+        print("FAIL: sub_fault was not asserted — ingress did not fault-close.")
+        ok = False
+    if results.get("sub_fault_type") != int(FaultType.OUTFORM_UNAUTH):
         print(
             f"FAIL: sub_fault_type = {results.get('sub_fault_type')}, "
-            f"expected {int(FaultType.OUTFORM_MINT)} (OUTFORM_MINT)."
+            f"expected {int(FaultType.OUTFORM_UNAUTH)} (OUTFORM_UNAUTH)."
         )
         ok = False
     if results.get("sub_busy_after") != 0:
@@ -331,7 +347,7 @@ def test_mload_wait_outform_fault_type():
         ok = False
     if ok:
         print("PASS")
-    assert ok, "Test 2 (mLoad WAIT_OUTFORM fault type) had failures — see output above"
+    assert ok, "Test 2 (mLoad Outform ingress fail-closed) had failures — see output above"
 
 
 # ---------------------------------------------------------------------------
@@ -597,7 +613,7 @@ def test_outform_iot_timeout():
 if __name__ == "__main__":
     failures = []
     for fn in (test_outform_iot_crc_fault,
-               test_mload_wait_outform_fault_type,
+               test_mload_outform_ingress_fail_closed,
                test_outform_iot_timeout):
         try:
             fn()

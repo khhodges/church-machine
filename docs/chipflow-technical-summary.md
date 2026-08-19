@@ -77,7 +77,8 @@ NS_ENTRY_LAYOUT:
   word0_location    (+0)  — lump base byte address (32 bits)
   word1_authority   (+4)  — WORD2_LAYOUT: limit_offset | gt_seq | g_bit | spare
   word2_integrity   (+8)  — integrity32 check word (32 bits)
-  word3_abstract_gt (+12) — advisory Abstract GT (GT_LAYOUT, 32 bits)
+  word3_cache_token (+12) — issue-blind cache/index T (32 bits,
+                            diagnostic only; never authority)
 ```
 
 ---

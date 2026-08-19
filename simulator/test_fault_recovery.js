@@ -987,18 +987,15 @@ console.log('\n--- T_RESOLVE: resolvePendingSlot ---');
 
         // CR6 — points at the c-list
         if (!sim.cr) sim.cr = new Array(16).fill(null);
+        const lumpBase = CLIST_BASE - (64 - CLIST_COUNT);
+        sim.memory[lumpBase] = sim.packLumpHeader(0, 1, CLIST_COUNT, 0);
+        sim.writeNSEntry(NS_SLOT, lumpBase, 63, 0, 0, 1, 0, CLIST_COUNT);
         sim.cr[6] = {
-            word0: 1,                    // non-zero → CR6 is "present"
+            word0: sim.createGT(0, NS_SLOT, { E: 1 }, 1),
             word1: CLIST_BASE,           // base address of c-list in memory
-            // word2 is parsed for clistCount via parseNSWord1()
-            word2: sim.packNSWord1(CLIST_COUNT, 0, 0, 0, CLIST_COUNT),
-            word3: 0,
+            word2: sim.readNSEntry(NS_SLOT).word1_limit,
+            word3: sim.readNSEntry(NS_SLOT).word2_seals,
         };
-
-        // Valid NS entry at NS_SLOT — any non-zero word0 satisfies isNSEntryValid
-        const nsBase = sim.NS_TABLE_BASE + NS_SLOT * sim.NS_ENTRY_WORDS;
-        sim.memory[nsBase]     = 1;   // word0 non-zero → entry is valid
-        sim.memory[nsBase + 1] = sim.packNSWord1(64, 0, 0, 1, 0);
 
         // Write a pending sentinel into the c-list at PENDING_SLOT
         const pendingGT = ChurchSimulator.makePendingGT(PET_NAME);
@@ -1132,8 +1129,9 @@ console.log('\n--- T_RESOLVE: resolvePendingSlot ---');
     // ── T_RESOLVE_I: CR6 present, clistCount=0 in word2 → slotIdx 0 rejected ─
     {
         const { sim } = makeResolveSim();
-        // Encode clistCount=0 into word2 by packing with count=0
-        sim.cr[6].word2 = sim.packNSWord1(0, 0, 0, 0, 0);
+        // A c-list bound is derived from the resident header, never from W1.
+        const ownerLoc = CLIST_BASE - (64 - CLIST_COUNT);
+        sim.memory[ownerLoc] = sim.packLumpHeader(0, 1, 0, 0);
         const result = sim.resolvePendingSlot(0, NS_SLOT);
 
         check('T_RESOLVE_I1: clistCount=0 causes slotIdx=0 to return ok=false',

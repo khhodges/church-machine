@@ -82,7 +82,10 @@ class ChurchMLoad(Elaboratable):
         self.outform_fault_in     = Signal()
         self.outform_fault_type_in = Signal(5)  # specific outform fault code from outform_iot
 
-        self.ns_abstract_gt = Signal(32)  # NS W3 abstract GT, gated: 0 when ~m_elevated
+        # NS W3 32-bit issue-blind content cache token (cache_token32) —
+        # non-authoritative, diagnostic only (Task #2862).  M-bit gated:
+        # 0 when ~m_elevated.
+        self.ns_cache_token32 = Signal(32)
 
     def elaborate(self, platform):
         m = Module()
@@ -238,12 +241,39 @@ class ChurchMLoad(Elaboratable):
                         m.d.sync += fault_type_reg.eq(FaultType.INVALID_OP)
                         m.next = "FAULT"
                     with m.Elif(self.mem_rd_data[25:27] == GT_TYPE_OUTFORM):
-                        m.d.sync += [
-                            outform_clist_addr_reg.eq(clist_gt_addr),
-                            outform_gt_raw_reg.eq(self.mem_rd_data),
-                            outform_slot_id_reg.eq(self.mem_rd_data[:16]),
-                        ]
-                        m.next = "TRIGGER_OUTFORM"
+                        # ── Fail-closed Outform ingress containment (Task #2862) ──
+                        # An Outform GT in a c-list slot names a lump that is NOT
+                        # resident and would have to be fetched over the network and
+                        # minted into a resident Inform capability.  That download
+                        # path is authenticated ONLY by a fused CRC-32 (in the
+                        # download engine) plus integrity32(T) (in Mint).  Neither
+                        # CRC-32 nor T is an authentication primitive — they detect
+                        # accidental corruption, not a malicious/attacker-controlled
+                        # payload — and there is NO trusted externally-authenticated
+                        # Mint identity/hash input on this hardware.  Promoting such a
+                        # payload would mint arbitrary attacker code into an NS entry
+                        # and c-list slot (see the Mint FSM in core.py) and hand it an
+                        # E-perm Inform GT.
+                        #
+                        # Therefore this ingress is fault-closed here — BEFORE any
+                        # outform_start_out pulse fires, and hence before allocation,
+                        # Mint, or any NS/c-list write can occur.  We do NOT start the
+                        # download engine and do NOT latch outform context.
+                        #
+                        # This containment covers every ingress that walks a c-list
+                        # through mLoad: LOAD, and the fused ELOADCALL / XLOADLAMBDA
+                        # (via ChurchELoadCall / ChurchXLoadLambda).  CALL's abstract
+                        # /outform source path is contained separately in
+                        # church_outform.py (ChurchOutformFSM).
+                        #
+                        # TO RE-ENABLE network Outform promotion, a future revision
+                        # must add an externally-authenticated Mint input (a trusted
+                        # full identity/hash the machine can verify against the
+                        # downloaded lump) and gate promotion on it; only then may the
+                        # TRIGGER_OUTFORM / download / Mint path be restored.  Until
+                        # that input exists, this MUST remain a hard fault.
+                        m.d.sync += fault_type_reg.eq(FaultType.OUTFORM_UNAUTH)
+                        m.next = "FAULT"
                     with m.Else():
                         m.next = "CHECK_NS"
 
@@ -312,6 +342,17 @@ class ChurchMLoad(Elaboratable):
             with m.State("FAULT"):
                 m.next = "IDLE"
 
+            # ── DEAD STATES (Task #2862) ──────────────────────────────────────
+            # TRIGGER_OUTFORM / WAIT_OUTFORM implement the OLD unauthenticated
+            # network Outform promotion path (download → alloc → Mint → re-read
+            # the c-list slot as a now-resident Inform GT).  FETCH_GT no longer
+            # transitions here — it fault-closes with OUTFORM_UNAUTH instead — so
+            # these states are unreachable and outform_start_out (driven by
+            # fsm.ongoing("TRIGGER_OUTFORM")) never pulses.  They are retained,
+            # unmodified and dead, as the exact re-entry point for a future
+            # revision that adds an externally-authenticated Mint input: restoring
+            # the FETCH_GT → TRIGGER_OUTFORM edge (gated on that authenticated
+            # input) re-enables promotion.  Do NOT wire FETCH_GT here without it.
             with m.State("TRIGGER_OUTFORM"):
                 # outform_start_out pulses combinatorially this cycle; go wait.
                 m.next = "WAIT_OUTFORM"
@@ -339,7 +380,7 @@ class ChurchMLoad(Elaboratable):
             self.outform_gt_raw.eq(outform_gt_raw_reg),
             self.outform_slot_id.eq(outform_slot_id_reg),
             self.outform_clist_addr.eq(outform_clist_addr_reg),
-            self.ns_abstract_gt.eq(Mux(m_elevated_reg, u_ns_gate.ns_abstract_gt, 0)),
+            self.ns_cache_token32.eq(Mux(m_elevated_reg, u_ns_gate.ns_cache_token32, 0)),
         ]
 
         return m

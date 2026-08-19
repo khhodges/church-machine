@@ -107,7 +107,7 @@ def _region_of(word_index, total_words, ns_size, thread_size, entry_size):
         r = total_words - 1 - word_index   # 0-indexed distance from top word
         slot  = r // NS_ENTRY_WORDS
         k     = NS_ENTRY_WORDS - 1 - (r % NS_ENTRY_WORDS)
-        field = ["word0_location", "word1_limits", "word2_seals", "word3_abstract_gt"][k]
+        field = ["word0_location", "word1_limits", "word2_seals", "word3_cache_token"][k]
         return f"NS table slot {slot} ({field})"
     if word_index < thread_size:
         return "Boot.Thread lump"

@@ -7,19 +7,19 @@
 
 ## Overview
 
-When a thread executes **LOAD** against a c-list slot whose GT type is
-`Outform` (`typ=10`), the lump binary is not resident in physical memory.
-The hardware fires the **Absent event** and invokes the **Locator** as a
-secure subroutine `CALL` in the same thread. There is no scheduler transfer,
-no thread park, and no context switch. The calling thread's register state
-stays live; the Locator executes on its stack.
+When a thread accesses an `Outform` (`typ=10`) GT, the lump is not resident.
+The **current hardware implementation fails closed with `OUTFORM_UNAUTH`**:
+its fused transport provides CRC/integrity checks but no trusted full identity
+or full binary SHA-256 authenticator, so it must not fetch, allocate, Mint, or
+publish an Inform capability. Resident Inform operation is unaffected.
 
-The Locator fetches the `lump.zip`, inflates and validates it, calls `Mint.Lump()`
-to write the Live NS slot, then `RETURN`s. The hardware automatically retries
-the `LOAD` instruction against the now-Live NS slot, and the calling thread
-continues normally.
+The simulator/host resolver implements the authenticated lifecycle described
+below: it preserves the exact restore token, verifies external canonical
+identity and full bytes, and only then promotes through the authorized writer.
+The hardware subroutine protocol later in this document is a **future design**
+and must remain disabled until an externally authenticated Mint input exists.
 
-This model keeps the hardware NS table small (256 slots × 12 bytes = 3 KB)
+This model keeps the hardware NS table small (256 slots × 16 bytes = 4 KB)
 and allows a practically unlimited catalogue of abstractions to be available
 without pre-loading them all.
 
@@ -30,27 +30,25 @@ without pre-loading them all.
 | Term | Definition |
 |------|------------|
 | **Outform GT** | A c-list slot Word 0 with `typ=10`. Signals that the lump is registered but not yet resident. The `object_id` field identifies which NS slot holds the recovery token. |
-| **Outform NS slot** | Each NS slot is 4 words. Words 1–3 hold a **96-bit opaque IDE token**; Word 0 carries the Outform GT type. Hardware passes this token to the Locator when the Absent event fires. |
-| **Live NS slot** | Each NS slot is 4 words. Word 0 is the live GT; Words 1–3 hold the real lump descriptor: `base` (Word 1), `gt_seq + limit_offset` (Word 2), `CRC-16` (Word 3). `LOAD` succeeds against a Live slot. |
-| **Locator** | A ROM-resident or namespace-installed lump invoked as a secure `CALL`. It owns the fetch-inflate-validate sequence and holds `NetworkIO`, `Mint`, and `NamespaceWrite` capabilities in its c-list. |
-| **IDE token** | The 96-bit value stored in the Outform NS slot (Words 1–3). Opaque to hardware; interpreted by the Locator to identify and authenticate the lump source. |
-| **Absent event** | The hardware condition raised when `LOAD` encounters an Outform GT. Invokes the Locator as a subroutine; does not suspend the thread. |
+| **Outform NS slot** | The access GT (held in a c-list or CR, not in the NS entry) has `gt_type=10`. NS Words 1–3 hold a **96-bit opaque restore token**; Word 0 is non-authoritative locator/reserved data. The authenticated host resolver preserves Words 1–3 verbatim. |
+| **Resident Inform NS slot** | The access GT has `gt_type=01`. NS Word 0 is `location`, Word 1 is authority, Word 2 is `integrity32`, and Word 3 is cache token `T`. `LOAD` succeeds only after the normal GT, integrity, sequence, permission, and range checks. |
+| **Locator** | Host/simulator authenticated resolver. A future hardware implementation requires a trusted full-identity/hash input before it may reach Mint. |
+| **Restore token** | The 96-bit value stored in Outform NS Words 1–3. It is opaque to hardware and contains the 32-bit lookup value `T` in W3. It selects a candidate fetch; it does not authenticate that candidate. |
+| **Absent event** | Simulator/host resolution trigger. Current hardware converts this condition to `OUTFORM_UNAUTH` without starting transport. |
 | **Mint** | The system component that validates a raw lump binary and, on success, writes the Live NS slot and issues an E-GT. |
 
 ---
 
 ## Trigger: The Absent Event
 
-The Locator is invoked when **all** of the following are true:
+The simulator/host Locator is invoked when **all** of the following are true:
 
 1. A thread executes **`LOAD`** against a c-list slot.
 2. The GT in that slot has **`typ = 10`** (Outform).
-3. The GT's `gt_seq` matches the stored sequence in the Outform NS slot — the GT is valid, just not yet resident.
+3. A matching trusted external generation/identity record exists for the slot.
 
-The hardware reads the three Outform NS words for `object_id`, extracts the
-96-bit IDE token, and invokes the Locator as a secure subroutine `CALL` in
-the same thread. The 96-bit IDE token is passed via the `CALL` argument
-convention (DR registers).
+The host snapshots all three Outform words before fetch. Current hardware does
+not read them into the CRC-only transport path; it faults before `outform_start`.
 
 > **What does NOT happen:** There is no scheduler transfer, no thread park,
 > and no interrupt. From the thread's perspective, `LOAD` executes with a
@@ -60,48 +58,60 @@ convention (DR registers).
 
 ## NS Slot States
 
-A namespace slot transitions between two states during the lazy-load lifecycle:
+The **access GT's `gt_type` is the only state discriminator**. The entry words
+must not be inspected to infer the state.
+
+| Access GT state | W0 | W1 | W2 | W3 | External identity record |
+|---|---|---|---|---|---|
+| NULL (`00`) | 0 | 0 | 0 | 0 | Cleared |
+| Outform (`10`) | Locator/reserved, non-authoritative | Restore token [95:64] | Restore token [63:32] | Restore token [31:0], including `T` | Required: canonical name, positive issue, identity hash, binary hash, cache `T`, sequence/generation, and exact W1–W3 snapshot |
+| Resident Inform (`01`) | Location | Authority (`f`, `g`, `gt_seq`, limit) | `integrity32(W0,W1)` | 32-bit cache/index `T` | Same trusted full identity retained outside the entry |
+
+An Abstract GT (`11`) is value-in-token and never owns an NS entry.
 
 ### Outform state (lump not resident)
 
 | NS Word | Contents |
 |---------|----------|
-| Word 0  | E-GT (Outform typ=10, permissions, `gt_seq`, `object_id`) |
-| Word 1  | IDE token bits [95:64] |
-| Word 2  | IDE token bits [63:32] |
-| Word 3  | IDE token bits [31:0] |
+| Word 0  | Locator/reserved data; never trusted as identity |
+| Word 1  | Restore token bits [95:64] |
+| Word 2  | Restore token bits [63:32] |
+| Word 3  | Restore token bits [31:0], including cache/index `T` |
 
-The 96-bit IDE token is opaque to hardware. It is passed to the Locator
-verbatim and interpreted to resolve the network source.
+The 96-bit token is opaque restore data. The authenticated host resolver
+preserves it verbatim; current hardware does not pass it to transport.
 
-### Live state (lump resident)
+### Resident Inform state (lump resident)
 
 | NS Word | Contents |
 |---------|----------|
-| Word 0  | E-GT (Inform typ=01, permissions, `gt_seq`, `object_id`) |
-| Word 1  | `base [32]` — physical base address of the lump |
-| Word 2  | `gt_seq [7]` \| `limit_offset [21]` |
-| Word 3  | `spare [15]` \| `G [1]` \| `CRC-16 [16]` |
+| Word 0  | `location [32]` — physical base address of the lump |
+| Word 1  | `f_flag[1]` \| `g_bit[1]` \| `gt_seq[9]` \| `limit_offset[21]` |
+| Word 2  | `integrity32` over Words 0–1 with mutable flags masked |
+| Word 3  | 32-bit issue-blind cache/index `T` |
 
 The Live NS slot is written atomically by **Mint** after it has validated
 the entire lump binary (see Step 8 below). `LOAD` succeeds against a Live slot.
 
-> **Note on the G bit:** `G=1` in a Live NS Word 3 marks the lump for
-> eviction (see Eviction below). During normal operation after a fresh lazy
-> load, `G=0`.
+`T = SHA-256(canonical UTF-8 dot_name || exact big-endian lump bytes)[31:0]`
+(represented by the first eight lowercase hex digits in filenames). Issue is
+excluded so code-equivalent issues may share `T`; issued identity, ownership,
+and revocation always use the full name plus positive issue. `T`, W3, and DR15
+are never authority. `integrity32` detects corruption of W0–W1 but is not an
+adversarial cryptographic authenticator; promotion requires the trusted full
+identity and full SHA-256 binary hash held outside the four words.
 
 ---
 
-## Protocol — Step by Step
+## Authenticated Host Protocol — Step by Step
 
 ### Step 1 — Absent event fires
-**Actor:** Hardware
+**Actor:** Simulator/host resolver
 
 **Trigger:** Thread executes `LOAD`; GT `typ=10` (Outform).
 
-The hardware reads the three Outform NS words for `object_id`, extracting the
-96-bit IDE token, then invokes the Locator as a secure subroutine `CALL` in the
-same thread, passing the IDE token via DR registers.
+The resolver snapshots the exact W1–W3 restore token and trusted generation.
+On physical hardware this trigger currently faults `OUTFORM_UNAUTH`.
 
 ---
 
@@ -211,16 +221,28 @@ Call `Mint.Lump(base, n)`. Mint performs its standard 9-step validation
 8. Validate each c-list slot (well-formed GT Word 0).
 9. Issue one E-GT; write Live NS slot.
 
-On success, Mint writes the three NS words for `object_id` (Words 1–3):
-- Word 1: `base`
-- Word 2: `gt_seq[27:21] | limit_offset[20:0]`
-- Word 3: `spare[15] | G[1] | CRC-16[15:0]`
+On success, the authorized Namespace/Mint writer stages and commits all four
+resident words:
+- Word 0: `location`
+- Word 1: authority (`f`, `g`, `gt_seq`, `limit_offset`)
+- Word 2: `integrity32`
+- Word 3: cache/index `T`
 
 The NS slot transitions **Outform → Live** atomically.
 
+> **Promotion verifies full identity and bytes before commit.** Outform → Inform
+> promotion completes only after Mint has recomputed `T` as a cache consistency
+> check **and independently verified** the full trusted identity (`dot.name`,
+> positive `issue`, identity hash, and full binary hash — all held outside the
+> NS entry). Matching `T` alone is never accepted. Only then
+> is the NS slot (and any dependent c-list binding) committed to Live. On any
+> failure the promotion is abandoned and the Outform state is **restored /
+> preserved** exactly — Words 1–3 (the opaque restore token, `T` in Word 3)
+> remain intact.
+
 **Failure → Mint rejection:** Mint frees the allocated region. The NS slot
-is **never written** by Mint on failure — it remains Outform (IDE token
-intact in Words 1–3). No restore operation is needed.
+is **never written** by Mint on failure — it remains Outform (restore token,
+including `T`, intact in Words 1–3). No restore operation is needed.
 
 > **Ownership:** Mint owns physical region allocation/free only. NS slot
 > ownership stays with the Locator throughout — Mint writes it exactly once
@@ -228,11 +250,10 @@ intact in Words 1–3). No restore operation is needed.
 
 ---
 
-### Step 9 — Locator returns; LOAD retries
-**Actor:** Locator → Hardware
+### Step 9 — Resolver returns; LOAD retries
+**Actor:** Simulator/host resolver
 
-The Locator `RETURN`s to the same thread that invoked it. The hardware
-automatically retries the **`LOAD`** instruction that fired the Absent event.
+The simulator resumes the suspended thread and retries the **`LOAD`**.
 The NS slot is now Live; `LOAD` resolves normally, populates the CR, and the
 calling thread continues execution.
 
@@ -241,12 +262,12 @@ latency cost).
 
 ---
 
-## Resolution Summary
+## Resolution Summary (simulator/host implementation)
 
 ```
-Thread LOAD ──► GT typ=10 (Outform) ──► Absent event fires
+Thread LOAD ──► GT typ=10 (Outform) ──► host resolution suspends
                                                 │
-                                    Locator invoked as subroutine CALL
+                                     authenticated resolver invoked
                                                 │
                          Step 2: Save 96-bit IDE token
                          Step 3: Fetch lump.zip via NetworkIO
@@ -256,9 +277,9 @@ Thread LOAD ──► GT typ=10 (Outform) ──► Absent event fires
                          Step 7: Verify CRC-32 over inflated bytes
                          Step 8: Mint.Lump(base, n) → Live NS slot
                                                 │
-                                    Locator RETURNs
+                                     thread resumes
                                                 │
-                              Hardware retries LOAD ──► Live NS slot
+                              Simulator retries LOAD ──► Live NS slot
                                                 │
                                    Thread continues normally
 ```
@@ -267,10 +288,10 @@ Thread LOAD ──► GT typ=10 (Outform) ──► Absent event fires
 
 ## Outform GT and Eviction
 
-The Outform GT (`typ=10` Word 0) in the caller's c-list slot is **not modified**
-by the Absent event or the Locator. The c-list slot permanently holds
-`typ=10 | object_id` — the NS slot is the source of truth for whether the
-lump is currently resident.
+The triggering c-list GT remains Outform until verification completes. A
+successful authenticated commit atomically replaces it with Inform; eviction
+restores that exact Outform GT. The access GT, never an NS word or UI hint, is
+the state discriminator.
 
 The 96-bit IDE token saved in Step 2 allows the Locator to restore the
 Outform state on eviction:
@@ -278,12 +299,13 @@ Outform state on eviction:
 ```
 Locator.evict sequence:
   1. Revoke all issued E-GTs for object_id
-       → Mint increments gt_seq in NS Word 2
+       → Mint increments gt_seq in NS Word 1 and regenerates Word 2 integrity
        → Any holder whose c-list Word 0 gt_seq mismatches faults on next LOAD
   2. Free physical region [base, 2ⁿ × 4 words)
        → MemoryManager.free(base)
   3. Restore NS slot to Outform state
-       → Write saved 96-bit IDE token back into NS Words 1–3
+       → Write the saved opaque restore token back into NS Words 1–3
+         *exactly* (W1‖W2‖W3, with content token T in Word 3)
        → NS slot is now Outform again
   4. Next LOAD from any holder fires the Absent event and re-triggers
      the full lazy-load protocol transparently
@@ -343,18 +365,18 @@ Compile time:
                                         │
                                lump.zip archived to Lump Library
 
-Run time (first LOAD against Outform GT):
-  Caller holds GT ──► LOAD ──► Absent event ──► Locator invoked
-                                                  lump.zip fetched
-                                                  inflated + CRC-32 verified
-                                                  Mint writes Live NS slot
-                                                  LOAD retried ──► GT resolved
+Simulator/host run time (first LOAD against Outform GT):
+  Caller GT ─► suspend ─► authenticated resolver verifies identity + bytes
+                         ─► authorized atomic promotion ─► retry LOAD
+
+Current hardware run time:
+  Caller GT ─► OUTFORM_UNAUTH fault (no transport, allocation, Mint, or publish)
 
 Run time (subsequent LOADs):
   Caller holds GT ──► LOAD ──► Live NS slot, lump resident ──► GT resolved immediately
 
-After eviction:
-  Caller holds GT ──► LOAD ──► Absent event again ──► Locator re-fetches
+After simulator eviction:
+  exact Outform GT and W1–W3 restore token return; host resolution may retry
 ```
 
 ---
@@ -364,14 +386,11 @@ After eviction:
 - **GT revocation works across lazy loads:** Incrementing `gt_seq` in the NS
   entry (via Mint) invalidates all outstanding GTs. The next `LOAD` from any
   holder with a stale `gt_seq` faults without triggering the Locator.
-- **Two-layer integrity:** CRC-32 (from ZIP header) is verified over the raw
-  inflated bytes. Mint then independently validates the lump's internal
-  structure, freespace, and c-list slots. Both checks must pass before the
-  Live NS slot is written.
-- **Capability isolation preserved:** The Locator runs inside the same
-  thread's trust domain. Mint writes the Live NS slot — only Mint has
-  `NamespaceWrite` authority. The caller's c-list slot (`typ=10`) is never
-  modified by the protocol; the NS slot is the sole source of residence truth.
+- **Authenticated promotion:** CRC/integrity checks are only corruption
+  detection. Host promotion additionally requires canonical identity and full
+  binary SHA-256, and replaces the triggering GT only at atomic commit.
+- **Hardware containment:** CRC-only physical ingress always faults
+  `OUTFORM_UNAUTH` before transport or publication.
 - **Eviction restores the lazy path cleanly:** Any holder retrying after
   eviction re-triggers the Locator transparently. No stale state is left
   in the NS table.
@@ -408,16 +427,14 @@ leaving the NS entry intact with `magic = 0x00 ≠ 0x1F` in memory.
 - Action: Loader restores the lump at a valid address within the existing NS grant, updates `word0_location`, recomputes the seal. Type, limit, gt_seq unchanged — no new authority minted.
 - NS entry authority: **always preserved**.
 
-### Mode 2 — Construct (Abstract GT, never instantiated)
+### Mode 2 — Authenticated host construct
 
-The object type exists as an Abstract GT but has no Inform NS entry and no
-lump yet. This is the Outform/Locator protocol described in this document —
-the Absent event fires on `LOAD` against an Outform GT, the Locator fetches
-`lump.zip`, inflates and validates it, and calls `Mint.Lump()` to write a
-new Live NS entry.
+The host/simulator may construct a resident Inform entry from an Outform GT
+only after the full external identity and exact bytes verify.
 
-- Trigger: hardware Absent event on Outform GT (`typ=10`).
-- Action: Locator fetch → inflate → Mint.Lump() → Live NS slot.
+- Trigger: simulator/host access to Outform GT (`typ=10`).
+- Action: authenticated fetch → full verification → authorized atomic commit.
+- Hardware: `OUTFORM_UNAUTH`; this mode is disabled without authenticated input.
 - NS entry: **newly minted** by Mint (Navana.Add delegation).
 
 The two modes are architecturally complementary: Mode 1 maintains objects

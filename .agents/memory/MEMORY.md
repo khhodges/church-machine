@@ -122,3 +122,4 @@
 - [Case-insensitive metadata aliases](case-insensitive-metadata-aliases.md) — case-equivalent registry aliases must update atomically; diagnostics dedupe only within one source location
 - [Direct LUMP call selector](direct-lump-call-selector.md) — single-entry LUMPs whose first code word is executable must use selector 0, never method-table selector 1
 - [Declared C-list B-flag rule](declared-clist-b-flag-rule.md) — declared capability rows must use B=0; browser and server validators must reject B-set Inform tokens consistently
+- [Canonical T vs lookup aliases](canonical-t-vs-lookup-aliases.md) — historical LUMP tokens may locate bytes, but only recomputed canonical T may populate W3 or drive promotion

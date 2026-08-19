@@ -10,7 +10,8 @@ Golden Tokens (GTs) are the fundamental unit of access control in the Church Mac
 A Golden Token encodes three things:
 1. **What** resource it refers to (via `slot_id` — the namespace slot ID)
 2. **What operations** are permitted (via permission bits)
-3. **Whether it is authentic** (via integrity32 parallel check on the NS entry)
+3. **Whether its local binding is intact and current** (via NS `integrity32`
+   plus `gt_seq`; adversarial identity authentication is a separate boundary)
 
 Without a valid Golden Token, no operation proceeds. Any attempt to use an invalid, expired, or insufficient token results in a FAULT.
 
@@ -124,7 +125,23 @@ Church Machine includes a 9-bit `gt_seq` field in bits [24:16] of the Golden Tok
 
 Each namespace entry (NS SLOT) occupies **4 consecutive 32-bit words** (16 bytes). The slot byte address is `slot_id × 16` from the NS table base. The NS table supports up to **65,536 entries** (bounded by the 16-bit `slot_id` field).
 
-### Word 0 — lump_base
+The four words are, canonically:
+
+| Word | Name | Role |
+|------|------|------|
+| Word 0 | `location` (lump_base) | Physical base address of the lump |
+| Word 1 | `authority` | `f_flag`, `g_bit`, `gt_seq` (revocation), `limit_offset` |
+| Word 2 | `integrity32` | Corruption/integrity check over Words 0–1; not cryptographic identity proof |
+| Word 3 | content token `T` | 32-bit issue-blind content cache/index (see below) |
+
+The **access GT's `gt_type` is the explicit discriminator** for how an entry is
+interpreted. A NULL entry (`gt_type = 00`) is never interpreted — the access
+faults at ChurchNSGate before any NS lookup. For an Outform entry (`gt_type =
+10`) the same four words carry the opaque restore token (`W1 ‖ W2 ‖ W3`, with
+`T` in Word 3) rather than a resident descriptor; the four-word layout itself is
+unchanged.
+
+### Word 0 — lump_base (location)
 
 The 32-bit lump base byte address in DMEM.
 
@@ -149,9 +166,41 @@ The 32-bit lump base byte address in DMEM.
 
 The 32-bit integrity32 parallel check result, computed over NS SLOT Word 0 and Word 1 (with both `g_bit[30]` and `f_flag[31]` masked to zero before the check).
 
-### Word 3 — abstract_gt (advisory)
+### Word 3 — content token cache/index (T)
 
-An optional GT annotation used by the IDE namespace viewer. Not covered by integrity32. Used by the hardware only when the M-bit elevation path is active.
+Word 3 holds a **32-bit issue-blind content token `T`** — a cache/index of the
+resolved lump's content identity (`T = hash(name ‖ genotype_binary)`, issue
+number excluded; see [`CM_LUMP_SPECIFICATION.md`](CM_LUMP_SPECIFICATION.md) §
+*The Token — Lump Identity*). It is written when the entry becomes resident and
+lets validation read the content token name-free, in O(1), without the full
+`dot.name.issue.token`.
+
+`T` is a **cache/index only**:
+
+- It is **not** authenticity, ownership, or revocation authority.
+  `integrity32` (Word 2) detects local corruption but is not adversarial
+  cryptographic authentication; trusted full identity and full binary hash live
+  outside the entry. Revocation lives in `gt_seq`; ownership uses the full
+  issued identity and its separate authorization path.
+- It is **never a seal and never authorizes** any operation. A stale or lost `T`
+  is simply recomputed by hashing the resident lump — caching it cannot corrupt
+  identity.
+- The hardware `word3` register (and its `DR15` mirror) is **diagnostic only**;
+  it is never a writeback authority.
+
+For an **Outform** entry, Words 1–3 together hold the exact opaque restore token
+(serialized `W1 ‖ W2 ‖ W3`), with `T` carried in Word 3; the entry owns those
+words verbatim so eviction can restore them exactly (see
+[`locator.md`](locator.md)).
+
+An **Abstract GT never owns an NS entry** — it carries its value in the GT word
+itself. Any former Word 3 "abstract GT annotation" is not an NS-entry field; such
+annotation now lives in access/catalogue metadata outside the entry.
+
+> **Deprecated alias.** Earlier drafts named this field `abstract_gt` /
+> `word3_abstract_gt` and described it as an advisory M-bit-gated annotation.
+> That name is a deprecated compatibility alias only; the canonical field is the
+> content-token cache `T` described above, and W3 authorizes nothing.
 
 ### integrity32 Integrity
 

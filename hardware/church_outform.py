@@ -1,7 +1,7 @@
 from amaranth import *
 from amaranth.lib.data import View
 
-from .hw_types import GT_TYPE_INFORM
+from .hw_types import GT_TYPE_INFORM, FaultType
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT
 
 
@@ -9,15 +9,24 @@ class ChurchOutformFSM(Elaboratable):
     """Mode 2 CALL intercept: promotes an Outform GT in a source CR to Inform GT.
 
     When a CALL instruction's source register contains an Outform GT
-    (gt_type == 0b10), this FSM intercepts before the CALL unit starts,
-    triggers the ChurchOutform download engine to lazily install the absent
-    lump, waits for the download and Mint steps to complete, then promotes
-    the source register's GT from Outform (type=0b10) to Inform (type=0b01)
-    using the freshly minted result GT's sequence number.  The CALL then
-    retries with the promoted Inform GT in the source register.
+    (gt_type == 0b10), this FSM intercepts before the CALL unit starts.
 
-    FSM: IDLE -> TRIGGER_OUTFORM -> WAIT_OUTFORM -> PROMOTE_WRITE -> DONE
-                                                 \\-> FAULT
+    ── Fail-closed Outform ingress containment (Task #2862) ──
+    Historically this FSM would trigger the ChurchOutform download engine to
+    lazily install the absent lump over the network, wait for download + Mint,
+    then promote the source register's GT from Outform (0b10) to Inform (0b01).
+    That promotion is authenticated ONLY by a fused CRC-32 + integrity32(T),
+    neither of which is an authentication primitive, and no trusted externally-
+    authenticated Mint identity/hash input exists on this hardware.  The
+    intercept is therefore now fault-closed: it transitions straight to FAULT
+    (fault_type = OUTFORM_UNAUTH) without asserting outform_start_out and without
+    reaching PROMOTE_WRITE, so no allocation / Mint / NS / c-list write and no CR
+    promotion ever occur.  See the IDLE state for the full rationale and the
+    conditions under which promotion may be re-enabled.
+
+    FSM (contained): IDLE -> FAULT
+    FSM (dead / re-entry point for a future authenticated Mint input):
+                     TRIGGER_OUTFORM -> WAIT_OUTFORM -> PROMOTE_WRITE -> DONE
 
     Interface to core.py:
       intercept_start / src_cr / src_cr_data  — driven by decode logic
@@ -120,14 +129,45 @@ class ChurchOutformFSM(Elaboratable):
 
             with m.State("IDLE"):
                 with m.If(self.intercept_start):
-                    m.d.sync += [
-                        src_cr_lat.eq(self.src_cr),
-                        src_cr_data_lat.eq(self.src_cr_data.as_value()),
-                        gt_raw_lat.eq(src_in_view.word0_gt.as_value()),
-                        slot_id_lat.eq(src_in_gt.slot_id),
-                    ]
-                    m.next = "TRIGGER_OUTFORM"
+                    # ── Fail-closed Outform ingress containment (Task #2862) ──
+                    # A CALL whose source CR holds an Outform GT (gt_type=0b10)
+                    # names a non-resident lump that would be fetched over the
+                    # network and minted into a resident Inform capability.  That
+                    # download path is authenticated ONLY by a fused CRC-32 (in the
+                    # download engine) plus integrity32(T) (in Mint).  Neither
+                    # CRC-32 nor T is authentication — they detect accidental
+                    # corruption, not attacker-controlled payload — and NO trusted
+                    # externally-authenticated Mint identity/hash input exists on
+                    # this hardware.  Promoting here would write attacker code into
+                    # an NS entry + c-list slot (Mint FSM in core.py) and stamp the
+                    # source CR with an E-perm Inform GT (PROMOTE_WRITE).
+                    #
+                    # Therefore the intercept is fault-closed immediately: this FSM
+                    # transitions straight to FAULT WITHOUT ever asserting
+                    # outform_start_out (so no download / alloc / Mint / NS / c-list
+                    # write occurs) and WITHOUT ever reaching PROMOTE_WRITE (so
+                    # cr_wr_en stays low and the source CR is never promoted).  The
+                    # CALL that triggered the intercept never runs — the machine
+                    # faults instead.
+                    #
+                    # TO RE-ENABLE network Outform promotion, a future revision must
+                    # add an externally-authenticated Mint input (a trusted full
+                    # identity/hash verified against the downloaded lump) and gate
+                    # this transition on it; only then may the FSM proceed to
+                    # TRIGGER_OUTFORM again.  Until then this MUST stay a hard fault.
+                    m.d.sync += fault_type_lat.eq(FaultType.OUTFORM_UNAUTH)
+                    m.next = "FAULT"
 
+            # ── DEAD STATES (Task #2862) ──────────────────────────────────────
+            # TRIGGER_OUTFORM / WAIT_OUTFORM / PROMOTE_WRITE / DONE implement the
+            # OLD unauthenticated network Outform promotion path.  IDLE no longer
+            # transitions here (it fault-closes with OUTFORM_UNAUTH), so these
+            # states are unreachable: outform_start_out and cr_wr_en never assert.
+            # They are retained, unmodified and dead, as the exact re-entry point
+            # for a future revision that adds an externally-authenticated Mint
+            # input — restoring the IDLE → TRIGGER_OUTFORM edge (gated on that
+            # authenticated input) re-enables promotion.  Do NOT re-wire IDLE here
+            # without it.
             with m.State("TRIGGER_OUTFORM"):
                 # Assert outform_start_out combinatorially for this one cycle.
                 # The outform engine latches the start on the rising edge and

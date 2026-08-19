@@ -1,17 +1,24 @@
-"""Hardware simulation tests for M-window seal validation (Task #446).
+"""Hardware simulation tests for M-window writeback authorization (Task #2862).
 
-Exercises the FNV-1a seal check added to the WRITEBACK state of the mwin FSM
-in hardware/core.py.  Two levels of coverage:
+Task #2862 REMOVED the FNV-1a / DR15 "seal" check that previously gated the
+WRITEBACK state of the mwin FSM in hardware/core.py.  The authoritative gate is
+now exactly three checks (fail-closed):
 
-  Formula tests — verify the Python-level FNV32 helper matches the constants
-                  exported from hw_types and that the 25-bit mask is correct.
-                  These run without Amaranth simulation.
+    non-NULL GT        (DR11 gt_type[26:25] != 0b00)
+    integrity32        (integrity32(DR12, DR13) == DR14)
+    9-bit gt_seq match (DR11[24:16] == DR13[29:21])
 
-  FSM unit tests — a minimal Elaboratable (MWinFSMUnit) that re-implements the
-                   WRITEBACK check in isolation.  Both the valid-seal path and
-                   the invalid-seal path are simulated with Amaranth to verify:
-                     - seal_ok=1 + no fault when the stored seal matches
-                     - seal_ok=0 + fault when the stored seal is corrupted
+DR15 now carries the resident Inform W3 (cache_token32) — a NON-authoritative,
+diagnostic-only value.  A random or tampered W3 must NEVER authorise a writeback
+and must NEVER deny one either.
+
+This module re-implements the updated WRITEBACK check in isolation
+(MWinFSMUnit, no seal) and proves:
+
+  * valid checks + ANY DR15 (0, random, tampered) → writeback succeeds
+      → random/tampered W3 cannot DENY.
+  * bad integrity / bad gt_seq / NULL GT + ANY DR15 → fault (fail closed)
+      → random/tampered W3 cannot AUTHORISE.
 
 Run with:  python -m hardware.test_mwin_seal
 """
@@ -21,24 +28,14 @@ from amaranth import *
 from amaranth.lib.data import View
 from amaranth.sim import Simulator
 
-from .hw_types import FNV_OFFSET_32, FNV_PRIME_32, FaultType
-from .layouts import SEALS_LAYOUT, GT_LAYOUT, WORD2_LAYOUT
+from .hw_types import FaultType
+from .layouts import GT_LAYOUT, WORD2_LAYOUT
 from .integrity32 import integrity32_amaranth
 
 
 # ---------------------------------------------------------------------------
-# Python-level helpers (must agree exactly with hardware/core.py formula)
+# Python-level helpers (must agree exactly with hardware/core.py)
 # ---------------------------------------------------------------------------
-
-def _fnv32(w0, w1):
-    """One-round FNV-1a: ((FNV_OFFSET_32 ^ w0) * FNV_PRIME_32) ^ w1, 32-bit."""
-    return (((FNV_OFFSET_32 ^ w0) * FNV_PRIME_32) ^ w1) & 0xFFFFFFFF
-
-
-def _seal(w0, w1):
-    """Lower 25 bits of the FNV-1a hash — the stored seal value (SEALS_LAYOUT.seal)."""
-    return _fnv32(w0, w1) & 0x1FFFFFF
-
 
 def _integrity32(w0, w1):
     """Python replica of hardware/integrity32.py for test vector generation."""
@@ -49,26 +46,36 @@ def _integrity32(w0, w1):
     return (rol32(w0, 7) ^ rol32(w1m, 13) ^ 0xDEADBEEF) & 0xFFFFFFFF
 
 
+# A spread of "adversarial" W3 (DR15) values to prove W3 is inert.
+_W3_VALUES = [
+    0x00000000,   # zeroed (Mint default)
+    0xFFFFFFFF,   # all ones
+    0xDEADBEEF,   # arbitrary garbage
+    0x13579BDF,   # random-ish
+    0xA5A5A5A5,   # tampered pattern
+]
+
+
 # ---------------------------------------------------------------------------
-# Minimal Elaboratable that mirrors the hardware WRITEBACK check
+# Minimal Elaboratable that mirrors the UPDATED hardware WRITEBACK check
 # ---------------------------------------------------------------------------
 
 class MWinFSMUnit(Elaboratable):
-    """Single-state check that mirrors the hardware WRITEBACK condition.
+    """Single-state check mirroring the post-Task-#2862 WRITEBACK condition.
 
     Inputs (set before trigger):
         dr11 — GT word (bits[26:25] must be non-NULL to allow writeback) ★v2.0
         dr12 — NS location word
         dr13 — NS authority word
         dr14 — expected integrity32(dr12, dr13)
-        dr15 — seals word: bits[24:0]=seal, bits[31:25]=version
+        dr15 — resident Inform W3 (cache_token32) — NON-authoritative; ignored
 
     Input:
         trigger — pulse high for one cycle to latch DR regs and begin check
 
     Outputs (combinatorial in CHECK state):
-        cr_wr_en    — 1 when all checks pass (writeback succeeds)
-        fault_valid — 1 when any check fails
+        cr_wr_en    — 1 when all authoritative checks pass (writeback succeeds)
+        fault_valid — 1 when any authoritative check fails (fail closed)
     """
 
     def __init__(self):
@@ -76,7 +83,7 @@ class MWinFSMUnit(Elaboratable):
         self.dr12 = Signal(32)
         self.dr13 = Signal(32)
         self.dr14 = Signal(32)
-        self.dr15 = Signal(32)
+        self.dr15 = Signal(32)   # cache_token32 — latched but never consulted
         self.trigger    = Signal()
         self.cr_wr_en   = Signal()
         self.fault_valid = Signal()
@@ -88,7 +95,7 @@ class MWinFSMUnit(Elaboratable):
         dr12_lat = Signal(32)
         dr13_lat = Signal(32)
         dr14_lat = Signal(32)
-        dr15_lat = Signal(32)
+        dr15_lat = Signal(32)   # cache_token32 shadow (diagnostic only)
 
         # Integrity check
         integrity_computed = Signal(32)
@@ -106,21 +113,12 @@ class MWinFSMUnit(Elaboratable):
             gtseq_ok.eq(dr11_gt_seq == dr13_gt_seq),
         ]
 
-        # Seal check — mirrors hardware/core.py exactly
-        seal_computed = Signal(32)
-        seal_masked   = Signal(25)
-        seal_ok       = Signal()
-        m.d.comb += [
-            seal_computed.eq(
-                ((FNV_OFFSET_32 ^ dr12_lat) * FNV_PRIME_32) ^ dr13_lat
-            ),
-            seal_masked.eq(seal_computed[:25]),
-            seal_ok.eq(seal_masked == View(SEALS_LAYOUT, dr15_lat).seal),
-        ]
-
         # DR11 validity: bits[26:25] != 0b00 (not NULL) ★v2.0 gt_type at [26:25]
         dr11_valid = Signal()
         m.d.comb += dr11_valid.eq(dr11_lat[25:27] != 0)
+
+        # NOTE (Task #2862): NO seal / DR15 check.  dr15_lat is latched purely
+        # so the shadow layout matches hardware, but it is NEVER read below.
 
         with m.FSM(name="mwin_unit"):
             with m.State("IDLE"):
@@ -139,7 +137,8 @@ class MWinFSMUnit(Elaboratable):
                         m.next = "FAULT"
 
             with m.State("WRITEBACK"):
-                with m.If(integrity_ok & gtseq_ok & seal_ok):
+                # Only the three authoritative checks; DR15/W3 is not consulted.
+                with m.If(integrity_ok & gtseq_ok):
                     m.d.comb += [self.cr_wr_en.eq(1), self.fault_valid.eq(0)]
                 with m.Else():
                     m.d.comb += [self.cr_wr_en.eq(0), self.fault_valid.eq(1)]
@@ -153,145 +152,144 @@ class MWinFSMUnit(Elaboratable):
 
 
 # ---------------------------------------------------------------------------
-# Test 1: FNV formula vectors (pure Python — no Amaranth sim needed)
+# Simulation driver
 # ---------------------------------------------------------------------------
 
-def test_fnv_formula_vectors():
-    """Formula: FNV constants match hw_types and the 25-bit mask is applied."""
-    print("=== Test 1: FNV seal formula vectors ===")
-
-    assert FNV_OFFSET_32 == 0x811c9dc5, f"FNV_OFFSET_32 mismatch: {FNV_OFFSET_32:#010x}"
-    assert FNV_PRIME_32  == 0x01000193, f"FNV_PRIME_32 mismatch:  {FNV_PRIME_32:#010x}"
-
-    VECTORS = [
-        (0x00001000, 0x00000010),
-        (0xABCDEF01, 0x12345678),
-        (0x00000000, 0x00000000),
-        (0xFFFFFFFF, 0xFFFFFFFF),
-    ]
-    for (w12, w13) in VECTORS:
-        seal = _seal(w12, w13)
-        assert 0 <= seal < (1 << 25), f"seal out of 25-bit range: {seal:#09x}"
-        bad = (seal ^ 0x1) & 0x1FFFFFF
-        assert bad != seal, "bit-flip must change the seal"
-        # Cross-check the formula is consistent with direct computation
-        direct = (((FNV_OFFSET_32 ^ w12) * FNV_PRIME_32) ^ w13) & 0x1FFFFFF
-        assert seal == direct, f"_seal inconsistency for ({w12:#010x}, {w13:#010x})"
-
-    print("PASS")
-
-
-# ---------------------------------------------------------------------------
-# Test 2: Valid seal → writeback succeeds (Amaranth simulation)
-# ---------------------------------------------------------------------------
-
-def test_mwin_valid_seal():
-    """FSM unit: correct FNV seal → cr_wr_en=1, fault_valid=0 in WRITEBACK."""
+def _run_case(dr11, dr12, dr13, dr14, dr15):
+    """Drive one WRITEBACK transaction; return (cr_wr_en, fault_valid)."""
     dut = MWinFSMUnit()
-    results = {}
-
-    # w13 must have DR13[29:21]=0 to match DR11.gt_seq=0 (gtseq_ok=True) ★v2.0.
-    # bits[29:21] of the test w13 values are zeroed by ANDing out those bits.
-    _GTSEQ_MASK = ~(0x1FF << 21) & 0xFFFFFFFF   # zero out bits[29:21] ★v2.0
-    VECTORS = [
-        (0x00001000, 0x00000010 & _GTSEQ_MASK),   # typical NS entry
-        (0xABCDEF01, 0x12345678 & _GTSEQ_MASK),   # arbitrary (gtseq bits zeroed)
-        (0xDEADBEEF, 0xCAFE0000 & _GTSEQ_MASK),   # another arbitrary
-    ]
+    out = {}
 
     async def testbench(ctx):
-        all_ok = True
-        for (w12, w13) in VECTORS:
-            # GT word: Inform type (bits[26:25]=0b01), gt_seq in bits[24:16]=0
-            # DR13[29:21]=0 must match DR11[24:16]=0 (gtseq_ok=True) ★v2.0
-            gt_word  = (0b01 << 25)    # gt_type=INFORM, gt_seq=0, slot=0
-            integ    = _integrity32(w12, w13)
-            seal_val = _seal(w12, w13)
-            # Pack seal into DR15[24:0], version=0 in bits[31:25]
-            dr15_val = seal_val & 0x1FFFFFF
-
-            ctx.set(dut.dr11, gt_word)
-            ctx.set(dut.dr12, w12)
-            ctx.set(dut.dr13, w13)
-            ctx.set(dut.dr14, integ)
-            ctx.set(dut.dr15, dr15_val)
-            ctx.set(dut.trigger, 1)
-            await ctx.tick()   # IDLE: latch, valid DR11 → WRITEBACK
-            ctx.set(dut.trigger, 0)
-            # In WRITEBACK state: combinatorial outputs valid this cycle
-            cr_wr    = ctx.get(dut.cr_wr_en)
-            fault_v  = ctx.get(dut.fault_valid)
-            await ctx.tick()   # → IDLE
-            if cr_wr != 1 or fault_v != 0:
-                print(f"  FAIL valid ({w12:#010x},{w13:#010x}): "
-                      f"cr_wr_en={cr_wr} fault_valid={fault_v} "
-                      f"seal={seal_val:#09x}")
-                all_ok = False
-        results["ok"] = all_ok
+        ctx.set(dut.dr11, dr11)
+        ctx.set(dut.dr12, dr12)
+        ctx.set(dut.dr13, dr13)
+        ctx.set(dut.dr14, dr14)
+        ctx.set(dut.dr15, dr15)
+        ctx.set(dut.trigger, 1)
+        await ctx.tick()   # IDLE: latch → WRITEBACK or FAULT
+        ctx.set(dut.trigger, 0)
+        out["cr_wr_en"]   = ctx.get(dut.cr_wr_en)
+        out["fault_valid"] = ctx.get(dut.fault_valid)
+        await ctx.tick()   # → IDLE
 
     sim = Simulator(dut)
     sim.add_clock(1e-6)
     sim.add_testbench(testbench)
     with sim.write_vcd("/dev/null"):
         sim.run()
-
-    print("\n=== Test 2: FSM unit — valid seal → writeback succeeds ===")
-    if not results.get("ok"):
-        assert False, "Test 2 (valid seal) had failures"
-    print("PASS")
+    return out["cr_wr_en"], out["fault_valid"]
 
 
-# ---------------------------------------------------------------------------
-# Test 3: Corrupted seal → WRITEBACK faults (Amaranth simulation)
-# ---------------------------------------------------------------------------
+_GTSEQ_MASK = ~(0x1FF << 21) & 0xFFFFFFFF   # zero out W2 bits[29:21]
 
-def test_mwin_invalid_seal():
-    """FSM unit: flipped seal bit → fault_valid=1, cr_wr_en=0 in WRITEBACK."""
-    dut = MWinFSMUnit()
-    results = {}
 
-    _GTSEQ_MASK = ~(0x1FF << 21) & 0xFFFFFFFF   # zero out bits[29:21] ★v2.0
-    VECTORS = [
+def _good_vectors():
+    """(w12, w13) pairs whose W2 gt_seq[29:21]=0 so gtseq matches GT.gt_seq=0."""
+    return [
         (0x00001000, 0x00000010 & _GTSEQ_MASK),
         (0xABCDEF01, 0x12345678 & _GTSEQ_MASK),
-        (0xCAFEBABE, 0x00000000),
+        (0xDEADBEEF, 0xCAFE0000 & _GTSEQ_MASK),
     ]
 
-    async def testbench(ctx):
-        all_ok = True
-        for (w12, w13) in VECTORS:
-            gt_word   = (0b01 << 25)   # INFORM type, gt_seq=0, DR13[29:21]=0 ★v2.0
-            integ     = _integrity32(w12, w13)
-            good_seal = _seal(w12, w13)
-            bad_seal  = (good_seal ^ 0x1) & 0x1FFFFFF   # flip LSB
 
-            ctx.set(dut.dr11, gt_word)
-            ctx.set(dut.dr12, w12)
-            ctx.set(dut.dr13, w13)
-            ctx.set(dut.dr14, integ)
-            ctx.set(dut.dr15, bad_seal)
-            ctx.set(dut.trigger, 1)
-            await ctx.tick()   # IDLE → WRITEBACK
-            ctx.set(dut.trigger, 0)
-            cr_wr   = ctx.get(dut.cr_wr_en)
-            fault_v = ctx.get(dut.fault_valid)
-            await ctx.tick()   # → IDLE
-            if cr_wr != 0 or fault_v != 1:
-                print(f"  FAIL invalid ({w12:#010x},{w13:#010x}): "
-                      f"cr_wr_en={cr_wr} fault_valid={fault_v} "
-                      f"good_seal={good_seal:#09x} bad_seal={bad_seal:#09x}")
+# ---------------------------------------------------------------------------
+# Test 1: valid checks + ANY W3 → writeback succeeds (W3 cannot DENY)
+# ---------------------------------------------------------------------------
+
+def test_random_w3_cannot_deny():
+    """Random/tampered DR15 (W3) never denies a valid writeback."""
+    print("=== Test 1: random/tampered W3 cannot DENY writeback ===")
+    gt_word = (0b01 << 25)   # gt_type=INFORM, gt_seq=0, slot=0
+    all_ok = True
+    for (w12, w13) in _good_vectors():
+        integ = _integrity32(w12, w13)
+        for w3 in _W3_VALUES:
+            cr_wr, fault_v = _run_case(gt_word, w12, w13, integ, w3)
+            if cr_wr != 1 or fault_v != 0:
+                print(f"  FAIL ({w12:#010x},{w13:#010x}) W3={w3:#010x}: "
+                      f"cr_wr_en={cr_wr} fault_valid={fault_v}")
                 all_ok = False
-        results["ok"] = all_ok
+    assert all_ok, "Test 1 had failures (W3 wrongly denied a valid writeback)"
+    print("PASS")
 
-    sim = Simulator(dut)
-    sim.add_clock(1e-6)
-    sim.add_testbench(testbench)
-    with sim.write_vcd("/dev/null"):
-        sim.run()
 
-    print("\n=== Test 3: FSM unit — corrupted seal → WRITEBACK fault ===")
-    if not results.get("ok"):
-        assert False, "Test 3 (invalid seal) had failures"
+# ---------------------------------------------------------------------------
+# Test 2: invalid checks + ANY W3 → fault (W3 cannot AUTHORISE)
+# ---------------------------------------------------------------------------
+
+def test_random_w3_cannot_authorize():
+    """Random/tampered DR15 (W3) never authorises when W1/W2/seq/GT are bad."""
+    print("\n=== Test 2: random/tampered W3 cannot AUTHORISE writeback ===")
+    gt_word_inform = (0b01 << 25)   # INFORM, gt_seq=0
+    all_ok = True
+
+    for (w12, w13) in _good_vectors():
+        good_integ = _integrity32(w12, w13)
+
+        # (a) bad W2/integrity: DR14 does not match integrity32(DR12, DR13)
+        for w3 in _W3_VALUES:
+            bad_integ = good_integ ^ 0x1
+            cr_wr, fault_v = _run_case(gt_word_inform, w12, w13, bad_integ, w3)
+            if cr_wr != 0 or fault_v != 1:
+                print(f"  FAIL bad-integrity ({w12:#010x}) W3={w3:#010x}: "
+                      f"cr_wr_en={cr_wr} fault_valid={fault_v}")
+                all_ok = False
+
+        # (b) tampered W1 (DR12): integrity no longer matches the stored DR14
+        for w3 in _W3_VALUES:
+            tampered_w12 = w12 ^ 0x00000100
+            cr_wr, fault_v = _run_case(gt_word_inform, tampered_w12, w13,
+                                       good_integ, w3)
+            if cr_wr != 0 or fault_v != 1:
+                print(f"  FAIL tampered-W1 ({w12:#010x}) W3={w3:#010x}: "
+                      f"cr_wr_en={cr_wr} fault_valid={fault_v}")
+                all_ok = False
+
+        # (c) bad gt_seq: GT.gt_seq (DR11[24:16]) != W2.gt_seq (DR13[29:21])
+        for w3 in _W3_VALUES:
+            gt_seq5 = (5 << 16)                         # GT.gt_seq = 5
+            gt_word_seq = gt_word_inform | gt_seq5
+            # W2.gt_seq left at 0 → mismatch; recompute integrity for this W2.
+            cr_wr, fault_v = _run_case(gt_word_seq, w12, w13, good_integ, w3)
+            if cr_wr != 0 or fault_v != 1:
+                print(f"  FAIL bad-gtseq ({w12:#010x}) W3={w3:#010x}: "
+                      f"cr_wr_en={cr_wr} fault_valid={fault_v}")
+                all_ok = False
+
+        # (d) NULL GT: DR11 gt_type == 0b00 → FAULT regardless of everything
+        for w3 in _W3_VALUES:
+            cr_wr, fault_v = _run_case(0x00000000, w12, w13, good_integ, w3)
+            if cr_wr != 0 or fault_v != 1:
+                print(f"  FAIL null-GT ({w12:#010x}) W3={w3:#010x}: "
+                      f"cr_wr_en={cr_wr} fault_valid={fault_v}")
+                all_ok = False
+
+    assert all_ok, "Test 2 had failures (W3 wrongly authorised / did not fail closed)"
+    print("PASS")
+
+
+# ---------------------------------------------------------------------------
+# Test 3: a matching gt_seq on BOTH sides still passes (positive control)
+# ---------------------------------------------------------------------------
+
+def test_matching_gtseq_passes():
+    """When GT.gt_seq matches W2.gt_seq, a valid entry still writes back."""
+    print("\n=== Test 3: matching gt_seq still authorises (positive control) ===")
+    all_ok = True
+    for seq in (0, 1, 7, 0x1FF):
+        w12 = 0x00004000
+        # W2 with gt_seq[29:21]=seq, limit in low bits
+        w13 = ((seq & 0x1FF) << 21) | 0x000000FF
+        integ = _integrity32(w12, w13)
+        gt_word = (0b01 << 25) | ((seq & 0x1FF) << 16)   # INFORM, GT.gt_seq=seq
+        for w3 in _W3_VALUES:
+            cr_wr, fault_v = _run_case(gt_word, w12, w13, integ, w3)
+            if cr_wr != 1 or fault_v != 0:
+                print(f"  FAIL matching-seq seq={seq} W3={w3:#010x}: "
+                      f"cr_wr_en={cr_wr} fault_valid={fault_v}")
+                all_ok = False
+    assert all_ok, "Test 3 had failures (valid matching-seq entry did not authorise)"
     print("PASS")
 
 
@@ -302,9 +300,9 @@ def test_mwin_invalid_seal():
 if __name__ == "__main__":
     failures = []
     for fn in (
-        test_fnv_formula_vectors,
-        test_mwin_valid_seal,
-        test_mwin_invalid_seal,
+        test_random_w3_cannot_deny,
+        test_random_w3_cannot_authorize,
+        test_matching_gtseq_passes,
     ):
         try:
             fn()

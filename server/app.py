@@ -4451,18 +4451,23 @@ import zlib as _zlib
 
 
 def _decode_gt_word(gt32):
-    """Decode a 32-bit Golden Token word.
+    """Decode a 32-bit Golden Token word (GT v2.0 word layout).
 
-    GT layout (mirrors simulator.js parseGT):
-      [31]=b_flag  [30:28]=perm3  [27]=dom  [26]=spare  [25]=f_flag
-      [24:23]=gt_type  [22:16]=gt_seq  [15:0]=ns_index
+    GT v2.0 layout (isa_reference.md §3, abstract-gt.md):
+      [31]=B (bind)  [30:28]=perm3  [27]=dom  [26:25]=gt_type
+      [24:16]=gt_seq (9-bit revocation counter)  [15:0]=ns_index
+
+    NOTE: the legacy v1 layout put gt_type at [24:23] and gt_seq at [22:16];
+    v2.0 widens gt_seq to 9 bits and relocates gt_type to [26:25].  f_flag is
+    NOT a GT word field in v2.0 (it lives in NS SLOT Word 1 bit[31]).
     """
     gt32 = int(gt32) & 0xFFFFFFFF
     if gt32 == 0:
         return {"null": True, "gt_word": "0x00000000", "ns_index": 0,
-                "perms": "", "gt_type": "NULL"}
+                "perms": "", "gt_type": "NULL", "gt_seq": 0}
     ns_index = gt32 & 0xFFFF
-    gt_type  = (gt32 >> 23) & 0x3
+    gt_type  = (gt32 >> 25) & 0x3
+    gt_seq   = (gt32 >> 16) & 0x1FF
     dom      = (gt32 >> 27) & 0x1
     perm3    = (gt32 >> 28) & 0x7
     b_flag   = (gt32 >> 31) & 0x1
@@ -4480,6 +4485,7 @@ def _decode_gt_word(gt32):
         "null":     False,
         "gt_word":  f"0x{gt32:08X}",
         "ns_index": ns_index,
+        "gt_seq":   gt_seq,
         "perms":    perms or "---",
         "gt_type":  ['NULL', 'Inform', 'Outform', 'Abstract'][gt_type & 3],
     }
@@ -4511,10 +4517,22 @@ def _extract_clist_from_words(words, base=0):
 # importable helper defined in lump_integrity.py.  Using the module keeps the
 # logic in one place and lets tests import the real implementation directly.
 try:
-    from lump_integrity import check_lump_canonical_integrity as _check_lump_canonical_integrity
+    from lump_integrity import (
+        check_lump_canonical_integrity as _check_lump_canonical_integrity,
+        resolve_canonical_lump as _resolve_canonical_lump,
+        canonical_binding_headers as _canonical_binding_headers,
+        normalize_lump_token as _normalize_lump_token,
+        LumpTokenError as _LumpTokenError,
+    )
 except ImportError:
     # Fallback: try with server package prefix (when imported as a sub-module)
-    from server.lump_integrity import check_lump_canonical_integrity as _check_lump_canonical_integrity
+    from server.lump_integrity import (
+        check_lump_canonical_integrity as _check_lump_canonical_integrity,
+        resolve_canonical_lump as _resolve_canonical_lump,
+        canonical_binding_headers as _canonical_binding_headers,
+        normalize_lump_token as _normalize_lump_token,
+        LumpTokenError as _LumpTokenError,
+    )
 
 
 def _extract_clist_from_lump_file(lump_path):
@@ -5184,7 +5202,9 @@ def _fetch_lump_from_library(token_hex):
     if not GITHUB_TOKEN or not GITHUB_LIBRARY_REPO:
         return None, None
 
-    # Accept 96-bit (24-hex) tokens: compare against word0_location (first 8 chars).
+    # Caller passes the normalized 8-hex W3 cache/index value.  A 96-bit
+    # Outform token is normalized before this helper is called; never select
+    # from its first word.
     raw_token  = token_hex.lower()
     lump_id    = raw_token[:8] if len(raw_token) >= 8 else raw_token
     token_norm = lump_id.lstrip('0') or '0'
@@ -5241,10 +5261,11 @@ def _fetch_lump_from_library(token_hex):
 def get_lump(token_hex):
     """Serve a raw lump binary — local stubs first, then Mum Tunnel Library.
 
-    Accepts both 8-hex (32-bit) and 24-hex (96-bit IDE) tokens.  For 96-bit
-    tokens the first 8 hex chars encode word0_location (the lump identity);
-    the remaining 16 chars carry word1_limit and word2_seals from the NS entry
-    and are used only for cross-validation in the library fallback.
+    Accepts EXACTLY 8-hex (32-bit cache/index token) or 24-hex (96-bit Outform
+    IDE token).  For a 24-hex Outform token the 32-bit cache/index T is the
+    FINAL 8 hex chars — the Words1-3 Outform protocol carries T in W3.  Any
+    other length or non-hex character is rejected with HTTP 400 (fail-closed);
+    the server never truncates an arbitrary-length token to guess a lookup key.
 
     §8 answer (GT v2.0 spec open question): Content verifiability.
     The response includes both a CRC-32 preamble word (prepended to the payload
@@ -5254,19 +5275,25 @@ def get_lump(token_hex):
     and comparing against the X-Lump-Hash header value.
     """
     from flask import Response
-    # 96-bit IDE token = 24 hex chars (word0||word1||word2 of NS Outform entry).
-    # Extract word0_location (first 8 chars) as the canonical lump identity key.
-    raw    = token_hex.lower()
-    lump_id = raw[:8] if len(raw) >= 8 else raw
-    key    = lump_id.lstrip('0') or '0'
-    key8   = lump_id.zfill(8)
+    # ── Token format validation (fail-closed) ──────────────────────────────
+    # Accept EXACTLY 8 hex (32-bit cache/index token) or 24 hex (96-bit Outform
+    # IDE token).  For a 24-hex Outform token the 32-bit cache/index T is the
+    # FINAL 8 hex chars — the Words1-3 protocol carries T in W3.  Anything else
+    # (wrong length, non-hex) is a hard 400, never a silent truncated lookup.
+    try:
+        tok = _normalize_lump_token(token_hex)
+    except _LumpTokenError as _te:
+        return jsonify({"error": str(_te)}), 400
+
+    key8   = tok["key8"]
+    key    = key8.lstrip('0') or '0'
 
     data   = LAZY_LUMPS.get(key) or LAZY_LUMPS.get(key8)
     source = 'local'
 
     if data is None:
         # Fall back to the Mum Tunnel Library
-        data, lib_name = _fetch_lump_from_library(token_hex)
+        data, lib_name = _fetch_lump_from_library(key8)
         if data is not None:
             LAZY_LUMPS[key8] = data           # cache for future requests
             source = f'library:{lib_name}'
@@ -5275,22 +5302,31 @@ def get_lump(token_hex):
                           ' (GitHub not configured — Mum Tunnel Library unavailable)'
             return jsonify({"error": f"Unknown lump token 0x{key8}{github_hint}"}), 404
 
-    # ── Canonical integrity check — fail-closed for canonical manifest entries ──
-    # Entries with a dot_name MUST pass hash validation before bytes are served.
-    # Returns None (legacy / library / unknown — serve freely), True (OK),
-    # or an error string (→ 409, no skip path).
+    # ── Canonical resolution — fail-closed for canonical manifest entries ──
+    # resolve_canonical_lump requires EXACTLY ONE canonical record per token,
+    # cross-checks canonical filename, dot_name, positive issue_n, binary_hash,
+    # identity_hash and sidecar consistency, and rejects ambiguous collisions
+    # and mismatches.  It NEVER mutates or backfills metadata on GET.
+    #   ok=False              → 409 (hard fail).
+    #   ok=True, trusted=True  → serve + canonical identity-binding headers.
+    #   ok=True, trusted=False → legacy/untrusted; serve raw but mark untrusted
+    #                            so secure simulator promotion can reject.
     _gl_lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
-    _gl_integrity = _check_lump_canonical_integrity(_gl_lumps_dir, key8, data)
-    if isinstance(_gl_integrity, str):
-        return jsonify({"error": _gl_integrity}), 409
+    _gl_res = _resolve_canonical_lump(_gl_lumps_dir, key8, data)
+    if not _gl_res.get("ok"):
+        return jsonify({"error": _gl_res.get("error", "Lump integrity failure")}), 409
 
-    import hashlib as _hashlib_lump
     payload = _lump_with_crc(data)
-    lump_sha256 = _hashlib_lump.sha256(data).hexdigest()
-    resp = Response(payload, mimetype='application/octet-stream',
-                    headers={'Content-Length': str(len(payload)),
-                             'X-Lump-Source': source,
-                             'X-Lump-Hash': f'sha256:{lump_sha256}'})
+    _headers = {
+        'Content-Length': str(len(payload)),
+        'X-Lump-Source': source,
+        # X-Lump-Hash retained for backward compatibility (sha256 of raw bytes).
+        'X-Lump-Hash': f"sha256:{_gl_res['binary_hash']}",
+    }
+    # Bind the response to canonical dot_name/issue_n/identity_hash/binary_hash
+    # and the cache token (or mark untrusted for legacy entries).
+    _headers.update(_canonical_binding_headers(_gl_res))
+    resp = Response(payload, mimetype='application/octet-stream', headers=_headers)
     return resp
 
 

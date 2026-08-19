@@ -91,7 +91,8 @@ class ChurchRegisters(Elaboratable):
 
         # M-set data words: driven by core when m_set_en fires.
         # For CALL M-GT path:  dr11=GT_word, dr12=NS_location, dr13=NS_authority,
-        #                      dr14=NS_integrity, dr15=NS_seals (word3_abstract_gt)
+        #                      dr14=NS_integrity, dr15=cache_token32 (resident
+        #                      Inform W3 — non-authoritative diagnostic; Task #2862)
         # For cr15_m_set port: dr11-14 sourced from CR15 fields + computed integrity32; dr15=0
         self.m_set_dr11 = Signal(32)
         self.m_set_dr12 = Signal(32)
@@ -101,12 +102,14 @@ class ChurchRegisters(Elaboratable):
 
         # Combinatorial reads of the M-window DRs (always valid).
         # DR11 = Abstract GT word, DR12 = NS_location, DR13 = NS_authority,
-        # DR14 = NS_integrity  (4-word core shadow for WRITEBACK; DR15 = NS_seals advisory).
+        # DR14 = NS_integrity  (authoritative shadow used by WRITEBACK).
+        # DR15 = cache_token32 (resident Inform W3) — non-authoritative diagnostic
+        #        only; never gates/authorises writeback (Task #2862).
         self.m_dr11 = Signal(32)
         self.m_dr12 = Signal(32)
         self.m_dr13 = Signal(32)
         self.m_dr14 = Signal(32)   # added for Task #440: 5-word M-window shadow
-        self.m_dr15 = Signal(32)   # NS_seals (advisory); 0 on cr15_m_set path
+        self.m_dr15 = Signal(32)   # cache_token32 (resident Inform W3); diagnostic; 0 on cr15_m_set path
 
         # Current M-flag state
         self.cr15_m_flag = Signal()

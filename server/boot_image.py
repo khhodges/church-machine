@@ -87,7 +87,7 @@ _MANDATORY_NS_SLOTS = (0, 1, 2, 3, 4, 5, BOOT_ABSTR_NS_SLOT, CAPABILITY_TEST_NS_
 
 # Format-version tag written to mem[NS_TABLE_BASE - 1] so loadBootImage()
 # can reject stale binaries.
-BOOT_IMAGE_FORMAT_TAG = 0xB0072128  # bumped for A7 v1.2 layout inversion (Thread@0, NS@top); must match simulator.js
+BOOT_IMAGE_FORMAT_TAG = 0xB0072862  # Task #2862: resident NS Word3 is cache_token32; must match simulator.js
 
 # Direct dispatch: NUC_CODE (B:07) pre-loads CR0 with the boot-entry E-GT.
 # No CHANGE→TPERM→CALL trampoline — 00000600.lump must always be present.
@@ -109,17 +109,6 @@ def _encode_perm(perms_dict):
     W = 1 if perms_dict.get("W") else 0
     R = 1 if perms_dict.get("R") else 0
     return 0, (X << 2) | (W << 1) | R
-
-
-def _abstract_gt_word(perms_dict):
-    """Encode a perms dict as a GT word with slot_id=0, gt_seq=0, gt_type=0, b_flag=0.
-
-    New GT layout: dom[27], perm[30:28].
-    Mirrors hardware/boot_rom.py _abstract_gt_word() and simulator.js createGT().
-    """
-    dom, perm3 = _encode_perm(perms_dict)
-    return _u32(((dom   & 0x1) << 27) |
-                ((perm3 & 0x7) << 28))
 
 
 # Abstract GT device-class constants (Task #406) — must match simulator.js
@@ -246,14 +235,18 @@ def perm_bits(perms):
     return bits & 0x3F
 
 
-def pack_ns_word1(limit17, b, f, g, gt_type, clist_count):
+def pack_ns_word1(limit_offset, gt_seq=0, g=0, f=0):
+    """Pack the canonical v2.0 NS W1 authority word.
+
+    W1 has one meaning in every resident entry:
+      limit_offset[20:0] | gt_seq[29:21] | g_bit[30] | f_flag[31].
+    Entry state is carried by the access GT, never by W1.
+    """
     return _u32(
-        ((b & 1) << 31)
-        | ((f & 1) << 30)
-        | ((g & 1) << 29)
-        | ((gt_type & 3) << 26)
-        | (((clist_count or 0) & 0x1FF) << 17)
-        | (limit17 & 0x1FFFF)
+        ((f & 1) << 31)
+        | ((g & 1) << 30)
+        | ((gt_seq & 0x1FF) << 21)
+        | (limit_offset & 0x1FFFFF)
     )
 
 
@@ -284,34 +277,27 @@ def create_gt(gt_seq, slot_id, perms, gt_type):
     return _u32(d | p | t | s | (slot_id & 0xFFFF))
 
 
-def compute_seal(location, limit17):
-    """CRC-16/XMODEM over location (4 bytes BE) || limit17 (3 bytes BE).
+def _rol32(value, amount):
+    value &= 0xFFFFFFFF
+    return ((value << amount) | (value >> (32 - amount))) & 0xFFFFFFFF
 
-    Mirrors simulator.js computeSeal() bit-for-bit.
+
+def integrity32(location, authority):
+    """Canonical hardware integrity32 over NS W0/W1.
+
+    G and F are mutable liveness/routing bits, so W1[31:30] are masked before
+    the check.  This is corruption detection, not cryptographic authenticity.
     """
-    crc = 0xFFFF
-    payload = [
-        (location >> 24) & 0xFF,
-        (location >> 16) & 0xFF,
-        (location >>  8) & 0xFF,
-         location        & 0xFF,
-        (limit17  >> 16) & 0xFF,
-        (limit17  >>  8) & 0xFF,
-         limit17         & 0xFF,
-    ]
-    for byte in payload:
-        for i in range(8):
-            bit = ((byte >> (7 - i)) & 1) ^ ((crc >> 15) & 1)
-            crc = ((crc << 1) & 0xFFFF) ^ (0x1021 if bit else 0)
-    return crc & 0xFFFF
-
-
-def make_version_seals(gt_seq, location, limit17):
-    return _u32(((gt_seq & 0x7F) << 25) | (compute_seal(location, limit17) & 0xFFFF))
+    authority_masked = authority & 0x3FFFFFFF
+    return _u32(
+        _rol32(location, 7)
+        ^ _rol32(authority_masked, 13)
+        ^ 0xDEADBEEF
+    )
 
 
 def write_ns_entry(mem, total, ns_entry_words, slot, location, lim17,
-                   b, g, gt_type, gt_seq, clist_count, abstract_gt):
+                   b, g, gt_type, gt_seq, clist_count, cache_token32):
     """Write a single NS table entry with internally-computed seal (word2).
 
     This is the sole legitimate path for writing NS table entries in the
@@ -328,9 +314,12 @@ def write_ns_entry(mem, total, ns_entry_words, slot, location, lim17,
         )
     base = total - (slot + 1) * ns_entry_words
     mem[base + 0] = location & 0xFFFFFFFF
-    mem[base + 1] = pack_ns_word1(lim17, b, 0, g, gt_type, clist_count)
-    mem[base + 2] = make_version_seals(gt_seq, location, lim17)
-    mem[base + 3] = (abstract_gt or 0) & 0xFFFFFFFF
+    authority = pack_ns_word1(lim17, gt_seq=gt_seq, g=g, f=0)
+    mem[base + 1] = authority
+    mem[base + 2] = integrity32(location, authority)
+    # Resident Inform Word 3 is a compact cache/index value only.  It is
+    # deliberately outside integrity32 and is never identity or authority.
+    mem[base + 3] = (cache_token32 or 0) & 0xFFFFFFFF
 
 
 # ----- pre-flight validator --------------------------------------------------
@@ -416,18 +405,8 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
                 "the boot image is invalid and would cause a BOOT fault at runtime"
             )
 
-    # Slot 10 (CapabilityTest) must carry an Inform GT (gt_type=1) in W1.
-    # A gtType of 0 (NULL) hides the CODE/Source button in the IDE and marks
-    # the entry invalid; catch a stale/zeroed slot 10 W1 with a clear error.
-    _ct_base = n_words - (CAPABILITY_TEST_NS_SLOT + 1) * NS_ENTRY_WORDS
-    _ct_w1 = words[_ct_base + 1]
-    _ct_gt_type = (_ct_w1 >> 26) & 0x3
-    if _ct_gt_type != 1:
-        raise ValueError(
-            f"validate_boot_image: NS slot {CAPABILITY_TEST_NS_SLOT} (CapabilityTest) "
-            f"W1 gtType is {_ct_gt_type}, expected 1 (Inform) "
-            f"(word1=0x{_ct_w1:08x}); the boot image is stale — regenerate it"
-        )
+    # Do not infer Inform/Outform from any NS word.  State belongs exclusively
+    # to access GTs, which are outside this raw table validator.
 
 
 def read_boot_entry_info(image_bytes):
@@ -590,13 +569,8 @@ def find_lump_file_by_abstraction(lumps_dir, abstraction_name, ns_slot):
 def parse_ns_table(image_bytes):
     """Parse the NS table from a boot image binary.
 
-    Returns a list of dicts, one per occupied slot (w0 != 0 or w1 != 0):
-      { "slot": int, "location": int, "gt_type": int, "f": int, "g": int,
-        "limit17": int, "seq": int, "seal": int, "b": int, "clist_count": int }
-
-    gt_type: 0=Null, 1=Inform, 2=Outform, 3=Abstract.
-    seq:  bits[31:25] of word2 (7-bit gt_seq).
-    seal: bits[15:0]  of word2 (CRC-16 seal).
+    Returns canonical authority/integrity fields. Entry state is intentionally
+    absent: it belongs to the access GT, not to an NS word.
     Returns [] when the image is unrecognisable.
     """
     n_words = len(image_bytes) // 4
@@ -643,14 +617,12 @@ def parse_ns_table(image_bytes):
         entries.append({
             "slot":        slot,
             "location":    w0,
-            "gt_type":     (w1 >> 26) & 3,
-            "f":           0,               # removed in v2.0; always 0
-            "g":           (w1 >> 29) & 1,
-            "limit17":     w1 & 0x1FFFF,
-            "seq":         (w2 >> 25) & 0x7F,
-            "seal":        w2 & 0xFFFF,
-            "b":           (w1 >> 31) & 1,
-            "clist_count": (w1 >> 17) & 0x1FF,
+            "f":           (w1 >> 31) & 1,
+            "g":           (w1 >> 30) & 1,
+            "limit17":     w1 & 0x1FFFFF,
+            "seq":         (w1 >> 21) & 0x1FF,
+            "integrity32": w2,
+            "integrity_ok": w2 == integrity32(w0, w1),
         })
     return entries
 def parse_ns_table_raw(image_bytes):
@@ -837,6 +809,67 @@ def _load_catalog_token_map(manifest_path):
     # ns-state.json overrides manifest where present (authoritative)
     out.update(_load_ns_state_token_map(lumps_dir))
     return out
+
+
+def _load_trusted_cache_token_map(manifest_path):
+    """Return slot→cache_token32 for canonical, fully verified lump records.
+
+    The external manifest/sidecar is the trusted full-identity source.  W3 only
+    receives its issue-blind 32-bit cache value after the exact on-disk bytes
+    satisfy the same resolver checks as ``GET /api/lump/<token>``.  Legacy or
+    incomplete records intentionally produce W3=0 rather than learning trust
+    from the bytes during image generation.
+    """
+    lumps_dir = os.path.dirname(manifest_path)
+    # Rich ns-state is the authoritative current slot assignment.  Do not
+    # merge stale manifest ns_slot aliases into it: that could place a valid
+    # token for one abstraction into a slot now owned by another abstraction.
+    slot_tokens = _load_ns_state_token_map(lumps_dir)
+    if not slot_tokens:
+        slot_tokens = _load_catalog_token_map(manifest_path)
+    try:
+        from lump_integrity import resolve_canonical_lump
+    except ImportError:
+        from server.lump_integrity import resolve_canonical_lump
+
+    try:
+        with open(manifest_path, "r") as f:
+            entries = json.load(f)
+    except Exception:
+        entries = []
+
+    trusted = {}
+    for slot, token_hex in slot_tokens.items():
+        token = str(token_hex or "").strip().lower()
+        if len(token) != 8:
+            continue
+        try:
+            token_value = int(token, 16)
+        except ValueError:
+            continue
+        matches = [
+            e for e in entries if isinstance(e, dict)
+            and str(e.get("token", "")).lower() == token
+            and e.get("dot_name")
+        ]
+        if len(matches) != 1:
+            continue
+        filename = matches[0].get("filename")
+        if not isinstance(filename, str) or not filename:
+            continue
+        try:
+            with open(os.path.join(lumps_dir, filename), "rb") as f:
+                raw = f.read()
+        except OSError:
+            continue
+        resolved = resolve_canonical_lump(lumps_dir, token, raw)
+        if resolved.get("ok") and resolved.get("identity_verified"):
+            try:
+                canonical_t = int(resolved.get("cache_token", ""), 16)
+            except (TypeError, ValueError):
+                continue
+            trusted[int(slot)] = canonical_t & 0xFFFFFFFF
+    return trusted
 
 
 def _load_boot_resident_entries(manifest_path):
@@ -1031,6 +1064,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
                 and isinstance(e.get("physAddr"), int) and e["physAddr"] > 0):
             phys_override[int(ns_slot)] = int(e["physAddr"])
 
+    _manifest_path_for_cache = os.path.join(lumps_dir, "manifest.json")
+    trusted_cache_tokens = _load_trusted_cache_token_map(_manifest_path_for_cache)
     catalog = DEFAULT_ABSTRACTION_CATALOG
     slot_sizes = {
         0: ns_size,
@@ -1097,7 +1132,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             clist_gts.append(create_gt(0, i, perms, 1))
             continue
         write_ns_entry(mem, total, NS_ENTRY_WORDS, i, loc, lim17,
-                       0, 0, 1, 0, clist_count, _abstract_gt_word(perms))
+                       0, 0, 1, 0, clist_count,
+                       trusted_cache_tokens.get(i, 0))
         clist_gts.append(create_gt(0, i, perms, 1))
 
     # Count only non-null catalog entries: the highest non-null slot index + 1.
@@ -1127,7 +1163,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         _e2_lim17 = (_e2_size - 1) & 0x1FFFF
         _e2_perms = {"E": 1}   # callable abstraction
         write_ns_entry(mem, total, NS_ENTRY_WORDS, _e2_slot, _e2_phys, _e2_lim17,
-                       0, 0, 1, 0, 0, _abstract_gt_word(_e2_perms))
+                       0, 0, 1, 0, 0,
+                       trusted_cache_tokens.get(_e2_slot, 0))
         locations[_e2_slot] = _e2_phys
         ns_count = max(ns_count, _e2_slot + 1)
 
@@ -1256,11 +1293,11 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         except Exception:
             pass
 
-    # Preserve the abstract_gt word3 that the catalog loop wrote for Boot.Abstr.
+    # Preserve the cache_token32 word3 that the catalog loop wrote for Boot.Abstr.
     # The lazy/resident paths below only need to update word1 (lim17+cc) and
-    # word2 (seal); word0 (location) and word3 (abstract_gt) stay from the loop.
+    # word2 (seal); word0 (location) and word3 (cache token) stay from the loop.
     _abstr_ns_base = total - (BOOT_ABSTR_NS_SLOT + 1) * NS_ENTRY_WORDS
-    _abstr_abstract_gt = mem[_abstr_ns_base + 3]
+    _abstr_cache_token = mem[_abstr_ns_base + 3]
 
     if _selftest_lazy:
         # Lazy mode: write CODE_NOT_RESIDENT stub (cw=0).  Simulator lazy-loads the
@@ -1269,7 +1306,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         entry_cr_limit = actual_abstr_size - 1  # cc=0 stub has no c-list
         write_ns_entry(mem, total, NS_ENTRY_WORDS, BOOT_ABSTR_NS_SLOT,
                        boot_entry_loc, entry_cr_limit, 0, 0, 1, 0, 0,
-                       _abstr_abstract_gt)
+                       _abstr_cache_token)
     elif abstr_words is not None:
         # Resident mode: saved lump present and validated — copy body into image.
         # abstr_words was parsed from big-endian disk format into Python ints;
@@ -1294,7 +1331,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
                     mem[_clist_base_m + 1] = clist_gts[1] & 0xFFFFFFFF  # idx 1: Next.GT
         write_ns_entry(mem, total, NS_ENTRY_WORDS, BOOT_ABSTR_NS_SLOT,
                        boot_entry_loc, entry_cr_limit, 0, 0, 1, 0, _saved_cc,
-                       _abstr_abstract_gt)
+                       _abstr_cache_token)
     else:
         # No saved lump and resident mode required — the trampoline is eliminated
         # (direct dispatch via CR0).  Raise a clear error so the operator knows to
@@ -1336,8 +1373,9 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
                 _gt = create_gt(0, _ref_slot, _perms, 1)
             mem[_loc + _sz - _cc + _ci] = _gt & 0xFFFFFFFF
         # Update NS entry: rewrite with corrected lim17 and cc via the gated helper.
+        _svc_ns_base = total - (_cslot + 1) * NS_ENTRY_WORDS
         write_ns_entry(mem, total, NS_ENTRY_WORDS, _cslot, _loc, _lim17,
-                       0, 0, 1, 0, _cc, 0)
+                       0, 0, 1, 0, _cc, mem[_svc_ns_base + 3])
 
     # Thread-count sentinel (Task #2563): stored at NS_TABLE_BASE - 4 so the
     # designer's memory-truth drill-down can verify the committed thread count.
@@ -1379,15 +1417,15 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         # Update NS entry word1 (lim17 + cc) and word2 (seal) to match the
         # actual lump.  The catalog loop wrote cc=0 for non-MMIO non-SelfTest
         # slots; boot-resident lumps may have cc > 0 (e.g. CapabilityTest has cc=5).
-        # Preserve word3 (abstract_gt) from the catalog loop.
+        # Preserve word3 (cache_token32) from the catalog loop.
         _hdr      = _body[0] if _body else 0
         _body_cc  = _hdr & 0xFF
         _body_sz  = len(_body)
         _br_lim17 = (_body_sz - _body_cc - 1) & 0x1FFFF
         _br_ns_base = total - (_slot + 1) * NS_ENTRY_WORDS
-        _br_abstract_gt = mem[_br_ns_base + 3]
+        _br_cache_token = mem[_br_ns_base + 3]
         write_ns_entry(mem, total, NS_ENTRY_WORDS, _slot, _phys, _br_lim17,
-                       0, 0, 1, 0, _body_cc, _br_abstract_gt)
+                       0, 0, 1, 0, _body_cc, _br_cache_token)
 
     # ----- Resident lump bodies (Step 2) --------------------------------
     token_map = _token_map

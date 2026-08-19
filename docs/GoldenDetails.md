@@ -241,7 +241,7 @@ fill CAP_REGs.
   ├────────────────────────────────────────────────┤ + 8
   │  Word 2   integrity32 — CRC (32 bits)          │
   ├────────────────────────────────────────────────┤ + 12
-  │  Word 3   abstract_gt — GT_LAYOUT (32 bits)    │
+  │  Word 3   cache_token32 T (32 bits)            │
   └────────────────────────────────────────────────┘
 ```
 
@@ -292,20 +292,20 @@ updated by the Loader when a lazy-load LUMP is fetched from the Tunnel.
 Written by **[IDE]**. Verified by **[CM]** on every LOAD via the ChurchNSGate
 pipeline. A mismatch faults with `SEAL` error — the SLOT has been tampered with.
 
-### SLOT Word 3 — abstract_gt (advisory)
+### SLOT Word 3 — cache token `T` (non-authoritative)
 
 ```
- ┌──────┬──────┬─────┬────────┬───────────┬──────────────────┐
- │b_flag│ perm │ dom │gt_type │  gt_seq   │    slot_id       │
- │  1b  │  3b  │  1b │  2b    │   9b      │     16b          │
- └──────┴──────┴─────┴────────┴───────────┴──────────────────┘
+ ┌────────────────────────────────────────────────────────────────┐
+ │      issue-blind 32-bit content lookup/cache value T           │
+ └────────────────────────────────────────────────────────────────┘
 ```
 
-Uses full GT_LAYOUT. Advisory annotation only: `slot_id = 0`, `gt_seq = 0`,
-`gt_type = 0b00` (NULL). Written by **[IDE]**. **Not covered by integrity32.**
-**[CM]** only reads this word when the M-bit elevation path is active
-(`m_elevated`). **[IDE]** uses it as a human-readable capability label for the
-namespace viewer.
+`T` is written only after the fetched bytes and the trusted full identity have
+both been verified. It is **not covered by integrity32** and is never proof of
+identity, ownership, revocation, or permission. **[CM]** may expose it through
+the M-elevated diagnostic path, but never uses it to authorize writeback. In an
+Outform entry, W1–W3 are instead the exact opaque restore token `W1||W2||W3`;
+W3 carries its final 32-bit cache value `T`.
 
 ---
 
@@ -439,8 +439,8 @@ Copied from NS SLOT Word 1 during LOAD. Same WORD2_LAYOUT as the NS SLOT.
 **[CM]** uses `limit_offset` for bounds checking and `gt_seq` for revocation
 on every instruction that references this CR.
 
-> **CR Word 3 does not exist.** NS SLOT Word 3 (abstract_gt) is advisory and is
-> never loaded into a CAP_REG.
+> **CR Word 3 does not exist.** NS SLOT Word 3 is the diagnostic cache value
+> `T` and is never loaded into a CAP_REG.
 
 ### LOAD resolution path
 

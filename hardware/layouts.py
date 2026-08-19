@@ -46,11 +46,15 @@ LUMP_HEADER_LAYOUT = StructLayout({
 #                            Identical bit layout to CR W2.  g_bit[30] and f_flag[31] are both
 #                            masked before integrity32 so they are mutable without reseal. ★v2.0
 #   word2_integrity   (+8):  integrity32(W0, W1 with g_bit[30] and f_flag[31] cleared) — 32-bit parallel check.
-#   word3_abstract_gt (+12): Abstract GT — advisory annotation for the NS abstraction only.
-#                            Uses full GT_LAYOUT encoding (dom+perm[2:0] at [30:27], gt_type[26:25]);
-#                            slot_id=0, gt_seq=0, gt_type=0b00 (NULL), b_flag=0 in this advisory word.
-#                            NOT covered by integrity32 (advisory; NS abstraction trusts it,
-#                            user-mode LOAD cannot observe it — ChurchMLoad gates on M-bit).
+#   word3_cache_token (+12): 32-bit issue-blind content cache/index token T — NON-authoritative.
+#                            Diagnostic/advisory hint only: never authenticity, ownership,
+#                            revocation, or writeback authority.  NOT covered by integrity32.
+#                            Built-in ROM has no trusted identity source, so every resident
+#                            DEMO_NAMESPACE W3 is 0.  Hardware NEVER uses W3 to gate or authorise
+#                            any M-window writeback (Task #2862).  User-mode LOAD cannot observe
+#                            it — ChurchMLoad gates on the M-bit.  raw W3 may still surface in
+#                            DR15 for diagnostics.
+#                            (`word3_abstract_gt` is a deprecated compatibility alias only.)
 #
 # The lump header (LUMP_HEADER_LAYOUT) lives at word 0 of the lump itself (at word0_location),
 # not in the NS table.  Hardware reads it via a separate memory fetch from word0_location.
@@ -58,7 +62,7 @@ NS_ENTRY_LAYOUT = StructLayout({
     "word0_location":    unsigned(32),
     "word1_authority":   unsigned(32),
     "word2_integrity":   unsigned(32),
-    "word3_abstract_gt": GT_LAYOUT,
+    "word3_cache_token": unsigned(32),
 })
 
 SEALS_LAYOUT = StructLayout({

@@ -399,7 +399,7 @@ class SystemAbstractions {
             for (const [name, nsIdx] of Object.entries(DEVICE_NS_SLOTS)) {
                 const entry = sim.readNSEntry(nsIdx);
                 if (entry) {
-                    const version = (entry.word2_seals >>> 25) & 0x7F;
+                    const version = sim.parseNSWord1(entry.word1_limit).gtSeq;
                     const gt = sim.createGT(version, nsIdx, { E: 1 }, 1);
                     navanaState.deviceRegistry[name] = {
                         nsIndex: nsIdx,
@@ -422,12 +422,13 @@ class SystemAbstractions {
                     const threadParsed = sim.parseNSWord1(threadEntry.word1_limit);
                     const threadBase = threadEntry.word0_location;
                     const allocSize = threadParsed.limit + 1;
-                    const newClistCount = threadParsed.clistCount + 1;
+                    const newClistCount = threadEntry.clistCount + 1;
                     const clistSlot = threadBase + allocSize - newClistCount;
                     sim.memory[clistSlot] = ledPK.gt;
-                    const newW1 = sim.packNSWord1(threadParsed.limit, threadParsed.b, threadParsed.g, threadParsed.chainable, threadParsed.gtType, newClistCount);
-                    const nsBase = sim.NS_TABLE_BASE + 1 * sim.NS_ENTRY_WORDS;
-                    sim.memory[nsBase + 1] = newW1;
+                    // C-list count is owned by the resident LUMP header, not W1.
+                    const threadHdr = sim.parseLumpHeader(sim.memory[threadBase]);
+                    sim.memory[threadBase] = sim.packLumpHeader(
+                        threadHdr.nMinus6, threadHdr.cw, newClistCount, threadHdr.typ);
                 }
 
                 if (!sim.nsClistMap[1]) sim.nsClistMap[1] = [];
@@ -780,7 +781,7 @@ class SystemAbstractions {
             for (let i = 0; i < sim.nsCount; i++) {
                 const entry = sim.readNSEntry(i);
                 if (!entry) continue;
-                const version = (entry.word2_seals >>> 25) & 0x7F;
+                const version = sim.parseNSWord1(entry.word1_limit).gtSeq;
                 if (version > 10) {
                     alerts.push({
                         type: 'VERSION_ANOMALY',
@@ -825,7 +826,7 @@ class SystemAbstractions {
                 return { ok: false, fault: 'NS_FULL', message: 'Navana.Add: no free NS slots' };
             }
 
-            const base = sim.NS_TABLE_BASE + freeSlot * sim.NS_ENTRY_WORDS;
+            const base = sim._nsSlotBase(freeSlot);
             const existingW2 = sim.memory[base + 2] || 0;
             const oldVersion = (existingW2 >>> 25) & 0x7F;
             const newVersion = (oldVersion + 1) & 0x7F;
@@ -847,7 +848,7 @@ class SystemAbstractions {
             if (index === undefined || index < 4) {
                 return { ok: false, fault: 'ARGS', message: 'Navana.Remove: invalid index (boot abstractions protected)' };
             }
-            const base = sim.NS_TABLE_BASE + index * sim.NS_ENTRY_WORDS;
+            const base = sim._nsSlotBase(index);
             const w2 = sim.memory[base + 2] || 0;
             const oldVersion = (w2 >>> 25) & 0x7F;
             const newVersion = (oldVersion + 1) & 0x7F;
@@ -932,7 +933,7 @@ class SystemAbstractions {
                 }
                 const entry = sim.readNSEntry(targetIdx);
                 if (entry) {
-                    const version = (entry.word2_seals >>> 25) & 0x7F;
+                    const version = sim.parseNSWord1(entry.word1_limit).gtSeq;
                     const gt = sim.createGT(version, targetIdx, capPerms, 1);
                     sim.memory[location + clistStart + ci] = gt;
                 }
@@ -1049,7 +1050,7 @@ class SystemAbstractions {
                     message: `Mint.Encode: NS[${base}] out of bounds (nsCount=${sim.nsCount})`
                 };
             }
-            const nsEntryBase = sim.NS_TABLE_BASE + base * sim.NS_ENTRY_WORDS;
+            const nsEntryBase = sim._nsSlotBase(base);
             const w1     = sim.memory[nsEntryBase + 1] >>> 0;
             const gtType = (w1 >>> 26) & 0x3;
 
@@ -1201,7 +1202,7 @@ class SystemAbstractions {
                 return { ok: false, fault: 'ARGS', message: 'Mint.Revoke: nsIndex required' };
             }
 
-            const base = sim.NS_TABLE_BASE + nsIndex * sim.NS_ENTRY_WORDS;
+            const base = sim._nsSlotBase(nsIndex);
             if (nsIndex >= sim.nsCount) {
                 return { ok: false, fault: 'BOUNDS', message: `Mint.Revoke: NS[${nsIndex}] out of bounds` };
             }
@@ -2681,7 +2682,7 @@ class SystemAbstractions {
             const sym   = DATA_SYMBOLS[idx];
             const approx = DATA_APPROX[idx];
             this.registry.bindMethod(NS_SLOT, name, function(sim, args) {
-                const nsBase  = sim.NS_TABLE_BASE + NS_SLOT * sim.NS_ENTRY_WORDS;
+                const nsBase  = sim._nsSlotBase(NS_SLOT);
                 const lumpBase = sim.memory[nsBase];
                 const hdr     = sim.parseLumpHeader(sim.memory[lumpBase]);
                 const dataBase = hdr.valid ? (lumpBase + 1 + hdr.cw) : -1;
@@ -2701,7 +2702,7 @@ class SystemAbstractions {
         const BUILTIN_DATA = 5;
 
         this.registry.bindMethod(NS_SLOT, 'Add', function(sim, args) {
-            const nsBase   = sim.NS_TABLE_BASE + NS_SLOT * sim.NS_ENTRY_WORDS;
+            const nsBase   = sim._nsSlotBase(NS_SLOT);
             const lumpBase = sim.memory[nsBase];
             const hdr      = sim.parseLumpHeader(sim.memory[lumpBase]);
             if (!hdr.valid) {
@@ -2743,7 +2744,7 @@ class SystemAbstractions {
 
         // Constants.Get(N) — read back a value stored by Constants.Add(). N comes from DR0.
         this.registry.bindMethod(NS_SLOT, 'Get', function(sim, args) {
-            const nsBase   = sim.NS_TABLE_BASE + NS_SLOT * sim.NS_ENTRY_WORDS;
+            const nsBase   = sim._nsSlotBase(NS_SLOT);
             const lumpBase = sim.memory[nsBase];
             const hdr      = sim.parseLumpHeader(sim.memory[lumpBase]);
             if (!hdr.valid) {

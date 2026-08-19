@@ -86,6 +86,8 @@ const DEFAULT_SCRIPT_ONLY_SUITES = [
     'constants-lump-tests',
     'lump-v13-freespace-tests',
     'check-lumps-guard',
+    'check-ns-word3-contract',
+    'test-check-ns-word3-contract',
 ];
 
 const configPath = path.join(__dirname, 'test-workflow-config.json');

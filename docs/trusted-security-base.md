@@ -34,14 +34,18 @@ This document describes the Church Machine's TSB design.
 | [30:25] | permissions  | R(25) W(26) X(27) L(28) S(29) E(30) |
 | [31]    | `B`          | Bind flag — stored in GT bit [31] |
 
-Each capability register is 128 bits wide (4 x 32-bit words):
+Each capability register is 96 bits wide (3 x 32-bit words):
 
 | Word  | Content |
 |-------|---------|
 | word0 | The 32-bit Golden Token |
 | word1 | Lump base address (NS Entry Word 0) |
 | word2 | NS Entry Word 1: `spare[31:28] \| gt_seq[27:21] \| limit_offset[20:0]` |
-| word3 | NS Entry Word 2: `spare[31:17] \| g_bit[16] \| CRC-16[15:0]` |
+
+NS Entry Word 2 is verified by the load gate but is not stored in the
+capability register. NS Entry Word 3 is the non-authoritative cache/index value
+`T`; the M-elevated DR15 mirror may expose it for diagnostics, but it never
+authorizes writeback.
 
 ### Permission Bits -- Only Six, Mutually Exclusive
 

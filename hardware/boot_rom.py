@@ -315,23 +315,8 @@ NUC_LUMP_BASE  = (len(BOOT_PROGRAM) - 1) * 4          # = 0x3FC (DMEM byte addre
 NUC_LUMP_HEADER = (0x1F << 27) | (NUC_PROGRAM_CW << 10)  # magic=0x1F, cw=17, n_minus_6=0, typ=0, cc=0
 
 
-def _abstract_gt_word(perms):
-    """Encode a permission mask as an Abstract GT word using the v2.0 dom+perm encoding.
-
-    Abstract GTs are advisory annotations stored in NS entry word3 (gt_type=NULL
-    is correct; this field is informational only).  They encode only the permission
-    intent for the slot; slot_id, gt_seq, gt_type, and b_flag are all zero.
-    Hardware never checks this field; ChurchMLoad gates its output on M-bit so
-    user-mode LOAD cannot observe it.
-
-    Layout: [30:28]=perm[2:0], [27]=dom, all other bits zero.
-    """
-    dom, perm3 = gt_encode_perm(perms)
-    return (perm3 << 28) | (dom << 27)
-
-
 def _make_ns_entry(gt_type, perms, slot_id, gt_seq, location, alloc_size, cw=0, cc=0,
-                   n_minus_6=0, abstract_gt=0):
+                   n_minus_6=0, cache_token32=0):
     """Build a 4-word NS entry (stride = slot_id << 4, i.e. 16 bytes per entry).
 
     Layout:
@@ -341,9 +326,13 @@ def _make_ns_entry(gt_type, perms, slot_id, gt_seq, location, alloc_size, cw=0, 
                                Identical bit layout to CR W2 (WORD2_LAYOUT).
       word2_integrity   (+8):  integrity32(W0, W1 with g_bit[30] and f_flag[31] masked) ★v2.0
                                Parallel 32-bit check; g_bit excluded so GC can set it freely.
-      word3_abstract_gt (+12): Abstract GT annotation — permission-profile word for the NS
-                               abstraction (M-bit gated; invisible to user-mode LOAD).
-                               Use _abstract_gt_word(perms) to encode; 0 for null/empty slots.
+      word3_cache_token (+12): 32-bit issue-blind content cache/index token T — NON-authoritative.
+                               Diagnostic/advisory only: never authenticity, ownership,
+                               revocation, or writeback authority (Task #2862).  M-bit gated;
+                               invisible to user-mode LOAD.  Built-in ROM has no trusted
+                               identity source, so cache_token32 defaults to 0 and every
+                               resident DEMO_NAMESPACE Word 3 is 0.  Do NOT encode a permission
+                               profile / Abstract GT here.
 
     The lump header (LUMP_HEADER_LAYOUT) is at word 0 of the lump itself (at location),
     not cached in the NS table entry.
@@ -356,7 +345,7 @@ def _make_ns_entry(gt_type, perms, slot_id, gt_seq, location, alloc_size, cw=0, 
 
     word2_integrity = integrity32(location, word1_authority)
 
-    return [location, word1_authority, word2_integrity, abstract_gt]
+    return [location, word1_authority, word2_integrity, cache_token32]
 
 
 # ---------------------------------------------------------------------------
@@ -513,26 +502,25 @@ NS_SLOT_COUNT = 8   # minimal boot namespace: slots 0-7
 #   Slot 6: SelfTest       — LUMP (base=0x0600, limit=511), E-perm; default ⚡ boot entry
 #   Slot 7: WukongCallHome — LUMP (base=0x1200, limit=127), E-perm; selectable diagnostic entry
 # ---------------------------------------------------------------------------
+# Every resident W3 cache token is 0: built-in ROM has no trusted full identity
+# source, so it never invents authenticity (Task #2862).  cache_token32 defaults
+# to 0 in _make_ns_entry and is intentionally left unset for all boot slots.
 DEMO_NAMESPACE = []
 for _i in range(NS_SLOT_COUNT):
     if _i == 0:
         _entry = _make_ns_entry(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, _i, 0,
-                                NS_TABLE_BASE, 64,
-                                abstract_gt=_abstract_gt_word(PERM_MASK_R | PERM_MASK_W))
+                                NS_TABLE_BASE, 64)
     elif _i in _MMIO_ENTRIES:
         _loc, _sz, _gtype, _perms = _MMIO_ENTRIES[_i]
-        _entry = _make_ns_entry(_gtype, _perms, _i, 0, _loc, _sz,
-                                abstract_gt=_abstract_gt_word(_perms))
+        _entry = _make_ns_entry(_gtype, _perms, _i, 0, _loc, _sz)
     elif _i in _SYSTEM_ABSTRACTION_SLOTS:
         _name, _perms = _SYSTEM_ABSTRACTION_SLOTS[_i]
         _entry = _make_ns_entry(GT_TYPE_INFORM, _perms, _i, 0,
-                                _i * 0x100, 64,
-                                abstract_gt=_abstract_gt_word(_perms))
+                                _i * 0x100, 64)
     else:
         # Slot 1: Boot.Thread — A7 v1.2 layout: Thread LUMP at word 0x0000.
         _entry = _make_ns_entry(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, _i, 0,
-                                0, 64,
-                                abstract_gt=_abstract_gt_word(PERM_MASK_R | PERM_MASK_W))
+                                0, 64)
     DEMO_NAMESPACE.extend(_entry)
 
 

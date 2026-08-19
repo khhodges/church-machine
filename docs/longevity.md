@@ -42,7 +42,8 @@ Each risk has a severity rating, a description of the fix, a reference to the ta
 **Problem:** The single-NS-entry model — one lump, one Inform GT, CALL splits by clistCount — is the central architectural idea, but it existed only in text descriptions. A visual was needed for the tutorial and documentation.
 
 **Solution:** Created `simulator/namespace_diagram.svg` showing:
-- The Namespace Table with 4-word NS entries (W0: location, W1: B|F|G|chain|type|clistCount|limit, W2: seals, W3: abstract_gt)
+- The Namespace Table with 4-word NS entries (W0: location, W1: authority,
+  W2: integrity32, W3: issue-blind cache/index `T`, never authority)
 - A lump with three regions: Method Table + Code (offset 0), FREESPACE (padding), C-List (GT slots at allocSize - clistCount)
 - CALL split arrows showing CR14 (code, X-only) and CR6 (c-list, L-only)
 - The E-GT format: Version(7) | Index(17) | Perms=E(6) | Type=01(2)

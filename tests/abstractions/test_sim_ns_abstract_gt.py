@@ -1,10 +1,10 @@
-"""Simulator-level tests for NS slot word3 Abstract GT (Task #322).
+"""Simulator-level tests for NS slot Word 3 cache token.
 
 Exercises the JavaScript simulator directly via Node.js to verify:
-  1. getNSTableMemoryDump() exposes word3 (abstract_gt) as raw[3] on every
+  1. getNSTableMemoryDump() exposes the cache token as raw[3] on every
      NS entry — confirming the 4-word entry format is reflected in dump output.
   2. _writeCR gates word3 on mElevation: the capability register receives the
-     abstract_gt value only when M-elevated; user-mode always reads 0.
+     diagnostic cache value only when M-elevated; user-mode always reads 0.
 
 These properties complement the Amaranth hardware tests in
 test_ns_abstract_gt.py and the binary-match checks in

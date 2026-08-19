@@ -723,7 +723,7 @@ function _clistTypeLabel(name) {
 function _nsOwnerOf(addr) {
     if (!sim || !sim.nsCount) return null;
     for (let i = 0; i < sim.nsCount; i++) {
-        const nsBase  = sim.NS_TABLE_BASE + i * sim.NS_ENTRY_WORDS;
+        const nsBase  = sim._nsSlotBase(i);
         const loc     = sim.memory[nsBase];
         const w1      = sim.memory[nsBase + 1];
         if (!loc && !w1) continue;
@@ -2496,6 +2496,7 @@ const _FAULT_CODES = {
 // Human-readable descriptions for firmware download (outform) fault codes
 // and lump structural integrity fault codes.
 const _OUTFORM_DESCRIPTIONS = {
+    OUTFORM_IDENTITY: 'Trusted identity check failed for the downloaded lump — its cache tag, issue, name, or binary fingerprint does not match the identity registered for this slot. The fetched lump was rejected and the awaiting Outform state was preserved. Re-resolve from a trusted source or re-add the abstraction.',
     OUTFORM_CRC:   'CRC-32 mismatch in the downloaded lump — the binary was corrupted in transit. Try re-downloading or re-flashing.',
     OUTFORM_ALLOC: 'Memory allocator rejected the lump — not enough free lump space to install this abstraction. Evict unused lumps and retry.',
     OUTFORM_MINT:  'Capability minting failed during lump install — the lump\u2019s GT could not be sealed. Check lump permissions and slot type.',
@@ -3529,14 +3530,57 @@ async function triggerLazyLoad(absentResult, mode) {
     }
 
     // ── 1. Fetch the lump binary from /api/lump/<token> ─────────────────────
-    let words, source;
+    // Task #2862: capture resolver metadata (cache tag T, dotName, issue, and
+    // trusted 64-hex SHA-256 hashes) alongside the binary, AND compute an
+    // independent SHA-256 over the raw lump payload bytes (EXCLUDING the 4-byte
+    // CRC prefix).  All of this is passed to receiveLump(), which compares it
+    // against the pre-registered per-slot identity BEFORE any resident state is
+    // written.  Fetch failures leave the awaiting state and the Outform identity
+    // data intact (we do NOT call receiveLump on a failed fetch).
+    let words, source, resolverMeta;
     try {
         const resp = await fetch(`/api/lump/${token}`);
         source = resp.headers.get('X-Lump-Source') || 'local';
+        // Trusted resolver metadata from response headers (server-supplied).
+        // Cache tag T is a 32-bit hex value; hashes are canonical 64-hex strings
+        // and MUST NOT be parseInt'd/truncated.
+        const _hdrU32 = function(name) {
+            const v = resp.headers.get(name);
+            if (v == null) return undefined;
+            const s = String(v).trim();
+            if (!/^[0-9a-fA-F]{8}$/.test(s)) return undefined;
+            return Number.parseInt(s, 16) >>> 0;
+        };
+        const _hdrHash = function(name) {
+            const v = resp.headers.get(name);
+            if (v == null) return undefined;
+            const s = String(v).trim()
+                .replace(/^sha256:/i, '')
+                .replace(/^0x/i, '')
+                .toLowerCase();
+            return /^[0-9a-f]{64}$/.test(s) ? s : undefined;   // canonical 64-hex only
+        };
+        const _issueN = (function(){
+            const v = resp.headers.get('X-Lump-Issue-N');   // canonical header name
+            if (v == null) return undefined;
+            const s = String(v).trim();
+            if (!/^[1-9][0-9]*$/.test(s)) return undefined;
+            const n = Number(s);
+            return Number.isSafeInteger(n) ? n : undefined;
+        })();
+        resolverMeta = {
+            cacheToken:   _hdrU32('X-Lump-Cache-Token'),
+            dotName:      resp.headers.get('X-Lump-Dot-Name') || undefined,
+            issueN:       _issueN,
+            identityHash: _hdrHash('X-Lump-Identity-Hash'),
+            binaryHash:   _hdrHash('X-Lump-Binary-Hash'),
+            trust:        resp.headers.get('X-Lump-Trust') || undefined,
+        };
         if (!resp.ok) {
             let errText = '';
             try { const j = await resp.json(); errText = j.error || ''; } catch(_) {}
             log(`⊿ Lazy load failed (HTTP ${resp.status}) for 0x${token}: ${errText}`);
+            // Fetch failure: awaiting state + Outform data intact; do not install.
             updateDashboard(); switchView('editor'); switchCodeTab('console');
             return;
         }
@@ -3546,15 +3590,32 @@ async function triggerLazyLoad(absentResult, mode) {
         for (let i = 0; i < Math.floor(buf.byteLength / 4); i++) {
             words.push(view.getUint32(i * 4, false));  // big-endian
         }
+        // Compute SHA-256 over the RAW lump payload bytes, EXCLUDING the 4-byte
+        // CRC-32 prefix (word[0]).  This is the independent fingerprint of the
+        // bytes we are about to commit; receiveLump compares it to BOTH the
+        // registered and resolver binaryHash.
+        try {
+            const payloadBytes = buf.byteLength >= 4 ? buf.slice(4) : new ArrayBuffer(0);
+            const digest = await crypto.subtle.digest('SHA-256', payloadBytes);
+            resolverMeta.computedBinaryHash = Array.from(new Uint8Array(digest))
+                .map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+        } catch (hashErr) {
+            console.error('[lazyLoad] SHA-256 computation failed:', hashErr);
+            log(`⊿ Lazy load hash error: ${hashErr.message}`);
+            // No computed hash → receiveLump will fail closed for secure Outform.
+            updateDashboard(); switchView('editor'); switchCodeTab('console');
+            return;
+        }
     } catch (e) {
         log(`⊿ Lazy load fetch error: ${e.message}`);
         console.error('[lazyLoad] fetch error:', e);
+        // Fetch error: awaiting state + Outform data intact; do not install.
         updateDashboard(); switchView('editor'); switchCodeTab('console');
         return;
     }
 
-    // ── 2. Install into simulator ────────────────────────────────────────────
-    const installResult = sim.receiveLump(words);
+    // ── 2. Install into simulator (identity verified inside receiveLump) ──────
+    const installResult = sim.receiveLump(words, resolverMeta);
     if (!installResult.ok) {
         // Check if there is a new OUTFORM_* or LUMP_* fault to surface a descriptive message.
         const installFault = sim.faultLog && sim.faultLog.length
@@ -13588,7 +13649,7 @@ function runTuringSimGate() {
     // place the c-list at lumpBase+progWords+1 (well past the last code word).
     // Re-seal the NS entry so mLoad version/seal checks still pass.
     {
-        const _nsBase     = testSim.NS_TABLE_BASE + testSim.bootEntrySlot * testSim.NS_ENTRY_WORDS;
+        const _nsBase     = testSim._nsSlotBase(testSim.bootEntrySlot);
         const _lumpBase   = testSim.memory[_nsBase] >>> 0;
         const _progWords  = asmResult.words.length;          // 863
         const _newLimit17 = _progWords;                      // fetchAddr for pc=progWords-1 is lumpBase+progWords = lumpBase+limit17

@@ -18,8 +18,11 @@ class ChurchNSGate(Elaboratable):
         W1 (+4)  authority     — identical layout to CR W2 (WORD2_LAYOUT)
                                  g_bit at [30], f_flag at [31]; both masked before integrity check ★v2.0
         W2 (+8)  integrity     — integrity32(W0, W1 with g_bit[30] and f_flag[31] cleared)
-        W3 (+12) abstract_gt   — advisory permission-profile annotation; fetched
-                                 and latched into raw_w3 (ChurchMLoad gates on M-bit)
+        W3 (+12) cache_token   — 32-bit issue-blind content cache/index token T
+                                 (non-authoritative); fetched and latched into
+                                 cache_token32.  Diagnostic/advisory hint only: it
+                                 never gates or authorises any writeback
+                                 (ChurchMLoad gates on M-bit).
 
     FSM (seal-check enabled)
     ────────────────────────
@@ -34,7 +37,9 @@ class ChurchNSGate(Elaboratable):
     ───────
         raw_base          NS W0  lump base byte address
         raw_w2            NS W1  authority (identical layout to CR W2)
-        ns_abstract_gt    NS W3  abstract GT annotation (M-bit gated by ChurchMLoad)
+        ns_cache_token32  NS W3  32-bit issue-blind content cache token
+                                 (cache_token32); non-authoritative, M-bit gated
+                                 by ChurchMLoad
         ns_entry_addr_out byte address of the NS entry (CR15 base + slot_id << 4)
 
     All outputs are valid while ns_gate_done is asserted and remain
@@ -74,7 +79,7 @@ class ChurchNSGate(Elaboratable):
 
         self.raw_base          = Signal(32)
         self.raw_w2            = Signal(32)
-        self.ns_abstract_gt    = Signal(32)
+        self.ns_cache_token32  = Signal(32)
         self.ns_entry_addr_out = Signal(32)
 
         self.mem_addr     = Signal(32)
@@ -92,7 +97,11 @@ class ChurchNSGate(Elaboratable):
         rd_armed = Signal()  # stale-valid guard for FETCH_LOC (see below)
         raw_base_reg = Signal(32)
         raw_w2_reg   = Signal(32)
-        raw_w3_reg   = Signal(32)
+        # Resident Inform W3 — non-authoritative cache token.  Latched from NS
+        # entry W3 for diagnostics/advisory use only; it MUST NOT gate or
+        # authorise any M-window writeback.  Exposed via ns_cache_token32 (M-bit
+        # gated by ChurchMLoad).
+        cache_token32_reg = Signal(32)
 
         ns_view       = View(CAP_REG_LAYOUT, self.cr15_namespace)
         ns_entry_addr = Signal(32)
@@ -121,7 +130,7 @@ class ChurchNSGate(Elaboratable):
                         gt_latched.eq(self.gt_word0),
                         raw_base_reg.eq(0),
                         raw_w2_reg.eq(0),
-                        raw_w3_reg.eq(0),
+                        cache_token32_reg.eq(0),
                         fault_type_reg.eq(FaultType.NONE),
                         rd_armed.eq(0),
                     ]
@@ -198,7 +207,7 @@ class ChurchNSGate(Elaboratable):
                 ]
                 m.d.sync += rd_armed.eq(1)
                 with m.If(self.mem_rd_valid & rd_armed):
-                    m.d.sync += [raw_w3_reg.eq(self.mem_rd_data), rd_armed.eq(0)]
+                    m.d.sync += [cache_token32_reg.eq(self.mem_rd_data), rd_armed.eq(0)]
                     m.next = "DONE"
 
             with m.State("DONE"):
@@ -214,7 +223,7 @@ class ChurchNSGate(Elaboratable):
             self.ns_gate_fault_type.eq(fault_type_reg),
             self.raw_base.eq(raw_base_reg),
             self.raw_w2.eq(raw_w2_reg),
-            self.ns_abstract_gt.eq(raw_w3_reg),
+            self.ns_cache_token32.eq(cache_token32_reg),
             self.ns_entry_addr_out.eq(ns_entry_addr),
         ]
 

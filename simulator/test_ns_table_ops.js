@@ -79,7 +79,7 @@ function makeSim() {
 function captureBootSlots(sim) {
     const snap = [];
     for (let i = 0; i <= 6; i++) {
-        const base = sim.NS_TABLE_BASE + i * sim.NS_ENTRY_WORDS;
+        const base = sim._nsSlotBase(i);
         snap.push({
             w0: sim.memory[base]     >>> 0,
             w1: sim.memory[base + 1] >>> 0,
@@ -107,6 +107,7 @@ function callNsTableClear(simInst, slot) {
     const sandbox = vm.createContext({
         sim: simInst,
         updateNamespace: function() {},
+        _setNsDirty: function() {},
     });
     vm.runInContext(nsTableClearSrc, sandbox);
     vm.runInContext(`_nsTableClear(${slot});`, sandbox);
@@ -129,9 +130,9 @@ function callNsTableClear(simInst, slot) {
         sim.isNSEntryValid(slot),
         `slot=${slot}, valid=${sim.isNSEntryValid(slot)}`);
 
-    check('T402: Add LUMP to slot 7 — _tokenSlotMap records token→slot',
-        sim._tokenSlotMap.has(TOKEN) && sim._tokenSlotMap.get(TOKEN) === 7,
-        `has=${sim._tokenSlotMap.has(TOKEN)}, slot=${sim._tokenSlotMap.get(TOKEN)}`);
+    check('T402: Add LUMP — _tokenSlotMap records token→slot (first free programmable slot)',
+        sim._tokenSlotMap.has(TOKEN) && sim._tokenSlotMap.get(TOKEN) === slot,
+        `has=${sim._tokenSlotMap.has(TOKEN)}, slot=${sim._tokenSlotMap.get(TOKEN)}, expected=${slot}`);
 }
 
 // ── T403–T406: _nsTableClear slot 7 ──────────────────────────────────────────
@@ -149,9 +150,10 @@ function callNsTableClear(simInst, slot) {
     sim.writeNSEntry(slot, 0x0400, 10, 0, 0, 1, 0, 3, 0);
     sim.nsLabels[slot] = NAME;
 
-    // Read gt_seq from word2 before clear
-    const w2Before = sim.memory[sim.NS_TABLE_BASE + slot * sim.NS_ENTRY_WORDS + 2] >>> 0;
-    const seqBefore = (w2Before >>> 25) & 0x7F;
+    // Canonical NS ABI: gt_seq lives in W1[29:21] (authority word), not W2
+    // (W2 is now a pure integrity32 hash). Read the sequence via parseNSWord1.
+    const w1Before  = sim.memory[sim._nsSlotBase(slot) + 1] >>> 0;
+    const seqBefore = sim.parseNSWord1(w1Before).gtSeq & 0x7F;
 
     // Clear
     callNsTableClear(sim, slot);
@@ -162,9 +164,9 @@ function callNsTableClear(simInst, slot) {
         eAfter === null || eAfter.word0_location === 0,
         `word0_location=${eAfter ? eAfter.word0_location : 'null'}`);
 
-    // After clear: gt_seq bumped by 1
-    const w2After  = sim.memory[sim.NS_TABLE_BASE + slot * sim.NS_ENTRY_WORDS + 2] >>> 0;
-    const seqAfter = (w2After >>> 25) & 0x7F;
+    // After clear: gt_seq bumped by 1 (read from W1[29:21], the canonical location)
+    const w1After  = sim.memory[sim._nsSlotBase(slot) + 1] >>> 0;
+    const seqAfter = sim.parseNSWord1(w1After).gtSeq & 0x7F;
     check('T404: _nsTableClear slot 7 — gt_seq bumped by 1',
         seqAfter === ((seqBefore + 1) & 0x7F),
         `seqBefore=${seqBefore}, seqAfter=${seqAfter}`);
@@ -293,18 +295,20 @@ function callNsTableClear(simInst, slot) {
 {
     const sim = makeSim();
 
-    // Add LUMP, then Boot
-    sim.allocOrFindNsSlot('tok_before_boot', 'PreBoot');
-    sim.writeNSEntry(7, 0x0400, 5, 0, 0, 1, 0, 0, 0);
-    sim.nsLabels[7] = 'PreBoot';
+    // Add LUMP to the first free programmable slot, then Boot.
+    const preSlot = sim.allocOrFindNsSlot('tok_before_boot', 'PreBoot');
+    sim.writeNSEntry(preSlot, 0x0400, 5, 0, 0, 1, 0, 0, 0);
+    sim.nsLabels[preSlot] = 'PreBoot';
 
     sim.reset();
 
-    // After reset slot 7 should be free again (boot catalog has null at slot 7)
+    // After reset the boot catalog restores the same free programmable slot:
+    // allocOrFindNsSlot must hand back the same first-free slot (not a bumped one),
+    // proving the pre-boot Add left no residue in the NS table after boot.
     const newSlot = sim.allocOrFindNsSlot('tok_after_boot', 'PostBoot');
-    check('T412: After Boot, allocOrFindNsSlot returns slot 7 (programmable slot free)',
-        newSlot === 7,
-        `newSlot=${newSlot}`);
+    check('T412: After Boot, allocOrFindNsSlot returns the first free programmable slot',
+        newSlot === preSlot,
+        `newSlot=${newSlot}, preSlot=${preSlot}`);
 }
 
 // ── T413: _nsTableClear guard — slot < 7 is rejected ─────────────────────────
@@ -327,5 +331,43 @@ function callNsTableClear(simInst, slot) {
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────
+// ── T414: binary image paths preserve W1/W2/W3 exactly ───────────────────────
+{
+    const seed = makeSim();
+    const loc = 0x0123;
+    const w1 = seed.packNSWord1(0x12345, 0x101, 1, 0);
+    const w2 = seed._integrity32(loc, w1);
+    const w3 = 0xC0FFEE42;
+    const nsWords = new Uint32Array(256);
+    nsWords[4] = loc; nsWords[5] = w1; nsWords[6] = w2; nsWords[7] = w3;
+
+    const fromImage = makeSim();
+    fromImage.loadImageFromBinary(nsWords, new Uint32Array(64), null);
+    const imageOut = fromImage.exportHardwareImage().namespace;
+    check('T414a: loadImage/export preserves nonzero gt_seq W1 and integrity W2',
+        imageOut[5] === w1 && imageOut[6] === w2);
+    check('T414b: loadImage/export preserves nonzero cache token W3',
+        imageOut[7] === w3);
+
+    const fromHardware = makeSim();
+    fromHardware.loadHardwareBinary(
+        new Uint32Array([seed.packLumpHeader(0, 1, 0, 0), 0]),
+        new Uint32Array([0, 0, 0, 0, loc, w1, w2, w3]),
+        new Uint32Array(0), null, null);
+    const hardwareOut = fromHardware.exportHardwareImage().namespace;
+    check('T414c: loadHardwareBinary/export preserves canonical W1/W2',
+        hardwareOut[5] === w1 && hardwareOut[6] === w2);
+    check('T414d: loadHardwareBinary/export preserves W3 verbatim',
+        hardwareOut[7] === w3);
+
+    fromHardware._nsUiTypeHint[1] = 2; // deliberately stale presentation hint
+    const free = fromHardware._findFreeSlot(64);
+    check('T414e: stale UI type hint cannot hide resident memory from allocator',
+        free >= loc + 64, `free=${free}, resident=[${loc},${loc + 64})`);
+    fromHardware.reset();
+    check('T414f: reset clears non-authoritative UI type hints',
+        fromHardware._nsUiTypeHint[1] !== 2);
+}
+
 console.log(`\n${pass + fail} tests: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

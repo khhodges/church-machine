@@ -215,9 +215,12 @@ function updateCRDetail() {
     } else {
         const _nsEtmp = sim.readNSEntry(nsIdx);
         if (_nsEtmp) {
+            // Canonical NS ABI: limit is W1[16:0]; c-list count is entry metadata
+            // (readNSEntry: resident header cc or side-table), NOT a W1 field.
             const _nsLimtmp = sim.parseNSWord1(_nsEtmp.word1_limit);
-            if (_nsLimtmp.clistCount > 0) {
-                _lumpClistBase = (_nsEtmp.word0_location >>> 0) + (_nsLimtmp.limit + 1) - _nsLimtmp.clistCount;
+            const _ccTmp    = _nsEtmp.clistCount || 0;
+            if (_ccTmp > 0) {
+                _lumpClistBase = (_nsEtmp.word0_location >>> 0) + (_nsLimtmp.limit + 1) - _ccTmp;
             }
         }
     }
@@ -869,7 +872,7 @@ function updateCRDetail() {
             html += '<div style="color:var(--text-secondary);padding:0.5rem;">Namespace table is empty.</div>';
         } else {
             html += '<table class="cr-table"><thead><tr>';
-            html += '<th>Label</th><th class="popup-sub-id">Idx</th><th>W0: Location</th><th>W1: Type</th><th>W1: F</th><th>W1: G</th><th>W1: Chain</th>';
+            html += '<th>Label</th><th class="popup-sub-id">Idx</th><th>W0: Location</th><th>Type</th><th>W1: F</th><th>W1: G</th><th>C-list</th>';
             html += '</tr></thead><tbody>';
             const typeNames = ['NULL','Inform','Outform','Abstract'];
             for (let i = 0; i < sim.nsCount; i++) {
@@ -883,7 +886,7 @@ function updateCRDetail() {
                 html += `<td>${typeNames[e.gtType] || '?'}</td>`;
                 html += `<td class="cr-flag">${sim.parseNSWord1(e.word1_limit).f}</td>`;
                 html += `<td class="cr-flag">${e.gBit}</td>`;
-                html += `<td>${e.chainable ? 'Yes' : 'No'}</td>`;
+                html += `<td>${e.clistCount || 0}</td>`;
                 html += '</tr>';
             }
             html += '</tbody></table>';
@@ -1473,24 +1476,24 @@ function updateCRDetail() {
 
         const loc = entry.word0_location >>> 0;
         const lim = sim.parseNSWord1(entry.word1_limit);
-        const sealGtSeq = (entry.word2_seals >>> 25) & 0x7F;
-        const sealCRC = entry.word2_seals & 0xFFFF;
+        // Canonical NS ABI: gt_seq lives in W1[29:21] (authority word); W2 is a
+        // full 32-bit integrity32 hash of {W0, W1(bits31:30 masked)}, not a CRC16.
+        const sealGtSeq = lim.gtSeq;
+        const integrity32 = entry.word2_seals >>> 0;
         const gtPermStr = cr.perms;
         const typeNames = ['NULL','Inform','Outform','Abstract'];
 
         html += '<table class="cr-table"><tbody>';
         html += `<tr><td>W0: Location</td><td>0x${loc.toString(16).toUpperCase().padStart(8,'0')}</td></tr>`;
-        html += `<tr><td>W1: Type</td><td>${typeNames[entry.gtType] || '?'}</td></tr>`;
+        html += `<tr><td>Type (meta)</td><td>${typeNames[entry.gtType] || '?'}</td></tr>`;
         html += `<tr><td>W1: F (Far)</td><td>${lim.f}</td></tr>`;
         html += `<tr><td>W1: G (GC)</td><td>${entry.gBit}</td></tr>`;
-        html += `<tr><td>W1: Chainable</td><td>${entry.chainable ? 'Yes' : 'No'}</td></tr>`;
+        html += `<tr><td>C-list count (meta)</td><td>${entry.clistCount || 0}</td></tr>`;
         html += `<tr><td>W1: Limit</td><td>0x${lim.limit.toString(16).toUpperCase().padStart(5,'0')} (${lim.limit + 1} words)</td></tr>`;
-        html += `<tr><td>W2: GT Seq</td><td>${sealGtSeq}</td></tr>`;
-        html += `<tr><td>W2: CRC Seal</td><td>0x${sealCRC.toString(16).toUpperCase().padStart(4,'0')}</td></tr>`;
-        const w3raw = (entry.word3_abstract_gt || 0) >>> 0;
-        const w3PermBits = (w3raw >>> 25) & 0x3F;
-        const w3PermStr = [['R',1],['W',2],['X',4],['L',8],['S',16],['E',32]].filter(([,b]) => w3PermBits & b).map(([n]) => n).join('') || '-';
-        html += `<tr><td>W3: Abstract GT</td><td>0x${w3raw.toString(16).toUpperCase().padStart(8,'0')} <span style="color:#aaa;font-size:0.85em;">[${w3PermStr}]</span></td></tr>`;
+        html += `<tr><td>W1: GT Seq</td><td>${sealGtSeq}</td></tr>`;
+        html += `<tr><td>W2: Integrity32</td><td>0x${integrity32.toString(16).toUpperCase().padStart(8,'0')}</td></tr>`;
+        const w3raw = (entry.word3_cache_token || 0) >>> 0;
+        html += `<tr><td>W3: Cache token T</td><td>0x${w3raw.toString(16).toUpperCase().padStart(8,'0')} <span style="color:#aaa;font-size:0.85em;">[lookup only; non-authoritative]</span></td></tr>`;
         html += `<tr><td>CR Permissions</td><td>[${gtPermStr}]</td></tr>`;
         if (entry.codeLength !== undefined) {
             html += `<tr><td>Code Length</td><td>${entry.codeLength} words (${entry.codeLength * 4} bytes)</td></tr>`;
@@ -1921,28 +1924,34 @@ function renderBootNSImage() {
     const nsWords = sim.nsCount * sim.NS_ENTRY_WORDS;
     html += `<div class="boot-section-label">② NS Table &nbsp;<span class="boot-section-note">at 0x${sim.NS_TABLE_BASE.toString(16).toUpperCase().padStart(4,'0')} · ${sim.nsCount} entries × 4 words = ${nsWords} words (${nsWords*4} bytes)</span></div>`;
     html += '<table class="ns-mem-table boot-ns-table"><thead><tr>';
-    html += '<th>Entry</th><th>Label</th><th>W0 · Base Addr</th><th>W1 · Type / Flags / Limit</th><th>W2 · Ver · CRC</th><th>C-list</th>';
+    html += '<th>Entry</th><th>Label</th><th>W0 · Base Addr</th><th>W1 · Type / Flags / Limit / Seq</th><th>W2 · Integrity32</th><th>C-list</th>';
     html += '</tr></thead><tbody>';
     for (let i = 0; i < sim.nsCount; i++) {
-        const base  = sim.NS_TABLE_BASE + i * sim.NS_ENTRY_WORDS;
+        // Canonical NS ABI: inverted table layout (_nsSlotBase); gt_seq is W1[29:21];
+        // W2 is integrity32; type + c-list count are entry metadata (readNSEntry),
+        // NOT W1 fields.
+        const base  = sim._nsSlotBase(i);
         const w0    = sim.memory[base]     || 0;
         const w1    = sim.memory[base + 1] || 0;
         const w2    = sim.memory[base + 2] || 0;
         const p     = sim.parseNSWord1(w1);
-        const ver   = (w2 >>> 25) & 0x7F;
-        const seal  = w2 & 0xFFFF;
+        const _ent  = sim.readNSEntry(i);
+        const _gtType = _ent ? _ent.gtType : 1;
+        const _cc     = _ent ? (_ent.clistCount || 0) : 0;
+        const ver   = p.gtSeq;
+        const seal  = w2 >>> 0;
         const label = sim.nsLabels[i] || '-';
-        const tName = typeNames[p.gtType] || '?';
-        const tCol  = typeColors[p.gtType] || '#888';
+        const tName = typeNames[_gtType] || '?';
+        const tCol  = typeColors[_gtType] || '#888';
         const empty = (w0 === 0 && w1 === 0 && w2 === 0);
-        const flags = (p.f ? ' F' : '') + (p.b ? ' B' : '') + (p.g ? ' G' : '') + (p.chainable ? ' Chain' : '');
+        const flags = (p.f ? ' F' : '') + (p.g ? ' G' : '');
         html += `<tr${empty ? ' style="opacity:0.28;"' : ''}>`;
         html += `<td class="boot-ns-idx">NS[${i}]</td>`;
         html += `<td class="boot-ns-label">${_bootHtmlEsc(label)}</td>`;
         html += `<td class="boot-ns-addr">0x${(w0>>>0).toString(16).toUpperCase().padStart(4,'0')}</td>`;
         html += `<td style="color:${tCol};font-family:monospace;font-size:0.75rem;">${tName}${flags} · Lim=0x${p.limit.toString(16).toUpperCase().padStart(4,'0')} (${p.limit+1}w)</td>`;
-        html += `<td style="color:#71717a;font-family:monospace;font-size:0.73rem;">v${ver} · CRC=0x${seal.toString(16).toUpperCase().padStart(4,'0')}</td>`;
-        html += `<td style="color:#f59e0b;font-size:0.73rem;">${p.clistCount ? p.clistCount + ' GT' + (p.clistCount!==1?'s':'') : ''}</td>`;
+        html += `<td style="color:#71717a;font-family:monospace;font-size:0.73rem;">v${ver} · i32=0x${seal.toString(16).toUpperCase().padStart(8,'0')}</td>`;
+        html += `<td style="color:#f59e0b;font-size:0.73rem;">${_cc ? _cc + ' GT' + (_cc!==1?'s':'') : ''}</td>`;
         html += '</tr>';
     }
     html += '</tbody></table>';
@@ -1954,8 +1963,7 @@ function renderBootNSImage() {
         const s2loc      = bootAbstrEntry.word0_location;
         const s2hdrWord  = (s2loc < sim.memory.length) ? (sim.memory[s2loc] >>> 0) : 0;
         const s2hdr      = sim.parseLumpHeader(s2hdrWord);
-        const s2lim      = sim.parseNSWord1(bootAbstrEntry.word1_limit);
-        const clistCount = s2hdr.valid ? s2hdr.cc : (s2lim.clistCount || 0);
+        const clistCount = s2hdr.valid ? s2hdr.cc : (bootAbstrEntry.clistCount || 0);
         const lumpSzB    = s2hdr.valid ? s2hdr.lumpSize : (sim.SLOT_SIZE || 64);
         const clistStart = lumpSzB - clistCount;  // c-list at physical end
         const clistBase  = s2loc + clistStart;
@@ -2273,12 +2281,13 @@ function renderMemoryDump(location, limit, nsIndex) {
             const hdrAddrHex = '0x' + location.toString(16).toUpperCase().padStart(4, '0');
             const typNames   = ['lump','namespace','Thread','?'];
             const nsEntry    = sim.readNSEntry(nsIndex);
-            const lumpVer    = nsEntry ? ((nsEntry.word2_seals >>> 25) & 0x7F) : 0;
-            const lumpSeal   = nsEntry ? (nsEntry.word2_seals & 0xFFFF) : 0;
+            // Canonical NS ABI: gt_seq is W1[29:21]; W2 is a full integrity32 hash.
+            const lumpVer    = nsEntry ? (sim.parseNSWord1(nsEntry.word1_limit).gtSeq) : 0;
+            const lumpSeal   = nsEntry ? (nsEntry.word2_seals >>> 0) : 0;
             const lumpNote   = `magic=0x${hdr.magic.toString(16).toUpperCase()}`
                              + ` \u00b7 n\u22126=${hdr.n_minus_6}\u2192${lumpSize}w`
                              + ` \u00b7 cw=${cw} \u00b7 typ=${typNames[hdr.typ]||hdr.typ} \u00b7 cc=${cc}`
-                             + ` \u00b7 ver=${lumpVer} \u00b7 CRC=0x${lumpSeal.toString(16).toUpperCase().padStart(4,'0')}`;
+                             + ` \u00b7 ver=${lumpVer} \u00b7 integrity32=0x${lumpSeal.toString(16).toUpperCase().padStart(8,'0')}`;
             // ── Lump Header row ────────────────────────────────────────────────
             html = `<div style="color:rgba(156,220,254,0.5);font-size:0.75rem;padding:0.15rem 0.5rem;margin-top:0.2rem;">Header`
                  + ` <span style="color:#3f3f46;font-size:0.72rem;">word 0 of lump \u00b7 ${lumpNote}</span></div>`;
@@ -2353,18 +2362,20 @@ function renderMemoryDump(location, limit, nsIndex) {
             const nsEntry2  = sim.readNSEntry(nsIndex);
             const lim2      = nsEntry2 ? sim.parseNSWord1(nsEntry2.word1_limit) : null;
             if (lim2 && lim2.limit > 0) {
-                const cc2        = lim2.clistCount;
+                // Canonical NS ABI: c-list count is entry metadata (resident-header
+                // / side-table via readNSEntry), gt_seq is W1[29:21], W2 is integrity32.
+                const cc2        = nsEntry2.clistCount || 0;
                 const allocSize2 = lim2.limit + 1;
                 const clistStart2 = cc2 > 0 ? (allocSize2 - cc2) : allocSize2;
-                const lumpVer2   = (nsEntry2.word2_seals >>> 25) & 0x7F;
-                const lumpSeal2  = nsEntry2.word2_seals & 0xFFFF;
+                const lumpVer2   = lim2.gtSeq;
+                const lumpSeal2  = nsEntry2.word2_seals >>> 0;
                 const locHex2    = '0x' + location.toString(16).toUpperCase().padStart(4, '0');
                 const hdrHex2    = '0x' + (hdrWord >>> 0).toString(16).toUpperCase().padStart(8, '0');
 
                 html  = `<div style="color:rgba(156,220,254,0.3);font-size:0.75rem;padding:0.15rem 0.5rem;margin-top:0.2rem;">Header`;
                 html += ` <span style="color:#3f3f46;font-size:0.72rem;">no lump header at ${locHex2}`;
                 html += ` \u00b7 layout from NS entry \u00b7 alloc=${allocSize2}w \u00b7 cc=${cc2}`;
-                html += ` \u00b7 ver=${lumpVer2} \u00b7 CRC=0x${lumpSeal2.toString(16).toUpperCase().padStart(4,'0')}</span></div>`;
+                html += ` \u00b7 ver=${lumpVer2} \u00b7 integrity32=0x${lumpSeal2.toString(16).toUpperCase().padStart(8,'0')}</span></div>`;
                 html += '<table class="ns-mem-table"><thead><tr><th>Offset</th><th>Address</th><th>Hex</th><th>Note</th></tr></thead><tbody>';
                 html += `<tr style="opacity:0.3;">`;
                 html += `<td style="color:#3f3f46;">+0</td>`;
@@ -2648,8 +2659,9 @@ function updateNamespace() {
         if (!_e) continue;
         const _sw0 = _e.word0_location || 0;
         const _sw1 = _e.word1_limit    || 0;
-        const _sw2 = _e.word2_seals    || 0;
-        if ((_sw0 !== 0) || (_sw1 !== 0)) {
+        // Canonical NS ABI: gt_seq lives in W1[29:21] (not W2 — W2 is integrity32).
+        const _gtSeq = sim.parseNSWord1(_sw1 >>> 0).gtSeq;
+        if (_sw0 !== 0) {
             const _mfe = sim.lazyManifest ? sim.lazyManifest[_si] : null;
             let _notResident = false;
             if (_mfe && _sw0 > 0 && sim.parseLumpHeader) {
@@ -2657,7 +2669,8 @@ function updateNamespace() {
                 if (_hdr && !_hdr.valid) _notResident = true;
             }
             if (_notResident) _cntLazy++; else _cntResident++;
-        } else if (((_sw2 >>> 25) & 0x7F) > 0) {
+        } else if (_gtSeq > 0) {
+            // W0==0 but a bumped gt_seq survives in W1 → a GC-reclaimed (garbage) slot.
             _cntGarbage++;
         }
     }
@@ -2679,7 +2692,7 @@ function updateNamespace() {
     html += '<th>Idx</th><th class="ns-label-col">Label</th>';
     html += '<th>W0: Location</th>';
     html += '<th>W1: Type</th><th>W1: F</th><th>W1: G</th><th>W1: Limit</th>';
-    html += '<th>W2: Seq</th><th>W2: CRC Seal</th>';
+    html += '<th>W1: Seq</th><th>W2: Integrity32</th>';
     html += '<th>Source</th>';
     html += '</tr></thead><tbody>';
 
@@ -2710,8 +2723,9 @@ function updateNamespace() {
             if (lumpHdr && !lumpHdr.valid) codeNotResident = true;
         }
         const lim = sim.parseNSWord1(e.word1_limit);
-        const ver = (e.word2_seals >>> 25) & 0x7F;
-        const seal = e.word2_seals & 0xFFFF;
+        // Canonical NS ABI: gt_seq is W1[29:21] (authority); W2 is integrity32.
+        const ver = lim.gtSeq;
+        const seal = e.word2_seals >>> 0;
         const isBootNS = (i === bootEntrySlot);
         const warmStyle = codeNotResident ? 'color:#f0a040;font-style:italic;' : '';
         const rowOpacity = codeNotResident ? 'opacity:0.8;' : '';
@@ -2752,7 +2766,7 @@ function updateNamespace() {
         html += `<td class="ns-flag" style="${warmStyle}">${e.gBit}</td>`;
         html += `<td style="${warmStyle}">0x${lim.limit.toString(16).toUpperCase().padStart(5, '0')}</td>`;
         html += `<td style="${warmStyle}">${ver}</td>`;
-        html += `<td style="${warmStyle}">0x${seal.toString(16).toUpperCase().padStart(4, '0')}</td>`;
+        html += `<td style="${warmStyle}">0x${seal.toString(16).toUpperCase().padStart(8, '0')}</td>`;
         {
             const _srcLump = _findSrcLump(i, e.label);
             const _srcToken = _srcLump ? _srcLump.token : null;
@@ -3247,10 +3261,98 @@ function _nsTableAddConfirm() {
         // Mode 1 (Restore) fires on first CALL/LOAD rather than setting limit17=0
         // (which would leave no callable range and break the seal after lazyLoad).
         const limit17    = hdr.cw;
-        const abstractGt = (sidecar && sidecar.abstract_gt) ? (sidecar.abstract_gt >>> 0) : 0;
 
-        // Write NS entry with programmer-chosen options
-        sim.writeNSEntry(slot, lumpBase, limit17, 0, 0, gtType, 0, hdr.cc, abstractGt);
+        // ── Task #2862: trusted identity registration for network Outform ──────
+        // Derive the trusted per-slot identity from the sidecar/manifest metadata
+        // BEFORE the lazy Outform NS entry is created.  The cache token T is the
+        // canonical W3 for a secure Outform (NOT an Abstract GT).  For a secure
+        // Outform (gtType === 2, i.e. a lump that will be fetched over the
+        // network on first CALL/LOAD) the metadata is MANDATORY: if the trusted
+        // discriminator fields are missing we fail closed rather than create an
+        // unverifiable Outform whose later promotion might rely on T alone.
+        // Cache tag T is a 32-bit value; hashes remain CANONICAL 64-hex strings
+        // (SHA-256) and are NEVER parseInt'd/truncated.
+        const _hexToU32 = function(v) {
+            if (v == null) return null;
+            if (typeof v === 'number') {
+                return Number.isInteger(v) && v >= 0 && v <= 0xFFFFFFFF
+                    ? (v >>> 0) : null;
+            }
+            const s = String(v).trim().replace(/^0x/i, '');
+            return /^[0-9a-fA-F]{8}$/.test(s)
+                ? (Number.parseInt(s, 16) >>> 0) : null;
+        };
+        const _positiveIssue = function(v) {
+            if (typeof v === 'number') {
+                return Number.isSafeInteger(v) && v > 0 ? v : NaN;
+            }
+            if (v == null) return NaN;
+            const s = String(v).trim();
+            if (!/^[1-9][0-9]*$/.test(s)) return NaN;
+            const n = Number(s);
+            return Number.isSafeInteger(n) ? n : NaN;
+        };
+        const _canon64 = function(v) {
+            if (v == null) return null;
+            const s = String(v).trim().replace(/^0x/i, '').toLowerCase();
+            return /^[0-9a-f]{64}$/.test(s) ? s : null;
+        };
+        const _idMeta = sidecar || {};
+        const cacheToken32 = _hexToU32(
+            _idMeta.cache_token != null ? _idMeta.cache_token
+          : _idMeta.cacheToken != null ? _idMeta.cacheToken
+          : token);   // fall back to the lump token low 32 bits
+        const issueN       = (_idMeta.issue_n != null) ? _positiveIssue(_idMeta.issue_n)
+                           : (_idMeta.issueN  != null) ? _positiveIssue(_idMeta.issueN)
+                           : (_idMeta.issue   != null) ? _positiveIssue(_idMeta.issue) : NaN;
+        const identityHash = _canon64(_idMeta.identity_hash != null ? _idMeta.identity_hash : _idMeta.identityHash);
+        const binaryHash   = _canon64(_idMeta.binary_hash   != null ? _idMeta.binary_hash   : _idMeta.binaryHash);
+        const dotName      = _idMeta.dot_name || _idMeta.dotName || name || '';
+
+        // A SECURE Outform (gtType === 2, network-fetched on first CALL/LOAD)
+        // requires the full trusted identity: cache tag T, a positive integer
+        // issue, a non-empty dotName, and canonical 64-hex identity/binary
+        // hashes.  If any is missing we FAIL CLOSED — never create an
+        // unverifiable Outform whose later promotion might rely on T alone.
+        const isSecureOutform = (gtType === 2);
+        if (isSecureOutform &&
+            (cacheToken32 == null || !(Number.isInteger(issueN) && issueN > 0) ||
+             !dotName || identityHash == null || binaryHash == null)) {
+            if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Install'; }
+            return Promise.reject(
+                'Secure Outform requires trusted identity metadata (cache_token, positive issue_n, dot_name, 64-hex identity_hash and binary_hash) — refusing to create an unverifiable Outform.');
+        }
+
+        // W3 for the NS entry:
+        //   • secure Outform → cache tag T (cacheToken32) — the canonical W3.
+        //   • Inform / legacy → cache token when available, else 0.  W3 no longer
+        //     carries an Abstract GT (Task #2862 W3=cache_token migration).
+        const w3CacheToken = (cacheToken32 != null) ? (cacheToken32 >>> 0) : 0;
+
+        // Register trusted identity outside the 4-word NS entry BEFORE the entry
+        // is written, so receiveLump() can verify against it on resolution.  Only
+        // a SECURE Outform gets a secure identity record (which enforces the
+        // canonical-field requirements in registerSlotIdentity).
+        if (typeof sim.registerSlotIdentity === 'function' && isSecureOutform) {
+            // Canonical NS ABI: W1 is authority only — packNSWord1(limit, gtSeq,
+            // gBit, fFlag). Type + c-list count are NOT W1 fields (side-tables /
+            // resident header). W2 is the integrity32 of {W0, W1}. These opaque
+            // words must match exactly what writeNSEntry() writes below.
+            const _w1 = sim.packNSWord1(limit17, 0, 0, 0) >>> 0;
+            const _w2 = sim.makeVersionSeals(0, lumpBase, limit17) >>> 0;
+            sim.registerSlotIdentity(slot, {
+                cacheToken:   w3CacheToken,
+                dotName:      dotName,
+                issueN:       issueN,
+                identityHash: identityHash,   // canonical 64-hex string
+                binaryHash:   binaryHash,     // canonical 64-hex string
+                outformWords: [_w1, _w2, w3CacheToken],
+                gtSeq:        0,
+            }, { secure: true });
+        }
+
+        // Write NS entry with programmer-chosen options.  W3 = cache token (T).
+        sim.writeNSEntry(slot, lumpBase, limit17, 0, 0, gtType, 0, hdr.cc, w3CacheToken);
         sim.nsLabels[slot] = name;
 
         // Persist slot→label to boot-config so the label survives hard resets.
@@ -3341,10 +3443,11 @@ function _nsTableAddConfirm() {
                 if (nsSlotRef != null) {
                     const refSlot = parseInt(nsSlotRef, 10);
                     if (!isNaN(refSlot) && refSlot >= 0 && sim.isNSEntryValid(refSlot)) {
-                        // Read live gt_seq from NS word2 bits[31:25] so the GT passes
-                        // version checks even if this slot has been cleared+reinstalled.
-                        const nsW2      = sim.memory[sim.NS_TABLE_BASE + refSlot * sim.NS_ENTRY_WORDS + 2];
-                        const liveGtSeq = (nsW2 >>> 25) & 0x7F;
+                        // Canonical NS ABI: read live gt_seq from W1[29:21] (authority
+                        // word) so the GT passes version checks even if this slot has
+                        // been cleared+reinstalled. (W2 is integrity32, not a version.)
+                        const nsW1      = sim.memory[sim._nsSlotBase(refSlot) + 1] >>> 0;
+                        const liveGtSeq = sim.parseNSWord1(nsW1).gtSeq;
                         sim.memory[writeAddr] = sim.createGT(liveGtSeq, refSlot, _parseCapPerms(cap), 1) >>> 0;
                     } else {
                         // NS slot not yet loaded — write null GT (0); runtime lazy-resolve fills it.
@@ -3433,9 +3536,13 @@ function _nsTableClear(slot) {
     if (!sim) return;
     if (slot < 7) return;
 
-    // Read current cycle count from word2 bits[31:25]
-    const word2 = sim.memory[sim.NS_TABLE_BASE + slot * sim.NS_ENTRY_WORDS + 2] >>> 0;
-    const curSeq = (word2 >>> 25) & 0x7F;
+    // Read the real inverted-layout NS entry, not an ascending legacy address.
+    // Canonical NS ABI: gt_seq lives in W1[29:21] (the authority word), NOT W2.
+    // W2 is now a pure integrity32 hash, so read/bump the sequence from W1 via
+    // parseNSWord1 — the GT validator also reads nsGtSeq from W1[29:21].
+    const base = sim._nsSlotBase(slot);
+    const word1 = sim.memory[base + 1] >>> 0;
+    const curSeq = sim.parseNSWord1(word1).gtSeq & 0x7F;
     const newSeq = (curSeq + 1) & 0x7F;
 
     // Zero the entry but write the bumped sequence through makeVersionSeals so
@@ -3449,6 +3556,10 @@ function _nsTableClear(slot) {
             if (s === slot) { sim._tokenSlotMap.delete(tok); break; }
         }
     }
+
+    // Task #2862: remove the trusted per-slot identity so a cleared slot cannot
+    // be re-used by a stale/replayed lump that still carries the old token.
+    if (typeof sim.clearSlotIdentity === 'function') sim.clearSlotIdentity(slot);
 
     // Shrink nsCount if this was the last valid entry
     if (slot === sim.nsCount - 1) {
@@ -3505,9 +3616,11 @@ window._nsTableSave = async function(btn) {
         }
 
         // ── Re-seal every active NS slot before encoding ───────────────────────
-        // Recomputes word2 (the CRC seal) from word0/word1 so no stale seal
-        // survives from an Add, Clear, or direct memory edit.
-        // gt_seq is preserved from the existing word2 bits[31:25].
+        // Recomputes word2 (the integrity32 hash) from word0/word1 so no stale
+        // seal survives from an Add, Clear, or direct memory edit.
+        // Canonical NS ABI: W2 = integrity32(W0, W1). gt_seq is NOT stored in W2 —
+        // it is part of the W1 authority word (bits[29:21]) and is preserved
+        // implicitly because we re-hash the existing W1 verbatim.
         {
             const nsBase  = sim.NS_TABLE_BASE >>> 0;
             const nsWords = sim.NS_ENTRY_WORDS;     // = 4
@@ -3518,8 +3631,7 @@ window._nsTableSave = async function(btn) {
                 const w0 = words[b] >>> 0;
                 if (w0 === 0) continue;             // unoccupied slot — skip
                 const w1     = words[b + 1] >>> 0;
-                const w2     = words[b + 2] >>> 0;
-                const gtSeq  = (w2 >>> 25) & 0x7F;
+                const gtSeq  = sim.parseNSWord1(w1).gtSeq;
                 const lim17  = w1 & 0x1FFFF;
                 words[b + 2] = sim.makeVersionSeals(gtSeq, w0, lim17) >>> 0;
             }
@@ -3542,13 +3654,15 @@ window._nsTableSave = async function(btn) {
             const _pW1 = sim.parseNSWord1(_e.word1_limit);
             const _loc  = _e.word0_location >>> 0;
             const _lim  = _pW1.limit & 0x1FFFF;
-            const _seq  = (_e.word2_seals >>> 25) & 0x7F;
-            const _seal = _e.word2_seals & 0xFFFF;
+            // Canonical NS ABI: gt_seq is W1[29:21]; W2 is a full integrity32 hash;
+            // type is entry-level metadata (side-table via readNSEntry), not W1.
+            const _seq  = _pW1.gtSeq;
+            const _seal = _e.word2_seals >>> 0;
             const _rich = {
                 name:     _lbl,
                 slot:     _si,
                 location: _hex8(_loc),
-                type:     _GT_TYPE_NAMES[_pW1.gtType] || 'Inform',
+                type:     _GT_TYPE_NAMES[_e.gtType] || 'Inform',
                 // F bit: taken truthfully from parseNSWord1(word1) — never hardcoded.
                 // In v2.0 the far-lump F flag is retired and parseNSWord1 returns f:0
                 // by design (bit[30] is the GC liveness mark); routing through the
@@ -3558,7 +3672,7 @@ window._nsTableSave = async function(btn) {
                 g:        _pW1.g,
                 limit:    _hex5(_lim),
                 seq:      _seq,
-                seal:     _hex4(_seal),
+                seal:     _hex8(_seal),
             };
             if (_si === bootEntrySlot) _rich.boot = true;
             nsAbstractions.push(_rich);
@@ -4385,9 +4499,12 @@ function _openPendingCListInNS(slotIdx) {
             const _ne = sim.readNSEntry(_ni);
             if (!_ne || !_ne.word0_location) continue;
             const _lumpBase = _ne.word0_location >>> 0;
+            // Canonical NS ABI: limit is W1[16:0]; c-list count is entry metadata
+            // (readNSEntry), NOT a W1 field.
             const _lim = sim.parseNSWord1(_ne.word1_limit);
-            if (!_lim || _lim.clistCount === 0) continue;
-            const _clistStart = _lumpBase + _lim.limit + 1 - _lim.clistCount;
+            const _cc  = _ne.clistCount || 0;
+            if (!_lim || _cc === 0) continue;
+            const _clistStart = _lumpBase + _lim.limit + 1 - _cc;
             const _clistEnd   = _lumpBase + _lim.limit + 1;
             if (slotAddr >= _clistStart && slotAddr < _clistEnd) {
                 targetNSIdx = _ni;
@@ -4562,11 +4679,17 @@ window.lumpCompress = async function(nsIdx) {
     // Zero freed trailing words
     for (let i = minSize; i < currentSize; i++) sim.memory[baseLoc + i] = 0;
 
-    // ── Step 5: update NS entry word1 ─────────────────────────────────────────
-    const nsBase = sim.NS_TABLE_BASE + nsIdx * sim.NS_ENTRY_WORDS;
-    const oldW1  = sim.memory[nsBase + 1] >>> 0;
-    const topBits = oldW1 & 0xFC000000;
-    sim.memory[nsBase + 1] = (topBits | ((cc & 0x1FF) << 17) | ((minSize - 1) & 0x1FFFF)) >>> 0;
+    // ── Step 5: update NS entry ───────────────────────────────────────────────
+    // Canonical NS ABI: W1 is authority only (limit[20:0] | gtSeq[29:21] | G | F).
+    // c-list count is NOT a W1 field — it lives in the resident header (updated
+    // above) and the writeNSEntry side-table. Preserve gt_seq, g-bit, declared
+    // type and W3; set the new limit17 (= minSize-1). writeNSEntry recomputes W2.
+    const nsBase   = sim._nsSlotBase(nsIdx);
+    const _w1c     = sim.parseNSWord1(sim.memory[nsBase + 1] >>> 0);
+    const _entryC  = sim.readNSEntry(nsIdx) || {};
+    sim.writeNSEntry(nsIdx, baseLoc, (minSize - 1) & 0x1FFFF, 0, _w1c.g,
+        _entryC.gtType != null ? _entryC.gtType : 1, _w1c.gtSeq, cc,
+        _entryC.word3_cache_token || 0);
 
     const parts = [];
     if (didShrink) parts.push(`freespace ${currentSize - minSize}w removed (${currentSize}w \u2192 ${minSize}w)`);
@@ -4607,18 +4730,21 @@ function _getLiveLumpState() {
         return {
             nsIdx, absName, baseLoc,
             lumpSize: null, cw: null, cc: null,
-            sealOk: false, storedSeal: '????', expectedSeal: '????',
+            sealOk: false, storedSeal: '????????', expectedSeal: '????????',
             warnings: [`BAD MAGIC: header=0x${hdrWord.toString(16).toUpperCase().padStart(8, '0')} (expected magic=0x1F)`],
             invalid: true,
         };
     }
 
     const sealOk = (typeof sim.validateMAC === 'function') ? sim.validateMAC(nse) : false;
-    const lim = (typeof sim.parseNSWord1 === 'function') ? sim.parseNSWord1(nse.word1_limit) : { limit: 0 };
-    const storedSeal = (nse.word2_seals & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
-    const expectedSeal = (typeof sim.computeSeal === 'function')
-        ? (sim.computeSeal(baseLoc, lim.limit) & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')
-        : '????';
+    const lim = (typeof sim.parseNSWord1 === 'function') ? sim.parseNSWord1(nse.word1_limit) : { limit: 0, gtSeq: 0 };
+    // Canonical NS ABI: W2 is a full 32-bit integrity32 hash of {W0, W1}, not a
+    // CRC16 in the low 16 bits. Expected value is recomputed via makeVersionSeals
+    // (integrity32), which now reconstructs W1 from limit + gt_seq (W1[29:21]).
+    const storedSeal = (nse.word2_seals >>> 0).toString(16).toUpperCase().padStart(8, '0');
+    const expectedSeal = (typeof sim.makeVersionSeals === 'function')
+        ? (sim.makeVersionSeals(lim.gtSeq, baseLoc, lim.limit) >>> 0).toString(16).toUpperCase().padStart(8, '0')
+        : '????????';
 
     // ── Dry-run validation warnings ────────────────────────────────────────
     const warnings = [];
@@ -4704,11 +4830,12 @@ window.lumpSaveLump = async function(nsIdx) {
         checks.push(`\u2713 1+cw+cc=${1+hdr.cw+hdr.cc} \u2264 lumpSize=${hdr.lumpSize}`);
     }
 
-    // ── 5. SEAL (version-seal CRC check) ──────────────────────────────────
+    // ── 5. SEAL (integrity32 check) ───────────────────────────────────────
+    // Canonical NS ABI: W2 is a full 32-bit integrity32 hash of {W0, W1}.
     const sealOk = sim.validateMAC(nse);
-    const storedSeal   = (nse.word2_seals & 0xFFFF).toString(16).toUpperCase().padStart(4,'0');
+    const storedSeal   = (nse.word2_seals >>> 0).toString(16).toUpperCase().padStart(8,'0');
     const lim          = sim.parseNSWord1(nse.word1_limit);
-    const expectedSeal = (sim.computeSeal(baseLoc, lim.limit) & 0xFFFF).toString(16).toUpperCase().padStart(4,'0');
+    const expectedSeal = (sim.makeVersionSeals(lim.gtSeq, baseLoc, lim.limit) >>> 0).toString(16).toUpperCase().padStart(8,'0');
     if (sealOk) {
         checks.push(`\u2713 SEAL OK: stored=0x${storedSeal}  computed=0x${expectedSeal}  limit17=${lim.limit}`);
     } else {
@@ -5431,21 +5558,20 @@ window.applyPOLA = async function(nsIdx) {
     for (let addr = clistBase; addr < newClistBase; addr++) sim.memory[addr] = 0;
 
     // ── Step 7: update lump header and NS entry ────────────────────────────
+    // Canonical NS ABI: c-list count is NOT a W1 field. It lives in the resident
+    // lump header (just rewritten via packLumpHeader) and the writeNSEntry side-
+    // table. gt_seq is W1[29:21]; W2 is integrity32(W0, W1). The authority word
+    // W1 is unchanged here (only the c-list count changed), and writeNSEntry
+    // recomputes W2 coherently.
     sim.memory[baseLoc] = sim.packLumpHeader(n_minus_6, cw, newCC, typ) >>> 0;
-    const nsBase = sim.NS_TABLE_BASE + nsIdx * sim.NS_ENTRY_WORDS;
-    const oldW1  = sim.memory[nsBase + 1] >>> 0;
-    const oldW2  = sim.memory[nsBase + 2] >>> 0;
-    const gtSeqP = (oldW2 >>> 25) & 0x7F;
-    const w1fP   = sim.parseNSWord1(oldW1);
-    // Only update clistCount; preserve limit17 so the CRC seal stays coherent.
-    // (The old code used lumpSize-1 here, which silently changed limit17 and
-    //  invalidated the seal on every POLA run.)
-    const newW1P = sim.packNSWord1(w1fP.limit, w1fP.b, w1fP.g, w1fP.chainable, w1fP.gtType, newCC);
-    sim.memory[nsBase + 1] = newW1P;
-    // Recompute seal: baseLoc and limit17 are both unchanged so this is
-    // equivalent to the original seal, but correct even if a prior POLA run
-    // left limit17 in a bad state.
-    sim.memory[nsBase + 2] = sim.makeVersionSeals(gtSeqP, baseLoc, w1fP.limit);
+    const nsBase = sim._nsSlotBase(nsIdx);
+    const oldEntry = sim.readNSEntry(nsIdx) || {};
+    const w1fP   = sim.parseNSWord1(sim.memory[nsBase + 1] >>> 0);
+    const gtSeqP = w1fP.gtSeq;
+    // Preserve limit17, g-bit, gt_seq, declared type and W3; only clistCount changes.
+    sim.writeNSEntry(nsIdx, baseLoc, w1fP.limit, 0, w1fP.g,
+        oldEntry.gtType != null ? oldEntry.gtType : 1, gtSeqP, newCC,
+        oldEntry.word3_cache_token || 0);
     // Propagate updated NS words to any CR currently holding a GT for this slot.
     for (let _ci = 0; _ci < 16; _ci++) {
         const _cr = sim.cr[_ci];

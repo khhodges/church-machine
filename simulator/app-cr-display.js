@@ -30,7 +30,7 @@ function updateCRDisplay() {
     html += '<th>R0: GT</th><th>Perms</th><th>Seq</th><th>Idx</th><th>Type</th>';
     html += '<th>R1: Location</th>';
     html += '<th>R0:B</th><th>F</th><th>Limit[16:0]</th>';
-    html += '<th>R3: Seq</th><th>CRC Seal</th>';
+    html += '<th>W1: Seq</th><th>W2: Integrity32</th>';
     html += '</tr></thead><tbody>';
     for (let i = 0; i < 16; i++) {
         if (i === 12) {
@@ -71,7 +71,7 @@ function updateCRDisplay() {
         html += `<td class="cr-flag">${cr.limitF}</td>`;
         html += `<td>0x${cr.limit17.toString(16).toUpperCase().padStart(5, '0')}</td>`;
         html += `<td>${cr.sealGtSeq}</td>`;
-        html += `<td>0x${cr.sealCRC.toString(16).toUpperCase().padStart(4, '0')}</td>`;
+        html += `<td>0x${(cr.sealCRC >>> 0).toString(16).toUpperCase().padStart(8, '0')}</td>`;
         html += '</tr>';
     }
     html += '</tbody></table>';
@@ -233,17 +233,20 @@ function renderCListEntryDetail(nsIdx, entry) {
     h += '<table class="cr-table" style="margin-bottom:0.5rem;"><tbody>';
     const loc = entry.word0_location >>> 0;
     const lim = sim.parseNSWord1(entry.word1_limit);
-    const ver = (entry.word2_seals >>> 25) & 0x7F;
-    const seal = entry.word2_seals & 0xFFFF;
+    // Canonical NS ABI: gt_seq is W1[29:21]; W2 is a full integrity32 hash.
+    const ver = lim.gtSeq;
+    const seal = entry.word2_seals >>> 0;
     h += `<tr><td style="color:var(--church-blue);width:120px;">W0: Location</td><td>0x${loc.toString(16).toUpperCase().padStart(8,'0')}</td></tr>`;
     const typeNames = ['NULL','Inform','Outform','Abstract'];
-    h += `<tr><td style="color:var(--church-blue)">W1: Type</td><td>${typeNames[entry.gtType] || '?'} (${entry.gtType})</td></tr>`;
+    // Canonical NS ABI: type + c-list count are entry metadata (side-table via
+    // readNSEntry), NOT W1 fields. W1 is authority only: limit | gtSeq | G | F.
+    h += `<tr><td style="color:var(--church-blue)">Type (meta)</td><td>${typeNames[entry.gtType] || '?'} (${entry.gtType})</td></tr>`;
     h += `<tr><td style="color:var(--church-blue)">W1: F (Far)</td><td>${lim.f}</td></tr>`;
     h += `<tr><td style="color:var(--church-blue)">W1: G (GC)</td><td>${entry.gBit}</td></tr>`;
-    h += `<tr><td style="color:var(--church-blue)">W1: Chainable</td><td>${lim.chainable ? 'Yes' : 'No'}</td></tr>`;
+    h += `<tr><td style="color:var(--church-blue)">C-list count (meta)</td><td>${entry.clistCount || 0}</td></tr>`;
     h += `<tr><td style="color:var(--church-blue)">W1: Limit</td><td>0x${lim.limit.toString(16).toUpperCase().padStart(5,'0')} (${lim.limit + 1} words)</td></tr>`;
-    h += `<tr><td style="color:var(--church-blue)">W2: Version</td><td>${ver}</td></tr>`;
-    h += `<tr><td style="color:var(--church-blue)">W2: CRC Seal</td><td>0x${seal.toString(16).toUpperCase().padStart(4,'0')}</td></tr>`;
+    h += `<tr><td style="color:var(--church-blue)">W1: Seq (Version)</td><td>${ver}</td></tr>`;
+    h += `<tr><td style="color:var(--church-blue)">W2: Integrity32</td><td>0x${seal.toString(16).toUpperCase().padStart(8,'0')}</td></tr>`;
     h += '</tbody></table>';
 
     const wordCount = lim.limit + 1;
@@ -306,7 +309,7 @@ function renderCListEntryDetail(nsIdx, entry) {
                         const _mObj1 = _methodAtOffset(nsIdx, w);
                         const _disasm1 = _applyMethodCRNames(_applyMethodDRNames(_annotateRawClistSlot(asm.disassemble(word), _clBase, nsIdx), _mObj1), _mObj1);
                         const decoded = word === 0 ? 'HALT' : _wrapRegHover(typeof _highlightCLOOMCSource === 'function' ? _highlightCLOOMCSource(_disasm1, 'assembly') : _disasm1);
-                        const isPC   = sim.bootComplete && (addr === (sim.memory[sim.NS_TABLE_BASE + 2 * sim.NS_ENTRY_WORDS] || (2 * sim.SLOT_SIZE)) + 1 + sim.pc);
+                        const isPC   = sim.bootComplete && (addr === (sim.memory[sim._nsSlotBase(2)] || (2 * sim.SLOT_SIZE)) + 1 + sim.pc);
                         const dimmed = word === 0 ? ' style="opacity:0.35;"' : '';
                         const _dc = _decompileWord(word, addr, nsIdx, _clBase, _crPets1);
                         const _dcCls = _dc ? (_dc.compiler ? 'code-decompiled-compiler' : 'code-decompiled-user') : '';
@@ -349,8 +352,10 @@ function renderCListEntryDetail(nsIdx, entry) {
             gtHtml += '</tbody></table>';
             h += gtHtml;
         } else {
-            // No valid lump header — derive LUMP layout from NS entry fields
-            const cc2        = lim.clistCount;
+            // No valid lump header — derive LUMP layout from NS entry fields.
+            // Canonical NS ABI: c-list count is entry metadata (readNSEntry side-
+            // table), NOT a W1 field.
+            const cc2        = entry.clistCount || 0;
             const allocSize2 = lim.limit + 1;
             const clistStart2 = cc2 > 0 ? (allocSize2 - cc2) : allocSize2;
             const locHex2    = '0x' + loc.toString(16).toUpperCase().padStart(4,'0');
@@ -1062,7 +1067,7 @@ function showCListSlotPopup(evt, clistBase, slotIdx, cc) {
             if (parsedCR6 && parsedCR6.index < sim.nsCount) {
                 const nsEntry = sim.readNSEntry(parsedCR6.index);
                 if (nsEntry) {
-                    const nsGtSeq = (nsEntry.word2_seals >>> 25) & 0x7F;
+                    const nsGtSeq = sim.parseNSWord1(nsEntry.word1_limit).gtSeq;
                     versionPass = parsedCR6.gt_seq === nsGtSeq;
                     sealPass    = sim.validateMAC(nsEntry);
                 }
@@ -1374,8 +1379,9 @@ function showEditorCListPopup(evt) {
                 if (gt && gt.index !== undefined && sim.readNSEntry && sim.parseNSWord1) {
                     const nse = sim.readNSEntry(gt.index);
                     if (nse) {
-                        const lim = sim.parseNSWord1(nse.word1_limit);
-                        cc = (lim && lim.clistCount) || 0;
+                        // Canonical NS ABI: c-list count is entry metadata
+                        // (readNSEntry side-table), NOT a W1 field.
+                        cc = nse.clistCount || 0;
                     }
                 }
             }

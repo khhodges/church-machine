@@ -3,7 +3,7 @@ from amaranth.lib.memory import Memory as LibMemory
 from amaranth.lib.data import View
 
 from .hw_types import *
-from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, WORD2_LAYOUT, COND_FLAGS_LAYOUT, LUMP_HEADER_LAYOUT, SEALS_LAYOUT
+from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, WORD2_LAYOUT, COND_FLAGS_LAYOUT, LUMP_HEADER_LAYOUT
 from .integrity32 import integrity32_amaranth
 from .boot_rom import NUC_LUMP_BASE, NUC_PROGRAM_CW, DEMO_CLIST_NAMED_SLOTS
 from .registers import ChurchRegisters
@@ -219,7 +219,9 @@ class ChurchCore(Elaboratable):
         # cr15_m_set: pulse to load DR11-DR14 from CR15 + integrity32 and set M-flag (test)
         # cr15_m_writeback_trigger: pulse to validate DR11/integrity and write back to CR15
         # cr15_m_flag: current M-flag state (combinatorial read)
-        # dbg_m_dr11..15: combinatorial reads of DR11-DR15 for test inspection
+        # dbg_m_dr11..15: combinatorial reads of DR11-DR15 for test inspection.
+        #   DR15 = cache_token32 (resident Inform W3) — non-authoritative diagnostic
+        #   only; the M-window writeback never consults it (Task #2862).
         self.cr15_m_set               = Signal()
         self.cr15_m_writeback_trigger = Signal()
         self.cr15_m_flag              = Signal()
@@ -841,9 +843,12 @@ class ChurchCore(Elaboratable):
                 Mux(u_call.mgt_set_trigger, u_call.mgt_ns_integrity,
                     cr15_m_set_integrity)
             ),
+            # DR15 = resident Inform W3 (cache_token32) — non-authoritative,
+            # diagnostic only.  Task #2862: no longer used to gate/authorise
+            # any writeback.  cr15_m_set path has no W3 available → DR15=0.
             u_regs.m_set_dr15.eq(
-                Mux(u_call.mgt_set_trigger, u_call.mgt_ns_seals,
-                    0)   # cr15_m_set path: seals word not available; DR15=0
+                Mux(u_call.mgt_set_trigger, u_call.mgt_cache_token32,
+                    0)
             ),
         ]
 
@@ -1937,6 +1942,10 @@ class ChurchCore(Elaboratable):
                     m.next = "MINT_WRITE_NS3"
 
                 with m.State("MINT_WRITE_NS3"):
+                    # NS W3 (resident Inform cache_token32) is written ZERO here:
+                    # Mint has no trusted cache-token input, so it does not invent
+                    # authenticity (Task #2862).  W3 is non-authoritative anyway —
+                    # it never gates/authorises any writeback.
                     m.d.comb += [
                         mint_ns_wr_en.eq(1),
                         mint_ns_addr.eq(mint_ns_entry_base + 12),
@@ -2167,6 +2176,8 @@ class ChurchCore(Elaboratable):
                     m.next = "MINT_WRITE_NS3"
 
                 with m.State("MINT_WRITE_NS3"):
+                    # NS W3 (cache_token32) written ZERO: no trusted cache-token
+                    # input, non-authoritative (Task #2862).
                     m.d.comb += [
                         mint_ns_wr_en.eq(1),
                         mint_ns_addr.eq(mint_ns_entry_base_ni + 12),
@@ -2286,26 +2297,16 @@ class ChurchCore(Elaboratable):
             mwin_gtseq_ok.eq(mwin_dr11_gt_seq == mwin_dr13_gt_seq),
         ]
 
-        # Seal check — DR15[24:0] must equal fnv32(DR12, DR13) & 0x1FFFFFF.
-        # Recomputes the one-round FNV-1a hash of the NS entry location (DR12)
-        # and limit/authority (DR13) and compares the lower 25 bits against the
-        # stored seal field.  A mismatch means the seals word was replaced with a
-        # stale or replayed value since the M-window was set.
-        mwin_seal_computed = Signal(32)
-        mwin_seal_masked   = Signal(25)
-        mwin_seal_ok       = Signal()
-        # Break the FNV-1a step into three explicit binary operations so that
-        # Yosys does not fuse the XOR–multiply–XOR chain into a single multi-term
-        # $macc cell that write_verilog cannot emit as plain Verilog.
-        mwin_fnv_xor       = Signal(32)   # FNV_OFFSET_32 ^ dr12
-        mwin_fnv_mul       = Signal(32)   # xor  * FNV_PRIME_32  (truncated to 32 b)
-        m.d.comb += mwin_fnv_xor.eq(FNV_OFFSET_32 ^ mwin_dr12_lat)
-        m.d.comb += mwin_fnv_mul.eq(mwin_fnv_xor * FNV_PRIME_32)
-        m.d.comb += [
-            mwin_seal_computed.eq(mwin_fnv_mul ^ mwin_dr13_lat),
-            mwin_seal_masked.eq(mwin_seal_computed[:25]),
-            mwin_seal_ok.eq(mwin_seal_masked == View(SEALS_LAYOUT, mwin_dr15_lat).seal),
-        ]
+        # NOTE (Task #2862): the former FNV/DR15 "seal" check has been REMOVED.
+        # DR15 holds the resident Inform W3 (cache_token32) — a non-authoritative,
+        # diagnostic-only value.  It is deliberately NOT recomputed, NOT compared,
+        # and NEVER gates or authorises the M-window writeback.  A random or
+        # tampered W3 can therefore neither authorise nor deny a writeback; the
+        # writeback closes closed on the three authoritative checks below:
+        #   - non-NULL GT       (mwin_dr11_valid)
+        #   - integrity32       (mwin_integrity_ok)
+        #   - 9-bit gt_seq match (mwin_gtseq_ok)
+        # DR15 remains exposed (dbg_m_dr15) purely for diagnostics.
 
         with m.FSM(name="mwin"):
             with m.State("IDLE"):
@@ -2333,18 +2334,21 @@ class ChurchCore(Elaboratable):
 
             with m.State("WRITEBACK"):
                 m.d.comb += mwin_busy.eq(1)
-                # Full validation: all three checks must pass; any failure → INVALID_OP + M-clear.
-                #   integrity32(DR12,DR13)==DR14        (integrity_ok)
-                #   GT.gt_seq==NS_auth.gt_seq           (gtseq_ok — revocation via gt_seq fields)
-                #   fnv32(DR12,DR13)&0x1FFFFFF==DR15[24:0]  (seal_ok — replay gap closed)
-                with m.If(mwin_integrity_ok & mwin_gtseq_ok & mwin_seal_ok):
+                # Authoritative validation (Task #2862): all THREE checks must pass;
+                # any failure → INVALID_OP + M-clear (fail closed).  DR15/W3 is NOT
+                # consulted here — it is a non-authoritative cache token only.
+                #   integrity32(DR12,DR13)==DR14   (integrity_ok)
+                #   GT.gt_seq==NS_auth.gt_seq      (gtseq_ok — revocation via gt_seq fields)
+                #   GT.gt_type != NULL             (dr11_valid — checked at IDLE transition)
+                with m.If(mwin_integrity_ok & mwin_gtseq_ok):
                     mwin_wr_view = View(CAP_REG_LAYOUT, mwin_cr_wr_data)
                     m.d.comb += [
                         mwin_wr_view.word0_gt.eq(mwin_dr11_lat),
                         mwin_wr_view.word1_location.eq(mwin_dr12_lat),
                         mwin_wr_view.word2_w2.eq(mwin_dr13_lat),
-                        # DR15 (NS word3/seals) is software-visible while M=1 but is not
-                        # written back to CR15 since the 3-word CAP_REG layout has no word3.
+                        # DR15 (resident Inform W3 / cache_token32) is software-visible
+                        # while M=1 for diagnostics, but it is neither authoritative nor
+                        # written back to CR15 (the 3-word CAP_REG layout has no word3).
                         mwin_cr_wr_en.eq(1),
                         mwin_m_set_en.eq(0),
                         mwin_m_clear_en.eq(1),

@@ -587,7 +587,7 @@
                 var clistBase  = cr6.word1 >>> 0;
                 var clistCount = 0;
                 try {
-                    clistCount = s.parseNSWord1(cr6.word2).clistCount;
+                    clistCount = s._clistCountForCR(6);
                 } catch (e) { clistCount = 0; }
 
                 if (clistCount > 0) {
