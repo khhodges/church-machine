@@ -1301,8 +1301,10 @@ function _applyPendingSimLoad() {
             sz: 1,
             frameWord: sentinelFrameWord,
         });
-        const threadBase = sim.cr[12] && sim.cr[12].word1;
-        if (threadBase) {
+        const threadBase = typeof sim._activeThreadBase === 'function'
+            ? sim._activeThreadBase()
+            : null;
+        if (threadBase !== null) {
             sim.memory[threadBase + sp_max] = sentinelFrameWord;
         }
         sim.sto = sp_max - 2;

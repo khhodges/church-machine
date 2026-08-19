@@ -2442,8 +2442,8 @@ class ChurchSimulator {
                     sz: 1,
                     frameWord: sentinelFrameWord,
                 });
-                const threadBase = this.cr[12] && this.cr[12].word1;
-                if (threadBase) {
+                const threadBase = this._activeThreadBase();
+                if (threadBase !== null) {
                     this.memory[threadBase + sp_max]     = sentinelFrameWord;
                     this.memory[threadBase + sp_max - 1] = oldCR6GT;
                 }
@@ -3479,12 +3479,24 @@ class ChurchSimulator {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
+    // Return the active Thread LUMP base, including the architecturally valid
+    // address zero.  A missing/null CR12 is represented by null rather than a
+    // falsy base so callers never confuse "Thread starts at word 0" with
+    // "there is no Thread capability".
+    _activeThreadBase() {
+        const cr12 = this.cr[12];
+        if (!cr12 || !Number.isInteger(cr12.word1) ||
+            ChurchSimulator.isNullGT(cr12.word0 >>> 0)) {
+            return null;
+        }
+        return cr12.word1 >>> 0;
+    }
+
     _writeDR(drIdx, value) {
         this.dr[drIdx] = value >>> 0;
         if (drIdx < 16) {
-            const cr12 = this.cr[12];
-            const threadBase = cr12 && cr12.word1;
-            if (threadBase) {
+            const threadBase = this._activeThreadBase();
+            if (threadBase !== null) {
                 const homeAddr = (threadBase + 1 + drIdx) >>> 0;
                 if (homeAddr < this.memory.length) {
                     this.memory[homeAddr] = value >>> 0;
@@ -3508,8 +3520,8 @@ class ChurchSimulator {
         this.cr[crIdx].word3 = this.mElevation ? (_w3Cache >>> 0) : 0;
         this.cr[crIdx].m = this.mElevation ? 1 : 0;
         if (crIdx <= 11 && crIdx !== 6) {
-            const threadBase = this.cr[12] && this.cr[12].word1;
-            if (threadBase) {
+            const threadBase = this._activeThreadBase();
+            if (threadBase !== null) {
                 const homeAddr = (threadBase + THREAD_CAPS_OFFSET + crIdx) >>> 0;
                 const cr12GT = this.cr[12].word0;
                 if (cr12GT) {
@@ -3528,8 +3540,8 @@ class ChurchSimulator {
     _clearCR(crIdx) {
         this.cr[crIdx] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
         if (crIdx <= 11 && crIdx !== 6) {
-            const threadBase = this.cr[12] && this.cr[12].word1;
-            if (threadBase) {
+            const threadBase = this._activeThreadBase();
+            if (threadBase !== null) {
                 this._threadWrite(threadBase + THREAD_CAPS_OFFSET + crIdx, 0, `_clearCR(${crIdx})`);
             }
         }
@@ -3702,7 +3714,7 @@ class ChurchSimulator {
     _flushLambdaCache() {
         if (!this.lambdaActive || !this.lambdaCachedFrame) return;
         const c = this.lambdaCachedFrame;
-        if (c.threadBase) {
+        if (Number.isInteger(c.threadBase)) {
             this._threadWrite(c.threadBase + c.addr, c.word, 'LAMBDA_FLUSH');
         }
         this.lambdaActive = false;
@@ -4746,8 +4758,8 @@ class ChurchSimulator {
         this._flushLambdaCache();
 
         const savedSTO = this.sto;
-        const callThreadBase = this.cr[12] && this.cr[12].word1;
-        if (callThreadBase) {
+        const callThreadBase = this._activeThreadBase();
+        if (callThreadBase !== null) {
             const hdrRead = this._threadRead(callThreadBase, `CALL CR${d.crDst} thread-hdr`);
             if (!hdrRead.ok) return null;
             const hdr = this.parseLumpHeader(hdrRead.value);
@@ -4782,7 +4794,7 @@ class ChurchSimulator {
             sz: 1,
             frameWord,
         });
-        if (callThreadBase) {
+        if (callThreadBase !== null) {
             if (!this._threadWrite(callThreadBase + savedSTO, frameWord, `CALL CR${d.crDst} frame`)) {
                 this.callStack.pop();
                 return null;
@@ -5264,7 +5276,7 @@ class ChurchSimulator {
         // Mask semantics: set bit = PRESERVE callee's CR (return value); clear bit = restore caller's.
         // One combined pass ensures callee internal GTs are never visible to the caller
         // unless explicitly preserved as return values.
-        const tnBaseRet = this.cr[12] && this.cr[12].word1;
+        const tnBaseRet = this._activeThreadBase();
         const clearedCRs = [];
         const preservedCRs = [];
         for (let i = 0; i < 12; i++) {
@@ -5274,7 +5286,7 @@ class ChurchSimulator {
             } else if (frame.savedCRs && frame.savedCRs[i] !== undefined) {
                 // Not a return value — restore the caller's saved state
                 this.cr[i] = {...frame.savedCRs[i]};
-                if (i !== 6 && tnBaseRet) {
+                if (i !== 6 && tnBaseRet !== null) {
                     this._threadWrite(tnBaseRet + THREAD_CAPS_OFFSET + i, this.cr[i].word0 >>> 0, `RETURN CR${i}-restore`);
                 }
             } else {
@@ -5834,8 +5846,8 @@ class ChurchSimulator {
         this._flushLambdaCache();
 
         const savedSTO = this.sto;
-        const lambdaThreadBase = this.cr[12] && this.cr[12].word1;
-        if (lambdaThreadBase) {
+        const lambdaThreadBase = this._activeThreadBase();
+        if (lambdaThreadBase !== null) {
             const hdrRead = this._threadRead(lambdaThreadBase, `LAMBDA CR${crIdx} thread-hdr`);
             if (!hdrRead.ok) return null;
             const threadHdr = this.parseLumpHeader(hdrRead.value);
@@ -6091,8 +6103,8 @@ class ChurchSimulator {
         const clistStart_ec = hdr_ec.lumpSize - hdr_ec.cc;
 
         const savedSTO_ec = this.sto;
-        const ecThreadBase = this.cr[12] && this.cr[12].word1;
-        if (ecThreadBase) {
+        const ecThreadBase = this._activeThreadBase();
+        if (ecThreadBase !== null) {
             const hdrRead_th = this._threadRead(ecThreadBase, `ELOADCALL CR${d.crDst} thread-hdr`);
             if (!hdrRead_th.ok) return null;
             const hdr_th     = this.parseLumpHeader(hdrRead_th.value);
@@ -6117,6 +6129,14 @@ class ChurchSimulator {
             sz: 1,
             frameWord:  frameWord_ec,
         });
+        if (ecThreadBase !== null) {
+            const oldCR6GT_ec = this.cr[6].word0 >>> 0;
+            if (!this._threadWrite(ecThreadBase + savedSTO_ec, frameWord_ec, `ELOADCALL CR${d.crDst} frame`) ||
+                !this._threadWrite(ecThreadBase + savedSTO_ec - 1, oldCR6GT_ec, `ELOADCALL CR${d.crDst} CR6-save`)) {
+                this.callStack.pop();
+                return null;
+            }
+        }
         this.sto = (savedSTO_ec - 2) & 0xFFF;
 
         // Write the loaded GT into the destination CR.
@@ -6471,9 +6491,8 @@ class ChurchSimulator {
                 this.ledMode = 'program';
                 // Sync to thread lump DR zone so hardware-accurate DR home is maintained.
                 if (drIdx < 16) {
-                    const dw12 = this.cr[12];
-                    const dwThreadBase = dw12 && dw12.word1;
-                    if (dwThreadBase) {
+                    const dwThreadBase = this._activeThreadBase();
+                    if (dwThreadBase !== null) {
                         const dwHomeAddr = (dwThreadBase + 1 + drIdx) >>> 0;
                         if (dwHomeAddr < this.memory.length) {
                             this.memory[dwHomeAddr] = value;
@@ -6627,8 +6646,8 @@ class ChurchSimulator {
             return null;
         }
         if (drIdx < 16) {
-            const dr12 = this.cr[12];
-            if (!dr12 || !dr12.word1) {
+            const drThreadBase = this._activeThreadBase();
+            if (drThreadBase === null) {
                 this.fault('NULL_CAP', `DREAD: CR12 is null — cannot sync DR${drIdx} to thread lump DR zone`);
                 return null;
             }
@@ -6703,9 +6722,8 @@ class ChurchSimulator {
         const value = this.dr[drIdx] >>> 0;
         let dwHomeAddr = -1;
         if (drIdx < 16) {
-            const dw12 = this.cr[12];
-            const dwThreadBase = dw12 && dw12.word1;
-            if (!dwThreadBase) {
+            const dwThreadBase = this._activeThreadBase();
+            if (dwThreadBase === null) {
                 this.fault('NULL_CAP', `DWRITE: CR12 is null — cannot sync DR${drIdx} to thread lump DR zone`);
                 return null;
             }
