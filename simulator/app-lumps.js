@@ -5377,16 +5377,17 @@ window.showFormatLump = function() {
             for (var _wi = 0; _wi < _svCW; _wi++) _svBinary[1 + _wi] = (_svWords[_wi] >>> 0);
         }
 
-        // Tier 2 (source embedded) only if it fits without growing the lump.
-        // Never inflate the binary just to store source — fall back to Tier 0
-        // (API JSON only) when freespace is too small.  Only grow for Tier 0
-        // itself, which is tiny (~1–3 words) and only needed for fully-packed lumps.
+        // Prefer Tier 2 (API JSON + full source embedded).  Grow the lump to the
+        // smallest power-of-2 that fits.  Fall back to Tier 0 (API JSON only)
+        // only when there is no source text at all.
         if (_srcWds && _t2Size <= (_fsEnd0 - _fsStart)) {
+            _flags = 0x03; _frameWds = [null].concat(_apiWds, [_srcBytes.length >>> 0], _srcWds);
+        } else if (_srcWds) {
+            _grow(_t2Size);
             _flags = 0x03; _frameWds = [null].concat(_apiWds, [_srcBytes.length >>> 0], _srcWds);
         } else if (_t0Size <= (_fsEnd0 - _fsStart)) {
             _flags = 0x00; _frameWds = [null].concat(_apiWds);
         } else {
-            // Fully-packed lump — grow just enough to fit the API JSON (Tier 0).
             _grow(_t0Size);
             _flags = 0x00; _frameWds = [null].concat(_apiWds);
         }
