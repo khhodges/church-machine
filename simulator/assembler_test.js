@@ -359,6 +359,37 @@ const WUKONG_CALLHOME_CONVENTIONS = {
         result.errors[0] ? result.errors[0].message : '(no error)');
 }
 
+// WCH5: WukongCallHome.hw is a complete hardware-LUMP C-list label, not the
+// "hw" method on WukongCallHome.  An exact dotted capability must win over
+// method syntax and call the declared row's default entry directly.
+{
+    const a = new ChurchAssembler(WUKONG_CALLHOME_CONVENTIONS);
+    const result = a.assemble(
+        'capabilities { LED0 RW, UART_TX W, WukongCallHome.hw E }\n' +
+        'CALL WukongCallHome.hw'
+    );
+    const callWord = result.words[0] >>> 0;
+    assert('WCH5 dotted C-list label assembles without a shortened-name error',
+        result.errors.length === 0, result.errors.map(e => e.message).join('; '));
+    assert('WCH5 dotted C-list label emits ELOADCALL to its declared row',
+        ((callWord >>> 27) & 0x1F) === 8 &&
+        ((callWord >>> 19) & 0xF) === 0 &&
+        ((callWord >>> 15) & 0xF) === 6 &&
+        (callWord & 0x7FFF) === 34,
+        `word=0x${callWord.toString(16)}`);
+}
+
+// WCH6: case-normalized dotted labels retain the exact-label interpretation.
+{
+    const a = new ChurchAssembler(WUKONG_CALLHOME_CONVENTIONS);
+    const result = a.assemble(
+        'capabilities { WukongCallHome.hw E }\n' +
+        'CALL WUKONGCALLHOME.HW'
+    );
+    assert('WCH6 normalized dotted C-list label assembles without errors',
+        result.errors.length === 0, result.errors.map(e => e.message).join('; '));
+}
+
 // ── Salvation abstraction method conventions (task-2032) ────────────────────
 // Mirrors simulator/abstractions.js Salvation method table: Create=0,
 // Release=1, Find=2, Transfer=3, Validate=4, Audit=5, main=14 (boot c-list
