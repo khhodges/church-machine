@@ -1760,8 +1760,14 @@ function _populateLumpApiTab(lump, panelId) {
         html += '<div style="color:var(--text-secondary);font-style:italic;font-size:0.83rem;padding:0.25rem 0;">cc\u202f=\u202f0 \u2014 no private c-list; uses ambient boot c-list at runtime.</div>';
     } else {
         html += '<table class="lump-detail-table"><thead><tr><th>Slot</th><th>Name</th><th>GT Word</th><th>Role</th></tr></thead><tbody>';
+        // Some sidecar capability arrays carry an explicit .slot field; others are
+        // plain-index arrays with no .slot.  Use slot-based lookup when any entry
+        // carries an explicit slot number, otherwise fall back to array index.
+        const _capsHaveSlots = caps.some(c => c && typeof c.slot === 'number');
         for (let si = 0; si < cc; si++) {
-            const cap  = caps.find(c => c.slot === si);
+            const cap  = _capsHaveSlots
+                ? (caps.find(c => c.slot === si) || null)
+                : (caps[si] || null);
             const name = cap ? (cap.name || '\u2014') : '\u2014';
             const gtRaw = cap ? (cap.gt || '') : '';
             const gtWord = gtRaw ? (parseInt(gtRaw, 16) >>> 0) : 0;
@@ -5346,7 +5352,7 @@ window.showFormatLump = async function() {
     // (never include token/issue — circular hash rule) and embed the current
     // editor source so the binary is self-defining (Tier 2).
     // Spec: lump-audit.js lumpAuditValidateContentFrame(), CM_LUMP_SPECIFICATION §Freespace.
-    await (async function _embedV13Frame() {
+    try { await (async function _embedV13Frame() {
         // UTF-8 encode a string to a byte array (big-endian word-packed later).
         function _utf8Bytes(s) {
             if (typeof TextEncoder !== 'undefined') {
@@ -5392,12 +5398,23 @@ window.showFormatLump = async function() {
         // Source text — compress with deflate-raw (Tier 2 compressed, flags 0x07).
         // srcLen in the frame stores the COMPRESSED byte count so the decompressor
         // knows exactly how many bytes to feed to DecompressionStream.
-        // Falls back to Tier 0 (API JSON only) when the editor is empty.
+        // Falls back to uncompressed Tier 2 (flags 0x03) if CompressionStream is
+        // unavailable or fails, and to Tier 0 (API JSON only) when editor is empty.
         var _srcEl    = document.getElementById('asmEditor');
         var _srcText  = _srcEl ? (_srcEl.value || '').trim() : '';
         var _srcRaw   = _srcText ? _utf8Bytes(_srcText) : null;
-        var _srcBytes = _srcRaw ? await _deflateRaw(_srcRaw) : null;  // compressed bytes
-        var _srcWds   = _srcBytes ? _packBE(_srcBytes) : null;
+        var _compressed = false;
+        var _srcBytes = null;
+        if (_srcRaw) {
+            try {
+                _srcBytes   = await _deflateRaw(_srcRaw);
+                _compressed = true;
+            } catch (_ce) {
+                _srcBytes   = _srcRaw;   // uncompressed fallback
+                _compressed = false;
+            }
+        }
+        var _srcWds = _srcBytes ? _packBE(_srcBytes) : null;
 
         // Frame size: 1 header + apiWords [+ 1 srcLen + compressed srcWords]
         var _fsStart = 1 + _svCW;
@@ -5419,16 +5436,17 @@ window.showFormatLump = async function() {
             for (var _wi = 0; _wi < _svCW; _wi++) _svBinary[1 + _wi] = (_svWords[_wi] >>> 0);
         }
 
-        // Prefer Tier 2 compressed (flags 0x07 = has_source | compressed).
-        // srcLen stores the COMPRESSED byte count; the reader feeds exactly that
-        // many bytes to DecompressionStream('deflate-raw') to recover the source.
+        // Prefer Tier 2 compressed (flags 0x07) or uncompressed (flags 0x03).
+        // srcLen stores the stored byte count; compressed readers additionally
+        // pass those bytes through DecompressionStream('deflate-raw').
         // Grow the lump to the smallest power-of-2 that fits.
         // Fall back to Tier 0 (API JSON only) when there is no source text.
+        var _t2Flags = _compressed ? 0x07 : 0x03;
         if (_srcWds && _t2Size <= (_fsEnd0 - _fsStart)) {
-            _flags = 0x07; _frameWds = [null].concat(_apiWds, [_srcBytes.length >>> 0], _srcWds);
+            _flags = _t2Flags; _frameWds = [null].concat(_apiWds, [_srcBytes.length >>> 0], _srcWds);
         } else if (_srcWds) {
             _grow(_t2Size);
-            _flags = 0x07; _frameWds = [null].concat(_apiWds, [_srcBytes.length >>> 0], _srcWds);
+            _flags = _t2Flags; _frameWds = [null].concat(_apiWds, [_srcBytes.length >>> 0], _srcWds);
         } else if (_t0Size <= (_fsEnd0 - _fsStart)) {
             _flags = 0x00; _frameWds = [null].concat(_apiWds);
         } else {
@@ -5451,7 +5469,7 @@ window.showFormatLump = async function() {
         for (var _fi = 0; _fi < _frameWds.length; _fi++) {
             _svBinary[_fsStart + _fi] = _frameWds[_fi] >>> 0;
         }
-    })();
+    })(); } catch (_frameErr) { /* frame embedding failed — binary is still valid without it */ }
     // ─────────────────────────────────────────────────────────────────────────
 
     // ── Populate c-list tail with pending GT sentinels ────────────────────────
