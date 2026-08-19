@@ -1899,21 +1899,34 @@ class ChurchSimulator {
         // boot image must be generated and loaded first.
         // NS entry word1/word2 are still set so the NS table entry is structurally
         // valid (non-zero), satisfying isNSEntryValid() during boot step B:05.
+        //
+        // ARCHITECTURAL HONESTY (Task #2867): the fallback placeholder is ALWAYS
+        // anchored to the canonical Boot.Abstr slot (_bootAbstrSlot = 6), NEVER to
+        // the user-selected this.bootEntrySlot.  When the user has selected a
+        // different entry (e.g. CapabilityTest at slot 10) but no boot image with
+        // its real body has been loaded, we must NOT fabricate an executable-looking
+        // header at the selected slot — that would let a zero-body slot masquerade
+        // as bootable code.  The selected slot keeps whatever the catalog loop wrote
+        // (a valid NS descriptor pointing at an empty region); boot will fault
+        // cleanly at B:06 (LUMP_MAGIC) until a real image supplies the body.
+        const _placeholderSlot = (typeof this._bootAbstrSlot === 'number')
+            ? this._bootAbstrSlot : this.bootEntrySlot;
         const entryLumpSize    = BOOT_ABSTR_LUMP_SIZE;
-        const entryNSBase      = this._nsSlotBase(this.bootEntrySlot);
+        const entryNSBase      = this._nsSlotBase(_placeholderSlot);
         const entryCRLimit     = entryLumpSize - 1;
-        const bootEntryLoc     = this.memory[this._nsSlotBase(this.bootEntrySlot)];
+        const bootEntryLoc     = this.memory[this._nsSlotBase(_placeholderSlot)];
         // W1 is authority only. The type hint below is presentation metadata.
         this.memory[entryNSBase + 1] = this.packNSWord1(entryCRLimit, 0, 0, 0);
         this.memory[entryNSBase + 2] = this.makeVersionSeals(0, bootEntryLoc, entryCRLimit);
         if (!this._nsUiTypeHint) this._nsUiTypeHint = {};
-        this._nsUiTypeHint[this.bootEntrySlot] = 1 /* display-only Inform hint */;
+        this._nsUiTypeHint[_placeholderSlot] = 1 /* display-only Inform hint */;
         if (!this._nsClistCount) this._nsClistCount = {};
-        this._nsClistCount[this.bootEntrySlot] = 0;
+        this._nsClistCount[_placeholderSlot] = 0;
 
-        // Write a minimal Boot.Abstr lump header at the boot entry slot physical
-        // address so NUC_CLIST (B:06) can read a valid magic word.  Without this,
-        // the standalone simulator (no boot image loaded) faults on the header check.
+        // Write a minimal Boot.Abstr lump header at the CANONICAL boot-abstraction
+        // slot's physical address so NUC_CLIST (B:06) can read a valid magic word
+        // when SelfTest itself is the boot entry.  Without this, the standalone
+        // simulator (no boot image loaded) faults on the header check.
         // Matches generate_boot_image() which always writes the real SelfTest lump;
         // for an empty standalone init we use cw=3, cc=0 (minimal valid header).
         // The parity test compares this word against the Python-generated header.

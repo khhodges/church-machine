@@ -227,6 +227,161 @@ def test_boot_image_loads_and_boots(cfg, skip_window, expected_ns_count):
     )
 
 
+# ---- Task #2867: CapabilityTest boot-entry residency + boot ----------------
+#
+# Selecting CapabilityTest (NS slot 10) as the boot entry must produce an
+# image whose slot-10 body is the REAL 23-word program with 5 declared
+# capabilities — never a synthetic header over zero words — and the simulator
+# must boot it to completion with CR14 pointing at slot 10.
+
+CAPTEST_SLOT = 10
+CAPTEST_CW   = 23
+CAPTEST_CC   = 5
+
+
+def _saved_project_cfg():
+    """The saved boot-config.json when present (it is gitignored runtime
+    state), else the equivalent default Wukong geometry — keeping the test
+    hermetic on a fresh checkout."""
+    path = os.path.join(ROOT, "server", "boot-config.json")
+    if os.path.isfile(path):
+        with open(path) as f:
+            return json.load(f)
+    return {
+        "step1": {
+            "totalNamespaceWords": 32768,
+            "namespaceLumpWords":   1024,
+            "threadLumpWords":       512,
+        },
+    }
+
+
+def _slot_body(image_bytes, slot):
+    """Return (location, body_words[64]) for an NS slot in an image."""
+    import struct
+    n = len(image_bytes) // 4
+    words = struct.unpack(f"<{n}I", image_bytes)
+    base = n - (slot + 1) * 4          # inverted NS layout, 4 words/slot
+    loc = words[base]
+    return loc, words[loc:loc + 64]
+
+
+def test_capabilitytest_image_payload_integrity():
+    """Generated image embeds CapabilityTest's real body at slot 10."""
+    cfg = _saved_project_cfg()
+    image = generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=CAPTEST_SLOT)
+    loc, body = _slot_body(image, CAPTEST_SLOT)
+    assert loc > 0, "slot 10 has no allocated location"
+    hdr = body[0]
+    assert (hdr >> 27) == 0x1F, f"slot 10 header magic invalid: 0x{hdr:08X}"
+    cw = (hdr >> 10) & 0x1FFF
+    cc = hdr & 0xFF
+    assert cw == CAPTEST_CW, f"slot 10 cw={cw}, expected {CAPTEST_CW}"
+    assert cc == CAPTEST_CC, f"slot 10 cc={cc}, expected {CAPTEST_CC}"
+    # The code region must be real instructions, not a zero-filled placeholder.
+    code = body[1:1 + CAPTEST_CW]
+    nonzero = sum(1 for wv in code if wv != 0)
+    assert nonzero >= CAPTEST_CW - 1, (
+        f"slot 10 code region is mostly zeros ({nonzero}/{CAPTEST_CW} non-zero) — "
+        f"placeholder body instead of the real CapabilityTest program"
+    )
+    # All 5 declared capabilities present at the lump tail.
+    clist = body[64 - CAPTEST_CC:64]
+    assert all(gv != 0 for gv in clist), (
+        f"slot 10 c-list has zero entries: {[hex(gv) for gv in clist]}"
+    )
+
+
+def test_capabilitytest_boot_entry_boots():
+    """Simulator boots to completion with CapabilityTest selected (slot 10)."""
+    cfg = _saved_project_cfg()
+    image = generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=CAPTEST_SLOT)
+    status = _run_harness(cfg, image)
+    assert status["loaded"] is True
+    assert status["faultLog"] == [], (
+        f"boot raised fault(s): {status['faultLog']}"
+    )
+    assert status["bootComplete"] is True
+    assert status["bootEntrySlot"] == CAPTEST_SLOT
+    # CR14 (code, R+X) must target the selected entry, not Boot.Abstr.
+    assert _gt_index(status["cr14"]["word0"]) == CAPTEST_SLOT, (
+        f"CR14 index={_gt_index(status['cr14']['word0'])}, expected {CAPTEST_SLOT}"
+    )
+    # CR0 (boot-entry E-GT via Thread.caps[0]) must also encode slot 10.
+    assert (status["cr0"]["word0"] & 0xFFFF) == CAPTEST_SLOT
+
+
+def test_capabilitytest_manifest_boot_resident():
+    """CapabilityTest's manifest entry must stay boot_resident=true.
+
+    Without this flag the generator writes slot 10's NS descriptor but a
+    zero-filled body — the exact bug behind Task #2867.
+    """
+    with open(os.path.join(LUMPS_DIR, "manifest.json")) as f:
+        entries = json.load(f)
+    matches = [e for e in entries if isinstance(e, dict)
+               and e.get("abstraction") == "CapabilityTest"
+               and e.get("ns_slot") == CAPTEST_SLOT]
+    assert matches, "CapabilityTest slot-10 entry missing from manifest.json"
+    assert matches[0].get("boot_resident") is True, (
+        "CapabilityTest manifest entry must carry boot_resident=true so "
+        "generate_boot_image embeds its real body at slot 10"
+    )
+
+
+def test_served_boot_image_carries_capabilitytest_body(tmp_path):
+    """The boot artifact the server ships must carry CapabilityTest's real
+    body at slot 10 (not zeros).
+
+    server/lumps/boot-image.bin is intentionally gitignored: the server
+    (re)generates it from tracked inputs — boot-config.json, manifest.json,
+    and the lump binaries — whenever those are newer.  This test is
+    therefore hermetic: it reproduces that exact regeneration path into a
+    temp file and validates the artifact, so it passes from a fresh
+    checkout without relying on untracked workspace residue.
+    """
+    from server.boot_image import validate_boot_image
+    cfg = _saved_project_cfg()
+    image = generate_boot_image(cfg, LUMPS_DIR)   # default entry, as on regen
+    path = tmp_path / "boot-image.bin"
+    path.write_bytes(image)
+    served = path.read_bytes()
+    # Accepted by the format/mandatory-slot validator (rejects obsolete images).
+    validate_boot_image(served)
+    loc, body = _slot_body(served, CAPTEST_SLOT)
+    hdr = body[0]
+    assert (hdr >> 27) == 0x1F and ((hdr >> 10) & 0x1FFF) == CAPTEST_CW, (
+        f"served image slot 10 header 0x{hdr:08X} is not the real "
+        f"CapabilityTest lump (expected magic=0x1F, cw={CAPTEST_CW}) — "
+        f"the manifest boot_resident flag regressed"
+    )
+    nonzero = sum(1 for wv in body[1:1 + CAPTEST_CW] if wv != 0)
+    assert nonzero >= CAPTEST_CW - 1, (
+        "served image slot 10 code region is zero-filled — the manifest "
+        "boot_resident flag regressed"
+    )
+
+
+def test_stale_image_reports_loaded_false():
+    """An image without the current format tag must report loaded=False and
+    must not fabricate a bootable state (bootComplete stays False)."""
+    cfg = _cfg_default()
+    image = bytearray(generate_boot_image(cfg, LUMPS_DIR))
+    # Corrupt the format tag wherever it appears (scan the last 8192 words).
+    import struct as _struct
+    n = len(image) // 4
+    words = list(_struct.unpack(f"<{n}I", bytes(image)))
+    from server.boot_image import BOOT_IMAGE_FORMAT_TAG
+    for i in range(max(0, n - 8192), n):
+        if words[i] == BOOT_IMAGE_FORMAT_TAG:
+            words[i] = 0xDEADBEEF
+    stale = _struct.pack(f"<{n}I", *words)
+    status = _run_harness(cfg, stale)
+    assert status["loaded"] is False, (
+        "loadBootImage() must reject an image without the current format tag"
+    )
+
+
 if __name__ == "__main__":
     failures = 0
     for p in CONFIGS:
@@ -238,4 +393,21 @@ if __name__ == "__main__":
         except AssertionError as e:
             failures += 1
             print(f"FAIL: {name}\n{e}")
+    import tempfile
+    from pathlib import Path
+    for fn in (test_capabilitytest_image_payload_integrity,
+               test_capabilitytest_boot_entry_boots,
+               test_capabilitytest_manifest_boot_resident,
+               test_served_boot_image_carries_capabilitytest_body,
+               test_stale_image_reports_loaded_false):
+        try:
+            if fn is test_served_boot_image_carries_capabilitytest_body:
+                with tempfile.TemporaryDirectory() as td:
+                    fn(Path(td))
+            else:
+                fn()
+            print(f"PASS: {fn.__name__}")
+        except AssertionError as e:
+            failures += 1
+            print(f"FAIL: {fn.__name__}\n{e}")
     sys.exit(1 if failures else 0)

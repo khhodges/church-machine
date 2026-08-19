@@ -880,18 +880,37 @@ function init() {
     // Probe once at startup — covers the case where the user navigated
     // here after a previous session generated an image.
     _probeBootImage().then(buf => {
-        if (buf) { window.bootImage = buf; window.bootImageAvailable = true;
+        if (buf) {
+                   // Task #2867: acceptance state must reflect the loader's
+                   // verdict, not merely that a fetch succeeded.  loadBootImage()
+                   // returns false for a stale/rejected binary; in that case the
+                   // image must NOT be marked available (a rejected image cannot
+                   // masquerade as booted memory).
+                   let _accepted = false;
                    try {
-                       sim.loadBootImage(buf); _applyBootEntryToSim();
-                       // Evict stale sticky patches for all NS slots now owned
-                       // by the boot image.  Patches that differ from the new
-                       // binary are cleared and reported; matching (redundant)
-                       // patches are cleared silently.  Must run before
-                       // _reapplyStickyPatches() fires at boot completion.
-                       if (typeof window._clearBootImageStickyPatches === 'function') {
-                           window._clearBootImageStickyPatches(sim.nsCount || 0);
+                       _accepted = sim.loadBootImage(buf) === true;
+                       if (_accepted) {
+                           _applyBootEntryToSim();
+                           // Evict stale sticky patches for all NS slots now owned
+                           // by the boot image.  Patches that differ from the new
+                           // binary are cleared and reported; matching (redundant)
+                           // patches are cleared silently.  Must run before
+                           // _reapplyStickyPatches() fires at boot completion.
+                           if (typeof window._clearBootImageStickyPatches === 'function') {
+                               window._clearBootImageStickyPatches(sim.nsCount || 0);
+                           }
+                       } else {
+                           console.warn('[bootImage] loadBootImage() rejected the fetched image (stale/invalid); not marking available.');
                        }
-                   } catch(e) { console.warn('[bootImage] apply failed:', e); } }
+                   } catch(e) { console.warn('[bootImage] apply failed:', e); _accepted = false; }
+                   if (_accepted) {
+                       window.bootImage = buf;
+                       window.bootImageAvailable = true;
+                   } else {
+                       window.bootImage = null;
+                       window.bootImageAvailable = false;
+                   }
+        }
         // Re-apply user-assigned namespace labels that sim.loadBootImage() may
         // have overwritten (the boot image zeros any NS slot it does not populate,
         // including free slots where the user stored custom pet names).

@@ -337,6 +337,84 @@ console.log('\n--- T206: null sim guard — production _syncBootEntryFromSim is 
         !Object.prototype.hasOwnProperty.call(lsStore, 'bootEntrySlot'));
 }
 
+// ── T207: fallback placeholder anchored to canonical Boot.Abstr slot ─────────
+//
+// Task #2867: _initNamespaceTable() used to write its synthetic Boot.Abstr
+// placeholder header at the USER-SELECTED bootEntrySlot.  With CapabilityTest
+// (slot 10) selected and no boot image, that fabricated an executable-looking
+// 3-word header at slot 10's location (0x0300) over zero code words, and left
+// the canonical slot 6 without its placeholder.  The placeholder must ALWAYS
+// anchor to sim._bootAbstrSlot (6); a selected non-canonical entry must remain
+// visibly non-resident (invalid header magic) so boot faults clearly instead
+// of running zeros.
+console.log('\n--- T207: fallback placeholder stays at canonical slot 6 (CapabilityTest selected) ---');
+{
+    const sim = new ChurchSimulator();
+    sim.bootEntrySlot = 10;      // user selects CapabilityTest
+    sim.reset();                 // fallback init — no boot image loaded
+
+    const canonical = sim._bootAbstrSlot;
+    check('T207a: _bootAbstrSlot is the canonical architectural slot 6', canonical === 6);
+
+    const loc6  = sim.memory[sim._nsSlotBase(6)]  >>> 0;
+    const loc10 = sim.memory[sim._nsSlotBase(10)] >>> 0;
+    const hdr6  = sim.parseLumpHeader(sim.memory[loc6]  >>> 0);
+    const hdr10 = sim.parseLumpHeader(sim.memory[loc10] >>> 0);
+
+    check('T207b: canonical slot 6 carries a valid placeholder lump header',
+        !!hdr6 && hdr6.valid === true);
+    check('T207c: selected slot 10 does NOT carry a fabricated executable header',
+        !hdr10 || hdr10.valid !== true);
+    check('T207d: bootEntrySlot selection (10) survives the fallback init',
+        sim.bootEntrySlot === 10);
+
+    // Selecting the canonical slot itself must still yield a bootable placeholder.
+    const sim2 = new ChurchSimulator();
+    sim2.bootEntrySlot = 6;
+    sim2.reset();
+    const loc6b = sim2.memory[sim2._nsSlotBase(6)] >>> 0;
+    const hdr6b = sim2.parseLumpHeader(sim2.memory[loc6b] >>> 0);
+    check('T207e: canonical-entry fallback still writes a valid placeholder at slot 6',
+        !!hdr6b && hdr6b.valid === true && hdr6b.cw > 0);
+}
+
+// ── T208: rejected boot image must not be marked available ───────────────────
+//
+// Task #2867: the app-shell startup probe and app-memory reset/generate/upload
+// paths must gate window.bootImage / window.bootImageAvailable on
+// loadBootImage()'s boolean verdict.  Source-level contract check: every
+// call site that sets bootImageAvailable=true must do so only after a
+// `sim.loadBootImage(...) === true` comparison (except the save path, which
+// re-uploads an image that was already accepted).
+console.log('\n--- T208: acceptance state gated on loadBootImage() verdict ---');
+{
+    const shellSrc = fs.readFileSync(path.join(__dirname, 'app-shell.js'),  'utf8');
+    const memSrc   = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');
+
+    // app-shell startup probe: must check the loader verdict and have a
+    // false-branch that clears availability.
+    const shellGates = /loadBootImage\((?:buf|window\.bootImage)\)\s*===\s*true/.test(shellSrc);
+    const shellClears = /bootImageAvailable\s*=\s*false/.test(shellSrc);
+    check('T208a: app-shell startup probe gates on loadBootImage() === true', shellGates);
+    check('T208b: app-shell clears bootImageAvailable on rejection', shellClears);
+
+    // app-memory: _maybeApplyBootImage / generateBootImage / uploadBootImageFile
+    const memGateCount = (memSrc.match(/loadBootImage\((?:buf|window\.bootImage)\)\s*===\s*true/g) || []).length;
+    check('T208c: app-memory has >=4 loader-verdict gates (reset x2, generate, upload)',
+        memGateCount >= 4);
+    const memClearCount = (memSrc.match(/bootImageAvailable\s*=\s*false/g) || []).length;
+    check('T208d: app-memory clears bootImageAvailable on rejection in >=4 paths',
+        memClearCount >= 4);
+
+    // Behavioural check: a stale image (no format tag) is rejected by the loader.
+    const sim = new ChurchSimulator();
+    const staleWords = new Uint32Array(sim.memory.length);
+    // all zeros — no BOOT_IMAGE_FORMAT_TAG anywhere
+    const verdict = sim.loadBootImage(staleWords.buffer);
+    check('T208e: loadBootImage() returns false for an image without the format tag',
+        verdict === false);
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(60)}`);
 console.log(`boot-entry-sync results: ${pass} passed, ${fail} failed`);

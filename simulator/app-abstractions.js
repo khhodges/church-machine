@@ -616,6 +616,28 @@ function setBootEntrySlot(idx, ev) {
                 || `Slot ${idx}`;
             sim.output += `[BOOT] WARNING: boot entry set to Slot ${idx} (${label}) — no lump installed. Boot will fault at B:04.\n`;
             if (typeof sim.emit === 'function') sim.emit('stateChange', sim.getState());
+        } else {
+            // Task #2867: residency preflight — the NS entry may be structurally
+            // valid (catalog descriptor) while the lump body at its location is
+            // still zeros (no boot image applied, or image lacks this body).
+            // Surface a clear image/residency warning instead of letting the
+            // user discover a LUMP_MAGIC fault at boot.
+            const _loc = entry.word0_location >>> 0;
+            if (_loc > 0 && _loc < sim.memory.length && typeof sim.parseLumpHeader === 'function') {
+                const _hdr = sim.parseLumpHeader(sim.memory[_loc] >>> 0);
+                if (!_hdr || !_hdr.valid || _hdr.cw === 0) {
+                    const label = (sim.nsLabels && sim.nsLabels[idx])
+                        || abstractionRegistry?.abstractions?.[idx]?.name
+                        || `Slot ${idx}`;
+                    const _why = (!_hdr || !_hdr.valid)
+                        ? 'no lump body is resident at its location (header magic invalid)'
+                        : 'its lump is a CODE_NOT_RESIDENT stub (cw=0)';
+                    sim.output += `[BOOT] WARNING: boot entry Slot ${idx} (${label}) — ${_why}. `
+                        + `Generate/apply a boot image with this entry resident, or boot will `
+                        + `lazy-load (simulator only) or fault with LUMP_MAGIC.\n`;
+                    if (typeof sim.emit === 'function') sim.emit('stateChange', sim.getState());
+                }
+            }
         }
     }
     renderAbstractions();

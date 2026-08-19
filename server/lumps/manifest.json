@@ -1879,6 +1879,7 @@
     "sidecar_file": "CapabilityTest.2.c7a66d01.json",
     "ns_slot": 10,
     "ns_slot_policy": "static",
+    "boot_resident": true,
     "lump_size": 64,
     "cw": 23,
     "cc": 5,

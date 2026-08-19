@@ -2485,13 +2485,34 @@ function _maybeApplyBootImage() {
         }
     }
     if (window.bootImage) {
-        try { sim.loadBootImage(window.bootImage); _applyBootEntryToSim(); _evictBootImgPatches(); } catch (e) { console.warn('[bootImage] apply failed:', e); }
+        // Task #2867: honour the loader's verdict.  A cached binary that the
+        // loader now rejects (e.g. a format-tag bump made it stale) must clear
+        // the active/available state instead of masquerading as booted memory.
+        try {
+            if (sim.loadBootImage(window.bootImage) === true) {
+                _applyBootEntryToSim(); _evictBootImgPatches();
+            } else {
+                console.warn('[bootImage] cached image rejected by loadBootImage(); clearing active state.');
+                window.bootImage = null;
+                window.bootImageAvailable = false;
+            }
+        } catch (e) { console.warn('[bootImage] apply failed:', e); }
         return;
     }
     if (window.bootImageAvailable) {
         _probeBootImage().then(buf => {
-            if (buf) { window.bootImage = buf;
-                       try { sim.loadBootImage(buf); _applyBootEntryToSim(); _evictBootImgPatches(); } catch(e){ console.warn('[bootImage] apply failed:', e); } }
+            if (buf) {
+                try {
+                    if (sim.loadBootImage(buf) === true) {
+                        window.bootImage = buf;
+                        _applyBootEntryToSim(); _evictBootImgPatches();
+                    } else {
+                        console.warn('[bootImage] fetched image rejected by loadBootImage(); clearing active state.');
+                        window.bootImage = null;
+                        window.bootImageAvailable = false;
+                    }
+                } catch(e){ console.warn('[bootImage] apply failed:', e); }
+            }
         });
     }
 }
@@ -2536,11 +2557,21 @@ function generateBootImage() {
             // immediately overlays it (no extra round-trip needed). The
             // 'reset' listener calls _maybeApplyBootImage which prefers
             // window.bootImage when present.
-            window.bootImageAvailable = true;
+            // Task #2867: only mark available once loadBootImage() accepts it.
             _probeBootImage().then(buf => {
                 if (buf) {
-                    window.bootImage = buf;
-                    try { sim.loadBootImage(buf); _applyBootEntryToSim(); if (typeof window._clearBootImageStickyPatches === 'function') window._clearBootImageStickyPatches(sim.nsCount || 0); } catch(e) { console.warn('[bootImage] apply failed:', e); }
+                    try {
+                        if (sim.loadBootImage(buf) === true) {
+                            window.bootImage = buf;
+                            window.bootImageAvailable = true;
+                            _applyBootEntryToSim();
+                            if (typeof window._clearBootImageStickyPatches === 'function') window._clearBootImageStickyPatches(sim.nsCount || 0);
+                        } else {
+                            window.bootImage = null;
+                            window.bootImageAvailable = false;
+                            if (result) result.textContent = 'Generated image was rejected by the loader (stale/invalid) — regenerate.';
+                        }
+                    } catch(e) { console.warn('[bootImage] apply failed:', e); }
                 }
             });
         })
@@ -2585,11 +2616,22 @@ function uploadBootImageFile(file) {
                         `style="color:#9bd;text-decoration:underline;">Download boot-image.bin</a>. ` +
                         `Reset the simulator to apply this image at boot.`;
                 }
-                window.bootImageAvailable = true;
+                // Task #2867: an uploaded image is server-validated, but the
+                // browser loader is the final gate — only mark available if it
+                // accepts the binary.
                 _probeBootImage().then(buf => {
                     if (buf) {
-                        window.bootImage = buf;
-                        try { sim.loadBootImage(buf); _syncBootEntryFromSim(); } catch(e) { console.warn('[bootImage] apply failed:', e); }
+                        try {
+                            if (sim.loadBootImage(buf) === true) {
+                                window.bootImage = buf;
+                                window.bootImageAvailable = true;
+                                _syncBootEntryFromSim();
+                            } else {
+                                window.bootImage = null;
+                                window.bootImageAvailable = false;
+                                if (result) result.textContent = 'Uploaded image was rejected by the loader (stale/invalid).';
+                            }
+                        } catch(e) { console.warn('[bootImage] apply failed:', e); }
                     }
                 });
             })
