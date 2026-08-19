@@ -13070,6 +13070,12 @@ function confirmSaveToNamespace() {
                 language:     _svLang,
                 ns_slot:      idx,
                 capabilities: _caps,
+                // Pass the canonical CRC32 token so the server stores the lump
+                // under the same token the format dialog displayed and the
+                // "Open Lump" toast navigates to.  Without this the server falls
+                // back to ns_slot<<8, which is a different value and makes the
+                // post-save navigation land on a 404.
+                token:        _svTok || undefined,
             }
         };
         fetch('/api/lumps/save', {
