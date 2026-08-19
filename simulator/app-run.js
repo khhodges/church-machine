@@ -5317,6 +5317,9 @@ BRANCH fail               ; infinite halt loop
 `;
 
 function loadExample(name) {
+    if (typeof window.exitSavedLumpEditorMode === 'function') {
+        window.exitSavedLumpEditorMode();
+    }
     // User explicitly chose an example — discard any wizard scaffold.
     window._wizardScaffoldActive = false;
     const editor = document.getElementById('asmEditor');

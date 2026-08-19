@@ -727,12 +727,17 @@
             </div>
             <div class="editor-divider" id="editorDivider"></div>
             <div class="editor-panel console-panel">
-                <div class="sidebar-tabs">
+                <div class="sidebar-tabs" id="codeSidebarTabs">
                     <button class="sidebar-tab active" id="codeTabConsole" onclick="switchCodeTab('console')" data-tooltip="Console Output — View assembler output and execution results">Console Output</button>
                     <button class="sidebar-tab" id="codeTabSyntax" onclick="switchCodeTab('syntax')" data-tooltip="Syntax — Quick reference for instruction syntax">Syntax</button>
                     <button class="sidebar-tab" id="codeTabHistory" onclick="switchCodeTab('history')" data-tooltip="History — Stories and context about Church Machine concepts">History</button>
                     <button class="sidebar-tab" id="codeTabJs" onclick="switchCodeTab('js')" data-tooltip="JS Source — Browse the simulator JS files that implement the boot code">JS</button>
                 </div>
+                <section id="savedLumpDisassemblyPanel" class="saved-lump-disassembly-panel" style="display:none;" aria-label="Compiled LUMP disassembly">
+                    <h2 id="savedLumpDisassemblyTitle">Compiled Disassembly</h2>
+                    <p>This read-only view is the exact compiled binary opened from the saved LUMP.</p>
+                    <pre id="savedLumpDisassembly" tabindex="0" aria-readonly="true"></pre>
+                </section>
                 <div id="asmErrorPanel" class="asm-error-panel" style="display:none;"></div>
                 <div id="asmWarningPanel" class="asm-warning-panel" style="display:none;"></div>
                 <div id="codeConsoleContent" style="display:flex;">

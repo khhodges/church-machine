@@ -225,6 +225,9 @@ function selectUserTab(id) {
     }
     const tab = userTabs.find(t => t.id === id);
     if (!tab) return;
+    if (typeof window.exitSavedLumpEditorMode === 'function') {
+        window.exitSavedLumpEditorMode();
+    }
     activeUserTabId = id;
     userTabDirty = false;
     _updateEditorCodeName(tab.name);
@@ -475,6 +478,9 @@ function _escHtml(s) {
 
 function openSourceFile(path) {
     closeOpenFileDialog();
+    if (typeof window.exitSavedLumpEditorMode === 'function') {
+        window.exitSavedLumpEditorMode();
+    }
     fetch('/' + path)
         .then(function(r) {
             if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1616,6 +1622,12 @@ function switchView(viewId) {
         // Remove the toolbar Discard button if it was injected for a LUMP edit
         var _exitDiscardBtn = document.getElementById('btnDiscardLumpEdit');
         if (_exitDiscardBtn) _exitDiscardBtn.remove();
+    }
+    // A saved LUMP owns the right-hand editor pane only while it is open.
+    // Any navigation away restores the ordinary console/reference interface.
+    if ((viewId !== 'editor' || !window._committingSavedLumpOpen) &&
+            typeof window.exitSavedLumpEditorMode === 'function') {
+        window.exitSavedLumpEditorMode();
     }
     if (viewId !== currentView && currentView === 'devices' && typeof stopDeviceTunnelPolling === 'function') {
         stopDeviceTunnelPolling();

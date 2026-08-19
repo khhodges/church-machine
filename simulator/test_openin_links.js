@@ -80,6 +80,11 @@ const EDITOR_TO_ABS_SRC  = extractFunctionByName('app-shell.js', '_editorJumpToA
 // WHICH token _pendingLumpAbstractionName/_pendingLumpMethodName resolve
 // against when several lumps share one abstraction name (different versions).
 const RENDER_LUMPS_SRC   = extractFunctionByName('app-abstractions.js', 'renderLumps');
+const SAVED_LUMP_SOURCE_SRC = extractFunctionByName('app-lumps.js', '_resolveSavedLumpEditorSource');
+const SAVED_LUMP_ENTER_SRC  = extractFunctionByName('app-lumps.js', '_enterSavedLumpEditorMode');
+const SAVED_LUMP_EXIT_SRC   = extractFunctionByName('app-lumps.js', 'exitSavedLumpEditorMode');
+const OPEN_SAVED_LUMP_SRC   = extractFunctionByName('app-lumps.js', 'openLumpInEditor');
+const SWITCH_CODE_TAB_SRC   = extractFunctionByName('app-run.js', 'switchCodeTab');
 
 const ALL_SRC = [TOAST_SRC, ABS_TO_EDITOR_SRC, ABS_TO_LUMP_SRC,
                  LUMP_VERSION_LABEL_SRC, SWITCH_LUMP_VERSION_SRC, SCROLL_METHOD_SRC,
@@ -1127,6 +1132,220 @@ trackAsync((async function t15() {
     assert('T20b fallback: toast title is "No LUMP found"',
         titleEl && titleEl.textContent === 'No LUMP found', titleEl && titleEl.textContent);
 })();
+
+// ── T21: saved-LUMP source recovery — compressed and uncompressed frames ─────
+trackAsync((async function t21() {
+    const { lumpBuildContentFrame, lumpDecodeContentFrame } =
+        require('./lump-content-frame.js');
+
+    async function buildBinary(source, forceUncompressed) {
+        const savedCompressionStream = global.CompressionStream;
+        if (forceUncompressed) global.CompressionStream = undefined;
+        let frame;
+        try {
+            frame = await lumpBuildContentFrame(
+                { name: 'Split.Editor.Test', language: 'assembly' }, source);
+        } finally {
+            global.CompressionStream = savedCompressionStream;
+        }
+        const code = [0xF8000000 >>> 0];
+        const cw = code.length;
+        let lumpSize = 64;
+        while (lumpSize < 1 + cw + frame.frameWords.length) lumpSize <<= 1;
+        let nm6 = 0;
+        while ((64 << nm6) < lumpSize) nm6++;
+        const header = (((0x1F & 0x1F) << 27) |
+            ((nm6 & 0x0F) << 23) | ((cw & 0x1FFF) << 10)) >>> 0;
+        const words = new Array(lumpSize).fill(0);
+        words[0] = header;
+        words[1] = code[0];
+        frame.frameWords.forEach((word, i) => { words[2 + i] = word >>> 0; });
+        return { words, flags: frame.flags };
+    }
+
+    const compressedSource =
+        '; embedded compressed source\nmethod Run {\n  RETURN\n}\n;' + 'x'.repeat(400);
+    const uncompressedSource = '; embedded plain source\nmethod Run {\n  RETURN\n}';
+    const compressed = await buildBinary(compressedSource, false);
+    const uncompressed = await buildBinary(uncompressedSource, true);
+
+    assert('T21 compressed embedded frame uses flags 0x07',
+        compressed.flags === 0x07, compressed.flags);
+    assert('T21 compressed embedded frame restores exact editable source',
+        await lumpDecodeContentFrame(compressed.words) === compressedSource);
+    assert('T21 uncompressed embedded frame uses flags 0x03',
+        uncompressed.flags === 0x03, uncompressed.flags);
+    assert('T21 uncompressed embedded frame restores exact editable source',
+        await lumpDecodeContentFrame(uncompressed.words) === uncompressedSource);
+})());
+
+// ── T22: source preference, sidecar fallback, and explicit missing state ──────
+(function t22() {
+    const sandbox = { console };
+    vm.createContext(sandbox);
+    vm.runInContext(SAVED_LUMP_SOURCE_SRC, sandbox);
+
+    const embedded = vm.runInContext(
+        '_resolveSavedLumpEditorSource("embedded source", "sidecar source")', sandbox);
+    const fallback = vm.runInContext(
+        '_resolveSavedLumpEditorSource(null, "sidecar source")', sandbox);
+    const missing = vm.runInContext(
+        '_resolveSavedLumpEditorSource(null, null)', sandbox);
+
+    assert('T22 embedded source wins over sidecar source',
+        embedded.origin === 'embedded' && embedded.source === 'embedded source', embedded);
+    assert('T22 older LUMP falls back to sidecar source',
+        fallback.origin === 'sidecar' && fallback.source === 'sidecar source', fallback);
+    assert('T22 missing source is explicitly identified',
+        missing.origin === 'missing' && missing.restored === false &&
+        missing.source.includes('No recoverable source'), missing.source);
+    assert('T22 missing-source buffer never copies compiled disassembly',
+        !missing.source.includes('0xF8000000'), missing.source);
+})();
+
+// ── T23: read-only split disassembly and normal-panel restoration ─────────────
+(function t23() {
+    const dom = new JSDOM(`<!DOCTYPE html><body>
+        <div id="codeSidebarTabs"></div>
+        <div id="savedLumpDisassemblyPanel" style="display:none">
+          <h2 id="savedLumpDisassemblyTitle"></h2>
+          <pre id="savedLumpDisassembly" aria-readonly="true"></pre>
+        </div>
+        <div id="codeConsoleContent" style="display:flex"></div>
+        <div id="codeHistoryPanel"></div><div id="codeSyntaxPanel"></div>
+        <div id="codeJsPanel"></div><div id="asmErrorPanel"></div>
+        <div id="asmWarningPanel"></div>
+        <div id="_lumpDraftBanner"><button id="_lumpDraftBannerDiscard">Discard</button></div>
+        <button id="codeTabConsole"></button><button id="codeTabHistory"></button>
+        <button id="codeTabSyntax"></button><button id="codeTabJs"></button>
+    </body>`);
+    const sandbox = {
+        window: dom.window,
+        document: dom.window.document,
+        console,
+        renderJsTab() {},
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(
+        SWITCH_CODE_TAB_SRC + '\n' + SAVED_LUMP_ENTER_SRC + '\n' + SAVED_LUMP_EXIT_SRC,
+        sandbox);
+
+    vm.runInContext('_enterSavedLumpEditorMode("RETURN\\n0xF8000000", "Saved.Code")', sandbox);
+    const doc = dom.window.document;
+    const pre = doc.getElementById('savedLumpDisassembly');
+    assert('T23 split mode labels the compiled disassembly',
+        doc.getElementById('savedLumpDisassemblyTitle').textContent ===
+        'Compiled Disassembly — Saved.Code');
+    assert('T23 compiled disassembly is displayed independently',
+        pre.textContent === 'RETURN\n0xF8000000', pre.textContent);
+    assert('T23 compiled disassembly is read-only semantic content',
+        pre.getAttribute('aria-readonly') === 'true' &&
+        pre.getAttribute('contenteditable') === null);
+    assert('T23 normal right-side tabs are replaced in split mode',
+        doc.getElementById('codeSidebarTabs').style.display === 'none' &&
+        doc.getElementById('savedLumpDisassemblyPanel').style.display === 'flex');
+
+    vm.runInContext('exitSavedLumpEditorMode()', sandbox);
+    assert('T23 leaving split mode restores normal tabs and console',
+        doc.getElementById('codeSidebarTabs').style.display === '' &&
+        doc.getElementById('savedLumpDisassemblyPanel').style.display === 'none' &&
+        doc.getElementById('codeConsoleContent').style.display === 'flex');
+    assert('T23 leaving split mode clears stale compiled text',
+        pre.textContent === '', JSON.stringify(pre.textContent));
+    assert('T23 leaving split mode clears saved-LUMP editor context',
+        dom.window._editorLumpDirtyListener === null &&
+        dom.window._editorLumpDirtyListenerEl === null &&
+        dom.window._editorLumpDirtyToken === null &&
+        dom.window._editorOpenLumpToken === null &&
+        dom.window._editorOpenLumpMeta === null &&
+        doc.getElementById('_lumpDraftBanner') === null);
+
+    dom.window._savedLumpOpenRequestId = 41;
+    vm.runInContext('exitSavedLumpEditorMode()', sandbox);
+    assert('T23 teardown invalidates an in-flight saved-LUMP open even when mode is hidden',
+        dom.window._savedLumpOpenRequestId === 42,
+        dom.window._savedLumpOpenRequestId);
+})();
+
+// ── T24: saved code LUMP details expose the canonical entry action ────────────
+(function t24() {
+    const appLumpsSource = fs.readFileSync(
+        path.resolve(__dirname, 'app-lumps.js'), 'utf8');
+    assert('T24 saved LUMP action is clearly labeled Open in Editor',
+        appLumpsSource.includes('Open in Editor</button>'));
+    assert('T24 entry action still routes through canonical openLumpInEditor path',
+        appLumpsSource.includes(
+            "addEventListener('click', () => openLumpInEditor(editBtn.dataset.editToken))"));
+    const appRunSource = fs.readFileSync(path.resolve(__dirname, 'app-run.js'), 'utf8');
+    const appCompileSource = fs.readFileSync(path.resolve(__dirname, 'app-compile.js'), 'utf8');
+    const appShellSource = fs.readFileSync(path.resolve(__dirname, 'app-shell.js'), 'utf8');
+    assert('T24 ordinary assembly examples exit saved-LUMP split mode',
+        /function loadExample\(name\) \{\s*if \(typeof window\.exitSavedLumpEditorMode/.test(
+            appRunSource));
+    assert('T24 ordinary CLOOMC examples exit saved-LUMP split mode',
+        /function loadCLOOMCExample\(name\) \{\s*if \(typeof window\.exitSavedLumpEditorMode/.test(
+            appCompileSource));
+    assert('T24 personal tabs exit saved-LUMP split mode',
+        /function selectUserTab\(id\)[\s\S]*?window\.exitSavedLumpEditorMode\(\)/.test(
+            appShellSource));
+    assert('T24 opened source files exit saved-LUMP split mode',
+        /function openSourceFile\(path\)[\s\S]*?window\.exitSavedLumpEditorMode\(\)/.test(
+            appShellSource));
+    assert('T24 async open checks its navigation request before committing',
+        appLumpsSource.includes(
+            'if (window._savedLumpOpenRequestId !== _openRequestId) return;') &&
+        appLumpsSource.includes('window._committingSavedLumpOpen = true'));
+})();
+
+// ── T25: navigating while binary fetch is pending cancels the late open ───────
+trackAsync((async function t25() {
+    let resolveWords;
+    const wordsResponse = new Promise(resolve => { resolveWords = resolve; });
+    const calls = { switchView: [] };
+    const saved = {
+        token: 'abc123',
+        abstraction: 'Delayed.Lump',
+        ns_slot: null,
+        capabilities: [],
+        lump_type: 'code',
+        content_type: 'code',
+    };
+    const entry = {
+        token: saved.token,
+        abstraction: saved.abstraction,
+        sources: { server: saved },
+    };
+    const sandbox = {
+        console,
+        fetch() { return wordsResponse; },
+        switchView(view) { calls.switchView.push(view); },
+        setTimeout,
+    };
+    sandbox.window = sandbox;
+    sandbox.LumpRegistry = {
+        SESSION_EPOCH: 0,
+        resolve(token) { return token === saved.token ? entry : null; },
+        list() { return [entry]; },
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(SAVED_LUMP_EXIT_SRC + '\n' + OPEN_SAVED_LUMP_SRC, sandbox);
+
+    const pendingOpen = vm.runInContext('openLumpInEditor("abc123")', sandbox);
+    vm.runInContext('exitSavedLumpEditorMode()', sandbox);
+    resolveWords({
+        ok: true,
+        json: async function() { return { words: [0xF8000400, 0xF8000000] }; },
+    });
+    await pendingOpen;
+
+    assert('T25 navigation invalidates the pending saved-LUMP request',
+        sandbox._savedLumpOpenRequestId === 2, sandbox._savedLumpOpenRequestId);
+    assert('T25 late binary response cannot reopen the editor or split panel',
+        calls.switchView.length === 0 && !sandbox._savedLumpEditorMode, calls);
+    assert('T25 late binary response cannot install stale saved-LUMP context',
+        sandbox._editorOpenLumpToken === undefined &&
+        sandbox._editorLumpDirtyToken === undefined);
+})());
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 (function waitAndSummarize() {

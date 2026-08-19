@@ -100,7 +100,7 @@ function showLumpDetail(token) {
     // ── Inline actions group (pushed right by margin-left:auto) ───────────────
     _headerStrip += `<div class="lump-hs-actions">`;
     if (!isNamespace) {
-        _headerStrip += `<button class="lump-hs-btn lump-edit-btn" data-edit-token="${_e(token)}" title="Edit \u2014 Open the code editor">&#9998; Edit</button>`;
+        _headerStrip += `<button class="lump-hs-btn lump-edit-btn" data-edit-token="${_e(token)}" title="Open this saved code and its compiled binary in the editor">&#9998; Open in Editor</button>`;
         _headerStrip += `<button class="lump-hs-btn lump-audit-btn" data-audit-token="${_e(token)}" title="Audit \u2014 Run pre-save consistency checks">\u2699 Audit</button>`;
         if (_isCodeLump) {
             _headerStrip += `<button class="lump-hs-btn lump-hs-btn-run" id="lumpWsRunBtn" onclick="_runSelectedLumpInSim(this)" title="Run in Simulator \u2014 Load binary into simulator">&#x25b6; Run</button>`;
@@ -1444,6 +1444,81 @@ function _lumpSrcEditMethod(absIdx, mName) {
     if (typeof _invalidateLastSavedToken === 'function') _invalidateLastSavedToken();
     if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
     if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
+}
+
+// Saved LUMPs are edited as source on the left while their immutable binary is
+// shown alongside it.  These helpers intentionally only alter the right pane,
+// so the regular editor console/reference UI remains unchanged outside this mode.
+function _enterSavedLumpEditorMode(compiledDisasm, lumpName) {
+    window._savedLumpEditorMode = true;
+    var tabs = document.getElementById('codeSidebarTabs');
+    var panel = document.getElementById('savedLumpDisassemblyPanel');
+    var title = document.getElementById('savedLumpDisassemblyTitle');
+    var text = document.getElementById('savedLumpDisassembly');
+    if (tabs) tabs.style.display = 'none';
+    ['codeConsoleContent', 'codeHistoryPanel', 'codeSyntaxPanel', 'codeJsPanel',
+        'asmErrorPanel', 'asmWarningPanel'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+    if (title) title.textContent = 'Compiled Disassembly — ' + lumpName;
+    if (text) text.textContent = compiledDisasm || '; Compiled disassembly unavailable.';
+    if (panel) panel.style.display = 'flex';
+}
+
+function exitSavedLumpEditorMode() {
+    // Also invalidate an open that is still awaiting binary/source fetches.
+    window._savedLumpOpenRequestId = (window._savedLumpOpenRequestId || 0) + 1;
+    if (!window._savedLumpEditorMode) return;
+    window._savedLumpEditorMode = false;
+    var tabs = document.getElementById('codeSidebarTabs');
+    var panel = document.getElementById('savedLumpDisassemblyPanel');
+    var text = document.getElementById('savedLumpDisassembly');
+    if (tabs) tabs.style.display = '';
+    if (panel) panel.style.display = 'none';
+    if (text) text.textContent = '';
+    ['_lumpSourceRestoredBanner', '_lumpSourceMissingBanner',
+        '_lumpMalformedBanner', '_lumpDraftBanner']
+        .forEach(function(id) {
+            var banner = document.getElementById(id);
+            if (banner) banner.remove();
+        });
+    if (window._editorLumpDirtyListener && window._editorLumpDirtyListenerEl) {
+        window._editorLumpDirtyListenerEl.removeEventListener(
+            'input', window._editorLumpDirtyListener);
+    }
+    window._editorLumpDirtyListener = null;
+    window._editorLumpDirtyListenerEl = null;
+    window._editorLumpDirtyToken = null;
+    window._editorOpenLumpToken = null;
+    window._editorOpenLumpMeta = null;
+    var discardBtn = document.getElementById('btnDiscardLumpEdit');
+    if (discardBtn) discardBtn.remove();
+    if (typeof switchCodeTab === 'function') switchCodeTab('console');
+}
+window.exitSavedLumpEditorMode = exitSavedLumpEditorMode;
+
+function _resolveSavedLumpEditorSource(embeddedSource, sidecarSource) {
+    if (typeof embeddedSource === 'string') {
+        return { source: embeddedSource, restored: true, origin: 'embedded' };
+    }
+    if (typeof sidecarSource === 'string' && sidecarSource.trim().length > 0) {
+        var isStub = sidecarSource.indexOf('; TODO: write your code here') !== -1
+                  || sidecarSource.indexOf('; TODO: write your code') !== -1;
+        var isUnresolvedPath = sidecarSource.indexOf('\n') === -1
+                            && /\.cloomc\s*$/.test(sidecarSource.trim());
+        if (!isStub && !isUnresolvedPath) {
+            return { source: sidecarSource, restored: true, origin: 'sidecar' };
+        }
+    }
+    return {
+        source:
+            '; No recoverable source was saved with this LUMP.\n' +
+            '; The read-only Compiled Disassembly panel shows what this binary executes.\n' +
+            '; Write or paste source here to create a new version.\n',
+        restored: false,
+        origin: 'missing'
+    };
 }
 
 function _lumpSourceProxyEdit(fn) {
@@ -4524,6 +4599,9 @@ function _scrollToLumpMethod(tk, methodName, _attempt) {
 // every other view.  sim.memory is used only for structural location info
 // (baseLoc / nsIdx / crIdx) needed by the patch bar and c-list picker.
 async function openLumpInEditor(token) {
+    if (window._savedLumpEditorMode) exitSavedLumpEditorMode();
+    var _openRequestId = (window._savedLumpOpenRequestId || 0) + 1;
+    window._savedLumpOpenRequestId = _openRequestId;
     var lump = window.LumpRegistry ? (window.LumpRegistry.resolve(token)?.sources?.server || null) : null;
 
     // ── Fresh-compilation redirect (dot.name.hash protocol) ───────────────
@@ -4686,6 +4764,7 @@ async function openLumpInEditor(token) {
             }
         } catch (_fe) {}
     }
+    if (window._savedLumpOpenRequestId !== _openRequestId) return;
 
     // ── Try to read embedded source from V1.3 0xAB content frame ─────────────
     // Delegates to lump-content-frame.js lumpDecodeContentFrame() which handles
@@ -4699,6 +4778,25 @@ async function openLumpInEditor(token) {
             catch (_bfe) { /* fall through */ }
         }
     }
+    if (window._savedLumpOpenRequestId !== _openRequestId) return;
+
+    // Embedded source is preferred; older LUMPs fetch their established
+    // sidecar source before any editor UI is changed.  Keeping all awaits
+    // before the view commit prevents a late response from reopening split
+    // mode after the user has navigated elsewhere.
+    var _sidecarSource = null;
+    if (typeof _binaryFrameSource !== 'string' && !_inMemoryLump) {
+        try {
+            var _dr = await fetch('/api/lumps/' + token + '/detail', { cache: 'no-store' });
+            if (_dr.ok) {
+                var _dj = await _dr.json();
+                if (_dj && typeof _dj.source === 'string') _sidecarSource = _dj.source;
+            }
+        } catch (_dfe) {}
+    }
+    if (window._savedLumpOpenRequestId !== _openRequestId) return;
+    var _sourceResolution = _resolveSavedLumpEditorSource(
+        _binaryFrameSource, _sidecarSource);
 
     // ── Disassemble from server words (authoritative) ──────────────────────
     var disasmLines = null;
@@ -4865,6 +4963,8 @@ async function openLumpInEditor(token) {
         }
     }
 
+    if (window._savedLumpOpenRequestId !== _openRequestId) return;
+
     // ── Set up editor context ──────────────────────────────────────────────
     _editorCREditActive = true;
     _editorCREditCR     = resolvedCRIdx;
@@ -4877,7 +4977,12 @@ async function openLumpInEditor(token) {
     //    init code does not see a stale seal and make the textarea read-only.
     localStorage.removeItem('cm_sealed_lump');
 
-    switchView('editor');
+    window._committingSavedLumpOpen = true;
+    try {
+        switchView('editor');
+    } finally {
+        window._committingSavedLumpOpen = false;
+    }
 
     var sel = document.getElementById('langSelector');
     if (sel) sel.value = 'assembly';
@@ -4889,6 +4994,8 @@ async function openLumpInEditor(token) {
         if (_existingMfBanner) _existingMfBanner.remove();
         var _existingSrcBanner = document.getElementById('_lumpSourceRestoredBanner');
         if (_existingSrcBanner) _existingSrcBanner.remove();
+        var _existingMissingBanner = document.getElementById('_lumpSourceMissingBanner');
+        if (_existingMissingBanner) _existingMissingBanner.remove();
 
         // ── Always make the editor fully editable on LUMP-panel open ──────
         asmEd.readOnly = false;
@@ -4896,36 +5003,16 @@ async function openLumpInEditor(token) {
         var _tabsRow = document.querySelector('.example-tabs-row');
         if (_tabsRow) _tabsRow.style.display = '';
 
-        // ── Determine the compiled (canonical) disasm text ─────────────────
+        // ── Determine compiled disassembly, independently of recovered source ─
         var _compiledDisasm;
         if (disasmLines) {
             _compiledDisasm = disasmLines.join('\n');
         } else {
-            // Binary parse failed — try canonical source as fallback.
-            var _malformedSrc = null;
-            var _absNameFb = lump.abstraction || '';
-            if (_absNameFb) {
-                try {
-                    var _sr = await fetch('/api/lump-source/' + encodeURIComponent(_absNameFb), { cache: 'no-store' });
-                    if (_sr.ok) {
-                        var _sj = await _sr.json();
-                        if (_sj && !_sj.binary_only && _sj.source) {
-                            _malformedSrc = _sj.source;
-                        }
-                    }
-                } catch (_sfe) {}
-            }
-            var _mfBannerMsg;
-            if (_malformedSrc) {
-                _compiledDisasm = _malformedSrc;
-                _mfBannerMsg = 'Binary is malformed \u2014 showing canonical source. Compile to rebuild the binary.';
-            } else {
-                var cwHint = (lump.cw  > 0) ? ('\n; Code region: ' + lump.cw  + ' word' + (lump.cw  !== 1 ? 's' : '')) : '';
-                var ccHint = (lump.cc  > 0) ? ('\n; C-List: '      + lump.cc  + ' GT slot' + (lump.cc  !== 1 ? 's' : '')) : '';
-                _compiledDisasm = '; ' + lumpName + cwHint + ccHint +
-                              '\n; Boot the machine to edit live code\n';
-                _mfBannerMsg = 'Binary is malformed \u2014 no canonical source found. Author a .cloomc file to enable source editing.';
-            }
+            var cwHint = (lump.cw  > 0) ? ('\n; Code region: ' + lump.cw  + ' word' + (lump.cw  !== 1 ? 's' : '')) : '';
+            var ccHint = (lump.cc  > 0) ? ('\n; C-List: '      + lump.cc  + ' GT slot' + (lump.cc  !== 1 ? 's' : '')) : '';
+            _compiledDisasm = '; ' + lumpName + cwHint + ccHint +
+                          '\n; Compiled disassembly is unavailable because this binary is malformed.\n';
+            var _mfBannerMsg = 'Binary is malformed \u2014 compiled disassembly is unavailable. Recoverable source, if any, remains editable.';
             // Show malformed-binary banner above the editor.
             var _mfBanner = document.createElement('div');
             _mfBanner.id = '_lumpMalformedBanner';
@@ -4942,43 +5029,18 @@ async function openLumpInEditor(token) {
         // form — it is exactly what was in the editor when the LUMP was saved.
         // Fall back to the sidecar detail endpoint for older lumps that predate
         // the V1.3 self-defining binary format.
-        var _sourceRestored = false;
-        if (_binaryFrameSource) {
-            _compiledDisasm = _binaryFrameSource;
-            _sourceRestored = true;
-        } else if (!_inMemoryLump) {
-            try {
-                var _dr = await fetch('/api/lumps/' + token + '/detail', { cache: 'no-store' });
-                if (_dr.ok) {
-                    var _dj = await _dr.json();
-                    if (_dj && typeof _dj.source === 'string' && _dj.source.trim().length > 0) {
-                        // Guard: never restore a stub/WIP placeholder as if it were
-                        // meaningful compiled source — that hides the real disasm.
-                        var _isStubSource = _dj.source.indexOf('; TODO: write your code here') !== -1
-                                         || _dj.source.indexOf('; TODO: write your code') !== -1;
-                        // Guard: server stores path-references for lumps whose source
-                        // lives in simulator/examples/*.cloomc.  The detail endpoint
-                        // resolves these to file content, but if the file is missing
-                        // (e.g. a different deployment) the raw path string leaks
-                        // through.  Never put a bare .cloomc path into the editor.
-                        var _isUnresolvedPath = _dj.source.indexOf('\n') === -1
-                                             && /\.cloomc\s*$/.test(_dj.source.trim());
-                        if (!_isStubSource && !_isUnresolvedPath) {
-                            _compiledDisasm = _dj.source;
-                            _sourceRestored = true;
-                        }
-                    }
-                }
-            } catch (_dfe) {}
-        }
+        var _recoveredSource = _sourceResolution.source;
+        var _sourceRestored = _sourceResolution.restored;
 
-        // ── Record original (compiled) text for dirty comparison ──────────
-        window._editorOriginalDisasm = _compiledDisasm;
+        // Keep the legacy name for compatibility with draft/discard paths;
+        // its value is now the original source buffer, not disassembly.
+        window._editorOriginalDisasm = _recoveredSource;
+        window._editorCompiledDisasm = _compiledDisasm;
 
         // ── Check for a saved draft from a previous session ───────────────
         var _savedDraft = _draftLsGet(token);
         if (_savedDraft !== null) _savedDraft = _migrateBfextBfinsSyntax(_savedDraft);
-        var _hasDraft   = _savedDraft !== null && _savedDraft.trim() !== '' && _savedDraft !== _compiledDisasm;
+        var _hasDraft   = _savedDraft !== null && _savedDraft.trim() !== '' && _savedDraft !== _recoveredSource;
 
         if (_hasDraft) {
             // Restore draft content into editor
@@ -5003,8 +5065,8 @@ async function openLumpInEditor(token) {
                 });
             }
         } else {
-            // No draft — show the compiled source (or disasm fallback)
-            asmEd.value = _compiledDisasm;
+            // No draft — show recovered source only; disassembly stays on right.
+            asmEd.value = _recoveredSource;
             // Show "source restored" banner when original source was fetched
             if (_sourceRestored) {
                 var _existingSourceBanner = document.getElementById('_lumpSourceRestoredBanner');
@@ -5020,6 +5082,19 @@ async function openLumpInEditor(token) {
                 else if (asmEd.parentNode) asmEd.parentNode.insertBefore(_srcBanner, asmEd);
             }
         }
+
+        if (!_sourceRestored) {
+            var _sourceMissingBanner = document.createElement('div');
+            _sourceMissingBanner.id = '_lumpSourceMissingBanner';
+            _sourceMissingBanner.className = 'lump-malformed-banner';
+            _sourceMissingBanner.textContent =
+                'No embedded or sidecar source was found. The left pane is a new editable source buffer; the right pane is compiled disassembly.';
+            var _sourceMissingParent = asmEd.parentNode && asmEd.parentNode.parentNode;
+            if (_sourceMissingParent) _sourceMissingParent.insertBefore(_sourceMissingBanner, asmEd.parentNode);
+            else if (asmEd.parentNode) asmEd.parentNode.insertBefore(_sourceMissingBanner, asmEd);
+        }
+
+        _enterSavedLumpEditorMode(_compiledDisasm, lumpName);
 
         if (typeof updateLineNumbers === 'function') updateLineNumbers();
         // Title must always follow the code module name without exception.
