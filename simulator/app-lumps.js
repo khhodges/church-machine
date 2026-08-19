@@ -4849,14 +4849,22 @@ async function openLumpInEditor(token) {
 
     // ── Try to read embedded source from V1.3 0xAB content frame ─────────────
     // Delegates to lump-content-frame.js lumpDecodeContentFrame() which handles
-    // both the uncompressed (flags=0x03) and deflate-raw compressed (flags=0x07)
-    // paths.  Falls through silently to sidecar / disasm when absent or malformed.
+    // compact/full, compressed/uncompressed source frames. Falls through silently
+    // to sidecar / disasm when absent or malformed.
     var _binaryFrameSource = null;
+    var _binaryFrameIsApiOnly = false;
     if (serverWords && serverWords.length > 0) {
         var _lcfDec = (typeof LumpContentFrame !== 'undefined') ? LumpContentFrame : null;
         if (_lcfDec) {
             try { _binaryFrameSource = await _lcfDec.lumpDecodeContentFrame(serverWords); }
             catch (_bfe) { /* fall through */ }
+        }
+        var _sourceHdr = serverWords[0] >>> 0;
+        var _sourceFrameStart = 1 + ((_sourceHdr >>> 10) & 0x1FFF);
+        if (_sourceFrameStart < serverWords.length) {
+            var _sourceFrameHdr = serverWords[_sourceFrameStart] >>> 0;
+            _binaryFrameIsApiOnly = ((_sourceFrameHdr >>> 24) & 0xFF) === 0xAB &&
+                ((_sourceFrameHdr >>> 16) & 0xFF) === 0x00;
         }
     }
     if (window._savedLumpOpenRequestId !== _openRequestId) return;
@@ -5169,7 +5177,9 @@ async function openLumpInEditor(token) {
             _sourceMissingBanner.id = '_lumpSourceMissingBanner';
             _sourceMissingBanner.className = 'lump-malformed-banner';
             _sourceMissingBanner.textContent =
-                'No embedded or sidecar source was found. The left pane is a new editable source buffer; the right pane is compiled disassembly.';
+                _binaryFrameIsApiOnly
+                    ? 'This LUMP was saved as API only, so no source was embedded. The left pane is a new editable source buffer; the right pane is compiled disassembly.'
+                    : 'No embedded or sidecar source was found. The left pane is a new editable source buffer; the right pane is compiled disassembly.';
             var _sourceMissingParent = asmEd.parentNode && asmEd.parentNode.parentNode;
             if (_sourceMissingParent) _sourceMissingParent.insertBefore(_sourceMissingBanner, asmEd.parentNode);
             else if (asmEd.parentNode) asmEd.parentNode.insertBefore(_sourceMissingBanner, asmEd);
@@ -5429,6 +5439,142 @@ function _renderFormatLumpVersionHistory(absName) {
     }
 }
 
+function _formatLumpApiDefinition(absName, caps) {
+    var _manifest = (typeof _lumpManifests !== 'undefined' && typeof sim !== 'undefined' &&
+                     sim && _lumpManifests[sim.bootEntrySlot])
+        ? _lumpManifests[sim.bootEntrySlot] : null;
+    var _methods = _manifest && Array.isArray(_manifest._methods) ? _manifest._methods : [];
+    return {
+        name: absName || '',
+        language: (typeof sim !== 'undefined' && sim && sim._lastCompiledLanguage) || 'assembly',
+        returnConvention: { register: 'DR0', description: 'return value' },
+        methods: _methods.filter(function(method) { return !method._internal; }).map(function(method, index) {
+            var _drPets = (method.pet_names && method.pet_names.DR) || {};
+            return {
+                name: method.name || ('method' + index),
+                index: index,
+                inputs: Object.keys(_drPets).sort(function(a, b) { return Number(a) - Number(b); })
+                    .map(function(reg) { return { name: _drPets[reg], register: 'DR' + reg }; }),
+                returns: { name: 'result', register: 'DR0' }
+            };
+        }),
+        capabilities: (caps || []).map(function(cap) {
+            if (typeof cap === 'string') return { name: cap, rights: [], grants: [] };
+            return {
+                name: (cap && cap.name) || '',
+                rights: (cap && Array.isArray(cap.rights)) ? cap.rights.slice() : [],
+                grants: (cap && Array.isArray(cap.grants)) ? cap.grants.slice() : []
+            };
+        })
+    };
+}
+
+function _fmtLumpByteSize(bytes) {
+    return String(bytes) + ' B';
+}
+
+function _renderFormatLumpCandidate(pending) {
+    if (!pending || !pending.candidates || !pending.candidates[pending.selectedProfile]) return;
+    var _candidate = pending.candidates[pending.selectedProfile];
+    pending.binary = _candidate.binary;
+    pending.caps = _candidate.caps;
+    pending.resolvedCaps = _candidate.resolvedCaps;
+    pending.selectedFlags = _candidate.frame.flags;
+
+    var _profilesEl = document.getElementById('fmtOutputProfiles');
+    if (_profilesEl) {
+        var _profileInfo = {
+            api:     { title: 'API only', detail: 'JSON API; no source' },
+            compact: { title: 'Compact source', detail: 'JSON API + comments removed' },
+            full:    { title: 'Full source', detail: 'JSON API + complete source' }
+        };
+        _profilesEl.innerHTML = ['api', 'compact', 'full'].map(function(profile) {
+            var item = pending.candidates[profile];
+            var info = _profileInfo[profile];
+            var disabled = !item;
+            var detail = disabled ? 'Requires saved source' : info.detail;
+            var size = disabled ? 'Unavailable' :
+                item.frame.frameWords.length + ' frame words · ' +
+                item.lumpSize + ' words / ' + _fmtLumpByteSize(item.lumpSize * 4);
+            return '<button type="button" class="fmt-output-profile' +
+                (pending.selectedProfile === profile ? ' is-selected' : '') +
+                '" role="radio" aria-checked="' + (pending.selectedProfile === profile ? 'true' : 'false') +
+                '" ' + (disabled ? 'disabled' : 'onclick="_selectFormatLumpProfile(\'' + profile + '\')"') + '>' +
+                '<span class="fmt-output-profile-title">' + info.title + '</span>' +
+                '<span class="fmt-output-profile-detail">' + detail + '</span>' +
+                '<span class="fmt-output-profile-size">' + size + '</span></button>';
+        }).join('');
+    }
+
+    var _warning = document.getElementById('fmtOutputWarning');
+    if (_warning) {
+        _warning.textContent = pending.selectedProfile === 'api' && pending.sourceText.trim().length > 0
+            ? 'API only does not store source. Reopening this LUMP cannot restore the editor text.'
+            : '';
+    }
+
+    var _cw = _candidate.cw;
+    var _cc = _candidate.cc;
+    var _chipsEl = document.getElementById('fmtHeaderChips');
+    if (_chipsEl) {
+        _chipsEl.innerHTML =
+            '<span class="fmt-chip fmt-chip-ok"><span class="fmt-chip-label">magic</span>0x1F \u2713</span>' +
+            '<span class="fmt-chip"><span class="fmt-chip-label">size</span>' + _candidate.lumpSize + ' words</span>' +
+            '<span class="fmt-chip"><span class="fmt-chip-label">cw</span>' + _cw + '</span>' +
+            '<span class="fmt-chip"><span class="fmt-chip-label">cc</span>' + _cc + '</span>' +
+            '<span class="fmt-chip"><span class="fmt-chip-label">frame</span>' + _candidate.frame.frameWords.length + ' words</span>';
+    }
+
+    var _auditResults = _candidate.auditResults;
+    var _hasErrors = _candidate.hasErrors;
+    var _hasWarnings = _candidate.hasWarnings;
+    var _auditEl = document.getElementById('fmtAuditResults');
+    if (_auditEl) {
+        _auditEl.innerHTML = '';
+        if (typeof lumpAuditRenderPanel === 'function') {
+            lumpAuditRenderPanel(_auditEl, _auditResults, {
+                collapsible: true,
+                startOpen: _hasErrors || _hasWarnings,
+            });
+        }
+    }
+
+    var _proceedBtn = document.getElementById('fmtProceedBtn');
+    var _proceedNote = document.getElementById('fmtProceedNote');
+    if (!_proceedBtn) return;
+    if (_hasErrors) {
+        _proceedBtn.disabled = true;
+        if (_proceedNote) {
+            _proceedNote.style.display = '';
+            _proceedNote.style.color = '#e07070';
+            _proceedNote.textContent = '\u2717 Fix errors above before saving';
+        }
+    } else if (_hasWarnings) {
+        _proceedBtn.disabled = false;
+        var _warnCount = _auditResults.filter(function(result) { return result.severity === 'warn'; }).length;
+        if (_proceedNote) {
+            _proceedNote.style.display = '';
+            _proceedNote.style.color = '#e0a055';
+            _proceedNote.textContent = '\u26a0 ' + _warnCount + ' warning' +
+                (_warnCount !== 1 ? 's' : '') + ' \u2014 review before saving';
+        }
+    } else {
+        _proceedBtn.disabled = false;
+        if (_proceedNote) {
+            _proceedNote.style.display = 'none';
+            _proceedNote.textContent = '';
+        }
+    }
+}
+
+function _selectFormatLumpProfile(profile) {
+    var pending = window._pendingLumpData;
+    if (!pending || !pending.candidates || !pending.candidates[profile]) return;
+    pending.selectedProfile = profile;
+    _renderFormatLumpCandidate(pending);
+}
+window._selectFormatLumpProfile = _selectFormatLumpProfile;
+
 // ── showFormatLump — Step 1 of the two-step Save Lump flow ───────────────────
 // Builds the spec-compliant binary, runs the lump audit, queries version
 // history, then opens #formatLumpDialog.  Stores the binary on
@@ -5449,120 +5595,97 @@ window.showFormatLump = async function() {
     var _caps    = (_regMem.memory.capabilities || []).slice();
     var _absName = (_regEntry && _regEntry.abstraction) || '';
 
-    // ── Build the spec-compliant binary ──────────────────────────────────────
-    // header word (magic 0x1F in bits[31:27]) + code region + padding + c-list.
+    // ── Build every user-selectable, spec-compliant binary from one snapshot ──
     var _svCC = _caps.length;
     var _svCW = _svWords.length;
-    var _svLumpSize = 64;
-    while (_svLumpSize < 1 + _svCW + _svCC) _svLumpSize = _svLumpSize << 1;
-    var _svNm6 = 0;
-    while ((64 << _svNm6) < _svLumpSize) _svNm6++;
-    var _svHdr = (((0x1F & 0x1F) << 27) |
-                  ((_svNm6 & 0x0F)  << 23) |
-                  ((_svCW  & 0x1FFF) << 10) |
-                  ((0 & 0x03) << 8) |
-                  (_svCC & 0xFF)) >>> 0;
-    var _svBinary = new Array(_svLumpSize).fill(0);
-    _svBinary[0] = _svHdr;
-    for (var _i = 0; _i < _svCW; _i++) _svBinary[1 + _i] = (_svWords[_i] >>> 0);
-    // c-list slots left as zeros — server injects the self-GT into slot 0.
-
-    // ── Embed V1.3 0xAB self-definition content frame ────────────────────────
-    // Delegates to lump-content-frame.js lumpBuildContentFrame() which handles
-    // UTF-8 encoding, big-endian packing, deflate-raw compression (flags=0x07),
-    // and the uncompressed fallback (flags=0x03 / 0x00).
-    // Spec: lump-audit.js lumpAuditValidateContentFrame(), CM_LUMP_SPECIFICATION §Freespace.
-    try { await (async function _embedV13Frame() {
-        var _lcf = (typeof LumpContentFrame !== 'undefined') ? LumpContentFrame : null;
-        if (!_lcf) return;  // shared module not loaded — skip frame embedding
-
-        // Build API JSON — name + language + cap names only (no token/issue).
-        var _capNames = _caps.map(function(c) {
-            return (c && c.name) ? c.name : (typeof c === 'string' && c ? c : null);
-        }).filter(Boolean);
-        var _apiObj = { name: _absName || '', language:
-            (typeof sim !== 'undefined' && sim && sim._lastCompiledLanguage) || 'assembly' };
-        if (_capNames.length > 0) _apiObj.caps = _capNames;
-
-        // Source text — from the editor textarea (empty string → Tier 0 frame).
-        var _srcEl   = document.getElementById('asmEditor');
-        var _srcText = _srcEl ? (_srcEl.value || '').trim() : '';
-
-        // lumpBuildContentFrame handles compression (0x07), uncompressed fallback
-        // (0x03), and Tier 0 (0x00 when srcText is empty).
-        var _built    = await _lcf.lumpBuildContentFrame(_apiObj, _srcText);
-        var _frameWds = _built.frameWords;
-
-        // Place frame into freespace; grow the lump binary if necessary.
-        var _fsStart = 1 + _svCW;
-        var _fsEnd0  = _svLumpSize - _svCC;
-
-        if (_frameWds.length > (_fsEnd0 - _fsStart)) {
-            // Grow to the smallest power-of-2 that fits.
-            while ((_svLumpSize - _svCC - _fsStart) < _frameWds.length) {
-                _svLumpSize = _svLumpSize << 1;
-            }
-            _svBinary.length = 0;
-            for (var _gi = 0; _gi < _svLumpSize; _gi++) _svBinary.push(0);
-            _svBinary[0] = _svHdr;
-            for (var _wi = 0; _wi < _svCW; _wi++) _svBinary[1 + _wi] = (_svWords[_wi] >>> 0);
-        }
-
-        // Recompute header if lump size changed (nm6 encodes log₂(lumpSize/64)).
-        _svNm6 = 0;
-        while ((64 << _svNm6) < _svLumpSize) _svNm6++;
-        _svHdr = (((0x1F & 0x1F) << 27) |
-                  ((_svNm6 & 0x0F)   << 23) |
-                  ((_svCW  & 0x1FFF) << 10) |
-                  ((0 & 0x03) << 8) |
-                  (_svCC & 0xFF)) >>> 0;
-        _svBinary[0] = _svHdr;
-
-        for (var _fi = 0; _fi < _frameWds.length; _fi++) {
-            _svBinary[_fsStart + _fi] = _frameWds[_fi] >>> 0;
-        }
-    })(); } catch (_frameErr) { /* frame embedding failed — binary is still valid without it */ }
-    // ─────────────────────────────────────────────────────────────────────────
-
-    // Materialize every declared capability now. Pending/NULL placeholders are
-    // not persistable: they make the saved LUMP depend on a later injection
-    // pass and allow malformed words to reach Code view and runtime.
     if (typeof CapabilityTokens === 'undefined') {
         alert('Cannot format this LUMP: capability token validator is unavailable.');
         return;
     }
-    var _clBase = _svLumpSize - _svCC;
-    var _capMaterialized = CapabilityTokens.materialize(_caps, _svBinary, _clBase, {
-        sim: (typeof sim !== 'undefined' ? sim : null),
-        lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) ? _lumpsCache : [],
-    });
-    if (!_capMaterialized.ok) {
-        var _capFailure = 'Cannot save this LUMP until its capabilities resolve:\n' +
-            _capMaterialized.errors.map(function(message) { return '\u2022 ' + message; }).join('\n');
-        if (typeof appendOutput === 'function') appendOutput(_capFailure, 'error');
-        alert(_capFailure);
+    var _lcf = (typeof LumpContentFrame !== 'undefined') ? LumpContentFrame : null;
+    if (!_lcf) {
+        alert('Cannot format this LUMP: the embedded content-frame builder is unavailable.');
         return;
     }
-    _caps = _capMaterialized.resolvedCaps.map(function(cap) {
-        return {
-            name: cap.name,
-            rights: cap.rights.slice(),
-            grants: cap.grants.slice(),
-            nsIndex: cap.nsIndex,
-        };
-    });
+    var _srcEl = document.getElementById('asmEditor');
+    var _srcText = _srcEl ? (_srcEl.value || '') : '';
+    var _apiObj = _formatLumpApiDefinition(_absName, _caps);
+    var _candidates = {};
+    var _profiles = ['api'];
+    if (_srcText.trim().length > 0) _profiles.push('compact', 'full');
 
-    // Store for Step 2 so confirmSaveToNamespace() does not rebuild.
-    // registeredAt is captured now so Step 2 can verify nothing was recompiled
-    // between Format Lump and Save to Namespace.
+    for (var _profileIndex = 0; _profileIndex < _profiles.length; _profileIndex++) {
+        var _profile = _profiles[_profileIndex];
+        var _built = await _lcf.lumpBuildContentFrame(_apiObj, _srcText, { profile: _profile });
+        var _frameWds = _built.frameWords;
+        var _svLumpSize = 64;
+        var _fsStart = 1 + _svCW;
+        while ((_svLumpSize - _svCC - _fsStart) < _frameWds.length) _svLumpSize = _svLumpSize << 1;
+        var _svNm6 = 0;
+        while ((64 << _svNm6) < _svLumpSize) _svNm6++;
+        var _svHdr = (((0x1F & 0x1F) << 27) |
+                      ((_svNm6 & 0x0F) << 23) |
+                      ((_svCW & 0x1FFF) << 10) |
+                      (_svCC & 0xFF)) >>> 0;
+        var _svBinary = new Array(_svLumpSize).fill(0);
+        _svBinary[0] = _svHdr;
+        for (var _wordIndex = 0; _wordIndex < _svCW; _wordIndex++) {
+            _svBinary[1 + _wordIndex] = _svWords[_wordIndex] >>> 0;
+        }
+        for (var _frameIndex = 0; _frameIndex < _frameWds.length; _frameIndex++) {
+            _svBinary[_fsStart + _frameIndex] = _frameWds[_frameIndex] >>> 0;
+        }
+        var _capMaterialized = CapabilityTokens.materialize(_caps, _svBinary, _svLumpSize - _svCC, {
+            sim: (typeof sim !== 'undefined' ? sim : null),
+            lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) ? _lumpsCache : [],
+        });
+        if (!_capMaterialized.ok) {
+            var _capFailure = 'Cannot save this LUMP until its capabilities resolve:\n' +
+                _capMaterialized.errors.map(function(message) { return '\u2022 ' + message; }).join('\n');
+            if (typeof appendOutput === 'function') appendOutput(_capFailure, 'error');
+            alert(_capFailure);
+            return;
+        }
+        var _normalizedCaps = _capMaterialized.resolvedCaps.map(function(cap) {
+            return { name: cap.name, rights: cap.rights.slice(), grants: cap.grants.slice(), nsIndex: cap.nsIndex };
+        });
+        var _manifest = { cw: _svCW, cc: _svCC, lump_size: _svLumpSize, capabilities: _normalizedCaps };
+        var _auditResults = (typeof lumpAudit === 'function') ? lumpAudit(_svBinary, _manifest, null, {}) : [];
+        _candidates[_profile] = {
+            profile: _profile,
+            binary: _svBinary,
+            lumpSize: _svLumpSize,
+            cw: _svCW,
+            cc: _svCC,
+            caps: _normalizedCaps,
+            resolvedCaps: _capMaterialized.resolvedCaps,
+            frame: _built,
+            auditResults: _auditResults,
+            hasErrors: (typeof lumpAuditHasErrors === 'function') ? lumpAuditHasErrors(_auditResults) : false,
+            hasWarnings: (typeof lumpAuditHasWarnings === 'function') ? lumpAuditHasWarnings(_auditResults) : false
+        };
+    }
+
+    // Store immutable candidates for Step 2; confirmSaveToNamespace retains its
+    // registeredAt freshness guard before it reuses the selected binary.
     var _svRegisteredAt = (_regMem && _regMem.memory) ? (_regMem.memory.registeredAt || 0) : 0;
+    var _selectedProfile = _candidates.full ? 'full' : 'api';
+    var _selectedCandidate = _candidates[_selectedProfile];
+    _caps = _selectedCandidate.caps;
     window._pendingLumpData = {
-        binary:       _svBinary,
+        binary:       _selectedCandidate.binary,
         words:        _svWords.slice(),
         caps:         _caps,
-        resolvedCaps: _capMaterialized.resolvedCaps,
-        registeredAt: _svRegisteredAt
+        resolvedCaps: _selectedCandidate.resolvedCaps,
+        registeredAt: _svRegisteredAt,
+        candidates: _candidates,
+        selectedProfile: _selectedProfile,
+        sourceText: _srcText,
+        api: _apiObj
     };
+    var _svLumpSize = _selectedCandidate.lumpSize;
+    var _svHdr = _selectedCandidate.binary[0] >>> 0;
+    var _svBinary = _selectedCandidate.binary;
 
     // ── Reference name: petname.AbstractionName#issueNumber · binaryHash ────────
     var _refEl = document.getElementById('fmtRefName');
@@ -5587,16 +5710,6 @@ window.showFormatLump = async function() {
     // ── Decode header for the summary row ────────────────────────────────────
     var _cw = (_svHdr >>> 10) & 0x1FFF;
     var _cc = _svHdr & 0xFF;
-
-    // Header chips
-    var _chipsEl = document.getElementById('fmtHeaderChips');
-    if (_chipsEl) {
-        _chipsEl.innerHTML =
-            '<span class="fmt-chip fmt-chip-ok"><span class="fmt-chip-label">magic</span>0x1F \u2713</span>' +
-            '<span class="fmt-chip"><span class="fmt-chip-label">size</span>' + _svLumpSize + ' words</span>' +
-            '<span class="fmt-chip"><span class="fmt-chip-label">cw</span>' + _cw + '</span>' +
-            '<span class="fmt-chip"><span class="fmt-chip-label">cc</span>' + _cc + '</span>';
-    }
 
     // ── Capabilities table ────────────────────────────────────────────────────
     var _capsEl = document.getElementById('fmtCapsTable');
@@ -5680,54 +5793,7 @@ window.showFormatLump = async function() {
         }
     }
 
-    // ── Run audit ─────────────────────────────────────────────────────────────
-    var _manifest = { cw: _cw, cc: _cc, lump_size: _svLumpSize, capabilities: _caps };
-    // Run the full audit including RNC.  NULL-GT warnings (severity:'warn') are
-    // expected for freshly compiled lumps — the runtime fills slots at load time —
-    // but suppressing them with skipRnc gave a misleading ✓ pass.  Showing them
-    // here lets the user see exactly what Step 1 found before they approve.
-    // RCI (c-list slot bounds) is the authoritative check; the server repeats it
-    // only as defence-in-depth.  If RCI passes here, the server must agree.
-    var _auditResults = (typeof lumpAudit === 'function') ? lumpAudit(_svBinary, _manifest, null, {}) : [];
-    var _hasErrors   = (typeof lumpAuditHasErrors   === 'function') ? lumpAuditHasErrors(_auditResults)   : false;
-    var _hasWarnings = (typeof lumpAuditHasWarnings === 'function') ? lumpAuditHasWarnings(_auditResults) : false;
-
-    var _auditEl = document.getElementById('fmtAuditResults');
-    if (_auditEl) {
-        _auditEl.innerHTML = '';
-        if (typeof lumpAuditRenderPanel === 'function') {
-            lumpAuditRenderPanel(_auditEl, _auditResults, {
-                collapsible: true,
-                startOpen:   _hasErrors || _hasWarnings,
-            });
-        }
-    }
-
-    // ── Proceed button state ──────────────────────────────────────────────────
-    var _proceedBtn  = document.getElementById('fmtProceedBtn');
-    var _proceedNote = document.getElementById('fmtProceedNote');
-    if (_proceedBtn) {
-        if (_hasErrors) {
-            _proceedBtn.disabled = true;
-            if (_proceedNote) {
-                _proceedNote.style.display = '';
-                _proceedNote.style.color   = '#e07070';
-                _proceedNote.textContent   = '\u2717 Fix errors above before saving';
-            }
-        } else if (_hasWarnings) {
-            _proceedBtn.disabled = false;
-            var _warnCount = _auditResults.filter(function(r) { return r.severity === 'warn'; }).length;
-            if (_proceedNote) {
-                _proceedNote.style.display = '';
-                _proceedNote.style.color   = '#e0a055';
-                _proceedNote.textContent   = '\u26a0 ' + _warnCount + ' warning' +
-                    (_warnCount !== 1 ? 's' : '') + ' \u2014 review before saving';
-            }
-        } else {
-            _proceedBtn.disabled = false;
-            if (_proceedNote) { _proceedNote.style.display = 'none'; _proceedNote.textContent = ''; }
-        }
-    }
+    _renderFormatLumpCandidate(window._pendingLumpData);
 
     // ── Version history (may be async) ───────────────────────────────────────
     _renderFormatLumpVersionHistory(_absName);

@@ -489,6 +489,7 @@ const {
     lumpFrameUtf8Bytes,
     lumpFramePackBE,
     lumpBuildContentFrame,
+    lumpDecodeContentFrameApi,
     lumpDecodeContentFrame,
 } = require('./lump-content-frame.js');
 
@@ -497,12 +498,13 @@ const {
 // into a properly-headered LUMP binary, and returns the complete word array.
 // The binary is the direct input to lumpDecodeContentFrame (the same object
 // openLumpInEditor receives from the server).
-async function buildTestLumpBinary(codeWords, apiObj, srcText) {
+async function buildTestLumpBinary(codeWords, apiObj, srcText, profile) {
     const _svCC = 0;
     const _svCW = codeWords.length;
 
     // Build frame via the production helper.
-    const { frameWords, flags: builtFlags } = await lumpBuildContentFrame(apiObj, srcText);
+    const options = profile === undefined ? undefined : { profile };
+    const { frameWords, flags: builtFlags } = await lumpBuildContentFrame(apiObj, srcText, options);
 
     // Compute minimum lump size: header + codeWords + frame + c-list.
     const _fsStart = 1 + _svCW;
@@ -527,7 +529,18 @@ async function buildTestLumpBinary(codeWords, apiObj, srcText) {
 
 (async function _runFsTests() {
     // ── API object and source fixture ─────────────────────────────────────────
-    const API_OBJ = { name: 'Scheduler.IRQ', language: 'assembly' };
+    const API_OBJ = {
+        name: 'Scheduler.IRQ',
+        language: 'assembly',
+        returnConvention: { register: 'DR0', description: 'return value' },
+        methods: [{
+            name: 'Dispatch',
+            index: 0,
+            inputs: [{ name: 'event', register: 'DR1' }],
+            returns: { name: 'result', register: 'DR0' }
+        }],
+        capabilities: [{ name: 'Handler', rights: ['E'], grants: ['E'] }]
+    };
 
     // Source text long enough (≥ 200 bytes) to benefit from deflate-raw compression.
     const SOURCE_TEXT = [
@@ -653,6 +666,48 @@ async function buildTestLumpBinary(codeWords, apiObj, srcText) {
               recovC === recovU);
     } catch (err) {
         console.log(`FAIL T-RT-FS03 (exception): ${err}`);
+        fail++;
+    }
+
+    // ── T-RT-FS04: Explicit API-only selection has no recoverable source ──────
+    console.log('\n--- T-RT-FS04: API-only output profile ---');
+    try {
+        const { binary, flags, fsStart } =
+            await buildTestLumpBinary(CODE_WORDS, API_OBJ, SOURCE_TEXT, 'api');
+        const recovered = await lumpDecodeContentFrame(binary);
+        const api = lumpDecodeContentFrameApi(binary);
+        check('T-RT-FS04a: API-only profile writes flags=0x00',
+              flags === 0x00 && (((binary[fsStart] >>> 0) >>> 16) & 0xFF) === 0x00);
+        check('T-RT-FS04b: API-only profile has no recoverable source', recovered === null);
+        check('T-RT-FS04c: API-only profile retains valid embedded JSON API',
+              api && api.name === API_OBJ.name && api.methods[0].returns.register === 'DR0');
+        check('T-RT-FS04d: embedded API omits circular token and issue fields',
+              api && !Object.prototype.hasOwnProperty.call(api, 'token') &&
+              !Object.prototype.hasOwnProperty.call(api, 'issue'));
+    } catch (err) {
+        console.log(`FAIL T-RT-FS04 (exception): ${err}`);
+        fail++;
+    }
+
+    // ── T-RT-FS05: Compact profile removes comments but remains recoverable ───
+    console.log('\n--- T-RT-FS05: compact-source output profile ---');
+    try {
+        const { binary, flags, fsStart } =
+            await buildTestLumpBinary(CODE_WORDS, API_OBJ, SOURCE_TEXT, 'compact');
+        const recovered = await lumpDecodeContentFrame(binary);
+        check('T-RT-FS05a: compact profile writes tier-1 source flags',
+              (flags === 0x05 || flags === 0x01) &&
+              (((binary[fsStart] >>> 0) >>> 16) & 0xFF) === flags);
+        check('T-RT-FS05b: compact profile removes source comments',
+              recovered !== null && recovered.indexOf('Scheduler.IRQ') === -1 &&
+              recovered.indexOf('; padding:') === -1);
+        check('T-RT-FS05c: compact profile keeps executable source',
+              recovered !== null && recovered.indexOf('LOAD CR0') !== -1 &&
+              recovered.indexOf('RETURN') !== -1);
+        check('T-RT-FS05d: compact-source frame is no larger than full-source frame',
+              binary.length <= (await buildTestLumpBinary(CODE_WORDS, API_OBJ, SOURCE_TEXT, 'full')).binary.length);
+    } catch (err) {
+        console.log(`FAIL T-RT-FS05 (exception): ${err}`);
         fail++;
     }
 

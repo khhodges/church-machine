@@ -184,15 +184,26 @@ function stripComments(src) {
  */
 function buildApiDefinition(result, words) {
     const methods = result.methods || [];
-    const api = { name: result.abstractionName || '', methods: [] };
+    const api = {
+        name: result.abstractionName || '',
+        language: result.language || 'assembly',
+        returnConvention: { register: 'DR0', description: 'return value' },
+        methods: [],
+        capabilities: (result.capabilities || []).map(cap => ({
+            name: cap.name || '',
+            rights: Array.isArray(cap.rights) ? cap.rights.slice() : [],
+        })),
+    };
     methods.forEach((m, i) => {
         if (m.visibility === 'private') return;
         const branchOffset = words && (1 + i) < words.length ? (words[1 + i] & 0x7FFF) : 0;
+        const inputs = (m.params || []).map((p, pi) => ({ name: p, register: `DR${pi + 1}` }));
         api.methods.push({
-            petName: m.name,
+            name: m.name,
+            index: i,
             branchOffset,
-            in: (m.params || []).map((p, pi) => ({ name: p, reg: `DR${pi + 1}` })),
-            out: [{ name: 'result', reg: 'DR1' }],
+            inputs,
+            returns: { name: 'result', register: 'DR0' },
         });
     });
     return api;

@@ -32,6 +32,7 @@ function check(label, cond, detail) {
 // ── Load source files ─────────────────────────────────────────────────────────
 const appRunSrc   = fs.readFileSync(path.join(__dirname, 'app-run.js'),   'utf8');
 const appLumpsSrc = fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8');
+const indexSrc    = fs.readFileSync(path.join(__dirname, 'index.html'),   'utf8');
 
 // ── T1: binary decision block precedes registerMemory inside confirmSaveToNamespace ──
 // The critical ordering requirement: _pendingCanReuse / _svBinary selection must
@@ -79,29 +80,29 @@ const appLumpsSrc = fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8'
     }
 }
 
-// ── T2: toolbar Save Lump button calls showFormatLump, not showSaveToNamespace ──
+// ── T2: Save Lump entry point calls showFormatLump, not showSaveToNamespace ────
 {
-    // Find the injected-toolbar-button handler in app-lumps.js.
-    // It is the addEventListener('click', ...) block after 'btnToolbarSaveLump'.
-    const btnIdx = appLumpsSrc.indexOf('btnToolbarSaveLump');
-    check('T2 btnToolbarSaveLump found in app-lumps.js', btnIdx !== -1);
-    if (btnIdx !== -1) {
-        // Extract the click handler block (~200 chars after the button is defined).
-        // The handler is a few hundred characters after the button's id assignment;
-        // we scan forward for 'showFormatLump' and 'showSaveToNamespace' within
-        // the function body of the click handler.
-        const clickHandlerStart = appLumpsSrc.indexOf("addEventListener('click'", btnIdx);
-        check('T2a click handler found', clickHandlerStart !== -1);
-        if (clickHandlerStart !== -1) {
-            const handlerSnippet = appLumpsSrc.slice(clickHandlerStart, clickHandlerStart + 600);
-            const callsFmt  = handlerSnippet.includes('showFormatLump');
-            const callsNsDirect = /showSaveToNamespace\s*\(\s*\)/.test(handlerSnippet) &&
-                                  !handlerSnippet.includes('showFormatLump');
-            check('T2b handler calls showFormatLump (not showSaveToNamespace directly)',
-                callsFmt && !callsNsDirect,
-                `showFormatLump=${callsFmt} directNS=${callsNsDirect}`);
-        }
+    // The permanent toolbar button calls editorSaveLump(), so guard the shared
+    // entry point rather than an obsolete injected-button implementation.
+    const entryIdx = appLumpsSrc.indexOf('window.editorSaveLump = function()');
+    check('T2 Save Lump entry point found in app-lumps.js', entryIdx !== -1);
+    if (entryIdx !== -1) {
+        const entrySnippet = appLumpsSrc.slice(entryIdx, entryIdx + 900);
+        const callsFmt = entrySnippet.includes('showFormatLump');
+        const callsNsDirect = /showSaveToNamespace\s*\(\s*\)/.test(entrySnippet);
+        check('T2a Save Lump opens Format Lump before namespace save',
+            callsFmt && !callsNsDirect,
+            `showFormatLump=${callsFmt} directNS=${callsNsDirect}`);
     }
+}
+
+// ── T2b: Format Lump offers persistent output choices before Step 2 ───────────
+{
+    check('T2b output-profile chooser exists in Format Lump dialog',
+        indexSrc.includes('id="fmtOutputProfiles"'));
+    check('T2c output selection writes the selected candidate into pending save data',
+        appLumpsSrc.includes('function _selectFormatLumpProfile(profile)') &&
+        appLumpsSrc.includes('pending.binary = _candidate.binary'));
 }
 
 // ── T3: _closeFormatLumpDialog clears _pendingLumpData ───────────────────────

@@ -17,13 +17,14 @@
  *       Deflate-raw compress a byte array via native CompressionStream.
  *       Throws if CompressionStream is not available.
  *
- *   lumpBuildContentFrame(apiObj, srcText)  → Promise<{frameWords, flags}>
+ *   lumpBuildContentFrame(apiObj, srcText, options)  → Promise<{frameWords, flags}>
  *       Build the 0xAB frame word array for a LUMP freespace zone.
  *       apiObj  — plain object to JSON-encode as the API definition
  *                 (must NOT contain token or issue — circular hash rule).
- *       srcText — source string to embed (null/'' → Tier 0, API JSON only).
- *       Compression (flags=0x07) is attempted first; falls back to
- *       uncompressed (flags=0x03) when CompressionStream is unavailable.
+ *       srcText — source string to embed.
+ *       options.profile — 'api', 'compact', or 'full' (defaults to 'full').
+ *       Compression uses flags 0x05/0x07 and falls back to 0x01/0x03 when
+ *       CompressionStream is unavailable.
  *       frameWords[0] is the 0xAB header word; frameWords.length gives the
  *       total word count the caller must reserve in the freespace zone.
  *
@@ -78,6 +79,23 @@ function lumpFramePackBE(bytes) {
     return ws;
 }
 
+/** Remove comment-only lines and trailing assembly / C-style line comments. */
+function lumpFrameStripComments(source) {
+    return String(source || '').split('\n')
+        .map(function(line) { return line.replace(/;.*$/, '').replace(/\/\/.*$/, ''); })
+        .filter(function(line) { return line.trim().length > 0; })
+        .join('\n');
+}
+
+function lumpFrameOutputProfile(options) {
+    var profile = options;
+    if (options && typeof options === 'object') profile = options.profile || options.tier;
+    if (profile === 0 || profile === '0' || profile === 'api') return 'api';
+    if (profile === 1 || profile === '1' || profile === 'compact') return 'compact';
+    if (profile === 2 || profile === '2' || profile === 'full' || profile == null) return 'full';
+    throw new Error('Unknown LUMP output profile: ' + profile);
+}
+
 /**
  * Deflate-raw compress a byte array using the browser-native CompressionStream.
  * Returns a Promise that resolves to the compressed byte array.
@@ -97,20 +115,37 @@ async function lumpFrameDeflateRaw(bytes) {
  * Build the 0xAB content frame for embedding in a LUMP freespace zone.
  *
  * @param {object} apiObj  — JSON-serialisable API definition (no token/issue).
- * @param {string|null} srcText — source text to embed; null/''/whitespace-only
- *                               produces a Tier 0 frame (API JSON only).
- * @returns {Promise<{frameWords: number[], flags: number}>}
+ * @param {string|null} srcText — source text to embed.
+ * @param {{profile?: 'api'|'compact'|'full'}|string|number} [options]
+ * @returns {Promise<{frameWords: number[], flags: number, profile: string,
+ *                    apiBytesLength: number, sourceBytesLength: number}>}
  *   frameWords — complete frame word array; frameWords[0] is the 0xAB header.
  *   flags      — the flags byte written into frameWords[0][23:16]:
  *                  0x00 Tier 0 (API only)
- *                  0x03 Tier 2 uncompressed source
- *                  0x07 Tier 2 deflate-raw compressed source
+ *                  0x01 Tier 1 compact uncompressed source
+ *                  0x05 Tier 1 compact deflate-raw source
+ *                  0x03 Tier 2 full uncompressed source
+ *                  0x07 Tier 2 full deflate-raw source
  */
-async function lumpBuildContentFrame(apiObj, srcText) {
+async function lumpBuildContentFrame(apiObj, srcText, options) {
     var _apiBytes = lumpFrameUtf8Bytes(JSON.stringify(apiObj));
     var _apiWds   = lumpFramePackBE(_apiBytes);
+    if (_apiBytes.length > 0xFFFF) {
+        throw new Error('Embedded API JSON exceeds the 65535-byte frame limit');
+    }
 
-    var _srcText  = (srcText && typeof srcText === 'string') ? srcText.trim() : '';
+    var _profile = lumpFrameOutputProfile(options);
+    var _requestedProfile = options !== undefined && options !== null;
+    var _srcText = (srcText && typeof srcText === 'string') ? srcText : '';
+    if (_profile === 'compact') _srcText = lumpFrameStripComments(_srcText);
+    if (_profile === 'api') _srcText = '';
+    if (_profile !== 'api' && _srcText.trim().length === 0) {
+        if (_requestedProfile) {
+            throw new Error('The ' + _profile + ' output profile requires saved source');
+        }
+        _profile = 'api';
+        _srcText = '';
+    }
     var _srcRaw   = _srcText ? lumpFrameUtf8Bytes(_srcText) : null;
     var _srcBytes = null;
     var _compressed = false;
@@ -126,7 +161,12 @@ async function lumpBuildContentFrame(apiObj, srcText) {
     }
 
     var _srcWds  = _srcBytes ? lumpFramePackBE(_srcBytes) : null;
-    var _flags   = _srcWds ? (_compressed ? 0x07 : 0x03) : 0x00;
+    var _flags   = 0x00;
+    if (_srcWds) {
+        _flags = _profile === 'compact'
+            ? (_compressed ? 0x05 : 0x01)
+            : (_compressed ? 0x07 : 0x03);
+    }
 
     // frameWords layout:
     //   [0]           — 0xAB header  (filled below)
@@ -139,7 +179,42 @@ async function lumpBuildContentFrame(apiObj, srcText) {
     }
     _frameWds[0] = ((0xAB << 24) | (_flags << 16) | (_apiBytes.length & 0xFFFF)) >>> 0;
 
-    return { frameWords: _frameWds, flags: _flags };
+    return {
+        frameWords: _frameWds,
+        flags: _flags,
+        profile: _srcWds ? _profile : 'api',
+        apiBytesLength: _apiBytes.length,
+        sourceBytesLength: _srcBytes ? _srcBytes.length : 0
+    };
+}
+
+/**
+ * Decode the JSON API document from a valid 0xAB content frame.
+ * Returns null when no frame or valid JSON API is available.
+ */
+function lumpDecodeContentFrameApi(serverWords) {
+    try {
+        if (!serverWords || serverWords.length === 0) return null;
+        var _bhdr = serverWords[0] >>> 0;
+        var _cw = (_bhdr >>> 10) & 0x1FFF;
+        var _cc = _bhdr & 0xFF;
+        var _sz = 64 << ((_bhdr >>> 23) & 0x0F);
+        var _start = 1 + _cw;
+        var _end = _sz - _cc;
+        if (_start >= _end || _start >= serverWords.length) return null;
+        var _hdr = serverWords[_start] >>> 0;
+        if (((_hdr >>> 24) & 0xFF) !== 0xAB) return null;
+        var _byteLength = _hdr & 0xFFFF;
+        var _wordLength = Math.ceil(_byteLength / 4);
+        if (_byteLength === 0 || _start + 1 + _wordLength > _end) return null;
+        var _bytes = [];
+        for (var _i = 0; _i < _wordLength; _i++) {
+            var _word = serverWords[_start + 1 + _i] >>> 0;
+            _bytes.push((_word >>> 24) & 0xFF, (_word >>> 16) & 0xFF,
+                        (_word >>> 8) & 0xFF, _word & 0xFF);
+        }
+        return JSON.parse(new TextDecoder().decode(new Uint8Array(_bytes.slice(0, _byteLength))));
+    } catch (_e) { return null; }
 }
 
 /**
@@ -205,8 +280,10 @@ async function lumpDecodeContentFrame(serverWords) {
 var _lcfExports = {
     lumpFrameUtf8Bytes:    lumpFrameUtf8Bytes,
     lumpFramePackBE:       lumpFramePackBE,
+    lumpFrameStripComments: lumpFrameStripComments,
     lumpFrameDeflateRaw:   lumpFrameDeflateRaw,
     lumpBuildContentFrame: lumpBuildContentFrame,
+    lumpDecodeContentFrameApi: lumpDecodeContentFrameApi,
     lumpDecodeContentFrame: lumpDecodeContentFrame,
 };
 
