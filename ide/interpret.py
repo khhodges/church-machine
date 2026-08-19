@@ -902,8 +902,22 @@ class Interpreter:
             return None
         raw = struct.pack(f">{src_nw}I", *words[pos:pos + src_nw])[:src_len]
         try:
+            if flags & 0x04:
+                # deflate-raw compressed (flags 0x05/0x07); wbits=-15 matches
+                # the browser CompressionStream('deflate-raw').
+                # Bound output to 256 KiB to guard against decompression bombs.
+                import zlib as _zlib_ip
+                _MAX_DECOMP = 1 << 18
+                _d = _zlib_ip.decompressobj(wbits=-15)
+                _chunk = _d.decompress(raw, _MAX_DECOMP)
+                if _d.unconsumed_tail:
+                    return None
+                _rest = _d.flush()
+                if not _d.eof:
+                    return None   # truncated stream
+                return (_chunk + _rest).decode("utf-8")
             return raw.decode("utf-8")
-        except UnicodeDecodeError:
+        except Exception:
             return None
 
     @staticmethod

@@ -1156,7 +1156,8 @@ class ChurchSimulator {
     //
     // For typ=lump (typ===0): inspect word cw+1.
     //   • bits [31:24] === 0xAB → validate the self-definition content frame:
-    //       7a  flags (bits [23:16]) must be 0x00 / 0x01 / 0x03
+    //       7a  flags (bits [23:16]) must be 0x00 / 0x01 / 0x03 (uncompressed)
+    //                                         or 0x05 / 0x07 (deflate-raw compressed variants)
     //       7b  api_byte_length (bits [15:0]) non-zero; API region within freespace
     //       7c  if flags.has_source: source_byte_length non-zero; source region
     //           within freespace
@@ -1205,9 +1206,12 @@ class ChurchSimulator {
         const fsWords = fsEnd - fsStart;
         const flags   = (w0 >>> 16) & 0xFF;
         const apiLen  = w0 & 0xFFFF;
-        if (flags !== 0x00 && flags !== 0x01 && flags !== 0x03) {
+        // Valid flags: 0x00 (API only), 0x01/0x03 (source/source+comments uncompressed),
+        //              0x05/0x07 (source/source+comments deflate-raw compressed; bit2=compressed).
+        const _VALID_FLAGS = new Set([0x00, 0x01, 0x03, 0x05, 0x07]);
+        if (!_VALID_FLAGS.has(flags)) {
             return { ok: false, code: 'FS_BAD_FLAGS',
-                     detail: `content header flags 0x${flags.toString(16).padStart(2, '0').toUpperCase()} — only 0x00, 0x01 or 0x03 are valid (step 7a)` };
+                     detail: `content header flags 0x${flags.toString(16).padStart(2, '0').toUpperCase()} — valid values are 0x00, 0x01, 0x03, 0x05, 0x07 (step 7a)` };
         }
         if (apiLen === 0) {
             return { ok: false, code: 'FS_API_LEN', detail: 'api_byte_length is zero (step 7b)' };
@@ -1257,7 +1261,10 @@ class ChurchSimulator {
                          detail: `non-zero word after the declared content region at word ${i} (0x${(words[i] >>> 0).toString(16).toUpperCase().padStart(8, '0')}; step 7d)` };
             }
         }
-        return { ok: true, tier: (flags === 0x03) ? 2 : (flags === 0x01) ? 1 : 0 };
+        // Tier from flags: bit0=has_source, bit1=has_comments (Tier 2), bit2=compressed.
+        // Both plain (0x01/0x03) and compressed (0x05/0x07) variants map to the same tier.
+        const _tier = (flags & 0x03) === 0x03 ? 2 : (flags & 0x01) ? 1 : 0;
+        return { ok: true, tier: _tier };
     }
 
     // Returns true when every non-zero word in the code region (words[1..cw])

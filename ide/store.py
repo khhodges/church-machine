@@ -39,6 +39,7 @@ import json
 import re
 import struct
 import time
+import zlib
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Iterator
@@ -112,8 +113,16 @@ CONTENT_MAGIC = 0xAB
 # Tier → flags byte.  Tier 2 (full source + comments) is the default: every
 # compile with no explicit tier produces a Tier 2 binary.  Tier 0/1 exist for
 # future use and testing.
-TIER_FLAGS = {0: 0x00, 1: 0x01, 2: 0x03}
-FLAGS_TIER = {v: k for k, v in TIER_FLAGS.items()}
+#
+# Compressed variants (bit 2 = compressed, deflate-raw / wbits=-15) are the
+# current default — they match the JS emitter (CompressionStream 'deflate-raw')
+# and are used by embed_content when zlib is available.  The plain variants are
+# kept for backward-compatible reading via FLAGS_TIER.
+TIER_FLAGS_PLAIN      = {0: 0x00, 1: 0x01, 2: 0x03}  # uncompressed (legacy)
+TIER_FLAGS_COMPRESSED = {0: 0x00, 1: 0x05, 2: 0x07}  # deflate-raw (current)
+TIER_FLAGS = TIER_FLAGS_COMPRESSED
+# All valid flags → tier mapping, both plain and compressed variants.
+FLAGS_TIER = {0x00: 0, 0x01: 1, 0x03: 2, 0x05: 1, 0x07: 2}
 DEFAULT_TIER = 2
 
 TIER_NAMES = {0: "api-only", 1: "source", 2: "source+comments"}
@@ -483,10 +492,18 @@ def embed_content(words: list[int], api: dict | bytes | None = None,
     api_words = _pack_be_words(api_raw)
     src_words: list[int] = []
     src_len = 0
+    compressed = False
     if tier >= 1:
         # Tier 1 strips comments here (canonical transformation), exactly
         # like embedSelfDefinition() in simulator/lump_builder.js.
-        src_raw = (strip_comments(source) if tier == 1 else source).encode("utf-8")
+        src_utf8 = (strip_comments(source) if tier == 1 else source).encode("utf-8")
+        # Try deflate-raw compression (wbits=-15 matches the browser's
+        # CompressionStream('deflate-raw') used by the JS emitter).
+        try:
+            src_raw = zlib.compress(src_utf8, level=6, wbits=-15)
+            compressed = True
+        except Exception:
+            src_raw = src_utf8           # plain UTF-8 fallback
         src_len = len(src_raw)
         src_words = _pack_be_words(src_raw)
 
@@ -522,7 +539,10 @@ def embed_content(words: list[int], api: dict | bytes | None = None,
     for i in range(fs_start, fs_end):
         out[i] = 0
 
-    flags = TIER_FLAGS[tier]
+    if tier >= 1 and compressed:
+        flags = TIER_FLAGS_COMPRESSED[tier]
+    else:
+        flags = TIER_FLAGS_PLAIN[tier]
     out[fs_start] = ((CONTENT_MAGIC << 24) | (flags << 16)
                      | (len(api_raw) & 0xFFFF))
     pos = fs_start + 1
@@ -586,9 +606,25 @@ def extract_content(words: list[int]) -> dict | None:
             raise SourceError("source region overruns freespace")
         raw = struct.pack(f">{src_nw}I", *words[pos:pos + src_nw])[:src_len]
         try:
-            source = raw.decode("utf-8")
-        except UnicodeDecodeError as e:
-            raise SourceError(f"source will not decode as UTF-8: {e}") from e
+            if flags & 0x04:
+                # deflate-raw compressed (flags 0x05 or 0x07); wbits=-15 matches
+                # the browser CompressionStream('deflate-raw') / JS _deflateRaw().
+                # Bound the decompressed output to guard against decompression bombs:
+                # the largest valid lump is 2^15 words = 131072 bytes, so 256 KiB
+                # is far above any legitimate source payload.
+                _MAX_DECOMP = 1 << 18   # 256 KiB
+                _d = zlib.decompressobj(wbits=-15)
+                _chunk = _d.decompress(raw, _MAX_DECOMP)
+                if _d.unconsumed_tail:
+                    raise zlib.error("decompressed output exceeds 256 KiB limit")
+                _rest = _d.flush()
+                if not _d.eof:
+                    raise zlib.error("truncated deflate-raw stream")
+                source = (_chunk + _rest).decode("utf-8")
+            else:
+                source = raw.decode("utf-8")
+        except (UnicodeDecodeError, zlib.error) as e:
+            raise SourceError(f"source could not be decoded: {e}") from e
 
     return {"tier": tier, "flags": flags, "api": api,
             "api_bytes": api_raw, "source": source}

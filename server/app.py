@@ -7423,7 +7423,10 @@ def _lump_freespace_content(words):
     if (h >> 24) & 0xFF != 0xAB:
         return None
     flags = (h >> 16) & 0xFF
-    tier  = {0x00: 0, 0x01: 1, 0x03: 2}.get(flags)
+    # Valid flag bytes: 0x00 (Tier 0), 0x01/0x03 (Tier 1/2 uncompressed),
+    # 0x05/0x07 (Tier 1/2 deflate-raw compressed; bit 2 = compressed flag).
+    _tier_map = {0x00: 0, 0x01: 1, 0x03: 2, 0x05: 1, 0x07: 2}
+    tier  = _tier_map.get(flags)
     if tier is None:
         return None
     api_len = h & 0xFFFF
@@ -7443,8 +7446,24 @@ def _lump_freespace_content(words):
         raw = _struct.pack(f'>{src_nw}I',
                            *[w & 0xFFFFFFFF for w in words[pos + 1:pos + 1 + src_nw]])[:src_len]
         try:
-            source = raw.decode('utf-8')
-        except UnicodeDecodeError:
+            if flags & 0x04:
+                # deflate-raw compressed (flags 0x05 or 0x07) — wbits=-15 matches
+                # the browser CompressionStream('deflate-raw') / JS _deflateRaw().
+                # Guard against decompression bombs: bound output to 256 KiB
+                # (far above the largest valid lump freespace of ~128 KiB).
+                import zlib as _zlib_fs
+                _MAX_DECOMP = 1 << 18   # 256 KiB
+                _d = _zlib_fs.decompressobj(wbits=-15)
+                _chunk = _d.decompress(raw, _MAX_DECOMP)
+                if _d.unconsumed_tail:
+                    return None   # reject oversized payloads silently
+                _rest = _d.flush()
+                if not _d.eof:
+                    return None   # truncated stream — reject silently
+                source = (_chunk + _rest).decode('utf-8')
+            else:
+                source = raw.decode('utf-8')
+        except Exception:
             return None
         content += 1 + src_nw
     return {"tier": tier, "flags": flags, "api_len": api_len,

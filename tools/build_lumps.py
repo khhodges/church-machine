@@ -29,6 +29,7 @@ import glob
 import json
 import os
 import struct
+import zlib
 
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT    = os.path.dirname(SCRIPT_DIR)
@@ -79,6 +80,60 @@ def words_to_binary(words, lump_size):
     padded = list(words) + [0] * lump_size
     padded = padded[:lump_size]
     return struct.pack(f'>{lump_size}I', *[int(w) & 0xFFFFFFFF for w in padded])
+
+
+def _bytes_to_be_words(data):
+    """Pack a byte sequence big-endian into a list of uint32 words (last word zero-padded)."""
+    nw = (len(data) + 3) // 4
+    out = []
+    for i in range(nw):
+        w = 0
+        for b in range(4):
+            bi = i * 4 + b
+            if bi < len(data):
+                w |= (data[bi] & 0xFF) << (24 - b * 8)
+        out.append(w & 0xFFFFFFFF)
+    return out
+
+
+def pack_content_frame(api_obj, source_text=None):
+    """Build a V1.3 0xAB self-definition content frame.
+
+    Spec: CM_LUMP_SPECIFICATION.md §Freespace Content and Self-Definition.
+
+    api_obj     — dict serialised as compact JSON (name/caps; never token/issue).
+    source_text — optional source string; compressed with deflate-raw (flags=0x07)
+                  when zlib is available, else uncompressed fallback (flags=0x03).
+                  When None, flags=0x00 (API JSON only, Tier 0).
+
+    Returns (frame_words, flags) where frame_words is a list of uint32 words
+    starting with the 0xAB header word.  The caller places these words at
+    freespace start (lump word cw+1).
+    """
+    api_bytes = json.dumps(api_obj, separators=(',', ':')).encode('utf-8')
+    api_len   = len(api_bytes)
+    api_words = _bytes_to_be_words(api_bytes)
+
+    if source_text:
+        src_raw = source_text.encode('utf-8')
+        try:
+            # deflate-raw: wbits=-15 matches CompressionStream('deflate-raw') in the browser.
+            src_bytes  = zlib.compress(src_raw, level=6, wbits=-15)
+            flags      = 0x07   # has_source | compressed (Tier 2 compressed)
+        except Exception:
+            src_bytes  = src_raw
+            flags      = 0x03   # has_source, uncompressed fallback (Tier 2)
+        src_len   = len(src_bytes)
+        src_words = _bytes_to_be_words(src_bytes)
+        # header | api_words | src_len_word | src_words
+        frame_words = [None] + api_words + [src_len] + src_words
+    else:
+        flags       = 0x00   # API JSON only (Tier 0)
+        frame_words = [None] + api_words
+
+    # Fill in the header word now that we know flags and api_len.
+    frame_words[0] = ((0xAB << 24) | (flags << 16) | (api_len & 0xFFFF)) & 0xFFFFFFFF
+    return frame_words, flags
 
 
 def parse_code(method):
@@ -183,10 +238,39 @@ def build_lump(payload, verbose=False):
         raise ValueError(
             f'{name}: cw={cw} + dw={dw} + cc={cc} >= lump_size={lump_size} — too large')
 
+    # ── V1.3 self-definition content frame (0xAB at word cw+1) ─────────────
+    # Spec: the frame lives at the first freespace word, which is word cw+1.
+    # For lumps with data_words the data region occupies words cw+1..cw+dw and
+    # shares the freespace zone; embedding a content frame there would corrupt
+    # the data, so we skip the frame for those lumps.
+    frame_words = []
+    if dw == 0:
+        api_obj = {'name': name}
+        cap_names = [c.get('name', '') for c in capabilities if c.get('name')]
+        if cap_names:
+            api_obj['caps'] = cap_names
+        source_text = payload.get('source') or None
+        frame_words, _frame_flags = pack_content_frame(api_obj, source_text)
+
+    frame_nw = len(frame_words)
+
+    # Grow lump_size until the frame fits in freespace (words cw+1 .. sz-cc-1).
+    while (lump_size - 1 - cw - dw - cc) < frame_nw:
+        lump_size <<= 1
+
     header = pack_lump_header(cw, cc, typ=0, lump_size=lump_size)
 
     words_out = [header] + all_code + data_words
     binary = words_to_binary(words_out, lump_size)
+
+    if frame_words:
+        # Patch frame words at word cw+1 (freespace start, immediately after code).
+        binary = bytearray(binary)
+        fs_word_offset = 1 + cw   # word index of first freespace word
+        for i, fw in enumerate(frame_words):
+            off = (fs_word_offset + i) * 4
+            struct.pack_into('>I', binary, off, int(fw) & 0xFFFFFFFF)
+        binary = bytes(binary)
 
     manifest_entry = {
         'token'      : token8,
