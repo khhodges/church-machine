@@ -210,8 +210,10 @@ class ChurchAssembler {
         // test assembler in app-run.js, and decompileWords) automatically pick
         // up conventions registered via setSharedMethodConventions() without any
         // change at each call site.
-        this.methodConventions = Object.assign(
-            {}, ChurchAssembler._sharedMethodConventions || {}, methodConventions);
+        this.methodConventions = ChurchAssembler._withNormalizedNameAliases(Object.assign(
+            {},
+            ChurchAssembler._sharedMethodConventions || {},
+            ChurchAssembler._withNormalizedNameAliases(methodConventions)));
         this.opcodes = {
             'LOAD': 0, 'SAVE': 1, 'CALL': 2, 'RETURN': 3,
             'CHANGE': 4, 'SWITCH': 5, 'TPERM': 6, 'LAMBDA': 7,
@@ -249,13 +251,55 @@ class ChurchAssembler {
         // Inherit the class-level namespace so locally-created assembler instances
         // (e.g. inside tutorials, builder, CLOOMC) automatically get symbol resolution
         // without every call site needing to call setNamespace() individually.
-        this.nsSymbols  = Object.assign({}, ChurchAssembler._sharedNsSymbols  || {});
+        this.nsSymbols  = ChurchAssembler._withNormalizedNameAliases(
+            ChurchAssembler._sharedNsSymbols || {});
         this.nsLoaded   = {};  // name → CR index (updated during assembly)
         // Null-GT row pet names: name → c-list slot index (e.g. {Mum: 5}).
         // Set via setClistSlots(); inherited class-wide like nsSymbols.
         this._clistSlots    = Object.assign({}, ChurchAssembler._sharedClistSlots || {});
         // Capabilities-block slots — rebuilt each assemble() call; always fresh.
         this._capBlockSlots = {};
+    }
+
+    // Abstraction names are identifiers, not display labels. Keep the canonical
+    // spelling for diagnostics while also accepting the normalized uppercase form
+    // used by the CLOOMC ROM and several assembler paths.
+    static _withNormalizedNameAliases(map) {
+        const winnerByNormalizedName = {};
+        for (const [name, value] of Object.entries(map || {})) {
+            winnerByNormalizedName[name.toUpperCase()] = value;
+        }
+
+        const normalized = {};
+        for (const name of Object.keys(map || {})) {
+            const upper = name.toUpperCase();
+            normalized[name] = winnerByNormalizedName[upper];
+            normalized[upper] = winnerByNormalizedName[upper];
+        }
+        return normalized;
+    }
+
+    static _nameKey(map, name) {
+        if (!map || !name) return null;
+        if (map[name] !== undefined) return name;
+        const upper = String(name).toUpperCase();
+        if (map[upper] !== undefined) return upper;
+        return Object.keys(map).find(key => key.toUpperCase() === upper) || null;
+    }
+
+    _methodConventionsFor(name) {
+        const key = ChurchAssembler._nameKey(this.methodConventions, name);
+        return key === null ? null : this.methodConventions[key];
+    }
+
+    _methodEntryFor(conventions, methodName) {
+        const key = ChurchAssembler._nameKey(conventions, methodName);
+        return key === null ? null : { name: key, entry: conventions[key] };
+    }
+
+    _recordNsLoaded(name, crIndex) {
+        this.nsLoaded[name] = crIndex;
+        this.nsLoaded[String(name).toUpperCase()] = crIndex;
     }
 
     // setClistSlots(nameToSlot) — register null-GT row pet names so the assembler
@@ -279,13 +323,18 @@ class ChurchAssembler {
     // Also updates this.methodConventions on the instance that calls it so the
     // conventions are available immediately (matching setNamespace() behaviour).
     static setSharedMethodConventions(map) {
-        ChurchAssembler._sharedMethodConventions = Object.assign(
-            {}, ChurchAssembler._sharedMethodConventions || {}, map || {});
+        const incoming = ChurchAssembler._withNormalizedNameAliases(map || {});
+        ChurchAssembler._sharedMethodConventions =
+            ChurchAssembler._withNormalizedNameAliases(Object.assign(
+                {}, ChurchAssembler._sharedMethodConventions || {}, incoming));
     }
 
     setSharedMethodConventions(map) {
         ChurchAssembler.setSharedMethodConventions(map);
-        Object.assign(this.methodConventions, map || {});
+        this.methodConventions = ChurchAssembler._withNormalizedNameAliases(
+            Object.assign(
+                {}, this.methodConventions,
+                ChurchAssembler._withNormalizedNameAliases(map || {})));
     }
 
     // ── Live snippet history ─────────────────────────────────────────────────
@@ -344,7 +393,8 @@ class ChurchAssembler {
     setNamespace(map) {
         // Persist as a class-level default so any future ChurchAssembler() instance
         // created anywhere in the app inherits the same namespace automatically.
-        ChurchAssembler._sharedNsSymbols = Object.assign({}, map);
+        ChurchAssembler._sharedNsSymbols =
+            ChurchAssembler._withNormalizedNameAliases(map || {});
         this.nsSymbols = Object.assign({}, ChurchAssembler._sharedNsSymbols);
         this.nsLoaded  = {};   // clear stale CR assignments
     }
@@ -405,26 +455,21 @@ class ChurchAssembler {
     // No-op when no capabilities block was declared (backward-compatible with programs
     // that rely entirely on the DEMO_CLIST or namespace auto-resolution).
     _checkCapDeclared(name, lineNum) {
-        if (!this._hasCapBlock) return;
+        if (!this._hasCapBlock) return true;
         const cleanName = (name || '').replace(/,/g, '').trim();
-        if (!cleanName) return;
-        if (this._capBlockSlots[cleanName] === undefined) {
-            // For hardware device shorthands (UART/BTN/SlideRule/Timer/Display/LED*),
-            // accept a case-insensitive match — `capabilities { uart }` + `LOAD CR5, UART`
-            // must not produce a "not declared" error.
-            if (ChurchAssembler._isHardwareCapName(cleanName)) {
-                const cleanUC = cleanName.toUpperCase();
-                const found = Object.keys(this._capBlockSlots).some(
-                    k => k.toUpperCase() === cleanUC
-                );
-                if (found) return;
-            }
+        if (!cleanName) return true;
+        if (ChurchAssembler._nameKey(this._capBlockSlots, cleanName) === null) {
+            const diagnosticKey = `${lineNum}:${cleanName.toUpperCase()}`;
+            if (this._reportedMissingCaps.has(diagnosticKey)) return false;
+            this._reportedMissingCaps.add(diagnosticKey);
             this.errors.push({
                 line: lineNum,
                 ...this._tokenCols(this._currentLineText, cleanName),
                 message: `"${cleanName}" is used but not declared in the capabilities block. Add it with a permission letter:\n  capabilities { ${cleanName} E }`
             });
+            return false;
         }
+        return true;
     }
 
     _resolveNSName(token) {
@@ -432,7 +477,8 @@ class ChurchAssembler {
         const name = token.replace(/,/g, '').trim();
 
         // 1. Currently loaded into a CR (e.g. after  LOAD CR6, LED)
-        if (this.nsLoaded[name] !== undefined) return this.nsLoaded[name];
+        const loadedKey = ChurchAssembler._nameKey(this.nsLoaded, name);
+        if (loadedKey !== null) return this.nsLoaded[loadedKey];
 
         // 1.5. Capabilities-block pre-pass — every capability declared in this
         //      assembly's  capabilities { }  block gets its 0-based position as its
@@ -440,17 +486,18 @@ class ChurchAssembler {
         //      null-GT rows alike.  A program with a capabilities block defines its
         //      OWN c-list layout; the DEMO_CLIST slots (paths 2–3) must not override.
         //      For programs without a capabilities block, _capBlockSlots is {}.
-        if (this._capBlockSlots && this._capBlockSlots[name] !== undefined)
-            return this._capBlockSlots[name];
+        const capKey = ChurchAssembler._nameKey(this._capBlockSlots, name);
+        if (capKey !== null) return this._capBlockSlots[capKey];
 
         // 2. Namespace Table (populated via setNamespace from the abstraction slot map)
-        if (this.nsSymbols[name] !== undefined) return this.nsSymbols[name];
+        const nsKey = ChurchAssembler._nameKey(this.nsSymbols, name);
+        if (nsKey !== null) return this.nsSymbols[nsKey];
 
         // 2.5. Null-GT row pet names (setClistSlots) — user-named c-list slots that
         //      hold no NS entry (e.g. "Mum" at slot 5).  These map directly to the
         //      c-list offset used in  LOAD  CRd, CR6[0x0005].
-        if (this._clistSlots && this._clistSlots[name] !== undefined)
-            return this._clistSlots[name];
+        const clistKey = ChurchAssembler._nameKey(this._clistSlots, name);
+        if (clistKey !== null) return this._clistSlots[clistKey];
 
         // 3. LED<N> shorthand — all LED0–LED5 share the LED_DEV GT at boot
         //    c-list slot 3 (clistGTs[3] = LED_DEV, MMIO 0x40000000, lim17=4).
@@ -654,7 +701,7 @@ class ChurchAssembler {
             if (slots[name] === undefined)   // first declaration wins on duplicates
                 slots[name] = i;
         }
-        return slots;
+        return ChurchAssembler._withNormalizedNameAliases(slots);
     }
 
     assemble(source) {
@@ -663,6 +710,7 @@ class ChurchAssembler {
         this.warnings = [];
         this.capabilities = [];   // names declared in capabilities { } header (if present)
         this._hasCapBlock = false; // true when any capabilities { } block is present in source
+        this._reportedMissingCaps = new Set();
         const _seenCapNames = new Set(); // duplicate-name guard for capabilities { } block
         // Reset to shared conventions — local .pet directives for this lump are
         // re-collected by _parsePetDirectives below and shadow these.
@@ -876,20 +924,21 @@ class ChurchAssembler {
                     const absName    = bcMatch[1];
                     const methodName = bcMatch[2];
                     const argsStr    = bcMatch[3].trim();
-                    const conv       = this.methodConventions[absName];
+                    const conv       = this._methodConventionsFor(absName);
                     if (!conv) {
                         this.errors.push({ line: lineNum + 1, ...this._tokenCols(line, absName), message:
                             `"${absName}" is not a known abstraction in the bare-call form "${absName}.${methodName}(...)". ` +
                             `Use LOAD to bind it first or check the method conventions.` });
                         continue;
                     }
-                    if (!conv[methodName]) {
+                    const methodMatch = this._methodEntryFor(conv, methodName);
+                    if (!methodMatch) {
                         const known = Object.keys(conv).join(', ');
                         this.errors.push({ line: lineNum + 1, ...this._tokenCols(line, methodName), message:
                             `"${methodName}" is not a known method of ${absName}. Known methods: ${known}.` });
                         continue;
                     }
-                    const methodEntry = conv[methodName];
+                    const methodEntry = methodMatch.entry;
                     const inputSpec   = methodEntry.input || '';
                     // Extract ordered register slots from input spec: CR2=..., DR1=...
                     const regOrder = [];
@@ -1005,9 +1054,10 @@ class ChurchAssembler {
                     if (!_isRealOpcode) {
                         const _bsAbs  = bsMatch[1];
                         const _bsMeth = bsMatch[2];
-                        const _bsConv = this.methodConventions[_bsAbs];
+                        const _bsConv = this._methodConventionsFor(_bsAbs);
                         if (_bsConv) {
-                            if (!_bsConv[_bsMeth]) {
+                            const _bsMethod = this._methodEntryFor(_bsConv, _bsMeth);
+                            if (!_bsMethod) {
                                 const _known = Object.keys(_bsConv).join(', ');
                                 this.errors.push({ line: lineNum + 1, ...this._tokenCols(line, _bsMeth), message:
                                     `"${_bsMeth}" is not a known method of ${_bsAbs}. Known methods: ${_known}.` });
@@ -1019,7 +1069,7 @@ class ChurchAssembler {
                             if (_args.length > 0) {
                                 // Resolve each argument against the method convention input spec,
                                 // applying the same CR/DR rules as the dot-paren bare-call sugar.
-                                const _methodEntry = _bsConv[_bsMeth];
+                                const _methodEntry = _bsMethod.entry;
                                 const _inputSpec   = _methodEntry.input || '';
                                 const _regOrder = [];
                                 const _regRe = /\b(CR|DR)(\d+)=/g;
@@ -1281,11 +1331,12 @@ class ChurchAssembler {
                     // 2-operand LOAD the programmer intends a fresh c-list access; use
                     // _capBlockSlots directly so slot=0 is encoded, not the CR number.
                     if (!parts[3] && this._capBlockSlots && this._capBlockSlots[res0.key] !== undefined) {
-                        imm = this._capBlockSlots[res0.key];
+                        const capKey0 = ChurchAssembler._nameKey(this._capBlockSlots, res0.key);
+                        imm = this._capBlockSlots[capKey0];
                     } else {
                         imm = res0.slot;
                     }
-                    this.nsLoaded[res0.key] = crDst;
+                    this._recordNsLoaded(res0.key, crDst);
                 } else {
                     crSrc = this._parseCR(parts[2], lineNum);
                     this._checkPrivCR(crSrc, 'LOAD', lineNum);
@@ -1300,11 +1351,12 @@ class ChurchAssembler {
                 if (res1 !== null && (!parts[3] || res1.consumed)) {
                     crSrc = 6;
                     if (!parts[3] && this._capBlockSlots && this._capBlockSlots[res1.key] !== undefined) {
-                        imm = this._capBlockSlots[res1.key];
+                        const capKey1 = ChurchAssembler._nameKey(this._capBlockSlots, res1.key);
+                        imm = this._capBlockSlots[capKey1];
                     } else {
                         imm = res1.slot;
                     }
-                    this.nsLoaded[res1.key] = crDst;
+                    this._recordNsLoaded(res1.key, crDst);
                 } else {
                     crSrc = this._parseCR(parts[2], lineNum);
                     this._checkPrivCR(crSrc, 'SAVE', lineNum);
@@ -1342,8 +1394,10 @@ class ChurchAssembler {
                         const argStr    = dotMethodRaw.slice(parenIdx + 1).replace(/\).*$/, '');
                         let suggestion = `  LOAD  CR2, ${argStr || '<GT>'}   ; load argument into a register\n  CALL  ${dotAbsName}.${bareMethod}`;
                         // Check if the bare method name is actually known, to give sharper advice.
-                        if (this.methodConventions[dotAbsName] && this.methodConventions[dotAbsName][bareMethod]) {
-                            const conv = this.methodConventions[dotAbsName][bareMethod];
+                        const dotConventions = this._methodConventionsFor(dotAbsName);
+                        const dotMethod = this._methodEntryFor(dotConventions, bareMethod);
+                        if (dotMethod) {
+                            const conv = dotMethod.entry;
                             if (conv.input) suggestion += `   ; ${conv.input}`;
                         }
                         this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, dotAbsName + '.' + bareMethod + '(' + argStr + ')') , message:
@@ -1352,21 +1406,24 @@ class ChurchAssembler {
                         break;
                     }
                     const dotMethodName = dotMethodRaw;
-                    this._checkCapDeclared(dotAbsName, lineNum);
-                    const crSlot = this.nsLoaded[dotAbsName];
+                    if (!this._checkCapDeclared(dotAbsName, lineNum)) break;
+                    const loadedKey = ChurchAssembler._nameKey(this.nsLoaded, dotAbsName);
+                    const crSlot = loadedKey === null ? undefined : this.nsLoaded[loadedKey];
                     if (crSlot !== undefined) {
                         crDst = crSlot;
-                        if (this.methodConventions[dotAbsName]) {
-                            const methodEntry = this.methodConventions[dotAbsName][dotMethodName];
-                            if (methodEntry !== undefined) {
-                                const idx = methodEntry.index;
+                        const dotConventions = this._methodConventionsFor(dotAbsName);
+                        if (dotConventions) {
+                            const methodMatch = this._methodEntryFor(dotConventions, dotMethodName);
+                            if (methodMatch) {
+                                const idx = typeof methodMatch.entry === 'object'
+                                    ? methodMatch.entry.index : methodMatch.entry;
                                 if (idx >= 0 && idx <= 16383) {
                                     imm = idx + 1;  // 1-based: imm=0 reserved for fast-path
                                 } else {
                                     this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, dotMethodName), message: `Method "${dotMethodName}" of ${dotAbsName} has index ${idx} which is out of range — method selectors must be 0–16383.` });
                                 }
                             } else {
-                                const known = Object.keys(this.methodConventions[dotAbsName]).join(', ');
+                                const known = Object.keys(dotConventions).join(', ');
                                 this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, dotMethodName), message: `"${dotMethodName}" is not a known method of ${dotAbsName}. Known methods: ${known}.` });
                             }
                         } else {
@@ -1385,14 +1442,17 @@ class ChurchAssembler {
                 // If the abstraction IS already in nsLoaded (loaded into a CR) the
                 // existing CALL path handles it correctly — do not intercept.
                 if (parts[2] && !rawDotTok.includes('.')) {
-                    const _nsSlot = (this.nsLoaded[rawDotTok] === undefined &&
-                                     this.nsSymbols[rawDotTok] !== undefined)
-                                    ? this.nsSymbols[rawDotTok] : null;
-                    if (_nsSlot !== null && this.methodConventions[rawDotTok]) {
+                    const _loadedKey = ChurchAssembler._nameKey(this.nsLoaded, rawDotTok);
+                    const _nsKey = ChurchAssembler._nameKey(this.nsSymbols, rawDotTok);
+                    const _nsSlot = (_loadedKey === null && _nsKey !== null)
+                                    ? this.nsSymbols[_nsKey] : null;
+                    const _rawConventions = this._methodConventionsFor(rawDotTok);
+                    if (_nsSlot !== null && _rawConventions) {
                         this._checkCapDeclared(rawDotTok, lineNum);
                         const _methName = (parts[2] || '').replace(/,/g, '').trim();
-                        const _methEntry = this.methodConventions[rawDotTok][_methName];
-                        if (_methEntry !== undefined) {
+                        const _methMatch = this._methodEntryFor(_rawConventions, _methName);
+                        if (_methMatch) {
+                            const _methEntry = _methMatch.entry;
                             opcode = 8;
                             crDst  = 0;
                             crSrc  = 6;
@@ -1405,7 +1465,7 @@ class ChurchAssembler {
                                 imm = ((_methIdx + 1) << 5) | (_nsSlot & 0x1F);
                             }
                         } else {
-                            const _known = Object.keys(this.methodConventions[rawDotTok]).join(', ');
+                            const _known = Object.keys(_rawConventions).join(', ');
                             this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, _methName), message: `"${_methName}" is not a known method of ${rawDotTok}. Known methods: ${_known}.` });
                         }
                         break;
@@ -1421,7 +1481,8 @@ class ChurchAssembler {
                     if (!isNumericSelector) {
                         const rawTok1 = (parts[1] || '').replace(/,/g, '').trim();
                         const rawTok2 = (parts[2] || '').replace(/,/g, '').trim();
-                        let absName = this.nsLoaded[rawTok1] !== undefined ? rawTok1 : null;
+                        const rawTok1LoadedKey = ChurchAssembler._nameKey(this.nsLoaded, rawTok1);
+                        let absName = rawTok1LoadedKey;
                         if (!absName) {
                             for (const [name, idx] of Object.entries(this.nsLoaded)) {
                                 if (idx === crDst) { absName = name; break; }
@@ -1429,19 +1490,21 @@ class ChurchAssembler {
                         }
                         if (!absName) {
                             this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, 'CR' + crDst), message: `CR${crDst} has no known abstraction binding — use a numeric selector (0–15) or load an abstraction into CR${crDst} with LOAD first.` });
-                        } else if (!this.methodConventions[absName]) {
+                        } else if (!this._methodConventionsFor(absName)) {
                             this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, rawTok2), message: `No method conventions registered for "${absName}" (bound to CR${crDst}). Cannot resolve method name "${rawTok2}".` });
                         } else {
-                            const methodEntry = this.methodConventions[absName][rawTok2];
-                            if (methodEntry !== undefined) {
-                                const idx = methodEntry.index;
+                            const absConventions = this._methodConventionsFor(absName);
+                            const methodMatch = this._methodEntryFor(absConventions, rawTok2);
+                            if (methodMatch) {
+                                const idx = typeof methodMatch.entry === 'object'
+                                    ? methodMatch.entry.index : methodMatch.entry;
                                 if (idx >= 0 && idx <= 16383) {
                                     imm = idx + 1;  // 1-based: imm=0 reserved for fast-path
                                 } else {
                                     this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, rawTok2), message: `Method "${rawTok2}" of ${absName} has index ${idx} which is out of range — method selectors must be 0–16383.` });
                                 }
                             } else {
-                                const known = Object.keys(this.methodConventions[absName]).join(', ');
+                                const known = Object.keys(absConventions).join(', ');
                                 this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, rawTok2), message: `"${rawTok2}" is not a known method of ${absName} (bound to CR${crDst}). Known methods: ${known}.` });
                             }
                         }
@@ -1574,9 +1637,7 @@ class ChurchAssembler {
                     let methodIdx8  = 0;
                     // Resolve conventions key: try exact case first (e.g. 'SlideRule'),
                     // fall back to uppercase (e.g. 'SLIDERULE') to match app-shell registration.
-                    const absKey8 = this.methodConventions[res8.key] !== undefined
-                        ? res8.key
-                        : res8.key.toUpperCase();
+                    const conventions8 = this._methodConventionsFor(res8.key);
                     if (/^\d+$/.test(rawMeth8)) {
                         // Numeric 0-based index (valid range: 0–126)
                         const m8 = parseInt(rawMeth8);
@@ -1585,16 +1646,16 @@ class ChurchAssembler {
                         } else {
                             methodIdx8 = m8 + 1;  // store 1-based in bits[14:8]
                         }
-                    } else if (this.methodConventions[absKey8] && this.methodConventions[absKey8][rawMeth8] !== undefined) {
-                        const mEntry8 = this.methodConventions[absKey8][rawMeth8];
+                    } else if (conventions8 && this._methodEntryFor(conventions8, rawMeth8)) {
+                        const mEntry8 = this._methodEntryFor(conventions8, rawMeth8).entry;
                         const mIdx8   = typeof mEntry8 === 'object' ? (mEntry8.index || 0) : mEntry8;
                         if (mIdx8 < 0 || mIdx8 > 126) {
                             this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, rawMeth8), message: `ELOADCALL method "${rawMeth8}" has index ${mIdx8} out of range (0–126 allowed).` });
                         } else {
                             methodIdx8 = mIdx8 + 1;  // store 1-based in bits[14:8]
                         }
-                    } else if (this.methodConventions[absKey8]) {
-                        const known8 = Object.keys(this.methodConventions[absKey8]).join(', ');
+                    } else if (conventions8) {
+                        const known8 = Object.keys(conventions8).join(', ');
                         this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, rawMeth8), message: `"${rawMeth8}" is not a known method of ${res8.key}. Known methods: ${known8}.` });
                     } else {
                         this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, rawMeth8), message: `No method conventions for "${res8.key}"; cannot resolve method "${rawMeth8}". Use a numeric 0-based index instead.` });

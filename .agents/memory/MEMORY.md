@@ -119,3 +119,4 @@
 - [Schema field removal must sweep all readers](schema-field-removal-sweep.md) — purge CI workflow steps + doc-figure HTML viewers too; add a CI invariant so the key stays gone
 - [Boot-suite test isolation](boot-suite-triage-clusters.md) — destructive tests on shared live dirs need a cross-process write lock or temp-dir isolation, not snapshot/restore alone; bulk-failure triage needs reconciled per-cluster F/E counts
 - [SelfTest word510 E-GT stomp](selftest-lump-word510-stomp.md) — boot_rom asserts word[510]=0x4A000006; full tests/boot run is destructive to server/lumps and caused the drift
+- [Case-insensitive metadata aliases](case-insensitive-metadata-aliases.md) — case-equivalent registry aliases must update atomically; diagnostics dedupe only within one source location

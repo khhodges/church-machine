@@ -3660,6 +3660,9 @@ const _ABSTRACTION_CONVENTIONS = {
     'LEDFlash': {
         'Run':   { index: 0, input: '', output: 'LED flash cycle; returns on completion' },
     },
+    'WukongCallHome': {
+        'Main':  { index: 0, input: '', output: 'returns to the IDE when online; spins offline' },
+    },
 };
 
 // Register conventions class-wide so all ChurchAssembler instances created

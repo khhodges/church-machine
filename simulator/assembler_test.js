@@ -222,6 +222,143 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
         errors.length > 0 ? errors[0].message : '(no error)');
 }
 
+// ── WukongCallHome dot-name normalization and diagnostics ────────────────────
+
+const WUKONG_CALLHOME_CONVENTIONS = {
+    'WukongCallHome': {
+        'Main': { index: 0, input: '', output: '' },
+    }
+};
+
+// WCH1: canonical mixed-case assembly name compiles after declaration + binding.
+{
+    const a = new ChurchAssembler(WUKONG_CALLHOME_CONVENTIONS);
+    a.setNamespace({ 'WukongCallHome': 7 });
+    const result = a.assemble(
+        'capabilities { WukongCallHome E }\n' +
+        'LOAD CR1, WukongCallHome\n' +
+        'CALL WukongCallHome.Main'
+    );
+    const callWord = result.words[1] >>> 0;
+    assert('WCH1 canonical WukongCallHome.Main assembles without errors',
+        result.errors.length === 0, result.errors.map(e => e.message).join('; '));
+    assert('WCH1 WukongCallHome.Main emits CALL CR1 with selector 1',
+        ((callWord >>> 27) & 0x1F) === 2 &&
+        ((callWord >>> 19) & 0xF) === 1 &&
+        (callWord & 0x7FFF) === 1,
+        `word=0x${callWord.toString(16)}`);
+}
+
+// WCH2: normalized abstraction spelling resolves through capability, namespace,
+// binding, and method-convention lookups.
+{
+    const a = new ChurchAssembler(WUKONG_CALLHOME_CONVENTIONS);
+    a.setNamespace({ 'WukongCallHome': 7 });
+    const result = a.assemble(
+        'capabilities { WukongCallHome E }\n' +
+        'LOAD CR2, WUKONGCALLHOME\n' +
+        'CALL WUKONGCALLHOME.Main'
+    );
+    const callWord = result.words[1] >>> 0;
+    assert('WCH2 normalized WUKONGCALLHOME.Main assembles without errors',
+        result.errors.length === 0, result.errors.map(e => e.message).join('; '));
+    assert('WCH2 normalized name retains the CR2 binding',
+        ((callWord >>> 19) & 0xF) === 2 && (callWord & 0x7FFF) === 1,
+        `word=0x${callWord.toString(16)}`);
+}
+
+// WCH2b: a later case-normalized override updates every alias atomically.
+{
+    const previousShared = ChurchAssembler._sharedMethodConventions;
+    ChurchAssembler._sharedMethodConventions = {};
+    ChurchAssembler.setSharedMethodConventions(WUKONG_CALLHOME_CONVENTIONS);
+    ChurchAssembler.setSharedMethodConventions({
+        'WUKONGCALLHOME': {
+            'Main': { index: 4, input: '', output: '' },
+        }
+    });
+
+    const canonical = new ChurchAssembler();
+    canonical.setNamespace({ 'WukongCallHome': 7 });
+    const canonicalResult = canonical.assemble(
+        'capabilities { WukongCallHome E }\n' +
+        'LOAD CR2, WukongCallHome\n' +
+        'CALL WukongCallHome.Main'
+    );
+    const normalized = new ChurchAssembler();
+    normalized.setNamespace({ 'WukongCallHome': 7 });
+    const normalizedResult = normalized.assemble(
+        'capabilities { WukongCallHome E }\n' +
+        'LOAD CR2, WUKONGCALLHOME\n' +
+        'CALL WUKONGCALLHOME.Main'
+    );
+
+    assert('WCH2b canonical and normalized names use the same later override',
+        canonicalResult.errors.length === 0 &&
+        normalizedResult.errors.length === 0 &&
+        (canonicalResult.words[1] & 0x7FFF) === 5 &&
+        (normalizedResult.words[1] & 0x7FFF) === 5,
+        `canonical=${canonicalResult.words[1] & 0x7FFF}, normalized=${normalizedResult.words[1] & 0x7FFF}`);
+    ChurchAssembler._sharedMethodConventions = previousShared;
+}
+
+// WCH3: an undeclared call reports only the declaration failure, not the
+// contradictory follow-on claim that the same abstraction is also unloaded.
+{
+    const a = new ChurchAssembler(WUKONG_CALLHOME_CONVENTIONS);
+    a.setNamespace({ 'WukongCallHome': 7 });
+    const result = a.assemble(
+        'capabilities { Other E }\n' +
+        'CALL WukongCallHome.Main'
+    );
+    assert('WCH3 missing capability emits exactly one error',
+        result.errors.length === 1, result.errors.map(e => e.message).join('; '));
+    assert('WCH3 missing capability error gives the declaration correction',
+        result.errors[0] &&
+        result.errors[0].message.includes('not declared') &&
+        result.errors[0].message.includes('capabilities { WukongCallHome E }') &&
+        !result.errors[0].message.includes('not been loaded'),
+        result.errors[0] ? result.errors[0].message : '(no error)');
+}
+
+// WCH3b: independent invalid source lines each retain their own diagnostic.
+{
+    const a = new ChurchAssembler(WUKONG_CALLHOME_CONVENTIONS);
+    a.setNamespace({ 'WukongCallHome': 7 });
+    const result = a.assemble(
+        'capabilities { Other E }\n' +
+        'CALL WukongCallHome.Main\n' +
+        'CALL WUKONGCALLHOME.Main'
+    );
+    assert('WCH3b repeated undeclared calls report both source lines',
+        result.errors.length === 2 &&
+        result.errors[0].line === 2 &&
+        result.errors[1].line === 3,
+        result.errors.map(e => `line ${e.line}: ${e.message}`).join('; '));
+    assert('WCH3b neither undeclared-call error adds a contradictory load error',
+        result.errors.every(e =>
+            e.message.includes('not declared') &&
+            !e.message.includes('not been loaded')),
+        result.errors.map(e => e.message).join('; '));
+}
+
+// WCH4: a declared but unbound assembly dot-call still requires LOAD.
+{
+    const a = new ChurchAssembler(WUKONG_CALLHOME_CONVENTIONS);
+    a.setNamespace({ 'WukongCallHome': 7 });
+    const result = a.assemble(
+        'capabilities { WukongCallHome E }\n' +
+        'CALL WukongCallHome.Main'
+    );
+    assert('WCH4 missing LOAD emits exactly one error',
+        result.errors.length === 1, result.errors.map(e => e.message).join('; '));
+    assert('WCH4 missing LOAD error gives a usable LOAD correction',
+        result.errors[0] &&
+        result.errors[0].message.includes('not been loaded') &&
+        result.errors[0].message.includes('Use LOAD'),
+        result.errors[0] ? result.errors[0].message : '(no error)');
+}
+
 // ── Salvation abstraction method conventions (task-2032) ────────────────────
 // Mirrors simulator/abstractions.js Salvation method table: Create=0,
 // Release=1, Find=2, Transfer=3, Validate=4, Audit=5, main=14 (boot c-list
@@ -1597,6 +1734,65 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
 // when the >>s operator or its English equivalent is used.
 
 const CLOOMCCompiler = require('./cloomc_compiler.js');
+
+// WCH5–WCH8: CLOOMC uses the same class-wide conventions registered for the
+// assembler, even when the compiler instance is created before/without a local
+// method-convention map.
+{
+    const previousGlobalAssembler = global.ChurchAssembler;
+    global.ChurchAssembler = ChurchAssembler;
+    ChurchAssembler.setSharedMethodConventions(WUKONG_CALLHOME_CONVENTIONS);
+
+    const compileWukongCall = (callText, capabilitiesText = 'WukongCallHome E') => {
+        const compiler = new CLOOMCCompiler();
+        return compiler.compileJS(
+            `abstraction Test {
+  capabilities { ${capabilitiesText} }
+  method run() {
+    ${callText}
+  }
+}`, []);
+    };
+
+    const canonical = compileWukongCall('WukongCallHome.Main()');
+    const canonicalWord = canonical.methods[0] && canonical.methods[0].code[0];
+    assert('WCH5 CLOOMC WukongCallHome.Main() compiles from shared conventions',
+        canonical.errors.length === 0, canonical.errors.map(e => e.message).join('; '));
+    assert('WCH5 CLOOMC emits ELOADCALL row 0, Main selector 1',
+        canonicalWord !== undefined &&
+        ((canonicalWord >>> 27) & 0x1F) === 8 &&
+        (canonicalWord & 0x1F) === 0 &&
+        ((canonicalWord >>> 5) & 0x7F) === 1,
+        canonicalWord === undefined ? 'no code' : `word=0x${(canonicalWord >>> 0).toString(16)}`);
+
+    const normalized = compileWukongCall('WUKONGCALLHOME.Main()');
+    assert('WCH6 CLOOMC normalized WUKONGCALLHOME.Main() compiles',
+        normalized.errors.length === 0, normalized.errors.map(e => e.message).join('; '));
+    assert('WCH6 normalized CLOOMC call emits the same capability-call sequence',
+        normalized.methods[0] &&
+        normalized.methods[0].code[0] === canonicalWord,
+        `canonical=${canonicalWord}, normalized=${normalized.methods[0] && normalized.methods[0].code[0]}`);
+
+    const explicitCall = compileWukongCall('CALL WukongCallHome.Main()');
+    assert('WCH7 CLOOMC CALL WukongCallHome.Main() compiles',
+        explicitCall.errors.length === 0, explicitCall.errors.map(e => e.message).join('; '));
+    assert('WCH7 explicit CLOOMC CALL emits the same capability-call sequence',
+        explicitCall.methods[0] &&
+        explicitCall.methods[0].code[0] === canonicalWord,
+        `canonical=${canonicalWord}, explicit=${explicitCall.methods[0] && explicitCall.methods[0].code[0]}`);
+
+    const missingCapability = compileWukongCall('WukongCallHome.Main()', 'Other E');
+    assert('WCH8 CLOOMC missing capability emits exactly one error',
+        missingCapability.errors.length === 1,
+        missingCapability.errors.map(e => e.message).join('; '));
+    assert('WCH8 CLOOMC missing capability error names the capabilities list only',
+        missingCapability.errors[0] &&
+        missingCapability.errors[0].message.includes('not in capabilities list') &&
+        !missingCapability.errors[0].message.includes('No method conventions'),
+        missingCapability.errors[0] ? missingCapability.errors[0].message : '(no error)');
+
+    global.ChurchAssembler = previousGlobalAssembler;
+}
 
 // Helper: find the first SHR word in an array of compiled code words.
 // Returns { word, shamt, arith } or null.

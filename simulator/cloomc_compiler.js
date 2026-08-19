@@ -40,7 +40,7 @@ function detectProfileViolations(methods, manifest) {
 }
 
 class CLOOMCCompiler {
-    constructor() {
+    constructor(methodConventions = {}) {
         this.opcodes = {
             LOAD: 0, SAVE: 1, CALL: 2, RETURN: 3,
             CHANGE: 4, SWITCH: 5, TPERM: 6, LAMBDA: 7,
@@ -66,6 +66,46 @@ class CLOOMCCompiler {
         // Populated externally from the AbstractionRegistry so the compiler can emit
         // the correct method selector in CALL instructions for capability methods.
         this.methodConventions = {};
+        this.setMethodConventions(methodConventions);
+    }
+
+    static _normalizeAbstractionName(name) {
+        return String(name || '').trim().toUpperCase();
+    }
+
+    setMethodConventions(map) {
+        for (const [name, methods] of Object.entries(map || {})) {
+            this.methodConventions[CLOOMCCompiler._normalizeAbstractionName(name)] = methods;
+        }
+    }
+
+    _syncRegisteredMethodConventions() {
+        // app-absdetail registers the complete abstraction convention set on the
+        // assembler after compiler instances may already have been constructed.
+        // Refresh at compile time so assembly and CLOOMC consume the same registry.
+        if (typeof ChurchAssembler !== 'undefined' &&
+                ChurchAssembler._sharedMethodConventions) {
+            this.setMethodConventions(ChurchAssembler._sharedMethodConventions);
+        }
+        if (typeof METHOD_REGISTER_CONVENTIONS !== 'undefined') {
+            this.setMethodConventions(METHOD_REGISTER_CONVENTIONS);
+        }
+
+        // Callers and tests historically assign methodConventions directly. Fold
+        // those canonical keys into the normalized lookup without breaking them.
+        this.setMethodConventions(Object.assign({}, this.methodConventions));
+    }
+
+    _methodConventionsFor(name) {
+        return this.methodConventions[CLOOMCCompiler._normalizeAbstractionName(name)] || null;
+    }
+
+    _methodEntryFor(conventions, methodName) {
+        if (!conventions) return null;
+        if (conventions[methodName] !== undefined) return conventions[methodName];
+        const normalized = String(methodName || '').toUpperCase();
+        const key = Object.keys(conventions).find(name => name.toUpperCase() === normalized);
+        return key === undefined ? null : conventions[key];
     }
 
     encode(opcode, cond, dst, src, imm) {
@@ -161,6 +201,7 @@ class CLOOMCCompiler {
     }
 
     compileJS(source, capabilities) {
+        this._syncRegisteredMethodConventions();
         const errors = [];
         // Auto-wrap code that has no abstraction/method declaration
         if (!/^\s*abstraction\s+\w+/m.test(source)) {
@@ -1701,17 +1742,17 @@ class CLOOMCCompiler {
                     if (argDR !== targetDR) code.push(this.encode(this.opcodes.IADD, 14, targetDR, argDR, 0));
                 }
             }
-            const convEntry = this.methodConventions[absName];
+            const convEntry = this._methodConventionsFor(absName);
             if (!convEntry) {
                 errors.push({ line: stmt.lineNum, message: `No method conventions registered for '${callDotMatch[1]}'; cannot resolve '${methodName}'.`, ...CLOOMCCompiler._tokenCols(stmt.rawLine, callDotMatch[1], _absNameOffset) });
                 return;
             }
-            if (convEntry[methodName] === undefined) {
+            const rawEntry = this._methodEntryFor(convEntry, methodName);
+            if (rawEntry === null) {
                 const known = Object.keys(convEntry).filter(k => !k.startsWith('_reserved')).join(', ');
                 errors.push({ line: stmt.lineNum, message: `Unknown method '${methodName}' on '${callDotMatch[1]}'. Known methods: ${known}`, ...CLOOMCCompiler._tokenCols(stmt.rawLine, methodName, _methodOffset) });
                 return;
             }
-            const rawEntry = convEntry[methodName];
             const methodSelector = typeof rawEntry === 'object' ? (rawEntry.index || 0) : rawEntry;
             const eloadcallMethodIdx = methodSelector + 1;
             if (methodSelector < 0 || methodSelector > 126) {
@@ -1753,17 +1794,17 @@ class CLOOMCCompiler {
                     if (argDR !== targetDR) code.push(this.encode(this.opcodes.IADD, 14, targetDR, argDR, 0));
                 }
             }
-            const convEntry = this.methodConventions[absName];
+            const convEntry = this._methodConventionsFor(absName);
             if (!convEntry) {
                 errors.push({ line: stmt.lineNum, message: `No method conventions registered for '${bareDotMatch[1]}'; cannot resolve '${methodName}'.`, ...CLOOMCCompiler._tokenCols(stmt.rawLine, bareDotMatch[1], _absNameOffset) });
                 return;
             }
-            if (convEntry[methodName] === undefined) {
+            const rawEntry = this._methodEntryFor(convEntry, methodName);
+            if (rawEntry === null) {
                 const known = Object.keys(convEntry).filter(k => !k.startsWith('_reserved')).join(', ');
                 errors.push({ line: stmt.lineNum, message: `Unknown method '${methodName}' on '${bareDotMatch[1]}'. Known methods: ${known}`, ...CLOOMCCompiler._tokenCols(stmt.rawLine, methodName, _methodOffset) });
                 return;
             }
-            const rawEntry = convEntry[methodName];
             const methodSelector = typeof rawEntry === 'object' ? (rawEntry.index || 0) : rawEntry;
             const eloadcallMethodIdx = methodSelector + 1;
             if (methodSelector < 0 || methodSelector > 126) {
@@ -1863,17 +1904,17 @@ class CLOOMCCompiler {
             // Look up the method selector from conventions (e.g. Billing.Balance = index 4).
             // imm15=0 is the fast-path (no table), so valid method selectors are 1-based.
             // Unresolved method names produce a compile error to prevent silent misdispatch.
-            const convEntry = this.methodConventions[absName];
+            const convEntry = this._methodConventionsFor(absName);
             if (!convEntry) {
                 errors.push({ line: stmt.lineNum, message: `No method conventions registered for '${callMatch[2]}'; cannot resolve '${methodName}'. Ensure the abstraction declares methods before compiling.`, ...CLOOMCCompiler._tokenCols(stmt.rawLine, callMatch[2], _absNameOffset) });
                 return;
             }
-            if (convEntry[methodName] === undefined) {
+            const rawEntry = this._methodEntryFor(convEntry, methodName);
+            if (rawEntry === null) {
                 const known = Object.keys(convEntry).join(', ');
                 errors.push({ line: stmt.lineNum, message: `Unknown method '${methodName}' on '${callMatch[2]}'. Known methods: ${known}`, ...CLOOMCCompiler._tokenCols(stmt.rawLine, methodName, _methodOffset) });
                 return;
             }
-            const rawEntry = convEntry[methodName];
             const methodSelector = typeof rawEntry === 'object' ? (rawEntry.index || 0) : rawEntry;
 
             // Fused ELOADCALL: replaces LOAD CR0 + CALL CR0 with a single instruction.
@@ -3079,6 +3120,7 @@ class CLOOMCCompiler {
     }
 
     compileSymbolic(source, capabilities) {
+        this._syncRegisteredMethodConventions();
         const errors = [];
         const parsed = this._parseSymbolicAbstraction(source, errors);
         if (errors.length > 0) {
@@ -3087,9 +3129,7 @@ class CLOOMCCompiler {
 
         if (typeof METHOD_REGISTER_CONVENTIONS !== 'undefined') {
             for (const absName of Object.keys(METHOD_REGISTER_CONVENTIONS)) {
-                if (!this.methodConventions[absName]) {
-                    this.methodConventions[absName] = METHOD_REGISTER_CONVENTIONS[absName];
-                }
+                this.setMethodConventions({ [absName]: METHOD_REGISTER_CONVENTIONS[absName] });
             }
         }
 
@@ -3424,13 +3464,13 @@ class CLOOMCCompiler {
                 const absName = anyAbsCallMatch[1];
                 const mName   = anyAbsCallMatch[2];
                 const argsStr = anyAbsCallMatch[3];
-                const convEntry = this.methodConventions[absName] || this.methodConventions[absName.toUpperCase()];
+                const convEntry = this._methodConventionsFor(absName);
                 if (!convEntry) {
                     errors.push({ line: lineNum, message: `No method conventions registered for "${absName}". Is it declared in capabilities {}?`, ...CLOOMCCompiler._tokenCols(currentRawLine, absName) });
                     return dstDR;
                 }
-                const methodEntry = convEntry[mName];
-                if (methodEntry === undefined) {
+                const methodEntry = this._methodEntryFor(convEntry, mName);
+                if (methodEntry === null) {
                     const known = Object.keys(convEntry).join(', ');
                     errors.push({ line: lineNum, message: `Unknown method "${mName}" on "${absName}". Known: ${known}`, ...CLOOMCCompiler._tokenCols(currentRawLine, mName) });
                     return dstDR;
@@ -3482,7 +3522,7 @@ class CLOOMCCompiler {
             if (inferCallMatch) {
                 const absName = inferCallMatch[1];
                 const innerExpr = inferCallMatch[2].trim();
-                const isKnownAbs = absName === 'SlideRule' || !!this.methodConventions[absName];
+                const isKnownAbs = absName === 'SlideRule' || !!this._methodConventionsFor(absName);
                 if (isKnownAbs) {
                     const opMethodMap = [['*', 'Multiply'], ['/', 'Divide'], ['+', 'Add'], ['-', 'Subtract']];
                     let routed = false;
