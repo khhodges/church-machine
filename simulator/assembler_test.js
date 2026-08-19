@@ -359,35 +359,47 @@ const WUKONG_CALLHOME_CONVENTIONS = {
         result.errors[0] ? result.errors[0].message : '(no error)');
 }
 
-// WCH5: WukongCallHome.hw is a complete hardware-LUMP C-list label, not the
-// "hw" method on WukongCallHome.  An exact dotted capability must win over
-// method syntax and call the declared row's default entry directly.
+// WCH4b–WCH4e: WukongCallHome.hw is a dotted C-list label, rather than the
+// "hw" method of WukongCallHome.  The hardware-ROM sidecar declares its
+// callable setup entry at offset 0, which maps to ELOADCALL's direct/default
+// selector 0.
 {
     const a = new ChurchAssembler(WUKONG_CALLHOME_CONVENTIONS);
     const result = a.assemble(
-        'capabilities { LED0 RW, UART_TX W, WukongCallHome.hw E }\n' +
-        'CALL WukongCallHome.hw'
+        'capabilities { Other E, WukongCallHome.hw E, WukongCallHome E }\n' +
+        'CALL WUKONGCALLHOME.HW\n' +
+        'LOAD CR2, WukongCallHome\n' +
+        'CALL WukongCallHome.Main'
     );
-    const callWord = result.words[0] >>> 0;
-    assert('WCH5 dotted C-list label assembles without a shortened-name error',
-        result.errors.length === 0, result.errors.map(e => e.message).join('; '));
-    assert('WCH5 dotted C-list label emits ELOADCALL to its declared row',
-        ((callWord >>> 27) & 0x1F) === 8 &&
-        ((callWord >>> 19) & 0xF) === 0 &&
-        ((callWord >>> 15) & 0xF) === 6 &&
-        (callWord & 0x7FFF) === 34,
-        `word=0x${callWord.toString(16)}`);
-}
+    const directWord = result.words[0] >>> 0;
+    const methodWord = result.words[2] >>> 0;
+    assert('WCH4b dotted hardware LUMP label is accepted in capabilities',
+        result.capabilities.length === 3 &&
+        result.capabilities[1].name === 'WukongCallHome.hw',
+        result.capabilities.map(cap => cap.name).join(', '));
+    assert('WCH4c normalized dotted hardware label emits direct ELOADCALL row 1, selector 0',
+        result.errors.length === 0 &&
+        ((directWord >>> 27) & 0x1F) === 8 &&
+        ((directWord >>> 19) & 0xF) === 0 &&
+        ((directWord >>> 15) & 0xF) === 6 &&
+        (directWord & 0x1F) === 1 &&
+        ((directWord >>> 5) & 0x7F) === 0,
+        `errors=${result.errors.map(e => e.message).join('; ')} word=0x${directWord.toString(16)}`);
+    assert('WCH4d WukongCallHome.Main remains a registered method call',
+        ((methodWord >>> 27) & 0x1F) === 2 &&
+        ((methodWord >>> 19) & 0xF) === 2 &&
+        (methodWord & 0x7FFF) === 1,
+        `word=0x${methodWord.toString(16)}`);
 
-// WCH6: case-normalized dotted labels retain the exact-label interpretation.
-{
-    const a = new ChurchAssembler(WUKONG_CALLHOME_CONVENTIONS);
-    const result = a.assemble(
+    const unknown = new ChurchAssembler(WUKONG_CALLHOME_CONVENTIONS).assemble(
         'capabilities { WukongCallHome.hw E }\n' +
-        'CALL WUKONGCALLHOME.HW'
+        'CALL Missing.hw'
     );
-    assert('WCH6 normalized dotted C-list label assembles without errors',
-        result.errors.length === 0, result.errors.map(e => e.message).join('; '));
+    assert('WCH4e unknown dotted call retains a precise missing declaration error',
+        unknown.errors.length === 1 &&
+        unknown.errors[0].message.includes('"Missing" is used but not declared') &&
+        unknown.errors[0].message.includes('capabilities { Missing E }'),
+        unknown.errors.map(e => e.message).join('; '));
 }
 
 // ── Salvation abstraction method conventions (task-2032) ────────────────────
@@ -7459,7 +7471,7 @@ abstraction VlcTest {
 
     // ── Non-Assembly inline-vs-canonical: app-compile.js front-end examples ──────
     // Non-Assembly inline-vs-canonical word-array comparisons
-    // ==========================================================
+    // ----------------------------------------------------------
     // Every non-Assembly inline example key in app-compile.js that can be compiled
     // cleanly by CLOOMCCompiler in isolation has a matching canonical .cloomc file in
     // simulator/cloomc/.  The canonical was created from the inline source (or vice

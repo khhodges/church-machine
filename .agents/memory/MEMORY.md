@@ -120,3 +120,4 @@
 - [Boot-suite test isolation](boot-suite-triage-clusters.md) — destructive tests on shared live dirs need a cross-process write lock or temp-dir isolation, not snapshot/restore alone; bulk-failure triage needs reconciled per-cluster F/E counts
 - [SelfTest word510 E-GT stomp](selftest-lump-word510-stomp.md) — boot_rom asserts word[510]=0x4A000006; full tests/boot run is destructive to server/lumps and caused the drift
 - [Case-insensitive metadata aliases](case-insensitive-metadata-aliases.md) — case-equivalent registry aliases must update atomically; diagnostics dedupe only within one source location
+- [Direct LUMP call selector](direct-lump-call-selector.md) — single-entry LUMPs whose first code word is executable must use selector 0, never method-table selector 1

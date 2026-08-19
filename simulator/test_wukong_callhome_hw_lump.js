@@ -21,6 +21,7 @@
 const fs   = require('fs');
 const path = require('path');
 const ChurchSimulator = require('./simulator.js');
+const ChurchAssembler = require('./assembler.js');
 
 let pass = 0;
 let fail = 0;
@@ -39,6 +40,8 @@ function check(label, cond, detail) {
 const EXTENDED_BASE  = 0x0400;
 const LUMP_FILE      = path.join(__dirname, '..', 'server', 'lumps',
                                  'WukongCallHome.hw.1.1dcb7b09.lump');
+const SIDECAR_FILE   = path.join(__dirname, '..', 'server', 'lumps',
+                                  'WukongCallHome.hw.1.1dcb7b09.json');
 const EXPECTED_CW       = 73;
 const EXPECTED_CC       = 2;
 const EXPECTED_LUMPSIZE = 128;
@@ -426,6 +429,33 @@ console.log('\n--- WCH-HW-10: All 73 code words survive loadLumpBinary intact --
     }
     check('WCH-HW-10d: freespace in simulator memory (0x044a..0x047d) is all zero',
         freeAllZero);
+}
+
+// ── WCH-HW-11: Dotted capability calls use the ROM's direct entry ────────────
+console.log('\n--- WCH-HW-11: WukongCallHome.hw dispatches through its direct entry ---');
+{
+    const sidecar = JSON.parse(fs.readFileSync(SIDECAR_FILE, 'utf8'));
+    const setupEntry = (sidecar.methods || []).find(method => method.name === 'setup');
+    check('WCH-HW-11a: sidecar names the complete dotted capability label',
+        sidecar.abstraction === 'WukongCallHome.hw' &&
+        sidecar.dot_name === 'WukongCallHome.hw',
+        `abstraction=${sidecar.abstraction} dot_name=${sidecar.dot_name}`);
+    check('WCH-HW-11b: hardware ROM setup/default entry starts at code offset 0',
+        setupEntry && setupEntry.offset === 0,
+        setupEntry ? `offset=${setupEntry.offset}` : 'setup method missing');
+
+    const assembled = new ChurchAssembler().assemble(
+        'capabilities { Other E, WukongCallHome.hw E }\n' +
+        'CALL wukongcallhome.HW'
+    );
+    const callWord = assembled.words[0] >>> 0;
+    check('WCH-HW-11c: assembler emits ELOADCALL row 1 with direct selector 0',
+        assembled.errors.length === 0 &&
+        ((callWord >>> 27) & 0x1F) === 8 &&
+        ((callWord >>> 15) & 0xF) === 6 &&
+        (callWord & 0x1F) === 1 &&
+        ((callWord >>> 5) & 0x7F) === 0,
+        `errors=${assembled.errors.map(error => error.message).join('; ')} word=0x${callWord.toString(16)}`);
 }
 
 // ── Summary ──────────────────────────────────────────────────────────────────

@@ -1367,6 +1367,31 @@ class ChurchAssembler {
             case 2: {
                 // Dot-notation: CALL SlideRule.Multiply (single token, no parts[2])
                 const rawDotTok = (parts[1] || '').replace(/,/g, '').trim();
+                // A dotted C-list label is a complete capability name, not
+                // necessarily an Abstraction.Method expression.  Resolve an exact
+                // declared label before splitting on "." so hardware ROM labels such
+                // as WukongCallHome.hw retain their identity.  The direct/default
+                // ELOADCALL selector is zero; it dispatches at the LUMP's entry
+                // point rather than through its method table.
+                const directCapKey = !parts[2] && rawDotTok.includes('.')
+                    ? ChurchAssembler._nameKey(this._capBlockSlots, rawDotTok)
+                    : null;
+                if (directCapKey !== null) {
+                    const clistRow = this._capBlockSlots[directCapKey];
+                    if (clistRow > 31) {
+                        this.errors.push({
+                            line: lineNum,
+                            ...this._tokenCols(this._currentLineText, rawDotTok),
+                            message: `ELOADCALL c-list row ${clistRow} for "${rawDotTok}" is out of range (0–31 allowed; ELOADCALL uses a 5-bit row field).`
+                        });
+                    } else {
+                        opcode = 8;
+                        crDst = 0;
+                        crSrc = 6;
+                        imm = clistRow & 0x1F; // selector 0 = direct/default entry
+                    }
+                    break;
+                }
                 // Early-catch: user wrote "CALL Abs.Method, ExtraArg" — the comma
                 // shows they expected function-call syntax.  CALL does not take
                 // operand arguments; pass arguments in DR/CR registers before the CALL.
@@ -1382,36 +1407,6 @@ class ChurchAssembler {
                     break;
                 }
                 if (!parts[2] && rawDotTok.includes('.')) {
-                    // A dotted C-list label (for example WukongCallHome.hw) is a
-                    // complete capability name, not necessarily an
-                    // Abstraction.Method selector.  Resolve an exact declared
-                    // capability first so hardware and versioned LUMPs can be
-                    // called directly from their c-list row.  This must precede
-                    // splitting at "." below: otherwise WukongCallHome.hw is
-                    // misread as WukongCallHome's "hw" method and the declaration
-                    // check incorrectly asks for the shortened name.
-                    const exactCapKey = ChurchAssembler._nameKey(this._capBlockSlots, rawDotTok);
-                    const exactPetKey = ChurchAssembler._nameKey(this._clistSlots, rawDotTok);
-                    const exactClistSlot = exactCapKey !== null
-                        ? this._capBlockSlots[exactCapKey]
-                        : (exactPetKey !== null ? this._clistSlots[exactPetKey] : undefined);
-                    if (exactClistSlot !== undefined) {
-                        if (exactClistSlot < 0 || exactClistSlot > 31) {
-                            this.errors.push({
-                                line: lineNum,
-                                ...this._tokenCols(this._currentLineText, rawDotTok),
-                                message: `C-list row ${exactClistSlot} for "${rawDotTok}" is out of range (0–31 allowed; ELOADCALL uses a 5-bit row field).`
-                            });
-                        } else {
-                            // Method selector 0 is encoded as 1; selector 0 is the
-                            // default entry for a direct LUMP capability call.
-                            opcode = 8; // ELOADCALL
-                            crDst = 0;
-                            crSrc = 6;
-                            imm = (1 << 5) | (exactClistSlot & 0x1F);
-                        }
-                        break;
-                    }
                     const dotIdx = rawDotTok.indexOf('.');
                     const dotAbsName = rawDotTok.slice(0, dotIdx);
                     const dotMethodRaw = rawDotTok.slice(dotIdx + 1);
