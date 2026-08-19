@@ -4688,52 +4688,16 @@ async function openLumpInEditor(token) {
     }
 
     // ── Try to read embedded source from V1.3 0xAB content frame ─────────────
-    // When flags bit 2 (0x04) is set the source region is deflate-raw compressed;
-    // srcLen stores the compressed byte count so DecompressionStream knows when to stop.
+    // Delegates to lump-content-frame.js lumpDecodeContentFrame() which handles
+    // both the uncompressed (flags=0x03) and deflate-raw compressed (flags=0x07)
+    // paths.  Falls through silently to sidecar / disasm when absent or malformed.
     var _binaryFrameSource = null;
     if (serverWords && serverWords.length > 0) {
-        try {
-            var _bhdr  = serverWords[0] >>> 0;
-            var _bCw   = (_bhdr >>> 10) & 0x1FFF;
-            var _bCc   = _bhdr & 0xFF;
-            var _bNm6  = (_bhdr >>> 23) & 0x0F;
-            var _bSz   = 64 << _bNm6;
-            var _bFsS  = 1 + _bCw;
-            var _bFsE  = _bSz - _bCc;
-            if (_bFsS < _bFsE && _bFsS < serverWords.length &&
-                    (((serverWords[_bFsS] >>> 0) >>> 24) & 0xFF) === 0xAB) {
-                var _fHdr    = serverWords[_bFsS] >>> 0;
-                var _fFlags  = (_fHdr >>> 16) & 0xFF;
-                var _fApiLen = _fHdr & 0xFFFF;
-                var _fApiW   = Math.ceil(_fApiLen / 4);
-                var _fCursor = _bFsS + 1 + _fApiW;
-                if ((_fFlags & 0x01) !== 0 && _fCursor < _bFsE) {
-                    var _fSrcLen = serverWords[_fCursor] >>> 0;
-                    var _fSrcW   = Math.ceil(_fSrcLen / 4);
-                    if (_fSrcLen > 0 && _fCursor + 1 + _fSrcW <= _bFsE) {
-                        // Unpack big-endian words → byte array, then trim to srcLen.
-                        var _fBytes = [];
-                        for (var _fsi = 0; _fsi < _fSrcW; _fsi++) {
-                            var _fsw = serverWords[_fCursor + 1 + _fsi] >>> 0;
-                            _fBytes.push((_fsw >>> 24) & 0xFF, (_fsw >>> 16) & 0xFF,
-                                         (_fsw >>>  8) & 0xFF,  _fsw         & 0xFF);
-                        }
-                        _fBytes = _fBytes.slice(0, _fSrcLen);
-                        if ((_fFlags & 0x04) !== 0 && typeof DecompressionStream !== 'undefined') {
-                            // Compressed — inflate with native DecompressionStream.
-                            var _ds = new DecompressionStream('deflate-raw');
-                            var _dw = _ds.writable.getWriter();
-                            _dw.write(new Uint8Array(_fBytes));
-                            _dw.close();
-                            _fBytes = Array.from(new Uint8Array(
-                                await new Response(_ds.readable).arrayBuffer()));
-                        }
-                        var _decoded = new TextDecoder().decode(new Uint8Array(_fBytes));
-                        if (_decoded.trim().length > 0) _binaryFrameSource = _decoded;
-                    }
-                }
-            }
-        } catch (_bfe) { /* silently fall through to sidecar / disasm */ }
+        var _lcfDec = (typeof LumpContentFrame !== 'undefined') ? LumpContentFrame : null;
+        if (_lcfDec) {
+            try { _binaryFrameSource = await _lcfDec.lumpDecodeContentFrame(serverWords); }
+            catch (_bfe) { /* fall through */ }
+        }
     }
 
     // ── Disassemble from server words (authoritative) ──────────────────────
@@ -5348,42 +5312,13 @@ window.showFormatLump = async function() {
     // c-list slots left as zeros — server injects the self-GT into slot 0.
 
     // ── Embed V1.3 0xAB self-definition content frame ────────────────────────
-    // The frame lives at word cw+1 (first freespace word).  Build API JSON
-    // (never include token/issue — circular hash rule) and embed the current
-    // editor source so the binary is self-defining (Tier 2).
+    // Delegates to lump-content-frame.js lumpBuildContentFrame() which handles
+    // UTF-8 encoding, big-endian packing, deflate-raw compression (flags=0x07),
+    // and the uncompressed fallback (flags=0x03 / 0x00).
     // Spec: lump-audit.js lumpAuditValidateContentFrame(), CM_LUMP_SPECIFICATION §Freespace.
     try { await (async function _embedV13Frame() {
-        // UTF-8 encode a string to a byte array (big-endian word-packed later).
-        function _utf8Bytes(s) {
-            if (typeof TextEncoder !== 'undefined') {
-                return Array.from(new TextEncoder().encode(String(s)));
-            }
-            var out = [];
-            for (var _ci = 0; _ci < s.length; _ci++) {
-                var _ch = s.charCodeAt(_ci);
-                if (_ch < 0x80)       { out.push(_ch); }
-                else if (_ch < 0x800) { out.push(0xC0 | (_ch >> 6)); out.push(0x80 | (_ch & 0x3F)); }
-                else                  { out.push(0xE0 | (_ch >> 12)); out.push(0x80 | ((_ch >> 6) & 0x3F)); out.push(0x80 | (_ch & 0x3F)); }
-            }
-            return out;
-        }
-        // Pack a byte array big-endian into a word array (last word zero-padded).
-        function _packBE(bytes) {
-            var nw = Math.ceil(bytes.length / 4);
-            var ws = new Array(nw).fill(0);
-            for (var _bi = 0; _bi < bytes.length; _bi++) {
-                ws[_bi >> 2] = (ws[_bi >> 2] | (bytes[_bi] << (24 - (_bi & 3) * 8))) >>> 0;
-            }
-            return ws;
-        }
-        // Deflate-raw compress a byte array using the browser-native CompressionStream.
-        async function _deflateRaw(bytes) {
-            var cs = new CompressionStream('deflate-raw');
-            var wr = cs.writable.getWriter();
-            wr.write(new Uint8Array(bytes));
-            wr.close();
-            return Array.from(new Uint8Array(await new Response(cs.readable).arrayBuffer()));
-        }
+        var _lcf = (typeof LumpContentFrame !== 'undefined') ? LumpContentFrame : null;
+        if (!_lcf) return;  // shared module not loaded — skip frame embedding
 
         // Build API JSON — name + language + cap names only (no token/issue).
         var _capNames = _caps.map(function(c) {
@@ -5392,80 +5327,41 @@ window.showFormatLump = async function() {
         var _apiObj = { name: _absName || '', language:
             (typeof sim !== 'undefined' && sim && sim._lastCompiledLanguage) || 'assembly' };
         if (_capNames.length > 0) _apiObj.caps = _capNames;
-        var _apiBytes = _utf8Bytes(JSON.stringify(_apiObj));
-        var _apiWds   = _packBE(_apiBytes);
 
-        // Source text — compress with deflate-raw (Tier 2 compressed, flags 0x07).
-        // srcLen in the frame stores the COMPRESSED byte count so the decompressor
-        // knows exactly how many bytes to feed to DecompressionStream.
-        // Falls back to uncompressed Tier 2 (flags 0x03) if CompressionStream is
-        // unavailable or fails, and to Tier 0 (API JSON only) when editor is empty.
-        var _srcEl    = document.getElementById('asmEditor');
-        var _srcText  = _srcEl ? (_srcEl.value || '').trim() : '';
-        var _srcRaw   = _srcText ? _utf8Bytes(_srcText) : null;
-        var _compressed = false;
-        var _srcBytes = null;
-        if (_srcRaw) {
-            try {
-                _srcBytes   = await _deflateRaw(_srcRaw);
-                _compressed = true;
-            } catch (_ce) {
-                _srcBytes   = _srcRaw;   // uncompressed fallback
-                _compressed = false;
-            }
-        }
-        var _srcWds = _srcBytes ? _packBE(_srcBytes) : null;
+        // Source text — from the editor textarea (empty string → Tier 0 frame).
+        var _srcEl   = document.getElementById('asmEditor');
+        var _srcText = _srcEl ? (_srcEl.value || '').trim() : '';
 
-        // Frame size: 1 header + apiWords [+ 1 srcLen + compressed srcWords]
+        // lumpBuildContentFrame handles compression (0x07), uncompressed fallback
+        // (0x03), and Tier 0 (0x00 when srcText is empty).
+        var _built    = await _lcf.lumpBuildContentFrame(_apiObj, _srcText);
+        var _frameWds = _built.frameWords;
+
+        // Place frame into freespace; grow the lump binary if necessary.
         var _fsStart = 1 + _svCW;
-        var _fsEnd0  = _svLumpSize - _svCC;          // initial freespace end
+        var _fsEnd0  = _svLumpSize - _svCC;
 
-        var _flags, _frameWds;
-        var _t2Size = 1 + _apiWds.length + (_srcWds ? 1 + _srcWds.length : 0);
-        var _t0Size = 1 + _apiWds.length;
-
-        // Grow the lump binary if the frame doesn't fit at the current size.
-        function _grow(neededFsWords) {
-            while ((_svLumpSize - _svCC - _fsStart) < neededFsWords) {
+        if (_frameWds.length > (_fsEnd0 - _fsStart)) {
+            // Grow to the smallest power-of-2 that fits.
+            while ((_svLumpSize - _svCC - _fsStart) < _frameWds.length) {
                 _svLumpSize = _svLumpSize << 1;
             }
-            // Rebuild with new size.
             _svBinary.length = 0;
             for (var _gi = 0; _gi < _svLumpSize; _gi++) _svBinary.push(0);
-            _svBinary[0] = _svHdr; // will be updated below after nm6 recalc
+            _svBinary[0] = _svHdr;
             for (var _wi = 0; _wi < _svCW; _wi++) _svBinary[1 + _wi] = (_svWords[_wi] >>> 0);
-        }
-
-        // Prefer Tier 2 compressed (flags 0x07) or uncompressed (flags 0x03).
-        // srcLen stores the stored byte count; compressed readers additionally
-        // pass those bytes through DecompressionStream('deflate-raw').
-        // Grow the lump to the smallest power-of-2 that fits.
-        // Fall back to Tier 0 (API JSON only) when there is no source text.
-        var _t2Flags = _compressed ? 0x07 : 0x03;
-        if (_srcWds && _t2Size <= (_fsEnd0 - _fsStart)) {
-            _flags = _t2Flags; _frameWds = [null].concat(_apiWds, [_srcBytes.length >>> 0], _srcWds);
-        } else if (_srcWds) {
-            _grow(_t2Size);
-            _flags = _t2Flags; _frameWds = [null].concat(_apiWds, [_srcBytes.length >>> 0], _srcWds);
-        } else if (_t0Size <= (_fsEnd0 - _fsStart)) {
-            _flags = 0x00; _frameWds = [null].concat(_apiWds);
-        } else {
-            _grow(_t0Size);
-            _flags = 0x00; _frameWds = [null].concat(_apiWds);
         }
 
         // Recompute header if lump size changed (nm6 encodes log₂(lumpSize/64)).
         _svNm6 = 0;
         while ((64 << _svNm6) < _svLumpSize) _svNm6++;
         _svHdr = (((0x1F & 0x1F) << 27) |
-                  ((_svNm6 & 0x0F)  << 23) |
+                  ((_svNm6 & 0x0F)   << 23) |
                   ((_svCW  & 0x1FFF) << 10) |
                   ((0 & 0x03) << 8) |
                   (_svCC & 0xFF)) >>> 0;
         _svBinary[0] = _svHdr;
 
-        // Write frame header then data words into freespace.
-        _frameWds[0] = ((0xAB << 24) | (_flags << 16) | (_apiBytes.length & 0xFFFF)) >>> 0;
         for (var _fi = 0; _fi < _frameWds.length; _fi++) {
             _svBinary[_fsStart + _fi] = _frameWds[_fi] >>> 0;
         }

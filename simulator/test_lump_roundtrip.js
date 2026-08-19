@@ -465,12 +465,204 @@ console.log('\n--- T-RT07j/k: Thread LUMP over-capacity guard ---');
     check('T-RT07k: RB1 severity === \'error\' for cw=0', rb1 !== undefined && rb1.severity === 'error');
 }
 
-// ── Summary ───────────────────────────────────────────────────────────────────
-console.log('\n══════════════════════════════════════');
-console.log(`Results: ${pass} passed, ${fail} failed`);
-if (fail > 0) {
-    console.error('SOME TESTS FAILED');
-    process.exit(1);
-} else {
-    console.log('ALL TESTS PASSED');
+// ── T-RT-FS01 / FS02 / FS03: 0xAB content-frame compression roundtrip ─────────
+//
+// These tests import and call the PRODUCTION helpers from lump-content-frame.js
+// — the same module that showFormatLump and openLumpInEditor delegate to.
+// Testing this module is therefore equivalent to testing those production paths;
+// a regression in lump-content-frame.js will cause these tests to fail.
+//
+//   T-RT-FS01 — Compressed path (flags = 0x07):
+//     lumpBuildContentFrame writes a deflate-raw compressed 0xAB frame;
+//     lumpDecodeContentFrame inflates it and returns the original source.
+//
+//   T-RT-FS02 — Uncompressed path (flags = 0x03):
+//     Same roundtrip but compression is forced off by temporarily shadowing
+//     CompressionStream so lumpBuildContentFrame takes the uncompressed fallback.
+//
+//   T-RT-FS03 — Flag-byte discrimination:
+//     Confirm that the compressed binary writes flags=0x07 and the uncompressed
+//     binary writes flags=0x03, and that lumpDecodeContentFrame recovers the
+//     correct source from both without confusion.
+
+const {
+    lumpFrameUtf8Bytes,
+    lumpFramePackBE,
+    lumpBuildContentFrame,
+    lumpDecodeContentFrame,
+} = require('./lump-content-frame.js');
+
+// ── buildTestLumpBinary: wrap production frame into a minimal LUMP binary ─────
+// Calls the production lumpBuildContentFrame, places the returned frameWords
+// into a properly-headered LUMP binary, and returns the complete word array.
+// The binary is the direct input to lumpDecodeContentFrame (the same object
+// openLumpInEditor receives from the server).
+async function buildTestLumpBinary(codeWords, apiObj, srcText) {
+    const _svCC = 0;
+    const _svCW = codeWords.length;
+
+    // Build frame via the production helper.
+    const { frameWords, flags: builtFlags } = await lumpBuildContentFrame(apiObj, srcText);
+
+    // Compute minimum lump size: header + codeWords + frame + c-list.
+    const _fsStart = 1 + _svCW;
+    let _svLumpSize = 64;
+    while (_svLumpSize < _fsStart + frameWords.length + _svCC) _svLumpSize <<= 1;
+
+    let _svNm6 = 0;
+    while ((64 << _svNm6) < _svLumpSize) _svNm6++;
+    const _svHdr = (((0x1F & 0x1F) << 27) |
+                    ((_svNm6 & 0x0F)   << 23) |
+                    ((_svCW  & 0x1FFF) << 10) |
+                    ((0 & 0x03) << 8) |
+                    (_svCC & 0xFF)) >>> 0;
+
+    const binary = new Array(_svLumpSize).fill(0);
+    binary[0] = _svHdr;
+    for (let i = 0; i < _svCW; i++) binary[1 + i] = codeWords[i] >>> 0;
+    for (let i = 0; i < frameWords.length; i++) binary[_fsStart + i] = frameWords[i] >>> 0;
+
+    return { binary, flags: builtFlags, fsStart: _fsStart };
 }
+
+(async function _runFsTests() {
+    // ── API object and source fixture ─────────────────────────────────────────
+    const API_OBJ = { name: 'Scheduler.IRQ', language: 'assembly' };
+
+    // Source text long enough (≥ 200 bytes) to benefit from deflate-raw compression.
+    const SOURCE_TEXT = [
+        '; Scheduler.IRQ — interrupt dispatch for the Church Machine',
+        '; Calls the registered handler and returns via RETURN.',
+        'capabilities {',
+        '    CR0 = Handler',
+        '    CR1 = Timer',
+        '}',
+        'method Dispatch {',
+        '    LOAD CR0',
+        '    CALL CR0, 1',
+        '    RETURN',
+        '}',
+        'method Reset {',
+        '    LOAD CR1',
+        '    CALL CR1, 1',
+        '    RETURN',
+        '}',
+        '; padding: ' + 'x'.repeat(180),   // push past 200 bytes
+    ].join('\n');
+
+    const CODE_WORDS = [0xF8000000 >>> 0];  // single sentinel code word
+
+    // ── T-RT-FS01: Compressed path (flags = 0x07) ─────────────────────────────
+    // CompressionStream is available in Node ≥ 18; lumpBuildContentFrame should
+    // produce a compressed frame (flags=0x07).  lumpDecodeContentFrame must
+    // inflate it and return the original source exactly.
+    console.log('\n--- T-RT-FS01: production compressed roundtrip (flags=0x07) ---');
+    try {
+        const { binary, flags, fsStart } = await buildTestLumpBinary(CODE_WORDS, API_OBJ, SOURCE_TEXT);
+        const recovered = await lumpDecodeContentFrame(binary);
+
+        check('T-RT-FS01a: lumpBuildContentFrame produced flags=0x07 (compressed)',
+              flags === 0x07);
+        check('T-RT-FS01b: 0xAB magic byte present at binary[fsStart]',
+              ((binary[fsStart] >>> 24) & 0xFF) === 0xAB);
+        check('T-RT-FS01c: binary flags byte at binary[fsStart][23:16] = 0x07',
+              (((binary[fsStart] >>> 0) >>> 16) & 0xFF) === 0x07);
+        check('T-RT-FS01d: lumpDecodeContentFrame returned a non-null string',
+              typeof recovered === 'string' && recovered !== null);
+        check('T-RT-FS01e: recovered source length matches original',
+              recovered !== null && recovered.length === SOURCE_TEXT.length);
+        check('T-RT-FS01f: recovered source content matches original exactly',
+              recovered === SOURCE_TEXT);
+    } catch (err) {
+        console.log(`FAIL T-RT-FS01 (exception): ${err}`);
+        fail++;
+    }
+
+    // ── T-RT-FS02: Uncompressed fallback path (flags = 0x03) ─────────────────
+    // Temporarily shadow the global CompressionStream so lumpBuildContentFrame
+    // takes the uncompressed fallback branch.  lumpDecodeContentFrame must then
+    // recover the source without inflating.
+    console.log('\n--- T-RT-FS02: production uncompressed roundtrip (flags=0x03) ---');
+    try {
+        const _savedCS = global.CompressionStream;
+        global.CompressionStream = undefined;   // force uncompressed fallback
+
+        let binaryU, flagsU, fsStartU;
+        try {
+            ({ binary: binaryU, flags: flagsU, fsStart: fsStartU } =
+                await buildTestLumpBinary(CODE_WORDS, API_OBJ, SOURCE_TEXT));
+        } finally {
+            global.CompressionStream = _savedCS; // always restore
+        }
+
+        const recoveredU = await lumpDecodeContentFrame(binaryU);
+
+        check('T-RT-FS02a: lumpBuildContentFrame produced flags=0x03 (uncompressed fallback)',
+              flagsU === 0x03);
+        check('T-RT-FS02b: 0xAB magic byte present at binary[fsStart]',
+              ((binaryU[fsStartU] >>> 24) & 0xFF) === 0xAB);
+        check('T-RT-FS02c: binary flags byte at binary[fsStart][23:16] = 0x03',
+              (((binaryU[fsStartU] >>> 0) >>> 16) & 0xFF) === 0x03);
+        check('T-RT-FS02d: lumpDecodeContentFrame returned a non-null string',
+              typeof recoveredU === 'string' && recoveredU !== null);
+        check('T-RT-FS02e: recovered source length matches original',
+              recoveredU !== null && recoveredU.length === SOURCE_TEXT.length);
+        check('T-RT-FS02f: recovered source content matches original exactly',
+              recoveredU === SOURCE_TEXT);
+    } catch (err) {
+        console.log(`FAIL T-RT-FS02 (exception): ${err}`);
+        fail++;
+    }
+
+    // ── T-RT-FS03: Flag-byte discrimination ────────────────────────────────────
+    // Build both a compressed and an uncompressed binary.  Assert the flags bytes
+    // are 0x07 and 0x03 respectively and that the decoder recovers the correct
+    // source from both.  This catches a silent swap of the flags values or a
+    // decoder that ignores the flags byte and always/never decompresses.
+    console.log('\n--- T-RT-FS03: flag-byte discrimination (0x07 vs 0x03 are distinct) ---');
+    try {
+        // Compressed binary (normal path — CompressionStream available).
+        const { binary: binC, flags: flagsC, fsStart: fsC } =
+            await buildTestLumpBinary(CODE_WORDS, API_OBJ, SOURCE_TEXT);
+
+        // Uncompressed binary (CompressionStream shadowed).
+        const _savedCS2 = global.CompressionStream;
+        global.CompressionStream = undefined;
+        let binU, flagsU2, fsU;
+        try {
+            ({ binary: binU, flags: flagsU2, fsStart: fsU } =
+                await buildTestLumpBinary(CODE_WORDS, API_OBJ, SOURCE_TEXT));
+        } finally {
+            global.CompressionStream = _savedCS2;
+        }
+
+        check('T-RT-FS03a: compressed binary has flags=0x07',
+              flagsC === 0x07 && (((binC[fsC] >>> 0) >>> 16) & 0xFF) === 0x07);
+        check('T-RT-FS03b: uncompressed binary has flags=0x03',
+              flagsU2 === 0x03 && (((binU[fsU] >>> 0) >>> 16) & 0xFF) === 0x03);
+        check('T-RT-FS03c: the two flags values are distinct', flagsC !== flagsU2);
+
+        // Both binaries must round-trip to the same source text.
+        const recovC = await lumpDecodeContentFrame(binC);
+        const recovU = await lumpDecodeContentFrame(binU);
+        check('T-RT-FS03d: compressed binary round-trips to original source',
+              recovC === SOURCE_TEXT);
+        check('T-RT-FS03e: uncompressed binary round-trips to original source',
+              recovU === SOURCE_TEXT);
+        check('T-RT-FS03f: both decodings are identical',
+              recovC === recovU);
+    } catch (err) {
+        console.log(`FAIL T-RT-FS03 (exception): ${err}`);
+        fail++;
+    }
+
+    // ── Summary ───────────────────────────────────────────────────────────────
+    console.log('\n══════════════════════════════════════');
+    console.log(`Results: ${pass} passed, ${fail} failed`);
+    if (fail > 0) {
+        console.error('SOME TESTS FAILED');
+        process.exit(1);
+    } else {
+        console.log('ALL TESTS PASSED');
+    }
+})();
