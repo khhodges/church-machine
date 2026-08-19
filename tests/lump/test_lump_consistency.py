@@ -2808,6 +2808,39 @@ class TestR24_NobrokenSymlinks:
                 stacklevel=2,
             )
 
+
+class TestRetiredWukongCallHomeAliases:
+    """Historical WukongCallHome aliases must stay retired.
+
+    These files were superseded by the manifest-designated canonical artifact,
+    but were later retargeted to one another and formed a symlink cycle.  Their
+    historical sidecars describe different binaries, so they cannot safely
+    alias the current file.  The archived WukongCallHome_v* binaries preserve
+    supported historical versions instead.
+    """
+
+    _RETIRED_FILENAMES = (
+        "WukongCallHome.1.78f1c4e0.lump",
+        "WukongCallHome.1.78f1c4e0.json",
+        "WukongCallHome.1.e0c7b11e.lump",
+        "WukongCallHome.1.e0c7b11e.json",
+        "WukongCallHome.1.f563bc1f.lump",
+        "WukongCallHome.1.f563bc1f.json",
+    )
+
+    def test_retired_aliases_are_not_discoverable(self):
+        """Prevent obsolete aliases from returning to the startup scan."""
+        present = sorted(
+            filename for filename in self._RETIRED_FILENAMES
+            if os.path.lexists(os.path.join(LUMPS_DIR, filename))
+        )
+        assert not present, (
+            "Retired WukongCallHome aliases must not be restored to server/lumps: "
+            f"{present}. The manifest canonical file is the supported artifact; "
+            "use an explicit archive for preserved historical binaries."
+        )
+
+
 class TestR21_ManifestCwCcMatchBinaryAllEntries:
     """R21: Every manifest entry with a declared cw or cc field whose .lump file
     is present on disk must have those values match the decoded binary header.
