@@ -95,6 +95,17 @@
 
         const allAbs = (sim && sim.abstractionRegistry && sim.abstractionRegistry.abstractions) || {};
 
+        // SelfTest's Next capability is a reserved alias for the active
+        // LightningBolt boot-entry GT. It is intentionally not required to
+        // appear as a separately registered namespace/device pet name.
+        if (_sameName(name, 'Next')) {
+            const lightningSlot = _validTarget(sim && sim.bootEntrySlot);
+            if (lightningSlot !== null) {
+                nsIndex = lightningSlot;
+                source = 'lightning-bolt';
+            }
+        }
+
         // Device pet names are the most specific mapping. LED0 and UART_TX must
         // resolve to their physical NS targets, not to a similarly named
         // catalogue abstraction.
