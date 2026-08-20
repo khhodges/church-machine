@@ -2029,6 +2029,17 @@
     flex-shrink: 0;
 }
 
+.clist-self-name {
+    color: #f4b942;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+.clist-self-target {
+    margin-left: 4px;
+    color: #c7a85a;
+    font-size: 0.62rem;
+}
+
 .clist-perms {
     display: flex;
     gap: 2px;

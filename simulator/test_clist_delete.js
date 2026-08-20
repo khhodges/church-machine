@@ -33,7 +33,7 @@ function nextTurn() {
     const editor = window.document.getElementById('asmEditor');
     editor.value = [
         'capabilities {',
-        '    SelfTest E',
+        '    WukongCallHome.hw E',
         '    Continue E',
         '    Diagnostics R',
         '}',
@@ -43,6 +43,11 @@ function nextTurn() {
 
     let inputEvents = 0;
     editor.addEventListener('input', () => { inputEvents++; });
+    window.sim = {
+        bootComplete: true,
+        cr: { 14: { word0: 0x4A000006 } },
+        nsLabels: { 6: 'SelfTest' },
+    };
     window.AsmInstructionPicker = { hide: function () {} };
     window.eval(fs.readFileSync(path.join(__dirname, 'clist-viewer.js'), 'utf8'));
 
@@ -51,22 +56,27 @@ function nextTurn() {
 
     let popup = window.document.querySelector('.clist-viewer-popup');
     check('CLD-1: source C-List renders', popup && popup.textContent.includes('SelfTest'));
-    check('CLD-2: CR0 has no delete button',
+    check('CLD-2: CR0 is always displayed as SELF',
+        popup.querySelector('.clist-row[data-slot="0"] .clist-self-name').textContent === 'SELF' &&
+        popup.querySelector('.clist-row[data-slot="0"] .clist-self-target').textContent === '(SelfTest)' &&
+        !popup.querySelector('.clist-row[data-slot="0"] .clist-name').textContent.includes('WukongCallHome.hw'),
+        popup.querySelector('.clist-row[data-slot="0"] .clist-name').textContent);
+    check('CLD-3: CR0 has no delete button',
         popup.querySelector('[data-action="delete-capability"][data-slot="0"]') === null);
 
     const deleteCR1 = popup.querySelector('[data-action="delete-capability"][data-slot="1"]');
-    check('CLD-3: CR1 has a delete button', !!deleteCR1);
+    check('CLD-4: CR1 has a delete button', !!deleteCR1);
     deleteCR1.click();
     await nextTurn();
 
-    check('CLD-4: deleting CR1 preserves CR0',
-        editor.value.includes('SelfTest E'), editor.value);
-    check('CLD-5: deleting CR1 removes only its source capability',
+    check('CLD-5: deleting CR1 preserves CR0',
+        editor.value.includes('WukongCallHome.hw E'), editor.value);
+    check('CLD-6: deleting CR1 removes only its source capability',
         !editor.value.includes('Continue E'), editor.value);
-    check('CLD-6: remaining rows are reindexed',
+    check('CLD-7: remaining rows are reindexed',
         popup.querySelector('.clist-row[data-slot="1"] .clist-name').textContent === 'Diagnostics',
         popup.innerHTML);
-    check('CLD-7: source change emits an input event', inputEvents === 1, String(inputEvents));
+    check('CLD-8: source change emits an input event', inputEvents === 1, String(inputEvents));
 
     // Add must never create the first capability at CR0.
     editor.value = 'capabilities {\n}\n';
@@ -81,9 +91,9 @@ function nextTurn() {
     pickerRow.dataset.capRights = 'E';
     popup.appendChild(pickerRow);
     pickerRow.click();
-    check('CLD-8: Add does not create a capability at CR0',
+    check('CLD-9: Add does not create a capability at CR0',
         editor.value === 'capabilities {\n}\n', editor.value);
-    check('CLD-9: blocked Add does not emit an input event', inputEvents === 1, String(inputEvents));
+    check('CLD-10: blocked Add does not emit an input event', inputEvents === 1, String(inputEvents));
 
     console.log('\n' + passed + ' passed, ' + failed + ' failed');
     if (failed) process.exit(1);

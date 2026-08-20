@@ -354,6 +354,32 @@
         return '';
     }
 
+    // CR0 is the compiler-owned self capability. Its pet name is always SELF;
+    // the target name comes from the currently executing CR14/NS entry rather
+    // than the ordinary per-row pet-name map, which can contain a stale name
+    // from a previously loaded program.
+    function _currentLumpName(s) {
+        if (!s) return '';
+        var cr14 = s.cr && s.cr[14];
+        if (cr14 && (cr14.word0 >>> 0) !== 0 && s.nsLabels) {
+            var nsIdx = (cr14.word0 >>> 0) & 0xFFFF;
+            if (s.nsLabels[nsIdx]) return String(s.nsLabels[nsIdx]);
+        }
+        if (s.programName && s.programName !== 'Program' && s.programName !== 'SelfTest') {
+            return String(s.programName);
+        }
+        if (s.programName === 'SelfTest') return 'SelfTest';
+        return '';
+    }
+
+    function _selfNameHtml(targetName) {
+        return '<span class="clist-self-name" title="compiler-owned self capability">SELF</span>' +
+            (targetName
+                ? '<span class="clist-self-target" title="SELF targets the executing abstraction">(' +
+                  escHtml(targetName) + ')</span>'
+                : '');
+    }
+
     // ── Build rows HTML from a flat array of raw GT words ────────────────────
     function _buildRowsFromWords(gtWords, petMap, nsLabels, nsTable, s) {
         var DC = { 1: 'LED', 2: 'UART', 3: 'Button', 4: 'Timer', 5: 'Display' };
@@ -434,7 +460,9 @@
                 _namedBadgeHtml(s, i) +
                 '<span class="clist-b-badge' + (bFlag ? ' clist-b-badge--on' : '') + '" title="Bind bit">B</span>' +
                 '<span class="clist-f-badge' + (fFlag ? ' clist-f-badge--on' : '') + '" title="Fault-on-use bit">F</span>' +
-                '<span class="clist-name">' + escHtml(displayName) + '</span>' +
+                '<span class="clist-name">' + (i === 0
+                    ? _selfNameHtml(_currentLumpName(s))
+                    : escHtml(displayName)) + '</span>' +
                 '</div>';
         }
         return html;
@@ -608,7 +636,9 @@
                             '<span class="clist-slot" title="slot ' + si + ' \u2014 declared in source (not yet compiled)">CR' + si + '</span>' +
                             rightsHtml +
                             _namedBadgeHtml(_srcSim, si) +
-                            '<span class="clist-name">' + escHtml(se.name) + '</span>' +
+                            '<span class="clist-name">' + (si === 0
+                                ? _selfNameHtml(_currentLumpName(_srcSim))
+                                : escHtml(se.name)) + '</span>' +
                             (si > 0
                                 ? '<button class="clist-delete-btn" data-action="delete-capability" data-slot="' + si + '" title="Delete CR' + si + ' from the source C-List">\u00D7</button>'
                                 : '') +
