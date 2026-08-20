@@ -1175,7 +1175,7 @@ if LUMP_MAX_ARCHIVE_VERSIONS < 0:
 LUMPS_MANIFEST_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                    "lumps", "manifest.json")
 
-def _load_lump_catalog():
+def _load_lump_catalog(selected_tokens=None):
     """Return the subset of server/lumps/manifest.json suitable for Step 2.
 
     Fixed-slot lumps (ns_slot is an integer) and entries that target reserved
@@ -1192,6 +1192,7 @@ def _load_lump_catalog():
             raw = json.load(f)
     except Exception:
         return []
+    selected_tokens = selected_tokens or {}
     out = []
     floating = []
     for entry in raw if isinstance(raw, list) else []:
@@ -1220,17 +1221,42 @@ def _load_lump_catalog():
             "nsSlot": slot,
             "lumpSize": entry.get("lump_size"),
             "token": entry.get("token"),
+            "lumpVersion": entry.get("lump_version", 0),
             "nsSlotPolicy": policy,
             "hasExecutableMethods": bool(entry.get("methods")),
         }
         if entry.get("media_tags"):
             e["mediaTags"] = entry["media_tags"]
         out.append(e)
-    # Stable ordering: by ns_slot, then abstraction name.
-    out.sort(key=lambda e: (e["nsSlot"], e["abstraction"] or ""))
+
+    # A namespace slot is an abstraction identity, not an archive-version
+    # listing.  Keep exactly one build candidate per dot name.  A persisted
+    # token selection wins; otherwise use the newest version, with manifest
+    # order as the deterministic tie-breaker.
+    grouped = {}
+    for candidate in out:
+        name = candidate.get("abstraction") or ""
+        grouped.setdefault(name, []).append(candidate)
+
+    selected_out = []
+    for name, candidates in grouped.items():
+        wanted = selected_tokens.get(name)
+        chosen = next((c for c in candidates if wanted and c.get("token") == wanted), None)
+        if chosen is None:
+            chosen = max(
+                enumerate(candidates),
+                key=lambda pair: (
+                    int(pair[1].get("lumpVersion") or 0),
+                    pair[0],
+                ),
+            )[1]
+        selected_out.append(chosen)
+
+    # Stable ordering: by NS slot, then abstraction name.
+    selected_out.sort(key=lambda e: (e["nsSlot"], e["abstraction"] or ""))
     # Floating lumps appended after fixed-slot entries, sorted by name.
     floating.sort(key=lambda e: e["abstraction"] or "")
-    return out + floating
+    return selected_out + floating
 
 def _validate_step2(step2, step1, target_board):
     """Validate the optional Step 2 (resident lumps) section.
