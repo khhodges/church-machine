@@ -68,6 +68,23 @@ function nextTurn() {
         popup.innerHTML);
     check('CLD-7: source change emits an input event', inputEvents === 1, String(inputEvents));
 
+    // Add must never create the first capability at CR0.
+    editor.value = 'capabilities {\n}\n';
+    window.CListViewer.show();
+    await nextTurn();
+    popup = window.document.querySelector('.clist-viewer-popup');
+    popup.querySelector('[data-action="show-picker"]').click();
+    await nextTurn();
+    const pickerRow = window.document.createElement('div');
+    pickerRow.className = 'clist-picker-row';
+    pickerRow.dataset.capName = 'ShouldNotBeCR0';
+    pickerRow.dataset.capRights = 'E';
+    popup.appendChild(pickerRow);
+    pickerRow.click();
+    check('CLD-8: Add does not create a capability at CR0',
+        editor.value === 'capabilities {\n}\n', editor.value);
+    check('CLD-9: blocked Add does not emit an input event', inputEvents === 1, String(inputEvents));
+
     console.log('\n' + passed + ' passed, ' + failed + ' failed');
     if (failed) process.exit(1);
 }()).catch(err => {
