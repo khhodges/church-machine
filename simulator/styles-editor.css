@@ -2166,6 +2166,21 @@
     color: #b4ffff;
     opacity: 1;
 }
+.clist-picker-earlier {
+    border-top: 1px solid rgba(255,255,255,0.08);
+    margin: 2px 8px 4px;
+    padding-top: 3px;
+}
+.clist-picker-earlier summary {
+    color: #8ea8bd;
+    cursor: pointer;
+    font-size: 0.66rem;
+    padding: 3px 2px;
+    user-select: none;
+}
+.clist-picker-earlier[open] summary {
+    color: #c5d8e7;
+}
 .clist-resolve-btn {
     font-size: 0.6rem;
     padding: 1px 6px;

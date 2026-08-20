@@ -131,3 +131,4 @@
 - [SelfTest Next follows LightningBolt](selftest-next-lightningbolt.md) — Next.GT is coupled to the selected boot-entry GT; independent continuation targets are prohibited
 - [C-List source-row indexing](clist-source-row-indexing.md) — compiler-owned CR0 is synthetic; source capability rows start at CR1 and delete by source index
 - [Draft banner placement](draft-banner-placement.md) — recovery banners must be siblings above the editor, never children of the code-editor flex row
+- [Capability picker version selection](capability-picker-version-selection.md) — show one latest eligible LUMP per abstraction by default; place older versions behind an explicit disclosure

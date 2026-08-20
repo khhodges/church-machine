@@ -834,6 +834,36 @@
         { name: 'Display0', hint: 'Display \u00b7 device 0', rights: 'W'  },
     ];
 
+    function _pickerLumpDate(lump) {
+        var raw = lump && lump.compiled_at;
+        var ms = typeof raw === 'number'
+            ? (raw < 100000000000 ? raw * 1000 : raw)
+            : Date.parse(raw || '');
+        return Number.isFinite(ms) ? ms : 0;
+    }
+
+    function _pickerLumpIsTested(lump) {
+        if (!lump || lump.binary_valid === false) return false;
+        return lump.tested === true ||
+            ['passed', 'pass'].indexOf(String(lump.test_status || '').toLowerCase()) >= 0 ||
+            ['stable', 'released', 'tested'].indexOf(String(lump.status || '').toLowerCase()) >= 0 ||
+            _pickerLumpDate(lump) > 0;
+    }
+
+    function _pickerLumpRow(lump, label) {
+        var rawName = lump.abstraction || lump.name || '';
+        var name = escHtml(rawName);
+        var date = _pickerLumpDate(lump);
+        var version = lump.version || lump.version_str;
+        var detail = label || (date ? new Date(date).toISOString().slice(0, 10) : 'undated');
+        if (version) detail += ' · v' + String(version);
+        return '<div class="clist-picker-row" data-cap-name="' + name + '" data-cap-rights="E">' +
+            '<span class="clist-picker-type clist-picker-type--inform">Inform</span>' +
+            '<span class="clist-picker-name">' + name + '</span>' +
+            '<span class="clist-picker-hint">NS[' + lump.ns_slot + '] · E · ' + escHtml(detail) + '</span>' +
+            '</div>';
+    }
+
     async function buildPickerContentAsync() {
         var s = (typeof sim !== 'undefined') ? sim : null;
         var bodyRows = '';
@@ -867,13 +897,30 @@
                 }) : [];
                 if (withSlots.length > 0) {
                     bodyRows += '<div class="clist-picker-section-header">Abstractions</div>';
+                    var grouped = {};
                     withSlots.forEach(function (l) {
-                        var name = escHtml(l.abstraction || l.name);
-                        bodyRows += '<div class="clist-picker-row" data-cap-name="' + name + '" data-cap-rights="E">' +
-                            '<span class="clist-picker-type clist-picker-type--inform">Inform</span>' +
-                            '<span class="clist-picker-name">' + name + '</span>' +
-                            '<span class="clist-picker-hint">NS[' + l.ns_slot + '] \u00b7 E</span>' +
-                            '</div>';
+                        var key = String(l.abstraction || l.name);
+                        (grouped[key] || (grouped[key] = [])).push(l);
+                    });
+                    Object.keys(grouped).sort().forEach(function (key) {
+                        var versions = grouped[key].slice().sort(function (a, b) {
+                            return _pickerLumpDate(b) - _pickerLumpDate(a);
+                        });
+                        var tested = versions.filter(_pickerLumpIsTested);
+                        var latest = tested[0] || versions[0];
+                        var older = versions.filter(function (l) { return l !== latest; });
+                        bodyRows += _pickerLumpRow(latest,
+                            _pickerLumpDate(latest) ? 'latest dated tested' : 'default');
+                        if (older.length) {
+                            bodyRows += '<details class="clist-picker-earlier">' +
+                                '<summary>Earlier versions (' + older.length + ')</summary>' +
+                                older.map(function (l) {
+                                    return _pickerLumpRow(l, _pickerLumpDate(l)
+                                        ? new Date(_pickerLumpDate(l)).toISOString().slice(0, 10)
+                                        : 'older');
+                                }).join('') +
+                                '</details>';
+                        }
                     });
                 }
             }

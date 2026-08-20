@@ -56,12 +56,13 @@ function nextTurn() {
 
     let popup = window.document.querySelector('.clist-viewer-popup');
     check('CLD-1: source C-List renders', popup && popup.textContent.includes('SelfTest'));
-    check('CLD-2: CR0 is always displayed as SELF',
+    check('CLD-2: row 0 is always displayed as SELF',
         popup.querySelector('.clist-row[data-slot="0"] .clist-self-name').textContent === 'SELF' &&
         popup.querySelector('.clist-row[data-slot="0"] .clist-self-target').textContent === '(SelfTest)' &&
+        popup.querySelector('.clist-row[data-slot="0"] .clist-slot').textContent === '0' &&
         !popup.querySelector('.clist-row[data-slot="0"] .clist-name').textContent.includes('WukongCallHome.hw'),
         popup.querySelector('.clist-row[data-slot="0"] .clist-name').textContent);
-    check('CLD-3: CR0 has no delete button',
+    check('CLD-3: row 0 has no delete button',
         popup.querySelector('[data-action="delete-capability"][data-slot="0"]') === null);
 
     const deleteCR1 = popup.querySelector('[data-action="delete-capability"][data-slot="1"]');
@@ -69,7 +70,7 @@ function nextTurn() {
     deleteCR1.click();
     await nextTurn();
 
-    check('CLD-5: deleting CR1 preserves compiler-owned CR0',
+    check('CLD-5: deleting row 1 preserves SELF in row 0',
         popup.querySelector('.clist-row[data-slot="0"] .clist-self-name').textContent === 'SELF',
         popup.innerHTML);
     check('CLD-6: deleting CR1 removes only the source capability at CR1',
