@@ -3,6 +3,7 @@ import re
 import sys
 from amaranth.back.verilog import convert
 from .core import ChurchCore
+from .readiness import CORE_SOURCES, stamp_text
 
 
 _STALE_CR7_PATTERN = "cr7_wr_"
@@ -375,6 +376,7 @@ def generate_core_verilog(output_dir="build"):
     ]
 
     verilog_text = convert(core, ports=ports)
+    verilog_text = stamp_text(verilog_text, CORE_SOURCES)
 
     output_path = os.path.join(output_dir, "church_core.v")
     _check_stale_cr7(verilog_text, output_path)
@@ -411,6 +413,7 @@ def generate_core_iot_verilog(output_dir="build"):
     ]
 
     verilog_text = convert(core, ports=ports)
+    verilog_text = stamp_text(verilog_text, CORE_SOURCES)
 
     output_path = os.path.join(output_dir, "church_core_iot.v")
     _check_stale_cr7(verilog_text, output_path)

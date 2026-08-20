@@ -4,6 +4,7 @@ import sys
 import subprocess
 from amaranth import ClockSignal
 from amaranth.back.rtlil import convert
+from .readiness import WUKONG_SOURCES, stamp_text
 
 
 def _extract_port_body(text, start):
@@ -461,7 +462,7 @@ def generate_rtlil_wukong(output_dir="build"):
 
     il_path = os.path.join(output_dir, "church_wukong_xc7a100t.il")
     with open(il_path, "w") as f:
-        f.write(rtlil_text)
+        f.write(stamp_text(rtlil_text, WUKONG_SOURCES))
 
     print(f"Generated: {il_path}")
     print(f"  File size: {len(rtlil_text):,} bytes")
@@ -469,6 +470,11 @@ def generate_rtlil_wukong(output_dir="build"):
 
     v_path = os.path.join(output_dir, "church_wukong_xc7a100t.v")
     _rtlil_to_verilog(il_path, v_path, module_name="church_wukong_xc7a100t")
+    if os.path.exists(v_path):
+        with open(v_path, "r", encoding="utf-8") as f:
+            generated_verilog = f.read()
+        with open(v_path, "w", encoding="utf-8") as f:
+            f.write(stamp_text(generated_verilog, WUKONG_SOURCES))
 
     return il_path
 

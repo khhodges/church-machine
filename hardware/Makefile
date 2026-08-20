@@ -27,7 +27,10 @@ JSON_IOT     := $(PROJ_IOT).json
 PNR_JSON_IOT := $(PROJ_IOT)_pnr.json
 PACK_IOT     := $(PROJ_IOT).fs
 
-.PHONY: pnr pack prog tang-iot pnr-iot pack-iot prog-iot clean check-cr7
+.PHONY: pnr pack prog tang-iot pnr-iot pack-iot prog-iot clean check-cr7 readiness
+
+readiness:
+	python3 ../scripts/check_hardware_namespace_thread_readiness.py
 
 pnr: $(PNR_JSON)
 $(PNR_JSON): $(JSON) $(CST)
