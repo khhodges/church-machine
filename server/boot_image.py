@@ -964,7 +964,7 @@ def _load_ns_state_token_map(lumps_dir):
         return {}
 
 
-def _load_catalog_token_map(manifest_path):
+def _load_catalog_token_map(manifest_path, selected_by_slot=None):
     """slot→token: ns-state.json (preferred) merged over manifest.json ns_slot fields."""
     lumps_dir = os.path.dirname(manifest_path)
     out = {}
@@ -983,6 +983,11 @@ def _load_catalog_token_map(manifest_path):
             out[slot] = tok
     # ns-state.json overrides manifest where present (authoritative)
     out.update(_load_ns_state_token_map(lumps_dir))
+    # A saved designer choice is explicit and must override the current
+    # ns-state/manifest default for that slot.
+    for slot, token in (selected_by_slot or {}).items():
+        if isinstance(slot, int) and isinstance(token, str) and token:
+            out[slot] = token
     return out
 
 
@@ -1048,7 +1053,7 @@ def _load_trusted_cache_token_map(manifest_path):
     return trusted
 
 
-def _load_boot_resident_entries(manifest_path):
+def _load_boot_resident_entries(manifest_path, selected_by_slot=None):
     """Return list of (ns_slot, token_hex, filename_or_none) for all manifest
     entries with boot_resident=true and a non-empty token.
 
@@ -1069,8 +1074,17 @@ def _load_boot_resident_entries(manifest_path):
         slot = e.get("ns_slot")
         tok  = e.get("token")
         if isinstance(slot, int) and isinstance(tok, str) and tok:
-            out.append((slot, tok, e.get("filename")))
-    return out
+            out.append((slot, tok, e.get("filename"), e.get("lump_version", 0)))
+    selected = selected_by_slot or {}
+    chosen = {}
+    for slot, tok, filename, version in out:
+        if slot in selected and tok == selected[slot]:
+            chosen[slot] = (slot, tok, filename, int(version or 0))
+        elif slot not in chosen:
+            chosen[slot] = (slot, tok, filename, int(version or 0))
+        elif int(version or 0) >= chosen[slot][3]:
+            chosen[slot] = (slot, tok, filename, int(version or 0))
+    return [(slot, tok, filename) for slot, tok, filename, _version in chosen.values()]
 
 
 def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
@@ -1241,6 +1255,14 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             phys_override[int(ns_slot)] = int(e["physAddr"])
 
     _manifest_path_for_cache = os.path.join(lumps_dir, "manifest.json")
+    _selected_slot_tokens = {
+        int(e.get("nsSlot")): e.get("lumpToken")
+        for e in step2_lumps
+        if isinstance(e, dict)
+        and isinstance(e.get("nsSlot"), int)
+        and isinstance(e.get("lumpToken"), str)
+        and e.get("lumpToken")
+    }
     trusted_cache_tokens = _load_trusted_cache_token_map(_manifest_path_for_cache)
     catalog = DEFAULT_ABSTRACTION_CATALOG
     slot_sizes = {
@@ -1575,8 +1597,9 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # Step-2 explicit config can override a slot's physAddr and will
     # overwrite this placement in the loop below.
     _manifest_path = os.path.join(lumps_dir, "manifest.json")
-    _token_map     = _load_catalog_token_map(_manifest_path)
-    for _slot, _tok, _filename in _load_boot_resident_entries(_manifest_path):
+    _token_map     = _load_catalog_token_map(_manifest_path, _selected_slot_tokens)
+    for _slot, _tok, _filename in _load_boot_resident_entries(
+            _manifest_path, _selected_slot_tokens):
         if _slot == BOOT_ABSTR_NS_SLOT:
             # Boot.Abstr is always synthesised above (via manifest lookup).
             # A manifest boot_resident entry at the same slot must not overwrite it.

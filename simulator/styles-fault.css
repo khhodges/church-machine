@@ -705,6 +705,21 @@
 }
 .le-select:focus { outline: none; border-color: rgba(218,165,32,0.5); }
 
+.le-next-btn {
+    background: rgba(218,165,32,0.12);
+    border: 1px solid rgba(218,165,32,0.45);
+    color: var(--church-gold);
+    padding: 0.35rem 0.7rem;
+    border-radius: 4px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.le-next-btn:hover {
+    background: rgba(218,165,32,0.22);
+    border-color: rgba(218,165,32,0.75);
+}
+
 .le-divider {
     height: 1px;
     background: rgba(218,165,32,0.15);
@@ -1174,6 +1189,10 @@
     outline: none;
     border-color: rgba(218,165,32,0.75);
     box-shadow: 0 0 0 2px rgba(218,165,32,0.15);
+}
+.le-rl-boot-select option {
+    background: var(--bg-input, #171722);
+    color: var(--text-primary, #e8e0c8);
 }
 
 .le-rl-show-all-toggle {

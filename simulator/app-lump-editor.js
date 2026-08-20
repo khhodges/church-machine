@@ -396,7 +396,8 @@
                 resident:    !!(saved && saved.resident),
                 physAddr:    (saved && Number.isFinite(saved.physAddr)) ? saved.physAddr : null,
                 lumpSize:    cat.lumpSize,
-                abstraction: cat.abstraction
+                abstraction: cat.abstraction,
+                lumpToken:   (saved && saved.lumpToken) || cat.token
             };
         }
     }
@@ -774,6 +775,10 @@
                     ' title="Upload a pre-built boot-image.bin from your computer">' +
                     '\u2B06\ufe0e Upload .bin' +
                 '</button>' +
+                '<button class="le-next-btn" onclick="lumpEditorNextStep(\'build\')"' +
+                    ' title="Save the boot configuration and continue to Build Bitstream">' +
+                    'Next: Build Bitstream \u2192' +
+                '</button>' +
             '</div>' +
             '<div class="le-rl-drop-zone" id="le-rl-drop-zone"' +
                 ' ondragover="event.preventDefault();event.dataTransfer.dropEffect=\'copy\';this.classList.add(\'le-rl-drop-active\')"' +
@@ -937,6 +942,10 @@
             ' title="Build and download a .lump binary with the current Thread LUMP header, and save step 1 sizes to boot config">' +
             '\u2B07 Save\u00a0/\u00a0Build LUMP' +
             '</button>' +
+             '<button class="le-next-btn" onclick="lumpEditorNextStep(\'lump-resident\')"' +
+             ' title="Save this step and continue to Resident LUMPs">' +
+             'Next: Resident LUMPs \u2192' +
+             '</button>' +
             '<span id="le-t-step1-status" class="le-rl-status" style="margin-left:0.75rem;"></span>' +
             '<span id="le-t-step1-err" class="le-rl-status" style="margin-left:0.5rem;color:#f77;"></span>' +
             '</div>';
@@ -1117,6 +1126,10 @@
                 '<button class="le-save-btn" onclick="lumpEditorPostStep1()"' +
                 ' title="Save current NS + Thread lump sizes as step 1 in the boot config">' +
                 '\u2714\ufe0e Save to boot config' +
+                '</button>' +
+                '<button class="le-next-btn" onclick="lumpEditorNextStep(\'lump-thread\')"' +
+                ' title="Save this step and continue to Thread LUMP">' +
+                'Next: Thread LUMP \u2192' +
                 '</button>' +
                 '<span id="le-ns-step1-status" class="le-rl-status" style="margin-left:0.75rem;"></span>' +
                 '<span id="le-ns-step1-err" class="le-rl-status" style="margin-left:0.5rem;color:#f77;"></span>' +
@@ -1679,6 +1692,25 @@
         _postStep1(statusEl, errEl);
     };
 
+    window.lumpEditorNextStep = function (tab) {
+        if (tab === 'lump-thread') {
+            lumpEditorPostStep1();
+        } else if (tab === 'lump-resident') {
+            lumpEditorSaveThread();
+        } else if (tab === 'build') {
+            var err = _rlValidate();
+            if (err) {
+                _rl.errorMsg = err;
+                renderResidentPanel();
+                return;
+            }
+            lumpEditorRLSave();
+        }
+        if (typeof switchBuilderViewTab === 'function') {
+            switchBuilderViewTab(tab);
+        }
+    };
+
     // ── Resident Lumps panel public handlers ──────────────────────────────────
 
     window.lumpEditorRLEmptySlots = function (v) {
@@ -1702,7 +1734,12 @@
         var step2Lumps = [];
         for (var slotStr in _rl.step2State) {
             var st = _rl.step2State[slotStr];
-            var row = { nsSlot: parseInt(slotStr, 10), resident: !!st.resident };
+            var row = {
+                nsSlot: parseInt(slotStr, 10),
+                resident: !!st.resident,
+                abstraction: st.abstraction,
+                lumpToken: st.lumpToken
+            };
             if (st.resident) {
                 row.physAddr = st.physAddr;
                 if (st.lumpSize) row.lumpSize = st.lumpSize;
