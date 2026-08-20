@@ -2052,6 +2052,19 @@ class ChurchAssembler {
             return 0;
         }
 
+        // A declared C-List name is valid as the second operand of the
+        // two-operand LOAD form, but it is not itself a CR. Point callers
+        // using it in a CR-only position to the valid load-then-alias form.
+        const capKey = ChurchAssembler._nameKey(this._capBlockSlots, rawTok);
+        if (capKey !== null) {
+            this.errors.push({
+                line: lineNum,
+                ...this._tokenCols(this._currentLineText, rawTok),
+                message: `"${rawTok}" is a named C-List entry, not a capability register. Load it first, then use the destination CR:\n  LOAD CR2, ${rawTok}\n  .pet selfGT CR2\n  TPERM selfGT, EXACT, selfGT`
+            });
+            return 0;
+        }
+
         let hint = '';
         const knownNames  = Object.keys(this.nsSymbols);
         const loadedNames = Object.keys(this.nsLoaded);

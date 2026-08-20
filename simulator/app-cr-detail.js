@@ -48,13 +48,14 @@ function _showAsmAdvisoryPopup(entry, isWarning, anchorX, anchorY) {
             + '</div>';
     }
 
-    // Keep the pet-name syntax visible from every assembler error. Errors
-    // commonly come from using a friendly name in the wrong place, and the
-    // editor's C-List names are otherwise easy to confuse with dot-notation.
+    // Keep the distinction between named C-List capabilities and register
+    // aliases visible from every assembler error. A name such as SelfTest can
+    // be loaded directly from a declared C-List row; .pet aliases a register
+    // only after that load.
     var petNameHelpHtml = '<div class="asm-advisory-popup-petname-help">'
-        + '<div class="asm-advisory-popup-sugg-title">&#x1F3F7; Pet names in instructions</div>'
-        + '<div class="asm-advisory-popup-sugg-body">Define a register alias with .pet, then use that alias anywhere the matching CR or DR register is expected.</div>'
-        + '<pre class="asm-advisory-popup-sugg-code">.pet SelfTest CR0\nLOAD   CR2, SelfTest\nTPERM  SelfTest, EXACT\n\n; .pet alias &lt;register&gt;</pre>'
+        + '<div class="asm-advisory-popup-sugg-title">&#x1F3F7; Named C-List entries and .pet aliases</div>'
+        + '<div class="asm-advisory-popup-sugg-body">A declared C-List name can be used directly in LOAD. Use .pet only to give a CR or DR register a local alias after it is loaded.</div>'
+        + '<pre class="asm-advisory-popup-sugg-code">capabilities {\n    SelfTest E\n}\nLOAD   CR2, SelfTest   ; loads named C-List row 0\n.pet   selfGT CR2      ; aliases the loaded register\nTPERM  selfGT, EXACT, selfGT</pre>'
         + '</div>';
 
     var footerHtml = '';
