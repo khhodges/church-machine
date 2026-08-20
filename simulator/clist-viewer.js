@@ -482,19 +482,23 @@
             }
 
             var displayName = petName || ('0x' + (rawWord >>> 0).toString(16).toUpperCase().padStart(8, '0'));
+            var dotName = (nsLabels && nsLabels[nsIdx]) || displayName;
+            var tokenText = '0x' + (rawWord >>> 0).toString(16).toUpperCase().padStart(8, '0');
             html += '<div class="clist-row" data-slot="' + i + '" tabindex="-1">' +
                 '<span class="clist-slot">' + i + '</span>' +
-                '<span class="clist-perms">' + permChipsHtml(gt.permissions) + '</span>' +
-                _namedBadgeHtml(s, i) +
-                '<span class="clist-b-badge' + (bFlag ? ' clist-b-badge--on' : '') + '" title="Bind bit">B</span>' +
-                '<span class="clist-f-badge' + (fFlag ? ' clist-f-badge--on' : '') + '" title="Fault-on-use bit">F</span>' +
-                '<span class="clist-name">' + (i === 0
+                '<span class="clist-name clist-pet-name">' + (i === 0
                     ? _selfNameHtml(_currentLumpName(s))
                     : escHtml(displayName)) + '</span>' +
+                '<span class="clist-dot-name">' + (i === 0
+                    ? escHtml(_currentLumpName(s) || '\u2014')
+                    : escHtml(dotName)) + '</span>' +
+                '<span class="clist-token">' + (i === 0 ? 'SELF' : tokenText) + '</span>' +
+                '<span class="clist-perms">' + permChipsHtml(gt.permissions) + '</span>' +
                 (i > 0
                     ? '<button class="clist-pet-name-btn" data-action="edit-pet-name" data-slot="' + i +
-                      '" title="Add or rename the pet name for CR' + i + '">\u270e</button>'
-                    : '') +
+                      '" title="Add or rename the pet name for row ' + i + '">\u270e</button>'
+                    : '<span class="clist-action-placeholder">\u2014</span>') +
+                '<span class="clist-action-placeholder">\u2014</span>' +
                 '</div>';
         }
         return html;
@@ -657,13 +661,19 @@
                 // User capabilities therefore begin at the displayed CR1.
                 var srcRows = '<div class="clist-row" data-slot="0" tabindex="-1">' +
                     '<span class="clist-slot">0</span>' +
-                    _namedBadgeHtml(_srcSim, 0) +
-                    '<span class="clist-name">' + _selfNameHtml(_currentLumpName(_srcSim)) + '</span>' +
+                    '<span class="clist-name clist-pet-name">' + _selfNameHtml(_currentLumpName(_srcSim)) + '</span>' +
+                    '<span class="clist-dot-name">' + escHtml(_currentLumpName(_srcSim) || '\u2014') + '</span>' +
+                    '<span class="clist-token">SELF</span>' +
+                    '<span class="clist-perms"><span class="clist-perm-chip clist-perm-chip--on" style="background:#f4b94222;color:#f4b942;border-color:#f4b94255;">E</span></span>' +
+                    '<span class="clist-action-placeholder">\u2014</span><span class="clist-action-placeholder">\u2014</span>' +
                     '</div>';
                 if (capSrcEntries.length > 0) {
                     for (var si = 0; si < capSrcEntries.length; si++) {
                         var se = capSrcEntries[si];
                         var sourceSlot = si + 1;
+                        var sourceDotName = String(se.name || '');
+                        var sourcePetName = (_nullSlotPetNames[sourceSlot] || _nullSlotPetNames[String(sourceSlot)] ||
+                            sourceDotName.split('.')[0] || '\u2014');
                         var rightsHtml = se.rights.length > 0
                             ? '<span class="clist-perms">' +
                               se.rights.join('').split('').map(function (ch) {
@@ -674,10 +684,10 @@
                             : '';
                 srcRows += '<div class="clist-row" data-slot="' + sourceSlot + '" tabindex="-1">' +
                             '<span class="clist-slot" title="row ' + sourceSlot + ' \u2014 declared in source (not yet compiled)">' + sourceSlot + '</span>' +
-                            '<span class="clist-name">' + escHtml(se.name) + '</span>' +
-                            _petAliasHtml(sourceSlot) +
+                            '<span class="clist-name clist-pet-name">' + escHtml(sourcePetName) + '</span>' +
+                            '<span class="clist-dot-name">' + escHtml(sourceDotName || '\u2014') + '</span>' +
+                            '<span class="clist-token">\u2014</span>' +
                             rightsHtml +
-                            _namedBadgeHtml(_srcSim, sourceSlot) +
                             '<button class="clist-pet-name-btn" data-action="edit-pet-name" data-slot="' + sourceSlot +
                                 '" title="Add or rename the pet name for CR' + sourceSlot + '">\u270e</button>' +
                             '<button class="clist-delete-btn" data-action="delete-capability" data-slot="' + sourceSlot +
