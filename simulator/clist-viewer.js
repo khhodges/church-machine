@@ -250,12 +250,12 @@
         });
     }
 
-    // ── Inline pet-name editor for any non-CR0 c-list slot ────────────────────
+    // ── Inline pet-name editor for user c-list rows (SELF/row 0 is protected) ─
     function _editPetName(row, slotIdx) {
         if (!row || !Number.isInteger(slotIdx) || slotIdx <= 0) return;
         var existing = _nullSlotPetNames[slotIdx] || _nullSlotPetNames[String(slotIdx)] || '';
         row.innerHTML =
-            '<span class="clist-slot">CR' + slotIdx + '</span>' +
+            '<span class="clist-slot">' + slotIdx + '</span>' +
             '<input class="clist-pet-name-input" type="text" ' +
                 'value="' + escHtml(existing) + '" ' +
                 'placeholder="placeholder name\u2026" maxlength="32" />';
@@ -292,6 +292,14 @@
             if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); _cancel(); }
         }, true);
         input.addEventListener('blur', _save);
+    }
+
+    function _petAliasHtml(slotIdx) {
+        var alias = _nullSlotPetNames[slotIdx] || _nullSlotPetNames[String(slotIdx)] || '';
+        return alias
+            ? '<span class="clist-pet-alias" title="Local pet name for CR' + slotIdx + '">(' +
+              escHtml(alias) + ')</span>'
+            : '';
     }
 
     // ── Insert CR operand into editor ─────────────────────────────────────────
@@ -411,7 +419,7 @@
                     'data-pending-name="' + escHtml(_pendingName) + '" tabindex="-1" ' +
                     'title="' + escHtml(_pendingName) + ' \u2014 declared but not yet introduced to a live GT.' +
                     (_canResolve ? ' Click to resolve.' : ' Boot the program first to resolve.') + '">' +
-                    '<span class="clist-slot">CR' + i + '</span>' +
+                    '<span class="clist-slot">' + i + '</span>' +
                     _namedBadgeHtml(s, i) +
                     '<span class="clist-pending-name">' + escHtml(_pendingName) + '</span>' +
                     '<span class="clist-pending-badge">not yet introduced</span>' +
@@ -431,14 +439,14 @@
                                (_nullSlotPetNames && (_nullSlotPetNames[i] || _nullSlotPetNames[String(i)])) || '';
                 if (_nullPet) {
                     html += '<div class="clist-row clist-row--null clist-row--named" data-slot="' + i + '" tabindex="-1" title="Click to rename \u2018' + escHtml(_nullPet) + '\u2019 (placeholder, not yet populated)">' +
-                        '<span class="clist-slot">CR' + i + '</span>' +
+                        '<span class="clist-slot">' + i + '</span>' +
                         _namedBadgeHtml(s, i) +
                         '<span class="clist-null-pet">' + escHtml(_nullPet) + '</span>' +
                         '<span class="clist-null-edit-hint">\u270e</span>' +
                         '</div>';
                 } else {
                     html += '<div class="clist-row clist-row--null" data-slot="' + i + '" tabindex="-1" title="Click to add a placeholder name for this empty slot">' +
-                        '<span class="clist-slot">CR' + i + '</span>' +
+                        '<span class="clist-slot">' + i + '</span>' +
                         _namedBadgeHtml(s, i) +
                         '<span class="clist-null-label">\u2014 null \u2014<span class="clist-null-hint">\u2295 name</span></span>' +
                         '</div>';
@@ -456,7 +464,8 @@
                 } catch (e2) { /* ignore */ }
             }
 
-            var petName = (petMap && petMap[i]) || (nsLabels && nsLabels[nsIdx]) || '';
+            var _localPetName = _nullSlotPetNames[i] || _nullSlotPetNames[String(i)] || '';
+            var petName = _localPetName || (petMap && petMap[i]) || (nsLabels && nsLabels[nsIdx]) || '';
             if (!petName && gt.type === 3) {
                 try {
                     var ab = _decodeAbstractGTWord(rawWord);
@@ -468,7 +477,7 @@
 
             var displayName = petName || ('0x' + (rawWord >>> 0).toString(16).toUpperCase().padStart(8, '0'));
             html += '<div class="clist-row" data-slot="' + i + '" tabindex="-1">' +
-                '<span class="clist-slot">CR' + i + '</span>' +
+                '<span class="clist-slot">' + i + '</span>' +
                 '<span class="clist-perms">' + permChipsHtml(gt.permissions) + '</span>' +
                 _namedBadgeHtml(s, i) +
                 '<span class="clist-b-badge' + (bFlag ? ' clist-b-badge--on' : '') + '" title="Bind bit">B</span>' +
@@ -476,6 +485,10 @@
                 '<span class="clist-name">' + (i === 0
                     ? _selfNameHtml(_currentLumpName(s))
                     : escHtml(displayName)) + '</span>' +
+                (i > 0
+                    ? '<button class="clist-pet-name-btn" data-action="edit-pet-name" data-slot="' + i +
+                      '" title="Add or rename the pet name for CR' + i + '">\u270e</button>'
+                    : '') +
                 '</div>';
         }
         return html;
@@ -637,7 +650,7 @@
                 // CR0 is compiler-owned SELF and is not declared in source.
                 // User capabilities therefore begin at the displayed CR1.
                 var srcRows = '<div class="clist-row" data-slot="0" tabindex="-1">' +
-                    '<span class="clist-slot">CR0</span>' +
+                    '<span class="clist-slot">0</span>' +
                     _namedBadgeHtml(_srcSim, 0) +
                     '<span class="clist-name">' + _selfNameHtml(_currentLumpName(_srcSim)) + '</span>' +
                     '</div>';
@@ -653,11 +666,14 @@
                               }).join('') +
                               '</span>'
                             : '';
-                        srcRows += '<div class="clist-row" data-slot="' + sourceSlot + '" tabindex="-1">' +
-                            '<span class="clist-slot" title="slot ' + sourceSlot + ' \u2014 declared in source (not yet compiled)">CR' + sourceSlot + '</span>' +
+                srcRows += '<div class="clist-row" data-slot="' + sourceSlot + '" tabindex="-1">' +
+                            '<span class="clist-slot" title="row ' + sourceSlot + ' \u2014 declared in source (not yet compiled)">' + sourceSlot + '</span>' +
+                            '<span class="clist-name">' + escHtml(se.name) + '</span>' +
+                            _petAliasHtml(sourceSlot) +
                             rightsHtml +
                             _namedBadgeHtml(_srcSim, sourceSlot) +
-                            '<span class="clist-name">' + escHtml(se.name) + '</span>' +
+                            '<button class="clist-pet-name-btn" data-action="edit-pet-name" data-slot="' + sourceSlot +
+                                '" title="Add or rename the pet name for CR' + sourceSlot + '">\u270e</button>' +
                             '<button class="clist-delete-btn" data-action="delete-capability" data-slot="' + sourceSlot +
                                 '" data-source-index="' + si + '" title="Delete CR' + sourceSlot + ' from the source C-List">\u00D7</button>' +
                             '</div>';

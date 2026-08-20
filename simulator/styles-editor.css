@@ -2141,6 +2141,31 @@
     cursor: help;
     letter-spacing: 0.02em;
 }
+.clist-pet-alias {
+    color: #8fd6d6;
+    font-size: 0.62rem;
+    font-style: italic;
+    white-space: nowrap;
+}
+.clist-pet-name-btn {
+    flex: 0 0 auto;
+    border: 1px solid rgba(62, 201, 201, 0.35);
+    border-radius: 3px;
+    background: rgba(62, 201, 201, 0.08);
+    color: #72caca;
+    font-size: 0.68rem;
+    line-height: 16px;
+    width: 19px;
+    height: 18px;
+    padding: 0;
+    cursor: pointer;
+    opacity: 0.78;
+}
+.clist-pet-name-btn:hover {
+    background: rgba(62, 201, 201, 0.22);
+    color: #b4ffff;
+    opacity: 1;
+}
 .clist-resolve-btn {
     font-size: 0.6rem;
     padding: 1px 6px;
