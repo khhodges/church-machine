@@ -10,7 +10,9 @@ R3   Every current .lump token has a manifest.json entry.
 R4   No orphan sidecar .json (every non-archive <stem>.json needs a matching .lump).
 R5   manifest.cw / cc / lump_size == binary header values.
 R6   sidecar.cw / cc / lump_size == binary header values (for sidecars that exist).
-R7   sidecar fields agree with manifest where both exist.
+R7   sidecar fields agree with manifest where both exist.  A sidecar-declared
+     boot_resident flag must also be explicitly present and equal in manifest.json,
+     because the boot-image generator reads only the manifest.
 R8   No duplicate ns_slot values unless all claimants share the same non-null variant_group.
 R9   RETIRED — ns_slot=null is implicitly dynamic; ns_slot_policy is optional/informational only.
 R10  Every manifest entry with lump_size declared has a .lump file on disk.
@@ -486,7 +488,9 @@ class TestR7_SidecarMatchesManifest:
 
     Checked fields: cw, cc, lump_size, ns_slot, abstraction, lump_version,
     and ns_slot_policy (with semantic normalization: absent = dynamic for null
-    slots, absent = static for fixed slots — R9 retired).
+    slots, absent = static for fixed slots — R9 retired).  boot_resident is
+    manifest-owned: if a sidecar declares it, manifest.json must explicitly
+    declare the same value so the boot-image generator cannot omit its body.
     """
 
     @pytest.mark.parametrize("entry", MANIFEST, ids=lambda e: e["token"])
@@ -503,6 +507,17 @@ class TestR7_SidecarMatchesManifest:
                     f"{token}: manifest.{field} = {m_val!r} but sidecar.{field} = {s_val!r}.\n"
                     "  The two must agree. Update whichever is stale, then bump CHANGELOG."
                 )
+        if "boot_resident" in sc:
+            m_val = entry.get("boot_resident")
+            s_val = sc["boot_resident"]
+            abstraction = entry.get("abstraction") or entry.get("dot_name") or token
+            assert "boot_resident" in entry and m_val == s_val, (
+                f"{abstraction}: manifest.boot_resident = {m_val!r} but "
+                f"sidecar.boot_resident = {s_val!r}.\n"
+                "  boot_resident is read only from manifest.json when generating "
+                "the boot image. Add the sidecar value to the manifest entry (or "
+                "align the two values) so this LUMP body is not silently omitted."
+            )
         # ns_slot_policy: always compare resolved values so absent-vs-static (null slot) is caught
         ns_slot = entry.get("ns_slot")
         if entry.get("ns_slot_policy") is not None or sc.get("ns_slot_policy") is not None:

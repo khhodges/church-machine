@@ -1920,7 +1920,8 @@
     "dot_name": "SelfTest",
     "issue_n": 1,
     "ns_slot": 6,
-    "ns_slot_policy": "static"
+    "ns_slot_policy": "static",
+    "boot_resident": true
   },
   {
     "token": "00000700",
