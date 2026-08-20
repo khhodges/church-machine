@@ -74,7 +74,7 @@ console.log(`Assembled ${words.length} instruction words.`);
 //             CR0  = E-GT for SelfTest  (Church domain, E-perm; from thread[+244])
 //             CR1  = E-GT for SelfTest  (loaded via LOAD CR1, SelfTest from c-list[0])
 //           CR0 and CR1 are bit-identical (0x4A000006) — EXACT cross-checks pass.
-//           boot_image.py overrides slot 0 with the memory-manager GT (R|W to NS[0]).
+//           This immutable self-reference is preserved in the boot image.
 //
 //   slot 1  Next  E  NS slot 6  — Next.GT: continuation called at done: when all tests pass.
 //           Default: SelfTest E-GT (self-loop via ELOADCALL).
@@ -94,12 +94,12 @@ const CLIST = [
 //   Words lumpSize-cc..lumpSize-1 : c-list (cc GT words, at lump tail)
 //
 // cw  = instruction word count (len(words))
-// cc  = 1  (one E-GT for SelfTest; POLA applied — see CLIST comment above)
+// cc  = 2  (SelfTest self-reference plus configurable Next.GT)
 // typ = 0  (standard lump, not thread/outform)
 // lump_size = next power-of-2 >= (1 + cw + cc)
 
 const cw = words.length;
-const cc = CLIST.length;   // 1
+const cc = CLIST.length;   // 2
 const totalNeeded = 1 + cw + cc;
 
 let lumpSize = 64;

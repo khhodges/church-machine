@@ -1495,18 +1495,18 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         _saved_cc      = abstr_words[0] & 0xFF
         entry_cr_limit = actual_abstr_size - _saved_cc - 1
 
-        # Patch the two virtually-managed c-list entries (idx 0: memory-manager GT,
-        # idx 1: Next.GT) into the resident lump copy.  The stored .lump binary has
-        # catalog-loop defaults baked into its c-list tail; overriding here ensures
-        # the IDE-configured values are baked into the boot-image.bin regardless of
-        # what was compiled into the .lump file.  cc=0 lumps have no c-list and skip
-        # this block safely.
-        if _saved_cc > 0 and len(clist_gts) > 0:
+        # Preserve SelfTest's immutable c-list row 0.  It is the same E-GT as
+        # Thread.CR0 and the SelfTest program LOADs it into CR1 before issuing
+        # TPERM EXACT CR0, CR1.  Replacing row 0 with a managed device or
+        # memory capability makes that intentional identity check fault.
+        #
+        # Only row 1 (Next.GT) is configuration-managed.  It may change with
+        # nextAfterSelfTestSlot, while row 0 remains the authenticated
+        # self-reference embedded in the canonical LUMP binary.
+        if _saved_cc > 1 and len(clist_gts) > 1:
             _clist_base_m = boot_entry_loc + actual_abstr_size - _saved_cc
             if 0 < _clist_base_m < total:
-                mem[_clist_base_m] = clist_gts[0] & 0xFFFFFFFF       # idx 0: memory-manager GT
-                if _saved_cc > 1 and len(clist_gts) > 1:
-                    mem[_clist_base_m + 1] = clist_gts[1] & 0xFFFFFFFF  # idx 1: Next.GT
+                mem[_clist_base_m + 1] = clist_gts[1] & 0xFFFFFFFF  # idx 1: Next.GT
         write_ns_entry(mem, total, NS_ENTRY_WORDS, BOOT_ABSTR_NS_SLOT,
                        boot_entry_loc, entry_cr_limit, 0, 0, 1, 0, _saved_cc,
                        _abstr_cache_token)

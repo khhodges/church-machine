@@ -455,9 +455,18 @@ def test_boot_image_next_gt_is_serialized(tmp_path, next_slot, expected_clist1_s
     ns_base  = total - (BOOT_ABSTR_NS_SLOT + 1) * NS_ENTRY_WORDS
     boot_loc = words[ns_base]
 
-    # c-list starts at boot_loc + LUMP_SIZE - CC; index 1 is the Next.GT.
+    # c-list starts at boot_loc + LUMP_SIZE - CC. Row 0 is SelfTest's
+    # immutable E-GT for the in-program CR0/CR1 EXACT check; row 1 is Next.GT.
     clist_base = boot_loc + LUMP_SIZE - CC
+    clist_0    = words[clist_base]
     clist_1    = words[clist_base + 1]
+
+    expected_self_gt = create_gt(0, BOOT_ABSTR_NS_SLOT, {"E": 1}, 1) & 0xFFFFFFFF
+    assert clist_0 == expected_self_gt, (
+        f"c-list[0] in boot image = 0x{clist_0:08X}; "
+        f"expected immutable SelfTest E-GT = 0x{expected_self_gt:08X}. "
+        "SelfTest loads this row into CR1 before TPERM EXACT CR0, CR1."
+    )
 
     # Expected: Inform E-GT targeting expected_clist1_slot, constructed the
     # same way boot_image.py does it (avoids hardcoding the bit pattern).
