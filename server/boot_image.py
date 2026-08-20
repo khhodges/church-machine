@@ -715,6 +715,8 @@ def find_lump_file_by_abstraction(lumps_dir, abstraction_name, ns_slot):
         for _e in _entries if isinstance(_entries, list) else []:
             if not isinstance(_e, dict):
                 continue
+            if _e.get("archived"):
+                continue
             if _e.get("abstraction") != abstraction_name:
                 continue
             if _e.get("ns_slot") != ns_slot:
@@ -928,6 +930,8 @@ def _load_ns_state_token_map(lumps_dir):
             with open(_mf) as _mf_f:
                 _entries = json.load(_mf_f)
             for _e in (_entries if isinstance(_entries, list) else []):
+                if _e.get("archived"):
+                    continue
                 _n = _e.get("abstraction")
                 _t = _e.get("token")
                 _s = _e.get("ns_slot")
@@ -971,6 +975,8 @@ def _load_catalog_token_map(manifest_path):
     except Exception:
         entries = []
     for e in entries if isinstance(entries, list) else []:
+        if e.get("archived"):
+            continue
         slot = e.get("ns_slot")
         tok  = e.get("token")
         if isinstance(slot, int) and isinstance(tok, str):
@@ -1018,6 +1024,7 @@ def _load_trusted_cache_token_map(manifest_path):
             continue
         matches = [
             e for e in entries if isinstance(e, dict)
+            and not e.get("archived")
             and str(e.get("token", "")).lower() == token
             and e.get("dot_name")
         ]
@@ -1057,7 +1064,7 @@ def _load_boot_resident_entries(manifest_path):
         return []
     out = []
     for e in entries if isinstance(entries, list) else []:
-        if not e.get("boot_resident"):
+        if e.get("archived") or not e.get("boot_resident"):
             continue
         slot = e.get("ns_slot")
         tok  = e.get("token")

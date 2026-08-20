@@ -20,6 +20,8 @@
 //   T205 — Sequential resets: bootEntrySlot tracks sim.bootEntrySlot across
 //           three consecutive sync calls (order-dependent state regression).
 //   T206 — Null sim guard: _syncBootEntryFromSim is safe when sim is null.
+//   T209 — a fresh browser session always defaults to SelfTest (slot 6), rather
+//           than reviving a previous lightning-bolt selection from localStorage.
 
 const vm   = require('vm');
 const fs   = require('fs');
@@ -413,6 +415,16 @@ console.log('\n--- T208: acceptance state gated on loadBootImage() verdict ---')
     const verdict = sim.loadBootImage(staleWords.buffer);
     check('T208e: loadBootImage() returns false for an image without the format tag',
         verdict === false);
+}
+
+// ── T209: a new IDE session starts at the canonical SelfTest entry ────────────
+console.log('\n--- T209: fresh browser session defaults to SelfTest ---');
+{
+    const memSrc = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');
+    check('T209a: browser startup initializes bootEntrySlot to SelfTest slot 6',
+        /let bootEntrySlot\s*=\s*6\s*;/.test(memSrc));
+    check('T209b: browser startup clears any stale persisted boot-entry selection',
+        /localStorage\.removeItem\(['"]bootEntrySlot['"]\)/.test(memSrc));
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────

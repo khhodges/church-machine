@@ -71,6 +71,7 @@
       "slot": 6,
       "location": "0x00000200",
       "type": "Inform",
+      "boot": true,
       "f": 0,
       "g": 0,
       "limit": "0x001FD",
@@ -119,8 +120,7 @@
       "g": 0,
       "limit": "0x0003F",
       "seq": 0,
-      "seal": "0x0CD0",
-      "boot": true
+      "seal": "0x0CD0"
     },
     {
       "name": "SlideRule",

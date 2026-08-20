@@ -4653,7 +4653,12 @@ function _closeCRDetailMenuOnce() {
 
 let selectedAbsIndex = null;
 let absCollapsedLayers = {};
-let bootEntrySlot = (() => { const s = parseInt(localStorage.getItem('bootEntrySlot'), 10); return Number.isFinite(s) ? Math.max(0, Math.min(255, s)) : 6; })();
+// A fresh IDE session always starts with the architectural Boot.Abstr:
+// SelfTest at slot 6.  The lightning bolt can select another entry for the
+// current session, while a deliberately generated boot image may still carry
+// its own explicit non-default entry.
+let bootEntrySlot = 6;
+try { localStorage.removeItem('bootEntrySlot'); } catch (_e) {}
 let userMethodData = {};
 let userMethodLists = {};
 

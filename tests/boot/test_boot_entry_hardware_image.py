@@ -13,6 +13,7 @@ The Wukong board's boot ROM runs whatever E-GT sits in Thread.caps[0]
      this is the gate /api/boot-image/send-to-hardware uses to reject
      non-resident images before they reach the board.
 """
+import json
 import os
 import struct
 import sys
@@ -73,6 +74,30 @@ def _reissue_boot_entry(image, slot, seq):
         seq, slot, {"E": 1}, 1
     )
     return struct.pack(f"<{total}I", *words)
+
+
+def _capabilitytest_manifest_body():
+    """Load the one manifest-designated CapabilityTest body for slot 10."""
+    with open(os.path.join(LUMPS_DIR, "manifest.json"), "r") as f:
+        entries = json.load(f)
+    matches = [
+        entry for entry in entries
+        if isinstance(entry, dict)
+        and not entry.get("archived")
+        and entry.get("abstraction") == "CapabilityTest"
+        and entry.get("ns_slot") == 10
+        and entry.get("boot_resident") is True
+    ]
+    assert len(matches) == 1, (
+        "manifest.json must define exactly one boot-resident CapabilityTest "
+        f"at slot 10; found {len(matches)}"
+    )
+    filename = matches[0].get("filename")
+    assert isinstance(filename, str) and filename
+    with open(os.path.join(LUMPS_DIR, filename), "rb") as f:
+        raw = f.read()
+    assert len(raw) % 4 == 0
+    return list(struct.unpack(f">{len(raw) // 4}I", raw))
 
 
 @pytest.mark.parametrize("slot", [6, 7])
@@ -152,6 +177,7 @@ def test_wukong_projection_keeps_capabilitytest_body_and_clist():
     )
     projected, info = build_wukong_upload_image(generic)
     words = _unpack_words(projected)
+    expected_body = _capabilitytest_manifest_body()
     forward_ns_base = 10 * NS_ENTRY_WORDS
     body_base = WUKONG_UPLOAD_BODY_BASE_WORD
 
@@ -161,16 +187,14 @@ def test_wukong_projection_keeps_capabilitytest_body_and_clist():
     assert info["resident"] is True
     assert info["caps0_ok"] is True
     assert words[forward_ns_base] == body_base * 4
-    assert words[body_base] == 0xF8005C05
+    assert words[body_base:body_base + len(expected_body)] == expected_body
     assert ((words[body_base] >> 27) & 0x1F) == 0x1F
-    assert ((words[body_base] >> 10) & 0x1FFF) == 23
-    assert words[body_base + 59:body_base + 64] == [
-        0x4A000006,  # SelfTest E
-        0x32000003,  # LED RW
-        0x32000002,  # UART RW
-        0x12000004,  # BTN R
-        0x32000005,  # TIMER RW
-    ]
+    assert ((words[body_base] >> 10) & 0x1FFF) == (
+        (expected_body[0] >> 10) & 0x1FFF
+    )
+    expected_cc = expected_body[0] & 0xFF
+    assert words[body_base + len(expected_body) - expected_cc:
+                 body_base + len(expected_body)] == expected_body[-expected_cc:]
     # Wukong's fixed Boot.Thread lives at word 896 and dispatches from caps[0].
     assert words[896 + THREAD_CAPS_OFFSET] == create_gt(0, 10, {"E": 1}, 1)
 

@@ -231,13 +231,12 @@ def test_boot_image_loads_and_boots(cfg, skip_window, expected_ns_count):
 # ---- Task #2867: CapabilityTest boot-entry residency + boot ----------------
 #
 # Selecting CapabilityTest (NS slot 10) as the boot entry must produce an
-# image whose slot-10 body is the REAL 23-word program with 5 declared
+# image whose slot-10 body is the current boot-resident program with its
+# declared capabilities — never a synthetic header over zero words — and the simulator
 # capabilities — never a synthetic header over zero words — and the simulator
 # must boot it to completion with CR14 pointing at slot 10.
 
 CAPTEST_SLOT = 10
-CAPTEST_CW   = 23
-CAPTEST_CC   = 5
 
 
 def _saved_project_cfg():
@@ -257,14 +256,39 @@ def _saved_project_cfg():
     }
 
 
-def _slot_body(image_bytes, slot):
-    """Return (location, body_words[64]) for an NS slot in an image."""
+def _capabilitytest_manifest_body():
+    """Return the one authoritative boot-resident CapabilityTest record/body."""
+    with open(os.path.join(LUMPS_DIR, "manifest.json"), "r") as f:
+        entries = json.load(f)
+    matches = [
+        entry for entry in entries
+        if isinstance(entry, dict)
+        and not entry.get("archived")
+        and entry.get("abstraction") == "CapabilityTest"
+        and entry.get("ns_slot") == CAPTEST_SLOT
+    ]
+    assert len(matches) == 1, (
+        "manifest.json must contain exactly one authoritative CapabilityTest "
+        f"entry for slot {CAPTEST_SLOT}; found {len(matches)}"
+    )
+    entry = matches[0]
+    assert entry.get("boot_resident") is True
+    filename = entry.get("filename")
+    assert isinstance(filename, str) and filename
+    with open(os.path.join(LUMPS_DIR, filename), "rb") as f:
+        raw = f.read()
+    assert len(raw) % 4 == 0
+    return entry, struct.unpack(f">{len(raw) // 4}I", raw)
+
+
+def _slot_body(image_bytes, slot, body_words=64):
+    """Return a requested number of body words from an NS slot in an image."""
     import struct
     n = len(image_bytes) // 4
     words = struct.unpack(f"<{n}I", image_bytes)
     base = n - (slot + 1) * 4          # inverted NS layout, 4 words/slot
     loc = words[base]
-    return loc, words[loc:loc + 64]
+    return loc, words[loc:loc + body_words]
 
 
 def _reissue_boot_entry(image_bytes, slot, seq):
@@ -280,24 +304,27 @@ def _reissue_boot_entry(image_bytes, slot, seq):
 def test_capabilitytest_image_payload_integrity():
     """Generated image embeds CapabilityTest's real body at slot 10."""
     cfg = _saved_project_cfg()
+    _, expected_body = _capabilitytest_manifest_body()
     image = generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=CAPTEST_SLOT)
-    loc, body = _slot_body(image, CAPTEST_SLOT)
+    loc, body = _slot_body(image, CAPTEST_SLOT, len(expected_body))
     assert loc > 0, "slot 10 has no allocated location"
     hdr = body[0]
     assert (hdr >> 27) == 0x1F, f"slot 10 header magic invalid: 0x{hdr:08X}"
     cw = (hdr >> 10) & 0x1FFF
     cc = hdr & 0xFF
-    assert cw == CAPTEST_CW, f"slot 10 cw={cw}, expected {CAPTEST_CW}"
-    assert cc == CAPTEST_CC, f"slot 10 cc={cc}, expected {CAPTEST_CC}"
+    assert body == expected_body, (
+        "slot 10 body differs from the authoritative boot-resident "
+        "CapabilityTest binary"
+    )
     # The code region must be real instructions, not a zero-filled placeholder.
-    code = body[1:1 + CAPTEST_CW]
+    code = body[1:1 + cw]
     nonzero = sum(1 for wv in code if wv != 0)
-    assert nonzero >= CAPTEST_CW - 1, (
-        f"slot 10 code region is mostly zeros ({nonzero}/{CAPTEST_CW} non-zero) — "
+    assert nonzero >= cw - 1, (
+        f"slot 10 code region is mostly zeros ({nonzero}/{cw} non-zero) — "
         f"placeholder body instead of the real CapabilityTest program"
     )
-    # All 5 declared capabilities present at the lump tail.
-    clist = body[64 - CAPTEST_CC:64]
+    # Every declared capability must be present at the lump tail.
+    clist = body[len(body) - cc:]
     assert all(gv != 0 for gv in clist), (
         f"slot 10 c-list has zero entries: {[hex(gv) for gv in clist]}"
     )
@@ -351,9 +378,13 @@ def test_capabilitytest_manifest_boot_resident():
     with open(os.path.join(LUMPS_DIR, "manifest.json")) as f:
         entries = json.load(f)
     matches = [e for e in entries if isinstance(e, dict)
+               and not e.get("archived")
                and e.get("abstraction") == "CapabilityTest"
                and e.get("ns_slot") == CAPTEST_SLOT]
-    assert matches, "CapabilityTest slot-10 entry missing from manifest.json"
+    assert len(matches) == 1, (
+        "manifest.json must contain exactly one CapabilityTest slot-10 entry; "
+        f"found {len(matches)}"
+    )
     assert matches[0].get("boot_resident") is True, (
         "CapabilityTest manifest entry must carry boot_resident=true so "
         "generate_boot_image embeds its real body at slot 10"
@@ -373,21 +404,24 @@ def test_served_boot_image_carries_capabilitytest_body(tmp_path):
     """
     from server.boot_image import validate_boot_image
     cfg = _saved_project_cfg()
+    _, expected_body = _capabilitytest_manifest_body()
     image = generate_boot_image(cfg, LUMPS_DIR)   # default entry, as on regen
     path = tmp_path / "boot-image.bin"
     path.write_bytes(image)
     served = path.read_bytes()
     # Accepted by the format/mandatory-slot validator (rejects obsolete images).
     validate_boot_image(served)
-    loc, body = _slot_body(served, CAPTEST_SLOT)
+    loc, body = _slot_body(served, CAPTEST_SLOT, len(expected_body))
     hdr = body[0]
-    assert (hdr >> 27) == 0x1F and ((hdr >> 10) & 0x1FFF) == CAPTEST_CW, (
+    expected_cw = (expected_body[0] >> 10) & 0x1FFF
+    assert (hdr >> 27) == 0x1F and ((hdr >> 10) & 0x1FFF) == expected_cw, (
         f"served image slot 10 header 0x{hdr:08X} is not the real "
-        f"CapabilityTest lump (expected magic=0x1F, cw={CAPTEST_CW}) — "
+        f"CapabilityTest lump (expected magic=0x1F, cw={expected_cw}) — "
         f"the manifest boot_resident flag regressed"
     )
-    nonzero = sum(1 for wv in body[1:1 + CAPTEST_CW] if wv != 0)
-    assert nonzero >= CAPTEST_CW - 1, (
+    assert body == expected_body
+    nonzero = sum(1 for wv in body[1:1 + expected_cw] if wv != 0)
+    assert nonzero >= expected_cw - 1, (
         "served image slot 10 code region is zero-filled — the manifest "
         "boot_resident flag regressed"
     )
