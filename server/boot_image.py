@@ -1078,8 +1078,10 @@ def _load_boot_resident_entries(manifest_path, selected_by_slot=None):
     selected = selected_by_slot or {}
     chosen = {}
     for slot, tok, filename, version in out:
-        if slot in selected and tok == selected[slot]:
-            chosen[slot] = (slot, tok, filename, int(version or 0))
+        if slot in selected:
+            if tok == selected[slot]:
+                chosen[slot] = (slot, tok, filename, int(version or 0))
+            continue
         elif slot not in chosen:
             chosen[slot] = (slot, tok, filename, int(version or 0))
         elif int(version or 0) >= chosen[slot][3]:

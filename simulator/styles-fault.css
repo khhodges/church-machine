@@ -1176,19 +1176,18 @@
 }
 
 .le-rl-boot-select {
-    background: rgba(218,165,32,0.08);
-    border: 1px solid rgba(218,165,32,0.40);
+    background: var(--bg-input);
+    border: 1px solid var(--border);
     border-radius: 4px;
-    color: var(--church-gold);
+    color: var(--text-primary);
     font-size: 0.82rem;
-    padding: 2px 6px;
+    padding: 0.25rem 0.5rem;
     cursor: pointer;
     max-width: 100%;
 }
 .le-rl-boot-select:focus {
     outline: none;
-    border-color: rgba(218,165,32,0.75);
-    box-shadow: 0 0 0 2px rgba(218,165,32,0.15);
+    border-color: rgba(218,165,32,0.5);
 }
 .le-rl-boot-select option {
     background: var(--bg-input, #171722);

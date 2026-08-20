@@ -1311,7 +1311,12 @@ def _validate_step2(step2, step1, target_board):
     token_err = _validate_step2_lump_tokens(step2)
     if token_err:
         return token_err
-    catalog = {e["nsSlot"]: e for e in _load_lump_catalog(_step2_selected_tokens(step2))}
+    selected_tokens = _step2_selected_tokens(step2)
+    catalog_entries = (
+        _load_lump_catalog(selected_tokens)
+        if selected_tokens else _load_lump_catalog()
+    )
+    catalog = {e["nsSlot"]: e for e in catalog_entries}
     _ns_slots_max_v2 = int(step1.get("nsSlotsMax") or _boot_image_gen.DEFAULT_NS_SLOTS_MAX)
     NS_TABLE_RESERVE = _boot_image_gen.ns_table_reserve_words(_ns_slots_max_v2)
     total = step1["totalNamespaceWords"]
