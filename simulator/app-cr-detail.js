@@ -48,6 +48,15 @@ function _showAsmAdvisoryPopup(entry, isWarning, anchorX, anchorY) {
             + '</div>';
     }
 
+    // Keep the pet-name syntax visible from every assembler error. Errors
+    // commonly come from using a friendly name in the wrong place, and the
+    // editor's C-List names are otherwise easy to confuse with dot-notation.
+    var petNameHelpHtml = '<div class="asm-advisory-popup-petname-help">'
+        + '<div class="asm-advisory-popup-sugg-title">&#x1F3F7; Pet names in instructions</div>'
+        + '<div class="asm-advisory-popup-sugg-body">Define a register alias with .pet, then use that alias anywhere the matching CR or DR register is expected.</div>'
+        + '<pre class="asm-advisory-popup-sugg-code">.pet SelfTest CR0\nLOAD   CR2, SelfTest\nTPERM  SelfTest, EXACT\n\n; .pet alias &lt;register&gt;</pre>'
+        + '</div>';
+
     var footerHtml = '';
     if (entry.line != null && !isNaN(entry.line)) {
         footerHtml = '<div class="asm-advisory-popup-footer">'
@@ -55,7 +64,7 @@ function _showAsmAdvisoryPopup(entry, isWarning, anchorX, anchorY) {
             + '</div>';
     }
 
-    popup.innerHTML = headerHtml + suggHtml + footerHtml;
+    popup.innerHTML = headerHtml + suggHtml + petNameHelpHtml + footerHtml;
     document.body.appendChild(popup);
 
     var vpW = window.innerWidth, vpH = window.innerHeight;

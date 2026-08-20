@@ -194,6 +194,14 @@
     gap: 0.2rem;
 }
 
+.asm-advisory-popup-petname-help {
+    margin-top: 0.1rem;
+    padding: 0.4rem 0.55rem;
+    background: rgba(62, 201, 201, 0.07);
+    border: 1px solid rgba(62, 201, 201, 0.24);
+    border-left: 3px solid rgba(62, 201, 201, 0.7);
+}
+
 .asm-advisory-popup-sugg-title {
     font-family: system-ui, sans-serif;
     font-size: 0.72rem;
