@@ -64,6 +64,10 @@ function nextTurn() {
         popup.querySelector('.clist-row[data-slot="0"] .clist-name').textContent);
     check('CLD-3: row 0 has no delete button',
         popup.querySelector('[data-action="delete-capability"][data-slot="0"]') === null);
+    const beforeSelfClick = editor.value;
+    popup.querySelector('.clist-row[data-slot="0"] .clist-self-name').click();
+    check('CLD-3b: clicking SELF does not modify the editor',
+        editor.value === beforeSelfClick && inputEvents === 0, editor.value);
 
     const deleteCR1 = popup.querySelector('[data-action="delete-capability"][data-slot="1"]');
     check('CLD-4: CR1 has a delete button', !!deleteCR1);

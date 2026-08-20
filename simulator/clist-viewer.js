@@ -166,6 +166,12 @@
             var row = e.target.closest('.clist-row[data-slot]');
             if (!row) return;
             var slotIdx = parseInt(row.dataset.slot, 10);
+            // SELF is a compiler-owned display row, not a user capability
+            // operand. Clicking its name must never write into the editor.
+            if (slotIdx === 0 && row.querySelector('.clist-self-name')) {
+                e.stopPropagation();
+                return;
+            }
             if (row.classList.contains('clist-row--null')) {
                 _editPetName(row, slotIdx);
                 return;

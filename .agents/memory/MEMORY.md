@@ -132,3 +132,4 @@
 - [C-List source-row indexing](clist-source-row-indexing.md) — compiler-owned CR0 is synthetic; source capability rows start at CR1 and delete by source index
 - [Draft banner placement](draft-banner-placement.md) — recovery banners must be siblings above the editor, never children of the code-editor flex row
 - [Capability picker version selection](capability-picker-version-selection.md) — show one latest eligible LUMP per abstraction by default; place older versions behind an explicit disclosure
+- [SELF row click safety](self-row-click-safety.md) — compiler-owned SELF is display-only in the C-List and must never write an operand into the editor
