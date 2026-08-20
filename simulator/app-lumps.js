@@ -1564,6 +1564,8 @@ function exitSavedLumpEditorMode() {
             var banner = document.getElementById(id);
             if (banner) banner.remove();
         });
+    var _draftEditor = document.getElementById('asmEditor');
+    if (_draftEditor) _draftEditor.classList.remove('cm-editor-draft');
     if (window._editorLumpDirtyListener && window._editorLumpDirtyListenerEl) {
         window._editorLumpDirtyListenerEl.removeEventListener(
             'input', window._editorLumpDirtyListener);
@@ -5134,6 +5136,7 @@ async function openLumpInEditor(token) {
         if (_hasDraft) {
             // Restore draft content into editor
             asmEd.value = _savedDraft;
+            asmEd.classList.add('cm-editor-draft');
             // Show draft-restore banner above the editor
             var _existingDraftBanner = document.getElementById('_lumpDraftBanner');
             if (_existingDraftBanner) _existingDraftBanner.remove();
@@ -5144,12 +5147,16 @@ async function openLumpInEditor(token) {
                 '<strong>Draft restored</strong>' +
                 '<span class="lump-draft-copy">Your previous edits are back in the editor, but are not saved to this LUMP yet. Use <b>Save Lump</b> to keep them, or </span>' +
                 '<button class="btn btn-sm lump-draft-discard-btn" id="_lumpDraftBannerDiscard">Discard Draft</button>';
-            if (asmEd.parentNode) asmEd.parentNode.insertBefore(_draftBanner, asmEd);
+            // Insert above the code-editor-wrap, not inside its flex row;
+            // inserting into asmEd.parentNode can cover the recovered text.
+            var _draftBannerParent = asmEd.parentNode && asmEd.parentNode.parentNode;
+            if (_draftBannerParent) _draftBannerParent.insertBefore(_draftBanner, asmEd.parentNode);
             var _bannerDiscardBtn = _draftBanner.querySelector('#_lumpDraftBannerDiscard');
             if (_bannerDiscardBtn) {
                 _bannerDiscardBtn.addEventListener('click', function() {
                     _draftLsDel(token);
                     asmEd.value = window._editorOriginalDisasm || '';
+                    asmEd.classList.remove('cm-editor-draft');
                     _draftBanner.remove();
                     if (typeof updateLineNumbers === 'function') updateLineNumbers();
                 });
@@ -5157,6 +5164,7 @@ async function openLumpInEditor(token) {
         } else {
             // No draft — show recovered source only; disassembly stays on right.
             asmEd.value = _recoveredSource;
+            asmEd.classList.remove('cm-editor-draft');
             // Show "source restored" banner when original source was fetched
             if (_sourceRestored) {
                 var _existingSourceBanner = document.getElementById('_lumpSourceRestoredBanner');
@@ -5230,6 +5238,7 @@ async function openLumpInEditor(token) {
         var _ed = document.getElementById('asmEditor');
         if (_ed) {
             _ed.value = window._editorOriginalDisasm || '';
+            _ed.classList.remove('cm-editor-draft');
             if (typeof updateLineNumbers === 'function') updateLineNumbers();
         }
         // Detach dirty listener
