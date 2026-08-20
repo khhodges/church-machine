@@ -206,6 +206,54 @@ const BuildApprovalView = {
         </div>`;
     },
 
+    _renderConsole(data) {
+        const wrap = document.getElementById('baConsole');
+        if (!wrap) return;
+        wrap.style.display = '';
+        const phase = String(data && data.phase || 'idle').toLowerCase();
+        const done = !!(data && data.done);
+        const failed = done && data.exit_code !== 0;
+        const phases = [
+            ['queued', 'Queued'],
+            ['launching', 'Connecting'],
+            ['running', 'Vivado running'],
+            [done && !failed ? 'complete' : 'failed', done && !failed ? 'Complete' : 'Result'],
+        ];
+        const rank = { idle: 0, queued: 0, launching: 1, running: 2, complete: 3, failed: 3 };
+        const current = rank[phase] == null ? 0 : rank[phase];
+        const phasesEl = document.getElementById('baConsolePhases');
+        if (phasesEl) {
+            phasesEl.innerHTML = phases.map((p, i) => {
+                let cls = i < current ? 'done' : (i === current ? 'active' : '');
+                if (failed && i === 3) cls = 'failed';
+                return `<span class="ba-console-phase ${cls}">${i < current && !failed ? '✓ ' : ''}${p[1]}</span>`;
+            }).join('');
+        }
+        const progress = document.getElementById('baConsoleProgress');
+        if (progress) progress.style.width = `${failed ? 100 : Math.min(100, [0, 8, 24, 76, 100][current] || 0)}%`;
+        const state = document.getElementById('baConsoleState');
+        if (state) state.textContent = failed ? `Failed (exit ${data.exit_code})` :
+            (done ? 'Complete' : (phase === 'running' ? 'Running' : phase === 'launching' ? 'Connecting' : 'Queued'));
+
+        const message = document.getElementById('baConsoleMessage');
+        if (!message) return;
+        const diagnosis = data && data.diagnosis;
+        if (failed && diagnosis) {
+            message.className = 'ba-console-message error';
+            message.innerHTML = `<b>What failed:</b> ${this._esc(diagnosis.what_failed)}` +
+                (diagnosis.phase ? ` <span>(phase: ${this._esc(diagnosis.phase)})</span>` : '') +
+                `<span class="ba-next"><b>Next:</b> ${this._esc(diagnosis.next_action)}</span>`;
+        } else if (done) {
+            message.className = 'ba-console-message';
+            message.innerHTML = '<b>Build complete.</b> Download the generated bitstream from the Connect tab.';
+        } else {
+            const log = (data && (data.log_tail || data.log)) || [];
+            const last = log.length ? log[log.length - 1] : 'Waiting for the remote build…';
+            message.className = 'ba-console-message';
+            message.innerHTML = `<b>${this._esc(phase === 'running' ? 'Vivado:' : 'Build:')}</b> ${this._esc(last)}`;
+        }
+    },
+
     _allChecksPass() {
         // Only hardware-relevant tiers gate Freeze/Approve.
         // Lazy/dynamic slots are fetched at runtime and don't affect the bitstream —
@@ -282,6 +330,7 @@ const BuildApprovalView = {
         const btn = document.getElementById('baApproveBtn');
         if (btn) btn.disabled = true;
         this._buildRunning = true;
+        this._renderConsole({ phase: 'queued', done: false, log_tail: ['Build queued…'] });
         const logEl = document.getElementById('baBuildLog');
         const logWrap = document.getElementById('baBuildLogWrap');
         if (logWrap) logWrap.style.display = '';
@@ -296,10 +345,21 @@ const BuildApprovalView = {
             });
             const data = await res.json();
             if (!res.ok || !data.ok) throw new Error(data.error || 'HTTP ' + res.status);
+            this._renderConsole({ phase: 'launching', done: false, log_tail: ['Remote build accepted; connecting…'] });
             if (statusEl) statusEl.textContent = 'Build running… (~22 min)';
             this._startBuildPoll();
         } catch (e) {
             if (logEl) logEl.textContent += '❌ Failed to start: ' + e.message + '\n';
+            this._renderConsole({
+                phase: 'failed',
+                done: true,
+                exit_code: null,
+                diagnosis: {
+                    phase: 'launch',
+                    what_failed: 'The build could not be started.',
+                    next_action: e.message || 'Check the build token, approval snapshot, and remote build configuration.',
+                },
+            });
             if (statusEl) { statusEl.textContent = 'Build failed to start'; statusEl.className = 'ba-build-status ba-build-bad'; }
             this._buildRunning = false;
             this._updateApproveBtn();
@@ -324,6 +384,7 @@ const BuildApprovalView = {
             });
             if (!res.ok) return;
             const data = await res.json();
+            this._renderConsole(data);
             const logEl = document.getElementById('baBuildLog');
             const statusEl = document.getElementById('baBuildStatus');
             if (logEl && data.log) {

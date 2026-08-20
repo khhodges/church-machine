@@ -199,6 +199,22 @@
         .ba-build-log-wrap { margin-top:1.2rem; border:1px solid #2a2a4a; border-radius:6px; overflow:hidden; }
         .ba-build-log-header { display:flex; align-items:center; justify-content:space-between; padding:0.4rem 0.8rem; background:#12121f; font-size:0.8rem; color:#888; border-bottom:1px solid #2a2a4a; }
         .ba-build-log { background:#08080f; color:#c8c8e0; font-family:'Courier New',monospace; font-size:0.73rem; padding:0.7rem 0.9rem; margin:0; max-height:320px; overflow-y:auto; white-space:pre-wrap; word-break:break-all; }
+        .ba-console { margin-top:1.2rem; border:1px solid #2a2a4a; border-radius:6px; overflow:hidden; background:#0d0d18; }
+        .ba-console-header { display:flex; align-items:center; justify-content:space-between; gap:0.8rem; padding:0.55rem 0.8rem; background:#151526; border-bottom:1px solid #2a2a4a; }
+        .ba-console-title { color:#e6e6f5; font-size:0.82rem; font-weight:700; }
+        .ba-console-state { font-size:0.75rem; color:#a5b4fc; }
+        .ba-console-progress { height:4px; background:#222238; }
+        .ba-console-progress-fill { height:100%; width:0%; background:#818cf8; transition:width .25s ease; }
+        .ba-console-phases { display:grid; grid-template-columns:repeat(4,1fr); gap:0.45rem; padding:0.7rem 0.8rem 0.45rem; }
+        .ba-console-phase { padding:0.42rem 0.5rem; border:1px solid #30304b; border-radius:4px; color:#777994; font-size:0.72rem; text-align:center; }
+        .ba-console-phase.active { border-color:#818cf8; color:#c7d2fe; background:#1c1c38; }
+        .ba-console-phase.done { border-color:#35664b; color:#86efac; }
+        .ba-console-phase.failed { border-color:#7f3030; color:#fca5a5; background:#271414; }
+        .ba-console-message { margin:0 0.8rem 0.7rem; padding:0.6rem 0.7rem; border-radius:4px; background:#111121; color:#c8c8e0; font-size:0.78rem; line-height:1.4; }
+        .ba-console-message.error { background:#291616; color:#fecaca; border:1px solid #7f3030; }
+        .ba-console-message b { color:#fff; }
+        .ba-console-message .ba-next { display:block; margin-top:0.25rem; color:#fde68a; }
+        @media (max-width:700px) { .ba-console-phases { grid-template-columns:repeat(2,1fr); } }
         .ba-build-status { font-size:0.78rem; font-weight:600; }
         .ba-build-running { color:#daa520; }
         .ba-build-ok      { color:#3fb950; }
@@ -1253,6 +1269,15 @@
             </div>
             <div id="baMapBody" class="ba-map-body">
                 <div class="ba-loading">Select the &#x1F528; Build tab to load NS map&hellip;</div>
+            </div>
+            <div id="baConsole" class="ba-console" style="display:none;">
+                <div class="ba-console-header">
+                    <span class="ba-console-title">&#x1F4DF; Build console</span>
+                    <span id="baConsoleState" class="ba-console-state">Idle</span>
+                </div>
+                <div class="ba-console-progress"><div id="baConsoleProgress" class="ba-console-progress-fill"></div></div>
+                <div id="baConsolePhases" class="ba-console-phases"></div>
+                <div id="baConsoleMessage" class="ba-console-message">Start a build to see live phases and messages.</div>
             </div>
             <div id="baBuildLogWrap" class="ba-build-log-wrap" style="display:none;">
                 <div class="ba-build-log-header">
