@@ -1764,8 +1764,8 @@ function switchView(viewId) {
     if (el) el.classList.add('active');
 
     document.querySelectorAll('.ham-item').forEach(btn => btn.classList.remove('ham-active'));
-    const activeHamItem = document.getElementById('hamItem-' + viewId);
-    if (activeHamItem) activeHamItem.classList.add('ham-active');
+    document.querySelectorAll('.ham-item[data-view="' + viewId + '"], #hamItem-' + viewId)
+        .forEach(btn => btn.classList.add('ham-active'));
 
     if (viewId === 'dashboard') { restoreAutoBootPref(); updateDashboard(); }
     if (viewId === 'github') loadGitHubCommunity();
