@@ -1,0 +1,1102 @@
+{
+  "frozen_at": "20260820T200711Z",
+  "all_checks_pass": true,
+  "ns_map": {
+    "tiers": {
+      "bootstrap": [
+        {
+          "slot": 0,
+          "name": "Boot.NS",
+          "token": null,
+          "header_word": null,
+          "cw": null,
+          "cc": null,
+          "location": "0x1FC00",
+          "perms": [
+            "R",
+            "W"
+          ],
+          "source": "BRAM (boot ROM)",
+          "checks": [
+            {
+              "label": "BRAM",
+              "ok": true,
+              "detail": "Baked into BRAM at NS_TABLE_BASE"
+            }
+          ]
+        },
+        {
+          "slot": 1,
+          "name": "Boot.Thread",
+          "token": null,
+          "header_word": null,
+          "cw": null,
+          "cc": null,
+          "location": "0xe00",
+          "perms": [
+            "R",
+            "W"
+          ],
+          "source": "BRAM (boot ROM)",
+          "checks": [
+            {
+              "label": "BRAM",
+              "ok": true,
+              "detail": "Thread lump baked into BRAM"
+            }
+          ]
+        }
+      ],
+      "resident": [
+        {
+          "slot": 2,
+          "name": "UART_DEV",
+          "token": null,
+          "header_word": "MMIO",
+          "cw": null,
+          "cc": null,
+          "location": "0x40000014",
+          "perms": [
+            "R",
+            "W"
+          ],
+          "source": "boot ROM",
+          "checks": [
+            {
+              "label": "MMIO",
+              "ok": true,
+              "detail": "MMIO at 0x40000014"
+            }
+          ]
+        },
+        {
+          "slot": 3,
+          "name": "LED_DEV",
+          "token": null,
+          "header_word": "MMIO",
+          "cw": null,
+          "cc": null,
+          "location": "0x40000000",
+          "perms": [
+            "R",
+            "W"
+          ],
+          "source": "boot ROM",
+          "checks": [
+            {
+              "label": "MMIO",
+              "ok": true,
+              "detail": "MMIO at 0x40000000"
+            }
+          ]
+        },
+        {
+          "slot": 4,
+          "name": "BTN_DEV",
+          "token": null,
+          "header_word": "MMIO",
+          "cw": null,
+          "cc": null,
+          "location": "0x40000028",
+          "perms": [
+            "R"
+          ],
+          "source": "boot ROM",
+          "checks": [
+            {
+              "label": "MMIO",
+              "ok": true,
+              "detail": "MMIO at 0x40000028"
+            }
+          ]
+        },
+        {
+          "slot": 5,
+          "name": "TIMER_DEV",
+          "token": null,
+          "header_word": "MMIO",
+          "cw": null,
+          "cc": null,
+          "location": "0x4000002C",
+          "perms": [
+            "R",
+            "W"
+          ],
+          "source": "boot ROM",
+          "checks": [
+            {
+              "label": "MMIO",
+              "ok": true,
+              "detail": "MMIO at 0x4000002C"
+            }
+          ]
+        },
+        {
+          "slot": 6,
+          "name": "SelfTest \u26a1",
+          "token": "00000600",
+          "header_word": "0xF9868002",
+          "cw": 416,
+          "cc": 2,
+          "location": "0x0600",
+          "perms": [
+            "E"
+          ],
+          "source": "server/lumps",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF9868002  cw=416 cc=2"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=416 cc=2 vs manifest cw=416 cc=2"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=2051c9560df786315a34c85da4143a8a"
+            },
+            {
+              "label": "name parity",
+              "ok": true,
+              "detail": "manifest=\"SelfTest\" sidecar=\"SelfTest\""
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='00000600' file='00000600'"
+            },
+            {
+              "label": "BRANCH opcode",
+              "ok": true,
+              "warn": false,
+              "detail": "terminal opcode=23 (BRANCH \u2705) at word[416]; 0xBF007E61"
+            },
+            {
+              "label": "SelfTest E-GT",
+              "ok": true,
+              "detail": "c-list[0]=0x4A000006 expected=0x4A000006 \u2705 matches boot_rom"
+            },
+            {
+              "label": "overlap",
+              "ok": true,
+              "detail": "No byte-range overlap with other resident slots"
+            }
+          ]
+        },
+        {
+          "slot": 7,
+          "name": "WukongCallHome",
+          "token": "8f7520e5",
+          "header_word": "0xF9812803",
+          "cw": 74,
+          "cc": 3,
+          "location": "0x1200",
+          "perms": [
+            "E"
+          ],
+          "source": "server/lumps",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF9812803  cw=74 cc=3"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=74 cc=3 vs manifest cw=74 cc=3"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=587214c20b76e7fcfa8785f02f4a7348"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='8f7520e5' file='8f7520e5'"
+            },
+            {
+              "label": "overlap",
+              "ok": true,
+              "detail": "No byte-range overlap with other resident slots"
+            }
+          ]
+        }
+      ],
+      "lazy": [
+        {
+          "slot": 9,
+          "name": "Constants",
+          "token": "00001200",
+          "header_word": "0xF8005C02",
+          "cw": 23,
+          "cc": 2,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (lazy)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF8005C02  cw=23 cc=2"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=23 cc=2 vs manifest cw=23 cc=2"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=7351417e55331d24f247801115c9f667"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='00001200' file='00001200'"
+            }
+          ]
+        },
+        {
+          "slot": 10,
+          "name": "CapabilityTest",
+          "token": "9ce28c0b",
+          "header_word": "0xF9805405",
+          "cw": 21,
+          "cc": 5,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (lazy)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF9805405  cw=21 cc=5"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=21 cc=5 vs manifest cw=21 cc=5"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=37e60503583bb9f40ad419aa16b65dfe"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='9ce28c0b' file='9ce28c0b'"
+            }
+          ]
+        },
+        {
+          "slot": 16,
+          "name": "SlideRule.Haskell",
+          "token": "00001001",
+          "header_word": "0xF9022401",
+          "cw": 137,
+          "cc": 1,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (lazy)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF9022401  cw=137 cc=1"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=137 cc=1 vs manifest cw=137 cc=1"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=13b21c321f76a76d09193b64405b04d6"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='00001001' file='00001001'"
+            }
+          ]
+        },
+        {
+          "slot": 22,
+          "name": "Tunnel",
+          "token": "00001f00",
+          "header_word": "0xF8009401",
+          "cw": 37,
+          "cc": 1,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (lazy)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF8009401  cw=37 cc=1"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=37 cc=1 vs manifest cw=37 cc=1"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=bf828b526cdef557f8ed743dcadac8e3"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='00001f00' file='00001f00'"
+            }
+          ]
+        },
+        {
+          "slot": 23,
+          "name": "Keystone",
+          "token": "00002000",
+          "header_word": "0xF8005802",
+          "cw": 22,
+          "cc": 2,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (lazy)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF8005802  cw=22 cc=2"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=22 cc=2 vs manifest cw=22 cc=2"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=6f76cb2e96cbb0c69c095b5f35e28eb8"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='00002000' file='00002000'"
+            }
+          ]
+        },
+        {
+          "slot": 43,
+          "name": "EventRouter",
+          "token": "b3076308",
+          "header_word": "0xF8004C00",
+          "cw": 19,
+          "cc": 0,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (lazy)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF8004C00  cw=19 cc=0"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=19 cc=0 vs manifest cw=19 cc=0"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=e4bf04f230e2be9c66c29ef8f25e5e0a"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='b3076308' file='b3076308'"
+            }
+          ]
+        },
+        {
+          "slot": "(dynamic)",
+          "name": "WordString",
+          "token": "ab1e86af",
+          "header_word": "0xF9849800",
+          "cw": 294,
+          "cc": 0,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (dynamic)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF9849800  cw=294 cc=0"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=294 cc=0 vs manifest cw=294 cc=0"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=6bc645dc4121d8f3e3be6195fe7cb370"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='ab1e86af' file='ab1e86af'"
+            }
+          ]
+        },
+        {
+          "slot": "(dynamic)",
+          "name": "Ethernet",
+          "token": "b169bba4",
+          "header_word": "0xF8003401",
+          "cw": 13,
+          "cc": 1,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (dynamic)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF8003401  cw=13 cc=1"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=13 cc=1 vs manifest cw=13 cc=1"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=0010b7bfef5de195b225877e638f75bf"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='b169bba4' file='b169bba4'"
+            }
+          ]
+        },
+        {
+          "slot": "(dynamic)",
+          "name": "GT.Encoding.v1.1.Hardware.Self-Test",
+          "token": "cb8739cf",
+          "header_word": "0xF8006808",
+          "cw": 26,
+          "cc": 8,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (dynamic)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF8006808  cw=26 cc=8"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=26 cc=8 vs manifest cw=26 cc=8"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=76777aa970eb5e26e8f6d72cb609c4dd"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='cb8739cf' file='cb8739cf'"
+            }
+          ]
+        },
+        {
+          "slot": "(dynamic)",
+          "name": "Salvation",
+          "token": "ab3de4fd",
+          "header_word": "0xF9023400",
+          "cw": 141,
+          "cc": 0,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (dynamic)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF9023400  cw=141 cc=0"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=141 cc=0 vs manifest cw=141 cc=0"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=a9ee0d15ce07363725cf6226c58c5fa1"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='ab3de4fd' file='ab3de4fd'"
+            }
+          ]
+        },
+        {
+          "slot": "(dynamic)",
+          "name": "BernoulliNumbers",
+          "token": "5a93ce79",
+          "header_word": "0xF8003C01",
+          "cw": 15,
+          "cc": 1,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (dynamic)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF8003C01  cw=15 cc=1"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=15 cc=1 vs manifest cw=15 cc=1"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=a3f396d0ee43db5dc2e2ba7dc4d479c4"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='5a93ce79' file='5a93ce79'"
+            }
+          ]
+        },
+        {
+          "slot": "(dynamic)",
+          "name": "StringOps",
+          "token": "50ce4c64",
+          "header_word": "0xF984EC00",
+          "cw": 315,
+          "cc": 0,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (dynamic)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF984EC00  cw=315 cc=0"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=315 cc=0 vs manifest cw=315 cc=0"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=8a44e6173d5b46d2e58156a040921767"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='50ce4c64' file='50ce4c64'"
+            }
+          ]
+        },
+        {
+          "slot": "(dynamic)",
+          "name": "EnglishLoops",
+          "token": "d9454529",
+          "header_word": "0xF8008C00",
+          "cw": 35,
+          "cc": 0,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (dynamic)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF8008C00  cw=35 cc=0"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=35 cc=0 vs manifest cw=35 cc=0"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=ee79ff879b1c16598a9f7eabe4d2ff73"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='d9454529' file='d9454529'"
+            }
+          ]
+        },
+        {
+          "slot": "(dynamic)",
+          "name": "IntegerOps",
+          "token": "19d3e599",
+          "header_word": "0xF8005000",
+          "cw": 20,
+          "cc": 0,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (dynamic)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF8005000  cw=20 cc=0"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=20 cc=0 vs manifest cw=20 cc=0"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=0631937864fa76c62fba9cdaf48b898a"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='19d3e599' file='19d3e599'"
+            }
+          ]
+        },
+        {
+          "slot": "(dynamic)",
+          "name": "NoteG",
+          "token": "04a720f8",
+          "header_word": "0xF8009801",
+          "cw": 38,
+          "cc": 1,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (dynamic)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF8009801  cw=38 cc=1"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=38 cc=1 vs manifest cw=38 cc=1"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=2beaf9fae04e88fa091433828f49a97e"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='04a720f8' file='04a720f8'"
+            }
+          ]
+        },
+        {
+          "slot": "(dynamic)",
+          "name": "Human.Hand",
+          "token": "97cc8047",
+          "header_word": "0xF8001C01",
+          "cw": 7,
+          "cc": 1,
+          "location": null,
+          "perms": [],
+          "source": "manifest (dynamic)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF8001C01  cw=7 cc=1"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=7 cc=1 vs manifest cw=7 cc=1"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=5d424776dd5910065cee1d77d1c2aa58"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='97cc8047' file='97cc8047'"
+            }
+          ]
+        },
+        {
+          "slot": "(dynamic)",
+          "name": "Memory",
+          "token": "c3963aed",
+          "header_word": "0xF8004C00",
+          "cw": 19,
+          "cc": 0,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (dynamic)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF8004C00  cw=19 cc=0"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=19 cc=0 vs manifest cw=19 cc=0"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=c31f8cc72ab86289f51eda6fd3e832a7"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='c3963aed' file='c3963aed'"
+            }
+          ]
+        },
+        {
+          "slot": "(dynamic)",
+          "name": "Scheduler.IRQ",
+          "token": "00000800",
+          "header_word": "0xF8000400",
+          "cw": 1,
+          "cc": 0,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (dynamic)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF8000400  cw=1 cc=0"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=1 cc=0 vs manifest cw=1 cc=0"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=54dcec4d93651ed7be9704b5daf0ea5c"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='00000800' file='00000800'"
+            }
+          ]
+        },
+        {
+          "slot": "(dynamic)",
+          "name": "Loader",
+          "token": "00130000",
+          "header_word": "0xF8000401",
+          "cw": 1,
+          "cc": 1,
+          "location": null,
+          "perms": [],
+          "source": "manifest (dynamic)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF8000401  cw=1 cc=1"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=1 cc=1 vs manifest cw=1 cc=1"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=849c62ab64cb33786c102607a33c3ecc"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='00130000' file='00130000'"
+            }
+          ]
+        },
+        {
+          "slot": "(dynamic)",
+          "name": "LEDFlash",
+          "token": "55f1a32f",
+          "header_word": "0xF8000401",
+          "cw": 1,
+          "cc": 1,
+          "location": null,
+          "perms": [],
+          "source": "manifest (dynamic)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF8000401  cw=1 cc=1"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=1 cc=1 vs manifest cw=1 cc=1"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=849c62ab64cb33786c102607a33c3ecc"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='55f1a32f' file='55f1a32f'"
+            }
+          ]
+        },
+        {
+          "slot": "(dynamic)",
+          "name": "MorseCmOk",
+          "token": "d78f751b",
+          "header_word": "0xF985AC01",
+          "cw": 363,
+          "cc": 1,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (dynamic)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF985AC01  cw=363 cc=1"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=363 cc=1 vs manifest cw=363 cc=1"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=5ea3fe4d2fa5238726886731463db362"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='d78f751b' file='d78f751b'"
+            }
+          ]
+        },
+        {
+          "slot": "(dynamic)",
+          "name": "SlideRule",
+          "token": "00001000",
+          "header_word": "0xFB28A801",
+          "cw": 2602,
+          "cc": 1,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (dynamic)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xFB28A801  cw=2602 cc=1"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=2602 cc=1 vs manifest cw=2602 cc=1"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=f5f0514369cc1f15ec33c88fd8e65e2c"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='00001000' file='00001000'"
+            }
+          ]
+        },
+        {
+          "slot": "(dynamic)",
+          "name": "PostFlashSelftest",
+          "token": "059dc47f",
+          "header_word": "0xF987CC02",
+          "cw": 499,
+          "cc": 2,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (dynamic)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF987CC02  cw=499 cc=2"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=499 cc=2 vs manifest cw=499 cc=2"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=10d7373c021ced90ef1380ea04948c27"
+            },
+            {
+              "label": "name parity",
+              "ok": true,
+              "detail": "manifest=\"PostFlashSelftest\" sidecar=\"PostFlashSelftest\""
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='059dc47f' file='059dc47f'"
+            }
+          ]
+        },
+        {
+          "slot": "(dynamic)",
+          "name": "Adder",
+          "token": "00aa1234",
+          "header_word": null,
+          "cw": 4,
+          "cc": 1,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (dynamic)",
+          "checks": [
+            {
+              "label": "file",
+              "ok": false,
+              "detail": "LUMP binary not found: None"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='00aa1234' file='00aa1234'"
+            }
+          ]
+        },
+        {
+          "slot": "(dynamic)",
+          "name": "Legacy",
+          "token": "00aa9999",
+          "header_word": "0xF8000401",
+          "cw": 1,
+          "cc": 1,
+          "location": null,
+          "perms": [
+            "E"
+          ],
+          "source": "manifest (dynamic)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF8000401  cw=1 cc=1"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=1 cc=1 vs manifest cw=1 cc=1"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=672005ea5356dc7a0aa3e4d5bb388351"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='00aa9999' file='00aa9999'"
+            }
+          ]
+        }
+      ],
+      "unused": []
+    },
+    "ns_table_base": "0x1FC00",
+    "ns_slot_count": 8
+  }
+}
