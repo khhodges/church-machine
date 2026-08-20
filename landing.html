@@ -124,6 +124,16 @@
             overflow: hidden;
             cursor: pointer;
         }
+        .card[draggable="true"] { cursor: grab; }
+        .card.card--dragging {
+            cursor: grabbing;
+            opacity: 0.45;
+            transform: scale(0.98);
+        }
+        .card.card--drag-target {
+            outline: 2px dashed #60a5fa;
+            outline-offset: 3px;
+        }
         .card:hover {
             border-color: #3b82f6;
             transform: translateY(-4px);
@@ -206,7 +216,7 @@
     <div class="cards">
 
         <!-- Code — Indigo -->
-        <div class="card" style="background: linear-gradient(135deg, #131526 0%, #0d0f1e 100%); border-color: #6366f1;" onclick="window.location='/simulator/#editor'">
+        <div class="card" data-card-id="code" draggable="true" style="background: linear-gradient(135deg, #131526 0%, #0d0f1e 100%); border-color: #6366f1;" onclick="window.location='/simulator/#editor'">
             <h2>Code</h2>
             <div class="tag" style="color: #6366f1;">CLOOMC &middot; Assembly &middot; Multi-Language</div>
             <p>
@@ -221,7 +231,7 @@
         </div>
 
         <!-- Builder — Orange -->
-        <div class="card" style="background: linear-gradient(135deg, #2e1e0e 0%, #1a1208 100%); border-color: #fb923c;" onclick="window.location='/simulator/#builder?tab=ti60-connect'">
+        <div class="card" data-card-id="builder" draggable="true" style="background: linear-gradient(135deg, #2e1e0e 0%, #1a1208 100%); border-color: #fb923c;" onclick="window.location='/simulator/#builder?tab=ti60-connect'">
             <h2>Builder</h2>
             <div class="tag" style="color: #fb923c;">Wukong Artix-7 &middot; Serial Bridge &middot; One-Click Flash</div>
             <p>
@@ -236,7 +246,7 @@
         </div>
 
         <!-- Tutorial — Emerald -->
-        <div class="card" style="background: linear-gradient(135deg, #0d1e14 0%, #071410 100%); border-color: #10b981;" onclick="window.location='/simulator/#tutorial'">
+        <div class="card" data-card-id="tutorial" draggable="true" style="background: linear-gradient(135deg, #0d1e14 0%, #071410 100%); border-color: #10b981;" onclick="window.location='/simulator/#tutorial'">
             <h2>Tutorial</h2>
             <div class="tag" style="color: #10b981;">Step-by-Step &middot; Capability Security &middot; Quizzes</div>
             <p>
@@ -251,7 +261,7 @@
         </div>
 
         <!-- Namespace — Teal -->
-        <div class="card" style="background: linear-gradient(135deg, #0d1e1e 0%, #071414 100%); border-color: #2dd4bf;" onclick="window.location='/simulator/#namespace'">
+        <div class="card" data-card-id="namespace" draggable="true" style="background: linear-gradient(135deg, #0d1e1e 0%, #071414 100%); border-color: #2dd4bf;" onclick="window.location='/simulator/#namespace'">
             <h2>Namespace</h2>
             <div class="tag" style="color: #2dd4bf;">8 Boot Slots &middot; Live View &middot; Hardware Mirror</div>
             <p>
@@ -266,7 +276,7 @@
         </div>
 
         <!-- Dashboard — Amber -->
-        <div class="card" style="background: linear-gradient(135deg, #2a1e08 0%, #1a1408 100%); border-color: #f59e0b;" onclick="window.location='/simulator/#dashboard'">
+        <div class="card" data-card-id="dashboard" draggable="true" style="background: linear-gradient(135deg, #2a1e08 0%, #1a1408 100%); border-color: #f59e0b;" onclick="window.location='/simulator/#dashboard'">
             <h2>Dashboard</h2>
             <div class="tag" style="color: #f59e0b;">Call-Home &middot; MTBF &middot; Fault Log</div>
             <p>
@@ -281,7 +291,7 @@
         </div>
 
         <!-- Abstractions — Violet -->
-        <div class="card" style="background: linear-gradient(135deg, #1a1228 0%, #10081e 100%); border-color: #8b5cf6;" onclick="window.location='/simulator/#abstractions'">
+        <div class="card" data-card-id="abstractions" draggable="true" style="background: linear-gradient(135deg, #1a1228 0%, #10081e 100%); border-color: #8b5cf6;" onclick="window.location='/simulator/#abstractions'">
             <h2>Abstractions</h2>
             <div class="tag" style="color: #8b5cf6;">47 Abstractions &middot; 9 Layers &middot; LUMP Catalog</div>
             <p>
@@ -296,7 +306,7 @@
         </div>
 
         <!-- Reference — Sky -->
-        <div class="card" style="background: linear-gradient(135deg, #0a1e2e 0%, #061418 100%); border-color: #0ea5e9;" onclick="window.location='/simulator/#reference'">
+        <div class="card" data-card-id="reference" draggable="true" style="background: linear-gradient(135deg, #0a1e2e 0%, #061418 100%); border-color: #0ea5e9;" onclick="window.location='/simulator/#reference'">
             <h2>Reference</h2>
             <div class="tag" style="color: #0ea5e9;">20 Instructions &middot; Capability Model &middot; CLOOMC ISA</div>
             <p>
@@ -311,7 +321,7 @@
         </div>
 
         <!-- Docs — Rose -->
-        <div class="card" style="background: linear-gradient(135deg, #2e0e14 0%, #1e080c 100%); border-color: #f43f5e;" onclick="window.location='/simulator/#docs'">
+        <div class="card" data-card-id="docs" draggable="true" style="background: linear-gradient(135deg, #2e0e14 0%, #1e080c 100%); border-color: #f43f5e;" onclick="window.location='/simulator/#docs'">
             <h2>Docs</h2>
             <div class="tag" style="color: #f43f5e;">Interactive &middot; Architecture &middot; Six Laws</div>
             <p>
@@ -329,5 +339,64 @@
     <footer>
         <p>Church-Turing Meta-Machine &middot; <a href="https://sipantic.com" target="_blank" rel="noopener">SIPantic.com</a></p>
     </footer>
+    <script>
+        (function() {
+            const storageKey = 'church_public_landing_card_order';
+            const grid = document.querySelector('.cards');
+            if (!grid) return;
+
+            const cards = Array.from(grid.querySelectorAll('.card[data-card-id]'));
+            let savedOrder = [];
+            try {
+                const parsed = JSON.parse(localStorage.getItem(storageKey) || '[]');
+                savedOrder = Array.isArray(parsed) ? parsed : [];
+            } catch (_) {}
+            savedOrder.slice().reverse().forEach(function(id) {
+                const card = cards.find(function(item) { return item.dataset.cardId === id; });
+                if (card) grid.insertBefore(card, grid.firstElementChild);
+            });
+
+            let dragged = null;
+            function saveOrder() {
+                const order = Array.from(grid.querySelectorAll('.card[data-card-id]'))
+                    .map(function(card) { return card.dataset.cardId; });
+                try { localStorage.setItem(storageKey, JSON.stringify(order)); } catch (_) {}
+            }
+
+            cards.forEach(function(card) {
+                card.addEventListener('dragstart', function(event) {
+                    dragged = card;
+                    card.classList.add('card--dragging');
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/plain', card.dataset.cardId);
+                });
+                card.addEventListener('dragover', function(event) {
+                    event.preventDefault();
+                    if (!dragged || dragged === card) return;
+                    event.dataTransfer.dropEffect = 'move';
+                    card.classList.add('card--drag-target');
+                    const bounds = card.getBoundingClientRect();
+                    grid.insertBefore(dragged,
+                        event.clientX < bounds.left + bounds.width / 2 ? card : card.nextSibling);
+                });
+                card.addEventListener('dragleave', function() {
+                    card.classList.remove('card--drag-target');
+                });
+                card.addEventListener('drop', function(event) {
+                    event.preventDefault();
+                    card.classList.remove('card--drag-target');
+                    saveOrder();
+                });
+                card.addEventListener('dragend', function() {
+                    card.classList.remove('card--dragging');
+                    grid.querySelectorAll('.card--drag-target').forEach(function(item) {
+                        item.classList.remove('card--drag-target');
+                    });
+                    if (dragged) saveOrder();
+                    dragged = null;
+                });
+            });
+        })();
+    </script>
 </body>
 </html>

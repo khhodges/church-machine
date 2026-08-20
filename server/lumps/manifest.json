@@ -2031,31 +2031,6 @@
     "issue_n": 1
   },
   {
-    "token": "00aa9999",
-    "abstraction": "Legacy",
-    "filename": "Legacy.1.8b7fb77f.lump",
-    "sidecar_file": "Legacy.1.8b7fb77f.json",
-    "lump_size": 64,
-    "cw": 1,
-    "cc": 1,
-    "author": "",
-    "version": "",
-    "lump_version": 1,
-    "compiled_at": 1787229304.7237945,
-    "methods": [
-      "Add"
-    ],
-    "grants": [
-      "E"
-    ],
-    "binary_hash": "388fa4a798890ee62f9745b5168495386ba4894b98cae1b881c2f4d184700865",
-    "petname": "",
-    "issue_number": 1,
-    "identity_hash": "fcf8ef52e2bf2c4ff55e88fcb0be280eca94c05c9540f643251a1641bc8019c9",
-    "dot_name": "Legacy",
-    "issue_n": 1
-  },
-  {
     "token": "00aa1234",
     "abstraction": "Adder",
     "filename": "Adder.1.db280c91.lump",
@@ -2078,6 +2053,31 @@
     "issue_number": 1,
     "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f",
     "dot_name": "Adder",
+    "issue_n": 1
+  },
+  {
+    "token": "00aa9999",
+    "abstraction": "Legacy",
+    "filename": "Legacy.1.8b7fb77f.lump",
+    "sidecar_file": "Legacy.1.8b7fb77f.json",
+    "lump_size": 64,
+    "cw": 1,
+    "cc": 1,
+    "author": "",
+    "version": "",
+    "lump_version": 2,
+    "compiled_at": 1787231591.552295,
+    "methods": [
+      "Add"
+    ],
+    "grants": [
+      "E"
+    ],
+    "binary_hash": "388fa4a798890ee62f9745b5168495386ba4894b98cae1b881c2f4d184700865",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "fcf8ef52e2bf2c4ff55e88fcb0be280eca94c05c9540f643251a1641bc8019c9",
+    "dot_name": "Legacy",
     "issue_n": 1
   }
 ]
