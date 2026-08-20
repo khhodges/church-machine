@@ -109,6 +109,26 @@ def _meta(token: str, abstraction: str = "LumpSaveTest") -> dict:
     }
 
 
+def _compiler_owned_self_words(row0: int = 0xFEED5E1F) -> list:
+    """A fully materialized ordinary compiler output awaiting NS allocation."""
+    words = [_hdr(cw=1, cc=1), 0] + [0] * (_LUMP_SZ - 2)
+    words[-1] = row0 & 0xFFFFFFFF
+    return words
+
+
+def _compiler_owned_self_meta(token: str) -> dict:
+    meta = _meta(token, "SelfIdentityTest")
+    meta["language"] = "cloomc"
+    meta["capabilities"] = [{
+        "name": "__SELF__",
+        "rights": ["E"],
+        "grants": ["E"],
+        "compiler_owned_self": True,
+        "placeholder": True,
+    }]
+    return meta
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -1219,3 +1239,63 @@ class TestDeclaredCapabilityClist:
         assert data.get("capability") == "LED0"
         assert "permission" in data["error"].lower()
         assert not list(isolated_lumps.glob("WukongCallHome*.lump"))
+
+
+class TestCompilerOwnedSelfCapability:
+    """The server preserves only the compiler placeholder until NS minting."""
+
+    def test_compiler_self_placeholder_saves_then_row_zero_patch_is_rejected(
+            self, client, isolated_lumps):
+        resp = client.post(
+            "/api/lumps/save",
+            json={
+                "binary": _compiler_owned_self_words(),
+                "metadata": _compiler_owned_self_meta("28790001"),
+            },
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        saved = resp.get_json()
+        saved_path = isolated_lumps / saved["lump"]
+        assert struct.unpack(">64I", saved_path.read_bytes())[-1] == 0xFEED5E1F
+
+        patch = client.patch(
+            f'/api/lump/{saved["token"]}/clist/0',
+            json={"gt_word": 0x4A000007},
+        )
+        assert patch.status_code == 422, patch.get_data(as_text=True)
+        assert patch.get_json()["immutable_self_capability"] is True
+        assert struct.unpack(">64I", saved_path.read_bytes())[-1] == 0xFEED5E1F
+
+    def test_wrong_compiler_self_row_is_rejected_without_files(
+            self, client, isolated_lumps):
+        resp = client.post(
+            "/api/lumps/save",
+            json={
+                "binary": _compiler_owned_self_words(0x4A000007),
+                "metadata": _compiler_owned_self_meta("28790002"),
+            },
+        )
+        assert resp.status_code == 422, resp.get_data(as_text=True)
+        data = resp.get_json()
+        assert data["namespace_identity_failed"] is True
+        assert data["clist_row"] == 0
+        assert not list(isolated_lumps.glob("SelfIdentityTest*.lump"))
+
+    def test_legacy_assembly_row_zero_patch_remains_allowed(
+            self, client, isolated_lumps):
+        """Type 0 alone is not compiler-self provenance."""
+        words = _compiler_owned_self_words(0)
+        metadata = _meta("28790003", "LegacyAssembly")
+        resp = client.post(
+            "/api/lumps/save",
+            json={"binary": words, "metadata": metadata},
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        saved = resp.get_json()
+
+        patch = client.patch(
+            f'/api/lump/{saved["token"]}/clist/0',
+            json={"gt_word": 0x4A000007},
+        )
+        assert patch.status_code == 200, patch.get_data(as_text=True)
+        assert patch.get_json()["gt_word"] == 0x4A000007

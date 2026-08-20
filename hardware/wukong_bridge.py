@@ -388,9 +388,10 @@ _FAULT_NAMES = {
     0x0F: 'F_BIT',         0x10: 'STACK_OVERFLOW', 0x11: 'ABSENT_OUTFORM',
     0x12: 'STACK_CORRUPT', 0x13: 'STACK_UNDERFLOW', 0x14: 'IRQ_NULL_BASE',
     0x15: 'OUTFORM_CRC',   0x16: 'OUTFORM_ALLOC', 0x17: 'OUTFORM_MINT',
-    0x18: 'OUTFORM_HDR',   0x19: 'OUTFORM_TIMEOUT',
+    0x18: 'OUTFORM_HDR',   0x19: 'OUTFORM_TIMEOUT', 0x1A: 'OUTFORM_UNAUTH',
+    0x1B: 'IMMUTABLE_SELF_CAP',
 }
-MAX_FAULT_CODE = max(_FAULT_NAMES)   # 0x19 — highest defined FaultType
+MAX_FAULT_CODE = max(_FAULT_NAMES)   # highest defined FaultType
 
 
 def _fault_name(code):
@@ -623,7 +624,7 @@ def validate_trace_frame(pkt):
       • NIA word-aligned and within DMEM range (< 64 KB)
       • ev_type is one of the known TRACE_EV_* constants
       • flags byte upper nibble zero (bits[7:4] are always 0 on hardware)
-      • fault byte reserved bit[5] zero, fault_code ≤ MAX_FAULT_CODE (0x19,
+      • fault byte reserved bit[5] zero, fault_code ≤ MAX_FAULT_CODE,
         highest hw_types.FaultType — keep _FAULT_NAMES in sync with FaultType)
     """
     if len(pkt) != TRACE_LEN or pkt[0] != TRACE_MAGIC:

@@ -146,12 +146,15 @@ function makeHdr(cw, cc, n_minus_6 = 0, typ = 0) {
 //   cc       : c-list words advertised in the header
 //   codeWord : the word placed at position 1 (the first code word)
 // Returns { sim, nsBase, hdrWord } ready for assertions.
-function setupAndLoad({ cw, cc, codeWord = 0, n_minus_6 = 0 }) {
+function setupAndLoad({
+    cw, cc, codeWord = 0, n_minus_6 = 0, typ = 0,
+    compilerOwnedSelf = false, row0 = 0
+}) {
     const sim = new ChurchSimulator();
     sim.bootComplete = true;
 
     const lumpSize = 1 << (n_minus_6 + 6);   // 64 for n_minus_6=0
-    const hdrWord  = makeHdr(cw, cc, n_minus_6);
+    const hdrWord  = makeHdr(cw, cc, n_minus_6, typ);
 
     // Build the full LUMP word array (lumpSize words):
     //   [0]          = header
@@ -161,6 +164,11 @@ function setupAndLoad({ cw, cc, codeWord = 0, n_minus_6 = 0 }) {
     const words = new Array(lumpSize).fill(0);
     words[0] = hdrWord;
     words[1] = codeWord;
+    if (compilerOwnedSelf && cc > 0) {
+        words[lumpSize - cc] = ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER;
+    } else if (cc > 0) {
+        words[lumpSize - cc] = row0 >>> 0;
+    }
 
     // Pre-seed NS slot 3 with an initial entry so loadLumpBinary has existing
     // flags (b, g, gtType) and a gt_seq to preserve.
@@ -185,7 +193,7 @@ function setupAndLoad({ cw, cc, codeWord = 0, n_minus_6 = 0 }) {
     // Also pre-seed CR12 to prevent internal crashes in call-stack helpers.
     sim.cr[12] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
 
-    const ok = sim.loadLumpBinary(words);
+    const ok = sim.loadLumpBinary(words, undefined, { compilerOwnedSelf });
     return { sim, nsBase, hdrWord, ok, GT_SEQ };
 }
 
@@ -348,7 +356,7 @@ console.log('\n--- LLB-03: Synthetic NS slot 3 cw=17 cc=1 round-trip (LED flash 
 // ── LLB-04: cc=0 — CR6 zeroed, clistCount=0 ──────────────────────────────────
 console.log('\n--- LLB-04: cc=0 leaves CR6 zeroed ---');
 {
-    const { sim, nsBase, ok } = setupAndLoad({ cw: 8, cc: 0 });
+    const { sim, nsBase, ok } = setupAndLoad({ cw: 8, cc: 0, typ: 1 });
 
     check('LLB-04a: loadLumpBinary returns true', ok === true);
 
@@ -1153,6 +1161,7 @@ console.log('\n--- LLB-19: Truncated buffer (header says 64 words, buffer has 32
         const words = new Array(64).fill(0);
         words[0] = makeHdr(CW, CC, 0);
         words[1] = 0x01000000;
+        words[64 - CC] = ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER;
         words[FS_START] = ((0xAB << 24) | ((flags & 0xFF) << 16) | (apiLen & 0xFFFF)) >>> 0;
         const apiWords = Math.ceil(apiLen / 4);
         for (let i = 0; i < apiWords; i++) words[FS_START + 1 + i] = 0x41414141;
@@ -1317,6 +1326,162 @@ console.log('\n--- LLB-19: Truncated buffer (header says 64 words, buffer has 32
             && sim.faultLog.some(f => (f.type || f.code) === 'LUMP_FS_LEGACY_NONZERO'),
             JSON.stringify(res));
     }
+}
+
+// ── LLB-21: ordinary Namespace identity minting ─────────────────────────────
+console.log('\n--- LLB-21: ordinary LUMP self identity is minted atomically ---');
+{
+    const valid = setupAndLoad({ cw: 4, cc: 1, compilerOwnedSelf: true });
+    const liveSeq = valid.sim.parseNSWord1(valid.sim.memory[valid.nsBase + 1]).gtSeq;
+    const expected = valid.sim.createGT(liveSeq, valid.sim.bootEntrySlot, {E:1}, 1) >>> 0;
+    check('LLB-21a: compiler placeholder becomes the live slot/sequence self E-GT',
+        valid.ok === true && valid.sim.memory[EXTENDED_BASE + 63] === expected,
+        `actual=0x${(valid.sim.memory[EXTENDED_BASE + 63] >>> 0).toString(16)} expected=0x${expected.toString(16)}`);
+
+    const rejectWith = function(row0) {
+        const sim = new ChurchSimulator();
+        sim.bootComplete = true;
+        const slot = 9;
+        const nsBase = sim._nsSlotBase(slot);
+        sim.memory[nsBase] = 0x123;
+        sim.memory[nsBase + 1] = sim.packNSWord1(7, 3, 0, 0);
+        sim.memory[nsBase + 2] = sim._integrity32(sim.memory[nsBase], sim.memory[nsBase + 1]);
+        sim.memory[EXTENDED_BASE] = 0xCAFEBABE;
+        const words = new Array(64).fill(0);
+        words[0] = makeHdr(4, 1);
+        words[63] = row0 >>> 0;
+        const beforeNs = Array.from(sim.memory.slice(nsBase, nsBase + 4));
+        const ok = sim.loadLumpBinary(words, slot, { compilerOwnedSelf: true });
+        return { sim, nsBase, beforeNs, ok };
+    };
+
+    const wrongSlot = rejectWith(new ChurchSimulator().createGT(3, 8, {E:1}, 1));
+    check('LLB-21b: wrong-slot self GT is rejected before Namespace or body changes',
+        wrongSlot.ok === false &&
+        wrongSlot.sim.memory[EXTENDED_BASE] === 0xCAFEBABE &&
+        wrongSlot.beforeNs.every((word, i) => word === wrongSlot.sim.memory[wrongSlot.nsBase + i]),
+        wrongSlot.sim.output.slice(-240));
+
+    const wrongSeq = rejectWith(new ChurchSimulator().createGT(2, 9, {E:1}, 1));
+    check('LLB-21c: wrong-sequence self GT is rejected atomically',
+        wrongSeq.ok === false &&
+        wrongSeq.beforeNs.every((word, i) => word === wrongSeq.sim.memory[wrongSeq.nsBase + i]),
+        wrongSeq.sim.output.slice(-240));
+
+    const altered = rejectWith(0x4A00F00D);
+    check('LLB-21d: altered c-list row 0 is rejected atomically',
+        altered.ok === false && altered.sim.memory[EXTENDED_BASE] === 0xCAFEBABE &&
+        altered.sim.output.includes('IDENTITY_SELF'), altered.sim.output.slice(-240));
+}
+
+// ── LLB-22: runtime writes cannot replace ordinary self identity ────────────
+console.log('\n--- LLB-22: SAVE cannot mutate ordinary self row ---');
+{
+    const { sim, nsBase, ok } = setupAndLoad({ cw: 4, cc: 1, compilerOwnedSelf: true });
+    const seq = sim.parseNSWord1(sim.memory[nsBase + 1]).gtSeq;
+    const before = sim.memory[EXTENDED_BASE + 63] >>> 0;
+    // Supply valid bindable S capabilities so SAVE reaches the immutable-row
+    // guard rather than failing an unrelated permission/range gate.
+    const saveCap = sim.createGT(seq, sim.bootEntrySlot, {S:1, B:1}, 1);
+    sim.cr[1] = { word0: saveCap, word1: EXTENDED_BASE, word2: sim.memory[nsBase + 1],
+        word3: sim.memory[nsBase + 2], m: 0 };
+    sim.cr[6].word0 = saveCap;
+    sim._execSave({ crDst: 1, crSrc: 6, imm: 0 });
+    check('LLB-22a: SAVE faults IMMUTABLE_SELF_CAP and preserves row 0',
+        ok === true && sim.memory[EXTENDED_BASE + 63] === before &&
+        sim.faultLog.some(f => f.type === 'IMMUTABLE_SELF_CAP'),
+        JSON.stringify(sim.faultLog.slice(-1)));
+
+    // This is a hardware rule, not compiler provenance policy: even an
+    // architectural/raw c-list presented through CR6 cannot write row 0.
+    const architectural = setupAndLoad({ cw: 4, cc: 1, typ: 2, row0: 0x4A00002A });
+    const architecturalBefore = architectural.sim.memory[EXTENDED_BASE + 63] >>> 0;
+    architectural.sim._execSave({ crDst: 1, crSrc: 6, imm: 0 });
+    check('LLB-22b: SAVE CR6 row 0 faults for architectural c-lists before operand checks',
+        architectural.sim.memory[EXTENDED_BASE + 63] === architecturalBefore &&
+        architectural.sim.faultLog.some(f => f.type === 'IMMUTABLE_SELF_CAP'),
+        JSON.stringify(architectural.sim.faultLog.slice(-1)));
+}
+
+// ── LLB-23: raw assembly type-0 LUMPs are explicit self-row exceptions ──────
+console.log('\n--- LLB-23: raw assembly keeps its type-0 row-zero layout ---');
+{
+    const zeroList = setupAndLoad({ cw: 4, cc: 0, typ: 0 });
+    check('LLB-23a: raw assembly type-0 LUMP with cc=0 installs',
+        zeroList.ok === true, zeroList.sim.output.slice(-240));
+
+    const rawRow = 0x4A00002A;
+    const rawList = setupAndLoad({ cw: 4, cc: 1, typ: 0, row0: rawRow });
+    check('LLB-23b: raw assembly type-0 LUMP preserves its declared row 0',
+        rawList.ok === true && rawList.sim.memory[EXTENDED_BASE + 63] === rawRow,
+        `actual=0x${(rawList.sim.memory[EXTENDED_BASE + 63] >>> 0).toString(16)}`);
+    check('LLB-23c: raw assembly slot is not registered as compiler-owned identity',
+        !rawList.sim._compilerOwnedSelfSlots ||
+        rawList.sim._compilerOwnedSelfSlots[rawList.sim.bootEntrySlot] !== true,
+        JSON.stringify(rawList.sim._compilerOwnedSelfSlots || {}));
+}
+
+// ── LLB-24: saved compiler LUMPs remint identity when reinstalled ─────────────
+console.log('\n--- LLB-24: saved compiler LUMPs retain identity provenance ---');
+{
+    const first = setupAndLoad({ cw: 4, cc: 1, compilerOwnedSelf: true });
+    const savedWords = Array.from(first.sim.memory.slice(EXTENDED_BASE, EXTENDED_BASE + 64));
+    const firstSelf = savedWords[63] >>> 0;
+    const sourceSlot = first.sim.bootEntrySlot;
+    const sourceSeq = first.sim.parseNSWord1(
+        first.sim.memory[first.sim._nsSlotBase(sourceSlot) + 1] >>> 0
+    ).gtSeq;
+    const reinstalledSlot = 9;
+    first.sim.bootEntrySlot = reinstalledSlot;
+    const reloaded = first.sim.loadLumpBinary(savedWords, reinstalledSlot, {
+        compilerOwnedSelf: true,
+        remintCompilerOwnedSelf: true,
+        sourceSelfSlot: sourceSlot,
+        sourceSelfSeq: sourceSeq
+    });
+    // loadLumpBinary's saved-LUMP loader keeps one shared physical staging base;
+    // the Namespace entry, sequence, and row-0 identity vary by target slot.
+    const reinstalledBase = EXTENDED_BASE;
+    const reinstalledNsBase = first.sim._nsSlotBase(reinstalledSlot);
+    const reinstalledSeq = first.sim.parseNSWord1(
+        first.sim.memory[reinstalledNsBase + 1] >>> 0
+    ).gtSeq;
+    const reinstalledSelf = first.sim.memory[reinstalledBase + 63] >>> 0;
+    const expectedSelf = first.sim.createGT(
+        reinstalledSeq, reinstalledSlot, { E: 1 }, 1
+    ) >>> 0;
+    check('LLB-24a: saved compiler LUMP is reminted for its new Namespace slot',
+        reloaded === true && reinstalledSelf === expectedSelf && reinstalledSelf !== firstSelf,
+        `old=0x${firstSelf.toString(16)} new=0x${reinstalledSelf.toString(16)} expected=0x${expectedSelf.toString(16)}`);
+    check('LLB-24b: reinstalled compiler LUMP retains runtime self-row protection',
+        first.sim._compilerOwnedSelfSlots[reinstalledSlot] === true,
+        JSON.stringify(first.sim._compilerOwnedSelfSlots));
+
+    const saveCap = first.sim.createGT(reinstalledSeq, reinstalledSlot, { S: 1, B: 1 }, 1);
+    first.sim.cr[1] = {
+        word0: saveCap, word1: reinstalledBase,
+        word2: first.sim.memory[reinstalledNsBase + 1],
+        word3: first.sim.memory[reinstalledNsBase + 2], m: 0
+    };
+    first.sim.cr[6].word0 = saveCap;
+    first.sim._execSave({ crDst: 1, crSrc: 6, imm: 0 });
+    check('LLB-24c: SAVE still faults after cross-slot reload',
+        first.sim.memory[reinstalledBase + 63] === expectedSelf &&
+        first.sim.faultLog.some(f => f.type === 'IMMUTABLE_SELF_CAP'),
+        JSON.stringify(first.sim.faultLog.slice(-1)));
+
+    const corrupt = savedWords.slice();
+    corrupt[63] = first.sim.createGT((sourceSeq + 1) & 0x7F, sourceSlot, { E: 1 }, 1);
+    const before = first.sim.memory[EXTENDED_BASE] >>> 0;
+    const rejected = first.sim.loadLumpBinary(corrupt, 10, {
+        compilerOwnedSelf: true,
+        remintCompilerOwnedSelf: true,
+        sourceSelfSlot: sourceSlot,
+        sourceSelfSeq: sourceSeq
+    });
+    check('LLB-24d: remint rejects a stale-sequence source self token atomically',
+        rejected === false && first.sim.memory[EXTENDED_BASE] === before &&
+        first.sim.output.includes('IDENTITY_SELF'), first.sim.output.slice(-260));
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────

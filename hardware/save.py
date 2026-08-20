@@ -15,7 +15,7 @@ class ChurchSave(Elaboratable):
         self.save_busy = Signal()
         self.save_complete = Signal()
         self.save_fault = Signal()
-        self.fault_type = Signal(4)
+        self.fault_type = Signal(5)
 
         self.cr_rd_addr = Signal(4)
         self.cr_rd_data = Signal(CAP_REG_LAYOUT)
@@ -42,8 +42,9 @@ class ChurchSave(Elaboratable):
 
         dst_reg_latched = Signal(CAP_REG_LAYOUT)
         src_reg_latched = Signal(CAP_REG_LAYOUT)
+        immutable_row0_latched = Signal()
         fault_latched = Signal()
-        fault_type_latched = Signal(4)
+        fault_type_latched = Signal(5)
         sub_start = Signal()
         sub_start_reg = Signal()
         sub_done_latched = Signal()
@@ -59,6 +60,10 @@ class ChurchSave(Elaboratable):
             u_msave.sub_dst_cap.eq(dst_reg_latched),
             u_msave.sub_src_gt.eq(src_view.word0_gt),
             u_msave.sub_index.eq(self.index),
+            # CR6 is the active c-list register. Its row 0 is the immutable
+            # resident identity; other architectural c-list registers retain
+            # their existing SAVE semantics.
+            u_msave.sub_immutable_row0.eq(immutable_row0_latched),
             u_msave.mem_wr_done.eq(self.mem_wr_done),
             u_msave.cr15_namespace.eq(self.cr15_namespace),
             u_msave.mem_rd_data.eq(self.mem_rd_data),
@@ -75,9 +80,16 @@ class ChurchSave(Elaboratable):
 
         with m.FSM(name="save_wrapper") as fsm:
             with m.State("IDLE"):
-                m.d.sync += [fault_latched.eq(0), fault_type_latched.eq(FaultType.NONE)]
+                m.d.sync += [
+                    fault_latched.eq(0),
+                    fault_type_latched.eq(FaultType.NONE),
+                ]
                 m.d.sync += [sub_done_latched.eq(0), sub_fault_latched.eq(0)]
                 with m.If(self.save_start):
+                    # Capture the instruction's CR6 identity at acceptance.
+                    # Decoder inputs may advance while this multi-cycle SAVE
+                    # is running, so the sub-unit must never inspect them live.
+                    m.d.sync += immutable_row0_latched.eq(self.cr_dst == CR_CLIST)
                     m.next = "CHECK_DST_READ"
 
             with m.State("CHECK_DST_READ"):

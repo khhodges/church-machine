@@ -121,23 +121,67 @@ class CLOOMCCompiler {
     compile(source, capabilities) {
         const targetDirective = this._parseTargetDirective(source);
         const cleanSource = source.replace(/^\s*@target\s+(IoT|Full)\s*$/im, '');
+        const previousReserveSelfRow = this._reserveCompilerSelfRow;
         let result;
-        if (this._detectPetName(cleanSource)) {
-            result = this.compilePetName(cleanSource, capabilities);
-        } else if (this._detectEnglish(cleanSource)) {
-            result = this.compileEnglish(cleanSource, capabilities);
-        } else if (this._detectSymbolic(cleanSource)) {
-            result = this.compileSymbolic(cleanSource, capabilities);
-        } else if (this._detectLambda(cleanSource)) {
-            result = this.compileLambda(cleanSource, capabilities);
-        } else if (this._detectHaskell(cleanSource)) {
-            result = this.compileHaskell(cleanSource, capabilities);
-        } else if (this._detectCLOOMC(cleanSource)) {
-            result = this.compileJS(cleanSource, capabilities);
-        } else if (this._detectAssembly(cleanSource)) {
-            result = this.compileAssembly(cleanSource, capabilities);
-        } else {
-            result = this.compileJS(cleanSource, capabilities);
+        try {
+            if (this._detectPetName(cleanSource)) {
+                this._reserveCompilerSelfRow = true;
+                result = this.compilePetName(cleanSource, capabilities);
+            } else if (this._detectEnglish(cleanSource)) {
+                this._reserveCompilerSelfRow = true;
+                result = this.compileEnglish(cleanSource, capabilities);
+            } else if (this._detectSymbolic(cleanSource)) {
+                this._reserveCompilerSelfRow = true;
+                result = this.compileSymbolic(cleanSource, capabilities);
+            } else if (this._detectLambda(cleanSource)) {
+                this._reserveCompilerSelfRow = true;
+                result = this.compileLambda(cleanSource, capabilities);
+            } else if (this._detectHaskell(cleanSource)) {
+                this._reserveCompilerSelfRow = true;
+                result = this.compileHaskell(cleanSource, capabilities);
+            } else if (this._detectCLOOMC(cleanSource)) {
+                this._reserveCompilerSelfRow = true;
+                result = this.compileJS(cleanSource, capabilities);
+            } else if (this._detectAssembly(cleanSource)) {
+                this._reserveCompilerSelfRow = false;
+                result = this.compileAssembly(cleanSource, capabilities);
+            } else {
+                this._reserveCompilerSelfRow = true;
+                result = this.compileJS(cleanSource, capabilities);
+            }
+        } finally {
+            this._reserveCompilerSelfRow = previousReserveSelfRow;
+        }
+        // Ordinary source abstractions always reserve c-list row zero for the
+        // resident self capability.  Its final E-GT cannot be emitted here:
+        // allocation has not yet selected a Namespace slot or minted its
+        // sequence.  The build pipeline writes the compiler-owned placeholder
+        // and the installation path resolves it atomically.
+        //
+        // Assembly is deliberately excluded.  It is also used to author Thread,
+        // Namespace-root and hardware c-lists whose row-zero contracts are
+        // architectural rather than ordinary-abstraction identity.
+        if (result.language !== 'assembly' && result.methods && result.methods.length > 0) {
+            const declared = Array.isArray(result.capabilities) ? result.capabilities : [];
+            const attemptsToOwnSelf = declared.some(cap => {
+                const name = typeof cap === 'string' ? cap : (cap && cap.name);
+                return String(name || '').trim().toUpperCase() === '__SELF__';
+            });
+            if (attemptsToOwnSelf) {
+                result.errors.push({
+                    line: null,
+                    message: 'capabilities { } cannot declare __SELF__: c-list row 0 is compiler-owned resident identity.'
+                });
+            } else {
+                result.capabilities = [{
+                    name: '__SELF__',
+                    rights: ['E'],
+                    grants: ['E'],
+                    compiler_owned_self: true,
+                    placeholder: true,
+                }, ...declared];
+                result.compilerSelfCapability = true;
+            }
         }
         if (result.errors.length === 0 && result.methods.length > 0) {
             result.profile = detectProfile(result.methods);
@@ -1020,22 +1064,34 @@ class CLOOMCCompiler {
 
     _buildROM(declaredCaps, uploadCaps, outErrors) {
         const rom = {};
-        const capNames = declaredCaps || [];
-        if (outErrors && capNames.length > 32) {
-            const excess = capNames.length - 32;
+        const allCaps = declaredCaps || [];
+        const declaredCompilerSelf = !!(allCaps[0] && typeof allCaps[0] === 'object' &&
+            allCaps[0].compiler_owned_self === true &&
+            String(allCaps[0].name || '').toUpperCase() === '__SELF__');
+        // During public compile(), reservation is enabled before the wrapper
+        // appends the __SELF__ metadata record.  Encode user caps at row one,
+        // but do not discard the first declared user capability in that phase.
+        const hasCompilerSelf = this._reserveCompilerSelfRow === true || declaredCompilerSelf;
+        const capNames = declaredCompilerSelf ? allCaps.slice(1) : allCaps;
+        // Only compiler-owned ordinary abstractions reserve row zero.  Assembly
+        // deliberately retains the full 32-row architectural c-list layout.
+        const firstUserRow = hasCompilerSelf ? 1 : 0;
+        const maxUserCaps = hasCompilerSelf ? 31 : 32;
+        if (outErrors && capNames.length > maxUserCaps) {
+            const excess = capNames.length - maxUserCaps;
             outErrors.push({
                 line: 1, col: 0, endCol: 0,
-                message: `capabilities block declares ${capNames.length} entries but the hardware c-list is limited to 32 (ELOADCALL uses a 5-bit row field, slots 0–31). Remove ${excess} entr${excess === 1 ? 'y' : 'ies'} or split the abstraction into smaller ones.`
+                message: `capabilities block declares ${capNames.length} entries but row 0 is the compiler-owned self capability; only 31 source entries fit in the 32-row hardware c-list. Remove ${excess} entr${excess === 1 ? 'y' : 'ies'} or split the abstraction into smaller ones.`
             });
         }
         for (let i = 0; i < capNames.length; i++) {
-            rom[(typeof capNames[i] === 'string' ? capNames[i] : capNames[i].name || '').toUpperCase()] = i;
+            rom[(typeof capNames[i] === 'string' ? capNames[i] : capNames[i].name || '').toUpperCase()] = i + firstUserRow;
         }
         if (uploadCaps && uploadCaps.length > 0) {
             for (let i = 0; i < uploadCaps.length; i++) {
                 const name = uploadCaps[i].name || uploadCaps[i].target;
                 if (typeof name === 'string') {
-                    rom[name.toUpperCase()] = i;
+                    rom[name.toUpperCase()] = i + firstUserRow;
                 }
             }
         }

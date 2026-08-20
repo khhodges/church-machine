@@ -3295,6 +3295,39 @@ function _nsTableAddConfirm() {
         const slotOffset      = Math.max(0, slot - PROG_SLOT);
         const lumpBase        = EXTENDED_BASE + slotOffset * EXTENDED_STRIDE;
 
+        // Ordinary code LUMPs are checked and minted on a private copy before
+        // *any* simulator mutation.  This prevents a stale self GT, wrong
+        // sequence, or mismatched Namespace location from leaving a half-added
+        // body/entry behind when the ADD modal rejects it.
+        const _compilerOwnedSelf = !!(sidecar && Array.isArray(sidecar.capabilities) &&
+            sidecar.capabilities[0] &&
+            sidecar.capabilities[0].compiler_owned_self === true &&
+            String(sidecar.capabilities[0].name || '').toUpperCase() === '__SELF__');
+        const _sourceSelfSlot = sidecar && sidecar.ns_slot != null
+            ? Number(sidecar.ns_slot) : NaN;
+        const _sourceSelfValid = Number.isInteger(_sourceSelfSlot) &&
+            _sourceSelfSlot >= 0 && sim.isNSEntryValid(_sourceSelfSlot);
+        const _sourceSelfSeq = _sourceSelfValid
+            ? sim.parseNSWord1(sim.memory[sim._nsSlotBase(_sourceSelfSlot) + 1] >>> 0).gtSeq
+            : NaN;
+        const _identity = sim._mintOrdinaryLumpIdentity(words, slot, lumpBase, {
+            // A compiler marker cannot be bypassed by selecting an Outform in
+            // the modal.  Raw assembly remains an explicit non-ordinary layout.
+            architectural: hdr.typ !== 0 || (gtType !== 1 && !_compilerOwnedSelf),
+            compilerOwnedSelf: _compilerOwnedSelf,
+            // A saved live self row can be reminted only after it matches the
+            // sidecar-recorded source slot and that live Namespace sequence.
+            remintCompilerOwnedSelf: _compilerOwnedSelf && _sourceSelfValid,
+            sourceSelfSlot: _sourceSelfSlot,
+            sourceSelfSeq: _sourceSelfSeq
+        });
+        if (!_identity.ok) {
+            return Promise.reject(
+                `Namespace identity validation failed (${_identity.code}): ${_identity.message}`
+            );
+        }
+        words = _identity.words;
+
         const copyLen = Math.min(words.length, EXTENDED_STRIDE);
         for (let wi = 0; wi < copyLen; wi++) {
             sim.memory[lumpBase + wi] = words[wi] >>> 0;
@@ -3358,7 +3391,10 @@ function _nsTableAddConfirm() {
         // issue, a non-empty dotName, and canonical 64-hex identity/binary
         // hashes.  If any is missing we FAIL CLOSED — never create an
         // unverifiable Outform whose later promotion might rely on T alone.
-        const isSecureOutform = (gtType === 2);
+        // Compiler-owned self identity is always an Inform E-GT. A modal type
+        // selection cannot turn it into an Outform after its identity was minted.
+        const effectiveGtType = _identity.ordinary ? 1 : gtType;
+        const isSecureOutform = (effectiveGtType === 2);
         if (isSecureOutform &&
             (cacheToken32 == null || !(Number.isInteger(issueN) && issueN > 0) ||
              !dotName || identityHash == null || binaryHash == null)) {
@@ -3395,8 +3431,10 @@ function _nsTableAddConfirm() {
             }, { secure: true });
         }
 
-        // Write NS entry with programmer-chosen options.  W3 = cache token (T).
-        sim.writeNSEntry(slot, lumpBase, limit17, 0, 0, gtType, 0, hdr.cc, w3CacheToken);
+        // Write NS entry with the verified identity type. W3 = cache token (T).
+        sim.writeNSEntry(slot, lumpBase, limit17, 0, 0, effectiveGtType,
+            _identity.ordinary ? _identity.entry.seq : 0, hdr.cc,
+            _identity.ordinary ? _identity.entry.cacheToken : w3CacheToken);
         sim.nsLabels[slot] = name;
 
         // Persist slot→label to boot-config so the label survives hard resets.
@@ -3466,6 +3504,13 @@ function _nsTableAddConfirm() {
             for (let capIdx = 0; capIdx < caps.length; capIdx++) {
                 const cap = caps[capIdx];
 
+                // Row zero is owned by the compiler/install mint, not by
+                // sidecar capability editing or import metadata.
+                if (capIdx === 0 && cap && cap.compiler_owned_self === true &&
+                    String(cap.name || '').toUpperCase() === '__SELF__') {
+                    continue;
+                }
+
                 // Skip slots filled at boot or explicitly null (leave binary GT intact).
                 if (cap.filled_by || cap.intentionally_null || cap.wired_at_boot) continue;
 
@@ -3513,6 +3558,9 @@ function _nsTableAddConfirm() {
                 sim.memory[writeAddr] = 0x00000000;
             }
         }
+        sim._compilerOwnedSelfSlots = sim._compilerOwnedSelfSlots || {};
+        if (_identity.ordinary) sim._compilerOwnedSelfSlots[slot] = true;
+        else delete sim._compilerOwnedSelfSlots[slot];
 
         // ── Lazy Load: zero header word + register manifest entry ─────────────
         // Mode 1 (Restore) fires when CALL/LOAD finds magic=0 at lumpBase.
@@ -3595,6 +3643,7 @@ function _nsTableClear(slot) {
 
     // Clear label and token-slot map
     if (sim.nsLabels) delete sim.nsLabels[slot];
+    if (sim._compilerOwnedSelfSlots) delete sim._compilerOwnedSelfSlots[slot];
     if (sim._tokenSlotMap) {
         for (const [tok, s] of sim._tokenSlotMap) {
             if (s === slot) { sim._tokenSlotMap.delete(tok); break; }

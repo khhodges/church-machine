@@ -14,10 +14,13 @@ class ChurchMSave(Elaboratable):
         self.sub_dst_cap = Signal(CAP_REG_LAYOUT)
         self.sub_src_gt = Signal(32)
         self.sub_index = Signal(16)
+        # The generic mSave primitive does not know which CR supplied the
+        # destination capability. ChurchSave asserts this only for CR6.
+        self.sub_immutable_row0 = Signal()
         self.sub_busy = Signal()
         self.sub_done = Signal()
         self.sub_fault = Signal()
-        self.sub_fault_type = Signal(4)
+        self.sub_fault_type = Signal(5)
 
         self.mem_wr_addr = Signal(32)
         self.mem_wr_data = Signal(32)
@@ -37,7 +40,8 @@ class ChurchMSave(Elaboratable):
         dst_cap_reg = Signal(CAP_REG_LAYOUT)
         src_gt_reg = Signal(32)
         index_reg = Signal(16)
-        fault_type_reg = Signal(4)
+        immutable_row0_reg = Signal()
+        fault_type_reg = Signal(5)
 
         dst_view = View(CAP_REG_LAYOUT, dst_cap_reg)
         dst_gt = View(GT_LAYOUT, dst_view.word0_gt)
@@ -81,8 +85,20 @@ class ChurchMSave(Elaboratable):
                         dst_cap_reg.eq(self.sub_dst_cap),
                         src_gt_reg.eq(self.sub_src_gt),
                         index_reg.eq(self.sub_index),
+                        immutable_row0_reg.eq(self.sub_immutable_row0),
                         fault_type_reg.eq(FaultType.NONE),
                     ]
+                    m.next = "CHECK_IMMUTABLE_ROW"
+
+            # CR6 row 0 is the resident identity credential. This guard must
+            # run before permissions, Namespace reads, or write-address
+            # generation: no valid SAVE operand may replace identity and no
+            # invalid operand may turn the violation into a BIND/PERM fault.
+            with m.State("CHECK_IMMUTABLE_ROW"):
+                with m.If(immutable_row0_reg & (index_reg == 0)):
+                    m.d.sync += fault_type_reg.eq(FaultType.IMMUTABLE_SELF_CAP)
+                    m.next = "FAULT"
+                with m.Else():
                     m.next = "CHECK_BIND"
 
             with m.State("CHECK_BIND"):

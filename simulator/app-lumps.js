@@ -6007,11 +6007,26 @@ async function _loadSavedLumpCapabilities(token, suppliedCaps) {
         capabilities: detail.capabilities,
         identityHash: detail.identity_hash || null,
         identitySealLocation: detail.identity_seal_location || null,
+        // Required when a compiler-owned LUMP was already installed once:
+        // its on-disk row 0 is a live GT and must still point at this source slot
+        // before the destination loader is allowed to remint it.
+        sourceNsSlot: detail.ns_slot != null ? detail.ns_slot : detail.nsSlot,
     };
 }
 
 function _validateSavedLumpClist(rawWords, header, savedMetadata, simInstance) {
     const savedCaps = savedMetadata.capabilities;
+    const selfMarkedRows = savedCaps.filter(cap =>
+        cap && typeof cap === 'object' && cap.compiler_owned_self === true
+    );
+    const compilerSelf = savedCaps[0];
+    const hasCompilerSelf = !!(compilerSelf &&
+        compilerSelf.compiler_owned_self === true &&
+        String(compilerSelf.name || '').toUpperCase() === '__SELF__' &&
+        (compilerSelf.slot == null || Number(compilerSelf.slot) === 0));
+    if (selfMarkedRows.length > 0 && !hasCompilerSelf) {
+        throw new Error('compiler-owned self capability must be the exact __SELF__ c-list row 0 record');
+    }
     const legacySelfSeal = savedCaps.length === 0 && header.cc > 0 &&
         savedMetadata.identitySealLocation !== 'sidecar' &&
         typeof savedMetadata.identityHash === 'string' &&
@@ -6038,13 +6053,52 @@ function _validateSavedLumpClist(rawWords, header, savedMetadata, simInstance) {
         if (typeof CapabilityTokens === 'undefined') {
             throw new Error('capability token validator is unavailable');
         }
-        const runResolved = CapabilityTokens.resolveCapabilities(savedCaps, {
+        const clistStart = header.lumpSize - header.cc;
+        let capsToValidate = savedCaps;
+        let validationStart = clistStart;
+        if (hasCompilerSelf) {
+            if (header.cc < 1) {
+                throw new Error('compiler-owned self capability requires c-list row 0');
+            }
+            const selfWord = (rawWords[clistStart] || 0) >>> 0;
+            const isPlaceholder = selfWord === ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER;
+            const parsedSelf = !isPlaceholder && simInstance &&
+                typeof simInstance.parseGT === 'function'
+                ? simInstance.parseGT(selfWord) : null;
+            const sourceSlot = Number(savedMetadata.sourceNsSlot);
+            const hasSourceSlot = Number.isInteger(sourceSlot) && sourceSlot >= 0;
+            const sourceEntryValid = hasSourceSlot && simInstance &&
+                typeof simInstance.isNSEntryValid === 'function' &&
+                simInstance.isNSEntryValid(sourceSlot);
+            const sourceSeq = sourceEntryValid
+                ? simInstance.parseNSWord1(
+                    simInstance.memory[simInstance._nsSlotBase(sourceSlot) + 1] >>> 0
+                ).gtSeq : NaN;
+            const isLiveSelf = !!(parsedSelf && parsedSelf.type === 1 &&
+                parsedSelf.permissions && parsedSelf.permissions.E === 1 &&
+                !parsedSelf.permissions.R && !parsedSelf.permissions.W &&
+                !parsedSelf.permissions.X && !parsedSelf.permissions.L &&
+                !parsedSelf.permissions.S && !parsedSelf.permissions.B &&
+                sourceEntryValid && parsedSelf.index === sourceSlot &&
+                parsedSelf.gt_seq === sourceSeq);
+            if (!isPlaceholder && !isLiveSelf) {
+                throw new Error(
+                    `compiler-owned self row 0 must be the compiler placeholder or an E-GT for its recorded source Namespace slot; got 0x${selfWord.toString(16).padStart(8, '0')}`
+                );
+            }
+            // __SELF__ is identity provenance, never a user-resolved dependency.
+            // The trusted loader below remints it after the destination slot and
+            // Namespace sequence are known.
+            capsToValidate = savedCaps.slice(1);
+            validationStart = clistStart + 1;
+        }
+        const runResolved = CapabilityTokens.resolveCapabilities(capsToValidate, {
             sim: simInstance,
             lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) ? _lumpsCache : [],
         });
         const runValidation = CapabilityTokens.validateClist(
             rawWords,
-            header.lumpSize - header.cc,
+            validationStart,
             runResolved,
             { sim: simInstance }
         );
@@ -6080,6 +6134,9 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
         const _runHeader = sim.parseLumpHeader(rawWords[0] >>> 0);
         if (!_runHeader || !_runHeader.valid) throw new Error('Malformed LUMP header');
         const _savedCaps = _validateSavedLumpClist(rawWords, _runHeader, _savedMetadata, sim);
+        const _compilerOwnedSelf = !!(_savedCaps[0] &&
+            _savedCaps[0].compiler_owned_self === true &&
+            String(_savedCaps[0].name || '').toUpperCase() === '__SELF__');
 
         const _BOOT_SLOT = sim._bootAbstrSlot;
         // _targetSlot: the NS slot the LUMP will occupy after loading.
@@ -6113,7 +6170,26 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
         sim.bootEntrySlot = _targetSlot;
         if (typeof bootEntrySlot !== 'undefined') bootEntrySlot = _targetSlot;
 
-        const loaded = sim.loadLumpBinary(rawWords, (nsSlot !== null && nsSlot !== undefined) ? nsSlot : undefined);
+        // A saved compiler LUMP contains its previous live self GT, not the
+        // compiler placeholder. Preserve the durable sidecar provenance so the
+        // loader remints row zero for this slot's current Namespace sequence.
+        const loaded = sim.loadLumpBinary(
+            rawWords,
+            (nsSlot !== null && nsSlot !== undefined) ? nsSlot : undefined,
+            {
+                compilerOwnedSelf: _compilerOwnedSelf,
+                remintCompilerOwnedSelf: _compilerOwnedSelf,
+                sourceSelfSlot: _savedMetadata.sourceNsSlot,
+                sourceSelfSeq: (() => {
+                    const sourceSlot = Number(_savedMetadata.sourceNsSlot);
+                    return Number.isInteger(sourceSlot) && sourceSlot >= 0 &&
+                        sim.isNSEntryValid(sourceSlot)
+                        ? sim.parseNSWord1(
+                            sim.memory[sim._nsSlotBase(sourceSlot) + 1] >>> 0
+                        ).gtSeq : NaN;
+                })()
+            }
+        );
         if (!loaded) {
             _restoreBootEntry();
             throw new Error('loadLumpBinary rejected the binary — check the console output for details');

@@ -847,6 +847,40 @@ function _getActiveSourceLabel() {
     return tab ? tab.textContent.trim() : null;
 }
 
+// Compiler-owned c-list row zero is serialized as a sentinel until a Namespace
+// slot is chosen.  CapabilityTokens intentionally never sees that sentinel:
+// every ordinary source capability starts at row one, while installation mints
+// the live self E-GT from the selected slot and its current sequence.
+function _isCompilerSelfCapability(cap) {
+    return !!(cap && typeof cap === 'object' && cap.compiler_owned_self === true &&
+        String(cap.name || '').toUpperCase() === '__SELF__');
+}
+
+function _materializeLumpCapabilities(caps, words, clistStart, context) {
+    const allCaps = Array.isArray(caps) ? caps : [];
+    const hasSelf = _isCompilerSelfCapability(allCaps[0]);
+    const userCaps = hasSelf ? allCaps.slice(1) : allCaps;
+    const writeStart = clistStart + (hasSelf ? 1 : 0);
+    if (hasSelf) {
+        words[clistStart] = (typeof ChurchSimulator !== 'undefined'
+            ? ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER : 0xFEED5E1F) >>> 0;
+    }
+    const materialized = CapabilityTokens.materialize(userCaps, words, writeStart, context);
+    if (!hasSelf) return materialized;
+    return {
+        ok: materialized.ok,
+        errors: materialized.errors || [],
+        resolvedCaps: [{
+            name: '__SELF__',
+            rights: ['E'],
+            grants: ['E'],
+            nsIndex: null,
+            compiler_owned_self: true,
+            placeholder: true,
+        }, ...(materialized.resolvedCaps || [])],
+    };
+}
+
 function compileDraft() {
     const editor = document.getElementById('asmEditor');
     if (!editor) return;
@@ -1429,7 +1463,7 @@ function compileAndBuild() {
         sim,
         lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) ? _lumpsCache : [],
     };
-    const _capMaterialized = CapabilityTokens.materialize(
+    const _capMaterialized = _materializeLumpCapabilities(
         caps, lumpWords, clistStart, _capTokenContext);
     const resolvedCaps = _capMaterialized.resolvedCaps;
     if (!_capMaterialized.ok) {
@@ -1579,7 +1613,12 @@ function compileAndBuild() {
             profile:        profile,
             language:       result.language || 'javascript',
             methods:        methodMeta,
-            capabilities:   resolvedCaps.map(rc => ({ name: rc.name, rights: rc.rights, grants: rc.grants, nsIndex: rc.nsIndex })),
+            capabilities:   resolvedCaps.map(rc => ({
+                name: rc.name, rights: rc.rights, grants: rc.grants, nsIndex: rc.nsIndex,
+                compiler_owned_self: rc.compiler_owned_self === true,
+                placeholder: rc.placeholder === true,
+            })),
+            compiler_owned_self: _isCompilerSelfCapability(resolvedCaps[0]),
             pet_names_dr:   drPetNames,
             pet_names_cr:   crPetNames,
             mtbf_clean_runs: mtbfClean,

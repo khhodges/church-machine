@@ -5514,6 +5514,18 @@ def save_lump():
             "capability_validation_failed": True,
         }), 422
     _has_declared_caps = len(_declared_caps_raw) > 0
+    # Newly compiled ordinary abstractions reserve row zero as a compiler-owned
+    # placeholder.  It is intentionally NOT a runtime GT: the final Namespace
+    # slot and sequence only exist in the installation transaction, which mints
+    # the live self E-GT.  Legacy and architectural binaries keep their existing
+    # explicit contracts.
+    _compiler_self_row = (
+        _sl_typ == 0 and _has_declared_caps and
+        isinstance(_declared_caps_raw[0], dict) and
+        _declared_caps_raw[0].get("compiler_owned_self") is True and
+        str(_declared_caps_raw[0].get("name", "")).upper() == "__SELF__"
+    )
+    _SELF_CAPABILITY_PLACEHOLDER = 0xFEED5E1F
     _validated_declared_caps = []
 
     # ── SelfTest canonical layout guard (ALL token 00000600 saves) ───────────
@@ -5670,6 +5682,21 @@ def save_lump():
                 "capability_validation_failed": True,
             }), 422
 
+        if _compiler_self_row:
+            _actual_placeholder = _sl_words[_clist_row0_idx] & 0xFFFFFFFF
+            if _actual_placeholder != _SELF_CAPABILITY_PLACEHOLDER:
+                return jsonify({
+                    "error": (
+                        "Namespace identity validation failed: ordinary LUMP c-list row 0 "
+                        "must contain the compiler-owned self placeholder until installation; "
+                        f"got 0x{_actual_placeholder:08X}."
+                    ),
+                    "namespace_identity_failed": True,
+                    "clist_row": 0,
+                    "expected_placeholder": _SELF_CAPABILITY_PLACEHOLDER,
+                    "actual_word": _actual_placeholder,
+                }), 422
+
         _right_order = ("R", "W", "X", "L", "S", "E")
         for _cap_row, _cap_raw in enumerate(_declared_caps_raw):
             if isinstance(_cap_raw, str):
@@ -5700,6 +5727,16 @@ def save_lump():
                 }
                 _body.update(_extra)
                 return jsonify(_body), 422
+
+            # Row zero is neither caller-declared nor server-editable.  Its
+            # placeholder was checked above; the live E-GT is minted only once
+            # the selected Namespace slot has a current sequence.
+            if _compiler_self_row and _cap_row == 0:
+                _validated_declared_caps.append({
+                    "name": "__SELF__", "rights": ["E"], "grants": ["E"],
+                    "compiler_owned_self": True,
+                })
+                continue
 
             if not _cap_name:
                 return _cap_reject("the declared capability has no name.")
@@ -6111,6 +6148,7 @@ def save_lump():
             if _has_declared_caps
             else metadata.get("capabilities", [])
         ),
+        "compiler_owned_self": _compiler_self_row,
         "pet_names": {
             "DR": metadata.get("pet_names_dr", {}),
             "CR": metadata.get("pet_names_cr", {})
@@ -7640,6 +7678,34 @@ def patch_lump_clist_slot(token_hex, slot_index):
         return jsonify({"error": "Lump has no c-list (cc=0)"}), 400
     if slot_index < 0 or slot_index >= cc:
         return jsonify({"error": f"slot_index {slot_index} out of range (cc={cc})"}), 400
+    # Type-0 includes raw assembly and legacy architectural layouts.  Only a
+    # sidecar that explicitly records the compiler-owned __SELF__ contract makes
+    # row zero immutable.
+    _compiler_self_row = False
+    sidecar_path = _resolve_sidecar_path(key8, lumps_dir)
+    if sidecar_path:
+        try:
+            with open(sidecar_path, 'r') as _sfh:
+                _sidecar = json.load(_sfh)
+            _caps = _sidecar.get("capabilities", [])
+            _compiler_self_row = bool(
+                _sidecar.get("compiler_owned_self") is True or
+                (isinstance(_caps, list) and len(_caps) > 0 and
+                 isinstance(_caps[0], dict) and
+                 _caps[0].get("compiler_owned_self") is True and
+                 str(_caps[0].get("name", "")).upper() == "__SELF__")
+            )
+        except (OSError, ValueError, TypeError):
+            _compiler_self_row = False
+    if slot_index == 0 and _compiler_self_row:
+        return jsonify({
+            "error": (
+                "c-list row 0 is the immutable ordinary-abstraction self capability. "
+                "Install or recompile the LUMP to mint a new Namespace identity."
+            ),
+            "immutable_self_capability": True,
+            "slot": 0,
+        }), 422
     if lump_size > n_words:
         return jsonify({"error": "Lump size exceeds file length"}), 400
 

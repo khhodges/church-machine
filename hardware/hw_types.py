@@ -347,6 +347,7 @@ class FaultType(IntEnum):
                              #   resident capability.  Re-enabling network promotion REQUIRES
                              #   adding such an authenticated Mint input — see hardware/mload.py
                              #   FETCH_GT and hardware/church_outform.py.
+    IMMUTABLE_SELF_CAP = 0x1B  # SAVE: c-list row 0 is the immutable self capability
 
 
 class BootState(IntEnum):

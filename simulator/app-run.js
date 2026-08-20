@@ -178,9 +178,17 @@ function _materializeRunCapabilities(capabilities, actionLabel) {
         };
     }
 
+    const hasSelf = !!(caps[0] && typeof caps[0] === 'object' &&
+        caps[0].compiler_owned_self === true &&
+        String(caps[0].name || '').toUpperCase() === '__SELF__');
+    const userCaps = hasSelf ? caps.slice(1) : caps;
     const tokenWords = new Array(caps.length).fill(0);
+    if (hasSelf) {
+        tokenWords[0] = (typeof ChurchSimulator !== 'undefined'
+            ? ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER : 0xFEED5E1F) >>> 0;
+    }
     const materialized = CapabilityTokens.materialize(
-        caps, tokenWords, 0,
+        userCaps, tokenWords, hasSelf ? 1 : 0,
         {
             sim,
             lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache))
@@ -197,13 +205,19 @@ function _materializeRunCapabilities(capabilities, actionLabel) {
     return {
         ok: true,
         errors: [],
-        capabilities: materialized.resolvedCaps.map((cap, index) => ({
+        capabilities: [
+            ...(hasSelf ? [{
+                name: '__SELF__', rights: ['E'], grants: ['E'], nsIndex: null,
+                compiler_owned_self: true, token: tokenWords[0] >>> 0,
+            }] : []),
+            ...materialized.resolvedCaps.map((cap, index) => ({
             name: cap.name,
             rights: cap.rights.slice(),
             grants: cap.grants.slice(),
             nsIndex: cap.nsIndex,
-            token: tokenWords[index] >>> 0,
-        })),
+            token: tokenWords[index + (hasSelf ? 1 : 0)] >>> 0,
+            }))
+        ],
     };
 }
 
@@ -1099,6 +1113,17 @@ function _injectClistNow() {
             const capName = (typeof cap === 'string' ? cap : (cap.name || '')).trim();
             const rights  = typeof cap === 'string' ? [] : (cap.rights || []);
             if (!capName) { sim.memory[clistBase + i] = 0; continue; }
+
+            // The ordinary abstraction's self row is compiler-owned.  It must
+            // be minted from the *current* sequence, never copied from a saved
+            // placeholder or a prior slot allocation.
+            if (i === 0 && cap && typeof cap === 'object' && cap.compiler_owned_self === true) {
+                const selfSeq = sim.parseNSWord1(sim.memory[nsBase + 1] >>> 0).gtSeq;
+                sim.memory[clistBase] = sim.createGT(selfSeq, BOOT_ABSTR_SLOT, {E:1}, 1) >>> 0;
+                sim._compilerOwnedSelfSlots = sim._compilerOwnedSelfSlots || {};
+                sim._compilerOwnedSelfSlots[BOOT_ABSTR_SLOT] = true;
+                continue;
+            }
 
             // Compile → Run records carry the exact materialized GT that passed
             // pre-run validation. Use it verbatim: rebuilding from demoClistGTs

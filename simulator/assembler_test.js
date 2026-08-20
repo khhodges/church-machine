@@ -1801,7 +1801,7 @@ const CLOOMCCompiler = require('./cloomc_compiler.js');
     const canonicalWord = canonical.methods[0] && canonical.methods[0].code[0];
     assert('WCH5 CLOOMC WukongCallHome.Main() compiles from shared conventions',
         canonical.errors.length === 0, canonical.errors.map(e => e.message).join('; '));
-    assert('WCH5 CLOOMC emits ELOADCALL row 0, Main selector 1',
+    assert('WCH5 direct CLOOMC frontend keeps its declared ELOADCALL row 0, Main selector 1',
         canonicalWord !== undefined &&
         ((canonicalWord >>> 27) & 0x1F) === 8 &&
         (canonicalWord & 0x1F) === 0 &&
@@ -2083,7 +2083,7 @@ function findSHR(words) {
         const imm = eloadWord & 0x7FFF;
         const row    = imm & 0x1F;
         const method = (imm >>> 5) & 0x7F;
-        assert('CC11 CALL Scheduler.pause(10) — row=0 (Scheduler at cap offset 0)',
+        assert('CC11 direct compiler frontend — declared Scheduler row=0',
             row === 0, `got row=${row}`);
         assert('CC11 CALL Scheduler.pause(10) — method=5 (pause index 4, 1-based)',
             method === 5, `got method=${method}`);
@@ -2135,7 +2135,7 @@ function findSHR(words) {
         eloadWord !== undefined, 'no ELOADCALL found in ' + JSON.stringify(words));
     if (eloadWord !== undefined) {
         const imm = eloadWord & 0x7FFF;
-        assert('CC13 bare dot-notation — row=0 (Scheduler at cap offset 0)',
+        assert('CC13 direct compiler frontend — declared Scheduler row=0',
             (imm & 0x1F) === 0, `got row=${imm & 0x1F}`);
         assert('CC13 bare dot-notation — method=5 (pause index 4, 1-based)',
             ((imm >>> 5) & 0x7F) === 5, `got method=${(imm >>> 5) & 0x7F}`);
@@ -3171,8 +3171,9 @@ const TP_INSTR_RSV = ((6 << 27) | (0xE << 23) | (0 << 19) | 11) >>> 0;
     sim.cr[0] = { word0: TP_GT_R_IDX0, word1: 0, word2: 0 };
     // NS entry 0: location = NS_TABLE_BASE - 1, limit = 2
     // upperBound = (NS_TABLE_BASE - 1) + 2 = NS_TABLE_BASE + 1 >= NS_TABLE_BASE → fail
-    sim.memory[sim.NS_TABLE_BASE + 0] = sim.NS_TABLE_BASE - 1;
-    sim.memory[sim.NS_TABLE_BASE + 1] = 2;
+    const ns0 = sim._nsSlotBase(0);
+    sim.memory[ns0 + 0] = sim.NS_TABLE_BASE - 1;
+    sim.memory[ns0 + 1] = 2;
     sim.step();
     assert('TP2 out-of-bounds GT: Z=0', sim.flags.Z === false, `Z=${sim.flags.Z}`);
     assert('TP2 out-of-bounds GT: N=1', sim.flags.N === true,  `N=${sim.flags.N}`);
@@ -3189,8 +3190,9 @@ const TP_INSTR_RSV = ((6 << 27) | (0xE << 23) | (0 << 19) | 11) >>> 0;
     sim.cr[0] = { word0: TP_GT_R_IDX0, word1: 0, word2: 0 };
     // NS entry 0: location = 100, limit = 50
     // sumF64 = 150, well below NS_TABLE_BASE → pass
-    sim.memory[sim.NS_TABLE_BASE + 0] = 100;
-    sim.memory[sim.NS_TABLE_BASE + 1] = 50;
+    const ns0 = sim._nsSlotBase(0);
+    sim.memory[ns0 + 0] = 100;
+    sim.memory[ns0 + 1] = 50;
     sim.step();
     assert('TP3 in-range GT with R perm: Z=1', sim.flags.Z === true,  `Z=${sim.flags.Z}`);
     assert('TP3 in-range GT with R perm: N=0', sim.flags.N === false, `N=${sim.flags.N}`);
@@ -3204,8 +3206,9 @@ const TP_INSTR_RSV = ((6 << 27) | (0xE << 23) | (0 << 19) | 11) >>> 0;
     sim.cr[0] = { word0: TP_GT_R_IDX0, word1: 0, word2: 0 };
     // NS entry 0: location = 0, limit = NS_TABLE_BASE (exceeds allowed region)
     // sumF64 = 0 + NS_TABLE_BASE = NS_TABLE_BASE >= NS_TABLE_BASE → fail
-    sim.memory[sim.NS_TABLE_BASE + 0] = 0;
-    sim.memory[sim.NS_TABLE_BASE + 1] = sim.NS_TABLE_BASE;  // stored directly in limit17 bits
+    const ns0 = sim._nsSlotBase(0);
+    sim.memory[ns0 + 0] = 0;
+    sim.memory[ns0 + 1] = sim.NS_TABLE_BASE;  // stored directly in limit17 bits
     sim.step();
     assert('TP4 location=0 + over-limit: Z=0', sim.flags.Z === false, `Z=${sim.flags.Z}`);
     assert('TP4 location=0 + over-limit: N=1', sim.flags.N === true,  `N=${sim.flags.N}`);
@@ -6959,10 +6962,10 @@ HALT
         eloadWords.length === 6,
         `got ${eloadWords.length} ELOADCALL word(s)`);
 
-    // Verify each ELOADCALL targets C-list row 0 (DijkstraFlag is the sole capability, 0-based)
-    const allRow0 = eloadWords.every(w => (w & 0x1F) === 0);
-    assert('EX-JDF-RUN-C5: all 6 ELOADCALL words target C-list row 0 (DijkstraFlag)',
-        allRow0,
+    // Row zero is the resident self identity; source capabilities begin at row one.
+    const allRow1 = eloadWords.every(w => (w & 0x1F) === 1);
+    assert('EX-JDF-RUN-C5: all 6 ELOADCALL words target C-list row 1 (DijkstraFlag)',
+        allRow1,
         `rows: ${eloadWords.map(w => w & 0x1F).join(', ')}`);
 
     // ── Phase B: DijkstraFlag binding trace ──────────────────────────────────

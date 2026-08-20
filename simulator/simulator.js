@@ -860,6 +860,9 @@ class ChurchSimulator {
         this.nsHandlers = {};
         this.nsClistMap = {};
         this._nsStubFlags = {};   // slot → true when every code word in the LUMP is opcode RETURN
+        // Installation provenance is runtime-only. Reset must not preserve a
+        // revoked slot's immutable-self guard; trusted loaders re-establish it.
+        this._compilerOwnedSelfSlots = {};
 
         this.bootComplete = false;
         this.mElevation = false;
@@ -1169,6 +1172,107 @@ class ChurchSimulator {
         // (call.py line 282: base = NS_base + (lumpSize − cc) × 4).
         const lumpSize  = 1 << (n_minus_6 + 6);
         return { magic, n_minus_6, lumpSize, cw, typ, cc, valid: magic === 0x1F };
+    }
+
+    // ── Ordinary-LUMP Namespace identity contract ───────────────────────────
+    // Row zero of an ordinary executable LUMP is not a user capability.  It is
+    // the resident object's own Inform E-GT.  A compiler writes the placeholder
+    // below because its final slot and gt_seq do not exist until allocation; the
+    // one minting path replaces it with the live GT before the binary is made
+    // resident.  It deliberately is not a valid runtime Golden Token.
+    //
+    // Architectural c-lists are explicit exceptions: Thread/Namespace bodies,
+    // Outforms, hardware entries, and callers that pass { architectural: true }.
+    // Those layouts are owned by their respective boot/hardware contracts.
+    static get SELF_CAPABILITY_PLACEHOLDER() { return 0xFEED5E1F; }
+
+    _ordinaryLumpNeedsSelfIdentity(hdr, opts = {}) {
+        if (!(hdr && hdr.valid && hdr.typ === 0) || opts.architectural) return false;
+        // Header type 0 means executable code, not necessarily a compiler-owned
+        // ordinary abstraction: raw assembly also uses it for legacy and
+        // architectural c-lists.  Once installed, provenance is retained by
+        // Namespace slot so runtime writes cannot guess from the header alone.
+        if (opts.compilerOwnedSelf === true) return true;
+        const slot = Number(opts.slot);
+        return Number.isInteger(slot) &&
+            !!(this._compilerOwnedSelfSlots && this._compilerOwnedSelfSlots[slot] === true);
+    }
+
+    _mintOrdinaryLumpIdentity(words, slot, location, opts = {}) {
+        const fail = (code, message) => ({ ok: false, code, message });
+        if (!Array.isArray(words) && !(words instanceof Uint32Array)) {
+            return fail('IDENTITY_WORDS', 'LUMP identity check requires a word array');
+        }
+        if (!Number.isInteger(slot) || slot < 0 ||
+            slot >= Math.floor(this.NS_TABLE_RESERVE / this.NS_ENTRY_WORDS)) {
+            return fail('IDENTITY_SLOT', `Namespace slot ${slot} is outside the live Namespace table`);
+        }
+        const copy = Array.from(words, word => word >>> 0);
+        const hdr = this.parseLumpHeader(copy[0] || 0);
+        if (!hdr.valid || copy.length < hdr.lumpSize) {
+            return fail('IDENTITY_HEADER', 'LUMP header is invalid or its declared body is truncated');
+        }
+        const row0 = hdr.lumpSize - hdr.cc;
+        // A compiler-owned row is proven either by trusted installation metadata
+        // or by its compiler placeholder in an uninstalled binary.  Do not infer
+        // it from typ=0: assembly can intentionally own row zero.
+        const compilerOwnedSelf = !opts.architectural && hdr.typ === 0 &&
+            (opts.compilerOwnedSelf === true ||
+             (hdr.cc > 0 && copy[row0] === ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER));
+        if (!compilerOwnedSelf) return { ok: true, words: copy, hdr, ordinary: false };
+        if (hdr.cc < 1) {
+            return fail('IDENTITY_CLIST', 'ordinary executable LUMPs require compiler-owned c-list row 0');
+        }
+        if (!Number.isInteger(location) || location < 0 ||
+            location + hdr.lumpSize > this.NS_TABLE_BASE) {
+            return fail('IDENTITY_LOCATION',
+                `allocated location 0x${Number(location).toString(16)} cannot contain ${hdr.lumpSize} LUMP words`);
+        }
+
+        const nsBase = this._nsSlotBase(slot);
+        const priorW1 = this.memory[nsBase + 1] >>> 0;
+        const prior = this.parseNSWord1(priorW1);
+        const seq = prior.gtSeq;
+        const expectedSelf = this.createGT(seq, slot, { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, 1) >>> 0;
+        const supplied = copy[row0] >>> 0;
+        const placeholder = ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER >>> 0;
+        if (supplied !== placeholder && supplied !== expectedSelf) {
+            // A saved, already-installed compiler LUMP may carry its previous
+            // live self GT. Remint it only when the caller proves that exact
+            // source slot+sequence; this is never a general "overwrite row 0"
+            // escape hatch for corrupt or stale binaries.
+            const sourceSlot = Number(opts.sourceSelfSlot);
+            const sourceSeq = Number(opts.sourceSelfSeq);
+            const expectedSourceSelf = Number.isInteger(sourceSlot) && sourceSlot >= 0 &&
+                Number.isInteger(sourceSeq) && sourceSeq >= 0
+                ? this.createGT(sourceSeq, sourceSlot,
+                    { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, 1) >>> 0
+                : null;
+            if (!(opts.remintCompilerOwnedSelf === true &&
+                  expectedSourceSelf !== null && supplied === expectedSourceSelf)) {
+                return fail('IDENTITY_SELF',
+                    `c-list row 0 is 0x${supplied.toString(16).padStart(8, '0')}; expected compiler placeholder, destination self E-GT 0x${expectedSelf.toString(16).padStart(8, '0')}, or proven source self identity`);
+            }
+        }
+
+        // Build W0..W3 independently before any caller writes memory.  W1/W2
+        // are recomputed from the final allocated location and live sequence,
+        // which catches stale location, scope, seal, and authority metadata.
+        const w0 = location >>> 0;
+        const w1 = this.packNSWord1(hdr.cw, seq, 0, 0) >>> 0;
+        const w2 = this._integrity32(w0, w1) >>> 0;
+        const w3 = opts.cacheToken != null
+            ? (opts.cacheToken >>> 0)
+            : (this.memory[nsBase + 3] >>> 0);
+        copy[row0] = expectedSelf;
+        return {
+            ok: true,
+            words: copy,
+            hdr,
+            ordinary: true,
+            selfGT: expectedSelf,
+            entry: { location: w0, word1: w1, integrity: w2, cacheToken: w3, seq, cc: hdr.cc }
+        };
     }
 
     // ── Mint validation step 7 — freespace validation ─────────────────────────
@@ -1529,6 +1633,19 @@ class ChurchSimulator {
         }
 
         const addr = clistBase + slotIdx;
+        if (slotIdx === 0) {
+            const ownerSlot = this.parseGT(cr6.word0 >>> 0).index;
+            const owner = this.readNSEntry(ownerSlot);
+            const ownerHdr = owner && owner.word0_location !== 0
+                ? this.parseLumpHeader(this.memory[owner.word0_location] >>> 0)
+                : null;
+            if (this._ordinaryLumpNeedsSelfIdentity(ownerHdr, { slot: ownerSlot })) {
+                return {
+                    ok: false,
+                    error: 'c-list row 0 is the immutable ordinary-abstraction self capability'
+                };
+            }
+        }
         const existing = (this.memory[addr] >>> 0);
         const hasLazyEntry = this._pendingResolves && this._pendingResolves.has(slotIdx);
 
@@ -4546,6 +4663,14 @@ class ChurchSimulator {
     }
 
     _execSave(d) {
+        // Hardware rule: CR6 is the active c-list and row 0 is always the
+        // resident identity credential.  This must fault before any operand,
+        // permission, Namespace, or memory path can mask the violation.
+        if (d.crSrc === 6 && d.imm === 0) {
+            this.fault('IMMUTABLE_SELF_CAP',
+                'SAVE: CR6 c-list row 0 is the immutable self capability');
+            return null;
+        }
         const srcGT = this.cr[d.crDst].word0;
         if (srcGT === 0) {
             this.fault('NULL_CAP', `SAVE: CR${d.crDst} is NULL`);
@@ -4618,6 +4743,24 @@ class ChurchSimulator {
             const slotPermCheck = this._validateClistSlotPerms(srcParsedCheck, d.imm);
             if (!slotPermCheck.ok) {
                 this.fault(slotPermCheck.fault, `SAVE: ${slotPermCheck.message}`);
+                return null;
+            }
+        }
+
+        // An ordinary executable LUMP's first c-list word is its Namespace
+        // identity credential.  SAVE must never be able to replace it: doing so
+        // turns a later TPERM EXACT/BIND check into a delayed, misleading fault.
+        // Architectural c-lists are exempt by header type.
+        if (d.imm === 0) {
+            const targetEntry = this.readNSEntry(clistCheck.parsed.index);
+            const targetHdr = targetEntry && targetEntry.word0_location !== 0
+                ? this.parseLumpHeader(this.memory[targetEntry.word0_location] >>> 0)
+                : null;
+            if (this._ordinaryLumpNeedsSelfIdentity(targetHdr, {
+                slot: clistCheck.parsed.index
+            })) {
+                this.fault('IMMUTABLE_SELF_CAP',
+                    `SAVE: c-list row 0 of ordinary NS[${clistCheck.parsed.index}] is the immutable self capability`);
                 return null;
             }
         }
@@ -7323,7 +7466,7 @@ class ChurchSimulator {
         this.emit('stateChange', this.getState());
     }
 
-    loadLumpBinary(words, nsSlot) {
+    loadLumpBinary(words, nsSlot, options = {}) {
         const EXTENDED_BASE  = 0x0400;
         const _nsSlotRaw     = (nsSlot !== undefined && nsSlot !== null) ? Number(nsSlot) : NaN;
         const abstrSlot      = Number.isInteger(_nsSlotRaw) ? _nsSlotRaw : this.bootEntrySlot;
@@ -7378,8 +7521,25 @@ class ChurchSimulator {
             return false;
         }
 
+        // Complete the compiler-owned placeholder only after the destination
+        // slot and its current sequence are known.  This returns a private copy:
+        // all failures above and below this point leave both RAM and the NS table
+        // untouched, including when a caller handed us a stale/wrong self GT.
+        const _identity = this._mintOrdinaryLumpIdentity(words, abstrSlot, EXTENDED_BASE, {
+            architectural: options.architectural === true || hdr.typ !== 0,
+            compilerOwnedSelf: options.compilerOwnedSelf === true,
+            remintCompilerOwnedSelf: options.remintCompilerOwnedSelf === true,
+            sourceSelfSlot: options.sourceSelfSlot,
+            sourceSelfSeq: options.sourceSelfSeq
+        });
+        if (!_identity.ok) {
+            this.output += `[loadLumpBinary] ERROR: Namespace identity validation failed (${_identity.code}) — ${_identity.message}. LUMP rejected without installation.\n`;
+            return false;
+        }
+        const installWords = _identity.words;
+
         for (let i = 0; i < lumpSize; i++) {
-            this.memory[EXTENDED_BASE + i] = (i < words.length ? words[i] : 0) >>> 0;
+            this.memory[EXTENDED_BASE + i] = installWords[i] >>> 0;
         }
 
         const nsBase       = this._nsSlotBase(abstrSlot);
@@ -7391,10 +7551,34 @@ class ChurchSimulator {
         // c-list count comes from the resident lump header (hdr.cc), recorded in
         // the side-table; state/type preserved from the prior entry (default Inform).
         // writeNSEntry recomputes W1 (authority) + W2 (integrity32).
-        const _declType    = (this._nsUiTypeHint && this._nsUiTypeHint[abstrSlot]) || 1;
+        // The ordinary self identity is an Inform E-GT, so its Namespace entry
+        // must be Inform as well.  UI type hints are meaningful only for the
+        // explicitly architectural c-list exceptions.
+        const _declType    = _identity.ordinary ? 1 :
+            ((this._nsUiTypeHint && this._nsUiTypeHint[abstrSlot]) || 1);
         this.writeNSEntry(abstrSlot, EXTENDED_BASE >>> 0, hdr.cw,
-            0, w1f.g, _declType, existingGtSeq, hdr.cc,
-            this.memory[nsBase + 3] >>> 0);
+            0, _identity.ordinary ? 0 : w1f.g, _declType, existingGtSeq, hdr.cc,
+            _identity.ordinary ? _identity.entry.cacheToken : (this.memory[nsBase + 3] >>> 0));
+
+        // writeNSEntry is the canonical commit mechanism.  Assert the exact
+        // four words it wrote for ordinary LUMPs so a future ABI drift cannot
+        // make a valid binary run under an incoherent Namespace entry.
+        if (_identity.ordinary) {
+            const committed = [
+                this.memory[nsBase] >>> 0, this.memory[nsBase + 1] >>> 0,
+                this.memory[nsBase + 2] >>> 0, this.memory[nsBase + 3] >>> 0
+            ];
+            const expected = [
+                _identity.entry.location, _identity.entry.word1,
+                _identity.entry.integrity, _identity.entry.cacheToken
+            ].map(word => word >>> 0);
+            if (committed.some((word, index) => word !== expected[index])) {
+                throw new Error(`loadLumpBinary: Namespace commit drift for NS[${abstrSlot}]`);
+            }
+        }
+        this._compilerOwnedSelfSlots = this._compilerOwnedSelfSlots || {};
+        if (_identity.ordinary) this._compilerOwnedSelfSlots[abstrSlot] = true;
+        else delete this._compilerOwnedSelfSlots[abstrSlot];
 
         // Stub detection: tag the NS slot when every code word is a bare RETURN.
         // Uses the raw words[] array (not memory[]) so the scan is immune to any
