@@ -2231,7 +2231,8 @@ function _installBootEntryGTIntoCR0() {
     if (!sim) return false;
     const bSlot = sim.bootEntrySlot;
     if (bSlot === null || bSlot === undefined) return false;
-    const gtWord = sim.createGT(0, bSlot, {E:1}, 1);
+    const bEntry = sim.readNSEntry(bSlot);
+    const gtWord = sim.createGT(bEntry ? bEntry.gtSeq : 0, bSlot, {E:1}, 1);
     // Write to the primary thread (NS slot 1 — the boot thread).
     const targets = new Set([1]);
     let wrote = false;

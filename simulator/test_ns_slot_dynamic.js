@@ -236,6 +236,19 @@ function makeBooted() {
     check('T312: sim.programBaseAddr is 0x0800 + 1 for slot 11 (code follows lump header)',
         sim.programBaseAddr === SLOT11_BASE + 1,
         `programBaseAddr=0x${(sim.programBaseAddr || 0).toString(16)}`);
+
+    const cr14 = sim.cr[14] || {};
+    const cr14Parsed = sim.parseGT(cr14.word0 >>> 0);
+    const liveEntry = sim.readNSEntry(11);
+    check('T312b: CR14 is an R+X GT minted for the compiled program slot',
+        cr14Parsed.index === 11 && cr14Parsed.permissions.R === 1 &&
+        cr14Parsed.permissions.X === 1 && cr14Parsed.gt_seq === (liveEntry ? liveEntry.gtSeq : -1),
+        `CR14=0x${(cr14.word0 >>> 0).toString(16)}, slot=${cr14Parsed.index}, seq=${cr14Parsed.gt_seq}`);
+
+    check('T312c: CR14 metadata mirrors the compiled program Namespace entry',
+        liveEntry !== null && cr14.word1 === liveEntry.word0_location &&
+        cr14.word2 === liveEntry.word1_limit && cr14.word3 === liveEntry.word2_seals,
+        `CR14=[0x${(cr14.word1 || 0).toString(16)},0x${(cr14.word2 || 0).toString(16)},0x${(cr14.word3 || 0).toString(16)}]`);
 }
 
 // ── Allocator fallback tests ──────────────────────────────────────────────────

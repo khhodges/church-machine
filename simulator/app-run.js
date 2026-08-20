@@ -1169,7 +1169,8 @@ function _injectClistNow() {
                 continue;
             }
             if (capName.toUpperCase() === 'BOOT.ABSTR') {
-                sim.memory[clistBase + i] = sim.createGT(0, sim.bootEntrySlot, {E:1}, 1) >>> 0;
+                sim.memory[clistBase + i] =
+                    sim.createGT(w1f.gtSeq, BOOT_ABSTR_SLOT, {E:1}, 1) >>> 0;
                 continue;
             }
 
@@ -1205,8 +1206,10 @@ function _injectClistNow() {
                 if (!perms.R && !perms.W && !perms.X && !perms.L && !perms.S && !perms.E) {
                     perms.E = 1;  // no rights declared → safe Church entry default
                 }
+                const targetEntry = sim.readNSEntry(nsIdx);
+                const targetSeq = targetEntry ? targetEntry.gtSeq : 0;
                 sim.memory[clistBase + i] =
-                    sim.createGT(0, nsIdx, perms, 1) >>> 0;
+                    sim.createGT(targetSeq, nsIdx, perms, 1) >>> 0;
                 continue;
             }
 
@@ -1224,7 +1227,7 @@ function _injectClistNow() {
             w1f.limit, w1f.b, w1f.g, w1f.gtType, cc
         );
         sim.memory[nsBase + 1] = nsWord1B;
-        const cr6GTb = sim.createGT(0, BOOT_ABSTR_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
+        const cr6GTb = sim.createGT(w1f.gtSeq, BOOT_ABSTR_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
         sim.cr[6] = {
             word0: cr6GTb,
             word1: clistBase >>> 0,
@@ -1254,7 +1257,7 @@ function _injectClistNow() {
             w1f.limit, w1f.b, w1f.g, w1f.gtType, cc
         );
         sim.memory[nsBase + 1] = nsWord1A;
-        const cr6GTa = sim.createGT(0, BOOT_ABSTR_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
+        const cr6GTa = sim.createGT(w1f.gtSeq, BOOT_ABSTR_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
         sim.cr[6] = {
             word0: cr6GTa,
             word1: clistBase >>> 0,
@@ -1287,13 +1290,29 @@ function _applyPendingSimLoad() {
     const _aplToken = window.LumpRegistry ? window.LumpRegistry.getCurrent() : null;
     const _aplCaps  = _aplMem ? (_aplMem.capabilities || []) : [];
     let   _progSlot = null;
-    if (sim.bootComplete && _aplToken && typeof sim.allocOrFindNsSlot === 'function') {
+    if (sim.bootComplete) {
+        // A compiled program must always receive its own Namespace slot.  Falling
+        // back to loadProgram() without a token would patch the live boot-entry
+        // LUMP (SelfTest at slot 6) and leave CR14 pointing at a shortened,
+        // mismatched descriptor after the next reset.
+        if (!_aplToken || typeof sim.allocOrFindNsSlot !== 'function') {
+            const message = '[applyPendingSimLoad] Cannot restore compiled program: no dynamic Namespace token/allocator is available.';
+            console.error(message);
+            sim.output += message + '\n';
+            _pendingSimLoad = false;
+            return false;
+        }
         const _aplName  = sim.programName || 'prog';
         _progSlot = sim.allocOrFindNsSlot(_aplToken, _aplName);
-        if (_progSlot !== null) {
-            sim.writeNsEntryForProgram(_progSlot, { words: _aplWords, caps: _aplCaps, label: _aplName });
-            sim.bootEntrySlot = _progSlot;
+        if (_progSlot === null) {
+            const message = `[applyPendingSimLoad] Cannot restore compiled program "${_aplName}": no Namespace slot is free.`;
+            console.error(message);
+            sim.output += message + '\n';
+            _pendingSimLoad = false;
+            return false;
         }
+        sim.writeNsEntryForProgram(_progSlot, { words: _aplWords, caps: _aplCaps, label: _aplName });
+        sim.bootEntrySlot = _progSlot;
     }
 
     sim.loadProgram(_aplWords, 0);
@@ -1304,7 +1323,9 @@ function _applyPendingSimLoad() {
     // already points to the new slot [7] lump at 0x0400 — every instruction
     // fetch faults the bounds check before stepCount++ is reached.
     if (_progSlot !== null && sim.bootComplete && sim.cr[14]) {
-        const _cr14GT = sim.createGT(0, _progSlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1) >>> 0;
+        const _programEntry = sim.readNSEntry(_progSlot);
+        const _programSeq = _programEntry ? _programEntry.gtSeq : 0;
+        const _cr14GT = sim.createGT(_programSeq, _progSlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1) >>> 0;
         sim.cr[14].word0 = _cr14GT;
         sim.cr[14].m = 0;
     }
@@ -1358,7 +1379,9 @@ function _applyPendingSimLoad() {
     // This replaces the SelfTest E-GT that the boot sequence installed at
     // thread[+THREAD_CAPS_OFFSET=244], making CR0 reference the user's program.
     if (_progSlot !== null && sim.bootComplete) {
-        const _progGT = sim.createGT(0, _progSlot, {E:1}, 1) >>> 0;
+        const _programEntry = sim.readNSEntry(_progSlot);
+        const _programSeq = _programEntry ? _programEntry.gtSeq : 0;
+        const _progGT = sim.createGT(_programSeq, _progSlot, {E:1}, 1) >>> 0;
         sim.cr[0] = { word0: _progGT, word1: 0, word2: 0, word3: 0, m: 0 };
         const _thEntry = sim.readNSEntry(1);
         if (_thEntry && _thEntry.word0_location > 0) {
@@ -1663,12 +1686,13 @@ function _autoLoadDefaultProgram() {
             : null;
         const _bootWords = _bootMem ? (_bootMem.words || []) : [];
         if (_bootWords.length > 0) {
-            sim.loadProgram(_bootWords, 0);
-            if (lastMethodTableSize > 0) {
-                // Skip method table so PC lands on the first instruction (body at word N).
-                sim.pc = lastMethodTableSize;
-            }
-            _injectClistNow();
+            // Never patch restored source into the boot-entry LUMP directly.
+            // Allocate/reuse the program's own slot first, then mint CR0/CR14
+            // from that entry.  Direct loadProgram() here used to shrink
+            // SelfTest's live descriptor to the cached program length while
+            // CR14 still carried the SelfTest slot token.
+            _pendingSimLoad = true;
+            _applyPendingSimLoad();
         }
         // Only apply boot lump pet names when no source-compiled program is
         // loaded — in source-assembled context the compiler owns the alias maps.

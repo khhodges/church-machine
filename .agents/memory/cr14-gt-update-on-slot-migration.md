@@ -26,3 +26,19 @@ if (_progSlot !== null && sim.bootComplete && sim.cr[14]) {
 This mirrors what NUC_CODE (boot step B:07) does: `createGT(0, bootEntrySlot, {R:1,W:0,X:1,...}, 1)`.
 
 Note: CR0 (the E-GT for dispatching methods) needs `{E:1}` — a different GT from CR14.
+
+## Reset-time compiled-program restore
+
+A cached source-compiled program must be restored through the same dynamic
+Namespace allocation path as a new compile.  It must never be passed directly
+to the generic program loader while the boot entry still names SelfTest.
+
+**Why:** Directly patching the cached words into the active boot-entry LUMP
+shrinks SelfTest's live Namespace descriptor to the cached program's code
+length, while CR14 continues to carry SelfTest's slot token.  The result is a
+misleading fetch RANGE fault at the cached program's old boundary even when the
+SelfTest binary itself is valid.
+
+**How to apply:** Allocate or reuse the compiled program's token-owned slot
+first, write its Namespace descriptor, then mint both CR0 and CR14 from that
+descriptor's live sequence, location, authority word, and integrity word.
