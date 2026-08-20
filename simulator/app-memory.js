@@ -2237,7 +2237,9 @@ function _installBootEntryGTIntoCR0() {
     let wrote = false;
     for (const nsIdx of targets) {
         const entry = sim.readNSEntry(nsIdx);
-        if (entry && entry.word0_location) {
+        // The canonical boot thread is rooted at address 0, which is a valid
+        // location and must not be rejected by a truthiness check.
+        if (entry && typeof entry.word0_location === 'number') {
             sim.memory[entry.word0_location + THREAD_LAYOUT.CAPS_START] = gtWord;
             wrote = true;
         }

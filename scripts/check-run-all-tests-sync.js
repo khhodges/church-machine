@@ -88,6 +88,7 @@ const DEFAULT_SCRIPT_ONLY_SUITES = [
     'check-lumps-guard',
     'check-ns-word3-contract',
     'test-check-ns-word3-contract',
+    'install-boot-entry-cr0-tests',
 ];
 
 const configPath = path.join(__dirname, 'test-workflow-config.json');

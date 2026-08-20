@@ -16,6 +16,8 @@
 //   bootSlot       number — sim.bootEntrySlot at call time
 //   fnSource       string — first 60 chars of the function source (proves it
 //                           originates from the loaded file, not a local copy)
+//   primaryCr0Value number — E-GT written to the canonical boot Thread's CR0
+//   gtWordExpected  number — independently computed E-GT for the boot entry
 
 'use strict';
 
@@ -31,7 +33,12 @@ global.window = {
             namespaceLumpWords:     64,
             threadLumpWords:       256,
         }
-    }
+    },
+    // app-memory.js registers an unload guard while it is evaluated. The
+    // harness does not dispatch browser events, but production initialization
+    // still needs the browser event-listener surface.
+    addEventListener: () => {},
+    removeEventListener: () => {},
 };
 
 const ChurchSimulator = require('../../simulator/simulator.js');
@@ -58,6 +65,8 @@ const sandbox = {
     window: global.window,
     localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
     document: {
+        addEventListener: () => {},
+        removeEventListener: () => {},
         getElementById(id) {
             if (id === 'editorConsole') return _consoleMock;
             return null;
@@ -133,35 +142,22 @@ const gtHexInLog   = hexMatch ? hexMatch[0] : '';
 const expectedGtWord = sim.createGT(0, bootSlot, {E:1}, 1);
 const expectedGtHex  = '0x' + (expectedGtWord >>> 0).toString(16).toUpperCase().padStart(8, '0');
 
-// Save run-1 console state before starting run 2.
+// Preserve the console result before inspecting the installed memory word.
 const consoleTextRun1 = _consoleMock.textContent;
 
-// ── Run 2: nsExpandedSlot=45 (second thread slot in view) ─────────────────────
-// app-memory.js declares `let nsExpandedSlot` at script scope, so setting
-// sandbox.nsExpandedSlot from outside the VM context has no effect on the
-// internal binding.  Use vm.runInContext to mutate it from within.
-vm.runInContext('nsExpandedSlot = 45;', sandbox);
-sim.output = '';
-_consoleMock.textContent = '';
-const returned2 = sandbox._installBootEntryGTIntoCR0();
-
-// Extract the log line from run 2.
-const outputLines2 = sim.output.split('\n').filter(l => l.length > 0);
-const logLine2     = outputLines2.find(l => l.startsWith('[IDE] CR0')) || '';
-
-// Read the value written to NS slot 45's CR0 address.
+// Read the actual primary boot-thread CR0 home slot. The canonical Thread LUMP
+// starts at address 0, so this verifies the zero-address path that boot uses.
 // THREAD_LAYOUT is a const in app-memory.js so it is lexically scoped to the
 // VM script and is not a property of the sandbox object.  Run a small helper
 // snippet inside the same context so it can reach THREAD_LAYOUT directly.
-const slot45CrValueResult = vm.runInContext(
+const primaryCr0Value = vm.runInContext(
     '(function() {' +
-    '  var e = sim.readNSEntry(45);' +
+    '  var e = sim.readNSEntry(1);' +
     '  if (!e || e.word0_location === undefined) return null;' +
     '  return sim.memory[e.word0_location + THREAD_LAYOUT.CAPS_START];' +
     '})()',
     sandbox
 );
-const slot45CrValue = slot45CrValueResult;
 
 const out = {
     returned,
@@ -172,13 +168,8 @@ const out = {
     gtHexExpected: expectedGtHex,
     bootSlot,
     fnSource,
-    run2: {
-        returned:      returned2,
-        simOutputLine: logLine2,
-        slot45CrValue,
-        gtWordExpected: expectedGtWord,
-        gtHexExpected:  expectedGtHex,
-    },
+    primaryCr0Value,
+    gtWordExpected: expectedGtWord,
 };
 
 process.stdout.write(JSON.stringify(out) + '\n');
