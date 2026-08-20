@@ -1146,22 +1146,8 @@ document.addEventListener('DOMContentLoaded', () => {
         initCodeCopyButtons();
         updateFPGAStatusBtn();
         const _asmEd = document.getElementById('asmEditor');
-        if (_asmEd) {
-            _asmEd.addEventListener('keydown', function(e) {
-                if (e.ctrlKey && e.shiftKey && (e.key === 'C' || e.key === 'c')) {
-                    e.preventDefault();
-                    if (typeof showEditorCListPopup === 'function') showEditorCListPopup(e);
-                }
-                if (e.ctrlKey && e.shiftKey && (e.key === 'F' || e.key === 'f')) {
-                    e.preventDefault();
-                    if (typeof saveSourceFile === 'function') saveSourceFile();
-                }
-                if (e.ctrlKey && e.shiftKey && (e.key === 'O' || e.key === 'o')) {
-                    e.preventDefault();
-                    if (typeof showOpenFileDialog === 'function') showOpenFileDialog();
-                }
-            });
-        }
+        // Do not override browser Ctrl/Command shortcuts in the editor.
+        // Find, save, open, and C-List remain available through the UI.
     });
 });
 

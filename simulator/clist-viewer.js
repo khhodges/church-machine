@@ -1247,24 +1247,6 @@
         return !!(popupEl && popupEl.style.display !== 'none');
     }
 
-    // ── Keyboard shortcut (Ctrl+Shift+C / Cmd+Shift+C) ───────────────────────
-    document.addEventListener('keydown', function (e) {
-        var cfg = (window.CListViewerConfig) ? window.CListViewerConfig : DEFAULT_SHORTCUT;
-        var wantCtrl  = (cfg.ctrl  !== undefined) ? cfg.ctrl  : DEFAULT_SHORTCUT.ctrl;
-        var wantShift = (cfg.shift !== undefined) ? cfg.shift : DEFAULT_SHORTCUT.shift;
-        var wantCode  = cfg.code || DEFAULT_SHORTCUT.code;
-        var ctrlOrCmd = e.ctrlKey || e.metaKey;
-
-        if (e.code === wantCode &&
-            ctrlOrCmd === wantCtrl &&
-            e.shiftKey === wantShift) {
-            var ed = document.getElementById('asmEditor');
-            if (!ed) return;
-            e.preventDefault();
-            toggleViewer();
-        }
-    });
-
     // Publish API first so the mutual-exclusion wrap below can reference it
     // getNullSlotPetNames() — returns a copy of the slot-index → pet-name map.
     // Used by the assembler to resolve null-GT row names (e.g. "Mum") to their

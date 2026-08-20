@@ -604,8 +604,8 @@
                                 <button class="ham-item" onclick="saveSourceFileAs();closeEditorActions()" data-tooltip="Save As — Choose a new path to save this source">Save As&hellip;</button>
                                 <div class="ham-divider"></div>
                                 <div class="ham-group-title">Search</div>
-                                <button class="ham-item" onclick="_editorFindOpen(false);closeEditorActions()" data-tooltip="Find — Search for text in the editor (Ctrl+F)">Find&hellip;</button>
-                                <button class="ham-item" onclick="_editorFindOpen(true);closeEditorActions()" data-tooltip="Find &amp; Replace — Search and replace text in the editor (Ctrl+H)">Find &amp; Replace&hellip;</button>
+                                <button class="ham-item" onclick="_editorFindOpen(false);closeEditorActions()" data-tooltip="Find — Search for text in the editor">Find&hellip;</button>
+                                <button class="ham-item" onclick="_editorFindOpen(true);closeEditorActions()" data-tooltip="Find &amp; Replace — Search and replace text in the editor">Find &amp; Replace&hellip;</button>
                                 <div class="ham-divider"></div>
                                 <div class="ham-group-title">Build</div>
                                 <button class="ham-item" onclick="smartCompile();closeEditorActions()" data-tooltip="Compile — Compile with auto-detected or selected source language">Compile</button>
@@ -615,7 +615,7 @@
                                 <button class="ham-item" onclick="compileAndCreateAbstraction();closeEditorActions()" data-tooltip="Create Abstraction — Compile and create via Navana.Abstraction.Add">Create Abstraction</button>
                                 <button class="ham-item" onclick="auditLumpOnly();closeEditorActions()" data-tooltip="Audit LUMP — Compile and run structural consistency checks without downloading or saving">Audit LUMP</button>
                                 <button class="ham-item" onclick="exportLumpAsPatch();closeEditorActions()" style="color:#66bb6a;" data-tooltip="Export Lump as Patch — Load a pre-built .lump file and convert to a .patch file for FPGA flashing">Lump → Patch ↓</button>
-                                <button class="ham-item" onclick="showEditorCListPopup(event);closeEditorActions()" style="color:#7dd3fc;" data-tooltip="C-List — Browse capability names and insert into editor (Ctrl+Shift+C)">C-List</button>
+                                <button class="ham-item" onclick="showEditorCListPopup(event);closeEditorActions()" style="color:#7dd3fc;" data-tooltip="C-List — Browse capability names and insert into editor">C-List</button>
                                 <div class="ham-divider"></div>
                                 <div class="ham-group-title">Install</div>
                                 <button class="ham-item" onclick="saveUploadJSON();closeEditorActions()" data-tooltip="Save Abstraction — Compile and save the abstraction definition file">Save Abstraction</button>
@@ -748,15 +748,15 @@
                     <span class="preset-notice-text">Integer arithmetic only — load the CLOOMC preset for exact fractions.</span>
                 </div>
                 <div class="asm-picker-toolbar">
-                    <button class="btn-instr-picker" title="Open instruction picker (Ctrl+Space)" data-tooltip="Instruction Picker — Browse and insert assembly instructions (Ctrl+Space)" onclick="(function(){var ed=document.getElementById('asmEditor');if(ed&&window.AsmInstructionPicker){ed.focus();window.AsmInstructionPicker.show(ed);}})()">&#x2295; Instructions</button>
-                    <button class="btn-clist-viewer" title="View C-List capabilities (Ctrl+Shift+C)" data-tooltip="C-List Viewer — Browse Golden Tokens in CR6 (Ctrl+Shift+C)" onclick="window.CListViewer&&window.CListViewer.toggle()">&#x2295; C-List</button>
+                <button class="btn-instr-picker" title="Open instruction picker" data-tooltip="Instruction Picker — Browse and insert assembly instructions" onclick="(function(){var ed=document.getElementById('asmEditor');if(ed&&window.AsmInstructionPicker){ed.focus();window.AsmInstructionPicker.show(ed);}})()">&#x2295; Instructions</button>
+                <button class="btn-clist-viewer" title="View C-List capabilities" data-tooltip="C-List Viewer — Browse Golden Tokens in CR6" onclick="window.CListViewer&&window.CListViewer.toggle()">&#x2295; C-List</button>
                     <input type="text" id="exampleSearchBox" class="example-search-box" placeholder="&#x1F50D; Search examples..." data-tooltip="Search Examples — live-filter the example tabs above by name" oninput="filterExampleTabs(this.value)">
                 </div>
                 <div id="compileFailedBanner" class="compile-failed-banner" role="alert" aria-live="assertive" style="display:none;">
                     <span class="compile-failed-banner-icon">&#x2716;</span>
                     <span id="compileFailedBannerText">COMPILE FAILED</span>
                 </div>
-                <!-- Find / Find & Replace bar — opened by hamburger menu or Ctrl+F / Ctrl+H -->
+                <!-- Find / Find & Replace bar — opened by the editor actions menu -->
                 <div id="editorFindBar" class="editor-find-bar" style="display:none;" role="search" aria-label="Find in editor">
                     <div class="editor-find-row">
                         <input type="text" id="editorFindInput" class="editor-find-input" placeholder="Find&hellip;" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off">
@@ -3520,35 +3520,12 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
             <span>Keyboard Shortcuts</span>
             <button class="btn shortcuts-close-btn" onclick="closeShortcutsHelp()" aria-label="Close">&times;</button>
         </div>
-        <div class="shortcuts-platform-note">Ctrl = Cmd on Mac &nbsp;&middot;&nbsp; press <kbd style="font-size:0.72rem;padding:0.1rem 0.35rem;">?</kbd> or <kbd style="font-size:0.72rem;padding:0.1rem 0.35rem;">Ctrl+/</kbd> to open anytime</div>
+        <div class="shortcuts-platform-note">Press <kbd style="font-size:0.72rem;padding:0.1rem 0.35rem;">?</kbd> to open anytime</div>
         <div class="shortcuts-body">
             <div class="shortcuts-section">
-                <div class="shortcuts-section-title">Navigation</div>
+                <div class="shortcuts-section-title">Editor</div>
                 <div class="shortcuts-grid">
-                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>A</kbd></span><span>Abstractions view</span>
-                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>B</kbd></span><span>Builder / Hardware view</span>
-                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>D</kbd></span><span>Dashboard / Simulator view</span>
-                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>F</kbd></span><span>Reference Docs view</span>
-                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>G</kbd></span><span>Garbage Collector view</span>
-                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>L</kbd></span><span>Lumps Repository view</span>
-                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>M</kbd></span><span>Math / REPL view</span>
-                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>N</kbd></span><span>Namespace Viewer</span>
-                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>P</kbd></span><span>Pipeline Visualiser</span>
-                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>T</kbd></span><span>Trace Log</span>
-                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>U</kbd></span><span>Tutorial</span>
-                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>V</kbd></span><span>Devices view</span>
-                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>Y</kbd></span><span>Docs view</span>
-                </div>
-            </div>
-            <div class="shortcuts-section">
-                <div class="shortcuts-section-title">Toolbar &amp; Editor</div>
-                <div class="shortcuts-grid">
-                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>S</kbd></span><span>Save active assembly tab</span>
-                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>S</kbd></span><span>Download source as .cloomc</span>
-                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>C</kbd></span><span>Toggle C-List Viewer</span>
-                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>N</kbd></span><span>New Abstraction Wizard</span>
-                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>L</kbd></span><span>Jump to Source Library</span>
-                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>R</kbd></span><span>Reboot / reset simulation</span>
+                    <span class="shortcuts-keys"><kbd>Tab</kbd></span><span>Insert indentation in the assembly editor</span>
                 </div>
             </div>
             <div class="shortcuts-section">

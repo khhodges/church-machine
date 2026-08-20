@@ -91,7 +91,7 @@ window._r1CheckSteps = function() {
 // EVENT LISTENERS
 //   sim.on('stateChange', ...)  — re-render CR/DR tables + memory after each step
 //   window.onresize             — reflow pipeline SVG
-//   document.onkeydown          — F8 = step, F5 = run, Escape = stop, Ctrl+R = reboot
+//   document.onkeydown          — F8 = step, F5 = run, Escape = stop
 //
 // FILE LAYOUT (other JS files loaded by index.html)
 //   simulator.js          — ChurchSimulator (CPU, GC, NS, boot)
@@ -1146,20 +1146,6 @@ function init() {
                 updateLineNumbers();
                 markUserTabDirty();
             }
-            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-                e.preventDefault();
-                if (activeUserTabId) saveActiveUserTab();
-            }
-            // Ctrl+F — Find; Ctrl+H — Find & Replace (scoped to this editor)
-            if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
-                if (e.key === 'f' || e.key === 'F') {
-                    e.preventDefault();
-                    if (typeof _editorFindOpen === 'function') _editorFindOpen(false);
-                } else if (e.key === 'h' || e.key === 'H') {
-                    e.preventDefault();
-                    if (typeof _editorFindOpen === 'function') _editorFindOpen(true);
-                }
-            }
             // Escape — close find bar if open, with focus returning to editor
             if (e.key === 'Escape') {
                 var _fb = document.getElementById('editorFindBar');
@@ -1248,65 +1234,9 @@ function init() {
     _initDefaultViewBolt();
     _initLandingCardDrag();
 
-    // Global keyboard shortcuts: Ctrl+<letter> → switch top-level view.
-    // Skipped when focus is inside any text input / textarea / contenteditable.
-    document.addEventListener('keydown', function _ideNavShortcut(e) {
-        // Ctrl+Shift+S — Save Pseudo Code (download editor source as .cloomc)
-        if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 's') {
-            e.preventDefault();
-            savePseudoCode();
-            return;
-        }
-        // Ctrl+Shift+L — jump directly to Source Library (Abstractions → Sources tab)
-        if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'l') {
-            const tag = document.activeElement ? document.activeElement.tagName : '';
-            if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT' &&
-                !(document.activeElement && document.activeElement.isContentEditable)) {
-                e.preventDefault();
-                switchView('abstractions');
-                switchAbsSubtab('sources');
-                return;
-            }
-        }
-        if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
-        const tag = document.activeElement ? document.activeElement.tagName : '';
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' ||
-            (document.activeElement && document.activeElement.isContentEditable)) return;
-        // Map letter → view name
-        const NAV = {
-            a: 'abstractions',   // Abstractions
-            b: 'builder',        // Builder / Hardware
-            d: 'dashboard',      // Dashboard / Simulator
-            h: 'home',           // Home landing page
-            f: 'reference',      // reFerences docs (r is reserved for Reboot)
-            g: 'gc',             // Garbage Collector
-            l: 'lumps',          // Lumps repository
-            m: 'repl',           // Math (REPL / SlideRule)
-            n: 'namespace',      // Namespace viewer
-            p: 'pipeline',       // Pipeline visualiser
-            t: 'trace',          // Trace log
-            u: 'tutorial',       // tUtorial
-            v: 'devices',        // deVices
-            y: 'docs',           // docs (no better letter free)
-        };
-        const key = e.key.toLowerCase();
-        // Ctrl+R — Reboot: reset and re-run the boot sequence.
-        // preventDefault stops the browser page-refresh so the shortcut works
-        // correctly even when the simulator is embedded in an iframe.
-        if (key === 'r') {
-            e.preventDefault();
-            resetSim();
-            return;
-        }
-        if (NAV[key]) {
-            e.preventDefault();
-            switchView(NAV[key]);
-        }
-    });
-
     // "?" — open keyboard shortcuts help overlay (only when not in a text field)
     document.addEventListener('keydown', function _shortcutsHelpKey(e) {
-        if (e.key !== '?' && !(e.key === '/' && (e.ctrlKey || e.metaKey))) return;
+        if (e.key !== '?') return;
         const tag = document.activeElement ? document.activeElement.tagName : '';
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' ||
             (document.activeElement && document.activeElement.isContentEditable)) return;
