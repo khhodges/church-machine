@@ -309,11 +309,30 @@ function renderCListEntryDetail(nsIdx, entry) {
                         const _mObj1 = _methodAtOffset(nsIdx, w);
                         const _disasm1 = _applyMethodCRNames(_applyMethodDRNames(_annotateRawClistSlot(asm.disassemble(word), _clBase, nsIdx), _mObj1), _mObj1);
                         const decoded = word === 0 ? 'HALT' : _wrapRegHover(typeof _highlightCLOOMCSource === 'function' ? _highlightCLOOMCSource(_disasm1, 'assembly') : _disasm1);
-                        const isPC   = sim.bootComplete && (addr === (sim.memory[sim._nsSlotBase(2)] || (2 * sim.SLOT_SIZE)) + 1 + sim.pc);
+                        // Show both sides of live execution: the instruction just
+                        // retired (progress) and the one the CPU will fetch next
+                        // (current).  Use the physical addresses supplied by the
+                        // active CR14/Namespace entry rather than assuming slot 2.
+                        const lastRetired = Array.isArray(sim._instrHistory) && sim._instrHistory.length
+                            ? sim._instrHistory[sim._instrHistory.length - 1] : null;
+                        const lastExecutedPhysicalAddr = lastRetired && Number.isInteger(lastRetired.physicalPC)
+                            ? lastRetired.physicalPC : sim.physicalPC;
+                        const lastExecutedAddr = sim.bootComplete && Number.isInteger(lastExecutedPhysicalAddr)
+                            ? (lastExecutedPhysicalAddr >>> 0) : -1;
+                        const nextPhysicalAddr = sim.bootComplete && typeof sim._nextPhysicalAddr === 'function'
+                            ? sim._nextPhysicalAddr() : -1;
+                        const currentAddr = Number.isInteger(nextPhysicalAddr) && nextPhysicalAddr >= 0
+                            ? (nextPhysicalAddr >>> 0) : -1;
+                        const isProgress = addr === lastExecutedAddr;
+                        const isPC = addr === currentAddr;
                         const dimmed = word === 0 ? ' style="opacity:0.35;"' : '';
                         const _dc = _decompileWord(word, addr, nsIdx, _clBase, _crPets1);
                         const _dcCls = _dc ? (_dc.compiler ? 'code-decompiled-compiler' : 'code-decompiled-user') : '';
-                        const rowCls = isPC ? 'code-pc-row' : (_dc && _dc.compiler ? 'code-row-compiler' : '');
+                        const rowCls = [
+                            isProgress ? 'code-progress-row' : '',
+                            isPC ? 'code-pc-row' : '',
+                            !isProgress && !isPC && _dc && _dc.compiler ? 'code-row-compiler' : '',
+                        ].filter(Boolean).join(' ');
                         codeHtml += `<tr class="${rowCls}"${dimmed}>`;
                         codeHtml += `<td class="cr-idx">+${w + 1}</td>`;
                         codeHtml += `<td class="cr-idx">0x${addr.toString(16).toUpperCase().padStart(4,'0')}</td>`;

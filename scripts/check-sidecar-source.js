@@ -2,8 +2,8 @@
 // scripts/check-sidecar-source.js
 //
 // Verifies that every sidecar JSON in server/lumps/ whose abstraction name
-// has a matching canonical source file in simulator/examples/ carries a
-// non-empty "source" field.
+// has a matching canonical source file in simulator/examples/ carries the
+// exact contents of that canonical source in its "source" field.
 //
 // Matching rule
 // -------------
@@ -13,19 +13,23 @@
 //   Salvation        → salvation
 //
 // If simulator/examples/<snake>.cloomc exists the sidecar must have
-//   "source": "<non-empty string>"
+//   "source": "<exact contents of simulator/examples/<snake>.cloomc>"
 //
 // Why this matters
 // ----------------
-// A rename or recompile pass can silently blank the "source" field.  This
-// check catches that regression before it reaches production.
+// A rename or recompile pass can silently blank or stale the "source" field.
+// This check catches both regressions before they reach production.
 //
 // Usage
 // -----
 //   node scripts/check-sidecar-source.js
 //
+// Test/integration overrides:
+//   --sidecar-dir <path>   directory containing sidecar JSON files
+//   --examples-dir <path>  directory containing canonical .cloomc files
+//
 // Exit codes:
-//   0 — all matched sidecars have non-empty source
+//   0 — all matched sidecars contain their exact canonical source
 //   1 — one or more violations found (details printed to stdout/stderr)
 
 'use strict';
@@ -34,8 +38,21 @@ const fs   = require('fs');
 const path = require('path');
 
 const ROOT         = path.resolve(__dirname, '..');
-const SIDECAR_DIR  = path.join(ROOT, 'server', 'lumps');
-const EXAMPLES_DIR = path.join(ROOT, 'simulator', 'examples');
+
+function parsePathArg(name, fallback) {
+    const marker = `--${name}`;
+    const index = process.argv.indexOf(marker);
+    if (index === -1) return fallback;
+    const value = process.argv[index + 1];
+    if (!value || value.startsWith('--')) {
+        console.error(`Missing value for ${marker}`);
+        process.exit(1);
+    }
+    return path.resolve(value);
+}
+
+const SIDECAR_DIR  = parsePathArg('sidecar-dir', path.join(ROOT, 'server', 'lumps'));
+const EXAMPLES_DIR = parsePathArg('examples-dir', path.join(ROOT, 'simulator', 'examples'));
 
 // Convert a CamelCase / PascalCase identifier to snake_case.
 // Only the transition between a lower (or digit) char and an upper char
@@ -65,6 +82,11 @@ const exampleStems = loadExampleStems();
 let violations = 0;
 let checked    = 0;
 
+function displayPath(filePath) {
+    const relative = path.relative(ROOT, filePath);
+    return relative && !relative.startsWith('..') ? relative : filePath;
+}
+
 const sidecarFiles = fs.existsSync(SIDECAR_DIR)
     ? fs.readdirSync(SIDECAR_DIR).filter(f => f.endsWith('.json')).sort()
     : [];
@@ -90,14 +112,33 @@ for (const fname of sidecarFiles) {
     const relSidecar = path.relative(ROOT, fpath);
     checked++;
 
+    const canonicalPath = path.join(EXAMPLES_DIR, `${stem}.cloomc`);
+    let canonicalSource;
+    try {
+        canonicalSource = fs.readFileSync(canonicalPath, 'utf8');
+    } catch (error) {
+        console.error(`  FAIL ${relSidecar}`);
+        console.error(`       could not read canonical source: ${displayPath(canonicalPath)}`);
+        console.error(`       ${error.message}`);
+        violations++;
+        continue;
+    }
+
     const source = data.source;
-    if (typeof source === 'string' && source.trim().length > 0) {
-        console.log(`  ok   ${relSidecar}`);
-    } else {
+    if (typeof source !== 'string' || source.trim().length === 0) {
         console.error(`  FAIL ${relSidecar}`);
         console.error(`       "source" field is empty or absent`);
-        console.error(`       canonical source: simulator/examples/${stem}.cloomc`);
+        console.error(`       canonical source: ${displayPath(canonicalPath)}`);
         violations++;
+    } else if (source !== canonicalSource) {
+        console.error(`  FAIL ${relSidecar}`);
+        console.error(`       "source" does not match the canonical source`);
+        console.error(`       canonical source: ${displayPath(canonicalPath)}`);
+        console.error(`       sidecar source length: ${source.length}`);
+        console.error(`       canonical source length: ${canonicalSource.length}`);
+        violations++;
+    } else {
+        console.log(`  ok   ${relSidecar}`);
     }
 }
 
@@ -107,12 +148,12 @@ if (violations > 0) {
         `check-sidecar-source: ${violations} violation(s) found (${checked} sidecar(s) checked).`
     );
     console.error('');
-    console.error('A recompile or rename pass blanked the "source" field.');
-    console.error('Repopulate it from the matching simulator/examples/*.cloomc file,');
+    console.error('A recompile or rename pass blanked or made the "source" field stale.');
+    console.error('Repopulate it exactly from the matching simulator/examples/*.cloomc file,');
     console.error('or run the build script that generates the sidecar.');
     process.exit(1);
 } else {
     console.log(
-        `check-sidecar-source: all ${checked} sidecar(s) with a matching .cloomc file pass.`
+        `check-sidecar-source: all ${checked} sidecar(s) with a matching .cloomc file match exactly.`
     );
 }

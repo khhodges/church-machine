@@ -994,7 +994,10 @@ let walkRunning = false;
 let walkTimer = null;
 
 // ── Run popover ─────────────────────────────────────────────────────────────
-let runBatchSize = 500;
+// Default to a visible one-instruction cadence.  Run used to execute 500
+// instructions before yielding, which meant the progress counter and current
+// code row were rarely painted before the program stopped.
+let runBatchSize = 1;
 let _runStopped = false;
 // _simRunActive is true from the moment runSim() starts its async batch loop
 // until finishRun() clears it.  It covers the gaps between setTimeout(runBatch)
@@ -1881,6 +1884,10 @@ function runSim() {
 
     const MAX_STEPS   = 10000;
     const BATCH_SIZE  = runBatchSize;
+    // A small delay after single-instruction batches guarantees the browser a
+    // paint opportunity, so the progress line and instruction highlights move
+    // together instead of collapsing into the final state.
+    const VISUAL_STEP_DELAY_MS = BATCH_SIZE === 1 ? 16 : 0;
     const breakpoints = simBreakpoints.size > 0 ? simBreakpoints : null;
     const con         = document.getElementById('editorConsole');
     const runBtn      = document.getElementById('btnRunSim');
@@ -1997,7 +2004,7 @@ function runSim() {
                     return;
                 }
                 try { updateDashboard(); } catch(e) { console.error('runBatch updateDashboard:', e); }
-                setTimeout(runBatch, 0);
+                setTimeout(runBatch, VISUAL_STEP_DELAY_MS);
             }
         } catch(e) {
             console.error('runSim batch error:', e);

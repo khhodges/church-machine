@@ -302,7 +302,7 @@ if (violations > 0) {
 
 // ── sidecar source guard ──────────────────────────────────────────────────────
 // Ensure every sidecar whose abstraction has a canonical .cloomc source file
-// carries a non-empty "source" field (catches silent blanking on recompile).
+// carries the exact canonical source (catches blank or stale archived copies).
 const sidecarResult = spawnSync(
     'node',
     [path.join(ROOT, 'scripts', 'check-sidecar-source.js')],

@@ -303,13 +303,13 @@
                             <button class="btn btn-danger sim-icon-btn" id="btnStopSim" onclick="stopSim()" style="display:none;" data-tooltip="Stop — Halt execution immediately">&#x23F9;</button>
                             <div class="run-popover" id="runPopover" style="display:none;">
                                 <div class="run-popover-title">Run Settings <button class="run-close-btn" onclick="hideRunPopover()" title="Close">&times;</button></div>
-                                <label class="run-label">Batch size <span class="run-hint">(steps between UI refresh)</span></label>
+                                <label class="run-label">Batch size <span class="run-hint">(1 keeps progress and the current instruction visible)</span></label>
                                 <select id="runBatchSelect" class="run-batch-select">
-                                    <option value="1">1</option>
+                                    <option value="1" selected>1 — live instruction view</option>
                                     <option value="10">10</option>
                                     <option value="50">50</option>
                                     <option value="100">100</option>
-                                    <option value="500" selected>500</option>
+                                    <option value="500">500</option>
                                     <option value="1000">1000</option>
                                 </select>
                                 <button class="btn btn-sm btn-success run-go-btn" onclick="runSimGo()">Go</button>
