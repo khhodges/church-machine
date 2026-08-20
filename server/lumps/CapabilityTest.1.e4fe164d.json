@@ -4,6 +4,8 @@
   "filename": "CapabilityTest.1.e4fe164d.lump",
   "sidecar_file": "CapabilityTest.1.e4fe164d.json",
   "ns_slot": 10,
+  "ns_slot_policy": "static",
+  "boot_resident": true,
   "lump_size": 512,
   "typ": 0,
   "content_type": "code",

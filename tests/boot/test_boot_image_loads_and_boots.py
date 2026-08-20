@@ -37,6 +37,7 @@ import os
 import struct
 import subprocess
 import sys
+import warnings
 
 import pytest
 
@@ -391,6 +392,47 @@ def test_capabilitytest_manifest_boot_resident():
     )
 
 
+def test_capabilitytest_boot_metadata_matches_sidecar():
+    """CapabilityTest's live manifest and sidecar must agree before booting.
+
+    The image builder selects resident programs from manifest.json.  A stale
+    sidecar that names slot 10 or marks the program boot-resident differently
+    could make the IDE display a different boot program from the one included
+    in a regenerated image.
+    """
+    entry, _ = _capabilitytest_manifest_body()
+    sidecar_file = entry.get("sidecar_file")
+    assert isinstance(sidecar_file, str) and sidecar_file, (
+        "the authoritative CapabilityTest manifest entry must name its sidecar"
+    )
+    with open(os.path.join(LUMPS_DIR, sidecar_file)) as f:
+        sidecar = json.load(f)
+
+    for field in ("ns_slot", "boot_resident"):
+        assert field in sidecar, (
+            f"CapabilityTest sidecar must explicitly declare {field} so it "
+            "cannot disagree with the boot-image manifest entry"
+        )
+        assert sidecar[field] == entry.get(field), (
+            f"CapabilityTest {field} mismatch: manifest={entry.get(field)!r}, "
+            f"sidecar={sidecar[field]!r}. Align both records before generating "
+            "a boot image."
+        )
+
+    cfg = _saved_project_cfg()
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        generate_boot_image(cfg, LUMPS_DIR)
+    capabilitytest_warnings = [
+        str(warning.message) for warning in caught
+        if "CapabilityTest" in str(warning.message)
+    ]
+    assert not capabilitytest_warnings, (
+        "CapabilityTest metadata drift must be fixed before generating a boot "
+        f"image; warnings={capabilitytest_warnings}"
+    )
+
+
 def test_served_boot_image_carries_capabilitytest_body(tmp_path):
     """The boot artifact the server ships must carry CapabilityTest's real
     body at slot 10 (not zeros).
@@ -463,6 +505,7 @@ if __name__ == "__main__":
     for fn in (test_capabilitytest_image_payload_integrity,
                test_capabilitytest_boot_entry_boots,
                test_capabilitytest_manifest_boot_resident,
+               test_capabilitytest_boot_metadata_matches_sidecar,
                test_served_boot_image_carries_capabilitytest_body,
                test_stale_image_reports_loaded_false):
         try:
