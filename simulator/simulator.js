@@ -1527,17 +1527,9 @@ class ChurchSimulator {
             this.memory[lumpBase] = this.packLumpHeader(n_minus_6, cw, 0, 0);
         }
 
-        // Preserve the destination entry's live generation when a compiled
-        // program is reinstalled after reset.  A slot can be reused for the
-        // same token, and resetting its generation to zero would mint CR0/CR14
-        // tokens that immediately disagree with an already-issued Namespace
-        // descriptor.
-        const existingEntry = this.readNSEntry(slot);
-        const liveGtSeq = existingEntry ? existingEntry.gtSeq : 0;
-
         // NS entry: Inform GT (type=1), limit17=cw, cc=0 (updated by loadProgram
         // and _injectClistNow that follow immediately in _applyPendingSimLoad).
-        this.writeNSEntry(slot, lumpBase, cw, 0, 0, 1, liveGtSeq, 0, 0);
+        this.writeNSEntry(slot, lumpBase, cw, 0, 0, 1, 0, 0, 0);
         this.nsLabels[slot] = label;
 
         this.output += `[allocNS] NS[${slot}] "${label}" \u2192 0x${lumpBase.toString(16)} (${newLumpSize} words, cw=${cw})\n`;

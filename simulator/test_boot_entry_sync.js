@@ -204,6 +204,41 @@ console.log('\n--- T201: _autoLoadDefaultProgram path — sync after boot-image 
         sim.bootEntrySlot === 7);
 }
 
+// ── T201f: cached editor source must not overwrite the boot LUMP ──────────────
+//
+// CR14 is derived by the boot CALL path from the selected Namespace descriptor.
+// A previous reset hook passed cached source directly to loadProgram(), which
+// shrank the selected SelfTest descriptor to the cached source length.  The
+// next CALL then correctly built CR14 with the wrong short range.
+console.log('\n--- T201f: cached source preserves the boot LUMP descriptor ---');
+{
+    const sim = makeTestSim();
+    const { ctx, sandbox } = makeSandbox(sim, 6);
+    const CACHED_WORDS = [0x11111111, 0x22222222, 0x33333333];
+    sandbox.window.LumpRegistry = {
+        getCurrent() { return 'cached-source'; },
+        resolve(token) {
+            return token === 'cached-source'
+                ? { sources: { memory: { words: CACHED_WORDS } } }
+                : null;
+        },
+    };
+    sandbox._defaultProgramLoaded = true;
+
+    const entryBefore = sim.readNSEntry(6);
+    const headerBefore = sim.memory[entryBefore.word0_location] >>> 0;
+    vm.runInContext('_autoLoadDefaultProgram()', ctx);
+    const entryAfter = sim.readNSEntry(6);
+    const headerAfter = sim.memory[entryAfter.word0_location] >>> 0;
+
+    check('T201f: reset-time cached source leaves SelfTest Namespace location unchanged',
+        entryAfter.word0_location === entryBefore.word0_location);
+    check('T201g: reset-time cached source leaves SelfTest authority/limit unchanged',
+        entryAfter.word1_limit === entryBefore.word1_limit);
+    check('T201h: reset-time cached source leaves SelfTest header unchanged',
+        headerAfter === headerBefore);
+}
+
 // ── T202: _loadCatalogLumpIntoSim path ───────────────────────────────────────
 //
 // When the user clicks "Load into Sim" in the Abstractions panel,
