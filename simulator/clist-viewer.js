@@ -84,6 +84,13 @@
             var addBtn = e.target.closest('[data-action="show-picker"]');
             if (addBtn) { showPicker(); return; }
 
+            var deleteBtn = e.target.closest('[data-action="delete-capability"]');
+            if (deleteBtn) {
+                e.stopPropagation();
+                _deleteCapability(parseInt(deleteBtn.dataset.slot, 10));
+                return;
+            }
+
             var polaBtn = e.target.closest('[data-action="pola-cleanup"]');
             if (polaBtn) { _removeUnusedCapabilities(); return; }
 
@@ -517,6 +524,37 @@
         showViewer(msg);
     }
 
+    // ── Delete one declared capability by its C-List row ────────────────────
+    // CR0 is the immutable source/self capability and intentionally has no
+    // delete control. Rewrite the same capabilities block used by POLA/Add so
+    // the editor, compiler, and popup remain in sync.
+    function _deleteCapability(slotIdx) {
+        var ed = activeEditor || document.getElementById('asmEditor');
+        var popup = getOrCreatePopup();
+        if (!ed || !Number.isInteger(slotIdx) || slotIdx <= 0) return;
+
+        var src = ed.value;
+        var capRe = /capabilities\s*\{([^}]*)\}/;
+        var cm = capRe.exec(src);
+        if (!cm) {
+            _showPolaToast(popup, 'No capabilities block found in source.');
+            return;
+        }
+
+        var entries = _parseCapEntries(cm[1]);
+        if (slotIdx >= entries.length) {
+            _showPolaToast(popup, 'C-List row CR' + slotIdx + ' is no longer present.');
+            return;
+        }
+
+        var removed = entries[slotIdx][0];
+        entries.splice(slotIdx, 1);
+        var newBlock = _formatCapBlock(entries);
+        ed.value = src.slice(0, cm.index) + newBlock + src.slice(cm.index + cm[0].length);
+        ed.dispatchEvent(new Event('input', { bubbles: true }));
+        showViewer('\u2702 Deleted CR' + slotIdx + ' (' + removed + ') from the source C-List.');
+    }
+
     // ── Async builder: live-sim takes priority when booted; static-binary otherwise ──
     async function buildContentAsync() {
         /* global sim, _petNameCRMap */
@@ -571,6 +609,9 @@
                             rightsHtml +
                             _namedBadgeHtml(_srcSim, si) +
                             '<span class="clist-name">' + escHtml(se.name) + '</span>' +
+                            (si > 0
+                                ? '<button class="clist-delete-btn" data-action="delete-capability" data-slot="' + si + '" title="Delete CR' + si + ' from the source C-List">\u00D7</button>'
+                                : '') +
                             '</div>';
                     }
                 } else {
