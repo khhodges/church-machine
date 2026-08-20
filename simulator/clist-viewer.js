@@ -87,7 +87,11 @@
             var deleteBtn = e.target.closest('[data-action="delete-capability"]');
             if (deleteBtn) {
                 e.stopPropagation();
-                _deleteCapability(parseInt(deleteBtn.dataset.slot, 10));
+                var _deleteSlot = parseInt(deleteBtn.dataset.slot, 10);
+                var _sourceIndex = deleteBtn.dataset.sourceIndex !== undefined
+                    ? parseInt(deleteBtn.dataset.sourceIndex, 10)
+                    : _deleteSlot - 1;
+                _deleteCapability(_sourceIndex, _deleteSlot);
                 return;
             }
 
@@ -556,10 +560,11 @@
     // CR0 is the immutable source/self capability and intentionally has no
     // delete control. Rewrite the same capabilities block used by POLA/Add so
     // the editor, compiler, and popup remain in sync.
-    function _deleteCapability(slotIdx) {
+    function _deleteCapability(sourceIndex, displaySlot) {
         var ed = activeEditor || document.getElementById('asmEditor');
         var popup = getOrCreatePopup();
-        if (!ed || !Number.isInteger(slotIdx) || slotIdx <= 0) return;
+        if (!ed || !Number.isInteger(sourceIndex) || sourceIndex < 0) return;
+        displaySlot = Number.isInteger(displaySlot) ? displaySlot : sourceIndex + 1;
 
         var src = ed.value;
         var capRe = /capabilities\s*\{([^}]*)\}/;
@@ -570,17 +575,17 @@
         }
 
         var entries = _parseCapEntries(cm[1]);
-        if (slotIdx >= entries.length) {
-            _showPolaToast(popup, 'C-List row CR' + slotIdx + ' is no longer present.');
+        if (sourceIndex >= entries.length) {
+            _showPolaToast(popup, 'C-List row CR' + displaySlot + ' is no longer present.');
             return;
         }
 
-        var removed = entries[slotIdx][0];
-        entries.splice(slotIdx, 1);
+        var removed = entries[sourceIndex][0];
+        entries.splice(sourceIndex, 1);
         var newBlock = _formatCapBlock(entries);
         ed.value = src.slice(0, cm.index) + newBlock + src.slice(cm.index + cm[0].length);
         ed.dispatchEvent(new Event('input', { bubbles: true }));
-        showViewer('\u2702 Deleted CR' + slotIdx + ' (' + removed + ') from the source C-List.');
+        showViewer('\u2702 Deleted CR' + displaySlot + ' (' + removed + ') from the source C-List.');
     }
 
     // ── Async builder: live-sim takes priority when booted; static-binary otherwise ──
@@ -619,11 +624,18 @@
                 // through to the live-sim/boot register view here would swap
                 // in a completely different data source and look like POLA
                 // "added" capabilities instead of cleaning them up.
-                var srcRows = '';
                 var _srcSim = (typeof sim !== 'undefined') ? sim : null;
+                // CR0 is compiler-owned SELF and is not declared in source.
+                // User capabilities therefore begin at the displayed CR1.
+                var srcRows = '<div class="clist-row" data-slot="0" tabindex="-1">' +
+                    '<span class="clist-slot">CR0</span>' +
+                    _namedBadgeHtml(_srcSim, 0) +
+                    '<span class="clist-name">' + _selfNameHtml(_currentLumpName(_srcSim)) + '</span>' +
+                    '</div>';
                 if (capSrcEntries.length > 0) {
                     for (var si = 0; si < capSrcEntries.length; si++) {
                         var se = capSrcEntries[si];
+                        var sourceSlot = si + 1;
                         var rightsHtml = se.rights.length > 0
                             ? '<span class="clist-perms">' +
                               se.rights.join('').split('').map(function (ch) {
@@ -632,20 +644,15 @@
                               }).join('') +
                               '</span>'
                             : '';
-                        srcRows += '<div class="clist-row" data-slot="' + si + '" tabindex="-1">' +
-                            '<span class="clist-slot" title="slot ' + si + ' \u2014 declared in source (not yet compiled)">CR' + si + '</span>' +
+                        srcRows += '<div class="clist-row" data-slot="' + sourceSlot + '" tabindex="-1">' +
+                            '<span class="clist-slot" title="slot ' + sourceSlot + ' \u2014 declared in source (not yet compiled)">CR' + sourceSlot + '</span>' +
                             rightsHtml +
-                            _namedBadgeHtml(_srcSim, si) +
-                            '<span class="clist-name">' + (si === 0
-                                ? _selfNameHtml(_currentLumpName(_srcSim))
-                                : escHtml(se.name)) + '</span>' +
-                            (si > 0
-                                ? '<button class="clist-delete-btn" data-action="delete-capability" data-slot="' + si + '" title="Delete CR' + si + ' from the source C-List">\u00D7</button>'
-                                : '') +
+                            _namedBadgeHtml(_srcSim, sourceSlot) +
+                            '<span class="clist-name">' + escHtml(se.name) + '</span>' +
+                            '<button class="clist-delete-btn" data-action="delete-capability" data-slot="' + sourceSlot +
+                                '" data-source-index="' + si + '" title="Delete CR' + sourceSlot + ' from the source C-List">\u00D7</button>' +
                             '</div>';
                     }
-                } else {
-                    srcRows = '<div class="clist-viewer-empty">No capabilities declared in source.</div>';
                 }
                 return _wrapRows('source', srcRows);
             }

@@ -69,12 +69,15 @@ function nextTurn() {
     deleteCR1.click();
     await nextTurn();
 
-    check('CLD-5: deleting CR1 preserves CR0',
-        editor.value.includes('WukongCallHome.hw E'), editor.value);
-    check('CLD-6: deleting CR1 removes only its source capability',
-        !editor.value.includes('Continue E'), editor.value);
+    check('CLD-5: deleting CR1 preserves compiler-owned CR0',
+        popup.querySelector('.clist-row[data-slot="0"] .clist-self-name').textContent === 'SELF',
+        popup.innerHTML);
+    check('CLD-6: deleting CR1 removes only the source capability at CR1',
+        !editor.value.includes('WukongCallHome.hw E') &&
+        editor.value.includes('Continue E') &&
+        editor.value.includes('Diagnostics R'), editor.value);
     check('CLD-7: remaining rows are reindexed',
-        popup.querySelector('.clist-row[data-slot="1"] .clist-name').textContent === 'Diagnostics',
+        popup.querySelector('.clist-row[data-slot="1"] .clist-name').textContent === 'Continue',
         popup.innerHTML);
     check('CLD-8: source change emits an input event', inputEvents === 1, String(inputEvents));
 
