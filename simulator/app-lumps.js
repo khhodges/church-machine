@@ -5141,8 +5141,9 @@ async function openLumpInEditor(token) {
             _draftBanner.id = '_lumpDraftBanner';
             _draftBanner.className = 'lump-draft-restore-banner';
             _draftBanner.innerHTML =
-                '<span>Unsaved draft \u2014 your last edits are restored. Compile to save, or </span>' +
-                '<button class="btn btn-sm lump-draft-discard-btn" id="_lumpDraftBannerDiscard">Discard</button>';
+                '<strong>Draft restored</strong>' +
+                '<span class="lump-draft-copy">Your previous edits are back in the editor, but are not saved to this LUMP yet. Use <b>Save Lump</b> to keep them, or </span>' +
+                '<button class="btn btn-sm lump-draft-discard-btn" id="_lumpDraftBannerDiscard">Discard Draft</button>';
             if (asmEd.parentNode) asmEd.parentNode.insertBefore(_draftBanner, asmEd);
             var _bannerDiscardBtn = _draftBanner.querySelector('#_lumpDraftBannerDiscard');
             if (_bannerDiscardBtn) {
@@ -5222,8 +5223,8 @@ async function openLumpInEditor(token) {
     var _discardBtn = document.createElement('button');
     _discardBtn.id = 'btnDiscardLumpEdit';
     _discardBtn.className = 'btn btn-sm lump-editor-discard-btn';
-    _discardBtn.setAttribute('data-tooltip', 'Discard — Clear draft, restore compiled disasm, return to LUMP panel');
-    _discardBtn.textContent = 'Discard';
+    _discardBtn.setAttribute('data-tooltip', 'Discard Draft — Clear recovered edits, restore the last saved source, and return to the LUMP panel');
+    _discardBtn.textContent = 'Discard Draft';
     _discardBtn.addEventListener('click', function() {
         _draftLsDel(token);
         var _ed = document.getElementById('asmEditor');

@@ -2139,7 +2139,12 @@
     color: #fbbf24;
     font-size: 0.82rem;
 }
+.lump-draft-restore-banner strong {
+    color: #fde68a;
+    white-space: nowrap;
+}
 .lump-draft-restore-banner span { flex: 1; }
+.lump-draft-copy b { color: #fef3c7; }
 /* ── Stored source block inside the Source tab ──────────── */
 .lump-stored-src-section {
     border-bottom: 1px solid var(--border-color, #2a2a4a);
