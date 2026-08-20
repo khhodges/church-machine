@@ -1677,6 +1677,23 @@ function _autoLoadDefaultProgram() {
 // switches, no delays.  Used by "Load into Sim" and the stepSim() fallback so
 // the user lands on a fully-booted machine ready to step their abstraction.
 // Returns true on clean boot, false if the machine halted or failed.
+//
+// A simulator fault normally emits a `fault` event, which app-shell turns into
+// the Fault popup.  A JavaScript exception in a boot controller, however, used
+// to leave the machine parked at the current B:NN phase with no fault record
+// and therefore no explanation for the user.  Preserve an existing specific
+// fault, but promote every otherwise-unreported halt/exception into BOOT.
+function _recordUnreportedBootFailure(context, error) {
+    if (!sim || sim.bootComplete || (sim.faultLog && sim.faultLog.length > 0)) return false;
+    const phase = `B:${String(Math.max(0, Number(sim.bootStep) || 0)).padStart(2, '0')}`;
+    const detail = error
+        ? ` — ${(error && error.message) ? error.message : String(error)}`
+        : ' — simulator halted without a recorded fault';
+    console.error(`[boot] ${phase} ${context}${detail}`);
+    sim.fault('BOOT', `${phase} ${context}${detail}`);
+    return true;
+}
+
 function instantBoot() {
     if (sim.bootComplete) return true;
     if (bootAnimating) {
@@ -1687,7 +1704,13 @@ function instantBoot() {
     sim.auditLog = [];
     let safety = 0;
     while (!sim.bootComplete && !sim.halted && safety++ < 30) {
-        try { sim._bootStep(); } catch(e) { console.error('instantBoot error:', e); break; }
+        try {
+            sim._bootStep();
+        } catch(e) {
+            console.error('instantBoot error:', e);
+            _recordUnreportedBootFailure('instant boot failed', e);
+            break;
+        }
         if (sim.auditLog.length > 0) { _bootAuditAccum.push(...sim.auditLog); sim.auditLog = []; }
     }
     if (sim.bootComplete && !sim.halted) {
@@ -1696,6 +1719,7 @@ function instantBoot() {
         updateDashboard();
         return true;
     }
+    _recordUnreportedBootFailure('instant boot did not complete');
     return false;
 }
 
@@ -1711,6 +1735,7 @@ function slowBoot() {
             if (sim.bootComplete || sim.halted) {
                 bootAnimating = false;
                 _bootAnimTimer = null;
+                if (sim.halted) _recordUnreportedBootFailure('boot sequence stopped');
                 const con = document.getElementById('editorConsole');
                 if (con) {
                     if (sim.halted) {
@@ -1791,6 +1816,7 @@ function slowBoot() {
             bootAnimating = false;
             _bootAnimTimer = null;
             console.error('slowBoot nextPhase error:', e);
+            _recordUnreportedBootFailure('boot animation failed', e);
             if (pipelineViz) pipelineViz.render();
             updateDashboard();
         }
@@ -1815,6 +1841,12 @@ function runSim() {
             openCRDetail(14);
             return;
         }
+    }
+    if (!sim.bootComplete) {
+        _recordUnreportedBootFailure('run requested before boot completed');
+        if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(sim.bootStep)); pipelineViz.render(); }
+        updateDashboard();
+        return;
     }
     if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(sim.bootStep)); pipelineViz.render(); }
     // Clear boot-microcode gate entries so the Gate Log starts empty for
@@ -3853,6 +3885,12 @@ function resetAndStep() {
             updateDashboard();
             return;
         }
+    }
+    if (!sim.bootComplete) {
+        _recordUnreportedBootFailure('reset-and-step boot did not complete');
+        if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(sim.bootStep)); pipelineViz.render(); }
+        updateDashboard();
+        return;
     }
     if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(sim.bootStep)); pipelineViz.render(); }
     if (!sim.halted) _autoLoadDefaultProgram();

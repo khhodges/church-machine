@@ -22,6 +22,8 @@
 //   T206 — Null sim guard: _syncBootEntryFromSim is safe when sim is null.
 //   T209 — a fresh browser session always defaults to SelfTest (slot 6), rather
 //           than reviving a previous lightning-bolt selection from localStorage.
+//   T210 — an unexpected boot halt is promoted to a BOOT fault instead of
+//           freezing at B:NN without the Fault popup.
 
 const vm   = require('vm');
 const fs   = require('fs');
@@ -88,6 +90,7 @@ function extractTopLevelFn(sourceFile, fnName) {
 const syncFnSrc      = extractTopLevelFn('app-abstractions.js', '_syncBootEntryFromSim');
 const autoLoadFnSrc  = extractTopLevelFn('app-run.js',          '_autoLoadDefaultProgram');
 const loadCatalogSrc = extractTopLevelFn('app-absdetail.js',    '_loadCatalogLumpIntoSim');
+const bootFailureFnSrc = extractTopLevelFn('app-run.js', '_recordUnreportedBootFailure');
 
 // ── Sandbox factory ───────────────────────────────────────────────────────────
 //
@@ -425,6 +428,34 @@ console.log('\n--- T209: fresh browser session defaults to SelfTest ---');
         /let bootEntrySlot\s*=\s*6\s*;/.test(memSrc));
     check('T209b: browser startup clears any stale persisted boot-entry selection',
         /localStorage\.removeItem\(['"]bootEntrySlot['"]\)/.test(memSrc));
+}
+
+// ── T210: no unreported boot freezes ─────────────────────────────────────────
+console.log('\n--- T210: unreported boot halts become visible BOOT faults ---');
+{
+    const faults = [];
+    const sandbox = {
+        console: { error() {} },
+        sim: {
+            bootComplete: false,
+            bootStep: 6,
+            halted: true,
+            faultLog: [],
+            fault(type, message) {
+                faults.push({ type, message });
+                this.faultLog.push({ type, message });
+            }
+        }
+    };
+    const ctx = vm.createContext(sandbox);
+    vm.runInContext(`${bootFailureFnSrc}; globalThis.result = _recordUnreportedBootFailure('boot sequence stopped');`, ctx);
+    check('T210a: an unreported halt is recorded as a BOOT fault',
+        sandbox.result === true && faults.length === 1 && faults[0].type === 'BOOT');
+    check('T210b: the BOOT fault identifies the phase where boot stopped',
+        faults[0] && faults[0].message.includes('B:06'));
+    vm.runInContext(`globalThis.duplicate = _recordUnreportedBootFailure('boot sequence stopped');`, ctx);
+    check('T210c: an existing fault is never replaced by a generic BOOT fault',
+        sandbox.duplicate === false && faults.length === 1);
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────
