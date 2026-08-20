@@ -1896,7 +1896,8 @@
     "issue_number": 1,
     "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
     "dot_name": "CapabilityTest",
-    "issue_n": 1
+    "issue_n": 1,
+    "variant_group": "compiled_capabilitytest"
   },
   {
     "token": "00000600",
@@ -2000,5 +2001,28 @@
     "ns_slot": 7,
     "ns_slot_policy": "static",
     "variant_group": "WukongCallHome"
+  },
+  {
+    "token": "9ce28c0b",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.1.e4fe164d.lump",
+    "sidecar_file": "CapabilityTest.1.e4fe164d.json",
+    "lump_size": 512,
+    "cw": 21,
+    "cc": 5,
+    "author": "",
+    "version": "",
+    "lump_version": 4,
+    "compiled_at": 1787209533.4511604,
+    "methods": [],
+    "grants": [
+      "E"
+    ],
+    "binary_hash": "e2959f33f05e4d045bad90d22c436148aaa6041ebe3c6c6614f8122443cd5345",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
+    "dot_name": "CapabilityTest",
+    "issue_n": 1
   }
 ]
