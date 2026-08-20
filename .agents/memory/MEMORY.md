@@ -135,4 +135,4 @@
 - [SELF row click safety](self-row-click-safety.md) — compiler-owned SELF is display-only in the C-List and must never write an operand into the editor
 - [Hardware readiness fingerprints](hardware-readiness-fingerprint.md) — generated Verilog/RTLIL must carry a content fingerprint of active Python inputs before synthesis
 - [Build Approval size accounting](build-approval-size-accounting.md) — derive displayed LUMP budgets from the big-endian binary and mark API metadata unavailable rather than guessing
-- [Namespace Table bitstream source](namespace-table-bitstream-source.md) — only LUMPs represented in the serialized Namespace Table belong to the bitstream; the manifest is metadata/catalog, not membership
+- [Namespace Table authority](namespace-table-bitstream-source.md) — Namespace Table first, then its assigned slots/LUMPs; manifest is never authoritative for membership or metadata
