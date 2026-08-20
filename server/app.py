@@ -1258,6 +1258,41 @@ def _load_lump_catalog(selected_tokens=None):
     floating.sort(key=lambda e: e["abstraction"] or "")
     return selected_out + floating
 
+def _step2_selected_tokens(step2):
+    """Return abstraction→token selections from a saved Step 2 payload."""
+    selected = {}
+    if not isinstance(step2, dict):
+        return selected
+    for row in step2.get("lumps") or []:
+        if not isinstance(row, dict):
+            continue
+        abstraction = row.get("abstraction")
+        token = row.get("lumpToken")
+        if isinstance(abstraction, str) and abstraction and isinstance(token, str) and token:
+            selected[abstraction] = token
+    return selected
+
+def _validate_step2_lump_tokens(step2):
+    """Reject explicit version selections that are not manifest entries."""
+    selected = _step2_selected_tokens(step2)
+    if not selected:
+        return None
+    try:
+        with open(LUMPS_MANIFEST_PATH) as f:
+            entries = json.load(f)
+    except Exception as exc:
+        return f"Cannot validate selected LUMP versions: {exc}"
+    for abstraction, token in selected.items():
+        if not any(
+            isinstance(entry, dict)
+            and not entry.get("archived")
+            and entry.get("abstraction") == abstraction
+            and entry.get("token") == token
+            for entry in (entries if isinstance(entries, list) else [])
+        ):
+            return f"Unknown LUMP version token {token!r} for abstraction {abstraction!r}"
+    return None
+
 def _validate_step2(step2, step1, target_board):
     """Validate the optional Step 2 (resident lumps) section.
 
@@ -1273,7 +1308,10 @@ def _validate_step2(step2, step1, target_board):
     lumps = step2.get("lumps") or []
     if not isinstance(lumps, list):
         return "step2.lumps must be a list"
-    catalog = {e["nsSlot"]: e for e in _load_lump_catalog()}
+    token_err = _validate_step2_lump_tokens(step2)
+    if token_err:
+        return token_err
+    catalog = {e["nsSlot"]: e for e in _load_lump_catalog(_step2_selected_tokens(step2))}
     _ns_slots_max_v2 = int(step1.get("nsSlotsMax") or _boot_image_gen.DEFAULT_NS_SLOTS_MAX)
     NS_TABLE_RESERVE = _boot_image_gen.ns_table_reserve_words(_ns_slots_max_v2)
     total = step1["totalNamespaceWords"]
@@ -1496,7 +1534,9 @@ def boot_config_get():
         "config": cfg,
         "defaults": DEFAULT_BOOT_CONFIG,
         "profiles": HARDWARE_PROFILES,
-        "lumpCatalog": _load_lump_catalog(),
+        "lumpCatalog": _load_lump_catalog(
+            _step2_selected_tokens(cfg.get("step2")) if isinstance(cfg, dict) else {}
+        ),
         "limits": {
             "maxNsEntries": MAX_NS_ENTRIES,
             "baseNamedNsCount": BASE_NAMED_NS_COUNT,
@@ -1541,6 +1581,10 @@ def boot_config_post():
         for e in (step2.get("lumps") or []):
             row = {"nsSlot": int(e["nsSlot"]),
                    "resident": bool(e.get("resident"))}
+            if e.get("abstraction"):
+                row["abstraction"] = str(e["abstraction"])
+            if e.get("lumpToken"):
+                row["lumpToken"] = str(e["lumpToken"])
             if row["resident"]:
                 row["physAddr"] = int(e["physAddr"])
                 if e.get("lumpSize") is not None:
