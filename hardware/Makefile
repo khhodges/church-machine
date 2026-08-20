@@ -33,7 +33,7 @@ readiness:
 	python3 ../scripts/check_hardware_namespace_thread_readiness.py
 
 pnr: $(PNR_JSON)
-$(PNR_JSON): $(JSON) $(CST)
+$(PNR_JSON): readiness $(JSON) $(CST)
 	nextpnr-himbaechel \
 	        --device $(DEVICE) \
 	        --json $(JSON) \
@@ -53,7 +53,7 @@ prog: $(PACK)
 tang-iot: pack-iot
 
 pnr-iot: $(PNR_JSON_IOT)
-$(PNR_JSON_IOT): $(JSON_IOT) $(CST)
+$(PNR_JSON_IOT): readiness $(JSON_IOT) $(CST)
 	nextpnr-himbaechel \
 	        --device $(DEVICE) \
 	        --json $(JSON_IOT) \

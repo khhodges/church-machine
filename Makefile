@@ -1,9 +1,12 @@
-.PHONY: bitstream bitstream-flash update-lump
+.PHONY: bitstream bitstream-flash readiness update-lump
 
-bitstream:
+readiness:
+	python3 scripts/check_hardware_namespace_thread_readiness.py
+
+bitstream: readiness
 	bash scripts/build_ti60_bitstream.sh
 
-bitstream-flash:
+bitstream-flash: readiness
 	bash scripts/build_ti60_bitstream.sh --flash
 
 update-lump:

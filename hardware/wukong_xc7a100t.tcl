@@ -30,6 +30,21 @@ set TOP      "church_wukong_xc7a100t"
 set PROJ_DIR "./vivado_wukong"
 set JOBS     4
 
+## ── Namespace/thread readiness gate ─────────────────────────────────────────
+## This must run before create_project or any Vivado synthesis work.  Keeping
+## the check here protects direct vendor-tool invocations that do not go
+## through a repository Makefile.
+set readiness_script [file normalize [file join [file dirname [info script]] .. scripts check_hardware_namespace_thread_readiness.py]]
+if {![file exists $readiness_script]} {
+    error "Hardware readiness checker not found: $readiness_script"
+}
+puts "\n═══ Checking namespace/thread readiness before Vivado ═══"
+if {[catch {exec python3 $readiness_script} readiness_output]} {
+    puts stderr $readiness_output
+    error "Hardware readiness check failed; synthesis was not started."
+}
+puts $readiness_output
+
 ## ── ILA flag ─────────────────────────────────────────────────────────────────
 ## Set INSERT_ILA to 1 to insert a Xilinx ILA debug core so Vivado Hardware
 ## Manager can probe Church Machine internals live over JTAG.
