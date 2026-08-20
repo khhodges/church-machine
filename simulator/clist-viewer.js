@@ -95,6 +95,14 @@
                 return;
             }
 
+            var petNameBtn = e.target.closest('[data-action="edit-pet-name"]');
+            if (petNameBtn) {
+                e.stopPropagation();
+                var petRow = petNameBtn.closest('.clist-row[data-slot]');
+                if (petRow) _editPetName(petRow, parseInt(petRow.dataset.slot, 10));
+                return;
+            }
+
             var polaBtn = e.target.closest('[data-action="pola-cleanup"]');
             if (polaBtn) { _removeUnusedCapabilities(); return; }
 
@@ -159,7 +167,7 @@
             if (!row) return;
             var slotIdx = parseInt(row.dataset.slot, 10);
             if (row.classList.contains('clist-row--null')) {
-                _editNullSlotPetName(row, slotIdx);
+                _editPetName(row, slotIdx);
                 return;
             }
             if (row.classList.contains('clist-row--pending')) {
@@ -242,8 +250,9 @@
         });
     }
 
-    // ── Inline pet-name editor for null c-list slots ──────────────────────────
-    function _editNullSlotPetName(row, slotIdx) {
+    // ── Inline pet-name editor for any non-CR0 c-list slot ────────────────────
+    function _editPetName(row, slotIdx) {
+        if (!row || !Number.isInteger(slotIdx) || slotIdx <= 0) return;
         var existing = _nullSlotPetNames[slotIdx] || _nullSlotPetNames[String(slotIdx)] || '';
         row.innerHTML =
             '<span class="clist-slot">CR' + slotIdx + '</span>' +
