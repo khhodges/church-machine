@@ -9,7 +9,8 @@ against the Flask test client:
      in the error message.
 
   2. A well-formed image produced by generate_boot_image() — must return 200
-     with ok=True.
+     with ok=True.  The shared boot fixture routes this write to a temporary
+     LUMP library, never the IDE's live ``server/lumps/`` directory.
 
 Neither case requires a saved boot-config.json on disk; the invalid-image
 case is crafted purely in memory, and the valid-image case generates the
@@ -69,64 +70,6 @@ def _zero_ns_slot(image_bytes, cfg, slot):
 
 def _to_b64(image_bytes):
     return base64.b64encode(image_bytes).decode("ascii")
-
-
-@pytest.fixture(scope="module", autouse=True)
-def lumps_dir_snapshot(tmp_path_factory):
-    """Full snapshot/restore of server/lumps/ around this destructive module.
-
-    test_upload_valid_boot_image_returns_200 POSTs a real boot image to
-    /api/boot-image/upload, which writes it to server/lumps/boot-image.bin.
-    A mid-suite failure with only per-test cleanup could leave boot-image.bin
-    in an unexpected state.  This module-scoped autouse fixture holds the
-    cross-process lumps_write_lock for the entire snapshot → tests → restore
-    span and guarantees full restoration even on unexpected failures.
-    """
-    from tests.boot.conftest import lumps_write_lock
-    import shutil as _shutil
-
-    with lumps_write_lock():
-        snap_dir = str(tmp_path_factory.mktemp("lumps_snapshot"))
-        entries = {}
-        for name in os.listdir(LUMPS_DIR):
-            p = os.path.join(LUMPS_DIR, name)
-            if os.path.islink(p):
-                entries[name] = ("link", os.readlink(p))
-            elif os.path.isfile(p):
-                dst = os.path.join(snap_dir, name)
-                _shutil.copy2(p, dst)
-                entries[name] = ("file", dst)
-
-        yield
-
-        # 1. Remove anything created during the module.
-        for name in os.listdir(LUMPS_DIR):
-            if name not in entries:
-                p = os.path.join(LUMPS_DIR, name)
-                if os.path.islink(p) or os.path.isfile(p):
-                    os.remove(p)
-
-        # 2. Restore originals (content, symlink targets, deleted files).
-        for name, (kind, val) in entries.items():
-            p = os.path.join(LUMPS_DIR, name)
-            if kind == "link":
-                current = os.readlink(p) if os.path.islink(p) else None
-                if current != val:
-                    if os.path.islink(p) or os.path.exists(p):
-                        os.remove(p)
-                    os.symlink(val, p)
-            else:
-                with open(val, "rb") as fh:
-                    original = fh.read()
-                if os.path.islink(p):
-                    os.remove(p)
-                needs_write = True
-                if os.path.isfile(p):
-                    with open(p, "rb") as fh:
-                        needs_write = fh.read() != original
-                if needs_write:
-                    with open(p, "wb") as fh:
-                        fh.write(original)
 
 
 @pytest.fixture(scope="module")

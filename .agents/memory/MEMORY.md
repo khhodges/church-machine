@@ -126,3 +126,4 @@
 - [boot_resident manifest-only](boot-resident-manifest-only.md) — generator reads boot_resident from manifest.json only; sidecar-only flag = NS descriptor with zero-filled body
 - [Wukong native upload projection](wukong-native-upload-projection.md) — generic tail-table boot images must be projected to 16K forward-table DMEM before serial upload
 - [Boot-entry generation minting](boot-entry-generation-minting.md) — every boot-entry GT must inherit its live Namespace Word-1 sequence
+- [Boot test private runtime state](boot-test-private-runtime-state.md) — LUMP isolation must include every boot-regeneration persistence input, including saved config

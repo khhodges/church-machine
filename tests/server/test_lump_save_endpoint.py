@@ -117,11 +117,9 @@ def _meta(token: str, abstraction: str = "LumpSaveTest") -> dict:
 def isolated_lumps(tmp_path, monkeypatch):
     """Redirect the server's lumps directory to a fresh temp directory.
 
-    save_lump() builds lumps_dir via:
-        os.path.join(os.path.dirname(__file__), 'lumps')
-    where __file__ is server/app.py.  Monkeypatching _app_module.__file__ to
-    a path inside tmp_path makes os.path.dirname(__file__) return tmp_path,
-    so lumps_dir = tmp_path/lumps — isolated from the live server/lumps/.
+    Some read endpoints still resolve paths relative to ``__file__`` while
+    save_lump() uses the configurable LUMPS_DIR.  Point both mechanisms at
+    the same private directory.
     """
     fake_app_py = tmp_path / "app.py"
     monkeypatch.setattr(_app_module, "__file__", str(fake_app_py))
@@ -129,6 +127,11 @@ def isolated_lumps(tmp_path, monkeypatch):
     lumps_dir.mkdir()
     # Seed an empty manifest so list_lumps() doesn't error on missing file.
     (lumps_dir / "manifest.json").write_text("[]")
+    monkeypatch.setattr(_app_module, "LUMPS_DIR", str(lumps_dir))
+    monkeypatch.setattr(
+        _app_module, "LUMPS_MANIFEST_PATH", str(lumps_dir / "manifest.json")
+    )
+    monkeypatch.setattr(_app_module, "_LUMPS_DIR", str(lumps_dir))
     return lumps_dir
 
 

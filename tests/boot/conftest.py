@@ -1,22 +1,23 @@
 """Shared fixtures for tests/boot/.
 
-The ``ensure_boot_abstr_lump`` fixture is session-scoped and autouse=True.
-It writes a minimal synthetic Boot.Abstr lump (00000600.lump) to the real
-server/lumps/ directory so that generate_boot_image() can succeed during
-tests without needing the actual PostFlashSelftest lump on disk.
-
-After the test session the file is removed if it was created by this fixture.
+Boot tests use per-session copies of the canonical LUMP library and saved boot
+configuration.  This lets them install a synthetic Boot.Abstr LUMP and
+exercise save/upload endpoints without changing IDE runtime state in the
+working tree.
 """
 import contextlib
 import fcntl
 import math
 import os
+import shutil
 import struct
+import sys
 
 import pytest
 
 ROOT      = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
+LIVE_LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
+LIVE_BOOT_CONFIG_PATH = os.path.join(ROOT, "server", "boot-config.json")
 
 
 # ── Cross-process write lock for the live server/lumps/ directory ────────────
@@ -47,9 +48,6 @@ def lumps_write_lock():
 _BOOT_ABSTR_NS_SLOT = 6
 _LUMP_SIZE          = 64          # words — must match BOOT_ABSTR_DEFAULT_SIZE
 _LUMP_FILENAME      = f"{_BOOT_ABSTR_NS_SLOT << 8:08x}.lump"   # "00000600.lump"
-_LUMP_PATH          = os.path.join(LUMPS_DIR, _LUMP_FILENAME)
-
-
 def _make_synthetic_lump(lump_size: int = _LUMP_SIZE, cw: int = 3, cc: int = 0) -> bytes:
     """Return a minimal valid big-endian Boot.Abstr lump binary.
 
@@ -65,29 +63,94 @@ def _make_synthetic_lump(lump_size: int = _LUMP_SIZE, cw: int = 3, cc: int = 0) 
     return struct.pack(f">{lump_size}I", *words)
 
 
-@pytest.fixture(scope="session", autouse=True)
-def ensure_boot_abstr_lump():
-    """Write a synthetic 00000600.lump to server/lumps/ for the test session.
+def _redirect_boot_module_paths(
+    source_dir: str,
+    isolated_dir: str,
+    exact_path_replacements: dict[str, str],
+) -> list[tuple[object, str, str]]:
+    """Point boot-test path constants at private storage and return originals.
 
-    generate_boot_image() raises ValueError when the Boot.Abstr lump file is
-    absent (direct-dispatch model — no trampoline fallback).  Tests in this
-    directory call generate_boot_image(cfg, LUMPS_DIR) with the real lumps
-    directory, so a synthetic stand-in is installed for the duration of the
-    session and cleaned up afterwards.
-
-    If 00000600.lump is already present (e.g. a real SelfTest lump is installed)
-    this fixture is a no-op and does not remove it afterwards.
+    Test modules intentionally keep their LUMP directory constants simple so
+    their image assertions are readable.  They are imported before session
+    fixtures run, therefore redirect their already-created path constants here
+    rather than making every individual test thread a fixture argument through
+    its helpers.
     """
-    already_present = os.path.exists(_LUMP_PATH)
-    if not already_present:
-        os.makedirs(LUMPS_DIR, exist_ok=True)
-        with open(_LUMP_PATH, "wb") as fh:
+    changed: list[tuple[object, str, str]] = []
+    source_prefix = source_dir + os.sep
+    boot_tests_dir = os.path.join(ROOT, "tests", "boot") + os.sep
+
+    for module in tuple(sys.modules.values()):
+        module_file = getattr(module, "__file__", "") or ""
+        if not os.path.abspath(module_file).startswith(boot_tests_dir):
+            continue
+        for name, value in tuple(vars(module).items()):
+            if not isinstance(value, str):
+                continue
+            if value in exact_path_replacements:
+                replacement = exact_path_replacements[value]
+            elif value == source_dir:
+                replacement = isolated_dir
+            elif value.startswith(source_prefix):
+                replacement = os.path.join(isolated_dir, value[len(source_prefix):])
+            else:
+                continue
+            setattr(module, name, replacement)
+            changed.append((module, name, value))
+    return changed
+
+
+@pytest.fixture(scope="session", autouse=True)
+def isolated_boot_lumps(tmp_path_factory):
+    """Give every boot test session a private copy of ``server/lumps/``.
+
+    The direct-dispatch tests need a Boot.Abstr binary even in a fresh checkout.
+    The synthetic binary is written only to this copy.  Flask state and
+    boot-test module constants and server persistence paths are redirected as
+    well, so save/upload coverage cannot leak a manifest, LUMP artifact, or
+    boot configuration change into the live IDE state.
+    """
+    isolated_dir = str(tmp_path_factory.mktemp("boot_lumps"))
+    shutil.copytree(LIVE_LUMPS_DIR, isolated_dir, symlinks=True, dirs_exist_ok=True)
+    boot_state_dir = str(tmp_path_factory.mktemp("boot_state"))
+    isolated_boot_config_path = os.path.join(boot_state_dir, "boot-config.json")
+    if os.path.exists(LIVE_BOOT_CONFIG_PATH):
+        shutil.copy2(LIVE_BOOT_CONFIG_PATH, isolated_boot_config_path)
+
+    synthetic_path = os.path.join(isolated_dir, _LUMP_FILENAME)
+    if not os.path.exists(synthetic_path):
+        with open(synthetic_path, "wb") as fh:
             fh.write(_make_synthetic_lump())
-    yield
-    # Do NOT delete the synthetic lump in teardown.  The all-tests runner
-    # executes boot test suites in parallel; a teardown delete in one pytest
-    # session races with another session that also needs the file.  Leaving
-    # the synthetic lump in server/lumps/ is safe — generate_boot_image()
-    # treats any file whose name matches <slot<<8>.lump as the Boot.Abstr
-    # lump and embeds it verbatim; the real SelfTest lump will overwrite this
-    # stub when it is (re)built by update-lump.
+
+    changed_modules = _redirect_boot_module_paths(
+        LIVE_LUMPS_DIR,
+        isolated_dir,
+        {LIVE_BOOT_CONFIG_PATH: isolated_boot_config_path},
+    )
+
+    import server.app as app_module
+
+    app_paths = {
+        "LUMPS_DIR": isolated_dir,
+        "LUMPS_MANIFEST_PATH": os.path.join(isolated_dir, "manifest.json"),
+        "BOOT_IMAGE_PATH": os.path.join(isolated_dir, "boot-image.bin"),
+        "NS_STATE_PATH": os.path.join(isolated_dir, "ns-state.json"),
+        "BOOT_CONFIG_PATH": isolated_boot_config_path,
+        "_LUMPS_DIR": isolated_dir,
+    }
+    original_app_paths = {
+        name: getattr(app_module, name)
+        for name in app_paths
+        if hasattr(app_module, name)
+    }
+    for name, value in app_paths.items():
+        if name in original_app_paths:
+            setattr(app_module, name, value)
+
+    try:
+        yield isolated_dir
+    finally:
+        for module, name, value in reversed(changed_modules):
+            setattr(module, name, value)
+        for name, value in original_app_paths.items():
+            setattr(app_module, name, value)

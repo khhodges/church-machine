@@ -5892,7 +5892,9 @@ def save_lump():
         }), 422
     # ── End pre-flight ────────────────────────────────────────────────────────
 
-    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    # Keep the writable library behind the module-level setting so endpoint
+    # tests can use a private temporary library instead of server/lumps/.
+    lumps_dir = LUMPS_DIR
     os.makedirs(lumps_dir, exist_ok=True)
 
     import re as _re_arch

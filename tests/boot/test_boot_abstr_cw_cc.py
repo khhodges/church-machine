@@ -26,7 +26,6 @@ Three scenarios:
      cw=3 / cc=0 (no regression in the no-saved-lump code path).
 """
 import os
-import shutil
 import struct
 import sys
 
@@ -85,96 +84,6 @@ def _make_lump_words(cw, cc):
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
-@pytest.fixture(scope="module", autouse=True)
-def lumps_dir_snapshot(tmp_path_factory):
-    """Full snapshot/restore of server/lumps/ around this destructive module.
-
-    Tests here POST /api/lumps/save for ns_slot=6.  Beyond the files the
-    per-test ``clean_300`` fixture tracks, save_lump() also writes a stub
-    SelfTest.<n>.<hash>.lump, re-points the SelfTest.1.<hash>.lump /
-    00000600.lump symlinks, rewrites manifest.json, and can truncate versioned
-    SelfTest_v*.lump files.  A midway suite failure used to leave the canonical
-    SelfTest binary corrupted (word[510] c-list[0] stomp), which broke
-    hardware/boot_rom.py's import-time assert and took down the IDE server.
-
-    This module-scoped autouse fixture holds the cross-process
-    ``lumps_write_lock`` (see tests/boot/conftest.py) for the entire
-    snapshot → tests → restore span, snapshots EVERY top-level file and
-    symlink in server/lumps/ before any test runs, then in teardown (which
-    pytest runs even when tests fail or error):
-      - deletes any file/symlink created during the module,
-      - restores any file whose bytes changed or that was deleted,
-      - restores any symlink whose target changed or that was deleted.
-
-    Guarantee and limits: the exclusive flock serializes this module against
-    every other *cooperating* writer of the live lumps directory (any test or
-    fixture that also takes ``lumps_write_lock``).  It does NOT protect
-    against non-cooperating writers — e.g. a live IDE/dev server process
-    saving lumps concurrently; such writes made during this module's window
-    would be reverted by the restore.  Do not run this suite while the dev
-    server is actively saving lumps.
-    """
-    from tests.boot.conftest import lumps_write_lock
-
-    with lumps_write_lock():
-        snap_dir = str(tmp_path_factory.mktemp("lumps_snapshot"))
-        entries = {}  # name -> ("link", target) | ("file", snapshot_path)
-        for name in os.listdir(LUMPS_DIR):
-            p = os.path.join(LUMPS_DIR, name)
-            if os.path.islink(p):
-                entries[name] = ("link", os.readlink(p))
-            elif os.path.isfile(p):
-                dst = os.path.join(snap_dir, name)
-                shutil.copy2(p, dst)
-                entries[name] = ("file", dst)
-
-        yield
-
-        # 1. Remove anything created during the module.
-        for name in os.listdir(LUMPS_DIR):
-            if name in entries:
-                continue
-            p = os.path.join(LUMPS_DIR, name)
-            if os.path.islink(p) or os.path.isfile(p):
-                os.remove(p)
-
-        # 2. Restore originals (content, symlink targets, deleted files).
-        for name, (kind, val) in entries.items():
-            p = os.path.join(LUMPS_DIR, name)
-            if kind == "link":
-                current = os.readlink(p) if os.path.islink(p) else None
-                if current != val:
-                    if os.path.islink(p) or os.path.exists(p):
-                        os.remove(p)
-                    os.symlink(val, p)
-            else:
-                with open(val, "rb") as fh:
-                    original = fh.read()
-                if os.path.islink(p):
-                    os.remove(p)
-                needs_write = True
-                if os.path.isfile(p):
-                    with open(p, "rb") as fh:
-                        needs_write = fh.read() != original
-                if needs_write:
-                    with open(p, "wb") as fh:
-                        fh.write(original)
-
-        # 3. Sanity guard: the canonical SelfTest binary must be intact
-        #    (word[510] == 0x4A000006, the c-list[0] SelfTest E-GT) whenever a
-        #    512-word 00000600.lump is present.  Fail loudly if restore missed it.
-        lump_600 = os.path.join(LUMPS_DIR, "00000600.lump")
-        if os.path.exists(lump_600):
-            with open(lump_600, "rb") as fh:
-                blob = fh.read()
-            if len(blob) == 512 * 4:
-                w510 = struct.unpack(">I", blob[510 * 4:511 * 4])[0]
-                assert w510 == 0x4A000006, (
-                    f"lumps_dir_snapshot restore failed: canonical SelfTest lump "
-                    f"word[510]={w510:#010x}, expected 0x4A000006"
-                )
-
-
 @pytest.fixture(scope="module")
 def client():
     """Shared Flask test client for the entire module."""
@@ -200,8 +109,8 @@ def clean_300():
                       boot-config Step 2 validation can read the lump catalog
                       and regenerate boot-image.bin successfully)
 
-    All existing files are restored unconditionally in teardown, so the real
-    lumps directory is left exactly as it was found regardless of test outcome.
+    All existing files are restored unconditionally in teardown.  The shared
+    boot fixture already redirects this module to a private library copy.
     """
     _to_remove    = (LUMP_600_PATH, JSON_600_PATH, JSON_003_PATH, LUMP_300_PATH, JSON_300_PATH)
     _keep_in_place = (MANIFEST_PATH,)
@@ -244,15 +153,15 @@ BOOT_CONFIG_PATH = os.path.join(ROOT, "server", "boot-config.json")
 
 @pytest.fixture()
 def reset_boot_config():
-    """Back up boot-config.json, replace with a minimal valid config, then restore.
+    """Replace the private boot config with a minimal valid config, then restore.
 
-    The on-disk boot-config.json may contain Step 2 lump references (e.g. NS
-    slot 18) whose lump files have since been deleted.  When those invalid
-    references exist, the save endpoint's boot-image regeneration fails with
-    a Step 2 validation error, causing boot_image_refreshed=False.
+    The shared boot fixture redirects ``BOOT_CONFIG_PATH`` and this test
+    module's path constant to temporary storage.  The copied config may
+    contain Step 2 LUMP references (e.g. NS slot 18) whose files have since
+    been deleted, which makes boot-image regeneration fail validation.
 
-    This fixture ensures a known-good minimal config is in place for tests
-    that rely on successful boot-image regeneration.
+    This fixture ensures a known-good minimal config is in place for the
+    test, without changing the IDE's real boot-config.json.
     """
     import json
     _MINIMAL_JSON = {
