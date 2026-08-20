@@ -4,8 +4,8 @@
  * test_sync_guard.js
  *
  * Tests the fallback behaviour of check-run-all-tests-sync.js when
- * test-workflow-config.json is missing or unparseable, and confirms the
- * happy-path produces the expected OK output.
+ * test-workflow-config.json is missing or unparseable, validates script-only
+ * declarations, and confirms the happy-path produces the expected OK output.
  *
  * Run:  node scripts/test_sync_guard.js
  */
@@ -131,15 +131,37 @@ function configWithScriptOnlySuites(scriptOnlySuites) {
 }
 
 // ---------------------------------------------------------------------------
-// T5 — normal case: exits 0, stdout contains "OK"
+// T5 — duplicate script-only declaration: exits 1 and reports the duplicate
+// ---------------------------------------------------------------------------
+{
+    const config = configWithScriptOnlySuites([
+        'sha32-vectors',
+        'lambda-exec-tests',
+        'sha32-vectors',
+        'lambda-exec-tests',
+    ]);
+    const result = withConfig(config, () => runGuard());
+    const output = `${result.stdout || ''}\n${result.stderr || ''}`;
+
+    check('T5: duplicate script-only declaration — exit code 1',
+        result.status === 1);
+
+    check('T5: duplicate script-only declaration — reports duplicated suite',
+        output.includes('scriptOnlySuites contains duplicate declarations') &&
+        output.includes('sha32-vectors') &&
+        output.includes('lambda-exec-tests'));
+}
+
+// ---------------------------------------------------------------------------
+// T6 — normal case: exits 0, stdout contains "OK"
 // ---------------------------------------------------------------------------
 {
     const result = runGuard();
 
-    check('T5: normal case — exit code 0',
+    check('T6: normal case — exit code 0',
         result.status === 0);
 
-    check('T5: normal case — OK line printed',
+    check('T6: normal case — OK line printed',
         (result.stdout || '').includes('OK — all'));
 }
 

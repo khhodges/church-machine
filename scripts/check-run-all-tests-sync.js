@@ -112,6 +112,7 @@ if (!fs.existsSync(configPath)) {
 // Script-only suites: registered in run-all-tests.sh but intentionally have
 // no dedicated workflow entry (too lightweight, or workflow limit reached).
 let SCRIPT_ONLY_SUITES;
+let SCRIPT_ONLY_DUPLICATES = [];
 if (!fs.existsSync(configPath)) {
     SCRIPT_ONLY_SUITES = new Set(DEFAULT_SCRIPT_ONLY_SUITES);
 } else {
@@ -121,7 +122,16 @@ if (!fs.existsSync(configPath)) {
     } catch (e) {
         parsed2 = { scriptOnlySuites: DEFAULT_SCRIPT_ONLY_SUITES };
     }
-    SCRIPT_ONLY_SUITES = new Set(parsed2.scriptOnlySuites || DEFAULT_SCRIPT_ONLY_SUITES);
+    const scriptOnlyDeclarations = parsed2.scriptOnlySuites || DEFAULT_SCRIPT_ONLY_SUITES;
+    const seenScriptOnlySuites = new Set();
+    SCRIPT_ONLY_DUPLICATES = [...new Set(
+        scriptOnlyDeclarations.filter(name => {
+            if (seenScriptOnlySuites.has(name)) return true;
+            seenScriptOnlySuites.add(name);
+            return false;
+        })
+    )].sort();
+    SCRIPT_ONLY_SUITES = new Set(scriptOnlyDeclarations);
 }
 
 // ---------------------------------------------------------------------------
@@ -252,6 +262,17 @@ if (scriptOnlyWithWorkflow.length > 0) {
     console.error('');
     console.error('Remove the declaration from scriptOnlySuites; dedicated workflows');
     console.error('must be tracked as normal test workflows.');
+}
+
+if (SCRIPT_ONLY_DUPLICATES.length > 0) {
+    ok = false;
+    console.error('');
+    console.error('SYNC ERROR — scriptOnlySuites contains duplicate declarations:');
+    for (const name of SCRIPT_ONLY_DUPLICATES) {
+        console.error(`  • ${name}`);
+    }
+    console.error('');
+    console.error('Remove duplicate entries from scripts/test-workflow-config.json.');
 }
 
 if (ok) {
