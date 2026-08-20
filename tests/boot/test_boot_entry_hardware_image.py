@@ -27,6 +27,7 @@ from server.boot_image import (
     read_boot_entry_info,
     build_wukong_upload_image,
     create_gt,
+    integrity32,
     NS_ENTRY_WORDS,
     WUKONG_DMEM_WORDS,
     WUKONG_UPLOAD_BODY_BASE_WORD,
@@ -58,6 +59,20 @@ def _ns_slot_base(total, slot):
 
 def _thread_loc(words, total):
     return words[_ns_slot_base(total, 1)]
+
+
+def _reissue_boot_entry(image, slot, seq):
+    """Return a coherent image where ``slot`` has a non-zero generation."""
+    words = _unpack_words(image)
+    total = len(words)
+    ns_base = _ns_slot_base(total, slot)
+    authority = (words[ns_base + 1] & ~(0x1FF << 21)) | ((seq & 0x1FF) << 21)
+    words[ns_base + 1] = authority
+    words[ns_base + 2] = integrity32(words[ns_base], authority)
+    words[_thread_loc(words, total) + THREAD_CAPS_OFFSET] = create_gt(
+        seq, slot, {"E": 1}, 1
+    )
+    return struct.pack(f"<{total}I", *words)
 
 
 @pytest.mark.parametrize("slot", [6, 7])
@@ -158,3 +173,26 @@ def test_wukong_projection_keeps_capabilitytest_body_and_clist():
     ]
     # Wukong's fixed Boot.Thread lives at word 896 and dispatches from caps[0].
     assert words[896 + THREAD_CAPS_OFFSET] == create_gt(0, 10, {"E": 1}, 1)
+
+
+def test_wukong_projection_preserves_reissued_boot_entry_generation():
+    """An entry at generation 1 must retain matching GTs after projection.
+
+    This protects the real VERSION fault where a slot-10 descriptor said seq=1
+    while Thread.caps[0] was still minted at seq=0.
+    """
+    generic = generate_boot_image(
+        _minimal_cfg(), LUMPS_DIR, boot_entry_slot=10,
+        require_entry_resident=True,
+    )
+    reissued = _reissue_boot_entry(generic, 10, 1)
+    source_info = read_boot_entry_info(reissued)
+    projected, projected_info = build_wukong_upload_image(reissued)
+    words = _unpack_words(projected)
+
+    assert source_info["entry_gt_seq"] == 1
+    assert source_info["caps0_ok"] is True
+    assert source_info["expected_gt"] == create_gt(1, 10, {"E": 1}, 1)
+    assert projected_info["caps0_ok"] is True
+    assert words[10 * NS_ENTRY_WORDS + 1] >> 21 == 1
+    assert words[896 + THREAD_CAPS_OFFSET] == create_gt(1, 10, {"E": 1}, 1)

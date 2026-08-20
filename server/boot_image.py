@@ -456,13 +456,20 @@ def read_boot_entry_info(image_bytes):
 
     entry_slot = words[tag_idx - 1] & 0xFF
 
-    def _ns_word0(slot):
+    def _ns_base(slot):
         base = n_words - (slot + 1) * NS_ENTRY_WORDS
         if base < 0 or base >= n_words:
             return None
-        return words[base]
+        return base
+
+    def _ns_word0(slot):
+        base = _ns_base(slot)
+        return words[base] if base is not None else None
 
     entry_loc = _ns_word0(entry_slot)
+    entry_ns_base = _ns_base(entry_slot)
+    entry_authority = words[entry_ns_base + 1] if entry_ns_base is not None else 0
+    entry_gt_seq = (entry_authority >> 21) & 0x1FF
 
     resident = False
     reason = None
@@ -486,11 +493,15 @@ def read_boot_entry_info(image_bytes):
 
     thread_loc   = _ns_word0(1) or 0
     thread_caps0 = words[thread_loc + 244] if 0 <= thread_loc + 244 < n_words else 0
-    expected_gt  = create_gt(0, entry_slot, {"E": 1}, 1)
+    # Thread.caps[0] is a capability for the selected live descriptor, so its
+    # generation must match W1[29:21].  Hardcoding sequence zero rejects a
+    # valid reissued boot entry and leads to a boot-time VERSION fault.
+    expected_gt  = create_gt(entry_gt_seq, entry_slot, {"E": 1}, 1)
 
     return {
         "entry_slot":   entry_slot,
         "entry_loc":    entry_loc,
+        "entry_gt_seq": entry_gt_seq,
         "resident":     resident,
         "reason":       reason,
         "thread_caps0": thread_caps0,
@@ -1368,7 +1379,9 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             f"than the fixed Thread capability zone offset (+244); each thread "
             f"body must be at least 256 words to contain its own CR0")
     mem[thread_loc] = pack_lump_header(_ns_n_minus_6(thread_size), 32, 12, 2)
-    mem[thread_loc + 244] = create_gt(0, boot_entry_slot, {"E": 1}, 1)
+    _boot_entry_ns_base = total - (boot_entry_slot + 1) * NS_ENTRY_WORDS
+    _boot_entry_seq = (mem[_boot_entry_ns_base + 1] >> 21) & 0x1FF
+    mem[thread_loc + 244] = create_gt(_boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
 
     # ----- V20 additional threads (Thread.2 .. Thread.n) -----------------
     # Each extra thread is a resident stack object identical in shape to
@@ -1391,7 +1404,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
                     f"threadLumpWords, or nsSlotsMax, or increase "
                     f"totalNamespaceWords.")
             mem[_t_cursor] = pack_lump_header(_ns_n_minus_6(thread_size), 32, 12, 2)
-            mem[_t_cursor + 244] = create_gt(0, boot_entry_slot, {"E": 1}, 1)
+            mem[_t_cursor + 244] = create_gt(_boot_entry_seq, boot_entry_slot, {"E": 1}, 1)
             extra_thread_locs.append(_t_cursor)
             _t_cursor = _t_end
         running_offset = _t_cursor

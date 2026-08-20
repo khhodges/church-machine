@@ -1852,8 +1852,15 @@ class ChurchSimulator {
         // The boot entry's done: loop calls TPERM CR0, E to decide when to dispatch
         // to the programmer's abstraction; INIT_ABSTR overwrites this slot when
         // the user loads their program, and the next Scheduler reschedule updates CR0.
+        // A GT is valid only for the exact Namespace-entry generation it was
+        // minted from.  Do not assume the selected entry is generation zero:
+        // a user can replace/reissue it before rebooting.  The boot path must
+        // carry the live W1 gt_seq into Thread.caps[0].
+        const _initialBootEntry = this.readNSEntry(this.bootEntrySlot);
+        const _initialBootSeq = _initialBootEntry
+            ? this.parseNSWord1(_initialBootEntry.word1_limit).gtSeq : 0;
         this.memory[threadLoc + THREAD_CAPS_OFFSET] =
-            this.createGT(0, this.bootEntrySlot, {E: 1}, 1);
+            this.createGT(_initialBootSeq, this.bootEntrySlot, {E: 1}, 1);
 
         // Memory-manager GT at c-list[0]: R|W Inform capability over NS slot 0 (full namespace).
         clistGTs[0] = this.createGT(0, BOOT_NS_SLOT_HEADER, {R:1, W:1}, 1);
@@ -2323,7 +2330,14 @@ class ChurchSimulator {
             // saved to the sentinel call frame in the thread stack.
             // ════════════════════════════════════════════════════════════════════
             case 5: {
-                const gt6 = this.createGT(0, this.bootEntrySlot, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);  // E-perm GT for boot entry
+                // Namespace entries can be reissued while retaining their slot.
+                // Mint the boot credential from the entry's *live* sequence;
+                // a hardcoded zero creates a stale GT and traps before the
+                // selected LUMP executes.
+                const _b5Entry = this.readNSEntry(this.bootEntrySlot);
+                const _b5Seq = _b5Entry
+                    ? this.parseNSWord1(_b5Entry.word1_limit).gtSeq : 0;
+                const gt6 = this.createGT(_b5Seq, this.bootEntrySlot, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);  // E-perm GT for boot entry
                 const check6 = this.mLoad(gt6, null, undefined);                                    // M-elevation mLoad; validates boot entry NS entry
                 const _b3Label = (this.nsLabels && this.nsLabels[this.bootEntrySlot]) || `Slot ${this.bootEntrySlot}`;
                 if (!check6.ok) {
@@ -2365,7 +2379,7 @@ class ChurchSimulator {
                     // simulator), so the old falsy guard `&& _b5ThreadEntry.word0_location`
                     // silently skipped the write.  Use a typeof check instead.
                     const _b5CR0Addr = (_b5ThreadEntry.word0_location >>> 0) + THREAD_CAPS_OFFSET;
-                    this.memory[_b5CR0Addr] = this.createGT(0, this.bootEntrySlot, {E:1}, 1);
+                    this.memory[_b5CR0Addr] = gt6;
                     // [BOOT] INIT_ABSTR Thread.caps[0] — replaced by per-event trace packets
                 }
 
@@ -2391,7 +2405,10 @@ class ChurchSimulator {
             case 6: {
                 // ── Step 1: Direct E-perm mLoad of boot entry abstraction ────────────
                 const _b4Label    = (this.nsLabels && this.nsLabels[this.bootEntrySlot]) || `Slot ${this.bootEntrySlot}`;
-                const bootEntryGT = this.createGT(0, this.bootEntrySlot, {R:0,W:0,X:0,L:0,S:0,E:1}, 1); // E-GT for boot entry
+                const _b6Entry = this.readNSEntry(this.bootEntrySlot);
+                const _b6Seq = _b6Entry
+                    ? this.parseNSWord1(_b6Entry.word1_limit).gtSeq : 0;
+                const bootEntryGT = this.createGT(_b6Seq, this.bootEntrySlot, {R:0,W:0,X:0,L:0,S:0,E:1}, 1); // E-GT for boot entry
                 const entryCheck  = this.mLoad(bootEntryGT, 'E', undefined);                              // E-perm mLoad: validates NS entry
                 if (!entryCheck.ok) {
                     this.fault('BOOT', `NUC_CLIST mLoad(${_b4Label}) failed: ${entryCheck.message}`);
@@ -2493,7 +2510,8 @@ class ChurchSimulator {
                     // every other CR must go through _writeCR using the mLoad-returned NS entry.
                     // Synthesise a clist-entry whose word0_location points to the c-list start
                     // (base + clistStart) so _writeCR sets CR6.word1 correctly.
-                    const cr6GT = this.createGT(0, bootEntrySlot, {R:0,W:0,X:0,L:1,S:0,E:0}, 1);   // L-perm c-list token
+                    const _b6EntrySeq = this.parseNSWord1(entryNSEntry.word1_limit).gtSeq;
+                    const cr6GT = this.createGT(_b6EntrySeq, bootEntrySlot, {R:0,W:0,X:0,L:1,S:0,E:0}, 1);   // L-perm c-list token
                     const _clistEntry = Object.assign({}, entryNSEntry, { word0_location: (base + clistStart) >>> 0 });
                     this._writeCR(6, cr6GT, _clistEntry);
                     this.cr[6].m = 1;   // CALL is always M-elevated (matches CALL ISA call.py: mload_m_elevated=1)
@@ -2537,7 +2555,8 @@ class ChurchSimulator {
                 // writes.  CR14 must be installed through _writeCR using the NS entry
                 // returned by the E-perm mLoad in NUC_CLIST (B:06).
                 // _writeCR sets CR14.word1 = entryNSEntry.word0_location = lump base ✓
-                const cr14GT = this.createGT(0, bootEntrySlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);  // R+X code token
+                const _b7EntrySeq = this.parseNSWord1(entryNSEntry.word1_limit).gtSeq;
+                const cr14GT = this.createGT(_b7EntrySeq, bootEntrySlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);  // R+X code token
                 this._writeCR(14, cr14GT, entryNSEntry);
                 // Boot ROM instruction [2]: CALL CR0, CR0 — 3 trace packets (hardware NIA=2)
                 this._emitTrace(2, TRACE_EV_CALL_CR6,  this.cr[6].word0  >>> 0);

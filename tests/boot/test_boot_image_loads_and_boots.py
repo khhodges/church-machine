@@ -34,6 +34,7 @@ check intentionally ignores (resident lump bodies, etc.).
 import base64
 import json
 import os
+import struct
 import subprocess
 import sys
 
@@ -42,7 +43,7 @@ import pytest
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)
 
-from server.boot_image import generate_boot_image  # noqa: E402
+from server.boot_image import generate_boot_image, integrity32  # noqa: E402
 
 LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
 HARNESS   = os.path.join(ROOT, "tests", "boot", "sim_boot_loader.js")
@@ -266,6 +267,16 @@ def _slot_body(image_bytes, slot):
     return loc, words[loc:loc + 64]
 
 
+def _reissue_boot_entry(image_bytes, slot, seq):
+    """Advance one descriptor generation while keeping its body and seal valid."""
+    words = list(struct.unpack(f"<{len(image_bytes) // 4}I", image_bytes))
+    ns_base = len(words) - (slot + 1) * 4
+    authority = (words[ns_base + 1] & ~(0x1FF << 21)) | ((seq & 0x1FF) << 21)
+    words[ns_base + 1] = authority
+    words[ns_base + 2] = integrity32(words[ns_base], authority)
+    return struct.pack(f"<{len(words)}I", *words)
+
+
 def test_capabilitytest_image_payload_integrity():
     """Generated image embeds CapabilityTest's real body at slot 10."""
     cfg = _saved_project_cfg()
@@ -309,6 +320,26 @@ def test_capabilitytest_boot_entry_boots():
     )
     # CR0 (boot-entry E-GT via Thread.caps[0]) must also encode slot 10.
     assert (status["cr0"]["word0"] & 0xFFFF) == CAPTEST_SLOT
+
+
+def test_capabilitytest_reissued_generation_boots():
+    """Boot mints all entry capabilities from the live W1 generation.
+
+    Reproduces the reported `GT seq 0, entry seq 1` failure without changing
+    CapabilityTest code: only the Namespace descriptor is reissued.
+    """
+    cfg = _saved_project_cfg()
+    image = generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=CAPTEST_SLOT)
+    reissued = _reissue_boot_entry(image, CAPTEST_SLOT, 1)
+    status = _run_harness(cfg, reissued)
+
+    assert status["loaded"] is True
+    assert status["faultLog"] == [], (
+        f"reissued CapabilityTest failed boot: {status['faultLog']}"
+    )
+    assert status["bootComplete"] is True
+    assert ((status["cr0"]["word0"] >> 16) & 0x1FF) == 1
+    assert ((status["cr14"]["word0"] >> 16) & 0x1FF) == 1
 
 
 def test_capabilitytest_manifest_boot_resident():
