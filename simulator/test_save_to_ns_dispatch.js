@@ -7,7 +7,7 @@
 // Run:  node simulator/test_save_to_ns_dispatch.js
 //
 // Background (Task #1134 / #1145):
-//   Method-table entries at lump word (i+1) are BRANCH instructions (opcode 17,
+//   Method-table entries at lump word (i+1) are BRANCH instructions (opcode 23,
 //   15-bit signed offset).  branchOffset = bodyOffset - i.
 //   CALL dispatcher: pc = (methodIndex-1) + soff = i + (bodyOffset-i) = bodyOffset.
 //   Fetch: physAddr = lump_base + 1 + bodyOffset → body first instruction.
@@ -26,7 +26,7 @@
 
 const ChurchSimulator = require('./simulator.js');
 
-const BRANCH_OPCODE = 17;
+const BRANCH_OPCODE = 23;
 const BRANCH_BASE   = (BRANCH_OPCODE << 27) >>> 0;
 
 function branchWord(offset) {
@@ -355,8 +355,9 @@ console.log('\n--- T007: end-to-end _execCall dispatch from saved NS slot ---');
     const slot1 = sim1.saveToNamespace('T7Target', words, { R:0, W:0, X:0, L:0, S:0, E:1 }, 1);
     const entry1 = sim1.readNSEntry(slot1);
 
-    // gt_seq = 0 because writeNSEntry is called with version=0
-    const gt_seq1 = (sim1.memory[sim1.NS_TABLE_BASE + slot1 * sim1.NS_ENTRY_WORDS + 2] >>> 25) & 0x7F;
+    // Namespace sequence is authoritative in W1[29:21].  Do not derive it
+    // from the integrity word or assume a forward NS-table layout.
+    const gt_seq1 = entry1.gtSeq;
 
     // E-perm Inform GT (type=1) pointing at the saved slot — exactly what CALL validates
     const eGT1 = sim1.createGT(gt_seq1, slot1, { R:0, W:0, X:0, L:0, S:0, E:1 }, 1);
@@ -376,7 +377,7 @@ console.log('\n--- T007: end-to-end _execCall dispatch from saved NS slot ---');
     sim2.bootComplete = true;
     const slot2 = sim2.saveToNamespace('T7Target2', words, { R:0, W:0, X:0, L:0, S:0, E:1 }, 1);
     const entry2 = sim2.readNSEntry(slot2);
-    const gt_seq2 = (sim2.memory[sim2.NS_TABLE_BASE + slot2 * sim2.NS_ENTRY_WORDS + 2] >>> 25) & 0x7F;
+    const gt_seq2 = entry2.gtSeq;
     const eGT2 = sim2.createGT(gt_seq2, slot2, { R:0, W:0, X:0, L:0, S:0, E:1 }, 1);
     sim2.cr[0] = { word0: eGT2, word1: entry2.word0_location, word2: entry2.word1_limit, word3: entry2.word2_seals, m: 0 };
 

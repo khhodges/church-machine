@@ -8360,7 +8360,11 @@ class ChurchSimulator {
         const lim17 = Math.min(lumpSize - cc - 1, 0x1FFFF);
         // No trusted full identity is registered by this local save path, so it
         // must not invent a resident cache token from the permission mask.
-        this.writeNSEntry(idx, loc, lim17, 0, 0, 0, gtType, 0, cc || undefined, 0);
+        // Keep type and generation in their own ABI fields.  The previous
+        // shifted call wrote gtType=1 into `version`, silently reissuing every
+        // saved LUMP at sequence 1 while callers minted E-GTs at sequence 0.
+        // That guaranteed a later INIT_ABSTR VERSION fault on a saved boot entry.
+        this.writeNSEntry(idx, loc, lim17, 0, 0, gtType, 0, cc, 0);
         this.nsLabels[idx] = label;
         // Word 0: lump header (magic=0x1F, n_minus_6, cw=codeLen, cc, typ=0).
         // Previously a GT word was written here, which broke CALL dispatch and
@@ -8397,7 +8401,9 @@ class ChurchSimulator {
         }
         // No trusted full identity is registered by this local save path, so W3
         // remains zero rather than carrying permission-derived data.
-        this.writeNSEntry(idx, loc, lim17, 0, 0, 0, gtType, 0, cc || undefined, 0);
+        // See saveToNamespace(): type is argument 6 and a new local save is
+        // generation 0.  Never shift the type into the Namespace gt_seq field.
+        this.writeNSEntry(idx, loc, lim17, 0, 0, gtType, 0, cc, 0);
         this.nsLabels[idx] = label;
         // Word 0: lump header (magic=0x1F, n_minus_6, cw=codeLen, cc, typ=0).
         // Previously a GT word was written here, which broke CALL dispatch and

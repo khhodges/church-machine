@@ -205,6 +205,47 @@ function expectedLumpSize(codeLen) {
         `got 0x${newHdr.magic.toString(16)}`);
 }
 
+// ── T13: save writers must not shift type into gt_seq ─────────────────────────
+// A shifted writeNSEntry() call turns Inform (type 1) into Namespace sequence 1.
+// A later boot then sees entry seq=1 while an E-GT is minted at seq=0, producing
+// the recurring INIT_ABSTR VERSION fault. Both Save-to-NS routes must preserve
+// Inform metadata and create a generation-zero descriptor.
+{
+    const sim = new ChurchSimulator();
+    const words = [0x12345678, 0x9ABCDEF0];
+    const slot = sim.saveToNamespace('GenerationCheck', words,
+        {R:0,W:0,X:1,L:0,S:0,E:0}, 1, [{name: 'SelfTest'}]);
+    const entry = sim.readNSEntry(slot);
+    assert('T13a saveToNamespace: Inform type is preserved', entry && entry.gtType === 1,
+        `got type=${entry && entry.gtType}`);
+    assert('T13b saveToNamespace: gt_seq starts at zero', entry && entry.gtSeq === 0,
+        `got seq=${entry && entry.gtSeq}`);
+    assert('T13c saveToNamespace: c-list count is preserved', entry && entry.clistCount === 1,
+        `got cc=${entry && entry.clistCount}`);
+    const entryGT = sim.createGT(entry.gtSeq, slot,
+        {R:0,W:0,X:0,L:0,S:0,E:1}, entry.gtType);
+    assert('T13d saveToNamespace: minted entry GT passes mLoad',
+        sim.mLoad(entryGT, 'E').ok === true);
+}
+
+{
+    const sim = new ChurchSimulator();
+    const words = [0xCAFEBABE, 0x01234567];
+    sim.saveToNamespaceAt(10, 'CapabilityTest', words,
+        {R:0,W:0,X:1,L:0,S:0,E:0}, 1, [{name: 'SelfTest'}]);
+    const entry = sim.readNSEntry(10);
+    assert('T13e saveToNamespaceAt: Inform type is preserved', entry && entry.gtType === 1,
+        `got type=${entry && entry.gtType}`);
+    assert('T13f saveToNamespaceAt: gt_seq starts at zero', entry && entry.gtSeq === 0,
+        `got seq=${entry && entry.gtSeq}`);
+    assert('T13g saveToNamespaceAt: c-list count is preserved', entry && entry.clistCount === 1,
+        `got cc=${entry && entry.clistCount}`);
+    const entryGT = sim.createGT(entry.gtSeq, 10,
+        {R:0,W:0,X:0,L:0,S:0,E:1}, entry.gtType);
+    assert('T13h saveToNamespaceAt: minted entry GT passes mLoad',
+        sim.mLoad(entryGT, 'E').ok === true);
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed} passed, ${failed} failed`);
