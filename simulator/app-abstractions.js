@@ -392,17 +392,8 @@ function _absFilterInput() {
     renderAbstractions();
 }
 
-// Slot index for the "→ Next" secondary ⚡ — the abstraction SelfTest chains to
-// when all tests pass (done: CALL AL, CR1, CR1 → ELOADCALL through c-list[1]).
-// -1 = default self-loop (SelfTest re-enters itself).
-// Persisted in localStorage and in boot-config.json (nextAfterSelfTestSlot).
-let nextAfterSelfTestSlot = (() => {
-    try {
-        const n = parseInt(localStorage.getItem('nextAfterSelfTestSlot'), 10);
-        return Number.isFinite(n) && n >= 0 ? n : -1;
-    } catch (e) { return -1; }
-})();
-if (typeof window !== 'undefined') window.nextAfterSelfTestSlot = nextAfterSelfTestSlot;
+// SelfTest's c-list Next.GT always follows the ⚡ LightningBolt boot-entry
+// selection. It has no independently persisted target.
 
 function renderAbstractions() {
     if (!abstractionRegistry) return;
@@ -445,7 +436,7 @@ function renderAbstractions() {
         const dotColor = IMPL_STATUS_COLORS[best] || '#9ca3af';
         const dotTitle = IMPL_STATUS_LABELS[best] || best;
         const isBootEntry  = abs.index === bootEntrySlot;
-        const isNextEntry  = nextAfterSelfTestSlot >= 0 && abs.index === nextAfterSelfTestSlot;
+        const isNextEntry  = abs.index === bootEntrySlot;
         const absProfile = _getAbstractionProfile(abs);
         const profileBadgeClass = absProfile === 'Full' ? 'profile-badge-full' : absProfile === 'XC7A100T' ? 'profile-badge-xc7a100t' : 'profile-badge-iot';
         const profileTitle = absProfile === 'Full' ? 'Full profile only (Wukong Artix-7)' : absProfile === 'XC7A100T' ? 'QMTECH Wukong XC7A100T only' : 'runs on both boards';
@@ -453,7 +444,7 @@ function renderAbstractions() {
         html += `<div class="abs-item${isActive ? ' active' : ''}" onclick="showAbstractionDetail(${abs.index})" ondblclick="event.stopPropagation();_goToLumpByAbstractionName(abstractionRegistry.getAbstraction(${abs.index}).name)" title="Double-click to jump to this abstraction\u2019s LUMP in the Repository">`;
         html += `<div class="abs-item-row1">`;
         html += `<span class="abs-item-idx abs-boot-entry-btn${isBootEntry ? ' boot-entry-active' : ''}" onclick="event.stopPropagation();setBootEntrySlot(${abs.index},event)" title="${isBootEntry ? 'Current boot entry \u2014 \u2318/Ctrl+click to push to FPGA' : 'Set as boot entry \u2014 \u2318/Ctrl+click to also push to FPGA'}">${isBootEntry ? '\u26a1' : abs.index}</span>`;
-        html += `<span class="abs-next-entry-btn${isNextEntry ? ' next-entry-active' : ''}" onclick="event.stopPropagation();setNextAfterSelfTestSlot(${abs.index})" title="${isNextEntry ? 'SelfTest chains here when tests pass \u2014 click to revert to self-loop' : 'Set as SelfTest continuation (called after all tests pass)'}" style="display:inline-flex;align-items:center;justify-content:center;min-width:1.5em;height:1.5em;border-radius:3px;font-size:0.82em;font-weight:600;cursor:pointer;margin-right:3px;${isNextEntry ? 'background:#16a34a;color:#fff;padding:0 4px;' : 'color:#6b7280;border:1px solid #d1d5db;padding:0 3px;background:transparent;'}" aria-label="${isNextEntry ? 'SelfTest Next: this abstraction' : 'Set as SelfTest Next'}">${isNextEntry ? '\u2192\u26a1' : '\u2192'}</span>`;
+        html += `<span class="abs-next-entry-btn${isNextEntry ? ' next-entry-active' : ''}" onclick="event.stopPropagation();setBootEntrySlot(${abs.index},event)" title="${isNextEntry ? 'SelfTest Next.GT follows this LightningBolt entry' : 'Set the LightningBolt entry; SelfTest Next.GT follows it'}" style="display:inline-flex;align-items:center;justify-content:center;min-width:1.5em;height:1.5em;border-radius:3px;font-size:0.82em;font-weight:600;cursor:pointer;margin-right:3px;${isNextEntry ? 'background:#16a34a;color:#fff;padding:0 4px;' : 'color:#6b7280;border:1px solid #d1d5db;padding:0 3px;background:transparent;'}" aria-label="${isNextEntry ? 'SelfTest Next follows this LightningBolt entry' : 'Set LightningBolt entry and SelfTest Next'}">${isNextEntry ? '\u2192\u26a1' : '\u2192'}</span>`;
         html += `<span class="abs-item-name">${abs.name}</span>`;
         html += `<span class="abs-profile-badge ${profileBadgeClass}" title="${absProfile} profile \u2014 ${profileTitle}">${absProfile}</span>`;
         if (compiledAt) html += `<span class="abs-item-date" title="Compiled ${compiledAt}">${compiledAt}</span>`;
@@ -508,83 +499,34 @@ function renderAbstractions() {
 }
 
 // ── setNextAfterSelfTestSlot ──────────────────────────────────────────────────
-// Designate a continuation abstraction for SelfTest's done: label.
-// Clicking the "→" button a second time on the same row reverts to the
-// default self-loop (nextAfterSelfTestSlot = -1, c-list[1] = SelfTest E-GT).
+// Compatibility entry point for older callers. Next.GT follows the
+// LightningBolt selection and cannot be configured independently.
 function setNextAfterSelfTestSlot(idx) {
-    // Clamp to the runtime NS capacity, not a hardcoded 255.
-    // sim.MAX_NS_ENTRIES is updated in reset() to match the loaded boot image's
-    // nsSlotsMax (default 256, up to 1024 for V20 extended-namespace images).
-    const _maxSlot = (sim && sim.MAX_NS_ENTRIES > 0) ? sim.MAX_NS_ENTRIES - 1 : 1023;
-    idx = Math.max(0, Math.min(_maxSlot, Math.trunc(Number(idx)) || 0));
-
-    // Toggle off if already selected — revert to SelfTest self-loop.
-    let newSlot;
-    if (nextAfterSelfTestSlot === idx) {
-        nextAfterSelfTestSlot = -1;
-        newSlot = -1;
-        try { localStorage.removeItem('nextAfterSelfTestSlot'); } catch (e) {}
-    } else {
-        nextAfterSelfTestSlot = idx;
-        newSlot = idx;
-        try { localStorage.setItem('nextAfterSelfTestSlot', String(idx)); } catch (e) {}
-    }
-    window.nextAfterSelfTestSlot = nextAfterSelfTestSlot;
-
-    // Update the simulator's DEMO_CLIST in-memory (c-list[1]).
-    if (sim) {
-        const _selfTestSlot = (sim._slotByPetName && typeof sim._slotByPetName === 'function')
-            ? sim._slotByPetName('SelfTest', 6) : 6;
-        const _targetSlot   = newSlot >= 0 ? newSlot : _selfTestSlot;
-        const _nextGT       = (typeof sim.createGT === 'function')
-            ? (sim.createGT(0, _targetSlot, {E: 1}, 1) >>> 0) : 0;
-
-        if (sim.demoClistGTs) sim.demoClistGTs[1] = _nextGT;
-
-        // Also patch the live in-memory c-list for the SelfTest lump (fixed at
-        // BOOT_ABSTR_NS_SLOT = 6), not the current boot entry which may differ.
-        // Use the lump header's cc field for the c-list offset; demoClistGTs.length
-        // is the simulator's virtual count and may not equal the on-disk lump's cc.
-        if (typeof sim._nsSlotBase === 'function' && typeof sim.parseLumpHeader === 'function') {
-            try {
-                const _selfTestNsSlot = (typeof sim._slotByPetName === 'function')
-                    ? sim._slotByPetName('SelfTest', 6) : 6;
-                const _nsBase     = sim._nsSlotBase(_selfTestNsSlot);
-                const _bootLoc    = sim.memory[_nsBase] >>> 0;
-                const _lumpHdr    = sim.memory[_bootLoc] >>> 0;
-                const _lumpParsed = sim.parseLumpHeader(_lumpHdr);
-                if (_lumpParsed && _lumpParsed.valid && _lumpParsed.cc >= 2) {
-                    const _cc        = _lumpParsed.cc;
-                    const _clistBase = _bootLoc + _lumpParsed.lumpSize - _cc;
-                    if (_clistBase > 0 && _clistBase + 1 < sim.memory.length) {
-                        sim.memory[_clistBase + 1] = _nextGT;
-                        console.log('[setNextAfterSelfTestSlot] c-list[1] updated to GT=0x' +
-                                    _nextGT.toString(16) + ' (slot ' + _targetSlot + ') at mem[0x' +
-                                    (_clistBase + 1).toString(16) + ']');
-                    }
-                }
-            } catch (_e) {
-                console.warn('[setNextAfterSelfTestSlot] live c-list patch skipped:', _e);
-            }
-        }
-    }
-
-    renderAbstractions();
-
-    // Persist to server boot-config so generate_boot_image() bakes the correct
-    // Next.GT into DEMO_CLIST idx 1 on the next "Generate Boot Image" / upload.
-    // Send auth header when REPORT_TOKEN is available (production deployments).
-    const _nextHeaders = { 'Content-Type': 'application/json' };
-    if (typeof _authHeaders === 'function') {
-        Object.assign(_nextHeaders, _authHeaders());
-    }
-    fetch('/api/boot-config/next-after-selftest', {
-        method:  'POST',
-        headers: _nextHeaders,
-        body:    JSON.stringify({ nextAfterSelfTestSlot: newSlot >= 0 ? newSlot : null }),
-    }).catch(() => {});
+    // Legacy callers now choose the same target used by the LightningBolt.
+    setBootEntrySlot(idx);
 }
 window.setNextAfterSelfTestSlot = setNextAfterSelfTestSlot;
+
+function _syncSelfTestNextGtToBootEntry(targetSlot) {
+    if (!sim || typeof sim.createGT !== 'function') return;
+    const nextGt = sim.createGT(0, targetSlot, {E: 1}, 1) >>> 0;
+    if (sim.demoClistGTs) sim.demoClistGTs[1] = nextGt;
+    if (typeof sim._nsSlotBase !== 'function' || typeof sim.parseLumpHeader !== 'function') return;
+    try {
+        const selfTestSlot = (typeof sim._slotByPetName === 'function')
+            ? sim._slotByPetName('SelfTest', 6) : 6;
+        const nsBase = sim._nsSlotBase(selfTestSlot);
+        const lumpBase = sim.memory[nsBase] >>> 0;
+        const lump = sim.parseLumpHeader(sim.memory[lumpBase] >>> 0);
+        if (!lump || !lump.valid || lump.cc < 2) return;
+        const clistNext = lumpBase + lump.lumpSize - lump.cc + 1;
+        if (clistNext > 0 && clistNext < sim.memory.length) {
+            sim.memory[clistNext] = nextGt;
+        }
+    } catch (e) {
+        console.warn('[SelfTest Next.GT] live c-list sync skipped:', e);
+    }
+}
 
 
 function setBootEntrySlot(idx, ev) {
@@ -597,6 +539,7 @@ function setBootEntrySlot(idx, ev) {
     localStorage.setItem('bootEntrySlot', String(idx));
     if (sim) {
         sim.bootEntrySlot = idx;
+        _syncSelfTestNextGtToBootEntry(idx);
         // Task #651: Write E-GT to thread caps zone CR0 slot (thread[+244]) so the
         // 3-instruction Boot.Abstr CHANGE → TPERM → CALL path picks up the new entry.
         // NS table is INVERTED: slot N is at NS_TABLE_BASE+NS_TABLE_RESERVE−(N+1)×NS_ENTRY_WORDS.

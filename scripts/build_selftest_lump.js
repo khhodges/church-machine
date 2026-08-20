@@ -77,12 +77,12 @@ console.log(`Assembled ${words.length} instruction words.`);
 //           This immutable self-reference is preserved in the boot image.
 //
 //   slot 1  Next  E  NS slot 6  — Next.GT: continuation called at done: when all tests pass.
-//           Default: SelfTest E-GT (self-loop via ELOADCALL).
-//           boot_image.py overrides with the E-GT for nextAfterSelfTestSlot (IDE-configured).
+//           boot_image.py replaces this template word with the E-GT selected
+//           by the ⚡ LightningBolt boot-entry control.
 //
 const CLIST = [
     { gt: 0x4A000006 }, // 0  SelfTest  E  NS slot 6  — E-GT for TPERM/EXACT tests
-    { gt: 0x4A000006 }, // 1  Next      E  NS slot 6  — Next.GT (default: SelfTest self-loop)
+    { gt: 0x4A000006 }, // 1  Next      E  template; boot image follows ⚡ entry
 ];
 
 // ── Pack LUMP binary ─────────────────────────────────────────────────────────
@@ -94,7 +94,7 @@ const CLIST = [
 //   Words lumpSize-cc..lumpSize-1 : c-list (cc GT words, at lump tail)
 //
 // cw  = instruction word count (len(words))
-// cc  = 2  (SelfTest self-reference plus configurable Next.GT)
+// cc  = 2  (SelfTest self-reference plus LightningBolt-following Next.GT)
 // typ = 0  (standard lump, not thread/outform)
 // lump_size = next power-of-2 >= (1 + cw + cc)
 
@@ -204,7 +204,7 @@ console.log(`Written: ${sidecarPath}`);
 console.log(`\nC-List GT slot assignments (cc=${CLIST.length}, tail-packed):`);
 const slotNames = [
     'SelfTest  E  NS-slot 6  — E-GT for TPERM/EXACT tests; boot_image.py overrides to mem-mgr GT',
-    'Next      E  NS-slot 6  — Next.GT (default=SelfTest self-loop); boot_image.py overrides per config',
+    'Next      E  NS-slot 6  — template; boot_image.py follows the ⚡ boot entry',
 ];
 for (let i = 0; i < CLIST.length; i++) {
     const gt = '0x' + CLIST[i].gt.toString(16).padStart(8, '0');

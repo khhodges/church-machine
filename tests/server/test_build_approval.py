@@ -684,11 +684,10 @@ class TestLumpSavePathTraversal:
         )
 
 
-class TestNextAfterSelftestAuth:
+class TestRetiredNextAfterSelftestEndpoint:
     """
-    Regression: POST /api/boot-config/next-after-selftest must require
-    Authorization: Bearer <REPORT_TOKEN> when REPORT_TOKEN is configured.
-    When REPORT_TOKEN is absent (dev mode), the endpoint must allow the request.
+    The retired endpoint still requires Authorization when REPORT_TOKEN is
+    configured, but it rejects independent Next.GT configuration in all modes.
     """
 
     def test_requires_token_when_configured(self, monkeypatch):
@@ -699,26 +698,21 @@ class TestNextAfterSelftestAuth:
             f'Should require auth when REPORT_TOKEN is set; got {resp.status_code}'
         )
 
-    def test_accepts_valid_token(self, monkeypatch, tmp_path):
+    def test_refuses_independent_target_with_valid_token(self, monkeypatch):
         monkeypatch.setenv('REPORT_TOKEN', 'test-secret-token-for-gate')
-        # Redirect boot-config writes to temp dir
-        cfg_path = str(tmp_path / 'boot-config.json')
-        monkeypatch.setattr(_app, 'BOOT_CONFIG_PATH', cfg_path)
         resp = client.post(
             '/api/boot-config/next-after-selftest',
             json={'nextAfterSelfTestSlot': 9},
             headers={'Authorization': 'Bearer test-secret-token-for-gate'},
         )
-        assert resp.status_code == 200, (
-            f'Should accept valid token; got {resp.status_code}: {resp.get_json()}'
+        assert resp.status_code == 409, (
+            f'Should refuse an independent Next target; got {resp.status_code}: {resp.get_json()}'
         )
 
-    def test_allows_when_no_token_configured(self, monkeypatch, tmp_path):
+    def test_refuses_independent_target_when_no_token_configured(self, monkeypatch):
         monkeypatch.delenv('REPORT_TOKEN', raising=False)
-        cfg_path = str(tmp_path / 'boot-config.json')
-        monkeypatch.setattr(_app, 'BOOT_CONFIG_PATH', cfg_path)
         resp = client.post('/api/boot-config/next-after-selftest',
                            json={'nextAfterSelfTestSlot': 9})
-        assert resp.status_code == 200, (
-            f'Should allow without credentials in dev mode; got {resp.status_code}: {resp.get_json()}'
+        assert resp.status_code == 409, (
+            f'Should refuse an independent Next target in dev mode; got {resp.status_code}'
         )

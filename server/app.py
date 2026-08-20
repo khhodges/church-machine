@@ -1533,13 +1533,12 @@ def boot_config_post():
                 _existing = json.load(_f)
             if isinstance(_existing.get("slotLabels"), dict):
                 cfg["slotLabels"] = _existing["slotLabels"]
-            # Preserve nextAfterSelfTestSlot — written by the "→ Next" secondary ⚡
-            # in the abstractions panel; must not be wiped by a Boot Image Designer save.
-            _n = _existing.get("nextAfterSelfTestSlot")
-            if isinstance(_n, int) and _n >= 0:
-                cfg["nextAfterSelfTestSlot"] = _n
         except Exception:
             pass
+    # Next.GT is derived from the LightningBolt boot entry when generating an
+    # image. A separately saved continuation target is obsolete and must not
+    # survive a Boot Image Designer save.
+    cfg.pop("nextAfterSelfTestSlot", None)
     try:
         with open(BOOT_CONFIG_PATH, "w") as f:
             json.dump(cfg, f, indent=2)
@@ -1569,45 +1568,19 @@ def _optional_report_token_check():
 
 @app.route("/api/boot-config/next-after-selftest", methods=["POST"])
 def boot_config_next_after_selftest():
-    """Write nextAfterSelfTestSlot to boot-config.json.
+    """Reject retired independent Next.GT configuration requests.
 
-    Called by the "→ Next" secondary ⚡ button in the abstractions panel.
-    Persisting the slot here means generate_boot_image() bakes the correct
-    Next.GT (E-GT targeting that slot) into DEMO_CLIST idx 1 automatically.
-
-    body: {"nextAfterSelfTestSlot": <int ≥ 0> | null}
-    null (or absent)  → remove the field → SelfTest self-loops back to itself.
-
-    Requires Authorization: Bearer <REPORT_TOKEN> when REPORT_TOKEN is set.
-    In dev sessions without a configured token the check is skipped so the
-    abstractions-panel button keeps working without credentials.
+    Next.GT always follows the ⚡ LightningBolt boot-entry GT; accepting an
+    independent slot would make the displayed continuation disagree with the
+    generated boot image.
     """
     ok, err = _optional_report_token_check()
     if not ok:
         return err
-    data = request.get_json(silent=True) or {}
-    slot = data.get("nextAfterSelfTestSlot")
-    cfg = {}
-    if os.path.isfile(BOOT_CONFIG_PATH):
-        try:
-            with open(BOOT_CONFIG_PATH) as _f:
-                cfg = json.load(_f) or {}
-        except Exception:
-            pass
-    if slot is None:
-        cfg.pop("nextAfterSelfTestSlot", None)
-    elif isinstance(slot, int) and 0 <= slot < MAX_NS_ENTRIES:
-        cfg["nextAfterSelfTestSlot"] = slot
-    else:
-        return jsonify({"ok": False, "error":
-                        f"nextAfterSelfTestSlot must be a non-negative integer "
-                        f"< {MAX_NS_ENTRIES} (V20 maximum) or null"}), 400
-    try:
-        with open(BOOT_CONFIG_PATH, "w") as _f:
-            json.dump(cfg, _f, indent=2)
-    except Exception as e:
-        return jsonify({"ok": False, "error": f"Failed to write boot-config.json: {e}"}), 500
-    return jsonify({"ok": True})
+    return jsonify({
+        "ok": False,
+        "error": "Next.GT always follows the LightningBolt boot-entry slot and cannot be set independently.",
+    }), 409
 
 
 @app.route("/api/boot-config/slot-label", methods=["POST"])

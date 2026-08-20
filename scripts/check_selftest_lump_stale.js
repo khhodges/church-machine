@@ -65,11 +65,12 @@ const words = result.words;
 // cc = 2.
 //   slot 0  SelfTest  E  NS slot 6  — E-GT for TPERM/EXACT tests.
 //           Loaded into CR1 via LOAD CR1, SelfTest.
-//   slot 1  Next      E  NS slot 6  — Next.GT (default: SelfTest self-loop).
-//           Called via ELOADCALL CR1, Next at done:; overridden by boot_image.py.
+//   slot 1  Next      E  NS slot 6  — template Next.GT.
+//           Called via ELOADCALL CR1, Next at done:; boot_image.py replaces it
+//           with the GT selected by the ⚡ LightningBolt boot entry.
 const CLIST = [
     { gt: 0x4A000006 }, // 0  SelfTest  E  NS slot 6
-    { gt: 0x4A000006 }, // 1  Next      E  NS slot 6  (default = SelfTest self-loop)
+    { gt: 0x4A000006 }, // 1  Next      E  template; boot image follows ⚡ entry
 ];
 
 // ── Pack LUMP binary ─────────────────────────────────────────────────────────

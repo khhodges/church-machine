@@ -383,21 +383,19 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
     assert hdr_cc == cc, f"lump header cc={hdr_cc} != {cc}"
 
 
-@pytest.mark.parametrize("next_slot,expected_clist1_slot", [
-    (None, 6),   # default: SelfTest self-loop (Next.GT → slot 6)
-    (7,    7),   # configured: WukongCallHome (slot 7)
-    (8,    8),   # configured: arbitrary user-chosen slot
-    (300, 300),  # extended-namespace slot (> DEFAULT_NS_SLOTS_MAX=256); validates 16-bit slot_id encoding
+@pytest.mark.parametrize("lightning_slot,stale_next_config", [
+    (6,   None),  # default LightningBolt target: SelfTest
+    (7,   6),     # LightningBolt target must beat stale self-loop config
+    (8,   300),   # LightningBolt target must beat any stale configured target
+    (300, 7),     # validates the 16-bit slot_id encoding above the default NS limit
 ])
-def test_boot_image_next_gt_is_serialized(tmp_path, next_slot, expected_clist1_slot):
-    """generate_boot_image() bakes the configured Next.GT into c-list[1] of the resident SelfTest lump.
+def test_boot_image_next_gt_follows_lightning_bolt(tmp_path, lightning_slot, stale_next_config):
+    """SelfTest c-list[1] always follows the selected LightningBolt boot entry.
 
-    This guards the serialisation path added for nextAfterSelfTestSlot: the
-    stored .lump binary retains catalog-loop defaults at its c-list tail, so
-    generate_boot_image() must patch clist_gts[1] into mem[] after copying the
-    resident lump.  Without that patch, changing nextAfterSelfTestSlot would
-    update boot-config.json and the simulator's virtual clistGTs[1] but would
-    never reach the boot-image binary uploaded to hardware.
+    The stored SelfTest binary has a slot-6 template in c-list[1], so image
+    generation must replace it after copying the resident lump. A legacy
+    nextAfterSelfTestSlot setting is deliberately supplied in several cases
+    to prove it cannot override the LightningBolt selection.
 
     Uses the production SelfTest lump (cc=2, 512 words) so the patch path taken
     by generate_boot_image() is identical to what runs on hardware.
@@ -444,10 +442,10 @@ def test_boot_image_next_gt_is_serialized(tmp_path, next_slot, expected_clist1_s
             "threadLumpWords":       256,
         },
     }
-    if next_slot is not None:
-        cfg["nextAfterSelfTestSlot"] = next_slot
+    if stale_next_config is not None:
+        cfg["nextAfterSelfTestSlot"] = stale_next_config
 
-    img   = generate_boot_image(cfg, str(tmp_path))
+    img   = generate_boot_image(cfg, str(tmp_path), boot_entry_slot=lightning_slot)
     total = 16384
     words = list(struct.unpack(f"<{total}I", img))
 
@@ -468,14 +466,14 @@ def test_boot_image_next_gt_is_serialized(tmp_path, next_slot, expected_clist1_s
         "SelfTest loads this row into CR1 before TPERM EXACT CR0, CR1."
     )
 
-    # Expected: Inform E-GT targeting expected_clist1_slot, constructed the
-    # same way boot_image.py does it (avoids hardcoding the bit pattern).
-    expected_gt = create_gt(0, expected_clist1_slot, {"E": 1}, 1) & 0xFFFFFFFF
+    # Expected: Inform E-GT targeting the LightningBolt-selected slot,
+    # constructed the same way boot_image.py does it (avoids hardcoding bits).
+    expected_gt = create_gt(0, lightning_slot, {"E": 1}, 1) & 0xFFFFFFFF
 
     assert clist_1 == expected_gt, (
         f"c-list[1] in boot image = 0x{clist_1:08X} (slot {clist_1 & 0xFFFF}); "
-        f"expected Next.GT = 0x{expected_gt:08X} (slot {expected_clist1_slot}). "
-        f"nextAfterSelfTestSlot={next_slot!r}. "
+        f"expected LightningBolt Next.GT = 0x{expected_gt:08X} (slot {lightning_slot}). "
+        f"ignored nextAfterSelfTestSlot={stale_next_config!r}. "
         f"Boot.Abstr at word 0x{boot_loc:X}, c-list base at word 0x{clist_base:X}."
     )
 

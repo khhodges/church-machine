@@ -128,3 +128,4 @@
 - [Boot-entry generation minting](boot-entry-generation-minting.md) — every boot-entry GT must inherit its live Namespace Word-1 sequence
 - [Boot test private runtime state](boot-test-private-runtime-state.md) — LUMP isolation must include every boot-regeneration persistence input, including saved config
 - [Latched hardware authorization](latched-hardware-authorization.md) — multi-cycle security predicates must be captured with the accepted instruction, never read from live decoder inputs
+- [SelfTest Next follows LightningBolt](selftest-next-lightningbolt.md) — Next.GT is coupled to the selected boot-entry GT; independent continuation targets are prohibited

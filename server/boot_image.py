@@ -1420,14 +1420,12 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     mem_mgr_gt = create_gt(0, 0, {"R":1, "W":1}, 1)
     clist_gts[0] = mem_mgr_gt
 
-    # Next.GT at c-list[1]: SelfTest calls through it at done: (CALL AL, CR1, CR1).
-    # Default: self-loop — E-GT targeting BOOT_ABSTR_NS_SLOT (SelfTest, slot 6).
-    # Configured: the slot designated by the "→ Next" secondary ⚡ in the IDE
-    # (persisted in boot-config.json as nextAfterSelfTestSlot).
-    _next_after_slot = cfg.get('nextAfterSelfTestSlot')
-    if not isinstance(_next_after_slot, int) or _next_after_slot < 0:
-        _next_after_slot = BOOT_ABSTR_NS_SLOT
-    clist_gts[1] = create_gt(0, _next_after_slot, {"E": 1}, 1)
+    # Next.GT at c-list[1]: SelfTest calls through it at done:
+    # (CALL AL, CR1, CR1). It always targets the same Namespace slot selected
+    # by the ⚡ LightningBolt boot-entry control. This keeps the post-SelfTest
+    # continuation and Thread.CR0 in lockstep; it is never independently
+    # configurable or a stale self-loop.
+    clist_gts[1] = create_gt(0, boot_entry_slot, {"E": 1}, 1)
 
     # ── DEMO_CLIST finalisation ─────────────────────────────────────────────────
     # The c-list GT words are managed virtually in clist_gts[].  They are NOT
@@ -1500,9 +1498,9 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         # TPERM EXACT CR0, CR1.  Replacing row 0 with a managed device or
         # memory capability makes that intentional identity check fault.
         #
-        # Only row 1 (Next.GT) is configuration-managed.  It may change with
-        # nextAfterSelfTestSlot, while row 0 remains the authenticated
-        # self-reference embedded in the canonical LUMP binary.
+        # Only row 1 (Next.GT) follows the selected LightningBolt boot entry;
+        # row 0 remains the authenticated self-reference embedded in the
+        # canonical LUMP binary.
         if _saved_cc > 1 and len(clist_gts) > 1:
             _clist_base_m = boot_entry_loc + actual_abstr_size - _saved_cc
             if 0 < _clist_base_m < total:
