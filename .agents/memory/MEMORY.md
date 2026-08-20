@@ -136,3 +136,4 @@
 - [Hardware readiness fingerprints](hardware-readiness-fingerprint.md) — generated Verilog/RTLIL must carry a content fingerprint of active Python inputs before synthesis
 - [Build Approval size accounting](build-approval-size-accounting.md) — derive displayed LUMP budgets from the big-endian binary and mark API metadata unavailable rather than guessing
 - [Namespace Table authority](namespace-table-bitstream-source.md) — Namespace Table first, then its assigned slots/LUMPs; manifest is never authoritative for membership or metadata
+- [Canonical dot-name LUMP integrity](canonical-dot-name-clist-integrity.md) — every LUMP is dot.name.1.token, with compiled data and dot-name C-list content covered by its integrity value

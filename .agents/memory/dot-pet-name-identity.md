@@ -7,6 +7,8 @@ description: How LUMP identity, correctness, and ownership are encoded — petna
 
 ## The design (from session documents)
 
+Every LUMP has a canonical `dot.name.1.token` identity. The dot name and the compilation's C-list expressed in dot-name form are part of the integrity-covered compiled representation; a changed named C-list must change the token.
+
 **Global identity lives in the dot pet name**, not in the GT or NS slot:
 - GT is local, transient, 32-bit, meaningful only on one machine — never an identity carrier
 - The stable cross-machine identity is `petname.Abstraction#n`
