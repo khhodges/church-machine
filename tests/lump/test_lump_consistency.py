@@ -2389,11 +2389,20 @@ def _rgt_check_word(w: int) -> str | None:
 # (the spec puts gt_type at bits[24:23] and reserves bit 26 as spare=0).
 # Both binaries were compiled against v2.0 hardware before the canonical
 # spec was frozen at v1.2.  Rebuilding with spec v1.2 GT format is pending.
+#
+# SPEC-EXCEPTION: WukongCallHome.1.71c2809c.lump (token 00000700) has
+# c-list[1] = 0xFEED0000, the legacy simulator pending-capability marker.
+# It is deferred-resolution state, not an issued GT, and is retained so the
+# historical Wukong boot binary remains executable. Newly saved LUMPs reject
+# pending markers before Mint, so this exception does not relax the format
+# contract for newly issued artifacts.
 _R22_CLIST_GT_EXCEPTIONS: frozenset = frozenset([
     "00001f00",  # Tunnel.1 — c-list[0]=0x07800200: v2.0 Abstract GT, bit26=1.
                  # SPEC-EXCEPTION: predates spec v1.2 GT Word 0 layout; rebuild pending.
     "b169bba4",  # Ethernet.1 — c-list[0]=0x07800400: v2.0 Abstract GT, bit26=1.
                  # SPEC-EXCEPTION: predates spec v1.2 GT Word 0 layout; rebuild pending.
+    "00000700",  # WukongCallHome — c-list[1]=0xFEED0000: legacy pending capability.
+                 # SPEC-EXCEPTION: deferred resolution marker, not an issued GT.
 ])
 
 

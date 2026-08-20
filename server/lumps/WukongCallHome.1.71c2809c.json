@@ -13,7 +13,7 @@
   "language": "",
   "author": "",
   "version": "",
-  "release_notes": "",
+  "release_notes": "Legacy boot binary: c-list[1] intentionally retains the 0xFEED0000 pending-capability marker for deferred simulator resolution. It is not an issued Golden Token; newly saved LUMPs reject pending markers before Mint.",
   "methods": [],
   "capabilities": [
     {
