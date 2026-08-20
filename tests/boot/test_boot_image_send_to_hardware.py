@@ -36,7 +36,14 @@ sys.path.insert(0, ROOT)
 
 import server.app as _app_module
 from server.app import app
-from server.boot_image import generate_boot_image, NS_ENTRY_WORDS, create_gt
+from server.boot_image import (
+    generate_boot_image,
+    build_wukong_upload_image,
+    NS_ENTRY_WORDS,
+    create_gt,
+    WUKONG_DMEM_WORDS,
+    WUKONG_UPLOAD_BODY_BASE_WORD,
+)
 
 LUMPS_DIR = os.path.join(ROOT, 'server', 'lumps')
 
@@ -207,10 +214,12 @@ def test_send_to_hardware_enqueues_upload_command(client, boot_bin_path):
     assert cmd_data.get('cmd') == 'u'
     assert 'data' in cmd_data
     assert len(cmd_data['data']) > 0
+    assert cmd_data.get('reboot') is True
 
 
 def test_send_to_hardware_base64_payload_decodes_correctly(client, boot_bin_path):
-    """The base64 'data' field round-trips back to the original file contents."""
+    """The queued data is the expected native Wukong projection, not the
+    generic simulator image stored in boot-image.bin."""
     _, original_payload = boot_bin_path
 
     client.post('/api/boot-image/send-to-hardware',
@@ -219,7 +228,12 @@ def test_send_to_hardware_base64_payload_decodes_correctly(client, boot_bin_path
     poll = client.get('/hardware/wukong/command')
     cmd_data = json.loads(poll.data)
     decoded = base64.b64decode(cmd_data['data'])
-    assert decoded == original_payload
+    expected, info = build_wukong_upload_image(original_payload)
+    assert decoded == expected
+    assert len(decoded) == WUKONG_DMEM_WORDS * 4
+    assert decoded != original_payload
+    words = struct.unpack(f'<{WUKONG_DMEM_WORDS}I', decoded)
+    assert words[info['entry_slot'] * NS_ENTRY_WORDS] == WUKONG_UPLOAD_BODY_BASE_WORD * 4
 
 
 # ── ACK race fix: ack cleared before command is observable ────────────────────
@@ -340,10 +354,9 @@ def test_breakpoint_cmd_still_accepted(client):
 
 # ── Endianness contract: LE file → bridge BE-swap → RTL → correct DMEM ────────
 
-def test_server_queues_raw_le_file_bytes():
-    """The server base64-encodes the raw boot-image.bin bytes (little-endian)
-    unchanged.  The bridge is responsible for the LE→BE word swap before UART
-    transmission.  This test confirms the server side of that contract."""
+def test_server_queues_native_wukong_le_image():
+    """The server projects the generic image onto Wukong's forward 16K DMEM
+    layout, then queues that new image as little-endian words for the bridge."""
     import base64, struct
     # A real generated image (LE words on disk) — the upload gate rejects
     # arbitrary placeholder bytes, so the contract is checked with genuine
@@ -377,14 +390,20 @@ def test_server_queues_raw_le_file_bytes():
         cmd_data = json.loads(poll.data)
         decoded  = base64.b64decode(cmd_data['data'])
 
-        # Server should have queued the raw LE bytes as-is
-        assert decoded == le_bytes, "Server altered the file bytes before base64-encoding"
+        # The server must project the generic tail-table image before encoding.
+        expected, info = build_wukong_upload_image(le_bytes)
+        assert decoded == expected
+        assert decoded != le_bytes
+        assert len(decoded) == WUKONG_DMEM_WORDS * 4
+        assert cmd_data.get('reboot') is True
+        assert info['entry_loc'] == WUKONG_UPLOAD_BODY_BASE_WORD
 
         # Bridge formula: byte-swap each LE word to BE before UART transmission.
         n = len(decoded) // 4
         be_wire  = struct.pack(f'>{n}I', *struct.unpack(f'<{n}I', decoded[:n * 4]))
         recovered = list(struct.unpack(f'>{n}I', be_wire))
-        assert recovered == words, (
+        expected_words = list(struct.unpack(f'<{n}I', expected))
+        assert recovered == expected_words, (
             f"LE→BE round-trip failed: got {[hex(w) for w in recovered]}")
     finally:
         if existed and old_data is not None:

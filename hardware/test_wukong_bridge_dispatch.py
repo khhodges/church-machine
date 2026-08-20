@@ -147,6 +147,29 @@ def test_handle_upload_writes_frame_and_posts_ack_on_success():
     assert ack_posts[-1]['json'].get('ok') is True
 
 
+def test_handle_upload_reboots_after_ack_when_requested():
+    """A complete native DMEM replacement must reboot through the boot ROM
+    before the bridge reports upload success."""
+    bridge = _import_bridge()
+    le_bytes = struct.pack('<I', 0xF8005C05)
+    ser = _FakeSer(read_bytes=bytes([0x06]))
+    posted = []
+
+    def _fake_post(url, json=None, **kwargs):
+        posted.append({'url': url, 'json': json})
+        return mock.MagicMock(status_code=200)
+
+    with mock.patch('hardware.wukong_bridge.requests.post', side_effect=_fake_post):
+        bridge._handle_upload(
+            {'data': base64.b64encode(le_bytes).decode('ascii'), 'reboot': True},
+            ser, 'http://ide', True,
+        )
+
+    assert bytes(ser._written).endswith(b'f')
+    ack_posts = [p for p in posted if 'upload-ack' in p['url']]
+    assert ack_posts[-1]['json'].get('ok') is True
+
+
 def test_handle_upload_posts_ack_failure_on_board_timeout():
     """If the board does not send 0x06 within the timeout, the bridge POSTs
     {ok: False} to /hardware/wukong/upload-ack."""

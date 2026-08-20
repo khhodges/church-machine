@@ -4,15 +4,19 @@ Produces a self-contained binary boot image from a saved boot-config.json.
 
 Format
 ------
-Raw little-endian 32-bit memory dump of the namespace memory window:
+Raw little-endian 32-bit memory dump of the simulator namespace memory window:
 
     bytes = totalNamespaceWords * 4
 
 The image is exactly what the simulator's `memory[]` array should look
 like immediately after `_initNamespaceTable()` finishes, so loading it
-is a single `memory.set(uint32_words)` on the simulator side. Real
-hardware can copy it straight into namespace SRAM with no
-post-processing.
+is a single `memory.set(uint32_words)` on the simulator side.
+
+This is deliberately *not* the Wukong serial-upload ABI.  The simulator
+uses an inverted Namespace table at the image tail, while Wukong has a
+16K-word DMEM with a forward Namespace table at address zero.  Use
+``build_wukong_upload_image()`` to project a validated generic image
+onto that physical layout before sending it to a board.
 
 The generator deliberately mirrors `simulator.js _initNamespaceTable()`
 rather than calling out to the simulator runtime — Python here is the
@@ -88,6 +92,14 @@ _MANDATORY_NS_SLOTS = (0, 1, 2, 3, 4, 5, BOOT_ABSTR_NS_SLOT, CAPABILITY_TEST_NS_
 # Format-version tag written to mem[NS_TABLE_BASE - 1] so loadBootImage()
 # can reject stale binaries.
 BOOT_IMAGE_FORMAT_TAG = 0xB0072862  # Task #2862: resident NS Word3 is cache_token32; must match simulator.js
+
+# Wukong's FPGA DMEM and serial uploader are fixed at 16K 32-bit words.  The
+# first 256 words are reserved for its forward Namespace table and bootstrap
+# space; its built-in structures occupy words through 1279.  A selected
+# boot-entry body is projected beginning at word 1280, safely after them.
+WUKONG_DMEM_WORDS = 16_384
+WUKONG_UPLOAD_BODY_BASE_WORD = 1_280
+WUKONG_FORWARD_NS_SLOTS = 64
 
 # Direct dispatch: NUC_CODE (B:07) pre-loads CR0 with the boot-entry E-GT.
 # No CHANGE→TPERM→CALL trampoline — 00000600.lump must always be present.
@@ -484,6 +496,152 @@ def read_boot_entry_info(image_bytes):
         "thread_caps0": thread_caps0,
         "expected_gt":  expected_gt,
         "caps0_ok":     thread_caps0 == expected_gt,
+    }
+
+
+def build_wukong_upload_image(generic_image):
+    """Project a generic boot image onto Wukong's physical DMEM layout.
+
+    Generic images use an inverted Namespace table at their tail; Wukong's
+    serial uploader writes a complete 16K-word DMEM image from word zero and
+    the board reads a forward Namespace table there.  Uploading the generic
+    image directly can therefore wrap its 14-bit write address and replace an
+    entry LUMP with unrelated words.
+
+    Start from the authoritative Wukong bootstrap layout, copy the selected
+    resident LUMP (including its tail c-list) to a safe dynamic body address,
+    install a forward descriptor, and update Boot.Thread.caps[0].  Returns
+    little-endian image bytes and the corresponding board-entry information.
+    The bridge performs the final per-word LE-to-BE conversion for UART.
+    """
+    source_info = read_boot_entry_info(generic_image)
+    if not source_info["resident"]:
+        raise ValueError(
+            "Wukong upload requires a resident executable boot entry: "
+            + (source_info["reason"] or "entry body is unavailable")
+        )
+    if not source_info["caps0_ok"]:
+        raise ValueError(
+            "Wukong upload requires Thread.caps[0] to match the selected "
+            f"entry slot {source_info['entry_slot']}"
+        )
+    if len(generic_image) % 4:
+        raise ValueError("Wukong upload source is not a whole-word image")
+
+    source_words = list(struct.unpack(
+        f"<{len(generic_image) // 4}I", generic_image
+    ))
+    source_total = len(source_words)
+    entry_slot = source_info["entry_slot"]
+    entry_loc = source_info["entry_loc"]
+    if not (0 <= entry_slot < WUKONG_FORWARD_NS_SLOTS):
+        raise ValueError(
+            f"Wukong supports forward Namespace slots 0–{WUKONG_FORWARD_NS_SLOTS - 1}; "
+            f"selected slot {entry_slot} cannot be uploaded"
+        )
+    if entry_loc is None or not (0 <= entry_loc < source_total):
+        raise ValueError("Wukong upload source has no valid selected-entry location")
+
+    entry_header = source_words[entry_loc]
+    alloc_words = 1 << (((entry_header >> 23) & 0xF) + 6)
+    if entry_loc + alloc_words > source_total:
+        raise ValueError(
+            f"Wukong upload source truncates selected slot {entry_slot}: "
+            f"needs {alloc_words} words from 0x{entry_loc:X}"
+        )
+    if WUKONG_UPLOAD_BODY_BASE_WORD + alloc_words > WUKONG_DMEM_WORDS:
+        raise ValueError(
+            f"selected slot {entry_slot} needs {alloc_words} words but cannot fit "
+            "in Wukong's available DMEM body region"
+        )
+
+    # Lazy import prevents simulator-only generation from requiring FPGA
+    # dependencies, while making this projection follow the actual bitstream
+    # bootstrap structures rather than a copied server-side layout.
+    try:
+        from hardware.boot_rom import (
+            WUKONG_DEMO_NAMESPACE,
+            WUKONG_DEMO_CLIST,
+            WUKONG_SELFTEST_BASE_WORD,
+            WUKONG_SELFTEST_WORDS,
+            WUKONG_CALLHOME_BASE_WORD,
+            WUKONG_WCH_CLIST_WORD,
+            WUKONG_WCH_CLIST,
+            WUKONG_NUC_PROGRAM,
+            WUKONG_THREAD_BASE_WORD,
+            WUKONG_THREAD_HEADER,
+            WUKONG_THREAD_STO_WORD,
+            WUKONG_THREAD_STO_INIT,
+            WUKONG_THREAD_CAPS0_WORD,
+            WUKONG_THREAD_CAPS12_WORD,
+            GT_TYPE_INFORM,
+            PERM_MASK_S,
+            make_gt,
+            wukong_wch_header,
+        )
+    except Exception as exc:
+        raise ValueError(f"Wukong upload layout is unavailable: {exc}") from exc
+
+    mem = [0] * WUKONG_DMEM_WORDS
+    mem[:len(WUKONG_DEMO_NAMESPACE)] = list(WUKONG_DEMO_NAMESPACE)
+    mem[256:256 + len(WUKONG_DEMO_CLIST)] = list(WUKONG_DEMO_CLIST)
+    mem[WUKONG_SELFTEST_BASE_WORD:
+        WUKONG_SELFTEST_BASE_WORD + len(WUKONG_SELFTEST_WORDS)] = list(WUKONG_SELFTEST_WORDS)
+
+    wch_words = [wukong_wch_header(len(WUKONG_NUC_PROGRAM))] + list(WUKONG_NUC_PROGRAM)
+    mem[WUKONG_CALLHOME_BASE_WORD:
+        WUKONG_CALLHOME_BASE_WORD + len(wch_words)] = wch_words
+    mem[WUKONG_WCH_CLIST_WORD:
+        WUKONG_WCH_CLIST_WORD + len(WUKONG_WCH_CLIST)] = list(WUKONG_WCH_CLIST)
+
+    # Mirror the FPGA initialisation order, including the fixed Thread objects.
+    mem[WUKONG_THREAD_BASE_WORD] = WUKONG_THREAD_HEADER
+    mem[WUKONG_THREAD_STO_WORD] = WUKONG_THREAD_STO_INIT
+    mem[WUKONG_THREAD_CAPS12_WORD] = make_gt(
+        GT_TYPE_INFORM, PERM_MASK_S, 1, 0
+    )
+
+    # Copy the complete allocation so c-list rows at the LUMP tail survive.
+    body_base = WUKONG_UPLOAD_BODY_BASE_WORD
+    mem[body_base:body_base + alloc_words] = source_words[
+        entry_loc:entry_loc + alloc_words
+    ]
+
+    # Re-seal the selected descriptor against its new byte address.  Its
+    # authority and cache token remain those validated in the generic source.
+    source_ns_base = source_total - (entry_slot + 1) * NS_ENTRY_WORDS
+    source_authority = source_words[source_ns_base + 1]
+    source_cache_token = source_words[source_ns_base + 3]
+    target_ns_base = entry_slot * NS_ENTRY_WORDS
+    body_base_byte = body_base * 4
+    mem[target_ns_base + 0] = body_base_byte
+    mem[target_ns_base + 1] = source_authority
+    mem[target_ns_base + 2] = integrity32(body_base_byte, source_authority)
+    mem[target_ns_base + 3] = source_cache_token
+
+    # The hardware boot ROM calls through this exact capability.
+    mem[WUKONG_THREAD_CAPS0_WORD] = source_info["thread_caps0"]
+
+    projected_header = mem[body_base]
+    projected_magic = (projected_header >> 27) & 0x1F
+    projected_cw = (projected_header >> 10) & 0x1FFF
+    if projected_magic != 0x1F or projected_cw == 0:
+        raise ValueError(
+            f"Wukong projection failed for slot {entry_slot}: "
+            f"header=0x{projected_header:08X}, cw={projected_cw}"
+        )
+
+    projected = struct.pack(f"<{WUKONG_DMEM_WORDS}I", *mem)
+    return projected, {
+        "entry_slot": entry_slot,
+        "entry_loc": body_base,
+        "resident": True,
+        "reason": None,
+        "thread_caps0": mem[WUKONG_THREAD_CAPS0_WORD],
+        "expected_gt": source_info["expected_gt"],
+        "caps0_ok": mem[WUKONG_THREAD_CAPS0_WORD] == source_info["expected_gt"],
+        "source_entry_loc": entry_loc,
+        "source_words": source_total,
     }
 
 

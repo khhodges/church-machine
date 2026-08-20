@@ -21,8 +21,10 @@ byte to the serial port.  Commands from the IDE:
   {cmd: "r"}                    → write b'r'  (run free)
   {cmd: "h"}                    → write b'h'  (halt immediately)
   {cmd: "b", nia: N}            → write b'b' + big-endian 4-byte NIA  (set/clear breakpoint)
-  {cmd: "u", data: "<base64>"}  → decode boot-image bytes, write 0x75+len(4 BE)+bytes
-                                   to UART, then POST result to /hardware/wukong/upload-ack
+    {cmd: "u", data: "<base64>", reboot: true}
+                                → decode board-native image, write 0x75+len(4 BE)+bytes
+                                   to UART, reboot through the boot ladder, then POST result
+                                   to /hardware/wukong/upload-ack
 
 Trace packet format (12 bytes, big-endian) — one packet per state-change event:
   [0]     0xAA      magic
@@ -1597,6 +1599,25 @@ def _handle_upload(data, ser, ide_base, verify_tls):
 
     if ack_found:
         print('  [upload] board ACK received — upload successful', flush=True)
+        # A complete DMEM replacement must restart from the boot ROM so it
+        # consumes the newly written Namespace descriptor and Thread.caps[0].
+        # The server requests this only for the Wukong-native projection; leave
+        # older/manual upload commands backward compatible.
+        if data.get('reboot'):
+            try:
+                ser.write(b'f')
+                ser.flush()
+                print('  [upload] rebooted board into uploaded boot entry', flush=True)
+            except Exception as exc:
+                errmsg = f'uploaded image but reboot command failed: {exc}'
+                print(f'  [upload] ERROR: {errmsg}', flush=True)
+                try:
+                    requests.post(f'{ide_base}/hardware/wukong/upload-ack',
+                                  json={'ok': False, 'error': errmsg},
+                                  timeout=2, verify=verify_tls)
+                except Exception:
+                    pass
+                return leftover
         try:
             requests.post(f'{ide_base}/hardware/wukong/upload-ack',
                           json={'ok': True},

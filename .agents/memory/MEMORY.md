@@ -124,3 +124,4 @@
 - [Declared C-list B-flag rule](declared-clist-b-flag-rule.md) — declared capability rows must use B=0; browser and server validators must reject B-set Inform tokens consistently
 - [Canonical T vs lookup aliases](canonical-t-vs-lookup-aliases.md) — historical LUMP tokens may locate bytes, but only recomputed canonical T may populate W3 or drive promotion
 - [boot_resident manifest-only](boot-resident-manifest-only.md) — generator reads boot_resident from manifest.json only; sidecar-only flag = NS descriptor with zero-filled body
+- [Wukong native upload projection](wukong-native-upload-projection.md) — generic tail-table boot images must be projected to 16K forward-table DMEM before serial upload

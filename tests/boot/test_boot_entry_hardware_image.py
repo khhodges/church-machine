@@ -25,8 +25,11 @@ sys.path.insert(0, ROOT)
 from server.boot_image import (
     generate_boot_image,
     read_boot_entry_info,
+    build_wukong_upload_image,
     create_gt,
     NS_ENTRY_WORDS,
+    WUKONG_DMEM_WORDS,
+    WUKONG_UPLOAD_BODY_BASE_WORD,
 )
 
 LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
@@ -119,3 +122,39 @@ def test_non_resident_entry_allowed_for_simulator():
     assert info["entry_slot"] == 2
     assert info["resident"] is False
     assert info["reason"]
+
+
+def test_wukong_projection_keeps_capabilitytest_body_and_clist():
+    """Slot 10 must survive the generic-image → Wukong-DMEM projection.
+
+    This is the board-specific regression for the NUC_CLIST header-magic
+    fault: Wukong reads a forward NS descriptor at word 10*4, not the generic
+    image's inverted tail-table entry.
+    """
+    generic = generate_boot_image(
+        _minimal_cfg(), LUMPS_DIR, boot_entry_slot=10,
+        require_entry_resident=True,
+    )
+    projected, info = build_wukong_upload_image(generic)
+    words = _unpack_words(projected)
+    forward_ns_base = 10 * NS_ENTRY_WORDS
+    body_base = WUKONG_UPLOAD_BODY_BASE_WORD
+
+    assert len(projected) == WUKONG_DMEM_WORDS * 4
+    assert info["entry_slot"] == 10
+    assert info["entry_loc"] == body_base
+    assert info["resident"] is True
+    assert info["caps0_ok"] is True
+    assert words[forward_ns_base] == body_base * 4
+    assert words[body_base] == 0xF8005C05
+    assert ((words[body_base] >> 27) & 0x1F) == 0x1F
+    assert ((words[body_base] >> 10) & 0x1FFF) == 23
+    assert words[body_base + 59:body_base + 64] == [
+        0x4A000006,  # SelfTest E
+        0x32000003,  # LED RW
+        0x32000002,  # UART RW
+        0x12000004,  # BTN R
+        0x32000005,  # TIMER RW
+    ]
+    # Wukong's fixed Boot.Thread lives at word 896 and dispatches from caps[0].
+    assert words[896 + THREAD_CAPS_OFFSET] == create_gt(0, 10, {"E": 1}, 1)

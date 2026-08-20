@@ -12180,11 +12180,20 @@ def boot_image_send_to_hardware():
                             'board would boot a different slot than reported. '
                             'Regenerate the boot image.'}), 400
 
-        _encoded = _b64.b64encode(_raw).decode('ascii')
+        # ``boot-image.bin`` is the simulator's generic, tail-table image.
+        # Never stream it raw into Wukong's 16K forward-table DMEM: a 32K
+        # image wraps its 14-bit upload address and corrupts the entry body.
+        # Build the board-native projection after validating the generic source.
+        try:
+            _wukong_raw, _wukong_entry_info = _boot_image_gen.build_wukong_upload_image(_raw)
+        except ValueError as _exc:
+            return jsonify({'error': f'boot image cannot be projected for Wukong: {_exc}'}), 400
+
+        _encoded = _b64.b64encode(_wukong_raw).decode('ascii')
 
         # Register NIA label map so trace events for the uploaded lump resolve
         # to "LumpName.N" labels instead of raw hex NIAs.
-        _wukong_update_active_lump_nia(_raw, _entry_info)
+        _wukong_update_active_lump_nia(_wukong_raw, _wukong_entry_info)
 
         # Record which entry slot this upload carries BEFORE the command
         # becomes observable to the bridge: a fast bridge could otherwise
@@ -12193,7 +12202,7 @@ def boot_image_send_to_hardware():
         # Rolled back in the finally block on any enqueue failure.
         global _wukong_pending_entry_slot
         with _wukong_hw_entry_lock:
-            _wukong_pending_entry_slot = _entry_info['entry_slot']
+            _wukong_pending_entry_slot = _wukong_entry_info['entry_slot']
 
         # Clear any stale ACK from a previous upload BEFORE making the new
         # upload command observable to the bridge.  Clearing after would create
@@ -12206,7 +12215,7 @@ def boot_image_send_to_hardware():
         global _wukong_cmd_delivery, _wukong_cmd_id
         with _wukong_command_lock:
             _wukong_cmd_id += 1
-            _wukong_pending_cmd = {'cmd': 'u', 'data': _encoded,
+            _wukong_pending_cmd = {'cmd': 'u', 'data': _encoded, 'reboot': True,
                                    'id': _wukong_cmd_id}
             _wukong_cmd_delivery = {
                 'id':          _wukong_cmd_id,
@@ -12219,8 +12228,10 @@ def boot_image_send_to_hardware():
             }
 
         _rollback = False   # committed — in-flight flag stays set
-        return jsonify({'queued': True, 'size': len(_raw),
-                        'entry_slot': _entry_info['entry_slot']})
+        return jsonify({'queued': True, 'size': len(_wukong_raw),
+                        'source_size': len(_raw),
+                        'format': 'wukong-native-dmem-v1',
+                        'entry_slot': _wukong_entry_info['entry_slot']})
     finally:
         if _rollback:
             with _wukong_hw_entry_lock:
