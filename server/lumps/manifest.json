@@ -1973,7 +1973,7 @@
     "identity_hash": "b2c8f3d7d7e755f24ac3ab22726514cfaa9a604d037ab661891c198a0f5d8b90",
     "dot_name": "WukongCallHome",
     "issue_n": 1,
-    "variant_group": "compiled_wukongcallhome"
+    "variant_group": "WukongCallHome"
   },
   {
     "token": "8f7520e5",
@@ -1996,6 +1996,9 @@
     "issue_number": 1,
     "identity_hash": "b2c8f3d7d7e755f24ac3ab22726514cfaa9a604d037ab661891c198a0f5d8b90",
     "dot_name": "WukongCallHome",
-    "issue_n": 1
+    "issue_n": 1,
+    "ns_slot": 7,
+    "ns_slot_policy": "static",
+    "variant_group": "WukongCallHome"
   }
 ]
