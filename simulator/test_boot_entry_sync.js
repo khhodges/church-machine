@@ -456,6 +456,57 @@ console.log('\n--- T208: acceptance state gated on loadBootImage() verdict ---')
 }
 
 // ── T209: a new IDE session starts at the canonical SelfTest entry ────────────
+//
+// The boot image is fetched asynchronously.  If a run completes from the
+// standalone 64-word placeholder first, simply copying the real image into
+// memory does not replace the already-derived CR14/CR11 state.  The startup
+// loader must reset through its image-overlay hook after caching a late image.
+console.log('\n--- T211: late boot-image arrival replaces fallback CR state ---');
+{
+    const appShellSrc = fs.readFileSync(path.join(__dirname, 'app-shell.js'), 'utf8');
+    const bootImageBytes = fs.readFileSync(
+        path.join(__dirname, '..', 'server', 'lumps', 'boot-image.bin')
+    );
+    const bootImage = bootImageBytes.buffer.slice(
+        bootImageBytes.byteOffset, bootImageBytes.byteOffset + bootImageBytes.byteLength
+    );
+    const sim = new ChurchSimulator();
+
+    function completeBoot(machine) {
+        let safety = 0;
+        while (!machine.bootComplete && !machine.halted && safety++ < 32) {
+            machine._bootStep();
+        }
+    }
+
+    completeBoot(sim);
+    const fallbackLimit = sim.parseNSWord1(sim.cr[14].word2 >>> 0).limit;
+    check('T211a: standalone fallback derives the historical 64-word CR14 range',
+        sim.bootComplete && fallbackLimit === 63);
+
+    check('T211b: the checked-in boot image is accepted after fallback boot',
+        sim.loadBootImage(bootImage) === true);
+    check('T211c: overlay alone leaves the old fallback CR14 range in place',
+        sim.parseNSWord1(sim.cr[14].word2 >>> 0).limit === 63);
+
+    // Model the reset listener after app-shell caches a late accepted image.
+    sim.reset();
+    check('T211d: the cached image reloads successfully during reset',
+        sim.loadBootImage(bootImage) === true);
+    completeBoot(sim);
+    const liveLimit = sim.parseNSWord1(sim.cr[14].word2 >>> 0).limit;
+    check('T211e: post-reset CALL derives CR14 from the real SelfTest descriptor',
+        sim.bootComplete && liveLimit === 509);
+
+    const cacheAt = appShellSrc.indexOf('window.bootImage = buf;');
+    const resetAt = appShellSrc.indexOf('if (_wasBootedBeforeImage)', cacheAt);
+    check('T211f: startup loader caches the accepted image before late-arrival reset',
+        appShellSrc.includes('const _wasBootedBeforeImage = !!sim.bootComplete;') &&
+        cacheAt >= 0 && resetAt > cacheAt &&
+        appShellSrc.indexOf('sim.reset();', resetAt) > resetAt);
+}
+
+// ── T209: a new IDE session starts at the canonical SelfTest entry ────────────
 console.log('\n--- T209: fresh browser session defaults to SelfTest ---');
 {
     const memSrc = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');

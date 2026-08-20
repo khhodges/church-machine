@@ -880,6 +880,16 @@ function init() {
     // Probe once at startup — covers the case where the user navigated
     // here after a previous session generated an image.
     _probeBootImage().then(buf => {
+        // A user can request a run while this asynchronous fetch is still in
+        // flight.  In that case the fallback 64-word SelfTest descriptor has
+        // already completed boot and CALL has installed CR14/CR11 from it.
+        // Loading the real image below replaces memory, but intentionally does
+        // not rewrite an already-running thread's capability registers.
+        //
+        // Remember this state so an accepted late image can reset through the
+        // normal reset hook after it has been cached.  That hook loads the image
+        // synchronously before the next B:05/B:07 sequence establishes CR14.
+        const _wasBootedBeforeImage = !!sim.bootComplete;
         if (buf) {
                    // Task #2867: acceptance state must reflect the loader's
                    // verdict, not merely that a fetch succeeded.  loadBootImage()
@@ -904,8 +914,20 @@ function init() {
                        }
                    } catch(e) { console.warn('[bootImage] apply failed:', e); _accepted = false; }
                    if (_accepted) {
+                       // Cache before resetting: _maybeApplyBootImage(), the
+                       // reset listener, uses this exact buffer to overlay the
+                       // real descriptor synchronously.
                        window.bootImage = buf;
                        window.bootImageAvailable = true;
+
+                       if (_wasBootedBeforeImage) {
+                           // Never continue execution with CR14/CR11 derived
+                           // from the fallback 64-word placeholder after the
+                           // real SelfTest LUMP has arrived.  A bare reset is
+                           // deliberate: the normal auto-boot policy below
+                           // decides whether to continue immediately.
+                           sim.reset();
+                       }
                    } else {
                        window.bootImage = null;
                        window.bootImageAvailable = false;

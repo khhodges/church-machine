@@ -43,4 +43,20 @@ Keep cached source in the editor until an explicit user action installs or runs
 it.  When diagnosing boot fetch faults, validate the CALL source E-GT and its
 Namespace entry before changing CR14.
 
+## Late boot-image arrival rule
+
+If the asynchronous boot-image fetch finishes after fallback boot completed,
+copying the real image into memory is insufficient: CR14 and CR11 still
+describe the already-running fallback LUMP. Cache the accepted image, then
+reset through the synchronous boot-image reset hook before allowing another
+boot/CALL sequence.
+
+**Why:** The fallback SelfTest allocation is 64 words, while the real SelfTest
+descriptor is substantially larger. An otherwise-valid image can therefore
+produce a CR14 RANGE fault at offset 64 when it arrives too late.
+
+**How to apply:** Treat a late accepted image as a runtime-state replacement,
+not merely a memory overlay. The reset hook must see the cached image before
+B:05/B:07 derive the source and code capabilities.
+
 Note: CR0 (the E-GT for dispatching methods) needs `{E:1}` — a different GT from CR14.
