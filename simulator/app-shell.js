@@ -1246,6 +1246,7 @@ function init() {
     }
     switchMathMode('hp35');
     _initDefaultViewBolt();
+    _initLandingCardDrag();
 
     // Global keyboard shortcuts: Ctrl+<letter> → switch top-level view.
     // Skipped when focus is inside any text input / textarea / contenteditable.
@@ -1323,6 +1324,84 @@ function init() {
         // Do NOT call resetSim() here — the fetch hasn't returned yet and the
         // stale sticky-patch eviction hasn't happened.
     });
+}
+
+// ── Landing-page card drag-and-drop ordering ───────────────────────────────
+// Each landing section has its own order. Keeping the order keyed by card
+// group means Learning Tools and Documentation can be arranged independently.
+function _initLandingCardDrag() {
+    const rows = document.querySelectorAll(
+        '.home-card-row[data-card-group], .home-core-grid[data-card-group]'
+    );
+    if (!rows.length) return;
+    const storageKey = 'church_landing_card_order';
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(storageKey) || '{}') || {}; } catch (_) {}
+
+    rows.forEach(function(row) {
+        const group = row.getAttribute('data-card-group');
+        const cards = Array.from(row.querySelectorAll('[data-card-id]'));
+        const order = Array.isArray(saved[group]) ? saved[group] : [];
+        order.slice().reverse().forEach(function(id) {
+            const card = cards.find(function(item) { return item.dataset.cardId === id; });
+            if (card) row.insertBefore(card, row.firstElementChild);
+        });
+
+        let dragged = null;
+        cards.forEach(function(card) {
+            card.setAttribute('aria-grabbed', 'false');
+            card.setAttribute('title', 'Drag to reorder this card');
+            const hint = document.createElement('span');
+            hint.className = 'home-card-drag-hint';
+            hint.setAttribute('aria-hidden', 'true');
+            hint.textContent = '⠿';
+            card.appendChild(hint);
+
+            card.addEventListener('dragstart', function(event) {
+                dragged = card;
+                card.classList.add('home-card--dragging');
+                card.setAttribute('aria-grabbed', 'true');
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', card.dataset.cardId);
+            });
+            card.addEventListener('dragover', function(event) {
+                event.preventDefault();
+                if (!dragged || dragged === card) return;
+                event.dataTransfer.dropEffect = 'move';
+                card.classList.add('home-card--drag-target');
+                const rect = card.getBoundingClientRect();
+                const insertBefore = event.clientX < rect.left + rect.width / 2;
+                row.insertBefore(dragged, insertBefore ? card : card.nextSibling);
+            });
+            card.addEventListener('dragleave', function() {
+                card.classList.remove('home-card--drag-target');
+            });
+            card.addEventListener('drop', function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+                card.classList.remove('home-card--drag-target');
+                _saveLandingCardOrder(row, storageKey);
+            });
+            card.addEventListener('dragend', function() {
+                card.classList.remove('home-card--dragging');
+                card.setAttribute('aria-grabbed', 'false');
+                row.querySelectorAll('.home-card--drag-target').forEach(function(item) {
+                    item.classList.remove('home-card--drag-target');
+                });
+                _saveLandingCardOrder(row, storageKey);
+                dragged = null;
+            });
+        });
+    });
+}
+
+function _saveLandingCardOrder(row, storageKey) {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(storageKey) || '{}') || {}; } catch (_) {}
+    saved[row.getAttribute('data-card-group')] = Array.from(
+        row.querySelectorAll('[data-card-id]')
+    ).map(function(card) { return card.dataset.cardId; });
+    try { localStorage.setItem(storageKey, JSON.stringify(saved)); } catch (_) {}
 }
 
 function openShortcutsHelp() {

@@ -53,7 +53,7 @@
     <link rel="icon" type="image/svg+xml" sizes="32x32" href="favicon.svg">
     <link rel="icon" type="image/svg+xml" sizes="16x16" href="favicon.svg">
     <link rel="stylesheet" href="styles-base.css?v=20260619a">
-    <link rel="stylesheet" href="styles-landing.css?v=20260708a">
+    <link rel="stylesheet" href="styles-landing.css?v=20260820-card-dnd2">
     <link rel="stylesheet" href="styles-toolbar.css?v=20260710a">
     <link rel="stylesheet" href="styles-editor.css?v=20260820-petname-help1">
     <link rel="stylesheet" href="styles-dashboard.css?v=20260708b">
@@ -368,33 +368,33 @@
         <div class="home-section">
             <div class="home-section-title">Core Functions</div>
         </div>
-        <div class="home-core-grid">
-            <div class="home-tile" onclick="switchView('builder');switchBuilderViewTab('ti60-connect')" data-tooltip="Hardware — Flash, connect, and verify your Wukong Artix-7 board">
+        <div class="home-core-grid" data-card-group="core">
+            <div class="home-tile" data-card-id="hardware" draggable="true" onclick="switchView('builder');switchBuilderViewTab('ti60-connect')" data-tooltip="Hardware — Flash, connect, and verify your Wukong Artix-7 board">
                 <div class="home-tile-icon">🔌</div>
                 <div class="home-tile-name">Hardware</div>
                 <div class="home-tile-desc">Flash &amp; connect your Wukong Artix-7 board</div>
             </div>
-            <div class="home-tile" onclick="switchView('namespace')" data-tooltip="Namespace — Browse and inspect all capability entries">
+            <div class="home-tile" data-card-id="namespace" draggable="true" onclick="switchView('namespace')" data-tooltip="Namespace — Browse and inspect all capability entries">
                 <div class="home-tile-icon">🗂️</div>
                 <div class="home-tile-name">Namespace</div>
                 <div class="home-tile-desc">Browse all capability table entries</div>
             </div>
-            <div class="home-tile" onclick="switchView('abstractions')" data-tooltip="Workshop — Build, inspect, and manage abstractions">
+            <div class="home-tile" data-card-id="workshop" draggable="true" onclick="switchView('abstractions')" data-tooltip="Workshop — Build, inspect, and manage abstractions">
                 <div class="home-tile-icon">🧩</div>
                 <div class="home-tile-name">Workshop</div>
                 <div class="home-tile-desc">Build and inspect abstractions</div>
             </div>
-            <div class="home-tile" onclick="switchView('editor')" data-tooltip="Code — Write CLOOMC programs and compile them">
+            <div class="home-tile" data-card-id="code" draggable="true" onclick="switchView('editor')" data-tooltip="Code — Write CLOOMC programs and compile them">
                 <div class="home-tile-icon">📝</div>
                 <div class="home-tile-name">Code</div>
                 <div class="home-tile-desc">Write and compile CLOOMC programs</div>
             </div>
-            <div class="home-tile" onclick="switchView('dashboard')" data-tooltip="Simulator — Step, run, and inspect the Church Machine">
+            <div class="home-tile" data-card-id="simulator" draggable="true" onclick="switchView('dashboard')" data-tooltip="Simulator — Step, run, and inspect the Church Machine">
                 <div class="home-tile-icon">⚙️</div>
                 <div class="home-tile-name">Simulator</div>
                 <div class="home-tile-desc">Step and run the Church Machine</div>
             </div>
-            <div class="home-tile" onclick="switchView('builder')" data-tooltip="Deploy — Build LUMPs and deploy to hardware">
+            <div class="home-tile" data-card-id="deploy" draggable="true" onclick="switchView('builder')" data-tooltip="Deploy — Build LUMPs and deploy to hardware">
                 <div class="home-tile-icon">🚀</div>
                 <div class="home-tile-name">Deploy</div>
                 <div class="home-tile-desc">Build LUMPs and deploy to hardware</div>
@@ -405,8 +405,8 @@
         <div class="home-section">
             <div class="home-section-title">Learning Tools</div>
         </div>
-        <div class="home-card-row">
-            <div class="home-card" onclick="switchView('tutorial')" data-tooltip="Tutorials — Step-by-step guides to CLOOMC, capabilities, and secure boot">
+        <div class="home-card-row" data-card-group="learning">
+            <div class="home-card" data-card-id="tutorials" draggable="true" onclick="switchView('tutorial')" data-tooltip="Tutorials — Step-by-step guides to CLOOMC, capabilities, and secure boot">
                 <div class="home-card-icon">📘</div>
                 <div class="home-card-name">Tutorials</div>
                 <div class="home-card-desc">Step-by-step CLOOMC guides</div>
@@ -415,7 +415,7 @@
                     <a class="home-chip" onclick="event.stopPropagation();switchView('repl')">Math REPL</a>
                 </div>
             </div>
-            <div class="home-card" onclick="switchView('abstractions')" data-tooltip="Abstractions — Browse, inspect, and deploy LUMPs">
+            <div class="home-card" data-card-id="abstractions" draggable="true" onclick="switchView('abstractions')" data-tooltip="Abstractions — Browse, inspect, and deploy LUMPs">
                 <div class="home-card-icon">🧩</div>
                 <div class="home-card-name">Abstractions</div>
                 <div class="home-card-desc">Browse and deploy capability modules</div>
@@ -424,7 +424,7 @@
                     <a class="home-chip" onclick="event.stopPropagation();switchView('namespace')">Namespace</a>
                 </div>
             </div>
-            <div class="home-card" onclick="switchView('dashboard')" data-tooltip="Dashboard — Live telemetry, MTBF, and fault log">
+            <div class="home-card" data-card-id="dashboard" draggable="true" onclick="switchView('dashboard')" data-tooltip="Dashboard — Live telemetry, MTBF, and fault log">
                 <div class="home-card-icon">📊</div>
                 <div class="home-card-name">Dashboard</div>
                 <div class="home-card-desc">Live MTBF, call-home, and fault records</div>
@@ -439,8 +439,8 @@
         <div class="home-section">
             <div class="home-section-title">Documentation</div>
         </div>
-        <div class="home-card-row">
-            <div class="home-card home-doc-card" onclick="switchView('reference')" data-tooltip="ISA Reference — Full Church Machine instruction set reference">
+        <div class="home-card-row" data-card-group="documentation">
+            <div class="home-card home-doc-card" data-card-id="reference" draggable="true" onclick="switchView('reference')" data-tooltip="ISA Reference — Full Church Machine instruction set reference">
                 <div class="home-card-icon">📖</div>
                 <div class="home-card-name">ISA Reference</div>
                 <div class="home-card-desc">Full instruction set reference</div>
@@ -449,7 +449,7 @@
                     <a class="home-chip" onclick="event.stopPropagation();switchView('reference');switchRefTab('hardware')">Architecture</a>
                 </div>
             </div>
-            <div class="home-card home-doc-card" onclick="switchView('docs')" data-tooltip="Docs — Hardware guide, CLOOMC++ guide, API reference">
+            <div class="home-card home-doc-card" data-card-id="docs" draggable="true" onclick="switchView('docs')" data-tooltip="Docs — Hardware guide, CLOOMC++ guide, API reference">
                 <div class="home-card-icon">📚</div>
                 <div class="home-card-name">All Docs</div>
                 <div class="home-card-desc">Hardware, language, and API guides</div>
@@ -459,7 +459,7 @@
                     <a class="home-chip" onclick="event.stopPropagation();" href="/docs/figures/Lumps Directory.html" target="_blank">Lump Viewer</a>
                 </div>
             </div>
-            <div class="home-card home-doc-card" onclick="switchView('hello-mum')" data-tooltip="Mum Tunnel — Share abstractions through the community library">
+            <div class="home-card home-doc-card" data-card-id="hello-mum" draggable="true" onclick="switchView('hello-mum')" data-tooltip="Mum Tunnel — Share abstractions through the community library">
                 <div class="home-card-icon">🌐</div>
                 <div class="home-card-name">Mum Tunnel</div>
                 <div class="home-card-desc">Share abstractions with the community</div>
@@ -2920,7 +2920,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script async src="app-ti60-connect.js?v=20260619a"></script>
     <script defer src="app-startup-wizard.js?v=20260619a"></script>
     <script src="lump-registry.js?v=20260719g"></script>
-    <script src="app-shell.js?v=20260803b"></script>
+    <script src="app-shell.js?v=20260820-card-dnd2"></script>
     <script src="app-tools.js?v=20260726a"></script>
     <script src="app-cr-display.js?v=20260521a"></script>
     <script src="app-cr-detail.js?v=20260820-named-capability1"></script>
