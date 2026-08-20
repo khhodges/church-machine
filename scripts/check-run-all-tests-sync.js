@@ -60,7 +60,6 @@ const DEFAULT_SCRIPT_ONLY_SUITES = [
     'compile-api-tests',
     'lump-builder-dispatch-tests',
     'wukong-protocol-tests',
-    'build-guard-tests',
     'update-lump-tests',
     'check-slot-index-leak',
     'ns-slot-dynamic-tests',
@@ -187,6 +186,19 @@ const orphanInScript = [...suiteNames]
     .filter(n => !testWorkflowNames.has(n) && !SCRIPT_ONLY_SUITES.has(n))
     .sort();
 
+// Script-only declarations must continue to describe real direct-run suites.
+// Otherwise a stale exemption can hide a removed test workflow indefinitely.
+const scriptOnlyMissingFromScript = [...SCRIPT_ONLY_SUITES]
+    .filter(n => !suiteNames.has(n))
+    .sort();
+
+// A script-only suite is specifically one without a dedicated workflow.  If
+// one is added to .replit later, the exemption should be removed so the two
+// registries cannot drift independently.
+const scriptOnlyWithWorkflow = [...SCRIPT_ONLY_SUITES]
+    .filter(n => allWorkflowNames.has(n))
+    .sort();
+
 let ok = true;
 
 if (missingFromScript.length > 0) {
@@ -214,6 +226,32 @@ if (orphanInScript.length > 0) {
     console.error('');
     console.error('Either add a matching workflow to .replit or remove the stale');
     console.error('run_suite entry from scripts/run-all-tests.sh.');
+}
+
+if (scriptOnlyMissingFromScript.length > 0) {
+    ok = false;
+    console.error('');
+    console.error('SYNC ERROR — the following script-only declarations are not');
+    console.error('registered in scripts/run-all-tests.sh:');
+    for (const name of scriptOnlyMissingFromScript) {
+        console.error(`  • ${name}`);
+    }
+    console.error('');
+    console.error('Add a matching run_suite entry or remove the stale');
+    console.error('scriptOnlySuites declaration from scripts/test-workflow-config.json.');
+}
+
+if (scriptOnlyWithWorkflow.length > 0) {
+    ok = false;
+    console.error('');
+    console.error('SYNC ERROR — the following script-only declarations also have');
+    console.error('a dedicated workflow in .replit:');
+    for (const name of scriptOnlyWithWorkflow) {
+        console.error(`  • ${name}`);
+    }
+    console.error('');
+    console.error('Remove the declaration from scriptOnlySuites; dedicated workflows');
+    console.error('must be tracked as normal test workflows.');
 }
 
 if (ok) {

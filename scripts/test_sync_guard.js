@@ -65,6 +65,12 @@ function withConfig(tempContent, fn) {
     }
 }
 
+function configWithScriptOnlySuites(scriptOnlySuites) {
+    const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+    config.scriptOnlySuites = scriptOnlySuites;
+    return JSON.stringify(config);
+}
+
 // ---------------------------------------------------------------------------
 // T1 — missing config file: exits 0, stderr contains WARNING
 // ---------------------------------------------------------------------------
@@ -92,15 +98,48 @@ function withConfig(tempContent, fn) {
 }
 
 // ---------------------------------------------------------------------------
-// T3 — normal case: exits 0, stdout contains "OK"
+// T3 — stale script-only declaration: exits 1 and reports the declaration
+// ---------------------------------------------------------------------------
+{
+    const config = configWithScriptOnlySuites(['suite-that-no-longer-exists']);
+    const result = withConfig(config, () => runGuard());
+    const output = `${result.stdout || ''}\n${result.stderr || ''}`;
+
+    check('T3: stale script-only declaration — exit code 1',
+        result.status === 1);
+
+    check('T3: stale script-only declaration — reports missing script registration',
+        output.includes('script-only declarations are not') &&
+        output.includes('suite-that-no-longer-exists'));
+}
+
+// ---------------------------------------------------------------------------
+// T4 — script-only declaration with a dedicated workflow: exits 1 and reports it
+// ---------------------------------------------------------------------------
+{
+    const config = configWithScriptOnlySuites(['assembler-tests']);
+    const result = withConfig(config, () => runGuard());
+    const output = `${result.stdout || ''}\n${result.stderr || ''}`;
+
+    check('T4: script-only declaration with workflow — exit code 1',
+        result.status === 1);
+
+    check('T4: script-only declaration with workflow — reports dedicated workflow',
+        output.includes('also have') &&
+        output.includes('a dedicated workflow in .replit') &&
+        output.includes('assembler-tests'));
+}
+
+// ---------------------------------------------------------------------------
+// T5 — normal case: exits 0, stdout contains "OK"
 // ---------------------------------------------------------------------------
 {
     const result = runGuard();
 
-    check('T3: normal case — exit code 0',
+    check('T5: normal case — exit code 0',
         result.status === 0);
 
-    check('T3: normal case — OK line printed',
+    check('T5: normal case — OK line printed',
         (result.stdout || '').includes('OK — all'));
 }
 
