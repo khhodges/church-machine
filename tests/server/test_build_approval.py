@@ -149,6 +149,33 @@ def test_validate_lump_size_appended():
     assert 'tamper' in err.lower() or 'unexpected' in err.lower()
 
 
+def test_lump_size_budget_reconciles_header_and_file():
+    """The approval budget reports measured sections and reserved allocation."""
+    data = _make_lump(terminal_opcode=CHURCH_BRANCH_OP, cw=8, cc=1)
+    path = _write_tmp_lump(data)
+    try:
+        budget = _app._ba_lump_size_budget(path)
+        assert budget['available'] is True
+        assert budget['code']['words'] == 8
+        assert budget['gt_capabilities']['words'] == 1
+        assert budget['total']['words'] == len(data) // 4
+        assert budget['allocation']['words'] >= budget['total']['words']
+        assert budget['allocation']['words'] == 64
+        assert budget['freespace']['words'] == budget['total']['words'] - 1 - 8 - 1
+        assert budget['reconciles'] is True
+    finally:
+        os.unlink(path)
+
+
+def test_build_failure_classifier_distinguishes_remote_crash_and_tool_error():
+    crash = _app._ba_classify_build_failure(
+        1, ['Vivado started', 'tmux session gone without EXIT_ marker'])
+    assert crash['category'] == 'remote_crash'
+    assert crash['next_action']
+    tool = _app._ba_classify_build_failure(1, ['ERROR: [Synth 8-1] cannot open source'])
+    assert tool['category'] == 'tool_error'
+
+
 # ===================================================================
 # Opcode check: BRANCH/RETURN/unknown + appended-data bypass
 # ===================================================================

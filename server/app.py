@@ -12423,6 +12423,8 @@ _ba_nonce_lock        = threading.Lock()
 _ba_build_log:  list  = []
 _ba_build_done: bool  = True              # True = idle; False = in-progress
 _ba_build_exit        = None
+_ba_build_phase       = 'idle'
+_ba_build_diagnosis   = None
 _ba_build_lock        = threading.Lock()
 
 # Droplet SSH configuration — overridable via environment variables.
@@ -12553,6 +12555,39 @@ def _ba_validate_lump_size(n_words, cw, cc):
     return (f'unexpected file size: {n_words} words '
             f'(header cw={cw} cc={cc} → expect {min_w} or {pow2_w}; '
             f'possible appended-data tampering)')
+
+def _ba_lump_size_budget(path):
+    """Derive a safe, reconciled size budget from a big-endian LUMP binary."""
+    if not path or not os.path.isfile(path):
+        return {'available': False, 'reason': 'binary unavailable'}
+    try:
+        with open(path, 'rb') as fh:
+            raw = fh.read()
+        if len(raw) % 4 or not raw:
+            return {'available': False, 'reason': 'binary is not word-aligned'}
+        words = list(_ba_struct.unpack(f'>{len(raw) // 4}I', raw))
+        header = words[0]
+        if ((header >> 27) & 0x1F) != 0x1F:
+            return {'available': False, 'reason': 'invalid LUMP header'}
+        cw, cc = (header >> 10) & 0x1FFF, header & 0xFF
+        allocation = 1 << (((header >> 23) & 0xF) + 6)
+        frame = _lump_freespace_content(words)
+        api = 1 + ((frame['api_len'] + 3) // 4) if frame else 0
+        source = (frame['content_words'] - api) if frame else 0
+        freespace = max(0, len(words) - 1 - cw - cc)
+        return {
+            'available': True,
+            'metadata': 'measured' if frame else 'unavailable',
+            'code': {'words': cw, 'bytes': cw * 4},
+            'api': {'words': api, 'bytes': api * 4, 'measured': bool(frame)},
+            'gt_capabilities': {'words': cc, 'bytes': cc * 4},
+            'freespace': {'words': freespace, 'bytes': freespace * 4, 'reserved': True},
+            'total': {'words': len(words), 'bytes': len(raw)},
+            'allocation': {'words': allocation, 'bytes': allocation * 4},
+            'reconciles': 1 + cw + cc + freespace == len(words),
+        }
+    except Exception as exc:
+        return {'available': False, 'reason': f'cannot read binary: {exc}'}
 
 def _ba_check_selftest_egt(lump_path, selftest_ns_slot):
     """
@@ -12980,6 +13015,27 @@ def _ba_build_ns_map():
                 'checks': checks,
             })
 
+    # Size accounting is informational.  In particular, lazy/runtime entries
+    # are included when available but never participate in approval gating.
+    for tier_name, tier_rows in (('resident', resident), ('lazy', lazy)):
+        for row in tier_rows:
+            lump_path = _ba_lump_file_for_token(row.get('token'))
+            row['size_budget'] = _ba_lump_size_budget(lump_path)
+    hardware_rows = [r for r in resident if r.get('size_budget', {}).get('available')]
+    def _sum_budget(key):
+        return sum(r['size_budget'][key]['words'] for r in hardware_rows)
+    hardware_budget = {
+        'lumps': len(hardware_rows),
+        'code': {'words': _sum_budget('code'), 'bytes': _sum_budget('code') * 4},
+        'api': {'words': _sum_budget('api'), 'bytes': _sum_budget('api') * 4},
+        'gt_capabilities': {'words': _sum_budget('gt_capabilities'),
+                            'bytes': _sum_budget('gt_capabilities') * 4},
+        'freespace': {'words': _sum_budget('freespace'), 'bytes': _sum_budget('freespace') * 4},
+        'total': {'words': sum(r['size_budget']['total']['words'] for r in hardware_rows),
+                  'bytes': sum(r['size_budget']['total']['bytes'] for r in hardware_rows)},
+        'allocation': {'words': sum(r['size_budget']['allocation']['words'] for r in hardware_rows),
+                       'bytes': sum(r['size_budget']['allocation']['bytes'] for r in hardware_rows)},
+    }
     return {
         'tiers': {
             'bootstrap': bootstrap,
@@ -12989,6 +13045,7 @@ def _ba_build_ns_map():
         },
         'ns_table_base': ns_table_base,
         'ns_slot_count': ns_slot_count,
+        'hardware_budget': hardware_budget,
     }
 
 def _resolve_lump_path(token8, lumps_dir=None):
@@ -13085,10 +13142,42 @@ def _ba_write_ssh_key():
     os.chmod(key_path, 0o600)
     return key_path
 
+def _ba_classify_build_failure(exit_code, log, phase='unknown'):
+    """Classify a remote build outcome using bounded, redacted log evidence."""
+    lines = list(log or [])
+    patterns = [
+        ('ssh_launch', ('ssh launch failed', 'connecttimeout', 'permission denied'),
+         'SSH could not start the remote build.',
+         'Check the droplet connection and SSH setup, then retry.'),
+        ('timeout', ('timed out', 'poll timed out'),
+         'The remote build exceeded the polling timeout.',
+         'Check the remote Vivado log and host load; retry after confirming the session stopped.'),
+        ('tool_error', ('vivado error:', 'error: [', 'cannot open', 'no such file'),
+         'Vivado or a required build input reported an error.',
+         'Open the log tail, fix the named tool/input error, then freeze a fresh approval snapshot.'),
+        ('implementation_failure', ('implementation failed', 'place 30-', 'route 30-', 'timing failed'),
+         'FPGA implementation failed after synthesis.',
+         'Review placement, routing, timing, or constraint errors in the log before retrying.'),
+        ('remote_crash', ('session gone', 'worker error', 'crashed'),
+         'The remote build session ended without a clean completion marker.',
+         'Inspect the retained log tail and remote host/session health, then retry.'),
+    ]
+    lower = '\n'.join(lines).lower()
+    category, what, next_action = ('exit_code', 'Vivado exited with a failure code.',
+                                    'Review the log tail for the first error, fix it, and retry.')
+    for candidate, needles, description, action in patterns:
+        if any(needle in lower for needle in needles):
+            category, what, next_action = candidate, description, action
+            break
+    evidence = [line for line in lines if any(x in line.lower()
+                for x in ('error', 'failed', 'timeout', 'session', 'crash', 'exit_'))][-5:]
+    return {'category': category, 'what_failed': what, 'next_action': next_action,
+            'phase': phase, 'exit_code': exit_code, 'evidence': evidence}
+
 
 def _ba_build_worker(key_path):
     """Background thread: SSH to droplet, start Vivado in tmux, stream log."""
-    global _ba_build_log, _ba_build_done, _ba_build_exit
+    global _ba_build_log, _ba_build_done, _ba_build_exit, _ba_build_phase, _ba_build_diagnosis
 
     ssh_base = [
         'ssh', '-i', key_path,
@@ -13102,12 +13191,16 @@ def _ba_build_worker(key_path):
             _ba_build_log.append(line)
 
     def _finish(code):
-        global _ba_build_done, _ba_build_exit
+        global _ba_build_done, _ba_build_exit, _ba_build_phase, _ba_build_diagnosis
         with _ba_build_lock:
             _ba_build_done = True
             _ba_build_exit = code
+            _ba_build_phase = 'complete' if code == 0 else 'failed'
+            _ba_build_diagnosis = _ba_classify_build_failure(code, _ba_build_log, _ba_build_phase)
 
-    _append('🔗 Connecting to build droplet…')
+        _append('🔗 Connecting to build droplet…')
+        with _ba_build_lock:
+            _ba_build_phase = 'launching'
 
     try:
         # 1. Kill any existing session + start new tmux Vivado build
@@ -13127,6 +13220,8 @@ def _ba_build_worker(key_path):
             _finish(r.returncode)
             return
 
+        with _ba_build_lock:
+            _ba_build_phase = 'running'
         _append(f'✅ Vivado synthesis started in tmux session "{_VIVADO_SESSION}"')
         _append('⏳ Polling build log (every 30 s)…')
 
@@ -13194,7 +13289,7 @@ def wukong_build_start():
       • build_nonce in the JSON body or ?build_nonce= query param  (browser)
     The nonce is obtained from GET /api/build-approval/ns-map.
     """
-    global _ba_build_log, _ba_build_done, _ba_build_exit
+    global _ba_build_log, _ba_build_done, _ba_build_exit, _ba_build_phase, _ba_build_diagnosis
 
     ok, err = _ba_validate_build_auth()
     if not ok:
@@ -13237,6 +13332,8 @@ def wukong_build_start():
         _ba_build_log = []
         _ba_build_done = False
         _ba_build_exit = None
+        _ba_build_phase = 'queued'
+        _ba_build_diagnosis = None
 
     t = threading.Thread(target=_ba_build_worker, args=(key_path,), daemon=True)
     t.start()
@@ -13257,7 +13354,11 @@ def wukong_build_status():
         log = list(_ba_build_log)
         done = _ba_build_done
         exit_code = _ba_build_exit
-    return jsonify({'log': log, 'done': done, 'exit_code': exit_code})
+        phase = _ba_build_phase
+        diagnosis = _ba_build_diagnosis
+    return jsonify({'log': log[-200:], 'log_tail': log[-40:], 'done': done,
+                    'exit_code': exit_code, 'phase': phase,
+                    'diagnosis': diagnosis})
 
 @app.route('/api/build-approval/freeze-snapshot', methods=['POST'])
 def build_approval_freeze_snapshot():

@@ -141,6 +141,9 @@ const BuildApprovalView = {
         ];
 
         let html = '';
+        if (data.hardware_budget) {
+            html += this._renderBudget('Hardware budget (resident binaries)', data.hardware_budget);
+        }
         for (const tier of tiers) {
             const slots = data.tiers && data.tiers[tier.key];
             if (!slots || !slots.length) continue;
@@ -149,7 +152,7 @@ const BuildApprovalView = {
 <thead><tr>
   <th>Slot</th><th>Name</th><th>Token</th><th>Header</th>
   <th>cw</th><th>cc</th><th>Location</th><th>Perms</th><th>Source</th>
-  <th>Checks</th>
+  <th>Checks</th><th>Size budget</th>
 </tr></thead><tbody>`;
             for (const s of slots) {
                 html += this._renderRow(s);
@@ -168,6 +171,16 @@ const BuildApprovalView = {
         const rowClass = hasError ? 'ba-row-bad' : (hasWarn ? 'ba-row-warn' : (allOk ? 'ba-row-ok' : ''));
         const checkHtml = checks.map(c => this._checkBadge(c)).join(' ') || '<span class="ba-badge ba-badge-unknown">—</span>';
 
+        const budget = s.size_budget;
+        const budgetHtml = budget && budget.available
+            ? `<div class="ba-size-budget" title="Measured binary content; freespace is reserved, not used content">
+                <span>Code ${budget.code.words}w</span>
+                <span>API ${budget.api.words}w${budget.api.measured ? '' : ' *'}</span>
+                <span>GT ${budget.gt_capabilities.words}w</span>
+                <span>Free ${budget.freespace.words}w</span>
+                <b>Total ${budget.total.words}w / alloc ${budget.allocation.words}w</b>
+               </div>`
+            : `<span class="ba-size-unavailable">${this._esc(budget && budget.reason || 'size unavailable')}</span>`;
         return `<tr class="${rowClass}">
   <td class="ba-slot">${this._esc(s.slot)}</td>
   <td class="ba-name">${this._esc(s.name || '—')}</td>
@@ -179,7 +192,18 @@ const BuildApprovalView = {
   <td class="ba-perms">${this._esc(this._permStr(s.perms))}</td>
   <td class="ba-src">${this._esc(s.source || '—')}</td>
   <td class="ba-checks">${checkHtml}</td>
+  <td class="ba-size">${budgetHtml}</td>
 </tr>`;
+    },
+
+    _renderBudget(label, b) {
+        const f = (x) => `${x.words}w / ${x.bytes} B`;
+        return `<div class="ba-budget-card"><strong>${this._esc(label)}</strong>
+          <span>Code ${f(b.code)}</span><span>API ${f(b.api)}</span>
+          <span>GT/capabilities ${f(b.gt_capabilities)}</span>
+          <span>Reserved freespace ${f(b.freespace)}</span>
+          <b>Total ${f(b.total)} · allocation ${f(b.allocation)}</b>
+        </div>`;
     },
 
     _allChecksPass() {
@@ -317,8 +341,13 @@ const BuildApprovalView = {
                 this._lastLogLen = 0;
                 const ok = data.exit_code === 0;
                 if (statusEl) {
-                    statusEl.textContent = ok ? '✅ Build complete!' : '❌ Build failed (exit ' + data.exit_code + ')';
+                    const d = data.diagnosis;
+                    statusEl.textContent = ok ? '✅ Build complete!' :
+                        '❌ ' + (d ? d.what_failed : ('Build failed (exit ' + data.exit_code + ')'));
                     statusEl.className = 'ba-build-status ' + (ok ? 'ba-build-ok' : 'ba-build-bad');
+                }
+                if (!ok && data.diagnosis && logEl) {
+                    logEl.textContent += `\nWhat failed: ${data.diagnosis.what_failed}\nNext: ${data.diagnosis.next_action}\n`;
                 }
                 if (ok && logEl) logEl.textContent += '\n✅ Synthesis complete — download the .bit from the Connect tab.\n';
                 this._updateApproveBtn();

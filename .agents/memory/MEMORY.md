@@ -134,3 +134,4 @@
 - [Capability picker version selection](capability-picker-version-selection.md) — show one latest eligible LUMP per abstraction by default; place older versions behind an explicit disclosure
 - [SELF row click safety](self-row-click-safety.md) — compiler-owned SELF is display-only in the C-List and must never write an operand into the editor
 - [Hardware readiness fingerprints](hardware-readiness-fingerprint.md) — generated Verilog/RTLIL must carry a content fingerprint of active Python inputs before synthesis
+- [Build Approval size accounting](build-approval-size-accounting.md) — derive displayed LUMP budgets from the big-endian binary and mark API metadata unavailable rather than guessing
