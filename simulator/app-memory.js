@@ -4702,12 +4702,16 @@ function _closeCRDetailMenuOnce() {
 
 let selectedAbsIndex = null;
 let absCollapsedLayers = {};
-// A fresh IDE session always starts with the architectural Boot.Abstr:
-// SelfTest at slot 6.  The lightning bolt can select another entry for the
-// current session, while a deliberately generated boot image may still carry
-// its own explicit non-default entry.
+// Restore the user's selected LightningBolt entry across IDE restarts.
+// SelfTest at slot 6 remains the fallback for a missing or malformed value;
+// app-abstractions.js applies architecture-specific slot migration/bounds.
 let bootEntrySlot = 6;
-try { localStorage.removeItem('bootEntrySlot'); } catch (_e) {}
+try {
+    const _storedBootEntry = Number.parseInt(localStorage.getItem('bootEntrySlot'), 10);
+    if (Number.isInteger(_storedBootEntry) && _storedBootEntry >= 0 && _storedBootEntry <= 0xFFFF) {
+        bootEntrySlot = _storedBootEntry;
+    }
+} catch (_e) {}
 let userMethodData = {};
 let userMethodLists = {};
 

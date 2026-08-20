@@ -20,8 +20,8 @@
 //   T205 — Sequential resets: bootEntrySlot tracks sim.bootEntrySlot across
 //           three consecutive sync calls (order-dependent state regression).
 //   T206 — Null sim guard: _syncBootEntryFromSim is safe when sim is null.
-//   T209 — a fresh browser session always defaults to SelfTest (slot 6), rather
-//           than reviving a previous lightning-bolt selection from localStorage.
+//   T209 — browser startup restores a valid LightningBolt selection from
+//           localStorage, with SelfTest (slot 6) as the missing/invalid fallback.
 //   T210 — an unexpected boot halt is promoted to a BOOT fault instead of
 //           freezing at B:NN without the Fault popup.
 
@@ -455,7 +455,7 @@ console.log('\n--- T208: acceptance state gated on loadBootImage() verdict ---')
         verdict === false);
 }
 
-// ── T209: a new IDE session starts at the canonical SelfTest entry ────────────
+// ── T209: a new IDE session restores the selected LightningBolt entry ─────────
 //
 // The boot image is fetched asynchronously.  If a run completes from the
 // standalone 64-word placeholder first, simply copying the real image into
@@ -506,14 +506,18 @@ console.log('\n--- T211: late boot-image arrival replaces fallback CR state ---'
         appShellSrc.indexOf('sim.reset();', resetAt) > resetAt);
 }
 
-// ── T209: a new IDE session starts at the canonical SelfTest entry ────────────
-console.log('\n--- T209: fresh browser session defaults to SelfTest ---');
+// ── T209: a new IDE session restores the selected LightningBolt entry ────────
+console.log('\n--- T209: browser startup restores LightningBolt selection ---');
 {
     const memSrc = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');
-    check('T209a: browser startup initializes bootEntrySlot to SelfTest slot 6',
+    check('T209a: browser startup keeps SelfTest slot 6 as the fallback',
         /let bootEntrySlot\s*=\s*6\s*;/.test(memSrc));
-    check('T209b: browser startup clears any stale persisted boot-entry selection',
-        /localStorage\.removeItem\(['"]bootEntrySlot['"]\)/.test(memSrc));
+    check('T209b: browser startup reads the persisted boot-entry selection',
+        /localStorage\.getItem\(['"]bootEntrySlot['"]\)/.test(memSrc) &&
+        /bootEntrySlot\s*=\s*_storedBootEntry/.test(memSrc));
+    check('T209c: malformed or out-of-range persisted values are ignored',
+        /_storedBootEntry\s*>=\s*0/.test(memSrc) &&
+        /_storedBootEntry\s*<=\s*0xFFFF/.test(memSrc));
 }
 
 // ── T210: no unreported boot freezes ─────────────────────────────────────────
