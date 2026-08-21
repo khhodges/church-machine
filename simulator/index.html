@@ -361,7 +361,7 @@
                         <button class="btn sim-icon-btn fault-panel-badge" id="faultPanelBadge" onclick="_faultBadgeClick()" style="display:none;" data-tooltip="Last Fault — A fault was recorded · click to view it in the editor">&#x26A0; Fault</button>
                         <button class="btn btn-success sim-icon-btn" id="toolStepBtn" onclick="stepSim()" data-tooltip="Step — Execute one instruction">&#x1F463;</button>
                         <div class="step-settings-wrap" id="stepSettingsWrap">
-                            <button class="btn sim-icon-btn step-settings-btn" id="stepSettingsBtn" onclick="toggleStepSettingsPopover()" aria-haspopup="dialog" aria-expanded="false" data-tooltip="Step Settings — Configure stepping and breakpoints">&#9881;</button>
+                            <button class="btn btn-break sim-icon-btn" id="toolBreakBtn" onclick="toggleStepSettingsPopover()" aria-haspopup="dialog" aria-expanded="false" data-tooltip="Breakpoint — Set/clear PC breakpoints · open Step Settings">&#x25CF;</button>
                             <div class="step-settings-popover" id="stepSettingsPopover" style="display:none;">
                                 <div class="step-settings-title">Step Settings <button class="step-settings-close" onclick="toggleStepSettingsPopover()" title="Close">&times;</button></div>
                                 <div class="step-settings-section">
@@ -384,7 +384,6 @@
                         <span id="wukongCallDepthBadge" class="wukong-call-depth-badge" style="display:none;" title="HW call-stack depth: 0">&#x21C6; 0</span>
                         <button class="btn btn-primary sim-icon-btn" id="toolHWLoadBtn" onclick="_wukongLoadToHardware()" style="display:none;font-size:11px;padding:2px 6px;" data-tooltip="Load to Hardware — Generate boot image and push it to the connected Wukong board">&#x26A1; Load</button>
                         <button class="btn btn-walk sim-icon-btn" id="toolWalkBtn" onclick="walkToggle()" data-tooltip="Walk — Animate step-by-step execution">&#x1F6B6;</button>
-                        <button class="btn btn-break sim-icon-btn" id="toolBreakBtn" onclick="toggleStepSettingsPopover()" data-tooltip="Breakpoint — Open Step Settings and manage PC breakpoints">&#x25CF;</button>
                         <div class="run-wrap" id="runWrap">
                             <button class="btn btn-success sim-icon-btn" id="btnRunSim" onclick="onRunBtnClick()" data-tooltip="Run — single-click to run · double-click for options">&#x1F3C3;</button>
                             <button class="btn btn-danger sim-icon-btn" id="btnStopSim" onclick="stopSim()" style="display:none;" data-tooltip="Stop — Halt execution immediately">&#x23F9;</button>

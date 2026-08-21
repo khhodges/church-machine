@@ -1473,8 +1473,6 @@ function toggleStepSettingsPopover() {
     if (!pop) return;
     const open = pop.style.display !== 'none';
     pop.style.display = open ? 'none' : 'block';
-    const btn = document.getElementById('stepSettingsBtn');
-    if (btn) btn.setAttribute('aria-expanded', open ? 'false' : 'true');
     const breakBtn = document.getElementById('toolBreakBtn');
     if (breakBtn) breakBtn.setAttribute('aria-expanded', open ? 'false' : 'true');
     if (!open) {
@@ -1495,7 +1493,6 @@ function openBreakPopoverAt(addr) {
     if (!pop) return;
     pop.style.display = 'block';
     renderBreakList();
-    document.getElementById('stepSettingsBtn')?.setAttribute('aria-expanded', 'true');
     document.getElementById('toolBreakBtn')?.setAttribute('aria-expanded', 'true');
     const inp = document.getElementById('breakAddrInput');
     if (inp) {
@@ -1540,13 +1537,10 @@ function addBreakpointFromInput() {
 // Close Step Settings when clicking outside it.
 document.addEventListener('click', function(e) {
     const wrap = document.getElementById('stepSettingsWrap');
-    const breakBtn = document.getElementById('toolBreakBtn');
-    const isBreakBtn = breakBtn && (e.target === breakBtn || breakBtn.contains(e.target));
-    if (wrap && !wrap.contains(e.target) && !isBreakBtn) {
+    if (wrap && !wrap.contains(e.target)) {
         const pop = document.getElementById('stepSettingsPopover');
         if (pop && pop.style.display !== 'none') {
             pop.style.display = 'none';
-            document.getElementById('stepSettingsBtn')?.setAttribute('aria-expanded', 'false');
             document.getElementById('toolBreakBtn')?.setAttribute('aria-expanded', 'false');
         }
     }

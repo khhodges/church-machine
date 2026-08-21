@@ -1,0 +1,95 @@
+{
+  "token": "9ce28c0b",
+  "abstraction": "CapabilityTest",
+  "filename": "CapabilityTest.1.3045f510.lump",
+  "sidecar_file": "CapabilityTest.1.3045f510.json",
+  "ns_slot": 10,
+  "lump_size": 128,
+  "typ": 0,
+  "content_type": "code",
+  "cw": 21,
+  "cc": 5,
+  "profile": "IoT",
+  "language": "",
+  "author": "",
+  "version": "",
+  "release_notes": "",
+  "methods": [],
+  "capabilities": [
+    {
+      "name": "SelfTest",
+      "rights": [
+        "E"
+      ],
+      "grants": [],
+      "nsIndex": 6
+    },
+    {
+      "name": "LED_DEV",
+      "rights": [
+        "R",
+        "W"
+      ],
+      "grants": [],
+      "nsIndex": 3
+    },
+    {
+      "name": "UART_DEV",
+      "rights": [
+        "R",
+        "W"
+      ],
+      "grants": [],
+      "nsIndex": 2
+    },
+    {
+      "name": "BTN_DEV",
+      "rights": [
+        "R"
+      ],
+      "grants": [],
+      "nsIndex": 4
+    },
+    {
+      "name": "TIMER_DEV",
+      "rights": [
+        "R",
+        "W"
+      ],
+      "grants": [],
+      "nsIndex": 5
+    }
+  ],
+  "compiler_owned_self": false,
+  "pet_names": {
+    "DR": {},
+    "CR": {}
+  },
+  "mtbf": {
+    "consecutive_clean": 0,
+    "total_runs": 0,
+    "status": "unknown",
+    "source_hash": ""
+  },
+  "deployment": {
+    "target_board": "wukong-xc7a100t",
+    "profile": "IoT",
+    "built_at": "2026-08-21T15:29:56.097781Z",
+    "builder": "CLOOMC++ IDE v1.0"
+  },
+  "grants": [
+    "E"
+  ],
+  "source": "",
+  "binary_hash": "dbcb1b07437ccfd352bafcac0a4e1a7e94830f28480c345b3dbed660cd3937bd",
+  "petname": "",
+  "issue_number": 1,
+  "identity_string": "CapabilityTest#1",
+  "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
+  "identity_seal_location": "sidecar",
+  "dot_name": "CapabilityTest",
+  "issue_n": 1,
+  "lump_version": 7,
+  "compiled_at": 1787326196.0978038,
+  "sourceStorageTier": 0
+}
