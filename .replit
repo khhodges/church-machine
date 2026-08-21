@@ -396,6 +396,17 @@ args = "bash scripts/check_stale_cr7.sh"
 outputType = "console"
 
 [[workflows.workflow]]
+name = "check-sitemap-figure-count"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node scripts/check-sitemap-figure-count.js"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
 name = "assembler-tests"
 author = "agent"
 
