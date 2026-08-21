@@ -1,0 +1,88 @@
+{
+  "artifacts": {
+    "church_wukong_xc7a100t.bit": {
+      "sha256": "438b3901f09bfc907b6411a69f443d347bbe48558188327f0760ca76d55f7837",
+      "size_bytes": 3826002
+    },
+    "church_wukong_xc7a100t.il": {
+      "sha256": "54ca7e9a9013c558319dea9cbf8c51073e6172141370a12be972d7fd3b631824",
+      "size_bytes": 3019712
+    },
+    "church_wukong_xc7a100t.mcs": {
+      "sha256": "3eb8faa05f5b73867ffc7f02763b5452951071345466e2dcde4e4a8f887cdad7",
+      "size_bytes": 10521876
+    },
+    "church_wukong_xc7a100t.v": {
+      "sha256": "cd4aeeca08a38e97024336a620b4e73f84fdd8121bbdeeb3c539a6375eb4e59f",
+      "size_bytes": 7935564
+    }
+  },
+  "boot_layout": {
+    "boot_program_words": [
+      "0x077F8000",
+      "0x27678001",
+      "0x17000000",
+      "0x00000000"
+    ],
+    "callhome_base_byte": 4608,
+    "callhome_ns_slot": 7,
+    "selftest_base_byte": 1536,
+    "selftest_ns_slot": 6,
+    "thread_base_word": 896
+  },
+  "generated_at_utc": "2026-08-21T21:50:30+00:00",
+  "hardware_sources_sha256": "c5b6d59e0612b7a078529e6ec83e75b7bc16e54304bb2e51bee96c65bfcc2e02",
+  "input_files_sha256": {
+    "hardware/boot_rom.py": "1007e9813a4a87a53a8bb773489f93c27776f744e0ae51020a315c6d46e6e393",
+    "hardware/call.py": "176743ecf71d791d7c925e766f34ec29ea673cb7bf9f20e0203b33b3a1de3b50",
+    "hardware/change.py": "27f85fa8606f17a6e743e358d4bd626fdab0dafdd27dee32d4b880fa2f71586c",
+    "hardware/church_outform.py": "a6824c30a2db4f19cba7e4118926c11bcf9567d6ea355e6e1c2d5050690d2640",
+    "hardware/cload.py": "69b5ab8e540352e20c18e098090cbb454cc35b5045a5244a8e688e93761e7dfb",
+    "hardware/core.py": "d1b40d53eb18c7e629105904285752fcd6279f2d39cdf4c5b33f463d2fe77875",
+    "hardware/decoder.py": "07d8db93abd21aefb06514a8a0e939f17a3160b353bd2a499c2fadbaa511aad6",
+    "hardware/dread.py": "656933b21b1eba56c6d110956b84d74621e4b90b17e804c0af8d55783d4e48d5",
+    "hardware/dwrite.py": "557a105ca6aa98626511a966def9b92da19c05c323db3c862800623772c553f1",
+    "hardware/fused_unit.py": "dea145f1e2725984defb5328ebd86fb320ba1f99a1d52d162a9458ab1821bc85",
+    "hardware/gc_unit.py": "e5204487f5af21457ccb8d274cecbb81d1a3486cd4407de5cf67c2402b92da8a",
+    "hardware/gen_rtlil.py": "6feafb44097317ee7ced92fbea1b25b5f08278a17ed28527e3731a0b2216a962",
+    "hardware/gen_verilog.py": "60bbb4cbe835c808fc5d989f4bb0682ada4ed86de9246dd71e4f004c2677fb09",
+    "hardware/hw_types.py": "7591f7a709afcae51c75210f4dc23eb448b806fbbe8caae5112d114234192d79",
+    "hardware/integrity32.py": "724b53646a01ad2112235e2f3115d0496911298806c8db16d12c916fd989b757",
+    "hardware/irq_dispatch.py": "90778ac121d061257d017a68074753d6524103ef4ec10c76998f635b85e0798d",
+    "hardware/lambda_unit.py": "86f0825ce518e506c0bb8584d1a78478b59193b2021a452c3a6c49f082558f23",
+    "hardware/layouts.py": "cd72d312b5a25a2733591241eef187c1a4bd4971a58dc07b6cca0f134d3bd08f",
+    "hardware/load.py": "26ee9f08ccb8581da07c7206dfbcfbd540d44e3161d28102db026f8060736f39",
+    "hardware/mload.py": "514d52cf711b7f10419e2669c294ab33edb80702efd7a138f6f4b1abc3f7d4b0",
+    "hardware/mload_seq.py": "ea5154c255efbde9403831097308c0cb14b535b280591fadada450b23ccc9f54",
+    "hardware/msave.py": "8e86215740942eaaaa4b9c6d6004c0e5b5bd748faf7122829346352ba87211d3",
+    "hardware/ns_gate.py": "1659f0f9fab7fc830ade4c22122a0a2aefa784b2fe6715fa17e4ae05bed82cfc",
+    "hardware/outform.py": "9992db192cb2677ff56a83f9356c5694ea92266a8693953226dfa81b93323382",
+    "hardware/outform_iot.py": "8f9042beaaa85fbbc2426e87a91867e03b91484fc8c9437f85e897e8a114ee0f",
+    "hardware/perm_check.py": "f9f0ae39dac76e18c7de28e2a5bc70e7c6ddf0ec250f68dd5ab59021e7f44829",
+    "hardware/pet_name_mem.py": "d608472b96158683e0297194a4484169a89a76cf33cb18de0208a0ad33d75ef2",
+    "hardware/registers.py": "d04cbdf7ee205bca0f8f013933a0f0e5a4b3fc83cd70313ae7c29fc89e034c56",
+    "hardware/ret.py": "8ef6cc6b10ef748dd88bb483ccb94dd614ac474ea6c9725778a7a6095989f8f4",
+    "hardware/save.py": "bb4b04637f9c3ecce14b4b8d92d6bbd7ea907f8ece2836be3c0648a9df353a80",
+    "hardware/stack_frame.py": "9292e277531cc3365885fc3c36b261076f4d10f5685655d4af124d23f6e52572",
+    "hardware/switch.py": "503b6c72b499dd7f7939a70b810e7ca1b0c856cf4f44118ae7a8fb4e8e1d4b01",
+    "hardware/tperm.py": "ccb1ca418c4c91f5279e772a7eb2d6f658a29f9935f271c3ce7689a273a9d05b",
+    "hardware/uart_rx.py": "0c6dd3f87cc83277f08ce22ab84718868aa9ede693d158eb834509cf69dccf6d",
+    "hardware/uart_tx.py": "22ad297089968c0a23f7912ad5e9b3252a91c05d7b58c159c771694c42bbd818",
+    "hardware/wukong_top.py": "c4003c348483ad1be9f3dc8f8bf70851b11856624abfeb8da8f538084ec126ab",
+    "hardware/wukong_xc7a100t.tcl": "ed3cb28879c7dee388e1b317493ba4f3624d793f580b5aa9c8ce78804fd08fd0",
+    "hardware/wukong_xc7a100t.xdc": "fe416e3b65c8b728473891c1f966b6665ab59c13471fed33d7f6dcbebd1af4b8"
+  },
+  "schema_version": 1,
+  "sentinel": {
+    "build_version": 16,
+    "magic_hex": "0xBC",
+    "n_init": 526,
+    "tu_version": 2
+  },
+  "source_commit": "431a4879b8d1bce715136aece3810d3aa429b6b9",
+  "vivado": {
+    "part": "xc7a100tfgg676-2",
+    "version": "2026.1",
+    "wns_ns": "2.165988"
+  }
+}
