@@ -84,6 +84,7 @@ const BuildApprovalView = {
         if (status) status.textContent = tok ? '✅ ready' : '';
 
         this.refresh(false);
+        this._checkBuildStatus();
         if (!this._timer) {
             this._timer = setInterval(() => {
                 if (document.hidden) return;
@@ -308,6 +309,23 @@ const BuildApprovalView = {
             if (status) status.textContent = '❌ Freeze failed: ' + e.message;
             if (btn) btn.disabled = false;
         }
+    },
+
+    async _checkBuildStatus() {
+        try {
+            const res = await fetch('/api/wukong-build/status', {
+                headers: this._authHeaders(),
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            // Re-populate the console with the last known build state so
+            // returning to the tab after a build shows the correct result.
+            this._renderConsole(data);
+            // If a build is still running, resume polling.
+            if (data && !data.done && data.phase && data.phase !== 'idle') {
+                if (!this._buildTimer) this._startBuildPoll();
+            }
+        } catch (_) { /* ignore — console stays in its static idle state */ }
     },
 
     async _loadSnapshot() {
