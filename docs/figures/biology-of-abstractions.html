@@ -1,95 +1,383 @@
-<h2 class="sr-only">The biology of Church Machine abstractions: how genotype, gene, organism, metabolism, membrane, symbiosis, evolution, and extinction map onto CLOOMC++ source, sealed tokens, LUMPs, Threads, CALL/RETURN, c-list reach, SSSS re-issuance, and retirement by disuse.</h2>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Biology of Abstractions — Church Machine</title>
 <style>
-  .cm-wrap { padding: 0.5rem 0; font-family: var(--font-sans); }
-  .cm-rail { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
-  .cm-pill { flex:1 1 auto; min-width:0; padding:7px 4px; border-radius:8px; border:0.5px solid var(--border); background:var(--surface-1); color:var(--text-secondary); font-size:11px; text-align:center; cursor:pointer; transition:background .15s,color .15s,border-color .15s; white-space:nowrap; }
-  .cm-pill.on { background:var(--bg-accent); color:var(--text-accent); border-color:var(--border-accent); font-weight:500; }
-  .cm-panel { border:0.5px solid var(--border); border-radius:12px; background:var(--surface-1); padding:18px 20px; min-height:230px; }
-  .cm-head { display:flex; align-items:baseline; gap:10px; margin-bottom:4px; }
-  .cm-stage { font-size:18px; font-weight:500; color:var(--text-primary); }
-  .cm-tag { font-size:12px; color:var(--text-muted); font-family:var(--font-mono); }
-  .cm-w0 { margin:12px 0; padding:10px 12px; border-radius:8px; background:var(--surface-0); border:0.5px solid var(--border); font-family:var(--font-mono); font-size:12px; color:var(--text-secondary); }
-  .cm-w0 b { color:var(--text-accent); font-weight:500; }
-  .cm-body { font-size:15px; line-height:1.65; color:var(--text-secondary); }
-  .cm-rule { margin-top:12px; padding:10px 12px 10px 14px; border-left:2px solid var(--border-accent); border-radius:0; background:var(--bg-accent); }
-  .cm-rule .lbl { font-size:11px; text-transform:none; color:var(--text-accent); font-weight:500; display:block; margin-bottom:2px; }
-  .cm-rule .txt { font-size:13.5px; line-height:1.55; color:var(--text-primary); }
-  .cm-nav { display:flex; align-items:center; justify-content:space-between; margin-top:14px; }
-  .cm-btn { padding:7px 14px; border-radius:var(--radius); border:0.5px solid var(--border-strong); background:var(--surface-2); color:var(--text-primary); font-size:13px; cursor:pointer; }
-  .cm-btn:disabled { opacity:.4; cursor:default; }
-  .cm-dots { font-size:12px; color:var(--text-muted); }
-  .cm-loop { font-size:12px; color:var(--text-accent); text-align:center; margin-top:10px; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0f0f23;
+    color: #eaeaea;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 0 3rem;
+  }
+
+  /* ── Top bar ── */
+  .bio-topbar {
+    width: 100%;
+    background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%);
+    border-bottom: 2px solid #e94560;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+    padding: 0.55rem 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .bio-back {
+    color: #a0a0a0;
+    text-decoration: none;
+    font-size: 0.78rem;
+    padding: 0.25rem 0.55rem;
+    border: 1px solid #2d3748;
+    border-radius: 4px;
+    background: #16213e;
+    transition: border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+  }
+  .bio-back:hover { border-color: #e94560; color: #eaeaea; }
+  .bio-topbar-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #fbbf24;
+    letter-spacing: 0.03em;
+  }
+  .bio-topbar-sub {
+    font-size: 0.7rem;
+    color: #6b7280;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-left: auto;
+  }
+
+  /* ── Page content wrapper ── */
+  .bio-wrap {
+    width: 100%;
+    max-width: 660px;
+    padding: 2rem 1.2rem 0;
+  }
+
+  /* ── Pill rail ── */
+  .bio-rail {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 1.2rem;
+  }
+  .bio-pill {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 6px 5px;
+    border-radius: 5px;
+    border: 1px solid #2d3748;
+    background: #16213e;
+    color: #6b7280;
+    font-size: 10.5px;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  .bio-pill:hover { border-color: #4b5563; color: #a0a0a0; }
+  .bio-pill.on {
+    background: rgba(251,191,36,0.12);
+    color: #fbbf24;
+    border-color: rgba(251,191,36,0.45);
+    font-weight: 600;
+  }
+
+  /* ── Main panel ── */
+  .bio-panel {
+    background: #1a1a2e;
+    border: 1px solid rgba(147,197,253,0.18);
+    border-radius: 10px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.55);
+    padding: 1.4rem 1.5rem 1.2rem;
+  }
+
+  /* ── Panel header ── */
+  .bio-header-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #e94560;
+    margin-bottom: 0.35rem;
+  }
+  .bio-stage-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-bottom: 0.1rem;
+  }
+  .bio-stage {
+    font-size: 1.45rem;
+    font-weight: 600;
+    color: #eaeaea;
+    line-height: 1.2;
+  }
+  .bio-tag {
+    font-size: 0.72rem;
+    color: #60a5fa;
+    font-family: 'Consolas', 'Courier New', monospace;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── Key concept box ── */
+  .bio-concept {
+    margin: 1rem 0;
+    padding: 0.7rem 0.9rem;
+    background: #0f3460;
+    border: 1px solid rgba(96,165,250,0.3);
+    border-radius: 6px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 12px;
+    color: #93c5fd;
+    line-height: 1.5;
+  }
+  .bio-concept b { color: #fbbf24; font-weight: 600; }
+
+  /* ── Body text ── */
+  .bio-body {
+    font-size: 0.88rem;
+    line-height: 1.7;
+    color: #a0a0a0;
+  }
+
+  /* ── Vital rule ── */
+  .bio-rule {
+    margin-top: 1rem;
+    padding: 0.65rem 0.85rem 0.65rem 1rem;
+    border-left: 2px solid #fbbf24;
+    background: rgba(251,191,36,0.06);
+    border-radius: 0 6px 6px 0;
+  }
+  .bio-rule-label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(251,191,36,0.7);
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+  .bio-rule-text {
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: #eaeaea;
+  }
+
+  /* ── Loop note ── */
+  .bio-loop {
+    font-size: 0.72rem;
+    color: #4ade80;
+    text-align: center;
+    margin-top: 0.75rem;
+    min-height: 1.1rem;
+    letter-spacing: 0.01em;
+  }
+
+  /* ── Navigation ── */
+  .bio-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 1.1rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid rgba(148,163,184,0.12);
+  }
+  .bio-btn {
+    padding: 0.4rem 1rem;
+    border-radius: 4px;
+    border: 1px solid #374151;
+    background: #16213e;
+    color: #eaeaea;
+    font-size: 0.78rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .bio-btn:hover:not(:disabled) {
+    border-color: #60a5fa;
+    background: #1b2d45;
+  }
+  .bio-btn:disabled { opacity: 0.35; cursor: default; }
+  .bio-dots {
+    font-size: 0.72rem;
+    color: #6b7280;
+    font-family: 'Consolas', 'Courier New', monospace;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Progress bar ── */
+  .bio-progress-wrap {
+    margin-bottom: 1rem;
+    height: 2px;
+    background: #2d3748;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .bio-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #fbbf24, #f59e0b);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
 </style>
-<div class="cm-wrap">
-  <div class="cm-rail" id="cm-rail"></div>
-  <div class="cm-panel">
-    <div class="cm-head"><span class="cm-stage" id="cm-stage"></span><span class="cm-tag" id="cm-tag"></span></div>
-    <div class="cm-w0" id="cm-w0"></div>
-    <div class="cm-body" id="cm-body"></div>
-    <div class="cm-rule"><span class="lbl">vital rule</span><span class="txt" id="cm-rule"></span></div>
-    <div class="cm-loop" id="cm-loop"></div>
-    <div class="cm-nav">
-      <button class="cm-btn" id="cm-prev" onclick="cmGo(-1)">Back</button>
-      <span class="cm-dots" id="cm-dots"></span>
-      <button class="cm-btn" id="cm-next" onclick="cmGo(1)">Next</button>
+</head>
+<body>
+
+<div class="bio-topbar">
+  <a class="bio-back" href="javascript:history.back()">← Church Machine</a>
+  <span class="bio-topbar-title">Biology of Abstractions</span>
+  <span class="bio-topbar-sub">CLOOMC · Reference Figure</span>
+</div>
+
+<div class="bio-wrap">
+  <div class="bio-rail" id="bio-rail"></div>
+  <div class="bio-progress-wrap">
+    <div class="bio-progress-bar" id="bio-progress"></div>
+  </div>
+  <div class="bio-panel">
+    <div class="bio-header-label">Biology of Abstractions</div>
+    <div class="bio-stage-row">
+      <span class="bio-stage" id="bio-stage"></span>
+      <span class="bio-tag" id="bio-tag"></span>
+    </div>
+    <div class="bio-concept" id="bio-concept"></div>
+    <div class="bio-body" id="bio-body"></div>
+    <div class="bio-rule">
+      <span class="bio-rule-label">vital rule</span>
+      <span class="bio-rule-text" id="bio-rule"></span>
+    </div>
+    <div class="bio-loop" id="bio-loop"></div>
+    <div class="bio-nav">
+      <button class="bio-btn" id="bio-prev" onclick="bioGo(-1)">← Back</button>
+      <span class="bio-dots" id="bio-dots"></span>
+      <button class="bio-btn" id="bio-next" onclick="bioGo(1)">Next →</button>
     </div>
   </div>
 </div>
+
 <script>
-  var CM = [
-    {s:"Genotype", t:"CLOOMC++ · the blueprint", w0:"programmer writes <b>Phone.ring(Mum)</b>",
-     b:"A genotype is a blueprint — it describes what an organism can do before any organism exists. In the Church Machine, the genotype is the CLOOMC++ source: capability declarations, method bodies, and c-list reach written in local pet names. No cell has run from it yet; it is pure potential.",
-     r:"The genotype defines capability; it does not exercise it. Every running organism is an expressed copy. The blueprint itself never executes."},
-    {s:"DNA", t:"token · content fingerprint", w0:"token = <b>hash(SELF ‖ code ‖ c-list)</b>",
-     b:"Compiling seals the genotype into a 32-bit token — the digital DNA. Like a strand of DNA, the token is stable and globally unique to that exact gene. The same source always yields the same token. Issue number, placement, and NS-index are not encoded; the token is pure identity.",
-     r:"DNA does not change when a cell divides or moves. The token does not change when a lump re-materialises or migrates. Identity is immutable; only expression varies."},
-    {s:"Gene", t:"LUMP · sealed unit of heredity", w0:"LUMP = <b>header ‖ code ‖ c-list ‖ freespace</b>",
-     b:"The sealed LUMP is the gene: a complete, self-describing unit of heredity. It carries its own identity (the token), its expression instructions (compiled code), its reach declarations (c-list rows in dot.name form), and optionally its own documentation (the freespace API block). A gene can be copied exactly; copying never changes identity.",
-     r:"The gene is the minimal unit of heredity. You cannot evolve a gene by patching it — patching changes the token and therefore produces a new identity. Evolution means authoring a new gene."},
-    {s:"Organism", t:"Thread · running instance", w0:"Thread CR12 → <b>c-list[0..n]</b> · own registers",
-     b:"A Thread is a living organism — a gene that has been expressed and is actively running. It owns a c-list (private reachability), a set of context registers, and a program counter. Many Threads may express the same gene simultaneously; each is a distinct organism with its own state, yet all share the same immutable genotype.",
-     r:"An organism is not the gene. Many organisms may share one genotype. Terminating an organism does not touch the gene; retiring a gene does not affect organisms that expressed it before retirement."},
-    {s:"Metabolism", t:"CALL · RETURN · cellular activity", w0:"CALL <b>CR6</b> → method → RETURN · repeat",
-     b:"Metabolism is the continuous activity that keeps an organism alive: CALL enters a method of a reachable organism, executes within its boundary, and RETURN brings control back. Every exchange is mediated by a sealed capability; an organism can only call what its c-list already holds. There is no ambient nutrient — every resource must be explicitly reached.",
-     r:"Metabolic reach is declared at compile time (c-list) and enforced at runtime (GT type-check). An organism cannot acquire reach it was not sealed with at birth.",
-     loop:"↻ call and return are the heartbeat — every live organism repeats them"},
-    {s:"Membrane", t:"c-list · capability boundary", w0:"reach = <b>c-list[0..limit]</b> · nothing else reachable",
-     b:"The cell membrane is the c-list boundary. Every interaction — every LOAD, CALL, SAVE — must pass through a named c-list row. There is no ambient authority; there is no shared address space. What is not in the c-list is not reachable, regardless of where it lives in memory. The membrane is the complete security surface.",
-     r:"The membrane is enforced by hardware, not policy. A cell cannot pierce it through clever addressing. Security flows from geometry — the c-list shape — not from runtime rule-checking."},
-    {s:"Symbiosis", t:"shared reach · mutual capability", w0:"two cells hold <b>token T</b> in their c-lists",
-     b:"Symbiosis in the Church Machine is shared reach. Two organisms that both hold token T in their c-lists can independently call methods of the same third organism. No ownership transfers — the third gene's identity is simply referenced by multiple c-lists simultaneously. The relationship is composable, explicit, and auditable at compile time.",
-     r:"Shared reach is not shared state. Two cells holding the same token hold independent promises or inform bindings. The gene they both reach is immutable; neither cell can corrupt it for the other."},
-    {s:"Evolution", t:"SSSS · new gene alongside old", w0:"<b>issue #7</b> (old) and <b>issue #8</b> (new) · both live",
-     b:"Biological evolution does not patch genes — it authors new ones and lets the old fall silent. The Church Machine works identically: edit source, recompile, reseal → new token → new gene, issued alongside the old. Callers migrate when they choose. Old and new run Safe and Secure Side by Side (SSSS) until the old is no longer expressed.",
-     r:"Evolution is authorship, not mutation. Patching a gene changes its token and therefore its identity — it becomes a new species. Side-by-side issuance is the only safe upgrade path.",
-     loop:"↻ evolution loops here — author new, let old fall silent"},
-    {s:"Extinction", t:"unreachable · reclaimed whole", w0:"nothing resolves to old token → <b>reclaimed</b>",
-     b:"Extinction is not deletion — it is the cessation of expression. A gene becomes extinct when nothing in any running c-list resolves to its token. With no reachability it cannot be called, cannot run, and cannot reproduce. The runtime reclaims it whole, the way a cell stops expressing a silenced gene. The identity is retired; its token will never be reused.",
-     r:"Retirement is by disuse, not by force. A live cell cannot be deleted — it can only stop being reached. The whole gene is the unit of retirement; partial retirement is not possible."}
-  ];
-  var cm_i = 0;
-  var rail = document.getElementById('cm-rail');
-  CM.forEach(function(d,i){
-    var p = document.createElement('div');
-    p.className = 'cm-pill'; p.textContent = d.s;
-    p.onclick = function(){ cm_i = i; cmR(); };
-    rail.appendChild(p);
-  });
-  function cmR(){
-    var d = CM[cm_i];
-    document.getElementById('cm-stage').textContent = d.s;
-    document.getElementById('cm-tag').textContent = d.t;
-    document.getElementById('cm-w0').innerHTML = d.w0;
-    document.getElementById('cm-body').textContent = d.b;
-    document.getElementById('cm-rule').textContent = d.r;
-    document.getElementById('cm-dots').textContent = (cm_i+1) + ' / ' + CM.length;
-    document.getElementById('cm-prev').disabled = (cm_i===0);
-    document.getElementById('cm-next').disabled = (cm_i===CM.length-1);
-    var loop = document.getElementById('cm-loop');
-    loop.textContent = d.loop || '';
-    var pills = rail.children;
-    for (var k=0;k<pills.length;k++) pills[k].className = 'cm-pill' + (k===cm_i?' on':'');
+var BIO = [
+  {
+    s: "Genotype",
+    t: "CLOOMC++ · the blueprint",
+    c: "programmer writes <b>Phone.ring(Mum)</b>",
+    b: "A genotype is a blueprint — it describes what an organism can do before any organism exists. In the Church Machine, the genotype is the CLOOMC++ source: capability declarations, method bodies, and c-list reach written in local pet names. No cell has run from it yet; it is pure potential.",
+    r: "The genotype defines capability; it does not exercise it. Every running organism is an expressed copy. The blueprint itself never executes."
+  },
+  {
+    s: "DNA",
+    t: "token · content fingerprint",
+    c: "token = <b>hash(SELF ‖ code ‖ c-list)</b>",
+    b: "Compiling seals the genotype into a 32-bit token — the digital DNA. Like a strand of DNA, the token is stable and globally unique to that exact gene. The same source always yields the same token. Issue number, placement, and NS-index are not encoded; the token is pure identity.",
+    r: "DNA does not change when a cell divides or moves. The token does not change when a lump re-materialises or migrates. Identity is immutable; only expression varies."
+  },
+  {
+    s: "Gene",
+    t: "LUMP · sealed unit of heredity",
+    c: "LUMP = <b>header ‖ code ‖ c-list ‖ freespace</b>",
+    b: "The sealed LUMP is the gene: a complete, self-describing unit of heredity. It carries its own identity (the token), its expression instructions (compiled code), its reach declarations (c-list rows in dot.name form), and optionally its own documentation (the freespace API block). A gene can be copied exactly; copying never changes identity.",
+    r: "The gene is the minimal unit of heredity. You cannot evolve a gene by patching it — patching changes the token and therefore produces a new identity. Evolution means authoring a new gene."
+  },
+  {
+    s: "Organism",
+    t: "Thread · running instance",
+    c: "Thread CR12 → <b>c-list[0..n]</b> · own registers",
+    b: "A Thread is a living organism — a gene that has been expressed and is actively running. It owns a c-list (private reachability), a set of context registers, and a program counter. Many Threads may express the same gene simultaneously; each is a distinct organism with its own state, yet all share the same immutable genotype.",
+    r: "An organism is not the gene. Many organisms may share one genotype. Terminating an organism does not touch the gene; retiring a gene does not affect organisms that expressed it before retirement."
+  },
+  {
+    s: "Metabolism",
+    t: "CALL · RETURN · cellular activity",
+    c: "CALL <b>CR6</b> → method → RETURN · repeat",
+    b: "Metabolism is the continuous activity that keeps an organism alive: CALL enters a method of a reachable organism, executes within its boundary, and RETURN brings control back. Every exchange is mediated by a sealed capability; an organism can only call what its c-list already holds. There is no ambient nutrient — every resource must be explicitly reached.",
+    r: "Metabolic reach is declared at compile time (c-list) and enforced at runtime (GT type-check). An organism cannot acquire reach it was not sealed with at birth.",
+    loop: "↻  call and return are the heartbeat — every live organism repeats them"
+  },
+  {
+    s: "Membrane",
+    t: "c-list · capability boundary",
+    c: "reach = <b>c-list[0..limit]</b> · nothing else reachable",
+    b: "The cell membrane is the c-list boundary. Every interaction — every LOAD, CALL, SAVE — must pass through a named c-list row. There is no ambient authority; there is no shared address space. What is not in the c-list is not reachable, regardless of where it lives in memory. The membrane is the complete security surface.",
+    r: "The membrane is enforced by hardware, not policy. A cell cannot pierce it through clever addressing. Security flows from geometry — the c-list shape — not from runtime rule-checking."
+  },
+  {
+    s: "Symbiosis",
+    t: "shared reach · mutual capability",
+    c: "two cells hold <b>token T</b> in their c-lists",
+    b: "Symbiosis in the Church Machine is shared reach. Two organisms that both hold token T in their c-lists can independently call methods of the same third organism. No ownership transfers — the third gene's identity is simply referenced by multiple c-lists simultaneously. The relationship is composable, explicit, and auditable at compile time.",
+    r: "Shared reach is not shared state. Two cells holding the same token hold independent promises or inform bindings. The gene they both reach is immutable; neither cell can corrupt it for the other."
+  },
+  {
+    s: "Evolution",
+    t: "SSSS · new gene alongside old",
+    c: "<b>issue #7</b> (old) and <b>issue #8</b> (new) · both live",
+    b: "Biological evolution does not patch genes — it authors new ones and lets the old fall silent. The Church Machine works identically: edit source, recompile, reseal → new token → new gene, issued alongside the old. Callers migrate when they choose. Old and new run Safe and Secure Side by Side (SSSS) until the old is no longer expressed.",
+    r: "Evolution is authorship, not mutation. Patching a gene changes its token and therefore its identity — it becomes a new species. Side-by-side issuance is the only safe upgrade path.",
+    loop: "↻  evolution loops here — author new, let old fall silent"
+  },
+  {
+    s: "Extinction",
+    t: "unreachable · reclaimed whole",
+    c: "nothing resolves to old token → <b>reclaimed</b>",
+    b: "Extinction is not deletion — it is the cessation of expression. A gene becomes extinct when nothing in any running c-list resolves to its token. With no reachability it cannot be called, cannot run, and cannot reproduce. The runtime reclaims it whole, the way a cell stops expressing a silenced gene. The identity is retired; its token will never be reused.",
+    r: "Retirement is by disuse, not by force. A live cell cannot be deleted — it can only stop being reached. The whole gene is the unit of retirement; partial retirement is not possible."
   }
-  function cmGo(dir){ cm_i = Math.max(0, Math.min(CM.length-1, cm_i+dir)); cmR(); }
-  cmR();
+];
+
+var bio_i = 0;
+var rail = document.getElementById('bio-rail');
+
+BIO.forEach(function(d, i) {
+  var p = document.createElement('button');
+  p.className = 'bio-pill';
+  p.textContent = d.s;
+  p.onclick = function() { bio_i = i; bioR(); };
+  rail.appendChild(p);
+});
+
+function bioR() {
+  var d = BIO[bio_i];
+  document.getElementById('bio-stage').textContent  = d.s;
+  document.getElementById('bio-tag').textContent    = d.t;
+  document.getElementById('bio-concept').innerHTML  = d.c;
+  document.getElementById('bio-body').textContent   = d.b;
+  document.getElementById('bio-rule').textContent   = d.r;
+  document.getElementById('bio-loop').textContent   = d.loop || '';
+  document.getElementById('bio-dots').textContent   = (bio_i + 1) + ' / ' + BIO.length;
+  document.getElementById('bio-prev').disabled      = (bio_i === 0);
+  document.getElementById('bio-next').disabled      = (bio_i === BIO.length - 1);
+  document.getElementById('bio-progress').style.width = ((bio_i + 1) / BIO.length * 100) + '%';
+  var pills = rail.children;
+  for (var k = 0; k < pills.length; k++)
+    pills[k].className = 'bio-pill' + (k === bio_i ? ' on' : '');
+  document.title = d.s + ' — Biology of Abstractions';
+}
+
+function bioGo(dir) {
+  bio_i = Math.max(0, Math.min(BIO.length - 1, bio_i + dir));
+  bioR();
+}
+
+// Keyboard navigation
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); bioGo(1); }
+  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   { e.preventDefault(); bioGo(-1); }
+});
+
+bioR();
 </script>
+</body>
+</html>
