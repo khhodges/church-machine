@@ -24,7 +24,8 @@ from hardware.boot_rom import (
     WUKONG_SELFTEST_BASE_WORD, WUKONG_WCH_BASE_WORD, WUKONG_WCH_CLIST,
     WUKONG_WCH_CLIST_WORD, WUKONG_NUC_PROGRAM, WUKONG_THREAD_BASE_WORD,
     WUKONG_THREAD_HEADER, WUKONG_THREAD_STO_WORD, WUKONG_THREAD_STO_INIT,
-    WUKONG_THREAD_CAPS0_WORD, WUKONG_THREAD_CAPS12_WORD, wukong_wch_header,
+    WUKONG_THREAD_CAPS0_WORD, WUKONG_THREAD_CAPS12_WORD, make_gt,
+    wukong_wch_header,
 )
 from hardware.hw_types import GT_TYPE_INFORM, PERM_MASK_S
 from hardware.wukong_bridge import _compute_expected_n_init
@@ -52,8 +53,8 @@ def _build_dmem_init():
     dmem_init[WUKONG_THREAD_BASE_WORD] = WUKONG_THREAD_HEADER
     dmem_init[WUKONG_THREAD_STO_WORD] = WUKONG_THREAD_STO_INIT
     dmem_init[WUKONG_THREAD_CAPS0_WORD] = 0x4A000006
-    dmem_init[WUKONG_THREAD_CAPS12_WORD] = (
-        (GT_TYPE_INFORM << 25) | (PERM_MASK_S << 20) | (1 << 8)
+    dmem_init[WUKONG_THREAD_CAPS12_WORD] = make_gt(
+        GT_TYPE_INFORM, PERM_MASK_S, 1, 0
     )
     return dmem_init
 
@@ -85,9 +86,10 @@ def test_n_init_is_positive():
 
 
 def test_n_init_fits_in_one_byte():
-    """The low-byte N_INIT sentinel encoding must fit the current image."""
+    """The low-byte N_INIT sentinel encoding must match the current image."""
     n = _compute_n_init()
-    assert n & 0xFF == 0x6B, f"unexpected N_INIT={n}"
+    assert n == 526, f"unexpected N_INIT={n}"
+    assert n & 0xFF == 0x0E, f"unexpected N_INIT low byte: 0x{n & 0xFF:02X}"
 
 
 def test_n_init_matches_bridge_helper():
@@ -136,7 +138,7 @@ def test_reference_file_exists_and_matches():
 def test_n_init_sentinel_byte_value():
     """Smoke-check the current N_INIT sentinel byte value."""
     n = _compute_n_init()
-    assert n & 0xFF == 0x6B, (
+    assert n & 0xFF == 0x0E, (
         f"N_INIT & 0xFF changed: now 0x{n & 0xFF:02X} (N_INIT={n}). "
         "Update expected value here AND rebuild the Wukong bitstream."
     )
@@ -160,8 +162,8 @@ def test_namespace_and_clist_counts():
     ns_nonzero    = sum(1 for v in WUKONG_DEMO_NAMESPACE if v != 0)
     clist_nonzero = sum(1 for v in WUKONG_DEMO_CLIST if v != 0)
     # 8-slot NS: slot 6/7 are resident LUMPs; the factory entry is SelfTest.
-    assert ns_nonzero == 32, (
-        f"WUKONG_DEMO_NAMESPACE non-zero word count changed: {ns_nonzero} (expected 32)"
+    assert ns_nonzero == 22, (
+        f"WUKONG_DEMO_NAMESPACE non-zero word count changed: {ns_nonzero} (expected 22)"
     )
     assert clist_nonzero == 7, (
         f"WUKONG_DEMO_CLIST non-zero word count changed: {clist_nonzero} (expected 7)"

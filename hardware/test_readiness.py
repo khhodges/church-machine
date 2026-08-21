@@ -6,7 +6,8 @@ Run with:  python -m pytest hardware/test_readiness.py -v
 
 from __future__ import annotations
 
-import importlib
+import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -91,25 +92,42 @@ def test_wukong_stamp_is_different_from_core_stamp():
 # ---------------------------------------------------------------------------
 
 def _hw_module_files(*import_names: str) -> frozenset[Path]:
-    """Return hardware/*.py paths for all hardware.* sub-modules currently
-    loaded after importing *import_names*.  test_* modules are excluded."""
-    for name in import_names:
-        importlib.import_module(name)
-    result = set()
-    for mod_name, mod in sys.modules.items():
-        if not mod_name.startswith("hardware."):
-            continue
-        if mod_name.startswith("hardware.test_"):
-            continue
-        f = getattr(mod, "__file__", None)
-        if f is None:
-            continue
-        p = Path(f)
-        try:
-            result.add(p.relative_to(ROOT))
-        except ValueError:
-            pass  # installed package — not a source file we own
-    return frozenset(result)
+    """Return a fresh-process import closure for the named hardware modules.
+
+    The old in-process probe accidentally included modules imported by earlier
+    tests, making the core closure appear to depend on Wukong-only sources.
+    A subprocess measures only imports caused by this specific generator.
+    """
+    program = """
+import importlib
+import json
+import sys
+from pathlib import Path
+
+root = Path.cwd()
+for name in json.loads(sys.argv[1]):
+    importlib.import_module(name)
+result = []
+for mod_name, mod in sys.modules.items():
+    if not mod_name.startswith("hardware.") or mod_name.startswith("hardware.test_"):
+        continue
+    filename = getattr(mod, "__file__", None)
+    if filename is None:
+        continue
+    try:
+        result.append(str(Path(filename).relative_to(root)))
+    except ValueError:
+        pass
+print(json.dumps(sorted(set(result))))
+"""
+    proc = subprocess.run(
+        [sys.executable, "-c", program, json.dumps(import_names)],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return frozenset(Path(item) for item in json.loads(proc.stdout))
 
 
 # Files that live inside the hardware package but deliberately do NOT affect

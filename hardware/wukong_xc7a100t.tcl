@@ -38,8 +38,12 @@ set readiness_script [file normalize [file join [file dirname [info script]] .. 
 if {![file exists $readiness_script]} {
     error "Hardware readiness checker not found: $readiness_script"
 }
+set readiness_python "python3"
+if {[info exists ::env(CM_PYTHON)] && $::env(CM_PYTHON) ne ""} {
+    set readiness_python $::env(CM_PYTHON)
+}
 puts "\n═══ Checking namespace/thread readiness before Vivado ═══"
-if {[catch {exec python3 $readiness_script} readiness_output]} {
+if {[catch {exec $readiness_python $readiness_script} readiness_output]} {
     puts stderr $readiness_output
     error "Hardware readiness check failed; synthesis was not started."
 }

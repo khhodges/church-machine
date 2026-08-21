@@ -462,7 +462,9 @@ def generate_rtlil_wukong(output_dir="build"):
 
     il_path = os.path.join(output_dir, "church_wukong_xc7a100t.il")
     with open(il_path, "w") as f:
-        f.write(stamp_text(rtlil_text, WUKONG_SOURCES))
+        # RTLIL uses `#` comments.  A Verilog-style `//` freshness stamp makes
+        # Yosys reject the generated IL before it can emit the Vivado input.
+        f.write(stamp_text(rtlil_text, WUKONG_SOURCES, comment_prefix="# "))
 
     print(f"Generated: {il_path}")
     print(f"  File size: {len(rtlil_text):,} bytes")

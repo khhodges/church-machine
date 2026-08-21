@@ -83,19 +83,26 @@ def artifact_stamp(paths: tuple[str, ...]) -> str:
     return f"CM-HARDWARE-SOURCES-SHA256: {source_fingerprint(paths)}"
 
 
-def stamp_text(text: str, paths: tuple[str, ...]) -> str:
+def stamp_text(
+    text: str, paths: tuple[str, ...], comment_prefix: str = "// "
+) -> str:
     """Add/replace the freshness marker without changing generated semantics."""
     marker = artifact_stamp(paths)
     lines = text.splitlines(keepends=True)
-    lines = [line for line in lines if not line.startswith("// " + "CM-HARDWARE-SOURCES-SHA256:")]
-    return "// " + marker + "\n" + "".join(lines)
+    prefixes = ("// ", "# ")
+    lines = [
+        line for line in lines
+        if not any(line.startswith(prefix + "CM-HARDWARE-SOURCES-SHA256:")
+                   for prefix in prefixes)
+    ]
+    return comment_prefix + marker + "\n" + "".join(lines)
 
 
 def artifact_is_fresh(path: Path, paths: tuple[str, ...]) -> tuple[bool, str]:
     if not path.exists():
         return False, f"{path} is missing"
     first_line = path.open("r", encoding="utf-8", errors="replace").readline().strip()
-    expected = "// " + artifact_stamp(paths)
-    if first_line != expected:
+    expected = artifact_stamp(paths)
+    if first_line not in ("// " + expected, "# " + expected):
         return False, f"{path} has no current hardware source fingerprint"
     return True, f"{path} matches current hardware sources"
