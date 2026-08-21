@@ -319,6 +319,26 @@
     flex: 0 1 auto;
 }
 
+/* Keep the execution controls on their own row on phone-width toolbars.
+   Without a full-width controls row, the fixed brand/menu content leaves
+   too little room for the counter strip and its help target. */
+@media (max-width: 500px) {
+    header {
+        flex-wrap: wrap;
+    }
+
+    header > .controls {
+        flex: 1 1 100%;
+        width: 100%;
+        min-width: 0;
+    }
+
+    #toolbarGroupSim {
+        flex: 1 1 100%;
+        max-width: 100%;
+    }
+}
+
 .sim-exec-btns .btn {
     padding: 0.25rem 0.6rem;
     font-size: 0.72rem;
