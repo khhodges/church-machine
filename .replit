@@ -306,6 +306,18 @@ args = "node simulator/test_wukong_toolbar_btn.js"
 [workflows.workflow.metadata]
 outputType = "console"
 
+
+[[workflows.workflow]]
+name = "step-settings-popover-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_step_settings_popover.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[workflows.workflow]]
 name = "cmd-click-boot-push-tests"
 author = "agent"

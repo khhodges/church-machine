@@ -232,6 +232,9 @@ register_suite "hex-tab-fill-path-tests" \
 register_suite "wukong-toolbar-btn-tests" \
     'node simulator/test_wukong_toolbar_btn.js'
 
+register_suite "step-settings-popover-tests" \
+    'node simulator/test_step_settings_popover.js'
+
 register_suite "cmd-click-boot-push-tests" \
     'node simulator/test_cmd_click_boot_push.js'
 
