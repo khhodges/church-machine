@@ -1,0 +1,95 @@
+<h2 class="sr-only">The biology of Church Machine abstractions: how genotype, gene, organism, metabolism, membrane, symbiosis, evolution, and extinction map onto CLOOMC++ source, sealed tokens, LUMPs, Threads, CALL/RETURN, c-list reach, SSSS re-issuance, and retirement by disuse.</h2>
+<style>
+  .cm-wrap { padding: 0.5rem 0; font-family: var(--font-sans); }
+  .cm-rail { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
+  .cm-pill { flex:1 1 auto; min-width:0; padding:7px 4px; border-radius:8px; border:0.5px solid var(--border); background:var(--surface-1); color:var(--text-secondary); font-size:11px; text-align:center; cursor:pointer; transition:background .15s,color .15s,border-color .15s; white-space:nowrap; }
+  .cm-pill.on { background:var(--bg-accent); color:var(--text-accent); border-color:var(--border-accent); font-weight:500; }
+  .cm-panel { border:0.5px solid var(--border); border-radius:12px; background:var(--surface-1); padding:18px 20px; min-height:230px; }
+  .cm-head { display:flex; align-items:baseline; gap:10px; margin-bottom:4px; }
+  .cm-stage { font-size:18px; font-weight:500; color:var(--text-primary); }
+  .cm-tag { font-size:12px; color:var(--text-muted); font-family:var(--font-mono); }
+  .cm-w0 { margin:12px 0; padding:10px 12px; border-radius:8px; background:var(--surface-0); border:0.5px solid var(--border); font-family:var(--font-mono); font-size:12px; color:var(--text-secondary); }
+  .cm-w0 b { color:var(--text-accent); font-weight:500; }
+  .cm-body { font-size:15px; line-height:1.65; color:var(--text-secondary); }
+  .cm-rule { margin-top:12px; padding:10px 12px 10px 14px; border-left:2px solid var(--border-accent); border-radius:0; background:var(--bg-accent); }
+  .cm-rule .lbl { font-size:11px; text-transform:none; color:var(--text-accent); font-weight:500; display:block; margin-bottom:2px; }
+  .cm-rule .txt { font-size:13.5px; line-height:1.55; color:var(--text-primary); }
+  .cm-nav { display:flex; align-items:center; justify-content:space-between; margin-top:14px; }
+  .cm-btn { padding:7px 14px; border-radius:var(--radius); border:0.5px solid var(--border-strong); background:var(--surface-2); color:var(--text-primary); font-size:13px; cursor:pointer; }
+  .cm-btn:disabled { opacity:.4; cursor:default; }
+  .cm-dots { font-size:12px; color:var(--text-muted); }
+  .cm-loop { font-size:12px; color:var(--text-accent); text-align:center; margin-top:10px; }
+</style>
+<div class="cm-wrap">
+  <div class="cm-rail" id="cm-rail"></div>
+  <div class="cm-panel">
+    <div class="cm-head"><span class="cm-stage" id="cm-stage"></span><span class="cm-tag" id="cm-tag"></span></div>
+    <div class="cm-w0" id="cm-w0"></div>
+    <div class="cm-body" id="cm-body"></div>
+    <div class="cm-rule"><span class="lbl">vital rule</span><span class="txt" id="cm-rule"></span></div>
+    <div class="cm-loop" id="cm-loop"></div>
+    <div class="cm-nav">
+      <button class="cm-btn" id="cm-prev" onclick="cmGo(-1)">Back</button>
+      <span class="cm-dots" id="cm-dots"></span>
+      <button class="cm-btn" id="cm-next" onclick="cmGo(1)">Next</button>
+    </div>
+  </div>
+</div>
+<script>
+  var CM = [
+    {s:"Genotype", t:"CLOOMC++ · the blueprint", w0:"programmer writes <b>Phone.ring(Mum)</b>",
+     b:"A genotype is a blueprint — it describes what an organism can do before any organism exists. In the Church Machine, the genotype is the CLOOMC++ source: capability declarations, method bodies, and c-list reach written in local pet names. No cell has run from it yet; it is pure potential.",
+     r:"The genotype defines capability; it does not exercise it. Every running organism is an expressed copy. The blueprint itself never executes."},
+    {s:"DNA", t:"token · content fingerprint", w0:"token = <b>hash(SELF ‖ code ‖ c-list)</b>",
+     b:"Compiling seals the genotype into a 32-bit token — the digital DNA. Like a strand of DNA, the token is stable and globally unique to that exact gene. The same source always yields the same token. Issue number, placement, and NS-index are not encoded; the token is pure identity.",
+     r:"DNA does not change when a cell divides or moves. The token does not change when a lump re-materialises or migrates. Identity is immutable; only expression varies."},
+    {s:"Gene", t:"LUMP · sealed unit of heredity", w0:"LUMP = <b>header ‖ code ‖ c-list ‖ freespace</b>",
+     b:"The sealed LUMP is the gene: a complete, self-describing unit of heredity. It carries its own identity (the token), its expression instructions (compiled code), its reach declarations (c-list rows in dot.name form), and optionally its own documentation (the freespace API block). A gene can be copied exactly; copying never changes identity.",
+     r:"The gene is the minimal unit of heredity. You cannot evolve a gene by patching it — patching changes the token and therefore produces a new identity. Evolution means authoring a new gene."},
+    {s:"Organism", t:"Thread · running instance", w0:"Thread CR12 → <b>c-list[0..n]</b> · own registers",
+     b:"A Thread is a living organism — a gene that has been expressed and is actively running. It owns a c-list (private reachability), a set of context registers, and a program counter. Many Threads may express the same gene simultaneously; each is a distinct organism with its own state, yet all share the same immutable genotype.",
+     r:"An organism is not the gene. Many organisms may share one genotype. Terminating an organism does not touch the gene; retiring a gene does not affect organisms that expressed it before retirement."},
+    {s:"Metabolism", t:"CALL · RETURN · cellular activity", w0:"CALL <b>CR6</b> → method → RETURN · repeat",
+     b:"Metabolism is the continuous activity that keeps an organism alive: CALL enters a method of a reachable organism, executes within its boundary, and RETURN brings control back. Every exchange is mediated by a sealed capability; an organism can only call what its c-list already holds. There is no ambient nutrient — every resource must be explicitly reached.",
+     r:"Metabolic reach is declared at compile time (c-list) and enforced at runtime (GT type-check). An organism cannot acquire reach it was not sealed with at birth.",
+     loop:"↻ call and return are the heartbeat — every live organism repeats them"},
+    {s:"Membrane", t:"c-list · capability boundary", w0:"reach = <b>c-list[0..limit]</b> · nothing else reachable",
+     b:"The cell membrane is the c-list boundary. Every interaction — every LOAD, CALL, SAVE — must pass through a named c-list row. There is no ambient authority; there is no shared address space. What is not in the c-list is not reachable, regardless of where it lives in memory. The membrane is the complete security surface.",
+     r:"The membrane is enforced by hardware, not policy. A cell cannot pierce it through clever addressing. Security flows from geometry — the c-list shape — not from runtime rule-checking."},
+    {s:"Symbiosis", t:"shared reach · mutual capability", w0:"two cells hold <b>token T</b> in their c-lists",
+     b:"Symbiosis in the Church Machine is shared reach. Two organisms that both hold token T in their c-lists can independently call methods of the same third organism. No ownership transfers — the third gene's identity is simply referenced by multiple c-lists simultaneously. The relationship is composable, explicit, and auditable at compile time.",
+     r:"Shared reach is not shared state. Two cells holding the same token hold independent promises or inform bindings. The gene they both reach is immutable; neither cell can corrupt it for the other."},
+    {s:"Evolution", t:"SSSS · new gene alongside old", w0:"<b>issue #7</b> (old) and <b>issue #8</b> (new) · both live",
+     b:"Biological evolution does not patch genes — it authors new ones and lets the old fall silent. The Church Machine works identically: edit source, recompile, reseal → new token → new gene, issued alongside the old. Callers migrate when they choose. Old and new run Safe and Secure Side by Side (SSSS) until the old is no longer expressed.",
+     r:"Evolution is authorship, not mutation. Patching a gene changes its token and therefore its identity — it becomes a new species. Side-by-side issuance is the only safe upgrade path.",
+     loop:"↻ evolution loops here — author new, let old fall silent"},
+    {s:"Extinction", t:"unreachable · reclaimed whole", w0:"nothing resolves to old token → <b>reclaimed</b>",
+     b:"Extinction is not deletion — it is the cessation of expression. A gene becomes extinct when nothing in any running c-list resolves to its token. With no reachability it cannot be called, cannot run, and cannot reproduce. The runtime reclaims it whole, the way a cell stops expressing a silenced gene. The identity is retired; its token will never be reused.",
+     r:"Retirement is by disuse, not by force. A live cell cannot be deleted — it can only stop being reached. The whole gene is the unit of retirement; partial retirement is not possible."}
+  ];
+  var cm_i = 0;
+  var rail = document.getElementById('cm-rail');
+  CM.forEach(function(d,i){
+    var p = document.createElement('div');
+    p.className = 'cm-pill'; p.textContent = d.s;
+    p.onclick = function(){ cm_i = i; cmR(); };
+    rail.appendChild(p);
+  });
+  function cmR(){
+    var d = CM[cm_i];
+    document.getElementById('cm-stage').textContent = d.s;
+    document.getElementById('cm-tag').textContent = d.t;
+    document.getElementById('cm-w0').innerHTML = d.w0;
+    document.getElementById('cm-body').textContent = d.b;
+    document.getElementById('cm-rule').textContent = d.r;
+    document.getElementById('cm-dots').textContent = (cm_i+1) + ' / ' + CM.length;
+    document.getElementById('cm-prev').disabled = (cm_i===0);
+    document.getElementById('cm-next').disabled = (cm_i===CM.length-1);
+    var loop = document.getElementById('cm-loop');
+    loop.textContent = d.loop || '';
+    var pills = rail.children;
+    for (var k=0;k<pills.length;k++) pills[k].className = 'cm-pill' + (k===cm_i?' on':'');
+  }
+  function cmGo(dir){ cm_i = Math.max(0, Math.min(CM.length-1, cm_i+dir)); cmR(); }
+  cmR();
+</script>
