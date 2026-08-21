@@ -102,6 +102,90 @@ a.next-step-link:hover {
     color: var(--text-primary);
 }
 
+/* ── Compact execution-counter help button ────────────────────────────── */
+.exec-counter-help-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.15rem;
+    height: 1.15rem;
+    padding: 0;
+    margin-left: 3px;
+    border-radius: 50%;
+    border: 1px solid rgba(120,120,180,0.35);
+    background: rgba(80,80,140,0.18);
+    color: #8888b8;
+    font-size: 0.62rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    vertical-align: middle;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    flex-shrink: 0;
+}
+.exec-counter-help-btn:hover {
+    background: rgba(100,100,200,0.28);
+    border-color: rgba(160,160,220,0.6);
+    color: #c8c8f0;
+}
+
+/* ── Execution-counter explanation popup ──────────────────────────────── */
+.exec-counter-popup {
+    position: fixed;
+    z-index: 11000;
+    background: #111121;
+    color: #e0e0f0;
+    border: 1px solid rgba(180,160,80,0.55);
+    border-radius: 7px;
+    box-shadow: 0 10px 32px rgba(0,0,0,0.65);
+    padding: 12px 14px 10px;
+    width: min(320px, calc(100vw - 28px));
+    font-size: 0.78rem;
+    line-height: 1.5;
+}
+.exec-counter-popup-title {
+    font-weight: 700;
+    font-size: 0.82rem;
+    color: #daa520;
+    margin-bottom: 9px;
+    padding-right: 20px;
+}
+.exec-counter-popup-close {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    background: none;
+    border: none;
+    color: #777;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 4px;
+}
+.exec-counter-popup-close:hover { color: #e0e0f0; }
+.exec-counter-popup table {
+    border-collapse: collapse;
+    width: 100%;
+}
+.exec-counter-popup td {
+    padding: 2px 6px 2px 0;
+    vertical-align: top;
+}
+.exec-counter-popup td:first-child {
+    font-family: monospace;
+    font-weight: 700;
+    color: #c8b464;
+    white-space: nowrap;
+    padding-right: 10px;
+}
+.exec-counter-popup-note {
+    margin-top: 8px;
+    padding-top: 7px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    color: #66667a;
+    font-size: 0.72rem;
+}
+
 .fault-free-badge {
     display: inline-flex;
     align-items: center;

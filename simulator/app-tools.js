@@ -333,9 +333,71 @@ function _updateExecutionCounter() {
     el.title = `Successful user instructions: ${fmt(total)} / 1,000`;
     const excluded = document.getElementById('executionExcludedCounters');
     if (excluded) {
-        excluded.textContent = `Boot ${fmt(s.bootPhases)} \u00b7 Fault ${fmt(s.faults)} \u00b7 Suspended ${fmt(s.suspensions)} \u00b7 Lazy ${fmt(s.lazyLoadWaits)} \u00b7 Rejected ${fmt(s.rejected)}`;
+        excluded.textContent =
+            `B=${fmt(s.bootPhases)}/F=${fmt(s.faults)}/S=${fmt(s.suspensions)}\u00a0\u00b7\u00a0L=${fmt(s.lazyLoadWaits)}\u00a0\u00b7\u00a0R=${fmt(s.rejected)}`;
     }
 }
+
+// ── Execution-counter explanation popup ───────────────────────────────────
+(function _wireExecCounterHelp() {
+    const ROWS = [
+        ['B', 'Boot',      'Steps counted during the boot sequence before your program starts.'],
+        ['F', 'Fault',     'Instructions that triggered a fault and were not retired.'],
+        ['S', 'Suspended', 'Instructions stalled waiting for a lazy-load fetch to complete.'],
+        ['L', 'Lazy',      'Lazy-load wait cycles (LUMP was absent; fetch was in flight).'],
+        ['R', 'Rejected',  'Operations rejected by the capability system before reaching retire.'],
+    ];
+    let _popup = null;
+
+    function _dismiss() {
+        if (_popup) { _popup.remove(); _popup = null; }
+        document.removeEventListener('keydown', _onKey, true);
+        document.removeEventListener('click',   _onDocClick, true);
+    }
+    function _onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); _dismiss(); } }
+    function _onDocClick(e) {
+        if (_popup && !_popup.contains(e.target) && e.target.id !== 'execCounterHelpBtn') _dismiss();
+    }
+
+    function _show(btn) {
+        if (_popup) { _dismiss(); return; }
+        _popup = document.createElement('div');
+        _popup.className = 'exec-counter-popup';
+        _popup.setAttribute('role', 'dialog');
+        _popup.setAttribute('aria-label', 'Execution counter legend');
+        const rows = ROWS.map(([k, name, desc]) =>
+            `<tr><td>${k}</td><td><strong style="color:#d0d0e8">${name}</strong> — ${desc}</td></tr>`
+        ).join('');
+        _popup.innerHTML =
+            '<button class="exec-counter-popup-close" aria-label="Close">\u00d7</button>' +
+            '<div class="exec-counter-popup-title">Execution counter legend</div>' +
+            `<table>${rows}</table>` +
+            '<div class="exec-counter-popup-note">Only <em>successful retirements</em> count toward the 1K&nbsp;threshold shown in the badge to the left.</div>';
+        document.body.appendChild(_popup);
+
+        // Position: just below the button, right-aligned to viewport edge
+        const r = btn.getBoundingClientRect();
+        const pw = Math.min(320, window.innerWidth - 28);
+        let left = r.right - pw;
+        if (left < 8) left = 8;
+        let top = r.bottom + 6;
+        if (top + 220 > window.innerHeight) top = r.top - 226;
+        _popup.style.left = left + 'px';
+        _popup.style.top  = Math.max(6, top) + 'px';
+        _popup.style.width = pw + 'px';
+
+        _popup.querySelector('.exec-counter-popup-close').addEventListener('click', _dismiss);
+        setTimeout(function() {
+            document.addEventListener('keydown', _onKey, true);
+            document.addEventListener('click',   _onDocClick, true);
+        }, 0);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const btn = document.getElementById('execCounterHelpBtn');
+        if (btn) btn.addEventListener('click', function(e) { e.stopPropagation(); _show(btn); });
+    });
+})();
 
 function updateMemoryStatsPanel() {
     const el = document.getElementById('memStatsContent');
