@@ -286,7 +286,8 @@
     display: flex;
     align-items: center;
     gap: 0.35rem;
-    flex-shrink: 0;
+    min-width: 0;
+    flex: 0 1 auto;
 }
 
 .toolbar-group--hidden {
@@ -305,7 +306,17 @@
     display: flex;
     align-items: center;
     gap: 0.35rem;
-    flex-shrink: 0;
+    min-width: 0;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+}
+
+.execution-counter-strip {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    max-width: 100%;
+    flex: 0 1 auto;
 }
 
 .sim-exec-btns .btn {
