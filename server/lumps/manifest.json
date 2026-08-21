@@ -2075,5 +2075,34 @@
     "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
     "dot_name": "CapabilityTest",
     "issue_n": 1
+  },
+  {
+    "token": "4ea370af",
+    "abstraction": "Abstraction:  NoteGAssembly",
+    "filename": "NoteGAssembly.1.f2e2eb3e.lump",
+    "sidecar_file": "NoteGAssembly.1.f2e2eb3e.json",
+    "lump_size": 256,
+    "cw": 141,
+    "cc": 1,
+    "author": "",
+    "version": "2026.08.21",
+    "lump_version": 1,
+    "compiled_at": 1787330635.5949898,
+    "methods": [
+      {
+        "name": "run",
+        "offset": 0,
+        "length": 141
+      }
+    ],
+    "grants": [
+      "E"
+    ],
+    "binary_hash": "8d8fd4d6fe8851e9e3aa94d7fc0c9120fc2e6265ca0ab68d7166beb1948340b6",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "1ef05f4ad1e97e63fdce23593edff27a02263e10c8eb13c3e7291f131c996058",
+    "dot_name": "NoteGAssembly",
+    "issue_n": 1
   }
 ]
