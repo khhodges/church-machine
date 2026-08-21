@@ -1855,6 +1855,167 @@ function _renderLumpDnaTab(tk) {
     if (typeof _initNsDepGraphPanZoom === 'function') _initNsDepGraphPanZoom(wrapId);
 }
 
+// ── LUMP Deep Dive ──────────────────────────────────────────────────────────
+// This graph deliberately works from the list endpoint's binary-derived
+// clist_entries. A missing NS resolution is still a node, so stale or legacy
+// capability references remain visible instead of disappearing.
+function _deepDiveLumpForToken(token) {
+    return (_lumpsCache || []).find(l => l && l.token === token) ||
+        (_lumpsCache || []).find(l => l && (l.token || '').replace(/[^a-z0-9]/gi, '') ===
+            (token || '').replace(/[^a-z0-9]/gi, '')) || null;
+}
+
+function _deepDiveTargetToken(entry) {
+    if (entry && entry.target_token) return entry.target_token;
+    if (entry && entry.token) return entry.token;
+    if (entry && entry.ns_index != null && typeof sim !== 'undefined' && sim &&
+        typeof sim.lumpTokenAtSlot === 'function') {
+        return sim.lumpTokenAtSlot(parseInt(entry.ns_index));
+    }
+    return null;
+}
+
+function _buildLumpDeepDiveGraph(rootLump) {
+    if (!rootLump) return null;
+    const lumps = _lumpsCache || [];
+    const nodes = [], edges = [], byKey = new Map(), queued = new Set();
+    const keyFor = (token, fallback) => token
+        ? `token:${token}` : `missing:${fallback}`;
+    const addNode = (key, data) => {
+        if (!byKey.has(key)) {
+            const node = Object.assign({ key, depth: 0 }, data);
+            byKey.set(key, node); nodes.push(node);
+        }
+        return byKey.get(key);
+    };
+    const rootKey = keyFor(rootLump.token, 'root');
+    addNode(rootKey, { token: rootLump.token, lump: rootLump, label: rootLump.dot_name || rootLump.abstraction || rootLump.token, kind: 'root' });
+    const queue = [{ lump: rootLump, key: rootKey, depth: 0 }];
+    queued.add(rootKey);
+    while (queue.length) {
+        const current = queue.shift();
+        const entries = Array.isArray(current.lump.clist_entries) ? current.lump.clist_entries : [];
+        if (!entries.length) {
+            const leafKey = `${current.key}:leaf`;
+            addNode(leafKey, { label: 'No C-List links', kind: 'leaf', depth: current.depth + 1 });
+            edges.push({ from: current.key, to: leafKey, label: 'leaf' });
+            continue;
+        }
+        entries.forEach((entry, index) => {
+            const isNull = !entry || entry.null || entry.gt_word === '0x00000000' ||
+                entry.gt_word === 0 || entry.state === 'null';
+            const targetToken = isNull ? null : _deepDiveTargetToken(entry);
+            const target = targetToken ? _deepDiveLumpForToken(targetToken) : null;
+            const fallback = isNull ? `null-${current.key}-${index}` :
+                `unresolved-${current.key}-${index}-${entry.ns_index == null ? 'legacy' : entry.ns_index}`;
+            const targetKey = keyFor(targetToken, fallback);
+            const hadTarget = byKey.has(targetKey);
+            const targetNode = addNode(targetKey, target ? {
+                token: target.token, lump: target,
+                label: target.dot_name || target.abstraction || target.token, kind: 'lump',
+                depth: current.depth + 1
+            } : {
+                label: isNull ? `NULL · C-List slot ${index}` :
+                    `UNRESOLVED · NS[${entry.ns_index == null ? '?' : entry.ns_index}]`,
+                kind: isNull ? 'null' : 'unresolved', depth: current.depth + 1,
+                token: targetToken || ''
+            });
+            const cycle = targetKey === current.key || (target && queued.has(targetKey));
+            edges.push({
+                from: current.key, to: targetKey,
+                label: `CR${index}${entry.perms ? ` · ${entry.perms}` : ''}`,
+                reused: hadTarget || cycle
+            });
+            if (target && !queued.has(targetKey)) {
+                queued.add(targetKey);
+                queue.push({ lump: target, key: targetKey, depth: current.depth + 1 });
+            }
+        });
+    }
+    if (!nodes.length) return null;
+    const maxDepth = Math.max(...nodes.map(n => n.depth), 0);
+    const levels = Array.from({ length: maxDepth + 1 }, () => []);
+    nodes.forEach(n => levels[n.depth].push(n));
+    const colW = 218, rowH = 72, pad = 24;
+    const width = Math.max(620, (maxDepth + 1) * colW + pad * 2);
+    const height = Math.max(190, ...levels.map(level => level.length * rowH + pad * 2));
+    const pos = new Map();
+    levels.forEach((level, depth) => {
+        const start = Math.max(pad, (height - level.length * rowH) / 2);
+        level.forEach((node, i) => pos.set(node.key, { x: pad + depth * colW, y: start + i * rowH }));
+    });
+    const esc = typeof _escHtml === 'function' ? _escHtml : s => String(s || '');
+    let svg = `<svg class="ns-dep-graph-svg lump-deep-dive-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Recursive DNA dependency graph"><defs><marker id="lump-dna-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#4a90e2"/></marker></defs><g class="nsdg-inner">`;
+    edges.forEach(edge => {
+        const a = pos.get(edge.from), b = pos.get(edge.to);
+        if (!a || !b) return;
+        const stroke = edge.reused ? '#f59e0b' : '#4a90e2';
+        svg += `<path d="M${a.x + 178},${a.y + 24} C${a.x + colW - 20},${a.y + 24} ${b.x - 24},${b.y + 24} ${b.x},${b.y + 24}" fill="none" stroke="${stroke}" stroke-width="${edge.reused ? 1.8 : 1.2}" stroke-dasharray="${edge.reused ? '5 3' : ''}" marker-end="url(#lump-dna-arrow)"/>`;
+        svg += `<text x="${(a.x + b.x + 178) / 2}" y="${(a.y + b.y) / 2 + 18}" class="lump-deep-edge-label">${esc(edge.label)}${edge.reused ? ' · reused/cycle' : ''}</text>`;
+    });
+    nodes.forEach(node => {
+        const p = pos.get(node.key);
+        const colors = { root: '#22c55e', lump: '#4a90e2', null: '#6b7280', unresolved: '#f59e0b', leaf: '#9ca3af' };
+        const color = colors[node.kind] || colors.lump;
+        const title = node.kind === 'root' ? 'SELECTED LUMP' : node.kind.toUpperCase();
+        svg += `<g class="lump-deep-node lump-deep-node-${node.kind}"><rect x="${p.x}" y="${p.y}" width="178" height="48" rx="5" fill="#08080f" stroke="${color}" stroke-width="${node.kind === 'root' ? 2 : 1.3}"/><text x="${p.x + 7}" y="${p.y + 15}" class="lump-deep-node-kind" fill="${color}">${title}</text><text x="${p.x + 7}" y="${p.y + 31}" class="lump-deep-node-label">${esc((node.label || '').slice(0, 26))}</text>${node.token ? `<text x="${p.x + 171}" y="${p.y + 43}" text-anchor="end" class="lump-deep-node-token">0x${esc(node.token)}</text>` : ''}</g>`;
+    });
+    svg += '</g></svg>';
+    return { svg, wrapId: `lump-deep-dive-graph-${(rootLump.token || 'root').replace(/[^a-z0-9]/gi, '')}`, nodes, edges };
+}
+
+function _closeLumpDeepDive() {
+    const modal = document.getElementById('lumpDeepDiveModal');
+    const trigger = modal && modal._trigger;
+    if (modal) modal.remove();
+    if (trigger) { trigger.setAttribute('aria-expanded', 'false'); trigger.focus(); }
+    document.removeEventListener('keydown', _lumpDeepDiveKeydown);
+}
+function _lumpDeepDiveKeydown(ev) { if (ev.key === 'Escape') _closeLumpDeepDive(); }
+
+async function _openLumpDeepDive(token, trigger) {
+    _closeLumpDeepDive();
+    const lump = _deepDiveLumpForToken(token);
+    if (!lump) return;
+    const modal = document.createElement('div');
+    modal.id = 'lumpDeepDiveModal'; modal.className = 'lump-deep-dive-backdrop';
+    modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'lumpDeepDiveTitle'); modal._trigger = trigger || document.activeElement;
+    const e = typeof _escHtml === 'function' ? _escHtml : s => String(s || '');
+    const type = typeof _lumpContentTypeLabel === 'function' ? _lumpContentTypeLabel(lump) : (lump.lump_type || 'LUMP');
+    modal.innerHTML = `<section class="lump-deep-dive-dialog"><header class="lump-deep-dive-header"><div><h2 id="lumpDeepDiveTitle">LUMP Deep Dive · ${e(lump.dot_name || lump.abstraction || token)}</h2><p>Recursive DNA reachability map</p></div><button type="button" class="lump-deep-dive-close" aria-label="Close Deep Dive">&times;</button></header><div class="lump-deep-dive-summary"><span><b>Token</b> 0x${e(lump.token)}</span><span><b>Name</b> ${e(lump.dot_name || lump.abstraction || 'Unknown')}</span><span><b>Type</b> ${e(type)}</span><span><b>Version</b> ${e(lump.lump_version ?? lump.version ?? '—')}</span><span><b>Size</b> ${e(lump.lump_size ?? '—')}w</span><span><b>NS slot</b> ${e(lump.ns_slot ?? 'saved')}</span></div><div class="lump-deep-dive-api" id="lumpDeepDiveApi">API/capability metadata: loading…</div><div class="lump-deep-dive-toolbar"><span>Edges are labeled by C-List register and permissions. Amber dashed edges are reused or cyclic.</span><button type="button" class="ns-dep-graph-btn" id="lumpDeepZoomIn">+</button><button type="button" class="ns-dep-graph-btn" id="lumpDeepZoomOut">−</button><button type="button" class="ns-dep-graph-btn" id="lumpDeepZoomReset">↺</button></div><div id="lumpDeepDiveBody" class="lump-deep-dive-body"><div class="lumps-loading">Building DNA graph…</div></div></section>`;
+    document.body.appendChild(modal);
+    modal.querySelector('.lump-deep-dive-close').addEventListener('click', _closeLumpDeepDive);
+    modal.addEventListener('click', ev => { if (ev.target === modal) _closeLumpDeepDive(); });
+    document.addEventListener('keydown', _lumpDeepDiveKeydown);
+    modal.querySelector('#lumpDeepZoomIn').onclick = () => _nsdgZoom(modal._graphWrapId, 1.25);
+    modal.querySelector('#lumpDeepZoomOut').onclick = () => _nsdgZoom(modal._graphWrapId, 0.8);
+    modal.querySelector('#lumpDeepZoomReset').onclick = () => _nsdgReset(modal._graphWrapId);
+    modal.querySelector('.lump-deep-dive-close').focus();
+    const result = _buildLumpDeepDiveGraph(lump);
+    const body = modal.querySelector('#lumpDeepDiveBody');
+    if (result) {
+        modal._graphWrapId = result.wrapId;
+        body.innerHTML = `<div class="ns-dep-graph-wrap" id="${result.wrapId}">${result.svg}</div>`;
+        _initNsDepGraphPanZoom(result.wrapId);
+    } else body.innerHTML = '<div class="lumps-placeholder">No C-List data is available for this LUMP.</div>';
+    try {
+        const resp = await fetch(`/api/lumps/${encodeURIComponent(token)}/detail`);
+        if (resp.ok && document.getElementById('lumpDeepDiveModal') === modal) {
+            const detail = await resp.json();
+            const caps = Array.isArray(detail.capabilities) ? detail.capabilities.length : 0;
+            const api = detail.api_definition ? 'API definition available' : 'No API definition recorded';
+            modal.querySelector('#lumpDeepDiveApi').textContent = `${api} · ${caps} declared capability${caps === 1 ? '' : 'ies'}${detail.language ? ` · ${detail.language}` : ''}`;
+        } else if (document.getElementById('lumpDeepDiveModal') === modal) {
+            modal.querySelector('#lumpDeepDiveApi').textContent = 'API metadata unavailable; graph is based on the repository list.';
+        }
+    } catch (_) {
+        const api = modal.querySelector('#lumpDeepDiveApi');
+        if (api) api.textContent = 'API metadata unavailable; graph is based on the repository list.';
+    }
+}
+window._openLumpDeepDive = _openLumpDeepDive;
+
 function _populateLumpApiTab(lump, panelId) {
     const el = document.getElementById(panelId);
     if (!el || el._apiLoaded) return;

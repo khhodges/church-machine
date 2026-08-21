@@ -851,9 +851,38 @@ async function renderLumps() {
                 html += `<option value="${_escHtml(token)}"${sel}>${_escHtml(label)}</option>`;
             }
             html += `</select>`;
+             html += `<div class="lump-repository-items" aria-label="LUMP repository items">`;
+             for (const lump of _sortedLumps) {
+                 const token = lump.token || '????????';
+                 const name = lump.dot_name || lump.abstraction || 'Unknown';
+                 const type = typeof _lumpContentTypeLabel === 'function'
+                     ? _lumpContentTypeLabel(lump) : (lump.lump_type || lump.content_type || 'LUMP');
+                 const version = lump.lump_version != null ? `v${lump.lump_version}`
+                     : (lump.version ? `v${lump.version}` : '');
+                 const meta = [type, version, lump.lump_size ? `${lump.lump_size}w` : '',
+                     lump.ns_slot != null ? `NS ${lump.ns_slot}` : 'saved'].filter(Boolean).join(' · ');
+                 html += `<div class="lump-item" data-lump-token="${_escHtml(token)}" tabindex="0" role="button" aria-label="View ${_escHtml(name)}">`
+                     + `<div class="lump-item-header"><span class="lump-item-name">${_escHtml(name)}</span>`
+                     + `<button type="button" class="lump-deep-dive-btn" data-deep-dive-token="${_escHtml(token)}" title="Open recursive DNA dependency graph">Deep Dive</button></div>`
+                     + `<div class="lump-item-meta"><span class="lump-token">0x${_escHtml(token)}</span><span>${_escHtml(meta)}</span></div></div>`;
+             }
+             html += `</div>`;
         }
 
         listEl.innerHTML = html;
+         listEl.querySelectorAll('.lump-item').forEach(item => {
+             const token = item.dataset.lumpToken;
+             item.addEventListener('click', () => lumpPickerChanged(token));
+             item.addEventListener('keydown', ev => {
+                 if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); lumpPickerChanged(token); }
+             });
+         });
+         listEl.querySelectorAll('.lump-deep-dive-btn').forEach(btn => {
+             btn.addEventListener('click', ev => {
+                 ev.stopPropagation();
+                 _openLumpDeepDive(btn.dataset.deepDiveToken);
+             });
+         });
         const _ss = document.getElementById('lumpSortSelect');
         if (_ss) _ss.value = _lumpSortOrder;
 

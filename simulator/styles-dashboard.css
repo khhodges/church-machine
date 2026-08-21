@@ -5424,6 +5424,169 @@ mark.abs-search-highlight {
     border-color: var(--church-gold);
 }
 
+.lump-repository-items {
+    margin-top: 0.45rem;
+    max-height: 18rem;
+    overflow-y: auto;
+}
+
+.lump-repository-items .lump-item {
+    margin-bottom: 3px;
+}
+
+.lump-item[tabindex="0"]:focus-visible {
+    outline: 2px solid var(--church-gold);
+    outline-offset: 1px;
+}
+
+.lump-deep-dive-btn {
+    flex: 0 0 auto;
+    padding: 0.18rem 0.48rem;
+    border: 1px solid rgba(74,144,226,0.5);
+    border-radius: 4px;
+    background: rgba(74,144,226,0.12);
+    color: #9fc8ff;
+    font: 600 0.64rem/1.2 inherit;
+    cursor: pointer;
+}
+
+.lump-deep-dive-btn:hover,
+.lump-deep-dive-btn:focus-visible {
+    background: rgba(74,144,226,0.28);
+    border-color: #7eb5f5;
+}
+
+.lump-deep-dive-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 12000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(2, 5, 15, 0.82);
+}
+
+.lump-deep-dive-dialog {
+    display: flex;
+    flex-direction: column;
+    width: min(1040px, 100%);
+    max-height: min(92vh, 900px);
+    overflow: hidden;
+    color: var(--text-primary);
+    background: #0b1020;
+    border: 1px solid rgba(100,160,255,0.35);
+    border-radius: 8px;
+    box-shadow: 0 18px 60px rgba(0,0,0,0.6);
+}
+
+.lump-deep-dive-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid rgba(100,160,255,0.18);
+}
+
+.lump-deep-dive-header h2 {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--church-gold);
+}
+
+.lump-deep-dive-header p {
+    margin: 0.25rem 0 0;
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+}
+
+.lump-deep-dive-close {
+    padding: 0.1rem 0.4rem;
+    border: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 1.45rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.lump-deep-dive-close:hover,
+.lump-deep-dive-close:focus-visible { color: var(--text-primary); }
+
+.lump-deep-dive-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.8rem;
+    padding: 0.65rem 1rem;
+    background: rgba(0,0,0,0.18);
+    font: 0.7rem/1.4 var(--font-mono, monospace);
+}
+
+.lump-deep-dive-summary span { white-space: nowrap; }
+.lump-deep-dive-summary b { color: var(--text-secondary); font-weight: 500; }
+
+.lump-deep-dive-api {
+    padding: 0.45rem 1rem;
+    color: #9fc8ff;
+    font-size: 0.7rem;
+    border-bottom: 1px solid rgba(100,160,255,0.12);
+}
+
+.lump-deep-dive-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    padding: 0.45rem 1rem;
+    color: var(--text-secondary);
+    font-size: 0.68rem;
+}
+
+.lump-deep-dive-toolbar span { flex: 1 1 20rem; }
+.lump-deep-dive-body {
+    min-height: 12rem;
+    overflow: auto;
+    padding: 0 1rem 1rem;
+}
+
+.lump-deep-dive-body .ns-dep-graph-wrap {
+    min-height: 12rem;
+    max-height: 58vh;
+}
+
+.lump-deep-dive-svg .lump-deep-edge-label,
+.lump-deep-edge-label {
+    fill: #9aa8c2;
+    font: 8px var(--font-mono, monospace);
+    text-anchor: middle;
+}
+
+.lump-deep-node-kind {
+    font: bold 7px var(--font-mono, monospace);
+    letter-spacing: 0.05em;
+}
+
+.lump-deep-node-label {
+    fill: #e2e8f0;
+    font: 9px var(--font-mono, monospace);
+}
+
+.lump-deep-node-token {
+    fill: #657594;
+    font: 7px var(--font-mono, monospace);
+}
+
+@media (max-width: 600px) {
+    .lump-deep-dive-backdrop { padding: 0.35rem; align-items: stretch; }
+    .lump-deep-dive-dialog { max-height: 100%; }
+    .lump-deep-dive-header { padding: 0.7rem; }
+    .lump-deep-dive-header h2 { font-size: 0.86rem; }
+    .lump-deep-dive-summary { padding: 0.55rem 0.7rem; gap: 0.3rem 0.55rem; }
+    .lump-deep-dive-toolbar, .lump-deep-dive-api { padding-left: 0.7rem; padding-right: 0.7rem; }
+    .lump-deep-dive-body { padding-left: 0.35rem; padding-right: 0.35rem; }
+}
+
 .lump-item-header {
     display: flex;
     align-items: center;
