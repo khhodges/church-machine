@@ -1,24 +1,44 @@
-"""tests/hardware/test_wukong_boot_rom_guard.py — Static guard: _WUKONG_ROM slot 3 must be BRANCH -1.
+"""tests/hardware/test_wukong_boot_rom_guard.py — Static guards for the Wukong boot ROM.
 
-Background
-----------
-The v11 bitstream shipped with _WUKONG_ROM[3] = 0x00000000 (zero word) instead
-of BRANCH AL, #-1.  When SelfTest returned, the CM decoded the zero word,
-triggered a fault, wiped all CRs to NULL GTs, and entered an infinite fault
-loop — fault LED ON, board unresponsive to IDE commands.
+Guards
+------
+1. _WUKONG_ROM[3] must be BRANCH AL, #-1 (not 0x00000000).
+   The v11 bitstream shipped with a zero word here.  When SelfTest returned,
+   the CM decoded it, triggered a fault, wiped all CRs to NULL GTs, and entered
+   an infinite fault loop — fault LED ON, board unresponsive to IDE commands.
 
-This test imports _WUKONG_ROM directly from hardware/wukong_top.py and asserts
-the guard word is correct *at module-load time* — before any synthesis run.
-No simulation is required; the check takes milliseconds.
+2. init_rom size in the committed RTLIL must match the Python-derived
+   WUKONG_N_INIT constant.  The init_rom is a LUTRAM seeded with every non-zero
+   DMEM word; if its size changes, the boot sequencer writes the wrong number
+   of words and the CM starts with a corrupted memory image.  This guard
+   catches the shrinkage before a synthesis run, not after a broken bitstream
+   is flashed to hardware.
+
+   Expected count (WUKONG_N_INIT) breaks down as:
+     WUKONG_SELFTEST_WORDS (non-zero subset of 512-word SelfTest LUMP body)
+     + WukongCallHome header + WUKONG_NUC_PROGRAM (74 words)
+     + WUKONG_DEMO_NAMESPACE + WUKONG_DEMO_CLIST (partial occupancy)
+     + WUKONG_WCH_CLIST + Boot.Thread header words (4 words)
+
+This test imports from hardware.wukong_top and hardware.boot_rom and reads
+build/church_wukong_xc7a100t.il.  No simulation is required; the checks take
+milliseconds.
 
 Run with:
     python -m pytest tests/hardware/test_wukong_boot_rom_guard.py -v
 """
 
+import os
+import re
+
 import pytest
 
 from hardware.boot_rom import BOOT_PROGRAM, encode_turing, TuringOpcode, CondCode
-from hardware.wukong_top import _WUKONG_ROM
+from hardware.wukong_top import _WUKONG_ROM, WUKONG_N_INIT
+
+_IL_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "..", "build", "church_wukong_xc7a100t.il"
+)
 
 
 # Expected BRANCH AL, #-1 encoding — must match the constant in wukong_top.py.
@@ -67,4 +87,61 @@ def test_wukong_rom_guard_word_is_not_zero():
     assert _WUKONG_ROM[3] != 0, (
         "_WUKONG_ROM[3] is 0x00000000 — the BRANCH -1 guard word is missing.  "
         "This is the exact defect that caused the v11 hardware fault-loop."
+    )
+
+
+# ── init_rom size guard ───────────────────────────────────────────────────────
+
+def test_wukong_il_exists_for_init_rom_check():
+    """build/church_wukong_xc7a100t.il must exist for the init_rom size guard.
+
+    If this test fails, run the Amaranth → RTLIL conversion step before
+    synthesis:
+        python -c "from hardware.wukong_top import ChurchWukongXC7A100T; ..."
+    or use the 'Regenerate Wukong RTLIL' action in the IDE build panel.
+    """
+    assert os.path.isfile(_IL_PATH), (
+        f"Committed RTLIL not found at {_IL_PATH}.  "
+        "Generate it before synthesis so the init_rom size guard can run."
+    )
+
+
+def test_wukong_init_rom_size_matches_python_source():
+    """init_rom size in church_wukong_xc7a100t.il must equal WUKONG_N_INIT.
+
+    The init_rom is a synthesis-time LUTRAM seeded with every non-zero word in
+    the 64 KiB DMEM image (WUKONG_N_INIT entries).  The hw_init sequencer uses
+    it to write all those words before boot_start fires, bypassing Vivado's
+    BRAM `initial`-block inference.
+
+    If the sizes diverge, the boot sequencer will write too few or too many
+    words and the CM will start with a corrupted memory image — producing a
+    silent broken bitstream rather than a build error.
+
+    Expected WUKONG_N_INIT = {expected} (computed from current Python source).
+    If the IL was generated from an older version of boot_rom.py or
+    wukong_top.py, regenerate it and commit the updated file.
+    """.format(expected=WUKONG_N_INIT)
+    if not os.path.isfile(_IL_PATH):
+        pytest.skip("build/church_wukong_xc7a100t.il not present — skipped")
+
+    with open(_IL_PATH, encoding="utf-8") as fh:
+        il_text = fh.read()
+
+    # The RTLIL line looks like:
+    #   memory width 46 size 526 \init_rom
+    m = re.search(r"memory width 46 size (\d+)\s+\\init_rom", il_text)
+    assert m is not None, (
+        "Could not find 'memory width 46 size N \\init_rom' in "
+        f"{_IL_PATH}.  The init_rom submodule may have been renamed or removed."
+    )
+
+    il_size = int(m.group(1))
+    assert il_size == WUKONG_N_INIT, (
+        f"init_rom size in committed RTLIL is {il_size} words, "
+        f"but WUKONG_N_INIT (Python source) is {WUKONG_N_INIT} words.  "
+        f"Delta = {il_size - WUKONG_N_INIT:+d} words.  "
+        "Regenerate build/church_wukong_xc7a100t.il and commit it so "
+        "the committed file stays in sync with the Python source.  "
+        "A stale init_rom produces a broken bitstream without a build error."
     )

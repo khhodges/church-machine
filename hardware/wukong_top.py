@@ -97,6 +97,41 @@ assert len(WUKONG_NUC_PROGRAM) <= 127, (
     "Bump n_minus_6 to 2 (alloc=256) and update WUKONG_DEMO_NAMESPACE slot 7 lim17."
 )
 
+# ── WUKONG_N_INIT — expected init_rom size (number of non-zero DMEM words) ────
+# This replicates the hw_init_pairs count computed inside elaborate() so tests
+# can assert it without running Amaranth elaboration.
+#
+# Derivation:
+#   WUKONG_DEMO_NAMESPACE  — 8 NS slots (32 words, partial occupancy)
+#   WUKONG_DEMO_CLIST      — 11 c-list entries (partial occupancy)
+#   WUKONG_SELFTEST_WORDS  — 512-word canonical SelfTest LUMP body
+#   WukongCallHome header + WUKONG_NUC_PROGRAM — 74 words
+#   WUKONG_WCH_CLIST       — 8-entry WukongCallHome c-list tail
+#   Boot.Thread header words — 4 words
+#
+# If this constant diverges from what elaborate() would produce, the
+# test_wukong_init_rom_size_matches_python_source test in
+# tests/hardware/test_wukong_boot_rom_guard.py fails before synthesis.
+_wch_cw_mod = len(WUKONG_NUC_PROGRAM)
+_dmem_tmp = list(WUKONG_DEMO_NAMESPACE)
+while len(_dmem_tmp) < 256:
+    _dmem_tmp.append(0)
+_dmem_tmp += list(WUKONG_DEMO_CLIST)
+while len(_dmem_tmp) < 16384:
+    _dmem_tmp.append(0)
+for _i, _v in enumerate(WUKONG_SELFTEST_WORDS):
+    _dmem_tmp[WUKONG_SELFTEST_BASE_WORD + _i] = _v
+for _i, _v in enumerate([wukong_wch_header(_wch_cw_mod)] + list(WUKONG_NUC_PROGRAM)):
+    _dmem_tmp[WUKONG_CALLHOME_BASE_WORD + _i] = _v
+for _i, _v in enumerate(WUKONG_WCH_CLIST):
+    _dmem_tmp[WUKONG_WCH_CLIST_WORD + _i] = _v
+_dmem_tmp[WUKONG_THREAD_BASE_WORD]   = WUKONG_THREAD_HEADER
+_dmem_tmp[WUKONG_THREAD_STO_WORD]    = WUKONG_THREAD_STO_INIT
+_dmem_tmp[WUKONG_THREAD_CAPS0_WORD]  = 0x4A000006
+_dmem_tmp[WUKONG_THREAD_CAPS12_WORD] = make_gt(GT_TYPE_INFORM, PERM_MASK_S, 1, 0)
+WUKONG_N_INIT = sum(1 for v in _dmem_tmp if v != 0)
+del _dmem_tmp, _wch_cw_mod
+
 
 class ChurchWukongXC7A100T(Elaboratable):
     """Minimal Church Machine top-level for QMTECH Wukong XC7A100T.
