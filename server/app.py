@@ -6774,6 +6774,8 @@ def get_lump_detail(token):
             if _fs_det is not None:
                 sidecar = dict(sidecar)
                 sidecar['sourceStorageTier'] = _fs_det['tier']
+                sidecar['api_definition'] = _fs_det['api_definition']
+                sidecar['api_definition_source'] = 'lump'
                 if _fs_det['source']:
                     sidecar['source'] = _fs_det['source']
         except Exception:
@@ -7813,6 +7815,18 @@ def _lump_freespace_content(words):
     if api_len == 0:
         return None
     api_nw  = (api_len + 3) // 4
+    if fs_start + 1 + api_nw > fs_end or fs_start + 1 + api_nw > len(words):
+        return None
+    try:
+        api_raw = _struct.pack(
+            f'>{api_nw}I',
+            *[w & 0xFFFFFFFF for w in words[fs_start + 1:fs_start + 1 + api_nw]]
+        )[:api_len]
+        api_definition = json.loads(api_raw.decode('utf-8'))
+        if not isinstance(api_definition, dict):
+            return None
+    except Exception:
+        return None
     content = 1 + api_nw
     source  = None
     if flags & 0x01:
@@ -7847,7 +7861,8 @@ def _lump_freespace_content(words):
             return None
         content += 1 + src_nw
     return {"tier": tier, "flags": flags, "api_len": api_len,
-            "content_words": content, "source": source}
+            "content_words": content, "source": source,
+            "api_definition": api_definition}
 
 
 @app.route("/api/lump/<token_hex>/resize", methods=["POST"])

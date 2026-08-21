@@ -2004,33 +2004,6 @@
     "variant_group": "compiled_capabilitytest"
   },
   {
-    "token": "9ce28c0b",
-    "abstraction": "CapabilityTest",
-    "filename": "CapabilityTest.1.e4fe164d.lump",
-    "sidecar_file": "CapabilityTest.1.e4fe164d.json",
-    "ns_slot": 10,
-    "ns_slot_policy": "static",
-    "boot_resident": true,
-    "variant_group": "compiled_capabilitytest",
-    "lump_size": 512,
-    "cw": 21,
-    "cc": 5,
-    "author": "",
-    "version": "",
-    "lump_version": 5,
-    "compiled_at": 1787212280.7945423,
-    "methods": [],
-    "grants": [
-      "E"
-    ],
-    "binary_hash": "e2959f33f05e4d045bad90d22c436148aaa6041ebe3c6c6614f8122443cd5345",
-    "petname": "",
-    "issue_number": 1,
-    "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
-    "dot_name": "CapabilityTest",
-    "issue_n": 1
-  },
-  {
     "token": "00aa9999",
     "abstraction": "Legacy",
     "filename": "Legacy.1.8b7fb77f.lump",
@@ -2040,8 +2013,8 @@
     "cc": 1,
     "author": "",
     "version": "",
-    "lump_version": 13,
-    "compiled_at": 1787321408.921328,
+    "lump_version": 14,
+    "compiled_at": 1787322673.05138,
     "methods": [
       "Add"
     ],
@@ -2065,8 +2038,8 @@
     "cc": 1,
     "author": "",
     "version": "",
-    "lump_version": 16,
-    "compiled_at": 1787321411.0473223,
+    "lump_version": 20,
+    "compiled_at": 1787322674.7566822,
     "methods": [
       "Add"
     ],
@@ -2078,6 +2051,29 @@
     "issue_number": 1,
     "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f",
     "dot_name": "Adder",
+    "issue_n": 1
+  },
+  {
+    "token": "9ce28c0b",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.1.e4fe164d.lump",
+    "sidecar_file": "CapabilityTest.1.e4fe164d.json",
+    "lump_size": 512,
+    "cw": 21,
+    "cc": 5,
+    "author": "",
+    "version": "",
+    "lump_version": 6,
+    "compiled_at": 1787322889.4251683,
+    "methods": [],
+    "grants": [
+      "E"
+    ],
+    "binary_hash": "e2959f33f05e4d045bad90d22c436148aaa6041ebe3c6c6614f8122443cd5345",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c",
+    "dot_name": "CapabilityTest",
     "issue_n": 1
   }
 ]
