@@ -3303,7 +3303,7 @@ BOOK_CHAPTERS = [
     ("Part IV: Runtime", [
         "CM_LUMP_SPECIFICATION.md",
         "abstractions.md",
-        {"type": "figure", "name": "Lumps Directory.html", "label": "Lump Viewer"},
+        {"type": "figure", "name": "lumps-directory.html", "label": "Lump Viewer"},
         "garbage-collection.md",
         "locator.md",
         "family-registry.md",

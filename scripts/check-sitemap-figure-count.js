@@ -94,7 +94,7 @@ const HREF_RE = /href="\/docs\/figures\/([^"]+\.html)"/g;
 const linkedSet = new Set();
 let m;
 while ((m = HREF_RE.exec(html)) !== null) {
-    // Decode percent-encoding so "Lumps%20Directory.html" matches the real name.
+    // Decode percent-encoding in case any href uses encoded characters.
     try {
         linkedSet.add(decodeURIComponent(m[1]));
     } catch (_) {

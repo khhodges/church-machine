@@ -298,8 +298,8 @@ jobs:
           # Viewer artifacts must not read the removed sidecar keys either.
           import re
           viewer_bad = []
-          for path in ('docs/figures/Lumps Directory.html',
-                       'docs/figures/Manifest Viewer.html'):
+          for path in ('docs/figures/lumps-directory.html',
+                       'docs/figures/manifest-viewer.html'):
               if not os.path.isfile(path):
                   continue
               text = open(path, encoding='utf-8').read()

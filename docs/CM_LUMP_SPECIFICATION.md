@@ -2040,7 +2040,7 @@ assembler test suite.
 ### `scripts/sync_lump_viewer_to_sidecars.py` — **removed (V1.3)**
 
 This script copied `group` and `doc_refs` fields from the Lump Viewer HTML
-(`docs/figures/Lumps Directory.html`) into per-lump sidecar JSONs, treating the Viewer as
+(`docs/figures/lumps-directory.html`) into per-lump sidecar JSONs, treating the Viewer as
 an authoritative curatorial source. Both fields and the Lump Viewer approval role have
 been removed from this specification: under the specified model the binary is the single
 source of truth and the sidecar carries no curatorial fields. The script and its tests

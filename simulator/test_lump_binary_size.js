@@ -138,14 +138,14 @@ console.log('\n--- LBS-04: All bundled *.lump files ---');
 }
 
 // ── LBS-05: Structural guard — truncation check present in the HTML ───────────
-console.log('\n--- LBS-05: Structural guard in Lumps Directory.html ---');
+console.log('\n--- LBS-05: Structural guard in lumps-directory.html ---');
 {
-  const htmlPath = path.join(__dirname, '..', 'docs', 'figures', 'Lumps Directory.html');
+  const htmlPath = path.join(__dirname, '..', 'docs', 'figures', 'lumps-directory.html');
   let html;
   try {
     html = fs.readFileSync(htmlPath, 'utf8');
   } catch (e) {
-    check('LBS-05 Lumps Directory.html readable', false, String(e));
+    check('LBS-05 lumps-directory.html readable', false, String(e));
     html = '';
   }
   if (html) {

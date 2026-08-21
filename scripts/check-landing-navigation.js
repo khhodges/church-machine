@@ -36,7 +36,7 @@ for (const view of viewIds) {
   if (count !== 1) throw new Error(`view ${view} must have exactly one hamburger destination (found ${count})`);
 }
 
-for (const href of ['/', '/ctmm/', '/simulator/', '/docs/figures/Lumps Directory.html',
+for (const href of ['/', '/ctmm/', '/simulator/', '/docs/figures/lumps-directory.html',
   '/six-laws/', '/patents/', '/docs/patent-unified.html',
   '/business/plan.html', '/business/deck.html']) {
   if (!menu.includes(`href="${href}"`)) throw new Error(`standalone route missing from menu: ${href}`);

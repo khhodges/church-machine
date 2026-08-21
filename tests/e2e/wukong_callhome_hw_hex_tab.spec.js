@@ -32,7 +32,7 @@ const crypto = require('crypto');
 const TOKEN        = '1dcb7b09';
 const EXPECTED_CW  = 73;
 const LUMP_SIZE    = 128;
-const LUMPS_PAGE   = '/docs/figures/Lumps%20Directory.html';
+const LUMPS_PAGE   = '/docs/figures/lumps-directory.html';
 
 const LUMP_FILE = path.join(
     __dirname, '..', '..', 'server', 'lumps',

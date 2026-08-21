@@ -1,5 +1,5 @@
 // test_hex_tab_fill_path.js — Smoke test for the Hex tab binary fill path
-// in docs/figures/Lumps Directory.html (Task #2768).
+// in docs/figures/lumps-directory.html.
 //
 // Strategy: extract the exact code blocks from the HTML and execute them under
 // Node.js with a synthetic binary buffer and a minimal DOM stub.  A regression
@@ -25,7 +25,7 @@
 const fs   = require('fs');
 const path = require('path');
 
-const HTML_PATH = path.resolve(__dirname, '../docs/figures/Lumps Directory.html');
+const HTML_PATH = path.resolve(__dirname, '../docs/figures/lumps-directory.html');
 
 // ── HTML extraction helpers ───────────────────────────────────────────────────
 

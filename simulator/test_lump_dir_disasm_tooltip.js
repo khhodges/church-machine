@@ -23,7 +23,7 @@ const path = require('path');
 
 function extractDisMnemBlock() {
     const html = fs.readFileSync(
-        path.resolve(__dirname, '../docs/figures/Lumps Directory.html'), 'utf8');
+        path.resolve(__dirname, '../docs/figures/lumps-directory.html'), 'utf8');
 
     const opStart = html.indexOf('const OPNAMES = {');
     if (opStart === -1) throw new Error('OPNAMES table not found');

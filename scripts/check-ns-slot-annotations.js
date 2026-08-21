@@ -104,7 +104,7 @@ const violations = TARGET_FILES.flatMap(f => scanFile(f));
 // makes the runtime-issued nature explicit, e.g.:
 //   "lazy-issued — slot assigned when <Name> abstraction is loaded"
 // ─────────────────────────────────────────────────────────────────────────────
-const LUMP_DIR_PATH = 'docs/figures/Lumps Directory.html';
+const LUMP_DIR_PATH = 'docs/figures/lumps-directory.html';
 const GT_NOTE_NS_SLOT_RE = /NS slot \d+/i;
 const lumpDirViolations = [];
 
