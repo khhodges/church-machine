@@ -1535,13 +1535,14 @@ function addBreakpointFromInput() {
     inp.style.borderColor = '';
     inp.value = '';
     addBreakpoint(addr);
-    document.getElementById('stepSettingsPopover')?.classList.add('step-settings-updated');
 }
 
 // Close Step Settings when clicking outside it.
 document.addEventListener('click', function(e) {
     const wrap = document.getElementById('stepSettingsWrap');
-    if (wrap && !wrap.contains(e.target)) {
+    const breakBtn = document.getElementById('toolBreakBtn');
+    const isBreakBtn = breakBtn && (e.target === breakBtn || breakBtn.contains(e.target));
+    if (wrap && !wrap.contains(e.target) && !isBreakBtn) {
         const pop = document.getElementById('stepSettingsPopover');
         if (pop && pop.style.display !== 'none') {
             pop.style.display = 'none';
