@@ -28,7 +28,13 @@ const ROOT        = path.resolve(__dirname, '..');
 const COMPILER    = path.join(ROOT, 'simulator', 'cloomc_compiler.js');
 const LUMP_BUILDER = path.join(ROOT, 'simulator', 'lump_builder.js');
 const SOURCE      = path.join(ROOT, 'simulator', 'cloomc', 'EventRouter.cloomc');
-const LUMPS_DIR   = path.join(ROOT, 'server', 'lumps');
+
+// --out-dir <path>: redirect .lump/.json/manifest writes to a different
+// directory (used by CI to validate without touching server/lumps/).
+const _outDirIdx  = process.argv.indexOf('--out-dir');
+const LUMPS_DIR   = (_outDirIdx !== -1 && process.argv[_outDirIdx + 1])
+    ? path.resolve(process.argv[_outDirIdx + 1])
+    : path.join(ROOT, 'server', 'lumps');
 const MANIFEST    = path.join(LUMPS_DIR, 'manifest.json');
 
 const NS_SLOT = 52;
@@ -157,6 +163,10 @@ const sidecar = {
     version: '1.0.0',
     lump_version: 0,
     description: 'Event-to-handler routing table. Maps event Golden Tokens to handler capabilities. Public: Add, Remove, Resolve, List, Methods. Private helpers enforce internal access control (dispatch entry=0).',
+    // "source" must always reflect the exact text of simulator/cloomc/EventRouter.cloomc.
+    // Never leave this field empty — the build CI guard enforces it after every recompile.
+    source:      source,
+    source_file: 'simulator/cloomc/EventRouter.cloomc',
 };
 
 fs.writeFileSync(sidecarPath, JSON.stringify(sidecar, null, 2) + '\n');

@@ -41,7 +41,13 @@ const path = require('path');
 const ROOT        = path.resolve(__dirname, '..');
 const ASSEMBLER   = path.join(ROOT, 'simulator', 'assembler.js');
 const SOURCE      = path.join(ROOT, 'simulator', 'examples', 'capability_test.cloomc');
-const LUMPS_DIR   = path.join(ROOT, 'server', 'lumps');
+
+// --out-dir <path>: redirect .lump/.json/manifest writes to a different
+// directory (used by CI to validate without touching server/lumps/).
+const _outDirIdx  = process.argv.indexOf('--out-dir');
+const LUMPS_DIR   = (_outDirIdx !== -1 && process.argv[_outDirIdx + 1])
+    ? path.resolve(process.argv[_outDirIdx + 1])
+    : path.join(ROOT, 'server', 'lumps');
 const MANIFEST    = path.join(LUMPS_DIR, 'manifest.json');
 
 // ── Minimal browser stubs so assembler.js loads in Node.js ──────────────────

@@ -44,6 +44,7 @@
     "wukong-cr-update-tests",
     "wukong-protocol-tests",
     "wukong-status-readonly-tests",
-    "wukong-trace-cr-server-tests"
+    "wukong-trace-cr-server-tests",
+    "check-build-lump-sidecar-source"
   ]
 }

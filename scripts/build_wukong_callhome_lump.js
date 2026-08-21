@@ -10,15 +10,18 @@
 //
 // The token is the CRC-32 of all binary bytes, lower-cased 8-hex-char string.
 //
-// C-List (cc=2) — tail of the lump, 2 slots:
-//   Slot 0  LED0    (NS slot 3, RW)  — LED_DEV  MMIO 0x40000000
-//   Slot 1  UART_TX (NS slot 2, RW)  — UART_DEV MMIO 0x40000014
+// C-List (cc=3) — tail of the lump, 3 slots:
+//   Slot 0  LED0              (NS slot 3, RW)  — LED_DEV  MMIO 0x40000000
+//   Slot 1  UART_TX           (NS slot 2, RW)  — UART_DEV MMIO 0x40000014
+//   Slot 2  WukongCallHome.hw (NS slot 7, E)   — hardware-accelerated callhome LUMP
 //
 // GT encoding (v2.0):
 //   b_flag[31] | perm[30:28] | dom[27] | gt_type[26:25] | gt_seq[24:16] | slot[15:0]
-//   Turing RW: dom=0, perm3=0b011=3, gt_type=Inform=0b01
+//   Turing RW:    dom=0, perm3=0b011=3, gt_type=Inform=0b01
+//   Church E:     dom=1, perm3=0b100=4, gt_type=Inform=0b01
 //   LED_DEV  slot 3 → (3<<28)|(0<<27)|(1<<25)|3 = 0x32000003
 //   UART_DEV slot 2 → (3<<28)|(0<<27)|(1<<25)|2 = 0x32000002
+//   WCH.hw   slot 7 → (4<<28)|(1<<27)|(1<<25)|7 = 0x4A000007
 //
 // Note: UART_TX is declared `W` in the capabilities block but the binary c-list
 // carries an RW GT (0x32000002) because DREAD is used to poll the STATUS register.
@@ -36,7 +39,13 @@ const path = require('path');
 const ROOT        = path.resolve(__dirname, '..');
 const ASSEMBLER   = path.join(ROOT, 'simulator', 'assembler.js');
 const SOURCE      = path.join(ROOT, 'simulator', 'examples', 'wukong_callhome.cloomc');
-const LUMPS_DIR   = path.join(ROOT, 'server', 'lumps');
+
+// --out-dir <path>: redirect .lump/.json/manifest writes to a different
+// directory (used by CI to validate without touching server/lumps/).
+const _outDirIdx  = process.argv.indexOf('--out-dir');
+const LUMPS_DIR   = (_outDirIdx !== -1 && process.argv[_outDirIdx + 1])
+    ? path.resolve(process.argv[_outDirIdx + 1])
+    : path.join(ROOT, 'server', 'lumps');
 const MANIFEST    = path.join(LUMPS_DIR, 'manifest.json');
 
 // ── Minimal browser stubs so assembler.js loads in Node.js ──────────────────
@@ -71,9 +80,11 @@ if (result.errors.length > 0) {
 const words = result.words;
 console.log(`Assembled ${words.length} instruction words.`);
 
-if (words.length !== 73) {
-    console.error(`ERROR: expected 73 words, got ${words.length}.`);
-    console.error('wukong_callhome.cloomc must produce exactly 73 instructions to match WUKONG_NUC_PROGRAM.');
+if (words.length !== 74) {
+    console.error(`ERROR: expected 74 words, got ${words.length}.`);
+    console.error('wukong_callhome.cloomc must produce exactly 74 instructions.');
+    console.error('Words 0-1 are LOAD setup, words 2-71 mirror WUKONG_NUC_PROGRAM,');
+    console.error('word 72 is CALL WukongCallHome.hw, word 73 is BRANCH loop_top.');
     process.exit(1);
 }
 
@@ -96,10 +107,12 @@ if (words.length !== 73) {
 //   UART_DEV NS slot 2: (0b011 << 28) | (0 << 27) | (0b01 << 25) | 2 = 0x32000002
 //
 const CLIST = [
-    { gt: 0x32000003, name: 'LED0',    ns_slot: 3, rights: ['R','W'],
-      note: 'LED_DEV  Inform GT (NS slot 3, MMIO 0x40000000, RW)' },
-    { gt: 0x32000002, name: 'UART_TX', ns_slot: 2, rights: ['R','W'],
-      note: 'UART_DEV Inform GT (NS slot 2, MMIO 0x40000014, RW — R needed for STATUS poll)' },
+    { gt: 0x32000003, name: 'LED0',              ns_slot: 3, rights: ['R','W'],
+      note: 'LED_DEV          Turing RW Inform GT (NS slot 3, MMIO 0x40000000)' },
+    { gt: 0x32000002, name: 'UART_TX',           ns_slot: 2, rights: ['R','W'],
+      note: 'UART_DEV         Turing RW Inform GT (NS slot 2, MMIO 0x40000014, R for STATUS poll)' },
+    { gt: 0x4A000007, name: 'WukongCallHome.hw', ns_slot: 7, rights: ['E'],
+      note: 'WukongCallHome.hw Church E Inform GT (NS slot 7)' },
 ];
 
 // ── Pack LUMP binary ─────────────────────────────────────────────────────────
@@ -227,8 +240,8 @@ const sidecar = {
     profile:         'IoT',
     language:        'assembly',
     description:     'Wukong board ROM boot program: LED0 blink at ~1 Hz and "CM:WUKONG\\r\\n" ' +
-                     'UART callhome banner. 73-instruction infinite loop, no CALL/RETURN. ' +
-                     'Transcribed from WUKONG_NUC_PROGRAM in hardware/boot_rom.py. ' +
+                     'UART callhome banner. 74 instructions: words 2-71 mirror WUKONG_NUC_PROGRAM, ' +
+                     'word 72 hands off via CALL WukongCallHome.hw, word 73 is the loop fallback BRANCH. ' +
                      'See docs/wukong-boot.md for the NULL_CAP standalone problem this solves.',
     // "source" must always reflect the exact text of simulator/examples/wukong_callhome.cloomc.
     // Never leave this field empty — check-sidecar-source.js enforces it after every recompile.
@@ -246,7 +259,7 @@ fs.writeFileSync(sidecarPath, JSON.stringify(sidecar, null, 2) + '\n');
 console.log(`Written: ${sidecarPath}`);
 
 // ── Print c-list slot assignments ─────────────────────────────────────────────
-console.log('\nC-List GT slot assignments (cc=2, tail-packed):');
+console.log(`\nC-List GT slot assignments (cc=${CLIST.length}, tail-packed):`);
 for (let i = 0; i < CLIST.length; i++) {
     const gt = '0x' + CLIST[i].gt.toString(16).padStart(8, '0');
     console.log(`  slot ${i}  ${gt}  ${CLIST[i].note}`);
