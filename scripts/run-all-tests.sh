@@ -112,7 +112,7 @@ register_suite "check-stale-cr7" \
     'bash scripts/check_stale_cr7.sh'
 
 register_suite "check-selftest-lump-stale" \
-    'node scripts/check_selftest_lump_stale.js && node scripts/test_check_selftest_lump_stale.js'
+    'node scripts/check_selftest_lump_stale.js && node scripts/test_check_selftest_lump_stale.js && node scripts/test_build_selftest_lump_cleanup.js'
 
 register_suite "check-capabilities-blocks" \
     'node scripts/check-capabilities-blocks.js'

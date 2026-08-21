@@ -26,12 +26,16 @@ const ROOT        = path.resolve(__dirname, '..');
 const ASSEMBLER   = path.join(ROOT, 'simulator', 'assembler.js');
 const SOURCE      = path.join(ROOT, 'simulator', 'examples', 'post_flash_selftest.cloomc');
 
+const lumpsDirArgIdx = process.argv.indexOf('--lumps-dir');
+
 // --out-dir <path>: redirect .lump/.json/manifest writes to a different
 // directory (used by CI to validate without touching server/lumps/).
 const _outDirIdx  = process.argv.indexOf('--out-dir');
-const LUMPS_DIR   = (_outDirIdx !== -1 && process.argv[_outDirIdx + 1])
+const LUMPS_DIR = (_outDirIdx !== -1 && process.argv[_outDirIdx + 1])
     ? path.resolve(process.argv[_outDirIdx + 1])
-    : path.join(ROOT, 'server', 'lumps');
+    : (lumpsDirArgIdx !== -1 && process.argv[lumpsDirArgIdx + 1])
+        ? path.resolve(process.argv[lumpsDirArgIdx + 1])
+        : path.join(ROOT, 'server', 'lumps');
 const MANIFEST    = path.join(LUMPS_DIR, 'manifest.json');
 
 // ── Minimal browser stubs so assembler.js loads in Node.js ──────────────────
@@ -128,7 +132,7 @@ const headerWord = (
 
 const padded = new Uint32Array(lumpSize);
 padded[0] = headerWord;
-for (let i = 0; i < cw; i++) padded[1 + i] = words[i] >>> 0;
+for (let i = 0; i < CLIST.length; i++) {
 
 // Write c-list GT values at the lump tail (words lumpSize-cc .. lumpSize-1)
 const clistBase = lumpSize - cc;
@@ -143,7 +147,7 @@ console.log(`  c-list base word index: ${clistBase}`);
 
 // ── Convert to big-endian bytes ──────────────────────────────────────────────
 const bytes = Buffer.alloc(lumpSize * 4);
-for (let i = 0; i < lumpSize; i++) {
+for (let i = 0; i < CLIST.length; i++) {
     bytes.writeUInt32BE(padded[i] >>> 0, i * 4);
 }
 
@@ -169,9 +173,6 @@ function crc32(buf) {
 }
 
 const token = crc32(bytes).toString(16).toLowerCase().padStart(8, '0');
-console.log(`Token (CRC-32 of binary): ${token}`);
-
-// ── Write .lump binary ───────────────────────────────────────────────────────
 const lumpPath    = path.join(LUMPS_DIR, `${token}.lump`);
 const sidecarPath = path.join(LUMPS_DIR, `${token}.json`);
 
@@ -238,21 +239,28 @@ const manifestEntry = {
     cc,
     grants: ['E'],
     lump_version: 0,
+    sidecar_file: `${token}.json`,
 };
+const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
+
+const existingIdx = manifest.findIndex(e => e.abstraction === 'PostFlashSelftest');
 
 console.log('\nManifest entry to add to server/lumps/manifest.json:');
 console.log(JSON.stringify(manifestEntry, null, 4));
 
-// ── Optionally update manifest.json automatically ─────────────────────────────
-const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
-const existing = manifest.find(e => e.abstraction === 'PostFlashSelftest');
-if (existing) {
-    console.log('\nExisting PostFlashSelftest entry found — removing it before update.');
-    const idx = manifest.indexOf(existing);
-    manifest.splice(idx, 1);
+// ── Update manifest.json ──────────────────────────────────────────────────────
+if (existingIdx !== -1) {
+    console.log('\nExisting PostFlashSelftest entry found — replacing it.');
+    manifest.splice(existingIdx, 1);
 }
 manifest.push(manifestEntry);
 fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 4) + '\n');
 console.log(`Updated: ${MANIFEST}`);
 
 console.log('\nDone. Run python -m pytest tests/lump/test_lump_consistency.py -v to verify.');
+
+        const oldLump    = path.join(LUMPS_DIR, `${oldToken}.lump`);
+
+    const oldToken = manifest[existingIdx].token;
+
+        const oldSidecar = path.join(LUMPS_DIR, `${oldToken}.json`);

@@ -1858,21 +1858,6 @@
         "issue_n": 1
     },
     {
-        "token": "059dc47f",
-        "abstraction": "PostFlashSelftest",
-        "ns_slot": null,
-        "ns_slot_policy": "dynamic",
-        "variant_group": null,
-        "lump_size": 512,
-        "cw": 499,
-        "cc": 2,
-        "grants": [
-            "E"
-        ],
-        "lump_version": 0,
-        "sidecar_file": "059dc47f.json"
-    },
-    {
         "token": "00000600",
         "abstraction": "SelfTest",
         "filename": "SelfTest.1.30542a6d.lump",
@@ -2091,5 +2076,20 @@
             "E"
         ],
         "lump_version": 1
+    },
+    {
+        "token": "059dc47f",
+        "abstraction": "PostFlashSelftest",
+        "ns_slot": null,
+        "ns_slot_policy": "dynamic",
+        "variant_group": null,
+        "lump_size": 512,
+        "cw": 499,
+        "cc": 2,
+        "grants": [
+            "E"
+        ],
+        "lump_version": 0,
+        "sidecar_file": "059dc47f.json"
     }
 ]
