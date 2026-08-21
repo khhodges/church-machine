@@ -304,6 +304,7 @@ function copyLedAssembly() {
 }
 
 function updateDashboard() {
+    _updateExecutionCounter();
     updateCRDisplay();
     updateDRDisplay();
     updateFlagsDisplay();
@@ -316,6 +317,24 @@ function updateDashboard() {
     updateMemoryStatsPanel();
     if (typeof renderWatchStrip === 'function') renderWatchStrip();
     if (typeof refreshInvokeBtn === 'function') refreshInvokeBtn();
+}
+
+// Render the authoritative simulator retirement count and the operations that
+// were intentionally excluded from it.  This is deliberately read-only: none
+// of the UI execution paths is allowed to add to the successful count.
+function _updateExecutionCounter() {
+    const el = document.getElementById('faultFreeCounter');
+    if (!el || !sim || !sim.executionStats) return;
+    const s = sim.executionStats;
+    const fmt = n => Number(n || 0).toLocaleString();
+    const total = Number(s.successful || 0);
+    el.textContent = `${fmt(total)}\u202F/\u202F1K`;
+    el.className = total >= 1000 ? 'fault-free-badge ff-eligible' : (total ? 'fault-free-badge ff-progress' : 'fault-free-badge ff-zero');
+    el.title = `Successful user instructions: ${fmt(total)} / 1,000`;
+    const excluded = document.getElementById('executionExcludedCounters');
+    if (excluded) {
+        excluded.textContent = `Boot ${fmt(s.bootPhases)} \u00b7 Fault ${fmt(s.faults)} \u00b7 Suspended ${fmt(s.suspensions)} \u00b7 Lazy ${fmt(s.lazyLoadWaits)} \u00b7 Rejected ${fmt(s.rejected)}`;
+    }
 }
 
 function updateMemoryStatsPanel() {

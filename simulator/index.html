@@ -394,6 +394,7 @@
                             </div>
                         </div>
                         <span id="faultFreeCounter" class="fault-free-badge ff-zero" data-tooltip="Fault-Free Instructions — accumulates across clean runs; reach 1,000 to unlock LUMP save">0&#x202F;/&#x202F;1K</span>
+                        <span id="executionExcludedCounters" class="execution-excluded-counters" aria-label="Excluded execution counters">Boot 0 · Fault 0 · Suspended 0 · Lazy 0 · Rejected 0</span>
                         <button class="btn btn-invoke sim-icon-btn" id="btnInvokeMethod" onclick="openInvokeModal()" style="display:none;" data-tooltip="Invoke Method — Set up a method call: choose method, fill in arguments, configure registers">&#x2609;</button>
                         <button class="btn btn-warning sim-icon-btn" onclick="resetSim()" data-tooltip="Boot — Reset and run the boot sequence (C+R)">&#x21BA;</button>
                         <label class="break-at-entry-label" id="breakAtEntryLabel" data-tooltip="Break at entry — Pause automatically at the very first instruction after boot (one-shot; clears itself after firing)"><input type="checkbox" id="breakAtEntryChk"> Break at entry</label>

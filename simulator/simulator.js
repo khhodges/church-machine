@@ -833,6 +833,17 @@ class ChurchSimulator {
         this.running = false;
         this.halted = false;
         this.stepCount = 0;
+        // User-visible execution accounting.  Keep this separate from stepCount:
+        // stepCount is architectural execution context used by timers and fault
+        // records, while these counters describe operations that actually retired.
+        this.executionStats = {
+            successful: 0,
+            bootPhases: 0,
+            faults: 0,
+            suspensions: 0,
+            lazyLoadWaits: 0,
+            rejected: 0,
+        };
         this.output = '';
         this.callStack = [];
         this.lambdaActive = false;
@@ -2158,6 +2169,7 @@ class ChurchSimulator {
         // and docs/architecture.md "Boot Sequence" implement the same three-lump sequence.
         if (this.bootComplete) return false;   // nothing to do once boot has finished
         if (this.halted) return false;         // stop re-entering after a boot fault (prevents infinite loop in runSim)
+        this.executionStats.bootPhases++;
         // _tracePacketsBuf is NOT cleared here — boot packets accumulate across all _bootStep() calls
         // so that after the full loop callers see all 8 packets (2+3+3) at once.
         // The buffer is cleared by reset() and at the top of step() for post-boot instructions.
@@ -3893,6 +3905,7 @@ class ChurchSimulator {
     }
 
     fault(type, message, meta = null) {
+        if (this.executionStats) this.executionStats.faults++;
         const lastH = this._instrHistory && this._instrHistory.length > 0
             ? this._instrHistory[this._instrHistory.length - 1] : null;
         const faultStep = (lastH && lastH.step === this.stepCount) ? this.stepCount : null;
@@ -4188,12 +4201,14 @@ class ChurchSimulator {
         // anything — return a suspended sentinel.  app.js drives the async fetch
         // and calls receiveLump() to resume, so this should rarely be hit.
         if (this.awaitingLump) {
+            this.executionStats.suspensions++;
             return { suspended: true, awaitingLump: this.awaitingLump };
         }
         // Lazy-Resolve: thread suspended waiting for IDE to supply a GT (Task #1519).
         // Return a sentinel so the IDE can display the Pending Capabilities panel.
         // Execution resumes when resolvePendingSlot() or escalateLazyResolve() is called.
         if (this._lazySuspended) {
+            this.executionStats.suspensions++;
             return {
                 lazySuspended: true,
                 pendingResolves: [...this._pendingResolves.entries()].map(([slot, e]) => ({
@@ -4364,6 +4379,13 @@ class ChurchSimulator {
         }
 
         if (result) {
+            // This is the sole successful-instruction retirement boundary.  A
+            // result returned by an instruction is a retirement; faulted and
+            // suspended paths return before here and are never counted.
+            if (result.absent) this.executionStats.lazyLoadWaits++;
+            else if (result.suspended || result.lazySuspended) this.executionStats.suspensions++;
+            else if (result.rejected) this.executionStats.rejected++;
+            else if (!result.timerIRQ) this.executionStats.successful++;
             // DR0 is the hardwired zero register — zeroed unconditionally after every
             // instruction. Signed results from device CALL paths are returned in DR1.
             this._writeDR(0, 0);
@@ -7974,6 +7996,10 @@ class ChurchSimulator {
             const result = this.step();
             if (!result) { stopReason = this.halted ? 'halted' : 'bootExit'; break; }
             if (!this.bootComplete) { stopReason = 'bootExit'; break; }
+            if (result.absent || result.suspended || result.lazySuspended || result.rejected) {
+                stopReason = result.absent ? 'lazyLoad' : result.lazySuspended ? 'suspended' : result.rejected ? 'rejected' : 'suspended';
+                break;
+            }
             steps++;
         }
         if (stopReason === 'stopped') {

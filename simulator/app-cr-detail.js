@@ -1168,9 +1168,11 @@ function _updateFaultFreeCounter() {
     const el = document.getElementById('faultFreeCounter');
     if (!el) return;
     const stale = _isSourceStale();
-    const ffi = stale ? 0 : _faultFreeInstrTotal;
+    const hasExecutionStats = !!(sim && sim.executionStats);
+    const displayStale = stale && !hasExecutionStats;
+    const ffi = hasExecutionStats ? sim.executionStats.successful : (stale ? 0 : _faultFreeInstrTotal);
     const eligible = ffi >= 1000;
-    if (stale || ffi === 0) {
+    if (displayStale || ffi === 0) {
         el.textContent = '0\u202F/\u202F1K';
         el.className = 'fault-free-badge ff-zero';
         el.title = 'Fault-free instructions: run a clean program to accumulate';
