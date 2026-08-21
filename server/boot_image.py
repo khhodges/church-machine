@@ -699,40 +699,31 @@ def _read_lump_body(lumps_dir, token_hex, filename=None):
 
 
 def find_lump_file_by_abstraction(lumps_dir, abstraction_name, ns_slot):
-    """Find the lump file for `abstraction_name` at `ns_slot` via manifest.json.
+    """Find the canonical lump assigned to a Namespace-state slot.
 
     Reads ``manifest.json`` and returns the full path to the first matching
     entry's lump file.  Prefers the versioned ``filename`` field; falls back to
     ``{token}.lump`` when ``filename`` is absent or missing on disk.  Returns
     ``None`` when no matching entry is found or no file exists.
     """
-    mf_path = os.path.join(lumps_dir, "manifest.json")
-    if not os.path.isfile(mf_path):
-        return None
     try:
-        with open(mf_path) as _f:
-            _entries = json.load(_f)
-        for _e in _entries if isinstance(_entries, list) else []:
-            if not isinstance(_e, dict):
+        with open(os.path.join(lumps_dir, "ns-state.json")) as _f:
+            _state = json.load(_f)
+        for _e in _state.get("abstractions", []):
+            if not isinstance(_e, dict) or _e.get("name") != abstraction_name:
                 continue
-            if _e.get("archived"):
+            if _e.get("slot") != ns_slot:
                 continue
-            if _e.get("abstraction") != abstraction_name:
-                continue
-            if _e.get("ns_slot") != ns_slot:
-                continue
-            # Prefer versioned filename if present and on disk
-            _fname = _e.get("filename")
-            if _fname:
-                _p = os.path.join(lumps_dir, _fname)
-                if os.path.isfile(_p):
-                    return _p
-            # Fall back to token-named file
-            _tok = _e.get("token")
-            if _tok:
-                _p = os.path.join(lumps_dir, f"{_tok}.lump")
-                if os.path.isfile(_p):
-                    return _p
+            _tok = _e.get("token") or _e.get("cache_token")
+            if _tok and os.path.isfile(os.path.join(lumps_dir, f"{_tok}.lump")):
+                return os.path.join(lumps_dir, f"{_tok}.lump")
+            import re as _re
+            _rx = _re.compile(
+                rf"^{_re.escape(str(abstraction_name))}\.\d+\.[0-9a-f]{{8}}\.lump$",
+                _re.IGNORECASE)
+            _files = sorted(fn for fn in os.listdir(lumps_dir) if _rx.match(fn))
+            if _files:
+                return os.path.join(lumps_dir, _files[-1])
     except Exception:
         pass
     return None
@@ -923,22 +914,24 @@ def _load_ns_state_token_map(lumps_dir):
         if not _abstractions:
             return {}
 
-        # Build name→{token, ns_slot} index from manifest (used by both formats).
-        _mf = os.path.join(lumps_dir, "manifest.json")
-        _name_info = {}
-        try:
-            with open(_mf) as _mf_f:
-                _entries = json.load(_mf_f)
-            for _e in (_entries if isinstance(_entries, list) else []):
-                if _e.get("archived"):
-                    continue
-                _n = _e.get("abstraction")
-                _t = _e.get("token")
-                _s = _e.get("ns_slot")
-                if _n and _t and isinstance(_s, int):
-                    _name_info.setdefault(_n, {"token": _t, "ns_slot": _s})
-        except Exception:
-            pass
+        def _state_file(_name):
+            """Find the newest canonical file for a state entry by dot name."""
+            import re as _re
+            _rx = _re.compile(
+                rf"^{_re.escape(str(_name))}\.(\d+)\.([0-9a-f]{{8}})\.lump$",
+                _re.IGNORECASE)
+            _found = []
+            try:
+                for _fn in os.listdir(lumps_dir):
+                    _m = _rx.match(_fn)
+                    if _m:
+                        _found.append((int(_m.group(1)), _m.group(2).lower(), _fn))
+            except OSError:
+                return None, None
+            if not _found:
+                return None, None
+            _issue, _token, _fn = max(_found)
+            return _token, _fn
 
         out = {}
 
@@ -949,40 +942,32 @@ def _load_ns_state_token_map(lumps_dir):
                 _slot = _entry.get("slot")
                 if not _name or not isinstance(_slot, int):
                     continue
-                _info = _name_info.get(_name)
-                if _info and _info.get("token"):
-                    out[_slot] = _info["token"]
+                _token = _entry.get("token") or _entry.get("cache_token")
+                if not _token:
+                    _token, _ = _state_file(_name)
+                if _token:
+                    out[_slot] = str(_token).lower()
             return out
 
-        # Old flat-name format: derive slot from manifest ns_slot.
-        for _name in _abstractions:
-            _info = _name_info.get(str(_name))
-            if _info:
-                out[_info["ns_slot"]] = _info["token"]
+        # Flat-name state has no explicit slot and therefore cannot safely
+        # establish Namespace membership.  It is intentionally not promoted
+        # from the manifest's historical ns_slot fields.
         return out
     except Exception:
         return {}
 
 
 def _load_catalog_token_map(manifest_path, selected_by_slot=None):
-    """slot→token: ns-state.json (preferred) merged over manifest.json ns_slot fields."""
+    """Return slot→token from Namespace state, with config selections overlaid.
+
+    The manifest remains a filename/catalog lookup only.  It must never create
+    membership or assign a token to a slot when Namespace state is present.
+    """
     lumps_dir = os.path.dirname(manifest_path)
-    out = {}
-    # Manifest provides backward-compat for entries written before ns-state.json existed
-    try:
-        with open(manifest_path, "r") as f:
-            entries = json.load(f)
-    except Exception:
-        entries = []
-    for e in entries if isinstance(entries, list) else []:
-        if e.get("archived"):
-            continue
-        slot = e.get("ns_slot")
-        tok  = e.get("token")
-        if isinstance(slot, int) and isinstance(tok, str):
-            out[slot] = tok
-    # ns-state.json overrides manifest where present (authoritative)
-    out.update(_load_ns_state_token_map(lumps_dir))
+    out = _load_ns_state_token_map(lumps_dir)
+    # A missing state file is an old image/configuration, not permission to
+    # treat the manifest as authority.  Only explicit designer selections can
+    # supply a slot in that case.
     # A saved designer choice is explicit and must override the current
     # ns-state/manifest default for that slot.
     for slot, token in (selected_by_slot or {}).items():
@@ -1054,27 +1039,41 @@ def _load_trusted_cache_token_map(manifest_path):
 
 
 def _load_boot_resident_entries(manifest_path, selected_by_slot=None):
-    """Return list of (ns_slot, token_hex, filename_or_none) for all manifest
-    entries with boot_resident=true and a non-empty token.
+    """Return resident entries represented by Namespace state.
 
     ``filename_or_none`` is the versioned filename (e.g. ``SelfTest_v75.lump``)
     when the manifest entry carries a ``filename`` field, otherwise ``None``.
     The caller should pass it to ``_read_lump_body`` so the versioned file is
     preferred over the legacy token-named fallback.
     """
+    lumps_dir = os.path.dirname(manifest_path)
     try:
-        with open(manifest_path, "r") as f:
-            entries = json.load(f)
+        with open(os.path.join(lumps_dir, "ns-state.json")) as f:
+            state = json.load(f)
     except Exception:
         return []
     out = []
-    for e in entries if isinstance(entries, list) else []:
-        if e.get("archived") or not e.get("boot_resident"):
+    for e in state.get("abstractions", []) if isinstance(state, dict) else []:
+        if not isinstance(e, dict) or e.get("type") not in ("Inform", "Resident"):
             continue
-        slot = e.get("ns_slot")
-        tok  = e.get("token")
-        if isinstance(slot, int) and isinstance(tok, str) and tok:
-            out.append((slot, tok, e.get("filename"), e.get("lump_version", 0)))
+        slot = e.get("slot")
+        tok  = e.get("token") or e.get("cache_token")
+        if not isinstance(slot, int):
+            continue
+        filename = e.get("filename")
+        if not tok:
+            import re as _re
+            rx = _re.compile(
+                rf"^{_re.escape(str(e.get('name') or ''))}\.(\d+)\.([0-9a-f]{{8}})\.lump$",
+                _re.IGNORECASE)
+            found = [(int(m.group(1)), m.group(2).lower(), fn)
+                     for fn in os.listdir(lumps_dir)
+                     if (m := rx.match(fn))]
+            if found:
+                _issue, tok, filename = max(found)
+        if not tok:
+            continue
+        out.append((slot, str(tok), filename, int(e.get("issue_n") or 0)))
     selected = selected_by_slot or {}
     chosen = {}
     for slot, tok, filename, version in out:

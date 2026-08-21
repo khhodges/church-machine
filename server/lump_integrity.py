@@ -4,10 +4,10 @@ This module is intentionally kept import-safe: no Flask, no SQLAlchemy, no
 application-startup side-effects.  Import it freely from tests, scripts, or
 server code.
 
-Canonical filename format: {Dot.Name}.{issue_n}.{Number}.lump
-  Dot.Name  — manifest dot_name field (e.g. "SelfTest", "Scheduler.IRQ")
-  issue_n   — manifest issue_n field (positive integer, "1" for all initial entries)
-  Number    — sha256(dot_name_utf8 + lump_bytes)[:8] (lowercase hex)
+Canonical filename format: {Dot.Name}.{issue_n}.{token}.lump
+  Dot.Name  — canonical abstraction identity (e.g. "SelfTest", "Scheduler.IRQ")
+  issue_n   — positive issuance number; it is not part of the content token
+  token     — sha256(dot_name_utf8 + sealed_genotype_bytes)[:8] (lowercase hex)
 
 The Number embeds both the lump content AND its identity (dot_name) so identical
 code compiled under two different names produces different Numbers.
@@ -97,12 +97,26 @@ _CANONICAL_RE = re.compile(
 )
 
 
-def compute_number(dot_name: str, lump_bytes: bytes) -> str:
-    """Return sha256(dot_name_utf8 + lump_bytes)[:8] (lowercase hex)."""
+def compute_token(dot_name: str, genotype_binary: bytes) -> str:
+    """Return the v3 content token for a sealed genotype.
+
+    The issue number is deliberately absent from this API.  ``genotype_binary``
+    is the complete on-disk, big-endian, power-of-two padded lump binary,
+    including the header, sealed c-list, and SELF row when present.
+    """
     h = hashlib.sha256()
     h.update(dot_name.encode('utf-8'))
-    h.update(lump_bytes)
+    h.update(genotype_binary)
     return h.hexdigest()[:8]
+
+
+def compute_number(dot_name: str, lump_bytes: bytes) -> str:
+    """Backward-compatible name for :func:`compute_token`.
+
+    Existing callers use ``Number`` for the filename component.  It is the
+    issue-independent v3 content token, not a CRC or issuance number.
+    """
+    return compute_token(dot_name, lump_bytes)
 
 
 def parse_canonical_filename(filename: str):

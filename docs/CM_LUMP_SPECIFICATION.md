@@ -1950,17 +1950,18 @@ advisory only.
 The scripts below are the supported workflow for rebuilding and validating `.lump`
 binaries and keeping example sources in sync.
 
-> **Token discovery.** Tokens are discovered via `server/lumps/manifest.json`;
-> do not maintain a separate token table in documentation. Where an older
-> (now archived) document carries a static token/source
-> table, this specification supersedes it — such tables go stale and must
-> not be relied on.
+> **Token discovery.** Bitstream membership, slot assignment, residency, and
+> displayed build metadata come from the committed Namespace Table and its
+> assigned slot/LUMP data. `manifest.json` is an untrusted catalog/lookup aid
+> only; it never establishes membership or content identity. The content token
+> is `sha256(canonical_dot_name ‖ sealed_genotype_binary)[:8]` and excludes
+> the re-issuable issue number. CRC/parity fields are per-GT checks, not seals.
 
 ### `scripts/update-lump.js` — one-command LUMP rebuild
 
-Changing a lump requires assembling the `.cloomc` source, writing the binary, updating the
-sidecar JSON, and patching `manifest.json` — all in one commit, or the consistency gate
-rejects the merge. `update-lump.js` wraps the entire sequence into a single command.
+Changing a sealed lump requires assembling a **new** `.cloomc` source and
+publishing a new immutable LUMP; existing sealed bytes are never patched in
+place. The Namespace Table is updated by the trusted installation path.
 
 **Invocation:**
 
@@ -1972,7 +1973,8 @@ make update-lump TOKEN=<hex>                        # Makefile shorthand
 
 **Inputs read:**
 
-1. The manifest entry for `<token>` in `server/lumps/manifest.json`.
+1. The Namespace Table entry assigned to `<token>` (the manifest may be used
+   only to locate an untrusted source/catalog record).
 2. The `.cloomc` source, discovered in this order:
    1. the manifest entry's `"source"` field (explicit path relative to repo root)
    2. `simulator/examples/<token>.cloomc`

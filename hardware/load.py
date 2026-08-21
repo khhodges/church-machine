@@ -38,6 +38,7 @@ class ChurchLoad(Elaboratable):
         cr_src_lat = Signal(4)
         cr_dst_lat = Signal(4)
         index_lat  = Signal(16)
+        structural_fault = Signal()
 
         m.d.comb += [
             self.mload_cr_src.eq(cr_src_lat),
@@ -55,7 +56,21 @@ class ChurchLoad(Elaboratable):
                         cr_src_lat.eq(self.cr_src),
                         cr_dst_lat.eq(self.cr_dst),
                         index_lat.eq(self.index),
+                        structural_fault.eq(
+                            # CR6 is the sealed c-list capability and CR14
+                            # is its machine-owned bound/code context.  The
+                            # namespace, stack, interrupt, and heap registers
+                            # are explicitly loaded during boot or by normal
+                            # working code and are not structural targets.
+                            (self.cr_dst == CR_CLIST) |
+                            (self.cr_dst == CR_CLOOMC)
+                        ),
                     ]
+                    m.next = "CHECK_STRUCTURAL"
+            with m.State("CHECK_STRUCTURAL"):
+                with m.If(structural_fault):
+                    m.next = "FAULT"
+                with m.Else():
                     m.next = "START_SUB"
             with m.State("START_SUB"):
                 m.d.comb += self.mload_start.eq(1)
@@ -67,12 +82,20 @@ class ChurchLoad(Elaboratable):
             with m.State("CALL_SUB"):
                 with m.If(self.mload_done | self.mload_fault):
                     m.next = "IDLE"
+            with m.State("FAULT"):
+                m.next = "IDLE"
 
         m.d.comb += [
             self.load_busy.eq(~fsm.ongoing("IDLE")),
             self.load_complete.eq(fsm.ongoing("CALL_SUB") & self.mload_done),
-            self.load_fault.eq(fsm.ongoing("CALL_SUB") & self.mload_fault),
-            self.fault_type.eq(self.mload_fault_type),
+            self.load_fault.eq(
+                fsm.ongoing("CALL_SUB") & self.mload_fault |
+                fsm.ongoing("FAULT")
+            ),
+            self.fault_type.eq(
+                Mux(fsm.ongoing("FAULT"), FaultType.STRUCTURAL_REG,
+                    self.mload_fault_type)
+            ),
         ]
 
         return m

@@ -2505,7 +2505,7 @@ def start_here():
       <p class="page-desc">
         Conventional code has no built-in memory safety. The Church Machine enforces boundaries using
         <strong>Golden Tokens</strong> — 32-bit unforgeable capability descriptors that carry version,
-        CRC seal, bounds, and permission bits. No code can read or write memory without a valid token.
+        CRC/parity checks, bounds, and permission bits. No code can read or write memory without a valid token.
       </p>
       <div class="code-block">
         <div class="code-label">Adding a Golden Token boundary</div>
@@ -2516,12 +2516,12 @@ def start_here():
       </div>
       <ul class="checklist">
         <li>Every MLOAD/MSTORE passes through the 4-stage mLoad capability validation pipeline</li>
-        <li>The pipeline checks: version, CRC seal, bounds, and permission bits — in that order</li>
+        <li>The pipeline checks: version, CRC/parity, bounds, and permission bits — in that order</li>
         <li>An out-of-bounds or permission-denied access fires a capability fault, not a crash</li>
         <li>Domain purity keeps capabilities strictly separate from code and data words</li>
       </ul>
       <div class="concept-box">
-        <strong>Golden Token format:</strong> bits [31:28] version · [27:16] CRC seal ·
+        <strong>Golden Token format:</strong> bits [31:28] version · [27:16] CRC/parity ·
         [15:8] upper bound · [7:0] lower bound. The <strong>E</strong> (execute) bit is the only
         permission in a C-List entry; data tokens carry <strong>R</strong> and/or <strong>W</strong>.
       </div>
@@ -2529,9 +2529,9 @@ def start_here():
         <div class="quiz-label">Quick Check</div>
         <div class="quiz-prompt">In what order does the mLoad pipeline perform its four checks?</div>
         <div class="quiz-options">
-          <button class="quiz-opt" onclick="checkAnswer(2,this,false)">Bounds → CRC seal → version → permissions</button>
-          <button class="quiz-opt" onclick="checkAnswer(2,this,true)">Version → CRC seal → bounds → permissions</button>
-          <button class="quiz-opt" onclick="checkAnswer(2,this,false)">Permissions → bounds → CRC seal → version</button>
+          <button class="quiz-opt" onclick="checkAnswer(2,this,false)">Bounds → CRC/parity → version → permissions</button>
+          <button class="quiz-opt" onclick="checkAnswer(2,this,true)">Version → CRC/parity → bounds → permissions</button>
+          <button class="quiz-opt" onclick="checkAnswer(2,this,false)">Permissions → bounds → CRC/parity → version</button>
         </div>
         <div class="quiz-hint" id="hint-2">The page lists the four checks explicitly — start with the most fundamental property of the token and work outward.</div>
         <div class="quiz-ok" id="ok-2">&#10003; Correct! Version first, then the seal, then bounds, then permission bits.</div>
@@ -2586,14 +2586,14 @@ def start_here():
       <h1 class="page-title">Add LUMP to Repository</h1>
       <p class="page-desc">
         A <strong>LUMP</strong> is the Church Machine's unit of deployment — a self-describing binary
-        that packages compiled code, its C-List of capabilities, and a header with CRC-sealed metadata.
+        that packages compiled code, its C-List of capabilities, and a header with CRC/parity metadata.
         Once built, you commit the LUMP to the Mum Tunnel repository so others can lazy-load it.
       </p>
       <div class="code-block">
         <div class="code-label">LUMP anatomy (simplified)</div>
         <pre><span class="cm">; Word 0  — header: magic, version, lump_size</span>
 <span class="cm">; Word 1  — bounds: cw (code words), cc (clist capacity)</span>
-<span class="cm">; Word 2  — CRC seal over words 0–1</span>
+<span class="cm">; Word 2  — CRC/parity over words 0–1</span>
 <span class="cm">; Words 3…cw  — compiled CLOOMC instructions</span>
 <span class="cm">; Words cw+1…end — C-List: Golden Token slots</span></pre>
       </div>
@@ -2610,14 +2610,14 @@ def start_here():
       </a>
       <div class="quiz" id="quiz-4">
         <div class="quiz-label">Quick Check</div>
-        <div class="quiz-prompt">Which LUMP word holds the CRC seal, and what does it cover?</div>
+        <div class="quiz-prompt">Which LUMP word holds the CRC/parity value, and what does it cover?</div>
         <div class="quiz-options">
           <button class="quiz-opt" onclick="checkAnswer(4,this,false)">Word 0 — seals the entire compiled instruction list</button>
           <button class="quiz-opt" onclick="checkAnswer(4,this,true)">Word 2 — seals Words 0 and 1 (the header)</button>
           <button class="quiz-opt" onclick="checkAnswer(4,this,false)">The last word — seals the C-List capability slots</button>
         </div>
         <div class="quiz-hint" id="hint-4">Look at the LUMP anatomy above: the seal appears third in the layout and protects the two words that precede it.</div>
-        <div class="quiz-ok" id="ok-4">&#10003; Correct! Word 2 is the CRC seal over Words 0–1 (magic/version/size and bounds).</div>
+        <div class="quiz-ok" id="ok-4">&#10003; Correct! Word 2 is the CRC/parity value over Words 0–1 (magic/version/size and bounds).</div>
       </div>
     </div>
 
@@ -2628,7 +2628,7 @@ def start_here():
       <p class="page-desc">
         Church Machine abstractions are loaded <em>on demand</em> — not at boot time. The
         <strong>Locator</strong> intercepts a call to an unloaded namespace slot, fetches the LUMP
-        from the Mum Tunnel, validates its CRC seal, and maps it into RAM before execution resumes.
+        from the Mum Tunnel, validates its CRC/parity, and maps it into RAM before execution resumes.
         You approve new LUMPs before they gain execute permission.
       </p>
       <ul class="checklist">
@@ -12718,7 +12718,8 @@ def _ba_check_final_opcode(lump_path):
         if op == BRANCH_OP:
             return {'ok': True,
                     'detail': (f'terminal opcode={op} (BRANCH ✅) at word[{last_idx}];'
-                               f' 0x{last_w:08X}')}
+                               f' 0x{last_w:08X}; header code boundary word[{cw}]'
+                               f' (legacy SelfTest boundary word[499] is outside this binary)')}
         # Neither BRANCH nor RETURN — warn but do not block approval
         return {'ok': None, 'warn': True,
                 'detail': (f'⚠️ terminal opcode={op} at word[{last_idx}] — not RETURN({RETURN_OP}) ✓,'
@@ -12791,24 +12792,40 @@ def _ba_build_ns_map():
     thread_base_word = int(_rom(r'WUKONG_THREAD_BASE_WORD\s*=\s*(\d+)', '896'))
     thread_base = hex(thread_base_word * 4)
 
-    # ── manifest ───────────────────────────────────────────────────────────
+    # ── Namespace Table state ─────────────────────────────────────────────
+    # The committed Namespace state is the authority for membership and slot
+    # assignment.  The manifest is deliberately not consulted to create
+    # entries here; it is only a catalog used later to locate loose bytes.
     manifest_path = os.path.join(_LUMPS_DIR, 'manifest.json')
-    manifest = []
+    ns_state_path = os.path.join(_LUMPS_DIR, 'ns-state.json')
+    ns_entries = []
     try:
-        with open(manifest_path) as f:
-            manifest = json.load(f)
+        with open(ns_state_path) as f:
+            state = json.load(f)
+        ns_entries = state.get('abstractions', []) if isinstance(state, dict) else []
     except Exception:
         pass
 
-    # Map ns_slot → manifest entry
+    # Normalize the rich state format for the existing rendering/check code.
+    # A state entry may carry its token directly; absent tokens are resolved
+    # from canonical filenames by name, never from a manifest slot claim.
     manifest_by_slot = {}
+    for state_entry in ns_entries:
+        if not isinstance(state_entry, dict) or not isinstance(state_entry.get('slot'), int):
+            continue
+        entry = dict(state_entry)
+        entry['ns_slot'] = state_entry['slot']
+        entry['abstraction'] = state_entry.get('name', '?')
+        entry['token'] = state_entry.get('token') or state_entry.get('cache_token')
+        if not entry.get('token'):
+            import glob as _glob
+            pat = os.path.join(_LUMPS_DIR, f"{entry['abstraction']}.*.????????.lump")
+            candidates = sorted(_glob.glob(pat))
+            if candidates:
+                entry['filename'] = os.path.basename(candidates[-1])
+                entry['token'] = os.path.basename(candidates[-1]).rsplit('.', 2)[1]
+        manifest_by_slot[entry['ns_slot']] = entry
     manifest_no_slot = []
-    for entry in manifest:
-        slot = entry.get('ns_slot')
-        if slot is not None and isinstance(slot, int):
-            manifest_by_slot[slot] = entry
-        else:
-            manifest_no_slot.append(entry)
 
     # ── Helper: build checks for a LUMP slot ──────────────────────────────
     def _lump_checks(slot_num, token, manifest_entry, lump_path, is_selftest=False):
@@ -12911,8 +12928,11 @@ def _ba_build_ns_map():
     ]
 
     # Slot 6 — SelfTest LUMP
-    st_token = '00000600'
-    st_lump = os.path.join(_LUMPS_DIR, st_token + '.lump')
+    st_entry = manifest_by_slot.get(selftest_slot) or {}
+    # The committed state token is the content token.  The legacy token-named
+    # file remains a lookup alias and must not redefine that identity.
+    st_token = st_entry.get('token') or '00000600'
+    st_lump = os.path.join(_LUMPS_DIR, st_entry.get('filename') or '00000600.lump')
     st_hdr = _ba_read_lump_header(st_lump) if os.path.exists(st_lump) else None
     st_checks = _lump_checks(selftest_slot, st_token,
                              manifest_by_slot.get(selftest_slot),

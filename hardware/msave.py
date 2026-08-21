@@ -53,7 +53,8 @@ class ChurchMSave(Elaboratable):
         dst_has_s_perm = dst_gt.dom & dst_gt.perm[1]   # Church dom=1, perm[1]=S
         dst_has_bind = dst_gt.b_flag
         index_in_bounds = Signal()
-        m.d.comb += index_in_bounds.eq(index_reg < dst_w2.limit_offset[:16])
+        # limit_offset is inclusive (cc - 1), so row cc-1 is valid.
+        m.d.comb += index_in_bounds.eq(index_reg <= dst_w2.limit_offset[:16])
 
         write_addr = Signal(32)
         m.d.comb += write_addr.eq(dst_view.word1_location + (index_reg << 2))

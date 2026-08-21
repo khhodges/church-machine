@@ -1278,7 +1278,7 @@
                  ' (' + (d1.limit + 1).toLocaleString() + ' words) \u00b7 clistCount=' + d1.clistCount +
                  ' \u00b7 b=' + d1.b + ' \u00b7 g=' + d1.g],
                 ['+2', 'word2 \u2014 integrity', hex8(raw.w2 >>> 0),
-                 'gt_seq=' + (((raw.w2 >>> 25) & 0x7F)) + ' \u00b7 CRC-16 seal=0x' + (raw.w2 & 0xFFFF).toString(16).toUpperCase()],
+                 'gt_seq=' + (((raw.w2 >>> 25) & 0x7F)) + ' \u00b7 CRC-16 parity=0x' + (raw.w2 & 0xFFFF).toString(16).toUpperCase()],
                 ['+3', 'word3 \u2014 cache token T', hex8(raw.w3 >>> 0),
                  raw.w3 === 0 ? 'No trusted cache binding recorded' :
                  '32-bit lookup/cache value only \u00b7 never identity or authority']

@@ -348,6 +348,7 @@ class FaultType(IntEnum):
                              #   adding such an authenticated Mint input — see hardware/mload.py
                              #   FETCH_GT and hardware/church_outform.py.
     IMMUTABLE_SELF_CAP = 0x1B  # SAVE: c-list row 0 is the immutable self capability
+    STRUCTURAL_REG = 0x1C      # LOAD: machine-owned structural register target
 
 
 class BootState(IntEnum):
