@@ -3272,6 +3272,7 @@ BOOK_CHAPTERS = [
         "quick-start.md",
         "board-connectivity.md",
         "cloomc-foundation.md",
+        {"type": "figure", "name": "biology-of-abstractions.html", "label": "Biology of Abstractions"},
         "prologue.md",
         "contributing.md",
     ]),
