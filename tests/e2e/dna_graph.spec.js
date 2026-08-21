@@ -78,6 +78,24 @@ test.describe('LUMP DNA graph regression', () => {
         // normal interaction state.
         await expect(page.locator('#lumpPickerSelect')).toBeVisible();
         await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+
+        const dialog = page.locator('#lumpDeepDiveModal');
+        const close = dialog.locator('.lump-deep-dive-close');
+        const zoomIn = dialog.locator('#lumpDeepZoomIn');
+        const zoomOut = dialog.locator('#lumpDeepZoomOut');
+        const zoomReset = dialog.locator('#lumpDeepZoomReset');
+        await expect(close).toBeFocused();
+        await page.keyboard.press('Shift+Tab');
+        await expect(zoomReset).toBeFocused();
+        await page.keyboard.press('Tab');
+        await expect(close).toBeFocused();
+        await page.keyboard.press('Tab');
+        await expect(zoomIn).toBeFocused();
+        await page.keyboard.press('Tab');
+        await expect(zoomOut).toBeFocused();
+        await page.keyboard.press('Tab');
+        await expect(zoomReset).toBeFocused();
+
         await page.keyboard.press('Escape');
         await expect(page.locator('#lumpDeepDiveModal')).toHaveCount(0);
         await expect(trigger).toHaveAttribute('aria-expanded', 'false');
@@ -93,6 +111,17 @@ test.describe('LUMP DNA graph regression', () => {
         const modal = page.locator('#lumpDeepDiveModal');
         await expect(modal).toBeVisible();
         await expect(modal.locator('.lump-deep-dive-dialog')).toBeVisible();
+        const close = modal.locator('.lump-deep-dive-close');
+        const zoomIn = modal.locator('#lumpDeepZoomIn');
+        const zoomReset = modal.locator('#lumpDeepZoomReset');
+        await expect(close).toBeFocused();
+        await page.keyboard.press('Tab');
+        await expect(zoomIn).toBeFocused();
+        await zoomReset.focus();
+        await page.keyboard.press('Tab');
+        await expect(close).toBeFocused();
+        await page.keyboard.press('Shift+Tab');
+        await expect(zoomReset).toBeFocused();
         await modal.locator('.lump-deep-dive-close').click();
         await expect(modal).toHaveCount(0);
         await expect(page.locator('#lumpPickerSelect')).toBeVisible();

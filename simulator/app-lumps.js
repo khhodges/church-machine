@@ -1981,7 +1981,34 @@ function _closeLumpDeepDive() {
     }
     document.removeEventListener('keydown', _lumpDeepDiveKeydown);
 }
-function _lumpDeepDiveKeydown(ev) { if (ev.key === 'Escape') _closeLumpDeepDive(); }
+function _lumpDeepDiveFocusableControls(modal) {
+    if (!modal) return [];
+    return Array.from(modal.querySelectorAll(
+        'a[href], area[href], button:not([disabled]), input:not([disabled]), ' +
+        'select:not([disabled]), textarea:not([disabled]), ' +
+        '[contenteditable="true"], [tabindex]:not([tabindex="-1"])'
+    )).filter(el => {
+        const style = window.getComputedStyle(el);
+        return style.display !== 'none' && style.visibility !== 'hidden' &&
+            el.getClientRects().length > 0;
+    });
+}
+function _lumpDeepDiveKeydown(ev) {
+    if (ev.key === 'Escape') {
+        _closeLumpDeepDive();
+        return;
+    }
+    if (ev.key !== 'Tab') return;
+    const modal = document.getElementById('lumpDeepDiveModal');
+    const controls = _lumpDeepDiveFocusableControls(modal);
+    if (!modal || !controls.length) return;
+    const currentIndex = controls.indexOf(document.activeElement);
+    const nextIndex = ev.shiftKey
+        ? (currentIndex <= 0 ? controls.length - 1 : currentIndex - 1)
+        : (currentIndex === controls.length - 1 ? 0 : currentIndex + 1);
+    ev.preventDefault();
+    controls[nextIndex].focus();
+}
 
 async function _openLumpDeepDive(token, trigger) {
     _closeLumpDeepDive();
