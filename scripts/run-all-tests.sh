@@ -394,6 +394,9 @@ register_suite "check-build-lump-sidecar-source" \
 register_suite "check-wukong-callhome-divergence" \
     'node scripts/check_wukong_callhome_divergence.js'
 
+register_suite "check-build-lump-clist" \
+    'node scripts/check-build-lump-clist.js'
+
 # ---------------------------------------------------------------------------
 # Group registry — map a short group name to a list of suite names
 # ---------------------------------------------------------------------------
@@ -407,7 +410,7 @@ ALL_GROUPS["lump"]="lump-consistency lump-v13-freespace-tests lump-binary-tests 
 
 ALL_GROUPS["simulator"]="fault-recovery-tests lambda-exec-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests warning-panel-tests bare-space-ns-fallback-tests disasm-panel-tests lump-dir-disasm-tooltip-tests boot-entry-sync-tests install-boot-entry-cr0-tests ns-slot-dynamic-tests ns-slot-policy-restore-tests ns-slot-modal-persist-tests selftest-lump-runs pet-name-memory-tests lump-builder-dispatch-tests openin-links-tests open-lump-freshness-tests lump-warning-tests call-cr6-l-perm-tests return-cr6-l-perm-tests load-through-l-perm-cr6-tests return-cr14-trace-tests wukong-cr-update-tests wukong-hw-fault-tests wukong-trace-cr-server-tests return-fetch-lump-tests constants-lump-tests"
 
-ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabilities-blocks check-no-ti60-ui check-api-reference-stale callhome-parser-tests check-slot-index-leak check-ila-probe-names test-check-ila-probe-names check-lumps-guard check-ns-word3-contract test-check-ns-word3-contract check-sitemap-figure-count check-verilog-rtlil-stale check-build-lump-sidecar-source check-wukong-callhome-divergence"
+ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabilities-blocks check-no-ti60-ui check-api-reference-stale callhome-parser-tests check-slot-index-leak check-ila-probe-names test-check-ila-probe-names check-lumps-guard check-ns-word3-contract test-check-ns-word3-contract check-sitemap-figure-count check-verilog-rtlil-stale check-build-lump-sidecar-source check-wukong-callhome-divergence check-build-lump-clist"
 
 ALL_GROUPS["hardware"]="hardware-sim boot-rom-no-false-halt wukong-boot-rom-guard"
 

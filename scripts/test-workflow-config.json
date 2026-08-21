@@ -46,6 +46,7 @@
     "wukong-status-readonly-tests",
     "wukong-trace-cr-server-tests",
     "check-build-lump-sidecar-source",
-    "check-wukong-callhome-divergence"
+    "check-wukong-callhome-divergence",
+    "check-build-lump-clist"
   ]
 }
