@@ -91,7 +91,7 @@
         @keyframes app-pulse { 0%,100%{opacity:.5} 50%{opacity:1} }
         @keyframes app-slide { 0%{transform:translateX(-200%)} 100%{transform:translateX(450%)} }
         /* hamburger menu — the eight public landing-card categories */
-        #hamDropdown { display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:9999; background:var(--bg-panel,#12121f); border:1px solid var(--border,#2a2a4a); border-radius:6px; box-shadow:0 8px 24px rgba(0,0,0,0.5); padding:0.35rem 0; min-width:200px; max-height:calc(100vh - 60px); overflow-y:auto; }
+        #hamDropdown { display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:9999; background:var(--bg-panel,#12121f); border:1px solid var(--border,#2a2a4a); border-radius:6px; box-shadow:0 8px 24px rgba(0,0,0,0.5); padding:0.35rem 0; min-width:200px; overflow:visible; }
         #hamDropdown.ham-open { display:flex !important; flex-direction:column; }
         .ham-group { display:flex; flex-direction:column; padding:0.2rem 0; }
         .ham-item { width:100%; box-sizing:border-box; display:flex; align-items:center; justify-content:space-between; gap:0.75rem; }
@@ -126,11 +126,12 @@
         .ham-section:first-child > .ham-subhead.ham-category { border-top:0; margin-top:0; padding-top:0.45rem; }
         /* ── Hover-expand category sections ───────────────────────────────── */
         .ham-section { position:relative; }
-        .ham-section > .ham-group { display:none; }
+        .ham-section > .ham-group { display:none; position:absolute; left:100%; top:0; min-width:210px; background:var(--bg-panel,#12121f); border:1px solid var(--border,#2a2a4a); border-radius:0 6px 6px 6px; box-shadow:6px 4px 20px rgba(0,0,0,0.55); z-index:10001; padding:0.2rem 0; flex-direction:column; }
         .ham-section:hover > .ham-group { display:flex; }
         .ham-subhead.ham-category.ham-section-head { display:flex; justify-content:space-between; align-items:center; cursor:default; padding-right:0.6rem; }
-        .ham-subhead.ham-category.ham-section-head::after { content:"\203A"; font-size:1rem; color:#444466; transition:color 0.12s, transform 0.12s; display:inline-block; transform-origin:center; }
-        .ham-section:hover > .ham-subhead.ham-category.ham-section-head::after { color:#daa520; transform:rotate(90deg); }
+        .ham-subhead.ham-category.ham-section-head::after { content:"\203A"; font-size:1rem; color:#444466; transition:color 0.12s; display:inline-block; }
+        .ham-section:hover > .ham-subhead.ham-category.ham-section-head { background:rgba(218,165,32,0.08); border-radius:4px; }
+        .ham-section:hover > .ham-subhead.ham-category.ham-section-head::after { color:#daa520; }
         .ham-nested-label { padding:0.35rem 0.75rem 0.05rem 1.15rem; font-size:0.62rem; color:#7777a0; }
         .ham-nested { padding-left:0.4rem; }
         .ham-link { text-decoration:none; color:inherit; }
