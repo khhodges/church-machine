@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // scripts/check-sitemap-figure-count.js
 //
-// Verifies three things about the "Technical Figures" section of
+// Verifies four things about the "Technical Figures" section of
 // simulator/index.html:
 //
 //   1. COUNT — The "(N)" span on the "Technical Figures" heading matches the
@@ -15,6 +15,11 @@
 //   3. LABELS — No two <a href="/docs/figures/..."> entries share the same
 //               visible link text.  Identical labels are indistinguishable to
 //               users and indicate a copy-paste mistake.
+//
+//   4. TITLES — Each entry in the "Technical Figures" list uses link text that
+//               exactly matches the <title> of the linked HTML file.  If a
+//               file's title is updated but the sitemap label is not, this
+//               check flags the mismatch with a clear diff.
 //
 // Run via:
 //   node scripts/check-sitemap-figure-count.js
@@ -32,10 +37,14 @@
 // To fix a duplicate label, give each entry a unique visible label (e.g. add
 // a subtitle that distinguishes the two figures).
 //
+// To fix a stale title, update the link text in the "Technical Figures" list
+// in simulator/index.html to match the <title> of the linked HTML file.
+//
 // Exit codes:
 //   0 — all checks pass
-//   1 — count is stale, the span cannot be found, the link sets diverge, or
-//       duplicate labels are found
+//   1 — count is stale, the span cannot be found, the link sets diverge,
+//       duplicate labels are found, or any sitemap label mismatches its
+//       file's <title>
 
 'use strict';
 
@@ -184,6 +193,141 @@ if (duplicateLabels.length > 0) {
     failed = true;
 } else {
     console.log(`check-sitemap-figure-count: labels ok — all ${labelMap.size} linked figure labels are unique`);
+}
+
+// ── CHECK 4: Technical Figures section is complete and labels match <title> ──
+//
+// Every file in docs/figures/ must appear in the "Technical Figures" list
+// section of simulator/index.html exactly once, and its visible link text must
+// exactly match the file's own <title> element (after HTML-entity decoding on
+// both sides).
+//
+// Three sub-failures are reported independently:
+//   a) A docs/figures/ file is absent from the Technical Figures section.
+//   b) A file appears more than once in the section.
+//   c) A section entry's label differs from the file's <title>.
+//
+// Only the "Technical Figures" list section of simulator/index.html is
+// examined, not other places in the page that also happen to link to the same
+// files (hamburger nav, inline chips, etc.).
+
+// Locate the Technical Figures heading using the same count-span pattern as
+// CHECK 1 so we land on the correct occurrence even when other links in the
+// page also contain the text "Technical Figures".
+const tfHeadingMatch = html.match(/Technical Figures\s*<span[^>]*>\(\d+\)<\/span>/);
+const tfHeadingIdx = tfHeadingMatch ? html.indexOf(tfHeadingMatch[0]) : -1;
+if (tfHeadingIdx === -1) {
+    // The count check above already handles a missing heading; skip this check.
+    console.error('check-sitemap-figure-count: SKIP title check — Technical Figures heading not found');
+} else {
+    // Slice from the heading to end-of-file, then trim at the closing tags.
+    // The list ends with the </div> that closes the flex column followed
+    // immediately by the </div> that closes the outer wrapper.
+    const afterHeading = html.slice(tfHeadingIdx);
+    const sectionEndMatch = afterHeading.match(/\n[ \t]*<\/div>[ \t]*\n[ \t]*<\/div>/);
+    const sectionHtml = sectionEndMatch
+        ? afterHeading.slice(0, sectionEndMatch.index)
+        : afterHeading;
+
+    // Helper: decode the five common HTML entities.
+    function decodeEntities(str) {
+        return str
+            .replace(/&amp;/g,  '&')
+            .replace(/&lt;/g,   '<')
+            .replace(/&gt;/g,   '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g,  "'")
+            .trim();
+    }
+
+    // Collect every anchor in the section: filename (decoded) → [label, …]
+    // We keep all labels for a filename so we can detect duplicates.
+    const SECTION_ANCHOR_RE = /href="\/docs\/figures\/([^"]+\.html)"[^>]*>([^<]*)</g;
+    // filename → [label, label, …]  (all occurrences within the section)
+    const sectionEntries = new Map();
+    let sm;
+    while ((sm = SECTION_ANCHOR_RE.exec(sectionHtml)) !== null) {
+        let filename;
+        try { filename = decodeURIComponent(sm[1]); } catch (_) { filename = sm[1]; }
+        const label = decodeEntities(sm[2]);
+        if (!sectionEntries.has(filename)) sectionEntries.set(filename, []);
+        sectionEntries.get(filename).push(label);
+    }
+
+    const sectionFileSet = new Set(sectionEntries.keys());
+
+    // a) Files in docs/figures/ that are absent from the section.
+    const missingFromSection = actualFiles.filter(f => !sectionFileSet.has(f)).sort();
+    // b) Files that appear in the section but not in docs/figures/ (already
+    //    caught by CHECK 2, but report here for completeness).
+    const extraInSection = [...sectionFileSet].filter(f => !actualSet.has(f)).sort();
+    // c) Files that appear more than once in the section.
+    const duplicateInSection = [...sectionEntries.entries()]
+        .filter(([, labels]) => labels.length > 1)
+        .sort(([a], [b]) => a.localeCompare(b));
+    // d) Label/title mismatches for section entries that exist on disk.
+    const titleMismatches = [];
+    for (const [filename, labels] of sectionEntries) {
+        const figPath = path.join(FIGURES_DIR, filename);
+        if (!fs.existsSync(figPath)) continue;  // caught by extraInSection above
+        const figHtml = fs.readFileSync(figPath, 'utf8');
+        const titleMatch = figHtml.match(/<title>([^<]*)<\/title>/i);
+        const fileTitle = titleMatch ? decodeEntities(titleMatch[1]) : '(no <title> found)';
+        // Check each label appearance individually.
+        for (const label of labels) {
+            if (label !== fileTitle) {
+                titleMismatches.push({ filename, sitemapLabel: label, fileTitle });
+            }
+        }
+    }
+
+    const check4Failed = missingFromSection.length > 0 || extraInSection.length > 0
+                      || duplicateInSection.length > 0 || titleMismatches.length > 0;
+
+    if (check4Failed) {
+        if (!failed) console.error('check-sitemap-figure-count: FAIL — Technical Figures section incomplete or labels stale');
+
+        if (missingFromSection.length > 0) {
+            console.error(`  ${missingFromSection.length} file(s) in docs/figures/ are absent from the Technical Figures list:`);
+            for (const f of missingFromSection) {
+                console.error(`    missing from section: ${f}`);
+            }
+            console.error('');
+            console.error('  Fix: add an entry for each missing file to the "Technical Figures" list');
+            console.error('  in simulator/index.html with link text matching the file\'s <title>.');
+        }
+
+        if (extraInSection.length > 0) {
+            console.error(`  ${extraInSection.length} entry/entries in the Technical Figures list point to non-existent files:`);
+            for (const f of extraInSection) {
+                console.error(`    extra in section: ${f}`);
+            }
+        }
+
+        if (duplicateInSection.length > 0) {
+            console.error(`  ${duplicateInSection.length} file(s) appear more than once in the Technical Figures list:`);
+            for (const [filename, labels] of duplicateInSection) {
+                console.error(`    duplicate: ${filename} (${labels.length} entries: ${labels.map(l => `"${l}"`).join(', ')})`);
+            }
+        }
+
+        if (titleMismatches.length > 0) {
+            console.error(`  ${titleMismatches.length} sitemap label(s) differ from their file's <title>:`);
+            for (const { filename, sitemapLabel, fileTitle } of titleMismatches) {
+                console.error(`    file: ${filename}`);
+                console.error(`      sitemap says: "${sitemapLabel}"`);
+                console.error(`      file <title>: "${fileTitle}"`);
+            }
+            console.error('');
+            console.error('  Fix: update the link text in the "Technical Figures" list');
+            console.error('  in simulator/index.html to match each file\'s <title>,');
+            console.error('  or update the file\'s <title> to match the sitemap label.');
+        }
+
+        failed = true;
+    } else {
+        console.log(`check-sitemap-figure-count: titles ok — all ${sectionEntries.size} Technical Figures section labels match their file's <title>`);
+    }
 }
 
 process.exit(failed ? 1 : 0);
