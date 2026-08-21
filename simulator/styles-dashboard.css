@@ -215,6 +215,88 @@ a.next-step-link:hover {
     border: 1px solid rgba(102,187,106,0.5);
     animation: ff-pulse 2s ease-in-out infinite;
 }
+
+/* Compact execution exclusions badge.  Keep it button-shaped so the
+   abbreviations remain discoverable without taking over the toolbar. */
+.execution-excluded-counters {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 0.14rem 0.5rem;
+    border: 1px solid rgba(120,120,120,0.3);
+    border-radius: 4px;
+    background: rgba(80,80,80,0.2);
+    color: #999;
+    font: 700 0.68rem/1.2 monospace;
+    letter-spacing: 0.15px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.execution-excluded-counters:hover,
+.execution-excluded-counters:focus-visible {
+    background: rgba(200,155,60,0.14);
+    border-color: rgba(200,155,60,0.55);
+    color: var(--church-gold);
+    outline: none;
+}
+.execution-counter-popup {
+    position: fixed;
+    z-index: 9200;
+    width: min(310px, calc(100vw - 1rem));
+    box-sizing: border-box;
+    padding: 0.75rem 0.85rem 0.8rem;
+    background: #171725;
+    border: 1px solid rgba(200,155,60,0.55);
+    border-radius: 7px;
+    color: #c8c8e0;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    box-shadow: 0 8px 26px rgba(0,0,0,0.55);
+    animation: execution-counter-popup-in 0.12s ease-out;
+}
+.execution-counter-popup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.45rem;
+    color: var(--church-gold);
+    font-weight: 700;
+}
+.execution-counter-popup-close {
+    flex: 0 0 auto;
+    padding: 0 0.2rem;
+    border: 0;
+    background: transparent;
+    color: #888;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.execution-counter-popup-close:hover,
+.execution-counter-popup-close:focus-visible { color: #fff; outline: none; }
+.execution-counter-popup-list {
+    margin: 0 0 0.55rem;
+    padding-left: 1.2rem;
+}
+.execution-counter-popup-list li { margin: 0.12rem 0; }
+.execution-counter-popup strong { color: #e6c45a; font-family: monospace; }
+.execution-counter-popup-note {
+    margin: 0;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    color: #a8a8c0;
+}
+@keyframes execution-counter-popup-in {
+    from { opacity: 0; transform: translateY(-3px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@media (max-width: 600px) {
+    .execution-excluded-counters { font-size: 0.62rem; padding-left: 0.35rem; padding-right: 0.35rem; }
+}
 @keyframes ff-pulse {
     0%, 100% { box-shadow: 0 0 0 0 rgba(102,187,106,0); }
     50%       { box-shadow: 0 0 6px 2px rgba(102,187,106,0.3); }

@@ -17,6 +17,80 @@ function _hideCompileFailedBanner() {
 var _asmAdvisoryPopupEl = null;
 var _asmAdvisoryKeydownBound = false;
 
+var _executionCounterPopupEl = null;
+var _executionCounterPopupTrigger = null;
+
+function _dismissExecutionCounterPopup() {
+    if (_executionCounterPopupEl && _executionCounterPopupEl.parentNode) {
+        _executionCounterPopupEl.parentNode.removeChild(_executionCounterPopupEl);
+    }
+    if (_executionCounterPopupTrigger) {
+        _executionCounterPopupTrigger.setAttribute('aria-expanded', 'false');
+    }
+    _executionCounterPopupEl = null;
+    _executionCounterPopupTrigger = null;
+    document.removeEventListener('keydown', _executionCounterPopupKeydown);
+    document.removeEventListener('mousedown', _executionCounterPopupOutsideClick);
+}
+
+function _showExecutionCounterPopup(trigger) {
+    if (_executionCounterPopupEl) {
+        _dismissExecutionCounterPopup();
+        return;
+    }
+    if (!trigger) return;
+    var popup = document.createElement('div');
+    popup.className = 'execution-counter-popup';
+    popup.setAttribute('role', 'dialog');
+    popup.setAttribute('aria-label', 'Execution counter explanations');
+    popup.innerHTML = '<div class="execution-counter-popup-header">'
+        + '<span>Excluded execution counters</span>'
+        + '<button type="button" class="execution-counter-popup-close" aria-label="Close">&times;</button>'
+        + '</div>'
+        + '<ul class="execution-counter-popup-list">'
+        + '<li><strong>B</strong> = boot phases</li>'
+        + '<li><strong>F</strong> = faults</li>'
+        + '<li><strong>S</strong> = suspended execution</li>'
+        + '<li><strong>L</strong> = lazy-load waits</li>'
+        + '<li><strong>R</strong> = rejected operations</li>'
+        + '</ul>'
+        + '<p class="execution-counter-popup-note">Only successfully retired user instructions contribute to the 1K fault-free total.</p>';
+    document.body.appendChild(popup);
+    _executionCounterPopupEl = popup;
+    _executionCounterPopupTrigger = trigger;
+    trigger.setAttribute('aria-expanded', 'true');
+
+    var rect = trigger.getBoundingClientRect();
+    var popupWidth = Math.min(310, window.innerWidth - 16);
+    var left = Math.min(Math.max(8, rect.right - popupWidth), window.innerWidth - popupWidth - 8);
+    var top = rect.bottom + 8;
+    if (top + popup.offsetHeight > window.innerHeight - 8) {
+        top = Math.max(8, rect.top - popup.offsetHeight - 8);
+    }
+    popup.style.left = left + 'px';
+    popup.style.top = top + 'px';
+
+    popup.querySelector('.execution-counter-popup-close').addEventListener('click', function() {
+        _dismissExecutionCounterPopup();
+        trigger.focus();
+    });
+    document.addEventListener('keydown', _executionCounterPopupKeydown);
+    document.addEventListener('mousedown', _executionCounterPopupOutsideClick);
+}
+
+function _executionCounterPopupKeydown(event) {
+    if (event.key === 'Escape') {
+        _dismissExecutionCounterPopup();
+    }
+}
+
+function _executionCounterPopupOutsideClick(event) {
+    if (_executionCounterPopupEl && !_executionCounterPopupEl.contains(event.target)
+        && event.target !== _executionCounterPopupTrigger) {
+        _dismissExecutionCounterPopup();
+    }
+}
+
 function _dismissAsmAdvisoryPopup() {
     if (_asmAdvisoryPopupEl && _asmAdvisoryPopupEl.parentNode) {
         _asmAdvisoryPopupEl.parentNode.removeChild(_asmAdvisoryPopupEl);
