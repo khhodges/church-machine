@@ -208,6 +208,9 @@ register_suite "ns-slot-modal-persist-tests" \
 register_suite "warning-panel-tests" \
     'node simulator/test_asm_warning_panel.js'
 
+register_suite "docs-search-figures-tests" \
+    'node simulator/test_docs_search_figures.js'
+
 register_suite "bare-space-ns-fallback-tests" \
     'node simulator/test_bare_space_ns_fallback.js'
 
