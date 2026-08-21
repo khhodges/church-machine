@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // scripts/check-sitemap-figure-count.js
 //
-// Verifies two things about the "Technical Figures" section of
+// Verifies three things about the "Technical Figures" section of
 // simulator/index.html:
 //
 //   1. COUNT — The "(N)" span on the "Technical Figures" heading matches the
@@ -11,6 +11,10 @@
 //              <a href="/docs/figures/FILENAME"> anywhere in
 //              simulator/index.html (extra links in the sitemap that point to
 //              non-existent files are also reported).
+//
+//   3. LABELS — No two <a href="/docs/figures/..."> entries share the same
+//               visible link text.  Identical labels are indistinguishable to
+//               users and indicate a copy-paste mistake.
 //
 // Run via:
 //   node scripts/check-sitemap-figure-count.js
@@ -25,9 +29,13 @@
 // simulator/index.html (the sitemap "Technical Figures" list is the canonical
 // place).
 //
+// To fix a duplicate label, give each entry a unique visible label (e.g. add
+// a subtitle that distinguishes the two figures).
+//
 // Exit codes:
-//   0 — both checks pass
-//   1 — count is stale, the span cannot be found, or the link sets diverge
+//   0 — all checks pass
+//   1 — count is stale, the span cannot be found, the link sets diverge, or
+//       duplicate labels are found
 
 'use strict';
 
@@ -86,19 +94,40 @@ if (hardcoded !== actualCount) {
     console.log(`check-sitemap-figure-count: count ok — (${hardcoded}) matches ${actualCount} files`);
 }
 
-// ── CHECK 2: link set ─────────────────────────────────────────────────────
+// ── CHECK 2: link set  /  CHECK 3: unique labels ──────────────────────────
+//
+// We match the full anchor element so we can capture both the href (for the
+// link-set check) and the visible text (for the duplicate-label check).
+// The regex is intentionally simple: the sitemap anchors are single-line
+// elements whose href attribute always appears before the closing >.
+//
+// Percent-encoded filenames (e.g. "Lumps%20Directory.html") are decoded so
+// they compare correctly against the actual filenames on disk.
 
-// Collect every /docs/figures/*.html href mentioned anywhere in the file.
-// Using the filename as given in the href (URL-encoded spaces become %20, etc.).
-const HREF_RE = /href="\/docs\/figures\/([^"]+\.html)"/g;
+const ANCHOR_RE = /href="(\/docs\/figures\/[^"]+\.html)"[^>]*>([^<]*)</g;
 const linkedSet = new Set();
+// label → [href, href, …]  (tracks every file that uses each visible text)
+const labelMap  = new Map();
 let m;
-while ((m = HREF_RE.exec(html)) !== null) {
-    // Decode percent-encoding in case any href uses encoded characters.
-    try {
-        linkedSet.add(decodeURIComponent(m[1]));
-    } catch (_) {
-        linkedSet.add(m[1]);
+
+while ((m = ANCHOR_RE.exec(html)) !== null) {
+    const rawHref = m[1].replace(/^\/docs\/figures\//, '');
+    const rawText = m[2]
+        .replace(/&amp;/g,  '&')
+        .replace(/&lt;/g,   '<')
+        .replace(/&gt;/g,   '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g,  "'")
+        .trim();
+
+    // Decode percent-encoding so "Lumps%20Directory.html" matches the real name.
+    let decoded;
+    try { decoded = decodeURIComponent(rawHref); } catch (_) { decoded = rawHref; }
+    linkedSet.add(decoded);
+
+    if (rawText) {
+        if (!labelMap.has(rawText)) labelMap.set(rawText, []);
+        labelMap.get(rawText).push('/docs/figures/' + rawHref);
     }
 }
 
@@ -127,6 +156,34 @@ if (extra.length > 0) {
         console.error(`    extra link: ${f}`);
     }
     failed = true;
+}
+
+// ── CHECK 3: unique labels ────────────────────────────────────────────────
+//
+// Every <a href="/docs/figures/..."> in the sitemap must have a distinct
+// visible label.  Two entries with identical text are indistinguishable to
+// users and indicate a copy-paste mistake (e.g. the "Self-Describing Stack
+// Frames" duplicate that prompted this check).
+
+const duplicateLabels = [...labelMap.entries()]
+    .filter(([, hrefs]) => hrefs.length > 1)
+    .sort(([a], [b]) => a.localeCompare(b));
+
+if (duplicateLabels.length > 0) {
+    if (!failed) console.error('check-sitemap-figure-count: FAIL — duplicate link labels');
+    console.error(`  ${duplicateLabels.length} label(s) appear more than once in the sitemap:`);
+    for (const [label, hrefs] of duplicateLabels) {
+        console.error(`    duplicate label: "${label}"`);
+        for (const href of hrefs) {
+            console.error(`      used by: ${href}`);
+        }
+    }
+    console.error('');
+    console.error('  Fix: give each entry in the "Technical Figures" list a unique visible label');
+    console.error('  in simulator/index.html (e.g. add a subtitle that distinguishes them).');
+    failed = true;
+} else {
+    console.log(`check-sitemap-figure-count: labels ok — all ${labelMap.size} linked figure labels are unique`);
 }
 
 process.exit(failed ? 1 : 0);
