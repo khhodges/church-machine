@@ -19,6 +19,7 @@
     "check-ns-word3-contract",
     "check-sha32-collisions",
     "check-slot-index-leak",
+    "check-verilog-rtlil-stale",
     "check-wukong-hw-init",
     "compile-api-tests",
     "constants-lump-tests",
