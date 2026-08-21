@@ -872,6 +872,25 @@ WUKONG_NUC_PROGRAM += [
 
 assert len(WUKONG_NUC_PROGRAM) == 73, f"WUKONG_NUC_PROGRAM length = {len(WUKONG_NUC_PROGRAM)}, expected 73"
 
+# Structurally verify the final BRANCH AL encodes the correct loop-back offset.
+# This catches silent drift when new banner bytes are added: the branch index
+# shifts forward but _WUKONG_LOOP_TOP stays at 3, making the hardcoded imm wrong.
+# The check is expressed in terms of the named constant so it self-corrects as
+# the program grows — the assertion itself never needs updating.
+_WUKONG_BRANCH_INDEX = len(WUKONG_NUC_PROGRAM) - 1  # currently 72
+_expected_branch_offset = _WUKONG_LOOP_TOP - _WUKONG_BRANCH_INDEX  # currently -69
+_branch_word = WUKONG_NUC_PROGRAM[_WUKONG_BRANCH_INDEX]
+_encoded_imm15 = _branch_word & 0x7FFF
+# Sign-extend 15-bit two's-complement value (bit 14 is the sign bit).
+_decoded_branch_offset = _encoded_imm15 if _encoded_imm15 < 0x4000 else _encoded_imm15 - 0x8000
+assert _decoded_branch_offset == _expected_branch_offset, (
+    f"WUKONG_NUC_PROGRAM[{_WUKONG_BRANCH_INDEX}] loop-back branch offset "
+    f"{_decoded_branch_offset} != {_expected_branch_offset} "
+    f"(_WUKONG_LOOP_TOP={_WUKONG_LOOP_TOP}, branch_index={_WUKONG_BRANCH_INDEX}). "
+    f"New banner bytes were added (or _WUKONG_LOOP_TOP changed) without updating "
+    f"the BRANCH AL offset at the end of WUKONG_NUC_PROGRAM."
+)
+
 
 class BootRom(Elaboratable):
     """Instruction ROM for Church Machine boot, demo, and abstraction code.

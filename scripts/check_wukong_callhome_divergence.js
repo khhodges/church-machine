@@ -208,6 +208,31 @@ if ((nucProgram[72] >>> 0) !== EXPECTED_ROM_LOOP) {
     diverged = true;
 }
 
+// Structural branch-target check: decode the 15-bit signed offset from word[72]
+// and verify it resolves to WUKONG_LOOP_TOP (word 3), regardless of program length.
+// This catches silent drift when banner bytes are added: the branch index shifts
+// forward but the loop-top index stays at 3, making a hardcoded offset wrong.
+{
+    const WUKONG_LOOP_TOP   = 3;   // _WUKONG_LOOP_TOP in hardware/boot_rom.py
+    const BRANCH_INDEX      = 72;
+    const romBranchWord     = nucProgram[BRANCH_INDEX] >>> 0;
+    const imm15             = romBranchWord & 0x7FFF;
+    // Sign-extend 15-bit two's-complement value (bit 14 is the sign bit).
+    const signedOffset      = (imm15 & 0x4000) ? (imm15 - 0x8000) : imm15;
+    const branchTarget      = BRANCH_INDEX + signedOffset;
+    if (branchTarget !== WUKONG_LOOP_TOP) {
+        console.error(
+            `  DIVERGED: ROM word[${BRANCH_INDEX}] branch target is word ${branchTarget}, ` +
+            `expected ${WUKONG_LOOP_TOP} (_WUKONG_LOOP_TOP). ` +
+            `Encoded offset=${signedOffset} (0x${(imm15).toString(16)}). ` +
+            `Banner bytes were added without updating the BRANCH AL offset.`
+        );
+        diverged = true;
+    } else {
+        console.log(`  OK: ROM word[${BRANCH_INDEX}] branch resolves to word ${branchTarget} (WUKONG_LOOP_TOP).`);
+    }
+}
+
 // Verify the declared capability order, exact rights, targets, and encoded GTs.
 const CapabilityTokens = require(CAP_TOKENS);
 const expectedCaps = [
