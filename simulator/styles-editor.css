@@ -393,6 +393,96 @@
     letter-spacing: 0.04em;
 }
 
+/* ── Step settings button and unified settings popover ───────────────────── */
+.step-settings-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+.step-settings-btn {
+    background: #1b2430;
+    border-color: #64748b;
+    color: #cbd5e1;
+    font-size: 0.9rem;
+}
+.step-settings-btn:hover,
+.step-settings-btn[aria-expanded="true"] {
+    background: #26364a;
+    border-color: #93c5fd;
+    color: #fff;
+}
+.step-settings-popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 290px;
+    max-width: min(290px, calc(100vw - 24px));
+    max-height: min(70vh, 460px);
+    overflow-y: auto;
+    background: #1a1a2e;
+    border: 1px solid rgba(147,197,253,0.42);
+    border-radius: 8px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.6);
+    z-index: 9999;
+    padding: 0.6rem 0.75rem 0.7rem;
+}
+.step-settings-title,
+.step-settings-label {
+    color: #93c5fd;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.step-settings-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.65rem;
+}
+.step-settings-close {
+    border: 0;
+    padding: 0 0.2rem;
+    background: transparent;
+    color: #9ca3af;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.step-settings-close:hover,
+.step-settings-close:focus-visible { color: #fff; }
+.step-settings-section {
+    padding: 0.45rem 0;
+    border-top: 1px solid rgba(148,163,184,0.15);
+}
+.step-settings-label { margin-bottom: 0.4rem; color: #94a3b8; }
+.step-settings-entry {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0 0 0.4rem;
+    color: #e2e8f0;
+    font-size: 0.75rem;
+}
+.step-settings-hint {
+    color: #64748b;
+    font-size: 0.68rem;
+    line-height: 1.4;
+}
+.step-settings-popover .break-list {
+    max-height: 9rem;
+    overflow-y: auto;
+}
+.step-settings-popover .break-add-row {
+    display: flex;
+    gap: 0.35rem;
+}
+.step-settings-popover .break-addr-input {
+    min-width: 0;
+    flex: 1;
+}
+
 /* ── Edit toolbar button ─────────────────────────────────────────────────── */
 .btn-edit {
     background: #1a2535;

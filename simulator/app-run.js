@@ -1468,19 +1468,35 @@ function renderBreakList() {
     ).join('');
 }
 
-function toggleBreakPopover() {
-    const pop = document.getElementById('breakPopover');
+function toggleStepSettingsPopover() {
+    const pop = document.getElementById('stepSettingsPopover');
     if (!pop) return;
     const open = pop.style.display !== 'none';
     pop.style.display = open ? 'none' : 'block';
-    if (!open) renderBreakList();
+    const btn = document.getElementById('stepSettingsBtn');
+    if (btn) btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+    const breakBtn = document.getElementById('toolBreakBtn');
+    if (breakBtn) breakBtn.setAttribute('aria-expanded', open ? 'false' : 'true');
+    if (!open) {
+        renderBreakList();
+        document.getElementById('breakAddrInput')?.focus();
+    }
+}
+
+// Backwards-compatible entry point for code and shortcuts that still refer to
+// the breakpoint control directly. Both buttons now open the same Step Settings
+// panel so breakpoint controls never appear in a detached or competing popup.
+function toggleBreakPopover() {
+    toggleStepSettingsPopover();
 }
 
 function openBreakPopoverAt(addr) {
-    const pop = document.getElementById('breakPopover');
+    const pop = document.getElementById('stepSettingsPopover');
     if (!pop) return;
     pop.style.display = 'block';
     renderBreakList();
+    document.getElementById('stepSettingsBtn')?.setAttribute('aria-expanded', 'true');
+    document.getElementById('toolBreakBtn')?.setAttribute('aria-expanded', 'true');
     const inp = document.getElementById('breakAddrInput');
     if (inp) {
         inp.value = '0x' + (addr >>> 0).toString(16).toUpperCase().padStart(4, '0');
@@ -1519,16 +1535,19 @@ function addBreakpointFromInput() {
     inp.style.borderColor = '';
     inp.value = '';
     addBreakpoint(addr);
-    const pop = document.getElementById('breakPopover');
-    if (pop) pop.style.display = 'none';
+    document.getElementById('stepSettingsPopover')?.classList.add('step-settings-updated');
 }
 
-// Close breakpoint popover when clicking outside it
+// Close Step Settings when clicking outside it.
 document.addEventListener('click', function(e) {
-    const wrap = document.getElementById('breakWrap');
+    const wrap = document.getElementById('stepSettingsWrap');
     if (wrap && !wrap.contains(e.target)) {
-        const pop = document.getElementById('breakPopover');
-        if (pop) pop.style.display = 'none';
+        const pop = document.getElementById('stepSettingsPopover');
+        if (pop && pop.style.display !== 'none') {
+            pop.style.display = 'none';
+            document.getElementById('stepSettingsBtn')?.setAttribute('aria-expanded', 'false');
+            document.getElementById('toolBreakBtn')?.setAttribute('aria-expanded', 'false');
+        }
     }
 });
 

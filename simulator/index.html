@@ -360,22 +360,31 @@
                         <button class="btn btn-warning sim-icon-btn fault-idle" id="toolFaultBtn" onclick="faultRecall()" data-tooltip="Fault — Click to recall the fault report">&#x26A1;</button>
                         <button class="btn sim-icon-btn fault-panel-badge" id="faultPanelBadge" onclick="_faultBadgeClick()" style="display:none;" data-tooltip="Last Fault — A fault was recorded · click to view it in the editor">&#x26A0; Fault</button>
                         <button class="btn btn-success sim-icon-btn" id="toolStepBtn" onclick="stepSim()" data-tooltip="Step — Execute one instruction">&#x1F463;</button>
+                        <div class="step-settings-wrap" id="stepSettingsWrap">
+                            <button class="btn sim-icon-btn step-settings-btn" id="stepSettingsBtn" onclick="toggleStepSettingsPopover()" aria-haspopup="dialog" aria-expanded="false" data-tooltip="Step Settings — Configure stepping and breakpoints">&#9881;</button>
+                            <div class="step-settings-popover" id="stepSettingsPopover" style="display:none;">
+                                <div class="step-settings-title">Step Settings <button class="step-settings-close" onclick="toggleStepSettingsPopover()" title="Close">&times;</button></div>
+                                <div class="step-settings-section">
+                                    <div class="step-settings-label">Stepping</div>
+                                    <label class="break-at-entry-label step-settings-entry" id="breakAtEntryLabel" data-tooltip="Break at entry — Pause automatically at the very first instruction after boot (one-shot; clears itself after firing)"><input type="checkbox" id="breakAtEntryChk"> Break at entry</label>
+                                    <div class="step-settings-hint">Step executes one instruction or boot phase at a time. Breakpoints pause Run and Walk before the matching program counter.</div>
+                                </div>
+                                <div class="step-settings-section">
+                                    <div class="step-settings-label">Breakpoints</div>
+                                    <div id="breakList" class="break-list"></div>
+                                    <div class="break-add-row">
+                                        <input id="breakAddrInput" class="break-addr-input" type="text" placeholder="0x0100" maxlength="8" onkeydown="if(event.key==='Enter')addBreakpointFromInput()" />
+                                        <button class="btn btn-sm btn-primary" onclick="addBreakpointFromInput()">Add</button>
+                                    </div>
+                                    <button class="btn btn-sm break-clear-btn" onclick="clearAllBreakpoints()">Clear All</button>
+                                </div>
+                            </div>
+                        </div>
                         <button class="btn btn-secondary sim-icon-btn" id="toolHWRunBtn" onclick="hwRunToggle()" style="display:none;font-size:11px;padding:2px 6px;" data-tooltip="HW Run/Pause — Toggle Wukong board free-run or instruction-boundary pause">&#x25B6; HW</button>
                         <span id="wukongCallDepthBadge" class="wukong-call-depth-badge" style="display:none;" title="HW call-stack depth: 0">&#x21C6; 0</span>
                         <button class="btn btn-primary sim-icon-btn" id="toolHWLoadBtn" onclick="_wukongLoadToHardware()" style="display:none;font-size:11px;padding:2px 6px;" data-tooltip="Load to Hardware — Generate boot image and push it to the connected Wukong board">&#x26A1; Load</button>
                         <button class="btn btn-walk sim-icon-btn" id="toolWalkBtn" onclick="walkToggle()" data-tooltip="Walk — Animate step-by-step execution">&#x1F6B6;</button>
-                        <div class="break-wrap" id="breakWrap">
-                            <button class="btn btn-break sim-icon-btn" id="toolBreakBtn" onclick="toggleBreakPopover()" data-tooltip="Breakpoint — Set/clear PC breakpoints for Run and Walk">&#x25CF;</button>
-                            <div class="break-popover" id="breakPopover" style="display:none;">
-                                <div class="break-popover-title">Breakpoints <button class="break-close-btn" onclick="toggleBreakPopover()" title="Close">&times;</button></div>
-                                <div id="breakList" class="break-list"></div>
-                                <div class="break-add-row">
-                                    <input id="breakAddrInput" class="break-addr-input" type="text" placeholder="0x0100" maxlength="8" onkeydown="if(event.key==='Enter')addBreakpointFromInput()" />
-                                    <button class="btn btn-sm btn-primary" onclick="addBreakpointFromInput()">Add</button>
-                                </div>
-                                <button class="btn btn-sm break-clear-btn" onclick="clearAllBreakpoints()">Clear All</button>
-                            </div>
-                        </div>
+                        <button class="btn btn-break sim-icon-btn" id="toolBreakBtn" onclick="toggleStepSettingsPopover()" data-tooltip="Breakpoint — Open Step Settings and manage PC breakpoints">&#x25CF;</button>
                         <div class="run-wrap" id="runWrap">
                             <button class="btn btn-success sim-icon-btn" id="btnRunSim" onclick="onRunBtnClick()" data-tooltip="Run — single-click to run · double-click for options">&#x1F3C3;</button>
                             <button class="btn btn-danger sim-icon-btn" id="btnStopSim" onclick="stopSim()" style="display:none;" data-tooltip="Stop — Halt execution immediately">&#x23F9;</button>
@@ -408,7 +417,6 @@
                         </div>
                         <button class="btn btn-invoke sim-icon-btn" id="btnInvokeMethod" onclick="openInvokeModal()" style="display:none;" data-tooltip="Invoke Method — Set up a method call: choose method, fill in arguments, configure registers">&#x2609;</button>
                         <button class="btn btn-warning sim-icon-btn" onclick="resetSim()" data-tooltip="Boot — Reset and run the boot sequence (C+R)">&#x21BA;</button>
-                        <label class="break-at-entry-label" id="breakAtEntryLabel" data-tooltip="Break at entry — Pause automatically at the very first instruction after boot (one-shot; clears itself after firing)"><input type="checkbox" id="breakAtEntryChk"> Break at entry</label>
                         <button class="btn btn-lazy sim-icon-btn" onclick="runLazyLoadTest()" data-tooltip="Lazy Load Test — Load absent Math.Add lump on demand, verify end-to-end lazy fetch">&#x29BF;</button>
                     </div>
                 </div>
