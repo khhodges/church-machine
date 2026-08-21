@@ -128,10 +128,15 @@
         .ham-section { position:relative; }
         .ham-section > .ham-group { display:none; position:absolute; left:100%; top:0; min-width:210px; background:var(--bg-panel,#12121f); border:1px solid var(--border,#2a2a4a); border-radius:0 6px 6px 6px; box-shadow:6px 4px 20px rgba(0,0,0,0.55); z-index:10001; padding:0.2rem 0; flex-direction:column; }
         .ham-section:hover > .ham-group { display:flex; }
-        .ham-subhead.ham-category.ham-section-head { display:flex; justify-content:space-between; align-items:center; cursor:default; padding-right:0.6rem; }
+        .ham-subhead.ham-category.ham-section-head { display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding-right:0.6rem; }
         .ham-subhead.ham-category.ham-section-head::after { content:"\203A"; font-size:1rem; color:#444466; transition:color 0.12s; display:inline-block; }
         .ham-section:hover > .ham-subhead.ham-category.ham-section-head { background:rgba(218,165,32,0.08); border-radius:4px; }
         .ham-section:hover > .ham-subhead.ham-category.ham-section-head::after { color:#daa520; }
+        /* ── Touch / keyboard expansion (mirrors hover styles) ──────────── */
+        .ham-section.ham-section-expanded > .ham-group { display:flex; }
+        .ham-section.ham-section-expanded > .ham-subhead.ham-category.ham-section-head { background:rgba(218,165,32,0.08); border-radius:4px; }
+        .ham-section.ham-section-expanded > .ham-subhead.ham-category.ham-section-head::after { color:#daa520; }
+        .ham-subhead.ham-category.ham-section-head:focus { outline:2px solid rgba(218,165,32,0.6); outline-offset:1px; border-radius:3px; }
         .ham-nested-label { padding:0.35rem 0.75rem 0.05rem 1.15rem; font-size:0.62rem; color:#7777a0; }
         .ham-nested { padding-left:0.4rem; }
         .ham-link { text-decoration:none; color:inherit; }

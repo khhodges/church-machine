@@ -1471,7 +1471,110 @@ function toggleHamburger() {
 function closeHamburger() {
     const dd = document.getElementById('hamDropdown');
     if (dd) dd.classList.remove('ham-open');
+    _collapseAllHamSections();
 }
+
+/* ── Ham section touch / keyboard helpers ─────────────────────────── */
+
+function _collapseAllHamSections() {
+    document.querySelectorAll('.ham-section.ham-section-expanded').forEach(function(s) {
+        s.classList.remove('ham-section-expanded');
+        const head = s.querySelector('.ham-section-head');
+        if (head) head.setAttribute('aria-expanded', 'false');
+    });
+}
+
+function _expandHamSection(section) {
+    _collapseAllHamSections();
+    section.classList.add('ham-section-expanded');
+    const head = section.querySelector('.ham-section-head');
+    if (head) head.setAttribute('aria-expanded', 'true');
+}
+
+function _hamSectionItems(section) {
+    const group = section.querySelector('.ham-group');
+    if (!group) return [];
+    return Array.from(group.querySelectorAll('.ham-item, a.ham-link')).filter(function(el) {
+        return !el.disabled && el.offsetParent !== null;
+    });
+}
+
+function initHamSectionInteraction() {
+    document.querySelectorAll('.ham-section').forEach(function(section) {
+        const head = section.querySelector('.ham-section-head');
+        if (!head) return;
+
+        // Make heading keyboard-reachable
+        if (!head.getAttribute('tabindex')) head.setAttribute('tabindex', '0');
+        head.setAttribute('role', 'button');
+        head.setAttribute('aria-expanded', 'false');
+        head.setAttribute('aria-haspopup', 'true');
+
+        // ── Touch ────────────────────────────────────────────────────────
+        head.addEventListener('touchend', function(e) {
+            e.preventDefault(); // suppress subsequent mouse events
+            const isOpen = section.classList.contains('ham-section-expanded');
+            if (isOpen) {
+                _collapseAllHamSections();
+            } else {
+                _expandHamSection(section);
+                // Focus first item so touch users can tap without a second gesture
+                const items = _hamSectionItems(section);
+                if (items.length) items[0].focus();
+            }
+        });
+
+        // ── Keyboard on the heading ───────────────────────────────────────
+        head.addEventListener('keydown', function(e) {
+            switch (e.key) {
+                case 'Enter':
+                case ' ':
+                case 'ArrowRight':
+                case 'ArrowDown': {
+                    e.preventDefault();
+                    _expandHamSection(section);
+                    const items = _hamSectionItems(section);
+                    if (items.length) items[0].focus();
+                    break;
+                }
+                case 'Escape': {
+                    e.preventDefault();
+                    _collapseAllHamSections();
+                    break;
+                }
+            }
+        });
+
+        // ── Keyboard within the submenu ───────────────────────────────────
+        const group = section.querySelector('.ham-group');
+        if (!group) return;
+        group.addEventListener('keydown', function(e) {
+            if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' &&
+                e.key !== 'Escape' && e.key !== 'ArrowLeft') return;
+            const items = _hamSectionItems(section);
+            const idx   = items.indexOf(document.activeElement);
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                const next = items[idx + 1] || items[0];
+                if (next) next.focus();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (idx === 0) {
+                    head.focus();
+                } else {
+                    const prev = items[idx - 1];
+                    if (prev) prev.focus();
+                }
+            } else if (e.key === 'Escape' || e.key === 'ArrowLeft') {
+                e.preventDefault();
+                _collapseAllHamSections();
+                head.focus();
+            }
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initHamSectionInteraction);
 
 function switchDocsTab(tabId) {
     var docsMap = {
