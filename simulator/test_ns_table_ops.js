@@ -369,5 +369,62 @@ function callNsTableClear(simInst, slot) {
         fromHardware._nsUiTypeHint[1] !== 2);
 }
 
+// ── T415: Navana.Init does NOT add any NS entries ─────────────────────────────
+// task #2941: Navana.Init must not auto-register SlideRule, Constants, or any
+// Scheduler/IRQ entry in the Namespace table.  The NS table after Init must
+// match the committed boot-image entries exactly — no more, no less.
+{
+    const AbstractionRegistry = require('./abstractions.js');
+
+    const sim = makeSim();
+    const nsCountBefore = sim.nsCount;
+    const snapBefore = [];
+    for (let i = 0; i < Math.min(64, nsCountBefore + 5); i++) {
+        const base = sim._nsSlotBase(i);
+        snapBefore.push({
+            w0: sim.memory[base]     >>> 0,
+            w1: sim.memory[base + 1] >>> 0,
+            w2: sim.memory[base + 2] >>> 0,
+            w3: sim.memory[base + 3] >>> 0,
+        });
+    }
+
+    // Trigger Navana.Init (the path that previously added SlideRule and Constants)
+    if (sim.abstractionRegistry) {
+        sim.abstractionRegistry.dispatchMethod(5, 'Init', sim, {});
+    }
+
+    const nsCountAfter = sim.nsCount;
+    check('T415a: Navana.Init does not increase nsCount',
+        nsCountAfter === nsCountBefore,
+        `nsCountBefore=${nsCountBefore}, nsCountAfter=${nsCountAfter}`);
+
+    // Verify no new valid NS entries appeared above nsCountBefore
+    let extraEntries = 0;
+    for (let i = nsCountBefore; i < nsCountBefore + 10; i++) {
+        if (sim.isNSEntryValid(i)) {
+            extraEntries++;
+            console.log(`  T415b: unexpected valid NS entry at slot ${i} after Navana.Init`);
+        }
+    }
+    check('T415b: Navana.Init adds zero new valid NS entries',
+        extraEntries === 0,
+        `extraEntries=${extraEntries}`);
+
+    // Verify existing boot slots are unchanged
+    let bootSlotsChanged = false;
+    for (let i = 0; i < Math.min(snapBefore.length, nsCountBefore); i++) {
+        const base = sim._nsSlotBase(i);
+        const w0 = sim.memory[base]     >>> 0;
+        const w1 = sim.memory[base + 1] >>> 0;
+        if (w0 !== snapBefore[i].w0 || w1 !== snapBefore[i].w1) {
+            bootSlotsChanged = true;
+            console.log(`  T415c: boot slot ${i} changed after Navana.Init: w0 ${snapBefore[i].w0.toString(16)}→${w0.toString(16)}`);
+        }
+    }
+    check('T415c: Navana.Init leaves all existing NS slots unchanged',
+        !bootSlotsChanged);
+}
+
 console.log(`\n${pass + fail} tests: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

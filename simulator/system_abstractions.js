@@ -342,9 +342,10 @@ class SystemAbstractions {
                 navanaState.sysPgt      = sysPgt;
                 navanaState.sysAccountId = billingOpen.result.accountId;
 
-                // Step 1 — code regions (quota charged via TuringMemory)
-                const srRes    = registry.dispatchMethod(48, 'AllocCode', sim, { p_gt: sysPgt, words: 16384 });
-                const constRes = registry.dispatchMethod(48, 'AllocCode', sim, { p_gt: sysPgt, words: 256   });
+                // Step 1 — code regions for SlideRule and Constants are NOT allocated here.
+                // task #2941: SlideRule and Constants operate through abstractionCLists
+                // dispatch targets and must NOT auto-add NS entries.  Removing their
+                // AllocCode + Navana.ADD calls keeps the NS table clean on every boot.
 
                 // Step 2 — data working buffers (raw PhysicalPool, no quota)
                 const schedRes   = registry.dispatchMethod(7, 'Allocate', sim, { size: 1024 });
@@ -353,40 +354,13 @@ class SystemAbstractions {
                 const ledBufRes  = registry.dispatchMethod(7, 'Allocate', sim, { size: 64   });
                 const uartBufRes = registry.dispatchMethod(7, 'Allocate', sim, { size: 512  });
 
-                // Step 3 — Navana.ADD -> Mint.Encode (correct 3-step flow)
-                // Only register a code lump in the NS when its AllocCode succeeded.
-                // A failed allocation must not produce an NS entry with location=0.
-                let srGT = 0, constGT = 0;
-                if (srRes && srRes.ok) {
-                    const srAddRes = registry.dispatchMethod(5, 'ADD', sim, {
-                        location: srRes.result.location,
-                        limit: 16384, gtType: 1, label: 'SlideRule'
-                    });
-                    if (srAddRes && srAddRes.ok) {
-                        const encSr = registry.dispatchMethod(6, 'Encode', sim, {
-                            base: srAddRes.result.nsIndex, exp: srAddRes.result.version,
-                            permsBits: 0x20, bindable: 0, far: 0
-                        });
-                        if (encSr && encSr.ok) srGT = encSr.result;
-                    }
-                }
-                if (constRes && constRes.ok) {
-                    const constAddRes = registry.dispatchMethod(5, 'ADD', sim, {
-                        location: constRes.result.location,
-                        limit: 256, gtType: 1, label: 'Constants'
-                    });
-                    if (constAddRes && constAddRes.ok) {
-                        const encConst = registry.dispatchMethod(6, 'Encode', sim, {
-                            base: constAddRes.result.nsIndex, exp: constAddRes.result.version,
-                            permsBits: 0x20, bindable: 0, far: 0
-                        });
-                        if (encConst && encConst.ok) constGT = encConst.result;
-                    }
-                }
+                // Step 3 — no Navana.ADD for SlideRule or Constants (task #2941).
+                // sliderule and constants are intentionally null; arithmetic dispatch
+                // routes through abstractionCLists, not through NS-indexed GTs.
 
                 navanaState.bootAllocations = {
-                    sliderule:    srRes    && srRes.ok    ? Object.assign({}, srRes.result,    { gt: srGT    }) : null,
-                    constants:    constRes && constRes.ok ? Object.assign({}, constRes.result, { gt: constGT }) : null,
+                    sliderule:    null,   // intentionally null — no NS entry (task #2941)
+                    constants:    null,   // intentionally null — no NS entry (task #2941)
                     scheduler:    schedRes   && schedRes.ok   ? schedRes.result   : null,
                     stack:        stackRes   && stackRes.ok   ? stackRes.result   : null,
                     dijkstraFlag: flagRes    && flagRes.ok    ? flagRes.result    : null,
@@ -831,7 +805,13 @@ class SystemAbstractions {
             const oldVersion = (existingW2 >>> 25) & 0x7F;
             const newVersion = (oldVersion + 1) & 0x7F;
 
+            // Gate _allowAutoWrite for the duration of this single NS write.
+            // Navana.ADD is the sole manual gate; it is the ONLY non-boot-load
+            // path that may call writeNSEntry (task #2941).
+            const _wasAllowed = sim._allowAutoWrite;
+            sim._allowAutoWrite = true;
             sim.writeNSEntry(freeSlot, location, limit, 0, 0, 0, gtType, newVersion, clistCount);
+            sim._allowAutoWrite = _wasAllowed;
             sim.nsLabels[freeSlot] = label;
 
             navanaState.managedAbstractions.push({ index: freeSlot, name: label, layer: -1 });
@@ -1131,6 +1111,19 @@ class SystemAbstractions {
 
             const labelPrefix = gtType === 3 ? 'ABS' : (hasTuring ? 'DATA' : 'CAP');
             const label = `${labelPrefix}[mint]`;
+
+            // skipNS: true suppresses the Navana.ADD NS entry (task #2941).
+            // Callers that do not need an NS entry (e.g. internal system allocations)
+            // pass this option to avoid polluting the namespace table.
+            if (args.skipNS) {
+                const gt = sim.createGT(0, 0, targetPerms, gtType);
+                const permBits = sim.getPermBits(targetPerms);
+                return {
+                    ok: true,
+                    result: { gt, nsIndex: null, location, size: allocatedSize, version: 0, type: gtType, typeName: typeNames[gtType] },
+                    message: `Mint.Create: ${typeNames[gtType]} GT (no NS entry, skipNS=true) perms=${permBits.toString(2).padStart(7,'0')} F=${fFlag}`,
+                };
+            }
 
             const addResult = sim.abstractionRegistry.dispatchMethod(5, 'Add', sim, {
                 location: location,

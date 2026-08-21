@@ -892,6 +892,11 @@ class ChurchSimulator {
         this.awaitingLump = null;
         this._tracePacketsBuf = [];  // per-instruction trace packet buffer (cleared before each step)
 
+        // NS write guard (task #2941): only boot-load (_initNamespaceTable) and the
+        // manual UI gate (Navana.ADD) may call writeNSEntry.  All other paths must use
+        // direct memory writes.  Set to true only in those two locations, never globally.
+        this._allowAutoWrite = false;
+
         // Three-tier fault recovery and scheduler interrupt state (Task #1077)
         this.irqState = {
             timerArmed: false,
@@ -1445,6 +1450,16 @@ class ChurchSimulator {
                 `See docs/abstract-io-addressing.md.`
             );
         }
+        // NS write guard (task #2941): catch accidental auto-writes outside the two
+        // legitimate windows: boot-load (_initNamespaceTable) and manual UI gate (Navana.ADD).
+        // console.assert fires in development; does not block execution in production.
+        if (!this._allowAutoWrite && this.bootComplete) {
+            console.assert(false,
+                `writeNSEntry(slot ${idx}): called outside an allowed write window ` +
+                `(bootComplete=true, _allowAutoWrite=false). ` +
+                `Only _initNamespaceTable and Navana.ADD may write NS entries automatically. ` +
+                `Use direct memory writes for GC/internal reclamation.`);
+        }
         const base = this._nsSlotBase(idx);
         if (!this._nsUiTypeHint) this._nsUiTypeHint = {};
         if (!this._nsClistCount) this._nsClistCount = {};
@@ -1771,6 +1786,10 @@ class ChurchSimulator {
         // All boot-time slots (Boot.NS, Boot.Thread, Boot.Abstr, Salvation, Navana, Mint, etc.) are Inform (type=1)
         // because they reference concrete physical memory lumps in the namespace table.
         // Abstract (type=3) GTs are only created by Navana.Abstraction.Add (user uploads) and Navana.MintPassKey.
+        //
+        // NS write guard: permit writeNSEntry for the duration of this boot-load path only.
+        // Cleared at the end of this method.  All other auto-writes are forbidden (task #2941).
+        this._allowAutoWrite = true;
         this.nsLabels = {};
         this.nsChainable = {};
         this.nsCount = 0;
@@ -2119,13 +2138,17 @@ class ChurchSimulator {
         // Must match boot_image.py BOOT_IMAGE_FORMAT_TAG and loadBootImage().
         const BOOT_IMAGE_FORMAT_TAG_INIT = 0xB0072862;  // bumped for Task #2862 (W3=cache_token migration; W1||W2||W3 Outform token)
         this.memory[this.NS_TABLE_BASE - 1] = BOOT_IMAGE_FORMAT_TAG_INIT >>> 0;
+
+        // Restore NS write guard: boot-load is complete; no further auto-writes permitted.
+        this._allowAutoWrite = false;
     }
 
-    // ── Seed the Scheduler.IRQ lazy manifest after Mint allocates its NS slot ───────
-    // Called from _fireSchedulerIRQ() after Mint.RegisterOutform → Navana.ADD has
-    // already written the NS entry.  This function only records the slot, seeds the
-    // lazy-load manifest, and updates irqState — it does NOT call writeNSEntry.
-    // That write is solely Mint's responsibility (through Navana).
+    // ── Seed the Scheduler.IRQ lazy manifest (no NS write) ──────────────────────
+    // Called from _fireSchedulerIRQ() on the first timer/wake path.
+    // task #2941: the NS table is NOT written here.  allocOrFindNsSlot reserves a
+    // slot index in _tokenSlotMap only; writeNSEntry is never called for the IRQ LUMP.
+    // This function only records the slot, seeds the lazy-load manifest, and updates
+    // irqState so the body can be installed on demand via lazyLoad().
     _seedIrqLazyManifest(irqSlot, irqLoc, irqGT) {
         const IRQ_LUMP_SIZE = 64;
 
@@ -2156,8 +2179,8 @@ class ChurchSimulator {
             this.irqState.irqLumpGT   = irqGT;
         }
 
-        this.output += `[IRQ-LUMP] Scheduler.IRQ registered at NS[${irqSlot}] `
-            + `loc=0x${irqLoc.toString(16)} (Outform via Mint→Navana, E-GT=0x${(irqGT>>>0).toString(16).toUpperCase()}) `
+        this.output += `[IRQ-LUMP] Scheduler.IRQ slot=${irqSlot} `
+            + `loc=0x${irqLoc.toString(16)} (no NS entry — task #2941) `
             + `— body lazy-loads on first Tier 2 fault\n`;
     }
 
@@ -3348,12 +3371,17 @@ class ChurchSimulator {
                 continue;
             }
             // Canonical NS ABI: gt_seq lives in W1[29:21] (not W2). Read/bump the
-            // sequence from W1 and re-write the (now-empty) entry via writeNSEntry
-            // so W1 carries the bumped gt_seq and W2 stays a coherent integrity32.
+            // sequence from W1 and re-write the (now-empty) entry via direct memory
+            // writes (task #2941: GC sweep must not go through writeNSEntry — that
+            // function is reserved for boot-load and the manual UI ADD gate only).
+            // Bump gt_seq in W1 so any live GT referencing this slot fails stale check.
             const base = this._nsSlotBase(c.index);
             const oldVersion = this.parseNSWord1(this.memory[base + 1] >>> 0).gtSeq & 0x7F;
             const newVersion = (oldVersion + 1) & 0x7F;
-            this.writeNSEntry(c.index, 0, 0, 0, 0, 0, newVersion, 0, 0);
+            this.memory[base + 0] = 0;
+            this.memory[base + 1] = this.packNSWord1(0, newVersion, 0, 0);
+            this.memory[base + 2] = this._integrity32(0, this.memory[base + 1]);
+            this.memory[base + 3] = 0;
 
             let wordsCleared = 0;
             for (let w = 0; w < this.SLOT_SIZE; w++) {
@@ -4005,22 +4033,21 @@ class ChurchSimulator {
         if (!this.irqState || this.irqState.irqActive) return null;
 
         // Resolve the IRQ LUMP slot on first call.
-        // Mint (NS slot 6) is the sole authority for NS slot registration.
-        // Route: Mint.RegisterOutform → Navana.ADD → writeNSEntry.
-        // If Mint is unavailable or refuses, the IRQ cannot proceed.
+        // task #2941: Scheduler.IRQ must NOT auto-register in the NS table.
+        // Instead: claim a slot index via allocOrFindNsSlot (no NS write) and seed
+        // the lazy manifest directly so the IRQ body can be installed on demand.
+        // The NS table entry is left absent — the IRQ dispatches through
+        // abstractionRegistry, not through a live NS entry.
         if (this.irqState.irqLumpSlot === null) {
             const _irqLoc  = this.irqState.irqAllocBase || 0;
-            const _mintResult = this.abstractionRegistry.dispatchMethod(6, 'RegisterOutform', this, {
-                location: _irqLoc,
-                limit:    (64 - 1) & 0x1FFFF,   // IRQ_LUMP_SIZE = 64
-                label:    'Scheduler.IRQ',
-            });
-            if (!_mintResult || !_mintResult.ok) {
-                this.output += `[IRQ] Scheduler.IRQ registration blocked — Mint.RegisterOutform refused: `
-                    + `${_mintResult ? _mintResult.message : 'Mint (NS slot 6) unavailable'}\n`;
+            const _irqSlot = this.allocOrFindNsSlot('00000800', 'Scheduler.IRQ');
+            if (_irqSlot === null) {
+                this.output += `[IRQ] Scheduler.IRQ slot allocation failed — NS table full\n`;
                 return null;
             }
-            this._seedIrqLazyManifest(_mintResult.result.nsIndex, _irqLoc, _mintResult.result.gt);
+            // _seedIrqLazyManifest: seeds lazyManifest[slot] and sets irqState.
+            // It does NOT call writeNSEntry — the NS table is left clean (task #2941).
+            this._seedIrqLazyManifest(_irqSlot, _irqLoc, 0);
         }
         const _schedulerSlot = (this.irqState.irqLumpSlot != null)
             ? this.irqState.irqLumpSlot
