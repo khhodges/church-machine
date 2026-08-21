@@ -1904,9 +1904,14 @@ function _buildLumpDeepDiveGraph(rootLump) {
         entries.forEach((entry, index) => {
             const isNull = !entry || entry.null || entry.gt_word === '0x00000000' ||
                 entry.gt_word === 0 || entry.state === 'null';
-            const targetToken = isNull ? null : _deepDiveTargetToken(entry);
+            // Keep legacy references as visible leaves even if their old
+            // token or slot happens to resolve in the current registry.
+            const isLegacy = !isNull && (entry.legacy === true ||
+                entry.state === 'legacy' || entry.kind === 'legacy');
+            const targetToken = isNull || isLegacy ? null : _deepDiveTargetToken(entry);
             const target = targetToken ? _deepDiveLumpForToken(targetToken) : null;
             const fallback = isNull ? `null-${current.key}-${index}` :
+                isLegacy ? `legacy-${current.key}-${index}` :
                 `unresolved-${current.key}-${index}-${entry.ns_index == null ? 'legacy' : entry.ns_index}`;
             const targetKey = keyFor(targetToken, fallback);
             const hadTarget = byKey.has(targetKey);
@@ -1916,8 +1921,10 @@ function _buildLumpDeepDiveGraph(rootLump) {
                 depth: current.depth + 1
             } : {
                 label: isNull ? `NULL · C-List slot ${index}` :
+                    isLegacy ? `LEGACY · C-List slot ${index}` :
                     `UNRESOLVED · NS[${entry.ns_index == null ? '?' : entry.ns_index}]`,
-                kind: isNull ? 'null' : 'unresolved', depth: current.depth + 1,
+                kind: isNull ? 'null' : isLegacy ? 'legacy' : 'unresolved',
+                depth: current.depth + 1,
                 token: targetToken || ''
             });
             const cycle = targetKey === current.key || (target && queued.has(targetKey));
@@ -1955,7 +1962,7 @@ function _buildLumpDeepDiveGraph(rootLump) {
     });
     nodes.forEach(node => {
         const p = pos.get(node.key);
-        const colors = { root: '#22c55e', lump: '#4a90e2', null: '#6b7280', unresolved: '#f59e0b', leaf: '#9ca3af' };
+        const colors = { root: '#22c55e', lump: '#4a90e2', null: '#6b7280', legacy: '#a78bfa', unresolved: '#f59e0b', leaf: '#9ca3af' };
         const color = colors[node.kind] || colors.lump;
         const title = node.kind === 'root' ? 'SELECTED LUMP' : node.kind.toUpperCase();
         svg += `<g class="lump-deep-node lump-deep-node-${node.kind}"><rect x="${p.x}" y="${p.y}" width="178" height="48" rx="5" fill="#08080f" stroke="${color}" stroke-width="${node.kind === 'root' ? 2 : 1.3}"/><text x="${p.x + 7}" y="${p.y + 15}" class="lump-deep-node-kind" fill="${color}">${title}</text><text x="${p.x + 7}" y="${p.y + 31}" class="lump-deep-node-label">${esc((node.label || '').slice(0, 26))}</text>${node.token ? `<text x="${p.x + 171}" y="${p.y + 43}" text-anchor="end" class="lump-deep-node-token">0x${esc(node.token)}</text>` : ''}</g>`;
@@ -1968,7 +1975,10 @@ function _closeLumpDeepDive() {
     const modal = document.getElementById('lumpDeepDiveModal');
     const trigger = modal && modal._trigger;
     if (modal) modal.remove();
-    if (trigger) { trigger.setAttribute('aria-expanded', 'false'); trigger.focus(); }
+    if (trigger && trigger.isConnected) {
+        trigger.setAttribute('aria-expanded', 'false');
+        trigger.focus();
+    }
     document.removeEventListener('keydown', _lumpDeepDiveKeydown);
 }
 function _lumpDeepDiveKeydown(ev) { if (ev.key === 'Escape') _closeLumpDeepDive(); }
@@ -1981,6 +1991,9 @@ async function _openLumpDeepDive(token, trigger) {
     modal.id = 'lumpDeepDiveModal'; modal.className = 'lump-deep-dive-backdrop';
     modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-labelledby', 'lumpDeepDiveTitle'); modal._trigger = trigger || document.activeElement;
+    if (modal._trigger && modal._trigger.setAttribute) {
+        modal._trigger.setAttribute('aria-expanded', 'true');
+    }
     const e = typeof _escHtml === 'function' ? _escHtml : s => String(s || '');
     const type = typeof _lumpContentTypeLabel === 'function' ? _lumpContentTypeLabel(lump) : (lump.lump_type || 'LUMP');
     modal.innerHTML = `<section class="lump-deep-dive-dialog"><header class="lump-deep-dive-header"><div><h2 id="lumpDeepDiveTitle">LUMP Deep Dive · ${e(lump.dot_name || lump.abstraction || token)}</h2><p>Recursive DNA reachability map</p></div><button type="button" class="lump-deep-dive-close" aria-label="Close Deep Dive">&times;</button></header><div class="lump-deep-dive-summary"><span><b>Token</b> 0x${e(lump.token)}</span><span><b>Name</b> ${e(lump.dot_name || lump.abstraction || 'Unknown')}</span><span><b>Type</b> ${e(type)}</span><span><b>Version</b> ${e(lump.lump_version ?? lump.version ?? '—')}</span><span><b>Size</b> ${e(lump.lump_size ?? '—')}w</span><span><b>NS slot</b> ${e(lump.ns_slot ?? 'saved')}</span></div><div class="lump-deep-dive-api" id="lumpDeepDiveApi">API/capability metadata: loading…</div><div class="lump-deep-dive-toolbar"><span>Edges are labeled by C-List register and permissions. Amber dashed edges are reused or cyclic.</span><button type="button" class="ns-dep-graph-btn" id="lumpDeepZoomIn">+</button><button type="button" class="ns-dep-graph-btn" id="lumpDeepZoomOut">−</button><button type="button" class="ns-dep-graph-btn" id="lumpDeepZoomReset">↺</button></div><div id="lumpDeepDiveBody" class="lump-deep-dive-body"><div class="lumps-loading">Building DNA graph…</div></div></section>`;
