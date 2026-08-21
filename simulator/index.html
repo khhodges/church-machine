@@ -123,7 +123,14 @@
         html.r1-learn-mode .ham-group.ham-learn-section { display:flex; }
         .ham-subhead { font-size:0.6rem; font-weight:700; letter-spacing:0.09em; color:#44446a; text-transform:uppercase; padding:0.5rem 0.75rem 0.05rem; }
         .ham-subhead.ham-category { color:#daa520; border-top:1px solid rgba(218,165,32,0.14); margin-top:0.2rem; padding-top:0.65rem; }
-        .ham-subhead.ham-category:first-of-type { border-top:0; margin-top:0; padding-top:0.45rem; }
+        .ham-section:first-child > .ham-subhead.ham-category { border-top:0; margin-top:0; padding-top:0.45rem; }
+        /* ── Hover-expand category sections ───────────────────────────────── */
+        .ham-section { position:relative; }
+        .ham-section > .ham-group { display:none; }
+        .ham-section:hover > .ham-group { display:flex; }
+        .ham-subhead.ham-category.ham-section-head { display:flex; justify-content:space-between; align-items:center; cursor:default; padding-right:0.6rem; }
+        .ham-subhead.ham-category.ham-section-head::after { content:"\203A"; font-size:1rem; color:#444466; transition:color 0.12s, transform 0.12s; display:inline-block; transform-origin:center; }
+        .ham-section:hover > .ham-subhead.ham-category.ham-section-head::after { color:#daa520; transform:rotate(90deg); }
         .ham-nested-label { padding:0.35rem 0.75rem 0.05rem 1.15rem; font-size:0.62rem; color:#7777a0; }
         .ham-nested { padding-left:0.4rem; }
         .ham-link { text-decoration:none; color:inherit; }
@@ -252,101 +259,119 @@
                                 <button id="hamDefaultClear" class="ham-bolt-clear" style="display:none;" onclick="_clearDefaultView()" data-tooltip="Remove default page — next load will resume the last visited page">✕ clear default</button>
                             </div>
                             <!-- Home -->
-                            <div class="ham-subhead ham-category">Home</div>
-                            <div class="ham-group" id="ham-grp-main">
-                                <a class="ham-item ham-link" id="hamItem-home" href="/" onclick="closeHamburger()">&#x1F3E0; Landing page<kbd class="ham-kbd">C+H</kbd></a>
+                            <div class="ham-section">
+                                <div class="ham-subhead ham-category ham-section-head">Home</div>
+                                <div class="ham-group" id="ham-grp-main">
+                                    <a class="ham-item ham-link" id="hamItem-home" href="/" onclick="closeHamburger()">&#x1F3E0; Landing page<kbd class="ham-kbd">C+H</kbd></a>
+                                </div>
                             </div>
                             <!-- Code -->
-                            <div class="ham-subhead ham-category">Code</div>
-                            <div class="ham-group" id="ham-grp-code">
-                                <button class="ham-item" id="hamItem-editor" onclick="switchView('editor');closeHamburger()">Programs / Editor</button>
-                                <button class="ham-item" id="hamItem-resume-draft" style="display:none;color:#daa520;" onclick="window.location='/start';closeHamburger()">&#x270F;&#xFE0F; Resume Draft</button>
-                                <button class="ham-item" id="hamItem-repl" onclick="switchView('repl');closeHamburger()">Math / REPL<kbd class="ham-kbd">C+M</kbd></button>
-                                <button class="ham-item" id="hamItem-source-library" onclick="window.location='/start?abstraction=1';closeHamburger()">Source Library</button>
+                            <div class="ham-section">
+                                <div class="ham-subhead ham-category ham-section-head">Code</div>
+                                <div class="ham-group" id="ham-grp-code">
+                                    <button class="ham-item" id="hamItem-editor" onclick="switchView('editor');closeHamburger()">Programs / Editor</button>
+                                    <button class="ham-item" id="hamItem-resume-draft" style="display:none;color:#daa520;" onclick="window.location='/start';closeHamburger()">&#x270F;&#xFE0F; Resume Draft</button>
+                                    <button class="ham-item" id="hamItem-repl" onclick="switchView('repl');closeHamburger()">Math / REPL<kbd class="ham-kbd">C+M</kbd></button>
+                                    <button class="ham-item" id="hamItem-source-library" onclick="window.location='/start?abstraction=1';closeHamburger()">Source Library</button>
+                                </div>
                             </div>
                             <!-- Builder -->
-                            <div class="ham-subhead ham-category">Builder</div>
-                            <div class="ham-group" id="ham-grp-builder">
-                                <button class="ham-item" id="hamItem-ti60-connect" onclick="switchView('builder');switchBuilderViewTab('ti60-connect');closeHamburger()">&#x1F50C; Connect Wukong</button>
-                                <button class="ham-item" id="hamItem-builder" onclick="switchView('builder');closeHamburger()">Builder<kbd class="ham-kbd">C+B</kbd></button>
-                                <button class="ham-item" id="hamItem-buildlog" onclick="switchView('builder');switchBuilderViewTab('buildlog');closeHamburger()">Build Log</button>
-                                <button class="ham-item" id="hamItem-lump-thread" onclick="switchView('builder');switchBuilderViewTab('lump-thread');closeHamburger()">Thread LUMP</button>
-                                <button class="ham-item" id="hamItem-lump-ns" onclick="switchView('builder');switchBuilderViewTab('lump-ns');closeHamburger()">Namespace LUMP</button>
-                                <button class="ham-item" id="hamItem-lump-resident" onclick="switchView('builder');switchBuilderViewTab('lump-resident');closeHamburger()">Resident LUMP</button>
-                                <button class="ham-item" id="hamItem-versions" onclick="switchView('builder');switchBuilderViewTab('versions');closeHamburger()">Versions</button>
-                                <button class="ham-item" id="hamItem-build" onclick="switchView('builder');switchBuilderViewTab('build');closeHamburger()">Build</button>
-                                <button class="ham-item" id="hamItem-testing" onclick="switchView('builder');switchBuilderViewTab('testing');closeHamburger()">Testing</button>
-                                <button class="ham-item" id="fpgaConnBtn" onclick="fpgaConnectToggle();closeHamburger()">FPGA</button>
-                                <button class="ham-item" id="fpgaBridgeBtn" onclick="fpgaBridgeConnect();closeHamburger()">Bridge</button>
-                                <button class="ham-item" id="fpgaReadBRAMBtn" onclick="fpgaReadBRAM();closeHamburger()">BRAM</button>
-                                <button class="ham-item" id="hamItem-devices" onclick="switchView('devices');switchDevicesTab('devices');closeHamburger()">Devices</button>
-                                <button class="ham-item" id="hamItem-launch" onclick="switchView('devices');switchDevicesTab('launch');closeHamburger()">Launch Readiness</button>
+                            <div class="ham-section">
+                                <div class="ham-subhead ham-category ham-section-head">Builder</div>
+                                <div class="ham-group" id="ham-grp-builder">
+                                    <button class="ham-item" id="hamItem-ti60-connect" onclick="switchView('builder');switchBuilderViewTab('ti60-connect');closeHamburger()">&#x1F50C; Connect Wukong</button>
+                                    <button class="ham-item" id="hamItem-builder" onclick="switchView('builder');closeHamburger()">Builder<kbd class="ham-kbd">C+B</kbd></button>
+                                    <button class="ham-item" id="hamItem-buildlog" onclick="switchView('builder');switchBuilderViewTab('buildlog');closeHamburger()">Build Log</button>
+                                    <button class="ham-item" id="hamItem-lump-thread" onclick="switchView('builder');switchBuilderViewTab('lump-thread');closeHamburger()">Thread LUMP</button>
+                                    <button class="ham-item" id="hamItem-lump-ns" onclick="switchView('builder');switchBuilderViewTab('lump-ns');closeHamburger()">Namespace LUMP</button>
+                                    <button class="ham-item" id="hamItem-lump-resident" onclick="switchView('builder');switchBuilderViewTab('lump-resident');closeHamburger()">Resident LUMP</button>
+                                    <button class="ham-item" id="hamItem-versions" onclick="switchView('builder');switchBuilderViewTab('versions');closeHamburger()">Versions</button>
+                                    <button class="ham-item" id="hamItem-build" onclick="switchView('builder');switchBuilderViewTab('build');closeHamburger()">Build</button>
+                                    <button class="ham-item" id="hamItem-testing" onclick="switchView('builder');switchBuilderViewTab('testing');closeHamburger()">Testing</button>
+                                    <button class="ham-item" id="fpgaConnBtn" onclick="fpgaConnectToggle();closeHamburger()">FPGA</button>
+                                    <button class="ham-item" id="fpgaBridgeBtn" onclick="fpgaBridgeConnect();closeHamburger()">Bridge</button>
+                                    <button class="ham-item" id="fpgaReadBRAMBtn" onclick="fpgaReadBRAM();closeHamburger()">BRAM</button>
+                                    <button class="ham-item" id="hamItem-devices" onclick="switchView('devices');switchDevicesTab('devices');closeHamburger()">Devices</button>
+                                    <button class="ham-item" id="hamItem-launch" onclick="switchView('devices');switchDevicesTab('launch');closeHamburger()">Launch Readiness</button>
+                                </div>
                             </div>
                             <!-- Tutorial -->
-                            <div class="ham-subhead ham-category">Tutorial</div>
-                            <div class="ham-group" id="ham-grp-tutorial">
-                                <button class="ham-item" id="hamItem-start" onclick="switchView('start');closeHamburger()">&#x1F680; Get Started</button>
-                                <button class="ham-item" id="hamItem-tutorial" onclick="switchView('tutorial');closeHamburger()">Tutorials</button>
-                                <div class="ham-nested-label">Tutorial lessons</div>
-                                <div class="ham-group ham-nested">
-                                    <button class="ham-item" onclick="switchView('tutorial');selectTutorial('sliderule');closeHamburger()">Slide Rule</button>
-                                    <button class="ham-item" onclick="switchView('tutorial');selectTutorial('cloomc');closeHamburger()">CLOOMC Language</button>
-                                    <button class="ham-item" onclick="switchView('tutorial');selectTutorial('security');closeHamburger()">Security</button>
-                                    <button class="ham-item" onclick="switchView('tutorial');selectTutorial('thread');closeHamburger()">Threads</button>
-                                    <button class="ham-item" onclick="switchView('tutorial');selectTutorial('abstraction');closeHamburger()">Abstractions</button>
-                                    <button class="ham-item" onclick="switchView('tutorial');selectTutorial('namespace');closeHamburger()">Namespace</button>
-                                    <button class="ham-item" onclick="switchView('tutorial');selectTutorial('secureboot');closeHamburger()">Secure Boot</button>
-                                    <button class="ham-item" onclick="switchView('tutorial');selectTutorial('englishloops');closeHamburger()">Loops</button>
-                                    <button class="ham-item" onclick="switchView('tutorial');selectTutorial('englishstring');closeHamburger()">Strings</button>
-                                    <button class="ham-item" onclick="switchView('tutorial');selectTutorial('englishcontact');closeHamburger()">Contacts</button>
+                            <div class="ham-section">
+                                <div class="ham-subhead ham-category ham-section-head">Tutorial</div>
+                                <div class="ham-group" id="ham-grp-tutorial">
+                                    <button class="ham-item" id="hamItem-start" onclick="switchView('start');closeHamburger()">&#x1F680; Get Started</button>
+                                    <button class="ham-item" id="hamItem-tutorial" onclick="switchView('tutorial');closeHamburger()">Tutorials</button>
+                                    <div class="ham-nested-label">Tutorial lessons</div>
+                                    <div class="ham-group ham-nested">
+                                        <button class="ham-item" onclick="switchView('tutorial');selectTutorial('sliderule');closeHamburger()">Slide Rule</button>
+                                        <button class="ham-item" onclick="switchView('tutorial');selectTutorial('cloomc');closeHamburger()">CLOOMC Language</button>
+                                        <button class="ham-item" onclick="switchView('tutorial');selectTutorial('security');closeHamburger()">Security</button>
+                                        <button class="ham-item" onclick="switchView('tutorial');selectTutorial('thread');closeHamburger()">Threads</button>
+                                        <button class="ham-item" onclick="switchView('tutorial');selectTutorial('abstraction');closeHamburger()">Abstractions</button>
+                                        <button class="ham-item" onclick="switchView('tutorial');selectTutorial('namespace');closeHamburger()">Namespace</button>
+                                        <button class="ham-item" onclick="switchView('tutorial');selectTutorial('secureboot');closeHamburger()">Secure Boot</button>
+                                        <button class="ham-item" onclick="switchView('tutorial');selectTutorial('englishloops');closeHamburger()">Loops</button>
+                                        <button class="ham-item" onclick="switchView('tutorial');selectTutorial('englishstring');closeHamburger()">Strings</button>
+                                        <button class="ham-item" onclick="switchView('tutorial');selectTutorial('englishcontact');closeHamburger()">Contacts</button>
+                                    </div>
                                 </div>
                             </div>
                             <!-- Namespace -->
-                            <div class="ham-subhead ham-category">Namespace</div>
-                            <div class="ham-group">
-                                <button class="ham-item" id="hamItem-namespace" onclick="switchView('namespace');closeHamburger()">Namespace Table<kbd class="ham-kbd">C+N</kbd></button>
-                                <button class="ham-item" id="hamItem-gt-view" onclick="switchView('gt-view');closeHamburger()">GT Inspector</button>
-                                <button class="ham-item" id="hamItem-memory" onclick="switchView('memory');closeHamburger()">Memory Dump</button>
+                            <div class="ham-section">
+                                <div class="ham-subhead ham-category ham-section-head">Namespace</div>
+                                <div class="ham-group">
+                                    <button class="ham-item" id="hamItem-namespace" onclick="switchView('namespace');closeHamburger()">Namespace Table<kbd class="ham-kbd">C+N</kbd></button>
+                                    <button class="ham-item" id="hamItem-gt-view" onclick="switchView('gt-view');closeHamburger()">GT Inspector</button>
+                                    <button class="ham-item" id="hamItem-memory" onclick="switchView('memory');closeHamburger()">Memory Dump</button>
+                                </div>
                             </div>
                             <!-- Simulator -->
-                            <div class="ham-subhead ham-category">Simulator</div>
-                            <div class="ham-group">
-                                <button class="ham-item" id="hamItem-dashboard" onclick="openSimulatorFromMenu()">Simulator Dashboard<kbd class="ham-kbd">C+D</kbd></button>
-                                <button class="ham-item" id="hamItem-abstractions" onclick="switchView('abstractions');closeHamburger()">Logic Catalog<kbd class="ham-kbd">C+A</kbd></button>
-                                <button class="ham-item" id="hamItem-pipeline" onclick="switchView('pipeline');closeHamburger()">Pipeline<kbd class="ham-kbd">C+P</kbd></button>
-                                <button class="ham-item" id="hamItem-trace" onclick="switchView('trace');closeHamburger()">Trace<kbd class="ham-kbd">C+T</kbd></button>
-                                <button class="ham-item" id="hamItem-gc" onclick="switchView('gc');closeHamburger()">GC<kbd class="ham-kbd">C+G</kbd></button>
+                            <div class="ham-section">
+                                <div class="ham-subhead ham-category ham-section-head">Simulator</div>
+                                <div class="ham-group">
+                                    <button class="ham-item" id="hamItem-dashboard" onclick="openSimulatorFromMenu()">Simulator Dashboard<kbd class="ham-kbd">C+D</kbd></button>
+                                    <button class="ham-item" id="hamItem-abstractions" onclick="switchView('abstractions');closeHamburger()">Logic Catalog<kbd class="ham-kbd">C+A</kbd></button>
+                                    <button class="ham-item" id="hamItem-pipeline" onclick="switchView('pipeline');closeHamburger()">Pipeline<kbd class="ham-kbd">C+P</kbd></button>
+                                    <button class="ham-item" id="hamItem-trace" onclick="switchView('trace');closeHamburger()">Trace<kbd class="ham-kbd">C+T</kbd></button>
+                                    <button class="ham-item" id="hamItem-gc" onclick="switchView('gc');closeHamburger()">GC<kbd class="ham-kbd">C+G</kbd></button>
+                                </div>
                             </div>
                             <!-- Abstractions -->
-                            <div class="ham-subhead ham-category">Abstractions</div>
-                            <div class="ham-group">
-                                <button class="ham-item" id="hamItem-lumps" onclick="switchView('lumps');closeHamburger()">LUMP Repository<kbd class="ham-kbd">C+L</kbd></button>
-                                <button class="ham-item" id="hamItem-hello-mum" onclick="switchView('hello-mum');closeHamburger()">Mum Tunnel</button>
-                                <button class="ham-item" id="hamItem-github" onclick="switchView('github');closeHamburger()">GitHub / Community</button>
+                            <div class="ham-section">
+                                <div class="ham-subhead ham-category ham-section-head">Abstractions</div>
+                                <div class="ham-group">
+                                    <button class="ham-item" id="hamItem-lumps" onclick="switchView('lumps');closeHamburger()">LUMP Repository<kbd class="ham-kbd">C+L</kbd></button>
+                                    <button class="ham-item" id="hamItem-hello-mum" onclick="switchView('hello-mum');closeHamburger()">Mum Tunnel</button>
+                                    <button class="ham-item" id="hamItem-github" onclick="switchView('github');closeHamburger()">GitHub / Community</button>
+                                </div>
                             </div>
                             <!-- Architecture -->
-                            <div class="ham-subhead ham-category">Architecture</div>
-                            <div class="ham-group">
-                                <button class="ham-item" id="hamItem-reference" onclick="switchView('reference');switchRefTab('isa');closeHamburger()">Instruction Reference<kbd class="ham-kbd">C+F</kbd></button>
-                                <button class="ham-item" onclick="switchView('reference');switchRefTab('hardware');closeHamburger()">Hardware Architecture</button>
-                                <button class="ham-item" id="hamItem-sitemap" onclick="switchView('sitemap');closeHamburger()">Site Map</button>
-                                <a class="ham-item ham-link" href="/ctmm/" onclick="closeHamburger()">CM Simulator</a>
-                                <a class="ham-item ham-link" href="/simulator/" onclick="closeHamburger()">Church Machine IDE</a>
+                            <div class="ham-section">
+                                <div class="ham-subhead ham-category ham-section-head">Architecture</div>
+                                <div class="ham-group">
+                                    <button class="ham-item" id="hamItem-reference" onclick="switchView('reference');switchRefTab('isa');closeHamburger()">Instruction Reference<kbd class="ham-kbd">C+F</kbd></button>
+                                    <button class="ham-item" onclick="switchView('reference');switchRefTab('hardware');closeHamburger()">Hardware Architecture</button>
+                                    <button class="ham-item" id="hamItem-sitemap" onclick="switchView('sitemap');closeHamburger()">Site Map</button>
+                                    <a class="ham-item ham-link" href="/ctmm/" onclick="closeHamburger()">CM Simulator</a>
+                                    <a class="ham-item ham-link" href="/simulator/" onclick="closeHamburger()">Church Machine IDE</a>
+                                </div>
                             </div>
                             <!-- Docs -->
-                            <div class="ham-subhead ham-category">Docs</div>
-                            <div class="ham-group">
-                                <button class="ham-item" id="hamItem-docs" onclick="switchView('docs');openDocAnchor('instruction-set.md');closeHamburger()">ISA Reference</button>
-                                <button class="ham-item" onclick="switchView('docs');openDocAnchor('HARDWARE.md');closeHamburger()">Hardware Guide</button>
-                                <button class="ham-item" onclick="switchView('docs');openDocAnchor('cloomc-foundation.md');closeHamburger()">CLOOMC++ Guide</button>
-                                <button class="ham-item" onclick="switchView('docs');openDocAnchor('api-reference.md');closeHamburger()">API Reference</button>
-                                <button class="ham-item" onclick="switchView('docs');openDocAnchor('quick-start.md');closeHamburger()">Quick Start &amp; Guides<kbd class="ham-kbd">C+Y</kbd></button>
-                                <a class="ham-item ham-link" href="/docs/figures/Lumps Directory.html" target="_blank" rel="noopener" onclick="closeHamburger()">Technical Figures</a>
-                                <a class="ham-item ham-link" href="/six-laws/" target="_blank" rel="noopener" onclick="closeHamburger()">Six Laws of CLOOMC</a>
-                                <a class="ham-item ham-link" href="/patents/" target="_blank" rel="noopener" onclick="closeHamburger()">Patent Portfolio</a>
-                                <a class="ham-item ham-link" href="/docs/patent-unified.html" target="_blank" rel="noopener" onclick="closeHamburger()">Unified Patent Submission</a>
-                                <a class="ham-item ham-link" href="/business/plan.html" target="_blank" rel="noopener" onclick="closeHamburger()">Business Plan</a>
-                                <a class="ham-item ham-link" href="/business/deck.html" target="_blank" rel="noopener" onclick="closeHamburger()">Investor Deck</a>
+                            <div class="ham-section">
+                                <div class="ham-subhead ham-category ham-section-head">Docs</div>
+                                <div class="ham-group">
+                                    <button class="ham-item" id="hamItem-docs" onclick="switchView('docs');openDocAnchor('instruction-set.md');closeHamburger()">ISA Reference</button>
+                                    <button class="ham-item" onclick="switchView('docs');openDocAnchor('HARDWARE.md');closeHamburger()">Hardware Guide</button>
+                                    <button class="ham-item" onclick="switchView('docs');openDocAnchor('cloomc-foundation.md');closeHamburger()">CLOOMC++ Guide</button>
+                                    <button class="ham-item" onclick="switchView('docs');openDocAnchor('api-reference.md');closeHamburger()">API Reference</button>
+                                    <button class="ham-item" onclick="switchView('docs');openDocAnchor('quick-start.md');closeHamburger()">Quick Start &amp; Guides<kbd class="ham-kbd">C+Y</kbd></button>
+                                    <a class="ham-item ham-link" href="/docs/figures/Lumps Directory.html" target="_blank" rel="noopener" onclick="closeHamburger()">Technical Figures</a>
+                                    <a class="ham-item ham-link" href="/six-laws/" target="_blank" rel="noopener" onclick="closeHamburger()">Six Laws of CLOOMC</a>
+                                    <a class="ham-item ham-link" href="/patents/" target="_blank" rel="noopener" onclick="closeHamburger()">Patent Portfolio</a>
+                                    <a class="ham-item ham-link" href="/docs/patent-unified.html" target="_blank" rel="noopener" onclick="closeHamburger()">Unified Patent Submission</a>
+                                    <a class="ham-item ham-link" href="/business/plan.html" target="_blank" rel="noopener" onclick="closeHamburger()">Business Plan</a>
+                                    <a class="ham-item ham-link" href="/business/deck.html" target="_blank" rel="noopener" onclick="closeHamburger()">Investor Deck</a>
+                                </div>
                             </div>
                         </div>
                     </div>
