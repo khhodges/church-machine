@@ -1,0 +1,488 @@
+{
+  "frozen_at": "20260821T180744Z",
+  "all_checks_pass": true,
+  "ns_map": {
+    "tiers": {
+      "bootstrap": [
+        {
+          "slot": 0,
+          "name": "Boot.NS",
+          "token": null,
+          "header_word": null,
+          "cw": null,
+          "cc": null,
+          "location": "0x1FC00",
+          "perms": [
+            "R",
+            "W"
+          ],
+          "source": "BRAM (boot ROM)",
+          "checks": [
+            {
+              "label": "BRAM",
+              "ok": true,
+              "detail": "Baked into BRAM at NS_TABLE_BASE"
+            }
+          ]
+        },
+        {
+          "slot": 1,
+          "name": "Boot.Thread",
+          "token": null,
+          "header_word": null,
+          "cw": null,
+          "cc": null,
+          "location": "0xe00",
+          "perms": [
+            "R",
+            "W"
+          ],
+          "source": "BRAM (boot ROM)",
+          "checks": [
+            {
+              "label": "BRAM",
+              "ok": true,
+              "detail": "Thread lump baked into BRAM"
+            }
+          ]
+        }
+      ],
+      "resident": [
+        {
+          "slot": 2,
+          "name": "UART_DEV",
+          "token": null,
+          "header_word": "MMIO",
+          "cw": null,
+          "cc": null,
+          "location": "0x40000014",
+          "perms": [
+            "R",
+            "W"
+          ],
+          "source": "boot ROM",
+          "checks": [
+            {
+              "label": "MMIO",
+              "ok": true,
+              "detail": "MMIO at 0x40000014"
+            }
+          ],
+          "size_budget": {
+            "available": false,
+            "reason": "binary unavailable"
+          }
+        },
+        {
+          "slot": 3,
+          "name": "LED_DEV",
+          "token": null,
+          "header_word": "MMIO",
+          "cw": null,
+          "cc": null,
+          "location": "0x40000000",
+          "perms": [
+            "R",
+            "W"
+          ],
+          "source": "boot ROM",
+          "checks": [
+            {
+              "label": "MMIO",
+              "ok": true,
+              "detail": "MMIO at 0x40000000"
+            }
+          ],
+          "size_budget": {
+            "available": false,
+            "reason": "binary unavailable"
+          }
+        },
+        {
+          "slot": 4,
+          "name": "BTN_DEV",
+          "token": null,
+          "header_word": "MMIO",
+          "cw": null,
+          "cc": null,
+          "location": "0x40000028",
+          "perms": [
+            "R"
+          ],
+          "source": "boot ROM",
+          "checks": [
+            {
+              "label": "MMIO",
+              "ok": true,
+              "detail": "MMIO at 0x40000028"
+            }
+          ],
+          "size_budget": {
+            "available": false,
+            "reason": "binary unavailable"
+          }
+        },
+        {
+          "slot": 5,
+          "name": "TIMER_DEV",
+          "token": null,
+          "header_word": "MMIO",
+          "cw": null,
+          "cc": null,
+          "location": "0x4000002C",
+          "perms": [
+            "R",
+            "W"
+          ],
+          "source": "boot ROM",
+          "checks": [
+            {
+              "label": "MMIO",
+              "ok": true,
+              "detail": "MMIO at 0x4000002C"
+            }
+          ],
+          "size_budget": {
+            "available": false,
+            "reason": "binary unavailable"
+          }
+        },
+        {
+          "slot": 6,
+          "name": "SelfTest \u26a1",
+          "token": "30542a6d",
+          "header_word": "0xF9868002",
+          "cw": 416,
+          "cc": 2,
+          "location": "0x0600",
+          "perms": [
+            "E"
+          ],
+          "source": "server/lumps",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF9868002  cw=416 cc=2"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=416 cc=2 vs manifest cw=None cc=None"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=2051c9560df786315a34c85da4143a8a"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='30542a6d' file='30542a6d'"
+            },
+            {
+              "label": "BRANCH opcode",
+              "ok": true,
+              "warn": false,
+              "detail": "terminal opcode=23 (BRANCH \u2705) at word[416]; 0xBF007E61; header code boundary word[416] (legacy SelfTest boundary word[499] is outside this binary)"
+            },
+            {
+              "label": "SelfTest E-GT",
+              "ok": true,
+              "detail": "c-list[0]=0x4A000006 expected=0x4A000006 \u2705 matches boot_rom"
+            },
+            {
+              "label": "overlap",
+              "ok": true,
+              "detail": "No byte-range overlap with other resident slots"
+            }
+          ],
+          "size_budget": {
+            "available": false,
+            "reason": "binary unavailable"
+          }
+        },
+        {
+          "slot": 7,
+          "name": "WukongCallHome",
+          "token": "1dcb7b09",
+          "header_word": "0xF8812402",
+          "cw": 73,
+          "cc": 2,
+          "location": "0x1200",
+          "perms": [
+            "E"
+          ],
+          "source": "server/lumps",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF8812402  cw=73 cc=2"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=73 cc=2 vs manifest cw=None cc=None"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=0ec98ffff135f49e0024e0073337f4d3"
+            },
+            {
+              "label": "name parity",
+              "ok": true,
+              "detail": "manifest=\"WukongCallHome.hw\" sidecar=\"WukongCallHome.hw\""
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='1dcb7b09' file='1dcb7b09'"
+            },
+            {
+              "label": "overlap",
+              "ok": true,
+              "detail": "No byte-range overlap with other resident slots"
+            }
+          ],
+          "size_budget": {
+            "available": true,
+            "metadata": "unavailable",
+            "code": {
+              "words": 73,
+              "bytes": 292
+            },
+            "api": {
+              "words": 0,
+              "bytes": 0,
+              "measured": false
+            },
+            "gt_capabilities": {
+              "words": 2,
+              "bytes": 8
+            },
+            "freespace": {
+              "words": 52,
+              "bytes": 208,
+              "reserved": true
+            },
+            "total": {
+              "words": 128,
+              "bytes": 512
+            },
+            "allocation": {
+              "words": 128,
+              "bytes": 512
+            },
+            "reconciles": true
+          }
+        }
+      ],
+      "lazy": [
+        {
+          "slot": 8,
+          "name": "Tunnel",
+          "token": "8770bf03",
+          "header_word": null,
+          "cw": null,
+          "cc": null,
+          "location": null,
+          "perms": [],
+          "source": "manifest (lazy)",
+          "checks": [
+            {
+              "label": "file",
+              "ok": false,
+              "detail": "LUMP binary not found: None"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='8770bf03' file='8770bf03'"
+            }
+          ],
+          "size_budget": {
+            "available": false,
+            "reason": "binary unavailable"
+          }
+        },
+        {
+          "slot": 9,
+          "name": "Ethernet",
+          "token": "b169bba4",
+          "header_word": "0xF8003401",
+          "cw": 13,
+          "cc": 1,
+          "location": null,
+          "perms": [],
+          "source": "manifest (lazy)",
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xF8003401  cw=13 cc=1"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=13 cc=1 vs manifest cw=None cc=None"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=0010b7bfef5de195b225877e638f75bf"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='b169bba4' file='b169bba4'"
+            }
+          ],
+          "size_budget": {
+            "available": true,
+            "metadata": "unavailable",
+            "code": {
+              "words": 13,
+              "bytes": 52
+            },
+            "api": {
+              "words": 0,
+              "bytes": 0,
+              "measured": false
+            },
+            "gt_capabilities": {
+              "words": 1,
+              "bytes": 4
+            },
+            "freespace": {
+              "words": 49,
+              "bytes": 196,
+              "reserved": true
+            },
+            "total": {
+              "words": 64,
+              "bytes": 256
+            },
+            "allocation": {
+              "words": 64,
+              "bytes": 256
+            },
+            "reconciles": true
+          }
+        },
+        {
+          "slot": 10,
+          "name": "CapabilityTest",
+          "token": "c7a66d01",
+          "header_word": null,
+          "cw": null,
+          "cc": null,
+          "location": null,
+          "perms": [],
+          "source": "manifest (lazy)",
+          "checks": [
+            {
+              "label": "file",
+              "ok": false,
+              "detail": "LUMP binary not found: None"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='c7a66d01' file='c7a66d01'"
+            }
+          ],
+          "size_budget": {
+            "available": false,
+            "reason": "binary unavailable"
+          }
+        },
+        {
+          "slot": 45,
+          "name": "SlideRule",
+          "token": "3542a2db",
+          "header_word": null,
+          "cw": null,
+          "cc": null,
+          "location": null,
+          "perms": [],
+          "source": "manifest (lazy)",
+          "checks": [
+            {
+              "label": "file",
+              "ok": false,
+              "detail": "LUMP binary not found: None"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='3542a2db' file='3542a2db'"
+            }
+          ],
+          "size_budget": {
+            "available": false,
+            "reason": "binary unavailable"
+          }
+        },
+        {
+          "slot": 46,
+          "name": "Constants",
+          "token": "e494696f",
+          "header_word": null,
+          "cw": null,
+          "cc": null,
+          "location": null,
+          "perms": [],
+          "source": "manifest (lazy)",
+          "checks": [
+            {
+              "label": "file",
+              "ok": false,
+              "detail": "LUMP binary not found: None"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='e494696f' file='e494696f'"
+            }
+          ],
+          "size_budget": {
+            "available": false,
+            "reason": "binary unavailable"
+          }
+        }
+      ],
+      "unused": []
+    },
+    "ns_table_base": "0x1FC00",
+    "ns_slot_count": 8,
+    "hardware_budget": {
+      "lumps": 1,
+      "code": {
+        "words": 73,
+        "bytes": 292
+      },
+      "api": {
+        "words": 0,
+        "bytes": 0
+      },
+      "gt_capabilities": {
+        "words": 2,
+        "bytes": 8
+      },
+      "freespace": {
+        "words": 52,
+        "bytes": 208
+      },
+      "total": {
+        "words": 128,
+        "bytes": 512
+      },
+      "allocation": {
+        "words": 128,
+        "bytes": 512
+      }
+    }
+  }
+}
