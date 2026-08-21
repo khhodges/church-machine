@@ -396,7 +396,7 @@ def download_wukong_bscan():
 
 @app.route("/dl/wukong-mcs")
 def download_wukong_mcs():
-    p = os.path.join(os.path.dirname(__file__), "..", "build", "church_wukong_xc7a100t.mcs")
+    p = os.path.join(_wukong_build_dir(), "church_wukong_xc7a100t.mcs")
     return send_file(os.path.abspath(p), as_attachment=True,
                      download_name="church_wukong_xc7a100t.mcs",
                      mimetype="application/octet-stream")
@@ -500,10 +500,12 @@ def upload_wukong_bit():
 
 @app.route("/api/bitstream-status")
 def api_bitstream_status():
-    """Return metadata about the pre-built Wukong bitstream for the IDE panel."""
+    """Return downloadable volatile and persistent Wukong image metadata."""
     build_dir = _wukong_build_dir()
     bit_path = os.path.join(build_dir, "church_wukong_xc7a100t.bit")
+    mcs_path = os.path.join(build_dir, "church_wukong_xc7a100t.mcs")
     present = os.path.isfile(bit_path)
+    mcs_present = os.path.isfile(mcs_path)
     source_version = _wukong_build_version()
     meta = {}
     bit_version = None
@@ -553,6 +555,8 @@ def api_bitstream_status():
         "git_sha": meta.get("git_sha"),
         "git_date": meta.get("git_date"),
         "git_message": meta.get("git_message"),
+        "mcs_present": mcs_present,
+        "mcs_size_bytes": os.path.getsize(mcs_path) if mcs_present else None,
     })
 
 
@@ -2979,11 +2983,18 @@ def release_r12_index():
           +String(d.mismatch_message).replace(/&/g,'&amp;').replace(/</g,'&lt;')
           +'</div>';
       }
-      card.innerHTML = '<div style="background:#071a0e;border:1px solid #166534;border-radius:8px;padding:14px 16px;display:flex;align-items:center;gap:14px;margin-bottom:0">'
+      var mcs = d.mcs_present
+        ? '<a href="/dl/wukong-mcs" style="padding:.4rem 1rem;background:#4c1d95;border-radius:5px;color:#ddd6fe;text-decoration:none;font-size:.82rem;font-weight:700;white-space:nowrap">&#x2B07; Download .mcs (persistent)</a>'
+        : '';
+      card.innerHTML = '<div style="background:#071a0e;border:1px solid #166534;border-radius:8px;padding:14px 16px;margin-bottom:0">'
+        +'<div style="display:flex;align-items:center;gap:14px">'
         +'<span style="font-size:1.5rem">✅</span>'
-        +'<div style="flex:1"><div style="color:#4ade80;font-weight:700;font-size:.9rem">Pre-built bitstream available</div>'
-        +'<div style="font-size:.75rem;color:#64748b;margin-top:2px">'+sz+' &middot; '+fw+(dt?' &middot; built '+dt:'')+'</div></div>'
-        +'<a href="/dl/wukong-bit" style="padding:.4rem 1rem;background:#166534;border-radius:5px;color:#4ade80;text-decoration:none;font-size:.82rem;font-weight:700;white-space:nowrap">&#x2B07; Download .bit</a>'
+        +'<div><div style="color:#4ade80;font-weight:700;font-size:.9rem">Pre-built bitstream available</div>'
+        +'<div style="font-size:.75rem;color:#64748b;margin-top:2px">'+sz+' &middot; '+fw+(dt?' &middot; built '+dt:'')+'<br>.bit loads once; .mcs programs the board to boot this image after reset.</div></div>'
+        +'</div>'
+        +'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">'
+        +'<a href="/dl/wukong-bit" style="padding:.4rem 1rem;background:#166534;border-radius:5px;color:#4ade80;text-decoration:none;font-size:.82rem;font-weight:700;white-space:nowrap">&#x2B07; Download .bit (temporary)</a>'
+        +mcs+'</div>'
         +'</div>' + warn;
     } else {
       card.innerHTML = '<div style="background:#1a0e0e;border:1px solid #4a1212;border-radius:8px;padding:12px 16px;font-size:.8rem;color:#9ca3af">'
@@ -3004,7 +3015,7 @@ def release_r12_index():
   <div><span class="file">BUILD.md</span><span class="note"> — full instructions</span></div>
 </div>
 
-<div class="box-title">&#x26A1; Flash the pre-built bitstream</div>
+<div class="box-title">&#x26A1; Load once or make the Wukong boot persistently</div>
 <div class="steps">
   <div class="step">
     <div class="step-num">1</div>
@@ -3016,21 +3027,29 @@ def release_r12_index():
   <div class="step">
     <div class="step-num">2</div>
     <div class="step-body">
-      <strong>Flash the board</strong>
+      <strong>Temporary: load the FPGA for this session</strong>
       <pre>openFPGALoader church_wukong_xc7a100t.bit</pre>
-      <p>Download the pre-built <code>.bit</code> from the card above (when available).</p>
+      <p>Download the pre-built <code>.bit</code> from the card above. This writes the FPGA's volatile configuration, so pressing reset or removing power clears it.</p>
       <p class="alt">Or via Vivado: <strong>Hardware Manager</strong> → Open target → Auto Connect → Program Device → select the <code>.bit</code>.</p>
     </div>
   </div>
   <div class="step">
     <div class="step-num">3</div>
     <div class="step-body">
-      <strong>Power-cycle the board</strong>
-      <p>Unplug and re-plug the USB cable. The board stores the bitstream permanently.</p>
+      <strong>Persistent: program the board's SPI boot flash</strong>
+      <p>Download the <code>.mcs</code> file from the purple button. In Vivado Hardware Manager, choose <strong>Add Configuration Memory Device</strong>, select <code>n25q64-3.3v-spi-x1_x2_x4</code>, then program the configuration memory with the downloaded <code>.mcs</code>.</p>
+      <p class="alt">This is the persistent “lock it home” path. It writes the Wukong’s SPI flash so the FPGA reloads this image after reset or power loss. Verify succeeds before resetting the board.</p>
     </div>
   </div>
   <div class="step">
     <div class="step-num">4</div>
+    <div class="step-body">
+      <strong>Reset and confirm automatic boot</strong>
+      <p>Press RESET or power-cycle the board. A correctly programmed <code>.mcs</code> restores the Church Machine without selecting the <code>.bit</code> again.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">5</div>
     <div class="step-body">
       <strong>Connect to the IDE</strong>
       <p>Open the <a href="/simulator" style="color:#a78bfa">Church Machine IDE</a> → click <strong>&#x1F50C; Connect Wukong</strong> → pick your board from the list. The IDE uploads the boot image automatically and the Church Machine starts running.</p>

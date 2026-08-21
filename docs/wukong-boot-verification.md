@@ -48,7 +48,7 @@ vivado -mode batch -source hardware/wukong_xc7a100t.tcl
 
 ---
 
-## Step 2 — Flash the board
+## Step 2 — Load once or program persistent boot flash
 
 **Option A — Vivado Hardware Manager (recommended)**
 
@@ -72,11 +72,31 @@ xc3sprog -c xpc -p 0 church_wukong_xc7a100t.bit
 openFPGALoader -b arty_a7_100t church_wukong_xc7a100t.bit
 ```
 
+These `.bit` commands configure the FPGA only until RESET or power loss. To
+make the Church Machine load automatically after every reset, program the
+generated `church_wukong_xc7a100t.mcs` into the Wukong’s SPI flash:
+
+```tcl
+# In the Vivado Hardware Manager Tcl console, after opening the JTAG target:
+set device [lindex [get_hw_devices] 0]
+create_hw_cfgmem -hw_device $device \
+  [lindex [get_cfgmem_parts {n25q64-3.3v-spi-x1_x2_x4}] 0]
+set cfgmem [get_property PROGRAM.HW_CFGMEM $device]
+set_property PROGRAM.ERASE       1 $cfgmem
+set_property PROGRAM.CFG_PROGRAM 1 $cfgmem
+set_property PROGRAM.VERIFY      1 $cfgmem
+set_property PROGRAM.FILES [list {church_wukong_xc7a100t.mcs}] $cfgmem
+program_hw_cfgmem $cfgmem
+boot_hw_device $device
+```
+
+Only reset or power-cycle after Vivado reports that verification succeeded.
+
 ---
 
 ## Step 3 — Acceptance criteria
 
-### (a) 0xBB sentinel — UART confirms boot path completed
+### (a) `0xBC 0E 02 10` sentinel — UART confirms boot path completed
 
 Open a serial terminal on the UART adapter port at **57600 8N1** before
 powering / resetting the board.
@@ -85,21 +105,17 @@ powering / resetting the board.
 python -m serial.tools.miniterm --raw /dev/ttyUSB0 57600
 ```
 
-Within **~1 second** of power-on (or pressing the reset button), you should
-see a single `0xBB` byte arrive.  In miniterm `--raw` mode it appears as a
-non-printable byte; to see it as hex use:
+Within **~1 second** of power-on (or pressing the reset button), the current
+v16 image emits the four-byte sentinel `0xBC 0x0E 0x02 0x10` after the
+`WUKONG` banner. In miniterm `--raw` mode the sentinel includes non-printable
+bytes; use the smoke-test script below to decode it.
 
 ```bash
-python3 -c "
-import serial, sys
-s = serial.Serial('/dev/ttyUSB0', 57600, timeout=3)
-b = s.read(1)
-print('Sentinel:', hex(b[0]) if b else 'TIMEOUT — sentinel NOT received')
-s.close()
-"
+python3 scripts/wukong_boot_smoke.py --port /dev/ttyUSB0
 ```
 
-**Pass:** `Sentinel: 0xbb`
+**Pass:** the smoke test reports a current `0xBC` sentinel and build version
+`16`.
 **Fail:** `TIMEOUT` → the boot FSM hw_init sequencer did not complete or
 `boot_triggered` never fired; check DMEM init logic in `wukong_top.py`.
 

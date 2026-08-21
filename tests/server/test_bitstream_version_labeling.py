@@ -30,6 +30,7 @@ if ROOT not in sys.path:
 import server.app as app_module
 
 BIT_NAME = "church_wukong_xc7a100t.bit"
+MCS_NAME = "church_wukong_xc7a100t.mcs"
 
 
 @pytest.fixture
@@ -183,3 +184,28 @@ def test_newer_bitstream_than_source_also_warns(client, tmp_path):
         st = client.get("/api/bitstream-status").get_json()
     assert st["version_mismatch"] is True
     assert "v8" in st["mismatch_message"] and "v9" in st["mismatch_message"]
+
+
+def test_persistent_mcs_download_and_status(client, tmp_path):
+    """The release page can advertise the SPI-flash image independently of .bit."""
+    payload = b":020000040000FA\n:00000001FF\n"
+    (tmp_path / MCS_NAME).write_bytes(payload)
+
+    response = client.get("/dl/wukong-mcs")
+    assert response.status_code == 200
+    assert response.data == payload
+    assert MCS_NAME in response.headers["Content-Disposition"]
+
+    status = client.get("/api/bitstream-status").get_json()
+    assert status["mcs_present"] is True
+    assert status["mcs_size_bytes"] == len(payload)
+
+
+def test_release_page_explains_temporary_bit_and_persistent_mcs(client):
+    """The release page must steer reset-proof installs to the SPI-flash image."""
+    response = client.get("/release/r12")
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert "Download .mcs (persistent)" in page
+    assert "volatile configuration" in page
+    assert "n25q64-3.3v-spi-x1_x2_x4" in page
