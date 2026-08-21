@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Figure 6: Self-Describing Stack Frames</title>
+<title>Figure 6: Self-Describing Stack Frames — Nesting Scenario &amp; Tag Format</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -35,7 +35,7 @@
 
 <div class="nav"><a href="/">&#8592; Church Machine</a></div>
 
-<h1>Figure 6 &mdash; Self-Describing Stack Frames</h1>
+<h1>Figure 6 &mdash; Self-Describing Stack Frames: Nesting Scenario &amp; Tag Format</h1>
 <p class="subtitle">The capability stack interleaves CALL frames (tag=0) and LAMBDA frames (tag=1). Each frame is self-describing: RETURN inspects the top-of-stack tag bit to determine the restoration path. CALL frames carry full CR/DR/flag state; LAMBDA frames carry only two machine-status registers.</p>
 
 <svg viewBox="0 0 1100 1240" xmlns="http://www.w3.org/2000/svg">
