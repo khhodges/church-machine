@@ -7782,7 +7782,7 @@ def _lump_freespace_content(words):
 
     Returns None for a legacy binary (no 0xAB magic at word cw+1 — all-zero
     freespace) or a non-code lump; otherwise a dict:
-      {tier, flags, api_len, content_words, source}
+      {tier, flags, api_len, content_words, source, api_definition}
     content_words counts the freespace words the frame occupies starting at
     word cw+1 (header + API + optional length word + source).
     """

@@ -5551,6 +5551,20 @@ mark.abs-search-highlight {
     font-family: 'Courier New', monospace;
 }
 
+.lump-api-json {
+    margin: 0;
+    max-height: 28rem;
+    overflow: auto;
+    padding: 0.75rem;
+    border: 1px solid rgba(200,155,60,0.22);
+    border-radius: 5px;
+    background: rgba(8,10,20,0.72);
+    color: #d1d5db;
+    font: 0.72rem/1.45 var(--font-mono, monospace);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 /* Filename row in the overview table */
 .lump-filename-code {
     background: rgba(100, 160, 255, 0.1);
