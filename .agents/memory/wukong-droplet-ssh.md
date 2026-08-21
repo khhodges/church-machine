@@ -114,6 +114,7 @@ scp -i ~/.ssh/replit_droplet -o StrictHostKeyChecking=no \
 | DRC NSTD-1/UCIO-1 blocks bitstream | dbg_* ports have no LOC/IOSTANDARD (they're ILA-only, not board pins) | `set_property SEVERITY {Warning}` for both checks in XDC |
 | `write_cfgmem -interface SPIx4` fails | Bitstream built without `SPI_BUSWIDTH=4` set | `set_property BITSTREAM.CONFIG.SPI_BUSWIDTH 4` in XDC |
 | Reusing synth checkpoint for resume | `launch_runs impl_1 -to_step write_bitstream` can fail if run already at 100% | Use `open_checkpoint *_routed.dcp` + `write_bitstream` directly |
+| Tcl readiness check cannot import Amaranth | Vivado's settings script can replace `PATH`, hiding the isolated build Python | Set `CM_PYTHON` to the virtualenv interpreter; the TCL gate uses it explicitly |
 
 **Why:** The container filesystem resets between sessions; the private key must
 come from a Replit secret or be regenerated and re-added each time.
