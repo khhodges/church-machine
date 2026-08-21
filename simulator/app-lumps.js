@@ -4288,9 +4288,12 @@ function _renderLumpThreadContent(bodyEl, lump, words) {
     bodyEl.className = '';
 }
 
+var _lumpImportTrigger = null;
+var _lumpImportTrap = null;
 function showLumpImportModal() {
     const m = document.getElementById('lumpImportModal');
     if (m) {
+        _lumpImportTrigger = document.activeElement;
         m.querySelector('#lumpImportName').value = '';
         m.querySelector('#lumpImportType').value = 'text';
         m.querySelector('#lumpImportFile').value = '';
@@ -4299,12 +4302,19 @@ function showLumpImportModal() {
         m.querySelector('#lumpImportImgH').value = '';
         _lumpImportToggleUI(m.querySelector('#lumpImportType').value);
         m.style.display = 'flex';
+        if (!_lumpImportTrap) _lumpImportTrap = _makeModalFocusTrap('lumpImportModal', closeLumpImportModal);
+        document.addEventListener('keydown', _lumpImportTrap, true);
+        const nameInput = m.querySelector('#lumpImportName');
+        if (nameInput) nameInput.focus();
     }
 }
 
 function closeLumpImportModal() {
     const m = document.getElementById('lumpImportModal');
     if (m) m.style.display = 'none';
+    if (_lumpImportTrap) document.removeEventListener('keydown', _lumpImportTrap, true);
+    if (_lumpImportTrigger && _lumpImportTrigger.isConnected) _lumpImportTrigger.focus();
+    _lumpImportTrigger = null;
 }
 
 function _lumpImportToggleUI(ct) {
@@ -5608,9 +5618,14 @@ function _fmtEscape(s) {
 }
 
 // ── _closeFormatLumpDialog ────────────────────────────────────────────────────
+var _formatLumpTrigger = null;
+var _formatLumpTrap = null;
 function _closeFormatLumpDialog() {
     var d = document.getElementById('formatLumpDialog');
     if (d) d.style.display = 'none';
+    if (_formatLumpTrap) document.removeEventListener('keydown', _formatLumpTrap, true);
+    if (_formatLumpTrigger && _formatLumpTrigger.isConnected) _formatLumpTrigger.focus();
+    _formatLumpTrigger = null;
     // Clear pending binary so a cancelled Step 1 can never contaminate Step 2.
     window._pendingLumpData = null;
 }
@@ -6037,8 +6052,16 @@ window.showFormatLump = async function() {
     _renderFormatLumpVersionHistory(_absName);
 
     // ── Show dialog ───────────────────────────────────────────────────────────
+    _formatLumpTrigger = document.activeElement;
+    if (!_formatLumpTrap) _formatLumpTrap = _makeModalFocusTrap('formatLumpDialog', _closeFormatLumpDialog);
+    document.addEventListener('keydown', _formatLumpTrap, true);
     var _dlg = document.getElementById('formatLumpDialog');
-    if (_dlg) { _dlg.style.display = ''; _dlg.scrollTop = 0; }
+    if (_dlg) {
+        _dlg.style.display = '';
+        _dlg.scrollTop = 0;
+        var _fmtCloseBtn = _dlg.querySelector('button');
+        if (_fmtCloseBtn) _fmtCloseBtn.focus();
+    }
 };
 
 // ── GT Slot Picker ────────────────────────────────────────────────────────────

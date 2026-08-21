@@ -1409,8 +1409,8 @@ function _showStopBtn(show) {
 }
 
 document.addEventListener('mousedown', function(e) {
-    const wrap = document.getElementById('runWrap');
-    const pop = document.getElementById('runPopover');
+    const wrap = document.getElementById('stepSettingsWrap');
+        const pop = document.getElementById('stepSettingsPopover');
     if (wrap && pop && pop.style.display !== 'none' && !wrap.contains(e.target)) {
         hideRunPopover();
     }
@@ -10800,6 +10800,7 @@ function confirmCreateNamespace() {
     updateDashboard();
 }
 
+var _saveNSTrigger = null;
 function showSaveToNamespace() {
     // Use LumpRegistry as the authoritative source — the compile path
     // (app-run.js ~L464) registers words there, NOT into lastAssembledWords.
@@ -10856,7 +10857,10 @@ function showSaveToNamespace() {
     const _csWords = window.LumpRegistry?.resolve(window.LumpRegistry?.getCurrent())?.sources?.memory?.words;
     const _csLen = _csWords ? _csWords.length : 0;
     info.textContent = `Code size: ${_csLen} words (${_csLen * 4} bytes)`;
+    _saveNSTrigger = document.activeElement;
     document.getElementById('saveNSDialog').style.display = '';
+    if (!_saveNSTrap) _saveNSTrap = _makeModalFocusTrap('saveNSDialog', closeSaveDialog);
+    document.addEventListener('keydown', _saveNSTrap, true);
     document.getElementById('saveNSLabel').focus();
 }
 
@@ -10889,6 +10893,9 @@ function onSlotChange() {
 
 function closeSaveDialog() {
     document.getElementById('saveNSDialog').style.display = 'none';
+    if (_saveNSTrap) document.removeEventListener('keydown', _saveNSTrap, true);
+    if (_saveNSTrigger && _saveNSTrigger.isConnected) _saveNSTrigger.focus();
+    _saveNSTrigger = null;
     // Clear any pending Format Lump binary so it cannot be accidentally reused
     // by a future Save to Namespace invocation opened independently.
     window._pendingLumpData = null;
@@ -12034,8 +12041,10 @@ function updateHardwarePanelLabel() {
     }
 }
 
+var _settingsTrigger = null;
 function openSettings() {
     if (!requirePermission('settings', 'Change Settings')) return;
+    _settingsTrigger = document.activeElement;
     const settings = getStudentSettings();
     document.getElementById('settingName').value = settings.name || '';
     const profSel = document.getElementById('settingProfession');
@@ -12094,6 +12103,10 @@ function openSettings() {
     const nf = document.getElementById('notifFault');          if (nf) nf.checked = notifPrefs.fault;
     const nc = document.getElementById('notifCompile');        if (nc) nc.checked = notifPrefs.compile;
     document.getElementById('settingsModal').style.display = 'flex';
+    if (!_settingsTrap) _settingsTrap = _makeModalFocusTrap('settingsModal', closeSettings);
+    document.addEventListener('keydown', _settingsTrap, true);
+    const _sfocus = document.getElementById('settingsSaveBtn') || document.getElementById('settingName');
+    if (_sfocus) _sfocus.focus();
 }
 
 function hasAnyPopupDismissedPerm() {
@@ -12194,6 +12207,9 @@ function _updatePetnamePreview() {
 
 function closeSettings() {
     document.getElementById('settingsModal').style.display = 'none';
+    if (_settingsTrap) document.removeEventListener('keydown', _settingsTrap, true);
+    if (_settingsTrigger && _settingsTrigger.isConnected) _settingsTrigger.focus();
+    _settingsTrigger = null;
 }
 
 function showReleaseHistory() {
@@ -17619,3 +17635,7 @@ function _onSimFaultSnapshot(snap) {
 // NOTE: The 'faultSnapshot' listener is registered on sim inside app-shell.js
 // init() (after sim = new ChurchSimulator()), because sim is null when
 // app-run.js is first evaluated.  See app-shell.js: sim.on('faultSnapshot', ...).
+
+var _saveNSTrap = null;
+
+var _settingsTrap = null;

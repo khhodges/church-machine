@@ -2634,7 +2634,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     </div>
 
     <div id="settingsModal" class="modal-overlay settings-fullpage" style="display:none;">
-        <div class="settings-page">
+        <div class="settings-page" role="dialog" aria-modal="true" aria-label="Settings">
             <div class="settings-page-header">
                 <div class="modal-title">Settings</div>
                 <div class="settings-page-actions">
@@ -2777,7 +2777,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
 
     <!-- ── Invoke Method dialog ────────────────────────────────────────────── -->
     <div id="invokeDialog" class="modal-overlay" style="display:none;">
-        <div class="modal-dialog invoke-dialog">
+        <div class="modal-dialog invoke-dialog" role="dialog" aria-modal="true" aria-label="Invoke Method">
             <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;">
                 <span>Invoke Method</span>
                 <button onclick="closeInvokeModal()" style="background:none;border:none;color:#9ca3af;font-size:1.2rem;cursor:pointer;line-height:1;padding:0;" data-tooltip="Close">&times;</button>
@@ -2829,7 +2829,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     </div>
 
     <div id="saveNSDialog" class="modal-overlay" style="display:none;">
-        <div class="modal-dialog">
+        <div class="modal-dialog" role="dialog" aria-modal="true" aria-label="Save to Namespace">
             <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;">
                 <span>Save to Namespace</span>
                 <button onclick="closeSaveDialog()" style="background:none;border:none;color:#9ca3af;font-size:1.2rem;cursor:pointer;line-height:1;padding:0;" data-tooltip="Close">&times;</button>
@@ -2867,7 +2867,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
 
     <!-- ── Format Lump dialog (Step 1 of 2) ────────────────────────────── -->
     <div id="formatLumpDialog" class="modal-overlay" style="display:none;" onclick="if(event.target===this)_closeFormatLumpDialog()">
-        <div class="modal-dialog fmt-lump-dialog">
+        <div class="modal-dialog fmt-lump-dialog" role="dialog" aria-modal="true" aria-label="Format Lump">
             <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;">
                 <span>Format Lump <span class="fmt-step-badge">Step 1 of 2</span></span>
                 <button onclick="_closeFormatLumpDialog()" style="background:none;border:none;color:#9ca3af;font-size:1.2rem;cursor:pointer;line-height:1;padding:0;" data-tooltip="Close">&times;</button>
@@ -2894,7 +2894,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
 
     <!-- ── Open File dialog ─────────────────────────────────────────────── -->
     <div id="openFileDialog" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeOpenFileDialog()">
-        <div class="modal-dialog" style="max-width:520px;width:92vw;max-height:80vh;display:flex;flex-direction:column;gap:0;">
+        <div class="modal-dialog" style="max-width:520px;width:92vw;max-height:80vh;display:flex;flex-direction:column;gap:0;" role="dialog" aria-modal="true" aria-label="Open File">
             <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
                 <span>Open File</span>
                 <button onclick="closeOpenFileDialog()" style="background:none;border:none;color:#9ca3af;font-size:1.2rem;cursor:pointer;line-height:1;padding:0;">&times;</button>
@@ -2910,7 +2910,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
 
     <!-- ── Save File / Save File As dialog ─────────────────────────────── -->
     <div id="saveFileDialog" class="modal-overlay" style="display:none;">
-        <div class="modal-dialog">
+        <div class="modal-dialog" role="dialog" aria-modal="true" aria-label="Save File">
             <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;">
                 <span>Save File</span>
                 <button onclick="closeSaveFileDialog()" style="background:none;border:none;color:#9ca3af;font-size:1.2rem;cursor:pointer;line-height:1;padding:0;" data-tooltip="Close">&times;</button>
@@ -3026,7 +3026,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script async src="app-ti60-connect.js?v=20260619a"></script>
     <script defer src="app-startup-wizard.js?v=20260619a"></script>
     <script src="lump-registry.js?v=20260719g"></script>
-    <script src="app-shell.js?v=20260820-card-dnd2"></script>
+    <script src="app-shell.js?v=20260821-modal-trap"></script>
     <script src="app-tools.js?v=20260726a"></script>
     <script src="app-cr-display.js?v=20260521a"></script>
     <script src="app-cr-detail.js?v=20260820-named-capability1"></script>
@@ -3037,7 +3037,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="lump-audit.js?v=20260724c"></script>
     <script src="rci-show-errs.js?v=20260519a"></script>
     <script src="lump-content-frame.js?v=20260819a"></script>
-    <script src="app-lumps.js?v=20260820-draft2"></script>
+    <script src="app-lumps.js?v=20260821-modal-trap"></script>
     <script src="app-absdetail.js?v=20260729b"></script>
     <!-- Load order matters: app-compile must precede app-run (exports LANG_EXAMPLE_GROUPS
          via window._cloomcLangExampleGroups); both must precede app-source-library. -->
@@ -3045,10 +3045,10 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="app-lump-editor.js?v=20260812b"></script>
     <script src="app-editor-find.js?v=20260815a"></script>
     <script src="lump_save_handler.js?v=20260815a"></script>
-    <script src="app-run.js?v=20260820b"></script>
+    <script src="app-run.js?v=20260821-modal-trap"></script>
     <script src="app-build-approval.js?v=20260815a"></script>
     <script src="app-source-library.js?v=20260720h"></script>
-    <script src="app-invoke.js?v=20260521a"></script>
+    <script src="app-invoke.js?v=20260821-modal-trap"></script>
     <script src="app-misc.js?v=20260803a"></script>
     <script src="asm-instruction-picker.js?v=20260602e"></script>
     <script src="asm-method-popup.js?v=20260518b"></script>
@@ -3344,7 +3344,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     })();
     </script>
 <div id="lumpTypeSelectorModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeLumpTypeSelector()">
-    <div class="modal-dialog lump-type-selector-dialog">
+    <div class="modal-dialog lump-type-selector-dialog" role="dialog" aria-modal="true" aria-label="Add LUMP — Choose Type">
         <div class="modal-title">Add LUMP — Choose Type</div>
         <div class="lump-type-grid">
             <button class="lump-type-card lump-type-card-inform" onclick="selectLumpType('inform')">
@@ -3399,7 +3399,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     </div>
 </div>
 <div id="lumpImportModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeLumpImportModal()">
-    <div class="modal-dialog lump-import-dialog">
+    <div class="modal-dialog lump-import-dialog" role="dialog" aria-modal="true" aria-label="Import LUMP">
         <div class="modal-title">Import LUMP</div>
         <div class="lump-import-row">
             <label for="lumpImportName">Name</label>

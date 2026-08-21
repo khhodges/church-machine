@@ -408,10 +408,15 @@ function savePseudoCode() {
 
 var _openFileCache = null;  // cached [{path, name, dir}] from last fetch
 
+var _openFileTrigger = null;
+var _openFileTrap = null;
 function showOpenFileDialog() {
     var dlg = document.getElementById('openFileDialog');
     if (!dlg) return;
+    _openFileTrigger = document.activeElement;
     dlg.style.display = 'flex';
+    if (!_openFileTrap) _openFileTrap = _makeModalFocusTrap('openFileDialog', closeOpenFileDialog);
+    document.addEventListener('keydown', _openFileTrap, true);
     var search = document.getElementById('openFileSearch');
     if (search) { search.value = ''; search.focus(); }
     _renderOpenFileList('');
@@ -435,6 +440,9 @@ function showOpenFileDialog() {
 function closeOpenFileDialog() {
     var dlg = document.getElementById('openFileDialog');
     if (dlg) dlg.style.display = 'none';
+    if (_openFileTrap) document.removeEventListener('keydown', _openFileTrap, true);
+    if (_openFileTrigger && _openFileTrigger.isConnected) _openFileTrigger.focus();
+    _openFileTrigger = null;
 }
 
 function _renderOpenFileList(query) {
@@ -573,9 +581,12 @@ function saveSourceFile() {
     }
 }
 
+var _saveFileTrigger = null;
+var _saveFileTrap = null;
 function saveSourceFileAs() {
     var dlg = document.getElementById('saveFileDialog');
     if (!dlg) return;
+    _saveFileTrigger = document.activeElement;
     var errEl = document.getElementById('saveFileError');
     if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
     var pathInput = document.getElementById('saveFilePathInput');
@@ -601,12 +612,17 @@ function saveSourceFileAs() {
         }
         setTimeout(function() { pathInput.focus(); pathInput.select(); }, 50);
     }
+    if (!_saveFileTrap) _saveFileTrap = _makeModalFocusTrap('saveFileDialog', closeSaveFileDialog);
+    document.addEventListener('keydown', _saveFileTrap, true);
     dlg.style.display = 'flex';
 }
 
 function closeSaveFileDialog() {
     var dlg = document.getElementById('saveFileDialog');
     if (dlg) dlg.style.display = 'none';
+    if (_saveFileTrap) document.removeEventListener('keydown', _saveFileTrap, true);
+    if (_saveFileTrigger && _saveFileTrigger.isConnected) _saveFileTrigger.focus();
+    _saveFileTrigger = null;
 }
 
 function confirmSaveFileDialog() {
@@ -1334,11 +1350,56 @@ function _saveLandingCardOrder(row, storageKey) {
     try { localStorage.setItem(storageKey, JSON.stringify(saved)); } catch (_) {}
 }
 
+// ── Shared modal focus-trap helpers ───────────────────────────────────────────
+// Returns all visible, keyboard-reachable controls inside a modal container.
+function _modalFocusableControls(modal) {
+    if (!modal) return [];
+    return Array.from(modal.querySelectorAll(
+        'a[href], area[href], button:not([disabled]), input:not([disabled]), ' +
+        'select:not([disabled]), textarea:not([disabled]), ' +
+        '[contenteditable="true"], [tabindex]:not([tabindex="-1"])'
+    )).filter(function(el) {
+        var st = window.getComputedStyle(el);
+        return st.display !== 'none' && st.visibility !== 'hidden' && el.getClientRects().length > 0;
+    });
+}
+// Returns a keydown handler that cycles Tab focus inside the named modal and
+// calls closeFn on Escape.  Register with addEventListener(…, true) (capture)
+// and deregister with removeEventListener on close.
+// The handler is a no-op when the modal is not visible, so stacked modals that
+// share the same event target do not interfere with each other.
+function _makeModalFocusTrap(modalId, closeFn) {
+    return function _focusTrapHandler(ev) {
+        var modal = document.getElementById(modalId);
+        // Skip if the modal is not currently displayed (e.g. hidden behind another modal)
+        if (!modal || window.getComputedStyle(modal).display === 'none') return;
+        if (ev.key === 'Escape') {
+            ev.preventDefault();
+            ev.stopImmediatePropagation();
+            closeFn();
+            return;
+        }
+        if (ev.key !== 'Tab') return;
+        var controls = _modalFocusableControls(modal);
+        if (!controls.length) return;
+        var cur = controls.indexOf(document.activeElement);
+        var next = ev.shiftKey
+            ? (cur <= 0 ? controls.length - 1 : cur - 1)
+            : (cur >= controls.length - 1 ? 0 : cur + 1);
+        ev.preventDefault();
+        controls[next].focus();
+    };
+}
+
+var _shortcutsHelpTrigger = null;
+var _shortcutsFocusTrap = null;
 function openShortcutsHelp() {
     const modal = document.getElementById('shortcutsModal');
     if (!modal) return;
+    _shortcutsHelpTrigger = document.activeElement;
     modal.style.display = 'flex';
-    document.addEventListener('keydown', _shortcutsEscHandler, true);
+    if (!_shortcutsFocusTrap) _shortcutsFocusTrap = _makeModalFocusTrap('shortcutsModal', closeShortcutsHelp);
+    document.addEventListener('keydown', _shortcutsFocusTrap, true);
     const closeBtn = modal.querySelector('.shortcuts-close-btn');
     if (closeBtn) closeBtn.focus();
 }
@@ -1347,16 +1408,12 @@ function closeShortcutsHelp() {
     const modal = document.getElementById('shortcutsModal');
     if (!modal) return;
     modal.style.display = 'none';
-    document.removeEventListener('keydown', _shortcutsEscHandler, true);
+    if (_shortcutsFocusTrap) document.removeEventListener('keydown', _shortcutsFocusTrap, true);
+    if (_shortcutsHelpTrigger && _shortcutsHelpTrigger.isConnected) _shortcutsHelpTrigger.focus();
+    _shortcutsHelpTrigger = null;
 }
 
-function _shortcutsEscHandler(e) {
-    if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        closeShortcutsHelp();
-    }
-}
+function _shortcutsEscHandler() { /* superseded by _shortcutsFocusTrap */ }
 
 function initTooltipAutoFlip() {
     document.addEventListener('pointerenter', function(e) {
@@ -1540,14 +1597,26 @@ function closeLumpsActions() {
     if (dd) dd.style.display = 'none';
 }
 
+var _lumpTypeSelectorTrigger = null;
+var _lumpTypeSelectorTrap = null;
 function showLumpTypeSelector() {
     const m = document.getElementById('lumpTypeSelectorModal');
-    if (m) m.style.display = 'flex';
+    if (!m) return;
+    _lumpTypeSelectorTrigger = document.activeElement;
+    m.style.display = 'flex';
+    if (!_lumpTypeSelectorTrap) _lumpTypeSelectorTrap = _makeModalFocusTrap('lumpTypeSelectorModal', closeLumpTypeSelector);
+    document.addEventListener('keydown', _lumpTypeSelectorTrap, true);
+    const first = _modalFocusableControls(m)[0];
+    if (first) first.focus();
 }
 
 function closeLumpTypeSelector() {
     const m = document.getElementById('lumpTypeSelectorModal');
-    if (m) m.style.display = 'none';
+    if (!m) return;
+    m.style.display = 'none';
+    if (_lumpTypeSelectorTrap) document.removeEventListener('keydown', _lumpTypeSelectorTrap, true);
+    if (_lumpTypeSelectorTrigger && _lumpTypeSelectorTrigger.isConnected) _lumpTypeSelectorTrigger.focus();
+    _lumpTypeSelectorTrigger = null;
 }
 
 function selectLumpType(type) {

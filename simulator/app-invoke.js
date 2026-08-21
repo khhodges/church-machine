@@ -130,6 +130,8 @@ function refreshInvokeBtn() {
 
 // ─── Invoke Method modal ──────────────────────────────────────────────────────
 let _invokeMethodIdx = 0;
+let _invokeTrigger = null;
+let _invokeTrap = null;
 
 function openInvokeModal() {
     const result = window._lastCLOOMCResult;
@@ -147,12 +149,19 @@ function openInvokeModal() {
     sel.value = _invokeMethodIdx;
     _renderInvokeParams();
 
+    _invokeTrigger = document.activeElement;
     document.getElementById('invokeDialog').style.display = 'flex';
+    if (!_invokeTrap) _invokeTrap = _makeModalFocusTrap('invokeDialog', closeInvokeModal);
+    document.addEventListener('keydown', _invokeTrap, true);
+    if (sel) sel.focus();
 }
 
 function closeInvokeModal() {
     const d = document.getElementById('invokeDialog');
     if (d) d.style.display = 'none';
+    if (_invokeTrap) document.removeEventListener('keydown', _invokeTrap, true);
+    if (_invokeTrigger && _invokeTrigger.isConnected) _invokeTrigger.focus();
+    _invokeTrigger = null;
 }
 
 function _isCapabilityParam(paramName, capabilities) {
