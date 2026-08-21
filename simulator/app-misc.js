@@ -430,20 +430,37 @@ async function importFromLibrary(path) {
 let docsLoaded = false;
 let _pendingDocAnchorNav = false;
 let docsData = null;
+let _docsLoadPromise = null;
 
 async function loadDocsView() {
     if (docsLoaded) return;
-    try {
-        const resp = await fetch('/api/docs/list');
-        docsData = await resp.json();
-        renderDocsFileList();
-        docsLoaded = true;
-        if (!_pendingDocAnchorNav) {
-            loadDoc('quick-start.md');
+    if (_docsLoadPromise) return _docsLoadPromise;
+    _docsLoadPromise = (async () => {
+        try {
+            const resp = await fetch('/api/docs/list');
+            docsData = await resp.json();
+            renderDocsFileList();
+            docsLoaded = true;
+            if (!_pendingDocAnchorNav) {
+                loadDoc('quick-start.md');
+            }
+        } catch (e) {
+            _docsLoadPromise = null;
+            const body = document.getElementById('docsContentBody');
+            if (body) body.innerHTML = '<div class="docs-placeholder">Failed to load document list.</div>';
         }
-    } catch (e) {
-        const body = document.getElementById('docsContentBody');
-        if (body) body.innerHTML = '<div class="docs-placeholder">Failed to load document list.</div>';
+    })();
+    return _docsLoadPromise;
+}
+
+async function openFigureAnchor(filename) {
+    _pendingDocAnchorNav = true;
+    switchView('docs');
+    loadFigure(filename);
+    try {
+        await loadDocsView();
+    } finally {
+        _pendingDocAnchorNav = false;
     }
 }
 
