@@ -196,6 +196,12 @@ fs.writeFileSync(lumpPath, bytes);
 console.log(`Written: ${lumpPath} (${bytes.length} bytes)`);
 
 // ── Write sidecar .json ───────────────────────────────────────────────────────
+//
+// IMPORTANT: the "source" field must always be set to the exact text of the
+// canonical .cloomc file for known-example abstractions (those whose abstraction
+// name maps to a file in simulator/examples/).  Any recompile or rename pass that
+// omits this field will be caught immediately by check-sidecar-source.js.
+//
 const capabilitiesJson = CLIST.map(c => ({
     name:    c.name,
     rights:  c.rights,
@@ -222,6 +228,9 @@ const sidecar = {
     language:        'assembly',
     description:     'Capability self-test: LOAD, TPERM, LOADEQ/LOADNE, SWITCH, Turing ISA, ELOADCALL — ' +
                      'exercises real A7 v1.2 boot-namespace caps (UART_DEV, LED_DEV, BTN_DEV, TIMER_DEV, SelfTest).',
+    // "source" must always reflect the exact text of simulator/examples/capability_test.cloomc.
+    // Never leave this field empty — check-sidecar-source.js enforces it after every recompile.
+    source:          source,
     source_file:     'simulator/examples/capability_test.cloomc',
     capabilities:    capabilitiesJson,
     grants:          ['E'],

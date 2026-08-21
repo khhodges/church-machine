@@ -173,6 +173,12 @@ fs.writeFileSync(lumpPath, bytes);
 console.log(`Written: ${lumpPath} (${bytes.length} bytes)`);
 
 // ── Write sidecar .json ───────────────────────────────────────────────────────
+//
+// IMPORTANT: the "source" field must always be set to the exact text of the
+// canonical .cloomc file for known-example abstractions (those whose abstraction
+// name maps to a file in simulator/examples/).  Any recompile or rename pass that
+// omits this field will be caught immediately by check-sidecar-source.js.
+//
 const capabilities = [
     { name: 'SelfTest', grants: ['E'], gt: '0x4A000006', ns_slot: 6, note: 'SelfTest E-GT — loaded into CR1 for TPERM and EXACT cross-checks (POLA minimum)' },
 ];
@@ -190,6 +196,9 @@ const sidecar = {
     profile: 'IoT',
     language: 'assembly',
     description: 'Post-Flash Exhaustive Self-Test — 81 hardware correctness tests (DR independence, ALU, shifts, branches, BFEXT/BFINS, TPERM, CHANGE, LOAD). DR0=0 on full pass, DR0=N on first failure.',
+    // "source" must always reflect the exact text of simulator/examples/post_flash_selftest.cloomc.
+    // Never leave this field empty — check-sidecar-source.js enforces it after every recompile.
+    source,
     capabilities,
     grants: ['E'],
     author: 'Church Machine',

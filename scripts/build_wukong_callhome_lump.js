@@ -197,6 +197,12 @@ fs.writeFileSync(lumpPath, bytes);
 console.log(`Written: ${lumpPath} (${bytes.length} bytes)`);
 
 // ── Write sidecar .json ───────────────────────────────────────────────────────
+//
+// IMPORTANT: the "source" field must always be set to the exact text of the
+// canonical .cloomc file for known-example abstractions (those whose abstraction
+// name maps to a file in simulator/examples/).  Any recompile or rename pass that
+// omits this field will be caught immediately by check-sidecar-source.js.
+//
 const capabilitiesJson = CLIST.map(c => ({
     name:    c.name,
     rights:  c.rights,
@@ -224,6 +230,9 @@ const sidecar = {
                      'UART callhome banner. 73-instruction infinite loop, no CALL/RETURN. ' +
                      'Transcribed from WUKONG_NUC_PROGRAM in hardware/boot_rom.py. ' +
                      'See docs/wukong-boot.md for the NULL_CAP standalone problem this solves.',
+    // "source" must always reflect the exact text of simulator/examples/wukong_callhome.cloomc.
+    // Never leave this field empty — check-sidecar-source.js enforces it after every recompile.
+    source:          source,
     source_file:     'simulator/examples/wukong_callhome.cloomc',
     capabilities:    capabilitiesJson,
     grants:          ['E'],
