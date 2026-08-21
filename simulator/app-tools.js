@@ -774,6 +774,12 @@ function updateGateLog() {
             html += `<span class="gate-loc-pc">PC&nbsp;=&nbsp;${ctx.pc}</span>`;
             html += `<span class="gate-loc-sep">&middot;</span>`;
             html += `<span class="gate-loc-instr">${instrStr}</span>`;
+            if (/^(CALL|RETURN|ELOADCALL|XLOADLAMBDA)$/i.test(ctx.opName || '')) {
+                const eventKind = /RETURN/i.test(ctx.opName) ? 'RETURN' : 'CALL';
+                const safeCtx = JSON.stringify(ctx)
+                    .replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+                html += `<button class="gate-loc-step gate-loc-step-link" onclick="event.stopPropagation();_openCallReturnDrilldown({kind:'${eventKind}',nia:${ctx.physicalPC != null ? ctx.physicalPC : ctx.pc},instrWord:${ctx.instrWord != null ? ctx.instrWord : 'null'}},${safeCtx})" title="Open the exact ${eventKind} instruction">Open exact ${eventKind}</button>`;
+            }
             html += `</div>`;
         }
         html += `</div>`;

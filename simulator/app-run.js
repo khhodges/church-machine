@@ -953,7 +953,7 @@ function stepSim() {
     if (result) {
         const con = document.getElementById('editorConsole');
         if (con) {
-            con.textContent += `\n[${sim.stepCount}] ${result.desc || 'executed'}`;
+            _appendSimulatorStepLog(result, con);
             if (Array.isArray(result.pipeline)) {
                 for (const s of result.pipeline) {
                     const stagePad = (s.stage || '').padEnd(6);
@@ -1611,8 +1611,7 @@ function walkNext() {
     }
     const con = document.getElementById('editorConsole');
     if (con) {
-        con.textContent += `\n[${sim.stepCount}] ${result.desc || 'executed'}`;
-        con.scrollTop = con.scrollHeight;
+        _appendSimulatorStepLog(result, con);
     }
     if (result.pipeline && pipelineViz) {
         pipelineViz.setNIA(_buildNIARows(result.physicalPC ?? result.pc, sim._nextPhysicalAddr()));
@@ -16125,6 +16124,159 @@ function _wukongTraceLocationText(data) {
     return 'NIA=' + nia + ' <instruction unavailable>';
 }
 
+// ── CALL / RETURN instruction drill-down ────────────────────────────────────
+// Trace packets deliberately repeat the retiring NIA for every micro-event.
+// Keep resolution anchored to that NIA (and never to the live CR14), so nested
+// calls and returns remain addressable after execution has moved on.
+function _callReturnInstructionLocation(event, context) {
+    event = event || {};
+    context = context || {};
+    const rawAddr = event.nia != null ? event.nia :
+        (event.physicalPC != null ? event.physicalPC :
+            (context.physicalPC != null ? context.physicalPC : context.pc));
+    const address = rawAddr == null ? null : (Number(rawAddr) >>> 0);
+    let word = event.instrWord != null ? event.instrWord :
+        (context.instrWord != null ? context.instrWord : null);
+    if (word == null && address != null && typeof sim !== 'undefined' && sim.memory &&
+        address < sim.memory.length) word = sim.memory[address] >>> 0;
+
+    let decoded = null;
+    if (word != null && typeof _cmDecodeWord === 'function') {
+        decoded = _cmDecodeWord(word >>> 0, address);
+    }
+    const mnemonic = decoded && decoded.mnemonic
+        ? decoded.mnemonic
+        : (context.opName || event.event || '');
+    const traceLabel = event.nia_label || null;
+    const inferredLump = traceLabel && traceLabel.indexOf('.') >= 0
+        ? traceLabel.slice(0, traceLabel.lastIndexOf('.')) : null;
+    const inferredMethod = traceLabel && traceLabel.indexOf('.') >= 0
+        ? traceLabel.slice(traceLabel.lastIndexOf('.') + 1) : null;
+    let owner = null;
+    if (address != null && typeof _nsOwnerOf === 'function') owner = _nsOwnerOf(address);
+    const nsIdx = event.nsIndex != null ? event.nsIndex :
+        (context.nsIndex != null ? context.nsIndex : (owner && owner.nsIdx));
+    const lump = event.lump || context.lump || (owner && owner.label) ||
+        (nsIdx != null && typeof sim !== 'undefined' && sim.nsLabels
+            ? sim.nsLabels[nsIdx] : null);
+    const method = event.method || context.method || inferredMethod || null;
+    return {
+        kind: String(event.kind || event.event || context.opName || mnemonic).toUpperCase(),
+        lump: lump || inferredLump || (nsIdx != null ? 'NS[' + nsIdx + ']' : null),
+        method,
+        offset: event.offset != null ? event.offset :
+            (owner && owner.base != null && address != null ? address - owner.base : null),
+        physicalAddress: address,
+        rawWord: word == null ? null : (word >>> 0),
+        decoded,
+        mnemonic,
+        operands: decoded && decoded.text ? decoded.text : (event.disasm || context.desc || null),
+        disassembly: event.disasm || (decoded && decoded.text) || null,
+        caller: event.caller || context.caller || null,
+        callee: event.callee || context.callee || null,
+        callDepth: event.call_depth != null ? event.call_depth :
+            (context.callDepth != null ? context.callDepth :
+                (typeof sim !== 'undefined' && sim.callStack ? sim.callStack.length : null)),
+        cr14: event.cr14_gt != null ? event.cr14_gt :
+            (context.cr14 != null ? context.cr14 : null),
+        cr12: event.cr12_gt != null ? event.cr12_gt :
+            (context.cr12 != null ? context.cr12 : null),
+        source: event.source || context.source || null,
+    };
+}
+
+function _ensureCallReturnDrilldownStyles() {
+    if (document.getElementById('call-return-drilldown-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'call-return-drilldown-styles';
+    style.textContent = [
+        '.call-return-drilldown{position:fixed;z-index:12000;right:18px;top:72px;width:min(500px,calc(100vw - 36px));max-height:calc(100vh - 100px);overflow:auto;background:#111121;color:#e6e6f5;border:1px solid #c89b3c;border-radius:7px;box-shadow:0 12px 36px rgba(0,0,0,.65);padding:14px;font:12px system-ui,sans-serif}',
+        '.call-return-drilldown h3{margin:0 28px 10px 0;color:#daa520;font:700 16px Georgia,serif}',
+        '.call-return-drilldown .crd-close{position:absolute;right:8px;top:6px;background:none;border:0;color:#aaa;font-size:20px;cursor:pointer}',
+        '.call-return-drilldown dl{display:grid;grid-template-columns:125px 1fr;gap:5px 10px;margin:0}',
+        '.call-return-drilldown dt{color:#8888b0}.call-return-drilldown dd{margin:0;font-family:monospace;overflow-wrap:anywhere}',
+        '.call-return-drilldown .crd-actions{display:flex;gap:8px;margin-top:13px}',
+        '.call-return-drilldown button.crd-action{background:#2a2440;color:#f2d47a;border:1px solid #6b5820;border-radius:4px;padding:5px 9px;cursor:pointer}',
+        '.call-return-event{color:#f2d47a;text-decoration:underline dotted;cursor:pointer;border:0;background:none;font:inherit;padding:0}'
+    ].join('');
+    document.head.appendChild(style);
+}
+
+function _dismissCallReturnDrilldown() {
+    const el = document.getElementById('call-return-drilldown');
+    if (el) el.remove();
+}
+
+function _openCallReturnDrilldown(event, context) {
+    const loc = _callReturnInstructionLocation(event, context);
+    _dismissCallReturnDrilldown();
+    _ensureCallReturnDrilldownStyles();
+    const esc = typeof _escHtml === 'function'
+        ? _escHtml
+        : function(v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function(c) {
+            return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+        }); };
+    const value = function(v) { return v == null || v === '' ? 'unavailable' : esc(v); };
+    const address = loc.physicalAddress == null ? null :
+        '0x' + loc.physicalAddress.toString(16).toUpperCase().padStart(8, '0');
+    const raw = loc.rawWord == null ? null :
+        '0x' + loc.rawWord.toString(16).toUpperCase().padStart(8, '0');
+    const popup = document.createElement('section');
+    popup.id = 'call-return-drilldown';
+    popup.className = 'call-return-drilldown';
+    popup.setAttribute('role', 'dialog');
+    popup.setAttribute('aria-label', loc.kind + ' instruction detail');
+    popup.innerHTML = '<button class="crd-close" aria-label="Close">×</button>' +
+        '<h3>' + value(loc.kind) + ' instruction</h3><dl>' +
+        '<dt>LUMP / abstraction</dt><dd>' + value(loc.lump) + '</dd>' +
+        '<dt>Method</dt><dd>' + value(loc.method) + '</dd>' +
+        '<dt>Offset</dt><dd>' + value(loc.offset) + '</dd>' +
+        '<dt>Physical address</dt><dd>' + value(address) + '</dd>' +
+        '<dt>Raw instruction</dt><dd>' + value(raw) + '</dd>' +
+        '<dt>Decoded instruction</dt><dd>' + value(loc.operands) + '</dd>' +
+        '<dt>Source / map</dt><dd>' + value(loc.source) + '</dd>' +
+        '<dt>Caller → callee</dt><dd>' + value(loc.caller || loc.callee) + '</dd>' +
+        '<dt>Call-stack depth</dt><dd>' + value(loc.callDepth) + '</dd>' +
+        '<dt>CR14 / CR12</dt><dd>' + value(loc.cr14 || loc.cr12) + '</dd>' +
+        '</dl><div class="crd-actions">' +
+        (loc.physicalAddress == null ? '' :
+            '<button class="crd-action crd-open-row">Open surrounding instructions</button>') +
+        '</div>';
+    document.body.appendChild(popup);
+    popup.querySelector('.crd-close').addEventListener('click', _dismissCallReturnDrilldown);
+    const open = popup.querySelector('.crd-open-row');
+    if (open) open.addEventListener('click', function() {
+        if (typeof openCRDetailAtPC === 'function') {
+            openCRDetailAtPC(loc.physicalAddress, loc.physicalAddress);
+        }
+        _dismissCallReturnDrilldown();
+    });
+    return loc;
+}
+window._callReturnInstructionLocation = _callReturnInstructionLocation;
+window._openCallReturnDrilldown = _openCallReturnDrilldown;
+
+function _appendSimulatorStepLog(result, container) {
+    if (!container) return;
+    const line = document.createElement('div');
+    line.appendChild(document.createTextNode('\n[' + (sim ? sim.stepCount : '?') + '] ' +
+        ((result && result.desc) || 'executed') + ' '));
+    if (result && result.eventLocation &&
+        (result.eventLocation.kind === 'CALL' || result.eventLocation.kind === 'RETURN')) {
+        const link = document.createElement('button');
+        link.className = 'call-return-event';
+        link.textContent = 'Open exact ' + result.eventLocation.kind;
+        link.title = 'Open the exact ' + result.eventLocation.kind + ' instruction';
+        link.addEventListener('click', function(e) {
+            e.stopPropagation();
+            _openCallReturnDrilldown(result.eventLocation, result.eventLocation);
+        });
+        line.appendChild(link);
+    }
+    container.appendChild(line);
+    container.scrollTop = container.scrollHeight;
+}
+
 let _wukongStaleBannerDismissed = false;
 // Last hardware fault data (null when no active fault).
 // Populated by _wukongShowFaultPanel; cleared by _wukongHideFaultPanel.
@@ -16430,11 +16582,21 @@ function _wukongAppendTrace(data) {
         const line = document.createElement('div');
         line.className = 'wukong-trace-line wukong-trace-call' +
                          (data.fault_valid ? ' wukong-trace-fault' : '');
-        line.appendChild(document.createTextNode(
-            '\nHW: ' + _wukongTraceLocationText(data) +
-            '  CALL push (depth ' + _wukongCallDepth + ')' +
-            (data.fault_valid ? '  \u26A1 ' +
-                (_WUKONG_FAULT_NAMES[data.fault_code] || 'FAULT_' + data.fault_code) : '')));
+        line.appendChild(document.createTextNode('\nHW: ' + _wukongTraceLocationText(data) +
+            '  '));
+        const callLink = document.createElement('button');
+        callLink.className = 'call-return-event';
+        callLink.textContent = 'CALL push (depth ' + _wukongCallDepth + ')';
+        callLink.title = 'Open the exact CALL instruction';
+        callLink.addEventListener('click', function(e) {
+            e.stopPropagation();
+            _openCallReturnDrilldown(Object.assign({}, data, {
+                kind: 'CALL', call_depth: _wukongCallDepth
+            }));
+        });
+        line.appendChild(callLink);
+        if (data.fault_valid) line.appendChild(document.createTextNode(
+            '  \u26A1 ' + (_WUKONG_FAULT_NAMES[data.fault_code] || 'FAULT_' + data.fault_code)));
         _appendToLog(hwLogBody, line, _WUKONG_HW_LOG_MAX);
         _appendToLog(con, line, 0);
         return;
@@ -16452,11 +16614,21 @@ function _wukongAppendTrace(data) {
         const line = document.createElement('div');
         line.className = 'wukong-trace-line wukong-trace-return' +
                          (data.fault_valid ? ' wukong-trace-fault' : '');
-        line.appendChild(document.createTextNode(
-            '\nHW: ' + _wukongTraceLocationText(data) +
-            '  RETURN (depth ' + _wukongCallDepth + ')' +
-            (data.fault_valid ? '  \u26A1 ' +
-                (_WUKONG_FAULT_NAMES[data.fault_code] || 'FAULT_' + data.fault_code) : '')));
+        line.appendChild(document.createTextNode('\nHW: ' + _wukongTraceLocationText(data) +
+            '  '));
+        const returnLink = document.createElement('button');
+        returnLink.className = 'call-return-event';
+        returnLink.textContent = 'RETURN (depth ' + _wukongCallDepth + ')';
+        returnLink.title = 'Open the exact RETURN instruction';
+        returnLink.addEventListener('click', function(e) {
+            e.stopPropagation();
+            _openCallReturnDrilldown(Object.assign({}, data, {
+                kind: 'RETURN', call_depth: _wukongCallDepth
+            }));
+        });
+        line.appendChild(returnLink);
+        if (data.fault_valid) line.appendChild(document.createTextNode(
+            '  \u26A1 ' + (_WUKONG_FAULT_NAMES[data.fault_code] || 'FAULT_' + data.fault_code)));
         _appendToLog(hwLogBody, line, _WUKONG_HW_LOG_MAX);
         _appendToLog(con, line, 0);
         return;

@@ -4390,6 +4390,26 @@ class ChurchSimulator {
             // instruction. Signed results from device CALL paths are returned in DR1.
             this._writeDR(0, 0);
             result.physicalPC = this.physicalPC;
+            // A stable, per-retirement location record lets trace consumers
+            // resolve CALL/RETURN by the instruction that retired, rather than
+            // consulting the now-mutated CR14 or most recent frame.
+            if (result.instr && (result.instr.opcode === 2 || result.instr.opcode === 3 ||
+                result.instr.opcode === 8 || result.instr.opcode === 9)) {
+                const labelEntries = Object.entries(this.programLabels || {})
+                    .filter(([, offset]) => Number.isFinite(offset) && offset <= this.pc)
+                    .sort((a, b) => b[1] - a[1]);
+                result.eventLocation = {
+                    kind: (result.instr.opcode === 3) ? 'RETURN' : 'CALL',
+                    pc: result.pc,
+                    physicalPC: result.physicalPC,
+                    instrWord,
+                    opName: this.opName(result.instr.opcode),
+                    lump: this.programName || null,
+                    method: labelEntries.length ? labelEntries[0][0] : null,
+                    offset: this.pc,
+                    callDepth: this.callStack.length,
+                };
+            }
             result.auditPipeline = this._auditPipeline();
             result.tracePackets = this._tracePacketsBuf.slice();
             this.emit('step', result);
