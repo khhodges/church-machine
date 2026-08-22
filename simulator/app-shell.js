@@ -1201,7 +1201,11 @@ function init() {
     const rawHash = window.location.hash.replace('#', '');
     const [hashView, hashQuery] = rawHash.split('?');
     const hashParams = {};
-    if (hashQuery) hashQuery.split('&').forEach(p => { const [k,v] = p.split('='); hashParams[k] = v; });
+    if (hashQuery) hashQuery.split('&').forEach(p => {
+        const [k, v] = p.split('=');
+        try { hashParams[k] = decodeURIComponent(v || ''); }
+        catch (_) { hashParams[k] = v || ''; }
+    });
     let startView = views.includes(hashView) ? hashView : null;
     // church_defaultView wins only when there is no explicit URL hash.
     // An explicit hash (e.g. from a landing-page link) always takes priority.
@@ -1246,9 +1250,30 @@ function init() {
             }, 120);
         }
     }
+    if ((startView === 'devices' || startView === 'reference' || startView === 'tutorial' ||
+            startView === 'docs') && (hashParams.tab || hashParams.lesson || hashParams.doc || hashParams.figure)) {
+        setTimeout(function() {
+            if (startView === 'devices' && hashParams.tab && typeof switchDevicesTab === 'function') {
+                switchDevicesTab(hashParams.tab);
+            }
+            if (startView === 'reference' && hashParams.tab && typeof switchRefTab === 'function') {
+                switchRefTab(hashParams.tab);
+            }
+            if (startView === 'tutorial' && hashParams.lesson && typeof selectTutorial === 'function') {
+                selectTutorial(hashParams.lesson);
+            }
+            if (startView === 'docs' && hashParams.doc && typeof openDocAnchor === 'function') {
+                openDocAnchor(hashParams.doc);
+            }
+            if (startView === 'docs' && hashParams.figure && typeof openFigureAnchor === 'function') {
+                openFigureAnchor(hashParams.figure);
+            }
+        }, 150);
+    }
     switchMathMode('hp35');
     _initDefaultViewBolt();
     _initLandingCardDrag();
+    _initLandingMenuRecency();
 
     // "?" — open keyboard shortcuts help overlay (only when not in a text field)
     document.addEventListener('keydown', function _shortcutsHelpKey(e) {
@@ -1348,6 +1373,77 @@ function _saveLandingCardOrder(row, storageKey) {
         row.querySelectorAll('[data-card-id]')
     ).map(function(card) { return card.dataset.cardId; });
     try { localStorage.setItem(storageKey, JSON.stringify(saved)); } catch (_) {}
+}
+
+// Keep the public landing page's first five tiles aligned with the exact
+// destinations selected from the hamburger menu.
+function _initLandingMenuRecency() {
+    const dropdown = document.getElementById('hamDropdown');
+    if (!dropdown || dropdown.dataset.recentTracking === 'true') return;
+    dropdown.dataset.recentTracking = 'true';
+    const storageKey = 'church_recent_menu_destinations';
+    dropdown.addEventListener('click', function(event) {
+        const item = event.target.closest('.ham-item');
+        if (!item || !dropdown.contains(item)) return;
+        const destination = _landingDestinationFromMenuItem(item);
+        if (!destination) return;
+        let recent = [];
+        try {
+            const parsed = JSON.parse(localStorage.getItem(storageKey) || '[]');
+            if (Array.isArray(parsed)) recent = parsed;
+        } catch (_) {}
+        recent = [destination].concat(recent.filter(function(entry) {
+            return !entry || entry.id !== destination.id;
+        })).slice(0, 5);
+        try { localStorage.setItem(storageKey, JSON.stringify(recent)); } catch (_) {}
+    }, true);
+}
+
+function _landingDestinationFromMenuItem(item) {
+    const action = item.getAttribute('onclick') || '';
+    const href = item.getAttribute('href');
+    let target = href || '';
+    if (!target) {
+        const directRoute = action.match(/window\.location\s*=\s*['"]([^'"]+)['"]/);
+        if (directRoute) {
+            target = directRoute[1];
+        } else {
+            const viewMatch = action.match(/switchView\('([^']+)'\)/);
+            let view = viewMatch ? viewMatch[1] : (action.includes('openSimulatorFromMenu') ? 'dashboard' : '');
+            const params = [];
+            const parameterActions = [
+                ['switchBuilderViewTab', 'tab'],
+                ['switchDevicesTab', 'tab'],
+                ['switchRefTab', 'tab'],
+                ['selectTutorial', 'lesson'],
+                ['openDocAnchor', 'doc'],
+                ['openFigureAnchor', 'figure'],
+            ];
+            parameterActions.forEach(function(pair) {
+                const match = action.match(new RegExp(pair[0] + "\\('([^']+)'\\)"));
+                if (match) params.push(pair[1] + '=' + encodeURIComponent(match[1]));
+            });
+            if (!view && params.some(function(param) { return param.indexOf('figure=') === 0; })) view = 'docs';
+            if (!view) return null; // Hardware actions are commands, not routes.
+            target = '/simulator/#' + view + (params.length ? '?' + params.join('&') : '');
+        }
+    }
+    if (!target) return null;
+    const label = Array.from(item.childNodes).filter(function(node) {
+        return node.nodeType === Node.TEXT_NODE;
+    }).map(function(node) {
+        return node.textContent;
+    }).join(' ').replace(/\s+/g, ' ').trim() || item.textContent.replace(/\s+/g, ' ').trim();
+    const section = item.closest('.ham-section');
+    const category = section ? (section.querySelector('.ham-category') || {}).textContent || '' : '';
+    const id = item.id || (target + '|' + label).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    return {
+        id: id,
+        label: label,
+        href: target,
+        category: category.trim(),
+        newTab: item.getAttribute('target') === '_blank',
+    };
 }
 
 // ── Shared modal focus-trap helpers ───────────────────────────────────────────

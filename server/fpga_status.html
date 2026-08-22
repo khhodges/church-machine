@@ -52,6 +52,9 @@
   .ctlbar input { background:#0d1320; color:#e8f0fe; border:1px solid #2d3f5a;
                   border-radius:5px; padding:3px 8px; font:inherit; width:110px; }
   .ctlbar .sep { width:1px; height:22px; background:#1f2b3e; margin:0 4px; }
+  .health-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .health-head .health-title { margin-bottom:0; }
+  .health-toggle { flex:0 0 auto; font-size:11px; padding:3px 9px; color:#9fb1c8; }
    .trace-windows { position:relative; min-height:650px; max-width:1500px; margin:0 0 16px; }
    .trace-window { position:absolute; display:flex; flex-direction:column; overflow:hidden;
                    background:#0f1726; border:1px solid #30415e; border-radius:10px;
@@ -158,7 +161,10 @@
 </div>
 
 <div id="healthStrip" style="margin-bottom:8px;background:#111827;border:1px solid #1f2b3e;border-radius:8px;padding:10px 14px;">
-  <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#5a6b82;margin-bottom:8px;">Pipeline Health</div>
+  <div class="health-head">
+    <div class="health-title" style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#5a6b82;margin-bottom:8px;">Pipeline Health</div>
+    <button id="healthToggle" class="health-toggle" type="button" aria-controls="healthStages" aria-expanded="true">Collapse</button>
+  </div>
   <div id="healthStages" style="display:flex;flex-wrap:wrap;gap:8px 20px;"></div>
 </div>
 
@@ -317,6 +323,23 @@
   }
 
   var DOT_COLOR = { green: '#22c55e', amber: '#f59e0b', red: '#ef4444' };
+  function initHealthCollapse() {
+    var toggle = document.getElementById('healthToggle');
+    var stages = document.getElementById('healthStages');
+    if (!toggle || !stages) return;
+    var collapsed = false;
+    try { collapsed = localStorage.getItem('fpga_health_collapsed') === '1'; } catch (_) {}
+    function setCollapsed(next) {
+      collapsed = !!next;
+      stages.hidden = collapsed;
+      toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      toggle.textContent = collapsed ? 'Expand' : 'Collapse';
+      try { localStorage.setItem('fpga_health_collapsed', collapsed ? '1' : '0'); } catch (_) {}
+    }
+    toggle.addEventListener('click', function() { setCollapsed(!collapsed); });
+    setCollapsed(collapsed);
+  }
+
   function renderHealthStrip(s) {
     var stages = classifyPipelineStages(s);
     var stagesEl = document.getElementById('healthStages');
@@ -1058,6 +1081,7 @@
       .catch(function () {});
   }
 
+  initHealthCollapse();
   note('FPGA status page opened — waiting for data…');
   refreshWorkspace();
   pollStatus();

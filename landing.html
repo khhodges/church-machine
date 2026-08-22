@@ -191,6 +191,13 @@
             inset: 0;
         }
         .card .arrow:hover { text-decoration: underline; }
+        .recent-menu-card {
+            text-decoration: none;
+            background: linear-gradient(135deg, #18253b 0%, #101827 100%);
+            border-color: #3b82f6;
+        }
+        .recent-menu-card .tag { color: #60a5fa; }
+        .recent-menu-card .arrow { color: #93c5fd; }
         footer {
             margin-top: 20px;
             font-size: 0.75rem;
@@ -354,6 +361,40 @@
             savedOrder.slice().reverse().forEach(function(id) {
                 const card = cards.find(function(item) { return item.dataset.cardId === id; });
                 if (card) grid.insertBefore(card, grid.firstElementChild);
+            });
+
+            // The first five tiles are the exact hamburger destinations most
+            // recently chosen in the IDE.  The fixed category cards remain as
+            // the useful fallback when there are fewer than five destinations.
+            let recentDestinations = [];
+            try {
+                const parsedRecent = JSON.parse(localStorage.getItem('church_recent_menu_destinations') || '[]');
+                recentDestinations = Array.isArray(parsedRecent) ? parsedRecent : [];
+            } catch (_) {}
+            recentDestinations.slice(0, 5).filter(function(destination) {
+                return destination && typeof destination.label === 'string' &&
+                    typeof destination.href === 'string' && destination.href;
+            }).reverse().forEach(function(destination) {
+                const tile = document.createElement('a');
+                tile.className = 'card recent-menu-card';
+                tile.href = destination.href;
+                if (destination.newTab) {
+                    tile.target = '_blank';
+                    tile.rel = 'noopener';
+                }
+                tile.dataset.recentDestination = destination.id || destination.href;
+                const title = document.createElement('h2');
+                title.textContent = destination.label;
+                const tag = document.createElement('div');
+                tag.className = 'tag';
+                tag.textContent = destination.category ? 'Recent menu · ' + destination.category : 'Recent menu';
+                const description = document.createElement('p');
+                description.textContent = 'Continue where you last navigated from the Church Machine IDE menu.';
+                const arrow = document.createElement('span');
+                arrow.className = 'arrow';
+                arrow.textContent = 'Open ' + destination.label + ' →';
+                tile.append(title, tag, description, arrow);
+                grid.insertBefore(tile, grid.firstElementChild);
             });
 
             let dragged = null;
