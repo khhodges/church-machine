@@ -268,6 +268,18 @@ def test_versions_view_includes_bitstream_log_panel():
     assert "_renderBitstreamLog(bitstreamLog)" in run
 
 
+def test_versions_view_uses_board_sentinel_when_local_bit_metadata_is_unknown():
+    """A live sentinel may identify the running board without relabeling .bit."""
+    run_path = os.path.join(ROOT, "simulator", "app-run.js")
+    with open(run_path, encoding="utf-8") as handle:
+        run = handle.read()
+
+    assert "artifactVersionKnown" in run
+    assert "boardVersionKnown" in run
+    assert "Running board matches v" in run
+    assert "Local bitstream metadata is unverified" in run
+
+
 def test_versions_api_exposes_pending_main_workstream_release(client, tmp_path):
     """Hardware commits waiting for synthesis are visible before a build runs."""
     bit_path = _write_bit(tmp_path, content=b"OLDER WUKONG BUILD")

@@ -11722,21 +11722,42 @@ const VersionsView = {
                 '<div class="versions-note">No pre-built Wukong bitstream found yet \u2014 upload one from a Vivado build.</div>';
             return;
         }
-        const fw = bs.firmware_version != null ? String(bs.firmware_version).replace(/^v+/i, '') : '?';
+        // The download sidecar is the only proof of the local .bit's version.
+        // If it is missing or stale, a connected board's boot sentinel can
+        // still truthfully identify the bitstream that is running right now.
+        const artifactFw = bs.firmware_version != null
+            ? String(bs.firmware_version).replace(/^v+/i, '') : '';
+        const boardFw = status && status.boot_info && status.boot_info.build_version != null
+            ? String(status.boot_info.build_version).replace(/^v+/i, '') : '';
+        const artifactVersionKnown = Boolean(bs.version_known) && /^\d+$/.test(artifactFw);
+        const boardVersionKnown = /^\d+$/.test(boardFw);
+        const usingBoardVersion = !artifactVersionKnown && boardVersionKnown;
+        const fw = artifactVersionKnown ? artifactFw : (boardVersionKnown ? boardFw : '?');
         const letter = bs.build_letter ? ` (build ${this._esc(bs.build_letter)})` : '';
         const expected = status ? status.expected_build_version : null;
         let badge = '';
-        if (expected != null && /^\d+$/.test(fw)) {
-            badge = Number(fw) === Number(expected)
-                ? this._badge('ok', 'Matches repo expectation')
+        if (expected != null && boardVersionKnown) {
+            badge = Number(boardFw) === Number(expected)
+                ? this._badge('ok', `Running board matches v${this._esc(expected)}`)
+                : this._badge('warn', `Running board is v${this._esc(boardFw)} · repo expects v${this._esc(expected)}`);
+        } else if (expected != null && artifactVersionKnown) {
+            badge = Number(artifactFw) === Number(expected)
+                ? this._badge('ok', 'Stored artifact matches repo expectation')
                 : this._badge('warn', `Repo expects v${this._esc(expected)}`);
         }
+        const runningNote = boardVersionKnown
+            ? `<div class="versions-note">Board sentinel reports the running bitstream as v${this._esc(boardFw)}.</div>`
+            : '';
+        const metadataNote = usingBoardVersion
+            ? '<div class="versions-note">Local bitstream metadata is unverified; regenerate its sidecar after the next verified upload.</div>'
+            : '';
         el.innerHTML =
-            `<div class="versions-value">firmware v${this._esc(fw)}${letter}</div>` +
+            `<div class="versions-value">firmware v${this._esc(fw)}${usingBoardVersion ? ' (running board)' : ''}${letter}</div>` +
             badge +
             (bs.git_sha ? `<div class="versions-note">Built from <code>${this._esc(String(bs.git_sha).slice(0, 7))}</code>` +
                 (bs.git_message ? ` &middot; ${this._esc(bs.git_message)}` : '') + '</div>' : '') +
-            (bs.built_at ? `<div class="versions-note">Built ${this._esc(this._age(bs.built_at) || bs.built_at)}</div>` : '');
+            (bs.built_at ? `<div class="versions-note">Built ${this._esc(this._age(bs.built_at) || bs.built_at)}</div>` : '') +
+            runningNote + metadataNote;
     },
 
     _renderBitstreamRelease(release) {
