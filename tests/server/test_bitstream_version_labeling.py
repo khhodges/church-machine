@@ -338,3 +338,15 @@ def test_github_push_route_fails_closed_without_server_pat(client, monkeypatch):
     response = client.post("/api/github/push")
     assert response.status_code == 503
     assert response.get_json()["success"] is False
+
+
+def test_successful_push_invalidates_github_diff_cache():
+    """A completed push must not leave the old file comparison cached."""
+    app_module._versions_diff_cache.update(
+        key=("old-local", "old-github", "repo"),
+        ts=9999999999.0,
+        payload={"in_sync": False, "counts": {"changed": 108}},
+    )
+    app_module._invalidate_versions_diff_cache()
+    assert app_module._versions_diff_cache["payload"] is None
+    assert app_module._versions_diff_cache["key"] is None

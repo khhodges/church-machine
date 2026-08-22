@@ -17,6 +17,7 @@
 - [Boot c-list slot index trap](boot-clist-slot-index.md) — clistGTs[0] is overwritten in-place (not prepended); UART=2, LED=3, BTN=4, TIMER=5 direct from _getHardwareBootCatalog() order
 - [LUMP binary is big-endian](lump-binary-big-endian.md) — raw .lump file words are big-endian; ad-hoc LE reads/writes silently corrupt header/c-list, verify with lump-audit.js (also in CM_LUMP_SPECIFICATION.md §Developer Traps)
 - [Shared fetch dedup for concurrent UI lookups](shared-fetch-dedup-for-concurrent-ui-lookups.md) — two independent render paths fetching the same detail endpoint for the same entity will double-fire it; dedupe via shared in-flight-promise cache
+- [Post-mutation comparison caches](post-mutation-comparison-caches.md) — a successful push or sync must invalidate its derived comparison cache before the UI refreshes
 - [Dev server port collision](dev-server-port-collision.md) — check-then-act "free port then bind" isn't race-proof between two independently-starting servers; give secondary servers their own default port + retry-with-backoff on bind
 - [Efinity headless Interface Designer patches](efinity-headless-interface-designer.md) — check_design() crashes headless without installed-Efinity-source patches; use scripts/apply_efinity_headless_patches.py; not every sub-build needs every patch (P1/P6 optional)
 - [EFX_MAP $readmemb path resolution + VDB caching](efx-map-readmemb.md) — bins must be in $SOC_DIR/ (not just work_syn/); 2026.1 MAP leaves INIT_0=all-FF in map.v (placeholder); PNR resolves $readmemb

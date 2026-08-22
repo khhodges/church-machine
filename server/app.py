@@ -1157,6 +1157,8 @@ def _execute_git_sync():
             "church-machine": _repo_status("khhodges/church-machine"),
         }
 
+        if success:
+            _invalidate_versions_diff_cache()
         logging.info(
             "Manual git-sync triggered: success=%s sha=%s repos=%s",
             success, sha, repos,
@@ -1172,6 +1174,19 @@ def _execute_git_sync():
     except Exception as exc:
         logging.exception("Error running GitHub sync")
         return {"success": False, "message": str(exc)}, 500
+
+
+def _invalidate_versions_diff_cache():
+    """Force the next Versions refresh to compare against GitHub again."""
+    cache = globals().get("_versions_diff_cache")
+    if not isinstance(cache, dict):
+        return
+    lock = globals().get("_versions_diff_lock")
+    if lock is not None:
+        with lock:
+            cache.update(key=None, ts=0.0, payload=None)
+    else:
+        cache.update(key=None, ts=0.0, payload=None)
 
 
 @app.route("/internal/git-sync")
