@@ -1,4 +1,4 @@
-## Flash church_wukong_xc7a100t.mcs to the on-board W25Q256JVSIQ SPI NOR flash
+## Flash church_wukong_xc7a100t.mcs to the on-board Micron N25Q064 SPI NOR flash
 ## ============================================================================
 ## Usage (Vivado batch mode — run from the directory containing the .mcs file):
 ##
@@ -11,7 +11,7 @@
 ##
 ## What this does:
 ##   1. Opens Vivado Hardware Manager and connects to the JTAG target
-##   2. Creates a cfgmem object for the W25Q256JVSIQ (256 Mb SPI NOR)
+##   2. Creates a cfgmem object for the N25Q064 (64 Mb SPI NOR)
 ##   3. Erases, programs, and verifies the flash with the Church Machine image
 ##   4. Issues boot_hw_device so the FPGA loads from flash immediately
 ##
@@ -19,7 +19,7 @@
 ##   • Press the RESET button on the Wukong board (or power-cycle) at any time
 ##   • The Church Machine boots automatically — no JTAG programmer needed
 ##   • Expected: D1 blinks ~1 Hz (running), D2 off (no fault)
-##   • UART E3 @ 57600 baud emits 0xBB sentinel within ~1 s of power-on
+##   • UART E3 @ 57600 baud emits 0xBC N_INIT 0x02 BUILD_VERSION
 ## ============================================================================
 
 ## ── Locate the MCS file ──────────────────────────────────────────────────────
@@ -44,11 +44,13 @@ set device [lindex $devices 0]
 puts "Target device: $device"
 refresh_hw_device -update_hw_probes false $device
 
-## ── Create cfgmem object for W25Q256JVSIQ ───────────────────────────────────
-puts "\n═══ Setting up SPI flash (W25Q256JVSIQ — 256 Mb) ═══"
-set flash_parts [get_cfgmem_parts {w25q256jvsiq-spi-x1_x2_x4}]
-if {[llength $flash_parts] == 0} {
-    error "Flash part 'w25q256jvsiq-spi-x1_x2_x4' not found in Vivado database.\nRun: get_cfgmem_parts *w25q256* to list available parts."
+## ── Create cfgmem object for Micron N25Q064 ─────────────────────────────────
+set expected_flash_part "n25q64-3.3v-spi-x1_x2_x4"
+puts "\n═══ Setting up SPI flash (Micron N25Q064 — 64 Mb) ═══"
+set flash_parts [get_cfgmem_parts [list $expected_flash_part]]
+if {[llength $flash_parts] != 1} {
+    set discovered [get_cfgmem_parts *n25q64*]
+    error "Verified Wukong flash part '$expected_flash_part' is not available in this Vivado database.\nDetected N25Q64 candidates: $discovered\nRun 'get_cfgmem_parts *n25q64*' and use a Vivado installation exposing the verified selector. Do not substitute W25Q256."
 }
 create_hw_cfgmem -hw_device $device [lindex $flash_parts 0]
 set cfgmem [get_property PROGRAM.HW_CFGMEM $device]
@@ -76,7 +78,7 @@ puts ""
 puts " VERIFICATION:"
 puts "   1. Disconnect the JTAG cable"
 puts "   2. Power-cycle (or press RESET) the Wukong board"
-puts "   3. UART E3 @ 57600 baud should emit 0xBB within ~1 s"
+puts "   3. UART E3 @ 57600 8N1 should emit 0xBC N_INIT 0x02 BUILD_VERSION within ~1 s"
 puts "   4. D1 (G21): blinks ~1 Hz (CM running)"
 puts "      D2 (G20): off (no fault latched)"
 puts "═══════════════════════════════════════════════════════════════════"

@@ -132,8 +132,8 @@ Multi-event instructions emit multiple consecutive packets with the same NIA:
 - `RETURN` → 3 packets (RETURN.pop, RETURN.CR6, RETURN.CR14)
 - others → 1 packet (RESULT)
 
-The **boot sentinel** is a separate 2–3 byte sequence emitted once at power-on, before trace packets begin:
-- `0xBC N_INIT TU_VERSION` — current bitstream
+The **boot sentinel** is a separate sequence emitted once at power-on, before trace packets begin:
+- `0xBC N_INIT TU_VERSION BUILD_VERSION` — current bitstream
 - `0xBB N_INIT` — stale bitstream (old TraceUnit; `ELOADCALL`/`XLOADLAMBDA` emit wrong packet count)
 
 ---
@@ -153,6 +153,12 @@ The **boot sentinel** is a separate 2–3 byte sequence emitted once at power-on
 ---
 
 ## 8. Vivado Build Steps
+
+For the complete Windows/AMD Vivado Hardware Manager programming workflow,
+including the distinction between temporary `.bit` programming and persistent
+N25Q064 `.mcs` flash programming, see the
+[Vivado Artix-7 Flash Guide](wukong-vivado-flash-guide.md). Use that guide as
+the source of truth for the GUI sequence and configuration-memory part.
 
 Short-form checklist for building a new bitstream. See `hardware/wukong_top.py` for the HDL entry point.
 
@@ -182,8 +188,9 @@ vivado -mode batch -source wukong_xc7a100t.tcl
             # Output: church_wukong_xc7a100t.bit  (in hardware/)
 
 [ ] Step 4  Program board (choose one):
-            # Option A — Vivado Hardware Manager (GUI):
-            #   open_hw_manager → connect → Program Device → church_wukong_xc7a100t.bit
+             # Option A — Vivado Hardware Manager (GUI):
+             #   See wukong-vivado-flash-guide.md for temporary .bit or persistent
+             #   N25Q064 .mcs programming.
             # Option B — xc3sprog (Chromebook Linux with Platform Cable USB II):
             #   xc3sprog -c xpc -p 0 church_wukong_xc7a100t.bit
 ```

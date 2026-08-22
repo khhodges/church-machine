@@ -942,10 +942,13 @@ def download_wukong_zip():
         xdc = os.path.join(HW_DIR, "wukong_xc7a100t.xdc")
         tcl = os.path.join(HW_DIR, "wukong_xc7a100t.tcl")
         bridge = os.path.join(BASE, "local_bridge.py")
+        flash_guide = os.path.join(BASE, "..", "docs", "wukong-vivado-flash-guide.md")
         if os.path.exists(xdc):
             zf.write(xdc, "wukong_xc7a100t.xdc")
         if os.path.exists(tcl):
             zf.write(tcl, "wukong_xc7a100t.tcl")
+        if os.path.exists(flash_guide):
+            zf.write(flash_guide, "wukong-vivado-flash-guide.md")
         if os.path.exists(bridge):
             zf.write(bridge, "local_bridge.py")
     buf.seek(0)
@@ -3239,6 +3242,9 @@ def release_r12_index():
 </div>
 
 <div class="box-title">&#x26A1; Load once or make the Wukong boot persistently</div>
+<p style="font-size:.82rem;color:#a78bfa">For the complete Windows/Vivado GUI
+sequence and troubleshooting, see
+<a href="/docs/wukong-vivado-flash-guide.md" style="color:#c4b5fd">Vivado Artix-7 Flash Guide</a>.</p>
 <div class="steps">
   <div class="step">
     <div class="step-num">1</div>
@@ -4247,7 +4253,7 @@ BUILD_MD_WUKONG = """# Church Machine — QMTECH Wukong XC7A100T Build Package
 
 ## What's Inside
 
-Vivado project files for the QMTECH Wukong (Artix-7 XC7A100T-1FGG676C).
+Vivado project files for the QMTECH Wukong (Artix-7 XC7A100T-2FGG676C).
 Synthesise on any machine with Vivado 2020.x or later (WebPACK edition — free).
 
 ### Files
@@ -4255,6 +4261,7 @@ Synthesise on any machine with Vivado 2020.x or later (WebPACK edition — free)
 - `church_wukong_xc7a100t.il` — Amaranth RTLIL (authoritative source)
 - `wukong_xc7a100t.xdc`       — Vivado XDC pin constraints
 - `wukong_xc7a100t.tcl`       — Vivado project creation + build script
+- `wukong-vivado-flash-guide.md` — Windows/Vivado Hardware Manager guide
 - `local_bridge.py`           — Serial bridge server (used by bridge.sh)
 
 ## Build Steps
@@ -4280,16 +4287,21 @@ A CPU-Optimized droplet (8 vCPU / 16 GB) runs the full build in ~25 min:
 
 ## Programming
 
-Open Vivado Hardware Manager → Connect → Open Target → Program Device →
-select `church_wukong_xc7a100t.bit`.
+See `docs/wukong-vivado-flash-guide.md` for the complete Windows/Vivado GUI
+sequence. For a temporary test, use Hardware Manager → Connect → Open Target
+→ Program Device and select `church_wukong_xc7a100t.bit`. For persistent boot,
+choose **Add Configuration Memory Device**, select
+`n25q64-3.3v-spi-x1_x2_x4`, and program `church_wukong_xc7a100t.mcs` with
+erase/program/verify enabled. A `.bit` is lost on reset or power loss; a
+verified `.mcs` survives both.
 
 Requires a JTAG adapter (Digilent JTAG-HS2 or compatible) connected
 to the Wukong board's 14-pin JTAG header.
 
 ## Expected LED Behaviour After Programming
 
-- D1 (J4): solid ON during boot (~microseconds), then blinks ~1 Hz
-- D2 (H6): 1 Hz heartbeat during boot, then OFF (lit = fault latched)
+- D1 (G21): solid ON during boot, then blinks ~1 Hz
+- D2 (G20): 1 Hz heartbeat during boot, then OFF (lit = fault latched)
 """
 
 

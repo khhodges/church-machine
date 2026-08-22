@@ -52,6 +52,10 @@ vivado -mode batch -source hardware/wukong_xc7a100t.tcl
 
 **Option A — Vivado Hardware Manager (recommended)**
 
+For the click-by-click Windows workflow, including the temporary-versus-
+persistent distinction and troubleshooting, see
+[Vivado Artix-7 Flash Guide](wukong-vivado-flash-guide.md).
+
 ```tcl
 open_hw_manager
 connect_hw_server -allow_non_jtag
@@ -202,8 +206,8 @@ Example passing output:
 ```
 Wukong boot smoke test  —  /dev/ttyUSB0 @ 57600 baud
 ------------------------------------------------------------
-[a] Waiting up to 3.0 s for 0xBB sentinel …
-[a] PASS — 0xBB received after 0.83 s (buffer offset 0)
+[a] Waiting up to 3.0 s for 0xBC sentinel …
+[a] PASS — 0xBC received after 0.83 s (buffer offset 0)
 [c] Sending 'r' (run-free) …
 [c] Waiting up to 3.0 s for a non-fault trace packet …
 [c] PASS — first non-fault trace packet received after 0.12 s  NIA=0x00000001  instr=0x...
@@ -221,7 +225,7 @@ message with triage hints when either criterion is not met.
 |------|---------|---------|
 | `--port PORT` | `/dev/ttyUSB0` | Serial device |
 | `--baud BAUD` | `57600` | Baud rate |
-| `--sentinel-timeout S` | `3` | Seconds to wait for 0xBB |
+| `--sentinel-timeout S` | `3` | Seconds to wait for 0xBC |
 | `--trace-timeout S` | `3` | Seconds to collect trace after `'r'` |
 
 ### When to run it
@@ -251,7 +255,7 @@ message with triage hints when either criterion is not met.
 | D2 heartbeats forever | `boot_triggered` never fires — DMEM hw_init stalled |
 | D2 stays ON after heartbeat stops | Fault latched during BOOT_PROGRAM — check BOOT_PROGRAM encoding |
 | D2 never blinks, stays OFF | Clock not reaching logic; IBUF→BUFG chain absent |
-| 0xBB not received | UART not wired or sentinel_req never asserted |
+| 0xBC not received | UART not wired, stale bitstream, or sentinel_req never asserted |
 | D1 stays solid ON after `'r'` | CM halted in step_mode=1; bridge not connected |
 | D1 stays OFF after boot | Active-LOW inversion missing; mmio_led_reg not written |
 | Trace packets with `fault_valid=True` | CM fault before reaching NUC loop — check BOOT_PROGRAM encoding |

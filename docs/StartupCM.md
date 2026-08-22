@@ -99,7 +99,8 @@ vivado -mode batch -source wukong_xc7a100t.tcl
 
 # Step 4 — Program the board:
 # Option A — Vivado Hardware Manager (GUI):
-#   open_hw_manager → connect → Program Device → church_wukong_xc7a100t.bit
+#   See [Vivado Artix-7 Flash Guide](wukong-vivado-flash-guide.md) for the
+#   temporary .bit and persistent N25Q064 .mcs paths.
 # Option B — xc3sprog (Chromebook Linux with Platform Cable USB II):
 #   xc3sprog -c xpc -p 0 church_wukong_xc7a100t.bit
 ```
@@ -151,7 +152,7 @@ Immediately before the CM starts executing, the hardware sends a boot sentinel
 over UART (57600 8N1, UART TX on pin E3):
 
 ```
-New bitstreams (current):   0xBC  N_INIT  TU_VERSION
+New bitstreams (current):   0xBC  N_INIT  TU_VERSION  BUILD_VERSION
 Old bitstreams (stale):     0xBB  N_INIT
 ```
 
@@ -250,7 +251,7 @@ Multi-event instructions emit multiple consecutive packets with the same NIA:
 ```
 1.  Flash church_wukong_xc7a100t.bit (factory build)
 2.  Power cycle the Wukong A7 board
-3.  Board sends boot sentinel:  0xBC N_INIT TU_VERSION
+3.  Board sends boot sentinel:  0xBC N_INIT TU_VERSION BUILD_VERSION
 4.  CM executes ROM[0]  LOAD CR15, CR15[0]
 5.  CM executes ROM[1]  CHANGE CR12, CR15, #1
 6.  CM executes ROM[2]  CALL CR0     ← enters SelfTest at NIA 0x604
@@ -263,7 +264,7 @@ Multi-event instructions emit multiple consecutive packets with the same NIA:
 ```
 1.  Set DMEM word 244 in hardware/wukong_top.py dmem_init, rebuild, flash
 2.  Power cycle the Wukong A7 board
-3.  Board sends boot sentinel:  0xBC N_INIT TU_VERSION
+3.  Board sends boot sentinel:  0xBC N_INIT TU_VERSION BUILD_VERSION
 4.  CM executes ROM[0]  LOAD CR15, CR15[0]
 5.  CM executes ROM[1]  CHANGE CR12, CR15, #1
 6.  CM executes ROM[2]  CALL CR0     ← enters configured boot abstraction

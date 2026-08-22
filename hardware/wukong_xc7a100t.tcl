@@ -248,7 +248,7 @@ puts ""
 puts " Expected LED behaviour after programming:"
 puts "   D1 (G21):  solid ON during boot (~50 cycles), then blinks ~1 Hz (CM MMIO-controlled)"
 puts "   D2 (G20):  1 Hz heartbeat during boot, then OFF when running (lit = fault latched)"
-puts "   UART E3:   0xBB sentinel byte at 57600 baud within ~1 s of power-on"
+puts "   UART E3:   0xBC N_INIT 0x02 BUILD_VERSION at 57600 8N1 within ~1 s of power-on"
 if {$INSERT_ILA} {
     puts ""
     puts " ILA dashboard (Hardware Manager):"
