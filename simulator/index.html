@@ -1464,12 +1464,12 @@
                             <span class="ti60-connection-number">1</span>
                             <div>
                                 <div class="ti60-connection-card-title">JTAG — programming</div>
-                                <div class="ti60-connection-card-purpose">Loads the <code>.bit</code> file into the FPGA</div>
+                        <div class="ti60-connection-card-purpose">Testing uses <code>.bit</code>; release uses <code>.mcs</code></div>
                             </div>
                         </div>
-                        <p>Use Vivado Hardware Manager, openFPGALoader, or another JTAG programmer. This connection programs the board; it does not carry the Church Machine trace stream.</p>
+                        <p>For testing, download the <code>.bit</code> and load it over JTAG. For the official reset-resident release, download the <code>.mcs</code> and program the board&rsquo;s SPI flash with the free AMD Vivado Hardware Manager. This connection programs the board; it does not carry the Church Machine trace stream.</p>
                         <div class="ti60-connection-detail"><strong>Windows / Mac:</strong> the JTAG cable appears inside Vivado Hardware Manager.</div>
-                        <div class="ti60-connection-detail"><strong>Linux / Chromebook:</strong> openFPGALoader detects the JTAG cable; it is not the COM port selected by the trace bridge.</div>
+                        <div class="ti60-connection-detail"><strong>Linux / Chromebook:</strong> openFPGALoader detects the JTAG cable; it is not the COM port selected by the trace bridge. AMD&rsquo;s free Vivado ML Standard Edition includes Hardware Manager.</div>
                     </article>
                     <article class="ti60-connection-card ti60-connection-uart">
                         <div class="ti60-connection-card-top">
@@ -2216,10 +2216,11 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
                 </div>
                 <div class="ti60-configuration-grid">
                     <article class="ti60-config-card ti60-config-card-jtag">
-                        <div class="ti60-config-card-title">&#x1F4BB; JTAG programming</div>
+                        <div class="ti60-config-card-title">&#x1F4BB; JTAG programming &middot; Artix-7</div>
                         <dl>
-                            <div><dt>Purpose</dt><dd>Load the FPGA <code>.bit</code> image</dd></div>
-                            <div><dt>Tool</dt><dd>Vivado Hardware Manager or openFPGALoader</dd></div>
+                            <div><dt>Testing</dt><dd>Download <code>.bit</code> and load it over JTAG for temporary testing; reset or power-cycle clears it.</dd></div>
+                            <div><dt>Official release</dt><dd>Download <code>.mcs</code> and program SPI flash for a reset-resident release image.</dd></div>
+                            <div><dt>Free AMD tool</dt><dd>AMD Vivado ML Standard Edition includes Vivado Hardware Manager; openFPGALoader is also supported.</dd></div>
                             <div><dt>Trace data</dt><dd>Not carried over JTAG</dd></div>
                         </dl>
                     </article>

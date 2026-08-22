@@ -75,6 +75,8 @@ def test_connect_view_clarifies_jtag_and_usb_uart_connections():
     assert 'often <code>COM3</code>' in index
     assert 'choose the <strong>3rd entry</strong>' in index
     assert 'class="ti60-active-port-label">Trace port' in index
+    assert 'Testing uses <code>.bit</code>; release uses <code>.mcs</code>' in index
+    assert 'free AMD Vivado Hardware Manager' in index
 
 
 def test_connect_view_has_configuration_tab_and_reference_images():
@@ -96,6 +98,15 @@ def test_connect_view_has_unit_under_test_tab_and_board_photo():
     assert 'id="ti60UnitUnderTestView"' in index
     assert 'ARTIX-7 FPGA UNIT UNDER TEST' in index
     assert 'image_1787415762377.png' in index
+
+
+def test_connect_view_explains_bit_testing_and_mcs_release_paths():
+    index_path = os.path.join(ROOT, 'simulator', 'index.html')
+    with open(index_path, encoding='utf-8') as handle:
+        index = handle.read()
+    assert 'Download <code>.bit</code> and load it over JTAG for temporary testing' in index
+    assert 'Download <code>.mcs</code> and program SPI flash for a reset-resident release image' in index
+    assert 'AMD Vivado ML Standard Edition includes Vivado Hardware Manager' in index
 
 
 def test_attached_asset_route_serves_reference_images_only():
