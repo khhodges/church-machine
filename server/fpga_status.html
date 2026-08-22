@@ -332,6 +332,7 @@
     function setCollapsed(next) {
       collapsed = !!next;
       stages.hidden = collapsed;
+      stages.style.display = collapsed ? 'none' : 'flex';
       toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
       toggle.textContent = collapsed ? 'Expand' : 'Collapse';
       try { localStorage.setItem('fpga_health_collapsed', collapsed ? '1' : '0'); } catch (_) {}
