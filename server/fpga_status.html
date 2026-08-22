@@ -142,6 +142,21 @@
 <h1>Wukong FPGA — Server Status</h1>
 <div class="sub">This page shows exactly what the server knows. It polls once per second and never interferes with the IDE.</div>
 
+<div class="ctlbar">
+  <span class="lbl">Board controls</span>
+  <button id="btnStep" title="Execute one instruction ('s')">Step</button>
+  <button id="btnRun"  class="primary" title="Start the board ('r')">Run ▶</button>
+  <span class="sep"></span>
+  <input id="bpNia" placeholder="BP NIA (hex)" spellcheck="false">
+  <button id="btnBp" title="Arm a breakpoint at this NIA ('b' + NIA)">Set BP</button>
+  <span class="sep"></span>
+  <button id="btnUpload" title="Send the current boot image to the board over UART ('u')">Upload boot image ⚡</button>
+  <span class="sep"></span>
+  <button id="btnReboot" title="Force the board to retransmit its boot sentinel ('f') — confirms which bitstream is running">↺ Reboot</button>
+  <span class="sep"></span>
+  <button id="btnWorkspace" class="primary" title="Jump to the live code and event workspace">Jump to execution workspace ↓</button>
+</div>
+
 <div id="healthStrip" style="margin-bottom:8px;background:#111827;border:1px solid #1f2b3e;border-radius:8px;padding:10px 14px;">
   <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#5a6b82;margin-bottom:8px;">Pipeline Health</div>
   <div id="healthStages" style="display:flex;flex-wrap:wrap;gap:8px 20px;"></div>
@@ -186,21 +201,6 @@
     <div class="row"><span class="k">CR6 GT</span><span class="v" id="cr6gt">—</span></div>
     <div class="row"><span class="k">CR14 GT</span><span class="v" id="cr14gt">—</span></div>
   </div>
-</div>
-
-<div class="ctlbar">
-  <span class="lbl">Board controls</span>
-  <button id="btnStep" title="Execute one instruction ('s')">Step</button>
-  <button id="btnRun"  class="primary" title="Start the board ('r')">Run ▶</button>
-  <span class="sep"></span>
-  <input id="bpNia" placeholder="BP NIA (hex)" spellcheck="false">
-  <button id="btnBp" title="Arm a breakpoint at this NIA ('b' + NIA)">Set BP</button>
-  <span class="sep"></span>
-  <button id="btnUpload" title="Send the current boot image to the board over UART ('u')">Upload boot image ⚡</button>
-  <span class="sep"></span>
-  <button id="btnReboot" title="Force the board to retransmit its boot sentinel ('f') — confirms which bitstream is running">↺ Reboot</button>
-  <span class="sep"></span>
-  <button id="btnWorkspace" class="primary" title="Jump to the live code and event workspace">Jump to execution workspace ↓</button>
 </div>
 
 <div class="trace-windows" id="traceWindows" aria-label="Floating trace views">
