@@ -345,6 +345,17 @@
     var stages = classifyPipelineStages(s);
     var stagesEl = document.getElementById('healthStages');
     if (!stagesEl) return;
+    var toggle = document.getElementById('healthToggle');
+    if (toggle) {
+      var overallState = stages.some(function(st) { return st.state === 'red'; }) ? 'red' :
+        stages.some(function(st) { return st.state === 'amber'; }) ? 'amber' : 'green';
+      var toggleColor = DOT_COLOR[overallState] || '#888';
+      toggle.dataset.healthState = overallState;
+      toggle.style.background = toggleColor;
+      toggle.style.borderColor = toggleColor;
+      toggle.style.color = '#08111f';
+      toggle.style.boxShadow = '0 0 7px ' + toggleColor;
+    }
     stagesEl.innerHTML = '';
     stages.forEach(function(st) {
       var col = DOT_COLOR[st.state] || '#888';
