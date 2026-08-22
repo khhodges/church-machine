@@ -1555,6 +1555,36 @@ details[open] .ti60-advanced-summary::before { transform: rotate(90deg); }
     grid-column: span 2;
 }
 
+.versions-release-items {
+  margin-top: 0.55rem;
+  border-top: 1px solid rgba(132, 153, 181, .18);
+}
+.versions-release-row {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(132, 153, 181, .18);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+.versions-release-row:last-child { border-bottom: 0; }
+.versions-release-row b { color: #c7d3e6; font-weight: 500; }
+.versions-release-row details { margin-top: 0.25rem; }
+.versions-release-row summary {
+  cursor: pointer;
+  color: #9fb4d8;
+  font-size: 0.75rem;
+}
+.versions-release-btn {
+  margin-top: 0.7rem;
+  background: #3d3416;
+  color: #f0d477;
+  border: 1px solid #7a672c;
+  border-radius: 5px;
+  padding: 0.35rem 0.7rem;
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+.versions-release-btn:hover { background: #4a4020; }
+
 .bitstream-log-row {
     display: grid;
     grid-template-columns: auto 1fr auto;

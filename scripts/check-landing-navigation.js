@@ -23,8 +23,9 @@ if ((menu.match(/class="[^"]*\bham-category\b[^"]*"/g) || []).length !== 9) {
 if (!shell.includes('_initLandingMenuRecency()') ||
     !shell.includes('_landingDestinationFromMenuItem') ||
     !landing.includes('church_recent_menu_destinations') ||
-    !landing.includes('recent-menu-card')) {
-  throw new Error('landing page is missing hamburger recency wiring');
+    !landing.includes('id="continueNavLink"') ||
+    landing.includes('recent-menu-card')) {
+  throw new Error('landing page is missing CONTINUE recency wiring');
 }
 
 const landingCards = [...landing.matchAll(/data-card-id="([^"]+)"/g)].map(m => m[1]);

@@ -11506,6 +11506,7 @@ const VersionsView = {
             this._renderGithub(status, gh);
             this._renderFpga(status);
             this._renderBitstream(bs, status);
+            this._renderBitstreamRelease(bitstreamLog && bitstreamLog.release);
             this._renderBitstreamLog(bitstreamLog);
             this._renderProd(prod);
             this._renderAdvice(status, gh, diff, bs, prod);
@@ -11736,6 +11737,49 @@ const VersionsView = {
             (bs.git_sha ? `<div class="versions-note">Built from <code>${this._esc(String(bs.git_sha).slice(0, 7))}</code>` +
                 (bs.git_message ? ` &middot; ${this._esc(bs.git_message)}` : '') + '</div>' : '') +
             (bs.built_at ? `<div class="versions-note">Built ${this._esc(this._age(bs.built_at) || bs.built_at)}</div>` : '');
+    },
+
+    _renderBitstreamRelease(release) {
+        const el = document.getElementById('versionsReleaseBody');
+        if (!el) return;
+        if (!release || typeof release.pending !== 'boolean') {
+            el.innerHTML = this._badge('unknown', 'Unavailable') +
+                '<div class="versions-note">Could not determine which main-workstream changes are waiting for synthesis.</div>';
+            return;
+        }
+        if (!release.pending) {
+            el.innerHTML = this._badge('ok', 'Current source released') +
+                `<div class="versions-note">${this._esc(release.reason || 'No pending hardware changes.')}</div>`;
+            return;
+        }
+        const sourceVersion = release.source_version != null
+            ? `v${this._esc(release.source_version)}` : 'version unknown';
+        const sourceCommit = release.source_commit
+            ? ` &middot; source <code>${this._esc(release.source_commit)}</code>` : '';
+        const items = Array.isArray(release.items) ? release.items : [];
+        const itemHtml = items.length
+            ? `<div class="versions-release-items">` +
+              items.slice(0, 8).map(item => {
+                  const files = Array.isArray(item.files) ? item.files : [];
+                  const fileHtml = files.length
+                      ? `<details><summary>${files.length} hardware file${files.length === 1 ? '' : 's'}</summary>` +
+                        files.map(file => `<div class="versions-diff-file"><code>${this._esc(file)}</code></div>`).join('') +
+                        '</details>'
+                      : '';
+                  return `<div class="versions-release-row">` +
+                      `<div><code>${this._esc(item.commit || 'unknown')}</code> ` +
+                      `<b>${this._esc(item.message || 'Hardware source change')}</b></div>` +
+                      fileHtml + '</div>';
+              }).join('') + '</div>'
+            : '<div class="versions-note">The release baseline is known to be behind, but commit details are unavailable.</div>';
+        const errorNote = release.error
+            ? `<div class="versions-note">${this._esc(release.error)}</div>` : '';
+        el.innerHTML =
+            this._badge('warn', 'Pending release') +
+            `<div class="versions-value">${sourceVersion}${sourceCommit}</div>` +
+            `<div class="versions-note">${this._esc(release.reason || 'Build required.')}</div>` +
+            itemHtml + errorNote +
+            '<button class="versions-release-btn" onclick="switchBuilderViewTab(\'build\')">Review &amp; release in Build Approval &rarr;</button>';
     },
 
     _renderBitstreamLog(log) {

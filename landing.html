@@ -54,6 +54,9 @@
             border-radius: 0 0 8px 8px;
             margin-bottom: 20px;
         }
+        .ide-nav.has-continue {
+            grid-template-columns: minmax(112px, 1.15fr) repeat(8, 1fr);
+        }
         .nav-col {
             border-right: 1px solid #1e2a3a;
         }
@@ -82,15 +85,34 @@
             color: #f0c040;
             background: rgba(218,165,32,0.08);
         }
+        .continue-nav-col {
+            display: none;
+        }
+        .ide-nav.has-continue .continue-nav-col {
+            display: block;
+        }
+        .continue-nav-link {
+            color: #93c5fd;
+            background: rgba(59, 130, 246, 0.12);
+            border: 1px solid rgba(59, 130, 246, 0.5);
+            margin: 4px;
+            padding: 8px 6px;
+        }
+        .continue-nav-link:hover {
+            color: #dbeafe;
+            background: rgba(59, 130, 246, 0.24);
+        }
 
         /* Responsive */
         @media (max-width: 1060px) {
             .ide-nav { grid-template-columns: repeat(4, 1fr); }
+            .ide-nav.has-continue { grid-template-columns: repeat(5, 1fr); }
             .nav-col:nth-child(4) { border-right: none; }
             .site-title { border-radius: 8px 8px 0 0; }
         }
         @media (max-width: 700px) {
             .ide-nav { grid-template-columns: repeat(2, 1fr); }
+            .ide-nav.has-continue { grid-template-columns: repeat(3, 1fr); }
             .nav-col:nth-child(2) { border-right: none; }
             .nav-col:nth-child(4) { border-right: none; }
             .nav-col:nth-child(6) { border-right: none; }
@@ -191,13 +213,6 @@
             inset: 0;
         }
         .card .arrow:hover { text-decoration: underline; }
-        .recent-menu-card {
-            text-decoration: none;
-            background: linear-gradient(135deg, #18253b 0%, #101827 100%);
-            border-color: #3b82f6;
-        }
-        .recent-menu-card .tag { color: #60a5fa; }
-        .recent-menu-card .arrow { color: #93c5fd; }
         footer {
             margin-top: 20px;
             font-size: 0.75rem;
@@ -211,6 +226,9 @@
 <body>
     <div class="site-title"><span class="lambda">λ</span> Church Machine</div>
     <nav class="ide-nav">
+        <div class="nav-col continue-nav-col" id="continueNavCol" style="display:none;">
+            <a class="nav-col-header continue-nav-link" id="continueNavLink" href="/simulator/" aria-label="Continue to your most recent IDE destination">CONTINUE</a>
+        </div>
         <div class="nav-col"><a class="nav-col-header" href="/simulator/#editor">CODE</a></div>
         <div class="nav-col"><a class="nav-col-header" href="/simulator/#builder?tab=ti60-connect">BUILDER</a></div>
         <div class="nav-col"><a class="nav-col-header" href="/simulator/#tutorial">TUTORIAL</a></div>
@@ -363,40 +381,35 @@
                 if (card) grid.insertBefore(card, grid.firstElementChild);
             });
 
-            // The first five tiles are the exact hamburger destinations most
-            // recently chosen in the IDE.  The fixed category cards remain as
-            // the useful fallback when there are fewer than five destinations.
+            // The most recent hamburger destination is a compact CONTINUE
+            // control beside CODE. The remaining recent destinations stay in
+            // localStorage for the IDE's own menu history.
             let recentDestinations = [];
             try {
                 const parsedRecent = JSON.parse(localStorage.getItem('church_recent_menu_destinations') || '[]');
                 recentDestinations = Array.isArray(parsedRecent) ? parsedRecent : [];
             } catch (_) {}
-            recentDestinations.slice(0, 5).filter(function(destination) {
+            const recentDestination = recentDestinations.find(function(destination) {
                 return destination && typeof destination.label === 'string' &&
                     typeof destination.href === 'string' && destination.href;
-            }).reverse().forEach(function(destination) {
-                const tile = document.createElement('a');
-                tile.className = 'card recent-menu-card';
-                tile.href = destination.href;
-                if (destination.newTab) {
-                    tile.target = '_blank';
-                    tile.rel = 'noopener';
-                }
-                tile.dataset.recentDestination = destination.id || destination.href;
-                const title = document.createElement('h2');
-                title.textContent = destination.label;
-                const tag = document.createElement('div');
-                tag.className = 'tag';
-                tag.textContent = destination.category ? 'Recent menu · ' + destination.category : 'Recent menu';
-                const description = document.createElement('p');
-                description.textContent = 'Continue where you last navigated from the Church Machine IDE menu.';
-                const arrow = document.createElement('span');
-                arrow.className = 'arrow';
-                arrow.textContent = 'Open ' + destination.label + ' →';
-                tile.append(title, tag, description, arrow);
-                grid.insertBefore(tile, grid.firstElementChild);
             });
-
+            const nav = document.querySelector('.ide-nav');
+            const continueCol = document.getElementById('continueNavCol');
+            const continueLink = document.getElementById('continueNavLink');
+            if (recentDestination && nav && continueCol && continueLink) {
+                continueCol.style.display = 'block';
+                nav.classList.add('has-continue');
+                continueLink.href = recentDestination.href;
+                continueLink.setAttribute(
+                    'aria-label',
+                    'Continue to ' + recentDestination.label
+                );
+                continueLink.title = 'Continue to ' + recentDestination.label;
+                if (recentDestination.newTab) {
+                    continueLink.target = '_blank';
+                    continueLink.rel = 'noopener';
+                }
+            }
             let dragged = null;
             function saveOrder() {
                 const order = Array.from(grid.querySelectorAll('.card[data-card-id]'))

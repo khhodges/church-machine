@@ -266,3 +266,37 @@ def test_versions_view_includes_bitstream_log_panel():
     assert 'id="versionsBitstreamLogBody"' in index
     assert "/api/bitstream-versions" in run
     assert "_renderBitstreamLog(bitstreamLog)" in run
+
+
+def test_versions_api_exposes_pending_main_workstream_release(client, tmp_path):
+    """Hardware commits waiting for synthesis are visible before a build runs."""
+    bit_path = _write_bit(tmp_path, content=b"OLDER WUKONG BUILD")
+    app_module._write_bitstream_sidecar(
+        bit_path, version=14, source_commit=None
+    )
+    with patch.object(app_module, "_wukong_build_version", return_value=16), \
+            patch.object(app_module, "_git_short_hash", return_value="ed2acb68"), \
+            patch.object(app_module, "_git_full_head", return_value="ed2acb68"):
+        response = client.get("/api/bitstream-versions")
+
+    assert response.status_code == 200
+    release = response.get_json()["release"]
+    assert release["pending"] is True
+    assert release["source_version"] == 16
+    assert release["artifact"]["version"] == 14
+    assert release["baseline_known"] is False
+    assert release["reason"]
+
+
+def test_versions_view_renders_release_candidate_and_build_action():
+    """The Versions tab provides a single path into the existing release flow."""
+    index_path = os.path.join(ROOT, "simulator", "index.html")
+    run_path = os.path.join(ROOT, "simulator", "app-run.js")
+    with open(index_path, encoding="utf-8") as handle:
+        index = handle.read()
+    with open(run_path, encoding="utf-8") as handle:
+        run = handle.read()
+
+    assert 'id="versionsReleaseBody"' in index
+    assert "_renderBitstreamRelease(bitstreamLog && bitstreamLog.release)" in run
+    assert "Review &amp; release in Build Approval" in run

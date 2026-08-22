@@ -140,3 +140,4 @@
 - [SELF row and lazy-loader resolution](canonical-dot-name-clist-integrity.md) — C-list row 0 is read-only SELF identity covered by integrity; lazy loading converts 32-bit Outform tokens into Inform GTs
 - [LUMP documentation cases](lump-documentation-cases.md) — classify each LUMP as fully documented, source without comments, or API only
 - [Fault snapshot reboot correlation](fault-snapshot-reboot-correlation.md) — auto-reboot only after the exact fault's complete snapshot is durably promoted
+- [Bitstream release candidate baseline](bitstream-release-candidate-baseline.md) — Versions must surface pending hardware commits; never claim an artifact released without a trusted source commit

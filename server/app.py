@@ -405,10 +405,147 @@ def _record_bitstream_version_event(status, version, source, source_commit=None,
         _atomic_write_json(_bitstream_version_log_path(), existing[-100:])
     return record
 
+_WUKONG_BITSTREAM_SOURCE_PREFIXES = ("hardware/", "verilog/")
+_WUKONG_BITSTREAM_SOURCE_EXCLUDES = (
+    "hardware/wukong_bridge.py",
+)
+
+def _is_wukong_bitstream_source(path):
+    """Return whether a repository path can change the synthesized Wukong image."""
+    if not any(path.startswith(prefix) for prefix in _WUKONG_BITSTREAM_SOURCE_PREFIXES):
+        return False
+    if path in _WUKONG_BITSTREAM_SOURCE_EXCLUDES or path.startswith("hardware/test"):
+        return False
+    return True
+
+def _git_full_head():
+    """Return the full local HEAD, or None when this checkout has no git history."""
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            cwd=BASE_DIR, stderr=subprocess.DEVNULL, timeout=10,
+            text=True,
+        ).strip()
+    except Exception:
+        return None
+
+def _wukong_bitstream_release_status():
+    """Describe source changes waiting for the next Wukong bitstream release.
+
+    The source commit stored in a verified bitstream sidecar is the release
+    baseline.  If that metadata is absent or unverifiable, the baseline is
+    explicitly unknown rather than guessing that the current artifact contains
+    the current source.  This endpoint is intentionally read-only; the Build
+    Approval tab remains the sole build/release action.
+    """
+    bit_path = os.path.join(_wukong_build_dir(), "church_wukong_xc7a100t.bit")
+    meta = _read_bitstream_meta(bit_path) if os.path.isfile(bit_path) else None
+    head = _git_full_head()
+    short_head = head[:12] if head else _git_short_hash()
+    source_version = _wukong_build_version()
+    artifact_version = meta.get("version") if meta else None
+    artifact_commit = meta.get("source_commit") if meta else None
+    baseline_known = bool(
+        head and artifact_commit and
+        re.fullmatch(r"[0-9a-fA-F]{7,40}", str(artifact_commit))
+    )
+    pending = (
+        meta is None or
+        artifact_version != source_version or
+        not baseline_known or
+        str(artifact_commit).lower() != head.lower()
+    )
+
+    if not pending:
+        reason = "The verified bitstream matches the current main-workstream source."
+    elif meta is None:
+        reason = "The stored bitstream has no trusted metadata; a new release baseline is required."
+    elif artifact_version != source_version:
+        reason = f"Source is at v{source_version}, while the verified artifact is v{artifact_version}."
+    elif not baseline_known:
+        reason = "The verified artifact has no trusted source commit, so its release baseline is unknown."
+    else:
+        reason = "Hardware source changes are ahead of the verified bitstream."
+
+    items = []
+    git_error = None
+    if head:
+        try:
+            log_args = [
+                "git", "log", "--first-parent",
+                "--format=%H%x09%h%x09%aI%x09%s",
+            ]
+            if baseline_known:
+                ancestor = subprocess.run(
+                    ["git", "merge-base", "--is-ancestor", str(artifact_commit), head],
+                    cwd=BASE_DIR, stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL, timeout=10,
+                ).returncode == 0
+            else:
+                ancestor = False
+            if ancestor:
+                log_args.append(f"{artifact_commit}..HEAD")
+            else:
+                log_args.extend(["-n", "8"])
+            log_args.extend(["--", "hardware/", "verilog/"])
+            log_text = subprocess.check_output(
+                log_args, cwd=BASE_DIR, stderr=subprocess.DEVNULL,
+                timeout=20, text=True,
+            )
+            for line in log_text.splitlines():
+                parts = line.split("\t", 3)
+                if len(parts) != 4:
+                    continue
+                commit, short_commit, committed_at, message = parts
+                files_text = subprocess.check_output(
+                    ["git", "diff-tree", "--root", "--no-commit-id",
+                     "--name-only", "-r", commit, "--", "hardware/", "verilog/"],
+                    cwd=BASE_DIR, stderr=subprocess.DEVNULL,
+                    timeout=10, text=True,
+                )
+                files = sorted({
+                    path.strip() for path in files_text.splitlines()
+                    if _is_wukong_bitstream_source(path.strip())
+                })
+                if files:
+                    items.append({
+                        "commit": short_commit[:12],
+                        "timestamp": committed_at,
+                        "message": message[:240],
+                        "files": files[:40],
+                    })
+                if len(items) >= 8:
+                    break
+        except Exception as exc:
+            # The release card remains useful without commit detail, and must
+            # not expose subprocess paths or exception text to the browser.
+            git_error = "Source history is temporarily unavailable."
+            logging.debug("Wukong release candidate history unavailable: %s", exc)
+
+    return {
+        "pending": bool(pending),
+        "source_version": source_version,
+        "source_commit": short_head,
+        "artifact": {
+            "present": bool(os.path.isfile(bit_path)),
+            "version": artifact_version,
+            "source_commit": str(artifact_commit)[:12] if artifact_commit else None,
+            "built_at": meta.get("built_at") if meta else None,
+        },
+        "baseline_known": baseline_known,
+        "reason": reason,
+        "items": items,
+        "error": git_error,
+    }
+
 @app.route("/api/bitstream-versions")
 def api_bitstream_versions():
-    """Return the latest Wukong rebuild and verified-upload version records."""
-    return jsonify({"ok": True, "versions": _read_bitstream_version_log()})
+    """Return completed Wukong releases plus the current pending release set."""
+    return jsonify({
+        "ok": True,
+        "versions": _read_bitstream_version_log(),
+        "release": _wukong_bitstream_release_status(),
+    })
 
 def _wukong_min_tu_version():
     """Read _TU_VERSION_CALL_3PKT from hardware/wukong_top.py (best-effort)."""
