@@ -323,6 +323,9 @@
   }
 
   var DOT_COLOR = { green: '#22c55e', amber: '#f59e0b', red: '#ef4444' };
+  var overallHealthState = null;
+  var healthWasAutoCollapsed = false;
+  var setHealthCollapsed = null;
   function initHealthCollapse() {
     var toggle = document.getElementById('healthToggle');
     var stages = document.getElementById('healthStages');
@@ -340,7 +343,11 @@
       toggle.textContent = collapsed ? 'Expand' : 'Collapse';
       try { localStorage.setItem('fpga_health_collapsed', collapsed ? '1' : '0'); } catch (_) {}
     }
-    toggle.addEventListener('click', function() { setCollapsed(!collapsed); });
+    toggle.addEventListener('click', function() {
+      healthWasAutoCollapsed = false;
+      setCollapsed(!collapsed);
+    });
+    setHealthCollapsed = setCollapsed;
     setCollapsed(collapsed);
   }
 
@@ -358,6 +365,14 @@
       toggle.style.borderColor = toggleColor;
       toggle.style.color = '#08111f';
       toggle.style.boxShadow = '0 0 7px ' + toggleColor;
+      if (overallState === 'green' && overallHealthState !== 'green') {
+        setHealthCollapsed(true);
+        healthWasAutoCollapsed = true;
+      } else if (overallState !== 'green' && overallHealthState === 'green' && healthWasAutoCollapsed) {
+        setHealthCollapsed(false);
+        healthWasAutoCollapsed = false;
+      }
+      overallHealthState = overallState;
     }
     stagesEl.innerHTML = '';
     stages.forEach(function(st) {
