@@ -12260,8 +12260,11 @@ def wukong_code_get():
 def wukong_console_post():
     """Bridge posts a line of raw UART ASCII output (banner text etc.).
 
-    Merged into the same ordered event queue as trace packets so the /fpga
-    page's live event log shows ALL board output in arrival order.
+    Merged into the same server-side ordered event queue as trace packets so
+    the Testing page's Live event log shows all board output in arrival order.
+    The IDE's HW Trace panel consumes the shared hardware trace/console stream
+    for session-local decoded execution context; the two views intentionally
+    differ in presentation and retention.
     Body JSON: {'text': str, 'ts': float}
     """
     global _wukong_event_seq

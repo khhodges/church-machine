@@ -15550,6 +15550,7 @@ function _wukongIsConnected() {
             '<button id="wukong-hw-log-clear" title="Clear trace log" style="background:none;border:none;color:#8888cc;cursor:pointer;font-size:11px;padding:0 4px;line-height:1;" onclick="event.stopPropagation();var b=document.getElementById(\'wukong-hw-log-body\');if(b)b.innerHTML=\'\';">✕ clear</button>' +
             '<button id="wukong-hw-log-collapse" title="Minimise" style="background:none;border:none;color:#8888cc;cursor:pointer;font-size:14px;padding:0 4px;line-height:1;">▼</button>' +
         '</div>' +
+        '<div class="wukong-hw-log-note" role="note">Execution view for this IDE session. Uses the same Wukong hardware trace/console feed as Testing; decoded events, NIA cursor, and fault context follow this session. Clear or hide this panel locally — the server event history is unchanged.</div>' +
         '<div id="wukong-health-strip" style="flex-shrink:0;padding:3px 8px 3px;background:#0e0e22;border-bottom:1px solid #2a2a44;font-size:10px;line-height:1.6;"></div>' +
         '<div id="wukong-hw-log-body" style="flex:1;overflow-y:auto;padding:4px 8px;color:#ccccee;line-height:1.5;"></div>';
     document.body.appendChild(panel);

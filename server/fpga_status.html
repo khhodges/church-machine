@@ -74,6 +74,9 @@
    .trace-window .loghdr { margin:0; padding:10px 12px; flex:0 0 auto; background:#111a2a;
                            border-bottom:1px solid #25344c; }
    .trace-window .loghdr h2 { font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#7a8ba3; }
+  .surface-note { color:#7a8ba3; font-size:11px; line-height:1.45; }
+  .trace-window .surface-note { padding:8px 12px; background:#0d1625; border-bottom:1px solid #1f2b3e; }
+  .status-note { color:#7a8ba3; font-size:11px; line-height:1.45; margin:-5px 0 14px; }
    .trace-window .workspace { height:auto; min-height:0; max-width:none; margin:0; flex:1;
                               border:0; border-radius:0; box-shadow:none; }
    .trace-window .workspace-head { cursor:grab; user-select:none; touch-action:none; }
@@ -208,6 +211,7 @@
     <div class="row"><span class="k">CR14 GT</span><span class="v" id="cr14gt">—</span></div>
   </div>
 </div>
+<div class="status-note" role="note"><strong>Reading this page:</strong> status cards are the latest bridge/board snapshot; they are not the historical log. The log below is the server's arrival-ordered history from the same Wukong hardware feed.</div>
 
 <div class="trace-windows" id="traceWindows" aria-label="Floating trace views">
   <section class="trace-window trace-window-log" id="eventLogWindow" aria-labelledby="eventLogTitle">
@@ -217,6 +221,7 @@
       <span class="window-hint">newest at bottom</span>
       <button id="clearBtn" title="Clear the live event log">Clear</button>
     </div>
+    <div class="surface-note" role="note">Operational board monitor: includes decoded trace packets plus UART and bridge messages in server arrival order. Polling delay, queue retention/overflow, or a server restart can change the visible window, so it may differ from the IDE's local HW Trace view without indicating different hardware truth.</div>
     <div id="log"></div>
   </section>
 
