@@ -1477,10 +1477,9 @@ class ChurchSimulator {
     // Returns the NS slot index to use for a compiled program identified by
     // `token`.  Resolution order:
     //   1. Token→slot map: if the same token was allocated before, reuse it.
-    //   2. Scan from slot 2 for the first NS slot with no valid entry.
-    //      Slots 0–7 are hardware catalog entries (Boot.NS, Boot.Thread,
-    //      UART/LED/BTN/TIMER_DEV, SelfTest, WukongCallHome) — they are all
-    //      pre-populated, so the scan naturally skips past them.
+    //   2. Scan from slot 11 for the first NS slot with no valid entry.
+    //      Slots 0–10 are the complete built-in catalog.  Higher slots are
+    //      user space even when a legacy token/label map still mentions them.
     //
     // All slot-number decisions are centralised here.  Callers (including
     // _applyPendingSimLoad) never reference a raw slot integer for user
@@ -1495,13 +1494,10 @@ class ChurchSimulator {
             if (reuse >= 0 && reuse < this.MAX_NS_ENTRIES) return reuse;
         }
 
-        // 2. Scan from slot 2 for the first free slot.
-        //    Slots 0 and 1 are hardware-fixed (NS root, Thread LUMP).
-        //    Slots 2–10 are system entries pre-populated by the boot image or bitstream.
-        //    Bitstream-only slots (e.g. slot 8) have all-zero NS entries but are
-        //    still reserved — skip them via _bitstreamSlots.
-        for (let s = 2; s < this.MAX_NS_ENTRIES; s++) {
-            if (this._bitstreamSlots && this._bitstreamSlots.has(s)) continue;
+        // 2. Scan user space.  Do not consult legacy _bitstreamSlots here:
+        //    those entries were an old mechanism for reserving private slots
+        //    and must not hide capacity from the user allocator.
+        for (let s = BOOT_NAMED_SLOTS.length; s < this.MAX_NS_ENTRIES; s++) {
             if (!this.isNSEntryValid(s)) {
                 if (token) this._tokenSlotMap.set(token, s);
                 return s;
@@ -1860,11 +1856,9 @@ class ChurchSimulator {
             // Bitstream-written slot — NS entry is provided by the FPGA bitstream at
             // power-on; boot software leaves the NS words as zeros (hardware fills them).
             // runningOffset is not advanced (no RAM body allocated by boot ROM).
-            // Track in _bitstreamSlots so allocOrFindNsSlot reserves the slot even
-            // though isNSEntryValid(i) returns false (all-zero NS entry).
+            // Legacy bitstream-only markers are display metadata only.  They must
+            // not reserve an allocatable namespace slot.
             if (a.bitstreamOnly) {
-                if (!this._bitstreamSlots) this._bitstreamSlots = new Set();
-                this._bitstreamSlots.add(i);
                 this.nsLabels[i] = a.label;
                 this.nsChainable[i] = a.chainable || false;
                 if (i >= this.nsCount) this.nsCount = i + 1;

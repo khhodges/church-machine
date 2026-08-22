@@ -121,28 +121,6 @@
       "limit": "0x0003F",
       "seq": 0,
       "seal": "0x0CD0"
-    },
-    {
-      "name": "SlideRule",
-      "slot": 45,
-      "location": "0x00002D00",
-      "type": "Null",
-      "f": 0,
-      "g": 0,
-      "limit": "0x04000",
-      "seq": 1,
-      "seal": "0xD5CC"
-    },
-    {
-      "name": "Constants",
-      "slot": 46,
-      "location": "0x00006D00",
-      "type": "Null",
-      "f": 0,
-      "g": 0,
-      "limit": "0x00100",
-      "seq": 1,
-      "seal": "0xFA59"
     }
   ],
   "generated_at": 1787092483.9646783

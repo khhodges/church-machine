@@ -1392,13 +1392,13 @@ MAX_NS_ENTRIES = 1024
 # server/boot_image.py DEFAULT_ABSTRACTION_CATALOG.
 BASE_NAMED_NS_COUNT = 11
 
-# Slots reserved for foundational lumps (Step 1) and device MMIO regions —
+# Slots reserved for the complete built-in catalog (foundational lumps and
+# device MMIO regions) — the programmer cannot place an additional lump here.
 # the programmer cannot place an additional resident lump body here.
 # Slots 0–1: Boot.NS, Boot.Thread (foundational RAM lumps).
 # Slots 2–5: UART_DEV, LED_DEV, BTN_DEV, TIMER_DEV (MMIO windows; NS entries
 #            point at physical hardware addresses, no lump body in RAM).
-# Slots 2–3 are included in range(0, 4); 4–5 not yet in this set (pre-existing).
-RESERVED_NS_SLOTS = set(range(0, 4)) | set(range(11, 16))
+RESERVED_NS_SLOTS = set(range(BASE_NAMED_NS_COUNT))
 LUMP_MAX_ARCHIVE_VERSIONS = 20  # max archived versions kept per token; oldest are pruned
 if LUMP_MAX_ARCHIVE_VERSIONS < 0:
     raise ValueError(f"LUMP_MAX_ARCHIVE_VERSIONS must be >= 0, got {LUMP_MAX_ARCHIVE_VERSIONS}")
@@ -1428,6 +1428,12 @@ def _load_lump_catalog(selected_tokens=None):
     for entry in raw if isinstance(raw, list) else []:
         slot = entry.get("ns_slot")
         policy = entry.get("ns_slot_policy", "dynamic" if not isinstance(slot, int) else "static")
+        # Pre-bound slots above the built-in catalog are legacy private
+        # identities, not programmer selections.  Expose those lumps as
+        # dynamically allocated so they cannot reserve user capacity.
+        if isinstance(slot, int) and slot >= BASE_NAMED_NS_COUNT:
+            slot = None
+            policy = "dynamic"
         if not isinstance(slot, int):
             # Floating lump — include in catalog with floating flag
             if policy == "dynamic" and entry.get("token"):
@@ -11854,7 +11860,6 @@ def _promote_wukong_fault_snapshot(snapshot, trace):
     with _fault_snapshot_lock:
         _fault_snapshot = entry
     return True
-
 
 
 @app.route('/api/fault-snapshot', methods=['POST'])

@@ -21,7 +21,7 @@
 //   T04 — cache path: persisted {static, 9} overrides stale server sidecar
 //   T05 — fresh-fetch path: server sidecar {static, 9} is used when cache is empty
 //   T06 — cache path: persisted values override server's dynamic/null defaults
-//   T07 — cache path: partial persist (policy only, no slot) overrides policy only
+//   T07 — legacy high slot from server is ignored without a saved choice
 //   T08 — fresh-fetch path: server sidecar {dynamic, null} yields policy=dynamic, nsSlotVal=''
 //   T09 — cache path: after dynamic install the modal shows policy=dynamic, no slot
 //   T10 — resolve: sidecar with ns_slot=0 yields nsSlotVal='0' (falsy-zero guard)
@@ -132,15 +132,14 @@ try {
     check('T06 cache override nsSlotVal=9',  nsSlotVal === '9',      nsSlotVal);
 }
 
-// T07 — partial cache: only policy is persisted (ns_slot not set in cache)
-// The modal must show the persisted policy but keep the slot from the server sidecar.
+// T07 — a legacy high slot must not become a modal default.
 {
     const token = 'cafe1234';
-    const serverSidecar = { token, ns_slot_policy: 'dynamic', ns_slot: 15 };
-    const cache = { [token]: { ns_slot_policy: 'static' } };  // ns_slot absent
+    const serverSidecar = { token, ns_slot_policy: 'static', ns_slot: 15 };
+    const cache = {};
     const { nsSlotVal, policy } = _nsSlotPolicyResolve(serverSidecar, token, cache);
-    check('T07 partial cache: policy=static',   policy    === 'static', policy);
-    check('T07 partial cache: nsSlotVal=15 (from server)', nsSlotVal === '15', nsSlotVal);
+    check('T07 legacy high slot: policy=dynamic', policy === 'dynamic', policy);
+    check('T07 legacy high slot: nsSlotVal empty', nsSlotVal === '', nsSlotVal);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

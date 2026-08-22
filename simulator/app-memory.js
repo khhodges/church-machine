@@ -2925,8 +2925,21 @@ function _nsSlotPolicyResolve(detailSidecar, token, nsPersistedSlotMeta) {
         }
     }
     const rawSlot   = detailSidecar.ns_slot;
-    const nsSlotVal = (rawSlot !== null && rawSlot !== undefined) ? String(rawSlot) : '';
-    const policy    = detailSidecar.ns_slot_policy || (nsSlotVal !== '' ? 'static' : 'dynamic');
+    // Slots above the built-in catalog were formerly used as private,
+    // hard-coded identities.  Treat those values as legacy metadata unless
+    // the programmer explicitly saved the choice in this session.
+    const hasExplicitSavedSlot = _persistedSlotMeta &&
+        _persistedSlotMeta.ns_slot !== undefined &&
+        _persistedSlotMeta.ns_slot !== null &&
+        _persistedSlotMeta.ns_slot !== '';
+    const legacyHighSlot = !hasExplicitSavedSlot &&
+        Number.isInteger(Number(rawSlot)) && Number(rawSlot) > 10;
+    const nsSlotVal = legacyHighSlot
+        ? ''
+        : ((rawSlot !== null && rawSlot !== undefined) ? String(rawSlot) : '');
+    const policy    = legacyHighSlot
+        ? 'dynamic'
+        : (detailSidecar.ns_slot_policy || (nsSlotVal !== '' ? 'static' : 'dynamic'));
     return { nsSlotVal, policy };
 }
 // _nsSlotPersistRecord: given the user's chosen policy and the allocated slot,
@@ -3167,9 +3180,9 @@ async function _nsPopulateAddMeta(token) {
                 </div>
                 <div>
                     <span style="${sLabel}">NS Slot</span>
-                    <input type="number" id="_nsSlotInput" min="7" max="${sim.MAX_NS_ENTRIES - 1}"
+                    <input type="number" id="_nsSlotInput" min="11" max="${sim.MAX_NS_ENTRIES - 1}"
                            placeholder="Auto-assign" value="${nsSlotVal}" style="${sInput}">
-                    <div style="color:#6b7280;font-size:0.68rem;margin-top:2px;">Blank = auto (≥ 7)</div>
+                    <div style="color:#6b7280;font-size:0.68rem;margin-top:2px;">Blank = auto (first free slot ≥ 11)</div>
                 </div>
                 <div>
                     <span style="${sLabel}">Slot Policy</span>
@@ -3626,7 +3639,9 @@ function _nsTableAddConfirm() {
 // then zeroes the entry. Any pre-Clear GT will fail GT validation on next use.
 function _nsTableClear(slot) {
     if (!sim) return;
-    if (slot < 7) return;
+    // Slots 0–10 are the complete built-in catalog.  Only user allocations
+    // may be cleared and returned to the allocator.
+    if (slot < 11) return;
 
     // Read the real inverted-layout NS entry, not an ascending legacy address.
     // Canonical NS ABI: gt_seq lives in W1[29:21] (the authority word), NOT W2.
