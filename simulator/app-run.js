@@ -16000,6 +16000,14 @@ function _wukongApplySnapshot(data) {
     // view so thread/memory panels reflect the atomically committed registers
     // without pretending that hardware memory was read.
     if (typeof renderMemoryView === 'function') renderMemoryView();
+    // A reason-2 snapshot is the complete architectural state captured before
+    // the bridge reboots a faulted board.  Upgrade the trace-only Last Fault
+    // panel from the server's promoted record; Boot.0 events that follow must
+    // not erase it.
+    if (Number(data.reason) === 2 && typeof _fetchAndShowLastFaultPanel === 'function') {
+        _lastFaultSnapshotDismissed = false;
+        _fetchAndShowLastFaultPanel();
+    }
     return true;
 }
 
@@ -16413,6 +16421,7 @@ const _WUKONG_FAULT_NAMES = {
     0x12: 'STACK_CORRUPT',  0x13: 'STACK_UNDERFLOW', 0x14: 'IRQ_NULL_BASE',
     0x15: 'OUTFORM_CRC',    0x16: 'OUTFORM_ALLOC', 0x17: 'OUTFORM_MINT',
     0x18: 'OUTFORM_HDR',    0x19: 'OUTFORM_TIMEOUT',
+    0x1A: 'OUTFORM_UNAUTH', 0x1B: 'IMMUTABLE_SELF_CAP',
 };
 
 // Build a fault-object compatible with showFaultModal() from a raw hardware

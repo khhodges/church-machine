@@ -139,3 +139,4 @@
 - [Canonical dot-name LUMP integrity](canonical-dot-name-clist-integrity.md) — every LUMP is dot.name.1.token, with compiled data and dot-name C-list content covered by its integrity value
 - [SELF row and lazy-loader resolution](canonical-dot-name-clist-integrity.md) — C-list row 0 is read-only SELF identity covered by integrity; lazy loading converts 32-bit Outform tokens into Inform GTs
 - [LUMP documentation cases](lump-documentation-cases.md) — classify each LUMP as fully documented, source without comments, or API only
+- [Fault snapshot reboot correlation](fault-snapshot-reboot-correlation.md) — auto-reboot only after the exact fault's complete snapshot is durably promoted

@@ -780,6 +780,87 @@ class StreamSync:
             self._ascii_run = []
         return []
 
+
+class FaultRecovery:
+    """Gate one automatic reboot on a complete hardware-fault snapshot.
+
+    Trace packets identify a fault but contain only partial register state. The
+    board emits a complete ``0xAC`` stop snapshot immediately afterwards. Keep
+    it halted until that snapshot is accepted, then issue exactly one reboot.
+    Explicit snapshots use reason 3 and never satisfy this gate.
+    """
+
+    FAULT_SNAPSHOT_REASON = 2
+
+    def __init__(self):
+        self.awaiting_snapshot = False
+        self.reboot_sent = False
+
+    def note_trace(self, trace, trace_seq, server_boot_id):
+        """Replace any pending correlation with this fault trace attempt."""
+        self.clear_pending()
+        if (trace.get('fault_valid') and isinstance(trace_seq, int) and
+                trace_seq > 0 and isinstance(server_boot_id, str) and server_boot_id):
+            self.awaiting_snapshot = True
+            self.trace_seq = trace_seq
+            self.server_boot_id = server_boot_id
+
+    def clear_pending(self):
+        """Discard a correlation that cannot safely authorize a reboot."""
+        self.awaiting_snapshot = False
+        self.trace_seq = None
+        self.server_boot_id = None
+
+    def should_reboot_after_snapshot(self, snapshot, accepted):
+        return bool(
+            accepted and self.awaiting_snapshot and not self.reboot_sent and
+            int(snapshot.get('reason', 0)) == self.FAULT_SNAPSHOT_REASON
+        )
+
+    def mark_reboot_sent(self):
+        self.reboot_sent = True
+        self.clear_pending()
+
+    def note_boot_sentinel(self):
+        """A completed Boot.0 entry allows a later fault to recover once."""
+        self.clear_pending()
+        self.reboot_sent = False
+
+    def snapshot_payload(self, snapshot):
+        """Attach the exact fault event and server generation for correlation."""
+        payload = dict(snapshot)
+        if (self.awaiting_snapshot and getattr(self, 'trace_seq', None) and
+                getattr(self, 'server_boot_id', None)):
+            payload['fault_trace_seq'] = self.trace_seq
+            payload['fault_boot_id'] = self.server_boot_id
+        return payload
+
+
+def _post_wukong_snapshot(ide_base, decoded, verify_tls):
+    """POST a decoded snapshot and confirm it became the durable Last Fault."""
+    try:
+        response = requests.post(
+            f'{ide_base}/hardware/wukong/snapshot',
+            json=decoded, timeout=1, verify=verify_tls)
+        if not 200 <= response.status_code < 300:
+            return False
+        return bool(response.json().get('promoted', False))
+    except Exception as exc:
+        print(f'  [snapshot POST error] {exc}', flush=True)
+        return False
+
+
+def _send_fault_reboot(ser):
+    """Restart a stopped board only after its complete fault snapshot is safe."""
+    try:
+        ser.write(b'f')
+        ser.flush()
+        return True
+    except Exception as exc:
+        print(f'  [fault recovery] reboot send error: {exc}', flush=True)
+        return False
+
+
 def is_console_plausible(b):
     """Return True when byte *b* is plausible genuine ASCII console output.
 
@@ -1043,6 +1124,10 @@ def main():
     # CHANGE_CR12, CHANGE_CR5).  Included in fault snapshot POSTs so the IDE's
     # Last Fault panel shows at least the call-path CRs rather than all-zero rows.
     _cr_gt_cache = {}   # {cr_index: gt_word0}
+    # Fault recovery is deliberately bridge-owned: this process is the sole
+    # serial writer and can prove that the board's complete stop snapshot was
+    # accepted before it asks the RTL to re-enter the boot ladder.
+    fault_recovery = FaultRecovery()
 
     # ── UART ASCII console forwarding ────────────────────────────────────
     # Printable UART bytes (banner text etc.) are line-buffered and POSTed
@@ -1129,12 +1214,21 @@ def main():
                     sync.lock('snapshot frame')
                     _console_flush(ide_base, verify_tls)
                     decoded['ts'] = time.time()
-                    try:
-                        requests.post(
-                            f'{ide_base}/hardware/wukong/snapshot',
-                            json=decoded, timeout=1, verify=verify_tls)
-                    except Exception as exc:
-                        print(f'  [snapshot POST error] {exc}', flush=True)
+                    snapshot_accepted = _post_wukong_snapshot(
+                        ide_base, fault_recovery.snapshot_payload(decoded), verify_tls)
+                    if fault_recovery.should_reboot_after_snapshot(
+                            decoded, snapshot_accepted):
+                        if _send_fault_reboot(ser):
+                            fault_recovery.mark_reboot_sent()
+                            print('  [fault recovery] complete fault snapshot '
+                                  'stored — rebooting into Boot.0', flush=True)
+                        else:
+                            fault_recovery.clear_pending()
+                    else:
+                        # A snapshot is terminal for the preceding stop.  If it
+                        # was clean, uncorrelated, or failed promotion, never
+                        # let its old trace id authorize a later fault.
+                        fault_recovery.clear_pending()
                     i += SNAPSHOT_HEADER_LEN + decoded['payload_len'] + SNAPSHOT_CRC_LEN
                     continue
 
@@ -1173,10 +1267,24 @@ def main():
                         if decoded.get('ev_type') in _EV_HAS_GT_PAYLOAD else ''
                     )
 
+                    trace_accepted = False
+                    trace_seq = None
+                    trace_boot_id = None
                     try:
-                        requests.post(
+                        response = requests.post(
                             f'{ide_base}/hardware/wukong/trace',
                             json=decoded, timeout=1, verify=verify_tls)
+                        trace_accepted = 200 <= response.status_code < 300
+                        if trace_accepted:
+                            trace_reply = response.json()
+                            trace_seq = int(trace_reply.get('seq', 0))
+                            trace_boot_id = trace_reply.get('boot_id')
+                            trace_accepted = (
+                                trace_seq > 0 and isinstance(trace_boot_id, str) and
+                                bool(trace_boot_id))
+                        if not trace_accepted:
+                            print(f'  [trace POST rejected or unsequenced] HTTP '
+                                  f'{response.status_code}', flush=True)
                     except Exception as exc:
                         print(f'  [trace POST error] {exc}')
 
@@ -1204,6 +1312,12 @@ def main():
                         _cr_gt_cache[_cr_idx] = payload_gt
 
                     if decoded['fault_valid']:
+                        # The server correlates a reason-2 snapshot with the
+                        # latest accepted fault trace.  If that trace did not
+                        # reach it, leave the physical board halted instead of
+                        # rebooting into Boot.0 with a stale fault record.
+                        fault_recovery.note_trace(
+                            decoded, trace_seq, trace_boot_id)
                         fault_str = f'  FAULT={_fault_name(decoded["fault_code"])}'
                         # Post a fault snapshot to the IDE so the Last Fault panel
                         # appears even when the hardware resets before the user polls.
@@ -1225,6 +1339,12 @@ def main():
                                 'abstraction_label': str(decoded.get('gt_label', '') or ''),
                                 'abstraction_slot': None,
                                 'source':        'hardware',
+                                # The compact trace packet cannot carry all
+                                # CR/DR words.  The reason-2 AC snapshot that
+                                # follows is promoted by the server and must
+                                # remain authoritative if this partial POST
+                                # arrives late from another browser client.
+                                'snapshot_complete': False,
                                 'cr':            _cr_rows,
                             }
                             _fault_snap.update({k: decoded[k] for k in
@@ -1268,6 +1388,9 @@ def main():
                         sync.lock('boot sentinel')
 
                     board_n_init_byte = sentinel['n_init_byte']
+                    # A new boot sentinel means the previous recovery finished;
+                    # permit exactly one automatic recovery for a later fault.
+                    fault_recovery.note_boot_sentinel()
                     tu_version        = sentinel['tu_version']   # None for V1
                     build_version     = sentinel.get('build_version')  # None for V1
                     tu_str            = (f'  TU_VERSION=0x{tu_version:02X}'

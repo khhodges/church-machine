@@ -112,6 +112,13 @@ function buildFaultObj(data, sim_) {
     return _wukongBuildHwFaultObj(data, sim_ || null, _WUKONG_FAULT_NAMES, _WUKONG_EV_INSTR_NAME);
 }
 
+const applySnapshotBody = extractFunctionBody(appRunSrc, '_wukongApplySnapshot', 'data');
+const _wukongApplySnapshot = new Function(
+    'data', 'sim', 'updateCRDisplay', 'updateDRDisplay', 'updateFlagsDisplay',
+    'updateInfoDisplay', '_wukongSetHwCursor', 'renderMemoryView',
+    '_fetchAndShowLastFaultPanel', applySnapshotBody
+);
+
 // ── Test harness ──────────────────────────────────────────────────────────────
 let passed = 0, failed = 0;
 
@@ -233,16 +240,18 @@ function assert(label, condition, detail) {
         0x17: 'OUTFORM_MINT',
         0x18: 'OUTFORM_HDR',
         0x19: 'OUTFORM_TIMEOUT',
+        0x1A: 'OUTFORM_UNAUTH',
+        0x1B: 'IMMUTABLE_SELF_CAP',
     };
     for (const [code, name] of Object.entries(expected)) {
         const got = _WUKONG_FAULT_NAMES[parseInt(code)];
         assert(`T_MAP 0x${parseInt(code).toString(16).padStart(2,'0')} → ${name}`,
             got === name, 'got ' + got);
     }
-    // Verify no extra codes above 0x19 are defined (table is not over-extended)
+    // Verify no extra codes above 0x1B are defined (table is not over-extended)
     const maxCode = Math.max(...Object.keys(_WUKONG_FAULT_NAMES).map(Number));
-    assert('T_MAP: max defined code is 0x19',
-        maxCode === 0x19, 'max=' + maxCode);
+    assert('T_MAP: max defined code is 0x1B',
+        maxCode === 0x1B, 'max=' + maxCode);
 }
 
 // ── T_PARITY: JS table matches hardware/wukong_bridge.py ─────────────────────
@@ -423,6 +432,38 @@ assert('T6e: hw disconnected + sim not booted → RESET',
     assert('T8b: crSnapshot[14].word0 matches sim.cr[14]',
         f.crSnapshot[14] && (f.crSnapshot[14].word0 >>> 0) === 0xABCD000E,
         'got ' + (f.crSnapshot[14] ? '0x' + (f.crSnapshot[14].word0 >>> 0).toString(16) : 'null'));
+}
+
+// ── T9: complete fault snapshot upgrades Last Fault before Boot.0 ─────────────
+{
+    let fetchLastFaultCalls = 0;
+    const fakeSim = {
+        applyHardwareSnapshot: function(data) {
+            return { ok: data && data.snapshot === true };
+        }
+    };
+    const result = _wukongApplySnapshot(
+        { snapshot: true, reason: 2, nia: 0x164 },
+        fakeSim, function() {}, function() {}, function() {}, function() {},
+        function() {}, function() {}, function() { fetchLastFaultCalls++; }
+    );
+    assert('T9a: complete reason-2 hardware snapshot is applied',
+        result === true, 'result=' + result);
+    assert('T9b: complete reason-2 hardware snapshot refreshes Last Fault',
+        fetchLastFaultCalls === 1, 'fetchLastFaultCalls=' + fetchLastFaultCalls);
+}
+
+// An explicit pause snapshot must never create or refresh a fault record.
+{
+    let fetchLastFaultCalls = 0;
+    const fakeSim = { applyHardwareSnapshot: function() { return { ok: true }; } };
+    _wukongApplySnapshot(
+        { snapshot: true, reason: 3, nia: 0x164 },
+        fakeSim, function() {}, function() {}, function() {}, function() {},
+        function() {}, function() {}, function() { fetchLastFaultCalls++; }
+    );
+    assert('T9c: clean reason-3 snapshot does not refresh Last Fault',
+        fetchLastFaultCalls === 0, 'fetchLastFaultCalls=' + fetchLastFaultCalls);
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────

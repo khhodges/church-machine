@@ -11553,6 +11553,62 @@ def wukong_relay_post():
 # Read by GET; cleared by DELETE or overwritten by the next POST.
 _fault_snapshot = None
 _fault_snapshot_lock = _wk_threading.Lock()
+_WUKONG_FAULT_NAMES = {
+    0x00: 'NONE',           0x01: 'PERM_R',        0x02: 'PERM_W',
+    0x03: 'PERM_X',         0x04: 'PERM_L',        0x05: 'PERM_S',
+    0x06: 'PERM_E',         0x07: 'NULL_CAP',      0x08: 'BOUNDS',
+    0x09: 'VERSION',        0x0A: 'SEAL',          0x0B: 'INVALID_OP',
+    0x0C: 'TPERM_RSV',      0x0D: 'DOMAIN_PURITY', 0x0E: 'BIND',
+    0x0F: 'F_BIT',          0x10: 'STACK_OVERFLOW', 0x11: 'ABSENT_OUTFORM',
+    0x12: 'STACK_CORRUPT',  0x13: 'STACK_UNDERFLOW', 0x14: 'IRQ_NULL_BASE',
+    0x15: 'OUTFORM_CRC',    0x16: 'OUTFORM_ALLOC', 0x17: 'OUTFORM_MINT',
+    0x18: 'OUTFORM_HDR',    0x19: 'OUTFORM_TIMEOUT',
+    0x1A: 'OUTFORM_UNAUTH', 0x1B: 'IMMUTABLE_SELF_CAP',
+}
+
+
+def _promote_wukong_fault_snapshot(snapshot, trace):
+    """Store a reason-2 Wukong snapshot as the durable complete Last Fault.
+
+    The trace packet arrives first and identifies the fault code.  Its register
+    rows are necessarily partial.  The following architectural snapshot carries
+    the actual CR/DR state, so it replaces that partial record before the bridge
+    reboots the board.  A clean pause uses snapshot reason 3 and never calls
+    this helper.
+    """
+    global _fault_snapshot
+    trace = trace if isinstance(trace, dict) else {}
+    if not trace.get('fault_valid'):
+        return False
+    fault_code = int(trace.get('fault_code', 0))
+    fault_message = _WUKONG_FAULT_NAMES.get(fault_code, f'FAULT_{fault_code}')
+
+    entry = {
+        'fault_code':        fault_code,
+        'fault_message':     fault_message,
+        'nia':               int(trace.get('nia', snapshot['nia'])),
+        'pc':                int(trace.get('nia', snapshot['nia'])),
+        'flags':             int(snapshot['flags']),
+        'call_depth':        int(trace.get('call_depth', 0)),
+        'led_bits':          0,
+        'abstraction_label': str(trace.get('gt_label') or
+                                 trace.get('nia_label') or ''),
+        'abstraction_slot':  None,
+        'source':            'hardware',
+        'ts':                float(snapshot.get('ts', _wk_time.time())),
+        'snapshot_complete': True,
+        'snapshot_reason':   int(snapshot['reason']),
+        'snapshot_seq':      int(snapshot['seq']),
+        'cr':                [list(row) for row in snapshot['cr']],
+        'dr':                list(snapshot['dr']),
+        'stored_cr12_gt':    int(snapshot['stored_cr12_gt']),
+        'stored_packed_pc':  int(snapshot['stored_packed_pc']),
+        'stored_mflag':      int(snapshot['stored_mflag']),
+    }
+    with _fault_snapshot_lock:
+        _fault_snapshot = entry
+    return True
+
 
 
 @app.route('/api/fault-snapshot', methods=['POST'])
@@ -11590,6 +11646,7 @@ def fault_snapshot_post():
                               if data.get('abstraction_slot') is not None else None),
         'source':            str(data.get('source', 'simulator')),
         'ts':                float(data.get('ts', _ft_time.time())),
+        'snapshot_complete': bool(data.get('snapshot_complete', False)),
     }
     # CR registers: accept either 16×[w0,w1,w2] list or absence (store null rows).
     raw_cr = data.get('cr')
@@ -11612,8 +11669,18 @@ def fault_snapshot_post():
         entry['dr'] = None
 
     with _fault_snapshot_lock:
-        _fault_snapshot = entry
-    return jsonify({'ok': True})
+        # A browser can receive the trace event after the bridge has already
+        # delivered the complete reason-2 snapshot.  Do not let that delayed,
+        # trace-only hardware record erase the real CR/DR fault state.
+        keep_complete_hardware = (
+            entry['source'] == 'hardware' and not entry['snapshot_complete'] and
+            isinstance(_fault_snapshot, dict) and
+            _fault_snapshot.get('source') == 'hardware' and
+            _fault_snapshot.get('snapshot_complete') is True
+        )
+        if not keep_complete_hardware:
+            _fault_snapshot = entry
+    return jsonify({'ok': True, 'stored': not keep_complete_hardware})
 
 
 @app.route('/api/fault-snapshot', methods=['GET'])
@@ -11706,7 +11773,7 @@ def wukong_trace_post():
             _wukong_latest_cr_gts[6]  = payload_gt
         elif ev_type == 0x07:  # TRACE_EV_CALL_CR14
             _wukong_latest_cr_gts[14] = payload_gt
-    return jsonify({'ok': True})
+    return jsonify({'ok': True, 'seq': entry['seq'], 'boot_id': BOOT_ID})
 
 
 @app.route('/hardware/wukong/snapshot', methods=['POST'])
@@ -11753,7 +11820,25 @@ def wukong_snapshot_post():
         if len(_wukong_event_queue) > _WUKONG_EVENT_QUEUE_MAXLEN:
             del _wukong_event_queue[:-_WUKONG_EVENT_QUEUE_MAXLEN]
         _wukong_latest_snapshot = dict(entry)
-    return jsonify({'ok': True, 'seq': entry['seq']})
+        # The bridge posts this id only after the corresponding fault trace
+        # was accepted.  Resolve it from the ordered queue rather than using
+        # global "latest" state, which can legitimately advance before this
+        # snapshot arrives.
+        try:
+            fault_trace_seq = int(data.get('fault_trace_seq', 0))
+        except (TypeError, ValueError):
+            fault_trace_seq = 0
+        fault_boot_id = str(data.get('fault_boot_id', '') or '')
+        correlated_trace = None
+        if fault_boot_id == BOOT_ID:
+            correlated_trace = next(
+                (event for event in _wukong_event_queue
+                 if event.get('seq') == fault_trace_seq and event.get('fault_valid')),
+                None)
+    promoted = False
+    if entry['reason'] == 2 and correlated_trace is not None:
+        promoted = _promote_wukong_fault_snapshot(entry, correlated_trace)
+    return jsonify({'ok': True, 'seq': entry['seq'], 'promoted': promoted})
 
 
 @app.route('/hardware/wukong/trace', methods=['GET'])

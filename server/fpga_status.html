@@ -26,8 +26,8 @@
   .fault { color:#f87171; }
   .good  { color:#4ade80; }
   .dim   { color:#5a6b82; }
-  #log { background:#0d1320; border:1px solid #1f2b3e; border-radius:8px;
-         padding:10px 12px; height:340px; overflow-y:auto; white-space:pre; font-size:12px; }
+   #log { background:#0d1320; border:0; border-radius:0;
+          padding:10px 12px; flex:1; min-height:0; overflow-y:auto; white-space:pre; font-size:12px; }
   #log .ev-call   { color:#60a5fa; }
   #log .ev-return { color:#c084fc; }
   #log .ev-load   { color:#34d399; }
@@ -40,9 +40,9 @@
            border-radius:5px; padding:3px 10px; font:inherit; cursor:pointer; }
   button:hover { background:#2d3f5a; }
   button:disabled { opacity:.45; cursor:default; }
-  .ctlbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+   .ctlbar { position:sticky; top:0; z-index:100; display:flex; flex-wrap:wrap; gap:8px; align-items:center;
             background:#111827; border:1px solid #1f2b3e; border-radius:8px;
-            padding:10px 14px; margin-bottom:16px; }
+             padding:10px 14px; margin-bottom:16px; box-shadow:0 8px 18px rgba(0,0,0,.28); }
   .ctlbar .lbl { font-size:11px; text-transform:uppercase; letter-spacing:1px;
                  color:#5a6b82; margin-right:4px; }
   .ctlbar button.primary { background:#1d4ed8; border-color:#2563eb; color:#fff; }
@@ -52,10 +52,30 @@
   .ctlbar input { background:#0d1320; color:#e8f0fe; border:1px solid #2d3f5a;
                   border-radius:5px; padding:3px 8px; font:inherit; width:110px; }
   .ctlbar .sep { width:1px; height:22px; background:#1f2b3e; margin:0 4px; }
-  .workspace { height:min(72vh,760px); min-height:460px; max-width:1500px; margin:0 0 16px;
-               display:flex; flex-direction:column; background:#0f1726; border:1px solid #30415e;
-               border-radius:10px; box-shadow:0 12px 36px rgba(0,0,0,.28); overflow:hidden; }
-  .workspace-head { display:flex; align-items:center; justify-content:space-between;
+   .trace-windows { position:relative; min-height:650px; max-width:1500px; margin:0 0 16px; }
+   .trace-window { position:absolute; display:flex; flex-direction:column; overflow:hidden;
+                   background:#0f1726; border:1px solid #30415e; border-radius:10px;
+                   box-shadow:0 12px 36px rgba(0,0,0,.28); resize:both; min-width:300px; min-height:190px; }
+   .trace-window.is-dragging { opacity:.94; box-shadow:0 18px 46px rgba(0,0,0,.46); }
+   .trace-window-log { left:0; top:0; width:36%; height:340px; z-index:2; }
+   .trace-window-workspace { right:0; top:0; width:62%; height:650px; z-index:1; }
+   .window-head { display:flex; align-items:center; justify-content:space-between; gap:12px;
+                  flex:0 0 auto; padding:10px 14px; color:#7a8ba3; font-size:11px;
+                  text-transform:uppercase; letter-spacing:1px; background:#131e31;
+                  border-bottom:1px solid #25344c; cursor:grab; user-select:none; touch-action:none; }
+   .window-head:active { cursor:grabbing; }
+   .window-head h2 { color:#e8f0fe; font-size:11px; text-transform:uppercase; letter-spacing:1px; }
+   .window-head .window-hint { color:#5a6b82; font-size:10px; text-transform:none; letter-spacing:0; }
+   .window-head button { cursor:pointer; user-select:auto; touch-action:auto; }
+   .window-head .window-drag-icon { color:#5a6b82; font-size:14px; letter-spacing:-2px; margin-right:auto; }
+   .trace-window .loghdr { margin:0; padding:10px 12px; flex:0 0 auto; background:#111a2a;
+                           border-bottom:1px solid #25344c; }
+   .trace-window .loghdr h2 { font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#7a8ba3; }
+   .trace-window .workspace { height:auto; min-height:0; max-width:none; margin:0; flex:1;
+                              border:0; border-radius:0; box-shadow:none; }
+   .trace-window .workspace-head { cursor:grab; user-select:none; touch-action:none; }
+   .trace-window .workspace-head:active { cursor:grabbing; }
+   .workspace-head { display:flex; align-items:center; justify-content:space-between;
                     gap:16px; padding:14px 18px; border-bottom:1px solid #25344c;
                     background:#131e31; }
   .workspace-head h2 { color:#e8f0fe; font-size:14px; }
@@ -100,12 +120,17 @@
   .code-row .bp { padding:2px 6px; font-size:10px; color:#fca5a5; }
   .code-row .bp.armed { color:#fff; background:#7f1d1d; border-color:#ef4444; }
   .empty-pane { color:#5a6b82; padding:18px 12px; line-height:1.6; }
-  @media (max-width: 900px) {
-    .workspace { height:78vh; min-height:420px; }
+   @media (max-width: 900px) {
+     .trace-windows { min-height:0; display:flex; flex-direction:column; gap:12px; }
+     .trace-window, .trace-window-log, .trace-window-workspace {
+       position:relative; inset:auto; width:100%; height:auto; min-height:0; resize:none;
+     }
+     .trace-window-log { height:300px; }
+     .trace-window-workspace { height:78vh; min-height:420px; }
   }
   @media (max-width: 560px) {
     body { padding:10px; }
-    .workspace { height:76vh; min-height:380px; }
+     .trace-window-workspace { height:76vh; min-height:380px; }
     .workspace-head { padding:11px 12px; }
     .workspace-head .hint { display:none; }
     .code-row { grid-template-columns:22px 74px 78px minmax(0,1fr) 30px; gap:5px; }
@@ -178,36 +203,42 @@
   <button id="btnWorkspace" class="primary" title="Jump to the live code and event workspace">Jump to execution workspace ↓</button>
 </div>
 
-<div class="loghdr">
-  <h2>Live event log (newest at bottom)</h2>
-  <button id="clearBtn">Clear</button>
-</div>
-<div id="log"></div>
-
-<section id="workspace" class="workspace" aria-labelledby="workspaceTitle">
-    <header class="workspace-head">
-      <div>
-        <h2 id="workspaceTitle">Execution workspace</h2>
-     <div class="hint">Last is blue, present is green, and next is yellow. The event history remains above with the Clear button.</div>
-      </div>
-      <div class="right">
-         <div class="execution-legend" aria-label="Instruction execution state">
-           <span class="last">Last</span>
-           <span class="present">Present</span>
-           <span class="next">Next</span>
-         </div>
-        <span id="codeSource">Loading code listing…</span>
-      </div>
-    </header>
-    <div class="workspace-body">
-      <section class="workspace-pane">
-       <div class="pane-head"><span>Code listing</span><span id="workspaceSelection">Present: waiting · Last: — · Next: —</span></div>
-        <div id="codeListing" class="workspace-scroll">
-          <div class="empty-pane">Loading the hardware NIA map…</div>
-        </div>
-      </section>
+<div class="trace-windows" id="traceWindows" aria-label="Floating trace views">
+  <section class="trace-window trace-window-log" id="eventLogWindow" aria-labelledby="eventLogTitle">
+    <div class="loghdr window-head" data-drag-handle>
+      <span class="window-drag-icon" aria-hidden="true">⋮⋮</span>
+      <h2 id="eventLogTitle">Live event log</h2>
+      <span class="window-hint">newest at bottom</span>
+      <button id="clearBtn" title="Clear the live event log">Clear</button>
     </div>
-</section>
+    <div id="log"></div>
+  </section>
+
+  <section id="workspace" class="trace-window trace-window-workspace workspace" aria-labelledby="workspaceTitle">
+      <header class="workspace-head window-head" data-drag-handle>
+        <div>
+          <h2 id="workspaceTitle">Execution workspace</h2>
+       <div class="hint">Last is blue, present is green, and next is yellow.</div>
+        </div>
+        <div class="right">
+           <div class="execution-legend" aria-label="Instruction execution state">
+             <span class="last">Last</span>
+             <span class="present">Present</span>
+             <span class="next">Next</span>
+           </div>
+          <span id="codeSource">Loading code listing…</span>
+        </div>
+      </header>
+      <div class="workspace-body">
+        <section class="workspace-pane">
+         <div class="pane-head"><span>Code listing</span><span id="workspaceSelection">Present: waiting · Last: — · Next: —</span></div>
+          <div id="codeListing" class="workspace-scroll">
+            <div class="empty-pane">Loading the hardware NIA map…</div>
+          </div>
+        </section>
+      </div>
+  </section>
+</div>
 
 <script>
 (function () {
@@ -809,6 +840,54 @@
   document.getElementById('btnWorkspace').onclick = function () {
     workspaceEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  // The two trace surfaces are movable desktop windows. Keep dragging limited
+  // to their title bars so selecting code and pressing Clear still behaves
+  // normally. Mobile falls back to a readable stacked layout via CSS.
+  (function initFloatingTraceWindows() {
+    var windows = Array.prototype.slice.call(
+      document.querySelectorAll('.trace-window[data-drag-handle], .trace-window'));
+    var z = 3;
+    windows.forEach(function (win) {
+      var handle = win.querySelector('[data-drag-handle]');
+      if (!handle) return;
+      handle.addEventListener('pointerdown', function (ev) {
+        if (ev.target.closest('button, input, select, a')) return;
+        if (window.matchMedia && window.matchMedia('(max-width: 900px)').matches) return;
+        ev.preventDefault();
+        var parent = document.getElementById('traceWindows');
+        var parentRect = parent.getBoundingClientRect();
+        var rect = win.getBoundingClientRect();
+        var offsetX = ev.clientX - rect.left;
+        var offsetY = ev.clientY - rect.top;
+        win.classList.add('is-dragging');
+        win.style.zIndex = ++z;
+        handle.setPointerCapture(ev.pointerId);
+        function move(moveEv) {
+          var left = moveEv.clientX - parentRect.left - offsetX;
+          var top = moveEv.clientY - parentRect.top - offsetY;
+          var maxLeft = Math.max(0, parent.clientWidth - win.offsetWidth);
+          var maxTop = Math.max(0, parent.offsetHeight - win.offsetHeight);
+          win.style.left = Math.max(0, Math.min(left, maxLeft)) + 'px';
+          win.style.top = Math.max(0, Math.min(top, maxTop)) + 'px';
+          win.style.right = 'auto';
+        }
+        function stop() {
+          win.classList.remove('is-dragging');
+          handle.removeEventListener('pointermove', move);
+          handle.removeEventListener('pointerup', stop);
+          handle.removeEventListener('pointercancel', stop);
+        }
+        handle.addEventListener('pointermove', move);
+        handle.addEventListener('pointerup', stop);
+        handle.addEventListener('pointercancel', stop);
+      });
+      win.addEventListener('pointerdown', function () {
+        if (!(window.matchMedia && window.matchMedia('(max-width: 900px)').matches))
+          win.style.zIndex = ++z;
+      });
+    });
+  })();
 
   function renderEvent(e) {
     var t = e.ts ? new Date(e.ts * 1000).toLocaleTimeString() : '--:--:--';
