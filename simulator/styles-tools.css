@@ -2799,6 +2799,12 @@
     font-size: .74rem;
     margin-top: 2px;
 }
+.ti60-dl-flash-install-note {
+    color: #c4b5fd;
+    font-size: .72rem;
+    line-height: 1.35;
+    margin-top: 4px;
+}
 .ti60-dl-flash-btns {
     display: flex;
     gap: 6px;
@@ -2828,6 +2834,13 @@
 }
 .ti60-dl-flash-btn-dl:hover {
     background: #1a7a3e;
+}
+.ti60-dl-flash-btn-mcs {
+    background: #4c1d95;
+    color: #ddd6fe;
+}
+.ti60-dl-flash-btn-mcs:hover {
+    background: #5b21b6;
 }
 .ti60-dl-flash-btn-flash {
     background: #1a2a50;

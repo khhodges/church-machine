@@ -1387,10 +1387,12 @@
                     <div class="ti60-dl-flash-info">
                         <div class="ti60-dl-flash-title" id="ti60DlFlashTitle">Pre-built bitstream ready</div>
                         <div class="ti60-dl-flash-meta" id="ti60DlFlashMeta"></div>
+                        <div class="ti60-dl-flash-install-note" id="ti60DlFlashInstallNote"></div>
                         <div id="ti60WatchStatus" style="display:none;margin-top:5px;font-size:0.8rem;"></div>
                     </div>
                     <div class="ti60-dl-flash-btns">
                         <a id="ti60DlHexBtn" class="ti60-dl-flash-btn ti60-dl-flash-btn-dl" href="/dl/wukong-bit" download="church_wukong_xc7a100t.bit">&#x2B07; Download .bit</a>
+                        <a id="ti60DlMcsBtn" class="ti60-dl-flash-btn ti60-dl-flash-btn-mcs" href="/dl/wukong-mcs" download="church_wukong_xc7a100t.mcs" style="display:none" title="Programs SPI flash so the board keeps this image after reset">&#x2B07; Download .mcs (persistent)</a>
                         <button class="ti60-dl-flash-btn ti60-dl-flash-btn-flash" onclick="switchBuilderViewTab('ti60-connect');StartupWizard.jumpToFlash();" title="Opens the Flash step in the Startup Wizard">&#x26A1; Flash via Wizard</button>
                         <button id="ti60WatchBtn" class="ti60-dl-flash-btn" style="display:none;background:#1a1a2e;border:1px solid #4a5568;color:#f0c674;" title="Poll every 30 s — lights up green when the next build letter appears">&#x1F514; Watch for next</button>
                     </div>
@@ -1435,6 +1437,14 @@
                         }
                         var metaEl = document.getElementById('ti60DlFlashMeta');
                         metaEl.textContent = meta.join(' \xb7 ');
+                        var mcsBtn = document.getElementById('ti60DlMcsBtn');
+                        var installNote = document.getElementById('ti60DlFlashInstallNote');
+                        if (mcsBtn) mcsBtn.style.display = d.mcs_present ? '' : 'none';
+                        if (installNote) {
+                            installNote.textContent = d.mcs_present
+                                ? 'The .bit is temporary. Use the .mcs to program SPI flash for automatic boot after reset.'
+                                : 'The .bit is temporary and is cleared by reset or power loss.';
+                        }
                         if (d.git_sha) {
                             var commitLine = document.createElement('div');
                             commitLine.style.cssText = 'margin-top:3px;font-size:0.78rem;color:#9ca3af;';

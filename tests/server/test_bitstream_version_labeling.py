@@ -209,3 +209,16 @@ def test_release_page_explains_temporary_bit_and_persistent_mcs(client):
     assert "Download .mcs (persistent)" in page
     assert "volatile configuration" in page
     assert "n25q64-3.3v-spi-x1_x2_x4" in page
+
+
+def test_connect_card_exposes_persistent_mcs_download():
+    """The in-IDE Connect card must not hide the reset-proof download path."""
+    index_path = os.path.join(ROOT, "simulator", "index.html")
+    with open(index_path, encoding="utf-8") as handle:
+        page = handle.read()
+
+    assert 'id="ti60DlMcsBtn"' in page
+    assert 'href="/dl/wukong-mcs"' in page
+    assert "Download .mcs (persistent)" in page
+    assert "d.mcs_present" in page
+    assert "automatic boot after reset" in page
