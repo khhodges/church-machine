@@ -12795,8 +12795,18 @@ function welcomeSkip() {
     closeWelcome();
 }
 
-const WHATS_NEW_VERSION = '2026-05-15';   // bump this when content changes, not on every deploy
+const WHATS_NEW_VERSION = '2026-07-10';   // bump this when content changes, not on every deploy
 const WHATS_NEW_FEATURES = [
+    {
+        title: "Named Salvation methods",
+        html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x1F511; Salvation methods now resolve by name</div>` +
+            `<p style="font-size:0.9rem;line-height:1.65;margin-bottom:0.75rem;">` +
+            `The assembler now understands dot-name calls such as <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">CALL Salvation.main</code> ` +
+            `and <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">ELOADCALL CR0, Salvation, main</code>. ` +
+            `Method names are resolved from the abstraction's registered conventions, so you can write readable calls without looking up numeric indices.</p>` +
+            `<p style="font-size:0.88rem;color:#aaa;line-height:1.5;margin:0;">` +
+            `The disassembler and compiler tests cover the same dot-notation paths end to end.</p>`
+    },
     {
         title: "Builder ZIP downloads fixed",
         html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x1F4E6; Download FPGA Package &mdash; what you see is what you get</div>` +

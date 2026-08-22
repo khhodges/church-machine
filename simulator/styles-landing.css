@@ -13,6 +13,14 @@
     border-bottom: 1px solid rgba(218,165,32,0.15);
 }
 
+.home-hero-topline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.85rem;
+    flex-wrap: wrap;
+}
+
 .home-hero-title {
     font-size: 1.75rem;
     font-weight: 700;
@@ -21,11 +29,58 @@
     margin-bottom: 0.35rem;
 }
 
+.home-hero-version {
+    display: inline-block;
+    margin-left: 0.35rem;
+    color: #f4d06f;
+    font-family: 'Courier New', monospace;
+    font-size: 0.7em;
+    font-weight: 600;
+    letter-spacing: 0;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.home-whats-new-btn {
+    border: 1px solid rgba(218,165,32,0.55);
+    border-radius: 999px;
+    padding: 0.35rem 0.7rem;
+    color: #f4d06f;
+    background: rgba(218,165,32,0.08);
+    font: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.home-whats-new-btn:hover,
+.home-whats-new-btn:focus-visible {
+    color: #fff3c4;
+    background: rgba(218,165,32,0.2);
+    border-color: var(--church-gold, #daa520);
+    outline: 2px solid rgba(218,165,32,0.35);
+    outline-offset: 2px;
+}
+
 .home-hero-sub {
     font-size: 0.9rem;
     color: #9ca3af;
     max-width: 480px;
     margin: 0 auto;
+}
+
+@media (max-width: 420px) {
+    .home-hero-topline {
+        gap: 0.45rem;
+    }
+
+    .home-hero-title {
+        font-size: 1.45rem;
+    }
+
+    .home-whats-new-btn {
+        font-size: 0.74rem;
+    }
 }
 
 /* Section headers */

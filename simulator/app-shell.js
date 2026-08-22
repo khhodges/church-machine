@@ -1543,6 +1543,11 @@ function checkBootId() {
             if (data.version) {
                 const el = document.getElementById('version-tag');
                 if (el) el.textContent = 'v' + data.version;
+                const landingEl = document.getElementById('landing-version');
+                if (landingEl) {
+                    landingEl.textContent = 'v' + data.version;
+                    landingEl.setAttribute('aria-label', 'IDE version v' + data.version);
+                }
             }
             {
                 const lastWhatsNewVersion = localStorage.getItem('church_whatsnew_version');
