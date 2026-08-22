@@ -2052,8 +2052,8 @@
     "cc": 1,
     "author": "",
     "version": "",
-    "lump_version": 23,
-    "compiled_at": 1787408312.7334692,
+    "lump_version": 24,
+    "compiled_at": 1787419450.7022853,
     "methods": [
       "Add"
     ],
@@ -2070,22 +2070,22 @@
   {
     "token": "00aa1234",
     "abstraction": "Adder",
-    "filename": "Adder.1.53edd33a.lump",
-    "sidecar_file": "Adder.1.53edd33a.json",
-    "lump_size": 512,
+    "filename": "Adder.1.db280c91.lump",
+    "sidecar_file": "Adder.1.db280c91.json",
+    "lump_size": 128,
     "cw": 4,
     "cc": 1,
     "author": "",
     "version": "",
-    "lump_version": 54,
-    "compiled_at": 1787408313.0975902,
+    "lump_version": 58,
+    "compiled_at": 1787419452.3921926,
     "methods": [
       "Add"
     ],
     "grants": [
       "E"
     ],
-    "binary_hash": "9eb8b77350aee8906407d0cd419155aad391ffd0e46b54e18733c0e8b14a2257",
+    "binary_hash": "d6ff9776979cb5eefdaf2dd4f6d612924ab17bcb117af17dde3ae95c218ec28d",
     "petname": "",
     "issue_number": 1,
     "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f",
