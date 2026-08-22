@@ -88,9 +88,22 @@ def test_connect_view_has_configuration_tab_and_reference_images():
     assert 'image_1787397327180.png' in index
 
 
+def test_connect_view_has_unit_under_test_tab_and_board_photo():
+    index_path = os.path.join(ROOT, 'simulator', 'index.html')
+    with open(index_path, encoding='utf-8') as handle:
+        index = handle.read()
+    assert 'id="ti60ConnectTab-unit-under-test"' in index
+    assert 'id="ti60UnitUnderTestView"' in index
+    assert 'ARTIX-7 FPGA UNIT UNDER TEST' in index
+    assert 'image_1787415762377.png' in index
+
+
 def test_attached_asset_route_serves_reference_images_only():
     client = app.test_client()
     response = client.get('/attached_assets/image_1787412016939.png')
     assert response.status_code == 200
     assert response.mimetype == 'image/png'
+    board = client.get('/attached_assets/image_1787415762377.png')
+    assert board.status_code == 200
+    assert board.mimetype == 'image/png'
     assert client.get('/attached_assets/image_1787412016939.txt').status_code == 404

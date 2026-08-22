@@ -1,21 +1,21 @@
 function switchTi60ConnectTab(tab) {
-    const isConfiguration = tab === 'configuration';
-    const connection = document.getElementById('ti60ConnectionView');
-    const configuration = document.getElementById('ti60ConfigurationView');
-    const connectionTab = document.getElementById('ti60ConnectTab-connection');
-    const configurationTab = document.getElementById('ti60ConnectTab-configuration');
-    if (!connection || !configuration) return;
-    connection.style.display = isConfiguration ? 'none' : '';
-    configuration.style.display = isConfiguration ? '' : 'none';
-    if (connectionTab) {
-        connectionTab.classList.toggle('ti60-connect-tab-active', !isConfiguration);
-        connectionTab.setAttribute('aria-selected', String(!isConfiguration));
-    }
-    if (configurationTab) {
-        configurationTab.classList.toggle('ti60-connect-tab-active', isConfiguration);
-        configurationTab.setAttribute('aria-selected', String(isConfiguration));
-    }
-    try { localStorage.setItem('ti60ConnectTab', isConfiguration ? 'configuration' : 'connection'); } catch (_) {}
+    const validTabs = ['connection', 'configuration', 'unit-under-test'];
+    const selectedTab = validTabs.includes(tab) ? tab : 'connection';
+    const views = {
+        connection: document.getElementById('ti60ConnectionView'),
+        configuration: document.getElementById('ti60ConfigurationView'),
+        'unit-under-test': document.getElementById('ti60UnitUnderTestView'),
+    };
+    if (Object.values(views).some(view => !view)) return;
+    validTabs.forEach(name => {
+        views[name].style.display = selectedTab === name ? '' : 'none';
+        const tabButton = document.getElementById('ti60ConnectTab-' + name);
+        if (tabButton) {
+            tabButton.classList.toggle('ti60-connect-tab-active', selectedTab === name);
+            tabButton.setAttribute('aria-selected', String(selectedTab === name));
+        }
+    });
+    try { localStorage.setItem('ti60ConnectTab', selectedTab); } catch (_) {}
 }
 
 window.switchTi60ConnectTab = switchTi60ConnectTab;
@@ -930,8 +930,8 @@ window.Ti60Connect = (function () {
         let savedTab = 'connection';
         try { savedTab = localStorage.getItem('ti60ConnectTab') || 'connection'; } catch (_) {}
         const requestedTab = new URLSearchParams(window.location.search).get('connectTab');
-        if (requestedTab === 'connection' || requestedTab === 'configuration') savedTab = requestedTab;
-        switchTi60ConnectTab(savedTab === 'configuration' ? 'configuration' : 'connection');
+        if (['connection', 'configuration', 'unit-under-test'].includes(requestedTab)) savedTab = requestedTab;
+        switchTi60ConnectTab(['connection', 'configuration', 'unit-under-test'].includes(savedTab) ? savedTab : 'connection');
         _updateForgetBtnVisibility();
 
         const savedUrl = localStorage.getItem('ti60BridgeUrl');

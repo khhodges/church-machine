@@ -1410,6 +1410,9 @@
                 <button class="ti60-connect-tab" id="ti60ConnectTab-configuration"
                         role="tab" aria-selected="false" aria-controls="ti60ConfigurationView"
                         onclick="switchTi60ConnectTab('configuration')">&#x2699;&#xFE0F; Configuration</button>
+                <button class="ti60-connect-tab" id="ti60ConnectTab-unit-under-test"
+                        role="tab" aria-selected="false" aria-controls="ti60UnitUnderTestView"
+                        onclick="switchTi60ConnectTab('unit-under-test')">&#x1F4F7; Unit Under Test</button>
             </div>
             <div id="ti60ConnectionView" class="ti60-connect-view">
 
@@ -2280,6 +2283,25 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
                         </figure>
                     </div>
                 </section>
+            </div>
+            <div id="ti60UnitUnderTestView" class="ti60-unit-under-test-view" style="display:none;" role="tabpanel" aria-labelledby="ti60ConnectTab-unit-under-test">
+                <div class="ti60-unit-under-test-header">
+                    <div>
+                        <div class="ti60-configuration-eyebrow">ARTIX-7 FPGA UNIT UNDER TEST</div>
+                        <h2>QMTECH Wukong board</h2>
+                        <p>The physical FPGA unit used for Wukong programming, trace capture, command delivery, and boot verification.</p>
+                    </div>
+                    <span class="ti60-unit-under-test-badge">XC7A100T-200T</span>
+                </div>
+                <figure class="ti60-board-photo-card">
+                    <img src="/attached_assets/image_1787415762377.png"
+                         alt="QMTECH Wukong Artix-7 XC7A100T-200T FPGA board"
+                         loading="eager">
+                    <figcaption>
+                        <strong>Artix-7 XC7A100T-200T Wukong Board</strong>
+                        <span>Physical unit under test</span>
+                    </figcaption>
+                </figure>
             </div>
         </div>
         <div id="buildDetailsPanel" style="display:none;" class="build-details-panel">
