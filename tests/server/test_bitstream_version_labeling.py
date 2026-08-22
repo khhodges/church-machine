@@ -36,7 +36,8 @@ MCS_NAME = "church_wukong_xc7a100t.mcs"
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(app_module, "_wukong_build_dir", lambda: str(tmp_path))
-    monkeypatch.delenv("REPORT_TOKEN", raising=False)
+    # Keep uploads exercised without depending on a workspace secret.
+    monkeypatch.setenv("REPORT_TOKEN", "bitstream-version-test-token")
     app_module.app.config["TESTING"] = True
     with app_module.app.test_client() as c:
         yield c
@@ -53,7 +54,7 @@ def _upload(client, version=None, content=b"\xff\x00BITSTREAM"):
     data = {"file": (io.BytesIO(content), BIT_NAME)}
     if version is not None:
         data["version"] = str(version)
-    return client.post("/upload/wukong-bit", data=data,
+    return client.post("/upload/wukong-bit?token=bitstream-version-test-token", data=data,
                        content_type="multipart/form-data")
 
 
@@ -222,3 +223,46 @@ def test_connect_card_exposes_persistent_mcs_download():
     assert "Download .mcs (persistent)" in page
     assert "d.mcs_present" in page
     assert "automatic boot after reset" in page
+
+
+def test_bitstream_version_log_keeps_remote_build_and_verified_upload_distinct(
+        client, tmp_path):
+    """A rebuild cannot claim an artifact hash until a matching upload verifies it."""
+    remote = app_module._record_bitstream_version_event(
+        status="succeeded",
+        version=17,
+        source="remote-vivado",
+        source_commit="abc123456789",
+    )
+    assert remote["bit_hash"] is None
+
+    response = client.get("/api/bitstream-versions")
+    assert response.status_code == 200
+    rows = response.get_json()["versions"]
+    assert len(rows) == 1
+    assert rows[0]["version"] == 17
+    assert rows[0]["source"] == "remote-vivado"
+    assert rows[0]["bit_hash"] is None
+
+    upload = _upload(client, version=17, content=b"VERIFIED WUKONG BUILD")
+    assert upload.status_code == 200
+    rows = client.get("/api/bitstream-versions").get_json()["versions"]
+    assert len(rows) == 2
+    assert rows[0]["source"] == "verified-upload"
+    assert rows[0]["version"] == 17
+    assert rows[0]["bit_hash"] == upload.get_json()["md5"]
+    assert rows[1]["source"] == "remote-vivado"
+
+
+def test_versions_view_includes_bitstream_log_panel():
+    """The Builder Versions tab must offer the persisted rebuild log."""
+    index_path = os.path.join(ROOT, "simulator", "index.html")
+    run_path = os.path.join(ROOT, "simulator", "app-run.js")
+    with open(index_path, encoding="utf-8") as handle:
+        index = handle.read()
+    with open(run_path, encoding="utf-8") as handle:
+        run = handle.read()
+
+    assert 'id="versionsBitstreamLogBody"' in index
+    assert "/api/bitstream-versions" in run
+    assert "_renderBitstreamLog(bitstreamLog)" in run

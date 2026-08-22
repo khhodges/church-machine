@@ -11487,23 +11487,26 @@ const VersionsView = {
         const btn = document.getElementById('versionsRefreshBtn');
         if (btn && manual) btn.disabled = true;
         try {
-            const [statusRes, ghRes, diffRes, bsRes, prodRes] = await Promise.allSettled([
+            const [statusRes, ghRes, diffRes, bsRes, bitstreamLogRes, prodRes] = await Promise.allSettled([
                 fetch('/hardware/wukong/status').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
                 fetch('/api/github/activity').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
                 fetch('/api/versions/github-diff').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
                 fetch('/api/bitstream-status').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
+                fetch('/api/bitstream-versions').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
                 fetch('/api/versions/production').then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))),
             ]);
             const status = statusRes.status === 'fulfilled' ? statusRes.value : null;
             const gh     = ghRes.status === 'fulfilled' ? ghRes.value : null;
             const diff   = diffRes.status === 'fulfilled' && !diffRes.value.error ? diffRes.value : null;
             const bs     = bsRes.status === 'fulfilled' ? bsRes.value : null;
+            const bitstreamLog = bitstreamLogRes.status === 'fulfilled' ? bitstreamLogRes.value : null;
             const prod   = prodRes.status === 'fulfilled' ? prodRes.value : null;
             this._lastDiff = diff;
             this._renderIde(status, gh, diff);
             this._renderGithub(status, gh);
             this._renderFpga(status);
             this._renderBitstream(bs, status);
+            this._renderBitstreamLog(bitstreamLog);
             this._renderProd(prod);
             this._renderAdvice(status, gh, diff, bs, prod);
             const lc = document.getElementById('versionsLastChecked');
@@ -11733,6 +11736,36 @@ const VersionsView = {
             (bs.git_sha ? `<div class="versions-note">Built from <code>${this._esc(String(bs.git_sha).slice(0, 7))}</code>` +
                 (bs.git_message ? ` &middot; ${this._esc(bs.git_message)}` : '') + '</div>' : '') +
             (bs.built_at ? `<div class="versions-note">Built ${this._esc(this._age(bs.built_at) || bs.built_at)}</div>` : '');
+    },
+
+    _renderBitstreamLog(log) {
+        const el = document.getElementById('versionsBitstreamLogBody');
+        if (!el) return;
+        const rows = log && Array.isArray(log.versions) ? log.versions : null;
+        if (!rows) {
+            el.innerHTML = this._badge('unknown', 'Unavailable') +
+                '<div class="versions-note">Could not read the bitstream version log.</div>';
+            return;
+        }
+        if (!rows.length) {
+            el.innerHTML = this._badge('unknown', 'No rebuilds recorded') +
+                '<div class="versions-note">The next approved Vivado rebuild will add its source version, commit, result, and verified artifact hash when uploaded.</div>';
+            return;
+        }
+        el.innerHTML = rows.slice(0, 5).map(row => {
+            const ok = row.status === 'succeeded';
+            const version = row.version != null ? `v${this._esc(row.version)}` : 'version unknown';
+            const commit = row.source_commit
+                ? ` &middot; <code>${this._esc(String(row.source_commit).slice(0, 12))}</code>` : '';
+            const hash = row.bit_hash
+                ? ` &middot; hash <code>${this._esc(String(row.bit_hash).slice(0, 12))}</code>` : '';
+            const source = row.source === 'verified-upload' ? 'verified upload' : 'remote Vivado';
+            return `<div class="bitstream-log-row">` +
+                this._badge(ok ? 'ok' : 'bad', ok ? 'Built' : 'Failed') +
+                `<span><b>${version}</b> &middot; ${this._esc(source)}${commit}${hash}</span>` +
+                `<span class="bitstream-log-age">${this._esc(this._age(row.timestamp) || row.timestamp || '')}</span>` +
+                '</div>';
+        }).join('');
     },
 
     _renderProd(prod) {

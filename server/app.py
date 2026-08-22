@@ -361,6 +361,55 @@ def _read_bitstream_meta(bit_path):
     except Exception:
         return None
 
+_BITSTREAM_VERSION_LOG_FILE = "wukong-bitstream-versions.json"
+_bitstream_version_log_lock = threading.Lock()
+
+def _bitstream_version_log_path():
+    """Return the append-only Wukong build-version log path."""
+    return os.path.join(_wukong_build_dir(), _BITSTREAM_VERSION_LOG_FILE)
+
+def _read_bitstream_version_log():
+    """Return the persisted version log, newest first, without raising."""
+    try:
+        with open(_bitstream_version_log_path()) as f:
+            records = json.load(f)
+        if not isinstance(records, list):
+            return []
+        return [record for record in records if isinstance(record, dict)][-100:][::-1]
+    except (OSError, ValueError, TypeError):
+        return []
+
+def _record_bitstream_version_event(status, version, source, source_commit=None,
+                                    bit_hash=None):
+    """Persist a factual Wukong bitstream build event.
+
+    The remote Vivado build and a subsequent artifact upload are separate
+    operations.  A build record therefore never invents an artifact hash:
+    ``bit_hash`` remains null until the generated .bit is uploaded and verified
+    locally.  The version and source commit are captured before the remote build
+    starts so later edits cannot rewrite this historical record.
+    """
+    import datetime as _dt
+    record = {
+        "timestamp": _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "status": "succeeded" if status == "succeeded" else "failed",
+        "version": version if isinstance(version, int) else None,
+        "source": str(source)[:40],
+        "source_commit": str(source_commit)[:64] if source_commit else None,
+        "bit_hash": str(bit_hash)[:128] if bit_hash else None,
+    }
+    with _bitstream_version_log_lock:
+        existing = list(reversed(_read_bitstream_version_log()))
+        existing.append(record)
+        os.makedirs(_wukong_build_dir(), exist_ok=True)
+        _atomic_write_json(_bitstream_version_log_path(), existing[-100:])
+    return record
+
+@app.route("/api/bitstream-versions")
+def api_bitstream_versions():
+    """Return the latest Wukong rebuild and verified-upload version records."""
+    return jsonify({"ok": True, "versions": _read_bitstream_version_log()})
+
 def _wukong_min_tu_version():
     """Read _TU_VERSION_CALL_3PKT from hardware/wukong_top.py (best-effort)."""
     try:
@@ -493,6 +542,13 @@ def upload_wukong_bit():
         bit_path=bit_path,
         bit_hash=meta["md5"],
         approver=_approver,
+    )
+    _record_bitstream_version_event(
+        status="succeeded",
+        version=version,
+        source="verified-upload",
+        source_commit=source_commit,
+        bit_hash=meta["md5"],
     )
 
     return jsonify({"ok": True, "size_bytes": size, "version": version, "md5": meta["md5"]})
@@ -12546,6 +12602,7 @@ _ba_build_exit        = None
 _ba_build_phase       = 'idle'
 _ba_build_diagnosis   = None
 _ba_build_lock        = threading.Lock()
+_ba_build_version_context = None
 
 # Droplet SSH configuration — overridable via environment variables.
 # Defaults match the DigitalOcean CPU-Optimised droplet used for Wukong synthesis.
@@ -13337,6 +13394,21 @@ def _ba_build_worker(key_path):
             _ba_build_exit = code
             _ba_build_phase = 'complete' if code == 0 else 'failed'
             _ba_build_diagnosis = _ba_classify_build_failure(code, _ba_build_log, _ba_build_phase)
+            build_context = dict(_ba_build_version_context or {})
+        # A successful remote synthesis is the definitive moment to create a
+        # version-log entry.  Artifact hash stays empty until /upload verifies
+        # the .bit file; failed runs are also retained so the version history
+        # never falsely implies that a source version produced an image.
+        try:
+            with app.app_context():
+                _record_bitstream_version_event(
+                    status="succeeded" if code == 0 else "failed",
+                    version=build_context.get("version"),
+                    source="remote-vivado",
+                    source_commit=build_context.get("source_commit"),
+                )
+        except Exception:
+            app.logger.exception("Could not persist Wukong bitstream version log")
 
         _append('🔗 Connecting to build droplet…')
         with _ba_build_lock:
@@ -13429,7 +13501,7 @@ def wukong_build_start():
       • build_nonce in the JSON body or ?build_nonce= query param  (browser)
     The nonce is obtained from GET /api/build-approval/ns-map.
     """
-    global _ba_build_log, _ba_build_done, _ba_build_exit, _ba_build_phase, _ba_build_diagnosis
+    global _ba_build_log, _ba_build_done, _ba_build_exit, _ba_build_phase, _ba_build_diagnosis, _ba_build_version_context
 
     ok, err = _ba_validate_build_auth()
     if not ok:
@@ -13474,6 +13546,10 @@ def wukong_build_start():
         _ba_build_exit = None
         _ba_build_phase = 'queued'
         _ba_build_diagnosis = None
+        _ba_build_version_context = {
+            "version": _wukong_build_version(),
+            "source_commit": _git_short_hash(),
+        }
 
     t = threading.Thread(target=_ba_build_worker, args=(key_path,), daemon=True)
     t.start()

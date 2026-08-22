@@ -18,12 +18,89 @@ import pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
 from amaranth.sim import Simulator
+from amaranth.hdl._ast import Operator, SwitchValue
+import amaranth.hdl._dsl as _amaranth_dsl
+from amaranth.hdl._xfrm import DomainCollector, ValueTransformer
+import amaranth.hdl._ir as _amaranth_ir
 
 from hardware.wukong_top import ChurchWukongXC7A100T, WUKONG_BUILD_VERSION
 
 
+def _memoize_amaranth_shapes():
+    """Apply the generator's safe AST cache before elaborating this full SoC."""
+    if getattr(Operator.shape, "_wukong_cached", False):
+        return
+    original_operator_shape = Operator.shape
+    original_switch_shape = SwitchValue.shape
+    original_check_rhs = _amaranth_dsl._check_rhs
+    original_domain_on_value = DomainCollector.on_value
+    original_transform_on_value = ValueTransformer.on_value
+    original_collect_signals = _amaranth_ir.Design._collect_used_signals_value
+
+    def cached_operator_shape(self):
+        try:
+            return self._shape_cache
+        except AttributeError:
+            self._shape_cache = original_operator_shape(self)
+            return self._shape_cache
+
+    def cached_switch_shape(self):
+        try:
+            return self._shape_cache
+        except AttributeError:
+            self._shape_cache = original_switch_shape(self)
+            return self._shape_cache
+
+    checked_ids = set()
+    def cached_check_rhs(value):
+        value_id = id(value)
+        if value_id in checked_ids:
+            return
+        checked_ids.add(value_id)
+        return original_check_rhs(value)
+
+    def cached_domain_on_value(self, value):
+        seen = getattr(self, "_wukong_seen_values", None)
+        if seen is None:
+            seen = self._wukong_seen_values = set()
+        if id(value) in seen:
+            return
+        seen.add(id(value))
+        return original_domain_on_value(self, value)
+
+    def cached_transform_on_value(self, value):
+        cache = getattr(self, "_wukong_value_cache", None)
+        if cache is None:
+            cache = self._wukong_value_cache = {}
+        key = id(value)
+        if key not in cache:
+            cache[key] = original_transform_on_value(self, value)
+        return cache[key]
+
+    def cached_collect_signals(self, fragment, value):
+        seen = getattr(self, "_wukong_collect_seen", None)
+        if seen is None:
+            seen = self._wukong_collect_seen = set()
+        key = (id(fragment), id(value))
+        if key in seen:
+            return
+        seen.add(key)
+        return original_collect_signals(self, fragment, value)
+
+    cached_operator_shape._wukong_cached = True
+    Operator.shape = cached_operator_shape
+    SwitchValue.shape = cached_switch_shape
+    _amaranth_dsl._check_rhs = cached_check_rhs
+    DomainCollector.on_value = cached_domain_on_value
+    ValueTransformer.on_value = cached_transform_on_value
+    _amaranth_ir.Design._collect_used_signals_value = cached_collect_signals
+
+
 def _boot_and_capture():
-    top = ChurchWukongXC7A100T(clk_freq=100, baud=1, sim_mode=True)
+    _memoize_amaranth_shapes()
+    # Keep a ten-cycle bit period for efficient RTL simulation while preserving
+    # real mid-bit UART sampling and the UartTx DONE-state handshake.
+    top = ChurchWukongXC7A100T(clk_freq=100, baud=10, sim_mode=True)
     bit = top.clk_freq // top.baud
 
     boot_bytes = []
@@ -50,7 +127,7 @@ def _boot_and_capture():
     async def drive(ctx):
         nonlocal rx_bytes
         # Phase A: boot — wait for 4 sentinel bytes.
-        for _ in range(30_000):
+        for _ in range(8_000):
             await ctx.tick()
             if len(boot_bytes) >= 4:
                 break
@@ -64,7 +141,9 @@ def _boot_and_capture():
                 await ctx.tick()
         for _ in range(60_000):
             await ctx.tick()
-            if len(refire_bytes) >= 8:
+            # A re-fired sentinel now holds instruction fetch until all four
+            # identity bytes leave UART, so no trace bytes need to follow it.
+            if len(refire_bytes) >= 4:
                 break
 
     sim = Simulator(top)
@@ -96,6 +175,8 @@ def test_boot_sentinel_full_four_bytes_on_tx_pin():
     assert boot_bytes[3] == (WUKONG_BUILD_VERSION & 0xFF), (
         f"BUILD_VERSION byte wrong: {[hex(b) for b in boot_bytes[:4]]}")
 
-    assert _find_sentinel(refire_bytes, n_init), (
-        f"'f' did not re-fire the full 4-byte sentinel; "
-        f"got {[hex(b) for b in refire_bytes]}")
+    expected_refire = [0xBC, n_init & 0xFF, 0x02, WUKONG_BUILD_VERSION & 0xFF]
+    assert refire_bytes[:4] == expected_refire, (
+        "'f' must emit the full sentinel before restarted execution can use "
+        f"UART TX; expected {[hex(b) for b in expected_refire]}, "
+        f"got {[hex(b) for b in refire_bytes[:8]]}")

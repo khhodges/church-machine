@@ -1550,3 +1550,29 @@ details[open] .ti60-advanced-summary::before { transform: rotate(90deg); }
 .versions-diff summary { cursor: pointer; color: #d9b44a; font-size: 0.85em; }
 .versions-diff-file { font-size: 0.78em; color: #9fb0c8; padding-left: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .versions-diff .versions-note b { color: #c7d3e6; }
+
+.versions-card-wide {
+    grid-column: span 2;
+}
+
+.bitstream-log-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(132, 153, 181, .18);
+    font-size: 12px;
+}
+
+.bitstream-log-row:last-child { border-bottom: 0; }
+.bitstream-log-row code { font-size: 11px; }
+.bitstream-log-age { color: #8290a8; white-space: nowrap; }
+
+@media (max-width: 700px) {
+    .versions-card-wide { grid-column: span 1; }
+    .bitstream-log-row {
+        grid-template-columns: auto 1fr;
+    }
+    .bitstream-log-age { grid-column: 2; }
+}

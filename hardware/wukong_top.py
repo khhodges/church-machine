@@ -511,7 +511,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         # Priority (highest to lowest):
         #   1. CM MMIO reg-5 write       — cm_tx_start
         #   2. HW boot banner            — "WUKONG\r\n", sent before boot_start
-        #   3. Boot sentinel (3 bytes)   — 0xBC then N_INIT&0xFF then TU_VERSION, once at boot
+        #   3. Boot sentinel (4 bytes)   — 0xBC, N_INIT, TU_VERSION, BUILD_VERSION
         #   4. TraceUnit packets         — fill remaining idle TX cycles
         #
         # cm_tx_start is the raw CM write signal; used by the TraceUnit to avoid
@@ -552,6 +552,9 @@ class ChurchWukongXC7A100T(Elaboratable):
         #               =2 → send TU_VERSION; =3 → send BUILD_VERSION.
         # After the fourth byte is accepted, sentinel_sent latches and req drops.
         # 'f' command clears sentinel_sent so the full 4-byte sequence re-fires.
+        # The instruction-fetch gate below holds the CM until this request
+        # drains.  That makes a manual or fault-recovery reboot announce its
+        # complete identity before a newly restarted program can claim UART TX.
         sentinel_req = Signal()
         m.d.comb += sentinel_req.eq(boot_triggered & ~sentinel_sent)
         with m.If(sentinel_req & tx_free & ~cm_tx_start & ~banner_req):
@@ -742,7 +745,11 @@ class ChurchWukongXC7A100T(Elaboratable):
         m.d.comb += [
             # trace_stall is OR-ed in so the TraceUnit can drain all event
             # packets for one instruction before the next retire fires.
-            core.imem_valid.eq(~step_halted & ~trace_stall & imem_settled),
+            # The sentinel has priority over trace and CM UART traffic.  Hold
+            # instruction fetch during its four-byte transmission so a forced
+            # reboot cannot execute far enough to starve the announcement that
+            # tells the bridge/IDE which build has actually restarted.
+            core.imem_valid.eq(~step_halted & ~trace_stall & imem_settled & ~sentinel_req),
             core.halt_req.eq(step_halted | trace_stall),
             core.free_run_start.eq(0),
             core.free_run_nia.eq(0),
@@ -756,10 +763,11 @@ class ChurchWukongXC7A100T(Elaboratable):
         #   'r' (0x72) — run:        clear step_mode; CM runs freely
         #   'h' (0x68) — legacy halt: assert step_mode + step_halted immediately
         #   'b' (0x62) — breakpoint: read 4 big-endian NIA bytes, then arm/disarm
-        #   'f' (0x66) — force sentinel: re-arm sentinel_sent=0 so the 3-byte
-        #                boot sentinel (0xBC N_INIT TU_VERSION) is retransmitted.
-        #                Lets the bridge re-detect the running bitstream identity
-        #                without reprogramming the FPGA.
+        #   'f' (0x66) — force reboot + sentinel: re-arm the full 4-byte
+        #                boot sentinel (0xBC N_INIT TU_VERSION BUILD_VERSION).
+        #                This is shared by manual Reboot and bridge-authorized
+        #                fault recovery, so both paths re-announce identity
+        #                before restarted code resumes.
         #   'u' (0x75) — upload:     receive 4-byte big-endian byte-count header,
         #                            then N raw bytes (big-endian 32-bit words).
         #                            Halts CM, writes words to DMEM starting at word 0,
