@@ -163,7 +163,7 @@
 <div id="healthStrip" style="margin-bottom:8px;background:#111827;border:1px solid #1f2b3e;border-radius:8px;padding:10px 14px;">
   <div class="health-head">
     <div class="health-title" style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#5a6b82;margin-bottom:8px;">Pipeline Health</div>
-    <button id="healthToggle" class="health-toggle" type="button" aria-controls="healthStages" aria-expanded="true">Collapse</button>
+    <button id="healthToggle" class="health-toggle" type="button" aria-controls="healthStages statusGrid" aria-expanded="true">Collapse</button>
   </div>
   <div id="healthStages" style="display:flex;flex-wrap:wrap;gap:8px 20px;"></div>
 </div>
@@ -173,7 +173,7 @@
   <span>Showing events relayed from <b id="relayBannerSrc">lab.cloomc.org</b> — <span id="relayBannerStatus">not yet connected</span></span>
 </div>
 
-<div class="grid">
+<div id="statusGrid" class="grid">
   <div class="card">
     <h2>Bridge</h2>
     <div class="row"><span class="k">Connection</span><span class="v big" id="bridgeState"><span class="dot bad"></span>—</span></div>
@@ -326,13 +326,16 @@
   function initHealthCollapse() {
     var toggle = document.getElementById('healthToggle');
     var stages = document.getElementById('healthStages');
-    if (!toggle || !stages) return;
+    var statusGrid = document.getElementById('statusGrid');
+    if (!toggle || !stages || !statusGrid) return;
     var collapsed = false;
     try { collapsed = localStorage.getItem('fpga_health_collapsed') === '1'; } catch (_) {}
     function setCollapsed(next) {
       collapsed = !!next;
       stages.hidden = collapsed;
       stages.style.display = collapsed ? 'none' : 'flex';
+      statusGrid.hidden = collapsed;
+      statusGrid.style.display = collapsed ? 'none' : 'grid';
       toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
       toggle.textContent = collapsed ? 'Expand' : 'Collapse';
       try { localStorage.setItem('fpga_health_collapsed', collapsed ? '1' : '0'); } catch (_) {}
