@@ -2043,6 +2043,29 @@
     "lump_version": 1
   },
   {
+    "token": "fe9c6e42",
+    "abstraction": "NoteGAssembly",
+    "filename": "NoteGAssembly.1.fed6f911.lump",
+    "sidecar_file": "NoteGAssembly.1.fed6f911.json",
+    "lump_size": 1024,
+    "cw": 141,
+    "cc": 1,
+    "author": "",
+    "version": "",
+    "lump_version": 1,
+    "compiled_at": 1787419584.8995218,
+    "methods": [],
+    "grants": [
+      "E"
+    ],
+    "binary_hash": "9490b3e536b73c28e1d30f28c6ccb46f4e84a25cdefca6571a27556aed66945a",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "75a7c570e333644077d6e93d2bc905cc61c4da9d6a3bfaad2990c6492c5079ac",
+    "dot_name": "NoteGAssembly",
+    "issue_n": 1
+  },
+  {
     "token": "00aa9999",
     "abstraction": "Legacy",
     "filename": "Legacy.1.8b7fb77f.lump",
@@ -2052,8 +2075,8 @@
     "cc": 1,
     "author": "",
     "version": "",
-    "lump_version": 24,
-    "compiled_at": 1787419450.7022853,
+    "lump_version": 25,
+    "compiled_at": 1787426045.6906965,
     "methods": [
       "Add"
     ],
@@ -2077,8 +2100,8 @@
     "cc": 1,
     "author": "",
     "version": "",
-    "lump_version": 58,
-    "compiled_at": 1787419452.3921926,
+    "lump_version": 62,
+    "compiled_at": 1787426047.440941,
     "methods": [
       "Add"
     ],
