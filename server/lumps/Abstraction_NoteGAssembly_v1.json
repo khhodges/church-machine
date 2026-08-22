@@ -12,7 +12,7 @@
   "profile": "IoT",
   "language": "assembly",
   "author": "",
-  "version": "2026.08.22",
+  "version": "2026.08.21",
   "release_notes": "",
   "methods": [
     {
@@ -36,7 +36,7 @@
   "deployment": {
     "target_board": "wukong-xc7a100t",
     "profile": "IoT",
-    "built_at": "2026-08-22T19:59:15.199673Z",
+    "built_at": "2026-08-21T16:43:55.594970Z",
     "builder": "CLOOMC++ IDE v1.0"
   },
   "grants": [
@@ -51,6 +51,7 @@
   "identity_seal_location": "c-list[0]",
   "dot_name": "NoteGAssembly",
   "issue_n": 1,
-  "lump_version": 2,
-  "compiled_at": 1787428755.1996982
+  "lump_version": 1,
+  "compiled_at": 1787330635.5949898,
+  "archived_version": 1
 }

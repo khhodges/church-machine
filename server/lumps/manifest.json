@@ -1999,35 +1999,6 @@
     "issue_n": 1
   },
   {
-    "token": "4ea370af",
-    "abstraction": "Abstraction:  NoteGAssembly",
-    "filename": "NoteGAssembly.1.f2e2eb3e.lump",
-    "sidecar_file": "NoteGAssembly.1.f2e2eb3e.json",
-    "lump_size": 256,
-    "cw": 141,
-    "cc": 1,
-    "author": "",
-    "version": "2026.08.21",
-    "lump_version": 1,
-    "compiled_at": 1787330635.5949898,
-    "methods": [
-      {
-        "name": "run",
-        "offset": 0,
-        "length": 141
-      }
-    ],
-    "grants": [
-      "E"
-    ],
-    "binary_hash": "8d8fd4d6fe8851e9e3aa94d7fc0c9120fc2e6265ca0ab68d7166beb1948340b6",
-    "petname": "",
-    "issue_number": 1,
-    "identity_hash": "1ef05f4ad1e97e63fdce23593edff27a02263e10c8eb13c3e7291f131c996058",
-    "dot_name": "NoteGAssembly",
-    "issue_n": 1
-  },
-  {
     "token": "c7425d6c",
     "abstraction": "CapabilityTest",
     "ns_slot": 10,
@@ -2113,6 +2084,35 @@
     "issue_number": 1,
     "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f",
     "dot_name": "Adder",
+    "issue_n": 1
+  },
+  {
+    "token": "4ea370af",
+    "abstraction": "Abstraction:  NoteGAssembly",
+    "filename": "NoteGAssembly.1.f2e2eb3e.lump",
+    "sidecar_file": "NoteGAssembly.1.f2e2eb3e.json",
+    "lump_size": 256,
+    "cw": 141,
+    "cc": 1,
+    "author": "",
+    "version": "2026.08.22",
+    "lump_version": 2,
+    "compiled_at": 1787428755.1996982,
+    "methods": [
+      {
+        "name": "run",
+        "offset": 0,
+        "length": 141
+      }
+    ],
+    "grants": [
+      "E"
+    ],
+    "binary_hash": "8d8fd4d6fe8851e9e3aa94d7fc0c9120fc2e6265ca0ab68d7166beb1948340b6",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "1ef05f4ad1e97e63fdce23593edff27a02263e10c8eb13c3e7291f131c996058",
+    "dot_name": "NoteGAssembly",
     "issue_n": 1
   }
 ]
