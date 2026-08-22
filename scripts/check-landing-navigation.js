@@ -20,6 +20,11 @@ if (categoryMatches.length !== categories.length) {
 if ((menu.match(/class="[^"]*\bham-category\b[^"]*"/g) || []).length !== 9) {
   throw new Error('hamburger must have exactly the eight landing-card categories');
 }
+if (!landing.includes('id="landingVersion"') ||
+    !landing.includes("fetch('/api/boot-id'") ||
+    !landing.includes("payload.version")) {
+  throw new Error('landing page is missing runtime version wiring');
+}
 if (!shell.includes('_initLandingMenuRecency()') ||
     !shell.includes('_landingDestinationFromMenuItem') ||
     !landing.includes('church_recent_menu_destinations') ||

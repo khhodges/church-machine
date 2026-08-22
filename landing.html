@@ -37,10 +37,21 @@
             font-weight: 700;
             color: #daa520;
             letter-spacing: 0.01em;
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            flex-wrap: wrap;
         }
         .site-title .lambda {
             font-size: 1.3rem;
             margin-right: 6px;
+        }
+        .site-version {
+            color: #a88a3a;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
         }
 
         /* ── Nav bar ────────────────────────────────────────────── */
@@ -224,7 +235,10 @@
     </style>
 </head>
 <body>
-    <div class="site-title"><span class="lambda">λ</span> Church Machine</div>
+    <div class="site-title">
+        <span><span class="lambda">λ</span> Church Machine</span>
+        <span class="site-version" id="landingVersion" aria-live="polite">Version unavailable</span>
+    </div>
     <nav class="ide-nav">
         <div class="nav-col continue-nav-col" id="continueNavCol" style="display:none;">
             <a class="nav-col-header continue-nav-link" id="continueNavLink" href="/simulator/" aria-label="Continue to your most recent IDE destination">CONTINUE</a>
@@ -366,6 +380,26 @@
     </footer>
     <script>
         (function() {
+            const versionTarget = document.getElementById('landingVersion');
+            if (versionTarget) {
+                fetch('/api/boot-id', { headers: { 'Accept': 'application/json' } })
+                    .then(function(response) {
+                        if (!response.ok) throw new Error('version request failed');
+                        return response.json();
+                    })
+                    .then(function(payload) {
+                        const version = payload && typeof payload.version === 'string'
+                            ? payload.version.trim()
+                            : '';
+                        if (version && version.toLowerCase() !== 'unknown') {
+                            versionTarget.textContent = 'Version ' + version;
+                        }
+                    })
+                    .catch(function() {
+                        // Keep the readable, non-version placeholder on failure.
+                    });
+            }
+
             const storageKey = 'church_public_landing_card_order';
             const grid = document.querySelector('.cards');
             if (!grid) return;
