@@ -134,6 +134,177 @@ header h1 a:hover {
     height: 100%;
     box-sizing: border-box;
 }
+.ti60-connect-tabs {
+    display: flex;
+    gap: 0.35rem;
+    margin: -0.15rem 0 1.1rem;
+    padding-bottom: 0.45rem;
+    border-bottom: 1px solid rgba(96,165,250,0.2);
+}
+.ti60-connect-tab {
+    padding: 0.48rem 0.85rem;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--text-secondary, #9ca3af);
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+.ti60-connect-tab:hover {
+    color: var(--text-primary, #eaeaea);
+    background: rgba(96,165,250,0.08);
+}
+.ti60-connect-tab-active {
+    border-color: rgba(96,165,250,0.4);
+    background: rgba(96,165,250,0.13);
+    color: #93c5fd;
+}
+.ti60-connect-view, .ti60-configuration-view { min-width: 0; }
+.ti60-configuration-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid rgba(167,139,250,0.3);
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(167,139,250,0.1), rgba(96,165,250,0.06));
+}
+.ti60-configuration-eyebrow {
+    margin-bottom: 0.25rem;
+    color: #a78bfa;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+}
+.ti60-configuration-header h2 {
+    margin: 0 0 0.3rem;
+    color: var(--text-primary, #eaeaea);
+    font-size: 1.05rem;
+}
+.ti60-configuration-header p {
+    max-width: 690px;
+    margin: 0;
+    color: var(--text-secondary, #a0a0a0);
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+.ti60-configuration-status, .ti60-config-gallery-count {
+    flex: 0 0 auto;
+    padding: 0.28rem 0.55rem;
+    border: 1px solid rgba(63,185,80,0.35);
+    border-radius: 4px;
+    color: #86efac;
+    font-size: 0.68rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.ti60-configuration-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.7rem;
+    margin-bottom: 1rem;
+}
+.ti60-config-card {
+    min-width: 0;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-left: 3px solid;
+    border-radius: 7px;
+    background: rgba(8,10,20,0.55);
+}
+.ti60-config-card-jtag { border-left-color: #f0c674; }
+.ti60-config-card-uart { border-left-color: #60a5fa; }
+.ti60-config-card-bridge { border-left-color: #a78bfa; }
+.ti60-config-card-title {
+    margin-bottom: 0.55rem;
+    color: var(--text-primary, #eaeaea);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+.ti60-config-card dl { margin: 0; }
+.ti60-config-card dl > div {
+    display: grid;
+    grid-template-columns: 5.2rem minmax(0, 1fr);
+    gap: 0.45rem;
+    padding: 0.24rem 0;
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+.ti60-config-card dt {
+    color: #7c8ca5;
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+.ti60-config-card dd {
+    min-width: 0;
+    margin: 0;
+    color: #bac4d4;
+    font-size: 0.72rem;
+    line-height: 1.35;
+}
+.ti60-config-card code {
+    padding: 0.04rem 0.2rem;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.07);
+    color: #c4b5fd;
+    font-family: monospace;
+    font-size: 0.92em;
+}
+.ti60-config-gallery {
+    padding: 0.9rem 1rem 1rem;
+    border: 1px solid rgba(96,165,250,0.25);
+    border-radius: 8px;
+    background: rgba(96,165,250,0.045);
+}
+.ti60-config-gallery-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.8rem;
+    margin-bottom: 0.75rem;
+}
+.ti60-config-gallery-head h3 {
+    margin: 0 0 0.25rem;
+    color: var(--text-primary, #eaeaea);
+    font-size: 0.92rem;
+}
+.ti60-config-gallery-head p {
+    margin: 0;
+    color: var(--text-secondary, #a0a0a0);
+    font-size: 0.74rem;
+}
+.ti60-config-gallery-count {
+    border-color: rgba(96,165,250,0.35);
+    color: #93c5fd;
+}
+.ti60-config-gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.65rem;
+}
+.ti60-config-image-card {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    background: rgba(8,10,20,0.7);
+}
+.ti60-config-image-card img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: contain;
+    background: #0a0e17;
+}
+.ti60-config-image-card figcaption {
+    padding: 0.38rem 0.45rem;
+    color: #b6c2d4;
+    font-size: 0.68rem;
+    line-height: 1.2;
+}
 
 .ti60-connect-header { margin-bottom: 1.25rem; }
 
@@ -569,6 +740,11 @@ header h1 a:hover {
 }
 
 @media (max-width: 540px) {
+    .ti60-configuration-header { flex-direction: column; }
+    .ti60-configuration-status { align-self: flex-start; }
+    .ti60-configuration-grid { grid-template-columns: 1fr; }
+    .ti60-config-gallery-head { flex-direction: column; }
+    .ti60-config-gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .ti60-connection-map-header { flex-direction: column; }
     .ti60-connection-map-rule { align-self: flex-start; }
     .ti60-connection-map-grid { grid-template-columns: 1fr; }

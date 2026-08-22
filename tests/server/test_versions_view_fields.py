@@ -75,3 +75,22 @@ def test_connect_view_clarifies_jtag_and_usb_uart_connections():
     assert 'often <code>COM3</code>' in index
     assert 'choose the <strong>3rd entry</strong>' in index
     assert 'class="ti60-active-port-label">Trace port' in index
+
+
+def test_connect_view_has_configuration_tab_and_reference_images():
+    index_path = os.path.join(ROOT, 'simulator', 'index.html')
+    with open(index_path, encoding='utf-8') as handle:
+        index = handle.read()
+    assert 'id="ti60ConnectTab-configuration"' in index
+    assert 'id="ti60ConfigurationView"' in index
+    assert 'Attached reference images' in index
+    assert 'image_1787412016939.png' in index
+    assert 'image_1787397327180.png' in index
+
+
+def test_attached_asset_route_serves_reference_images_only():
+    client = app.test_client()
+    response = client.get('/attached_assets/image_1787412016939.png')
+    assert response.status_code == 200
+    assert response.mimetype == 'image/png'
+    assert client.get('/attached_assets/image_1787412016939.txt').status_code == 404

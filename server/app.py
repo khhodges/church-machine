@@ -3386,6 +3386,17 @@ def simulator_static(path):
     filepath = os.path.join(SIMULATOR_DIR, path)
     return _serve_file(filepath, os.path.basename(path))
 
+_ATTACHED_ASSET_EXTENSIONS = {
+    ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg",
+}
+
+@app.route("/attached_assets/<path:path>")
+def attached_asset_static(path):
+    """Serve browser-safe user-provided image assets used by IDE references."""
+    if os.path.splitext(path)[1].lower() not in _ATTACHED_ASSET_EXTENSIONS:
+        return make_response("Not found", 404)
+    return send_from_directory(os.path.join(BASE_DIR, "attached_assets"), path)
+
 _RV32_ALLOWED_EXTENSIONS = {
     ".html", ".js", ".css", ".json", ".png", ".jpg", ".jpeg",
     ".gif", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".eot",

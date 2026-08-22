@@ -1,3 +1,25 @@
+function switchTi60ConnectTab(tab) {
+    const isConfiguration = tab === 'configuration';
+    const connection = document.getElementById('ti60ConnectionView');
+    const configuration = document.getElementById('ti60ConfigurationView');
+    const connectionTab = document.getElementById('ti60ConnectTab-connection');
+    const configurationTab = document.getElementById('ti60ConnectTab-configuration');
+    if (!connection || !configuration) return;
+    connection.style.display = isConfiguration ? 'none' : '';
+    configuration.style.display = isConfiguration ? '' : 'none';
+    if (connectionTab) {
+        connectionTab.classList.toggle('ti60-connect-tab-active', !isConfiguration);
+        connectionTab.setAttribute('aria-selected', String(!isConfiguration));
+    }
+    if (configurationTab) {
+        configurationTab.classList.toggle('ti60-connect-tab-active', isConfiguration);
+        configurationTab.setAttribute('aria-selected', String(isConfiguration));
+    }
+    try { localStorage.setItem('ti60ConnectTab', isConfiguration ? 'configuration' : 'connection'); } catch (_) {}
+}
+
+window.switchTi60ConnectTab = switchTi60ConnectTab;
+
 window.Ti60Connect = (function () {
     const BAUD           = 57600;
     const STEPS          = ['uart', 'callhome', 'register', 'release'];
@@ -905,6 +927,11 @@ window.Ti60Connect = (function () {
     }
 
     function onTabOpen() {
+        let savedTab = 'connection';
+        try { savedTab = localStorage.getItem('ti60ConnectTab') || 'connection'; } catch (_) {}
+        const requestedTab = new URLSearchParams(window.location.search).get('connectTab');
+        if (requestedTab === 'connection' || requestedTab === 'configuration') savedTab = requestedTab;
+        switchTi60ConnectTab(savedTab === 'configuration' ? 'configuration' : 'connection');
         _updateForgetBtnVisibility();
 
         const savedUrl = localStorage.getItem('ti60BridgeUrl');

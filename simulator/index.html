@@ -1403,6 +1403,15 @@
             </div>
         </div>
         <div id="ti60ConnectPanel" style="display:none;" class="ti60-connect-panel">
+            <div class="ti60-connect-tabs" role="tablist" aria-label="Wukong connection sections">
+                <button class="ti60-connect-tab ti60-connect-tab-active" id="ti60ConnectTab-connection"
+                        role="tab" aria-selected="true" aria-controls="ti60ConnectionView"
+                        onclick="switchTi60ConnectTab('connection')">&#x1F50C; Connection</button>
+                <button class="ti60-connect-tab" id="ti60ConnectTab-configuration"
+                        role="tab" aria-selected="false" aria-controls="ti60ConfigurationView"
+                        onclick="switchTi60ConnectTab('configuration')">&#x2699;&#xFE0F; Configuration</button>
+            </div>
+            <div id="ti60ConnectionView" class="ti60-connect-view">
 
             <!-- ── Download & Flash card ──────────────────────────────── -->
             <div id="ti60DlFlashCard" class="ti60-dl-flash-card">
@@ -2192,6 +2201,86 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
                     <button class="ti60-success-view-btn" onclick="switchView('editor')">Write your first program &#x2192;</button>
                 </div>
             </div><!-- /ti60PolBody -->
+            </div><!-- /ti60ConnectionView -->
+            <div id="ti60ConfigurationView" class="ti60-configuration-view" style="display:none;" role="tabpanel" aria-labelledby="ti60ConnectTab-configuration">
+                <div class="ti60-configuration-header">
+                    <div>
+                        <div class="ti60-configuration-eyebrow">WUKONG CONNECTION PROFILE</div>
+                        <h2>Configuration</h2>
+                        <p>Keep the programming link, trace bridge, and board settings together. Use these values when configuring the host machine or diagnosing a connection.</p>
+                    </div>
+                    <span class="ti60-configuration-status">&#x2705; Reference profile</span>
+                </div>
+                <div class="ti60-configuration-grid">
+                    <article class="ti60-config-card ti60-config-card-jtag">
+                        <div class="ti60-config-card-title">&#x1F4BB; JTAG programming</div>
+                        <dl>
+                            <div><dt>Purpose</dt><dd>Load the FPGA <code>.bit</code> image</dd></div>
+                            <div><dt>Tool</dt><dd>Vivado Hardware Manager or openFPGALoader</dd></div>
+                            <div><dt>Trace data</dt><dd>Not carried over JTAG</dd></div>
+                        </dl>
+                    </article>
+                    <article class="ti60-config-card ti60-config-card-uart">
+                        <div class="ti60-config-card-title">&#x1F4E1; USB-UART bridge</div>
+                        <dl>
+                            <div><dt>Baud</dt><dd><code>57600 8N1</code></dd></div>
+                            <div><dt>Linux</dt><dd><code>/dev/ttyUSB*</code> or <code>/dev/ttyACM*</code></dd></div>
+                            <div><dt>Windows</dt><dd>Select the assigned <code>COM</code> port</dd></div>
+                        </dl>
+                    </article>
+                    <article class="ti60-config-card ti60-config-card-bridge">
+                        <div class="ti60-config-card-title">&#x1F527; Bridge service</div>
+                        <dl>
+                            <div><dt>Script</dt><dd><code>hardware/wukong_bridge.py</code></dd></div>
+                            <div><dt>IDE port</dt><dd><code>8766</code></dd></div>
+                            <div><dt>Responsibilities</dt><dd>Trace, commands, uploads, and acknowledgements</dd></div>
+                        </dl>
+                    </article>
+                </div>
+                <section class="ti60-config-gallery" aria-labelledby="ti60ConfigGalleryTitle">
+                    <div class="ti60-config-gallery-head">
+                        <div>
+                            <h3 id="ti60ConfigGalleryTitle">Attached reference images</h3>
+                            <p>Recent IDE and Wukong views for matching the expected connection, status, and execution states.</p>
+                        </div>
+                        <span class="ti60-config-gallery-count">8 references</span>
+                    </div>
+                    <div class="ti60-config-gallery-grid">
+                        <figure class="ti60-config-image-card">
+                            <img src="/attached_assets/image_1787412016939.png" alt="Versions overview with IDE and GitHub status" loading="lazy">
+                            <figcaption>Versions overview</figcaption>
+                        </figure>
+                        <figure class="ti60-config-image-card">
+                            <img src="/attached_assets/image_1787411450703.png" alt="Connect Wukong landing card" loading="lazy">
+                            <figcaption>Connect Wukong entry</figcaption>
+                        </figure>
+                        <figure class="ti60-config-image-card">
+                            <img src="/attached_assets/image_1787400066450.png" alt="Wukong board controls including Step, Run, upload, and Reboot" loading="lazy">
+                            <figcaption>Board controls</figcaption>
+                        </figure>
+                        <figure class="ti60-config-image-card">
+                            <img src="/attached_assets/image_1787400219123.png" alt="Wukong dashboard actions menu" loading="lazy">
+                            <figcaption>Dashboard actions</figcaption>
+                        </figure>
+                        <figure class="ti60-config-image-card">
+                            <img src="/attached_assets/image_1787400544224.png" alt="Pipeline health indicators and status cards" loading="lazy">
+                            <figcaption>Pipeline health</figcaption>
+                        </figure>
+                        <figure class="ti60-config-image-card">
+                            <img src="/attached_assets/image_1787401132045.png" alt="Bridge, board, boot, and server status cards" loading="lazy">
+                            <figcaption>Connection status</figcaption>
+                        </figure>
+                        <figure class="ti60-config-image-card">
+                            <img src="/attached_assets/image_1787401901279.png" alt="Hardware trace panel showing boot sentinel status" loading="lazy">
+                            <figcaption>Hardware trace</figcaption>
+                        </figure>
+                        <figure class="ti60-config-image-card">
+                            <img src="/attached_assets/image_1787397327180.png" alt="Execution workspace with code listing and trace events" loading="lazy">
+                            <figcaption>Execution workspace</figcaption>
+                        </figure>
+                    </div>
+                </section>
+            </div>
         </div>
         <div id="buildDetailsPanel" style="display:none;" class="build-details-panel">
             <div class="build-details-status-bar">
