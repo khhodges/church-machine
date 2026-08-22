@@ -312,3 +312,29 @@ def test_versions_view_renders_release_candidate_and_build_action():
     assert 'id="versionsReleaseBody"' in index
     assert "_renderBitstreamRelease(bitstreamLog && bitstreamLog.release)" in run
     assert "Review &amp; release in Build Approval" in run
+
+
+def test_versions_view_includes_github_push_action():
+    """GitHub differences expose the explicit push action and server route."""
+    index_path = os.path.join(ROOT, "simulator", "index.html")
+    run_path = os.path.join(ROOT, "simulator", "app-run.js")
+    app_path = os.path.join(ROOT, "server", "app.py")
+    with open(index_path, encoding="utf-8") as handle:
+        index = handle.read()
+    with open(run_path, encoding="utf-8") as handle:
+        run = handle.read()
+    with open(app_path, encoding="utf-8") as handle:
+        app = handle.read()
+
+    assert 'id="versionsGithubBody"' in index
+    assert "versions-github-push-btn" in run
+    assert "fetch('/api/github/push'" in run
+    assert '@app.route("/api/github/push", methods=["POST"])' in app
+
+
+def test_github_push_route_fails_closed_without_server_pat(client, monkeypatch):
+    """The UI route must not attempt a push when its server credential is absent."""
+    monkeypatch.setenv("GITHUB_PAT", "")
+    response = client.post("/api/github/push")
+    assert response.status_code == 503
+    assert response.get_json()["success"] is False

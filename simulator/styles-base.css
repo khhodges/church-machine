@@ -1550,6 +1550,21 @@ details[open] .ti60-advanced-summary::before { transform: rotate(90deg); }
 .versions-diff summary { cursor: pointer; color: #d9b44a; font-size: 0.85em; }
 .versions-diff-file { font-size: 0.78em; color: #9fb0c8; padding-left: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .versions-diff .versions-note b { color: #c7d3e6; }
+.versions-github-push-btn {
+  display: block;
+  margin-top: 0.65rem;
+  background: #2f5d3a;
+  color: #d9f4df;
+  border: 1px solid #4f9962;
+  border-radius: 5px;
+  padding: 0.32rem 0.72rem;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.versions-github-push-btn:hover { background: #3a7549; }
+.versions-github-push-btn:disabled { opacity: 0.65; cursor: wait; }
+.versions-github-push-error { color: #f0a0a0; }
 
 .versions-card-wide {
     grid-column: span 2;

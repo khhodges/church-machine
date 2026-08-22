@@ -11683,6 +11683,7 @@ const VersionsView = {
         const ide = status ? status.ide_version : null;
         const diff = this._lastDiff;
         let badge;
+        let pushButton = '';
         if (!this._isGitSha(ide)) {
             badge = this._badge('unknown', 'IDE version unknown');
         } else if ((diff && diff.in_sync) || ide.startsWith(c.sha) || c.sha.startsWith(ide)) {
@@ -11698,15 +11699,54 @@ const VersionsView = {
         } else {
             badge = this._badge('warn', 'Different commit than the IDE');
         }
+        if (diff && diff.in_sync === false) {
+            pushButton =
+                '<button class="versions-github-push-btn" onclick="VersionsView.pushToGithub()" ' +
+                'title="Push this IDE commit to the GitHub mirrors">Git Push</button>';
+        }
         const repoLine = gh.repo
             ? `<div class="versions-note"><a href="https://github.com/${this._esc(gh.repo)}" target="_blank" rel="noopener">${this._esc(gh.repo)}</a></div>`
             : '';
         el.innerHTML =
             repoLine +
             `<div class="versions-value"><a href="${this._esc(c.url)}" target="_blank" rel="noopener"><code>${this._esc(c.sha)}</code></a></div>` +
-            badge +
+            badge + pushButton +
             `<div class="versions-note">${this._esc(c.message)}<br>` +
             `${this._esc(c.author)} &middot; ${this._esc(this._age(c.date) || c.date)}</div>`;
+    },
+
+    async pushToGithub() {
+        const button = document.querySelector('.versions-github-push-btn');
+        if (!confirm('Push the current IDE commit to both GitHub mirrors?\n\nThis force-updates the mirrors to match this IDE.')) {
+            return;
+        }
+        if (button) {
+            button.disabled = true;
+            button.textContent = 'Pushing…';
+        }
+        try {
+            const response = await fetch('/api/github/push', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'GitHub push failed');
+            }
+            this._lastDiff = null;
+            await this.refresh(true);
+        } catch (error) {
+            if (button) {
+                button.disabled = false;
+                button.textContent = 'Git Push';
+            }
+            const message = error && error.message ? error.message : 'GitHub push failed';
+            const note = document.createElement('div');
+            note.className = 'versions-note versions-github-push-error';
+            note.textContent = message;
+            const body = document.getElementById('versionsGithubBody');
+            if (body) body.appendChild(note);
+        }
     },
 
     _renderBitstream(bs, status) {

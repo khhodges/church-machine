@@ -1109,34 +1109,20 @@ def report_sync_lfs_now():
         logging.exception("Error in /report/sync-lfs-now")
         return jsonify({"success": False, "message": str(exc)}), 500
 
-@app.route("/internal/git-sync")
-def internal_git_sync():
-    """Trigger an immediate code push to both GitHub repos (non-LFS).
-
-    Pushes to:
-      • khhodges/s-ide-v1      (S-IDE v1 simplified entry-point IDE)
-      • khhodges/church-machine (full Church Machine source)
-
-    Requires Authorization: Bearer <REPORT_TOKEN> header or ?token=<REPORT_TOKEN>.
-
-    Returns JSON: {success, returncode, output, sha, branch, repos}
-      repos: {"s-ide-v1": "ok"|"fail", "church-machine": "ok"|"fail"}
-    """
+def _execute_git_sync():
+    """Run the configured non-LFS GitHub mirror push and return its result."""
     import subprocess
-    from daily_report import check_report_auth as _check_auth
-    if not _check_auth(request):
-        return jsonify({"error": "Unauthorized — supply token via Authorization header or ?token="}), 401
 
     pat = os.environ.get("GITHUB_PAT", "").strip()
     if not pat:
-        return jsonify({"success": False, "message": "GITHUB_PAT secret is not set"}), 503
+        return {"success": False, "message": "GITHUB_PAT secret is not set"}, 503
 
     script = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         "scripts", "sync-to-github.sh",
     )
     if not os.path.isfile(script):
-        return jsonify({"success": False, "message": "sync-to-github.sh not found"}), 500
+        return {"success": False, "message": "sync-to-github.sh not found"}, 500
 
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     try:
@@ -1175,17 +1161,46 @@ def internal_git_sync():
             "Manual git-sync triggered: success=%s sha=%s repos=%s",
             success, sha, repos,
         )
-        return jsonify({
+        return {
             "success": success,
             "returncode": result.returncode,
             "output": output[-2000:],
             "sha": sha,
             "branch": branch,
             "repos": repos,
-        })
+        }, 200
     except Exception as exc:
-        logging.exception("Error in /internal/git-sync")
-        return jsonify({"success": False, "message": str(exc)}), 500
+        logging.exception("Error running GitHub sync")
+        return {"success": False, "message": str(exc)}, 500
+
+
+@app.route("/internal/git-sync")
+def internal_git_sync():
+    """Trigger an immediate code push to both GitHub repos (non-LFS).
+
+    Pushes to:
+      • khhodges/s-ide-v1      (S-IDE v1 simplified entry-point IDE)
+      • khhodges/church-machine (full Church Machine source)
+
+    Requires Authorization: Bearer <REPORT_TOKEN> header or ?token=<REPORT_TOKEN>.
+    """
+    from daily_report import check_report_auth as _check_auth
+    if not _check_auth(request):
+        return jsonify({"error": "Unauthorized — supply token via Authorization header or ?token="}), 401
+    payload, status = _execute_git_sync()
+    return jsonify(payload), status
+
+
+@app.route("/api/github/push", methods=["POST"])
+def api_github_push():
+    """Run an explicit UI-requested push without exposing the GitHub PAT.
+
+    The browser action is confirmed in the UI. The server keeps the PAT
+    server-side and reuses the same mirror script as the authenticated
+    internal endpoint.
+    """
+    payload, status = _execute_git_sync()
+    return jsonify(payload), status
 
 
 @app.route("/report/task-run", methods=["POST"])
