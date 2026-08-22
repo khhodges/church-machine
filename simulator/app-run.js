@@ -11840,7 +11840,7 @@ const VersionsView = {
             `<div class="versions-value">${sourceVersion}${sourceCommit}</div>` +
             `<div class="versions-note">${this._esc(release.reason || 'Build required.')}</div>` +
             itemHtml + errorNote +
-            '<button class="versions-release-btn" onclick="switchBuilderViewTab(\'build\')">Review &amp; release in Build Approval &rarr;</button>';
+            '<button class="versions-release-btn" onclick="switchBuilderViewTab(\'build\')">&#x1F528; Open Build Approval &amp; review comments &rarr;</button>';
     },
 
     _renderBitstreamLog(log) {

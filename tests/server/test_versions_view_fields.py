@@ -63,3 +63,15 @@ def test_status_remains_readonly_with_new_fields():
     d2 = client.get('/hardware/wukong/status').get_json()
     assert d1['expected_build_version'] == d2['expected_build_version']
     assert d1['min_tu_version'] == d2['min_tu_version']
+
+
+def test_connect_view_clarifies_jtag_and_usb_uart_connections():
+    index_path = os.path.join(ROOT, 'simulator', 'index.html')
+    with open(index_path, encoding='utf-8') as handle:
+        index = handle.read()
+    assert 'id="ti60ConnectionMapTitle"' in index
+    assert 'JTAG — programming' in index
+    assert 'USB-UART — trace &amp; commands' in index
+    assert 'often <code>COM3</code>' in index
+    assert 'choose the <strong>3rd entry</strong>' in index
+    assert 'class="ti60-active-port-label">Trace port' in index

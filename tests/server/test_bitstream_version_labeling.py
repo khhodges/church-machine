@@ -311,7 +311,7 @@ def test_versions_view_renders_release_candidate_and_build_action():
 
     assert 'id="versionsReleaseBody"' in index
     assert "_renderBitstreamRelease(bitstreamLog && bitstreamLog.release)" in run
-    assert "Review &amp; release in Build Approval" in run
+    assert "Open Build Approval &amp; review comments" in run
 
 
 def test_versions_view_includes_github_push_action():

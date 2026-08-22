@@ -14,6 +14,7 @@ const BuildApprovalView = {
     _buildRunning: false,
     _buildTimer: null,
     _lastMap: null,
+    _release: null,
     AUTO_REFRESH_MS: 30000,
 
     onTabClose() {
@@ -84,6 +85,7 @@ const BuildApprovalView = {
         if (status) status.textContent = tok ? '✅ ready' : '';
 
         this.refresh(false);
+        this._loadReleaseContext();
         this._checkBuildStatus();
         if (!this._timer) {
             this._timer = setInterval(() => {
@@ -111,6 +113,7 @@ const BuildApprovalView = {
                 if (body) body.innerHTML =
                     '<div class="ba-error">🔑 Paste your <strong>REPORT_TOKEN</strong> into the ' +
                     '"Build token" field above to load the NS map.</div>';
+                this._renderIssueComments(null);
                 return;
             }
             if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -119,9 +122,11 @@ const BuildApprovalView = {
             // Store the CSRF nonce for the build-start call.
             if (data.build_nonce) this._buildNonce = data.build_nonce;
             this._render(data);
+            this._renderIssueComments(data);
             this._updateApproveBtn();
         } catch (e) {
             if (body) body.innerHTML = `<div class="ba-error">Failed to load NS map: ${this._esc(e.message)}</div>`;
+            this._renderIssueComments(null);
         } finally {
             this._inFlight = false;
             if (btn) btn.disabled = false;
@@ -162,6 +167,97 @@ const BuildApprovalView = {
         }
 
         body.innerHTML = html || '<div class="ba-empty">No NS map data available.</div>';
+    },
+
+    async _loadReleaseContext() {
+        const el = document.getElementById('baReleaseContext');
+        if (el && !this._release) {
+            el.innerHTML = '<div class="ba-loading">Loading pending release comments…</div>';
+        }
+        try {
+            const res = await fetch('/api/bitstream-versions');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            this._release = data && data.release ? data.release : null;
+        } catch (e) {
+            this._release = { error: 'Could not load release context: ' + e.message };
+        }
+        this._renderReleaseContext();
+    },
+
+    _renderReleaseContext() {
+        const el = document.getElementById('baReleaseContext');
+        if (!el) return;
+        const release = this._release;
+        if (!release || release.error) {
+            el.innerHTML = `<div class="ba-context-head"><strong>📝 Pending release comments</strong></div>` +
+                `<div class="ba-context-note">${this._esc((release && release.error) || 'Release context is unavailable.')}</div>`;
+            return;
+        }
+        if (!release.pending) {
+            el.innerHTML = `<div class="ba-context-head"><strong>📝 Pending release comments</strong>${this._badge('ok', 'Current')}</div>` +
+                `<div class="ba-context-note">${this._esc(release.reason || 'No pending hardware changes.')}</div>`;
+            return;
+        }
+        const items = Array.isArray(release.items) ? release.items : [];
+        const itemHtml = items.length
+            ? `<div class="ba-comment-list">${items.slice(0, 8).map(item => {
+                const files = Array.isArray(item.files) ? item.files : [];
+                const fileNote = files.length
+                    ? `<span class="ba-comment-files">${files.length} hardware file${files.length === 1 ? '' : 's'}</span>`
+                    : '';
+                return `<div class="ba-comment-row"><code>${this._esc(item.commit || 'unknown')}</code>` +
+                    `<span>${this._esc(item.message || 'Hardware source change')}</span>${fileNote}</div>`;
+            }).join('')}</div>`
+            : '<div class="ba-context-note">A release is pending, but no source-change comments are available.</div>';
+        el.innerHTML =
+            `<div class="ba-context-head"><strong>📝 Pending release comments</strong>${this._badge('warn', 'Review required')}</div>` +
+            `<div class="ba-context-note">${this._esc(release.reason || 'Build required.')}</div>` +
+            itemHtml;
+    },
+
+    _renderIssueComments(data) {
+        const el = document.getElementById('baIssueComments');
+        if (!el) return;
+        if (!data || !data.tiers) {
+            el.innerHTML = '<div class="ba-context-head"><strong>⚠️ Approval issues &amp; comments</strong></div>' +
+                '<div class="ba-context-note">Paste the build token above to load protected validation comments.</div>';
+            return;
+        }
+        const tierLabels = {
+            bootstrap: 'Bootstrap',
+            resident: 'Resident',
+            lazy: 'Lazy-load',
+            unused: 'Unused / gap',
+        };
+        const issues = [];
+        for (const [tier, slots] of Object.entries(data.tiers)) {
+            for (const slot of (slots || [])) {
+                for (const check of (slot.checks || [])) {
+                    if (check.ok === false || check.warn) {
+                        issues.push({ tier, slot, check });
+                    }
+                }
+            }
+        }
+        if (!issues.length) {
+            el.innerHTML = `<div class="ba-context-head"><strong>⚠️ Approval issues &amp; comments</strong>${this._badge('ok', 'No issues')}</div>` +
+                '<div class="ba-context-note">All current validation checks pass without warnings.</div>';
+            return;
+        }
+        const issueHtml = issues.map(({ tier, slot, check }) => {
+            const blocking = check.ok === false && (tier === 'bootstrap' || tier === 'resident');
+            const severity = blocking ? 'bad' : 'warn';
+            const label = blocking ? 'Blocks build' : 'Review';
+            const location = `${tierLabels[tier] || tier} · slot ${slot.slot} · ${slot.name || 'unnamed'}`;
+            return `<div class="ba-issue-row ba-issue-${severity}">` +
+                `${this._badge(severity, label)} <b>${this._esc(location)}</b> — ${this._esc(check.label || 'validation check')}` +
+                `<div class="ba-issue-detail">${this._esc(check.detail || 'No additional comment was provided.')}</div></div>`;
+        }).join('');
+        el.innerHTML =
+            `<div class="ba-context-head"><strong>⚠️ Approval issues &amp; comments</strong>${this._badge('warn', `${issues.length} to review`)}</div>` +
+            '<div class="ba-context-note">Blocking items prevent Freeze and Build. Lazy-load and unused-slot items remain visible for review but do not necessarily block a hardware build.</div>' +
+            `<div class="ba-issue-list">${issueHtml}</div>`;
     },
 
     _renderRow(s) {

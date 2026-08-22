@@ -166,7 +166,7 @@
         @media (max-width:600px) { .r1-step-card { flex-direction:column; } .r1-step-action { width:100%; align-items:stretch; } .r1-step-btn { width:100%; text-align:center; } }
         /* ── Build Approval panel ────────────────────────────────────── */
         .ba-panel { padding:0; overflow-y:auto; max-height:calc(100vh - 120px); }
-        .ba-panel > .ba-header, .ba-panel > .ba-toolbar, .ba-panel > .ba-map-body, .ba-panel > .ba-build-log-wrap { padding-left:1.4rem; padding-right:1.4rem; }
+        .ba-panel > .ba-header, .ba-panel > .ba-toolbar, .ba-panel > .ba-release-context, .ba-panel > .ba-issue-comments, .ba-panel > .ba-map-body, .ba-panel > .ba-build-log-wrap { padding-left:1.4rem; padding-right:1.4rem; }
         .ba-panel > .ba-header { padding-top:1rem; }
         .ba-token-row { display:flex; align-items:center; gap:0.6rem; padding:0.45rem 1.4rem; background:#0a0e17; border-bottom:1px solid #1c1f35; }
         .ba-token-row label { font-size:0.78rem; color:#7ec8e3; white-space:nowrap; user-select:none; }
@@ -239,6 +239,18 @@
         .ba-size-budget { display:flex; flex-wrap:wrap; gap:2px 6px; line-height:1.25; }
         .ba-size-budget b { color:#e0e0f0; width:100%; }
         .ba-size-unavailable { color:#666; font-style:italic; }
+        .ba-release-context, .ba-issue-comments { margin:0.6rem 0; padding-top:0.65rem; padding-bottom:0.65rem; border:1px solid #2a2a4a; border-radius:6px; background:#10101b; }
+        .ba-release-context { border-left:3px solid #daa520; }
+        .ba-issue-comments { border-left:3px solid #7ec8e3; }
+        .ba-context-head { display:flex; align-items:center; gap:0.45rem; color:#e0e0f0; font-size:0.82rem; }
+        .ba-context-note { margin-top:0.35rem; color:#aaa; font-size:0.76rem; line-height:1.45; }
+        .ba-comment-list, .ba-issue-list { margin-top:0.45rem; border-top:1px solid #2a2a4a; }
+        .ba-comment-row, .ba-issue-row { padding:0.42rem 0; border-bottom:1px solid #202038; font-size:0.75rem; line-height:1.4; }
+        .ba-comment-row:last-child, .ba-issue-row:last-child { border-bottom:0; }
+        .ba-comment-row code { color:#7ec8e3; margin-right:0.45rem; }
+        .ba-comment-files { display:inline-block; margin-left:0.45rem; color:#77779a; font-size:0.69rem; }
+        .ba-issue-row b { color:#e0e0f0; }
+        .ba-issue-detail { margin:0.2rem 0 0 0.25rem; color:#b7bed2; }
     </style>
 </head>
 <body>
@@ -1289,7 +1301,7 @@
             <button class="builder-view-tab" id="builderViewTab-lump-resident" onclick="switchBuilderViewTab('lump-resident')" style="display:none;">&#x1F3E0; Resident</button>
             <button class="builder-view-tab active" id="builderViewTab-ti60-connect" onclick="switchBuilderViewTab('ti60-connect')">&#x1F50C; Connect</button>
             <button class="builder-view-tab" id="builderViewTab-versions" onclick="switchBuilderViewTab('versions')">&#x1F9ED; Versions</button>
-            <button class="builder-view-tab" id="builderViewTab-build" onclick="switchBuilderViewTab('build')" title="Build Approval — NS map verification and Vivado synthesis launch">&#x1F528; Build</button>
+            <button class="builder-view-tab" id="builderViewTab-build" onclick="switchBuilderViewTab('build')" title="Build Approval — NS map verification and Vivado synthesis launch">&#x1F528; Build Approval</button>
             <button class="builder-view-tab" id="builderViewTab-testing" onclick="switchBuilderViewTab('testing')" title="FPGA status page — bridge/board/boot state, board controls, and live event log">&#x1F9EA; Testing</button>
         </div>
         <div id="builderView"></div>
@@ -1318,6 +1330,12 @@
                 <button id="baApproveBtn" class="ba-approve-btn" disabled onclick="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.startBuild()">&#x1F528; Build Bitstream</button>
                 <span id="baSnapshotStatus" class="ba-snapshot-status"></span>
             </div>
+            <div id="baReleaseContext" class="ba-release-context">
+                <div class="ba-loading">Loading pending release comments&hellip;</div>
+            </div>
+            <div id="baIssueComments" class="ba-issue-comments">
+                <div class="ba-loading">Loading approval issues&hellip;</div>
+            </div>
             <div id="baMapBody" class="ba-map-body">
                 <div class="ba-loading">Select the &#x1F528; Build tab to load NS map&hellip;</div>
             </div>
@@ -1342,6 +1360,7 @@
             <div class="versions-header">
                 <h2>&#x1F9ED; Versions</h2>
                 <button id="versionsRefreshBtn" class="versions-refresh-btn" onclick="if(typeof VersionsView!=='undefined')VersionsView.refresh(true)">&#x21BB; Refresh</button>
+                <button id="versionsBuildApprovalBtn" class="versions-build-approval-btn" onclick="switchBuilderViewTab('build')" title="Review pending hardware changes, validation issues, and build approval">&#x1F528; Build Approval</button>
                 <button id="versionsAdviceBtn" class="versions-advice-btn" style="display:none;" onclick="if(typeof VersionsView!=='undefined')VersionsView.toggleAdvice()">&#x26A0; Health</button>
                 <span id="versionsLastChecked" class="versions-last-checked"></span>
             </div>
@@ -1417,6 +1436,44 @@
                     </div>
                 </div>
             </div>
+
+            <!-- ── Two physical USB connections ─────────────────────────── -->
+            <section class="ti60-connection-map" aria-labelledby="ti60ConnectionMapTitle">
+                <div class="ti60-connection-map-header">
+                    <div>
+                        <h2 id="ti60ConnectionMapTitle">Two board connections — different jobs</h2>
+                        <p>Programming and live trace use separate interfaces. Use the JTAG connection to load the FPGA, then use the USB-UART connection for the bridge and trace.</p>
+                    </div>
+                    <span class="ti60-connection-map-rule">Do not use JTAG as the trace port</span>
+                </div>
+                <div class="ti60-connection-map-grid">
+                    <article class="ti60-connection-card ti60-connection-jtag">
+                        <div class="ti60-connection-card-top">
+                            <span class="ti60-connection-number">1</span>
+                            <div>
+                                <div class="ti60-connection-card-title">JTAG — programming</div>
+                                <div class="ti60-connection-card-purpose">Loads the <code>.bit</code> file into the FPGA</div>
+                            </div>
+                        </div>
+                        <p>Use Vivado Hardware Manager, openFPGALoader, or another JTAG programmer. This connection programs the board; it does not carry the Church Machine trace stream.</p>
+                        <div class="ti60-connection-detail"><strong>Windows / Mac:</strong> the JTAG cable appears inside Vivado Hardware Manager.</div>
+                        <div class="ti60-connection-detail"><strong>Linux / Chromebook:</strong> openFPGALoader detects the JTAG cable; it is not the COM port selected by the trace bridge.</div>
+                    </article>
+                    <article class="ti60-connection-card ti60-connection-uart">
+                        <div class="ti60-connection-card-top">
+                            <span class="ti60-connection-number">2</span>
+                            <div>
+                                <div class="ti60-connection-card-title">USB-UART — trace &amp; commands</div>
+                                <div class="ti60-connection-card-purpose">Bridge connection for trace, run/step, and upload</div>
+                            </div>
+                        </div>
+                        <p>Run <code>hardware/wukong_bridge.py</code> against this serial port. It carries the live trace packets and the commands sent by the IDE at <code>57600 8N1</code>.</p>
+                        <div class="ti60-connection-detail"><strong>Windows:</strong> often <code>COM3</code>, but the number is assigned by Windows — select the actual USB-UART port shown in Device Manager.</div>
+                        <div class="ti60-connection-detail"><strong>Linux:</strong> usually <code>/dev/ttyUSB*</code> or <code>/dev/ttyACM*</code>. <strong>ChromeOS:</strong> if the FT4232H picker shows four interfaces, choose the <strong>3rd entry</strong> for USB-UART.</div>
+                    </article>
+                </div>
+            </section>
+
             <script>
             (function(){
                 var _watchTimer  = null;
@@ -1666,7 +1723,7 @@
                                 <ol class="sw-list">
                                     <li>Download <code>church_wukong_xc7a100t.bit</code> using the card at the top of this tab</li>
                                     <li>Activate OSS CAD Suite:<br><code>source ~/oss-cad-suite/environment</code></li>
-                                    <li>Confirm the JTAG cable is visible:<br><code>ls /dev/ttyUSB*</code> — expect <code>/dev/ttyUSB0</code></li>
+                                    <li>Confirm the JTAG programmer is visible with <code>openFPGALoader --detect</code> (the JTAG interface is separate from the USB-UART trace port)</li>
                                     <li>Flash the downloaded bitstream:<br><code>openFPGALoader church_wukong_xc7a100t.bit</code><br>
                                         <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">openFPGALoader auto-detects the Artix-7 JTAG cable.</span></li>
                                     <li>Wait for <strong>"Programming done"</strong> — a few seconds</li>
@@ -2034,7 +2091,7 @@ CALLHOME:{"board":"wukong-xc7a100t","uid":"AABBCCDD","nia":0,"boot_ok":1,"fault"
                             <a id="ti60IframeBanner" href="/simulator/" target="_blank" class="ti60-open-tab-btn" style="display:none;">Open in full tab &#x2192;</a>
                         </div>
                         <div id="ti60ActivePortRow" class="ti60-active-port-row" style="display:none;">
-                            <span class="ti60-active-port-label">Active port</span>
+                            <span class="ti60-active-port-label">Trace port</span>
                             <span id="ti60ActivePortValue" class="ti60-active-port-value"></span>
                         </div>
                     </div>
@@ -2053,7 +2110,7 @@ CALLHOME:{"board":"wukong-xc7a100t","uid":"AABBCCDD","nia":0,"boot_ok":1,"fault"
                         <div class="ti60-step-icon">&#x26A1;</div>
                         <div class="ti60-step-body">
                             <div class="ti60-step-title">Connect</div>
-                            <div class="ti60-step-desc">Board found — it said hello over the USB cable</div>
+                            <div class="ti60-step-desc">USB-UART trace link found — the board said hello</div>
                         </div>
                         <div class="ti60-step-status" id="ti60StepStatus-uart">&#x2014;</div>
                     </div>

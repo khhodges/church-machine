@@ -171,6 +171,110 @@ header h1 a:hover {
     line-height: 1.5;
 }
 
+.ti60-connection-map {
+    margin: 0 0 1rem;
+    padding: 0.9rem 1rem 1rem;
+    border: 1px solid rgba(96,165,250,0.28);
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(96,165,250,0.08), rgba(167,139,250,0.04));
+}
+.ti60-connection-map-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.9rem;
+    margin-bottom: 0.8rem;
+}
+.ti60-connection-map-header h2 {
+    margin: 0 0 0.3rem;
+    color: var(--text-primary, #eaeaea);
+    font-size: 0.98rem;
+}
+.ti60-connection-map-header p {
+    max-width: 680px;
+    margin: 0;
+    color: var(--text-secondary, #a0a0a0);
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+.ti60-connection-map-rule {
+    flex: 0 0 auto;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid rgba(251,191,36,0.35);
+    border-radius: 4px;
+    color: #f0c674;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+.ti60-connection-map-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+}
+.ti60-connection-card {
+    min-width: 0;
+    padding: 0.75rem 0.8rem;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-left: 3px solid;
+    border-radius: 6px;
+    background: rgba(8,10,20,0.55);
+}
+.ti60-connection-jtag { border-left-color: #f0c674; }
+.ti60-connection-uart { border-left-color: #60a5fa; }
+.ti60-connection-card-top {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin-bottom: 0.45rem;
+}
+.ti60-connection-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.45rem;
+    height: 1.45rem;
+    flex: 0 0 1.45rem;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+.ti60-connection-jtag .ti60-connection-number { color: #f0c674; }
+.ti60-connection-uart .ti60-connection-number { color: #60a5fa; }
+.ti60-connection-card-title {
+    color: var(--text-primary, #eaeaea);
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+.ti60-connection-card-purpose {
+    margin-top: 0.1rem;
+    color: var(--text-secondary, #a0a0a0);
+    font-size: 0.7rem;
+}
+.ti60-connection-card p {
+    margin: 0 0 0.55rem;
+    color: var(--text-secondary, #a0a0a0);
+    font-size: 0.75rem;
+    line-height: 1.45;
+}
+.ti60-connection-card code {
+    padding: 0.05em 0.25em;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.07);
+    color: #c4b5fd;
+    font-family: monospace;
+    font-size: 0.92em;
+}
+.ti60-connection-detail {
+    margin-top: 0.28rem;
+    color: #9aa8bd;
+    font-size: 0.7rem;
+    line-height: 1.4;
+}
+.ti60-connection-detail strong { color: #d7deea; }
+
 .ti60-pol-heading {
     position: relative;
     display: inline-block;
@@ -465,6 +569,9 @@ header h1 a:hover {
 }
 
 @media (max-width: 540px) {
+    .ti60-connection-map-header { flex-direction: column; }
+    .ti60-connection-map-rule { align-self: flex-start; }
+    .ti60-connection-map-grid { grid-template-columns: 1fr; }
     .ti60-steps { grid-template-columns: 1fr; }
     .ti60-action-row { flex-direction: column; }
 }
@@ -1518,6 +1625,11 @@ details[open] .ti60-advanced-summary::before { transform: rotate(90deg); }
     padding: 0.25rem 0.7rem; font-size: 0.8rem; cursor: pointer; margin-left: 0.5rem;
 }
 .versions-advice-btn:hover { background: #4a4020; }
+.versions-build-approval-btn {
+  background: #3d3416; color: #f0d477; border: 1px solid #7a672c; border-radius: 5px;
+  padding: 0.3rem 0.65rem; cursor: pointer; font-size: 0.78rem; font-weight: 600;
+}
+.versions-build-approval-btn:hover { background: #4a4020; }
 .versions-advice-btn.versions-advice-ok { background: #16391f; color: #7fd894; border-color: #2c6b3c; }
 .versions-advice-popup {
     position: relative; background: #1c2333; border: 1px solid #7a672c; border-radius: 8px;

@@ -106,6 +106,7 @@
 - [Wukong physical Halt isolation](wukong-halt-isolation.md) — full-top UART simulation latches Halt; physical failures are downstream of source/RTL correctness
 - [Hardware snapshot separation](hardware-snapshot-separation.md) — hardware NIA/cursor and stored thread context must stay separate from simulator PC, live CR12, and breakpoints
 - [Wukong bridge Windows support](wukong-windows-bridge.md) — use pyserial port enumeration so the same bridge supports COM ports natively without WSL
+- [Wukong dual-link connectivity](wukong-dual-link-connectivity.md) — JTAG programs the FPGA; a separate USB-UART port carries trace, commands, and upload; COM3 is only a common Windows label
 - [Wukong server symbol import](wukong-server-symbol-import.md) — direct server workflow needs the repository root on sys.path or known pet-name listings fall back to `<unknown>`
 - [mLoad inclusive c-list bounds](mload-inclusive-c-list-bounds.md) — limit_offset stores count−1, so valid index checks must use inclusive `<=`
 - [Wukong RTL generation initializer bottleneck](wukong-rtl-generation-init-bottleneck.md) — fixed 64 KiB DMEM is not proof of a BRAM issue; Amaranth conversion can stall before Yosys/Vivado

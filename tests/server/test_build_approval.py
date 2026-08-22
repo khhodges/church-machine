@@ -536,6 +536,24 @@ def test_build_approval_routes_registered():
         )
 
 
+def test_build_approval_exposes_release_and_validation_comments():
+    """The approval workflow keeps pending-change comments and issue details visible."""
+    root = os.path.normpath(os.path.join(SERVER_DIR, '..'))
+    with open(os.path.join(root, 'simulator', 'index.html'), encoding='utf-8') as handle:
+        index = handle.read()
+    with open(os.path.join(root, 'simulator', 'app-build-approval.js'), encoding='utf-8') as handle:
+        approval = handle.read()
+    with open(os.path.join(root, 'simulator', 'app-run.js'), encoding='utf-8') as handle:
+        runtime = handle.read()
+
+    assert 'id="versionsBuildApprovalBtn"' in index
+    assert 'id="baReleaseContext"' in index
+    assert 'id="baIssueComments"' in index
+    assert '_loadReleaseContext()' in approval
+    assert '_renderIssueComments(data)' in approval
+    assert 'Open Build Approval &amp; review comments' in runtime
+
+
 def test_worker_droplet_constants_defined():
     """
     All four droplet configuration constants used by _ba_build_worker must be
