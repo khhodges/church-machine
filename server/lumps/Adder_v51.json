@@ -1,13 +1,13 @@
 {
-  "token": "00aa9999",
-  "abstraction": "Legacy",
-  "filename": "Legacy.1.8b7fb77f.lump",
-  "sidecar_file": "Legacy.1.8b7fb77f.json",
+  "token": "00aa1234",
+  "abstraction": "Adder",
+  "filename": "Adder.1.db280c91.lump",
+  "sidecar_file": "Adder.1.db280c91.json",
   "ns_slot": null,
-  "lump_size": 64,
+  "lump_size": 128,
   "typ": 0,
   "content_type": "code",
-  "cw": 1,
+  "cw": 4,
   "cc": 1,
   "profile": "IoT",
   "language": "cloomc",
@@ -32,22 +32,23 @@
   "deployment": {
     "target_board": "wukong-xc7a100t",
     "profile": "IoT",
-    "built_at": "2026-08-20T13:13:11.552279Z",
+    "built_at": "2026-08-22T11:49:27.728908Z",
     "builder": "CLOOMC++ IDE v1.0"
   },
   "grants": [
     "E"
   ],
   "source": "",
-  "binary_hash": "388fa4a798890ee62f9745b5168495386ba4894b98cae1b881c2f4d184700865",
+  "binary_hash": "d6ff9776979cb5eefdaf2dd4f6d612924ab17bcb117af17dde3ae95c218ec28d",
   "petname": "",
   "issue_number": 1,
-  "identity_string": "Legacy#1",
-  "identity_hash": "fcf8ef52e2bf2c4ff55e88fcb0be280eca94c05c9540f643251a1641bc8019c9",
+  "identity_string": "Adder#1",
+  "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f",
   "identity_seal_location": "c-list[0]",
-  "dot_name": "Legacy",
+  "dot_name": "Adder",
   "issue_n": 1,
-  "lump_version": 2,
-  "compiled_at": 1787231591.552295,
-  "archived_version": 2
+  "lump_version": 51,
+  "compiled_at": 1787399367.7289255,
+  "sourceStorageTier": 2,
+  "archived_version": 51
 }

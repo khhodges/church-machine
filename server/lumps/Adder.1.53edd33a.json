@@ -32,7 +32,7 @@
   "deployment": {
     "target_board": "wukong-xc7a100t",
     "profile": "IoT",
-    "built_at": "2026-08-22T11:49:26.694759Z",
+    "built_at": "2026-08-22T14:18:33.097573Z",
     "builder": "CLOOMC++ IDE v1.0"
   },
   "grants": [
@@ -47,7 +47,7 @@
   "identity_seal_location": "c-list[0]",
   "dot_name": "Adder",
   "issue_n": 1,
-  "lump_version": 50,
-  "compiled_at": 1787399366.6947749,
+  "lump_version": 54,
+  "compiled_at": 1787408313.0975902,
   "sourceStorageTier": 2
 }
