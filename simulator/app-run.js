@@ -15641,11 +15641,16 @@ function _wukongClassifyPipelineStages(s, ideSeq, ideLastTs) {
     stages.push({ name: 'Bridge', state: bridge.state, detail: bridge.detail });
 
     // ── Stage 2: Board trace ─────────────────────────────────────────────────
+    var churchOnly = !!(s && s.bridge && s.bridge.church_only);
     var trace;
     if (traceAge !== null && traceAge < 3) {
         trace = { state: 'green', detail: 'Trace packets flowing \u2014 last ' + _wukongAgeStr(traceAge) };
     } else if (traceAge !== null && traceAge < 30) {
-        trace = { state: 'amber', detail: 'Last trace ' + _wukongAgeStr(traceAge) + ' \u2014 board may be halted' };
+        if (churchOnly) {
+            trace = { state: 'amber', detail: 'Last trace ' + _wukongAgeStr(traceAge) + ' \u2014 Turing filter ON \u2014 fewer packets expected' };
+        } else {
+            trace = { state: 'amber', detail: 'Last trace ' + _wukongAgeStr(traceAge) + ' \u2014 board may be halted' };
+        }
     } else if (totalPosts === 0) {
         if (totalPolls > 0) {
             trace = { state: 'red',
@@ -15656,8 +15661,13 @@ function _wukongClassifyPipelineStages(s, ideSeq, ideLastTs) {
                 detail: 'No trace packets ever received \u2014 is the board powered and the FPGA bitstream loaded?' };
         }
     } else {
-        trace = { state: 'red',
-            detail: 'No trace in ' + _wukongAgeStr(traceAge) + ' \u2014 board halted or UART disconnected' };
+        if (churchOnly) {
+            trace = { state: 'red',
+                detail: 'No trace in ' + _wukongAgeStr(traceAge) + ' \u2014 Turing filter ON \u2014 fewer packets expected, but this gap is very long' };
+        } else {
+            trace = { state: 'red',
+                detail: 'No trace in ' + _wukongAgeStr(traceAge) + ' \u2014 board halted or UART disconnected' };
+        }
     }
     stages.push({ name: 'Board trace', state: trace.state, detail: trace.detail });
 
