@@ -9,7 +9,18 @@ project.zip
 
 # ── Mockup sandbox (244 MB) ───────────────────────────────────────────────────
 # Canvas design tooling; not used in the deployed IDE.
-artifacts/
+artifacts/mockup-sandbox/
+
+# ── IDE Introduction artifact — source and deps only ─────────────────────────
+# Flask serves the pre-built dist/public/ at /ide-intro/; source files,
+# node_modules, and config are not needed in the deployment snapshot.
+artifacts/church-machine-ide-introduction/node_modules/
+artifacts/church-machine-ide-introduction/src/
+artifacts/church-machine-ide-introduction/scripts/
+artifacts/church-machine-ide-introduction/public/
+artifacts/church-machine-ide-introduction/*.ts
+artifacts/church-machine-ide-introduction/*.json
+artifacts/church-machine-ide-introduction/index.html
 
 # ── Agent screenshot attachments (56 MB) ─────────────────────────────────────
 attached_assets/

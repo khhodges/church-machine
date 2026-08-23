@@ -284,6 +284,23 @@ def add_cache_control(response):
     response.headers["Permissions-Policy"] = "serial=(self)"
     return response
 
+_INTRO_DIST_DIR = os.path.join(BASE_DIR, "artifacts", "church-machine-ide-introduction", "dist", "public")
+
+@app.route("/ide-intro/")
+@app.route("/ide-intro/<path:filename>")
+def serve_ide_intro(filename="index.html"):
+    """Serve the pre-built IDE Introduction slides SPA.
+
+    The artifact is built with BASE_PATH=/ide-intro/ so all asset references
+    are rooted there.  Any path that doesn't match a real file falls back to
+    index.html so client-side routes (/handout, etc.) work after a hard
+    refresh.
+    """
+    filepath = os.path.join(_INTRO_DIST_DIR, filename)
+    if os.path.isfile(filepath):
+        return send_from_directory(_INTRO_DIST_DIR, filename)
+    return send_from_directory(_INTRO_DIST_DIR, "index.html")
+
 @app.route("/dl/wukong-bridge")
 def download_wukong_bridge():
     # Serve the canonical bridge from hardware/ — server/wukong_bridge.py was a
@@ -3952,8 +3969,8 @@ def switch_lifecycle_html():
 
 BOOK_CHAPTERS = [
     ("Getting Started", [
-        {"type": "link", "label": "🎞 IDE Introduction", "artifact_port": 21279, "artifact_path": "/"},
-        {"type": "link", "label": "📄 Facilitator Handout", "artifact_port": 21279, "artifact_path": "/handout"},
+        {"type": "link", "label": "🎞 IDE Introduction", "artifact_port": 21279, "artifact_path": "/", "production_path": "/ide-intro/"},
+        {"type": "link", "label": "📄 Facilitator Handout", "artifact_port": 21279, "artifact_path": "/handout", "production_path": "/ide-intro/handout"},
         "quick-start.md",
         "board-connectivity.md",
         "cloomc-foundation.md",
@@ -4057,7 +4074,16 @@ def docs_list():
                 dev_domain = os.environ.get("REPLIT_DEV_DOMAIN", "")
                 port = item.get("artifact_port", 0)
                 path = item.get("artifact_path", "/")
-                url = f"https://{port}-{dev_domain}{path}" if dev_domain and port else ""
+                production_path = item.get("production_path", "")
+                if dev_domain and port:
+                    # Dev workspace: use Replit's port-prefixed proxy URL.
+                    url = f"https://{port}-{dev_domain}{path}"
+                elif production_path:
+                    # Production deployment: the artifact is built and served
+                    # by Flask at a fixed path — no port prefix needed.
+                    url = production_path
+                else:
+                    url = ""
                 entries.append({
                     "name": "",
                     "type": "link",
