@@ -2621,6 +2621,32 @@
 }
 .wukong-fault-view-link:hover { color: #93c5fd; opacity: 1; text-decoration: underline; }
 
+.wukong-fault-reboot-btn {
+    grid-column: 1 / -1;
+    margin-top: 5px;
+    padding: 3px 10px;
+    background: #2a1000;
+    border: 1px solid #a04010;
+    border-radius: 3px;
+    color: #f5a623;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+    letter-spacing: 0.03em;
+    opacity: 0.85;
+    align-self: center;
+    justify-self: start;
+    white-space: nowrap;
+}
+.wukong-fault-reboot-btn:hover {
+    background: #3a1800;
+    border-color: #f5a623;
+    opacity: 1;
+}
+.wukong-fault-reboot-btn:active {
+    background: #1c0a00;
+}
+
 /* Fault-triggered disassembly modal — reuses .chlog-modal scaffold */
 .wukong-fault-disasm-modal .chlog-modal-machine { color: #f5a623; }
 
