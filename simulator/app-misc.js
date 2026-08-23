@@ -2058,7 +2058,7 @@ function _devHardwareRenderSnapshot(devId, snapshot) {
     }
     var cr = Array.isArray(snapshot.cr) ? snapshot.cr : [];
     var dr = Array.isArray(snapshot.dr) ? snapshot.dr : [];
-    var reason = ({1: 'pause', 2: 'step', 3: 'fault', 4: 'breakpoint'})[snapshot.reason] ||
+    var reason = ({1: 'pause', 2: 'fault', 3: 'step', 4: 'breakpoint'})[snapshot.reason] ||
         ('reason ' + (snapshot.reason === undefined ? '?' : snapshot.reason));
     el.innerHTML =
         '<div class="dev-hw-snapshot-grid">' +

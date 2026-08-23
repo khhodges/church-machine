@@ -134,18 +134,23 @@ class TestQueueConsumeAckLifecycle:
         assert d['write_error'] == ''
 
     def test_same_letter_late_ack_race_ignored(self, client):
-        """f -> consume -> new f queued -> late ack for the FIRST f must not
-        mark the second f as written (same command letter, different id)."""
+        """f -> consume -> write_ok -> new f queued -> late stale ack for the
+        FIRST f must not mark the second f as written."""
         id1 = _post_cmd(client, 'f').get_json()['id']
         client.get('/hardware/wukong/command')       # bridge consumes first f
-        id2 = _post_cmd(client, 'f').get_json()['id']  # user clicks again
+        # Confirm the first write so the slot is no longer in-flight.
+        _ack(client, 'f', id1, True)
+        assert _status(client)['command_delivery']['write_ok'] is True
+        # Only now is a new command accepted (write confirmed, slot free).
+        id2 = _post_cmd(client, 'f').get_json()['id']
         assert id2 != id1
+        # A stale ACK with id1 must be ignored once id2 owns the slot.
+        client.get('/hardware/wukong/command')
         _ack(client, 'f', id1, True)                 # late ack for first f
         d = _status(client)['command_delivery']
         assert d['id'] == id2
         assert d['write_ok'] is None, 'late same-letter ack corrupted new record'
         # After the second f is consumed, its own ack applies normally.
-        client.get('/hardware/wukong/command')
         _ack(client, 'f', id2, True)
         d = _status(client)['command_delivery']
         assert d['id'] == id2 and d['write_ok'] is True
@@ -269,8 +274,69 @@ class TestBridgeDisconnectDiagnostics:
     def test_no_overwrite_flag_after_consumption(self, client):
         _post_cmd(client, 'f')
         client.get('/hardware/wukong/command')   # bridge consumed it
+        # After consumption but before write confirmation, the slot is locked.
         r = _post_cmd(client, 's')
-        assert 'overwrote' not in r.get_json()
+        assert r.status_code == 409
+
+
+class TestInFlightWriteGuard:
+    """Regression guard: a command consumed by the bridge but not yet write-
+    confirmed must not be silently replaced by a subsequent POST.
+
+    The 'STEP superseded' trace pattern occurs when:
+      1. Bridge consumes a STEP command (GET stamps consumed_ts)
+      2. Bridge is slow writing to serial (>8 s in observed trace)
+      3. User re-clicks STEP before write_ok arrives
+      4. Old delivery-tracking ID is replaced → old ACK rejected → step lost
+
+    Fix: server returns 409 while write_ts is None but consumed_ts is set.
+    """
+
+    def test_consumed_not_confirmed_rejects_new_command(self, client):
+        """A command the bridge has consumed but not yet confirmed blocks a
+        new POST with 409 rather than silently dropping the in-flight step."""
+        qid = _post_cmd(client, 's').get_json()['id']
+        client.get('/hardware/wukong/command')      # bridge consumes it
+        d = _status(client)['command_delivery']
+        assert d['consumed_ts'] is not None
+        assert d['write_ts'] is None
+        r = _post_cmd(client, 's')
+        assert r.status_code == 409
+        body = r.get_json()
+        assert body['ok'] is False
+        assert 'in progress' in body['error']
+        # Delivery record still points to the original command.
+        assert _status(client)['command_delivery']['id'] == qid
+
+    def test_pending_not_consumed_can_still_be_overwritten(self, client):
+        """A command that is queued but not yet consumed (bridge hasn't polled)
+        can still be overwritten — that is the documented pre-existing policy."""
+        r1 = _post_cmd(client, 'f').get_json()
+        r2 = _post_cmd(client, 's')
+        assert r2.status_code == 200
+        assert r2.get_json()['overwrote'] == 'f'
+
+    def test_after_write_confirmed_new_command_accepted(self, client):
+        """Once write_ok arrives the slot is free and the next STEP is accepted
+        normally (no lingering 409)."""
+        qid = _post_cmd(client, 's').get_json()['id']
+        client.get('/hardware/wukong/command')
+        _ack(client, 's', qid, True)
+        assert _status(client)['command_delivery']['write_ok'] is True
+        r = _post_cmd(client, 's')
+        assert r.status_code == 200
+        assert r.get_json()['ok'] is True
+
+    def test_after_write_failed_new_command_accepted(self, client):
+        """A confirmed write failure (ok=false) also frees the slot so the
+        user can retry without being stuck at 409 forever."""
+        qid = _post_cmd(client, 's').get_json()['id']
+        client.get('/hardware/wukong/command')
+        _ack(client, 's', qid, False, 'serial port dead')
+        assert _status(client)['command_delivery']['write_ok'] is False
+        r = _post_cmd(client, 's')
+        assert r.status_code == 200
+        assert r.get_json()['ok'] is True
 
 
 class TestBreakpointNiaParsing:

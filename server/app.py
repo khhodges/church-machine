@@ -13100,6 +13100,21 @@ def wukong_command_post():
 
     now = _wk_time.time()
     with _wukong_command_lock:
+        # Guard: if the bridge already consumed a command but has not yet
+        # confirmed the serial write, refuse to accept the new command.
+        # Accepting it would replace the delivery-tracking ID, orphan the
+        # in-flight ACK, and cause the IDE watcher to report "no confirmation"
+        # even if the bridge successfully wrote the old command to serial.
+        # This prevents the "STEP superseded" trace pattern where a slow serial
+        # write causes the user's retry to silently drop the in-flight step.
+        d = _wukong_cmd_delivery
+        if (d is not None and
+                d.get('consumed_ts') is not None and
+                d.get('write_ts') is None):
+            return jsonify({
+                'ok': False,
+                'error': 'bridge write in progress — retry after confirmation',
+            }), 409
         prev = _wukong_pending_cmd
         _wukong_cmd_id += 1
         entry['id'] = _wukong_cmd_id
