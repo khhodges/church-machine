@@ -79,6 +79,27 @@ SNAPSHOT_HEADER_LEN = 6       # magic, version, payload length, sequence
 SNAPSHOT_CRC_LEN = 2
 SNAPSHOT_PAYLOAD_LEN = 284
 
+# ── Boot trace packet gate ────────────────────────────────────────────────────
+# On a cold board start the CM emits a fixed number of trace packets
+# immediately after the sentinel (boot-thread CHANGE sequence + boot CALL
+# sequence).  The breakdown is:
+#   CHANGE.push + CHANGE.CR12 + CHANGE.CR5  →  3 packets  (thread context init)
+#   CALL.CR6   + CALL.CR14   + CALL.push   →  3 packets  (boot CALL)
+#   RESULT                                 →  1 packet   (SelfTest entry)
+#   RESULT                                 →  1 packet   (first SelfTest step)
+#                                             ─────────
+#                                              8 packets total
+#
+# Race window: the bridge sends 'r' then 'q' after the sentinel.  If 'q'
+# arrives at the hardware before the boot CALL packet has been processed,
+# the resulting snapshot captures misleading mid-boot register state
+# (e.g. CR6/CR14 not yet updated).  The fix: arm a deferred-'q' gate on
+# every sentinel; send 'q' only after BOOT_TRACE_PACKET_COUNT packets
+# have been received, or BOOT_Q_TIMEOUT seconds have elapsed (whichever
+# comes first).
+BOOT_TRACE_PACKET_COUNT = 8    # trace packets expected before 'q' is safe
+BOOT_Q_TIMEOUT          = 2.0  # seconds; timeout fallback for slow boards
+
 # ── Event type constants ──────────────────────────────────────────────────────
 # Must match _TRACE_EV_* in wukong_top.py and docs/debug-packet-protocol.md.
 TRACE_EV_RESULT      = 0x00  # Single-packet result (DR→DR, SAVE, Function, etc.)
@@ -1158,6 +1179,15 @@ def main():
     # accepted before it asks the RTL to re-enter the boot ladder.
     fault_recovery = FaultRecovery()
 
+    # Deferred 'q' (snapshot) gate — set on each boot sentinel and cleared
+    # once BOOT_TRACE_PACKET_COUNT trace packets have been received or
+    # BOOT_Q_TIMEOUT seconds have elapsed.  Prevents the snapshot from racing
+    # with in-flight boot trace packets on a cold board start (see the
+    # BOOT_TRACE_PACKET_COUNT constant block above for the full race analysis).
+    _boot_q_pending   = False
+    _boot_q_remaining = 0
+    _boot_q_deadline  = 0.0
+
     # ── UART ASCII console forwarding ────────────────────────────────────
     # Printable UART bytes (banner text etc.) are line-buffered and POSTed
     # to the IDE so the /fpga page's live event log shows ALL board output,
@@ -1407,6 +1437,24 @@ def main():
                           f'  flags={flag_str}{fault_str}{bp_str}')
                     i += TRACE_LEN
 
+                    # Boot trace packet gate: count down toward the deferred
+                    # snapshot.  Each accepted trace packet after a sentinel
+                    # moves the CM one step closer to its settled post-boot
+                    # state.  Fire 'q' as soon as the last expected packet
+                    # lands so the IDE sees accurate post-boot registers.
+                    if _boot_q_pending:
+                        _boot_q_remaining -= 1
+                        if _boot_q_remaining <= 0:
+                            _boot_q_pending = False
+                            try:
+                                ser.write(b'q')
+                                last_write_ts = time.time()
+                                print('  [boot] all boot trace packets received'
+                                      ' — snapshot requested', flush=True)
+                            except Exception as _qe:
+                                print(f'  [boot] snapshot send error: {_qe}',
+                                      flush=True)
+
                 elif b in (BOOT_SENTINEL_V1, BOOT_SENTINEL_V2):
                     # Flush pending ASCII first (arrival-order preservation).
                     _console_flush(ide_base, verify_tls)
@@ -1476,18 +1524,32 @@ def main():
                     # will pause the CM automatically on any actual fault retire,
                     # so an unconditional 'h' here is no longer needed.
                     #
-                    # Immediately follow with 'q' (snapshot request) so the IDE
-                    # always receives a fresh register dump on reconnect.  Without
-                    # this, a board that was left halted from a prior session will
-                    # show stale (halted) state until the user issues a command,
-                    # because the bridge no longer sends 'h' on every connect.
+                    # 'q' (snapshot request) is NOT sent immediately here.
+                    # On a cold board start the CM emits BOOT_TRACE_PACKET_COUNT
+                    # trace packets right after the sentinel (boot-thread CHANGE +
+                    # boot CALL sequence).  Sending 'q' back-to-back with 'r'
+                    # races with those packets: 'q' can arrive at the hardware
+                    # before the boot CALL has been processed, so the snapshot
+                    # captures partial mid-boot register state (CR6/CR14 not yet
+                    # updated) rather than the final settled boot state.
+                    #
+                    # Mitigation: arm the deferred-'q' gate here.  The main
+                    # receive loop sends 'q' after BOOT_TRACE_PACKET_COUNT
+                    # trace packets have been observed — or after BOOT_Q_TIMEOUT
+                    # seconds — whichever comes first.  This guarantees the
+                    # snapshot always reflects post-boot register state.
                     try:
                         ser.write(b'r')
                         last_write_ts = time.time()
                         _bridge_status('automatic_run_after_sentinel', 'connected',
                                        'intentional run after boot sentinel')
-                        ser.write(b'q')
-                        last_write_ts = time.time()
+                        _boot_q_pending   = True
+                        _boot_q_remaining = BOOT_TRACE_PACKET_COUNT
+                        _boot_q_deadline  = time.time() + BOOT_Q_TIMEOUT
+                        print(f'  [boot] deferring snapshot until '
+                              f'{BOOT_TRACE_PACKET_COUNT} boot trace packets '
+                              f'received (timeout={BOOT_Q_TIMEOUT:.1f}s)',
+                              flush=True)
                     except Exception as exc:
                         print(f'  [run send error] {exc}')
                         _bridge_status('automatic_run_failed', 'serial_error', str(exc))
@@ -1603,6 +1665,22 @@ def main():
             del buf[:i]
 
             now = time.time()
+            # Deferred snapshot timeout: if the expected boot trace packets
+            # have not all arrived within BOOT_Q_TIMEOUT seconds, send 'q'
+            # anyway so the IDE still gets a register snapshot on boards that
+            # emit fewer packets than expected (e.g. older bitstreams).
+            if _boot_q_pending and now >= _boot_q_deadline:
+                _boot_q_pending = False
+                try:
+                    ser.write(b'q')
+                    last_write_ts = now
+                    print(f'  [boot] snapshot timeout — requesting snapshot '
+                          f'({_boot_q_remaining} boot packet(s) still pending)',
+                          flush=True)
+                except Exception as _qe:
+                    print(f'  [boot] snapshot send error (timeout): {_qe}',
+                          flush=True)
+
             # Idle flush: a partial line with no newline (e.g. a banner that
             # ends without \n) is forwarded after 0.5 s of UART silence.
             if _console_line and now - _console_last[0] >= 0.5:
