@@ -17125,6 +17125,28 @@ async function _wukongStep() {
     } catch(e) {}
 }
 
+// Send the hardware board-reboot command ('f') and clear the fault badge
+// immediately when the bridge confirms the serial write (write_ok=true).
+// This prevents the badge from staying visible during the reboot window —
+// the board is already rebooting cleanly, so no fault is active.
+async function _wukongHwFaultReset() {
+    try {
+        const d = await _wukongPostCmd('f', null, 'REBOOT');
+        if (!d) return;
+        const ok = await _wukongWatchDelivery(d.id, 'REBOOT', 10000);
+        if (ok) {
+            // Immediately clear hardware fault state so the status chip reverts
+            // to a clean state synchronously on write confirmation, not after
+            // the next poll cycle detects disconnection.
+            _wukongHwFaulted      = false;
+            _wukongPrevFaultValid = false;
+            _wukongHideFaultPanel();
+            if (typeof updateFlagsDisplay === 'function') updateFlagsDisplay();
+        }
+    } catch(e) {}
+}
+window._wukongHwFaultReset = _wukongHwFaultReset;
+
 async function hwRunToggle() {
     const wantRunning = !_wukongHWRunning;
     const label = wantRunning ? 'RUN' : 'PAUSE';
@@ -17429,6 +17451,18 @@ function _wukongShowFaultPanel(data) {
     body.querySelector('.wukong-fault-view-link').addEventListener('click', function() {
         _wukongOpenFaultDisasm(parseInt(this.dataset.nia, 10));
     });
+
+    // ↺ Reboot button: sends 'f' to the board and clears the fault badge
+    // immediately on write confirmation (write_ok=true), without waiting for
+    // the next poll cycle to detect disconnection.
+    const rebootBtn = document.createElement('button');
+    rebootBtn.className = 'wukong-fault-reboot-btn';
+    rebootBtn.textContent = '\u21BA Reboot';
+    rebootBtn.title = 'Send reboot command to the board and clear the fault badge';
+    rebootBtn.addEventListener('click', function() {
+        _wukongHwFaultReset();
+    });
+    body.appendChild(rebootBtn);
 
     panel.appendChild(header);
     panel.appendChild(body);

@@ -223,6 +223,70 @@ function computeStatusLabel(hwConnected, hwFaulted, simHalted, simBootComplete) 
         'old formula still present — revert was not applied');
 }
 
+// ── T9: 'f' command write_ok=true → badge hidden synchronously ───────────────
+// Scenario: board is halted with an active hardware fault.  User clicks the
+// ↺ Reboot button in the hardware fault panel (calls _wukongHwFaultReset).
+// When the bridge confirms write_ok=true the IDE clears _wukongHwFaulted
+// immediately — the badge must hide without waiting for the next poll cycle.
+{
+    // Phase 1 — active hardware fault; badge visible.
+    let hwFaulted   = true;
+    const hwConnected = true;
+    const simHalted   = false;
+
+    assert('T9a: active hw fault — badge visible before write_ok',
+        computeStatusHalted(hwConnected, hwFaulted, simHalted) === true,
+        'statusHalted=' + computeStatusHalted(hwConnected, hwFaulted, simHalted));
+
+    assert('T9b: active hw fault — label is HW FAULTED',
+        computeStatusLabel(hwConnected, hwFaulted, simHalted, true) === 'HW FAULTED',
+        'label=' + computeStatusLabel(hwConnected, hwFaulted, simHalted, true));
+
+    // Phase 2 — write_ok=true received from _wukongWatchDelivery.
+    // _wukongHwFaultReset() sets _wukongHwFaulted = false immediately.
+    hwFaulted = false;
+
+    assert('T9c: write_ok=true — badge hidden synchronously',
+        computeStatusHalted(hwConnected, hwFaulted, simHalted) === false,
+        'statusHalted=' + computeStatusHalted(hwConnected, hwFaulted, simHalted));
+
+    assert('T9d: write_ok=true — label is HW RUNNING (board rebooting cleanly)',
+        computeStatusLabel(hwConnected, hwFaulted, simHalted, true) === 'HW RUNNING',
+        'label=' + computeStatusLabel(hwConnected, hwFaulted, simHalted, true));
+}
+
+// ── T10: Source-level guard — _wukongHwFaultReset clears flag on write_ok ────
+// Confirm the production source wires the write_ok=true delivery path to an
+// immediate _wukongHwFaulted clear so a future edit cannot silently skip it.
+{
+    const appRunSrc = fs.readFileSync(
+        path.join(__dirname, 'app-run.js'), 'utf8');
+
+    // Function must exist.
+    const fnIdx = appRunSrc.indexOf('async function _wukongHwFaultReset(');
+    assert('T10a: _wukongHwFaultReset function present in app-run.js',
+        fnIdx !== -1,
+        '_wukongHwFaultReset not found');
+
+    // Extract the function body and verify the flag is cleared inside it.
+    const fnBody = fnIdx !== -1
+        ? appRunSrc.slice(fnIdx, appRunSrc.indexOf('\n}', fnIdx) + 2)
+        : '';
+
+    assert('T10b: _wukongHwFaultReset clears _wukongHwFaulted inside the function',
+        fnBody.indexOf('_wukongHwFaulted') !== -1 && fnBody.indexOf('false') !== -1,
+        'flag clear not found in _wukongHwFaultReset body');
+
+    assert('T10c: _wukongHwFaultReset sends the "f" command',
+        fnBody.indexOf("'f'") !== -1,
+        '"f" command not found in _wukongHwFaultReset body');
+
+    // The Reboot button in _wukongShowFaultPanel must call _wukongHwFaultReset.
+    assert('T10d: _wukongShowFaultPanel wires a button to _wukongHwFaultReset',
+        appRunSrc.indexOf('_wukongHwFaultReset()') !== -1,
+        '_wukongHwFaultReset() call site not found');
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log('');
 console.log((passed + failed) + ' tests: ' + passed + ' passed, ' + failed + ' failed');

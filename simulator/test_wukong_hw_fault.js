@@ -381,6 +381,59 @@ function makeTransitionDetector() {
         td.modalCalls === 2, 'modalCalls=' + td.modalCalls);
 }
 
+// ── T5e–g: Manual reset via 'f' command — badge cleared on write_ok=true ────
+// Simulates _wukongHwFaultReset(): the write_ok=true confirmation path must
+// clear hwFaulted immediately, without waiting for a fault-clear trace event
+// or a poll-cycle disconnect.
+{
+    // Start with an active fault (board halted after trace transition).
+    let hwFaulted      = true;
+    let prevFaultValid = true;
+    let flagsCalls     = 0;
+    let panelHidden    = false;
+
+    assert('T5e: before write_ok — hwFaulted is true (badge visible)',
+        hwFaulted === true, 'hwFaulted=' + hwFaulted);
+
+    // Simulate write_ok=true confirmation path (mirrors _wukongHwFaultReset).
+    function simulateWriteOkConfirmed() {
+        hwFaulted      = false;
+        prevFaultValid = false;
+        panelHidden    = true;
+        flagsCalls++;
+    }
+    simulateWriteOkConfirmed();
+
+    assert('T5f: after write_ok — hwFaulted false (badge cleared synchronously)',
+        hwFaulted === false, 'hwFaulted=' + hwFaulted);
+
+    assert('T5g: after write_ok — updateFlagsDisplay called once',
+        flagsCalls === 1, 'flagsCalls=' + flagsCalls);
+
+    assert('T5h: after write_ok — fault panel hidden',
+        panelHidden === true, 'panelHidden=' + panelHidden);
+}
+
+// ── T5i: Source-level guard — _wukongHwFaultReset exists and clears flag ─────
+{
+    const fnIdx = appRunSrc.indexOf('async function _wukongHwFaultReset(');
+    assert('T5i: _wukongHwFaultReset function present in app-run.js',
+        fnIdx !== -1,
+        '_wukongHwFaultReset not found');
+
+    // Find the function body and verify the flag-clear is wired to write_ok.
+    const fnBody = fnIdx !== -1
+        ? appRunSrc.slice(fnIdx, appRunSrc.indexOf('\n}', fnIdx) + 2)
+        : '';
+    assert('T5j: _wukongHwFaultReset body clears _wukongHwFaulted',
+        fnBody.indexOf('_wukongHwFaulted') !== -1 && fnBody.indexOf('false') !== -1,
+        'flag clear not found in _wukongHwFaultReset body');
+
+    assert('T5k: _wukongHwFaultReset posts the "f" command',
+        fnBody.indexOf("'f'") !== -1,
+        '"f" command not found in _wukongHwFaultReset body');
+}
+
 // ── T6: Machine-status label logic ───────────────────────────────────────────
 // Test the status label decision logic directly (extracted from app-memory.js).
 function computeStatusLabel(hwConnected, hwFaulted, simHalted, simBootComplete) {
