@@ -15328,10 +15328,14 @@ SWITCH CR3, 0        ; CR15 <- namespace GT from CR3`
     },
 ];
 
-let _refActiveTab = 'abstractions';
+let _refActiveTab = 'hardware';
 let _selectedAbstraction = null;
 
 function switchRefTab(tab) {
+    // Keep the tab state constrained to the two panels.  "isa" is retained
+    // as a historical alias for the hardware instruction reference.
+    if (tab === 'isa') tab = 'hardware';
+    if (tab !== 'abstractions' && tab !== 'hardware') tab = 'hardware';
     _refActiveTab = tab;
     document.querySelectorAll('.ref-tab').forEach(b => b.classList.remove('active'));
     const btn = document.getElementById('refTab-' + tab);

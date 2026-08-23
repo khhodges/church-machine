@@ -2448,12 +2448,12 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
 
     <div id="reference" class="view">
         <div class="ref-tab-row">
-            <button class="ref-tab active" id="refTab-abstractions" onclick="switchRefTab('abstractions')">Abstractions &amp; Methods</button>
-            <button class="ref-tab" id="refTab-hardware" onclick="switchRefTab('hardware')">Hardware Architecture</button>
+            <button class="ref-tab" id="refTab-abstractions" onclick="switchRefTab('abstractions')">Abstractions &amp; Methods</button>
+            <button class="ref-tab active" id="refTab-hardware" onclick="switchRefTab('hardware')">Hardware Architecture</button>
         </div>
         <div class="ref-layout" id="refLayout">
             <div class="ref-list-panel">
-                <div class="panel" id="refPanel-abstractions">
+                <div class="panel" id="refPanel-abstractions" style="display:none;">
                     <div class="panel-title">Abstractions &amp; Methods</div>
                     <div class="abs-search-wrap">
                         <input id="absSearchInput" type="search" class="abs-search-input"
@@ -2462,10 +2462,10 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
                     </div>
                     <div id="instrListAbstractions" class="instr-list"></div>
                 </div>
-                <div class="panel" id="refPanel-hardware" style="display:none;">
+                <div class="panel" id="refPanel-hardware">
                     <div class="panel-title">Hardware Instruction Set &mdash; 20 Instructions</div>
-                    <div class="mbit-rules-box">
-                        <div class="mbit-rules-title">M-bit rules &mdash; per-register inspection model</div>
+                    <details class="mbit-rules-box">
+                        <summary class="mbit-rules-title">M-bit rules &mdash; per-register inspection model</summary>
                         <div class="mbit-rules-body">
                             The M-bit is a 1-bit flag on every CR register, separate from its GT permissions.
                             It is set and cleared by hardware to control the <em>M-window</em> (inspection channel).
@@ -2481,7 +2481,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
                             <span class="instr-mstate-badge mstate-swap">M&updownarrow;</span> save/restore &ensp;
                             <span class="instr-mstate-badge mstate-pulse">M~</span> transient</span>
                         </div>
-                    </div>
+                    </details>
                     <div class="instr-domain-header">Church Domain (10)</div>
                     <div id="instrListChurch" class="instr-list"></div>
                     <div class="instr-domain-header">Turing Domain (10 + shared RETURN)</div>

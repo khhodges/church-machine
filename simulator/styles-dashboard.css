@@ -4345,6 +4345,11 @@ a.next-step-link:hover {
 }
 
 .mbit-rules-title {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    cursor: pointer;
+    list-style: none;
     font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -4353,6 +4358,20 @@ a.next-step-link:hover {
     padding: 0.4rem 0.65rem;
     background: rgba(218, 165, 32, 0.08);
     border-bottom: 1px solid rgba(218, 165, 32, 0.15);
+}
+.mbit-rules-title::-webkit-details-marker { display: none; }
+.mbit-rules-title::before {
+    content: '\25B6';
+    color: var(--church-gold);
+    font-size: 0.62rem;
+    transition: transform 0.15s ease;
+}
+.mbit-rules-box[open] > .mbit-rules-title::before {
+    transform: rotate(90deg);
+}
+.mbit-rules-title:focus-visible {
+    outline: 2px solid var(--church-gold);
+    outline-offset: -2px;
 }
 
 .mbit-rules-body {
