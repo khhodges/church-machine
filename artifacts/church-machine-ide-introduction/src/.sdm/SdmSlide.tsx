@@ -62,11 +62,11 @@ function describeParseFailure(
 
 function tryParse(input: unknown): ParsedState {
   const result = parseSlideDocument(input);
-  if (result.ok) {
-    return { document: result.document, error: null };
+  if (!('document' in result)) {
+    return { document: null, error: describeParseFailure(result) };
   }
 
-  return { document: null, error: describeParseFailure(result) };
+  return { document: result.document, error: null };
 }
 
 function useStageScale(

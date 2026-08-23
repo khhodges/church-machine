@@ -402,21 +402,21 @@ function embeddedDocumentIssues(
     return [];
   }
   const result = parseSlideDocument(message.document);
-  if (result.ok) {
-    return [];
+  if (!('document' in result)) {
+    if (result.reason === 'invalid') {
+      return result.issues.map((issue) => ({
+        path: issue.path === '/' ? '/document' : `/document${issue.path}`,
+        message: issue.message,
+      }));
+    }
+    return [
+      {
+        path: '/document/version',
+        message: `Unsupported SDM document version ${result.version}.`,
+      },
+    ];
   }
-  if (result.reason === 'invalid') {
-    return result.issues.map((issue) => ({
-      path: issue.path === '/' ? '/document' : `/document${issue.path}`,
-      message: issue.message,
-    }));
-  }
-  return [
-    {
-      path: '/document/version',
-      message: `Unsupported SDM document version ${result.version}.`,
-    },
-  ];
+  return [];
 }
 
 function parseMessage<Message>(

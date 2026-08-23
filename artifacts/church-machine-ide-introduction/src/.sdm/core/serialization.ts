@@ -45,7 +45,7 @@ export function decodeSlideDocumentText(
   text: string,
 ): DecodeSlideDocumentResult {
   const decoded = decodeYamlValue(text);
-  if (!decoded.ok) {
+  if (!('value' in decoded)) {
     return { ok: false, reason: 'syntax', message: decoded.message };
   }
 

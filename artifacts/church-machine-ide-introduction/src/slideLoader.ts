@@ -21,7 +21,7 @@ const sdmModules: Record<string, { default: unknown }> = import.meta.glob(
 
 function loadManifestSlides(): SlideEntry[] {
   const parsed = parseSlidesManifest(manifestJson);
-  if (parsed.ok) {
+  if ('entries' in parsed) {
     return parsed.entries;
   }
 

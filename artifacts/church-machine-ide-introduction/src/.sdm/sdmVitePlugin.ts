@@ -15,7 +15,7 @@ export function sdmVitePlugin(): Plugin {
         return null;
       }
       const decoded = decodeYamlValue(code);
-      if (!decoded.ok) {
+      if (!('value' in decoded)) {
         throw new Error(decoded.message);
       }
 
@@ -31,7 +31,7 @@ export function sdmVitePlugin(): Plugin {
         return;
       }
       const decoded = decodeYamlValue(readFileSync(ctx.file, 'utf8'));
-      if (!decoded.ok) {
+      if (!('value' in decoded)) {
         return;
       }
       ctx.server.ws.send({
