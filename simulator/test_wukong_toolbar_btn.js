@@ -400,6 +400,92 @@ function makeHwStopEnv(opts) {
     }).catch(function() {});
 })();
 
+// ── WB-SK: keyboard shortcut (Shift+H → emergency stop) ──────────────────────
+// Extracts _hwStopShortcutHandler from app-run.js and exercises it directly
+// with mock event objects so we avoid DOM dispatch complexity.
+
+function extractHwStopShortcutCode(srcPath) {
+    const src = fs.readFileSync(path.resolve(__dirname, srcPath), 'utf8');
+    const startMarker = 'function _hwStopShortcutHandler(';
+    const endMarker   = 'window._hwStopShortcutHandler = _hwStopShortcutHandler;';
+    const start = src.indexOf(startMarker);
+    if (start === -1) throw new Error(startMarker + ' not found in ' + srcPath);
+    const end = src.indexOf(endMarker, start);
+    if (end === -1) throw new Error(endMarker + ' not found after start in ' + srcPath);
+    return src.slice(start, end + endMarker.length);
+}
+
+const HW_STOP_SHORTCUT_SRC = extractHwStopShortcutCode('app-run.js');
+
+function makeShortcutEnv(opts) {
+    opts = opts || {};
+    const dom = new JSDOM('<!DOCTYPE html><body></body>', { runScripts: 'outside-only' });
+    const stopCalls = [];
+    const sb = {
+        window:   dom.window,
+        document: dom.window.document,
+        _wukongConnected: (opts.connected !== undefined) ? opts.connected : true,
+        _wukongHWRunning: (opts.running   !== undefined) ? opts.running   : true,
+        _wukongIsConnected: function() { return sb._wukongConnected; },
+        hwStop: function() { stopCalls.push(true); },
+        _stopCalls: stopCalls,
+    };
+    vm.createContext(sb);
+    vm.runInContext(HW_STOP_SHORTCUT_SRC, sb, { filename: 'app-run.shortcut.js' });
+    return sb;
+}
+
+// WB-SK-1  Shift+H while connected + running → hwStop() called once
+(function() {
+    const env = makeShortcutEnv({ connected: true, running: true });
+    env._testEvent = {
+        shiftKey: true, key: 'H',
+        target: { tagName: 'BUTTON', isContentEditable: false },
+        preventDefault: function() {},
+    };
+    vm.runInContext('_hwStopShortcutHandler(_testEvent);', env);
+    check('WB-SK-1', 'Shift+H while connected+running → hwStop() called',
+        env._stopCalls.length === 1);
+})();
+
+// WB-SK-2  Shift+H while board is halted (not running) → ignored
+(function() {
+    const env = makeShortcutEnv({ connected: true, running: false });
+    env._testEvent = {
+        shiftKey: true, key: 'H',
+        target: { tagName: 'BUTTON', isContentEditable: false },
+        preventDefault: function() {},
+    };
+    vm.runInContext('_hwStopShortcutHandler(_testEvent);', env);
+    check('WB-SK-2', 'Shift+H while halted → hwStop() NOT called',
+        env._stopCalls.length === 0);
+})();
+
+// WB-SK-3  Shift+H while disconnected → ignored
+(function() {
+    const env = makeShortcutEnv({ connected: false, running: false });
+    env._testEvent = {
+        shiftKey: true, key: 'H',
+        target: { tagName: 'BUTTON', isContentEditable: false },
+        preventDefault: function() {},
+    };
+    vm.runInContext('_hwStopShortcutHandler(_testEvent);', env);
+    check('WB-SK-3', 'Shift+H while disconnected → hwStop() NOT called',
+        env._stopCalls.length === 0);
+})();
+
+// WB-SK-4  Shift+H with focus in a textarea → ignored (editor-safe guard)
+(function() {
+    const env = makeShortcutEnv({ connected: true, running: true });
+    env._testEvent = {
+        shiftKey: true, key: 'H',
+        target: { tagName: 'TEXTAREA', isContentEditable: false },
+        preventDefault: function() {},
+    };
+    vm.runInContext('_hwStopShortcutHandler(_testEvent);', env);
+    check('WB-SK-4', 'Shift+H in textarea → hwStop() NOT called (editor guard)',
+        env._stopCalls.length === 0);
+})();
 // ── Summary ───────────────────────────────────────────────────────────────────
 // Async tests (WB-ST-4/5/6) resolve via microtask queues; the timeout below
 // lets all .then() callbacks settle before printing results and exiting.

@@ -17223,6 +17223,21 @@ async function hwStop() {
 }
 window.hwStop = hwStop;
 
+// ── Emergency-stop keyboard shortcut (Shift+H) ────────────────────────────
+// Fires hwStop() when Shift+H is pressed while the board is connected and
+// free-running.  Ignored when focus is inside any text-editing element so
+// the shortcut does not interfere with typing in the editor or input fields.
+function _hwStopShortcutHandler(e) {
+    if (!e.shiftKey || e.key !== 'H') return;
+    const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+    if (tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable)) return;
+    if (!_wukongIsConnected() || !_wukongHWRunning) return;
+    e.preventDefault();
+    hwStop();
+}
+document.addEventListener('keydown', _hwStopShortcutHandler);
+window._hwStopShortcutHandler = _hwStopShortcutHandler;
+
 async function _wukongLoadToHardware() {
     const loadBtn = document.getElementById('toolHWLoadBtn');
     if (loadBtn) {
