@@ -581,6 +581,7 @@
                 <div class="home-chip-row">
                     <a class="home-chip" onclick="event.stopPropagation();switchView('lumps')">LUMP Browser</a>
                     <a class="home-chip" onclick="event.stopPropagation();switchView('namespace')">Namespace</a>
+                    <a class="home-chip" onclick="event.stopPropagation();switchView('namespace-dna')">Namespace DNA</a>
                 </div>
             </div>
             <div class="home-card" data-card-id="dashboard" draggable="true" onclick="switchView('dashboard')" data-tooltip="Dashboard — Live telemetry, MTBF, and fault log">
@@ -3279,7 +3280,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script async src="app-ti60-connect.js?v=20260619a"></script>
     <script defer src="app-startup-wizard.js?v=20260619a"></script>
     <script src="lump-registry.js?v=20260719g"></script>
-    <script src="app-shell.js?v=20260821-modal-trap"></script>
+    <script src="app-shell.js?v=20260823-ns-dna"></script>
     <script src="app-tools.js?v=20260726a"></script>
     <script src="app-cr-display.js?v=20260521a"></script>
     <script src="app-cr-detail.js?v=20260820-named-capability1"></script>
@@ -3287,6 +3288,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="pet_name_audit.js"></script>
     <script src="app-memory.js?v=20260820-persist1"></script>
     <script src="app-abstractions.js?v=20260820-next1"></script>
+    <script src="app-ns-dna.js"></script>
     <script src="lump-audit.js?v=20260724c"></script>
     <script src="rci-show-errs.js?v=20260519a"></script>
     <script src="lump-content-frame.js?v=20260819a"></script>
@@ -3693,6 +3695,20 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
         </div>
     </div>
 </div>
+<div id="namespace-dna" class="view">
+    <div style="max-width:960px;margin:0 auto;padding:1.25rem 1rem;">
+        <div style="display:flex;align-items:baseline;gap:0.75rem;margin-bottom:0.2rem;">
+            <h2 style="color:#d4a843;font-size:1.15rem;margin:0;">Namespace DNA</h2>
+            <span style="font-size:0.8rem;color:#6e7681;">Capability GT links between abstractions</span>
+        </div>
+        <p style="color:#6e7681;font-size:0.8rem;margin:0 0 0.75rem;">
+            Each node is a Namespace slot. Directed arrows represent declared GT capability links
+            from source to target. Hover a node or edge for details.
+        </p>
+        <div id="namespace-dna-body"></div>
+    </div>
+</div>
+
 <div id="gt-view" class="view">
     <div class="gtv-panel">
         <div class="gtv-panel-title">GT Inspector — Golden Tokens by Type</div>

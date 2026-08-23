@@ -1191,7 +1191,7 @@ function init() {
         }
     }).catch(function() { window._hasOpenAIKey = false; });
     checkBootId();
-    const views = ['home','repl','editor','start','tutorial','dashboard','namespace','hello-mum','abstractions','lumps','pipeline','trace','reference','docs','builder','sitemap','gc','devices','github','memory','gt-view'];
+    const views = ['home','repl','editor','start','tutorial','dashboard','namespace','hello-mum','abstractions','lumps','pipeline','trace','reference','docs','builder','sitemap','gc','devices','github','memory','gt-view','namespace-dna'];
     const rawHash = window.location.hash.replace('#', '');
     const [hashView, hashQuery] = rawHash.split('?');
     const hashParams = {};
@@ -1983,6 +1983,7 @@ function switchView(viewId) {
         setTimeout(function() { _wukongShowFaultPanel(_wukongLastFaultData); }, 0);
     }
     if (viewId === 'gt-view') renderGTView();
+    if (viewId === 'namespace-dna' && typeof renderNamespaceDNA === 'function') renderNamespaceDNA();
     if (viewId === 'pipeline' && pipelineViz) pipelineViz.render();
     if (viewId === 'start') {
         if (typeof window._r1CheckSteps === 'function') window._r1CheckSteps();
@@ -2082,7 +2083,7 @@ let _pendingGCPhases = null;   // phases[] from the current in-progress GC run
 
 // ── Default-view lightning bolt drag-and-drop ──────────────────────────────
 function _initDefaultViewBolt() {
-    const views = ['home','repl','editor','start','tutorial','dashboard','namespace','hello-mum','abstractions','lumps','pipeline','trace','reference','docs','builder','sitemap','gc','devices','github','memory','gt-view'];
+    const views = ['home','repl','editor','start','tutorial','dashboard','namespace','hello-mum','abstractions','lumps','pipeline','trace','reference','docs','builder','sitemap','gc','devices','github','memory','gt-view','namespace-dna'];
     const bolt = document.getElementById('hamDefaultBolt');
     const clearBtn = document.getElementById('hamDefaultClear');
     if (!bolt) return;
