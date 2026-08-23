@@ -18,8 +18,7 @@ This document records the design session held in May 2026 between the original P
 
 ### The First Immersive Capability Computer (PP250)
 
-The PP250 (Plessey UK, 1972) was the first immersive capability computer to be sucessfully fielded commercially. It operated for two decades without a single reported security breach to the capability model. Every object in the
-PP250 was accessed through a hardware-validated capability key, a descriptor; no program could reach memory it did not hold a descriptor for. The system survived in production and served in the first Gulf War. It accumulated the necessary operational evidence to turn a theoretical model into a proven if incomplete engineering discipline.
+The PP250 (Plessey UK, 1972) was the first immersive capability computer to be sucessfully fielded commercially. It operated for two decades without a single reported security breach to the capability model. Every object in the PP250 was accessed through a hardware-validated capability key, a descriptor; no program could reach memory it did not hold a descriptor for. The system survived in production and served in the first Gulf War. It accumulated the necessary operational evidence to turn a theoretical model into a proven if incomplete engineering discipline.
 
 The Church Machine is the PP250's direct and architectural complete successor. The lineage is not metaphorical — it is architectural. The key PP250 designer is also after half a century of binary computer failures the Church Machine designer.
 
@@ -28,46 +27,23 @@ The Church Machine is the PP250's direct and architectural complete successor. T
 Three things about flawless computation inherited from the PP250:
 
 1. **The capability model.** Every memory access, indeed every machine instruction is mediated
-   by one or mode hardware-validated token. There is no ambient authority; there is no
-   privileged mode that bypasses the check. If you do not hold a valid
-   token, you cannot touch the memory. These laws apply to Boot at the
-   instant power is applied
+by one or mode hardware-validated token. There is no ambient authority; there is no privileged mode that bypasses the check. If you do not hold a valid token, you cannot touch the memory. These laws apply to Boot at the instant power is applied
 
 3. **Hardware-enforced capability keys**, promoted to the digital gold of international cyberspace. The NS table is the direct descendant of the PP250's segment table. Each entry describes a region of memory — its location, its size, and its current version. The hardware recomputes the integrity check on every access and rejects any entry that has been tampered with.
 
-4. **The principle that capabilities ARE the IDE.** In the PP250 the
-   descriptor table was the system map. In the Church Machine the Namespace
-   table, viewed through the IDE, is the complete, live description of
-   everything the running system can reach in a distributed, universal cyberspace. There is no separate registry,
-   no configuration file, no out-of-band channel. The namespace is the
-   system.
+4. **The principle that capabilities ARE the IDE.** In the PP250 the descriptor table was the system map. In the Church Machine the Namespace table, viewed through the IDE, is the complete, live description of everything the running system can reach in a distributed, universal cyberspace. There is no separate registry, no configuration file, no out-of-band channel. The namespace is the system.
 
 ### What Is New
 
 Three things are new in the Church Machine:
 
 1. **LUMP architecture — Lazy Unit of Memory Placement — **
-   A LUMP is a power-of-2-sized, self-describing
-   binary package for a single abstraction — its methods as CLOOMC code, its c-list, and its
-   header word in one contiguous block. LUMPs are the packaging and delivery
-   system. They did not exist in the PP250. The PP250 loaded segments from
-   disk; the Church Machine fetches LUMPs from the IDE, using a CLOOMC tunnel to
-   the Mum Library. LUMP is how abstractions are protected and travel between Church Machines.
+   A LUMP is a power-of-2-sized, self-describing binary package for a single abstraction — its methods as CLOOMC code, its c-list, and its header word in one contiguous block. LUMPs are the packaging and delivery system. They did not exist in the PP250. The PP250 loaded segments from
+disk; the Church Machine fetches LUMPs from the IDE, using a CLOOMC tunnel to the Mum Library. LUMP is how abstractions are protected and travel between Church Machines.
 
-2. **CLOOMC ISA.** Capability-Limited / Object-Oriented / Machine-Code is
-   the core technology — the instruction set that runs on the Church Machine
-   processor. Like the Church-Turing thesis CLOOMC is a secure combination of Chutch-Instruction
-   encapsulating standard Turing-Instructions, limiting ambient authority to atomic computations.
-   CLOOMC is what is compiled, what is deployed, and what the
-   hardware executes. It is not a scripting layer or a bytecode. It is the
-   machine code.
+2. **CLOOMC ISA.** Capability-Limited / Object-Oriented / Machine-Code is the core technology — the instruction set that runs on the Church Machine processor. Like the Church-Turing thesis CLOOMC is a secure combination of Chutch-Instruction encapsulating standard Turing-Instructions, limiting ambient authority to atomic computations. CLOOMC is what is compiled, what is deployed, and what the hardware executes. It is not a scripting layer or a bytecode. It is the machine code.
 
-4. **Golden Token 32-bit encoding.** The PP250's descriptors were 24 bit
-   hardware words. The Church Machine encodes the full capability — slot
-   index, revocation sequence, permission bits, bind flag, and type — into
-   a single 32-bit word. Every GT is a complete, self-contained run-time capability
-   expression that can be validated, formed and signed, and instantly
-   revoked in O(1) by incrementing a 9-bit version counter. ★v2.0
+4. **Golden Token 32-bit encoding.** The PP250's descriptors were 24 bit hardware words. The Church Machine encodes the full capability — slot index, revocation sequence, permission bits, bind flag, and type — into a single 32-bit word. Every GT is a complete, self-contained run-time capability expression that can be validated, formed and signed, and instantly revoked in O(1) by incrementing a 9-bit version counter. ★v2.0
 
 ---
 
