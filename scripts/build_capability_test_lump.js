@@ -88,7 +88,7 @@ console.log(`Assembled ${words.length} instruction words.`);
 //
 // GT layout (v2.0):
 //   [31]    b_flag  = 0
-//   [30:28] perm3   — Church E: 0b100=4; Turing RW: 0b011=3; Turing R: 0b001=1
+//   [30:28] perm3   — Church E: 0b100=4; Turing RW: 0b011=3; Turing W: 0b010=2; Turing R: 0b001=1
 //   [27]    dom     — Church=1, Turing=0
 //   [26:25] gt_type — Inform=0b01
 //   [24:16] gt_seq  = 0

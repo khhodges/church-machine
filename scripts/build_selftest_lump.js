@@ -91,8 +91,8 @@ console.log(`Assembled ${words.length} instruction words.`);
 //           by the ⚡ LightningBolt boot-entry control.
 //
 const CLIST = [
-    { gt: 0x4A000006 }, // 0  SelfTest  E  NS slot 6  — E-GT for TPERM/EXACT tests
-    { gt: 0x4A000006 }, // 1  Next      E  template; boot image follows ⚡ entry
+    { gt: 0x4A000006, rights: ['E'] }, // 0  SelfTest  E  NS slot 6  — E-GT for TPERM/EXACT tests
+    { gt: 0x4A000006, rights: ['E'] }, // 1  Next      E  template; boot image follows ⚡ entry
 ];
 
 // ── Pack LUMP binary ─────────────────────────────────────────────────────────

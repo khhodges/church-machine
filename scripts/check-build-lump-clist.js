@@ -17,9 +17,11 @@
 // What is compared:
 //   1. Count — CLIST.length must equal the number of capabilities{} entries.
 //   2. Names — each slot's name must match in order (position = c-list slot index).
-//   3. Rights — derived by DECODING THE GT BITFIELD, not from the optional `rights:`
-//      metadata array or inline comments (those are documentation only).
-//      The GT bits are the authority for what is actually written into the binary.
+//   3. Metadata — every CLIST entry's `rights:` array must exactly match the
+//      rights encoded by its raw GT word.
+//   4. Source rights — derived by DECODING THE GT BITFIELD, not from the optional
+//      `rights:` metadata array or inline comments. The GT bits are the authority
+//      for what is actually written into the binary.
 //
 // GT encoding (v2.0):
 //   [31]    b_flag  — always 0 for standard entries
@@ -72,18 +74,25 @@ const PAIRS = [
 ];
 
 // ---------------------------------------------------------------------------
-// GT bitfield decoder — derives effective rights from the raw GT word.
+// GT bitfield decoder — derives fields and effective rights from the raw GT word.
 //
-// This is the authoritative rights mapping; the optional `rights:` array in the
-// build script is documentation only and is NOT used for the comparison.
+// This is the authoritative rights mapping. A declared `rights:` array remains
+// useful documentation, but must agree with these decoded fields.
 //
 // Returns a sorted array of uppercase right letters, e.g. ['E'], ['R','W'].
 // Returns null if the perm encoding is unrecognised.
 // ---------------------------------------------------------------------------
 
+function decodeGTFields(gt) {
+    return {
+        perm3:  (gt >>> 28) & 0x7,
+        dom:    (gt >>> 27) & 0x1,
+        gtType: (gt >>> 25) & 0x3,
+    };
+}
+
 function decodeGTRights(gt) {
-    const perm3 = (gt >>> 28) & 0x7;
-    const dom   = (gt >>> 27) & 0x1;
+    const { perm3, dom } = decodeGTFields(gt);
 
     if (dom === 1) {
         // Church domain
@@ -96,6 +105,17 @@ function decodeGTRights(gt) {
     if (perm3 === 1) return ['R'];
     if (perm3 === 0) return [];
     return null; // unrecognised Turing perm
+}
+
+function formatGTFields(gt) {
+    const { perm3, dom, gtType } = decodeGTFields(gt);
+    const domName = dom === 1 ? 'Church' : 'Turing';
+    const typeName = gtType === 1 ? 'Inform' : 'other';
+    return (
+        `perm3=0b${perm3.toString(2).padStart(3, '0')} (${perm3}), ` +
+        `dom=${dom} (${domName}), ` +
+        `gt_type=0b${gtType.toString(2).padStart(2, '0')} (${typeName})`
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +171,8 @@ function parseSourceCapabilities(text) {
 //   - Name strategy A: name: 'Foo' property.
 //   - Name strategy B: inline comment  // N  CapabilityName  ...
 //
-// Returns an array of { name, gt, decodedRights } in declaration order, or null.
+// Returns an array of { name, gt, decodedRights, claimedRights } in declaration
+// order, or null. `claimedRights` is null when the entry does not declare it.
 // ---------------------------------------------------------------------------
 
 function parseBuildScriptCLIST(text) {
@@ -180,12 +201,24 @@ function parseBuildScriptCLIST(text) {
         // GT value — required.
         const gtMatch = objText.match(/\bgt\s*:\s*(0x[0-9A-Fa-f]+|\d+)/);
         if (!gtMatch) {
-            entries.push({ name: '(no gt)', gt: null, decodedRights: null });
+            entries.push({
+                name: '(no gt)',
+                gt: null,
+                decodedRights: null,
+                claimedRights: null,
+            });
             i = j + 1;
             continue;
         }
         const gt           = parseInt(gtMatch[1], 16);
         const decodedRights = decodeGTRights(gt);
+        const rightsMatch  = objText.match(/\brights\s*:\s*\[([^\]]*)\]/);
+        const claimedRights = rightsMatch
+            ? [...new Set(
+                [...rightsMatch[1].matchAll(/['"]([A-Za-z]+)['"]/g)]
+                    .flatMap(match => parseSourceRights(match[1]))
+            )].sort()
+            : null;
 
         // Name: prefer explicit property, fall back to inline comment.
         const namePropMatch = objText.match(/\bname\s*:\s*['"]([^'"]+)['"]/);
@@ -197,7 +230,7 @@ function parseBuildScriptCLIST(text) {
             name = commentMatch ? commentMatch[1] : '(unnamed)';
         }
 
-        entries.push({ name, gt, decodedRights });
+        entries.push({ name, gt, decodedRights, claimedRights });
         i = j + 1;
     }
 
@@ -211,6 +244,10 @@ function parseBuildScriptCLIST(text) {
 function rightsStr(arr) {
     if (!arr || arr.length === 0) return '(none)';
     return arr.join('');
+}
+
+function claimedRightsStr(arr) {
+    return arr === null ? '(not declared)' : `[${arr.join(', ')}]`;
 }
 
 // ---------------------------------------------------------------------------
@@ -235,7 +272,7 @@ function compareCaps(sourceCaps, clistEntries, label) {
         lines.push(`         CLIST:   ${clistEntries.map(e => e.name).join(', ')}`);
     }
 
-    // (2) Per-slot name + GT-decoded rights comparison.
+    // (2) Per-slot name, declared-rights metadata, and GT-decoded source rights.
     const maxLen = Math.max(sourceCaps.length, clistEntries.length);
     for (let slot = 0; slot < maxLen; slot++) {
         const src = sourceCaps[slot];
@@ -253,6 +290,27 @@ function compareCaps(sourceCaps, clistEntries, label) {
         }
 
         const nameMismatch = (src.name !== cle.name);
+        let claimedRightsFail = false;
+        let claimedRightsMsg  = '';
+
+        // Every CLIST entry must declare its human-readable rights and those
+        // metadata must agree exactly with the raw GT, including widening.
+        if (cle.gt === null || cle.decodedRights === null ||
+            cle.claimedRights === null ||
+            rightsStr(cle.claimedRights) !== rightsStr(cle.decodedRights)) {
+            claimedRightsFail = true;
+            const decoded = cle.decodedRights === null
+                ? '(unrecognised)'
+                : claimedRightsStr(cle.decodedRights);
+            const gtHex = cle.gt === null
+                ? '(missing)'
+                : `0x${cle.gt.toString(16).toUpperCase().padStart(8, '0')}`;
+            const fields = cle.gt === null ? 'unavailable' : formatGTFields(cle.gt);
+            claimedRightsMsg = (
+                `slot ${slot} (${src.name}): CLIST GT ${gtHex} decodes to ${decoded}; ` +
+                `${fields}; claimed rights ${claimedRightsStr(cle.claimedRights)}`
+            );
+        }
 
         let rightsFail = false;
         let rightsNote = false;
@@ -295,6 +353,10 @@ function compareCaps(sourceCaps, clistEntries, label) {
             lines.push(`   FAIL  slot ${slot}: name mismatch — source '${src.name}', CLIST '${cle.name}'`);
             ok = false;
         }
+        if (claimedRightsFail) {
+            lines.push(`   FAIL  ${claimedRightsMsg}`);
+            ok = false;
+        }
         if (rightsFail) {
             lines.push(`   FAIL  ${rightsMsg}`);
             ok = false;
@@ -302,7 +364,7 @@ function compareCaps(sourceCaps, clistEntries, label) {
             lines.push(`   note  ${rightsMsg}`);
         }
 
-        if (!nameMismatch && !rightsFail) {
+        if (!nameMismatch && !claimedRightsFail && !rightsFail) {
             const r    = cle.decodedRights ? rightsStr(cle.decodedRights) : '?';
             const note = rightsNote ? '  (wider than declared)' : '';
             lines.push(`   ok    slot ${slot}  ${src.name}  ${r}${note}`);
@@ -386,6 +448,8 @@ function runSelfTests() {
            'GT 0x22000000 decodes to W (Turing W-only)');
     assert(decodeGTRights(0x5A000000) === null,
            'GT with unrecognised Church perm3=5 returns null');
+    assert(JSON.stringify(decodeGTFields(0x4A000006)) === '{"perm3":4,"dom":1,"gtType":1}',
+           'GT field decoder exposes perm3, dom, and gt_type');
 
     // ── Source capabilities parser — comma format ─────────────────────────────
     const srcComma = parseSourceCapabilities(
@@ -434,6 +498,8 @@ function runSelfTests() {
     assert(namedCLIST && namedCLIST[2].name === 'BTN_DEV' &&
            JSON.stringify(namedCLIST[2].decodedRights) === '["R"]',
            'named CLIST: slot 2 = BTN_DEV, decoded R from gt');
+    assert(namedCLIST && JSON.stringify(namedCLIST[1].claimedRights) === '["R","W"]',
+           'named CLIST: declared rights metadata parsed');
 
     // ── CLIST parser — comment-only entries (post_flash_selftest format) ──────
     const commentCLIST = parseBuildScriptCLIST(
@@ -451,6 +517,19 @@ function runSelfTests() {
            JSON.stringify(commentCLIST[1].decodedRights) === '["E"]',
            'comment-only CLIST: slot 1 Next, rights from gt 0x4A000006 (not comment)');
 
+    // ── Drift: missing declared rights metadata ────────────────────────────────
+    {
+        const r = syntheticCheck(
+            'capabilities {\n    SelfTest E\n}\n',
+            "const CLIST = [\n    { gt: 0x4A000006 }, // 0  SelfTest  E\n];\n"
+        );
+        assert(!r.ok && r.lines.some(line =>
+            line.includes('0x4A000006') &&
+            line.includes('perm3=0b100') &&
+            line.includes('claimed rights (not declared)')
+        ), 'drift: CLIST entry without a rights array → FAIL');
+    }
+
     // ── Drift: name mismatch ──────────────────────────────────────────────────
     {
         const r = syntheticCheck(
@@ -459,6 +538,24 @@ function runSelfTests() {
         );
         assert(!r.ok && r.lines.some(l => l.includes('FAIL') && l.includes('name mismatch')),
                'drift: name mismatch (BTN_DEV vs BUTTON_DEV) → FAIL');
+    }
+
+    // ── Drift: declared rights metadata disagrees with the GT ──────────────────
+    // The source and binary agree on RW; only the build-script metadata claims R.
+    // This specifically catches a right-name / wrong-hex copy-paste error.
+    {
+        const r = syntheticCheck(
+            'capabilities {\n    LED_DEV RW\n}\n',
+            "const CLIST = [\n    { gt: 0x32000003, name: 'LED_DEV', ns_slot: 3, rights: ['R'] },\n];\n"
+        );
+        const message = r.lines.find(line => line.includes('claimed rights'));
+        assert(!r.ok && message &&
+               message.includes('0x32000003') &&
+               message.includes('perm3=0b011') &&
+               message.includes('dom=0') &&
+               message.includes('gt_type=0b01') &&
+               message.includes('claimed rights [R]'),
+               'drift: declared rights R disagrees with RW GT and reports decoded fields');
     }
 
     // ── Drift: GT encodes fewer rights than source (narrowing) ────────────────
