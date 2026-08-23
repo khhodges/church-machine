@@ -16,6 +16,16 @@ const fs   = require('fs');
 const path = require('path');
 
 const ChurchSimulator = require('./simulator.js');
+
+function writeTestNsEntry(sim, ...args) {
+    const bootComplete = sim.bootComplete;
+    sim.bootComplete = false;
+    try {
+        return sim.writeNSEntry(...args);
+    } finally {
+        sim.bootComplete = bootComplete;
+    }
+}
 const CapabilityTokens = require('./capability_tokens.js');
 
 // bootSim() from tests/gates/sim_helpers is fine; setupCR6 there uses the
@@ -46,7 +56,7 @@ function setupCR6(sim) {
     // writeNSEntry(idx, location, limit17, bFlag, gBit, gtType, version, clistCount, cacheToken)
     // clistCount=1 is recorded in the _nsClistCount side-table and surfaced by
     // readNSEntry() (header fallback), which _clistCountForCR(6) consults.
-    sim.writeNSEntry(CR6_DESC_SLOT, CR6_DESC_LOC, 0, 0, 0, 1 /*Inform*/, 0, 1 /*clistCount*/, 0);
+    writeTestNsEntry(sim, CR6_DESC_SLOT, CR6_DESC_LOC, 0, 0, 0, 1 /*Inform*/, 0, 1 /*clistCount*/, 0);
     const nsBase  = sim._nsSlotBase(CR6_DESC_SLOT);
     const gt_seq  = sim.parseNSWord1(sim.memory[nsBase + 1] >>> 0).gtSeq;
     const eGT     = sim.createGT(gt_seq, CR6_DESC_SLOT, { E: 1 }, 1);
@@ -575,7 +585,7 @@ console.log('\n--- T008: NULL GT no pet name → immediate NULL_CAP fault ---');
         // c-list count is entry-level metadata (side-table), not a W1 field:
         // re-declare the CR6 descriptor slot with clistCount=12 so
         // _clistCountForCR(6) reports 12 via readNSEntry() fallback.
-        sim.writeNSEntry(CR6_DESC_SLOT, CR6_DESC_LOC, 0, 0, 0, 1, 0, 12, 0);
+        writeTestNsEntry(sim, CR6_DESC_SLOT, CR6_DESC_LOC, 0, 0, 0, 1, 0, 12, 0);
         sim.memory[511] = 0;  // slot 11 → NULL GT (500 + 11)
         // Leave programCapabilities empty → no pet name for slot 11.
         sim.programCapabilities = null;

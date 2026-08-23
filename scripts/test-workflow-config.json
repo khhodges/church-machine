@@ -32,6 +32,7 @@
     "lump-save-error-surface-tests",
     "lump-v13-freespace-tests",
     "ns-slot-dynamic-tests",
+    "rogue-namespace-slot-tests",
     "pipeline-health-stages-tests",
     "pipeline-health-status-tests",
     "sentinel-warning-tests",

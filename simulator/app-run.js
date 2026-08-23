@@ -1101,6 +1101,11 @@ function _injectClistNow() {
     // setting CR6.word2 with limit17=0 → every subsequent LOAD through CR6 faults.
     const nsBase    = sim._nsSlotBase(BOOT_ABSTR_SLOT);
     const w1f       = sim.parseNSWord1(sim.memory[nsBase + 1]);
+    const bootGtSeq = w1f.gtSeq;
+    const _gtSeqForSlot = function(slot) {
+        const entry = sim.readNSEntry(slot);
+        return entry ? sim.parseNSWord1(entry.word1_limit).gtSeq : 0;
+    };
     const lumpBase  = sim.memory[nsBase] >>> 0;
     const lumpHdr   = sim.memory[lumpBase] >>> 0;
     const hdrParsed = sim.parseLumpHeader(lumpHdr);
@@ -1165,11 +1170,13 @@ function _injectClistNow() {
             // Church E-GT at the current boot-entry slot, which has migrated over
             // time — do NOT hardcode 3, use sim.bootEntrySlot).
             if (capName.toUpperCase() === 'BOOT.NUCS') {
-                sim.memory[clistBase + i] = sim.createGT(0, 1, {X:1}, 1) >>> 0;
+                sim.memory[clistBase + i] =
+                    sim.createGT(_gtSeqForSlot(1), 1, {X:1}, 1) >>> 0;
                 continue;
             }
             if (capName.toUpperCase() === 'BOOT.ABSTR') {
-                sim.memory[clistBase + i] = sim.createGT(0, sim.bootEntrySlot, {E:1}, 1) >>> 0;
+                sim.memory[clistBase + i] =
+                    sim.createGT(bootGtSeq, sim.bootEntrySlot, {E:1}, 1) >>> 0;
                 continue;
             }
 
@@ -1206,7 +1213,7 @@ function _injectClistNow() {
                     perms.E = 1;  // no rights declared → safe Church entry default
                 }
                 sim.memory[clistBase + i] =
-                    sim.createGT(0, nsIdx, perms, 1) >>> 0;
+                    sim.createGT(_gtSeqForSlot(nsIdx), nsIdx, perms, 1) >>> 0;
                 continue;
             }
 
@@ -1220,11 +1227,10 @@ function _injectClistNow() {
         }
 
         sim.memory[lumpBase] = ((lumpHdr & ~0xFF) | (cc & 0xFF)) >>> 0;
-        const nsWord1B = sim.packNSWord1(
-            w1f.limit, w1f.b, w1f.g, w1f.gtType, cc
-        );
-        sim.memory[nsBase + 1] = nsWord1B;
-        const cr6GTb = sim.createGT(0, BOOT_ABSTR_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
+        const nsWord1B = sim.memory[nsBase + 1] >>> 0;
+        sim._nsClistCount[BOOT_ABSTR_SLOT] = cc;
+        const cr6GTb = sim.createGT(
+            bootGtSeq, BOOT_ABSTR_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
         sim.cr[6] = {
             word0: cr6GTb,
             word1: clistBase >>> 0,
@@ -1250,11 +1256,10 @@ function _injectClistNow() {
             sim.memory[clistBase + i] = sim.demoClistGTs[i] >>> 0;
         }
         sim.memory[lumpBase] = ((lumpHdr & ~0xFF) | (cc & 0xFF)) >>> 0;
-        const nsWord1A = sim.packNSWord1(
-            w1f.limit, w1f.b, w1f.g, w1f.gtType, cc
-        );
-        sim.memory[nsBase + 1] = nsWord1A;
-        const cr6GTa = sim.createGT(0, BOOT_ABSTR_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
+        const nsWord1A = sim.memory[nsBase + 1] >>> 0;
+        sim._nsClistCount[BOOT_ABSTR_SLOT] = cc;
+        const cr6GTa = sim.createGT(
+            bootGtSeq, BOOT_ABSTR_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
         sim.cr[6] = {
             word0: cr6GTa,
             word1: clistBase >>> 0,
@@ -1287,11 +1292,16 @@ function _applyPendingSimLoad() {
     const _aplToken = window.LumpRegistry ? window.LumpRegistry.getCurrent() : null;
     const _aplCaps  = _aplMem ? (_aplMem.capabilities || []) : [];
     let   _progSlot = null;
+    let   _progGtSeq = 0;
     if (sim.bootComplete && _aplToken && typeof sim.allocOrFindNsSlot === 'function') {
         const _aplName  = sim.programName || 'prog';
         _progSlot = sim.allocOrFindNsSlot(_aplToken, _aplName);
         if (_progSlot !== null) {
             sim.writeNsEntryForProgram(_progSlot, { words: _aplWords, caps: _aplCaps, label: _aplName });
+            const _progEntry = sim.readNSEntry(_progSlot);
+            _progGtSeq = _progEntry
+                ? sim.parseNSWord1(_progEntry.word1_limit).gtSeq
+                : 0;
             sim.bootEntrySlot = _progSlot;
         }
     }
@@ -1304,7 +1314,8 @@ function _applyPendingSimLoad() {
     // already points to the new slot [7] lump at 0x0400 — every instruction
     // fetch faults the bounds check before stepCount++ is reached.
     if (_progSlot !== null && sim.bootComplete && sim.cr[14]) {
-        const _cr14GT = sim.createGT(0, _progSlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1) >>> 0;
+        const _cr14GT = sim.createGT(
+            _progGtSeq, _progSlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1) >>> 0;
         sim.cr[14].word0 = _cr14GT;
         sim.cr[14].m = 0;
     }
@@ -1358,7 +1369,7 @@ function _applyPendingSimLoad() {
     // This replaces the SelfTest E-GT that the boot sequence installed at
     // thread[+THREAD_CAPS_OFFSET=244], making CR0 reference the user's program.
     if (_progSlot !== null && sim.bootComplete) {
-        const _progGT = sim.createGT(0, _progSlot, {E:1}, 1) >>> 0;
+        const _progGT = sim.createGT(_progGtSeq, _progSlot, {E:1}, 1) >>> 0;
         sim.cr[0] = { word0: _progGT, word1: 0, word2: 0, word3: 0, m: 0 };
         const _thEntry = sim.readNSEntry(1);
         if (_thEntry && _thEntry.word0_location > 0) {
@@ -1793,12 +1804,6 @@ function slowBoot() {
                     // empty for user-code debugging after a clean boot.
                     sim.auditLog = [];
                     _autoLoadDefaultProgram();
-                    // Restore user-assigned namespace labels that sim.reset()
-                    // wiped (nsLabels = {}).  Must run after _autoLoadDefaultProgram
-                    // so any program-load-triggered NS writes have already landed.
-                    // Skips slots where isNSEntryValid() is true so boot-image
-                    // catalog entries always take precedence over saved labels.
-                    if (typeof loadNamespaceState === 'function') loadNamespaceState();
                     // Show last-fault panel if a fault snapshot was recorded
                     // before this reboot (survives the reboot animation).
                     if (typeof _fetchAndShowLastFaultPanel === 'function') {
@@ -13360,6 +13365,28 @@ method swap(p) = (snd p, fst p)</div>
     return adapted;
 }
 
+function _persistNamespaceSlotLabel(slot, label) {
+    window.bootConfig = window.bootConfig || {};
+    window.bootConfig.slotLabels = window.bootConfig.slotLabels || {};
+    window.bootConfig.slotLabels[String(slot)] = label;
+
+    const pending = fetch('/api/boot-config/slot-label', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slot: slot, label: label })
+    }).then(function(response) {
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        return response.json();
+    });
+    window._nsLabelPersistPromises = window._nsLabelPersistPromises || [];
+    window._nsLabelPersistPromises.push(pending);
+    pending.catch(function(error) {
+        console.warn('[Namespace] slot-label persist failed:', error);
+    });
+    return pending;
+}
+window._persistNamespaceSlotLabel = _persistNamespaceSlotLabel;
+
 function confirmSaveToNamespace() {
     const slotSel = document.getElementById('saveNSSlot');
     const label = document.getElementById('saveNSLabel').value.trim();
@@ -13501,7 +13528,7 @@ function confirmSaveToNamespace() {
         sim.saveToNamespaceAt(idx, label, _svWords, perms, gtType, _caps);
     }
     closeSaveDialog();
-    saveNamespaceState();
+    _persistNamespaceSlotLabel(idx, label);
 
     // Compute and store the token for the just-saved lump so "Open Lump"
     // navigates by token after a Save to NS (Step 2 of token-first navigation).
@@ -13569,67 +13596,20 @@ function confirmSaveToNamespace() {
 
 
 function saveNamespaceState() {
-    const entries = [];
-    for (let i = 0; i < sim.nsCount; i++) {
-        const e = sim.readNSEntry(i);
-        const customLabel = (sim.nsLabels && sim.nsLabels[i]) || null;
-        if (!e && !customLabel) { entries.push(null); continue; }
-        if (!e) {
-            entries.push({ nsWords: [], label: customLabel, dataWords: [] });
-            continue;
-        }
-        const mem = sim.getEntryMemory(i);
-        const base = sim._nsSlotBase(i);
-        entries.push({
-            nsWords: [sim.memory[base], sim.memory[base + 1], sim.memory[base + 2]],
-            label: e.label || customLabel,
-            dataWords: mem ? [mem.gt, ...mem.words] : [],
-        });
-    }
-    localStorage.setItem('church_namespace', JSON.stringify(entries));
+    // Compatibility shim for older callers. Namespace occupancy is persisted
+    // only by the committed Namespace/boot-image path, never by browser memory.
+    loadNamespaceState();
 }
 
 function loadNamespaceState() {
-    const saved = localStorage.getItem('church_namespace');
-    if (!saved) return;
+    // One-way retirement of the obsolete raw-memory snapshot. Deliberately do
+    // not parse or migrate its labels: a legacy label cannot prove that its slot
+    // is occupied in the committed Namespace and therefore cannot be trusted.
     try {
-        const entries = JSON.parse(saved);
-        for (let i = 0; i < entries.length; i++) {
-            const item = entries[i];
-            if (!item) continue;
-            if (sim.isNSEntryValid(i)) continue;
-            if (item.nsWords && item.nsWords.length === 3) {
-                const base = sim._nsSlotBase(i);
-                sim.memory[base + 0] = item.nsWords[0] >>> 0;
-                sim.memory[base + 1] = item.nsWords[1] >>> 0;
-                sim.memory[base + 2] = item.nsWords[2] >>> 0;
-                if (i >= sim.nsCount) sim.nsCount = i + 1;
-                if (item.label) sim.nsLabels[i] = item.label;
-                if (item.dataWords && item.dataWords.length > 0) {
-                    const loc = item.nsWords[0] >>> 0;
-                    for (let j = 0; j < item.dataWords.length; j++) {
-                        sim.memory[loc + j] = item.dataWords[j] >>> 0;
-                    }
-                }
-            } else if (item.label && (!item.nsWords || item.nsWords.length === 0)) {
-                sim.nsLabels[i] = item.label;
-                if (i >= sim.nsCount) sim.nsCount = i + 1;
-            } else if (item.entry) {
-                const loc = item.entry.word0_location || (i * sim.SLOT_SIZE);
-                const lim = sim.parseNSWord1(item.entry.word1_limit || 0);
-                const restoredGtType = (item.entry.gtType === 3)
-                    ? (console.warn(`[NS restore] slot ${i}: gtType=3 (Abstract) is not valid in NS table; treating as Inform (1)`), 1)
-                    : (item.entry.gtType != null ? item.entry.gtType : 1);
-                sim.writeNSEntry(i, loc, lim.limit, lim.b, item.entry.gBit || 0, item.entry.chainable ? 1 : 0, restoredGtType, 0);
-                sim.nsLabels[i] = item.entry.label || '';
-                if (item.words && item.words.length > 0) {
-                    for (let j = 0; j < item.words.length; j++) {
-                        sim.memory[loc + j] = item.words[j] >>> 0;
-                    }
-                }
-            }
-        }
-    } catch (e) {}
+        localStorage.removeItem('church_namespace');
+    } catch (e) {
+        console.warn('[Namespace] could not retire legacy browser snapshot:', e);
+    }
 }
 
 function downloadHardwareImage() {

@@ -57,6 +57,16 @@ global.window = {};   // silence any bootConfig references in the constructor
 
 const ChurchSimulator = require('../../simulator/simulator.js');
 
+function writeTestNsEntry(sim, ...args) {
+    const bootComplete = sim.bootComplete;
+    sim.bootComplete = false;
+    try {
+        return sim.writeNSEntry(...args);
+    } finally {
+        sim.bootComplete = bootComplete;
+    }
+}
+
 let passed = 0;
 let failed = 0;
 
@@ -159,8 +169,8 @@ console.log('\n--- PHASE 1: lump-header CALL path (cc>0) ---');
         `sentinel=0x${SENTINEL_WORD.toString(16)} return=0x${RETURN_WORD.toString(16)}`);
 
     // NS entries
-    sim.writeNSEntry(CALLER_SLOT, CALLER_BASE, 63, 0, 0, 1, 0, CALLER_CC, 0);
-    sim.writeNSEntry(CALLEE_SLOT, CALLEE_BASE, 63, 0, 0, 1, 0, CALLEE_CC, 0);
+    writeTestNsEntry(sim, CALLER_SLOT, CALLER_BASE, 63, 0, 0, 1, 0, CALLER_CC, 0);
+    writeTestNsEntry(sim, CALLEE_SLOT, CALLEE_BASE, 63, 0, 0, 1, 0, CALLEE_CC, 0);
 
     // CR14 = caller's RX code cap
     const callerRXGT = sim.createGT(0, CALLER_SLOT, {R:1, X:1}, 1);
@@ -323,9 +333,9 @@ console.log('\n--- PHASE 2: non-lump-header CALL path (cc=0) ---');
     sim2.memory[CALLEE_CODE_BASE + 2] = RETURN_WORD2;  // PC=1 in code lump
 
     // NS entries
-    sim2.writeNSEntry(CALLER2_SLOT,     CALLER2_BASE,     63, 0, 0, 1, 0, CALLER2_CC,     0);
-    sim2.writeNSEntry(CALLEE_CC0_SLOT,  CALLEE_CC0_BASE,  63, 0, 0, 1, 0, 0 /* cc=0 */,   0);
-    sim2.writeNSEntry(CALLEE_CODE_SLOT, CALLEE_CODE_BASE, 63, 0, 0, 1, 0, CALLEE_CODE_CC, 0);
+    writeTestNsEntry(sim2, CALLER2_SLOT,     CALLER2_BASE,     63, 0, 0, 1, 0, CALLER2_CC,     0);
+    writeTestNsEntry(sim2, CALLEE_CC0_SLOT,  CALLEE_CC0_BASE,  63, 0, 0, 1, 0, 0 /* cc=0 */,   0);
+    writeTestNsEntry(sim2, CALLEE_CODE_SLOT, CALLEE_CODE_BASE, 63, 0, 0, 1, 0, CALLEE_CODE_CC, 0);
 
     // CR14 = caller2's RX code cap
     const caller2RXGT = sim2.createGT(0, CALLER2_SLOT, {R:1, X:1}, 1);

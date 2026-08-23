@@ -1,6 +1,6 @@
-// =============================================================================
+// -----------------------------------------------------------------------------
 // simulator.js — Church Machine CPU Simulator
-// =============================================================================
+// -----------------------------------------------------------------------------
 //
 // Node.js compatibility shim: abstract_gt_manager.js is a separate file in
 // the browser but must be loaded here when running under Node.js (test harnesses).
@@ -89,7 +89,7 @@ if (typeof module !== 'undefined' && typeof AbstractGTManager === 'undefined') {
 //                            DEMO_NAMESPACE); _bootStep() mirrors this exactly
 //   hardware/call.py       — CALL/RETURN micro-op implementation
 //
-// =============================================================================
+// -----------------------------------------------------------------------------
 
 // Offset of the caps zone (CR0-CR11 GT home slots) inside a 256-word thread lump
 const THREAD_CAPS_OFFSET = 244;
@@ -155,6 +155,17 @@ const BOOT_NS_SLOT_THREAD = 1;   // Thread entry LUMP (TCB / boot Thread)
 // boot-entry E-GT (Thread.caps[0]).  No trampoline instructions needed.
 
 class ChurchSimulator {
+    #builtinNamespaceWriteDepth = 0;
+
+    #withBuiltinNamespaceWrite(reason, callback) {
+        this.#builtinNamespaceWriteDepth++;
+        try {
+            return this.withNamespaceWrite(reason, callback);
+        } finally {
+            this.#builtinNamespaceWriteDepth--;
+        }
+    }
+
     constructor() {
         this._listeners = {};
         // NS_TABLE_BASE is recomputed in reset() (and in the binary loaders) to
@@ -438,28 +449,22 @@ class ChurchSimulator {
         // Re-write word0 and word1 unconditionally so binary age never affects
         // runtime slot-type behaviour.
         {
-            const _wasAllowed = this._allowAutoWrite;
-            this._allowAutoWrite = true;
-            try {
-                const _MMIO_REINIT = {
-                    2: { addr: 0x40000014, lim17: 2 },   // UART_DEV:  TX/STATUS/RX
-                    3: { addr: 0x40000000, lim17: 4 },   // LED_DEV:   LED0-LED4
-                    4: { addr: 0x40000028, lim17: 0 },   // BTN_DEV:   state
-                    5: { addr: 0x4000002C, lim17: 4 },   // TIMER_DEV: 5 registers
-                };
-                for (const [_slotStr, _spec] of Object.entries(_MMIO_REINIT)) {
-                    const _slot  = Number(_slotStr);
-                    // This is a display/catalog hint, never execution state or authority.
-                    const _declared = (this._nsUiTypeHint && this._nsUiTypeHint[_slot]) || 0;
-                    if (_declared !== 1) {
-                        // writeNSEntry recomputes W1 (authority) and W2 (integrity32).
-                        this.writeNSEntry(_slot, _spec.addr >>> 0, _spec.lim17, 0, 0, 1, 0, 0,
-                            this.memory[this._nsSlotBase(_slot) + 3] >>> 0);
-                        this.output += `[BOOTIMG] NS[${_slot}] MMIO gtType upgraded NULL→Inform (stale binary).\n`;
-                    }
+            const _MMIO_REINIT = {
+                2: { addr: 0x40000014, lim17: 2 },   // UART_DEV:  TX/STATUS/RX
+                3: { addr: 0x40000000, lim17: 4 },   // LED_DEV:   LED0-LED4
+                4: { addr: 0x40000028, lim17: 0 },   // BTN_DEV:   state
+                5: { addr: 0x4000002C, lim17: 4 },   // TIMER_DEV: 5 registers
+            };
+            for (const [_slotStr, _spec] of Object.entries(_MMIO_REINIT)) {
+                const _slot  = Number(_slotStr);
+                // This is a display/catalog hint, never execution state or authority.
+                const _declared = (this._nsUiTypeHint && this._nsUiTypeHint[_slot]) || 0;
+                if (_declared !== 1) {
+                    // writeNSEntry recomputes W1 (authority) and W2 (integrity32).
+                    this.writeNSEntry(_slot, _spec.addr >>> 0, _spec.lim17, 0, 0, 1, 0, 0,
+                        this.memory[this._nsSlotBase(_slot) + 3] >>> 0);
+                    this.output += `[BOOTIMG] NS[${_slot}] MMIO gtType upgraded NULL→Inform (stale binary).\n`;
                 }
-            } finally {
-                this._allowAutoWrite = _wasAllowed;
             }
         }
 
@@ -660,24 +665,28 @@ class ChurchSimulator {
         // be pre-computed in the binary.  After the lump header is written we
         // synthesise the GT here and store it at lumpBase + (lumpSize - cc + idx).
         //
-        // Convention: data-alias NS slots live at 200 + ns_slot, so Constants
-        // (slot 18) gets its data alias at NS slot 218, etc.
+        // Data aliases are ordinary dynamic Namespace allocations. They must use
+        // the same first-free policy as programs, Mint, and manual Add.
         if (cc > 0) {
             const capsList = bootUpload.capabilities || [];
             const selfDataRIdx = capsList.findIndex(c => c && c.type === 'self-data-R');
             if (selfDataRIdx >= 0) {
                 const dataBase   = (loc + 1 + totalCodeWords) >>> 0;
                 const dataLimit  = totalDataWords > 0 ? totalDataWords - 1 : 0;
-                const dataNsSlot = 200 + slotIndex;
-                const _wasAllowed = this._allowAutoWrite;
-                this._allowAutoWrite = true;
-                try {
-                    this.writeNSEntry(dataNsSlot, dataBase, dataLimit, 0, 0, 0, 1, 0, 0);
-                } finally {
-                    this._allowAutoWrite = _wasAllowed;
+                const dataNsSlot = this.allocOrFindNsSlot(null, `${label}.data`);
+                if (dataNsSlot === null) {
+                    this.output += `[LOADER] FAIL: no free Namespace slot for ${label}.data\n`;
+                    return false;
                 }
+                const dataGtSeq = this._nsSequenceForWrite(dataNsSlot);
+                this.withNamespaceWrite('dynamic LUMP data installation', () => {
+                    this.writeNSEntry(
+                        dataNsSlot, dataBase, dataLimit, 0, 0, 1,
+                        dataGtSeq, 0, 0);
+                });
                 this.nsLabels[dataNsSlot] = `${label}.data`;
-                const dataGT = this.createGT(0, dataNsSlot, {R:1,W:0,X:0,L:0,S:0,E:0}, 1);
+                const dataGT = this.createGT(
+                    dataGtSeq, dataNsSlot, {R:1,W:0,X:0,L:0,S:0,E:0}, 1);
                 this.memory[(loc + lumpSize - cc + selfDataRIdx) >>> 0] = dataGT;
                 this.output += `[LOADER] ${label}: self-data-R → NS[${dataNsSlot}] base=0x${dataBase.toString(16).toUpperCase()} limit=${dataLimit} GT@lump+${lumpSize - cc + selfDataRIdx}\n`;
             }
@@ -781,7 +790,9 @@ class ChurchSimulator {
         // slots with no registered identity keep the historical behaviour
         // (NS entry authority preserved, lump body zeroed).
         if (this.getSlotIdentity(slotIndex)) {
-            this._restoreOutformWords(slotIndex);
+            this.withNamespaceWrite('dynamic LUMP eviction', () => {
+                this._restoreOutformWords(slotIndex);
+            });
             this._restoreOutformBindings(slotIndex);
             this.output += `[LOADER] Evicted ${label} (slot ${slotIndex}) — resident body cleared, Outform W1-3 restored (identity preserved)\n`;
         } else {
@@ -883,6 +894,9 @@ class ChurchSimulator {
         this.nsHandlers = {};
         this.nsClistMap = {};
         this._nsStubFlags = {};   // slot → true when every code word in the LUMP is opcode RETURN
+        // A free slot must be four zero words so first-free allocation can reuse
+        // it. Keep the bumped generation out-of-band until the slot is reissued.
+        this._nsFreeSequences = {};
         // Installation provenance is runtime-only. Reset must not preserve a
         // revoked slot's immutable-self guard; trusted loaders re-establish it.
         this._compilerOwnedSelfSlots = {};
@@ -904,9 +918,8 @@ class ChurchSimulator {
         this.awaitingLump = null;
         this._tracePacketsBuf = [];  // per-instruction trace packet buffer (cleared before each step)
 
-        // NS write guard (task #2941): only boot-load (_initNamespaceTable) and the
-        // manual UI gate (Navana.ADD) may call writeNSEntry.  All other paths must use
-        // direct memory writes.  Set to true only in those two locations, never globally.
+        // Namespace occupancy is security-relevant. Boot setup writes before
+        // bootComplete; post-boot mutations must use a scoped explicit action.
         this._allowAutoWrite = false;
 
         // Three-tier fault recovery and scheduler interrupt state (Task #1077)
@@ -1258,9 +1271,7 @@ class ChurchSimulator {
         }
 
         const nsBase = this._nsSlotBase(slot);
-        const priorW1 = this.memory[nsBase + 1] >>> 0;
-        const prior = this.parseNSWord1(priorW1);
-        const seq = prior.gtSeq;
+        const seq = this._nsSequenceForWrite(slot);
         const expectedSelf = this.createGT(seq, slot, { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, 1) >>> 0;
         const supplied = copy[row0] >>> 0;
         const placeholder = ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER >>> 0;
@@ -1452,6 +1463,41 @@ class ChurchSimulator {
         return this.NS_TABLE_BASE + this.NS_TABLE_RESERVE - (idx + 1) * this.NS_ENTRY_WORDS;
     }
 
+    firstUserNsSlot() {
+        return BOOT_NAMED_SLOTS.length;
+    }
+
+    _nsSequenceForWrite(idx) {
+        const remembered = this._nsFreeSequences && this._nsFreeSequences[idx];
+        if (Number.isInteger(remembered)) return remembered & 0x1FF;
+        if (!Number.isInteger(idx) || idx < 0 || idx >= this.MAX_NS_ENTRIES) return 0;
+        return this.parseNSWord1(
+            this.memory[this._nsSlotBase(idx) + 1] >>> 0
+        ).gtSeq;
+    }
+
+    withNamespaceWrite(reason, callback) {
+        if (typeof callback !== 'function') {
+            throw new TypeError('withNamespaceWrite requires a callback');
+        }
+        const previous = this._allowAutoWrite;
+        this._allowAutoWrite = true;
+        try {
+            return callback();
+        } finally {
+            this._allowAutoWrite = previous;
+        }
+    }
+
+    _assertNamespaceWriteAllowed(action, idx) {
+        if (!this._allowAutoWrite && this.bootComplete) {
+            throw new Error(
+                `${action}(slot ${idx}): called outside an allowed write window ` +
+                `(bootComplete=true, _allowAutoWrite=false). ` +
+                `Use withNamespaceWrite() for an explicit programmer action.`);
+        }
+    }
+
     // Task #2862: the final parameter is the 32-bit CACHE TOKEN written to W3
     // (word3_cache_token), NOT an Abstract GT.  Renamed abstract_gt -> cacheToken32.
     writeNSEntry(idx, location, limit17, bFlag, gBit, gtType, version, clistCount, cacheToken32) {
@@ -1462,15 +1508,17 @@ class ChurchSimulator {
                 `See docs/abstract-io-addressing.md.`
             );
         }
-        // NS write guard (task #2941): catch accidental auto-writes outside an
-        // explicitly allowed boot, loader, or manual-ADD write window.
-        // console.assert fires in development; does not block execution in production.
-        if (!this._allowAutoWrite && this.bootComplete) {
-            console.assert(false,
-                `writeNSEntry(slot ${idx}): called outside an allowed write window ` +
-                `(bootComplete=true, _allowAutoWrite=false). ` +
-                `Legitimate writers must set _allowAutoWrite for the duration of the write. ` +
-                `Use direct memory writes for GC/internal reclamation.`);
+        // Namespace occupancy is security-relevant state.  Once boot has completed,
+        // writes must be inside a scoped boot/programmer action; logging an assertion
+        // is not sufficient because execution would otherwise continue and mutate it.
+        this._assertNamespaceWriteAllowed('writeNSEntry', idx);
+        if (!Number.isInteger(idx) || idx < 0 || idx >= this.MAX_NS_ENTRIES) {
+            throw new RangeError(`writeNSEntry: slot must be an integer 0–${this.MAX_NS_ENTRIES - 1}`);
+        }
+        if (this.bootComplete && idx < this.firstUserNsSlot() &&
+            this.#builtinNamespaceWriteDepth === 0) {
+            throw new RangeError(
+                `writeNSEntry: built-in slot ${idx} is immutable after boot`);
         }
         const base = this._nsSlotBase(idx);
         if (!this._nsUiTypeHint) this._nsUiTypeHint = {};
@@ -1482,7 +1530,38 @@ class ChurchSimulator {
         this.memory[base + 2] = this._integrity32(
             this.memory[base + 0], this.memory[base + 1]);
         this.memory[base + 3] = (cacheToken32 || 0) >>> 0;   // W3 = cache token (T)
+        if (this._nsFreeSequences) delete this._nsFreeSequences[idx];
         if (idx >= this.nsCount) this.nsCount = idx + 1;
+    }
+
+    clearNSEntry(idx) {
+        this._assertNamespaceWriteAllowed('clearNSEntry', idx);
+        if (!Number.isInteger(idx) || idx < this.firstUserNsSlot() || idx >= this.MAX_NS_ENTRIES) {
+            throw new RangeError(
+                `clearNSEntry: slot must be an integer ${this.firstUserNsSlot()}–${this.MAX_NS_ENTRIES - 1}`);
+        }
+        const base = this._nsSlotBase(idx);
+        const oldVersion = this.parseNSWord1(this.memory[base + 1] >>> 0).gtSeq;
+        const newVersion = (oldVersion + 1) & 0x1FF;
+        this.memory.fill(0, base, base + this.NS_ENTRY_WORDS);
+        if (!this._nsFreeSequences) this._nsFreeSequences = {};
+        this._nsFreeSequences[idx] = newVersion;
+        if (this._nsUiTypeHint) delete this._nsUiTypeHint[idx];
+        if (this._nsClistCount) delete this._nsClistCount[idx];
+        if (this.nsLabels) delete this.nsLabels[idx];
+        if (this._compilerOwnedSelfSlots) delete this._compilerOwnedSelfSlots[idx];
+        if (this._tokenSlotMap) {
+            for (const [token, slot] of this._tokenSlotMap) {
+                if (slot === idx) this._tokenSlotMap.delete(token);
+            }
+        }
+        if (typeof this.clearSlotIdentity === 'function') this.clearSlotIdentity(idx);
+        if (idx === this.nsCount - 1) {
+            while (this.nsCount > 0 && !this.isNSEntryValid(this.nsCount - 1)) {
+                this.nsCount--;
+            }
+        }
+        return { oldVersion, newVersion };
     }
 
     // ── Dynamic NS slot allocator (Task #2084) ────────────────────────────────
@@ -1509,7 +1588,7 @@ class ChurchSimulator {
         // 2. Scan user space.  Do not consult legacy _bitstreamSlots here:
         //    those entries were an old mechanism for reserving private slots
         //    and must not hide capacity from the user allocator.
-        for (let s = BOOT_NAMED_SLOTS.length; s < this.MAX_NS_ENTRIES; s++) {
+        for (let s = this.firstUserNsSlot(); s < this.MAX_NS_ENTRIES; s++) {
             if (!this.isNSEntryValid(s)) {
                 if (token) this._tokenSlotMap.set(token, s);
                 return s;
@@ -1534,12 +1613,11 @@ class ChurchSimulator {
     writeNsEntryForProgram(slot, opts) {
         // Each allocated slot gets its own 256-word (0x100) region in extended
         // memory so lumps never overlap when multiple compiled programs coexist.
-        //   Slot 7 (primary programmable) → 0x0400
-        //   Slot 8                        → 0x0500
-        //   Slot 9                        → 0x0600  … and so on.
-        const EXTENDED_BASE    = 0x0400;
+        //   First user slot (11) → 0x0800
+        //   Slot 12              → 0x0900, and so on.
+        const EXTENDED_BASE    = 0x0800;
         const EXTENDED_STRIDE  = 0x0100;   // 256 words per slot; enough for any program
-        const PROG_SLOT        = 7;        // primary programmable slot
+        const PROG_SLOT        = this.firstUserNsSlot();
         const slotOffset       = Math.max(0, slot - PROG_SLOT);
         const lumpBase         = EXTENDED_BASE + slotOffset * EXTENDED_STRIDE;
 
@@ -1563,13 +1641,11 @@ class ChurchSimulator {
 
         // NS entry: Inform GT (type=1), limit17=cw, cc=0 (updated by loadProgram
         // and _injectClistNow that follow immediately in _applyPendingSimLoad).
-        const _wasAllowed = this._allowAutoWrite;
-        this._allowAutoWrite = true;
-        try {
-            this.writeNSEntry(slot, lumpBase, cw, 0, 0, 1, 0, 0, 0);
-        } finally {
-            this._allowAutoWrite = _wasAllowed;
-        }
+        this.withNamespaceWrite('compiled program load', () => {
+            this.writeNSEntry(
+                slot, lumpBase, cw, 0, 0, 1,
+                this._nsSequenceForWrite(slot), 0, 0);
+        });
         this.nsLabels[slot] = label;
 
         this.output += `[allocNS] NS[${slot}] "${label}" \u2192 0x${lumpBase.toString(16)} (${newLumpSize} words, cw=${cw})\n`;
@@ -1698,7 +1774,9 @@ class ChurchSimulator {
         const pendingName = ChurchSimulator.isPendingGT(existing)
             ? ChurchSimulator.pendingGTName(existing)
             : (hasLazyEntry ? this._pendingResolves.get(slotIdx).petName : `slot${slotIdx}`);
-        const newGT = this.createGT(0, nsIdx, { R:0, W:0, X:0, L:0, S:0, E:1 }, 1);
+        const newGT = this.createGT(
+            this._nsSequenceForWrite(nsIdx), nsIdx,
+            { R:0, W:0, X:0, L:0, S:0, E:1 }, 1);
         this.memory[addr] = newGT >>> 0;
         this.output += `[RESOLVE] CR${slotIdx} "${pendingName}" \u2192 NS[${nsIdx}] introduced interactively.\n`;
 
@@ -3191,24 +3269,28 @@ class ChurchSimulator {
         // Matches hardware mload.py RESET_GBIT: clears G-bit (WORD2_LAYOUT Word1[30]) on successful load.
         // g_bit at bit[30] — excluded from integrity32 (both g_bit[30] and f_flag[31] masked),
         // so this write requires no seal recomputation. Real-time update matches hardware. ★v2.0
-        const base = this._nsSlotBase(idx);
-        const w1 = this.memory[base + 1];
-        if (this.gcPolarity === 0) {
-            this.memory[base + 1] = (w1 | (1 << 30)) >>> 0;
-        } else {
-            this.memory[base + 1] = (w1 & ~(1 << 30)) >>> 0;
-        }
+        this.withNamespaceWrite('garbage collector mark-live', () => {
+            const base = this._nsSlotBase(idx);
+            const w1 = this.memory[base + 1];
+            if (this.gcPolarity === 0) {
+                this.memory[base + 1] = (w1 | (1 << 30)) >>> 0;
+            } else {
+                this.memory[base + 1] = (w1 & ~(1 << 30)) >>> 0;
+            }
+        });
     }
 
     markGarbage(idx) {
         // Matches hardware GC mark phase: sets G-bit (WORD2_LAYOUT Word1[30]) to suspect. ★v2.0
-        const base = this._nsSlotBase(idx);
-        const w1 = this.memory[base + 1];
-        if (this.gcPolarity === 0) {
-            this.memory[base + 1] = (w1 & ~(1 << 30)) >>> 0;
-        } else {
-            this.memory[base + 1] = (w1 | (1 << 30)) >>> 0;
-        }
+        this.withNamespaceWrite('garbage collector mark-garbage', () => {
+            const base = this._nsSlotBase(idx);
+            const w1 = this.memory[base + 1];
+            if (this.gcPolarity === 0) {
+                this.memory[base + 1] = (w1 & ~(1 << 30)) >>> 0;
+            } else {
+                this.memory[base + 1] = (w1 | (1 << 30)) >>> 0;
+            }
+        });
     }
 
     getGBit(idx) {
@@ -3377,23 +3459,13 @@ class ChurchSimulator {
         let freedSlots = 0;
         let freedWords = 0;
         for (const c of candidates) {
-            if (c.index === 0) {
-                p4Lines.push(`SKIP NS[0] "Boot.NS" — namespace root protected`);
-                log.push(`  SKIP NS[0] "Boot.NS" — namespace root is protected`);
+            if (c.index < this.firstUserNsSlot()) {
+                p4Lines.push(`SKIP NS[${c.index}] "${c.label}" — built-in slot protected`);
+                log.push(`  SKIP NS[${c.index}] "${c.label}" — built-in slot is protected`);
                 continue;
             }
-            // Canonical NS ABI: gt_seq lives in W1[29:21] (not W2). Read/bump the
-            // sequence from W1 and re-write the (now-empty) entry via direct memory
-            // writes (task #2941: GC sweep must not go through writeNSEntry — that
-            // function is reserved for boot-load and the manual UI ADD gate only).
-            // Bump gt_seq in W1 so any live GT referencing this slot fails stale check.
-            const base = this._nsSlotBase(c.index);
-            const oldVersion = this.parseNSWord1(this.memory[base + 1] >>> 0).gtSeq & 0x7F;
-            const newVersion = (oldVersion + 1) & 0x7F;
-            this.memory[base + 0] = 0;
-            this.memory[base + 1] = this.packNSWord1(0, newVersion, 0, 0);
-            this.memory[base + 2] = this._integrity32(0, this.memory[base + 1]);
-            this.memory[base + 3] = 0;
+            const cleared = this.withNamespaceWrite('garbage collector sweep', () =>
+                this.clearNSEntry(c.index));
 
             let wordsCleared = 0;
             for (let w = 0; w < this.SLOT_SIZE; w++) {
@@ -3404,7 +3476,7 @@ class ChurchSimulator {
             }
             freedWords += wordsCleared;
             p4Lines.push(`CLEAR NS[${c.index}] "${c.label}" — ${wordsCleared} words zeroed`);
-            log.push(`  CLEAR NS[${c.index}] "${c.label}" — version ${oldVersion}->${newVersion}, ${wordsCleared} object words zeroed`);
+            log.push(`  CLEAR NS[${c.index}] "${c.label}" — version ${cleared.oldVersion}->${cleared.newVersion}, ${wordsCleared} object words zeroed`);
 
             delete this.nsLabels[c.index];
             freedSlots++;
@@ -3593,6 +3665,7 @@ class ChurchSimulator {
     // live Outform entry (gtType already = 2) and any re-derivation could alter
     // limit/clistCount/reserved bits and break byte-for-byte identity.
     _restoreOutformWords(slot) {
+        this._assertNamespaceWriteAllowed('_restoreOutformWords', slot);
         const id = this.getSlotIdentity(slot);
         if (!id || !Array.isArray(id.outformWords)) return false;
         const base = this._nsSlotBase(slot);
@@ -3636,13 +3709,13 @@ class ChurchSimulator {
         //    (authority: limit/gt_seq/G/F) and W2 (integrity32) stay consistent.
         //    State/type (Inform) and cc are recorded in side-tables, never W1.
         //    W3 (word3_cache_token) carries the cache token ONLY.
-        const _wasAllowed = this._allowAutoWrite;
-        this._allowAutoWrite = true;
-        try {
-            this.writeNSEntry(slot, freeBase >>> 0, limit17, 0, 0, 1 /* Inform */, 0, cc, cacheToken32 >>> 0);
-        } finally {
-            this._allowAutoWrite = _wasAllowed;
-        }
+        this.#withBuiltinNamespaceWrite('validated LUMP restoration', () => {
+            this.writeNSEntry(
+                slot, freeBase >>> 0, limit17, 0, 0, 1 /* Inform */,
+                this._nsSequenceForWrite(slot), cc,
+                cacheToken32 >>> 0
+            );
+        });
     }
 
     _absentLumpIntercept(entry, targetIdx, d, instrName, bindingAddr, accessGT) {
@@ -4505,7 +4578,9 @@ class ChurchSimulator {
                     }
                 }
                 if (_resolvedNsIdx >= 0 && this.isNSEntryValid(_resolvedNsIdx)) {
-                    const _resolvedGT = this.createGT(0, _resolvedNsIdx, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
+                    const _resolvedGT = this.createGT(
+                        this._nsSequenceForWrite(_resolvedNsIdx), _resolvedNsIdx,
+                        {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
                     this.memory[clistLoc + d.imm] = _resolvedGT >>> 0;
                     slotGT = _resolvedGT >>> 0;
                     this.output += `[LAZY-RESOLVE] NULL Slot ${d.imm} "${_pcn}" \u2192 NS[${_resolvedNsIdx}] resolved instantly.\n`;
@@ -4563,7 +4638,9 @@ class ChurchSimulator {
                 }
             }
             if (_resolvedNsIdx >= 0 && this.isNSEntryValid(_resolvedNsIdx)) {
-                const _resolvedGT = this.createGT(0, _resolvedNsIdx, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
+                const _resolvedGT = this.createGT(
+                    this._nsSequenceForWrite(_resolvedNsIdx), _resolvedNsIdx,
+                    {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
                 this.memory[clistLoc + d.imm] = _resolvedGT >>> 0;
                 slotGT = _resolvedGT >>> 0;
                 this.output += `[LAZY-RESOLVE] Slot ${d.imm} "${_pendingName}" \u2192 NS[${_resolvedNsIdx}] resolved instantly.\n`;
@@ -6191,7 +6268,9 @@ class ChurchSimulator {
                     }
                 }
                 if (_resolvedNsIdx >= 0 && this.isNSEntryValid(_resolvedNsIdx)) {
-                    const _resolvedGT = this.createGT(0, _resolvedNsIdx, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
+                    const _resolvedGT = this.createGT(
+                        this._nsSequenceForWrite(_resolvedNsIdx), _resolvedNsIdx,
+                        {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
                     this.memory[srcLoc + ecRow] = _resolvedGT >>> 0;
                     slotGT = _resolvedGT >>> 0;
                     this.output += `[LAZY-RESOLVE] NULL Slot ${ecRow} "${_pcn}" \u2192 NS[${_resolvedNsIdx}] resolved instantly.\n`;
@@ -6252,7 +6331,9 @@ class ChurchSimulator {
                 }
             }
             if (_resolvedNsIdx >= 0 && this.isNSEntryValid(_resolvedNsIdx)) {
-                const _resolvedGT = this.createGT(0, _resolvedNsIdx, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
+                const _resolvedGT = this.createGT(
+                    this._nsSequenceForWrite(_resolvedNsIdx), _resolvedNsIdx,
+                    {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
                 this.memory[srcLoc + ecRow] = _resolvedGT >>> 0;
                 slotGT = _resolvedGT >>> 0;
                 this.output += `[LAZY-RESOLVE] ELOADCALL: Slot ${ecRow} "${_pendingName}" \u2192 NS[${_resolvedNsIdx}] resolved instantly.\n`;
@@ -6501,7 +6582,9 @@ class ChurchSimulator {
                     }
                 }
                 if (_resolvedNsIdx >= 0 && this.isNSEntryValid(_resolvedNsIdx)) {
-                    const _resolvedGT = this.createGT(0, _resolvedNsIdx, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
+                    const _resolvedGT = this.createGT(
+                        this._nsSequenceForWrite(_resolvedNsIdx), _resolvedNsIdx,
+                        {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
                     this.memory[srcLoc + d.imm] = _resolvedGT >>> 0;
                     slotGT = _resolvedGT >>> 0;
                     this.output += `[LAZY-RESOLVE] NULL Slot ${d.imm} "${_pcn}" \u2192 NS[${_resolvedNsIdx}] resolved instantly.\n`;
@@ -7430,17 +7513,13 @@ class ChurchSimulator {
                         const oldW1         = this.memory[nsBase + 1] >>> 0;
                         const w1f           = this.parseNSWord1(oldW1);
                         // Canonical NS ABI: gt_seq is W1[29:21], not W2 (integrity32).
-                        const existingGtSeq = w1f.gtSeq;
+                        const existingGtSeq = this._nsSequenceForWrite(abstrSlot);
                         const _declType     = (this._nsUiTypeHint && this._nsUiTypeHint[abstrSlot]) || 1;
-                        const _wasAllowed = this._allowAutoWrite;
-                        this._allowAutoWrite = true;
-                        try {
+                        this.withNamespaceWrite('compiled program load', () => {
                             this.writeNSEntry(abstrSlot, newLumpBase >>> 0, words.length,
                                 0, w1f.g, _declType, existingGtSeq, 0,
                                 this.memory[nsBase + 3] >>> 0);
-                        } finally {
-                            this._allowAutoWrite = _wasAllowed;
-                        }
+                        });
 
                         // Update CR14 (code-region capability) to new lump location + NS words
                         const cr14 = this.cr[14];
@@ -7511,21 +7590,17 @@ class ChurchSimulator {
                     const w1f          = this.parseNSWord1(oldW1);
                     const newLimit17   = newCW;
                     // Canonical NS ABI: gt_seq is W1[29:21], not W2 (integrity32).
-                    const existingGtSeq = w1f.gtSeq;
+                    const existingGtSeq = this._nsSequenceForWrite(abstrSlot);
                     // Preserve declared type + cc (state/count are side-tables, not W1);
                     // writeNSEntry recomputes W1 (authority) + W2 (integrity32).
                     const _declType    = (this._nsUiTypeHint && this._nsUiTypeHint[abstrSlot]) || 1;
                     const _declCC      = (this._nsClistCount && this._nsClistCount[abstrSlot]) || 0;
                     // Always keep NS slot word0 pointing at the actual lump base
-                    const _wasAllowed = this._allowAutoWrite;
-                    this._allowAutoWrite = true;
-                    try {
+                    this.withNamespaceWrite('compiled program load', () => {
                         this.writeNSEntry(abstrSlot, baseAddr >>> 0, newLimit17,
                             0, w1f.g, _declType, existingGtSeq, _declCC,
                             this.memory[nsBase + 3] >>> 0);
-                    } finally {
-                        this._allowAutoWrite = _wasAllowed;
-                    }
+                    });
                     const cr14 = this.cr[14];
                     if (cr14) {
                         // word1 is the physical base — must match NS slot 3 word0
@@ -7632,7 +7707,7 @@ class ChurchSimulator {
         const oldW1        = this.memory[nsBase + 1] >>> 0;
         const w1f          = this.parseNSWord1(oldW1);
         // Canonical NS ABI: gt_seq is W1[29:21], not W2 (integrity32).
-        const existingGtSeq = w1f.gtSeq;
+        const existingGtSeq = this._nsSequenceForWrite(abstrSlot);
 
         // c-list count comes from the resident lump header (hdr.cc), recorded in
         // the side-table; state/type preserved from the prior entry (default Inform).
@@ -7642,15 +7717,11 @@ class ChurchSimulator {
         // explicitly architectural c-list exceptions.
         const _declType    = _identity.ordinary ? 1 :
             ((this._nsUiTypeHint && this._nsUiTypeHint[abstrSlot]) || 1);
-        const _wasAllowed = this._allowAutoWrite;
-        this._allowAutoWrite = true;
-        try {
+        this.#withBuiltinNamespaceWrite('validated LUMP installation', () => {
             this.writeNSEntry(abstrSlot, EXTENDED_BASE >>> 0, hdr.cw,
                 0, _identity.ordinary ? 0 : w1f.g, _declType, existingGtSeq, hdr.cc,
                 _identity.ordinary ? _identity.entry.cacheToken : (this.memory[nsBase + 3] >>> 0));
-        } finally {
-            this._allowAutoWrite = _wasAllowed;
-        }
+        });
 
         // writeNSEntry is the canonical commit mechanism.  Assert the exact
         // four words it wrote for ordinary LUMPs so a future ABI drift cannot
@@ -8143,7 +8214,9 @@ class ChurchSimulator {
         // leave partial resident state behind.  The trusted identity map is NOT
         // cleared — re-resolution must be able to reproduce the same token.
         const _reject = (faultType, faultMsg, returnMsg) => {
-            this._restoreOutformWords(nsIndex);
+            this.withNamespaceWrite('dynamic LUMP rejection restore', () => {
+                this._restoreOutformWords(nsIndex);
+            });
             this.awaitingLump = null;
             this.fault(faultType, faultMsg);
             return { ok: false, message: returnMsg };
@@ -8621,11 +8694,14 @@ class ChurchSimulator {
         perms = perms || {R:0,W:0,X:1,L:0,S:0,E:0};
         gtType = (gtType !== undefined && gtType !== null) ? gtType : 1;
         let idx = -1;
-        for (let i = 0; i < this.nsCount; i++) {
+        for (let i = this.firstUserNsSlot(); i < this.nsCount; i++) {
             if (this.nsLabels[i] === label) { idx = i; break; }
         }
         if (idx === -1) {
-            idx = this.nsCount;
+            idx = this.allocOrFindNsSlot(null, label);
+        }
+        if (idx === null) {
+            throw new Error('saveToNamespace: no free Namespace slots');
         }
         const loc = idx * this.SLOT_SIZE;
         const codeLen = words.length;
@@ -8644,7 +8720,11 @@ class ChurchSimulator {
         // shifted call wrote gtType=1 into `version`, silently reissuing every
         // saved LUMP at sequence 1 while callers minted E-GTs at sequence 0.
         // That guaranteed a later INIT_ABSTR VERSION fault on a saved boot entry.
-        this.writeNSEntry(idx, loc, lim17, 0, 0, gtType, 0, cc, 0);
+        this.withNamespaceWrite('Save to Namespace', () => {
+            this.writeNSEntry(
+                idx, loc, lim17, 0, 0, gtType,
+                this._nsSequenceForWrite(idx), cc, 0);
+        });
         this.nsLabels[idx] = label;
         // Word 0: lump header (magic=0x1F, n_minus_6, cw=codeLen, cc, typ=0).
         // Previously a GT word was written here, which broke CALL dispatch and
@@ -8664,6 +8744,11 @@ class ChurchSimulator {
     saveToNamespaceAt(idx, label, words, perms, gtType, caps) {
         perms = perms || {R:0,W:0,X:1,L:0,S:0,E:0};
         gtType = (gtType !== undefined && gtType !== null) ? gtType : 1;
+        if (!Number.isInteger(idx) || idx < this.firstUserNsSlot() || idx >= this.MAX_NS_ENTRIES) {
+            throw new RangeError(
+                `saveToNamespaceAt: explicit slot must be between ${this.firstUserNsSlot()} and ${this.MAX_NS_ENTRIES - 1}`
+            );
+        }
         const loc = idx * this.SLOT_SIZE;
         const codeLen = words.length;
         // cc comes from the capabilities block declared in the source (e.g. `capabilities { LED0 RW }`).
@@ -8682,8 +8767,13 @@ class ChurchSimulator {
         // No trusted full identity is registered by this local save path, so W3
         // remains zero rather than carrying permission-derived data.
         // See saveToNamespace(): type is argument 6 and a new local save is
-        // generation 0.  Never shift the type into the Namespace gt_seq field.
-        this.writeNSEntry(idx, loc, lim17, 0, 0, gtType, 0, cc, 0);
+        // A fresh slot starts at generation 0; a cleared/reused slot consumes its
+        // retained next generation. Never shift the type into the gt_seq field.
+        this.withNamespaceWrite('Save to Namespace', () => {
+            this.writeNSEntry(
+                idx, loc, lim17, 0, 0, gtType,
+                this._nsSequenceForWrite(idx), cc, 0);
+        });
         this.nsLabels[idx] = label;
         // Word 0: lump header (magic=0x1F, n_minus_6, cw=codeLen, cc, typ=0).
         // Previously a GT word was written here, which broke CALL dispatch and
@@ -8717,11 +8807,13 @@ class ChurchSimulator {
         const parsed = this.parseNSWord1(entry.word1_limit);
         // Type/state + cc are entry-level metadata (side-tables), never W1 fields;
         // b_flag is a GT-word property, not an NS authority field → 0 here.
-        this.writeNSEntry(
-            idx, loc, lim17, 0, parsed.g, entry.gtType,
-            this.parseNSWord1(entry.word1_limit).gtSeq, entry.clistCount || 0,
-            entry.word3_cache_token || 0
-        );
+        this.withNamespaceWrite('Namespace memory edit', () => {
+            this.writeNSEntry(
+                idx, loc, lim17, 0, parsed.g, entry.gtType,
+                this.parseNSWord1(entry.word1_limit).gtSeq, entry.clistCount || 0,
+                entry.word3_cache_token || 0
+            );
+        });
         for (let i = 0; i < dataWords.length; i++) {
             this.memory[loc + i] = dataWords[i] >>> 0;
         }

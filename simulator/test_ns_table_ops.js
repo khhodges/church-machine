@@ -8,19 +8,19 @@
 // Run:  node simulator/test_ns_table_ops.js
 //
 // Coverage:
-//   T401 — Add LUMP to slot 7: NS entry is valid after writeNSEntry
-//   T402 — Add LUMP to slot 7: _tokenSlotMap records the token→slot mapping
-//   T403 — _nsTableClear slot 7: NS entry word0_location drops to 0
-//   T404 — _nsTableClear slot 7: gt_seq in NS word2 is bumped by exactly 1
-//   T405 — _nsTableClear slot 7: token is removed from _tokenSlotMap
-//   T406 — _nsTableClear slot 7: boot slots 0–5 are unchanged after Clear
+//   T401 — Add LUMP to first user slot: NS entry is valid after writeNSEntry
+//   T402 — Add LUMP: _tokenSlotMap records the token→slot mapping
+//   T403 — _nsTableClear first user slot: NS entry word0_location drops to 0
+//   T404 — _nsTableClear: gt_seq in NS word2 is bumped by exactly 1
+//   T405 — _nsTableClear: token is removed from _tokenSlotMap
+//   T406 — _nsTableClear: built-in slots are unchanged after Clear
 //   T407 — Boot (sim.reset()) after Add: _tokenSlotMap is empty
 //   T408 — Boot (sim.reset()) after Add: boot slots 0–6 are intact
 //   T409 — Boot (sim.reset()) after Clear: _tokenSlotMap is still empty
 //   T410 — Boot (sim.reset()) after Clear: boot slots 0–6 are intact
 //   T411 — Boot (sim.reset()) after Add (no Clear): boot slots 0–6 are intact
-//   T412 — After Boot, allocOrFindNsSlot returns slot 7 (programmable slot free)
-//   T413 — _nsTableClear guards: slot < 7 is rejected (boot slots protected)
+//   T412 — After Boot, allocOrFindNsSlot returns first user slot
+//   T413 — _nsTableClear guards: slots 0–10 are rejected
 
 const vm   = require('vm');
 const fs   = require('fs');
@@ -75,6 +75,12 @@ function makeSim() {
     return sim;
 }
 
+function writeEntry(sim, ...args) {
+    return sim.withNamespaceWrite('test programmer action', () => {
+        sim.writeNSEntry(...args);
+    });
+}
+
 // ── Capture snapshot of NS entries for slots 0–6 ────────────────────────────
 function captureBootSlots(sim) {
     const snap = [];
@@ -122,11 +128,11 @@ function callNsTableClear(simInst, slot) {
 
     // Simulate what _nsTableAddConfirm does (without the fetch):
     const slot = sim.allocOrFindNsSlot(TOKEN, NAME);
-    sim.writeNSEntry(slot, 0x0400, 10, 0, 0, 1, 0, 0, 0);
+    writeEntry(sim, slot, 0x0400, 10, 0, 0, 1, 0, 0, 0);
     sim.nsLabels[slot] = NAME;
 
     const e = sim.readNSEntry(slot);
-    check('T401: Add LUMP to slot 7 — NS entry is valid (isNSEntryValid)',
+    check('T401: Add LUMP to first user slot — NS entry is valid (isNSEntryValid)',
         sim.isNSEntryValid(slot),
         `slot=${slot}, valid=${sim.isNSEntryValid(slot)}`);
 
@@ -135,7 +141,7 @@ function callNsTableClear(simInst, slot) {
         `has=${sim._tokenSlotMap.has(TOKEN)}, slot=${sim._tokenSlotMap.get(TOKEN)}, expected=${slot}`);
 }
 
-// ── T403–T406: _nsTableClear slot 7 ──────────────────────────────────────────
+// ── T403–T406: _nsTableClear first user slot ─────────────────────────────────
 {
     const sim = makeSim();
 
@@ -147,32 +153,35 @@ function callNsTableClear(simInst, slot) {
 
     // Add
     const slot = sim.allocOrFindNsSlot(TOKEN, NAME);
-    sim.writeNSEntry(slot, 0x0400, 10, 0, 0, 1, 0, 3, 0);
+    writeEntry(sim, slot, 0x0400, 10, 0, 0, 1, 0, 3, 0);
     sim.nsLabels[slot] = NAME;
 
     // Canonical NS ABI: gt_seq lives in W1[29:21] (authority word), not W2
     // (W2 is now a pure integrity32 hash). Read the sequence via parseNSWord1.
     const w1Before  = sim.memory[sim._nsSlotBase(slot) + 1] >>> 0;
-    const seqBefore = sim.parseNSWord1(w1Before).gtSeq & 0x7F;
+    const seqBefore = sim.parseNSWord1(w1Before).gtSeq & 0x1FF;
 
     // Clear
     callNsTableClear(sim, slot);
 
-    // After clear: word0_location should be 0
+    // A free slot is represented by four zero words so first-free allocation
+    // can immediately reuse it.
     const eAfter = sim.readNSEntry(slot);
-    check('T403: _nsTableClear slot 7 — NS entry word0_location is 0 after clear',
-        eAfter === null || eAfter.word0_location === 0,
-        `word0_location=${eAfter ? eAfter.word0_location : 'null'}`);
+    const rawAfter = Array.from(sim.memory.slice(
+        sim._nsSlotBase(slot), sim._nsSlotBase(slot) + sim.NS_ENTRY_WORDS));
+    check('T403: _nsTableClear user slot — all four NS words are zero after clear',
+        eAfter === null && rawAfter.every(word => word === 0),
+        `entry=${JSON.stringify(eAfter)}, raw=${rawAfter.join(',')}`);
 
-    // After clear: gt_seq bumped by 1 (read from W1[29:21], the canonical location)
-    const w1After  = sim.memory[sim._nsSlotBase(slot) + 1] >>> 0;
-    const seqAfter = sim.parseNSWord1(w1After).gtSeq & 0x7F;
-    check('T404: _nsTableClear slot 7 — gt_seq bumped by 1',
-        seqAfter === ((seqBefore + 1) & 0x7F),
-        `seqBefore=${seqBefore}, seqAfter=${seqAfter}`);
+    // The bumped sequence stays out-of-band while free, then Navana.ADD uses it
+    // when the slot is reissued.
+    const seqAfter = sim._nsFreeSequences[slot];
+    check('T404: _nsTableClear user slot — bumped gt_seq retained for reissue',
+        seqAfter === ((seqBefore + 1) & 0x1FF),
+        `seqBefore=${seqBefore}, remembered=${seqAfter}`);
 
     // After clear: token removed from _tokenSlotMap
-    check('T405: _nsTableClear slot 7 — token removed from _tokenSlotMap',
+    check('T405: _nsTableClear user slot — token removed from _tokenSlotMap',
         !sim._tokenSlotMap.has(TOKEN),
         `tokenSlotMap.has=${sim._tokenSlotMap.has(TOKEN)}`);
 
@@ -186,7 +195,7 @@ function callNsTableClear(simInst, slot) {
             console.log(`  slot ${i} changed: w0 ${bootBefore[i].w0.toString(16)}→${bootAfterClear[i].w0.toString(16)}`);
         }
     }
-    check('T406: _nsTableClear slot 7 — boot slots 0–5 unchanged',
+    check('T406: _nsTableClear user slot — boot slots 0–5 unchanged',
         bootSlotsSafe);
 }
 
@@ -199,7 +208,7 @@ function callNsTableClear(simInst, slot) {
 
     // Add LUMP
     const slot = sim.allocOrFindNsSlot(TOKEN, NAME);
-    sim.writeNSEntry(slot, 0x0400, 5, 0, 0, 1, 0, 0, 0);
+    writeEntry(sim, slot, 0x0400, 5, 0, 0, 1, 0, 0, 0);
     sim.nsLabels[slot] = NAME;
 
     // Capture boot slots before reset
@@ -247,7 +256,7 @@ function callNsTableClear(simInst, slot) {
 
     // Add LUMP, then Clear, then Boot
     const slot = sim.allocOrFindNsSlot(TOKEN, NAME);
-    sim.writeNSEntry(slot, 0x0400, 8, 0, 0, 1, 0, 0, 0);
+    writeEntry(sim, slot, 0x0400, 8, 0, 0, 1, 0, 0, 0);
     sim.nsLabels[slot] = NAME;
 
     callNsTableClear(sim, slot);
@@ -278,7 +287,7 @@ function callNsTableClear(simInst, slot) {
 
     // Add LUMP but do NOT clear — just Boot directly
     const slot = sim.allocOrFindNsSlot(TOKEN, NAME);
-    sim.writeNSEntry(slot, 0x0400, 12, 0, 0, 1, 0, 0, 0);
+    writeEntry(sim, slot, 0x0400, 12, 0, 0, 1, 0, 0, 0);
     sim.nsLabels[slot] = NAME;
 
     // Boot
@@ -291,13 +300,13 @@ function callNsTableClear(simInst, slot) {
             `slot${i}:0x${s.w0.toString(16)}`)));
 }
 
-// ── T412: After Boot, allocOrFindNsSlot returns slot 7 ───────────────────────
+// ── T412: After Boot, allocator returns the first user slot ──────────────────
 {
     const sim = makeSim();
 
     // Add LUMP to the first free programmable slot, then Boot.
     const preSlot = sim.allocOrFindNsSlot('tok_before_boot', 'PreBoot');
-    sim.writeNSEntry(preSlot, 0x0400, 5, 0, 0, 1, 0, 0, 0);
+    writeEntry(sim, preSlot, 0x0400, 5, 0, 0, 1, 0, 0, 0);
     sim.nsLabels[preSlot] = 'PreBoot';
 
     sim.reset();
@@ -311,19 +320,19 @@ function callNsTableClear(simInst, slot) {
         `newSlot=${newSlot}, preSlot=${preSlot}`);
 }
 
-// ── T413: _nsTableClear guard — slot < 7 is rejected ─────────────────────────
+// ── T413: _nsTableClear guard — built-in slots are rejected ─────────────────
 {
     const sim = makeSim();
 
     // Capture boot slot 6 (SelfTest) before attempted clear
     const snapBefore = captureBootSlots(sim);
 
-    // Attempt to clear boot slot 6 — should be silently rejected (slot < 7 guard)
+    // Attempt to clear boot slot 6 — should be silently rejected.
     callNsTableClear(sim, 6);
 
     const snapAfter = captureBootSlots(sim);
 
-    check('T413: _nsTableClear rejects slot < 7 — boot slot 6 unchanged',
+    check('T413: _nsTableClear rejects built-in slot 6',
         snapBefore[6].w0 === snapAfter[6].w0 &&
         snapBefore[6].w1 === snapAfter[6].w1 &&
         snapBefore[6].w2 === snapAfter[6].w2,

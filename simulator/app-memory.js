@@ -2029,7 +2029,7 @@ const THREAD_LAYOUT = {
     CAPS_START:   THREAD_FS - 12, CAPS_END:  THREAD_FS - 1,             CAPS_WORDS: 12,
     TOTAL:        THREAD_FS,
 };
-const THREAD_NS_SLOTS = new Set([1, 45]);
+const THREAD_NS_SLOTS = new Set([1]);
 
 function renderThreadMemoryLayout(nsIndex, expandAll = false) {
     const entry = sim.readNSEntry(nsIndex);
@@ -2231,7 +2231,9 @@ function _installBootEntryGTIntoCR0() {
     if (!sim) return false;
     const bSlot = sim.bootEntrySlot;
     if (bSlot === null || bSlot === undefined) return false;
-    const gtWord = sim.createGT(0, bSlot, {E:1}, 1);
+    const bEntry = sim.readNSEntry(bSlot);
+    const bSeq = bEntry ? sim.parseNSWord1(bEntry.word1_limit).gtSeq : 0;
+    const gtWord = sim.createGT(bSeq, bSlot, {E:1}, 1);
     // Write to the primary thread (NS slot 1 — the boot thread).
     const targets = new Set([1]);
     let wrote = false;
@@ -3269,8 +3271,9 @@ function _nsTableAddConfirm() {
     let userSlot = null;
     if (slotPolicy !== 'dynamic' && slotInputVal !== '') {
         userSlot = parseInt(slotInputVal, 10);
-        if (isNaN(userSlot) || userSlot < 0 || userSlot >= sim.MAX_NS_ENTRIES) {
-            if (errEl) errEl.textContent = `Slot must be between 0 and ${sim.MAX_NS_ENTRIES - 1}.`;
+        const firstUserSlot = sim.firstUserNsSlot();
+        if (isNaN(userSlot) || userSlot < firstUserSlot || userSlot >= sim.MAX_NS_ENTRIES) {
+            if (errEl) errEl.textContent = `Slot must be between ${firstUserSlot} and ${sim.MAX_NS_ENTRIES - 1}.`;
             return;
         }
         if (sim.isNSEntryValid(userSlot)) {
@@ -3302,9 +3305,9 @@ function _nsTableAddConfirm() {
         if (slot === null) return Promise.reject('Namespace table is full');
 
         // Copy lump words into this slot's extended DMEM region
-        const EXTENDED_BASE   = 0x0400;
+        const EXTENDED_BASE   = 0x0800;
         const EXTENDED_STRIDE = 0x0100;
-        const PROG_SLOT       = 7;
+        const PROG_SLOT       = sim.firstUserNsSlot();
         const slotOffset      = Math.max(0, slot - PROG_SLOT);
         const lumpBase        = EXTENDED_BASE + slotOffset * EXTENDED_STRIDE;
 
@@ -3421,6 +3424,7 @@ function _nsTableAddConfirm() {
         //   • Inform / legacy → cache token when available, else 0.  W3 no longer
         //     carries an Abstract GT (Task #2862 W3=cache_token migration).
         const w3CacheToken = (cacheToken32 != null) ? (cacheToken32 >>> 0) : 0;
+        const slotGtSeq = sim._nsSequenceForWrite(slot);
 
         // Register trusted identity outside the 4-word NS entry BEFORE the entry
         // is written, so receiveLump() can verify against it on resolution.  Only
@@ -3431,8 +3435,8 @@ function _nsTableAddConfirm() {
             // gBit, fFlag). Type + c-list count are NOT W1 fields (side-tables /
             // resident header). W2 is the integrity32 of {W0, W1}. These opaque
             // words must match exactly what writeNSEntry() writes below.
-            const _w1 = sim.packNSWord1(limit17, 0, 0, 0) >>> 0;
-            const _w2 = sim.makeVersionSeals(0, lumpBase, limit17) >>> 0;
+            const _w1 = sim.packNSWord1(limit17, slotGtSeq, 0, 0) >>> 0;
+            const _w2 = sim.makeVersionSeals(slotGtSeq, lumpBase, limit17) >>> 0;
             sim.registerSlotIdentity(slot, {
                 cacheToken:   w3CacheToken,
                 dotName:      dotName,
@@ -3440,24 +3444,28 @@ function _nsTableAddConfirm() {
                 identityHash: identityHash,   // canonical 64-hex string
                 binaryHash:   binaryHash,     // canonical 64-hex string
                 outformWords: [_w1, _w2, w3CacheToken],
-                gtSeq:        0,
+                gtSeq:        slotGtSeq,
             }, { secure: true });
         }
 
         // Write NS entry with the verified identity type. W3 = cache token (T).
-        sim.writeNSEntry(slot, lumpBase, limit17, 0, 0, effectiveGtType,
-            _identity.ordinary ? _identity.entry.seq : 0, hdr.cc,
-            _identity.ordinary ? _identity.entry.cacheToken : w3CacheToken);
+        sim.withNamespaceWrite('manual Namespace Add', function() {
+            sim.writeNSEntry(slot, lumpBase, limit17, 0, 0, effectiveGtType,
+                _identity.ordinary ? _identity.entry.seq : slotGtSeq, hdr.cc,
+                _identity.ordinary ? _identity.entry.cacheToken : w3CacheToken);
+        });
         sim.nsLabels[slot] = name;
 
         // Persist slot→label to boot-config so the label survives hard resets.
         // Uses a lightweight PATCH endpoint that merges into the existing config
         // without wiping step1/step2/step3 fields.
-        fetch('/api/boot-config/slot-label', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ slot: slot, label: name })
-        }).catch(function(e) { console.warn('[NSADD] slot-label persist failed:', e); });
+        if (typeof window._persistNamespaceSlotLabel === 'function') {
+            window._persistNamespaceSlotLabel(slot, name);
+        } else {
+            window.bootConfig = window.bootConfig || {};
+            window.bootConfig.slotLabels = window.bootConfig.slotLabels || {};
+            window.bootConfig.slotLabels[String(slot)] = name;
+        }
 
         // Persist the programmer's slot-policy choice (and the concrete slot assigned)
         // back to the sidecar so re-add and boot_image.py use the correct policy.
@@ -3643,38 +3651,11 @@ function _nsTableClear(slot) {
     // may be cleared and returned to the allocator.
     if (slot < 11) return;
 
-    // Read the real inverted-layout NS entry, not an ascending legacy address.
-    // Canonical NS ABI: gt_seq lives in W1[29:21] (the authority word), NOT W2.
-    // W2 is now a pure integrity32 hash, so read/bump the sequence from W1 via
-    // parseNSWord1 — the GT validator also reads nsGtSeq from W1[29:21].
-    const base = sim._nsSlotBase(slot);
-    const word1 = sim.memory[base + 1] >>> 0;
-    const curSeq = sim.parseNSWord1(word1).gtSeq & 0x7F;
-    const newSeq = (curSeq + 1) & 0x7F;
-
-    // Zero the entry but write the bumped sequence through makeVersionSeals so
-    // the GT validator detects nsGtSeq !== gt_seq for any pre-Clear token.
-    sim.writeNSEntry(slot, 0, 0, 0, 0, 0, newSeq, 0, 0);
-
-    // Clear label and token-slot map
-    if (sim.nsLabels) delete sim.nsLabels[slot];
-    if (sim._compilerOwnedSelfSlots) delete sim._compilerOwnedSelfSlots[slot];
-    if (sim._tokenSlotMap) {
-        for (const [tok, s] of sim._tokenSlotMap) {
-            if (s === slot) { sim._tokenSlotMap.delete(tok); break; }
-        }
-    }
-
-    // Task #2862: remove the trusted per-slot identity so a cleared slot cannot
-    // be re-used by a stale/replayed lump that still carries the old token.
-    if (typeof sim.clearSlotIdentity === 'function') sim.clearSlotIdentity(slot);
-
-    // Shrink nsCount if this was the last valid entry
-    if (slot === sim.nsCount - 1) {
-        let newCount = slot;
-        while (newCount > 0 && !sim.isNSEntryValid(newCount - 1)) newCount--;
-        sim.nsCount = newCount;
-    }
+    // A free entry must be all-zero so the shared allocator can reuse it.
+    // clearNSEntry keeps the bumped generation out-of-band until reissue.
+    sim.withNamespaceWrite('manual Namespace Clear', function() {
+        sim.clearNSEntry(slot);
+    });
 
     _setNsDirty(true);
     if (typeof updateNamespace === 'function') updateNamespace();
@@ -3704,6 +3685,15 @@ window._nsTableSave = async function(btn) {
     if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; btn.style.color = '#ccc'; }
 
     try {
+        // Add/Save label writes and the binary commit form one canonical save.
+        // Wait for every in-flight label update so a quick Save→reload cannot
+        // observe the occupied slot before its committed custom label.
+        const labelWrites = (window._nsLabelPersistPromises || []).slice();
+        if (labelWrites.length) {
+            await Promise.all(labelWrites);
+            window._nsLabelPersistPromises = [];
+        }
+
         // The boot image occupies exactly sim.NS_TABLE_BASE + sim.NS_TABLE_RESERVE
         // words, because the generator writes the NS table at the tail and the
         // format-tag scanner computes: NS_TABLE_BASE = tagIdx + 1, and
@@ -4804,9 +4794,11 @@ window.lumpCompress = async function(nsIdx) {
     const nsBase   = sim._nsSlotBase(nsIdx);
     const _w1c     = sim.parseNSWord1(sim.memory[nsBase + 1] >>> 0);
     const _entryC  = sim.readNSEntry(nsIdx) || {};
-    sim.writeNSEntry(nsIdx, baseLoc, (minSize - 1) & 0x1FFFF, 0, _w1c.g,
-        _entryC.gtType != null ? _entryC.gtType : 1, _w1c.gtSeq, cc,
-        _entryC.word3_cache_token || 0);
+    sim.withNamespaceWrite('manual LUMP compression', function() {
+        sim.writeNSEntry(nsIdx, baseLoc, (minSize - 1) & 0x1FFFF, 0, _w1c.g,
+            _entryC.gtType != null ? _entryC.gtType : 1, _w1c.gtSeq, cc,
+            _entryC.word3_cache_token || 0);
+    });
 
     const parts = [];
     if (didShrink) parts.push(`freespace ${currentSize - minSize}w removed (${currentSize}w \u2192 ${minSize}w)`);
@@ -5686,9 +5678,11 @@ window.applyPOLA = async function(nsIdx) {
     const w1fP   = sim.parseNSWord1(sim.memory[nsBase + 1] >>> 0);
     const gtSeqP = w1fP.gtSeq;
     // Preserve limit17, g-bit, gt_seq, declared type and W3; only clistCount changes.
-    sim.writeNSEntry(nsIdx, baseLoc, w1fP.limit, 0, w1fP.g,
-        oldEntry.gtType != null ? oldEntry.gtType : 1, gtSeqP, newCC,
-        oldEntry.word3_cache_token || 0);
+    sim.withNamespaceWrite('manual C-list compaction', function() {
+        sim.writeNSEntry(nsIdx, baseLoc, w1fP.limit, 0, w1fP.g,
+            oldEntry.gtType != null ? oldEntry.gtType : 1, gtSeqP, newCC,
+            oldEntry.word3_cache_token || 0);
+    });
     // Propagate updated NS words to any CR currently holding a GT for this slot.
     for (let _ci = 0; _ci < 16; _ci++) {
         const _cr = sim.cr[_ci];

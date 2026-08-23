@@ -42,8 +42,8 @@
 //   Layer 7 — Security  (NS[43]..NS[44])
 //     Security.Attestation, Security.KeyStore
 //
-//   Layer 8 — Application  (NS[45])
-//     App.Salvation  (the first user-facing entry point after boot)
+//   Layer 8 — Application  (dynamic user slots)
+//     App.Salvation  (a user-facing entry point allocated after boot)
 //
 // ABSTRACTION DESCRIPTOR SHAPE
 //   Each descriptor passed to registry.register() is:
@@ -787,31 +787,19 @@ class SystemAbstractions {
             const gtType = args.gtType || 1;
             const label = args.label || 'unnamed';
 
-            let freeSlot = -1;
-            for (let i = 45; i < sim.MAX_NS_ENTRIES; i++) {
-                if (!sim.isNSEntryValid(i)) { freeSlot = i; break; }
-            }
-            if (freeSlot === -1) {
-                for (let i = 11; i < 45; i++) {
-                    if (!sim.isNSEntryValid(i)) { freeSlot = i; break; }
-                }
-            }
-            if (freeSlot === -1) {
+            const freeSlot = sim.allocOrFindNsSlot(null, label);
+            if (freeSlot === null) {
                 return { ok: false, fault: 'NS_FULL', message: 'Navana.Add: no free NS slots' };
             }
 
-            const base = sim._nsSlotBase(freeSlot);
-            const existingW2 = sim.memory[base + 2] || 0;
-            const oldVersion = (existingW2 >>> 25) & 0x7F;
-            const newVersion = (oldVersion + 1) & 0x7F;
+            const newVersion = sim._nsSequenceForWrite(freeSlot);
 
-            // Gate _allowAutoWrite for the duration of this single NS write.
-            // Navana.ADD is the sole manual gate; it is the ONLY non-boot-load
-            // path that may call writeNSEntry (task #2941).
-            const _wasAllowed = sim._allowAutoWrite;
-            sim._allowAutoWrite = true;
-            sim.writeNSEntry(freeSlot, location, limit, 0, 0, 0, gtType, newVersion, clistCount);
-            sim._allowAutoWrite = _wasAllowed;
+            sim.withNamespaceWrite('Mint/Navana registration', () => {
+                sim.writeNSEntry(
+                    freeSlot, location, limit, 0, 0, gtType, newVersion,
+                    clistCount, 0
+                );
+            });
             sim.nsLabels[freeSlot] = label;
 
             navanaState.managedAbstractions.push({ index: freeSlot, name: label, layer: -1 });
@@ -825,23 +813,22 @@ class SystemAbstractions {
 
         this.registry.bindMethod(5, 'REMOVE', function(sim, args) {
             const index = args.index;
-            if (index === undefined || index < 4) {
+            if (!Number.isInteger(index) ||
+                    index < sim.firstUserNsSlot() ||
+                    index >= sim.MAX_NS_ENTRIES) {
                 return { ok: false, fault: 'ARGS', message: 'Navana.Remove: invalid index (boot abstractions protected)' };
             }
-            const base = sim._nsSlotBase(index);
-            const w2 = sim.memory[base + 2] || 0;
-            const oldVersion = (w2 >>> 25) & 0x7F;
-            const newVersion = (oldVersion + 1) & 0x7F;
-            sim.memory[base + 0] = 0;
-            sim.memory[base + 1] = 0;
-            sim.memory[base + 2] = (newVersion << 25) >>> 0;
+            if (!sim.isNSEntryValid(index)) {
+                return { ok: false, fault: 'ARGS', message: `Navana.Remove: NS[${index}] is already free` };
+            }
             const label = sim.nsLabels[index] || 'unnamed';
-            delete sim.nsLabels[index];
+            const cleared = sim.withNamespaceWrite('Mint/Navana removal', () =>
+                sim.clearNSEntry(index));
             navanaState.managedAbstractions = navanaState.managedAbstractions.filter(a => a.index !== index);
             return {
                 ok: true,
-                result: { index: index, revoked: true },
-                message: `Navana.Remove: NS[${index}] "${label}" revoked (v${oldVersion}->v${newVersion})`
+                result: { index: index, revoked: true, version: cleared.newVersion },
+                message: `Navana.Remove: NS[${index}] "${label}" revoked (v${cleared.oldVersion}->v${cleared.newVersion})`
             };
         });
 
@@ -1191,20 +1178,27 @@ class SystemAbstractions {
 
         this.registry.bindMethod(6, 'Revoke', function(sim, args) {
             const nsIndex = args.nsIndex;
-            if (nsIndex === undefined || nsIndex === null) {
-                return { ok: false, fault: 'ARGS', message: 'Mint.Revoke: nsIndex required' };
+            if (!Number.isInteger(nsIndex) ||
+                    nsIndex < sim.firstUserNsSlot() ||
+                    nsIndex >= sim.MAX_NS_ENTRIES) {
+                return { ok: false, fault: 'ARGS', message: 'Mint.Revoke: valid user nsIndex required' };
             }
 
-            const base = sim._nsSlotBase(nsIndex);
-            if (nsIndex >= sim.nsCount) {
+            const entry = sim.readNSEntry(nsIndex);
+            if (!entry) {
                 return { ok: false, fault: 'BOUNDS', message: `Mint.Revoke: NS[${nsIndex}] out of bounds` };
             }
 
-            const w2 = sim.memory[base + 2];
-            const oldVersion = (w2 >>> 25) & 0x7F;
-            const newVersion = (oldVersion + 1) & 0x7F;
-            const seal = w2 & 0xFFFF;
-            sim.memory[base + 2] = (((newVersion & 0x7F) << 25) | (seal & 0xFFFF)) >>> 0;
+            const parsed = sim.parseNSWord1(entry.word1_limit);
+            const oldVersion = parsed.gtSeq;
+            const newVersion = (oldVersion + 1) & 0x1FF;
+            sim.withNamespaceWrite('Mint revocation', () => {
+                sim.writeNSEntry(
+                    nsIndex, entry.word0_location, parsed.limit, 0, parsed.g,
+                    entry.gtType, newVersion, entry.clistCount || 0,
+                    entry.word3_cache_token || 0
+                );
+            });
 
             return {
                 ok: true,
@@ -1251,7 +1245,9 @@ class SystemAbstractions {
             this._memoryState = {
                 allocations: {},
                 freeList: [],
-                nextFreeAddr: 45 * 0x100,
+                // Dynamic objects begin with the first user Namespace slot.
+                // Do not inherit the retired NS[45] high-water mark.
+                nextFreeAddr: 11 * 0x100,
             };
         }
         const memState = this._memoryState;

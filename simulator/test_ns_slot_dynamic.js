@@ -80,7 +80,6 @@ function makeBooted() {
 // ── Unit tests: allocOrFindNsSlot ─────────────────────────────────────────────
 {
     const sim = makeBooted();
-
     const slot1 = sim.allocOrFindNsSlot('tok_abc', 'MyProg');
     check('T301: allocOrFindNsSlot returns slot 11 for fresh sim', slot1 === 11);
 
@@ -136,6 +135,10 @@ function makeBooted() {
     const syncBESrc        = extractTopLevelFn('app-abstractions.js', '_syncBootEntryFromSim');
 
     const sim = makeBooted();
+    // Model slot 11 having been cleared four times before this compile. The
+    // compiler must consume that retained generation for both the NS entry and
+    // every live GT it installs.
+    sim._nsFreeSequences[11] = 4;
 
     // Minimal 3-instruction program
     const PROG_WORDS = [0x11111111, 0x22222222, 0x33333333];
@@ -225,12 +228,23 @@ function makeBooted() {
 
     // CR0 word encodes: [31]=b_flag=0, perm bits, gt_type, gt_seq, slot_index
     // For E-GT at slot 11: perm=E=0b100 (Church), dom=1, type=1
-    // createGT(0, 11, {E:1}, 1) — slot index is in bits [8:0] = 11
+    // The slot index is in bits [8:0]; gt_seq must match the reissued NS entry.
     const cr0Word = sim.cr[0] ? (sim.cr[0].word0 >>> 0) : 0;
     const cr0SlotIdx = cr0Word & 0x1FF;
     check('T311: sim.cr[0] encodes NS slot [11]',
         cr0SlotIdx === 11,
         `cr0.word0=0x${cr0Word.toString(16)}, slotIdx=${cr0SlotIdx}`);
+    const entry11 = sim.readNSEntry(11);
+    const entry11Seq = sim.parseNSWord1(entry11.word1_limit).gtSeq;
+    const cr0Seq = sim.parseGT(cr0Word).gt_seq;
+    const cr14Seq = sim.parseGT(sim.cr[14].word0 >>> 0).gt_seq;
+    check('T311a: reissued compiled slot keeps one generation across NS, CR0, and CR14',
+        entry11Seq === 4 && cr0Seq === 4 && cr14Seq === 4,
+        `NS=${entry11Seq}, CR0=${cr0Seq}, CR14=${cr14Seq}`);
+    const cr14Load = sim.mLoad(sim.cr[14].word0, 'X', 14, sim.cr[14].word1);
+    check('T311b: reissued compiled program remains executable through CR14',
+        cr14Load && cr14Load.ok === true,
+        JSON.stringify(cr14Load));
 
     const SLOT11_BASE = 0x0800;
     check('T312: sim.programBaseAddr is 0x0800 + 1 for slot 11 (code follows lump header)',

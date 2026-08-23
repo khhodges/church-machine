@@ -63,6 +63,7 @@ const DEFAULT_SCRIPT_ONLY_SUITES = [
     'update-lump-tests',
     'check-slot-index-leak',
     'ns-slot-dynamic-tests',
+    'rogue-namespace-slot-tests',
     'lambda-exec-tests',
     'hardware-sim',
     'check-ila-probe-names',

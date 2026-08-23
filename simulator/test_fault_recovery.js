@@ -31,6 +31,16 @@ function check(label, cond) {
     }
 }
 
+function writeTestNsEntry(sim, ...args) {
+    const bootComplete = sim.bootComplete;
+    sim.bootComplete = false;
+    try {
+        return sim.writeNSEntry(...args);
+    } finally {
+        sim.bootComplete = bootComplete;
+    }
+}
+
 // Build a minimal simulator wired to a fresh registry + system abstractions.
 function makeTestSim() {
     const sim = new ChurchSimulator();
@@ -257,7 +267,7 @@ console.log('\n--- T008-step: sim.step() executes Scheduler.pause (method index 
     // Write a valid NS entry for Scheduler at slot 8 so mLoad can pass.
     // location=0 (no code lump) causes lumpIsResident=false → system-abstraction
     // fast path fires; limit17=1, gtType=1(Inform) gives a valid non-null entry.
-    stepSim.writeNSEntry(8, 0, 1, 0, 0, 0, 1, 0, 0);
+    writeTestNsEntry(stepSim, 8, 0, 1, 0, 0, 0, 1, 0, 0);
 
     // Create an E-permission Inform GT for NS slot 8 (Scheduler).
     // gt_seq=1 matches version=1 written by writeNSEntry above (mLoad VERSION check).
@@ -384,7 +394,7 @@ console.log('\n--- T009: loadProgram + step() pause + step() timer wake ---');
     // Write a valid NS entry for Scheduler at slot 8.
     // location=0, gtType=1 (Inform) → lumpIsResident=false triggers the
     // system-abstraction fast path in _execCall rather than code execution.
-    t9sim.writeNSEntry(8, 0, 1, 0, 0, 0, 1, 0, 0);
+    writeTestNsEntry(t9sim, 8, 0, 1, 0, 0, 0, 1, 0, 0);
 
     // Create an E-permission Inform GT for NS slot 8 (Scheduler) and put it in CR0.
     // gt_seq=1 matches version=1 written by writeNSEntry above (mLoad VERSION check).
@@ -505,7 +515,7 @@ console.log('\n--- T010: continuous step() loop — timer fires without manual s
 
     // ── Phase A: write program into memory and set up Scheduler in CR0 ────────
     // Slot 8 (Scheduler): no code lump → system-abstraction fast path in _execCall.
-    t10sim.writeNSEntry(8, 0, 1, 0, 0, 0, 1, 0, 0);
+    writeTestNsEntry(t10sim, 8, 0, 1, 0, 0, 0, 1, 0, 0);
     // gt_seq=1 matches version=1 written by writeNSEntry above (mLoad VERSION check).
     const t10schedGT = t10sim.createGT(1, 8, { E: 1 }, 1);
     t10sim.cr[0] = { word0: t10schedGT, word1: 0, word2: 0, word3: 0, m: 0 };
@@ -989,7 +999,7 @@ console.log('\n--- T_RESOLVE: resolvePendingSlot ---');
         if (!sim.cr) sim.cr = new Array(16).fill(null);
         const lumpBase = CLIST_BASE - (64 - CLIST_COUNT);
         sim.memory[lumpBase] = sim.packLumpHeader(0, 1, CLIST_COUNT, 0);
-        sim.writeNSEntry(NS_SLOT, lumpBase, 63, 0, 0, 1, 0, CLIST_COUNT);
+        writeTestNsEntry(sim, NS_SLOT, lumpBase, 63, 0, 0, 1, 0, CLIST_COUNT);
         sim.cr[6] = {
             word0: sim.createGT(0, NS_SLOT, { E: 1 }, 1),
             word1: CLIST_BASE,           // base address of c-list in memory
@@ -1396,7 +1406,7 @@ console.log('\n--- T015: LAZY_LOAD wired from _execCall (cw=0 lump) ---');
 
     // Write NS entry at slot 20 (no system abstraction registered there).
     // version=1, gtType=1 (Inform), location=LUMP_BASE, limit17=63.
-    sim.writeNSEntry(NS_SLOT, LUMP_BASE, 63, 0, 0, 1, 1, 0, 0);
+    writeTestNsEntry(sim, NS_SLOT, LUMP_BASE, 63, 0, 0, 1, 1, 0, 0);
 
     // Write a valid lump header at LUMP_BASE with cw=0 (code evicted).
     // cc=1 keeps lumpIsResident=true so the system-abstraction fast-path
@@ -1470,7 +1480,7 @@ console.log('\n--- T015: LAZY_LOAD wired from _execCall (cw=0 lump) ---');
     {
         const { sim: sim2 } = makeTestSim();
         sim2.bootComplete = false;
-        sim2.writeNSEntry(NS_SLOT, LUMP_BASE, 63, 0, 0, 1, 1, 0, 0);
+        writeTestNsEntry(sim2, NS_SLOT, LUMP_BASE, 63, 0, 0, 1, 1, 0, 0);
         sim2.memory[LUMP_BASE] = sim2.packLumpHeader(0, 0, 1, 0);
         // Remove abstractionRegistry so _fireSchedulerIRQ returns null (not fired)
         sim2.abstractionRegistry = null;
@@ -1507,7 +1517,7 @@ console.log('\n--- T016: LAZY_RESOLVE wired from _execEloadcall ---');
         sim.bootComplete = false;
 
         // NS slot 5 backs CR6 (the c-list GT); clistCount=10 so ecRow=2 is in range.
-        sim.writeNSEntry(NS_SLOT5, CLIST_BASE, 63, 0, 0, 1, 1, 10, 0);
+        writeTestNsEntry(sim, NS_SLOT5, CLIST_BASE, 63, 0, 0, 1, 1, 10, 0);
 
         // CR6 = E-perm Inform GT for slot 5; word1 = c-list base; word2 encodes clistCount.
         const cr6GT = sim.createGT(1, NS_SLOT5, {E:1}, 1);
@@ -1615,7 +1625,7 @@ console.log('\n--- T016: LAZY_RESOLVE wired from _execEloadcall ---');
         const TARGET_SLOT = 15;
 
         // Write a valid NS entry at slot 15 so isNSEntryValid returns true.
-        sim.writeNSEntry(TARGET_SLOT, 0x300, 63, 0, 0, 1, 1, 0, 0);
+        writeTestNsEntry(sim, TARGET_SLOT, 0x300, 63, 0, 0, 1, 1, 0, 0);
         sim.nsLabels[TARGET_SLOT] = PET_NAME;
 
         // Place a pending GT in the c-list.
@@ -1785,7 +1795,7 @@ console.log('\n--- T018: LAZY_RESOLVE wired from _execLoad (petNameMemory) ---')
         sim.bootComplete = false;
 
         // NS slot 7 backs CR6 (the c-list GT); clistCount=10 so LOAD_SLOT=3 is in range.
-        sim.writeNSEntry(NS_SLOT7, CLIST_BASE, 63, 0, 0, 1, 1, 10, 0);
+        writeTestNsEntry(sim, NS_SLOT7, CLIST_BASE, 63, 0, 0, 1, 1, 10, 0);
 
         // CR6 = E-perm Inform GT for slot 7; word1 = c-list base; word2 encodes clistCount.
         const cr6GT = sim.createGT(1, NS_SLOT7, { E: 1 }, 1);
@@ -1888,7 +1898,7 @@ console.log('\n--- T019: STUB_METHOD fault (all-RETURN stub LUMP) ---');
         sim.memory[STUB_BASE + _wi] = stubWords[_wi] >>> 0;
     }
 
-    sim.writeNSEntry(STUB_SLOT, STUB_BASE, 2, 0, 0, 1, 1, 1, 0);
+    writeTestNsEntry(sim, STUB_SLOT, STUB_BASE, 2, 0, 0, 1, 1, 1, 0);
     sim.nsLabels[STUB_SLOT] = 'StubAbstraction';
 
     sim._nsStubFlags = sim._nsStubFlags || {};

@@ -852,8 +852,7 @@ function init() {
     // window.bootConfig was prefetched by the DOMContentLoaded handler before
     // init() ran (Task #214 Step 1), so this single reset already uses the
     // programmer-chosen lump sizes when present, and historical defaults
-    // otherwise. No re-reset is needed — that previously caused a race with
-    // loadNamespaceState() that could wipe restored state.
+    // otherwise. No re-reset is needed.
     sim.reset();
     _initLazyLoadManifest();
     _absMethodsLoad();
@@ -949,13 +948,6 @@ function init() {
                        window.bootImageAvailable = false;
                    }
         }
-        // Re-apply user-assigned namespace labels that sim.loadBootImage() may
-        // have overwritten (the boot image zeros any NS slot it does not populate,
-        // including free slots where the user stored custom pet names).
-        // loadNamespaceState() skips slots where isNSEntryValid() is true, so
-        // boot-image catalog entries take precedence; only truly empty slots
-        // (like user-defined slot 50+) are restored from localStorage.
-        loadNamespaceState();
         // Refresh the namespace table immediately after the boot image loads so
         // the live unified view populates even if the user navigated there before
         // the async fetch resolved, or before auto-boot fired.
@@ -1182,6 +1174,8 @@ function init() {
         new MutationObserver(syncLineScroll).observe(asmWarnOverlay, { childList: true });
     }
     updateLineNumbers();
+    // One-way deletion of the obsolete browser snapshot. This never restores
+    // Namespace words, labels, LUMP memory, or nsCount.
     loadNamespaceState();
     // Probe server for OPENAI_API_KEY availability (hides Generate button if missing).
     // Default false — button stays hidden until server confirms key is set.

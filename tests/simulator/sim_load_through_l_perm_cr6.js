@@ -56,6 +56,16 @@ global.window = {};  // silence bootConfig references in the constructor
 
 const ChurchSimulator = require('../../simulator/simulator.js');
 
+function writeTestNsEntry(sim, ...args) {
+    const bootComplete = sim.bootComplete;
+    sim.bootComplete = false;
+    try {
+        return sim.writeNSEntry(...args);
+    } finally {
+        sim.bootComplete = bootComplete;
+    }
+}
+
 const PERM_MASK = 0x70000000;   // bits[30:28]
 const L_PERM   = 0x10000000;   // perm[0]=L → bits[30:28] = 0b001
 const E_PERM   = 0x40000000;   // perm[2]=E → bits[30:28] = 0b100
@@ -145,8 +155,8 @@ console.log('\n--- PHASE 1: _execLoad with L-perm CR6, imm=0 ---');
     const faults = installFaultCapture(sim);
 
     // NS entries: both need valid seals so mLoad's validateMAC passes.
-    sim.writeNSEntry(CR6_SLOT,    CLIST_BASE, 63, 0, 0, 1, 0, CLIST_COUNT, 0);
-    sim.writeNSEntry(TARGET_SLOT, 0x0300,     63, 0, 0, 1, 0, 0, 0);
+    writeTestNsEntry(sim, CR6_SLOT,    CLIST_BASE, 63, 0, 0, 1, 0, CLIST_COUNT, 0);
+    writeTestNsEntry(sim, TARGET_SLOT, 0x0300,     63, 0, 0, 1, 0, 0, 0);
 
     // CR6 = L-perm GT (gt_seq=0 matches the NS entry written with version=0).
     const cr6GT = sim.createGT(0, CR6_SLOT, {L:1}, 1);
@@ -207,8 +217,8 @@ console.log('\n--- PHASE 2: _execLoad with L-perm CR6, imm=1 ---');
     const sim = makeSim();
     const faults = installFaultCapture(sim);
 
-    sim.writeNSEntry(CR6_SLOT,    CLIST_BASE, 63, 0, 0, 1, 0, CLIST_COUNT, 0);
-    sim.writeNSEntry(TARGET_SLOT, 0x0380,     63, 0, 0, 1, 0, 0, 0);
+    writeTestNsEntry(sim, CR6_SLOT,    CLIST_BASE, 63, 0, 0, 1, 0, CLIST_COUNT, 0);
+    writeTestNsEntry(sim, TARGET_SLOT, 0x0380,     63, 0, 0, 1, 0, 0, 0);
 
     const cr6GT = sim.createGT(0, CR6_SLOT, {L:1}, 1);
     sim.cr[6] = {
@@ -289,9 +299,9 @@ console.log('\n--- PHASE E2E: full fetch/decode/execute via sim.step() ---');
     sim.memory[CALLER_BASE + 1] = LOAD_WORD;  // code word 0 (PC=0)
 
     // ── NS entries ───────────────────────────────────────────────────────────
-    sim.writeNSEntry(CALLER_SLOT, CALLER_BASE, 63, 0, 0, 1, 0, CALLER_CC, 0);
-    sim.writeNSEntry(CR6_SLOT,   CLIST_BASE,  63, 0, 0, 1, 0, CLIST_COUNT, 0);
-    sim.writeNSEntry(TARGET_SLOT, TARGET_BASE, 63, 0, 0, 1, 0, 0, 0);
+    writeTestNsEntry(sim, CALLER_SLOT, CALLER_BASE, 63, 0, 0, 1, 0, CALLER_CC, 0);
+    writeTestNsEntry(sim, CR6_SLOT,   CLIST_BASE,  63, 0, 0, 1, 0, CLIST_COUNT, 0);
+    writeTestNsEntry(sim, TARGET_SLOT, TARGET_BASE, 63, 0, 0, 1, 0, 0, 0);
 
     // ── CR14: code register for caller lump (RX-perm) ────────────────────────
     const cr14GT = sim.createGT(0, CALLER_SLOT, {R:1, X:1}, 1);  // Turing RX, type=1 (Inform)

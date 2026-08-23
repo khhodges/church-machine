@@ -182,7 +182,7 @@ sim.pc = 0;
 
 // Find a free high-memory region for our stub.
 const STUB_BASE  = 0xE000;    // arbitrary free page (above any boot data)
-const CLIST_BASE = STUB_BASE + 64;   // c-list starts after the lump
+const CLIST_BASE = STUB_BASE + 63;   // cc=1 occupies the final word of the 64-word lump
 
 // Write a minimal 64-word stub code lump:
 //   word[STUB_BASE+0] = header (magic=0x1F, nMinus6=0→size=64, cw=1, cc=1)
@@ -202,7 +202,9 @@ sim.memory[CLIST_BASE] = STUB_CODE_GT >>> 0;   // c-list[0] = code cap
 // Register the stub NS entry via writeNSEntry (uses inverted slot layout internally).
 // writeNSEntry(idx, location, limit17, bFlag, gBit, gtType, version, clistCount, abstract_gt)
 //   gtType=1 = Inform, clistCount=1 so mLoad can find the c-list.
-sim.writeNSEntry(STUB_NS_SLOT, STUB_BASE, 63, 0, 0, 1, 0, 1, 0);
+sim.withNamespaceWrite('test fixture setup', () => {
+    sim.writeNSEntry(STUB_NS_SLOT, STUB_BASE, 63, 0, 0, 1, 0, 1, 0);
+});
 // writeNSEntry increments nsCount automatically when idx >= nsCount.
 
 // Build an E-perm GT for the stub abstraction and put it in CR0.
@@ -211,9 +213,11 @@ sim.cr[0] = { word0: STUB_E_GT >>> 0, word1: CLIST_BASE, word2: 0, word3: 0, m: 
 
 // Now execute CALL CR0, CR0 (opcode=2, cond=AL, crDst=0, crSrc=0, imm=0)
 sim.pc = 0;
+sim.halted = false;
+sim.sto = 63;  // final two words of the active 64-word Thread LUMP are a valid frame
 const rCall = writeAndStep(enc(2, AL, 0, 0, 0));
 check('TD1 CALL step() returns a result (not fault)', !!rCall && !rCall.faulted,
-    `desc: ${rCall && rCall.desc}`);
+    `desc: ${rCall && rCall.desc}; halted=${sim.halted}; output=${sim.output.slice(-240)}`);
 const callPkts = (rCall && rCall.tracePackets) || [];
 check('TD2 CALL emits exactly 3 packets',     callPkts.length === 3,
     `got ${callPkts.length}: ${JSON.stringify(callPkts)}`);
@@ -240,6 +244,7 @@ const SENTINEL_CR13     = 0xFFFFFFFE;
 sim.cr[0] = { word0: ABSTRACT_GT_WORD0, word1: SENTINEL_CR13, word2: 0, word3: 0, m: 0 };
 
 sim.pc = 0;
+sim.halted = false;
 // SWITCH: opcode=5, cond=AL, crDst=0 (ignored by SWITCH), crSrc=0, imm=5 (→CR13)
 const switchInstr = enc(5, AL, 0, 0, 5);
 sim.memory[STUB_BASE + 1 + sim.pc] = switchInstr;

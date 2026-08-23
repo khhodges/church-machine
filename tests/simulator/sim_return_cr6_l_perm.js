@@ -59,6 +59,16 @@ global.window = {};  // silence any bootConfig references in the constructor
 
 const ChurchSimulator = require('../../simulator/simulator.js');
 
+function writeTestNsEntry(sim, ...args) {
+    const bootComplete = sim.bootComplete;
+    sim.bootComplete = false;
+    try {
+        return sim.writeNSEntry(...args);
+    } finally {
+        sim.bootComplete = bootComplete;
+    }
+}
+
 const PERM_MASK = 0x70000000;   // bits[30:28]
 const L_PERM   = 0x10000000;   // perm[0]=L  → bits[30:28] = 0b001
 const E_PERM   = 0x40000000;   // perm[2]=E  → bits[30:28] = 0b100
@@ -220,8 +230,8 @@ console.log('\n--- PHASE 2: real CALL→RETURN round-trip (cc>0, mask=0) ---');
     writeLumpHdr(sim, CALLEE_BASE, CALLEE_CC, CALLEE_CW);
 
     // Write NS table entries.
-    sim.writeNSEntry(CALLER_SLOT, CALLER_BASE, 63, 0, 0, 1, 0, CALLER_CC, 0);
-    sim.writeNSEntry(CALLEE_SLOT, CALLEE_BASE, 63, 0, 0, 1, 0, CALLEE_CC, 0);
+    writeTestNsEntry(sim, CALLER_SLOT, CALLER_BASE, 63, 0, 0, 1, 0, CALLER_CC, 0);
+    writeTestNsEntry(sim, CALLEE_SLOT, CALLEE_BASE, 63, 0, 0, 1, 0, CALLEE_CC, 0);
 
     // CR6: caller's L-GT for the caller's own c-list (slot 5).
     const callerCR6GT = sim.createGT(0, CALLER_SLOT, {L:1}, 1);
@@ -307,7 +317,7 @@ console.log('\n--- PHASE 3: CALL→RETURN with mask bit 6 SET (CR6 preserved) --
     const faults = installFaultCapture(sim);
 
     writeLumpHdr(sim, CALLEE_BASE, CALLEE_CC, CALLEE_CW);
-    sim.writeNSEntry(CALLEE_SLOT, CALLEE_BASE, 63, 0, 0, 1, 0, CALLEE_CC, 0);
+    writeTestNsEntry(sim, CALLEE_SLOT, CALLEE_BASE, 63, 0, 0, 1, 0, CALLEE_CC, 0);
 
     // Caller's CR6 = L-GT for slot 4.
     sim.cr[6] = {
@@ -399,8 +409,8 @@ console.log('\n--- PHASE E2E: full fetch/decode/execute via sim.step() ---');
     sim.memory[CALLER_BASE + 2] = RETURN_WORD;   // code word 1 (PC=1) → RETURN
 
     // NS table.
-    sim.writeNSEntry(CALLER_SLOT, CALLER_BASE, 63, 0, 0, 1, 0, CALLER_CC, 0);
-    sim.writeNSEntry(CALLEE_SLOT, CALLEE_BASE, 63, 0, 0, 1, 0, CALLEE_CC, 0);
+    writeTestNsEntry(sim, CALLER_SLOT, CALLER_BASE, 63, 0, 0, 1, 0, CALLER_CC, 0);
+    writeTestNsEntry(sim, CALLEE_SLOT, CALLEE_BASE, 63, 0, 0, 1, 0, CALLEE_CC, 0);
 
     // Caller's CR6 = L-GT for caller slot.
     const callerCR6GT = sim.createGT(0, CALLER_SLOT, {L:1}, 1);

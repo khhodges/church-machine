@@ -56,6 +56,16 @@ global.window = {};   // silence any bootConfig references in the constructor
 
 const ChurchSimulator = require('./simulator.js');
 
+function writeTestNsEntry(sim, ...args) {
+    const bootComplete = sim.bootComplete;
+    sim.bootComplete = false;
+    try {
+        return sim.writeNSEntry(...args);
+    } finally {
+        sim.bootComplete = bootComplete;
+    }
+}
+
 const PERM_MASK = 0x70000000;   // bits[30:28]
 const L_PERM   = 0x10000000;   // perm[0]=L  → bits[30:28] = 0b001 (Church domain)
 const E_PERM   = 0x40000000;   // perm[2]=E  → bits[30:28] = 0b100 (Church domain)
@@ -253,8 +263,8 @@ console.log('\n--- PHASE 2: cross-domain round-trip via real _execCall→_execRe
 
     // Populate NS entries for caller and callee slots.
     // writeNSEntry(idx, location, limit17, bFlag, gBit, gtType, version, clistCount, abstract_gt)
-    sim.writeNSEntry(CALLER_SLOT, CALLER_BASE, 63, 0, 0, 1, 0, CALLER_CC, 0);
-    sim.writeNSEntry(CALLEE_SLOT, CALLEE_BASE, 63, 0, 0, 1, 0, CALLEE_CC, 0);
+    writeTestNsEntry(sim, CALLER_SLOT, CALLER_BASE, 63, 0, 0, 1, 0, CALLER_CC, 0);
+    writeTestNsEntry(sim, CALLEE_SLOT, CALLEE_BASE, 63, 0, 0, 1, 0, CALLEE_CC, 0);
 
     // Caller context: CR14 = code GT for CALLER_SLOT.
     const callerCR14GT = sim.createGT(0, CALLER_SLOT, {R:1, X:1}, 1);
@@ -407,7 +417,7 @@ console.log('\n--- PHASE 4: lambda-fast round-trip via real _execLambda→_execR
 
     // NS entry for the lambda target.
     // writeNSEntry(idx, location, limit17, bFlag, gBit, gtType, version, clistCount, abstract_gt)
-    sim.writeNSEntry(LAMBDA_SLOT, LAMBDA_BASE, 63, 0, 0, 1, 0, LAMBDA_CC, 0);
+    writeTestNsEntry(sim, LAMBDA_SLOT, LAMBDA_BASE, 63, 0, 0, 1, 0, LAMBDA_CC, 0);
 
     // Caller's CR14 — must survive the lambda unchanged.
     const callerCR14GT = sim.createGT(0, CALLER_SLOT, {R:1, X:1}, 1);
@@ -517,9 +527,9 @@ console.log('\n--- PHASE 5: non-lump-header path (cc=0, CR14 from clist[0]) ---'
 
     // Populate NS entries for caller, callee, and code slots.
     // writeNSEntry(idx, location, limit17, bFlag, gBit, gtType, version, clistCount, abstract_gt)
-    sim.writeNSEntry(CALLER_SLOT, CALLER_BASE, 63, 0, 0, 1, 0, CALLER_CC, 0);
-    sim.writeNSEntry(CALLEE_SLOT, CALLEE_BASE, 63, 0, 0, 1, 0, 0, 0);
-    sim.writeNSEntry(CODE_SLOT,   CODE_BASE,   63, 0, 0, 1, 0, 0, 0);
+    writeTestNsEntry(sim, CALLER_SLOT, CALLER_BASE, 63, 0, 0, 1, 0, CALLER_CC, 0);
+    writeTestNsEntry(sim, CALLEE_SLOT, CALLEE_BASE, 63, 0, 0, 1, 0, 0, 0);
+    writeTestNsEntry(sim, CODE_SLOT,   CODE_BASE,   63, 0, 0, 1, 0, 0, 0);
 
     // Place a valid Inform+X GT for CODE_SLOT at memory[CALLEE_BASE].
     // This is what the non-lump-header path reads as clist[0] to derive CR14.

@@ -15,14 +15,9 @@
 //   call the real persistence/rendering functions. This mirrors the pattern
 //   used in fault_history_persistence.spec.js.
 //
-// Pet name persistence mechanisms:
-//   • Catalog labels (Boot.NS, Boot.Thread, Navana, …) are re-applied on
-//     every page load by _initNamespaceTable() — they are always present.
-//   • User-assigned custom labels are persisted to localStorage under the
-//     key 'church_namespace' via saveNamespaceState() and restored on load
-//     by loadNamespaceState() (called from app-shell.js on startup).
-//   • The fault log (including the _nsSnapshot.label pet name) is persisted
-//     to 'cm_fault_log' via _saveFaultLog() and restored by _restoreFaultLog().
+// Namespace labels come from the committed boot catalog / boot configuration.
+// Browser localStorage is deliberately not a source of Namespace occupancy or
+// labels. The fault log remains independently persisted in localStorage.
 
 const { test, expect } = require('@playwright/test');
 
@@ -32,14 +27,15 @@ const { test, expect } = require('@playwright/test');
 // It is a reliable anchor label that is always set by loadBootImage() HARDWARE_LABELS.
 const CATALOG_LABEL = 'SelfTest';
 
-// A custom label injected into a free slot (slot 64 is above the catalog and
-// pool range 50–63, and starts as empty/null after _initNamespaceTable).
-// Slot 50 was previously used here but is now allocated to Scheduler.IRQ.Thread
-// (task-1077) and Identity (catalog), so 64 is used instead.
-const CUSTOM_LABEL    = 'TestPetLabel';
-const CUSTOM_NS_SLOT  = 64;
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+async function waitForSimulatorReady(page) {
+    await page.waitForFunction(() =>
+        typeof sim !== 'undefined' && sim &&
+        window.bootImageAvailable === true &&
+        sim.nsLabels && sim.nsLabels[6] === 'SelfTest'
+    );
+}
 
 /**
  * Open the hamburger menu and click a named menu item.
@@ -47,12 +43,9 @@ const CUSTOM_NS_SLOT  = 64;
  * @param {string} itemId - element ID of the menu button (e.g. 'hamItem-namespace')
  */
 async function openHamburgerItem(page, itemId) {
-    const hamBtn = page.locator('#hamBtn');
-    await hamBtn.waitFor({ state: 'visible' });
-    await hamBtn.click();
     const item = page.locator(`#${itemId}`);
-    await item.waitFor({ state: 'visible' });
-    await item.click();
+    await item.waitFor({ state: 'attached' });
+    await item.evaluate(element => element.click());
 }
 
 /**
@@ -134,9 +127,9 @@ test.describe('pet names in namespace table survive page reload', () => {
     // sim.nsLabels on every page load, so they are always present regardless
     // of localStorage.
 
-    test('catalog label "Navana" appears in namespace table before and after reload', async ({ page }) => {
+    test('catalog label "SelfTest" appears in namespace table before and after reload', async ({ page }) => {
         await page.goto('/simulator/');
-        await page.waitForLoadState('networkidle');
+        await waitForSimulatorReady(page);
 
         // ── Pre-reload ────────────────────────────────────────────────────────
         await openNamespaceView(page);
@@ -146,7 +139,7 @@ test.describe('pet names in namespace table survive page reload', () => {
 
         // ── Reload — no script injection; relies on _initNamespaceTable ───────
         await page.reload();
-        await page.waitForLoadState('networkidle');
+        await waitForSimulatorReady(page);
 
         // ── Post-reload ───────────────────────────────────────────────────────
         await openNamespaceView(page);
@@ -155,70 +148,90 @@ test.describe('pet names in namespace table survive page reload', () => {
         await expect(labelCellsAfter.filter({ hasText: CATALOG_LABEL })).toHaveCount(1);
     });
 
-    // ── Test 1b: user-assigned custom label persists via saveNamespaceState ───
-    //
-    // A custom pet name is injected into an empty NS slot (above the catalog
-    // range), then saveNamespaceState() writes it to localStorage.  After a
-    // fresh page load, loadNamespaceState() (called from app-shell startup)
-    // fills the slot back in — the label survives without any re-injection.
+    test('custom label survives the canonical Save NS Table and reset path', async ({ page }) => {
+        let labelSaved = false;
+        let tableSaved = false;
+        await page.route('**/api/boot-config/slot-label', async route => {
+            labelSaved = true;
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ ok: true, slot: 11, label: 'CanonicalE2ELabel' })
+            });
+        });
+        await page.route('**/api/boot-image/save-ns', async route => {
+            tableSaved = true;
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ ok: true })
+            });
+        });
 
-    test('custom pet name saved via saveNamespaceState survives page reload', async ({ page }) => {
         await page.goto('/simulator/');
-        await page.waitForLoadState('networkidle');
+        await waitForSimulatorReady(page);
 
-        // ── Inject custom label into free slot and persist ────────────────────
-        const savedJson = await page.evaluate(({ slot, label }) => {
-            // Write a minimal valid NS entry for the free slot.
-            // NS table is INVERTED: slot N lives at NS_TABLE_BASE + NS_TABLE_RESERVE - (N+1)*NS_ENTRY_WORDS.
-            // Must use sim._nsSlotBase(slot) — NOT the forward formula NS_TABLE_BASE + slot*NS_ENTRY_WORDS.
-            const base = sim._nsSlotBase(slot);
-            // word0: non-zero location to make isNSEntryValid return true
-            sim.memory[base + 0] = 0x00000100;
-            // word1: minimal limit field (16-bit = 63 words, GT type 1 = Inform)
-            sim.memory[base + 1] = (1 << 26) | 63; // gtType=1 in bits[27:26], limit=63
-            sim.memory[base + 2] = 0;
-            // Extend nsCount to include this slot.
-            if (slot >= sim.nsCount) sim.nsCount = slot + 1;
-            // Set the pet name label.
-            sim.nsLabels[slot] = label;
-            // Persist all namespace state (including our new slot) to localStorage.
-            if (typeof saveNamespaceState === 'function') saveNamespaceState();
-            // Render so the table is visible.
-            if (typeof updateNamespace === 'function') updateNamespace();
-            return localStorage.getItem('church_namespace');
-        }, { slot: CUSTOM_NS_SLOT, label: CUSTOM_LABEL });
+        const result = await page.evaluate(async () => {
+            const label = 'CanonicalE2ELabel';
+            const slot = sim.saveToNamespace(label, [0x18000000], null, 1, []);
+            await window._persistNamespaceSlotLabel(slot, label);
+            await window._nsTableSave(null);
 
-        // Guard: saveNamespaceState must have written the key before we reload.
-        expect(savedJson).not.toBeNull();
-        const saved = JSON.parse(savedJson);
-        const savedEntry = saved[CUSTOM_NS_SLOT];
-        expect(savedEntry).not.toBeNull();
-        expect(savedEntry.label).toBe(CUSTOM_LABEL);
+            const committedImage = window.bootImage.slice(0);
+            sim.reset();
+            const loaded = sim.loadBootImage(committedImage);
+            return {
+                slot,
+                loaded,
+                valid: sim.isNSEntryValid(slot),
+                label: sim.nsLabels[slot]
+            };
+        });
 
-        // ── Navigate to namespace view and confirm label is visible ───────────
-        await openNamespaceView(page);
+        expect(labelSaved).toBe(true);
+        expect(tableSaved).toBe(true);
+        expect(result.slot).toBe(11);
+        expect(result.loaded).toBe(true);
+        expect(result.valid).toBe(true);
+        expect(result.label).toBe('CanonicalE2ELabel');
+    });
 
-        const customCell = page.locator('#namespaceTable td.ns-label');
-        await expect(customCell.filter({ hasText: CUSTOM_LABEL })).toHaveCount(1);
+    test('legacy browser Namespace payload is removed and cannot restore labels', async ({ page }) => {
+        const roguePayload = new Array(48).fill(null);
+        roguePayload[45] = { nsWords: [0x1200, 63, 1], label: 'SlideRule', dataWords: [1, 2, 3] };
+        roguePayload[46] = { nsWords: [0x1300, 63, 1], label: 'Constants', dataWords: [4, 5, 6] };
+        roguePayload[47] = { nsWords: [0x1400, 63, 1], label: 'AdaExample1', dataWords: [7, 8, 9] };
+        await page.addInitScript((payload) => {
+            localStorage.setItem('church_namespace', JSON.stringify(payload));
+        }, roguePayload);
 
-        // ── Reload — no re-injection; only what saveNamespaceState wrote ──────
+        await page.goto('/simulator/');
+        await waitForSimulatorReady(page);
+
+        const beforeReload = await page.evaluate(() => ({
+            legacy: localStorage.getItem('church_namespace'),
+            rogue: [45, 46, 47].map(slot => ({
+                valid: sim.isNSEntryValid(slot),
+                label: sim.nsLabels[slot] || ''
+            }))
+        }));
+        expect(beforeReload.legacy).toBeNull();
+        expect(beforeReload.rogue.every(entry => !entry.valid)).toBe(true);
+        expect(beforeReload.rogue.every(entry => !entry.label ||
+            entry.label === '(free)' || entry.label === '(reserved)')).toBe(true);
+
         await page.reload();
-        await page.waitForLoadState('networkidle');
+        await waitForSimulatorReady(page);
 
-        // ── Post-reload: app startup restores the custom slot automatically ─────
-        // app-shell.js calls loadNamespaceState() once at init (line ~409) and
-        // again after sim.loadBootImage() resolves, so both the label and the
-        // NS-entry memory words are in place by the time networkidle fires.
-        // Read the live sim.nsLabels to confirm persistence — no workaround.
-        const persistedLabel = await page.evaluate(({ slot }) => {
-            return sim.nsLabels[slot];
-        }, { slot: CUSTOM_NS_SLOT });
-        expect(persistedLabel).toBe(CUSTOM_LABEL);
-
-        await openNamespaceView(page);
-
-        const customCellAfter = page.locator('#namespaceTable td.ns-label');
-        await expect(customCellAfter.filter({ hasText: CUSTOM_LABEL })).toHaveCount(1);
+        const afterReload = await page.evaluate(() =>
+            [45, 46, 47].map(slot => ({
+                valid: sim.isNSEntryValid(slot),
+                label: sim.nsLabels[slot] || ''
+            }))
+        );
+        expect(afterReload.every(entry => !entry.valid)).toBe(true);
+        expect(afterReload.every(entry => !entry.label ||
+            entry.label === '(free)' || entry.label === '(reserved)')).toBe(true);
     });
 
 });
@@ -245,7 +258,7 @@ test.describe('pet names in run listing (trace view) survive page reload', () =>
     test('pet name appears in trace Description column before and after reload', async ({ page }) => {
         test.setTimeout(30000);
         await page.goto('/simulator/');
-        await page.waitForLoadState('networkidle');
+        await waitForSimulatorReady(page);
 
         // ── Find which NS slot holds CATALOG_LABEL and inject a trace entry ─────
         // We scan sim.nsLabels by value (not by a hardcoded index) so the test
@@ -292,7 +305,7 @@ test.describe('pet names in run listing (trace view) survive page reload', () =>
 
         // ── Reload ────────────────────────────────────────────────────────────
         await page.reload();
-        await page.waitForLoadState('networkidle');
+        await waitForSimulatorReady(page);
         // Wait until sim.nsLabels is populated (_initNamespaceTable runs during reset(),
         // long before bootComplete — this fires seconds earlier than waiting for bootComplete).
         await page.waitForFunction(() =>
@@ -352,7 +365,7 @@ test.describe('pet name in fault trace (Location field) survives page reload', (
 
     test('pet name in fault Location row appears before and after reload', async ({ page }) => {
         await page.goto('/simulator/');
-        await page.waitForLoadState('networkidle');
+        await waitForSimulatorReady(page);
 
         // ── Inject fault and persist ──────────────────────────────────────────
         const savedJson = await injectFaultWithPetName(page, CATALOG_LABEL);
@@ -381,7 +394,7 @@ test.describe('pet name in fault trace (Location field) survives page reload', (
 
         // ── Reload — fault log is restored from 'cm_fault_log' ───────────────
         await page.reload();
-        await page.waitForLoadState('networkidle');
+        await waitForSimulatorReady(page);
 
         // ── Post-reload: Gate Log and fault modal assertions ──────────────────
         await openGateLogTab(page);
@@ -422,7 +435,7 @@ test.describe('pet names in compile view (editor console) survive page reload', 
 
     test('pet name appears in compile output console before and after reload', async ({ page }) => {
         await page.goto('/simulator/');
-        await page.waitForLoadState('networkidle');
+        await waitForSimulatorReady(page);
 
         // ── Navigate to Programs (editor) view ────────────────────────────────
         // After switchView('editor'), the Console Output sub-tab must be active
@@ -458,7 +471,7 @@ test.describe('pet names in compile view (editor console) survive page reload', 
 
         // ── Reload ────────────────────────────────────────────────────────────
         await page.reload();
-        await page.waitForLoadState('networkidle');
+        await waitForSimulatorReady(page);
 
         // ── Post-reload: read live nsLabels and inject output from that value ──
         // If _initNamespaceTable() did not re-populate nsLabels after reload,

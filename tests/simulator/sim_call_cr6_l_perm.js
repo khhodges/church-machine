@@ -50,6 +50,16 @@ global.window = {};  // silence any bootConfig references in the constructor
 
 const ChurchSimulator = require('../../simulator/simulator.js');
 
+function writeTestNsEntry(sim, ...args) {
+    const bootComplete = sim.bootComplete;
+    sim.bootComplete = false;
+    try {
+        return sim.writeNSEntry(...args);
+    } finally {
+        sim.bootComplete = bootComplete;
+    }
+}
+
 const PERM_MASK = 0x70000000;   // bits[30:28]
 const L_PERM   = 0x10000000;   // perm[0]=L  → bits[30:28] = 0b001
 const E_PERM   = 0x40000000;   // perm[2]=E  → bits[30:28] = 0b100
@@ -129,7 +139,7 @@ console.log('\n--- PHASE 1: lump-header path (cc=2) ---');
     const faults = installFaultCapture(sim);
 
     writeLumpHdr(sim, CALLEE_BASE, CC, CW);
-    sim.writeNSEntry(CALLEE_SLOT, CALLEE_BASE, 63, 0, 0, 1, 0, CC, 0);
+    writeTestNsEntry(sim, CALLEE_SLOT, CALLEE_BASE, 63, 0, 0, 1, 0, CC, 0);
 
     sim.cr[0] = {
         word0: sim.createGT(0, CALLEE_SLOT, {E:1}, 1),
@@ -174,7 +184,7 @@ console.log('\n--- PHASE 2: non-lump-header path (cc=0) ---');
     const faults = installFaultCapture(sim);
 
     writeLumpHdr(sim, CALLEE_BASE, CC, CW);
-    sim.writeNSEntry(CALLEE_SLOT, CALLEE_BASE, 63, 0, 0, 1, 0, CC, 0);
+    writeTestNsEntry(sim, CALLEE_SLOT, CALLEE_BASE, 63, 0, 0, 1, 0, CC, 0);
 
     sim.cr[0] = {
         word0: sim.createGT(0, CALLEE_SLOT, {E:1}, 1),
@@ -249,9 +259,9 @@ console.log('\n--- PHASE E2E: full fetch/decode/execute via sim.step() ---');
     // ── Write NS table entries ────────────────────────────────────────────────
     // Caller slot: RX-perm (Turing domain) so CR14 mLoad('X') passes.
     // clistCount = CALLER_CC for the NS entry (not for GT perm).
-    sim.writeNSEntry(CALLER_SLOT, CALLER_BASE, 63, 0, 0, 1, 0, CALLER_CC, 0);
+    writeTestNsEntry(sim, CALLER_SLOT, CALLER_BASE, 63, 0, 0, 1, 0, CALLER_CC, 0);
     // Callee slot: E-perm (Church domain) called via CR0.
-    sim.writeNSEntry(CALLEE_SLOT, CALLEE_BASE, 63, 0, 0, 1, 0, CALLEE_CC, 0);
+    writeTestNsEntry(sim, CALLEE_SLOT, CALLEE_BASE, 63, 0, 0, 1, 0, CALLEE_CC, 0);
 
     // ── Set up capability registers ───────────────────────────────────────────
     // CR14: code register → caller lump, RX-perm Inform GT.

@@ -48,6 +48,16 @@ const fs   = require('fs');
 const path = require('path');
 const ChurchSimulator = require('./simulator.js');
 
+function writeTestNsEntry(sim, ...args) {
+    const bootComplete = sim.bootComplete;
+    sim.bootComplete = false;
+    try {
+        return sim.writeNSEntry(...args);
+    } finally {
+        sim.bootComplete = bootComplete;
+    }
+}
+
 let pass = 0;
 let fail = 0;
 
@@ -136,15 +146,15 @@ function setupSim(rawWords) {
 
     // 2. NS entry — Constants code (slot 9)
     //    location=EXTENDED_BASE, limit=cw=23, Inform type, cc in clistCount field
-    sim.writeNSEntry(CONSTANTS_NS_SLOT, EXTENDED_BASE, hdr.cw, 0, 0, 1, 0, hdr.cc, 0);
+    writeTestNsEntry(sim, CONSTANTS_NS_SLOT, EXTENDED_BASE, hdr.cw, 0, 0, 1, 0, hdr.cc, 0);
 
     // 3. NS entry — Constants data region (slot 10)
     //    location=DATA_LOC=0x0413, limit=4 (upper bound = 0x0417, covers offsets 0..4)
-    sim.writeNSEntry(DATA_NS_SLOT, DATA_LOC, 4, 0, 0, 1, 0, 0, 0);
+    writeTestNsEntry(sim, DATA_NS_SLOT, DATA_LOC, 4, 0, 0, 1, 0, 0, 0);
 
     // 4. NS entry — dummy thread lump (slot 15)
     //    Covers DR zone (threadBase+1..+16) and caps zone (threadBase+244..+255).
-    sim.writeNSEntry(THREAD_NS_SLOT, THREAD_BASE, THREAD_LIMIT, 0, 0, 1, 0, 0, 0);
+    writeTestNsEntry(sim, THREAD_NS_SLOT, THREAD_BASE, THREAD_LIMIT, 0, 0, 1, 0, 0, 0);
 
     // 5. CR14 = R+X code cap for Constants (instruction fetch)
     const codeGT    = sim.createGT(0, CONSTANTS_NS_SLOT, {R: 1, X: 1}, 1);

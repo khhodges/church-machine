@@ -172,73 +172,50 @@ A lightweight format for importing a single entry without a pre-existing slot ta
 
 ### What import does with this format
 
-- Allocates the next free slot at `sim.nsCount`
-- Derives `location = index * SLOT_SIZE`
+- Allocates the first free user slot at or above slot 11
+- Derives the physical location from the shared user-slot mapping
 - Writes NS entry via `writeNSEntry(idx, loc, lim17, 0, 0, 0, chainable, gtType, 0)`
 - Copies code words into memory starting at `location`
 - Sets label
 
 ---
 
-## Format 4 — localStorage persistence
+## Retired browser snapshot
 
-Internal format used by `saveNamespaceState` / `loadNamespaceState`. Stored under the key `church_namespace` in `localStorage`. **Not intended for hand-authoring** — it is written and read automatically by the IDE.
+Older IDE versions stored a full Namespace snapshot under the
+`church_namespace` localStorage key. The IDE now deletes that key at startup
+without parsing or restoring it. Occupied slots, labels, and LUMP memory come
+only from the committed Namespace/boot image; browser state is not authoritative.
 
 ```json
-[
-  {
-    "nsWords": [64512, 0, 0],
-    "label": "Boot.NS",
-    "dataWords": []
-  },
-  null,
-  {
-    "nsWords": [6144, 134250558, 738247681],
-    "label": "Navana",
-    "dataWords": [1356218373, 268959744, 285736961]
-  }
-]
+localStorage.removeItem("church_namespace")
 ```
-
-The outer array is indexed by NS slot. `null` means the slot was empty.
-
-| Field       | Type     | Description |
-|-------------|----------|-------------|
-| `nsWords`   | number[4]| The four raw 32-bit hardware words of the slot: `[word0, word1, word2, word3]`. Written directly into `sim.memory[NS_TABLE_BASE + idx * 4 + 0..3]`. |
-| `label`     | string   | Human-readable name. Stored in `sim.nsLabels`. |
-| `dataWords` | number[] | Contents of the backing memory region. The first word is the GT (`sim.memory[loc]`); subsequent words are code/data. Written starting at `word0_location` (decoded from `nsWords[0]`). |
-
-### Load behaviour
-
-- Slots that already pass `isNSEntryValid` are skipped (boot entries are not overwritten)
-- If `nsWords` is present and has length 3, the three hardware words are written directly — this is the authoritative path
-- If `nsWords` is absent but `entry` is present (legacy format), `writeNSEntry` is called using the parsed `entry` fields
-
----
 
 ## Summary: which fields survive each round-trip
 
-| Field             | Single export | Full export | Label import | localStorage |
-|-------------------|:---:|:---:|:---:|:---:|
-| `word0_location`  | ✓ (in `entry`) | ✓ (in `entry`) | derived | ✓ (in `nsWords[0]`) |
-| `word1_limit` (raw) | ✓ (in `entry`) | ✓ (in `entry`) | derived | ✓ (in `nsWords[1]`) |
-| `word2_seals` (raw) | ✓ (in `entry`) | ✓ (in `entry`) | recomputed | ✓ (in `nsWords[2]`) |
-| B flag (bind)     | ✗ (entry has raw w1) | ✗ | ✗ | ✓ (packed in `nsWords[1]`) |
-| F flag (far)      | ✗ | ✗ | ✗ | ✓ (packed in `nsWords[1]`) |
-| G bit (GC)        | ✓ (`gBit`) | ✓ | ✗ | ✓ |
-| `gtType`          | ✓ (string + in entry) | ✓ | ✓ (0–3) | ✓ |
-| `clistCount`      | ✓ (in `entry`) | ✓ | ✗ | ✓ |
-| `chainable`       | ✓ (in `entry`) | ✓ | ✓ | ✓ |
-| `label`           | ✓ | ✓ | ✓ | ✓ |
-| version           | ✓ (decode `word2_seals`) | ✓ | recomputed (0) | ✓ |
-| CRC-16 seal       | ✓ (decode `word2_seals`) | ✓ | recomputed | ✓ |
-| code words        | ✓ | ✓ | ✓ | ✓ (in `dataWords[1..]`) |
-| GT word           | ✓ (`gt` field) | ✓ | ✗ | ✓ (`dataWords[0]`) |
-| permissions       | ✓ (decoded from GT) | ✗ | ✗ | ✗ |
+| Field             | Single export | Full export | Label import |
+|-------------------|:---:|:---:|:---:|
+| `word0_location`  | ✓ (in `entry`) | ✓ (in `entry`) | derived |
+| `word1_limit` (raw) | ✓ (in `entry`) | ✓ (in `entry`) | derived |
+| `word2_seals` (raw) | ✓ (in `entry`) | ✓ (in `entry`) | recomputed |
+| B flag (bind)     | ✗ (entry has raw w1) | ✗ | ✗ |
+| F flag (far)      | ✗ | ✗ | ✗ |
+| G bit (GC)        | ✓ (`gBit`) | ✓ | ✗ |
+| `gtType`          | ✓ (string + in entry) | ✓ | ✓ (0–3) |
+| `clistCount`      | ✓ (in `entry`) | ✓ | ✗ |
+| `chainable`       | ✓ (in `entry`) | ✓ | ✓ |
+| `label`           | ✓ | ✓ | ✓ |
+| version           | ✓ (decode `word2_seals`) | ✓ | recomputed (0) |
+| CRC-16 seal       | ✓ (decode `word2_seals`) | ✓ | recomputed |
+| code words        | ✓ | ✓ | ✓ |
+| GT word           | ✓ (`gt` field) | ✓ | ✗ |
+| permissions       | ✓ (decoded from GT) | ✗ | ✗ |
 
 > ✓ = preserved  ✗ = lost or recomputed during round-trip
 
-**Consequence:** Only localStorage preserves the complete slot state (all three hardware words and all data). The export/import formats are for code exchange and bootstrapping, not for perfect fidelity restoration of a running simulator state.
+The retired browser payload is intentionally excluded: it is deleted, not
+restored. Canonical boot-image persistence is the authority for a running
+Namespace.
 
 ---
 
