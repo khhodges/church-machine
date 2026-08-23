@@ -1399,9 +1399,38 @@ def index():
 
 @app.route("/robots.txt")
 def robots_txt():
-    content = "User-agent: *\nAllow: /\nSitemap: https://haskell-main-1.replit.app/sitemap.xml\n"
+    content = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Sitemap: https://haskell-main-1.replit.app/sitemap.xml\n"
+        "# AI crawler guidance\n"
+        "# See /llms.txt for a structured index of documentation\n"
+    )
     return make_response(content, 200, {"Content-Type": "text/plain; charset=utf-8"})
 
+@app.route("/llms.txt")
+def llms_txt():
+    content = (
+        "# Church Machine — llms.txt\n"
+        "# Capability-based secure computing platform (Church Machine / CLOOMC)\n"
+        "#\n"
+        "# Church Machine is a capability-secure computing architecture with its own\n"
+        "# ISA, multi-language compiler (CLOOMC), and FPGA hardware target (Wukong A7).\n"
+        "# Capabilities replace pointers for all inter-abstraction communication.\n"
+        "\n"
+        "## Core documentation\n"
+        "- /docs/cloomc-foundation.md: CLOOMC ISA, capability model, memory architecture\n"
+        "- /docs/HARDWARE.md: Wukong A7 board hardware setup and FPGA integration\n"
+        "- /docs/instruction-set.md: Instruction set reference and fault recovery\n"
+        "- /docs/isa_reference.md: ISA encoding reference\n"
+        "- /docs/mload.md: mLoad memory instruction specification\n"
+        "\n"
+        "## Public pages\n"
+        "- /: Landing page — overview of the Church Machine platform\n"
+        "- /simulator/: Browser-based Church Machine IDE\n"
+        "- /start-guide: Getting started guide\n"
+    )
+    return make_response(content, 200, {"Content-Type": "text/plain; charset=utf-8"})
 @app.route("/sitemap.xml")
 def sitemap_xml():
     content = (
