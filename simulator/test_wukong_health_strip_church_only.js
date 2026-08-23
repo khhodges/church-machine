@@ -183,6 +183,105 @@ console.log('\nWukong health-strip — church_only filter tests\n');
     }
 }
 
+// ── Bridge stage helper ───────────────────────────────────────────────────────
+// Returns stages[0] ("Bridge"), verifying the name and failing loudly on mismatch.
+function runBridge(label, s) {
+    const stages = classify(s, -1, null);
+    const br = stages[0];
+    if (!br || br.name !== 'Bridge') {
+        failures++;
+        console.log('  FAIL  ' + label + '  — stages[0] is not "Bridge": ' + JSON.stringify(br));
+        return null;
+    }
+    return br;
+}
+
+console.log('\nWukong health-strip — Bridge stage + church_only filter tests\n');
+
+// ── Case 6: church_only=true + bridgeAge<3 → green + "Turing filter" ──────────
+{
+    const s = {
+        bridge_poll_age:    1,
+        last_trace_age:     1,
+        total_bridge_polls: 10,
+        total_trace_posts:  50,
+        server_seq: 5,
+        bridge: { church_only: true }
+    };
+    const br = runBridge('case6', s);
+    if (br) {
+        check('case6: church_only=true + bridgeAge<3 → state=green',
+              br.state === 'green', 'got ' + br.state);
+        check('case6: detail is non-empty',
+              br.detail && br.detail.length > 0, 'detail: ' + br.detail);
+        check('case6: detail contains "Turing filter"',
+              br.detail.includes('Turing filter'), 'detail: ' + br.detail);
+    }
+}
+
+// ── Case 7: church_only=true + bridgeAge=15 → amber + "Turing filter" ─────────
+{
+    const s = {
+        bridge_poll_age:    15,
+        last_trace_age:     1,
+        total_bridge_polls: 10,
+        total_trace_posts:  50,
+        server_seq: 5,
+        bridge: { church_only: true }
+    };
+    const br = runBridge('case7', s);
+    if (br) {
+        check('case7: church_only=true + bridgeAge=15 → state=amber',
+              br.state === 'amber', 'got ' + br.state);
+        check('case7: detail is non-empty',
+              br.detail && br.detail.length > 0, 'detail: ' + br.detail);
+        check('case7: detail contains "Turing filter"',
+              br.detail.includes('Turing filter'), 'detail: ' + br.detail);
+    }
+}
+
+// ── Case 8: church_only=true + bridgeAge=null + totalPolls=0 → red (no-polls) ─
+{
+    const s = {
+        bridge_poll_age:    null,
+        last_trace_age:     null,
+        total_bridge_polls: 0,
+        total_trace_posts:  0,
+        server_seq: 0,
+        bridge: { church_only: true }
+    };
+    const br = runBridge('case8', s);
+    if (br) {
+        check('case8: church_only=true + bridgeAge=null + totalPolls=0 → state=red',
+              br.state === 'red', 'got ' + br.state);
+        check('case8: detail is non-empty',
+              br.detail && br.detail.length > 0, 'detail: ' + br.detail);
+        check('case8: detail contains "Turing filter"',
+              br.detail.includes('Turing filter'), 'detail: ' + br.detail);
+    }
+}
+
+// ── Case 9: church_only=true + bridgeAge=60 + totalPolls>0 → red (stalled) ────
+{
+    const s = {
+        bridge_poll_age:    60,
+        last_trace_age:     1,
+        total_bridge_polls: 20,
+        total_trace_posts:  100,
+        server_seq: 10,
+        bridge: { church_only: true }
+    };
+    const br = runBridge('case9', s);
+    if (br) {
+        check('case9: church_only=true + bridgeAge=60 + totalPolls>0 → state=red',
+              br.state === 'red', 'got ' + br.state);
+        check('case9: detail is non-empty',
+              br.detail && br.detail.length > 0, 'detail: ' + br.detail);
+        check('case9: detail contains "Turing filter"',
+              br.detail.includes('Turing filter'), 'detail: ' + br.detail);
+    }
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + (failures === 0 ? 'All tests passed.' : failures + ' test(s) FAILED.') + '\n');
 process.exit(failures === 0 ? 0 : 1);
