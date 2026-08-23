@@ -13,6 +13,7 @@ object and a monkeypatched requests.post.
 import os
 import struct
 import sys
+import types
 
 import pytest
 
@@ -151,3 +152,134 @@ class TestWriteFailure:
         ser = FakeSerial()
         _run('s', ser)          # must not raise
         assert ser.written == [b's']
+
+
+def test_main_reconnects_after_read_failure_and_acknowledges_after_write(
+        monkeypatch):
+    """The long-running loop survives a dead UART and finds its new port.
+
+    This deliberately drives ``main`` rather than only testing the command
+    helper: a read exception must not terminate the bridge or start a new
+    session, and a consumed command must not look delivered before its write
+    acknowledgement reaches the server.
+    """
+    timeline = []
+    serials = []
+    command_pending = True
+
+    class FakeSerial:
+        def __init__(self, port, baud, timeout):
+            self.port = port
+            self.written = []
+            self.read_count = 0
+            serials.append(self)
+
+        def read(self, _size):
+            self.read_count += 1
+            if self.port == '/dev/ttyUSB0':
+                raise OSError('USB read failed')
+            if self.read_count == 1:
+                return b''
+            raise KeyboardInterrupt
+
+        def write(self, data):
+            timeline.append(('serial_write', self.port, bytes(data)))
+            self.written.append(bytes(data))
+
+        def reset_input_buffer(self):
+            timeline.append(('flush', self.port))
+
+        def close(self):
+            timeline.append(('close', self.port))
+
+    class FakeResponse:
+        status_code = 200
+
+        def __init__(self, body):
+            self.body = body
+
+        def json(self):
+            return self.body
+
+    class FakeRequests:
+        def post(self, url, json=None, timeout=None, verify=None):
+            event = ('post', url, dict(json or {}), 1000 + len(timeline))
+            timeline.append(event)
+            return FakeResponse({})
+
+        def get(self, url, headers=None, timeout=None, verify=None):
+            nonlocal command_pending
+            if command_pending:
+                command_pending = False
+                timeline.append(('command_consumed', 1000 + len(timeline)))
+                return FakeResponse({'cmd': 's', 'id': 314})
+            return FakeResponse({})
+
+    class FakeTime:
+        def __init__(self):
+            self.now = 2000.0
+
+        def time(self):
+            self.now += 0.01
+            return self.now
+
+        def sleep(self, _seconds):
+            pass
+
+    class FakeUUID:
+        @staticmethod
+        def uuid4():
+            return types.SimpleNamespace(hex='stable-bridge-session')
+
+    fake_time = FakeTime()
+    fake_requests = FakeRequests()
+    fake_serial_module = types.SimpleNamespace(
+        Serial=FakeSerial,
+        SerialException=OSError,
+    )
+    monkeypatch.setattr(bridge, 'serial', fake_serial_module)
+    monkeypatch.setattr(bridge, 'requests', fake_requests)
+    monkeypatch.setattr(bridge, 'time', fake_time)
+    monkeypatch.setattr(bridge, 'uuid', FakeUUID)
+    monkeypatch.setattr(bridge, '_compute_expected_n_init', lambda: None)
+    monkeypatch.setattr(bridge, '_available_serial_ports',
+                        lambda: ['/dev/ttyUSB0'])
+    monkeypatch.setattr(bridge, '_find_serial_port',
+                        lambda preferred=None: '/dev/ttyUSB1')
+    monkeypatch.setattr(sys, 'argv', [
+        'wukong_bridge.py', '--port=/dev/ttyUSB0', '--ide=http://ide.test',
+    ])
+
+    bridge.main()
+
+    assert [ser.port for ser in serials] == [
+        '/dev/ttyUSB0', '/dev/ttyUSB1',
+    ]
+    assert serials[1].written == [b's']
+
+    status_posts = [
+        entry for entry in timeline
+        if entry[0] == 'post' and entry[1].endswith('/bridge-status')
+    ]
+    assert [entry[2]['event'] for entry in status_posts] == [
+        'session_started', 'serial_read_error', 'reconnect_attempt',
+        'reconnected',
+    ]
+    assert all(entry[2]['session_id'] == 'stable-bridge-session'
+               for entry in status_posts)
+    assert status_posts[-1][2]['serial_port'] == '/dev/ttyUSB1'
+    assert all(isinstance(entry[3], (int, float)) for entry in status_posts)
+    assert status_posts[-1][3] > status_posts[0][3]
+
+    command_index = next(i for i, entry in enumerate(timeline)
+                         if entry[0] == 'command_consumed')
+    write_index = next(i for i, entry in enumerate(timeline)
+                       if entry[0] == 'serial_write')
+    ack_index = next(i for i, entry in enumerate(timeline)
+                     if entry[0] == 'post'
+                     and entry[1].endswith('/command-ack'))
+    assert command_index < write_index < ack_index
+    assert timeline[ack_index][2] == {
+        'cmd': 's', 'ok': True, 'error': '', 'id': 314,
+        'session_id': 'stable-bridge-session',
+    }
