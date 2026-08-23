@@ -347,7 +347,13 @@ class TestFaultHaltRtlSource:
 
 
 class TestBridgeSentinelHaltOrdering:
-    """Bridge sends 'r' then 'q' AFTER consuming the sentinel — no race with trace packets."""
+    """Bridge sends 'r' AFTER consuming the sentinel, then arms deferred-q gate.
+
+    'q' (snapshot request) is NOT sent immediately.  After sentinel detection
+    the bridge arms _boot_q_pending so the receive loop sends 'q' only after
+    BOOT_TRACE_PACKET_COUNT boot trace packets have arrived — this prevents the
+    snapshot from capturing mid-boot register state.
+    """
 
     def _get_bridge_src(self) -> str:
         with open(_WUKONG_BRIDGE_PATH) as fh:
@@ -381,13 +387,17 @@ class TestBridgeSentinelHaltOrdering:
             "ser.write(b'r') must be inside the sentinel branch, after parsing the sentinel"
         )
 
-    def test_snapshot_request_sent_after_run_on_sentinel(self):
-        """Bridge sends 'q' (snapshot request) immediately after 'r' on sentinel detection.
+    def test_snapshot_gate_armed_after_run_on_sentinel(self):
+        """Bridge arms the deferred-snapshot gate in the sentinel block.
 
-        This guarantees the IDE receives a fresh register dump on every bridge
-        reconnect, even when the board was left halted from a prior session.
-        Without the 'q', a stale halted display could persist until the user
-        manually issues a command.
+        'q' is NOT sent immediately after 'r' — that would race with the boot
+        trace packets the CM emits right after boot (CHANGE + CALL sequence),
+        causing the snapshot to capture mid-boot register state.
+
+        Instead the bridge sets _boot_q_pending = True inside the sentinel
+        try-block, and the receive loop sends 'q' after
+        BOOT_TRACE_PACKET_COUNT post-sentinel packets arrive (or a timeout).
+        This test verifies the gate is armed, not that 'q' is sent immediately.
         """
         src = self._get_bridge_src()
         sentinel_branch_idx = src.find("BOOT_SENTINEL_V1, BOOT_SENTINEL_V2")
@@ -396,16 +406,27 @@ class TestBridgeSentinelHaltOrdering:
         )
         run_write_idx = src.find("ser.write(b'r')", sentinel_branch_idx)
         assert run_write_idx != -1, (
-            "ser.write(b'r') not found after sentinel branch"
+            "ser.write(b'r') not found after the sentinel branch in wukong_bridge.py"
         )
-        snapshot_write_idx = src.find("ser.write(b'q')", run_write_idx)
-        assert snapshot_write_idx != -1, (
-            "ser.write(b'q') not found after ser.write(b'r') in the sentinel branch — "
-            "bridge must request a snapshot immediately after sending 'r' so the IDE "
-            "gets a fresh register dump on every reconnect"
+        # The sentinel block must arm the deferred-q gate, not send 'q' directly.
+        # Find the end of the sentinel block (the 'if sentinel[stale]:' that follows).
+        sentinel_block_end = src.find("if sentinel['stale']:", run_write_idx)
+        assert sentinel_block_end != -1, (
+            "'if sentinel[stale]:' end marker not found after ser.write(b'r') "
+            "in wukong_bridge.py — sentinel block boundary may have changed"
         )
-        assert snapshot_write_idx > run_write_idx, (
-            "ser.write(b'q') must appear after ser.write(b'r') in the sentinel block"
+        sentinel_block = src[run_write_idx:sentinel_block_end]
+        assert '_boot_q_pending' in sentinel_block, (
+            "_boot_q_pending not armed in the sentinel try-block — "
+            "the bridge must set _boot_q_pending = True after 'r' so the "
+            "receive loop can send 'q' after boot trace packets settle"
+        )
+        # 'q' must NOT be written immediately in the sentinel block;
+        # it belongs in the deferred gate in the receive loop.
+        assert "ser.write(b'q')" not in sentinel_block, (
+            "ser.write(b'q') found in the sentinel block — 'q' must be deferred "
+            "to after BOOT_TRACE_PACKET_COUNT post-sentinel packets, not sent "
+            "immediately (risk: snapshot captures mid-boot register state)"
         )
 
     def test_halt_command_byte_is_not_trace_magic(self):

@@ -41,6 +41,10 @@ def _reset_state():
     with _app_module._wukong_boot_info_lock:
         _app_module._wukong_boot_info = {}
     _app_module._wukong_last_bridge_poll = 0.0
+    # Clear bridge timeline so absence assertions are deterministic across tests.
+    with _app_module._wukong_bridge_lock:
+        _app_module._wukong_bridge_timeline.clear()
+        _app_module._wukong_bridge_info.clear()
 
 
 @pytest.fixture()
@@ -387,6 +391,74 @@ class TestBreakpointNiaParsing:
         r = _post_cmd(client, 'b', nia=None)
         assert r.status_code == 400
         assert self._pending_nia() is None
+
+
+class TestAutomaticRunAfterSentinelLabel:
+    """Task 3012: the bridge now emits 'automatic_run_after_sentinel' (not the
+    old 'automatic_halt_after_sentinel') after a clean boot sentinel.  Verify
+    that the server surfaces the new label verbatim in bridge_timeline so the
+    Devices panel can distinguish a post-sentinel connected state from a halt."""
+
+    def test_automatic_run_label_appears_in_timeline(self, client):
+        """POSTing the new event label must appear verbatim in bridge_timeline."""
+        r = _bridge_status(
+            client,
+            session_id='run-sentinel-test',
+            event='automatic_run_after_sentinel',
+            state='connected',
+            reason='intentional run after boot sentinel',
+            serial_port='/dev/ttyUSB0',
+        )
+        assert r.status_code == 200
+        timeline = _status(client)['bridge_timeline']
+        matching = [e for e in timeline if e['event'] == 'automatic_run_after_sentinel']
+        assert matching, (
+            "bridge_timeline must contain an entry with "
+            "event='automatic_run_after_sentinel'"
+        )
+        entry = matching[-1]
+        assert entry['state'] == 'connected', (
+            "automatic_run_after_sentinel must carry state='connected'"
+        )
+        assert entry['session_id'] == 'run-sentinel-test'
+
+    def test_automatic_run_state_connected_not_halted(self, client):
+        """The state field must be 'connected', not 'halted' — the board runs
+        freely after a clean sentinel; only a fault_halt event would set halted."""
+        _bridge_status(
+            client,
+            session_id='s-run',
+            event='automatic_run_after_sentinel',
+            state='connected',
+            reason='intentional run after boot sentinel',
+        )
+        timeline = _status(client)['bridge_timeline']
+        run_entries = [e for e in timeline if e['event'] == 'automatic_run_after_sentinel']
+        assert run_entries, "expected at least one automatic_run_after_sentinel entry"
+        for e in run_entries:
+            assert e['state'] != 'halted', (
+                "automatic_run_after_sentinel must never carry state='halted'; "
+                "got state=%r" % e['state']
+            )
+
+    def test_old_halt_label_absent_from_bridge(self, client):
+        """Regression: the old 'automatic_halt_after_sentinel' label must never
+        be injected by the current bridge — if it appears in the timeline it
+        means a stale bridge is connected."""
+        # Populate the timeline with the correct new event only.
+        _bridge_status(
+            client,
+            session_id='s-new',
+            event='automatic_run_after_sentinel',
+            state='connected',
+            reason='intentional run after boot sentinel',
+        )
+        timeline = _status(client)['bridge_timeline']
+        stale = [e for e in timeline if e['event'] == 'automatic_halt_after_sentinel']
+        assert not stale, (
+            "Found stale 'automatic_halt_after_sentinel' entries in bridge_timeline — "
+            "the bridge must emit 'automatic_run_after_sentinel' instead: %r" % stale
+        )
 
 
 class TestBootInfoReceivedTs:
