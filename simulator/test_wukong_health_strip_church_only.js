@@ -282,6 +282,87 @@ console.log('\nWukong health-strip — Bridge stage + church_only filter tests\n
     }
 }
 
+// ── IDE event feed stage helper ───────────────────────────────────────────────
+// Returns stages[3] ("IDE events"), verifying the name and failing loudly on
+// mismatch.  Pass ideSeq and ideLastTs directly so we can exercise the full
+// IDE-cursor path (not the server-only ideSeq=-1 path used elsewhere).
+function runIde(label, s, ideSeq, ideLastTs) {
+    const stages = classify(s, ideSeq, ideLastTs);
+    const ide = stages[3];
+    if (!ide || ide.name !== 'IDE events') {
+        failures++;
+        console.log('  FAIL  ' + label + '  — stages[3] is not "IDE events": ' + JSON.stringify(ide));
+        return null;
+    }
+    return ide;
+}
+
+console.log('\nWukong health-strip — IDE event feed stage + church_only filter tests\n');
+
+// ── Case 10: church_only=true + ideSeq stale → amber ─────────────────────────
+// Simulates the bridge dropping while the filter is on: ideSeq is positive but
+// the last event arrived 20 s ago, pushing the IDE feed into amber.
+{
+    const nowSec = Date.now() / 1000;
+    const s = {
+        bridge_poll_age:    1,
+        last_trace_age:     1,
+        total_bridge_polls: 10,
+        total_trace_posts:  50,
+        server_seq:         20,
+        bridge: { church_only: true }
+    };
+    const ide = runIde('case10', s, 20, nowSec - 20);
+    if (ide) {
+        check('case10: church_only=true + ideSeq stale (20s) → state=amber',
+              ide.state === 'amber', 'got ' + ide.state);
+        check('case10: detail is non-empty',
+              ide.detail && ide.detail.length > 0, 'detail: ' + ide.detail);
+    }
+}
+
+// ── Case 11: church_only=true + ideSeq=0 + serverSeq=0 → red ─────────────────
+// Bridge drops before any packets arrive; both IDE cursor and server queue are
+// at zero, so the IDE event feed must show red.
+{
+    const s = {
+        bridge_poll_age:    null,
+        last_trace_age:     null,
+        total_bridge_polls: 0,
+        total_trace_posts:  0,
+        server_seq:         0,
+        bridge: { church_only: true }
+    };
+    const ide = runIde('case11', s, 0, null);
+    if (ide) {
+        check('case11: church_only=true + ideSeq=0 + serverSeq=0 → state=red',
+              ide.state === 'red', 'got ' + ide.state);
+        check('case11: detail is non-empty',
+              ide.detail && ide.detail.length > 0, 'detail: ' + ide.detail);
+    }
+}
+
+// ── Case 12: church_only=true + ideSeq=0 + serverSeq>0 → amber ───────────────
+// Server accumulated events while the filter was on, but the IDE cursor is still
+// at 0 (e.g. page not yet refreshed after reconnect).  Stage 4 should be amber.
+{
+    const s = {
+        bridge_poll_age:    1,
+        last_trace_age:     1,
+        total_bridge_polls: 10,
+        total_trace_posts:  50,
+        server_seq:         15,
+        bridge: { church_only: true }
+    };
+    const ide = runIde('case12', s, 0, null);
+    if (ide) {
+        check('case12: church_only=true + ideSeq=0 + serverSeq>0 → state=amber',
+              ide.state === 'amber', 'got ' + ide.state);
+        check('case12: detail is non-empty',
+              ide.detail && ide.detail.length > 0, 'detail: ' + ide.detail);
+    }
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + (failures === 0 ? 'All tests passed.' : failures + ' test(s) FAILED.') + '\n');
 process.exit(failures === 0 ? 0 : 1);
