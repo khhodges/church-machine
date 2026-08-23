@@ -161,12 +161,13 @@
   <button id="btnReboot" title="Force the board to retransmit its boot sentinel ('f') — confirms which bitstream is running">↺ Reboot</button>
   <span class="sep"></span>
   <button id="btnWorkspace" class="primary" title="Jump to the live code and event workspace">Jump to execution workspace ↓</button>
+  <span class="sep"></span>
+  <button id="healthToggle" class="health-toggle" type="button" aria-controls="healthStages statusGrid" aria-expanded="true" title="Collapse or expand FPGA health details">Collapse</button>
 </div>
 
 <div id="healthStrip" style="margin-bottom:8px;background:#111827;border:1px solid #1f2b3e;border-radius:8px;padding:10px 14px;">
   <div class="health-head">
     <div class="health-title" style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#5a6b82;margin-bottom:8px;">Pipeline Health</div>
-    <button id="healthToggle" class="health-toggle" type="button" aria-controls="healthStages statusGrid" aria-expanded="true">Collapse</button>
   </div>
   <div id="healthStages" style="display:flex;flex-wrap:wrap;gap:8px 20px;"></div>
 </div>
