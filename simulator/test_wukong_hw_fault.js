@@ -250,8 +250,8 @@ function assert(label, condition, detail) {
     }
     // Verify no extra codes above 0x1B are defined (table is not over-extended)
     const maxCode = Math.max(...Object.keys(_WUKONG_FAULT_NAMES).map(Number));
-    assert('T_MAP: max defined code is 0x1B',
-        maxCode === 0x1B, 'max=' + maxCode);
+    assert('T_MAP: max defined code is 0x1C',
+        maxCode === 0x1C, 'max=' + maxCode);
 }
 
 // ── T_PARITY: JS table matches hardware/wukong_bridge.py ─────────────────────

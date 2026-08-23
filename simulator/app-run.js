@@ -16592,7 +16592,7 @@ setInterval(async function _wukongPoll() {
 
 // Fault-code table — must stay in sync with hardware.hw_types.FaultType and
 // hardware/wukong_bridge.py _FAULT_NAMES (which is the canonical JS-side source).
-// Codes 0x00–0x19 are all defined; unknown codes fall back to 'FAULT_<n>'.
+// Codes 0x00–0x1C are all defined; unknown codes fall back to 'FAULT_<n>'.
 const _WUKONG_FAULT_NAMES = {
     0x00: 'NONE',           0x01: 'PERM_R',        0x02: 'PERM_W',
     0x03: 'PERM_X',         0x04: 'PERM_L',        0x05: 'PERM_S',
@@ -16603,7 +16603,7 @@ const _WUKONG_FAULT_NAMES = {
     0x12: 'STACK_CORRUPT',  0x13: 'STACK_UNDERFLOW', 0x14: 'IRQ_NULL_BASE',
     0x15: 'OUTFORM_CRC',    0x16: 'OUTFORM_ALLOC', 0x17: 'OUTFORM_MINT',
     0x18: 'OUTFORM_HDR',    0x19: 'OUTFORM_TIMEOUT',
-    0x1A: 'OUTFORM_UNAUTH', 0x1B: 'IMMUTABLE_SELF_CAP',
+    0x1A: 'OUTFORM_UNAUTH', 0x1B: 'IMMUTABLE_SELF_CAP', 0x1C: 'STRUCTURAL_REG',
 };
 
 // Build a fault-object compatible with showFaultModal() from a raw hardware
