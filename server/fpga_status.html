@@ -1024,11 +1024,12 @@
       return;
     }
     var line = formatEvent(e);
-    var cls = e.fault_valid ? 'ev-fault' :
-      (e.kind === 'info' ? 'ev-note' :
-      (e.snapshot ? 'ev-note' : (e.ev_type >= 6 && e.ev_type <= 8 ? 'ev-call' :
-       (e.ev_type >= 9 && e.ev_type <= 11 ? 'ev-return' :
-        (e.ev_type === 1 || e.ev_type === 2 ? 'ev-load' : ''))));
+    var cls = '';
+    if (e.fault_valid) cls = 'ev-fault';
+    else if (e.kind === 'info' || e.snapshot) cls = 'ev-note';
+    else if (e.ev_type >= 6 && e.ev_type <= 8) cls = 'ev-call';
+    else if (e.ev_type >= 9 && e.ev_type <= 11) cls = 'ev-return';
+    else if (e.ev_type === 1 || e.ev_type === 2) cls = 'ev-load';
     addLine(line, cls);
     if (e.nia !== undefined) {
       lastTraceNia = Number(e.nia) >>> 0;

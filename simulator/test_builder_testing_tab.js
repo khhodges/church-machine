@@ -73,6 +73,7 @@ function makeEnv() {
         initResidentPanel: undefined,
         Ti60Connect: undefined,
         VersionsView: undefined,
+        _loadBuildHistory() {},
     });
     vm.runInContext(SWITCH_SRC, ctx);
     return ctx;
