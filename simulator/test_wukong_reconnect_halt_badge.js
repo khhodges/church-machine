@@ -287,6 +287,344 @@ function computeStatusLabel(hwConnected, hwFaulted, simHalted, simBootComplete) 
         '_wukongHwFaultReset() call site not found');
 }
 
+// ── Relay-mode executable harness ────────────────────────────────────────────
+//
+// In relay mode the IDE mirrors events from a remote server (lab.cloomc.org).
+// Events arrive via the same /hardware/wukong/events endpoint, each stamped
+// with relayed=true by the server-side relay worker.  The _wukongDrainEvents()
+// loop passes them to _wukongAppendTrace identically to direct-board events.
+//
+// Tests T11–T14 execute production code paths in a Node vm sandbox with mocked
+// DOM, fetch, and clock so we verify the actual state mutations rather than
+// re-checking the badge formula in isolation.
+//
+// ── Sandbox setup ─────────────────────────────────────────────────────────────
+const vm = require('vm');
+const APP_RUN_PATH = path.join(__dirname, 'app-run.js');
+const APP_PY_PATH  = path.join(__dirname, '..', 'server', 'app.py');
+const appRunSrc    = fs.readFileSync(APP_RUN_PATH, 'utf8');
+const appPySrc     = fs.readFileSync(APP_PY_PATH, 'utf8');
+
+// Generic brace-balanced extractor: finds the first occurrence of `sig` in
+// `src` then returns the text from `sig` through the matching closing brace.
+function extractFn(src, sig) {
+    const i0 = src.indexOf(sig);
+    if (i0 === -1) throw new Error('Cannot find: ' + sig);
+    let depth = 0, start = -1, end = -1;
+    for (let i = i0; i < src.length; i++) {
+        if (src[i] === '{') { if (depth === 0) start = i; depth++; }
+        else if (src[i] === '}') { if (--depth === 0) { end = i; break; } }
+    }
+    if (end === -1) throw new Error('Unbalanced braces for: ' + sig);
+    return src.slice(i0, end + 1);
+}
+
+// Extract a simple scalar `let name = value;` line (handles aligned whitespace).
+function extractSimpleLet(src, name) {
+    const re = new RegExp('let\\s+' + name + '\\s*=\\s*[^;\\n]+;');
+    const m  = src.match(re);
+    if (!m) throw new Error('Cannot find let: ' + name);
+    return m[0];
+}
+
+// Extract a `const name = {...};` or `const name = new Set([...]);` up to the
+// first semicolon at brace-depth 0.  Uses regex for the prefix so aligned
+// whitespace (e.g. `const _WUKONG_STALE_MS  = 10000;`) is handled correctly.
+function extractConstDecl(src, name) {
+    const re = new RegExp('const\\s+' + name + '\\s*=\\s*');
+    const m  = re.exec(src);
+    if (!m) throw new Error('Cannot find const: ' + name);
+    const i0       = m.index;
+    const valStart = m.index + m[0].length;
+    let depth = 0;
+    for (let i = valStart; i < src.length; i++) {
+        const c = src[i];
+        if (c === '{' || c === '[' || c === '(') depth++;
+        else if (c === '}' || c === ']' || c === ')') depth--;
+        else if (c === ';' && depth === 0) return src.slice(i0, i + 1);
+    }
+    throw new Error('Cannot parse const: ' + name);
+}
+
+// Build a minimal capturing DOM element.
+function makeEl() {
+    const el = {
+        className: '', textContent: '', childElementCount: 0,
+        scrollTop: 0, scrollHeight: 0, firstElementChild: null, children: [],
+        appendChild(n) {
+            this.children.push(n);
+            this.childElementCount = this.children.length;
+            this.firstElementChild = this.children[0];
+            return n;
+        },
+        removeChild(n) {
+            const i = this.children.indexOf(n);
+            if (i !== -1) this.children.splice(i, 1);
+            this.childElementCount = this.children.length;
+            this.firstElementChild = this.children[0] || null;
+        },
+        cloneNode() {
+            const c = makeEl(); c.className = this.className; return c;
+        },
+        addEventListener() {},
+        querySelector() { return null; },
+        querySelectorAll() { return []; },
+    };
+    return el;
+}
+
+// Create a vm context that:
+//   • provides all DOM / helper stubs _wukongAppendTrace needs
+//   • runs the minimal production declarations (state vars + functions)
+//   • exposes var-accessor pairs so the test can read/write let-scope state
+function buildTraceCtx() {
+    const calls = { updateFlagsDisplay: 0 };
+    const hwLog = makeEl();
+    const con   = makeEl();
+
+    const ctx = vm.createContext({
+        // DOM
+        document: {
+            getElementById(id) {
+                if (id === 'wukong-hw-log-body') return hwLog;
+                if (id === 'editorConsole')      return con;
+                return null;
+            },
+            createElement() { return makeEl(); },
+            createTextNode(t) { return { text: t, cloneNode() { return this; } }; },
+            querySelector() { return null; },
+        },
+        window: {},
+        setTimeout() {},
+        // fetch stub — _showLastFaultPanel path calls fetch(); don't await it
+        fetch() { return Promise.resolve({ catch() {} }); },
+        sim: null,
+        // _wukongAppendTrace helper stubs
+        _wukongSetHwCursor()          {},
+        _wukongSetPipelineHwNIA()     {},
+        _wukongSyncFaultDisasmPanel() {},
+        _wukongBuildHwFaultObj(d)     { return { faultCode: d.fault_code || 0 }; },
+        showFaultModal()              {},
+        updateFlagsDisplay()          { calls.updateFlagsDisplay++; },
+        _showLastFaultPanel()         {},
+        _lastFaultSnapshotDismissed:  false,
+        _wukongHideFaultPanel()       {},
+        _wukongShowFaultPanel()       {},
+        _wukongUpdateCallDepthBadge() {},
+        _wukongTraceLocationText()    { return ''; },
+        _openCallReturnDrilldown()    {},
+        _decodeGtLabel()              { return ''; },
+        _wukongUpdateToolbarBtn()     {},
+        _wukongFormatEvent()          { return ''; },
+        updateCRDisplay()             {},
+        _wukongUpdateBtn()            {},
+        // poll helper stubs (used by the stale guard block)
+        _wukongDrainEvents()          { return Promise.resolve(false); },
+    });
+
+    // Build and run the minimal production code in the context.
+    // Order matters: state vars → constants → helpers → the main function.
+    const prod = [
+        extractSimpleLet(appRunSrc, '_wukongLastTraceTs'),
+        extractConstDecl(appRunSrc, '_WUKONG_STALE_MS'),
+        extractSimpleLet(appRunSrc, '_wukongCallDepth'),
+        extractSimpleLet(appRunSrc, '_wukongPrevFaultValid'),
+        extractSimpleLet(appRunSrc, '_wukongHwFaulted'),
+        extractFn(appRunSrc, 'function _wukongIsConnected('),
+        extractConstDecl(appRunSrc, '_WUKONG_FAULT_NAMES'),
+        extractConstDecl(appRunSrc, '_WUKONG_EV_TRACE_NAMES'),
+        extractConstDecl(appRunSrc, '_WUKONG_EV_HAS_GT_PAYLOAD'),
+        'const _WUKONG_HW_LOG_MAX = 300;',
+        extractFn(appRunSrc, 'function _wukongFlagsStr('),
+        extractFn(appRunSrc, 'function _wukongHex('),
+        extractFn(appRunSrc, 'function _wukongAppendTrace('),
+        // var accessors so the test can read/write let-scoped state from Node
+        'var _getHwFaulted       = function() { return _wukongHwFaulted; };',
+        'var _setHwFaulted       = function(v) { _wukongHwFaulted = v; };',
+        'var _getPrevFaultValid  = function() { return _wukongPrevFaultValid; };',
+        'var _setPrevFaultValid  = function(v) { _wukongPrevFaultValid = v; };',
+        'var _getLastTraceTs     = function() { return _wukongLastTraceTs; };',
+        'var _setLastTraceTs     = function(v) { _wukongLastTraceTs = v; };',
+        'var _callIsConnected    = function() { return _wukongIsConnected(); };',
+    ].join('\n');
+
+    vm.runInContext(prod, ctx);
+    return { ctx, calls };
+}
+
+const { ctx: traceCtx, calls: traceCalls } = buildTraceCtx();
+
+// ── T11: Relay event with fault_valid=false → _wukongHwFaulted stays false ────
+// Scenario: relay delivers a trace event ({relayed:true, fault_valid:false}).
+// The badge formula drives off _wukongHwFaulted; the relayed field must be
+// transparent (no early-return or bypass in _wukongAppendTrace).
+{
+    const nowSec = Date.now() / 1000;
+    // Seed a fresh timestamp so _wukongIsConnected() would return true after drain.
+    traceCtx._setLastTraceTs(nowSec);
+    // Start with prev=false so false→false doesn't trigger a transition.
+    traceCtx._setPrevFaultValid(false);
+    traceCtx._setHwFaulted(false);
+
+    // Inject a relayed, clean (non-fault) RESULT event.
+    const cleanRelayedEvent = {
+        relayed:     true,
+        fault_valid: false,
+        ev_type:     0x00,  // RESULT — simplest event type; no CALL/RETURN depth logic
+        nia:         0x00000140,
+        ts:          nowSec,
+        seq:         1,
+        flags:       0,
+    };
+    traceCtx._wukongAppendTrace(cleanRelayedEvent);
+
+    assert('T11a: relay clean event — _wukongHwFaulted stays false',
+        traceCtx._getHwFaulted() === false,
+        '_wukongHwFaulted=' + traceCtx._getHwFaulted());
+
+    assert('T11b: relay clean event — _wukongPrevFaultValid updated to false',
+        traceCtx._getPrevFaultValid() === false,
+        '_wukongPrevFaultValid=' + traceCtx._getPrevFaultValid());
+}
+
+// ── T12: Relay event with fault_valid=true → _wukongHwFaulted set true ────────
+// First a false→true transition (new fault from relay), then a true→false clear.
+{
+    const nowSec = Date.now() / 1000;
+    traceCtx._setLastTraceTs(nowSec);
+    // prev is currently false (left by T11) — so fault_valid=true fires the transition.
+    const faultRelayedEvent = {
+        relayed:     true,
+        fault_valid: true,
+        fault_code:  0x01,  // PERM_R
+        ev_type:     0x00,
+        nia:         0x00000140,
+        ts:          nowSec,
+        seq:         2,
+        flags:       0,
+    };
+    traceCtx._wukongAppendTrace(faultRelayedEvent);
+
+    assert('T12a: relay fault event — _wukongHwFaulted set true (badge visible)',
+        traceCtx._getHwFaulted() === true,
+        '_wukongHwFaulted=' + traceCtx._getHwFaulted());
+
+    assert('T12b: relay fault event — updateFlagsDisplay called',
+        traceCalls.updateFlagsDisplay >= 1,
+        'updateFlagsDisplay calls=' + traceCalls.updateFlagsDisplay);
+
+    // Fault-clear path: relay delivers a clean event after the fault.
+    const clearRelayedEvent = {
+        relayed:     true,
+        fault_valid: false,
+        ev_type:     0x00,
+        nia:         0x00000140,
+        ts:          nowSec,
+        seq:         3,
+        flags:       0,
+    };
+    traceCtx._wukongAppendTrace(clearRelayedEvent);
+
+    assert('T12c: relay fault-clear event — _wukongHwFaulted cleared to false',
+        traceCtx._getHwFaulted() === false,
+        '_wukongHwFaulted=' + traceCtx._getHwFaulted());
+}
+
+// ── T13: Relay goes offline → stale-halt guard clears _wukongHwFaulted ────────
+// The guard lives inside the 500 ms setInterval(_wukongPoll) body.  We extract
+// that block verbatim from app-run.js, execute it in the same vm context with
+// a stale timestamp, and assert the production guard clears the fault flag.
+{
+    // Phase 1 — simulate: relay was live, board was faulted.
+    const recentSec = Date.now() / 1000;
+    traceCtx._setLastTraceTs(recentSec);
+    traceCtx._setHwFaulted(true);
+    traceCtx._setPrevFaultValid(true);
+
+    assert('T13a: pre-stale — _wukongIsConnected()=true',
+        traceCtx._callIsConnected() === true);
+
+    assert('T13b: pre-stale — _wukongHwFaulted is true (relay fault visible)',
+        traceCtx._getHwFaulted() === true);
+
+    // Phase 2 — relay goes offline: timestamp ages beyond _WUKONG_STALE_MS.
+    traceCtx._setLastTraceTs(1);   // epoch — definitely stale (> 10 s ago)
+
+    assert('T13c: post-stale — _wukongIsConnected()=false',
+        traceCtx._callIsConnected() === false);
+
+    // Phase 3 — run the production stale-halt guard extracted from setInterval body.
+    // We extract the `if (_pollWasConnected && !_wukongIsConnected())` block from
+    // the _wukongPoll body and execute it with _pollWasConnected forced to true.
+    const pollBodySig  = 'setInterval(async function _wukongPoll()';
+    const pollBlockSig = 'if (_pollWasConnected && !_wukongIsConnected())';
+    const pollBodyFull = extractFn(appRunSrc, pollBodySig);
+    const guardStart   = pollBodyFull.indexOf(pollBlockSig);
+    if (guardStart === -1) throw new Error('Cannot find guard block in poll body');
+    // Extract from the `if` through its matching closing brace.
+    const guardCode = extractFn(pollBodyFull.slice(guardStart), pollBlockSig);
+
+    const updateFlagsBefore = traceCalls.updateFlagsDisplay;
+    // Execute with _pollWasConnected=true: the guard fires because
+    // _wukongIsConnected() returns false (timestamp is stale).
+    vm.runInContext('var _pollWasConnected = true;\n' + guardCode, traceCtx);
+
+    assert('T13d: stale guard executed — _wukongHwFaulted cleared to false',
+        traceCtx._getHwFaulted() === false,
+        '_wukongHwFaulted=' + traceCtx._getHwFaulted());
+
+    assert('T13e: stale guard executed — _wukongPrevFaultValid cleared',
+        traceCtx._getPrevFaultValid() === false,
+        '_wukongPrevFaultValid=' + traceCtx._getPrevFaultValid());
+
+    assert('T13f: stale guard executed — updateFlagsDisplay was called',
+        traceCalls.updateFlagsDisplay > updateFlagsBefore,
+        'calls before=' + updateFlagsBefore + ' after=' + traceCalls.updateFlagsDisplay);
+}
+
+// ── T14: Structural source checks ─────────────────────────────────────────────
+// Now that the executable harness has verified production behaviour, structural
+// checks confirm the guard and relay-stamp are wired into the right branches.
+{
+    // T14a — the stale-halt clear is INSIDE the disconnect guard conditional,
+    // not loose in the module.  Extract the _wukongPoll setInterval body,
+    // find the guard block, and verify the clear is within that block.
+    const pollBodyFull = extractFn(appRunSrc, 'setInterval(async function _wukongPoll()');
+    const guardBlockFn = extractFn(
+        pollBodyFull.slice(pollBodyFull.indexOf('if (_pollWasConnected && !_wukongIsConnected())')),
+        'if (_pollWasConnected && !_wukongIsConnected())'
+    );
+    assert('T14a-i: _wukongHwFaulted=false is inside the disconnect guard block',
+        guardBlockFn.includes('_wukongHwFaulted      = false;'),
+        'clear not found in guard block');
+
+    assert('T14a-ii: updateFlagsDisplay() call is inside the disconnect guard block',
+        guardBlockFn.includes('updateFlagsDisplay'),
+        'updateFlagsDisplay not in guard block');
+
+    // T14b — server/app.py relay worker stamps every injected event with
+    // relayed=True so consumers can distinguish relay from direct events.
+    assert('T14b: server/app.py relay worker stamps ev_copy[relayed]=True',
+        appPySrc.includes("ev_copy['relayed']    = True"),
+        'relay stamp not found in app.py');
+
+    // T14c — _wukongAppendTrace has no data.relayed gate before the fault
+    // transition block.  If such a guard existed, relay faults would be silently
+    // skipped and _wukongHwFaulted would never be set for relay events.
+    const traceFnBody  = extractFn(appRunSrc, 'function _wukongAppendTrace(');
+    const faultBlockPos = traceFnBody.indexOf('if (data.fault_valid && !_wukongPrevFaultValid)');
+    assert('T14c: fault transition block exists in _wukongAppendTrace',
+        faultBlockPos !== -1,
+        'fault transition not found');
+
+    const beforeFaultBlock = traceFnBody.slice(0, faultBlockPos);
+    // A data.relayed early-return would appear as `if (data.relayed) return;`
+    // or `if (ev.relayed) return;` before the fault block.
+    const relayedBypass = /if\s*\(\s*(data|ev)\.relayed\s*\)\s*return/.test(beforeFaultBlock);
+    assert('T14d: _wukongAppendTrace has no data.relayed bypass before fault transition',
+        !relayedBypass,
+        'relayed bypass found before fault block');
+}
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log('');
 console.log((passed + failed) + ' tests: ' + passed + ' passed, ' + failed + ' failed');
