@@ -3998,7 +3998,7 @@ BOOK_CHAPTERS = [
         "instruction-set.md",
         "isa_encoding.md",
         "church-instructions.md",
-        "instruction_matrix.md",
+        "instruction-matrix.md",
         "lambda-instruction.md",
         "golden-tokens.md",
         "gt-literals.md",

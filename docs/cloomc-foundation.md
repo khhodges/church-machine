@@ -66,8 +66,8 @@ Three things are new in the Church Machine:
    hardware words. The Church Machine encodes the full capability — slot
    index, revocation sequence, permission bits, bind flag, and type — into
    a single 32-bit word. Every GT is a complete, self-contained run-time capability
-   expression that can be validated, forged with machine secret, and instantly
-   revoked in O(1) by incrementing a 7-bit version counter.
+   expression that can be validated, formed and signed, and instantly
+   revoked in O(1) by incrementing a 9-bit version counter. ★v2.0
 
 ---
 
@@ -80,10 +80,16 @@ functionality. The 32-bit GT word encodes:
 
 - **What** can be accessed (`slot_id`, 16 bits — the namespace index)
 - **How** it can be accessed (`dom` + `perm[2:0]`, 4 bits — domain selector (0=Turing {X,W,R}, 1=Church {E,S,L}) plus 3-bit permission payload; Turing/Church domains are mutualy exclusive structurally enforced by the `dom` (domain) bit.
-- **Whether** this instance is current (`gt_seq`, 7 bits — revocation counter)
+- **Whether** this instance is current (`gt_seq`, 9 bits — revocation counter) ★v2.0
 - **What kind** of resource it is (`gt_type`, 2 bits — Null, Inform, Outform, Abstract)
 - **Whether** it can be propagated (`b_flag`, 1 bit — bind permission)
-- **Whether** it targets a far/remote resource (`f_flag`, 1 bit — Far indicator, per-token)
+
+Total: 16 + 9 + 2 + 1 + 3 + 1 = 32 bits exactly. ★v2.0
+
+> **Note (v2.0):** `f_flag` (Far indicator) has moved from the GT word to NS Slot Word 1
+> bit [31] — it is a property of the namespace entry, not of the token itself.  Both
+> `f_flag` and `g_bit` (NS Slot Word 1 bit [30]) are masked out before integrity32 is
+> computed so the IDE can set them freely without resealing.
 
 The permissions are not advisory. The hardware reads the permission bits
 before permitting any microcoded instruction step to proceed. A program that holds only an
@@ -310,6 +316,14 @@ There are no other configuration parameters.
 - **NS table** is the NS LUMP — it lives at the top (to grow down) of
   memory. `totalNamespaceWords` is the programmer's choice, encoded in the
   NS LUMP header, set by the IDE.
+- **NS slot addressing** counts down from the top of the NS LUMP.
+  Slot 0 occupies the four words at the highest address in the NS LUMP
+  (`totalNamespaceWords − 4` through `totalNamespaceWords − 1`).
+  Slot N occupies words at `totalNamespaceWords − 4 − N × 4`.
+  Equivalently: `slot_word_address(N) = NS_TABLE_BASE + NS_TABLE_RESERVE − 4 − N × 4`.
+  The LUMP header word sits at the lowest address of the block (`NS_TABLE_BASE`).
+  On A7 (`totalNamespaceWords = 131,072`): slot 0 → `0x1FFFC`, slot 1 → `0x1FFF8`,
+  slot 255 → `0x1FC04`, LUMP header → `0x1FC00`.
 - **cc field** (8 bits) limits c-list rows to 255 per abstraction. It does not limit
   NS slots — the GT `slot_id` field is 16 bits, allowing up to 65,535 slots.
 - **limit17** (17 bits) caps the pool at 131,071 words — enough headroom for the
@@ -351,6 +365,14 @@ Pool ceiling    = totalNamespaceWords − 1 (header)
                 = 131,071 (XC7A100T)
 ```
 
+> **Note on inverted layout:** Because NS and Thread are physically separated — NS LUMP
+> sits at the top of memory (growing downward) and Thread LUMP sits at the bottom
+> (address 0x0000) — there is no single `foundation_end` address in the v1.2 layout.
+> The dynamic pool starts immediately after Thread LUMP at word **0x0100**. The value
+> `foundation_end = 1,280 words` correctly tallies total TSB overhead but does not
+> correspond to a single contiguous address boundary. Use `pool_start = 0x0100` when
+> describing the base of the allocatable pool.
+
 Nothing else needs to be set. The programmer engineers the NS LUMP and
 Thread LUMP using the IDE. The hardware boot ROM (3 instructions, see Section 6) handles
 the rest. Slot 2 onward is the dynamic pool, ehere Thread.CR0 = the Lightning Bolt abstraction.
@@ -368,6 +390,14 @@ top         NS Lump       1,024     max RAM Necessary — NS root
 bottom      Thread Lump     256     Necessary — boot thread (slot 1)
 top−0x400   NS Table      1,024     Necessary — capability table
 ────────────────────────────────────────────────────────────
+
+NS Table slot layout (A7, totalNamespaceWords = 131,072):
+  0x1FFFC  — slot  0  (NS LUMP root, 4 words)       ← highest address
+  0x1FFF8  — slot  1  (Thread LUMP, 4 words)
+  0x1FFF4  — slot  2  (first dynamic slot, 4 words)
+     …
+  0x1FC04  — slot 255 (last of 256 slots, 4 words)
+  0x1FC00  — LUMP header word                        ← NS_TABLE_BASE (lowest)
 ```
 
 The 3-instruction boot ROM program lives in IMEM (separate from DMEM),
@@ -392,7 +422,7 @@ hardware demo pre-loads it with an E-GT for Salvation (slot 4).
 
 ### What Was Removed and Why
 
-**First attempt faild and CR8 to 12 incosistencies resolved
+Slot 3 as a special hardware-privileged boot code domain has been removed. All slots from 2 upward are freely allocatable by the IDE. The CR8-to-CR12 thread-register inconsistency from earlier drafts is resolved: CR12 is the sole thread stack register.
 
 ---
 
@@ -415,7 +445,7 @@ Silicon is silicon.
 
 **Boot sequence — three hardware ROM instructions then one CALL:**
 
-0.  Hardware Probe IDE Tunnel (online/offline)
+0.  Hardware Probe IDE Tunnel (online/offline) *(implemented by Sapphire SoC firmware call-home; no new hardware required)*
 1. `LOAD AL, CR15, CR15[0]` — refresh Namespace cap (slot 0) into CR15.
 2. `CHANGE AL, CR12, CR15, #1` — load Thread LUMP (slot 1); establishes CR0–CR11 including `Thread.CR0`.
 3. `CALL AL, CR0, CR0` — enter `Thread.CR0`, the IDE-configured Application LUMP.
@@ -423,8 +453,7 @@ Silicon is silicon.
 The IDE writes the chosen slot into `Thread.CR0` via `setBootEntrySlot()`
 before flashing.
 
-**Slot 2 onward is available for catalog abstractions.
-All prior assumptions removed
+**Slot 2 and above are available for any catalog abstraction. No slot below slot 2 may be used by user code.**
 
 ### Why This Is Correct
 
@@ -461,12 +490,15 @@ network is the library.
 
 ### Comparison Table
 
-| Field | Previous Platform | XC7A100T |
-|-------|-----------|----------|
-| `totalNamespaceWords` | delete 65,536 | 131,072 |
-| `foundation_end` (NS + Thread only) |delete 0x0140 (320) | 0x0140 (320) |
-| Application LUMP Thread.CR0 | 
-
+| Field | XC7A100T |
+|-------|----------|
+| `totalNamespaceWords` | 131,072 |
+| `pool_start` (Thread end) | 0x0100 (256 words) |
+| Application LUMP base | 0x0100 (first word of dynamic pool) |
+| NS_TABLE_BASE | 0x1FC00 |
+| Pool ceiling | 0x1FBFF |
+| `limit17` | 0x1FBFF |
+| `slot_0_word_address` | 0x1FFFC (`totalNamespaceWords − 4`) |
 
 ### Why limit17 Matters
 
@@ -529,7 +561,7 @@ The firmware's `pp250_fault_recovery()` function (in `hardware/soc_combined/firm
 
 ## See Also
 
-- [`CM_LUMP_SPECIFICATION.md`](CM_LUMP_SPECIFICATION.md) — Authoritative rules for foundation lump design, programmer-controlled boot image steps, and the IDE role
+- [`CM_LUMP_SPECIFICATION.md`](../CM_LUMP_SPECIFICATION.md) — Authoritative rules for foundation lump design, programmer-controlled boot image steps, and the IDE role (formerly `foundation-lump-design.md`, now consolidated)
 - [`boot-rom-layout.md`](boot-rom-layout.md) — Specific demo boot ROM layout (IMEM map, NUC_PROGRAM, DEMO_NAMESPACE, DEMO_CLIST)
 - [`ctmm-memory-map.md`](ctmm-memory-map.md) — Authoritative CM memory map with NS table, lump headers, and per-board profiles
 - [`locator.md`](locator.md) — Absent-lump fetch protocol; lazy load lifecycle
