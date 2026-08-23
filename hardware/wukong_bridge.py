@@ -537,6 +537,24 @@ def decode_trace_packet(pkt):
     }
 
 
+def _is_turing_only_result(decoded):
+    """Return True for bare Turing RESULT packets that --church-only suppresses.
+
+    A packet is a "bare Turing result" when all three conditions hold:
+      1. ev_type == TRACE_EV_RESULT  (not a CALL/RETURN sub-packet)
+      2. fault_valid is False        (no fault — must always be visible)
+      3. payload_gt == 0             (no GT payload — LOAD/CHANGE carry one)
+
+    ADD, SUB, CMP, BRANCH, and similar arithmetic/control-flow instructions
+    all satisfy this predicate; Church-level CALL, RETURN, LOAD, and CHANGE
+    instructions do not (they either carry a non-zero GT or emit non-RESULT
+    ev_types).
+    """
+    return (decoded['ev_type'] == TRACE_EV_RESULT
+            and not decoded['fault_valid']
+            and not decoded['payload_gt'])
+
+
 def _crc16_ccitt(data, crc=0xFFFF):
     """CRC-16-CCITT used by the complete architectural snapshot frame."""
     for byte in data:
@@ -1081,9 +1099,16 @@ def main():
     parser.add_argument('--ide', default='http://localhost:5000', help='IDE base URL')
     parser.add_argument('--insecure', action='store_true',
                         help='Skip TLS certificate verification')
+    parser.add_argument('--church-only', action='store_true',
+                        help='Suppress bare Turing RESULT packets (no fault, no GT '
+                             'payload).  CALL/RETURN sequences and any faulting '
+                             'instruction always pass through.  Dramatically reduces '
+                             'trace volume for programs like SelfTest that execute '
+                             'many arithmetic steps between Church-level operations.')
     args = parser.parse_args()
 
-    ide_base   = args.ide.rstrip('/')
+    ide_base    = args.ide.rstrip('/')
+    church_only = args.church_only
 
     # For https:// IDE URLs the common case is a self-signed / lab certificate
     # (e.g. lab.cloomc.org), which floods the terminal with one urllib3
@@ -1115,6 +1140,8 @@ def main():
         print(f'Wukong bridge: {port} @ {args.baud} baud → {ide_base}')
     if not verify_tls:
         print('SSL verification disabled — add a cert to enable')
+    if church_only:
+        print('[trace] church-only filter enabled — bare Turing RESULTs suppressed')
 
     # Compute the expected N_INIT from the current boot_rom.py tables once at
     # startup.  Used to validate the N_INIT byte that the board sends after the
@@ -1324,6 +1351,31 @@ def main():
                         i += 1
                         continue
                     sync.lock('trace frame')
+                    # Boot trace packet gate: count down toward the deferred
+                    # 'q' snapshot.  Run BEFORE the church-only filter so that
+                    # filtered bare-Turing RESULT packets still contribute to
+                    # the count — the boot sequence may be entirely composed of
+                    # such packets and the gate must fire at the right time
+                    # regardless of filtering mode.
+                    if _boot_q_pending:
+                        _boot_q_remaining -= 1
+                        if _boot_q_remaining <= 0:
+                            _boot_q_pending = False
+                            try:
+                                ser.write(b'q')
+                                last_write_ts = time.time()
+                                print('  [boot] all boot trace packets received'
+                                      ' — snapshot requested', flush=True)
+                            except Exception as _qe:
+                                print(f'  [boot] snapshot send error: {_qe}',
+                                      flush=True)
+                    # church-only filter: suppress bare Turing RESULT packets
+                    # (no fault, no GT payload).  The frame is still consumed
+                    # (i advances by TRACE_LEN) but nothing is forwarded to the
+                    # IDE and nothing is printed to the terminal.
+                    if church_only and _is_turing_only_result(decoded):
+                        i += TRACE_LEN
+                        continue
                     # Flush any pending ASCII first so console text and trace
                     # packets appear in the IDE event log in arrival order.
                     _console_flush(ide_base, verify_tls)
@@ -1436,24 +1488,6 @@ def main():
                     print(f'[{ts_str}] HW: {where}{instruction}  {ev_name}{gt_str}'
                           f'  flags={flag_str}{fault_str}{bp_str}')
                     i += TRACE_LEN
-
-                    # Boot trace packet gate: count down toward the deferred
-                    # snapshot.  Each accepted trace packet after a sentinel
-                    # moves the CM one step closer to its settled post-boot
-                    # state.  Fire 'q' as soon as the last expected packet
-                    # lands so the IDE sees accurate post-boot registers.
-                    if _boot_q_pending:
-                        _boot_q_remaining -= 1
-                        if _boot_q_remaining <= 0:
-                            _boot_q_pending = False
-                            try:
-                                ser.write(b'q')
-                                last_write_ts = time.time()
-                                print('  [boot] all boot trace packets received'
-                                      ' — snapshot requested', flush=True)
-                            except Exception as _qe:
-                                print(f'  [boot] snapshot send error: {_qe}',
-                                      flush=True)
 
                 elif b in (BOOT_SENTINEL_V1, BOOT_SENTINEL_V2):
                     # Flush pending ASCII first (arrival-order preservation).
