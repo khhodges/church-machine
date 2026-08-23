@@ -279,8 +279,9 @@ function makeUpdateBtnEnv(opts) {
     const sb = {
         window: window,
         document: document,
-        _wukongConnected: opts.connected || false,
-        _wukongHWRunning: opts.running   || false,
+        _wukongConnected: opts.connected   || false,
+        _wukongHWRunning: opts.running     || false,
+        _wukongBridgeSeen: opts.bridgeSeen || false,
         _wukongWasConnected: undefined,   // allow first-run transition
         _wukongIsConnected: function() { return sb._wukongConnected; },
         _wukongUpdateCallDepthBadge: function() {},

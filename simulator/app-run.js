@@ -15509,6 +15509,11 @@ function showApiAbstractionDetail(slot) {
 let _wukongHWRunning    = false;   // true = board is in free-run mode
 let _wukongLastTraceTs  = 0;       // unix timestamp (seconds) of last trace packet
 const _WUKONG_STALE_MS  = 10000;   // 10 s without a packet → disconnected
+// Bridge liveness flag: true when the events endpoint reports the bridge has
+// polled within the last 3 s.  Unlike _wukongIsConnected(), this stays true
+// even when the board is halted and no trace packets are flowing, so the HW
+// toolbar buttons remain visible whenever the bridge is running.
+let _wukongBridgeSeen   = false;
 
 let _wukongCallDepth    = 0;       // call stack depth tracked via CALL_PUSH/POP events
 let _wukongWasConnected = false;   // previous connection state (for connect/disconnect msgs)
@@ -15974,7 +15979,7 @@ function _wukongUpdateBtn() {
     }
 
     if (!btn) return;
-    btn.style.display = (connected || _wukongHWRunning) ? '' : 'none';
+    btn.style.display = (connected || _wukongBridgeSeen || _wukongHWRunning) ? '' : 'none';
     btn.textContent   = _wukongHWRunning ? '\u23F8 HW' : '\u25B6 HW';
     btn.dataset.tooltip = _wukongHWRunning
         ? 'HW Pause \u2014 Pause at the next instruction boundary'
@@ -16003,7 +16008,7 @@ function _wukongUpdateBtn() {
     // cannot interrupt a delivery that is already in progress.
     const stopBtn = document.getElementById('toolHWStopBtn');
     if (stopBtn) {
-        stopBtn.style.display = (connected || _wukongHWRunning) ? '' : 'none';
+        stopBtn.style.display = (connected || _wukongBridgeSeen || _wukongHWRunning) ? '' : 'none';
         stopBtn.disabled = !_wukongHWRunning;
     }
 
@@ -16012,7 +16017,7 @@ function _wukongUpdateBtn() {
     // upload is in progress so the user cannot double-fire it.
     const loadBtn = document.getElementById('toolHWLoadBtn');
     if (loadBtn) {
-        loadBtn.style.display = (connected || _wukongHWRunning) ? '' : 'none';
+        loadBtn.style.display = (connected || _wukongBridgeSeen || _wukongHWRunning) ? '' : 'none';
     }
 
     // Show/hide call-depth badge.
@@ -16236,6 +16241,12 @@ async function _wukongDrainEvents() {
     const serverSeq   = typeof data.server_seq   === 'number' ? data.server_seq   : null;
     const queueMinSeq = typeof data.queue_min_seq === 'number' ? data.queue_min_seq : 0;
     const events      = Array.isArray(data.events) ? data.events : [];
+    // Update bridge liveness flag from every poll response so that the HW
+    // toolbar buttons stay visible even when the board is halted and no trace
+    // packets are flowing (at which point _wukongIsConnected() returns false).
+    if (typeof data.bridge_connected === 'boolean') {
+        _wukongBridgeSeen = data.bridge_connected;
+    }
 
     // Server restart: sequence counter was reset below our cursor.
     // Reset cursor to 0 so the next drain call fetches all current events.

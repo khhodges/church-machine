@@ -12873,6 +12873,15 @@ def wukong_events_get():
         after = int(request.args.get('after', 0))
     except (TypeError, ValueError):
         after = 0
+    # bridge_connected mirrors the same computation used by the /status endpoint
+    # so that the toolbar buttons can show up even when no trace packets are
+    # flowing (e.g. the board is halted and _wukongIsConnected() would return
+    # false on the client because _wukongLastTraceTs is stale or zero).
+    _ev_now = _wk_time.time()
+    _ev_bridge_connected = bool(
+        _wukong_last_bridge_poll and
+        (_ev_now - _wukong_last_bridge_poll) < 3.0
+    )
     with _wukong_trace_lock:
         events = [e for e in _wukong_event_queue if e.get('seq', 0) > after]
         resp = {
@@ -12887,6 +12896,9 @@ def wukong_events_get():
             # cursor to detect overflow gaps (queue_min_seq > cursor + 1).
             'queue_min_seq': _wukong_event_queue[0]['seq']
                              if _wukong_event_queue else 0,
+            # True when the bridge polled within the last 3 s — lets the client
+            # show HW toolbar buttons even while the board is halted (no traces).
+            'bridge_connected': _ev_bridge_connected,
         }
         if 6 in _wukong_latest_cr_gts:
             resp['cr6_gt']  = _wukong_latest_cr_gts[6]
