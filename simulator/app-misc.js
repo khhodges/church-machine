@@ -453,9 +453,26 @@ async function loadDocsView() {
     return _docsLoadPromise;
 }
 
-function openArtifact(port, path) {
-    const host = window.location.hostname.replace(/^\d+-/, '');
-    const url = 'https://' + port + '-' + host + path;
+function openArtifact(event, port, devPath, productionPath, label) {
+    const hostname = window.location.hostname || '';
+    const isReplitDev = /\.replit\.dev$/i.test(hostname);
+    let url;
+    let probePort = 0;
+
+    if (isReplitDev && port) {
+        const host = hostname.replace(/^\d+-/, '');
+        url = 'https://' + port + '-' + host + (devPath || '/');
+        probePort = port;
+    } else {
+        // Deployed IDE pages must stay on the IDE origin. The artifact's
+        // production route is served by Flask; using a dev-port URL here can
+        // replace the IDE with a blank/error page.
+        url = new URL(productionPath || devPath || '/', window.location.origin).href;
+    }
+
+    if (typeof openArtifactLink === 'function' && event) {
+        return openArtifactLink(event, url, probePort, label || 'IDE Introduction');
+    }
     window.open(url, '_blank', 'noopener');
 }
 
