@@ -8,6 +8,7 @@
     "build": "vite build --config vite.config.ts",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "validate-slides": "pnpm exec tsx scripts/validate-slides.ts",
+    "test": "node --import tsx/esm --test src/.sdm/core/serialization.test.ts src/.sdm/core/slidesManifest.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
