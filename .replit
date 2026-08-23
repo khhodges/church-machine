@@ -854,7 +854,7 @@ outputType = "console"
 [deployment]
 deploymentTarget = "autoscale"
 run = ["gunicorn", "--bind", "0.0.0.0:23636", "--workers", "1", "--threads", "8", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "server.app:app"]
-build = ["pip", "install", "-r", "requirements.txt"]
+build = ["bash", "-lc", "pip install -r requirements.txt && pnpm install --frozen-lockfile && pnpm --filter @workspace/church-machine-ide-introduction run build:production"]
 
 [nix]
 channel = "stable-25_05"

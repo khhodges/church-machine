@@ -14,15 +14,6 @@ localPort = 21279
 [services.development]
 run = "pnpm --filter @workspace/church-machine-ide-introduction run dev"
 
-[services.production]
-build = [ "pnpm", "--filter", "@workspace/church-machine-ide-introduction", "run", "build:production" ]
-serve = "static"
-publicDir = "artifacts/church-machine-ide-introduction/dist/public"
-
-[[services.production.rewrites]]
-from = "/*"
-to = "/index.html"
-
 [services.env]
 PORT = "21279"
 BASE_PATH = "/ide-intro/"
