@@ -11,7 +11,7 @@
 // The token is the CRC-32 of all binary bytes, lower-cased 8-hex-char string.
 // The manifest.json entry is printed to stdout for manual insertion or patch.
 //
-// C-List (cc=1) — tail of the lump, 1 slot:
+// C-List (cc=2) — tail of the lump, 2 slots:
 //   Slot 0  0x4A000006  E    SelfTest (NS slot 6) — one E-GT loaded into CR1 for TPERM/EXACT tests
 //
 // Usage:
@@ -132,7 +132,7 @@ const headerWord = (
 
 const padded = new Uint32Array(lumpSize);
 padded[0] = headerWord;
-for (let i = 0; i < CLIST.length; i++) {
+for (let i = 0; i < cw; i++) padded[1 + i] = words[i] >>> 0;
 
 // Write c-list GT values at the lump tail (words lumpSize-cc .. lumpSize-1)
 const clistBase = lumpSize - cc;
@@ -147,7 +147,7 @@ console.log(`  c-list base word index: ${clistBase}`);
 
 // ── Convert to big-endian bytes ──────────────────────────────────────────────
 const bytes = Buffer.alloc(lumpSize * 4);
-for (let i = 0; i < CLIST.length; i++) {
+for (let i = 0; i < lumpSize; i++) {
     bytes.writeUInt32BE(padded[i] >>> 0, i * 4);
 }
 
@@ -173,6 +173,27 @@ function crc32(buf) {
 }
 
 const token = crc32(bytes).toString(16).toLowerCase().padStart(8, '0');
+console.log(`Token (CRC-32 of binary): ${token}`);
+
+// ── Remove old SelfTest lump files ──────────────────────────────────────────
+const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
+const existingIdx = manifest.findIndex(e => e.abstraction === 'PostFlashSelftest');
+if (existingIdx !== -1) {
+    const oldToken = manifest[existingIdx].token;
+    if (oldToken && oldToken !== token) {
+        const oldLump = path.join(LUMPS_DIR, `${oldToken}.lump`);
+        const oldSidecar = path.join(LUMPS_DIR, `${oldToken}.json`);
+        if (fs.existsSync(oldLump)) {
+            fs.unlinkSync(oldLump);
+            console.log(`Removed old: ${oldLump}`);
+        }
+        if (fs.existsSync(oldSidecar)) {
+            fs.unlinkSync(oldSidecar);
+            console.log(`Removed old: ${oldSidecar}`);
+        }
+    }
+}
+
 const lumpPath    = path.join(LUMPS_DIR, `${token}.lump`);
 const sidecarPath = path.join(LUMPS_DIR, `${token}.json`);
 
@@ -241,10 +262,6 @@ const manifestEntry = {
     lump_version: 0,
     sidecar_file: `${token}.json`,
 };
-const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
-
-const existingIdx = manifest.findIndex(e => e.abstraction === 'PostFlashSelftest');
-
 console.log('\nManifest entry to add to server/lumps/manifest.json:');
 console.log(JSON.stringify(manifestEntry, null, 4));
 
@@ -258,9 +275,3 @@ fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 4) + '\n');
 console.log(`Updated: ${MANIFEST}`);
 
 console.log('\nDone. Run python -m pytest tests/lump/test_lump_consistency.py -v to verify.');
-
-        const oldLump    = path.join(LUMPS_DIR, `${oldToken}.lump`);
-
-    const oldToken = manifest[existingIdx].token;
-
-        const oldSidecar = path.join(LUMPS_DIR, `${oldToken}.json`);

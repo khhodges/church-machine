@@ -48,6 +48,7 @@
     "wukong-trace-cr-server-tests",
     "check-build-lump-sidecar-source",
     "check-wukong-callhome-divergence",
-    "check-build-lump-clist"
+    "check-build-lump-clist",
+    "build-selftest-lump-syntax"
   ]
 }
