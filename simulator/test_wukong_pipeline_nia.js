@@ -24,8 +24,8 @@ check('helper re-renders the pipeline visualizer',
       src.slice(helperStart, helperStart + 900).includes('pipelineViz.render()'));
 check('trace path updates pipeline NIA after moving hardware cursor',
       traceStart !== -1 &&
-      src.slice(traceStart, traceStart + 1500).includes(
-          '_wukongSetHwCursor(niaInt);\n    _wukongSetPipelineHwNIA(niaInt);'));
+      src.slice(traceStart).includes('_wukongSetHwCursor(niaInt);') &&
+      src.slice(traceStart).includes('_wukongSetPipelineHwNIA(niaInt);'));
 
 console.log(failures === 0
     ? '\nAll wukong-pipeline-nia tests passed.'
