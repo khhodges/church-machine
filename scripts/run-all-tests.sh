@@ -280,6 +280,9 @@ register_suite "wukong-hw-fault-tests" \
 register_suite "wukong-reconnect-halt-badge-tests" \
     'node simulator/test_wukong_reconnect_halt_badge.js'
 
+register_suite "wukong-turing-filter-badge-tests" \
+    'node simulator/test_wukong_turing_filter_badge.js'
+
 register_suite "wukong-console-warning-tests" \
     'node simulator/test_wukong_console_warning.js'
 
@@ -327,6 +330,9 @@ register_suite "docs-artifact-link-tests" \
 
 register_suite "wukong-status-readonly-tests" \
     'python3 -m pytest tests/server/test_wukong_status_readonly.py -v'
+
+register_suite "wukong-turing-filter-server-tests" \
+    'python3 -m pytest tests/server/test_wukong_turing_filter.py -v'
 
 register_suite "pipeline-health-status-tests" \
     'python3 -m pytest tests/server/test_pipeline_health_status_fields.py -v'

@@ -356,6 +356,17 @@ args = "node simulator/test_wukong_reconnect_halt_badge.js"
 outputType = "console"
 
 [[workflows.workflow]]
+name = "wukong-turing-filter-badge-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_wukong_turing_filter_badge.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
 name = "wukong-console-warning-tests"
 author = "agent"
 
