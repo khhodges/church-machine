@@ -1641,6 +1641,57 @@
     border-radius: 3px;
 }
 
+.build-history-namespace-context {
+    margin: 0.75rem 0.15rem 0.2rem;
+}
+
+.historical-ns-context {
+    border: 1px solid rgba(91, 160, 255, 0.45);
+    border-left: 3px solid #5ba0ff;
+    background: rgba(46, 103, 190, 0.12);
+    border-radius: 4px;
+    padding: 0.65rem 0.75rem;
+    color: var(--text-primary);
+    font-size: 0.76rem;
+}
+
+.historical-ns-context h4 {
+    margin: 0 0 0.35rem;
+    color: #b9d8ff;
+    font-size: 0.8rem;
+}
+
+.historical-ns-context p {
+    margin: 0.25rem 0;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.historical-ns-slots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-top: 0.45rem;
+}
+
+.historical-ns-slot {
+    font-family: var(--mono, monospace);
+    background: rgba(255,255,255,0.07);
+    border-radius: 3px;
+    padding: 0.16rem 0.35rem;
+}
+
+.bh-ns button,
+.historical-ns-context button {
+    border: 1px solid rgba(91,160,255,0.5);
+    background: rgba(91,160,255,0.15);
+    color: #c8e1ff;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.7rem;
+    padding: 0.18rem 0.4rem;
+}
+
 .build-step-row {
     display: flex;
     gap: 0.5rem;

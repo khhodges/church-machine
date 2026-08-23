@@ -148,6 +148,9 @@ def register_models(db):
         status       = Column(String(16), default="unknown")            # succeeded/failed/partial
         approver     = Column(String(128), default="")                  # who triggered the build
         git_commit   = Column(String(64), default="")                   # short git hash
+        # Version encoded into the FPGA sentinel.  This is distinct from the
+        # immutable BuildRecord id/version used by the server's history table.
+        hardware_version = Column(Integer, nullable=True)
         # JSON blobs
         ns_snapshot  = Column(Text, default=None)    # NS table state at build time
         test_results = Column(Text, default=None)    # {workflow: pass/fail/unknown}

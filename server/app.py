@@ -310,6 +310,29 @@ def _wukong_build_dir():
     """Directory holding the pre-built Wukong bitstream (patchable in tests)."""
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "build"))
 
+
+_wukong_upload_lock = threading.RLock()
+
+
+def _wukong_upload_guard(build_dir):
+    """Serialize canonical bitstream publication across threads and workers."""
+    import contextlib
+    import fcntl
+
+    @contextlib.contextmanager
+    def _guard():
+        os.makedirs(build_dir, exist_ok=True)
+        lock_path = os.path.join(build_dir, ".wukong-upload.lock")
+        with _wukong_upload_lock:
+            with open(lock_path, "a+") as lock_file:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+                try:
+                    yield
+                finally:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+    return _guard()
+
+
 def _bitstream_sidecar_path(bit_path):
     """Path of the JSON metadata sidecar next to a .bit file."""
     return bit_path + ".meta.json"
@@ -609,7 +632,13 @@ def upload_wukong_bit():
     Usage from Chromebook or droplet:
       curl -X POST <ide-url>/upload/wukong-bit \
            -H "Authorization: Bearer <REPORT_TOKEN>" \
-           -F "file=@church_wukong_xc7a100t.bit"
+           -F "file=@church_wukong_xc7a100t.bit" \
+           -F "version=<hardware-version>" \
+           -F "commit=<full-source-commit>" \
+           -F "build_record_id=<approved-build-record>"
+
+    Omitting build_record_id is allowed for unmatched external artifacts, but
+    those uploads explicitly carry no authoritative Namespace snapshot.
     """
     token = os.environ.get("REPORT_TOKEN", "")
     if not token:
@@ -640,55 +669,132 @@ def upload_wukong_bit():
             _record_build_event(board="wukong-xc7a100t", status="failed", notes="invalid_version")
             return jsonify({"ok": False, "error": "version must be an integer"}), 400
     source_commit = request.form.get("commit", "") or request.args.get("commit", "") or None
+    build_record_raw = (
+        request.form.get("build_record_id", "") or
+        request.args.get("build_record_id", "")
+    )
+    build_record_id = None
+    if build_record_raw:
+        try:
+            build_record_id = int(build_record_raw)
+        except ValueError:
+            _record_build_event(board="wukong-xc7a100t", status="failed",
+                                notes="invalid_build_record")
+            return jsonify({"ok": False, "error": "build_record_id must be an integer"}), 400
     _approver = request.form.get("approver", "") or request.args.get("approver", "")
 
-    # ── filesystem flow — entirely wrapped so every failure is recorded ──────
-    # Save to a temp file first, write its sidecar, then atomically move both
-    # into place — a failed upload leaves the previous .bit + sidecar intact.
-    tmp_path = bit_path + ".uploading"
+    # Unique temp files plus a cross-process lock keep artifact, sidecar, and
+    # history publication one serialized operation.
+    import tempfile as _upload_tempfile
     try:
         os.makedirs(build_dir, exist_ok=True)
-        f.save(tmp_path)
-        meta = _write_bitstream_sidecar(tmp_path, version=version, source_commit=source_commit)
-        os.replace(_bitstream_sidecar_path(tmp_path), _bitstream_sidecar_path(bit_path))
-        os.replace(tmp_path, bit_path)
-        size = os.path.getsize(bit_path)
-    except Exception as _fs_exc:
-        for leftover in (tmp_path, _bitstream_sidecar_path(tmp_path)):
-            try:
-                os.remove(leftover)
-            except OSError:
-                pass
-        # Record failure with a safe fixed code — never str(exception)
+    except Exception:
         _record_build_event(board="wukong-xc7a100t", status="failed",
                             notes="save_error", approver=_approver)
-        app.logger.exception("Wukong bit upload filesystem error")
+        app.logger.exception("Wukong bit upload directory error")
         return jsonify({"ok": False, "error": "Upload write failed"}), 500
-    # ── end filesystem flow ──────────────────────────────────────────────────
+    with _wukong_upload_guard(build_dir):
+        match = {
+            "state": "unavailable",
+            "reason": "Upload is not bound to an approved server build record.",
+        }
+        matched_record = None
+        matched_snapshot = None
+        if build_record_id is not None:
+            candidate = db.session.get(BuildRecord, build_record_id)
+            binding_error = None
+            if candidate is None or candidate.board != "wukong-xc7a100t":
+                binding_error = "Approved build record was not found."
+            elif candidate.status != "succeeded":
+                binding_error = "Approved build did not complete successfully."
+            elif candidate.hardware_version != version:
+                binding_error = "Upload build version does not match the approved build."
+            elif not source_commit or str(candidate.git_commit) != str(source_commit):
+                binding_error = "Upload source commit does not exactly match the approved build."
+            elif not candidate.bit_hash:
+                binding_error = "Approved build has no verified remote artifact digest."
+            elif candidate.bit_path:
+                binding_error = "Approved build artifact was already uploaded."
+            else:
+                candidate_snapshot = _read_record_namespace_snapshot(candidate)
+                if candidate_snapshot is None:
+                    binding_error = "Approved build has no Namespace snapshot."
+                else:
+                    matched_record = candidate
+                    matched_snapshot = candidate_snapshot
+            if binding_error:
+                _record_build_event(
+                    board="wukong-xc7a100t", status="failed",
+                    notes="build_binding_rejected", approver=_approver,
+                    hardware_version=version, git_commit=source_commit or "")
+                return jsonify({"ok": False, "error": binding_error,
+                                "namespace_snapshot": False}), 409
 
-    app.logger.info("Wukong bit uploaded: %d bytes (version=%s md5=%s)",
-                    size, version, meta["md5"])
+        tmp_fd, tmp_path = _upload_tempfile.mkstemp(
+            prefix="church_wukong_xc7a100t.bit.uploading.", dir=build_dir)
+        os.close(tmp_fd)
+        try:
+            f.save(tmp_path)
+            meta = _write_bitstream_sidecar(
+                tmp_path, version=version, source_commit=source_commit)
+            if matched_record is not None and meta["md5"] != matched_record.bit_hash:
+                _record_build_event(
+                    board="wukong-xc7a100t", status="failed",
+                    notes="artifact_digest_mismatch", approver=_approver,
+                    hardware_version=version, git_commit=source_commit or "")
+                return jsonify({
+                    "ok": False,
+                    "error": "Upload digest does not match the approved remote build.",
+                    "namespace_snapshot": False,
+                }), 409
+            if matched_record is not None:
+                match = {
+                    "state": "available",
+                    "build_id": matched_record.id,
+                    "fingerprint": matched_snapshot["fingerprint"],
+                }
+            os.replace(_bitstream_sidecar_path(tmp_path), _bitstream_sidecar_path(bit_path))
+            os.replace(tmp_path, bit_path)
+            size = os.path.getsize(bit_path)
+        except Exception:
+            _record_build_event(board="wukong-xc7a100t", status="failed",
+                                notes="save_error", approver=_approver)
+            app.logger.exception("Wukong bit upload filesystem error")
+            return jsonify({"ok": False, "error": "Upload write failed"}), 500
+        finally:
+            for leftover in (tmp_path, _bitstream_sidecar_path(tmp_path)):
+                try:
+                    os.remove(leftover)
+                except OSError:
+                    pass
 
-    # Record this upload as a build event so it appears in Build History.
-    # Version is always set to the record's primary-key id (atomic, unique).
-    # Caller-supplied version is NOT used for BuildRecord allocation.
-    _record_build_event(
-        board="wukong-xc7a100t",
-        status="succeeded",
-        notes="upload",
-        bit_path=bit_path,
-        bit_hash=meta["md5"],
-        approver=_approver,
-    )
-    _record_bitstream_version_event(
-        status="succeeded",
-        version=version,
-        source="verified-upload",
-        source_commit=source_commit,
-        bit_hash=meta["md5"],
-    )
+        app.logger.info("Wukong bit uploaded: %d bytes (version=%s md5=%s)",
+                        size, version, meta["md5"])
+        _record_build_event(
+            board="wukong-xc7a100t",
+            status="succeeded",
+            notes="upload" if matched_snapshot else "upload_namespace_unavailable",
+            bit_path=bit_path,
+            bit_hash=meta["md5"],
+            approver=_approver,
+            ns_snapshot=matched_snapshot,
+            hardware_version=version,
+            git_commit=(matched_record.git_commit if matched_record else (source_commit or "")),
+        )
+        if matched_record is not None:
+            matched_record.bit_path = bit_path
+            db.session.commit()
+        _record_bitstream_version_event(
+            status="succeeded",
+            version=version,
+            source="verified-upload",
+            source_commit=source_commit,
+            bit_hash=meta["md5"],
+        )
 
-    return jsonify({"ok": True, "size_bytes": size, "version": version, "md5": meta["md5"]})
+    return jsonify({"ok": True, "size_bytes": size, "version": version, "md5": meta["md5"],
+                    "namespace_snapshot": match.get("state") == "available",
+                    "namespace_reason": match.get("reason")})
 
 
 @app.route("/api/bitstream-status")
@@ -753,7 +859,8 @@ def api_bitstream_status():
     })
 
 
-def _record_build_event(board, status, notes="", bit_path="", bit_hash="", mcs_path="", approver=""):
+def _record_build_event(board, status, notes="", bit_path="", bit_hash="", mcs_path="", approver="",
+                        ns_snapshot=None, hardware_version=None, git_commit=None):
     """Write a BuildRecord directly from server-side code.
 
     Called by build_fpga() and upload_wukong_bit() — no client auth required.
@@ -770,7 +877,11 @@ def _record_build_event(board, status, notes="", bit_path="", bit_hash="", mcs_p
             board=str(board or "")[:64],
             status=str(status or "unknown")[:16],
             approver=str(approver or "")[:128],
-            git_commit=_git_short_hash()[:64],
+            git_commit=str(_git_short_hash() if git_commit is None else git_commit)[:64],
+            hardware_version=(int(hardware_version)
+                              if isinstance(hardware_version, int) else None),
+            ns_snapshot=(json.dumps(ns_snapshot, sort_keys=True, separators=(",", ":"))
+                         if isinstance(ns_snapshot, dict) else None),
             bit_path=str(bit_path or "")[:512],
             bit_hash=str(bit_hash or "")[:64],
             mcs_path=str(mcs_path or "")[:512],
@@ -789,6 +900,207 @@ def _record_build_event(board, status, notes="", bit_path="", bit_hash="", mcs_p
         except Exception:
             pass
         return None
+
+
+_NAMESPACE_SNAPSHOT_SCHEMA_VERSION = 1
+_NAMESPACE_SNAPSHOT_MAX_SLOTS = 256
+
+
+def _namespace_snapshot_fingerprint(namespace):
+    """Return the deterministic identity of immutable Namespace contents."""
+    canonical = json.dumps(namespace, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return _ba_hashlib.sha256(canonical).hexdigest()
+
+
+def _raw_namespace_fingerprint(raw):
+    """Return a deterministic identity for committed four-word NS entries."""
+    import hashlib
+    entries = []
+    for entry in (raw or {}).get("entries", []):
+        if not isinstance(entry, dict):
+            continue
+        entries.append({
+            "slot": int(entry.get("slot", 0)),
+            "w0": int(entry.get("w0", 0)) & 0xFFFFFFFF,
+            "w1": int(entry.get("w1", 0)) & 0xFFFFFFFF,
+            "w2": int(entry.get("w2", 0)) & 0xFFFFFFFF,
+            "w3": int(entry.get("w3", 0)) & 0xFFFFFFFF,
+        })
+    entries.sort(key=lambda item: item["slot"])
+    encoded = json.dumps(entries, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _capture_committed_namespace_snapshot(hardware_version=None, source_commit=None,
+                                         approval_frozen_at=None):
+    """Freeze the server's committed decoded and raw Namespace state.
+
+    This deliberately reads the persisted state and boot image at the accepted
+    build boundary.  It never accepts browser state, and callers retain the
+    returned JSON verbatim rather than re-reading mutable live files later.
+    """
+    with _namespace_commit_guard():
+        if not os.path.isfile(NS_STATE_PATH) or not os.path.isfile(BOOT_IMAGE_PATH):
+            raise ValueError("Committed Namespace state or boot image is unavailable")
+        with open(NS_STATE_PATH, encoding="utf-8") as state_file:
+            state = json.load(state_file)
+        if not isinstance(state, dict) or not isinstance(state.get("abstractions"), list):
+            raise ValueError("Committed Namespace metadata is invalid")
+        with open(BOOT_IMAGE_PATH, "rb") as image_file:
+            raw = _boot_image_gen.parse_ns_table_raw(image_file.read())
+        if not isinstance(raw, dict) or not isinstance(raw.get("entries"), list):
+            raise ValueError("Committed boot image has no readable Namespace table")
+        raw_fingerprint = _raw_namespace_fingerprint(raw)
+
+    decoded_slots = []
+    for entry in state["abstractions"]:
+        if not isinstance(entry, dict) or not isinstance(entry.get("slot"), int):
+            continue
+        if not 0 <= entry["slot"] < _NAMESPACE_SNAPSHOT_MAX_SLOTS:
+            continue
+        # Keep only declared Namespace metadata.  Browser-only annotations and
+        # arbitrary future payload fields cannot become build authority.
+        decoded = {
+            key: entry[key] for key in (
+                "name", "slot", "location", "type", "f", "g", "limit",
+                "seq", "seal", "token", "cache_token", "boot",
+            ) if key in entry
+        }
+        if decoded.get("name"):
+            decoded_slots.append(decoded)
+    decoded_slots.sort(key=lambda item: item["slot"])
+
+    raw_entries = []
+    for entry in raw["entries"]:
+        if not isinstance(entry, dict) or not isinstance(entry.get("slot"), int):
+            continue
+        if not 0 <= entry["slot"] < _NAMESPACE_SNAPSHOT_MAX_SLOTS:
+            continue
+        try:
+            raw_entries.append({
+                "slot": entry["slot"],
+                "w0": int(entry["w0"]) & 0xFFFFFFFF,
+                "w1": int(entry["w1"]) & 0xFFFFFFFF,
+                "w2": int(entry["w2"]) & 0xFFFFFFFF,
+                "w3": int(entry["w3"]) & 0xFFFFFFFF,
+            })
+        except (KeyError, TypeError, ValueError):
+            continue
+    raw_entries.sort(key=lambda item: item["slot"])
+    if not raw_entries:
+        raise ValueError("Committed boot image Namespace table is empty")
+    decoded_by_slot = {entry["slot"]: entry for entry in decoded_slots}
+    raw_by_slot = {entry["slot"]: entry for entry in raw_entries}
+    if set(decoded_by_slot) != set(raw_by_slot):
+        raise ValueError("Committed Namespace metadata and raw table occupy different slots")
+    for slot, decoded in decoded_by_slot.items():
+        try:
+            decoded_location = int(str(decoded["location"]), 0)
+        except (KeyError, TypeError, ValueError):
+            raise ValueError(f"Committed Namespace slot {slot} has an invalid location")
+        if decoded_location != raw_by_slot[slot]["w0"]:
+            raise ValueError(f"Committed Namespace slot {slot} metadata does not match raw table")
+    recorded_raw_fingerprint = state.get("committed_raw_fingerprint")
+    if not recorded_raw_fingerprint:
+        raise ValueError("Committed Namespace metadata is not bound to a raw table revision")
+    if recorded_raw_fingerprint != raw_fingerprint:
+        raise ValueError("Committed Namespace metadata is bound to a different raw table revision")
+
+    namespace = {
+        "decoded_slots": decoded_slots,
+        "raw": {
+            "total_words": int(raw.get("totalWords", 0)),
+            "max_entries": int(raw.get("maxEntries", 0)),
+            "ns_table_base": int(raw.get("nsTableBase", 0)),
+            "entries": raw_entries,
+        },
+    }
+    return {
+        "schema_version": _NAMESPACE_SNAPSHOT_SCHEMA_VERSION,
+        "fingerprint": _namespace_snapshot_fingerprint(namespace),
+        "captured_at": _ba_datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "authority": "server-committed-namespace",
+        "provenance": {
+            "hardware_version": hardware_version if isinstance(hardware_version, int) else None,
+            "source_commit": str(source_commit)[:64] if source_commit else None,
+            "approval_frozen_at": str(approval_frozen_at)[:32] if approval_frozen_at else None,
+            "committed_raw_fingerprint": raw_fingerprint,
+        },
+        "namespace": namespace,
+    }
+
+
+def _read_record_namespace_snapshot(record):
+    """Return a validated, bounded historical Namespace snapshot or None."""
+    try:
+        snapshot = json.loads(record.ns_snapshot) if record and record.ns_snapshot else None
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(snapshot, dict) or snapshot.get("schema_version") != _NAMESPACE_SNAPSHOT_SCHEMA_VERSION:
+        return None
+    namespace = snapshot.get("namespace")
+    raw = namespace.get("raw") if isinstance(namespace, dict) else None
+    slots = namespace.get("decoded_slots") if isinstance(namespace, dict) else None
+    if not isinstance(raw, dict) or not isinstance(raw.get("entries"), list) or not isinstance(slots, list):
+        return None
+    if len(raw["entries"]) > _NAMESPACE_SNAPSHOT_MAX_SLOTS or len(slots) > _NAMESPACE_SNAPSHOT_MAX_SLOTS:
+        return None
+    fingerprint = snapshot.get("fingerprint")
+    if not isinstance(fingerprint, str) or len(fingerprint) != 64:
+        return None
+    return snapshot
+
+
+def _namespace_match_for_hardware_version(hardware_version):
+    """Find one unambiguous successful historical Namespace for an FPGA version."""
+    if not isinstance(hardware_version, int):
+        return {"state": "unavailable", "reason": "The FPGA did not report a build version."}
+    try:
+        records = (BuildRecord.query
+                   .filter_by(board="wukong-xc7a100t", status="succeeded",
+                              hardware_version=hardware_version)
+                   .order_by(BuildRecord.id.desc()).all())
+    except Exception:
+        return {"state": "unavailable", "reason": "Build history is unavailable."}
+    grouped = {}
+    for record in records:
+        snapshot = _read_record_namespace_snapshot(record)
+        if snapshot:
+            grouped.setdefault(snapshot["fingerprint"], (record, snapshot))
+    if not grouped:
+        return {"state": "unavailable",
+                "reason": "No recorded Namespace snapshot matches this FPGA build."}
+    if len(grouped) != 1:
+        return {"state": "ambiguous",
+                "reason": "More than one recorded Namespace snapshot matches this build version."}
+    record, snapshot = next(iter(grouped.values()))
+    return {
+        "state": "available",
+        "build_id": record.id,
+        "build_history_version": record.version,
+        "fingerprint": snapshot["fingerprint"],
+    }
+
+
+def _build_namespace_detail(record):
+    """Return a path-free bounded historical context for the browser."""
+    snapshot = _read_record_namespace_snapshot(record)
+    if not snapshot:
+        return {"ok": True, "available": False,
+                "reason": "No Namespace snapshot is available for this build."}
+    return {
+        "ok": True,
+        "available": True,
+        "build": {
+            "id": record.id,
+            "version": record.version,
+            "hardware_version": record.hardware_version,
+            "status": record.status,
+            "git_commit": record.git_commit,
+            "bit_hash": record.bit_hash or None,
+        },
+        "snapshot": snapshot,
+    }
 
 
 @app.route("/api/builds", methods=["GET"])
@@ -822,12 +1134,42 @@ def api_builds_list():
                 "git_commit":   r.git_commit,
                 "test_results": tr,
                 "bit_hash":     r.bit_hash,   # integrity check only — no server path
+                "hardware_version": r.hardware_version,
+                "namespace_snapshot": bool(_read_record_namespace_snapshot(r)),
+                "namespace_fingerprint": (
+                    _read_record_namespace_snapshot(r).get("fingerprint")
+                    if _read_record_namespace_snapshot(r) else None
+                ),
                 # notes omitted: may contain internal error codes stored server-side
             })
         return jsonify({"ok": True, "builds": out})
     except Exception as e:
         logging.exception("api_builds_list failed")
         return jsonify({"ok": False, "error": "could not load build history"}), 500
+
+
+@app.route("/api/builds/<int:build_id>/namespace", methods=["GET"])
+def api_build_namespace_detail(build_id):
+    """Return the saved test context for one historical build, never live NS state."""
+    try:
+        record = db.session.get(BuildRecord, build_id)
+        if record is None:
+            return jsonify({"ok": False, "error": "Build record not found"}), 404
+        return jsonify(_build_namespace_detail(record))
+    except Exception:
+        logging.exception("api_build_namespace_detail failed")
+        return jsonify({"ok": False, "error": "could not load build Namespace"}), 500
+
+
+@app.route("/api/builds/namespace-match", methods=["GET"])
+def api_build_namespace_match():
+    """Resolve a reported FPGA version without falling back to live Namespace state."""
+    try:
+        version = int(request.args.get("hardware_version", ""))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "hardware_version must be an integer"}), 400
+    result = _namespace_match_for_hardware_version(version)
+    return jsonify({"ok": True, "hardware_version": version, **result})
 
 
 @app.route("/api/builds", methods=["POST"])
@@ -843,7 +1185,7 @@ def api_builds_create():
         status       — 'succeeded' | 'failed' | 'partial'
         approver     — who triggered the build (optional)
         git_commit   — git short hash (optional; auto-detected if omitted)
-        ns_snapshot  — JS object snapshot of NS table (optional)
+        hardware_version — FPGA sentinel build version (optional)
         test_results — JS object {workflow_name: 'pass'|'fail'|'unknown'} (optional)
         bit_hash     — md5 hex of .bit file (optional)
         notes        — free text (optional)
@@ -861,8 +1203,11 @@ def api_builds_create():
     data = request.get_json(silent=True) or {}
     # Version is always set equal to the record's primary key after flush —
     # no caller-supplied override, no MAX+1 race.
-    ns_snap = data.get("ns_snapshot")
     test_res = data.get("test_results")
+    try:
+        hardware_version = int(data.get("hardware_version")) if data.get("hardware_version") is not None else None
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "hardware_version must be an integer"}), 400
     try:
         br = BuildRecord(
             version=0,   # placeholder; overwritten with id after flush
@@ -871,7 +1216,10 @@ def api_builds_create():
             status=str(data.get("status", "unknown"))[:16],
             approver=str(data.get("approver", ""))[:128],
             git_commit=str(data.get("git_commit", "") or _git_short_hash())[:64],
-            ns_snapshot=json.dumps(ns_snap) if ns_snap is not None else None,
+            # External callers cannot supply Namespace authority.  Only the
+            # approved server-side build boundary records an authoritative snapshot.
+            ns_snapshot=None,
+            hardware_version=hardware_version,
             test_results=json.dumps(test_res) if test_res is not None else None,
             # External callers supply a hash only — paths are internal to the server.
             bit_hash=str(data.get("bit_hash", ""))[:64],
@@ -1936,6 +2284,69 @@ BOOT_IMAGE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 NS_STATE_PATH   = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                "lumps", "ns-state.json")
 LUMPS_DIR = os.path.dirname(LUMPS_MANIFEST_PATH)
+_namespace_commit_lock = threading.RLock()
+_namespace_commit_state = threading.local()
+
+
+def _namespace_commit_guard():
+    """Cross-process, re-entrant lock for the committed Namespace file pair."""
+    import contextlib
+    import fcntl
+
+    @contextlib.contextmanager
+    def _guard():
+        with _namespace_commit_lock:
+            depth = getattr(_namespace_commit_state, "depth", 0)
+            if depth:
+                _namespace_commit_state.depth = depth + 1
+                try:
+                    yield
+                finally:
+                    _namespace_commit_state.depth -= 1
+                return
+            lock_path = os.path.join(os.path.dirname(NS_STATE_PATH), ".namespace-commit.lock")
+            os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+            with open(lock_path, "a+") as lock_file:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+                _namespace_commit_state.depth = 1
+                try:
+                    yield
+                finally:
+                    _namespace_commit_state.depth = 0
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+    return _guard()
+
+
+def _write_boot_image_bytes(image_bytes):
+    """Atomically replace the committed boot image under the Namespace lock."""
+    tmp_path = BOOT_IMAGE_PATH + ".tmp"
+    with _namespace_commit_guard():
+        try:
+            with open(tmp_path, "wb") as image_file:
+                image_file.write(image_bytes)
+            os.replace(tmp_path, BOOT_IMAGE_PATH)
+            _invalidate_ns_state_raw_binding()
+        except Exception:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+            raise
+
+
+def _invalidate_ns_state_raw_binding():
+    """Mark decoded metadata unavailable after a raw-only boot-image write."""
+    if not os.path.isfile(NS_STATE_PATH):
+        return
+    with open(NS_STATE_PATH, encoding="utf-8") as state_file:
+        state = json.load(state_file)
+    if not isinstance(state, dict):
+        raise ValueError("Namespace metadata is invalid")
+    state.pop("committed_raw_fingerprint", None)
+    tmp_state = NS_STATE_PATH + ".tmp"
+    with open(tmp_state, "w", encoding="utf-8") as state_file:
+        json.dump(state, state_file, indent=2)
+    os.replace(tmp_state, NS_STATE_PATH)
 
 # Canonical list of server-managed tokens — excluded from the /api/lumps browser
 # listing and exempt from the R3 manifest-presence check in test_lump_consistency.py.
@@ -2011,8 +2422,7 @@ def boot_image_generate():
     except Exception as e:
         return jsonify({"ok": False, "error": f"Generator failed: {e}"}), 500
     try:
-        with open(BOOT_IMAGE_PATH, "wb") as f:
-            f.write(blob)
+        _write_boot_image_bytes(blob)
     except Exception as e:
         return jsonify({"ok": False, "error": f"Failed to write boot-image.bin: {e}"}), 500
     _load_boot_abstr_lump()
@@ -2071,8 +2481,7 @@ def _auto_regen_boot_image():
         if _err:
             return None, f"Cannot read boot config: {_err}"
         _blob = _boot_image_gen.generate_boot_image(_cfg, LUMPS_DIR)
-        with open(BOOT_IMAGE_PATH, "wb") as _fh:
-            _fh.write(_blob)
+        _write_boot_image_bytes(_blob)
         _load_boot_abstr_lump()
         _load_boot_ns_lump()
         logging.info("boot_image_binary: auto-regenerated boot-image.bin (LUMP source was newer)")
@@ -2413,8 +2822,7 @@ def boot_image_upload():
         return jsonify({"ok": False, "error": str(exc)}), 400
 
     try:
-        with open(BOOT_IMAGE_PATH, "wb") as f:
-            f.write(image_bytes)
+        _write_boot_image_bytes(image_bytes)
     except Exception as e:
         return jsonify({"ok": False, "error": f"Failed to write boot-image.bin: {e}"}), 500
 
@@ -2519,14 +2927,8 @@ def boot_image_save_ns():
     except ValueError as _exc:
         return jsonify({"ok": False, "error": str(_exc)}), 400
 
-    # Write boot-image.bin
-    try:
-        with open(BOOT_IMAGE_PATH, "wb") as _fh:
-            _fh.write(_img_bytes)
-    except Exception as _exc:
-        return jsonify({"ok": False, "error": f"Failed to write boot-image.bin: {_exc}"}), 500
-
-    # Write ns-state.json (rich per-slot format)
+    # Commit both files under one lock so an accepted build cannot capture a
+    # decoded/raw hybrid while Save NS Table is in progress.
     try:
         _raw_abs = _ns_state.get("abstractions") or []
         # Accept list of rich dicts; silently drop any malformed element.
@@ -2534,9 +2936,25 @@ def boot_image_save_ns():
             _a for _a in _raw_abs
             if isinstance(_a, dict) and _a.get("name") and isinstance(_a.get("slot"), int)
         ]
-        _write_ns_state(_ns_entries)
-    except Exception as _nse:
-        print(f"[ns-state] save-ns: failed to write ns-state.json: {_nse}", flush=True)
+        with _namespace_commit_guard():
+            old_image = None
+            if os.path.isfile(BOOT_IMAGE_PATH):
+                with open(BOOT_IMAGE_PATH, "rb") as old_image_file:
+                    old_image = old_image_file.read()
+            _write_boot_image_bytes(_img_bytes)
+            try:
+                _write_ns_state(_ns_entries)
+            except Exception:
+                if old_image is not None:
+                    _write_boot_image_bytes(old_image)
+                else:
+                    try:
+                        os.remove(BOOT_IMAGE_PATH)
+                    except OSError:
+                        pass
+                raise
+    except Exception as _exc:
+        return jsonify({"ok": False, "error": f"Failed to commit Namespace: {_exc}"}), 500
 
     _load_boot_ns_lump()   # refresh _BOOT_NS_META
 
@@ -5168,21 +5586,27 @@ def _read_boot_entry_name_from_image():
 def _write_ns_state(entries):
     """Write ns-state.json atomically — rich list of NS row objects."""
     import time as _tm_ns
-    _state = {
-        "abstractions": list(entries or []),
-        "generated_at": _tm_ns.time(),
-    }
     _tmp = NS_STATE_PATH + ".tmp"
-    try:
-        with open(_tmp, "w") as _fh:
-            json.dump(_state, _fh, indent=2)
-        os.replace(_tmp, NS_STATE_PATH)
-    except Exception:
+    with _namespace_commit_guard():
+        _state = {
+            "abstractions": list(entries or []),
+            "generated_at": _tm_ns.time(),
+        }
+        if os.path.isfile(BOOT_IMAGE_PATH):
+            with open(BOOT_IMAGE_PATH, "rb") as image_file:
+                raw = _boot_image_gen.parse_ns_table_raw(image_file.read())
+            if isinstance(raw, dict):
+                _state["committed_raw_fingerprint"] = _raw_namespace_fingerprint(raw)
         try:
-            os.remove(_tmp)
-        except OSError:
-            pass
-        raise
+            with open(_tmp, "w") as _fh:
+                json.dump(_state, _fh, indent=2)
+            os.replace(_tmp, NS_STATE_PATH)
+        except Exception:
+            try:
+                os.remove(_tmp)
+            except OSError:
+                pass
+            raise
 
 def _ensure_ns_state():
     """Create/migrate ns-state.json to the rich per-slot format on startup.
@@ -5220,6 +5644,7 @@ def _ensure_ns_state():
               f"{len(_entries)} occupied slots", flush=True)
     except Exception as _exc:
         print(f"[ns-state] cold-start creation failed: {_exc}", flush=True)
+
 
 def _migrate_sidecars_drop_group_doc_refs():
     """One-pass idempotent migration (Lump V1.3): remove the removed curatorial
@@ -6588,8 +7013,7 @@ def save_lump():
             cfg_bi, err_bi = _read_saved_boot_config()
             if not err_bi:
                 blob_bi = _boot_image_gen.generate_boot_image(cfg_bi, LUMPS_DIR)
-                with open(BOOT_IMAGE_PATH, 'wb') as _bif:
-                    _bif.write(blob_bi)
+                _write_boot_image_bytes(blob_bi)
                 boot_refreshed = True
                 print(f'[lumps] boot-image.bin regenerated ({len(blob_bi)} bytes)', flush=True)
                 _load_boot_abstr_lump()   # refresh _BOOT_ABSTR_META / LAZY_LUMPS['00000600']
@@ -10843,6 +11267,19 @@ with app.app_context():
 
     from sqlalchemy import inspect as _sa_inspect, text as _sa_text
     _inspector = _sa_inspect(db.engine)
+    _existing_br_cols = {c["name"] for c in _inspector.get_columns("build_records")}
+    if "hardware_version" not in _existing_br_cols:
+        try:
+            db.session.execute(_sa_text(
+                "ALTER TABLE build_records ADD COLUMN hardware_version INTEGER DEFAULT NULL"))
+            db.session.commit()
+            logging.info("Migrated: added hardware_version column to build_records table")
+        except Exception:
+            db.session.rollback()
+            # Another worker may have completed the same idempotent migration.
+            refreshed = {c["name"] for c in _sa_inspect(db.engine).get_columns("build_records")}
+            if "hardware_version" not in refreshed:
+                raise
     _existing_cols = {c["name"] for c in _inspector.get_columns("devices")}
     if "bridge_scheme" not in _existing_cols:
         db.session.execute(_sa_text("ALTER TABLE devices ADD COLUMN bridge_scheme VARCHAR(8) DEFAULT 'http'"))
@@ -12476,6 +12913,10 @@ def wukong_status_get():
         'relay_source_url': _wukong_relay_url,
         'relay_last_ok':    (now - _wukong_relay_last_ok) if _wukong_relay_last_ok else None,
         'relay_last_rx':    (now - _wukong_relay_last_rx) if _wukong_relay_last_rx else None,
+        # Snapshot lookup is version-scoped.  It intentionally never reads the
+        # mutable current Namespace as a fallback for a historical bitstream.
+        'namespace_snapshot': _namespace_match_for_hardware_version(
+            boot_info.get('build_version') if isinstance(boot_info, dict) else None),
     })
 
 
@@ -13585,7 +14026,12 @@ def _ba_build_worker(key_path):
         with _ba_build_lock:
             _ba_build_log.append(line)
 
+    with _ba_build_lock:
+        active_build_context = dict(_ba_build_version_context or {})
+    artifact_hash = None
+
     def _finish(code):
+        nonlocal artifact_hash
         global _ba_build_done, _ba_build_exit, _ba_build_phase, _ba_build_diagnosis
         with _ba_build_lock:
             _ba_build_done = True
@@ -13593,10 +14039,8 @@ def _ba_build_worker(key_path):
             _ba_build_phase = 'complete' if code == 0 else 'failed'
             _ba_build_diagnosis = _ba_classify_build_failure(code, _ba_build_log, _ba_build_phase)
             build_context = dict(_ba_build_version_context or {})
-        # A successful remote synthesis is the definitive moment to create a
-        # version-log entry.  Artifact hash stays empty until /upload verifies
-        # the .bit file; failed runs are also retained so the version history
-        # never falsely implies that a source version produced an image.
+        # A successful remote synthesis persists its expected artifact digest.
+        # Upload later verifies the published bytes against this value.
         try:
             with app.app_context():
                 _record_bitstream_version_event(
@@ -13604,7 +14048,16 @@ def _ba_build_worker(key_path):
                     version=build_context.get("version"),
                     source="remote-vivado",
                     source_commit=build_context.get("source_commit"),
+                    bit_hash=artifact_hash if code == 0 else None,
                 )
+                record_id = build_context.get("record_id")
+                if isinstance(record_id, int):
+                    record = db.session.get(BuildRecord, record_id)
+                    if record is not None:
+                        record.status = "succeeded" if code == 0 else "failed"
+                        if code == 0:
+                            record.bit_hash = artifact_hash
+                        db.session.commit()
         except Exception:
             app.logger.exception("Could not persist Wukong bitstream version log")
 
@@ -13614,13 +14067,32 @@ def _ba_build_worker(key_path):
 
     try:
         # 1. Kill any existing session + start new tmux Vivado build
+        import shlex as _ba_shlex
+        expected_commit = str(active_build_context.get("source_commit") or
+                              _git_full_head() or _git_short_hash())
+        remote_body = (
+            "source /opt/Xilinx/2026.1/Vivado/settings64.sh; "
+            "actual_commit=$(git rev-parse HEAD 2>/dev/null); "
+            f"if [ \"$actual_commit\" != {_ba_shlex.quote(expected_commit)} ]; then "
+            "echo REMOTE_COMMIT_MISMATCH; echo EXIT_43; exit 43; fi; "
+            "if ! git diff --quiet || ! git diff --cached --quiet; then "
+            "echo REMOTE_WORKTREE_DIRTY; echo EXIT_46; exit 46; fi; "
+            "rm -f church_wukong_xc7a100t.bit; "
+            "vivado -mode batch -source wukong_xc7a100t.tcl; "
+            "rc=$?; "
+            "if [ \"$rc\" -eq 0 ]; then "
+            "if [ -f church_wukong_xc7a100t.bit ]; then "
+            "digest=$(md5sum church_wukong_xc7a100t.bit | awk '{print $1}'); "
+            "echo ARTIFACT_MD5_$digest; "
+            "else rc=44; echo ARTIFACT_MISSING; fi; fi; "
+            "echo EXIT_$rc"
+        )
+        remote_script = f"{{ {remote_body}; }} > vivado_cm.log 2>&1"
         launch_cmd = (
-            f'cd {_DROPLET_BUILD_DIR} && '
+            f'cd {_ba_shlex.quote(_DROPLET_BUILD_DIR)} || exit $?; '
             f'tmux kill-session -t {_VIVADO_SESSION} 2>/dev/null; '
             f'tmux new-session -d -s {_VIVADO_SESSION} '
-            f"'source /opt/Xilinx/2026.1/Vivado/settings64.sh && "
-            f"vivado -mode batch -source wukong_xc7a100t.tcl "
-            f"> vivado_cm.log 2>&1; echo EXIT_$? >> vivado_cm.log'"
+            f'{_ba_shlex.quote(remote_script)}'
         )
         r = subprocess.run(ssh_base + [launch_cmd],
                            capture_output=True, text=True, timeout=30)
@@ -13661,6 +14133,9 @@ def _ba_build_worker(key_path):
             seen_lines += len(new_lines)
             for ln in new_lines:
                 _append(ln)
+                digest_match = re.match(r'ARTIFACT_MD5_([0-9a-fA-F]{32})$', ln.strip())
+                if digest_match:
+                    artifact_hash = digest_match.group(1).lower()
 
             # Check for exit marker
             exit_code = None
@@ -13671,6 +14146,9 @@ def _ba_build_worker(key_path):
                     break
 
             if exit_code is not None:
+                if exit_code == 0 and artifact_hash is None:
+                    _append('❌ Build produced no verifiable artifact digest')
+                    exit_code = 45
                 _append(f'\n{"✅ Build complete!" if exit_code == 0 else "❌ Build FAILED"} (exit {exit_code})')
                 _finish(exit_code)
                 return
@@ -13744,15 +14222,41 @@ def wukong_build_start():
         _ba_build_exit = None
         _ba_build_phase = 'queued'
         _ba_build_diagnosis = None
+        source_version = _wukong_build_version()
+        source_commit = _git_full_head() or _git_short_hash()
+        try:
+            namespace_snapshot = _capture_committed_namespace_snapshot(
+                hardware_version=source_version,
+                source_commit=source_commit,
+                approval_frozen_at=latest_snap.get("frozen_at"),
+            )
+        except ValueError as snapshot_error:
+            return jsonify({"ok": False, "error": str(snapshot_error)}), 422
+        record_id = _record_build_event(
+            board="wukong-xc7a100t",
+            status="running",
+            notes="approved_build",
+            ns_snapshot=namespace_snapshot,
+            hardware_version=source_version,
+            git_commit=source_commit,
+        )
+        if record_id is None:
+            return jsonify({"ok": False, "error": "Could not create the approved build record"}), 500
         _ba_build_version_context = {
-            "version": _wukong_build_version(),
-            "source_commit": _git_short_hash(),
+            "version": source_version,
+            "source_commit": source_commit,
+            "record_id": record_id,
+            "namespace_fingerprint": namespace_snapshot["fingerprint"],
         }
 
     t = threading.Thread(target=_ba_build_worker, args=(key_path,), daemon=True)
     t.start()
 
-    return jsonify({'ok': True, 'message': 'Build started — poll /api/wukong-build/status'})
+    return jsonify({'ok': True, 'message': 'Build started — poll /api/wukong-build/status',
+                    'build_record_id': record_id,
+                    'hardware_version': source_version,
+                    'source_commit': source_commit,
+                    'namespace_fingerprint': namespace_snapshot["fingerprint"]})
 
 @app.route('/api/wukong-build/status', methods=['GET'])
 def wukong_build_status():
@@ -13770,9 +14274,14 @@ def wukong_build_status():
         exit_code = _ba_build_exit
         phase = _ba_build_phase
         diagnosis = _ba_build_diagnosis
+        build_context = dict(_ba_build_version_context or {})
     return jsonify({'log': log[-200:], 'log_tail': log[-40:], 'done': done,
                     'exit_code': exit_code, 'phase': phase,
-                    'diagnosis': diagnosis})
+                    'diagnosis': diagnosis,
+                    'build_record_id': build_context.get('record_id'),
+                    'hardware_version': build_context.get('version'),
+                    'source_commit': build_context.get('source_commit'),
+                    'namespace_fingerprint': build_context.get('namespace_fingerprint')})
 
 @app.route('/api/build-approval/freeze-snapshot', methods=['POST'])
 def build_approval_freeze_snapshot():

@@ -375,6 +375,91 @@ def test_freeze_snapshot_stores_all_checks_pass(monkeypatch, tmp_path):
     assert isinstance(snap['all_checks_pass'], bool)
 
 
+def test_namespace_capture_rejects_decoded_raw_hybrid(monkeypatch, tmp_path):
+    """A build cannot freeze metadata A together with raw Namespace B."""
+    state_path = tmp_path / 'ns-state.json'
+    image_path = tmp_path / 'boot-image.bin'
+    state_path.write_text(json.dumps({
+        'abstractions': [{
+            'name': 'Namespace.A',
+            'slot': 6,
+            'location': '0x00000200',
+            'type': 'Inform',
+        }],
+    }))
+    image_path.write_bytes(b'raw-image-fixture')
+    monkeypatch.setattr(_app, 'NS_STATE_PATH', str(state_path))
+    monkeypatch.setattr(_app, 'BOOT_IMAGE_PATH', str(image_path))
+    monkeypatch.setattr(_app._boot_image_gen, 'parse_ns_table_raw', lambda _: {
+        'totalWords': 16384,
+        'maxEntries': 256,
+        'nsTableBase': 15360,
+        'entries': [{'slot': 6, 'w0': 0x300, 'w1': 0, 'w2': 0, 'w3': 0}],
+    })
+    with pytest.raises(ValueError, match='does not match raw table'):
+        _app._capture_committed_namespace_snapshot(hardware_version=1)
+
+
+def test_namespace_capture_rejects_changed_raw_revision_with_same_slots(monkeypatch, tmp_path):
+    """Stable slots/locations cannot hide changed raw authority or cache words."""
+    raw_a = {'entries': [{'slot': 6, 'w0': 0x200, 'w1': 1, 'w2': 2, 'w3': 3}]}
+    raw_b = {
+        'entries': [{'slot': 6, 'w0': 0x200, 'w1': 9, 'w2': 2, 'w3': 3}],
+        'totalWords': 16384, 'maxEntries': 256, 'nsTableBase': 15360,
+    }
+    state_path = tmp_path / 'ns-state.json'
+    image_path = tmp_path / 'boot-image.bin'
+    state_path.write_text(json.dumps({
+        'abstractions': [{
+            'name': 'Namespace.A', 'slot': 6, 'location': '0x00000200',
+        }],
+        'committed_raw_fingerprint': _app._raw_namespace_fingerprint(raw_a),
+    }))
+    image_path.write_bytes(b'raw-image-fixture')
+    monkeypatch.setattr(_app, 'NS_STATE_PATH', str(state_path))
+    monkeypatch.setattr(_app, 'BOOT_IMAGE_PATH', str(image_path))
+    monkeypatch.setattr(_app._boot_image_gen, 'parse_ns_table_raw', lambda _: raw_b)
+    with pytest.raises(ValueError, match='different raw table revision'):
+        _app._capture_committed_namespace_snapshot(hardware_version=1)
+
+
+def test_namespace_capture_rejects_unbound_legacy_metadata_with_same_slots(monkeypatch, tmp_path):
+    state_path = tmp_path / 'ns-state.json'
+    image_path = tmp_path / 'boot-image.bin'
+    state_path.write_text(json.dumps({
+        'abstractions': [{'name': 'Namespace.A', 'slot': 6, 'location': '0x200'}],
+    }))
+    image_path.write_bytes(b'legacy-raw-image')
+    monkeypatch.setattr(_app, 'NS_STATE_PATH', str(state_path))
+    monkeypatch.setattr(_app, 'BOOT_IMAGE_PATH', str(image_path))
+    monkeypatch.setattr(_app._boot_image_gen, 'parse_ns_table_raw', lambda _: {
+        'totalWords': 16384, 'maxEntries': 256, 'nsTableBase': 15360,
+        'entries': [{'slot': 6, 'w0': 0x200, 'w1': 9, 'w2': 2, 'w3': 3}],
+    })
+    with pytest.raises(ValueError, match='not bound'):
+        _app._capture_committed_namespace_snapshot(hardware_version=1)
+
+
+def test_raw_only_boot_image_write_invalidates_namespace_binding(monkeypatch, tmp_path):
+    state_path = tmp_path / 'ns-state.json'
+    image_path = tmp_path / 'boot-image.bin'
+    state_path.write_text(json.dumps({
+        'abstractions': [{'name': 'Namespace.A', 'slot': 6, 'location': '0x200'}],
+        'committed_raw_fingerprint': 'a' * 64,
+    }))
+    monkeypatch.setattr(_app, 'NS_STATE_PATH', str(state_path))
+    monkeypatch.setattr(_app, 'BOOT_IMAGE_PATH', str(image_path))
+    _app._write_boot_image_bytes(b'new-raw-image')
+    state = json.loads(state_path.read_text())
+    assert 'committed_raw_fingerprint' not in state
+    monkeypatch.setattr(_app._boot_image_gen, 'parse_ns_table_raw', lambda _: {
+        'totalWords': 16384, 'maxEntries': 256, 'nsTableBase': 15360,
+        'entries': [{'slot': 6, 'w0': 0x200, 'w1': 9, 'w2': 2, 'w3': 3}],
+    })
+    with pytest.raises(ValueError, match='not bound'):
+        _app._capture_committed_namespace_snapshot(hardware_version=1)
+
+
 # ===================================================================
 # /start gate: requires a clean frozen snapshot
 # ===================================================================
@@ -596,7 +681,7 @@ def test_worker_command_construction(monkeypatch, tmp_path):
         captured_cmds.append(cmd)
         class _R:
             returncode = 0
-            stdout = 'EXIT_0\n'
+            stdout = 'ARTIFACT_MD5_0123456789abcdef0123456789abcdef\nEXIT_0\n'
             stderr = ''
         return _R()
 
@@ -629,14 +714,22 @@ def test_worker_command_construction(monkeypatch, tmp_path):
         _os.unlink(key_path)
 
     assert len(captured_cmds) >= 1, 'Worker must invoke at least one SSH command'
-    # The first SSH command must include the droplet IP and build directory
-    first_cmd = ' '.join(str(c) for c in captured_cmds[0])
-    assert _app._DROPLET_IP in first_cmd, (
-        f'SSH command must contain droplet IP {_app._DROPLET_IP!r}; got: {first_cmd[:200]}'
+    # Commit discovery may run locally first; inspect the first actual SSH call.
+    ssh_cmd = next(
+        ' '.join(str(c) for c in cmd)
+        for cmd in captured_cmds
+        if _app._DROPLET_IP in ' '.join(str(c) for c in cmd)
     )
-    assert _app._DROPLET_BUILD_DIR in first_cmd, (
-        f'SSH command must contain build dir {_app._DROPLET_BUILD_DIR!r}; got: {first_cmd[:200]}'
+    assert _app._DROPLET_IP in ssh_cmd, (
+        f'SSH command must contain droplet IP {_app._DROPLET_IP!r}; got: {ssh_cmd[:200]}'
     )
+    assert _app._DROPLET_BUILD_DIR in ssh_cmd, (
+        f'SSH command must contain build dir {_app._DROPLET_BUILD_DIR!r}; got: {ssh_cmd[:200]}'
+    )
+    assert 'git rev-parse HEAD' in ssh_cmd
+    assert 'git diff --quiet' in ssh_cmd
+    assert 'rm -f church_wukong_xc7a100t.bit' in ssh_cmd
+    assert 'ARTIFACT_MD5_' in ssh_cmd
 
 
 def test_start_rejected_with_failed_snapshot(monkeypatch, tmp_path):
@@ -665,6 +758,56 @@ def test_start_rejected_with_failed_snapshot(monkeypatch, tmp_path):
     assert resp.status_code == 422, (
         f'Should be 422 (failed checks in snapshot); got {resp.status_code}: {resp.get_json()}'
     )
+
+
+def test_approved_start_freezes_committed_namespace_before_worker_runs(monkeypatch, tmp_path):
+    """Build A keeps its server-captured Namespace when the live project later moves to B."""
+    if not REPORT_TOKEN:
+        pytest.skip('REPORT_TOKEN not set')
+    monkeypatch.setattr(_app, '_BUILD_SNAPSHOTS_DIR', str(tmp_path))
+    (tmp_path / 'build-approval-20260823T000000Z.json').write_text(json.dumps({
+        'frozen_at': '20260823T000000Z',
+        'all_checks_pass': True,
+        'ns_map': {'tiers': {}},
+    }))
+    namespace_a = {
+        'schema_version': _app._NAMESPACE_SNAPSHOT_SCHEMA_VERSION,
+        'fingerprint': 'a' * 64,
+        'captured_at': '2026-08-23T00:00:00Z',
+        'authority': 'server-committed-namespace',
+        'provenance': {},
+        'namespace': {
+            'decoded_slots': [{'name': 'A', 'slot': 6}],
+            'raw': {'entries': [{'slot': 6, 'w0': 1, 'w1': 2, 'w2': 3, 'w3': 4}]},
+        },
+    }
+    monkeypatch.setattr(_app, '_capture_committed_namespace_snapshot', lambda **_: namespace_a)
+    monkeypatch.setattr(_app, '_ba_write_ssh_key', lambda: str(tmp_path / 'key'))
+
+    class _NoWorkerThread:
+        def __init__(self, *args, **kwargs):
+            pass
+        def start(self):
+            pass
+
+    monkeypatch.setattr(_app.threading, 'Thread', _NoWorkerThread)
+    monkeypatch.setattr(_app, '_ba_build_done', True)
+    monkeypatch.setattr(_app, '_ba_build_log', [])
+    nonce_response = client.get('/api/build-approval/ns-map', headers=AUTH_HEADERS)
+    nonce = nonce_response.get_json()['build_nonce']
+    response = client.post('/api/wukong-build/start', json={'build_nonce': nonce}, headers=AUTH_HEADERS)
+    assert response.status_code == 200, response.get_json()
+    with _app.app.app_context():
+        saved = _app.BuildRecord.query.order_by(_app.BuildRecord.id.desc()).first()
+        saved_snapshot = json.loads(saved.ns_snapshot)
+        assert saved_snapshot['namespace']['decoded_slots'][0]['name'] == 'A'
+        # A later live B is intentionally not persisted into the already accepted build.
+        namespace_b = dict(namespace_a)
+        namespace_b['namespace'] = {
+            'decoded_slots': [{'name': 'B', 'slot': 6}],
+            'raw': {'entries': [{'slot': 6, 'w0': 9, 'w1': 9, 'w2': 9, 'w3': 9}]},
+        }
+        assert saved_snapshot['namespace'] != namespace_b['namespace']
 
 
 # ===================================================================

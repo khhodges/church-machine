@@ -11438,6 +11438,7 @@ function switchBuilderViewTab(tab) {
 const VersionsView = {
     _timer: null,
     _inFlight: false,
+    _historicalNamespaceKey: null,
     AUTO_REFRESH_MS: 15000,
 
     onTabOpen() {
@@ -11918,6 +11919,7 @@ const VersionsView = {
             return;
         }
         const bv = bi.build_version;
+        const nsMatch = status.namespace_snapshot || null;
         let badge;
         if (expected == null || bv == null) {
             badge = this._badge('unknown', 'Expected version unknown');
@@ -11932,7 +11934,25 @@ const VersionsView = {
             badge +
             (bi.stale_tu ? '<div class="versions-note">TraceUnit predates the 3-packet CALL sequence \u2014 reflash the bitstream.</div>' : '') +
             (bi.received_ts ? `<div class="versions-note">Sentinel received ${this._esc(this._age(bi.received_ts * 1000))}</div>` : '') +
+            this._namespaceMatchLine(nsMatch) +
             expLine;
+        const namespaceKey = nsMatch && nsMatch.state === 'available'
+            ? String(nsMatch.build_id) + ':' + String(nsMatch.fingerprint) : null;
+        if (namespaceKey && namespaceKey !== this._historicalNamespaceKey) {
+            this._historicalNamespaceKey = namespaceKey;
+            recallBuildNamespace(nsMatch.build_id, 'connected FPGA');
+        }
+    },
+
+    _namespaceMatchLine(match) {
+        if (!match) return '';
+        if (match.state === 'available') {
+            return '<div class="versions-note">Historical Namespace snapshot matched this FPGA. ' +
+                `<button type="button" class="versions-release-btn" onclick="openHistoricalFpgaNamespaceContext()">View test context</button></div>`;
+        }
+        const reason = match.reason ? this._esc(match.reason) : 'Namespace snapshot unavailable.';
+        const label = match.state === 'ambiguous' ? 'Namespace ambiguous' : 'Namespace unavailable';
+        return `<div class="versions-note"><b>${label}:</b> ${reason}</div>`;
     },
 };
 window.VersionsView = VersionsView;
@@ -12066,7 +12086,7 @@ function _renderBuildHistory(builds) {
     // Header
     const thead = table.createTHead();
     const hrow = thead.insertRow();
-    ['Version', 'Date (UTC)', 'Board', 'Status', 'Tests', '.bit hash', 'Commit'].forEach(h => {
+    ['Version', 'FPGA', 'Date (UTC)', 'Board', 'Status', 'Tests', '.bit hash', 'Commit', 'Namespace'].forEach(h => {
         const th = document.createElement('th');
         th.textContent = h;
         hrow.appendChild(th);
@@ -12081,6 +12101,10 @@ function _renderBuildHistory(builds) {
         // Version
         const tdVer = tr.insertCell(); tdVer.className = 'bh-ver';
         tdVer.textContent = b.version != null ? 'v' + b.version : '—';
+
+        // FPGA sentinel version
+        const tdHardwareVersion = tr.insertCell(); tdHardwareVersion.className = 'bh-hardware-ver';
+        tdHardwareVersion.textContent = b.hardware_version != null ? 'v' + b.hardware_version : '—';
 
         // Timestamp
         const tdTs = tr.insertCell(); tdTs.className = 'bh-ts';
@@ -12126,11 +12150,112 @@ function _renderBuildHistory(builds) {
         const commitCode = document.createElement('code');
         commitCode.textContent = b.git_commit ? b.git_commit.slice(0, 8) : '—';
         tdCommit.appendChild(commitCode);
+
+        // Namespace snapshot: a historical test context only, never a live
+        // Namespace mutation. The detail endpoint supplies the bounded raw
+        // words and decoded labels on explicit user action.
+        const tdNs = tr.insertCell(); tdNs.className = 'bh-ns';
+        if (b.namespace_snapshot) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = 'Inspect / recall';
+            button.title = 'Use this saved Namespace only as historical FPGA testing context';
+            button.addEventListener('click', () => recallBuildNamespace(b.id, 'Build History'));
+            tdNs.appendChild(button);
+        } else {
+            tdNs.textContent = 'Unavailable';
+            tdNs.title = 'This record has no authoritative Namespace snapshot.';
+        }
     });
 
     el.textContent = '';
     el.appendChild(table);
 }
+
+const HistoricalFpgaNamespaceContext = {
+    build: null,
+    snapshot: null,
+    origin: null,
+};
+window.HistoricalFpgaNamespaceContext = HistoricalFpgaNamespaceContext;
+
+function _renderHistoricalNamespaceContext(message) {
+    const container = document.getElementById('buildHistoryNamespaceContext');
+    if (!container) return;
+    container.textContent = '';
+    if (!message) return;
+    if (!message.available) {
+        const panel = document.createElement('div');
+        panel.className = 'historical-ns-context';
+        const title = document.createElement('h4');
+        title.textContent = 'Historical FPGA test context unavailable';
+        const detail = document.createElement('p');
+        detail.textContent = message.reason || 'No saved Namespace is available for this build.';
+        panel.append(title, detail);
+        container.appendChild(panel);
+        return;
+    }
+    const snapshot = message.snapshot || {};
+    const namespace = snapshot.namespace || {};
+    const slots = Array.isArray(namespace.decoded_slots) ? namespace.decoded_slots : [];
+    const raw = namespace.raw || {};
+    const panel = document.createElement('div');
+    panel.className = 'historical-ns-context';
+    const title = document.createElement('h4');
+    const hardwareVersion = message.build && message.build.hardware_version;
+    title.textContent = 'Historical FPGA test context' +
+        (hardwareVersion != null ? ' — FPGA build v' + hardwareVersion : '');
+    const detail = document.createElement('p');
+    detail.textContent = 'This is a read-only saved Namespace for hardware testing. It does not replace or alter the current committed Namespace.';
+    const fingerprint = document.createElement('p');
+    fingerprint.textContent = 'Snapshot ' + String(snapshot.fingerprint || '').slice(0, 16) +
+        '… · ' + slots.length + ' decoded slots · ' +
+        (Array.isArray(raw.entries) ? raw.entries.length : 0) + ' raw four-word entries';
+    const slotList = document.createElement('div');
+    slotList.className = 'historical-ns-slots';
+    slots.forEach(slot => {
+        const item = document.createElement('span');
+        item.className = 'historical-ns-slot';
+        item.textContent = 'S' + slot.slot + ' ' + (slot.name || '(unnamed)') +
+            (slot.token ? ' · ' + slot.token : '');
+        slotList.appendChild(item);
+    });
+    panel.append(title, detail, fingerprint, slotList);
+    container.appendChild(panel);
+}
+
+async function recallBuildNamespace(buildId, origin) {
+    _renderHistoricalNamespaceContext({available: false, reason: 'Loading saved Namespace…'});
+    try {
+        const response = await fetch('/api/builds/' + encodeURIComponent(buildId) + '/namespace');
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || ('HTTP ' + response.status));
+        if (data.available) {
+            // Intentionally an isolated browser-memory context.  It is never
+            // assigned into sim._nsState, persisted, or sent to an NS write API.
+            HistoricalFpgaNamespaceContext.build = data.build;
+            HistoricalFpgaNamespaceContext.snapshot = data.snapshot;
+            HistoricalFpgaNamespaceContext.origin = origin || 'Build History';
+        }
+        _renderHistoricalNamespaceContext(data);
+    } catch (error) {
+        _renderHistoricalNamespaceContext({
+            available: false,
+            reason: 'Could not load the saved Namespace: ' + error.message,
+        });
+    }
+}
+window.recallBuildNamespace = recallBuildNamespace;
+
+function openHistoricalFpgaNamespaceContext() {
+    if (typeof switchView === 'function') switchView('builder');
+    if (typeof switchBuilderViewTab === 'function') switchBuilderViewTab('ti60-connect');
+    const history = document.getElementById('buildHistoryBody');
+    if (history && history.classList.contains('collapsed')) toggleBuildHistory();
+    const context = document.getElementById('buildHistoryNamespaceContext');
+    if (context) context.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+}
+window.openHistoricalFpgaNamespaceContext = openHistoricalFpgaNamespaceContext;
 
 function _refreshBuildHistoryIfOpen() {
     /** Reload build history when the panel is already expanded. */
