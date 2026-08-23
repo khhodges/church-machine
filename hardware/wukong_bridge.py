@@ -1183,6 +1183,7 @@ def main():
             'event': event, 'state': state or bridge_state, 'reason': reason,
             'reconnect_attempt': reconnect_attempt,
             'last_read_ts': last_read_ts, 'last_write_ts': last_write_ts,
+            'church_only': church_only,
         }
         try:
             requests.post(f'{ide_base}/hardware/wukong/bridge-status',

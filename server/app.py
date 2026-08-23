@@ -12325,6 +12325,7 @@ def wukong_bridge_status_post():
                 'last_write_ts': data.get('last_write_ts'),
                 'reconnect_attempt': int(data.get('reconnect_attempt', 0) or 0),
                 'updated_ts': now,
+                'church_only': bool(data.get('church_only', False)),
             })
         if event or session:
             item = {

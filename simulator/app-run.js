@@ -15561,6 +15561,7 @@ function _wukongIsConnected() {
     panel.innerHTML =
         '<div id="wukong-hw-log-hdr" style="display:flex;align-items:center;justify-content:space-between;padding:3px 8px;background:#12122a;border-bottom:1px solid #3a3a5c;flex-shrink:0;cursor:pointer;" title="Click to collapse/expand">' +
             '<span style="color:#f0c040;font-weight:bold;font-size:11px;">⚡ HW Trace</span>' +
+            '<span id="wukong-hw-log-filter-badge" style="display:none;margin-left:6px;padding:1px 5px;background:#92400e;color:#fcd34d;border:1px solid #d97706;border-radius:3px;font-size:9px;font-weight:bold;letter-spacing:.4px;white-space:nowrap;" title="Bridge is running with --church-only: bare Turing RESULT packets are suppressed">Turing filter ON</span>' +
             '<span id="wukong-hw-log-nia" style="color:#8888cc;font-size:10px;flex:1;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:0 8px;"></span>' +
             '<button id="wukong-hw-log-clear" title="Clear this local view" style="background:none;border:none;color:#8888cc;cursor:pointer;font-size:11px;padding:0 4px;line-height:1;" onclick="event.stopPropagation();var b=document.getElementById(\'wukong-hw-log-body\');if(b)b.innerHTML=\'\';">✕ clear</button>' +
             '<button id="wukong-hw-log-close" title="Hide HW Trace (server history is retained)" style="background:none;border:none;color:#8888cc;cursor:pointer;font-size:14px;padding:0 4px;line-height:1;">×</button>' +
@@ -15757,6 +15758,11 @@ async function _wukongRefreshHealthStrip() {
         var stages = _wukongClassifyPipelineStages(s, _wukongLastEventSeq, _wukongLastTraceTs || null);
         strip.innerHTML = _wukongHealthStripHtml(stages);
         _wukongUpdateRelayBanner();
+        var filterBadge = document.getElementById('wukong-hw-log-filter-badge');
+        if (filterBadge) {
+            var churchOnly = !!(s && s.bridge && s.bridge.church_only);
+            filterBadge.style.display = churchOnly ? '' : 'none';
+        }
     } catch(e) {}
 }
 
