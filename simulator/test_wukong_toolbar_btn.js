@@ -293,6 +293,10 @@ function makeUpdateBtnEnv(opts) {
 }
 
 // Build a lightweight env for hwStop tests with controllable async stubs.
+// opts.running       — initial _wukongHWRunning (default true)
+// opts.postFails     — _wukongPostCmd returns null (simulates server error)
+// opts.watchFails    — _wukongWatchDelivery returns false (delivery timeout/drop)
+// opts.connected     — what _wukongIsConnected() returns (default true)
 function makeHwStopEnv(opts) {
     opts = opts || {};
     const dom = new JSDOM(
@@ -309,11 +313,26 @@ function makeHwStopEnv(opts) {
         window: window,
         document: document,
         _wukongHWRunning: (opts.running !== undefined) ? opts.running : true,
+        _wukongConnected: (opts.connected !== undefined) ? opts.connected : true,
+        _wukongIsConnected: function() { return sb._wukongConnected; },
         _wukongPostCmd: async function(cmd, extra, label) {
             postedCmds.push(cmd);
             return opts.postFails ? null : { ok: true, id: 'test-id-1' };
         },
-        _wukongWatchDelivery: async function() { return true; },
+        _wukongWatchDelivery: async function() {
+            return opts.watchFails ? false : true;
+        },
+        _updateBtnCallCount: 0,
+        _wukongUpdateBtn: function() {
+            sb._updateBtnCallCount++;
+            // Mirror the real _wukongUpdateBtn stop-button visibility rule so the
+            // test can assert the button is hidden when the bridge is gone.
+            var btn = document.getElementById('toolHWStopBtn');
+            if (btn) {
+                btn.style.display = (sb._wukongIsConnected() || sb._wukongHWRunning) ? '' : 'none';
+                btn.disabled = !sb._wukongHWRunning;
+            }
+        },
         _postedCmds: postedCmds,
     };
     vm.createContext(sb);
@@ -352,6 +371,12 @@ function makeHwStopEnv(opts) {
         btn.style.display === 'none');
 })();
 
+// ── Async test gate ───────────────────────────────────────────────────────────
+// Collect all async test promises here so Promise.all can wait for every one
+// of them before printing the summary and exiting.  This avoids the fragile
+// ordering assumption that WB-ST-4's exit fires last.
+const _asyncTests = [];
+
 // ── WB-ST-4  hwStop dispatches 'h' when the board is running ─────────────────
 (function() {
     const env = makeHwStopEnv({ running: true });
@@ -365,39 +390,65 @@ function makeHwStopEnv(opts) {
         stopBtn.disabled === true);
     check('WB-ST-4b', "hwStop → label changes to '⏳ Stopping…' before await",
         stopBtn.textContent === '\u23F3 Stopping\u2026');
-    // Drive the async chain to completion, then assert.
-    p.then(function() {
+    _asyncTests.push(p.then(function() {
         check('WB-ST-4c', "hwStop → posted command 'h'",
             env._postedCmds.length === 1 && env._postedCmds[0] === 'h');
         check('WB-ST-4d', "hwStop → label reverts to '⏹ HW' after completion",
             stopBtn.textContent === '\u23F9 HW');
-    }).catch(function(e) {
-        console.error('WB-ST-4 async error:', e);
-        process.exit(1);
-    });
+    }));
 })();
 
 // ── WB-ST-5  hwStop is a no-op when the board is already halted ──────────────
 (function() {
     const env = makeHwStopEnv({ running: false });
     const p = vm.runInContext('hwStop()', env);
-    p.then(function() {
+    _asyncTests.push(p.then(function() {
         check('WB-ST-5', "hwStop → no command posted when already halted",
             env._postedCmds.length === 0);
-    }).catch(function() {});
+    }));
 })();
 
-// ── WB-ST-6  hwStop reverts label to '⏹ HW' when delivery fails ──────────────
+// ── WB-ST-6  hwStop re-enables button when delivery watcher times out ─────────
+// Covers the path: POST succeeds → _wukongWatchDelivery returns false →
+// bridge still up → Stop button must be re-enabled so the user can retry.
+(function() {
+    const env = makeHwStopEnv({ running: true, watchFails: true, connected: true });
+    const stopBtn = env.document.getElementById('toolHWStopBtn');
+    const p = vm.runInContext('hwStop()', env);
+    _asyncTests.push(p.then(function() {
+        check('WB-ST-6a', 'watch-timeout + still connected → button re-enabled',
+            stopBtn.disabled === false);
+        check('WB-ST-6b', 'watch-timeout + still connected → _wukongUpdateBtn NOT called',
+            env._updateBtnCallCount === 0);
+    }));
+})();
+
+// ── WB-ST-7  hwStop hides button when bridge drops mid-halt ──────────────────
+// Covers the path: POST succeeds → _wukongWatchDelivery returns false →
+// bridge is now gone → _wukongUpdateBtn() is called and the button is hidden.
+(function() {
+    const env = makeHwStopEnv({ running: true, watchFails: true, connected: false });
+    const stopBtn = env.document.getElementById('toolHWStopBtn');
+    const p = vm.runInContext('hwStop()', env);
+    _asyncTests.push(p.then(function() {
+        check('WB-ST-7a', 'mid-halt disconnect → _wukongUpdateBtn() called',
+            env._updateBtnCallCount === 1);
+        check('WB-ST-7b', 'mid-halt disconnect → stop button hidden',
+            stopBtn.style.display === 'none');
+    }));
+})();
+
+// ── WB-ST-8  hwStop reverts label to '⏹ HW' when POST delivery fails ─────────
 (function() {
     const env = makeHwStopEnv({ running: true, postFails: true });
     const stopBtn = env.document.getElementById('toolHWStopBtn');
     const p = vm.runInContext('hwStop()', env);
-    check('WB-ST-6a', "hwStop (fail path) → label changes to '⏳ Stopping…' before await",
+    check('WB-ST-8a', "hwStop (fail path) → label changes to '⏳ Stopping…' before await",
         stopBtn.textContent === '\u23F3 Stopping\u2026');
-    p.then(function() {
-        check('WB-ST-6b', "hwStop (fail path) → label reverts to '⏹ HW' after failed delivery",
+    _asyncTests.push(p.then(function() {
+        check('WB-ST-8b', "hwStop (fail path) → label reverts to '⏹ HW' after failed delivery",
             stopBtn.textContent === '\u23F9 HW');
-    }).catch(function() {});
+    }));
 })();
 
 // ── WB-SK: keyboard shortcut (Shift+H → emergency stop) ──────────────────────
@@ -487,8 +538,16 @@ function makeShortcutEnv(opts) {
         env._stopCalls.length === 0);
 })();
 // ── Summary ───────────────────────────────────────────────────────────────────
-// Async tests (WB-ST-4/5/6) resolve via microtask queues; the timeout below
-// lets all .then() callbacks settle before printing results and exiting.
+// Wait for every async test to settle before printing results.
+Promise.all(_asyncTests).then(function() {
+    console.log('\n' + passed + ' passed, ' + failed + ' failed');
+    process.exit(failed ? 1 : 0);
+}).catch(function(e) {
+    console.error('Async test error:', e);
+    process.exit(1);
+});
+
+// Fallback: if a test hangs (e.g. a promise never resolves), exit after 5 s.
 setTimeout(function() {
     console.log('\n' + passed + ' passed, ' + failed + ' failed');
     process.exit(failed ? 1 : 0);

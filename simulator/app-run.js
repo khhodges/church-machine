@@ -17217,7 +17217,18 @@ async function hwStop() {
         if (_wukongHWRunning && stopBtn) stopBtn.disabled = false;
         return;
     }
-    await _wukongWatchDelivery(d.id, 'STOP', 10000);
+    const ok = await _wukongWatchDelivery(d.id, 'STOP', 10000);
+    if (!ok) {
+        if (!_wukongIsConnected()) {
+            // Bridge disconnected mid-halt: board state is unknown — treat as
+            // halted and let _wukongUpdateBtn hide the controls immediately.
+            _wukongHWRunning = false;
+            _wukongUpdateBtn();
+        } else if (_wukongHWRunning) {
+            // Delivery timed out but bridge still up: re-enable the Stop button.
+            if (stopBtn) stopBtn.disabled = false;
+        }
+    }
     // Board state will be updated by the next poll cycle via _wukongUpdateBtn().
     if (stopBtn) stopBtn.textContent = '\u23F9 HW';
 }
