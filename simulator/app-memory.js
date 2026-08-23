@@ -1676,7 +1676,12 @@ function updateFlagsDisplay() {
     const statusLabel = _hwConnected
         ? (_hwFaulted ? 'HW FAULTED' : 'HW RUNNING')
         : (sim.halted ? 'HALTED' : (sim.bootComplete ? 'READY' : 'RESET'));
-    const statusHalted = _hwFaulted || sim.halted;
+    // sim.halted is a software-simulator concept; when hardware is live it must
+    // not pollute the hardware status chip (e.g. after a board reconnect where
+    // the simulator was previously halted).  Only _hwFaulted drives the halted
+    // chip while the board is connected; sim.halted applies only when no board
+    // is present.
+    const statusHalted = _hwFaulted || (!_hwConnected && sim.halted);
     const cap = sim.lastCapability;
 
     // ── Compact status chip in the flags-led-row ──────────────────────────

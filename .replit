@@ -345,6 +345,17 @@ args = "node simulator/test_wukong_hw_fault.js"
 outputType = "console"
 
 [[workflows.workflow]]
+name = "wukong-reconnect-halt-badge-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_wukong_reconnect_halt_badge.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
 name = "wukong-console-warning-tests"
 author = "agent"
 
