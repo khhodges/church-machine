@@ -1399,10 +1399,11 @@ def index():
 
 @app.route("/robots.txt")
 def robots_txt():
+    origin = request.url_root.rstrip("/")
     content = (
-        "User-agent: *\n"
-        "Allow: /\n"
-        "Sitemap: https://lab.cloomc.org/sitemap.xml\n"
+        f"User-agent: *\n"
+        f"Allow: /\n"
+        f"Sitemap: {origin}/sitemap.xml\n"
         "# AI crawler guidance\n"
         "# See /llms.txt for a structured index of documentation\n"
     )
@@ -1433,13 +1434,17 @@ def llms_txt():
     return make_response(content, 200, {"Content-Type": "text/plain; charset=utf-8"})
 @app.route("/sitemap.xml")
 def sitemap_xml():
+    origin = request.url_root.rstrip("/")
     content = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-        '  <url><loc>https://lab.cloomc.org/</loc><priority>1.0</priority></url>\n'
-        '  <url><loc>https://lab.cloomc.org/simulator/</loc><priority>0.9</priority></url>\n'
-        '  <url><loc>https://lab.cloomc.org/docs/</loc><priority>0.7</priority></url>\n'
-        '  <url><loc>https://lab.cloomc.org/python-demo/</loc><priority>0.6</priority></url>\n'
+        f'  <url><loc>{origin}/</loc><priority>1.0</priority></url>\n'
+        f'  <url><loc>{origin}/simulator/</loc><priority>0.9</priority></url>\n'
+        f'  <url><loc>{origin}/docs/</loc><priority>0.7</priority></url>\n'
+        f'  <url><loc>{origin}/ide-intro/</loc><priority>0.6</priority></url>\n'
+        f'  <url><loc>{origin}/start-guide</loc><priority>0.7</priority></url>\n'
+        f'  <url><loc>{origin}/release/r1/</loc><priority>0.5</priority></url>\n'
+        f'  <url><loc>{origin}/release/r12/</loc><priority>0.5</priority></url>\n'
         '</urlset>\n'
     )
     return make_response(content, 200, {"Content-Type": "application/xml; charset=utf-8"})
