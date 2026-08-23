@@ -226,6 +226,172 @@ function check(id, desc, cond) {
     check('WB-9', 'collapsed body → header .click() fired to expand', env._calls.hdrClick === 1);
 })();
 
+// ── Stop button helpers ───────────────────────────────────────────────────────
+// Extracts _wukongUpdateBtn() — used to test the Stop button's enable/disable
+// transitions driven by the production enable-logic.
+
+function extractUpdateBtnCode(srcPath) {
+    const src = fs.readFileSync(path.resolve(__dirname, srcPath), 'utf8');
+    const startMarker = 'function _wukongUpdateBtn()';
+    const endMarker   = '\nfunction _wukongUpdateToolbarBtn(';
+    const start = src.indexOf(startMarker);
+    if (start === -1) throw new Error(startMarker + ' not found in ' + srcPath);
+    const end = src.indexOf(endMarker, start);
+    if (end === -1) throw new Error(endMarker + ' not found after start in ' + srcPath);
+    return src.slice(start, end);
+}
+
+// Extracts hwStop() — used to test that clicking Stop dispatches 'h'.
+function extractHwStopCode(srcPath) {
+    const src = fs.readFileSync(path.resolve(__dirname, srcPath), 'utf8');
+    const startMarker = 'async function hwStop(';
+    const endMarker   = 'window.hwStop = hwStop;';
+    const start = src.indexOf(startMarker);
+    if (start === -1) throw new Error(startMarker + ' not found in ' + srcPath);
+    const end = src.indexOf(endMarker, start);
+    if (end === -1) throw new Error(endMarker + ' not found after start in ' + srcPath);
+    return src.slice(start, end + endMarker.length);
+}
+
+const UPDATE_BTN_SRC = extractUpdateBtnCode('app-run.js');
+const HW_STOP_SRC    = extractHwStopCode('app-run.js');
+
+// Build a lightweight env for _wukongUpdateBtn tests.
+// Provides only the globals the function reads; stubs everything it calls that
+// is irrelevant to the stop-button assertions.
+function makeUpdateBtnEnv(opts) {
+    opts = opts || {};
+    const dom = new JSDOM(
+        '<!DOCTYPE html><body>' +
+        '<button id="toolHWRunBtn"  style="display:none;"></button>' +
+        '<button id="toolHWStopBtn" style="display:none;"></button>' +
+        '<button id="toolStepBtn"></button>' +
+        '<button id="toolHWLoadBtn" style="display:none;"></button>' +
+        '<div id="wukong-hw-log" style="display:none;">' +
+            '<div id="wukong-hw-log-body"></div>' +
+        '</div>' +
+        '</body>',
+        { runScripts: 'outside-only' }
+    );
+    const window   = dom.window;
+    const document = window.document;
+
+    const sb = {
+        window: window,
+        document: document,
+        _wukongConnected: opts.connected || false,
+        _wukongHWRunning: opts.running   || false,
+        _wukongWasConnected: undefined,   // allow first-run transition
+        _wukongIsConnected: function() { return sb._wukongConnected; },
+        _wukongUpdateCallDepthBadge: function() {},
+        _wukongUpdateToolbarBtn:     function() {},
+    };
+    vm.createContext(sb);
+    vm.runInContext(UPDATE_BTN_SRC, sb, { filename: 'app-run.updatebtn.js' });
+    return sb;
+}
+
+// Build a lightweight env for hwStop tests with controllable async stubs.
+function makeHwStopEnv(opts) {
+    opts = opts || {};
+    const dom = new JSDOM(
+        '<!DOCTYPE html><body>' +
+        '<button id="toolHWStopBtn"></button>' +
+        '</body>',
+        { runScripts: 'outside-only' }
+    );
+    const window   = dom.window;
+    const document = window.document;
+
+    const postedCmds = [];
+    const sb = {
+        window: window,
+        document: document,
+        _wukongHWRunning: (opts.running !== undefined) ? opts.running : true,
+        _wukongPostCmd: async function(cmd, extra, label) {
+            postedCmds.push(cmd);
+            return opts.postFails ? null : { ok: true, id: 'test-id-1' };
+        },
+        _wukongWatchDelivery: async function() { return true; },
+        _postedCmds: postedCmds,
+    };
+    vm.createContext(sb);
+    vm.runInContext(HW_STOP_SRC, sb, { filename: 'app-run.hwstop.js' });
+    return sb;
+}
+
+// ── WB-ST-1  Stop button disabled when board is halted (not running) ──────────
+(function() {
+    const env = makeUpdateBtnEnv({ connected: true, running: false });
+    vm.runInContext('_wukongUpdateBtn();', env);
+    const btn = env.document.getElementById('toolHWStopBtn');
+    check('WB-ST-1a', 'halted + connected → stop button visible',
+        btn.style.display !== 'none');
+    check('WB-ST-1b', 'halted + connected → stop button disabled',
+        btn.disabled === true);
+})();
+
+// ── WB-ST-2  Stop button enabled when board is free-running ──────────────────
+(function() {
+    const env = makeUpdateBtnEnv({ connected: true, running: true });
+    vm.runInContext('_wukongUpdateBtn();', env);
+    const btn = env.document.getElementById('toolHWStopBtn');
+    check('WB-ST-2a', 'running + connected → stop button visible',
+        btn.style.display !== 'none');
+    check('WB-ST-2b', 'running + connected → stop button enabled',
+        btn.disabled === false);
+})();
+
+// ── WB-ST-3  Stop button hidden when disconnected and not running ─────────────
+(function() {
+    const env = makeUpdateBtnEnv({ connected: false, running: false });
+    vm.runInContext('_wukongUpdateBtn();', env);
+    const btn = env.document.getElementById('toolHWStopBtn');
+    check('WB-ST-3', 'disconnected + halted → stop button hidden',
+        btn.style.display === 'none');
+})();
+
+// ── WB-ST-4  hwStop dispatches 'h' when the board is running ─────────────────
+(function() {
+    const env = makeHwStopEnv({ running: true });
+    // hwStop is async; we check the synchronous side-effects (optimistic
+    // disable) immediately, and verify the posted command after the promise
+    // chain settles via a resolved microtask queue.
+    const stopBtn = env.document.getElementById('toolHWStopBtn');
+    // Run hwStop and collect the promise.
+    const p = vm.runInContext('hwStop()', env);
+    check('WB-ST-4a', 'hwStop → button optimistically disabled before await',
+        stopBtn.disabled === true);
+    // Drive the async chain to completion, then assert.
+    p.then(function() {
+        check('WB-ST-4b', "hwStop → posted command 'h'",
+            env._postedCmds.length === 1 && env._postedCmds[0] === 'h');
+        // Re-run the summary after the async test settles.
+        console.log('\n' + passed + ' passed, ' + failed + ' failed');
+        process.exit(failed ? 1 : 0);
+    }).catch(function(e) {
+        console.error('WB-ST-4 async error:', e);
+        process.exit(1);
+    });
+    // Return early — summary printed inside the .then() above.
+    return;
+})();
+
+// ── WB-ST-5  hwStop is a no-op when the board is already halted ──────────────
+(function() {
+    const env = makeHwStopEnv({ running: false });
+    const p = vm.runInContext('hwStop()', env);
+    p.then(function() {
+        check('WB-ST-5', "hwStop → no command posted when already halted",
+            env._postedCmds.length === 0);
+    }).catch(function() {});
+})();
+
 // ── Summary ───────────────────────────────────────────────────────────────────
-console.log('\n' + passed + ' passed, ' + failed + ' failed');
-process.exit(failed ? 1 : 0);
+// (printed inside the WB-ST-4 .then() chain after all async work settles)
+// Fallback in case the async tests above throw synchronously before reaching
+// their .then() — keeps the process from hanging silently.
+setTimeout(function() {
+    console.log('\n' + passed + ' passed, ' + failed + ' failed  (timeout fallback)');
+    process.exit(failed ? 1 : 0);
+}, 5000);

@@ -15998,6 +15998,15 @@ function _wukongUpdateBtn() {
         }
     }
 
+    // ⏹ Stop button: visible when connected, enabled only when the board is
+    // free-running.  Disabled when halted or in step mode so a redundant 'h'
+    // cannot interrupt a delivery that is already in progress.
+    const stopBtn = document.getElementById('toolHWStopBtn');
+    if (stopBtn) {
+        stopBtn.style.display = (connected || _wukongHWRunning) ? '' : 'none';
+        stopBtn.disabled = !_wukongHWRunning;
+    }
+
     // ⚡ Load to Hardware button: visible whenever the board is connected or
     // was recently connected (same condition as HW Run), but disabled while an
     // upload is in progress so the user cannot double-fire it.
@@ -17180,6 +17189,26 @@ async function hwRunToggle() {
         _wukongUpdateBtn();
     }
 }
+
+// Send the immediate-halt command ('h') to the board.  Unlike the 's' pause
+// used by hwRunToggle(), 'h' does not wait for a clean instruction boundary —
+// it is an emergency stop for runaway or infinite-loop situations.
+// The button is disabled optimistically on click and re-enabled if delivery
+// fails or when the board transitions back to running via _wukongUpdateBtn().
+async function hwStop() {
+    if (!_wukongHWRunning) return;   // already halted — nothing to do
+    const stopBtn = document.getElementById('toolHWStopBtn');
+    if (stopBtn) stopBtn.disabled = true;
+    const d = await _wukongPostCmd('h', null, 'STOP');
+    if (!d) {
+        // Delivery failed: restore the button if the board is still running.
+        if (_wukongHWRunning && stopBtn) stopBtn.disabled = false;
+        return;
+    }
+    await _wukongWatchDelivery(d.id, 'STOP', 10000);
+    // Board state will be updated by the next poll cycle via _wukongUpdateBtn().
+}
+window.hwStop = hwStop;
 
 async function _wukongLoadToHardware() {
     const loadBtn = document.getElementById('toolHWLoadBtn');
