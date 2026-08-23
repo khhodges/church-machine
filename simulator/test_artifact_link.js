@@ -184,15 +184,15 @@ function check(label, cond, detail) {
               'count=' + opened.length);
     }
 
-    // AL-8: hamburger buttons use the same launch flow as Docs sidebar links ──
+    // AL-8: development launch stays on the IDE origin so it survives resets ──
     {
         const { w, launches } = makeMenuEnv('https://5000-demo.replit.dev/simulator/');
         w.openArtifact({}, 21279, '/ide-intro/', '/ide-intro/', 'IDE Introduction');
-        check('AL-8 dev hamburger link uses the artifact proxy URL',
-               launches.length === 1 && launches[0].url === 'https://21279-demo.replit.dev/ide-intro/',
+        check('AL-8 dev hamburger link uses the IDE-origin route',
+               launches.length === 1 && launches[0].url === 'https://5000-demo.replit.dev/ide-intro/',
               JSON.stringify(launches));
-        check('AL-8 dev hamburger link probes the artifact port',
-              launches[0] && launches[0].port === 21279,
+        check('AL-8 dev hamburger link skips the reset-sensitive port proxy',
+               launches[0] && launches[0].port === 0,
               JSON.stringify(launches[0]));
     }
 

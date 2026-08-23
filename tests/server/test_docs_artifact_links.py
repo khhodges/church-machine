@@ -97,8 +97,8 @@ def test_production_links_have_zero_port_and_production_url(client):
 # ---------------------------------------------------------------------------
 
 def test_dev_links_have_nonzero_port_and_proxy_url(client):
-    """With REPLIT_DEV_DOMAIN set, link entries must use the dev-proxy URL and
-    emit a nonzero artifact_port so the browser can probe reachability."""
+    """With REPLIT_DEV_DOMAIN set, link entries must stay on the IDE origin
+    rather than using a reset-sensitive port-prefixed development URL."""
     fake_domain = 'test-domain.replit.dev'
     with patch.dict(os.environ, {'REPLIT_DEV_DOMAIN': fake_domain}):
         resp = client.get('/api/docs/list')
@@ -113,11 +113,15 @@ def test_dev_links_have_nonzero_port_and_proxy_url(client):
     ]
 
     for entry in link_entries:
-        assert entry['artifact_port'] != 0, (
-            f"Link '{entry['label']}' must have nonzero artifact_port in dev"
+        assert entry['artifact_port'] == 0, (
+            f"Link '{entry['label']}' must not use an artifact port in dev"
         )
         assert fake_domain in entry['url'], (
-            f"Link '{entry['label']}' dev URL should contain the dev domain; "
+            f"Link '{entry['label']}' URL should contain the dev domain; "
+            f"got url={entry['url']!r}"
+        )
+        assert not entry['url'].startswith('https://21279-'), (
+            f"Link '{entry['label']}' must not use a port-prefixed dev URL; "
             f"got url={entry['url']!r}"
         )
 

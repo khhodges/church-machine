@@ -4147,19 +4147,16 @@ def docs_list():
                 port = item.get("artifact_port", 0)
                 path = item.get("artifact_path", "/")
                 production_path = item.get("production_path", "")
-                if dev_domain and port:
-                    # Dev workspace: use Replit's port-prefixed proxy URL.
-                    # Supply probe_port so the browser can probe reachability
-                    # before opening the link (prevents a raw connection-refused
-                    # error when the artifact dev server is not running).
-                    url = f"https://{port}-{dev_domain}{path}"
-                    probe_port = port
-                elif replit_domain and production_path:
-                    # Production deployment: build a full absolute URL from the
-                    # primary production domain and the artifact's fixed serving
-                    # path so the link works regardless of the page's base URL.
-                    # No dev server involved, so no reachability probe needed.
-                    url = f"https://{replit_domain}{production_path}"
+                if production_path:
+                    # The IDE's Flask app serves the built artifact on this
+                    # same-origin path in both development and production.
+                    # Do not use port-prefixed dev URLs: their temporary proxy
+                    # registration can vanish after a workspace reset.
+                    origin_domain = dev_domain or replit_domain
+                    url = (
+                        f"https://{origin_domain}{production_path}"
+                        if origin_domain else production_path
+                    )
                     probe_port = 0
                 else:
                     # Neither dev domain nor production domain is set (e.g. CI
