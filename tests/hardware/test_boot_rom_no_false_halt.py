@@ -347,7 +347,7 @@ class TestFaultHaltRtlSource:
 
 
 class TestBridgeSentinelHaltOrdering:
-    """Bridge sends 'r' AFTER consuming the sentinel — no race with trace packets."""
+    """Bridge sends 'r' then 'q' AFTER consuming the sentinel — no race with trace packets."""
 
     def _get_bridge_src(self) -> str:
         with open(_WUKONG_BRIDGE_PATH) as fh:
@@ -379,6 +379,33 @@ class TestBridgeSentinelHaltOrdering:
         # run_write_idx must be after the sentinel branch start
         assert run_write_idx > sentinel_branch_idx, (
             "ser.write(b'r') must be inside the sentinel branch, after parsing the sentinel"
+        )
+
+    def test_snapshot_request_sent_after_run_on_sentinel(self):
+        """Bridge sends 'q' (snapshot request) immediately after 'r' on sentinel detection.
+
+        This guarantees the IDE receives a fresh register dump on every bridge
+        reconnect, even when the board was left halted from a prior session.
+        Without the 'q', a stale halted display could persist until the user
+        manually issues a command.
+        """
+        src = self._get_bridge_src()
+        sentinel_branch_idx = src.find("BOOT_SENTINEL_V1, BOOT_SENTINEL_V2")
+        assert sentinel_branch_idx != -1, (
+            "Cannot locate sentinel branch in wukong_bridge.py"
+        )
+        run_write_idx = src.find("ser.write(b'r')", sentinel_branch_idx)
+        assert run_write_idx != -1, (
+            "ser.write(b'r') not found after sentinel branch"
+        )
+        snapshot_write_idx = src.find("ser.write(b'q')", run_write_idx)
+        assert snapshot_write_idx != -1, (
+            "ser.write(b'q') not found after ser.write(b'r') in the sentinel branch — "
+            "bridge must request a snapshot immediately after sending 'r' so the IDE "
+            "gets a fresh register dump on every reconnect"
+        )
+        assert snapshot_write_idx > run_write_idx, (
+            "ser.write(b'q') must appear after ser.write(b'r') in the sentinel block"
         )
 
     def test_halt_command_byte_is_not_trace_magic(self):

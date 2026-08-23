@@ -1475,11 +1475,19 @@ def main():
                     # attaches.  The hardware fault_halt mechanism (reason=2)
                     # will pause the CM automatically on any actual fault retire,
                     # so an unconditional 'h' here is no longer needed.
+                    #
+                    # Immediately follow with 'q' (snapshot request) so the IDE
+                    # always receives a fresh register dump on reconnect.  Without
+                    # this, a board that was left halted from a prior session will
+                    # show stale (halted) state until the user issues a command,
+                    # because the bridge no longer sends 'h' on every connect.
                     try:
                         ser.write(b'r')
                         last_write_ts = time.time()
                         _bridge_status('automatic_run_after_sentinel', 'connected',
                                        'intentional run after boot sentinel')
+                        ser.write(b'q')
+                        last_write_ts = time.time()
                     except Exception as exc:
                         print(f'  [run send error] {exc}')
                         _bridge_status('automatic_run_failed', 'serial_error', str(exc))
