@@ -146,3 +146,4 @@
 - [Historical hardware authority chain](historical-hardware-authority-chain.md) — grant saved test context only through an exact build, source, and artifact-digest binding
 - [Testing iframe health regression](testing-iframe-health-regression.md) — isolate live telemetry when verifying health-panel state across persistent Builder-tab navigation
 - [Artifact dependency lock refresh](artifact-dependency-lock-refresh.md) — a new pnpm-filtered artifact may need an online lock refresh before its local Vite binary is resolvable
+- [Primary publish vs static artifact](primary-publish-vs-static-artifact.md) — publishing a nested artifact can replace the custom-domain root despite a correct root autoscale config
