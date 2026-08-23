@@ -1,6 +1,6 @@
 """RTL regression: the boot sentinel must arrive on the UART TX pin as the
-full 4-byte sequence 0xBC N_INIT&0xFF TU_VERSION BUILD_VERSION, both at boot
-and after an 'f' (force-retransmit) command.
+full 4-byte sequence 0xBC N_INIT&0xFF TU_VERSION BUILD_VERSION at boot, after
+an explicit 'f', and after an authorized fault recovery.
 
 Guards against the UartTx DONE-gap double-increment bug: UartTx has a
 one-cycle DONE state (busy=0, done=1) during which `start` is ignored; any
@@ -24,6 +24,7 @@ from amaranth.hdl._xfrm import DomainCollector, ValueTransformer
 import amaranth.hdl._ir as _amaranth_ir
 
 from hardware.wukong_top import ChurchWukongXC7A100T, WUKONG_BUILD_VERSION
+from hardware import wukong_bridge as wb
 
 
 def _memoize_amaranth_shapes():
@@ -105,6 +106,7 @@ def _boot_and_capture():
 
     boot_bytes = []
     refire_bytes = []
+    fault_bytes = []
     rx_bytes = boot_bytes  # capture target (switched to refire_bytes later)
 
     async def uart_capture(ctx):
@@ -126,6 +128,22 @@ def _boot_and_capture():
 
     async def drive(ctx):
         nonlocal rx_bytes
+
+        async def send_uart(byte):
+            for level in ([0] + [(byte >> b) & 1 for b in range(8)] + [1]):
+                ctx.set(top.uart_rx_pin, level)
+                for _ in range(bit):
+                    await ctx.tick()
+
+        def snapshot_start():
+            header = [wb.SNAPSHOT_MAGIC, wb.SNAPSHOT_VERSION,
+                      wb.SNAPSHOT_PAYLOAD_LEN >> 8,
+                      wb.SNAPSHOT_PAYLOAD_LEN & 0xFF]
+            for offset in range(len(fault_bytes) - len(header) + 1):
+                if fault_bytes[offset:offset + len(header)] == header:
+                    return offset
+            return None
+
         # Phase A: boot — wait for 4 sentinel bytes.
         for _ in range(8_000):
             await ctx.tick()
@@ -135,10 +153,7 @@ def _boot_and_capture():
         # may interleave, so collect generously and scan for the 0xBC magic
         # (exactly what the bridge does).
         rx_bytes = refire_bytes
-        for level_bits in ([0] + [(0x66 >> b) & 1 for b in range(8)] + [1]):
-            ctx.set(top.uart_rx_pin, level_bits)
-            for _ in range(bit):
-                await ctx.tick()
+        await send_uart(0x66)
         for _ in range(60_000):
             await ctx.tick()
             # A re-fired sentinel now holds instruction fetch until all four
@@ -146,12 +161,47 @@ def _boot_and_capture():
             if len(refire_bytes) >= 4:
                 break
 
+        # Phase C: inject a fault into the production top. The CM must remain
+        # held while its reason-2 snapshot drains, even if run/step arrive.
+        # Only the bridge's post-promotion 'g' authorization may produce the
+        # recovered sentinel.
+        rx_bytes = fault_bytes
+        ctx.set(top.sim_fault_inject, 1)
+        snap_start = None
+        for _ in range(80_000):
+            await ctx.tick()
+            snap_start = snapshot_start()
+            if snap_start is not None:
+                break
+        ctx.set(top.sim_fault_inject, 0)
+
+        # These would bypass fail-closed recovery if recovery_hold were absent.
+        await send_uart(0x72)  # 'r'
+        await send_uart(0x73)  # 's'
+
+        snapshot_len = (
+            wb.SNAPSHOT_HEADER_LEN + wb.SNAPSHOT_PAYLOAD_LEN +
+            wb.SNAPSHOT_CRC_LEN)
+        if snap_start is not None:
+            for _ in range(80_000):
+                await ctx.tick()
+                if len(fault_bytes) >= snap_start + snapshot_len:
+                    break
+
+        await send_uart(0x67)  # 'g' — accepted promoted-fault recovery
+        for _ in range(60_000):
+            await ctx.tick()
+            if snap_start is not None:
+                snapshot_end = snap_start + snapshot_len
+                if len(fault_bytes) >= snapshot_end + 4:
+                    break
+
     sim = Simulator(top)
     sim.add_clock(1e-6)
     sim.add_testbench(drive)
     sim.add_testbench(uart_capture, background=True)
     sim.run()
-    return top, boot_bytes, refire_bytes
+    return top, boot_bytes, refire_bytes, fault_bytes
 
 
 def _find_sentinel(byte_list, n_init):
@@ -163,7 +213,7 @@ def _find_sentinel(byte_list, n_init):
 
 
 def test_boot_sentinel_full_four_bytes_on_tx_pin():
-    top, boot_bytes, refire_bytes = _boot_and_capture()
+    top, boot_bytes, refire_bytes, fault_bytes = _boot_and_capture()
     # N_INIT is len(hw_init_pairs); recover it from the second boot byte only
     # after validating structure — assert magic and known bytes explicitly.
     assert len(boot_bytes) >= 4, f"boot: expected ≥4 UART bytes, got {boot_bytes}"
@@ -180,3 +230,31 @@ def test_boot_sentinel_full_four_bytes_on_tx_pin():
         "'f' must emit the full sentinel before restarted execution can use "
         f"UART TX; expected {[hex(b) for b in expected_refire]}, "
         f"got {[hex(b) for b in refire_bytes[:8]]}")
+
+    snapshot_len = (
+        wb.SNAPSHOT_HEADER_LEN + wb.SNAPSHOT_PAYLOAD_LEN +
+        wb.SNAPSHOT_CRC_LEN)
+    snapshot_start = next(
+        (i for i in range(len(fault_bytes) - 3)
+         if fault_bytes[i:i + 4] == [
+             wb.SNAPSHOT_MAGIC, wb.SNAPSHOT_VERSION,
+             wb.SNAPSHOT_PAYLOAD_LEN >> 8,
+             wb.SNAPSHOT_PAYLOAD_LEN & 0xFF]),
+        None)
+    assert snapshot_start is not None, (
+        f"fault recovery emitted no complete snapshot header: {fault_bytes[:32]}")
+    snapshot_end = snapshot_start + snapshot_len
+    snapshot = wb.decode_snapshot_frame(
+        bytes(fault_bytes[snapshot_start:snapshot_end]))
+    assert snapshot['reason'] == wb.FaultRecovery.FAULT_SNAPSHOT_REASON
+
+    # CRC validation above proves the attempted r/s and the recovered sentinel
+    # did not preempt or corrupt any byte of the snapshot frame.
+    recovered_bytes = bytes(fault_bytes[snapshot_end:snapshot_end + 4])
+    recovered = wb.parse_boot_sentinel(recovered_bytes)
+    assert recovered is not False
+    assert recovered['length'] == wb.SENTINEL_V2_LEN
+    assert recovered_bytes == bytes(expected_refire), (
+        "authorized fault recovery must emit the complete current sentinel; "
+        f"expected {[hex(b) for b in expected_refire]}, "
+        f"got {[hex(b) for b in fault_bytes[snapshot_end:snapshot_end + 8]]}")

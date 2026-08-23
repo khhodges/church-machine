@@ -13189,7 +13189,7 @@ def wukong_boot_info_post():
         'tu_version':   int(data.get('tu_version', 0)),
         'build_version': int(bv) if bv is not None else None,
         # Server-side receive timestamp: lets the /fpga page confirm a FRESH
-        # sentinel arrived after a Reboot ('f') — true end-to-end proof.
+        # sentinel arrived after an explicit reboot or authorized fault recovery.
         'received_ts':   _wk_time.time(),
     }
     with _wukong_boot_info_lock:

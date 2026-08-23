@@ -133,6 +133,75 @@ WUKONG_N_INIT = sum(1 for v in _dmem_tmp if v != 0)
 del _dmem_tmp, _wch_cw_mod
 
 
+class FaultRecoveryControl(Elaboratable):
+    """Fail-closed, frame-serialized reboot authorization.
+
+    A fault holds execution until a complete reason-2 snapshot has drained and
+    the bridge authorizes recovery. Explicit manual reboot uses the same safe
+    boundary but intentionally does not require fault-snapshot authorization.
+    """
+
+    def __init__(self):
+        self.fault_halt = Signal()
+        self.snapshot_complete = Signal()
+        self.snapshot_reason = Signal(2)
+        self.manual_reboot_cmd = Signal()
+        self.authorize_recovery_cmd = Signal()
+        self.reboot_safe = Signal()
+
+        self.hold = Signal()
+        self.reboot_pulse = Signal()
+        self.rearm_sentinel = Signal()
+
+        # Exposed for focused cycle-level regression tests.
+        self.fault_pending = Signal()
+        self.snapshot_drained = Signal()
+        self.manual_reboot_pending = Signal()
+        self.authorized_reboot_pending = Signal()
+
+    def elaborate(self, platform):
+        m = Module()
+
+        m.d.comb += [
+            self.hold.eq(self.fault_pending | self.fault_halt),
+            self.reboot_pulse.eq(
+                self.reboot_safe &
+                (self.manual_reboot_pending |
+                 self.authorized_reboot_pending)),
+            self.rearm_sentinel.eq(self.reboot_pulse),
+        ]
+
+        with m.If(self.fault_halt):
+            m.d.sync += [
+                self.fault_pending.eq(1),
+                self.snapshot_drained.eq(0),
+            ]
+
+        with m.If(self.snapshot_complete &
+                  (self.snapshot_reason == 2) &
+                  self.fault_pending):
+            m.d.sync += self.snapshot_drained.eq(1)
+
+        with m.If(self.manual_reboot_cmd):
+            m.d.sync += self.manual_reboot_pending.eq(1)
+
+        with m.If(self.authorize_recovery_cmd &
+                  self.fault_pending & self.snapshot_drained):
+            m.d.sync += self.authorized_reboot_pending.eq(1)
+
+        # Keep this assignment last: an explicit reboot intentionally overrides
+        # a same-cycle fault hold once the shared UART boundary is safe.
+        with m.If(self.reboot_pulse):
+            m.d.sync += [
+                self.fault_pending.eq(0),
+                self.snapshot_drained.eq(0),
+                self.manual_reboot_pending.eq(0),
+                self.authorized_reboot_pending.eq(0),
+            ]
+
+        return m
+
+
 class ChurchWukongXC7A100T(Elaboratable):
     """Minimal Church Machine top-level for QMTECH Wukong XC7A100T.
 
@@ -144,7 +213,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         UART baud rate.  Default 57 600 — matches CH340 callhome bridge.
         UartTx computes divisor = clk_freq // baud = 50_000_000 // 57_600 = 868 (0.006% error).
     sim_mode : bool
-        Unused — kept for interface parity with gen_rtlil.py.
+        Enables direct simulator clocking and a test-only fault-injection input.
     build_sig : list[int] | None
         Optional 4-byte build signature (unused in this minimal build).
 
@@ -165,6 +234,10 @@ class ChurchWukongXC7A100T(Elaboratable):
         self.rst_n        = Signal(init=1)  # Active-low button   (M6) — constrained, reserved
         self.uart_tx_pin  = Signal(init=1)  # UART TX (E3) — idles HIGH
         self.uart_rx_pin  = Signal(init=1)  # UART RX (F3) — idles HIGH; step/run/halt/bp cmds
+        # Test-only input. It is ignored in hardware builds (sim_mode=False)
+        # and lets the full-top UART regression exercise the real fault capture
+        # and recovery sequencer without corrupting production boot memory.
+        self.sim_fault_inject = Signal()
 
         self.led = [Signal(name=f"led{i}") for i in range(2)]
 
@@ -370,6 +443,8 @@ class ChurchWukongXC7A100T(Elaboratable):
         snapshot_tx_req = Signal()
         snapshot_tx_byte = Signal(8)
         snapshot_tx_ack = Signal()
+        snapshot_complete = Signal()
+        snapshot_complete_reason = Signal(2)
         # trace_stall: asserted by TraceUnit while events are pending.
         # OR-ed into halt_req/imem_valid so the CM cannot retire the next
         # instruction until the TraceUnit drains all queued event packets.
@@ -668,7 +743,7 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         # ── Core control signals ───────────────────────────────────────────────
         fault_latched = Signal()
-        cm_reboot     = Signal()   # 1-cycle pulse from 'f' — full CM reboot (FAULT_RST, NIA=0)
+        cm_reboot     = Signal()   # 1-cycle serialized reboot pulse from 'f' or authorized 'g'
         m.d.sync += fault_latched.eq(~cm_reboot & (fault_latched | core.fault_valid))
         m.d.comb += core.reboot_req.eq(cm_reboot)
 
@@ -688,6 +763,10 @@ class ChurchWukongXC7A100T(Elaboratable):
         snapshot_pending = Signal()
         snapshot_reason = Signal(2)  # 0=step/pause, 1=breakpoint, 2=fault, 3=explicit
         snapshot_seq = Signal(16)
+        snapshot_busy = Signal()
+        manual_reboot_cmd = Signal()
+        authorize_recovery_cmd = Signal()
+        reboot_safe = Signal()
 
         # ── Breakpoints: 4 NIA slots ──────────────────────────────────────────
         bp_nia   = [Signal(32, init=0xFFFFFFFF, name=f"bp_nia{i}") for i in range(4)]
@@ -708,7 +787,24 @@ class ChurchWukongXC7A100T(Elaboratable):
         # exactly like a breakpoint hit.  This lets the IDE single-step through
         # the fault handler without the CM silently retrying and continuing.
         fault_halt = Signal()
-        m.d.comb += fault_halt.eq(core.retire_valid & core.retire_fault_valid)
+        if self.sim_mode:
+            m.d.comb += fault_halt.eq(
+                (core.retire_valid & core.retire_fault_valid) |
+                self.sim_fault_inject)
+        else:
+            m.d.comb += fault_halt.eq(
+                core.retire_valid & core.retire_fault_valid)
+        recovery = m.submodules.fault_recovery = FaultRecoveryControl()
+        m.d.comb += [
+            recovery.fault_halt.eq(fault_halt),
+            recovery.snapshot_complete.eq(snapshot_complete),
+            recovery.snapshot_reason.eq(snapshot_complete_reason),
+            recovery.manual_reboot_cmd.eq(manual_reboot_cmd),
+            recovery.authorize_recovery_cmd.eq(authorize_recovery_cmd),
+            recovery.reboot_safe.eq(reboot_safe),
+            cm_reboot.eq(recovery.reboot_pulse),
+        ]
+        recovery_hold = recovery.hold
         stop_retire = Signal()
         m.d.comb += stop_retire.eq(
             core.retire_valid & (
@@ -733,7 +829,6 @@ class ChurchWukongXC7A100T(Elaboratable):
                 snapshot_pending.eq(1),
                 snapshot_reason.eq(Mux(bp_hit, 1, Mux(fault_halt, 2, 0))),
             ]
-
         # Fetch-settle bubble: DMEM BRAM is sync-read; the cycle after
         # imem_addr changes the read port still presents the OLD word.  Mask
         # imem_valid for that cycle or the core retires a stale decode right
@@ -749,8 +844,10 @@ class ChurchWukongXC7A100T(Elaboratable):
             # instruction fetch during its four-byte transmission so a forced
             # reboot cannot execute far enough to starve the announcement that
             # tells the bridge/IDE which build has actually restarted.
-            core.imem_valid.eq(~step_halted & ~trace_stall & imem_settled & ~sentinel_req),
-            core.halt_req.eq(step_halted | trace_stall),
+            core.imem_valid.eq(
+                ~step_halted & ~trace_stall & imem_settled &
+                ~sentinel_req & ~recovery_hold),
+            core.halt_req.eq(step_halted | trace_stall | recovery_hold),
             core.free_run_start.eq(0),
             core.free_run_nia.eq(0),
             core.gc_start.eq(0),
@@ -765,9 +862,9 @@ class ChurchWukongXC7A100T(Elaboratable):
         #   'b' (0x62) — breakpoint: read 4 big-endian NIA bytes, then arm/disarm
         #   'f' (0x66) — force reboot + sentinel: re-arm the full 4-byte
         #                boot sentinel (0xBC N_INIT TU_VERSION BUILD_VERSION).
-        #                This is shared by manual Reboot and bridge-authorized
-        #                fault recovery, so both paths re-announce identity
-        #                before restarted code resumes.
+        #   'g' (0x67) — authorize fault recovery after the bridge has durably
+        #                promoted the correlated reason-2 snapshot. Ignored
+        #                unless that exact snapshot has drained.
         #   'u' (0x75) — upload:     receive 4-byte big-endian byte-count header,
         #                            then N raw bytes (big-endian 32-bit words).
         #                            Halts CM, writes words to DMEM starting at word 0,
@@ -795,58 +892,56 @@ class ChurchWukongXC7A100T(Elaboratable):
                             # free-run it enters step mode and latches a pending
                             # pause until the next retirement.  From an
                             # already halted state it grants exactly one retire.
-                            m.d.comb += [
-                                step_grant.eq(step_mode & step_halted),
-                            ]
-                            m.d.sync += [
-                                step_mode.eq(1),
-                                step_pause_pending.eq(~step_mode),
-                            ]
+                            with m.If(~recovery_hold):
+                                m.d.comb += [
+                                    step_grant.eq(step_mode & step_halted),
+                                ]
+                                m.d.sync += [
+                                    step_mode.eq(1),
+                                    step_pause_pending.eq(~step_mode),
+                                ]
                         with m.Case(0x72):  # 'r'
-                            m.d.sync += [
-                                step_mode.eq(0),
-                                step_halted.eq(0),
-                                step_pause_pending.eq(0),
-                            ]
+                            with m.If(~recovery_hold):
+                                m.d.sync += [
+                                    step_mode.eq(0),
+                                    step_halted.eq(0),
+                                    step_pause_pending.eq(0),
+                                ]
                         with m.Case(0x68):  # 'h'
-                            m.d.sync += [
-                                step_mode.eq(1),
-                                step_halted.eq(1),
-                                step_pause_pending.eq(0),
-                                snapshot_pending.eq(1),
-                                snapshot_reason.eq(3),
-                            ]
+                            with m.If(~recovery_hold):
+                                m.d.sync += [
+                                    step_mode.eq(1),
+                                    step_halted.eq(1),
+                                    step_pause_pending.eq(0),
+                                    snapshot_pending.eq(1),
+                                    snapshot_reason.eq(3),
+                                ]
                         with m.Case(0x62):  # 'b'
                             m.d.sync += bp_recv_cnt.eq(0)
                             m.next = "BP_RECV"
                         with m.Case(0x66):  # 'f' — full CM reboot + sentinel retransmit
-                            # REBOOT and FAULT both zero the NIA: pulse reboot_req
-                            # so the core takes the same FAULT_RST path a post-boot
-                            # fault takes (clear_all → boot ladder → NIA=0), then
-                            # BOOT_PROGRAM re-executes (LOAD/CHANGE/CALL trace
-                            # events re-fire).  DMEM is NOT reloaded, so uploaded
-                            # lump changes take effect on the reboot.
-                            # Also re-arm the sentinel and clear the fault latch +
-                            # step state so the CM free-runs after the reboot.
-                            m.d.comb += cm_reboot.eq(1)
-                            m.d.sync += [
-                                sentinel_sent.eq(0), sentinel_phase.eq(0),
-                                step_mode.eq(0), step_halted.eq(0),
-                            ]
+                            # Defer until any in-flight trace/snapshot frame has
+                            # drained. This preserves explicit reboot semantics
+                            # without letting the sentinel split another frame.
+                            m.d.comb += manual_reboot_cmd.eq(1)
+                        with m.Case(0x67):  # 'g' — promoted fault recovery
+                            m.d.comb += authorize_recovery_cmd.eq(1)
                         with m.Case(0x75):  # 'u' — upload
                             # Halt the CM immediately; it stays halted until
                             # UPLOAD_ACK sends the 0x06 completion byte and the
                             # bridge then issues 'r' to re-enable free-run.
-                            m.d.sync += [
-                                step_mode.eq(1), step_halted.eq(1),
-                                up_len_cnt.eq(0),
-                            ]
-                            m.next = "UPLOAD_LEN"
+                            with m.If(~recovery_hold):
+                                m.d.sync += [
+                                    step_mode.eq(1), step_halted.eq(1),
+                                    up_len_cnt.eq(0),
+                                ]
+                                m.next = "UPLOAD_LEN"
                         with m.Case(0x71):  # 'q' — explicit snapshot request
-                            m.d.sync += [
-                                snapshot_pending.eq(1),
-                                snapshot_reason.eq(3),
-                            ]
+                            with m.If(~recovery_hold):
+                                m.d.sync += [
+                                    snapshot_pending.eq(1),
+                                    snapshot_reason.eq(3),
+                                ]
 
             with m.State("BP_RECV"):
                 with m.If(uart_rx.valid):
@@ -978,6 +1073,19 @@ class ChurchWukongXC7A100T(Elaboratable):
                 # would drop the 0x06 ACK byte.
                 with m.If(tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req):
                     m.next = "IDLE"
+
+        # Both reboot paths use the same serialized boundary. In particular,
+        # sentinel_req cannot preempt a trace or snapshot frame, and reason-2
+        # fault recovery remains fail-closed until the bridge's 'g' command.
+        m.d.comb += reboot_safe.eq(
+            ~trace_stall & ~snapshot_busy & ~snapshot_pending)
+        with m.If(recovery.rearm_sentinel):
+            m.d.sync += [
+                sentinel_sent.eq(0),
+                sentinel_phase.eq(0),
+                step_mode.eq(0),
+                step_halted.eq(0),
+            ]
 
         # ── TraceUnit FSM ──────────────────────────────────────────────────────
         #
@@ -1219,6 +1327,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         snap_sto = Signal(32)
         snap_thread_packed_pc = Signal(32)
         snap_thread_mflag = Signal(32)
+        snap_reason = Signal(2)
         snap_mem_addr = Signal(14)
         snap_payload_idx = Signal(9)
 
@@ -1258,7 +1367,7 @@ class ChurchWukongXC7A100T(Elaboratable):
             snap_thread_mflag,
         ]
         snap_payload_bytes = [
-            Cat(snapshot_reason, C(0, 6)),
+            Cat(snap_reason, C(0, 6)),
             snap_flags,
             Cat(core.debug_m_flag, C(0, 7)),
             C(0, 8),
@@ -1279,13 +1388,17 @@ class ChurchWukongXC7A100T(Elaboratable):
             snap_payload_idx.eq(snap_bidx - 6),
             snapshot_tx_req.eq(0),
             snapshot_tx_byte.eq(0),
+            snapshot_complete.eq(0),
+            snapshot_complete_reason.eq(0),
         ]
         with m.FSM(name="snapshot_unit"):
             with m.State("IDLE"):
                 with m.If(snapshot_pending & ~trace_stall):
                     m.d.sync += [
                         snapshot_pending.eq(0),
+                        snapshot_busy.eq(1),
                         snapshot_seq.eq(snap_seq_next),
+                        snap_reason.eq(snapshot_reason),
                         snap_bidx.eq(0),
                         snap_crc.eq(snap_header_crc),
                     ]
@@ -1351,6 +1464,11 @@ class ChurchWukongXC7A100T(Elaboratable):
                     with m.If((snap_bidx >= 6) & (snap_bidx < _SNAP_DATA_LEN)):
                         m.d.sync += snap_crc.eq(crc_next)
                     with m.If(snap_bidx == _SNAP_FRAME_LEN - 1):
+                        m.d.comb += [
+                            snapshot_complete.eq(1),
+                            snapshot_complete_reason.eq(snap_reason),
+                        ]
+                        m.d.sync += snapshot_busy.eq(0)
                         m.next = "IDLE"
                     with m.Else():
                         m.d.sync += snap_bidx.eq(snap_bidx + 1)

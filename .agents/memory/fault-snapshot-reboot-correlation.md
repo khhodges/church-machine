@@ -10,6 +10,12 @@ for the exact accepted fault event, scoped to the current server generation.
 Pending correlation is single-use and must be cleared on any later fault
 attempt or terminal snapshot that does not reboot.
 
+Automatic fault recovery authorization must remain distinct from explicit
+manual reboot. The board holds execution through the fault frame, waits for a
+dedicated post-promotion authorization, and re-announces identity only after
+trace and snapshot traffic has drained. Manual reboot may intentionally
+override a fault hold, but it must use that same frame-safe UART boundary.
+
 **Why:** A compact trace has only partial state. Rebooting after an
 uncorrelated or stale snapshot can permanently associate complete register
 state with the wrong fault, especially when other events arrive, a request
@@ -19,4 +25,6 @@ fails, or the server restarts and event numbering is reused.
 server-generation identifier plus event ID with the accepted fault event,
 include both with the full snapshot, and reboot only after an explicit
 promotion acknowledgement. Treat rejected, clean, and competing events as
-disarming conditions.
+disarming conditions. Never use the ordinary manual-reboot command as the
+automatic authorization signal, and never allow a recovered identity
+announcement to preempt a trace or snapshot frame.

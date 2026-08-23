@@ -782,12 +782,14 @@ class StreamSync:
 
 
 class FaultRecovery:
-    """Gate one automatic reboot on a complete hardware-fault snapshot.
+    """Gate one authorized recovery on a complete hardware-fault snapshot.
 
     Trace packets identify a fault but contain only partial register state. The
     board emits a complete ``0xAC`` stop snapshot immediately afterwards. Keep
-    it halted until that snapshot is accepted, then issue exactly one reboot.
-    Explicit snapshots use reason 3 and never satisfy this gate.
+    it halted until that snapshot is accepted, then send the dedicated ``g``
+    authorization. The RTL accepts it only after a reason-2 snapshot has fully
+    drained, and then reboots with a fresh sentinel. Explicit snapshots use
+    reason 3 and never satisfy this gate.
     """
 
     FAULT_SNAPSHOT_REASON = 2
@@ -850,14 +852,14 @@ def _post_wukong_snapshot(ide_base, decoded, verify_tls):
         return False
 
 
-def _send_fault_reboot(ser):
-    """Restart a stopped board only after its complete fault snapshot is safe."""
+def _authorize_fault_recovery(ser):
+    """Authorize recovery only after the complete fault snapshot is safe."""
     try:
-        ser.write(b'f')
+        ser.write(b'g')
         ser.flush()
         return True
     except Exception as exc:
-        print(f'  [fault recovery] reboot send error: {exc}', flush=True)
+        print(f'  [fault recovery] authorization send error: {exc}', flush=True)
         return False
 
 
@@ -1218,10 +1220,10 @@ def main():
                         ide_base, fault_recovery.snapshot_payload(decoded), verify_tls)
                     if fault_recovery.should_reboot_after_snapshot(
                             decoded, snapshot_accepted):
-                        if _send_fault_reboot(ser):
+                        if _authorize_fault_recovery(ser):
                             fault_recovery.mark_reboot_sent()
                             print('  [fault recovery] complete fault snapshot '
-                                  'stored — rebooting into Boot.0', flush=True)
+                                  'stored — authorizing Boot.0 recovery', flush=True)
                         else:
                             fault_recovery.clear_pending()
                     else:

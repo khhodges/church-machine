@@ -195,6 +195,10 @@ args = "ns-slot-modal-persist-tests"
 task = "workflow.run"
 args = "hex-tab-fill-path-tests"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "wukong-fault-sentinel"
+
 [[workflows.workflow]]
 name = "Church Machine IDE"
 author = "agent"
@@ -899,3 +903,14 @@ outputType = "console"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python -m pytest tests/server/test_wukong_command_delivery.py tests/hardware/test_wukong_bridge_command_ack.py -v"
+
+[[workflows.workflow]]
+name = "wukong-fault-sentinel"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python -m pytest tests/hardware/test_wukong_snapshot_protocol.py hardware/test_wukong_bridge_resync.py tests/server/test_wukong_snapshot.py tests/server/test_wukong_command_delivery.py hardware/test_boot_rom_no_false_halt.py::test_repeated_reboots_stay_clean -q"
