@@ -15625,6 +15625,7 @@ function _wukongClassifyPipelineStages(s, ideSeq, ideLastTs) {
     var bi         = (s && s.boot_info) || {};
 
     // ── Stage 1: Bridge ───────────────────────────────────────────────────────
+    var churchOnly = !!(s && s.bridge && s.bridge.church_only);
     var bridge;
     if (bridgeAge !== null && bridgeAge < 3) {
         bridge = { state: 'green', detail: 'Polling \u2014 last ' + _wukongAgeStr(bridgeAge) };
@@ -15638,10 +15639,10 @@ function _wukongClassifyPipelineStages(s, ideSeq, ideLastTs) {
         bridge = { state: 'red',
             detail: 'Bridge stopped ' + _wukongAgeStr(bridgeAge) + ' \u2014 bridge script may have crashed or lost network' };
     }
+    if (churchOnly) { bridge.detail += ' \u2014 Turing filter ON'; }
     stages.push({ name: 'Bridge', state: bridge.state, detail: bridge.detail });
 
     // ── Stage 2: Board trace ─────────────────────────────────────────────────
-    var churchOnly = !!(s && s.bridge && s.bridge.church_only);
     var trace;
     if (traceAge !== null && traceAge < 3) {
         trace = { state: 'green', detail: 'Trace packets flowing \u2014 last ' + _wukongAgeStr(traceAge) };
