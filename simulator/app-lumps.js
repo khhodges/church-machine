@@ -2010,6 +2010,42 @@ function _lumpDeepDiveKeydown(ev) {
     controls[nextIndex].focus();
 }
 
+/* ---- DD_ANNOTATIONS_UNIT_TEST_EXPORT_START ---- */
+// Extract a flat list of method name strings from a lump detail response.
+// api_definition.methods may be string[] or {name}[]; sidecar .methods is {name,...}[].
+// Returns null when no API definition is present at all (legacy lump).
+// Returns [] when the definition exists but declares no methods.
+function _ddExtractMethodNames(detail) {
+    if (detail.api_definition && Array.isArray(detail.api_definition.methods)) {
+        return detail.api_definition.methods.map(m =>
+            typeof m === 'string' ? m : ((m && m.name) ? m.name : String(m)));
+    }
+    if (detail.api_definition) return []; // definition present but no methods key
+    if (Array.isArray(detail.methods) && detail.methods.length > 0) {
+        return detail.methods.map(m =>
+            typeof m === 'string' ? m : ((m && m.name) ? m.name : String(m)));
+    }
+    return null; // no API definition recorded
+}
+
+// Navigate from the Deep Dive modal to the abstractions detail panel for a
+// given abstraction.  Closes the modal first so the panel is visible.
+function _deepDiveOpenAbstraction(nsSlot, absName) {
+    _closeLumpDeepDive();
+    let slot = (nsSlot != null && nsSlot !== '') ? parseInt(nsSlot) : null;
+    if ((slot === null || isNaN(slot)) && absName &&
+            typeof abstractionRegistry !== 'undefined' && abstractionRegistry) {
+        const found = Object.values(abstractionRegistry.abstractions || {})
+            .find(a => a.name === absName);
+        if (found) slot = found.index;
+    }
+    if (typeof switchView === 'function') switchView('abstractions');
+    if (slot !== null && !isNaN(slot) && typeof showAbstractionDetail === 'function') {
+        showAbstractionDetail(slot);
+    }
+}
+window._deepDiveOpenAbstraction = _deepDiveOpenAbstraction;
+
 async function _openLumpDeepDive(token, trigger) {
     _closeLumpDeepDive();
     const lump = _deepDiveLumpForToken(token);
@@ -2023,7 +2059,33 @@ async function _openLumpDeepDive(token, trigger) {
     }
     const e = typeof _escHtml === 'function' ? _escHtml : s => String(s || '');
     const type = typeof _lumpContentTypeLabel === 'function' ? _lumpContentTypeLabel(lump) : (lump.lump_type || 'LUMP');
-    modal.innerHTML = `<section class="lump-deep-dive-dialog"><header class="lump-deep-dive-header"><div><h2 id="lumpDeepDiveTitle">LUMP Deep Dive · ${e(lump.dot_name || lump.abstraction || token)}</h2><p>Recursive DNA reachability map</p></div><button type="button" class="lump-deep-dive-close" aria-label="Close Deep Dive">&times;</button></header><div class="lump-deep-dive-summary"><span><b>Token</b> 0x${e(lump.token)}</span><span><b>Name</b> ${e(lump.dot_name || lump.abstraction || 'Unknown')}</span><span><b>Type</b> ${e(type)}</span><span><b>Version</b> ${e(lump.lump_version ?? lump.version ?? '—')}</span><span><b>Size</b> ${e(lump.lump_size ?? '—')}w</span><span><b>NS slot</b> ${e(lump.ns_slot ?? 'saved')}</span></div><div class="lump-deep-dive-api" id="lumpDeepDiveApi">API/capability metadata: loading…</div><div class="lump-deep-dive-toolbar"><span>Edges are labeled by C-List register and permissions. Amber dashed edges are reused or cyclic.</span><button type="button" class="ns-dep-graph-btn" id="lumpDeepZoomIn">+</button><button type="button" class="ns-dep-graph-btn" id="lumpDeepZoomOut">−</button><button type="button" class="ns-dep-graph-btn" id="lumpDeepZoomReset">↺</button></div><div id="lumpDeepDiveBody" class="lump-deep-dive-body"><div class="lumps-loading">Building DNA graph…</div></div></section>`;
+    // Raw (unescaped) nav args for closure capture — renderers use textContent/DOM, not innerHTML.
+    const _navSlot = (lump.ns_slot != null && lump.ns_slot !== '') ? parseInt(lump.ns_slot) : null;
+    const _navName = lump.abstraction || lump.dot_name || '';
+    modal.innerHTML = `<section class="lump-deep-dive-dialog">\
+<header class="lump-deep-dive-header">\
+<div><h2 id="lumpDeepDiveTitle">LUMP Deep Dive \u00b7 ${e(lump.dot_name || lump.abstraction || token)}</h2>\
+<p>Recursive DNA reachability map</p></div>\
+<button type="button" class="lump-deep-dive-close" aria-label="Close Deep Dive">&times;</button></header>\
+<div class="lump-deep-dive-summary">\
+<span><b>Token</b> 0x${e(lump.token)}</span>\
+<span><b>Name</b> ${e(lump.dot_name || lump.abstraction || 'Unknown')}</span>\
+<span><b>Type</b> ${e(type)}</span>\
+<span><b>Version</b> ${e(lump.lump_version ?? lump.version ?? '\u2014')}</span>\
+<span><b>Size</b> ${e(lump.lump_size ?? '\u2014')}w</span>\
+<span><b>NS slot</b> ${e(lump.ns_slot ?? 'saved')}</span></div>\
+<div class="lump-deep-dive-api lump-dd-methods-row" id="lumpDeepDiveMethods">\
+<span class="lump-dd-loading">loading\u2026</span></div>\
+<div class="lump-deep-dive-toolbar">\
+<span>Edges are labeled by C-List register and permissions. Amber dashed edges are reused or cyclic.</span>\
+<button type="button" class="ns-dep-graph-btn" id="lumpDeepZoomIn">+</button>\
+<button type="button" class="ns-dep-graph-btn" id="lumpDeepZoomOut">\u2212</button>\
+<button type="button" class="ns-dep-graph-btn" id="lumpDeepZoomReset">\u21ba</button></div>\
+<div id="lumpDeepDiveBody" class="lump-deep-dive-body"><div class="lumps-loading">Building DNA graph\u2026</div></div>\
+<div class="lump-dd-source-row" id="lumpDeepDiveSource">\
+<button type="button" class="lump-dd-source-badge lump-dd-source-badge--loading" disabled>\
+loading\u2026</button></div>\
+</section>`;
     document.body.appendChild(modal);
     modal.querySelector('.lump-deep-dive-close').addEventListener('click', _closeLumpDeepDive);
     modal.addEventListener('click', ev => { if (ev.target === modal) _closeLumpDeepDive(); });
@@ -2041,20 +2103,117 @@ async function _openLumpDeepDive(token, trigger) {
     } else body.innerHTML = '<div class="lumps-placeholder">No C-List data is available for this LUMP.</div>';
     try {
         const resp = await fetch(`/api/lumps/${encodeURIComponent(token)}/detail`);
-        if (resp.ok && document.getElementById('lumpDeepDiveModal') === modal) {
-            const detail = await resp.json();
-            const caps = Array.isArray(detail.capabilities) ? detail.capabilities.length : 0;
-            const api = detail.api_definition ? 'API definition available' : 'No API definition recorded';
-            modal.querySelector('#lumpDeepDiveApi').textContent = `${api} · ${caps} declared capability${caps === 1 ? '' : 'ies'}${detail.language ? ` · ${detail.language}` : ''}`;
-        } else if (document.getElementById('lumpDeepDiveModal') === modal) {
-            modal.querySelector('#lumpDeepDiveApi').textContent = 'API metadata unavailable; graph is based on the repository list.';
+        if (!resp.ok || document.getElementById('lumpDeepDiveModal') !== modal) {
+            if (document.getElementById('lumpDeepDiveModal') === modal) {
+                _ddRenderMethodsFailed(modal);
+                _ddRenderSourceFailed(modal, _navSlot, _navName);
+            }
+            return;
         }
+        const detail = await resp.json();
+        if (document.getElementById('lumpDeepDiveModal') !== modal) return;
+        _ddRenderMethods(modal, detail, _navSlot, _navName);
+        _ddRenderSource(modal, detail, _navSlot, _navName);
     } catch (_) {
-        const api = modal.querySelector('#lumpDeepDiveApi');
-        if (api) api.textContent = 'API metadata unavailable; graph is based on the repository list.';
+        if (document.getElementById('lumpDeepDiveModal') === modal) {
+            _ddRenderMethodsFailed(modal);
+            _ddRenderSourceFailed(modal, _navSlot, _navName);
+        }
     }
 }
 window._openLumpDeepDive = _openLumpDeepDive;
+
+// ── Deep Dive annotation renderers ──────────────────────────────────────────
+
+// Helper: create a DOM element with class and text; append to parent.
+function _ddAppend(parent, tag, cls, text) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (text !== undefined) el.textContent = text;
+    parent.appendChild(el);
+    return el;
+}
+
+function _ddRenderMethods(modal, detail, navSlot, navName) {
+    const el = modal.querySelector('#lumpDeepDiveMethods');
+    if (!el) return;
+    el.innerHTML = '';
+    const methods = _ddExtractMethodNames(detail);
+    if (methods === null) {
+        // No api_definition at all — legacy binary
+        _ddAppend(el, 'span', 'lump-dd-no-methods',
+            'No API definition recorded in binary');
+    } else if (methods.length === 0) {
+        _ddAppend(el, 'span', 'lump-dd-no-methods',
+            'No methods declared \u2014 CALL enters the abstraction directly');
+    } else {
+        _ddAppend(el, 'span', 'lump-dd-methods-label', 'Methods:');
+        for (const mname of methods) {
+            // Each pill is a keyboard-accessible button that navigates to the
+            // abstraction detail panel.  navSlot/navName are captured in the
+            // closure — no inline JS strings, no injection risk.
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'lump-dd-method-pill';
+            btn.textContent = mname;
+            btn.title = 'Open abstraction detail';
+            btn.addEventListener('click', () =>
+                _deepDiveOpenAbstraction(navSlot, navName));
+            el.appendChild(btn);
+        }
+    }
+}
+
+function _ddRenderMethodsFailed(modal) {
+    const el = modal.querySelector('#lumpDeepDiveMethods');
+    if (el) {
+        el.innerHTML = '';
+        _ddAppend(el, 'span', 'lump-dd-no-methods', 'API metadata unavailable');
+    }
+}
+
+// Build a source-tier badge button using DOM APIs so slot/name are captured in
+// a closure rather than interpolated into an onclick string.
+function _ddMakeSourceBtn(tierClass, label, navSlot, navName) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `lump-dd-source-badge ${tierClass}`;
+    btn.textContent = `${label} \u2014 open abstraction detail`;
+    btn.addEventListener('click', () =>
+        _deepDiveOpenAbstraction(navSlot, navName));
+    return btn;
+}
+
+function _ddRenderSource(modal, detail, navSlot, navName) {
+    const el = modal.querySelector('#lumpDeepDiveSource');
+    if (!el) return;
+    el.innerHTML = '';
+    const tier = detail.sourceStorageTier;
+    let tierClass, label;
+    if (tier === 2) {
+        tierClass = 'lump-dd-source-badge--tier2';
+        label = '\u2705 Full source included';
+    } else if (tier === 1) {
+        tierClass = 'lump-dd-source-badge--tier1';
+        label = '\u26a0\ufe0f Uncommented source included';
+    } else {
+        tierClass = 'lump-dd-source-badge--tier0';
+        label = '\u25cb No source embedded';
+    }
+    el.appendChild(_ddMakeSourceBtn(tierClass, label, navSlot, navName));
+}
+
+function _ddRenderSourceFailed(modal, navSlot, navName) {
+    const el = modal.querySelector('#lumpDeepDiveSource');
+    if (el) {
+        el.innerHTML = '';
+        el.appendChild(_ddMakeSourceBtn(
+            'lump-dd-source-badge--tier0',
+            '\u25cb Source status unknown',
+            navSlot, navName));
+    }
+}
+/* ---- DD_ANNOTATIONS_UNIT_TEST_EXPORT_END ---- */
 
 function _populateLumpApiTab(lump, panelId) {
     const el = document.getElementById(panelId);

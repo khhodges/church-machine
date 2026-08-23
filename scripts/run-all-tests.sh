@@ -334,6 +334,9 @@ register_suite "bitstream-version-labeling-tests" \
 register_suite "pipeline-health-stages-tests" \
     'node simulator/test_pipeline_health_stages.js'
 
+register_suite "deep-dive-annotations-tests" \
+    'node simulator/test_deep_dive_annotations.js'
+
 register_suite "versions-view-tests" \
     'python3 -m pytest tests/server/test_versions_view_fields.py -v'
 

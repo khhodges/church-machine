@@ -5596,6 +5596,123 @@ mark.abs-search-highlight {
     font: 7px var(--font-mono, monospace);
 }
 
+/* ── Deep Dive method pills (above the graph) ─────────────────────────────── */
+.lump-dd-methods-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem 0.45rem;
+    min-height: 2rem;
+}
+
+.lump-dd-methods-label {
+    color: var(--text-secondary);
+    font-size: 0.68rem;
+    font-weight: 500;
+    flex: 0 0 auto;
+    margin-right: 0.1rem;
+}
+
+.lump-dd-method-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.16rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid rgba(34, 197, 94, 0.45);
+    background: rgba(34, 197, 94, 0.1);
+    color: #86efac;
+    font: 600 0.68rem/1.2 var(--font-mono, monospace);
+    white-space: nowrap;
+    flex: 0 0 auto;
+    cursor: pointer;
+    outline-offset: 2px;
+    transition: background 0.13s, border-color 0.13s;
+}
+.lump-dd-method-pill:hover,
+.lump-dd-method-pill:focus-visible {
+    background: rgba(34, 197, 94, 0.22);
+    border-color: rgba(34, 197, 94, 0.75);
+}
+
+.lump-dd-no-methods {
+    color: var(--text-secondary);
+    font-size: 0.68rem;
+    font-style: italic;
+}
+
+.lump-dd-loading {
+    color: var(--text-secondary);
+    font-size: 0.68rem;
+    font-style: italic;
+    animation: lump-dd-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes lump-dd-pulse {
+    0%, 100% { opacity: 0.5; }
+    50%       { opacity: 1;   }
+}
+
+/* ── Deep Dive source badge (below the graph) ─────────────────────────────── */
+.lump-dd-source-row {
+    display: flex;
+    align-items: center;
+    padding: 0.45rem 1rem;
+    border-top: 1px solid rgba(100, 160, 255, 0.12);
+}
+
+.lump-dd-source-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.22rem 0.7rem;
+    border-radius: 5px;
+    border: 1px solid transparent;
+    font: 0.7rem/1.3 inherit;
+    cursor: pointer;
+    background: transparent;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.lump-dd-source-badge--tier2 {
+    color: #86efac;
+    border-color: rgba(34, 197, 94, 0.4);
+    background: rgba(34, 197, 94, 0.08);
+}
+.lump-dd-source-badge--tier2:hover,
+.lump-dd-source-badge--tier2:focus-visible {
+    background: rgba(34, 197, 94, 0.18);
+    border-color: rgba(34, 197, 94, 0.65);
+}
+
+.lump-dd-source-badge--tier1 {
+    color: #fcd34d;
+    border-color: rgba(245, 158, 11, 0.4);
+    background: rgba(245, 158, 11, 0.08);
+}
+.lump-dd-source-badge--tier1:hover,
+.lump-dd-source-badge--tier1:focus-visible {
+    background: rgba(245, 158, 11, 0.18);
+    border-color: rgba(245, 158, 11, 0.65);
+}
+
+.lump-dd-source-badge--tier0 {
+    color: var(--text-secondary);
+    border-color: rgba(100, 116, 139, 0.35);
+    background: rgba(100, 116, 139, 0.07);
+}
+.lump-dd-source-badge--tier0:hover,
+.lump-dd-source-badge--tier0:focus-visible {
+    background: rgba(100, 116, 139, 0.15);
+    border-color: rgba(100, 116, 139, 0.55);
+}
+
+.lump-dd-source-badge--loading {
+    color: var(--text-secondary);
+    border-color: transparent;
+    cursor: default;
+    animation: lump-dd-pulse 1.4s ease-in-out infinite;
+}
+
 @media (max-width: 600px) {
     .lump-deep-dive-backdrop { padding: 0.35rem; align-items: stretch; }
     .lump-deep-dive-dialog { max-height: 100%; }
@@ -5604,6 +5721,7 @@ mark.abs-search-highlight {
     .lump-deep-dive-summary { padding: 0.55rem 0.7rem; gap: 0.3rem 0.55rem; }
     .lump-deep-dive-toolbar, .lump-deep-dive-api { padding-left: 0.7rem; padding-right: 0.7rem; }
     .lump-deep-dive-body { padding-left: 0.35rem; padding-right: 0.35rem; }
+    .lump-dd-source-row { padding-left: 0.7rem; padding-right: 0.7rem; }
 }
 
 .lump-item-header {
