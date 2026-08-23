@@ -3002,6 +3002,9 @@
     color: var(--church-gold);
 }
 
+.docs-file-link { opacity: 0.92; }
+.docs-file-link:hover { opacity: 1; }
+
 .docs-file-item .file-size {
     font-size: 0.65rem;
     color: var(--text-muted);

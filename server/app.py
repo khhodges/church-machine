@@ -3952,6 +3952,8 @@ def switch_lifecycle_html():
 
 BOOK_CHAPTERS = [
     ("Getting Started", [
+        {"type": "link", "label": "🎞 IDE Introduction", "artifact_port": 21279, "artifact_path": "/"},
+        {"type": "link", "label": "📄 Facilitator Handout", "artifact_port": 21279, "artifact_path": "/handout"},
         "quick-start.md",
         "board-connectivity.md",
         "cloomc-foundation.md",
@@ -4051,7 +4053,19 @@ def docs_list():
     for part_title, filenames in BOOK_CHAPTERS:
         entries = []
         for item in filenames:
-            if isinstance(item, dict):
+            if isinstance(item, dict) and item.get("type") == "link":
+                dev_domain = os.environ.get("REPLIT_DEV_DOMAIN", "")
+                port = item.get("artifact_port", 0)
+                path = item.get("artifact_path", "/")
+                url = f"https://{port}-{dev_domain}{path}" if dev_domain and port else ""
+                entries.append({
+                    "name": "",
+                    "type": "link",
+                    "label": item["label"],
+                    "url": url,
+                    "size": 0,
+                })
+            elif isinstance(item, dict):
                 # Inline figure entry within a chapter
                 fig_name = item["name"]
                 fig_path = os.path.join(figures_dir, fig_name)

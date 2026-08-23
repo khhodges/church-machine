@@ -253,6 +253,70 @@ function assert(label, condition, detail) {
         figItem ? 'display=' + figItem.style.display : '(not found)');
 }
 
+// ── DS-8: link-type item participates in chapter search filter ────────────────
+//
+// A chapter group that contains a docs-file-link item must behave the same as
+// one that contains a doc or figure entry: the link is hidden when the query
+// does not match its label text, visible when it does, and the chapter group
+// visibility follows the same rule.
+{
+    const linkLabel = 'IDE Introduction';
+    const html = `<!DOCTYPE html><body>
+        <div id="docsFileList">
+            <div class="docs-chapter-group">
+                <div class="docs-chapter-title">Getting Started</div>
+                <div class="docs-file-item docs-file-link" data-link="https://21279-example.replit.dev/">
+                    <span class="docs-chapter-num">1.1</span>
+                    <span>↗ ${linkLabel}</span>
+                </div>
+                <div class="docs-file-item" data-doc="quick-start.md">
+                    <span class="docs-chapter-num">1.2</span>
+                    <span>quick-start</span>
+                </div>
+            </div>
+        </div>
+        <div id="docsFigureList"></div>
+        <div class="docs-figures-title">Figures</div>
+    </body>`;
+
+    const { JSDOM: _JSDOM } = require('jsdom');
+    const dom8      = new _JSDOM(html);
+    const document8 = dom8.window.document;
+    const sandbox8  = { document: document8 };
+    const ctx8 = vm.createContext(new Proxy(sandbox8, {
+        get(target, prop, receiver) {
+            if (prop in target) return Reflect.get(target, prop, receiver);
+            if (typeof prop === 'string' && prop in globalThis) return globalThis[prop];
+            if (typeof prop === 'string' && /^[_a-zA-Z]/.test(prop)) return function() {};
+            return undefined;
+        },
+        has() { return true; },
+    }));
+    vm.runInContext(FILTER_SRC, ctx8, { filename: 'app-misc.js' });
+
+    // Query matches the link label — link should be visible, group should be visible.
+    vm.runInContext('filterDocsList("ide introduction")', ctx8);
+    const linkItem8 = document8.querySelector('[data-link]');
+    const docItem8  = document8.querySelector('[data-doc="quick-start.md"]');
+    const group8    = document8.querySelector('.docs-chapter-group');
+
+    assert('DS-8: link item is visible when query matches its label',
+        linkItem8 && isVisible(linkItem8),
+        linkItem8 ? 'display=' + linkItem8.style.display : '(not found)');
+    assert('DS-8: chapter group stays visible when only the link matches',
+        group8 && isVisible(group8),
+        group8 ? 'display=' + group8.style.display : '(not found)');
+    assert('DS-8: non-matching doc item in same group is hidden',
+        docItem8 && !isVisible(docItem8),
+        docItem8 ? 'display=' + docItem8.style.display : '(not found)');
+
+    // Query does not match link label — link should be hidden.
+    vm.runInContext('filterDocsList("zzznomatch")', ctx8);
+    assert('DS-8: link item is hidden when query does not match',
+        linkItem8 && !isVisible(linkItem8),
+        linkItem8 ? 'display=' + linkItem8.style.display : '(not found)');
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);

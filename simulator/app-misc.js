@@ -511,6 +511,11 @@ function renderDocsFileList() {
             chapterNum++;
             const items = ch.docs.map((d, i) => {
                 const sizeKB = (d.size / 1024).toFixed(1);
+                if (d.type === 'link') {
+                    const label = d.label || '';
+                    const url   = d.url || '';
+                    return `<div class="docs-file-item docs-file-link" onclick="window.open(${JSON.stringify(url)},'_blank')" data-link="${url}"><span class="docs-chapter-num">${chapterNum}.${i + 1}</span><span>↗ ${label}</span></div>`;
+                }
                 if (d.type === 'figure') {
                     const label = d.label || d.name.replace('.html', '');
                     return `<div class="docs-file-item" onclick="loadFigure('${d.name}')" data-fig="${d.name}"><span class="docs-chapter-num">${chapterNum}.${i + 1}</span><span>&#x1F4CA; ${label}</span><span class="file-size">${sizeKB} KB</span></div>`;
