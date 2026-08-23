@@ -187,9 +187,9 @@ function check(label, cond, detail) {
     // AL-8: hamburger buttons use the same launch flow as Docs sidebar links ──
     {
         const { w, launches } = makeMenuEnv('https://5000-demo.replit.dev/simulator/');
-        w.openArtifact({}, 21279, '/', '/ide-intro/', 'IDE Introduction');
+        w.openArtifact({}, 21279, '/ide-intro/', '/ide-intro/', 'IDE Introduction');
         check('AL-8 dev hamburger link uses the artifact proxy URL',
-              launches.length === 1 && launches[0].url === 'https://21279-demo.replit.dev/',
+               launches.length === 1 && launches[0].url === 'https://21279-demo.replit.dev/ide-intro/',
               JSON.stringify(launches));
         check('AL-8 dev hamburger link probes the artifact port',
               launches[0] && launches[0].port === 21279,
@@ -199,7 +199,7 @@ function check(label, cond, detail) {
     // AL-9: production never points a user at an unavailable dev-server port ──
     {
         const { w, launches } = makeMenuEnv('https://church-machine.replit.app/simulator/');
-        w.openArtifact({}, 21279, '/handout', '/ide-intro/handout', 'Facilitator Handout');
+        w.openArtifact({}, 21279, '/ide-intro/handout', '/ide-intro/handout', 'Facilitator Handout');
         check('AL-9 production hamburger link stays on the IDE origin',
               launches.length === 1 &&
               launches[0].url === 'https://church-machine.replit.app/ide-intro/handout',

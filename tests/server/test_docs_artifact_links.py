@@ -121,6 +121,10 @@ def test_dev_links_have_nonzero_port_and_proxy_url(client):
             f"got url={entry['url']!r}"
         )
 
+    urls_by_label = {entry['label']: entry['url'] for entry in link_entries}
+    assert urls_by_label['🎞 IDE Introduction'].endswith('/ide-intro/')
+    assert urls_by_label['📄 Facilitator Handout'].endswith('/ide-intro/handout')
+
 
 # ---------------------------------------------------------------------------
 # DAL-3 / DAL-4 / DAL-5: /api/artifact-reachable

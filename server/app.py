@@ -4035,8 +4035,8 @@ def switch_lifecycle_html():
 
 BOOK_CHAPTERS = [
     ("Getting Started", [
-        {"type": "link", "label": "🎞 IDE Introduction", "artifact_port": 21279, "artifact_path": "/", "production_path": "/ide-intro/"},
-        {"type": "link", "label": "📄 Facilitator Handout", "artifact_port": 21279, "artifact_path": "/handout", "production_path": "/ide-intro/handout"},
+        {"type": "link", "label": "🎞 IDE Introduction", "artifact_port": 21279, "artifact_path": "/ide-intro/", "production_path": "/ide-intro/"},
+        {"type": "link", "label": "📄 Facilitator Handout", "artifact_port": 21279, "artifact_path": "/ide-intro/handout", "production_path": "/ide-intro/handout"},
         "quick-start.md",
         "board-connectivity.md",
         "cloomc-foundation.md",
