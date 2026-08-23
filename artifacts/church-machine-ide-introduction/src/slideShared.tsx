@@ -1,0 +1,12 @@
+import type { ReactNode } from 'react';
+
+export function DeckSlide({ kicker, title, subtitle, children, footer = 'CHURCH MACHINE IDE · INTRODUCTION' }: { kicker: string; title: ReactNode; subtitle: string; children: ReactNode; footer?: string }) {
+  return <main className="deck-slide"><div className="grid-glow" /><header className="slide-header"><div className="brand"><span className="lambda">λ</span> CHURCH MACHINE <span className="brand-muted">/ IDE</span></div><div className="slide-count">{kicker}</div></header><section className="slide-content"><div className="title-block"><div className="kicker">{kicker}</div><h1>{title}</h1><p>{subtitle}</p></div>{children}</section><footer><span>{footer}</span><span className="footer-mark">GOLDEN TOKEN · SECURE BY CONSTRUCTION</span></footer></main>;
+}
+export function Label({children}:{children:ReactNode}){return <span className="label">{children}</span>}
+export function NotesTag({text}:{text:string}){return <div className="notes-tag">PRESENTER CUE <span>{text}</span></div>}
+export function Card({num,title,children}:{num:string;title:string;children:ReactNode}){return <div className="card"><b className="card-num">{num}</b><div><strong>{title}</strong><p>{children}</p></div></div>}
+export function Step({n,title,text}:{n:string;title:string;text:string}){return <div className="step"><b>{n}</b><div><strong>{title}</strong><span>{text}</span></div></div>}
+export function Flow({items}:{items:string[]}){return <div className="flow">{items.map((x,i)=><span key={x}>{x}{i<items.length-1&&<i>→</i>}</span>)}</div>}
+export function CodePanel({title,code}:{title:string;code:string}){return <div className="code-panel"><div className="panel-head"><span className="dot red-dot"/><span className="dot yellow-dot"/><span className="dot green-dot"/><b>{title}</b></div><pre>{code}</pre></div>}
+export function TracePanel(){return <div className="trace-panel"><div className="panel-head">TRACE · LIVE VIEW</div><div className="trace-line"><em>0x0000</em><b>LOAD</b><span>DR1 ← 2</span></div><div className="trace-line active"><em>0x0004</em><b>LOAD</b><span>DR2 ← 3</span></div><div className="trace-line"><em>0x0008</em><b>ADD</b><span>DR0 ← 5</span></div><div className="trace-line"><em>0x000C</em><b>PRINT</b><span>output → 5</span></div></div>}

@@ -18,7 +18,32 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "jsdom": "^29.0.2"
+    "@replit/vite-plugin-cartographer": "^0.6.1",
+    "@replit/vite-plugin-dev-banner": "^0.1.2",
+    "@replit/vite-plugin-runtime-error-modal": "^0.0.6",
+    "@sinclair/typebox": "^0.34.52",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "jsdom": "^29.0.2",
+    "prosemirror-commands": "^1.7.1",
+    "prosemirror-history": "^1.5.0",
+    "prosemirror-keymap": "^1.2.3",
+    "prosemirror-model": "^1.25.4",
+    "prosemirror-state": "^1.4.4",
+    "prosemirror-transform": "^1.11.0",
+    "prosemirror-view": "^1.41.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "recharts": "^3.10.1",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "wouter": "^3.10.0",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1"

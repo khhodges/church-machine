@@ -1,0 +1,28 @@
+kind = "slides"
+previewPath = "/"
+title = "Church Machine IDE — Introduction"
+description = "A polished 30-minute introductory presentation for first-time developers learning the Church Machine IDE, its simulator workflow, capability model, Namespace tools, debugging views, and FPGA testing handoff."
+version = "1.0.0"
+id = "artifacts/church-machine-ide-introduction"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21279
+
+[services.development]
+run = "pnpm --filter @workspace/church-machine-ide-introduction run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/church-machine-ide-introduction", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/church-machine-ide-introduction/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21279"
+BASE_PATH = "/"

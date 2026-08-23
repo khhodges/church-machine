@@ -1,0 +1,39 @@
+{
+  "name": "@workspace/church-machine-ide-introduction",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --config vite.config.ts --host 0.0.0.0",
+    "build": "vite build --config vite.config.ts",
+    "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
+    "validate-slides": "pnpm exec tsx scripts/validate-slides.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@replit/vite-plugin-cartographer": "catalog:",
+    "@replit/vite-plugin-dev-banner": "catalog:",
+    "@replit/vite-plugin-runtime-error-modal": "catalog:",
+    "@sinclair/typebox": "0.34.33",
+    "@tailwindcss/vite": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "prosemirror-commands": "1.7.1",
+    "prosemirror-history": "1.5.0",
+    "prosemirror-keymap": "1.2.3",
+    "prosemirror-model": "1.25.4",
+    "prosemirror-state": "1.4.4",
+    "prosemirror-transform": "1.11.0",
+    "prosemirror-view": "1.41.6",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "recharts": "^2.15.4",
+    "tailwindcss": "catalog:",
+    "tsx": "catalog:",
+    "vite": "catalog:",
+    "wouter": "catalog:",
+    "yaml": "2.8.3"
+  }
+}
