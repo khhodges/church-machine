@@ -148,8 +148,10 @@ def test_artifact_reachable_rejects_invalid_port(client):
 def test_artifact_reachable_closed_allowlisted_port_returns_clean_json(client):
     """An allowlisted port that is not listening must return 200 ok=false with
     no socket-error details in the response body."""
-    # Port 21279 is allowlisted but never listening in CI
-    resp = client.get('/api/artifact-reachable?port=21279')
+    # Mock the socket rather than assuming the artifact workflow is stopped:
+    # developers normally keep the introduction deck running on this port.
+    with patch('socket.create_connection', side_effect=ConnectionRefusedError):
+        resp = client.get('/api/artifact-reachable?port=21279')
     assert resp.status_code == 200
     body = resp.get_json()
     assert body['ok'] is False

@@ -37,6 +37,7 @@ function extractFn(srcPath, marker) {
 
 // Structural guard: fails fast if the function was renamed or removed.
 const LINK_SRC = extractFn('app-misc.js', 'async function openArtifactLink(');
+const MENU_LAUNCH_SRC = extractFn('app-misc.js', 'function openArtifact(');
 
 // ── Fixture ───────────────────────────────────────────────────────────────────
 //
@@ -75,6 +76,20 @@ function makeEnv(fetchOk) {
     }
 
     return { w: w, opened: opened, ev: ev };
+}
+
+function makeMenuEnv(url) {
+    const dom = new JSDOM('<!DOCTYPE html><body></body>', {
+        runScripts: 'outside-only',
+        url: url,
+    });
+    const w = dom.window;
+    const launches = [];
+    w.openArtifactLink = function(event, targetUrl, port, label) {
+        launches.push({ event: event, url: targetUrl, port: port, label: label });
+    };
+    vm.runInContext(MENU_LAUNCH_SRC, dom.getInternalVMContext());
+    return { w: w, launches: launches };
 }
 
 // ── Test runner ───────────────────────────────────────────────────────────────
@@ -167,6 +182,31 @@ function check(label, cond, detail) {
         await w.openArtifactLink(ev(), '', 21279, 'lbl');
         check('AL-7 empty url: window.open not called', opened.length === 0,
               'count=' + opened.length);
+    }
+
+    // AL-8: hamburger buttons use the same launch flow as Docs sidebar links ──
+    {
+        const { w, launches } = makeMenuEnv('https://5000-demo.replit.dev/simulator/');
+        w.openArtifact({}, 21279, '/', '/ide-intro/', 'IDE Introduction');
+        check('AL-8 dev hamburger link uses the artifact proxy URL',
+              launches.length === 1 && launches[0].url === 'https://21279-demo.replit.dev/',
+              JSON.stringify(launches));
+        check('AL-8 dev hamburger link probes the artifact port',
+              launches[0] && launches[0].port === 21279,
+              JSON.stringify(launches[0]));
+    }
+
+    // AL-9: production never points a user at an unavailable dev-server port ──
+    {
+        const { w, launches } = makeMenuEnv('https://church-machine.replit.app/simulator/');
+        w.openArtifact({}, 21279, '/handout', '/ide-intro/handout', 'Facilitator Handout');
+        check('AL-9 production hamburger link stays on the IDE origin',
+              launches.length === 1 &&
+              launches[0].url === 'https://church-machine.replit.app/ide-intro/handout',
+              JSON.stringify(launches));
+        check('AL-9 production hamburger link skips the dev-server probe',
+              launches[0] && launches[0].port === 0,
+              JSON.stringify(launches[0]));
     }
 
     // Summary ─────────────────────────────────────────────────────────────────
