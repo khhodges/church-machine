@@ -291,12 +291,13 @@ function SlideViewer() {
 export default function App() {
   const [location, navigate] = useLocation();
 
-  // DO NOT edit this useEffect - redirects unknown routes to the first slide.
-  // The "/" and "/allslides" routes are handled separately below.
+  // Keep non-slide top-level routes out of the unknown-route redirect. The
+  // handout is a standalone printable page, not a numbered presentation slide.
   useEffect(() => {
     if (
       location !== '/' &&
       location !== '/allslides' &&
+      location !== '/handout' &&
       getSlideIndex(location) === -1
     ) {
       if (slides.length > 0) {
