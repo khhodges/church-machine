@@ -1402,7 +1402,7 @@ def robots_txt():
     content = (
         "User-agent: *\n"
         "Allow: /\n"
-        "Sitemap: https://haskell-main-1.replit.app/sitemap.xml\n"
+        "Sitemap: https://lab.cloomc.org/sitemap.xml\n"
         "# AI crawler guidance\n"
         "# See /llms.txt for a structured index of documentation\n"
     )
@@ -1436,10 +1436,10 @@ def sitemap_xml():
     content = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-        '  <url><loc>https://haskell-main-1.replit.app/</loc><priority>1.0</priority></url>\n'
-        '  <url><loc>https://haskell-main-1.replit.app/simulator/</loc><priority>0.9</priority></url>\n'
-        '  <url><loc>https://haskell-main-1.replit.app/docs/</loc><priority>0.7</priority></url>\n'
-        '  <url><loc>https://haskell-main-1.replit.app/python-demo/</loc><priority>0.6</priority></url>\n'
+        '  <url><loc>https://lab.cloomc.org/</loc><priority>1.0</priority></url>\n'
+        '  <url><loc>https://lab.cloomc.org/simulator/</loc><priority>0.9</priority></url>\n'
+        '  <url><loc>https://lab.cloomc.org/docs/</loc><priority>0.7</priority></url>\n'
+        '  <url><loc>https://lab.cloomc.org/python-demo/</loc><priority>0.6</priority></url>\n'
         '</urlset>\n'
     )
     return make_response(content, 200, {"Content-Type": "application/xml; charset=utf-8"})
@@ -3059,6 +3059,13 @@ def start_here():
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Getting Started — Church Machine</title>
+<meta name="description" content="Three-step guide to flashing the Wukong A7 FPGA, connecting it to the Church Machine IDE, and running your first CLOOMC program.">
+<link rel="canonical" href="https://lab.cloomc.org/start-guide">
+<meta property="og:title" content="Getting Started — Church Machine">
+<meta property="og:description" content="Three-step guide to flashing, connecting, and running your first CLOOMC program on the Church Machine FPGA IDE.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://lab.cloomc.org/start-guide">
+<meta property="og:site_name" content="Church Machine">
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:system-ui,sans-serif;background:#0a0e17;color:#c8d6e5;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:40px 24px 64px}
@@ -3555,7 +3562,15 @@ def release_r1_index():
     html = f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CM Release 1 — Document Set</title>
+<meta name="description" content="14-document CM Release 1 package from Kenneth J Hamer-Hodges covering the Church-Turing Meta-Machine architecture, capability-based security, and the Church Machine ISA.">
+<link rel="canonical" href="https://lab.cloomc.org/release/r1/">
+<meta property="og:title" content="CM Release 1 — Document Set">
+<meta property="og:description" content="Complete CM Release 1 document set — 14 PDFs covering the Church-Turing Meta-Machine architecture and capability-based secure computing.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://lab.cloomc.org/release/r1/">
+<meta property="og:site_name" content="Church Machine">
 <style>
   body{{font-family:system-ui,sans-serif;background:#0a0e17;color:#c8d6e5;padding:32px;max-width:860px;margin:0 auto}}
   h1{{color:#daa520;margin-bottom:4px}}
@@ -3599,6 +3614,13 @@ def release_r12_index():
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Church Machine — Wukong Artix-7 Download</title>
+<meta name="description" content="Download the QMTECH Wukong Artix-7 FPGA package for the Church Machine IDE — Verilog netlist, XDC pin constraints, Vivado build script, and pre-built bitstream.">
+<link rel="canonical" href="https://lab.cloomc.org/release/r12/">
+<meta property="og:title" content="Church Machine — Wukong Artix-7 Download">
+<meta property="og:description" content="Download the complete Wukong Artix-7 FPGA package for Church Machine — Verilog netlist, pin constraints, Vivado build script, and pre-built bitstream.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://lab.cloomc.org/release/r12/">
+<meta property="og:site_name" content="Church Machine">
 <style>
   *{box-sizing:border-box}
   body{font-family:system-ui,sans-serif;background:#0a0e17;color:#c8d6e5;padding:24px 20px;max-width:720px;margin:0 auto}
