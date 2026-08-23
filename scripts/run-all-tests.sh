@@ -283,6 +283,9 @@ register_suite "wukong-reconnect-halt-badge-tests" \
 register_suite "wukong-console-warning-tests" \
     'node simulator/test_wukong_console_warning.js'
 
+register_suite "wukong-health-strip-church-only-tests" \
+    'node simulator/test_wukong_health_strip_church_only.js'
+
 register_suite "wukong-trace-cr-server-tests" \
     'python3 -m pytest tests/server/test_wukong_trace_cr_update.py -v'
 
