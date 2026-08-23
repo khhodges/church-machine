@@ -347,38 +347,38 @@ class TestFaultHaltRtlSource:
 
 
 class TestBridgeSentinelHaltOrdering:
-    """Bridge sends 'h' AFTER consuming the sentinel — no race with trace packets."""
+    """Bridge sends 'r' AFTER consuming the sentinel — no race with trace packets."""
 
     def _get_bridge_src(self) -> str:
         with open(_WUKONG_BRIDGE_PATH) as fh:
             return fh.read()
 
     def test_halt_byte_sent_after_sentinel_consumed(self):
-        """In the bridge main loop, ser.write(b'h') appears AFTER sentinel parsing,
-        not before — so no 'h' byte is injected while boot packets are in flight.
+        """In the bridge main loop, ser.write(b'r') appears AFTER sentinel parsing,
+        not before — so no 'r' byte is injected while boot packets are in flight.
         """
         src = self._get_bridge_src()
         # The bridge parses the sentinel in the elif branch for BOOT_SENTINEL_V* bytes.
-        # Find that branch and confirm ser.write(b'h') is inside it (after the sentinel).
+        # Find that branch and confirm ser.write(b'r') is inside it (after the sentinel).
         sentinel_branch_idx = src.find("BOOT_SENTINEL_V1, BOOT_SENTINEL_V2")
         assert sentinel_branch_idx != -1, (
             "Cannot locate sentinel branch in wukong_bridge.py "
             "(expected 'BOOT_SENTINEL_V1, BOOT_SENTINEL_V2' in elif)"
         )
-        halt_write_idx = src.find("ser.write(b'h')", sentinel_branch_idx)
-        assert halt_write_idx != -1, (
-            "ser.write(b'h') not found after the sentinel branch in wukong_bridge.py — "
-            "board may never enter step mode after bridge attaches"
+        run_write_idx = src.find("ser.write(b'r')", sentinel_branch_idx)
+        assert run_write_idx != -1, (
+            "ser.write(b'r') not found after the sentinel branch in wukong_bridge.py — "
+            "bridge may not send run command after boot sentinel"
         )
-        # Confirm 'h' is sent before any trace-packet forwarding logic
+        # Confirm 'r' is sent before any trace-packet forwarding logic
         # by checking it appears in the sentinel elif block, not the trace-packet if block.
         trace_magic_if_idx = src.find("if b == TRACE_MAGIC:")
         assert trace_magic_if_idx < sentinel_branch_idx, (
             "Unexpected structure: TRACE_MAGIC check should appear before the sentinel branch"
         )
-        # halt_write_idx must be after the sentinel branch start
-        assert halt_write_idx > sentinel_branch_idx, (
-            "ser.write(b'h') must be inside the sentinel branch, after parsing the sentinel"
+        # run_write_idx must be after the sentinel branch start
+        assert run_write_idx > sentinel_branch_idx, (
+            "ser.write(b'r') must be inside the sentinel branch, after parsing the sentinel"
         )
 
     def test_halt_command_byte_is_not_trace_magic(self):

@@ -1471,18 +1471,18 @@ def main():
                         print(f'BOOT: board ready — N_INIT byte=0x{board_n_init_byte:02X} '
                               f'(validation skipped: boot_rom not importable){tu_str}{bv_str}')
 
-                    # Send 'h' immediately so the board enters step mode as soon
-                    # as the bridge attaches.  This means any fault that fires
-                    # during free-run (before the user clicks ▶ HW) will be
-                    # visible rather than running past unnoticed.
+                    # Send 'r' so the CM keeps running freely after the bridge
+                    # attaches.  The hardware fault_halt mechanism (reason=2)
+                    # will pause the CM automatically on any actual fault retire,
+                    # so an unconditional 'h' here is no longer needed.
                     try:
-                        ser.write(b'h')
+                        ser.write(b'r')
                         last_write_ts = time.time()
-                        _bridge_status('automatic_halt_after_sentinel', 'connected',
-                                       'intentional halt after boot sentinel')
+                        _bridge_status('automatic_run_after_sentinel', 'connected',
+                                       'intentional run after boot sentinel')
                     except Exception as exc:
-                        print(f'  [halt send error] {exc}')
-                        _bridge_status('automatic_halt_failed', 'serial_error', str(exc))
+                        print(f'  [run send error] {exc}')
+                        _bridge_status('automatic_run_failed', 'serial_error', str(exc))
 
                     if sentinel['stale']:
                         if tu_version is None:
