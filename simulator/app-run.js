@@ -12920,117 +12920,13 @@ function welcomeSkip() {
     closeWelcome();
 }
 
-const WHATS_NEW_VERSION = '2026-07-10';   // bump this when content changes, not on every deploy
-const WHATS_NEW_FEATURES = [
-    {
-        title: "Named Salvation methods",
-        html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x1F511; Salvation methods now resolve by name</div>` +
-            `<p style="font-size:0.9rem;line-height:1.65;margin-bottom:0.75rem;">` +
-            `The assembler now understands dot-name calls such as <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">CALL Salvation.main</code> ` +
-            `and <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">ELOADCALL CR0, Salvation, main</code>. ` +
-            `Method names are resolved from the abstraction's registered conventions, so you can write readable calls without looking up numeric indices.</p>` +
-            `<p style="font-size:0.88rem;color:#aaa;line-height:1.5;margin:0;">` +
-            `The disassembler and compiler tests cover the same dot-notation paths end to end.</p>`
-    },
-    {
-        title: "Builder ZIP downloads fixed",
-        html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x1F4E6; Download FPGA Package &mdash; what you see is what you get</div>` +
-            `<p style="font-size:0.9rem;line-height:1.65;margin-bottom:0.75rem;">` +
-            `The build log printed after a ZIP download now exactly matches what is inside the file &mdash; for all three boards. ` +
-            `The FPGA package no longer lists a phantom <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">.edif</code> that was never generated; ` +
-            `Wukong and Tang Nano now list <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">local_bridge.py</code> which was silently included; ` +
-            `Tang Nano marks <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">.v</code> and <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">.json</code> as conditional.</p>` +
-            `<p style="font-size:0.88rem;color:#aaa;line-height:1.5;margin:0;">` +
-            `A new test suite enforces that ZIP contents and build log can never drift apart again.</p>`
-    },
-    {
-        title: "Capability access rights",
-        html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x1F512; capabilities { LED0 RW } &mdash; declare what you need</div>` +
-            `<p style="font-size:0.9rem;line-height:1.65;margin-bottom:0.75rem;">` +
-            `You can now declare access rights directly in the <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">capabilities { }</code> block. ` +
-            `Write <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">LED0 RW</code> to declare read-write access, ` +
-            `<code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">Memory E</code> for execute-only, and so on. ` +
-            `Rights tokens (R / W / X / E) are parsed by both the assembler and the CLOOMC++ compiler and carried through to Draft output, save payloads, and editor injection.</p>` +
-            `<p style="font-size:0.88rem;color:#aaa;line-height:1.5;margin:0;">` +
-            `Draft now cross-checks declared rights against sidecar grants and warns if you claimed more than the capability allows.</p>`
-    },
-    {
-        title: "C-list in console & extended LUMP summary",
-        html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x1F4CB; See your C-list and LUMP layout at a glance</div>` +
-            `<p style="font-size:0.9rem;line-height:1.65;margin-bottom:0.75rem;">` +
-            `After a successful assemble or compile the console now appends a <strong>c-list section</strong> listing every capability by row index. ` +
-            `The LUMP disassembly header comment is also extended: ` +
-            `<code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">(17 words, cc=1, 46 free)</code> ` +
-            `shows code-word count, C-list slot count, and freespace in a single line.</p>` +
-            `<p style="font-size:0.88rem;color:#aaa;line-height:1.5;margin:0;">` +
-            `Both the CR-register editor path and the Lumps panel disassembly path show the extended summary.</p>`
-    },
-    {
-        title: "Named method syntax",
-        html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x1F4AC; CALL SlideRule.Multiply &mdash; write what you mean</div>` +
-            `<p style="font-size:0.9rem;line-height:1.65;margin-bottom:0.75rem;">` +
-            `You can now write <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">CALL SlideRule.Multiply</code> or ` +
-            `<code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">CALL CR11, Multiply</code> ` +
-            `instead of looking up method indices by hand. The assembler resolves the method name automatically from the abstraction's loaded conventions.</p>` +
-            `<p style="font-size:0.88rem;color:#aaa;line-height:1.5;margin:0;">` +
-            `The disassembler also produces dot-notation output, so what you write is what you read back.</p>`
-    },
-    {
-        title: "Clickable error panel",
-        html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x1F4CD; Click an error &mdash; jump straight to the line</div>` +
-            `<p style="font-size:0.9rem;line-height:1.65;margin-bottom:0.75rem;">` +
-            `Compiler and assembler errors in the error panel are now clickable. Click any message and the editor scrolls to the ` +
-            `exact failing line and highlights it in the gutter &mdash; no more manually counting lines to find your mistake.</p>` +
-            `<p style="font-size:0.88rem;color:#aaa;line-height:1.5;margin:0;">` +
-            `BRANCH out-of-range errors are also caught at assemble time with a clear message.</p>`
-    },
-    {
-        title: "One-command flash",
-        html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x26A1; flash.sh &mdash; one command to build and flash</div>` +
-            `<p style="font-size:0.9rem;line-height:1.65;margin-bottom:0.75rem;">` +
-            `The FPGA download package now includes <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">flash.sh</code> &mdash; ` +
-            `a single command that runs the full build-to-flash pipeline (nextpnr &rarr; gowin_pack &rarr; openFPGALoader). ` +
-            `It stops on the first error with a diagnostic hint, and ends with an LED success checklist.</p>` +
-            `<p style="font-size:0.88rem;color:#aaa;line-height:1.5;margin:0;">` +
-            `Go to <strong>Builder</strong> &rarr; <strong>Download FPGA Package</strong> to get the new ZIP.</p>`
-    },
-    {
-        title: "Serial bridge in the ZIP",
-        html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x1F310; bridge.sh &mdash; connect your board to the IDE</div>` +
-            `<p style="font-size:0.9rem;line-height:1.65;margin-bottom:0.75rem;">` +
-            `The download package now includes <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">bridge.sh</code> and ` +
-            `<code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">local_bridge.py</code>. ` +
-            `After flashing, run <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">./bridge.sh --ide=https://cloomc.org</code> ` +
-            `and your board appears in the <strong>Devices</strong> panel within seconds.</p>` +
-            `<p style="font-size:0.88rem;color:#aaa;line-height:1.5;margin:0;">` +
-            `No need to clone the repo separately &mdash; the ZIP is fully self-contained.</p>`
-    },
-    {
-        title: "Devices panel",
-        html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x1F4F1; Devices panel &mdash; see and manage connected boards</div>` +
-            `<p style="font-size:0.9rem;line-height:1.65;margin-bottom:0.75rem;">` +
-            `Open <strong>Devices</strong> from the hamburger menu to see every connected FPGA board. ` +
-            `Each board shows its status (online/offline), board type, firmware version, and boot count. ` +
-            `Click <strong>Deploy</strong> to push a compiled abstraction to any board, or ` +
-            `<strong>Deploy All</strong> to update every online board at once.</p>` +
-            `<p style="font-size:0.88rem;color:#aaa;line-height:1.5;margin:0;">` +
-            `Label your boards to keep track of multi-device IoT deployments.</p>`
-    },
-    {
-        title: "FPGA call-home",
-        html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x1F4E1; FPGA call-home &mdash; boards register automatically</div>` +
-            `<p style="font-size:0.9rem;line-height:1.65;margin-bottom:0.75rem;">` +
-            `When a board boots with the current bitstream, it sends a 23-byte call-home packet ` +
-            `over UART (including boot reason, last fault code, and faulting instruction address). The bridge detects this, sends an acknowledgment, and registers the board with the IDE. ` +
-            `A 60-second heartbeat keeps the board marked as online.</p>` +
-            `<p style="font-size:0.88rem;color:#bbb;line-height:1.6;margin-bottom:0.5rem;">` +
-            `Board type byte in the packet: <code>0x01</code> = Tang Nano 20K &nbsp;·&nbsp; ` +
-            `<code>0x03</code> = legacy board code &nbsp;·&nbsp; ` +
-            `<code>0x06</code> = Wukong XC7A100T</p>` +
-            `<p style="font-size:0.88rem;color:#aaa;line-height:1.5;margin:0;">` +
-            `No manual registration needed &mdash; plug in, flash, run bridge, done.</p>`
-    }
-];
+const WHATS_NEW_RELEASE = window.CHURCH_WHATS_NEW_RELEASE;
+if (!WHATS_NEW_RELEASE || typeof WHATS_NEW_RELEASE.version !== 'string' ||
+    !Array.isArray(WHATS_NEW_RELEASE.features) || WHATS_NEW_RELEASE.features.length === 0) {
+    throw new Error('What\'s New release data must load before app-run.js.');
+}
+const WHATS_NEW_VERSION = WHATS_NEW_RELEASE.version;
+const WHATS_NEW_FEATURES = WHATS_NEW_RELEASE.features;
 
 let _whatsNewIdx = 0;
 

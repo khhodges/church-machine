@@ -16,6 +16,7 @@
     "check-ila-probe-names",
     "check-lumps-guard",
     "check-no-ti60-ui",
+    "check-whats-new-feed",
     "check-ns-word3-contract",
     "check-sha32-collisions",
     "check-slot-index-leak",
