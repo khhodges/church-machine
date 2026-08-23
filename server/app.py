@@ -4072,17 +4072,23 @@ def docs_list():
         for item in filenames:
             if isinstance(item, dict) and item.get("type") == "link":
                 dev_domain = os.environ.get("REPLIT_DEV_DOMAIN", "")
-                replit_domains = os.environ.get("REPLIT_DOMAINS", "")
+                # REPLIT_DOMAINS can hold multiple space-separated values
+                # (e.g. "foo.replit.app bar.replit.app").  Extract only the
+                # first token so that it is always a single well-formed domain
+                # and the URL we build is never malformed.
+                _replit_domains_raw = os.environ.get("REPLIT_DOMAINS", "")
+                replit_domain = _replit_domains_raw.split()[0] if _replit_domains_raw.split() else ""
                 port = item.get("artifact_port", 0)
                 path = item.get("artifact_path", "/")
                 production_path = item.get("production_path", "")
                 if dev_domain and port:
                     # Dev workspace: use Replit's port-prefixed proxy URL.
                     url = f"https://{port}-{dev_domain}{path}"
-                elif replit_domains and production_path:
-                    # Production deployment: the artifact is built and served
-                    # by Flask at a fixed path — no port prefix needed.
-                    url = production_path
+                elif replit_domain and production_path:
+                    # Production deployment: build a full absolute URL from the
+                    # primary production domain and the artifact's fixed serving
+                    # path so the link works regardless of the page's base URL.
+                    url = f"https://{replit_domain}{production_path}"
                 else:
                     # Neither dev domain nor production domain is set (e.g. CI
                     # or a standalone install).  Disable the link rather than
