@@ -199,6 +199,30 @@ def test_uncorrelated_fault_reason_snapshot_does_not_replace_last_fault(client):
     assert stored['snapshot_complete'] is True
 
 
+def test_incomplete_fault_snapshot_never_authorizes_recovery(client):
+    """A fault trace alone, or an incomplete AC payload, cannot authorize g."""
+    before = client.get('/api/fault-snapshot').get_json()
+    trace = {
+        'nia': 0x164, 'ev_type': 0, 'payload_gt': 0,
+        'flags': 0, 'fault_code': 3, 'fault_valid': True,
+        'bp_hit': False, 'ts': time.time(),
+    }
+    trace_response = client.post('/hardware/wukong/trace', data=json.dumps(trace),
+                                 content_type='application/json')
+    trace_meta = trace_response.get_json()
+    incomplete = _snapshot()
+    incomplete['reason'] = 2
+    incomplete['cr'] = incomplete['cr'][:-1]
+    incomplete['fault_trace_seq'] = trace_meta['seq']
+    incomplete['fault_boot_id'] = trace_meta['boot_id']
+    response = client.post('/hardware/wukong/snapshot',
+                           data=json.dumps(incomplete),
+                           content_type='application/json')
+    assert response.status_code == 400
+    assert response.get_json().get('promoted') is not True
+    assert client.get('/api/fault-snapshot').get_json() == before
+
+
 def test_fault_snapshot_uses_correlated_trace_even_after_competing_events(client):
     """A clean or another fault-valid trace cannot hijack an armed recovery."""
     fault_a = {

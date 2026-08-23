@@ -73,6 +73,11 @@ def _ack(client, cmd, cmd_id, ok, error=''):
                        data=json.dumps(body), content_type='application/json')
 
 
+def _bridge_status(client, **body):
+    return client.post('/hardware/wukong/bridge-status',
+                       data=json.dumps(body), content_type='application/json')
+
+
 class TestQueueConsumeAckLifecycle:
     def test_queue_records_delivery_entry(self, client):
         t0 = time.time()
@@ -193,6 +198,26 @@ class TestQueueConsumeAckLifecycle:
     def test_no_delivery_record_before_first_command(self, client):
         assert _status(client)['command_delivery'] is None
 
+    def test_delayed_consumption_is_not_delivery(self, client):
+        """Polling status while the bridge is disconnected leaves reboot pending."""
+        queued = _post_cmd(client, 'f').get_json()
+        d = _status(client)
+        assert d['command_delivery']['id'] == queued['id']
+        assert d['command_delivery']['consumed_ts'] is None
+        assert d['command_delivery']['write_ok'] is None
+        assert d['halt']['state'] == 'reboot pending'
+        assert 'not proven written' in d['halt']['reason']
+
+    def test_old_bridge_without_write_ack_stays_pending(self, client):
+        """Legacy bridges dequeue commands but cannot prove UART delivery."""
+        queued = _post_cmd(client, 'f').get_json()
+        got = client.get('/hardware/wukong/command').get_json()
+        assert got['id'] == queued['id']
+        d = _status(client)
+        assert d['command_delivery']['consumed_ts'] is not None
+        assert d['command_delivery']['write_ok'] is None
+        assert d['halt']['state'] == 'reboot pending'
+
 
 class TestOverwriteBehavior:
     def test_overwrite_surfaced_in_response(self, client):
@@ -209,6 +234,37 @@ class TestOverwriteBehavior:
         # New command wins the single slot; delivery record follows it.
         assert _status(client)['command_delivery']['cmd'] == 's'
         assert client.get('/hardware/wukong/command').get_json().get('cmd') == 's'
+
+
+class TestBridgeDisconnectDiagnostics:
+    def test_network_and_serial_reconnect_events_keep_session_timestamps(self, client):
+        session = 'bridge-session-a'
+        assert _bridge_status(
+            client, session_id=session, serial_port='/dev/ttyUSB0',
+            event='poll_failed', state='network_error',
+            reason='HTTPS poll disconnected').status_code == 200
+        assert _bridge_status(
+            client, session_id=session, serial_port='/dev/ttyUSB1',
+            event='reconnect_attempt', state='reconnecting',
+            reason='USB port renumbered', reconnect_attempt=2).status_code == 200
+        status = _status(client)
+        assert status['bridge']['session_id'] == session
+        assert status['bridge']['state'] == 'reconnecting'
+        timeline = status['bridge_timeline']
+        assert len(timeline) >= 2
+        assert [event['session_id'] for event in timeline[-2:]] == [session, session]
+        assert all(isinstance(event['ts'], (int, float)) for event in timeline[-2:])
+        assert timeline[-1]['serial_port'] == '/dev/ttyUSB1'
+        assert timeline[-1]['reconnect_attempt'] == 2
+
+    def test_timeline_is_bounded_without_losing_latest_actionable_event(self, client):
+        for i in range(_app_module._WUKONG_BRIDGE_TIMELINE_MAXLEN + 20):
+            _bridge_status(client, session_id=f's-{i}', event='heartbeat',
+                           state='connected', serial_port=f'USB{i}')
+        timeline = _status(client)['bridge_timeline']
+        assert len(timeline) == 32  # status intentionally exposes latest 32
+        assert timeline[0]['session_id'] == f's-{_app_module._WUKONG_BRIDGE_TIMELINE_MAXLEN + 20 - 32}'
+        assert timeline[-1]['session_id'] == 's-147'
 
     def test_no_overwrite_flag_after_consumption(self, client):
         _post_cmd(client, 'f')

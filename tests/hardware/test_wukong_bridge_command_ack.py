@@ -127,6 +127,23 @@ class TestWriteFailure:
         assert j['cmd'] == 'z'
         assert j['ok'] is False
 
+    def test_read_or_write_serial_exception_is_reported(self, acks):
+        """A consumed command with a dead UART produces an explicit failure."""
+        ser = FakeSerial(fail=True)
+        _run('s', ser, data={'id': 99})
+        assert acks[-1]['json'] == {
+            'cmd': 's', 'ok': False, 'error': 'serial write failed: port dead',
+            'id': 99,
+        }
+
+    def test_serial_write_exception_ack_includes_bridge_session(self, acks):
+        ser = FakeSerial(fail=True)
+        bridge.execute_board_command('s', {'id': 100}, ser,
+                                     lambda: ser, bytearray(), IDE, True,
+                                     session_id='bridge-session-1')
+        assert acks[-1]['json']['session_id'] == 'bridge-session-1'
+        assert acks[-1]['json']['id'] == 100
+
     def test_ack_post_failure_never_raises(self, monkeypatch):
         def boom(*a, **k):
             raise ConnectionError('server down')
