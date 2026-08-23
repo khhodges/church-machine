@@ -179,10 +179,14 @@
 
 <div id="statusGrid" class="grid">
   <div class="card">
-    <h2>Bridge</h2>
+    <h2>Bridge &amp; Server</h2>
     <div class="row"><span class="k">Connection</span><span class="v big" id="bridgeState"><span class="dot bad"></span>—</span></div>
     <div class="row"><span class="k">Last command poll</span><span class="v" id="bridgeAge">—</span></div>
     <div class="row"><span class="k">Last trace packet</span><span class="v" id="traceAge">—</span></div>
+    <div class="row"><span class="k">Bridge session / serial</span><span class="v" id="bridgeIdentity">no active bridge</span></div>
+    <div class="row"><span class="k">Server events / queue</span><span class="v" id="serverPipe">0 / 0</span></div>
+    <div class="row"><span class="k">Command lifecycle</span><span class="v" id="cmdDelivery">no active command</span></div>
+    <div class="row"><span class="k">Reconnect / last error</span><span class="v" id="bridgeEvidence">none</span></div>
   </div>
   <div class="card">
     <h2>Board</h2>
@@ -191,7 +195,6 @@
     <div class="row"><span class="k">Last location</span><span class="v" id="lastLocation">—</span></div>
     <div class="row"><span class="k">Last instruction</span><span class="v" id="lastInstruction">—</span></div>
     <div class="row"><span class="k">Flags (NZCV)</span><span class="v" id="lastFlags">—</span></div>
-    <div class="row"><span class="k">Fault</span><span class="v" id="lastFault">—</span></div>
     <div class="row"><span class="k">Call depth</span><span class="v" id="callDepth">—</span></div>
   </div>
   <div class="card">
@@ -202,14 +205,18 @@
     <div class="row"><span class="k">IDE version</span><span class="v" id="ideVersion">—</span></div>
     <div class="row"><span class="k">Upload in flight</span><span class="v" id="uploadState">no</span></div>
     <div class="row"><span class="k">Pending command</span><span class="v" id="pendingCmd">none</span></div>
-    <div class="row"><span class="k">Last cmd delivery</span><span class="v" id="cmdDelivery">—</span></div>
+    <div class="row"><span class="k">Last sentinel</span><span class="v" id="lastSentinel">none</span></div>
   </div>
   <div class="card">
-    <h2>Server</h2>
-    <div class="row"><span class="k">Events received</span><span class="v" id="serverSeq">0</span></div>
-    <div class="row"><span class="k">Queue length</span><span class="v" id="queueLen">0</span></div>
-    <div class="row"><span class="k">CR6 GT</span><span class="v" id="cr6gt">—</span></div>
-    <div class="row"><span class="k">CR14 GT</span><span class="v" id="cr14gt">—</span></div>
+    <h2>FAULT</h2>
+    <div class="row"><span class="k">Halt classification</span><span class="v big" id="faultState">no active fault</span></div>
+    <div class="row"><span class="k">Why execution stopped</span><span class="v" id="faultReason">no active fault</span></div>
+    <div class="row"><span class="k">Code / stage</span><span class="v" id="faultCode">no active fault</span></div>
+    <div class="row"><span class="k">Faulting NIA / location</span><span class="v" id="faultLocation">no active fault</span></div>
+    <div class="row"><span class="k">Instruction / breakpoint</span><span class="v" id="faultInstruction">no active fault</span></div>
+    <div class="row"><span class="k">Snapshot evidence</span><span class="v" id="faultSnapshot">no active fault</span></div>
+    <div class="row"><span class="k">Recovery authorization</span><span class="v" id="faultRecovery">manual reboot is separate</span></div>
+    <div class="row"><span class="k">Relevant evidence</span><span class="v" id="faultEvidence">no active fault</span></div>
   </div>
 </div>
 <div class="status-note" role="note"><strong>Reading this page:</strong> status cards are the latest bridge/board snapshot; they are not the historical log. The log below is the server's arrival-ordered history from the same Wukong hardware feed.</div>
@@ -450,7 +457,7 @@
     0x13:'STACK_UNDERFLOW', 0x14:'IRQ_NULL_BASE', 0x15:'OUTFORM_CRC',
     0x16:'OUTFORM_ALLOC', 0x17:'OUTFORM_MINT', 0x18:'OUTFORM_HDR',
     0x19:'OUTFORM_TIMEOUT', 0x1A:'OUTFORM_UNAUTH',
-    0x1B:'IMMUTABLE_SELF_CAP'
+    0x1B:'IMMUTABLE_SELF_CAP', 0x1C:'STRUCTURAL_REG'
   };
   var cursor = 0;
   var logEl = document.getElementById('log');
@@ -997,6 +1004,15 @@
       else setState('bridgeState', 'bad', 'never seen');
       document.getElementById('bridgeAge').textContent = ageStr(s.bridge_poll_age);
       document.getElementById('traceAge').textContent = ageStr(s.last_trace_age);
+      var br = s.bridge || {};
+      document.getElementById('bridgeIdentity').textContent =
+        (br.session_id ? br.session_id.slice(0, 12) : 'no active bridge') +
+        (br.serial_port ? ' / ' + br.serial_port : '');
+      document.getElementById('serverPipe').textContent =
+        (s.server_seq || 0) + ' / ' + (s.queue_len || 0);
+      var be = document.getElementById('bridgeEvidence');
+      be.textContent = br.reason || (br.reconnect_attempt ? 'attempt ' + br.reconnect_attempt : 'none');
+      be.className = br.state === 'connected' || !br.state ? 'v good' : 'v fault';
 
       var lt = s.latest_trace || {};
       if (s.last_trace_age !== null && s.last_trace_age !== undefined && s.last_trace_age < 3)
@@ -1011,12 +1027,30 @@
       document.getElementById('lastLocation').textContent = lt.nia_label || 'unknown';
       document.getElementById('lastInstruction').textContent = lt.disasm || 'unavailable';
       document.getElementById('lastFlags').textContent = lt.flags !== undefined ? flags(lt.flags) : '—';
-      var fEl = document.getElementById('lastFault');
-      if (lt.fault_valid) {
-        fEl.textContent = FAULT_NAMES[lt.fault_code] || ('0x' + (lt.fault_code || 0).toString(16));
-        fEl.className = 'v fault';
-      } else { fEl.textContent = 'none'; fEl.className = 'v good'; }
       document.getElementById('callDepth').textContent = s.call_depth;
+      var h = s.halt || {};
+      var hs = document.getElementById('faultState');
+      hs.textContent = h.state || 'no active fault';
+      hs.className = h.state === 'running' ? 'v good big' :
+        (h.active_fault ? 'v fault big' : 'v warn big');
+      document.getElementById('faultReason').textContent = h.reason || 'no active fault';
+      document.getElementById('faultCode').textContent = h.active_fault ?
+        (h.fault_name + ' / ' + (h.fault_stage || 'unknown')) : 'no active fault';
+      document.getElementById('faultLocation').textContent = h.active_fault ?
+        (hex(h.nia) + ' / ' + (h.location || 'unknown')) : 'no active fault';
+      document.getElementById('faultInstruction').textContent = h.active_fault ?
+        ((h.instruction || 'instruction unavailable') + ' / breakpoint ' +
+         (h.breakpoint_hit ? 'hit' : 'not hit')) : 'no active fault';
+      document.getElementById('faultSnapshot').textContent = h.active_fault ?
+        ('complete=' + (h.snapshot_complete ? 'yes' : 'no') +
+         ', correlated=' + (h.snapshot_correlated ? 'yes' : 'no') +
+         ', promoted=' + (h.snapshot_promoted ? 'yes' : 'no')) : 'no active fault';
+      document.getElementById('faultRecovery').textContent = h.active_fault ?
+        (h.recovery_authorized ? 'authorized' : 'not authorized — automatic recovery remains blocked') :
+        'manual reboot is separate';
+      document.getElementById('faultEvidence').textContent = h.active_fault ?
+        ('command #' + (h.last_command_id || 'none') + '; ' +
+         (br.reason || 'review bridge timeline')) : 'no active fault';
 
       var bi = s.boot_info || {};
       if (bi.tu_version !== undefined && Object.keys(bi).length) {
@@ -1026,6 +1060,9 @@
         document.getElementById('tuVersion').textContent = bi.tu_version;
         if (bi.build_version != null)
           document.getElementById('boardBuildVersion').textContent = 'v' + bi.build_version;
+        document.getElementById('lastSentinel').textContent =
+          'seen ' + ageStr((Date.now() / 1000) - bi.received_ts) +
+          (bi.stale_tu ? ' — stale' : ' — current');
       } else if (s.bridge_connected) {
         // Bridge attached mid-stream: the board booted before the bridge was
         // listening, so no sentinel was captured this session.  Tell the user
@@ -1080,11 +1117,6 @@
         cdEl.textContent = "'" + cd.cmd + "' queued (not consumed)";
         cdEl.className = 'v dim';
       }
-      document.getElementById('serverSeq').textContent = s.server_seq;
-      document.getElementById('queueLen').textContent = s.queue_len;
-      document.getElementById('cr6gt').textContent  = s.cr6_gt  != null ? hex(s.cr6_gt)  : '—';
-      document.getElementById('cr14gt').textContent = s.cr14_gt != null ? hex(s.cr14_gt) : '—';
-
       if (lastServerSeq !== null && s.server_seq < lastServerSeq) {
         note('server restarted — event counter reset (' + lastServerSeq + ' → ' + s.server_seq + ')');
         cursor = 0;

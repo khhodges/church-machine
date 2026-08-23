@@ -48,6 +48,7 @@ import os
 import struct
 import sys
 import time
+import uuid
 
 try:
     import serial
@@ -389,7 +390,7 @@ _FAULT_NAMES = {
     0x12: 'STACK_CORRUPT', 0x13: 'STACK_UNDERFLOW', 0x14: 'IRQ_NULL_BASE',
     0x15: 'OUTFORM_CRC',   0x16: 'OUTFORM_ALLOC', 0x17: 'OUTFORM_MINT',
     0x18: 'OUTFORM_HDR',   0x19: 'OUTFORM_TIMEOUT', 0x1A: 'OUTFORM_UNAUTH',
-    0x1B: 'IMMUTABLE_SELF_CAP',
+    0x1B: 'IMMUTABLE_SELF_CAP', 0x1C: 'STRUCTURAL_REG',
 }
 MAX_FAULT_CODE = max(_FAULT_NAMES)   # highest defined FaultType
 
@@ -924,23 +925,26 @@ def try_parse_utf8_sequence(buf, i):
     return (n, text)
 
 
-def post_command_ack(ide_base, verify_tls, cmd, ok, error='', cmd_id=None):
+def post_command_ack(ide_base, verify_tls, cmd, ok, error='', cmd_id=None,
+                      session_id=None):
     """Report the serial-write result for a dequeued command to the server.
 
     Delivery of the ack is best-effort; a failure to POST never interrupts
     the bridge loop.
     """
     try:
+        payload = {'cmd': cmd, 'ok': ok, 'error': error, 'id': cmd_id}
+        if session_id:
+            payload['session_id'] = session_id
         requests.post(f'{ide_base}/hardware/wukong/command-ack',
-                      json={'cmd': cmd, 'ok': ok, 'error': error,
-                            'id': cmd_id},
+                      json=payload,
                       timeout=1, verify=verify_tls)
     except Exception as exc:
         print(f'  [command-ack POST error] {exc}', flush=True)
 
 
 def execute_board_command(cmd, data, ser, reopen_serial, buf,
-                          ide_base, verify_tls):
+                          ide_base, verify_tls, session_id=None):
     """Write a dequeued command ('s','r','h','q','b','f') to the board's UART.
 
     Reports success/failure back to the server via POST
@@ -967,12 +971,12 @@ def execute_board_command(cmd, data, ser, reopen_serial, buf,
                 except ValueError:
                     post_command_ack(ide_base, verify_tls, cmd, False,
                                      f'unparseable breakpoint nia {raw_nia!r}',
-                                     cmd_id=cmd_id)
+                    cmd_id=cmd_id, session_id=session_id)
                     return ser
             if not (0 <= nia_val <= 0xFFFFFFFF):
                 post_command_ack(ide_base, verify_tls, cmd, False,
                                  f'breakpoint nia out of range: {nia_val}',
-                                 cmd_id=cmd_id)
+                                 cmd_id=cmd_id, session_id=session_id)
                 return ser
             ser.write(b'b' + struct.pack('>I', nia_val))
         elif cmd == 'f':
@@ -988,14 +992,16 @@ def execute_board_command(cmd, data, ser, reopen_serial, buf,
         else:
             post_command_ack(ide_base, verify_tls, cmd, False,
                              f'bridge does not understand command {cmd!r}',
-                             cmd_id=cmd_id)
+                             cmd_id=cmd_id, session_id=session_id)
             return ser
-        post_command_ack(ide_base, verify_tls, cmd, True, cmd_id=cmd_id)
+        post_command_ack(ide_base, verify_tls, cmd, True, cmd_id=cmd_id,
+                         session_id=session_id)
     except Exception as exc:
         print(f'  [command] serial write FAILED for {cmd!r}: {exc}',
               flush=True)
         post_command_ack(ide_base, verify_tls, cmd, False,
-                         f'serial write failed: {exc}', cmd_id=cmd_id)
+                         f'serial write failed: {exc}', cmd_id=cmd_id,
+                         session_id=session_id)
     return ser
 
 
@@ -1116,6 +1122,27 @@ def main():
           'discarded until the first valid trace frame or boot sentinel',
           flush=True)
     sync = StreamSync(out=lambda msg: print(msg, flush=True))
+    session_id = uuid.uuid4().hex
+    bridge_state = 'connected'
+    last_read_ts = None
+    last_write_ts = None
+
+    def _bridge_status(event='heartbeat', state=None, reason='',
+                       reconnect_attempt=0):
+        """Best-effort health publication; never blocks the UART loop."""
+        payload = {
+            'session_id': session_id, 'serial_port': port,
+            'event': event, 'state': state or bridge_state, 'reason': reason,
+            'reconnect_attempt': reconnect_attempt,
+            'last_read_ts': last_read_ts, 'last_write_ts': last_write_ts,
+        }
+        try:
+            requests.post(f'{ide_base}/hardware/wukong/bridge-status',
+                          json=payload, timeout=0.5, verify=verify_tls)
+        except Exception as exc:
+            print(f'[bridge] status POST failed: {exc}', flush=True)
+
+    _bridge_status('session_started', 'connected')
 
     buf          = bytearray()
     last_poll    = 0.0
@@ -1164,6 +1191,8 @@ def main():
         except Exception:
             pass
         for attempt in range(15):
+            _bridge_status('reconnect_attempt', 'reconnecting',
+                           'waiting for serial port', attempt + 1)
             found = _find_serial_port(port)
             try:
                 s = serial.Serial(found, args.baud, timeout=0.05)
@@ -1171,6 +1200,8 @@ def main():
                     print(f'[bridge] USB renumbered: {port} → {found}', flush=True)
                     port = found
                 print(f'[bridge] serial port reopened ({port})', flush=True)
+                _bridge_status('reconnected', 'connected',
+                               f'serial port available: {port}')
                 # Attach flush + quiet resync: drop the frame lock and any
                 # partial buffer so we re-acquire alignment without spraying
                 # misaligned payload bytes as console text.
@@ -1186,14 +1217,20 @@ def main():
                 print(f'[bridge] reopen attempt {attempt+1}/15 failed ({found}): {exc}', flush=True)
                 time.sleep(1)
         print(f'[bridge] ERROR: could not reopen serial port after 15 attempts', file=sys.stderr)
+        _bridge_status('reconnect_failed', 'serial_error',
+                       'could not reopen serial port after 15 attempts', 15)
         return ser  # return old object; read loop will keep failing gracefully
 
     try:
         while True:
             try:
                 chunk = ser.read(128)
+                if chunk:
+                    last_read_ts = time.time()
             except (serial.SerialException, OSError) as exc:
                 print(f'[bridge] serial read error: {exc} — reopening port', flush=True)
+                bridge_state = 'serial_error'
+                _bridge_status('serial_read_error', bridge_state, str(exc))
                 ser = _reopen_serial()
                 buf.clear()
                 continue
@@ -1440,8 +1477,12 @@ def main():
                     # visible rather than running past unnoticed.
                     try:
                         ser.write(b'h')
+                        last_write_ts = time.time()
+                        _bridge_status('automatic_halt_after_sentinel', 'connected',
+                                       'intentional halt after boot sentinel')
                     except Exception as exc:
                         print(f'  [halt send error] {exc}')
+                        _bridge_status('automatic_halt_failed', 'serial_error', str(exc))
 
                     if sentinel['stale']:
                         if tu_version is None:
@@ -1470,7 +1511,8 @@ def main():
                             requests.post(
                                 f'{ide_base}/hardware/wukong/boot-info',
                                 json={'stale_tu': True, 'tu_version': post_tu,
-                                      'build_version': build_version},
+                                      'build_version': build_version,
+                                      'session_id': session_id},
                                 timeout=1, verify=verify_tls)
                         except Exception as exc:
                             print(f'  [boot-info POST error] {exc}')
@@ -1480,7 +1522,8 @@ def main():
                             requests.post(
                                 f'{ide_base}/hardware/wukong/boot-info',
                                 json={'stale_tu': False, 'tu_version': tu_version,
-                                      'build_version': build_version},
+                                      'build_version': build_version,
+                                      'session_id': session_id},
                                 timeout=1, verify=verify_tls)
                         except Exception as exc:
                             print(f'  [boot-info POST error] {exc}')
@@ -1561,6 +1604,7 @@ def main():
                 try:
                     r = requests.get(
                         f'{ide_base}/hardware/wukong/command',
+                        headers={'X-Wukong-Session': session_id},
                         timeout=0.1, verify=verify_tls)
                     if r.status_code == 200:
                         data = r.json() or {}
@@ -1568,7 +1612,7 @@ def main():
                         if cmd in ('s', 'r', 'h', 'q', 'b', 'f'):
                             ser = execute_board_command(
                                 cmd, data, ser, _reopen_serial, buf,
-                                ide_base, verify_tls)
+                                ide_base, verify_tls, session_id)
                         elif cmd == 'u':
                             try:
                                 _leftover = _handle_upload(
@@ -1592,8 +1636,9 @@ def main():
                                         timeout=2, verify=verify_tls)
                                 except Exception:
                                     pass
-                except Exception:
-                    pass
+                except Exception as exc:
+                    bridge_state = 'network_error'
+                    _bridge_status('http_error', bridge_state, str(exc))
 
     except KeyboardInterrupt:
         print('\nBridge stopped.')

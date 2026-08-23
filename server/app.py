@@ -12031,6 +12031,10 @@ _wukong_last_trace_post  = 0.0
 # distinguish "never seen" (== 0) from "stale / timed out" (> 0).
 _wukong_total_trace_posts  = 0   # every POST /hardware/wukong/trace
 _wukong_total_bridge_polls = 0   # every GET  /hardware/wukong/command
+_wukong_bridge_lock         = _wk_threading.Lock()
+_wukong_bridge_info         = {}
+_wukong_bridge_timeline     = []
+_WUKONG_BRIDGE_TIMELINE_MAXLEN = 128
 # Command delivery lifecycle record for the most recent command.  Lets the
 # /fpga page distinguish "still queued" / "bridge consumed it" / "written to
 # the board's UART" instead of fire-and-forget.  Protected by
@@ -12047,6 +12051,113 @@ _wukong_total_bridge_polls = 0   # every GET  /hardware/wukong/command
 #                 duplicate ack can never be attributed to the wrong command
 _wukong_cmd_delivery = None
 _wukong_cmd_id       = 0     # monotonic; incremented under _wukong_command_lock
+
+
+def _record_wukong_bridge_event(event, state='', reason='', session_id='',
+                                serial_port='', reconnect_attempt=0):
+    item = {
+        'ts': _wk_time.time(), 'session_id': str(session_id or '')[:128],
+        'event': str(event or '')[:80], 'state': str(state or '')[:40],
+        'reason': str(reason or '')[:400], 'serial_port': str(serial_port or '')[:128],
+        'reconnect_attempt': int(reconnect_attempt or 0),
+    }
+    with _wukong_bridge_lock:
+        _wukong_bridge_timeline.append(item)
+        del _wukong_bridge_timeline[:-_WUKONG_BRIDGE_TIMELINE_MAXLEN]
+
+
+def _wukong_halt_summary(latest, snapshot, delivery, bridge, now):
+    """Return conservative, evidence-based stop classification for dashboards."""
+    fault = bool(latest.get('fault_valid'))
+    bp = bool(latest.get('bp_hit'))
+    age = (now - float(latest.get('ts', now))) if latest.get('ts') else None
+    command = delivery or {}
+    if command.get('cmd') == 'f' and command.get('write_ok') is None:
+        state, reason = 'reboot pending', 'reboot is not proven written to the board'
+    elif bridge.get('state') in ('reconnecting', 'serial_error'):
+        state, reason = 'serial reconnecting', bridge.get('reason') or 'serial link recovery in progress'
+    elif fault:
+        state, reason = 'fault hold', 'the FPGA reported a fault and is held for snapshot/recovery'
+    elif bp:
+        state, reason = 'intentional halt', 'execution stopped at a configured breakpoint'
+    elif command.get('cmd') == 'h' and command.get('write_ok') is True:
+        state, reason = 'intentional halt', 'manual halt command was written to the board'
+    elif bridge and bridge.get('state') == 'network_error':
+        state, reason = 'server/network polling gap', bridge.get('reason') or 'bridge cannot reach the server'
+    elif bridge.get('state') == 'silent':
+        state, reason = 'board silent', bridge.get('reason') or 'no recent board data'
+    elif age is not None and age > 3:
+        state, reason = 'intentional halt', 'no newer trace; a missing trace alone is not treated as a fault'
+    else:
+        state, reason = 'running', 'recent board trace activity'
+    return {
+        'state': state, 'reason': reason, 'active_fault': fault,
+        'fault_code': latest.get('fault_code') if fault else None,
+        'fault_name': _wukong_fault_name(latest.get('fault_code')) if fault else None,
+        'fault_stage': 'retire' if fault else None,
+        'nia': latest.get('nia') if fault else None,
+        'location': latest.get('nia_label') if fault else None,
+        'instruction': latest.get('disasm') if fault else None,
+        'breakpoint_hit': bp,
+        'snapshot_complete': bool(snapshot),
+        'snapshot_correlated': bool(snapshot.get('fault_trace_seq')) if snapshot else False,
+        'snapshot_promoted': bool(snapshot.get('promoted')) if snapshot else False,
+        'recovery_authorized': bool(delivery and delivery.get('cmd') == 'g' and
+                                   delivery.get('write_ok')),
+        'last_command_id': command.get('id'),
+    }
+
+
+def _wukong_fault_name(code):
+    names = {
+        0: 'NONE', 1: 'PERM_R', 2: 'PERM_W', 3: 'PERM_X', 4: 'PERM_L',
+        5: 'PERM_S', 6: 'PERM_E', 7: 'NULL_CAP', 8: 'BOUNDS', 9: 'VERSION',
+        10: 'SEAL', 11: 'INVALID_OP', 12: 'TPERM_RSV', 13: 'DOMAIN_PURITY',
+        14: 'BIND', 15: 'F_BIT', 16: 'STACK_OVERFLOW', 17: 'ABSENT_OUTFORM',
+        18: 'STACK_CORRUPT', 19: 'STACK_UNDERFLOW', 20: 'IRQ_NULL_BASE',
+        21: 'OUTFORM_CRC', 22: 'OUTFORM_ALLOC', 23: 'OUTFORM_MINT',
+        24: 'OUTFORM_HDR', 25: 'OUTFORM_TIMEOUT', 26: 'OUTFORM_UNAUTH',
+        27: 'IMMUTABLE_SELF_CAP', 28: 'STRUCTURAL_REG',
+    }
+    return names.get(int(code or 0), 'FAULT_%s' % int(code or 0))
+
+
+@app.route('/hardware/wukong/bridge-status', methods=['POST'])
+def wukong_bridge_status_post():
+    """Accept non-invasive bridge health updates.
+
+    This endpoint is deliberately separate from command polling: a bridge
+    reconnecting from a dead USB port can still tell the IDE what is happening.
+    The timeline is bounded and is diagnostic evidence, not an execution input.
+    """
+    data = request.get_json(silent=True) or {}
+    now = _wk_time.time()
+    session = str(data.get('session_id', '') or '')[:128]
+    event = str(data.get('event', '') or '')[:80]
+    with _wukong_bridge_lock:
+        if session:
+            _wukong_bridge_info.update({
+                'session_id': session,
+                'serial_port': str(data.get('serial_port', '') or '')[:128],
+                'state': str(data.get('state', '') or '')[:40],
+                'reason': str(data.get('reason', '') or '')[:400],
+                'last_read_ts': data.get('last_read_ts'),
+                'last_write_ts': data.get('last_write_ts'),
+                'reconnect_attempt': int(data.get('reconnect_attempt', 0) or 0),
+                'updated_ts': now,
+            })
+        if event or session:
+            item = {
+                'ts': now, 'session_id': session,
+                'event': event or 'heartbeat',
+                'state': str(data.get('state', '') or '')[:40],
+                'reason': str(data.get('reason', '') or '')[:400],
+                'serial_port': str(data.get('serial_port', '') or '')[:128],
+                'reconnect_attempt': int(data.get('reconnect_attempt', 0) or 0),
+            }
+            _wukong_bridge_timeline.append(item)
+            del _wukong_bridge_timeline[:-_WUKONG_BRIDGE_TIMELINE_MAXLEN]
+    return jsonify({'ok': True})
 
 # ── Wukong relay state ────────────────────────────────────────────────────────
 # When relay is active, a background thread polls a remote server (default:
@@ -12813,6 +12924,8 @@ def wukong_command_post():
             'write_error': '',
             'write_ts':    None,
         }
+    _record_wukong_bridge_event('command_queued', 'server',
+                                f"command {cmd!r} queued", '', '', 0)
     resp = {'ok': True, 'id': entry['id']}
     if prev:
         resp['overwrote'] = prev.get('cmd')
@@ -12828,13 +12941,23 @@ def wukong_command_get():
     """
     global _wukong_pending_cmd, _wukong_last_bridge_poll, _wukong_total_bridge_polls
     _wukong_last_bridge_poll    = _wk_time.time()
+    bridge_session = request.headers.get('X-Wukong-Session', '')[:128]
     _wukong_total_bridge_polls += 1
+    if bridge_session:
+        with _wukong_bridge_lock:
+            _wukong_bridge_info.update({
+                'session_id': bridge_session,
+                'state': 'polling',
+                'updated_ts': _wukong_last_bridge_poll,
+            })
     with _wukong_command_lock:
         entry = _wukong_pending_cmd
         _wukong_pending_cmd = None
         if entry and _wukong_cmd_delivery \
                 and _wukong_cmd_delivery.get('id') == entry.get('id'):
             _wukong_cmd_delivery['consumed_ts'] = _wukong_last_bridge_poll
+            if bridge_session:
+                _wukong_cmd_delivery['bridge_session'] = bridge_session
     if entry:
         return jsonify(entry)
     return jsonify({})
@@ -12868,6 +12991,9 @@ def wukong_status_get():
         _d = pending['data']
         pending = {'cmd': pending.get('cmd'),
                    'data_bytes': len(_d) if isinstance(_d, (str, bytes)) else 0}
+    with _wukong_bridge_lock:
+        bridge_info = dict(_wukong_bridge_info)
+        bridge_timeline = list(_wukong_bridge_timeline[-32:])
     bridge_age = (now - _wukong_last_bridge_poll) if _wukong_last_bridge_poll else None
     trace_age  = (now - _wukong_last_trace_post)  if _wukong_last_trace_post  else None
     return jsonify({
@@ -12903,6 +13029,10 @@ def wukong_status_get():
         'upload_in_flight':   upl,
         'pending_command':    pending,
         'command_delivery':   delivery,
+        'bridge':              bridge_info,
+        'bridge_timeline':     bridge_timeline,
+        'halt':                _wukong_halt_summary(latest, snapshot, delivery,
+                                                    bridge_info, now),
         'ide_version':        BUILD_VERSION,
         # Repo-side expectations so the Versions view can compare against the
         # sentinel-reported build_version / tu_version without extra requests.
@@ -12988,6 +13118,7 @@ def wukong_command_ack_post():
     cmd  = str(data.get('cmd', '')).strip()
     ok   = bool(data.get('ok', False))
     err  = str(data.get('error', ''))[:400] if not ok else ''
+    ack_session = str(data.get('session_id', '') or '')[:128]
     try:
         ack_id = int(data.get('id'))
     except (TypeError, ValueError):
@@ -12997,10 +13128,19 @@ def wukong_command_ack_post():
                 and ack_id is not None \
                 and _wukong_cmd_delivery.get('id') == ack_id \
                 and _wukong_cmd_delivery.get('cmd') == cmd \
-                and _wukong_cmd_delivery.get('consumed_ts') is not None:
+                and _wukong_cmd_delivery.get('consumed_ts') is not None \
+                and (not _wukong_cmd_delivery.get('bridge_session') or
+                     not ack_session or
+                     _wukong_cmd_delivery.get('bridge_session') == ack_session):
             _wukong_cmd_delivery['write_ok']    = ok
             _wukong_cmd_delivery['write_error'] = err
             _wukong_cmd_delivery['write_ts']    = _wk_time.time()
+            if ack_session:
+                _wukong_cmd_delivery['bridge_session'] = ack_session
+            _record_wukong_bridge_event(
+                'command_write_ok' if ok else 'command_write_failed',
+                'connected' if ok else 'serial_error', err,
+                ack_session, '', 0)
     return jsonify({'ok': True})
 
 
@@ -13188,12 +13328,24 @@ def wukong_boot_info_post():
         'stale_tu':     bool(data.get('stale_tu', False)),
         'tu_version':   int(data.get('tu_version', 0)),
         'build_version': int(bv) if bv is not None else None,
+        'session_id':   str(data.get('session_id', '') or '')[:128],
         # Server-side receive timestamp: lets the /fpga page confirm a FRESH
         # sentinel arrived after an explicit reboot or authorized fault recovery.
         'received_ts':   _wk_time.time(),
     }
     with _wukong_boot_info_lock:
         _wukong_boot_info = entry
+    with _wukong_bridge_lock:
+        if entry['session_id']:
+            _wukong_bridge_info['session_id'] = entry['session_id']
+        _wukong_bridge_timeline.append({
+            'ts': entry['received_ts'], 'session_id': entry['session_id'],
+            'event': 'boot_sentinel', 'state': 'connected',
+            'reason': 'boot sentinel observed',
+            'serial_port': _wukong_bridge_info.get('serial_port', ''),
+            'reconnect_attempt': 0,
+        })
+        del _wukong_bridge_timeline[:-_WUKONG_BRIDGE_TIMELINE_MAXLEN]
     return jsonify({'ok': True})
 
 
