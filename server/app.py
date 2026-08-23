@@ -1422,7 +1422,7 @@ def health():
 
 @app.route("/favicon.ico")
 def favicon():
-    return make_response('', 204)
+    return redirect("/simulator/favicon.svg", code=301)
 
 @app.route("/api/boot-id")
 def boot_id():
