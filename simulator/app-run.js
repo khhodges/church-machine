@@ -15536,7 +15536,7 @@ function _wukongIsConnected() {
     const panel = document.createElement('div');
     panel.id = 'wukong-hw-log';
     panel.style.cssText = [
-        'display:none',
+        'display:flex',
         'position:fixed',
         'bottom:0',
         'right:0',
@@ -15558,13 +15558,20 @@ function _wukongIsConnected() {
         '<div id="wukong-hw-log-hdr" style="display:flex;align-items:center;justify-content:space-between;padding:3px 8px;background:#12122a;border-bottom:1px solid #3a3a5c;flex-shrink:0;cursor:pointer;" title="Click to collapse/expand">' +
             '<span style="color:#f0c040;font-weight:bold;font-size:11px;">⚡ HW Trace</span>' +
             '<span id="wukong-hw-log-nia" style="color:#8888cc;font-size:10px;flex:1;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:0 8px;"></span>' +
-            '<button id="wukong-hw-log-clear" title="Clear trace log" style="background:none;border:none;color:#8888cc;cursor:pointer;font-size:11px;padding:0 4px;line-height:1;" onclick="event.stopPropagation();var b=document.getElementById(\'wukong-hw-log-body\');if(b)b.innerHTML=\'\';">✕ clear</button>' +
+            '<button id="wukong-hw-log-clear" title="Clear this local view" style="background:none;border:none;color:#8888cc;cursor:pointer;font-size:11px;padding:0 4px;line-height:1;" onclick="event.stopPropagation();var b=document.getElementById(\'wukong-hw-log-body\');if(b)b.innerHTML=\'\';">✕ clear</button>' +
+            '<button id="wukong-hw-log-close" title="Hide HW Trace (server history is retained)" style="background:none;border:none;color:#8888cc;cursor:pointer;font-size:14px;padding:0 4px;line-height:1;">×</button>' +
             '<button id="wukong-hw-log-collapse" title="Minimise" style="background:none;border:none;color:#8888cc;cursor:pointer;font-size:14px;padding:0 4px;line-height:1;">▼</button>' +
         '</div>' +
         '<div class="wukong-hw-log-note" role="note">Execution view for this IDE session. Uses the same Wukong hardware trace/console feed as Testing; decoded events, NIA cursor, and fault context follow this session. Clear or hide this panel locally — the server event history is unchanged.</div>' +
         '<div id="wukong-health-strip" style="flex-shrink:0;padding:3px 8px 3px;background:#0e0e22;border-bottom:1px solid #2a2a44;font-size:10px;line-height:1.6;"></div>' +
-        '<div id="wukong-hw-log-body" style="flex:1;overflow-y:auto;padding:4px 8px;color:#ccccee;line-height:1.5;"></div>';
+        '<div id="wukong-hw-log-body" style="flex:1;overflow:auto;padding:4px 8px;color:#ccccee;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;"></div>';
     document.body.appendChild(panel);
+    var closeBtn = document.getElementById('wukong-hw-log-close');
+    if (closeBtn) closeBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        window._wukongHwLogHidden = true;
+        panel.style.display = 'none';
+    });
 
     // Collapse / expand on header click
     var collapsed = false;
@@ -15705,6 +15712,11 @@ function _wukongClassifyPipelineStages(s, ideSeq, ideLastTs) {
 function _wukongHealthStripHtml(stages) {
     var DOT = { green: '#22c55e', amber: '#f59e0b', red: '#ef4444' };
     var html = '<div style="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:flex-start;">';
+    var esc = typeof _escHtml === 'function' ? _escHtml : function(v) {
+        return String(v == null ? '' : v).replace(/[&<>"]/g, function(c) {
+            return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+        });
+    };
     stages.forEach(function(st) {
         var color = DOT[st.state] || '#888';
         html +=
@@ -15714,7 +15726,7 @@ function _wukongHealthStripHtml(stages) {
                     '<span style="color:#b0b8cc;font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;">' + st.name + '</span>' +
                 '</span>' +
                 (st.state !== 'green' ?
-                    '<span style="color:#9098b0;font-size:9px;padding-left:11px;max-width:220px;white-space:normal;line-height:1.4;">' + st.detail + '</span>' : '') +
+                    '<span style="color:#9098b0;font-size:9px;padding-left:11px;max-width:220px;white-space:normal;line-height:1.4;">' + esc(st.detail) + '</span>' : '') +
             '</span>';
     });
     html += '</div>';
@@ -15920,7 +15932,7 @@ function _wukongUpdateBtn() {
 
     // Show or hide the persistent HW log panel.
     const hwLog = document.getElementById('wukong-hw-log');
-    if (hwLog) hwLog.style.display = connected ? 'flex' : 'none';
+    if (hwLog && !window._wukongHwLogHidden) hwLog.style.display = 'flex';
 
     // Emit a one-time connection-state message into the HW log.
     if (connected !== _wukongWasConnected) {
@@ -16012,6 +16024,7 @@ function wukongConnBtnClick() {
     if (connected) {
         const panel = document.getElementById('wukong-hw-log');
         if (panel) {
+            window._wukongHwLogHidden = false;
             panel.style.display = 'flex';
             // Expand if collapsed (body hidden).
             const body = document.getElementById('wukong-hw-log-body');
@@ -16273,6 +16286,8 @@ const _WUKONG_EV_TRACE_NAMES = {
     0x05: 'CHANGE CR5',
     0x06: 'CALL CR6',
     0x07: 'CALL CR14',
+    0x08: 'CALL push',
+    0x09: 'RETURN pop',
     0x0A: 'RETURN CR6',
     0x0B: 'RETURN CR14',
 };
@@ -16637,6 +16652,68 @@ function _wukongFlagsStr(flags) {
 // Older entries are pruned from the top when this limit is exceeded.
 const _WUKONG_HW_LOG_MAX = 300;
 
+// Canonical event display contract.  The server status page has the same
+// fields and ordering; deliberately use explicit unavailable values for data
+// older bridges do not send.
+function _wukongNormalizeEvent(e) {
+    e = e || {};
+    const snapshot = !!e.snapshot;
+    const ev = snapshot ? 'SNAPSHOT' :
+        (_WUKONG_EV_TRACE_NAMES[e.ev_type] || e.event ||
+         ('EV_0x' + (e.ev_type || 0).toString(16).toUpperCase()));
+    const hasGt = _WUKONG_EV_HAS_GT_PAYLOAD.has(Number(e.ev_type));
+    const raw = e.instr != null ? e.instr : e.instr_word;
+    return {
+        seq: e.seq == null ? 'unavailable' : e.seq,
+        type: snapshot ? 'snapshot' : (e.kind === 'info' ? 'info' : 'trace'),
+        event: ev, nia: e.nia == null ? 'unavailable' : _wukongHex(e.nia),
+        lump: e.pet_name || e.abstraction_label || e.nia_label || 'unavailable',
+        offset: e.offset == null ? 'unavailable' : e.offset,
+        raw: raw == null ? 'unavailable' : _wukongHex(raw),
+        decoded: e.disasm || 'unavailable',
+        source: e.source_map || 'unavailable',
+        flags: e.flags == null ? 'unavailable' : _wukongFlagsStr(e.flags),
+        gt: hasGt ? _wukongHex(e.payload_gt || 0) : 'unavailable',
+        gtLabel: e.gt_label || (hasGt ? (_decodeGtLabel(e.payload_gt >>> 0) || 'unavailable') : 'unavailable'),
+        depth: e.call_depth == null ? 'unavailable' : e.call_depth,
+        breakpoint: e.bp_hit ? 'hit' : 'not hit',
+        fault: e.fault_valid ? ((_WUKONG_FAULT_NAMES[e.fault_code] || 'FAULT_' + e.fault_code) +
+            ' (' + _wukongHex(e.fault_code) + ')') : 'none',
+        reason: e.reason == null ? 'unavailable' : e.reason,
+        integrity: e.integrity || (snapshot ? (e.crc_valid === false ? 'CRC failed' : 'CRC16 verified') : 'unavailable'),
+        availability: snapshot ? ('CR=' + (e.cr ? 'available' : 'unavailable') +
+            ', DR=' + (e.dr ? 'available' : 'unavailable')) : null,
+        state: e.state || 'unavailable'
+    };
+}
+function _wukongHex(v) {
+    return '0x' + (Number(v) >>> 0).toString(16).toUpperCase().padStart(8, '0');
+}
+function _wukongFormatEvent(e) {
+    const n = _wukongNormalizeEvent(e);
+    const t = e.ts ? new Date(e.ts * 1000).toLocaleTimeString() : '--:--:--';
+    if (typeof e.console === 'string')
+        return '[' + t + '] #' + n.seq + '  UART  text=' + e.console;
+    if (n.type === 'info')
+        return '[' + t + '] #' + n.seq + '  INFO  event=' + n.event +
+            ' state=' + n.state + ' reason=' + n.reason;
+    if (n.type === 'snapshot')
+        return '[' + t + '] #' + n.seq + '  SNAPSHOT reason=' + n.reason +
+            ' snapshot_seq=' + (e.snapshot_seq == null ? 'unavailable' : e.snapshot_seq) +
+            ' integrity=' + n.integrity +
+            ' stored_pc=' + (e.stored_packed_pc == null ? 'unavailable' : _wukongHex(e.stored_packed_pc)) +
+            ' stored_nia=' + n.nia + ' ' + n.availability +
+            ' promoted=' + (e.promoted ? 'yes' : 'no') +
+            ' correlated=' + (e.fault_trace_seq ? 'yes' : 'no');
+    return '[' + t + '] #' + n.seq + '  TRACE group=' +
+        (e.group || (e.nia == null ? 'unavailable' : _wukongHex(e.nia) + ':' + n.event.split(' ')[0])) +
+        ' event=' + n.event +
+        ' nia=' + n.nia + ' lump=' + n.lump + ' offset=' + n.offset +
+        ' raw=' + n.raw + ' decoded=' + n.decoded + ' source=' + n.source +
+        ' flags=' + n.flags + ' payload_gt=' + n.gt + ' gt_label=' + n.gtLabel +
+        ' depth=' + n.depth + ' breakpoint=' + n.breakpoint + ' fault=' + n.fault;
+}
+
 function _wukongAppendTrace(data) {
     // Always write to the persistent panel (present regardless of current view).
     // Also write to editorConsole when the user is on the Assembly tab.
@@ -16656,7 +16733,9 @@ function _wukongAppendTrace(data) {
         const line   = document.createElement('div');
         line.className = 'wukong-trace-line' +
             (isWarn ? ' wukong-trace-gap wukong-console-warn' : ' wukong-console-line');
-        line.appendChild(document.createTextNode('\nHW: ' + text));
+        line.appendChild(document.createTextNode(
+            typeof _wukongFormatEvent === 'function'
+                ? _wukongFormatEvent(data) : '\nHW: ' + text));
         for (const target of [con, hwLogBody]) {
             if (!target) continue;
             target.appendChild(line.cloneNode(true));
@@ -16665,6 +16744,16 @@ function _wukongAppendTrace(data) {
             }
             target.scrollTop = target.scrollHeight;
         }
+        return;
+    }
+
+    // Snapshots and bridge lifecycle records are first-class ordered events.
+    if (data.snapshot || data.kind === 'info') {
+        const line = document.createElement('div');
+        line.className = 'wukong-trace-line' + (data.snapshot ? ' wukong-trace-fault' : '');
+        line.appendChild(document.createTextNode(_wukongFormatEvent(data)));
+        _appendToLog(hwLogBody, line, _WUKONG_HW_LOG_MAX);
+        _appendToLog(con, line, 0);
         return;
     }
 
@@ -16869,11 +16958,9 @@ function _wukongAppendTrace(data) {
     // Fault lines get a distinct class so they stand out visually.
     const line = document.createElement('div');
     line.className = 'wukong-trace-line' + (data.fault_valid ? ' wukong-trace-fault' : '');
-    line.appendChild(document.createTextNode(
-        '\nHW: ' + _wukongTraceLocationText(data) +
-        (evTraceName ? '  ' + evTraceName : '') +
-        gtAnnotation +
-        '  flags=' + flags + '  ' + stateStr));
+    line.textContent = typeof _wukongFormatEvent === 'function'
+        ? _wukongFormatEvent(data)
+        : ('\nHW: ' + _wukongTraceLocationText(data) + ' ' + (evTraceName || 'TRACE'));
     if (data.bp_hit) {
         const bpBtn = document.createElement('button');
         bpBtn.className = 'wukong-bp-hit-link';

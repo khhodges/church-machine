@@ -12064,6 +12064,33 @@ def _record_wukong_bridge_event(event, state='', reason='', session_id='',
     with _wukong_bridge_lock:
         _wukong_bridge_timeline.append(item)
         del _wukong_bridge_timeline[:-_WUKONG_BRIDGE_TIMELINE_MAXLEN]
+    # Heartbeats belong in the live status card, not the historical story.
+    # State transitions and errors are durable ordered events.
+    if event != 'heartbeat':
+        _queue_wukong_info_event(
+            event, state, reason, session_id=item['session_id'],
+            serial_port=item['serial_port'],
+            reconnect_attempt=item['reconnect_attempt'])
+
+
+def _queue_wukong_info_event(event, state='', reason='', **extra):
+    """Put non-packet bridge information in the same ordered history.
+
+    Trace packets and snapshots already use this queue.  Keeping lifecycle
+    records here prevents the two browser surfaces from inventing different
+    connection/command stories.
+    """
+    global _wukong_event_seq
+    item = {'kind': 'info', 'event': str(event or 'unknown'),
+            'state': str(state or ''), 'reason': str(reason or ''),
+            'ts': _wk_time.time()}
+    item.update(extra)
+    with _wukong_trace_lock:
+        _wukong_event_seq += 1
+        item['seq'] = _wukong_event_seq
+        _wukong_event_queue.append(item)
+        if len(_wukong_event_queue) > _WUKONG_EVENT_QUEUE_MAXLEN:
+            del _wukong_event_queue[:-_WUKONG_EVENT_QUEUE_MAXLEN]
 
 
 def _wukong_halt_summary(latest, snapshot, delivery, bridge, now):
@@ -12157,6 +12184,12 @@ def wukong_bridge_status_post():
             }
             _wukong_bridge_timeline.append(item)
             del _wukong_bridge_timeline[:-_WUKONG_BRIDGE_TIMELINE_MAXLEN]
+            if item['event'] != 'heartbeat':
+                _queue_wukong_info_event(
+                    item['event'], item['state'], item['reason'],
+                    session_id=item['session_id'],
+                    serial_port=item['serial_port'],
+                    reconnect_attempt=item['reconnect_attempt'])
     return jsonify({'ok': True})
 
 # ── Wukong relay state ────────────────────────────────────────────────────────
@@ -12603,10 +12636,13 @@ def wukong_snapshot_post():
         entry['cr'] = [[int(word) & 0xFFFFFFFF for word in row] for row in cr]
         entry['dr'] = [int(word) & 0xFFFFFFFF for word in dr]
         entry['snapshot'] = True
+        entry['snapshot_seq'] = entry['seq']
         entry['version'] = 1
         entry['m_flag'] = bool(data.get('m_flag', False))
         entry['crc16'] = int(data.get('crc16', 0)) & 0xFFFF
         entry['ts'] = float(data.get('ts', 0.0))
+        entry['crc_valid'] = bool(data.get('crc_valid', True))
+        entry['integrity'] = str(data.get('integrity', 'CRC16 verified'))
     except (KeyError, TypeError, ValueError, OverflowError) as exc:
         return jsonify({'ok': False, 'error': f'invalid snapshot: {exc}'}), 400
 

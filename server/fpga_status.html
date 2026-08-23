@@ -27,7 +27,8 @@
   .good  { color:#4ade80; }
   .dim   { color:#5a6b82; }
    #log { background:#0d1320; border:0; border-radius:0;
-          padding:10px 12px; flex:1; min-height:0; overflow-y:auto; white-space:pre; font-size:12px; }
+           padding:10px 12px; flex:1; min-height:0; overflow:auto; white-space:pre-wrap;
+           overflow-wrap:anywhere; font-size:12px; }
   #log .ev-call   { color:#60a5fa; }
   #log .ev-return { color:#c084fc; }
   #log .ev-load   { color:#34d399; }
@@ -442,7 +443,7 @@
 
   var EV_NAMES = {
     0x00:'RESULT', 0x01:'LOAD shadow GT', 0x02:'LOAD new GT',
-    0x03:'CHANGE push', 0x04:'CHANGE CR12', 0x05:'CHANGE CR5',
+      0x03:'CHANGE push', 0x04:'CHANGE CR12', 0x05:'CHANGE CR5',
     0x06:'CALL CR6', 0x07:'CALL CR14', 0x08:'CALL push',
     0x09:'RETURN pop', 0x0A:'RETURN CR6', 0x0B:'RETURN CR14'
   };
@@ -782,6 +783,65 @@
     return EV_NAMES[e.ev_type] !== undefined ? EV_NAMES[e.ev_type]
       : ('EV_0x' + (e.ev_type || 0).toString(16).toUpperCase());
   }
+  // Canonical display model shared with the IDE HW Trace renderer.  Missing
+  // wire fields are intentionally shown as "unavailable", never guessed.
+  function normalizeEvent(e) {
+    e = e || {};
+    var snapshot = !!e.snapshot;
+    var ev = snapshot ? 'SNAPSHOT' :
+      (EV_NAMES[e.ev_type] !== undefined ? EV_NAMES[e.ev_type] :
+       (e.event || ('EV_0x' + (e.ev_type || 0).toString(16).toUpperCase())));
+    var raw = e.instr !== undefined ? e.instr : e.instr_word;
+    var gt = [1,2,4,5,6,7,10,11].indexOf(Number(e.ev_type)) >= 0
+      ? hex(e.payload_gt || 0) : 'unavailable';
+    return {
+      seq: e.seq == null ? 'unavailable' : e.seq,
+      type: snapshot ? 'snapshot' : (e.kind === 'info' ? 'info' : 'trace'),
+      event: ev,
+      nia: e.nia == null ? 'unavailable' : hex(e.nia),
+      lump: e.pet_name || e.abstraction_label || 'unavailable',
+      offset: e.offset == null ? 'unavailable' : e.offset,
+      raw: raw == null ? 'unavailable' : hex(raw),
+      decoded: e.disasm || 'unavailable',
+      source: e.source_map || 'unavailable',
+      flags: e.flags == null ? 'unavailable' : flags(e.flags),
+      gt: gt,
+      gtLabel: e.gt_label || 'unavailable',
+      depth: e.call_depth == null ? 'unavailable' : e.call_depth,
+      breakpoint: e.bp_hit ? 'hit' : 'not hit',
+      fault: e.fault_valid ? ((FAULT_NAMES[e.fault_code] || 'FAULT_' + e.fault_code) +
+                              ' (' + hex(e.fault_code) + ')') : 'none',
+      reason: e.reason == null ? 'unavailable' : e.reason,
+      snapshotSeq: e.snapshot ? (e.snapshot_seq == null ? 'unavailable' : e.snapshot_seq) : 'unavailable',
+      integrity: e.integrity || (e.snapshot ? (e.crc_valid === false ? 'CRC failed' : 'CRC16 verified') : 'unavailable'),
+      availability: e.snapshot ? ('CR=' + (e.cr ? 'available' : 'unavailable') +
+        ', DR=' + (e.dr ? 'available' : 'unavailable')) : null,
+      state: e.state || 'unavailable'
+    };
+  }
+  function formatEvent(e) {
+    var n = normalizeEvent(e);
+    var t = e.ts ? new Date(e.ts * 1000).toLocaleTimeString() : '--:--:--';
+    if (typeof e.console === 'string')
+      return '[' + t + '] #' + n.seq + '  UART  text=' + e.console;
+    if (n.type === 'info')
+      return '[' + t + '] #' + n.seq + '  INFO  event=' + n.event +
+        ' state=' + n.state + ' reason=' + n.reason;
+    if (n.type === 'snapshot')
+      return '[' + t + '] #' + n.seq + '  SNAPSHOT reason=' + n.reason +
+        ' snapshot_seq=' + n.snapshotSeq + ' integrity=' + n.integrity +
+        ' stored_pc=' + (e.stored_packed_pc == null ? 'unavailable' : hex(e.stored_packed_pc)) +
+        ' stored_nia=' + n.nia + ' ' + n.availability +
+        ' promoted=' + (e.promoted ? 'yes' : 'no') +
+        ' correlated=' + (e.fault_trace_seq ? 'yes' : 'no');
+      return '[' + t + '] #' + n.seq + '  TRACE group=' +
+        (e.group || (e.nia == null ? 'unavailable' : hex(e.nia) + ':' + n.event.split(' ')[0])) +
+        ' event=' + n.event +
+      ' nia=' + n.nia + ' lump=' + n.lump + ' offset=' + n.offset +
+      ' raw=' + n.raw + ' decoded=' + n.decoded + ' source=' + n.source +
+      ' flags=' + n.flags + ' payload_gt=' + n.gt + ' gt_label=' + n.gtLabel +
+      ' depth=' + n.depth + ' breakpoint=' + n.breakpoint + ' fault=' + n.fault;
+  }
   function eventSummary(e) {
     if (e.console !== undefined) return 'UART: ' + e.console;
     var name = e.nia_label || ('NIA=' + hex(e.nia));
@@ -956,31 +1016,16 @@
   })();
 
   function renderEvent(e) {
-    var t = e.ts ? new Date(e.ts * 1000).toLocaleTimeString() : '--:--:--';
     if (e.console !== undefined) {
-      addLine('[' + t + '] #' + e.seq + '  UART: ' + e.console, 'ev-uart');
+      addLine(formatEvent(e), /WARNING|stale|mismatch/i.test(String(e.console)) ? 'ev-fault' : 'ev-uart');
       return;
     }
-    var evName = EV_NAMES[e.ev_type] !== undefined ? EV_NAMES[e.ev_type]
-               : ('EV_0x' + (e.ev_type || 0).toString(16).toUpperCase());
-    var location = e.nia_label
-      ? e.nia_label + ' (NIA=' + hex(e.nia) + ')'
-      : 'NIA=' + hex(e.nia);
-    var line = '[' + t + '] #' + e.seq + '  ' + location;
-    if (e.disasm) line += '  ' + e.disasm;
-    line += '  ' + evName;
-    if (e.payload_gt) line += '  GT=' + hex(e.payload_gt);
-    line += '  flags=' + flags(e.flags || 0);
-    if (e.call_depth !== undefined) line += '  depth=' + e.call_depth;
-    var cls = '';
-    if (e.ev_type >= 6 && e.ev_type <= 8) cls = 'ev-call';
-    else if (e.ev_type >= 9 && e.ev_type <= 11) cls = 'ev-return';
-    else if (e.ev_type === 1 || e.ev_type === 2) cls = 'ev-load';
-    if (e.fault_valid) {
-      line += '  FAULT=' + (FAULT_NAMES[e.fault_code] || ('0x' + (e.fault_code || 0).toString(16)));
-      cls = 'ev-fault';
-    }
-    if (e.bp_hit) line += '  [BP HIT]';
+    var line = formatEvent(e);
+    var cls = e.fault_valid ? 'ev-fault' :
+      (e.kind === 'info' ? 'ev-note' :
+      (e.snapshot ? 'ev-note' : (e.ev_type >= 6 && e.ev_type <= 8 ? 'ev-call' :
+       (e.ev_type >= 9 && e.ev_type <= 11 ? 'ev-return' :
+        (e.ev_type === 1 || e.ev_type === 2 ? 'ev-load' : ''))));
     addLine(line, cls);
     if (e.nia !== undefined) {
       lastTraceNia = Number(e.nia) >>> 0;
@@ -1030,7 +1075,7 @@
       document.getElementById('callDepth').textContent = s.call_depth;
       var h = s.halt || {};
       var hs = document.getElementById('faultState');
-      hs.textContent = h.state || 'no active fault';
+       hs.textContent = h.state === 'running' ? 'running — no active fault' : (h.state || 'no active fault');
       hs.className = h.state === 'running' ? 'v good big' :
         (h.active_fault ? 'v fault big' : 'v warn big');
       document.getElementById('faultReason').textContent = h.reason || 'no active fault';
