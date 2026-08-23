@@ -861,8 +861,23 @@ async function renderLumps() {
                      : (lump.version ? `v${lump.version}` : '');
                  const meta = [type, version, lump.lump_size ? `${lump.lump_size}w` : '',
                      lump.ns_slot != null ? `NS ${lump.ns_slot}` : 'saved'].filter(Boolean).join(' · ');
+                 // Source documentation tier dot: green=2 (full), amber=1 (uncommented), grey=0 (none), neutral=legacy
+                 const _isNs = (lump.lump_type || '').toLowerCase() === 'namespace' || lump.typ === 1;
+                 let _tierDotHtml = '';
+                 if (!_isNs) {
+                     const _t = (typeof lump.sourceStorageTier === 'number') ? lump.sourceStorageTier : null;
+                     const _dotCls = _t === 2 ? 'lump-src-tier-dot--t2'
+                                   : _t === 1 ? 'lump-src-tier-dot--t1'
+                                   : _t === 0 ? 'lump-src-tier-dot--t0'
+                                   : 'lump-src-tier-dot--legacy';
+                     const _dotTip = _t === 2 ? 'Full source included'
+                                   : _t === 1 ? 'Uncommented source included'
+                                   : _t === 0 ? 'No source embedded'
+                                   : 'Source tier unknown (pre-V1.3 binary)';
+                     _tierDotHtml = `<span class="lump-src-tier-dot ${_dotCls}" title="${_escHtml(_dotTip)}" aria-label="${_escHtml(_dotTip)}"></span>`;
+                 }
                  html += `<div class="lump-item" data-lump-token="${_escHtml(token)}" tabindex="0" role="button" aria-label="View ${_escHtml(name)}">`
-                     + `<div class="lump-item-header"><span class="lump-item-name">${_escHtml(name)}</span>`
+                     + `<div class="lump-item-header"><span class="lump-item-name-group"><span class="lump-item-name">${_escHtml(name)}</span>${_tierDotHtml}</span>`
                      + `<button type="button" class="lump-deep-dive-btn" data-deep-dive-token="${_escHtml(token)}" aria-haspopup="dialog" aria-expanded="false" title="Open recursive DNA dependency graph">Deep Dive</button></div>`
                      + `<div class="lump-item-meta"><span class="lump-token">0x${_escHtml(token)}</span><span>${_escHtml(meta)}</span></div></div>`;
              }
