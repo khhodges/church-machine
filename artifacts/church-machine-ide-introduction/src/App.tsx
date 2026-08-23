@@ -17,6 +17,7 @@ import { slides } from '@/slideLoader';
 import type { Action } from '@/.sdm/core/schema';
 import { isSdmEditingActive } from '@/.sdm/editingState';
 import { useLocation } from 'wouter';
+import Handout from '@/pages/handout';
 
 function getSlideIndex(pathname: string): number {
   const match = pathname.match(/^\/slide(\d+)$/);
@@ -375,6 +376,7 @@ export default function App() {
   }, [location, navigate]);
 
   if (location === '/') return <SlideViewer />;
+  if (location === '/handout') return <Handout />;
   if (location === '/allslides') return <AllSlides />;
   return <SlideEditor />;
 }
