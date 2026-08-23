@@ -453,6 +453,12 @@ async function loadDocsView() {
     return _docsLoadPromise;
 }
 
+function openArtifact(port, path) {
+    const host = window.location.hostname.replace(/^\d+-/, '');
+    const url = 'https://' + port + '-' + host + path;
+    window.open(url, '_blank', 'noopener');
+}
+
 async function openFigureAnchor(filename) {
     _pendingDocAnchorNav = true;
     switchView('docs');
