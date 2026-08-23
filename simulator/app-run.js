@@ -15846,6 +15846,19 @@ function _wukongSetHwCursor(niaInt) {
     }
 }
 
+// Keep the Execution Workspace's last/this/next instruction rows synchronized
+// with the retiring hardware instruction.  Simulator stepping updates this
+// through stepSim(); hardware trace packets arrive through _wukongAppendTrace
+// instead, so they need an explicit update and render here.
+function _wukongSetPipelineHwNIA(niaInt) {
+    if (!pipelineViz || typeof _buildNIARows !== 'function' ||
+        typeof pipelineViz.setNIA !== 'function') return;
+    const current = niaInt >>> 0;
+    const previous = current > 0 ? current - 1 : null;
+    pipelineViz.setNIA(_buildNIARows(previous, current));
+    if (typeof pipelineViz.render === 'function') pipelineViz.render();
+}
+
 // Refresh every .nia-col-hwbp gutter marker in any open disassembly modal.
 function _wukongRefreshHwbpGutters() {
     const connected = _wukongIsConnected();
@@ -16661,6 +16674,7 @@ function _wukongAppendTrace(data) {
     // ── Move the HW cursor in any open disassembly panel ─────────────────────
     // _wukongSetHwCursor also updates _wukongLastHwNIA.
     _wukongSetHwCursor(niaInt);
+    _wukongSetPipelineHwNIA(niaInt);
 
     // ── Apply CR register updates from ev_type + payload_gt ──────────────────
     // Only CRs explicitly reported in packets are touched; sim is not stepped.
