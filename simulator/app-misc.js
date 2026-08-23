@@ -514,6 +514,9 @@ function renderDocsFileList() {
                 if (d.type === 'link') {
                     const label = d.label || '';
                     const url   = d.url || '';
+                    if (!url) {
+                        return `<div class="docs-file-item docs-file-link docs-file-link-disabled" title="Not available in this environment" data-link=""><span class="docs-chapter-num">${chapterNum}.${i + 1}</span><span>↗ ${label}</span></div>`;
+                    }
                     return `<div class="docs-file-item docs-file-link" onclick="window.open(${JSON.stringify(url)},'_blank')" data-link="${url}"><span class="docs-chapter-num">${chapterNum}.${i + 1}</span><span>↗ ${label}</span></div>`;
                 }
                 if (d.type === 'figure') {

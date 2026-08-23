@@ -3004,6 +3004,8 @@
 
 .docs-file-link { opacity: 0.92; }
 .docs-file-link:hover { opacity: 1; }
+.docs-file-link-disabled { opacity: 0.4; cursor: not-allowed; }
+.docs-file-link-disabled:hover { opacity: 0.4; background: transparent !important; }
 
 .docs-file-item .file-size {
     font-size: 0.65rem;
