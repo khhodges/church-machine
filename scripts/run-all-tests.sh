@@ -226,6 +226,9 @@ register_suite "openin-links-tests" \
 register_suite "open-lump-freshness-tests" \
     'node simulator/test_open_lump_freshness.js'
 
+register_suite "artifact-link-tests" \
+    'node simulator/test_artifact_link.js'
+
 register_suite "lump-warning-tests" \
     'node simulator/lump_warning_test.js && node simulator/test_lump_audit_jump.js'
 
@@ -312,6 +315,9 @@ register_suite "version-telemetry-tests" \
 
 register_suite "compile-api-tests" \
     'python3 -m pytest tests/server/test_compile_api.py -v'
+
+register_suite "docs-artifact-link-tests" \
+    'python -m pytest tests/server/test_docs_artifact_links.py -v'
 
 register_suite "wukong-status-readonly-tests" \
     'python3 -m pytest tests/server/test_wukong_status_readonly.py -v'

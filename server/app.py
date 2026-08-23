@@ -295,7 +295,17 @@ def serve_ide_intro(filename="index.html"):
     are rooted there.  Any path that doesn't match a real file falls back to
     index.html so client-side routes (/handout, etc.) work after a hard
     refresh.
+
+    Returns 503 with a JSON body if the SPA has not been built yet (i.e.
+    dist/public/index.html is absent) so callers get an actionable error
+    rather than a werkzeug 404 with no explanation.
     """
+    index_path = os.path.join(_INTRO_DIST_DIR, "index.html")
+    if not os.path.isfile(index_path):
+        return jsonify({
+            "error": "IDE Introduction slides not built. "
+                     "Run: pnpm --filter @workspace/church-machine-ide-introduction build"
+        }), 503
     filepath = os.path.join(_INTRO_DIST_DIR, filename)
     if os.path.isfile(filepath):
         return send_from_directory(_INTRO_DIST_DIR, filename)
@@ -4083,22 +4093,30 @@ def docs_list():
                 production_path = item.get("production_path", "")
                 if dev_domain and port:
                     # Dev workspace: use Replit's port-prefixed proxy URL.
+                    # Supply probe_port so the browser can probe reachability
+                    # before opening the link (prevents a raw connection-refused
+                    # error when the artifact dev server is not running).
                     url = f"https://{port}-{dev_domain}{path}"
+                    probe_port = port
                 elif replit_domain and production_path:
                     # Production deployment: build a full absolute URL from the
                     # primary production domain and the artifact's fixed serving
                     # path so the link works regardless of the page's base URL.
+                    # No dev server involved, so no reachability probe needed.
                     url = f"https://{replit_domain}{production_path}"
+                    probe_port = 0
                 else:
                     # Neither dev domain nor production domain is set (e.g. CI
                     # or a standalone install).  Disable the link rather than
                     # pointing to a URL that does not exist in this context.
                     url = ""
+                    probe_port = 0
                 entries.append({
                     "name": "",
                     "type": "link",
                     "label": item["label"],
                     "url": url,
+                    "artifact_port": probe_port,
                     "size": 0,
                 })
             elif isinstance(item, dict):
@@ -4144,6 +4162,38 @@ def docs_list():
                 figures.append({"name": f, "type": "figure", "size": size})
     return jsonify({"docs": flat_docs, "chapters": chapters, "figures": figures})
 
+# Ports that the UI is allowed to probe via /api/artifact-reachable.
+# Derived at import time from BOOK_CHAPTERS so there is a single source of
+# truth; add new artifact ports to BOOK_CHAPTERS, not here.
+_ARTIFACT_ALLOWED_PORTS: "frozenset[int]" = frozenset(
+    item["artifact_port"]
+    for _, entries in BOOK_CHAPTERS
+    for item in entries
+    if isinstance(item, dict) and item.get("type") == "link" and item.get("artifact_port")
+)
+
+@app.route("/api/artifact-reachable")
+def artifact_reachable():
+    """Check whether a known artifact dev server port is accepting connections.
+
+    Only ports explicitly listed in BOOK_CHAPTERS are probed; any other port
+    returns the same generic {"ok": false} so the endpoint cannot be used as a
+    port-scanning oracle against arbitrary loopback services.
+
+    Returns {"ok": true} when a TCP connection to 127.0.0.1:<port> succeeds
+    within 1 second, otherwise {"ok": false}.  Error details are intentionally
+    omitted from the response to avoid leaking internal service information.
+    """
+    import socket
+    port = request.args.get("port", type=int)
+    if not port or port not in _ARTIFACT_ALLOWED_PORTS:
+        return jsonify({"ok": False}), 400
+    try:
+        sock = socket.create_connection(("127.0.0.1", port), timeout=1.0)
+        sock.close()
+        return jsonify({"ok": True})
+    except (socket.timeout, ConnectionRefusedError, OSError):
+        return jsonify({"ok": False})
 @app.route("/api/docs/read/<path:filename>")
 def docs_read(filename):
     if '..' in filename or filename.startswith('/'):

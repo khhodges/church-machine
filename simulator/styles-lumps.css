@@ -3007,6 +3007,19 @@
 .docs-file-link-disabled { opacity: 0.4; cursor: not-allowed; }
 .docs-file-link-disabled:hover { opacity: 0.4; background: transparent !important; }
 
+.artifact-offline-notice {
+    display: block;
+    margin-top: 4px;
+    padding: 4px 8px;
+    font-size: 0.72rem;
+    line-height: 1.4;
+    color: #fff;
+    background: #b94a00;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: normal;
+}
+
 .docs-file-item .file-size {
     font-size: 0.65rem;
     color: var(--text-muted);

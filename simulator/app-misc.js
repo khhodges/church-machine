@@ -520,10 +520,14 @@ function renderDocsFileList() {
                 if (d.type === 'link') {
                     const label = d.label || '';
                     const url   = d.url || '';
+                    const port  = d.artifact_port || 0;
                     if (!url) {
+                        // No URL in this environment (e.g. no dev domain and no
+                        // production_path configured): show a disabled entry rather
+                        // than a broken link.
                         return `<div class="docs-file-item docs-file-link docs-file-link-disabled" title="Not available in this environment" data-link=""><span class="docs-chapter-num">${chapterNum}.${i + 1}</span><span>↗ ${label}</span></div>`;
                     }
-                    return `<div class="docs-file-item docs-file-link" onclick="window.open(${JSON.stringify(url)},'_blank')" data-link="${url}"><span class="docs-chapter-num">${chapterNum}.${i + 1}</span><span>↗ ${label}</span></div>`;
+                    return `<div class="docs-file-item docs-file-link" onclick="openArtifactLink(event,${JSON.stringify(url)},${port},${JSON.stringify(label)})" data-link="${url}"><span class="docs-chapter-num">${chapterNum}.${i + 1}</span><span>↗ ${label}</span></div>`;
                 }
                 if (d.type === 'figure') {
                     const label = d.label || d.name.replace('.html', '');
@@ -549,6 +553,62 @@ function renderDocsFileList() {
     }).join('');
 }
 
+/**
+ * Click handler for artifact-backed sidebar links (e.g. the IDE Introduction
+ * slide deck).  Before navigating it checks via the server whether the
+ * artifact dev server is actually listening.  When the server is down it shows
+ * a small inline notice rather than letting the browser display a raw
+ * connection-refused error with no explanation.
+ *
+ * Popup-blocking browsers (Safari, Firefox strict mode) only honour
+ * window.open() calls that are synchronous with a user gesture.  We therefore
+ * open a blank target window *before* the async reachability fetch; if the
+ * server is reachable we navigate it to the real URL, otherwise we close it
+ * and render the offline notice.
+ */
+async function openArtifactLink(event, url, port, label) {
+    if (!url) return;
+    if (!port) { window.open(url, '_blank'); return; }
+
+    const el = event.currentTarget;
+    // Remove any existing notice on this element before re-checking.
+    const old = el.querySelector('.artifact-offline-notice');
+    if (old) old.remove();
+
+    // Open a blank target synchronously while the user-activation gesture is
+    // still live, before we lose it to the async fetch below.
+    //
+    // We cannot use the 'noopener' feature flag here — it causes window.open()
+    // to return null, giving us no reference to navigate later.  Instead we
+    // sever win.opener immediately (while the tab is still on about:blank and
+    // therefore same-origin with this page) so the opened window cannot
+    // navigate its opener via the reverse-tabnabbing attack vector.
+    const win = window.open('', '_blank');
+    if (win) win.opener = null;
+
+    try {
+        const resp = await fetch('/api/artifact-reachable?port=' + port);
+        const data = await resp.json();
+        if (data.ok) {
+            if (win) win.location.href = url;
+            return;
+        }
+    } catch (_) {
+        // Network error contacting our own server — close blank tab and fall
+        // through to the offline notice.
+    }
+
+    // Server not reachable: close the blank tab and show a friendly inline notice.
+    if (win) win.close();
+
+    const notice = document.createElement('span');
+    notice.className = 'artifact-offline-notice';
+    notice.textContent = 'Slide deck server is not running. Start the workflow "artifacts/church-machine-ide-introduction: web" then try again.';
+    // Auto-dismiss after 6 s; clicking the notice also dismisses it.
+    const dismiss = setTimeout(() => notice.remove(), 6000);
+    notice.addEventListener('click', e => { e.stopPropagation(); clearTimeout(dismiss); notice.remove(); });
+    el.appendChild(notice);
+}
 async function loadDoc(filename, anchor) {
     document.querySelectorAll('.docs-file-item').forEach(el => el.classList.remove('active'));
     const active = document.querySelector(`.docs-file-item[data-doc="${filename}"]`);
@@ -4094,4 +4154,3 @@ function confirmResetLaunchTests() {
             .catch(function() { close(); });
     });
 }
-

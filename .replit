@@ -918,3 +918,25 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python -m pytest tests/hardware/test_wukong_snapshot_protocol.py hardware/test_wukong_bridge_resync.py tests/server/test_wukong_snapshot.py tests/server/test_wukong_command_delivery.py hardware/test_boot_rom_no_false_halt.py::test_repeated_reboots_stay_clean -q"
+
+[[workflows.workflow]]
+name = "artifact-link-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_artifact_link.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "docs-artifact-link-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python -m pytest tests/server/test_docs_artifact_links.py -v"
+
+[workflows.workflow.metadata]
+outputType = "console"
