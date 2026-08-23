@@ -362,19 +362,18 @@ function makeHwStopEnv(opts) {
     const p = vm.runInContext('hwStop()', env);
     check('WB-ST-4a', 'hwStop → button optimistically disabled before await',
         stopBtn.disabled === true);
+    check('WB-ST-4b', "hwStop → label changes to '⏳ Stopping…' before await",
+        stopBtn.textContent === '\u23F3 Stopping\u2026');
     // Drive the async chain to completion, then assert.
     p.then(function() {
-        check('WB-ST-4b', "hwStop → posted command 'h'",
+        check('WB-ST-4c', "hwStop → posted command 'h'",
             env._postedCmds.length === 1 && env._postedCmds[0] === 'h');
-        // Re-run the summary after the async test settles.
-        console.log('\n' + passed + ' passed, ' + failed + ' failed');
-        process.exit(failed ? 1 : 0);
+        check('WB-ST-4d', "hwStop → label reverts to '⏹ HW' after completion",
+            stopBtn.textContent === '\u23F9 HW');
     }).catch(function(e) {
         console.error('WB-ST-4 async error:', e);
         process.exit(1);
     });
-    // Return early — summary printed inside the .then() above.
-    return;
 })();
 
 // ── WB-ST-5  hwStop is a no-op when the board is already halted ──────────────
@@ -387,11 +386,23 @@ function makeHwStopEnv(opts) {
     }).catch(function() {});
 })();
 
+// ── WB-ST-6  hwStop reverts label to '⏹ HW' when delivery fails ──────────────
+(function() {
+    const env = makeHwStopEnv({ running: true, postFails: true });
+    const stopBtn = env.document.getElementById('toolHWStopBtn');
+    const p = vm.runInContext('hwStop()', env);
+    check('WB-ST-6a', "hwStop (fail path) → label changes to '⏳ Stopping…' before await",
+        stopBtn.textContent === '\u23F3 Stopping\u2026');
+    p.then(function() {
+        check('WB-ST-6b', "hwStop (fail path) → label reverts to '⏹ HW' after failed delivery",
+            stopBtn.textContent === '\u23F9 HW');
+    }).catch(function() {});
+})();
+
 // ── Summary ───────────────────────────────────────────────────────────────────
-// (printed inside the WB-ST-4 .then() chain after all async work settles)
-// Fallback in case the async tests above throw synchronously before reaching
-// their .then() — keeps the process from hanging silently.
+// Async tests (WB-ST-4/5/6) resolve via microtask queues; the timeout below
+// lets all .then() callbacks settle before printing results and exiting.
 setTimeout(function() {
-    console.log('\n' + passed + ' passed, ' + failed + ' failed  (timeout fallback)');
+    console.log('\n' + passed + ' passed, ' + failed + ' failed');
     process.exit(failed ? 1 : 0);
 }, 5000);

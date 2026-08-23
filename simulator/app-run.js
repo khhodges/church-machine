@@ -17198,15 +17198,17 @@ async function hwRunToggle() {
 async function hwStop() {
     if (!_wukongHWRunning) return;   // already halted — nothing to do
     const stopBtn = document.getElementById('toolHWStopBtn');
-    if (stopBtn) stopBtn.disabled = true;
+    if (stopBtn) { stopBtn.disabled = true; stopBtn.textContent = '\u23F3 Stopping\u2026'; }
     const d = await _wukongPostCmd('h', null, 'STOP');
     if (!d) {
         // Delivery failed: restore the button if the board is still running.
+        if (stopBtn) stopBtn.textContent = '\u23F9 HW';
         if (_wukongHWRunning && stopBtn) stopBtn.disabled = false;
         return;
     }
     await _wukongWatchDelivery(d.id, 'STOP', 10000);
     // Board state will be updated by the next poll cycle via _wukongUpdateBtn().
+    if (stopBtn) stopBtn.textContent = '\u23F9 HW';
 }
 window.hwStop = hwStop;
 
