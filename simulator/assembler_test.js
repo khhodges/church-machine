@@ -7483,9 +7483,8 @@ abstraction VlcTest {
     //
     // Coverage by front-end:
     //   Haskell  — church_math, church_memory, church_pair, church_case
-    //   Lambda   — lambda_church_encoding, lambda_fixed_point, lambda_sliderule,
-    //              lambda_rational
-    //              (lambda_church_numerals excluded: 2 undefined-variable errors)
+    //   Lambda   — lambda_church_numerals, lambda_church_encoding,
+    //              lambda_fixed_point, lambda_sliderule, lambda_rational
     //   English  — english_integer_ops, english_loops, english_packed_string
     //              (english_contact excluded: external capability convention required)
     //   Symbolic — ada_note_g (→ ada_note_g_symbolic.cloomc), bernoulli_numbers
@@ -7589,6 +7588,10 @@ abstraction VlcTest {
         // ── Lambda: EX-LCE-INLINE — ChurchEncoding ───────────────────────────────
         checkInlineVsCanonicalClomc(
             'EX-LCE-INLINE', 'lambda_church_encoding', 'lambda_church_encoding.cloomc');
+
+        // ── Lambda: EX-LCN-INLINE — ChurchNumerals ───────────────────────────────
+        checkInlineVsCanonicalClomc(
+            'EX-LCN-INLINE', 'lambda_church_numerals', 'lambda_church_numerals.cloomc');
 
         // ── Lambda: EX-LFP-INLINE — FixedPoint ───────────────────────────────────
         checkInlineVsCanonicalClomc(

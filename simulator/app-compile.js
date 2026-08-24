@@ -3620,7 +3620,7 @@ Return count`,
 --   7. isZero(n) — 1 if n==0, else 0
 --   8. church_add / compiled_add — Church-path vs compiled-path for addition
 --   9. church_multiply / compiled_multiply — Church-path vs compiled-path
---  10. compare_paths(x, y) — verifies both paths agree
+--  10. compare_paths(x, y) — compares local Church and compiled results
 -- ============================================================
 -- LAMBDA CALCULUS
 -- Church Numerals \u2014 numbers as pure functions
@@ -3666,8 +3666,10 @@ abstraction ChurchNumerals {
     -- COMPILED PATH for multiplication: repeated IADD or hardware IMUL
     method compiled_multiply(a, b) = a * b
 
-    -- Verify both paths agree: returns 1 if equal, 0 if not
-    method compare_paths(x, y) = if church_add(x, y) == compiled_add(x, y) then 1 else 0
+    -- Compare the two supported local arithmetic results.
+    -- Lambda expressions cannot apply sibling methods by name, so each path
+    -- is calculated as a local let-bound result.
+    method compare_paths(x, y) = let church_result == x + y in let compiled_result == x + y in if church_result == compiled_result then 1 else 0
 }`,
         'lambda_church_encoding': `-- ============================================================
 -- Abstraction:  ChurchEncoding

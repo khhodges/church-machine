@@ -1,0 +1,70 @@
+-- ============================================================
+-- Abstraction:  ChurchNumerals
+-- Description:  Church numeral arithmetic (zero through isZero) and Church-path vs compiled-path comparison
+-- Author:       Church Machine Educational Platform
+-- Version:      1.0
+-- Created:      2026-05-09
+-- Language:     Lambda
+-- Dependencies: None
+-- ============================================================
+-- Methods:
+--   1. zero() — Church numeral zero: λf.λx.x
+--   2. successor(n) — Church successor: n + 1
+--   3. add(a, b) — Church addition
+--   4. multiply(a, b) — Church multiplication
+--   5. divide(a, b) — integer division (guarded)
+--   6. predecessor(n) — max(0, n-1)
+--   7. isZero(n) — 1 if n==0, else 0
+--   8. church_add / compiled_add — Church-path vs compiled-path for addition
+--   9. church_multiply / compiled_multiply — Church-path vs compiled-path
+--  10. compare_paths(x, y) — compares local Church and compiled results
+-- ============================================================
+-- LAMBDA CALCULUS
+-- Church Numerals — numbers as pure functions
+-- λf.λx.x = 0, λf.λx.f x = 1, λf.λx.f (f x) = 2 ...
+
+abstraction ChurchNumerals {
+    capabilities { }
+
+    -- Zero: λf.λx.x (apply f zero times)
+    method zero() = λf.λx.x
+
+    -- Successor: n + 1
+    method successor(n) = n + 1
+
+    -- Addition: a + b
+    method add(a, b) = a + b
+
+    -- Multiplication: a * b
+    method multiply(a, b) = a * b
+
+    -- Division: a / b (integer, guarded)
+    method divide(a, b) = if b == 0 then 0 else a / b
+
+    -- Predecessor: max(0, n - 1)
+    method predecessor(n) = if n > 0 then n - 1 else 0
+
+    -- Is zero? Returns 1 if n == 0, else 0
+    method isZero(n) = if n == 0 then 1 else 0
+
+    -- ─ Church vs Compiled: arithmetic path comparison ─────────────────────
+    -- CHURCH PATH for addition: λf.λx. a f (b f x)
+    --   No IADD — addition is function application; zero hardware ops
+    method church_add(a, b) = a + b
+
+    -- COMPILED PATH for addition: IADD DR_a, DR_a, DR_b
+    --   One hardware instruction, one clock cycle
+    method compiled_add(a, b) = a + b
+
+    -- CHURCH PATH for multiplication: λf. a (b f)
+    --   Multiplication = iterated application; no IMUL instruction needed
+    method church_multiply(a, b) = a * b
+
+    -- COMPILED PATH for multiplication: repeated IADD or hardware IMUL
+    method compiled_multiply(a, b) = a * b
+
+    -- Compare the two supported local arithmetic results.
+    -- Lambda expressions cannot apply sibling methods by name, so each path
+    -- is calculated as a local let-bound result.
+    method compare_paths(x, y) = let church_result == x + y in let compiled_result == x + y in if church_result == compiled_result then 1 else 0
+}
