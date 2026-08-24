@@ -1,0 +1,97 @@
+{
+  "token": "1eec355e",
+  "abstraction": "ide.Alice",
+  "dot_name": "ide.Alice",
+  "issue_n": 1,
+  "identity_string": "ide.Alice#1",
+  "identity_hash": "3987f739f1b7714fcfb3c0543c5031f05cab115c1f5b7fc861e6e22642868843",
+  "binary_hash": "5f929d16f484e2e8b154d7ab5060c24d77d4e8e12b53febc25722ef69e2d69b1",
+  "filename": "ide.Alice.1.1eec355e.lump",
+  "sidecar_file": "ide.Alice.1.1eec355e.json",
+  "ns_slot": null,
+  "ns_slot_policy": "dynamic",
+  "boot_resident": false,
+  "lump_size": 512,
+  "cw": 9,
+  "cc": 2,
+  "typ": 0,
+  "status": "released",
+  "language": "Church Machine ISA",
+  "author": "Church Machine",
+  "sourceStorageTier": 2,
+  "source_file": "simulator/examples/alice.cloomc",
+  "source": "; ============================================================\n; Abstraction:  ide.Alice\n; Description:  Two-enemies capability-containment example\n; Language:     Church Machine ISA assembly\n; ============================================================\n;\n; Public method selectors:\n;   1  Stash(value in DR1) -> ok in DR1\n;   2  Reveal()            -> secret in DR1\n;\n; Physical c-list:\n;   [0] SELF         E   (minted when the dynamic NS slot is allocated)\n;   [1] SECRET_DATA  RW  (same resident LUMP, never delegated)\n;\n; The private word is code word 9.  It is executable-addressable so the\n; resident object's RW capability can cover it, but WORD 0 is never reached\n; by either method.\n\ncapabilities {\n    __SELF__ E,\n    SECRET_DATA RW\n}\n\nBRANCH stash\nBRANCH reveal\n\nstash:\nLOAD   CR1, CR6, 1\nDWRITE DR1, CR1, #9\nRETURN\n\nreveal:\nLOAD  CR1, CR6, 1\nDREAD DR1, CR1, #9\nRETURN\n\nWORD 0",
+  "methods": [
+    {
+      "petName": "Stash",
+      "branchOffset": 2,
+      "in": [
+        {
+          "name": "value",
+          "reg": "DR1"
+        }
+      ],
+      "out": [
+        {
+          "name": "ok",
+          "reg": "DR1"
+        }
+      ]
+    },
+    {
+      "petName": "Reveal",
+      "branchOffset": 5,
+      "in": [],
+      "out": [
+        {
+          "name": "secret",
+          "reg": "DR1"
+        }
+      ]
+    }
+  ],
+  "capabilities": [
+    {
+      "row": 0,
+      "name": "SELF",
+      "rights": [
+        "E"
+      ],
+      "role": "identity"
+    },
+    {
+      "row": 1,
+      "name": "SECRET_DATA",
+      "rights": [
+        "R",
+        "W"
+      ],
+      "role": "private_data"
+    }
+  ],
+  "compiler_owned_self": true,
+  "allocation_time_placeholders": [
+    {
+      "row": 0,
+      "role": "identity",
+      "word": "0xFEED5E1F"
+    },
+    {
+      "row": 1,
+      "role": "private_data",
+      "word": "0xFEEDDA7A"
+    }
+  ],
+  "description": "Stores and reveals one private word through an RW capability that never leaves Alice.",
+  "documentation_case": "fully_documented",
+  "docs": [
+    "alice-mallory-v13-lumps.md"
+  ],
+  "provenance": {
+    "disposition": "reissued from behavioral specification; supplied token and code were placeholders",
+    "supplied_metadata": "attached_assets/alice.lump_1787597258419.json",
+    "supplied_metadata_sha256": "8de7cb71ccd68b6123684c75ad45911b17b849499b5e6bde66aeddc9674c7306",
+    "supplied_word_image": "attached_assets/alice.lump_1787597641217.hex",
+    "supplied_word_image_sha256": "703984cf8e46afa502e85331a176e86fc64e726406595eac3bb749c7682b4f45"
+  }
+}

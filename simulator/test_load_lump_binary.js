@@ -1485,6 +1485,93 @@ console.log('\n--- LLB-24: saved compiler LUMPs retain identity provenance ---')
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────
+console.log('\n--- LLB-25: private-data reminting is exact and atomic ---');
+{
+    function privateSentinelLoad({
+        rows, compilerOwnedSelf = true, privateDataRows = [1], typ = 0
+    }) {
+        const sim = new ChurchSimulator();
+        sim.bootComplete = true;
+        const slot = 11;
+        const nsBase = sim._nsSlotBase(slot);
+        sim.memory[nsBase] = 0x222;
+        sim.memory[nsBase + 1] = sim.packNSWord1(9, 4, 0, 0);
+        sim.memory[nsBase + 2] = sim._integrity32(
+            sim.memory[nsBase], sim.memory[nsBase + 1]);
+        sim.memory[EXTENDED_BASE] = 0xCAFEBABE;
+        const words = new Array(64).fill(0);
+        words[0] = makeHdr(4, 3, 0, typ);
+        words[61] = ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER;
+        for (const row of rows) {
+            words[61 + row] = ChurchSimulator.PRIVATE_DATA_CAPABILITY_PLACEHOLDER;
+        }
+        const beforeNs = Array.from(sim.memory.slice(nsBase, nsBase + 4));
+        const ok = sim.loadLumpBinary(words, slot, {
+            compilerOwnedSelf, privateDataRows
+        });
+        return { sim, nsBase, beforeNs, ok };
+    }
+
+    const valid = privateSentinelLoad({ rows: [1] });
+    const validSeq = valid.sim.parseNSWord1(
+        valid.sim.memory[valid.nsBase + 1]).gtSeq;
+    const expectedPrivate = valid.sim.createGT(
+        validSeq, 11, { R: 1, W: 1 }, 1) >>> 0;
+    check('LLB-25a: declared row 1 remints to exact destination RW GT',
+        valid.ok === true &&
+        valid.sim.memory[EXTENDED_BASE + 62] === expectedPrivate,
+        valid.sim.output.slice(-260));
+
+    const wrongRow = privateSentinelLoad({ rows: [2] });
+    check('LLB-25b: private placeholder in wrong row is rejected atomically',
+        wrongRow.ok === false &&
+        wrongRow.sim.memory[EXTENDED_BASE] === 0xCAFEBABE &&
+        wrongRow.beforeNs.every((word, i) => word === wrongRow.sim.memory[wrongRow.nsBase + i]) &&
+        wrongRow.sim.output.includes('IDENTITY_PRIVATE'),
+        wrongRow.sim.output.slice(-260));
+
+    const extraRow = privateSentinelLoad({ rows: [1, 2] });
+    check('LLB-25c: extra private placeholder is rejected atomically',
+        extraRow.ok === false &&
+        extraRow.sim.memory[EXTENDED_BASE] === 0xCAFEBABE &&
+        extraRow.beforeNs.every((word, i) => word === extraRow.sim.memory[extraRow.nsBase + i]) &&
+        extraRow.sim.output.includes('IDENTITY_PRIVATE'),
+        extraRow.sim.output.slice(-260));
+
+    const untrusted = privateSentinelLoad({
+        rows: [1], compilerOwnedSelf: false, privateDataRows: [1]
+    });
+    check('LLB-25d: non-compiler-owned input cannot request private reminting',
+        untrusted.ok === false &&
+        untrusted.sim.memory[EXTENDED_BASE] === 0xCAFEBABE &&
+        untrusted.beforeNs.every((word, i) => word === untrusted.sim.memory[untrusted.nsBase + i]) &&
+        untrusted.sim.output.includes('IDENTITY_PRIVATE'),
+        untrusted.sim.output.slice(-260));
+
+    const rawRowZero = privateSentinelLoad({
+        rows: [0], compilerOwnedSelf: false, privateDataRows: []
+    });
+    check('LLB-25e: raw row 0 cannot smuggle the private sentinel as authority',
+        rawRowZero.ok === false &&
+        rawRowZero.sim.memory[EXTENDED_BASE] === 0xCAFEBABE &&
+        rawRowZero.beforeNs.every((word, i) =>
+            word === rawRowZero.sim.memory[rawRowZero.nsBase + i]) &&
+        rawRowZero.sim.output.includes('IDENTITY_PRIVATE'),
+        rawRowZero.sim.output.slice(-260));
+
+    const architecturalRowZero = privateSentinelLoad({
+        rows: [0], compilerOwnedSelf: false, privateDataRows: [], typ: 2
+    });
+    check('LLB-25f: architectural row 0 cannot use the private sentinel',
+        architecturalRowZero.ok === false &&
+        architecturalRowZero.sim.memory[EXTENDED_BASE] === 0xCAFEBABE &&
+        architecturalRowZero.beforeNs.every((word, i) =>
+            word === architecturalRowZero.sim.memory[architecturalRowZero.nsBase + i]) &&
+        architecturalRowZero.sim.output.includes('IDENTITY_PRIVATE'),
+        architecturalRowZero.sim.output.slice(-260));
+}
+
+// ── Summary ───────────────────────────────────────────────────────────────────
 console.log('\n══════════════════════════════════════');
 console.log(`Results: ${pass} passed, ${fail} failed`);
 if (fail > 0) {

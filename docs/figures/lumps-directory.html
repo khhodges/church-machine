@@ -925,33 +925,37 @@ const LUMPS = [
 
 // ── TWO-ENEMIES SECURITY PROOF ────────────────────────────────
 {
-  id:"Alice", genotype:"0x3FCBF37C", token:"3fcbf37c", section:"Two-Enemies Proof",
+  id:"ide.Alice", genotype:"0x1EEC355E", token:"1eec355e", section:"Two-Enemies Proof",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
-  lump_size:64, cw:14, cc:1, typ:0,
-  language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
-  description:"Alice principal in the two-enemies security proof. Stash stores a secret (GT or data word) behind an E-permission capability; Reveal returns it only when the caller's identity GT matches the original caller's. Mallory cannot Steal because she does not hold Alice's E-GT — any CALL from Mallory faults with PERM_DENIED.",
+  lump_size:512, cw:9, cc:2, typ:0,
+  language:"Church Machine ISA", author:"Church Machine", version:"1", status:"released",
+  description:"Alice stores one private data word behind an RW capability that never leaves her c-list. Stash writes DR1 into that word; Reveal returns it through DR1. The compiler-owned SELF row and private-data row are reminted atomically when Mint assigns Alice a dynamic Namespace slot.",
   ns_state:null,
   methods:[
-    { name:"Stash",  offset:0, length:7, description:"Store a secret GT (CR1) under Alice's capability lock. Only callable once — subsequent Stash calls return ALREADY_SET.", inputs:["CR1: secret GT to store"], outputs:["DR0: 0 = stored · 1 = already set"] },
-    { name:"Reveal", offset:7, length:7, description:"Return the stashed secret GT if the caller's identity matches. Non-matching callers receive NULL GT.", inputs:[], outputs:["CR1: stored secret GT · NULL if identity mismatch"] }
+    { name:"Stash",  offset:2, length:3, description:"Write the caller-supplied value to Alice's private resident word.", inputs:["DR1: value"], outputs:["DR1: value (preserved by RETURN)"] },
+    { name:"Reveal", offset:5, length:3, description:"Read Alice's private resident word.", inputs:[], outputs:["DR1: secret"] }
   ],
   capabilities:[
-    { slot:0, name:"SECRET_DATA", rights:["R","W"], gt:"", note:"Private secret store — Alice controls this GT; Mallory cannot reach it" }
+    { slot:0, name:"SELF", rights:["E"], gt:"", note:"Compiler-owned identity row; reminted for Alice's assigned Namespace slot" },
+    { slot:1, name:"SECRET_DATA", rights:["R","W"], gt:"", note:"Private resident word; never delegated to Mallory" }
   ],
-  source:null, doc_count:0, docs:[]
+  source:"simulator/examples/alice.cloomc", doc_count:1, docs:["alice-mallory-v13-lumps.md"]
 },
 {
-  id:"Mallory", genotype:"0xB2AB7AF0", token:"b2ab7af0", section:"Two-Enemies Proof",
+  id:"ide.Mallory", genotype:"0x0CA567B5", token:"0ca567b5", section:"Two-Enemies Proof",
   ns_slot:null, ns_slot_policy:"dynamic", boot_resident:false, variant_group:null,
-  lump_size:64, cw:12, cc:0, typ:0,
-  language:"CLOOMC", author:"Church Machine", version:"1.0", status:"released",
-  description:"Mallory adversary in the two-enemies security proof. Attempts to Steal Alice's secret and Probe Alice's internal state. Both calls must fault with PERM_DENIED (Mallory holds no E-GT for Alice). The proof passes when both Steal and Probe return fault codes and Alice's secret is unchanged.",
+  lump_size:256, cw:5, cc:2, typ:0,
+  language:"Church Machine ISA", author:"Church Machine", version:"1", status:"released",
+  description:"Mallory is the adversary in the two-enemies containment example. Alice's private capability is deliberately absent from Mallory's c-list. Steal requests undeclared row 2 and deterministically faults NO_CAPABILITY before any data read.",
   ns_state:null,
   methods:[
-    { name:"Steal", offset:0, length:6, description:"Attempt to call Alice.Reveal without holding the correct E-GT. Must produce PERM_DENIED fault. Returns fault code in DR0.", inputs:[], outputs:["DR0: PERM_DENIED fault code (proof passes) · 0 = proof FAILS"] },
-    { name:"Probe", offset:6, length:6, description:"Attempt to LOAD Alice's internal c-list GT without L-permission. Must produce PERM_DENIED. Returns fault code in DR0.", inputs:[], outputs:["DR0: PERM_DENIED fault code (proof passes) · 0 = proof FAILS"] }
+    { name:"Steal", offset:1, length:3, description:"Request absent c-list row 2. LOAD faults before the following DREAD can execute.", inputs:[], outputs:["Fault: NO_CAPABILITY"] }
   ],
-  capabilities:[], source:null, doc_count:0, docs:[]
+  capabilities:[
+    { slot:0, name:"SELF", rights:["E"], gt:"", note:"Compiler-owned identity row; reminted for Mallory's assigned Namespace slot" },
+    { slot:1, name:"SCRATCH", rights:["R","W"], gt:"", note:"Mallory's own private resident word; not Alice's SECRET_DATA" }
+  ],
+  source:"simulator/examples/mallory.cloomc", doc_count:1, docs:["alice-mallory-v13-lumps.md"]
 }
 
 ]; // end LUMPS

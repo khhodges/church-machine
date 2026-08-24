@@ -6511,6 +6511,39 @@ function _validateSavedLumpClist(rawWords, header, savedMetadata, simInstance) {
             // Namespace sequence are known.
             capsToValidate = savedCaps.slice(1);
             validationStart = clistStart + 1;
+            const privateRows = savedCaps.flatMap((cap, row) =>
+                cap && cap.role === 'private_data' ? [row] : []);
+            if (privateRows.length > 0) {
+                if (privateRows.length !== 1 || privateRows[0] !== 1) {
+                    throw new Error('private-data capability must be the exact compiler-owned c-list row 1 record');
+                }
+                const privateWord = (rawWords[clistStart + 1] || 0) >>> 0;
+                const isPrivatePlaceholder =
+                    privateWord === ChurchSimulator.PRIVATE_DATA_CAPABILITY_PLACEHOLDER;
+                const parsedPrivate = !isPrivatePlaceholder && simInstance &&
+                    typeof simInstance.parseGT === 'function'
+                    ? simInstance.parseGT(privateWord) : null;
+                const sourceSlot = Number(savedMetadata.sourceNsSlot);
+                const sourceEntryValid = Number.isInteger(sourceSlot) && sourceSlot >= 0 &&
+                    simInstance && typeof simInstance.isNSEntryValid === 'function' &&
+                    simInstance.isNSEntryValid(sourceSlot);
+                const sourceSeq = sourceEntryValid
+                    ? simInstance.parseNSWord1(
+                        simInstance.memory[simInstance._nsSlotBase(sourceSlot) + 1] >>> 0
+                    ).gtSeq : NaN;
+                const p = parsedPrivate && parsedPrivate.permissions;
+                const isLivePrivate = !!(parsedPrivate && parsedPrivate.type === 1 && p &&
+                    p.R === 1 && p.W === 1 && !p.X && !p.L && !p.S && !p.E && !p.B &&
+                    sourceEntryValid && parsedPrivate.index === sourceSlot &&
+                    parsedPrivate.gt_seq === sourceSeq);
+                if (!isPrivatePlaceholder && !isLivePrivate) {
+                    throw new Error(
+                        `private-data row 1 must be its compiler placeholder or an RW GT for its recorded source Namespace slot; got 0x${privateWord.toString(16).padStart(8, '0')}`
+                    );
+                }
+                capsToValidate = savedCaps.slice(2);
+                validationStart = clistStart + 2;
+            }
         }
         const runResolved = CapabilityTokens.resolveCapabilities(capsToValidate, {
             sim: simInstance,
@@ -6557,6 +6590,8 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
         const _compilerOwnedSelf = !!(_savedCaps[0] &&
             _savedCaps[0].compiler_owned_self === true &&
             String(_savedCaps[0].name || '').toUpperCase() === '__SELF__');
+        const _privateDataRows = _savedCaps.flatMap((cap, row) =>
+            cap && cap.role === 'private_data' ? [row] : []);
 
         const _BOOT_SLOT = sim._bootAbstrSlot;
         // _targetSlot: the NS slot the LUMP will occupy after loading.
@@ -6607,7 +6642,8 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
                         ? sim.parseNSWord1(
                             sim.memory[sim._nsSlotBase(sourceSlot) + 1] >>> 0
                         ).gtSeq : NaN;
-                })()
+                })(),
+                privateDataRows: _privateDataRows
             }
         );
         if (!loaded) {

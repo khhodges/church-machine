@@ -43,6 +43,15 @@ function compilerSelfMeta(overrides = {}, metadata = {}) {
         ...metadata,
     };
 }
+function compilerPrivateMeta(metadata = {}) {
+    return {
+        capabilities: [
+            { name: '__SELF__', slot: 0, compiler_owned_self: true },
+            { name: 'PRIVATE', slot: 1, role: 'private_data' },
+        ],
+        ...metadata,
+    };
+}
 
 console.log('\n--- saved LUMP compiler self validation ---');
 {
@@ -131,6 +140,46 @@ console.log('\n--- saved LUMP compiler self validation ---');
     } catch (err) { message = String(err.message || err); }
     check('SLV-6: stale-sequence source self E-GT is rejected before remint',
         /self row 0 must be/i.test(message), message);
+}
+
+{
+    const sim = new ChurchSimulator();
+    const words = new Array(64).fill(0);
+    words[0] = header(4, 2);
+    words[62] = ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER;
+    words[63] = ChurchSimulator.PRIVATE_DATA_CAPABILITY_PLACEHOLDER;
+    let caps;
+    try {
+        caps = validateSavedLumpClist(
+            words, sim.parseLumpHeader(words[0]), compilerPrivateMeta(), sim);
+    } catch (err) { caps = err; }
+    const loaded = Array.isArray(caps) && sim.loadLumpBinary(words, 9, {
+        compilerOwnedSelf: true,
+        privateDataRows: [1],
+    });
+    const nsBase = sim._nsSlotBase(9);
+    const seq = sim.parseNSWord1(sim.memory[nsBase + 1] >>> 0).gtSeq;
+    const expectedPrivate = sim.createGT(seq, 9, { R: 1, W: 1 }, 1) >>> 0;
+    check('SLV-7: declared private row 1 validates and remints to destination RW GT',
+        loaded === true && sim.memory[0x400 + 63] === expectedPrivate,
+        String(caps));
+}
+
+{
+    const sim = new ChurchSimulator();
+    const words = new Array(64).fill(0);
+    words[0] = header(4, 3);
+    words[61] = ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER;
+    words[63] = ChurchSimulator.PRIVATE_DATA_CAPABILITY_PLACEHOLDER;
+    const metadata = compilerPrivateMeta();
+    metadata.capabilities.splice(1, 0, { name: 'OTHER', slot: 1, token: 0 });
+    metadata.capabilities[2].slot = 2;
+    let message = '';
+    try {
+        validateSavedLumpClist(words, sim.parseLumpHeader(words[0]), metadata, sim);
+    } catch (err) { message = String(err.message || err); }
+    check('SLV-8: browser loader rejects private-data declarations outside row 1',
+        /exact compiler-owned c-list row 1/i.test(message), message);
 }
 
 console.log(`\nResults: ${pass} passed, ${fail} failed`);

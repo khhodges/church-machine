@@ -4,8 +4,8 @@
 // Verifies two properties of the Far-capability fault path:
 //
 //   1. LOAD_NUC (boot step 4) fires an F_BIT fault when the boot-entry
-//      NS slot has its F-bit set (word1 bit 30).  The seal is computed
-//      from (location, limit17) only, so flipping bit 30 does not break
+//      NS slot has its F-bit set (word1 bit 31).  The seal is computed
+//      from (location, limit17) only, so flipping bit 31 does not break
 //      the CRC seal check, letting the fault path be reached cleanly.
 //
 //   2. _FAULT_CODES['F_BIT'] in simulator/app.js equals 0x0F (not null),
@@ -57,13 +57,13 @@ function fail(msg) { ERRORS.push(msg); }
         return;
     }
 
-    // Inject F=1 (bit 30) into the boot-entry slot's word1.
-    // The CRC seal covers only (word0_location, limit17) — bit 30 is outside
+    // Inject F=1 (bit 31) into the boot-entry slot's word1.
+    // The CRC seal covers only (word0_location, limit17) — bit 31 is outside
     // that range — so the seal remains valid and mLoad in B:06 passes the seal
     // check.  The explicit F-bit check inside B:06 NUC_CLIST then fires the fault.
     const slotIdx  = sim.bootEntrySlot;
-    const memBase  = sim.NS_TABLE_BASE + slotIdx * sim.NS_ENTRY_WORDS;
-    sim.memory[memBase + 1] = (sim.memory[memBase + 1] | (1 << 30)) >>> 0;
+    const memBase  = sim._nsSlotBase(slotIdx);
+    sim.memory[memBase + 1] = (sim.memory[memBase + 1] | 0x80000000) >>> 0;
 
     // Run B:06 NUC_CLIST: should now fault with F_BIT.
     const faultsBefore = sim.faultLog.length;
@@ -140,12 +140,12 @@ function fail(msg) { ERRORS.push(msg); }
     // so that CALL CR6 reaches the F-bit check instead of faulting NULL_CAP.
     const slotIdx = sim.bootEntrySlot;
     {
-        const nsBase_ = sim.NS_TABLE_BASE + slotIdx * sim.NS_ENTRY_WORDS;
+        const nsBase_ = sim._nsSlotBase(slotIdx);
         const gt_seq_ = (sim.memory[nsBase_ + 2] >>> 25) & 0x7F;
         sim.cr[6].word0 = sim.createGT(gt_seq_, slotIdx, { E: 1 }, 1);
     }
-    const memBase = sim.NS_TABLE_BASE + slotIdx * sim.NS_ENTRY_WORDS;
-    sim.memory[memBase + 1] = (sim.memory[memBase + 1] | (1 << 30)) >>> 0;
+    const memBase = sim._nsSlotBase(slotIdx);
+    sim.memory[memBase + 1] = (sim.memory[memBase + 1] | 0x80000000) >>> 0;
 
     // Encode a CALL CR6 instruction and write it at the fetch address for PC=0.
     // Instruction layout: [31:27] opcode | [26:23] cond | [22:19] crDst | ...
@@ -180,7 +180,35 @@ function fail(msg) { ERRORS.push(msg); }
     console.log('[PASS] CALL F_BIT runtime fault fired: "' + fBitFault.message + '"');
 })();
 
-// ─── Test 4: mSave fires F_BIT when the TARGET NS slot has F=1 ───────────────
+// ─── Test 4: CALL does not confuse GC bit 30 with Far bit 31 ─────────────────
+
+(function testCallGcBitIsNotFar() {
+    const sim = bootSim();
+    if (!sim.bootComplete) {
+        fail('Boot did not complete for CALL GC-bit test');
+        return;
+    }
+    const slotIdx = sim.bootEntrySlot;
+    const memBase = sim._nsSlotBase(slotIdx);
+    const gtSeq = sim.parseNSWord1(sim.memory[memBase + 1]).gtSeq;
+    sim.cr[6].word0 = sim.createGT(gtSeq, slotIdx, { E: 1 }, 1);
+    sim.memory[memBase + 1] = (sim.memory[memBase + 1] | 0x40000000) >>> 0;
+
+    const codeBase = sim.cr[14].word1;
+    sim.memory[codeBase + 1] = sim.encodeInstruction(2, 0xE, 6, 0, 0) >>> 0;
+    sim.pc = 0;
+    sim.halted = false;
+    const faultsBefore = sim.faultLog.length;
+    sim.step();
+    const newFaults = sim.faultLog.slice(faultsBefore);
+    if (newFaults.some(f => f.type === 'F_BIT')) {
+        fail('CALL treated GC bit 30 as Far bit 31');
+        return;
+    }
+    console.log('[PASS] CALL ignores GC bit 30 when Far bit 31 is clear');
+})();
+
+// ─── Test 5: mSave fires F_BIT when the TARGET NS slot has F=1 ───────────────
 //
 // The mSave gate checks the F-bit on the TARGET slot (not the source).
 // _execSave now resolves the C-list NS index and passes it as targetIdx, so
@@ -192,7 +220,7 @@ function fail(msg) { ERRORS.push(msg); }
 //   2. Build a synthetic GT for bootEntrySlot with B=1 (so bindPass succeeds)
 //      and a matching gt_seq (so the version check passes).  The CRC seal on
 //      the NS entry is not affected because the seal covers only
-//      (word0_location, limit17) — bit 30 (F) is outside that range.
+//      (word0_location, limit17) — bit 31 (F) is outside that range.
 //   3. Inject F=1 into bootEntrySlot's word1 and pass bootEntrySlot as targetIdx.
 //   4. Assert mSave returns { ok: false, fault: 'F_BIT' }.
 
@@ -210,19 +238,18 @@ function fail(msg) { ERRORS.push(msg); }
     // Read the boot-entry NS entry to extract the current gt_seq so the
     // synthetic GT passes the version check inside mSave.
     const slotIdx = sim.bootEntrySlot;
-    const memBase = sim.NS_TABLE_BASE + slotIdx * sim.NS_ENTRY_WORDS;
-    const word2   = sim.memory[memBase + 2];
-    const gt_seq  = (word2 >>> 25) & 0x7F;
+    const memBase = sim._nsSlotBase(slotIdx);
+    const gt_seq  = sim.parseNSWord1(sim.memory[memBase + 1]).gtSeq;
 
     // Construct a synthetic GT with B=1 so that bindPass succeeds and
     // execution reaches the farPass check.  Only the GT bits are modified;
     // the NS entry itself (and therefore its CRC seal) is untouched here.
     const syntheticGT = sim.createGT(gt_seq, slotIdx, { B: 1, E: 1 }, 1);
 
-    // Inject F=1 (bit 30) into the target slot's word1.  The seal covers
-    // only (word0_location, limit17) so bit 30 is safe to flip without
+    // Inject F=1 (bit 31) into the target slot's word1.  The seal covers
+    // only (word0_location, limit17) so bit 31 is safe to flip without
     // invalidating the seal.
-    sim.memory[memBase + 1] = (sim.memory[memBase + 1] | (1 << 30)) >>> 0;
+    sim.memory[memBase + 1] = (sim.memory[memBase + 1] | 0x80000000) >>> 0;
 
     // Call mSave directly with targetIdx=slotIdx so the far-bit check fires.
     const result = sim.mSave(syntheticGT, slotIdx, 6);

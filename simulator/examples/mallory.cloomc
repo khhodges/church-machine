@@ -1,0 +1,30 @@
+; ============================================================
+; Abstraction:  ide.Mallory
+; Description:  Adversary in the two-enemies containment example
+; Language:     Church Machine ISA assembly
+; ============================================================
+;
+; Public method selector:
+;   1  Steal() -> faults NO_CAPABILITY
+;
+; Physical c-list:
+;   [0] SELF     E   (minted when the dynamic NS slot is allocated)
+;   [1] SCRATCH  RW  (same resident LUMP)
+;
+; Alice's SECRET_DATA is intentionally absent.  Steal asks CR6 for row 2;
+; because Mallory only owns rows 0 and 1, LOAD deterministically faults
+; NO_CAPABILITY before any data read can occur.
+
+capabilities {
+    __SELF__ E,
+    SCRATCH RW
+}
+
+BRANCH steal
+
+steal:
+LOAD  CR1, CR6, 2
+DREAD DR1, CR1, #0
+RETURN
+
+WORD 0

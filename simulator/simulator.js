@@ -1226,6 +1226,7 @@ class ChurchSimulator {
     // Outforms, hardware entries, and callers that pass { architectural: true }.
     // Those layouts are owned by their respective boot/hardware contracts.
     static get SELF_CAPABILITY_PLACEHOLDER() { return 0xFEED5E1F; }
+    static get PRIVATE_DATA_CAPABILITY_PLACEHOLDER() { return 0xFEEDDA7A; }
 
     _ordinaryLumpNeedsSelfIdentity(hdr, opts = {}) {
         if (!(hdr && hdr.valid && hdr.typ === 0) || opts.architectural) return false;
@@ -1254,12 +1255,23 @@ class ChurchSimulator {
             return fail('IDENTITY_HEADER', 'LUMP header is invalid or its declared body is truncated');
         }
         const row0 = hdr.lumpSize - hdr.cc;
-        // A compiler-owned row is proven either by trusted installation metadata
-        // or by its compiler placeholder in an uninstalled binary.  Do not infer
-        // it from typ=0: assembly can intentionally own row zero.
-        const compilerOwnedSelf = !opts.architectural && hdr.typ === 0 &&
-            (opts.compilerOwnedSelf === true ||
-             (hdr.cc > 0 && copy[row0] === ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER));
+        // Compiler ownership is trusted installation provenance, never inferred
+        // from a sentinel supplied by the binary itself. Raw assembly can use the
+        // same type and must not opt itself into reminting by choosing magic words.
+        const compilerOwnedSelf = this._ordinaryLumpNeedsSelfIdentity(hdr, {
+            ...opts, slot
+        });
+        const privatePlaceholder = ChurchSimulator.PRIVATE_DATA_CAPABILITY_PLACEHOLDER >>> 0;
+        const suppliedPrivateRows = [];
+        for (let row = 0; row < hdr.cc; row++) {
+            if ((copy[row0 + row] >>> 0) === privatePlaceholder) {
+                suppliedPrivateRows.push(row);
+            }
+        }
+        if (!compilerOwnedSelf && suppliedPrivateRows.length > 0) {
+            return fail('IDENTITY_PRIVATE',
+                'private-data placeholder requires trusted compiler-owned installation metadata');
+        }
         if (!compilerOwnedSelf) return { ok: true, words: copy, hdr, ordinary: false };
         if (hdr.cc < 1) {
             return fail('IDENTITY_CLIST', 'ordinary executable LUMPs require compiler-owned c-list row 0');
@@ -1273,24 +1285,53 @@ class ChurchSimulator {
         const nsBase = this._nsSlotBase(slot);
         const seq = this._nsSequenceForWrite(slot);
         const expectedSelf = this.createGT(seq, slot, { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, 1) >>> 0;
+        const expectedPrivateData = this.createGT(
+            seq, slot, { R: 1, W: 1, X: 0, L: 0, S: 0, E: 0 }, 1) >>> 0;
         const supplied = copy[row0] >>> 0;
         const placeholder = ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER >>> 0;
+        const sourceSlot = Number(opts.sourceSelfSlot);
+        const sourceSeq = Number(opts.sourceSelfSeq);
+        const sourceIdentityProven = opts.remintCompilerOwnedSelf === true &&
+            Number.isInteger(sourceSlot) && sourceSlot >= 0 &&
+            Number.isInteger(sourceSeq) && sourceSeq >= 0;
+        const expectedSourceSelf = sourceIdentityProven
+            ? this.createGT(sourceSeq, sourceSlot,
+                { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, 1) >>> 0
+            : null;
+        const expectedSourcePrivateData = sourceIdentityProven
+            ? this.createGT(sourceSeq, sourceSlot,
+                { R: 1, W: 1, X: 0, L: 0, S: 0, E: 0 }, 1) >>> 0
+            : null;
         if (supplied !== placeholder && supplied !== expectedSelf) {
             // A saved, already-installed compiler LUMP may carry its previous
             // live self GT. Remint it only when the caller proves that exact
             // source slot+sequence; this is never a general "overwrite row 0"
             // escape hatch for corrupt or stale binaries.
-            const sourceSlot = Number(opts.sourceSelfSlot);
-            const sourceSeq = Number(opts.sourceSelfSeq);
-            const expectedSourceSelf = Number.isInteger(sourceSlot) && sourceSlot >= 0 &&
-                Number.isInteger(sourceSeq) && sourceSeq >= 0
-                ? this.createGT(sourceSeq, sourceSlot,
-                    { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, 1) >>> 0
-                : null;
-            if (!(opts.remintCompilerOwnedSelf === true &&
-                  expectedSourceSelf !== null && supplied === expectedSourceSelf)) {
+            if (!(expectedSourceSelf !== null && supplied === expectedSourceSelf)) {
                 return fail('IDENTITY_SELF',
                     `c-list row 0 is 0x${supplied.toString(16).padStart(8, '0')}; expected compiler placeholder, destination self E-GT 0x${expectedSelf.toString(16).padStart(8, '0')}, or proven source self identity`);
+            }
+        }
+
+        const privateDataRows = Array.isArray(opts.privateDataRows)
+            ? Array.from(new Set(opts.privateDataRows.map(Number)))
+            : [];
+        if (privateDataRows.some(row => !Number.isInteger(row) || row !== 1 || row >= hdr.cc)) {
+            return fail('IDENTITY_PRIVATE',
+                'private-data reminting currently supports only declared c-list row 1');
+        }
+        if (suppliedPrivateRows.some(row => !privateDataRows.includes(row))) {
+            return fail('IDENTITY_PRIVATE',
+                `undeclared private-data placeholder found in c-list row ${suppliedPrivateRows.find(row => !privateDataRows.includes(row))}`);
+        }
+        for (const row of privateDataRows) {
+            const addr = row0 + row;
+            const privateWord = copy[addr] >>> 0;
+            if (privateWord !== privatePlaceholder &&
+                privateWord !== expectedPrivateData &&
+                !(expectedSourcePrivateData !== null && privateWord === expectedSourcePrivateData)) {
+                return fail('IDENTITY_PRIVATE',
+                    `c-list row ${row} is 0x${privateWord.toString(16).padStart(8, '0')}; expected private-data placeholder, destination RW GT, or proven source private-data GT`);
             }
         }
 
@@ -1304,6 +1345,9 @@ class ChurchSimulator {
             ? (opts.cacheToken >>> 0)
             : (this.memory[nsBase + 3] >>> 0);
         copy[row0] = expectedSelf;
+        for (const row of privateDataRows) {
+            copy[row0 + row] = expectedPrivateData;
+        }
         return {
             ok: true,
             words: copy,
@@ -2653,8 +2697,10 @@ class ChurchSimulator {
                     return false;
                 }
                 const entryNSEntry  = entryCheck.entry;                             // NS entry for boot entry abstraction
-                // F-bit check removed: bit[30] of W1 is the GC liveness mark (g_bit),
-                // not the far-lump flag; f_flag is bit[31] and masked from integrity32. ★v2.0
+                if (this.parseNSWord1(entryNSEntry.word1_limit).f === 1) {
+                    this.fault('F_BIT', `NUC_CLIST: ${_b4Label} has F-bit set (Far)`);
+                    return false;
+                }
                 const bootEntrySlot = this.bootEntrySlot;
 
                 // ── Step 2: Read Boot.Abstr lump header (word 0) ──────────────────────
@@ -4558,6 +4604,11 @@ class ChurchSimulator {
         }
         const absAddr = (clistLoc + d.imm) >>> 0;
         const clistRange = { base: clistLoc, upperBound: (clistLoc + clistSize - 1) >>> 0 };
+        if (d.crSrc === 6 && d.imm >= clistSize) {
+            this.fault('NO_CAPABILITY',
+                `LOAD: c-list has no capability at row ${d.imm} (declared rows: 0–${Math.max(0, clistSize - 1)})`);
+            return null;
+        }
         const check = this.mLoad(clistGT, (d.crSrc === 6 || !this.bootComplete) ? null : 'L', d.crSrc, absAddr, clistRange);
         if (!check.ok) {
             this.fault(check.fault, `LOAD: CR${d.crSrc}: ${check.message}`);
@@ -4984,7 +5035,7 @@ class ChurchSimulator {
         {
             const preBase = this._nsSlotBase(srcParsed.index);
             const preW1   = this.memory[preBase + 1];
-            if ((preW1 >>> 30) & 1) {
+            if ((preW1 >>> 31) & 1) {
                 this.fault('F_BIT', `CALL: CR${d.crDst} has F-bit set (Far)`);
                 return null;
             }
@@ -5623,7 +5674,11 @@ class ChurchSimulator {
         }
 
         if (frame.savedDRs) {
-            for (let di = 0; di < 16; di++) {
+            // DR1–DR3 are caller-saved argument/return registers.  Preserve the
+            // callee's values across RETURN; restore DR4–DR15 from the caller.
+            // DR0 remains hardwired zero through _writeDR.
+            this._writeDR(0, 0);
+            for (let di = 4; di < 16; di++) {
                 this._writeDR(di, frame.savedDRs[di]);
             }
         }
@@ -7691,7 +7746,8 @@ class ChurchSimulator {
             compilerOwnedSelf: options.compilerOwnedSelf === true,
             remintCompilerOwnedSelf: options.remintCompilerOwnedSelf === true,
             sourceSelfSlot: options.sourceSelfSlot,
-            sourceSelfSeq: options.sourceSelfSeq
+            sourceSelfSeq: options.sourceSelfSeq,
+            privateDataRows: options.privateDataRows
         });
         if (!_identity.ok) {
             this.output += `[loadLumpBinary] ERROR: Namespace identity validation failed (${_identity.code}) — ${_identity.message}. LUMP rejected without installation.\n`;
@@ -8851,7 +8907,7 @@ ChurchSimulator.FAULT_CODES = {
     LUMP_MAGIC: null, LUMP_SIZE: null, LUMP_LAYOUT: null, LUMP_OOM: null,
     OUTFORM_IDENTITY: null,   // Task #2862: trusted per-slot identity mismatch (software-only)
     NO_CODE: null, PRIVATE_METHOD: null, CODE_NOT_RESIDENT: null, PRIV_REG: null,
-    LAZY_RESOLVE_PENDING: null, STUB_METHOD: null,
+    LAZY_RESOLVE_PENDING: null, STUB_METHOD: null, NO_CAPABILITY: null,
 };
 
 // Task #1530: Scheduler IRQ c-list — exposed for external test code.

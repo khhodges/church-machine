@@ -2114,5 +2114,43 @@
     "identity_hash": "c9092a4835de23c6b57a82f4ec140753b99ca30a68f28d53557c26ca25151a8f",
     "dot_name": "Adder",
     "issue_n": 1
+  },
+  {
+    "token": "1eec355e",
+    "abstraction": "ide.Alice",
+    "dot_name": "ide.Alice",
+    "issue_n": 1,
+    "ns_slot": null,
+    "ns_slot_policy": "dynamic",
+    "boot_resident": false,
+    "lump_size": 512,
+    "cw": 9,
+    "cc": 2,
+    "status": "released",
+    "language": "Church Machine ISA",
+    "author": "Church Machine",
+    "filename": "ide.Alice.1.1eec355e.lump",
+    "sidecar_file": "ide.Alice.1.1eec355e.json",
+    "binary_hash": "5f929d16f484e2e8b154d7ab5060c24d77d4e8e12b53febc25722ef69e2d69b1",
+    "identity_hash": "3987f739f1b7714fcfb3c0543c5031f05cab115c1f5b7fc861e6e22642868843"
+  },
+  {
+    "token": "0ca567b5",
+    "abstraction": "ide.Mallory",
+    "dot_name": "ide.Mallory",
+    "issue_n": 1,
+    "ns_slot": null,
+    "ns_slot_policy": "dynamic",
+    "boot_resident": false,
+    "lump_size": 256,
+    "cw": 5,
+    "cc": 2,
+    "status": "released",
+    "language": "Church Machine ISA",
+    "author": "Church Machine",
+    "filename": "ide.Mallory.1.0ca567b5.lump",
+    "sidecar_file": "ide.Mallory.1.0ca567b5.json",
+    "binary_hash": "a220c45f71efffa1ef401a99343967964ab402786b3236688f161d297f07427f",
+    "identity_hash": "f3b48e1b7403b0e77da69bc18f7b60db71061bfc1b9c0bc672e2ff282d11d1fe"
   }
 ]

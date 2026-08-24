@@ -1,0 +1,37 @@
+; ============================================================
+; Abstraction:  ide.Alice
+; Description:  Two-enemies capability-containment example
+; Language:     Church Machine ISA assembly
+; ============================================================
+;
+; Public method selectors:
+;   1  Stash(value in DR1) -> ok in DR1
+;   2  Reveal()            -> secret in DR1
+;
+; Physical c-list:
+;   [0] SELF         E   (minted when the dynamic NS slot is allocated)
+;   [1] SECRET_DATA  RW  (same resident LUMP, never delegated)
+;
+; The private word is code word 9.  It is executable-addressable so the
+; resident object's RW capability can cover it, but WORD 0 is never reached
+; by either method.
+
+capabilities {
+    __SELF__ E,
+    SECRET_DATA RW
+}
+
+BRANCH stash
+BRANCH reveal
+
+stash:
+LOAD   CR1, CR6, 1
+DWRITE DR1, CR1, #9
+RETURN
+
+reveal:
+LOAD  CR1, CR6, 1
+DREAD DR1, CR1, #9
+RETURN
+
+WORD 0

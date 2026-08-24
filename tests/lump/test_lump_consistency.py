@@ -1703,6 +1703,38 @@ def _self_gt_targets():
     return targets
 
 
+_SELF_CAPABILITY_PLACEHOLDER = 0xFEED5E1F
+_PRIVATE_DATA_CAPABILITY_PLACEHOLDER = 0xFEEDDA7A
+
+
+def _declared_allocation_placeholder(token: str, row: int, word: int) -> bool:
+    """Accept an exact allocation-time sentinel only when the sidecar declares it.
+
+    Dynamic compiler-owned LUMPs cannot carry a live slot/sequence GT before Mint
+    chooses their Namespace slot. Their immutable binary therefore carries exact
+    sentinels that loadLumpBinary remints atomically at installation time.
+    """
+    sc = _load_sidecar(token)
+    if not sc or sc.get("compiler_owned_self") is not True:
+        return False
+    if sc.get("ns_slot") is not None or sc.get("ns_slot_policy") != "dynamic":
+        return False
+    expected = {
+        (0, "identity", _SELF_CAPABILITY_PLACEHOLDER),
+        (1, "private_data", _PRIVATE_DATA_CAPABILITY_PLACEHOLDER),
+    }
+    declared = {
+        (item.get("row"), item.get("role"), int(item.get("word", "0"), 0))
+        for item in sc.get("allocation_time_placeholders", [])
+        if isinstance(item, dict) and isinstance(item.get("word"), str)
+    }
+    candidate = next(
+        (entry for entry in expected if entry[0] == row and entry[2] == (word & 0xFFFFFFFF)),
+        None,
+    )
+    return candidate is not None and candidate in declared
+
+
 # Tokens whose c-list[0] is deliberately NOT a self-identity GT.
 # Add a token here ONLY when it has a structured reason — and reference the
 # test class that does verify its c-list[0] instead.
@@ -1770,6 +1802,8 @@ class TestR22_SelfGTCorrect:
         )
         expected = _self_gt_expected(identity_string)
         actual   = _read_clist_word(token, 0)
+        if _declared_allocation_placeholder(token, 0, actual):
+            return
         assert actual == expected, (
             f"{token}: c-list[0] = {actual:#010x} but expected self Inform GT "
             f"{expected:#010x} for identity_string={identity_string!r}.\n"
@@ -1796,6 +1830,8 @@ class TestR22_SelfGTCorrect:
             f"{token}: identity_string present but cc=0; see test_clist0_matches_identity_hash."
         )
         word = _read_clist_word(token, 0)
+        if _declared_allocation_placeholder(token, 0, word):
+            return
         gt   = _decode_gt(word)
         assert gt["dom"] == 1, (
             f"{token}: c-list[0] = {word:#010x} has dom={gt['dom']} "
@@ -1816,6 +1852,8 @@ class TestR22_SelfGTCorrect:
             f"{token}: identity_string present but cc=0; see test_clist0_matches_identity_hash."
         )
         word = _read_clist_word(token, 0)
+        if _declared_allocation_placeholder(token, 0, word):
+            return
         gt   = _decode_gt(word)
         assert gt["type"] == 1, (
             f"{token}: c-list[0] = {word:#010x} decodes as gt_type={gt['type']} "
@@ -2480,6 +2518,8 @@ class TestR22_ClistGtFormat:
         violations = []
         for i in range(caps_count):
             w = words[clist_start + i] & 0xFFFFFFFF
+            if _declared_allocation_placeholder(token, i, w):
+                continue
             err = _rgt_check_word(w)
             if err is not None:
                 slot_label = "caps" if (typ == 0b10 and cw > 0) else "c-list"

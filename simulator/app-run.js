@@ -2552,6 +2552,7 @@ const _FAULT_CODES = {
     PERM:null, BOOT:null, MATH_ERROR:null,
     DOMAIN_ERROR:null, HANDLER:null, PERMISSION:null, TYPE:null,
     LUMP_MAGIC:null, LUMP_SIZE:null, LUMP_LAYOUT:null, LUMP_OOM:null,
+    NO_CAPABILITY:null,
 };
 
 // Human-readable descriptions for firmware download (outform) fault codes
