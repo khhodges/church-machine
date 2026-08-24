@@ -122,6 +122,7 @@ class SystemAbstractions {
     _bindAll() {
         this._bindSalvation();
         this._bindNavana();
+        this._bindBank();
         this._bindMint();
         this._bindMemory();
         this._bindBilling();
@@ -209,7 +210,10 @@ class SystemAbstractions {
             ledDriverAbstraction: null,
             passKeyAuditLog: [],
             driverPermGrants: {},
-            driverGrantCounter: 0
+            driverGrantCounter: 0,
+            topSecurityObjects: {},
+            topSecurityObjectCounter: 0,
+            topSecurityPassKeyCounter: 0
         };
 
         function encodePassKeyIndex(deviceSelector, permMask, pkId) {
@@ -253,14 +257,26 @@ class SystemAbstractions {
             const parsed = sim.parseGT(gt32);
             if (parsed.type !== 2) return { ok: false, reason: 'TYPE', message: `PassKey GT type is ${parsed.typeName}, must be Abstract` };
 
+            const record = navanaState.passKeys[gt32];
+            if (!record) return { ok: false, reason: 'NOT_ISSUED', message: 'PassKey not issued by Navana' };
+            if (record.revoked) return { ok: false, reason: 'REVOKED', message: 'PassKey has been revoked' };
+
+            // Programmer-defined top-security objects use the same opaque,
+            // Abstract GT credential as device passkeys, but their key index
+            // deliberately has no device-selector encoding.  The exact issued
+            // token remains the authority; callers cannot manufacture a record
+            // merely by copying the public object id or a method name.
+            if (record.kind === 'top-security') {
+                if ((record.gt >>> 0) !== (gt32 >>> 0)) {
+                    return { ok: false, reason: 'TAMPERED', message: 'Top-security PassKey does not match its issuance record' };
+                }
+                return { ok: true, record: record };
+            }
+
             const decoded = decodePassKeyIndex(parsed.index);
             if (!decoded.deviceSelector || !Object.values(PASSKEY_DEVICE_SELECTORS).includes(decoded.deviceSelector)) {
                 return { ok: false, reason: 'ENCODING', message: `PassKey GT index encodes invalid device selector 0x${decoded.deviceSelector.toString(16)}` };
             }
-
-            const record = navanaState.passKeys[gt32];
-            if (!record) return { ok: false, reason: 'NOT_ISSUED', message: 'PassKey not issued by Navana' };
-            if (record.revoked) return { ok: false, reason: 'REVOKED', message: 'PassKey has been revoked' };
 
             if (decoded.deviceSelector !== record.deviceSelector) {
                 return { ok: false, reason: 'TAMPERED', message: 'PassKey GT index device selector does not match registry' };
@@ -270,6 +286,140 @@ class SystemAbstractions {
             }
 
             return { ok: true, record: record };
+        }
+
+        function secureRandomWords(count) {
+            if (typeof globalThis !== 'undefined' && globalThis.crypto &&
+                    typeof globalThis.crypto.getRandomValues === 'function') {
+                const words = new Uint32Array(count);
+                globalThis.crypto.getRandomValues(words);
+                return Array.from(words, word => word >>> 0);
+            }
+            if (typeof require === 'function') {
+                // Node-only test/runtime path. Browser builds must have the Web
+                // Crypto API; there is intentionally no Math.random() fallback
+                // for a top-security credential.
+                const bytes = require('crypto').randomBytes(count * 4);
+                const words = [];
+                for (let i = 0; i < count; i++) words.push(bytes.readUInt32LE(i * 4) >>> 0);
+                return words;
+            }
+            throw new Error('secure random source is unavailable');
+        }
+
+        function publicTopSecurityPassKey(record) {
+            return { gt: record.gt, proof: record.proof.slice() };
+        }
+
+        function mintTopSecurityPassKey(sim, securityObject, allowedMethods, owner) {
+            // A top-security PassKey must never be derived from an object id or
+            // a public counter.  A caller can know those values, whereas this
+            // randomly selected GT identity is only available to the recipient.
+            // The 32-bit GT format leaves 25 variable identity bits once type
+            // and E permission are fixed; retain every issued value and retry on
+            // collision rather than ever reusing a revoked identity.
+            let gt = 0;
+            for (let attempt = 0; attempt < 128; attempt++) {
+                const entropy = secureRandomWords(1)[0];
+                const keyIndex = entropy & 0xFFFF;
+                const keySeq = (entropy >>> 16) & 0x1FF;
+                const candidate = sim.createGT(keySeq, keyIndex, { E: 1 }, 2);
+                if (!navanaState.passKeys[candidate]) {
+                    gt = candidate;
+                    break;
+                }
+            }
+            if (!gt) throw new Error('could not allocate a unique PassKey identity');
+
+            const keyNumber = ++navanaState.topSecurityPassKeyCounter;
+            const record = {
+                id: keyNumber,
+                gt,
+                kind: 'top-security',
+                objectId: securityObject.id,
+                objectName: securityObject.name,
+                allowedMethods: allowedMethods.slice(),
+                owner: !!owner,
+                // A GT contains only 25 variable identity bits once its type
+                // and E permission are fixed.  It is therefore an identifier,
+                // not the sole secret: every top-security operation must also
+                // prove possession of this independent 128-bit value.
+                proof: secureRandomWords(4),
+                issuedBy: 'Navana',
+                issuedAt: Date.now(),
+                revoked: false
+            };
+            navanaState.passKeys[gt] = record;
+            securityObject.passKeys.push(gt);
+            return record;
+        }
+
+        function topSecurityAudit(sim, gate, object, method, result, detail) {
+            if (!sim || !sim.auditLog) return;
+            sim.auditLog.push({
+                gate,
+                label: object ? `Top security: ${object.name}` : 'Top security',
+                nsIndex: 5,
+                requiredPerm: 'E + object PassKey',
+                checks: {
+                    object: { pass: !!object },
+                    passkey: { pass: result === 'pass' },
+                    method: { pass: result === 'pass', perm: method || '—' }
+                },
+                b: 0, f: 0,
+                result,
+                detail
+            });
+        }
+
+        function readTopSecurityPassKey(args) {
+            const bundled = args.passKey && typeof args.passKey === 'object' ? args.passKey
+                : (args.passkey && typeof args.passkey === 'object' ? args.passkey : null);
+            const gt = bundled
+                ? (bundled.gt !== undefined ? bundled.gt : bundled.passKeyGT)
+                : (args.passKeyGT !== undefined ? args.passKeyGT
+                : (args.passkey !== undefined ? args.passkey
+                : (args.passKey !== undefined ? args.passKey
+                : (args.dr1 !== undefined ? args.dr1 : 0))));
+            const proof = bundled
+                ? (bundled.proof !== undefined ? bundled.proof : bundled.passKeyProof)
+                : (args.passKeyProof !== undefined ? args.passKeyProof
+                : (args.proof !== undefined ? args.proof
+                : ([args.dr2, args.dr3, args.dr4, args.dr5].every(word => word !== undefined)
+                    ? [args.dr2, args.dr3, args.dr4, args.dr5]
+                    : args.dr2)));
+            return { gt, proof };
+        }
+
+        function requireTopSecurityKey(sim, object, passKey, methodName, requireOwner) {
+            if (!object || object.revoked) {
+                return { ok: false, fault: 'REVOKED', message: 'Top-security object is revoked or unavailable' };
+            }
+            const validation = validatePassKey(sim, passKey.gt);
+            if (!validation.ok) {
+                return { ok: false, fault: 'PERM', message: `Top-security PassKey rejected: ${validation.message}` };
+            }
+            const record = validation.record;
+            if (record.kind !== 'top-security' || record.objectId !== object.id) {
+                return { ok: false, fault: 'PERM', message: 'PassKey is not issued for this top-security object' };
+            }
+            if (!Array.isArray(passKey.proof) || passKey.proof.length !== record.proof.length) {
+                return { ok: false, fault: 'PERM', message: 'Top-security PassKey proof is missing or malformed' };
+            }
+            let proofDifference = 0;
+            for (let i = 0; i < record.proof.length; i++) {
+                proofDifference |= (record.proof[i] ^ (passKey.proof[i] >>> 0));
+            }
+            if (proofDifference !== 0) {
+                return { ok: false, fault: 'PERM', message: 'Top-security PassKey proof does not match the issued credential' };
+            }
+            if (requireOwner && !record.owner) {
+                return { ok: false, fault: 'PERM', message: 'This operation requires the object owner PassKey' };
+            }
+            if (methodName && !record.owner && !record.allowedMethods.includes(methodName.toUpperCase())) {
+                return { ok: false, fault: 'PERM', message: `PassKey is not authorised for ${object.name}.${methodName}` };
+            }
+            return { ok: true, record };
         }
 
         function createLEDDriverAbstraction(sim) {
@@ -700,6 +850,198 @@ class SystemAbstractions {
             };
         });
 
+        // SecureObjectAdd(name, methods) -> owner PassKey
+        //
+        // This is the programmer-facing entry point for a top-security object.
+        // The protected method bodies stay in the programmer's abstraction; this
+        // registry stores the access policy and optionally invokes trusted host
+        // handlers supplied by the IDE/runtime.  M-elevation is deliberately
+        // required here: ordinary code can receive a delegated key but cannot
+        // define a new authority boundary for itself.
+        this.registry.bindMethod(5, 'SecureObjectAdd', function(sim, args) {
+            if (!navanaState.initialized) {
+                return { ok: false, fault: 'NOT_INIT', message: 'Navana.SecureObjectAdd: Navana not initialized' };
+            }
+            if (!sim.mElevation) {
+                return { ok: false, fault: 'PERM', message: 'Navana.SecureObjectAdd: requires M-elevation (programmer authority)' };
+            }
+
+            const name = typeof args.name === 'string' ? args.name.trim() : '';
+            if (!/^[A-Za-z][A-Za-z0-9_.-]{0,63}$/.test(name)) {
+                return { ok: false, fault: 'ARGS', message: 'Navana.SecureObjectAdd: name must start with a letter and contain only letters, numbers, dot, dash, or underscore' };
+            }
+            const duplicate = Object.values(navanaState.topSecurityObjects)
+                .some(o => !o.revoked && o.name.toLowerCase() === name.toLowerCase());
+            if (duplicate) {
+                return { ok: false, fault: 'EXISTS', message: `Navana.SecureObjectAdd: "${name}" already exists` };
+            }
+
+            const suppliedMethods = args.methods;
+            const descriptors = Array.isArray(suppliedMethods)
+                ? suppliedMethods.map(method => [method, null])
+                : (suppliedMethods && typeof suppliedMethods === 'object'
+                    ? Object.entries(suppliedMethods) : []);
+            if (descriptors.length === 0) {
+                return { ok: false, fault: 'ARGS', message: 'Navana.SecureObjectAdd: declare at least one protected method' };
+            }
+
+            const methods = {};
+            const handlers = {};
+            for (const [rawName, descriptor] of descriptors) {
+                const methodName = typeof rawName === 'string' ? rawName.trim() : '';
+                const upper = methodName.toUpperCase();
+                if (!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(methodName) || methods[upper]) {
+                    return { ok: false, fault: 'ARGS', message: `Navana.SecureObjectAdd: invalid or duplicate method "${methodName}"` };
+                }
+                methods[upper] = methodName;
+                const handler = typeof descriptor === 'function'
+                    ? descriptor
+                    : (descriptor && typeof descriptor.handler === 'function' ? descriptor.handler : null);
+                if (handler) handlers[upper] = handler;
+            }
+
+            const object = {
+                id: ++navanaState.topSecurityObjectCounter,
+                name,
+                methods,
+                handlers,
+                passKeys: [],
+                createdAt: Date.now(),
+                revoked: false
+            };
+            navanaState.topSecurityObjects[object.id] = object;
+            let ownerKey;
+            try {
+                ownerKey = mintTopSecurityPassKey(sim, object, Object.keys(methods), true);
+            } catch (error) {
+                delete navanaState.topSecurityObjects[object.id];
+                return { ok: false, fault: 'MINT', message: `Navana.SecureObjectAdd: ${error.message}` };
+            }
+            topSecurityAudit(sim, 'Navana.SecureObjectAdd', object, null, 'pass', 'object registered');
+
+            return {
+                ok: true,
+                result: {
+                    objectId: object.id,
+                    name: object.name,
+                    methods: Object.values(object.methods),
+                    ownerPassKey: publicTopSecurityPassKey(ownerKey),
+                    ownerPassKeyGT: ownerKey.gt
+                },
+                message: `Navana.SecureObjectAdd: registered top-security object "${name}" with ${descriptors.length} protected method(s); owner PassKey issued`
+            };
+        });
+
+        // SecureObjectMintPassKey(objectId, ownerPassKey, methods?) -> delegated PassKey
+        this.registry.bindMethod(5, 'SecureObjectMintPassKey', function(sim, args) {
+            const objectId = args.objectId !== undefined ? args.objectId : args.object_id;
+            const object = navanaState.topSecurityObjects[objectId];
+            const ownerCheck = requireTopSecurityKey(sim, object, readTopSecurityPassKey(args), null, true);
+            if (!ownerCheck.ok) {
+                topSecurityAudit(sim, 'Navana.SecureObjectMintPassKey', object, null, 'fail', ownerCheck.message);
+                return ownerCheck;
+            }
+
+            const requested = args.methods === undefined
+                ? Object.keys(object.methods)
+                : (Array.isArray(args.methods) ? args.methods : []);
+            const allowedMethods = [];
+            for (const method of requested) {
+                const upper = String(method).toUpperCase();
+                if (!object.methods[upper]) {
+                    return { ok: false, fault: 'METHOD', message: `Navana.SecureObjectMintPassKey: ${object.name}.${method} is not a protected method` };
+                }
+                if (!allowedMethods.includes(upper)) allowedMethods.push(upper);
+            }
+            if (allowedMethods.length === 0) {
+                return { ok: false, fault: 'ARGS', message: 'Navana.SecureObjectMintPassKey: select at least one method' };
+            }
+            let key;
+            try {
+                key = mintTopSecurityPassKey(sim, object, allowedMethods, false);
+            } catch (error) {
+                return { ok: false, fault: 'MINT', message: `Navana.SecureObjectMintPassKey: ${error.message}` };
+            }
+            topSecurityAudit(sim, 'Navana.SecureObjectMintPassKey', object, null, 'pass', `delegated methods=${allowedMethods.join(',')}`);
+            return {
+                ok: true,
+                result: {
+                    passKey: publicTopSecurityPassKey(key),
+                    passKeyGT: key.gt,
+                    objectId: object.id,
+                    methods: allowedMethods.map(m => object.methods[m])
+                },
+                message: `Navana.SecureObjectMintPassKey: delegated PassKey issued for ${object.name}.${allowedMethods.map(m => object.methods[m]).join(', ')}`
+            };
+        });
+
+        // SecureObjectCall(objectId, method, passKey, args) -> handler result
+        this.registry.bindMethod(5, 'SecureObjectCall', function(sim, args) {
+            const objectId = args.objectId !== undefined ? args.objectId : args.object_id;
+            const object = navanaState.topSecurityObjects[objectId];
+            const method = typeof args.method === 'string' ? args.method.trim() : '';
+            const upper = method.toUpperCase();
+            if (!object || !object.methods[upper]) {
+                return { ok: false, fault: 'METHOD', message: 'Navana.SecureObjectCall: unknown top-security object or protected method' };
+            }
+            const keyCheck = requireTopSecurityKey(sim, object, readTopSecurityPassKey(args), upper, false);
+            if (!keyCheck.ok) {
+                topSecurityAudit(sim, 'Navana.SecureObjectCall', object, method, 'fail', keyCheck.message);
+                return keyCheck;
+            }
+
+            let result = { authorized: true, objectId: object.id, method: object.methods[upper] };
+            try {
+                if (object.handlers[upper]) {
+                    result = object.handlers[upper](sim, args.arguments || args.methodArgs || {}, {
+                        objectId: object.id,
+                        objectName: object.name,
+                        passKeyId: keyCheck.record.id
+                    });
+                }
+            } catch (error) {
+                topSecurityAudit(sim, 'Navana.SecureObjectCall', object, method, 'fail', `handler error: ${error.message}`);
+                return { ok: false, fault: 'HANDLER', message: `Navana.SecureObjectCall: protected handler failed: ${error.message}` };
+            }
+
+            topSecurityAudit(sim, 'Navana.SecureObjectCall', object, method, 'pass', `PassKey #${keyCheck.record.id} authorised`);
+            return {
+                ok: true,
+                result,
+                message: `Navana.SecureObjectCall: ${object.name}.${object.methods[upper]} authorised by object-scoped PassKey`
+            };
+        });
+
+        // SecureObjectRevoke(objectId, ownerPassKey, passKeyGT?) -> ok
+        this.registry.bindMethod(5, 'SecureObjectRevoke', function(sim, args) {
+            const objectId = args.objectId !== undefined ? args.objectId : args.object_id;
+            const object = navanaState.topSecurityObjects[objectId];
+            const ownerCheck = requireTopSecurityKey(sim, object, readTopSecurityPassKey(args), null, true);
+            if (!ownerCheck.ok) {
+                topSecurityAudit(sim, 'Navana.SecureObjectRevoke', object, null, 'fail', ownerCheck.message);
+                return ownerCheck;
+            }
+
+            const targetGT = args.targetPassKeyGT || args.targetPasskey || null;
+            if (targetGT) {
+                const target = navanaState.passKeys[targetGT];
+                if (!target || target.kind !== 'top-security' || target.objectId !== object.id) {
+                    return { ok: false, fault: 'PERM', message: 'Navana.SecureObjectRevoke: target key does not belong to this object' };
+                }
+                target.revoked = true;
+                topSecurityAudit(sim, 'Navana.SecureObjectRevoke', object, null, 'pass', `PassKey #${target.id} revoked`);
+                return { ok: true, result: { revokedPassKeyGT: targetGT }, message: `Navana.SecureObjectRevoke: delegated PassKey revoked for ${object.name}` };
+            }
+
+            object.revoked = true;
+            for (const keyGT of object.passKeys) {
+                const key = navanaState.passKeys[keyGT];
+                if (key) key.revoked = true;
+            }
+            topSecurityAudit(sim, 'Navana.SecureObjectRevoke', object, null, 'pass', 'object and all PassKeys revoked');
+            return { ok: true, result: { objectId: object.id, revoked: true }, message: `Navana.SecureObjectRevoke: ${object.name} and all of its PassKeys revoked` };
+        });
+
         this.registry.bindMethod(5, 'GetPassKeyAuditLog', function(sim, args) {
             return {
                 ok: true,
@@ -958,6 +1300,48 @@ class SystemAbstractions {
                 result: { index: index || upload.index, updated: true },
                 message: `Navana.Abstraction.Update: NS[${index || upload.index}] updated`
             };
+        });
+
+        // Bank uses Navana's object registry and credential authority.  Keeping
+        // this adapter here prevents Bank from minting caller-controlled GTs.
+        this._topSecurityApi = {
+            obtainPassKey: (sim, args) => {
+                const objectId = args.objectId !== undefined ? args.objectId : args.object_id;
+                const object = navanaState.topSecurityObjects[objectId];
+                const ownerCheck = requireTopSecurityKey(sim, object, readTopSecurityPassKey(args), null, true);
+                if (!ownerCheck.ok) {
+                    topSecurityAudit(sim, 'Bank.ObtainPassKey', object, null, 'fail', ownerCheck.message);
+                    return ownerCheck;
+                }
+
+                let key;
+                try {
+                    key = mintTopSecurityPassKey(sim, object, Object.keys(object.methods), false);
+                } catch (error) {
+                    return { ok: false, fault: 'MINT', message: `Bank.ObtainPassKey: ${error.message}` };
+                }
+                topSecurityAudit(sim, 'Bank.ObtainPassKey', object, null, 'pass', 'fresh object passkey issued');
+                return {
+                    ok: true,
+                    result: {
+                        objectId: object.id,
+                        objectName: object.name,
+                        methods: Object.values(object.methods),
+                        passKey: publicTopSecurityPassKey(key),
+                        passKeyGT: key.gt
+                    },
+                    message: `Bank.ObtainPassKey: fresh PassKey issued for stored object ${object.name}`
+                };
+            }
+        };
+    }
+
+    _bindBank() {
+        this.registry.bindMethod(54, 'ObtainPassKey', (sim, args) => {
+            if (!this._topSecurityApi) {
+                return { ok: false, fault: 'NOT_INIT', message: 'Bank.ObtainPassKey: Bank authority is not initialized' };
+            }
+            return this._topSecurityApi.obtainPassKey(sim, args || {});
         });
     }
 

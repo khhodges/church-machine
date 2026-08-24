@@ -56,6 +56,11 @@ Namespace Master Controller. Sole NS table writer. Runs indefinitely — does no
 | Abstraction.Add | `Abstraction.Add(code, clist) → E-GT` | E | ⏳ planned | Process compiled abstraction, allocate lump, write code + c-list, forge Inform E-GT. |
 | Abstraction.Update | `Abstraction.Update(nsIndex, code) → ok` | E | ⏳ planned | Re-carve lump or migrate to larger allocation. |
 | Abstraction.Remove | `Abstraction.Remove(nsIndex) → ok` | E | ⏳ planned | Revoke GT, free lump, clear NS slot. |
+| SecureObjectAdd | `SecureObjectAdd(name, methods) → ownerPassKey` | E + M | ✅ | Programmer-only: define a top-security object and issue its 128-bit-proof owner PassKey. |
+| SecureObjectMintPassKey | `SecureObjectMintPassKey(objectId, ownerKey, methods?) → PassKey` | E + owner key | ✅ | Delegate a revocable, method-limited PassKey with an independent 128-bit proof. |
+| SecureObjectCall | `SecureObjectCall(objectId, method, passKey) → result` | E + object key + proof | ✅ | Call a protected top-security method only with an authorised object PassKey and its 128-bit proof. |
+| SecureObjectRevoke | `SecureObjectRevoke(objectId, ownerKey, targetKey?) → ok` | E + owner key + proof | ✅ | Revoke one delegated key or the entire top-security object. |
+| Bank.ObtainPassKey | `Bank.ObtainPassKey(objectId, ownerKey) → PassKey` | E + owner key + proof | ✅ | Obtain a fresh passkey for one of your stored objects without exposing its Namespace slot. |
 | Manage | `Manage(nsIndex, op) → ok` | E | ⏳ planned | Abstraction lifecycle — creation, destruction, reconfiguration. |
 | Monitor | `Monitor() → stats` | E | ⏳ planned | System health — step counts, namespace utilization, fault rates. |
 | IDS | `IDS() → log` | E | ⏳ planned | Intrusion detection — monitors GT version anomalies and permission escalation attempts. |

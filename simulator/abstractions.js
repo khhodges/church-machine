@@ -301,8 +301,9 @@ class AbstractionRegistry {
             { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(5, 'Navana', 1,
-            ['Create', 'Release', 'Find', 'Update', 'Manage', 'Monitor', 'IDS', 'main'],
-            'Namespace slot guardian — allocates, releases, and resolves NS slots; keeps the namespace table consistent. Callers supply a PassKey GT to authenticate and bill slot operations. Runs indefinitely (does not RETURN).',
+            ['Create', 'Release', 'Find', 'Update', 'Manage', 'Monitor', 'IDS',
+             'SecureObjectAdd', 'SecureObjectMintPassKey', 'SecureObjectCall', 'SecureObjectRevoke', 'main'],
+            'Namespace slot guardian — allocates, releases, and resolves NS slots; keeps the namespace table consistent. It also lets an M-elevated programmer define top-security objects whose selected methods require object-scoped, revocable PassKey GTs. Runs indefinitely (does not RETURN).',
             { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(6, 'Mint', 1,
@@ -565,6 +566,14 @@ class AbstractionRegistry {
             'returns to IDE if online (ACK=1) or spins offline. ' +
             'Wukong NS slot 7; set as ⚡ boot-entry to test the full call-home path in the IDE.',
             { author: 'Church Machine', version: '1.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+
+        // Bank is a dynamically issued system service, not a new fixed hardware
+        // boot slot.  Its passkey method delegates through Navana's object-scoped
+        // credential registry and never exposes a lockbox Namespace index.
+        this.createAbstraction(54, 'Bank', 1,
+            ['ObtainPassKey'],
+            'Namespace-backed custody authority — obtains a fresh object-scoped PassKey for an existing stored object. The caller must prove ownership with the current PassKey; the returned GT is paired with a private 128-bit proof.',
+            { author: 'Church Machine', version: '1.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, freedNSSlot: true });
     }
 }
 

@@ -149,3 +149,4 @@
 - [Artifact dependency lock refresh](artifact-dependency-lock-refresh.md) — a new pnpm-filtered artifact may need an online lock refresh before its local Vite binary is resolvable
 - [Primary publish vs static artifact](primary-publish-vs-static-artifact.md) — publishing a nested artifact can replace the custom-domain root despite a correct root autoscale config
 - [Actionable transport incidents](actionable-transport-incidents.md) — latch terminal failures until proven recovery; diagnostics may escalate guidance but never replace incident identity
+- [Top-security passkey credentials](top-security-passkeys.md) — protected-object access requires an object-scoped GT plus a 128-bit proof; never treat the GT alone as a secret
