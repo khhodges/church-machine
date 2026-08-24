@@ -1407,8 +1407,62 @@ def index():
     landing_path = os.path.join(BASE_DIR, "landing.html")
     return send_file(landing_path, mimetype="text/html")
 
+_SITE_SEARCH_CODE_ROOTS = (
+    "hardware",
+    "scripts",
+    "server",
+    "simulator",
+    "tests",
+)
+_SITE_SEARCH_CODE_EXTENSIONS = frozenset({
+    ".bash", ".c", ".cc", ".cloomc", ".cpp", ".css", ".h", ".hpp",
+    ".js", ".mjs", ".py", ".scss", ".sh", ".sv", ".tcl", ".ts",
+    ".tsx", ".v", ".vh", ".yaml", ".yml",
+})
+_SITE_SEARCH_CODE_EXCLUDED_DIRS = frozenset({
+    ".git", ".cache", ".local", ".pytest_cache", "__pycache__",
+    "node_modules", "test-results", "lumps",
+})
+_SITE_SEARCH_MAX_CODE_BYTES = 2 * 1024 * 1024
+
+
+def _site_code_filepath(filename):
+    """Return an allowlisted source path, or None for an unsafe path."""
+    if not filename or filename.startswith("/") or "\\" in filename:
+        return None
+    parts = filename.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        return None
+    if parts[0] not in _SITE_SEARCH_CODE_ROOTS:
+        return None
+    if os.path.splitext(filename)[1].lower() not in _SITE_SEARCH_CODE_EXTENSIONS:
+        return None
+
+    filepath = os.path.realpath(os.path.join(BASE_DIR, *parts))
+    repo_root = os.path.realpath(BASE_DIR)
+    try:
+        if os.path.commonpath((repo_root, filepath)) != repo_root:
+            return None
+    except ValueError:
+        return None
+    if not os.path.isfile(filepath):
+        return None
+    try:
+        if os.path.getsize(filepath) > _SITE_SEARCH_MAX_CODE_BYTES:
+            return None
+    except OSError:
+        return None
+    return filepath
+
+
+def _site_code_fallback_title(rel):
+    filename = os.path.basename(rel)
+    stem = os.path.splitext(filename)[0].replace("-", " ").replace("_", " ").strip()
+    return (stem or filename) + " source"
+
+
 def _site_search_sources():
-    """Yield the public HTML and documentation files searchable from /."""
+    """Yield public pages, docs, and allowlisted source files searchable from /."""
     sources = [
         ("landing.html", "/", "Landing page", "page"),
         ("simulator/index.html", "/simulator/", "Church Machine IDE", "page"),
@@ -1434,6 +1488,33 @@ def _site_search_sources():
                     url = "/" + rel
                 title = filename.rsplit(".", 1)[0].replace("-", " ").replace("_", " ").strip()
                 sources.append((rel, url, title, "document"))
+    for code_root in _SITE_SEARCH_CODE_ROOTS:
+        root_dir = os.path.join(BASE_DIR, code_root)
+        if not os.path.isdir(root_dir):
+            continue
+        for root, dirs, files in os.walk(root_dir):
+            dirs[:] = sorted(
+                directory for directory in dirs
+                if directory not in _SITE_SEARCH_CODE_EXCLUDED_DIRS
+                and not directory.startswith(".")
+            )
+            for filename in sorted(files):
+                extension = os.path.splitext(filename)[1].lower()
+                if filename.startswith(".") or extension not in _SITE_SEARCH_CODE_EXTENSIONS:
+                    continue
+                filepath = os.path.join(root, filename)
+                try:
+                    if os.path.getsize(filepath) > _SITE_SEARCH_MAX_CODE_BYTES:
+                        continue
+                except OSError:
+                    continue
+                rel = os.path.relpath(filepath, BASE_DIR).replace(os.sep, "/")
+                sources.append((
+                    rel,
+                    "/code/" + rel,
+                    _site_code_fallback_title(rel),
+                    "code",
+                ))
     return sources
 
 def _site_search_text(raw, extension):
@@ -1460,11 +1541,14 @@ def _site_search_title(raw, fallback, extension):
         match = re.search(r"^\s*#\s+(.+?)\s*$", raw, flags=re.MULTILINE)
         if match:
             return match.group(1).strip()
+        match = re.search(r"\babstraction\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{", raw)
+        if match:
+            return match.group(1) + " source"
     return fallback
 
 @app.route("/api/site-search")
 def site_search():
-    """Search public pages and docs without exposing their source files."""
+    """Search public pages, docs, and allowlisted source files."""
     query = re.sub(r"\s+", " ", request.args.get("q", "")).strip()
     if len(query) > 120:
         query = query[:120]
@@ -1474,8 +1558,10 @@ def site_search():
     terms = [term.lower() for term in query.split() if term]
     results = []
     for rel, url, fallback_title, kind in _site_search_sources():
-        filepath = os.path.join(BASE_DIR, rel)
+        filepath = _site_code_filepath(rel) if kind == "code" else os.path.join(BASE_DIR, rel)
         try:
+            if kind == "code" and filepath is None:
+                continue
             with open(filepath, "r", encoding="utf-8", errors="replace") as source:
                 raw = source.read()
         except (OSError, UnicodeError):
@@ -1512,6 +1598,42 @@ def site_search():
 
     results.sort(key=lambda item: (-item.pop("_score"), item["title"].lower()))
     return jsonify({"query": query, "results": results})
+
+
+@app.route("/code/<path:filename>")
+def site_code_viewer(filename):
+    """Display an allowlisted source file as escaped text."""
+    filepath = _site_code_filepath(filename)
+    if filepath is None:
+        return jsonify({"error": "Code file not found"}), 404
+    try:
+        with open(filepath, "r", encoding="utf-8", errors="replace") as source:
+            raw = source.read()
+    except (OSError, UnicodeError):
+        return jsonify({"error": "Code file not found"}), 404
+
+    rel = os.path.relpath(filepath, BASE_DIR).replace(os.sep, "/")
+    title = _site_search_title(
+        raw,
+        _site_code_fallback_title(rel),
+        os.path.splitext(filepath)[1].lower(),
+    )
+    page = (
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+        "<title>" + _html.escape(title) + "</title>"
+        "<style>body{margin:0;background:#0b1020;color:#dbe4f0;font:14px/1.55 "
+        "system-ui,sans-serif}header{padding:18px 24px;border-bottom:1px solid "
+        "#263449;background:#111827}h1{margin:0 0 5px;font-size:18px;color:#f4d06f}"
+        "p{margin:0;color:#94a3b8;font:12px/1.4 monospace}pre{margin:0;padding:24px;"
+        "overflow:auto;tab-size:4}code{font:13px/1.6 'SF Mono','Fira Code',monospace;"
+        "white-space:pre}</style></head><body><header><h1>" +
+        _html.escape(title) + "</h1><p>" + _html.escape(rel) +
+        "</p></header><pre><code>" + _html.escape(raw) +
+        "</code></pre></body></html>"
+    )
+    return make_response(page, 200, {"Content-Type": "text/html; charset=utf-8"})
+
 
 @app.route("/robots.txt")
 def robots_txt():

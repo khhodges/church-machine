@@ -396,8 +396,8 @@
         <div class="nav-col"><a class="nav-col-header" href="/simulator/#reference">REFERENCE</a></div>
         <div class="nav-col"><a class="nav-col-header" href="/simulator/#docs">DOCS</a></div>
     </nav>
-    <section class="site-search" aria-label="Search public pages and documents">
-        <label class="site-search-label" for="siteSearchInput">Search pages &amp; documents</label>
+    <section class="site-search" aria-label="Search public pages, documents, and code">
+        <label class="site-search-label" for="siteSearchInput">Search pages, documents &amp; code</label>
         <form class="site-search-form" id="siteSearchForm">
             <input class="site-search-input" id="siteSearchInput" type="search"
                    placeholder="Search the Church Machine site…" autocomplete="off"
@@ -587,7 +587,7 @@
                 }).join('');
                 searchStatus.textContent = results.length
                     ? results.length + ' result' + (results.length === 1 ? '' : 's') + ' found'
-                    : 'No pages or documents matched that search.';
+                    : 'No pages, documents, or code matched that search.';
                 searchClear.style.display = searchInput.value ? 'block' : 'none';
             }
 
@@ -601,7 +601,7 @@
                     return;
                 }
                 const requestId = ++searchRequest;
-                searchStatus.textContent = 'Searching pages and documents…';
+                searchStatus.textContent = 'Searching pages, documents, and code…';
                 fetch('/api/site-search?q=' + encodeURIComponent(query), {
                     headers: { 'Accept': 'application/json' }
                 }).then(function(response) {
