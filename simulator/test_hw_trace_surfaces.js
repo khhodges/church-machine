@@ -29,6 +29,23 @@ check('Testing includes UART and bridge messages', /UART and bridge messages/.te
 check('Testing describes arrival ordering', /server's arrival-ordered history/.test(status) &&
       /server arrival order/.test(status));
 check('Testing explains retention and restart divergence', /queue retention\/overflow, or a server restart/.test(status));
+check('Simulator does not expose HW run control', !fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8').includes('id="toolHWRunBtn"'));
+check('Simulator does not expose HW stop control', !fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8').includes('id="toolHWStopBtn"'));
+check('Simulator does not expose HW load control', !fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8').includes('id="toolHWLoadBtn"'));
+check('Simulator Step is software-only', !/Wukong hardware step: mirror/.test(appRun));
+check('Simulator has no active HW stop shortcut', !/document\.addEventListener\('keydown', _hwStopShortcutHandler\)/.test(appRun));
+check('Simulator boot-entry selection never pushes hardware', !/if \(_isCmdClick\)/.test(
+      fs.readFileSync(path.join(__dirname, 'app-abstractions.js'), 'utf8')));
+check('Simulator Wukong status opens Testing', /id="toolbarWukongBtn"[^>]*switchBuilderViewTab\('testing'\)/.test(
+      fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8')));
+check('Testing exposes Step HW control', /id="btnStep"[^>]*>Step HW ▶<\/button>/.test(status));
+check('Testing exposes HW run control', /id="btnRun"[^>]*>▶ HW<\/button>/.test(status));
+check('Testing exposes immediate Stop HW control', /id="btnStop"[^>]*>⏹ HW<\/button>/.test(status) &&
+      /sendCmd\(\{ cmd: 'h' \}, 'STOP'/.test(status));
+check('Testing exposes Load control', /id="btnUpload"[^>]*>⚡ Load<\/button>/.test(status));
+check('Testing exposes live HW call depth', /id="toolbarCallDepth"/.test(status));
+check('Testing owns Shift+H emergency stop', /e\.shiftKey/.test(status) && /e\.key !== 'H'/.test(status));
+check('Testing uses the simplified Show trace button', /id="btnWorkspace"[^>]*>Show trace<\/button>/.test(status));
 check('console endpoint shares ordered queue', /same server-side ordered event queue as trace packets/.test(server));
 
 if (failures) process.exit(1);

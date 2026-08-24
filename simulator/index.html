@@ -437,10 +437,6 @@
                                 </div>
                             </div>
                         </div>
-                        <button class="btn btn-secondary sim-icon-btn" id="toolHWRunBtn" onclick="hwRunToggle()" style="display:none;font-size:11px;padding:2px 6px;" data-tooltip="HW Run/Pause — Toggle Wukong board free-run or instruction-boundary pause">&#x25B6; HW</button>
-                        <button class="btn btn-danger sim-icon-btn" id="toolHWStopBtn" onclick="hwStop()" style="display:none;font-size:11px;padding:2px 6px;" data-tooltip="Stop HW — Immediately halt the Wukong board wherever it is in execution (Shift+H)">&#x23F9; HW</button>
-                        <span id="wukongCallDepthBadge" class="wukong-call-depth-badge" style="display:none;" title="HW call-stack depth: 0">&#x21C6; 0</span>
-                        <button class="btn btn-primary sim-icon-btn" id="toolHWLoadBtn" onclick="_wukongLoadToHardware()" style="display:none;font-size:11px;padding:2px 6px;" data-tooltip="Load to Hardware — Generate boot image and push it to the connected Wukong board">&#x26A1; Load</button>
                         <button class="btn btn-walk sim-icon-btn" id="toolWalkBtn" onclick="walkToggle()" data-tooltip="Walk — Animate step-by-step execution">&#x1F6B6;</button>
                         <div class="run-wrap" id="runWrap">
                             <button class="btn btn-success sim-icon-btn" id="btnRunSim" onclick="onRunBtnClick()" data-tooltip="Run — single-click to run · double-click for options">&#x1F3C3;</button>
@@ -503,7 +499,7 @@
                     </div>
                 </div>
                 <div class="sim-controls">
-                    <button class="btn btn-view" id="toolbarWukongBtn" onclick="wukongConnBtnClick()" style="opacity:0.45;" data-tooltip="Wukong board — not connected · click for bridge setup instructions">&#x26A1; Wukong</button>
+                    <button class="btn btn-view" id="toolbarWukongBtn" onclick="switchView('builder');switchBuilderViewTab('testing')" style="opacity:0.45;" data-tooltip="Wukong board status — open the Testing page">&#x26A1; Wukong</button>
                     <span id="toolbarIdeBadge"></span>
                     <button class="btn btn-view btn-settings-icon" onclick="openSettings()" data-tooltip="Settings — Configure student profile, subjects, and family">&#9881;</button>
                 </div>

@@ -530,10 +530,6 @@ function _syncSelfTestNextGtToBootEntry(targetSlot) {
 
 
 function setBootEntrySlot(idx, ev) {
-    // Task #2532: Cmd+click (⌘ on Mac, Ctrl elsewhere) on the lightning bolt
-    // additionally pushes the newly-selected boot entry to the Wukong board.
-    const _isCmdClick = !!(ev && (ev.metaKey || ev.ctrlKey));
-    const _anchorEl   = (ev && ev.target) || null;
     idx = Math.max(0, Math.min(255, Math.trunc(Number(idx)) || 0));
     bootEntrySlot = idx;
     localStorage.setItem('bootEntrySlot', String(idx));
@@ -587,17 +583,6 @@ function setBootEntrySlot(idx, ev) {
     if (currentView === 'namespace') updateNamespace();
     if (typeof window.lumpEditorRenderResidentPanel === 'function') window.lumpEditorRenderResidentPanel();
 
-    // Task #2532: Cmd+click → push the new boot entry to the connected board.
-    // A plain click never touches hardware; with no board connected the
-    // Cmd+click degrades to a normal click plus a "No board connected" badge.
-    if (_isCmdClick) {
-        const _connected = (typeof _wukongIsConnected === 'function') && _wukongIsConnected();
-        if (!_connected) {
-            _showBootPushBadge(_anchorEl, 'No board connected', 'warn', 2500);
-        } else if (typeof _wukongLoadToHardware === 'function') {
-            _pushBootEntryToHardware(idx, _anchorEl);
-        }
-    }
 }
 
 // ── Task #2532: Cmd+click boot-entry hardware push ───────────────────────────

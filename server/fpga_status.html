@@ -53,6 +53,9 @@
   .ctlbar input { background:#0d1320; color:#e8f0fe; border:1px solid #2d3f5a;
                   border-radius:5px; padding:3px 8px; font:inherit; width:110px; }
   .ctlbar .sep { width:1px; height:22px; background:#1f2b3e; margin:0 4px; }
+  .ctlbar .call-depth-badge { display:inline-flex; align-items:center; min-height:25px;
+                              padding:3px 8px; border:1px solid #2d3f5a; border-radius:5px;
+                              color:#93c5fd; background:#0d1625; font-size:11px; }
   .health-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .health-head .health-title { margin-bottom:0; }
   .health-toggle { flex:0 0 auto; font-size:11px; padding:3px 9px; color:#9fb1c8; }
@@ -151,17 +154,19 @@
 
 <div class="ctlbar">
   <span class="lbl">Board controls</span>
-  <button id="btnStep" title="Execute one instruction ('s')">Step</button>
-  <button id="btnRun"  class="primary" title="Start the board ('r')">Run ▶</button>
+  <button id="btnStep" title="Step HW — execute one Wukong instruction ('s')">Step HW ▶</button>
+  <button id="btnRun"  class="primary" title="HW Run — start the Wukong board ('r')">▶ HW</button>
+  <button id="btnStop" class="danger" title="Stop HW — halt immediately ('h'); keyboard shortcut Shift+H" disabled>⏹ HW</button>
+  <span id="toolbarCallDepth" class="call-depth-badge" title="HW call-stack depth: 0">⇆ 0</span>
   <span class="sep"></span>
   <input id="bpNia" placeholder="BP NIA (hex)" spellcheck="false">
   <button id="btnBp" title="Arm a breakpoint at this NIA ('b' + NIA)">Set BP</button>
   <span class="sep"></span>
-  <button id="btnUpload" title="Send the current boot image to the board over UART ('u')">Upload boot image ⚡</button>
+  <button id="btnUpload" title="Load the current server boot image onto the Wukong board over UART ('u')">⚡ Load</button>
   <span class="sep"></span>
   <button id="btnReboot" title="Force the board to retransmit its boot sentinel ('f') — confirms which bitstream is running">↺ Reboot</button>
   <span class="sep"></span>
-  <button id="btnWorkspace" class="primary" title="Jump to the live code and event workspace">Jump to execution workspace ↓</button>
+  <button id="btnWorkspace" class="primary" title="Show the live trace">Show trace</button>
   <span class="sep"></span>
   <button id="healthToggle" class="health-toggle" type="button" aria-controls="healthStages statusGrid" aria-expanded="true" title="Collapse or expand FPGA health details">Collapse</button>
 </div>
@@ -520,20 +525,25 @@
   // command racing an upload for that slot.
   var ctlBusy = false;
   var boardRunning = false;
-  var CTL_IDS = ['btnStep', 'btnRun', 'btnBp', 'btnUpload', 'btnReboot', 'btnWorkspace'];
+  var CTL_IDS = ['btnStep', 'btnRun', 'btnStop', 'btnBp', 'btnUpload', 'btnReboot', 'btnWorkspace'];
   function updateRunButton() {
     var btn = document.getElementById('btnRun');
     if (!btn) return;
-    btn.textContent = boardRunning ? 'Pause ❚❚' : 'Run ▶';
+    btn.textContent = boardRunning ? '⏸ HW' : '▶ HW';
     btn.title = boardRunning
-      ? "Pause at the next instruction boundary ('s')"
-      : "Free-run ('r')";
+      ? "HW Pause — pause at the next instruction boundary ('s')"
+      : "HW Run — free-run the Wukong board ('r')";
     btn.classList.toggle('primary', !boardRunning);
     btn.classList.toggle('danger', boardRunning);
+    var step = document.getElementById('btnStep');
+    var stop = document.getElementById('btnStop');
+    if (step) step.disabled = ctlBusy || boardRunning;
+    if (stop) stop.disabled = ctlBusy || !boardRunning;
   }
   function setCtlBusy(b) {
     ctlBusy = b;
     CTL_IDS.forEach(function (id) { document.getElementById(id).disabled = b; });
+    updateRunButton();
   }
   function describeFailure(status, d, bodyText) {
     if (status === 409) return 'upload in progress — wait for it to finish';
@@ -675,6 +685,22 @@
         }
       });
   };
+  document.getElementById('btnStop').onclick = function () {
+    if (!boardRunning) return;
+    sendCmd({ cmd: 'h' }, 'STOP', function (ok) {
+      if (ok) {
+        boardRunning = false;
+        updateRunButton();
+      }
+    });
+  };
+  document.addEventListener('keydown', function (e) {
+    var tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '';
+    if (!e.shiftKey || e.key !== 'H' || tag === 'input' || tag === 'textarea' ||
+        (e.target && e.target.isContentEditable) || !boardRunning || ctlBusy) return;
+    e.preventDefault();
+    document.getElementById('btnStop').click();
+  });
   updateRunButton();
   // ── Reboot ('f') delivery watcher ─────────────────────────────────────
   // After queueing 'f', poll /status every 500 ms and report each stage:
@@ -1133,6 +1159,12 @@
       document.getElementById('lastInstruction').textContent = lt.disasm || 'unavailable';
       document.getElementById('lastFlags').textContent = lt.flags !== undefined ? flags(lt.flags) : '—';
       document.getElementById('callDepth').textContent = s.call_depth;
+      var toolbarDepth = document.getElementById('toolbarCallDepth');
+      if (toolbarDepth) {
+        var depth = Number(s.call_depth || 0);
+        toolbarDepth.textContent = '⇆ ' + depth;
+        toolbarDepth.title = 'HW call-stack depth: ' + depth;
+      }
       renderLastAcceptedFault(s);
       var h = s.halt || {};
       var hs = document.getElementById('faultState');

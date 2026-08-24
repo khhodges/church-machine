@@ -340,26 +340,28 @@ function makeHwStopEnv(opts) {
     return sb;
 }
 
-// ── WB-ST-1  Stop button disabled when board is halted (not running) ──────────
+// ── WB-ST-1  Simulator never surfaces the legacy Stop HW control ──────────────
 (function() {
     const env = makeUpdateBtnEnv({ connected: true, running: false });
     vm.runInContext('_wukongUpdateBtn();', env);
     const btn = env.document.getElementById('toolHWStopBtn');
-    check('WB-ST-1a', 'halted + connected → stop button visible',
-        btn.style.display !== 'none');
-    check('WB-ST-1b', 'halted + connected → stop button disabled',
-        btn.disabled === true);
+    const step = env.document.getElementById('toolStepBtn');
+    check('WB-ST-1a', 'halted + connected → legacy stop button stays hidden',
+        btn.style.display === 'none');
+    check('WB-ST-1b', 'halted + connected → simulator Step is not relabelled HW',
+        !/HW/.test(step.textContent));
 })();
 
-// ── WB-ST-2  Stop button enabled when board is free-running ──────────────────
+// ── WB-ST-2  Hardware activity cannot reveal simulator board controls ─────────
 (function() {
     const env = makeUpdateBtnEnv({ connected: true, running: true });
     vm.runInContext('_wukongUpdateBtn();', env);
-    const btn = env.document.getElementById('toolHWStopBtn');
-    check('WB-ST-2a', 'running + connected → stop button visible',
-        btn.style.display !== 'none');
-    check('WB-ST-2b', 'running + connected → stop button enabled',
-        btn.disabled === false);
+    const stop = env.document.getElementById('toolHWStopBtn');
+    const run = env.document.getElementById('toolHWRunBtn');
+    check('WB-ST-2a', 'running + connected → legacy stop button stays hidden',
+        stop.style.display === 'none');
+    check('WB-ST-2b', 'running + connected → legacy run button stays hidden',
+        run.style.display === 'none');
 })();
 
 // ── WB-ST-3  Stop button hidden when disconnected and not running ─────────────

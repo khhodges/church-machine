@@ -911,9 +911,6 @@ function stepSim() {
     // Track RETURN so the watch strip can highlight DR0 (the return value)
     window._lastStepWasReturn = !!(result && result.opName === 'RETURN');
 
-    // ── Wukong hardware step: mirror each sim step to the physical board ──
-    if (_wukongIsConnected() && !_wukongHWRunning) { _wukongStep(); }
-
     if (result && result.absent) {
         // Absent-lump: simulator suspended waiting for a lazy-load fetch.
         const con = document.getElementById('editorConsole');
@@ -15953,7 +15950,6 @@ async function _wukongSetHwBreakpoint(nia) {
 window._wukongSetHwBreakpoint = _wukongSetHwBreakpoint;
 
 function _wukongUpdateBtn() {
-    const btn = document.getElementById('toolHWRunBtn');
     const connected = _wukongIsConnected();
 
     // Show or hide the persistent HW log panel.
@@ -15978,52 +15974,9 @@ function _wukongUpdateBtn() {
         });
     }
 
-    if (!btn) return;
-    btn.style.display = (connected || _wukongBridgeSeen || _wukongHWRunning) ? '' : 'none';
-    btn.textContent   = _wukongHWRunning ? '\u23F8 HW' : '\u25B6 HW';
-    btn.dataset.tooltip = _wukongHWRunning
-        ? 'HW Pause \u2014 Pause at the next instruction boundary'
-        : 'HW Run \u2014 Free-run the Wukong board';
-    btn.classList.toggle('btn-warning', _wukongHWRunning);
-    btn.classList.toggle('btn-secondary', !_wukongHWRunning);
-
-    // Update Step button label — "Step HW ▶" when board is connected.
-    const stepBtn = document.getElementById('toolStepBtn');
-    if (stepBtn) {
-        if (connected) {
-            stepBtn.textContent   = 'Step HW \u25B6';
-            stepBtn.dataset.tooltip = 'Step HW \u2014 Send one step command to the Wukong board';
-            stepBtn.style.fontSize = '11px';
-            stepBtn.style.padding  = '2px 6px';
-        } else {
-            stepBtn.innerHTML      = '&#x1F463;';
-            stepBtn.dataset.tooltip = 'Step \u2014 Execute one instruction';
-            stepBtn.style.fontSize = '';
-            stepBtn.style.padding  = '';
-        }
-    }
-
-    // ⏹ Stop button: visible when connected, enabled only when the board is
-    // free-running.  Disabled when halted or in step mode so a redundant 'h'
-    // cannot interrupt a delivery that is already in progress.
-    const stopBtn = document.getElementById('toolHWStopBtn');
-    if (stopBtn) {
-        stopBtn.style.display = (connected || _wukongBridgeSeen || _wukongHWRunning) ? '' : 'none';
-        stopBtn.disabled = !_wukongHWRunning;
-    }
-
-    // ⚡ Load to Hardware button: visible whenever the board is connected or
-    // was recently connected (same condition as HW Run), but disabled while an
-    // upload is in progress so the user cannot double-fire it.
-    const loadBtn = document.getElementById('toolHWLoadBtn');
-    if (loadBtn) {
-        loadBtn.style.display = (connected || _wukongBridgeSeen || _wukongHWRunning) ? '' : 'none';
-    }
-
-    // Show/hide call-depth badge.
-    _wukongUpdateCallDepthBadge();
-
-    // ⚡ Wukong toolbar status button (visible on every view).
+    // The simulator toolbar is software-only. Its Wukong item is passive
+    // connection status plus a link to Builder > Testing, where every board
+    // control lives.
     _wukongUpdateToolbarBtn(connected);
 }
 
@@ -16041,13 +15994,13 @@ function _wukongUpdateToolbarBtn(connected) {
         tb.style.opacity = '1';
         tb.style.color = '#44dd88';
         tb.style.borderColor = 'rgba(68,221,136,0.5)';
-        tb.setAttribute('data-tooltip', 'Wukong board connected \u2014 click to show the HW Trace panel');
+        tb.setAttribute('data-tooltip', 'Wukong board connected \u2014 open the Testing page');
     } else {
         tb.textContent = '\u26A1 Wukong';
         tb.style.opacity = '0.45';
         tb.style.color = '';
         tb.style.borderColor = '';
-        tb.setAttribute('data-tooltip', 'Wukong board \u2014 not connected \u00B7 click for bridge setup instructions');
+        tb.setAttribute('data-tooltip', 'Wukong board \u2014 not connected \u00B7 open the Testing page');
     }
 }
 
@@ -17234,10 +17187,9 @@ async function hwStop() {
 }
 window.hwStop = hwStop;
 
-// ── Emergency-stop keyboard shortcut (Shift+H) ────────────────────────────
-// Fires hwStop() when Shift+H is pressed while the board is connected and
-// free-running.  Ignored when focus is inside any text-editing element so
-// the shortcut does not interfere with typing in the editor or input fields.
+// Legacy helper retained for compatibility with direct test harnesses. It is
+// deliberately not registered on the simulator document: Shift+H belongs to
+// the Wukong Testing page, which owns all physical-board controls.
 function _hwStopShortcutHandler(e) {
     if (!e.shiftKey || e.key !== 'H') return;
     const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
@@ -17246,7 +17198,6 @@ function _hwStopShortcutHandler(e) {
     e.preventDefault();
     hwStop();
 }
-document.addEventListener('keydown', _hwStopShortcutHandler);
 window._hwStopShortcutHandler = _hwStopShortcutHandler;
 
 async function _wukongLoadToHardware() {

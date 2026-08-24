@@ -1,20 +1,12 @@
-// test_cmd_click_boot_push.js — Cmd+click lightning bolt pushes boot entry to FPGA
+// test_cmd_click_boot_push.js — simulator boot selection stays software-only
 //
-// Verifies the production code in app-abstractions.js (setBootEntrySlot,
-// _pushBootEntryToHardware, _showBootPushBadge) and app-run.js
-// (_wukongLoadToHardware) against these contracted behaviours (Task #2532):
+// Verifies the production setBootEntrySlot behavior after physical Wukong
+// controls moved exclusively to Builder > Testing:
 //
-//   CP-1  Plain click → simulator entry changes, NO hardware endpoints called
-//   CP-2  Cmd+click (metaKey) with board connected → /api/boot-image/generate
-//         is called with the newly selected entrySlot + forHardware:true,
-//         then /api/boot-image/send-to-hardware, then upload-ack is polled,
-//         then {cmd:'r'} is sent — the same flow as the ⚡ Load button
-//   CP-3  Ctrl+click behaves identically to Cmd+click
-//   CP-4  Cmd+click with NO board connected → zero hardware fetches, a
-//         "No board connected" badge is shown, simulator entry still changes
-//   CP-5  Cmd+click when /api/boot-image/generate fails → error badge,
-//         send-to-hardware is never called
-//   CP-6  Success path shows a "✓ Sent to board" badge
+//   CP-1  Plain click changes only the simulator entry
+//   CP-2  Cmd+click still changes only the simulator entry
+//   CP-3  Ctrl+click still changes only the simulator entry
+//   CP-4  No modifier path creates upload badges or calls hardware endpoints
 //
 // Run with:  node simulator/test_cmd_click_boot_push.js
 'use strict';
@@ -138,6 +130,7 @@ function makeEnv(opts) {
         _wukongIsConnected: function() { return !!opts.connected; },
         _wukongHWRunning: false,
         _wukongUpdateBtn: function() {},
+        _syncSelfTestNextGtToBootEntry: function() {},
     };
     sandbox.globalThis = sandbox;
     vm.createContext(sandbox);
@@ -184,64 +177,37 @@ function assert(cond, label) {
         assert(!env.document.querySelector('.boot-push-badge'), 'no badge shown');
     }
 
-    console.log('CP-2  Cmd+click + connected → generate→send→ack→run with correct entrySlot');
+    console.log('CP-2  Cmd+click + connected remains software-only');
     {
         const env = makeEnv({ connected: true });
         vm.runInContext('setBootEntrySlot(5, __ev)',
             Object.assign(env, { __ev: makeEvent(env, { metaKey: true }) }));
-        const badge = await waitForFinalBadge(env);
-        const urls = env.fetchCalls.map(c => c.url);
-        const gen  = env.fetchCalls.find(c => c.url === '/api/boot-image/generate');
-        assert(!!gen, '/api/boot-image/generate called');
-        assert(gen && gen.body && gen.body.entrySlot === 5, 'generate carries entrySlot=5');
-        assert(gen && gen.body && gen.body.forHardware === true, 'generate carries forHardware:true');
-        assert(urls.indexOf('/api/boot-image/send-to-hardware') !== -1, 'send-to-hardware called');
-        assert(urls.indexOf('/hardware/wukong/upload-ack') !== -1, 'upload-ack polled');
-        const runCmd = env.fetchCalls.find(c =>
-            c.url === '/hardware/wukong/command' && c.body && c.body.cmd === 'r');
-        assert(!!runCmd, "board start command {cmd:'r'} sent");
-        assert(urls.indexOf('/api/boot-image/generate') <
-               urls.indexOf('/api/boot-image/send-to-hardware'), 'generate happens before send');
-        assert(env.sim.bootEntrySlot === 5, 'simulator boot entry also updated');
-        assert(badge && badge.className.indexOf('boot-push-badge-ok') !== -1,
-            'success badge shown (CP-6)');
-        assert(badge && badge.textContent.indexOf('slot 5') !== -1,
-            'success badge names the slot');
+        await new Promise(res => setTimeout(res, 100));
+        assert(env.fetchCalls.length === 0, 'Cmd+click makes no hardware requests');
+        assert(env.sim.bootEntrySlot === 5, 'simulator boot entry updated to 5');
+        assert(!env.document.querySelector('.boot-push-badge'), 'Cmd+click shows no hardware badge');
     }
 
-    console.log('CP-3  Ctrl+click behaves like Cmd+click');
+    console.log('CP-3  Ctrl+click remains software-only');
     {
         const env = makeEnv({ connected: true });
         vm.runInContext('setBootEntrySlot(4, __ev)',
             Object.assign(env, { __ev: makeEvent(env, { ctrlKey: true }) }));
-        await waitForFinalBadge(env);
-        const gen = env.fetchCalls.find(c => c.url === '/api/boot-image/generate');
-        assert(gen && gen.body && gen.body.entrySlot === 4, 'Ctrl+click triggers generate with entrySlot=4');
+        await new Promise(res => setTimeout(res, 100));
+        assert(env.fetchCalls.length === 0, 'Ctrl+click makes no hardware requests');
+        assert(env.sim.bootEntrySlot === 4, 'simulator boot entry updated to 4');
+        assert(!env.document.querySelector('.boot-push-badge'), 'Ctrl+click shows no hardware badge');
     }
 
-    console.log('CP-4  Cmd+click with no board → no fetches + "No board connected" badge');
+    console.log('CP-4  Modifier behavior is independent of board connectivity');
     {
         const env = makeEnv({ connected: false });
         vm.runInContext('setBootEntrySlot(2, __ev)',
             Object.assign(env, { __ev: makeEvent(env, { metaKey: true }) }));
         await new Promise(res => setTimeout(res, 100));
         assert(env.fetchCalls.length === 0, 'no hardware fetches without a board');
-        const badge = env.document.querySelector('.boot-push-badge-warn');
-        assert(!!badge, 'warn badge shown');
-        assert(badge && badge.textContent === 'No board connected', 'badge says "No board connected"');
+        assert(!env.document.querySelector('.boot-push-badge'), 'no board-status badge on simulator');
         assert(env.sim.bootEntrySlot === 2, 'simulator entry still updated');
-    }
-
-    console.log('CP-5  generate failure → error badge, no send-to-hardware');
-    {
-        const env = makeEnv({ connected: true, generateFails: true });
-        vm.runInContext('setBootEntrySlot(5, __ev)',
-            Object.assign(env, { __ev: makeEvent(env, { metaKey: true }) }));
-        const badge = await waitForFinalBadge(env);
-        const urls = env.fetchCalls.map(c => c.url);
-        assert(urls.indexOf('/api/boot-image/generate') !== -1, 'generate attempted');
-        assert(urls.indexOf('/api/boot-image/send-to-hardware') === -1, 'send-to-hardware NOT called');
-        assert(badge && badge.className.indexOf('boot-push-badge-err') !== -1, 'error badge shown');
     }
 
     console.log('');

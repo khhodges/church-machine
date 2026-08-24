@@ -58,6 +58,28 @@ async function openTestingTab(page) {
 }
 
 test.describe('Builder ▸ Testing FPGA health panel', () => {
+    test('keeps physical Wukong controls on Testing and off the simulator toolbar',
+        async ({ page }) => {
+            const { iframe } = await openTestingTab(page);
+            const testing = iframe.contentFrame();
+
+            await expect(testing.locator('#btnStep')).toHaveText('Step HW ▶');
+            await expect(testing.locator('#btnRun')).toHaveText('▶ HW');
+            await expect(testing.locator('#btnStop')).toHaveText('⏹ HW');
+            await expect(testing.locator('#btnUpload')).toHaveText('⚡ Load');
+            await expect(testing.locator('#toolbarCallDepth')).toBeVisible();
+
+            await expect(page.locator('#toolHWRunBtn')).toHaveCount(0);
+            await expect(page.locator('#toolHWStopBtn')).toHaveCount(0);
+            await expect(page.locator('#toolHWLoadBtn')).toHaveCount(0);
+            await expect(page.locator('#wukongCallDepthBadge')).toHaveCount(0);
+
+            const simulatorStep = page.locator('#toolStepBtn');
+            await expect(simulatorStep).not.toHaveText(/HW/);
+            await expect(page.locator('#toolbarWukongBtn'))
+                .toHaveAttribute('onclick', /switchBuilderViewTab\('testing'\)/);
+        });
+
     test('preserves collapsed and expanded choices after Builder tab navigation',
         async ({ page }) => {
             const { iframe, health } = await openTestingTab(page);
