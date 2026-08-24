@@ -31,6 +31,22 @@ Hardware-initialized at reset. Not callable by programs.
 
 Shared, atomic system abstractions. All callable via E permission.
 
+### Bank — dynamic CLOOMC LUMP (registry 54) `E`
+
+Canonical dynamic CLOOMC LUMP backed by proof-bound Namespace custody. Lockbox keys are opaque, revocable PassKeys paired with independent 128-bit proofs; live runtime authority and private Namespace entries are never returned by the static LUMP identity.
+
+| Method | Signature | Perms | Description |
+|--------|-----------|-------|-------------|
+| MintKey | `MintKey(capacity?) → bankKey` | E + M | Create an empty dynamically allocated lockbox and return its opaque owner key. |
+| Deposit | `Deposit(lockboxId, bankKey, sourceGT, offset?, words?, kind?) → metadata` | E + bank key + source R | Copy a bounded LUMP or memory region into an empty lockbox without exposing raw custody storage. |
+| Withdraw | `Withdraw(lockboxId, bankKey) → valueGT` | E + bank key | Atomically release the deposited valuable as a fresh memory GT and quarantine the lockbox key. |
+| Inspect | `Inspect(lockboxId, bankKey) → metadata` | E + bank key | Return safe custody state, size, type, and sequence metadata without revealing contents or Namespace location. |
+| Revoke | `Revoke(lockboxId, ownerKey) → ok` | E + owner key | Invalidate all lockbox keys and quarantine its Namespace-backed custody record. |
+| ObtainPassKey | `ObtainPassKey(lockboxId, ownerKey) → bankKey` | E + owner key + proof | Reissue a fresh object-scoped passkey for an existing lockbox after proving ownership with the current key. |
+| ExportRecovery | `ExportRecovery(lockboxId, ownerKey) → protectedState` | E + owner key + proof | Create proof-bound authenticated recovery ciphertext without persisting the raw PassKey proof. |
+| Recover | `Recover(protectedState, originalKey) → freshBankKey` | E + M + original key + proof | Restore a valuable into a fresh private Namespace entry and issue a replacement owner PassKey. |
+| List | `List() → metadata[]` | E | List non-sensitive status metadata for active and revoked lockboxes. |
+
 ### Salvation — NS[4] `E`
 
 Security smoke test. Proves CALL, TPERM, and LAMBDA work, then transfers control to Navana forever.
@@ -194,22 +210,6 @@ Abstract handle issuance. Tracks per-NS-slot reference counts for abstract (Chur
 |--------|-----------|-------|-------------|
 | AllocAbstract | `AllocAbstract(nsSlot) → handle` | E | Increment reference count for an NS slot and return an abstract handle. |
 | Free | `Free(handle) → ok` | E | Decrement reference count; release slot if count reaches zero. |
-
-### Bank — NS[54] `E`
-
-Namespace-backed custody service. Lockbox keys are opaque, revocable PassKeys paired with independent 128-bit proofs; the underlying Namespace entry is never returned as authority.
-
-| Method | Signature | Perms | Description |
-|--------|-----------|-------|-------------|
-| MintKey | `MintKey(capacity?) → bankKey` | E + M | Create an empty dynamically allocated lockbox and return its opaque owner key. |
-| Deposit | `Deposit(lockboxId, bankKey, sourceGT, offset?, words?, kind?) → metadata` | E + bank key + source R | Copy a bounded LUMP or memory region into an empty lockbox without exposing raw custody storage. |
-| Withdraw | `Withdraw(lockboxId, bankKey) → valueGT` | E + bank key | Atomically release the deposited valuable as a fresh memory GT and quarantine the lockbox key. |
-| Inspect | `Inspect(lockboxId, bankKey) → metadata` | E + bank key | Return safe custody state, size, type, and sequence metadata without revealing contents or Namespace location. |
-| Revoke | `Revoke(lockboxId, ownerKey) → ok` | E + owner key | Invalidate all lockbox keys and quarantine its Namespace-backed custody record. |
-| ObtainPassKey | `ObtainPassKey(lockboxId, ownerKey) → bankKey` | E + owner key + proof | Reissue a fresh object-scoped passkey for an existing lockbox after proving ownership with the current key. |
-| ExportRecovery | `ExportRecovery(lockboxId, ownerKey) → protectedState` | E + owner key + proof | Create proof-bound authenticated recovery ciphertext without persisting the raw PassKey proof. |
-| Recover | `Recover(protectedState, originalKey) → freshBankKey` | E + M + original key + proof | Restore a valuable into a fresh private Namespace entry and issue a replacement owner PassKey. |
-| List | `List() → metadata[]` | E | List non-sensitive status metadata for active and revoked lockboxes. |
 
 ---
 
@@ -411,8 +411,8 @@ PP250 deterministic garbage collection with bidirectional G-bit. Atomic Turing i
 | Slots | Layer | Count | Status |
 |-------|-------|-------|--------|
 | 0–3 | Boot | 4 | ✅ Complete |
-| 4–10, 19, 31–32, 45, 47–49, 54 | System Services | 15 | 🟡 Partial |
-| null, 11–15 | Hardware Attachments | 6 | 🟡 Partial |
+| 4–10, 19, 31–32, 45, 47–49; dynamic CLOOMC LUMP (registry 54) | System Services | 15 | 🟡 Partial |
+| 11–15; Ethernet (dynamic) | Hardware Attachments | 6 | 🟡 Partial |
 | 16–18, 46 | Mathematics | 4 | 🟡 Partial |
 | 20–27, 43 | Lambda Calculus | 9 | ✅ Complete |
 | 28–30 | Social Abstractions | 3 | 🔴 Planned |

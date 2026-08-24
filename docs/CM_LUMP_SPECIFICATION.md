@@ -1323,6 +1323,28 @@ an Outform Event only if the download remains absent.
 
 ### C-list Slot 0 — The Lump's Own GT
 
+### Dynamic System LUMPs — Bank
+
+`Bank` is a canonical CLOOMC LUMP with a dynamic Namespace policy. Its binary
+is a normal self-defining `typ=00` LUMP: it has a compiler-owned SELF identity
+in c-list row 0, an `E` caller grant, a canonical filename/identity seal, and
+the full Bank source/API frame. It deliberately has **no fixed `ns_slot` and
+is not boot-resident**.
+
+The c-list SELF word identifies `Bank#1`; it is not a live lockbox credential
+and has no authority over private custody memory. When a Bank call is installed
+or dispatched, the dynamic system binding mints the live E-GT and enforces
+proof validation, private Outform storage, complete zeroization, and
+server-authorized recovery. A LUMP implementation must never embed a PassKey
+proof, a private lockbox address, or a reusable custody GT.
+
+The packaged manifest/binary/sidecar are validated during Bank artifact build,
+then emit a browser runtime identity projection. `SystemAbstractions` binds the
+Bank methods only when that generated projection still names the canonical
+dynamic Bank LUMP and matches the dynamic registry descriptor. A bad identity
+fails closed: it cannot create a private custody allocation or dispatch a Bank
+operation.
+
 > **C-list slot 0 is always the GT for the lump itself.** This GT is valid for both:
 > - **Inform** — a caller passes a GT to this lump; the lump can refer to its own GT in
 >   slot 0 to identify itself in the exchange

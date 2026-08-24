@@ -41,6 +41,10 @@ function profileSuffix(abs) {
     return ` *(${abs.profile} only)*`;
 }
 
+function locationLabel(abs) {
+    return abs.location || `NS[${abs.slot}]`;
+}
+
 function methodStatusIcon(m) {
     return m.implemented ? '✅' : '⏳ planned';
 }
@@ -178,7 +182,7 @@ L();
     L();
     for (const abs of layer) {
         if (abs.methods.length === 0) continue;
-        L(`### ${displayName(abs.name)} — NS[${abs.slot}]`);
+        L(`### ${displayName(abs.name)} — ${locationLabel(abs)}`);
         L();
         L(methodTable(abs));
         L();
@@ -200,7 +204,7 @@ L();
     const planned = layer.filter(a => a.implemented === false);
 
     for (const abs of live) {
-        L(`### ${abs.name} — NS[${abs.slot}] \`${abs.perms}\`${implLabel(abs)}`);
+        L(`### ${abs.name} — ${locationLabel(abs)} \`${abs.perms}\`${implLabel(abs)}`);
         L();
         L(abs.description);
         L();
@@ -249,7 +253,7 @@ L();
     }
 
     for (const abs of live) {
-        L(`### ${abs.name} — NS[${abs.slot}] \`${abs.perms}\`${implLabel(abs)}${profileSuffix(abs)}`);
+        L(`### ${abs.name} — ${locationLabel(abs)} \`${abs.perms}\`${implLabel(abs)}${profileSuffix(abs)}`);
         L();
         L(abs.description);
         L();
@@ -285,7 +289,7 @@ L();
     const planned = layer.filter(a => a.implemented === false);
 
     for (const abs of live) {
-        L(`### ${abs.name} — NS[${abs.slot}] \`${abs.perms}\`${implLabel(abs)}`);
+        L(`### ${abs.name} — ${locationLabel(abs)} \`${abs.perms}\`${implLabel(abs)}`);
         L();
         L(abs.description);
         L();
@@ -373,7 +377,7 @@ for (const layerNum of [5, 6, 7]) {
     const planned = layer.filter(a => a.implemented === false);
 
     for (const abs of live) {
-        L(`### ${abs.name} — NS[${abs.slot}] \`${abs.perms}\`${implLabel(abs)}`);
+        L(`### ${abs.name} — ${locationLabel(abs)} \`${abs.perms}\`${implLabel(abs)}`);
         L();
         L(abs.description);
         L();
@@ -425,8 +429,11 @@ const layerOrder = Object.keys(byLayer).map(Number).sort((a, b) => a - b);
 for (const layerNum of layerOrder) {
     if (layerNum === 9) continue;
     const layer = byLayer[layerNum];
-    const slots = layer.map(a => a.slot);
-    const slotStr = compactSlots(slots);
+    const slots = layer.filter(a => Number.isInteger(a.slot)).map(a => a.slot);
+    const dynamic = layer.filter(a => !Number.isInteger(a.slot));
+    const staticSlotStr = slots.length ? compactSlots(slots) : '';
+    const dynamicStr = dynamic.map(a => a.location || `${a.name} (dynamic)`).join(', ');
+    const slotStr = [staticSlotStr, dynamicStr].filter(Boolean).join('; ');
     const layerName = API_LAYER_NAMES[layerNum];
     const count = layer.length;
 

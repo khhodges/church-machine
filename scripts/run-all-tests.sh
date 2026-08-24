@@ -155,7 +155,7 @@ register_suite "fault-recovery-tests" \
     'node simulator/test_fault_recovery.js'
 
 register_suite "bank-custody-recovery-tests" \
-    'node simulator/test_bank_passkey.js && python -m pytest tests/server/test_bank_custody_recovery.py -v'
+    'node simulator/test_bank_lump.js && node simulator/test_bank_passkey.js && python -m pytest tests/server/test_bank_custody_recovery.py -v'
 
 register_suite "lambda-exec-tests" \
     'node simulator/test_lambda_exec.js'

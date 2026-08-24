@@ -13,6 +13,13 @@
 //     Constructor calls _bindAll() which registers every abstraction via
 //     this.registry.register(name, descriptor).
 //
+const BankLumpBinding = (typeof module !== 'undefined' && module.exports)
+    ? require('./bank_lump_binding.js')
+    : window.BankLumpBinding;
+const BankLumpIdentity = (typeof module !== 'undefined' && module.exports)
+    ? require('./bank_lump_identity.js')
+    : window.BankLumpIdentity;
+
 // ABSTRACTION LAYERS  (9 layers, 46 total abstractions)
 //
 //   Layer 0 — Boot primitives  (NS[0]..NS[15])
@@ -1574,6 +1581,14 @@ class SystemAbstractions {
     }
 
     _bindBank() {
+        const runtime = BankLumpBinding && BankLumpBinding.resolveRuntime(this.registry, BankLumpIdentity);
+        if (!runtime || !runtime.ok) {
+            this.bankRuntimeBinding = null;
+            console.error(`Bank runtime disabled: ${(runtime && runtime.message) || 'identity binding unavailable'}`);
+            return; // Fail closed: never create private custody state through an unbound Bank.
+        }
+        this.bankRuntimeBinding = runtime.result;
+        const BANK_REGISTRY_INDEX = runtime.result.index;
         if (!this._bankState) {
             this._bankState = { nextId: 0, lockboxes: {} };
         }
@@ -1837,7 +1852,7 @@ class SystemAbstractions {
             bankState.lockboxes = {};
         };
 
-        this.registry.bindMethod(54, 'MintKey', (sim, args = {}) => {
+        this.registry.bindMethod(BANK_REGISTRY_INDEX, 'MintKey', (sim, args = {}) => {
             if (!sim.mElevation) return fail('MintKey', 'PERM', 'requires M-elevation (Bank authority)');
             const requested = args.capacity === undefined ? (args.size === undefined ? 64 : args.size) : args.capacity;
             if (!Number.isInteger(requested) || requested <= 0 || requested > MAX_CAPACITY) {
@@ -1895,7 +1910,7 @@ class SystemAbstractions {
             };
         });
 
-        this.registry.bindMethod(54, 'Deposit', (sim, args = {}) => {
+        this.registry.bindMethod(BANK_REGISTRY_INDEX, 'Deposit', (sim, args = {}) => {
             const lockbox = lockboxById(args.lockboxId === undefined ? args.objectId : args.lockboxId);
             const auth = authorize(sim, lockbox, args, 'Deposit');
             if (!auth.ok) return auth;
@@ -1919,14 +1934,14 @@ class SystemAbstractions {
             return { ok: true, result: safeMetadata(lockbox), message: `Bank.Deposit: ${kind} (${source.words}w) secured in lockbox ${lockbox.id}` };
         });
 
-        this.registry.bindMethod(54, 'Inspect', (sim, args = {}) => {
+        this.registry.bindMethod(BANK_REGISTRY_INDEX, 'Inspect', (sim, args = {}) => {
             const lockbox = lockboxById(args.lockboxId === undefined ? args.objectId : args.lockboxId);
             const auth = authorize(sim, lockbox, args, 'Inspect');
             if (!auth.ok) return auth;
             return { ok: true, result: safeMetadata(lockbox), message: `Bank.Inspect: lockbox ${lockbox.id} metadata returned` };
         });
 
-        this.registry.bindMethod(54, 'Withdraw', (sim, args = {}) => {
+        this.registry.bindMethod(BANK_REGISTRY_INDEX, 'Withdraw', (sim, args = {}) => {
             const lockbox = lockboxById(args.lockboxId === undefined ? args.objectId : args.lockboxId);
             const auth = authorize(sim, lockbox, args, 'Withdraw');
             if (!auth.ok) return auth;
@@ -1992,7 +2007,7 @@ class SystemAbstractions {
             };
         });
 
-        this.registry.bindMethod(54, 'Revoke', (sim, args = {}) => {
+        this.registry.bindMethod(BANK_REGISTRY_INDEX, 'Revoke', (sim, args = {}) => {
             const lockbox = lockboxById(args.lockboxId === undefined ? args.objectId : args.lockboxId);
             const auth = authorize(sim, lockbox, args, 'Revoke', true);
             if (!auth.ok) return auth;
@@ -2011,7 +2026,7 @@ class SystemAbstractions {
             return { ok: true, result: { lockboxId: lockbox.id, revoked: true, quarantined: true }, message: `Bank.Revoke: lockbox ${lockbox.id} revoked and custody quarantined` };
         });
 
-        this.registry.bindMethod(54, 'ObtainPassKey', (sim, args = {}) => {
+        this.registry.bindMethod(BANK_REGISTRY_INDEX, 'ObtainPassKey', (sim, args = {}) => {
             const requestedId = args.lockboxId === undefined ? args.objectId : args.lockboxId;
             const lockbox = lockboxById(requestedId);
             if (lockbox) {
@@ -2027,7 +2042,7 @@ class SystemAbstractions {
             return this._topSecurityApi.obtainPassKey(sim, args);
         });
 
-        this.registry.bindMethod(54, 'ExportRecovery', (sim, args = {}) => {
+        this.registry.bindMethod(BANK_REGISTRY_INDEX, 'ExportRecovery', (sim, args = {}) => {
             const lockbox = lockboxById(args.lockboxId === undefined ? args.objectId : args.lockboxId);
             const auth = authorize(sim, lockbox, args, 'ExportRecovery', true);
             if (!auth.ok) return auth;
@@ -2042,7 +2057,7 @@ class SystemAbstractions {
             };
         });
 
-        this.registry.bindMethod(54, 'Recover', (sim, args = {}) => {
+        this.registry.bindMethod(BANK_REGISTRY_INDEX, 'Recover', (sim, args = {}) => {
             if (!sim.mElevation) return fail('Recover', 'PERM', 'requires M-elevation (Bank authority)');
             const grantToken = typeof args.recoveryGrant === 'string' ? args.recoveryGrant : '';
             const grant = recoveryGrants[grantToken];
@@ -2154,7 +2169,7 @@ class SystemAbstractions {
             };
         });
 
-        this.registry.bindMethod(54, 'List', (sim, args = {}) => {
+        this.registry.bindMethod(BANK_REGISTRY_INDEX, 'List', (sim, args = {}) => {
             const entries = Object.values(bankState.lockboxes).map(safeMetadata);
             return { ok: true, result: entries, message: `Bank.List: ${entries.length} lockbox record(s)` };
         });

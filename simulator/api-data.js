@@ -126,9 +126,10 @@ const API_DATA = [
         ]
     },
     {
-        slot: 54, name: 'Bank', layer: 1,
+        slot: null, registryIndex: 54, name: 'Bank', layer: 1,
+        location: 'dynamic CLOOMC LUMP (registry 54)',
         perms: 'E',
-        description: 'Namespace-backed custody service. Lockbox keys are opaque, revocable PassKeys paired with independent 128-bit proofs; the underlying Namespace entry is never returned as authority.',
+        description: 'Canonical dynamic CLOOMC LUMP backed by proof-bound Namespace custody. Lockbox keys are opaque, revocable PassKeys paired with independent 128-bit proofs; live runtime authority and private Namespace entries are never returned by the static LUMP identity.',
         implemented: true, profile: 'Full',
         methods: [
             { name: 'MintKey',       signature: 'MintKey(capacity?) → bankKey', perms: 'E + M', description: 'Create an empty dynamically allocated lockbox and return its opaque owner key.', implemented: true },

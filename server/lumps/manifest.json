@@ -2152,5 +2152,197 @@
     "sidecar_file": "ide.Mallory.1.0ca567b5.json",
     "binary_hash": "a220c45f71efffa1ef401a99343967964ab402786b3236688f161d297f07427f",
     "identity_hash": "f3b48e1b7403b0e77da69bc18f7b60db71061bfc1b9c0bc672e2ff282d11d1fe"
+  },
+  {
+    "token": "5382e0e2",
+    "abstraction": "Bank",
+    "dot_name": "Bank",
+    "issue_n": 1,
+    "ns_slot": null,
+    "ns_slot_policy": "dynamic",
+    "boot_resident": false,
+    "lump_size": 4096,
+    "cw": 426,
+    "cc": 1,
+    "typ": 0,
+    "status": "released",
+    "language": "CLOOMC",
+    "author": "Church Machine",
+    "grants": [
+      "E"
+    ],
+    "methods": [
+      {
+        "name": "MintKey",
+        "index": 0,
+        "branchOffset": 10,
+        "inputs": [
+          {
+            "name": "capacity",
+            "register": "DR1"
+          }
+        ],
+        "returns": {
+          "name": "result",
+          "register": "DR0"
+        }
+      },
+      {
+        "name": "Deposit",
+        "index": 1,
+        "branchOffset": 57,
+        "inputs": [
+          {
+            "name": "owner_handle",
+            "register": "DR1"
+          },
+          {
+            "name": "source_gt",
+            "register": "DR2"
+          },
+          {
+            "name": "offset",
+            "register": "DR3"
+          },
+          {
+            "name": "words",
+            "register": "DR4"
+          },
+          {
+            "name": "kind",
+            "register": "DR5"
+          }
+        ],
+        "returns": {
+          "name": "result",
+          "register": "DR0"
+        }
+      },
+      {
+        "name": "Withdraw",
+        "index": 2,
+        "branchOffset": 144,
+        "inputs": [
+          {
+            "name": "owner_handle",
+            "register": "DR1"
+          }
+        ],
+        "returns": {
+          "name": "result",
+          "register": "DR0"
+        }
+      },
+      {
+        "name": "Inspect",
+        "index": 3,
+        "branchOffset": 194,
+        "inputs": [
+          {
+            "name": "owner_handle",
+            "register": "DR1"
+          }
+        ],
+        "returns": {
+          "name": "result",
+          "register": "DR0"
+        }
+      },
+      {
+        "name": "Revoke",
+        "index": 4,
+        "branchOffset": 224,
+        "inputs": [
+          {
+            "name": "owner_handle",
+            "register": "DR1"
+          }
+        ],
+        "returns": {
+          "name": "result",
+          "register": "DR0"
+        }
+      },
+      {
+        "name": "ObtainPassKey",
+        "index": 5,
+        "branchOffset": 266,
+        "inputs": [
+          {
+            "name": "owner_handle",
+            "register": "DR1"
+          }
+        ],
+        "returns": {
+          "name": "result",
+          "register": "DR0"
+        }
+      },
+      {
+        "name": "ExportRecovery",
+        "index": 6,
+        "branchOffset": 314,
+        "inputs": [
+          {
+            "name": "owner_handle",
+            "register": "DR1"
+          }
+        ],
+        "returns": {
+          "name": "result",
+          "register": "DR0"
+        }
+      },
+      {
+        "name": "Recover",
+        "index": 7,
+        "branchOffset": 345,
+        "inputs": [
+          {
+            "name": "protected_state",
+            "register": "DR1"
+          },
+          {
+            "name": "original_handle",
+            "register": "DR2"
+          }
+        ],
+        "returns": {
+          "name": "result",
+          "register": "DR0"
+        }
+      },
+      {
+        "name": "List",
+        "index": 8,
+        "branchOffset": 408,
+        "inputs": [],
+        "returns": {
+          "name": "result",
+          "register": "DR0"
+        }
+      }
+    ],
+    "permissions": {
+      "caller_grants": [
+        "E"
+      ],
+      "c_list_row_0": {
+        "role": "compiler-owned symbolic SELF identity",
+        "gt": "0x0b19718e",
+        "live_lockbox_authority": false
+      }
+    },
+    "self_gt": 186216846,
+    "runtime_binding": {
+      "registry_index": 54,
+      "dispatch": "SystemAbstractions",
+      "authority": "proof-bound dynamic custody",
+      "fixed_hardware_boot_slot": false
+    },
+    "filename": "Bank.1.5382e0e2.lump",
+    "sidecar_file": "Bank.1.5382e0e2.json",
+    "binary_hash": "6985e92299b1c9828a7f0633fd4ddab74b9d356be0568ae4bc36aba0d5594982",
+    "identity_hash": "3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11"
   }
 ]

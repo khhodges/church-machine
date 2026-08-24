@@ -238,10 +238,16 @@ CR6 and CR14 are re-derived by CALL/RETURN via mLoad. CR12 is saved and restored
 
 ## Bank Lockbox Credentials
 
-`Bank` is a dynamically issued system service; it does **not** add a fixed
-hardware boot slot. `MintKey(capacity)` creates a private lockbox record with a
-dynamically allocated Namespace entry, but callers receive only an opaque,
-object-scoped PassKey:
+`Bank` is a canonical dynamic **CLOOMC LUMP** as well as a dynamically issued
+system service. Its canonical binary carries the `Bank#1` SELF identity in
+c-list row 0 and is registered in the LUMP manifest with `ns_slot: null` and
+`ns_slot_policy: "dynamic"`. That symbolic identity lets the IDE and loader
+resolve the Bank abstraction without reserving a hardware boot slot.
+
+Installing or calling Bank still mints its live Inform E-GT through the runtime;
+the packaged SELF identity is not a lockbox authority. `MintKey(capacity)`
+creates a private lockbox record with a dynamically allocated Namespace entry,
+but callers receive only an opaque, object-scoped PassKey:
 
 ```text
 { gt: Abstract GT identifier, proof: [four 32-bit CSPRNG words] }
