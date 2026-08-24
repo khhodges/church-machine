@@ -209,7 +209,7 @@
     <div class="row"><span class="k">Last sentinel</span><span class="v" id="lastSentinel">none</span></div>
   </div>
   <div class="card">
-    <h2>FAULT</h2>
+    <h2>CURRENT EXECUTION</h2>
     <div class="row"><span class="k">Halt classification</span><span class="v big" id="faultState">no active fault</span></div>
     <div class="row"><span class="k">Why execution stopped</span><span class="v" id="faultReason">no active fault</span></div>
     <div class="row"><span class="k">Code / stage</span><span class="v" id="faultCode">no active fault</span></div>
@@ -220,6 +220,11 @@
     <div class="row"><span class="k">Relevant evidence</span><span class="v" id="faultEvidence">no active fault</span></div>
   </div>
 </div>
+<section id="lastAcceptedFault" class="card" style="margin-bottom:16px;">
+  <div class="health-head"><h2 style="margin:0;">Last Accepted Fault</h2><span id="lastAcceptedState" class="big dim">UNAVAILABLE</span></div>
+  <div id="lastAcceptedMeta" class="grid" style="margin:10px 0 0;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));"></div>
+  <div id="lastAcceptedRegs" style="overflow:auto;margin-top:10px;"></div>
+</section>
 <div class="status-note" role="note"><strong>Reading this page:</strong> status cards are the latest bridge/board snapshot; they are not the historical log. The log below is the server's arrival-ordered history from the same Wukong hardware feed.</div>
 
 <div class="trace-windows" id="traceWindows" aria-label="Floating trace views">
@@ -1045,6 +1050,57 @@
     }
   }
 
+  function renderLastAcceptedFault(s) {
+    var rec = s.last_accepted_fault;
+    var candidate = s.fault_candidate || {};
+    var stateEl = document.getElementById('lastAcceptedState');
+    var metaEl = document.getElementById('lastAcceptedMeta');
+    var regsEl = document.getElementById('lastAcceptedRegs');
+    if (!stateEl || !metaEl || !regsEl) return;
+    var esc = function(v) { return String(v).replace(/[&<>"']/g, function(ch) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];
+    }); };
+    if (!rec) {
+      var pending = candidate.state || 'unavailable';
+      stateEl.textContent = pending.toUpperCase() + (candidate.decision ? ' — ' + candidate.decision : '');
+      stateEl.className = 'big ' + (pending === 'rejected' ? 'fault' : pending === 'pending' ? 'warn' : 'dim');
+      metaEl.innerHTML = '<div class="surface-note">No durable accepted record. Candidate ' +
+        esc(candidate.incident_id || 'unavailable') + ' is ' + esc(pending) + '.</div>';
+      regsEl.innerHTML = '';
+      return;
+    }
+    stateEl.textContent = 'ACCEPTED / ' + (rec.incident_id || 'incident unavailable');
+    stateEl.className = 'big good';
+    var val = function(v) { return v === null || v === undefined ? 'UNAVAILABLE' : String(v); };
+    var hx = function(v) { return v === null || v === undefined ? 'UNAVAILABLE' : hex(v); };
+    var fields = [
+      ['Fault',rec.fault_message || ('Code '+val(rec.fault_code))],
+      ['Source',rec.source],['Abstraction',rec.abstraction_label || 'UNAVAILABLE'],
+      ['Correlation',rec.correlation_status],['Promotion',rec.promotion_status],
+      ['Recovery',rec.recovery_authorized ? 'AUTHORIZED' : 'BLOCKED'],
+      ['CRC',rec.crc_valid === true ? 'VALID / '+val(rec.crc16) : rec.crc_valid === false ? 'INVALID' : 'UNAVAILABLE'],
+      ['NIA',hx(rec.nia)],['Flags',rec.flags && typeof rec.flags === 'object' ?
+        ['N','Z','C','V'].map(function(k){return k+'='+(rec.flags[k]?1:0);}).join(' ') :
+        (typeof rec.flags === 'number' ?
+          'N='+((rec.flags>>3)&1)+' Z='+((rec.flags>>2)&1)+' C='+((rec.flags>>1)&1)+' V='+(rec.flags&1) :
+          val(rec.flags))],
+      ['Stored CR12 GT',hx(rec.stored_cr12_gt)],['Stored packed PC',hx(rec.stored_packed_pc)],
+      ['Stored MFLAG',hx(rec.stored_mflag)],['Thread base',hx(rec.thread_base)],['STO',val(rec.sto)]
+    ];
+    metaEl.innerHTML = fields.map(function(p) {
+      return '<div class="card"><div class="row"><span class="k">'+esc(p[0])+'</span><span class="v">'+esc(p[1])+'</span></div></div>';
+    }).join('');
+    var cr = Array.isArray(rec.cr) ? rec.cr : [], dr = Array.isArray(rec.dr) ? rec.dr : [];
+    var table = '<table style="width:100%;border-collapse:collapse"><thead><tr><th>Reg</th><th>Word 0 / value</th><th>Word 1</th><th>Word 2</th></tr></thead><tbody>';
+    for (var i=0;i<16;i++) {
+      var c = Array.isArray(cr[i]) ? cr[i] : [];
+      table += '<tr><td>CR'+i+'</td><td>'+esc(hx(c[0]))+'</td><td>'+esc(hx(c[1]))+'</td><td>'+esc(hx(c[2]))+'</td></tr>';
+    }
+    table += '</tbody></table><div style="display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:4px;margin-top:8px">';
+    for (var j=0;j<16;j++) table += '<div class="card" style="padding:6px"><span class="k">DR'+j+'</span> <span class="v">'+esc(hx(dr[j]))+'</span></div>';
+    regsEl.innerHTML = table + '</div>';
+  }
+
   function pollStatus() {
     fetch('/hardware/wukong/status').then(function (r) { return r.json(); }).then(function (s) {
       if (s.bridge_connected) setState('bridgeState', 'ok', 'connected');
@@ -1077,6 +1133,7 @@
       document.getElementById('lastInstruction').textContent = lt.disasm || 'unavailable';
       document.getElementById('lastFlags').textContent = lt.flags !== undefined ? flags(lt.flags) : '—';
       document.getElementById('callDepth').textContent = s.call_depth;
+      renderLastAcceptedFault(s);
       var h = s.halt || {};
       var hs = document.getElementById('faultState');
        hs.textContent = h.state === 'running' ? 'running — no active fault' : (h.state || 'no active fault');

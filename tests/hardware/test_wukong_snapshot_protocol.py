@@ -3,6 +3,7 @@
 import os
 import struct
 import sys
+from copy import deepcopy
 from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
@@ -151,15 +152,35 @@ def test_fault_recovery_control_is_wired_into_top_execution_and_uart_gates():
     snapshot_done_block = source[snapshot_final_byte:snapshot_final_byte + 400]
     assert 'snapshot_complete.eq(1)' in snapshot_done_block
     assert 'snapshot_complete_reason.eq(snap_reason)' in snapshot_done_block
+    for marker in (
+            'snap_nia.eq(core.nia)',
+            'snap_flags_latched.eq(live_snap_flags[:4])',
+            'snap_m_flag_latched.eq(core.debug_m_flag)',
+            'snap_thread_base.eq(core.debug_cr_words[12][1])',
+            'snap_cr_words[cr_idx][word_idx].eq(',
+            'snap_dr_words[dr_idx].eq('):
+        assert marker in source
+    payload_block = source[source.index('snap_words = ['):
+                           source.index('snap_payload_array = Array(')]
+    assert 'snap_nia' in payload_block
+    assert 'snap_thread_base' in payload_block
+    assert 'snap_cr_words[cr_idx][word_idx]' in payload_block
+    assert 'snap_dr_words[dr_idx]' in payload_block
+    assert 'core.nia' not in payload_block
+    assert 'core.debug_cr_words' not in payload_block
+    assert 'core.debug_dr_words' not in payload_block
 
 
 class _FakeResponse:
-    def __init__(self, status_code=200, promoted=True):
+    def __init__(self, status_code=200, reply=None):
         self.status_code = status_code
-        self._promoted = promoted
+        self._reply = reply or {
+            'ok': True, 'accepted': True, 'promoted': True,
+            'duplicate': False, 'decision': 'promoted',
+        }
 
     def json(self):
-        return {'promoted': self._promoted}
+        return self._reply
 
 
 class _FakeSerial:
@@ -180,6 +201,11 @@ def test_fault_recovery_authorizes_after_snapshot_then_rearms_at_sentinel(monkey
 
     def fake_post(url, json=None, timeout=None, verify=None):
         posts.append((url, json))
+        if url.endswith('/recovery-authorization'):
+            return _FakeResponse(reply={
+                'ok': True, 'accepted': True, 'duplicate': False,
+                'decision': 'recovery_authorized',
+            })
         return _FakeResponse()
 
     monkeypatch.setattr(wb.requests, 'post', fake_post)
@@ -188,17 +214,28 @@ def test_fault_recovery_authorizes_after_snapshot_then_rearms_at_sentinel(monkey
     fault_snapshot = wb.decode_snapshot_frame(_frame())
     fault_snapshot['reason'] = wb.FaultRecovery.FAULT_SNAPSHOT_REASON
 
+    trace_payload = recovery.prepare_trace(
+        {'fault_valid': True, 'nia': 0x164}, 'bridge-session-a')
     recovery.note_trace(
-        {'fault_valid': True, 'nia': 0x164}, trace_seq=7,
-        server_boot_id='server-a')
+        trace_payload, trace_seq=7, server_boot_id='server-a')
     snapshot_payload = recovery.snapshot_payload(fault_snapshot)
     accepted = wb._post_wukong_snapshot('http://ide.test', snapshot_payload, True)
-    assert accepted is True
+    assert accepted['decision'] == 'promoted'
     assert recovery.should_reboot_after_snapshot(fault_snapshot, accepted) is True
     assert wb._authorize_fault_recovery(serial) is True
+    auth_payload = recovery.authorization_payload()
+    posts.clear()
+    assert wb._post_recovery_authorization(
+        'http://ide.test', auth_payload, True)['decision'] == \
+        'recovery_authorized'
     recovery.mark_reboot_sent()
 
-    assert posts == [('http://ide.test/hardware/wukong/snapshot', snapshot_payload)]
+    assert posts == [
+        ('http://ide.test/hardware/wukong/recovery-authorization',
+         auth_payload),
+    ]
+    assert snapshot_payload['incident_id'] == trace_payload['incident_id']
+    assert snapshot_payload['bridge_session'] == 'bridge-session-a'
     assert snapshot_payload['fault_trace_seq'] == 7
     assert snapshot_payload['fault_boot_id'] == 'server-a'
     assert serial.writes == [b'g']
@@ -247,7 +284,10 @@ def test_fault_recovery_keeps_board_halted_when_fault_trace_was_rejected():
 
 def test_fault_recovery_never_reboots_when_server_cannot_promote_snapshot(monkeypatch):
     def fake_post(*_args, **_kwargs):
-        return _FakeResponse(promoted=False)
+        return _FakeResponse(reply={
+            'ok': False, 'accepted': False, 'promoted': False,
+            'decision': 'invalid_snapshot',
+        })
 
     monkeypatch.setattr(wb.requests, 'post', fake_post)
     recovery = wb.FaultRecovery()
@@ -257,7 +297,7 @@ def test_fault_recovery_never_reboots_when_server_cannot_promote_snapshot(monkey
     fault_snapshot['reason'] = wb.FaultRecovery.FAULT_SNAPSHOT_REASON
     accepted = wb._post_wukong_snapshot(
         'http://ide.test', recovery.snapshot_payload(fault_snapshot), True)
-    assert accepted is False
+    assert accepted is None
     assert recovery.should_reboot_after_snapshot(fault_snapshot, accepted) is False
 
 
@@ -280,3 +320,83 @@ def test_rejected_later_fault_cannot_reuse_an_older_pending_correlation():
     fault_snapshot['reason'] = wb.FaultRecovery.FAULT_SNAPSHOT_REASON
     assert 'fault_trace_seq' not in recovery.snapshot_payload(fault_snapshot)
     assert recovery.should_reboot_after_snapshot(fault_snapshot, accepted=True) is False
+
+
+def test_fault_trace_and_snapshot_retries_preserve_exact_incident_payload(monkeypatch):
+    """A committed request with a lost response retries without duplicating data."""
+    recovery = wb.FaultRecovery()
+    trace_payload = recovery.prepare_trace(
+        {'fault_valid': True, 'nia': 0x10, 'flags': 0x0D},
+        'bridge-session-retry')
+    trace_posts = []
+    trace_replies = [
+        wb.requests.Timeout('response lost after commit'),
+        _FakeResponse(reply={
+            'ok': True, 'accepted': True, 'duplicate': True,
+            'decision': 'duplicate', 'seq': 41, 'boot_id': 'server-a',
+        }),
+    ]
+
+    def fake_trace_post(_url, json=None, **_kwargs):
+        trace_posts.append((id(json), deepcopy(json)))
+        reply = trace_replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+    monkeypatch.setattr(wb.requests, 'post', fake_trace_post)
+    monkeypatch.setattr(wb.time, 'sleep', lambda _seconds: None)
+    trace_ack = wb._post_wukong_trace(
+        'http://ide.test', trace_payload, True, max_attempts=2)
+    assert trace_ack['decision'] == 'duplicate'
+    assert len(trace_posts) == 2
+    assert trace_posts[0] == trace_posts[1]
+    assert recovery.note_trace(
+        trace_payload, trace_ack['seq'], trace_ack['boot_id'])
+
+    snapshot = wb.decode_snapshot_frame(_frame())
+    snapshot['reason'] = wb.FaultRecovery.FAULT_SNAPSHOT_REASON
+    snapshot_payload = recovery.snapshot_payload(snapshot)
+    snapshot_posts = []
+    snapshot_replies = [
+        wb.requests.Timeout('snapshot response lost after promotion'),
+        _FakeResponse(reply={
+            'ok': True, 'accepted': True, 'promoted': True,
+            'duplicate': True, 'decision': 'duplicate',
+        }),
+    ]
+
+    def fake_snapshot_post(_url, json=None, **_kwargs):
+        snapshot_posts.append((id(json), deepcopy(json)))
+        reply = snapshot_replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+    monkeypatch.setattr(wb.requests, 'post', fake_snapshot_post)
+    snapshot_ack = wb._post_wukong_snapshot(
+        'http://ide.test', snapshot_payload, True, max_attempts=2)
+    assert snapshot_ack['decision'] == 'duplicate'
+    assert snapshot_posts[0] == snapshot_posts[1]
+    assert recovery.should_reboot_after_snapshot(snapshot, snapshot_ack)
+
+
+def test_explicit_server_generation_rejection_remains_fail_closed(monkeypatch):
+    def fake_post(*_args, **_kwargs):
+        return _FakeResponse(status_code=409, reply={
+            'ok': False, 'accepted': False, 'promoted': False,
+            'decision': 'server_generation_changed',
+        })
+
+    monkeypatch.setattr(wb.requests, 'post', fake_post)
+    recovery = wb.FaultRecovery()
+    trace_payload = recovery.prepare_trace(
+        {'fault_valid': True, 'nia': 0x10}, 'bridge-session-a')
+    recovery.note_trace(trace_payload, 9, 'old-server')
+    snapshot = wb.decode_snapshot_frame(_frame())
+    snapshot['reason'] = wb.FaultRecovery.FAULT_SNAPSHOT_REASON
+    response = wb._post_wukong_snapshot(
+        'http://ide.test', recovery.snapshot_payload(snapshot), True,
+        max_attempts=1)
+    assert response is None
+    assert recovery.should_reboot_after_snapshot(snapshot, response) is False

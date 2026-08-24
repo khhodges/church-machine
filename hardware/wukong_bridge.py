@@ -623,6 +623,8 @@ def decode_snapshot_frame(frame):
         'cr': cr_words,
         'dr': dr_words,
         'crc16': received_crc,
+        'crc_valid': True,
+        'integrity': 'CRC16 verified',
     }
 
 
@@ -837,25 +839,54 @@ class FaultRecovery:
     def __init__(self):
         self.awaiting_snapshot = False
         self.reboot_sent = False
+        self.incident_id = None
+        self.bridge_session = None
+        self.trace_payload = None
+        self.authorization_id = None
 
-    def note_trace(self, trace, trace_seq, server_boot_id):
-        """Replace any pending correlation with this fault trace attempt."""
+    def prepare_trace(self, trace, bridge_session):
+        """Freeze one immutable fault trace payload before its first POST."""
         self.clear_pending()
-        if (trace.get('fault_valid') and isinstance(trace_seq, int) and
-                trace_seq > 0 and isinstance(server_boot_id, str) and server_boot_id):
+        payload = dict(trace)
+        if trace.get('fault_valid'):
             self.awaiting_snapshot = True
+            self.incident_id = uuid.uuid4().hex
+            self.bridge_session = str(bridge_session or '')
+            self.authorization_id = uuid.uuid4().hex
+            payload['incident_id'] = self.incident_id
+            payload['bridge_session'] = self.bridge_session
+            self.trace_payload = payload
+        return payload
+
+    def note_trace(self, trace, trace_seq, server_boot_id, bridge_session=None):
+        """Record the server correlation returned for the frozen fault trace."""
+        if self.trace_payload is None and trace.get('fault_valid'):
+            self.prepare_trace(trace, bridge_session or 'legacy-bridge-session')
+        if (self.awaiting_snapshot and isinstance(trace_seq, int) and
+                trace_seq > 0 and isinstance(server_boot_id, str) and server_boot_id):
             self.trace_seq = trace_seq
             self.server_boot_id = server_boot_id
+            return True
+        self.trace_seq = None
+        self.server_boot_id = None
+        return False
 
     def clear_pending(self):
         """Discard a correlation that cannot safely authorize a reboot."""
         self.awaiting_snapshot = False
         self.trace_seq = None
         self.server_boot_id = None
+        self.incident_id = None
+        self.bridge_session = None
+        self.trace_payload = None
+        self.authorization_id = None
 
     def should_reboot_after_snapshot(self, snapshot, accepted):
         return bool(
             accepted and self.awaiting_snapshot and not self.reboot_sent and
+            self.incident_id and self.bridge_session and
+            isinstance(self.trace_seq, int) and self.trace_seq > 0 and
+            isinstance(self.server_boot_id, str) and self.server_boot_id and
             int(snapshot.get('reason', 0)) == self.FAULT_SNAPSHOT_REASON
         )
 
@@ -871,25 +902,91 @@ class FaultRecovery:
     def snapshot_payload(self, snapshot):
         """Attach the exact fault event and server generation for correlation."""
         payload = dict(snapshot)
+        if self.awaiting_snapshot and self.incident_id and self.bridge_session:
+            payload['incident_id'] = self.incident_id
+            payload['bridge_session'] = self.bridge_session
         if (self.awaiting_snapshot and getattr(self, 'trace_seq', None) and
                 getattr(self, 'server_boot_id', None)):
             payload['fault_trace_seq'] = self.trace_seq
             payload['fault_boot_id'] = self.server_boot_id
         return payload
 
+    def authorization_payload(self):
+        """Return the stable idempotency payload for the already-written ``g``."""
+        return {
+            'incident_id': self.incident_id,
+            'bridge_session': self.bridge_session,
+            'authorization_id': self.authorization_id,
+        }
 
-def _post_wukong_snapshot(ide_base, decoded, verify_tls):
-    """POST a decoded snapshot and confirm it became the durable Last Fault."""
-    try:
-        response = requests.post(
-            f'{ide_base}/hardware/wukong/snapshot',
-            json=decoded, timeout=1, verify=verify_tls)
-        if not 200 <= response.status_code < 300:
-            return False
-        return bool(response.json().get('promoted', False))
-    except Exception as exc:
-        print(f'  [snapshot POST error] {exc}', flush=True)
-        return False
+
+def _post_json_retry(url, payload, verify_tls, label, accept_reply,
+                     max_attempts=None, timeout=1):
+    """Retry one frozen JSON payload until accepted or explicitly rejected.
+
+    Network failures and HTTP 5xx responses are transient.  HTTP 4xx and a
+    well-formed non-accepting 2xx response are terminal so fault recovery stays
+    fail-closed instead of guessing.
+    """
+    attempt = 0
+    while max_attempts is None or attempt < max_attempts:
+        attempt += 1
+        try:
+            response = requests.post(
+                url, json=payload, timeout=timeout, verify=verify_tls)
+            try:
+                reply = response.json()
+            except Exception:
+                reply = {}
+            if 200 <= response.status_code < 300:
+                if accept_reply(reply):
+                    return reply
+                print(f'  [{label} rejected] decision='
+                      f'{reply.get("decision", "invalid response")}', flush=True)
+                return None
+            if 400 <= response.status_code < 500:
+                print(f'  [{label} rejected] HTTP {response.status_code} '
+                      f'decision={reply.get("decision", "unknown")}', flush=True)
+                return None
+            print(f'  [{label} transient] HTTP {response.status_code}', flush=True)
+        except Exception as exc:
+            print(f'  [{label} transient] {exc}', flush=True)
+        if max_attempts is None or attempt < max_attempts:
+            time.sleep(min(0.1 * (2 ** min(attempt - 1, 4)), 1.6))
+    return None
+
+
+def _post_wukong_trace(ide_base, payload, verify_tls, max_attempts=None):
+    """Commit one fault trace idempotently and return its stable correlation."""
+    return _post_json_retry(
+        f'{ide_base}/hardware/wukong/trace', payload, verify_tls, 'trace POST',
+        lambda reply: bool(
+            reply.get('accepted') and int(reply.get('seq', 0)) > 0 and
+            isinstance(reply.get('boot_id'), str) and reply.get('boot_id')),
+        max_attempts=max_attempts)
+
+
+def _post_wukong_snapshot(ide_base, decoded, verify_tls, max_attempts=None):
+    """Commit a snapshot and confirm promotion for this exact incident."""
+    return _post_json_retry(
+        f'{ide_base}/hardware/wukong/snapshot', decoded, verify_tls,
+        'snapshot POST',
+        lambda reply: bool(
+            reply.get('accepted') and reply.get('promoted') and
+            reply.get('decision') in ('promoted', 'duplicate')),
+        max_attempts=max_attempts)
+
+
+def _post_recovery_authorization(ide_base, payload, verify_tls,
+                                 max_attempts=None):
+    """Publish the already-written ``g`` in arrival order before Boot.0."""
+    return _post_json_retry(
+        f'{ide_base}/hardware/wukong/recovery-authorization',
+        payload, verify_tls, 'recovery authorization POST',
+        lambda reply: bool(
+            reply.get('accepted') and
+            reply.get('decision') in ('recovery_authorized', 'duplicate')),
+        max_attempts=max_attempts)
 
 
 def _authorize_fault_recovery(ser):
@@ -1311,14 +1408,29 @@ def main():
                     sync.lock('snapshot frame')
                     _console_flush(ide_base, verify_tls)
                     decoded['ts'] = time.time()
-                    snapshot_accepted = _post_wukong_snapshot(
-                        ide_base, fault_recovery.snapshot_payload(decoded), verify_tls)
+                    snapshot_payload = fault_recovery.snapshot_payload(decoded)
+                    snapshot_reply = _post_wukong_snapshot(
+                        ide_base, snapshot_payload, verify_tls,
+                        max_attempts=(None if decoded.get('reason') ==
+                                      FaultRecovery.FAULT_SNAPSHOT_REASON else 1))
+                    snapshot_accepted = bool(snapshot_reply)
                     if fault_recovery.should_reboot_after_snapshot(
                             decoded, snapshot_accepted):
                         if _authorize_fault_recovery(ser):
+                            authorization_payload = (
+                                fault_recovery.authorization_payload())
+                            authorization_reply = _post_recovery_authorization(
+                                ide_base, authorization_payload, verify_tls,
+                                max_attempts=None)
                             fault_recovery.mark_reboot_sent()
-                            print('  [fault recovery] complete fault snapshot '
-                                  'stored — authorizing Boot.0 recovery', flush=True)
+                            if authorization_reply:
+                                print('  [fault recovery] complete fault snapshot '
+                                      'stored — authorizing Boot.0 recovery',
+                                      flush=True)
+                            else:
+                                print('  [fault recovery] authorization was written '
+                                      'but server rejected its audit record',
+                                      flush=True)
                         else:
                             fault_recovery.clear_pending()
                     else:
@@ -1392,23 +1504,27 @@ def main():
                     trace_accepted = False
                     trace_seq = None
                     trace_boot_id = None
-                    try:
-                        response = requests.post(
-                            f'{ide_base}/hardware/wukong/trace',
-                            json=decoded, timeout=1, verify=verify_tls)
-                        trace_accepted = 200 <= response.status_code < 300
-                        if trace_accepted:
-                            trace_reply = response.json()
+                    trace_payload = (
+                        fault_recovery.prepare_trace(decoded, session_id)
+                        if decoded.get('fault_valid') else decoded)
+                    if decoded.get('fault_valid'):
+                        trace_reply = _post_wukong_trace(
+                            ide_base, trace_payload, verify_tls,
+                            max_attempts=None)
+                        if trace_reply:
                             trace_seq = int(trace_reply.get('seq', 0))
                             trace_boot_id = trace_reply.get('boot_id')
-                            trace_accepted = (
-                                trace_seq > 0 and isinstance(trace_boot_id, str) and
-                                bool(trace_boot_id))
-                        if not trace_accepted:
-                            print(f'  [trace POST rejected or unsequenced] HTTP '
-                                  f'{response.status_code}', flush=True)
-                    except Exception as exc:
-                        print(f'  [trace POST error] {exc}')
+                            trace_accepted = fault_recovery.note_trace(
+                                trace_payload, trace_seq, trace_boot_id,
+                                session_id)
+                    else:
+                        try:
+                            response = requests.post(
+                                f'{ide_base}/hardware/wukong/trace',
+                                json=trace_payload, timeout=1, verify=verify_tls)
+                            trace_accepted = 200 <= response.status_code < 300
+                        except Exception as exc:
+                            print(f'  [trace POST error] {exc}')
 
                     ev_type    = decoded['ev_type']
                     payload_gt = decoded['payload_gt']
@@ -1438,44 +1554,7 @@ def main():
                         # latest accepted fault trace.  If that trace did not
                         # reach it, leave the physical board halted instead of
                         # rebooting into Boot.0 with a stale fault record.
-                        fault_recovery.note_trace(
-                            decoded, trace_seq, trace_boot_id)
                         fault_str = f'  FAULT={_fault_name(decoded["fault_code"])}'
-                        # Post a fault snapshot to the IDE so the Last Fault panel
-                        # appears even when the hardware resets before the user polls.
-                        # Include cached GT word0 values for all CRs seen so far in
-                        # this session (word1/word2 are not carried by trace packets
-                        # and are zeroed).  The IDE panel shows these as partial
-                        # register state rather than all-zero rows.
-                        try:
-                            _cr_rows = [[_cr_gt_cache.get(i, 0), 0, 0]
-                                        for i in range(16)]
-                            _fault_snap = {
-                                'fault_code':    decoded['fault_code'],
-                                'fault_message': _fault_name(decoded['fault_code']),
-                                'nia':           decoded['nia'],
-                                'pc':            decoded['nia'],
-                                'flags':         decoded.get('flags', 0),
-                                'call_depth':    0,
-                                'led_bits':      0,
-                                'abstraction_label': str(decoded.get('gt_label', '') or ''),
-                                'abstraction_slot': None,
-                                'source':        'hardware',
-                                # The compact trace packet cannot carry all
-                                # CR/DR words.  The reason-2 AC snapshot that
-                                # follows is promoted by the server and must
-                                # remain authoritative if this partial POST
-                                # arrives late from another browser client.
-                                'snapshot_complete': False,
-                                'cr':            _cr_rows,
-                            }
-                            _fault_snap.update({k: decoded[k] for k in
-                                ('pet_name', 'nia_label') if k in decoded})
-                            requests.post(
-                                f'{ide_base}/api/fault-snapshot',
-                                json=_fault_snap, timeout=1, verify=verify_tls)
-                        except Exception as _fse:
-                            print(f'  [fault-snapshot POST error] {_fse}')
                     else:
                         fault_str = ''
                     bp_str = '  [BP HIT]' if decoded['bp_hit'] else ''

@@ -78,8 +78,7 @@ test.describe('Last Fault panel — emit → POST → GET round-trip', () => {
         // Clear any stale server snapshot from a prior run.
         await clearServerSnapshot(page);
 
-        // Switch to the editor view so #editorConsole (and its parent, which is
-        // the panel's insertion point) is in the visible DOM.
+        // Switch to the editor view so the stable page-level host is visible.
         await page.evaluate(() => {
             if (typeof switchView === 'function') switchView('editor');
         });
@@ -116,8 +115,7 @@ test.describe('Last Fault panel — emit → POST → GET round-trip', () => {
         expect(emitOk, '_onSimFaultSnapshot must be callable').toBe(true);
 
         // ── Assert: panel visible after emit ──────────────────────────────────
-        const panel = page.locator('#last-fault-panel');
-        await panel.waitFor({ state: 'attached', timeout: 5000 });
+        const panel = page.locator('#lastFaultHost');
         await expect(panel).toBeVisible();
 
         // The fault message and key fields must appear inside the panel.
@@ -139,8 +137,8 @@ test.describe('Last Fault panel — emit → POST → GET round-trip', () => {
         });
         expect(hideOk, '_hideLastFaultPanel must be defined').toBe(true);
 
-        // Panel should be gone now.
-        await panel.waitFor({ state: 'detached', timeout: 3000 });
+        // Stable host remains mounted but is empty/hidden now.
+        await expect(panel).toBeHidden();
 
         // Call the browser-GET path: fetch from server and re-render.
         const fetchOk = await page.evaluate(() => {
@@ -151,7 +149,6 @@ test.describe('Last Fault panel — emit → POST → GET round-trip', () => {
         expect(fetchOk, '_fetchAndShowLastFaultPanel must be defined').toBe(true);
 
         // The panel must re-appear because the server still holds the snapshot.
-        await panel.waitFor({ state: 'attached', timeout: 5000 });
         await expect(panel).toBeVisible();
 
         // Content check on the re-fetched panel.
@@ -162,21 +159,26 @@ test.describe('Last Fault panel — emit → POST → GET round-trip', () => {
         await clearServerSnapshot(page);
     });
 
-    test('#last-fault-panel is absent when no fault snapshot exists on the server', async ({ page }) => {
+    test('stable host shows an explicit unavailable state when no snapshot exists', async ({ page }) => {
         test.setTimeout(40000);
 
         await page.addInitScript(() => {
             localStorage.setItem('church_whatsnew_dismissed_perm', '1');
         });
 
-        // Intercept GET /api/fault-snapshot to return 404 so _fetchAndShowLastFaultPanel
-        // finds nothing, regardless of any snapshot left by a prior test or run.
+        // Intercept GET /api/fault-snapshot so the lifecycle renderer sees an
+        // explicit unavailable state regardless of prior server state.
         await page.route('/api/fault-snapshot', async (route) => {
             if (route.request().method() === 'GET') {
                 await route.fulfill({
-                    status: 404,
+                    status: 200,
                     contentType: 'application/json',
-                    body: JSON.stringify({ ok: false, error: 'no fault snapshot' }),
+                    body: JSON.stringify({
+                        ok: false,
+                        display_state: 'unavailable',
+                        decision: 'missing_trace',
+                        reason: 'No durable accepted fault record.',
+                    }),
                 });
             } else {
                 await route.continue();
@@ -185,9 +187,12 @@ test.describe('Last Fault panel — emit → POST → GET round-trip', () => {
 
         await page.goto('/simulator/');
         await waitForSimReady(page);
+        await page.evaluate(() => {
+            if (typeof switchView === 'function') switchView('editor');
+        });
 
-        // Call _fetchAndShowLastFaultPanel — server returns 404, so no panel
-        // should appear.
+        // Call _fetchAndShowLastFaultPanel — the stable host must explain the
+        // unavailable state instead of silently doing nothing.
         await page.evaluate(() => {
             if (typeof _fetchAndShowLastFaultPanel === 'function') {
                 _fetchAndShowLastFaultPanel();
@@ -197,8 +202,92 @@ test.describe('Last Fault panel — emit → POST → GET round-trip', () => {
         // Give any async work time to settle.
         await page.waitForTimeout(800);
 
-        const panel = page.locator('#last-fault-panel');
-        await expect(panel).toHaveCount(0);
+        const panel = page.locator('#lastFaultHost');
+        await expect(panel).toBeVisible();
+        await expect(panel).toContainText('UNAVAILABLE');
+        await expect(panel).toContainText('No durable accepted fault record');
+    });
+
+    test('promoted hardware fault remains fully visible after recovery Boot.0', async ({ page }) => {
+        test.setTimeout(60000);
+        const incidentId = 'e2e-incident-0000000000000001';
+        const bridgeSession = 'e2e-bridge-session';
+        const untrustedLabel = '<img src=x onerror="window.__faultXss=true">';
+        const trace = {
+            nia: 0x164, ev_type: 0, payload_gt: 0, flags: 0x0D,
+            fault_code: 3, fault_valid: true, bp_hit: false,
+            ts: Date.now() / 1000,
+            incident_id: incidentId, bridge_session: bridgeSession,
+            gt_label: untrustedLabel,
+        };
+        const traceResponse = await page.request.post('/hardware/wukong/trace', {
+            data: trace,
+        });
+        expect(traceResponse.ok()).toBe(true);
+        const traceAck = await traceResponse.json();
+
+        const cr = Array.from({ length: 16 }, (_, i) => [i, i + 1, i + 2]);
+        const dr = Array.from({ length: 16 }, (_, i) => 0x100 + i);
+        const snapshotResponse = await page.request.post('/hardware/wukong/snapshot', {
+            data: {
+                snapshot: true, version: 1, seq: 7, reason: 2,
+                flags: trace.flags, m_flag: true, nia: trace.nia,
+                sto: 0x55, thread_base: 0x220,
+                stored_cr12_gt: 0xA1, stored_packed_pc: 0xB2,
+                stored_mflag: 0xC3, cr, dr, crc16: 0xCAFE,
+                crc_valid: true, integrity: 'CRC16 verified',
+                ts: Date.now() / 1000,
+                incident_id: incidentId, bridge_session: bridgeSession,
+                fault_trace_seq: traceAck.seq, fault_boot_id: traceAck.boot_id,
+            },
+        });
+        expect(snapshotResponse.ok()).toBe(true);
+        expect((await snapshotResponse.json()).decision).toBe('promoted');
+
+        const authResponse = await page.request.post(
+            '/hardware/wukong/recovery-authorization',
+            { data: {
+                incident_id: incidentId, bridge_session: bridgeSession,
+                authorization_id: 'e2e-authorization-0000000000000001',
+            } }
+        );
+        expect(authResponse.ok()).toBe(true);
+        await page.request.post('/hardware/wukong/trace', {
+            data: {
+                nia: 0, ev_type: 0, payload_gt: 0, flags: 0,
+                fault_code: 0, fault_valid: false, bp_hit: false,
+                ts: Date.now() / 1000,
+            },
+        });
+
+        await page.goto('/simulator/');
+        await waitForSimReady(page);
+        await page.evaluate(() => {
+            if (typeof switchView === 'function') switchView('editor');
+            _fetchAndShowLastFaultPanel();
+        });
+        const ideRecord = page.locator('#lastFaultHost');
+        await expect(ideRecord).toBeVisible();
+        await expect(ideRecord).toContainText(incidentId);
+        await expect(ideRecord).toContainText('PERM_X');
+        await expect(ideRecord).toContainText('AUTHORIZED');
+        await expect(ideRecord).toContainText('CR15');
+        await expect(ideRecord).toContainText('0x00000011');
+        await expect(ideRecord).toContainText('DR15');
+        await expect(ideRecord).toContainText('0x0000010F');
+
+        await page.goto('/fpga');
+        const accepted = page.locator('#lastAcceptedFault');
+        await expect(accepted).toContainText(incidentId, { timeout: 10000 });
+        await expect(accepted).toContainText('AUTHORIZED');
+        await expect(accepted).toContainText('CR15');
+        await expect(accepted).toContainText('0x00000011');
+        await expect(accepted).toContainText('DR15');
+        await expect(accepted).toContainText('0x0000010F');
+        await expect(accepted).toContainText(untrustedLabel);
+        await expect(accepted.locator('img')).toHaveCount(0);
+        expect(await page.evaluate(() => window.__faultXss)).toBeUndefined();
+        await expect(page.locator('#faultState')).toContainText('running');
     });
 
 });

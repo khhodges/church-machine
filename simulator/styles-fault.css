@@ -1,4 +1,41 @@
 /* ── Fault Popup Modal ───────────────────────────────────────── */
+.last-fault-host {
+    margin: 0 0 0.8rem;
+    border: 1px solid rgba(100, 140, 200, 0.28);
+    background: rgba(10, 13, 24, 0.94);
+    color: var(--text-primary);
+    font-family: var(--font-mono, monospace);
+}
+.last-fault-host:empty { display:none; }
+.last-fault-host.lf-state-accepted { border-color: rgba(60, 190, 150, 0.55); }
+.last-fault-host.lf-state-pending { border-color: rgba(240, 180, 70, 0.55); }
+.last-fault-host.lf-state-rejected { border-color: rgba(220, 80, 80, 0.6); }
+.last-fault-host.lf-state-unavailable { border-color: rgba(130, 140, 160, 0.35); }
+.last-fault-host .last-fault-panel-header {
+    display:flex; justify-content:space-between; align-items:center; gap:1rem;
+    padding:0.55rem 0.75rem; border-bottom:1px solid rgba(120,140,180,.2);
+    text-transform:uppercase; letter-spacing:.08em; font-size:.72rem;
+}
+.last-fault-host .last-fault-panel-header strong { font-size:.66rem; color:#9ed8c2; }
+.lf-state-pending .last-fault-panel-header strong { color:#e6bd67; }
+.lf-state-rejected .last-fault-panel-header strong { color:#e58c8c; }
+.lf-state-unavailable .last-fault-panel-header strong { color:#9aa4b5; }
+.last-fault-state-detail { padding:.65rem .75rem; color:var(--text-secondary); font-size:.75rem; }
+.lf-accepted-meta { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:0; }
+.lf-row { display:flex; min-width:0; border-bottom:1px solid rgba(120,140,180,.1); }
+.lf-label { flex:0 0 auto; padding:.35rem .45rem; color:var(--text-secondary); font-size:.64rem; }
+.lf-value { min-width:0; padding:.35rem .45rem; color:var(--text-primary); overflow-wrap:anywhere; font-size:.7rem; }
+.lf-register-block { padding:.55rem .65rem; border-top:1px solid rgba(120,140,180,.18); }
+.lf-register-block h4 { margin:0 0 .45rem; color:var(--text-secondary); font-size:.66rem; text-transform:uppercase; letter-spacing:.07em; }
+.lf-cr-grid, .lf-dr-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:3px; }
+.lf-reg-cell { display:flex; flex-direction:column; gap:2px; min-width:0; padding:.3rem .4rem; background:rgba(80,100,140,.1); }
+.lf-reg-cell b { color:#89b9e8; font-size:.65rem; }
+.lf-reg-cell code { color:#d3d8e4; font-size:.63rem; overflow-wrap:anywhere; }
+@media (max-width: 720px) {
+    .lf-accepted-meta { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .lf-cr-grid, .lf-dr-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+
 .fault-dialog {
     min-width: 480px;
     max-width: 680px;

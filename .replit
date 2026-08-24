@@ -874,7 +874,7 @@ args = "node simulator/test_hex_tab_fill_path.js"
 outputType = "console"
 
 [deployment]
-deploymentTarget = "autoscale"
+deploymentTarget = "vm"
 run = ["gunicorn", "--bind", "0.0.0.0:23636", "--workers", "1", "--threads", "8", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "server.app:app"]
 build = ["bash", "-lc", "pip install -r requirements.txt && pnpm install --frozen-lockfile && pnpm --filter @workspace/church-machine-ide-introduction run build:production"]
 
@@ -962,3 +962,14 @@ args = "python -m pytest tests/server/test_docs_artifact_links.py -v"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "wukong-relay-deployment-guard"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python -m pytest tests/server/test_primary_publish_config.py -v"

@@ -520,6 +520,36 @@ assert('T6e: hw disconnected + sim not booted → RESET',
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────
+// ── T10: durable Last Accepted Fault display contract ─────────────────────────
+{
+    const requiredIds = [
+        'lastFaultHost', 'last-fault-panel-header', 'lf-state-pending',
+        'lf-state-rejected', 'lf-state-unavailable', 'CR0–CR15', 'DR0–DR15'
+    ];
+    for (const marker of requiredIds) {
+        assert('T10: production source contains ' + marker,
+            appRunSrc.indexOf(marker) !== -1 || fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8').indexOf(marker) !== -1 ||
+            fs.readFileSync(path.join(__dirname, 'styles-fault.css'), 'utf8').indexOf(marker) !== -1,
+            'missing marker');
+    }
+    const durableFields = [
+        'incident_id', 'correlation_status', 'promotion_status', 'recovery_authorized',
+        'crc_valid', 'crc16', 'stored_cr12_gt', 'stored_packed_pc', 'stored_mflag',
+        'thread_base', 'sto'
+    ];
+    for (const field of durableFields) {
+        assert('T10: renders durable field ' + field,
+            appRunSrc.indexOf(field) !== -1 || fs.readFileSync(path.join(__dirname, '..', 'server', 'fpga_status.html'), 'utf8').indexOf(field) !== -1,
+            'missing field');
+    }
+    assert('T10: fixed sixteen-register loops are present',
+        /i\s*<\s*16/.test(appRunSrc) && /j\s*<\s*16/.test(appRunSrc),
+        'register loops missing');
+    assert('T10: bounded retry schedule is explicit',
+        appRunSrc.indexOf('[0, 250, 500, 1000, 2000]') !== -1,
+        'retry schedule missing');
+}
+
 console.log('');
 console.log((passed + failed) + ' tests: ' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);

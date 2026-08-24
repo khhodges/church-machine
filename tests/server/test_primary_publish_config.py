@@ -29,11 +29,21 @@ def test_introduction_artifact_cannot_replace_production_root():
         )
 
 
-def test_root_publish_runs_ide_and_builds_introduction():
+def test_root_publish_uses_an_always_on_vm_for_stateful_wukong_relay():
+    """Prevent process-local Wukong incident state from being republished on Autoscale.
+
+    The relay intentionally keeps its command queue, bridge timeline, fault
+    correlation records, and Last Accepted Fault in process memory. Autoscale
+    instances neither share that state nor guarantee a continuously live
+    process, so changing this target back would make fault recovery unsafe.
+    """
     config = tomllib.loads((ROOT / ".replit").read_text(encoding="utf-8"))
     deployment = config["deployment"]
 
-    assert deployment["deploymentTarget"] == "autoscale"
+    assert deployment["deploymentTarget"] == "vm", (
+        "The process-local Wukong relay requires a single always-on VM. "
+        "Implement shared durable coordination before using Autoscale."
+    )
     assert "server.app:app" in deployment["run"]
 
     build_text = " ".join(deployment["build"])

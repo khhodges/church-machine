@@ -1328,6 +1328,18 @@ class ChurchWukongXC7A100T(Elaboratable):
         snap_thread_packed_pc = Signal(32)
         snap_thread_mflag = Signal(32)
         snap_reason = Signal(2)
+        snap_nia = Signal(32)
+        snap_flags_latched = Signal(4)
+        snap_m_flag_latched = Signal()
+        snap_thread_base = Signal(32)
+        snap_cr_words = [
+            [Signal(32, name=f"snap_cr{cr_idx}_w{word_idx}")
+             for word_idx in range(3)]
+            for cr_idx in range(16)
+        ]
+        snap_dr_words = [
+            Signal(32, name=f"snap_dr{dr_idx}") for dr_idx in range(16)
+        ]
         snap_mem_addr = Signal(14)
         snap_payload_idx = Signal(9)
 
@@ -1357,29 +1369,28 @@ class ChurchWukongXC7A100T(Elaboratable):
         def _be_bytes(word):
             return [word[24:32], word[16:24], word[8:16], word[0:8]]
 
-        snap_flags = Cat(
+        live_snap_flags = Cat(
             core.flags.V, core.flags.C, core.flags.Z, core.flags.N, C(0, 4))
         snap_words = [
-            core.nia, snap_sto,
-            core.debug_cr_words[12][1],
+            snap_nia, snap_sto,
+            snap_thread_base,
             snap_thread_cr12_gt,
             snap_thread_packed_pc,
             snap_thread_mflag,
         ]
         snap_payload_bytes = [
             Cat(snap_reason, C(0, 6)),
-            snap_flags,
-            Cat(core.debug_m_flag, C(0, 7)),
+            Cat(snap_flags_latched, C(0, 4)),
+            Cat(snap_m_flag_latched, C(0, 7)),
             C(0, 8),
         ]
         for word in snap_words:
             snap_payload_bytes += _be_bytes(word)
         for cr_idx in range(16):
             for word_idx in range(3):
-                snap_payload_bytes += _be_bytes(
-                    core.debug_cr_words[cr_idx][word_idx])
+                snap_payload_bytes += _be_bytes(snap_cr_words[cr_idx][word_idx])
         for dr_idx in range(16):
-            snap_payload_bytes += _be_bytes(core.debug_dr_words[dr_idx])
+            snap_payload_bytes += _be_bytes(snap_dr_words[dr_idx])
         snap_payload_array = Array(snap_payload_bytes)
 
         m.d.comb += [
@@ -1399,37 +1410,48 @@ class ChurchWukongXC7A100T(Elaboratable):
                         snapshot_busy.eq(1),
                         snapshot_seq.eq(snap_seq_next),
                         snap_reason.eq(snapshot_reason),
+                        snap_nia.eq(core.nia),
+                        snap_flags_latched.eq(live_snap_flags[:4]),
+                        snap_m_flag_latched.eq(core.debug_m_flag),
+                        snap_thread_base.eq(core.debug_cr_words[12][1]),
                         snap_bidx.eq(0),
                         snap_crc.eq(snap_header_crc),
                     ]
+                    for cr_idx in range(16):
+                        for word_idx in range(3):
+                            m.d.sync += snap_cr_words[cr_idx][word_idx].eq(
+                                core.debug_cr_words[cr_idx][word_idx])
+                    for dr_idx in range(16):
+                        m.d.sync += snap_dr_words[dr_idx].eq(
+                            core.debug_dr_words[dr_idx])
                     m.next = "READ_THREAD_CR12"
 
             # DMEM is synchronous: each READ state presents an address and
             # its WAIT state latches the returned word.
             with m.State("READ_THREAD_CR12"):
                 m.d.comb += snap_mem_addr.eq(
-                    (core.debug_cr_words[12][1] >> 2) + 256)
+                    (snap_thread_base >> 2) + 256)
                 m.next = "WAIT_THREAD_CR12"
             with m.State("WAIT_THREAD_CR12"):
                 m.d.sync += snap_thread_cr12_gt.eq(snapshot_mem_rd.data)
                 m.next = "READ_STO"
             with m.State("READ_STO"):
                 m.d.comb += snap_mem_addr.eq(
-                    (core.debug_cr_words[5][1] >> 2))
+                    (snap_cr_words[5][1] >> 2))
                 m.next = "WAIT_STO"
             with m.State("WAIT_STO"):
                 m.d.sync += snap_sto.eq(snapshot_mem_rd.data)
                 m.next = "READ_PACKED_PC"
             with m.State("READ_PACKED_PC"):
                 m.d.comb += snap_mem_addr.eq(
-                    (core.debug_cr_words[12][1] >> 2) + 17)
+                    (snap_thread_base >> 2) + 17)
                 m.next = "WAIT_PACKED_PC"
             with m.State("WAIT_PACKED_PC"):
                 m.d.sync += snap_thread_packed_pc.eq(snapshot_mem_rd.data)
                 m.next = "READ_THREAD_M"
             with m.State("READ_THREAD_M"):
                 m.d.comb += snap_mem_addr.eq(
-                    (core.debug_cr_words[12][1] >> 2) + 18)
+                    (snap_thread_base >> 2) + 18)
                 m.next = "WAIT_THREAD_M"
             with m.State("WAIT_THREAD_M"):
                 m.d.sync += snap_thread_mflag.eq(snapshot_mem_rd.data)

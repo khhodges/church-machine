@@ -17816,6 +17816,68 @@ function _wukongSyncFaultDisasmPanel(faultValid, niaInt) {
 
 let _lastFaultSnapshotData  = null;   // Most-recent snapshot received
 let _lastFaultSnapshotDismissed = false; // True after user clicks Dismiss
+let _lastFaultFetchTimer = null;
+let _lastFaultFetchGeneration = 0;
+
+function _lastFaultHex(v) {
+    if (v === null || v === undefined || v === '') return 'UNAVAILABLE';
+    return '0x' + ((Number(v) >>> 0).toString(16).toUpperCase().padStart(8, '0'));
+}
+
+function _lastFaultValue(v) {
+    return (v === null || v === undefined) ? 'UNAVAILABLE' : String(v);
+}
+
+function _renderLastAcceptedFaultState(state, detail) {
+    var host = document.getElementById('lastFaultHost');
+    if (!host) return;
+    var labels = { pending: 'PENDING', rejected: 'REJECTED', unavailable: 'UNAVAILABLE' };
+    host.className = 'last-fault-host lf-state-' + state;
+    host.innerHTML = '<div class="last-fault-panel-header"><span>Last Accepted Fault</span><strong>' +
+        (labels[state] || 'UNAVAILABLE') + '</strong></div><div class="last-fault-state-detail">' +
+        _escHtml(detail || 'No durable accepted record.') + '</div>';
+}
+
+function _renderAcceptedLastFault(snap) {
+    var host = document.getElementById('lastFaultHost');
+    if (!host) return;
+    var cr = Array.isArray(snap.cr) ? snap.cr : [];
+    var dr = Array.isArray(snap.dr) ? snap.dr : [];
+    var flags = snap.flags && typeof snap.flags === 'object'
+        ? ['N','Z','C','V'].map(function(k) { return k + '=' + (snap.flags[k] ? 1 : 0); }).join(' ')
+        : _lastFaultValue(snap.flags);
+    var fields = [
+        ['Fault', snap.fault_message || ('Code ' + _lastFaultValue(snap.fault_code))],
+        ['Source', snap.source],
+        ['Abstraction', snap.abstraction_label],
+        ['Incident', snap.incident_id], ['Correlation', snap.correlation_status],
+        ['Promotion', snap.promotion_status],
+        ['Recovery', snap.recovery_authorized ? 'AUTHORIZED' : 'BLOCKED'],
+        ['CRC', snap.crc_valid === true ? 'VALID ' + _lastFaultValue(snap.crc16) : (snap.crc_valid === false ? 'INVALID' : 'UNAVAILABLE')],
+        ['NIA', _lastFaultHex(snap.nia)], ['Flags', flags],
+        ['Stored CR12 GT', _lastFaultHex(snap.stored_cr12_gt)],
+        ['Stored packed PC', _lastFaultHex(snap.stored_packed_pc)],
+        ['Stored MFLAG', _lastFaultHex(snap.stored_mflag)],
+        ['Thread base', _lastFaultHex(snap.thread_base)], ['STO', snap.sto]
+    ];
+    var rows = fields.map(function(pair) {
+        return '<div class="lf-row"><span class="lf-label">' + _escHtml(pair[0]) +
+            '</span><span class="lf-value">' + _escHtml(_lastFaultValue(pair[1])) + '</span></div>';
+    }).join('');
+    var crHtml = '<div class="lf-register-block"><h4>Capability Registers CR0–CR15</h4><div class="lf-cr-grid">';
+    for (var i = 0; i < 16; i++) {
+        var c = Array.isArray(cr[i]) ? cr[i] : [];
+        crHtml += '<div class="lf-reg-cell"><b>CR' + i + '</b><code>' +
+            _lastFaultHex(c[0]) + ' / ' + _lastFaultHex(c[1]) + ' / ' + _lastFaultHex(c[2]) + '</code></div>';
+    }
+    crHtml += '</div></div><div class="lf-register-block"><h4>Data Registers DR0–DR15</h4><div class="lf-dr-grid">';
+    for (var j = 0; j < 16; j++) {
+        crHtml += '<div class="lf-reg-cell"><b>DR' + j + '</b><code>' + _lastFaultHex(dr[j]) + '</code></div>';
+    }
+    host.className = 'last-fault-host lf-state-accepted';
+    host.innerHTML = '<div class="last-fault-panel-header"><span>Last Accepted Fault</span><strong>ACCEPTED — durable record</strong></div>' +
+        '<div class="lf-accepted-meta">' + rows + '</div>' + crHtml + '</div></div>';
+}
 
 /**
  * Build the CR/DR table HTML from a fault snapshot object.
@@ -17918,7 +17980,8 @@ function _faultBadgeClick() {
     if (typeof switchView === 'function') switchView('editor');
     // Scroll after a short delay so the view transition has completed.
     setTimeout(function() {
-        var panel = document.getElementById('last-fault-panel');
+        var panel = document.getElementById('lastFaultHost') ||
+            document.getElementById('last-fault-panel');
         if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, 80);
 }
@@ -17929,6 +17992,11 @@ function _faultBadgeClick() {
 function _hideLastFaultPanel(clearState) {
     var panel = document.getElementById('last-fault-panel');
     if (panel) panel.remove();
+    var host = document.getElementById('lastFaultHost');
+    if (host) {
+        host.className = 'last-fault-host';
+        host.innerHTML = '';
+    }
     if (clearState) {
         _lastFaultSnapshotData = null;
         _lastFaultSnapshotDismissed = false;
@@ -17945,10 +18013,22 @@ function _hideLastFaultPanel(clearState) {
  */
 function _showLastFaultPanel(snap) {
     if (_lastFaultSnapshotDismissed) return;
-    var con = document.getElementById('editorConsole');
+    var con = document.getElementById('lastFaultHost') || document.getElementById('editorConsole');
     if (!con || !con.parentNode) return;
 
     _lastFaultSnapshotData = snap;
+    if (con.id === 'lastFaultHost') {
+        var localSnap = Object.assign({
+            incident_id: 'local-capture-pending-server',
+            correlation_status: 'local simulator capture',
+            promotion_status: 'pending server storage',
+            recovery_authorized: false,
+            crc_valid: null
+        }, snap);
+        _renderAcceptedLastFault(localSnap);
+        _updateFaultToolbarBadge();
+        return;
+    }
 
     // Remove any previous instance before re-rendering.
     var prev = document.getElementById('last-fault-panel');
@@ -17960,7 +18040,7 @@ function _showLastFaultPanel(snap) {
 
     var header = document.createElement('div');
     header.className = 'last-fault-panel-header';
-    header.innerHTML = '<span>\u26A0 Last Fault</span>';
+    header.innerHTML = '<span>Last Accepted Fault</span>';
 
     var dismiss = document.createElement('button');
     dismiss.textContent = 'Dismiss';
@@ -17988,14 +18068,33 @@ function _showLastFaultPanel(snap) {
  */
 function _fetchAndShowLastFaultPanel() {
     if (_lastFaultSnapshotDismissed) return;
-    fetch('/api/fault-snapshot')
-        .then(function(r) { return r.ok ? r.json() : null; })
-        .then(function(snap) {
-            if (snap && snap.fault_message !== undefined) {
-                _showLastFaultPanel(snap);
+    var generation = ++_lastFaultFetchGeneration;
+    var delays = [0, 250, 500, 1000, 2000];
+    function attempt(index) {
+        if (generation !== _lastFaultFetchGeneration) return;
+        fetch('/api/fault-snapshot', { cache: 'no-store' }).then(function(r) {
+            return r.json().then(function(body) { return { ok: r.ok, body: body || {} }; });
+        }).then(function(result) {
+            var body = result.body;
+            var state = body.display_state || (result.ok && body.incident_id ? 'accepted' : 'unavailable');
+            if (state === 'accepted' && body.incident_id) {
+                _lastFaultSnapshotData = body;
+                _renderAcceptedLastFault(body);
+            } else {
+                _renderLastAcceptedFaultState(state, body.reason || body.decision || 'No durable accepted record.');
             }
-        })
-        .catch(function() {});
+            if (state === 'pending' && index < delays.length - 1) {
+                _lastFaultFetchTimer = setTimeout(function() { attempt(index + 1); }, delays[index + 1]);
+            }
+        }).catch(function() {
+            if (index < delays.length - 1) {
+                _lastFaultFetchTimer = setTimeout(function() { attempt(index + 1); }, delays[index + 1]);
+            } else {
+                _renderLastAcceptedFaultState('unavailable', 'Lookup failed after bounded retry.');
+            }
+        });
+    }
+    attempt(0);
 }
 
 /**

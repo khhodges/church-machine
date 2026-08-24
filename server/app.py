@@ -12173,6 +12173,14 @@ _WUKONG_EVENT_QUEUE_MAXLEN = 2048
 # the client can display and resync accurate depth even after a queue overflow gap
 # or server restart without needing to replay lost intermediate events.
 _wukong_call_depth     = 0
+_wukong_fault_incidents = {}       # incident_id -> bounded correlation record
+_WUKONG_FAULT_INCIDENT_MAXLEN = 128
+_WUKONG_FAULT_INCIDENT_TTL = 600.0
+_wukong_fault_candidate = {
+    'state': 'unavailable',
+    'decision': 'missing_trace',
+    'incident_id': '',
+}
 # Heartbeat timestamps for the /fpga status page (time.time() floats).
 #   _wukong_last_bridge_poll — updated on every bridge GET /hardware/wukong/command
 #   _wukong_last_trace_post  — updated on every bridge POST /hardware/wukong/trace
@@ -12300,6 +12308,28 @@ def _wukong_fault_name(code):
         27: 'IMMUTABLE_SELF_CAP', 28: 'STRUCTURAL_REG',
     }
     return names.get(int(code or 0), 'FAULT_%s' % int(code or 0))
+
+
+def _wukong_payload_digest(payload):
+    """Return a stable digest used to make bridge retries idempotent."""
+    import hashlib as _wk_hashlib
+    canonical = json.dumps(payload, sort_keys=True, separators=(',', ':'),
+                           ensure_ascii=True)
+    return _wk_hashlib.sha256(canonical.encode('utf-8')).hexdigest()
+
+
+def _trim_wukong_fault_incidents_locked(now=None):
+    """Expire old correlations and retain a small retry/deduplication window."""
+    now = float(now if now is not None else _wk_time.time())
+    expired = [
+        incident_id for incident_id, item in _wukong_fault_incidents.items()
+        if now - float(item.get('created_ts', now)) > _WUKONG_FAULT_INCIDENT_TTL
+    ]
+    for incident_id in expired:
+        _wukong_fault_incidents.pop(incident_id, None)
+    while len(_wukong_fault_incidents) > _WUKONG_FAULT_INCIDENT_MAXLEN:
+        oldest = next(iter(_wukong_fault_incidents))
+        _wukong_fault_incidents.pop(oldest, None)
 
 
 @app.route('/hardware/wukong/bridge-status', methods=['POST'])
@@ -12586,6 +12616,18 @@ def _promote_wukong_fault_snapshot(snapshot, trace):
         'snapshot_complete': True,
         'snapshot_reason':   int(snapshot['reason']),
         'snapshot_seq':      int(snapshot['seq']),
+        'incident_id':       str(snapshot.get('incident_id', '') or ''),
+        'bridge_session':    str(snapshot.get('bridge_session', '') or ''),
+        'server_boot_id':     str(snapshot.get('fault_boot_id', '') or ''),
+        'fault_trace_seq':    int(snapshot.get('fault_trace_seq', 0) or 0),
+        'correlation_status': 'correlated',
+        'promotion_status':   'promoted',
+        'recovery_authorized': False,
+        'crc_valid':          bool(snapshot.get('crc_valid', False)),
+        'crc16':              int(snapshot.get('crc16', 0)) & 0xFFFF,
+        'integrity':          str(snapshot.get('integrity', '') or ''),
+        'sto':                int(snapshot.get('sto', 0)),
+        'thread_base':        int(snapshot.get('thread_base', 0)),
         'cr':                [list(row) for row in snapshot['cr']],
         'dr':                list(snapshot['dr']),
         'stored_cr12_gt':    int(snapshot['stored_cr12_gt']),
@@ -12619,6 +12661,8 @@ def fault_snapshot_post():
     global _fault_snapshot
     data = request.get_json(silent=True) or {}
     import time as _ft_time
+    source = str(data.get('source', 'simulator'))
+    simulator_snapshot = source == 'simulator'
     entry = {
         'fault_code':        int(data.get('fault_code', 0)),
         'fault_message':     str(data.get('fault_message', '') or ''),
@@ -12630,9 +12674,29 @@ def fault_snapshot_post():
         'abstraction_label': str(data.get('abstraction_label', '') or ''),
         'abstraction_slot':  (int(data['abstraction_slot'])
                               if data.get('abstraction_slot') is not None else None),
-        'source':            str(data.get('source', 'simulator')),
+        'source':            source,
         'ts':                float(data.get('ts', _ft_time.time())),
-        'snapshot_complete': bool(data.get('snapshot_complete', False)),
+        'snapshot_complete': bool(
+            data.get('snapshot_complete', simulator_snapshot)),
+        'incident_id':       str(data.get('incident_id') or
+                                 ('simulator-' + uuid.uuid4().hex
+                                  if simulator_snapshot else '')),
+        'bridge_session':    str(data.get('bridge_session', '') or ''),
+        'correlation_status': str(data.get(
+            'correlation_status',
+            'local simulator capture' if simulator_snapshot else 'pending')),
+        'promotion_status': str(data.get(
+            'promotion_status',
+            'stored' if simulator_snapshot else 'pending')),
+        'recovery_authorized': bool(data.get('recovery_authorized', False)),
+        'crc_valid': data.get('crc_valid'),
+        'crc16': data.get('crc16'),
+        'integrity': str(data.get('integrity', '') or ''),
+        'sto': data.get('sto'),
+        'thread_base': data.get('thread_base'),
+        'stored_cr12_gt': data.get('stored_cr12_gt'),
+        'stored_packed_pc': data.get('stored_packed_pc'),
+        'stored_mflag': data.get('stored_mflag'),
     }
     # CR registers: accept either 16×[w0,w1,w2] list or absence (store null rows).
     raw_cr = data.get('cr')
@@ -12671,11 +12735,22 @@ def fault_snapshot_post():
 
 @app.route('/api/fault-snapshot', methods=['GET'])
 def fault_snapshot_get():
-    """Return the most recent fault snapshot, or 404 if none recorded."""
+    """Return the accepted fault or an explicit pending/rejected/unavailable state."""
+    with _wukong_trace_lock:
+        candidate = dict(_wukong_fault_candidate)
     with _fault_snapshot_lock:
-        snap = _fault_snapshot
+        snap = dict(_fault_snapshot) if isinstance(_fault_snapshot, dict) else None
     if snap is None:
-        return jsonify({'ok': False, 'error': 'no fault snapshot'}), 404
+        state = candidate.get('state') or 'unavailable'
+        return jsonify({
+            'ok': False,
+            'display_state': state,
+            'decision': candidate.get('decision') or 'missing_trace',
+            'reason': candidate.get('reason') or 'No durable accepted fault record.',
+            'incident_id': candidate.get('incident_id') or '',
+        })
+    snap['display_state'] = 'accepted'
+    snap['candidate'] = candidate
     return jsonify(snap)
 
 
@@ -12707,7 +12782,8 @@ def wukong_trace_post():
         ts          — float timestamp
     """
     global _wukong_latest_trace, _wukong_latest_cr_gts, _wukong_event_seq, \
-           _wukong_call_depth, _wukong_last_trace_post, _wukong_total_trace_posts
+           _wukong_call_depth, _wukong_last_trace_post, _wukong_total_trace_posts, \
+           _wukong_fault_candidate
     _wukong_last_trace_post    = _wk_time.time()
     _wukong_total_trace_posts += 1
     data = request.get_json(silent=True) or {}
@@ -12725,6 +12801,24 @@ def wukong_trace_post():
         'bp_hit':      bool(data.get('bp_hit', False)),
         'ts':          float(data.get('ts', 0.0)),
     }
+    incident_id = str(data.get('incident_id', '') or '')
+    bridge_session = str(data.get('bridge_session', '') or '')
+    if incident_id:
+        if len(incident_id) > 80 or len(incident_id) < 16 or \
+                not all(ch.isalnum() or ch in '-_' for ch in incident_id):
+            return jsonify({
+                'ok': False, 'accepted': False,
+                'decision': 'incident_mismatch',
+                'reason': 'invalid incident id',
+            }), 400
+        if not bridge_session or len(bridge_session) > 128:
+            return jsonify({
+                'ok': False, 'accepted': False,
+                'decision': 'incident_mismatch',
+                'reason': 'missing or invalid bridge session',
+            }), 400
+        entry['incident_id'] = incident_id
+        entry['bridge_session'] = bridge_session
     # The packet format intentionally remains backward-compatible.  Prefer
     # metadata supplied by a newer bridge, but derive it server-side as well
     # for old bridges that only POST the original packet fields.
@@ -12736,7 +12830,36 @@ def wukong_trace_post():
     if not location:
         location = _wukong_trace_metadata(entry['nia']) or {}
     entry.update(location)
+    trace_digest = _wukong_payload_digest({
+        key: entry[key] for key in sorted(entry)
+        if key not in ('call_depth', 'seq')
+    })
     with _wukong_trace_lock:
+        _trim_wukong_fault_incidents_locked()
+        existing_incident = _wukong_fault_incidents.get(incident_id) if incident_id else None
+        if existing_incident is not None:
+            if existing_incident.get('bridge_session') != bridge_session or \
+                    existing_incident.get('trace_digest') != trace_digest:
+                _wukong_fault_candidate = {
+                    'state': 'rejected', 'decision': 'incident_mismatch',
+                    'incident_id': incident_id,
+                    'reason': 'incident id was reused with different trace data',
+                }
+                app.logger.warning(
+                    'Wukong fault incident %s rejected: incident mismatch', incident_id)
+                return jsonify({
+                    'ok': False, 'accepted': False,
+                    'decision': 'incident_mismatch',
+                    'incident_id': incident_id,
+                }), 409
+            return jsonify({
+                'ok': True, 'accepted': True, 'duplicate': True,
+                'decision': 'duplicate',
+                'incident_id': incident_id,
+                'seq': existing_incident['trace_seq'],
+                'boot_id': existing_incident['server_boot_id'],
+            })
+
         # Update authoritative call depth BEFORE assigning seq so that
         # entry['call_depth'] reflects the state AFTER this event is applied.
         if ev_type == 0x08:    # TRACE_EV_CALL_PUSH
@@ -12759,7 +12882,29 @@ def wukong_trace_post():
             _wukong_latest_cr_gts[6]  = payload_gt
         elif ev_type == 0x07:  # TRACE_EV_CALL_CR14
             _wukong_latest_cr_gts[14] = payload_gt
-    return jsonify({'ok': True, 'seq': entry['seq'], 'boot_id': BOOT_ID})
+        if incident_id and entry['fault_valid']:
+            _wukong_fault_incidents[incident_id] = {
+                'incident_id': incident_id,
+                'bridge_session': bridge_session,
+                'trace_digest': trace_digest,
+                'trace': dict(entry),
+                'trace_seq': entry['seq'],
+                'server_boot_id': BOOT_ID,
+                'created_ts': _wk_time.time(),
+                'state': 'pending',
+            }
+            _wukong_fault_candidate = {
+                'state': 'pending', 'decision': 'missing_trace',
+                'incident_id': incident_id,
+                'reason': 'fault trace accepted; complete reason-2 snapshot pending',
+            }
+            _trim_wukong_fault_incidents_locked()
+    decision = 'trace_accepted' if incident_id else 'accepted'
+    return jsonify({
+        'ok': True, 'accepted': True, 'duplicate': False,
+        'decision': decision, 'incident_id': incident_id,
+        'seq': entry['seq'], 'boot_id': BOOT_ID,
+    })
 
 
 @app.route('/hardware/wukong/snapshot', methods=['POST'])
@@ -12772,7 +12917,8 @@ def wukong_snapshot_post():
     order.
     """
     global _wukong_latest_snapshot, _wukong_event_seq, \
-        _wukong_last_trace_post, _wukong_total_trace_posts
+        _wukong_last_trace_post, _wukong_total_trace_posts, \
+        _wukong_fault_candidate
     data = request.get_json(silent=True) or {}
     try:
         cr = data.get('cr')
@@ -12795,39 +12941,195 @@ def wukong_snapshot_post():
         entry['m_flag'] = bool(data.get('m_flag', False))
         entry['crc16'] = int(data.get('crc16', 0)) & 0xFFFF
         entry['ts'] = float(data.get('ts', 0.0))
-        entry['crc_valid'] = bool(data.get('crc_valid', True))
-        entry['integrity'] = str(data.get('integrity', 'CRC16 verified'))
+        # A fault-recovery snapshot must explicitly carry the bridge's wire
+        # CRC verdict.  Do not infer success from a missing field: a retried
+        # or hand-crafted reason-2 payload without this evidence must remain
+        # fail-closed below.
+        entry['crc_valid'] = data.get('crc_valid')
+        entry['integrity'] = str(data.get('integrity', ''))
     except (KeyError, TypeError, ValueError, OverflowError) as exc:
-        return jsonify({'ok': False, 'error': f'invalid snapshot: {exc}'}), 400
+        return jsonify({
+            'ok': False, 'accepted': False, 'promoted': False,
+            'decision': 'invalid_snapshot',
+            'reason': f'invalid snapshot: {exc}',
+        }), 400
 
     _wukong_last_trace_post = _wk_time.time()
     _wukong_total_trace_posts += 1
+    incident_id = str(data.get('incident_id', '') or '')
+    bridge_session = str(data.get('bridge_session', '') or '')
+    fault_boot_id = str(data.get('fault_boot_id', '') or '')
+    try:
+        fault_trace_seq = int(data.get('fault_trace_seq', 0))
+    except (TypeError, ValueError):
+        fault_trace_seq = 0
+    entry.update({
+        'incident_id': incident_id,
+        'bridge_session': bridge_session,
+        'fault_boot_id': fault_boot_id,
+        'fault_trace_seq': fault_trace_seq,
+    })
+    snapshot_digest = _wukong_payload_digest(data)
+
     with _wukong_trace_lock:
+        _trim_wukong_fault_incidents_locked()
+        if entry['reason'] == 2:
+            incident = _wukong_fault_incidents.get(incident_id)
+            if incident is None:
+                if fault_boot_id and fault_boot_id != BOOT_ID:
+                    decision, status = 'server_generation_changed', 409
+                    reason = 'snapshot belongs to a prior server generation'
+                else:
+                    decision, status = 'missing_trace', 409
+                    reason = 'no accepted fault trace exists for this incident'
+            elif not fault_boot_id or fault_boot_id != BOOT_ID:
+                decision, status = 'server_generation_changed', 409
+                reason = 'snapshot is missing the accepted server generation'
+            elif incident.get('server_boot_id') != fault_boot_id:
+                decision, status = 'server_generation_changed', 409
+                reason = 'server generation changed after the fault trace'
+            elif incident.get('bridge_session') != bridge_session or \
+                    incident.get('trace_seq') != fault_trace_seq:
+                decision, status = 'incident_mismatch', 409
+                reason = 'snapshot correlation does not match the accepted trace'
+            elif incident.get('state') == 'promoted':
+                if incident.get('snapshot_digest') == snapshot_digest:
+                    return jsonify({
+                        'ok': True, 'accepted': True, 'promoted': True,
+                        'duplicate': True, 'decision': 'duplicate',
+                        'incident_id': incident_id,
+                        'seq': incident.get('snapshot_event_seq'),
+                    })
+                decision, status = 'incident_mismatch', 409
+                reason = 'incident id was reused with different snapshot data'
+            elif entry['crc_valid'] is not True:
+                decision, status = 'invalid_snapshot', 400
+                reason = 'snapshot lacks an explicit valid CRC verdict'
+            else:
+                trace = incident.get('trace') or {}
+                same_nia = int(trace.get('nia', -1)) == int(entry['nia'])
+                same_flags = (int(trace.get('flags', -1)) & 0x0F) == \
+                    (int(entry['flags']) & 0x0F)
+                if not same_nia or not same_flags:
+                    decision, status = 'invalid_snapshot', 400
+                    reason = 'snapshot does not contain the correlated fault-time NIA/flags'
+                else:
+                    decision = status = reason = None
+
+            if decision is not None:
+                _wukong_fault_candidate = {
+                    'state': 'rejected', 'decision': decision,
+                    'incident_id': incident_id, 'reason': reason,
+                }
+                app.logger.warning(
+                    'Wukong fault incident %s snapshot rejected: %s (%s)',
+                    incident_id or '<missing>', decision, reason)
+                return jsonify({
+                    'ok': False, 'accepted': False, 'promoted': False,
+                    'decision': decision, 'incident_id': incident_id,
+                    'reason': reason,
+                }), status
+
         _wukong_event_seq += 1
         entry['seq'] = _wukong_event_seq
         _wukong_event_queue.append(entry)
         if len(_wukong_event_queue) > _WUKONG_EVENT_QUEUE_MAXLEN:
             del _wukong_event_queue[:-_WUKONG_EVENT_QUEUE_MAXLEN]
+        promoted = False
+        if entry['reason'] == 2:
+            incident = _wukong_fault_incidents[incident_id]
+            promoted = _promote_wukong_fault_snapshot(entry, incident['trace'])
+            if promoted:
+                entry['correlation_status'] = 'correlated'
+                entry['promotion_status'] = 'promoted'
+                incident.update({
+                    'state': 'promoted',
+                    'snapshot_digest': snapshot_digest,
+                    'snapshot_event_seq': entry['seq'],
+                })
+                _wukong_fault_candidate = {
+                    'state': 'accepted', 'decision': 'promoted',
+                    'incident_id': incident_id,
+                    'reason': 'complete fault-time snapshot durably promoted',
+                }
         _wukong_latest_snapshot = dict(entry)
-        # The bridge posts this id only after the corresponding fault trace
-        # was accepted.  Resolve it from the ordered queue rather than using
-        # global "latest" state, which can legitimately advance before this
-        # snapshot arrives.
-        try:
-            fault_trace_seq = int(data.get('fault_trace_seq', 0))
-        except (TypeError, ValueError):
-            fault_trace_seq = 0
-        fault_boot_id = str(data.get('fault_boot_id', '') or '')
-        correlated_trace = None
-        if fault_boot_id == BOOT_ID:
-            correlated_trace = next(
-                (event for event in _wukong_event_queue
-                 if event.get('seq') == fault_trace_seq and event.get('fault_valid')),
-                None)
-    promoted = False
-    if entry['reason'] == 2 and correlated_trace is not None:
-        promoted = _promote_wukong_fault_snapshot(entry, correlated_trace)
-    return jsonify({'ok': True, 'seq': entry['seq'], 'promoted': promoted})
+    decision = 'promoted' if promoted else 'not_fault_snapshot'
+    app.logger.info(
+        'Wukong snapshot incident=%s decision=%s promoted=%s',
+        incident_id or '<none>', decision, promoted)
+    return jsonify({
+        'ok': True, 'accepted': True, 'seq': entry['seq'],
+        'incident_id': incident_id, 'promoted': promoted,
+        'duplicate': False, 'decision': decision,
+    })
+
+
+@app.route('/hardware/wukong/recovery-authorization', methods=['POST'])
+def wukong_recovery_authorization_post():
+    """Record the exact promoted incident for which the bridge wrote ``g``."""
+    global _wukong_event_seq, _wukong_fault_candidate, _fault_snapshot
+    data = request.get_json(silent=True) or {}
+    incident_id = str(data.get('incident_id', '') or '')
+    bridge_session = str(data.get('bridge_session', '') or '')
+    authorization_id = str(data.get('authorization_id', '') or '')
+    if not authorization_id:
+        return jsonify({
+            'ok': False, 'accepted': False,
+            'decision': 'invalid_snapshot',
+            'reason': 'recovery authorization requires a stable authorization id',
+        }), 400
+    with _wukong_trace_lock:
+        incident = _wukong_fault_incidents.get(incident_id)
+        if incident is None or incident.get('state') != 'promoted':
+            return jsonify({
+                'ok': False, 'accepted': False,
+                'decision': 'missing_trace',
+                'reason': 'incident has not been promoted',
+            }), 409
+        if incident.get('bridge_session') != bridge_session:
+            return jsonify({
+                'ok': False, 'accepted': False,
+                'decision': 'incident_mismatch',
+            }), 409
+        if incident.get('authorization_id'):
+            if incident['authorization_id'] != authorization_id:
+                return jsonify({
+                    'ok': False, 'accepted': False,
+                    'decision': 'incident_mismatch',
+                }), 409
+            return jsonify({
+                'ok': True, 'accepted': True, 'duplicate': True,
+                'decision': 'duplicate', 'incident_id': incident_id,
+            })
+        incident['authorization_id'] = authorization_id
+        incident['recovery_authorized'] = True
+        _wukong_event_seq += 1
+        auth_event = {
+            'kind': 'info', 'event': 'recovery_authorized',
+            'state': 'authorized',
+            'reason': 'bridge wrote g after durable snapshot promotion',
+            'incident_id': incident_id, 'seq': _wukong_event_seq,
+            'ts': _wk_time.time(),
+        }
+        _wukong_event_queue.append(auth_event)
+        if len(_wukong_event_queue) > _WUKONG_EVENT_QUEUE_MAXLEN:
+            del _wukong_event_queue[:-_WUKONG_EVENT_QUEUE_MAXLEN]
+        _wukong_fault_candidate = {
+            'state': 'accepted', 'decision': 'recovery_authorized',
+            'incident_id': incident_id,
+            'reason': 'automatic recovery authorization was written to the board',
+        }
+        with _fault_snapshot_lock:
+            if isinstance(_fault_snapshot, dict) and \
+                    _fault_snapshot.get('incident_id') == incident_id:
+                _fault_snapshot = dict(_fault_snapshot)
+                _fault_snapshot['recovery_authorized'] = True
+                _fault_snapshot['recovery_authorization_id'] = authorization_id
+    app.logger.info('Wukong recovery authorized for incident %s', incident_id)
+    return jsonify({
+        'ok': True, 'accepted': True, 'duplicate': False,
+        'decision': 'recovery_authorized', 'incident_id': incident_id,
+    })
 
 
 @app.route('/hardware/wukong/trace', methods=['GET'])
@@ -13195,6 +13497,14 @@ def wukong_status_get():
         qlen      = len(_wukong_event_queue)
         depth     = _wukong_call_depth
         cr_gts    = dict(_wukong_latest_cr_gts)
+        fault_candidate = dict(_wukong_fault_candidate)
+    with _fault_snapshot_lock:
+        last_accepted_fault = (
+            dict(_fault_snapshot)
+            if isinstance(_fault_snapshot, dict) and
+            _fault_snapshot.get('snapshot_complete') is True
+            else None
+        )
     with _wukong_boot_info_lock:
         boot_info = dict(_wukong_boot_info)
     with _upload_in_flight_lock:
@@ -13232,6 +13542,8 @@ def wukong_status_get():
         # Latest validated architectural stop snapshot.  This is read-only
         # status data for dashboards; it does not mutate simulator state.
         'latest_snapshot':    snapshot,
+        'last_accepted_fault': last_accepted_fault,
+        'fault_candidate':     fault_candidate,
         'cr6_gt':             cr_gts.get(6),
         'cr14_gt':            cr_gts.get(14),
         'boot_info':          boot_info,
