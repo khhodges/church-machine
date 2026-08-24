@@ -43,6 +43,7 @@
 - [BRAM NUC_PROGRAM staleness trap](bram-nuc-program-staleness.md) — church_ti60_f225.v BRAM goes stale when boot_rom.py NUC_PROGRAM changes; regen or patch via gen_cm_dmem_direct.py
 - [Verilog/RTLIL regeneration procedure](verilog-regen-procedure.md) — 9 gen commands for all actively-synthesised targets; legacy-frozen files; builder tab visibility trap
 - [ChurchAssembler Node global shim](church-assembler-node-shim.md) — compileAssembly() checks typeof global; set global.ChurchAssembler before requiring CLOOMCCompiler in Node subprocesses
+- [CLOOMC source expression subset](cloomc-source-expression-subset.md) — split compound guards and nested expressions into single-op temporaries; use bfext/bfins for bitfield work
 - [app.py raw SQL pattern](app-py-raw-sql.md) — server/app.py has no sqlite3 import; all DB access must use db.session.execute(_sa_text(...)); never _sqlite3.connect()
 - [church_ti60f225 module name](church-module-name.md) — Amaranth/Yosys generates module church_ti60f225 (no underscore); top.v must instantiate without underscore or efx_map hard-crashes with bare STACK TRACE
 - [v2.0 hardware format audit](v2-format-audit.md) — cond codes ARM order (CS=2 not LT=2); Turing opcodes at 16-25 not 10-19; integrity32=ROL-XOR not CRC; g_bit is toggle not set/clear; simulator NS format incompatible with hardware WORD2_LAYOUT; stale-opcode .lump sweep pattern
