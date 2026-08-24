@@ -7593,6 +7593,120 @@ abstraction VlcTest {
         checkInlineVsCanonicalClomc(
             'EX-LCN-INLINE', 'lambda_church_numerals', 'lambda_church_numerals.cloomc');
 
+        // ── Lambda: EX-LCN-RUNTIME — ChurchNumerals compare_paths ───────────────
+        // Execute the generated method directly instead of dispatching through
+        // another ChurchNumerals method.  Lambda sibling-method application is
+        // intentionally unsupported, while compare_paths is defined entirely
+        // with local let-bound arithmetic and should therefore run independently.
+        {
+            const runtimeResult = new CLOOMCCompiler().compileLambda(
+                extractInlineFromCompile('lambda_church_numerals'));
+            const compareMethod = runtimeResult.methods &&
+                runtimeResult.methods.find(m => m.name === 'compare_paths');
+            const runtimeCodeBase = 0x200;
+            const runtimeMaxSteps = 200000;
+
+            function runLambdaMethod(method, args) {
+                if (!method || !method.code || method.code.length === 0) {
+                    return { error: 'compare_paths has no compiled code' };
+                }
+
+                const sim = new ChurchSimulator();
+                sim.bootComplete = true;
+                for (let i = 0; i < method.code.length; i++) {
+                    sim.memory[runtimeCodeBase + 1 + i] = method.code[i] >>> 0;
+                }
+
+                const cr14GT = sim.createGT(
+                    0, 3, { R: 1, W: 0, X: 1, L: 0, S: 0, E: 0 }, 1);
+                sim.cr[14] = {
+                    word0: cr14GT,
+                    word1: runtimeCodeBase,
+                    word2: 0,
+                    word3: 0,
+                    m: 0,
+                };
+
+                // Pure Lambda arithmetic only needs instruction-fetch
+                // capability validation; bypass the full boot namespace here.
+                sim.mLoad = function (gt) {
+                    if (!gt || ChurchSimulator.isNullGT(gt)) {
+                        return { ok: false, fault: 'NULL_CAP', message: 'null GT' };
+                    }
+                    return {
+                        ok: true,
+                        parsed: {
+                            index: 3,
+                            gt_seq: 0,
+                            permissions: { R: 1, X: 1 },
+                        },
+                        entry: {
+                            word0_location: runtimeCodeBase,
+                            word1_limit: runtimeCodeBase + 0x1000,
+                        },
+                        index: 3,
+                    };
+                };
+
+                sim.dr.fill(0);
+                for (let i = 0; i < args.length; i++) {
+                    sim.dr[1 + i] = args[i] | 0;
+                }
+                sim.pc = 0;
+                sim.halted = false;
+                sim.callStack.push({
+                    sentinel: false,
+                    sz: 1,
+                    returnPC: 0xFFF0,
+                    savedCRs: null,
+                    savedDRs: null,
+                    savedFlags: null,
+                });
+                const targetDepth = sim.callStack.length;
+
+                let steps = 0;
+                while (!sim.halted &&
+                       sim.callStack.length >= targetDepth &&
+                       steps < runtimeMaxSteps) {
+                    sim.step();
+                    steps++;
+                }
+                if (steps >= runtimeMaxSteps) {
+                    return { error: 'exceeded ' + runtimeMaxSteps + ' steps' };
+                }
+                if (sim.halted) {
+                    const fault = sim.faultLog && sim.faultLog.length
+                        ? sim.faultLog[sim.faultLog.length - 1].message
+                        : 'unknown';
+                    return { error: 'simulator halted: ' + fault, steps };
+                }
+                return { result: sim.dr[1] | 0, steps };
+            }
+
+            assert('EX-LCN-RUNTIME: compare_paths compiles without errors',
+                runtimeResult.errors.length === 0,
+                runtimeResult.errors.map(e => 'L' + e.line + ': ' + e.message).join('; '));
+            assert('EX-LCN-RUNTIME: compare_paths method is present',
+                !!compareMethod,
+                'method not found in generated output');
+
+            for (const [label, args] of [
+                ['zero inputs', [0, 0]],
+                ['zero plus positive', [0, 4]],
+                ['positive plus zero', [5, 0]],
+                ['mixed positive inputs', [2, 7]],
+                ['equal positive inputs', [6, 6]],
+            ]) {
+                const result = runLambdaMethod(compareMethod, args);
+                assert('EX-LCN-RUNTIME: compare_paths ' + label + ' runs without error',
+                    !result.error,
+                    result.error);
+                assert('EX-LCN-RUNTIME: compare_paths ' + label + ' returns 1',
+                    !result.error && result.result === 1,
+                    'got ' + result.result + ' in ' + result.steps + ' steps');
+            }
+        }
+
         // ── Lambda: EX-LFP-INLINE — FixedPoint ───────────────────────────────────
         checkInlineVsCanonicalClomc(
             'EX-LFP-INLINE', 'lambda_fixed_point', 'lambda_fixed_point.cloomc');
