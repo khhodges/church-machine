@@ -26,6 +26,17 @@
   .fault { color:#f87171; }
   .good  { color:#4ade80; }
   .dim   { color:#5a6b82; }
+  .bridge-alert-toast { position:fixed; right:20px; bottom:20px; z-index:1000;
+                        display:flex; align-items:flex-start; gap:12px; max-width:430px;
+                        padding:12px 14px; background:#241b0d; color:#fef3c7;
+                        border:1px solid #8a5a12; border-left:4px solid #f59e0b;
+                        border-radius:7px; box-shadow:0 8px 24px #000a; }
+  .bridge-alert-body { display:flex; flex-direction:column; gap:3px; }
+  .bridge-alert-title { color:#fbbf24; font-weight:700; }
+  .bridge-alert-message { color:#fde68a; line-height:1.35; }
+  .bridge-alert-action { color:#d6b978; font-size:11px; line-height:1.35; }
+  .bridge-alert-dismiss { background:none; border:0; color:#d6b978; cursor:pointer;
+                          font-size:18px; line-height:1; padding:0 2px; }
    #log { background:#0d1320; border:0; border-radius:0;
            padding:10px 12px; flex:1; min-height:0; overflow:auto; white-space:pre-wrap;
            overflow-wrap:anywhere; font-size:12px; }
@@ -487,6 +498,9 @@
   var codeListingTracePet = null;
   var lastTraceNia = null;
   var workspaceEl = document.getElementById('workspace');
+  var bridgeAlertIncidentId = null;
+  var bridgeAlertDismissed = false;
+  var bridgeAlertFingerprint = '';
 
   function hex(v) { return '0x' + (v >>> 0).toString(16).toUpperCase().padStart(8, '0'); }
   function flags(f) {
@@ -515,6 +529,69 @@
   }
   function note(text) {
     addLine('[' + new Date().toLocaleTimeString() + '] ' + text, 'ev-note');
+  }
+  function dismissBridgeAlert(incidentId) {
+    bridgeAlertDismissed = true;
+    try { localStorage.setItem('wukongBridgeAlertDismissed', String(incidentId || '')); } catch (e) {}
+    var toast = document.getElementById('bridge-alert-toast');
+    if (toast) toast.remove();
+  }
+  function showBridgeAlert(alert) {
+    var old = document.getElementById('bridge-alert-toast');
+    if (old) old.remove();
+    var toast = document.createElement('div');
+    toast.id = 'bridge-alert-toast';
+    toast.className = 'bridge-alert-toast';
+    toast.setAttribute('role', 'alert');
+    var body = document.createElement('div');
+    body.className = 'bridge-alert-body';
+    var title = document.createElement('strong');
+    title.className = 'bridge-alert-title';
+    title.textContent = alert.title || 'Wukong connection requires attention';
+    var message = document.createElement('div');
+    message.className = 'bridge-alert-message';
+    message.textContent = alert.message || 'The Wukong bridge connection is unavailable.';
+    var action = document.createElement('div');
+    action.className = 'bridge-alert-action';
+    action.textContent = alert.action || 'Restart the bridge or switch to the simulator.';
+    body.appendChild(title);
+    body.appendChild(message);
+    body.appendChild(action);
+    var dismiss = document.createElement('button');
+    dismiss.className = 'bridge-alert-dismiss';
+    dismiss.textContent = '\u00D7';
+    dismiss.title = 'Dismiss until the connection recovers';
+    dismiss.onclick = function () { dismissBridgeAlert(alert.incident_id); };
+    toast.appendChild(body);
+    toast.appendChild(dismiss);
+    document.body.appendChild(toast);
+  }
+  function handleBridgeAlert(alert) {
+    if (!alert || !alert.active || !alert.incident_id) {
+      bridgeAlertIncidentId = null;
+      bridgeAlertDismissed = false;
+      bridgeAlertFingerprint = '';
+      var old = document.getElementById('bridge-alert-toast');
+      if (old) old.remove();
+      try { localStorage.removeItem('wukongBridgeAlertDismissed'); } catch (e) {}
+      return;
+    }
+    if (bridgeAlertIncidentId !== alert.incident_id) {
+      bridgeAlertIncidentId = alert.incident_id;
+      bridgeAlertDismissed = false;
+      bridgeAlertFingerprint = '';
+      try {
+        bridgeAlertDismissed =
+          localStorage.getItem('wukongBridgeAlertDismissed') === alert.incident_id;
+      } catch (e) {}
+    }
+    var fingerprint = [alert.title, alert.message, alert.action].join('\n');
+    if (!bridgeAlertDismissed &&
+        (!document.getElementById('bridge-alert-toast') ||
+         bridgeAlertFingerprint !== fingerprint)) {
+      showBridgeAlert(alert);
+      bridgeAlertFingerprint = fingerprint;
+    }
   }
   document.getElementById('clearBtn').onclick = function () { logEl.innerHTML = ''; };
 
@@ -1129,6 +1206,7 @@
 
   function pollStatus() {
     fetch('/hardware/wukong/status').then(function (r) { return r.json(); }).then(function (s) {
+      handleBridgeAlert(s.bridge_alert);
       if (s.bridge_connected) setState('bridgeState', 'ok', 'connected');
       else if (s.bridge_poll_age !== null && s.bridge_poll_age !== undefined)
         setState('bridgeState', 'bad', 'disconnected');

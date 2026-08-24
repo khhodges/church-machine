@@ -12196,6 +12196,22 @@ _wukong_bridge_lock         = _wk_threading.Lock()
 _wukong_bridge_info         = {}
 _wukong_bridge_timeline     = []
 _WUKONG_BRIDGE_TIMELINE_MAXLEN = 128
+# Transport diagnostics are retained in bridge_timeline/bridge status, but
+# they are not execution events.  In particular, a 50 ms polling loop can
+# otherwise turn one network outage into hundreds of identical console lines.
+_WUKONG_BRIDGE_DIAGNOSTIC_EVENTS = frozenset((
+    'http_error', 'network_error', 'poll_failed',
+    'reconnect_attempt', 'serial_read_error', 'reconnected',
+))
+# A bridge that was previously heard from must be absent long enough before
+# the browser interrupts the user.  A single failed HTTP poll is normal.
+_WUKONG_BRIDGE_LOSS_ALERT_SECONDS = 5.0
+_wukong_bridge_incident_counter = 0
+_wukong_bridge_alert = {
+    'active': False, 'incident_id': '', 'kind': '',
+    'title': '', 'message': '', 'action': '',
+    'started_ts': None, 'updated_ts': None, 'dismissed': False,
+}
 # Command delivery lifecycle record for the most recent command.  Lets the
 # /fpga page distinguish "still queued" / "bridge consumed it" / "written to
 # the board's UART" instead of fire-and-forget.  Protected by
@@ -12226,12 +12242,104 @@ def _record_wukong_bridge_event(event, state='', reason='', session_id='',
         _wukong_bridge_timeline.append(item)
         del _wukong_bridge_timeline[:-_WUKONG_BRIDGE_TIMELINE_MAXLEN]
     # Heartbeats belong in the live status card, not the historical story.
-    # State transitions and errors are durable ordered events.
-    if event != 'heartbeat':
+    # Low-level transport diagnostics also stay out of the shared execution
+    # history; the bounded bridge timeline remains available to diagnostics.
+    if event != 'heartbeat' and event not in _WUKONG_BRIDGE_DIAGNOSTIC_EVENTS:
         _queue_wukong_info_event(
             event, state, reason, session_id=item['session_id'],
             serial_port=item['serial_port'],
             reconnect_attempt=item['reconnect_attempt'])
+
+
+def _wukong_refresh_bridge_alert(now=None):
+    """Update and return the one active, user-facing bridge incident.
+
+    This deliberately derives sustained loss from the server's successful
+    command-poll timestamp rather than from each failed request.  A terminal
+    serial reconnect failure escalates immediately because it already carries
+    a concrete recovery action.
+    """
+    global _wukong_bridge_incident_counter, _wukong_bridge_alert
+    now = _wk_time.time() if now is None else now
+    bridge_age = (now - _wukong_last_bridge_poll
+                  if _wukong_last_bridge_poll else None)
+    with _wukong_bridge_lock:
+        bridge = dict(_wukong_bridge_info)
+        current = _wukong_bridge_alert
+        bridge_update_age = (
+            now - float(bridge.get('updated_ts'))
+            if bridge.get('updated_ts') is not None else None
+        )
+        recovered = (
+            (bridge_age is not None and bridge_age < 3.0) or
+            (bridge.get('event') in ('reconnected', 'session_started') and
+             bridge_update_age is not None and bridge_update_age < 3.0)
+        )
+        if recovered:
+            if current.get('active'):
+                _wukong_bridge_alert = dict(current)
+                _wukong_bridge_alert.update({
+                    'active': False, 'dismissed': False,
+                    'updated_ts': now,
+                })
+            return dict(_wukong_bridge_alert)
+
+        # Once all serial reopen attempts have failed, preserve that more
+        # actionable diagnosis through the subsequent read-error loop.  Only a
+        # demonstrated reconnect or successful command poll clears the latch.
+        terminal_serial = (
+            bridge.get('event') == 'reconnect_failed' or
+            (current.get('active') and
+             current.get('kind') == 'serial_reconnect_failed')
+        )
+        sustained_loss = (
+            _wukong_total_bridge_polls > 0 and
+            bridge_age is not None and
+            bridge_age >= _WUKONG_BRIDGE_LOSS_ALERT_SECONDS
+        )
+        if terminal_serial:
+            kind = 'serial_reconnect_failed'
+            title = 'Wukong board connection requires attention'
+            message = (
+                'The bridge could not reconnect to the FPGA after repeated '
+                'serial attempts.'
+            )
+            action = (
+                'Check the USB-UART connection, restart the bridge, or switch '
+                'to the simulator.'
+            )
+        elif sustained_loss:
+            kind = 'bridge_unreachable'
+            title = 'Wukong bridge connection lost'
+            message = (
+                'The IDE has not heard a bridge poll for '
+                f'{int(bridge_age)} seconds.'
+            )
+            action = (
+                'Restart the bridge and check its server URL/network; switch '
+                'to the simulator if the board is unavailable.'
+            )
+        else:
+            return dict(_wukong_bridge_alert)
+
+        if not current.get('active'):
+            _wukong_bridge_incident_counter += 1
+            _wukong_bridge_alert = {
+                'active': True,
+                'incident_id': 'wukong-bridge-%d' % _wukong_bridge_incident_counter,
+                'kind': kind, 'title': title, 'message': message,
+                'action': action, 'started_ts': now, 'updated_ts': now,
+                'dismissed': False,
+            }
+        else:
+            # Keep the same incident identity while it persists, but allow a
+            # terminal serial failure to improve the recovery guidance.
+            _wukong_bridge_alert = dict(current)
+            _wukong_bridge_alert.update({
+                'kind': kind, 'title': title, 'message': message,
+                'action': action, 'updated_ts': now,
+            })
+        return dict(_wukong_bridge_alert)
 
 
 def _queue_wukong_info_event(event, state='', reason='', **extra):
@@ -12356,6 +12464,7 @@ def wukong_bridge_status_post():
                 'reconnect_attempt': int(data.get('reconnect_attempt', 0) or 0),
                 'updated_ts': now,
                 'church_only': bool(data.get('church_only', False)),
+                'event': event or 'heartbeat',
             })
         if event or session:
             item = {
@@ -12368,12 +12477,16 @@ def wukong_bridge_status_post():
             }
             _wukong_bridge_timeline.append(item)
             del _wukong_bridge_timeline[:-_WUKONG_BRIDGE_TIMELINE_MAXLEN]
-            if item['event'] != 'heartbeat':
+            if (item['event'] != 'heartbeat' and
+                    item['event'] not in _WUKONG_BRIDGE_DIAGNOSTIC_EVENTS):
                 _queue_wukong_info_event(
                     item['event'], item['state'], item['reason'],
                     session_id=item['session_id'],
                     serial_port=item['serial_port'],
                     reconnect_attempt=item['reconnect_attempt'])
+    # Refresh immediately so a terminal reconnect failure is visible on the
+    # next status poll, without waiting for a second lifecycle POST.
+    _wukong_refresh_bridge_alert(now)
     return jsonify({'ok': True})
 
 # ── Wukong relay state ────────────────────────────────────────────────────────
@@ -13467,6 +13580,8 @@ def wukong_command_get():
             _wukong_bridge_info.update({
                 'session_id': bridge_session,
                 'state': 'polling',
+                    'event': 'polling',
+                    'reason': '',
                 'updated_ts': _wukong_last_bridge_poll,
             })
     with _wukong_command_lock:
@@ -13523,6 +13638,7 @@ def wukong_status_get():
         bridge_timeline = list(_wukong_bridge_timeline[-32:])
     bridge_age = (now - _wukong_last_bridge_poll) if _wukong_last_bridge_poll else None
     trace_age  = (now - _wukong_last_trace_post)  if _wukong_last_trace_post  else None
+    bridge_alert = _wukong_refresh_bridge_alert(now)
     return jsonify({
         # Pipeline-health counters (never reset within a process session).
         # total_trace_posts == 0  → server has never seen a trace packet this session.
@@ -13560,6 +13676,7 @@ def wukong_status_get():
         'command_delivery':   delivery,
         'bridge':              bridge_info,
         'bridge_timeline':     bridge_timeline,
+        'bridge_alert':        bridge_alert,
         'halt':                _wukong_halt_summary(latest, snapshot, delivery,
                                                     bridge_info, now),
         'ide_version':        BUILD_VERSION,

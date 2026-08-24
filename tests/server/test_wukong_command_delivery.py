@@ -41,6 +41,13 @@ def _reset_state():
     with _app_module._wukong_boot_info_lock:
         _app_module._wukong_boot_info = {}
     _app_module._wukong_last_bridge_poll = 0.0
+    _app_module._wukong_total_bridge_polls = 0
+    _app_module._wukong_bridge_incident_counter = 0
+    _app_module._wukong_bridge_alert = {
+        'active': False, 'incident_id': '', 'kind': '',
+        'title': '', 'message': '', 'action': '',
+        'started_ts': None, 'updated_ts': None, 'dismissed': False,
+    }
     # Clear bridge timeline so absence assertions are deterministic across tests.
     with _app_module._wukong_bridge_lock:
         _app_module._wukong_bridge_timeline.clear()
@@ -274,6 +281,63 @@ class TestBridgeDisconnectDiagnostics:
         assert len(timeline) == 32  # status intentionally exposes latest 32
         assert timeline[0]['session_id'] == f's-{_app_module._WUKONG_BRIDGE_TIMELINE_MAXLEN + 20 - 32}'
         assert timeline[-1]['session_id'] == 's-147'
+
+    def test_transport_diagnostics_stay_out_of_execution_event_queue(self, client):
+        _bridge_status(client, session_id='bridge-session-a',
+                       event='http_error', state='network_error',
+                       reason='temporary HTTPS timeout')
+        _bridge_status(client, session_id='bridge-session-a',
+                       event='reconnect_attempt', state='reconnecting',
+                       reason='waiting for serial port', reconnect_attempt=1)
+        _bridge_status(client, session_id='bridge-session-a',
+                       event='reconnected', state='connected',
+                       reason='serial port available')
+        events = client.get('/hardware/wukong/events?after=0').get_json()['events']
+        assert not any(e.get('event') in (
+            'http_error', 'reconnect_attempt', 'reconnected'
+        )
+                       for e in events)
+        timeline = _status(client)['bridge_timeline']
+        assert [e['event'] for e in timeline[-3:]] == [
+            'http_error', 'reconnect_attempt', 'reconnected'
+        ]
+
+    def test_sustained_bridge_loss_alerts_once_and_resets_after_recovery(self, client):
+        _bridge_status(client, session_id='bridge-session-a',
+                       event='session_started', state='connected')
+        client.get('/hardware/wukong/command')
+        _app_module._wukong_last_bridge_poll = time.time() - 6
+        with _app_module._wukong_bridge_lock:
+            _app_module._wukong_bridge_info['updated_ts'] = time.time() - 6
+        first = _status(client)['bridge_alert']
+        second = _status(client)['bridge_alert']
+        assert first['active'] is True
+        assert first['kind'] == 'bridge_unreachable'
+        assert first['incident_id'] == second['incident_id']
+        assert second['active'] is True
+        client.get('/hardware/wukong/command')
+        recovered = _status(client)['bridge_alert']
+        assert recovered['active'] is False
+        _app_module._wukong_last_bridge_poll = time.time() - 6
+        later = _status(client)['bridge_alert']
+        assert later['active'] is True
+        assert later['incident_id'] != first['incident_id']
+
+    def test_terminal_serial_reconnect_failure_is_actionable(self, client):
+        _bridge_status(client, session_id='bridge-session-a',
+                       event='reconnect_failed', state='serial_error',
+                       reason='could not reopen serial port after 15 attempts',
+                       reconnect_attempt=15)
+        alert = _status(client)['bridge_alert']
+        assert alert['active'] is True
+        assert alert['kind'] == 'serial_reconnect_failed'
+        assert 'USB-UART' in alert['action']
+        _bridge_status(client, session_id='bridge-session-a',
+                       event='serial_read_error', state='serial_error',
+                       reason='dead port read failed again')
+        still_terminal = _status(client)['bridge_alert']
+        assert still_terminal['incident_id'] == alert['incident_id']
+        assert still_terminal['kind'] == 'serial_reconnect_failed'
 
     def test_no_overwrite_flag_after_consumption(self, client):
         _post_cmd(client, 'f')

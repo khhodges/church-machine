@@ -67,15 +67,20 @@ function extractFunction(src, name) {
 function makeEl(tag) {
     return {
         tag: tag || 'div',
+        id: '',
         className: '',
         children: [],
         text: '',
+        textContent: '',
         childElementCount: 0,
         scrollTop: 0,
         scrollHeight: 0,
         firstElementChild: null,
+        parentNode: null,
+        listeners: {},
         appendChild: function(node) {
             this.children.push(node);
+            node.parentNode = this;
             this.childElementCount = this.children.length;
             this.firstElementChild = this.children[0];
             return node;
@@ -85,7 +90,13 @@ function makeEl(tag) {
             if (idx !== -1) this.children.splice(idx, 1);
             this.childElementCount = this.children.length;
             this.firstElementChild = this.children[0] || null;
+            node.parentNode = null;
         },
+        remove: function() {
+            if (this.parentNode) this.parentNode.removeChild(this);
+        },
+        setAttribute: function(name, value) { this[name] = value; },
+        addEventListener: function(name, fn) { this.listeners[name] = fn; },
         cloneNode: function() {
             const c = makeEl(this.tag);
             c.className = this.className;
@@ -98,18 +109,35 @@ function makeEl(tag) {
 
 const editorConsole = makeEl('div');
 const hwLogBody     = makeEl('div');
+const body           = makeEl('body');
+
+function findById(node, id) {
+    if (node.id === id) return node;
+    for (const child of node.children || []) {
+        const found = findById(child, id);
+        if (found) return found;
+    }
+    return null;
+}
 
 global.document = {
     getElementById: function(id) {
         if (id === 'editorConsole')      return editorConsole;
         if (id === 'wukong-hw-log-body') return hwLogBody;
-        return null;
+        return findById(body, id);
     },
     createElement: function(tag) { return makeEl(tag); },
     createTextNode: function(t) { return { text: t, cloneNode: function() { return this; } }; },
+    body: body,
 };
 global.window = {};
 global.sim = null;   // console path must return before any sim usage
+const stored = new Map();
+global.localStorage = {
+    getItem: function(k) { return stored.has(k) ? stored.get(k) : null; },
+    setItem: function(k, v) { stored.set(k, String(v)); },
+    removeItem: function(k) { stored.delete(k); },
+};
 
 // Stubs for trace-path helpers (must NOT be reached by console events).
 let tracePathTouched = false;
@@ -126,6 +154,11 @@ eval('global._wukongAppendTrace = ' + appendSrc);
 function lineText(node) {
     // A line element's text lives in its appended text nodes.
     return (node.children || []).map(c => c.text || '').join('') + (node.text || '');
+}
+function treeText(node) {
+    if (!node) return '';
+    return (node.text || '') + (node.textContent || '') +
+        (node.children || []).map(treeText).join('');
 }
 
 // Feed the exact warning event the bridge produces on N_INIT mismatch.
@@ -158,6 +191,66 @@ if (editorConsole.children.length === 2) {
     check('plain line text visible',
           lineText(node).includes('Wukong CM boot banner'));
 }
+
+// ── 3. Actionable bridge alerts: once per incident + recovery reset ──────────
+global._wukongBridgeAlertIncidentId = null;
+global._wukongBridgeAlertDismissed = false;
+global._wukongBridgeAlertFingerprint = '';
+global._wukongDismissBridgeAlert = eval(
+    '(' + extractFunction(appRunSrc, '_wukongDismissBridgeAlert') + ')');
+global._wukongShowBridgeAlertToast = eval(
+    '(' + extractFunction(appRunSrc, '_wukongShowBridgeAlertToast') + ')');
+global._wukongHandleBridgeAlert = eval(
+    '(' + extractFunction(appRunSrc, '_wukongHandleBridgeAlert') + ')');
+
+const ALERT_A = {
+    active: true,
+    incident_id: 'wukong-bridge-1',
+    title: 'Wukong bridge connection lost',
+    message: 'The IDE has not heard a bridge poll for 8 seconds.',
+    action: 'Restart the bridge and check its network; switch to the simulator.',
+};
+_wukongHandleBridgeAlert(ALERT_A);
+check('actionable incident opens one toast',
+      body.children.filter(n => n.id === 'wukong-bridge-alert-toast').length === 1);
+const firstToast = document.getElementById('wukong-bridge-alert-toast');
+check('toast carries recovery guidance',
+      !!firstToast && treeText(firstToast).includes('Restart the bridge') &&
+      treeText(firstToast).includes('simulator'));
+_wukongHandleBridgeAlert(ALERT_A);
+check('same incident does not open a second toast',
+      body.children.filter(n => n.id === 'wukong-bridge-alert-toast').length === 1);
+_wukongHandleBridgeAlert(Object.assign({}, ALERT_A, {
+    title: 'Wukong board connection requires attention',
+    action: 'Check the USB-UART connection and restart the bridge.',
+}));
+check('same incident can escalate its visible recovery guidance',
+      treeText(document.getElementById('wukong-bridge-alert-toast')).includes('USB-UART'));
+
+const escalatedToast = document.getElementById('wukong-bridge-alert-toast');
+const dismissBtn = escalatedToast && escalatedToast.children[1];
+if (dismissBtn && dismissBtn.listeners.click) dismissBtn.listeners.click();
+check('incident toast can be dismissed',
+      !document.getElementById('wukong-bridge-alert-toast'));
+_wukongHandleBridgeAlert(ALERT_A);
+check('dismissal is respected while incident continues',
+      !document.getElementById('wukong-bridge-alert-toast'));
+
+_wukongHandleBridgeAlert({active: false});
+_wukongHandleBridgeAlert(Object.assign({}, ALERT_A, {
+    incident_id: 'wukong-bridge-2'
+}));
+check('recovery permits a later incident notification',
+      !!document.getElementById('wukong-bridge-alert-toast'));
+
+const fpgaStatusSrc = fs.readFileSync(
+    path.join(__dirname, '..', 'server', 'fpga_status.html'), 'utf8');
+check('standalone FPGA status handles bridge alert state',
+      fpgaStatusSrc.includes('function handleBridgeAlert(alert)') &&
+      fpgaStatusSrc.includes('handleBridgeAlert(s.bridge_alert)'));
+check('standalone FPGA alert dismissal persists for the incident',
+      fpgaStatusSrc.includes("localStorage.setItem('wukongBridgeAlertDismissed'") &&
+      fpgaStatusSrc.includes('bridgeAlertFingerprint'));
 
 console.log(failures === 0
     ? '\nAll wukong-console-warning tests passed.'

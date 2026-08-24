@@ -2724,6 +2724,21 @@
     flex-shrink: 0;
 }
 .wukong-disconnect-close-btn:hover { color: #d1d5db; }
+.wukong-bridge-alert-toast {
+    align-items: flex-start;
+    border-left-color: #f59e0b;
+    background: #241b0d;
+    color: #fef3c7;
+}
+.wukong-bridge-alert-body {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+.wukong-bridge-alert-title { color: #fbbf24; font-weight: 700; }
+.wukong-bridge-alert-message { color: #fde68a; line-height: 1.35; }
+.wukong-bridge-alert-action { color: #d6b978; font-size: 12px; line-height: 1.35; }
 .nia-disasm-desc {
     padding: 0.18rem 0.8rem 0.22rem calc(0.8rem + 2.5ch + 0.5rem);
     background: #1e1500;

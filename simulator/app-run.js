@@ -15514,6 +15514,9 @@ let _wukongBridgeSeen   = false;
 
 let _wukongCallDepth    = 0;       // call stack depth tracked via CALL_PUSH/POP events
 let _wukongWasConnected = false;   // previous connection state (for connect/disconnect msgs)
+let _wukongBridgeAlertIncidentId = null;
+let _wukongBridgeAlertDismissed  = false;
+let _wukongBridgeAlertFingerprint = '';
 
 let _wukongLastHwNIA    = null;    // last hardware NIA seen from trace packets
 let _wukongHwNia        = null;    // retiring NIA of last HW trace packet
@@ -15751,6 +15754,84 @@ function _wukongHealthStripHtml(stages) {
     return html;
 }
 
+function _wukongDismissBridgeAlert(incidentId) {
+    _wukongBridgeAlertDismissed = true;
+    try {
+        localStorage.setItem('wukongBridgeAlertDismissed', String(incidentId || ''));
+    } catch (e) {}
+    const toast = document.getElementById('wukong-bridge-alert-toast');
+    if (toast) toast.remove();
+}
+
+function _wukongShowBridgeAlertToast(alert) {
+    const existing = document.getElementById('wukong-bridge-alert-toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.id = 'wukong-bridge-alert-toast';
+    toast.className = 'wukong-disconnect-toast wukong-bridge-alert-toast';
+    toast.setAttribute('role', 'alert');
+
+    const body = document.createElement('div');
+    body.className = 'wukong-bridge-alert-body';
+    const title = document.createElement('strong');
+    title.className = 'wukong-bridge-alert-title';
+    title.textContent = alert.title || 'Wukong connection requires attention';
+    const message = document.createElement('div');
+    message.className = 'wukong-bridge-alert-message';
+    message.textContent = alert.message || 'The Wukong bridge connection is unavailable.';
+    const action = document.createElement('div');
+    action.className = 'wukong-bridge-alert-action';
+    action.textContent = alert.action || 'Restart the bridge or switch to the simulator.';
+    body.appendChild(title);
+    body.appendChild(message);
+    body.appendChild(action);
+
+    const dismiss = document.createElement('button');
+    dismiss.textContent = '\u00D7';
+    dismiss.title = 'Dismiss until the connection recovers';
+    dismiss.className = 'wukong-disconnect-close-btn';
+    dismiss.addEventListener('click', function() {
+        _wukongDismissBridgeAlert(alert.incident_id);
+    });
+    toast.appendChild(body);
+    toast.appendChild(dismiss);
+    document.body.appendChild(toast);
+}
+
+/**
+ * Show one notification for a server-side bridge incident.  The incident ID
+ * is stable while the outage continues, so the 3-second health poll cannot
+ * reopen the same notification.  A recovery response clears the ID and
+ * dismissal state so a later outage is reported.
+ */
+function _wukongHandleBridgeAlert(alert) {
+    if (!alert || !alert.active || !alert.incident_id) {
+        _wukongBridgeAlertIncidentId = null;
+        _wukongBridgeAlertDismissed = false;
+        _wukongBridgeAlertFingerprint = '';
+        const toast = document.getElementById('wukong-bridge-alert-toast');
+        if (toast) toast.remove();
+        try { localStorage.removeItem('wukongBridgeAlertDismissed'); } catch (e) {}
+        return;
+    }
+    if (_wukongBridgeAlertIncidentId !== alert.incident_id) {
+        _wukongBridgeAlertIncidentId = alert.incident_id;
+        _wukongBridgeAlertDismissed = false;
+        _wukongBridgeAlertFingerprint = '';
+        try {
+            _wukongBridgeAlertDismissed =
+                localStorage.getItem('wukongBridgeAlertDismissed') === alert.incident_id;
+        } catch (e) {}
+    }
+    const fingerprint = [alert.title, alert.message, alert.action].join('\n');
+    if (!_wukongBridgeAlertDismissed &&
+        (!document.getElementById('wukong-bridge-alert-toast') ||
+         _wukongBridgeAlertFingerprint !== fingerprint)) {
+        _wukongShowBridgeAlertToast(alert);
+        _wukongBridgeAlertFingerprint = fingerprint;
+    }
+}
+
 /** Fetch status and render the health strip inside #wukong-health-strip. */
 async function _wukongRefreshHealthStrip() {
     try {
@@ -15766,6 +15847,7 @@ async function _wukongRefreshHealthStrip() {
             _wukongRelayLastRx    = (s.relay_last_rx !== undefined && s.relay_last_rx !== null)
                 ? s.relay_last_rx : null;
         }
+        _wukongHandleBridgeAlert(s.bridge_alert);
         var strip = document.getElementById('wukong-health-strip');
         if (!strip) return;
         var stages = _wukongClassifyPipelineStages(s, _wukongLastEventSeq, _wukongLastTraceTs || null);
