@@ -2739,6 +2739,24 @@ function updateNamespace() {
     html += `<button id="nsSaveBtn" onclick="event.stopPropagation();_nsTableSave(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save all NS table changes to boot-image.bin + ns-state.json — the single write path for NS mutations">\u{1F4BE} Save NS Table</button>`;
     html += `<button onclick="event.stopPropagation();_nsTableAdd()" style="background:#1a2e1a;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Install a LUMP from the repository into the next free NS slot">+ Add LUMP</button>`;
     html += '</div>';
+    // Bank custody status deliberately projects no raw NS slot, address,
+    // contents, or credential. It is a safe operational view only.
+    try {
+        const bankBoxes = sim.systemAbstractions &&
+            typeof sim.systemAbstractions.getBankLockboxes === 'function'
+            ? sim.systemAbstractions.getBankLockboxes() : [];
+        if (bankBoxes.length) {
+            const badges = bankBoxes.map(box => {
+                const color = box.state === 'deposited' ? '#4ec9b0'
+                    : (box.state === 'revoked' ? '#f87171' : '#f0a040');
+                const value = box.state === 'deposited'
+                    ? `${box.contentsType} · ${box.contentsWords}w`
+                    : box.state;
+                return `<span style="border:1px solid ${color}66;color:${color};border-radius:9px;padding:2px 7px;font-size:0.7rem;">Lockbox ${box.lockboxId}: ${value}</span>`;
+            }).join('');
+            html += `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:5px 10px;border-bottom:1px solid rgba(255,255,255,0.07);font-size:0.72rem;"><strong style="color:#c4a7ff;">Bank custody</strong>${badges}<span style="color:#777;">Credentials, locations, and stored words are hidden.</span></div>`;
+        }
+    } catch (_) { /* Namespace rendering must not depend on Bank availability. */ }
     html += '<table class="ns-table"><thead><tr>';
     html += '<th>Idx</th><th class="ns-label-col">Label</th>';
     html += '<th>W0: Location</th>';
@@ -2762,6 +2780,15 @@ function updateNamespace() {
             }
             html += `<td class="ns-entry-actions"></td>`;
             html += '</tr>';
+            continue;
+        }
+        const privateBankSlot = sim._bankPrivateSlots && sim._bankPrivateSlots[i];
+        if (privateBankSlot) {
+            html += `<tr id="ns-row-${i}" class="ns-row" style="opacity:0.78;">`;
+            html += `<td class="ns-idx-cell"><span style="color:#8f7ac8;">◈</span></td>`;
+            html += `<td class="ns-label" style="color:#c4a7ff;">Bank private custody</td>`;
+            html += `<td colspan="6" style="color:#777;font-size:0.78rem;">Lockbox ${privateBankSlot.lockboxId} — protected backing record</td>`;
+            html += `<td class="ns-entry-actions"></td></tr>`;
             continue;
         }
         const manifest = sim.lazyManifest ? sim.lazyManifest[i] : null;

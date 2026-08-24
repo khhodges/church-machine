@@ -126,6 +126,21 @@ const API_DATA = [
         ]
     },
     {
+        slot: 54, name: 'Bank', layer: 1,
+        perms: 'E',
+        description: 'Namespace-backed custody service. Lockbox keys are opaque, revocable PassKeys paired with independent 128-bit proofs; the underlying Namespace entry is never returned as authority.',
+        implemented: true, profile: 'Full',
+        methods: [
+            { name: 'MintKey',       signature: 'MintKey(capacity?) → bankKey', perms: 'E + M', description: 'Create an empty dynamically allocated lockbox and return its opaque owner key.', implemented: true },
+            { name: 'Deposit',       signature: 'Deposit(lockboxId, bankKey, sourceGT, offset?, words?, kind?) → metadata', perms: 'E + bank key + source R', description: 'Copy a bounded LUMP or memory region into an empty lockbox without exposing raw custody storage.', implemented: true },
+            { name: 'Withdraw',      signature: 'Withdraw(lockboxId, bankKey) → valueGT', perms: 'E + bank key', description: 'Atomically release the deposited valuable as a fresh memory GT and quarantine the lockbox key.', implemented: true },
+            { name: 'Inspect',       signature: 'Inspect(lockboxId, bankKey) → metadata', perms: 'E + bank key', description: 'Return safe custody state, size, type, and sequence metadata without revealing contents or Namespace location.', implemented: true },
+            { name: 'Revoke',        signature: 'Revoke(lockboxId, ownerKey) → ok', perms: 'E + owner key', description: 'Invalidate all lockbox keys and quarantine its Namespace-backed custody record.', implemented: true },
+            { name: 'ObtainPassKey', signature: 'ObtainPassKey(lockboxId, ownerKey) → bankKey', perms: 'E + owner key + proof', description: 'Reissue a fresh object-scoped passkey for an existing lockbox after proving ownership with the current key.', implemented: true },
+            { name: 'List',          signature: 'List() → metadata[]', perms: 'E', description: 'List non-sensitive status metadata for active and revoked lockboxes.', implemented: true }
+        ]
+    },
+    {
         slot: 6, name: 'Mint', layer: 1,
         perms: 'E',
         description: 'GT lifecycle management. Creates GTs with bounded permissions; Revoke instantly kills all outstanding copies.',

@@ -16,6 +16,7 @@ import gzip as _gzip
 import queue
 import threading
 import requests as http_requests
+import html as _html
 
 # ── SSE device-event bus ──────────────────────────────────────────────────────
 _sse_clients     = []
@@ -1396,6 +1397,112 @@ def api_releases_publish():
 def index():
     landing_path = os.path.join(BASE_DIR, "landing.html")
     return send_file(landing_path, mimetype="text/html")
+
+def _site_search_sources():
+    """Yield the public HTML and documentation files searchable from /."""
+    sources = [
+        ("landing.html", "/", "Landing page", "page"),
+        ("simulator/index.html", "/simulator/", "Church Machine IDE", "page"),
+    ]
+    if os.path.isdir(DOCS_DIR):
+        for root, dirs, files in os.walk(DOCS_DIR):
+            dirs[:] = sorted(d for d in dirs if d not in {".git", "__pycache__"})
+            for filename in sorted(files):
+                if not filename.endswith((".md", ".html")):
+                    continue
+                filepath = os.path.join(root, filename)
+                rel = os.path.relpath(filepath, BASE_DIR).replace(os.sep, "/")
+                doc_rel = rel[len("docs/"):]
+                if doc_rel.startswith("business/"):
+                    url = "/business/" + doc_rel[len("business/"):]
+                    if not url.endswith(".html"):
+                        url += ".html"
+                elif doc_rel == "six-laws/index.html":
+                    url = "/six-laws/"
+                elif doc_rel == "patents/index.html":
+                    url = "/patents/"
+                else:
+                    url = "/" + rel
+                title = filename.rsplit(".", 1)[0].replace("-", " ").replace("_", " ").strip()
+                sources.append((rel, url, title, "document"))
+    return sources
+
+def _site_search_text(raw, extension):
+    """Convert a public source into compact searchable text."""
+    if extension == ".html":
+        raw = re.sub(r"<(script|style)\b[^>]*>.*?</\1>", " ", raw,
+                     flags=re.IGNORECASE | re.DOTALL)
+        raw = re.sub(r"<[^>]+>", " ", raw)
+    return re.sub(r"\s+", " ", _html.unescape(raw)).strip()
+
+def _site_search_title(raw, fallback, extension):
+    if extension == ".html":
+        match = re.search(r"<title\b[^>]*>(.*?)</title>", raw,
+                          flags=re.IGNORECASE | re.DOTALL)
+        if not match:
+            match = re.search(r"<h1\b[^>]*>(.*?)</h1>", raw,
+                              flags=re.IGNORECASE | re.DOTALL)
+        if match:
+            title = re.sub(r"<[^>]+>", " ", match.group(1))
+            title = re.sub(r"\s+", " ", _html.unescape(title)).strip()
+            if title:
+                return title
+    else:
+        match = re.search(r"^\s*#\s+(.+?)\s*$", raw, flags=re.MULTILINE)
+        if match:
+            return match.group(1).strip()
+    return fallback
+
+@app.route("/api/site-search")
+def site_search():
+    """Search public pages and docs without exposing their source files."""
+    query = re.sub(r"\s+", " ", request.args.get("q", "")).strip()
+    if len(query) > 120:
+        query = query[:120]
+    if not query:
+        return jsonify({"query": "", "results": []})
+
+    terms = [term.lower() for term in query.split() if term]
+    results = []
+    for rel, url, fallback_title, kind in _site_search_sources():
+        filepath = os.path.join(BASE_DIR, rel)
+        try:
+            with open(filepath, "r", encoding="utf-8", errors="replace") as source:
+                raw = source.read()
+        except (OSError, UnicodeError):
+            continue
+        extension = os.path.splitext(filepath)[1].lower()
+        searchable = _site_search_text(raw, extension)
+        lower = searchable.lower()
+        title = _site_search_title(raw, fallback_title, extension)
+        haystack = " ".join((title, rel, searchable)).lower()
+        if not all(term in haystack for term in terms):
+            continue
+
+        first_match = min(
+            (position for term in terms
+             for position in [lower.find(term)] if position >= 0),
+            default=0
+        )
+        start = max(0, first_match - 90)
+        excerpt = searchable[start:start + 240]
+        if start > 0:
+            excerpt = "…" + excerpt
+        if start + 240 < len(searchable):
+            excerpt += "…"
+        title_score = sum(title.lower().count(term) for term in terms)
+        path_score = sum(rel.lower().count(term) for term in terms)
+        results.append({
+            "title": title,
+            "url": url,
+            "path": "/" if rel == "landing.html" else "/" + rel,
+            "kind": kind,
+            "excerpt": excerpt,
+            "_score": title_score * 20 + path_score * 5,
+        })
+
+    results.sort(key=lambda item: (-item.pop("_score"), item["title"].lower()))
+    return jsonify({"query": query, "results": results})
 
 @app.route("/robots.txt")
 def robots_txt():

@@ -568,11 +568,11 @@ class AbstractionRegistry {
             { author: 'Church Machine', version: '1.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         // Bank is a dynamically issued system service, not a new fixed hardware
-        // boot slot.  Its passkey method delegates through Navana's object-scoped
-        // credential registry and never exposes a lockbox Namespace index.
+        // boot slot. Its keys delegate through Navana's object-scoped credential
+        // registry and never expose a lockbox Namespace index.
         this.createAbstraction(54, 'Bank', 1,
-            ['ObtainPassKey'],
-            'Namespace-backed custody authority — obtains a fresh object-scoped PassKey for an existing stored object. The caller must prove ownership with the current PassKey; the returned GT is paired with a private 128-bit proof.',
+            ['MintKey', 'Deposit', 'Withdraw', 'Inspect', 'Revoke', 'ObtainPassKey', 'List'],
+            'Namespace-backed custody authority — mints opaque revocable lockbox keys, accepts capability-bounded LUMP or memory-region deposits, returns valuables through fresh memory GTs, exposes non-sensitive metadata, and revokes custody. PassKey proofs never leave the credential boundary.',
             { author: 'Church Machine', version: '1.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, freedNSSlot: true });
     }
 }

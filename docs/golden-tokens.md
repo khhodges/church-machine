@@ -236,6 +236,48 @@ CR6 and CR14 are re-derived by CALL/RETURN via mLoad. CR12 is saved and restored
 
 ---
 
+## Bank Lockbox Credentials
+
+`Bank` is a dynamically issued system service; it does **not** add a fixed
+hardware boot slot. `MintKey(capacity)` creates a private lockbox record with a
+dynamically allocated Namespace entry, but callers receive only an opaque,
+object-scoped PassKey:
+
+```text
+{ gt: Abstract GT identifier, proof: [four 32-bit CSPRNG words] }
+```
+
+The GT identifies the lockbox credential, while the independent 128-bit proof
+authorizes its use. Neither a Namespace slot number nor a copied GT alone grants
+read or write access to the stored region.
+
+| Bank method | Required authority | Result |
+|---|---|---|
+| `MintKey` | M-elevated programmer authority | Empty lockbox owner key |
+| `Deposit` | Lockbox key + source `R` GT | Bounded copy into custody |
+| `Inspect` | Lockbox key | Non-sensitive state and size metadata |
+| `Withdraw` | Lockbox key | Fresh GT for a copied-out valuable; lockbox is quarantined |
+| `Revoke` | Owner key | All lockbox credentials invalidated; custody record quarantined |
+
+Deposits validate the source GT type, current Namespace sequence, `R`
+permission, and offset/length bounds before writing any lockbox state. A
+withdrawal creates and registers the new region before retiring the lockbox
+entry, so an allocation or Namespace failure leaves the original valuable in
+custody. Before a withdrawn or revoked backing allocation can return to the
+free list, Bank zeroizes the *entire* allocation. The backing Namespace record
+uses Outform type rather than a public Inform memory capability (Abstract GTs
+never occupy Namespace entries). Active Bank physical ranges also reject
+overlapping Namespace registrations and memory resolution, so a copied or
+guessed alias cannot bypass custody. The record is shown
+only as opaque “Bank private custody” in the Namespace UI. UI status may show a
+lockbox’s state and word count, but never its location, Namespace entry number,
+stored contents, proof, or private key. A same-instance hard reset zeroizes
+every active lockbox, removes its credentials and private-range guards, and
+starts a new Bank session; durable recovery is intentionally not part of this
+initial custody model.
+
+---
+
 ## Cross-references
 
 - [`architecture.md`](architecture.md) — Overall Church Machine architecture

@@ -170,6 +170,30 @@ class SystemAbstractions {
         };
     }
 
+    // Deliberately safe for UI diagnostics: this projection never includes a
+    // lockbox Namespace index, physical address, stored words, or credential.
+    getBankLockboxes() {
+        const lockboxes = (this._bankState && this._bankState.lockboxes) || {};
+        return Object.values(lockboxes).map(box => ({
+            lockboxId: box.id,
+            capacity: box.capacity,
+            state: box.revoked ? 'revoked' : (box.contents ? 'deposited' : 'empty'),
+            contentsType: box.contents ? box.contents.kind : null,
+            contentsWords: box.contents ? box.contents.words : 0,
+            withdrawn: !!box.withdrawn,
+            sequence: box.currentSeq
+        }));
+    }
+
+    // Called by ChurchSimulator.reset() before it replaces memory. Dynamic
+    // service state is process-local, so it must never outlive the Namespace
+    // image that gave it meaning.
+    onSimulatorReset(sim) {
+        if (typeof this._resetBankState === 'function') this._resetBankState(sim);
+        if (typeof this._resetNavanaState === 'function') this._resetNavanaState();
+        if (typeof this._resetDynamicMemoryState === 'function') this._resetDynamicMemoryState();
+    }
+
     _bindSalvation() {
         this.registry.bindMethod(4, 'LOAD', function(sim, args) {
             return { ok: true, result: 'Salvation.LOAD: proved namespace lookup' };
@@ -214,6 +238,22 @@ class SystemAbstractions {
             topSecurityObjects: {},
             topSecurityObjectCounter: 0,
             topSecurityPassKeyCounter: 0
+        };
+        this._resetNavanaState = () => {
+            passKeyCounter = 0;
+            navanaState.initialized = false;
+            navanaState.managedAbstractions = [];
+            navanaState.idsLog = [];
+            navanaState.monitorLog = [];
+            navanaState.deviceRegistry = {};
+            navanaState.passKeys = {};
+            navanaState.ledDriverAbstraction = null;
+            navanaState.passKeyAuditLog = [];
+            navanaState.driverPermGrants = {};
+            navanaState.driverGrantCounter = 0;
+            navanaState.topSecurityObjects = {};
+            navanaState.topSecurityObjectCounter = 0;
+            navanaState.topSecurityPassKeyCounter = 0;
         };
 
         function encodePassKeyIndex(deviceSelector, permMask, pkId) {
@@ -1128,6 +1168,16 @@ class SystemAbstractions {
             const clistCount = args.clistCount || 0;
             const gtType = args.gtType || 1;
             const label = args.label || 'unnamed';
+            const proposedEnd = (location >>> 0) + (limit >>> 0);
+            const overlapsPrivateCustody = (sim._bankPrivateRanges || []).some(range =>
+                (location >>> 0) <= range.end && proposedEnd >= range.start);
+            if (overlapsPrivateCustody) {
+                return {
+                    ok: false,
+                    fault: 'NO_CAPABILITY',
+                    message: 'Navana.Add: range overlaps private Bank custody'
+                };
+            }
 
             const freeSlot = sim.allocOrFindNsSlot(null, label);
             if (freeSlot === null) {
@@ -1305,6 +1355,20 @@ class SystemAbstractions {
         // Bank uses Navana's object registry and credential authority.  Keeping
         // this adapter here prevents Bank from minting caller-controlled GTs.
         this._topSecurityApi = {
+            validatePassKey: (sim, objectId, passKey, methodName, requireOwner) => {
+                const object = navanaState.topSecurityObjects[objectId];
+                return requireTopSecurityKey(sim, object, passKey || {}, methodName || null, !!requireOwner);
+            },
+            revokeObject: (objectId) => {
+                const object = navanaState.topSecurityObjects[objectId];
+                if (!object) return { ok: false, fault: 'NOT_FOUND', message: 'top-security object not found' };
+                object.revoked = true;
+                for (const keyGT of object.passKeys) {
+                    const key = navanaState.passKeys[keyGT];
+                    if (key) key.revoked = true;
+                }
+                return { ok: true };
+            },
             obtainPassKey: (sim, args) => {
                 const objectId = args.objectId !== undefined ? args.objectId : args.object_id;
                 const object = navanaState.topSecurityObjects[objectId];
@@ -1337,11 +1401,320 @@ class SystemAbstractions {
     }
 
     _bindBank() {
-        this.registry.bindMethod(54, 'ObtainPassKey', (sim, args) => {
-            if (!this._topSecurityApi) {
-                return { ok: false, fault: 'NOT_INIT', message: 'Bank.ObtainPassKey: Bank authority is not initialized' };
+        if (!this._bankState) {
+            this._bankState = { nextId: 0, lockboxes: {} };
+        }
+        const bankState = this._bankState;
+        const registry = this.registry;
+        const MAX_CAPACITY = 0x20000;
+
+        const keyFor = (args) => {
+            if (!args) return {};
+            if (args.passKey && typeof args.passKey === 'object') return args.passKey;
+            if (args.passkey && typeof args.passkey === 'object') return args.passkey;
+            if (args.bankKey && typeof args.bankKey === 'object') return args.bankKey;
+            return {
+                gt: args.passKeyGT !== undefined ? args.passKeyGT
+                    : (args.passkeyGT !== undefined ? args.passkeyGT
+                    : (args.bankKeyGT !== undefined ? args.bankKeyGT : args.dr1)),
+                proof: args.passKeyProof !== undefined ? args.passKeyProof
+                    : (args.proof !== undefined ? args.proof
+                    : ([args.dr2, args.dr3, args.dr4, args.dr5].every(v => v !== undefined)
+                        ? [args.dr2, args.dr3, args.dr4, args.dr5] : undefined))
+            };
+        };
+
+        const fail = (method, fault, message) => ({ ok: false, fault, message: `Bank.${method}: ${message}` });
+        const lockboxById = (id) => {
+            if (!Number.isInteger(id) || id <= 0) return null;
+            return bankState.lockboxes[id] || null;
+        };
+        const authorize = (sim, lockbox, args, method, ownerOnly = false) => {
+            if (!lockbox) return fail(method, 'NOT_FOUND', 'lockbox not found');
+            if (lockbox.revoked) return fail(method, 'REVOKED', 'lockbox has been revoked');
+            if (lockbox.seq !== lockbox.currentSeq) return fail(method, 'STALE_KEY', 'lockbox sequence is stale');
+            const check = this._topSecurityApi && this._topSecurityApi.validatePassKey
+                ? this._topSecurityApi.validatePassKey(sim, lockbox.securityObjectId, keyFor(args), method, ownerOnly)
+                : { ok: false, fault: 'NOT_INIT', message: 'top-security authority unavailable' };
+            return check.ok ? check : { ok: false, fault: check.fault || 'PERM', message: check.message };
+        };
+        const releaseAllocation = (sim, location) => {
+            return registry.dispatchMethod(7, 'Release', sim, { location });
+        };
+        const protectLockboxRange = (sim, lockbox) => {
+            if (!sim._bankPrivateRanges) sim._bankPrivateRanges = [];
+            sim._bankPrivateRanges.push({
+                lockboxId: lockbox.id,
+                start: lockbox.location,
+                end: lockbox.location + lockbox.capacity - 1
+            });
+        };
+        const unprotectLockboxRange = (sim, lockbox) => {
+            if (!sim._bankPrivateRanges) return;
+            sim._bankPrivateRanges = sim._bankPrivateRanges.filter(range => range.lockboxId !== lockbox.id);
+        };
+        const zeroizeLockbox = (sim, lockbox) => {
+            // Releasing a populated allocation without wiping it turns the
+            // allocator free list into a read-back channel. Always erase the
+            // complete allocation (not only the deposited word count) before
+            // it can be reclaimed by another dynamic Namespace record.
+            for (let i = 0; i < lockbox.capacity; i++) {
+                sim.memory[lockbox.location + i] = 0;
             }
-            return this._topSecurityApi.obtainPassKey(sim, args || {});
+        };
+        const registerRegion = (sim, location, size, label) => {
+            return registry.dispatchMethod(5, 'Add', sim, {
+                location, limit: size - 1, clistCount: 0, gtType: 1, label
+            });
+        };
+        const registerPrivateLockbox = (sim, location, size, label) => {
+            return registry.dispatchMethod(5, 'Add', sim, {
+                // Outform type prevents the backing entry from being resolved
+                // as a normal R/W Inform region. Abstract GTs intentionally
+                // have no NS entry; the independent Navana top-security object
+                // credential remains the only legitimate authority here.
+                location, limit: size - 1, clistCount: 0, gtType: 2, label
+            });
+        };
+        const sourceRegion = (sim, args) => {
+            const sourceGT = args.sourceGT !== undefined ? args.sourceGT
+                : (args.sourceGt !== undefined ? args.sourceGt
+                : (args.gt !== undefined ? args.gt : args.sourceToken));
+            if (!Number.isInteger(sourceGT) && typeof sourceGT !== 'number') {
+                return { ok: false, fault: 'ARGS', message: 'sourceGT capability is required' };
+            }
+            const parsed = sim.parseGT(sourceGT >>> 0);
+            if (parsed.type !== 1) return { ok: false, fault: 'TYPE', message: 'sourceGT must be an Inform memory capability' };
+            if (!parsed.permissions.R) return { ok: false, fault: 'PERM', message: 'sourceGT must grant R permission' };
+            if (!Number.isInteger(parsed.index) || parsed.index < 0 || parsed.index >= sim.MAX_NS_ENTRIES) {
+                return { ok: false, fault: 'BOUNDS', message: 'sourceGT namespace index is out of range' };
+            }
+            const entry = sim.readNSEntry(parsed.index);
+            if (!entry || !sim.isNSEntryValid(parsed.index)) {
+                return { ok: false, fault: 'STALE_KEY', message: 'sourceGT refers to an empty Namespace entry' };
+            }
+            if (sim._bankPrivateSlots && sim._bankPrivateSlots[parsed.index]) {
+                return { ok: false, fault: 'NO_CAPABILITY', message: 'sourceGT cannot resolve private Bank custody' };
+            }
+            if (parsed.gt_seq !== entry.gtSeq) {
+                return { ok: false, fault: 'STALE_KEY', message: 'sourceGT has a stale Namespace sequence' };
+            }
+            const sourceLimit = sim.parseNSWord1(entry.word1_limit).limit;
+            const sourceOffset = args.sourceOffset === undefined ? 0 : args.sourceOffset;
+            const words = args.words === undefined ? (args.size === undefined ? sourceLimit + 1 : args.size) : args.words;
+            if (!Number.isInteger(sourceOffset) || sourceOffset < 0 ||
+                    !Number.isInteger(words) || words <= 0 ||
+                    sourceOffset + words > sourceLimit + 1) {
+                return { ok: false, fault: 'BOUNDS', message: 'sourceOffset and words exceed the capability bounds' };
+            }
+            const start = (entry.word0_location >>> 0) + sourceOffset;
+            if (start < 0 || start + words > sim.memory.length) {
+                return { ok: false, fault: 'BOUNDS', message: 'source region exceeds simulator memory' };
+            }
+            const sourceEnd = start + words - 1;
+            const overlapsPrivateCustody = (sim._bankPrivateRanges || []).some(range =>
+                start <= range.end && sourceEnd >= range.start);
+            if (overlapsPrivateCustody) {
+                return { ok: false, fault: 'NO_CAPABILITY', message: 'sourceGT range overlaps private Bank custody' };
+            }
+            const data = Array.from(sim.memory.slice(start, start + words), word => word >>> 0);
+            return { ok: true, data, words, sourceIndex: parsed.index, sourceOffset, sourcePerms: parsed.permissions };
+        };
+        const safeMetadata = (lockbox) => ({
+            lockboxId: lockbox.id,
+            capacity: lockbox.capacity,
+            state: lockbox.revoked ? 'revoked' : (lockbox.contents ? 'deposited' : 'empty'),
+            deposited: !!lockbox.contents,
+            contentsType: lockbox.contents ? lockbox.contents.kind : null,
+            contentsWords: lockbox.contents ? lockbox.contents.words : 0,
+            withdrawn: lockbox.withdrawn,
+            sequence: lockbox.currentSeq
+        });
+        this._resetBankState = (sim) => {
+            for (const lockbox of Object.values(bankState.lockboxes)) {
+                zeroizeLockbox(sim, lockbox);
+            }
+            bankState.nextId = 0;
+            bankState.lockboxes = {};
+        };
+
+        this.registry.bindMethod(54, 'MintKey', (sim, args = {}) => {
+            if (!sim.mElevation) return fail('MintKey', 'PERM', 'requires M-elevation (Bank authority)');
+            const requested = args.capacity === undefined ? (args.size === undefined ? 64 : args.size) : args.capacity;
+            if (!Number.isInteger(requested) || requested <= 0 || requested > MAX_CAPACITY) {
+                return fail('MintKey', 'BOUNDS', `capacity must be an integer in 1..${MAX_CAPACITY}`);
+            }
+            const id = ++bankState.nextId;
+            const allocation = registry.dispatchMethod(7, 'Allocate', sim, { size: requested });
+            if (!allocation.ok) return fail('MintKey', allocation.fault || 'OOM', allocation.message);
+            const objectName = `Bank.Lockbox.${id}`;
+            const ns = registerPrivateLockbox(sim, allocation.result.location, allocation.result.size, objectName);
+            if (!ns.ok) {
+                releaseAllocation(sim, allocation.result.location);
+                return fail('MintKey', ns.fault || 'NS_FULL', ns.message);
+            }
+            const objectResult = registry.dispatchMethod(5, 'SecureObjectAdd', sim, {
+                name: objectName,
+                methods: ['Deposit', 'Withdraw', 'Inspect', 'Revoke', 'ObtainPassKey']
+            });
+            if (!objectResult.ok) {
+                registry.dispatchMethod(5, 'Remove', sim, { index: ns.result.nsIndex });
+                releaseAllocation(sim, allocation.result.location);
+                return fail('MintKey', objectResult.fault || 'MINT', objectResult.message);
+            }
+            const lockbox = {
+                id,
+                capacity: allocation.result.size,
+                location: allocation.result.location,
+                nsIndex: ns.result.nsIndex,
+                nsVersion: ns.result.version,
+                securityObjectId: objectResult.result.objectId,
+                currentSeq: 1,
+                seq: 1,
+                contents: null,
+                withdrawn: false,
+                revoked: false,
+                createdAt: Date.now()
+            };
+            // The backing record is private custody bookkeeping, not a public
+            // Inform memory capability. Retain an explicit UI marker so the
+            // ordinary Namespace view cannot disclose its address or label.
+            if (!sim._bankPrivateSlots) sim._bankPrivateSlots = {};
+            sim._bankPrivateSlots[ns.result.nsIndex] = { lockboxId: id };
+            protectLockboxRange(sim, lockbox);
+            bankState.lockboxes[id] = lockbox;
+            return {
+                ok: true,
+                result: {
+                    lockboxId: id,
+                    capacity: lockbox.capacity,
+                    bankKey: objectResult.result.ownerPassKey,
+                    passKey: objectResult.result.ownerPassKey
+                },
+                message: `Bank.MintKey: opaque lockbox key issued for lockbox ${id} (${lockbox.capacity}w)`
+            };
+        });
+
+        this.registry.bindMethod(54, 'Deposit', (sim, args = {}) => {
+            const lockbox = lockboxById(args.lockboxId === undefined ? args.objectId : args.lockboxId);
+            const auth = authorize(sim, lockbox, args, 'Deposit');
+            if (!auth.ok) return auth;
+            if (lockbox.contents) return fail('Deposit', 'OCCUPIED', 'lockbox already contains a deposited valuable');
+            const source = sourceRegion(sim, args);
+            if (!source.ok) return fail('Deposit', source.fault, source.message);
+            if (source.words > lockbox.capacity) return fail('Deposit', 'BOUNDS', 'valuable is larger than lockbox capacity');
+            const kind = args.kind === 'lump' || args.lump === true ? 'lump' : 'region';
+            const snapshot = source.data.slice();
+            // No checks remain after this point: commit the copy and metadata
+            // together so every rejected request leaves both regions untouched.
+            for (let i = 0; i < snapshot.length; i++) sim.memory[lockbox.location + i] = snapshot[i];
+            lockbox.contents = {
+                kind, words: source.words, sourceIndex: source.sourceIndex,
+                sourceOffset: source.sourceOffset, sourcePerms: { ...source.sourcePerms },
+                digest: snapshot.reduce((h, word) => (((h * 33) ^ word) >>> 0), 5381)
+            };
+            lockbox.withdrawn = false;
+            return { ok: true, result: safeMetadata(lockbox), message: `Bank.Deposit: ${kind} (${source.words}w) secured in lockbox ${lockbox.id}` };
+        });
+
+        this.registry.bindMethod(54, 'Inspect', (sim, args = {}) => {
+            const lockbox = lockboxById(args.lockboxId === undefined ? args.objectId : args.lockboxId);
+            const auth = authorize(sim, lockbox, args, 'Inspect');
+            if (!auth.ok) return auth;
+            return { ok: true, result: safeMetadata(lockbox), message: `Bank.Inspect: lockbox ${lockbox.id} metadata returned` };
+        });
+
+        this.registry.bindMethod(54, 'Withdraw', (sim, args = {}) => {
+            const lockbox = lockboxById(args.lockboxId === undefined ? args.objectId : args.lockboxId);
+            const auth = authorize(sim, lockbox, args, 'Withdraw');
+            if (!auth.ok) return auth;
+            if (!lockbox.contents) return fail('Withdraw', 'EMPTY', 'lockbox has no deposited valuable');
+            const contents = lockbox.contents;
+            const data = Array.from(sim.memory.slice(lockbox.location, lockbox.location + contents.words), word => word >>> 0);
+            const allocation = registry.dispatchMethod(7, 'Allocate', sim, { size: contents.words });
+            if (!allocation.ok) return fail('Withdraw', allocation.fault || 'OOM', allocation.message);
+            const ns = registerRegion(sim, allocation.result.location, allocation.result.size, `Bank.Withdrawn.${lockbox.id}`);
+            if (!ns.ok) {
+                releaseAllocation(sim, allocation.result.location);
+                return fail('Withdraw', ns.fault || 'NS_FULL', ns.message);
+            }
+            for (let i = 0; i < data.length; i++) sim.memory[allocation.result.location + i] = data[i];
+            const permissions = {
+                R: 1, W: contents.sourcePerms.W ? 1 : 0,
+                X: contents.sourcePerms.X ? 1 : 0
+            };
+            const gt = sim.createGT(ns.result.version, ns.result.nsIndex, permissions, 1);
+            const removed = registry.dispatchMethod(5, 'Remove', sim, { index: lockbox.nsIndex });
+            if (!removed.ok) {
+                registry.dispatchMethod(5, 'Remove', sim, { index: ns.result.nsIndex });
+                for (let i = 0; i < allocation.result.size; i++) {
+                    sim.memory[allocation.result.location + i] = 0;
+                }
+                releaseAllocation(sim, allocation.result.location);
+                return fail('Withdraw', 'NAMESPACE', 'could not retire the lockbox entry; valuable remains in custody');
+            }
+            zeroizeLockbox(sim, lockbox);
+            if (sim._bankPrivateSlots) delete sim._bankPrivateSlots[lockbox.nsIndex];
+            unprotectLockboxRange(sim, lockbox);
+            releaseAllocation(sim, lockbox.location);
+            lockbox.contents = null;
+            lockbox.withdrawn = true;
+            lockbox.revoked = true;
+            lockbox.currentSeq++;
+            lockbox.seq = lockbox.currentSeq;
+            const revoked = this._topSecurityApi.revokeObject(lockbox.securityObjectId);
+            if (!revoked.ok) {
+                // The valuable has already been atomically transferred.  Keep the
+                // lockbox quarantined rather than ever restoring a stale key.
+                lockbox.revoked = true;
+            }
+            return {
+                ok: true,
+                result: {
+                    lockboxId: lockbox.id, withdrawn: true, words: data.length,
+                    gt, size: allocation.result.size
+                },
+                message: `Bank.Withdraw: ${data.length}w released from lockbox ${lockbox.id} as an opaque memory GT`
+            };
+        });
+
+        this.registry.bindMethod(54, 'Revoke', (sim, args = {}) => {
+            const lockbox = lockboxById(args.lockboxId === undefined ? args.objectId : args.lockboxId);
+            const auth = authorize(sim, lockbox, args, 'Revoke', true);
+            if (!auth.ok) return auth;
+            const remove = registry.dispatchMethod(5, 'Remove', sim, { index: lockbox.nsIndex });
+            if (!remove.ok) return fail('Revoke', 'NAMESPACE', 'Namespace removal failed; lockbox remains active');
+            zeroizeLockbox(sim, lockbox);
+            if (sim._bankPrivateSlots) delete sim._bankPrivateSlots[lockbox.nsIndex];
+            unprotectLockboxRange(sim, lockbox);
+            releaseAllocation(sim, lockbox.location);
+            lockbox.contents = null;
+            lockbox.revoked = true;
+            lockbox.currentSeq++;
+            lockbox.seq = lockbox.currentSeq;
+            registry.dispatchMethod(5, 'SecureObjectRevoke', sim, { objectId: lockbox.securityObjectId, passKey: keyFor(args) });
+            return { ok: true, result: { lockboxId: lockbox.id, revoked: true, quarantined: true }, message: `Bank.Revoke: lockbox ${lockbox.id} revoked and custody quarantined` };
+        });
+
+        this.registry.bindMethod(54, 'ObtainPassKey', (sim, args = {}) => {
+            const requestedId = args.lockboxId === undefined ? args.objectId : args.lockboxId;
+            const lockbox = lockboxById(requestedId);
+            if (lockbox) {
+                const auth = authorize(sim, lockbox, args, 'ObtainPassKey', true);
+                if (!auth.ok) return auth;
+                return this._topSecurityApi.obtainPassKey(sim, {
+                    objectId: lockbox.securityObjectId, passKey: keyFor(args)
+                });
+            }
+            // Preserve the previously shipped Bank adapter for programmer-defined
+            // top-security objects that are not Bank lockboxes.
+            if (!this._topSecurityApi) return fail('ObtainPassKey', 'NOT_INIT', 'Bank authority is not initialized');
+            return this._topSecurityApi.obtainPassKey(sim, args);
+        });
+
+        this.registry.bindMethod(54, 'List', (sim, args = {}) => {
+            const entries = Object.values(bankState.lockboxes).map(safeMetadata);
+            return { ok: true, result: entries, message: `Bank.List: ${entries.length} lockbox record(s)` };
         });
     }
 
@@ -1691,6 +2064,11 @@ class SystemAbstractions {
         }
 
         memState._doAllocate = doAllocate;
+        this._resetDynamicMemoryState = () => {
+            memState.allocations = {};
+            memState.freeList = [];
+            memState.nextFreeAddr = 11 * 0x100;
+        };
 
         this.registry.bindMethod(7, 'Allocate', function(sim, args) {
             return doAllocate(sim, args.size || 16, 'PhysicalPool.Allocate');

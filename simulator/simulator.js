@@ -835,6 +835,15 @@ class ChurchSimulator {
     }
 
     reset() {
+        // Dynamic system services hold authority state outside the raw NS
+        // words. Retire it before replacing memory so no credential, range
+        // guard, or allocator record can survive a same-instance hard reset.
+        if (this.systemAbstractions &&
+                typeof this.systemAbstractions.onSimulatorReset === 'function') {
+            this.systemAbstractions.onSimulatorReset(this);
+        }
+        this._bankPrivateSlots = {};
+        this._bankPrivateRanges = [];
         // Presentation hints are rebuildable metadata, never lifecycle state.
         this._nsUiTypeHint = {};
         this._nsClistCount = {};
@@ -3156,6 +3165,20 @@ class ChurchSimulator {
         const entry = this.readNSEntry(parsed.index);
         if (!entry) {
             return { ok: false, fault: 'BOUNDS', message: `namespace entry ${parsed.index} is null` };
+        }
+        // Bank lockbox backing entries are Namespace bookkeeping only.  They
+        // must never become a memory-resolution oracle even if an attacker
+        // guesses the dynamic slot and builds an Inform-shaped GT by hand.
+        if (this._bankPrivateSlots && this._bankPrivateSlots[parsed.index]) {
+            return { ok: false, fault: 'NO_CAPABILITY', message: 'Bank private custody entry is not directly resolvable' };
+        }
+        const entryBase = entry.word0_location >>> 0;
+        const entryLimit = this.parseNSWord1(entry.word1_limit).limit;
+        const entryEnd = entryBase + entryLimit;
+        const overlapsPrivateBankRange = (this._bankPrivateRanges || []).some(range =>
+            entryBase <= range.end && entryEnd >= range.start);
+        if (overlapsPrivateBankRange) {
+            return { ok: false, fault: 'NO_CAPABILITY', message: 'Namespace entry overlaps private Bank custody' };
         }
         const nsGtSeq = this.parseNSWord1(entry.word1_limit).gtSeq;
         const versionMatch = parsed.gt_seq === nsGtSeq;

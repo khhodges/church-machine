@@ -1,0 +1,54 @@
+// Bank — dynamic Namespace-backed lockbox custody contract.
+//
+// Bank is a system abstraction registered at catalog index 54. It is NOT a
+// hardware boot slot: Bank.MintKey dynamically allocates the private region
+// and registers its lockbox entry through Memory.Allocate → Navana.Add.
+//
+// A Bank key is a Navana top-security PassKey:
+//   - object-scoped Abstract GT identifier
+//   - independently generated 128-bit proof (four 32-bit words)
+// Both are required. The JS binding owns the CSPRNG, key registry, Namespace
+// allocation, cleanup, and atomic error handling; this source documents the
+// high-level contract rather than attempting to model those host services.
+
+abstraction Bank {
+    capabilities {
+    }
+
+    // MintKey(capacity) requires M-elevated programmer authority. It returns
+    // an opaque owner PassKey for one empty dynamic lockbox.
+    method MintKey(capacity) {
+        return(0)
+    }
+
+    // Deposit(lockbox_key, source_gt, offset, words, kind) accepts only a
+    // current Inform GT with R permission. The source range is checked before
+    // any custody copy is committed. kind is "lump" or "region".
+    method Deposit(lockbox_key, source_gt, offset, words, kind) {
+        return(0)
+    }
+
+    // Withdraw(lockbox_key) copies the valuable into a newly registered
+    // region, returns that fresh GT, then invalidates the lockbox record.
+    method Withdraw(lockbox_key) {
+        return(0)
+    }
+
+    // Inspect(lockbox_key) returns only state, type, word count, and sequence;
+    // it never returns a private location, Namespace slot, contents, or proof.
+    method Inspect(lockbox_key) {
+        return(0)
+    }
+
+    // Revoke(owner_key) invalidates all credentials for this lockbox and
+    // quarantines its private Namespace-backed record.
+    method Revoke(owner_key) {
+        return(0)
+    }
+
+    // ObtainPassKey(owner_key) issues a new owner-equivalent PassKey after
+    // proof verification. The old credential remains valid until Revoke.
+    method ObtainPassKey(owner_key) {
+        return(0)
+    }
+}

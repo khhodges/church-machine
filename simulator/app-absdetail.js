@@ -372,6 +372,26 @@ function showAbstractionDetail(index, methodName) {
     html += `<div class="abs-detail-desc">${abs.description}</div>`;
     html += '</div>';
 
+    if (abs.index === 54 && typeof sim !== 'undefined' && sim &&
+            sim.systemAbstractions &&
+            typeof sim.systemAbstractions.getBankLockboxes === 'function') {
+        const boxes = sim.systemAbstractions.getBankLockboxes();
+        const rows = boxes.length
+            ? boxes.map(box => {
+                const content = box.state === 'deposited'
+                    ? `${box.contentsType} · ${box.contentsWords} words`
+                    : box.state;
+                return `<li>Lockbox ${box.lockboxId}: <strong>${content}</strong> · sequence ${box.sequence}</li>`;
+            }).join('')
+            : '<li>No lockboxes have been minted in this simulator session.</li>';
+        html += '<div class="abs-detail-section">' +
+            '<div class="abs-detail-section-title">Safe custody status</div>' +
+            `<ul style="margin:0.35rem 0 0 1.15rem;color:#b8b8c5;">${rows}</ul>` +
+            '<div style="margin-top:0.45rem;color:#777;font-size:0.76rem;">' +
+            'Locations, Namespace entries, contents, and PassKey proofs are intentionally not displayed.</div>' +
+            '</div>';
+    }
+
     {
         let clistLoaded = false;
         let cc = 0;
