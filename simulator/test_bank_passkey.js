@@ -4,6 +4,12 @@
 const ChurchSimulator = require('./simulator.js');
 const AbstractionRegistry = require('./abstractions.js');
 const SystemAbstractions = require('./system_abstractions.js');
+// Bank.Recover consumes a server grant synchronously in the browser. Model the
+// authorised bridge here; server endpoint coverage verifies its real response.
+global.XMLHttpRequest = class {
+    open() {}
+    send() { this.status = 200; }
+};
 
 let pass = 0;
 let fail = 0;
@@ -260,9 +266,13 @@ const rollbackDeposit = registry.dispatchMethod(54, 'Deposit', sim, {
 const rollbackDestination = systemAbs._memoryState.nextFreeAddr;
 const originalDispatch = registry.dispatchMethod;
 registry.dispatchMethod = function(index, method, targetSim, methodArgs) {
-    if (index === 5 && method === 'Remove' && methodArgs &&
-            methodArgs.index === rollbackRecord.nsIndex) {
-        return { ok: false, fault: 'INJECTED', message: 'old lockbox removal refused' };
+    if (index === 5 && method === 'Remove' && methodArgs) {
+        return {
+            ok: false,
+            fault: 'INJECTED',
+            message: methodArgs.index === rollbackRecord.nsIndex
+                ? 'old lockbox removal refused' : 'withdraw destination cleanup refused'
+        };
     }
     return originalDispatch.call(this, index, method, targetSim, methodArgs);
 };
@@ -270,10 +280,48 @@ const rollbackWithdraw = registry.dispatchMethod(54, 'Withdraw', sim, {
     lockboxId: rollbackBox.result.lockboxId, bankKey: rollbackBox.result.bankKey
 });
 registry.dispatchMethod = originalDispatch;
-check('BANK19: failed withdrawal zeroizes the copied destination before release',
+check('BANK19: failed withdrawal zeroizes and quarantines a destination whose Namespace cleanup fails',
     rollbackDeposit.ok && !rollbackWithdraw.ok &&
     Array.from(sim.memory.slice(rollbackDestination, rollbackDestination + 64))
-        .every(word => word === 0));
+        .every(word => word === 0) &&
+    systemAbs._memoryState.allocations[rollbackDestination] &&
+    sim._bankQuarantinedAllocations[rollbackDestination]);
+
+const recoverable = registry.dispatchMethod(54, 'MintKey', sim, { capacity: 8 });
+const recoverableDeposit = registry.dispatchMethod(54, 'Deposit', sim, {
+    lockboxId: recoverable.result.lockboxId,
+    bankKey: recoverable.result.bankKey,
+    sourceGT,
+    words: sourceWords.length,
+    kind: 'lump'
+});
+const exportedRecovery = registry.dispatchMethod(54, 'ExportRecovery', sim, {
+    lockboxId: recoverable.result.lockboxId,
+    bankKey: recoverable.result.bankKey
+});
+const recoveryState = exportedRecovery.ok ? exportedRecovery.result.recoveryState : null;
+const oldRecoveryNsVersion = systemAbs._bankState.lockboxes[recoverable.result.lockboxId].nsVersion;
+check('BANK19b: recovery export is encrypted, proof-bound, and contains no raw proof',
+    recoverableDeposit.ok && exportedRecovery.ok && recoveryState &&
+    recoveryState.credential && recoveryState.credential.proofCommitment &&
+    recoveryState.cipher && typeof recoveryState.cipher.ciphertext === 'string' &&
+    !JSON.stringify(recoveryState).includes(JSON.stringify(recoverable.result.bankKey.proof)));
+
+const revokedRecovery = registry.dispatchMethod(54, 'MintKey', sim, { capacity: 4 });
+const revokedRecoveryDeposit = registry.dispatchMethod(54, 'Deposit', sim, {
+    lockboxId: revokedRecovery.result.lockboxId,
+    bankKey: revokedRecovery.result.bankKey,
+    sourceGT,
+    words: sourceWords.length
+});
+const revokedRecoveryState = registry.dispatchMethod(54, 'ExportRecovery', sim, {
+    lockboxId: revokedRecovery.result.lockboxId,
+    bankKey: revokedRecovery.result.bankKey
+});
+const revokedRecoveryCall = registry.dispatchMethod(54, 'Revoke', sim, {
+    lockboxId: revokedRecovery.result.lockboxId,
+    bankKey: revokedRecovery.result.bankKey
+});
 
 sim.reset();
 check('BANK20: same-instance reset clears Bank custody, credentials, and private guards',
@@ -284,12 +332,86 @@ check('BANK20: same-instance reset clears Bank custody, credentials, and private
     !registry.dispatchMethod(54, 'Inspect', sim, { lockboxId, bankKey }).ok);
 registry.dispatchMethod(5, 'Init', sim, {});
 sim.mElevation = true;
+const recoveryAllocationsBefore = Object.keys(systemAbs._memoryState.allocations).sort();
+const corruptRecovery = JSON.parse(JSON.stringify(recoveryState));
+corruptRecovery.cipher.tag = corruptRecovery.cipher.tag.replace(/^./, corruptRecovery.cipher.tag[0] === '0' ? '1' : '0');
+systemAbs.registerBankRecoveryGrant({
+    token: 'server-grant-corrupt', lockboxId: recoverable.result.lockboxId, recoveryState: corruptRecovery
+});
+const rejectedCorruptRecovery = registry.dispatchMethod(54, 'Recover', sim, {
+    lockboxId: recoverable.result.lockboxId,
+    recoveryGrant: 'server-grant-corrupt',
+    bankKey: recoverable.result.bankKey
+});
+check('BANK20b: corrupted recovery state is rejected without allocating Namespace state',
+    !rejectedCorruptRecovery.ok && rejectedCorruptRecovery.fault === 'CORRUPT' &&
+    JSON.stringify(Object.keys(systemAbs._memoryState.allocations).sort()) ===
+        JSON.stringify(recoveryAllocationsBefore));
+const staleRecoveryKey = {
+    gt: recoverable.result.bankKey.gt,
+    proof: recoverable.result.bankKey.proof.map((word, i) => i === 0 ? (word ^ 1) >>> 0 : word)
+};
+systemAbs.registerBankRecoveryGrant({
+    token: 'server-grant-stale', lockboxId: recoverable.result.lockboxId, recoveryState
+});
+const rejectedStaleRecovery = registry.dispatchMethod(54, 'Recover', sim, {
+    lockboxId: recoverable.result.lockboxId,
+    recoveryGrant: 'server-grant-stale',
+    bankKey: staleRecoveryKey
+});
+check('BANK20c: stale recovery credentials are rejected before allocation',
+    !rejectedStaleRecovery.ok && rejectedStaleRecovery.fault === 'STALE_KEY' &&
+    JSON.stringify(Object.keys(systemAbs._memoryState.allocations).sort()) ===
+        JSON.stringify(recoveryAllocationsBefore));
+systemAbs.registerBankRecoveryGrant({
+    token: 'server-grant-revoked', lockboxId: revokedRecovery.result.lockboxId,
+    recoveryState: revokedRecoveryState.result.recoveryState
+});
+const rejectedRevokedRecovery = registry.dispatchMethod(54, 'Recover', sim, {
+    lockboxId: revokedRecovery.result.lockboxId,
+    recoveryGrant: 'server-grant-revoked',
+    bankKey: revokedRecovery.result.bankKey
+});
+check('BANK20d: revoked credentials cannot recover an exported lockbox',
+    revokedRecoveryDeposit.ok && revokedRecoveryCall.ok &&
+    !rejectedRevokedRecovery.ok && rejectedRevokedRecovery.fault === 'REVOKED');
+systemAbs.registerBankRecoveryGrant({
+    token: 'server-grant-success', lockboxId: recoverable.result.lockboxId, recoveryState
+});
+const recovered = registry.dispatchMethod(54, 'Recover', sim, {
+    lockboxId: recoverable.result.lockboxId,
+    recoveryGrant: 'server-grant-success',
+    bankKey: recoverable.result.bankKey
+});
+const recoveredRecord = recovered.ok && systemAbs._bankState.lockboxes[recoverable.result.lockboxId];
+check('BANK20e: recovery restores words into a fresh private Namespace entry and replacement key',
+    recovered.ok && recovered.result.recovered && recovered.result.sequence > 1 &&
+    recovered.result.bankKey.gt !== recoverable.result.bankKey.gt &&
+    recoveredRecord && sourceWords.every((word, index) =>
+        sim.memory[recoveredRecord.location + index] === word) &&
+    sim.readNSEntry(recoveredRecord.nsIndex).gtType === 2 &&
+    recoveredRecord.nsVersion !== oldRecoveryNsVersion);
+const oldRecoveryKeyRejected = registry.dispatchMethod(54, 'Inspect', sim, {
+    lockboxId: recoverable.result.lockboxId,
+    bankKey: recoverable.result.bankKey
+});
+const replayRecoveryRejected = registry.dispatchMethod(54, 'Recover', sim, {
+    lockboxId: recoverable.result.lockboxId,
+    recoveryGrant: 'server-grant-success',
+    bankKey: recoverable.result.bankKey
+});
+check('BANK20f: recovery rotates credentials and consumes the old envelope',
+    !oldRecoveryKeyRejected.ok && !replayRecoveryRejected.ok &&
+    replayRecoveryRejected.fault === 'STALE_KEY');
+
+const originalAllocOrFind = sim.allocOrFindNsSlot;
 sim.allocOrFindNsSlot = () => null; // model a Namespace with no free dynamic slot
 const allocationKeysBeforeExhaustion = Object.keys(systemAbs._memoryState.allocations).sort();
 const exhausted = registry.dispatchMethod(54, 'MintKey', sim, { capacity: 4 });
+sim.allocOrFindNsSlot = originalAllocOrFind;
 check('BANK21: Namespace exhaustion rolls back the unregistered lockbox allocation',
     !exhausted.ok && exhausted.fault === 'NS_FULL' &&
-    systemAbs.getBankLockboxes().length === 0 &&
+    systemAbs.getBankLockboxes().length === 1 &&
     JSON.stringify(Object.keys(systemAbs._memoryState.allocations).sort()) ===
         JSON.stringify(allocationKeysBeforeExhaustion));
 

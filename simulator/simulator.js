@@ -844,6 +844,7 @@ class ChurchSimulator {
         }
         this._bankPrivateSlots = {};
         this._bankPrivateRanges = [];
+        this._bankQuarantinedAllocations = {};
         // Presentation hints are rebuildable metadata, never lifecycle state.
         this._nsUiTypeHint = {};
         this._nsClistCount = {};

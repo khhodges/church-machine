@@ -137,6 +137,8 @@ const API_DATA = [
             { name: 'Inspect',       signature: 'Inspect(lockboxId, bankKey) → metadata', perms: 'E + bank key', description: 'Return safe custody state, size, type, and sequence metadata without revealing contents or Namespace location.', implemented: true },
             { name: 'Revoke',        signature: 'Revoke(lockboxId, ownerKey) → ok', perms: 'E + owner key', description: 'Invalidate all lockbox keys and quarantine its Namespace-backed custody record.', implemented: true },
             { name: 'ObtainPassKey', signature: 'ObtainPassKey(lockboxId, ownerKey) → bankKey', perms: 'E + owner key + proof', description: 'Reissue a fresh object-scoped passkey for an existing lockbox after proving ownership with the current key.', implemented: true },
+            { name: 'ExportRecovery', signature: 'ExportRecovery(lockboxId, ownerKey) → protectedState', perms: 'E + owner key + proof', description: 'Create proof-bound authenticated recovery ciphertext without persisting the raw PassKey proof.', implemented: true },
+            { name: 'Recover',       signature: 'Recover(protectedState, originalKey) → freshBankKey', perms: 'E + M + original key + proof', description: 'Restore a valuable into a fresh private Namespace entry and issue a replacement owner PassKey.', implemented: true },
             { name: 'List',          signature: 'List() → metadata[]', perms: 'E', description: 'List non-sensitive status metadata for active and revoked lockboxes.', implemented: true }
         ]
     },

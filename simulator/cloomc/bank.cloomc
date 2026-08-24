@@ -51,4 +51,16 @@ abstraction Bank {
     method ObtainPassKey(owner_key) {
         return(0)
     }
+
+    // ExportRecovery(owner_key) emits authenticated ciphertext derived from
+    // the original object-scoped owner credential. It contains no raw proof.
+    method ExportRecovery(owner_key) {
+        return(0)
+    }
+
+    // Recover(protected_state, original_key) verifies the original credential,
+    // then creates a fresh private Namespace entry and replacement owner key.
+    method Recover(protected_state, original_key) {
+        return(0)
+    }
 }

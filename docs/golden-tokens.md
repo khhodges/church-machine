@@ -258,6 +258,8 @@ read or write access to the stored region.
 | `Inspect` | Lockbox key | Non-sensitive state and size metadata |
 | `Withdraw` | Lockbox key | Fresh GT for a copied-out valuable; lockbox is quarantined |
 | `Revoke` | Owner key | All lockbox credentials invalidated; custody record quarantined |
+| `ExportRecovery` | Owner key | Authenticated ciphertext bound to the original owner GT and proof |
+| `Recover` | Original owner key + M-elevation | Fresh private NS entry and a replacement owner key |
 
 Deposits validate the source GT type, current Namespace sequence, `R`
 permission, and offset/length bounds before writing any lockbox state. A
@@ -271,10 +273,34 @@ overlapping Namespace registrations and memory resolution, so a copied or
 guessed alias cannot bypass custody. The record is shown
 only as opaque “Bank private custody” in the Namespace UI. UI status may show a
 lockbox’s state and word count, but never its location, Namespace entry number,
-stored contents, proof, or private key. A same-instance hard reset zeroizes
-every active lockbox, removes its credentials and private-range guards, and
-starts a new Bank session; durable recovery is intentionally not part of this
-initial custody model.
+stored contents, proof, or private key.
+
+### Restart recovery
+
+`ExportRecovery` serializes a deposited valuable as an authenticated ciphertext.
+Its encryption key is derived from the original owner GT, its independent
+128-bit proof, and the fixed Bank recovery policy. The envelope contains a
+proof commitment, ciphertext, nonce, and authentication tag — **never raw proof
+words**. The server’s `/api/bank-custody` vault stores that already-protected
+envelope inside a separate authenticated encryption layer derived from the
+deployment secret. Recovery and revocation requests present the proof only in
+memory for comparison; the server neither stores nor logs it.
+
+After a simulator reset, `Recover` validates the original credential and
+envelope before allocating anything. It registers a new private Outform
+Namespace entry with a sequence distinct from the retired entry's sequence,
+copies the
+valuable only after every allocation succeeds, and issues a new owner PassKey.
+The old credential cannot operate on the restored lockbox. A bad tag,
+malformed payload, stale GT/proof, replayed envelope, or a revoked vault is
+rejected without publishing a Namespace entry or changing the existing
+allocation state. The server atomically claims a vault before returning its
+envelope, so it cannot issue a second recovery response; a server-side revoke
+records a durable tombstone, so an exported pre-revocation envelope cannot be
+recovered later through the server. If any local Namespace registration fails,
+the simulator releases the unregistered allocation before publishing the
+valuable; a failed withdrawal cleanup instead wipes and quarantines its
+destination allocation so a live alias can never observe reused memory.
 
 ---
 

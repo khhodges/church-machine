@@ -1,5 +1,52 @@
 var _crDetailHighlightPC = null;
 
+// Durable Bank custody bridge. Proofs are sent only in the immediate
+// authorised request body; neither this helper nor localStorage retains them.
+window.BankCustodyVault = {
+    async save(lockboxId, bankKey) {
+        const exported = abstractionRegistry.dispatchMethod(54, 'ExportRecovery', sim, {
+            lockboxId, bankKey
+        });
+        if (!exported.ok) throw new Error(exported.message || 'Bank recovery export failed');
+        const response = await fetch('/api/bank-custody', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state: exported.result.recoveryState })
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || 'Could not save protected custody state');
+        return body.vault_id;
+    },
+    async recover(vaultId, bankKey) {
+        const response = await fetch(`/api/bank-custody/${encodeURIComponent(vaultId)}/recover`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ gt: bankKey.gt, proof: bankKey.proof })
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || 'Bank recovery was rejected');
+        const system = sim.systemAbstractions;
+        if (!system.registerBankRecoveryGrant({
+            token: body.recovery_grant, lockboxId: body.state.lockboxId,
+            recoveryState: body.state
+        })) throw new Error('Bank recovery grant is invalid');
+        const recovered = abstractionRegistry.dispatchMethod(54, 'Recover', sim, {
+            lockboxId: body.state.lockboxId, recoveryGrant: body.recovery_grant, bankKey
+        });
+        if (!recovered.ok) throw new Error(recovered.message || 'Bank recovery could not restore custody');
+        return recovered.result;
+    },
+    async revoke(vaultId, lockboxId, bankKey) {
+        const response = await fetch(`/api/bank-custody/${encodeURIComponent(vaultId)}/revoke`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ gt: bankKey.gt, proof: bankKey.proof })
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || 'Could not revoke custody vault');
+        const revoked = abstractionRegistry.dispatchMethod(54, 'Revoke', sim, { lockboxId, bankKey });
+        if (!revoked.ok) throw new Error(revoked.message || 'Bank lockbox revoke failed');
+        return revoked.result;
+    }
+};
+
 // ── ns-state.json committed slot→token map ───────────────────────────────────
 // Fetched once at load and refreshed after every successful Save Namespace.
 // _findSrcLump uses this as its primary lookup to avoid the 3-level fallback.

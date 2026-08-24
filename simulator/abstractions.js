@@ -571,8 +571,8 @@ class AbstractionRegistry {
         // boot slot. Its keys delegate through Navana's object-scoped credential
         // registry and never expose a lockbox Namespace index.
         this.createAbstraction(54, 'Bank', 1,
-            ['MintKey', 'Deposit', 'Withdraw', 'Inspect', 'Revoke', 'ObtainPassKey', 'List'],
-            'Namespace-backed custody authority — mints opaque revocable lockbox keys, accepts capability-bounded LUMP or memory-region deposits, returns valuables through fresh memory GTs, exposes non-sensitive metadata, and revokes custody. PassKey proofs never leave the credential boundary.',
+            ['MintKey', 'Deposit', 'Withdraw', 'Inspect', 'Revoke', 'ObtainPassKey', 'ExportRecovery', 'Recover', 'List'],
+            'Namespace-backed custody authority — mints opaque revocable lockbox keys, accepts capability-bounded LUMP or memory-region deposits, returns valuables through fresh memory GTs, and restores proof-bound encrypted recovery state through a fresh Namespace entry and PassKey. PassKey proofs never leave the credential boundary.',
             { author: 'Church Machine', version: '1.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, freedNSSlot: true });
     }
 }

@@ -207,6 +207,8 @@ Namespace-backed custody service. Lockbox keys are opaque, revocable PassKeys pa
 | Inspect | `Inspect(lockboxId, bankKey) → metadata` | E + bank key | Return safe custody state, size, type, and sequence metadata without revealing contents or Namespace location. |
 | Revoke | `Revoke(lockboxId, ownerKey) → ok` | E + owner key | Invalidate all lockbox keys and quarantine its Namespace-backed custody record. |
 | ObtainPassKey | `ObtainPassKey(lockboxId, ownerKey) → bankKey` | E + owner key + proof | Reissue a fresh object-scoped passkey for an existing lockbox after proving ownership with the current key. |
+| ExportRecovery | `ExportRecovery(lockboxId, ownerKey) → protectedState` | E + owner key + proof | Create proof-bound authenticated recovery ciphertext without persisting the raw PassKey proof. |
+| Recover | `Recover(protectedState, originalKey) → freshBankKey` | E + M + original key + proof | Restore a valuable into a fresh private Namespace entry and issue a replacement owner PassKey. |
 | List | `List() → metadata[]` | E | List non-sensitive status metadata for active and revoked lockboxes. |
 
 ---

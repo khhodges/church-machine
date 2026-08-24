@@ -35,6 +35,11 @@ _lumps_manifest_lock = threading.Lock()
 # finished their Phase-1 manifest read before either enters Phase 7, making
 # the race window deterministic.  None in production (no overhead).
 _lumps_manifest_pre_write_hook: "threading.Callable | None" = None
+import hashlib
+import hmac
+import time
+_BANK_CUSTODY_AAD = b"church-machine-bank-custody-v1"
+_bank_custody_lock = threading.RLock()
 
 
 def _atomic_write_json(path: str, data) -> None:
@@ -58,6 +63,10 @@ def _atomic_write_json(path: str, data) -> None:
             pass
         raise
 
+def _bank_custody_key() -> bytes:
+    return hashlib.sha256(
+        ("ChurchMachine.BankCustody|" + str(app.secret_key)).encode("utf-8")
+    ).digest()
 def _push_device_event(payload: dict):
     """Broadcast a JSON event to all open SSE connections."""
     msg = "data: " + json.dumps(payload) + "\n\n"
@@ -1561,6 +1570,56 @@ def sitemap_xml():
 def health():
     return jsonify({"status": "ok"})
 
+@app.route("/api/bank-custody", methods=["POST"])
+def save_bank_custody():
+    """Store a proof-free, client-encrypted Bank recovery envelope."""
+    data = request.get_json(silent=True) or {}
+    vault_id = _bank_custody_vault_id(data.get("vault_id"))
+    state = _bank_custody_validate_state(data.get("state"))
+    if not state or (data.get("vault_id") is not None and not vault_id):
+        return jsonify({"ok": False, "error": "invalid protected custody state"}), 400
+    # New vault identifiers are server-issued CSPRNG values. A caller may
+    # provide an existing one only when updating it with the current proof.
+    requested_vault_id = vault_id
+    credential = state["credential"]
+    with _bank_custody_lock:
+        row = (db.session.execute(_sa_text(
+            "SELECT revoked, consumed, revision FROM bank_custody WHERE vault_id = :vault_id"
+        ), {"vault_id": vault_id}).mappings().first() if vault_id else None)
+        if requested_vault_id and row:
+            _, _, error = _bank_custody_authorize_request(vault_id, data)
+            if error:
+                return error
+        if row and (row["revoked"] or row["consumed"]):
+            return jsonify({"ok": False, "error": "custody vault is retired"}), 409
+        if not row:
+            vault_id = secrets.token_urlsafe(32).replace("-", "a").replace("_", "b")
+        revision = int(row["revision"]) + 1 if row else 1
+        try:
+            db.session.execute(_sa_text("""
+                INSERT INTO bank_custody
+                    (vault_id, protected_state, credential_gt, proof_commitment, revoked, revision, updated_at)
+                VALUES (:vault_id, :protected_state, :credential_gt, :proof_commitment, 0, :revision, :updated_at)
+                ON CONFLICT(vault_id) DO UPDATE SET
+                    protected_state = excluded.protected_state,
+                    credential_gt = excluded.credential_gt,
+                    proof_commitment = excluded.proof_commitment,
+                    revoked = 0,
+                    revision = excluded.revision,
+                    updated_at = excluded.updated_at
+            """), {
+                "vault_id": vault_id,
+                "protected_state": _bank_custody_protect(state),
+                "credential_gt": credential["gt"] & 0xFFFFFFFF,
+                "proof_commitment": credential["proofCommitment"].lower(),
+                "revision": revision,
+                "updated_at": time.time()
+            })
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            return jsonify({"ok": False, "error": "could not save protected custody state"}), 500
+    return jsonify({"ok": True, "vault_id": vault_id, "revision": revision})
 @app.route("/favicon.ico")
 def favicon():
     return redirect("/simulator/favicon.svg", code=301)
@@ -11654,6 +11713,29 @@ with app.app_context():
         pass
     logging.info("ns_keystore table ready")
 
+    db.session.execute(_sa_text("""
+        CREATE TABLE IF NOT EXISTS bank_custody (
+            vault_id         TEXT PRIMARY KEY,
+            protected_state  TEXT NOT NULL,
+            credential_gt    INTEGER NOT NULL,
+            proof_commitment TEXT NOT NULL,
+            revoked          INTEGER NOT NULL DEFAULT 0,
+            consumed         INTEGER NOT NULL DEFAULT 0,
+            recovery_grant   TEXT,
+            revision         INTEGER NOT NULL DEFAULT 1,
+            updated_at       REAL NOT NULL DEFAULT 0.0
+        )
+    """))
+    _bank_custody_columns = {c["name"] for c in _sa_inspect(db.engine).get_columns("bank_custody")}
+    if "consumed" not in _bank_custody_columns:
+        db.session.execute(_sa_text(
+            "ALTER TABLE bank_custody ADD COLUMN consumed INTEGER NOT NULL DEFAULT 0"
+        ))
+    if "recovery_grant" not in _bank_custody_columns:
+        db.session.execute(_sa_text("ALTER TABLE bank_custody ADD COLUMN recovery_grant TEXT"))
+    db.session.commit()
+    logging.info("bank_custody table ready")
+
 
     _existing_launch = {t.test_id: t for t in LaunchTest.query.all()}
     for seed_id, seed_name, seed_desc, _auto in LAUNCH_TESTS_SEED:
@@ -15321,6 +15403,220 @@ def _read_manifest_safe(manifest_path):
         raise ValueError(
             f"manifest.json at {manifest_path!r} could not be read: {_exc}"
         ) from _exc
+
+
+@app.route("/api/bank-custody/<vault_id>/revoke", methods=["POST"])
+def revoke_bank_custody(vault_id):
+    vault_id = _bank_custody_vault_id(vault_id)
+    if not vault_id:
+        return jsonify({"ok": False, "error": "invalid vault id"}), 400
+    with _bank_custody_lock:
+        row, _, error = _bank_custody_authorize_request(vault_id, request.get_json(silent=True) or {})
+        if error:
+            return error
+        try:
+            db.session.execute(_sa_text("""
+                UPDATE bank_custody SET revoked = 1, revision = revision + 1, updated_at = :updated_at
+                WHERE vault_id = :vault_id
+            """), {"vault_id": vault_id, "updated_at": time.time()})
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            return jsonify({"ok": False, "error": "could not revoke custody vault"}), 500
+    return jsonify({"ok": True, "vault_id": vault_id, "revoked": True})
+
+@app.route("/api/bank-custody/<vault_id>", methods=["DELETE"])
+def delete_bank_custody(vault_id):
+    vault_id = _bank_custody_vault_id(vault_id)
+    if not vault_id:
+        return jsonify({"ok": False, "error": "invalid vault id"}), 400
+    with _bank_custody_lock:
+        _, _, error = _bank_custody_authorize_request(vault_id, request.get_json(silent=True) or {})
+        if error:
+            return error
+        try:
+            db.session.execute(_sa_text("DELETE FROM bank_custody WHERE vault_id = :vault_id"),
+                {"vault_id": vault_id})
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            return jsonify({"ok": False, "error": "could not delete custody vault"}), 500
+    return jsonify({"ok": True, "vault_id": vault_id, "deleted": True})
+
+
+def _bank_custody_request_commitment(data, state):
+    proof = data.get("proof")
+    gt = data.get("gt")
+    credential = state.get("credential", {})
+    if (not isinstance(gt, int) or gt < 0 or gt > 0xFFFFFFFF or
+            not isinstance(proof, list) or len(proof) != 4 or
+            any(not isinstance(word, int) or word < 0 or word > 0xFFFFFFFF for word in proof)):
+        return None
+    policy = credential.get("policy")
+    material = f"ChurchMachine.BankCredential.v1|{gt}|{','.join(str(word) for word in proof)}|{policy}"
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+@app.route("/api/bank-custody/<vault_id>/recover", methods=["POST"])
+def recover_bank_custody(vault_id):
+    vault_id = _bank_custody_vault_id(vault_id)
+    if not vault_id:
+        return jsonify({"ok": False, "error": "invalid vault id"}), 400
+    with _bank_custody_lock:
+        row, state, error = _bank_custody_authorize_request(vault_id, request.get_json(silent=True) or {})
+        if error:
+            return error
+        if row["revoked"] or row["consumed"]:
+            return jsonify({"ok": False, "error": "custody vault is retired"}), 409
+        try:
+            recovery_grant = secrets.token_urlsafe(32)
+            claimed = db.session.execute(_sa_text("""
+                UPDATE bank_custody SET consumed = 1, recovery_grant = :recovery_grant,
+                    revision = revision + 1, updated_at = :updated_at
+                WHERE vault_id = :vault_id AND revoked = 0 AND consumed = 0
+            """), {"vault_id": vault_id, "recovery_grant": recovery_grant, "updated_at": time.time()})
+            if claimed.rowcount != 1:
+                db.session.rollback()
+                return jsonify({"ok": False, "error": "custody vault was already claimed"}), 409
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            return jsonify({"ok": False, "error": "could not claim custody vault"}), 500
+    # State holds client-side ciphertext and a commitment only. The browser
+    # still needs the submitted proof to open it and install a fresh NS entry.
+    return jsonify({
+        "ok": True,
+        "vault_id": vault_id,
+        "revision": int(row["revision"]) + 1,
+        "recovery_grant": recovery_grant,
+        "state": state
+    })
+
+
+@app.route("/api/bank-custody/grant/<grant>/consume", methods=["POST"])
+def consume_bank_custody_grant(grant):
+    if not isinstance(grant, str) or len(grant) < 32:
+        return jsonify({"ok": False, "error": "invalid recovery grant"}), 400
+    with _bank_custody_lock:
+        row = db.session.execute(_sa_text("""
+            SELECT vault_id, revoked FROM bank_custody WHERE recovery_grant = :grant AND consumed = 1
+        """), {"grant": grant}).mappings().first()
+        if not row or row["revoked"]:
+            return jsonify({"ok": False, "error": "recovery grant is no longer valid"}), 403
+        db.session.execute(_sa_text("""
+            UPDATE bank_custody SET recovery_grant = NULL WHERE vault_id = :vault_id
+        """), {"vault_id": row["vault_id"]})
+        db.session.commit()
+    return jsonify({"ok": True, "vault_id": row["vault_id"]})
+
+def _bank_custody_has_raw_proof(value) -> bool:
+    if isinstance(value, dict):
+        for key, nested in value.items():
+            normalized = str(key).replace("_", "").replace("-", "").lower()
+            if normalized in {"proof", "passkeyproof", "bankkeyproof"}:
+                return True
+            if _bank_custody_has_raw_proof(nested):
+                return True
+    elif isinstance(value, list):
+        return any(_bank_custody_has_raw_proof(item) for item in value)
+    return False
+
+def _bank_custody_stream(key: bytes, nonce: bytes, length: int) -> bytes:
+    output = bytearray()
+    counter = 0
+    while len(output) < length:
+        output.extend(hashlib.sha256(
+            key + nonce + counter.to_bytes(4, "big")
+        ).digest())
+        counter += 1
+    return bytes(output[:length])
+
+def _bank_custody_unprotect(encoded: str) -> dict:
+    try:
+        packed = base64.urlsafe_b64decode(encoded.encode("ascii"))
+    except Exception as exc:
+        raise ValueError("stored custody state is not decodable") from exc
+    if len(packed) < 48:
+        raise ValueError("stored custody state is incomplete")
+    nonce, tag, cipher = packed[:16], packed[16:48], packed[48:]
+    key = _bank_custody_key()
+    expected = hmac.new(key, _BANK_CUSTODY_AAD + nonce + cipher, hashlib.sha256).digest()
+    if not hmac.compare_digest(tag, expected):
+        raise ValueError("stored custody state authentication failed")
+    stream = _bank_custody_stream(key, nonce, len(cipher))
+    try:
+        return json.loads(bytes(a ^ b for a, b in zip(cipher, stream)).decode("utf-8"))
+    except Exception as exc:
+        raise ValueError("stored custody state is malformed") from exc
+
+def _bank_custody_vault_id(value):
+    return value if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_-]{16,128}", value) else None
+
+def _bank_custody_protect(value: dict) -> str:
+    plain = json.dumps(value, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    key = _bank_custody_key()
+    nonce = secrets.token_bytes(16)
+    stream = _bank_custody_stream(key, nonce, len(plain))
+    cipher = bytes(a ^ b for a, b in zip(plain, stream))
+    tag = hmac.new(key, _BANK_CUSTODY_AAD + nonce + cipher, hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(nonce + tag + cipher).decode("ascii")
+
+def _bank_custody_validate_state(state):
+    if (not isinstance(state, dict) or _bank_custody_has_raw_proof(state) or
+            set(state) != {"version", "lockboxId", "credential", "cipher"}):
+        return None
+    credential = state.get("credential")
+    cipher = state.get("cipher")
+    if (state.get("version") != 1 or not isinstance(state.get("lockboxId"), int) or
+            state["lockboxId"] <= 0 or not isinstance(credential, dict) or
+            not isinstance(cipher, dict) or not isinstance(credential.get("gt"), int) or
+            credential["gt"] < 0 or credential["gt"] > 0xFFFFFFFF or
+            set(credential) != {"gt", "proofCommitment", "policy"} or
+            set(cipher) != {"algorithm", "nonce", "ciphertext", "tag"} or
+            not isinstance(credential.get("policy"), str) or
+            len(credential["policy"]) > 1024 or
+            not isinstance(credential.get("proofCommitment"), str) or
+            not re.fullmatch(r"[0-9a-f]{64}", credential["proofCommitment"], re.I) or
+            cipher.get("algorithm") != "CM-BANK-RECOVERY-SHA256-STREAM-v1" or
+            not all(isinstance(cipher.get(key), str) for key in ("nonce", "ciphertext", "tag")) or
+            not re.fullmatch(r"[0-9a-f]{32}", cipher["nonce"], re.I) or
+            not re.fullmatch(r"[0-9a-f]{64}", cipher["tag"], re.I) or
+            not re.fullmatch(r"[0-9a-f]+", cipher["ciphertext"], re.I) or
+            len(cipher["ciphertext"]) % 2 != 0 or len(cipher["ciphertext"]) > 4 * 1024 * 1024):
+        return None
+    return state
+
+@app.route("/api/bank-custody/<vault_id>", methods=["GET"])
+def bank_custody_status(vault_id):
+    vault_id = _bank_custody_vault_id(vault_id)
+    if not vault_id:
+        return jsonify({"ok": False, "error": "invalid vault id"}), 400
+    row = db.session.execute(_sa_text("""
+        SELECT revoked, consumed, revision, updated_at FROM bank_custody WHERE vault_id = :vault_id
+    """), {"vault_id": vault_id}).mappings().first()
+    if not row:
+        return jsonify({"ok": False, "error": "custody vault not found"}), 404
+    return jsonify({
+        "ok": True, "vault_id": vault_id, "revoked": bool(row["revoked"]),
+        "consumed": bool(row["consumed"]),
+        "revision": int(row["revision"]), "updated_at": float(row["updated_at"])
+    })
+
+def _bank_custody_authorize_request(vault_id, data):
+    row = db.session.execute(_sa_text("""
+        SELECT protected_state, credential_gt, proof_commitment, revoked, consumed, revision
+        FROM bank_custody WHERE vault_id = :vault_id
+    """), {"vault_id": vault_id}).mappings().first()
+    if not row:
+        return None, None, (jsonify({"ok": False, "error": "custody vault not found"}), 404)
+    try:
+        state = _bank_custody_unprotect(row["protected_state"])
+    except ValueError:
+        return None, None, (jsonify({"ok": False, "error": "stored custody state is corrupted"}), 409)
+    commitment = _bank_custody_request_commitment(data, state)
+    if (commitment is None or data.get("gt") != int(row["credential_gt"]) or
+            not hmac.compare_digest(commitment, str(row["proof_commitment"]))):
+        return None, None, (jsonify({"ok": False, "error": "recovery credential rejected"}), 403)
+    return row, state, None
 
 
 if __name__ == "__main__":

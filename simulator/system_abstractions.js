@@ -113,10 +113,163 @@ function nextPow2(n) {
     return n + 1;
 }
 
+// Recovery envelopes are intentionally self-contained and synchronous so they
+// can be used by the simulator's existing method dispatcher in both Node tests
+// and the browser.  This is an authenticated encrypt-then-MAC construction:
+// SHA-256 derives a key from the object-scoped proof, generates a stream for
+// the payload, and authenticates nonce+ciphertext.  The proof itself is never
+// part of the envelope.  The server additionally encrypts the complete
+// envelope at rest (see /api/bank-custody in server/app.py).
+function recoveryUtf8(value) {
+    if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(value);
+    if (typeof Buffer !== 'undefined') return Uint8Array.from(Buffer.from(value, 'utf8'));
+    throw new Error('UTF-8 encoder is unavailable');
+}
+
+function recoverySha256(input) {
+    const bytes = input instanceof Uint8Array ? input : Uint8Array.from(input || []);
+    const words = [];
+    const bitLength = bytes.length * 8;
+    const paddedLength = (((bytes.length + 9) + 63) >> 6) << 6;
+    const padded = new Uint8Array(paddedLength);
+    padded.set(bytes);
+    padded[bytes.length] = 0x80;
+    const high = Math.floor(bitLength / 0x100000000);
+    const low = bitLength >>> 0;
+    padded[paddedLength - 8] = (high >>> 24) & 0xff;
+    padded[paddedLength - 7] = (high >>> 16) & 0xff;
+    padded[paddedLength - 6] = (high >>> 8) & 0xff;
+    padded[paddedLength - 5] = high & 0xff;
+    padded[paddedLength - 4] = (low >>> 24) & 0xff;
+    padded[paddedLength - 3] = (low >>> 16) & 0xff;
+    padded[paddedLength - 2] = (low >>> 8) & 0xff;
+    padded[paddedLength - 1] = low & 0xff;
+    let h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a;
+    let h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19;
+    const k = [
+        0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+        0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+        0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+        0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+        0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+        0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+        0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+        0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+    ];
+    const rotr = (x, n) => (x >>> n) | (x << (32 - n));
+    for (let offset = 0; offset < padded.length; offset += 64) {
+        const w = new Uint32Array(64);
+        for (let i = 0; i < 16; i++) {
+            const p = offset + i * 4;
+            w[i] = ((padded[p] << 24) | (padded[p + 1] << 16) |
+                (padded[p + 2] << 8) | padded[p + 3]) >>> 0;
+        }
+        for (let i = 16; i < 64; i++) {
+            const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+            const s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+            w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
+        }
+        let a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, h = h7;
+        for (let i = 0; i < 64; i++) {
+            const s1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+            const ch = (e & f) ^ (~e & g);
+            const temp1 = (h + s1 + ch + k[i] + w[i]) >>> 0;
+            const s0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+            const maj = (a & b) ^ (a & c) ^ (b & c);
+            const temp2 = (s0 + maj) >>> 0;
+            h = g; g = f; f = e; e = (d + temp1) >>> 0;
+            d = c; c = b; b = a; a = (temp1 + temp2) >>> 0;
+        }
+        h0 = (h0 + a) >>> 0; h1 = (h1 + b) >>> 0; h2 = (h2 + c) >>> 0; h3 = (h3 + d) >>> 0;
+        h4 = (h4 + e) >>> 0; h5 = (h5 + f) >>> 0; h6 = (h6 + g) >>> 0; h7 = (h7 + h) >>> 0;
+    }
+    for (const word of [h0,h1,h2,h3,h4,h5,h6,h7]) {
+        words.push((word >>> 24) & 0xff, (word >>> 16) & 0xff, (word >>> 8) & 0xff, word & 0xff);
+    }
+    return Uint8Array.from(words);
+}
+
+function recoveryHex(bytes) {
+    return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function recoveryBytesFromHex(hex) {
+    if (typeof hex !== 'string' || hex.length % 2 !== 0 || !/^[0-9a-f]+$/i.test(hex)) return null;
+    const result = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < result.length; i++) result[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+    return result;
+}
+
+function recoveryConcat(...parts) {
+    const length = parts.reduce((n, part) => n + part.length, 0);
+    const result = new Uint8Array(length);
+    let offset = 0;
+    for (const part of parts) {
+        result.set(part, offset);
+        offset += part.length;
+    }
+    return result;
+}
+
+function recoveryRandomBytes(length) {
+    if (typeof globalThis !== 'undefined' && globalThis.crypto &&
+            typeof globalThis.crypto.getRandomValues === 'function') {
+        const bytes = new Uint8Array(length);
+        globalThis.crypto.getRandomValues(bytes);
+        return bytes;
+    }
+    if (typeof require === 'function') {
+        return Uint8Array.from(require('crypto').randomBytes(length));
+    }
+    throw new Error('secure random source is unavailable for recovery encryption');
+}
+
+function recoveryConstantTimeEqual(a, b) {
+    if (!a || !b || a.length !== b.length) return false;
+    let difference = 0;
+    for (let i = 0; i < a.length; i++) difference |= a[i] ^ b[i];
+    return difference === 0;
+}
+
 class SystemAbstractions {
     constructor(registry) {
         this.registry = registry;
+        // Recovery grants arrive from the server vault bridge and are
+        // deliberately separate from exportable encrypted envelopes.
+        this._bankRecoveryGrants = {};
         this._bindAll();
+    }
+
+    // Called only by the browser's server-vault bridge after /recover has
+    // authorised the original proof. The raw envelope is kept behind this
+    // one-time token rather than accepted directly by Bank.Recover.
+    registerBankRecoveryGrant(grant) {
+        if (!grant || typeof grant.token !== 'string' || grant.token.length < 16 ||
+                !Number.isInteger(grant.lockboxId) || !grant.recoveryState) {
+            return false;
+        }
+        this._bankRecoveryGrants[grant.token] = {
+            lockboxId: grant.lockboxId,
+            recoveryState: grant.recoveryState,
+            consumed: false
+        };
+        return true;
+    }
+
+    _consumeBankRecoveryGrant(token) {
+        // The vault, not browser memory, is the authority for a recovery
+        // grant. A synchronous same-origin request keeps Bank.Recover atomic:
+        // no private Namespace allocation occurs until the server accepts the
+        // exact one-time token it issued.
+        if (typeof XMLHttpRequest === 'undefined') return false;
+        try {
+            const request = new XMLHttpRequest();
+            request.open('POST', `/api/bank-custody/grant/${encodeURIComponent(token)}/consume`, false);
+            request.send(null);
+            return request.status === 200;
+        } catch (_) {
+            return false;
+        }
     }
 
     _bindAll() {
@@ -1184,7 +1337,15 @@ class SystemAbstractions {
                 return { ok: false, fault: 'NS_FULL', message: 'Navana.Add: no free NS slots' };
             }
 
-            const newVersion = sim._nsSequenceForWrite(freeSlot);
+            const currentVersion = sim._nsSequenceForWrite(freeSlot);
+            const freshAfterVersion = args.freshAfterVersion;
+            // A reset clears raw NS words. Recovery therefore advances a
+            // matching candidate generation instead of accidentally reissuing
+            // the retired entry's sequence in a recycled dynamic slot.
+            const newVersion = Number.isInteger(freshAfterVersion) &&
+                    (freshAfterVersion & 0x1FF) === currentVersion
+                ? (currentVersion + 1) & 0x1FF
+                : currentVersion;
 
             sim.withNamespaceWrite('Mint/Navana registration', () => {
                 sim.writeNSEntry(
@@ -1396,6 +1557,18 @@ class SystemAbstractions {
                     },
                     message: `Bank.ObtainPassKey: fresh PassKey issued for stored object ${object.name}`
                 };
+            },
+            // Internal-only lookup used to create a recovery envelope.  The
+            // record never crosses the public Bank API; in particular, its
+            // proof is consumed only while deriving the envelope key.
+            ownerPassKeyRecord: (objectId) => {
+                const object = navanaState.topSecurityObjects[objectId];
+                if (!object || object.revoked) return null;
+                const ownerGT = object.passKeys.find(gt => {
+                    const record = navanaState.passKeys[gt];
+                    return record && record.owner && !record.revoked;
+                });
+                return ownerGT ? (navanaState.passKeys[ownerGT] || null) : null;
             }
         };
     }
@@ -1404,7 +1577,10 @@ class SystemAbstractions {
         if (!this._bankState) {
             this._bankState = { nextId: 0, lockboxes: {} };
         }
+        if (!this._bankRecoveryRecords) this._bankRecoveryRecords = {};
         const bankState = this._bankState;
+        const recoveryRecords = this._bankRecoveryRecords;
+        const recoveryGrants = this._bankRecoveryGrants;
         const registry = this.registry;
         const MAX_CAPACITY = 0x20000;
 
@@ -1462,18 +1638,141 @@ class SystemAbstractions {
                 sim.memory[lockbox.location + i] = 0;
             }
         };
+        const proofWords = (passKey) => Array.isArray(passKey && passKey.proof) &&
+            passKey.proof.length === 4 && passKey.proof.every(word => Number.isInteger(word))
+            ? passKey.proof.map(word => word >>> 0) : null;
+        const recoveryPolicy = (lockbox) => JSON.stringify({
+            object: `Bank.Lockbox.${lockbox.id}`,
+            owner: true,
+            methods: ['DEPOSIT', 'WITHDRAW', 'INSPECT', 'REVOKE', 'OBTAINPASSKEY']
+        });
+        const recoveryKey = (gt, proof, policy) =>
+            recoverySha256(recoveryUtf8(`ChurchMachine.BankRecovery.v1|${gt >>> 0}|${proof.join(',')}|${policy}`));
+        const recoveryCommitment = (gt, proof, policy) =>
+            recoveryHex(recoverySha256(recoveryUtf8(`ChurchMachine.BankCredential.v1|${gt >>> 0}|${proof.join(',')}|${policy}`)));
+        const counterBytes = (counter) => Uint8Array.from([
+            (counter >>> 24) & 0xff, (counter >>> 16) & 0xff, (counter >>> 8) & 0xff, counter & 0xff
+        ]);
+        const makeRecoveryEnvelope = (sim, lockbox, ownerRecord) => {
+            const proof = proofWords(ownerRecord);
+            if (!proof || !Number.isInteger(ownerRecord.gt)) return null;
+            if (!lockbox.contents) return null;
+            const policy = recoveryPolicy(lockbox);
+            const payload = JSON.stringify({
+                version: 1,
+                lockboxId: lockbox.id,
+                capacity: lockbox.capacity,
+                previousSequence: lockbox.currentSeq,
+                previousNamespaceSequence: lockbox.nsVersion,
+                contents: {
+                    kind: lockbox.contents.kind,
+                    words: lockbox.contents.words,
+                    sourcePerms: { R: 1, W: lockbox.contents.sourcePerms.W ? 1 : 0,
+                        X: lockbox.contents.sourcePerms.X ? 1 : 0 },
+                    data: Array.from(sim.memory.slice(lockbox.location,
+                        lockbox.location + lockbox.contents.words), word => word >>> 0)
+                }
+            });
+            const key = recoveryKey(ownerRecord.gt, proof, policy);
+            const nonce = recoveryRandomBytes(16);
+            const plain = recoveryUtf8(payload);
+            const cipher = new Uint8Array(plain.length);
+            for (let offset = 0, counter = 0; offset < plain.length; offset += 32, counter++) {
+                const stream = recoverySha256(recoveryConcat(key, nonce, counterBytes(counter)));
+                for (let i = 0; i < 32 && offset + i < plain.length; i++) {
+                    cipher[offset + i] = plain[offset + i] ^ stream[i];
+                }
+            }
+            const tag = recoveryHex(recoverySha256(recoveryConcat(key, nonce, cipher)));
+            return {
+                version: 1,
+                lockboxId: lockbox.id,
+                credential: {
+                    gt: ownerRecord.gt >>> 0,
+                    proofCommitment: recoveryCommitment(ownerRecord.gt, proof, policy),
+                    policy
+                },
+                cipher: {
+                    algorithm: 'CM-BANK-RECOVERY-SHA256-STREAM-v1',
+                    nonce: recoveryHex(nonce),
+                    ciphertext: recoveryHex(cipher),
+                    tag
+                }
+            };
+        };
+        const openRecoveryEnvelope = (envelope, passKey) => {
+            if (!envelope || envelope.version !== 1 || !envelope.credential || !envelope.cipher ||
+                    envelope.cipher.algorithm !== 'CM-BANK-RECOVERY-SHA256-STREAM-v1') {
+                return { ok: false, fault: 'CORRUPT', message: 'recovery envelope format is invalid' };
+            }
+            const proof = proofWords(passKey);
+            const gt = passKey && passKey.gt;
+            if (!proof || !Number.isInteger(gt) || (gt >>> 0) !== (envelope.credential.gt >>> 0)) {
+                return { ok: false, fault: 'STALE_KEY', message: 'recovery credential does not match the original object' };
+            }
+            const policy = typeof envelope.credential.policy === 'string' ? envelope.credential.policy : '';
+            const expectedCommitment = recoveryCommitment(gt, proof, policy);
+            if (expectedCommitment !== envelope.credential.proofCommitment) {
+                return { ok: false, fault: 'STALE_KEY', message: 'recovery credential proof is stale or revoked' };
+            }
+            const nonce = recoveryBytesFromHex(envelope.cipher.nonce);
+            const cipher = recoveryBytesFromHex(envelope.cipher.ciphertext);
+            const suppliedTag = typeof envelope.cipher.tag === 'string'
+                ? recoveryBytesFromHex(envelope.cipher.tag) : null;
+            if (!nonce || nonce.length !== 16 || !cipher || !suppliedTag || suppliedTag.length !== 32) {
+                return { ok: false, fault: 'CORRUPT', message: 'recovery envelope ciphertext is invalid' };
+            }
+            const key = recoveryKey(gt, proof, policy);
+            const expectedTag = recoverySha256(recoveryConcat(key, nonce, cipher));
+            if (!recoveryConstantTimeEqual(expectedTag, suppliedTag)) {
+                return { ok: false, fault: 'CORRUPT', message: 'recovery envelope authentication failed' };
+            }
+            const plain = new Uint8Array(cipher.length);
+            for (let offset = 0, counter = 0; offset < cipher.length; offset += 32, counter++) {
+                const stream = recoverySha256(recoveryConcat(key, nonce, counterBytes(counter)));
+                for (let i = 0; i < 32 && offset + i < cipher.length; i++) {
+                    plain[offset + i] = cipher[offset + i] ^ stream[i];
+                }
+            }
+            let payload;
+            try {
+                const text = typeof TextDecoder !== 'undefined'
+                    ? new TextDecoder().decode(plain)
+                    : Buffer.from(plain).toString('utf8');
+                payload = JSON.parse(text);
+            } catch (_) {
+                return { ok: false, fault: 'CORRUPT', message: 'recovery envelope payload is not valid JSON' };
+            }
+            if (!payload || payload.version !== 1 || payload.lockboxId !== envelope.lockboxId ||
+                    payload.lockboxId <= 0 || !Number.isInteger(payload.capacity) ||
+                    !Number.isInteger(payload.previousNamespaceSequence) ||
+                    !payload.contents || !Array.isArray(payload.contents.data) ||
+                    payload.contents.data.length !== payload.contents.words ||
+                    payload.contents.words <= 0 || payload.contents.words > payload.capacity ||
+                    payload.contents.data.some(word => !Number.isInteger(word) || word < 0 || word > 0xFFFFFFFF)) {
+                return { ok: false, fault: 'CORRUPT', message: 'recovery envelope payload is invalid' };
+            }
+            return { ok: true, payload };
+        };
+        const rememberRecovery = (sim, lockbox, ownerRecord) => {
+            const envelope = makeRecoveryEnvelope(sim, lockbox, ownerRecord);
+            if (!envelope) return null;
+            recoveryRecords[lockbox.id] = { envelope, revoked: false, consumed: false };
+            lockbox.recoveryEnvelope = envelope;
+            return envelope;
+        };
         const registerRegion = (sim, location, size, label) => {
             return registry.dispatchMethod(5, 'Add', sim, {
                 location, limit: size - 1, clistCount: 0, gtType: 1, label
             });
         };
-        const registerPrivateLockbox = (sim, location, size, label) => {
+        const registerPrivateLockbox = (sim, location, size, label, freshAfterVersion) => {
             return registry.dispatchMethod(5, 'Add', sim, {
                 // Outform type prevents the backing entry from being resolved
                 // as a normal R/W Inform region. Abstract GTs intentionally
                 // have no NS entry; the independent Navana top-security object
                 // credential remains the only legitimate authority here.
-                location, limit: size - 1, clistCount: 0, gtType: 2, label
+                location, limit: size - 1, clistCount: 0, gtType: 2, label, freshAfterVersion
             });
         };
         const sourceRegion = (sim, args) => {
@@ -1574,6 +1873,7 @@ class SystemAbstractions {
                 contents: null,
                 withdrawn: false,
                 revoked: false,
+                recoveryEnvelope: null,
                 createdAt: Date.now()
             };
             // The backing record is private custody bookkeeping, not a public
@@ -1614,6 +1914,8 @@ class SystemAbstractions {
                 digest: snapshot.reduce((h, word) => (((h * 33) ^ word) >>> 0), 5381)
             };
             lockbox.withdrawn = false;
+            const ownerRecord = this._topSecurityApi.ownerPassKeyRecord(lockbox.securityObjectId);
+            rememberRecovery(sim, lockbox, ownerRecord);
             return { ok: true, result: safeMetadata(lockbox), message: `Bank.Deposit: ${kind} (${source.words}w) secured in lockbox ${lockbox.id}` };
         });
 
@@ -1646,12 +1948,23 @@ class SystemAbstractions {
             const gt = sim.createGT(ns.result.version, ns.result.nsIndex, permissions, 1);
             const removed = registry.dispatchMethod(5, 'Remove', sim, { index: lockbox.nsIndex });
             if (!removed.ok) {
-                registry.dispatchMethod(5, 'Remove', sim, { index: ns.result.nsIndex });
+                const cleanup = registry.dispatchMethod(5, 'Remove', sim, { index: ns.result.nsIndex });
                 for (let i = 0; i < allocation.result.size; i++) {
                     sim.memory[allocation.result.location + i] = 0;
                 }
-                releaseAllocation(sim, allocation.result.location);
-                return fail('Withdraw', 'NAMESPACE', 'could not retire the lockbox entry; valuable remains in custody');
+                if (cleanup.ok) {
+                    releaseAllocation(sim, allocation.result.location);
+                    return fail('Withdraw', 'NAMESPACE', 'could not retire the lockbox entry; valuable remains in custody');
+                }
+                // A destination whose Namespace entry could not be removed must
+                // never return to the allocator. It is wiped, then quarantined
+                // so its still-live GT cannot resolve another allocation later.
+                if (!sim._bankQuarantinedAllocations) sim._bankQuarantinedAllocations = {};
+                sim._bankQuarantinedAllocations[allocation.result.location] = {
+                    reason: 'withdraw destination namespace cleanup failed',
+                    nsIndex: ns.result.nsIndex
+                };
+                return fail('Withdraw', 'NAMESPACE', 'could not retire lockbox or cleanup destination; destination quarantined');
             }
             zeroizeLockbox(sim, lockbox);
             if (sim._bankPrivateSlots) delete sim._bankPrivateSlots[lockbox.nsIndex];
@@ -1662,6 +1975,7 @@ class SystemAbstractions {
             lockbox.revoked = true;
             lockbox.currentSeq++;
             lockbox.seq = lockbox.currentSeq;
+            if (recoveryRecords[lockbox.id]) recoveryRecords[lockbox.id].revoked = true;
             const revoked = this._topSecurityApi.revokeObject(lockbox.securityObjectId);
             if (!revoked.ok) {
                 // The valuable has already been atomically transferred.  Keep the
@@ -1692,6 +2006,7 @@ class SystemAbstractions {
             lockbox.revoked = true;
             lockbox.currentSeq++;
             lockbox.seq = lockbox.currentSeq;
+            if (recoveryRecords[lockbox.id]) recoveryRecords[lockbox.id].revoked = true;
             registry.dispatchMethod(5, 'SecureObjectRevoke', sim, { objectId: lockbox.securityObjectId, passKey: keyFor(args) });
             return { ok: true, result: { lockboxId: lockbox.id, revoked: true, quarantined: true }, message: `Bank.Revoke: lockbox ${lockbox.id} revoked and custody quarantined` };
         });
@@ -1710,6 +2025,133 @@ class SystemAbstractions {
             // top-security objects that are not Bank lockboxes.
             if (!this._topSecurityApi) return fail('ObtainPassKey', 'NOT_INIT', 'Bank authority is not initialized');
             return this._topSecurityApi.obtainPassKey(sim, args);
+        });
+
+        this.registry.bindMethod(54, 'ExportRecovery', (sim, args = {}) => {
+            const lockbox = lockboxById(args.lockboxId === undefined ? args.objectId : args.lockboxId);
+            const auth = authorize(sim, lockbox, args, 'ExportRecovery', true);
+            if (!auth.ok) return auth;
+            if (!lockbox.contents) return fail('ExportRecovery', 'EMPTY', 'lockbox has no deposited valuable');
+            const ownerRecord = this._topSecurityApi.ownerPassKeyRecord(lockbox.securityObjectId);
+            const envelope = rememberRecovery(sim, lockbox, ownerRecord);
+            if (!envelope) return fail('ExportRecovery', 'MINT', 'could not create a protected recovery envelope');
+            return {
+                ok: true,
+                result: { lockboxId: lockbox.id, recoveryState: envelope },
+                message: `Bank.ExportRecovery: protected recovery state prepared for lockbox ${lockbox.id}`
+            };
+        });
+
+        this.registry.bindMethod(54, 'Recover', (sim, args = {}) => {
+            if (!sim.mElevation) return fail('Recover', 'PERM', 'requires M-elevation (Bank authority)');
+            const grantToken = typeof args.recoveryGrant === 'string' ? args.recoveryGrant : '';
+            const grant = recoveryGrants[grantToken];
+            if (!grant || grant.consumed) {
+                return fail('Recover', 'STALE_KEY', 'a current server recovery grant is required');
+            }
+            if (!this._consumeBankRecoveryGrant(grantToken)) {
+                return fail('Recover', 'STALE_KEY', 'server rejected the recovery grant');
+            }
+            const supplied = grant.recoveryState;
+            const requestedId = args.lockboxId === undefined ? args.objectId : args.lockboxId;
+            const stored = requestedId && recoveryRecords[requestedId] ? recoveryRecords[requestedId] : null;
+            const envelope = supplied || (stored && !stored.revoked && !stored.consumed ? stored.envelope : null);
+            if (!envelope) return fail('Recover', stored && stored.revoked ? 'REVOKED' : 'NOT_FOUND', 'protected recovery state is unavailable');
+            if (stored && stored.revoked) return fail('Recover', 'REVOKED', 'the original lockbox credential was revoked');
+            const passKey = keyFor(args);
+            const opened = openRecoveryEnvelope(envelope, passKey);
+            if (!opened.ok) return fail('Recover', opened.fault, opened.message);
+            const payload = opened.payload;
+            if (grant.lockboxId !== payload.lockboxId) {
+                return fail('Recover', 'STALE_KEY', 'server grant does not match the recovery lockbox');
+            }
+            if (requestedId !== undefined && Number(requestedId) !== payload.lockboxId) {
+                return fail('Recover', 'STALE_KEY', 'recovery state does not match the requested lockbox');
+            }
+            if (recoveryRecords[payload.lockboxId] && recoveryRecords[payload.lockboxId].consumed) {
+                return fail('Recover', 'STALE_KEY', 'recovery state has already been consumed');
+            }
+            if (bankState.lockboxes[payload.lockboxId]) {
+                return fail('Recover', 'EXISTS', 'lockbox is already active in this simulator session');
+            }
+            if (!Number.isInteger(payload.capacity) || payload.capacity <= 0 ||
+                    payload.capacity > MAX_CAPACITY) {
+                return fail('Recover', 'CORRUPT', 'recovery capacity is invalid');
+            }
+            const allocation = registry.dispatchMethod(7, 'Allocate', sim, { size: payload.capacity });
+            if (!allocation.ok) return fail('Recover', allocation.fault || 'OOM', allocation.message);
+            const objectName = `Bank.Lockbox.${payload.lockboxId}`;
+            const ns = registerPrivateLockbox(sim, allocation.result.location, allocation.result.size, objectName,
+                payload.previousNamespaceSequence);
+            if (!ns.ok) {
+                releaseAllocation(sim, allocation.result.location);
+                return fail('Recover', ns.fault || 'NS_FULL', ns.message);
+            }
+            const objectResult = registry.dispatchMethod(5, 'SecureObjectAdd', sim, {
+                name: objectName,
+                methods: ['Deposit', 'Withdraw', 'Inspect', 'Revoke', 'ObtainPassKey', 'ExportRecovery']
+            });
+            if (!objectResult.ok) {
+                registry.dispatchMethod(5, 'Remove', sim, { index: ns.result.nsIndex });
+                releaseAllocation(sim, allocation.result.location);
+                return fail('Recover', objectResult.fault || 'MINT', objectResult.message);
+            }
+            if (ns.result.version === (payload.previousNamespaceSequence & 0x1FF)) {
+                registry.dispatchMethod(5, 'Remove', sim, { index: ns.result.nsIndex });
+                releaseAllocation(sim, allocation.result.location);
+                return fail('Recover', 'STALE_KEY', 'recovery could not mint a fresh Namespace sequence');
+            }
+            const lockbox = {
+                id: payload.lockboxId,
+                capacity: allocation.result.size,
+                location: allocation.result.location,
+                nsIndex: ns.result.nsIndex,
+                nsVersion: ns.result.version,
+                securityObjectId: objectResult.result.objectId,
+                currentSeq: Math.max(1, (payload.previousSequence >>> 0) + 1),
+                seq: Math.max(1, (payload.previousSequence >>> 0) + 1),
+                contents: {
+                    kind: payload.contents.kind === 'lump' ? 'lump' : 'region',
+                    words: payload.contents.words,
+                    sourceIndex: null,
+                    sourceOffset: 0,
+                    sourcePerms: {
+                        R: 1, W: payload.contents.sourcePerms && payload.contents.sourcePerms.W ? 1 : 0,
+                        X: payload.contents.sourcePerms && payload.contents.sourcePerms.X ? 1 : 0
+                    },
+                    digest: payload.contents.data.reduce((h, word) => (((h * 33) ^ word) >>> 0), 5381)
+                },
+                withdrawn: false,
+                revoked: false,
+                recoveryEnvelope: envelope,
+                recovered: true,
+                createdAt: Date.now()
+            };
+            // All fallible allocation and registration steps are complete.
+            // Only now copy the protected valuable and publish the lockbox.
+            for (let i = 0; i < payload.contents.data.length; i++) {
+                sim.memory[allocation.result.location + i] = payload.contents.data[i] >>> 0;
+            }
+            if (!sim._bankPrivateSlots) sim._bankPrivateSlots = {};
+            sim._bankPrivateSlots[ns.result.nsIndex] = { lockboxId: lockbox.id };
+            protectLockboxRange(sim, lockbox);
+            bankState.lockboxes[lockbox.id] = lockbox;
+            bankState.nextId = Math.max(bankState.nextId, lockbox.id);
+            grant.consumed = true;
+            if (recoveryRecords[lockbox.id]) recoveryRecords[lockbox.id].consumed = true;
+            else recoveryRecords[lockbox.id] = { envelope, revoked: false, consumed: true };
+            return {
+                ok: true,
+                result: {
+                    lockboxId: lockbox.id,
+                    recovered: true,
+                    sequence: lockbox.currentSeq,
+                    bankKey: objectResult.result.ownerPassKey,
+                    passKey: objectResult.result.ownerPassKey,
+                    metadata: safeMetadata(lockbox)
+                },
+                message: `Bank.Recover: lockbox ${lockbox.id} restored with fresh Namespace and PassKey`
+            };
         });
 
         this.registry.bindMethod(54, 'List', (sim, args = {}) => {
