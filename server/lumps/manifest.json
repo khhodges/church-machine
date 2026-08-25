@@ -2496,8 +2496,8 @@
     "cc": 1,
     "author": "",
     "version": "2026.08.25",
-    "lump_version": 2,
-    "compiled_at": 1787650626.384638,
+    "lump_version": 3,
+    "compiled_at": 1787660943.3916147,
     "methods": [
       {
         "name": "run",
