@@ -1463,16 +1463,30 @@ class CLOOMCCompiler {
         this._crossMethodRefs = [];
 
         for (const stmt of method.body) {
-            if (!stmt.text || stmt.text.startsWith('//') || stmt.text.startsWith(';')) continue;
+            // Method-body records retain the original editor line for listings and
+            // error columns. Strip a trailing CLOOMC++ comment only for parsing so
+            // `let count = 1; // explanation` does not become one expression.
+            // CLOOMC++ has no string-literal grammar, so `//` is unambiguous here.
+            const commentAt = stmt.text ? stmt.text.indexOf('//') : -1;
+            const statementText = (commentAt >= 0 ? stmt.text.slice(0, commentAt) : (stmt.text || '')).trim();
+            if (!statementText || statementText.startsWith('--') || statementText.startsWith(';')) continue;
 
-            const labelMatch = stmt.text.match(/^(\w+):$/);
+            // Parser indexes are zero-based; diagnostics and editor gutters are
+            // one-based. Passing the display line through the compile pipeline
+            // prevents an error on a statement after a comment from highlighting
+            // the preceding comment line.
+            const statementLine = Number.isInteger(stmt.lineNum) ? stmt.lineNum + 1 : stmt.lineNum;
+            const compiledStmt = { ...stmt, text: statementText, lineNum: statementLine };
+            this._currentLineNum = statementLine;
+
+            const labelMatch = compiledStmt.text.match(/^(\w+):$/);
             if (labelMatch) {
                 labels[labelMatch[1]] = code.length;
-                manifest.push({ src: stmt.lineNum, addr: code.length, desc: `label ${labelMatch[1]}` });
+                manifest.push({ src: compiledStmt.lineNum, addr: code.length, desc: `label ${labelMatch[1]}` });
                 continue;
             }
 
-            this._compileStatement(stmt, code, locals, rom, capNames, labels, labelRefs, errors, manifest, method);
+            this._compileStatement(compiledStmt, code, locals, rom, capNames, labels, labelRefs, errors, manifest, method);
         }
 
         for (const ref of labelRefs) {
