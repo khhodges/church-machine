@@ -782,7 +782,11 @@ function showNewTabDialog() {
     if (nameInput) { nameInput.value = ''; nameInput.focus(); }
     const langSel = document.getElementById('newTabLang');
     const mainSel = document.getElementById('langSelector');
-    if (langSel && mainSel) langSel.value = mainSel.value;
+    if (langSel && mainSel) {
+        // "personal" is the display mode for user tabs, not a source language.
+        langSel.value = langSel.querySelector('option[value="' + mainSel.value + '"]')
+            ? mainSel.value : 'javascript';
+    }
 }
 
 function hideNewTabDialog() {
@@ -795,17 +799,71 @@ function confirmNewTab() {
     const langSel = document.getElementById('newTabLang');
     const name = nameInput ? nameInput.value.trim() : '';
     if (!name) { alert('Please enter a program name.'); return; }
-    const lang = langSel ? langSel.value : 'assembly';
-    // Snapshot the current editor content so the new tab starts with it
-    const editor = document.getElementById('asmEditor');
-    const initialCode = editor ? editor.value : '';
+    const lang = langSel ? langSel.value : 'javascript';
+    const sourceName = _newAbstractionSourceName(name);
+    const initialCode = _newAbstractionProforma(sourceName, lang);
     hideNewTabDialog();
     const sel = document.getElementById('langSelector');
     if (sel && sel.value !== lang) {
         sel.value = lang;
         onLangChange(true);
     }
+    // A new abstraction is not an edit of whichever server file was open.
+    window._editorSourceFilePath = null;
     createUserTab(name, lang, initialCode);
+}
+
+// The New command always starts with a valid, editable abstraction scaffold.
+// Keep the language-specific forms here so the dialog's language choice remains
+// useful while avoiding accidental reuse of the current editor contents.
+function _newAbstractionSourceName(name) {
+    const clean = String(name || '').replace(/[^A-Za-z0-9_$]+/g, '_')
+        .replace(/^(\d)/, '_$1').replace(/^_+|_+$/g, '');
+    return clean || 'NewAbstraction';
+}
+
+function _newAbstractionProforma(name, lang) {
+    if (lang === 'haskell') {
+        return `abstraction ${name} {
+    capabilities { }
+
+    method Run(value) = value
+}`;
+    }
+    if (lang === 'lambda') {
+        return `abstraction ${name} {
+    capabilities { }
+
+    method Run(value) = value
+}`;
+    }
+    if (lang === 'english') {
+        return `Create an abstraction called ${name}
+It has no capabilities
+
+Add a method called Run that takes value
+    Return value`;
+    }
+    if (lang === 'symbolic') {
+        return `abstraction ${name} {
+    method Run() {
+        V1 = 0
+    }
+}`;
+    }
+    if (lang === 'assembly') {
+        return `; ${name} abstraction proforma
+; Add instructions for the abstraction body below.
+RETURN`;
+    }
+    return `abstraction ${name} {
+    capabilities { }
+
+    method Run(value) {
+        result = value
+        return(result)
+    }
+}`;
 }
 
 function init() {
