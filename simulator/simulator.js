@@ -940,6 +940,8 @@ class ChurchSimulator {
         this.awaitingLump = null;
         this._bootPrefetchStarted = false;
         this._bootPrefetchFailed = false;
+        this._bootPrefetchPromise = null;
+        this._bootPrefetchStepQueued = false;
         this._tracePacketsBuf = [];  // per-instruction trace packet buffer (cleared before each step)
 
         // Namespace occupancy is security-relevant. Boot setup writes before

@@ -804,6 +804,35 @@ function _bootNIARows(bootStep) {
 }
 
 function stepSim() {
+    // A configured boot prefetch is part of startup, not an ordinary lazy-load
+    // pause. Never execute user code while its ordered downloads are pending.
+    if (sim.bootComplete && sim._bootPrefetchPromise) {
+        const pending = sim._bootPrefetchPromise;
+        const con = document.getElementById('editorConsole');
+        if (con) {
+            con.textContent += '\n⏳ Waiting for configured boot prefetch…';
+            con.scrollTop = con.scrollHeight;
+        }
+        if (!sim._bootPrefetchStepQueued) {
+            sim._bootPrefetchStepQueued = true;
+            pending.then(() => {
+                sim._bootPrefetchStepQueued = false;
+                if (!sim.halted && !sim._bootPrefetchFailed) stepSim();
+            }).catch(err => {
+                sim._bootPrefetchStepQueued = false;
+                console.error('[boot-prefetch] step wait failed:', err);
+            });
+        }
+        return;
+    }
+    if (sim.bootComplete && sim._bootPrefetchFailed) {
+        const con = document.getElementById('editorConsole');
+        if (con) {
+            con.textContent += '\n⊿ Required boot prefetch failed — execution remains stopped.';
+            con.scrollTop = con.scrollHeight;
+        }
+        return;
+    }
     if (!sim.bootComplete) {
         // If a compiled abstraction is waiting, skip the manual boot ceremony
         // and silently complete all boot phases so the user can step their code.
@@ -878,6 +907,10 @@ function stepSim() {
             // for user-code debugging after a clean boot.
             sim.auditLog = [];
             _autoLoadDefaultProgram();
+            _startBootLumpPrefetch().catch(err => {
+                console.error('[boot-prefetch] manual boot failure:', err);
+                sim._bootPrefetchFailed = true;
+            });
             updateDashboard();
             if (!sim.halted) {
                 // Boot completed cleanly — paused at first instruction.
@@ -1398,6 +1431,16 @@ function runSimGo() {
     // two boot-complete callbacks — from spawning a second concurrent
     // runBatch() loop and corrupting simulation state.
     if (sim.running || _simRunActive) return;
+    if (sim._bootPrefetchPromise) {
+        const pending = sim._bootPrefetchPromise;
+        pending.then(() => {
+            if (!sim.halted && !sim._bootPrefetchFailed) runSimGo();
+        }).catch(err => {
+            console.error('[boot-prefetch] run wait failed:', err);
+        });
+        return;
+    }
+    if (sim._bootPrefetchFailed) return;
     const sel = document.getElementById('runBatchSelect');
     if (sel) runBatchSize = parseInt(sel.value, 10) || 500;
     hideRunPopover();
@@ -1767,6 +1810,10 @@ function instantBoot() {
         sim.auditLog = [];
         _autoLoadDefaultProgram();
         updateDashboard();
+        _startBootLumpPrefetch().catch(e => {
+            console.error('[boot-prefetch] instant boot failure:', e);
+            sim._bootPrefetchFailed = true;
+        });
         return true;
     }
     _recordUnreportedBootFailure('instant boot did not complete');
@@ -1880,7 +1927,10 @@ function slowBoot() {
 }
 
 async function _startBootLumpPrefetch() {
-    if (!sim || sim._bootPrefetchStarted) return;
+    if (!sim) return;
+    if (sim._bootPrefetchStarted) {
+        return sim._bootPrefetchPromise;
+    }
     const entries = Object.entries(sim.lazyManifest || {})
         .filter(([, e]) => e && e.prefetch && !e.loaded)
         .sort((a, b) => (a[1].prefetchOrder - b[1].prefetchOrder) ||
@@ -1892,41 +1942,49 @@ async function _startBootLumpPrefetch() {
         if (con) { con.textContent += '\n' + msg; con.scrollTop = con.scrollHeight; }
         console.log('[boot-prefetch]', msg);
     };
-    log(`[LOADER] Boot prefetch: ${entries.length} raw LUMP(s), sequential order ` +
-        `${entries.map(([s]) => s).join(', ')}`);
-    for (const [slotStr, entry] of entries) {
-        const slot = Number(slotStr);
-        let completed = false;
-        for (let attempt = 1; attempt <= 2 && !completed; attempt++) {
-            const absent = sim.prepareLumpPrefetch(slot);
-            if (!absent) {
-                log(`⚠ Boot prefetch could not prepare Slot ${slot}`);
-                break;
+    const work = (async () => {
+        log(`[LOADER] Boot prefetch: ${entries.length} raw LUMP(s), sequential order ` +
+            `${entries.map(([s]) => s).join(', ')}`);
+        for (const [slotStr, entry] of entries) {
+            const slot = Number(slotStr);
+            let completed = false;
+            for (let attempt = 1; attempt <= 2 && !completed; attempt++) {
+                const absent = sim.prepareLumpPrefetch(slot);
+                if (!absent) {
+                    log(`⚠ Boot prefetch could not prepare Slot ${slot}`);
+                    break;
+                }
+                absent.fetchUrl = entry.downloadUrl || `/api/lump/${absent.token}`;
+                log(`[LOADER] Prefetching Slot ${slot} (${entry.label || 'entry_' + slot}) ` +
+                    `(attempt ${attempt}/2)`);
+                const result = await triggerLazyLoad(absent, 'boot-prefetch');
+                completed = !!(result && result.ok && entry.loaded);
+                if (!completed) {
+                    // Network errors intentionally leave the suspension intact for
+                    // the ordinary retry button. Clear only this host transaction
+                    // before beginning the bounded prefetch retry.
+                    sim.awaitingLump = null;
+                    if (attempt < 2) log(`[LOADER] Retrying Slot ${slot}…`);
+                }
             }
-            absent.fetchUrl = entry.downloadUrl || `/api/lump/${absent.token}`;
-            log(`[LOADER] Prefetching Slot ${slot} (${entry.label || 'entry_' + slot}) ` +
-                `(attempt ${attempt}/2)`);
-            const result = await triggerLazyLoad(absent, 'boot-prefetch');
-            completed = !!(result && result.ok && entry.loaded);
             if (!completed) {
-                // Network errors intentionally leave the suspension intact for
-                // the ordinary retry button.  Clear only this host transaction
-                // before beginning the bounded prefetch retry.
-                sim.awaitingLump = null;
-                if (attempt < 2) log(`[LOADER] Retrying Slot ${slot}…`);
+                const required = entry.prefetchRequired !== false;
+                log(`${required ? '⊿ REQUIRED' : '⚠ OPTIONAL'} boot prefetch failed for ` +
+                    `Slot ${slot}; ${required ? 'boot prefetch stopped' : 'slot remains demand-loadable'}`);
+                if (required) {
+                    sim._bootPrefetchFailed = true;
+                    return;
+                }
             }
         }
-        if (!completed) {
-            const required = entry.prefetchRequired !== false;
-            log(`${required ? '⊿ REQUIRED' : '⚠ OPTIONAL'} boot prefetch failed for ` +
-                `Slot ${slot}; ${required ? 'boot prefetch stopped' : 'slot remains demand-loadable'}`);
-            if (required) {
-                sim._bootPrefetchFailed = true;
-                return;
-            }
-        }
-    }
-    log('[LOADER] Boot prefetch complete');
+        log('[LOADER] Boot prefetch complete');
+    })();
+    sim._bootPrefetchPromise = work;
+    const release = () => {
+        if (sim && sim._bootPrefetchPromise === work) sim._bootPrefetchPromise = null;
+    };
+    work.then(release, release);
+    return work;
 }
 
 function runSim() {

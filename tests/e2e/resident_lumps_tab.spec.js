@@ -303,3 +303,63 @@ test.describe('Resident Lumps tab — Save fires POST to /api/boot-config', () =
     });
 
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Suite 4 — lazy boot-prefetch configuration
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('Resident Lumps tab — lazy boot prefetch', () => {
+
+    test('saves the default raw LUMP URL, order, and required policy', async ({ page }) => {
+        test.setTimeout(40000);
+        let capturedPostBody = null;
+
+        await page.route('**/api/boot-config', async route => {
+            if (route.request().method() === 'GET') {
+                await route.fulfill({
+                    status:      200,
+                    contentType: 'application/json',
+                    body:        JSON.stringify(STUB_BOOT_CONFIG_RESPONSE),
+                });
+            } else if (route.request().method() === 'POST') {
+                capturedPostBody = JSON.parse(route.request().postData() || '{}');
+                await route.fulfill({
+                    status:      200,
+                    contentType: 'application/json',
+                    body:        JSON.stringify({ ok: true, config: capturedPostBody }),
+                });
+            } else {
+                await route.continue();
+            }
+        });
+
+        await openResidentLumpsTab(page);
+        const panel = page.locator('#lumpResidentPanel');
+        const resident = panel.locator('input[data-rl-slot="12"][data-rl-field="resident"]');
+        const prefetch = panel.locator('input[data-rl-slot="12"][data-rl-field="prefetch"]');
+
+        await expect(resident).not.toBeChecked();
+        await prefetch.check();
+        await expect(resident).not.toBeChecked();
+
+        const required = panel.locator('input[data-rl-slot="12"][data-rl-field="prefetchRequired"]');
+        const order = panel.locator('input[data-rl-slot="12"][data-rl-field="prefetchOrder"]');
+        await expect(required).toBeChecked();
+        await expect(order).toHaveValue('12');
+        await order.fill('3');
+
+        await panel.locator('button.le-save-btn', { hasText: 'Save boot config' }).click();
+        await expect.poll(() => capturedPostBody).not.toBeNull();
+
+        const row = capturedPostBody.step2.lumps.find(entry => entry.nsSlot === 12);
+        expect(row).toMatchObject({
+            nsSlot:          12,
+            resident:        false,
+            prefetch:        true,
+            prefetchRequired: true,
+            prefetchOrder:   3,
+            downloadUrl:     '/api/lump/DEADBEEF',
+        });
+    });
+
+});
