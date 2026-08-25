@@ -1,0 +1,67 @@
+{
+  "token": "0f8ad81b",
+  "abstraction": "MyAbstraction",
+  "filename": "MyAbstraction.1.827cfd7c.lump",
+  "sidecar_file": "MyAbstraction.1.827cfd7c.json",
+  "ns_slot": null,
+  "lump_size": 64,
+  "typ": 0,
+  "content_type": "code",
+  "cw": 2,
+  "cc": 1,
+  "profile": "IoT",
+  "language": "javascript",
+  "author": "",
+  "version": "2026.08.25",
+  "release_notes": "",
+  "methods": [
+    {
+      "name": "run",
+      "offset": 0,
+      "length": 2
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "__SELF__",
+      "rights": [
+        "E"
+      ],
+      "grants": [
+        "E"
+      ],
+      "compiler_owned_self": true
+    }
+  ],
+  "compiler_owned_self": true,
+  "pet_names": {
+    "DR": {},
+    "CR": {}
+  },
+  "mtbf": {
+    "consecutive_clean": 0,
+    "total_runs": 0,
+    "status": "unknown",
+    "source_hash": "e610b53a"
+  },
+  "deployment": {
+    "target_board": "wukong-xc7a100t",
+    "profile": "IoT",
+    "built_at": "2026-08-25T09:37:06.384621Z",
+    "builder": "CLOOMC++ IDE v1.0"
+  },
+  "grants": [
+    "E"
+  ],
+  "source": "HALT",
+  "binary_hash": "5120739b4fb8cc7c6999e560ae4b48c56228c1c190a76778b4d0b56153c4fc4d",
+  "petname": "",
+  "issue_number": 1,
+  "identity_string": "MyAbstraction#1",
+  "identity_hash": "654062b290784712f75bdaa55e4584c6af6215072698b8e579049da720ad75ed",
+  "identity_seal_location": "sidecar",
+  "dot_name": "MyAbstraction",
+  "issue_n": 1,
+  "lump_version": 2,
+  "compiled_at": 1787650626.384638
+}
