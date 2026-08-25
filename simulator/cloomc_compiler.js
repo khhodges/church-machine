@@ -957,7 +957,10 @@ class CLOOMCCompiler {
         const lines = source.split('\n');
         for (const line of lines) {
             const t = line.trim();
-            if (t.startsWith('--')) continue;
+            // Language probes must ignore every comment syntax accepted by
+            // source languages in this compiler. CLOOMC documentation often
+            // uses words such as "pure" that are Haskell markers only in code.
+            if (t.startsWith('--') || t.startsWith('//') || t.startsWith(';')) continue;
             if (t.match(/^(?:public\s+|private\s+)?method\s+\w+\s*\([^)]*\)\s*=\s*/)) return true;
             if (t.includes('\\') && t.includes('->')) return true;
             if (t.match(/\bcase\b.*\bof\b/)) return true;

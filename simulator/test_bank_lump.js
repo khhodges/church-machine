@@ -47,6 +47,8 @@ const cc = header & 0xFF;
 
 check('BANK-LUMP02: Bank source remains a compilable CLOOMC abstraction',
     artifact.compiled.abstractionName === 'Bank' && artifact.compiled.errors.length === 0 &&
+    artifact.compiled.methods.map(method => method.name).join(',') ===
+        'Create,Read,InspectVariable,Release,RevokeVariable' &&
     source.includes('abstraction Bank'));
 check('BANK-LUMP03: checked-in binary is the canonical compiler serialization',
     binary.equals(artifact.binary));

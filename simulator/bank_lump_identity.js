@@ -4,8 +4,8 @@
     const identity = Object.freeze({
   "dot_name": "Bank",
   "issue_n": 1,
-  "token": "8f5edf1d",
-  "binary_hash": "3bb89caf9a074f5618187787e1e007e7fb8f7587eec18783149ff6692f0d9cf9",
+  "token": "7c58f0f4",
+  "binary_hash": "6aea59970919b8b62d158b9e0be3185b5bfb5dcf1a370d3a6ed8187606d94d05",
   "identity_hash": "3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11",
   "self_gt": 1259958670,
   "ns_slot": null,
@@ -26,19 +26,21 @@
       },
       "status_semantics": "1=success; nonzero Bank error code=failure",
       "policy": {
-        "validation": "T3.1-T3.4-approval-before-private-custody",
+        "validation": "structural-and-type-gates-then-T3.1-T3.4-before-private-custody",
         "commit": "atomic-private-custody-or-cleanup",
         "issuance": "nullable-typed-bankvariable-capability-after-commit",
         "input_register": "CR1",
         "result_register": "CR0",
         "status_register": "DR0",
         "approval_gates": [
+          "Gate 1 structural",
+          "Gate 2 type",
           "T3.1",
           "T3.2",
-          "T3.3",
+          "T3.3 deferred",
           "T3.4"
         ],
-        "T3_3": "deferred-genesis-certificate; human-IDE-authority"
+        "T3_3": "deferred-not-verified; human-IDE-vouched provenance only"
       },
       "error_codes": {
         "NO_CAPABILITY": 257,
@@ -210,8 +212,8 @@
       }
     }
   },
-  "genesis_authority": "human-IDE",
-  "genesis_certificate_verification": "deferred"
+  "genesis_authority": "human-IDE-vouched-not-verified",
+  "genesis_certificate_verification": "deferred-not-verified"
 });
     if (typeof module !== 'undefined' && module.exports) module.exports = identity;
     root.BankLumpIdentity = identity;

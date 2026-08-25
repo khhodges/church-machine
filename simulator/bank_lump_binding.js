@@ -10,8 +10,8 @@
 (function exposeBankLumpBinding(root) {
     const DOT_NAME = 'Bank';
     const ISSUE_N = 1;
-    const TOKEN = '8f5edf1d';
-    const BINARY_HASH = '3bb89caf9a074f5618187787e1e007e7fb8f7587eec18783149ff6692f0d9cf9';
+    const TOKEN = '7c58f0f4';
+    const BINARY_HASH = '6aea59970919b8b62d158b9e0be3185b5bfb5dcf1a370d3a6ed8187606d94d05';
     const IDENTITY_HASH = '3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11';
     const SELF_GT = 0x4B19718E;
     const REGISTRY_INDEX = 54;
