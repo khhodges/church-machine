@@ -2165,6 +2165,13 @@ def _load_lump_catalog(selected_tokens=None):
             "nsSlotPolicy": policy,
             "hasExecutableMethods": bool(entry.get("methods")),
         }
+        # Expose the canonical binding needed by host-side prefetch.  These
+        # values are informational until receiveLump() verifies the response
+        # headers and raw payload hash.
+        for _src, _dst in (("dot_name", "dotName"), ("issue_n", "issueN"),
+                            ("identity_hash", "identityHash"), ("binary_hash", "binaryHash")):
+            if entry.get(_src) is not None:
+                e[_dst] = entry[_src]
         if entry.get("media_tags"):
             e["mediaTags"] = entry["media_tags"]
         out.append(e)
@@ -2295,6 +2302,7 @@ def _validate_step2(step2, step1, target_board):
     # NS slots 2–5 are MMIO (no RAM body) — they do not contribute to foundation_end.
     usable_end = total - NS_TABLE_RESERVE
     seen_slots = set()
+    seen_prefetch_orders = set()
     occupied = []  # list of (start, end_exclusive, label) for resident lumps
     for entry in lumps:
         if not isinstance(entry, dict):
@@ -2323,6 +2331,9 @@ def _validate_step2(step2, step1, target_board):
                 order = entry.get("prefetchOrder", slot)
                 if not isinstance(order, int) or order < 0:
                     return f"prefetchOrder for NS slot {slot} must be a non-negative integer"
+                if order in seen_prefetch_orders:
+                    return f"duplicate prefetchOrder {order}"
+                seen_prefetch_orders.add(order)
             continue
         cat = catalog[slot]
         lump_size = entry.get("lumpSize") or cat.get("lumpSize")
@@ -2543,6 +2554,7 @@ def boot_config_post():
                 row["lumpToken"] = str(e["lumpToken"])
             if not row["resident"] and e.get("prefetch"):
                 row["prefetch"] = True
+                row["prefetchRequired"] = e.get("prefetchRequired") is not False
                 row["downloadUrl"] = str(e.get("downloadUrl", "")).strip()
                 row["prefetchOrder"] = int(e.get("prefetchOrder", row["nsSlot"]))
             if row["resident"]:

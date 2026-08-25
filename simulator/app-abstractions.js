@@ -341,6 +341,37 @@ function _initLazyLoadManifest() {
                     loadCount: 0,
                     bootUpload: upload
                 };
+                // Ordered raw-LUMP boot prefetch is opt-in.  Keep it on the
+                // manifest entry so the host loader can use the exact same
+                // identity registered for ordinary demand-driven loading.
+                const prefetch = step2Lumps.find(e =>
+                    e && e.nsSlot === upload.index && !e.resident && e.prefetch);
+                if (prefetch) {
+                    manifest[upload.index].prefetch = true;
+                    manifest[upload.index].prefetchOrder =
+                        Number.isInteger(prefetch.prefetchOrder)
+                            ? prefetch.prefetchOrder : upload.index;
+                    manifest[upload.index].prefetchRequired =
+                        prefetch.prefetchRequired !== false;
+                    manifest[upload.index].downloadUrl =
+                        prefetch.downloadUrl || `/api/lump/${upload.token || ''}`;
+                    const catalogEntry = (window._lumpCatalog || []).find(c =>
+                        c && c.nsSlot === upload.index);
+                    if (catalogEntry && sim.registerSlotIdentity &&
+                            catalogEntry.dotName && catalogEntry.issueN &&
+                            catalogEntry.identityHash && catalogEntry.binaryHash) {
+                        try {
+                            sim.registerSlotIdentity(upload.index, {
+                                dotName: catalogEntry.dotName,
+                                issueN: catalogEntry.issueN,
+                                identityHash: catalogEntry.identityHash,
+                                binaryHash: catalogEntry.binaryHash
+                            });
+                        } catch (e) {
+                            console.warn(`[bootConfig] prefetch identity rejected for slot ${upload.index}:`, e);
+                        }
+                    }
+                }
                 if (isResident) residentSlots.push({slot: upload.index, cfg});
             }
         }

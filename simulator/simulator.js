@@ -594,6 +594,18 @@ class ChurchSimulator {
         }
     }
 
+    // Prepare the existing secure Outform transaction for a host-side boot
+    // prefetch.  No NS words are changed here; receiveLump() remains the only
+    // path allowed to validate and publish a resident promotion.
+    prepareLumpPrefetch(slotIndex) {
+        const entry = this.lazyManifest && this.lazyManifest[slotIndex];
+        if (!entry || !entry.prefetch || entry.loaded) return null;
+        if (this.awaitingLump) return null;
+        const result = this._absentLumpIntercept(
+            entry, slotIndex, null, 'BOOT_PREFETCH', null, null);
+        return result && result.absent ? result : this.awaitingLump;
+    }
+
     lazyLoad(slotIndex) {
         const entry = this.lazyManifest[slotIndex];
         if (!entry) return false;
@@ -926,6 +938,8 @@ class ChurchSimulator {
         this.lastCapability = null;
         this.auditLog = [];
         this.awaitingLump = null;
+        this._bootPrefetchStarted = false;
+        this._bootPrefetchFailed = false;
         this._tracePacketsBuf = [];  // per-instruction trace packet buffer (cleared before each step)
 
         // Namespace occupancy is security-relevant. Boot setup writes before

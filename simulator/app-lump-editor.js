@@ -394,6 +394,11 @@
             var saved = savedMap[cat.nsSlot];
             _rl.step2State[cat.nsSlot] = {
                 resident:    !!(saved && saved.resident),
+                prefetch:    !!(saved && saved.prefetch),
+                prefetchRequired: !(saved && saved.prefetchRequired === false),
+                prefetchOrder: (saved && Number.isInteger(saved.prefetchOrder))
+                    ? saved.prefetchOrder : cat.nsSlot,
+                downloadUrl: (saved && saved.downloadUrl) || ('/api/lump/' + (cat.token || '')),
                 physAddr:    (saved && Number.isFinite(saved.physAddr)) ? saved.physAddr : null,
                 lumpSize:    cat.lumpSize,
                 abstraction: cat.abstraction,
@@ -495,6 +500,14 @@
         var st    = _rl.step2State[slot] || {};
         if (field === 'resident') {
             st.resident = !!ev.target.checked;
+            if (st.resident) st.prefetch = false;
+        } else if (field === 'prefetch') {
+            st.prefetch = !!ev.target.checked;
+            if (st.prefetch) st.resident = false;
+        } else if (field === 'prefetchRequired') {
+            st.prefetchRequired = !!ev.target.checked;
+        } else if (field === 'prefetchOrder') {
+            st.prefetchOrder = parseInt(ev.target.value, 10);
         } else if (field === 'physAddr') {
             var v = ev.target.value;
             st.physAddr = (v === '' ? null : parseInt(v, 10));
@@ -634,7 +647,7 @@
         }
 
         if (!_fixedCatalog.length) {
-            rows += '<tr><td colspan="6" class="le-rl-empty-msg">No catalog lumps available ' +
+            rows += '<tr><td colspan="7" class="le-rl-empty-msg">No catalog lumps available ' +
                    '(server/lumps/manifest.json has no assignable entries).</td></tr>';
         } else {
             for (var i = 0; i < _fixedCatalog.length; i++) {
@@ -666,6 +679,17 @@
                       '<div class="le-rl-addr-hint' + (st.resident ? '' : ' le-rl-addr-hint-inactive') + '">' +
                         esc(addrHintText) +
                       '</div>' +
+                    '</td>' +
+                    '<td class="le-rl-td">' +
+                      '<label class="le-rl-mode-label' + (st.prefetch ? ' le-rl-mode-resident' : '') + '">' +
+                        '<input type="checkbox" class="le-rl-check" data-rl-slot="' + cat.nsSlot +
+                          '" data-rl-field="prefetch"' + (st.prefetch ? ' checked' : '') + '> Prefetch</label>' +
+                      (st.prefetch ? '<label class="le-rl-mode-label"><input type="checkbox" data-rl-slot="' +
+                        cat.nsSlot + '" data-rl-field="prefetchRequired"' +
+                        (st.prefetchRequired ? ' checked' : '') + '> Required</label>' +
+                        '<input type="number" min="0" step="1" class="le-rl-addr" data-rl-slot="' +
+                        cat.nsSlot + '" data-rl-field="prefetchOrder" value="' +
+                        esc(String(st.prefetchOrder)) + '" title="Prefetch order">' : '') +
                     '</td>' +
                     '<td class="le-rl-td le-rl-td-boot">' + _bootBadge(cat) + '</td>' +
                     '</tr>';
@@ -741,8 +765,9 @@
             '<th class="le-rl-th">Lump</th>' +
             '<th class="le-rl-th le-rl-th-narrow">NS</th>' +
             '<th class="le-rl-th le-rl-th-narrow">Size&nbsp;(w)</th>' +
-            '<th class="le-rl-th le-rl-th-mode">Mode</th>' +
+                '<th class="le-rl-th le-rl-th-mode">Mode</th>' +
             '<th class="le-rl-th">Phys addr&nbsp;(resident only)</th>' +
+                '<th class="le-rl-th">Boot prefetch</th>' +
             '<th class="le-rl-th le-rl-th-boot">Boot?</th>' +
             '</tr></thead>' +
             '<tbody>' + rows + '</tbody>' +
@@ -1740,6 +1765,13 @@
                 abstraction: st.abstraction,
                 lumpToken: st.lumpToken
             };
+            if (!row.resident && st.prefetch) {
+                row.prefetch = true;
+                row.prefetchRequired = st.prefetchRequired !== false;
+                row.prefetchOrder = Number.isInteger(st.prefetchOrder)
+                    ? st.prefetchOrder : row.nsSlot;
+                row.downloadUrl = st.downloadUrl || ('/api/lump/' + (st.lumpToken || ''));
+            }
             if (st.resident) {
                 row.physAddr = st.physAddr;
                 if (st.lumpSize) row.lumpSize = st.lumpSize;

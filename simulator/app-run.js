@@ -1809,6 +1809,11 @@ function slowBoot() {
                 }
                 updateDashboard();
                 if (!sim.halted) {
+                    // Fetch explicitly configured early Outforms before user
+                    // execution.  This is asynchronous and serialized; the
+                    // normal demand-driven path remains active for everything
+                    // outside the policy.
+                    const _prefetchDone = _startBootLumpPrefetch();
                     // Land on the user's default page (⚡ bolt setting) or
                     // fall back to lumps. Clear the guard so subsequent
                     // manual resets redirect to dashboard as normal.
@@ -1819,8 +1824,14 @@ function slowBoot() {
                     // Boot completed cleanly — cascade straight into continuous execution.
                     // "Break at entry" (if checked) inserts a one-shot breakpoint at the
                     // very first instruction so the user lands paused there automatically.
-                    _setEntryBreakpoint();
-                    runSimGo();
+                    _prefetchDone.then(() => {
+                        if (sim.halted || sim._bootPrefetchFailed) return;
+                        _setEntryBreakpoint();
+                        runSimGo();
+                    }).catch(e => {
+                        console.error('[boot-prefetch] unexpected failure:', e);
+                        sim._bootPrefetchFailed = true;
+                    });
                 }
                 return;
             }
@@ -1866,6 +1877,56 @@ function slowBoot() {
         }
     }
     nextPhase();
+}
+
+async function _startBootLumpPrefetch() {
+    if (!sim || sim._bootPrefetchStarted) return;
+    const entries = Object.entries(sim.lazyManifest || {})
+        .filter(([, e]) => e && e.prefetch && !e.loaded)
+        .sort((a, b) => (a[1].prefetchOrder - b[1].prefetchOrder) ||
+                       (Number(a[0]) - Number(b[0])));
+    if (!entries.length) return;
+    sim._bootPrefetchStarted = true;
+    const con = document.getElementById('editorConsole');
+    const log = msg => {
+        if (con) { con.textContent += '\n' + msg; con.scrollTop = con.scrollHeight; }
+        console.log('[boot-prefetch]', msg);
+    };
+    log(`[LOADER] Boot prefetch: ${entries.length} raw LUMP(s), sequential order ` +
+        `${entries.map(([s]) => s).join(', ')}`);
+    for (const [slotStr, entry] of entries) {
+        const slot = Number(slotStr);
+        let completed = false;
+        for (let attempt = 1; attempt <= 2 && !completed; attempt++) {
+            const absent = sim.prepareLumpPrefetch(slot);
+            if (!absent) {
+                log(`⚠ Boot prefetch could not prepare Slot ${slot}`);
+                break;
+            }
+            absent.fetchUrl = entry.downloadUrl || `/api/lump/${absent.token}`;
+            log(`[LOADER] Prefetching Slot ${slot} (${entry.label || 'entry_' + slot}) ` +
+                `(attempt ${attempt}/2)`);
+            const result = await triggerLazyLoad(absent, 'boot-prefetch');
+            completed = !!(result && result.ok && entry.loaded);
+            if (!completed) {
+                // Network errors intentionally leave the suspension intact for
+                // the ordinary retry button.  Clear only this host transaction
+                // before beginning the bounded prefetch retry.
+                sim.awaitingLump = null;
+                if (attempt < 2) log(`[LOADER] Retrying Slot ${slot}…`);
+            }
+        }
+        if (!completed) {
+            const required = entry.prefetchRequired !== false;
+            log(`${required ? '⊿ REQUIRED' : '⚠ OPTIONAL'} boot prefetch failed for ` +
+                `Slot ${slot}; ${required ? 'boot prefetch stopped' : 'slot remains demand-loadable'}`);
+            if (required) {
+                sim._bootPrefetchFailed = true;
+                return;
+            }
+        }
+    }
+    log('[LOADER] Boot prefetch complete');
 }
 
 function runSim() {
@@ -3601,7 +3662,7 @@ async function triggerLazyLoad(absentResult, mode) {
     // data intact (we do NOT call receiveLump on a failed fetch).
     let words, source, resolverMeta;
     try {
-        const resp = await fetch(`/api/lump/${token}`);
+        const resp = await fetch(absentResult.fetchUrl || `/api/lump/${token}`);
         source = resp.headers.get('X-Lump-Source') || 'local';
         // Trusted resolver metadata from response headers (server-supplied).
         // Cache tag T is a 32-bit hex value; hashes are canonical 64-hex strings
@@ -3644,7 +3705,7 @@ async function triggerLazyLoad(absentResult, mode) {
             log(`⊿ Lazy load failed (HTTP ${resp.status}) for 0x${token}: ${errText}`);
             // Fetch failure: awaiting state + Outform data intact; do not install.
             updateDashboard(); switchView('editor'); switchCodeTab('console');
-            return;
+            return { ok: false, error: `HTTP ${resp.status}` };
         }
         const buf = await resp.arrayBuffer();
         words = [];
@@ -3666,14 +3727,14 @@ async function triggerLazyLoad(absentResult, mode) {
             log(`⊿ Lazy load hash error: ${hashErr.message}`);
             // No computed hash → receiveLump will fail closed for secure Outform.
             updateDashboard(); switchView('editor'); switchCodeTab('console');
-            return;
+            return { ok: false, error: hashErr.message };
         }
     } catch (e) {
         log(`⊿ Lazy load fetch error: ${e.message}`);
         console.error('[lazyLoad] fetch error:', e);
         // Fetch error: awaiting state + Outform data intact; do not install.
         updateDashboard(); switchView('editor'); switchCodeTab('console');
-        return;
+        return { ok: false, error: e.message };
     }
 
     // ── 2. Install into simulator (identity verified inside receiveLump) ──────
@@ -3695,12 +3756,19 @@ async function triggerLazyLoad(absentResult, mode) {
             log(`\u22bf Install failed: ${installResult.message}`);
         }
         updateDashboard(); switchView('editor'); switchCodeTab('console');
-        return;
+        return { ok: false, error: installResult.message };
     }
     const srcLabel = source.startsWith('library:')
         ? `Mum Tunnel Library — ${source.slice(8)}`
         : 'local cache';
     log(`✓ Installed: ${label} — ${installResult.lumpSize} words @ 0x${installResult.freeBase.toString(16).toUpperCase()} [${srcLabel}]`);
+
+    // Boot prefetch deliberately stops after the validated installation.  It
+    // must not execute or retry an instruction merely because it downloaded a
+    // later Outform slot.
+    if (mode === 'boot-prefetch') {
+        return { ok: true, slot: absentResult.nsIndex, installResult };
+    }
 
     // ── 3. Auto-retry the LOAD (PC was reset to retryPC by receiveLump) ──────
     const faultsBefore = sim.faultLog ? sim.faultLog.length : 0;
