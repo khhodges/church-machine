@@ -59,7 +59,8 @@
             ownerReturn.kind !== 'capability' || ownerReturn.secure_type !== 'BankOwnerKey' ||
             !withdrawnValue || withdrawnValue.register !== 'CR2' ||
             withdrawnValue.kind !== 'capability' || withdrawnValue.secure_type !== 'Inform' ||
-            !createdVariable || createdVariable.register !== 'CR0' ||
+             !createdVariable || createdVariable.register !== 'CR0' ||
+             capabilityABI.Create.returns_nullable !== true ||
             createdVariable.kind !== 'capability' || createdVariable.secure_type !== 'BankVariable' ||
             !inspectVariable || !inspectVariable.returns ||
             inspectVariable.returns.register !== 'DR1' ||

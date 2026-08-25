@@ -1653,8 +1653,35 @@ class SystemAbstractions {
                 sim.cr[index].word3 = 0;
             }
         };
+        // DR0 is a diagnostic result for Bank calls.  Keep 1 as the successful
+        // completion value for compatibility, but make every failure
+        // distinguishable.  CR0 remains the only authority result: Create
+        // materializes it on success and leaves it as the NULL capability on
+        // every failure.
+        const BANK_ERROR_CODES = Object.freeze({
+            NO_CAPABILITY: 0x101,
+            TYPE: 0x102,
+            IDENTITY: 0x103,
+            PERM: 0x104,
+            BOUNDS: 0x105,
+            NOT_FOUND: 0x106,
+            REVOKED: 0x107,
+            STALE_KEY: 0x108,
+            OOM: 0x109,
+            NS_FULL: 0x10A,
+            MINT: 0x10B,
+            NAMESPACE: 0x10C,
+            CORRUPT: 0x10D,
+            NOT_INIT: 0x10E,
+            INTERNAL: 0x1FF,
+        });
+        const bankErrorCode = (result) => {
+            if (!result || result.ok) return 1;
+            if (Number.isInteger(result.error_code)) return result.error_code >>> 0;
+            return BANK_ERROR_CODES[result.fault] || BANK_ERROR_CODES.INTERNAL;
+        };
         const finishBankCapabilityResult = (sim, register, result) => {
-            writeBankDR(sim, 0, result && result.ok ? 1 : 0);
+            writeBankDR(sim, 0, bankErrorCode(result));
             if (result && result.ok && result.result &&
                     result.result.capability && result.result.capability.register === register) {
                 materializeBankCapability(sim, result.result.capability);
@@ -1703,7 +1730,12 @@ class SystemAbstractions {
             return capability ? { gt: capability.gt, proof: capability.proof } : {};
         };
 
-        const fail = (method, fault, message) => ({ ok: false, fault, message: `Bank.${method}: ${message}` });
+        const fail = (method, fault, message, error_code) => ({
+            ok: false,
+            fault,
+            error_code: error_code || BANK_ERROR_CODES[fault] || BANK_ERROR_CODES.INTERNAL,
+            message: `Bank.${method}: ${message}`
+        });
         const lockboxById = (id) => {
             if (!Number.isInteger(id) || id <= 0) return null;
             return bankState.lockboxes[id] || null;

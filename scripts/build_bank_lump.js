@@ -95,6 +95,8 @@ function buildBankArtifact() {
     api.capability_abi = {
         Create: {
             status: { register: 'DR0', kind: 'value' },
+            status_semantics: '1=success; nonzero Bank error code=failure',
+            returns_nullable: true,
             inputs: [{
                 name: 'lump', register: 'CR1', kind: 'capability',
                 secure_type: 'Inform', rights: ['R']
