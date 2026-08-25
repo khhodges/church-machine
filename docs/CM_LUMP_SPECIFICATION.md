@@ -1346,17 +1346,19 @@ Inform source only in `CR2`. The verified abstraction interface starts with
 
 | Method | Inputs | Outputs | Meaning |
 |---|---|---|---|
-| `Create` | CR1 typed Inform `R` LUMP capability **or** a complete LUMP value; its canonical identity metadata accompanies the value | DR0 status; CR3 `BankVariable` Abstract + `E` capability | Verify and privately commit exactly one complete self-defining `typ=lump` binary. |
-| `InspectVariable` | CR3 `BankVariable` | DR0 status; DR1 word count; DR2 capacity; DR3 issue; DR4 lifecycle | Return scalar inspection fields plus non-sensitive identity/provenance metadata without a private location. |
-| `Read` | CR3 `BankVariable`; DR1 offset; DR2 word count | DR0 status; CR4 fresh Inform `R` capability | Copy only the requested in-bounds words into a new public readable allocation. |
-| `Release` | CR3 `BankVariable` | DR0 status | Zeroize and retire the private allocation; the variable capability is stale thereafter. |
-| `RevokeVariable` | CR3 `BankVariable` | DR0 status | Revoke the variable authority, zeroize and retire its private allocation. |
+| `Create` | CR1 typed Inform `R` LUMP capability **or** a complete LUMP value; its canonical identity metadata accompanies the value | DR0 binary status (`0`/`1`) only; CR0 `BankVariable` Abstract + `E` capability | Verify and privately commit exactly one complete self-defining `typ=lump` binary, then issue the typed Enter authority in CR0. |
+| `InspectVariable` | CR0 `BankVariable` | DR0 binary status; DR1 word count; DR2 capacity; DR3 issue; DR4 lifecycle | Accept only the typed CR0 capability; return scalar inspection fields plus non-sensitive identity/provenance metadata without a private location. |
+| `Read` | CR0 `BankVariable`; DR1 offset; DR2 word count | DR0 binary status; CR4 fresh Inform `R` capability | Copy only the requested in-bounds words into a new public readable allocation. |
+| `Release` | CR0 `BankVariable` | DR0 binary status | Zeroize and retire the private allocation; clear CR0 so the variable capability is stale thereafter. |
+| `RevokeVariable` | CR0 `BankVariable` | DR0 binary status | Revoke the variable authority, clear CR0, and zeroize and retire its private allocation. |
 
 The capability registers above are type checked by the live binding. A raw GT,
 proof words, a Namespace index, a memory address, or a reconstructed handle in
 DRs is not a substitute for either `BankOwnerKey` or `BankVariable`. `Create`
 does not return an owner credential, a private Namespace address, or a private
-GT. `BankOwnerKey` remains the authority for the separate lockbox lifecycle
+GT. `CR0` is the only returned authority for the verified Bank variable;
+`DR0` reports only binary pass/fail and must never be used as a capability.
+`BankOwnerKey` remains the authority for the separate lockbox lifecycle
 (`MintKey`, `Deposit`, `Withdraw`, `Inspect`, `Revoke`, `ObtainPassKey`,
 `ExportRecovery`, and `Recover`); `BankVariable` is the capability that names
 the created abstraction value. This separation prevents callers from treating
@@ -1391,6 +1393,12 @@ attestation or registry chain in addition to Bank's byte validation. The
 current API records such a caller declaration as non-authoritative provenance;
 it never upgrades it to a verified genesis claim merely because it was supplied
 by the caller.
+
+The owner capability and verified variable capability are intentionally
+different authorities. Owner methods manage a Bank lockbox; variable methods
+mediate reads, release, revocation, and explicit nested `Create(Read(...))`
+workflows. A successful status in `DR0` does not grant either authority, and
+retirement clears the corresponding capability register.
 
 A Bank variable contains **one complete LUMP**, not an indexed collection.
 `words` is the exact encoded binary size. `capacity` is the actual private

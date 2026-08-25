@@ -41,7 +41,7 @@ const BANK_CAPABILITY_TYPES = [
     },
     {
         name: 'BankVariable',
-        register: 'CR3',
+        register: 'CR0',
         gt_type: 'Abstract',
         rights: ['E'],
         proof_bound: true,
@@ -100,14 +100,14 @@ function buildBankArtifact() {
                 secure_type: 'Inform', rights: ['R']
             }],
             returns: {
-                name: 'variable', register: 'CR3', kind: 'capability',
+                name: 'variable', register: 'CR0', kind: 'capability',
                 secure_type: 'BankVariable', rights: ['E']
             },
         },
         Read: {
             status: { register: 'DR0', kind: 'value' },
             inputs: [
-                { name: 'variable', register: 'CR3', kind: 'capability',
+                { name: 'variable', register: 'CR0', kind: 'capability',
                     secure_type: 'BankVariable', rights: ['E'] },
                 { name: 'offset', register: 'DR1', kind: 'value' },
                 { name: 'words', register: 'DR2', kind: 'value' },
@@ -119,7 +119,7 @@ function buildBankArtifact() {
         },
         InspectVariable: {
             status: { register: 'DR0', kind: 'value' },
-            inputs: [{ name: 'variable', register: 'CR3', kind: 'capability',
+            inputs: [{ name: 'variable', register: 'CR0', kind: 'capability',
                 secure_type: 'BankVariable', rights: ['E'] }],
             returns: { name: 'word_count', register: 'DR1', kind: 'value' },
             outputs: [
@@ -132,13 +132,13 @@ function buildBankArtifact() {
         },
         Release: {
             status: { register: 'DR0', kind: 'value' },
-            inputs: [{ name: 'variable', register: 'CR3', kind: 'capability',
+            inputs: [{ name: 'variable', register: 'CR0', kind: 'capability',
                 secure_type: 'BankVariable', rights: ['E'] }],
             returns: { name: 'status', register: 'DR0', kind: 'value' },
         },
         RevokeVariable: {
             status: { register: 'DR0', kind: 'value' },
-            inputs: [{ name: 'variable', register: 'CR3', kind: 'capability',
+            inputs: [{ name: 'variable', register: 'CR0', kind: 'capability',
                 secure_type: 'BankVariable', rights: ['E'] }],
             returns: { name: 'status', register: 'DR0', kind: 'value' },
         },

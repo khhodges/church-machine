@@ -19,15 +19,19 @@ abstraction Bank {
     capabilities {
     }
 
-    // Create(lump: CR1 Inform R) -> BankVariable E capability in CR3,
-    // validation/commit status in DR0.  The source must be a complete,
-    // self-defining LUMP; the live binding verifies its bytes and metadata
-    // before allocating private custody.
+    // Create(lump: CR1 Inform R) -> BankVariable E capability in CR0,
+    // validation/commit status in DR0.  CR0 is the resulting Enter authority;
+    // DR0 is only the binary pass/fail status and can never authorize entry.
+    // The LUMP is checked first: its seals, token, SELF identity, and declared
+    // relationships must agree before the live binding issues this capability.
+    // A hash is an integrity check, not proof of provenance by itself.
     method Create(lump: capability Inform R) {
         return(1)
     }
 
-    // Read and Inspect operate on the typed E capability returned by Create.
+    // Read and Inspect operate on the typed E capability returned by Create in
+    // CR0.  Methods mediate every read of a Bank-owned abstraction; callers
+    // cannot substitute CR3, a raw GT, DR0, or metadata for that capability.
     // The binding returns a fresh readable Inform capability in CR4 for Read.
     // Inspect writes status=DR0, words=DR1, capacity=DR2, issue=DR3, and
     // lifecycle=DR4; private locations and tokens are never materialised.
@@ -45,6 +49,11 @@ abstraction Bank {
         return(1)
     }
 
+    // Release and RevokeVariable retire the verified variable, zeroize its
+    // private storage, and clear CR0.  An owner capability (CR1) controls a
+    // Bank lockbox; a BankVariable capability (CR0) controls only the verified
+    // variable it names.  Nested variables are created by calling Create on a
+    // readable result from Read, never by exposing the owner's private record.
     method Release(variable: capability BankVariable E) {
         return(1)
     }

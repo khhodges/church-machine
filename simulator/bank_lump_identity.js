@@ -4,8 +4,8 @@
     const identity = Object.freeze({
   "dot_name": "Bank",
   "issue_n": 1,
-  "token": "f386f8fe",
-  "binary_hash": "363a58a895fa5a6e8c596d881c637bfe26d6cce58314d64ee6d76a02a231a203",
+  "token": "0e759698",
+  "binary_hash": "ea90cf2e16ebadb4bd6e8a85c9f3b4824ee700d09049c4a972c0830e0a450b2b",
   "identity_hash": "3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11",
   "self_gt": 186216846,
   "ns_slot": null,
@@ -37,7 +37,7 @@
       ],
       "returns": {
         "name": "variable",
-        "register": "CR3",
+        "register": "CR0",
         "kind": "capability",
         "secure_type": "BankVariable",
         "rights": [
@@ -53,7 +53,7 @@
       "inputs": [
         {
           "name": "variable",
-          "register": "CR3",
+          "register": "CR0",
           "kind": "capability",
           "secure_type": "BankVariable",
           "rights": [
@@ -89,7 +89,7 @@
       "inputs": [
         {
           "name": "variable",
-          "register": "CR3",
+          "register": "CR0",
           "kind": "capability",
           "secure_type": "BankVariable",
           "rights": [
@@ -139,7 +139,7 @@
       "inputs": [
         {
           "name": "variable",
-          "register": "CR3",
+          "register": "CR0",
           "kind": "capability",
           "secure_type": "BankVariable",
           "rights": [
@@ -161,7 +161,7 @@
       "inputs": [
         {
           "name": "variable",
-          "register": "CR3",
+          "register": "CR0",
           "kind": "capability",
           "secure_type": "BankVariable",
           "rights": [

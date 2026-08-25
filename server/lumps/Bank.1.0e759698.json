@@ -1,12 +1,12 @@
 {
-  "token": "f386f8fe",
+  "token": "0e759698",
   "abstraction": "Bank",
   "dot_name": "Bank",
   "issue_n": 1,
   "ns_slot": null,
   "ns_slot_policy": "dynamic",
   "boot_resident": false,
-  "lump_size": 4096,
+  "lump_size": 8192,
   "cw": 290,
   "cc": 1,
   "typ": 0,
@@ -34,7 +34,7 @@
       ],
       "returns": {
         "name": "variable",
-        "register": "CR3",
+        "register": "CR0",
         "kind": "capability",
         "secure_type": "BankVariable",
         "rights": [
@@ -53,7 +53,7 @@
       "inputs": [
         {
           "name": "variable",
-          "register": "CR3",
+          "register": "CR0",
           "kind": "capability",
           "secure_type": "BankVariable",
           "rights": [
@@ -92,7 +92,7 @@
       "inputs": [
         {
           "name": "variable",
-          "register": "CR3",
+          "register": "CR0",
           "kind": "capability",
           "secure_type": "BankVariable",
           "rights": [
@@ -145,7 +145,7 @@
       "inputs": [
         {
           "name": "variable",
-          "register": "CR3",
+          "register": "CR0",
           "kind": "capability",
           "secure_type": "BankVariable",
           "rights": [
@@ -170,7 +170,7 @@
       "inputs": [
         {
           "name": "variable",
-          "register": "CR3",
+          "register": "CR0",
           "kind": "capability",
           "secure_type": "BankVariable",
           "rights": [
@@ -430,7 +430,7 @@
     },
     {
       "name": "BankVariable",
-      "register": "CR3",
+      "register": "CR0",
       "gt_type": "Abstract",
       "rights": [
         "E"
@@ -458,7 +458,7 @@
       ],
       "returns": {
         "name": "variable",
-        "register": "CR3",
+        "register": "CR0",
         "kind": "capability",
         "secure_type": "BankVariable",
         "rights": [
@@ -474,7 +474,7 @@
       "inputs": [
         {
           "name": "variable",
-          "register": "CR3",
+          "register": "CR0",
           "kind": "capability",
           "secure_type": "BankVariable",
           "rights": [
@@ -510,7 +510,7 @@
       "inputs": [
         {
           "name": "variable",
-          "register": "CR3",
+          "register": "CR0",
           "kind": "capability",
           "secure_type": "BankVariable",
           "rights": [
@@ -560,7 +560,7 @@
       "inputs": [
         {
           "name": "variable",
-          "register": "CR3",
+          "register": "CR0",
           "kind": "capability",
           "secure_type": "BankVariable",
           "rights": [
@@ -582,7 +582,7 @@
       "inputs": [
         {
           "name": "variable",
-          "register": "CR3",
+          "register": "CR0",
           "kind": "capability",
           "secure_type": "BankVariable",
           "rights": [
@@ -663,15 +663,15 @@
     "credential_abi": "capability-register-v1",
     "fixed_hardware_boot_slot": false
   },
-  "filename": "Bank.1.f386f8fe.lump",
-  "sidecar_file": "Bank.1.f386f8fe.json",
-  "binary_hash": "363a58a895fa5a6e8c596d881c637bfe26d6cce58314d64ee6d76a02a231a203",
+  "filename": "Bank.1.0e759698.lump",
+  "sidecar_file": "Bank.1.0e759698.json",
+  "binary_hash": "ea90cf2e16ebadb4bd6e8a85c9f3b4824ee700d09049c4a972c0830e0a450b2b",
   "identity_hash": "3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11",
   "identity_string": "Bank#1",
   "identity_seal_location": "c-list[0]",
   "sourceStorageTier": 2,
   "source_file": "simulator/cloomc/bank.cloomc",
-  "source": "// Bank \u2014 dynamic Namespace-backed lockbox custody service.\n//\n// Bank is a dynamic CLOOMC LUMP at catalog index 54, not a hardware boot\n// slot. MintKey creates private Outform storage only when it is called.\n//\n// Security ABI:\n//   * owner_key is a BankOwnerKey capability in CR1, never an integer in DR;\n//   * Deposit's source is an Inform R capability in CR2, never a scalar GT;\n//   * offsets, word counts, kinds, capacities, and status values remain DR\n//     values; and\n//   * the live binding validates the independent 128-bit proof attached to the\n//     typed owner capability, manages custody, zeroization, and recovery.\n//\n// The source models lifecycle state only. It cannot manufacture, inspect, or\n// reconstruct authority from integer fields: the CR ABI and proof-bound runtime\n// gate are the sole security boundary for those operations.\n\nabstraction Bank {\n    capabilities {\n    }\n\n    // Create(lump: CR1 Inform R) -> BankVariable E capability in CR3,\n    // validation/commit status in DR0.  The source must be a complete,\n    // self-defining LUMP; the live binding verifies its bytes and metadata\n    // before allocating private custody.\n    method Create(lump: capability Inform R) {\n        return(1)\n    }\n\n    // Read and Inspect operate on the typed E capability returned by Create.\n    // The binding returns a fresh readable Inform capability in CR4 for Read.\n    // Inspect writes status=DR0, words=DR1, capacity=DR2, issue=DR3, and\n    // lifecycle=DR4; private locations and tokens are never materialised.\n    method Read(variable: capability BankVariable E, offset, words) {\n        if (offset < 0) {\n            return(0)\n        }\n        if (words <= 0) {\n            return(0)\n        }\n        return(1)\n    }\n\n    method InspectVariable(variable: capability BankVariable E) {\n        return(1)\n    }\n\n    method Release(variable: capability BankVariable E) {\n        return(1)\n    }\n\n    method RevokeVariable(variable: capability BankVariable E) {\n        return(1)\n    }\n\n    // MintKey(capacity: DR1) -> BankOwnerKey capability in CR1, status in DR0.\n    method MintKey(capacity) {\n        if (capacity <= 0) {\n            return(0)\n        }\n\n        var lockbox_id = read(CR7, 0)\n        if (lockbox_id == 0) {\n            lockbox_id = 1\n        }\n        write(CR7, 0, lockbox_id + 1)\n\n        var sequence_base = read(CR7, 1)\n        var sequence_incremented = sequence_base + 1\n        var sequence = bfext(sequence_incremented, 0, 7)\n        if (sequence == 0) {\n            sequence = 1\n        }\n        write(CR7, 1, sequence)\n        write(CR7, 2, lockbox_id)\n        write(CR7, 3, sequence)\n        write(CR7, 4, capacity)\n        write(CR7, 5, 0)\n        write(CR7, 6, 0)\n        write(CR7, 7, 0)\n        write(CR7, 8, 0)\n        return(1)\n    }\n\n    // owner_key arrives through CR1 as BankOwnerKey; source arrives through CR2\n    // as an Inform R capability. The runtime binding validates both before this\n    // lifecycle policy can be entered.\n    method Deposit(owner_key: capability BankOwnerKey E, source: capability Inform R, offset, words, kind) {\n        var state = read(CR7, 6)\n        if (state != 0) {\n            return(0)\n        }\n        var capacity = read(CR7, 4)\n        if (offset < 0) {\n            return(0)\n        }\n        if (words <= 0) {\n            return(0)\n        }\n        if (words > capacity) {\n            return(0)\n        }\n        if (kind != 1) {\n            if (kind != 2) {\n                return(0)\n            }\n        }\n\n        write(CR7, 5, words)\n        write(CR7, 6, 1)\n        write(CR7, 7, kind)\n        write(CR7, 8, 1)\n        return(1)\n    }\n\n    // owner_key: CR1 BankOwnerKey. On success the binding returns a fresh\n    // Inform capability for the copied valuable in CR2 and status in DR0.\n    method Withdraw(owner_key: capability BankOwnerKey E) {\n        var state = read(CR7, 6)\n        if (state != 1) {\n            return(0)\n        }\n\n        var sequence_base = read(CR7, 1)\n        var sequence_incremented = sequence_base + 1\n        var next_sequence = bfext(sequence_incremented, 0, 7)\n        if (next_sequence == 0) {\n            next_sequence = 1\n        }\n        write(CR7, 1, next_sequence)\n        write(CR7, 3, next_sequence)\n        write(CR7, 5, 0)\n        write(CR7, 6, 2)\n        write(CR7, 7, 0)\n        write(CR7, 8, 0)\n        return(1)\n    }\n\n    // Inspect returns non-sensitive packed metadata in DR0.\n    method Inspect(owner_key: capability BankOwnerKey E) {\n        var state = read(CR7, 6)\n        var kind = read(CR7, 7)\n        var words = read(CR7, 5)\n        var metadata = bfext(words, 0, 16)\n        bfins(metadata, kind, 24, 6)\n        bfins(metadata, state, 30, 2)\n        return(metadata)\n    }\n\n    // Revoke zeroizes and retires the private record in the runtime binding.\n    method Revoke(owner_key: capability BankOwnerKey E) {\n        var sequence_base = read(CR7, 1)\n        var sequence_incremented = sequence_base + 1\n        var next_sequence = bfext(sequence_incremented, 0, 7)\n        if (next_sequence == 0) {\n            next_sequence = 1\n        }\n        write(CR7, 1, next_sequence)\n        write(CR7, 3, next_sequence)\n        write(CR7, 5, 0)\n        write(CR7, 6, 2)\n        write(CR7, 7, 0)\n        write(CR7, 8, 0)\n        return(1)\n    }\n\n    // Reissue an owner capability through CR1; DR0 carries status only.\n    method ObtainPassKey(owner_key: capability BankOwnerKey E) {\n        var state = read(CR7, 6)\n        if (state == 2) {\n            return(0)\n        }\n        var sequence_base = read(CR7, 1)\n        var sequence_incremented = sequence_base + 1\n        var next_sequence = bfext(sequence_incremented, 0, 7)\n        if (next_sequence == 0) {\n            next_sequence = 1\n        }\n        write(CR7, 1, next_sequence)\n        write(CR7, 3, next_sequence)\n        return(1)\n    }\n\n    // ExportRecovery returns protected scalar state in DR0; it still requires\n    // owner_key in CR1 so a recovery envelope cannot be requested with a DR GT.\n    method ExportRecovery(owner_key: capability BankOwnerKey E) {\n        var state = read(CR7, 6)\n        if (state != 1) {\n            return(0)\n        }\n        write(CR7, 8, 1)\n        return(1)\n    }\n\n    // protected_state is ordinary DR1 data. original_key is the typed CR1\n    // owner capability for the recovery grant; the replacement key returns in\n    // CR1 and success status in DR0.\n    method Recover(protected_state, original_key: capability BankOwnerKey E) {\n        if (protected_state == 0) {\n            return(0)\n        }\n        var recovery_present = read(CR7, 8)\n        if (recovery_present == 0) {\n            return(0)\n        }\n\n        var replacement_id = read(CR7, 0)\n        if (replacement_id == 0) {\n            replacement_id = 1\n        }\n        write(CR7, 0, replacement_id + 1)\n        var sequence_base = read(CR7, 1)\n        var sequence_incremented = sequence_base + 1\n        var next_sequence = bfext(sequence_incremented, 0, 7)\n        if (next_sequence == 0) {\n            next_sequence = 1\n        }\n        write(CR7, 1, next_sequence)\n        write(CR7, 2, replacement_id)\n        write(CR7, 3, next_sequence)\n        write(CR7, 5, 0)\n        write(CR7, 6, 0)\n        write(CR7, 7, 0)\n        write(CR7, 8, 0)\n        return(1)\n    }\n\n    // List() -> active lockbox count in DR0.\n    method List() {\n        var active_id = read(CR7, 2)\n        if (active_id == 0) {\n            return(0)\n        }\n        var state = read(CR7, 6)\n        if (state == 2) {\n            return(0)\n        }\n        return(1)\n    }\n}",
+  "source": "// Bank \u2014 dynamic Namespace-backed lockbox custody service.\n//\n// Bank is a dynamic CLOOMC LUMP at catalog index 54, not a hardware boot\n// slot. MintKey creates private Outform storage only when it is called.\n//\n// Security ABI:\n//   * owner_key is a BankOwnerKey capability in CR1, never an integer in DR;\n//   * Deposit's source is an Inform R capability in CR2, never a scalar GT;\n//   * offsets, word counts, kinds, capacities, and status values remain DR\n//     values; and\n//   * the live binding validates the independent 128-bit proof attached to the\n//     typed owner capability, manages custody, zeroization, and recovery.\n//\n// The source models lifecycle state only. It cannot manufacture, inspect, or\n// reconstruct authority from integer fields: the CR ABI and proof-bound runtime\n// gate are the sole security boundary for those operations.\n\nabstraction Bank {\n    capabilities {\n    }\n\n    // Create(lump: CR1 Inform R) -> BankVariable E capability in CR0,\n    // validation/commit status in DR0.  CR0 is the resulting Enter authority;\n    // DR0 is only the binary pass/fail status and can never authorize entry.\n    // The LUMP is checked first: its seals, token, SELF identity, and declared\n    // relationships must agree before the live binding issues this capability.\n    // A hash is an integrity check, not proof of provenance by itself.\n    method Create(lump: capability Inform R) {\n        return(1)\n    }\n\n    // Read and Inspect operate on the typed E capability returned by Create in\n    // CR0.  Methods mediate every read of a Bank-owned abstraction; callers\n    // cannot substitute CR3, a raw GT, DR0, or metadata for that capability.\n    // The binding returns a fresh readable Inform capability in CR4 for Read.\n    // Inspect writes status=DR0, words=DR1, capacity=DR2, issue=DR3, and\n    // lifecycle=DR4; private locations and tokens are never materialised.\n    method Read(variable: capability BankVariable E, offset, words) {\n        if (offset < 0) {\n            return(0)\n        }\n        if (words <= 0) {\n            return(0)\n        }\n        return(1)\n    }\n\n    method InspectVariable(variable: capability BankVariable E) {\n        return(1)\n    }\n\n    // Release and RevokeVariable retire the verified variable, zeroize its\n    // private storage, and clear CR0.  An owner capability (CR1) controls a\n    // Bank lockbox; a BankVariable capability (CR0) controls only the verified\n    // variable it names.  Nested variables are created by calling Create on a\n    // readable result from Read, never by exposing the owner's private record.\n    method Release(variable: capability BankVariable E) {\n        return(1)\n    }\n\n    method RevokeVariable(variable: capability BankVariable E) {\n        return(1)\n    }\n\n    // MintKey(capacity: DR1) -> BankOwnerKey capability in CR1, status in DR0.\n    method MintKey(capacity) {\n        if (capacity <= 0) {\n            return(0)\n        }\n\n        var lockbox_id = read(CR7, 0)\n        if (lockbox_id == 0) {\n            lockbox_id = 1\n        }\n        write(CR7, 0, lockbox_id + 1)\n\n        var sequence_base = read(CR7, 1)\n        var sequence_incremented = sequence_base + 1\n        var sequence = bfext(sequence_incremented, 0, 7)\n        if (sequence == 0) {\n            sequence = 1\n        }\n        write(CR7, 1, sequence)\n        write(CR7, 2, lockbox_id)\n        write(CR7, 3, sequence)\n        write(CR7, 4, capacity)\n        write(CR7, 5, 0)\n        write(CR7, 6, 0)\n        write(CR7, 7, 0)\n        write(CR7, 8, 0)\n        return(1)\n    }\n\n    // owner_key arrives through CR1 as BankOwnerKey; source arrives through CR2\n    // as an Inform R capability. The runtime binding validates both before this\n    // lifecycle policy can be entered.\n    method Deposit(owner_key: capability BankOwnerKey E, source: capability Inform R, offset, words, kind) {\n        var state = read(CR7, 6)\n        if (state != 0) {\n            return(0)\n        }\n        var capacity = read(CR7, 4)\n        if (offset < 0) {\n            return(0)\n        }\n        if (words <= 0) {\n            return(0)\n        }\n        if (words > capacity) {\n            return(0)\n        }\n        if (kind != 1) {\n            if (kind != 2) {\n                return(0)\n            }\n        }\n\n        write(CR7, 5, words)\n        write(CR7, 6, 1)\n        write(CR7, 7, kind)\n        write(CR7, 8, 1)\n        return(1)\n    }\n\n    // owner_key: CR1 BankOwnerKey. On success the binding returns a fresh\n    // Inform capability for the copied valuable in CR2 and status in DR0.\n    method Withdraw(owner_key: capability BankOwnerKey E) {\n        var state = read(CR7, 6)\n        if (state != 1) {\n            return(0)\n        }\n\n        var sequence_base = read(CR7, 1)\n        var sequence_incremented = sequence_base + 1\n        var next_sequence = bfext(sequence_incremented, 0, 7)\n        if (next_sequence == 0) {\n            next_sequence = 1\n        }\n        write(CR7, 1, next_sequence)\n        write(CR7, 3, next_sequence)\n        write(CR7, 5, 0)\n        write(CR7, 6, 2)\n        write(CR7, 7, 0)\n        write(CR7, 8, 0)\n        return(1)\n    }\n\n    // Inspect returns non-sensitive packed metadata in DR0.\n    method Inspect(owner_key: capability BankOwnerKey E) {\n        var state = read(CR7, 6)\n        var kind = read(CR7, 7)\n        var words = read(CR7, 5)\n        var metadata = bfext(words, 0, 16)\n        bfins(metadata, kind, 24, 6)\n        bfins(metadata, state, 30, 2)\n        return(metadata)\n    }\n\n    // Revoke zeroizes and retires the private record in the runtime binding.\n    method Revoke(owner_key: capability BankOwnerKey E) {\n        var sequence_base = read(CR7, 1)\n        var sequence_incremented = sequence_base + 1\n        var next_sequence = bfext(sequence_incremented, 0, 7)\n        if (next_sequence == 0) {\n            next_sequence = 1\n        }\n        write(CR7, 1, next_sequence)\n        write(CR7, 3, next_sequence)\n        write(CR7, 5, 0)\n        write(CR7, 6, 2)\n        write(CR7, 7, 0)\n        write(CR7, 8, 0)\n        return(1)\n    }\n\n    // Reissue an owner capability through CR1; DR0 carries status only.\n    method ObtainPassKey(owner_key: capability BankOwnerKey E) {\n        var state = read(CR7, 6)\n        if (state == 2) {\n            return(0)\n        }\n        var sequence_base = read(CR7, 1)\n        var sequence_incremented = sequence_base + 1\n        var next_sequence = bfext(sequence_incremented, 0, 7)\n        if (next_sequence == 0) {\n            next_sequence = 1\n        }\n        write(CR7, 1, next_sequence)\n        write(CR7, 3, next_sequence)\n        return(1)\n    }\n\n    // ExportRecovery returns protected scalar state in DR0; it still requires\n    // owner_key in CR1 so a recovery envelope cannot be requested with a DR GT.\n    method ExportRecovery(owner_key: capability BankOwnerKey E) {\n        var state = read(CR7, 6)\n        if (state != 1) {\n            return(0)\n        }\n        write(CR7, 8, 1)\n        return(1)\n    }\n\n    // protected_state is ordinary DR1 data. original_key is the typed CR1\n    // owner capability for the recovery grant; the replacement key returns in\n    // CR1 and success status in DR0.\n    method Recover(protected_state, original_key: capability BankOwnerKey E) {\n        if (protected_state == 0) {\n            return(0)\n        }\n        var recovery_present = read(CR7, 8)\n        if (recovery_present == 0) {\n            return(0)\n        }\n\n        var replacement_id = read(CR7, 0)\n        if (replacement_id == 0) {\n            replacement_id = 1\n        }\n        write(CR7, 0, replacement_id + 1)\n        var sequence_base = read(CR7, 1)\n        var sequence_incremented = sequence_base + 1\n        var next_sequence = bfext(sequence_incremented, 0, 7)\n        if (next_sequence == 0) {\n            next_sequence = 1\n        }\n        write(CR7, 1, next_sequence)\n        write(CR7, 2, replacement_id)\n        write(CR7, 3, next_sequence)\n        write(CR7, 5, 0)\n        write(CR7, 6, 0)\n        write(CR7, 7, 0)\n        write(CR7, 8, 0)\n        return(1)\n    }\n\n    // List() -> active lockbox count in DR0.\n    method List() {\n        var active_id = read(CR7, 2)\n        if (active_id == 0) {\n            return(0)\n        }\n        var state = read(CR7, 6)\n        if (state == 2) {\n            return(0)\n        }\n        return(1)\n    }\n}",
   "compiler_language": "javascript",
   "capabilities": [
     {

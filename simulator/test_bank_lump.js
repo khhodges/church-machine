@@ -94,7 +94,7 @@ check('BANK-LUMP09b: Bank records typed CR inputs while scalar values remain DR 
     JSON.stringify(create.inputs) === JSON.stringify([
         { name: 'lump', register: 'CR1', kind: 'capability', secure_type: 'Inform', rights: ['R'] },
     ]) &&
-    create.returns.register === 'CR3' && create.returns.secure_type === 'BankVariable' &&
+    create.returns.register === 'CR0' && create.returns.secure_type === 'BankVariable' &&
     deposit &&
     JSON.stringify(deposit.inputs) === JSON.stringify([
         { name: 'owner_key', register: 'CR1', kind: 'capability', secure_type: 'BankOwnerKey', rights: ['E'] },
@@ -220,12 +220,19 @@ const missingCapability = registry.dispatchMethod(54, 'Create', sim, {
     lumpValue: { words: sourceWords, metadata: sourceCapability.metadata }
 });
 check('BANK-LUMP13: a value form is allowed only when canonical seals accompany it',
-    missingCapability.ok && missingCapability.result.variableCapability.register === 'CR3' &&
+    missingCapability.ok && missingCapability.result.variableCapability.register === 'CR0' &&
     missingCapability.result.variableCapability.secure_type === 'BankVariable' &&
     missingCapability.result.nsIndex === undefined &&
     missingCapability.result.metadata.capacity >= sourceWords.length &&
-    sim.dr[0] === 1 && sim.cr[3].word0 === missingCapability.result.variableCapability.gt);
+    sim.dr[0] === 1 && sim.cr[0].word0 === missingCapability.result.variableCapability.gt);
 const variable = missingCapability.result;
+const wrongRegister = registry.dispatchMethod(54, 'InspectVariable', sim, {
+    variableId: variable.variableId,
+    capabilities: { variable: { ...variable.variableCapability, register: 'CR3' } }
+});
+check('BANK-LUMP13b: CR3 and other registers cannot substitute for CR0 authority',
+    !wrongRegister.ok && wrongRegister.fault === 'NO_CAPABILITY' && sim.dr[0] === 0 &&
+    sim.cr[0].word0 === variable.variableCapability.gt);
 const badVariableCapability = registry.dispatchMethod(54, 'InspectVariable', sim, {
     variableId: variable.variableId,
     capabilities: { variable: { ...variable.variableCapability, secure_type: 'Inform', gt_type: 'Inform' } }
@@ -315,11 +322,19 @@ const released = registry.dispatchMethod(54, 'Release', sim, {
 const releasedReuse = registry.dispatchMethod(7, 'Allocate', sim, { size: sourceWords.length });
 check('BANK-LUMP20: release invalidates the BankVariable and zeroizes its private allocation',
     released.ok && releasedReuse.ok && releasedReuse.result.location === releaseRecord.location &&
-    sim.dr[0] === 1 && sim.cr[3].word0 === 0 &&
+    sim.dr[0] === 1 && sim.cr[0].word0 === 0 &&
     Array.from(sim.memory.slice(releasedReuse.result.location,
         releasedReuse.result.location + releasedReuse.result.size)).every(word => word === 0) &&
     !registry.dispatchMethod(54, 'InspectVariable', sim, {
         variableId: variable.variableId, capabilities: { variable: variable.variableCapability }
     }).ok);
+
+const staleCreate = registry.dispatchMethod(54, 'Create', sim, {
+    lumpValue: { words: alteredCode, metadata: sourceCapability.metadata }
+});
+check('BANK-LUMP21: failed Create clears any previously materialized CR0 authority',
+    !staleCreate.ok && staleCreate.fault === 'IDENTITY' &&
+    sim.dr[0] === 0 && sim.cr[0].word0 === 0 &&
+    !sim._bankCapabilityRegisters.CR0);
 
 console.log(`\n${pass} Bank LUMP checks passed.`);

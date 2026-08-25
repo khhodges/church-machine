@@ -10,8 +10,8 @@
 (function exposeBankLumpBinding(root) {
     const DOT_NAME = 'Bank';
     const ISSUE_N = 1;
-    const TOKEN = 'f386f8fe';
-    const BINARY_HASH = '363a58a895fa5a6e8c596d881c637bfe26d6cce58314d64ee6d76a02a231a203';
+    const TOKEN = '0e759698';
+    const BINARY_HASH = 'ea90cf2e16ebadb4bd6e8a85c9f3b4824ee700d09049c4a972c0830e0a450b2b';
     const IDENTITY_HASH = '3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11';
     const SELF_GT = 0x0B19718E;
     const REGISTRY_INDEX = 54;
@@ -59,7 +59,7 @@
             ownerReturn.kind !== 'capability' || ownerReturn.secure_type !== 'BankOwnerKey' ||
             !withdrawnValue || withdrawnValue.register !== 'CR2' ||
             withdrawnValue.kind !== 'capability' || withdrawnValue.secure_type !== 'Inform' ||
-            !createdVariable || createdVariable.register !== 'CR3' ||
+            !createdVariable || createdVariable.register !== 'CR0' ||
             createdVariable.kind !== 'capability' || createdVariable.secure_type !== 'BankVariable' ||
             !inspectVariable || !inspectVariable.returns ||
             inspectVariable.returns.register !== 'DR1' ||

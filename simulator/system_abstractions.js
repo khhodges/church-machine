@@ -1615,7 +1615,7 @@ class SystemAbstractions {
             proof: Array.isArray(passKey.proof) ? passKey.proof.map(word => word >>> 0) : []
         });
         const makeVariableCapability = (passKey, variableId) => ({
-            register: 'CR3',
+            register: 'CR0',
             kind: 'capability',
             secure_type: 'BankVariable',
             gt_type: 'Abstract',
@@ -1658,6 +1658,9 @@ class SystemAbstractions {
             if (result && result.ok && result.result &&
                     result.result.capability && result.result.capability.register === register) {
                 materializeBankCapability(sim, result.result.capability);
+            } else if (result && result.ok && result.result &&
+                    result.result.clearCapability === register) {
+                clearBankCapability(sim, register);
             } else if (!result || !result.ok) {
                 clearBankCapability(sim, register);
             }
@@ -1684,9 +1687,9 @@ class SystemAbstractions {
             const capabilities = args && args.capabilities;
             const supplied = capabilities && (capabilities.variable || capabilities.bankVariable);
             const capability = supplied || (sim && sim._bankCapabilityRegisters &&
-                sim._bankCapabilityRegisters.CR3);
+                sim._bankCapabilityRegisters.CR0);
             if (!capability || typeof capability !== 'object' ||
-                    capability.register !== 'CR3' ||
+                    capability.register !== 'CR0' ||
                     capability.kind !== 'capability' ||
                     capability.secure_type !== 'BankVariable' ||
                     capability.gt_type !== 'Abstract' ||
@@ -1722,7 +1725,7 @@ class SystemAbstractions {
             if (variable.revoked || variable.released) return fail(method, 'REVOKED', 'Bank variable is no longer live');
             if (variable.seq !== variable.currentSeq) return fail(method, 'STALE_KEY', 'Bank variable sequence is stale');
             if (!variableCapabilityFor(args, sim)) {
-                return fail(method, 'NO_CAPABILITY', 'BankVariable E capability is required in CR3');
+                return fail(method, 'NO_CAPABILITY', 'BankVariable E capability is required in CR0');
             }
             const check = this._topSecurityApi && this._topSecurityApi.validatePassKey
                 ? this._topSecurityApi.validatePassKey(
@@ -2048,22 +2051,22 @@ class SystemAbstractions {
         };
 
         this.registry.bindMethod(BANK_REGISTRY_INDEX, 'Create', (sim, args = {}) => {
-            if (!sim.mElevation) return finishBankCapabilityResult(sim, 'CR3',
+            if (!sim.mElevation) return finishBankCapabilityResult(sim, 'CR0',
                 fail('Create', 'PERM', 'requires M-elevation (Bank authority)'));
             const input = createLumpInput(sim, args);
-            if (!input.ok) return finishBankCapabilityResult(sim, 'CR3',
+            if (!input.ok) return finishBankCapabilityResult(sim, 'CR0',
                 fail('Create', input.fault, input.message));
 
             const validation = input.validation;
             const id = (bankState.nextVariableId || 0) + 1;
             const allocation = registry.dispatchMethod(7, 'Allocate', sim, { size: input.data.length });
-            if (!allocation.ok) return finishBankCapabilityResult(sim, 'CR3',
+            if (!allocation.ok) return finishBankCapabilityResult(sim, 'CR0',
                 fail('Create', allocation.fault || 'OOM', allocation.message));
             const objectName = `Bank.Variable.${id}`;
             const ns = registerPrivateLockbox(sim, allocation.result.location, allocation.result.size, objectName);
             if (!ns.ok) {
                 releaseAllocation(sim, allocation.result.location);
-                return finishBankCapabilityResult(sim, 'CR3',
+                return finishBankCapabilityResult(sim, 'CR0',
                     fail('Create', ns.fault || 'NS_FULL', ns.message));
             }
             const objectResult = registry.dispatchMethod(5, 'SecureObjectAdd', sim, {
@@ -2073,7 +2076,7 @@ class SystemAbstractions {
             if (!objectResult.ok) {
                 registry.dispatchMethod(5, 'Remove', sim, { index: ns.result.nsIndex });
                 releaseAllocation(sim, allocation.result.location);
-                return finishBankCapabilityResult(sim, 'CR3',
+                return finishBankCapabilityResult(sim, 'CR0',
                     fail('Create', objectResult.fault || 'MINT', objectResult.message));
             }
             const delegated = this._topSecurityApi.obtainPassKey(sim, {
@@ -2083,7 +2086,7 @@ class SystemAbstractions {
             if (!delegated.ok || !delegated.result || !delegated.result.passKey) {
                 registry.dispatchMethod(5, 'Remove', sim, { index: ns.result.nsIndex });
                 releaseAllocation(sim, allocation.result.location);
-                return finishBankCapabilityResult(sim, 'CR3',
+                return finishBankCapabilityResult(sim, 'CR0',
                     fail('Create', delegated.fault || 'MINT', delegated.message || 'variable capability mint failed'));
             }
             const variable = {
@@ -2116,7 +2119,7 @@ class SystemAbstractions {
             bankState.nextVariableId = id;
             bankState.variables[id] = variable;
             const variableCapability = makeVariableCapability(delegated.result.passKey, id);
-            return finishBankCapabilityResult(sim, 'CR3', {
+            return finishBankCapabilityResult(sim, 'CR0', {
                 ok: true,
                 result: {
                     variableId: id,
@@ -2225,7 +2228,8 @@ class SystemAbstractions {
             unprotectLockboxRange(sim, variable);
             releaseAllocation(sim, variable.location);
             return { ok: true, result: { variableId: variable.id,
-                released: !revoked, revoked: !!revoked }, message: `Bank.${method}: variable ${variable.id} retired` };
+                released: !revoked, revoked: !!revoked, clearCapability: 'CR0' },
+                message: `Bank.${method}: variable ${variable.id} retired` };
         };
 
         this.registry.bindMethod(BANK_REGISTRY_INDEX, 'Release', (sim, args = {}) => {
@@ -2235,8 +2239,8 @@ class SystemAbstractions {
                 : args.variableId;
             const variable = Number.isInteger(variableId) ? bankState.variables[variableId] : null;
             const auth = authorizeVariable(sim, variable, args, 'Release');
-            if (!auth.ok) return finishBankCapabilityResult(sim, 'CR3', auth);
-            return finishBankCapabilityResult(sim, 'CR3', retireVariable(sim, variable, 'Release', false));
+            if (!auth.ok) return finishBankCapabilityResult(sim, 'CR0', auth);
+            return finishBankCapabilityResult(sim, 'CR0', retireVariable(sim, variable, 'Release', false));
         });
 
         this.registry.bindMethod(BANK_REGISTRY_INDEX, 'RevokeVariable', (sim, args = {}) => {
@@ -2246,8 +2250,8 @@ class SystemAbstractions {
                 : args.variableId;
             const variable = Number.isInteger(variableId) ? bankState.variables[variableId] : null;
             const auth = authorizeVariable(sim, variable, args, 'RevokeVariable');
-            if (!auth.ok) return finishBankCapabilityResult(sim, 'CR3', auth);
-            return finishBankCapabilityResult(sim, 'CR3', retireVariable(sim, variable, 'RevokeVariable', true));
+            if (!auth.ok) return finishBankCapabilityResult(sim, 'CR0', auth);
+            return finishBankCapabilityResult(sim, 'CR0', retireVariable(sim, variable, 'RevokeVariable', true));
         });
 
         this.registry.bindMethod(BANK_REGISTRY_INDEX, 'MintKey', (sim, args = {}) => {
