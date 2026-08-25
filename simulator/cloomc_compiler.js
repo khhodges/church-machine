@@ -66,6 +66,12 @@ class CLOOMCCompiler {
         // Populated externally from the AbstractionRegistry so the compiler can emit
         // the correct method selector in CALL instructions for capability methods.
         this.methodConventions = {};
+        // Native capability-presence predicates are reserved for runtime-bound
+        // system LUMPs. Callers that build another such LUMP may opt in
+        // explicitly; Bank is recognised by compileJS so the editor compiles
+        // its canonical source with the same fail-closed serialization as the
+        // artifact builder.
+        this.nativeCapabilityPredicates = false;
         this.setMethodConventions(methodConventions);
     }
 
@@ -260,6 +266,10 @@ class CLOOMCCompiler {
         if (errors.length > 0) {
             return { methods: [], errors, manifest: [], abstractionName: parsed.name || '', capabilities: parsed.capabilities || [], language: 'javascript' };
         }
+        const previousNativeCapabilityPredicates = this._activeNativeCapabilityPredicates;
+        this._activeNativeCapabilityPredicates =
+            this.nativeCapabilityPredicates === true ||
+            String(parsed.name || '').toUpperCase() === 'BANK';
 
         const rom = this._buildROM(parsed.capabilities, capabilities || [], errors);
         const methods = [];
@@ -274,26 +284,29 @@ class CLOOMCCompiler {
                 .map(m => m.name)
         );
 
-        for (const method of parsed.methods) {
-            if (method.aliasOf) {
-                methods.push({ name: method.name, aliasOf: method.aliasOf, params: method.params || [], visibility: method.visibility || 'public' });
-                continue;
+        try {
+            for (const method of parsed.methods) {
+                if (method.aliasOf) {
+                    methods.push({ name: method.name, aliasOf: method.aliasOf, params: method.params || [], visibility: method.visibility || 'public' });
+                    continue;
+                }
+                if (method.rawIsa) {
+                    methods.push({ name: method.name, code: method.rawIsa, params: method.params || [], visibility: method.visibility || 'public', ...(method.sourceLines && { sourceLines: method.sourceLines }) });
+                    manifest.push({ name: method.name, mapping: [] });
+                    continue;
+                }
+                const result = this._compileMethod(method, rom, parsed.capabilities);
+                if (result.errors.length > 0) {
+                    errors.push(...result.errors);
+                } else {
+                    methods.push({ name: method.name, code: result.code, params: method.params || [], visibility: method.visibility || 'public', crossMethodRefs: result.crossMethodRefs, ...(method.isMain && { isMain: true }), ...(method.sourceLines && { sourceLines: method.sourceLines }) });
+                    manifest.push({ name: method.name, mapping: result.manifest });
+                }
             }
-            if (method.rawIsa) {
-                methods.push({ name: method.name, code: method.rawIsa, params: method.params || [], visibility: method.visibility || 'public', ...(method.sourceLines && { sourceLines: method.sourceLines }) });
-                manifest.push({ name: method.name, mapping: [] });
-                continue;
-            }
-            const result = this._compileMethod(method, rom, parsed.capabilities);
-            if (result.errors.length > 0) {
-                errors.push(...result.errors);
-            } else {
-                methods.push({ name: method.name, code: result.code, params: method.params || [], visibility: method.visibility || 'public', crossMethodRefs: result.crossMethodRefs, ...(method.isMain && { isMain: true }), ...(method.sourceLines && { sourceLines: method.sourceLines }) });
-                manifest.push({ name: method.name, mapping: result.manifest });
-            }
+        } finally {
+            this._privateMethodNames = null;
+            this._activeNativeCapabilityPredicates = previousNativeCapabilityPredicates;
         }
-
-        this._privateMethodNames = null;
 
         if (errors.length === 0) {
             const _bodyIndex = new Map();
@@ -1785,7 +1798,7 @@ class CLOOMCCompiler {
         const nativeCapabilityNullMatch = text.match(
             /^if\s*\(\s*(CR\d+)\s*(==|!=)\s*null\s*\)\s*\{$/,
         );
-        if (nativeCapabilityNullMatch && this.nativeCapabilityPredicates === true) {
+        if (nativeCapabilityNullMatch && this._activeNativeCapabilityPredicates === true) {
             const [, register, operator] = nativeCapabilityNullMatch;
             if (operator === '!=') {
                 const branchAddr = code.length;
