@@ -1601,28 +1601,16 @@ class SystemAbstractions {
         const registry = this.registry;
         const MAX_CAPACITY = 0x20000;
 
-        // Bank credentials are typed Church capabilities, not DR payloads.
-        // A caller must place an owner capability in CR1; its proof travels with
-        // that protected capability object and is never reconstructed from
-        // dr1…dr5, a raw integer GT, or a loose proof array.
-        const makeOwnerCapability = (passKey) => ({
-            register: 'CR1',
-            kind: 'capability',
-            secure_type: 'BankOwnerKey',
-            gt_type: 'Abstract',
-            rights: ['E'],
-            gt: passKey.gt >>> 0,
-            proof: Array.isArray(passKey.proof) ? passKey.proof.map(word => word >>> 0) : []
-        });
-        const makeVariableCapability = (passKey, variableId) => ({
+        // The sanctum passkey is never made part of the public Bank ABI. It is
+        // held only by the internal binding while the caller receives CR0's
+        // typed BankVariable Golden Token.
+        const makeVariableCapability = (passKey) => ({
             register: 'CR0',
             kind: 'capability',
             secure_type: 'BankVariable',
             gt_type: 'Abstract',
             rights: ['E'],
-            gt: passKey.gt >>> 0,
-            proof: Array.isArray(passKey.proof) ? passKey.proof.map(word => word >>> 0) : [],
-            variable_id: variableId
+            gt: passKey.gt >>> 0
         });
         const writeBankDR = (sim, index, value) => {
             if (typeof sim._writeDR === 'function') sim._writeDR(index, value);
@@ -1694,23 +1682,6 @@ class SystemAbstractions {
             }
             return result;
         };
-        const ownerCapabilityFor = (args) => {
-            const capabilities = args && args.capabilities;
-            const capability = capabilities && (capabilities.owner_key || capabilities.ownerKey);
-            if (!capability || typeof capability !== 'object' ||
-                    capability.register !== 'CR1' ||
-                    capability.kind !== 'capability' ||
-                    capability.secure_type !== 'BankOwnerKey' ||
-                    capability.gt_type !== 'Abstract' ||
-                    !Array.isArray(capability.rights) || !capability.rights.includes('E')) {
-                return null;
-            }
-            return capability;
-        };
-        const keyFor = (args) => {
-            const capability = ownerCapabilityFor(args);
-            return capability ? { gt: capability.gt, proof: capability.proof } : {};
-        };
         const variableCapabilityFor = (args, sim) => {
             const capabilities = args && args.capabilities;
             const supplied = capabilities && (capabilities.variable || capabilities.bankVariable);
@@ -1728,7 +1699,16 @@ class SystemAbstractions {
         };
         const variableKeyFor = (args, sim) => {
             const capability = variableCapabilityFor(args, sim);
-            return capability ? { gt: capability.gt, proof: capability.proof } : {};
+            if (!capability) return {};
+            const variable = Object.values(bankState.variables).find(candidate =>
+                candidate.sanctumKey && candidate.sanctumKey.gt === (capability.gt >>> 0));
+            return variable ? variable.sanctumKey : {};
+        };
+        const variableForCapability = (args, sim) => {
+            const capability = variableCapabilityFor(args, sim);
+            if (!capability) return null;
+            return Object.values(bankState.variables).find(variable =>
+                variable.sanctumKey && variable.sanctumKey.gt === (capability.gt >>> 0)) || null;
         };
 
         const fail = (method, fault, message, error_code) => ({
@@ -1754,12 +1734,12 @@ class SystemAbstractions {
             return check.ok ? check : { ok: false, fault: check.fault || 'PERM', message: check.message };
         };
         const authorizeVariable = (sim, variable, args, method) => {
-            if (!variable) return fail(method, 'NOT_FOUND', 'Bank variable not found');
-            if (variable.revoked || variable.released) return fail(method, 'REVOKED', 'Bank variable is no longer live');
-            if (variable.seq !== variable.currentSeq) return fail(method, 'STALE_KEY', 'Bank variable sequence is stale');
             if (!variableCapabilityFor(args, sim)) {
                 return fail(method, 'NO_CAPABILITY', 'BankVariable E capability is required in CR0');
             }
+            if (!variable) return fail(method, 'NOT_FOUND', 'Bank variable not found');
+            if (variable.revoked || variable.released) return fail(method, 'REVOKED', 'Bank variable is no longer live');
+            if (variable.seq !== variable.currentSeq) return fail(method, 'STALE_KEY', 'Bank variable sequence is stale');
             const check = this._topSecurityApi && this._topSecurityApi.validatePassKey
                 ? this._topSecurityApi.validatePassKey(
                 sim, variable.securityObjectId, variableKeyFor(args, sim), method, false)
@@ -1990,7 +1970,6 @@ class SystemAbstractions {
             sequence: lockbox.currentSeq
         });
         const safeVariableMetadata = (variable) => ({
-            variableId: variable.id,
             dot_name: variable.dot_name,
             issue_n: variable.issue_n,
             token: variable.token,
@@ -2136,6 +2115,7 @@ class SystemAbstractions {
                 nsIndex: ns.result.nsIndex,
                 nsVersion: ns.result.version,
                 securityObjectId: objectResult.result.objectId,
+                sanctumKey: delegated.result.passKey,
                 currentSeq: 1,
                 seq: 1,
                 released: false,
@@ -2151,11 +2131,10 @@ class SystemAbstractions {
             protectLockboxRange(sim, variable);
             bankState.nextVariableId = id;
             bankState.variables[id] = variable;
-            const variableCapability = makeVariableCapability(delegated.result.passKey, id);
+            const variableCapability = makeVariableCapability(delegated.result.passKey);
             return finishBankCapabilityResult(sim, 'CR0', {
                 ok: true,
                 result: {
-                    variableId: id,
                     variableCapability,
                     capability: variableCapability,
                     metadata: safeVariableMetadata(variable)
@@ -2165,11 +2144,7 @@ class SystemAbstractions {
         });
 
         this.registry.bindMethod(BANK_REGISTRY_INDEX, 'Read', (sim, args = {}) => {
-            const capability = variableCapabilityFor(args, sim);
-            const variableId = args.variableId === undefined
-                ? (args.objectId === undefined ? capability && capability.variable_id : args.objectId)
-                : args.variableId;
-            const variable = Number.isInteger(variableId) ? bankState.variables[variableId] : null;
+            const variable = variableForCapability(args, sim);
             const auth = authorizeVariable(sim, variable, args, 'Read');
             if (!auth.ok) return finishBankCapabilityResult(sim, 'CR4', auth);
             const offset = args.offset === undefined ? 0 : args.offset;
@@ -2204,18 +2179,14 @@ class SystemAbstractions {
             };
             return finishBankCapabilityResult(sim, 'CR4', {
                 ok: true,
-                result: { variableId: variable.id, readableCapability, capability: readableCapability,
+                result: { readableCapability, capability: readableCapability,
                     gt, words, offset },
                 message: `Bank.Read: ${words} word(s) copied from variable ${variable.id}`
             });
         });
 
         this.registry.bindMethod(BANK_REGISTRY_INDEX, 'InspectVariable', (sim, args = {}) => {
-            const capability = variableCapabilityFor(args, sim);
-            const variableId = args.variableId === undefined
-                ? (args.objectId === undefined ? capability && capability.variable_id : args.objectId)
-                : args.variableId;
-            const variable = Number.isInteger(variableId) ? bankState.variables[variableId] : null;
+            const variable = variableForCapability(args, sim);
             const auth = authorizeVariable(sim, variable, args, 'InspectVariable');
             if (!auth.ok) {
                 writeBankDR(sim, 0, bankErrorCode(auth));
@@ -2260,32 +2231,35 @@ class SystemAbstractions {
             if (sim._bankPrivateSlots) delete sim._bankPrivateSlots[variable.nsIndex];
             unprotectLockboxRange(sim, variable);
             releaseAllocation(sim, variable.location);
-            return { ok: true, result: { variableId: variable.id,
+            return { ok: true, result: {
                 released: !revoked, revoked: !!revoked, clearCapability: 'CR0' },
                 message: `Bank.${method}: variable ${variable.id} retired` };
         };
 
         this.registry.bindMethod(BANK_REGISTRY_INDEX, 'Release', (sim, args = {}) => {
-            const capability = variableCapabilityFor(args, sim);
-            const variableId = args.variableId === undefined
-                ? (args.objectId === undefined ? capability && capability.variable_id : args.objectId)
-                : args.variableId;
-            const variable = Number.isInteger(variableId) ? bankState.variables[variableId] : null;
+            const variable = variableForCapability(args, sim);
             const auth = authorizeVariable(sim, variable, args, 'Release');
             if (!auth.ok) return finishBankCapabilityResult(sim, 'CR0', auth);
             return finishBankCapabilityResult(sim, 'CR0', retireVariable(sim, variable, 'Release', false));
         });
 
         this.registry.bindMethod(BANK_REGISTRY_INDEX, 'RevokeVariable', (sim, args = {}) => {
-            const capability = variableCapabilityFor(args, sim);
-            const variableId = args.variableId === undefined
-                ? (args.objectId === undefined ? capability && capability.variable_id : args.objectId)
-                : args.variableId;
-            const variable = Number.isInteger(variableId) ? bankState.variables[variableId] : null;
+            const variable = variableForCapability(args, sim);
             const auth = authorizeVariable(sim, variable, args, 'RevokeVariable');
             if (!auth.ok) return finishBankCapabilityResult(sim, 'CR0', auth);
             return finishBankCapabilityResult(sim, 'CR0', retireVariable(sim, variable, 'RevokeVariable', true));
         });
+
+        // Minting and rotating the sanctum credential, plus the historical
+        // owner-key lockbox adapter, are internal implementation details.
+        // Remove their dispatch entries as well as their catalogue names so a
+        // direct registry call cannot reach an authority-bearing legacy path.
+        for (const method of [
+            'MintKey', 'Deposit', 'Withdraw', 'Inspect', 'Revoke',
+            'ObtainPassKey', 'ExportRecovery', 'Recover', 'List'
+        ]) {
+            this.registry.removeMethod(BANK_REGISTRY_INDEX, method);
+        }
 
         this.registry.bindMethod(BANK_REGISTRY_INDEX, 'MintKey', (sim, args = {}) => {
             if (!sim.mElevation) return fail('MintKey', 'PERM', 'requires M-elevation (Bank authority)');
@@ -2634,6 +2608,12 @@ class SystemAbstractions {
             const entries = Object.values(bankState.lockboxes).map(safeMetadata);
             return { ok: true, result: entries, message: `Bank.List: ${entries.length} lockbox record(s)` };
         });
+        for (const method of [
+            'MintKey', 'Deposit', 'Withdraw', 'Inspect', 'Revoke',
+            'ObtainPassKey', 'ExportRecovery', 'Recover', 'List'
+        ]) {
+            this.registry.removeMethod(BANK_REGISTRY_INDEX, method);
+        }
     }
 
     _bindMint() {

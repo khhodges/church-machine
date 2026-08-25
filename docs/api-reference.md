@@ -42,15 +42,6 @@ Canonical dynamic CLOOMC LUMP backed by proof-bound Namespace custody. Lockbox k
 | InspectVariable | `InspectVariable(variable: CR0) → DR0: status/error; words: DR1; capacity: DR2; issue: DR3; lifecycle: DR4` | BankVariable E | Inspect scalar size/capacity/lifecycle fields in distinct DRs using only the typed CR0 capability; DR0 identifies failure and never carries authority. |
 | Release | `Release(variable: CR0) → DR0: status/error` | BankVariable E | Zeroize and retire a Bank-managed LUMP through its CR0 capability; CR0 is cleared afterward and failures identify their error in DR0. |
 | RevokeVariable | `RevokeVariable(variable: CR0) → DR0: status/error` | BankVariable E | Revoke the CR0 variable authority and zeroize the private LUMP allocation; failures identify their error in DR0. |
-| MintKey | `MintKey(capacity: DR1) → owner_key: CR1` | E + M | Create an empty dynamically allocated lockbox; return a typed BankOwnerKey capability in CR1 and status in DR0. |
-| Deposit | `Deposit(owner_key: CR1, source: CR2, offset: DR1, words: DR2, kind: DR3) → status: DR0` | E + BankOwnerKey + Inform R | Copy a bounded LUMP or memory region into an empty lockbox using typed capabilities; reject raw GTs, proofs, and reconstructed handles supplied through DRs. |
-| Withdraw | `Withdraw(owner_key: CR1) → valuable: CR2, status: DR0` | E + BankOwnerKey | Atomically release the valuable as a fresh typed Inform capability in CR2 and quarantine the lockbox key. |
-| Inspect | `Inspect(owner_key: CR1) → metadata: DR0` | E + BankOwnerKey | Return safe custody state, size, type, and sequence metadata without revealing contents or Namespace location. |
-| Revoke | `Revoke(owner_key: CR1) → status: DR0` | E + BankOwnerKey | Invalidate all lockbox keys and quarantine its Namespace-backed custody record. |
-| ObtainPassKey | `ObtainPassKey(owner_key: CR1) → owner_key: CR1, status: DR0` | E + BankOwnerKey + proof | Reissue a fresh object-scoped owner capability in CR1 after proving ownership with the current typed capability. |
-| ExportRecovery | `ExportRecovery(owner_key: CR1) → protectedState: DR0` | E + BankOwnerKey + proof | Create proof-bound authenticated recovery ciphertext in DR0 without persisting the raw PassKey proof. |
-| Recover | `Recover(protectedState: DR1, original_key: CR1) → owner_key: CR1, status: DR0` | E + M + BankOwnerKey + proof | Restore a valuable into a fresh private Namespace entry and issue a replacement owner capability in CR1. |
-| List | `List() → metadata: DR0` | E | List non-sensitive status metadata for active and revoked lockboxes in a scalar DR result. |
 
 ### Salvation — NS[4] `E`
 
@@ -81,7 +72,6 @@ Namespace Master Controller. Sole NS table writer. Runs indefinitely — does no
 | SecureObjectMintPassKey | `SecureObjectMintPassKey(objectId, ownerKey, methods?) → PassKey` | E + owner key | ✅ | Delegate a revocable, method-limited PassKey with an independent 128-bit proof. |
 | SecureObjectCall | `SecureObjectCall(objectId, method, passKey) → result` | E + object key + proof | ✅ | Call a protected top-security method only with an authorised object PassKey and its 128-bit proof. |
 | SecureObjectRevoke | `SecureObjectRevoke(objectId, ownerKey, targetKey?) → ok` | E + owner key + proof | ✅ | Revoke one delegated key or the entire top-security object. |
-| Bank.ObtainPassKey | `Bank.ObtainPassKey(objectId, ownerKey) → PassKey` | E + owner key + proof | ✅ | Obtain a fresh passkey for one of your stored objects without exposing its Namespace slot. |
 | Manage | `Manage(nsIndex, op) → ok` | E | ⏳ planned | Abstraction lifecycle — creation, destruction, reconfiguration. |
 | Monitor | `Monitor() → stats` | E | ⏳ planned | System health — step counts, namespace utilization, fault rates. |
 | IDS | `IDS() → log` | E | ⏳ planned | Intrusion detection — monitors GT version anomalies and permission escalation attempts. |

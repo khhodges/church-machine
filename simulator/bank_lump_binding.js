@@ -10,8 +10,8 @@
 (function exposeBankLumpBinding(root) {
     const DOT_NAME = 'Bank';
     const ISSUE_N = 1;
-    const TOKEN = '7bd12610';
-    const BINARY_HASH = '8875c13f80c4db86d1c709025793c21792db300e65f47c747657c6292f9f9801';
+    const TOKEN = 'f5ba2534';
+    const BINARY_HASH = '5ec723ea3c459c2e796c42ab1efcf997197fdfadf42671c2864863706429593e';
     const IDENTITY_HASH = '3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11';
     const SELF_GT = 0x0B19718E;
     const REGISTRY_INDEX = 54;
@@ -51,15 +51,12 @@
             return fail('projection does not match the canonical Bank runtime binding');
         }
         const capabilityABI = identity.capability_abi || {};
-        const ownerReturn = capabilityABI.MintKey && capabilityABI.MintKey.returns;
-        const withdrawnValue = capabilityABI.Withdraw && capabilityABI.Withdraw.returns;
         const createdVariable = capabilityABI.Create && capabilityABI.Create.returns;
         const createErrorCodes = capabilityABI.Create && capabilityABI.Create.error_codes;
         const inspectVariable = capabilityABI.InspectVariable;
-        if (!ownerReturn || ownerReturn.register !== 'CR1' ||
-            ownerReturn.kind !== 'capability' || ownerReturn.secure_type !== 'BankOwnerKey' ||
-            !withdrawnValue || withdrawnValue.register !== 'CR2' ||
-            withdrawnValue.kind !== 'capability' || withdrawnValue.secure_type !== 'Inform' ||
+        if (Object.keys(capabilityABI).some(name =>
+                ['MintKey', 'Deposit', 'Withdraw', 'Inspect', 'Revoke',
+                    'ObtainPassKey', 'ExportRecovery', 'Recover', 'List'].includes(name)) ||
              !createdVariable || createdVariable.register !== 'CR0' ||
              capabilityABI.Create.returns_nullable !== true ||
              !createErrorCodes || createErrorCodes.IDENTITY !== 0x103 ||

@@ -1,458 +1,92 @@
 'use strict';
-// Bank.ObtainPassKey tests: fresh credentials for an existing stored object.
 
+// Bank authority regression coverage.  The public Bank surface is deliberately
+// capability-only; its sanctum credential is never returned to this caller.
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const ChurchSimulator = require('./simulator.js');
 const AbstractionRegistry = require('./abstractions.js');
 const SystemAbstractions = require('./system_abstractions.js');
-// Bank.Recover consumes a server grant synchronously in the browser. Model the
-// authorised bridge here; server endpoint coverage verifies its real response.
-global.XMLHttpRequest = class {
-    open() {}
-    send() { this.status = 200; }
-};
 
-let pass = 0;
-let fail = 0;
-function check(label, condition) {
-    if (condition) {
-        console.log(`PASS ${label}`);
-        pass++;
-    } else {
-        console.log(`FAIL ${label}`);
-        fail++;
-    }
-}
-
-const sim = new ChurchSimulator();
+const root = path.resolve(__dirname, '..');
+const manifest = JSON.parse(fs.readFileSync(path.join(root, 'server/lumps/manifest.json')));
+const entry = manifest.find(item => item.dot_name === 'Bank');
+const binary = fs.readFileSync(path.join(root, 'server/lumps', entry.filename));
+const words = Array.from({ length: binary.length / 4 }, (_, i) => binary.readUInt32BE(i * 4));
 const registry = new AbstractionRegistry();
-const systemAbs = new SystemAbstractions(registry);
-sim.initAbstractions(registry, systemAbs, null);
+const system = new SystemAbstractions(registry);
+const sim = new ChurchSimulator();
+sim.initAbstractions(registry, system, null);
 sim.bootComplete = true;
 sim.mElevation = true;
 registry.dispatchMethod(5, 'Init', sim, {});
 
-// The direct registry test harness adapts ergonomic named inputs to the same
-// typed CR ABI a LUMP caller uses. Keep the original dispatcher so the suite
-// can also prove that raw DR credentials and malformed capabilities fail.
-const rawBankDispatch = registry.dispatchMethod.bind(registry);
-registry.dispatchMethod = (index, method, targetSim, args = {}) => {
-    if (index !== 54) return rawBankDispatch(index, method, targetSim, args);
-    const capabilities = { ...(args.capabilities || {}) };
-    const owner = args.bankKey || args.passKey || args.passkey;
-    if (!capabilities.ownerKey && owner && owner.secure_type === 'BankOwnerKey') {
-        capabilities.ownerKey = owner;
+function check(label, condition) {
+    assert.ok(condition, label);
+    console.log(`PASS ${label}`);
+}
+
+const allocation = registry.dispatchMethod(7, 'Allocate', sim, { size: words.length });
+const added = registry.dispatchMethod(5, 'Add', sim, {
+    location: allocation.result.location, limit: allocation.result.size - 1,
+    gtType: 1, label: 'Bank.Create.Source'
+});
+words.forEach((word, i) => { sim.memory[allocation.result.location + i] = word; });
+const source = {
+    register: 'CR1', kind: 'capability', secure_type: 'Inform',
+    gt_type: 'Inform', rights: ['R'],
+    gt: sim.createGT(added.result.version, added.result.nsIndex, { R: 1 }, 1),
+    metadata: {
+        dot_name: entry.dot_name, issue_n: entry.issue_n, token: entry.token,
+        binary_hash: entry.binary_hash, identity_hash: entry.identity_hash,
+        self_gt: entry.self_gt, identity_string: 'Bank#1'
     }
-    const sourceGT = args.sourceGT !== undefined ? args.sourceGT : args.sourceGt;
-    if (!capabilities.source && sourceGT !== undefined) {
-        capabilities.source = {
-            register: 'CR2', kind: 'capability', secure_type: 'Inform',
-            gt_type: 'Inform', rights: ['R'], gt: sourceGT
-        };
-    }
-    return rawBankDispatch(index, method, targetSim, { ...args, capabilities });
 };
 
-let accessCount = 0;
-const stored = registry.dispatchMethod(5, 'SecureObjectAdd', sim, {
-    name: 'Stored.Lockbox',
-    methods: { Open: () => ({ opened: ++accessCount }) }
-});
-check('BANK01: stored object exists before requesting its Bank passkey', stored.ok);
+const created = registry.dispatchMethod(54, 'Create', sim, { capabilities: { lump: source } });
+check('BANK01: Create returns a typed BankVariable capability in CR0',
+    created.ok && created.result.variableCapability.register === 'CR0' &&
+    created.result.variableCapability.secure_type === 'BankVariable' &&
+    created.result.variableCapability.gt_type === 'Abstract' &&
+    Array.isArray(created.result.variableCapability.proof) === false &&
+    sim.cr[0].word0 !== 0);
+check('BANK02: no sanctum credential or private location crosses Create',
+    created.result.variableCapability.gt !== undefined &&
+    created.result.variableCapability.variable_id === undefined &&
+    created.result.variableId === undefined &&
+    created.result.metadata.variableId === undefined &&
+    created.result.metadata.location === undefined &&
+    created.result.metadata.nsIndex === undefined);
+check('BANK03: Bank does not expose legacy owner-key methods',
+    ['MINTKEY', 'DEPOSIT', 'WITHDRAW', 'INSPECT', 'REVOKE', 'OBTAINPASSKEY',
+        'EXPORTRECOVERY', 'RECOVER', 'LIST'].every(name => typeof registry.getByName('Bank').dispatch[name] !== 'function'));
 
-const ownerKey = stored.result.ownerPassKey;
-const obtained = registry.dispatchMethod(54, 'ObtainPassKey', sim, {
-    objectId: stored.result.objectId,
-    passKey: ownerKey
+const variable = created.result.variableCapability;
+const inspected = registry.dispatchMethod(54, 'InspectVariable', sim, {
+    capabilities: { variable }
 });
-check('BANK02: Bank obtains a fresh passkey with the owner credential', obtained.ok);
-check('BANK03: Bank returns a GT and private proof pair',
-    obtained.ok && obtained.result.passKey.gt !== 0 &&
-    Array.isArray(obtained.result.passKey.proof) &&
-    obtained.result.passKey.proof.length === 4);
-check('BANK04: Bank does not return a Namespace slot as the authority',
-    obtained.ok && obtained.result.nsIndex === undefined);
-
-const opened = registry.dispatchMethod(5, 'SecureObjectCall', sim, {
-    objectId: stored.result.objectId,
-    method: 'Open',
-    passKey: obtained.result.passKey
-});
-check('BANK05: obtained passkey authorises the stored object method',
-    opened.ok && opened.result.opened === 1 && accessCount === 1);
-
-const wrongObject = registry.dispatchMethod(54, 'ObtainPassKey', sim, {
-    objectId: stored.result.objectId + 1,
-    passKey: ownerKey
-});
-check('BANK06: Bank rejects an unknown stored-object id', !wrongObject.ok);
-
-const wrongOwner = registry.dispatchMethod(54, 'ObtainPassKey', sim, {
-    objectId: stored.result.objectId,
-    passKey: obtained.result.passKey
-});
-check('BANK07: a delegated object passkey cannot mint another Bank passkey', !wrongOwner.ok);
-
-registry.dispatchMethod(5, 'SecureObjectRevoke', sim, {
-    objectId: stored.result.objectId,
-    passKey: ownerKey
-});
-const stale = registry.dispatchMethod(54, 'ObtainPassKey', sim, {
-    objectId: stored.result.objectId,
-    passKey: ownerKey
-});
-check('BANK08: Bank rejects the owner credential after object revocation',
-    !stale.ok && stale.fault === 'REVOKED');
-
-// Full custody lifecycle against a real Namespace-backed source region.
-const sourceAllocation = registry.dispatchMethod(7, 'Allocate', sim, { size: 8 });
-const sourceRegistration = registry.dispatchMethod(5, 'Add', sim, {
-    location: sourceAllocation.result.location,
-    limit: sourceAllocation.result.size - 1,
-    gtType: 1,
-    label: 'Test.SourceRegion'
-});
-const sourceWords = [0x4c554d50, 0x00010003, 0xdeadbeef, 0xcafebabe];
-sourceWords.forEach((word, index) => {
-    sim.memory[sourceAllocation.result.location + index] = word;
-});
-const sourceGT = sim.createGT(
-    sourceRegistration.result.version,
-    sourceRegistration.result.nsIndex,
-    { R: 1, W: 1 },
-    1
-);
-
-sim.mElevation = true;
-// An attacker can pre-register an alias at a predictable future allocator
-// address; Bank must still reject the alias once that address becomes custody.
-const predictedLockboxLocation = systemAbs._memoryState.nextFreeAddr;
-const preExistingAlias = registry.dispatchMethod(5, 'Add', sim, {
-    location: predictedLockboxLocation,
-    limit: 63,
-    gtType: 1,
-    label: 'Attacker.PreExistingAlias'
-});
-const preExistingAliasGT = sim.createGT(
-    preExistingAlias.result.version,
-    preExistingAlias.result.nsIndex,
-    { R: 1 },
-    1
-);
-const minted = registry.dispatchMethod(54, 'MintKey', sim, { capacity: 8 });
-check('BANK09: MintKey creates an opaque dynamic lockbox key', minted.ok &&
-    minted.result.lockboxId > 0 && minted.result.bankKey.gt !== undefined &&
-    minted.result.nsIndex === undefined);
-const lockboxId = minted.result.lockboxId;
-const bankKey = minted.result.bankKey;
-check('BANK09b: MintKey returns a tagged CR1 BankOwnerKey capability',
-    bankKey.register === 'CR1' && bankKey.kind === 'capability' &&
-    bankKey.secure_type === 'BankOwnerKey' && bankKey.gt_type === 'Abstract' &&
-    bankKey.rights.includes('E') && Array.isArray(bankKey.proof) && bankKey.proof.length === 4);
-const rawDrCredential = rawBankDispatch(54, 'Inspect', sim, {
-    lockboxId, dr1: bankKey.gt, dr2: bankKey.proof[0], dr3: bankKey.proof[1],
-    dr4: bankKey.proof[2], dr5: bankKey.proof[3]
-});
-check('BANK09c: raw DR credentials cannot authorise a Bank operation',
-    !rawDrCredential.ok && rawDrCredential.fault === 'NO_CAPABILITY');
-const forgedOwnerCapability = rawBankDispatch(54, 'Inspect', sim, {
-    lockboxId,
-    capabilities: {
-        ownerKey: { ...bankKey, secure_type: 'Inform', gt_type: 'Inform', register: 'CR2', rights: ['R'] }
-    }
-});
-check('BANK09d: a forged or wrong-typed owner capability is rejected',
-    !forgedOwnerCapability.ok && forgedOwnerCapability.fault === 'NO_CAPABILITY');
-const firstLockbox = systemAbs._bankState.lockboxes[lockboxId];
-const reissued = registry.dispatchMethod(54, 'ObtainPassKey', sim, { lockboxId, bankKey });
-const reissuedKey = reissued.result.passKey;
-check('BANK09b: a lockbox backing entry is Outform, not a public memory region',
-    firstLockbox && sim.readNSEntry(firstLockbox.nsIndex).gtType === 2 &&
-    sim._bankPrivateSlots[firstLockbox.nsIndex].lockboxId === lockboxId);
-const guessedBackingGT = sim.createGT(firstLockbox.nsVersion, firstLockbox.nsIndex, { R: 1 }, 1);
-check('BANK09c: guessed Inform GTs cannot resolve private Bank backing storage',
-    !sim.mLoad(guessedBackingGT, 'R', null, firstLockbox.location).ok);
-const aliasedRegistration = registry.dispatchMethod(5, 'Add', sim, {
-    location: firstLockbox.location,
-    limit: 0,
-    gtType: 1,
-    label: 'Attacker.BankAlias'
-});
-check('BANK09d: Navana refuses an Inform alias for active private Bank custody',
-    !aliasedRegistration.ok && aliasedRegistration.fault === 'NO_CAPABILITY');
-const deposited = registry.dispatchMethod(54, 'Deposit', sim, {
-    lockboxId, bankKey, sourceGT, words: sourceWords.length, kind: 'lump'
-});
-check('BANK10: Deposit accepts a bounded LUMP region', deposited.ok &&
-    deposited.result.contentsType === 'lump' && deposited.result.contentsWords === sourceWords.length);
-const attackerBox = registry.dispatchMethod(54, 'MintKey', sim, { capacity: 4 });
-const aliasExfiltration = registry.dispatchMethod(54, 'Deposit', sim, {
-    lockboxId: attackerBox.result.lockboxId,
-    bankKey: attackerBox.result.bankKey,
-    sourceGT: preExistingAliasGT,
-    words: 1
-});
-check('BANK10b: pre-existing Namespace aliases cannot read Bank custody',
-    firstLockbox.location === predictedLockboxLocation &&
-    !aliasExfiltration.ok && aliasExfiltration.fault === 'NO_CAPABILITY');
-const inspected = registry.dispatchMethod(54, 'Inspect', sim, { lockboxId, bankKey });
-check('BANK11: Inspect exposes custody metadata but not storage authority',
-    inspected.ok && inspected.result.deposited &&
-    inspected.result.capacity >= sourceWords.length &&
+check('BANK04: typed BankVariable authorizes safe scalar inspection',
+    inspected.ok && inspected.registers.DR0 === 1 && inspected.registers.DR1 === words.length &&
     inspected.result.location === undefined && inspected.result.nsIndex === undefined);
-const boundsBox = registry.dispatchMethod(54, 'MintKey', sim, { capacity: 4 });
-const badDeposit = registry.dispatchMethod(54, 'Deposit', sim, {
-    lockboxId: boundsBox.result.lockboxId,
-    bankKey: boundsBox.result.bankKey,
-    sourceGT, sourceOffset: sourceAllocation.result.size - 1, words: 2
-});
-check('BANK12: invalid source bounds fail without changing custody',
-    !badDeposit.ok && badDeposit.fault === 'BOUNDS' &&
-    registry.dispatchMethod(54, 'Inspect', sim, {
-        lockboxId: boundsBox.result.lockboxId, bankKey: boundsBox.result.bankKey
-    }).result.contentsWords === 0);
-const staleSourceBox = registry.dispatchMethod(54, 'MintKey', sim, { capacity: 4 });
-const staleSourceGT = sim.createGT(
-    (sourceRegistration.result.version + 1) & 0x1FF,
-    sourceRegistration.result.nsIndex,
-    { R: 1, W: 1 },
-    1
-);
-const staleSourceDeposit = registry.dispatchMethod(54, 'Deposit', sim, {
-    lockboxId: staleSourceBox.result.lockboxId,
-    bankKey: staleSourceBox.result.bankKey,
-    sourceGT: staleSourceGT,
-    words: 1
-});
-check('BANK12b: stale source capabilities cannot alter a lockbox',
-    !staleSourceDeposit.ok && staleSourceDeposit.fault === 'STALE_KEY' &&
-    registry.dispatchMethod(54, 'Inspect', sim, {
-        lockboxId: staleSourceBox.result.lockboxId, bankKey: staleSourceBox.result.bankKey
-    }).result.contentsWords === 0);
-const noReadBox = registry.dispatchMethod(54, 'MintKey', sim, { capacity: 4 });
-const noReadGT = sim.createGT(
-    sourceRegistration.result.version,
-    sourceRegistration.result.nsIndex,
-    { W: 1 },
-    1
-);
-const noReadDeposit = registry.dispatchMethod(54, 'Deposit', sim, {
-    lockboxId: noReadBox.result.lockboxId,
-    bankKey: noReadBox.result.bankKey,
-    sourceGT: noReadGT,
-    words: 1
-});
-check('BANK12c: a source capability without R permission is rejected',
-    !noReadDeposit.ok && noReadDeposit.fault === 'PERM' &&
-    registry.dispatchMethod(54, 'Inspect', sim, {
-        lockboxId: noReadBox.result.lockboxId, bankKey: noReadBox.result.bankKey
-    }).result.contentsWords === 0);
 
-const withdrawn = registry.dispatchMethod(54, 'Withdraw', sim, { lockboxId, passKey: reissuedKey });
-check('BANK13: Withdraw returns a fresh memory GT', withdrawn.ok &&
-    withdrawn.result.gt !== undefined && withdrawn.result.words === sourceWords.length);
-const releasedEntry = sim.readNSEntry(sim.parseGT(withdrawn.result.gt).index);
-check('BANK14: withdrawn GT resolves to an independent copied region',
-    releasedEntry && sourceWords.every((word, index) => sim.memory[releasedEntry.word0_location + index] === word));
-const reusedAfterWithdraw = registry.dispatchMethod(7, 'Allocate', sim, { size: 4 });
-check('BANK14b: withdrawal zeroizes custody memory before allocator reuse',
-    reusedAfterWithdraw.ok && reusedAfterWithdraw.result.location === firstLockbox.location &&
-    Array.from(sim.memory.slice(reusedAfterWithdraw.result.location,
-        reusedAfterWithdraw.result.location + reusedAfterWithdraw.result.size)).every(word => word === 0));
-const duplicateWithdraw = registry.dispatchMethod(54, 'Withdraw', sim, { lockboxId, passKey: reissuedKey });
-check('BANK15: duplicate withdrawal is rejected after quarantine', !duplicateWithdraw.ok);
-const revokedUnderlyingKey = registry.dispatchMethod(5, 'SecureObjectCall', sim, {
-    objectId: firstLockbox.securityObjectId,
-    method: 'Inspect',
-    passKey: reissuedKey
+const rawGt = registry.dispatchMethod(54, 'InspectVariable', sim, {
+    variableId: created.result.variableId, dr1: variable.gt,
+    capabilities: { variable: { ...variable, register: 'CR3' } }
 });
-check('BANK15b: withdrawal revokes the underlying delegated PassKey too',
-    !revokedUnderlyingKey.ok && revokedUnderlyingKey.fault === 'REVOKED');
+check('BANK05: scalar IDs, raw GTs, and reconstructed handles do not authorize',
+    !rawGt.ok && rawGt.fault === 'NO_CAPABILITY' && sim.dr[0] === 0x101);
 
-const second = registry.dispatchMethod(54, 'MintKey', sim, { capacity: 4 });
-const secondLockbox = systemAbs._bankState.lockboxes[second.result.lockboxId];
-const secondDeposit = registry.dispatchMethod(54, 'Deposit', sim, {
-    lockboxId: second.result.lockboxId,
-    bankKey: second.result.bankKey,
-    sourceGT,
-    words: sourceWords.length
+const read = registry.dispatchMethod(54, 'Read', sim, {
+    capabilities: { variable }, offset: 0, words: words.length
 });
-const secondRevoke = registry.dispatchMethod(54, 'Revoke', sim, {
-    lockboxId: second.result.lockboxId, bankKey: second.result.bankKey
-});
-const reusedAfterRevoke = registry.dispatchMethod(7, 'Allocate', sim, { size: 4 });
-check('BANK16: Revoke invalidates a populated lockbox and clears its backing storage',
-    secondDeposit.ok && secondRevoke.ok && secondRevoke.result.revoked &&
-    reusedAfterRevoke.ok && reusedAfterRevoke.result.location === secondLockbox.location &&
-    Array.from(sim.memory.slice(reusedAfterRevoke.result.location,
-        reusedAfterRevoke.result.location + reusedAfterRevoke.result.size)).every(word => word === 0));
-const revokedInspect = registry.dispatchMethod(54, 'Inspect', sim, {
-    lockboxId: second.result.lockboxId, bankKey: second.result.bankKey
-});
-check('BANK17: revoked keys cannot inspect custody', !revokedInspect.ok && revokedInspect.fault === 'REVOKED');
-const listed = registry.dispatchMethod(54, 'List', sim, {});
-check('BANK18: List returns safe metadata for lockbox records',
-    listed.ok && listed.result.some(entry => entry.lockboxId === lockboxId) &&
-    listed.result.every(entry => entry.location === undefined && entry.nsIndex === undefined));
+check('BANK06: typed capability flow reads through a fresh Inform capability',
+    read.ok && read.result.readableCapability.register === 'CR4' &&
+    read.result.readableCapability.secure_type === 'Inform');
 
-const rollbackBox = registry.dispatchMethod(54, 'MintKey', sim, { capacity: 4 });
-const rollbackRecord = systemAbs._bankState.lockboxes[rollbackBox.result.lockboxId];
-const rollbackDeposit = registry.dispatchMethod(54, 'Deposit', sim, {
-    lockboxId: rollbackBox.result.lockboxId,
-    bankKey: rollbackBox.result.bankKey,
-    sourceGT,
-    words: sourceWords.length
-});
-const rollbackDestination = systemAbs._memoryState.nextFreeAddr;
-const originalDispatch = registry.dispatchMethod;
-registry.dispatchMethod = function(index, method, targetSim, methodArgs) {
-    if (index === 5 && method === 'Remove' && methodArgs) {
-        return {
-            ok: false,
-            fault: 'INJECTED',
-            message: methodArgs.index === rollbackRecord.nsIndex
-                ? 'old lockbox removal refused' : 'withdraw destination cleanup refused'
-        };
-    }
-    return originalDispatch.call(this, index, method, targetSim, methodArgs);
-};
-const rollbackWithdraw = registry.dispatchMethod(54, 'Withdraw', sim, {
-    lockboxId: rollbackBox.result.lockboxId, bankKey: rollbackBox.result.bankKey
-});
-registry.dispatchMethod = originalDispatch;
-check('BANK19: failed withdrawal zeroizes and quarantines a destination whose Namespace cleanup fails',
-    rollbackDeposit.ok && !rollbackWithdraw.ok &&
-    Array.from(sim.memory.slice(rollbackDestination, rollbackDestination + 64))
-        .every(word => word === 0) &&
-    systemAbs._memoryState.allocations[rollbackDestination] &&
-    sim._bankQuarantinedAllocations[rollbackDestination]);
+const released = registry.dispatchMethod(54, 'Release', sim, { capabilities: { variable } });
+check('BANK07: release retires the variable and clears CR0',
+    released.ok && sim.cr[0].word0 === 0 &&
+    !registry.dispatchMethod(54, 'InspectVariable', sim, { capabilities: { variable } }).ok);
 
-const recoverable = registry.dispatchMethod(54, 'MintKey', sim, { capacity: 8 });
-const recoverableDeposit = registry.dispatchMethod(54, 'Deposit', sim, {
-    lockboxId: recoverable.result.lockboxId,
-    bankKey: recoverable.result.bankKey,
-    sourceGT,
-    words: sourceWords.length,
-    kind: 'lump'
-});
-const exportedRecovery = registry.dispatchMethod(54, 'ExportRecovery', sim, {
-    lockboxId: recoverable.result.lockboxId,
-    bankKey: recoverable.result.bankKey
-});
-const recoveryState = exportedRecovery.ok ? exportedRecovery.result.recoveryState : null;
-const oldRecoveryNsVersion = systemAbs._bankState.lockboxes[recoverable.result.lockboxId].nsVersion;
-check('BANK19b: recovery export is encrypted, proof-bound, and contains no raw proof',
-    recoverableDeposit.ok && exportedRecovery.ok && recoveryState &&
-    recoveryState.credential && recoveryState.credential.proofCommitment &&
-    recoveryState.cipher && typeof recoveryState.cipher.ciphertext === 'string' &&
-    !JSON.stringify(recoveryState).includes(JSON.stringify(recoverable.result.bankKey.proof)));
-
-const revokedRecovery = registry.dispatchMethod(54, 'MintKey', sim, { capacity: 4 });
-const revokedRecoveryDeposit = registry.dispatchMethod(54, 'Deposit', sim, {
-    lockboxId: revokedRecovery.result.lockboxId,
-    bankKey: revokedRecovery.result.bankKey,
-    sourceGT,
-    words: sourceWords.length
-});
-const revokedRecoveryState = registry.dispatchMethod(54, 'ExportRecovery', sim, {
-    lockboxId: revokedRecovery.result.lockboxId,
-    bankKey: revokedRecovery.result.bankKey
-});
-const revokedRecoveryCall = registry.dispatchMethod(54, 'Revoke', sim, {
-    lockboxId: revokedRecovery.result.lockboxId,
-    bankKey: revokedRecovery.result.bankKey
-});
-
-sim.reset();
-check('BANK20: same-instance reset clears Bank custody, credentials, and private guards',
-    systemAbs.getBankLockboxes().length === 0 &&
-    Object.keys(sim._bankPrivateSlots).length === 0 &&
-    sim._bankPrivateRanges.length === 0 &&
-    Object.keys(systemAbs._memoryState.allocations).length === 0 &&
-    !registry.dispatchMethod(54, 'Inspect', sim, { lockboxId, bankKey }).ok);
-registry.dispatchMethod(5, 'Init', sim, {});
-sim.mElevation = true;
-const recoveryAllocationsBefore = Object.keys(systemAbs._memoryState.allocations).sort();
-const corruptRecovery = JSON.parse(JSON.stringify(recoveryState));
-corruptRecovery.cipher.tag = corruptRecovery.cipher.tag.replace(/^./, corruptRecovery.cipher.tag[0] === '0' ? '1' : '0');
-systemAbs.registerBankRecoveryGrant({
-    token: 'server-grant-corrupt', lockboxId: recoverable.result.lockboxId, recoveryState: corruptRecovery
-});
-const rejectedCorruptRecovery = registry.dispatchMethod(54, 'Recover', sim, {
-    lockboxId: recoverable.result.lockboxId,
-    recoveryGrant: 'server-grant-corrupt',
-    bankKey: recoverable.result.bankKey
-});
-check('BANK20b: corrupted recovery state is rejected without allocating Namespace state',
-    !rejectedCorruptRecovery.ok && rejectedCorruptRecovery.fault === 'CORRUPT' &&
-    JSON.stringify(Object.keys(systemAbs._memoryState.allocations).sort()) ===
-        JSON.stringify(recoveryAllocationsBefore));
-const staleRecoveryKey = {
-    gt: recoverable.result.bankKey.gt,
-    proof: recoverable.result.bankKey.proof.map((word, i) => i === 0 ? (word ^ 1) >>> 0 : word)
-};
-systemAbs.registerBankRecoveryGrant({
-    token: 'server-grant-stale', lockboxId: recoverable.result.lockboxId, recoveryState
-});
-const rejectedStaleRecovery = registry.dispatchMethod(54, 'Recover', sim, {
-    lockboxId: recoverable.result.lockboxId,
-    recoveryGrant: 'server-grant-stale',
-    bankKey: staleRecoveryKey
-});
-check('BANK20c: stale recovery credentials are rejected before allocation',
-    !rejectedStaleRecovery.ok && rejectedStaleRecovery.fault === 'STALE_KEY' &&
-    JSON.stringify(Object.keys(systemAbs._memoryState.allocations).sort()) ===
-        JSON.stringify(recoveryAllocationsBefore));
-systemAbs.registerBankRecoveryGrant({
-    token: 'server-grant-revoked', lockboxId: revokedRecovery.result.lockboxId,
-    recoveryState: revokedRecoveryState.result.recoveryState
-});
-const rejectedRevokedRecovery = registry.dispatchMethod(54, 'Recover', sim, {
-    lockboxId: revokedRecovery.result.lockboxId,
-    recoveryGrant: 'server-grant-revoked',
-    bankKey: revokedRecovery.result.bankKey
-});
-check('BANK20d: revoked credentials cannot recover an exported lockbox',
-    revokedRecoveryDeposit.ok && revokedRecoveryCall.ok &&
-    !rejectedRevokedRecovery.ok && rejectedRevokedRecovery.fault === 'REVOKED');
-systemAbs.registerBankRecoveryGrant({
-    token: 'server-grant-success', lockboxId: recoverable.result.lockboxId, recoveryState
-});
-const recovered = registry.dispatchMethod(54, 'Recover', sim, {
-    lockboxId: recoverable.result.lockboxId,
-    recoveryGrant: 'server-grant-success',
-    bankKey: recoverable.result.bankKey
-});
-const recoveredRecord = recovered.ok && systemAbs._bankState.lockboxes[recoverable.result.lockboxId];
-check('BANK20e: recovery restores words into a fresh private Namespace entry and replacement key',
-    recovered.ok && recovered.result.recovered && recovered.result.sequence > 1 &&
-    recovered.result.bankKey.gt !== recoverable.result.bankKey.gt &&
-    recoveredRecord && sourceWords.every((word, index) =>
-        sim.memory[recoveredRecord.location + index] === word) &&
-    sim.readNSEntry(recoveredRecord.nsIndex).gtType === 2 &&
-    recoveredRecord.nsVersion !== oldRecoveryNsVersion);
-const oldRecoveryKeyRejected = registry.dispatchMethod(54, 'Inspect', sim, {
-    lockboxId: recoverable.result.lockboxId,
-    bankKey: recoverable.result.bankKey
-});
-const replayRecoveryRejected = registry.dispatchMethod(54, 'Recover', sim, {
-    lockboxId: recoverable.result.lockboxId,
-    recoveryGrant: 'server-grant-success',
-    bankKey: recoverable.result.bankKey
-});
-check('BANK20f: recovery rotates credentials and consumes the old envelope',
-    !oldRecoveryKeyRejected.ok && !replayRecoveryRejected.ok &&
-    replayRecoveryRejected.fault === 'STALE_KEY');
-
-const originalAllocOrFind = sim.allocOrFindNsSlot;
-sim.allocOrFindNsSlot = () => null; // model a Namespace with no free dynamic slot
-const allocationKeysBeforeExhaustion = Object.keys(systemAbs._memoryState.allocations).sort();
-const exhausted = registry.dispatchMethod(54, 'MintKey', sim, { capacity: 4 });
-sim.allocOrFindNsSlot = originalAllocOrFind;
-check('BANK21: Namespace exhaustion rolls back the unregistered lockbox allocation',
-    !exhausted.ok && exhausted.fault === 'NS_FULL' &&
-    systemAbs.getBankLockboxes().length === 1 &&
-    JSON.stringify(Object.keys(systemAbs._memoryState.allocations).sort()) ===
-        JSON.stringify(allocationKeysBeforeExhaustion));
-
-console.log(`\n${pass} passed, ${fail} failed`);
-process.exitCode = fail ? 1 : 0;
+console.log('\nBank capability-only checks passed.');

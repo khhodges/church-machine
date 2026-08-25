@@ -4,8 +4,8 @@
     const identity = Object.freeze({
   "dot_name": "Bank",
   "issue_n": 1,
-  "token": "7bd12610",
-  "binary_hash": "8875c13f80c4db86d1c709025793c21792db300e65f47c747657c6292f9f9801",
+  "token": "f5ba2534",
+  "binary_hash": "5ec723ea3c459c2e796c42ab1efcf997197fdfadf42671c2864863706429593e",
   "identity_hash": "3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11",
   "self_gt": 186216846,
   "ns_slot": null,
@@ -192,54 +192,6 @@
         "name": "status",
         "register": "DR0",
         "kind": "value"
-      }
-    },
-    "MintKey": {
-      "status": {
-        "register": "DR0",
-        "kind": "value"
-      },
-      "returns": {
-        "name": "owner_key",
-        "register": "CR1",
-        "kind": "capability",
-        "secure_type": "BankOwnerKey"
-      }
-    },
-    "Withdraw": {
-      "status": {
-        "register": "DR0",
-        "kind": "value"
-      },
-      "returns": {
-        "name": "valuable",
-        "register": "CR2",
-        "kind": "capability",
-        "secure_type": "Inform"
-      }
-    },
-    "ObtainPassKey": {
-      "status": {
-        "register": "DR0",
-        "kind": "value"
-      },
-      "returns": {
-        "name": "owner_key",
-        "register": "CR1",
-        "kind": "capability",
-        "secure_type": "BankOwnerKey"
-      }
-    },
-    "Recover": {
-      "status": {
-        "register": "DR0",
-        "kind": "value"
-      },
-      "returns": {
-        "name": "owner_key",
-        "register": "CR1",
-        "kind": "capability",
-        "secure_type": "BankOwnerKey"
       }
     }
   }

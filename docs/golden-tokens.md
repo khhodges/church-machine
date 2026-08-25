@@ -245,33 +245,28 @@ c-list row 0 and is registered in the LUMP manifest with `ns_slot: null` and
 resolve the Bank abstraction without reserving a hardware boot slot.
 
 Installing or calling Bank still mints its live authority through the runtime;
-the packaged SELF identity is not a lockbox authority. Bank has both the
-legacy owner-key lockbox API and the verified `Create(lump)` API. `MintKey`
-creates a private lockbox record with a dynamically allocated Namespace entry,
-but returns an opaque, object-scoped `BankOwnerKey` **capability in CR1**:
+the packaged SELF identity is not a custody authority. The Bank inner sanctum
+creates private records and mints typed Golden Tokens for internal use; it
+never returns an owner key or proof:
 
 ```text
-{ register: CR1, secure_type: BankOwnerKey, gt: Abstract GT identifier,
-  proof: [four 32-bit CSPRNG words] }
+{ register: CR0, secure_type: BankVariable, gt: Abstract GT,
+  proof: internal-only }
 ```
 
-The GT identifies the lockbox credential, while the independent 128-bit proof
-authorizes its use. Bank accepts that authority only through the typed CR1
-capability ABI; a copied GT, proof words, or an owner-handle integer supplied in
-DRs fails. `Deposit` similarly accepts its readable source GT only as a typed
-Inform `R` capability in CR2. Capacity, offsets, word counts, kinds, and status
-values are ordinary DR values. Neither a Namespace slot number nor a copied GT
-alone grants read or write access to the stored region.
+The GT is the only authority crossing the public Bank boundary. The independent
+proof is retained by the sanctum and validated internally. A copied GT, proof
+words, object ID, Namespace address, or reconstructed handle supplied in DRs
+fails. Capacity, offsets, word counts, kinds, and status values are ordinary
+DR values.
 
 | Bank method | Required authority | Result |
 |---|---|---|
-| `MintKey` | M-elevated programmer authority | Empty `BankOwnerKey` capability in CR1 |
-| `Deposit` | CR1 `BankOwnerKey` + CR2 Inform `R` capability | Bounded copy into custody |
-| `Inspect` | CR1 `BankOwnerKey` | Non-sensitive state and size metadata |
-| `Withdraw` | CR1 `BankOwnerKey` | Fresh Inform capability in CR2; lockbox is quarantined |
-| `Revoke` | CR1 `BankOwnerKey` | All lockbox credentials invalidated; custody record quarantined |
-| `ExportRecovery` | CR1 `BankOwnerKey` | Authenticated ciphertext bound to the original owner GT and proof |
-| `Recover` | CR1 original `BankOwnerKey` + M-elevation | Fresh private NS entry and a replacement CR1 owner capability |
+| `Create` | M elevation + CR1 Inform `R` | CR0 `BankVariable` E capability or NULL |
+| `Read` | CR0 `BankVariable` E | Fresh Inform `R` capability |
+| `InspectVariable` | CR0 `BankVariable` E | Safe scalar metadata in DRs |
+| `Release` | CR0 `BankVariable` E | Zeroize and retire private custody |
+| `RevokeVariable` | CR0 `BankVariable` E | Revoke, zeroize, and quarantine private custody |
 
 ### Verified Bank variables
 
@@ -279,8 +274,8 @@ alone grants read or write access to the stored region.
 complete LUMP value or a **typed Inform `R` capability in CR1** that resolves
 the complete LUMP bytes. On success it returns a separate proof-bound
 `BankVariable` Abstract `E` capability in **CR3**. That capability represents
-the created Bank-managed variable; it is not a `BankOwnerKey`, raw GT integer,
-proof tuple, Namespace slot, or private address.
+the created Bank-managed variable; it is not a raw GT integer, proof tuple,
+Namespace slot, or private address.
 
 | Method | Required typed authority | Result |
 |---|---|---|

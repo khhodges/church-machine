@@ -1694,7 +1694,8 @@ def health():
 
 @app.route("/api/bank-custody", methods=["POST"])
 def save_bank_custody():
-    """Store a proof-free, client-encrypted Bank recovery envelope."""
+    """Legacy owner-key recovery is retired; custody stays inside Bank."""
+    return jsonify({"ok": False, "error": "Bank custody requires a typed BankVariable capability"}), 410
     data = request.get_json(silent=True) or {}
     vault_id = _bank_custody_vault_id(data.get("vault_id"))
     state = _bank_custody_validate_state(data.get("state"))
@@ -15529,6 +15530,7 @@ def _read_manifest_safe(manifest_path):
 
 @app.route("/api/bank-custody/<vault_id>/revoke", methods=["POST"])
 def revoke_bank_custody(vault_id):
+    return jsonify({"ok": False, "error": "legacy Bank custody credentials are not accepted"}), 410
     vault_id = _bank_custody_vault_id(vault_id)
     if not vault_id:
         return jsonify({"ok": False, "error": "invalid vault id"}), 400
@@ -15549,6 +15551,7 @@ def revoke_bank_custody(vault_id):
 
 @app.route("/api/bank-custody/<vault_id>", methods=["DELETE"])
 def delete_bank_custody(vault_id):
+    return jsonify({"ok": False, "error": "legacy Bank custody credentials are not accepted"}), 410
     vault_id = _bank_custody_vault_id(vault_id)
     if not vault_id:
         return jsonify({"ok": False, "error": "invalid vault id"}), 400
@@ -15580,6 +15583,7 @@ def _bank_custody_request_commitment(data, state):
 
 @app.route("/api/bank-custody/<vault_id>/recover", methods=["POST"])
 def recover_bank_custody(vault_id):
+    return jsonify({"ok": False, "error": "legacy Bank recovery credentials are not accepted"}), 410
     vault_id = _bank_custody_vault_id(vault_id)
     if not vault_id:
         return jsonify({"ok": False, "error": "invalid vault id"}), 400
@@ -15616,6 +15620,7 @@ def recover_bank_custody(vault_id):
 
 @app.route("/api/bank-custody/grant/<grant>/consume", methods=["POST"])
 def consume_bank_custody_grant(grant):
+    return jsonify({"ok": False, "error": "legacy Bank recovery grants are not accepted"}), 410
     if not isinstance(grant, str) or len(grant) < 32:
         return jsonify({"ok": False, "error": "invalid recovery grant"}), 400
     with _bank_custody_lock:

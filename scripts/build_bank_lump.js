@@ -45,14 +45,6 @@ const BANK_ERROR_CODES = Object.freeze({
 });
 const BANK_CAPABILITY_TYPES = [
     {
-        name: 'BankOwnerKey',
-        register: 'CR1',
-        gt_type: 'Abstract',
-        rights: ['E'],
-        proof_bound: true,
-        description: 'Object-scoped owner authority with an independent 128-bit proof.'
-    },
-    {
         name: 'Inform',
         register: 'CR2',
         gt_type: 'Inform',
@@ -164,22 +156,6 @@ function buildBankArtifact() {
             inputs: [{ name: 'variable', register: 'CR0', kind: 'capability',
                 secure_type: 'BankVariable', rights: ['E'] }],
             returns: { name: 'status', register: 'DR0', kind: 'value' },
-        },
-        MintKey: {
-            status: { register: 'DR0', kind: 'value' },
-            returns: { name: 'owner_key', register: 'CR1', kind: 'capability', secure_type: 'BankOwnerKey' },
-        },
-        Withdraw: {
-            status: { register: 'DR0', kind: 'value' },
-            returns: { name: 'valuable', register: 'CR2', kind: 'capability', secure_type: 'Inform' },
-        },
-        ObtainPassKey: {
-            status: { register: 'DR0', kind: 'value' },
-            returns: { name: 'owner_key', register: 'CR1', kind: 'capability', secure_type: 'BankOwnerKey' },
-        },
-        Recover: {
-            status: { register: 'DR0', kind: 'value' },
-            returns: { name: 'owner_key', register: 'CR1', kind: 'capability', secure_type: 'BankOwnerKey' },
         },
     };
     for (const method of api.methods) {

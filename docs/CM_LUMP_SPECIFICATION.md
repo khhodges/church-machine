@@ -1338,11 +1338,10 @@ proof validation, private Outform storage, complete zeroization, and
 server-authorized recovery. A LUMP implementation must never embed a PassKey
 proof, a private lockbox address, or a reusable custody GT.
 
-Bank has two deliberately distinct custody interfaces. The original lockbox
-interface uses an object-scoped `BankOwnerKey` (Abstract + `E`, with its
-independent 128-bit proof) only in `CR1`; `Deposit` receives its readable
-Inform source only in `CR2`. The verified abstraction interface starts with
-`Create(lump)`:
+Bank exposes one custody interface. Its inner sanctum may mint and rotate a
+typed Golden Token for private use, but that passkey, proof, object identifier,
+and Namespace address never cross the Bank boundary. The public interface
+starts with `Create(lump)`:
 
 | Method | Inputs | Outputs | Meaning |
 |---|---|---|---|
@@ -1353,10 +1352,10 @@ Inform source only in `CR2`. The verified abstraction interface starts with
 | `RevokeVariable` | CR0 `BankVariable` | DR0=1 on success or a specific Bank error code | Revoke the variable authority, clear CR0, and zeroize and retire its private allocation. |
 
 The capability registers above are type checked by the live binding. A raw GT,
-proof words, a Namespace index, a memory address, or a reconstructed handle in
-DRs is not a substitute for either `BankOwnerKey` or `BankVariable`. `Create`
-does not return an owner credential, a private Namespace address, or a private
-GT. `CR0` is the only returned authority for the verified Bank variable;
+proof words, a Namespace index, a memory address, scalar object identifier, or
+a reconstructed handle in DRs is not authority. `Create` returns only the
+typed BankVariable Golden Token in CR0; its private proof remains in the
+sanctum. `CR0` is the only returned authority for the verified Bank variable;
 `DR0` reports `1` for success or a specific nonzero Bank error code for failure,
 and must never be used as a capability. `CR0` is a capability-or-NULL result:
 callers must test it before entering the verified abstraction.
@@ -1367,11 +1366,11 @@ For `Create`, the canonical diagnostic codes are: `0x101` no typed capability,
 Namespace slot, `0x10B` capability minting failed, and `0x10C` private
 Namespace cleanup failed. The complete machine-readable mapping is embedded in
 the Bank LUMP's `capability_abi.Create.error_codes` object.
-`BankOwnerKey` remains the authority for the separate lockbox lifecycle
-(`MintKey`, `Deposit`, `Withdraw`, `Inspect`, `Revoke`, `ObtainPassKey`,
-`ExportRecovery`, and `Recover`); `BankVariable` is the capability that names
-the created abstraction value. This separation prevents callers from treating
-the static LUMP identity or a scalar value as custody authority.
+There is no public `MintKey`, owner-key, raw-proof, or scalar-handle lifecycle.
+Allocation, proof validation, rotation, zeroization, and recovery are inner
+sanctum operations reached only after validating the BankVariable Golden Token.
+This prevents callers from treating the static LUMP identity or a scalar value
+as custody authority.
 
 Before `Create` reserves an allocation or writes a Namespace entry, the binding
 derives and checks all of the following from the submitted bytes and their
