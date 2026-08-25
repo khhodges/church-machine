@@ -563,6 +563,7 @@
             const searchResults = document.getElementById('siteSearchResults');
             let searchTimer = null;
             let searchRequest = 0;
+            const searchStorageKey = 'church_public_site_search';
 
             function escapeSearchHtml(value) {
                 return String(value || '').replace(/[&<>"']/g, function(character) {
@@ -591,6 +592,32 @@
                 searchClear.style.display = searchInput.value ? 'block' : 'none';
             }
 
+            function rememberSearchResults(query, payload) {
+                try {
+                    localStorage.setItem(searchStorageKey, JSON.stringify({
+                        query: query,
+                        payload: payload
+                    }));
+                } catch (_) {
+                    // Search remains usable when browser storage is unavailable.
+                }
+            }
+
+            function restoreSearchResults() {
+                try {
+                    const saved = JSON.parse(localStorage.getItem(searchStorageKey) || 'null');
+                    if (!saved || typeof saved.query !== 'string' ||
+                            !saved.query.trim() || !saved.payload ||
+                            !Array.isArray(saved.payload.results)) {
+                        return;
+                    }
+                    searchInput.value = saved.query;
+                    renderSearchResults(saved.payload);
+                } catch (_) {
+                    // Ignore malformed or unavailable browser storage.
+                }
+            }
+
             function searchSite() {
                 const query = searchInput.value.trim();
                 window.clearTimeout(searchTimer);
@@ -598,6 +625,7 @@
                     searchResults.innerHTML = '';
                     searchStatus.textContent = '';
                     searchClear.style.display = 'none';
+                    try { localStorage.removeItem(searchStorageKey); } catch (_) {}
                     return;
                 }
                 const requestId = ++searchRequest;
@@ -608,7 +636,10 @@
                     if (!response.ok) throw new Error('search request failed');
                     return response.json();
                 }).then(function(payload) {
-                    if (requestId === searchRequest) renderSearchResults(payload);
+                    if (requestId === searchRequest) {
+                        renderSearchResults(payload);
+                        rememberSearchResults(query, payload);
+                    }
                 }).catch(function() {
                     if (requestId === searchRequest) {
                         searchResults.innerHTML = '';
@@ -638,6 +669,7 @@
                     searchSite();
                     searchInput.focus();
                 });
+                restoreSearchResults();
             }
 
             const storageKey = 'church_public_landing_card_order';
