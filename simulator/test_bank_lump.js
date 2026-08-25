@@ -118,7 +118,10 @@ check('BANK-LUMP09b: Bank records typed CR inputs while scalar values remain DR 
     ]) &&
     create.returns.register === 'CR0' && create.returns.secure_type === 'BankVariable' &&
     entry.capability_abi.Create.returns_nullable === true &&
-    entry.capability_abi.Create.policy.validation === 'complete-self-defining-lump-before-private-custody' &&
+     entry.capability_abi.Create.policy.validation === 'T3.1-T3.4-approval-before-private-custody' &&
+     JSON.stringify(entry.capability_abi.Create.policy.approval_gates) ===
+         JSON.stringify(['T3.1', 'T3.2', 'T3.3', 'T3.4']) &&
+     entry.capability_abi.Create.policy.T3_3 === 'deferred-genesis-certificate; human-IDE-authority' &&
     entry.capability_abi.Create.policy.commit === 'atomic-private-custody-or-cleanup' &&
     entry.capability_abi.Create.policy.issuance === 'nullable-typed-bankvariable-capability-after-commit' &&
     entry.capability_abi.Create.policy.input_register === 'CR1' &&
@@ -204,7 +207,9 @@ const sourceCapability = {
     metadata: {
         dot_name: entry.dot_name, issue_n: entry.issue_n, token: entry.token,
         binary_hash: entry.binary_hash, identity_hash: entry.identity_hash,
-        self_gt: entry.self_gt, identity_string: sidecar.identity_string
+        self_gt: entry.self_gt, identity_string: sidecar.identity_string,
+        genesis_authority: entry.genesis_authority,
+        genesis_certificate_verification: entry.genesis_certificate_verification
     }
 };
 const validateCandidate = candidate => BankLumpBinding.validateLump({
@@ -268,6 +273,14 @@ check('BANK-LUMP12: forged token metadata fails before Bank allocates private cu
     (!sim._bankCapabilityRegisters || !sim._bankCapabilityRegisters.CR0) &&
     JSON.stringify(Object.keys(systemAbs._memoryState.allocations).sort()) ===
         JSON.stringify(allocationsBeforeRejectedCreate));
+const withoutGenesisAuthority = { ...sourceCapability.metadata };
+delete withoutGenesisAuthority.genesis_authority;
+const deferredGateFailure = registry.dispatchMethod(54, 'Create', sim, {
+    lumpValue: { words: sourceWords, metadata: withoutGenesisAuthority }
+});
+check('BANK-LUMP12a: T3.3 fails closed when deferred human-IDE authority is absent',
+    !deferredGateFailure.ok && deferredGateFailure.fault === 'IDENTITY' &&
+    sim.dr[0] === 0x103 && sim.cr[0].word0 === 0);
 const alteredCode = sourceWords.slice();
 alteredCode[10] = (alteredCode[10] ^ 1) >>> 0;
 const alteredCodeCreate = registry.dispatchMethod(54, 'Create', sim, {
@@ -295,6 +308,32 @@ check('BANK-LUMP12c: a self-consistent hash claim cannot bypass the c-list SELF 
     sim.dr[0] === 0x103 && sim.cr[0].word0 === 0 &&
     JSON.stringify(Object.keys(systemAbs._memoryState.allocations).sort()) ===
         JSON.stringify(allocationsBeforeRejectedCreate));
+const wrongIssueMetadata = {
+    ...sourceCapability.metadata, issue_n: 2,
+    identity_hash: sha256('Bank#2')
+};
+const wrongIssueCreate = registry.dispatchMethod(54, 'Create', sim, {
+    lumpValue: { words: sourceWords, metadata: wrongIssueMetadata }
+});
+check('BANK-LUMP12d: T3.2 rejects an issue and identity substitution',
+    !wrongIssueCreate.ok && wrongIssueCreate.fault === 'IDENTITY' &&
+    sim.dr[0] === 0x103 && sim.cr[0].word0 === 0);
+const wrongSelf = sourceWords.slice();
+wrongSelf[wrongSelf.length - 1] ^= 1;
+const wrongSelfBinary = Buffer.alloc(wrongSelf.length * 4);
+wrongSelf.forEach((word, index) => wrongSelfBinary.writeUInt32BE(word >>> 0, index * 4));
+const wrongSelfMetadata = {
+    ...sourceCapability.metadata,
+    token: sha256(Buffer.concat([Buffer.from('Bank', 'utf8'), wrongSelfBinary])).slice(0, 8),
+    binary_hash: sha256(wrongSelfBinary)
+};
+const wrongSelfCreate = registry.dispatchMethod(54, 'Create', sim, {
+    lumpValue: { words: wrongSelf, metadata: wrongSelfMetadata }
+});
+check('BANK-LUMP12e: T3.4 rejects a c-list SELF that does not equal the derived E identity',
+    !wrongSelfCreate.ok && wrongSelfCreate.fault === 'IDENTITY' &&
+    wrongSelfCreate.message.includes('T3.4') &&
+    sim.dr[0] === 0x103 && sim.cr[0].word0 === 0);
 const missingCapability = registry.dispatchMethod(54, 'Create', sim, {
     lumpValue: { words: sourceWords, metadata: sourceCapability.metadata }
 });

@@ -40,7 +40,9 @@ const source = {
     metadata: {
         dot_name: entry.dot_name, issue_n: entry.issue_n, token: entry.token,
         binary_hash: entry.binary_hash, identity_hash: entry.identity_hash,
-        self_gt: entry.self_gt, identity_string: 'Bank#1'
+        self_gt: entry.self_gt, identity_string: 'Bank#1',
+        genesis_authority: entry.genesis_authority,
+        genesis_certificate_verification: entry.genesis_certificate_verification
     }
 };
 

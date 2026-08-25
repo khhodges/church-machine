@@ -1360,8 +1360,9 @@ sanctum. `CR0` is the only returned authority for the verified Bank variable;
 and must never be used as a capability. `CR0` is a capability-or-NULL result:
 callers must test it before entering the verified abstraction.
 
-The executable Create policy has three ordered stages: validate the complete
-submitted LUMP, atomically commit private custody (or clean up every partial
+The executable Create policy has four approval gates followed by two commit
+stages: T3.1–T3.4 validate the complete submitted LUMP and its requested
+identity, then atomically commit private custody (or clean up every partial
 allocation/Namespace/object state), and issue the nullable typed
 `BankVariable E` capability in CR0 only after that commit succeeds. The
 source-level flow records validation failure, custody commit, and post-commit
@@ -1403,13 +1404,14 @@ make forged bytes acceptable. A malformed header, a stale/copy-pasted token,
 an altered code word, a forged API name, a mismatched identity hash, or a
 different c-list SELF fails before any private custody state is published.
 
-These checks establish **mechanical tampering-and-substitution detection**, not
-historical genesis. A modified binary or swapped name/token combination fails
-Gate 3 before custody is allocated. The provenance of the name-to-token binding
-is currently human-vouched: a matching token and identity seal prove the
-submitted bytes are self-consistent under the declared `name#issue`, but not
-who first published the abstraction. A future genesis-rooted certificate
-verifier may strengthen Gate 3 without weakening these mechanical checks.
+These checks are the explicit T3 sequence: **T3.1** recomputes the canonical
+content address and dependent identities from bytes; **T3.2** compares the
+requested token, binary hash, identity hash, issue, and dot name; **T3.3** is
+currently a deferred certificate-versus-genesis decision recorded as
+`human-IDE` authority; and **T3.4** compares c-list SELF with the exact
+E-identity derived from embedded dot name and issue. T3.3 is not signature
+verification and does not claim a genesis certificate exists. Missing or
+contradictory T3.3 authority fails closed. All four gates run before custody.
 
 The owner capability and verified variable capability are intentionally
 different authorities. Owner methods manage a Bank lockbox; variable methods

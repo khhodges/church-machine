@@ -61,12 +61,14 @@ const BANK_CAPABILITY_TYPES = [
     },
 ];
 const BANK_CREATE_POLICY = Object.freeze({
-    validation: 'complete-self-defining-lump-before-private-custody',
+    validation: 'T3.1-T3.4-approval-before-private-custody',
     commit: 'atomic-private-custody-or-cleanup',
     issuance: 'nullable-typed-bankvariable-capability-after-commit',
     input_register: 'CR1',
     result_register: 'CR0',
     status_register: 'DR0',
+    approval_gates: ['T3.1', 'T3.2', 'T3.3', 'T3.4'],
+    T3_3: 'deferred-genesis-certificate; human-IDE-authority',
 });
 
 global.ChurchAssembler = require(path.join(ROOT, 'simulator', 'assembler.js'));
@@ -244,11 +246,15 @@ function buildBankArtifact() {
         sidecar_file: sidecarFile,
         binary_hash: binaryHash,
         identity_hash: identityHash,
+        genesis_authority: 'human-IDE',
+        genesis_certificate_verification: 'deferred',
     };
 
     const sidecar = {
         ...shared,
         identity_string: identityString,
+        genesis_authority: 'human-IDE',
+        genesis_certificate_verification: 'deferred',
         identity_seal_location: 'c-list[0]',
         sourceStorageTier: 2,
         source_file: 'simulator/cloomc/bank.cloomc',
@@ -297,6 +303,8 @@ function identityProjection(artifact) {
         boot_resident: entry.boot_resident,
         runtime_binding: entry.runtime_binding,
         capability_abi: entry.capability_abi,
+        genesis_authority: entry.genesis_authority,
+        genesis_certificate_verification: entry.genesis_certificate_verification,
     };
 }
 

@@ -285,12 +285,16 @@ Namespace slot, or private address.
 | `Release` | CR0 `BankVariable E` | Wipe and retire the private variable allocation |
 | `RevokeVariable` | CR0 `BankVariable E` | Revoke authority, wipe and retire the private allocation |
 
-Create is a three-stage policy: the submitted bytes are completely validated
-first; private custody is then committed atomically, with every allocation,
+Create is a staged T3 policy: T3.1 recomputes content identity from submitted
+bytes, T3.2 compares every requested identity field, T3.3 records the deferred
+human-IDE authority decision (not certificate verification), and T3.4 requires
+SELF to equal the derived E identity. Only after these gates pass is private
+custody committed atomically, with every allocation,
 Namespace, object, and copy failure cleaned up; only after that commit does the
 binding materialize the nullable typed capability in CR0. DR0 remains status
 data only. The CLOOMC source carries this control flow, while the proof-bound
-runtime alone performs validation, custody, and credential retention.
+runtime alone performs validation, custody, and credential retention. An absent
+or contradictory deferred-authority decision fails closed.
 
 Bank verifies the binary header and encoded size, the `0xAB` embedded API and
 declared name, full binary hash, canonical name-plus-binary token, identity

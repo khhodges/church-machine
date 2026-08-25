@@ -29,8 +29,12 @@ abstraction Bank {
     // resulting Enter authority; DR0 is diagnostic data and can never authorize
     // entry. The caller must test CR0 before using the verified abstraction.
     //
-    // The executable policy is deliberately staged:
-    //   1. validate the complete submitted LUMP and fail with NULL CR0;
+    // The executable policy is deliberately staged as Bank T3 approval:
+    //   T3.1 recompute the canonical content address from submitted bytes;
+    //   T3.2 compare every requested identity assertion mechanically;
+    //   T3.3 record deferred genesis authority as human-IDE approval only;
+    //   T3.4 require compiler-owned SELF == E(dot name, issue), then
+    //   validate the complete submitted LUMP and fail with NULL CR0;
     //   2. commit private custody atomically (allocation, private Namespace
     //      record, proof-bound object, and copied bytes), cleaning up on error;
     //   3. issue the nullable typed BankVariable E capability only after commit.
@@ -39,9 +43,9 @@ abstraction Bank {
     // control-flow contract without exposing their scalar results.
     method Create(lump: capability Inform R) {
         tperm(CR1, R)
-        // The binding performs complete seal, token, SELF, relationship
-        // validation and atomically commits private custody before it reaches
-        // this result check. It clears CR0 on every validation or commit error.
+        // The native binding returns only after T3.1, T3.2, T3.3, and T3.4
+        // succeed, then atomically commits private custody. It clears CR0 on
+        // every approval or commit error.
         //
         // This is deliberately a capability-presence check, not a DR0 status
         // check: DR0 is diagnostic data and must never stand in for authority.

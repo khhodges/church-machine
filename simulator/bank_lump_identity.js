@@ -4,8 +4,8 @@
     const identity = Object.freeze({
   "dot_name": "Bank",
   "issue_n": 1,
-  "token": "d5c860ea",
-  "binary_hash": "ed0f408174e31026775705311bf7336fbb129ce6d390039ad0e32aab09fe4d88",
+  "token": "8f5edf1d",
+  "binary_hash": "3bb89caf9a074f5618187787e1e007e7fb8f7587eec18783149ff6692f0d9cf9",
   "identity_hash": "3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11",
   "self_gt": 1259958670,
   "ns_slot": null,
@@ -26,12 +26,19 @@
       },
       "status_semantics": "1=success; nonzero Bank error code=failure",
       "policy": {
-        "validation": "complete-self-defining-lump-before-private-custody",
+        "validation": "T3.1-T3.4-approval-before-private-custody",
         "commit": "atomic-private-custody-or-cleanup",
         "issuance": "nullable-typed-bankvariable-capability-after-commit",
         "input_register": "CR1",
         "result_register": "CR0",
-        "status_register": "DR0"
+        "status_register": "DR0",
+        "approval_gates": [
+          "T3.1",
+          "T3.2",
+          "T3.3",
+          "T3.4"
+        ],
+        "T3_3": "deferred-genesis-certificate; human-IDE-authority"
       },
       "error_codes": {
         "NO_CAPABILITY": 257,
@@ -202,7 +209,9 @@
         "kind": "value"
       }
     }
-  }
+  },
+  "genesis_authority": "human-IDE",
+  "genesis_certificate_verification": "deferred"
 });
     if (typeof module !== 'undefined' && module.exports) module.exports = identity;
     root.BankLumpIdentity = identity;
