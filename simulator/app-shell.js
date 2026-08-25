@@ -808,6 +808,16 @@ function confirmNewTab() {
     createUserTab(name, lang, initialCode);
 }
 
+// File → New starts working immediately: it replaces the visible editor with a
+// fresh proforma instead of opening the optional named-tab dialog first.
+function newAbstraction() {
+    const name = 'New.Abstraction';
+    const lang = 'assembly';
+    const initialCode = _newAbstractionProforma(name);
+    window._editorSourceFilePath = null;
+    createUserTab(name, lang, initialCode);
+}
+
 // The New command always starts with the editable abstraction proforma.
 // Abstraction source is intentionally kept in the Assembly editor mode so
 // users can add the low-level method bodies directly.
@@ -825,7 +835,9 @@ function _newAbstractionProforma(name) {
 
 ; Provides: the functions of ...
 abstraction ${name} {
-    capabilities { }
+    capabilities {
+        ; (capability grants added here)
+    }
     method Status {
         ; Return the status
         ; Depends on: self
