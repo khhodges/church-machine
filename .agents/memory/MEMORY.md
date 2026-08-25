@@ -156,3 +156,4 @@
 - [Bank recovery grants](bank-recovery-grants.md) — restart recovery needs server-authorized proof-free custody envelopes and a distinct NS generation
 - [Dynamic system LUMP runtime binding](dynamic-system-lump-runtime-binding.md) — dynamic LUMPs must gate dispatch on their generated canonical identity, never only a duplicated registry index
 - [Capability ABI result materialization](capability-abi-result-materialization.md) — a runtime binding must write declared CR/DR outputs and preserve protected proof state, not return authority only in host objects
+- [Bank artifact binding seals](bank-artifact-binding-seals.md) — Bank’s source is embedded in its artifact, so regeneration must also synchronize binding token/hash constants
