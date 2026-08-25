@@ -7,12 +7,18 @@
 //   * every public authority is a typed capability register;
 //   * offsets, word counts, kinds, capacities, and status values remain DR
 //     values; and
-//   * the live binding keeps the sanctum passkey private and manages custody,
-//     zeroization, and recovery.
+//   * the live binding keeps the inner-sanctum passkey private and manages
+//     custody, zeroization, and recovery.
 //
 // The source models lifecycle state only. It cannot manufacture, inspect, or
 // reconstruct authority from integer fields: the CR ABI and proof-bound runtime
 // gate are the sole security boundary for those operations.
+//
+// MintKey is deliberately not a public method. The live Bank binding invokes
+// it only inside the inner sanctum, where it mints or rotates the private
+// passkey and retains its independent proof. No owner key, proof, scalar ID,
+// Namespace address, or reconstructed handle crosses the Bank boundary.
+// Callers use the higher-level methods below with typed Golden Tokens only.
 
 abstraction Bank {
     capabilities {
@@ -52,10 +58,12 @@ abstraction Bank {
     }
 
     // Release and RevokeVariable retire the verified variable, zeroize its
-    // private storage, and clear CR0.  An owner capability (CR1) controls a
-    // Bank lockbox; a BankVariable capability (CR0) controls only the verified
-    // variable it names.  Nested variables are created by calling Create on a
-    // readable result from Read, never by exposing the owner's private record.
+    // private storage, and clear CR0. A BankVariable capability (CR0) is the
+    // only public authority for the verified variable it names. The binding
+    // resolves that typed Golden Token to private custody state and retains
+    // the passkey/proof internally; callers never receive the private record.
+    // Nested variables are created by calling Create on a readable result from
+    // Read, never by exposing inner-sanctum state.
     method Release(variable: capability BankVariable E) {
         return(1)
     }
