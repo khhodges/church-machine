@@ -2312,6 +2312,17 @@ def _validate_step2(step2, step1, target_board):
             return f"NS slot {slot} is not present in the lump catalog"
         resident = bool(entry.get("resident"))
         if not resident:
+            if entry.get("prefetch"):
+                url = entry.get("downloadUrl")
+                if not isinstance(url, str) or not url.strip():
+                    return f"lazy prefetch for NS slot {slot} requires downloadUrl"
+                url = url.strip()
+                if not (url.startswith("/api/lump/") or url.startswith("https://")):
+                    return (f"lazy prefetch URL for NS slot {slot} must be an IDE "
+                            "raw-LUMP path or an https URL")
+                order = entry.get("prefetchOrder", slot)
+                if not isinstance(order, int) or order < 0:
+                    return f"prefetchOrder for NS slot {slot} must be a non-negative integer"
             continue
         cat = catalog[slot]
         lump_size = entry.get("lumpSize") or cat.get("lumpSize")
@@ -2530,6 +2541,10 @@ def boot_config_post():
                 row["abstraction"] = str(e["abstraction"])
             if e.get("lumpToken"):
                 row["lumpToken"] = str(e["lumpToken"])
+            if not row["resident"] and e.get("prefetch"):
+                row["prefetch"] = True
+                row["downloadUrl"] = str(e.get("downloadUrl", "")).strip()
+                row["prefetchOrder"] = int(e.get("prefetchOrder", row["nsSlot"]))
             if row["resident"]:
                 row["physAddr"] = int(e["physAddr"])
                 if e.get("lumpSize") is not None:
