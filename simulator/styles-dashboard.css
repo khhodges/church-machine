@@ -5449,6 +5449,43 @@ mark.abs-search-highlight {
     overflow-y: auto;
 }
 
+#lumpsListContent {
+    transition: opacity 0.16s ease, max-height 0.2s ease, margin 0.2s ease;
+    max-height: 24rem;
+    overflow: hidden;
+}
+
+#lumpsListContent.lump-repository-collapsed {
+    max-height: 0;
+    opacity: 0;
+    margin: 0;
+    pointer-events: none;
+}
+
+.lump-repo-toggle-btn {
+    display: none;
+    flex: 0 0 auto;
+    margin-left: auto;
+    padding: 0.2rem 0.55rem;
+    border: 1px solid rgba(126, 200, 164, 0.35);
+    border-radius: 4px;
+    background: rgba(126, 200, 164, 0.1);
+    color: #9ad9b6;
+    font: 600 0.68rem/1.3 inherit;
+    cursor: pointer;
+}
+
+.lump-repo-toggle-btn.is-visible {
+    display: inline-block;
+}
+
+.lump-repo-toggle-btn:hover,
+.lump-repo-toggle-btn:focus-visible {
+    background: rgba(126, 200, 164, 0.2);
+    border-color: rgba(154, 217, 182, 0.65);
+    color: #c5f1d5;
+}
+
 .lump-repository-items .lump-item {
     margin-bottom: 3px;
 }

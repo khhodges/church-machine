@@ -901,6 +901,7 @@ async function renderLumps() {
             // (e.g. after a page reload when the registry is already populated).
             _updateLumpViewingLabel(_selTok);
         }
+         _setLumpRepositoryCollapsed(Boolean(_selTok));
         // If a pending tab was requested (e.g. from _openLumpSource), apply it now
         // after showLumpDetail has built the tab panels.
         if (window._pendingLumpTab) {
@@ -966,13 +967,36 @@ function _updateLumpRepoCount(x, y) {
 
 // Called by the lump picker <select> when the user chooses a different lump.
 window.lumpPickerChanged = function(token) {
-    if (!token) { _updateLumpViewingLabel(''); return; }
+    if (!token) {
+        _updateLumpViewingLabel('');
+        _setLumpRepositoryCollapsed(false);
+        return;
+    }
     if (window.LumpRegistry) window.LumpRegistry.setCurrent(token);
     try { localStorage.setItem('lastSelectedLumpToken', token); } catch (_e) {}
     _lumpRecordView(token);
     _updateLumpViewingLabel(token);
+    _setLumpRepositoryCollapsed(true);
     if (typeof window.showLumpDetail === 'function') window.showLumpDetail(token);
     else if (typeof showLumpDetail === 'function') showLumpDetail(token);
+};
+
+// Keep the selected LUMP detail as the primary workspace after a selection.
+// The repository remains available through the compact header control.
+function _setLumpRepositoryCollapsed(collapsed) {
+    const listEl = document.getElementById('lumpsListContent');
+    const toggle = document.getElementById('lumpRepoToggleBtn');
+    if (!listEl || !toggle) return;
+    listEl.classList.toggle('lump-repository-collapsed', collapsed);
+    toggle.classList.toggle('is-visible', collapsed);
+    toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    toggle.textContent = collapsed ? 'Browse repository' : 'Hide repository';
+}
+
+window.toggleLumpRepository = function() {
+    const listEl = document.getElementById('lumpsListContent');
+    if (!listEl) return;
+    _setLumpRepositoryCollapsed(!listEl.classList.contains('lump-repository-collapsed'));
 };
 
 // Updates the "Viewing: <name> [TYPE]" label below the picker.
