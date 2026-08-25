@@ -10,8 +10,8 @@
 (function exposeBankLumpBinding(root) {
     const DOT_NAME = 'Bank';
     const ISSUE_N = 1;
-    const TOKEN = '234e0e62';
-    const BINARY_HASH = 'a530bc1d92254c18079609a279bfacbab9cbe9b431c3ca0af3f1ce415ed533fb';
+    const TOKEN = '0e2eba74';
+    const BINARY_HASH = 'a1c41a3b7e0199aedaa99c402a38f314205fe3c30a2d19bd99082861c49bae11';
     const IDENTITY_HASH = '3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11';
     const SELF_GT = 0x0B19718E;
     const REGISTRY_INDEX = 54;
@@ -53,10 +53,12 @@
         const capabilityABI = identity.capability_abi || {};
         const createdVariable = capabilityABI.Create && capabilityABI.Create.returns;
         const createErrorCodes = capabilityABI.Create && capabilityABI.Create.error_codes;
+        const createPolicy = capabilityABI.Create && capabilityABI.Create.policy;
         const inspectVariable = capabilityABI.InspectVariable;
         if (Object.keys(capabilityABI).some(name =>
                 ['MintKey', 'Deposit', 'Withdraw', 'Inspect', 'Revoke',
                     'ObtainPassKey', 'ExportRecovery', 'Recover', 'List'].includes(name)) ||
+             !createdPolicyMatches(createPolicy) ||
              !createdVariable || createdVariable.register !== 'CR0' ||
              capabilityABI.Create.returns_nullable !== true ||
              !createErrorCodes || createErrorCodes.IDENTITY !== 0x103 ||
@@ -72,6 +74,15 @@
             return fail('Bank SELF does not identify canonical Bank#1');
         }
         return { ok: true, result: identity };
+    }
+
+    function createdPolicyMatches(policy) {
+        return policy && policy.validation === 'complete-self-defining-lump-before-private-custody' &&
+            policy.commit === 'atomic-private-custody-or-cleanup' &&
+            policy.issuance === 'nullable-typed-bankvariable-capability-after-commit' &&
+            policy.input_register === 'CR1' &&
+            policy.result_register === 'CR0' &&
+            policy.status_register === 'DR0';
     }
 
     function validateArtifact({ manifestEntry, sidecar, binary }) {

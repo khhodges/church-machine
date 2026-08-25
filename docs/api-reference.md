@@ -37,7 +37,7 @@ Canonical dynamic CLOOMC LUMP backed by proof-bound Namespace custody. Lockbox k
 
 | Method | Signature | Perms | Description |
 |--------|-----------|-------|-------------|
-| Create | `Create(lump: CR1) → CR0: Enter variable or NULL; DR0: status/error` | E + M + Inform R | Validate the complete self-defining LUMP before issuing its typed BankVariable Enter capability in CR0. CR0 is NULL on failure; DR0 is 1 on success or a specific Bank error code. |
+| Create | `Create(lump: CR1 Inform R) → CR0: nullable BankVariable E; DR0: status/error` | E + M + Inform R | Validate the complete self-defining LUMP, atomically commit private custody or clean up, then issue the typed capability in CR0. CR0 is NULL on failure; DR0 is diagnostic only. |
 | Read | `Read(variable: CR0, offset: DR1, words: DR2) → readable: CR4; DR0: status/error` | BankVariable E | Copy a bounded slice of a live Bank-managed LUMP through the typed CR0 capability into a fresh readable Inform capability; failures return a specific DR0 error code. |
 | InspectVariable | `InspectVariable(variable: CR0) → DR0: status/error; words: DR1; capacity: DR2; issue: DR3; lifecycle: DR4` | BankVariable E | Inspect scalar size/capacity/lifecycle fields in distinct DRs using only the typed CR0 capability; DR0 identifies failure and never carries authority. |
 | Release | `Release(variable: CR0) → DR0: status/error` | BankVariable E | Zeroize and retire a Bank-managed LUMP through its CR0 capability; CR0 is cleared afterward and failures identify their error in DR0. |

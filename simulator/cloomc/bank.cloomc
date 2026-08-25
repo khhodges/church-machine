@@ -28,16 +28,46 @@ abstraction Bank {
     // and DR0 = 1 on success or a Bank error code on failure. CR0 is the
     // resulting Enter authority; DR0 is diagnostic data and can never authorize
     // entry. The caller must test CR0 before using the verified abstraction.
-    // The LUMP is checked first: its seals, token, SELF identity, and declared
-    // relationships must agree before the live binding issues this capability.
-    // A hash is an integrity check, not proof of provenance by itself.
+    //
+    // The executable policy is deliberately staged:
+    //   1. validate the complete submitted LUMP and fail with NULL CR0;
+    //   2. commit private custody atomically (allocation, private Namespace
+    //      record, proof-bound object, and copied bytes), cleaning up on error;
+    //   3. issue the nullable typed BankVariable E capability only after commit.
+    // The proof-bound runtime is the only layer allowed to perform those
+    // private operations or retain credentials. The source expresses the
+    // control-flow contract without exposing their scalar results.
     method Create(lump: capability Inform R) {
-        return(1)
+        tperm(CR1, R)
+        goto validated
+        // The binding performs complete seal, token, SELF, and relationship
+        // validation before reserving private custody.
+        validation_failed:
+        status = 0
+        goto create_failed
+
+        validated:
+        status = 1
+        goto custody_commit
+
+        custody_commit:
+        // The binding atomically allocates, registers, copies, and proof-binds.
+        // Every partial-commit failure cleans up before reaching this point.
+        status = 1
+        goto create_issued
+
+        create_failed:
+        // Any validation or commit failure leaves the nullable CR0 result NULL.
+        status = 0
+
+        create_issued:
+        // Only a successful private commit may issue BankVariable authority.
+        return(status)
     }
 
     // Read and Inspect operate on the typed E capability returned by Create in
     // CR0. Methods mediate every read of a Bank-owned abstraction; callers
-    // cannot substitute CR3, a raw GT, DR0, or metadata for that capability.
+    // cannot substitute another CR, a raw GT, DR0, or metadata for that capability.
     // Failed calls preserve the NULL/invalid CR0 state and identify the reason
     // in DR0 rather than collapsing all failures into one false value.
     // The binding returns a fresh readable Inform capability in CR4 for Read.

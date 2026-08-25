@@ -1,13 +1,13 @@
 {
-  "token": "234e0e62",
+  "token": "0e2eba74",
   "abstraction": "Bank",
   "dot_name": "Bank",
   "issue_n": 1,
   "ns_slot": null,
   "ns_slot_policy": "dynamic",
   "boot_resident": false,
-  "lump_size": 2048,
-  "cw": 23,
+  "lump_size": 4096,
+  "cw": 38,
   "cc": 1,
   "typ": 0,
   "status": "released",
@@ -49,7 +49,7 @@
     {
       "name": "Read",
       "index": 1,
-      "branchOffset": 9,
+      "branchOffset": 21,
       "inputs": [
         {
           "name": "variable",
@@ -88,7 +88,7 @@
     {
       "name": "InspectVariable",
       "index": 2,
-      "branchOffset": 6,
+      "branchOffset": 36,
       "inputs": [
         {
           "name": "variable",
@@ -141,7 +141,7 @@
     {
       "name": "Release",
       "index": 3,
-      "branchOffset": 6,
+      "branchOffset": 36,
       "inputs": [
         {
           "name": "variable",
@@ -166,7 +166,7 @@
     {
       "name": "RevokeVariable",
       "index": 4,
-      "branchOffset": 6,
+      "branchOffset": 36,
       "inputs": [
         {
           "name": "variable",
@@ -217,6 +217,14 @@
         "kind": "value"
       },
       "status_semantics": "1=success; nonzero Bank error code=failure",
+      "policy": {
+        "validation": "complete-self-defining-lump-before-private-custody",
+        "commit": "atomic-private-custody-or-cleanup",
+        "issuance": "nullable-typed-bankvariable-capability-after-commit",
+        "input_register": "CR1",
+        "result_register": "CR0",
+        "status_register": "DR0"
+      },
       "error_codes": {
         "NO_CAPABILITY": 257,
         "TYPE": 258,
@@ -405,15 +413,15 @@
     "credential_abi": "capability-register-v1",
     "fixed_hardware_boot_slot": false
   },
-  "filename": "Bank.1.234e0e62.lump",
-  "sidecar_file": "Bank.1.234e0e62.json",
-  "binary_hash": "a530bc1d92254c18079609a279bfacbab9cbe9b431c3ca0af3f1ce415ed533fb",
+  "filename": "Bank.1.0e2eba74.lump",
+  "sidecar_file": "Bank.1.0e2eba74.json",
+  "binary_hash": "a1c41a3b7e0199aedaa99c402a38f314205fe3c30a2d19bd99082861c49bae11",
   "identity_hash": "3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11",
   "identity_string": "Bank#1",
   "identity_seal_location": "c-list[0]",
   "sourceStorageTier": 2,
   "source_file": "simulator/cloomc/bank.cloomc",
-  "source": "// Bank \u2014 dynamic Namespace-backed lockbox custody service.\n//\n// Bank is a dynamic CLOOMC LUMP at catalog index 54, not a hardware boot\n// slot. The inner sanctum creates private Outform storage only when needed.\n//\n// Security ABI:\n//   * every public authority is a typed capability register;\n//   * offsets, word counts, kinds, capacities, and status values remain DR\n//     values; and\n//   * the live binding keeps the inner-sanctum passkey private and manages\n//     custody, zeroization, and recovery.\n//\n// The source models lifecycle state only. It cannot manufacture, inspect, or\n// reconstruct authority from integer fields: the CR ABI and proof-bound runtime\n// gate are the sole security boundary for those operations.\n//\n// MintKey is deliberately not a public method. The live Bank binding invokes\n// it only inside the inner sanctum, where it mints or rotates the private\n// passkey and retains its independent proof. No owner key, proof, scalar ID,\n// Namespace address, or reconstructed handle crosses the Bank boundary.\n// Callers use the higher-level methods below with typed Golden Tokens only.\n\nabstraction Bank {\n    capabilities {\n    }\n\n    // Create(lump: CR1 Inform R) -> CR0 = BankVariable Enter capability or NULL,\n    // and DR0 = 1 on success or a Bank error code on failure. CR0 is the\n    // resulting Enter authority; DR0 is diagnostic data and can never authorize\n    // entry. The caller must test CR0 before using the verified abstraction.\n    // The LUMP is checked first: its seals, token, SELF identity, and declared\n    // relationships must agree before the live binding issues this capability.\n    // A hash is an integrity check, not proof of provenance by itself.\n    method Create(lump: capability Inform R) {\n        return(1)\n    }\n\n    // Read and Inspect operate on the typed E capability returned by Create in\n    // CR0. Methods mediate every read of a Bank-owned abstraction; callers\n    // cannot substitute CR3, a raw GT, DR0, or metadata for that capability.\n    // Failed calls preserve the NULL/invalid CR0 state and identify the reason\n    // in DR0 rather than collapsing all failures into one false value.\n    // The binding returns a fresh readable Inform capability in CR4 for Read.\n    // Inspect writes status=DR0, words=DR1, capacity=DR2, issue=DR3, and\n    // lifecycle=DR4; private locations and tokens are never materialised.\n    method Read(variable: capability BankVariable E, offset, words) {\n        if (offset < 0) {\n            return(0)\n        }\n        if (words <= 0) {\n            return(0)\n        }\n        return(1)\n    }\n\n    method InspectVariable(variable: capability BankVariable E) {\n        return(1)\n    }\n\n    // Release and RevokeVariable retire the verified variable, zeroize its\n    // private storage, and clear CR0. A BankVariable capability (CR0) is the\n    // only public authority for the verified variable it names. The binding\n    // resolves that typed Golden Token to private custody state and retains\n    // the passkey/proof internally; callers never receive the private record.\n    // Nested variables are created by calling Create on a readable result from\n    // Read, never by exposing inner-sanctum state.\n    method Release(variable: capability BankVariable E) {\n        return(1)\n    }\n\n    method RevokeVariable(variable: capability BankVariable E) {\n        return(1)\n    }\n\n}",
+  "source": "// Bank \u2014 dynamic Namespace-backed lockbox custody service.\n//\n// Bank is a dynamic CLOOMC LUMP at catalog index 54, not a hardware boot\n// slot. The inner sanctum creates private Outform storage only when needed.\n//\n// Security ABI:\n//   * every public authority is a typed capability register;\n//   * offsets, word counts, kinds, capacities, and status values remain DR\n//     values; and\n//   * the live binding keeps the inner-sanctum passkey private and manages\n//     custody, zeroization, and recovery.\n//\n// The source models lifecycle state only. It cannot manufacture, inspect, or\n// reconstruct authority from integer fields: the CR ABI and proof-bound runtime\n// gate are the sole security boundary for those operations.\n//\n// MintKey is deliberately not a public method. The live Bank binding invokes\n// it only inside the inner sanctum, where it mints or rotates the private\n// passkey and retains its independent proof. No owner key, proof, scalar ID,\n// Namespace address, or reconstructed handle crosses the Bank boundary.\n// Callers use the higher-level methods below with typed Golden Tokens only.\n\nabstraction Bank {\n    capabilities {\n    }\n\n    // Create(lump: CR1 Inform R) -> CR0 = BankVariable Enter capability or NULL,\n    // and DR0 = 1 on success or a Bank error code on failure. CR0 is the\n    // resulting Enter authority; DR0 is diagnostic data and can never authorize\n    // entry. The caller must test CR0 before using the verified abstraction.\n    //\n    // The executable policy is deliberately staged:\n    //   1. validate the complete submitted LUMP and fail with NULL CR0;\n    //   2. commit private custody atomically (allocation, private Namespace\n    //      record, proof-bound object, and copied bytes), cleaning up on error;\n    //   3. issue the nullable typed BankVariable E capability only after commit.\n    // The proof-bound runtime is the only layer allowed to perform those\n    // private operations or retain credentials. The source expresses the\n    // control-flow contract without exposing their scalar results.\n    method Create(lump: capability Inform R) {\n        tperm(CR1, R)\n        goto validated\n        // The binding performs complete seal, token, SELF, and relationship\n        // validation before reserving private custody.\n        validation_failed:\n        status = 0\n        goto create_failed\n\n        validated:\n        status = 1\n        goto custody_commit\n\n        custody_commit:\n        // The binding atomically allocates, registers, copies, and proof-binds.\n        // Every partial-commit failure cleans up before reaching this point.\n        status = 1\n        goto create_issued\n\n        create_failed:\n        // Any validation or commit failure leaves the nullable CR0 result NULL.\n        status = 0\n\n        create_issued:\n        // Only a successful private commit may issue BankVariable authority.\n        return(status)\n    }\n\n    // Read and Inspect operate on the typed E capability returned by Create in\n    // CR0. Methods mediate every read of a Bank-owned abstraction; callers\n    // cannot substitute another CR, a raw GT, DR0, or metadata for that capability.\n    // Failed calls preserve the NULL/invalid CR0 state and identify the reason\n    // in DR0 rather than collapsing all failures into one false value.\n    // The binding returns a fresh readable Inform capability in CR4 for Read.\n    // Inspect writes status=DR0, words=DR1, capacity=DR2, issue=DR3, and\n    // lifecycle=DR4; private locations and tokens are never materialised.\n    method Read(variable: capability BankVariable E, offset, words) {\n        if (offset < 0) {\n            return(0)\n        }\n        if (words <= 0) {\n            return(0)\n        }\n        return(1)\n    }\n\n    method InspectVariable(variable: capability BankVariable E) {\n        return(1)\n    }\n\n    // Release and RevokeVariable retire the verified variable, zeroize its\n    // private storage, and clear CR0. A BankVariable capability (CR0) is the\n    // only public authority for the verified variable it names. The binding\n    // resolves that typed Golden Token to private custody state and retains\n    // the passkey/proof internally; callers never receive the private record.\n    // Nested variables are created by calling Create on a readable result from\n    // Read, never by exposing inner-sanctum state.\n    method Release(variable: capability BankVariable E) {\n        return(1)\n    }\n\n    method RevokeVariable(variable: capability BankVariable E) {\n        return(1)\n    }\n\n}",
   "compiler_language": "javascript",
   "capabilities": [
     {

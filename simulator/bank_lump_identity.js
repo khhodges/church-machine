@@ -4,8 +4,8 @@
     const identity = Object.freeze({
   "dot_name": "Bank",
   "issue_n": 1,
-  "token": "234e0e62",
-  "binary_hash": "a530bc1d92254c18079609a279bfacbab9cbe9b431c3ca0af3f1ce415ed533fb",
+  "token": "0e2eba74",
+  "binary_hash": "a1c41a3b7e0199aedaa99c402a38f314205fe3c30a2d19bd99082861c49bae11",
   "identity_hash": "3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11",
   "self_gt": 186216846,
   "ns_slot": null,
@@ -25,6 +25,14 @@
         "kind": "value"
       },
       "status_semantics": "1=success; nonzero Bank error code=failure",
+      "policy": {
+        "validation": "complete-self-defining-lump-before-private-custody",
+        "commit": "atomic-private-custody-or-cleanup",
+        "issuance": "nullable-typed-bankvariable-capability-after-commit",
+        "input_register": "CR1",
+        "result_register": "CR0",
+        "status_register": "DR0"
+      },
       "error_codes": {
         "NO_CAPABILITY": 257,
         "TYPE": 258,

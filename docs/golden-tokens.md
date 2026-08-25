@@ -273,17 +273,24 @@ DR values.
 `Create(lump)` is the abstraction-custody operation. It accepts either a
 complete LUMP value or a **typed Inform `R` capability in CR1** that resolves
 the complete LUMP bytes. On success it returns a separate proof-bound
-`BankVariable` Abstract `E` capability in **CR3**. That capability represents
+`BankVariable` Abstract `E` capability in **CR0**. That capability represents
 the created Bank-managed variable; it is not a raw GT integer, proof tuple,
 Namespace slot, or private address.
 
 | Method | Required typed authority | Result |
 |---|---|---|
-| `Create` | M elevation + CR1 Inform `R` LUMP capability (or verified LUMP value) | CR3 `BankVariable E`; DR0 status |
-| `InspectVariable` | CR3 `BankVariable E` | DR0 status; DR1 words; DR2 capacity; DR3 issue; DR4 lifecycle; safe identity/provenance metadata |
-| `Read` | CR3 `BankVariable E` + DR1/DR2 bounds | CR4 fresh bounded Inform `R` capability |
-| `Release` | CR3 `BankVariable E` | Wipe and retire the private variable allocation |
-| `RevokeVariable` | CR3 `BankVariable E` | Revoke authority, wipe and retire the private allocation |
+| `Create` | M elevation + CR1 Inform `R` LUMP capability (or verified LUMP value) | CR0 nullable `BankVariable E`; DR0 status |
+| `InspectVariable` | CR0 `BankVariable E` | DR0 status; DR1 words; DR2 capacity; DR3 issue; DR4 lifecycle; safe identity/provenance metadata |
+| `Read` | CR0 `BankVariable E` + DR1/DR2 bounds | CR4 fresh bounded Inform `R` capability |
+| `Release` | CR0 `BankVariable E` | Wipe and retire the private variable allocation |
+| `RevokeVariable` | CR0 `BankVariable E` | Revoke authority, wipe and retire the private allocation |
+
+Create is a three-stage policy: the submitted bytes are completely validated
+first; private custody is then committed atomically, with every allocation,
+Namespace, object, and copy failure cleaned up; only after that commit does the
+binding materialize the nullable typed capability in CR0. DR0 remains status
+data only. The CLOOMC source carries this control flow, while the proof-bound
+runtime alone performs validation, custody, and credential retention.
 
 Bank verifies the binary header and encoded size, the `0xAB` embedded API and
 declared name, full binary hash, canonical name-plus-binary token, identity

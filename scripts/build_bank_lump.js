@@ -60,6 +60,14 @@ const BANK_CAPABILITY_TYPES = [
         description: 'Typed E capability naming one validated Bank-managed LUMP variable.'
     },
 ];
+const BANK_CREATE_POLICY = Object.freeze({
+    validation: 'complete-self-defining-lump-before-private-custody',
+    commit: 'atomic-private-custody-or-cleanup',
+    issuance: 'nullable-typed-bankvariable-capability-after-commit',
+    input_register: 'CR1',
+    result_register: 'CR0',
+    status_register: 'DR0',
+});
 
 global.ChurchAssembler = require(path.join(ROOT, 'simulator', 'assembler.js'));
 const CLOOMCCompiler = require(path.join(ROOT, 'simulator', 'cloomc_compiler.js'));
@@ -108,6 +116,7 @@ function buildBankArtifact() {
         Create: {
             status: { register: 'DR0', kind: 'value' },
             status_semantics: '1=success; nonzero Bank error code=failure',
+            policy: { ...BANK_CREATE_POLICY },
             error_codes: { ...BANK_ERROR_CODES },
             returns_nullable: true,
             inputs: [{
@@ -330,5 +339,5 @@ if (require.main === module) {
 }
 
 module.exports = {
-    BANK_ERROR_CODES, buildBankArtifact, identityProjection, renderIdentityProjection, selfIdentityGT, writeBankArtifact,
+    BANK_ERROR_CODES, BANK_CREATE_POLICY, buildBankArtifact, identityProjection, renderIdentityProjection, selfIdentityGT, writeBankArtifact,
 };

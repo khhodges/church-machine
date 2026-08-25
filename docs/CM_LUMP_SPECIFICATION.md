@@ -1360,6 +1360,15 @@ sanctum. `CR0` is the only returned authority for the verified Bank variable;
 and must never be used as a capability. `CR0` is a capability-or-NULL result:
 callers must test it before entering the verified abstraction.
 
+The executable Create policy has three ordered stages: validate the complete
+submitted LUMP, atomically commit private custody (or clean up every partial
+allocation/Namespace/object state), and issue the nullable typed
+`BankVariable E` capability in CR0 only after that commit succeeds. The
+source-level flow records validation failure, custody commit, and post-commit
+issuance; only the proof-bound runtime may execute the private validation,
+credential, and custody operations. DR0 remains status data and never becomes
+authority.
+
 For `Create`, the canonical diagnostic codes are: `0x101` no typed capability,
 `0x102` wrong capability type, `0x103` identity/seal validation failed,
 `0x104` permission denied, `0x109` allocation failed, `0x10A` no private

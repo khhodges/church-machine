@@ -58,6 +58,28 @@ check('BANK-LUMP05: Bank carries the compiler-owned symbolic SELF identity in c-
 check('BANK-LUMP06: Bank is a self-defining tier-2 CLOOMC LUMP',
     ((binary.readUInt32BE((cw + 1) * 4) >>> 24) & 0xFF) === 0xAB &&
     sidecar.sourceStorageTier === 2 && sidecar.source === source);
+const createSource = source.slice(source.indexOf('method Create'), source.indexOf('// Read and Inspect'));
+check('BANK-LUMP06b: embedded Create source records validation, atomic commit, and post-commit issuance',
+    createSource.includes('validation_failed:') &&
+    createSource.includes('custody_commit:') &&
+    createSource.includes('create_issued:') &&
+    createSource.includes('complete seal, token, SELF') &&
+    createSource.includes('atomically allocates, registers, copies, and proof-binds') &&
+    createSource.includes('Only a successful private commit may issue BankVariable authority') &&
+    !/method Create[\s\S]*?\{\s*return\(1\)/.test(createSource));
+const embeddedContentHeader = binary.readUInt32BE((cw + 1) * 4);
+const embeddedApiLength = embeddedContentHeader & 0xFFFF;
+const embeddedApi = JSON.parse(binary.subarray((cw + 1) * 4 + 4,
+    (cw + 1) * 4 + 4 + embeddedApiLength).toString('utf8'));
+const embeddedSourceHeaderOffset = (cw + 1) * 4 + 4 + Math.ceil(embeddedApiLength / 4) * 4;
+const embeddedSourceLength = binary.readUInt32BE(embeddedSourceHeaderOffset);
+const embeddedSource = binary.subarray(embeddedSourceHeaderOffset + 4,
+    embeddedSourceHeaderOffset + 4 + embeddedSourceLength).toString('utf8');
+check('BANK-LUMP06c: binary self-definition embeds the canonical Bank source and Create policy',
+    embeddedSource === source &&
+    embeddedApi.capability_abi.Create.policy.input_register === 'CR1' &&
+    embeddedApi.capability_abi.Create.policy.result_register === 'CR0' &&
+    embeddedApi.capability_abi.Create.policy.status_register === 'DR0');
 check('BANK-LUMP07: manifest and sidecar bind the canonical identity and binary',
     entry.token === sidecar.token &&
     entry.token === sha256(Buffer.concat([Buffer.from('Bank', 'utf8'), binary])).slice(0, 8) &&
@@ -93,6 +115,12 @@ check('BANK-LUMP09b: Bank records typed CR inputs while scalar values remain DR 
     ]) &&
     create.returns.register === 'CR0' && create.returns.secure_type === 'BankVariable' &&
     entry.capability_abi.Create.returns_nullable === true &&
+    entry.capability_abi.Create.policy.validation === 'complete-self-defining-lump-before-private-custody' &&
+    entry.capability_abi.Create.policy.commit === 'atomic-private-custody-or-cleanup' &&
+    entry.capability_abi.Create.policy.issuance === 'nullable-typed-bankvariable-capability-after-commit' &&
+    entry.capability_abi.Create.policy.input_register === 'CR1' &&
+    entry.capability_abi.Create.policy.result_register === 'CR0' &&
+    entry.capability_abi.Create.policy.status_register === 'DR0' &&
     entry.capability_abi.Create.error_codes.IDENTITY === 0x103 &&
     entry.capability_abi.Create.error_codes.NO_CAPABILITY === 0x101 &&
      !Object.keys(entry.capability_abi).some(name =>
