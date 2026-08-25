@@ -2344,5 +2344,74 @@
     "sidecar_file": "Bank.1.5382e0e2.json",
     "binary_hash": "6985e92299b1c9828a7f0633fd4ddab74b9d356be0568ae4bc36aba0d5594982",
     "identity_hash": "3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11"
+  },
+  {
+    "token": "00003600",
+    "abstraction": "Bank",
+    "filename": "Bank.1.dad46c69.lump",
+    "sidecar_file": "Bank.1.dad46c69.json",
+    "lump_size": 512,
+    "cw": 417,
+    "cc": 1,
+    "author": "",
+    "version": "2026.08.24",
+    "lump_version": 1,
+    "compiled_at": 1787612211.6267831,
+    "methods": [
+      {
+        "name": "MintKey",
+        "offset": 0,
+        "length": 47
+      },
+      {
+        "name": "Deposit",
+        "offset": 47,
+        "length": 87
+      },
+      {
+        "name": "Withdraw",
+        "offset": 134,
+        "length": 50
+      },
+      {
+        "name": "Inspect",
+        "offset": 184,
+        "length": 30
+      },
+      {
+        "name": "Revoke",
+        "offset": 214,
+        "length": 42
+      },
+      {
+        "name": "ObtainPassKey",
+        "offset": 256,
+        "length": 48
+      },
+      {
+        "name": "ExportRecovery",
+        "offset": 304,
+        "length": 31
+      },
+      {
+        "name": "Recover",
+        "offset": 335,
+        "length": 63
+      },
+      {
+        "name": "List",
+        "offset": 398,
+        "length": 19
+      }
+    ],
+    "grants": [
+      "E"
+    ],
+    "binary_hash": "d0f1be3d7d7be7f8ca70356e8cf53b46f1595f4f84900c45b6cb86900d9236c6",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11",
+    "dot_name": "Bank",
+    "issue_n": 1
   }
 ]

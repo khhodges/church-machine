@@ -1,0 +1,107 @@
+{
+  "token": "00003600",
+  "abstraction": "Bank",
+  "filename": "Bank.1.dad46c69.lump",
+  "sidecar_file": "Bank.1.dad46c69.json",
+  "ns_slot": 54,
+  "lump_size": 512,
+  "typ": 0,
+  "content_type": "code",
+  "cw": 417,
+  "cc": 1,
+  "profile": "IoT",
+  "language": "javascript",
+  "author": "",
+  "version": "2026.08.24",
+  "release_notes": "",
+  "methods": [
+    {
+      "name": "MintKey",
+      "offset": 0,
+      "length": 47
+    },
+    {
+      "name": "Deposit",
+      "offset": 47,
+      "length": 87
+    },
+    {
+      "name": "Withdraw",
+      "offset": 134,
+      "length": 50
+    },
+    {
+      "name": "Inspect",
+      "offset": 184,
+      "length": 30
+    },
+    {
+      "name": "Revoke",
+      "offset": 214,
+      "length": 42
+    },
+    {
+      "name": "ObtainPassKey",
+      "offset": 256,
+      "length": 48
+    },
+    {
+      "name": "ExportRecovery",
+      "offset": 304,
+      "length": 31
+    },
+    {
+      "name": "Recover",
+      "offset": 335,
+      "length": 63
+    },
+    {
+      "name": "List",
+      "offset": 398,
+      "length": 19
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "__SELF__",
+      "rights": [
+        "E"
+      ],
+      "grants": [
+        "E"
+      ],
+      "compiler_owned_self": true
+    }
+  ],
+  "compiler_owned_self": true,
+  "pet_names": {
+    "DR": {},
+    "CR": {}
+  },
+  "mtbf": {
+    "consecutive_clean": 0,
+    "total_runs": 0,
+    "status": "unknown",
+    "source_hash": "60ccd280"
+  },
+  "deployment": {
+    "target_board": "wukong-xc7a100t",
+    "profile": "IoT",
+    "built_at": "2026-08-24T22:56:51.626757Z",
+    "builder": "CLOOMC++ IDE v1.0"
+  },
+  "grants": [
+    "E"
+  ],
+  "source": "// Bank \u2014 dynamic Namespace-backed lockbox custody service.\n//\n// Bank is a system abstraction at catalog index 54. It is not a hardware boot\n// slot: the live binding creates a private Outform Namespace entry only when\n// MintKey() is called.\n//\n// This CLOOMC source is the executable access-control reference model. It\n// models the lifecycle and freshness rules that fit in a LUMP:\n//   * one opaque, sequence-bearing owner handle;\n//   * empty -> deposited -> revoked lifecycle;\n//   * Inform + R source-capability admission checks; and\n//   * sequence rotation on reissue, withdrawal, and revocation.\n//\n// The system binding supplies the operations that cannot safely be implemented\n// by a static LUMP: CSPRNG proof generation, 128-bit proof verification,\n// physical-range isolation, memory copying and zeroization, dynamic Namespace\n// registration, and server-authorized recovery grants. A source LUMP never\n// manufactures a usable protected-memory GT by itself.\n//\n// Reference-model CR7 state:\n//   [0] next_lockbox_id\n//   [1] next_sequence\n//   [2] active_lockbox_id\n//   [3] active_sequence\n//   [4] capacity_words\n//   [5] deposited_words\n//   [6] state: 0 empty, 1 deposited, 2 revoked\n//   [7] deposited_kind: 1 LUMP, 2 region\n//   [8] recovery_state_present\n//\n// An owner handle is a 32-bit Abstract E-only model token:\n//   bits [15:0]  lockbox id\n//   bits [22:16] current sequence\n//   bits [24:23] Abstract type (2)\n//   bits [30:25] E permission (0x20)\n//\n// In the live binding the corresponding authority is a PassKey containing an\n// object-scoped Abstract GT plus an independent 128-bit proof. The proof is\n// request-only and must never be stored in this source model.\n\nabstraction Bank {\n    capabilities {\n    }\n\n    // MintKey(capacity) -> owner handle.\n    //\n    // The binding requires M-elevation and returns a full PassKey. The source\n    // model allocates a non-zero id and rotates a 7-bit sequence.\n    method MintKey(capacity) {\n        if (capacity <= 0) {\n            return(0)\n        }\n\n        var lockbox_id = read(CR7, 0)\n        if (lockbox_id == 0) {\n            lockbox_id = 1\n        }\n        write(CR7, 0, lockbox_id + 1)\n\n        var sequence_base = read(CR7, 1)\n        var sequence_incremented = sequence_base + 1\n        var sequence = bfext(sequence_incremented, 0, 7)\n        if (sequence == 0) {\n            sequence = 1\n        }\n        write(CR7, 1, sequence)\n        write(CR7, 2, lockbox_id)\n        write(CR7, 3, sequence)\n        write(CR7, 4, capacity)\n        write(CR7, 5, 0)\n        write(CR7, 6, 0)\n        write(CR7, 7, 0)\n        write(CR7, 8, 0)\n\n        var owner_handle = bfext(lockbox_id, 0, 16)\n        bfins(owner_handle, sequence, 16, 7)\n        bfins(owner_handle, 2, 23, 2)\n        bfins(owner_handle, 0x20, 25, 6)\n        return(owner_handle)\n    }\n\n    // Deposit(owner_handle, source_gt, offset, words, kind) -> 1 | 0.\n    //\n    // kind is 1 for a LUMP and 2 for a memory region. The source checks the\n    // parts of the source GT available in one word; the binding additionally\n    // verifies Namespace freshness, bounds, non-aliasing, and copies the data.\n    method Deposit(owner_handle, source_gt, offset, words, kind) {\n        var handle_id = bfext(owner_handle, 0, 16)\n        var handle_sequence = bfext(owner_handle, 16, 7)\n        var handle_type = bfext(owner_handle, 23, 2)\n        var active_id = read(CR7, 2)\n        var active_sequence = read(CR7, 3)\n        var state = read(CR7, 6)\n        if (handle_id != active_id) {\n            return(0)\n        }\n        if (handle_sequence != active_sequence) {\n            return(0)\n        }\n        if (handle_type != 2) {\n            return(0)\n        }\n        if (state != 0) {\n            return(0)\n        }\n\n        var source_type = bfext(source_gt, 23, 2)\n        var source_read = bfext(source_gt, 25, 1)\n        if (source_type != 1) {\n            return(0)\n        }\n        if (source_read == 0) {\n            return(0)\n        }\n        var capacity = read(CR7, 4)\n        if (offset < 0) {\n            return(0)\n        }\n        if (words <= 0) {\n            return(0)\n        }\n        if (words > capacity) {\n            return(0)\n        }\n        if (kind != 1) {\n            if (kind != 2) {\n                return(0)\n            }\n        }\n\n        write(CR7, 5, words)\n        write(CR7, 6, 1)\n        write(CR7, 7, kind)\n        write(CR7, 8, 1)\n        return(1)\n    }\n\n    // Withdraw(owner_handle) -> 1 | 0.\n    //\n    // The successful binding result is a fresh Inform GT for a new registered\n    // region. The reference model returns success only: emitting a standalone\n    // GT here would create authority without the mandatory data copy,\n    // Namespace registration, and zeroization transaction.\n    method Withdraw(owner_handle) {\n        var handle_id = bfext(owner_handle, 0, 16)\n        var handle_sequence = bfext(owner_handle, 16, 7)\n        var active_id = read(CR7, 2)\n        if (handle_id != active_id) {\n            return(0)\n        }\n        var active_sequence = read(CR7, 3)\n        if (handle_sequence != active_sequence) {\n            return(0)\n        }\n        var state = read(CR7, 6)\n        if (state != 1) {\n            return(0)\n        }\n\n        var sequence_base = read(CR7, 1)\n        var sequence_incremented = sequence_base + 1\n        var next_sequence = bfext(sequence_incremented, 0, 7)\n        if (next_sequence == 0) {\n            next_sequence = 1\n        }\n        write(CR7, 1, next_sequence)\n        write(CR7, 3, next_sequence)\n        write(CR7, 5, 0)\n        write(CR7, 6, 2)\n        write(CR7, 7, 0)\n        write(CR7, 8, 0)\n        return(1)\n    }\n\n    // Inspect(owner_handle) -> packed non-sensitive metadata | 0.\n    //\n    // Packed layout: state[31:30], kind[29:24], deposited words[15:0].\n    // No physical location, Namespace index, contents, or proof is exposed.\n    method Inspect(owner_handle) {\n        var handle_id = bfext(owner_handle, 0, 16)\n        var handle_sequence = bfext(owner_handle, 16, 7)\n        var active_id = read(CR7, 2)\n        if (handle_id != active_id) {\n            return(0)\n        }\n        var active_sequence = read(CR7, 3)\n        if (handle_sequence != active_sequence) {\n            return(0)\n        }\n        var state = read(CR7, 6)\n        var kind = read(CR7, 7)\n        var words = read(CR7, 5)\n        var metadata = bfext(words, 0, 16)\n        bfins(metadata, kind, 24, 6)\n        bfins(metadata, state, 30, 2)\n        return(metadata)\n    }\n\n    // Revoke(owner_handle) -> 1 | 0.\n    //\n    // The live binding zeroizes the complete allocation and quarantines the\n    // private Namespace record before allocator reuse.\n    method Revoke(owner_handle) {\n        var handle_id = bfext(owner_handle, 0, 16)\n        var handle_sequence = bfext(owner_handle, 16, 7)\n        var active_id = read(CR7, 2)\n        if (handle_id != active_id) {\n            return(0)\n        }\n        var active_sequence = read(CR7, 3)\n        if (handle_sequence != active_sequence) {\n            return(0)\n        }\n\n        var sequence_base = read(CR7, 1)\n        var sequence_incremented = sequence_base + 1\n        var next_sequence = bfext(sequence_incremented, 0, 7)\n        if (next_sequence == 0) {\n            next_sequence = 1\n        }\n        write(CR7, 1, next_sequence)\n        write(CR7, 3, next_sequence)\n        write(CR7, 5, 0)\n        write(CR7, 6, 2)\n        write(CR7, 7, 0)\n        write(CR7, 8, 0)\n        return(1)\n    }\n\n    // ObtainPassKey(owner_handle) -> fresh owner handle | 0.\n    //\n    // This models sequence rotation. The binding also validates the independent\n    // 128-bit proof and returns an opaque replacement PassKey.\n    method ObtainPassKey(owner_handle) {\n        var handle_id = bfext(owner_handle, 0, 16)\n        var handle_sequence = bfext(owner_handle, 16, 7)\n        var active_id = read(CR7, 2)\n        if (handle_id != active_id) {\n            return(0)\n        }\n        var active_sequence = read(CR7, 3)\n        if (handle_sequence != active_sequence) {\n            return(0)\n        }\n        var state = read(CR7, 6)\n        if (state == 2) {\n            return(0)\n        }\n\n        var sequence_base = read(CR7, 1)\n        var sequence_incremented = sequence_base + 1\n        var next_sequence = bfext(sequence_incremented, 0, 7)\n        if (next_sequence == 0) {\n            next_sequence = 1\n        }\n        write(CR7, 1, next_sequence)\n        write(CR7, 3, next_sequence)\n        var replacement = bfext(handle_id, 0, 16)\n        bfins(replacement, next_sequence, 16, 7)\n        bfins(replacement, 2, 23, 2)\n        bfins(replacement, 0x20, 25, 6)\n        return(replacement)\n    }\n\n    // ExportRecovery(owner_handle) -> 1 | 0.\n    //\n    // The binding returns authenticated ciphertext containing no raw proof.\n    // The source marks that recoverable state exists without exposing it.\n    method ExportRecovery(owner_handle) {\n        var handle_id = bfext(owner_handle, 0, 16)\n        var handle_sequence = bfext(owner_handle, 16, 7)\n        var active_id = read(CR7, 2)\n        if (handle_id != active_id) {\n            return(0)\n        }\n        var active_sequence = read(CR7, 3)\n        if (handle_sequence != active_sequence) {\n            return(0)\n        }\n        var state = read(CR7, 6)\n        if (state != 1) {\n            return(0)\n        }\n        write(CR7, 8, 1)\n        return(1)\n    }\n\n    // Recover(protected_state, original_handle) -> replacement handle | 0.\n    //\n    // protected_state represents a consumed server recovery grant. The source\n    // permits recovery only from a marked envelope; the binding verifies the\n    // authenticated ciphertext, consumes the grant, and allocates a fresh\n    // Namespace generation before returning its full replacement PassKey.\n    method Recover(protected_state, original_handle) {\n        if (protected_state == 0) {\n            return(0)\n        }\n        var recovery_present = read(CR7, 8)\n        if (recovery_present == 0) {\n            return(0)\n        }\n        var original_id = bfext(original_handle, 0, 16)\n        var active_id = read(CR7, 2)\n        if (original_id != active_id) {\n            return(0)\n        }\n\n        var replacement_id = read(CR7, 0)\n        if (replacement_id == 0) {\n            replacement_id = 1\n        }\n        write(CR7, 0, replacement_id + 1)\n        var sequence_base = read(CR7, 1)\n        var sequence_incremented = sequence_base + 1\n        var next_sequence = bfext(sequence_incremented, 0, 7)\n        if (next_sequence == 0) {\n            next_sequence = 1\n        }\n        write(CR7, 1, next_sequence)\n        write(CR7, 2, replacement_id)\n        write(CR7, 3, next_sequence)\n        write(CR7, 5, 0)\n        write(CR7, 6, 0)\n        write(CR7, 7, 0)\n        write(CR7, 8, 0)\n\n        var replacement = bfext(replacement_id, 0, 16)\n        bfins(replacement, next_sequence, 16, 7)\n        bfins(replacement, 2, 23, 2)\n        bfins(replacement, 0x20, 25, 6)\n        return(replacement)\n    }\n\n    // List() -> active lockbox count.\n    //\n    // The binding returns safe metadata for all lockboxes. The single-lockbox\n    // source model therefore returns 1 when its current lockbox is active.\n    method List() {\n        var active_id = read(CR7, 2)\n        if (active_id == 0) {\n            return(0)\n        }\n        var state = read(CR7, 6)\n        if (state == 2) {\n            return(0)\n        }\n        return(1)\n    }\n}",
+  "binary_hash": "d0f1be3d7d7be7f8ca70356e8cf53b46f1595f4f84900c45b6cb86900d9236c6",
+  "petname": "",
+  "issue_number": 1,
+  "identity_string": "Bank#1",
+  "identity_hash": "3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11",
+  "identity_seal_location": "sidecar",
+  "dot_name": "Bank",
+  "issue_n": 1,
+  "lump_version": 1,
+  "compiled_at": 1787612211.6267831
+}
