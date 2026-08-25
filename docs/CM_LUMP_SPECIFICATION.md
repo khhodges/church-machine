@@ -1360,9 +1360,11 @@ sanctum. `CR0` is the only returned authority for the verified Bank variable;
 and must never be used as a capability. `CR0` is a capability-or-NULL result:
 callers must test it before entering the verified abstraction.
 
-The executable Create policy has four approval gates followed by two commit
-stages: T3.1–T3.4 validate the complete submitted LUMP and its requested
-identity, then atomically commit private custody (or clean up every partial
+The executable Create policy first applies structural and type gates, followed
+by four T3 stages and two commit stages: Gate 1 validates the complete submitted
+LUMP's structural framing; Gate 2 validates its type, dispatch, and capability
+safety; then T3.1–T3.4 apply the requested identity contract. Only after that
+does it atomically commit private custody (or clean up every partial
 allocation/Namespace/object state), and issue the nullable typed
 `BankVariable E` capability in CR0 only after that commit succeeds. The
 source-level flow records validation failure, custody commit, and post-commit
@@ -1389,29 +1391,37 @@ these ordered gates:
    allocation, `typ=lump`, `cw`/`cc` bounds, a complete `0xAB`
    API-and-source frame, and zero padding through the c-list boundary.
    Public API methods must resolve to executable dispatch entries.
-2. **E-abstraction/type validity.** The SELF c-list row must be the exact
-   Church-domain Inform E capability derived for the declared identity.
-   Method capabilities must never combine Turing execute (`X`) and Church
-   enter (`E`) rights.
-3. **Requested identity validity.** Recompute the binary hash, canonical
-   `SHA-256(name || complete_big_endian_binary)[:8]` token, and
-   `SHA-256(name#issue)` identity seal; compare each supplied metadata
-   assertion (`dot_name`, issue, token, binary hash, identity hash, SELF GT,
-   and optional identity string) with those independently derived values.
+2. **Type and safety validity.** Verify API dispatch entries and capability
+   safety. The SELF c-list row must be a Church-domain Inform capability with
+   exact `E` permission; method capabilities must never combine Turing execute
+   (`X`) and Church enter (`E`) rights.
+3. **T3.1 pure content address.** Recompute the binary hash and canonical
+   `SHA-256(name || complete_big_endian_binary)[:8]` token from the embedded
+   dot name and complete bytes. The issue is deliberately excluded from token
+   input.
+4. **T3.2 requested identity.** Compare supplied dot name, issue, token,
+   binary hash, identity hash, optional identity string, and later the SELF
+   assertion with independently derived values.
+5. **T3.3 deferred provenance.** Require an explicit declaration that genesis
+   certificate verification is deferred and provenance is human-IDE-vouched,
+   not verified. This is disclosure, not a signature, certificate, publisher,
+   or genesis-chain verification.
+6. **T3.4 SELF identity.** Compare c-list SELF with the exact E-identity
+   derived from the embedded dot name and requested issue.
 
 Thus metadata tells Bank what relationship the caller is asserting, but cannot
 make forged bytes acceptable. A malformed header, a stale/copy-pasted token,
 an altered code word, a forged API name, a mismatched identity hash, or a
 different c-list SELF fails before any private custody state is published.
 
-These checks are the explicit T3 sequence: **T3.1** recomputes the canonical
-content address and dependent identities from bytes; **T3.2** compares the
-requested token, binary hash, identity hash, issue, and dot name; **T3.3** is
-currently a deferred certificate-versus-genesis decision recorded as
-`human-IDE` authority; and **T3.4** compares c-list SELF with the exact
-E-identity derived from embedded dot name and issue. T3.3 is not signature
-verification and does not claim a genesis certificate exists. Missing or
-contradictory T3.3 authority fails closed. All four gates run before custody.
+The T3 ordering is explicit: **T3.1** recomputes the pure content address from
+bytes and embedded dot name; **T3.2** compares requested identity assertions;
+**T3.3** is explicitly *deferred*, not passed—no genesis certificate,
+signature, publisher, or chain has been verified, and provenance is only
+human-IDE-vouched; then **T3.4** compares c-list SELF with the exact
+E-identity derived from dot name and issue. SELF may include the issue, but the
+token never does. Missing or contradictory deferred/unverified provenance
+fails closed. Gates 1/2 and T3.1, T3.2, and T3.4 run before custody.
 
 The owner capability and verified variable capability are intentionally
 different authorities. Owner methods manage a Bank lockbox; variable methods

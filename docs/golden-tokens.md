@@ -285,16 +285,21 @@ Namespace slot, or private address.
 | `Release` | CR0 `BankVariable E` | Wipe and retire the private variable allocation |
 | `RevokeVariable` | CR0 `BankVariable E` | Revoke authority, wipe and retire the private allocation |
 
-Create is a staged T3 policy: T3.1 recomputes content identity from submitted
-bytes, T3.2 compares every requested identity field, T3.3 records the deferred
-human-IDE authority decision (not certificate verification), and T3.4 requires
-SELF to equal the derived E identity. Only after these gates pass is private
-custody committed atomically, with every allocation,
+Create first applies Gate 1 (complete LUMP structural framing) and Gate 2
+(complete LUMP type, dispatch, and capability safety) before doing cryptographic
+work. T3.1 then recomputes a pure content token from the embedded dot name plus
+submitted bytes—**not** the issue number. T3.2 compares every requested identity
+field mechanically. T3.3 is explicitly deferred: no genesis certificate,
+signature, publisher, or chain is verified; provenance is only human-IDE-vouched
+and must be labelled as unverified. T3.4 requires SELF to equal the derived E
+identity, where SELF may include the requested issue but the token does not.
+Only after Gates 1/2 and T3.1, T3.2, and T3.4 succeed is private custody
+committed atomically, with every allocation,
 Namespace, object, and copy failure cleaned up; only after that commit does the
 binding materialize the nullable typed capability in CR0. DR0 remains status
 data only. The CLOOMC source carries this control flow, while the proof-bound
 runtime alone performs validation, custody, and credential retention. An absent
-or contradictory deferred-authority decision fails closed.
+or contradictory deferred/unverified-provenance declaration fails closed.
 
 Bank verifies the binary header and encoded size, the `0xAB` embedded API and
 declared name, full binary hash, canonical name-plus-binary token, identity

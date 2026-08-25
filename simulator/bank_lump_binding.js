@@ -17,7 +17,8 @@
     const REGISTRY_INDEX = 54;
     const DISPATCH = 'SystemAbstractions';
     const AUTHORITY = 'proof-bound dynamic custody';
-    const GENESIS_AUTHORITY = 'human-IDE';
+    const GENESIS_AUTHORITY = 'human-IDE-vouched-not-verified';
+    const GENESIS_CERTIFICATE_VERIFICATION = 'deferred-not-verified';
 
     function sha256(value) {
         if (typeof require !== 'function') {
@@ -52,8 +53,8 @@
             return fail('projection does not match the canonical Bank runtime binding');
         }
         if (identity.genesis_authority !== GENESIS_AUTHORITY ||
-            identity.genesis_certificate_verification !== 'deferred') {
-            return fail('Bank T3.3 must remain an explicit deferred human-IDE authority decision');
+            identity.genesis_certificate_verification !== GENESIS_CERTIFICATE_VERIFICATION) {
+            return fail('Bank T3.3 must remain explicitly deferred and human-vouched, not verified');
         }
         const capabilityABI = identity.capability_abi || {};
         const createdVariable = capabilityABI.Create && capabilityABI.Create.returns;
@@ -82,14 +83,14 @@
     }
 
     function createdPolicyMatches(policy) {
-        return policy && policy.validation === 'T3.1-T3.4-approval-before-private-custody' &&
+        return policy && policy.validation === 'structural-and-type-gates-then-T3.1-T3.4-before-private-custody' &&
             policy.commit === 'atomic-private-custody-or-cleanup' &&
             policy.issuance === 'nullable-typed-bankvariable-capability-after-commit' &&
             policy.input_register === 'CR1' &&
             policy.result_register === 'CR0' &&
             policy.status_register === 'DR0' &&
-            JSON.stringify(policy.approval_gates) === JSON.stringify(['T3.1', 'T3.2', 'T3.3', 'T3.4']) &&
-            policy.T3_3 === 'deferred-genesis-certificate; human-IDE-authority';
+            JSON.stringify(policy.approval_gates) === JSON.stringify(['Gate 1 structural', 'Gate 2 type', 'T3.1', 'T3.2', 'T3.3 deferred', 'T3.4']) &&
+            policy.T3_3 === 'deferred-not-verified; human-IDE-vouched provenance only';
     }
 
     function validateArtifact({ manifestEntry, sidecar, binary }) {
@@ -128,6 +129,8 @@
     // `metadata` is an assertion, not an authority: every asserted identity
     // field is recomputed from the bytes and the embedded API name.
     function validateLump({ binary, metadata }, hashFn) {
+        // Gate 1: validate the complete LUMP's inexpensive structural framing
+        // before parsing metadata or hashing its contents.
         if (!binary || typeof binary.length !== 'number' || binary.length % 4 !== 0) {
             return fail('LUMP binary must be a non-empty whole-word byte sequence');
         }
@@ -215,6 +218,8 @@
         for (let offset = payloadEnd; offset < clistOffset; offset += 4) {
             if (readWord(offset) !== 0) return fail('LUMP freespace has non-zero trailing data');
         }
+        // Gate 2: validate the complete LUMP's type, dispatch, and capability
+        // safety rules before any cryptographic identity recomputation.
         // A public method must point at executable code, while private
         // methods may deliberately retain the builder's zero entry.
         const rejectsMixedDomainRights = capability => {
@@ -243,54 +248,56 @@
         }
         const asserted = metadata && typeof metadata === 'object' ? metadata : {};
         const dotName = api.name;
-        const issue = asserted.issue_n;
-        if (!Number.isInteger(issue) || issue <= 0 || issue > 0xFFFFFFFF) {
-            return fail('LUMP issue_n metadata is required for identity verification');
-        }
-        const identityString = `${dotName}#${issue}`;
-        // T3.1: derive every content-dependent identity value from the
-        // submitted bytes and embedded name. Caller metadata is never input.
+        // T3.1 (Gate 3): derive the pure content address from submitted bytes
+        // and their embedded dot name. The issue is deliberately excluded from
+        // this token: issue belongs to SELF identity, not content addressing.
         const binaryHash = hex(hash(bytes));
         const token = hex(hash(concat(utf8(dotName), bytes))).slice(0, 8);
+        // T3.2 (Gate 4): only after the pure content address is well-formed do
+        // we accept an issue assertion and compare every requested identity.
+        const issue = asserted.issue_n;
+        if (!Number.isInteger(issue) || issue <= 0 || issue > 0xFFFFFFFF) {
+            return fail('Bank T3.2 requested identity requires a valid issue_n');
+        }
+        const identityString = `${dotName}#${issue}`;
         const identityHash = hex(hash(identityString));
-        const expectedSelf = (0x4A000000 |
-            (Number.parseInt(identityHash.slice(0, 8), 16) & 0x01FFFFFF)) >>> 0;
-        const selfOffset = (size - cc) * 4;
-        const selfGT = readWord(selfOffset);
         const checks = [
             ['dot_name', asserted.dot_name, dotName],
             ['token', asserted.token, token],
             ['binary_hash', asserted.binary_hash, binaryHash],
             ['identity_hash', asserted.identity_hash, identityHash],
-            ['self_gt', asserted.self_gt, expectedSelf],
         ];
-        // T3.2: compare the caller's requested identity against the pure
-        // recomputation. This catches substitution, stale metadata, and
-        // tampering even when the caller recomputes only some fields.
         for (const [field, actual, expected] of checks) {
             if (actual !== expected) {
                 return fail(`Bank T3.2 requested identity mismatch: ${field}`);
             }
         }
-        const selfType = (selfGT >>> 25) & 0x03;
-        const selfDomain = (selfGT >>> 27) & 0x01;
-        const selfRights = (selfGT >>> 28) & 0x07;
-        // T3.4: the compiler-owned SELF must be the exact E identity derived
-        // from the embedded dot name and requested issue.
-        if (selfGT !== expectedSelf) return fail('Bank T3.4 SELF does not equal the embedded dot-name identity');
-        if (selfType !== 1 || selfDomain !== 1 || selfRights !== 4) {
-            return fail('LUMP c-list row zero must be an exact E-permission SELF GT');
-        }
         if (asserted.identity_string !== undefined && asserted.identity_string !== identityString) {
             return fail('Bank T3.2 requested identity mismatch: identity_string');
         }
-        // T3.3 is intentionally not a cryptographic verifier. It records the
-        // current provenance boundary explicitly and rejects an absent or
-        // contradictory decision rather than silently treating integrity as
-        // genesis authority.
+        // T3.3 (Gate 5) is intentionally NOT a cryptographic verification.
+        // It requires metadata to disclose that genesis verification is
+        // deferred and provenance is merely human-vouched. It does not verify a
+        // certificate, signature, publisher, or genesis chain.
         if (asserted.genesis_authority !== GENESIS_AUTHORITY ||
-            asserted.genesis_certificate_verification !== 'deferred') {
-            return fail('Bank T3.3 deferred genesis authority requires human-IDE approval');
+            asserted.genesis_certificate_verification !== GENESIS_CERTIFICATE_VERIFICATION) {
+            return fail('Bank T3.3 requires explicit deferred, human-vouched—not verified—genesis provenance');
+        }
+        // T3.4 (Gate 6): SELF may encode the requested issue, but must be the
+        // exact E identity derived from the embedded dot name and that issue.
+        const expectedSelf = (0x4A000000 |
+            (Number.parseInt(identityHash.slice(0, 8), 16) & 0x01FFFFFF)) >>> 0;
+        const selfOffset = (size - cc) * 4;
+        const selfGT = readWord(selfOffset);
+        if (asserted.self_gt !== expectedSelf) {
+            return fail('Bank T3.4 requested SELF does not equal the derived E identity');
+        }
+        const selfType = (selfGT >>> 25) & 0x03;
+        const selfDomain = (selfGT >>> 27) & 0x01;
+        const selfRights = (selfGT >>> 28) & 0x07;
+        if (selfGT !== expectedSelf) return fail('Bank T3.4 SELF does not equal the embedded dot-name identity');
+        if (selfType !== 1 || selfDomain !== 1 || selfRights !== 4) {
+            return fail('LUMP c-list row zero must be an exact E-permission SELF GT');
         }
         return {
             ok: true,
@@ -299,15 +306,15 @@
                 identity_hash: identityHash, identity_string: identityString,
                 self_gt: expectedSelf, lump_size: size, cw, cc, api,
                 approval: {
-                    T3_1: 'passed: canonical content address recomputed from bytes',
+                    T3_1: 'passed: pure content address recomputed from dot name and bytes',
                     T3_2: 'passed: requested identity matches recomputation',
-                    T3_3: 'deferred: human-IDE authority',
-                    T3_4: 'passed: compiler-owned SELF matches dot-name identity'
+                    T3_3: 'deferred: no genesis certificate or signature was verified; provenance is human-vouched',
+                    T3_4: 'passed: compiler-owned SELF matches dot-name and issue identity'
                 },
                 t3: {
                     T3_1: { ok: true, decision: 'recomputed-from-submitted-bytes' },
                     T3_2: { ok: true, decision: 'requested-identity-compared' },
-                    T3_3: { ok: true, decision: 'deferred-human-IDE-authority' },
+                    T3_3: { ok: null, decision: 'deferred-not-verified-human-vouched-provenance' },
                     T3_4: { ok: true, decision: 'SELF-equals-derived-E-identity' }
                 }
             }

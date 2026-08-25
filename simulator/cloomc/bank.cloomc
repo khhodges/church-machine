@@ -29,23 +29,30 @@ abstraction Bank {
     // resulting Enter authority; DR0 is diagnostic data and can never authorize
     // entry. The caller must test CR0 before using the verified abstraction.
     //
-    // The executable policy is deliberately staged as Bank T3 approval:
-    //   T3.1 recompute the canonical content address from submitted bytes;
-    //   T3.2 compare every requested identity assertion mechanically;
-    //   T3.3 record deferred genesis authority as human-IDE approval only;
-    //   T3.4 require compiler-owned SELF == E(dot name, issue), then
-    //   validate the complete submitted LUMP and fail with NULL CR0;
-    //   2. commit private custody atomically (allocation, private Namespace
+    // The executable policy is deliberately staged:
+    //   Gate 1 validates the complete submitted LUMP's structural framing;
+    //   Gate 2 validates its type, dispatch, and capability safety rules;
+    //   T3.1 recomputes the pure dot-name-plus-bytes content token;
+    //   T3.2 compares every requested identity assertion mechanically;
+    //   T3.3 is explicitly deferred: no genesis certificate or signature is
+    //        verified, and provenance remains human-IDE-vouched only;
+    //   T3.4 requires compiler-owned SELF == E(dot name, issue), then
+    //   commits private custody atomically (allocation, private Namespace
     //      record, proof-bound object, and copied bytes), cleaning up on error;
     //   3. issue the nullable typed BankVariable E capability only after commit.
     // The proof-bound runtime is the only layer allowed to perform those
     // private operations or retain credentials. The source expresses the
     // control-flow contract without exposing their scalar results.
     method Create(lump: capability Inform R) {
+        // TPERM asks for readable authority. The Bank binding additionally
+        // requires CR1 to carry exactly R (not R+W, R+X, or another superset)
+        // before it accepts this source capability.
         tperm(CR1, R)
-        // The native binding returns only after T3.1, T3.2, T3.3, and T3.4
-        // succeed, then atomically commits private custody. It clears CR0 on
-        // every approval or commit error.
+        // The native binding returns only after Gates 1/2 and T3.1, T3.2, and
+        // T3.4 succeed. T3.3 is not a successful certificate check: it records
+        // the explicit deferred, human-vouched provenance boundary. Only then
+        // does it atomically commit private custody. It clears CR0 on every
+        // validation or commit error.
         //
         // This is deliberately a capability-presence check, not a DR0 status
         // check: DR0 is diagnostic data and must never stand in for authority.

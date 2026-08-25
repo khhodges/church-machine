@@ -2018,12 +2018,14 @@ class SystemAbstractions {
                         suppliedCapability.secure_type !== 'Lump') {
                     return { ok: false, fault: 'TYPE', message: 'Create requires a typed readable LUMP capability' };
                 }
+                const rights = Array.isArray(suppliedCapability.rights)
+                    ? suppliedCapability.rights.map(String).sort()
+                    : [];
                 if (suppliedCapability.register !== 'CR1' ||
                         suppliedCapability.kind !== 'capability' ||
                         suppliedCapability.gt_type !== 'Inform' ||
-                        !Array.isArray(suppliedCapability.rights) ||
-                        !suppliedCapability.rights.includes('R')) {
-                    return { ok: false, fault: 'NO_CAPABILITY', message: 'Create requires an Inform R capability in CR1' };
+                        rights.length !== 1 || rights[0] !== 'R') {
+                    return { ok: false, fault: 'NO_CAPABILITY', message: 'Create requires an exactly-R Inform capability in CR1' };
                 }
                 const normalized = {
                     ...suppliedCapability,

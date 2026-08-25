@@ -61,14 +61,14 @@ const BANK_CAPABILITY_TYPES = [
     },
 ];
 const BANK_CREATE_POLICY = Object.freeze({
-    validation: 'T3.1-T3.4-approval-before-private-custody',
+    validation: 'structural-and-type-gates-then-T3.1-T3.4-before-private-custody',
     commit: 'atomic-private-custody-or-cleanup',
     issuance: 'nullable-typed-bankvariable-capability-after-commit',
     input_register: 'CR1',
     result_register: 'CR0',
     status_register: 'DR0',
-    approval_gates: ['T3.1', 'T3.2', 'T3.3', 'T3.4'],
-    T3_3: 'deferred-genesis-certificate; human-IDE-authority',
+    approval_gates: ['Gate 1 structural', 'Gate 2 type', 'T3.1', 'T3.2', 'T3.3 deferred', 'T3.4'],
+    T3_3: 'deferred-not-verified; human-IDE-vouched provenance only',
 });
 
 global.ChurchAssembler = require(path.join(ROOT, 'simulator', 'assembler.js'));
@@ -246,15 +246,15 @@ function buildBankArtifact() {
         sidecar_file: sidecarFile,
         binary_hash: binaryHash,
         identity_hash: identityHash,
-        genesis_authority: 'human-IDE',
-        genesis_certificate_verification: 'deferred',
+        genesis_authority: 'human-IDE-vouched-not-verified',
+        genesis_certificate_verification: 'deferred-not-verified',
     };
 
     const sidecar = {
         ...shared,
         identity_string: identityString,
-        genesis_authority: 'human-IDE',
-        genesis_certificate_verification: 'deferred',
+        genesis_authority: 'human-IDE-vouched-not-verified',
+        genesis_certificate_verification: 'deferred-not-verified',
         identity_seal_location: 'c-list[0]',
         sourceStorageTier: 2,
         source_file: 'simulator/cloomc/bank.cloomc',

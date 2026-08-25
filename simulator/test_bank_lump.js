@@ -118,10 +118,10 @@ check('BANK-LUMP09b: Bank records typed CR inputs while scalar values remain DR 
     ]) &&
     create.returns.register === 'CR0' && create.returns.secure_type === 'BankVariable' &&
     entry.capability_abi.Create.returns_nullable === true &&
-     entry.capability_abi.Create.policy.validation === 'T3.1-T3.4-approval-before-private-custody' &&
+     entry.capability_abi.Create.policy.validation === 'structural-and-type-gates-then-T3.1-T3.4-before-private-custody' &&
      JSON.stringify(entry.capability_abi.Create.policy.approval_gates) ===
-         JSON.stringify(['T3.1', 'T3.2', 'T3.3', 'T3.4']) &&
-     entry.capability_abi.Create.policy.T3_3 === 'deferred-genesis-certificate; human-IDE-authority' &&
+         JSON.stringify(['Gate 1 structural', 'Gate 2 type', 'T3.1', 'T3.2', 'T3.3 deferred', 'T3.4']) &&
+     entry.capability_abi.Create.policy.T3_3 === 'deferred-not-verified; human-IDE-vouched provenance only' &&
     entry.capability_abi.Create.policy.commit === 'atomic-private-custody-or-cleanup' &&
     entry.capability_abi.Create.policy.issuance === 'nullable-typed-bankvariable-capability-after-commit' &&
     entry.capability_abi.Create.policy.input_register === 'CR1' &&
@@ -218,8 +218,15 @@ const validateCandidate = candidate => BankLumpBinding.validateLump({
 });
 const malformedFrame = Buffer.from(artifact.binary);
 malformedFrame.writeUInt32BE(0, (cw + 1) * 4);
-check('BANK-LUMP11b: Gate 1 rejects a missing self-definition frame',
-    !validateCandidate(malformedFrame).ok);
+let malformedHashCalls = 0;
+const malformedValidation = BankLumpBinding.validateLump({
+    binary: malformedFrame, metadata: sourceCapability.metadata,
+}, () => {
+    malformedHashCalls++;
+    return '0'.repeat(64);
+});
+check('BANK-LUMP11b: Gate 1 rejects malformed framing before any hash is computed',
+    !malformedValidation.ok && malformedHashCalls === 0);
 const nonZeroPadding = Buffer.from(artifact.binary);
 nonZeroPadding.writeUInt32BE(1, (size - cc - 1) * 4);
 check('BANK-LUMP11c: Gate 1 rejects non-zero trailing freespace padding',
@@ -263,6 +270,23 @@ const mixedRightsMetadata = {
 };
 check('BANK-LUMP11f: Gate 2 rejects an XE method capability even with matching seals',
     !BankLumpBinding.validateLump({ binary: mixedRightsBinary, metadata: mixedRightsMetadata }).ok);
+const tokenForEitherIssue = issue => {
+    assert.ok(Number.isInteger(issue) && issue > 0, 'test issue must be positive');
+    return sha256(Buffer.concat([Buffer.from(entry.dot_name, 'utf8'), binary])).slice(0, 8);
+};
+const selfForIssue = issue => (0x4A000000 |
+    (Number.parseInt(sha256(`${entry.dot_name}#${issue}`).slice(0, 8), 16) & 0x01FFFFFF)) >>> 0;
+check('BANK-LUMP11g: T3.1 token excludes issue while T3.4 SELF includes dot-name and issue',
+    tokenForEitherIssue(1) === tokenForEitherIssue(2) &&
+    tokenForEitherIssue(entry.issue_n) === entry.token &&
+    selfForIssue(1) !== selfForIssue(2) &&
+    selfForIssue(entry.issue_n) === entry.self_gt);
+const canonicalApproval = validateCandidate(artifact.binary);
+check('BANK-LUMP11h: T3.3 reports deferred human-vouched provenance, never a verified genesis check',
+    canonicalApproval.ok &&
+    canonicalApproval.result.t3.T3_3.ok === null &&
+    canonicalApproval.result.t3.T3_3.decision === 'deferred-not-verified-human-vouched-provenance' &&
+    canonicalApproval.result.approval.T3_3.includes('no genesis certificate or signature was verified'));
 const allocationsBeforeRejectedCreate = Object.keys(systemAbs._memoryState.allocations).sort();
 const forgedToken = registry.dispatchMethod(54, 'Create', sim, {
     capabilities: { lump: { ...sourceCapability, metadata: { ...sourceCapability.metadata, token: '00000000' } } }
@@ -278,9 +302,16 @@ delete withoutGenesisAuthority.genesis_authority;
 const deferredGateFailure = registry.dispatchMethod(54, 'Create', sim, {
     lumpValue: { words: sourceWords, metadata: withoutGenesisAuthority }
 });
-check('BANK-LUMP12a: T3.3 fails closed when deferred human-IDE authority is absent',
+check('BANK-LUMP12a: T3.3 fails closed when explicit deferred human-vouched provenance is absent',
     !deferredGateFailure.ok && deferredGateFailure.fault === 'IDENTITY' &&
     sim.dr[0] === 0x103 && sim.cr[0].word0 === 0);
+const extraRightsCapability = registry.dispatchMethod(54, 'Create', sim, {
+    capabilities: { lump: { ...sourceCapability, rights: ['R', 'W'] } }
+});
+check('BANK-LUMP12aa: Bank rejects CR1 capabilities with more than exactly R authority',
+    !extraRightsCapability.ok && extraRightsCapability.fault === 'NO_CAPABILITY' &&
+    extraRightsCapability.message.includes('exactly-R') &&
+    sim.dr[0] === 0x101 && sim.cr[0].word0 === 0);
 const alteredCode = sourceWords.slice();
 alteredCode[10] = (alteredCode[10] ^ 1) >>> 0;
 const alteredCodeCreate = registry.dispatchMethod(54, 'Create', sim, {
