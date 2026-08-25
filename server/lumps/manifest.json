@@ -2615,5 +2615,56 @@
     "identity_hash": "654062b290784712f75bdaa55e4584c6af6215072698b8e579049da720ad75ed",
     "dot_name": "MyAbstraction",
     "issue_n": 1
+  },
+  {
+    "token": "00003600",
+    "abstraction": "Bank",
+    "filename": "Bank.1.a4327568.lump",
+    "sidecar_file": "Bank.1.a4327568.json",
+    "lump_size": 64,
+    "cw": 32,
+    "cc": 1,
+    "author": "",
+    "version": "2026.08.25",
+    "lump_version": 1,
+    "compiled_at": 1787693049.1390812,
+    "methods": [
+      {
+        "name": "Create",
+        "offset": 0,
+        "length": 8
+      },
+      {
+        "name": "Read",
+        "offset": 8,
+        "length": 15
+      },
+      {
+        "name": "InspectVariable",
+        "offset": 23,
+        "length": 3
+      },
+      {
+        "name": "Release",
+        "offset": 26,
+        "length": 3,
+        "aliasOf": "InspectVariable"
+      },
+      {
+        "name": "RevokeVariable",
+        "offset": 29,
+        "length": 3,
+        "aliasOf": "InspectVariable"
+      }
+    ],
+    "grants": [
+      "E"
+    ],
+    "binary_hash": "f3dcc15ef14f5a7311666562b2d30906353fa577df36f328fb95b01113ed37a8",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11",
+    "dot_name": "Bank",
+    "issue_n": 1
   }
 ]
