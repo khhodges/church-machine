@@ -10,8 +10,8 @@
 (function exposeBankLumpBinding(root) {
     const DOT_NAME = 'Bank';
     const ISSUE_N = 1;
-    const TOKEN = 'edfbedd4';
-    const BINARY_HASH = 'c50f06d855df6bb4c20d60caea9202c6ea7ddc00944cb31dd1697e58314d86de';
+    const TOKEN = 'f386f8fe';
+    const BINARY_HASH = '363a58a895fa5a6e8c596d881c637bfe26d6cce58314d64ee6d76a02a231a203';
     const IDENTITY_HASH = '3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11';
     const SELF_GT = 0x0B19718E;
     const REGISTRY_INDEX = 54;
@@ -53,10 +53,18 @@
         const capabilityABI = identity.capability_abi || {};
         const ownerReturn = capabilityABI.MintKey && capabilityABI.MintKey.returns;
         const withdrawnValue = capabilityABI.Withdraw && capabilityABI.Withdraw.returns;
+        const createdVariable = capabilityABI.Create && capabilityABI.Create.returns;
+        const inspectVariable = capabilityABI.InspectVariable;
         if (!ownerReturn || ownerReturn.register !== 'CR1' ||
             ownerReturn.kind !== 'capability' || ownerReturn.secure_type !== 'BankOwnerKey' ||
             !withdrawnValue || withdrawnValue.register !== 'CR2' ||
-            withdrawnValue.kind !== 'capability' || withdrawnValue.secure_type !== 'Inform') {
+            withdrawnValue.kind !== 'capability' || withdrawnValue.secure_type !== 'Inform' ||
+            !createdVariable || createdVariable.register !== 'CR3' ||
+            createdVariable.kind !== 'capability' || createdVariable.secure_type !== 'BankVariable' ||
+            !inspectVariable || !inspectVariable.returns ||
+            inspectVariable.returns.register !== 'DR1' ||
+            !Array.isArray(inspectVariable.outputs) ||
+            inspectVariable.outputs.map(output => output.register).join(',') !== 'DR1,DR2,DR3,DR4') {
             return fail('projection does not describe the canonical capability-register ABI');
         }
         if (identity.self_gt !== SELF_GT) {
@@ -93,6 +101,106 @@
         return { ok: true, result: manifestEntry };
     }
 
+    // Validate a LUMP value before Bank allocates private custody for it.
+    // `metadata` is an assertion, not an authority: every asserted identity
+    // field is recomputed from the bytes and the embedded API name.
+    function validateLump({ binary, metadata }, hashFn) {
+        if (!binary || typeof binary.length !== 'number' || binary.length % 4 !== 0) {
+            return fail('LUMP binary must be a non-empty whole-word byte sequence');
+        }
+        const bytes = Uint8Array.from(binary);
+        const readWord = offset => (((bytes[offset] << 24) | (bytes[offset + 1] << 16) |
+            (bytes[offset + 2] << 8) | bytes[offset + 3]) >>> 0);
+        const utf8 = value => typeof TextEncoder !== 'undefined'
+            ? new TextEncoder().encode(value)
+            : Uint8Array.from(Buffer.from(value, 'utf8'));
+        const concat = (...parts) => {
+            const result = new Uint8Array(parts.reduce((n, part) => n + part.length, 0));
+            let offset = 0;
+            for (const part of parts) {
+                result.set(part, offset);
+                offset += part.length;
+            }
+            return result;
+        };
+        const hash = value => hashFn
+            ? hashFn(typeof value === 'string' ? utf8(value) : value)
+            : sha256(value);
+        const hex = value => typeof value === 'string'
+            ? value : Array.from(value, b => b.toString(16).padStart(2, '0')).join('');
+        if (bytes.length < 8) return fail('LUMP binary is too small');
+        const header = readWord(0);
+        if ((header >>> 27) !== 0x1F) return fail('LUMP header magic is invalid');
+        const nMinus6 = (header >>> 23) & 0x0F;
+        if (nMinus6 > 9) return fail('LUMP size exponent exceeds the architectural bound');
+        const size = 1 << (nMinus6 + 6);
+        const cw = (header >>> 10) & 0x1FFF;
+        const typ = (header >>> 8) & 0x03;
+        const cc = header & 0xFF;
+        if (typ !== 0) return fail('Bank.Create accepts only typ=lump values');
+        if (bytes.length !== size * 4) return fail('LUMP byte length disagrees with its header');
+        if (cc < 1 || 1 + cw + cc > size) return fail('LUMP code/c-list bounds are invalid');
+
+        const contentOffset = (cw + 1) * 4;
+        if (contentOffset + 4 > bytes.length) return fail('LUMP has no self-definition frame');
+        const contentHeader = readWord(contentOffset);
+        if ((contentHeader >>> 24) !== 0xAB) return fail('LUMP self-definition frame is missing');
+        const flags = (contentHeader >>> 16) & 0xFF;
+        const apiLength = contentHeader & 0xFFFF;
+        const apiStart = contentOffset + 4;
+        const apiEnd = apiStart + apiLength;
+        if (apiLength === 0 || apiEnd > bytes.length) return fail('LUMP API frame is truncated');
+        let api;
+        try {
+            const apiText = typeof TextDecoder !== 'undefined'
+                ? new TextDecoder().decode(bytes.subarray(apiStart, apiEnd))
+                : Buffer.from(bytes.subarray(apiStart, apiEnd)).toString('utf8');
+            api = JSON.parse(apiText);
+        } catch (_) {
+            return fail('LUMP embedded API is not valid JSON');
+        }
+        if (!api || typeof api.name !== 'string' || !api.name ||
+                !Array.isArray(api.methods) || (flags & 0x03) === 0) {
+            return fail('LUMP embedded API metadata is incomplete');
+        }
+        const asserted = metadata && typeof metadata === 'object' ? metadata : {};
+        const dotName = api.name;
+        const issue = asserted.issue_n;
+        if (!Number.isInteger(issue) || issue <= 0 || issue > 0xFFFFFFFF) {
+            return fail('LUMP issue_n metadata is required for identity verification');
+        }
+        const identityString = `${dotName}#${issue}`;
+        const binaryHash = hex(hash(bytes));
+        const token = hex(hash(concat(utf8(dotName), bytes))).slice(0, 8);
+        const identityHash = hex(hash(identityString));
+        const expectedSelf = (0x0A000000 |
+            (Number.parseInt(identityHash.slice(0, 8), 16) & 0x01FFFFFF)) >>> 0;
+        const selfOffset = (size - cc) * 4;
+        const selfGT = readWord(selfOffset);
+        const checks = [
+            ['dot_name', asserted.dot_name, dotName],
+            ['token', asserted.token, token],
+            ['binary_hash', asserted.binary_hash, binaryHash],
+            ['identity_hash', asserted.identity_hash, identityHash],
+            ['self_gt', asserted.self_gt, expectedSelf],
+        ];
+        for (const [field, actual, expected] of checks) {
+            if (actual !== expected) return fail(`LUMP ${field} metadata does not match trusted bytes`);
+        }
+        if (selfGT !== expectedSelf) return fail('LUMP c-list row zero is not its canonical SELF identity');
+        if (asserted.identity_string !== undefined && asserted.identity_string !== identityString) {
+            return fail('LUMP identity_string metadata disagrees with its issue');
+        }
+        return {
+            ok: true,
+            result: {
+                dot_name: dotName, issue_n: issue, token, binary_hash: binaryHash,
+                identity_hash: identityHash, identity_string: identityString,
+                self_gt: expectedSelf, lump_size: size, cw, cc, api
+            }
+        };
+    }
+
     function resolveRuntime(registry, identity) {
         const projection = validateProjection(identity);
         if (!projection.ok) return projection;
@@ -106,7 +214,7 @@
         return { ok: true, result: { index: descriptor.index, token: identity.token, selfGT: identity.self_gt } };
     }
 
-    const api = { validateProjection, validateArtifact, resolveRuntime };
+    const api = { validateProjection, validateArtifact, validateLump, resolveRuntime };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     root.BankLumpBinding = api;
 })(typeof window !== 'undefined' ? window : globalThis);

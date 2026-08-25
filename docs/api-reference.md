@@ -37,6 +37,11 @@ Canonical dynamic CLOOMC LUMP backed by proof-bound Namespace custody. Lockbox k
 
 | Method | Signature | Perms | Description |
 |--------|-----------|-------|-------------|
+| Create | `Create(lump: CR1) → variable: CR3, status: DR0` | E + M + Inform R | Validate a complete self-defining LUMP from trusted bytes, then issue a typed BankVariable E capability; identity metadata is checked but never trusted as caller authority. |
+| Read | `Read(variable: CR3, offset: DR1, words: DR2) → readable: CR4, status: DR0` | BankVariable E | Copy a bounded slice of a live Bank-managed LUMP into a fresh typed readable Inform capability. |
+| InspectVariable | `InspectVariable(variable: CR3) → status: DR0; words: DR1; capacity: DR2; issue: DR3; lifecycle: DR4` | BankVariable E | Inspect scalar size/capacity/lifecycle fields in distinct DRs, plus safe identity metadata, without revealing private Namespace storage. |
+| Release | `Release(variable: CR3) → status: DR0` | BankVariable E | Zeroize and retire a Bank-managed LUMP after removing its private Namespace record. |
+| RevokeVariable | `RevokeVariable(variable: CR3) → status: DR0` | BankVariable E | Revoke the variable capability and zeroize the private LUMP allocation. |
 | MintKey | `MintKey(capacity: DR1) → owner_key: CR1` | E + M | Create an empty dynamically allocated lockbox; return a typed BankOwnerKey capability in CR1 and status in DR0. |
 | Deposit | `Deposit(owner_key: CR1, source: CR2, offset: DR1, words: DR2, kind: DR3) → status: DR0` | E + BankOwnerKey + Inform R | Copy a bounded LUMP or memory region into an empty lockbox using typed capabilities; reject raw GTs, proofs, and reconstructed handles supplied through DRs. |
 | Withdraw | `Withdraw(owner_key: CR1) → valuable: CR2, status: DR0` | E + BankOwnerKey | Atomically release the valuable as a fresh typed Inform capability in CR2 and quarantine the lockbox key. |

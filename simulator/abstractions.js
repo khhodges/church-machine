@@ -571,8 +571,8 @@ class AbstractionRegistry {
         // boot slot. Its keys delegate through Navana's object-scoped credential
         // registry and never expose a lockbox Namespace index.
         this.createAbstraction(54, 'Bank', 1,
-            ['MintKey', 'Deposit', 'Withdraw', 'Inspect', 'Revoke', 'ObtainPassKey', 'ExportRecovery', 'Recover', 'List'],
-            'Canonical dynamic CLOOMC LUMP and Namespace-backed custody authority — its symbolic SELF identity resolves through the LUMP catalog while the proof-bound runtime mints opaque revocable lockbox keys. It accepts capability-bounded LUMP or memory-region deposits, returns valuables through fresh memory GTs, and restores encrypted recovery state through a fresh Namespace entry and PassKey. It has no fixed hardware boot slot; PassKey proofs never leave the credential boundary.',
+            ['Create', 'Read', 'InspectVariable', 'Release', 'RevokeVariable', 'MintKey', 'Deposit', 'Withdraw', 'Inspect', 'Revoke', 'ObtainPassKey', 'ExportRecovery', 'Recover', 'List'],
+            'Canonical dynamic CLOOMC LUMP and Namespace-backed custody authority — Create verifies a complete self-defining LUMP before committing it and returns a proof-bound BankVariable E capability. Its symbolic SELF identity resolves through the LUMP catalog while the proof-bound runtime keeps variable and legacy lockbox storage private. It has no fixed hardware boot slot; PassKey proofs never leave the credential boundary.',
             { author: 'Church Machine', version: '1.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, freedNSSlot: true });
     }
 }

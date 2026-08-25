@@ -1590,8 +1590,10 @@ class SystemAbstractions {
         this.bankRuntimeBinding = runtime.result;
         const BANK_REGISTRY_INDEX = runtime.result.index;
         if (!this._bankState) {
-            this._bankState = { nextId: 0, lockboxes: {} };
+            this._bankState = { nextId: 0, lockboxes: {}, nextVariableId: 0, variables: {} };
         }
+        if (!this._bankState.variables) this._bankState.variables = {};
+        if (!Number.isInteger(this._bankState.nextVariableId)) this._bankState.nextVariableId = 0;
         if (!this._bankRecoveryRecords) this._bankRecoveryRecords = {};
         const bankState = this._bankState;
         const recoveryRecords = this._bankRecoveryRecords;
@@ -1612,6 +1614,55 @@ class SystemAbstractions {
             gt: passKey.gt >>> 0,
             proof: Array.isArray(passKey.proof) ? passKey.proof.map(word => word >>> 0) : []
         });
+        const makeVariableCapability = (passKey, variableId) => ({
+            register: 'CR3',
+            kind: 'capability',
+            secure_type: 'BankVariable',
+            gt_type: 'Abstract',
+            rights: ['E'],
+            gt: passKey.gt >>> 0,
+            proof: Array.isArray(passKey.proof) ? passKey.proof.map(word => word >>> 0) : [],
+            variable_id: variableId
+        });
+        const writeBankDR = (sim, index, value) => {
+            if (typeof sim._writeDR === 'function') sim._writeDR(index, value);
+            else if (sim.dr) sim.dr[index] = value >>> 0;
+        };
+        const clearBankCapability = (sim, register) => {
+            if (sim._bankCapabilityRegisters) delete sim._bankCapabilityRegisters[register];
+            const index = Number(String(register).slice(2));
+            if (sim.cr && Number.isInteger(index) && sim.cr[index]) {
+                sim.cr[index].word0 = 0;
+                sim.cr[index].word1 = 0;
+                sim.cr[index].word2 = 0;
+                sim.cr[index].word3 = 0;
+            }
+        };
+        const materializeBankCapability = (sim, capability) => {
+            if (!sim._bankCapabilityRegisters) sim._bankCapabilityRegisters = {};
+            sim._bankCapabilityRegisters[capability.register] = Array.isArray(capability.proof)
+                ? { ...capability, proof: capability.proof.slice() }
+                : { ...capability };
+            const index = Number(capability.register.slice(2));
+            if (sim.cr && Number.isInteger(index) && sim.cr[index]) {
+                // PassKey proof stays inside the protected binding; CR carries
+                // the public E-GT identity just as other capability registers do.
+                sim.cr[index].word0 = capability.gt >>> 0;
+                sim.cr[index].word1 = 0;
+                sim.cr[index].word2 = 0;
+                sim.cr[index].word3 = 0;
+            }
+        };
+        const finishBankCapabilityResult = (sim, register, result) => {
+            writeBankDR(sim, 0, result && result.ok ? 1 : 0);
+            if (result && result.ok && result.result &&
+                    result.result.capability && result.result.capability.register === register) {
+                materializeBankCapability(sim, result.result.capability);
+            } else if (!result || !result.ok) {
+                clearBankCapability(sim, register);
+            }
+            return result;
+        };
         const ownerCapabilityFor = (args) => {
             const capabilities = args && args.capabilities;
             const capability = capabilities && (capabilities.owner_key || capabilities.ownerKey);
@@ -1629,6 +1680,25 @@ class SystemAbstractions {
             const capability = ownerCapabilityFor(args);
             return capability ? { gt: capability.gt, proof: capability.proof } : {};
         };
+        const variableCapabilityFor = (args, sim) => {
+            const capabilities = args && args.capabilities;
+            const supplied = capabilities && (capabilities.variable || capabilities.bankVariable);
+            const capability = supplied || (sim && sim._bankCapabilityRegisters &&
+                sim._bankCapabilityRegisters.CR3);
+            if (!capability || typeof capability !== 'object' ||
+                    capability.register !== 'CR3' ||
+                    capability.kind !== 'capability' ||
+                    capability.secure_type !== 'BankVariable' ||
+                    capability.gt_type !== 'Abstract' ||
+                    !Array.isArray(capability.rights) || !capability.rights.includes('E')) {
+                return null;
+            }
+            return capability;
+        };
+        const variableKeyFor = (args, sim) => {
+            const capability = variableCapabilityFor(args, sim);
+            return capability ? { gt: capability.gt, proof: capability.proof } : {};
+        };
 
         const fail = (method, fault, message) => ({ ok: false, fault, message: `Bank.${method}: ${message}` });
         const lockboxById = (id) => {
@@ -1644,6 +1714,19 @@ class SystemAbstractions {
             }
             const check = this._topSecurityApi && this._topSecurityApi.validatePassKey
                 ? this._topSecurityApi.validatePassKey(sim, lockbox.securityObjectId, keyFor(args), method, ownerOnly)
+                : { ok: false, fault: 'NOT_INIT', message: 'top-security authority unavailable' };
+            return check.ok ? check : { ok: false, fault: check.fault || 'PERM', message: check.message };
+        };
+        const authorizeVariable = (sim, variable, args, method) => {
+            if (!variable) return fail(method, 'NOT_FOUND', 'Bank variable not found');
+            if (variable.revoked || variable.released) return fail(method, 'REVOKED', 'Bank variable is no longer live');
+            if (variable.seq !== variable.currentSeq) return fail(method, 'STALE_KEY', 'Bank variable sequence is stale');
+            if (!variableCapabilityFor(args, sim)) {
+                return fail(method, 'NO_CAPABILITY', 'BankVariable E capability is required in CR3');
+            }
+            const check = this._topSecurityApi && this._topSecurityApi.validatePassKey
+                ? this._topSecurityApi.validatePassKey(
+                sim, variable.securityObjectId, variableKeyFor(args, sim), method, false)
                 : { ok: false, fault: 'NOT_INIT', message: 'top-security authority unavailable' };
             return check.ok ? check : { ok: false, fault: check.fault || 'PERM', message: check.message };
         };
@@ -1870,13 +1953,302 @@ class SystemAbstractions {
             withdrawn: lockbox.withdrawn,
             sequence: lockbox.currentSeq
         });
+        const safeVariableMetadata = (variable) => ({
+            variableId: variable.id,
+            dot_name: variable.dot_name,
+            issue_n: variable.issue_n,
+            token: variable.token,
+            type: variable.kind,
+            words: variable.words,
+            capacity: variable.capacity,
+            state: variable.revoked ? 'revoked' : (variable.released ? 'released' : 'live'),
+            sequence: variable.currentSeq,
+            provenance: variable.provenance
+        });
         this._resetBankState = (sim) => {
             for (const lockbox of Object.values(bankState.lockboxes)) {
                 zeroizeLockbox(sim, lockbox);
             }
             bankState.nextId = 0;
             bankState.lockboxes = {};
+            for (const variable of Object.values(bankState.variables || {})) {
+                if (!variable.released && !variable.revoked) zeroizeLockbox(sim, variable);
+            }
+            bankState.nextVariableId = 0;
+            bankState.variables = {};
+            sim._bankCapabilityRegisters = {};
         };
+
+        const lumpWordsToBytes = (words) => {
+            const bytes = new Uint8Array(words.length * 4);
+            words.forEach((word, index) => {
+                bytes[index * 4] = (word >>> 24) & 0xFF;
+                bytes[index * 4 + 1] = (word >>> 16) & 0xFF;
+                bytes[index * 4 + 2] = (word >>> 8) & 0xFF;
+                bytes[index * 4 + 3] = word & 0xFF;
+            });
+            return bytes;
+        };
+        const createLumpInput = (sim, args) => {
+            const capabilities = args && args.capabilities;
+            const suppliedCapability = capabilities &&
+                (capabilities.lump || capabilities.source);
+            const value = args && (args.lumpValue ||
+                (args.lump && typeof args.lump === 'object' &&
+                    !args.lump.register && !args.lump.kind ? args.lump : null));
+            let source;
+            let metadata = args && (args.metadata || args.lumpMetadata);
+            if (suppliedCapability) {
+                if (suppliedCapability.secure_type !== 'Inform' &&
+                        suppliedCapability.secure_type !== 'Lump') {
+                    return { ok: false, fault: 'TYPE', message: 'Create requires a typed readable LUMP capability' };
+                }
+                if (suppliedCapability.register !== 'CR1' ||
+                        suppliedCapability.kind !== 'capability' ||
+                        suppliedCapability.gt_type !== 'Inform' ||
+                        !Array.isArray(suppliedCapability.rights) ||
+                        !suppliedCapability.rights.includes('R')) {
+                    return { ok: false, fault: 'NO_CAPABILITY', message: 'Create requires an Inform R capability in CR1' };
+                }
+                const normalized = {
+                    ...suppliedCapability,
+                    // Lump is a semantic subtype; sourceRegion applies the
+                    // architectural Inform R checks to its backing capability.
+                    secure_type: 'Inform', register: 'CR2'
+                };
+                source = sourceRegion(sim, {
+                    ...args, capabilities: { ...capabilities, source: normalized }
+                });
+                metadata = metadata || suppliedCapability.metadata;
+            } else if (value) {
+                const rawWords = value.words;
+                if (!Array.isArray(rawWords) && !(rawWords instanceof Uint32Array)) {
+                    return { ok: false, fault: 'TYPE', message: 'LUMP value must contain whole 32-bit words' };
+                }
+                const words = Array.from(rawWords, word => Number(word));
+                if (words.some(word => !Number.isInteger(word) || word < 0 || word > 0xFFFFFFFF)) {
+                    return { ok: false, fault: 'CORRUPT', message: 'LUMP value contains an invalid word' };
+                }
+                source = { ok: true, data: words, words: words.length };
+                metadata = metadata || value.metadata;
+            } else {
+                return { ok: false, fault: 'NO_CAPABILITY', message: 'typed LUMP capability or LUMP value is required' };
+            }
+            if (!source.ok) return source;
+            if (!metadata || typeof metadata !== 'object') {
+                return { ok: false, fault: 'IDENTITY', message: 'canonical LUMP metadata is required' };
+            }
+            const validation = BankLumpBinding.validateLump({
+                binary: lumpWordsToBytes(source.data), metadata
+            }, recoverySha256);
+            if (!validation.ok) return {
+                ok: false, fault: 'IDENTITY', message: validation.message
+            };
+            return { ok: true, data: source.data, validation: validation.result };
+        };
+
+        this.registry.bindMethod(BANK_REGISTRY_INDEX, 'Create', (sim, args = {}) => {
+            if (!sim.mElevation) return finishBankCapabilityResult(sim, 'CR3',
+                fail('Create', 'PERM', 'requires M-elevation (Bank authority)'));
+            const input = createLumpInput(sim, args);
+            if (!input.ok) return finishBankCapabilityResult(sim, 'CR3',
+                fail('Create', input.fault, input.message));
+
+            const validation = input.validation;
+            const id = (bankState.nextVariableId || 0) + 1;
+            const allocation = registry.dispatchMethod(7, 'Allocate', sim, { size: input.data.length });
+            if (!allocation.ok) return finishBankCapabilityResult(sim, 'CR3',
+                fail('Create', allocation.fault || 'OOM', allocation.message));
+            const objectName = `Bank.Variable.${id}`;
+            const ns = registerPrivateLockbox(sim, allocation.result.location, allocation.result.size, objectName);
+            if (!ns.ok) {
+                releaseAllocation(sim, allocation.result.location);
+                return finishBankCapabilityResult(sim, 'CR3',
+                    fail('Create', ns.fault || 'NS_FULL', ns.message));
+            }
+            const objectResult = registry.dispatchMethod(5, 'SecureObjectAdd', sim, {
+                name: objectName,
+                methods: ['Read', 'InspectVariable', 'Release', 'RevokeVariable']
+            });
+            if (!objectResult.ok) {
+                registry.dispatchMethod(5, 'Remove', sim, { index: ns.result.nsIndex });
+                releaseAllocation(sim, allocation.result.location);
+                return finishBankCapabilityResult(sim, 'CR3',
+                    fail('Create', objectResult.fault || 'MINT', objectResult.message));
+            }
+            const delegated = this._topSecurityApi.obtainPassKey(sim, {
+                objectId: objectResult.result.objectId,
+                passKey: objectResult.result.ownerPassKey
+            });
+            if (!delegated.ok || !delegated.result || !delegated.result.passKey) {
+                registry.dispatchMethod(5, 'Remove', sim, { index: ns.result.nsIndex });
+                releaseAllocation(sim, allocation.result.location);
+                return finishBankCapabilityResult(sim, 'CR3',
+                    fail('Create', delegated.fault || 'MINT', delegated.message || 'variable capability mint failed'));
+            }
+            const variable = {
+                id,
+                dot_name: validation.dot_name,
+                issue_n: validation.issue_n,
+                token: validation.token,
+                binary_hash: validation.binary_hash,
+                identity_hash: validation.identity_hash,
+                kind: 'lump',
+                words: input.data.length,
+                capacity: allocation.result.size,
+                location: allocation.result.location,
+                nsIndex: ns.result.nsIndex,
+                nsVersion: ns.result.version,
+                securityObjectId: objectResult.result.objectId,
+                currentSeq: 1,
+                seq: 1,
+                released: false,
+                revoked: false,
+                provenance: args.provenance ? 'declared-not-attested' : 'integrity-only',
+                createdAt: Date.now()
+            };
+            for (let i = 0; i < input.data.length; i++) {
+                sim.memory[allocation.result.location + i] = input.data[i] >>> 0;
+            }
+            if (!sim._bankPrivateSlots) sim._bankPrivateSlots = {};
+            sim._bankPrivateSlots[ns.result.nsIndex] = { variableId: id };
+            protectLockboxRange(sim, variable);
+            bankState.nextVariableId = id;
+            bankState.variables[id] = variable;
+            const variableCapability = makeVariableCapability(delegated.result.passKey, id);
+            return finishBankCapabilityResult(sim, 'CR3', {
+                ok: true,
+                result: {
+                    variableId: id,
+                    variableCapability,
+                    capability: variableCapability,
+                    metadata: safeVariableMetadata(variable)
+                },
+                message: `Bank.Create: verified ${validation.dot_name}#${validation.issue_n} LUMP committed as variable ${id}`
+            });
+        });
+
+        this.registry.bindMethod(BANK_REGISTRY_INDEX, 'Read', (sim, args = {}) => {
+            const capability = variableCapabilityFor(args, sim);
+            const variableId = args.variableId === undefined
+                ? (args.objectId === undefined ? capability && capability.variable_id : args.objectId)
+                : args.variableId;
+            const variable = Number.isInteger(variableId) ? bankState.variables[variableId] : null;
+            const auth = authorizeVariable(sim, variable, args, 'Read');
+            if (!auth.ok) return finishBankCapabilityResult(sim, 'CR4', auth);
+            const offset = args.offset === undefined ? 0 : args.offset;
+            const words = args.words === undefined ? variable.words - offset : args.words;
+            if (!Number.isInteger(offset) || !Number.isInteger(words) ||
+                    offset < 0 || words <= 0 || offset + words > variable.words) {
+                return finishBankCapabilityResult(sim, 'CR4',
+                    fail('Read', 'BOUNDS', 'offset and words exceed the Bank variable bounds'));
+            }
+            const allocation = registry.dispatchMethod(7, 'Allocate', sim, { size: words });
+            if (!allocation.ok) return finishBankCapabilityResult(sim, 'CR4',
+                fail('Read', allocation.fault || 'OOM', allocation.message));
+            const ns = registerRegion(sim, allocation.result.location, allocation.result.size,
+                `Bank.Read.${variable.id}`);
+            if (!ns.ok) {
+                releaseAllocation(sim, allocation.result.location);
+                return finishBankCapabilityResult(sim, 'CR4',
+                    fail('Read', ns.fault || 'NS_FULL', ns.message));
+            }
+            for (let i = 0; i < words; i++) {
+                sim.memory[allocation.result.location + i] =
+                    sim.memory[variable.location + offset + i] >>> 0;
+            }
+            const gt = sim.createGT(ns.result.version, ns.result.nsIndex, { R: 1 }, 1);
+            const readableCapability = {
+                register: 'CR4',
+                kind: 'capability',
+                secure_type: 'Inform',
+                gt_type: 'Inform',
+                rights: ['R'],
+                gt
+            };
+            return finishBankCapabilityResult(sim, 'CR4', {
+                ok: true,
+                result: { variableId: variable.id, readableCapability, capability: readableCapability,
+                    gt, words, offset },
+                message: `Bank.Read: ${words} word(s) copied from variable ${variable.id}`
+            });
+        });
+
+        this.registry.bindMethod(BANK_REGISTRY_INDEX, 'InspectVariable', (sim, args = {}) => {
+            const capability = variableCapabilityFor(args, sim);
+            const variableId = args.variableId === undefined
+                ? (args.objectId === undefined ? capability && capability.variable_id : args.objectId)
+                : args.variableId;
+            const variable = Number.isInteger(variableId) ? bankState.variables[variableId] : null;
+            const auth = authorizeVariable(sim, variable, args, 'InspectVariable');
+            if (!auth.ok) {
+                writeBankDR(sim, 0, 0);
+                return auth;
+            }
+            const writeDR = (index, value) => {
+                if (typeof sim._writeDR === 'function') sim._writeDR(index, value);
+                else if (sim.dr) sim.dr[index] = value >>> 0;
+            };
+            // DR0 is the operation status. The scalar inspection projection is
+            // intentionally separate: metadata can never compete with status
+            // for the same register or reveal a private Namespace address.
+            writeDR(0, 1);
+            writeDR(1, variable.words);
+            writeDR(2, variable.capacity);
+            writeDR(3, variable.issue_n);
+            writeDR(4, 1); // active
+            return { ok: true, result: safeVariableMetadata(variable),
+                registers: { DR0: 1, DR1: variable.words, DR2: variable.capacity,
+                    DR3: variable.issue_n, DR4: 1 },
+                message: `Bank.InspectVariable: variable ${variable.id} metadata returned` };
+        });
+
+        const retireVariable = (sim, variable, method, revoked) => {
+            zeroizeLockbox(sim, variable);
+            // A cleanup error must never keep authority live. Preserve the
+            // zeroed protected range for retry/quarantine, but make every
+            // existing capability terminal before attempting Namespace removal.
+            variable.released = !revoked;
+            variable.revoked = true;
+            variable.currentSeq++;
+            variable.seq = variable.currentSeq;
+            this._topSecurityApi.revokeObject(variable.securityObjectId);
+            const removed = registry.dispatchMethod(5, 'Remove', sim, { index: variable.nsIndex });
+            if (!removed.ok) {
+                if (!sim._bankQuarantinedAllocations) sim._bankQuarantinedAllocations = {};
+                sim._bankQuarantinedAllocations[variable.location] = {
+                    reason: 'Bank variable namespace cleanup failed', nsIndex: variable.nsIndex
+                };
+                return fail(method, 'NAMESPACE', 'variable was wiped but its allocation was quarantined');
+            }
+            if (sim._bankPrivateSlots) delete sim._bankPrivateSlots[variable.nsIndex];
+            unprotectLockboxRange(sim, variable);
+            releaseAllocation(sim, variable.location);
+            return { ok: true, result: { variableId: variable.id,
+                released: !revoked, revoked: !!revoked }, message: `Bank.${method}: variable ${variable.id} retired` };
+        };
+
+        this.registry.bindMethod(BANK_REGISTRY_INDEX, 'Release', (sim, args = {}) => {
+            const capability = variableCapabilityFor(args, sim);
+            const variableId = args.variableId === undefined
+                ? (args.objectId === undefined ? capability && capability.variable_id : args.objectId)
+                : args.variableId;
+            const variable = Number.isInteger(variableId) ? bankState.variables[variableId] : null;
+            const auth = authorizeVariable(sim, variable, args, 'Release');
+            if (!auth.ok) return finishBankCapabilityResult(sim, 'CR3', auth);
+            return finishBankCapabilityResult(sim, 'CR3', retireVariable(sim, variable, 'Release', false));
+        });
+
+        this.registry.bindMethod(BANK_REGISTRY_INDEX, 'RevokeVariable', (sim, args = {}) => {
+            const capability = variableCapabilityFor(args, sim);
+            const variableId = args.variableId === undefined
+                ? (args.objectId === undefined ? capability && capability.variable_id : args.objectId)
+                : args.variableId;
+            const variable = Number.isInteger(variableId) ? bankState.variables[variableId] : null;
+            const auth = authorizeVariable(sim, variable, args, 'RevokeVariable');
+            if (!auth.ok) return finishBankCapabilityResult(sim, 'CR3', auth);
+            return finishBankCapabilityResult(sim, 'CR3', retireVariable(sim, variable, 'RevokeVariable', true));
+        });
 
         this.registry.bindMethod(BANK_REGISTRY_INDEX, 'MintKey', (sim, args = {}) => {
             if (!sim.mElevation) return fail('MintKey', 'PERM', 'requires M-elevation (Bank authority)');

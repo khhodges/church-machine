@@ -2154,7 +2154,36 @@
     "identity_hash": "f3b48e1b7403b0e77da69bc18f7b60db71061bfc1b9c0bc672e2ff282d11d1fe"
   },
   {
-    "token": "edfbedd4",
+    "token": "0f8ad81b",
+    "abstraction": "MyAbstraction",
+    "filename": "MyAbstraction.1.827cfd7c.lump",
+    "sidecar_file": "MyAbstraction.1.827cfd7c.json",
+    "lump_size": 64,
+    "cw": 2,
+    "cc": 1,
+    "author": "",
+    "version": "2026.08.25",
+    "lump_version": 3,
+    "compiled_at": 1787660943.3916147,
+    "methods": [
+      {
+        "name": "run",
+        "offset": 0,
+        "length": 2
+      }
+    ],
+    "grants": [
+      "E"
+    ],
+    "binary_hash": "5120739b4fb8cc7c6999e560ae4b48c56228c1c190a76778b4d0b56153c4fc4d",
+    "petname": "",
+    "issue_number": 1,
+    "identity_hash": "654062b290784712f75bdaa55e4584c6af6215072698b8e579049da720ad75ed",
+    "dot_name": "MyAbstraction",
+    "issue_n": 1
+  },
+  {
+    "token": "f386f8fe",
     "abstraction": "Bank",
     "dot_name": "Bank",
     "issue_n": 1,
@@ -2162,7 +2191,7 @@
     "ns_slot_policy": "dynamic",
     "boot_resident": false,
     "lump_size": 4096,
-    "cw": 267,
+    "cw": 290,
     "cc": 1,
     "typ": 0,
     "status": "released",
@@ -2173,9 +2202,180 @@
     ],
     "methods": [
       {
-        "name": "MintKey",
+        "name": "Create",
         "index": 0,
-        "branchOffset": 10,
+        "branchOffset": 15,
+        "inputs": [
+          {
+            "name": "lump",
+            "register": "CR1",
+            "kind": "capability",
+            "secure_type": "Inform",
+            "rights": [
+              "R"
+            ]
+          }
+        ],
+        "returns": {
+          "name": "variable",
+          "register": "CR3",
+          "kind": "capability",
+          "secure_type": "BankVariable",
+          "rights": [
+            "E"
+          ]
+        },
+        "status": {
+          "register": "DR0",
+          "kind": "value"
+        }
+      },
+      {
+        "name": "Read",
+        "index": 1,
+        "branchOffset": 18,
+        "inputs": [
+          {
+            "name": "variable",
+            "register": "CR3",
+            "kind": "capability",
+            "secure_type": "BankVariable",
+            "rights": [
+              "E"
+            ]
+          },
+          {
+            "name": "offset",
+            "register": "DR1",
+            "kind": "value"
+          },
+          {
+            "name": "words",
+            "register": "DR2",
+            "kind": "value"
+          }
+        ],
+        "returns": {
+          "name": "readable",
+          "register": "CR4",
+          "kind": "capability",
+          "secure_type": "Inform",
+          "rights": [
+            "R"
+          ]
+        },
+        "status": {
+          "register": "DR0",
+          "kind": "value"
+        }
+      },
+      {
+        "name": "InspectVariable",
+        "index": 2,
+        "branchOffset": 15,
+        "inputs": [
+          {
+            "name": "variable",
+            "register": "CR3",
+            "kind": "capability",
+            "secure_type": "BankVariable",
+            "rights": [
+              "E"
+            ]
+          }
+        ],
+        "returns": {
+          "name": "word_count",
+          "register": "DR1",
+          "kind": "value"
+        },
+        "outputs": [
+          {
+            "name": "word_count",
+            "register": "DR1",
+            "kind": "value"
+          },
+          {
+            "name": "capacity",
+            "register": "DR2",
+            "kind": "value"
+          },
+          {
+            "name": "issue_n",
+            "register": "DR3",
+            "kind": "value"
+          },
+          {
+            "name": "lifecycle",
+            "register": "DR4",
+            "kind": "value",
+            "values": {
+              "active": 1,
+              "released": 2,
+              "revoked": 3,
+              "quarantined": 4
+            }
+          }
+        ],
+        "status": {
+          "register": "DR0",
+          "kind": "value"
+        }
+      },
+      {
+        "name": "Release",
+        "index": 3,
+        "branchOffset": 15,
+        "inputs": [
+          {
+            "name": "variable",
+            "register": "CR3",
+            "kind": "capability",
+            "secure_type": "BankVariable",
+            "rights": [
+              "E"
+            ]
+          }
+        ],
+        "returns": {
+          "name": "status",
+          "register": "DR0",
+          "kind": "value"
+        },
+        "status": {
+          "register": "DR0",
+          "kind": "value"
+        }
+      },
+      {
+        "name": "RevokeVariable",
+        "index": 4,
+        "branchOffset": 15,
+        "inputs": [
+          {
+            "name": "variable",
+            "register": "CR3",
+            "kind": "capability",
+            "secure_type": "BankVariable",
+            "rights": [
+              "E"
+            ]
+          }
+        ],
+        "returns": {
+          "name": "status",
+          "register": "DR0",
+          "kind": "value"
+        },
+        "status": {
+          "register": "DR0",
+          "kind": "value"
+        }
+      },
+      {
+        "name": "MintKey",
+        "index": 5,
+        "branchOffset": 33,
         "inputs": [
           {
             "name": "capacity",
@@ -2196,8 +2396,8 @@
       },
       {
         "name": "Deposit",
-        "index": 1,
-        "branchOffset": 51,
+        "index": 6,
+        "branchOffset": 74,
         "inputs": [
           {
             "name": "owner_key",
@@ -2240,8 +2440,8 @@
       },
       {
         "name": "Withdraw",
-        "index": 2,
-        "branchOffset": 96,
+        "index": 7,
+        "branchOffset": 119,
         "inputs": [
           {
             "name": "owner_key",
@@ -2266,8 +2466,8 @@
       },
       {
         "name": "Inspect",
-        "index": 3,
-        "branchOffset": 128,
+        "index": 8,
+        "branchOffset": 151,
         "inputs": [
           {
             "name": "owner_key",
@@ -2286,8 +2486,8 @@
       },
       {
         "name": "Revoke",
-        "index": 4,
-        "branchOffset": 140,
+        "index": 9,
+        "branchOffset": 163,
         "inputs": [
           {
             "name": "owner_key",
@@ -2306,8 +2506,8 @@
       },
       {
         "name": "ObtainPassKey",
-        "index": 5,
-        "branchOffset": 164,
+        "index": 10,
+        "branchOffset": 187,
         "inputs": [
           {
             "name": "owner_key",
@@ -2332,8 +2532,8 @@
       },
       {
         "name": "ExportRecovery",
-        "index": 6,
-        "branchOffset": 188,
+        "index": 11,
+        "branchOffset": 211,
         "inputs": [
           {
             "name": "owner_key",
@@ -2352,8 +2552,8 @@
       },
       {
         "name": "Recover",
-        "index": 7,
-        "branchOffset": 201,
+        "index": 12,
+        "branchOffset": 224,
         "inputs": [
           {
             "name": "protected_state",
@@ -2383,8 +2583,8 @@
       },
       {
         "name": "List",
-        "index": 8,
-        "branchOffset": 249,
+        "index": 13,
+        "branchOffset": 272,
         "inputs": [],
         "returns": {
           "name": "result",
@@ -2411,9 +2611,175 @@
           "R"
         ],
         "description": "Readable source-memory capability for a Bank deposit."
+      },
+      {
+        "name": "BankVariable",
+        "register": "CR3",
+        "gt_type": "Abstract",
+        "rights": [
+          "E"
+        ],
+        "proof_bound": true,
+        "description": "Typed E capability naming one validated Bank-managed LUMP variable."
       }
     ],
     "capability_abi": {
+      "Create": {
+        "status": {
+          "register": "DR0",
+          "kind": "value"
+        },
+        "inputs": [
+          {
+            "name": "lump",
+            "register": "CR1",
+            "kind": "capability",
+            "secure_type": "Inform",
+            "rights": [
+              "R"
+            ]
+          }
+        ],
+        "returns": {
+          "name": "variable",
+          "register": "CR3",
+          "kind": "capability",
+          "secure_type": "BankVariable",
+          "rights": [
+            "E"
+          ]
+        }
+      },
+      "Read": {
+        "status": {
+          "register": "DR0",
+          "kind": "value"
+        },
+        "inputs": [
+          {
+            "name": "variable",
+            "register": "CR3",
+            "kind": "capability",
+            "secure_type": "BankVariable",
+            "rights": [
+              "E"
+            ]
+          },
+          {
+            "name": "offset",
+            "register": "DR1",
+            "kind": "value"
+          },
+          {
+            "name": "words",
+            "register": "DR2",
+            "kind": "value"
+          }
+        ],
+        "returns": {
+          "name": "readable",
+          "register": "CR4",
+          "kind": "capability",
+          "secure_type": "Inform",
+          "rights": [
+            "R"
+          ]
+        }
+      },
+      "InspectVariable": {
+        "status": {
+          "register": "DR0",
+          "kind": "value"
+        },
+        "inputs": [
+          {
+            "name": "variable",
+            "register": "CR3",
+            "kind": "capability",
+            "secure_type": "BankVariable",
+            "rights": [
+              "E"
+            ]
+          }
+        ],
+        "returns": {
+          "name": "word_count",
+          "register": "DR1",
+          "kind": "value"
+        },
+        "outputs": [
+          {
+            "name": "word_count",
+            "register": "DR1",
+            "kind": "value"
+          },
+          {
+            "name": "capacity",
+            "register": "DR2",
+            "kind": "value"
+          },
+          {
+            "name": "issue_n",
+            "register": "DR3",
+            "kind": "value"
+          },
+          {
+            "name": "lifecycle",
+            "register": "DR4",
+            "kind": "value",
+            "values": {
+              "active": 1,
+              "released": 2,
+              "revoked": 3,
+              "quarantined": 4
+            }
+          }
+        ]
+      },
+      "Release": {
+        "status": {
+          "register": "DR0",
+          "kind": "value"
+        },
+        "inputs": [
+          {
+            "name": "variable",
+            "register": "CR3",
+            "kind": "capability",
+            "secure_type": "BankVariable",
+            "rights": [
+              "E"
+            ]
+          }
+        ],
+        "returns": {
+          "name": "status",
+          "register": "DR0",
+          "kind": "value"
+        }
+      },
+      "RevokeVariable": {
+        "status": {
+          "register": "DR0",
+          "kind": "value"
+        },
+        "inputs": [
+          {
+            "name": "variable",
+            "register": "CR3",
+            "kind": "capability",
+            "secure_type": "BankVariable",
+            "rights": [
+              "E"
+            ]
+          }
+        ],
+        "returns": {
+          "name": "status",
+          "register": "DR0",
+          "kind": "value"
+        }
+      },
       "MintKey": {
         "status": {
           "register": "DR0",
@@ -2481,38 +2847,9 @@
       "credential_abi": "capability-register-v1",
       "fixed_hardware_boot_slot": false
     },
-    "filename": "Bank.1.edfbedd4.lump",
-    "sidecar_file": "Bank.1.edfbedd4.json",
-    "binary_hash": "c50f06d855df6bb4c20d60caea9202c6ea7ddc00944cb31dd1697e58314d86de",
+    "filename": "Bank.1.f386f8fe.lump",
+    "sidecar_file": "Bank.1.f386f8fe.json",
+    "binary_hash": "363a58a895fa5a6e8c596d881c637bfe26d6cce58314d64ee6d76a02a231a203",
     "identity_hash": "3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11"
-  },
-  {
-    "token": "0f8ad81b",
-    "abstraction": "MyAbstraction",
-    "filename": "MyAbstraction.1.827cfd7c.lump",
-    "sidecar_file": "MyAbstraction.1.827cfd7c.json",
-    "lump_size": 64,
-    "cw": 2,
-    "cc": 1,
-    "author": "",
-    "version": "2026.08.25",
-    "lump_version": 3,
-    "compiled_at": 1787660943.3916147,
-    "methods": [
-      {
-        "name": "run",
-        "offset": 0,
-        "length": 2
-      }
-    ],
-    "grants": [
-      "E"
-    ],
-    "binary_hash": "5120739b4fb8cc7c6999e560ae4b48c56228c1c190a76778b4d0b56153c4fc4d",
-    "petname": "",
-    "issue_number": 1,
-    "identity_hash": "654062b290784712f75bdaa55e4584c6af6215072698b8e579049da720ad75ed",
-    "dot_name": "MyAbstraction",
-    "issue_n": 1
   }
 ]

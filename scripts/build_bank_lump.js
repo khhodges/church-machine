@@ -39,6 +39,14 @@ const BANK_CAPABILITY_TYPES = [
         rights: ['R'],
         description: 'Readable source-memory capability for a Bank deposit.'
     },
+    {
+        name: 'BankVariable',
+        register: 'CR3',
+        gt_type: 'Abstract',
+        rights: ['E'],
+        proof_bound: true,
+        description: 'Typed E capability naming one validated Bank-managed LUMP variable.'
+    },
 ];
 
 global.ChurchAssembler = require(path.join(ROOT, 'simulator', 'assembler.js'));
@@ -85,6 +93,55 @@ function buildBankArtifact() {
     const api = buildApiDefinition(compiled, built.words);
     api.capability_types = BANK_CAPABILITY_TYPES.map(type => ({ ...type, rights: type.rights.slice() }));
     api.capability_abi = {
+        Create: {
+            status: { register: 'DR0', kind: 'value' },
+            inputs: [{
+                name: 'lump', register: 'CR1', kind: 'capability',
+                secure_type: 'Inform', rights: ['R']
+            }],
+            returns: {
+                name: 'variable', register: 'CR3', kind: 'capability',
+                secure_type: 'BankVariable', rights: ['E']
+            },
+        },
+        Read: {
+            status: { register: 'DR0', kind: 'value' },
+            inputs: [
+                { name: 'variable', register: 'CR3', kind: 'capability',
+                    secure_type: 'BankVariable', rights: ['E'] },
+                { name: 'offset', register: 'DR1', kind: 'value' },
+                { name: 'words', register: 'DR2', kind: 'value' },
+            ],
+            returns: {
+                name: 'readable', register: 'CR4', kind: 'capability',
+                secure_type: 'Inform', rights: ['R']
+            },
+        },
+        InspectVariable: {
+            status: { register: 'DR0', kind: 'value' },
+            inputs: [{ name: 'variable', register: 'CR3', kind: 'capability',
+                secure_type: 'BankVariable', rights: ['E'] }],
+            returns: { name: 'word_count', register: 'DR1', kind: 'value' },
+            outputs: [
+                { name: 'word_count', register: 'DR1', kind: 'value' },
+                { name: 'capacity', register: 'DR2', kind: 'value' },
+                { name: 'issue_n', register: 'DR3', kind: 'value' },
+                { name: 'lifecycle', register: 'DR4', kind: 'value',
+                    values: { active: 1, released: 2, revoked: 3, quarantined: 4 } },
+            ],
+        },
+        Release: {
+            status: { register: 'DR0', kind: 'value' },
+            inputs: [{ name: 'variable', register: 'CR3', kind: 'capability',
+                secure_type: 'BankVariable', rights: ['E'] }],
+            returns: { name: 'status', register: 'DR0', kind: 'value' },
+        },
+        RevokeVariable: {
+            status: { register: 'DR0', kind: 'value' },
+            inputs: [{ name: 'variable', register: 'CR3', kind: 'capability',
+                secure_type: 'BankVariable', rights: ['E'] }],
+            returns: { name: 'status', register: 'DR0', kind: 'value' },
+        },
         MintKey: {
             status: { register: 'DR0', kind: 'value' },
             returns: { name: 'owner_key', register: 'CR1', kind: 'capability', secure_type: 'BankOwnerKey' },
@@ -104,6 +161,12 @@ function buildBankArtifact() {
     };
     for (const method of api.methods) {
         if (api.capability_abi[method.name]) {
+            if (api.capability_abi[method.name].inputs) {
+                method.inputs = api.capability_abi[method.name].inputs;
+            }
+            if (api.capability_abi[method.name].outputs) {
+                method.outputs = api.capability_abi[method.name].outputs;
+            }
             method.returns = api.capability_abi[method.name].returns;
             method.status = api.capability_abi[method.name].status;
         }

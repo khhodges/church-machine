@@ -245,7 +245,8 @@ c-list row 0 and is registered in the LUMP manifest with `ns_slot: null` and
 resolve the Bank abstraction without reserving a hardware boot slot.
 
 Installing or calling Bank still mints its live authority through the runtime;
-the packaged SELF identity is not a lockbox authority. `MintKey(capacity)`
+the packaged SELF identity is not a lockbox authority. Bank has both the
+legacy owner-key lockbox API and the verified `Create(lump)` API. `MintKey`
 creates a private lockbox record with a dynamically allocated Namespace entry,
 but returns an opaque, object-scoped `BankOwnerKey` **capability in CR1**:
 
@@ -271,6 +272,39 @@ alone grants read or write access to the stored region.
 | `Revoke` | CR1 `BankOwnerKey` | All lockbox credentials invalidated; custody record quarantined |
 | `ExportRecovery` | CR1 `BankOwnerKey` | Authenticated ciphertext bound to the original owner GT and proof |
 | `Recover` | CR1 original `BankOwnerKey` + M-elevation | Fresh private NS entry and a replacement CR1 owner capability |
+
+### Verified Bank variables
+
+`Create(lump)` is the abstraction-custody operation. It accepts either a
+complete LUMP value or a **typed Inform `R` capability in CR1** that resolves
+the complete LUMP bytes. On success it returns a separate proof-bound
+`BankVariable` Abstract `E` capability in **CR3**. That capability represents
+the created Bank-managed variable; it is not a `BankOwnerKey`, raw GT integer,
+proof tuple, Namespace slot, or private address.
+
+| Method | Required typed authority | Result |
+|---|---|---|
+| `Create` | M elevation + CR1 Inform `R` LUMP capability (or verified LUMP value) | CR3 `BankVariable E`; DR0 status |
+| `InspectVariable` | CR3 `BankVariable E` | DR0 status; DR1 words; DR2 capacity; DR3 issue; DR4 lifecycle; safe identity/provenance metadata |
+| `Read` | CR3 `BankVariable E` + DR1/DR2 bounds | CR4 fresh bounded Inform `R` capability |
+| `Release` | CR3 `BankVariable E` | Wipe and retire the private variable allocation |
+| `RevokeVariable` | CR3 `BankVariable E` | Revoke authority, wipe and retire the private allocation |
+
+Bank verifies the binary header and encoded size, the `0xAB` embedded API and
+declared name, full binary hash, canonical name-plus-binary token, identity
+seal, and the compiler-owned SELF word at c-list row zero before it allocates
+or writes a private Outform record. All accompanying identity metadata is an
+assertion cross-checked against those bytes, never caller authority. The result
+is one LUMP per Bank variable. Its exposed `capacity` is the actual private
+allocator result (including any allocator rounding), while its exposed `words`
+is the encoded LUMP size; `Read`/`Create` is the explicit nested-value
+round-trip and never aliases private parent memory.
+
+Cryptographic seals prove integrity and the declared identity relationships;
+they do **not** prove publisher history or trusted genesis. A deployment that
+requires a stronger origin assertion must verify a trusted registry or
+attestation chain separately. An arbitrary caller-provided provenance label is
+recorded only as non-authoritative provenance and cannot elevate trust.
 
 Deposits validate the source GT type, current Namespace sequence, `R`
 permission, and offset/length bounds before writing any lockbox state. A

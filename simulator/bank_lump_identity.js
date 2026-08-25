@@ -4,8 +4,8 @@
     const identity = Object.freeze({
   "dot_name": "Bank",
   "issue_n": 1,
-  "token": "edfbedd4",
-  "binary_hash": "c50f06d855df6bb4c20d60caea9202c6ea7ddc00944cb31dd1697e58314d86de",
+  "token": "f386f8fe",
+  "binary_hash": "363a58a895fa5a6e8c596d881c637bfe26d6cce58314d64ee6d76a02a231a203",
   "identity_hash": "3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11",
   "self_gt": 186216846,
   "ns_slot": null,
@@ -19,6 +19,162 @@
     "fixed_hardware_boot_slot": false
   },
   "capability_abi": {
+    "Create": {
+      "status": {
+        "register": "DR0",
+        "kind": "value"
+      },
+      "inputs": [
+        {
+          "name": "lump",
+          "register": "CR1",
+          "kind": "capability",
+          "secure_type": "Inform",
+          "rights": [
+            "R"
+          ]
+        }
+      ],
+      "returns": {
+        "name": "variable",
+        "register": "CR3",
+        "kind": "capability",
+        "secure_type": "BankVariable",
+        "rights": [
+          "E"
+        ]
+      }
+    },
+    "Read": {
+      "status": {
+        "register": "DR0",
+        "kind": "value"
+      },
+      "inputs": [
+        {
+          "name": "variable",
+          "register": "CR3",
+          "kind": "capability",
+          "secure_type": "BankVariable",
+          "rights": [
+            "E"
+          ]
+        },
+        {
+          "name": "offset",
+          "register": "DR1",
+          "kind": "value"
+        },
+        {
+          "name": "words",
+          "register": "DR2",
+          "kind": "value"
+        }
+      ],
+      "returns": {
+        "name": "readable",
+        "register": "CR4",
+        "kind": "capability",
+        "secure_type": "Inform",
+        "rights": [
+          "R"
+        ]
+      }
+    },
+    "InspectVariable": {
+      "status": {
+        "register": "DR0",
+        "kind": "value"
+      },
+      "inputs": [
+        {
+          "name": "variable",
+          "register": "CR3",
+          "kind": "capability",
+          "secure_type": "BankVariable",
+          "rights": [
+            "E"
+          ]
+        }
+      ],
+      "returns": {
+        "name": "word_count",
+        "register": "DR1",
+        "kind": "value"
+      },
+      "outputs": [
+        {
+          "name": "word_count",
+          "register": "DR1",
+          "kind": "value"
+        },
+        {
+          "name": "capacity",
+          "register": "DR2",
+          "kind": "value"
+        },
+        {
+          "name": "issue_n",
+          "register": "DR3",
+          "kind": "value"
+        },
+        {
+          "name": "lifecycle",
+          "register": "DR4",
+          "kind": "value",
+          "values": {
+            "active": 1,
+            "released": 2,
+            "revoked": 3,
+            "quarantined": 4
+          }
+        }
+      ]
+    },
+    "Release": {
+      "status": {
+        "register": "DR0",
+        "kind": "value"
+      },
+      "inputs": [
+        {
+          "name": "variable",
+          "register": "CR3",
+          "kind": "capability",
+          "secure_type": "BankVariable",
+          "rights": [
+            "E"
+          ]
+        }
+      ],
+      "returns": {
+        "name": "status",
+        "register": "DR0",
+        "kind": "value"
+      }
+    },
+    "RevokeVariable": {
+      "status": {
+        "register": "DR0",
+        "kind": "value"
+      },
+      "inputs": [
+        {
+          "name": "variable",
+          "register": "CR3",
+          "kind": "capability",
+          "secure_type": "BankVariable",
+          "rights": [
+            "E"
+          ]
+        }
+      ],
+      "returns": {
+        "name": "status",
+        "register": "DR0",
+        "kind": "value"
+      }
+    },
     "MintKey": {
       "status": {
         "register": "DR0",

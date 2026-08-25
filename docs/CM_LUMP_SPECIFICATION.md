@@ -1338,14 +1338,68 @@ proof validation, private Outform storage, complete zeroization, and
 server-authorized recovery. A LUMP implementation must never embed a PassKey
 proof, a private lockbox address, or a reusable custody GT.
 
-Bank's callable ABI is capability-typed: an object-scoped `BankOwnerKey`
-(Abstract + `E`, with its independent 128-bit proof) is supplied only in
-`CR1`; `Deposit` receives its readable Inform source capability only in `CR2`.
-The embedded API frame records those secure types. It must reject a raw GT,
-proof words, or a reconstructed owner handle in DRs. Capacity, offsets, word
-counts, kinds, protected-state handles, and result/status values are ordinary
-DR values. `MintKey`, `ObtainPassKey`, and `Recover` return owner authority in
-`CR1`; `Withdraw` returns its fresh Inform capability in `CR2`.
+Bank has two deliberately distinct custody interfaces. The original lockbox
+interface uses an object-scoped `BankOwnerKey` (Abstract + `E`, with its
+independent 128-bit proof) only in `CR1`; `Deposit` receives its readable
+Inform source only in `CR2`. The verified abstraction interface starts with
+`Create(lump)`:
+
+| Method | Inputs | Outputs | Meaning |
+|---|---|---|---|
+| `Create` | CR1 typed Inform `R` LUMP capability **or** a complete LUMP value; its canonical identity metadata accompanies the value | DR0 status; CR3 `BankVariable` Abstract + `E` capability | Verify and privately commit exactly one complete self-defining `typ=lump` binary. |
+| `InspectVariable` | CR3 `BankVariable` | DR0 status; DR1 word count; DR2 capacity; DR3 issue; DR4 lifecycle | Return scalar inspection fields plus non-sensitive identity/provenance metadata without a private location. |
+| `Read` | CR3 `BankVariable`; DR1 offset; DR2 word count | DR0 status; CR4 fresh Inform `R` capability | Copy only the requested in-bounds words into a new public readable allocation. |
+| `Release` | CR3 `BankVariable` | DR0 status | Zeroize and retire the private allocation; the variable capability is stale thereafter. |
+| `RevokeVariable` | CR3 `BankVariable` | DR0 status | Revoke the variable authority, zeroize and retire its private allocation. |
+
+The capability registers above are type checked by the live binding. A raw GT,
+proof words, a Namespace index, a memory address, or a reconstructed handle in
+DRs is not a substitute for either `BankOwnerKey` or `BankVariable`. `Create`
+does not return an owner credential, a private Namespace address, or a private
+GT. `BankOwnerKey` remains the authority for the separate lockbox lifecycle
+(`MintKey`, `Deposit`, `Withdraw`, `Inspect`, `Revoke`, `ObtainPassKey`,
+`ExportRecovery`, and `Recover`); `BankVariable` is the capability that names
+the created abstraction value. This separation prevents callers from treating
+the static LUMP identity or a scalar value as custody authority.
+
+Before `Create` reserves an allocation or writes a Namespace entry, the binding
+derives and checks all of the following from the submitted bytes and their
+self-definition frame:
+
+1. the header magic, `typ=lump`, power-of-two size, `cw`/`cc` bounds, and a
+   present `0xAB` self-definition frame;
+2. the embedded API JSON and its declared abstraction name;
+3. the full SHA-256 binary seal and the canonical token
+   `SHA-256(name || complete_big_endian_binary)[:8]`;
+4. the identity seal `SHA-256(name#issue)`, its derived compiler-owned SELF
+   GT, and c-list row zero's exact equality to that SELF GT; and
+5. every supplied metadata assertion (`dot_name`, issue, token, binary hash,
+   identity hash, SELF GT, and optional identity string) against those
+   independently recomputed relationships.
+
+Thus metadata tells Bank what relationship the caller is asserting, but cannot
+make forged bytes acceptable. A malformed header, a stale/copy-pasted token,
+an altered code word, a forged API name, a mismatched identity hash, or a
+different c-list SELF fails before any private custody state is published.
+
+These checks establish **integrity and identity consistency**, not historical
+genesis. A matching token and identity seal prove that accepted bytes are
+self-consistent under the declared `name#issue`; they do not prove who first
+published the abstraction or that a particular source registry approved it.
+Any caller that requires that stronger claim must require a declared trusted
+attestation or registry chain in addition to Bank's byte validation. The
+current API records such a caller declaration as non-authoritative provenance;
+it never upgrades it to a verified genesis claim merely because it was supplied
+by the caller.
+
+A Bank variable contains **one complete LUMP**, not an indexed collection.
+`words` is the exact encoded binary size. `capacity` is the actual private
+Namespace-backed allocation returned by the allocator: an exact fit remains an
+exact fit, while allocator power-of-two rounding is visible only through the
+safe capacity projection. Nested custody is explicit: `Read` produces a fresh
+bounded Inform capability, and `Create` may validate that returned complete
+LUMP into a distinct Bank variable. No nested value receives an implicit
+alias to the parent’s private storage.
 
 The packaged manifest/binary/sidecar are validated during Bank artifact build,
 then emit a browser runtime identity projection. `SystemAbstractions` binds the

@@ -19,6 +19,40 @@ abstraction Bank {
     capabilities {
     }
 
+    // Create(lump: CR1 Inform R) -> BankVariable E capability in CR3,
+    // validation/commit status in DR0.  The source must be a complete,
+    // self-defining LUMP; the live binding verifies its bytes and metadata
+    // before allocating private custody.
+    method Create(lump: capability Inform R) {
+        return(1)
+    }
+
+    // Read and Inspect operate on the typed E capability returned by Create.
+    // The binding returns a fresh readable Inform capability in CR4 for Read.
+    // Inspect writes status=DR0, words=DR1, capacity=DR2, issue=DR3, and
+    // lifecycle=DR4; private locations and tokens are never materialised.
+    method Read(variable: capability BankVariable E, offset, words) {
+        if (offset < 0) {
+            return(0)
+        }
+        if (words <= 0) {
+            return(0)
+        }
+        return(1)
+    }
+
+    method InspectVariable(variable: capability BankVariable E) {
+        return(1)
+    }
+
+    method Release(variable: capability BankVariable E) {
+        return(1)
+    }
+
+    method RevokeVariable(variable: capability BankVariable E) {
+        return(1)
+    }
+
     // MintKey(capacity: DR1) -> BankOwnerKey capability in CR1, status in DR0.
     method MintKey(capacity) {
         if (capacity <= 0) {
