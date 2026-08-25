@@ -1564,6 +1564,7 @@ def site_search():
                 continue
             with open(filepath, "r", encoding="utf-8", errors="replace") as source:
                 raw = source.read()
+            modified_at = os.path.getmtime(filepath)
         except (OSError, UnicodeError):
             continue
         extension = os.path.splitext(filepath)[1].lower()
@@ -1594,9 +1595,14 @@ def site_search():
             "kind": kind,
             "excerpt": excerpt,
             "_score": title_score * 20 + path_score * 5,
+            "_modified_at": modified_at,
         })
 
-    results.sort(key=lambda item: (-item.pop("_score"), item["title"].lower()))
+    results.sort(key=lambda item: (
+        -item.pop("_modified_at"),
+        -item.pop("_score"),
+        item["title"].lower(),
+    ))
     return jsonify({"query": query, "results": results})
 
 

@@ -622,6 +622,13 @@
                     event.preventDefault();
                     searchSite();
                 });
+                searchInput.addEventListener('keydown', function(event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        window.clearTimeout(searchTimer);
+                        searchSite();
+                    }
+                });
                 searchInput.addEventListener('input', function() {
                     window.clearTimeout(searchTimer);
                     searchTimer = window.setTimeout(searchSite, 180);

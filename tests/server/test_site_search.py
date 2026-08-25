@@ -33,6 +33,24 @@ def test_site_search_includes_bank_source(client):
     assert bank["url"] == "/code/simulator/cloomc/bank.cloomc"
 
 
+def test_site_search_results_are_newest_first(client):
+    response = client.get("/api/site-search?q=source")
+
+    assert response.status_code == 200
+    results = response.get_json()["results"]
+    assert len(results) > 1
+
+    paths = [result["path"] for result in results]
+    modified_times = [
+        os.path.getmtime(
+            _app_module._site_code_filepath(path.removeprefix("/code/"))
+        ) if path.startswith("/code/")
+        else os.path.getmtime(os.path.join(ROOT, path.lstrip("/")))
+        for path in paths
+    ]
+    assert modified_times == sorted(modified_times, reverse=True)
+
+
 def test_code_viewer_escapes_source_as_html(client):
     response = client.get("/code/simulator/cloomc/bank.cloomc")
 
