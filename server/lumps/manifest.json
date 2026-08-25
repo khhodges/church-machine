@@ -2154,7 +2154,7 @@
     "identity_hash": "f3b48e1b7403b0e77da69bc18f7b60db71061bfc1b9c0bc672e2ff282d11d1fe"
   },
   {
-    "token": "5382e0e2",
+    "token": "edfbedd4",
     "abstraction": "Bank",
     "dot_name": "Bank",
     "issue_n": 1,
@@ -2162,7 +2162,7 @@
     "ns_slot_policy": "dynamic",
     "boot_resident": false,
     "lump_size": 4096,
-    "cw": 426,
+    "cw": 267,
     "cc": 1,
     "typ": 0,
     "status": "released",
@@ -2179,38 +2179,58 @@
         "inputs": [
           {
             "name": "capacity",
-            "register": "DR1"
+            "register": "DR1",
+            "kind": "value"
           }
         ],
         "returns": {
-          "name": "result",
-          "register": "DR0"
+          "name": "owner_key",
+          "register": "CR1",
+          "kind": "capability",
+          "secure_type": "BankOwnerKey"
+        },
+        "status": {
+          "register": "DR0",
+          "kind": "value"
         }
       },
       {
         "name": "Deposit",
         "index": 1,
-        "branchOffset": 57,
+        "branchOffset": 51,
         "inputs": [
           {
-            "name": "owner_handle",
-            "register": "DR1"
+            "name": "owner_key",
+            "register": "CR1",
+            "kind": "capability",
+            "secure_type": "BankOwnerKey",
+            "rights": [
+              "E"
+            ]
           },
           {
-            "name": "source_gt",
-            "register": "DR2"
+            "name": "source",
+            "register": "CR2",
+            "kind": "capability",
+            "secure_type": "Inform",
+            "rights": [
+              "R"
+            ]
           },
           {
             "name": "offset",
-            "register": "DR3"
+            "register": "DR1",
+            "kind": "value"
           },
           {
             "name": "words",
-            "register": "DR4"
+            "register": "DR2",
+            "kind": "value"
           },
           {
             "name": "kind",
-            "register": "DR5"
+            "register": "DR3",
+            "kind": "value"
           }
         ],
         "returns": {
@@ -2221,26 +2241,42 @@
       {
         "name": "Withdraw",
         "index": 2,
-        "branchOffset": 144,
+        "branchOffset": 96,
         "inputs": [
           {
-            "name": "owner_handle",
-            "register": "DR1"
+            "name": "owner_key",
+            "register": "CR1",
+            "kind": "capability",
+            "secure_type": "BankOwnerKey",
+            "rights": [
+              "E"
+            ]
           }
         ],
         "returns": {
-          "name": "result",
-          "register": "DR0"
+          "name": "valuable",
+          "register": "CR2",
+          "kind": "capability",
+          "secure_type": "Inform"
+        },
+        "status": {
+          "register": "DR0",
+          "kind": "value"
         }
       },
       {
         "name": "Inspect",
         "index": 3,
-        "branchOffset": 194,
+        "branchOffset": 128,
         "inputs": [
           {
-            "name": "owner_handle",
-            "register": "DR1"
+            "name": "owner_key",
+            "register": "CR1",
+            "kind": "capability",
+            "secure_type": "BankOwnerKey",
+            "rights": [
+              "E"
+            ]
           }
         ],
         "returns": {
@@ -2251,11 +2287,16 @@
       {
         "name": "Revoke",
         "index": 4,
-        "branchOffset": 224,
+        "branchOffset": 140,
         "inputs": [
           {
-            "name": "owner_handle",
-            "register": "DR1"
+            "name": "owner_key",
+            "register": "CR1",
+            "kind": "capability",
+            "secure_type": "BankOwnerKey",
+            "rights": [
+              "E"
+            ]
           }
         ],
         "returns": {
@@ -2266,26 +2307,42 @@
       {
         "name": "ObtainPassKey",
         "index": 5,
-        "branchOffset": 266,
+        "branchOffset": 164,
         "inputs": [
           {
-            "name": "owner_handle",
-            "register": "DR1"
+            "name": "owner_key",
+            "register": "CR1",
+            "kind": "capability",
+            "secure_type": "BankOwnerKey",
+            "rights": [
+              "E"
+            ]
           }
         ],
         "returns": {
-          "name": "result",
-          "register": "DR0"
+          "name": "owner_key",
+          "register": "CR1",
+          "kind": "capability",
+          "secure_type": "BankOwnerKey"
+        },
+        "status": {
+          "register": "DR0",
+          "kind": "value"
         }
       },
       {
         "name": "ExportRecovery",
         "index": 6,
-        "branchOffset": 314,
+        "branchOffset": 188,
         "inputs": [
           {
-            "name": "owner_handle",
-            "register": "DR1"
+            "name": "owner_key",
+            "register": "CR1",
+            "kind": "capability",
+            "secure_type": "BankOwnerKey",
+            "rights": [
+              "E"
+            ]
           }
         ],
         "returns": {
@@ -2296,26 +2353,38 @@
       {
         "name": "Recover",
         "index": 7,
-        "branchOffset": 345,
+        "branchOffset": 201,
         "inputs": [
           {
             "name": "protected_state",
-            "register": "DR1"
+            "register": "DR1",
+            "kind": "value"
           },
           {
-            "name": "original_handle",
-            "register": "DR2"
+            "name": "original_key",
+            "register": "CR1",
+            "kind": "capability",
+            "secure_type": "BankOwnerKey",
+            "rights": [
+              "E"
+            ]
           }
         ],
         "returns": {
-          "name": "result",
-          "register": "DR0"
+          "name": "owner_key",
+          "register": "CR1",
+          "kind": "capability",
+          "secure_type": "BankOwnerKey"
+        },
+        "status": {
+          "register": "DR0",
+          "kind": "value"
         }
       },
       {
         "name": "List",
         "index": 8,
-        "branchOffset": 408,
+        "branchOffset": 249,
         "inputs": [],
         "returns": {
           "name": "result",
@@ -2323,6 +2392,77 @@
         }
       }
     ],
+    "capability_types": [
+      {
+        "name": "BankOwnerKey",
+        "register": "CR1",
+        "gt_type": "Abstract",
+        "rights": [
+          "E"
+        ],
+        "proof_bound": true,
+        "description": "Object-scoped owner authority with an independent 128-bit proof."
+      },
+      {
+        "name": "Inform",
+        "register": "CR2",
+        "gt_type": "Inform",
+        "rights": [
+          "R"
+        ],
+        "description": "Readable source-memory capability for a Bank deposit."
+      }
+    ],
+    "capability_abi": {
+      "MintKey": {
+        "status": {
+          "register": "DR0",
+          "kind": "value"
+        },
+        "returns": {
+          "name": "owner_key",
+          "register": "CR1",
+          "kind": "capability",
+          "secure_type": "BankOwnerKey"
+        }
+      },
+      "Withdraw": {
+        "status": {
+          "register": "DR0",
+          "kind": "value"
+        },
+        "returns": {
+          "name": "valuable",
+          "register": "CR2",
+          "kind": "capability",
+          "secure_type": "Inform"
+        }
+      },
+      "ObtainPassKey": {
+        "status": {
+          "register": "DR0",
+          "kind": "value"
+        },
+        "returns": {
+          "name": "owner_key",
+          "register": "CR1",
+          "kind": "capability",
+          "secure_type": "BankOwnerKey"
+        }
+      },
+      "Recover": {
+        "status": {
+          "register": "DR0",
+          "kind": "value"
+        },
+        "returns": {
+          "name": "owner_key",
+          "register": "CR1",
+          "kind": "capability",
+          "secure_type": "BankOwnerKey"
+        }
+      }
+    },
     "permissions": {
       "caller_grants": [
         "E"
@@ -2338,80 +2478,12 @@
       "registry_index": 54,
       "dispatch": "SystemAbstractions",
       "authority": "proof-bound dynamic custody",
+      "credential_abi": "capability-register-v1",
       "fixed_hardware_boot_slot": false
     },
-    "filename": "Bank.1.5382e0e2.lump",
-    "sidecar_file": "Bank.1.5382e0e2.json",
-    "binary_hash": "6985e92299b1c9828a7f0633fd4ddab74b9d356be0568ae4bc36aba0d5594982",
+    "filename": "Bank.1.edfbedd4.lump",
+    "sidecar_file": "Bank.1.edfbedd4.json",
+    "binary_hash": "c50f06d855df6bb4c20d60caea9202c6ea7ddc00944cb31dd1697e58314d86de",
     "identity_hash": "3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11"
-  },
-  {
-    "token": "00003600",
-    "abstraction": "Bank",
-    "filename": "Bank.1.dad46c69.lump",
-    "sidecar_file": "Bank.1.dad46c69.json",
-    "lump_size": 512,
-    "cw": 417,
-    "cc": 1,
-    "author": "",
-    "version": "2026.08.24",
-    "lump_version": 1,
-    "compiled_at": 1787612211.6267831,
-    "methods": [
-      {
-        "name": "MintKey",
-        "offset": 0,
-        "length": 47
-      },
-      {
-        "name": "Deposit",
-        "offset": 47,
-        "length": 87
-      },
-      {
-        "name": "Withdraw",
-        "offset": 134,
-        "length": 50
-      },
-      {
-        "name": "Inspect",
-        "offset": 184,
-        "length": 30
-      },
-      {
-        "name": "Revoke",
-        "offset": 214,
-        "length": 42
-      },
-      {
-        "name": "ObtainPassKey",
-        "offset": 256,
-        "length": 48
-      },
-      {
-        "name": "ExportRecovery",
-        "offset": 304,
-        "length": 31
-      },
-      {
-        "name": "Recover",
-        "offset": 335,
-        "length": 63
-      },
-      {
-        "name": "List",
-        "offset": 398,
-        "length": 19
-      }
-    ],
-    "grants": [
-      "E"
-    ],
-    "binary_hash": "d0f1be3d7d7be7f8ca70356e8cf53b46f1595f4f84900c45b6cb86900d9236c6",
-    "petname": "",
-    "issue_number": 1,
-    "identity_hash": "3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11",
-    "dot_name": "Bank",
-    "issue_n": 1
   }
 ]

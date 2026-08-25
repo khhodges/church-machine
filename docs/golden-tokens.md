@@ -244,28 +244,33 @@ c-list row 0 and is registered in the LUMP manifest with `ns_slot: null` and
 `ns_slot_policy: "dynamic"`. That symbolic identity lets the IDE and loader
 resolve the Bank abstraction without reserving a hardware boot slot.
 
-Installing or calling Bank still mints its live Inform E-GT through the runtime;
+Installing or calling Bank still mints its live authority through the runtime;
 the packaged SELF identity is not a lockbox authority. `MintKey(capacity)`
 creates a private lockbox record with a dynamically allocated Namespace entry,
-but callers receive only an opaque, object-scoped PassKey:
+but returns an opaque, object-scoped `BankOwnerKey` **capability in CR1**:
 
 ```text
-{ gt: Abstract GT identifier, proof: [four 32-bit CSPRNG words] }
+{ register: CR1, secure_type: BankOwnerKey, gt: Abstract GT identifier,
+  proof: [four 32-bit CSPRNG words] }
 ```
 
 The GT identifies the lockbox credential, while the independent 128-bit proof
-authorizes its use. Neither a Namespace slot number nor a copied GT alone grants
-read or write access to the stored region.
+authorizes its use. Bank accepts that authority only through the typed CR1
+capability ABI; a copied GT, proof words, or an owner-handle integer supplied in
+DRs fails. `Deposit` similarly accepts its readable source GT only as a typed
+Inform `R` capability in CR2. Capacity, offsets, word counts, kinds, and status
+values are ordinary DR values. Neither a Namespace slot number nor a copied GT
+alone grants read or write access to the stored region.
 
 | Bank method | Required authority | Result |
 |---|---|---|
-| `MintKey` | M-elevated programmer authority | Empty lockbox owner key |
-| `Deposit` | Lockbox key + source `R` GT | Bounded copy into custody |
-| `Inspect` | Lockbox key | Non-sensitive state and size metadata |
-| `Withdraw` | Lockbox key | Fresh GT for a copied-out valuable; lockbox is quarantined |
-| `Revoke` | Owner key | All lockbox credentials invalidated; custody record quarantined |
-| `ExportRecovery` | Owner key | Authenticated ciphertext bound to the original owner GT and proof |
-| `Recover` | Original owner key + M-elevation | Fresh private NS entry and a replacement owner key |
+| `MintKey` | M-elevated programmer authority | Empty `BankOwnerKey` capability in CR1 |
+| `Deposit` | CR1 `BankOwnerKey` + CR2 Inform `R` capability | Bounded copy into custody |
+| `Inspect` | CR1 `BankOwnerKey` | Non-sensitive state and size metadata |
+| `Withdraw` | CR1 `BankOwnerKey` | Fresh Inform capability in CR2; lockbox is quarantined |
+| `Revoke` | CR1 `BankOwnerKey` | All lockbox credentials invalidated; custody record quarantined |
+| `ExportRecovery` | CR1 `BankOwnerKey` | Authenticated ciphertext bound to the original owner GT and proof |
+| `Recover` | CR1 original `BankOwnerKey` + M-elevation | Fresh private NS entry and a replacement CR1 owner capability |
 
 Deposits validate the source GT type, current Namespace sequence, `R`
 permission, and offset/length bounds before writing any lockbox state. A

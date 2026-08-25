@@ -10,8 +10,8 @@
 (function exposeBankLumpBinding(root) {
     const DOT_NAME = 'Bank';
     const ISSUE_N = 1;
-    const TOKEN = '5382e0e2';
-    const BINARY_HASH = '6985e92299b1c9828a7f0633fd4ddab74b9d356be0568ae4bc36aba0d5594982';
+    const TOKEN = 'edfbedd4';
+    const BINARY_HASH = 'c50f06d855df6bb4c20d60caea9202c6ea7ddc00944cb31dd1697e58314d86de';
     const IDENTITY_HASH = '3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11';
     const SELF_GT = 0x0B19718E;
     const REGISTRY_INDEX = 54;
@@ -46,8 +46,18 @@
         if (binding.registry_index !== REGISTRY_INDEX ||
             binding.dispatch !== DISPATCH ||
             binding.authority !== AUTHORITY ||
+            binding.credential_abi !== 'capability-register-v1' ||
             binding.fixed_hardware_boot_slot !== false) {
             return fail('projection does not match the canonical Bank runtime binding');
+        }
+        const capabilityABI = identity.capability_abi || {};
+        const ownerReturn = capabilityABI.MintKey && capabilityABI.MintKey.returns;
+        const withdrawnValue = capabilityABI.Withdraw && capabilityABI.Withdraw.returns;
+        if (!ownerReturn || ownerReturn.register !== 'CR1' ||
+            ownerReturn.kind !== 'capability' || ownerReturn.secure_type !== 'BankOwnerKey' ||
+            !withdrawnValue || withdrawnValue.register !== 'CR2' ||
+            withdrawnValue.kind !== 'capability' || withdrawnValue.secure_type !== 'Inform') {
+            return fail('projection does not describe the canonical capability-register ABI');
         }
         if (identity.self_gt !== SELF_GT) {
             return fail('Bank SELF does not identify canonical Bank#1');

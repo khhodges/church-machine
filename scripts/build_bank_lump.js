@@ -23,6 +23,23 @@ const SOURCE_FILE = path.join(ROOT, 'simulator', 'cloomc', 'bank.cloomc');
 const IDENTITY_PROJECTION_PATH = path.join(ROOT, 'simulator', 'bank_lump_identity.js');
 const DOT_NAME = 'Bank';
 const ISSUE_N = 1;
+const BANK_CAPABILITY_TYPES = [
+    {
+        name: 'BankOwnerKey',
+        register: 'CR1',
+        gt_type: 'Abstract',
+        rights: ['E'],
+        proof_bound: true,
+        description: 'Object-scoped owner authority with an independent 128-bit proof.'
+    },
+    {
+        name: 'Inform',
+        register: 'CR2',
+        gt_type: 'Inform',
+        rights: ['R'],
+        description: 'Readable source-memory capability for a Bank deposit.'
+    },
+];
 
 global.ChurchAssembler = require(path.join(ROOT, 'simulator', 'assembler.js'));
 const CLOOMCCompiler = require(path.join(ROOT, 'simulator', 'cloomc_compiler.js'));
@@ -66,6 +83,31 @@ function buildBankArtifact() {
 
     const built = buildLump(compiled, { allocationWords: 64 });
     const api = buildApiDefinition(compiled, built.words);
+    api.capability_types = BANK_CAPABILITY_TYPES.map(type => ({ ...type, rights: type.rights.slice() }));
+    api.capability_abi = {
+        MintKey: {
+            status: { register: 'DR0', kind: 'value' },
+            returns: { name: 'owner_key', register: 'CR1', kind: 'capability', secure_type: 'BankOwnerKey' },
+        },
+        Withdraw: {
+            status: { register: 'DR0', kind: 'value' },
+            returns: { name: 'valuable', register: 'CR2', kind: 'capability', secure_type: 'Inform' },
+        },
+        ObtainPassKey: {
+            status: { register: 'DR0', kind: 'value' },
+            returns: { name: 'owner_key', register: 'CR1', kind: 'capability', secure_type: 'BankOwnerKey' },
+        },
+        Recover: {
+            status: { register: 'DR0', kind: 'value' },
+            returns: { name: 'owner_key', register: 'CR1', kind: 'capability', secure_type: 'BankOwnerKey' },
+        },
+    };
+    for (const method of api.methods) {
+        if (api.capability_abi[method.name]) {
+            method.returns = api.capability_abi[method.name].returns;
+            method.status = api.capability_abi[method.name].status;
+        }
+    }
     const identityString = `${DOT_NAME}#${ISSUE_N}`;
     const selfGT = selfIdentityGT(identityString);
 
@@ -84,6 +126,7 @@ function buildBankArtifact() {
         registry_index: 54,
         dispatch: 'SystemAbstractions',
         authority: 'proof-bound dynamic custody',
+        credential_abi: 'capability-register-v1',
         fixed_hardware_boot_slot: false,
     };
     const permissions = {
@@ -112,6 +155,8 @@ function buildBankArtifact() {
         author: 'Church Machine',
         grants: ['E'],
         methods,
+        capability_types: api.capability_types,
+        capability_abi: api.capability_abi,
         permissions,
         self_gt: selfGT,
         runtime_binding: runtimeBinding,
@@ -171,6 +216,7 @@ function identityProjection(artifact) {
         ns_slot_policy: entry.ns_slot_policy,
         boot_resident: entry.boot_resident,
         runtime_binding: entry.runtime_binding,
+        capability_abi: entry.capability_abi,
     };
 }
 

@@ -4,8 +4,8 @@
     const identity = Object.freeze({
   "dot_name": "Bank",
   "issue_n": 1,
-  "token": "5382e0e2",
-  "binary_hash": "6985e92299b1c9828a7f0633fd4ddab74b9d356be0568ae4bc36aba0d5594982",
+  "token": "edfbedd4",
+  "binary_hash": "c50f06d855df6bb4c20d60caea9202c6ea7ddc00944cb31dd1697e58314d86de",
   "identity_hash": "3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11",
   "self_gt": 186216846,
   "ns_slot": null,
@@ -15,7 +15,58 @@
     "registry_index": 54,
     "dispatch": "SystemAbstractions",
     "authority": "proof-bound dynamic custody",
+    "credential_abi": "capability-register-v1",
     "fixed_hardware_boot_slot": false
+  },
+  "capability_abi": {
+    "MintKey": {
+      "status": {
+        "register": "DR0",
+        "kind": "value"
+      },
+      "returns": {
+        "name": "owner_key",
+        "register": "CR1",
+        "kind": "capability",
+        "secure_type": "BankOwnerKey"
+      }
+    },
+    "Withdraw": {
+      "status": {
+        "register": "DR0",
+        "kind": "value"
+      },
+      "returns": {
+        "name": "valuable",
+        "register": "CR2",
+        "kind": "capability",
+        "secure_type": "Inform"
+      }
+    },
+    "ObtainPassKey": {
+      "status": {
+        "register": "DR0",
+        "kind": "value"
+      },
+      "returns": {
+        "name": "owner_key",
+        "register": "CR1",
+        "kind": "capability",
+        "secure_type": "BankOwnerKey"
+      }
+    },
+    "Recover": {
+      "status": {
+        "register": "DR0",
+        "kind": "value"
+      },
+      "returns": {
+        "name": "owner_key",
+        "register": "CR1",
+        "kind": "capability",
+        "secure_type": "BankOwnerKey"
+      }
+    }
   }
 });
     if (typeof module !== 'undefined' && module.exports) module.exports = identity;

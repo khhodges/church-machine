@@ -31,6 +31,27 @@ sim.bootComplete = true;
 sim.mElevation = true;
 registry.dispatchMethod(5, 'Init', sim, {});
 
+// The direct registry test harness adapts ergonomic named inputs to the same
+// typed CR ABI a LUMP caller uses. Keep the original dispatcher so the suite
+// can also prove that raw DR credentials and malformed capabilities fail.
+const rawBankDispatch = registry.dispatchMethod.bind(registry);
+registry.dispatchMethod = (index, method, targetSim, args = {}) => {
+    if (index !== 54) return rawBankDispatch(index, method, targetSim, args);
+    const capabilities = { ...(args.capabilities || {}) };
+    const owner = args.bankKey || args.passKey || args.passkey;
+    if (!capabilities.ownerKey && owner && owner.secure_type === 'BankOwnerKey') {
+        capabilities.ownerKey = owner;
+    }
+    const sourceGT = args.sourceGT !== undefined ? args.sourceGT : args.sourceGt;
+    if (!capabilities.source && sourceGT !== undefined) {
+        capabilities.source = {
+            register: 'CR2', kind: 'capability', secure_type: 'Inform',
+            gt_type: 'Inform', rights: ['R'], gt: sourceGT
+        };
+    }
+    return rawBankDispatch(index, method, targetSim, { ...args, capabilities });
+};
+
 let accessCount = 0;
 const stored = registry.dispatchMethod(5, 'SecureObjectAdd', sim, {
     name: 'Stored.Lockbox',
@@ -123,6 +144,24 @@ check('BANK09: MintKey creates an opaque dynamic lockbox key', minted.ok &&
     minted.result.nsIndex === undefined);
 const lockboxId = minted.result.lockboxId;
 const bankKey = minted.result.bankKey;
+check('BANK09b: MintKey returns a tagged CR1 BankOwnerKey capability',
+    bankKey.register === 'CR1' && bankKey.kind === 'capability' &&
+    bankKey.secure_type === 'BankOwnerKey' && bankKey.gt_type === 'Abstract' &&
+    bankKey.rights.includes('E') && Array.isArray(bankKey.proof) && bankKey.proof.length === 4);
+const rawDrCredential = rawBankDispatch(54, 'Inspect', sim, {
+    lockboxId, dr1: bankKey.gt, dr2: bankKey.proof[0], dr3: bankKey.proof[1],
+    dr4: bankKey.proof[2], dr5: bankKey.proof[3]
+});
+check('BANK09c: raw DR credentials cannot authorise a Bank operation',
+    !rawDrCredential.ok && rawDrCredential.fault === 'NO_CAPABILITY');
+const forgedOwnerCapability = rawBankDispatch(54, 'Inspect', sim, {
+    lockboxId,
+    capabilities: {
+        ownerKey: { ...bankKey, secure_type: 'Inform', gt_type: 'Inform', register: 'CR2', rights: ['R'] }
+    }
+});
+check('BANK09d: a forged or wrong-typed owner capability is rejected',
+    !forgedOwnerCapability.ok && forgedOwnerCapability.fault === 'NO_CAPABILITY');
 const firstLockbox = systemAbs._bankState.lockboxes[lockboxId];
 const reissued = registry.dispatchMethod(54, 'ObtainPassKey', sim, { lockboxId, bankKey });
 const reissuedKey = reissued.result.passKey;

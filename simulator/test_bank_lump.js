@@ -85,6 +85,23 @@ check('BANK-LUMP09: manifest method table and E grant match the compiled artifac
     JSON.stringify(entry.grants) === JSON.stringify(['E']) &&
     entry.methods.map(method => method.name).join(',') ===
         'MintKey,Deposit,Withdraw,Inspect,Revoke,ObtainPassKey,ExportRecovery,Recover,List');
+const deposit = entry.methods.find(method => method.name === 'Deposit');
+const mintKey = entry.methods.find(method => method.name === 'MintKey');
+const recover = entry.methods.find(method => method.name === 'Recover');
+check('BANK-LUMP09b: Bank records typed CR inputs while scalar values remain DR inputs',
+    deposit &&
+    JSON.stringify(deposit.inputs) === JSON.stringify([
+        { name: 'owner_key', register: 'CR1', kind: 'capability', secure_type: 'BankOwnerKey', rights: ['E'] },
+        { name: 'source', register: 'CR2', kind: 'capability', secure_type: 'Inform', rights: ['R'] },
+        { name: 'offset', register: 'DR1', kind: 'value' },
+        { name: 'words', register: 'DR2', kind: 'value' },
+        { name: 'kind', register: 'DR3', kind: 'value' },
+    ]) &&
+    mintKey && mintKey.returns.register === 'CR1' &&
+    mintKey.returns.secure_type === 'BankOwnerKey' &&
+    recover && recover.inputs[0].register === 'DR1' && recover.inputs[1].register === 'CR1' &&
+    entry.runtime_binding.credential_abi === 'capability-register-v1' &&
+    !source.includes('owner_handle') && !source.includes('source_gt'));
 
 const registry = new AbstractionRegistry();
 const systemAbs = new SystemAbstractions(registry);

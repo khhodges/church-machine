@@ -1599,20 +1599,35 @@ class SystemAbstractions {
         const registry = this.registry;
         const MAX_CAPACITY = 0x20000;
 
+        // Bank credentials are typed Church capabilities, not DR payloads.
+        // A caller must place an owner capability in CR1; its proof travels with
+        // that protected capability object and is never reconstructed from
+        // dr1…dr5, a raw integer GT, or a loose proof array.
+        const makeOwnerCapability = (passKey) => ({
+            register: 'CR1',
+            kind: 'capability',
+            secure_type: 'BankOwnerKey',
+            gt_type: 'Abstract',
+            rights: ['E'],
+            gt: passKey.gt >>> 0,
+            proof: Array.isArray(passKey.proof) ? passKey.proof.map(word => word >>> 0) : []
+        });
+        const ownerCapabilityFor = (args) => {
+            const capabilities = args && args.capabilities;
+            const capability = capabilities && (capabilities.owner_key || capabilities.ownerKey);
+            if (!capability || typeof capability !== 'object' ||
+                    capability.register !== 'CR1' ||
+                    capability.kind !== 'capability' ||
+                    capability.secure_type !== 'BankOwnerKey' ||
+                    capability.gt_type !== 'Abstract' ||
+                    !Array.isArray(capability.rights) || !capability.rights.includes('E')) {
+                return null;
+            }
+            return capability;
+        };
         const keyFor = (args) => {
-            if (!args) return {};
-            if (args.passKey && typeof args.passKey === 'object') return args.passKey;
-            if (args.passkey && typeof args.passkey === 'object') return args.passkey;
-            if (args.bankKey && typeof args.bankKey === 'object') return args.bankKey;
-            return {
-                gt: args.passKeyGT !== undefined ? args.passKeyGT
-                    : (args.passkeyGT !== undefined ? args.passkeyGT
-                    : (args.bankKeyGT !== undefined ? args.bankKeyGT : args.dr1)),
-                proof: args.passKeyProof !== undefined ? args.passKeyProof
-                    : (args.proof !== undefined ? args.proof
-                    : ([args.dr2, args.dr3, args.dr4, args.dr5].every(v => v !== undefined)
-                        ? [args.dr2, args.dr3, args.dr4, args.dr5] : undefined))
-            };
+            const capability = ownerCapabilityFor(args);
+            return capability ? { gt: capability.gt, proof: capability.proof } : {};
         };
 
         const fail = (method, fault, message) => ({ ok: false, fault, message: `Bank.${method}: ${message}` });
@@ -1624,6 +1639,9 @@ class SystemAbstractions {
             if (!lockbox) return fail(method, 'NOT_FOUND', 'lockbox not found');
             if (lockbox.revoked) return fail(method, 'REVOKED', 'lockbox has been revoked');
             if (lockbox.seq !== lockbox.currentSeq) return fail(method, 'STALE_KEY', 'lockbox sequence is stale');
+            if (!ownerCapabilityFor(args)) {
+                return fail(method, 'NO_CAPABILITY', 'BankOwnerKey capability is required in CR1');
+            }
             const check = this._topSecurityApi && this._topSecurityApi.validatePassKey
                 ? this._topSecurityApi.validatePassKey(sim, lockbox.securityObjectId, keyFor(args), method, ownerOnly)
                 : { ok: false, fault: 'NOT_INIT', message: 'top-security authority unavailable' };
@@ -1791,11 +1809,19 @@ class SystemAbstractions {
             });
         };
         const sourceRegion = (sim, args) => {
-            const sourceGT = args.sourceGT !== undefined ? args.sourceGT
-                : (args.sourceGt !== undefined ? args.sourceGt
-                : (args.gt !== undefined ? args.gt : args.sourceToken));
+            const capabilities = args && args.capabilities;
+            const sourceCapability = capabilities && capabilities.source;
+            if (!sourceCapability || typeof sourceCapability !== 'object' ||
+                    sourceCapability.register !== 'CR2' ||
+                    sourceCapability.kind !== 'capability' ||
+                    sourceCapability.secure_type !== 'Inform' ||
+                    sourceCapability.gt_type !== 'Inform' ||
+                    !Array.isArray(sourceCapability.rights) || !sourceCapability.rights.includes('R')) {
+                return { ok: false, fault: 'NO_CAPABILITY', message: 'Inform R source capability is required in CR2' };
+            }
+            const sourceGT = sourceCapability.gt;
             if (!Number.isInteger(sourceGT) && typeof sourceGT !== 'number') {
-                return { ok: false, fault: 'ARGS', message: 'sourceGT capability is required' };
+                return { ok: false, fault: 'ARGS', message: 'source capability has no GT' };
             }
             const parsed = sim.parseGT(sourceGT >>> 0);
             if (parsed.type !== 1) return { ok: false, fault: 'TYPE', message: 'sourceGT must be an Inform memory capability' };
@@ -1898,13 +1924,18 @@ class SystemAbstractions {
             sim._bankPrivateSlots[ns.result.nsIndex] = { lockboxId: id };
             protectLockboxRange(sim, lockbox);
             bankState.lockboxes[id] = lockbox;
+            const ownerCapability = makeOwnerCapability(objectResult.result.ownerPassKey);
             return {
                 ok: true,
                 result: {
                     lockboxId: id,
                     capacity: lockbox.capacity,
-                    bankKey: objectResult.result.ownerPassKey,
-                    passKey: objectResult.result.ownerPassKey
+                    // Legacy result names remain aliases during the public API
+                    // transition. Each contains a tagged CR1 capability, not an
+                    // untyped GT/proof payload.
+                    ownerCapability,
+                    bankKey: ownerCapability,
+                    passKey: ownerCapability
                 },
                 message: `Bank.MintKey: opaque lockbox key issued for lockbox ${id} (${lockbox.capacity}w)`
             };
@@ -2001,7 +2032,15 @@ class SystemAbstractions {
                 ok: true,
                 result: {
                     lockboxId: lockbox.id, withdrawn: true, words: data.length,
-                    gt, size: allocation.result.size
+                    gt, size: allocation.result.size,
+                    valuableCapability: {
+                        register: 'CR2',
+                        kind: 'capability',
+                        secure_type: 'Inform',
+                        gt_type: 'Inform',
+                        rights: ['R', ...(permissions.W ? ['W'] : []), ...(permissions.X ? ['X'] : [])],
+                        gt
+                    }
                 },
                 message: `Bank.Withdraw: ${data.length}w released from lockbox ${lockbox.id} as an opaque memory GT`
             };
@@ -2032,9 +2071,20 @@ class SystemAbstractions {
             if (lockbox) {
                 const auth = authorize(sim, lockbox, args, 'ObtainPassKey', true);
                 if (!auth.ok) return auth;
-                return this._topSecurityApi.obtainPassKey(sim, {
+                const issued = this._topSecurityApi.obtainPassKey(sim, {
                     objectId: lockbox.securityObjectId, passKey: keyFor(args)
                 });
+                if (!issued.ok || !issued.result || !issued.result.passKey) return issued;
+                const ownerCapability = makeOwnerCapability(issued.result.passKey);
+                return {
+                    ...issued,
+                    result: {
+                        ...issued.result,
+                        ownerCapability,
+                        bankKey: ownerCapability,
+                        passKey: ownerCapability
+                    }
+                };
             }
             // Preserve the previously shipped Bank adapter for programmer-defined
             // top-security objects that are not Bank lockboxes.
@@ -2155,14 +2205,16 @@ class SystemAbstractions {
             grant.consumed = true;
             if (recoveryRecords[lockbox.id]) recoveryRecords[lockbox.id].consumed = true;
             else recoveryRecords[lockbox.id] = { envelope, revoked: false, consumed: true };
+            const ownerCapability = makeOwnerCapability(objectResult.result.ownerPassKey);
             return {
                 ok: true,
                 result: {
                     lockboxId: lockbox.id,
                     recovered: true,
                     sequence: lockbox.currentSeq,
-                    bankKey: objectResult.result.ownerPassKey,
-                    passKey: objectResult.result.ownerPassKey,
+                    ownerCapability,
+                    bankKey: ownerCapability,
+                    passKey: ownerCapability,
                     metadata: safeMetadata(lockbox)
                 },
                 message: `Bank.Recover: lockbox ${lockbox.id} restored with fresh Namespace and PassKey`

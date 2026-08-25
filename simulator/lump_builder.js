@@ -197,7 +197,38 @@ function buildApiDefinition(result, words) {
     methods.forEach((m, i) => {
         if (m.visibility === 'private') return;
         const branchOffset = words && (1 + i) < words.length ? (words[1 + i] & 0x7FFF) : 0;
-        const inputs = (m.params || []).map((p, pi) => ({ name: p, register: `DR${pi + 1}` }));
+        const parameterSpecs = Array.isArray(m.parameterSpecs)
+            ? m.parameterSpecs
+            : (m.params || []).map(p => {
+                const text = String(p || '').trim();
+                const capability = text.match(
+                    /^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*capability\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s+([RWXLES]+))?$/i
+                );
+                return capability
+                    ? {
+                        name: capability[1],
+                        kind: 'capability',
+                        secure_type: capability[2],
+                        rights: capability[3]
+                            ? [...new Set(capability[3].toUpperCase().split(''))]
+                            : [],
+                    }
+                    : { name: text, kind: 'value' };
+            });
+        let nextDataRegister = 1;
+        let nextCapabilityRegister = 1;
+        const inputs = parameterSpecs.map(param => {
+            if (param.kind === 'capability') {
+                return {
+                    name: param.name,
+                    register: `CR${nextCapabilityRegister++}`,
+                    kind: 'capability',
+                    secure_type: param.secure_type,
+                    rights: Array.isArray(param.rights) ? param.rights.slice() : [],
+                };
+            }
+            return { name: param.name, register: `DR${nextDataRegister++}`, kind: 'value' };
+        });
         api.methods.push({
             name: m.name,
             index: i,

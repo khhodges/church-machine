@@ -1338,6 +1338,15 @@ proof validation, private Outform storage, complete zeroization, and
 server-authorized recovery. A LUMP implementation must never embed a PassKey
 proof, a private lockbox address, or a reusable custody GT.
 
+Bank's callable ABI is capability-typed: an object-scoped `BankOwnerKey`
+(Abstract + `E`, with its independent 128-bit proof) is supplied only in
+`CR1`; `Deposit` receives its readable Inform source capability only in `CR2`.
+The embedded API frame records those secure types. It must reject a raw GT,
+proof words, or a reconstructed owner handle in DRs. Capacity, offsets, word
+counts, kinds, protected-state handles, and result/status values are ordinary
+DR values. `MintKey`, `ObtainPassKey`, and `Recover` return owner authority in
+`CR1`; `Withdraw` returns its fresh Inform capability in `CR2`.
+
 The packaged manifest/binary/sidecar are validated during Bank artifact build,
 then emit a browser runtime identity projection. `SystemAbstractions` binds the
 Bank methods only when that generated projection still names the canonical

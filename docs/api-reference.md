@@ -37,15 +37,15 @@ Canonical dynamic CLOOMC LUMP backed by proof-bound Namespace custody. Lockbox k
 
 | Method | Signature | Perms | Description |
 |--------|-----------|-------|-------------|
-| MintKey | `MintKey(capacity?) → bankKey` | E + M | Create an empty dynamically allocated lockbox and return its opaque owner key. |
-| Deposit | `Deposit(lockboxId, bankKey, sourceGT, offset?, words?, kind?) → metadata` | E + bank key + source R | Copy a bounded LUMP or memory region into an empty lockbox without exposing raw custody storage. |
-| Withdraw | `Withdraw(lockboxId, bankKey) → valueGT` | E + bank key | Atomically release the deposited valuable as a fresh memory GT and quarantine the lockbox key. |
-| Inspect | `Inspect(lockboxId, bankKey) → metadata` | E + bank key | Return safe custody state, size, type, and sequence metadata without revealing contents or Namespace location. |
-| Revoke | `Revoke(lockboxId, ownerKey) → ok` | E + owner key | Invalidate all lockbox keys and quarantine its Namespace-backed custody record. |
-| ObtainPassKey | `ObtainPassKey(lockboxId, ownerKey) → bankKey` | E + owner key + proof | Reissue a fresh object-scoped passkey for an existing lockbox after proving ownership with the current key. |
-| ExportRecovery | `ExportRecovery(lockboxId, ownerKey) → protectedState` | E + owner key + proof | Create proof-bound authenticated recovery ciphertext without persisting the raw PassKey proof. |
-| Recover | `Recover(protectedState, originalKey) → freshBankKey` | E + M + original key + proof | Restore a valuable into a fresh private Namespace entry and issue a replacement owner PassKey. |
-| List | `List() → metadata[]` | E | List non-sensitive status metadata for active and revoked lockboxes. |
+| MintKey | `MintKey(capacity: DR1) → owner_key: CR1` | E + M | Create an empty dynamically allocated lockbox; return a typed BankOwnerKey capability in CR1 and status in DR0. |
+| Deposit | `Deposit(owner_key: CR1, source: CR2, offset: DR1, words: DR2, kind: DR3) → status: DR0` | E + BankOwnerKey + Inform R | Copy a bounded LUMP or memory region into an empty lockbox using typed capabilities; reject raw GTs, proofs, and reconstructed handles supplied through DRs. |
+| Withdraw | `Withdraw(owner_key: CR1) → valuable: CR2, status: DR0` | E + BankOwnerKey | Atomically release the valuable as a fresh typed Inform capability in CR2 and quarantine the lockbox key. |
+| Inspect | `Inspect(owner_key: CR1) → metadata: DR0` | E + BankOwnerKey | Return safe custody state, size, type, and sequence metadata without revealing contents or Namespace location. |
+| Revoke | `Revoke(owner_key: CR1) → status: DR0` | E + BankOwnerKey | Invalidate all lockbox keys and quarantine its Namespace-backed custody record. |
+| ObtainPassKey | `ObtainPassKey(owner_key: CR1) → owner_key: CR1, status: DR0` | E + BankOwnerKey + proof | Reissue a fresh object-scoped owner capability in CR1 after proving ownership with the current typed capability. |
+| ExportRecovery | `ExportRecovery(owner_key: CR1) → protectedState: DR0` | E + BankOwnerKey + proof | Create proof-bound authenticated recovery ciphertext in DR0 without persisting the raw PassKey proof. |
+| Recover | `Recover(protectedState: DR1, original_key: CR1) → owner_key: CR1, status: DR0` | E + M + BankOwnerKey + proof | Restore a valuable into a fresh private Namespace entry and issue a replacement owner capability in CR1. |
+| List | `List() → metadata: DR0` | E | List non-sensitive status metadata for active and revoked lockboxes in a scalar DR result. |
 
 ### Salvation — NS[4] `E`
 

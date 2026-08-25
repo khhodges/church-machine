@@ -1,51 +1,25 @@
 // Bank — dynamic Namespace-backed lockbox custody service.
 //
-// Bank is a system abstraction at catalog index 54. It is not a hardware boot
-// slot: the live binding creates a private Outform Namespace entry only when
-// MintKey() is called.
+// Bank is a dynamic CLOOMC LUMP at catalog index 54, not a hardware boot
+// slot. MintKey creates private Outform storage only when it is called.
 //
-// This CLOOMC source is the executable access-control reference model. It
-// models the lifecycle and freshness rules that fit in a LUMP:
-//   * one opaque, sequence-bearing owner handle;
-//   * empty -> deposited -> revoked lifecycle;
-//   * Inform + R source-capability admission checks; and
-//   * sequence rotation on reissue, withdrawal, and revocation.
+// Security ABI:
+//   * owner_key is a BankOwnerKey capability in CR1, never an integer in DR;
+//   * Deposit's source is an Inform R capability in CR2, never a scalar GT;
+//   * offsets, word counts, kinds, capacities, and status values remain DR
+//     values; and
+//   * the live binding validates the independent 128-bit proof attached to the
+//     typed owner capability, manages custody, zeroization, and recovery.
 //
-// The system binding supplies the operations that cannot safely be implemented
-// by a static LUMP: CSPRNG proof generation, 128-bit proof verification,
-// physical-range isolation, memory copying and zeroization, dynamic Namespace
-// registration, and server-authorized recovery grants. A source LUMP never
-// manufactures a usable protected-memory GT by itself.
-//
-// Reference-model CR7 state:
-//   [0] next_lockbox_id
-//   [1] next_sequence
-//   [2] active_lockbox_id
-//   [3] active_sequence
-//   [4] capacity_words
-//   [5] deposited_words
-//   [6] state: 0 empty, 1 deposited, 2 revoked
-//   [7] deposited_kind: 1 LUMP, 2 region
-//   [8] recovery_state_present
-//
-// An owner handle is a 32-bit Abstract E-only model token:
-//   bits [15:0]  lockbox id
-//   bits [22:16] current sequence
-//   bits [24:23] Abstract type (2)
-//   bits [30:25] E permission (0x20)
-//
-// In the live binding the corresponding authority is a PassKey containing an
-// object-scoped Abstract GT plus an independent 128-bit proof. The proof is
-// request-only and must never be stored in this source model.
+// The source models lifecycle state only. It cannot manufacture, inspect, or
+// reconstruct authority from integer fields: the CR ABI and proof-bound runtime
+// gate are the sole security boundary for those operations.
 
 abstraction Bank {
     capabilities {
     }
 
-    // MintKey(capacity) -> owner handle.
-    //
-    // The binding requires M-elevation and returns a full PassKey. The source
-    // model allocates a non-zero id and rotates a 7-bit sequence.
+    // MintKey(capacity: DR1) -> BankOwnerKey capability in CR1, status in DR0.
     method MintKey(capacity) {
         if (capacity <= 0) {
             return(0)
@@ -71,45 +45,15 @@ abstraction Bank {
         write(CR7, 6, 0)
         write(CR7, 7, 0)
         write(CR7, 8, 0)
-
-        var owner_handle = bfext(lockbox_id, 0, 16)
-        bfins(owner_handle, sequence, 16, 7)
-        bfins(owner_handle, 2, 23, 2)
-        bfins(owner_handle, 0x20, 25, 6)
-        return(owner_handle)
+        return(1)
     }
 
-    // Deposit(owner_handle, source_gt, offset, words, kind) -> 1 | 0.
-    //
-    // kind is 1 for a LUMP and 2 for a memory region. The source checks the
-    // parts of the source GT available in one word; the binding additionally
-    // verifies Namespace freshness, bounds, non-aliasing, and copies the data.
-    method Deposit(owner_handle, source_gt, offset, words, kind) {
-        var handle_id = bfext(owner_handle, 0, 16)
-        var handle_sequence = bfext(owner_handle, 16, 7)
-        var handle_type = bfext(owner_handle, 23, 2)
-        var active_id = read(CR7, 2)
-        var active_sequence = read(CR7, 3)
+    // owner_key arrives through CR1 as BankOwnerKey; source arrives through CR2
+    // as an Inform R capability. The runtime binding validates both before this
+    // lifecycle policy can be entered.
+    method Deposit(owner_key: capability BankOwnerKey E, source: capability Inform R, offset, words, kind) {
         var state = read(CR7, 6)
-        if (handle_id != active_id) {
-            return(0)
-        }
-        if (handle_sequence != active_sequence) {
-            return(0)
-        }
-        if (handle_type != 2) {
-            return(0)
-        }
         if (state != 0) {
-            return(0)
-        }
-
-        var source_type = bfext(source_gt, 23, 2)
-        var source_read = bfext(source_gt, 25, 1)
-        if (source_type != 1) {
-            return(0)
-        }
-        if (source_read == 0) {
             return(0)
         }
         var capacity = read(CR7, 4)
@@ -135,23 +79,9 @@ abstraction Bank {
         return(1)
     }
 
-    // Withdraw(owner_handle) -> 1 | 0.
-    //
-    // The successful binding result is a fresh Inform GT for a new registered
-    // region. The reference model returns success only: emitting a standalone
-    // GT here would create authority without the mandatory data copy,
-    // Namespace registration, and zeroization transaction.
-    method Withdraw(owner_handle) {
-        var handle_id = bfext(owner_handle, 0, 16)
-        var handle_sequence = bfext(owner_handle, 16, 7)
-        var active_id = read(CR7, 2)
-        if (handle_id != active_id) {
-            return(0)
-        }
-        var active_sequence = read(CR7, 3)
-        if (handle_sequence != active_sequence) {
-            return(0)
-        }
+    // owner_key: CR1 BankOwnerKey. On success the binding returns a fresh
+    // Inform capability for the copied valuable in CR2 and status in DR0.
+    method Withdraw(owner_key: capability BankOwnerKey E) {
         var state = read(CR7, 6)
         if (state != 1) {
             return(0)
@@ -172,21 +102,8 @@ abstraction Bank {
         return(1)
     }
 
-    // Inspect(owner_handle) -> packed non-sensitive metadata | 0.
-    //
-    // Packed layout: state[31:30], kind[29:24], deposited words[15:0].
-    // No physical location, Namespace index, contents, or proof is exposed.
-    method Inspect(owner_handle) {
-        var handle_id = bfext(owner_handle, 0, 16)
-        var handle_sequence = bfext(owner_handle, 16, 7)
-        var active_id = read(CR7, 2)
-        if (handle_id != active_id) {
-            return(0)
-        }
-        var active_sequence = read(CR7, 3)
-        if (handle_sequence != active_sequence) {
-            return(0)
-        }
+    // Inspect returns non-sensitive packed metadata in DR0.
+    method Inspect(owner_key: capability BankOwnerKey E) {
         var state = read(CR7, 6)
         var kind = read(CR7, 7)
         var words = read(CR7, 5)
@@ -196,22 +113,8 @@ abstraction Bank {
         return(metadata)
     }
 
-    // Revoke(owner_handle) -> 1 | 0.
-    //
-    // The live binding zeroizes the complete allocation and quarantines the
-    // private Namespace record before allocator reuse.
-    method Revoke(owner_handle) {
-        var handle_id = bfext(owner_handle, 0, 16)
-        var handle_sequence = bfext(owner_handle, 16, 7)
-        var active_id = read(CR7, 2)
-        if (handle_id != active_id) {
-            return(0)
-        }
-        var active_sequence = read(CR7, 3)
-        if (handle_sequence != active_sequence) {
-            return(0)
-        }
-
+    // Revoke zeroizes and retires the private record in the runtime binding.
+    method Revoke(owner_key: capability BankOwnerKey E) {
         var sequence_base = read(CR7, 1)
         var sequence_incremented = sequence_base + 1
         var next_sequence = bfext(sequence_incremented, 0, 7)
@@ -227,26 +130,12 @@ abstraction Bank {
         return(1)
     }
 
-    // ObtainPassKey(owner_handle) -> fresh owner handle | 0.
-    //
-    // This models sequence rotation. The binding also validates the independent
-    // 128-bit proof and returns an opaque replacement PassKey.
-    method ObtainPassKey(owner_handle) {
-        var handle_id = bfext(owner_handle, 0, 16)
-        var handle_sequence = bfext(owner_handle, 16, 7)
-        var active_id = read(CR7, 2)
-        if (handle_id != active_id) {
-            return(0)
-        }
-        var active_sequence = read(CR7, 3)
-        if (handle_sequence != active_sequence) {
-            return(0)
-        }
+    // Reissue an owner capability through CR1; DR0 carries status only.
+    method ObtainPassKey(owner_key: capability BankOwnerKey E) {
         var state = read(CR7, 6)
         if (state == 2) {
             return(0)
         }
-
         var sequence_base = read(CR7, 1)
         var sequence_incremented = sequence_base + 1
         var next_sequence = bfext(sequence_incremented, 0, 7)
@@ -255,28 +144,12 @@ abstraction Bank {
         }
         write(CR7, 1, next_sequence)
         write(CR7, 3, next_sequence)
-        var replacement = bfext(handle_id, 0, 16)
-        bfins(replacement, next_sequence, 16, 7)
-        bfins(replacement, 2, 23, 2)
-        bfins(replacement, 0x20, 25, 6)
-        return(replacement)
+        return(1)
     }
 
-    // ExportRecovery(owner_handle) -> 1 | 0.
-    //
-    // The binding returns authenticated ciphertext containing no raw proof.
-    // The source marks that recoverable state exists without exposing it.
-    method ExportRecovery(owner_handle) {
-        var handle_id = bfext(owner_handle, 0, 16)
-        var handle_sequence = bfext(owner_handle, 16, 7)
-        var active_id = read(CR7, 2)
-        if (handle_id != active_id) {
-            return(0)
-        }
-        var active_sequence = read(CR7, 3)
-        if (handle_sequence != active_sequence) {
-            return(0)
-        }
+    // ExportRecovery returns protected scalar state in DR0; it still requires
+    // owner_key in CR1 so a recovery envelope cannot be requested with a DR GT.
+    method ExportRecovery(owner_key: capability BankOwnerKey E) {
         var state = read(CR7, 6)
         if (state != 1) {
             return(0)
@@ -285,23 +158,15 @@ abstraction Bank {
         return(1)
     }
 
-    // Recover(protected_state, original_handle) -> replacement handle | 0.
-    //
-    // protected_state represents a consumed server recovery grant. The source
-    // permits recovery only from a marked envelope; the binding verifies the
-    // authenticated ciphertext, consumes the grant, and allocates a fresh
-    // Namespace generation before returning its full replacement PassKey.
-    method Recover(protected_state, original_handle) {
+    // protected_state is ordinary DR1 data. original_key is the typed CR1
+    // owner capability for the recovery grant; the replacement key returns in
+    // CR1 and success status in DR0.
+    method Recover(protected_state, original_key: capability BankOwnerKey E) {
         if (protected_state == 0) {
             return(0)
         }
         var recovery_present = read(CR7, 8)
         if (recovery_present == 0) {
-            return(0)
-        }
-        var original_id = bfext(original_handle, 0, 16)
-        var active_id = read(CR7, 2)
-        if (original_id != active_id) {
             return(0)
         }
 
@@ -323,18 +188,10 @@ abstraction Bank {
         write(CR7, 6, 0)
         write(CR7, 7, 0)
         write(CR7, 8, 0)
-
-        var replacement = bfext(replacement_id, 0, 16)
-        bfins(replacement, next_sequence, 16, 7)
-        bfins(replacement, 2, 23, 2)
-        bfins(replacement, 0x20, 25, 6)
-        return(replacement)
+        return(1)
     }
 
-    // List() -> active lockbox count.
-    //
-    // The binding returns safe metadata for all lockboxes. The single-lockbox
-    // source model therefore returns 1 when its current lockbox is active.
+    // List() -> active lockbox count in DR0.
     method List() {
         var active_id = read(CR7, 2)
         if (active_id == 0) {

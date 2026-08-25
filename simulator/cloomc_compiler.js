@@ -1118,6 +1118,36 @@ class CLOOMCCompiler {
         return { name, rights };
     }
 
+    // Parse a method parameter that is carried by the Church capability path
+    // instead of the Turing data-register ABI. For example:
+    //
+    //   owner_key: capability BankOwnerKey
+    //
+    // Ordinary parameters remain scalar DR values. The capability type is
+    // preserved in the compiled API definition so a runtime binding can reject
+    // a copied integer or a value supplied through DR1.
+    static _parseMethodParameter(param) {
+        if (param && typeof param === 'object' && param.name) {
+            return { ...param, kind: param.kind || 'value' };
+        }
+        const text = String(param || '').trim();
+        const capability = text.match(
+            /^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*capability\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s+([RWXLES]+))?$/i
+        );
+        if (capability) {
+            const rights = capability[3]
+                ? [...new Set(capability[3].toUpperCase().split(''))]
+                : [];
+            return {
+                name: capability[1],
+                kind: 'capability',
+                secure_type: capability[2],
+                rights,
+            };
+        }
+        return { name: text, kind: 'value' };
+    }
+
     _parseAbstraction(source, errors) {
         // Auto-wrap code that has no abstraction declaration
         if (!/^\s*abstraction\s+\w+/m.test(source)) {
@@ -1393,16 +1423,35 @@ class CLOOMCCompiler {
         this._currentLineNum = method.startLine;
         this._tempExhausted = false;
 
-        for (const param of method.params) {
-            const paramIdx = method.params.indexOf(param);
-            if (paramIdx + this.DR_ARGS_START <= this.DR_ARGS_END) {
-                locals[param] = paramIdx + this.DR_ARGS_START;
+        const parameterSpecs = (method.params || []).map(param =>
+            CLOOMCCompiler._parseMethodParameter(param)
+        );
+        method.parameterSpecs = parameterSpecs;
+        let nextDataArgument = this.DR_ARGS_START;
+        let nextCapabilityArgument = 1;
+        for (const param of parameterSpecs) {
+            if (param.kind === 'capability') {
+                while ([0, 6, 12, 13, 14, 15].includes(nextCapabilityArgument)) {
+                    nextCapabilityArgument++;
+                }
+                if (nextCapabilityArgument > 11) {
+                    errors.push({
+                        line: method.startLine,
+                        message: 'Too many capability parameters — no caller capability registers remain'
+                    });
+                    return { code: [], errors, manifest: [] };
+                }
+                this._crLocals[param.name] = nextCapabilityArgument++;
+                continue;
+            }
+            if (nextDataArgument <= this.DR_ARGS_END) {
+                locals[param.name] = nextDataArgument++;
             } else {
                 if (nextLocal > this.DR_LOCALS_END) {
                     errors.push({ line: method.startLine, message: `Too many parameters — max ${this.DR_LOCALS_END - this.DR_LOCALS_START + 1 + this.DR_ARGS_END - this.DR_ARGS_START + 1}` });
                     return { code: [], errors, manifest: [] };
                 }
-                locals[param] = nextLocal++;
+                locals[param.name] = nextLocal++;
             }
         }
 
