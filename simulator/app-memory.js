@@ -2691,6 +2691,7 @@ function updateNamespace() {
     const container = document.getElementById('namespaceTable');
     if (!container) return;
     if (!sim) return;
+    if (window._nsPrefetchDirty === undefined) window._nsPrefetchDirty = false;
     // Lazily warm the LumpRegistry server list so Source buttons appear even on
     // first NS view load, before the user has visited the Repository view.
     // _lumpsCacheWarmPending — in-flight guard; cleared on settle.
@@ -2741,6 +2742,7 @@ function updateNamespace() {
     html += _statChip('Free',     _cntFree,     '#6a9f6a', 'Slots available for allocation');
     html += `<span id="nsBoltDrag" class="ns-bolt-drag" draggable="true" title="Drag \u26a1 onto any NS row to crown that abstraction as Boot.Thread.CR0 \u2014 the first abstraction invoked after boot">\u26a1 Boot entry</span>`;
     html += `<button id="nsSaveBtn" onclick="event.stopPropagation();_nsTableSave(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save all NS table changes to boot-image.bin + ns-state.json — the single write path for NS mutations">\u{1F4BE} Save NS Table</button>`;
+    html += `<button id="nsPrefetchSaveBtn" onclick="event.stopPropagation();_nsPrefetchSaveClick(this)" style="background:#2a2415;color:#c89b3c;border:1px solid rgba(200,155,60,0.4);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save the Namespace Table's ordered raw-LUMP boot prefetch settings">Save prefetch</button>`;
     html += `<button onclick="event.stopPropagation();_nsTableAdd()" style="background:#1a2e1a;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Install a LUMP from the repository into the next free NS slot">+ Add LUMP</button>`;
     html += '</div>';
     // Bank custody status deliberately projects no raw NS slot, address,
@@ -2770,6 +2772,110 @@ function updateNamespace() {
     html += '</tr></thead><tbody>';
 
     const typeNames = ['NULL','Inform','Outform','Abstract'];
+
+    // Namespace Table is the primary operational view for a slot. Keep its
+    // prefetch controls backed by the same Step 2 records as Builder >
+    // Resident LUMPs, so changing either surface produces one configuration.
+    function _nsPrefetchRow(slot, manifest) {
+        if (!manifest || manifest.priority === 'hot' || !manifest.bootUpload) return '';
+        const cfg = window.bootConfig || {};
+        const rows = cfg.step2 && Array.isArray(cfg.step2.lumps) ? cfg.step2.lumps : [];
+        const saved = rows.find(row => row && row.nsSlot === slot && !row.resident) || null;
+        const enabled = !!(saved && saved.prefetch);
+        const required = !(saved && saved.prefetchRequired === false);
+        const order = saved && Number.isInteger(saved.prefetchOrder) ? saved.prefetchOrder : slot;
+        const checked = enabled ? ' checked' : '';
+        const detail = enabled
+            ? `<label style="display:inline-flex;align-items:center;gap:3px;margin-left:5px;color:#f0a040;" title="Stop startup if this raw LUMP cannot be validated"><input type="checkbox" data-ns-prefetch-slot="${slot}" data-ns-prefetch-field="required"${required ? ' checked' : ''} onclick="event.stopPropagation();_nsPrefetchChange(${slot},'required',this.checked)"> required</label>` +
+              `<input type="number" min="0" step="1" value="${order}" data-ns-prefetch-slot="${slot}" data-ns-prefetch-field="order" title="Sequential boot prefetch order" onclick="event.stopPropagation()" onchange="event.stopPropagation();_nsPrefetchChange(${slot},'order',this.value)" style="width:42px;margin-left:5px;background:#0d0d1a;color:#d0d0e8;border:1px solid #6b5320;border-radius:3px;font-size:0.68rem;padding:1px 3px;">`
+            : '';
+        return `<span style="display:inline-flex;align-items:center;gap:3px;margin-left:5px;color:#c89b3c;white-space:nowrap;" title="Fetch this lazy LUMP during boot, before user code runs"><input type="checkbox" data-ns-prefetch-slot="${slot}" data-ns-prefetch-field="enabled"${checked} onclick="event.stopPropagation();_nsPrefetchChange(${slot},'enabled',this.checked)"> prefetch</span>${detail}`;
+    }
+
+    window._nsPrefetchChange = function(slot, field, value) {
+        const cfg = window.bootConfig || {};
+        if (!cfg.step2) cfg.step2 = { lumps: [] };
+        if (!Array.isArray(cfg.step2.lumps)) cfg.step2.lumps = [];
+        let row = cfg.step2.lumps.find(item => item && item.nsSlot === slot);
+        const manifest = sim.lazyManifest && sim.lazyManifest[slot];
+        const src = (typeof _findSrcLump === 'function') ? _findSrcLump(slot, sim.nsLabels && sim.nsLabels[slot]) : null;
+        if (!row) {
+            row = {
+                nsSlot: slot,
+                resident: false,
+                abstraction: (manifest && manifest.label) || (sim.nsLabels && sim.nsLabels[slot]) || ('Slot ' + slot),
+                lumpToken: (src && src.token) || ''
+            };
+            cfg.step2.lumps.push(row);
+        }
+        row.resident = false;
+        if (field === 'enabled') {
+            if (value) {
+                row.prefetch = true;
+                row.prefetchRequired = row.prefetchRequired !== false;
+                row.prefetchOrder = Number.isInteger(row.prefetchOrder) ? row.prefetchOrder : slot;
+                row.downloadUrl = row.downloadUrl || (manifest && manifest.downloadUrl) || ((src && src.token) ? '/api/lump/' + src.token : '');
+            } else {
+                delete row.prefetch;
+                delete row.prefetchRequired;
+                delete row.prefetchOrder;
+                delete row.downloadUrl;
+            }
+        } else if (field === 'required') {
+            row.prefetch = true;
+            row.prefetchRequired = !!value;
+        } else if (field === 'order') {
+            row.prefetch = true;
+            row.prefetchOrder = Math.max(0, parseInt(value, 10) || 0);
+        }
+        window._nsPrefetchDirty = true;
+        updateNamespace();
+    };
+
+    window._nsPrefetchSave = async function() {
+        const cfg = window.bootConfig;
+        if (!cfg || !cfg.step1) {
+            throw new Error('Boot configuration is not available; open Builder once to initialize it.');
+        }
+        const response = await fetch('/api/boot-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                targetBoard: cfg.targetBoard,
+                step1: cfg.step1,
+                step2: cfg.step2 || { lumps: [] },
+                step3: cfg.step3 || { emptySlotCount: 0 }
+            })
+        });
+        const body = await response.json();
+        if (!response.ok || body.ok === false) throw new Error(body.error || `HTTP ${response.status}`);
+        window.bootConfig = body.config || cfg;
+        window._nsPrefetchDirty = false;
+    };
+    window._nsPrefetchSaveClick = async function(btn) {
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Saving…';
+        }
+        try {
+            await window._nsPrefetchSave();
+            if (btn) {
+                btn.textContent = '✓ Prefetch saved';
+                btn.style.color = '#4ec9b0';
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.textContent = 'Save prefetch';
+                    btn.style.color = '';
+                }, 1800);
+            }
+        } catch (err) {
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = '⚠ ' + err.message;
+                btn.style.color = '#f87171';
+            }
+        }
+    };
     for (let i = 0; i < sim.nsCount; i++) {
         const e = sim.readNSEntry(i);
         if (!e) {
@@ -2866,7 +2972,7 @@ function updateNamespace() {
                                 THREAD_NS_SLOTS.has(i) ||
                                 _hwCapRe.test(e.label || '');
             if (codeNotResident) {
-                html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span></td>`;
+                html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span>${_nsPrefetchRow(i, manifest)}</td>`;
             } else {
                 let _srcBtn = '';
                 if (!_hideSource) {
@@ -2878,7 +2984,7 @@ function updateNamespace() {
                         : `null,${i}`;
                     _srcBtn = `<button class="btn btn-xs" onclick="event.stopPropagation();_openLumpSource(${_onclickTarget})" style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);" title="Open source in Repository view">Source</button>`;
                 }
-                html += `<td class="ns-entry-actions">${_srcBtn}</td>`;
+                html += `<td class="ns-entry-actions">${_srcBtn}${_nsPrefetchRow(i, manifest)}</td>`;
             }
         }
         html += '</tr>';
