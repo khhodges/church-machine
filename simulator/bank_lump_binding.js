@@ -13,7 +13,7 @@
     const TOKEN = '5433e4ff';
     const BINARY_HASH = 'a8d7db527cbd290766a4df90fd5ea2960af7b09f68c54374eeff0a7c42505178';
     const IDENTITY_HASH = '3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11';
-    const SELF_GT = 0x0B19718E;
+    const SELF_GT = 0x4B19718E;
     const REGISTRY_INDEX = 54;
     const DISPATCH = 'SystemAbstractions';
     const AUTHORITY = 'proof-bound dynamic custody';
@@ -150,18 +150,23 @@
         const typ = (header >>> 8) & 0x03;
         const cc = header & 0xFF;
         if (typ !== 0) return fail('Bank.Create accepts only typ=lump values');
-        if (bytes.length !== size * 4) return fail('LUMP byte length disagrees with its header');
+        if (bytes.length !== size * 4 || (size & (size - 1)) !== 0) {
+            return fail('LUMP size must be an exact power-of-two allocation');
+        }
         if (cc < 1 || 1 + cw + cc > size) return fail('LUMP code/c-list bounds are invalid');
 
         const contentOffset = (cw + 1) * 4;
+        const clistOffset = (size - cc) * 4;
+        if (contentOffset >= clistOffset) return fail('LUMP has no freespace between code and c-list');
         if (contentOffset + 4 > bytes.length) return fail('LUMP has no self-definition frame');
         const contentHeader = readWord(contentOffset);
         if ((contentHeader >>> 24) !== 0xAB) return fail('LUMP self-definition frame is missing');
         const flags = (contentHeader >>> 16) & 0xFF;
+        if (![0, 1, 3].includes(flags)) return fail('LUMP self-definition flags are invalid');
         const apiLength = contentHeader & 0xFFFF;
         const apiStart = contentOffset + 4;
         const apiEnd = apiStart + apiLength;
-        if (apiLength === 0 || apiEnd > bytes.length) return fail('LUMP API frame is truncated');
+        if (apiLength === 0 || apiEnd > clistOffset) return fail('LUMP API frame is truncated');
         let api;
         try {
             const apiText = typeof TextDecoder !== 'undefined'
@@ -174,6 +179,36 @@
         if (!api || typeof api.name !== 'string' || !api.name ||
                 !Array.isArray(api.methods) || (flags & 0x03) === 0) {
             return fail('LUMP embedded API metadata is incomplete');
+        }
+        let payloadEnd = apiEnd;
+        if (flags >= 1) {
+            if (payloadEnd + 4 > clistOffset) return fail('LUMP source length is missing');
+            const sourceLength = readWord(payloadEnd);
+            payloadEnd += 4;
+            if (sourceLength === 0 || payloadEnd + sourceLength > clistOffset) {
+                return fail('LUMP embedded source frame is truncated');
+            }
+            payloadEnd += sourceLength;
+        }
+        for (let offset = payloadEnd; offset < clistOffset; offset += 4) {
+            if (readWord(offset) !== 0) return fail('LUMP freespace has non-zero trailing data');
+        }
+        // A public method must point at executable code, while private
+        // methods may deliberately retain the builder's zero entry.
+        const methodByIndex = new Map((api.methods || []).map(method => [method.index, method]));
+        for (const method of api.methods) {
+            if (!Number.isInteger(method.index) || method.index < 0 || method.index >= cw) {
+                return fail('LUMP API method index is outside the dispatch table');
+            }
+            const entry = readWord(4 + method.index * 4);
+            if (entry === 0 || entry > cw) return fail('LUMP API method has an invalid entry point');
+            const inputs = Array.isArray(method.inputs) ? method.inputs : [];
+            for (const input of inputs) {
+                const rights = Array.isArray(input.rights) ? input.rights.map(String) : [];
+                if (rights.includes('X') && rights.includes('E')) {
+                    return fail('LUMP method capability cannot combine X and E rights');
+                }
+            }
         }
         const asserted = metadata && typeof metadata === 'object' ? metadata : {};
         const dotName = api.name;
@@ -199,7 +234,13 @@
         for (const [field, actual, expected] of checks) {
             if (actual !== expected) return fail(`LUMP ${field} metadata does not match trusted bytes`);
         }
+        const selfType = (selfGT >>> 25) & 0x03;
+        const selfDomain = (selfGT >>> 27) & 0x01;
+        const selfRights = (selfGT >>> 28) & 0x07;
         if (selfGT !== expectedSelf) return fail('LUMP c-list row zero is not its canonical SELF identity');
+        if (selfType !== 1 || selfDomain !== 1 || selfRights !== 4) {
+            return fail('LUMP c-list row zero must be an exact E-permission SELF GT');
+        }
         if (asserted.identity_string !== undefined && asserted.identity_string !== identityString) {
             return fail('LUMP identity_string metadata disagrees with its issue');
         }
