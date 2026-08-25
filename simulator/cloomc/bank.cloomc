@@ -39,30 +39,19 @@ abstraction Bank {
     // control-flow contract without exposing their scalar results.
     method Create(lump: capability Inform R) {
         tperm(CR1, R)
-        goto validated
-        // The binding performs complete seal, token, SELF, and relationship
-        // validation before reserving private custody.
-        validation_failed:
-        status = 0
-        goto create_failed
-
-        validated:
-        status = 1
-        goto custody_commit
-
-        custody_commit:
-        // The binding atomically allocates, registers, copies, and proof-binds.
-        // Every partial-commit failure cleans up before reaching this point.
-        status = 1
-        goto create_issued
-
-        create_failed:
-        // Any validation or commit failure leaves the nullable CR0 result NULL.
-        status = 0
-
-        create_issued:
-        // Only a successful private commit may issue BankVariable authority.
-        return(status)
+        // The binding performs complete seal, token, SELF, relationship
+        // validation and atomically commits private custody before it reaches
+        // this result check. It clears CR0 on every validation or commit error.
+        //
+        // This is deliberately a capability-presence check, not a DR0 status
+        // check: DR0 is diagnostic data and must never stand in for authority.
+        if (CR0 != null) {
+            // A non-NULL CR0 is the proof-bound BankVariable E capability issued
+            // after the successful private commit.
+            return(1)
+        }
+        // NULL CR0 means no BankVariable was issued.
+        return(0)
     }
 
     // Read and Inspect operate on the typed E capability returned by Create in

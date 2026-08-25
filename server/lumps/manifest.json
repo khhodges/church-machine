@@ -2183,7 +2183,7 @@
     "issue_n": 1
   },
   {
-    "token": "0e2eba74",
+    "token": "5433e4ff",
     "abstraction": "Bank",
     "dot_name": "Bank",
     "issue_n": 1,
@@ -2191,7 +2191,7 @@
     "ns_slot_policy": "dynamic",
     "boot_resident": false,
     "lump_size": 4096,
-    "cw": 38,
+    "cw": 31,
     "cc": 1,
     "typ": 0,
     "status": "released",
@@ -2233,7 +2233,7 @@
       {
         "name": "Read",
         "index": 1,
-        "branchOffset": 21,
+        "branchOffset": 14,
         "inputs": [
           {
             "name": "variable",
@@ -2272,7 +2272,7 @@
       {
         "name": "InspectVariable",
         "index": 2,
-        "branchOffset": 36,
+        "branchOffset": 29,
         "inputs": [
           {
             "name": "variable",
@@ -2325,7 +2325,7 @@
       {
         "name": "Release",
         "index": 3,
-        "branchOffset": 36,
+        "branchOffset": 29,
         "inputs": [
           {
             "name": "variable",
@@ -2350,7 +2350,7 @@
       {
         "name": "RevokeVariable",
         "index": 4,
-        "branchOffset": 36,
+        "branchOffset": 29,
         "inputs": [
           {
             "name": "variable",
@@ -2597,9 +2597,9 @@
       "credential_abi": "capability-register-v1",
       "fixed_hardware_boot_slot": false
     },
-    "filename": "Bank.1.0e2eba74.lump",
-    "sidecar_file": "Bank.1.0e2eba74.json",
-    "binary_hash": "a1c41a3b7e0199aedaa99c402a38f314205fe3c30a2d19bd99082861c49bae11",
+    "filename": "Bank.1.5433e4ff.lump",
+    "sidecar_file": "Bank.1.5433e4ff.json",
+    "binary_hash": "a8d7db527cbd290766a4df90fd5ea2960af7b09f68c54374eeff0a7c42505178",
     "identity_hash": "3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11"
   }
 ]

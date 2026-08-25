@@ -1752,6 +1752,46 @@ class CLOOMCCompiler {
         const text = stmt.text.trim().replace(/;$/, '');
         if (!text || text.startsWith('//')) return;
 
+        // Native-bound dynamic LUMPs may state their post-dispatch result
+        // contract as `if (CRn != null)`. The Church Machine ISA deliberately
+        // has no instruction that projects a capability-register word into a
+        // data-register comparison: treating DR0 status data as a capability
+        // surrogate would make nonzero error codes look authoritative.
+        //
+        // Such predicates are therefore accepted only when an embedding
+        // compiler explicitly opts in. Their serialized fallback fails closed
+        // (for `!= null`, it skips the success body); a native dispatcher is
+        // responsible for evaluating the actual capability state before it
+        // returns to the caller. Ordinary CLOOMC sources continue to reject
+        // this unsupported predicate rather than gaining a misleading
+        // capability-to-data coercion.
+        const nativeCapabilityNullMatch = text.match(
+            /^if\s*\(\s*(CR\d+)\s*(==|!=)\s*null\s*\)\s*\{$/,
+        );
+        if (nativeCapabilityNullMatch && this.nativeCapabilityPredicates === true) {
+            const [, register, operator] = nativeCapabilityNullMatch;
+            if (operator === '!=') {
+                const branchAddr = code.length;
+                code.push(this.encode(this.opcodes.BRANCH, this.conditions.AL, 0, 0, 0));
+                labelRefs.push({ addr: branchAddr, label: `__endif_${branchAddr}`, lineNum: stmt.lineNum });
+                labels[`__endif_${branchAddr}`] = -1;
+                manifest.push({
+                    src: stmt.lineNum,
+                    addr: branchAddr,
+                    desc: `if (${register} != null) [native capability predicate; static fallback fails closed]`,
+                });
+            } else {
+                // A null test's static fallback is already the null path, so
+                // the body may be serialized directly.
+                manifest.push({
+                    src: stmt.lineNum,
+                    addr: code.length,
+                    desc: `if (${register} == null) [native capability predicate; static fallback]`,
+                });
+            }
+            return;
+        }
+
         const returnMatch = text.match(/^(?:RETURN|return)(?:\s*\(\s*(.*?)\s*\)|\s+(.+))?$/);
         if (returnMatch) {
             const _returnExpr = returnMatch[1] !== undefined ? returnMatch[1] : (returnMatch[2] ? returnMatch[2].trim() : undefined);

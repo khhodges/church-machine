@@ -59,14 +59,16 @@ check('BANK-LUMP06: Bank is a self-defining tier-2 CLOOMC LUMP',
     ((binary.readUInt32BE((cw + 1) * 4) >>> 24) & 0xFF) === 0xAB &&
     sidecar.sourceStorageTier === 2 && sidecar.source === source);
 const createSource = source.slice(source.indexOf('method Create'), source.indexOf('// Read and Inspect'));
-check('BANK-LUMP06b: embedded Create source records validation, atomic commit, and post-commit issuance',
-    createSource.includes('validation_failed:') &&
-    createSource.includes('custody_commit:') &&
-    createSource.includes('create_issued:') &&
-    createSource.includes('complete seal, token, SELF') &&
-    createSource.includes('atomically allocates, registers, copies, and proof-binds') &&
-    createSource.includes('Only a successful private commit may issue BankVariable authority') &&
+check('BANK-LUMP06b: Create tests the issued CR0 capability rather than treating DR0 or an unconditional return as authority',
+    createSource.includes('if (CR0 != null)') &&
+    createSource.includes('DR0 is diagnostic data and must never stand in for authority') &&
+    createSource.includes('return(0)') &&
+    !createSource.includes('return(status)') &&
     !/method Create[\s\S]*?\{\s*return\(1\)/.test(createSource));
+const compiledCreate = artifact.compiled.manifest.find(method => method.name === 'Create');
+check('BANK-LUMP06bb: Bank serializes CR0 presence as a native predicate with a fail-closed static fallback',
+    compiledCreate && compiledCreate.mapping.some(entry =>
+        entry.desc === 'if (CR0 != null) [native capability predicate; static fallback fails closed]'));
 const embeddedContentHeader = binary.readUInt32BE((cw + 1) * 4);
 const embeddedApiLength = embeddedContentHeader & 0xFFFF;
 const embeddedApi = JSON.parse(binary.subarray((cw + 1) * 4 + 4,

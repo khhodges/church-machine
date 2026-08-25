@@ -101,7 +101,13 @@ function stringifyAsciiJson(value) {
 
 function buildBankArtifact() {
     const source = fs.readFileSync(SOURCE_FILE, 'utf8');
-    const compiled = new CLOOMCCompiler().compile(source);
+    const compiler = new CLOOMCCompiler();
+    // Bank is a native-bound dynamic LUMP. Its canonical source tests the
+    // nullable CR0 result after the binding has completed validation and
+    // custody commit. Enable the compiler's fail-closed serialization for
+    // that one capability-presence predicate; never substitute DR0 status.
+    compiler.nativeCapabilityPredicates = true;
+    const compiled = compiler.compile(source);
     if (compiled.errors.length) {
         throw new Error(`Bank CLOOMC compilation failed:\n${JSON.stringify(compiled.errors, null, 2)}`);
     }
