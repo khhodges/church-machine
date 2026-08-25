@@ -37,11 +37,11 @@ Canonical dynamic CLOOMC LUMP backed by proof-bound Namespace custody. Lockbox k
 
 | Method | Signature | Perms | Description |
 |--------|-----------|-------|-------------|
-| Create | `Create(lump: CR1) → variable: CR0, status: DR0` | E + M + Inform R | Validate the complete self-defining LUMP before issuing its typed BankVariable E capability in CR0; DR0 is binary status only and never authority. |
-| Read | `Read(variable: CR0, offset: DR1, words: DR2) → readable: CR4, status: DR0` | BankVariable E | Copy a bounded slice of a live Bank-managed LUMP through the typed CR0 capability into a fresh readable Inform capability. |
-| InspectVariable | `InspectVariable(variable: CR0) → status: DR0; words: DR1; capacity: DR2; issue: DR3; lifecycle: DR4` | BankVariable E | Inspect scalar size/capacity/lifecycle fields in distinct DRs using only the typed CR0 capability, without revealing private Namespace storage. |
-| Release | `Release(variable: CR0) → status: DR0` | BankVariable E | Zeroize and retire a Bank-managed LUMP through its CR0 capability; CR0 is cleared afterward. |
-| RevokeVariable | `RevokeVariable(variable: CR0) → status: DR0` | BankVariable E | Revoke the CR0 variable authority and zeroize the private LUMP allocation. |
+| Create | `Create(lump: CR1) → CR0: Enter variable or NULL; DR0: status/error` | E + M + Inform R | Validate the complete self-defining LUMP before issuing its typed BankVariable Enter capability in CR0. CR0 is NULL on failure; DR0 is 1 on success or a specific Bank error code. |
+| Read | `Read(variable: CR0, offset: DR1, words: DR2) → readable: CR4; DR0: status/error` | BankVariable E | Copy a bounded slice of a live Bank-managed LUMP through the typed CR0 capability into a fresh readable Inform capability; failures return a specific DR0 error code. |
+| InspectVariable | `InspectVariable(variable: CR0) → DR0: status/error; words: DR1; capacity: DR2; issue: DR3; lifecycle: DR4` | BankVariable E | Inspect scalar size/capacity/lifecycle fields in distinct DRs using only the typed CR0 capability; DR0 identifies failure and never carries authority. |
+| Release | `Release(variable: CR0) → DR0: status/error` | BankVariable E | Zeroize and retire a Bank-managed LUMP through its CR0 capability; CR0 is cleared afterward and failures identify their error in DR0. |
+| RevokeVariable | `RevokeVariable(variable: CR0) → DR0: status/error` | BankVariable E | Revoke the CR0 variable authority and zeroize the private LUMP allocation; failures identify their error in DR0. |
 | MintKey | `MintKey(capacity: DR1) → owner_key: CR1` | E + M | Create an empty dynamically allocated lockbox; return a typed BankOwnerKey capability in CR1 and status in DR0. |
 | Deposit | `Deposit(owner_key: CR1, source: CR2, offset: DR1, words: DR2, kind: DR3) → status: DR0` | E + BankOwnerKey + Inform R | Copy a bounded LUMP or memory region into an empty lockbox using typed capabilities; reject raw GTs, proofs, and reconstructed handles supplied through DRs. |
 | Withdraw | `Withdraw(owner_key: CR1) → valuable: CR2, status: DR0` | E + BankOwnerKey | Atomically release the valuable as a fresh typed Inform capability in CR2 and quarantine the lockbox key. |

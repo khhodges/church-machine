@@ -1675,6 +1675,7 @@ class SystemAbstractions {
             NOT_INIT: 0x10E,
             INTERNAL: 0x1FF,
         });
+        this.bankErrorCodes = BANK_ERROR_CODES;
         const bankErrorCode = (result) => {
             if (!result || result.ok) return 1;
             if (Number.isInteger(result.error_code)) return result.error_code >>> 0;
@@ -2217,7 +2218,7 @@ class SystemAbstractions {
             const variable = Number.isInteger(variableId) ? bankState.variables[variableId] : null;
             const auth = authorizeVariable(sim, variable, args, 'InspectVariable');
             if (!auth.ok) {
-                writeBankDR(sim, 0, 0);
+                writeBankDR(sim, 0, bankErrorCode(auth));
                 return auth;
             }
             const writeDR = (index, value) => {

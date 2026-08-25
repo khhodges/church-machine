@@ -95,6 +95,9 @@ check('BANK-LUMP09b: Bank records typed CR inputs while scalar values remain DR 
         { name: 'lump', register: 'CR1', kind: 'capability', secure_type: 'Inform', rights: ['R'] },
     ]) &&
     create.returns.register === 'CR0' && create.returns.secure_type === 'BankVariable' &&
+    entry.capability_abi.Create.returns_nullable === true &&
+    entry.capability_abi.Create.error_codes.IDENTITY === 0x103 &&
+    entry.capability_abi.Create.error_codes.NO_CAPABILITY === 0x101 &&
     deposit &&
     JSON.stringify(deposit.inputs) === JSON.stringify([
         { name: 'owner_key', register: 'CR1', kind: 'capability', secure_type: 'BankOwnerKey', rights: ['E'] },
@@ -189,6 +192,8 @@ const forgedToken = registry.dispatchMethod(54, 'Create', sim, {
 });
 check('BANK-LUMP12: forged token metadata fails before Bank allocates private custody',
     !forgedToken.ok && forgedToken.fault === 'IDENTITY' &&
+    sim.dr[0] === 0x103 && sim.cr[0].word0 === 0 &&
+    (!sim._bankCapabilityRegisters || !sim._bankCapabilityRegisters.CR0) &&
     JSON.stringify(Object.keys(systemAbs._memoryState.allocations).sort()) ===
         JSON.stringify(allocationsBeforeRejectedCreate));
 const alteredCode = sourceWords.slice();
@@ -198,6 +203,7 @@ const alteredCodeCreate = registry.dispatchMethod(54, 'Create', sim, {
 });
 check('BANK-LUMP12b: altered binary bytes fail their canonical integrity seal before allocation',
     !alteredCodeCreate.ok && alteredCodeCreate.fault === 'IDENTITY' &&
+    sim.dr[0] === 0x103 && sim.cr[0].word0 === 0 &&
     JSON.stringify(Object.keys(systemAbs._memoryState.allocations).sort()) ===
         JSON.stringify(allocationsBeforeRejectedCreate));
 const alteredSelf = sourceWords.slice();
@@ -214,6 +220,7 @@ const alteredSelfCreate = registry.dispatchMethod(54, 'Create', sim, {
 });
 check('BANK-LUMP12c: a self-consistent hash claim cannot bypass the c-list SELF identity check',
     !alteredSelfCreate.ok && alteredSelfCreate.fault === 'IDENTITY' &&
+    sim.dr[0] === 0x103 && sim.cr[0].word0 === 0 &&
     JSON.stringify(Object.keys(systemAbs._memoryState.allocations).sort()) ===
         JSON.stringify(allocationsBeforeRejectedCreate));
 const missingCapability = registry.dispatchMethod(54, 'Create', sim, {
@@ -231,7 +238,7 @@ const wrongRegister = registry.dispatchMethod(54, 'InspectVariable', sim, {
     capabilities: { variable: { ...variable.variableCapability, register: 'CR3' } }
 });
 check('BANK-LUMP13b: CR3 and other registers cannot substitute for CR0 authority',
-    !wrongRegister.ok && wrongRegister.fault === 'NO_CAPABILITY' && sim.dr[0] === 0 &&
+    !wrongRegister.ok && wrongRegister.fault === 'NO_CAPABILITY' && sim.dr[0] === 0x101 &&
     sim.cr[0].word0 === variable.variableCapability.gt);
 const badVariableCapability = registry.dispatchMethod(54, 'InspectVariable', sim, {
     variableId: variable.variableId,
@@ -251,7 +258,8 @@ const outOfBoundsRead = registry.dispatchMethod(54, 'Read', sim, {
     capabilities: { variable: variable.variableCapability }
 });
 check('BANK-LUMP15: BankVariable reads reject encoded-bound violations without allocation',
-    !outOfBoundsRead.ok && outOfBoundsRead.fault === 'BOUNDS');
+    !outOfBoundsRead.ok && outOfBoundsRead.fault === 'BOUNDS' && sim.dr[0] === 0x105 &&
+    sim.cr[0].word0 === variable.variableCapability.gt && sim.cr[4].word0 === 0);
 const read = registry.dispatchMethod(54, 'Read', sim, {
     offset: 0, words: sourceWords.length
 });
@@ -300,6 +308,7 @@ const postFailureRead = registry.dispatchMethod(54, 'Read', sim, {
 const afterFailedCleanupAllocation = registry.dispatchMethod(7, 'Allocate', sim, { size: sourceWords.length });
 check('BANK-LUMP18b: failed Namespace cleanup quarantines zeroed storage and revokes the old variable capability',
     !failedRelease.ok && failedRelease.fault === 'NAMESPACE' &&
+    failedRelease.error_code === 0x10C && sim.cr[0].word0 === 0 &&
     !postFailureRead.ok && postFailureRead.fault === 'REVOKED' &&
     afterFailedCleanupAllocation.ok && afterFailedCleanupAllocation.result.location !== quarantinedRecord.location &&
     Array.from(sim.memory.slice(quarantinedRecord.location,
@@ -313,6 +322,7 @@ const namespaceExhausted = registry.dispatchMethod(54, 'Create', sim, {
 sim.allocOrFindNsSlot = originalAllocOrFind;
 check('BANK-LUMP19: Namespace failure rolls back verified Create before publishing a variable',
     !namespaceExhausted.ok && namespaceExhausted.fault === 'NS_FULL' &&
+    sim.dr[0] === 0x10A && sim.cr[0].word0 === 0 &&
     JSON.stringify(Object.keys(systemAbs._memoryState.allocations).sort()) ===
         JSON.stringify(createAllocationsBeforeNsFailure));
 const releaseRecord = systemAbs._bankState.variables[variable.variableId];
@@ -334,7 +344,7 @@ const staleCreate = registry.dispatchMethod(54, 'Create', sim, {
 });
 check('BANK-LUMP21: failed Create clears any previously materialized CR0 authority',
     !staleCreate.ok && staleCreate.fault === 'IDENTITY' &&
-    sim.dr[0] === 0 && sim.cr[0].word0 === 0 &&
+    sim.dr[0] === 0x103 && sim.cr[0].word0 === 0 &&
     !sim._bankCapabilityRegisters.CR0);
 
 console.log(`\n${pass} Bank LUMP checks passed.`);

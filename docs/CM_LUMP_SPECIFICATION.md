@@ -1360,6 +1360,13 @@ GT. `CR0` is the only returned authority for the verified Bank variable;
 `DR0` reports `1` for success or a specific nonzero Bank error code for failure,
 and must never be used as a capability. `CR0` is a capability-or-NULL result:
 callers must test it before entering the verified abstraction.
+
+For `Create`, the canonical diagnostic codes are: `0x101` no typed capability,
+`0x102` wrong capability type, `0x103` identity/seal validation failed,
+`0x104` permission denied, `0x109` allocation failed, `0x10A` no private
+Namespace slot, `0x10B` capability minting failed, and `0x10C` private
+Namespace cleanup failed. The complete machine-readable mapping is embedded in
+the Bank LUMP's `capability_abi.Create.error_codes` object.
 `BankOwnerKey` remains the authority for the separate lockbox lifecycle
 (`MintKey`, `Deposit`, `Withdraw`, `Inspect`, `Revoke`, `ObtainPassKey`,
 `ExportRecovery`, and `Recover`); `BankVariable` is the capability that names

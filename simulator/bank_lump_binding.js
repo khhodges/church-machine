@@ -10,8 +10,8 @@
 (function exposeBankLumpBinding(root) {
     const DOT_NAME = 'Bank';
     const ISSUE_N = 1;
-    const TOKEN = '0e759698';
-    const BINARY_HASH = 'ea90cf2e16ebadb4bd6e8a85c9f3b4824ee700d09049c4a972c0830e0a450b2b';
+    const TOKEN = '7bd12610';
+    const BINARY_HASH = '8875c13f80c4db86d1c709025793c21792db300e65f47c747657c6292f9f9801';
     const IDENTITY_HASH = '3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11';
     const SELF_GT = 0x0B19718E;
     const REGISTRY_INDEX = 54;
@@ -54,6 +54,7 @@
         const ownerReturn = capabilityABI.MintKey && capabilityABI.MintKey.returns;
         const withdrawnValue = capabilityABI.Withdraw && capabilityABI.Withdraw.returns;
         const createdVariable = capabilityABI.Create && capabilityABI.Create.returns;
+        const createErrorCodes = capabilityABI.Create && capabilityABI.Create.error_codes;
         const inspectVariable = capabilityABI.InspectVariable;
         if (!ownerReturn || ownerReturn.register !== 'CR1' ||
             ownerReturn.kind !== 'capability' || ownerReturn.secure_type !== 'BankOwnerKey' ||
@@ -61,6 +62,8 @@
             withdrawnValue.kind !== 'capability' || withdrawnValue.secure_type !== 'Inform' ||
              !createdVariable || createdVariable.register !== 'CR0' ||
              capabilityABI.Create.returns_nullable !== true ||
+             !createErrorCodes || createErrorCodes.IDENTITY !== 0x103 ||
+             createErrorCodes.NO_CAPABILITY !== 0x101 ||
             createdVariable.kind !== 'capability' || createdVariable.secure_type !== 'BankVariable' ||
             !inspectVariable || !inspectVariable.returns ||
             inspectVariable.returns.register !== 'DR1' ||

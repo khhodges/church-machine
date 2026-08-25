@@ -4,8 +4,8 @@
     const identity = Object.freeze({
   "dot_name": "Bank",
   "issue_n": 1,
-  "token": "0e759698",
-  "binary_hash": "ea90cf2e16ebadb4bd6e8a85c9f3b4824ee700d09049c4a972c0830e0a450b2b",
+  "token": "7bd12610",
+  "binary_hash": "8875c13f80c4db86d1c709025793c21792db300e65f47c747657c6292f9f9801",
   "identity_hash": "3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11",
   "self_gt": 186216846,
   "ns_slot": null,
@@ -24,6 +24,25 @@
         "register": "DR0",
         "kind": "value"
       },
+      "status_semantics": "1=success; nonzero Bank error code=failure",
+      "error_codes": {
+        "NO_CAPABILITY": 257,
+        "TYPE": 258,
+        "IDENTITY": 259,
+        "PERM": 260,
+        "BOUNDS": 261,
+        "NOT_FOUND": 262,
+        "REVOKED": 263,
+        "STALE_KEY": 264,
+        "OOM": 265,
+        "NS_FULL": 266,
+        "MINT": 267,
+        "NAMESPACE": 268,
+        "CORRUPT": 269,
+        "NOT_INIT": 270,
+        "INTERNAL": 511
+      },
+      "returns_nullable": true,
       "inputs": [
         {
           "name": "lump",

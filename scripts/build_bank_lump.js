@@ -23,6 +23,26 @@ const SOURCE_FILE = path.join(ROOT, 'simulator', 'cloomc', 'bank.cloomc');
 const IDENTITY_PROJECTION_PATH = path.join(ROOT, 'simulator', 'bank_lump_identity.js');
 const DOT_NAME = 'Bank';
 const ISSUE_N = 1;
+// Stable diagnostic ABI for Bank. DR0 is 1 on success; failure codes are
+// nonzero and never grant authority. Create's authority result is CR0, which
+// is the NULL capability when any one of these failures occurs.
+const BANK_ERROR_CODES = Object.freeze({
+    NO_CAPABILITY: 0x101,
+    TYPE: 0x102,
+    IDENTITY: 0x103,
+    PERM: 0x104,
+    BOUNDS: 0x105,
+    NOT_FOUND: 0x106,
+    REVOKED: 0x107,
+    STALE_KEY: 0x108,
+    OOM: 0x109,
+    NS_FULL: 0x10A,
+    MINT: 0x10B,
+    NAMESPACE: 0x10C,
+    CORRUPT: 0x10D,
+    NOT_INIT: 0x10E,
+    INTERNAL: 0x1FF,
+});
 const BANK_CAPABILITY_TYPES = [
     {
         name: 'BankOwnerKey',
@@ -96,6 +116,7 @@ function buildBankArtifact() {
         Create: {
             status: { register: 'DR0', kind: 'value' },
             status_semantics: '1=success; nonzero Bank error code=failure',
+            error_codes: { ...BANK_ERROR_CODES },
             returns_nullable: true,
             inputs: [{
                 name: 'lump', register: 'CR1', kind: 'capability',
@@ -333,5 +354,5 @@ if (require.main === module) {
 }
 
 module.exports = {
-    buildBankArtifact, identityProjection, renderIdentityProjection, selfIdentityGT, writeBankArtifact,
+    BANK_ERROR_CODES, buildBankArtifact, identityProjection, renderIdentityProjection, selfIdentityGT, writeBankArtifact,
 };
