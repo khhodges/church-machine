@@ -17,6 +17,7 @@ const BankLumpIdentity = require('./bank_lump_identity.js');
 const ChurchSimulator = require('./simulator.js');
 const AbstractionRegistry = require('./abstractions.js');
 const SystemAbstractions = require('./system_abstractions.js');
+const { buildLump, embedSelfDefinition } = require('./lump_builder.js');
 
 let pass = 0;
 function check(label, condition) {
@@ -52,7 +53,7 @@ check('BANK-LUMP03: checked-in binary is the canonical compiler serialization',
 check('BANK-LUMP04: header, binary size, code words, and c-list count agree',
     size === binary.length / 4 && size === entry.lump_size && size === sidecar.lump_size &&
     cw === entry.cw && cw === sidecar.cw && cc === 1 && cc === entry.cc && cc === sidecar.cc);
-check('BANK-LUMP05: Bank carries the compiler-owned symbolic SELF identity in c-list row zero',
+check('BANK-LUMP05: Bank carries the compiler-owned E-permission SELF identity in c-list row zero',
     binary.readUInt32BE((size - cc) * 4) === artifact.selfGT &&
     sidecar.permissions.c_list_row_0.live_lockbox_authority === false);
 check('BANK-LUMP06: Bank is a self-defining tier-2 CLOOMC LUMP',
@@ -206,6 +207,57 @@ const sourceCapability = {
         self_gt: entry.self_gt, identity_string: sidecar.identity_string
     }
 };
+const validateCandidate = candidate => BankLumpBinding.validateLump({
+    binary: candidate,
+    metadata: sourceCapability.metadata,
+});
+const malformedFrame = Buffer.from(artifact.binary);
+malformedFrame.writeUInt32BE(0, (cw + 1) * 4);
+check('BANK-LUMP11b: Gate 1 rejects a missing self-definition frame',
+    !validateCandidate(malformedFrame).ok);
+const nonZeroPadding = Buffer.from(artifact.binary);
+nonZeroPadding.writeUInt32BE(1, (size - cc - 1) * 4);
+check('BANK-LUMP11c: Gate 1 rejects non-zero trailing freespace padding',
+    !validateCandidate(nonZeroPadding).ok);
+const invalidEntryPoint = Buffer.from(artifact.binary);
+invalidEntryPoint.writeUInt32BE(0, 4);
+check('BANK-LUMP11d: Gate 2 rejects a public method without an executable entry point',
+    !validateCandidate(invalidEntryPoint).ok);
+const nonEnterSelf = Buffer.from(artifact.binary);
+nonEnterSelf.writeUInt32BE(entry.self_gt & ~0x40000000, (size - cc) * 4);
+check('BANK-LUMP11e: Gate 2 rejects a SELF identity that lacks exact E permission',
+    !validateCandidate(nonEnterSelf).ok);
+const mixedRightsIdentity = 'Mallory#1';
+const mixedRightsHash = sha256(mixedRightsIdentity);
+const mixedRightsSelf = (0x4A000000 |
+    (Number.parseInt(mixedRightsHash.slice(0, 8), 16) & 0x01FFFFFF)) >>> 0;
+const mixedRightsBuilt = buildLump({
+    methods: [{ name: 'Run', visibility: 'public', code: [0] }],
+    capabilities: [],
+});
+mixedRightsBuilt.words[mixedRightsBuilt.clistStart] = mixedRightsSelf;
+const mixedRightsWords = embedSelfDefinition(mixedRightsBuilt.words, {
+    name: 'Mallory',
+    methods: [{
+        name: 'Run',
+        index: 0,
+        inputs: [{ name: 'bad', kind: 'capability', rights: ['X', 'E'] }],
+    }],
+    capabilities: [],
+}, 'abstraction Mallory { }', 2);
+const mixedRightsBinary = Buffer.alloc(mixedRightsWords.length * 4);
+mixedRightsWords.forEach((word, index) => mixedRightsBinary.writeUInt32BE(word >>> 0, index * 4));
+const mixedRightsMetadata = {
+    dot_name: 'Mallory',
+    issue_n: 1,
+    token: sha256(Buffer.concat([Buffer.from('Mallory', 'utf8'), mixedRightsBinary])).slice(0, 8),
+    binary_hash: sha256(mixedRightsBinary),
+    identity_hash: mixedRightsHash,
+    self_gt: mixedRightsSelf,
+    identity_string: mixedRightsIdentity,
+};
+check('BANK-LUMP11f: Gate 2 rejects an XE method capability even with matching seals',
+    !BankLumpBinding.validateLump({ binary: mixedRightsBinary, metadata: mixedRightsMetadata }).ok);
 const allocationsBeforeRejectedCreate = Object.keys(systemAbs._memoryState.allocations).sort();
 const forgedToken = registry.dispatchMethod(54, 'Create', sim, {
     capabilities: { lump: { ...sourceCapability, metadata: { ...sourceCapability.metadata, token: '00000000' } } }

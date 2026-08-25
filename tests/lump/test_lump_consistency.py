@@ -1653,7 +1653,7 @@ class TestR20_BootCatalogAbstractGTRoundTrip:
         )
 
 
-def _self_gt_expected(identity_string: str) -> int:
+def _self_gt_expected(identity_string: str, *, enter_permission: bool = False) -> int:
     """Compute the expected self Inform GT word for a given identity_string.
 
     Formula (from server/app.py):
@@ -1661,14 +1661,19 @@ def _self_gt_expected(identity_string: str) -> int:
         hash25  = hash32 & 0x1FFFFFF          (low 25 bits)
         self_gt = 0x0A000000 | hash25
 
-    0x0A000000 encodes:  perm3=0, dom=1 (Church), gt_type=1 (Inform), R=0, W=0.
-    The 25-bit hash occupies bits[24:0] — slot_id / sequence fields — making
-    this GT a secretless, public identity token with no capability permissions.
+    Most compiler-owned SELF rows use 0x0A000000: perm3=0, dom=1 (Church),
+    gt_type=1 (Inform). A sidecar may explicitly declare the Bank-style
+    E-permission SELF, which uses 0x4A000000 instead. The 25-bit hash occupies
+    bits[24:0] — slot_id / sequence fields.
     """
     h = hashlib.sha256(identity_string.encode("utf-8")).hexdigest()
     hash32  = int(h[:8], 16)
     hash25  = hash32 & 0x1FFFFFF
-    return (0x0A000000 | hash25) & 0xFFFFFFFF
+    # Bank's runtime validator requires its SELF row to be an exact Church E
+    # capability, while ordinary compiler-owned SELF rows remain public
+    # identity tokens with no authority.
+    prefix = 0x4A000000 if enter_permission else 0x0A000000
+    return (prefix | hash25) & 0xFFFFFFFF
 
 
 def _self_gt_targets():
@@ -1800,7 +1805,13 @@ class TestR22_SelfGTCorrect:
             "  that the self Inform GT can be stored at c-list[0].\n"
             "  Fix: recompile the LUMP so that cc >= 1."
         )
-        expected = _self_gt_expected(identity_string)
+        sidecar = _load_sidecar(token) or {}
+        self_rights = (
+            sidecar.get("permissions", {})
+            .get("c_list_row_0", {})
+            .get("rights")
+        )
+        expected = _self_gt_expected(identity_string, enter_permission=self_rights == ["E"])
         actual   = _read_clist_word(token, 0)
         if _declared_allocation_placeholder(token, 0, actual):
             return

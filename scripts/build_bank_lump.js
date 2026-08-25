@@ -89,7 +89,9 @@ function packWords(words) {
 
 function selfIdentityGT(identityString) {
     const hash32 = Number.parseInt(sha256(identityString).slice(0, 8), 16) >>> 0;
-    return (0x0A000000 | (hash32 & 0x01FFFFFF)) >>> 0;
+    // SELF keeps the compiler-owned identity payload, but carries exactly
+    // Church E permission so it is a valid abstraction entry capability.
+    return (0x4A000000 | (hash32 & 0x01FFFFFF)) >>> 0;
 }
 
 function stringifyAsciiJson(value) {
@@ -188,8 +190,8 @@ function buildBankArtifact() {
     const identityString = `${DOT_NAME}#${ISSUE_N}`;
     const selfGT = selfIdentityGT(identityString);
 
-    // Row zero is compiler-owned symbolic identity, not a dynamic lockbox
-    // authority. A real E-GT is minted only when Bank is installed/called.
+    // Row zero is the compiler-owned E-identity, never a dynamic lockbox
+    // authority. The runtime still mints a separate BankVariable capability.
     built.words[built.clistStart] = selfGT;
     const words = embedSelfDefinition(built.words, api, source, 2);
     const binary = packWords(words);
@@ -209,8 +211,9 @@ function buildBankArtifact() {
     const permissions = {
         caller_grants: ['E'],
         c_list_row_0: {
-            role: 'compiler-owned symbolic SELF identity',
+            role: 'compiler-owned E-permission SELF identity',
             gt: `0x${selfGT.toString(16).padStart(8, '0')}`,
+            rights: ['E'],
             live_lockbox_authority: false,
         },
     };
@@ -254,8 +257,8 @@ function buildBankArtifact() {
         capabilities: [{
             row: 0,
             name: 'SELF',
-            rights: [],
-            role: 'compiler-owned symbolic identity',
+            rights: ['E'],
+            role: 'compiler-owned E-permission identity',
             compiler_owned: true,
         }],
         compiler_owned_self: true,

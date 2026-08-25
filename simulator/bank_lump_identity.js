@@ -4,10 +4,10 @@
     const identity = Object.freeze({
   "dot_name": "Bank",
   "issue_n": 1,
-  "token": "5433e4ff",
-  "binary_hash": "a8d7db527cbd290766a4df90fd5ea2960af7b09f68c54374eeff0a7c42505178",
+  "token": "d5c860ea",
+  "binary_hash": "ed0f408174e31026775705311bf7336fbb129ce6d390039ad0e32aab09fe4d88",
   "identity_hash": "3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11",
-  "self_gt": 186216846,
+  "self_gt": 1259958670,
   "ns_slot": null,
   "ns_slot_policy": "dynamic",
   "boot_resident": false,

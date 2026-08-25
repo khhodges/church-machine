@@ -1381,35 +1381,35 @@ sanctum operations reached only after validating the BankVariable Golden Token.
 This prevents callers from treating the static LUMP identity or a scalar value
 as custody authority.
 
-Before `Create` reserves an allocation or writes a Namespace entry, the binding
-derives and checks all of the following from the submitted bytes and their
-self-definition frame:
+Before `Create` reserves an allocation or writes a Namespace entry, it applies
+these ordered gates:
 
-1. the header magic, `typ=lump`, power-of-two size, `cw`/`cc` bounds, and a
-   present `0xAB` self-definition frame;
-2. the embedded API JSON and its declared abstraction name;
-3. the full SHA-256 binary seal and the canonical token
-   `SHA-256(name || complete_big_endian_binary)[:8]`;
-4. the identity seal `SHA-256(name#issue)`, its derived compiler-owned SELF
-   GT, and c-list row zero's exact equality to that SELF GT; and
-5. every supplied metadata assertion (`dot_name`, issue, token, binary hash,
-   identity hash, SELF GT, and optional identity string) against those
-   independently recomputed relationships.
+1. **Structural LUMP validity.** Verify header magic, an exact power-of-two
+   allocation, `typ=lump`, `cw`/`cc` bounds, a complete `0xAB`
+   API-and-source frame, and zero padding through the c-list boundary.
+   Public API methods must resolve to executable dispatch entries.
+2. **E-abstraction/type validity.** The SELF c-list row must be the exact
+   Church-domain Inform E capability derived for the declared identity.
+   Method capabilities must never combine Turing execute (`X`) and Church
+   enter (`E`) rights.
+3. **Requested identity validity.** Recompute the binary hash, canonical
+   `SHA-256(name || complete_big_endian_binary)[:8]` token, and
+   `SHA-256(name#issue)` identity seal; compare each supplied metadata
+   assertion (`dot_name`, issue, token, binary hash, identity hash, SELF GT,
+   and optional identity string) with those independently derived values.
 
 Thus metadata tells Bank what relationship the caller is asserting, but cannot
 make forged bytes acceptable. A malformed header, a stale/copy-pasted token,
 an altered code word, a forged API name, a mismatched identity hash, or a
 different c-list SELF fails before any private custody state is published.
 
-These checks establish **integrity and identity consistency**, not historical
-genesis. A matching token and identity seal prove that accepted bytes are
-self-consistent under the declared `name#issue`; they do not prove who first
-published the abstraction or that a particular source registry approved it.
-Any caller that requires that stronger claim must require a declared trusted
-attestation or registry chain in addition to Bank's byte validation. The
-current API records such a caller declaration as non-authoritative provenance;
-it never upgrades it to a verified genesis claim merely because it was supplied
-by the caller.
+These checks establish **mechanical tampering-and-substitution detection**, not
+historical genesis. A modified binary or swapped name/token combination fails
+Gate 3 before custody is allocated. The provenance of the name-to-token binding
+is currently human-vouched: a matching token and identity seal prove the
+submitted bytes are self-consistent under the declared `name#issue`, but not
+who first published the abstraction. A future genesis-rooted certificate
+verifier may strengthen Gate 3 without weakening these mechanical checks.
 
 The owner capability and verified variable capability are intentionally
 different authorities. Owner methods manage a Bank lockbox; variable methods

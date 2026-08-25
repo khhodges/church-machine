@@ -141,7 +141,6 @@
 - [Build Approval size accounting](build-approval-size-accounting.md) — derive displayed LUMP budgets from the big-endian binary and mark API metadata unavailable rather than guessing
 - [Namespace Table authority](namespace-table-bitstream-source.md) — Namespace Table first, then its assigned slots/LUMPs; manifest is never authoritative for membership or metadata
 - [Canonical dot-name LUMP integrity](canonical-dot-name-clist-integrity.md) — every LUMP is dot.name.1.token, with compiled data and dot-name C-list content covered by its integrity value
-- [SELF row and lazy-loader resolution](canonical-dot-name-clist-integrity.md) — C-list row 0 is read-only SELF identity covered by integrity; lazy loading converts 32-bit Outform tokens into Inform GTs
 - [LUMP documentation cases](lump-documentation-cases.md) — classify each LUMP as fully documented, source without comments, or API only
 - [Fault snapshot reboot correlation](fault-snapshot-reboot-correlation.md) — auto-reboot only after the exact fault's complete snapshot is durably promoted
 - [Bitstream release candidate baseline](bitstream-release-candidate-baseline.md) — Versions must surface pending hardware commits; never claim an artifact released without a trusted source commit
@@ -157,3 +156,4 @@
 - [Dynamic system LUMP runtime binding](dynamic-system-lump-runtime-binding.md) — dynamic LUMPs must gate dispatch on their generated canonical identity, never only a duplicated registry index
 - [Capability ABI result materialization](capability-abi-result-materialization.md) — a runtime binding must write declared CR/DR outputs and preserve protected proof state, not return authority only in host objects
 - [Bank artifact binding seals](bank-artifact-binding-seals.md) — Bank’s source is embedded in its artifact, so regeneration must also synchronize binding token/hash constants
+- [Bank validation gates](bank-validation-gates.md) — Bank uses structural, E/type, then mechanical identity checks; provenance remains human-vouched until a genesis verifier exists

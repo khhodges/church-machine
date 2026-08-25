@@ -10,8 +10,8 @@
 (function exposeBankLumpBinding(root) {
     const DOT_NAME = 'Bank';
     const ISSUE_N = 1;
-    const TOKEN = '5433e4ff';
-    const BINARY_HASH = 'a8d7db527cbd290766a4df90fd5ea2960af7b09f68c54374eeff0a7c42505178';
+    const TOKEN = 'd5c860ea';
+    const BINARY_HASH = 'ed0f408174e31026775705311bf7336fbb129ce6d390039ad0e32aab09fe4d88';
     const IDENTITY_HASH = '3b19718e37c1f36fcca3457e3016ec722737bd33103fac22f1c616de0fd63b11';
     const SELF_GT = 0x4B19718E;
     const REGISTRY_INDEX = 54;
@@ -180,7 +180,12 @@
                 !Array.isArray(api.methods) || (flags & 0x03) === 0) {
             return fail('LUMP embedded API metadata is incomplete');
         }
-        let payloadEnd = apiEnd;
+        const apiPaddedEnd = (apiEnd + 3) & ~3;
+        if (apiPaddedEnd > clistOffset) return fail('LUMP API frame exceeds freespace');
+        for (let offset = apiEnd; offset < apiPaddedEnd; offset++) {
+            if (bytes[offset] !== 0) return fail('LUMP API alignment padding is non-zero');
+        }
+        let payloadEnd = apiPaddedEnd;
         if (flags >= 1) {
             if (payloadEnd + 4 > clistOffset) return fail('LUMP source length is missing');
             const sourceLength = readWord(payloadEnd);
@@ -188,26 +193,41 @@
             if (sourceLength === 0 || payloadEnd + sourceLength > clistOffset) {
                 return fail('LUMP embedded source frame is truncated');
             }
-            payloadEnd += sourceLength;
+            const sourceEnd = payloadEnd + sourceLength;
+            const sourcePaddedEnd = (sourceEnd + 3) & ~3;
+            if (sourcePaddedEnd > clistOffset) return fail('LUMP source frame exceeds freespace');
+            for (let offset = sourceEnd; offset < sourcePaddedEnd; offset++) {
+                if (bytes[offset] !== 0) return fail('LUMP source alignment padding is non-zero');
+            }
+            payloadEnd = sourcePaddedEnd;
         }
         for (let offset = payloadEnd; offset < clistOffset; offset += 4) {
             if (readWord(offset) !== 0) return fail('LUMP freespace has non-zero trailing data');
         }
         // A public method must point at executable code, while private
         // methods may deliberately retain the builder's zero entry.
-        const methodByIndex = new Map((api.methods || []).map(method => [method.index, method]));
+        const rejectsMixedDomainRights = capability => {
+            const rights = Array.isArray(capability && capability.rights)
+                ? capability.rights.map(String)
+                : [];
+            return rights.includes('X') && rights.includes('E');
+        };
+        if ((api.capabilities || []).some(rejectsMixedDomainRights)) {
+            return fail('LUMP declared capability cannot combine X and E rights');
+        }
         for (const method of api.methods) {
             if (!Number.isInteger(method.index) || method.index < 0 || method.index >= cw) {
                 return fail('LUMP API method index is outside the dispatch table');
             }
             const entry = readWord(4 + method.index * 4);
             if (entry === 0 || entry > cw) return fail('LUMP API method has an invalid entry point');
-            const inputs = Array.isArray(method.inputs) ? method.inputs : [];
-            for (const input of inputs) {
-                const rights = Array.isArray(input.rights) ? input.rights.map(String) : [];
-                if (rights.includes('X') && rights.includes('E')) {
-                    return fail('LUMP method capability cannot combine X and E rights');
-                }
+            const methodCapabilities = [
+                ...(Array.isArray(method.inputs) ? method.inputs : []),
+                method.returns,
+                ...(Array.isArray(method.outputs) ? method.outputs : []),
+            ];
+            if (methodCapabilities.some(rejectsMixedDomainRights)) {
+                return fail('LUMP method capability cannot combine X and E rights');
             }
         }
         const asserted = metadata && typeof metadata === 'object' ? metadata : {};
@@ -220,7 +240,7 @@
         const binaryHash = hex(hash(bytes));
         const token = hex(hash(concat(utf8(dotName), bytes))).slice(0, 8);
         const identityHash = hex(hash(identityString));
-        const expectedSelf = (0x0A000000 |
+        const expectedSelf = (0x4A000000 |
             (Number.parseInt(identityHash.slice(0, 8), 16) & 0x01FFFFFF)) >>> 0;
         const selfOffset = (size - cc) * 4;
         const selfGT = readWord(selfOffset);
