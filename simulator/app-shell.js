@@ -781,12 +781,7 @@ function showNewTabDialog() {
     const nameInput = document.getElementById('newTabName');
     if (nameInput) { nameInput.value = ''; nameInput.focus(); }
     const langSel = document.getElementById('newTabLang');
-    const mainSel = document.getElementById('langSelector');
-    if (langSel && mainSel) {
-        // "personal" is the display mode for user tabs, not a source language.
-        langSel.value = langSel.querySelector('option[value="' + mainSel.value + '"]')
-            ? mainSel.value : 'javascript';
-    }
+    if (langSel) langSel.value = 'assembly';
 }
 
 function hideNewTabDialog() {
@@ -799,7 +794,7 @@ function confirmNewTab() {
     const langSel = document.getElementById('newTabLang');
     const name = nameInput ? nameInput.value.trim() : '';
     if (!name) { alert('Please enter a program name.'); return; }
-    const lang = langSel ? langSel.value : 'javascript';
+    const lang = 'assembly';
     const sourceName = _newAbstractionSourceName(name);
     const initialCode = _newAbstractionProforma(sourceName, lang);
     hideNewTabDialog();
@@ -813,55 +808,65 @@ function confirmNewTab() {
     createUserTab(name, lang, initialCode);
 }
 
-// The New command always starts with a valid, editable abstraction scaffold.
-// Keep the language-specific forms here so the dialog's language choice remains
-// useful while avoiding accidental reuse of the current editor contents.
+// The New command always starts with the editable abstraction proforma.
+// Abstraction source is intentionally kept in the Assembly editor mode so
+// users can add the low-level method bodies directly.
 function _newAbstractionSourceName(name) {
-    const clean = String(name || '').replace(/[^A-Za-z0-9_$]+/g, '_')
-        .replace(/^(\d)/, '_$1').replace(/^_+|_+$/g, '');
-    return clean || 'NewAbstraction';
+    const clean = String(name || '').trim()
+        .replace(/[\s_]+/g, '.')
+        .replace(/[^A-Za-z0-9.$]+/g, '')
+        .replace(/\.+/g, '.')
+        .replace(/^\.+|\.+$/g, '');
+    return clean || 'New.Abstraction';
 }
 
-function _newAbstractionProforma(name, lang) {
-    if (lang === 'haskell') {
-        return `abstraction ${name} {
+function _newAbstractionProforma(name) {
+    return `Source for ${name}  (dot.name)
+
+; Provides: the functions of ...
+abstraction ${name} {
     capabilities { }
-
-    method Run(value) = value
-}`;
+    method Status {
+        ; Return the status
+        ; Depends on: self
+        ; TODO: write your code here
+        RETURN
     }
-    if (lang === 'lambda') {
-        return `abstraction ${name} {
-    capabilities { }
-
-    method Run(value) = value
-}`;
+    method Close_Fist {
+        ; Close all fingers
+        ; Depends on: self
+        ; TODO: write your code here
+        RETURN
     }
-    if (lang === 'english') {
-        return `Create an abstraction called ${name}
-It has no capabilities
-
-Add a method called Run that takes value
-    Return value`;
+    method Open_Hand {
+        ; Extend all fingers
+        ; Depends on: self
+        ; TODO: write your code here
+        RETURN
     }
-    if (lang === 'symbolic') {
-        return `abstraction ${name} {
-    method Run() {
-        V1 = 0
+    method Grip {
+        ; Close as a fist
+        ; Depends on: self
+        ; TODO: write your code here
+        RETURN
     }
-}`;
+    method Point {
+        ; Point with forefinger
+        ; Depends on: self
+        ; TODO: write your code here
+        RETURN
     }
-    if (lang === 'assembly') {
-        return `; ${name} abstraction proforma
-; Add instructions for the abstraction body below.
-RETURN`;
+    method Count {
+        ; Display fingers as a number
+        ; Depends on: self
+        ; TODO: write your code here
+        RETURN
     }
-    return `abstraction ${name} {
-    capabilities { }
-
-    method Run(value) {
-        result = value
-        return(result)
+    method Pinch {
+        ; Close the thumb and finger to touch each other
+        ; Depends on: self
+        ; TODO: write your code here
+        RETURN
     }
 }`;
 }
