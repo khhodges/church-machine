@@ -220,6 +220,9 @@ register_suite "ns-slot-modal-persist-tests" \
 register_suite "warning-panel-tests" \
     'node simulator/test_asm_warning_panel.js'
 
+register_suite "live-lump-validation-tests" \
+    'node simulator/test_live_lump_validations.js'
+
 register_suite "docs-search-figures-tests" \
     'node simulator/test_docs_search_figures.js'
 

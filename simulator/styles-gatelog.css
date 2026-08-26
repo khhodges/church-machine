@@ -330,6 +330,123 @@
     font-weight: 600;
 }
 
+.lump-validations-section {
+    margin: 10px 0 14px;
+    padding: 11px;
+    border: 1px solid rgba(83, 153, 201, 0.36);
+    border-left: 4px solid #5aa7dc;
+    border-radius: 6px;
+    background: linear-gradient(110deg, rgba(27, 57, 77, 0.34), rgba(20, 26, 36, 0.38));
+}
+.lump-validations-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 9px;
+}
+.lump-validations-heading h3 {
+    margin: 1px 0 0;
+    color: #b6ddf8;
+    font-size: 0.9rem;
+    letter-spacing: 0.02em;
+}
+.lump-validations-heading p {
+    max-width: 430px;
+    margin: 0;
+    color: #8ba2b2;
+    font-size: 0.72rem;
+    text-align: right;
+}
+.lump-validations-kicker {
+    color: #6daed6;
+    font-size: 0.64rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.lump-validation-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+.lump-validation-card {
+    min-width: 0;
+    padding: 9px;
+    border: 1px solid rgba(115, 139, 156, 0.32);
+    border-radius: 5px;
+    background: rgba(8, 15, 23, 0.52);
+}
+.lump-validation-card.pass { border-top: 3px solid #3bbf72; }
+.lump-validation-card.fault { border-top: 3px solid #e15a65; }
+.lump-validation-card.unavailable { border-top: 3px solid #8a929b; }
+.lump-validation-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 7px;
+}
+.lump-validation-context {
+    color: #d8ebf7;
+    font-weight: 700;
+    font-size: 0.81rem;
+}
+.lump-validation-slot {
+    overflow: hidden;
+    color: #9aaebb;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.68rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.lump-validation-state,
+.lump-validation-check {
+    display: inline-block;
+    border-radius: 3px;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+.lump-validation-state { padding: 3px 5px; white-space: nowrap; }
+.lump-validation-state.pass, .lump-validation-check.pass { color: #63e798; background: rgba(31, 105, 61, 0.35); }
+.lump-validation-state.fault, .lump-validation-check.fault { color: #ff7e89; background: rgba(125, 35, 45, 0.43); }
+.lump-validation-state.unavailable, .lump-validation-check.unavailable { color: #b7bec7; background: rgba(86, 94, 104, 0.34); }
+.lump-validation-metadata {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    margin-top: 7px;
+    color: #8fb2c9;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.65rem;
+}
+.lump-validation-metadata code { color: #c9e6f8; }
+.lump-validation-reason {
+    min-height: 2.2em;
+    margin: 7px 0;
+    color: #b9c5ce;
+    font-size: 0.7rem;
+    line-height: 1.35;
+}
+.lump-validation-checks { display: flex; flex-wrap: wrap; gap: 4px; }
+.lump-validation-check { padding: 2px 4px; }
+.lump-validation-inspect {
+    margin-top: 8px;
+    padding: 0;
+    border: 0;
+    color: #75bde9;
+    background: transparent;
+    cursor: pointer;
+    font-size: 0.69rem;
+}
+.lump-validation-inspect:hover { color: #c1e6fb; text-decoration: underline; }
+@media (max-width: 880px) {
+    .lump-validation-grid { grid-template-columns: 1fr; }
+    .lump-validations-heading { align-items: flex-start; flex-direction: column; gap: 3px; }
+    .lump-validations-heading p { text-align: left; }
+}
+
 .check-pass {
     background: rgba(30, 80, 45, 0.5);
     color: #55ee88;

@@ -687,6 +687,17 @@ args = "node simulator/test_asm_warning_panel.js"
 outputType = "console"
 
 [[workflows.workflow]]
+name = "live-lump-validation-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_live_lump_validations.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
 name = "docs-search-figures-tests"
 author = "agent"
 

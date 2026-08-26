@@ -433,11 +433,81 @@ function updateToolbarIdeBadge() {
     el.innerHTML = `<span class="info-ide-badge toolbar-ide-badge ${isOnline ? 'info-ide-online' : 'info-ide-offline'}" style="cursor:pointer;" onclick="switchView('dashboard');switchDashTab('state');" title="IDE connection — click for details">IDE: ${status}</span>`;
 }
 
+function _gateLogEscape(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function _renderLiveLumpValidations(validations) {
+    const fallback = (key, title, register) => ({
+        key, title, register, state: 'unavailable', status: 'unavailable',
+        reason: 'Live LUMP validation is not available in this simulator build.', checks: [],
+    });
+    const cards = [
+        validations && validations.namespace || fallback('namespace', 'Namespace', 'CR15'),
+        validations && validations.thread || fallback('thread', 'Thread', 'CR12'),
+        validations && validations.abstraction || fallback('abstraction', 'Abstraction', 'CR14'),
+    ];
+    let html = `<section class="lump-validations-section" aria-label="LUMP Validations">
+        <div class="lump-validations-heading">
+            <div><span class="lump-validations-kicker">Live execution context</span><h3>LUMP Validations</h3></div>
+            <p>Namespace, Thread, and executing Abstraction derived from live CR15, CR12, and CR14.</p>
+        </div>
+        <div class="lump-validation-grid">`;
+
+    for (const card of cards) {
+        const state = card.state === 'pass' ? 'pass' : (card.state === 'fault' ? 'fault' : 'unavailable');
+        const badge = state === 'pass' ? 'PASS' : (state === 'fault' ? 'FAULT' : 'NOT AVAILABLE');
+        const slotText = card.slot == null
+            ? `${card.register || 'CR?'} · no resolved slot`
+            : `${card.register || 'CR?'} → NS[${card.slot}]${card.name ? ` · ${card.name}` : ''}`;
+        const entry = card.entry || null;
+        const header = card.header || null;
+        let metadata = '';
+        if (entry) {
+            metadata += `<span>loc <code>0x${(entry.location >>> 0).toString(16).toUpperCase().padStart(4, '0')}</code></span>`;
+            metadata += `<span>seq <code>${entry.gtSeq}</code></span>`;
+        }
+        if (header) {
+            metadata += `<span>hdr <code>0x${(header.raw >>> 0).toString(16).toUpperCase().padStart(8, '0')}</code></span>`;
+            metadata += `<span>${header.lumpSize} words · cw ${header.cw} · cc ${header.cc}</span>`;
+        }
+        const checks = (card.checks || []).map(check => {
+            const checkState = check.pass === true ? 'pass' : (check.pass === false ? 'fault' : 'unavailable');
+            const symbol = checkState === 'pass' ? '&#10003;' : (checkState === 'fault' ? '&#10007;' : '&mdash;');
+            return `<span class="lump-validation-check ${checkState}" title="${_gateLogEscape(check.detail || '')}">${symbol}&nbsp;${_gateLogEscape(check.label)}</span>`;
+        }).join('');
+        html += `<article class="lump-validation-card ${state}" data-validation-kind="${_gateLogEscape(card.key || '')}" data-validation-state="${state}">
+            <div class="lump-validation-card-head">
+                <div><span class="lump-validation-context">${_gateLogEscape(card.title || 'LUMP')}</span>
+                <div class="lump-validation-slot">${_gateLogEscape(slotText)}</div></div>
+                <span class="lump-validation-state ${state}">${badge}</span>
+            </div>
+            ${metadata ? `<div class="lump-validation-metadata">${metadata}</div>` : ''}
+            <p class="lump-validation-reason">${_gateLogEscape(card.reason || (state === 'pass' ? 'Canonical live checks passed.' : 'Context cannot be inspected.'))}</p>
+            ${checks ? `<div class="lump-validation-checks">${checks}</div>` : '<div class="lump-validation-checks"><span class="lump-validation-check unavailable">&mdash;&nbsp;NOT INSPECTABLE</span></div>'}
+            <button type="button" class="lump-validation-inspect" onclick="openCRDetail(${Number(String(card.register || '').replace('CR', '')) || 14})">Inspect ${_gateLogEscape(card.register || 'context register')} &rarr;</button>
+        </article>`;
+    }
+    return html + `</div></section>`;
+}
+
 function updateGateLog() {
     if (!sim) return;
     const container = document.getElementById('gateLogContent');
     if (!container) return;
     const log = sim.auditLog || [];
+    let liveValidations = null;
+    try {
+        liveValidations = typeof sim.getLiveLumpValidations === 'function'
+            ? sim.getLiveLumpValidations() : null;
+    } catch (error) {
+        console.warn('[Gate Log] live LUMP validation failed to render', error);
+    }
 
     // ── Fault banner ──────────────────────────────────────────────────────────
     // Built unconditionally so it appears even when auditLog is empty.
@@ -662,10 +732,14 @@ function updateGateLog() {
         }
     }
 
+    // This lives with the capability audit rather than the static Namespace
+    // browser: its cards always answer what CR15, CR12, and CR14 mean now.
+    html += _renderLiveLumpValidations(liveValidations);
+
     // Empty-state guidance — only when there is no fault banner, no audit entries,
     // and the scheduler has not yet performed any IRQ sweeps.
     if (faultLog.length === 0 && log.length === 0 && _frtSweepCount === 0) {
-        container.innerHTML = `<div class="gate-log-empty">
+        html += `<div class="gate-log-empty">
             <p>No gates recorded yet.</p>
             <ol class="audit-guide-steps">
                 <li>Click <b>Boot</b> (top-right)</li>
@@ -673,7 +747,6 @@ function updateGateLog() {
                 <li>Click <b>Step</b> (top-right) — each click shows the mLoad / mSave gates for that instruction</li>
             </ol>
         </div>`;
-        return;
     }
 
     for (const a of log) {

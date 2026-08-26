@@ -3144,6 +3144,278 @@ class ChurchSimulator {
             this._integrity32(entry.word0_location, entry.word1_limit);
     }
 
+    // Return validation cards for the three LUMPs that make up the live
+    // execution context.  This is deliberately derived from the architectural
+    // registers rather than the selected repository item or bootEntrySlot:
+    // CR15 is the Namespace, CR12 is the active Thread, and CR14 is the code
+    // Abstraction.  The UI can therefore show a real unavailable state instead
+    // of treating a missing registry record as a valid LUMP.
+    getLiveLumpValidations() {
+        const contexts = [
+            { key: 'namespace', title: 'Namespace', register: 15, expected: 'namespace' },
+            { key: 'thread', title: 'Thread', register: 12, expected: 'thread' },
+            { key: 'abstraction', title: 'Abstraction', register: 14, expected: 'abstraction' },
+        ];
+        const result = {};
+        for (const context of contexts) {
+            result[context.key] = this._validateLiveLumpContext(context);
+        }
+        return result;
+    }
+
+    _validateLiveLumpContext(context) {
+        const unavailable = (reason, extra = {}) => ({
+            key: context.key,
+            title: context.title,
+            register: `CR${context.register}`,
+            expected: context.expected,
+            state: 'unavailable',
+            status: 'unavailable',
+            result: 'unavailable',
+            slot: null,
+            name: null,
+            reason,
+            checks: [],
+            ...extra,
+        });
+
+        if (!this.bootComplete) {
+            return unavailable(`Machine has not completed boot; ${context.title} context is not established.`);
+        }
+
+        const cr = this.cr && this.cr[context.register];
+        const gtWord = cr ? (cr.word0 >>> 0) : 0;
+        if (!cr || ChurchSimulator.isNullGT(gtWord)) {
+            return unavailable(`${context.register === 15 ? 'Namespace' : context.title} register is NULL; no live LUMP is selected.`);
+        }
+
+        let parsed;
+        try {
+            parsed = this.parseGT(gtWord);
+        } catch (error) {
+            return {
+                ...unavailable(`${context.register} contains a malformed Golden Token.`, { gtWord }),
+                state: 'fault',
+                status: 'fault',
+                result: 'fault',
+            };
+        }
+        if (parsed.malformed) {
+            return {
+                ...unavailable(`${context.register} contains a malformed Golden Token${parsed.malformedReason ? ` (${parsed.malformedReason})` : ''}.`, { gtWord, parsed }),
+                state: 'fault',
+                status: 'fault',
+                result: 'fault',
+            };
+        }
+
+        const slot = parsed.index;
+        if (slot < 0 || slot >= this.MAX_NS_ENTRIES || slot >= this.nsCount) {
+            return {
+                ...unavailable(`${context.register} points to NS[${slot}], outside the live Namespace.`, { gtWord, slot, parsed }),
+                state: 'fault',
+                status: 'fault',
+                result: 'fault',
+            };
+        }
+
+        const entry = this.readNSEntry(slot);
+        const name = (this.nsLabels && this.nsLabels[slot]) || `NS[${slot}]`;
+        if (!entry) {
+            return unavailable(`NS[${slot}] "${name}" has no resident Namespace entry (missing, evicted, or not booted).`, {
+                gtWord, slot, parsed, name,
+            });
+        }
+
+        const location = entry.word0_location >>> 0;
+        const authority = entry.word1_limit >>> 0;
+        const integrity = entry.word2_seals >>> 0;
+        const authorityFields = this.parseNSWord1(authority);
+        const entryInfo = {
+            location,
+            authority,
+            integrity,
+            cacheToken: entry.word3_cache_token >>> 0,
+            gtSeq: authorityFields.gtSeq,
+            f: authorityFields.f,
+            g: authorityFields.g,
+            limit: authorityFields.limit,
+        };
+        const checks = [];
+        const addCheck = (id, label, pass, detail) => {
+            checks.push({ id, label, pass: pass === null ? null : !!pass, state: pass === null ? 'unavailable' : (pass ? 'pass' : 'fault'), detail });
+        };
+
+        const versionPass = parsed.gt_seq === authorityFields.gtSeq;
+        addCheck('version', 'VERSION', versionPass,
+            `GT sequence ${parsed.gt_seq} ${versionPass ? 'matches' : 'does not match'} Namespace sequence ${authorityFields.gtSeq}`);
+        const integrityPass = this.validateMAC(entry);
+        addCheck('integrity', 'INTEGRITY', integrityPass,
+            integrityPass ? 'Namespace integrity32 matches location and authority' : 'Namespace integrity32 does not match location and authority');
+
+        // The live Namespace is a raw v1.2 Namespace table, not a code LUMP
+        // with an embedded LUMP header at its base.  Its canonical structure is
+        // the 4-word descriptor table described by NS[0]'s authority limit.
+        if (context.expected === 'namespace') {
+            const tableWords = authorityFields.limit + 1;
+            const tableFits = location < this.memory.length && location + tableWords <= this.memory.length;
+            const descriptorAligned = tableWords >= this.NS_ENTRY_WORDS &&
+                tableWords % this.NS_ENTRY_WORDS === 0;
+            // NS descriptors are inverted: slot 0 is at the high end of the
+            // reserve, then subsequent slots grow down.  A short declaration
+            // from NS_TABLE_BASE must therefore reach the high-end descriptor
+            // span; a simple `nsCount * stride` check is not sufficient.
+            const liveDescriptorStart = this.NS_TABLE_BASE + this.NS_TABLE_RESERVE -
+                this.nsCount * this.NS_ENTRY_WORDS;
+            const liveDescriptorEnd = this.NS_TABLE_BASE + this.NS_TABLE_RESERVE;
+            const coversLiveSlots = location <= liveDescriptorStart &&
+                location + tableWords >= liveDescriptorEnd;
+            // The simulator has one authoritative live Namespace table at its
+            // inverted-table base.  An aligned Thread LUMP can otherwise mimic
+            // a table's geometry (for example at location zero), so geometry
+            // alone must never produce a Namespace PASS.
+            const canonicalTableBase = location === this.NS_TABLE_BASE;
+            entryInfo.tableWords = tableWords;
+            entryInfo.tableEntries = descriptorAligned ? tableWords / this.NS_ENTRY_WORDS : null;
+            if (authorityFields.f) {
+                addCheck('resident', 'RESIDENT', null,
+                    'F=1 marks this Namespace table as FAR; its descriptors are not locally inspectable');
+                addCheck('header', 'NS HEADER', null, 'Namespace descriptor format cannot be inspected while FAR');
+                addCheck('layout', 'LAYOUT', null, 'Namespace table extent cannot be inspected while FAR');
+                addCheck('type', 'TYPE', null, 'Namespace table type cannot be inspected while FAR');
+            } else {
+                addCheck('resident', 'RESIDENT', tableFits,
+                    tableFits ? 'Namespace table is resident in simulator memory' : 'Namespace table extent is outside simulator memory');
+                addCheck('header', 'NS HEADER', descriptorAligned && canonicalTableBase,
+                    descriptorAligned
+                        ? (canonicalTableBase
+                            ? `v1.2 Namespace table has ${this.NS_ENTRY_WORDS}-word descriptors at the canonical table base`
+                            : `Namespace descriptor table must begin at ${this.NS_TABLE_BASE}, not ${location}`)
+                        : `Namespace table has invalid ${tableWords}-word descriptor geometry`);
+                addCheck('layout', 'LAYOUT', tableFits && coversLiveSlots,
+                    `declared ${tableWords} words (${entryInfo.tableEntries == null ? '?' : entryInfo.tableEntries} entries); live inverted descriptors occupy ${liveDescriptorStart}..${liveDescriptorEnd - 1}`);
+                addCheck('type', 'TYPE', canonicalTableBase,
+                    canonicalTableBase
+                        ? 'CR15 resolves to the live Namespace table context'
+                        : 'CR15 resolves to a LUMP that is not the canonical live Namespace table');
+            }
+            const failed = checks.some(check => check.pass === false);
+            const unavailableState = checks.some(check => check.pass === null);
+            const state = failed ? 'fault' : (unavailableState ? 'unavailable' : 'pass');
+            return {
+                key: context.key,
+                title: context.title,
+                register: `CR${context.register}`,
+                expected: context.expected,
+                state,
+                status: state,
+                result: state,
+                slot,
+                name,
+                gtWord,
+                parsed,
+                entry: entryInfo,
+                header: null,
+                checks,
+                reason: failed
+                    ? checks.find(check => check.pass === false).detail
+                    : (unavailableState ? checks.find(check => check.pass === null).detail : ''),
+            };
+        }
+
+        // F=1 explicitly denotes a FAR body. Do not inspect a stale local word
+        // at its last location and accidentally call it a resident header.
+        const rawHeader = !authorityFields.f && location < this.memory.length ? (this.memory[location] >>> 0) : null;
+        const header = rawHeader === null ? null : this.parseLumpHeader(rawHeader);
+        const lazyCode = context.expected === 'abstraction' && header && header.valid && header.cw === 0;
+        if (authorityFields.f) {
+            addCheck('resident', 'RESIDENT', null,
+                'F=1 marks this entry as FAR; the LUMP body is not locally inspectable');
+        } else if (lazyCode) {
+            addCheck('resident', 'RESIDENT', null,
+                'Executable code is not resident (header cw=0; LUMP may be lazy or evicted)');
+        } else if (header === null) {
+            addCheck('resident', 'RESIDENT', false,
+                `LUMP location 0x${location.toString(16).toUpperCase()} is outside simulator memory`);
+        } else if (!header.valid) {
+            addCheck('resident', 'RESIDENT', false,
+                `No valid LUMP header at word ${location}`);
+        } else {
+            addCheck('resident', 'RESIDENT', true, 'LUMP header is resident in simulator memory');
+        }
+
+        if (header === null) {
+            addCheck('header', 'HEADER', null, 'Header cannot be read because the LUMP location is unavailable');
+            addCheck('layout', 'LAYOUT', null, 'Layout cannot be checked without a header');
+            addCheck('type', 'TYPE', null, 'LUMP type cannot be checked without a header');
+        } else {
+            addCheck('header', 'HEADER', header.valid,
+                header.valid
+                    ? `MAGIC=0x${header.magic.toString(16).toUpperCase().padStart(2, '0')} recognized`
+                    : `MAGIC=0x${header.magic.toString(16).toUpperCase().padStart(2, '0')}; expected 0x1F`);
+
+            if (lazyCode) {
+                addCheck('layout', 'LAYOUT', null, 'Code layout cannot be inspected until the lazy/evicted body is resident');
+                addCheck('type', 'TYPE', null, 'Executable type cannot be confirmed until the lazy/evicted body is resident');
+            } else {
+                const end = location + header.lumpSize;
+                const withinMemory = end <= this.memory.length;
+                let layoutPass = withinMemory;
+                let layoutDetail = `declared ${header.lumpSize} words at ${location}..${end - 1}`;
+                if (context.expected === 'thread') {
+                    const minFit = 1 + 16 + header.cc + header.cw + 12;
+                    layoutPass = layoutPass && header.cw > 0 && header.cc > 0 && minFit <= header.lumpSize;
+                    layoutDetail += `; Thread zones need ${minFit} of ${header.lumpSize} words`;
+                } else {
+                    const contentWords = 1 + header.cw + header.cc;
+                    layoutPass = layoutPass && header.cw > 0 && contentWords <= header.lumpSize;
+                    layoutDetail += `; code+c-list use ${contentWords} of ${header.lumpSize} words`;
+                }
+                addCheck('layout', 'LAYOUT', header.valid ? layoutPass : null, layoutDetail);
+
+                let typePass;
+                let typeDetail;
+                if (context.expected === 'thread') {
+                    typePass = header.typ === 2 && header.cw > 0;
+                    typeDetail = `expected Thread typ=10/cw>0; actual typ=${header.typ.toString(2).padStart(2, '0')}/cw=${header.cw}`;
+                } else {
+                    typePass = (header.typ === 0 || header.typ === 3) && header.cw > 0;
+                    typeDetail = `expected executable typ=00 or Outform typ=11/cw>0; actual typ=${header.typ.toString(2).padStart(2, '0')}/cw=${header.cw}`;
+                }
+                addCheck('type', 'TYPE', header.valid ? typePass : null, typeDetail);
+            }
+        }
+
+        // A valid header with cw=0 is the simulator's explicit lazy/evicted
+        // representation for an executable abstraction. It is unavailable, not
+        // a PASS and not a malformed-header FAULT.
+        const failed = checks.some(check => check.pass === false);
+        const unavailableState = checks.some(check => check.pass === null) || lazyCode;
+        const state = failed ? 'fault' : (unavailableState ? 'unavailable' : 'pass');
+        let reason = '';
+        if (lazyCode) reason = 'Executable code is not resident (header cw=0; LUMP may be lazy or evicted).';
+        else if (failed) reason = checks.find(check => check.pass === false).detail;
+        else if (unavailableState) reason = checks.find(check => check.pass === null)?.detail || 'LUMP cannot currently be inspected.';
+
+        return {
+            key: context.key,
+            title: context.title,
+            register: `CR${context.register}`,
+            expected: context.expected,
+            state,
+            status: state,
+            result: state,
+            slot,
+            name,
+            gtWord,
+            parsed,
+            entry: entryInfo,
+            header: header ? { raw: rawHeader, ...header } : null,
+            checks,
+            reason,
+        };
+    }
+
     _validateClistSlotPerms(parsed, slotIdx) {
         // mTCB domain-purity chokepoint for LOAD and SAVE.
         //

@@ -70,7 +70,7 @@
     <link rel="stylesheet" href="styles-editor.css?v=20260820-petname-help1">
     <link rel="stylesheet" href="styles-dashboard.css?v=20260708b">
     <link rel="stylesheet" href="styles-lumps.css?v=20260820-draft2">
-    <link rel="stylesheet" href="styles-gatelog.css?v=20260513a">
+    <link rel="stylesheet" href="styles-gatelog.css?v=20260826-lump-validations">
     <link rel="stylesheet" href="styles-fault.css?v=20260814a">
     <link rel="stylesheet" href="styles-tools.css?v=20260619b">
     <style>
@@ -671,7 +671,7 @@
         <div id="dashPanel-gatelog" class="dash-panel">
             <div class="panel">
                 <div class="gate-log-titlebar">
-                    <span class="panel-title">Gate Log &mdash; mLoad / mSave from last Step</span>
+                    <span class="panel-title">Gate Log &mdash; Live LUMP validation &amp; capability gates</span>
                     <button class="btn btn-sm gate-reset-btn" onclick="resetAndStep()" data-tooltip="Reset &amp; Step — Fast-boot the machine and open the CR14 step view">&#x21BA;&nbsp;Reset&nbsp;&amp;&nbsp;Step</button>
                 </div>
                 <div id="gateLogContent"></div>
@@ -3258,7 +3258,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script async src="webserial.js"></script>
     <script async src="hw_binary.js?v=20260528b"></script>
     <script src="abstract_gt_manager.js"></script>
-    <script src="simulator.js?v=20260820a"></script>
+    <script src="simulator.js?v=20260826-lump-validations"></script>
     <script src="capability_tokens.js?v=20260820-next2"></script>
     <script src="assembler.js?v=20260820-named-capability1"></script>
     <script src="pipeline.js?v=20260510a"></script>
@@ -3285,7 +3285,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script defer src="app-startup-wizard.js?v=20260619a"></script>
     <script src="lump-registry.js?v=20260719g"></script>
     <script src="app-shell.js?v=20260823-ns-dna"></script>
-    <script src="app-tools.js?v=20260726a"></script>
+    <script src="app-tools.js?v=20260826-lump-validations"></script>
     <script src="app-cr-display.js?v=20260521a"></script>
     <script src="app-cr-detail.js?v=20260820-named-capability1"></script>
     <script src="tab-correction.js?v=20260501a"></script>
