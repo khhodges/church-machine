@@ -11048,6 +11048,100 @@ function confirmCreateNamespace() {
     updateDashboard();
 }
 
+// Return every user-replaceable Namespace slot known to the IDE. A user LUMP
+// may be saved in the repository before its slot appears in the current boot
+// image, so the live simulator table alone is not sufficient after a reload.
+// Live entries take precedence over persisted labels and catalog metadata.
+function _collectSaveNamespaceSlotCandidates(simulator, serverLumps, savedLabels) {
+    if (!simulator || typeof simulator.firstUserNsSlot !== 'function') return [];
+    const firstUserSlot = simulator.firstUserNsSlot();
+    const maxSlots = Number.isInteger(simulator.MAX_NS_ENTRIES)
+        ? simulator.MAX_NS_ENTRIES : (simulator.nsCount || 0);
+    const candidates = new Map();
+    const validSlot = function(slot) {
+        return Number.isInteger(slot) && slot >= firstUserSlot && slot < maxSlots;
+    };
+    const usableLabel = function(label) {
+        const text = String(label || '').trim();
+        return text && text !== '(free)' && text !== '(reserved)' ? text : '';
+    };
+    const add = function(rawSlot, rawLabel, priority) {
+        const slot = Number(rawSlot);
+        if (!validSlot(slot)) return;
+        const label = usableLabel(rawLabel) || `Saved LUMP ${slot}`;
+        const previous = candidates.get(slot);
+        if (!previous || priority > previous.priority) {
+            candidates.set(slot, { slot, label, priority });
+        }
+    };
+
+    // Do not stop at nsCount: reloads restore the boot image's count, while a
+    // user-selected replacement slot can legitimately sit above that boundary.
+    for (let slot = firstUserSlot; slot < maxSlots; slot++) {
+        const entry = simulator.readNSEntry(slot);
+        if (entry) add(slot, entry.label, 3);
+    }
+
+    for (const [slot, label] of Object.entries(savedLabels || {})) {
+        add(slot, label, 2);
+    }
+
+    for (const lump of Array.isArray(serverLumps) ? serverLumps : []) {
+        if (!lump || lump.ns_slot === null || lump.ns_slot === undefined) continue;
+        add(lump.ns_slot, lump.abstraction || lump.name, 1);
+    }
+
+    return Array.from(candidates.values()).sort((a, b) => a.slot - b.slot);
+}
+
+function _currentSaveNamespaceLumpName() {
+    const current = window.LumpRegistry
+        ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())
+        : null;
+    return current && current.abstraction
+        ? String(current.abstraction).trim().toLowerCase()
+        : (sim.programName ? String(sim.programName).trim().toLowerCase() : '');
+}
+
+function _populateSaveNamespaceSlotPicker(options) {
+    const opts = options || {};
+    const slotSel = document.getElementById('saveNSSlot');
+    if (!slotSel) return null;
+    const previousValue = slotSel.value;
+    slotSel.innerHTML = '';
+
+    const newOpt = document.createElement('option');
+    newOpt.value = 'new';
+    newOpt.textContent = '\u2014 New Entry \u2014';
+    slotSel.appendChild(newOpt);
+
+    const serverLumps = window.LumpRegistry
+        ? window.LumpRegistry.getServerList()
+        : [];
+    const savedLabels = (window.bootConfig && window.bootConfig.slotLabels) || {};
+    const candidates = _collectSaveNamespaceSlotCandidates(sim, serverLumps, savedLabels);
+    for (const candidate of candidates) {
+        const opt = document.createElement('option');
+        opt.value = String(candidate.slot);
+        opt.textContent = `[${candidate.slot}] ${candidate.label}`;
+        opt.dataset.nsLabel = candidate.label;
+        slotSel.appendChild(opt);
+    }
+
+    let selectedValue = 'new';
+    if (opts.preserveSelection &&
+        Array.from(slotSel.options).some(opt => opt.value === previousValue)) {
+        selectedValue = previousValue;
+    } else if (opts.selectMatchingCurrent) {
+        const currentName = _currentSaveNamespaceLumpName();
+        const match = candidates.find(candidate =>
+            candidate.label.toLowerCase() === currentName);
+        if (match) selectedValue = String(match.slot);
+    }
+    slotSel.value = selectedValue;
+    return { selectedValue, candidates };
+}
+
 var _saveNSTrigger = null;
 function showSaveToNamespace() {
     // Use LumpRegistry as the authoritative source — the compile path
@@ -11078,50 +11172,11 @@ function showSaveToNamespace() {
         }
     }
     const slotSel = document.getElementById('saveNSSlot');
-    slotSel.innerHTML = '';
-    const newOpt = document.createElement('option');
-    newOpt.value = 'new';
-    newOpt.textContent = '\u2014 New Entry \u2014';
-    slotSel.appendChild(newOpt);
-    // Slots 0 through firstUserNsSlot()-1 are fixed Resident entries. They
-    // remain visible in the Namespace Table, but Save to Namespace must not
-    // offer them as overwrite targets because saveToNamespaceAt() rejects
-    // writes to those protected slots.
-    const _firstUserSaveSlot = sim.firstUserNsSlot();
-    for (let i = _firstUserSaveSlot; i < sim.nsCount; i++) {
-        const e = sim.readNSEntry(i);
-        if (!e) continue;
-        const opt = document.createElement('option');
-        opt.value = i;
-        opt.textContent = `[${i}] ${e.label}`;
-        slotSel.appendChild(opt);
-    }
-    // A release rebuild should default to replacing the currently selected
-    // user LUMP when its name is already present.  Keep New Entry available as
-    // the explicit choice for creating a separate copy.
-    slotSel.value = 'new';
-    const _currentLump = window.LumpRegistry
-        ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())
-        : null;
-    const _currentName = _currentLump && _currentLump.abstraction
-        ? String(_currentLump.abstraction).trim().toLowerCase()
-        : (sim.programName ? String(sim.programName).trim().toLowerCase() : '');
-    if (_currentName) {
-        for (const _opt of Array.from(slotSel.options)) {
-            if (_opt.value === 'new') continue;
-            const _existingName = String(_opt.textContent || '')
-                .replace(/^\[\d+\]\s*/, '').trim().toLowerCase();
-            if (_existingName === _currentName) {
-                slotSel.value = _opt.value;
-                break;
-            }
-        }
-    }
-    const _defaultSlot = parseInt(slotSel.value, 10);
-    const _defaultEntry = slotSel.value !== 'new' && Number.isInteger(_defaultSlot)
-        ? sim.readNSEntry(_defaultSlot)
-        : null;
-    document.getElementById('saveNSLabel').value = _defaultEntry ? (_defaultEntry.label || '') : '';
+    _populateSaveNamespaceSlotPicker({ selectMatchingCurrent: true });
+    const _defaultOption = slotSel.options[slotSel.selectedIndex];
+    document.getElementById('saveNSLabel').value = slotSel.value === 'new'
+        ? ''
+        : ((_defaultOption && _defaultOption.dataset.nsLabel) || '');
     document.getElementById('saveNSLabel').disabled = false;
     document.getElementById('saveNSType').value = '0';
     document.getElementById('permR').checked = false;
@@ -11139,6 +11194,19 @@ function showSaveToNamespace() {
     if (!_saveNSTrap) _saveNSTrap = _makeModalFocusTrap('saveNSDialog', closeSaveDialog);
     document.addEventListener('keydown', _saveNSTrap, true);
     document.getElementById('saveNSLabel').focus();
+
+    // The Repository list may not have been visited in this session. Refresh
+    // the picker after its shared catalog fetch resolves; preserve New Entry or
+    // a user-selected slot so an in-progress save is never changed underneath
+    // the programmer.
+    if (window.LumpRegistry && !window.LumpRegistry.isServerListFetched()) {
+        window.LumpRegistry.warmServerList().then(function() {
+            const dialog = document.getElementById('saveNSDialog');
+            if (dialog && dialog.style.display !== 'none') {
+                _populateSaveNamespaceSlotPicker({ preserveSelection: true });
+            }
+        });
+    }
 }
 
 function onSlotChange() {
@@ -11157,14 +11225,15 @@ function onSlotChange() {
     } else {
         const idx = parseInt(slotSel.value);
         const entry = sim.readNSEntry(idx);
-        if (entry) {
-            labelInput.value = entry.label;
-            labelInput.disabled = false;
-            document.getElementById('saveNSType').value = String(entry.gtType || 0);
-            // Permissions deliberately NOT copied from the existing GT — the
-            // user is overwriting that slot with new compiled code, so the
-            // default should be E-only, same as a fresh slot.
-        }
+        const selectedOption = slotSel.options[slotSel.selectedIndex];
+        labelInput.value = entry
+            ? (entry.label || '')
+            : ((selectedOption && selectedOption.dataset.nsLabel) || '');
+        labelInput.disabled = false;
+        document.getElementById('saveNSType').value = String(entry ? (entry.gtType || 0) : 0);
+        // Permissions deliberately NOT copied from the existing GT — the
+        // user is overwriting that slot with new compiled code, so the
+        // default should be E-only, same as a fresh slot.
     }
 }
 
