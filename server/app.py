@@ -2142,7 +2142,11 @@ DEFAULT_BOOT_CONFIG = {
     "step1": {
         "totalNamespaceWords": 16384,
         "namespaceLumpWords": 64,
-        "threadLumpWords": 256,
+        # Keep the clean-project default aligned with the validated project
+        # boot image.  A Thread contains its fixed capability zone at +244,
+        # so 512 words leaves the default context well clear of the minimum
+        # 256-word architectural footprint.
+        "threadLumpWords": 512,
     },
     # Step 2 (Task #215): per-lump resident/lazy decision. Empty list =
     # historical default (all catalog lumps lazy-loaded on first CALL).

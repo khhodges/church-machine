@@ -30,7 +30,9 @@ if ROOT not in sys.path:
 
 import server.app as _app_module
 from server.app import (
+    DEFAULT_BOOT_CONFIG,
     HARDWARE_PROFILES,
+    _validate_step1,
     _validate_step2,
 )
 
@@ -39,7 +41,7 @@ from server.app import (
 # ---------------------------------------------------------------------------
 
 LUMP_SIZE = 64  # words — used for all resident test lumps
-NS_SLOT = 5     # not in RESERVED_NS_SLOTS (0-3, 11-15)
+NS_SLOT = 16    # outside the current 0–10 foundational/device catalog
 
 FAKE_CATALOG_ENTRY = {
     "abstraction": "TestLump",
@@ -128,6 +130,16 @@ class TestValidateStep2General:
     def test_empty_lumps_list_passes(self):
         assert _validate_step2({"lumps": []}, self._step1(), TI60_BOARD) is None
 
+    def test_missing_catalog_slot_rejected(self):
+        """A saved lazy selection must name a real catalog slot."""
+        missing_slot = NS_SLOT + 1
+        err = _validate_step2(
+            {"lumps": [{"nsSlot": missing_slot, "resident": False}]},
+            self._step1(),
+            TI60_BOARD,
+        )
+        assert err == f"NS slot {missing_slot} is not present in the lump catalog"
+
     def test_lazy_lump_needs_no_phys_addr(self):
         """Lazy entries (resident=False) need only nsSlot — no physAddr required."""
         step2 = {"lumps": [{"nsSlot": NS_SLOT, "resident": False}]}
@@ -184,20 +196,46 @@ class TestValidateStep2General:
             "lumpSize": LUMP_SIZE,
         }
         entry_b = {
-            "nsSlot": 6,
+            "nsSlot": NS_SLOT + 1,
             "resident": True,
             "physAddr": FOUNDATION_END + LUMP_SIZE - 1,
             "lumpSize": LUMP_SIZE,
         }
-        # Add ns_slot 6 to the fake catalog so duplicate-catalog check passes.
+        # Add a second unreserved slot to the fake catalog so the overlap
+        # guard runs before the missing-catalog guard.
         extended_catalog = [
             FAKE_CATALOG_ENTRY,
-            {"abstraction": "OtherLump", "nsSlot": 6, "lumpSize": LUMP_SIZE, "token": "aabbccdd"},
+            {
+                "abstraction": "OtherLump",
+                "nsSlot": NS_SLOT + 1,
+                "lumpSize": LUMP_SIZE,
+                "token": "aabbccdd",
+            },
         ]
         with patch.object(_app_module, "_load_lump_catalog", return_value=extended_catalog):
             err = _validate_step2({"lumps": [entry_a, entry_b]}, self._step1(), TI60_BOARD)
         assert err is not None
         assert "overlap" in err
+
+
+# ---------------------------------------------------------------------------
+# Thread foundation geometry
+# ---------------------------------------------------------------------------
+
+class TestValidateStep1ThreadGeometry:
+    """The default Thread allocation must fit its fixed capability zone."""
+
+    def test_default_thread_size_is_valid(self):
+        step1 = dict(DEFAULT_BOOT_CONFIG["step1"])
+        assert _validate_step1(DEFAULT_BOOT_CONFIG["targetBoard"], step1) is None
+        assert step1["threadLumpWords"] >= 256
+
+    def test_undersized_thread_is_rejected_before_image_generation(self):
+        step1 = dict(DEFAULT_BOOT_CONFIG["step1"])
+        step1["threadLumpWords"] = 64
+        err = _validate_step1(DEFAULT_BOOT_CONFIG["targetBoard"], step1)
+        assert err is not None
+        assert "threadLumpWords must be at least 256" in err
 
 
 # ---------------------------------------------------------------------------

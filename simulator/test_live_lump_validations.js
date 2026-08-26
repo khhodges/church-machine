@@ -60,6 +60,18 @@ check('Namespace uses its canonical table header check',
     cards.namespace.checks.some(c => c.id === 'header' && c.label === 'NS HEADER' && c.pass));
 check('Thread retains valid address zero as a real LUMP location',
     cards.thread.entry && cards.thread.entry.location === 0 && cards.thread.state === 'pass');
+check('default Thread declares storage for its fixed capability zone',
+    cards.thread.header && cards.thread.header.lumpSize >= 256);
+
+const threadLocation = cards.thread.entry.location;
+const originalThreadHeader = sim.memory[threadLocation];
+sim.memory[threadLocation] = sim.packLumpHeader(0, 32, 12, 2);
+cards = sim.getLiveLumpValidations();
+checkState(cards.thread, 'fault', 'undersized Thread image is a layout FAULT');
+check('undersized Thread reports the declared storage shortfall',
+    cards.thread.checks.some(c => c.id === 'layout' && c.pass === false &&
+        c.detail.includes('Thread zones need')));
+sim.memory[threadLocation] = originalThreadHeader;
 
 const originalCR15 = { ...sim.cr[15] };
 const threadSeq = sim.parseNSWord1(sim.readNSEntry(1).word1_limit).gtSeq;
