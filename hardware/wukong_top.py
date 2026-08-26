@@ -804,7 +804,12 @@ class ChurchWukongXC7A100T(Elaboratable):
             recovery.reboot_safe.eq(reboot_safe),
             cm_reboot.eq(recovery.reboot_pulse),
         ]
-        recovery_hold = recovery.hold
+        # Use the registered pending state at the fetch gate.  recovery.hold
+        # also includes the same-cycle fault_halt input, which feeds back
+        # through core.imem_valid -> decoder.fault_valid -> retire_valid during
+        # Amaranth elaboration.  The pending latch takes effect on the next
+        # cycle and is the correct architectural boundary for the hold.
+        recovery_hold = recovery.fault_pending
         stop_retire = Signal()
         m.d.comb += stop_retire.eq(
             core.retire_valid & (

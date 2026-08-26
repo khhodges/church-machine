@@ -374,6 +374,18 @@ def _bitstream_sidecar_path(bit_path):
     """Path of the JSON metadata sidecar next to a .bit file."""
     return bit_path + ".meta.json"
 
+def _sha256_file(path):
+    """Return the SHA-256 digest for a local artifact, or None if unreadable."""
+    import hashlib
+    try:
+        digest = hashlib.sha256()
+        with open(path, "rb") as handle:
+            for chunk in iter(lambda: handle.read(1 << 20), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+    except (OSError, TypeError):
+        return None
+
 def _write_bitstream_sidecar(bit_path, version=None, source_commit=None):
     """Write a metadata sidecar describing the actual .bit file on disk.
 
@@ -383,12 +395,15 @@ def _write_bitstream_sidecar(bit_path, version=None, source_commit=None):
     """
     import hashlib, datetime as _dt
     md5 = hashlib.md5()
+    sha256 = hashlib.sha256()
     with open(bit_path, "rb") as f:
         for chunk in iter(lambda: f.read(1 << 20), b""):
             md5.update(chunk)
+            sha256.update(chunk)
     meta = {
         "version": version,
         "md5": md5.hexdigest(),
+        "sha256": sha256.hexdigest(),
         "built_at": _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "source_commit": source_commit,
         "size_bytes": os.path.getsize(bit_path),
@@ -500,11 +515,37 @@ def _wukong_bitstream_release_status():
     """
     bit_path = os.path.join(_wukong_build_dir(), "church_wukong_xc7a100t.bit")
     meta = _read_bitstream_meta(bit_path) if os.path.isfile(bit_path) else None
+    provenance_path = os.path.join(
+        _wukong_build_dir(), "church_wukong_xc7a100t.provenance.json"
+    )
+    provenance = None
+    try:
+        with open(provenance_path, encoding="utf-8") as handle:
+            candidate = json.load(handle)
+        if isinstance(candidate, dict):
+            provenance = candidate
+    except (OSError, ValueError, TypeError):
+        pass
     head = _git_full_head()
     short_head = head[:12] if head else _git_short_hash()
     source_version = _wukong_build_version()
     artifact_version = meta.get("version") if meta else None
     artifact_commit = meta.get("source_commit") if meta else None
+    artifact_sha = None
+    if meta:
+        artifact_sha = meta.get("sha256")
+        if not artifact_sha and os.path.isfile(bit_path):
+            # Legacy sidecars only carried MD5; they remain usable for download
+            # labeling, but never qualify as a release proof.
+            artifact_sha = None
+    provenance_matches = bool(
+        provenance and provenance.get("source_commit") == head and
+        provenance.get("source_tree_clean") is True and
+        provenance.get("release_status") == "verified" and
+        provenance.get("artifacts", {}).get("church_wukong_xc7a100t", {})
+        .get("sha256") == _sha256_file(bit_path)
+        if os.path.isfile(bit_path) else False
+    )
     baseline_known = bool(
         head and artifact_commit and
         re.fullmatch(r"[0-9a-fA-F]{7,40}", str(artifact_commit))
@@ -513,7 +554,8 @@ def _wukong_bitstream_release_status():
         meta is None or
         artifact_version != source_version or
         not baseline_known or
-        str(artifact_commit).lower() != head.lower()
+        str(artifact_commit).lower() != head.lower() or
+        not provenance_matches
     )
 
     if not pending:
@@ -524,6 +566,8 @@ def _wukong_bitstream_release_status():
         reason = f"Source is at v{source_version}, while the verified artifact is v{artifact_version}."
     elif not baseline_known:
         reason = "The verified artifact has no trusted source commit, so its release baseline is unknown."
+    elif not provenance_matches:
+        reason = "The bitstream has no matching clean-source provenance record; release status is unknown."
     else:
         reason = "Hardware source changes are ahead of the verified bitstream."
 
@@ -591,6 +635,8 @@ def _wukong_bitstream_release_status():
             "version": artifact_version,
             "source_commit": str(artifact_commit)[:12] if artifact_commit else None,
             "built_at": meta.get("built_at") if meta else None,
+            "sha256": artifact_sha,
+            "provenance_verified": provenance_matches,
         },
         "baseline_known": baseline_known,
         "reason": reason,

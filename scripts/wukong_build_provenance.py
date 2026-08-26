@@ -48,6 +48,37 @@ def _git_commit() -> str | None:
         return None
 
 
+def _git_tree_clean() -> bool:
+    """Return whether the source commit can be used as a reproducible baseline."""
+    try:
+        changed = subprocess.check_output(
+            ["git", "status", "--porcelain=v1"], cwd=ROOT,
+            text=True, stderr=subprocess.DEVNULL,
+        ).splitlines()
+        # Generated build outputs are intentionally tracked for distribution
+        # and change as part of regeneration; they are not source ambiguity.
+        source_paths = (
+            "hardware/", "server/lumps/boot-image.bin",
+            "pyproject.toml", "uv.lock",
+        )
+        return not any(
+            len(line) > 3 and line[3:].strip().startswith(source_paths)
+            for line in changed
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return False
+
+
+def _boot_input_hashes() -> dict[str, str]:
+    """Hash serialized boot inputs separately from the generator source set."""
+    candidates = ("hardware/boot_rom.py", "server/lumps/boot-image.bin")
+    return {
+        relative: _sha256(ROOT / relative)
+        for relative in candidates
+        if (ROOT / relative).is_file()
+    }
+
+
 def _tracked_file_hashes() -> dict[str, str]:
     from hardware.readiness import WUKONG_SOURCES
 
@@ -58,7 +89,8 @@ def _tracked_file_hashes() -> dict[str, str]:
     return {relative: _sha256(ROOT / relative) for relative in paths}
 
 
-def _build_record(vivado_version: str | None, wns: str | None) -> dict:
+def _build_record(vivado_version: str | None, wns: str | None,
+                  release_verified: bool = False) -> dict:
     from hardware.boot_rom import (
         BOOT_PROGRAM,
         SELFTEST_NS_SLOT,
@@ -88,6 +120,9 @@ def _build_record(vivado_version: str | None, wns: str | None) -> dict:
         "schema_version": 1,
         "generated_at_utc": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
         "source_commit": _git_commit(),
+        "source_tree_clean": _git_tree_clean(),
+        "boot_inputs_sha256": _boot_input_hashes(),
+        "release_status": "verified" if release_verified else "unverified",
         "sentinel": {
             "magic_hex": "0xBC",
             "build_version": WUKONG_BUILD_VERSION,
@@ -137,11 +172,22 @@ def _verify(path: Path) -> int:
     current = _build_record(
         (record.get("vivado") or {}).get("version"),
         (record.get("vivado") or {}).get("wns_ns"),
+        record.get("release_status") == "verified",
     )
     failures = []
-    for key in ("hardware_sources_sha256", "input_files_sha256", "sentinel", "boot_layout"):
+    for key in (
+        "hardware_sources_sha256", "input_files_sha256", "sentinel",
+        "boot_layout", "source_tree_clean", "boot_inputs_sha256",
+    ):
         if record.get(key) != current.get(key):
             failures.append(key)
+    if record.get("source_tree_clean") is not True:
+        failures.append("source_tree_not_clean")
+    from hardware.readiness import artifact_is_fresh, WUKONG_SOURCES
+    for relative in ("build/church_wukong_xc7a100t.il", "build/church_wukong_xc7a100t.v"):
+        fresh, _ = artifact_is_fresh(ROOT / relative, WUKONG_SOURCES)
+        if not fresh:
+            failures.append(f"stale:{relative}")
     for name, expected in (record.get("artifacts") or {}).items():
         actual = (current.get("artifacts") or {}).get(name)
         if actual != expected:
@@ -160,12 +206,20 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--vivado-version", default=None)
     parser.add_argument("--wns", default=None, help="Clean implementation WNS in ns")
+    parser.add_argument(
+        "--release-verified", action="store_true",
+        help="Attest a vendor-built release (only after reviewing Vivado evidence)",
+    )
     parser.add_argument("--verify", action="store_true")
     args = parser.parse_args()
     output = args.output if args.output.is_absolute() else ROOT / args.output
     if args.verify:
         return _verify(output)
-    _write_atomic(output, _build_record(args.vivado_version, args.wns))
+    if args.release_verified and (not args.vivado_version or args.wns is None):
+        parser.error("--release-verified requires --vivado-version and --wns")
+    _write_atomic(output, _build_record(
+        args.vivado_version, args.wns, args.release_verified
+    ))
     print(f"Written: {output}")
     return 0
 
