@@ -1,0 +1,24 @@
+{
+  "token": "55f1a32f",
+  "abstraction": "LEDFlash",
+  "filename": "LEDFlash.1.55f1a32f.lump",
+  "sidecar_file": "LEDFlash.1.55f1a32f.json",
+  "ns_slot": null,
+  "ns_slot_policy": "dynamic",
+  "lump_size": 64,
+  "cw": 1,
+  "cc": 1,
+  "lump_version": 3,
+  "compiled_at": 1785334347.719854,
+  "status": "wip",
+  "methods": [
+    {
+      "name": "blink",
+      "offset": 0,
+      "length": 1,
+      "description": "Toggle LED0 at ~1 Hz using nested delay loops"
+    }
+  ],
+  "dot_name": "LEDFlash",
+  "issue_n": 1
+}

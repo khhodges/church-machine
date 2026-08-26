@@ -131,8 +131,9 @@ function expectedLumpSize(codeLen) {
 {
     const sim = new ChurchSimulator();
     const words = [0x00000001, 0x00000002];
-    sim.saveToNamespaceAt(7, 'SlotSeven', words, {R:0,W:0,X:1,L:0,S:0,E:0}, 1);
-    const loc = 7 * sim.SLOT_SIZE;
+    const slot = sim.firstUserNsSlot();
+    sim.saveToNamespaceAt(slot, 'SlotSeven', words, {R:0,W:0,X:1,L:0,S:0,E:0}, 1);
+    const loc = slot * sim.SLOT_SIZE;
     const hdr = sim.parseLumpHeader(sim.memory[loc]);
     assert('T8 saveToNamespaceAt: header magic = 0x1F', hdr.magic === 0x1F,
         `got 0x${hdr.magic.toString(16)}`);
@@ -142,8 +143,9 @@ function expectedLumpSize(codeLen) {
 {
     const sim = new ChurchSimulator();
     const words = [0x11111111, 0x22222222, 0x33333333];
-    sim.saveToNamespaceAt(5, 'SlotFive', words, {R:0,W:0,X:1,L:0,S:0,E:0}, 1);
-    const loc = 5 * sim.SLOT_SIZE;
+    const slot = sim.firstUserNsSlot() + 1;
+    sim.saveToNamespaceAt(slot, 'SlotFive', words, {R:0,W:0,X:1,L:0,S:0,E:0}, 1);
+    const loc = slot * sim.SLOT_SIZE;
     const hdr = sim.parseLumpHeader(sim.memory[loc]);
     assert('T9 saveToNamespaceAt: cw = 3', hdr.cw === words.length,
         `got ${hdr.cw}`);
@@ -158,8 +160,9 @@ function expectedLumpSize(codeLen) {
 {
     const sim = new ChurchSimulator();
     const words = new Array(8).fill(0xF0F0F0F0);
-    sim.saveToNamespaceAt(9, 'SlotNine', words, {R:0,W:0,X:1,L:0,S:0,E:0}, 1);
-    const nse = sim.readNSEntry(9);
+    const slot = sim.firstUserNsSlot() + 2;
+    sim.saveToNamespaceAt(slot, 'SlotNine', words, {R:0,W:0,X:1,L:0,S:0,E:0}, 1);
+    const nse = sim.readNSEntry(slot);
     const lim = sim.parseNSWord1(nse.word1_limit);
     const exp = expectedLumpSize(words.length) - 1;
     assert('T10 saveToNamespaceAt: NS limit17 = lumpSize - 1', lim.limit === exp,
@@ -231,16 +234,17 @@ function expectedLumpSize(codeLen) {
 {
     const sim = new ChurchSimulator();
     const words = [0xCAFEBABE, 0x01234567];
-    sim.saveToNamespaceAt(10, 'CapabilityTest', words,
+    const slot = sim.firstUserNsSlot();
+    sim.saveToNamespaceAt(slot, 'CapabilityTest', words,
         {R:0,W:0,X:1,L:0,S:0,E:0}, 1, [{name: 'SelfTest'}]);
-    const entry = sim.readNSEntry(10);
+    const entry = sim.readNSEntry(slot);
     assert('T13e saveToNamespaceAt: Inform type is preserved', entry && entry.gtType === 1,
         `got type=${entry && entry.gtType}`);
     assert('T13f saveToNamespaceAt: gt_seq starts at zero', entry && entry.gtSeq === 0,
         `got seq=${entry && entry.gtSeq}`);
     assert('T13g saveToNamespaceAt: c-list count is preserved', entry && entry.clistCount === 1,
         `got cc=${entry && entry.clistCount}`);
-    const entryGT = sim.createGT(entry.gtSeq, 10,
+    const entryGT = sim.createGT(entry.gtSeq, slot,
         {R:0,W:0,X:0,L:0,S:0,E:1}, entry.gtType);
     assert('T13h saveToNamespaceAt: minted entry GT passes mLoad',
         sim.mLoad(entryGT, 'E').ok === true);

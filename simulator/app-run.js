@@ -11074,7 +11074,12 @@ function showSaveToNamespace() {
     newOpt.value = 'new';
     newOpt.textContent = '\u2014 New Entry \u2014';
     slotSel.appendChild(newOpt);
-    for (let i = 0; i < sim.nsCount; i++) {
+    // Slots 0 through firstUserNsSlot()-1 are fixed Resident entries. They
+    // remain visible in the Namespace Table, but Save to Namespace must not
+    // offer them as overwrite targets because saveToNamespaceAt() rejects
+    // writes to those protected slots.
+    const _firstUserSaveSlot = sim.firstUserNsSlot();
+    for (let i = _firstUserSaveSlot; i < sim.nsCount; i++) {
         const e = sim.readNSEntry(i);
         if (!e) continue;
         const opt = document.createElement('option');
@@ -13756,10 +13761,43 @@ function confirmSaveToNamespace() {
     // ── Persist to simulator namespace ────────────────────────────────────────
     let idx;
     if (slotSel.value === 'new') {
-        idx = sim.saveToNamespace(label, _svWords, perms, gtType, _caps);
+        try {
+            idx = sim.saveToNamespace(label, _svWords, perms, gtType, _caps);
+        } catch (err) {
+            console.error('[SaveNS] save failed:', err);
+            const _saveErr = err && err.message ? err.message : String(err);
+            if (typeof _showFpgaToast === 'function') {
+                _showFpgaToast('Save to Namespace Failed', _saveErr, 'error', 7000);
+            } else {
+                alert('Save to Namespace failed: ' + _saveErr);
+            }
+            return;
+        }
     } else {
-        idx = parseInt(slotSel.value);
-        sim.saveToNamespaceAt(idx, label, _svWords, perms, gtType, _caps);
+        idx = parseInt(slotSel.value, 10);
+        const _firstUserSlot = sim.firstUserNsSlot();
+        const _maxUserSlot = sim.MAX_NS_ENTRIES - 1;
+        if (!Number.isInteger(idx) || idx < _firstUserSlot || idx > _maxUserSlot) {
+            const _slotError = `Save blocked: choose a user Namespace slot between ${_firstUserSlot} and ${_maxUserSlot}, or select New Entry.`;
+            if (typeof _showFpgaToast === 'function') {
+                _showFpgaToast('Save to Namespace Blocked', _slotError, 'error', 7000);
+            } else {
+                alert(_slotError);
+            }
+            return;
+        }
+        try {
+            sim.saveToNamespaceAt(idx, label, _svWords, perms, gtType, _caps);
+        } catch (err) {
+            console.error('[SaveNS] save failed:', err);
+            const _saveErr = err && err.message ? err.message : String(err);
+            if (typeof _showFpgaToast === 'function') {
+                _showFpgaToast('Save to Namespace Failed', _saveErr, 'error', 7000);
+            } else {
+                alert('Save to Namespace failed: ' + _saveErr);
+            }
+            return;
+        }
     }
     closeSaveDialog();
     _persistNamespaceSlotLabel(idx, label);

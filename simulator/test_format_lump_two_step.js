@@ -105,13 +105,40 @@ const indexSrc    = fs.readFileSync(path.join(__dirname, 'index.html'),   'utf8'
         appLumpsSrc.includes('pending.binary = _candidate.binary'));
 }
 
+// ── T2c: Save-to-NS never exposes fixed Resident slots ────────────────────────
+{
+    const showSaveIdx = appRunSrc.indexOf('function showSaveToNamespace()');
+    check('T2c showSaveToNamespace found', showSaveIdx !== -1);
+    if (showSaveIdx !== -1) {
+        const showSaveBody = appRunSrc.slice(showSaveIdx, appRunSrc.indexOf('function onSlotChange()', showSaveIdx));
+        check('T2c1 save slot enumeration starts at firstUserNsSlot()',
+            showSaveBody.includes('const _firstUserSaveSlot = sim.firstUserNsSlot()') &&
+            showSaveBody.includes('i = _firstUserSaveSlot'));
+    }
+}
+
+// ── T2d: stale/programmatic fixed-slot selections are blocked client-side ────
+{
+    const confirmIdx = appRunSrc.indexOf('function confirmSaveToNamespace()');
+    check('T2d confirmSaveToNamespace found', confirmIdx !== -1);
+    if (confirmIdx !== -1) {
+        const confirmBody = appRunSrc.slice(confirmIdx, appRunSrc.indexOf('function ', confirmIdx + 10));
+        check('T2d1 confirm validates the first user slot before explicit save',
+            confirmBody.includes('const _firstUserSlot = sim.firstUserNsSlot()') &&
+            confirmBody.includes('Save blocked: choose a user Namespace slot'));
+        check('T2d2 explicit save exceptions are surfaced instead of escaping',
+            confirmBody.includes("console.error('[SaveNS] save failed:', err)") &&
+            confirmBody.includes("Save to Namespace Failed"));
+    }
+}
+
 // ── T3: _closeFormatLumpDialog clears _pendingLumpData ───────────────────────
 {
     const fnIdx = appLumpsSrc.indexOf('function _closeFormatLumpDialog()');
     check('T3 _closeFormatLumpDialog found in app-lumps.js', fnIdx !== -1);
     if (fnIdx !== -1) {
-        // Extract the function body (~300 chars).
-        const snippet = appLumpsSrc.slice(fnIdx, fnIdx + 300);
+        // Include the complete function and its cleanup statement.
+        const snippet = appLumpsSrc.slice(fnIdx, fnIdx + 800);
         check('T3a _closeFormatLumpDialog clears _pendingLumpData',
             snippet.includes('window._pendingLumpData = null'),
             snippet);
@@ -123,8 +150,8 @@ const indexSrc    = fs.readFileSync(path.join(__dirname, 'index.html'),   'utf8'
     const fnIdx = appRunSrc.indexOf('function closeSaveDialog()');
     check('T4 closeSaveDialog found in app-run.js', fnIdx !== -1);
     if (fnIdx !== -1) {
-        // Use 400 chars — the function body including comment is ~250 chars.
-        const snippet = appRunSrc.slice(fnIdx, fnIdx + 400);
+        // Include the complete function and its cleanup statement.
+        const snippet = appRunSrc.slice(fnIdx, fnIdx + 800);
         check('T4a closeSaveDialog clears _pendingLumpData',
             snippet.includes('window._pendingLumpData = null'),
             snippet.slice(0, 120) + '…');
