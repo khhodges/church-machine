@@ -93,6 +93,11 @@ _COMPILE_API_TOKEN = os.environ.get('COMPILE_API_TOKEN', '')
 _SERVER_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SERVER_DIR not in sys.path:
     sys.path.insert(0, _SERVER_DIR)
+# Release-test subprocesses can point the writable LUMP library at a temporary
+# copy.  Production and normal development keep using server/lumps/.
+_LUMPS_DIR_OVERRIDE = os.environ.get("CHURCH_TEST_LUMPS_DIR", "").strip()
+if _LUMPS_DIR_OVERRIDE:
+    _LUMPS_DIR_OVERRIDE = os.path.abspath(_LUMPS_DIR_OVERRIDE)
 # `python server/app.py` puts only server/ on sys.path.  The Wukong symbol
 # module lives under the repository root, so make that importable before the
 # optional symbol import below.  Without this, the running workflow silently
@@ -2187,8 +2192,10 @@ RESERVED_NS_SLOTS = set(range(BASE_NAMED_NS_COUNT))
 LUMP_MAX_ARCHIVE_VERSIONS = 20  # max archived versions kept per token; oldest are pruned
 if LUMP_MAX_ARCHIVE_VERSIONS < 0:
     raise ValueError(f"LUMP_MAX_ARCHIVE_VERSIONS must be >= 0, got {LUMP_MAX_ARCHIVE_VERSIONS}")
-LUMPS_MANIFEST_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                   "lumps", "manifest.json")
+LUMPS_MANIFEST_PATH = os.path.join(
+    _LUMPS_DIR_OVERRIDE or os.path.join(os.path.dirname(os.path.abspath(__file__)), "lumps"),
+    "manifest.json",
+)
 
 def _load_lump_catalog(selected_tokens=None):
     """Return the subset of server/lumps/manifest.json suitable for Step 2.
@@ -2791,10 +2798,8 @@ def boot_config_slot_label():
 # server/boot_image.py for the layout. The image is written to
 # server/lumps/boot-image.bin so the IDE can offer it as a download AND so
 # the simulator can fetch and apply it at boot via /api/boot-image/binary.
-BOOT_IMAGE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                               "lumps", "boot-image.bin")
-NS_STATE_PATH   = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                               "lumps", "ns-state.json")
+BOOT_IMAGE_PATH = os.path.join(os.path.dirname(LUMPS_MANIFEST_PATH), "boot-image.bin")
+NS_STATE_PATH   = os.path.join(os.path.dirname(LUMPS_MANIFEST_PATH), "ns-state.json")
 LUMPS_DIR = os.path.dirname(LUMPS_MANIFEST_PATH)
 _namespace_commit_lock = threading.RLock()
 _namespace_commit_state = threading.local()
@@ -5935,7 +5940,7 @@ _build_lazy_lumps()
 # production environments where GitHub may not be reachable.
 def _load_bundled_lumps():
     import glob as _glob
-    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir = LUMPS_DIR
     if not os.path.isdir(lumps_dir):
         return
     for path in sorted(_glob.glob(os.path.join(lumps_dir, '*.lump'))):
@@ -6259,7 +6264,7 @@ def _migrate_sidecars_drop_group_doc_refs():
     startup; a clean catalogue is a no-op.  In debug mode a leftover key after
     migration is treated as an assertion failure.
     """
-    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir = LUMPS_DIR
     if not os.path.isdir(lumps_dir):
         return
     cleaned = 0
@@ -6299,7 +6304,7 @@ def _load_boot_abstr_lump():
     The extracted word array is re-packed big-endian for LAZY_LUMPS, matching the
     convention used by all other *.lump files and the get_lump_words endpoint.
     """
-    boot_path = os.path.join(os.path.dirname(__file__), 'lumps', 'boot-image.bin')
+    boot_path = BOOT_IMAGE_PATH
     if not os.path.isfile(boot_path):
         return
     try:
@@ -6372,7 +6377,7 @@ def _load_boot_abstr_lump():
         # stub (which is just a lazy placeholder with cw=0, cc=0).  The manifest
         # file IS the real SelfTest code; the stub in boot-image.bin merely marks
         # the slot reserved so the boot ROM can lazy-load it on demand.
-        _lumps_dir_mo = os.path.join(os.path.dirname(__file__), 'lumps')
+        _lumps_dir_mo = LUMPS_DIR
         _mf_mo_path = os.path.join(_lumps_dir_mo, 'manifest.json')
         _canonical_loaded = False
         if os.path.isfile(_mf_mo_path):
@@ -6453,7 +6458,7 @@ def _load_boot_ns_lump():
     header and walk the NS table to build the namespace_meta.entries array that the
     Lump Repository panel uses to render the SVG dependency graph and NS Table view.
     """
-    boot_path = os.path.join(os.path.dirname(__file__), 'lumps', 'boot-image.bin')
+    boot_path = BOOT_IMAGE_PATH
     if not os.path.isfile(boot_path):
         return
     try:
@@ -6660,7 +6665,7 @@ def get_lump(token_hex):
     #   ok=True, trusted=True  → serve + canonical identity-binding headers.
     #   ok=True, trusted=False → legacy/untrusted; serve raw but mark untrusted
     #                            so secure simulator promotion can reject.
-    _gl_lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    _gl_lumps_dir = LUMPS_DIR
     _gl_res = _resolve_canonical_lump(_gl_lumps_dir, key8, data)
     if not _gl_res.get("ok"):
         return jsonify({"error": _gl_res.get("error", "Lump integrity failure")}), 409
@@ -6691,7 +6696,7 @@ def get_lump_bundle():
     import zipfile as _zipfile
     from flask import Response as _Response
 
-    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir = LUMPS_DIR
     buf = _io.BytesIO()
     manifest_path = os.path.join(lumps_dir, 'manifest.json') if os.path.isdir(lumps_dir) else None
 
@@ -7703,7 +7708,7 @@ def save_lump_wip():
         token8 = _hl_wip.sha256(abs_name.encode()).hexdigest()[:8]
 
     # ── Load manifest ─────────────────────────────────────────────────────────
-    lumps_dir     = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir     = LUMPS_DIR
     os.makedirs(lumps_dir, exist_ok=True)
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
     try:
@@ -7872,7 +7877,7 @@ def patch_wip_source(token):
     payload = request.get_json(force=True, silent=True) or {}
     source  = payload.get('source', '')
 
-    lumps_dir     = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir     = LUMPS_DIR
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
 
     # Resolve the sidecar file path via manifest first, fall back to bare token
@@ -7920,7 +7925,7 @@ def list_lumps():
     Use GET /api/lumps/<token>/detail to retrieve the full sidecar including
     the source field for a specific lump.
     """
-    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir = LUMPS_DIR
 
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
     manifest = []
@@ -8016,7 +8021,7 @@ def get_lump_detail(token):
     is called lazily by the IDE editor when the user clicks 'Edit ✎' so it can
     restore the exact source text that was compiled.
     """
-    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir = LUMPS_DIR
     token8 = (token.lower()[:8] if len(token) >= 8 else token.lower()).zfill(8)
 
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
@@ -8092,7 +8097,7 @@ def get_lump_words(token_hex):
     key   = key8.lstrip('0') or '0'
     data  = LAZY_LUMPS.get(key8) or LAZY_LUMPS.get(key)
     if data is None:
-        lumps_dir  = os.path.join(os.path.dirname(__file__), 'lumps')
+        lumps_dir  = LUMPS_DIR
         lump_path  = os.path.join(lumps_dir, f'{key8}.lump')
         # Check manifest for a named (human-readable) filename
         _mf_path = os.path.join(lumps_dir, 'manifest.json')
@@ -8126,7 +8131,7 @@ def get_lump_words(token_hex):
     # returns None (legacy/unknown — serve freely), True (validated OK), or a
     # string (error message — caller returns 409, no skip path).
     import hashlib as _hl_words
-    _lh_lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    _lh_lumps_dir = LUMPS_DIR
     _integrity_result = _check_lump_canonical_integrity(_lh_lumps_dir, key8, lump_raw)
     if isinstance(_integrity_result, str):
         return jsonify({"error": _integrity_result}), 409
@@ -8136,7 +8141,7 @@ def get_lump_words(token_hex):
     _bh_live = _hl_words.sha256(lump_raw).hexdigest()
 
     # Backfill sidecar with binary_hash if it was compiled before this field existed.
-    _lumps_dir_bh = os.path.join(os.path.dirname(__file__), 'lumps')
+    _lumps_dir_bh = LUMPS_DIR
     _sc_fn_bh = f'{key8}.json'
     _mf_bh_path = os.path.join(_lumps_dir_bh, 'manifest.json')
     if os.path.isfile(_mf_bh_path):
@@ -8206,7 +8211,7 @@ def get_lump_history(token):
     key8 = (raw[:8] if len(raw) >= 8 else raw).zfill(8)
     if not _re.fullmatch(r'[0-9a-f]{8}', key8):
         return jsonify({"error": "Invalid token"}), 400
-    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir = LUMPS_DIR
     # Find safe stem from manifest so we can match human-readable archive files
     _safe_stem_h = None
     _mf_path_h = os.path.join(lumps_dir, 'manifest.json')
@@ -8276,7 +8281,7 @@ def lump_fork_version(token):
     if not _re_fv.fullmatch(r'[0-9a-f]{8}', key8):
         return jsonify({"error": "Invalid token"}), 400
 
-    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir = LUMPS_DIR
     # Resolve current lump path from manifest (may be human-readable name)
     lump_path   = os.path.join(lumps_dir, f'{key8}.lump')
     sc_path     = os.path.join(lumps_dir, f'{key8}.json')
@@ -8376,7 +8381,7 @@ def get_lump_version_words(token, version):
     key8 = (raw[:8] if len(raw) >= 8 else raw).zfill(8)
     if not _re.fullmatch(r'[0-9a-f]{8}', key8):
         return jsonify({"error": "Invalid token"}), 400
-    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir = LUMPS_DIR
     lump_path_v = os.path.join(lumps_dir, f'{key8}-v{version}.lump')
     # Also check for human-readable versioned archive: <AbsName>_v<N>.lump
     _mf_v = os.path.join(lumps_dir, 'manifest.json')
@@ -8476,7 +8481,7 @@ def get_lump_source(name):
     # 0. V1.3 self-defining binary — the embedded Tier 1/2 source is the
     # authoritative source and MUST precede all external/sidecar fallbacks:
     # a same-name .cloomc file on disk may be stale or a different program.
-    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir = LUMPS_DIR
     if os.path.isdir(lumps_dir):
         for fname in os.listdir(lumps_dir):
             if not fname.endswith('.json') or fname == 'manifest.json':
@@ -8547,7 +8552,7 @@ def get_lump_source(name):
                 pass
 
     # 3. Sidecar source_file field — scan server/lumps/*.json for matching abstraction
-    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir = LUMPS_DIR
     if os.path.isdir(lumps_dir):
         for fname in os.listdir(lumps_dir):
             if not fname.endswith('.json'):
@@ -8666,7 +8671,7 @@ def put_lump_content(token):
 
     raw  = token.lower()
     key8 = (raw[:8] if len(raw) >= 8 else raw).zfill(8)
-    lumps_dir    = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir    = LUMPS_DIR
     lump_path    = os.path.join(lumps_dir, f'{key8}.lump')
     sidecar_path = os.path.join(lumps_dir, f'{key8}.json')
 
@@ -8745,7 +8750,7 @@ def patch_lump_meta(token):
     raw   = token.lower()
     key8  = (raw[:8] if len(raw) >= 8 else raw).zfill(8)
 
-    lumps_dir    = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir    = LUMPS_DIR
     sidecar_path = os.path.join(lumps_dir, f'{key8}.json')
 
     payload = request.get_json(force=True, silent=True) or {}
@@ -8911,7 +8916,7 @@ def post_lump_mtbf(token):
     raw  = token.lower()
     key8 = (raw[:8] if len(raw) >= 8 else raw).zfill(8)
 
-    lumps_dir    = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir    = LUMPS_DIR
     sidecar_path = os.path.join(lumps_dir, f'{key8}.json')
 
     if not os.path.isfile(sidecar_path):
@@ -8997,7 +9002,7 @@ def patch_lump_clist_slot(token_hex, slot_index):
     raw  = token_hex.lower()
     key8 = (raw[:8] if len(raw) >= 8 else raw).zfill(8)
 
-    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir = LUMPS_DIR
     lump_path = _resolve_lump_path(key8, lumps_dir)
     if not lump_path:
         return jsonify({"error": f"No .lump file for token {key8}"}), 404
@@ -9188,7 +9193,7 @@ def resize_lump(token_hex):
     import math as _math
     raw   = token_hex.lower()
     key8  = (raw[:8] if len(raw) >= 8 else raw).zfill(8)
-    lumps_dir    = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir    = LUMPS_DIR
     lump_path    = _resolve_lump_path(key8, lumps_dir)
     sidecar_path = _resolve_sidecar_path(key8, lumps_dir)
 
@@ -9196,7 +9201,7 @@ def resize_lump(token_hex):
     # There is no standalone .lump file for this token; resize it in-place inside
     # the binary, update NS slot 6, then write the file back.
     if not lump_path and key8 == '00000600' and _BOOT_ABSTR_META:
-        boot_path = os.path.join(os.path.dirname(__file__), 'lumps', 'boot-image.bin')
+        boot_path = BOOT_IMAGE_PATH
         if not os.path.isfile(boot_path):
             return jsonify({"error": "boot-image.bin not found"}), 400
         with open(boot_path, 'rb') as fh:
@@ -9272,9 +9277,9 @@ def resize_lump(token_hex):
         # Update Boot.Abstr NS entry word 1 (new cr_limit) and word 2 (recomputed seal)
         new_cr_limit = new_size - cc - 1
         mem_bi[boot_ns_base + 1] = _boot_image_gen.pack_ns_word1(
-            new_cr_limit, 0, 0, 0, 0, 1, cc)
-        mem_bi[boot_ns_base + 2] = _boot_image_gen.make_version_seals(
-            0, word0_location, new_cr_limit)
+            new_cr_limit, 0, 0, 0)
+        mem_bi[boot_ns_base + 2] = _boot_image_gen.integrity32(
+            word0_location, mem_bi[boot_ns_base + 1])
 
         # Serialize back to little-endian bytes and write boot-image.bin
         new_bytes = _struct.pack(f'<{n_words}I', *[int(w) & 0xFFFFFFFF for w in mem_bi])
@@ -9434,7 +9439,7 @@ def import_lump():
     payload_hash = _hl.sha256(raw_bytes).hexdigest()[:4]
     token8 = (_hl.sha256(name.encode('utf-8')).hexdigest()[:4] + payload_hash)
 
-    lumps_dir  = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir  = LUMPS_DIR
     os.makedirs(lumps_dir, exist_ok=True)
 
     lump_bytes = _struct.pack(f'>{lump_size}I', *[int(w) & 0xFFFFFFFF for w in all_words])
@@ -9542,7 +9547,7 @@ def upload_lump_file():
     # Token = sha256(raw file bytes)[:8]
     token8 = _hl.sha256(raw_bytes).hexdigest()[:8]
 
-    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir = LUMPS_DIR
     os.makedirs(lumps_dir, exist_ok=True)
 
     lump_path = os.path.join(lumps_dir, f'{token8}.lump')
@@ -9657,7 +9662,7 @@ def build_namespace():
     words = [0] * lump_size
     words[0] = header
 
-    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir = LUMPS_DIR
     bundled_files = {}
 
     for entry in entries:
@@ -9869,7 +9874,7 @@ def delete_lump(token):
     if not _re.fullmatch(r'[0-9a-f]{1,8}', raw):
         return jsonify({"error": "Invalid token — must be 1-8 hex characters"}), 400
     token8 = raw.zfill(8)
-    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    lumps_dir = LUMPS_DIR
 
     lump_path    = _resolve_lump_path(token8, lumps_dir)
     sidecar_path = _resolve_sidecar_path(token8, lumps_dir)
@@ -10184,7 +10189,7 @@ def _run_hello_mum_flow(dev):
             return
 
         # Step 3 — Keystone.Hello → Tunnel.Call via JS harness → /mum/hello
-        lumps_dir = os.path.join(_SERVER_DIR, "lumps")
+        lumps_dir = LUMPS_DIR
         img_bytes = _boot_image_gen.generate_boot_image(_BOOT_CFG_FOR_FLOW, lumps_dir)
         img_b64   = base64.b64encode(img_bytes).decode("ascii")
 
@@ -10604,7 +10609,7 @@ def boot_lump_words():
     to disassemble NIA lines and display the GT the instruction accesses.
     """
     import struct as _struct
-    boot_img = os.path.join(os.path.dirname(__file__), "lumps", "boot-image.bin")
+    boot_img = BOOT_IMAGE_PATH
     if not os.path.exists(boot_img):
         return jsonify({"ok": False, "error": "no boot image available"})
     with open(boot_img, "rb") as _f:
@@ -14425,7 +14430,7 @@ def boot_image_send_to_hardware():
 
     _rollback = True   # cleared only on successful enqueue
     try:
-        _boot_bin = os.path.join(_SERVER_DIR, 'lumps', 'boot-image.bin')
+        _boot_bin = os.path.join(LUMPS_DIR, 'boot-image.bin')
         if not os.path.isfile(_boot_bin):
             return jsonify({'error': 'boot-image.bin not found — generate it first'}), 404
 

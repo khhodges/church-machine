@@ -142,7 +142,7 @@ register_suite "wukong-command-delivery-tests" \
     'python -m pytest tests/server/test_wukong_command_delivery.py tests/hardware/test_wukong_bridge_command_ack.py -v'
 
 register_suite "wukong-fault-sentinel" \
-    'python -m pytest tests/hardware/test_wukong_snapshot_protocol.py hardware/test_wukong_bridge_resync.py tests/server/test_wukong_snapshot.py tests/server/test_wukong_command_delivery.py hardware/test_boot_rom_no_false_halt.py::test_repeated_reboots_stay_clean -q'
+    'python -m pytest tests/hardware/test_wukong_snapshot_protocol.py hardware/test_wukong_bridge_resync.py tests/server/test_wukong_snapshot.py tests/server/test_wukong_command_delivery.py tests/server/test_lump_root_override.py hardware/test_boot_rom_no_false_halt.py::test_repeated_reboots_stay_clean -q'
 
 register_suite "sha32-vectors" \
     'python -m pytest scripts/test_sha32_vectors.py -v'
@@ -650,6 +650,16 @@ launch_suite() {
     local cmd="$2"
     local out="$WORK_DIR/${name}.out"
     local pid_file="$WORK_DIR/${name}.pid"
+    local isolated_lumps=""
+    case " ${ALL_GROUPS[hardware]} " in
+        *" ${name} "*)
+            isolated_lumps="$WORK_DIR/${name}-lumps"
+            mkdir -p "$isolated_lumps"
+            if [ -d "server/lumps" ]; then
+                cp -a server/lumps/. "$isolated_lumps/"
+            fi
+            ;;
+    esac
 
     # Record wall-clock start time so the progress loop can show elapsed seconds
     date +%s > "$WORK_DIR/${name}.start"
@@ -660,7 +670,12 @@ launch_suite() {
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo "  SUITE: $name"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        eval "$cmd"
+        if [ -n "$isolated_lumps" ]; then
+            echo "  [lumps-isolation] using $isolated_lumps"
+            CHURCH_TEST_LUMPS_DIR="$isolated_lumps" eval "$cmd"
+        else
+            eval "$cmd"
+        fi
     } > "$out" 2>&1 &
 
     echo $! > "$pid_file"
