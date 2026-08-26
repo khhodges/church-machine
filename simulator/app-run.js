@@ -10891,6 +10891,15 @@ function _isLegacyPostFlashSelftestTpermSource(source) {
 function loadEditorState() {
     const editor = document.getElementById('asmEditor');
     if (editor) {
+        // The primary code editor always contains editable source.  Earlier
+        // compiled-LUMP flows could leave a readOnly property on this textarea
+        // in a live browser session, making the saved source appear editable
+        // while rejecting normal typing.  A compiled binary is displayed in
+        // its separate disassembly panel, so it must never keep this source
+        // editor locked across a restore.
+        editor.readOnly = false;
+        if (editor.classList) editor.classList.remove('cm-editor-sealed');
+        try { localStorage.removeItem('cm_sealed_lump'); } catch (e) {}
         let saved = localStorage.getItem('church_editor_code');
         if (saved) {
             // Before strict same-domain TPERM enforcement, an old built-in

@@ -751,6 +751,8 @@ function openSourceFile(path) {
         .then(function(code) {
             var ed = document.getElementById('asmEditor');
             if (!ed) return;
+            ed.readOnly = false;
+            if (ed.classList) ed.classList.remove('cm-editor-sealed');
             // Save active user tab if dirty before clobbering
             if (typeof activeUserTabId !== 'undefined' && activeUserTabId &&
                 typeof userTabDirty !== 'undefined' && userTabDirty &&

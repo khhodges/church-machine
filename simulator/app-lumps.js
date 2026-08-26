@@ -1550,6 +1550,16 @@ function _enterSavedLumpEditorMode(compiledDisasm, lumpName) {
 function exitSavedLumpEditorMode() {
     // Also invalidate an open that is still awaiting binary/source fetches.
     window._savedLumpOpenRequestId = (window._savedLumpOpenRequestId || 0) + 1;
+    // The left pane is always source code, never the immutable compiled
+    // disassembly shown on the right. Clear any stale seal even when no
+    // saved-LUMP mode is currently active so normal source editing recovers
+    // after navigation or opening a file.
+    var _sourceEditor = document.getElementById('asmEditor');
+    if (_sourceEditor) {
+        _sourceEditor.readOnly = false;
+        if (_sourceEditor.classList) _sourceEditor.classList.remove('cm-editor-sealed');
+    }
+    try { localStorage.removeItem('cm_sealed_lump'); } catch (_e) {}
     if (!window._savedLumpEditorMode) return;
     window._savedLumpEditorMode = false;
     var tabs = document.getElementById('codeSidebarTabs');
