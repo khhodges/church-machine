@@ -3,6 +3,8 @@
 import os
 import struct
 import sys
+import threading
+import time
 from copy import deepcopy
 from pathlib import Path
 
@@ -46,6 +48,160 @@ def test_snapshot_parser_rejects_truncation_and_bad_crc():
     broken = bytearray(frame)
     broken[-1] ^= 0x01
     assert wb.try_parse_snapshot_frame(broken) is None
+
+
+def test_fault_decode_records_operator_visible_identity_before_delivery():
+    recovery = wb.FaultRecovery()
+    payload = recovery.prepare_trace({
+        'fault_valid': True,
+        'fault_code': 3,
+        'nia': 0x164,
+        'flags': 0x0D,
+    }, 'bridge-session-local')
+    assert payload['incident_id'] == recovery.local_fault['incident_id']
+    assert recovery.local_fault == {
+        'state': 'local_decoded_awaiting_delivery',
+        'incident_id': payload['incident_id'],
+        'fault_code': 3,
+        'fault_name': 'PERM_X',
+        'nia': 0x164,
+        'flags': 0x0D,
+        'correlation_status': 'local decoded; awaiting IDE delivery',
+        'promotion_status': 'pending server delivery',
+    }
+
+
+def test_fault_delivery_worker_does_not_block_uart_result_polling(monkeypatch):
+    started = threading.Event()
+    release = threading.Event()
+
+    def blocked_trace_post(*_args, **_kwargs):
+        started.set()
+        release.wait(2)
+        return {'accepted': True, 'seq': 9, 'boot_id': 'server-a'}
+
+    monkeypatch.setattr(wb, '_post_wukong_trace', blocked_trace_post)
+    worker = wb.FaultDeliveryWorker('http://ide.test', True)
+    worker.submit('trace_fault', {'fault_valid': True, 'nia': 0x164})
+    assert started.wait(1), 'worker did not start asynchronous delivery'
+    assert worker.poll() == []
+    release.set()
+    deadline = time.time() + 1
+    results = []
+    while time.time() < deadline and not results:
+        results = worker.poll()
+        time.sleep(0.005)
+    assert results and results[0]['reply']['seq'] == 9
+    worker.close()
+
+
+def test_active_fault_rejects_late_results_from_an_older_incident():
+    recovery = wb.FaultRecovery()
+    first = recovery.prepare_trace(
+        {'fault_valid': True, 'nia': 0x164}, 'bridge-session-a')
+    second = recovery.prepare_trace(
+        {'fault_valid': True, 'nia': 0x200}, 'bridge-session-a')
+    assert recovery.owns_trace_payload(second)
+    assert not recovery.owns_trace_payload(first)
+
+
+def test_status_delivery_submission_does_not_wait_for_an_outage(monkeypatch):
+    started = threading.Event()
+    release = threading.Event()
+
+    def blocked_status_post(*_args, **_kwargs):
+        started.set()
+        release.wait(2)
+        return _FakeResponse()
+
+    monkeypatch.setattr(wb.requests, 'post', blocked_status_post)
+    worker = wb.FaultDeliveryWorker('http://ide.test', True)
+    worker.submit('status', {'event': 'fault_decoded'})
+    assert started.wait(1), 'status delivery did not enter the worker'
+    start = time.monotonic()
+    worker.submit('trace_fault', {'incident_id': 'new-fault', 'fault_valid': True})
+    assert time.monotonic() - start < 0.05
+    worker.close()
+    release.set()
+
+
+def test_failed_fault_snapshot_delivery_keeps_active_incident_for_retry(monkeypatch):
+    replies = [None, {
+        'ok': True, 'accepted': True, 'promoted': True,
+        'decision': 'promoted',
+    }]
+
+    def snapshot_post(*_args, **_kwargs):
+        return replies.pop(0)
+
+    monkeypatch.setattr(wb, '_post_wukong_snapshot', snapshot_post)
+    recovery = wb.FaultRecovery()
+    trace = recovery.prepare_trace(
+        {'fault_valid': True, 'nia': 0x164}, 'bridge-session-retry')
+    assert recovery.note_trace(trace, 7, 'server-a')
+    snapshot = wb.decode_snapshot_frame(_frame())
+    snapshot['reason'] = wb.FaultRecovery.FAULT_SNAPSHOT_REASON
+    payload = recovery.snapshot_payload(snapshot)
+    worker = wb.FaultDeliveryWorker('http://ide.test', True)
+
+    worker.submit('snapshot_fault', payload)
+    deadline = time.time() + 1
+    first = []
+    while time.time() < deadline and not first:
+        first = worker.poll()
+        time.sleep(0.005)
+    assert first and first[0]['reply'] is None
+    # Main-loop failure handling must not clear this active correlation before
+    # resubmitting the exact same reason-2 snapshot.
+    assert recovery.owns_snapshot_payload(payload)
+
+    worker.submit('snapshot_fault', payload)
+    deadline = time.time() + 1
+    second = []
+    while time.time() < deadline and not second:
+        second = worker.poll()
+        time.sleep(0.005)
+    assert second and second[0]['reply']['decision'] == 'promoted'
+    assert recovery.should_reboot_after_snapshot(snapshot, second[0]['reply'])
+    worker.close()
+
+
+def test_telemetry_queue_is_bounded_during_a_transport_outage(monkeypatch):
+    started = threading.Event()
+    release = threading.Event()
+
+    class Response:
+        status_code = 200
+        content = b''
+
+    def blocked_post(*_args, **_kwargs):
+        started.set()
+        release.wait(2)
+        return Response()
+
+    monkeypatch.setattr(wb.requests, 'post', blocked_post)
+    worker = wb.FaultDeliveryWorker('http://ide.test', True)
+    worker.submit('trace', {'nia': 0})
+    assert started.wait(1)
+    for nia in range(500):
+        worker.submit('trace', {'nia': nia})
+    assert worker._telemetry_jobs.qsize() <= worker._telemetry_jobs.maxsize
+    assert worker._telemetry_jobs.maxsize == 128
+    worker.close()
+    release.set()
+
+
+def test_active_fault_evidence_replaces_stale_critical_queue_entry():
+    worker = wb.FaultDeliveryWorker('http://ide.test', True)
+    worker.close()
+    for n in range(worker._fault_jobs.maxsize):
+        worker._fault_jobs.put_nowait((
+            'trace_fault', {'incident_id': f'old-{n}'}, True))
+    active = {'incident_id': 'active-snapshot', 'fault_valid': True}
+    assert worker.submit('snapshot_fault', active) is True
+    queued = list(worker._fault_jobs.queue)
+    assert len(queued) == worker._fault_jobs.maxsize
+    assert any(payload == active for _kind, payload, _critical in queued)
 
 
 def test_fault_recovery_hardware_is_fail_closed_and_frame_serialized():

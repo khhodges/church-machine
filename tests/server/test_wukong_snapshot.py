@@ -162,6 +162,82 @@ def test_simulator_fault_gets_a_durable_display_identity(client):
     assert stored['promotion_status'] == 'stored'
 
 
+def test_bridge_local_fault_candidate_is_visible_before_trace_delivery(client):
+    incident_id = 'bridge-local-incident-0001'
+    response = client.post(
+        '/hardware/wukong/bridge-status',
+        data=json.dumps({
+            'session_id': 'bridge-session-local',
+            'event': 'fault_decoded',
+            'state': 'fault_hold',
+            'fault_delivery': {
+                'state': 'local_decoded_awaiting_delivery',
+                'incident_id': incident_id,
+                'fault_code': 3,
+                'fault_name': 'PERM_X',
+                'nia': 0x164,
+                'flags': 0x0D,
+                'correlation_status': 'local decoded; awaiting IDE delivery',
+                'promotion_status': 'pending server delivery',
+            },
+        }),
+        content_type='application/json')
+    assert response.status_code == 200
+
+    pending = client.get('/api/fault-snapshot').get_json()
+    assert pending['display_state'] == 'pending'
+    assert pending['decision'] == 'local_fault_awaiting_delivery'
+    assert pending['fault_name'] == 'PERM_X'
+    assert pending['nia'] == 0x164
+    assert pending['correlation_status'] == \
+        'local decoded; awaiting IDE delivery'
+
+    status = client.get('/hardware/wukong/status').get_json()
+    assert status['fault_candidate']['state'] == 'pending'
+    assert status['fault_candidate']['incident_id'] == incident_id
+    assert status['bridge']['fault_delivery']['state'] == \
+        'local_decoded_awaiting_delivery'
+
+    trace, trace_ack = _post_fault_trace(client, incident_id=incident_id)
+    assert trace_ack['decision'] == 'trace_accepted'
+    trace_pending = client.get('/api/fault-snapshot').get_json()
+    assert trace_pending['display_state'] == 'pending'
+    assert trace_pending['decision'] == 'trace_accepted_awaiting_snapshot'
+    assert trace_pending['fault_name'] == 'PERM_X'
+    assert trace_pending['nia'] == trace['nia']
+
+
+def test_new_local_fault_is_not_masked_by_older_promoted_snapshot(client):
+    old_trace, old_ack = _post_fault_trace(
+        client, incident_id='old-promoted-incident-0001')
+    old_snapshot = _correlated_snapshot(old_trace, old_ack)
+    assert client.post(
+        '/hardware/wukong/snapshot', data=json.dumps(old_snapshot),
+        content_type='application/json').get_json()['decision'] == 'promoted'
+
+    response = client.post(
+        '/hardware/wukong/bridge-status',
+        data=json.dumps({
+            'session_id': 'bridge-session-new',
+            'event': 'fault_decoded',
+            'fault_delivery': {
+                'state': 'local_decoded_awaiting_delivery',
+                'incident_id': 'new-local-incident-0001',
+                'fault_code': 8,
+                'fault_name': 'BOUNDS',
+                'nia': 0x200,
+                'flags': 1,
+            },
+        }),
+        content_type='application/json')
+    assert response.status_code == 200
+    pending = client.get('/api/fault-snapshot').get_json()
+    assert pending['display_state'] == 'pending'
+    assert pending['incident_id'] == 'new-local-incident-0001'
+    assert pending['fault_name'] == 'BOUNDS'
+    assert pending['nia'] == 0x200
+
+
 def test_fault_snapshot_survives_reboot_trace_with_complete_machine_state(client):
     """SelfTest fault → reason-2 AC snapshot → Boot.0 keeps the actual fault."""
     partial = {

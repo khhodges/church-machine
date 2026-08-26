@@ -45,8 +45,10 @@ Multi-event instructions emit multiple consecutive packets with the same NIA:
 import argparse
 import base64
 import os
+import queue
 import struct
 import sys
+import threading
 import time
 import uuid
 
@@ -843,6 +845,7 @@ class FaultRecovery:
         self.bridge_session = None
         self.trace_payload = None
         self.authorization_id = None
+        self.local_fault = None
 
     def prepare_trace(self, trace, bridge_session):
         """Freeze one immutable fault trace payload before its first POST."""
@@ -856,6 +859,16 @@ class FaultRecovery:
             payload['incident_id'] = self.incident_id
             payload['bridge_session'] = self.bridge_session
             self.trace_payload = payload
+            self.local_fault = {
+                'state': 'local_decoded_awaiting_delivery',
+                'incident_id': self.incident_id,
+                'fault_code': int(trace.get('fault_code', 0)),
+                'fault_name': _fault_name(trace.get('fault_code', 0)),
+                'nia': int(trace.get('nia', 0)),
+                'flags': int(trace.get('flags', 0)),
+                'correlation_status': 'local decoded; awaiting IDE delivery',
+                'promotion_status': 'pending server delivery',
+            }
         return payload
 
     def note_trace(self, trace, trace_seq, server_boot_id, bridge_session=None):
@@ -866,9 +879,21 @@ class FaultRecovery:
                 trace_seq > 0 and isinstance(server_boot_id, str) and server_boot_id):
             self.trace_seq = trace_seq
             self.server_boot_id = server_boot_id
+            if self.local_fault:
+                self.local_fault.update({
+                    'state': 'trace_accepted_awaiting_snapshot',
+                    'correlation_status': 'trace accepted; complete snapshot pending',
+                    'promotion_status': 'pending complete snapshot',
+                })
             return True
         self.trace_seq = None
         self.server_boot_id = None
+        if self.local_fault:
+            self.local_fault.update({
+                'state': 'local_decoded_awaiting_delivery',
+                'correlation_status': 'local decoded; awaiting IDE delivery',
+                'promotion_status': 'pending server delivery',
+            })
         return False
 
     def clear_pending(self):
@@ -880,6 +905,17 @@ class FaultRecovery:
         self.bridge_session = None
         self.trace_payload = None
         self.authorization_id = None
+
+    def owns_trace_payload(self, payload):
+        """True only when a delivery result belongs to the active incident."""
+        return bool(
+            self.awaiting_snapshot and self.incident_id and
+            isinstance(payload, dict) and
+            payload.get('incident_id') == self.incident_id)
+
+    def owns_snapshot_payload(self, payload):
+        """True only when a fault snapshot still belongs to this incident."""
+        return self.owns_trace_payload(payload)
 
     def should_reboot_after_snapshot(self, snapshot, accepted):
         return bool(
@@ -919,6 +955,157 @@ class FaultRecovery:
             'authorization_id': self.authorization_id,
         }
 
+
+class FaultDeliveryWorker:
+    """Deliver telemetry without making the UART parser wait on HTTPS.
+
+    Every HTTP request is bounded to one attempt. The UART thread decides
+    whether the active fault needs another attempt after consuming its result;
+    this prevents an unreachable older incident from head-of-line blocking a
+    newer fault forever. Jobs are processed in priority order: local fault
+    status, fault trace, fault snapshot, recovery audit, then ordinary
+    telemetry.
+    """
+
+    def __init__(self, ide_base, verify_tls):
+        self.ide_base = ide_base
+        self.verify_tls = verify_tls
+        # Fault evidence has a small reserved lane. Ordinary telemetry is
+        # lossy by design during an outage: the most recent later trace/status
+        # is useful, but no backlog is worth starving a board-fault record.
+        self._fault_jobs = queue.Queue(maxsize=16)
+        self._telemetry_jobs = queue.Queue(maxsize=128)
+        self._fault_results = queue.Queue(maxsize=16)
+        self._telemetry_results = queue.Queue(maxsize=128)
+        self._fault_submit_lock = threading.Lock()
+        self._stopped = threading.Event()
+        self._thread = threading.Thread(
+            target=self._run, name='wukong-telemetry', daemon=True)
+        self._thread.start()
+
+    def close(self):
+        """Stop after any in-flight bounded request; used by bridge shutdown/tests."""
+        self._stopped.set()
+
+    def submit(self, kind, payload, priority=None):
+        payload = dict(payload)
+        critical = kind in (
+            'trace_fault', 'snapshot_fault', 'recovery_authorization')
+        target = self._fault_jobs if critical else self._telemetry_jobs
+        if critical:
+            # The board can have only one recovery-eligible fault at a time.
+            # If an old queued critical retry fills the reserved lane, discard
+            # that oldest queued attempt in favour of the newest active
+            # evidence. An in-flight request still completes and is rejected
+            # by incident ownership if it became stale.
+            with self._fault_submit_lock:
+                try:
+                    target.put_nowait((kind, payload, critical))
+                    return True
+                except queue.Full:
+                    try:
+                        target.get_nowait()
+                        target.put_nowait((kind, payload, critical))
+                        return True
+                    except queue.Empty:
+                        # The worker won the race; retry the nonblocking put.
+                        try:
+                            target.put_nowait((kind, payload, critical))
+                            return True
+                        except queue.Full:
+                            pass
+                    except queue.Full:
+                        pass
+            print(f'  [{kind}] reserved delivery queue full; retry pending',
+                  flush=True)
+            return False
+        try:
+            target.put_nowait((kind, payload, critical))
+            return True
+        except queue.Full:
+            # Never let a stalled IDE make the UART parser wait. Fault retries
+            # are resubmitted by the parser after a bounded delivery result;
+            # lower-priority telemetry may be dropped under sustained outage.
+            return False
+
+    def poll(self):
+        """Return completed jobs without blocking the UART loop."""
+        results = []
+        for source in (self._fault_results, self._telemetry_results):
+            while True:
+                try:
+                    results.append(source.get_nowait())
+                except queue.Empty:
+                    break
+        return results
+
+    def _run(self):
+        while not self._stopped.is_set():
+            try:
+                # Wait briefly on the reserved lane rather than blocking on
+                # ordinary telemetry; a fault submitted just after this check
+                # must wake the worker promptly.
+                kind, payload, critical = self._fault_jobs.get(timeout=0.05)
+            except queue.Empty:
+                try:
+                    kind, payload, critical = self._telemetry_jobs.get_nowait()
+                except queue.Empty:
+                    continue
+            try:
+                if kind == 'trace_fault':
+                    reply = _post_wukong_trace(
+                        self.ide_base, payload, self.verify_tls,
+                        max_attempts=1)
+                elif kind == 'snapshot_fault':
+                    reply = _post_wukong_snapshot(
+                        self.ide_base, payload, self.verify_tls,
+                        max_attempts=1)
+                elif kind == 'snapshot':
+                    reply = _post_wukong_snapshot(
+                        self.ide_base, payload, self.verify_tls,
+                        max_attempts=1)
+                elif kind == 'recovery_authorization':
+                    reply = _post_recovery_authorization(
+                        self.ide_base, payload, self.verify_tls,
+                        max_attempts=1)
+                elif kind in ('status', 'console', 'boot_info'):
+                    endpoint = {
+                        'status': 'bridge-status',
+                        'console': 'console',
+                        'boot_info': 'boot-info',
+                    }[kind]
+                    timeout = 0.5 if kind == 'status' else 1
+                    response = requests.post(
+                        f'{self.ide_base}/hardware/wukong/{endpoint}',
+                        json=payload, timeout=timeout, verify=self.verify_tls)
+                    reply = {} if 200 <= response.status_code < 300 else None
+                else:
+                    try:
+                        response = requests.post(
+                            f'{self.ide_base}/hardware/wukong/trace',
+                            json=payload, timeout=1, verify=self.verify_tls)
+                        reply = response.json() if response.content else {}
+                        if not (200 <= response.status_code < 300):
+                            reply = None
+                    except Exception as exc:
+                        print(f'  [trace POST error] {exc}', flush=True)
+                        reply = None
+            except Exception as exc:
+                # A malformed response or unexpected worker error must not
+                # terminate telemetry delivery or the serial bridge.
+                print(f'  [{kind} delivery error] {exc}', flush=True)
+                reply = None
+            result = {
+                'kind': kind, 'payload': payload, 'reply': reply}
+            target = self._fault_results if critical else self._telemetry_results
+            try:
+                target.put_nowait(result)
+            except queue.Full:
+                # Telemetry results are informational. A critical result is
+                # retained by retrying this bounded put, never by allocating
+                # an unbounded backlog.
+                if critical:
+                    target.put(result)
 
 def _post_json_retry(url, payload, verify_tls, label, accept_reply,
                      max_attempts=None, timeout=1):
@@ -1271,9 +1458,10 @@ def main():
     bridge_state = 'connected'
     last_read_ts = None
     last_write_ts = None
+    delivery_worker = FaultDeliveryWorker(ide_base, verify_tls)
 
     def _bridge_status(event='heartbeat', state=None, reason='',
-                       reconnect_attempt=0):
+                       reconnect_attempt=0, fault_delivery=None):
         """Best-effort health publication; never blocks the UART loop."""
         payload = {
             'session_id': session_id, 'serial_port': port,
@@ -1282,11 +1470,9 @@ def main():
             'last_read_ts': last_read_ts, 'last_write_ts': last_write_ts,
             'church_only': church_only,
         }
-        try:
-            requests.post(f'{ide_base}/hardware/wukong/bridge-status',
-                          json=payload, timeout=0.5, verify=verify_tls)
-        except Exception as exc:
-            print(f'[bridge] status POST failed: {exc}', flush=True)
+        if fault_delivery:
+            payload['fault_delivery'] = dict(fault_delivery)
+        delivery_worker.submit('status', payload)
 
     _bridge_status('session_started', 'connected')
 
@@ -1303,6 +1489,114 @@ def main():
     # serial writer and can prove that the board's complete stop snapshot was
     # accepted before it asks the RTL to re-enter the boot ladder.
     fault_recovery = FaultRecovery()
+    # A reason-2 snapshot can arrive before the asynchronous fault trace POST
+    # has returned its server sequence. Hold it until that exact correlation
+    # is available; never post an uncorrelated snapshot.
+    pending_fault_snapshot = [None]  # (incident_id, decoded snapshot)
+
+    def _fault_delivery_status():
+        """Return the local evidence that is safe to expose to the IDE."""
+        return dict(fault_recovery.local_fault or {})
+
+    def _process_delivery_results():
+        """Apply completed HTTP results without ever waiting for the worker."""
+        nonlocal ser
+        for result in delivery_worker.poll():
+            kind = result['kind']
+            reply = result.get('reply')
+            if kind == 'trace_fault':
+                payload = result['payload']
+                # A result from an older delivery attempt is diagnostic only:
+                # it must never lend its server sequence to the active fault.
+                if not fault_recovery.owns_trace_payload(payload):
+                    print('  [fault delivery] stale trace result discarded',
+                          flush=True)
+                    continue
+                trace_seq = int(reply.get('seq', 0)) if reply else None
+                trace_boot_id = reply.get('boot_id') if reply else None
+                accepted = fault_recovery.note_trace(
+                    payload, trace_seq, trace_boot_id, session_id)
+                if accepted:
+                    print('  [fault delivery] trace accepted; '
+                          'complete snapshot still required', flush=True)
+                    _bridge_status(
+                        'fault_trace_accepted', 'fault_hold',
+                        'fault trace accepted; complete snapshot pending',
+                        fault_delivery=_fault_delivery_status())
+                else:
+                    print('  [fault delivery] local fault remains pending '
+                          '— IDE trace delivery has not been confirmed',
+                          flush=True)
+                    _bridge_status(
+                        'fault_trace_pending', 'fault_hold',
+                        'local fault decoded; awaiting IDE trace delivery',
+                        fault_delivery=_fault_delivery_status())
+                    # Retry only the still-active incident. The worker itself
+                    # never sleeps/retries, so UART parsing stays independent.
+                    delivery_worker.submit('trace_fault', payload)
+                if accepted and pending_fault_snapshot[0] is not None:
+                    pending_incident, pending = pending_fault_snapshot[0]
+                    if pending_incident == fault_recovery.incident_id:
+                        pending_fault_snapshot[0] = None
+                        delivery_worker.submit(
+                            'snapshot_fault',
+                            fault_recovery.snapshot_payload(pending))
+            elif kind == 'snapshot_fault':
+                snapshot = result['payload']
+                if not fault_recovery.owns_snapshot_payload(snapshot):
+                    print('  [fault delivery] stale snapshot result discarded',
+                          flush=True)
+                    continue
+                accepted = bool(reply)
+                if fault_recovery.should_reboot_after_snapshot(
+                        snapshot, accepted):
+                    if _authorize_fault_recovery(ser):
+                        authorization_payload = (
+                            fault_recovery.authorization_payload())
+                        fault_recovery.mark_reboot_sent()
+                        delivery_worker.submit(
+                            'recovery_authorization', authorization_payload)
+                        print('  [fault recovery] complete fault snapshot '
+                              'stored — authorizing Boot.0 recovery',
+                              flush=True)
+                        _bridge_status(
+                            'fault_snapshot_correlated', 'fault_recovery',
+                            'complete fault snapshot promoted; recovery authorized',
+                            fault_delivery={
+                                'state': 'fully_correlated',
+                                'incident_id': authorization_payload['incident_id'],
+                                'correlation_status': 'fully correlated',
+                                'promotion_status': 'promoted',
+                            })
+                    else:
+                        fault_recovery.clear_pending()
+                else:
+                    # A failed network attempt keeps the active, correlated
+                    # incident armed for an exact snapshot retry. A server
+                    # response that did not promote it is terminal and remains
+                    # fail-closed.
+                    if reply:
+                        fault_recovery.clear_pending()
+                        print('  [fault delivery] snapshot was not correlated '
+                              '— recovery remains blocked', flush=True)
+                    else:
+                        print('  [fault delivery] snapshot delivery failed '
+                              '— recovery remains blocked', flush=True)
+                        delivery_worker.submit('snapshot_fault', snapshot)
+            elif kind == 'snapshot':
+                # Explicit/manual snapshots are informational and never
+                # participate in the automatic recovery gate.
+                if reply is None:
+                    print('  [snapshot POST error] delivery deferred',
+                          flush=True)
+            elif kind == 'recovery_authorization':
+                if reply:
+                    print('  [fault recovery] authorization audit confirmed',
+                          flush=True)
+                else:
+                    print('  [fault recovery] authorization audit pending '
+                          '— board recovery was already fail-closed at snapshot',
+                          flush=True)
 
     # Deferred 'q' (snapshot) gate — set on each boot sentinel and cleared
     # once BOOT_TRACE_PACKET_COUNT trace packets have been received or
@@ -1327,12 +1621,8 @@ def main():
         _console_line.clear()
         if not text.strip():
             return
-        try:
-            requests.post(f'{base}/hardware/wukong/console',
-                          json={'text': text, 'ts': time.time()},
-                          timeout=1, verify=vtls)
-        except Exception as exc:
-            print(f'  [console POST error] {exc}')
+        delivery_worker.submit(
+            'console', {'text': text, 'ts': time.time()})
 
     def _reopen_serial():
         """Close and reopen the serial port; return the new Serial object.
@@ -1409,35 +1699,22 @@ def main():
                     _console_flush(ide_base, verify_tls)
                     decoded['ts'] = time.time()
                     snapshot_payload = fault_recovery.snapshot_payload(decoded)
-                    snapshot_reply = _post_wukong_snapshot(
-                        ide_base, snapshot_payload, verify_tls,
-                        max_attempts=(None if decoded.get('reason') ==
-                                      FaultRecovery.FAULT_SNAPSHOT_REASON else 1))
-                    snapshot_accepted = bool(snapshot_reply)
-                    if fault_recovery.should_reboot_after_snapshot(
-                            decoded, snapshot_accepted):
-                        if _authorize_fault_recovery(ser):
-                            authorization_payload = (
-                                fault_recovery.authorization_payload())
-                            authorization_reply = _post_recovery_authorization(
-                                ide_base, authorization_payload, verify_tls,
-                                max_attempts=None)
-                            fault_recovery.mark_reboot_sent()
-                            if authorization_reply:
-                                print('  [fault recovery] complete fault snapshot '
-                                      'stored — authorizing Boot.0 recovery',
-                                      flush=True)
-                            else:
-                                print('  [fault recovery] authorization was written '
-                                      'but server rejected its audit record',
-                                      flush=True)
+                    if decoded.get('reason') == FaultRecovery.FAULT_SNAPSHOT_REASON:
+                        # The fault trace worker is ahead of this snapshot, but
+                        # its result is applied by the UART thread. Hold the
+                        # complete frame until it supplies seq/boot_id.
+                        if (fault_recovery.awaiting_snapshot and
+                                getattr(fault_recovery, 'trace_seq', None)):
+                            delivery_worker.submit(
+                                'snapshot_fault', snapshot_payload)
+                        elif fault_recovery.awaiting_snapshot:
+                            pending_fault_snapshot[0] = (
+                                fault_recovery.incident_id, decoded)
                         else:
-                            fault_recovery.clear_pending()
+                            print('  [fault recovery] uncorrelated snapshot '
+                                  '— recovery remains blocked', flush=True)
                     else:
-                        # A snapshot is terminal for the preceding stop.  If it
-                        # was clean, uncorrelated, or failed promotion, never
-                        # let its old trace id authorize a later fault.
-                        fault_recovery.clear_pending()
+                        delivery_worker.submit('snapshot', snapshot_payload)
                     i += SNAPSHOT_HEADER_LEN + decoded['payload_len'] + SNAPSHOT_CRC_LEN
                     continue
 
@@ -1489,8 +1766,8 @@ def main():
                     if church_only and _is_turing_only_result(decoded):
                         i += TRACE_LEN
                         continue
-                    # Flush any pending ASCII first so console text and trace
-                    # packets appear in the IDE event log in arrival order.
+                    # Queue pending ASCII first so console text and trace
+                    # packets retain arrival order without blocking UART reads.
                     _console_flush(ide_base, verify_tls)
                     decoded['ts'] = time.time()
                     location = _trace_location(decoded['nia'])
@@ -1501,30 +1778,11 @@ def main():
                         if decoded.get('ev_type') in _EV_HAS_GT_PAYLOAD else ''
                     )
 
-                    trace_accepted = False
-                    trace_seq = None
-                    trace_boot_id = None
                     trace_payload = (
                         fault_recovery.prepare_trace(decoded, session_id)
                         if decoded.get('fault_valid') else decoded)
-                    if decoded.get('fault_valid'):
-                        trace_reply = _post_wukong_trace(
-                            ide_base, trace_payload, verify_tls,
-                            max_attempts=None)
-                        if trace_reply:
-                            trace_seq = int(trace_reply.get('seq', 0))
-                            trace_boot_id = trace_reply.get('boot_id')
-                            trace_accepted = fault_recovery.note_trace(
-                                trace_payload, trace_seq, trace_boot_id,
-                                session_id)
-                    else:
-                        try:
-                            response = requests.post(
-                                f'{ide_base}/hardware/wukong/trace',
-                                json=trace_payload, timeout=1, verify=verify_tls)
-                            trace_accepted = 200 <= response.status_code < 300
-                        except Exception as exc:
-                            print(f'  [trace POST error] {exc}')
+                    delivery_kind = (
+                        'trace_fault' if decoded.get('fault_valid') else 'trace')
 
                     ev_type    = decoded['ev_type']
                     payload_gt = decoded['payload_gt']
@@ -1541,10 +1799,8 @@ def main():
                         gt_str = ''
 
                     # Update rolling CR GT cache from packets that unambiguously
-                    # carry a known CR's new GT value.  Done after the trace POST
-                    # so the packet is already delivered before we mutate state,
-                    # but before the fault check so a fault in the same packet
-                    # captures the register update that caused it.
+                    # carry a known CR's new GT value before a later snapshot
+                    # captures the register update that caused the fault.
                     _cr_idx = _EV_TO_CR.get(ev_type)
                     if _cr_idx is not None:
                         _cr_gt_cache[_cr_idx] = payload_gt
@@ -1567,6 +1823,12 @@ def main():
                         instruction = "  <instruction unavailable>"
                     print(f'[{ts_str}] HW: {where}{instruction}  {ev_name}{gt_str}'
                           f'  flags={flag_str}{fault_str}{bp_str}')
+                    if decoded.get('fault_valid'):
+                        _bridge_status(
+                            'fault_decoded', 'fault_hold',
+                            'local fault decoded; awaiting IDE delivery',
+                            fault_delivery=_fault_delivery_status())
+                    delivery_worker.submit(delivery_kind, trace_payload)
                     i += TRACE_LEN
 
                 elif b in (BOOT_SENTINEL_V1, BOOT_SENTINEL_V2):
@@ -1617,18 +1879,14 @@ def main():
                                   file=sys.stderr)
                             # Notify the IDE so the mismatch is visible in the
                             # console event log, not just the bridge's stderr.
-                            try:
-                                requests.post(
-                                    f'{ide_base}/hardware/wukong/console',
-                                    json={'text': ('⚠ Board bitstream may be stale — '
-                                                   'N_INIT mismatch (board sent '
-                                                   f'0x{board_n_init_byte:02X}, expected '
-                                                   f'0x{expected_byte:02X}). Reflash the '
-                                                   'bitstream.'),
-                                          'ts': time.time()},
-                                    timeout=1, verify=verify_tls)
-                            except Exception as exc:
-                                print(f'  [console POST error] {exc}')
+                            delivery_worker.submit('console', {
+                                'text': ('⚠ Board bitstream may be stale — '
+                                         'N_INIT mismatch (board sent '
+                                         f'0x{board_n_init_byte:02X}, expected '
+                                         f'0x{expected_byte:02X}). Reflash the '
+                                         'bitstream.'),
+                                'ts': time.time(),
+                            })
                     else:
                         print(f'BOOT: board ready — N_INIT byte=0x{board_n_init_byte:02X} '
                               f'(validation skipped: boot_rom not importable){tu_str}{bv_str}')
@@ -1691,26 +1949,18 @@ def main():
                               file=sys.stderr)
                         # Notify the IDE so it can show a visible warning banner.
                         post_tu = tu_version if tu_version is not None else 0x01
-                        try:
-                            requests.post(
-                                f'{ide_base}/hardware/wukong/boot-info',
-                                json={'stale_tu': True, 'tu_version': post_tu,
-                                      'build_version': build_version,
-                                      'session_id': session_id},
-                                timeout=1, verify=verify_tls)
-                        except Exception as exc:
-                            print(f'  [boot-info POST error] {exc}')
+                        delivery_worker.submit('boot_info', {
+                            'stale_tu': True, 'tu_version': post_tu,
+                            'build_version': build_version,
+                            'session_id': session_id,
+                        })
                     else:
                         # Current bitstream — clear any previous stale warning in the IDE.
-                        try:
-                            requests.post(
-                                f'{ide_base}/hardware/wukong/boot-info',
-                                json={'stale_tu': False, 'tu_version': tu_version,
-                                      'build_version': build_version,
-                                      'session_id': session_id},
-                                timeout=1, verify=verify_tls)
-                        except Exception as exc:
-                            print(f'  [boot-info POST error] {exc}')
+                        delivery_worker.submit('boot_info', {
+                            'stale_tu': False, 'tu_version': tu_version,
+                            'build_version': build_version,
+                            'session_id': session_id,
+                        })
 
                     i += sentinel['length']
 
@@ -1779,6 +2029,9 @@ def main():
             del buf[:i]
 
             now = time.time()
+            # Apply only completed HTTP results. Network retries remain in the
+            # daemon worker and can never stop UART decoding.
+            _process_delivery_results()
             # Deferred snapshot timeout: if the expected boot trace packets
             # have not all arrived within BOOT_Q_TIMEOUT seconds, send 'q'
             # anyway so the IDE still gets a register snapshot on boards that

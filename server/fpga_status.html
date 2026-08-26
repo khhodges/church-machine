@@ -1168,7 +1168,13 @@
       stateEl.textContent = pending.toUpperCase() + (candidate.decision ? ' — ' + candidate.decision : '');
       stateEl.className = 'big ' + (pending === 'rejected' ? 'fault' : pending === 'pending' ? 'warn' : 'dim');
       metaEl.innerHTML = '<div class="surface-note">No durable accepted record. Candidate ' +
-        esc(candidate.incident_id || 'unavailable') + ' is ' + esc(pending) + '.</div>';
+        esc(candidate.incident_id || 'unavailable') + ' is ' + esc(pending) + '.</div>' +
+        (candidate.fault_name || candidate.fault_code != null ? (
+          '<div class="surface-note"><strong>Locally decoded fault:</strong> ' +
+          esc(candidate.fault_name || ('Code ' + candidate.fault_code)) +
+          ' at NIA ' + esc(candidate.nia == null ? 'UNAVAILABLE' : hex(candidate.nia)) +
+          '<br>Correlation: ' + esc(candidate.correlation_status ||
+            'awaiting IDE delivery') + '</div>') : '');
       regsEl.innerHTML = '';
       return;
     }

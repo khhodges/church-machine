@@ -12874,10 +12874,29 @@ def wukong_bridge_status_post():
     reconnecting from a dead USB port can still tell the IDE what is happening.
     The timeline is bounded and is diagnostic evidence, not an execution input.
     """
+    global _wukong_fault_candidate
     data = request.get_json(silent=True) or {}
     now = _wk_time.time()
     session = str(data.get('session_id', '') or '')[:128]
     event = str(data.get('event', '') or '')[:80]
+    raw_fault = data.get('fault_delivery')
+    fault_delivery = None
+    if isinstance(raw_fault, dict):
+        # This is operator-facing local evidence, not an execution input.
+        # Keep only bounded scalar fields and never allow it to authorize
+        # recovery or replace a promoted snapshot.
+        fault_delivery = {
+            'state': str(raw_fault.get('state', '') or '')[:80],
+            'incident_id': str(raw_fault.get('incident_id', '') or '')[:128],
+            'fault_code': int(raw_fault.get('fault_code', 0) or 0),
+            'fault_name': str(raw_fault.get('fault_name', '') or '')[:80],
+            'nia': int(raw_fault.get('nia', 0) or 0),
+            'flags': int(raw_fault.get('flags', 0) or 0),
+            'correlation_status': str(
+                raw_fault.get('correlation_status', '') or '')[:160],
+            'promotion_status': str(
+                raw_fault.get('promotion_status', '') or '')[:160],
+        }
     with _wukong_bridge_lock:
         if session:
             _wukong_bridge_info.update({
@@ -12892,6 +12911,8 @@ def wukong_bridge_status_post():
                 'church_only': bool(data.get('church_only', False)),
                 'event': event or 'heartbeat',
             })
+            if fault_delivery is not None:
+                _wukong_bridge_info['fault_delivery'] = fault_delivery
         if event or session:
             item = {
                 'ts': now, 'session_id': session,
@@ -12910,6 +12931,48 @@ def wukong_bridge_status_post():
                     session_id=item['session_id'],
                     serial_port=item['serial_port'],
                     reconnect_attempt=item['reconnect_attempt'])
+    if fault_delivery is not None:
+        state = fault_delivery.get('state')
+        incident_id = fault_delivery.get('incident_id', '')
+        if state == 'local_decoded_awaiting_delivery':
+            with _wukong_trace_lock:
+                current = _wukong_fault_candidate
+                # This lifecycle event is emitted only when the bridge
+                # decodes a new local fault. It must supersede an older
+                # promoted candidate so the IDE cannot show stale details.
+                if (incident_id and not (
+                        current.get('incident_id') == incident_id and
+                        current.get('decision') in (
+                            'trace_accepted_awaiting_snapshot',
+                            'snapshot_promoted',
+                            'recovery_authorized'))):
+                    _wukong_fault_candidate = {
+                        'state': 'pending',
+                        'decision': 'local_fault_awaiting_delivery',
+                        'incident_id': incident_id,
+                        'fault_code': fault_delivery['fault_code'],
+                        'fault_name': fault_delivery['fault_name'],
+                        'nia': fault_delivery['nia'],
+                        'flags': fault_delivery['flags'],
+                        'correlation_status': fault_delivery[
+                            'correlation_status'],
+                        'promotion_status': fault_delivery[
+                            'promotion_status'],
+                        'reason': 'fault decoded locally; awaiting IDE delivery',
+                    }
+        elif state == 'trace_accepted_awaiting_snapshot':
+            with _wukong_trace_lock:
+                current = _wukong_fault_candidate
+                if current.get('incident_id') == incident_id:
+                    _wukong_fault_candidate.update({
+                        'state': 'pending',
+                        'decision': 'trace_accepted_awaiting_snapshot',
+                        'correlation_status': fault_delivery[
+                            'correlation_status'],
+                        'promotion_status': fault_delivery[
+                            'promotion_status'],
+                        'reason': 'fault trace accepted; complete snapshot pending',
+                    })
     # Refresh immediately so a terminal reconnect failure is visible on the
     # next status poll, without waiting for a second lifecycle POST.
     _wukong_refresh_bridge_alert(now)
@@ -13279,7 +13342,16 @@ def fault_snapshot_get():
         candidate = dict(_wukong_fault_candidate)
     with _fault_snapshot_lock:
         snap = dict(_fault_snapshot) if isinstance(_fault_snapshot, dict) else None
-    if snap is None:
+    # A newer locally decoded incident must not be masked by the last fully
+    # promoted snapshot from an earlier fault. Keep the older record available
+    # in memory for correlation-safe history, but expose the newer pending
+    # incident to the IDE until its own snapshot is promoted.
+    newer_pending = (
+        snap is not None and candidate.get('state') == 'pending' and
+        candidate.get('incident_id') and
+        candidate.get('incident_id') != snap.get('incident_id')
+    )
+    if snap is None or newer_pending:
         state = candidate.get('state') or 'unavailable'
         return jsonify({
             'ok': False,
@@ -13287,6 +13359,12 @@ def fault_snapshot_get():
             'decision': candidate.get('decision') or 'missing_trace',
             'reason': candidate.get('reason') or 'No durable accepted fault record.',
             'incident_id': candidate.get('incident_id') or '',
+            'fault_code': candidate.get('fault_code'),
+            'fault_name': candidate.get('fault_name'),
+            'nia': candidate.get('nia'),
+            'flags': candidate.get('flags'),
+            'correlation_status': candidate.get('correlation_status'),
+            'promotion_status': candidate.get('promotion_status'),
         })
     snap['display_state'] = 'accepted'
     snap['candidate'] = candidate
@@ -13433,8 +13511,15 @@ def wukong_trace_post():
                 'state': 'pending',
             }
             _wukong_fault_candidate = {
-                'state': 'pending', 'decision': 'missing_trace',
+                'state': 'pending',
+                'decision': 'trace_accepted_awaiting_snapshot',
                 'incident_id': incident_id,
+                'fault_code': entry['fault_code'],
+                'fault_name': _wukong_fault_name(entry['fault_code']),
+                'nia': entry['nia'],
+                'flags': entry['flags'],
+                'correlation_status': 'trace accepted; complete snapshot pending',
+                'promotion_status': 'pending complete snapshot',
                 'reason': 'fault trace accepted; complete reason-2 snapshot pending',
             }
             _trim_wukong_fault_incidents_locked()

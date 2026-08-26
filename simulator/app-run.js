@@ -18010,14 +18010,24 @@ function _lastFaultValue(v) {
     return (v === null || v === undefined) ? 'UNAVAILABLE' : String(v);
 }
 
-function _renderLastAcceptedFaultState(state, detail) {
+function _renderLastAcceptedFaultState(state, detail, candidate) {
     var host = document.getElementById('lastFaultHost');
     if (!host) return;
     var labels = { pending: 'PENDING', rejected: 'REJECTED', unavailable: 'UNAVAILABLE' };
+    candidate = candidate || {};
+    var localDetails = '';
+    if (state === 'pending' && (candidate.fault_name || candidate.fault_code !== undefined)) {
+        var faultName = candidate.fault_name || ('Code ' + _lastFaultValue(candidate.fault_code));
+        localDetails = '<div class="last-fault-state-evidence"><b>Locally decoded fault:</b> ' +
+            _escHtml(faultName) + ' at NIA ' + _escHtml(_lastFaultHex(candidate.nia)) +
+            '<br><span>Correlation: ' + _escHtml(candidate.correlation_status ||
+                'awaiting IDE delivery') + '</span></div>';
+    }
     host.className = 'last-fault-host lf-state-' + state;
-    host.innerHTML = '<div class="last-fault-panel-header"><span>Last Accepted Fault</span><strong>' +
+    host.innerHTML = '<div class="last-fault-panel-header"><span>' +
+        (localDetails ? 'Hardware Fault' : 'Last Accepted Fault') + '</span><strong>' +
         (labels[state] || 'UNAVAILABLE') + '</strong></div><div class="last-fault-state-detail">' +
-        _escHtml(detail || 'No durable accepted record.') + '</div>';
+        _escHtml(detail || 'No durable accepted record.') + '</div>' + localDetails;
 }
 
 function _renderAcceptedLastFault(snap) {
@@ -18263,7 +18273,9 @@ function _fetchAndShowLastFaultPanel() {
                 _lastFaultSnapshotData = body;
                 _renderAcceptedLastFault(body);
             } else {
-                _renderLastAcceptedFaultState(state, body.reason || body.decision || 'No durable accepted record.');
+                _renderLastAcceptedFaultState(state,
+                    body.reason || body.decision || 'No durable accepted record.',
+                    body);
             }
             if (state === 'pending' && index < delays.length - 1) {
                 _lastFaultFetchTimer = setTimeout(function() { attempt(index + 1); }, delays[index + 1]);
