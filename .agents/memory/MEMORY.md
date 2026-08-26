@@ -149,3 +149,4 @@
 - [Bank artifact binding seals](bank-artifact-binding-seals.md) — Bank’s source is embedded in its artifact, so regeneration must also synchronize binding token/hash constants
 - [Bank validation gates](bank-validation-gates.md) — Bank uses structural, E/type, then mechanical identity checks; provenance remains human-vouched until a genesis verifier exists
 - [TPERM domain-purity SelfTest rule](tperm-domain-purity-selftest.md) — cross-domain TPERM requests fault by design; resident self-tests must not expect a Z=0 continuation
+- [Fault trace delivery blocking](fault-trace-delivery-blocking.md) — fault packets await indefinitely for IDE trace acceptance before local reporting, so HTTPS outages surface as missing faults
