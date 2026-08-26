@@ -57,6 +57,8 @@ check('shows Boot.NS in the picker data',
     result.some(entry => entry.slot === 0 && entry.label === 'Boot.NS' && entry.disabled));
 check('shows Boot.Thread in the picker data',
     result.some(entry => entry.slot === 1 && entry.label === 'Boot.Thread' && entry.disabled));
+check('leaves slot 2 enabled',
+    result.some(entry => entry.slot === 6 && !entry.disabled));
 check('leaves non-bootstrap slots enabled in the picker',
     result.some(entry => entry.slot === 10 && !entry.disabled));
 check('finds a live user slot above stale nsCount',

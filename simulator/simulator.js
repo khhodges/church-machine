@@ -156,6 +156,7 @@ const BOOT_NS_SLOT_THREAD = 1;   // Thread entry LUMP (TCB / boot Thread)
 
 class ChurchSimulator {
     #builtinNamespaceWriteDepth = 0;
+    #namespaceSaveWriteDepth = 0;
 
     #withBuiltinNamespaceWrite(reason, callback) {
         this.#builtinNamespaceWriteDepth++;
@@ -1540,6 +1541,14 @@ class ChurchSimulator {
         return BOOT_NAMED_SLOTS.length;
     }
 
+    // Explicit Save-to-Namespace replacement may target any existing slot
+    // except the two bootstrap entries. New-entry allocation still starts at
+    // firstUserNsSlot(), so this wider range only applies to an intentional
+    // replacement selected by the programmer.
+    saveNamespaceStartSlot() {
+        return 2;
+    }
+
     _nsSequenceForWrite(idx) {
         const remembered = this._nsFreeSequences && this._nsFreeSequences[idx];
         if (Number.isInteger(remembered)) return remembered & 0x1FF;
@@ -1559,6 +1568,18 @@ class ChurchSimulator {
             return callback();
         } finally {
             this._allowAutoWrite = previous;
+        }
+    }
+
+    withNamespaceSave(reason, callback) {
+        if (typeof callback !== 'function') {
+            throw new TypeError('withNamespaceSave requires a callback');
+        }
+        this.#namespaceSaveWriteDepth++;
+        try {
+            return this.withNamespaceWrite(reason, callback);
+        } finally {
+            this.#namespaceSaveWriteDepth--;
         }
     }
 
@@ -1589,7 +1610,8 @@ class ChurchSimulator {
             throw new RangeError(`writeNSEntry: slot must be an integer 0–${this.MAX_NS_ENTRIES - 1}`);
         }
         if (this.bootComplete && idx < this.firstUserNsSlot() &&
-            this.#builtinNamespaceWriteDepth === 0) {
+            this.#builtinNamespaceWriteDepth === 0 &&
+            this.#namespaceSaveWriteDepth === 0) {
             throw new RangeError(
                 `writeNSEntry: built-in slot ${idx} is immutable after boot`);
         }
@@ -9127,12 +9149,16 @@ class ChurchSimulator {
     saveToNamespaceAt(idx, label, words, perms, gtType, caps) {
         perms = perms || {R:0,W:0,X:1,L:0,S:0,E:0};
         gtType = (gtType !== undefined && gtType !== null) ? gtType : 1;
-        if (!Number.isInteger(idx) || idx < this.firstUserNsSlot() || idx >= this.MAX_NS_ENTRIES) {
+        if (!Number.isInteger(idx) || idx < this.saveNamespaceStartSlot() || idx >= this.MAX_NS_ENTRIES) {
             throw new RangeError(
-                `saveToNamespaceAt: explicit slot must be between ${this.firstUserNsSlot()} and ${this.MAX_NS_ENTRIES - 1}`
+                `saveToNamespaceAt: explicit slot must be between ${this.saveNamespaceStartSlot()} and ${this.MAX_NS_ENTRIES - 1}`
             );
         }
-        const loc = idx * this.SLOT_SIZE;
+        // Replacements retain the existing LUMP's physical location. This is
+        // essential for preallocated system/catalog slots; only a genuinely
+        // absent slot falls back to the ordinary slot-derived address.
+        const existingEntry = this.readNSEntry(idx);
+        const loc = existingEntry ? existingEntry.word0_location : idx * this.SLOT_SIZE;
         const codeLen = words.length;
         // cc comes from the capabilities block declared in the source (e.g. `capabilities { LED0 RW }`).
         // Callers pass lastAssembledCapabilities; default 0 if absent.
@@ -9140,6 +9166,11 @@ class ChurchSimulator {
         // Lump must be a power-of-2 block >= 64 words that fits header + code + c-list.
         let lumpSize = 64;
         while (lumpSize < 1 + codeLen + cc) lumpSize <<= 1;
+        if (!Number.isInteger(loc) || loc < 0 || loc + lumpSize > this.memory.length) {
+            throw new RangeError(
+                `saveToNamespaceAt: slot ${idx} is not backed by writable LUMP storage`
+            );
+        }
         const n_minus_6 = Math.max(0, Math.ceil(Math.log2(lumpSize)) - 6);
         // NS entry limit17 = index of last valid code/data word = lumpSize - cc - 1.
         const lim17 = Math.min(lumpSize - cc - 1, 0x1FFFF);
@@ -9152,7 +9183,7 @@ class ChurchSimulator {
         // See saveToNamespace(): type is argument 6 and a new local save is
         // A fresh slot starts at generation 0; a cleared/reused slot consumes its
         // retained next generation. Never shift the type into the gt_seq field.
-        this.withNamespaceWrite('Save to Namespace', () => {
+        this.withNamespaceSave('Save to Namespace', () => {
             this.writeNSEntry(
                 idx, loc, lim17, 0, 0, gtType,
                 this._nsSequenceForWrite(idx), cc, 0);

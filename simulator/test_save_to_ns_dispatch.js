@@ -24,6 +24,7 @@
 //   T005 — 3-method LUMP: each method dispatches to the correct sentinel
 //   T006 — Bare legacy entries (pre-fix) resolve to the WRONG word (regression guard)
 //   T008 — same-name saves replace the selected user slot, not factory slot 6
+//   T009 — an explicitly selected lower catalog slot can be replaced in place
 
 const ChurchSimulator = require('./simulator.js');
 
@@ -110,6 +111,25 @@ console.log('\n--- T008: same-name release saves replace selected user slot only
         firstToken && secondToken && firstToken !== secondToken);
     check('T008f: factory SelfTest slot remains unchanged',
         factoryBefore.every((word, index) => word === factoryAfter[index]));
+}
+
+// ── T009: explicit lower-slot replacement ───────────────────────────────────
+console.log('\n--- T009: explicit lower-slot replacement ---');
+{
+    const sim = new ChurchSimulator();
+    sim.bootComplete = true;
+    const targetSlot = 6;
+    const previous = sim.readNSEntry(targetSlot);
+    const replacement = [0x1800D006];
+    sim.saveToNamespaceAt(targetSlot, 'SelfTest Release', replacement, null, 1, []);
+    const saved = sim.readNSEntry(targetSlot);
+
+    check('T009a: selected lower slot remains present',
+        saved && saved.word0_location === previous.word0_location);
+    check('T009b: lower-slot replacement retains its existing location',
+        saved && previous && saved.word0_location === previous.word0_location);
+    check('T009c: lower-slot replacement writes the new binary body',
+        saved && sim.memory[saved.word0_location + 1] === replacement[0]);
 }
 
 // ── T001: saveToNamespace writes BRANCH-encoded entries to memory ──────────────

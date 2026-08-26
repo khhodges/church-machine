@@ -13894,10 +13894,21 @@ function confirmSaveToNamespace() {
         }
     } else {
         idx = parseInt(slotSel.value, 10);
-        const _firstUserSlot = sim.firstUserNsSlot();
-        const _maxUserSlot = sim.MAX_NS_ENTRIES - 1;
-        if (!Number.isInteger(idx) || idx < _firstUserSlot || idx > _maxUserSlot) {
-            const _slotError = `Save blocked: choose a user Namespace slot between ${_firstUserSlot} and ${_maxUserSlot}, or select New Entry.`;
+        const _firstSaveSlot = typeof sim.saveNamespaceStartSlot === 'function'
+            ? sim.saveNamespaceStartSlot() : 2;
+        const _maxSaveSlot = sim.MAX_NS_ENTRIES - 1;
+        const _selectedOption = slotSel.options[slotSel.selectedIndex];
+        if (_selectedOption && _selectedOption.disabled) {
+            const _slotError = 'Save blocked: Boot.NS (slot 0) and Boot.Thread (slot 1) cannot be replaced.';
+            if (typeof _showFpgaToast === 'function') {
+                _showFpgaToast('Save to Namespace Blocked', _slotError, 'error', 7000);
+            } else {
+                alert(_slotError);
+            }
+            return;
+        }
+        if (!Number.isInteger(idx) || idx < _firstSaveSlot || idx > _maxSaveSlot) {
+            const _slotError = `Save blocked: choose a Namespace slot between ${_firstSaveSlot} and ${_maxSaveSlot}, or select New Entry.`;
             if (typeof _showFpgaToast === 'function') {
                 _showFpgaToast('Save to Namespace Blocked', _slotError, 'error', 7000);
             } else {

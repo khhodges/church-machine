@@ -105,27 +105,28 @@ const indexSrc    = fs.readFileSync(path.join(__dirname, 'index.html'),   'utf8'
         appLumpsSrc.includes('pending.binary = _candidate.binary'));
 }
 
-// ── T2c: Save-to-NS never exposes fixed Resident slots ────────────────────────
+// ── T2c: Save-to-NS lists every known slot; bootstrap slots are disabled ───────
 {
-    const showSaveIdx = appRunSrc.indexOf('function showSaveToNamespace()');
-    check('T2c showSaveToNamespace found', showSaveIdx !== -1);
-    if (showSaveIdx !== -1) {
-        const showSaveBody = appRunSrc.slice(showSaveIdx, appRunSrc.indexOf('function onSlotChange()', showSaveIdx));
-        check('T2c1 save slot enumeration starts at firstUserNsSlot()',
-            showSaveBody.includes('const _firstUserSaveSlot = sim.firstUserNsSlot()') &&
-            showSaveBody.includes('i = _firstUserSaveSlot'));
+    const collectIdx = appRunSrc.indexOf('function _collectSaveNamespaceSlotCandidates(');
+    check('T2c save slot collector found', collectIdx !== -1);
+    if (collectIdx !== -1) {
+        const collectBody = appRunSrc.slice(collectIdx, appRunSrc.indexOf('function _currentSaveNamespaceLumpName()', collectIdx));
+        check('T2c1 collector enumerates from slot 0 and disables only bootstrap slots',
+            collectBody.includes('for (let slot = 0; slot < maxSlots; slot++)') &&
+            collectBody.includes('disabled: slot === 0 || slot === 1'));
     }
 }
 
-// ── T2d: stale/programmatic fixed-slot selections are blocked client-side ────
+// ── T2d: explicit replacement starts at slot 2; bootstrap selections block ────
 {
     const confirmIdx = appRunSrc.indexOf('function confirmSaveToNamespace()');
     check('T2d confirmSaveToNamespace found', confirmIdx !== -1);
     if (confirmIdx !== -1) {
         const confirmBody = appRunSrc.slice(confirmIdx, appRunSrc.indexOf('function ', confirmIdx + 10));
-        check('T2d1 confirm validates the first user slot before explicit save',
-            confirmBody.includes('const _firstUserSlot = sim.firstUserNsSlot()') &&
-            confirmBody.includes('Save blocked: choose a user Namespace slot'));
+        check('T2d1 confirm validates the explicit replacement slot range',
+            confirmBody.includes('sim.saveNamespaceStartSlot()') &&
+            confirmBody.includes('Boot.NS (slot 0) and Boot.Thread (slot 1) cannot be replaced.') &&
+            confirmBody.includes('Save blocked: choose a Namespace slot'));
         check('T2d2 explicit save exceptions are surfaced instead of escaping',
             confirmBody.includes("console.error('[SaveNS] save failed:', err)") &&
             confirmBody.includes("Save to Namespace Failed"));

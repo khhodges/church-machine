@@ -2843,8 +2843,8 @@ def boot_config_slot_label():
     data = request.get_json(silent=True) or {}
     slot = data.get("slot")
     label = str(data.get("label", "") or "").strip()
-    if not isinstance(slot, int) or slot < 11 or slot >= 256:
-        return jsonify({"ok": False, "error": "slot must be an integer 11–255"}), 400
+    if not isinstance(slot, int) or slot < 2 or slot >= 256:
+        return jsonify({"ok": False, "error": "slot must be an integer 2–255"}), 400
     if not label:
         return jsonify({"ok": False, "error": "label must be a non-empty string"}), 400
     cfg = {}
