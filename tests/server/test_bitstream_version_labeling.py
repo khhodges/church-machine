@@ -143,6 +143,21 @@ def test_tampered_bit_ignores_sidecar(client, tmp_path):
     assert "_v" not in cd
 
 
+def test_tampered_bit_ignores_modern_sha256_sidecar(client, tmp_path):
+    """A modern sidecar must verify both its legacy and release digests."""
+    _upload(client, version=7, content=b"ORIGINAL CONTENT")
+    sidecar_path = tmp_path / (BIT_NAME + ".meta.json")
+    sidecar = json.loads(sidecar_path.read_text())
+    sidecar["md5"] = __import__("hashlib").md5(b"REPLACED CONTENT").hexdigest()
+    sidecar_path.write_text(json.dumps(sidecar))
+    _write_bit(tmp_path, content=b"REPLACED CONTENT")
+
+    with patch.object(app_module, "_wukong_build_version", return_value=7):
+        status = client.get("/api/bitstream-status").get_json()
+    assert status["firmware_version"] is None
+    assert status["version_known"] is False
+
+
 # ---------------------------------------------------------------------------
 # Upload without version → sidecar records null version; upload with a bad
 # version string → 400
@@ -298,6 +313,31 @@ def test_versions_api_exposes_pending_main_workstream_release(client, tmp_path):
     assert release["artifact"]["version"] == 14
     assert release["baseline_known"] is False
     assert release["reason"]
+
+
+def test_versions_api_accepts_matching_verified_provenance(client, tmp_path):
+    """The release check must use the provenance key for the actual .bit file."""
+    commit = "a" * 40
+    bit_path = _write_bit(tmp_path, content=b"VERIFIED WUKONG BUILD")
+    meta = app_module._write_bitstream_sidecar(
+        bit_path, version=17, source_commit=commit
+    )
+    provenance = {
+        "schema_version": 1,
+        "source_commit": commit,
+        "source_tree_clean": True,
+        "release_status": "verified",
+        "artifacts": {BIT_NAME: {"sha256": meta["sha256"]}},
+    }
+    (tmp_path / "church_wukong_xc7a100t.provenance.json").write_text(
+        json.dumps(provenance)
+    )
+    with patch.object(app_module, "_wukong_build_version", return_value=17), \
+            patch.object(app_module, "_git_full_head", return_value=commit):
+        release = client.get("/api/bitstream-versions").get_json()["release"]
+
+    assert release["pending"] is False
+    assert release["artifact"]["provenance_verified"] is True
 
 
 def test_versions_view_renders_release_candidate_and_build_action():

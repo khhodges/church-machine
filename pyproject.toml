@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.11"
 dependencies = [
-    "amaranth>=0.5.8",
+    "amaranth==0.5.9",
     "bleach>=6.3.0",
     "flask>=3.1.2",
     "flask-dance>=7.1.0",

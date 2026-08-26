@@ -1,4 +1,4 @@
-# CM-HARDWARE-SOURCES-SHA256: 221a02697771dc2c1abc5dfb47a25ce2459b18fd6305898f855a7f466df1b7df
+# CM-HARDWARE-SOURCES-SHA256: 344eb5f417504eeb0f7bc13bc825de4929cd98b229c694182020eaddbc9592c7
 attribute \generator "Amaranth"
 attribute \src "/home/runner/workspace/hardware/wukong_top.py:269"
 attribute \top 1
@@ -2992,7 +2992,7 @@ module \top
     parameter \WIDTH 8
     connect \S $18 [0]
     connect \A $20 [7:0]
-    connect \B 8'00010000
+    connect \B 8'00010001
     connect \Y $21
   end
 

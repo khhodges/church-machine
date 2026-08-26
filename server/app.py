@@ -416,8 +416,10 @@ def _read_bitstream_meta(bit_path):
     """Return trustworthy sidecar metadata for bit_path, or None.
 
     Returns None when the sidecar is missing, unparseable, or its recorded
-    md5 no longer matches the file on disk (i.e. the .bit was replaced
-    without updating the sidecar — metadata cannot be trusted).
+    digest no longer matches the file on disk (i.e. the .bit was replaced
+    without updating the sidecar — metadata cannot be trusted). Legacy
+    MD5-only sidecars remain readable for download labeling, but a sidecar that
+    supplies SHA-256 must also verify it before that stronger identity is used.
     """
     import hashlib
     sc = _bitstream_sidecar_path(bit_path)
@@ -427,10 +429,15 @@ def _read_bitstream_meta(bit_path):
         if not isinstance(meta, dict) or not meta.get("md5"):
             return None
         md5 = hashlib.md5()
+        sha256 = hashlib.sha256()
         with open(bit_path, "rb") as f:
             for chunk in iter(lambda: f.read(1 << 20), b""):
                 md5.update(chunk)
+                sha256.update(chunk)
         if md5.hexdigest() != meta["md5"]:
+            return None
+        expected_sha256 = meta.get("sha256")
+        if expected_sha256 and sha256.hexdigest() != expected_sha256:
             return None
         return meta
     except Exception:
@@ -542,7 +549,7 @@ def _wukong_bitstream_release_status():
         provenance and provenance.get("source_commit") == head and
         provenance.get("source_tree_clean") is True and
         provenance.get("release_status") == "verified" and
-        provenance.get("artifacts", {}).get("church_wukong_xc7a100t", {})
+        provenance.get("artifacts", {}).get("church_wukong_xc7a100t.bit", {})
         .get("sha256") == _sha256_file(bit_path)
         if os.path.isfile(bit_path) else False
     )

@@ -17,3 +17,4 @@ PyJWT>=2.13.0
 urllib3>=2.7.0,<3
 fpdf
 pyserial
+amaranth==0.5.9
